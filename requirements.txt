@@ -1,0 +1,6 @@
+sqlalchemy
+pyrogram
+python-dotenv
+psycopg2-binary
+tgcrypto
+alembic
