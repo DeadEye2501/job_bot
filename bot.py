@@ -174,9 +174,10 @@ class JobBot:
             return
     
     async def _get_hr_username(self, text):
-        match = re.search(r'@([a-zA-Z0-9_]{5,32})', text)
-        if match:
-            return match.group(1)
+        matches = re.findall(r'@([a-zA-Z0-9_]{5,32})', text)
+        for username in matches:
+            if username.lower() not in [u.lower() for u in USERNAME_IGNORE_LIST]:
+                return username
         return None
     
     async def _apply_vacancy(self, vacancy):
