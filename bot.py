@@ -42,6 +42,55 @@ class JobBot:
         self.client = self._setup_client()
         self._setup_handlers()
 
+    def _sanitize_filename(self, name):
+        invalid = '<>:"/\\|?*\n\r\t'
+        result = ''.join('_' if ch in invalid else ch for ch in name).strip()
+        result = result[:120].rstrip('.')
+        return result or 'vacancy'
+
+    def _truncate_to_word(self, text, limit):
+        if len(text) <= limit:
+            return text
+        cut = text[:limit]
+        space_idx = cut.rfind(' ')
+        if space_idx == -1:
+            return cut.strip()
+        return cut[:space_idx].strip()
+
+    def _save_vacancy_markdown(self, vacancy):
+        files_dir = Path('files')
+        files_dir.mkdir(parents=True, exist_ok=True)
+        title = vacancy.title
+        body = vacancy.text.strip()
+        created = datetime.now().date().isoformat()
+        desc_source = next((p for p in body.split('\n\n') if p.strip()), body)
+        desc_flat = desc_source.replace('\n', ' ').strip()
+        desc = self._truncate_to_word(desc_flat, 100)
+        filename_base = self._sanitize_filename(title)
+        filename = files_dir / f"{filename_base}.md"
+        counter = 1
+        while filename.exists():
+            filename = files_dir / f"{filename_base} ({counter}).md"
+            counter += 1
+        content = (
+            "---\n"
+            "tags:\n"
+            "  - Vacancy\n"
+            f"desc: {desc}\n"
+            f"created: {created}\n"
+            "links:\n"
+            "  - \"[[Вакансии]]\"\n"
+            "---\n"
+            f"### {title}\n\n"
+            f"{body}"
+        )
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(content)
+            logger.info(f"Saved vacancy markdown: {filename}")
+        except Exception as e:
+            logger.warning(f"Failed to save vacancy markdown: {e}")
+
     def _setup_statistics(self):
         with session_scope() as session:
             statistic = session.query(Statistic).first()
@@ -113,6 +162,7 @@ class JobBot:
                     logger.info(f"Vacancy \n{message_text}\nIs not valid (score: {score})")
                     return
                 vacancy = await self._save_vacancy(message_text, chat.id, score, session)
+                self._save_vacancy_markdown(vacancy)
                 await self._apply_vacancy(vacancy)
                 logger.info(f"Vacancy {vacancy.title} (id: {vacancy.id}) is applied (score: {score})")
                 return
