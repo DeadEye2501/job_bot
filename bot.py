@@ -22,6 +22,12 @@ USERNAME_IGNORE_LIST = [
     "freeIT_job",
 ]
 
+IGNORED_PATTERNS = [
+    'ci/cd',
+    'c++',
+    'c#',
+]
+
 
 class JobBot:
     def __init__(self):
@@ -29,7 +35,7 @@ class JobBot:
         self.api_hash = os.getenv("API_HASH")
         self.phone_number = os.getenv("PHONE_NUMBER")
         self.password = os.getenv("PASSWORD")
-        self.threshold = int(os.getenv("THRESHOLD", "10"))
+        self.threshold = int(os.getenv("THRESHOLD", "5"))
         self.host_username = os.getenv("HOST_USERNAME")
         self.send_delay = int(os.getenv("SEND_DELAY", "300"))
         self.statistics_id = self._setup_statistics()
@@ -84,7 +90,7 @@ class JobBot:
                         await self._notify_host(notification)
                         logger.info(f"Forwarded message from HR @{hr.username} to host")
                     return
-            elif message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+            elif message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
                 chat = session.query(Chat).filter(
                     Chat.telegram_id == message.chat.id
                 ).first()
@@ -113,18 +119,27 @@ class JobBot:
 
     async def _validate_vacancy(self, text, session):
         filters = session.query(Filter).filter(Filter.is_active == True).all()
-        normalized_text = re.sub(r'[^\w\s]', ' ', text.lower())
-        words = set(re.findall(r'\b\w+\b', normalized_text))
+        text_lower = text.lower()
+        for i, pattern in enumerate(IGNORED_PATTERNS):
+            text_lower = text_lower.replace(pattern, f'__EXC{i}__')
+        normalized_text = re.sub(r'[^\w\s]', ' ', text_lower)
+        normalized_text = re.sub(r'\s+', ' ', normalized_text).strip()
+        for i, pattern in enumerate(IGNORED_PATTERNS):
+            normalized_text = normalized_text.replace(f'__EXC{i}__', pattern)
         total_weight = 0
         found_filters = set()
         for filter_text in filters:
             if filter_text.id in found_filters:
                 continue
-            normalized_filter = re.sub(r'[^\w\s]', ' ', filter_text.text.lower()).strip()
-            filter_words = set(re.findall(r'\b\w+\b', normalized_filter))
-            if filter_words and filter_words.issubset(words):
-                total_weight += filter_text.weight
-                found_filters.add(filter_text.id)
+            variants = [v.strip() for v in filter_text.text.split(', ')]
+            found = False
+            for variant in variants:
+                if found:
+                    break
+                if variant in normalized_text:
+                    total_weight += filter_text.weight
+                    found_filters.add(filter_text.id)
+                    found = True
         return total_weight if total_weight >= self.threshold else -1
 
     async def _save_vacancy(self, text, chat_id, score, session):
