@@ -1,5 +1,6 @@
 import os
 import logging
+import sys
 from contextlib import contextmanager
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
@@ -19,7 +20,6 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-
 @contextmanager
 def session_scope():
     session = SessionLocal()
@@ -32,12 +32,17 @@ def session_scope():
     finally:
         session.close()
 
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('bot.log'),
+        logging.FileHandler('bot.log', encoding='utf-8'),
         logging.StreamHandler()
     ]
 )

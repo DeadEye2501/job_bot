@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from pyrogram import Client
-from pyrogram.enums import ChatType
+from pyrogram.enums import ChatType, ParseMode
 from pyrogram.handlers import MessageHandler
 from config import get_logger, session_scope
 from models import Chat, Filter, Vacancy, HR, Answer, Statistic
@@ -35,7 +35,7 @@ class JobBot:
         self.api_hash = os.getenv("API_HASH")
         self.phone_number = os.getenv("PHONE_NUMBER")
         self.password = os.getenv("PASSWORD")
-        self.threshold = int(os.getenv("THRESHOLD", "5"))
+        self.threshold = int(os.getenv("THRESHOLD", "0"))
         self.host_username = os.getenv("HOST_USERNAME")
         self.send_delay = int(os.getenv("SEND_DELAY", "300"))
         self.statistics_id = self._setup_statistics()
@@ -86,7 +86,7 @@ class JobBot:
                         if vacancy:
                             notification += f"\n\n**Контакт HR:** [{hr.username}]({hr_link})"
                             notification += f"\n**Вакансия:** {vacancy.title} ({vacancy.score} баллов)"
-                            notification += f"\n\n```\n{vacancy.text}\n```"
+                            notification += f"\n```\n{vacancy.text}\n```"
                         await self._notify_host(notification)
                         logger.info(f"Forwarded message from HR @{hr.username} to host")
                     return
@@ -105,16 +105,19 @@ class JobBot:
                     logger.info(f"Added new chat to database: {chat.title} (id: {chat.telegram_id})")
                     return
                 if not chat.is_active:
+                    logger.info(f"Chat {chat.title} (id: {chat.telegram_id}) is not active")
                     return
                 message_text = message.text or message.caption or ""
                 score = await self._validate_vacancy(message_text, session)
-                if score == -1:
+                if score < self.threshold:
+                    logger.info(f"Vacancy \n{message_text}\nIs not valid (score: {score})")
                     return
                 vacancy = await self._save_vacancy(message_text, chat.id, score, session)
                 await self._apply_vacancy(vacancy)
+                logger.info(f"Vacancy {vacancy.title} (id: {vacancy.id}) is applied (score: {score})")
                 return
             else:
-                logger.info(f"Unknown chat type: {message.chat.type}")
+                logger.info(f"Unknown chat type: {message.chat.type} (id: {message.chat.id})")
                 return
 
     async def _validate_vacancy(self, text, session):
@@ -140,7 +143,7 @@ class JobBot:
                     total_weight += filter_text.weight
                     found_filters.add(filter_text.id)
                     found = True
-        return total_weight if total_weight >= self.threshold else -1
+        return total_weight
 
     async def _save_vacancy(self, text, chat_id, score, session):
         hr = await self._get_hr(text, session)
@@ -200,7 +203,7 @@ class JobBot:
         if not vacancy.hr:
             notification = f"**Интересная вакансия без контакта HR**"
             notification += f"\n**Вакансия:** {vacancy.title} ({vacancy.score} баллов)"
-            notification += f"\n\n```\n{vacancy.text}\n```"
+            notification += f"\n```\n{vacancy.text}\n```"
             await self._notify_host(notification)
             self._update_statistics(applied_to_host=1)
             logger.info(f"Notified host about vacancy: {vacancy.id} - {vacancy.title}")
@@ -231,7 +234,7 @@ class JobBot:
 
     async def _notify_host(self, text):
         user = await self.client.get_users(self.host_username)
-        await self.client.send_message(user.id, text, parse_mode="md")
+        await self.client.send_message(user.id, text, parse_mode=ParseMode.MARKDOWN)
     
     def _get_resume_path(self):
         files_dir = Path("files")
