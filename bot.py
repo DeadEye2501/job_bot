@@ -57,27 +57,40 @@ class JobBot:
             return cut.strip()
         return cut[:space_idx].strip()
 
+    def _extract_title(self, text):
+        first_line = (text or '').split('\n')[0][:255]
+        cleaned = re.sub(r'[^\w\s\-\.,:/()+]', '', first_line)
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip().rstrip(' :;-')
+        def repl(m):
+            return f"{m.group(1)}{m.group(2).upper()}"
+        titled = re.sub(r'(^|[\s\-/():+\.,])([A-Za-zА-Яа-яЁё])', repl, cleaned)
+        return titled or 'Vacancy'
+
     def _save_vacancy_markdown(self, vacancy):
-        files_dir = Path('files')
+        custom_path = os.getenv("VACANCY_FILE_PATH")
+        files_dir = Path(custom_path) if custom_path else Path('files')
         files_dir.mkdir(parents=True, exist_ok=True)
         title = vacancy.title
-        title_cap = ' '.join(word.capitalize() for word in title.split())
         body = vacancy.text.strip()
         created = datetime.now().date().isoformat()
         desc_source = next((p for p in body.split('\n\n') if p.strip()), body)
         desc_flat = desc_source.replace('\n', ' ').strip()
         desc = self._truncate_to_word(desc_flat, 100)
-        filename_base = self._sanitize_filename(title_cap)
+        filename_base = self._sanitize_filename(title)
         filename = files_dir / f"{filename_base}.md"
         counter = 1
         while filename.exists():
             filename = files_dir / f"{filename_base} ({counter}).md"
             counter += 1
+        contact = f"https://t.me/{vacancy.hr.username}" if (vacancy.hr and vacancy.hr.username) else ""
         content = (
             "---\n"
             "tags:\n"
             "  - Vacancy\n"
             f"desc: {desc}\n"
+            f"score: {vacancy.score}\n"
+            f"contact: {contact}\n"
+            f"status: Applied\n"
             f"created: {created}\n"
             "links:\n"
             "  - \"[[Вакансии]]\"\n"
@@ -90,7 +103,7 @@ class JobBot:
                 f.write(content)
             logger.info(f"Saved vacancy markdown: {filename}")
         except Exception as e:
-            logger.warning(f"Failed to save vacancy markdown: {e}")
+            logger.warning(f"Failed to save vacancy markdown for '{title}': {e}")
 
     def _setup_statistics(self):
         with session_scope() as session:
@@ -191,7 +204,8 @@ class JobBot:
         message_text = message.text or message.caption or ""
         score = await self._validate_vacancy(message_text, session)
         if score < self.threshold:
-            logger.info(f"Vacancy \n{message_text}\nIs not valid (score: {score})")
+            title = self._extract_title(message_text) if message_text else "Unknown"
+            logger.info(f"Vacancy '{title}' is not valid (score: {score})")
             return
         vacancy = await self._save_vacancy(message_text, chat.id, score, session)
         self._save_vacancy_markdown(vacancy)
@@ -226,7 +240,7 @@ class JobBot:
 
     async def _save_vacancy(self, text, chat_id, score, session):
         hr = await self._get_hr(text, session)
-        title = text.split('\n')[0][:255].rstrip(' :;-')
+        title = self._extract_title(text)
         vacancy = Vacancy(
             title=title,
             text=text,
@@ -280,10 +294,11 @@ class JobBot:
     async def _apply_vacancy(self, vacancy):
         logger.info(f"Applying vacancy: {vacancy.id} - {vacancy.title}")
         if not vacancy.hr:
-            notification = f"**Интересная вакансия без контакта HR**"
-            notification += f"\n**Вакансия:** {vacancy.title} ({vacancy.score} баллов)"
-            notification += f"\n```\n{vacancy.text}\n```"
-            await self._notify_host(notification)
+            if not os.getenv("NOTIFY_HOST"):
+                notification = f"**Интересная вакансия без контакта HR**"
+                notification += f"\n**Вакансия:** {vacancy.title} ({vacancy.score} баллов)"
+                notification += f"\n```\n{vacancy.text}\n```"
+                await self._notify_host(notification)
             self._update_statistics(applied_to_host=1)
             logger.info(f"Notified host about vacancy: {vacancy.id} - {vacancy.title}")
         else:
