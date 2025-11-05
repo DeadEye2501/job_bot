@@ -66,7 +66,7 @@ class JobBot:
         titled = re.sub(r'(^|[\s\-/():+\.,])([A-Za-zА-Яа-яЁё])', repl, cleaned)
         return titled or 'Vacancy'
 
-    def _save_vacancy_markdown(self, vacancy):
+    def _save_vacancy_markdown(self, vacancy, status='Applied'):
         custom_path = os.getenv("VACANCY_FILE_PATH")
         files_dir = Path(custom_path) if custom_path else Path('files')
         files_dir.mkdir(parents=True, exist_ok=True)
@@ -90,7 +90,7 @@ class JobBot:
             f"desc: {desc}\n"
             f"score: {vacancy.score}\n"
             f"contact: {contact}\n"
-            f"status: Applied\n"
+            f"status: {status}\n"
             f"created: {created}\n"
             "links:\n"
             "  - \"[[Вакансии]]\"\n"
@@ -208,7 +208,8 @@ class JobBot:
             logger.info(f"Vacancy '{title}' is not valid (score: {score})")
             return
         vacancy = await self._save_vacancy(message_text, chat.id, score, session)
-        self._save_vacancy_markdown(vacancy)
+        status = 'Applied' if vacancy.hr else 'New'
+        self._save_vacancy_markdown(vacancy, status)
         await self._apply_vacancy(vacancy)
         logger.info(f"Vacancy {vacancy.title} (id: {vacancy.id}) is applied (score: {score})")
         return
