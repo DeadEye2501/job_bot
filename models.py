@@ -60,6 +60,17 @@ class Vacancy(Base):
     chat = relationship('Chat', backref='vacancies')
 
 
+class Message(Base):
+    __tablename__ = 'messages'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    chat_id = Column(Integer, ForeignKey('chats.id'), nullable=False)
+    telegram_id = Column(BigInteger, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+    chat = relationship('Chat', backref='messages')
+
+
 class Statistic(Base):
     __tablename__ = 'statistics'
 

@@ -5,11 +5,11 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
-from pyrogram import Client
+from pyrogram import Client, filters
 from pyrogram.enums import ChatType, ParseMode
 from pyrogram.handlers import MessageHandler
 from config import get_logger, session_scope
-from models import Chat, Filter, Vacancy, HR, Answer, Statistic
+from models import Chat, Filter, Vacancy, HR, Answer, Statistic, Message
 
 load_dotenv()
 
@@ -61,12 +61,13 @@ class JobBot:
         files_dir = Path('files')
         files_dir.mkdir(parents=True, exist_ok=True)
         title = vacancy.title
+        title_cap = ' '.join(word.capitalize() for word in title.split())
         body = vacancy.text.strip()
         created = datetime.now().date().isoformat()
         desc_source = next((p for p in body.split('\n\n') if p.strip()), body)
         desc_flat = desc_source.replace('\n', ' ').strip()
         desc = self._truncate_to_word(desc_flat, 100)
-        filename_base = self._sanitize_filename(title)
+        filename_base = self._sanitize_filename(title_cap)
         filename = files_dir / f"{filename_base}.md"
         counter = 1
         while filename.exists():
@@ -113,62 +114,90 @@ class JobBot:
         )
     
     def _setup_handlers(self):
-        self.client.add_handler(MessageHandler(self._handle_message))
+        self.client.add_handler(MessageHandler(self._handle_message, filters=ChatType.PRIVATE))
 
     async def _handle_message(self, client, message):
+        logger.info(f"Handling message: {message.text}")
         with session_scope() as session:
-            if message.chat.type == ChatType.PRIVATE:
-                hr = session.query(HR).filter(
-                    HR.telegram_id == message.from_user.id
-                ).first()
-                if hr:
-                    vacancy = session.query(Vacancy).filter(
-                        Vacancy.hr_id == hr.id
-                    ).order_by(Vacancy.created_at.desc()).first()
-                    if vacancy and not vacancy.replied_at:
-                        vacancy.replied_at = datetime.now()
-                        session.commit()
-                        self._update_statistics(replied_vacancies=1)
-                        message_text = message.text or message.caption or ""
-                        hr_link = f"https://t.me/{hr.username}" if hr.username else "no username"
-                        notification = f"Ответ от HR @{hr.username}:\n\n{message_text}"
-                        if vacancy:
-                            notification += f"\n\n**Контакт HR:** [{hr.username}]({hr_link})"
-                            notification += f"\n**Вакансия:** {vacancy.title} ({vacancy.score} баллов)"
-                            notification += f"\n```\n{vacancy.text}\n```"
-                        await self._notify_host(notification)
-                        logger.info(f"Forwarded message from HR @{hr.username} to host")
-                    return
-            elif message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
-                chat = session.query(Chat).filter(
-                    Chat.telegram_id == message.chat.id
-                ).first()
-                if not chat:
-                    chat = Chat(
-                        telegram_id=message.chat.id,
-                        title=message.chat.title or "Unknown",
-                        is_active=False
-                    )
-                    session.add(chat)
+            hr = session.query(HR).filter(
+                HR.telegram_id == message.from_user.id
+            ).first()
+            if hr:
+                vacancy = session.query(Vacancy).filter(
+                    Vacancy.hr_id == hr.id
+                ).order_by(Vacancy.created_at.desc()).first()
+                if vacancy and not vacancy.replied_at:
+                    vacancy.replied_at = datetime.now()
                     session.commit()
-                    logger.info(f"Added new chat to database: {chat.title} (id: {chat.telegram_id})")
-                    return
-                if not chat.is_active:
-                    logger.info(f"Chat {chat.title} (id: {chat.telegram_id}) is not active")
-                    return
-                message_text = message.text or message.caption or ""
-                score = await self._validate_vacancy(message_text, session)
-                if score < self.threshold:
-                    logger.info(f"Vacancy \n{message_text}\nIs not valid (score: {score})")
-                    return
-                vacancy = await self._save_vacancy(message_text, chat.id, score, session)
-                self._save_vacancy_markdown(vacancy)
-                await self._apply_vacancy(vacancy)
-                logger.info(f"Vacancy {vacancy.title} (id: {vacancy.id}) is applied (score: {score})")
+                    self._update_statistics(replied_vacancies=1)
+                    message_text = message.text or message.caption or ""
+                    hr_link = f"https://t.me/{hr.username}" if hr.username else "no username"
+                    notification = f"Ответ от HR @{hr.username}:\n\n{message_text}"
+                    if vacancy:
+                        notification += f"\n\n**Контакт HR:** [{hr.username}]({hr_link})"
+                        notification += f"\n**Вакансия:** {vacancy.title} ({vacancy.score} баллов)"
+                        notification += f"\n```\n{vacancy.text}\n```"
+                    await self._notify_host(notification)
+                    logger.info(f"Forwarded message from HR @{hr.username} to host")
                 return
-            else:
-                logger.info(f"Unknown chat type: {message.chat.type} (id: {message.chat.id})")
-                return
+
+    async def _poll_channels(self):
+        while True:
+            try:
+                await self._check_channels()
+                await asyncio.sleep(10)
+            except Exception as e:
+                logger.error(f"Error polling channels: {e}", exc_info=True)
+                await asyncio.sleep(10)
+
+    async def _check_channels(self):
+        with session_scope() as session:
+            async for dialog in self.client.get_dialogs():
+                if dialog.chat.type == ChatType.CHANNEL:
+                    chat = session.query(Chat).filter(
+                        Chat.telegram_id == dialog.chat.id
+                    ).first()
+                    if not chat:
+                        chat = Chat(
+                            telegram_id=dialog.chat.id,
+                            title=dialog.chat.title or "Unknown",
+                            is_active=False
+                        )
+                        session.add(chat)
+                        session.commit()
+                        logger.info(f"Added new chat to database: {chat.title} (id: {chat.telegram_id})")
+                    elif chat.is_active:
+                        await self._get_last_chat_messages(chat, session)
+
+    async def _get_last_chat_messages(self, chat, session):
+        try:
+            async for message in self.client.get_chat_history(chat.telegram_id, limit=10):
+                existing_message = session.query(Message).filter(
+                    Message.telegram_id == message.id,
+                    Message.chat_id == chat.id
+                ).first()
+                if not existing_message:
+                    new_message = Message(
+                        telegram_id=message.id,
+                        chat_id=chat.id
+                    )
+                    session.add(new_message)
+                    session.commit()
+                    await self._handle_chat_message(message, chat, session)
+        except Exception as e:
+            logger.warning(f"Failed to get last messages for {chat.telegram_id}: {e}")
+
+    async def _handle_chat_message(self, message, chat, session):
+        message_text = message.text or message.caption or ""
+        score = await self._validate_vacancy(message_text, session)
+        if score < self.threshold:
+            logger.info(f"Vacancy \n{message_text}\nIs not valid (score: {score})")
+            return
+        vacancy = await self._save_vacancy(message_text, chat.id, score, session)
+        self._save_vacancy_markdown(vacancy)
+        await self._apply_vacancy(vacancy)
+        logger.info(f"Vacancy {vacancy.title} (id: {vacancy.id}) is applied (score: {score})")
+        return
 
     async def _validate_vacancy(self, text, session):
         filters = session.query(Filter).filter(Filter.is_active == True).all()
@@ -311,6 +340,7 @@ class JobBot:
 
     async def start(self):
         await self.client.start()
+        asyncio.create_task(self._poll_channels())
 
     async def stop(self):
         await self.client.stop()
