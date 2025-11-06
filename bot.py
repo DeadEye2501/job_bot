@@ -87,10 +87,10 @@ class JobBot:
             "---\n"
             "tags:\n"
             "  - Vacancy\n"
-            f"desc: {desc}\n"
+            f"desc: {desc}.\n"
             f"score: {vacancy.score}\n"
-            f"contact: {contact}\n"
-            f"status: {status}\n"
+            f"contact: {contact}.\n"
+            f"status: {status}.\n"
             f"created: {created}\n"
             "links:\n"
             "  - \"[[Вакансии]]\"\n"
@@ -158,10 +158,10 @@ class JobBot:
         while True:
             try:
                 await self._check_channels()
-                await asyncio.sleep(10)
+                await asyncio.sleep(120)
             except Exception as e:
                 logger.error(f"Error polling channels: {e}", exc_info=True)
-                await asyncio.sleep(10)
+                await asyncio.sleep(120)
 
     async def _check_channels(self):
         with session_scope() as session:
