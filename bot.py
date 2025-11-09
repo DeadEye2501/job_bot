@@ -76,6 +76,8 @@ class JobBot:
         desc_source = next((p for p in body.split('\n\n') if p.strip()), body)
         desc_flat = desc_source.replace('\n', ' ').strip()
         desc = self._truncate_to_word(desc_flat, 100)
+        if desc:
+            desc = desc[0].upper() + desc[1:].lower() + "."
         filename_base = self._sanitize_filename(title)
         filename = files_dir / f"{filename_base}.md"
         counter = 1
@@ -87,7 +89,7 @@ class JobBot:
             "---\n"
             "tags:\n"
             "  - Vacancy\n"
-            f"desc: {desc}.\n"
+            f"desc: {desc}\n"
             f"score: {vacancy.score}\n"
             f"contact: {contact}\n"
             f"status: {status}\n"
@@ -132,6 +134,9 @@ class JobBot:
     async def _handle_message(self, client, message):
         logger.info(f"Handling message: {message.text}")
         with session_scope() as session:
+            if not message.from_user:
+                logger.info(f"Message from non-user: {message.text}")
+                return
             hr = session.query(HR).filter(
                 HR.telegram_id == message.from_user.id
             ).first()
@@ -164,6 +169,7 @@ class JobBot:
                 await asyncio.sleep(120)
 
     async def _check_channels(self):
+        logger.info("Checking channels...")
         with session_scope() as session:
             async for dialog in self.client.get_dialogs():
                 if dialog.chat.type == ChatType.CHANNEL:
