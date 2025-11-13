@@ -6,10 +6,22 @@ from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from pyrogram import Client, filters
-from pyrogram.enums import ChatType, ParseMode
+from pyrogram.enums import ChatType, ParseMode, MessageEntityType
 from pyrogram.handlers import MessageHandler
 from config import get_logger, session_scope
 from models import Chat, Filter, Vacancy, HR, Answer, Statistic, Message
+
+EMOJI_PATTERN = re.compile(
+    "["
+    "\U0001F600-\U0001F64F"
+    "\U0001F300-\U0001F5FF"
+    "\U0001F680-\U0001F6FF"
+    "\U0001F1E0-\U0001F1FF"
+    "\U00002702-\U000027B0"
+    "\U000024C2-\U0001F251"
+    "]+",
+    flags=re.UNICODE,
+)
 
 load_dotenv()
 
@@ -59,12 +71,16 @@ class JobBot:
 
     def _extract_title(self, text):
         first_line = (text or '').split('\n')[0][:255]
-        cleaned = re.sub(r'[^\w\s\-\.,:/()+]', '', first_line)
-        cleaned = re.sub(r'\s+', ' ', cleaned).strip().rstrip(' :;-')
-        def repl(m):
-            return f"{m.group(1)}{m.group(2).upper()}"
-        titled = re.sub(r'(^|[\s\-/():+\.,])([A-Za-zА-Яа-яЁё])', repl, cleaned)
+        first_line = self._remove_emojis(first_line)
+        cleaned = re.sub(r'[^0-9A-Za-zА-Яа-яЁё\s\+\-]', ' ', first_line)
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        titled = cleaned.title()
         return titled or 'Vacancy'
+
+    def _remove_emojis(self, text):
+        if not text:
+            return text
+        return EMOJI_PATTERN.sub('', text)
 
     def _save_vacancy_markdown(self, vacancy, status='Applied'):
         custom_path = os.getenv("VACANCY_FILE_PATH")
@@ -74,7 +90,8 @@ class JobBot:
         body = vacancy.text.strip()
         created = datetime.now().date().isoformat()
         desc_source = next((p for p in body.split('\n\n') if p.strip()), body)
-        desc_flat = desc_source.replace('\n', ' ').strip()
+        desc_source_clean = self._remove_emojis(desc_source)
+        desc_flat = desc_source_clean.replace('\n', ' ').strip()
         desc = self._truncate_to_word(desc_flat, 100)
         if desc:
             desc = desc[0].upper() + desc[1:].lower() + "."
@@ -131,6 +148,26 @@ class JobBot:
     def _setup_handlers(self):
         self.client.add_handler(MessageHandler(self._handle_message, filters=ChatType.PRIVATE))
 
+    def _get_message_text(self, message):
+        base_text = message.text or message.caption or ""
+        entities = message.entities if message.text else message.caption_entities
+        if not entities:
+            return base_text
+        result = []
+        last_offset = 0
+        for entity in sorted(entities, key=lambda e: e.offset):
+            start = entity.offset
+            end = start + entity.length
+            result.append(base_text[last_offset:start])
+            entity_text = base_text[start:end]
+            if entity.type == MessageEntityType.TEXT_LINK and entity.url:
+                result.append(f"[{entity_text}]({entity.url})")
+            else:
+                result.append(entity_text)
+            last_offset = end
+        result.append(base_text[last_offset:])
+        return "".join(result)
+
     async def _handle_message(self, client, message):
         logger.info(f"Handling message: {message.text}")
         with session_scope() as session:
@@ -148,7 +185,7 @@ class JobBot:
                     vacancy.replied_at = datetime.now()
                     session.commit()
                     self._update_statistics(replied_vacancies=1)
-                    message_text = message.text or message.caption or ""
+                    message_text = self._get_message_text(message)
                     hr_link = f"https://t.me/{hr.username}" if hr.username else "no username"
                     notification = f"Ответ от HR @{hr.username}:\n\n{message_text}"
                     if vacancy:
@@ -172,7 +209,7 @@ class JobBot:
         logger.info("Checking channels...")
         with session_scope() as session:
             async for dialog in self.client.get_dialogs():
-                if dialog.chat.type == ChatType.CHANNEL:
+                if dialog.chat.type in [ChatType.CHANNEL, ChatType.SUPERGROUP, ChatType.GROUP]:
                     chat = session.query(Chat).filter(
                         Chat.telegram_id == dialog.chat.id
                     ).first()
@@ -207,7 +244,7 @@ class JobBot:
             logger.warning(f"Failed to get last messages for {chat.telegram_id}: {e}")
 
     async def _handle_chat_message(self, message, chat, session):
-        message_text = message.text or message.caption or ""
+        message_text = self._get_message_text(message)
         score = await self._validate_vacancy(message_text, session)
         if score < self.threshold:
             title = self._extract_title(message_text) if message_text else "Unknown"
