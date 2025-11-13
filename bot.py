@@ -92,9 +92,11 @@ class JobBot:
         desc_source = next((p for p in body.split('\n\n') if p.strip()), body)
         desc_source_clean = self._remove_emojis(desc_source)
         desc_flat = desc_source_clean.replace('\n', ' ').strip()
-        desc = self._truncate_to_word(desc_flat, 100)
+        desc = self._truncate_to_word(desc_flat, 100).strip()
         if desc:
-            desc = desc[0].upper() + desc[1:].lower() + "."
+            desc = desc[0].upper() + desc[1:].lower()
+            if not desc.endswith('.'):
+                desc += "."
         filename_base = self._sanitize_filename(title)
         filename = files_dir / f"{filename_base}.md"
         counter = 1
@@ -250,11 +252,17 @@ class JobBot:
             title = self._extract_title(message_text) if message_text else "Unknown"
             logger.info(f"Vacancy '{title}' is not valid (score: {score})")
             return
-        vacancy = await self._save_vacancy(message_text, chat.id, score, session)
-        status = 'Applied' if vacancy.hr else 'New'
-        self._save_vacancy_markdown(vacancy, status)
-        await self._apply_vacancy(vacancy)
-        logger.info(f"Vacancy {vacancy.title} (id: {vacancy.id}) is applied (score: {score})")
+        duplicate = session.query(Vacancy).filter(
+            Vacancy.text == message_text
+        ).first()
+        if duplicate:
+            logger.info(f"Duplicate vacancy skipped: {duplicate.title} (id: {duplicate.id})")
+        else:
+            vacancy = await self._save_vacancy(message_text, chat.id, score, session)
+            status = 'Applied' if vacancy.hr else 'New'
+            self._save_vacancy_markdown(vacancy, status)
+            await self._apply_vacancy(vacancy)
+            logger.info(f"Vacancy {vacancy.title} (id: {vacancy.id}) is applied (score: {score})")
         return
 
     async def _validate_vacancy(self, text, session):
