@@ -404,7 +404,10 @@ async def classify_hr_reply(
 ) -> Classification | None:
     if not text:
         return None
-    text = text[:4000]
+    # Truncate с конца, не с начала: «most recent signal wins». В burst'е
+    # из 1000 коротких сообщений первые 4000 chars содержат старые ack'и,
+    # а реальный вердикт («давайте на интервью» / «не подходите») в конце.
+    text = text[-4000:]
     logger.debug("classify_hr_reply: %d chars", len(text))
     try:
         r = await client.post(

@@ -75,7 +75,12 @@ async def process_dm(
         return
     sender_id = msg.from_user.id
     sender_username = msg.from_user.username
+    # ``text`` идёт в БД (в чат-ленту) с reply-quote prefix'ом «↪…».
+    # ``classify_text`` идёт в LLM-классификатор — без quote'а, чтобы
+    # классификатор не оценивал как реплику HR то, что мы сами же
+    # цитируем (cover-letter intro, бывшая реплика HR'а и т.п.).
     text = extract_dm_text(msg)
+    classify_text = extract_text(msg)
     logger.debug(
         "DM received: sender_id=%s username=%s len=%d",
         sender_id,
@@ -165,12 +170,13 @@ async def process_dm(
 
     # С debounce-планировщиком (production-путь) — сообщение в буфере,
     # классификация отложена. Без планировщика (тесты / fallback) —
-    # классифицируем inline как раньше.
+    # классифицируем inline как раньше. В обоих случаях идёт
+    # ``classify_text`` (без reply-quote prefix'а), не ``text``.
     if schedule_classification is not None:
-        schedule_classification(hr.id, vacancy_id, new_msg_id, text)
+        schedule_classification(hr.id, vacancy_id, new_msg_id, classify_text)
         return
 
-    classification = await classify_hr_reply(text, lm_client, lm_chat_model)
+    classification = await classify_hr_reply(classify_text, lm_client, lm_chat_model)
     if classification is None:
         logger.info(
             "vacancy %s: classifier returned None, skipping status update",
@@ -439,6 +445,13 @@ class IngestionPipeline:
         # сообщения в burst'е.
         self._dm_classify_buffer: dict[int, list[dict]] = {}
         self._dm_classify_tasks: dict[int, asyncio.Task] = {}
+        # Семафор на одновременные LLM-классификации. Catch-up на OFF→active
+        # transition'е может разом разбудить debounce'ры по всем HR'ам, что
+        # на локальной LM Studio превращается в 30 параллельных httpx.post
+        # к одному серверу — она ставит их в очередь, начинает таймаутить и
+        # часть вердиктов теряется. 2 одновременных вызова — компромисс
+        # между throughput'ом и не-OOM'нуть LM Studio.
+        self._dm_classify_semaphore = asyncio.Semaphore(2)
 
         # Shutdown-флаг. Bot.run finally выставляет его в True ДО
         # client.stop() / lm_*.aclose() — после этого schedule_dm_class*
@@ -451,7 +464,35 @@ class IngestionPipeline:
         """Bot.run finally: с этого момента DM-handler ничего не делает."""
         self._shutting_down = True
 
+    def update_dm_buffer_text(self, hr_id: int, msg_id: int, new_text: str) -> None:
+        """HR отредактировал сообщение пока оно сидит в debounce-буфере —
+        обновим текст, чтобы LLM-классификатор видел свежее содержимое."""
+        buf = self._dm_classify_buffer.get(hr_id)
+        if not buf:
+            return
+        for item in buf:
+            if item["msg_id"] == msg_id:
+                item["text"] = new_text or ""
+                break
+
+    def remove_dm_buffer_msg(self, hr_id: int, msg_id: int) -> None:
+        """HR удалил сообщение пока оно сидит в debounce-буфере — выкинем
+        его из burst'а, чтобы не учитывать в классификации."""
+        buf = self._dm_classify_buffer.get(hr_id)
+        if not buf:
+            return
+        self._dm_classify_buffer[hr_id] = [
+            item for item in buf if item["msg_id"] != msg_id
+        ]
+        if not self._dm_classify_buffer[hr_id]:
+            self._dm_classify_buffer.pop(hr_id, None)
+
     DM_CLASSIFY_DEBOUNCE_SEC = 60.0
+    # Cap buffer'а на одного HR — защита от спама. 50 сообщений в одном
+    # debounce-окне (60с) уже точно ненормально; накопление тысяч строк
+    # раздувает память и rам прибавляет ничего полезного — LLM всё равно
+    # отрежет хвост в classify_hr_reply.
+    DM_CLASSIFY_BUFFER_CAP = 50
 
     def schedule_dm_classification(
         self,
@@ -473,6 +514,18 @@ class IngestionPipeline:
             return
         buf = self._dm_classify_buffer.setdefault(hr_id, [])
         buf.append({"vacancy_id": vacancy_id, "msg_id": msg_id, "text": text})
+        # Cap: спам / зацикленный HR не должен раздувать память.
+        # Drop oldest, оставляя последние DM_CLASSIFY_BUFFER_CAP штук —
+        # «свежий сигнал» важнее «полной истории», тем более что
+        # classify_hr_reply всё равно режет последние 4000 chars.
+        if len(buf) > self.DM_CLASSIFY_BUFFER_CAP:
+            dropped = len(buf) - self.DM_CLASSIFY_BUFFER_CAP
+            del buf[: dropped]
+            logger.warning(
+                "schedule_dm_classification: hr %d burst > %d msgs, "
+                "dropping oldest %d",
+                hr_id, self.DM_CLASSIFY_BUFFER_CAP, dropped,
+            )
         prev = self._dm_classify_tasks.get(hr_id)
         if prev is not None and not prev.done():
             prev.cancel()
@@ -485,14 +538,40 @@ class IngestionPipeline:
             await asyncio.sleep(self.DM_CLASSIFY_DEBOUNCE_SEC)
         except asyncio.CancelledError:
             return  # перепланировано более свежим сообщением — выходим тихо
-        buf = self._dm_classify_buffer.pop(hr_id, [])
-        # Identity-check: между sleep'ом и сюда мог прилететь новый
-        # schedule_dm_classification, который положил в _dm_classify_tasks
-        # уже ДРУГОЙ task. Снимать его из dict нельзя — иначе он останется
-        # без strong-reference и asyncio может его собрать GC'м до выполнения.
+        # Identity-check ДО pop'а буфера: если за время sleep'а прилетело
+        # новое schedule_dm_classification, оно cancel'нуло нас и положило
+        # в _dm_classify_tasks свой task. Если мы pop'нем буфер, новый
+        # task получит пусто и тоже выйдет тихо — burst пропадёт. Сначала
+        # удостоверимся, что мы всё ещё «owner» этого hr_id.
         current = asyncio.current_task()
-        if self._dm_classify_tasks.get(hr_id) is current:
-            self._dm_classify_tasks.pop(hr_id, None)
+        if self._dm_classify_tasks.get(hr_id) is not current:
+            return  # superseded — буфер не трогаем, пусть новый task его драйнит
+        self._dm_classify_tasks.pop(hr_id, None)
+        # Защита от race shutdown'а: между sleep'ом и сюда могли вызвать
+        # mark_shutting_down + cancel_pending. Если флаг — выходим без
+        # LLM-вызова и БД-записи (sessions/clients уже закрываются).
+        if self._shutting_down:
+            return
+        # Re-check blacklist: HR мог попасть туда между process_dm-time
+        # (когда мы пропустили входящее в фильтре) и фактическим debounce-
+        # тиком. process_dm уже не пишет такие сообщения в буфер, но если
+        # blacklist взвели за время burst'а — текущий накопленный пакет
+        # тоже надо отбросить, не классифицируя.
+        async with self._session_factory() as session:
+            from backend.repository import _hr_blacklist_value
+            from backend.models import HR
+            hr_row = await session.get(HR, hr_id)
+            bl_value = (
+                await _hr_blacklist_value(session, hr_row) if hr_row else None
+            )
+        if bl_value:
+            logger.info(
+                "debounced classify: hr %d in blacklist (%s) — drop burst",
+                hr_id, bl_value,
+            )
+            self._dm_classify_buffer.pop(hr_id, None)
+            return
+        buf = self._dm_classify_buffer.pop(hr_id, [])
         if not buf:
             return
         # Склеиваем тексты с двойным переносом — чтобы LLM видела границы
@@ -503,9 +582,10 @@ class IngestionPipeline:
         vacancy_id = last["vacancy_id"]
         msg_id = last["msg_id"]
         try:
-            classification = await classify_hr_reply(
-                text, self._lm_client, self._lm_chat_model
-            )
+            async with self._dm_classify_semaphore:
+                classification = await classify_hr_reply(
+                    text, self._lm_client, self._lm_chat_model
+                )
         except Exception:
             logger.exception(
                 "debounced classify failed for hr %d (%d msgs)",

@@ -1062,7 +1062,7 @@ class Bot:
         if not msg.chat:
             return
         from sqlalchemy import update as _sa_update
-        from backend.helpers import extract_dm_text
+        from backend.helpers import extract_dm_text, extract_text
         from backend.repository import find_known_hr
 
         chat_id = msg.chat.id
@@ -1085,6 +1085,11 @@ class Bot:
             await session.commit()
             updated = res.rowcount or 0
             hr_id = hr.id
+        # Если это сообщение всё ещё сидит в debounce-буфере (HR отредак-
+        # тировал в первые 60 сек) — обновим текст там тоже, чтобы
+        # классификатор видел свежее содержимое.
+        if updated and is_incoming:
+            self._ingestion.update_dm_buffer_text(hr_id, msg.id, extract_text(msg))
         if updated:
             logger.debug(
                 "DM edit synced: hr=%d tg_msg=%d incoming=%s",
@@ -1170,6 +1175,10 @@ class Bot:
                 await session.commit()
                 if rowcount:
                     touched_hr_ids.add(hr.id)
+                    # Если удалённое сообщение всё ещё сидит в debounce-буфере
+                    # — выкинем его оттуда, чтобы не учитывать в классификации.
+                    for tg_msg_id in msg_ids:
+                        self._ingestion.remove_dm_buffer_msg(hr.id, tg_msg_id)
 
         if chatless_ids:
             async with self._session_factory() as session:
