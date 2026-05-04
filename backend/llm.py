@@ -838,6 +838,18 @@ reason: для fit можно null или короткая фраза; для re
 Ответ: {"verdict": "fit", "reason": null}
 Пояснение (НЕ возвращай его в JSON, это для тебя): «Code Review», «Scrum meetings», «стейкхолдеры» — стандартные IT-термины, в тексте нет ЯВНОГО упоминания иностранного языка (ни названия языка, ни уровня CEFR, ни формулировки «<язык>-speaking team», ни «interviews in <язык>») — reject по языку НЕЛЬЗЯ.
 
+Пример F4 (fit — ENGLISH-LANGUAGE post, кандидат знает Английский B2, ЯВНОГО уровня в тексте нет):
+LANGUAGE_REQUIREMENTS: Русский — native, Английский — B2.
+Поля: title='Backend Engineer', stack=['Python','PostgreSQL'], remote='remote', location=null. Текст: "Backend Engineer. We're a fully remote product team. You'll work on our payments service in Python and PostgreSQL. We're looking for engineers with 3+ years of backend experience."
+Ответ: {"verdict": "fit", "reason": null}
+Пояснение (для тебя): пост написан по-английски, но НИГДЕ в тексте не сказано «native English», «C1+», «fluent English required», «English-speaking team only», «interviews in English» — это просто английский пост, не требование уровня. B2 у кандидата достаточно для письменной переписки и стандартных созвонов, reject ставить НЕЛЬЗЯ.
+
+Пример F5 (fit — RU-пост «удалёнка», БЕЗ гео-ограничения; кандидат вне РФ):
+CANDIDATE_LOCATION: Армения/Ереван. ACCEPTED_FORMATS: удалёнка.
+Поля: title='Python разработчик', stack=['Python','FastAPI'], remote='remote', location=null. Текст: "Python разработчик в продуктовую команду. Удалёнка, гибкий график. Стек: Python, FastAPI, PostgreSQL. От 3 лет опыта."
+Ответ: {"verdict": "fit", "reason": null}
+Пояснение (для тебя): «удалёнка» без «удалёнка из РФ» / «только из России» / «remote in Russia» / «time zone MSK» / «российский ИП» — это remote без гео-ограничения, reject по локации НЕЛЬЗЯ.
+
 Пример G (trash — реклама курса):
 Поля: title=null, stack=[], remote=null, location=null. Текст: "🔥 Курс по дизайну с трудоустройством за 4 месяца, скидка 50%, регистрация по ссылке..."
 Ответ: {"verdict": "trash", "reason": "Это реклама курса с трудоустройством, а не вакансия."}

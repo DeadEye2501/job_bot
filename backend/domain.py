@@ -258,13 +258,16 @@ _SALARY_NEGOTIABLE_RE = re.compile(r"собесед|договор|обсужд|
 
 def normalize_salary_to_rub_thousands(
     salary: str | None,
+    *,
+    usd_rate: int | None = None,
+    eur_rate: int | None = None,
 ) -> tuple[int | None, int | None]:
     """Parse a free-form salary string into (min, max) in thousands of RUB.
 
     The parser is intentionally lossy — it only needs to be good enough to
-    drive the range filter in the vacancy list. Currency conversion uses
-    static rates (USD≈90, EUR≈100); update if the real rate diverges enough
-    to bucket vacancies into the wrong filter slot.
+    drive the range filter in the vacancy list. Currency rates можно
+    передать (per RuntimeSettings.salary_usd_to_rub / _eur_to_rub); если
+    не переданы — используются дефолты модуля (90 / 100).
 
     Returns ``(None, None)`` when no number can be extracted (NULL salary,
     "—", "по итогам собеседования", etc.). When only one number is found,
@@ -281,10 +284,12 @@ def normalize_salary_to_rub_thousands(
         # вместо ложного «30 тыс ₽».
         return (None, None)
 
+    usd_rate = usd_rate if usd_rate and usd_rate > 0 else _SALARY_USD_TO_RUB
+    eur_rate = eur_rate if eur_rate and eur_rate > 0 else _SALARY_EUR_TO_RUB
     if _SALARY_USD_RE.search(s):
-        currency_mult = _SALARY_USD_TO_RUB
+        currency_mult = usd_rate
     elif _SALARY_EUR_RE.search(s):
-        currency_mult = _SALARY_EUR_TO_RUB
+        currency_mult = eur_rate
     else:
         currency_mult = 1
 

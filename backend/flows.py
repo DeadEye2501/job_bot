@@ -1214,7 +1214,11 @@ class IngestionPipeline:
                 v.grade = parsed.grade
                 v.salary = parsed.salary
                 v.salary_rub_min, v.salary_rub_max = (
-                    normalize_salary_to_rub_thousands(parsed.salary)
+                    normalize_salary_to_rub_thousands(
+                        parsed.salary,
+                        usd_rate=self._rs.salary_usd_to_rub,
+                        eur_rate=self._rs.salary_eur_to_rub,
+                    )
                 )
                 v.remote = parsed.remote
                 v.location = parsed.location
@@ -1494,7 +1498,11 @@ class IngestionPipeline:
                     v.grade = parsed.grade
                     v.salary = parsed.salary
                     v.salary_rub_min, v.salary_rub_max = (
-                        normalize_salary_to_rub_thousands(parsed.salary)
+                        normalize_salary_to_rub_thousands(
+                        parsed.salary,
+                        usd_rate=self._rs.salary_usd_to_rub,
+                        eur_rate=self._rs.salary_eur_to_rub,
+                    )
                     )
                     v.remote = parsed.remote
                     v.location = parsed.location

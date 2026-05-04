@@ -120,6 +120,12 @@ _APP_DEFAULTS: dict[str, str] = {
     # При False parse-pipeline всё равно отрабатывает — статус NEW,
     # ручная отправка из UI через «Отправить отклик» работает.
     "auto_apply": "true",
+    # FX-rates для перевода salary в RUB при range-фильтрации. Раньше
+    # были hardcoded 90/100 в backend/domain.py — устаревали без
+    # возможности крутить. Юзер обновляет вручную через DBeaver когда
+    # курс реально дрейфует за пределы своего bucket'а.
+    "salary_usd_to_rub": "90",
+    "salary_eur_to_rub": "100",
 }
 
 
@@ -231,6 +237,22 @@ class RuntimeSettings:
         отключена (parse-pipeline отрабатывает, ручная отправка через
         UI работает)."""
         return self._app_value("auto_apply").lower() == "true"
+
+    @property
+    def salary_usd_to_rub(self) -> int:
+        try:
+            v = int(self._app_value("salary_usd_to_rub"))
+        except ValueError:
+            return 90
+        return v if v > 0 else 90
+
+    @property
+    def salary_eur_to_rub(self) -> int:
+        try:
+            v = int(self._app_value("salary_eur_to_rub"))
+        except ValueError:
+            return 100
+        return v if v > 0 else 100
 
     def _app_value(self, key: str) -> str:
         # Treat NULL / empty / whitespace-only values in the DB as "not
