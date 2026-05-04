@@ -242,14 +242,50 @@ async def catch_up_missed_dms(
     logger.info("DM catch-up: %d HR(s)", len(chats))
     new_msgs_total = 0
     tombstoned_total = 0
+    from pyrogram.errors import FloodWait, PeerIdInvalid
     for hr, _last_seen in chats:
         try:
             target = hr.telegram_user_id or hr.telegram_username
             if target is None:
                 continue
             messages = []
-            async for msg in client.get_chat_history(target, limit=backfill_limit):
-                messages.append(msg)
+            try:
+                async for msg in client.get_chat_history(target, limit=backfill_limit):
+                    messages.append(msg)
+            except PeerIdInvalid:
+                # Pyrogram peer-cache не знает этого id (HR добавлен по
+                # @username без предыдущего DM, либо session сброшен).
+                # Пробуем resolve по username, если есть; иначе skip.
+                logger.warning(
+                    "catch_up: PeerIdInvalid для hr %d (target=%s) — пробую "
+                    "resolve по @username",
+                    hr.id, target,
+                )
+                if hr.telegram_username:
+                    try:
+                        await client.get_users(hr.telegram_username)
+                        # После get_users peer попадает в cache; повторим
+                        # get_chat_history.
+                        messages = []
+                        async for msg in client.get_chat_history(
+                            hr.telegram_username, limit=backfill_limit
+                        ):
+                            messages.append(msg)
+                    except Exception as e:
+                        logger.warning(
+                            "catch_up: resolve fallback failed для hr %d: %s",
+                            hr.id, e,
+                        )
+                        continue
+                else:
+                    continue
+            except FloodWait as e:
+                # Не падаем всем циклом — отдыхаем и идём к следующему HR.
+                logger.warning(
+                    "catch_up: FloodWait %ds на hr %d — пропускаем",
+                    getattr(e, "value", "?"), hr.id,
+                )
+                continue
             from backend.bot import _classify_media, _download_media
             had_new = False
             # Oldest-first so the chat order stays sane in the UI.
