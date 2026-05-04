@@ -1,5 +1,8 @@
 import asyncio
 import logging
+import random
+import time
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -489,6 +492,13 @@ class IngestionPipeline:
         # между throughput'ом и не-OOM'нуть LM Studio.
         self._dm_classify_semaphore = asyncio.Semaphore(2)
 
+        # Per-poll-cycle counter авто-отправок и timestamp последней. Live
+        # на time жизни IngestionPipeline; счётчик per-cycle сбрасывается
+        # на старте poll_active_channels, last_send_ts — прозрачно
+        # переживает циклы (для inter-send-delay'я).
+        self._auto_send_count_this_cycle: int = 0
+        self._last_auto_send_ts: float = 0.0
+
         # Shutdown-флаг. Bot.run finally выставляет его в True ДО
         # client.stop() / lm_*.aclose() — после этого schedule_dm_class*
         # и process_dm молча no-op'ят, чтобы Pyrogram'овский handler,
@@ -687,6 +697,11 @@ class IngestionPipeline:
 
     async def poll_active_channels(self) -> None:
         await self._reload_resources()
+        # Per-cycle cap reset. last_auto_send_ts намеренно не трогаем —
+        # пауза между auto-send'ами должна переживать границу циклов
+        # (если в конце предыдущего отправили, в начале нового сразу
+        # отправлять не надо).
+        self._auto_send_count_this_cycle = 0
         # Берём ВСЕ каналы с @username (не только active=true): metadata-
         # sweep должен подтягивать title и аватарки и для выключенных
         # каналов тоже — они всё равно показываются в UI и пользователь
@@ -1295,14 +1310,14 @@ class IngestionPipeline:
 
         # Авто-отправка отклика: вакансия прошла score-threshold + LLM-fit-
         # validator (status остался NEW), HR резолвлен в Telegram-юзера,
-        # юзер не выключил auto_apply в настройках — генерируем cover
-        # letter и отправляем с прикреплённым CV.
+        # юзер не выключил auto_apply, лимиты не превышены — генерируем
+        # cover letter и отправляем с прикреплённым CV.
         if (
             status == VacancyStatus.NEW
             and hr_for_send is not None
             and self._rs.auto_apply
         ):
-            ok, reason = await self._send_application(
+            ok, reason = await self._try_auto_send(
                 hr_for_send, parsed, vacancy_id
             )
             # Audit-event: фиксируем КАЖДУЮ попытку auto-send'а вне
@@ -1593,6 +1608,80 @@ class IngestionPipeline:
         if not raw:
             return None
         return Path(raw)
+
+    async def _try_auto_send(
+        self, hr, parsed: ParsedVacancy, vacancy_id: int
+    ) -> tuple[bool, str]:
+        """Wrapper над _send_application с проверкой rate-limit'ов: cycle
+        cap, per-day cap, FloodWait-окно, inter-send delay. Возвращает
+        тот же (ok, reason) контракт; новые reason-коды:
+        ``cycle_cap`` / ``day_cap`` / ``flood_wait``.
+        """
+        # FloodWait persist: Bot.send (через _send_application → _send)
+        # на FloodWait выписывает в app_settings момент когда можно
+        # пробовать снова. Дёргать send_dm раньше — гарантированный
+        # повторный FloodWait и накопление штрафа.
+        wait_until = self._rs.flood_wait_until_ts
+        if wait_until > 0:
+            remaining = wait_until - time.time()
+            if remaining > 0:
+                logger.warning(
+                    "vacancy %d: skipping auto-send, FloodWait еще %d сек",
+                    vacancy_id, int(remaining),
+                )
+                return False, "flood_wait"
+
+        # Cycle cap.
+        if self._auto_send_count_this_cycle >= self._rs.auto_apply_max_per_cycle:
+            logger.info(
+                "vacancy %d: skipping auto-send, cycle cap %d reached",
+                vacancy_id, self._rs.auto_apply_max_per_cycle,
+            )
+            return False, "cycle_cap"
+
+        # Per-day cap. Если дата сменилась — обнуляем счётчик.
+        today = date.today().isoformat()
+        cnt = self._rs.auto_apply_count_today
+        if self._rs.auto_apply_count_today_date != today:
+            cnt = 0
+            try:
+                await self._rs.set_app("auto_apply_count_today", "0")
+                await self._rs.set_app("auto_apply_count_today_date", today)
+            except Exception:
+                logger.exception("auto_apply day-counter reset failed")
+        if cnt >= self._rs.auto_apply_per_day_cap:
+            logger.warning(
+                "vacancy %d: skipping auto-send, day cap %d reached",
+                vacancy_id, self._rs.auto_apply_per_day_cap,
+            )
+            return False, "day_cap"
+
+        # Inter-send delay (jitter). Пропускаем для первого send'а в
+        # bot-instance'е (last_auto_send_ts == 0).
+        if self._last_auto_send_ts > 0:
+            since = time.time() - self._last_auto_send_ts
+            min_d = self._rs.auto_apply_inter_send_min_sec
+            max_d = self._rs.auto_apply_inter_send_max_sec
+            target_delay = random.uniform(min_d, max_d) if max_d > min_d else min_d
+            if since < target_delay:
+                wait = target_delay - since
+                logger.info(
+                    "vacancy %d: inter-send delay %d сек до отправки",
+                    vacancy_id, int(wait),
+                )
+                await asyncio.sleep(wait)
+
+        ok, reason = await self._send_application(hr, parsed, vacancy_id)
+        if ok:
+            self._auto_send_count_this_cycle += 1
+            self._last_auto_send_ts = time.time()
+            try:
+                await self._rs.set_app(
+                    "auto_apply_count_today", str(cnt + 1)
+                )
+            except Exception:
+                logger.exception("auto_apply day-counter increment failed")
+        return ok, reason
 
     async def _send_application(
         self,

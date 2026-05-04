@@ -736,9 +736,43 @@ class Bot:
                 "Sending DM to hr %s (vacancy=%s, %d chars)",
                 target, vacancy_id, len(text),
             )
-            tg_msg_id = await telegram.send_dm(
-                self._client, target, text, attachment
-            )
+            from pyrogram.errors import FloodWait
+            import time as _time
+            try:
+                tg_msg_id = await telegram.send_dm(
+                    self._client, target, text, attachment
+                )
+            except FloodWait as e:
+                # Persist'им «не пытайся до этого времени» в app_settings
+                # — IngestionPipeline._try_auto_send проверит и пропустит
+                # auto-send'ы пока окно не закроется. Для manual UI-send
+                # это просто возврат False — юзер увидит «Telegram отказался»
+                # toast и попробует позже.
+                secs = int(getattr(e, "value", 0) or 0)
+                until = _time.time() + secs
+                logger.warning(
+                    "Bot.send: FloodWait %d сек, persist'у flood_wait_until_ts",
+                    secs,
+                )
+                try:
+                    await self._rs.set_app(
+                        "flood_wait_until_ts", str(until)
+                    )
+                except Exception:
+                    logger.exception(
+                        "Bot.send: failed to persist flood_wait_until_ts"
+                    )
+                return False
+        # При успешной отправке очистим flood_wait_until_ts (если он
+        # был — Telegram отпустил). Не критично, но тогда _try_auto_send
+        # не будет проверять стэйл-окно после восстановления.
+        if not suppressed and self._rs.flood_wait_until_ts > 0:
+            try:
+                await self._rs.set_app("flood_wait_until_ts", "0")
+            except Exception:
+                logger.exception(
+                    "Bot.send: failed to clear flood_wait_until_ts"
+                )
         # С этого момента сообщение УШЛО к HR (или сэмулировано). Если
         # коммит ниже упадёт — сообщение в Telegram реальное, а Message-row
         # в БД нет. Чтобы повторное «Отправить отклик» НЕ отправило DM

@@ -126,6 +126,17 @@ _APP_DEFAULTS: dict[str, str] = {
     # курс реально дрейфует за пределы своего bucket'а.
     "salary_usd_to_rub": "90",
     "salary_eur_to_rub": "100",
+    # Анти-спам гарды против Telegram-ban'а аккаунта при unlock'е
+    # send_locked. Раньше Bot.send шёл без троттлинга — 30 NEW-вакансий
+    # в одном poll-цикле = 30 DM HR-ам подряд, и Telegram режет.
+    # Каждый параметр — отдельный ключ, юзер крутит через DBeaver.
+    "auto_apply_max_per_cycle": "5",      # cap на auto-send'ы за один poll
+    "auto_apply_per_day_cap": "30",        # суммарный cap за календарный день
+    "auto_apply_inter_send_min_sec": "60", # min пауза между auto-DM
+    "auto_apply_inter_send_max_sec": "180",# max пауза (jitter)
+    "auto_apply_count_today": "0",         # счётчик, авто-resets на смену даты
+    "auto_apply_count_today_date": "",     # YYYY-MM-DD когда счётчик последний раз обнулялся
+    "flood_wait_until_ts": "0",            # epoch float — Bot.send не пытается до этого момента
 }
 
 
@@ -253,6 +264,56 @@ class RuntimeSettings:
         except ValueError:
             return 100
         return v if v > 0 else 100
+
+    @property
+    def auto_apply_max_per_cycle(self) -> int:
+        try:
+            v = int(self._app_value("auto_apply_max_per_cycle"))
+        except ValueError:
+            return 5
+        return v if v > 0 else 5
+
+    @property
+    def auto_apply_per_day_cap(self) -> int:
+        try:
+            v = int(self._app_value("auto_apply_per_day_cap"))
+        except ValueError:
+            return 30
+        return v if v > 0 else 30
+
+    @property
+    def auto_apply_inter_send_min_sec(self) -> int:
+        try:
+            v = int(self._app_value("auto_apply_inter_send_min_sec"))
+        except ValueError:
+            return 60
+        return v if v >= 0 else 60
+
+    @property
+    def auto_apply_inter_send_max_sec(self) -> int:
+        try:
+            v = int(self._app_value("auto_apply_inter_send_max_sec"))
+        except ValueError:
+            return 180
+        return v if v >= self.auto_apply_inter_send_min_sec else self.auto_apply_inter_send_min_sec
+
+    @property
+    def auto_apply_count_today(self) -> int:
+        try:
+            return int(self._app_value("auto_apply_count_today"))
+        except ValueError:
+            return 0
+
+    @property
+    def auto_apply_count_today_date(self) -> str:
+        return self._app_value("auto_apply_count_today_date")
+
+    @property
+    def flood_wait_until_ts(self) -> float:
+        try:
+            return float(self._app_value("flood_wait_until_ts"))
+        except ValueError:
+            return 0.0
 
     def _app_value(self, key: str) -> str:
         # Treat NULL / empty / whitespace-only values in the DB as "not
