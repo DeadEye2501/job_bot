@@ -663,9 +663,41 @@ class Bot:
             await self._lm_client.aclose()
 
     async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> bool:
-        """Re-parse / re-classify one vacancy — vacancies detail «more» menu."""
+        """Re-parse / re-classify one vacancy — vacancies detail «more» menu.
+
+        Wraps the rerun in the same ``_current_poll_task`` slot + cycle
+        hooks как обычный poll-цикл — это даёт юзеру штатный прогресс-бар
+        и кнопку «остановить» в футере на время выполнения. Если уже
+        идёт другой цикл, сигнализируем «busy» через возврат False —
+        UI покажет toast про «не удалось перезапустить».
+        """
         logger.info("UI rerun pipeline for vacancy %d", vacancy_id)
-        return await self._ingestion.rerun_pipeline_for_vacancy(vacancy_id)
+        if self._current_poll_task is not None:
+            logger.info("ui_rerun: another cycle is already running, skipping")
+            return False
+        if self.on_cycle_start is not None:
+            try: self.on_cycle_start()
+            except Exception: logger.exception("on_cycle_start hook failed")
+        if self.on_progress is not None:
+            try: self.on_progress("rerun", f"Прогон вакансии #{vacancy_id}…", 0, 0)
+            except Exception: logger.exception("on_progress hook failed")
+        ok = False
+        try:
+            self._current_poll_task = asyncio.create_task(
+                self._ingestion.rerun_pipeline_for_vacancy(vacancy_id)
+            )
+            try:
+                ok = await self._current_poll_task
+            except asyncio.CancelledError:
+                logger.info("rerun pipeline for vacancy %d cancelled by user", vacancy_id)
+        except Exception:
+            logger.exception("rerun pipeline for vacancy %d failed", vacancy_id)
+        finally:
+            self._current_poll_task = None
+            if self.on_cycle_end is not None:
+                try: self.on_cycle_end()
+                except Exception: logger.exception("on_cycle_end hook failed")
+        return ok
 
     async def ui_send_vacancy_application(self, vacancy_id: int) -> tuple[bool, str]:
         """Manual cover-letter send — vacancy detail «more» menu, кнопка

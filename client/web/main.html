@@ -15335,11 +15335,17 @@
     if (stage === 'channel') {
       progressState.channel = { label, cur, tot };
       paintBar(chBar, chFill, cur, tot, false);
+      renderCaption();
     } else if (stage === 'message') {
       progressState.message = { label, cur, tot };
       paintBar(msgBar, msgFill, cur, tot, false);
+      renderCaption();
+    } else if (stage === 'rerun') {
+      // Single-vacancy rerun: бары держатся индетерминантными
+      // (выставлены в onIngestionStarted), мы только меняем подпись
+      // на текущую стадию («фетч поста / парсинг / валидация / …»).
+      progressCaption.textContent = label || 'Прогон вакансии…';
     }
-    renderCaption();
   }
 
   // --- Custom dropdown (.cdd) — global delegation -----------------------

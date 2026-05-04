@@ -791,22 +791,83 @@ class IngestionPipeline:
     async def rerun_pipeline_for_vacancy(self, vacancy_id: int) -> bool:
         """Re-parse + re-classify an existing vacancy. UI's "прогнать заново".
 
-        Reuses the original ``raw_text`` and source channel hint. Profile
-        skills / blacklist are reloaded so the user can edit those and
-        immediately re-evaluate vacancies under the new rules. Returns
-        False if the vacancy is missing or has no raw_text.
+        По возможности **повторно фетчим оригинальный пост из Telegram**
+        (по `source_channel_id` + `source_msg_id`) и сохраняем свежий
+        ``raw_text`` в БД до повторного парса. Это даёт «полностью
+        переобработать заново»-семантику, которую юзер ожидает: если
+        пост был отредактирован в канале, рерана увидит актуальный
+        текст; если нет — поведение идентично старому. Fallback на
+        кешированный ``v.raw_text`` срабатывает, когда канал/сообщение
+        недоступны (FloodWait, удалено, нет ни id ни username).
+        Profile skills / blacklist тоже переподгружаются,
+        чтобы юзер мог отредактировать их и сразу пере-оценить вакансии
+        под новые правила. Returns False если вакансии нет или у неё
+        пустой ``raw_text`` (и Telegram-фетч тоже ничего не дал).
         """
         async with self._session_factory() as session:
             v = await session.get(Vacancy, vacancy_id)
             if v is None:
                 logger.warning("rerun: vacancy %d missing", vacancy_id)
                 return False
-            text = v.raw_text or ""
+            cached_text = v.raw_text or ""
             channel_username = ""
+            source_msg_id = v.source_msg_id
             if v.source_channel_id is not None:
                 ch = await session.get(TelegramChannel, v.source_channel_id)
                 if ch is not None and ch.username:
                     channel_username = ch.username
+
+        from pyrogram.errors import FloodWait
+
+        fresh_text: str | None = None
+        if channel_username and source_msg_id is not None:
+            try:
+                msg = await self._client.get_messages(
+                    channel_username, message_ids=source_msg_id
+                )
+                if msg is not None and not getattr(msg, "empty", False):
+                    candidate = extract_text(msg)
+                    if candidate:
+                        fresh_text = candidate
+                    else:
+                        logger.info(
+                            "rerun: vacancy %d fetched msg @%s/%d but text is empty (media-only?), keeping cached raw_text",
+                            vacancy_id, channel_username, source_msg_id,
+                        )
+                else:
+                    logger.info(
+                        "rerun: vacancy %d msg @%s/%d not available (deleted/empty), keeping cached raw_text",
+                        vacancy_id, channel_username, source_msg_id,
+                    )
+            except FloodWait as e:
+                logger.warning(
+                    "rerun: vacancy %d FloodWait %ss while fetching @%s/%d, keeping cached raw_text",
+                    vacancy_id, e.value, channel_username, source_msg_id,
+                )
+            except Exception:
+                logger.exception(
+                    "rerun: vacancy %d failed to refetch @%s/%d, keeping cached raw_text",
+                    vacancy_id, channel_username, source_msg_id,
+                )
+
+        if fresh_text is not None and fresh_text != cached_text:
+            # Свежий raw_text коммитится отдельной транзакцией ДО парса,
+            # т.е. при сбое/cancel'е парса в БД останется новый raw_text
+            # рядом со stale parsed-полями (title/stack/score из прошлого
+            # прогона). Это самовосстанавливается на следующем rerun:
+            # парс прогонится по уже свежему тексту. Лучше иметь
+            # актуальный raw_text для будущих ретраев, чем держать
+            # старый текст и парс синхронно — у юзера всё равно нет
+            # «частично-обновлённой» семантики.
+            async with self._session_factory() as session:
+                v = await session.get(Vacancy, vacancy_id)
+                if v is not None:
+                    v.raw_text = fresh_text
+                    await session.commit()
+            text = fresh_text
+        else:
+            text = cached_text
+
         if not text:
             logger.warning("rerun: vacancy %d has empty raw_text", vacancy_id)
             return False
@@ -1277,7 +1338,6 @@ class IngestionPipeline:
 
                 v.status = status
                 v.skip_reason = skip_reason
-                v.score = score
                 # Marks the row as fully populated by the LLM pipeline —
                 # see ``Vacancy.is_parsed`` docstring. Set inside the same
                 # transaction as the parsed fields so a crash after this
@@ -1289,9 +1349,18 @@ class IngestionPipeline:
                 v.company_name = parsed.company_name
                 v.hr_contact = parsed.hr_contact
                 # Если повторный парс вернул пустой stack (LLM-регрессия —
-                # модель в этот раз не извлекла скиллы), сохраняем прежний.
-                # Иначе rerun по уже распаршенной вакансии стирает чипы.
-                v.stack = parsed.stack if parsed.stack else (v.stack or [])
+                # модель в этот раз не извлекла скиллы), сохраняем прежний
+                # stack ВМЕСТЕ со старым score. Score считается от
+                # parsed.stack_required/preferred, и при пустом stack он
+                # уходит в 0 — UI получал бы Python-чип при Score:0,
+                # рассинхрон. Держим пару (stack, score) синхронной.
+                if parsed.stack:
+                    v.stack = parsed.stack
+                    v.score = score
+                else:
+                    v.stack = v.stack or []
+                    if v.score is None:
+                        v.score = score
                 v.grade = parsed.grade
                 v.salary = parsed.salary
                 v.salary_rub_min, v.salary_rub_max = (
