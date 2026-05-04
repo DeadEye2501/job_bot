@@ -1115,6 +1115,13 @@
       showStatus(statusId, 'err', 'Укажите base_url провайдера.');
       return false;
     }
+    // URL без схемы (например, «localhost:1234») долетает до httpx как
+    // относительный path и даёт криптовый стек-трейс. Требуем явную
+    // http:// или https://.
+    if (!/^https?:\/\//i.test(cfg.base_url.trim())) {
+      showStatus(statusId, 'err', 'base_url должен начинаться с http:// или https://');
+      return false;
+    }
     if (!cfg.model) {
       showStatus(statusId, 'err', 'Укажите название модели.');
       return false;

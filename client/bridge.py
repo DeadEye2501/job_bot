@@ -339,6 +339,12 @@ class WizardApi(QObject):
             except Exception:
                 logger.exception("WizardApi: tg disconnect on cleanup failed")
             self._tg_client = None
+        # Чистим OTP-state тоже, чтобы при relaunch'е (тот же процесс,
+        # новый Wizard) не было stale phone_code_hash от предыдущей
+        # сессии. Парные creds — на случай если включена телеметрия и
+        # они куда-то утекут с repr'ом.
+        self._tg_phone_code_hash = None
+        self._tg_creds = None
 
     # --- helpers -----------------------------------------------------------
 
@@ -393,29 +399,46 @@ class WizardApi(QObject):
     async def _do_telegram_send_code(
         self, api_id: int, api_hash: str, phone: str
     ) -> str:
+        # Cleanup старого клиента: если юзер нажал «Назад → ввести
+        # другой номер», предыдущий PyrogramClient мог остаться полу-
+        # подключённым и держать сокет. Идём через _safe_disconnect
+        # вместо inline try/except — match'ит паттерн MainApi.
+        await _safe_disconnect(self._tg_client)
+        self._tg_client = None
+        self._tg_phone_code_hash = None
+        new_client: PyrogramClient | None = None
         try:
-            if self._tg_client is not None:
-                try:
-                    await self._tg_client.disconnect()
-                except Exception:
-                    pass
-            self._tg_client = PyrogramClient(
+            new_client = PyrogramClient(
                 name="job_bot_wizard",
                 api_id=api_id,
                 api_hash=api_hash,
                 phone_number=phone,
                 in_memory=True,
             )
-            await self._tg_client.connect()
-            sent = await self._tg_client.send_code(phone)
+            await new_client.connect()
+            sent = await new_client.send_code(phone)
+            # Только после успешного send_code'а биндим к self —
+            # иначе на ошибке полу-построенный клиент висит на self,
+            # а cleanup() при выходе пытается его disconnect'нуть.
+            self._tg_client = new_client
             self._tg_phone_code_hash = sent.phone_code_hash
             return _ok({"message": f"Код отправлен в Telegram на {phone}."})
         except PhoneNumberInvalid:
+            await _safe_disconnect(new_client)
             return _err("Неверный номер телефона.")
+        except FloodWait as e:
+            secs = int(getattr(e, "value", 0) or 0)
+            await _safe_disconnect(new_client)
+            return _err(
+                f"Telegram попросил подождать {_humanize_duration(secs)} "
+                "перед следующей попыткой отправить код."
+            )
         except BadRequest as e:
+            await _safe_disconnect(new_client)
             return _err(f"Telegram отклонил запрос: {e}")
         except Exception as e:
             logger.exception("telegram_send_code failed")
+            await _safe_disconnect(new_client)
             return _err(f"{type(e).__name__}: {e}")
 
     @Slot(str)
@@ -676,7 +699,15 @@ class WizardApi(QObject):
             return
 
         if mode == "parse":
-            self._dispatch(self.cv_save_done, self._do_cv_parse_and_save(path))
+            # CV parse временно отключён в wizard'е (wizard.html step 3
+            # рендерит кнопку с disabled=True + «Функция находится в
+            # разработке»). UI сюда не должен попасть, но если payload
+            # пришёл от прямого JS-вызова или от устаревшей версии HTML —
+            # отбиваем явно, не запуская PDF-парсер с известными issues
+            # из feedback_*-памяти.
+            self.cv_save_done.emit(
+                _err("CV parsing временно отключён — выберите 'attach'.")
+            )
             return
 
         self.cv_save_done.emit(_err(f"Неизвестный режим: {mode!r}"))
