@@ -166,6 +166,16 @@ async def find_latest_vacancy_id_for_hr(
     статус» только-что добавленной вакансии (time-travel). Также берутся
     только полностью распаршенные вакансии (``is_parsed=True``), чтобы
     DM в parse-window не флипнул статус ещё не готовой строки.
+
+    Clock-skew nuance: ``as_of`` приходит от Telegram (msg.date), а
+    ``Vacancy.created_at`` пишется локальным ``func.now()``. Если часы
+    клиента опаздывают относительно Telegram-серверного времени, существует
+    тонкий race с auto-send'ом, который committs и сразу шлёт DM — но в
+    single-user setup (Pyrogram-сессия привязана к ОС-времени) клиентское
+    время и Telegram-серверное обычно синкаются NTP-сервисом, окно
+    рассогласования = единицы секунд. Документировано вместо переключения
+    ``created_at`` на ``msg.date`` исходного поста (которое потребовало
+    бы тащить msg-time через 5 слоёв ingestion'а).
     """
     stmt = (
         select(Vacancy)
@@ -4083,10 +4093,16 @@ async def build_profile_block(session: AsyncSession) -> str:
         skills_by_cat.setdefault(s.category, []).append(s.name)
     skills_lines = [f"- {cat}: {', '.join(names)}" for cat, names in skills_by_cat.items()]
 
-    header_lines = [
-        f"Имя: {profile.first_name} {profile.last_name}",
-        f"Роль: {profile.title}",
-    ]
+    # Незаполненные поля (None в БД) пропускаем целиком, иначе LLM получит
+    # «Имя: None None» / «Роль: None» и попытается включить это в письмо.
+    full_name = " ".join(
+        p for p in (profile.first_name, profile.last_name) if p
+    ).strip()
+    header_lines: list[str] = []
+    if full_name:
+        header_lines.append(f"Имя: {full_name}")
+    if profile.title:
+        header_lines.append(f"Роль: {profile.title}")
     if profile.location:
         header_lines.append(f"Локация: {profile.location}")
     if experiences:
@@ -4105,7 +4121,9 @@ async def build_profile_block(session: AsyncSession) -> str:
         suffix = f": {e.achievements[0]}" if e.achievements else ""
         exp_lines.append(f"- {e.company} ({e.role}, {start} — {end}){suffix}")
 
-    sections = ["\n".join(header_lines)]
+    sections: list[str] = []
+    if header_lines:
+        sections.append("\n".join(header_lines))
     if skills_lines:
         sections.append("Стек:\n" + "\n".join(skills_lines))
     if exp_lines:

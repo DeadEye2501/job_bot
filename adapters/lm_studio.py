@@ -128,7 +128,24 @@ async def list_models(client: httpx.AsyncClient, *, kind: str | None = None) -> 
         # Fallthrough: провайдер без /api/v0 — возвращаем полный список.
     r = await client.get("/v1/models")
     r.raise_for_status()
-    return [m["id"] for m in r.json().get("data", []) if isinstance(m, dict) and m.get("id")]
+    ids = [m["id"] for m in r.json().get("data", []) if isinstance(m, dict) and m.get("id")]
+    if kind is None:
+        return ids
+    # Для не-LM-Studio провайдеров (/v1/models не отдаёт type) heuristic-
+    # фильтр по имени. Покрытие — топовые семейства embedding-моделей в
+    # Ollama / OpenAI: `bge-*` (BAAI), `e5-*` (Microsoft), `nomic-embed-*`
+    # (Nomic), `*ada*` / `text-embedding-*` (OpenAI), generic `*embed*`.
+    # Без этого фильтра embedding'и протекают в chat-picker (и наоборот),
+    # юзер выбирает не то — LLM-вызовы валятся с «not a chat model».
+    embed_markers = (
+        "embed", "ada", "text-embedding-", "bge-", "e5-", "nomic-",
+    )
+    def _looks_like_embed(name: str) -> bool:
+        n = name.lower()
+        return any(mark in n for mark in embed_markers)
+    if kind == "embed":
+        return [i for i in ids if _looks_like_embed(i)]
+    return [i for i in ids if not _looks_like_embed(i)]
 
 
 async def embed(client: httpx.AsyncClient, model: str, text: str) -> list[float]:

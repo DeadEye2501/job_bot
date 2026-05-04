@@ -374,15 +374,18 @@ def _clean_stack_items(
 def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
     raw = _extract_last_json(answer)
     if raw is None:
+        logger.debug("_parse_vacancy_json: no JSON block in LLM answer (%d chars)", len(answer))
         return None
     try:
         data = json.loads(raw)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.debug("_parse_vacancy_json: JSONDecodeError %s on %r", e, raw[:200])
         return None
 
     raw_title = data.get("title")
     title = raw_title.strip() if isinstance(raw_title, str) else ""
     if not title:
+        logger.debug("_parse_vacancy_json: empty/missing title in JSON keys=%s", list(data.keys()))
         return None
 
     # Stack is split into two lists (``stack_required`` / ``stack_preferred``).
@@ -957,6 +960,22 @@ _REASON_STYLE_VIOLATIONS: tuple[re.Pattern[str], ...] = (
     # «кандидат живёт в …», «кандидат находится в …» — пересказ локации
     re.compile(r"\bкандидат\s+живёт\b", re.IGNORECASE),
     re.compile(r"\bкандидат\s+находится\s+в\b", re.IGNORECASE),
+    # Парафразы без явного «у кандидата»: «только B1 — недостаточно»,
+    # «всего B1 мало», «B1 недостаточно для…». Anchor на CEFR + слова
+    # «недостаточно/мало/слабо», чтобы не словить легитимный reject
+    # вакансии «требуется C1, а у нас только B2 в требованиях».
+    re.compile(
+        r"\b(только|лишь|всего)\s+(A1|A2|B1|B2|C1|C2)\b[^.]*\b(недостаточно|мало|слаб)",
+        re.IGNORECASE,
+    ),
+    # Bare «B1 недостаточно» без квантификатора — агрессивно: вакансия
+    # сама может цитировать «B1 недостаточно для C1-роли». Триггерим
+    # ТОЛЬКО когда рядом «у кандидата»/«его»/«мой» — это явно сравнение
+    # с данными кандидата.
+    re.compile(
+        r"\b(у\s+кандидат\w*|его|мой)\b[^.]*\b(A1|A2|B1|B2|C1|C2)\s+недостаточно\b",
+        re.IGNORECASE,
+    ),
 
     # === EN === (для англоязычных reason'ов; иначе safety-net молча отключается)
     # «candidate has only B1», «candidate only has middle», «candidate has just A2»

@@ -566,8 +566,8 @@ class Bot:
                 # сообщения уже в БД — юзеру нужно будет переклассифицировать
                 # вручную через UI если нужно.
                 if mode is BotMode.OFF and prev_mode is not BotMode.OFF:
-                    logger.info("Transition into OFF; cancelling pending DM debouncers")
-                    await self._ingestion.cancel_pending_dm_classifications()
+                    logger.info("Transition into OFF; draining DM debouncers")
+                    await self._ingestion.cancel_pending_dm_classifications(drain=True)
                 if mode is not BotMode.OFF and prev_mode is BotMode.OFF:
                     logger.info(
                         "Transition into active mode (%s); running DM catch-up",

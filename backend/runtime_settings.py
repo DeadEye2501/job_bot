@@ -48,6 +48,41 @@ def _mask_phone(phone: str | None) -> str:
 _KEYRING_SERVICE = "JobBot"
 _KEYRING_KEY = "master_key"
 
+# Бэкенды keyring'а, которые мы отказываемся использовать: PlaintextKeyring
+# (file-based, шифрования нет — секреты лежат в `~/.local/share/python_keyring`
+# в открытом виде) и fail.Keyring (нет функционирующего бэкенда — каждый
+# вызов raise'нет, _get_or_create_master_key уйдёт в loop с генерацией
+# нового ключа на каждый encrypt/decrypt → расшифровать сохранённое
+# нельзя). Headless / minimal Linux без SecretService — типичный кейс.
+_REJECTED_KEYRING_BACKENDS = (
+    "keyrings.alt.file.PlaintextKeyring",
+    "keyring.backends.fail.Keyring",
+)
+
+
+def _check_keyring_backend() -> None:
+    """Pre-flight: log активный keyring-бэкенд, raise если небезопасный.
+
+    Идея — fail-fast на старте, до первой попытки сохранить TG/LLM creds.
+    Иначе при PlaintextKeyring secrets уходят на диск открытым текстом,
+    при fail.Keyring каждый encrypt'ает с новым ключом и старые ciphertexts
+    становятся нечитаемыми.
+    """
+    try:
+        backend = keyring.get_keyring()
+    except Exception:
+        logger.exception("keyring.get_keyring() failed — backend probe error")
+        return
+    backend_cls = f"{type(backend).__module__}.{type(backend).__name__}"
+    if backend_cls in _REJECTED_KEYRING_BACKENDS:
+        raise RuntimeError(
+            f"Insecure keyring backend: {backend_cls}. Установите системный "
+            "keyring (Windows Credential Manager / macOS Keychain / Linux "
+            "SecretService) — иначе секреты приложения нельзя надёжно "
+            "зашифровать."
+        )
+    logger.info("keyring backend: %s", backend_cls)
+
 
 def _get_or_create_master_key() -> bytes:
     existing = keyring.get_password(_KEYRING_SERVICE, _KEYRING_KEY)

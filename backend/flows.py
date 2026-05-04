@@ -598,6 +598,13 @@ class IngestionPipeline:
         # LLM-вызова и БД-записи (sessions/clients уже закрываются).
         if self._shutting_down:
             return
+        await self._classify_and_apply_for_hr(hr_id)
+
+    async def _classify_and_apply_for_hr(self, hr_id: int) -> None:
+        """Drain burst-буфера для hr_id: один LLM-вызов на накопленный
+        пакет → apply_classification. Используется и из debounce-тика,
+        и из drain-on-OFF в `cancel_pending_dm_classifications`.
+        """
         # Re-check blacklist: HR мог попасть туда между process_dm-time
         # (когда мы пропустили входящее в фильтре) и фактическим debounce-
         # тиком. process_dm уже не пишет такие сообщения в буфер, но если
@@ -666,7 +673,9 @@ class IngestionPipeline:
             except Exception:
                 logger.exception("on_vacancies_changed hook failed")
 
-    async def cancel_pending_dm_classifications(self) -> None:
+    async def cancel_pending_dm_classifications(
+        self, *, drain: bool = False
+    ) -> None:
         """Кенсельнут все висящие debounce-таймеры (бот стопается / OFF /
         shutdown). asyncio.Task.cancel() — это hint, который сработает
         только если task сидит на await. Если он уже прошёл sleep и
@@ -674,9 +683,13 @@ class IngestionPipeline:
         и task продолжит дёргать httpx-клиент / session_factory — которые
         могут уже быть закрыты в shutdown-пути. Поэтому ПОСЛЕ cancel'ов
         ждём с таймаутом, чтобы все живые task'и доработали или
-        завершились по cancel'у. Накопленный текст пропадает; сами
-        Message-row'ы остаются в БД — юзер увидит сообщения, статус
-        придётся переклассифицировать вручную.
+        завершились по cancel'у.
+
+        ``drain=True`` (OFF transition) — после cancel'ов проходим по
+        каждому непустому буферу и делаем финальную классификацию: иначе
+        burst, накопленный за debounce-окном, пропадает молча и юзер
+        получает «вакансия в Answered, но статус не двинулся». Shutdown
+        путь использует drain=False — клиенты/сессии уже закрываются.
         """
         tasks = [t for t in self._dm_classify_tasks.values() if not t.done()]
         for t in tasks:
@@ -693,6 +706,21 @@ class IngestionPipeline:
                     sum(1 for t in tasks if not t.done()),
                 )
         self._dm_classify_tasks.clear()
+        if drain and self._shutting_down:
+            logger.debug(
+                "cancel_pending_dm_classifications: drain=True ignored "
+                "because shutdown in progress"
+            )
+        if drain and not self._shutting_down:
+            # Snapshot keys — _classify_and_apply_for_hr pop'ает буфер.
+            hr_ids = [hr_id for hr_id, buf in self._dm_classify_buffer.items() if buf]
+            for hr_id in hr_ids:
+                try:
+                    await self._classify_and_apply_for_hr(hr_id)
+                except Exception:
+                    logger.exception(
+                        "drain classify on OFF failed for hr %d", hr_id,
+                    )
         self._dm_classify_buffer.clear()
 
     async def poll_active_channels(self) -> None:
@@ -1602,6 +1630,12 @@ class IngestionPipeline:
                 )
 
     async def _reload_resources(self) -> None:
+        # Кэши skills/blacklist/profile/languages/profile_block обновляются
+        # ровно один раз — в начале каждого poll-цикла. Если юзер редактирует
+        # профиль через UI между циклами, изменения подхватятся ТОЛЬКО на
+        # следующем `poll_active_changes`. Это намеренно: cache invalidation
+        # из UI-bridge'а потребует cross-thread hook'а, и польза маргинальная
+        # (юзер редко редактирует профиль во время активного полла).
         async with self._session_factory() as session:
             self._skills_cache = await load_profile_skills(session)
             self._blacklist_patterns = await load_active_blacklist_patterns(
@@ -1765,6 +1799,15 @@ class IngestionPipeline:
                 hr, cover, attachment=cv_path, vacancy_id=vacancy_id,
                 force=force,
             )
+        except FileNotFoundError:
+            # CV-файл удалён/перемещён между is_file()-чеком выше и open'ом
+            # внутри Pyrogram'а. UI должен показать «CV пропал», а не
+            # абстрактное «Telegram отказался».
+            logger.warning(
+                "vacancy %d: CV file disappeared between check and send (%s)",
+                vacancy_id, cv_path,
+            )
+            return False, "cv_missing"
         except Exception:
             logger.exception(
                 "vacancy %d: send failed",

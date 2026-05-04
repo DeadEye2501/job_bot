@@ -6,6 +6,17 @@ the @Slot methods. Results come back to JS via Qt signals.
 
 Slots return immediately; JS connects to the matching signal to receive
 the JSON result.
+
+SECURITY — cleartext secrets through QWebChannel:
+Несколько slot'ов сознательно отдают plaintext-секреты во фронт (это
+single-user app, JS живёт в embedded WebView, не по сети):
+- ``initial_state`` / ``request_system_settings`` — chat/embed api_key,
+  Telegram api_id+api_hash, расшифрованный CV-path.
+- ``request_telegram_login_state`` — phone/account-метаданные.
+Прежде чем добавлять новые slot'ы, отдающие секреты, подумайте:
+заслуживает ли поле статус «можно вернуть как есть», или его лучше
+скрыть/подменить (eye-toggle паттерн на UI). Audit-trail см. git blame
+по соответствующим slot'ам.
 """
 
 from __future__ import annotations
@@ -94,20 +105,26 @@ class AsyncRunner:
         def _quiet_pyrogram_shutdown(loop, context):
             exc = context.get("exception")
             msg = str(exc) if exc else ""
+            # WARNING (а не DEBUG): если эти исключения всплывают вне
+            # shutdown'а — это значит мы где-то закрыли DB-pool / loop
+            # рано, и тихий DEBUG это спрячет. WARNING шумит ровно один
+            # раз на teardown — приемлемо. Если ловите эти warning'и не
+            # при выходе из приложения / log_out / delete_all_data —
+            # значит появился реальный bug.
             if isinstance(exc, sqlite3.ProgrammingError) and \
                "closed database" in msg:
-                logger.debug("Pyrogram shutdown race swallowed: %s", exc)
+                logger.warning("Pyrogram shutdown race swallowed: %s", exc)
                 return
             if isinstance(exc, RuntimeError) and \
                "Event loop is closed" in msg:
-                logger.debug("Pyrogram shutdown race swallowed: %s", exc)
+                logger.warning("Pyrogram shutdown race swallowed: %s", exc)
                 return
             if isinstance(exc, AttributeError):
-                # AttributeError при teardown'е: pyrogram внутри иногда
-                # дёргает self.<attr> на уже-обнулённом объекте. Лог в
-                # debug, чтобы реальные AttributeError'ы в нашем коде не
-                # глохли — наши падают НЕ из set_exception_handler'а, а
-                # из обычного await/return.
+                # AttributeError при teardown'е остаётся DEBUG — самый шумный
+                # из трёх (pyrogram дёргает self.<attr> на уже-обнулённом
+                # объекте по нескольку раз за teardown). WARNING'и от sqlite3/
+                # RuntimeError выше — точечный сигнал «бд/loop закрыты вне
+                # shutdown'а», AttributeError диагностически слабее.
                 logger.debug("AttributeError during teardown swallowed: %s", exc)
                 return
             loop.default_exception_handler(context)
