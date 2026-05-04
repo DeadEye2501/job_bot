@@ -440,6 +440,17 @@ class IngestionPipeline:
         self._dm_classify_buffer: dict[int, list[dict]] = {}
         self._dm_classify_tasks: dict[int, asyncio.Task] = {}
 
+        # Shutdown-флаг. Bot.run finally выставляет его в True ДО
+        # client.stop() / lm_*.aclose() — после этого schedule_dm_class*
+        # и process_dm молча no-op'ят, чтобы Pyrogram'овский handler,
+        # успевший отстрелить уже после teardown'а, не насыпал в БД
+        # запись и не попытался дёрнуть закрытый httpx-клиент.
+        self._shutting_down: bool = False
+
+    def mark_shutting_down(self) -> None:
+        """Bot.run finally: с этого момента DM-handler ничего не делает."""
+        self._shutting_down = True
+
     DM_CLASSIFY_DEBOUNCE_SEC = 60.0
 
     def schedule_dm_classification(
@@ -454,6 +465,8 @@ class IngestionPipeline:
         от HR не приходило), таск ``_run_debounced_classify`` соберёт
         пакет и сделает один LLM-вызов.
         """
+        if self._shutting_down:
+            return
         if not text:
             # Медиа-only без подписи нечем классифицировать. Пропускаем
             # тихо — само сообщение уже в БД.

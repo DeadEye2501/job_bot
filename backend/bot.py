@@ -218,6 +218,11 @@ class Bot:
         # by stop().
         self._wake_event = asyncio.Event()
         self._stop_event = asyncio.Event()
+        # Capture loop в run() — нужен для thread-safe kick / cancel /
+        # request_stop из Qt-треда. Эти Event-ы и Task-и живут на
+        # runner-loop'е; .set() / .cancel() из чужого треда — undefined
+        # behavior (CPython его прощает, но контракт asyncio нарушается).
+        self._loop: asyncio.AbstractEventLoop | None = None
         # Optional UI hooks fired around each Full-mode poll cycle.
         self.on_cycle_start = None  # filled in by client.bridge.MainApi if running under the UI
         self.on_cycle_end = None    # filled in by client.bridge.MainApi if running under the UI
@@ -264,10 +269,29 @@ class Bot:
         # button can cancel it without killing the whole bot loop.
         self._current_poll_task: asyncio.Task | None = None
 
+    @property
+    def is_ready(self) -> bool:
+        """True after Bot.run() прошёл await client.start() и захватил loop.
+        До этой точки Pyrogram-клиент ещё не подключён, и любой
+        ``self._bot.<method>()`` из Qt-треда может попасть в полу-
+        инициализированное состояние. Используйте этот флаг для
+        gate-проверок (`if bot is not None and bot.is_ready: ...`)."""
+        return self._loop is not None
+
     def kick(self) -> None:
-        """Wake the loop so the next poll runs immediately instead of waiting."""
+        """Wake the loop so the next poll runs immediately instead of waiting.
+
+        Thread-safe: вызывается из Qt-треда. Через ``call_soon_threadsafe``
+        планируем .set() на runner-loop'е, чтобы не мутить Event из чужого
+        треда напрямую (asyncio.Event внутри ходит по _waiters и пытается
+        loop.call_soon — без call_soon_threadsafe это иногда роняет).
+        """
         logger.debug("Poll wake requested")
-        self._wake_event.set()
+        loop = self._loop
+        if loop is not None and not loop.is_closed():
+            loop.call_soon_threadsafe(self._wake_event.set)
+        else:
+            self._wake_event.set()
 
     async def poll_channel_now(
         self, channel_id: int
@@ -394,10 +418,20 @@ class Bot:
         return channel_id, "created"
 
     def cancel_current_poll(self) -> None:
-        """Cancel an in-flight poll cycle without stopping the whole bot."""
+        """Cancel an in-flight poll cycle without stopping the whole bot.
+
+        Thread-safe: см. ``kick``. Task.cancel() из чужого треда мутирует
+        внутреннее состояние Task'а и пытается loop.call_soon — обязан
+        идти через call_soon_threadsafe.
+        """
         task = self._current_poll_task
-        if task is not None and not task.done():
-            logger.info("Cancel current poll requested")
+        if task is None or task.done():
+            return
+        logger.info("Cancel current poll requested")
+        loop = self._loop
+        if loop is not None and not loop.is_closed():
+            loop.call_soon_threadsafe(task.cancel)
+        else:
             task.cancel()
 
     async def force_poll_once(self) -> None:
@@ -431,10 +465,18 @@ class Bot:
                 except Exception: logger.exception("on_cycle_end hook failed")
 
     def request_stop(self) -> None:
-        """Ask the loop to exit after the current iteration."""
+        """Ask the loop to exit after the current iteration.
+
+        Thread-safe: см. ``kick``.
+        """
         logger.info("Stop requested")
-        self._stop_event.set()
-        self._wake_event.set()
+        loop = self._loop
+        if loop is not None and not loop.is_closed():
+            loop.call_soon_threadsafe(self._stop_event.set)
+            loop.call_soon_threadsafe(self._wake_event.set)
+        else:
+            self._stop_event.set()
+            self._wake_event.set()
 
     async def log_out_session(self) -> None:
         """Revoke server-side TG session via DROP_AUTH and exit the run loop.
@@ -462,6 +504,13 @@ class Bot:
         if self._dry_run:
             logger.warning("DRY-RUN mode: outgoing TG messages will NOT be sent")
         await self._client.start()
+        # ``self._loop`` ставим ПОСЛЕ client.start() — это и метка
+        # «бот готов принимать kick/cancel из Qt-треда», и сам loop
+        # для thread-safe методов. До этого момента kick/cancel/
+        # request_stop fallback'ятся на прямой .set() (безопасно: Event
+        # ещё не имеет ожидателей; а poll-task ещё не создан, так что
+        # и cancel'ить нечего).
+        self._loop = asyncio.get_running_loop()
         from backend.runtime_settings import _mask_phone
         logger.info(
             "Telegram client connected (phone=%s)",
@@ -562,6 +611,12 @@ class Bot:
                     return
         finally:
             logger.info("Bot run-loop exiting")
+            # Shutdown-флаг ДО client.stop(): Pyrogram'овский DM-handler,
+            # успевший отстрелить уже после teardown'а, увидит флаг и
+            # no-op'нет вместо того, чтобы пытаться писать в закрытый
+            # session_factory или дёргать httpx-клиенты, которые мы
+            # сейчас будем aclose'ить.
+            self._ingestion.mark_shutting_down()
             # Висящие debounce-таски DM-классификации не должны жить дольше
             # бота — иначе при reload'е RuntimeSettings (новый Bot) старые
             # таски попытаются использовать закрытый httpx-клиент.

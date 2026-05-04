@@ -77,14 +77,31 @@ class AsyncRunner:
         asyncio.set_event_loop(self.loop)
         # Pyrogram'ский race во время shutdown / log_out: внутренний таск
         # Client.handle_updates догоняет с update'ом для уже закрытой
-        # SQLite-storage и кидает ProgrammingError("Cannot operate on a
-        # closed database"). Делать тут нечего — apply'нуть уже не во что,
+        # SQLite-storage / стопнутого loop'а / частично-разобранного
+        # клиента. Делать тут нечего — apply'нуть уже не во что,
         # фильтруем шум, чтобы он не прыгал в stderr и не пугал юзера.
+        # Список расширен по review-concurrency.md M4: помимо
+        # ProgrammingError("closed database") теперь глушатся и
+        # RuntimeError("Event loop is closed"), и AttributeError на
+        # частично-разобранных Pyrogram-объектах при teardown'е.
         def _quiet_pyrogram_shutdown(loop, context):
             exc = context.get("exception")
+            msg = str(exc) if exc else ""
             if isinstance(exc, sqlite3.ProgrammingError) and \
-               "closed database" in str(exc):
+               "closed database" in msg:
                 logger.debug("Pyrogram shutdown race swallowed: %s", exc)
+                return
+            if isinstance(exc, RuntimeError) and \
+               "Event loop is closed" in msg:
+                logger.debug("Pyrogram shutdown race swallowed: %s", exc)
+                return
+            if isinstance(exc, AttributeError):
+                # AttributeError при teardown'е: pyrogram внутри иногда
+                # дёргает self.<attr> на уже-обнулённом объекте. Лог в
+                # debug, чтобы реальные AttributeError'ы в нашем коде не
+                # глохли — наши падают НЕ из set_exception_handler'а, а
+                # из обычного await/return.
+                logger.debug("AttributeError during teardown swallowed: %s", exc)
                 return
             loop.default_exception_handler(context)
         self.loop.set_exception_handler(_quiet_pyrogram_shutdown)
@@ -97,21 +114,26 @@ class AsyncRunner:
         if not self.loop.is_running():
             return
         logger.info("AsyncRunner stopping")
-        # Cancel pending tasks so aclose / disconnect handlers in finally
-        # blocks get a chance to run before the loop dies.
+        # Cancel pending tasks so aclose / disconnect handlers в finally
+        # блоках Bot.run / IngestionPipeline получают шанс отработать
+        # до смерти loop'а. Таймаут расширен с 3с до 15с — Bot.run
+        # finally делает `await client.stop()` Pyrogram'а + два
+        # `await lm_*.aclose()`, на flaky-сети это легко 5-10с.
+        # Раньше cancel_pending уезжал по таймауту и тут же loop.stop()
+        # рубил cleanup'ы посередине.
         async def _cancel_pending() -> None:
             tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
         try:
-            asyncio.run_coroutine_threadsafe(_cancel_pending(), self.loop).result(timeout=3)
+            asyncio.run_coroutine_threadsafe(_cancel_pending(), self.loop).result(timeout=15)
         except Exception:
             logger.exception("AsyncRunner: cancel_pending failed during stop")
         self.loop.call_soon_threadsafe(self.loop.stop)
-        self._thread.join(timeout=3)
+        self._thread.join(timeout=15)
         if self._thread.is_alive():
-            logger.warning("AsyncRunner thread did not exit within 3s join timeout")
+            logger.warning("AsyncRunner thread did not exit within 15s join timeout")
 
 
 # === Bridge ===============================================================
@@ -321,12 +343,21 @@ class WizardApi(QObject):
     # --- helpers -----------------------------------------------------------
 
     def _dispatch(self, signal: Signal, coro: Coroutine[Any, Any, Any]) -> None:
-        """Schedule a coroutine and emit its JSON result on `signal`."""
+        """Schedule a coroutine and emit its JSON result on `signal`.
+
+        CancelledError при shutdown'е WizardApi (закрытие окна / переход
+        в MainApi) — не error, JS-handler уже отвалился. Глушим, чтобы
+        не сыпать «CancelledError: » в умирающий UI. Согласовано с
+        MainApi._dispatch.
+        """
         future = self._runner.submit(coro)
 
         def on_done(f: Future) -> None:
             try:
                 payload = f.result()
+            except asyncio.CancelledError:
+                logger.debug("bridge: coroutine cancelled during shutdown")
+                return
             except Exception as e:
                 logger.exception("bridge: unexpected error in coroutine")
                 payload = _err(f"{type(e).__name__}: {e}")
