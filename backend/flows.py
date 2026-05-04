@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
-from adapters import lm_studio
+from adapters import lm_studio, telegram
 from backend.domain import (
     check_blacklist,
     cosine_top_match,
@@ -1441,10 +1441,14 @@ class IngestionPipeline:
     ) -> tuple[bool, str]:
         """Send cover letter + CV to hr for vacancy_id.
 
-        Возвращает (ok, reason). reason — короткий код причины skip'а или
-        'sent'. UI использует код для toast'а — иначе юзер не отличит
-        реальную отправку от молчаливого skip'а (CV missing / SEND_LOCKED /
-        LLM-провал и т.д.).
+        Возвращает (ok, reason). reason — короткий код:
+        ``sent`` (реальный DM ушёл), ``sent_locked`` (заглушено
+        SEND_LOCKED/dry_run, БД-эффект состоялся), ``profile_empty``,
+        ``cover_letter_failed``, ``cv_missing``, ``race`` (между
+        cover-letter генерацией и отправкой статус вакансии успел
+        измениться), ``blocked`` (OFF mode / blacklist / нет таргета),
+        ``telegram_error``. UI пишет toast по этому коду — иначе юзер
+        не отличит реальную отправку от молчаливого skip'а.
         """
         if not self._profile_block:
             logger.warning(
@@ -1467,6 +1471,24 @@ class IngestionPipeline:
                 vacancy_id, cv_path,
             )
             return False, "cv_missing"
+        # Race-guard: между прохождением фильтров и началом отправки могло
+        # пройти несколько секунд (LLM-генерация cover letter'а), за это
+        # время manual «Отправить отклик» из UI или параллельный auto-flow
+        # уже могли отправить отклик и flip'нуть status. Перепроверяем
+        # перед самым _send. force=True (manual UI) пропускает проверку —
+        # юзер уже одобрил повторную отправку явно.
+        if not force:
+            async with self._session_factory() as session:
+                v = await session.get(Vacancy, vacancy_id)
+                if v is None:
+                    return False, "no_vacancy"
+                if v.status == VacancyStatus.APPLIED:
+                    logger.info(
+                        "vacancy %d: status already APPLIED at send-time "
+                        "(race with manual UI or parallel auto-flow)",
+                        vacancy_id,
+                    )
+                    return False, "race"
         try:
             sent = await self._send(
                 hr, cover, attachment=cv_path, vacancy_id=vacancy_id,
@@ -1480,12 +1502,24 @@ class IngestionPipeline:
             )
             return False, "telegram_error"
         if not sent:
-            # Bot.send вернул False — что-то заблочило (SEND_LOCKED / OFF mode /
-            # blacklist / dry_run). Конкретная причина лежит в логах warning'а
-            # из Bot.send, нам нужен только factvalid.
+            # Bot.send вернул False — заблочило на стадии guards (OFF mode /
+            # blacklist / нет таргета). Конкретная причина в логах warning'а
+            # из Bot.send.
             return False, "blocked"
-        logger.info("vacancy %d: cover letter sent to hr %d", vacancy_id, hr.id)
-        return True, "sent"
+        # Различаем реальную отправку от SEND_LOCKED-имитации: status=APPLIED
+        # выставлен в обоих случаях, но UI должен показать честный toast,
+        # иначе юзер тестирующий в SEND_LOCKED-режиме думает что HR получил
+        # письмо. dry_run живёт на Bot — отсюда не виден; не критично, dry_run
+        # — внутренний dev-режим без UI-обещаний.
+        suppressed = telegram.SEND_LOCKED
+        reason = "sent_locked" if suppressed else "sent"
+        logger.info(
+            "vacancy %d: cover letter %s to hr %d",
+            vacancy_id,
+            "simulated (SEND_LOCKED)" if suppressed else "sent",
+            hr.id,
+        )
+        return True, reason
 
     async def send_application_for_vacancy(self, vacancy_id: int) -> tuple[bool, str]:
         """Manual cover-letter send (UI «Отправить отклик»). Reconstructs

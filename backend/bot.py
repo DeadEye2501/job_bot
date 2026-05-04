@@ -641,26 +641,35 @@ class Bot:
                 hr.id, bl_value, vacancy_id,
             )
             return False
-        # SEND_LOCKED / dry_run: имитируем успешную отправку — логируем
-        # текст и attachment, но реального вызова Pyrogram'у не делаем.
-        # Дальнейший DB-апдейт (Message row + status=APPLIED) идёт как
-        # обычно — иначе тестировать pipeline без реальных HR-ов нельзя.
+        # SEND_LOCKED / dry_run: имитируем успешную отправку — реального
+        # вызова Pyrogram'у не делаем. Дальнейший DB-апдейт (Message row +
+        # status=APPLIED) идёт как обычно — иначе тестировать pipeline без
+        # реальных HR-ов нельзя. Текст письма В ЛОГ НЕ ПИШЕМ (PII: имя,
+        # работодатели, скилы из profile_block); если нужен аудит сэмули-
+        # рованной отправки — смотри Message-row, она пишется в БД даже в
+        # suppressed-режиме.
         suppressed = self._dry_run or telegram.SEND_LOCKED
+        tg_msg_id: int | None = None
         if suppressed:
             tag = "[DRY-RUN]" if self._dry_run else "[SEND_LOCKED]"
             logger.warning(
-                "%s would have sent DM to %s (vacancy=%s, attachment=%s):\n%s",
-                tag, target, vacancy_id, attachment, text,
+                "%s would have sent DM to %s (vacancy=%s, %d chars, attachment=%s)",
+                tag, target, vacancy_id, len(text), attachment,
             )
         else:
             logger.info(
                 "Sending DM to hr %s (vacancy=%s, %d chars)",
                 target, vacancy_id, len(text),
             )
-            await telegram.send_dm(self._client, target, text, attachment)
+            tg_msg_id = await telegram.send_dm(
+                self._client, target, text, attachment
+            )
         # С этого момента сообщение УШЛО к HR (или сэмулировано). Если
-        # коммит ниже упадёт — сообщение в Telegram реальное, а в БД пусто.
-        # Логим cover letter явно, чтобы юзер мог восстановить аудит вручную.
+        # коммит ниже упадёт — сообщение в Telegram реальное, а Message-row
+        # в БД нет. Чтобы повторное «Отправить отклик» НЕ отправило DM
+        # ещё раз, делаем fallback-flip status=APPLIED отдельной тонкой
+        # транзакцией: пусть аудит-row потерян, но re-send отбивается
+        # стандартной already_applied-проверкой в send_application_for_vacancy.
         try:
             async with self._session_factory() as session:
                 session.add(
@@ -669,6 +678,7 @@ class Bot:
                         hr_id=hr.id,
                         vacancy_id=vacancy_id,
                         text=text,
+                        tg_message_id=tg_msg_id,
                     )
                 )
                 applied_now = False
@@ -683,12 +693,32 @@ class Bot:
         except Exception:
             logger.error(
                 "Bot.send: DB commit FAILED after%s telegram send to %s "
-                "(vacancy=%s); message is sent but no Message row recorded. "
-                "Cover letter text was: %r",
+                "(vacancy=%s, %d chars); message is sent but no Message row "
+                "recorded. Attempting standalone status flip to block re-send.",
                 " (suppressed)" if suppressed else "",
-                target, vacancy_id, text,
+                target, vacancy_id, len(text),
                 exc_info=True,
             )
+            if vacancy_id is not None:
+                try:
+                    async with self._session_factory() as session:
+                        v = await session.get(Vacancy, vacancy_id)
+                        if v is not None and should_apply_status(
+                            v.status, VacancyStatus.APPLIED, force=force
+                        ):
+                            v.status = VacancyStatus.APPLIED
+                            await session.commit()
+                            logger.info(
+                                "vacancy %s status -> APPLIED via fallback "
+                                "(audit Message-row missing)",
+                                vacancy_id,
+                            )
+                except Exception:
+                    logger.exception(
+                        "Bot.send: fallback status-flip also FAILED for "
+                        "vacancy=%s — re-send protection broken, watch out",
+                        vacancy_id,
+                    )
             # Возвращаем True — в Telegram сообщение реально ушло (или
             # сэмулировано в SEND_LOCKED-режиме), повторная отправка не нужна.
             return True

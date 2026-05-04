@@ -59,7 +59,11 @@ async def send_dm(
     user: str | int,
     text: str,
     attachment: str | Path | None = None,
-) -> None:
+) -> int | None:
+    """Отправляет DM. Возвращает Telegram message_id ответа Pyrogram'а,
+    либо None если отправка заглушена SEND_LOCKED — caller использует id
+    для записи в Message.tg_message_id (закрывает UNIQUE-дыру с NULL'ами
+    для outgoing-row'ов, см. cover-letter review C2)."""
     if SEND_LOCKED:
         _log.warning(
             "send_dm: SEND_LOCKED=True — would have sent to %r"
@@ -68,8 +72,9 @@ async def send_dm(
             f" with attachment {attachment}" if attachment else "",
             len(text),
         )
-        return
+        return None
     if attachment is not None:
-        await client.send_document(user, str(attachment), caption=text)
+        msg = await client.send_document(user, str(attachment), caption=text)
     else:
-        await client.send_message(user, text)
+        msg = await client.send_message(user, text)
+    return getattr(msg, "id", None)

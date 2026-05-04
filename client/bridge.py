@@ -1601,6 +1601,14 @@ class MainApi(QObject):
             "cv_missing":         "Файл резюме не найден — проверь путь в настройках.",
             "blocked":            "Отправка заблокирована (OFF mode / blacklist / у HR нет ни id, ни @username).",
             "telegram_error":     "Telegram отказался принять сообщение (см. логи).",
+            "race":               "Статус вакансии успел измениться — отправка отменена.",
+        }
+        # Success-коды тоже доходят до UI: в SEND_LOCKED-режиме мы хотим
+        # показать честный toast «отклик зачтён, но реального DM не было»,
+        # иначе юзер думает что HR получил письмо.
+        SUCCESS_NOTES = {
+            "sent":               None,  # обычный success — UI сам нарисует
+            "sent_locked":        "DEV: SEND_LOCKED активен — статус выставлен, реального Telegram-сообщения не было.",
         }
 
         async def run() -> str:
@@ -1610,7 +1618,11 @@ class MainApi(QObject):
             if not ok:
                 msg = REASONS.get(reason, f"Не удалось отправить: {reason}")
                 return _err(msg, vacancy_id=vacancy_id, action="send")
-            return _ok({"vacancy_id": vacancy_id, "action": "send"})
+            payload = {"vacancy_id": vacancy_id, "action": "send", "reason": reason}
+            note = SUCCESS_NOTES.get(reason)
+            if note is not None:
+                payload["note"] = note
+            return _ok(payload)
 
         self._dispatch(self.vacancy_action_done, run())
 
