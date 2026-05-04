@@ -7894,13 +7894,18 @@
     if (st.messagesFor !== hrId || !st.messages.length) return;
     const now = new Date();
     let touched = false;
-    for (const m of st.messages) {
-      if (m.incoming || m.readAt) continue;
-      if (m.tgMessageId == null || m.tgMessageId > maxId) continue;
-      m.readAt = now;
+    // Копируем message-объекты перед мутацией (per frontend review M5):
+    // если кто-то ещё держит ссылку на тот же объект (futures plugins,
+    // history snapshot для undo и т.п.), они не увидят неконсистентного
+    // сдвига. Сегодня других ссылок нет, но защита почти бесплатна.
+    const next = st.messages.map(m => {
+      if (m.incoming || m.readAt) return m;
+      if (m.tgMessageId == null || m.tgMessageId > maxId) return m;
       touched = true;
-    }
+      return { ...m, readAt: now };
+    });
     if (!touched) return;
+    st.messages = next;
     if (appState.section === 'contacts' && appState.contacts.tab === 'hr') {
       renderSection();
     }
