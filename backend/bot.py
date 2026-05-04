@@ -810,22 +810,21 @@ class Bot:
                         # из Bot.send проходил молча, в UI было видно
                         # только applied_sent VacancyEvent (без статус-цвета).
                         kind_label = (
-                            "Ручная отправка"
+                            "Ручная отправка."
                             if force
-                            else "Авто-отправка отклика"
+                            else "Авто-отправка отклика."
                         )
-                        suffix = (
-                            " (SEND_LOCKED — симуляция, реального DM не было)"
-                            if suppressed
-                            else ""
-                        )
+                        # SEND_LOCKED-пометка раньше дописывалась в
+                        # explanation — но это делало timeline-запись разной
+                        # в dev и проде. Аудит факта суппрессии живёт в
+                        # VacancyEvent(kind="applied_sent").payload.suppressed.
                         session.add(
                             VacancyStatusHistory(
                                 vacancy_id=vacancy_id,
                                 message_id=None,
                                 previous_status=previous_status,
                                 status=VacancyStatus.APPLIED,
-                                explanation=f"{kind_label}{suffix}",
+                                explanation=kind_label,
                                 applied=True,
                             )
                         )

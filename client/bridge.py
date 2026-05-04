@@ -1694,12 +1694,11 @@ class MainApi(QObject):
             "telegram_error":     "Telegram отказался принять сообщение (см. логи).",
             "race":               "Статус вакансии успел измениться — отправка отменена.",
         }
-        # Success-коды тоже доходят до UI: в SEND_LOCKED-режиме мы хотим
-        # показать честный toast «отклик зачтён, но реального DM не было»,
-        # иначе юзер думает что HR получил письмо.
+        # Success-коды тоже доходят до UI на случай будущих кодов
+        # (sent — единственный сейчас, note=None → toast не показываем,
+        # UI сам нарисует обычный success).
         SUCCESS_NOTES = {
-            "sent":               None,  # обычный success — UI сам нарисует
-            "sent_locked":        "DEV: SEND_LOCKED активен — статус выставлен, реального Telegram-сообщения не было.",
+            "sent":               None,
         }
 
         async def run() -> str:

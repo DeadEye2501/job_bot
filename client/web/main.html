@@ -5398,6 +5398,7 @@
       ts: h.changed_at,
       status: h.status,
       explanation: h.explanation,
+      applied: h.applied,
     }));
     const events = (detail.events || []).map(e => ({
       kind: 'event',
@@ -5427,7 +5428,10 @@
       let dotCls = '';
       let textHtml = '';
       if (it.kind === 'history') {
-        dotCls = ' ' + statusToClass(it.status);
+        // Цвет точки = цвет статуса ТОЛЬКО когда запись реально сменила
+        // статус (applied=true). Comment-only (applied=false) → пустой
+        // dotCls → дефолтный серый из `.tl-dot { background: var(--text-muted) }`.
+        dotCls = it.applied ? (' ' + statusToClass(it.status)) : '';
         // Always-on inline-edit. Драфт (если пользователь сейчас печатает)
         // имеет приоритет над server-value, чтобы push-rerender'ы не
         // подменяли текст под рукой. Placeholder = «без комментария» —
@@ -5475,7 +5479,6 @@
         const reason = it.payload.reason || (ok ? 'sent' : 'unknown');
         const reasonLabels = {
           'sent': 'cover letter отправлен',
-          'sent_locked': 'симуляция (SEND_LOCKED)',
           'profile_empty': 'профиль пуст',
           'cover_letter_failed': 'LLM не сгенерировал письмо',
           'cv_missing': 'CV-файл не найден',
@@ -5490,10 +5493,11 @@
         // VacancyEvent kind="applied_sent" — фактическая отправка письма
         // (Bot.send). Парная с VacancyStatusHistory("Applied"); тут
         // несём dev-метаданные (suppressed, cover_letter_chars, force).
-        const suppressed = it.payload.suppressed === true;
+        // SEND_LOCKED-факт в payload остаётся для аудита, но в UI его
+        // не показываем — иначе dev-режим выглядит иначе чем прод.
         const force = it.payload.force === true;
         const chars = it.payload.cover_letter_chars;
-        const tag = suppressed ? '[SEND_LOCKED]' : (force ? 'ручная' : '');
+        const tag = force ? 'ручная' : '';
         const charsPart = chars ? `, ${chars} симв.` : '';
         const fullText = (tag ? `${tag} ` : '') + `Отправлен отклик${charsPart}.`;
         dotCls = ' ' + statusToClass('Applied');

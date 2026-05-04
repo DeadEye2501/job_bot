@@ -1694,13 +1694,12 @@ class IngestionPipeline:
         """Send cover letter + CV to hr for vacancy_id.
 
         Возвращает (ok, reason). reason — короткий код:
-        ``sent`` (реальный DM ушёл), ``sent_locked`` (заглушено
-        SEND_LOCKED/dry_run, БД-эффект состоялся), ``profile_empty``,
-        ``cover_letter_failed``, ``cv_missing``, ``race`` (между
-        cover-letter генерацией и отправкой статус вакансии успел
-        измениться), ``blocked`` (OFF mode / blacklist / нет таргета),
-        ``telegram_error``. UI пишет toast по этому коду — иначе юзер
-        не отличит реальную отправку от молчаливого skip'а.
+        ``sent`` (отправка зачтена — реальный DM или SEND_LOCKED-имитация,
+        БД-эффект одинаков), ``profile_empty``, ``cover_letter_failed``,
+        ``cv_missing``, ``race`` (между cover-letter генерацией и отправкой
+        статус вакансии успел измениться), ``blocked`` (OFF mode / blacklist
+        / нет таргета), ``telegram_error``. UI пишет toast по этому коду —
+        иначе юзер не отличит реальную отправку от молчаливого skip'а.
         """
         if not self._profile_block:
             logger.warning(
@@ -1758,20 +1757,18 @@ class IngestionPipeline:
             # blacklist / нет таргета). Конкретная причина в логах warning'а
             # из Bot.send.
             return False, "blocked"
-        # Различаем реальную отправку от SEND_LOCKED-имитации: status=APPLIED
-        # выставлен в обоих случаях, но UI должен показать честный toast,
-        # иначе юзер тестирующий в SEND_LOCKED-режиме думает что HR получил
-        # письмо. dry_run живёт на Bot — отсюда не виден; не критично, dry_run
-        # — внутренний dev-режим без UI-обещаний.
-        suppressed = telegram.SEND_LOCKED
-        reason = "sent_locked" if suppressed else "sent"
+        # SEND_LOCKED-факт суппрессии остаётся в логах и в
+        # VacancyEvent("applied_sent").payload.suppressed; в timeline-записи
+        # и в reason-коде мы его НЕ различаем — иначе dev-режим выглядит
+        # иначе чем прод, и тестировать поведение «как при реальной
+        # отправке» нельзя.
         logger.info(
             "vacancy %d: cover letter %s to hr %d",
             vacancy_id,
-            "simulated (SEND_LOCKED)" if suppressed else "sent",
+            "simulated (SEND_LOCKED)" if telegram.SEND_LOCKED else "sent",
             hr.id,
         )
-        return True, reason
+        return True, "sent"
 
     async def send_application_for_vacancy(self, vacancy_id: int) -> tuple[bool, str]:
         """Manual cover-letter send (UI «Отправить отклик»). Reconstructs

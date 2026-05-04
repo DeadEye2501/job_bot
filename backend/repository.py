@@ -45,6 +45,21 @@ from backend.payloads import (
 logger = logging.getLogger(__name__)
 
 
+# Зеркало JS-`_ensureTrailingPeriod` (client/web/main.html). Применяется
+# ко всем записям `vacancy_status_history.explanation`, чтобы заметки в
+# таймлайне рендерились единообразно как "Status: reason." — независимо
+# от того, ЛЛМ ли это, ручной ввод или подпись авто-отправки.
+def _ensure_trailing_period(s: str | None) -> str | None:
+    if s is None:
+        return None
+    trimmed = s.strip()
+    if not trimmed:
+        return None
+    if trimmed[-1] in ".!?…:":
+        return trimmed
+    return trimmed + "."
+
+
 async def find_known_hr(
     session: AsyncSession,
     telegram_user_id: int,
@@ -725,7 +740,7 @@ async def change_vacancy_status(
     if vacancy is None:
         return None
     previous = vacancy.status
-    cleaned_explanation = (explanation or "").strip() or None
+    cleaned_explanation = _ensure_trailing_period(explanation)
     status_changed = previous != new_status
     if not status_changed and cleaned_explanation is None:
         return None
@@ -771,12 +786,7 @@ async def update_status_history_explanation(
     row = await session.get(VacancyStatusHistory, history_id)
     if row is None:
         return False
-    normalized: str | None
-    if explanation is None or not explanation.strip():
-        normalized = None
-    else:
-        normalized = explanation
-    row.explanation = normalized
+    row.explanation = _ensure_trailing_period(explanation)
     return True
 
 
@@ -2860,7 +2870,7 @@ async def apply_classification(
             message_id=message_id,
             previous_status=previous,
             status=classification.status,
-            explanation=classification.explanation,
+            explanation=_ensure_trailing_period(classification.explanation),
             applied=applied,
         )
     )
