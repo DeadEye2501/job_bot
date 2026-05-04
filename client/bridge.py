@@ -674,7 +674,7 @@ class WizardApi(QObject):
             self._parent_widget,
             "Выберите файл резюме",
             "",
-            "Резюме (*.pdf *.md *.txt);;Все файлы (*)",
+            "Резюме (*.pdf *.PDF *.md *.MD *.txt *.TXT);;Все файлы (*)",
         )
         if not path:
             return _err("cancelled")
@@ -777,12 +777,13 @@ class WizardApi(QObject):
 
     @Slot()
     def finish(self) -> None:
-        async def run() -> str:
-            await self._rs.mark_wizard_completed()
-            logger.info("Wizard finish requested")
-            return _ok()
-
-        self._dispatch(self.finish_done, run())
+        # Раньше: mark_wizard_completed здесь, до клика «Открыть Job Bot».
+        # Если приложение крашилось между finish и enter_main_app, следующий
+        # запуск шёл сразу в Main и юзер пропускал handoff-screen. Теперь
+        # mark_wizard_completed отложен в enter_main_app — оба события
+        # становятся атомарными с UX-точки зрения.
+        logger.info("Wizard finish requested")
+        self.finish_done.emit(_ok())
 
     @Slot()
     def close_window(self) -> None:
@@ -791,7 +792,18 @@ class WizardApi(QObject):
 
     @Slot()
     def enter_main_app(self) -> None:
-        """Hand off from wizard to the main app — shell does the actual swap."""
+        """Hand off from wizard to the main app — shell does the actual swap.
+
+        ``mark_wizard_completed`` живёт здесь, а не в ``finish``: иначе при
+        крахе приложения между finish и реальным переходом в Main юзер на
+        следующем старте оказался бы в Main без полноценного handoff'а.
+        """
+        async def _mark() -> None:
+            try:
+                await self._rs.mark_wizard_completed()
+            except Exception:
+                logger.exception("mark_wizard_completed failed on enter_main_app")
+        self._runner.submit(_mark())
         if self._on_enter_main is not None:
             self._on_enter_main()
 
@@ -1182,7 +1194,7 @@ class MainApi(QObject):
             self._parent_widget,
             "Выберите файл резюме",
             "",
-            "Резюме (*.pdf *.md *.txt);;Все файлы (*)",
+            "Резюме (*.pdf *.PDF *.md *.MD *.txt *.TXT);;Все файлы (*)",
         )
         if not path:
             return _err("cancelled")

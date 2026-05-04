@@ -757,6 +757,10 @@
       // Reset the model dropdown to that provider's defaults; user-typed
       // model is dropped because it likely won't exist on the new provider.
       state.chat.model = '';
+      // Inval'нем _lastModelFetch — preset мог поменять base_url, надо
+      // обязательно пойти в сеть за свежим списком даже если signature
+      // совпадает с предыдущей.
+      _lastModelFetch.chat = '';
       renderChat();
     };
     $('chat-base-url').onblur = () => requestModelList('chat');
@@ -1083,7 +1087,7 @@
           2. В <strong>Системе → Настройки</strong> задайте порог отсева вакансий.
           <br>
           3. Добавьте каналы с вакансиями в <strong>Чат → Каналы</strong> и
-          <strong>вступите в них под Telegram-аккаунтом бота</strong> — иначе он не увидит
+          <strong>подпишитесь на них под Telegram-аккаунтом бота</strong> — иначе он не увидит
           сообщения.
         </p>
       </div>
@@ -1184,9 +1188,12 @@
       // Only re-evaluate same_as_chat if embed actually has saved data —
       // otherwise we keep the default (true) so the user inherits chat creds.
       if (init.embed.base_url) {
+        // normalizeUrl снимает trailing slash + lowercase'ит — иначе
+        // «http://localhost:1234/» vs «http://localhost:1234» давало
+        // false-mismatch и UI рисовал embed-extras с теми же кредами.
         state.embed.same_as_chat = (
-          init.embed.base_url === state.chat.base_url &&
-          init.embed.api_key  === state.chat.api_key
+          normalizeUrl(init.embed.base_url) === normalizeUrl(state.chat.base_url) &&
+          init.embed.api_key === state.chat.api_key
         );
       }
     }
