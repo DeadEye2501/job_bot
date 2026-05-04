@@ -23,8 +23,15 @@ logging.basicConfig(
 )
 # Attach the in-memory buffer handler that backs the UI «Логи» screen.
 # Идемпотентно — повторный install() не-op.
-from backend.log_buffer import install as _install_log_buffer
+from backend.log_buffer import (
+    install as _install_log_buffer,
+    install_secret_filter as _install_secret_filter,
+)
 _install_log_buffer()
+# Secret-redaction filter ставим ДО первого logger.* — чтобы Bearer-
+# токены / api_hash / session-string'и из третьих либ (httpx debug,
+# pyrogram, sqlalchemy echo) маскировались до stdout и UI-buffer'а.
+_install_secret_filter()
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 

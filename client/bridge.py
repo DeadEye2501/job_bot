@@ -161,7 +161,12 @@ async def _do_list_models_for_creds(
         models = await lm_studio.list_models(client, kind=kind)
         return {"ok": True, "models": models}
     except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+        # httpx иногда сериализует request включая Authorization-header
+        # в repr exception'а. Прогоняем через root-logger SecretRedaction-
+        # Filter руками — он висит на root, но мы тут просто текст
+        # формируем без logger.* вызова.
+        from backend.log_buffer import _redact
+        return {"ok": False, "error": _redact(f"{type(e).__name__}: {e}")}
     finally:
         await client.aclose()
 
@@ -195,13 +200,18 @@ async def _do_llm_probe(
 async def _safe_disconnect(client) -> None:
     """Best-effort disconnect для PyrogramClient. Используется для cleanup
     временного login-клиента: сокет всегда стоит закрыть, даже если
-    клиент в полу-открытом состоянии и `disconnect()` сам кинет."""
+    клиент в полу-открытом состоянии и `disconnect()` сам кинет.
+
+    Бросаем в DEBUG (с traceback'ом) — molчaть полностью неудобно при
+    диагностике редких socket-leak'ов: ConnectionResetError /
+    OSError(EPIPE) ловится тут регулярно, и хорошо видеть в логе что это
+    именно `_safe_disconnect`-swallow, а не что-то странное."""
     if client is None:
         return
     try:
         await client.disconnect()
     except Exception:
-        pass
+        logger.debug("_safe_disconnect swallowed", exc_info=True)
 
 
 def _humanize_duration(seconds: int) -> str:
@@ -422,7 +432,8 @@ class WizardApi(QObject):
             # а cleanup() при выходе пытается его disconnect'нуть.
             self._tg_client = new_client
             self._tg_phone_code_hash = sent.phone_code_hash
-            return _ok({"message": f"Код отправлен в Telegram на {phone}."})
+            from backend.runtime_settings import _mask_phone
+            return _ok({"message": f"Код отправлен в Telegram на {_mask_phone(phone)}."})
         except PhoneNumberInvalid:
             await _safe_disconnect(new_client)
             return _err("Неверный номер телефона.")
@@ -3260,6 +3271,22 @@ class MainApi(QObject):
                         errors.append(f"{sub}/: {e}")
                         logger.exception("delete_all: failed to remove %s", d)
 
+            # 4) Удаляем Fernet master key из OS-keychain'а. Без этого
+            # после reinstall'а у юзера висит мёртвая запись в Windows
+            # Credential Manager / macOS Keychain — некритично (новый
+            # ключ перегенерится), но «delete all» должно быть «delete
+            # all», а не «delete most».
+            try:
+                import keyring as _keyring
+                from backend.runtime_settings import (
+                    _KEYRING_SERVICE,
+                    _KEYRING_KEY,
+                )
+                _keyring.delete_password(_KEYRING_SERVICE, _KEYRING_KEY)
+            except Exception as e:
+                # delete_password может бросить если записи нет — это OK.
+                logger.debug("delete_all: keyring entry already absent (%s)", e)
+
             if errors:
                 return _err("Не все файлы удалось удалить: " + "; ".join(errors))
             return _ok({})
@@ -3433,7 +3460,8 @@ class MainApi(QObject):
             sent = await new_client.send_code(phone)
             self._tg_login_client = new_client
             self._tg_login_phone_code_hash = sent.phone_code_hash
-            return _ok({"message": f"Код отправлен в Telegram на {phone}."})
+            from backend.runtime_settings import _mask_phone
+            return _ok({"message": f"Код отправлен в Telegram на {_mask_phone(phone)}."})
         except PhoneNumberInvalid:
             await _safe_disconnect(new_client)
             return _err("Неверный номер телефона.")

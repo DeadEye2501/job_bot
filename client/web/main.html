@@ -2,6 +2,17 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<!--
+  CSP: документ загружается из file:// в QWebEngine, никаких внешних
+  загрузок не делаем — заранее ограничиваем источники чтобы любой
+  будущий «давайте подгрузим аватарку из Telegram CDN» не открывал
+  XSS-вектор без явной правки этого мета-тега.
+  data: разрешён для img, чтобы avatar'ы (приходят как data-URL'ы из
+  bridge'а) рендерились. unsafe-inline для script — у нас весь JS
+  inline в <script>; разделим на файлы — снимем.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self' 'unsafe-inline' qrc://*; connect-src 'self' qrc://*;">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
 <title>Job Bot</title>
 <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css">
 <link rel="stylesheet" href="vendor/flatpickr/dark.css">

@@ -12,11 +12,66 @@ Ring-buffer ограничен MAX_RECORDS — самые старые молч�
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from collections import deque
 from typing import Callable
 
 MAX_RECORDS = 5000
+
+
+# === Defence-in-depth: scrub известные паттерны секретов ===================
+# В коде ни один logger.* специально секреты не пишет (audited). Но третьи
+# либы (httpx debug-mode, pyrogram, sqlalchemy echo) могут засветить
+# Authorization-header или строку коннекта; SecretRedactionFilter ловит
+# это до того как record уезжает в stdout и в UI-buffer.
+_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"Bearer\s+[A-Za-z0-9_\-\.]+", re.IGNORECASE),
+    re.compile(r"sk-[A-Za-z0-9_\-]{16,}"),
+    re.compile(
+        r"(api_hash[\"']?\s*[:=]\s*[\"']?)[a-f0-9]{32}",
+        re.IGNORECASE,
+    ),
+    # Telegram session-string (base64-ish blob с : разделителями) —
+    # эвристика: 50+ символов A-Za-z0-9+/=:_-. Слишком короткое не
+    # маскируем — false-positive risk.
+    re.compile(r"\b[A-Za-z0-9+/=]{60,}\b"),
+)
+_REDACTED = "***"
+
+
+def _redact(text: str) -> str:
+    out = text
+    for pat in _SECRET_PATTERNS:
+        out = pat.sub(_REDACTED, out)
+    return out
+
+
+class SecretRedactionFilter(logging.Filter):
+    """Применяет _redact к message и exc_text. Ставится на root logger
+    через ``install_secret_filter()``; работает на ВСЕ handlers одинаково."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        scrubbed = _redact(msg)
+        if scrubbed != msg:
+            record.msg = scrubbed
+            record.args = ()
+        if record.exc_text:
+            record.exc_text = _redact(record.exc_text)
+        return True
+
+
+def install_secret_filter() -> None:
+    """Идемпотентно ставит SecretRedactionFilter на root logger."""
+    root = logging.getLogger()
+    for f in root.filters:
+        if isinstance(f, SecretRedactionFilter):
+            return
+    root.addFilter(SecretRedactionFilter())
 
 
 class LogBufferHandler(logging.Handler):
