@@ -788,6 +788,28 @@
     font-style: italic;
   }
 
+  /* === Z-index ladder ===================================================
+   * Растёт сверху вниз — большее значение перекрывает меньшее. Перед
+   * добавлением нового слоя сверьтесь с этой лестницей; промежутки
+   * (10, 20, 25, 30, 35) оставлены ровно чтобы вставлять между слоями
+   * без переноса всего стека. Метки соответствуют реальным селекторам
+   * в этом файле — не путать с wizard.html (отдельный документ).
+   *
+   *      2 — bubble-photo close-overlay поверх фото в чате
+   *     10 — sticky-заголовки таблиц / list-row внутри секций
+   *     20 — sticky topbar / sticky-headers контента
+   *     25 — pinned action-bar поверх контента
+   *     30 — drawer/sidebar overlays (system, contacts)
+   *     35 — `.vac-filter-channel-list` (filter dropdown поверх vacancies)
+   *     50 — popovers (status / score)
+   *     60 — `.sys-settings-login-backdrop` (settings re-auth fullscreen)
+   *    100 — `.bl-combobox-dropdown` (blacklist combobox)
+   *    900 — popover-dismiss-overlay (clicks-through trap)
+   *    901 — popover content поверх своего overlay'я
+   *   1000 — `.modal-backdrop` (showModal-confirm/prompt fullscreen)
+   *  10000 — toast-stack (всегда поверх любого modal'а)
+   */
+
   /* === Custom modal (replaces native prompt/confirm) =================== */
   .modal-backdrop {
     position: fixed;
@@ -4582,12 +4604,29 @@
     return null;
   }
 
+  // Per-section scroll memory: при выходе из секции запоминаем scrollTop,
+  // при возврате — восстанавливаем. Без этого юзер крутит длинный список
+  // вакансий, переключается в Settings, возвращается — и оказывается
+  // снова наверху.
+  const _sectionScrolls = {};
+  let _lastRenderedSection = null;
+
   function renderSection() {
     // Preserve scroll position of .section-body across re-renders so a
     // partial state change (opening a skill picker, adding a list item)
     // doesn't kick the user back to the top.
     const oldBody = mainSlot.querySelector('.section-body');
-    const savedScroll = oldBody ? oldBody.scrollTop : 0;
+    const oldScroll = oldBody ? oldBody.scrollTop : 0;
+    // При смене секции — запоминаем уходящий scroll в _sectionScrolls,
+    // а в этом рендере используем сохранённое значение для НОВОЙ секции
+    // (если возвращаемся в неё, иначе 0). При re-render'е той же секции
+    // оставляем поведение «продолжить скролл» как было.
+    if (_lastRenderedSection !== null && _lastRenderedSection !== appState.section) {
+      _sectionScrolls[_lastRenderedSection] = oldScroll;
+    }
+    const savedScroll = (_lastRenderedSection !== appState.section)
+      ? (_sectionScrolls[appState.section] || 0)
+      : oldScroll;
 
     // Скролл внутри дропдаунов фильтра (каналы / компании) тоже надо
     // сохранять: тоггл чекбокса вызывает renderSection() для пересчёта
@@ -4695,6 +4734,7 @@
         }
       } catch (_) { /* ignore — потеряем фокус, но не упадём */ }
     }
+    _lastRenderedSection = appState.section;
   }
 
   // === Experience skill-picker outside-click closer ====================
@@ -8504,11 +8544,12 @@
           : '';
         const textCls = m.deleted ? 'cnt-bubble-text deleted' : 'cnt-bubble-text';
         let mediaHtml = '';
-        if (m.mediaKind === 'photo' && m.mediaPath) {
-          mediaHtml = `<a class="cnt-bubble-photo" href="${escapeAttr(m.mediaPath)}" target="_blank" rel="noopener"><img src="${escapeAttr(m.mediaPath)}" alt="photo"></a>`;
-        } else if (m.mediaKind === 'document' && m.mediaPath) {
-          const name = m.mediaName || m.mediaPath.split(/[\\/]/).pop() || 'документ';
-          mediaHtml = `<a class="cnt-bubble-doc" href="${escapeAttr(m.mediaPath)}" target="_blank" rel="noopener"><span class="material-symbols-outlined">description</span><span>${escapeHtml(name)}</span></a>`;
+        const safePath = safeMediaHref(m.mediaPath);
+        if (m.mediaKind === 'photo' && safePath) {
+          mediaHtml = `<a class="cnt-bubble-photo" href="${escapeAttr(safePath)}" target="_blank" rel="noopener"><img src="${escapeAttr(safePath)}" alt="photo"></a>`;
+        } else if (m.mediaKind === 'document' && safePath) {
+          const name = m.mediaName || safePath.split(/[\\/]/).pop() || 'документ';
+          mediaHtml = `<a class="cnt-bubble-doc" href="${escapeAttr(safePath)}" target="_blank" rel="noopener"><span class="material-symbols-outlined">description</span><span>${escapeHtml(name)}</span></a>`;
         } else if (m.mediaKind && !m.mediaPath) {
           mediaHtml = `<div class="cnt-bubble-text" style="color:var(--text-tertiary);font-style:italic;">[${m.mediaKind}]</div>`;
         }
@@ -14735,6 +14776,19 @@
   }
   function escapeAttr(s) { return escapeHtml(s); }
 
+  // Local media-paths приходят из бэка (Pyrogram сохраняет в MEDIA_DIR).
+  // Под обычным потоком там абсолютный path или file://-URL. Defensive
+  // scheme guard на случай если будущий рефактор протянет в это поле
+  // server-controlled данные: `escapeAttr` HTML-экранирует, но не
+  // валидирует scheme — `javascript:`/`data:`/`vbscript:` прошли бы
+  // насквозь. Срезаем их явно; всё остальное пропускаем как есть.
+  function safeMediaHref(p) {
+    const s = String(p ?? '').trim();
+    if (!s) return '';
+    if (/^(javascript|data|vbscript):/i.test(s)) return '';
+    return s;
+  }
+
   function showToast(message, opts) {
     // Backwards-compat: второй аргумент исторически был числом ms; теперь
     // принимает либо number, либо {ms, variant}. variant === 'danger' даёт
@@ -14763,7 +14817,14 @@
 
   // Custom modal — replaces native window.prompt / window.confirm so the
   // dialog matches our dark theme instead of QtWebEngine's stock chrome.
+  // Stacking guard: если предыдущий showModal ещё не resolve'нулся (юзер
+  // успел дважды кликнуть «Удалить» / два push'а из бэка пришли подряд),
+  // второй вызов сразу resolve'ится в null — иначе keydown-handler'ы
+  // обоих диалогов работают одновременно и Escape «зажирает» оба promise'а.
+  let _modalOpen = false;
   function showModal({ message, type = 'confirm', defaultValue = '', okLabel, danger = false }) {
+    if (_modalOpen) return Promise.resolve(null);
+    _modalOpen = true;
     return new Promise((resolve) => {
       const backdrop = document.createElement('div');
       backdrop.className = 'modal-backdrop';
@@ -14788,6 +14849,7 @@
       const close = (result) => {
         document.removeEventListener('keydown', onKey);
         backdrop.remove();
+        _modalOpen = false;
         resolve(result);
       };
       const onKey = (e) => {

@@ -337,7 +337,14 @@ def cosine_top_match(
     matrix: np.ndarray,
     threshold: float = 0.92,
 ) -> int | None:
-    assert len(ids) == matrix.shape[0], "ids/matrix length mismatch"
+    # Runtime-check вместо `assert` — assert'ы выпиливаются `python -O`
+    # и invariant проверки не работают в production. Длина mismatch'а —
+    # bug в caller'е (плохая консистентность embedding-cache'а), лучше
+    # быстро упасть с понятным сообщением, чем тихо вернуть мусор.
+    if len(ids) != matrix.shape[0]:
+        raise ValueError(
+            f"cosine_top_match: ids/matrix length mismatch ({len(ids)} vs {matrix.shape[0]})"
+        )
     if matrix.size == 0:
         return None
     q = np.asarray(query, dtype=np.float32)

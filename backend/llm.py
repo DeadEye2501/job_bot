@@ -66,6 +66,12 @@ CLASSIFY_HR_REPLY_PROMPT = """Ты классифицируешь ответ HR-
 Текст: "We'd like to offer you the Lead Florist position at €3200/month, full-time, starting Nov 15. Please confirm."
 Ответ: {"status": "Offer", "explanation": "HR is making a formal offer with specified position, salary, schedule and start date."}
 
+Текст: "Hallo! Leider haben wir uns für einen anderen Kandidaten entschieden. Vielen Dank für Ihr Interesse und viel Erfolg!"
+Ответ: {"status": "Decline", "explanation": "HR teilt mit, dass ein anderer Kandidat ausgewählt wurde — höfliche Absage."}
+
+Текст: "Hätten Sie Lust auf ein 30-minütiges Gespräch morgen um 14:00 Uhr CET, um die Stelle zu besprechen?"
+Ответ: {"status": "Invitation", "explanation": "HR lädt zu einem 30-minütigen Gespräch zur konkreten Zeit ein."}
+
 Формат ответа строго: {"status": "...", "explanation": "..."}
 Никакого текста до или после JSON. Никакого markdown. Никаких code-fence заборчиков. Никаких пояснений вне поля explanation."""
 

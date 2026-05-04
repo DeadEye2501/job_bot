@@ -1407,6 +1407,9 @@ class IngestionPipeline:
                 return
             ch.last_processed_msg_id = msg_id
             await session.commit()
+        logger.debug(
+            "advance_cursor: channel=%d -> msg_id=%d", channel_id, msg_id,
+        )
 
     async def _ensure_embedding_cache(self) -> None:
         if self._embedding_cache_loaded:
