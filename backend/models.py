@@ -3,6 +3,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     Column,
     DateTime,
     Enum as SQLEnum,
@@ -58,7 +59,15 @@ profile_experience_skills = Table(
 
 
 class BotState(Base):
+    """Single-row table — id всегда 1. CHECK-constraint защищает от
+    случайной вставки второй строки через raw SQL: ``runtime_settings``
+    хардкодит id=1 в setter'ах, но без БД-уровневой защиты ``get_mode``
+    при наличии лишних строк возвращал бы недетерминированную."""
+
     __tablename__ = "bot_state"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_bot_state_singleton"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     mode: Mapped[BotMode] = mapped_column(
@@ -144,8 +153,12 @@ class ProfileExperience(Base):
     role: Mapped[str]
     start_date: Mapped[date]
     end_date: Mapped[date | None]
-    achievements: Mapped[list[str]] = mapped_column(JSON)
-    responsibilities: Mapped[list[str]] = mapped_column(JSON)
+    achievements: Mapped[list[str]] = mapped_column(
+        JSON, server_default=text("'[]'")
+    )
+    responsibilities: Mapped[list[str]] = mapped_column(
+        JSON, server_default=text("'[]'")
+    )
     skills: Mapped[list["ProfileSkill"]] = relationship(
         secondary=profile_experience_skills
     )
@@ -158,7 +171,10 @@ class TelegramChannel(Base):
     username: Mapped[str | None]
     title: Mapped[str | None]
     is_active: Mapped[bool] = mapped_column(server_default=expression.true())
-    last_processed_msg_id: Mapped[int | None]
+    # BigInteger: Telegram message id может выйти за 2^31 в долгоживущих
+    # массовых каналах. SQLite это проглатывает (INTEGER == 64bit), но
+    # тип явно фиксирует контракт и переносит код на Postgres без сюрпризов.
+    last_processed_msg_id: Mapped[int | None] = mapped_column(BigInteger)
     avatar: Mapped[bytes | None] = mapped_column(LargeBinary)
 
 
@@ -184,12 +200,21 @@ class HR(Base):
 
 class Vacancy(Base):
     __tablename__ = "vacancy"
+    # SQLite сам индексов на FK не создаёт — каждая отрисовка HR-карточки,
+    # карточки компании, статистики канала иначе делает full-scan. Compound
+    # (hr_id, is_parsed) и (company_id, is_parsed) покрывают самые горячие
+    # фильтры UI-списка вакансий.
     __table_args__ = (
         UniqueConstraint(
             "source_channel_id",
             "source_msg_id",
             name="uq_vacancy_source",
         ),
+        Index("ix_vacancy_hr_id", "hr_id"),
+        Index("ix_vacancy_company_id", "company_id"),
+        Index("ix_vacancy_source_channel_id", "source_channel_id"),
+        Index("ix_vacancy_hr_id_is_parsed", "hr_id", "is_parsed"),
+        Index("ix_vacancy_company_id_is_parsed", "company_id", "is_parsed"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -198,7 +223,8 @@ class Vacancy(Base):
     source_channel_id: Mapped[int | None] = mapped_column(
         ForeignKey("telegram_channel.id")
     )
-    source_msg_id: Mapped[int | None]
+    # BigInteger — см. TelegramChannel.last_processed_msg_id.
+    source_msg_id: Mapped[int | None] = mapped_column(BigInteger)
     raw_text: Mapped[str | None]
     embedding: Mapped[list[float] | None] = mapped_column(JSON)
     title: Mapped[str | None]
@@ -262,7 +288,9 @@ class Company(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(unique=True)
-    aliases: Mapped[list[str]] = mapped_column(JSON)
+    aliases: Mapped[list[str]] = mapped_column(
+        JSON, server_default=text("'[]'")
+    )
     website: Mapped[str | None]
     notes: Mapped[str | None]
     avatar: Mapped[bytes | None] = mapped_column(LargeBinary)
@@ -270,6 +298,8 @@ class Company(Base):
 
 class Message(Base):
     __tablename__ = "message"
+    # FK-индексы на hr_id / vacancy_id горячие: chat-list, HR-detail,
+    # vacancy-delete-cascade ходят по ним в каждом UI-action'е.
     __table_args__ = (
         UniqueConstraint(
             "hr_id",
@@ -277,6 +307,8 @@ class Message(Base):
             "is_incoming",
             name="uq_message_hr_tgid_dir",
         ),
+        Index("ix_message_hr_id", "hr_id"),
+        Index("ix_message_vacancy_id", "vacancy_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -374,6 +406,9 @@ class VacancyStatusHistory(Base):
     __tablename__ = "vacancy_status_history"
     __table_args__ = (
         Index("ix_vsh_vacancy_changed", "vacancy_id", "changed_at"),
+        # Aggregate-запросы по статусу (Applied / Decline counters в stats)
+        # сканировали всю таблицу — теперь по индексу.
+        Index("ix_vsh_status", "status"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -410,10 +445,14 @@ class TgAccount(Base):
     """Single-row table holding the active Telegram account.
 
     Encrypted columns store ciphertext produced by the Python-side Fernet
-    wrapper using the master key from the OS keyring.
+    wrapper using the master key from the OS keyring. CHECK-constraint
+    enforces id=1 на уровне БД — см. ``BotState`` для мотивации.
     """
 
     __tablename__ = "tg_account"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_tg_account_singleton"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     api_id: Mapped[int | None]

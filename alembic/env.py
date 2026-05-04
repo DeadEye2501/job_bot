@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from logging.config import fileConfig
 
 from alembic import context
@@ -23,7 +24,15 @@ if config.config_file_name is not None:
         from backend.log_buffer import install as _reinstall_log_buffer
         _reinstall_log_buffer()
     except Exception:
-        pass
+        # Не падаем если log_buffer переехал/сломался — миграция важнее
+        # UI-логов, но молчать тоже нельзя: если это из-за ImportError'а,
+        # юзер бы хотел знать что UI «Логи» больше не получит сообщений
+        # после `alembic upgrade`.
+        logging.getLogger(__name__).warning(
+            "alembic env: failed to reinstall LogBufferHandler — "
+            "in-app log panel will miss migration output",
+            exc_info=True,
+        )
 
 target_metadata = Base.metadata
 
