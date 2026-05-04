@@ -3106,6 +3106,25 @@ class MainApi(QObject):
         embed = payload.get("embed") if isinstance(payload.get("embed"), dict) else None
         app = payload.get("app") if isinstance(payload.get("app"), dict) else None
 
+        # Pre-validate: пустой model — почти всегда last-blur'на стерлась
+        # в tab-switch'е (см. main.html guards). Раньше уходило в
+        # _set_llm как пустая строка, _from_llm_row возвращал None и
+        # config «исчезал» — юзер думал «починилось», а LLM-вызовы
+        # начинали валиться. Лучше отбить рано с понятной ошибкой.
+        for kind_name, payload in (("chat", chat), ("embed", embed)):
+            if payload is None:
+                continue
+            model_val = str(payload.get("model") or "").strip()
+            if not model_val:
+                logger.warning(
+                    "save_settings: empty model for %s — refusing to save",
+                    kind_name,
+                )
+                self.settings_save_done.emit(
+                    _err(f"{kind_name}: пустое имя модели — сохранение отклонено")
+                )
+                return
+
         async def run() -> str:
             applied: list[str] = []
             try:

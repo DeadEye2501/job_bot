@@ -6376,7 +6376,7 @@
         if (id == null || !api) return;
         const ok = await showModal({
           type: 'confirm',
-          message: 'Удалить эту вакансию? Связанная история статусов и события пайплайна будут удалены.',
+          message: 'Удалить эту вакансию? Связанная история статусов и события будут удалены.',
           okLabel: 'Удалить',
           danger: true,
         });
@@ -12553,10 +12553,20 @@
     // На blur полей base_url/api_key — обновляем datalist + autosave.
     // Дополнительно: если embed.same_as_chat, blur по chat-полям должен
     // обновить и embed-datalist + сохранить embed-секцию (creds копируются).
+    // ВАЖНО про blur-листенеры ниже: при переключении таба `renderSection()`
+    // сносит mainSlot.innerHTML до того, как blur успевает сработать. Браузер
+    // FIRE'ит blur на detached input'е, наш handler пытается прочитать
+    // mainSlot.querySelector('[data-field="chat.api_key"]') — а там уже DOM
+    // другой секции. Возвращается null → fallback '' → _saveSettings({chat:
+    // {base_url:'', api_key:'', model:''}}) ЗАТИРАЕТ creds в БД и в appState.
+    // Гард: если фокусированный input уже отсоединён, blur был частью
+    // tab-switch'а, save игнорим. Состояние creds останется тем, что было
+    // до начала редактирования — пусть юзер вернётся и нажмёт ещё раз.
     ['chat.base_url', 'chat.api_key'].forEach(field => {
       const inp = mainSlot.querySelector(`[data-field="${field}"]`);
       if (!inp) return;
       inp.addEventListener('blur', () => {
+        if (!inp.isConnected) return;
         _llmFetchModels('chat');
         const patch = { chat: _readChatFromDom() };
         if (appState.system.settings.embedSameAsChat) {
@@ -12570,6 +12580,7 @@
       const inp = mainSlot.querySelector(`[data-field="${field}"]`);
       if (!inp) return;
       inp.addEventListener('blur', () => {
+        if (!inp.isConnected) return;
         _llmFetchModels('embed');
         _saveSettings({ embed: _readEmbedFromDom() });
       });
@@ -12579,6 +12590,7 @@
     const chatModelInp = mainSlot.querySelector('[data-field="chat.model"]');
     if (chatModelInp) {
       chatModelInp.addEventListener('blur', () => {
+        if (!chatModelInp.isConnected) return;
         const patch = { chat: _readChatFromDom() };
         if (appState.system.settings.embedSameAsChat) {
           patch.embed = _readEmbedFromDom();
@@ -12588,7 +12600,10 @@
     }
     const embedModelInp = mainSlot.querySelector('[data-field="embed.model"]');
     if (embedModelInp) {
-      embedModelInp.addEventListener('blur', () => _saveSettings({ embed: _readEmbedFromDom() }));
+      embedModelInp.addEventListener('blur', () => {
+        if (!embedModelInp.isConnected) return;
+        _saveSettings({ embed: _readEmbedFromDom() });
+      });
     }
     // Любое редактирование creds сбрасывает probe-плашку — иначе она
     // продолжает показывать старый «model · ms» / «Проверка…», когда
@@ -12612,6 +12627,18 @@
           probe.error = '';
           const pill = mainSlot.querySelector(`[data-role="${kind}-probe-pill"]`);
           if (pill) pill.remove();
+          // Re-enable «Проверить» — без этого кнопка остаётся disabled
+          // навсегда: probe.status сбрасывается на 'idle', но disabled
+          // attribute живёт в DOM с момента предыдущего рендера. Поздний
+          // ответ через onLlmProbeDone увидит status !== 'busy' и не
+          // ререндерит — кнопка торчит disabled до полного re-render'а.
+          const probeBtn = mainSlot.querySelector(
+            `[data-action="settings-llm-probe"][data-kind="${kind}"]`
+          );
+          if (probeBtn) {
+            probeBtn.disabled = false;
+            probeBtn.innerHTML = '<span class="material-symbols-outlined">network_check</span>Проверить';
+          }
         }
       });
     });
@@ -12847,7 +12874,7 @@
     if (clearBtn) {
       clearBtn.addEventListener('click', async () => {
         const ok = await showModal({
-          message: `Очистить in-memory log-buffer?\n\nЗаписи в файлах/stdout не удаляются — это только UI-список.`,
+          message: `Очистить буфер логов в окне?\n\nЗаписи в файлах/stdout не удаляются — это только UI-список.`,
           type: 'confirm',
           danger: true,
           okLabel: 'Очистить',
