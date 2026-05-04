@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 380ee78d02c9
+Revision ID: dcdb3ecb3a6f
 Revises: 
-Create Date: 2026-05-03 11:30:38.582699+00:00
+Create Date: 2026-05-04 14:46:07.245293+00:00
 
 """
 from typing import Sequence, Union
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = '380ee78d02c9'
+revision: str = 'dcdb3ecb3a6f'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -37,12 +37,13 @@ def upgrade() -> None:
     op.create_table('bot_state',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('mode', sa.Enum('Off', 'DM Only', 'Full', name='bot_mode'), server_default=sa.text("'Off'"), nullable=False),
+    sa.CheckConstraint('id = 1', name='ck_bot_state_singleton'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('company',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
-    sa.Column('aliases', sa.JSON(), nullable=False),
+    sa.Column('aliases', sa.JSON(), server_default=sa.text("'[]'"), nullable=False),
     sa.Column('website', sa.String(), nullable=True),
     sa.Column('notes', sa.String(), nullable=True),
     sa.Column('avatar', sa.LargeBinary(), nullable=True),
@@ -91,7 +92,7 @@ def upgrade() -> None:
     sa.Column('username', sa.String(), nullable=True),
     sa.Column('title', sa.String(), nullable=True),
     sa.Column('is_active', sa.Boolean(), server_default=sa.text('1'), nullable=False),
-    sa.Column('last_processed_msg_id', sa.Integer(), nullable=True),
+    sa.Column('last_processed_msg_id', sa.BigInteger(), nullable=True),
     sa.Column('avatar', sa.LargeBinary(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
@@ -103,6 +104,7 @@ def upgrade() -> None:
     sa.Column('password_encrypted', sa.String(), nullable=True),
     sa.Column('session_blob_encrypted', sa.LargeBinary(), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.CheckConstraint('id = 1', name='ck_tg_account_singleton'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('profile_experience',
@@ -113,8 +115,8 @@ def upgrade() -> None:
     sa.Column('role', sa.String(), nullable=False),
     sa.Column('start_date', sa.Date(), nullable=False),
     sa.Column('end_date', sa.Date(), nullable=True),
-    sa.Column('achievements', sa.JSON(), nullable=False),
-    sa.Column('responsibilities', sa.JSON(), nullable=False),
+    sa.Column('achievements', sa.JSON(), server_default=sa.text("'[]'"), nullable=False),
+    sa.Column('responsibilities', sa.JSON(), server_default=sa.text("'[]'"), nullable=False),
     sa.ForeignKeyConstraint(['profile_id'], ['profile.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -152,7 +154,7 @@ def upgrade() -> None:
     sa.Column('hr_id', sa.Integer(), nullable=True),
     sa.Column('company_id', sa.Integer(), nullable=True),
     sa.Column('source_channel_id', sa.Integer(), nullable=True),
-    sa.Column('source_msg_id', sa.Integer(), nullable=True),
+    sa.Column('source_msg_id', sa.BigInteger(), nullable=True),
     sa.Column('raw_text', sa.String(), nullable=True),
     sa.Column('embedding', sa.JSON(), nullable=True),
     sa.Column('title', sa.String(), nullable=True),
@@ -180,6 +182,11 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('source_channel_id', 'source_msg_id', name='uq_vacancy_source')
     )
+    op.create_index('ix_vacancy_company_id', 'vacancy', ['company_id'], unique=False)
+    op.create_index('ix_vacancy_company_id_is_parsed', 'vacancy', ['company_id', 'is_parsed'], unique=False)
+    op.create_index('ix_vacancy_hr_id', 'vacancy', ['hr_id'], unique=False)
+    op.create_index('ix_vacancy_hr_id_is_parsed', 'vacancy', ['hr_id', 'is_parsed'], unique=False)
+    op.create_index('ix_vacancy_source_channel_id', 'vacancy', ['source_channel_id'], unique=False)
     op.create_table('message',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('is_incoming', sa.Boolean(), server_default=sa.text('0'), nullable=False),
@@ -199,6 +206,8 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('hr_id', 'tg_message_id', 'is_incoming', name='uq_message_hr_tgid_dir')
     )
+    op.create_index('ix_message_hr_id', 'message', ['hr_id'], unique=False)
+    op.create_index('ix_message_vacancy_id', 'message', ['vacancy_id'], unique=False)
     op.create_table('profile_experience_skills',
     sa.Column('experience_id', sa.Integer(), nullable=False),
     sa.Column('skill_id', sa.Integer(), nullable=False),
@@ -229,6 +238,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['vacancy_id'], ['vacancy.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index('ix_vsh_status', 'vacancy_status_history', ['status'], unique=False)
     op.create_index('ix_vsh_vacancy_changed', 'vacancy_status_history', ['vacancy_id', 'changed_at'], unique=False)
     # ### end Alembic commands ###
 
@@ -236,11 +246,19 @@ def upgrade() -> None:
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_index('ix_vsh_vacancy_changed', table_name='vacancy_status_history')
+    op.drop_index('ix_vsh_status', table_name='vacancy_status_history')
     op.drop_table('vacancy_status_history')
     op.drop_index('ix_vacancy_event_vacancy_created', table_name='vacancy_event')
     op.drop_table('vacancy_event')
     op.drop_table('profile_experience_skills')
+    op.drop_index('ix_message_vacancy_id', table_name='message')
+    op.drop_index('ix_message_hr_id', table_name='message')
     op.drop_table('message')
+    op.drop_index('ix_vacancy_source_channel_id', table_name='vacancy')
+    op.drop_index('ix_vacancy_hr_id_is_parsed', table_name='vacancy')
+    op.drop_index('ix_vacancy_hr_id', table_name='vacancy')
+    op.drop_index('ix_vacancy_company_id_is_parsed', table_name='vacancy')
+    op.drop_index('ix_vacancy_company_id', table_name='vacancy')
     op.drop_table('vacancy')
     op.drop_index('ix_trash_event_channel_created', table_name='trash_event')
     op.drop_table('trash_event')
