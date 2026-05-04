@@ -1189,7 +1189,7 @@ async def get_hr_detail(
     )
 
 
-def _hr_blacklist_candidates(hr: HR) -> list[str]:
+def hr_blacklist_candidates(hr: HR) -> list[str]:
     """Possible blacklist `value` strings for this HR — same format the
     `contacts_add_hr_to_blacklist` slot writes. Both forms are checked so
     a row added under one identifier (username) still surfaces if the HR
@@ -1204,7 +1204,7 @@ def _hr_blacklist_candidates(hr: HR) -> list[str]:
 
 
 async def _hr_blacklist_value(session: AsyncSession, hr: HR) -> str | None:
-    candidates = _hr_blacklist_candidates(hr)
+    candidates = hr_blacklist_candidates(hr)
     if not candidates:
         return None
     # Deterministic when both forms exist (rare — re-add across schema
@@ -1326,7 +1326,7 @@ async def list_hr_with_counts(
     )
 
     def _is_blacklisted(hr: HR) -> bool:
-        return any(c in bl_values for c in _hr_blacklist_candidates(hr))
+        return any(c in bl_values for c in hr_blacklist_candidates(hr))
 
     return [
         HrWithCount(
@@ -1394,13 +1394,13 @@ async def list_companies_with_counts(
         CompanyWithCount(
             company=c,
             vacancy_count=int(cnt or 0),
-            is_blacklisted=any(v in bl_values for v in _company_blacklist_candidates(c)),
+            is_blacklisted=any(v in bl_values for v in company_blacklist_candidates(c)),
         )
         for c, cnt in rows
     ]
 
 
-def _channel_blacklist_candidates(ch: TelegramChannel) -> list[str]:
+def channel_blacklist_candidates(ch: TelegramChannel) -> list[str]:
     """Возможные blacklist `value` строки для канала. Используется для
     case-insensitive lookup'а — username может быть mixed-case или нет.
     Сейчас возвращаем только @username; формат и регистр совпадает с
@@ -1409,10 +1409,6 @@ def _channel_blacklist_candidates(ch: TelegramChannel) -> list[str]:
     if not ch.username:
         return []
     return [f"@{ch.username}"]
-
-
-def channel_blacklist_candidates(ch: TelegramChannel) -> list[str]:
-    return _channel_blacklist_candidates(ch)
 
 
 def channel_blacklist_preferred_value(ch: TelegramChannel) -> str | None:
@@ -1427,7 +1423,7 @@ async def _channel_blacklist_value(
     """Если канал сейчас активно в blacklist'е, возвращаем точный
     `value` строки (для UI-чипа в detail-pane). None — если не в нём.
     """
-    candidates = _channel_blacklist_candidates(ch)
+    candidates = channel_blacklist_candidates(ch)
     if not candidates:
         return None
     row = (
@@ -1497,7 +1493,7 @@ async def list_telegram_channels(
     )
 
     def _is_blacklisted(ch: TelegramChannel) -> bool:
-        return any(c in bl_values for c in _channel_blacklist_candidates(ch))
+        return any(c in bl_values for c in channel_blacklist_candidates(ch))
 
     return [
         ChannelWithCount(
@@ -2462,7 +2458,7 @@ async def deactivate_blacklisted_channels(session: AsyncSession) -> int:
     ).all()
     flipped = 0
     for ch in channels:
-        if any(c in bl_values for c in _channel_blacklist_candidates(ch)):
+        if any(c in bl_values for c in channel_blacklist_candidates(ch)):
             ch.is_active = False
             flipped += 1
     if flipped:
@@ -2506,7 +2502,7 @@ async def set_all_channels_active(
         )
         if bl_values:
             # Совпадение по `@username` — то же exact-match, что в
-            # `_channel_blacklist_candidates`.
+            # `channel_blacklist_candidates`.
             stripped = [v.lstrip("@") for v in bl_values]
             stmt = stmt.where(TelegramChannel.username.notin_(stripped))
     result = await session.execute(stmt)
@@ -2561,7 +2557,7 @@ async def delete_channel(
     return detached_n
 
 
-def _company_blacklist_candidates(co: Company) -> list[str]:
+def company_blacklist_candidates(co: Company) -> list[str]:
     """Possible blacklist `value` strings that should match this company.
 
     Just the company name — no other identifiers exist (no @username
@@ -2571,10 +2567,6 @@ def _company_blacklist_candidates(co: Company) -> list[str]:
     return [co.name] if co.name else []
 
 
-def company_blacklist_candidates(co: Company) -> list[str]:
-    return _company_blacklist_candidates(co)
-
-
 def company_blacklist_preferred_value(co: Company) -> str | None:
     return co.name or None
 
@@ -2582,7 +2574,7 @@ def company_blacklist_preferred_value(co: Company) -> str | None:
 async def _company_blacklist_value(
     session: AsyncSession, co: Company
 ) -> str | None:
-    candidates = _company_blacklist_candidates(co)
+    candidates = company_blacklist_candidates(co)
     if not candidates:
         return None
     row = (
@@ -3445,16 +3437,6 @@ async def delete_hr(session: AsyncSession, hr_id: int) -> bool:
         int(detached or 0),
     )
     return True
-
-
-def hr_blacklist_candidates(hr: HR) -> list[str]:
-    """Possible blacklist `value` strings that should match this HR.
-
-    Order: @username first, then user_id:N. Both are returned because a
-    row may have been added under either identifier; lookups need to
-    match on the union.
-    """
-    return _hr_blacklist_candidates(hr)
 
 
 def hr_blacklist_preferred_value(hr: HR) -> str | None:

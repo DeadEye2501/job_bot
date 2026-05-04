@@ -7885,19 +7885,40 @@
     }));
   }
 
+  // Trailing-edge debounce для read-receipt'ов: HR открывая чат может
+  // мгновенно прочитать пачку наших старых исходящих → 10 receipt'ов
+  // за миллисекунду. Без debounce — 10 renderSection'ов и 10 пересборок
+  // st.messages copy-on-write'ом. Накапливаем maxId, применяем один раз.
+  let _onReadReceiptTimer = null;
+  const _onReadReceiptPending = new Map(); // hrId → maxTgId
   function onContactsHrReadReceipt(p) {
     if (!p || !p.ok) return;
     const hrId = Number(p.hr_id);
     const maxId = Number(p.max_tg_id);
     if (!Number.isFinite(hrId) || !Number.isFinite(maxId)) return;
+    const prev = _onReadReceiptPending.get(hrId);
+    if (prev == null || maxId > prev) {
+      _onReadReceiptPending.set(hrId, maxId);
+    }
+    if (_onReadReceiptTimer) clearTimeout(_onReadReceiptTimer);
+    _onReadReceiptTimer = setTimeout(() => {
+      _onReadReceiptTimer = null;
+      const pending = new Map(_onReadReceiptPending);
+      _onReadReceiptPending.clear();
+      _flushReadReceipts(pending);
+    }, PUSH_DEBOUNCE_MS);
+  }
+
+  function _flushReadReceipts(pending) {
     const st = appState.contacts.hr;
-    if (st.messagesFor !== hrId || !st.messages.length) return;
+    const maxId = pending.get(st.messagesFor);
+    if (maxId == null || !st.messages.length) return;
     const now = new Date();
     let touched = false;
-    // Копируем message-объекты перед мутацией (per frontend review M5):
-    // если кто-то ещё держит ссылку на тот же объект (futures plugins,
-    // history snapshot для undo и т.п.), они не увидят неконсистентного
-    // сдвига. Сегодня других ссылок нет, но защита почти бесплатна.
+    // Копируем message-объекты перед мутацией (frontend review M5):
+    // если кто-то ещё держит ссылку на тот же объект, они не увидят
+    // неконсистентного сдвига. Сегодня других ссылок нет, но защита
+    // почти бесплатна.
     const next = st.messages.map(m => {
       if (m.incoming || m.readAt) return m;
       if (m.tgMessageId == null || m.tgMessageId > maxId) return m;
@@ -7911,23 +7932,36 @@
     }
   }
 
+  // Trailing-edge debounce для двух push-сигналов про DM: и
+  // «новое сообщение пришло», и «HR прочитал N сообщений сразу» при
+  // burst'е улетают пачкой. Без debounce каждый дёргал re-fetch
+  // detail+messages, в результате — N последовательных round-trip'ов
+  // в БД на одного юзера. 200мс схлопывает burst в один re-fetch.
+  let _onMessagesArrivedTimer = null;
+  let _onMessagesArrivedHrId = null;
   function onContactsHrMessagesArrived(payload) {
     let p;
     try { p = JSON.parse(payload); } catch { return; }
     if (!p || !p.ok) return;
     const hrId = Number(p.hr_id);
     if (!Number.isFinite(hrId)) return;
-    // List + detail are cheap refreshes — bump unread bubble in the row
-    // and the head chip even if the user is on a different HR.
-    requestContactsHrList({ mode: 'refresh' });
-    if (appState.contacts.selectedHrId === hrId) {
-      const st = appState.contacts.hr;
-      // Release the auto-mark latch so the new incoming row gets re-marked.
-      st.markReadFor = null;
-      if (st.markReadTimer) { clearTimeout(st.markReadTimer); st.markReadTimer = null; }
-      requestContactsHrDetail(hrId);
-      requestContactsHrMessages(hrId);
-    }
+    _onMessagesArrivedHrId = hrId;
+    if (_onMessagesArrivedTimer) clearTimeout(_onMessagesArrivedTimer);
+    _onMessagesArrivedTimer = setTimeout(() => {
+      _onMessagesArrivedTimer = null;
+      const id = _onMessagesArrivedHrId;
+      _onMessagesArrivedHrId = null;
+      // List + detail — cheap refreshes; bump unread bubble в row и
+      // head chip даже если юзер на другом HR.
+      requestContactsHrList({ mode: 'refresh' });
+      if (id != null && appState.contacts.selectedHrId === id) {
+        const st = appState.contacts.hr;
+        st.markReadFor = null;
+        if (st.markReadTimer) { clearTimeout(st.markReadTimer); st.markReadTimer = null; }
+        requestContactsHrDetail(id);
+        requestContactsHrMessages(id);
+      }
+    }, PUSH_DEBOUNCE_MS);
   }
 
   function onContactsHrMessagesLoaded(payload) {
@@ -14832,16 +14866,25 @@
     healthInitialized = true;
     applyBotControlsLock();
     // Channels detail-pane more-popover gates «Прогнать сейчас» on health.
-    // Если popover открыт когда health flip-ается, у нас будет stale
-    // disabled-стейт — re-render'им. Без этого условия каждый health-tick
-    // (раз в N секунд) гасил бы DOM и сбрасывал фокус в полях поиска и
-    // в add-modal.
+    // Раньше: full renderSection() — сбивал фокус, прокрутку и состояние
+    // add-modal'и КАЖДЫЕ N секунд пока popover открыт. Теперь точечно:
+    // toggle disabled-attribute + title на одной кнопке через прямой DOM.
     if (
       appState.section === 'contacts'
       && appState.contacts.tab === 'channels'
       && appState.contacts.channels.morePopoverOpen
     ) {
-      renderSection();
+      const btn = document.querySelector(
+        '.cnt-ch-pane [data-action="cnt-ch-poll-now"], '
+        + '[data-action="cnt-ch-poll-now"]'
+      );
+      if (btn) {
+        const ok = isAllHealthy();
+        btn.disabled = !ok;
+        btn.title = ok
+          ? 'Запустить поллинг этого канала'
+          : buildHealthBlockedTip();
+      }
     }
     // Если бот сейчас в Full / DM Only, а хотя бы один хелсчек упал —
     // гасим режим в Off, чтобы основной цикл бота на следующей итерации
