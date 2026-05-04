@@ -2958,7 +2958,18 @@ class MainApi(QObject):
         совпадение на levelname, source — startswith (logger 'backend.flows'
         матчит фильтр 'backend'), search — substring case-insensitive по
         msg+details.
+
+        Дешёвая 1-сек защита от auto-fire'а из JS (например, log-poll'а в
+        пол-секунды): второй вызов в окне 1 секунды считается избыточным,
+        UI всё равно перерендерится через подписку на push-сигнал.
         """
+        import time as _time
+        last_ts = getattr(self, "_logs_request_last_ts", 0.0)
+        now = _time.time()
+        if now - last_ts < 1.0:
+            logger.debug("request_system_logs: debounced (interval %.2fs)", now - last_ts)
+            return
+        self._logs_request_last_ts = now
         from backend.log_buffer import get_handler
         try:
             payload = json.loads(payload_json) if payload_json else {}

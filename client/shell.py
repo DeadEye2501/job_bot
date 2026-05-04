@@ -86,6 +86,31 @@ def run_ui() -> int:
     logger.info("Forcing bot mode to Off on launch")
     _await(runner.submit(rs.set_mode(BotMode.OFF)))
 
+    # Sessions cleanup: если в БД лежит Fernet-encrypted session_string
+    # (Bot работает в in-memory mode), локальные sessions/*.session
+    # файлы уже не используются и хранят cleartext auth_key. Сносим
+    # их — security review L3.
+    if rs.tg is not None and rs.tg.session_string:
+        try:
+            from config import get_data_dir as _gdd
+            sessions_dir = _gdd() / "sessions"
+            if sessions_dir.exists():
+                removed = 0
+                for p in sessions_dir.iterdir():
+                    if p.is_file() and p.suffix in (".session", ".session-journal"):
+                        try:
+                            p.unlink()
+                            removed += 1
+                        except Exception as e:
+                            logger.debug("session cleanup: %s: %s", p.name, e)
+                if removed:
+                    logger.info(
+                        "session cleanup: removed %d stale .session file(s)",
+                        removed,
+                    )
+        except Exception:
+            logger.exception("session cleanup failed")
+
     window = QMainWindow()
     window.setWindowTitle("Job Bot")
     window.setWindowIcon(icon)
