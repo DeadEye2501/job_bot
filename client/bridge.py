@@ -538,12 +538,19 @@ class WizardApi(QObject):
     async def _finalize_telegram_login(self) -> str:
         assert self._tg_client is not None
         assert self._tg_creds is not None
+        client = self._tg_client
+        # try/finally чтобы disconnect выполнился даже на ошибке
+        # export_session_string'а — иначе сокет утекает (паттерн уже в
+        # MainApi._finalize_telegram_relogin, тут backport).
+        session_string: str | None = None
         try:
-            session_string = await self._tg_client.export_session_string()
-            await self._tg_client.disconnect()
-        except Exception as e:
-            logger.exception("telegram session export failed")
-            return _err(f"{type(e).__name__}: {e}")
+            try:
+                session_string = await client.export_session_string()
+            except Exception as e:
+                logger.exception("telegram session export failed")
+                return _err(f"{type(e).__name__}: {e}")
+        finally:
+            await _safe_disconnect(client)
 
         c = self._tg_creds
         await self._rs.set_tg(
