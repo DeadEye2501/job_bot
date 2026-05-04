@@ -2411,26 +2411,6 @@ async def find_channel_by_username(
     ).first()
 
 
-async def create_channel(
-    session: AsyncSession, username: str
-) -> TelegramChannel:
-    """Insert a new active channel. Stores ``username`` in canonical
-    (lowercase) form so future lookups don't depend on the user's input
-    case. ``title`` / ``avatar`` start NULL — metadata sweep (poll cycle
-    or post-create refresh) fills them in. Caller wraps in
-    ``session.begin()``.
-    """
-    ch = TelegramChannel(
-        username=username.lower(),
-        title=None,
-        is_active=True,
-    )
-    session.add(ch)
-    await session.flush()
-    logger.info("Created channel id=%d username=%s", ch.id, ch.username)
-    return ch
-
-
 async def set_channel_active(
     session: AsyncSession, channel_id: int, is_active: bool
 ) -> bool:

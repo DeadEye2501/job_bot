@@ -234,8 +234,8 @@ async def catch_up_missed_dms(
     ``is_deleted=True`` here.
     """
     from datetime import datetime, timezone
-    from sqlalchemy.exc import IntegrityError
     from backend.models import Message
+    # IntegrityError уже импортирован на module-level (flows.py:7)
 
     async with session_factory() as session:
         chats = await list_hrs_for_backfill(session)

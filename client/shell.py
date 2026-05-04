@@ -32,6 +32,12 @@ WEB_DIR = CLIENT_DIR / "web"
 WIZARD_HTML = WEB_DIR / "wizard.html"
 MAIN_HTML = WEB_DIR / "main.html"
 ICON_FILE = CLIENT_DIR / "icon.ico"
+if not ICON_FILE.exists():
+    # QIcon молча возвращает null-icon на отсутствующем файле, окно
+    # рендерится с дефолтной Qt-иконкой и юзер на packaging-issue
+    # натыкается визуально, без диагностики. Лог при старте даёт ops'у
+    # сразу понять «иконка пропала, в .exe не запаковалась».
+    logger.warning("ICON_FILE missing at %s — window will render without icon", ICON_FILE)
 
 WIZARD_WINDOW_SIZE = (640, 620)
 MAIN_WINDOW_DEFAULT = (900, 660)

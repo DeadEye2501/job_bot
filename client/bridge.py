@@ -23,8 +23,14 @@ from pathlib import Path
 from typing import Any, Callable, Coroutine
 
 import httpx
-from PySide6.QtCore import QObject, QTimer, Signal, Slot
-from PySide6.QtWidgets import QFileDialog, QMainWindow, QWidget
+from PySide6.QtCore import QObject, QTimer, QUrl, Signal, Slot
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import (
+    QApplication,
+    QFileDialog,
+    QMainWindow,
+    QWidget,
+)
 from sqlalchemy import func, select, text as sa_text
 from pyrogram.client import Client as PyrogramClient
 from pyrogram.errors import (
@@ -1206,9 +1212,6 @@ class MainApi(QObject):
         cv_path = self._rs.cv_path
         if not cv_path:
             return
-        from PySide6.QtCore import QUrl
-        from PySide6.QtGui import QDesktopServices
-
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(cv_path).resolve())))
 
     @Slot(str)
@@ -1222,16 +1225,11 @@ class MainApi(QObject):
         """
         if not url:
             return
-        from PySide6.QtCore import QUrl
-        from PySide6.QtGui import QDesktopServices
-
         QDesktopServices.openUrl(QUrl(url))
 
     @Slot(str)
     def copy_to_clipboard(self, text: str) -> None:
         """Копирование в системный буфер для WebEngine UI (Clipboard API там часто недоступен)."""
-        from PySide6.QtWidgets import QApplication
-
         cb = QApplication.clipboard()
         if cb:
             cb.setText(text or "")
