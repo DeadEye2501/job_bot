@@ -27,6 +27,7 @@ from pyrogram.raw.types import (
     UpdateReadHistoryOutbox as _UpdateReadHistoryOutbox,
 )
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from adapters import lm_studio, telegram
@@ -34,6 +35,11 @@ from config import get_data_dir
 from backend import repository
 from backend.domain import should_apply_status
 from backend.flows import IngestionPipeline, catch_up_missed_dms, process_dm
+from backend.helpers import extract_dm_text, extract_text, fetch_telegram_avatar
+from backend.repository import (
+    _hr_blacklist_value,
+    find_known_hr,
+)
 from backend.models import (
     HR,
     BotMode,
@@ -387,7 +393,6 @@ class Bot:
             if existing is not None:
                 return existing.id, "exists"
 
-        from backend.helpers import fetch_telegram_avatar
         try:
             chat = await self._client.get_chat(username)
         except Exception as e:
@@ -704,7 +709,6 @@ class Bot:
         # может пройти время на LLM-генерацию). Зеркалит проверку из
         # send_to_hr_chat / send_to_hr_media.
         async with self._session_factory() as session:
-            from backend.repository import _hr_blacklist_value
             bl_value = await _hr_blacklist_value(session, hr)
         if bl_value:
             logger.warning(
@@ -927,7 +931,6 @@ class Bot:
             if hr is None:
                 raise RuntimeError(f"HR id={hr_id} не найден.")
             target = hr.telegram_user_id or hr.telegram_username
-            from backend.repository import _hr_blacklist_value
             bl_value = await _hr_blacklist_value(session, hr)
         if target is None:
             raise RuntimeError(
@@ -948,7 +951,6 @@ class Bot:
         # it'll persist the row first and our INSERT then trips the
         # (hr_id, tg_message_id, is_incoming=False) UNIQUE. Treat that as
         # success and return the existing row.
-        from sqlalchemy.exc import IntegrityError
         async with self._session_factory() as session:
             row = Message(
                 is_incoming=False,
@@ -999,7 +1001,6 @@ class Bot:
             if hr is None:
                 raise RuntimeError(f"HR id={hr_id} не найден.")
             target = hr.telegram_user_id or hr.telegram_username
-            from backend.repository import _hr_blacklist_value
             bl_value = await _hr_blacklist_value(session, hr)
         if target is None:
             raise RuntimeError(
@@ -1054,7 +1055,6 @@ class Bot:
         media_kind = "photo" if as_photo else "document"
         media_name = None if as_photo else src.name
 
-        from sqlalchemy.exc import IntegrityError
         async with self._session_factory() as session:
             row = Message(
                 is_incoming=False,
@@ -1100,7 +1100,6 @@ class Bot:
             return
         from datetime import datetime as _dt, timezone as _tz
         from sqlalchemy import update as _sa_update
-        from backend.repository import find_known_hr
 
         user_id = peer.user_id
         max_id = update.max_id
@@ -1136,8 +1135,6 @@ class Bot:
         if not msg.chat:
             return
         from sqlalchemy import update as _sa_update
-        from backend.helpers import extract_dm_text, extract_text
-        from backend.repository import find_known_hr
 
         chat_id = msg.chat.id
         chat_username = getattr(msg.chat, "username", None)
@@ -1212,7 +1209,6 @@ class Bot:
 
         now = _dt.now(_tz.utc)
         touched_hr_ids: set[int] = set()
-        from backend.repository import find_known_hr
 
         async def _flip_deleted(session, where_clauses) -> int:
             # Two updates so we can also seal read_at on incoming tombstones
@@ -1305,9 +1301,6 @@ class Bot:
             return
         if not msg.chat:
             return
-        from sqlalchemy.exc import IntegrityError
-        from backend.helpers import extract_dm_text
-        from backend.repository import find_known_hr
 
         recipient_id = msg.chat.id
         recipient_username = getattr(msg.chat, "username", None)
@@ -1399,7 +1392,6 @@ class Bot:
         if not msg.from_user:
             return
         try:
-            from backend.repository import find_known_hr
             async with self._session_factory() as session:
                 hr = await find_known_hr(
                     session,

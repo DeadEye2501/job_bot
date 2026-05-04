@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from sqlalchemy import func, select, text as sa_text
+from sqlalchemy.exc import IntegrityError
 from pyrogram.client import Client as PyrogramClient
 from pyrogram.errors import (
     BadRequest,
@@ -1962,7 +1963,6 @@ class MainApi(QObject):
             return
 
         async def run() -> str:
-            from sqlalchemy.exc import IntegrityError
             try:
                 async with self._session_factory() as session:
                     async with session.begin():
@@ -4207,7 +4207,6 @@ class MainApi(QObject):
             return
 
         async def run() -> str:
-            from sqlalchemy.exc import IntegrityError
             try:
                 async with self._session_factory() as session:
                     co = await repository.create_company(

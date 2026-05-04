@@ -5551,7 +5551,7 @@
     }).join('');
     const applyDisabled = st.statusSaving ? ' disabled' : '';
     return `
-      <div class="status-popover" data-role="status-popover">
+      <div class="status-popover">
         <div class="status-options">${options}</div>
         <textarea class="popover-comment" data-role="status-comment" placeholder="Причина (опционально)...">${escapeHtml(st.statusCommentDraft || '')}</textarea>
         <div class="popover-actions">
@@ -5581,7 +5581,7 @@
       : (!canRerunPipeline ? buildHealthBlockedTip() : 'Сгенерировать cover letter и отправить с резюме');
     const sendMuted = canSend ? '' : ' is-disabled';
     return `
-      <div class="more-popover" data-role="more-popover">
+      <div class="more-popover">
         <button class="menu-item${sendMuted}" data-action="send-application" type="button" title="${escapeAttr(sendTitle)}">
           <span class="material-symbols-outlined">send</span>
           <span>Отправить отклик</span>
@@ -8326,7 +8326,7 @@
           <span>Добавить в blacklist</span>
         </button>`;
     return `
-      <div class="more-popover" data-role="cnt-hr-more-popover">
+      <div class="more-popover">
         <button class="menu-item" data-action="cnt-hr-merge" type="button" title="Слить с другим HR">
           <span class="material-symbols-outlined">merge</span>
           <span>Слить с другим HR</span>
@@ -9530,7 +9530,7 @@
           <span>Добавить в blacklist</span>
         </button>`;
     return `
-      <div class="more-popover" data-role="cnt-co-more-popover">
+      <div class="more-popover">
         <button class="menu-item" data-action="cnt-co-merge" type="button" title="Слить с другой компанией">
           <span class="material-symbols-outlined">merge</span>
           <span>Слить с другой компанией</span>
@@ -10437,7 +10437,7 @@
           <span>Добавить в blacklist</span>
         </button>`;
     return `
-      <div class="more-popover" data-role="cnt-ch-more-popover">
+      <div class="more-popover">
         <button class="menu-item" data-action="cnt-ch-poll-now" type="button" title="${escapeAttr(blockedTip)}"${pollDisabled ? ' disabled' : ''}>
           <span class="material-symbols-outlined">refresh</span>
           <span>Прогнать сейчас</span>
