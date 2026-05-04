@@ -34,7 +34,15 @@ from config import get_data_dir
 from backend import repository
 from backend.domain import should_apply_status
 from backend.flows import IngestionPipeline, catch_up_missed_dms, process_dm
-from backend.models import HR, BotMode, Message, Vacancy, VacancyEvent, VacancyStatus
+from backend.models import (
+    HR,
+    BotMode,
+    Message,
+    Vacancy,
+    VacancyEvent,
+    VacancyStatus,
+    VacancyStatusHistory,
+)
 from backend.runtime_settings import RuntimeSettings
 
 
@@ -733,25 +741,56 @@ class Bot:
         # ещё раз, делаем fallback-flip status=APPLIED отдельной тонкой
         # транзакцией: пусть аудит-row потерян, но re-send отбивается
         # стандартной already_applied-проверкой в send_application_for_vacancy.
+        # SEND_LOCKED / dry_run: Message-row НЕ пишем (раньше писали «для
+        # аудита», но получалось что in-app HR-чат показывал фантомное
+        # сообщение, которого в реальном Telegram нет — юзеры путались).
+        # Аудит покрыт VacancyEvent(kind="applied_sent") ниже + флагом
+        # suppressed=True в его payload'е.
         try:
             async with self._session_factory() as session:
-                session.add(
-                    Message(
-                        is_incoming=False,
-                        hr_id=hr.id,
-                        vacancy_id=vacancy_id,
-                        text=text,
-                        tg_message_id=tg_msg_id,
+                if not suppressed:
+                    session.add(
+                        Message(
+                            is_incoming=False,
+                            hr_id=hr.id,
+                            vacancy_id=vacancy_id,
+                            text=text,
+                            tg_message_id=tg_msg_id,
+                        )
                     )
-                )
                 applied_now = False
                 if vacancy_id is not None:
                     v = await session.get(Vacancy, vacancy_id)
                     if v is not None and should_apply_status(
                         v.status, VacancyStatus.APPLIED, force=force
                     ):
+                        previous_status = v.status
                         v.status = VacancyStatus.APPLIED
                         applied_now = True
+                        # Status-history row нужен чтобы таймлайн вакансии
+                        # показал «Applied: …» — без этого NEW→APPLIED-флип
+                        # из Bot.send проходил молча, в UI было видно
+                        # только applied_sent VacancyEvent (без статус-цвета).
+                        kind_label = (
+                            "Ручная отправка"
+                            if force
+                            else "Авто-отправка отклика"
+                        )
+                        suffix = (
+                            " (SEND_LOCKED — симуляция, реального DM не было)"
+                            if suppressed
+                            else ""
+                        )
+                        session.add(
+                            VacancyStatusHistory(
+                                vacancy_id=vacancy_id,
+                                message_id=None,
+                                previous_status=previous_status,
+                                status=VacancyStatus.APPLIED,
+                                explanation=f"{kind_label}{suffix}",
+                                applied=True,
+                            )
+                        )
                 await session.commit()
         except Exception:
             logger.error(

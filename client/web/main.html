@@ -5460,7 +5460,44 @@
         const statusName = it.payload.status
           ? `<span class="status-name">${escapeHtml(it.payload.status)}:</span>`
           : '';
+        // Точка совпадает с цветом статуса вакансии после парса —
+        // иначе «New: Без замечаний.» рендерилось серой точкой,
+        // несовпадающей с собственным badge'ом «New» на шапке.
+        if (it.payload.status) {
+          dotCls = ' ' + statusToClass(it.payload.status);
+        }
         textHtml = `${statusName} <span class="tl-event">${escapeHtml(skipReason)}</span>`;
+      } else if (it.eventKind === 'auto_send') {
+        // VacancyEvent kind="auto_send" — каждая попытка авто-отправки
+        // (success или fail). payload: {ok: bool, reason: str}.
+        // Точку красим зелёным (Applied) если получилось, иначе серая.
+        const ok = it.payload.ok === true;
+        const reason = it.payload.reason || (ok ? 'sent' : 'unknown');
+        const reasonLabels = {
+          'sent': 'cover letter отправлен',
+          'sent_locked': 'симуляция (SEND_LOCKED)',
+          'profile_empty': 'профиль пуст',
+          'cover_letter_failed': 'LLM не сгенерировал письмо',
+          'cv_missing': 'CV-файл не найден',
+          'race': 'статус успел измениться',
+          'blocked': 'отправка заблокирована',
+          'telegram_error': 'Telegram отказался',
+        };
+        const label = reasonLabels[reason] || reason;
+        if (ok) dotCls = ' ' + statusToClass('Applied');
+        textHtml = `<span class="tl-event">Авто-отправка: ${escapeHtml(label)}.</span>`;
+      } else if (it.eventKind === 'applied_sent') {
+        // VacancyEvent kind="applied_sent" — фактическая отправка письма
+        // (Bot.send). Парная с VacancyStatusHistory("Applied"); тут
+        // несём dev-метаданные (suppressed, cover_letter_chars, force).
+        const suppressed = it.payload.suppressed === true;
+        const force = it.payload.force === true;
+        const chars = it.payload.cover_letter_chars;
+        const tag = suppressed ? '[SEND_LOCKED]' : (force ? 'ручная' : '');
+        const charsPart = chars ? `, ${chars} симв.` : '';
+        const fullText = (tag ? `${tag} ` : '') + `Отправлен отклик${charsPart}.`;
+        dotCls = ' ' + statusToClass('Applied');
+        textHtml = `<span class="tl-event">${escapeHtml(fullText)}</span>`;
       } else if (it.eventKind === 'linked_hr') {
         const prev = it.payload.previous_name
           ? escapeHtml(it.payload.previous_name)
