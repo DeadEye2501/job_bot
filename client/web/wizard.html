@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Job Bot — настройка</title>
+
+<style>
+  @font-face {
+    font-family: 'Material Symbols Outlined';
+    font-style: normal;
+    font-weight: 300;
+    src: url('fonts/material-symbols-outlined.ttf') format('truetype');
+  }
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    font-variation-settings: 'wght' 350;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+  :root {
+    --bg-primary: #1d1d1f;
+    --bg-secondary: #2d2d2f;
+    --bg-tertiary: #3d3d3f;
+    --border: #424245;
+    --text-primary: #f5f5f7;
+    --text-secondary: #86868b;
+    --text-tertiary: #636366;
+    --accent: #64f20c;
+  }
+  html { color-scheme: dark; }
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    line-height: 1.5;
+  }
+
+  .wiz-window {
+    width: 100vw;
+    height: 100vh;
+    background: var(--bg-secondary);
+    display: grid;
+    grid-template-rows: 64px 1fr 56px;
+    overflow: hidden;
+  }
+
+  .wiz-stepper {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 32px;
+    display: flex;
+    align-items: center;
+  }
+  .wiz-stepper.dimmed { opacity: 0.4; }
+  .step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+  }
+  .step::before {
+    content: '';
+    position: absolute;
+    height: 3px;
+    border-radius: 1.5px;
+    background: var(--bg-tertiary);
+    top: 7px;
+    left: calc(-50% + 9px);
+    width: calc(100% - 18px);
+    z-index: 0;
+  }
+  .step:first-child::before { display: none; }
+  .step.active::before, .step.done::before { background: var(--accent); }
+  .step-circle {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 0.66rem; font-weight: 500;
+    display: inline-flex; align-items: center; justify-content: center;
+    line-height: 1;
+    position: relative;
+    z-index: 1;
+  }
+  .step.active .step-circle { background: var(--accent); color: #1d1d1f; }
+  .step.done .step-circle {
+    background: rgba(100,242,12,0.2);
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .step-label {
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+  }
+  .step.active .step-label { color: var(--text-primary); font-weight: 500; }
+  .step.done .step-label { color: var(--text-secondary); }
+
+  .wiz-body { padding: 14px 28px; overflow-y: auto; }
+  .wiz-body > *:last-child { padding-bottom: 14px; }
+  .wiz-title { font-size: 1.05rem; color: var(--text-primary); font-weight: 500; margin-bottom: 4px; }
+  .wiz-subtitle { color: var(--text-tertiary); font-size: 0.82rem; margin-bottom: 14px; line-height: 1.5; }
+  .wiz-subtitle a { color: var(--accent); text-decoration: none; }
+  .wiz-subtitle a:hover { text-decoration: underline; }
+
+  .wiz-fields { display: flex; flex-direction: column; gap: 6px; }
+  .input {
+    background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary);
+    border-radius: 4px; padding: 7px 10px; font-size: 0.86rem; font-family: inherit;
+    width: 100%;
+  }
+  .input.mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.83rem; }
+  .input:focus { outline: none; border-color: var(--accent); }
+  .input::placeholder { color: var(--text-tertiary); }
+  .input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .secret-input { display: flex; align-items: center; gap: 4px; }
+  .secret-input .input { flex: 1; }
+  .icon-btn {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-secondary); border-radius: 4px; cursor: pointer;
+    background: transparent; border: 0;
+  }
+  .icon-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+  .icon-btn .material-symbols-outlined { font-size: 16px; }
+
+  .wiz-foot {
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 18px;
+  }
+  .btn {
+    padding: 6px 14px; border-radius: 5px;
+    border: 1px solid var(--border); background: var(--bg-secondary);
+    color: var(--text-primary); font-size: 0.82rem; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #1d1d1f; border-color: var(--accent); font-weight: 500; }
+  .btn.text { background: transparent; border: 0; color: var(--text-secondary); }
+  .btn.text:hover { color: var(--text-primary); }
+  .btn .material-symbols-outlined { font-size: 14px; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .welcome { display: flex; flex-direction: column; gap: 12px; padding-bottom: 14px; }
+  .welcome-head { display: flex; align-items: center; gap: 10px; }
+  .welcome-head .material-symbols-outlined { font-size: 28px; color: var(--accent); }
+  .welcome-head h1 { font-size: 1.2rem; color: var(--text-primary); font-weight: 500; margin: 0; }
+  .welcome-text { color: var(--text-secondary); font-size: 0.86rem; line-height: 1.5; }
+  .welcome-text strong { color: var(--text-primary); font-weight: 500; }
+
+  .warning-card, .info-card {
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 8px;
+    align-items: start;
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+  .warning-card { background: rgba(255,159,10,0.10); border: 1px solid rgba(255,159,10,0.4); }
+  .warning-card .material-symbols-outlined { color: #ffb547; font-size: 18px; margin-top: 1px; }
+  .warning-card strong { color: #ffb547; }
+  .info-card { background: rgba(10,132,255,0.08); border: 1px solid rgba(10,132,255,0.35); font-size: 0.8rem; padding: 9px 12px; }
+  .info-card .material-symbols-outlined { color: #5ac8fa; font-size: 16px; margin-top: 1px; }
+  .info-card strong { color: #5ac8fa; font-weight: 500; }
+  .wiz-body > .info-card, .wiz-body > .warning-card { margin: 10px 0 12px; }
+
+  .help { color: var(--text-secondary); font-size: 0.8rem; line-height: 1.5; margin-bottom: 12px; }
+  .help strong { color: var(--text-primary); font-weight: 500; }
+  .help a { color: var(--accent); text-decoration: none; }
+  .help a:hover { text-decoration: underline; }
+  .help code { font-family: ui-monospace, Consolas, monospace; font-size: 0.78rem; background: var(--bg-tertiary); padding: 1px 5px; border-radius: 3px; color: var(--text-primary); }
+  .help ol { margin: 6px 0 0 22px; padding: 0; }
+  .help ol li { margin-bottom: 3px; }
+
+  .status-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 10px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    font-size: 0.82rem;
+    margin-top: 8px;
+  }
+  .status-row .material-symbols-outlined { font-size: 16px; }
+  .status-row.pending { color: var(--text-secondary); }
+  .status-row.pending .material-symbols-outlined { color: #ffd60a; }
+  .status-row.ok { color: var(--text-primary); }
+  .status-row.ok .material-symbols-outlined { color: #34c759; }
+  .status-row.err { color: var(--text-primary); }
+  .status-row.err .material-symbols-outlined { color: #ff453a; }
+  .status-row.busy .material-symbols-outlined { animation: spin 1s linear infinite; color: var(--accent); }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  .preset-select {
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    color: var(--text-primary); border-radius: 4px;
+    padding: 7px 10px; font-size: 0.86rem; font-family: inherit;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><polyline points='2,4 5,7 8,4' fill='none' stroke='%2386868b' stroke-width='1.5'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+    width: 100%;
+  }
+  .preset-select:focus { outline: none; border-color: var(--accent); }
+
+  .checkbox-row { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.84rem; cursor: pointer; }
+  .checkbox-row input { accent-color: var(--accent); }
+
+  .file-pick {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-tertiary); border: 1px dashed var(--border);
+    border-radius: 4px; padding: 12px;
+  }
+  .file-pick.has-file { border-style: solid; }
+  .file-pick .material-symbols-outlined { font-size: 22px; color: var(--text-tertiary); }
+  .file-pick .text { flex: 1; color: var(--text-secondary); font-size: 0.84rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-pick .text .name { color: var(--text-primary); font-weight: 500; }
+
+  .radio-card {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 8px;
+    align-items: start;
+    padding: 9px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .radio-card:hover { border-color: var(--accent); }
+  .radio-card.selected { border-color: var(--accent); background: rgba(100,242,12,0.08); }
+  .radio-card.disabled { cursor: not-allowed; opacity: 0.55; }
+  .radio-card.disabled:hover { border-color: var(--border); }
+  .radio-card input { accent-color: var(--accent); margin-top: 2px; }
+  .radio-card.disabled input { cursor: not-allowed; }
+  .radio-card .rc-title { color: var(--text-primary); font-size: 0.84rem; font-weight: 500; }
+  .radio-card .rc-sub { color: var(--text-tertiary); font-size: 0.74rem; margin-top: 2px; line-height: 1.4; }
+
+  .done {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+    height: 100%;
+    gap: 10px;
+  }
+  .done .check { color: var(--accent); font-size: 36px; }
+  .done h2 { font-size: 1.1rem; color: var(--text-primary); font-weight: 500; margin: 0; }
+  .done p { color: var(--text-secondary); max-width: 380px; line-height: 1.5; font-size: 0.86rem; margin: 0; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="wiz-window">
+  <div class="wiz-stepper" id="stepper">
+    <div class="step" data-step="1"><span class="step-circle">1</span><span class="step-label">Telegram</span></div>
+    <div class="step" data-step="2"><span class="step-circle">2</span><span class="step-label">LLM</span></div>
+    <div class="step" data-step="3"><span class="step-circle">3</span><span class="step-label">Сравнение</span></div>
+    <div class="step" data-step="4"><span class="step-circle">4</span><span class="step-label">Резюме</span></div>
+  </div>
+
+  <div class="wiz-body" id="body">
+    <!-- screens injected here -->
+  </div>
+
+  <div class="wiz-foot" id="foot">
+    <span></span>
+    <span></span>
+  </div>
+</div>
+
+<script src="qwebchannel.js"></script>
+<script>
+  // ===================================================================
+  // State + helpers
+  // ===================================================================
+  const state = {
+    screen: 'welcome',
+    completed: new Set(),
+    wizard_completed: false,
+    tg: { api_id: '', api_hash: '', phone: '', password: '' },
+    chat: { provider: 'LM Studio', base_url: 'http://localhost:1234', api_key: '', model: '' },
+    embed: { same_as_chat: true, base_url: '', api_key: '', model: '' },
+    cv: { path: '', name: '', size: 0, mode: 'attach' },
+  };
+
+  // Cache last successful list_models request per kind; skip refetch if
+  // the (base_url, api_key) tuple hasn't changed since the previous call.
+  // Cleared on failure inside onModelsListed so a retry actually goes
+  // through (was a bug: a failed first fetch poisoned the cache and
+  // every subsequent attempt was silently skipped).
+  const _lastModelFetch = { chat: '', embed: '' };
+
+  // Set when the user explicitly clicked «Проверить» on the chat/embed
+  // screen with an empty model name — turns the click into a "fetch
+  // model list" operation. onModelsListed reads the flag to render an
+  // appropriate status message and clears it.
+  const _checkAwaitingList = { chat: false, embed: false };
+
+  function normalizeUrl(u) {
+    return (u || '').trim().toLowerCase().replace(/\/+$/, '');
+  }
+
+  const PROVIDER_PRESETS = {
+    'OpenAI': {
+      url: 'https://api.openai.com/v1',
+      key_required: true,
+      chat_models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+      embed_models: ['text-embedding-3-small', 'text-embedding-3-large'],
+    },
+    'LM Studio': {
+      url: 'http://localhost:1234',
+      key_required: false,
+      chat_models: [],
+      embed_models: [],
+    },
+    'Ollama': {
+      url: 'http://localhost:11434',
+      key_required: false,
+      chat_models: ['llama3.1', 'qwen2.5', 'gemma2'],
+      embed_models: ['nomic-embed-text', 'mxbai-embed-large'],
+    },
+    'OpenRouter': {
+      url: 'https://openrouter.ai/api/v1',
+      key_required: true,
+      chat_models: [
+        'anthropic/claude-3.5-sonnet',
+        'openai/gpt-4o-mini',
+        'openai/gpt-4o',
+        'meta-llama/llama-3.1-70b-instruct',
+        'qwen/qwen-2.5-72b-instruct',
+      ],
+      embed_models: ['openai/text-embedding-3-small'],
+    },
+    'Custom': {
+      url: '',
+      key_required: false,
+      chat_models: [],
+      embed_models: [],
+    },
+  };
+
+  function modelSelectHtml(prefix, value, options) {
+    let opts = '';
+    for (const m of options) {
+      opts += `<option value="${escapeAttr(m)}"></option>`;
+    }
+    const placeholder = options.length
+      ? 'Модель (выберите из списка или введите свою)'
+      : 'Название модели';
+    return `
+      <input class="input mono" id="${prefix}-model-input" list="${prefix}-model-presets"
+             placeholder="${placeholder}" value="${escapeAttr(value)}" maxlength="128" autocomplete="off">
+      <datalist id="${prefix}-model-presets">${opts}</datalist>
+    `;
+  }
+
+  function getModelValue(prefix) {
+    const inp = $(`${prefix}-model-input`);
+    return inp ? inp.value.trim() : '';
+  }
+
+  function repopulateModels(prefix, models, _currentValue) {
+    const dl = $(`${prefix}-model-presets`);
+    if (!dl || !models || !models.length) return;
+    dl.innerHTML = models.map((m) => `<option value="${escapeAttr(m)}"></option>`).join('');
+    // Подсказку у поля тоже подменяем — иначе пользователь видит
+    // «Название модели» и не понимает, что список уже подгружен.
+    const inp = $(`${prefix}-model-input`);
+    if (inp && !inp.value) inp.placeholder = 'Модель (выберите из списка или введите свою)';
+  }
+
+  function requestModelList(kind) {
+    if (!api) return;
+    let base_url, api_key;
+    if (kind === 'chat') {
+      base_url = ($('chat-base-url') ? $('chat-base-url').value : state.chat.base_url).trim();
+      api_key  = $('chat-api-key') ? $('chat-api-key').value : state.chat.api_key;
+    } else {
+      if (state.embed.same_as_chat) {
+        base_url = state.chat.base_url;
+        api_key  = state.chat.api_key;
+      } else {
+        base_url = ($('embed-base-url') ? $('embed-base-url').value : state.embed.base_url).trim();
+        api_key  = $('embed-api-key') ? $('embed-api-key').value : state.embed.api_key;
+      }
+    }
+    if (!base_url) return;
+    const sig = base_url + '\0' + api_key;
+    if (_lastModelFetch[kind] === sig) return;
+    _lastModelFetch[kind] = sig;
+    api.list_models_for(JSON.stringify({ kind, base_url, api_key }));
+  }
+
+  function onModelsListed(payloadJson) {
+    let r;
+    try { r = JSON.parse(payloadJson); } catch { return; }
+    if (!r) return;
+    const kind = r.kind;
+    const screen = (kind === 'chat') ? 'chat' : (kind === 'embed' ? 'embed' : null);
+    if (!screen) return;
+    const awaiting = _checkAwaitingList[kind];
+
+    if (!r.ok || !r.models || !r.models.length) {
+      // Кэш сбрасываем, чтобы повторное «Проверить» / blur ушло в сеть,
+      // а не молча отскочило (LM Studio мог стартовать после первого
+      // фейла, юзер ждёт, что вторая попытка реально пойдёт).
+      _lastModelFetch[kind] = '';
+      if (awaiting && state.screen === screen) {
+        _checkAwaitingList[kind] = false;
+        const c = $('check'); if (c) c.disabled = false;
+        const n = $('next'); if (n) n.disabled = false;
+        const msg = !r.ok
+          ? `Не удалось получить список моделей: ${r.error || 'ошибка'}`
+          : 'Провайдер не вернул ни одной модели — проверьте, что в LM Studio загружена модель.';
+        showStatus('status', 'err', msg);
+      }
+      return;
+    }
+
+    if (state.screen !== screen) return;
+    repopulateModels(kind, r.models, kind === 'chat' ? state.chat.model : state.embed.model);
+    if (awaiting) {
+      _checkAwaitingList[kind] = false;
+      const c = $('check'); if (c) c.disabled = false;
+      const n = $('next'); if (n) n.disabled = false;
+      showStatus(
+        'status',
+        'ok',
+        `Найдено моделей: ${r.models.length}. Выберите модель из списка и нажмите «Проверить».`,
+      );
+    }
+  }
+
+  let api = null; // QWebChannel-exposed Python API
+
+  const $ = (id) => document.getElementById(id);
+  const body = $('body');
+  const foot = $('foot');
+  const stepper = $('stepper');
+
+  function setStepperVisible(visible) {
+    stepper.style.visibility = visible ? 'visible' : 'hidden';
+  }
+
+  function updateStepper(currentStep, doneSteps) {
+    stepper.classList.remove('dimmed');
+    stepper.querySelectorAll('.step').forEach((el) => {
+      const n = parseInt(el.dataset.step, 10);
+      el.classList.remove('active', 'done');
+      if (doneSteps.has(n)) {
+        el.classList.add('done');
+        el.querySelector('.step-circle').textContent = '✓';
+      } else {
+        el.querySelector('.step-circle').textContent = String(n);
+        if (n === currentStep) el.classList.add('active');
+      }
+    });
+  }
+
+  function dimStepper() {
+    stepper.classList.add('dimmed');
+    stepper.querySelectorAll('.step').forEach((el) => {
+      el.classList.remove('active', 'done');
+      el.querySelector('.step-circle').textContent = el.dataset.step;
+    });
+  }
+
+  // ===================================================================
+  // Screens
+  // ===================================================================
+
+  function go(screen) {
+    state.screen = screen;
+    render();
+  }
+
+  function render() {
+    switch (state.screen) {
+      case 'welcome':       return renderWelcome();
+      case 'tg-creds':      return renderTgCreds();
+      case 'tg-code':       return renderTgCode();
+      case 'tg-password':   return renderTgPassword();
+      case 'chat':          return renderChat();
+      case 'embed':         return renderEmbed();
+      case 'cv':            return renderCv();
+      case 'done':          return renderDone();
+    }
+  }
+
+  // --- Welcome -------------------------------------------------------------
+
+  function renderWelcome() {
+    dimStepper();
+    body.innerHTML = `
+      <div class="welcome">
+        <div class="welcome-head">
+          <span class="material-symbols-outlined">smart_toy</span>
+          <h1>Добро пожаловать в Job Bot</h1>
+        </div>
+        <div class="welcome-text">
+          Бот читает вакансии из Telegram-каналов, сравнивает их с вашим профилем, помогает
+          вести переписку с HR и отслеживает статусы откликов. Настройка займёт 4 шага:
+          <strong>Telegram</strong>, <strong>LLM</strong>, <strong>эмбеддинги</strong>,
+          <strong>резюме</strong>.
+        </div>
+        <div class="warning-card">
+          <span class="material-symbols-outlined">warning</span>
+          <div>
+            <strong>Заведите отдельный аккаунт для бота.</strong> Telegram считает массовую
+            автоматизацию нарушением правил и может заблокировать номер
+            <strong>без возможности восстановления</strong>. Основной аккаунт под это не подходит.
+          </div>
+        </div>
+        <div class="info-card">
+          <span class="material-symbols-outlined">lock</span>
+          <div>
+            <strong>Все ключи остаются на вашем компьютере.</strong> Telegram-сессия и API-ключи
+            LLM шифруются ключом из системного хранилища паролей и лежат только в локальной БД.
+            Наружу ничего не уходит.
+          </div>
+        </div>
+      </div>
+    `;
+    foot.innerHTML = `
+      <span></span>
+      <button class="btn primary" id="next">Дальше <span class="material-symbols-outlined">arrow_forward</span></button>
+    `;
+    $('next').onclick = () => go('tg-creds');
+  }
+
+  // --- Step 1: Telegram credentials ----------------------------------------
+
+  function renderTgCreds() {
+    updateStepper(1, state.completed);
+    body.innerHTML = `
+      <div class="wiz-title">Telegram-аккаунт</div>
+      <div class="wiz-subtitle">
+        Бот заходит в Telegram как обычный клиент. Для этого нужны <strong>api_id</strong> и
+        <strong>api_hash</strong> — пара идентификатор/ключ, которую Telegram выдаёт каждому
+        приложению.
+      </div>
+      <div class="help">
+        <strong>Где их взять:</strong>
+        <ol>
+          <li>Откройте <code>https://my.telegram.org/auth</code> и войдите по номеру.</li>
+          <li>Перейдите в <strong>API development tools</strong>.</li>
+          <li>Заполните <strong>App title</strong> и <strong>Short name</strong> — значения любые.</li>
+          <li>Скопируйте <strong>App api_id</strong> и <strong>App api_hash</strong> в поля ниже.</li>
+        </ol>
+      </div>
+      <div class="wiz-fields">
+        <input class="input mono" id="api_id" maxlength="16" placeholder="api_id" value="${state.tg.api_id}">
+        <input class="input mono" id="api_hash" maxlength="64" placeholder="api_hash" value="${state.tg.api_hash}">
+        <input class="input mono" id="phone" maxlength="32" placeholder="Телефон в международном формате, например +71234567890" value="${state.tg.phone}">
+        <div id="status"></div>
+      </div>
+    `;
+    foot.innerHTML = `
+      <button class="btn text" id="back">Назад</button>
+      <button class="btn primary" id="send">Отправить код <span class="material-symbols-outlined">send</span></button>
+    `;
+    $('back').onclick = () => go('welcome');
+    $('send').onclick = () => {
+      state.tg.api_id = $('api_id').value.trim();
+      state.tg.api_hash = $('api_hash').value.trim();
+      state.tg.phone = $('phone').value.trim();
+      if (!state.tg.api_id || !state.tg.api_hash || !state.tg.phone) {
+        showStatus('status', 'err', 'Заполните все поля.');
+        return;
+      }
+      showStatus('status', 'busy', 'Запрашиваем код в Telegram...');
+      $('send').disabled = true;
+      api.telegram_send_code(JSON.stringify(state.tg));
+    };
+  }
+
+  function onTelegramSendCode(payloadJson) {
+    const r = JSON.parse(payloadJson);
+    if (state.screen !== 'tg-creds') return;
+    if (!r.ok) {
+      showStatus('status', 'err', r.error);
+      const sendBtn = $('send'); if (sendBtn) sendBtn.disabled = false;
+      return;
+    }
+    go('tg-code');
+  }
+
+  // --- Step 1: code entry --------------------------------------------------
+
+  function renderTgCode() {
+    updateStepper(1, state.completed);
+    body.innerHTML = `
+      <div class="wiz-title">Telegram-аккаунт</div>
+      <div class="wiz-subtitle">Код подтверждения отправлен на <strong>${escapeHtml(state.tg.phone)}</strong> через Telegram.</div>
+      <div class="status-row pending">
+        <span class="material-symbols-outlined">hourglass_empty</span>
+        Откройте Telegram и введите код из сообщения ниже.
+      </div>
+      <div class="wiz-fields" style="margin-top: 8px;">
+        <input class="input mono" id="code" maxlength="10" placeholder="Код подтверждения" autofocus>
+        <div id="status"></div>
+      </div>
+    `;
+    foot.innerHTML = `
+      <button class="btn text" id="back">Назад</button>
+      <button class="btn primary" id="confirm">Подтвердить <span class="material-symbols-outlined">login</span></button>
+    `;
+    $('back').onclick = () => go('tg-creds');
+    $('confirm').onclick = () => {
+      const code = $('code').value.trim();
+      if (!code) { showStatus('status', 'err', 'Введите код.'); return; }
+      $('confirm').disabled = true;
+      showStatus('status', 'busy', 'Проверяем код...');
+      api.telegram_confirm_code(JSON.stringify({ code }));
+    };
+    $('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('confirm').click(); });
+  }
+
+  function onTelegramConfirmCode(payloadJson) {
+    const r = JSON.parse(payloadJson);
+    if (state.screen !== 'tg-code') return;
+    if (!r.ok) {
+      showStatus('status', 'err', r.error);
+      const b = $('confirm'); if (b) b.disabled = false;
+      return;
+    }
+    if (r.need_password) {
+      go('tg-password');
+      return;
+    }
+    if (r.done) {
+      state.completed.add(1);
+      go('chat');
+      return;
+    }
+  }
+
+  // --- Step 1: 2FA password -----------------------------------------------
+
+  function renderTgPassword() {
+    updateStepper(1, state.completed);
+    body.innerHTML = `
+      <div class="wiz-title">Telegram-аккаунт</div>
+      <div class="wiz-subtitle">На аккаунте включена двухфакторная защита. Введите облачный пароль Telegram.</div>
+      <div class="wiz-fields">
+        <div class="secret-input">
+          <input class="input mono" type="password" id="password" maxlength="256" placeholder="Облачный пароль Telegram" value="${escapeAttr(state.tg.password || '')}" autofocus>
+          <button class="icon-btn" id="toggle-pwd"><span class="material-symbols-outlined">visibility</span></button>
+        </div>
+        <div id="status"></div>
+      </div>
+    `;
+    foot.innerHTML = `
+      <button class="btn text" id="back">Назад</button>
+      <button class="btn primary" id="confirm">Войти <span class="material-symbols-outlined">login</span></button>
+    `;
+    $('back').onclick = () => go('tg-code');
+    $('toggle-pwd').onclick = () => {
+      const p = $('password');
+      p.type = (p.type === 'password') ? 'text' : 'password';
+    };
+    $('confirm').onclick = () => {
+      const password = $('password').value;
+      if (!password) { showStatus('status', 'err', 'Введите пароль.'); return; }
+      $('confirm').disabled = true;
+      showStatus('status', 'busy', 'Проверяем пароль...');
+      api.telegram_confirm_password(JSON.stringify({ password }));
+    };
+    $('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('confirm').click(); });
+  }
+
+  function onTelegramConfirmPassword(payloadJson) {
+    const r = JSON.parse(payloadJson);
+    if (state.screen !== 'tg-password') return;
+    if (!r.ok) {
+      showStatus('status', 'err', r.error);
+      const b = $('confirm'); if (b) b.disabled = false;
+      return;
+    }
+    if (r.done) {
+      state.completed.add(1);
+      go('chat');
+    }
+  }
+
+  // --- Step 2: chat LLM ----------------------------------------------------
+
+  function renderChat() {
+    updateStepper(2, state.completed);
+    const presets = Object.keys(PROVIDER_PRESETS).map((name) =>
+      `<option value="${name}" ${state.chat.provider === name ? 'selected' : ''}>${name}</option>`
+    ).join('');
+    const chatModels = (PROVIDER_PRESETS[state.chat.provider] || {}).chat_models || [];
+    body.innerHTML = `
+      <div class="wiz-title">LLM для чата</div>
+      <div class="wiz-subtitle">
+        На этой модели бот <strong>разбирает вакансии</strong> и классифицирует ответы HR.
+        Подойдёт любой сервис с OpenAI-совместимым API.
+      </div>
+      <div class="wiz-fields">
+        <select class="preset-select" id="chat-provider">${presets}</select>
+        <input class="input mono" id="chat-base-url" maxlength="255" placeholder="base_url" value="${escapeAttr(state.chat.base_url)}">
+        <div class="secret-input">
+          <input class="input mono" type="password" id="chat-api-key" maxlength="512" placeholder="api_key (если требуется)" value="${escapeAttr(state.chat.api_key)}">
+          <button class="icon-btn" id="toggle-key"><span class="material-symbols-outlined">visibility</span></button>
+        </div>
+        ${modelSelectHtml('chat', state.chat.model, chatModels)}
+        <div class="help" style="margin: -2px 0 0;">
+          После «Проверить» список заменится теми моделями, которые реально доступны у провайдера.
+        </div>
+        <div id="status"></div>
+      </div>
+      <div class="info-card">
+        <span class="material-symbols-outlined">privacy_tip</span>
+        <div>
+          <strong>Что уходит провайдеру.</strong> Тексты вакансий, ваше резюме и переписка с HR
+          будут отправляться выбранной модели. Для полной приватности подключите локальный
+          <strong>LM Studio</strong> или <strong>Ollama</strong>.
+        </div>
+      </div>
+    `;
+    foot.innerHTML = `
+      <button class="btn text" id="back">Назад</button>
+      <div style="display: flex; gap: 6px;">
+        <button class="btn" id="check"><span class="material-symbols-outlined">network_check</span>Проверить</button>
+        <button class="btn primary" id="next">Дальше <span class="material-symbols-outlined">arrow_forward</span></button>
+      </div>
+    `;
+    $('back').onclick = () => go('tg-creds');
+    $('chat-provider').onchange = () => {
+      const name = $('chat-provider').value;
+      state.chat.provider = name;
+      const preset = PROVIDER_PRESETS[name];
+      if (preset.url) $('chat-base-url').value = preset.url;
+      // Reset the model dropdown to that provider's defaults; user-typed
+      // model is dropped because it likely won't exist on the new provider.
+      state.chat.model = '';
+      renderChat();
+    };
+    $('chat-base-url').onblur = () => requestModelList('chat');
+    $('chat-api-key').onblur = () => requestModelList('chat');
+    $('toggle-key').onclick = () => {
+      const k = $('chat-api-key');
+      k.type = (k.type === 'password') ? 'text' : 'password';
+    };
+    if (state.chat.base_url) requestModelList('chat');
+    $('check').onclick = () => {
+      collectChat();
+      if (!state.chat.base_url) {
+        showStatus('status', 'err', 'Укажите base_url провайдера.');
+        return;
+      }
+      // Без названия модели «Проверить» работает как «обновить список
+      // моделей у провайдера»: cache busting + явный list_models_for.
+      // Это закрывает кейс LM Studio, у которого в пресетах chat_models
+      // = [], и до фетча datalist пустой.
+      if (!state.chat.model) {
+        _lastModelFetch.chat = '';
+        _checkAwaitingList.chat = true;
+        $('check').disabled = true;
+        $('next').disabled = true;
+        showStatus('status', 'busy', 'Загружаем список моделей у провайдера...');
+        requestModelList('chat');
+        return;
+      }
+      $('check').disabled = true;
+      $('next').disabled = true;
+      showStatus('status', 'busy', 'Проверяем подключение...');
+      api.chat_check(JSON.stringify(state.chat));
+    };
+    $('next').onclick = () => {
+      collectChat();
+      if (!validateLlm(state.chat, 'status')) return;
+      $('next').disabled = true;
+      $('back').disabled = true;
+      showStatus('status', 'busy', 'Сохраняем...');
+      api.chat_save(JSON.stringify(state.chat));
+    };
+  }
+
+  function collectChat() {
+    state.chat.base_url = $('chat-base-url').value.trim();
+    state.chat.api_key = $('chat-api-key').value;
+    state.chat.model = getModelValue('chat');
+  }
+
+  function onChatCheck(payloadJson) {
+    if (state.screen !== 'chat') return;
+    const r = JSON.parse(payloadJson);
+    const c = $('check'); if (c) c.disabled = false;
+    const n = $('next'); if (n) n.disabled = false;
+    if (!r.ok) { showStatus('status', 'err', r.error); return; }
+    if (r.models && r.models.length) repopulateModels('chat', r.models, state.chat.model);
+    showStatus('status', 'ok', 'Подключение работает' + (r.detail ? ` (${r.detail})` : ''));
+  }
+
+  function onChatSave(payloadJson) {
+    if (state.screen !== 'chat') return;
+    const r = JSON.parse(payloadJson);
+    if (!r.ok) {
+      showStatus('status', 'err', r.error);
+      const n = $('next'); if (n) n.disabled = false;
+      const b = $('back'); if (b) b.disabled = false;
+      return;
+    }
+    if (state.embed.same_as_chat) {
+      state.embed.base_url = state.chat.base_url;
+      state.embed.api_key = state.chat.api_key;
+    }
+    state.completed.add(2);
+    go('embed');
+  }
+
+  // --- Step 3: embed LLM ---------------------------------------------------
+
+  function renderEmbed() {
+    updateStepper(3, state.completed);
+    const provider = state.chat.provider;
+    const embedModels = (PROVIDER_PRESETS[provider] || {}).embed_models || [];
+    body.innerHTML = `
+      <div class="wiz-title">LLM для эмбеддингов</div>
+      <div class="wiz-subtitle">
+        Эмбеддинг — числовое представление текста. Бот превращает в эмбеддинги каждую вакансию
+        и ваш профиль и сравнивает их между собой — так он понимает, насколько вакансия вам
+        подходит. Без этого бот не сможет ставить вакансиям оценки и отсеивать повторы из разных каналов.
+      </div>
+      <div class="info-card">
+        <span class="material-symbols-outlined">info</span>
+        <div>
+          Embedding-модель — отдельная от чат-модели. У облачных провайдеров
+          (<strong>OpenAI</strong>, <strong>OpenRouter</strong>) тот же ключ обычно открывает
+          доступ и к ней — оставьте галочку ниже. У локальных (<strong>LM Studio</strong>,
+          <strong>Ollama</strong>) embedding-модель нужно загрузить отдельно — это другая модель,
+          не та, что вы используете для чата.
+        </div>
+      </div>
+      <div class="wiz-fields">
+        <label class="checkbox-row">
+          <input type="checkbox" id="same" ${state.embed.same_as_chat ? 'checked' : ''}>
+          Те же base_url и api_key, что и для чата
+        </label>
+        <div id="embed-extra" class="${state.embed.same_as_chat ? 'hidden' : ''}" style="display: flex; flex-direction: column; gap: 6px;">
+          <input class="input mono" id="embed-base-url" maxlength="255" placeholder="base_url" value="${escapeAttr(state.embed.base_url)}">
+          <div class="secret-input">
+            <input class="input mono" type="password" id="embed-api-key" maxlength="512" placeholder="api_key" value="${escapeAttr(state.embed.api_key)}">
+            <button class="icon-btn" id="toggle-key"><span class="material-symbols-outlined">visibility</span></button>
+          </div>
+        </div>
+        ${modelSelectHtml('embed', state.embed.model, embedModels)}
+        <div class="help" style="margin: -2px 0 0;">
+          После «Проверить» список заменится теми моделями, которые реально доступны у провайдера.
+        </div>
+        <div id="status"></div>
+      </div>
+    `;
+    foot.innerHTML = `
+      <button class="btn text" id="back">Назад</button>
+      <div style="display: flex; gap: 6px;">
+        <button class="btn" id="check"><span class="material-symbols-outlined">network_check</span>Проверить</button>
+        <button class="btn primary" id="next">Дальше <span class="material-symbols-outlined">arrow_forward</span></button>
+      </div>
+    `;
+    $('back').onclick = () => go('chat');
+    $('same').onchange = () => {
+      state.embed.same_as_chat = $('same').checked;
+      $('embed-extra').classList.toggle('hidden', state.embed.same_as_chat);
+      if (state.embed.same_as_chat) {
+        state.embed.base_url = state.chat.base_url;
+        state.embed.api_key = state.chat.api_key;
+      }
+      requestModelList('embed');
+    };
+    if ($('embed-base-url')) $('embed-base-url').onblur = () => requestModelList('embed');
+    if ($('embed-api-key'))  $('embed-api-key').onblur  = () => requestModelList('embed');
+    if ($('toggle-key')) $('toggle-key').onclick = () => {
+      const k = $('embed-api-key');
+      k.type = (k.type === 'password') ? 'text' : 'password';
+    };
+    requestModelList('embed');
+    $('check').onclick = () => {
+      collectEmbed();
+      if (!state.embed.base_url) {
+        showStatus('status', 'err', 'Укажите base_url провайдера.');
+        return;
+      }
+      if (!state.embed.model) {
+        _lastModelFetch.embed = '';
+        _checkAwaitingList.embed = true;
+        $('check').disabled = true;
+        $('next').disabled = true;
+        showStatus('status', 'busy', 'Загружаем список моделей у провайдера...');
+        requestModelList('embed');
+        return;
+      }
+      $('check').disabled = true;
+      $('next').disabled = true;
+      showStatus('status', 'busy', 'Проверяем подключение...');
+      api.embed_check(JSON.stringify(state.embed));
+    };
+    $('next').onclick = () => {
+      collectEmbed();
+      if (!validateLlm(state.embed, 'status')) return;
+      $('next').disabled = true;
+      $('back').disabled = true;
+      showStatus('status', 'busy', 'Сохраняем...');
+      api.embed_save(JSON.stringify(state.embed));
+    };
+  }
+
+  function collectEmbed() {
+    if (state.embed.same_as_chat) {
+      state.embed.base_url = state.chat.base_url;
+      state.embed.api_key = state.chat.api_key;
+    } else {
+      state.embed.base_url = $('embed-base-url').value.trim();
+      state.embed.api_key = $('embed-api-key').value;
+    }
+    state.embed.model = getModelValue('embed');
+  }
+
+  function onEmbedCheck(payloadJson) {
+    if (state.screen !== 'embed') return;
+    const r = JSON.parse(payloadJson);
+    const c = $('check'); if (c) c.disabled = false;
+    const n = $('next'); if (n) n.disabled = false;
+    if (!r.ok) { showStatus('status', 'err', r.error); return; }
+    if (r.models && r.models.length) repopulateModels('embed', r.models, state.embed.model);
+    showStatus('status', 'ok', 'Подключение работает' + (r.detail ? ` (${r.detail})` : ''));
+  }
+
+  function onEmbedSave(payloadJson) {
+    if (state.screen !== 'embed') return;
+    const r = JSON.parse(payloadJson);
+    if (!r.ok) {
+      showStatus('status', 'err', r.error);
+      const n = $('next'); if (n) n.disabled = false;
+      const b = $('back'); if (b) b.disabled = false;
+      return;
+    }
+    state.completed.add(3);
+    go('cv');
+  }
+
+  // --- Step 4: CV ----------------------------------------------------------
+
+  function renderCv() {
+    updateStepper(4, state.completed);
+    const hasFile = !!state.cv.path;
+    const fileText = hasFile
+      ? `<span class="name">${escapeHtml(state.cv.name)}</span> · ${formatSize(state.cv.size)}`
+      : 'Файл ещё не выбран';
+    body.innerHTML = `
+      <div class="wiz-title">Резюме</div>
+      <div class="wiz-subtitle">Файл резюме в <strong>PDF</strong>, <strong>Markdown</strong> или <strong>txt</strong>. Используется для автозаполнения профиля и хранится локально.</div>
+      <div class="file-pick ${hasFile ? 'has-file' : ''}">
+        <span class="material-symbols-outlined">${hasFile ? 'description' : 'upload_file'}</span>
+        <span class="text" id="file-text">${fileText}</span>
+        <button class="btn" id="pick">${hasFile ? 'Заменить' : 'Выбрать'}</button>
+      </div>
+      <div class="wiz-fields" style="margin-top: 12px;">
+        ${renderRadioCard('parse', 'Разобрать через LLM и заполнить профиль',
+          'Функция находится в разработке.', { disabled: true })}
+        ${renderRadioCard('attach', 'Только прикрепить файл',
+          'Файл сохранится в профиле. Навыки и опыт нужно будет заполнить вручную в разделе Профиль.')}
+        ${renderRadioCard('skip', 'Пропустить шаг',
+          'Резюме можно добавить позже в разделе Профиль.')}
+      </div>
+      <div id="status" style="margin-top: 8px;"></div>
+    `;
+    foot.innerHTML = `
+      <button class="btn text" id="back">Назад</button>
+      <button class="btn primary" id="finish">Готово <span class="material-symbols-outlined">check</span></button>
+    `;
+    $('back').onclick = () => go('embed');
+    $('pick').onclick = async () => {
+      const r = JSON.parse(await api.pick_cv_file());
+      if (!r.ok) return;
+      state.cv.path = r.path; state.cv.name = r.name; state.cv.size = r.size;
+      renderCv();
+    };
+    document.querySelectorAll('.radio-card').forEach((card) => {
+      card.onclick = (ev) => {
+        if (card.classList.contains('disabled')) { ev.preventDefault(); return; }
+        state.cv.mode = card.dataset.mode;
+        document.querySelectorAll('.radio-card').forEach((c) => {
+          c.classList.toggle('selected', c.dataset.mode === state.cv.mode);
+          c.querySelector('input').checked = (c.dataset.mode === state.cv.mode);
+        });
+      };
+    });
+    $('finish').onclick = () => {
+      if (state.cv.mode !== 'skip' && !state.cv.path) {
+        showStatus('status', 'err', 'Выберите файл или вариант «Пропустить шаг».');
+        return;
+      }
+      $('finish').disabled = true;
+      $('back').disabled = true;
+      const msg = state.cv.mode === 'parse'
+        ? 'Разбираем резюме. Это может занять несколько минут...'
+        : 'Сохраняем...';
+      showStatus('status', 'busy', msg);
+      api.cv_save(JSON.stringify({ mode: state.cv.mode, path: state.cv.path }));
+    };
+  }
+
+  function renderRadioCard(mode, title, sub, opts = {}) {
+    const disabled = !!opts.disabled;
+    const selected = !disabled && state.cv.mode === mode;
+    const cls = ['radio-card'];
+    if (selected) cls.push('selected');
+    if (disabled) cls.push('disabled');
+    return `
+      <label class="${cls.join(' ')}" data-mode="${mode}">
+        <input type="radio" name="cvmode" ${selected ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+        <div>
+          <div class="rc-title">${title}</div>
+          <div class="rc-sub">${sub}</div>
+        </div>
+      </label>
+    `;
+  }
+
+  function onCvSave(payloadJson) {
+    if (state.screen !== 'cv') return;
+    const r = JSON.parse(payloadJson);
+    if (!r.ok) {
+      showStatus('status', 'err', r.error);
+      const f = $('finish'); if (f) f.disabled = false;
+      const b = $('back');   if (b) b.disabled = false;
+      return;
+    }
+    state.completed.add(4);
+    api.finish();
+  }
+
+  function onFinish(payloadJson) {
+    const r = JSON.parse(payloadJson);
+    if (!r.ok) {
+      showStatus('status', 'err', r.error);
+      const f = $('finish'); if (f) f.disabled = false;
+      const b = $('back');   if (b) b.disabled = false;
+      return;
+    }
+    go('done');
+  }
+
+  // --- Done ---------------------------------------------------------------
+
+  function renderDone() {
+    updateStepper(0, new Set([1, 2, 3, 4]));
+    body.innerHTML = `
+      <div class="done">
+        <span class="check material-symbols-outlined">check_circle</span>
+        <h2>Готово</h2>
+        <p>
+          Что сделать дальше:
+          <br><br>
+          1. Откройте <strong>Профиль → Skills</strong> и проверьте уровни навыков. Если резюме
+          разбирала LLM — пройдитесь по списку и поправьте оценки.
+          <br>
+          2. В <strong>Системе → Настройки</strong> задайте порог отсева вакансий.
+          <br>
+          3. Добавьте каналы с вакансиями в <strong>Чат → Каналы</strong> и
+          <strong>вступите в них под Telegram-аккаунтом бота</strong> — иначе он не увидит
+          сообщения.
+        </p>
+      </div>
+    `;
+    foot.innerHTML = `
+      <span></span>
+      <button class="btn primary" id="open">Открыть Job Bot <span class="material-symbols-outlined">arrow_forward</span></button>
+    `;
+    $('open').onclick = () => { api.enter_main_app(); };
+  }
+
+  // ===================================================================
+  // Helpers
+  // ===================================================================
+
+  function showStatus(id, kind, text) {
+    const el = $(id);
+    if (!el) return;
+    const icon = {
+      pending: 'hourglass_empty',
+      busy:    'progress_activity',
+      ok:      'check_circle',
+      err:     'error',
+    }[kind] || 'info';
+    el.className = 'status-row ' + kind;
+    el.innerHTML = `<span class="material-symbols-outlined">${icon}</span><span>${escapeHtml(text)}</span>`;
+  }
+
+  function validateLlm(cfg, statusId) {
+    if (!cfg.base_url) {
+      showStatus(statusId, 'err', 'Укажите base_url провайдера.');
+      return false;
+    }
+    if (!cfg.model) {
+      showStatus(statusId, 'err', 'Укажите название модели.');
+      return false;
+    }
+    return true;
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' Б';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' КБ';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+
+  // ===================================================================
+  // Bootstrap QWebChannel
+  // ===================================================================
+
+  function pickStartScreen(_completed, wizardCompleted) {
+    // The wizard always walks from welcome on launch; pre-filled fields
+    // make the click-through cheap. shell.py routes wizard_completed=true
+    // straight to main, so 'done' here is only reached after the user
+    // finishes the cycle in this session.
+    return wizardCompleted ? 'done' : 'welcome';
+  }
+
+  function applyInitialState(initJson) {
+    let init;
+    try { init = JSON.parse(initJson); } catch { init = null; }
+    if (!init || !init.ok) { render(); return; }
+    state.completed = new Set(init.completed || []);
+    state.wizard_completed = !!init.wizard_completed;
+    if (init.tg) {
+      if (init.tg.api_id)   state.tg.api_id   = init.tg.api_id;
+      if (init.tg.api_hash) state.tg.api_hash = init.tg.api_hash;
+      if (init.tg.phone)    state.tg.phone    = init.tg.phone;
+      if (init.tg.password) state.tg.password = init.tg.password;
+    }
+    if (init.chat) {
+      if (init.chat.base_url) state.chat.base_url = init.chat.base_url;
+      if (init.chat.api_key)  state.chat.api_key  = init.chat.api_key;
+      if (init.chat.model)    state.chat.model    = init.chat.model;
+      // Match the saved base_url against known providers, tolerating
+      // trailing slashes and case differences.
+      const target = normalizeUrl(state.chat.base_url);
+      for (const [name, p] of Object.entries(PROVIDER_PRESETS)) {
+        if (p.url && normalizeUrl(p.url) === target) { state.chat.provider = name; break; }
+      }
+    }
+    if (init.embed) {
+      if (init.embed.base_url) state.embed.base_url = init.embed.base_url;
+      if (init.embed.api_key)  state.embed.api_key  = init.embed.api_key;
+      if (init.embed.model)    state.embed.model    = init.embed.model;
+      // Only re-evaluate same_as_chat if embed actually has saved data —
+      // otherwise we keep the default (true) so the user inherits chat creds.
+      if (init.embed.base_url) {
+        state.embed.same_as_chat = (
+          init.embed.base_url === state.chat.base_url &&
+          init.embed.api_key  === state.chat.api_key
+        );
+      }
+    }
+    if (init.cv_path) {
+      state.cv.path = init.cv_path;
+      state.cv.name = init.cv_path.split(/[\\/]/).pop();
+      state.cv.size = 0;
+    }
+    state.screen = pickStartScreen(state.completed, state.wizard_completed);
+    render();
+  }
+
+  new QWebChannel(qt.webChannelTransport, (channel) => {
+    api = channel.objects.api;
+    api.telegram_send_code_done.connect(onTelegramSendCode);
+    api.telegram_confirm_code_done.connect(onTelegramConfirmCode);
+    api.telegram_confirm_password_done.connect(onTelegramConfirmPassword);
+    api.chat_check_done.connect(onChatCheck);
+    api.chat_save_done.connect(onChatSave);
+    api.embed_check_done.connect(onEmbedCheck);
+    api.embed_save_done.connect(onEmbedSave);
+    api.cv_save_done.connect(onCvSave);
+    api.finish_done.connect(onFinish);
+    api.models_listed.connect(onModelsListed);
+    api.initial_state(applyInitialState);
+  });
+</script>
+</body>
+</html>

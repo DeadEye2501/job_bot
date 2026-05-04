@@ -1,0 +1,50 @@
+# Secrets
+.env
+
+# Personal data seed migration (CV, skills, experience, subscribed channels,
+# hardcoded tunables). Ships only on dev's machine; other users get an empty
+# DB + RuntimeSettings._APP_DEFAULTS + the first-run wizard.
+alembic/versions/aa4e0de05368_seed_initial_data.py
+
+# Local-only design / brainstorm artifacts (UI mockups with personal CV
+# content, status-color spec, etc.). Repo is code-only.
+docs/
+.superpowers/
+
+# Personal CV files. Other users put their own PDF here and point cv_path at it.
+cv/
+
+# Local Claude Code agent settings.
+.claude/
+
+# Playwright MCP screenshot / snapshot artifacts (used during UI iteration,
+# not part of the project).
+.playwright-mcp/
+
+# Local backups of the .git dir from previous repo-resets.
+.git.bak*/
+
+# Pyrogram session
+sessions/
+*.session
+*.session-journal
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
