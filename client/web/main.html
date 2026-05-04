@@ -3228,6 +3228,21 @@
   }
   .stats-period-pill:hover { border-color: var(--accent); }
   .stats-period-pill.active { background: var(--accent); color: #1d1d1f; border-color: var(--accent); font-weight: 500; }
+  .stats-refresh-btn {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 4px;
+  }
+  .stats-refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .stats-refresh-btn .material-symbols-outlined { font-size: 14px; line-height: 1; }
+  .stats-refresh-btn.spinning .material-symbols-outlined { animation: stats-refresh-spin 0.8s linear infinite; }
+  @keyframes stats-refresh-spin { to { transform: rotate(360deg); } }
   .stats-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; }
   .stats-card {
     background: var(--bg-secondary);
@@ -4513,6 +4528,14 @@
         api.request_vacancy_detail(appState.vacancies.selectedId);
       }
       startVacanciesRefreshTimer();
+    } else if (section === 'stats' && api) {
+      // Re-entry refresh: stats are derived from vacancies/messages that
+      // may have changed while user was off the section. Без сброса кеша
+      // экран показывал stale-данные до ручного переключения периода.
+      const s = appState.stats;
+      s.kpi = null; s.breakdown = null; s.hrResponses = null;
+      s.skills = null; s.channels = null;
+      requestAllStatsForPeriod();
     } else if (section === 'contacts' && appState.contacts.tab === 'hr' && api) {
       // Re-entry refresh: incoming DM classifier may have written new rows /
       // unread counts while user was off the section. Match vacancies'
@@ -5254,7 +5277,7 @@
           </div>
         </div>
         <div class="vac-filter-footer">
-          <button type="button" class="btn" data-action="filter-reset"><span class="material-symbols-outlined" style="font-size:14px;">restart_alt</span>Сбросить</button>
+          <button type="button" class="btn" data-action="filter-reset" style="display:inline-flex;align-items:center;gap:4px;"><span class="material-symbols-outlined" style="font-size:14px;line-height:1;">restart_alt</span>Сбросить</button>
           <div class="vac-filter-footer-right">
             <button type="button" class="btn" data-action="filter-cancel">Отмена</button>
             <button type="button" class="btn primary" data-action="filter-apply">Применить</button>
@@ -5461,7 +5484,17 @@
       if (a.kind !== b.kind) return a.kind === 'history' ? -1 : 1;
       return 0;
     });
-    const items = all.map((it, idx) => {
+    // Префильтр скрытых событий (успешный auto_send — он дублирует
+    // applied_sent + Applied-history) ДО `.map`, чтобы `idx === 0`
+    // означало именно первый ВИДИМЫЙ ряд. Иначе, когда самое свежее
+    // событие — скрытый auto_send-ok, current-glow не достаётся
+    // никому: idx=0 рендерит '', а idx=1 (видимый) уже не current.
+    const visible = all.filter(it => !(
+      it.kind === 'event'
+      && it.eventKind === 'auto_send'
+      && it.payload && it.payload.ok === true
+    ));
+    const items = visible.map((it, idx) => {
       const isCurrent = idx === 0;
       const when = formatRelative(it.ts);
       const titleAttr = it.ts ? ` title="${escapeAttr(it.ts)}"` : '';
@@ -5472,6 +5505,17 @@
         // статус (applied=true). Comment-only (applied=false) → пустой
         // dotCls → дефолтный серый из `.tl-dot { background: var(--text-muted) }`.
         dotCls = it.applied ? (' ' + statusToClass(it.status)) : '';
+        // Системно-сгенерированные комментарии не редактируем — они
+        // отражают факт автоматического действия (Bot.send выставил
+        // Applied + кладёт фиксированный текст). Юзер может только
+        // редактировать комменты, которые он сам и оставил при ручной
+        // смене статуса. Хардкодим известные авто-тексты, т.к.
+        // отдельной колонки `auto` в vacancy_status_history нет.
+        const AUTO_EXPLANATIONS = new Set([
+          'Авто-отправка отклика.',
+          'Ручная отправка.',
+        ]);
+        const isAuto = AUTO_EXPLANATIONS.has((it.explanation || '').trim());
         // Always-on inline-edit. Драфт (если пользователь сейчас печатает)
         // имеет приоритет над server-value, чтобы push-rerender'ы не
         // подменяли текст под рукой. Placeholder = «без комментария» —
@@ -5481,10 +5525,17 @@
           ? drafts[it.id]
           : null;
         const value = draftVal != null ? draftVal : (it.explanation || '');
-        textHtml = `<span class="tl-history-row">`
-          + `<span class="status-name">${escapeHtml(it.status || '')}:</span>`
-          + `<textarea class="tl-explanation-input" data-role="tl-explanation" data-history-id="${it.id}" rows="1" maxlength="2000" placeholder="без комментария.">${escapeHtml(value)}</textarea>`
-          + `</span>`;
+        if (isAuto) {
+          textHtml = `<span class="tl-history-row">`
+            + `<span class="status-name">${escapeHtml(it.status || '')}:</span>`
+            + `<span class="tl-event">${escapeHtml(value)}</span>`
+            + `</span>`;
+        } else {
+          textHtml = `<span class="tl-history-row">`
+            + `<span class="status-name">${escapeHtml(it.status || '')}:</span>`
+            + `<textarea class="tl-explanation-input" data-role="tl-explanation" data-history-id="${it.id}" rows="1" maxlength="2000" placeholder="без комментария.">${escapeHtml(value)}</textarea>`
+            + `</span>`;
+        }
       } else if (it.eventKind === 'ingested') {
         const ch = it.payload.channel
           ? `@${it.payload.channel}`
@@ -5512,22 +5563,20 @@
         }
         textHtml = `${statusName} <span class="tl-event">${escapeHtml(skipReason)}</span>`;
       } else if (it.eventKind === 'auto_send') {
-        // VacancyEvent kind="auto_send" — каждая попытка авто-отправки
-        // (success или fail). payload: {ok: bool, reason: str}.
-        // Точку красим зелёным (Applied) если получилось, иначе серая.
-        const ok = it.payload.ok === true;
-        const reason = it.payload.reason || (ok ? 'sent' : 'unknown');
+        // VacancyEvent kind="auto_send" — каждая попытка авто-отправки.
+        // Успешные попытки префильтрованы выше (см. `visible`), сюда
+        // доходят только провалы; показываем причину, по которой
+        // авто-отправка не сработала.
+        const reason = it.payload.reason || 'unknown';
         const reasonLabels = {
-          'sent': 'cover letter отправлен',
           'profile_empty': 'профиль пуст',
-          'cover_letter_failed': 'LLM не сгенерировал письмо',
+          'cover_letter_failed': 'письмо не прошло проверку',
           'cv_missing': 'CV-файл не найден',
           'race': 'статус успел измениться',
           'blocked': 'отправка заблокирована',
           'telegram_error': 'Telegram отказался',
         };
         const label = reasonLabels[reason] || reason;
-        if (ok) dotCls = ' ' + statusToClass('Applied');
         textHtml = `<span class="tl-event">Авто-отправка: ${escapeHtml(label)}.</span>`;
       } else if (it.eventKind === 'applied_sent') {
         // VacancyEvent kind="applied_sent" — фактическая отправка письма
@@ -5535,12 +5584,13 @@
         // несём dev-метаданные (suppressed, cover_letter_chars, force).
         // SEND_LOCKED-факт в payload остаётся для аудита, но в UI его
         // не показываем — иначе dev-режим выглядит иначе чем прод.
+        // Цвет точки оставляем дефолтным (серым) — статус-цвет
+        // зарезервирован за событиями смены статуса (history-rows).
         const force = it.payload.force === true;
         const chars = it.payload.cover_letter_chars;
         const tag = force ? 'ручная' : '';
         const charsPart = chars ? `, ${chars} симв.` : '';
         const fullText = (tag ? `${tag} ` : '') + `Отправлен отклик${charsPart}.`;
-        dotCls = ' ' + statusToClass('Applied');
         textHtml = `<span class="tl-event">${escapeHtml(fullText)}</span>`;
       } else if (it.eventKind === 'linked_hr') {
         const prev = it.payload.previous_name
@@ -10583,16 +10633,19 @@
     if (!st.vacancies.length) {
       return `<div class="cnt-det-section"><div class="cnt-vacs-empty">Из этого канала ещё нет вакансий.</div></div>`;
     }
-    const rows = st.vacancies.map(v => {
+    const parsed = st.vacancies.filter(v => v.title && v.title.trim());
+    if (!parsed.length) {
+      return `<div class="cnt-det-section"><div class="cnt-vacs-empty">Из этого канала ещё нет вакансий.</div></div>`;
+    }
+    const rows = parsed.map(v => {
       const cls = statusToClass(v.status || 'New');
       const score = (v.score == null) ? '' : `<span class="vac-mini-score">${v.score}</span>`;
       const when = v.createdAt ? fmtShortAgo(v.createdAt) : '';
-      const title = v.title && v.title.trim() ? v.title : '— без названия —';
       return `
         <div class="vac-mini-row" data-action="cnt-ch-open-vacancy" data-vacancy-id="${v.id}">
           <span class="status-dot ${cls}"></span>
           ${score}
-          <span class="vac-mini-title">${escapeHtml(title)}</span>
+          <span class="vac-mini-title">${escapeHtml(v.title)}</span>
           <span class="vac-mini-when">${escapeHtml(when)}</span>
         </div>
       `;
@@ -13484,7 +13537,11 @@
       const cls = k === cur ? ' active' : '';
       return `<button type="button" class="stats-period-pill${cls}" data-period="${k}">${escapeHtml(STATS_PERIOD_LABELS[k])}</button>`;
     }).join('');
-    return `<div class="stats-toolbar">${pills}</div>`;
+    const st = appState.stats;
+    const loading = st.kpiLoading || st.breakdownLoading || st.hrResponsesLoading || st.skillsLoading || st.channelsLoading;
+    const spin = loading ? ' spinning' : '';
+    const refresh = `<button type="button" class="stats-refresh-btn${spin}" data-action="stats-refresh" title="Обновить"><span class="material-symbols-outlined">sync</span></button>`;
+    return `<div class="stats-toolbar">${pills}${refresh}</div>`;
   }
 
   function renderStats() {
@@ -13524,6 +13581,16 @@
         requestAllStatsForPeriod();
       });
     });
+    const refreshBtn = mainSlot.querySelector('[data-action="stats-refresh"]');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        const s = appState.stats;
+        s.kpi = null; s.breakdown = null; s.hrResponses = null;
+        s.skills = null; s.channels = null;
+        renderSection();
+        requestAllStatsForPeriod();
+      });
+    }
     // Клик по строке статуса → переход на список вакансий с применённым
     // single-status фильтром. Перетираем filtersApplied целиком (а не
     // дополняем): пользовательский intent "хочу увидеть вакансии этого

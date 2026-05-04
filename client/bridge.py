@@ -1725,7 +1725,7 @@ class MainApi(QObject):
             "no_hr":              "К вакансии не привязан HR.",
             "already_applied":    "Отклик по этой вакансии уже отправлен.",
             "profile_empty":      "Профиль пуст — нечем заполнить cover letter.",
-            "cover_letter_failed":"LLM не смог сгенерировать cover letter (см. логи).",
+            "cover_letter_failed":"Cover letter не прошёл проверку (длина / формат — см. логи).",
             "cv_missing":         "Файл резюме не найден — проверьте путь в настройках.",
             "blocked":            "Отправка заблокирована (OFF mode / blacklist / у HR нет ни id, ни @username).",
             "telegram_error":     "Telegram отказался принять сообщение (см. логи).",

@@ -1288,7 +1288,10 @@ class IngestionPipeline:
                 v.description = parsed.description
                 v.company_name = parsed.company_name
                 v.hr_contact = parsed.hr_contact
-                v.stack = parsed.stack
+                # Если повторный парс вернул пустой stack (LLM-регрессия —
+                # модель в этот раз не извлекла скиллы), сохраняем прежний.
+                # Иначе rerun по уже распаршенной вакансии стирает чипы.
+                v.stack = parsed.stack if parsed.stack else (v.stack or [])
                 v.grade = parsed.grade
                 v.salary = parsed.salary
                 v.salary_rub_min, v.salary_rub_max = (
