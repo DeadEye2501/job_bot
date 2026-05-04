@@ -685,6 +685,13 @@ class IngestionPipeline:
         ждём с таймаутом, чтобы все живые task'и доработали или
         завершились по cancel'у.
 
+        Edge race во время normal completion: tardy task мог проскочить
+        cancel (был в commit'е) и сделать `apply_classification` уже
+        ПОСЛЕ self._dm_classify_tasks.clear(). Корректность не нарушается —
+        commit прошёл, статус-history-row записан; просто tasks-dict
+        некоторое время будет содержать ссылку на завершившийся task,
+        пока следующий schedule_dm_classification его не перезапишет.
+
         ``drain=True`` (OFF transition) — после cancel'ов проходим по
         каждому непустому буферу и делаем финальную классификацию: иначе
         burst, накопленный за debounce-окном, пропадает молча и юзер
