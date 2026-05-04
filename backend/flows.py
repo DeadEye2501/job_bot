@@ -1254,10 +1254,36 @@ class IngestionPipeline:
         self._fire_vacancies_changed()
 
         # Авто-отправка отклика: вакансия прошла score-threshold + LLM-fit-
-        # validator (status остался NEW), HR резолвлен в Telegram-юзера —
-        # генерируем cover letter и отправляем с прикреплённым CV.
-        if status == VacancyStatus.NEW and hr_for_send is not None:
-            await self._send_application(hr_for_send, parsed, vacancy_id)
+        # validator (status остался NEW), HR резолвлен в Telegram-юзера,
+        # юзер не выключил auto_apply в настройках — генерируем cover
+        # letter и отправляем с прикреплённым CV.
+        if (
+            status == VacancyStatus.NEW
+            and hr_for_send is not None
+            and self._rs.auto_apply
+        ):
+            ok, reason = await self._send_application(
+                hr_for_send, parsed, vacancy_id
+            )
+            # Audit-event: фиксируем КАЖДУЮ попытку auto-send'а вне
+            # зависимости от исхода — иначе юзер смотрит на NEW-вакансию
+            # через месяцы и не может понять «почему авто-отправка не
+            # сработала, ведь HR резолвлен и score прошёл».
+            try:
+                async with self._session_factory() as session:
+                    session.add(
+                        VacancyEvent(
+                            vacancy_id=vacancy_id,
+                            kind="auto_send",
+                            payload={"ok": ok, "reason": reason},
+                        )
+                    )
+                    await session.commit()
+            except Exception:
+                logger.exception(
+                    "auto_send VacancyEvent persist failed",
+                    extra={"vacancy_id": vacancy_id},
+                )
 
     async def _is_unparsed_vacancy(self, vacancy_id: int) -> bool:
         """A vacancy is 'orphaned' when its embedding row is in the cache

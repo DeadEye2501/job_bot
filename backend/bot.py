@@ -34,7 +34,7 @@ from config import get_data_dir
 from backend import repository
 from backend.domain import should_apply_status
 from backend.flows import IngestionPipeline, catch_up_missed_dms, process_dm
-from backend.models import HR, BotMode, Message, Vacancy, VacancyStatus
+from backend.models import HR, BotMode, Message, Vacancy, VacancyEvent, VacancyStatus
 from backend.runtime_settings import RuntimeSettings
 
 
@@ -503,6 +503,14 @@ class Bot:
     async def run(self, *, once: bool = False) -> None:
         if self._dry_run:
             logger.warning("DRY-RUN mode: outgoing TG messages will NOT be sent")
+        # Синкаем dev-safety lock из БД-настройки в module-level guard
+        # adapters/telegram.send_dm. Авторитет — rs.send_locked; константа
+        # — defence-in-depth на случай если Bot.send забудет проверить.
+        telegram.SEND_LOCKED = self._rs.send_locked
+        if telegram.SEND_LOCKED:
+            logger.warning(
+                "SEND_LOCKED=True: outgoing DM will be simulated, not sent"
+            )
         await self._client.start()
         # ``self._loop`` ставим ПОСЛЕ client.start() — это и метка
         # «бот готов принимать kick/cancel из Qt-треда», и сам loop
@@ -779,6 +787,33 @@ class Bot:
             return True
         if applied_now:
             logger.info("vacancy %s status -> APPLIED after send", vacancy_id)
+        # Audit-event: фиксируем факт фактической отправки cover-letter'а
+        # (real DM или SEND_LOCKED-имитация) — это нужно для UI-таймлайна
+        # вакансии, иначе у юзера только Message-row + status flip,
+        # без явной строки «отклик отправлен» в истории. force=True от
+        # ручного UI выделяем отдельным флагом.
+        if vacancy_id is not None:
+            try:
+                async with self._session_factory() as session:
+                    session.add(
+                        VacancyEvent(
+                            vacancy_id=vacancy_id,
+                            kind="applied_sent",
+                            payload={
+                                "hr_id": hr.id,
+                                "force": force,
+                                "suppressed": suppressed,
+                                "cover_letter_chars": len(text),
+                                "tg_message_id": tg_msg_id,
+                            },
+                        )
+                    )
+                    await session.commit()
+            except Exception:
+                logger.exception(
+                    "applied_sent VacancyEvent persist failed",
+                    extra={"vacancy_id": vacancy_id},
+                )
         return True
 
     async def mark_hr_chat_read(self, hr_id: int) -> int:

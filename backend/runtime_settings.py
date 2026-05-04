@@ -110,6 +110,16 @@ _APP_DEFAULTS: dict[str, str] = {
     "dm_backfill_limit": "50",
     "cv_path": "",
     "wizard_completed": "false",
+    # send_locked: dev-safety, по дефолту блочит реальную отправку DM.
+    # Раньше был hardcoded const в adapters/telegram.py — теперь
+    # авторитет здесь, а telegram.SEND_LOCKED синкается из этой
+    # настройки на старте Bot.run.
+    "send_locked": "true",
+    # auto_apply: kill-switch для автоматической отправки cover-letter'ов
+    # из poll-цикла (auto-send branch в _parse_and_update_vacancy).
+    # При False parse-pipeline всё равно отрабатывает — статус NEW,
+    # ручная отправка из UI через «Отправить отклик» работает.
+    "auto_apply": "true",
 }
 
 
@@ -206,6 +216,21 @@ class RuntimeSettings:
     @property
     def wizard_completed(self) -> bool:
         return self._app_value("wizard_completed").lower() == "true"
+
+    @property
+    def send_locked(self) -> bool:
+        """Если True, реальная отправка Telegram-DM подавляется (для
+        dev-тестов). Авторитетный источник — здесь; ``telegram.SEND_LOCKED``
+        синкается с этой настройкой на старте Bot.run и при изменении
+        через UI."""
+        return self._app_value("send_locked").lower() == "true"
+
+    @property
+    def auto_apply(self) -> bool:
+        """Если False, авто-отправка cover-letter'ов из poll-цикла
+        отключена (parse-pipeline отрабатывает, ручная отправка через
+        UI работает)."""
+        return self._app_value("auto_apply").lower() == "true"
 
     def _app_value(self, key: str) -> str:
         # Treat NULL / empty / whitespace-only values in the DB as "not
