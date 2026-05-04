@@ -3740,17 +3740,60 @@
      имеют разную высоту контента). */
   .sys-settings .pipeline-row {
     display: grid;
-    grid-template-columns: 1.4fr 1fr 1fr;
+    grid-template-columns: repeat(5, 1fr);
     gap: 4px 12px;
     align-items: start;
   }
+  .sys-settings .pipeline-row > div {
+    display: flex; flex-direction: column;
+    min-width: 0;  /* иначе длинные лейблы распирают грид-ячейку */
+  }
+  .sys-settings .pipeline-toggle {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 28px; height: 14px;
+    background: var(--bg-tertiary);
+    border-radius: 7px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin: 0;
+    flex-shrink: 0;
+  }
+  .sys-settings .pipeline-toggle::after {
+    content: '';
+    position: absolute;
+    left: 2px; top: 2px;
+    width: 10px; height: 10px;
+    background: var(--text-tertiary);
+    border-radius: 50%;
+    transition: all 0.15s;
+  }
+  .sys-settings .pipeline-toggle:checked { background: var(--accent); }
+  .sys-settings .pipeline-toggle:checked::after {
+    left: calc(100% - 12px);
+    background: #1d1d1f;
+  }
+  /* Container для toggle-cell: имитирует высоту .with-unit/.slider-row,
+     чтобы тумблер встал на одну линию с числовыми инпутами рядом.
+     justify-content: center — тумблер по центру своей колонки, как и
+     остальные элементы пайплайна. */
+  .sys-settings .with-toggle {
+    display: flex; align-items: center; justify-content: center; height: 28px;
+  }
   .sys-settings .pipeline-label {
     font-size: 0.7rem; color: var(--text-tertiary); margin-bottom: 2px;
+    text-align: center;
   }
   .sys-settings .with-unit {
     display: flex; align-items: center; gap: 6px;
+    justify-content: center;
   }
-  .sys-settings .with-unit .input { width: 100%; }
+  /* Number-инпут в пайплайне фиксированной ширины — иначе при равных
+     5 колонках инпут «50» и инпут «1800» расползались бы на всю ячейку
+     с разной визуальной плотностью; центрирование внутри ячейки работает
+     только при контентной ширине. */
+  .sys-settings .with-unit .input { width: 72px; flex: 0 0 auto; }
   .sys-settings .with-unit .unit { color: var(--text-tertiary); font-size: 0.75rem; }
   .sys-settings .slider-row {
     display: grid; grid-template-columns: 1fr 32px; gap: 8px; align-items: center;
@@ -5484,16 +5527,22 @@
       if (a.kind !== b.kind) return a.kind === 'history' ? -1 : 1;
       return 0;
     });
-    // Префильтр скрытых событий (успешный auto_send — он дублирует
-    // applied_sent + Applied-history) ДО `.map`, чтобы `idx === 0`
+    // Префильтр скрытых событий ДО `.map`, чтобы `idx === 0`
     // означало именно первый ВИДИМЫЙ ряд. Иначе, когда самое свежее
-    // событие — скрытый auto_send-ok, current-glow не достаётся
-    // никому: idx=0 рендерит '', а idx=1 (видимый) уже не current.
-    const visible = all.filter(it => !(
-      it.kind === 'event'
-      && it.eventKind === 'auto_send'
-      && it.payload && it.payload.ok === true
-    ));
+    // событие — скрытое, current-glow не достаётся никому:
+    // idx=0 рендерит '', а idx=1 (видимый) уже не current.
+    // Скрываем:
+    //   - auto_send с ok=true: дублирует applied_sent + Applied-history;
+    //   - applied_sent целиком: дублирует Applied-history-row («Applied:
+    //     Авто-отправка отклика.» / «Applied: Ручная отправка.»),
+    //     причём с обрезанным «N симв..» хвостом, который полезен только
+    //     dev-аудиту, не юзеру. Аудит-данные остаются в БД, в UI их нет.
+    const visible = all.filter(it => {
+      if (it.kind !== 'event') return true;
+      if (it.eventKind === 'auto_send' && it.payload && it.payload.ok === true) return false;
+      if (it.eventKind === 'applied_sent') return false;
+      return true;
+    });
     const items = visible.map((it, idx) => {
       const isCurrent = idx === 0;
       const when = formatRelative(it.ts);
@@ -5578,20 +5627,6 @@
         };
         const label = reasonLabels[reason] || reason;
         textHtml = `<span class="tl-event">Авто-отправка: ${escapeHtml(label)}.</span>`;
-      } else if (it.eventKind === 'applied_sent') {
-        // VacancyEvent kind="applied_sent" — фактическая отправка письма
-        // (Bot.send). Парная с VacancyStatusHistory("Applied"); тут
-        // несём dev-метаданные (suppressed, cover_letter_chars, force).
-        // SEND_LOCKED-факт в payload остаётся для аудита, но в UI его
-        // не показываем — иначе dev-режим выглядит иначе чем прод.
-        // Цвет точки оставляем дефолтным (серым) — статус-цвет
-        // зарезервирован за событиями смены статуса (history-rows).
-        const force = it.payload.force === true;
-        const chars = it.payload.cover_letter_chars;
-        const tag = force ? 'ручная' : '';
-        const charsPart = chars ? `, ${chars} симв.` : '';
-        const fullText = (tag ? `${tag} ` : '') + `Отправлен отклик${charsPart}.`;
-        textHtml = `<span class="tl-event">${escapeHtml(fullText)}</span>`;
       } else if (it.eventKind === 'linked_hr') {
         const prev = it.payload.previous_name
           ? escapeHtml(it.payload.previous_name)
@@ -12314,9 +12349,17 @@
     if (patch.app) {
       if (!st.pipeline) st.pipeline = {};
       for (const [k, v] of Object.entries(patch.app)) {
-        // app-значения в state — типизированные числа; конвертим если можем.
-        const n = Number(v);
-        st.pipeline[k] = Number.isFinite(n) ? n : v;
+        // app-значения в state — типизированные числа ИЛИ bool'ы (для
+        // toggle-полей вроде send_locked). Bool пропускаем как есть:
+        // Number(true) === 1, Number.isFinite(1) === true → без guard'а
+        // bool превращался бы в число и `p.send_locked !== false`-чек
+        // в рендере перестал бы корректно отличать включённое от выключенного.
+        if (typeof v === 'boolean') {
+          st.pipeline[k] = v;
+        } else {
+          const n = Number(v);
+          st.pipeline[k] = Number.isFinite(n) ? n : v;
+        }
       }
     }
     if (!api) return;
@@ -12599,11 +12642,12 @@
 
   function _renderPipelineSection() {
     const st = appState.system.settings;
-    const p = st.pipeline || { scoring_threshold: 10, poll_interval_sec: 1800, backfill_limit: 15, dm_backfill_limit: 50 };
+    const p = st.pipeline || { scoring_threshold: 10, poll_interval_sec: 1800, backfill_limit: 15, dm_backfill_limit: 50, send_locked: true };
     const SCORE_MAX = 20;
     const score = Number.isFinite(p.scoring_threshold) ? p.scoring_threshold : 10;
     const scoreClamped = Math.max(0, Math.min(SCORE_MAX, score));
     const scorePct = (scoreClamped / SCORE_MAX) * 100;
+    const sendLocked = p.send_locked !== false;
     return `
       <div class="section">
         <div class="section-title">
@@ -12637,6 +12681,12 @@
             <div class="with-unit">
               <input class="input" type="number" min="1" max="500" data-field="pipeline.dm_backfill_limit" value="${escapeAttr(String(p.dm_backfill_limit))}">
               <span class="unit">шт</span>
+            </div>
+          </div>
+          <div>
+            <div class="pipeline-label" title="Когда включено, исходящие DM не уходят в Telegram (dev-режим — для локального теста пайплайна без реальной отправки)">Симуляция отправки</div>
+            <div class="with-toggle">
+              <input type="checkbox" class="pipeline-toggle" data-field="pipeline.send_locked"${sendLocked ? ' checked' : ''}>
             </div>
           </div>
         </div>
@@ -12703,6 +12753,16 @@
     if (scoreSlider2) {
       scoreSlider2.addEventListener('change', () => {
         _saveSettings({ app: { scoring_threshold: scoreSlider2.value } });
+      });
+    }
+    const sendLockedToggle = mainSlot.querySelector('[data-field="pipeline.send_locked"]');
+    if (sendLockedToggle) {
+      sendLockedToggle.addEventListener('change', () => {
+        // Optimistic state update: следующий ререндер из push'а БД-патча
+        // не должен «откатить» галочку, пока ответ не пришёл.
+        if (!appState.system.settings.pipeline) appState.system.settings.pipeline = {};
+        appState.system.settings.pipeline.send_locked = sendLockedToggle.checked;
+        _saveSettings({ app: { send_locked: sendLockedToggle.checked } });
       });
     }
     const deleteAllBtn = mainSlot.querySelector('[data-action="settings-delete-all"]');

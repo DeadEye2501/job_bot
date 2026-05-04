@@ -3144,6 +3144,7 @@ class MainApi(QObject):
                     "poll_interval_sec": self._rs.poll_interval_sec,
                     "backfill_limit": self._rs.backfill_limit,
                     "dm_backfill_limit": self._rs.dm_backfill_limit,
+                    "send_locked": self._rs.send_locked,
                 },
             })
 
@@ -3253,13 +3254,30 @@ class MainApi(QObject):
                 if app is not None:
                     # Whitelist: чтобы UI не мог по ошибке/опечатке писать
                     # произвольные ключи в app_settings.
-                    allowed = {"scoring_threshold", "poll_interval_sec", "backfill_limit", "dm_backfill_limit"}
+                    allowed = {
+                        "scoring_threshold", "poll_interval_sec",
+                        "backfill_limit", "dm_backfill_limit",
+                        "send_locked",
+                    }
                     for key, value in app.items():
                         if key not in allowed:
                             logger.warning("save_settings: unknown app key %r ignored", key)
                             continue
+                        # Bool → "true"/"false": app_settings хранит строки,
+                        # rs.send_locked парсит обратно в lower-case bool
+                        # (см. RuntimeSettings.send_locked). True/False через
+                        # str() дали бы "True"/"False" — не пройдут .lower()
+                        # сравнение с "true".
+                        if isinstance(value, bool):
+                            value = "true" if value else "false"
                         await self._rs.set_app(str(key), str(value))
                         applied.append(f"app.{key}")
+                    # Sync send_locked в adapters.telegram чтобы новое значение
+                    # начало действовать без рестарта бота. Авторитет —
+                    # rs.send_locked; константа — кеш для горячего пути отправки.
+                    if "send_locked" in app:
+                        from adapters import telegram as _tg
+                        _tg.SEND_LOCKED = self._rs.send_locked
             except Exception as e:
                 logger.exception("save_settings failed")
                 return _err(f"{type(e).__name__}: {e}", applied=applied)

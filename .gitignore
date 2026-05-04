@@ -48,3 +48,8 @@ env/
 .vscode/
 *.swp
 .DS_Store
+
+# PyInstaller artifacts
+build/
+dist/
+JobBot.exe
