@@ -13,6 +13,7 @@ and the cache).
 """
 
 import logging
+import math
 from dataclasses import dataclass, field
 
 import keyring
@@ -48,14 +49,16 @@ def _mask_phone(phone: str | None) -> str:
 _KEYRING_SERVICE = "JobBot"
 _KEYRING_KEY = "master_key"
 
-# Бэкенды keyring'а, которые мы отказываемся использовать: PlaintextKeyring
-# (file-based, шифрования нет — секреты лежат в `~/.local/share/python_keyring`
-# в открытом виде) и fail.Keyring (нет функционирующего бэкенда — каждый
-# вызов raise'нет, _get_or_create_master_key уйдёт в loop с генерацией
-# нового ключа на каждый encrypt/decrypt → расшифровать сохранённое
-# нельзя). Headless / minimal Linux без SecretService — типичный кейс.
+# Бэкенды keyring'а, которые мы отказываемся использовать. Все они
+# хранят секреты на диске в виде, который не считается «system-grade»
+# encryption: либо plaintext (шифрования нет), либо file-based KDF
+# с ключом-вне-OS-сейфа, либо вообще no-op fail-stub. Headless /
+# minimal Linux без SecretService — типичный кейс.
 _REJECTED_KEYRING_BACKENDS = (
     "keyrings.alt.file.PlaintextKeyring",
+    "keyrings.alt.file.EncryptedKeyring",      # passphrase-derived KDF, не OS-vault
+    "keyrings.alt.file_base.Keyring",          # generic file-based base class
+    "keyrings.alt.Windows.RegistryKeyring",    # plaintext в реестре Windows
     "keyring.backends.fail.Keyring",
 )
 
@@ -76,10 +79,10 @@ def _check_keyring_backend() -> None:
     backend_cls = f"{type(backend).__module__}.{type(backend).__name__}"
     if backend_cls in _REJECTED_KEYRING_BACKENDS:
         raise RuntimeError(
-            f"Insecure keyring backend: {backend_cls}. Установите системный "
-            "keyring (Windows Credential Manager / macOS Keychain / Linux "
-            "SecretService) — иначе секреты приложения нельзя надёжно "
-            "зашифровать."
+            f"Небезопасный keyring-бэкенд: {backend_cls}. Установите "
+            "системный keyring (Windows Credential Manager / macOS "
+            "Keychain / Linux SecretService) — иначе секреты приложения "
+            "нельзя надёжно зашифровать."
         )
     logger.info("keyring backend: %s", backend_cls)
 
@@ -260,11 +263,19 @@ class RuntimeSettings:
 
     @property
     def dedup_cosine_threshold(self) -> float:
-        """Cosine-порог дедупа в `cosine_top_match`. См. _APP_DEFAULTS."""
+        """Cosine-порог дедупа в `cosine_top_match`. См. _APP_DEFAULTS.
+
+        Clamp [0.5, 0.999]: 0.0 дропнул бы все вакансии как «дубликаты»
+        (cosine ≥ 0 для нормированных векторов всегда), 1.0 эффективно
+        выключил бы дедуп. NaN/Inf тоже отбиваем.
+        """
         try:
-            return float(self._app_value("dedup_cosine_threshold"))
-        except (ValueError, TypeError):
+            v = float(self._app_value("dedup_cosine_threshold"))
+        except ValueError:
             return 0.92
+        if not math.isfinite(v):
+            return 0.92
+        return max(0.5, min(0.999, v))
 
     @property
     def dm_backfill_limit(self) -> int:

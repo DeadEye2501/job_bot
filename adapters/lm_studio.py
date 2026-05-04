@@ -137,8 +137,11 @@ async def list_models(client: httpx.AsyncClient, *, kind: str | None = None) -> 
     # (Nomic), `*ada*` / `text-embedding-*` (OpenAI), generic `*embed*`.
     # Без этого фильтра embedding'и протекают в chat-picker (и наоборот),
     # юзер выбирает не то — LLM-вызовы валятся с «not a chat model».
+    # `text-embedding-ada-` уже покрывает OpenAI ada-семейство; bare
+    # «ada» как substring опасен — поймает гипотетический «yi-chat-ada»
+    # / «llama-canada-tuned» и спрячет их из chat-picker'а.
     embed_markers = (
-        "embed", "ada", "text-embedding-", "bge-", "e5-", "nomic-",
+        "embed", "text-embedding-", "bge-", "e5-", "nomic-",
     )
     def _looks_like_embed(name: str) -> bool:
         n = name.lower()

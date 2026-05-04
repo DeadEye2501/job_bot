@@ -720,14 +720,22 @@ class IngestionPipeline:
             )
         if drain and not self._shutting_down:
             # Snapshot keys — _classify_and_apply_for_hr pop'ает буфер.
+            # Параллелим: 5 HR'ов × 3-5s LLM-RTT последовательно = ~25s
+            # стола в OFF transition, в течение которого run-loop не
+            # реагирует на stop_event/wake. asyncio.gather + return_exceptions
+            # — пусть один сломанный classify не валит остальные.
             hr_ids = [hr_id for hr_id, buf in self._dm_classify_buffer.items() if buf]
-            for hr_id in hr_ids:
-                try:
-                    await self._classify_and_apply_for_hr(hr_id)
-                except Exception:
-                    logger.exception(
-                        "drain classify on OFF failed for hr %d", hr_id,
-                    )
+            if hr_ids:
+                results = await asyncio.gather(
+                    *(self._classify_and_apply_for_hr(hr_id) for hr_id in hr_ids),
+                    return_exceptions=True,
+                )
+                for hr_id, res in zip(hr_ids, results):
+                    if isinstance(res, Exception):
+                        logger.exception(
+                            "drain classify on OFF failed for hr %d",
+                            hr_id, exc_info=res,
+                        )
         self._dm_classify_buffer.clear()
 
     async def poll_active_channels(self) -> None:

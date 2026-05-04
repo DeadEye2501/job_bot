@@ -789,25 +789,25 @@
   }
 
   /* === Z-index ladder ===================================================
-   * Растёт сверху вниз — большее значение перекрывает меньшее. Перед
-   * добавлением нового слоя сверьтесь с этой лестницей; промежутки
-   * (10, 20, 25, 30, 35) оставлены ровно чтобы вставлять между слоями
-   * без переноса всего стека. Метки соответствуют реальным селекторам
-   * в этом файле — не путать с wizard.html (отдельный документ).
+   * Растёт сверху вниз — большее значение перекрывает меньшее. Метки
+   * сверены grep'ом по реальным селекторам в этом файле (главный CSS):
    *
-   *      2 — bubble-photo close-overlay поверх фото в чате
-   *     10 — sticky-заголовки таблиц / list-row внутри секций
-   *     20 — sticky topbar / sticky-headers контента
-   *     25 — pinned action-bar поверх контента
-   *     30 — drawer/sidebar overlays (system, contacts)
-   *     35 — `.vac-filter-channel-list` (filter dropdown поверх vacancies)
-   *     50 — popovers (status / score)
+   *      2 — `.vac-raw-modal .raw-copy-btn` (sticky кнопка копирования
+   *          в raw-text модалке вакансии)
+   *     10 — `.skill-picker` (выпадающий picker скиллов в профиле)
+   *     20 — `.vac-sort-menu` / `.status-popover` (компактные popover'ы
+   *          внутри карточки вакансии)
+   *     25 — `.vac-filter-popover` (фильтры на listing'е вакансий)
+   *     30 — `.cdd-panel` (custom-dropdown panel — generic компонент)
+   *     35 — `.vac-filter-dropdown-panel` (вложенный список каналов/
+   *          компаний внутри vac-filter-popover'а)
+   *     50 — `.more-popover` (actions-menu в карточке вакансии)
    *     60 — `.sys-settings-login-backdrop` (settings re-auth fullscreen)
    *    100 — `.bl-combobox-dropdown` (blacklist combobox)
-   *    900 — popover-dismiss-overlay (clicks-through trap)
-   *    901 — popover content поверх своего overlay'я
+   *    900 — `.unread-popup-backdrop` (overlay-trap под unread-popup)
+   *    901 — `.unread-popup` (popup непрочитанных HR'ов)
    *   1000 — `.modal-backdrop` (showModal-confirm/prompt fullscreen)
-   *  10000 — toast-stack (всегда поверх любого modal'а)
+   *  10000 — `.app-toast` (всегда поверх любого модала)
    */
 
   /* === Custom modal (replaces native prompt/confirm) =================== */
@@ -14826,8 +14826,14 @@
     if (_modalOpen) return Promise.resolve(null);
     _modalOpen = true;
     return new Promise((resolve) => {
-      const backdrop = document.createElement('div');
-      backdrop.className = 'modal-backdrop';
+      // Synchronous-throw recovery: если мы упадём ДО привязки close()
+      // к onclick handler'ам (e.g. createElement OOM, escapeHtml exception),
+      // _modalOpen остался бы true навсегда, и все последующие showModal
+      // тихо resolve'ились бы в null. try/catch на construction phase.
+      let backdrop;
+      try {
+        backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
       const inputHtml = type === 'prompt'
         ? `<input class="modal-input" id="__modal-input" maxlength="255" value="${escapeAttr(defaultValue)}">`
         : '';
@@ -14859,11 +14865,20 @@
           close(input ? input.value.trim() : true);
         }
       };
-      document.addEventListener('keydown', onKey);
+      // querySelector wiring ДО addEventListener: иначе sync-throw на
+      // одной из этих строк оставит keydown-handler привязанным навсегда.
       backdrop.querySelector('[data-act="cancel"]').onclick = () => close(null);
       backdrop.querySelector('[data-act="ok"]').onclick = () =>
         close(input ? input.value.trim() : true);
       backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(null); });
+      document.addEventListener('keydown', onKey);
+      } catch (err) {
+        // Construction failed — освобождаем guard, чтобы следующий
+        // showModal не оказался в permanent-locked состоянии.
+        _modalOpen = false;
+        if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        resolve(null);
+      }
     });
   }
 
@@ -15315,7 +15330,7 @@
       api.ingestion_action_done.connect((p) => {
         try {
           const r = JSON.parse(p);
-          if (!r.ok && r.error) showToast(r.error);
+          if (!r.ok && r.error) showToast(r.error, { variant: 'danger' });
         } catch {}
       });
       api.progress_update.connect(onProgressUpdate);

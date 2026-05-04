@@ -43,8 +43,15 @@ def main() -> int:
 
     # Fail-fast если keyring-бэкенд небезопасный (PlaintextKeyring) или
     # сломан (fail.Keyring) — иначе secrets улетят в открытом виде на
-    # диск или потеряются после первого старта.
-    _check_keyring_backend()
+    # диск или потеряются после первого старта. Друже сообщение в stderr
+    # вместо raw traceback'а — Qt UI ещё не поднят, диалог показать
+    # негде, но юзер хотя бы поймёт причину выхода вместо «упало непонятно».
+    try:
+        _check_keyring_backend()
+    except RuntimeError as e:
+        logger.critical("keyring pre-flight failed: %s", e)
+        print(f"\n[Job Bot] Не удалось запуститься: {e}\n", file=sys.stderr)
+        return 2
     # Schema must be ensured BEFORE the Qt event loop starts because alembic
     # spins its own asyncio.run inside.
     bootstrap.ensure_schema()

@@ -12,7 +12,8 @@ SECURITY — cleartext secrets through QWebChannel:
 single-user app, JS живёт в embedded WebView, не по сети):
 - ``initial_state`` / ``request_system_settings`` — chat/embed api_key,
   Telegram api_id+api_hash, расшифрованный CV-path.
-- ``request_telegram_login_state`` — phone/account-метаданные.
+- ``request_profile`` — PII профиля (email, phone, telegram_username,
+  github_url, location, education) + абсолютный путь к CV.
 Прежде чем добавлять новые slot'ы, отдающие секреты, подумайте:
 заслуживает ли поле статус «можно вернуть как есть», или его лучше
 скрыть/подменить (eye-toggle паттерн на UI). Audit-trail см. git blame
@@ -1725,7 +1726,7 @@ class MainApi(QObject):
             "already_applied":    "Отклик по этой вакансии уже отправлен.",
             "profile_empty":      "Профиль пуст — нечем заполнить cover letter.",
             "cover_letter_failed":"LLM не смог сгенерировать cover letter (см. логи).",
-            "cv_missing":         "Файл резюме не найден — проверь путь в настройках.",
+            "cv_missing":         "Файл резюме не найден — проверьте путь в настройках.",
             "blocked":            "Отправка заблокирована (OFF mode / blacklist / у HR нет ни id, ни @username).",
             "telegram_error":     "Telegram отказался принять сообщение (см. логи).",
             "race":               "Статус вакансии успел измениться — отправка отменена.",
