@@ -832,6 +832,7 @@ class MainApi(QObject):
     mode_changed = Signal(str)
     ingestion_started = Signal()
     ingestion_finished = Signal(str)
+    ingestion_action_done = Signal(str)
     progress_update = Signal(str)
     profile_changed = Signal(str)
     profile_save_done = Signal(str)
@@ -1108,11 +1109,29 @@ class MainApi(QObject):
 
     @Slot()
     def trigger_ingestion(self) -> None:
-        """Refresh button — force a one-shot poll regardless of bot mode."""
+        """Refresh button — force a one-shot poll regardless of bot mode.
+
+        Если уже идёт другой цикл — показываем toast «уже идёт цикл,
+        пропустил», иначе пользователь жмёт кнопку и не понимает почему
+        ничего не происходит.
+        """
         if self._bot is None:
             return
         logger.info("Manual ingestion triggered")
-        self._runner.submit(self._bot.force_poll_once())
+
+        async def run() -> str:
+            status = await self._bot.force_poll_once()
+            if status == "busy":
+                return _err("Уже идёт другой цикл, попробуйте позже.", action="trigger_ingestion", status=status)
+            if status == "ok":
+                return _ok({"action": "trigger_ingestion", "status": status})
+            messages = {
+                "cancelled": "Поллинг отменён.",
+                "error": "Не удалось прогнать каналы — см. логи.",
+            }
+            return _err(messages.get(status, "Не удалось прогнать."), action="trigger_ingestion", status=status)
+
+        self._dispatch(self.ingestion_action_done, run())
 
     @Slot()
     def stop_ingestion(self) -> None:
@@ -3106,6 +3125,7 @@ class MainApi(QObject):
                     "scoring_threshold": self._rs.scoring_threshold,
                     "poll_interval_sec": self._rs.poll_interval_sec,
                     "backfill_limit": self._rs.backfill_limit,
+                    "dm_backfill_limit": self._rs.dm_backfill_limit,
                 },
             })
 
@@ -3160,7 +3180,8 @@ class MainApi(QObject):
         Payload — словарь с любыми из ключей:
         - chat: {base_url, api_key, model}
         - embed: {base_url, api_key, model}
-        - app: {scoring_threshold, poll_interval_sec, backfill_limit, ...}
+        - app: {scoring_threshold, poll_interval_sec, backfill_limit,
+          dm_backfill_limit, ...}
         Применяем через rs.set_chat / rs.set_embed / rs.set_app. Ошибки
         возвращаем в payload, UI показывает toast.
         """
@@ -3214,7 +3235,7 @@ class MainApi(QObject):
                 if app is not None:
                     # Whitelist: чтобы UI не мог по ошибке/опечатке писать
                     # произвольные ключи в app_settings.
-                    allowed = {"scoring_threshold", "poll_interval_sec", "backfill_limit"}
+                    allowed = {"scoring_threshold", "poll_interval_sec", "backfill_limit", "dm_backfill_limit"}
                     for key, value in app.items():
                         if key not in allowed:
                             logger.warning("save_settings: unknown app key %r ignored", key)

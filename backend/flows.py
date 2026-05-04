@@ -952,17 +952,40 @@ class IngestionPipeline:
 
         ordered = list(reversed(new_msgs))
         total = len(ordered)
-        for i, msg in enumerate(ordered):
-            self._emit_progress("message", f"@{channel_username}", i, total)
-            await self._ingest_post(channel_id, channel_username, msg)
-        self._emit_progress("message", f"@{channel_username}", total, total)
+        # Cursor flush'ится батчами вместо коммита на каждое сообщение —
+        # backfill_limit=15 × 50 каналов = ~750 fsync'ов на цикл иначе.
+        # При crash mid-batch потеряем до BATCH_FLUSH_EVERY-1 уже-обработанных
+        # сообщений (они реингестятся, дедуп по embedding'у не пропустит).
+        # finally-flush гарантирует, что курсор не отстаёт между poll-циклами.
+        BATCH_FLUSH_EVERY = 10
+        cursor: int | None = None
+        try:
+            for i, msg in enumerate(ordered):
+                self._emit_progress("message", f"@{channel_username}", i, total)
+                try:
+                    await self._ingest_post(channel_id, channel_username, msg)
+                except Exception:
+                    # Advance cursor anyway — иначе сломанное сообщение
+                    # реингестится бесконечно. Дубликаты (если ingest
+                    # частично прошёл) всё равно срежет дедуп.
+                    logger.exception(
+                        "[@%s] %d ingest failed, advancing cursor",
+                        channel_username, msg.id,
+                    )
+                cursor = msg.id
+                if (i + 1) % BATCH_FLUSH_EVERY == 0:
+                    await self._advance_cursor(channel_id, cursor)
+            self._emit_progress("message", f"@{channel_username}", total, total)
+        finally:
+            if cursor is not None:
+                await self._advance_cursor(channel_id, cursor)
 
     async def _ingest_post(
         self, channel_id: int, channel_username: str, msg
     ) -> None:
+        # Cursor advance'ится в `_poll_channel` (батчами), не здесь.
         text = extract_text(msg)
         if not text or msg.service is not None or msg.poll is not None:
-            await self._advance_cursor(channel_id, msg.id)
             return
 
         try:
@@ -976,7 +999,6 @@ class IngestionPipeline:
                 msg.id,
                 e,
             )
-            await self._advance_cursor(channel_id, msg.id)
             return
 
         await self._ensure_embedding_cache()
@@ -984,6 +1006,7 @@ class IngestionPipeline:
             np.asarray(embedding, dtype=np.float32),
             self._embedding_ids,
             self._embedding_matrix,
+            threshold=self._rs.dedup_cosine_threshold,
         )
         if similar_id is not None:
             # Could be a real duplicate, or the embedding of a vacancy left
@@ -1009,7 +1032,6 @@ class IngestionPipeline:
                     "[@%s] %d duplicate of vacancy %d, skipping",
                     channel_username, msg.id, similar_id,
                 )
-            await self._advance_cursor(channel_id, msg.id)
             return
 
         new_vacancy_id = await self._save_new_vacancy(
@@ -1019,8 +1041,6 @@ class IngestionPipeline:
             await self._parse_and_update_vacancy(
                 new_vacancy_id, text, channel_username
             )
-
-        await self._advance_cursor(channel_id, msg.id)
 
     async def _save_new_vacancy(
         self,

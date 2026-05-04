@@ -12505,7 +12505,7 @@
 
   function _renderPipelineSection() {
     const st = appState.system.settings;
-    const p = st.pipeline || { scoring_threshold: 10, poll_interval_sec: 1800, backfill_limit: 15 };
+    const p = st.pipeline || { scoring_threshold: 10, poll_interval_sec: 1800, backfill_limit: 15, dm_backfill_limit: 50 };
     const SCORE_MAX = 20;
     const score = Number.isFinite(p.scoring_threshold) ? p.scoring_threshold : 10;
     const scoreClamped = Math.max(0, Math.min(SCORE_MAX, score));
@@ -12535,6 +12535,13 @@
             <div class="pipeline-label">Сообщений за цикл</div>
             <div class="with-unit">
               <input class="input" type="number" min="1" max="500" data-field="pipeline.backfill_limit" value="${escapeAttr(String(p.backfill_limit))}">
+              <span class="unit">шт</span>
+            </div>
+          </div>
+          <div>
+            <div class="pipeline-label">DM-сообщений на HR</div>
+            <div class="with-unit">
+              <input class="input" type="number" min="1" max="500" data-field="pipeline.dm_backfill_limit" value="${escapeAttr(String(p.dm_backfill_limit))}">
               <span class="unit">шт</span>
             </div>
           </div>
@@ -12622,6 +12629,7 @@
     [
       'pipeline.poll_interval_sec',
       'pipeline.backfill_limit',
+      'pipeline.dm_backfill_limit',
     ].forEach(field => {
       const inp = mainSlot.querySelector(`[data-field="${field}"]`);
       if (!inp) return;
@@ -15242,6 +15250,12 @@
       api.mode_changed.connect((p)   => { try { applyMode(JSON.parse(p)); }   catch {} });
       api.ingestion_started.connect(onIngestionStarted);
       api.ingestion_finished.connect(onIngestionFinished);
+      api.ingestion_action_done.connect((p) => {
+        try {
+          const r = JSON.parse(p);
+          if (!r.ok && r.error) showToast(r.error);
+        } catch {}
+      });
       api.progress_update.connect(onProgressUpdate);
       api.profile_changed.connect(onProfileChanged);
       api.profile_save_done.connect(onProfileSaveDone);

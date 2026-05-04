@@ -2556,13 +2556,27 @@ async def delete_channel(
             .values(source_channel_id=None)
         )
     ).rowcount
+    # TrashEvent держит ondelete=SET NULL — PRAGMA foreign_keys=ON
+    # (adapters/db.py) сделает это автоматически при session.delete(ch).
+    # Дублирующий UPDATE — defense-in-depth: если FK по какой-то причине
+    # disabled (dev sqlite3 CLI / отсутствие listener'а), события не
+    # останутся «висячими» с указателем на удалённый канал.
+    detached_trash = (
+        await session.execute(
+            update(TrashEvent)
+            .where(TrashEvent.source_channel_id == channel_id)
+            .values(source_channel_id=None)
+        )
+    ).rowcount
     await session.delete(ch)
     detached_n = int(detached or 0)
+    detached_trash_n = int(detached_trash or 0)
     logger.info(
-        "Deleted channel %d (@%s), detached %d vacancies",
+        "Deleted channel %d (@%s), detached %d vacancies, %d trash events",
         channel_id,
         ch_username,
         detached_n,
+        detached_trash_n,
     )
     return detached_n
 

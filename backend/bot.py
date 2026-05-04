@@ -447,20 +447,21 @@ class Bot:
         else:
             task.cancel()
 
-    async def force_poll_once(self) -> None:
+    async def force_poll_once(self) -> Literal["ok", "busy", "cancelled", "error"]:
         """Manual one-shot poll, fired regardless of bot_state.mode. Used by
         the refresh button so the user always sees something happen.
 
-        No-op if a poll cycle is already running (UI's stop button takes
-        precedence) — two concurrent cycles would race on the embedding
-        cache and the channel cursor.
+        Returns "busy" if another cycle is already running (UI's stop button
+        takes precedence) — two concurrent cycles would race on the embedding
+        cache and the channel cursor. UI surfaces "busy" as a toast.
         """
         if self._current_poll_task is not None:
             logger.info("force_poll_once: another cycle is already running, skipping")
-            return
+            return "busy"
         if self.on_cycle_start is not None:
             try: self.on_cycle_start()
             except Exception: logger.exception("on_cycle_start hook failed")
+        status: Literal["ok", "cancelled", "error"] = "ok"
         try:
             self._current_poll_task = asyncio.create_task(
                 self._ingestion.poll_active_channels()
@@ -469,13 +470,16 @@ class Bot:
                 await self._current_poll_task
             except asyncio.CancelledError:
                 logger.info("forced poll cycle cancelled by user")
+                status = "cancelled"
         except Exception:
             logger.exception("forced poll cycle failed")
+            status = "error"
         finally:
             self._current_poll_task = None
             if self.on_cycle_end is not None:
                 try: self.on_cycle_end()
                 except Exception: logger.exception("on_cycle_end hook failed")
+        return status
 
     def request_stop(self) -> None:
         """Ask the loop to exit after the current iteration.

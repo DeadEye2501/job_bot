@@ -126,6 +126,11 @@ _APP_DEFAULTS: dict[str, str] = {
     # курс реально дрейфует за пределы своего bucket'а.
     "salary_usd_to_rub": "90",
     "salary_eur_to_rub": "100",
+    # Cosine-similarity порог дедупа вакансий по embedding'ам. >= → считаем
+    # дубликатом существующей вакансии и не парсим повторно. Слишком высокий
+    # → дубли проскальзывают; слишком низкий → разные вакансии в одной
+    # компании склеиваются. 0.92 — эмпирический baseline.
+    "dedup_cosine_threshold": "0.92",
     # Анти-спам гарды против Telegram-ban'а аккаунта при unlock'е
     # send_locked. Раньше Bot.send шёл без троттлинга — 30 NEW-вакансий
     # в одном poll-цикле = 30 DM HR-ам подряд, и Telegram режет.
@@ -217,6 +222,14 @@ class RuntimeSettings:
     def backfill_limit(self) -> int:
         """How many recent messages to scrape per Telegram channel poll."""
         return int(self._app_value("backfill_limit"))
+
+    @property
+    def dedup_cosine_threshold(self) -> float:
+        """Cosine-порог дедупа в `cosine_top_match`. См. _APP_DEFAULTS."""
+        try:
+            return float(self._app_value("dedup_cosine_threshold"))
+        except (ValueError, TypeError):
+            return 0.92
 
     @property
     def dm_backfill_limit(self) -> int:
