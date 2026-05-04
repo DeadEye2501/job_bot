@@ -23,9 +23,14 @@ STICKY_STATUSES = frozenset(
 )
 
 
-_WORD_CHARS = frozenset(
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
-)
+# Используем Python-овский Unicode \w (включает кириллицу, греческий
+# и т.п.). Раньше _WORD_CHARS были только ASCII — blacklist-паттерн
+# «.NET» матчился внутри «.NETKaфедра», а паттерн «нода» — внутри
+# «нодаль» только если соседние буквы были латиницей. Теперь boundary
+# работает одинаково для любых алфавитов.
+def _is_word_char(ch: str) -> bool:
+    """True если символ — Unicode word-char (буква/цифра/_)."""
+    return bool(re.match(r"\w", ch, re.UNICODE))
 
 
 @functools.lru_cache(maxsize=512)
@@ -33,13 +38,14 @@ def _compile_word_pattern(variant: str) -> re.Pattern[str]:
     first = variant[0]
     last = variant[-1]
     first_class = (
-        "[A-Za-z0-9_]" if first in _WORD_CHARS else f"[{re.escape(first)}]"
+        r"\w" if _is_word_char(first) else f"[{re.escape(first)}]"
     )
     last_class = (
-        "[A-Za-z0-9_]" if last in _WORD_CHARS else f"[{re.escape(last)}]"
+        r"\w" if _is_word_char(last) else f"[{re.escape(last)}]"
     )
     return re.compile(
-        rf"(?<!{first_class}){re.escape(variant)}(?!{last_class})"
+        rf"(?<!{first_class}){re.escape(variant)}(?!{last_class})",
+        re.UNICODE,
     )
 
 
@@ -167,19 +173,25 @@ def is_empty_vacancy(parsed: ParsedVacancy | None) -> bool:
     без обращения к LLM-валидатору.
 
     Критерии:
-    - parsed is None — LLM не извлек даже title.
-    - title есть, но при этом одновременно отсутствуют ВСЕ ключевые поля:
-      description, stack, hr_contact, company_name. То есть кроме голой
-      строки заголовка в посте нет ничего полезного.
+    - parsed is None — LLM не извлёк даже title.
+    - title есть, но из 5 ключевых полей (description, stack, hr_contact,
+      company_name, salary) заполнено МЕНЬШЕ ДВУХ. Раньше требовалось
+      чтобы ВСЕ четыре отсутствовали (description+stack+hr_contact+
+      company_name) — это съедало валидные короткие посты типа
+      «Junior дизайнер | удалёнка | контакт @anna_hr» (есть title +
+      hr_contact, остальное пусто → trash). Теперь нужны хотя бы ДВА
+      сигнала из пяти.
     """
     if parsed is None:
         return True
-    return (
-        parsed.description is None
-        and not parsed.stack
-        and parsed.hr_contact is None
-        and parsed.company_name is None
+    signals = (
+        bool(parsed.description),
+        bool(parsed.stack),
+        bool(parsed.hr_contact),
+        bool(parsed.company_name),
+        bool(parsed.salary),
     )
+    return sum(signals) < 2
 
 
 def decide_vacancy_status(
@@ -237,6 +249,11 @@ _SALARY_EUR_RE = re.compile(r"€|eur|евро")
 # the thousands suffix.
 _SALARY_THOUSANDS_RE = re.compile(r"(?<![a-zа-я])(?:k|к|тыс)", re.IGNORECASE)
 _SALARY_MILLIONS_RE = re.compile(r"(?<![a-zа-я])(?:m|млн|million)", re.IGNORECASE)
+# «Зарплата обсуждается / по итогам собеса / по договорённости» — тексты,
+# где случайные числа («30 days vacation», «5 лет опыта») не являются
+# зарплатой. Ловим до того, как _SALARY_NUM_RE их выловит и насуёт в
+# salary_rub_min/max бессмысленные значения, ломающие range-фильтр.
+_SALARY_NEGOTIABLE_RE = re.compile(r"собесед|договор|обсужд|negotia")
 
 
 def normalize_salary_to_rub_thousands(
@@ -257,6 +274,11 @@ def normalize_salary_to_rub_thousands(
         return (None, None)
     s = salary.strip().lower()
     if not s:
+        return (None, None)
+    if _SALARY_NEGOTIABLE_RE.search(s):
+        # «По итогам собеседования + 30 дней отпуска» извлёк бы 30 в
+        # min/max — мусорное значение. Лучше None — UI покажет «—»
+        # вместо ложного «30 тыс ₽».
         return (None, None)
 
     if _SALARY_USD_RE.search(s):
