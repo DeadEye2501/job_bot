@@ -2873,23 +2873,30 @@ async def apply_classification(
         return
     previous = vacancy.status
     applied = should_apply_status(previous, classification.status)
-    if applied:
-        vacancy.status = classification.status
+    if not applied:
+        # Переход не разрешён state-machine'ом (например, classifier
+        # выдал Invitation для уже-Decline вакансии). Раньше тут писали
+        # призрачную VacancyStatusHistory с applied=False — она вылезала
+        # в timeline отдельной строкой и сбивала с толку. Теперь не
+        # пишем ничего: входящий DM уже сохранён как Message выше по
+        # стеку, этого аудит-следа достаточно.
         logger.info(
-            "vacancy %d: status %s -> %s (auto, msg=%d)",
-            vacancy_id,
-            previous.value if previous else None,
-            classification.status.value,
-            message_id,
-        )
-    else:
-        logger.debug(
-            "vacancy %d: classifier verdict %s blocked by sticky %s (msg=%d)",
+            "vacancy %d: classifier verdict %s blocked by state-machine "
+            "(current=%s, msg=%d) — no history row written",
             vacancy_id,
             classification.status.value,
             previous.value if previous else None,
             message_id,
         )
+        return
+    vacancy.status = classification.status
+    logger.info(
+        "vacancy %d: status %s -> %s (auto, msg=%d)",
+        vacancy_id,
+        previous.value if previous else None,
+        classification.status.value,
+        message_id,
+    )
     session.add(
         VacancyStatusHistory(
             vacancy_id=vacancy_id,
@@ -2897,7 +2904,7 @@ async def apply_classification(
             previous_status=previous,
             status=classification.status,
             explanation=_ensure_trailing_period(classification.explanation),
-            applied=applied,
+            applied=True,
         )
     )
 

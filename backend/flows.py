@@ -16,6 +16,7 @@ from backend.domain import (
     cosine_top_match,
     decide_vacancy_status,
     is_empty_vacancy,
+    is_terminal_for_auto,
     normalize_salary_to_rub_thousands,
     score_parsed,
 )
@@ -169,6 +170,23 @@ async def process_dm(
             return
 
     if vacancy_id is None:
+        return
+
+    # State-machine gate: если вакансия уже в терминальном для авто-
+    # классификатора статусе (Offer/Decline/Scam/Not Fit), вообще не
+    # тратим LLM на её сообщения и не пишем призрачные строки в
+    # vacancy_status_history. См. backend/domain.py::ALLOWED_AUTO_TRANSITIONS.
+    # Сообщение уже сохранено выше — это аудит-след входящего DM,
+    # его и достаточно.
+    async with session_factory() as session:
+        v_status = await session.scalar(
+            select(Vacancy.status).where(Vacancy.id == vacancy_id)
+        )
+    if v_status is not None and is_terminal_for_auto(v_status):
+        logger.info(
+            "vacancy %s: status=%s terminal for auto, skip classification",
+            vacancy_id, v_status.value,
+        )
         return
 
     # С debounce-планировщиком (production-путь) — сообщение в буфере,
@@ -634,6 +652,22 @@ class IngestionPipeline:
         last = buf[-1]
         vacancy_id = last["vacancy_id"]
         msg_id = last["msg_id"]
+        # Re-check state-machine: статус мог уйти в терминальный за время
+        # debounce-окна (например, юзер вручную выставил Decline), и
+        # классифицировать burst уже бессмысленно — apply_classification
+        # всё равно отбьёт `should_apply_status`. Лучше срезать здесь —
+        # экономим LLM-вызов.
+        async with self._session_factory() as session:
+            v_status = await session.scalar(
+                select(Vacancy.status).where(Vacancy.id == vacancy_id)
+            )
+        if v_status is not None and is_terminal_for_auto(v_status):
+            logger.info(
+                "vacancy %s: status=%s terminal for auto, "
+                "drop debounced burst (hr %d, %d msgs)",
+                vacancy_id, v_status.value, hr_id, len(buf),
+            )
+            return
         try:
             async with self._dm_classify_semaphore:
                 classification = await classify_hr_reply(
