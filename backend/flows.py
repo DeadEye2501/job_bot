@@ -197,7 +197,9 @@ async def process_dm(
         schedule_classification(hr.id, vacancy_id, new_msg_id, classify_text)
         return
 
-    classification = await classify_hr_reply(classify_text, lm_client, lm_chat_model)
+    classification = await classify_hr_reply(
+        classify_text, v_status, lm_client, lm_chat_model
+    )
     if classification is None:
         logger.info(
             "vacancy %s: classifier returned None, skipping status update",
@@ -671,7 +673,7 @@ class IngestionPipeline:
         try:
             async with self._dm_classify_semaphore:
                 classification = await classify_hr_reply(
-                    text, self._lm_client, self._lm_chat_model
+                    text, v_status, self._lm_client, self._lm_chat_model
                 )
         except Exception:
             logger.exception(
