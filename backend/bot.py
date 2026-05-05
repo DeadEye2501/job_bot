@@ -292,6 +292,9 @@ class Bot:
         self._ingestion.on_vacancies_changed = lambda: (
             self.on_vacancies_changed and self.on_vacancies_changed()
         )
+        self._ingestion.on_new_message = lambda hr_id: (
+            self.on_new_message and self.on_new_message(hr_id)
+        )
         # Reference to the currently-running poll task so the UI's stop
         # button can cancel it without killing the whole bot loop.
         self._current_poll_task: asyncio.Task | None = None
@@ -1417,6 +1420,15 @@ class Bot:
                 )
             ).first()
             if existing is not None:
+                # Echo собственного Bot.send-а: row уже была вписана при
+                # отправке cover-letter'а, повторно её писать не надо, но
+                # UI ещё не уведомлён — chat должен обновиться синхронно
+                # с прилётом echo из Telegram.
+                if self.on_new_message is not None:
+                    try:
+                        self.on_new_message(hr_id_for_media)
+                    except Exception:
+                        logger.exception("on_new_message hook failed")
                 return
         media_kind, media_name = _classify_media(msg)
         media_path = (

@@ -3660,7 +3660,13 @@ def _concat_notes(survivor: str | None, absorbed: str | None) -> str | None:
 
 async def find_or_create_hr(
     session: AsyncSession, user, *, avatar: bytes | None = None
-) -> HR:
+) -> tuple[HR, bool]:
+    """Return (hr, created). ``created=True`` ⇒ row только что вставлен —
+    caller (vacancy parse path: основная ветка с автоотправкой и NotFit-
+    save) использует это, чтобы запустить per-HR backfill DM-истории.
+    Catch-up для всех HR'ов крутится только на OFF→active transition;
+    новый HR, созданный в активном режиме, без этого хука остался бы с
+    пустым чатом до рестарта."""
     hr = (
         await session.scalars(
             select(HR).where(HR.telegram_user_id == user.id)
@@ -3696,7 +3702,7 @@ async def find_or_create_hr(
             user.username,
             full_name,
         )
-        return hr
+        return hr, True
 
     if hr.telegram_user_id is None:
         hr.telegram_user_id = user.id
@@ -3710,7 +3716,7 @@ async def find_or_create_hr(
     # column is manually cleared.
     if avatar is not None and hr.avatar is None:
         hr.avatar = avatar
-    return hr
+    return hr, False
 
 
 async def load_profile_skills(session: AsyncSession) -> list[ProfileSkill]:

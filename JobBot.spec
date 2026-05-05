@@ -30,7 +30,7 @@ datas = [
     # попадать НЕ должна. Без неё новый пользователь получает чистую
     # БД, runtime_settings._APP_DEFAULTS и first-run wizard, как и
     # задумано в README/config.py.
-    ('alembic/versions/dcdb3ecb3a6f_init.py', 'alembic/versions'),
+    ('alembic/versions/8ba64b863cb1_init.py', 'alembic/versions'),
 ]
 
 hiddenimports = [
@@ -41,13 +41,19 @@ hiddenimports = [
     'keyring.backends.Windows',
     'keyring.backends.fail',
     # alembic/env.py и init-миграция загружаются через importlib рантайм
-    # (load_python_file), а не статическим импортом из main — PyInstaller
-    # не видит их транзитивные импорты в графе. Перечисляем явно всё,
-    # что они используют. logging.config — submodule, поэтому даже при
-    # уже включённом logging его надо запросить отдельно.
+    # (load_python_file через spec_from_file_location), а не статическим
+    # импортом из main — PyInstaller не видит их транзитивные импорты
+    # в графе. logging.config — submodule, поэтому даже при уже
+    # включённом logging его надо запросить отдельно.
+    #
+    # NB: саму init-миграцию через hiddenimports перечислять смысла
+    # нет — alembic-хеши часто начинаются с цифры (например,
+    # 8ba64b863cb1_init), а Python identifier с цифры не начинается,
+    # PyInstaller просто молча скипает такие записи. Файл попадает в
+    # бандл через datas (см. выше) и alembic находит его при сканировании
+    # versions/-каталога по имени файла, не по импорту.
     'logging.config',
     'logging.handlers',
-    'alembic.versions.dcdb3ecb3a6f_init',
 ]
 
 

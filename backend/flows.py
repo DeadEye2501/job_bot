@@ -231,6 +231,173 @@ async def process_dm(
             )
 
 
+async def backfill_hr_dm_history(
+    client,
+    hr,
+    lm_client,
+    lm_chat_model,
+    session_factory,
+    *,
+    backfill_limit: int,
+    on_message_persisted=None,
+    on_vacancies_changed=None,
+    schedule_classification=None,
+) -> None:
+    """Pull the DM history of one HR and persist it.
+
+    Used by ``catch_up_missed_dms`` (per-HR loop) and the auto-apply path
+    (when ``find_or_create_hr`` just minted a new HR — without this hook
+    the chat would show only the cover-letter we just sent, prior history
+    invisible until the next OFF→active transition).
+    """
+    from datetime import datetime, timezone
+    from backend.models import Message
+    from pyrogram.errors import FloodWait, PeerIdInvalid
+
+    target = hr.telegram_user_id or hr.telegram_username
+    if target is None:
+        return
+    messages = []
+    try:
+        async for msg in client.get_chat_history(target, limit=backfill_limit):
+            messages.append(msg)
+    except PeerIdInvalid:
+        # Pyrogram peer-cache не знает этого id (HR добавлен по
+        # @username без предыдущего DM, либо session сброшен).
+        # Пробуем resolve по username, если есть; иначе skip.
+        logger.warning(
+            "backfill: PeerIdInvalid для hr %d (target=%s) — пробую "
+            "resolve по @username",
+            hr.id, target,
+        )
+        if hr.telegram_username:
+            try:
+                await client.get_users(hr.telegram_username)
+                # После get_users peer попадает в cache; повторим
+                # get_chat_history.
+                messages = []
+                async for msg in client.get_chat_history(
+                    hr.telegram_username, limit=backfill_limit
+                ):
+                    messages.append(msg)
+            except Exception as e:
+                logger.warning(
+                    "backfill: resolve fallback failed для hr %d: %s",
+                    hr.id, e,
+                )
+                return
+        else:
+            return
+    except FloodWait as e:
+        logger.warning(
+            "backfill: FloodWait %ds на hr %d — пропускаем",
+            getattr(e, "value", "?"), hr.id,
+        )
+        return
+    from backend.bot import _classify_media, _download_media
+    had_new = False
+    # Oldest-first so the chat order stays sane in the UI.
+    for msg in reversed(messages):
+        if msg.outgoing:
+            # Direct insert — outgoing doesn't need LLM classification.
+            text = extract_dm_text(msg)
+            media_kind, media_name = _classify_media(msg)
+            media_path = (
+                await _download_media(client, msg, hr.id)
+                if media_kind is not None else None
+            )
+            try:
+                async with session_factory() as session:
+                    session.add(Message(
+                        is_incoming=False,
+                        hr_id=hr.id,
+                        text=text,
+                        tg_message_id=msg.id,
+                        sent_at=msg.date,
+                        media_kind=media_kind,
+                        media_path=media_path,
+                        media_name=media_name,
+                    ))
+                    await session.commit()
+                had_new = True
+            except IntegrityError:
+                pass  # already stored
+            except Exception:
+                logger.exception(
+                    "backfill outgoing insert failed",
+                    extra={"hr_id": hr.id, "tg_message_id": msg.id},
+                )
+        else:
+            # Incoming routed through the same pipeline as live DMs so
+            # classification + vacancy-linking stay consistent. The
+            # UNIQUE constraint inside save_incoming_message dedupes.
+            try:
+                await process_dm(
+                    msg, lm_client, lm_chat_model, session_factory,
+                    client=client,
+                    schedule_classification=schedule_classification,
+                )
+                had_new = True
+                # С debounce-планировщиком статус НЕ меняется
+                # синхронно — он флипнется через 60с после burst'а.
+                # Тогда же отдельный таск пушит on_vacancies_changed
+                # сам. Не дублируем сигнал отсюда — в catch-up
+                # после OFF→active это особенно важно: 50 сообщений
+                # × 30 HR'ов = 1500 пушей за миллисекунду.
+                # Без планировщика (legacy путь) — классификация
+                # inline, тогда сигнал нужен.
+                if (
+                    schedule_classification is None
+                    and on_vacancies_changed is not None
+                ):
+                    try:
+                        on_vacancies_changed()
+                    except Exception:
+                        logger.exception(
+                            "backfill: on_vacancies_changed hook failed"
+                        )
+            except Exception:
+                logger.exception(
+                    "backfill incoming process failed",
+                    extra={"hr_id": hr.id, "tg_message_id": msg.id},
+                )
+    # Delete reconciliation. Window = ids covered by the fetched
+    # history; anything in our DB inside that window not present in
+    # the response was deleted while we were offline.
+    tombstoned = False
+    if messages:
+        seen_ids = {m.id for m in messages}
+        min_id = min(seen_ids)
+        async with session_factory() as session:
+            local_rows = list(
+                (
+                    await session.scalars(
+                        select(Message).where(
+                            Message.hr_id == hr.id,
+                            Message.tg_message_id.is_not(None),
+                            Message.tg_message_id >= min_id,
+                            Message.is_deleted.is_(False),
+                        )
+                    )
+                ).all()
+            )
+            now = datetime.now(timezone.utc)
+            for row in local_rows:
+                if row.tg_message_id in seen_ids:
+                    continue
+                row.is_deleted = True
+                if row.is_incoming and row.read_at is None:
+                    row.read_at = now
+                tombstoned = True
+            if tombstoned:
+                await session.commit()
+    if (had_new or tombstoned) and on_message_persisted is not None:
+        try:
+            on_message_persisted(hr.id)
+        except Exception:
+            logger.exception("on_message_persisted hook failed")
+
+
 async def catch_up_missed_dms(
     client,
     lm_client,
@@ -256,161 +423,18 @@ async def catch_up_missed_dms(
     fetched window but is missing from Telegram's response is flipped to
     ``is_deleted=True`` here.
     """
-    from datetime import datetime, timezone
-    from backend.models import Message
-    # IntegrityError уже импортирован на module-level (flows.py:7)
-
     async with session_factory() as session:
         chats = await list_hrs_for_backfill(session)
     logger.info("DM catch-up: %d HR(s)", len(chats))
-    new_msgs_total = 0
-    tombstoned_total = 0
-    from pyrogram.errors import FloodWait, PeerIdInvalid
     for hr, _last_seen in chats:
         try:
-            target = hr.telegram_user_id or hr.telegram_username
-            if target is None:
-                continue
-            messages = []
-            try:
-                async for msg in client.get_chat_history(target, limit=backfill_limit):
-                    messages.append(msg)
-            except PeerIdInvalid:
-                # Pyrogram peer-cache не знает этого id (HR добавлен по
-                # @username без предыдущего DM, либо session сброшен).
-                # Пробуем resolve по username, если есть; иначе skip.
-                logger.warning(
-                    "catch_up: PeerIdInvalid для hr %d (target=%s) — пробую "
-                    "resolve по @username",
-                    hr.id, target,
-                )
-                if hr.telegram_username:
-                    try:
-                        await client.get_users(hr.telegram_username)
-                        # После get_users peer попадает в cache; повторим
-                        # get_chat_history.
-                        messages = []
-                        async for msg in client.get_chat_history(
-                            hr.telegram_username, limit=backfill_limit
-                        ):
-                            messages.append(msg)
-                    except Exception as e:
-                        logger.warning(
-                            "catch_up: resolve fallback failed для hr %d: %s",
-                            hr.id, e,
-                        )
-                        continue
-                else:
-                    continue
-            except FloodWait as e:
-                # Не падаем всем циклом — отдыхаем и идём к следующему HR.
-                logger.warning(
-                    "catch_up: FloodWait %ds на hr %d — пропускаем",
-                    getattr(e, "value", "?"), hr.id,
-                )
-                continue
-            from backend.bot import _classify_media, _download_media
-            had_new = False
-            # Oldest-first so the chat order stays sane in the UI.
-            for msg in reversed(messages):
-                if msg.outgoing:
-                    # Direct insert — outgoing doesn't need LLM classification.
-                    text = extract_dm_text(msg)
-                    media_kind, media_name = _classify_media(msg)
-                    media_path = (
-                        await _download_media(client, msg, hr.id)
-                        if media_kind is not None else None
-                    )
-                    try:
-                        async with session_factory() as session:
-                            session.add(Message(
-                                is_incoming=False,
-                                hr_id=hr.id,
-                                text=text,
-                                tg_message_id=msg.id,
-                                sent_at=msg.date,
-                                media_kind=media_kind,
-                                media_path=media_path,
-                                media_name=media_name,
-                            ))
-                            await session.commit()
-                        had_new = True
-                    except IntegrityError:
-                        pass  # already stored
-                    except Exception:
-                        logger.exception(
-                            "catch_up outgoing insert failed",
-                            extra={"hr_id": hr.id, "tg_message_id": msg.id},
-                        )
-                else:
-                    # Incoming routed through the same pipeline as live DMs so
-                    # classification + vacancy-linking stay consistent. The
-                    # UNIQUE constraint inside save_incoming_message dedupes.
-                    try:
-                        await process_dm(
-                            msg, lm_client, lm_chat_model, session_factory,
-                            client=client,
-                            schedule_classification=schedule_classification,
-                        )
-                        had_new = True
-                        # С debounce-планировщиком статус НЕ меняется
-                        # синхронно — он флипнется через 60с после burst'а.
-                        # Тогда же отдельный таск пушит on_vacancies_changed
-                        # сам. Не дублируем сигнал отсюда — в catch-up
-                        # после OFF→active это особенно важно: 50 сообщений
-                        # × 30 HR'ов = 1500 пушей за миллисекунду.
-                        # Без планировщика (legacy путь) — классификация
-                        # inline, тогда сигнал нужен.
-                        if (
-                            schedule_classification is None
-                            and on_vacancies_changed is not None
-                        ):
-                            try:
-                                on_vacancies_changed()
-                            except Exception:
-                                logger.exception(
-                                    "catch_up: on_vacancies_changed hook failed"
-                                )
-                    except Exception:
-                        logger.exception(
-                            "catch_up incoming process failed",
-                            extra={"hr_id": hr.id, "tg_message_id": msg.id},
-                        )
-            # Delete reconciliation. Window = ids covered by the fetched
-            # history; anything in our DB inside that window not present in
-            # the response was deleted while we were offline.
-            tombstoned = False
-            if messages:
-                seen_ids = {m.id for m in messages}
-                min_id = min(seen_ids)
-                async with session_factory() as session:
-                    local_rows = list(
-                        (
-                            await session.scalars(
-                                select(Message).where(
-                                    Message.hr_id == hr.id,
-                                    Message.tg_message_id.is_not(None),
-                                    Message.tg_message_id >= min_id,
-                                    Message.is_deleted.is_(False),
-                                )
-                            )
-                        ).all()
-                    )
-                    now = datetime.now(timezone.utc)
-                    for row in local_rows:
-                        if row.tg_message_id in seen_ids:
-                            continue
-                        row.is_deleted = True
-                        if row.is_incoming and row.read_at is None:
-                            row.read_at = now
-                        tombstoned = True
-                    if tombstoned:
-                        await session.commit()
-            if (had_new or tombstoned) and on_message_persisted is not None:
-                try:
-                    on_message_persisted(hr.id)
-                except Exception:
-                    logger.exception("on_message_persisted hook failed")
+            await backfill_hr_dm_history(
+                client, hr, lm_client, lm_chat_model, session_factory,
+                backfill_limit=backfill_limit,
+                on_message_persisted=on_message_persisted,
+                on_vacancies_changed=on_vacancies_changed,
+                schedule_classification=schedule_classification,
+            )
         except Exception:
             logger.exception(
                 "catch_up failed for hr %d", hr.id, extra={"hr_id": hr.id}
@@ -493,6 +517,11 @@ class IngestionPipeline:
         # refresh вкладки «Вакансии» — push-аналог 5-сек polling-таймера,
         # который раньше был на JS-стороне.
         self.on_vacancies_changed = None
+        # Optional UI hook: called as on_new_message(hr_id) после persist'а
+        # сообщения (в т.ч. backfill'ом нового HR'а из автоаплая). Bot
+        # форвардит сюда свой self.on_new_message, чтобы IngestionPipeline
+        # мог толкать chat-update без обратной зависимости на Bot.
+        self.on_new_message = None
 
         # === DM burst-debounce =========================================
         # Юзеры (особенно русскоязычные) часто пишут одну мысль 3-5
@@ -519,6 +548,13 @@ class IngestionPipeline:
         self._auto_send_count_this_cycle: int = 0
         self._last_auto_send_ts: float = 0.0
 
+        # Strong-references на in-flight per-HR backfill таски (kicked
+        # из _spawn_hr_backfill). Event loop держит на тасках только
+        # weak-ref'ы — без своего set'а Python может GC'нуть таск
+        # посреди выполнения с warning'ом «Task was destroyed but it
+        # is pending». На done-callback'е сам себя убираем из set'а.
+        self._backfill_tasks: set[asyncio.Task] = set()
+
         # Shutdown-флаг. Bot.run finally выставляет его в True ДО
         # client.stop() / lm_*.aclose() — после этого schedule_dm_class*
         # и process_dm молча no-op'ят, чтобы Pyrogram'овский handler,
@@ -529,6 +565,8 @@ class IngestionPipeline:
     def mark_shutting_down(self) -> None:
         """Bot.run finally: с этого момента DM-handler ничего не делает."""
         self._shutting_down = True
+        for task in self._backfill_tasks:
+            task.cancel()
 
     def update_dm_buffer_text(self, hr_id: int, msg_id: int, new_text: str) -> None:
         """HR отредактировал сообщение пока оно сидит в debounce-буфере —
@@ -1391,6 +1429,7 @@ class IngestionPipeline:
         resolved_hr_user = None
         resolved_hr_avatar = None
         hr_for_send = None
+        hr_for_backfill = None
         if parsed.hr_contact:
             resolved_hr_user = await resolve_hr_telegram(
                 self._client, parsed.hr_contact
@@ -1463,7 +1502,7 @@ class IngestionPipeline:
                         v.company_id = company.id
 
                 if resolved_hr_user is not None:
-                    hr = await find_or_create_hr(
+                    hr, hr_created = await find_or_create_hr(
                         session, resolved_hr_user, avatar=resolved_hr_avatar
                     )
                     v.hr_id = hr.id
@@ -1472,6 +1511,7 @@ class IngestionPipeline:
                     # expire_on_commit=False, поэтому атрибуты hr остаются
                     # валидными после close.
                     hr_for_send = hr
+                    hr_for_backfill = hr if hr_created else None
 
                 fields_filled = [
                     name for name, val in (
@@ -1544,6 +1584,13 @@ class IngestionPipeline:
                     "auto_send VacancyEvent persist failed",
                     extra={"vacancy_id": vacancy_id},
                 )
+
+        # ПОСЛЕ auto-send'а: иначе backfill может через get_chat_history
+        # вытащить cover-letter сообщение раньше, чем Bot.send закоммитит
+        # свою row с vacancy_id'ом — и вставит дубль без vacancy_id, а
+        # Bot.send'овский insert упадёт на UNIQUE.
+        if hr_for_backfill is not None:
+            self._spawn_hr_backfill(hr_for_backfill)
 
     async def _is_unparsed_vacancy(self, vacancy_id: int) -> bool:
         """A vacancy is 'orphaned' when its embedding row is in the cache
@@ -1664,6 +1711,40 @@ class IngestionPipeline:
         except Exception:
             logger.exception("on_vacancies_changed hook failed")
 
+    def _spawn_hr_backfill(self, hr) -> None:
+        """Per-HR DM backfill kicked when a freshly-created HR is wired up
+        from a parsed vacancy. Runs as a background task so the parse loop
+        doesn't block on Telegram history fetch + media downloads. Pushes
+        ``on_new_message`` per HR once the rows land — open chat in UI
+        fills in without restart.
+
+        Wajne: вызывать ПОСЛЕ ``_try_auto_send`` для свежесозданного HR'а,
+        иначе backfill может догнать через ``get_chat_history`` cover-
+        letter сообщение раньше, чем ``Bot.send`` закоммитит свою row,
+        и вставит её без ``vacancy_id`` (UNIQUE на (hr_id, tg_message_id,
+        is_incoming) потом отстрелит Bot.send'овский insert).
+        """
+        async def _run() -> None:
+            try:
+                await backfill_hr_dm_history(
+                    self._client, hr, self._lm_client, self._lm_chat_model,
+                    self._session_factory,
+                    backfill_limit=self._rs.dm_backfill_limit,
+                    on_message_persisted=self.on_new_message,
+                    on_vacancies_changed=self.on_vacancies_changed,
+                    schedule_classification=self.schedule_dm_classification,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    "spawn_hr_backfill failed for hr %d",
+                    hr.id, extra={"hr_id": hr.id},
+                )
+        task = asyncio.create_task(_run())
+        self._backfill_tasks.add(task)
+        task.add_done_callback(self._backfill_tasks.discard)
+
     async def _save_empty_vacancy(
         self, vacancy_id: int, parsed: ParsedVacancy | None
     ) -> None:
@@ -1690,6 +1771,7 @@ class IngestionPipeline:
         # сетевого вызова.
         resolved_hr_user = None
         resolved_hr_avatar = None
+        hr_for_backfill = None
         if parsed is not None and parsed.hr_contact:
             resolved_hr_user = await resolve_hr_telegram(
                 self._client, parsed.hr_contact
@@ -1745,10 +1827,12 @@ class IngestionPipeline:
                         if company is not None:
                             v.company_id = company.id
                     if resolved_hr_user is not None:
-                        hr = await find_or_create_hr(
+                        hr, hr_created = await find_or_create_hr(
                             session, resolved_hr_user, avatar=resolved_hr_avatar
                         )
                         v.hr_id = hr.id
+                        if hr_created:
+                            hr_for_backfill = hr
                 else:
                     v.title = None
                     v.description = None
@@ -1788,6 +1872,9 @@ class IngestionPipeline:
                     vacancy_id,
                     extra={"vacancy_id": vacancy_id},
                 )
+                return
+        if hr_for_backfill is not None:
+            self._spawn_hr_backfill(hr_for_backfill)
 
     async def _reload_resources(self) -> None:
         # Кэши skills/blacklist/profile/languages/profile_block обновляются

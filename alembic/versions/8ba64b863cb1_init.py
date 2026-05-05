@@ -1,8 +1,8 @@
 """init
 
-Revision ID: dcdb3ecb3a6f
+Revision ID: 8ba64b863cb1
 Revises: 
-Create Date: 2026-05-04 14:46:07.245293+00:00
+Create Date: 2026-05-05 11:06:05.338783+00:00
 
 """
 from typing import Sequence, Union
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'dcdb3ecb3a6f'
+revision: str = '8ba64b863cb1'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -231,8 +231,9 @@ def upgrade() -> None:
     sa.Column('message_id', sa.Integer(), nullable=True),
     sa.Column('previous_status', sa.Enum('New', 'Applied', 'Answered', 'Test', 'Invitation', 'In Progress', 'Decline', 'Ghosting', 'Scam', 'Not Fit', 'Offer', name='vacancy_status'), nullable=True),
     sa.Column('status', sa.Enum('New', 'Applied', 'Answered', 'Test', 'Invitation', 'In Progress', 'Decline', 'Ghosting', 'Scam', 'Not Fit', 'Offer', name='vacancy_status'), nullable=False),
-    sa.Column('explanation', sa.String(length=2000), nullable=True),
+    sa.Column('explanation', sa.String(), nullable=True),
     sa.Column('applied', sa.Boolean(), server_default=sa.text('1'), nullable=False),
+    sa.Column('source', sa.Enum('system', 'user', name='status_history_source'), server_default=sa.text("'system'"), nullable=False),
     sa.Column('changed_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['message_id'], ['message.id'], ),
     sa.ForeignKeyConstraint(['vacancy_id'], ['vacancy.id'], ),
