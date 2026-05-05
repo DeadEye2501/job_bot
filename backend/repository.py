@@ -2930,28 +2930,53 @@ async def mark_ghosted_vacancies(
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=timeout_days)
     eligible_status_values = [s for s in GHOSTING_ELIGIBLE_FROM]
-    candidates = (
-        await session.scalars(
-            select(Vacancy).where(Vacancy.status.in_(eligible_status_values))
+    # Один round-trip вместо 1+2N: pre-агрегируем последние таймстампы
+    # по vacancy_id (для входящих DM) и по (vacancy_id, status) — для
+    # status-history. OUTER JOIN потому, что у новых вакансий ещё может
+    # не быть ни сообщений, ни истории.
+    last_msg_subq = (
+        select(
+            Message.vacancy_id.label("vid"),
+            func.max(Message.sent_at).label("last_msg_at"),
+        )
+        .where(Message.is_incoming.is_(True))
+        .group_by(Message.vacancy_id)
+        .subquery()
+    )
+    last_status_subq = (
+        select(
+            VacancyStatusHistory.vacancy_id.label("vid"),
+            VacancyStatusHistory.status.label("status"),
+            func.max(VacancyStatusHistory.changed_at).label("last_status_at"),
+        )
+        .group_by(
+            VacancyStatusHistory.vacancy_id, VacancyStatusHistory.status
+        )
+        .subquery()
+    )
+    rows = (
+        await session.execute(
+            select(
+                Vacancy,
+                last_msg_subq.c.last_msg_at,
+                last_status_subq.c.last_status_at,
+            )
+            .outerjoin(last_msg_subq, last_msg_subq.c.vid == Vacancy.id)
+            .outerjoin(
+                last_status_subq,
+                and_(
+                    last_status_subq.c.vid == Vacancy.id,
+                    last_status_subq.c.status == Vacancy.status,
+                ),
+            )
+            .where(Vacancy.status.in_(eligible_status_values))
         )
     ).all()
-    if not candidates:
+    if not rows:
         return []
 
     affected: list[int] = []
-    for v in candidates:
-        last_msg_at = await session.scalar(
-            select(func.max(Message.sent_at)).where(
-                Message.vacancy_id == v.id,
-                Message.is_incoming.is_(True),
-            )
-        )
-        last_status_at = await session.scalar(
-            select(func.max(VacancyStatusHistory.changed_at)).where(
-                VacancyStatusHistory.vacancy_id == v.id,
-                VacancyStatusHistory.status == v.status,
-            )
-        )
+    for v, last_msg_at, last_status_at in rows:
         # Берём максимум из доступных временных меток. created_at
         # есть всегда, остальные могут быть None — фильтруем.
         timestamps = [v.created_at]

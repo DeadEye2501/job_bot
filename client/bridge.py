@@ -4512,10 +4512,18 @@ class MainApi(QObject):
             except Exception as e:
                 logger.debug("healthcheck: db probe failed: %s", e)
 
-            # TG: a real connect would conflict with Bot.run's session, so
-            # we only check the saved session-string is present.
+            # TG: проверяем живость уже работающего Pyrogram-клиента в
+            # Bot.run. ``is_connected`` отражает state MTProto-сессии и
+            # отваливается, когда Pyrogram'овский heartbeat ловит timeout
+            # (≈30-60с после реального отключения сети). Параллельный
+            # connect отсюда устроил бы конфликт сессий, поэтому смотрим
+            # только на бот'овский клиент. До старта бота (нет
+            # session_string или ранний этап init'а) — false: пока сессия
+            # не поднята, считать TG здоровым нечестно.
             results["tg"] = bool(
-                self._rs.tg and getattr(self._rs.tg, "session_string", None)
+                self._bot is not None
+                and self._bot.is_ready
+                and getattr(self._bot._client, "is_connected", False)
             )
 
             if self._rs.chat is not None:

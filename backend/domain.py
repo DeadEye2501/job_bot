@@ -26,9 +26,10 @@ logger = logging.getLogger(__name__)
 # от HR). Поэтому повторный Invitation/Test после Test/Invitation в
 # графе НЕТ — он возможен только из In Progress.
 #
-# Ghosting — отдельный таймер-механизм (TODO, отдельная задача), не
-# auto-результат HR-реплая. Из Ghosting выход разрешён, если HR вдруг
-# ответил — оживаем в Answered/Invitation/Test/Offer/Decline.
+# Ghosting — отдельный таймер-механизм (см. mark_ghosted_vacancies +
+# GHOSTING_TIMEOUT_DAYS), не auto-результат HR-реплая. Из Ghosting
+# выход разрешён, если HR вдруг ответил — оживаем в
+# Answered/Invitation/Test/Offer/Decline.
 ALLOWED_AUTO_TRANSITIONS: dict[VacancyStatus, frozenset[VacancyStatus]] = {
     VacancyStatus.NEW: frozenset({VacancyStatus.APPLIED}),
     VacancyStatus.APPLIED: frozenset(
@@ -104,7 +105,7 @@ def is_terminal_for_auto(status: VacancyStatus) -> bool:
 # статусов timer не запускается (Test/Invitation = мяч у меня;
 # Answered = промежуточная фаза, переход в Ghosting прямо из неё
 # не предусмотрен графом).
-GHOSTING_TIMEOUT_DAYS = 7
+GHOSTING_TIMEOUT_DAYS = 14
 
 # Из каких статусов вакансия может уйти в Ghosting по таймеру.
 # Должно быть подмножеством состояний, у которых GHOSTING есть в
