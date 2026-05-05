@@ -1865,28 +1865,24 @@ def _stats_period_since(period: str) -> datetime | None:
 async def get_stats_kpi(
     session: AsyncSession, *, period: str
 ) -> dict:
-    """Top-row KPIs для экрана Statistics: 4 счётчика с дельтой за period.
+    """Top-row KPIs для экрана Statistics: 5 счётчиков с дельтой за period.
+
+    Все KPI кроме total — history-based (distinct vacancy_id, у которых
+    КОГДА-ЛИБО был переход в соответствующий статус). Это монотонно
+    растущие счётчики: ручной флип статуса назад не уменьшает их.
 
     - total: лайфтайм count всех parsed-вакансий.
-    - applied_total: лайфтайм count вакансий когда-либо в статусах
-      Applied и далее (мы реально отправили отклик).
-    - in_progress_now: текущий count в активной воронке после Applied
-      (Answered/Test/Invitation/InProgress).
-    - offer_now: текущий count Offer'ов.
+    - applied_total: когда-либо были в Applied.
+    - in_progress_total: когда-либо доходили до Invitation или Test.
+    - offer_total: когда-либо доходили до Offer.
+    - decline_total: когда-либо были в Decline.
 
-    Дельты — `*_period`: сколько вакансий созданы в период (для total)
-    или сейчас в этих статусах + были созданы в период (грубо приближает
-    «прибавило за период», точная история переходов потребовала бы
-    JOIN с VacancyStatusHistory — отложено).
+    Дельты — `*_period`: для total — created_at в окне; для остальных —
+    первый переход в соответствующий статус (min(changed_at)) в окне.
     """
     since = _stats_period_since(period)
 
-    in_progress_set = {
-        VacancyStatus.ANSWERED,
-        VacancyStatus.TEST,
-        VacancyStatus.INVITATION,
-        VacancyStatus.IN_PROGRESS,
-    }
+    in_progress_set = {VacancyStatus.INVITATION, VacancyStatus.TEST}
 
     base_filter = [Vacancy.is_parsed.is_(True)]
 
@@ -1894,40 +1890,27 @@ async def get_stats_kpi(
         select(func.count(Vacancy.id)).where(*base_filter)
     )).scalar_one())
 
-    # «Откликов отправлено» — distinct вакансии, у которых КОГДА-ЛИБО был
-    # переход в Applied. Считать по текущему `vacancy.status` нельзя:
-    # пользователь может вручную выставить Decline/Ghosting/InProgress
-    # для трекинга (без реальной отправки), либо авто-классификатор по
-    # входящему сообщению поднимет вакансию в Decline в обход Applied —
-    # current-status-based count в обоих случаях врёт.
     applied_total = int((await session.execute(
         select(func.count(func.distinct(VacancyStatusHistory.vacancy_id))).where(
             VacancyStatusHistory.status == VacancyStatus.APPLIED,
         )
     )).scalar_one())
 
-    # «Отказов» — distinct вакансии, когда-либо побывавшие в Decline. Та же
-    # логика, что и applied_total: history-based, не current-status —
-    # decline терминальный, но пользователь мог переключить вакансию из
-    # Decline в другой статус для трекинга, и количество всё равно должно
-    # отражать факт «получил отказ».
+    in_progress_total = int((await session.execute(
+        select(func.count(func.distinct(VacancyStatusHistory.vacancy_id))).where(
+            VacancyStatusHistory.status.in_(in_progress_set),
+        )
+    )).scalar_one())
+
+    offer_total = int((await session.execute(
+        select(func.count(func.distinct(VacancyStatusHistory.vacancy_id))).where(
+            VacancyStatusHistory.status == VacancyStatus.OFFER,
+        )
+    )).scalar_one())
+
     decline_total = int((await session.execute(
         select(func.count(func.distinct(VacancyStatusHistory.vacancy_id))).where(
             VacancyStatusHistory.status == VacancyStatus.DECLINE,
-        )
-    )).scalar_one())
-
-    in_progress_now = int((await session.execute(
-        select(func.count(Vacancy.id)).where(
-            *base_filter,
-            Vacancy.status.in_(in_progress_set),
-        )
-    )).scalar_one())
-
-    offer_now = int((await session.execute(
-        select(func.count(Vacancy.id)).where(
-            *base_filter,
-            Vacancy.status == VacancyStatus.OFFER,
         )
     )).scalar_one())
 
@@ -1936,50 +1919,30 @@ async def get_stats_kpi(
         total_period = int((await session.execute(
             select(func.count(Vacancy.id)).where(*period_filter)
         )).scalar_one())
-        # В period — distinct вакансии, у которых ПЕРВЫЙ переход в Applied
-        # случился в окне периода. Привязка к самому факту «отправили» —
-        # сравниваем changed_at, а не vacancy.created_at.
-        first_applied_subq = (
-            select(
-                VacancyStatusHistory.vacancy_id.label("vid"),
-                func.min(VacancyStatusHistory.changed_at).label("first_at"),
+
+        async def _first_in_period(statuses) -> int:
+            cond = (
+                VacancyStatusHistory.status.in_(statuses)
+                if isinstance(statuses, (set, list, tuple))
+                else VacancyStatusHistory.status == statuses
             )
-            .where(VacancyStatusHistory.status == VacancyStatus.APPLIED)
-            .group_by(VacancyStatusHistory.vacancy_id)
-            .subquery()
-        )
-        applied_period = int((await session.execute(
-            select(func.count(first_applied_subq.c.vid)).where(
-                first_applied_subq.c.first_at >= since,
+            sub = (
+                select(
+                    VacancyStatusHistory.vacancy_id.label("vid"),
+                    func.min(VacancyStatusHistory.changed_at).label("first_at"),
+                )
+                .where(cond)
+                .group_by(VacancyStatusHistory.vacancy_id)
+                .subquery()
             )
-        )).scalar_one())
-        # Decline period — first decline transition в окне periode.
-        first_decline_subq = (
-            select(
-                VacancyStatusHistory.vacancy_id.label("vid"),
-                func.min(VacancyStatusHistory.changed_at).label("first_at"),
-            )
-            .where(VacancyStatusHistory.status == VacancyStatus.DECLINE)
-            .group_by(VacancyStatusHistory.vacancy_id)
-            .subquery()
-        )
-        decline_period = int((await session.execute(
-            select(func.count(first_decline_subq.c.vid)).where(
-                first_decline_subq.c.first_at >= since,
-            )
-        )).scalar_one())
-        in_progress_period = int((await session.execute(
-            select(func.count(Vacancy.id)).where(
-                *period_filter,
-                Vacancy.status.in_(in_progress_set),
-            )
-        )).scalar_one())
-        offer_period = int((await session.execute(
-            select(func.count(Vacancy.id)).where(
-                *period_filter,
-                Vacancy.status == VacancyStatus.OFFER,
-            )
-        )).scalar_one())
+            return int((await session.execute(
+                select(func.count(sub.c.vid)).where(sub.c.first_at >= since)
+            )).scalar_one())
+
+        applied_period = await _first_in_period(VacancyStatus.APPLIED)
+        in_progress_period = await _first_in_period(in_progress_set)
+        offer_period = await _first_in_period(VacancyStatus.OFFER)
+        decline_period = await _first_in_period(VacancyStatus.DECLINE)
     else:
         total_period = applied_period = decline_period = None
         in_progress_period = offer_period = None
@@ -1988,8 +1951,8 @@ async def get_stats_kpi(
         "period": period,
         "total": total,
         "applied_total": applied_total,
-        "in_progress_now": in_progress_now,
-        "offer_now": offer_now,
+        "in_progress_total": in_progress_total,
+        "offer_total": offer_total,
         "decline_total": decline_total,
         "total_period": total_period,
         "applied_period": applied_period,
@@ -2023,20 +1986,26 @@ async def get_stats_channels_pipeline(
 ) -> dict:
     """Per-channel pipeline-таблица для карточки «Каналы».
 
-    Колонки:
-      - total: parsed вакансий из канала за period
-      - trash: status = TRASH (текущий)
-      - not_fit: status = NOT_FIT (текущий)
-      - fit = total − trash − not_fit (то, что прошло парсер + фит-валидатор)
-      - sent: distinct vacancy_id, у которых КОГДА-ЛИБО был переход в
-        Applied (history-based — current vacancy.status может быть
-        перетёрт пользователем вручную)
-      - answered: distinct vid с переходом в любой из
+    Ингест-колонки (по `Vacancy.created_at >= since`):
+      - total: всё, что канал прислал в окно (Vacancy-ряды + trash_events)
+      - trash: auto-ingest deletions (`trash_event`) + ряды с
+        `status=NOT_FIT` и `skip_reason LIKE 'trash:%'` (rerun-режим)
+      - not_fit: `status=NOT_FIT` БЕЗ trash-маркера (отсев фит-валидатором)
+      - fit = max(0, total − trash − not_fit)
+
+    Funnel-колонки (по `min(changed_at) >= since` — distinct vacancy_id,
+    у которых ПЕРВЫЙ переход в соответствующий набор статусов случился
+    в окне period; для period='all' — лайфтайм без фильтра по времени):
+      - sent: первый переход в Applied
+      - answered: первый переход в любой из
         {Answered, Test, Invitation, In Progress, Offer, Decline}
-      - invite_plus: distinct vid с переходом в {Invitation, In Progress, Offer}
-      - decline: distinct vid с переходом в Decline
+      - invite_plus: первый переход в {Invitation, In Progress, Offer}
+      - decline: первый переход в Decline
       - conv_answ_sent = answered/sent (None если sent=0)
       - conv_invite_sent = invite_plus/sent (None если sent=0)
+
+    Канал попадает в таблицу, если в окне есть хоть что-то: ингест,
+    trash-event или funnel-активность.
 
     Сортировка: по total desc, тай-брейкер по label.
     """
@@ -2101,11 +2070,11 @@ async def get_stats_channels_pipeline(
         if ch_id is not None:
             trash_events_by_ch[ch_id] = int(cnt or 0)
 
-    if not rows and not trash_events_by_ch:
-        return {"period": period, "channels": []}
-
     # Шаг 2: history-based «sent / answered / invite+ / decline» per channel.
-    # Тянем все history-rows для вакансий из этих каналов, группируем в Python.
+    # Distinct vacancy_id, у которых ПЕРВЫЙ переход в нужный набор статусов
+    # (min(changed_at)) попал в окно period. Привязка к самому факту
+    # перехода, а не к Vacancy.created_at — чтобы funnel показывал именно
+    # «прогресс за период», совпадая с верхним KPI-блоком.
     answered_set = {
         VacancyStatus.ANSWERED, VacancyStatus.TEST, VacancyStatus.INVITATION,
         VacancyStatus.IN_PROGRESS, VacancyStatus.OFFER, VacancyStatus.DECLINE,
@@ -2113,37 +2082,45 @@ async def get_stats_channels_pipeline(
     invite_set = {
         VacancyStatus.INVITATION, VacancyStatus.IN_PROGRESS, VacancyStatus.OFFER,
     }
-    history_rows = (
-        await session.execute(
-            select(
-                Vacancy.source_channel_id,
-                VacancyStatusHistory.vacancy_id,
-                VacancyStatusHistory.status,
-            )
-            .join(Vacancy, Vacancy.id == VacancyStatusHistory.vacancy_id)
-            .where(*base_filter)
-        )
-    ).all()
-    # per-channel sets чтобы distinct по vacancy_id работало
-    sent_by_ch: dict[int, set[int]] = {}
-    answered_by_ch: dict[int, set[int]] = {}
-    invite_by_ch: dict[int, set[int]] = {}
-    decline_by_ch: dict[int, set[int]] = {}
-    for ch_id, vid, status in history_rows:
-        if ch_id is None:
-            continue
-        if status == VacancyStatus.APPLIED:
-            sent_by_ch.setdefault(ch_id, set()).add(vid)
-        if status in answered_set:
-            answered_by_ch.setdefault(ch_id, set()).add(vid)
-        if status in invite_set:
-            invite_by_ch.setdefault(ch_id, set()).add(vid)
-        if status == VacancyStatus.DECLINE:
-            decline_by_ch.setdefault(ch_id, set()).add(vid)
 
-    # Сводим. Каналы с TrashEvent'ами но без Vacancy-рядов в текущем
-    # period (если, например, за месяц канал прислал только мусор) тоже
-    # должны попасть в таблицу — добавляем их явно.
+    async def _first_in_period_by_channel(statuses) -> dict[int, set[int]]:
+        cond = (
+            VacancyStatusHistory.status.in_(statuses)
+            if isinstance(statuses, (set, list, tuple))
+            else VacancyStatusHistory.status == statuses
+        )
+        sub = (
+            select(
+                VacancyStatusHistory.vacancy_id.label("vid"),
+                func.min(VacancyStatusHistory.changed_at).label("first_at"),
+            )
+            .where(cond)
+            .group_by(VacancyStatusHistory.vacancy_id)
+            .subquery()
+        )
+        q = (
+            select(Vacancy.source_channel_id, sub.c.vid)
+            .join(sub, sub.c.vid == Vacancy.id)
+            .where(Vacancy.is_parsed.is_(True))
+        )
+        if since is not None:
+            q = q.where(sub.c.first_at >= since)
+        by_ch: dict[int, set[int]] = {}
+        for ch_id, vid in (await session.execute(q)).all():
+            if ch_id is None:
+                continue
+            by_ch.setdefault(ch_id, set()).add(vid)
+        return by_ch
+
+    sent_by_ch = await _first_in_period_by_channel(VacancyStatus.APPLIED)
+    answered_by_ch = await _first_in_period_by_channel(answered_set)
+    invite_by_ch = await _first_in_period_by_channel(invite_set)
+    decline_by_ch = await _first_in_period_by_channel(VacancyStatus.DECLINE)
+
+    # Сводим. Канал должен попасть в таблицу, если в окне периода у него
+    # есть хоть что-то: Vacancy-ряды (ингест), TrashEvent (auto-deletions)
+    # или funnel-активность (старая вакансия впервые перешла в нужный
+    # статус внутри окна).
     items_by_ch: dict[int, dict] = {}
     for ch_id, title, username, total_vac, rerun_trash, not_fit in rows:
         items_by_ch[ch_id] = {
@@ -2153,8 +2130,13 @@ async def get_stats_channels_pipeline(
             "_rerun_trash": int(rerun_trash or 0),
             "not_fit": int(not_fit or 0),
         }
-    # Channels без vacancies, но с trash-events — нужны лейблы
-    orphan_ids = [c for c in trash_events_by_ch.keys() if c not in items_by_ch]
+    needed_ch_ids: set[int] = set()
+    needed_ch_ids.update(trash_events_by_ch.keys())
+    needed_ch_ids.update(sent_by_ch.keys())
+    needed_ch_ids.update(answered_by_ch.keys())
+    needed_ch_ids.update(invite_by_ch.keys())
+    needed_ch_ids.update(decline_by_ch.keys())
+    orphan_ids = [c for c in needed_ch_ids if c not in items_by_ch]
     if orphan_ids:
         orphan_rows = (
             await session.execute(
@@ -2170,6 +2152,8 @@ async def get_stats_channels_pipeline(
                 "_rerun_trash": 0,
                 "not_fit": 0,
             }
+    if not items_by_ch:
+        return {"period": period, "channels": []}
 
     items = []
     for ch_id, item in items_by_ch.items():
