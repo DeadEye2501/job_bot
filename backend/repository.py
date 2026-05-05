@@ -2909,6 +2909,81 @@ async def apply_classification(
     )
 
 
+async def mark_ghosted_vacancies(
+    session: AsyncSession,
+    *,
+    timeout_days: int,
+) -> list[int]:
+    """Сканирует Applied/In Progress вакансии и переводит в Ghosting те,
+    у которых HR молчит дольше ``timeout_days``.
+
+    «Молчит» означает: ни одного входящего Message, и сам статус не
+    менялся, и вакансия не создавалась в окне последних ``timeout_days``
+    дней. Reference timestamp = max(last incoming Message.sent_at,
+    last status change в текущий статус, vacancy.created_at).
+
+    Возвращает список vacancy_id, переведённых в Ghosting. Caller
+    оборачивает в session.begin() и выполняет commit.
+    """
+    from datetime import datetime, timedelta, timezone
+    from backend.domain import GHOSTING_ELIGIBLE_FROM
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=timeout_days)
+    eligible_status_values = [s for s in GHOSTING_ELIGIBLE_FROM]
+    candidates = (
+        await session.scalars(
+            select(Vacancy).where(Vacancy.status.in_(eligible_status_values))
+        )
+    ).all()
+    if not candidates:
+        return []
+
+    affected: list[int] = []
+    for v in candidates:
+        last_msg_at = await session.scalar(
+            select(func.max(Message.sent_at)).where(
+                Message.vacancy_id == v.id,
+                Message.is_incoming.is_(True),
+            )
+        )
+        last_status_at = await session.scalar(
+            select(func.max(VacancyStatusHistory.changed_at)).where(
+                VacancyStatusHistory.vacancy_id == v.id,
+                VacancyStatusHistory.status == v.status,
+            )
+        )
+        # Берём максимум из доступных временных меток. created_at
+        # есть всегда, остальные могут быть None — фильтруем.
+        timestamps = [v.created_at]
+        if last_msg_at is not None:
+            timestamps.append(last_msg_at)
+        if last_status_at is not None:
+            timestamps.append(last_status_at)
+        last_activity = max(timestamps)
+        if last_activity >= cutoff:
+            continue
+        # Перевод в Ghosting. message_id=None — это системное событие,
+        # не привязано к конкретной HR-реплике. source ложится на
+        # server_default 'system'.
+        previous = v.status
+        v.status = VacancyStatus.GHOSTING
+        session.add(
+            VacancyStatusHistory(
+                vacancy_id=v.id,
+                message_id=None,
+                previous_status=previous,
+                status=VacancyStatus.GHOSTING,
+                explanation=(
+                    f"HR не отвечает более {timeout_days} дней — "
+                    "автоматически помечено как ghosting."
+                ),
+                applied=True,
+            )
+        )
+        affected.append(v.id)
+    return affected
+
+
 # === Company dedup ====================================================
 # Трёхступенчатая схема:
 #   Stage 1 — детерминированные правила: точное совпадение нормализованного

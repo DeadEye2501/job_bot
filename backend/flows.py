@@ -709,6 +709,40 @@ class IngestionPipeline:
             except Exception:
                 logger.exception("on_vacancies_changed hook failed")
 
+    async def check_ghosting_timeouts(self) -> int:
+        """Сканирует Applied/In Progress вакансии и переводит в Ghosting
+        те, по которым HR молчит дольше GHOSTING_TIMEOUT_DAYS.
+
+        Дёргается из Bot.run loop'а раз в poll-tick (DM_ONLY и FULL —
+        в OFF не запускается, бот считается «на паузе»). Стоимость
+        низкая: только Applied/In Progress попадают в шорт-лист, для
+        каждой 2 SQL-запроса (max(message), max(history)). Если
+        кандидатов нет — ранний return.
+        """
+        from backend.domain import GHOSTING_TIMEOUT_DAYS
+        from backend.repository import mark_ghosted_vacancies
+
+        try:
+            async with self._session_factory() as session:
+                async with session.begin():
+                    affected = await mark_ghosted_vacancies(
+                        session, timeout_days=GHOSTING_TIMEOUT_DAYS,
+                    )
+        except Exception:
+            logger.exception("check_ghosting_timeouts failed")
+            return 0
+        if affected:
+            logger.info(
+                "ghosting timer: marked %d vacancies (ids=%s)",
+                len(affected), affected,
+            )
+            if self.on_vacancies_changed is not None:
+                try:
+                    self.on_vacancies_changed()
+                except Exception:
+                    logger.exception("on_vacancies_changed hook failed")
+        return len(affected)
+
     async def cancel_pending_dm_classifications(
         self, *, drain: bool = False
     ) -> None:

@@ -599,6 +599,16 @@ class Bot:
                         )
                     except Exception:
                         logger.exception("dm catch-up failed")
+                # Ghosting timer: дёргается каждый tick в активных
+                # режимах (DM_ONLY и FULL). В OFF не запускается — бот
+                # на паузе, не должен сам менять статусы. Сама проверка
+                # дешёвая: только Applied/In Progress попадают в шорт-
+                # лист, и при пустом списке ранний return.
+                if mode is not BotMode.OFF:
+                    try:
+                        await self._ingestion.check_ghosting_timeouts()
+                    except Exception:
+                        logger.exception("ghosting timer tick failed")
                 # Channel polling and outbound applications are Full-only.
                 # DM Only and Off both skip ingestion (DM Only still reacts
                 # to incoming HR messages via the registered MessageHandler).

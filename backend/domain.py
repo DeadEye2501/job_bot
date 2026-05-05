@@ -99,6 +99,24 @@ def is_terminal_for_auto(status: VacancyStatus) -> bool:
     return not ALLOWED_AUTO_TRANSITIONS[status]
 
 
+# Сколько дней молчания HR'а считать ghosting'ом. Применимо к
+# Applied и In Progress (в них «мяч на стороне HR»). Для остальных
+# статусов timer не запускается (Test/Invitation = мяч у меня;
+# Answered = промежуточная фаза, переход в Ghosting прямо из неё
+# не предусмотрен графом).
+GHOSTING_TIMEOUT_DAYS = 7
+
+# Из каких статусов вакансия может уйти в Ghosting по таймеру.
+# Должно быть подмножеством состояний, у которых GHOSTING есть в
+# ALLOWED_AUTO_TRANSITIONS. Хардкод этого подмножества здесь —
+# защита от случайного расхождения: если кто-то добавит Ghosting в
+# graph для нового from-state, ему придётся явно также включить
+# его в этот сет.
+GHOSTING_ELIGIBLE_FROM: frozenset[VacancyStatus] = frozenset(
+    {VacancyStatus.APPLIED, VacancyStatus.IN_PROGRESS}
+)
+
+
 # Используем Python-овский Unicode \w (включает кириллицу, греческий
 # и т.п.). Раньше _WORD_CHARS были только ASCII — blacklist-паттерн
 # «.NET» матчился внутри «.NETKaфедра», а паттерн «нода» — внутри
