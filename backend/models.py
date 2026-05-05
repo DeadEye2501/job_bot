@@ -45,6 +45,19 @@ class VacancyStatus(enum.Enum):
     OFFER = "Offer"
 
 
+class StatusHistorySource(enum.Enum):
+    """Кто сгенерировал запись в vacancy_status_history.
+
+    SYSTEM — авто-классификация HR-реплая, авто-/ручная отправка отклика
+    ботом, любые системные источники. Текст в ``explanation`` сгенерирован
+    кодом или LLM, юзер его не писал.
+    USER — пользователь руками сменил статус через UI, ``explanation``
+    введён юзером и должен быть редактируемым."""
+
+    SYSTEM = "system"
+    USER = "user"
+
+
 class LlmConfigKind(enum.Enum):
     CHAT = "chat"
     EMBED = "embed"
@@ -437,6 +450,14 @@ class VacancyStatusHistory(Base):
     # сам обрабатывает None/empty; UI textarea имеет maxlength=2000.
     explanation: Mapped[str | None] = mapped_column(String)
     applied: Mapped[bool] = mapped_column(server_default=expression.true())
+    source: Mapped[StatusHistorySource] = mapped_column(
+        SQLEnum(
+            StatusHistorySource,
+            values_callable=lambda x: [e.value for e in x],
+            name="status_history_source",
+        ),
+        server_default=text("'system'"),
+    )
     changed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

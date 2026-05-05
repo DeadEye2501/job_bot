@@ -3751,9 +3751,9 @@
   .sys-settings .pipeline-toggle {
     appearance: none;
     -webkit-appearance: none;
-    width: 28px; height: 14px;
+    width: 42px; height: 21px;
     background: var(--bg-tertiary);
-    border-radius: 7px;
+    border-radius: 11px;
     position: relative;
     cursor: pointer;
     transition: background 0.15s;
@@ -3763,15 +3763,15 @@
   .sys-settings .pipeline-toggle::after {
     content: '';
     position: absolute;
-    left: 2px; top: 2px;
-    width: 10px; height: 10px;
+    left: 3px; top: 3px;
+    width: 15px; height: 15px;
     background: var(--text-tertiary);
     border-radius: 50%;
     transition: all 0.15s;
   }
   .sys-settings .pipeline-toggle:checked { background: var(--accent); }
   .sys-settings .pipeline-toggle:checked::after {
-    left: calc(100% - 12px);
+    left: calc(100% - 18px);
     background: #1d1d1f;
   }
   /* Container для toggle-cell: имитирует высоту .with-unit/.slider-row,
@@ -4678,10 +4678,12 @@
   let _lastRenderedSection = null;
 
   function renderSection() {
-    // Preserve scroll position of .section-body across re-renders so a
+    // Preserve scroll position of the page-body across re-renders so a
     // partial state change (opening a skill picker, adding a list item)
-    // doesn't kick the user back to the top.
-    const oldBody = mainSlot.querySelector('.section-body');
+    // doesn't kick the user back to the top. Settings uses .sys-settings
+    // as its own overflow:auto wrapper instead of .section-body — without
+    // it any push-driven re-render scrolls the screen to the top.
+    const oldBody = mainSlot.querySelector('.section-body, .sys-settings');
     const oldScroll = oldBody ? oldBody.scrollTop : 0;
     // При смене секции — запоминаем уходящий scroll в _sectionScrolls,
     // а в этом рендере используем сохранённое значение для НОВОЙ секции
@@ -4766,7 +4768,7 @@
     // ветку placeholder'а.
     if (typeof _syncLogsSubscription === 'function') _syncLogsSubscription();
 
-    const newBody = mainSlot.querySelector('.section-body');
+    const newBody = mainSlot.querySelector('.section-body, .sys-settings');
     if (newBody && savedScroll) newBody.scrollTop = savedScroll;
 
     for (const role of Object.keys(popoverScrolls)) {
@@ -5554,17 +5556,11 @@
         // статус (applied=true). Comment-only (applied=false) → пустой
         // dotCls → дефолтный серый из `.tl-dot { background: var(--text-muted) }`.
         dotCls = it.applied ? (' ' + statusToClass(it.status)) : '';
-        // Системно-сгенерированные комментарии не редактируем — они
-        // отражают факт автоматического действия (Bot.send выставил
-        // Applied + кладёт фиксированный текст). Юзер может только
-        // редактировать комменты, которые он сам и оставил при ручной
-        // смене статуса. Хардкодим известные авто-тексты, т.к.
-        // отдельной колонки `auto` в vacancy_status_history нет.
-        const AUTO_EXPLANATIONS = new Set([
-          'Авто-отправка отклика.',
-          'Ручная отправка.',
-        ]);
-        const isAuto = AUTO_EXPLANATIONS.has((it.explanation || '').trim());
+        // Редактируемы только записи source=user — те, что юзер руками
+        // создал через UI-смену статуса. Всё остальное (auto-send,
+        // классификация HR-реплая) — source=system, текст сгенерирован
+        // кодом или LLM, юзеру там трогать нечего.
+        const isAuto = it.source !== 'user';
         // Always-on inline-edit. Драфт (если пользователь сейчас печатает)
         // имеет приоритет над server-value, чтобы push-rerender'ы не
         // подменяли текст под рукой. Placeholder = «без комментария» —

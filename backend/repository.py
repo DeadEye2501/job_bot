@@ -20,6 +20,7 @@ from backend.models import (
     ProfileExperience,
     ProfileLanguage,
     ProfileSkill,
+    StatusHistorySource,
     TelegramChannel,
     TrashEvent,
     Vacancy,
@@ -763,6 +764,7 @@ async def change_vacancy_status(
         status=new_status,
         explanation=cleaned_explanation,
         applied=status_changed,
+        source=StatusHistorySource.USER,
     )
     session.add(history)
     await session.flush()

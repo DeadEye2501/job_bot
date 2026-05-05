@@ -4712,6 +4712,7 @@ def _vacancy_detail_to_dict(
                 "status": h.status.value,
                 "explanation": h.explanation,
                 "applied": h.applied,
+                "source": h.source.value,
                 "changed_at": h.changed_at.isoformat() if h.changed_at else None,
             }
             for h in detail.history
