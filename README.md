@@ -48,7 +48,7 @@ pipenv run python main.py
 - **Контакты** — HR-ы (с переписками), компании, каналы, чёрный список.
 - **Статистика** — KPI, воронка статусов, распределение по каналам и скиллам, медианное время ответа HR.
 - **Система** — две вкладки:
-  - **Настройки** — Telegram (api_id/api_hash/phone, login/logout), LLM для чата, LLM для эмбеддингов, пайплайн (score threshold, интервал опроса, лимит сообщений за цикл), опасная зона (полное удаление данных). Все поля автосейвятся при `blur`/`change`.
+  - **Настройки** — Telegram (api_id/api_hash/phone, login/logout), LLM для чата, LLM для эмбеддингов, пайплайн (score threshold, интервал опроса, лимит сообщений за цикл, симуляция отправки DM для dev-режима), опасная зона (полное удаление данных). Все поля автосейвятся при `blur`/`change`.
   - **Логи** — in-memory ring-buffer на 5000 записей, мульти-фильтр уровней, авто-обновление.
 
 ## Разработка
@@ -64,7 +64,18 @@ pipenv run alembic upgrade head
 
 ### Сборка `.exe`
 
-`pyinstaller`-конфигурация — TODO. Сейчас распространение только через клон + `pipenv install`.
+Конфигурация в `JobBot.spec` (PyInstaller, single-file Windows-бандл).
+
+```powershell
+pipenv run pip install pyinstaller          # один раз — в venv
+pipenv run python -m PyInstaller JobBot.spec --clean --noconfirm
+```
+
+После сборки готовый файл лежит в `dist/JobBot.exe` (~240 МБ). Холодный старт — 5–15 сек: онешот распаковывает себя во временный `_MEIPASS`-каталог. БД и логи живут в `%APPDATA%\JobBot`, рядом с .exe ничего не сохраняется — распространять можно как один файл.
+
+Что вшито в бандл (см. `JobBot.spec`): `client/web/` (HTML/JS/шрифты/flatpickr), `alembic.ini` + `alembic/env.py` + `alembic/script.py.mako` + init-миграция, `client/icon.ico`. Hidden imports: `aiosqlite`, `keyring.backends.Windows`, `logging.config`, явные имена alembic-versions модулей.
+
+> Seed-миграция `aa4e0de05368_seed_initial_data.py` (персональные данные разработчика — CV, опыт, скиллы, подписанные каналы) gitignored и в стандартной spec-сборке **не попадает в бандл**. Получатель .exe увидит чистую БД + first-run wizard.
 
 ### Структура проекта
 

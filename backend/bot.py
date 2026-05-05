@@ -219,8 +219,21 @@ class Bot:
         self._client.add_handler(
             EditedMessageHandler(self._on_dm_edit, filters.private)
         )
+        # NOTE: `filters.private` НЕ годится для DeletedMessagesHandler.
+        # Pyrogram'овский parse_deleted_messages для UpdateDeleteMessages
+        # (все приватные удаления) ставит msg.chat=None — peer info в этом
+        # апдейте не приходит. filters.private требует m.chat.type in
+        # {PRIVATE, BOT}, и для chat=None даёт False — handler не срабатывает
+        # вообще. Поэтому пропускаем chatless-stub'ы и явные private-чаты,
+        # отсекая каналы (UpdateDeleteChannelMessages приходит уже с
+        # chat=Channel).
         self._client.add_handler(
-            DeletedMessagesHandler(self._on_dm_delete, filters.private)
+            DeletedMessagesHandler(
+                self._on_dm_delete,
+                filters.private | filters.create(
+                    lambda _, __, m: getattr(m, "chat", None) is None
+                ),
+            )
         )
         # UpdateReadHistoryOutbox carries the «HR has read up to msg N» signal
         # for our outgoing DMs. Filter out everything else inside the handler;
