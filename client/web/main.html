@@ -2702,6 +2702,12 @@
     margin-top: 2px;
     display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
   }
+  /* min-width:0 на детях — без него длинная company-link / tg-link
+     считает свою ширину = ширине всего текста и при flex-wrap всё
+     родителем переносится на новую строку (та же ловушка, что и в
+     .tl-history-row). Сейчас в реальных данных не воспроизводится
+     (HR-имя/компания обычно короткие), но превентивно. */
+  .cnt-det-sub > * { min-width: 0; }
   .cnt-det-sub .tg-link {
     color: var(--text-tertiary);
     cursor: pointer;
@@ -2719,6 +2725,7 @@
     display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
     font-size: 0.72rem;
   }
+  .cnt-det-meta-row > * { min-width: 0; }
   .cnt-det-meta-chip {
     display: inline-flex; align-items: center; gap: 4px;
     background: var(--bg-tertiary);
