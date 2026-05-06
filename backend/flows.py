@@ -58,6 +58,7 @@ from backend.repository import (
     load_profile_skills,
     get_profile,
     refresh_hr_username,
+    resolve_reply_target_vacancy,
     save_incoming_message,
 )
 
@@ -140,9 +141,24 @@ async def process_dm(
             refresh_hr_username(hr, sender_username)
             if avatar_bytes is not None and hr.avatar is None:
                 hr.avatar = avatar_bytes
-            vacancy_id = await find_latest_vacancy_id_for_hr(
-                session, hr.id, as_of=msg.date,
-            )
+            # Reply-attribution: если HR ответил на наше конкретное
+            # сообщение через Telegram-reply, мы точно знаем, на какую
+            # вакансию это реакция (наша outgoing-row в Message с этим
+            # tg_message_id хранит её vacancy_id). Иначе fallback на
+            # «самая свежая вакансия HR'а» — это правильное приближение
+            # для одиночных HR-ов, но для multi-vacancy HR'а может
+            # ошибиться (HR пишет про вторую из пяти, бот атрибутирует
+            # на пятую). Reply-цепочка эту проблему как раз и решает.
+            vacancy_id = None
+            reply_to_id = getattr(msg, "reply_to_message_id", None)
+            if reply_to_id:
+                vacancy_id = await resolve_reply_target_vacancy(
+                    session, hr.id, reply_to_id,
+                )
+            if vacancy_id is None:
+                vacancy_id = await find_latest_vacancy_id_for_hr(
+                    session, hr.id, as_of=msg.date,
+                )
             new_msg = await save_incoming_message(
                 session, hr.id, vacancy_id, text, msg.id, msg.date,
                 media_kind=media_kind,
