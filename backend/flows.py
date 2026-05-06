@@ -483,25 +483,6 @@ def _build_candidate_profile(
 # cover letter + CV, как первый раз.
 _RECENT_SEND_WINDOW_DAYS = 14
 
-# 1-й контакт. Префикс с названием/каналом ВСЕГДА детерминированный —
-# не доверяемся LLM-у вписать корректное название и канал-источник.
-# {body} — собственно cover letter из generate_cover_letter.
-_FULL_PREFIX_TEMPLATE = (
-    "Откликаюсь на вакансию: {title}\n"
-    "Канал: {channel_ref}\n\n"
-    "{body}"
-)
-# 2-й контакт в окне (count==1). Без LLM, без CV-attachment'а.
-_SHORT_FIRST_TEMPLATE = (
-    "А вот я увидел ещё одну интересную вакансию: {title}\n"
-    "Канал: {channel_ref}"
-)
-# 3-й и далее (count>=2). Тоже hardcoded.
-_SHORT_NEXT_TEMPLATE = (
-    "И ещё одну: {title}\n"
-    "Канал: {channel_ref}"
-)
-
 
 def _format_channel_ref(channel_username: str | None) -> str | None:
     """Нормализуем @-handle для подстановки в шаблоны. None → None
@@ -517,15 +498,14 @@ def _format_channel_ref(channel_username: str | None) -> str | None:
 
 def _build_full_text(title: str, channel_ref: str | None, body: str) -> str:
     """Полный cover letter с детерминированным префиксом title/канал.
-    LLM-output идёт в {body} как есть."""
+    LLM-output идёт в {body} как есть. Пустой title не блокирует
+    отправку — отправить отклик важнее, чем точно подписать вакансию;
+    деградируемся в нейтральное «вашу вакансию», и пусть HR разберётся
+    по каналу/контексту."""
+    head = f"Откликаюсь на вакансию: {title}" if title else "Откликаюсь на вашу вакансию"
     if channel_ref:
-        return _FULL_PREFIX_TEMPLATE.format(
-            title=title, channel_ref=channel_ref, body=body,
-        )
-    # Канал не резолвлен (defensive — на практике все ingest'ом-парсенные
-    # вакансии имеют channel-FK). Дропаем строку «Канал: …» целиком,
-    # иначе HR увидит «Канал: None».
-    return f"Откликаюсь на вакансию: {title}\n\n{body}"
+        head += f"\nКанал: {channel_ref}"
+    return f"{head}\n\n{body}"
 
 
 def _build_short_text(
@@ -533,16 +513,23 @@ def _build_short_text(
 ) -> str:
     """Hardcoded follow-up. ``prior_count`` — сколько раз мы уже писали
     этому HR'у cover letter в окне (1 → «А вот ещё одну», 2+ → «И ещё
-    одну»)."""
-    if channel_ref:
-        template = (
-            _SHORT_FIRST_TEMPLATE if prior_count == 1
-            else _SHORT_NEXT_TEMPLATE
+    одну»). Пустой title не блокирует — деградируемся в обобщённое
+    «вашу вакансию», см. ``_build_full_text``."""
+    if title:
+        intro = (
+            f"А вот я увидел ещё одну интересную вакансию: {title}"
+            if prior_count == 1
+            else f"И ещё одну: {title}"
         )
-        return template.format(title=title, channel_ref=channel_ref)
-    if prior_count == 1:
-        return f"А вот я увидел ещё одну интересную вакансию: {title}"
-    return f"И ещё одну: {title}"
+    else:
+        intro = (
+            "А вот я увидел ещё одну вашу вакансию"
+            if prior_count == 1
+            else "И ещё одну вашу вакансию"
+        )
+    if channel_ref:
+        intro += f"\nКанал: {channel_ref}"
+    return intro
 
 
 class IngestionPipeline:
@@ -2025,11 +2012,13 @@ class IngestionPipeline:
 
         Возвращает (ok, reason). reason — короткий код:
         ``sent`` (отправка зачтена — реальный DM или SEND_LOCKED-имитация),
-        ``no_vacancy`` (vacancy_id не найден), ``no_title`` (defensive: у
-        вакансии пустой title), ``profile_empty`` / ``cover_letter_failed``
-        / ``cv_missing`` (только в полной ветке — short вариант их избегает
-        конструктивно), ``race`` (статус успел флипнуться в APPLIED),
-        ``blocked`` (OFF mode / blacklist / нет таргета), ``telegram_error``.
+        ``no_vacancy`` (vacancy_id не найден), ``profile_empty`` /
+        ``cover_letter_failed`` / ``cv_missing`` (только в полной ветке —
+        short вариант их избегает конструктивно), ``race`` (статус успел
+        флипнуться в APPLIED), ``blocked`` (OFF mode / blacklist / нет
+        таргета), ``telegram_error``. Пустой title не блокирует отправку
+        — деградируемся на нейтральное «вашу вакансию» в шаблоне
+        (``_build_full_text`` / ``_build_short_text``).
         UI пишет toast по этому коду — иначе юзер не отличит реальную
         отправку от молчаливого skip'а.
         """
@@ -2061,16 +2050,6 @@ class IngestionPipeline:
             channel_ref = _format_channel_ref(
                 v.channel.username if v.channel is not None else None
             )
-
-        if not title:
-            # Дополнительный гард: NOT_FIT-ветка не должна сюда дотащить,
-            # но если как-то долетела (manual UI на сломанной строке) —
-            # лучше явный reason, чем нелепое «Откликаюсь на вакансию: »
-            # с пустотой.
-            logger.warning(
-                "vacancy %d: title пустой, skipping send", vacancy_id,
-            )
-            return False, "no_title"
 
         if prior_count == 0:
             # 1-й контакт за окно — полный cover letter + CV.

@@ -1723,7 +1723,6 @@ class MainApi(QObject):
         REASONS = {
             "no_vacancy":         "Вакансия не найдена.",
             "no_hr":              "К вакансии не привязан HR.",
-            "no_title":           "У вакансии пустой title — нечего вписать в шаблон.",
             "already_applied":    "Отклик по этой вакансии уже отправлен.",
             "profile_empty":      "Профиль пуст — нечем заполнить cover letter.",
             "cover_letter_failed":"Cover letter не прошёл проверку (длина / формат — см. логи).",
