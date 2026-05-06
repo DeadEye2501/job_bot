@@ -496,25 +496,13 @@ def _format_channel_ref(channel_username: str | None) -> str | None:
     return s if s.startswith("@") else f"@{s}"
 
 
-def _build_full_text(title: str, channel_ref: str | None, body: str) -> str:
-    """Полный cover letter с детерминированным префиксом title/канал.
-    LLM-output идёт в {body} как есть. Пустой title не блокирует
-    отправку — отправить отклик важнее, чем точно подписать вакансию;
-    деградируемся в нейтральное «вашу вакансию», и пусть HR разберётся
-    по каналу/контексту."""
-    head = f"Откликаюсь на вакансию: {title}" if title else "Откликаюсь на вашу вакансию"
-    if channel_ref:
-        head += f"\nКанал: {channel_ref}"
-    return f"{head}\n\n{body}"
-
-
 def _build_short_text(
     title: str, channel_ref: str | None, prior_count: int,
 ) -> str:
     """Hardcoded follow-up. ``prior_count`` — сколько раз мы уже писали
     этому HR'у cover letter в окне (1 → «А вот ещё одну», 2+ → «И ещё
     одну»). Пустой title не блокирует — деградируемся в обобщённое
-    «вашу вакансию», см. ``_build_full_text``."""
+    «вашу вакансию» (отправить отклик важнее, чем точно подписать)."""
     if title:
         intro = (
             f"А вот я увидел ещё одну интересную вакансию: {title}"
@@ -2062,6 +2050,7 @@ class IngestionPipeline:
             body = await generate_cover_letter(
                 self._profile_block, parsed,
                 self._lm_client, self._lm_chat_model,
+                channel_ref=channel_ref,
             )
             if body is None:
                 logger.warning(
@@ -2076,7 +2065,10 @@ class IngestionPipeline:
                     vacancy_id, cv_path,
                 )
                 return False, "cv_missing"
-            text = _build_full_text(title, channel_ref, body)
+            # Title и @канал теперь вплетены LLM'ом прямо в body —
+            # детерминированный префикс «Откликаюсь на вакансию: …\nКанал:
+            # …\n\n» убран, выглядел как штамп поверх живого письма.
+            text = body
             attachment = cv_path
         else:
             # 2-й и далее в окне — hardcoded short без LLM, без CV.
