@@ -1849,7 +1849,19 @@ async def generate_cover_letter(
     # factcheck должны видеть финальный текст с вписанными title/канал, а
     # не «{title}» / «{channel}», иначе word/char-count соврёт и factcheck
     # увидит подозрительные curly-braces.
-    title_value = (parsed.title or "").strip()
+    #
+    # Title — данные парсера, не наши; теоретически в нём могут оказаться
+    # символы placeholder-синтаксиса (`{`, `}`, `[`, `]`, `<`, `>`).
+    # Например, parser-извлечённый Title `C++ Developer (template <T>)` или
+    # `Senior Python {remote}`. Если такие символы прорвутся в substituted
+    # text, ниже их зацепит has_bracket_placeholder / template-leak regex
+    # и письмо уйдёт в reject как фантомный LLM-placeholder. Чистим их в
+    # title до подстановки — потеря для HR минимальна (это decorative
+    # символы), false-positive reject устранён. Channel — гарантированно
+    # `@username` из _format_channel_ref, sanitization не нужна.
+    title_value = (parsed.title or "").strip().translate(
+        str.maketrans("", "", "{}[]<>")
+    )
     channel_value = (channel_ref or "").strip()
     text = raw_text.replace("{title}", title_value).replace("{channel}", channel_value)
 
