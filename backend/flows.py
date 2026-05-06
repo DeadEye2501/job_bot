@@ -45,6 +45,7 @@ from backend.payloads import ParsedVacancy
 from backend.repository import (
     apply_classification,
     build_profile_block,
+    count_recent_outgoing_with_vacancy_for_hr,
     delete_vacancy as _repo_delete_vacancy,
     find_known_hr,
     find_latest_vacancy_id_for_hr,
@@ -458,6 +459,74 @@ def _build_candidate_profile(
         ],
         free_preferences=profile.free_preferences,
     )
+
+
+# ---------------------------------------------------------------- send-templates
+# Окно «недавно отправляли cover letter этому HR'у» (см.
+# count_recent_outgoing_with_vacancy_for_hr). Старше — шлём полный
+# cover letter + CV, как первый раз.
+_RECENT_SEND_WINDOW_DAYS = 14
+
+# 1-й контакт. Префикс с названием/каналом ВСЕГДА детерминированный —
+# не доверяемся LLM-у вписать корректное название и канал-источник.
+# {body} — собственно cover letter из generate_cover_letter.
+_FULL_PREFIX_TEMPLATE = (
+    "Откликаюсь на вакансию: {title}\n"
+    "Канал: {channel_ref}\n\n"
+    "{body}"
+)
+# 2-й контакт в окне (count==1). Без LLM, без CV-attachment'а.
+_SHORT_FIRST_TEMPLATE = (
+    "А вот я увидел ещё одну интересную вакансию: {title}\n"
+    "Канал: {channel_ref}"
+)
+# 3-й и далее (count>=2). Тоже hardcoded.
+_SHORT_NEXT_TEMPLATE = (
+    "И ещё одну: {title}\n"
+    "Канал: {channel_ref}"
+)
+
+
+def _format_channel_ref(channel_username: str | None) -> str | None:
+    """Нормализуем @-handle для подстановки в шаблоны. None → None
+    (caller дропает строку «Канал: …» целиком, чтобы не рендерилось
+    «Канал: None»)."""
+    if not channel_username:
+        return None
+    s = channel_username.strip()
+    if not s:
+        return None
+    return s if s.startswith("@") else f"@{s}"
+
+
+def _build_full_text(title: str, channel_ref: str | None, body: str) -> str:
+    """Полный cover letter с детерминированным префиксом title/канал.
+    LLM-output идёт в {body} как есть."""
+    if channel_ref:
+        return _FULL_PREFIX_TEMPLATE.format(
+            title=title, channel_ref=channel_ref, body=body,
+        )
+    # Канал не резолвлен (defensive — на практике все ingest'ом-парсенные
+    # вакансии имеют channel-FK). Дропаем строку «Канал: …» целиком,
+    # иначе HR увидит «Канал: None».
+    return f"Откликаюсь на вакансию: {title}\n\n{body}"
+
+
+def _build_short_text(
+    title: str, channel_ref: str | None, prior_count: int,
+) -> str:
+    """Hardcoded follow-up. ``prior_count`` — сколько раз мы уже писали
+    этому HR'у cover letter в окне (1 → «А вот ещё одну», 2+ → «И ещё
+    одну»)."""
+    if channel_ref:
+        template = (
+            _SHORT_FIRST_TEMPLATE if prior_count == 1
+            else _SHORT_NEXT_TEMPLATE
+        )
+        return template.format(title=title, channel_ref=channel_ref)
+    if prior_count == 1:
+        return f"А вот я увидел ещё одну интересную вакансию: {title}"
+    return f"И ещё одну: {title}"
 
 
 class IngestionPipeline:
@@ -1927,43 +1996,101 @@ class IngestionPipeline:
         *,
         force: bool = False,
     ) -> tuple[bool, str]:
-        """Send cover letter + CV to hr for vacancy_id.
+        """Send cover letter (или short follow-up) HR'у для vacancy_id.
+
+        Решение «полный cover letter + CV» vs «короткий follow-up без
+        вложений» принимается по count'у наших исходящих этому HR'у с
+        привязанным vacancy_id за последние ``_RECENT_SEND_WINDOW_DAYS``
+        дней (см. ``count_recent_outgoing_with_vacancy_for_hr``). 0 →
+        полный, ≥1 → short. Это анти-спам гард на случай, когда HR
+        публикует несколько вакансий и pipeline видит их в одном цикле:
+        первый отклик идёт нормально, последующие — короткие «А вот ещё
+        одну: …», без повторного резюме и без LLM-задержки.
 
         Возвращает (ok, reason). reason — короткий код:
-        ``sent`` (отправка зачтена — реальный DM или SEND_LOCKED-имитация,
-        БД-эффект одинаков), ``profile_empty``, ``cover_letter_failed``,
-        ``cv_missing``, ``race`` (между cover-letter генерацией и отправкой
-        статус вакансии успел измениться), ``blocked`` (OFF mode / blacklist
-        / нет таргета), ``telegram_error``. UI пишет toast по этому коду —
-        иначе юзер не отличит реальную отправку от молчаливого skip'а.
+        ``sent`` (отправка зачтена — реальный DM или SEND_LOCKED-имитация),
+        ``no_vacancy`` (vacancy_id не найден), ``no_title`` (defensive: у
+        вакансии пустой title), ``profile_empty`` / ``cover_letter_failed``
+        / ``cv_missing`` (только в полной ветке — short вариант их избегает
+        конструктивно), ``race`` (статус успел флипнуться в APPLIED),
+        ``blocked`` (OFF mode / blacklist / нет таргета), ``telegram_error``.
+        UI пишет toast по этому коду — иначе юзер не отличит реальную
+        отправку от молчаливого skip'а.
         """
-        if not self._profile_block:
-            logger.warning(
-                "vacancy %d: profile_block empty, skipping send", vacancy_id
+        # Загрузка вакансии + канала и подсчёт prior outgoing'ов в одной
+        # сессии. Race-guard upfront: статус мог уже флипнуться (manual UI
+        # или параллельный auto-flow). force=True (manual UI «Отправить
+        # отклик») перебивает: юзер сам решил повторить отправку.
+        async with self._session_factory() as session:
+            v = (
+                await session.scalars(
+                    select(Vacancy)
+                    .where(Vacancy.id == vacancy_id)
+                    .options(selectinload(Vacancy.channel))
+                )
+            ).first()
+            if v is None:
+                return False, "no_vacancy"
+            if not force and v.status == VacancyStatus.APPLIED:
+                logger.info(
+                    "vacancy %d: status already APPLIED at send-time "
+                    "(race with manual UI or parallel auto-flow)",
+                    vacancy_id,
+                )
+                return False, "race"
+            prior_count = await count_recent_outgoing_with_vacancy_for_hr(
+                session, hr.id, window_days=_RECENT_SEND_WINDOW_DAYS,
             )
-            return False, "profile_empty"
-        cover = await generate_cover_letter(
-            self._profile_block, parsed, self._lm_client, self._lm_chat_model
-        )
-        if cover is None:
-            logger.warning(
-                "vacancy %d: cover letter generation failed, skipping send",
-                vacancy_id,
+            title = (v.title or "").strip()
+            channel_ref = _format_channel_ref(
+                v.channel.username if v.channel is not None else None
             )
-            return False, "cover_letter_failed"
-        cv_path = self._cv_path()
-        if cv_path is None or not cv_path.is_file():
+
+        if not title:
+            # Дополнительный гард: NOT_FIT-ветка не должна сюда дотащить,
+            # но если как-то долетела (manual UI на сломанной строке) —
+            # лучше явный reason, чем нелепое «Откликаюсь на вакансию: »
+            # с пустотой.
             logger.warning(
-                "vacancy %d: CV file missing (%s), skipping send",
-                vacancy_id, cv_path,
+                "vacancy %d: title пустой, skipping send", vacancy_id,
             )
-            return False, "cv_missing"
-        # Race-guard: между прохождением фильтров и началом отправки могло
-        # пройти несколько секунд (LLM-генерация cover letter'а), за это
-        # время manual «Отправить отклик» из UI или параллельный auto-flow
-        # уже могли отправить отклик и flip'нуть status. Перепроверяем
-        # перед самым _send. force=True (manual UI) пропускает проверку —
-        # юзер уже одобрил повторную отправку явно.
+            return False, "no_title"
+
+        if prior_count == 0:
+            # 1-й контакт за окно — полный cover letter + CV.
+            if not self._profile_block:
+                logger.warning(
+                    "vacancy %d: profile_block empty, skipping send",
+                    vacancy_id,
+                )
+                return False, "profile_empty"
+            body = await generate_cover_letter(
+                self._profile_block, parsed,
+                self._lm_client, self._lm_chat_model,
+            )
+            if body is None:
+                logger.warning(
+                    "vacancy %d: cover letter generation failed, skipping send",
+                    vacancy_id,
+                )
+                return False, "cover_letter_failed"
+            cv_path = self._cv_path()
+            if cv_path is None or not cv_path.is_file():
+                logger.warning(
+                    "vacancy %d: CV file missing (%s), skipping send",
+                    vacancy_id, cv_path,
+                )
+                return False, "cv_missing"
+            text = _build_full_text(title, channel_ref, body)
+            attachment = cv_path
+        else:
+            # 2-й и далее в окне — hardcoded short без LLM, без CV.
+            text = _build_short_text(title, channel_ref, prior_count)
+            attachment = None
+
+        # Race-guard re-check после LLM-задержки. Для short-ветки задержки
+        # нет, но re-check дешёвый — оставляем симметрично, чтобы не было
+        # асимметричных гонок при одновременном auto+manual.
         if not force:
             async with self._session_factory() as session:
                 v = await session.get(Vacancy, vacancy_id)
@@ -1971,23 +2098,23 @@ class IngestionPipeline:
                     return False, "no_vacancy"
                 if v.status == VacancyStatus.APPLIED:
                     logger.info(
-                        "vacancy %d: status already APPLIED at send-time "
-                        "(race with manual UI or parallel auto-flow)",
+                        "vacancy %d: status flipped to APPLIED during "
+                        "send-prep (race with manual UI or parallel auto-flow)",
                         vacancy_id,
                     )
                     return False, "race"
         try:
             sent = await self._send(
-                hr, cover, attachment=cv_path, vacancy_id=vacancy_id,
+                hr, text, attachment=attachment, vacancy_id=vacancy_id,
                 force=force,
             )
         except FileNotFoundError:
             # CV-файл удалён/перемещён между is_file()-чеком выше и open'ом
-            # внутри Pyrogram'а. UI должен показать «CV пропал», а не
-            # абстрактное «Telegram отказался».
+            # внутри Pyrogram'а. Касается только полной ветки (short без
+            # attachment'а — туда мы FileNotFoundError не доедет).
             logger.warning(
-                "vacancy %d: CV file disappeared between check and send (%s)",
-                vacancy_id, cv_path,
+                "vacancy %d: CV file disappeared between check and send",
+                vacancy_id,
             )
             return False, "cv_missing"
         except Exception:
@@ -2004,14 +2131,13 @@ class IngestionPipeline:
             return False, "blocked"
         # SEND_LOCKED-факт суппрессии остаётся в логах и в
         # VacancyEvent("applied_sent").payload.suppressed; в timeline-записи
-        # и в reason-коде мы его НЕ различаем — иначе dev-режим выглядит
-        # иначе чем прод, и тестировать поведение «как при реальной
-        # отправке» нельзя.
+        # и в reason-коде мы его НЕ различаем.
         logger.info(
-            "vacancy %d: cover letter %s to hr %d",
+            "vacancy %d: %s %s to hr %d (prior_count=%d)",
             vacancy_id,
+            "short follow-up" if prior_count else "cover letter",
             "simulated (SEND_LOCKED)" if telegram.SEND_LOCKED else "sent",
-            hr.id,
+            hr.id, prior_count,
         )
         return True, "sent"
 
