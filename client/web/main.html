@@ -2427,6 +2427,14 @@
     flex-wrap: wrap;
   }
   .tl-history-row .status-name { flex: 0 0 auto; }
+  /* Без flex:1 + min-width:0 длинный .tl-event считает свою ширину =
+     ширине всего текста и не помещается на одной строке со status-name,
+     срабатывает flex-wrap → весь span сваливается на следующую строку.
+     Так длинный «Decline: HR сообщает …» рендерился со status-name
+     одиноко на верхней строке и explanation полностью под ним.
+     С flex:1 + min-width:0 span ужимается до доступного места,
+     а текст внутри wrap'ается по словам — как и должно. */
+  .tl-history-row .tl-event { flex: 1 1 auto; min-width: 0; }
   .tl-explanation-input {
     flex: 1;
     min-width: 120px;
