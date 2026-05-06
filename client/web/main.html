@@ -5700,8 +5700,9 @@
     // через LLM и шлёт в Telegram с прикреплённым CV. Доступно только
     // когда привязан HR (иначе слать некому); проверка здоровья та же,
     // что для rerun (нужен LLM).
-    const canSend = Boolean(detail.hr_id) && canRerunPipeline;
-    const sendTitle = !detail.hr_id
+    const hrId = detail.hr ? detail.hr.id : null;
+    const canSend = Boolean(hrId) && canRerunPipeline;
+    const sendTitle = !hrId
       ? 'Сначала привяжите HR'
       : (!canRerunPipeline ? buildHealthBlockedTip() : 'Сгенерировать cover letter и отправить с резюме');
     const sendMuted = canSend ? '' : ' is-disabled';
