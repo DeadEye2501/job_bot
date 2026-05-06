@@ -195,6 +195,60 @@ async def find_latest_vacancy_id_for_hr(
     return latest.id if latest else None
 
 
+async def count_recent_outgoing_with_vacancy_for_hr(
+    session: AsyncSession,
+    hr_id: int,
+    *,
+    window_days: int = 14,
+) -> int:
+    """Сколько cover-letter'ов мы отправили этому HR'у за последние
+    ``window_days`` дней. Считаются только outgoing rows с привязанным
+    ``vacancy_id`` — ручные сообщения из чата Contacts (без vacancy_id)
+    игнорируются. Подписан на 0 при отсутствии истории.
+
+    Используется в auto / manual send-ветке для решения «полный cover
+    letter + CV (count==0) vs short follow-up без вложений (count>=1)».
+    Cutoff считаем в Python, чтобы не зависеть от диалекта date-arithmetic.
+
+    SEND_LOCKED dev-режим Message-rows не пишет → в dev-сценариях count
+    всегда 0, что и нужно: dev тестирует full-cover-letter путь.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
+    stmt = select(func.count(Message.id)).where(
+        Message.hr_id == hr_id,
+        ~Message.is_incoming,
+        Message.vacancy_id.is_not(None),
+        Message.sent_at >= cutoff,
+    )
+    return (await session.scalar(stmt)) or 0
+
+
+async def resolve_reply_target_vacancy(
+    session: AsyncSession,
+    hr_id: int,
+    reply_to_tg_msg_id: int,
+) -> int | None:
+    """Найти vacancy_id нашего outgoing-сообщения, на которое HR ответил
+    через Telegram-reply (`reply_to_message_id`). Возвращает ``None``
+    если процитированное сообщение не наше / не найдено / без vacancy_id
+    (ручная переписка из Contacts).
+
+    Уникальность гарантирует UniqueConstraint
+    ``(hr_id, tg_message_id, is_incoming)`` — outgoing-row с заданным
+    tg_message_id для HR'а ровно одна.
+    """
+    stmt = (
+        select(Message.vacancy_id)
+        .where(
+            Message.hr_id == hr_id,
+            ~Message.is_incoming,
+            Message.tg_message_id == reply_to_tg_msg_id,
+        )
+        .limit(1)
+    )
+    return await session.scalar(stmt)
+
+
 def refresh_hr_username(hr: HR, sender_username: str | None) -> None:
     if sender_username and hr.telegram_username != sender_username:
         hr.telegram_username = sender_username
