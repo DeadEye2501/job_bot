@@ -2244,7 +2244,7 @@ async def get_stats_channels_pipeline(
 
 
 async def get_stats_skills(
-    session: AsyncSession, *, period: str, limit: int = 25, min_count: int = 2,
+    session: AsyncSession, *, period: str, limit: int = 27, min_count: int = 2,
 ) -> dict:
     """Топ-N технологий из `Vacancy.stack` за period с маркировкой
     «есть в моём профиле».
