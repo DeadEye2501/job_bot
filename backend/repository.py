@@ -1307,11 +1307,17 @@ async def list_hr_with_counts(
     *,
     limit: int | None = None,
     offset: int = 0,
+    sort_by: str = "vacancy_count",
 ) -> list[HrWithCount]:
     """All HRs with their vacancy count and most recent linked company.
 
-    Used by the "Связать с HR" picker AND the Contacts/HR pane (05). Sorted
-    by vacancy count DESC, then by name to keep prolific HRs at the top.
+    Used by the "Связать с HR" picker AND the Contacts/HR pane (05).
+
+    ``sort_by``:
+    - ``"vacancy_count"`` (default, picker): vacancy count DESC, then name —
+      keeps prolific HRs at the top, the natural order for a linker.
+    - ``"last_activity"`` (Contacts/HR): max(message.sent_at) DESC NULLS LAST,
+      then name — последние, с кем была переписка, наверху.
 
     ``last_company_name`` is the company of the HR's most recent vacancy;
     NULL if that vacancy isn't linked to any company, even if older
@@ -1326,12 +1332,38 @@ async def list_hr_with_counts(
     caller can implement infinite-scroll. ``None`` limit (default) returns
     everything — preserves the picker's existing behaviour.
     """
-    base = (
-        select(HR, func.count(Vacancy.id).label("cnt"))
-        .outerjoin(Vacancy, Vacancy.hr_id == HR.id)
-        .group_by(HR.id)
-        .order_by(func.count(Vacancy.id).desc(), HR.name.asc())
-    )
+    if sort_by == "last_activity":
+        # Пре-агрегируем последнюю переписку отдельным GROUP BY hr_id вместо
+        # коррелированного scalar-subquery в ORDER BY: иначе SQLite заново
+        # сканировал бы message-таблицу по разу на каждого HR при сортировке.
+        # Здесь — один проход по message с использованием ix_message_hr_id,
+        # дальше LEFT JOIN на HR.
+        last_act_subq = (
+            select(
+                Message.hr_id.label("hr_id"),
+                func.max(Message.sent_at).label("last_act"),
+            )
+            .where(Message.is_deleted.is_(False))
+            .group_by(Message.hr_id)
+            .subquery()
+        )
+        base = (
+            select(HR, func.count(Vacancy.id).label("cnt"))
+            .outerjoin(Vacancy, Vacancy.hr_id == HR.id)
+            .outerjoin(last_act_subq, last_act_subq.c.hr_id == HR.id)
+            .group_by(HR.id, last_act_subq.c.last_act)
+            .order_by(
+                last_act_subq.c.last_act.desc().nullslast(),
+                HR.name.asc(),
+            )
+        )
+    else:
+        base = (
+            select(HR, func.count(Vacancy.id).label("cnt"))
+            .outerjoin(Vacancy, Vacancy.hr_id == HR.id)
+            .group_by(HR.id)
+            .order_by(func.count(Vacancy.id).desc(), HR.name.asc())
+        )
     counts = (await session.execute(base)).all()
 
     if search:

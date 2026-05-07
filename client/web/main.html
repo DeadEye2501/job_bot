@@ -3463,6 +3463,17 @@
     padding-left: 10px;
     padding-right: 10px;
   }
+  /* Фикс-ширина лейбла, чтобы метры стартовали с одной x-координаты —
+     иначе "n/a" / "0%" / "100%" / "40%" сдвигают полоску в каждой строке.
+     text-align: center — текст центрируется внутри своего бокса, и пара
+     процент + полоска сидит ровно по центру колонки, а не «прижата» к
+     правому краю лейбла. */
+  .stats-ch-grid .stats-ch-conv-label {
+    display: inline-block;
+    width: 36px;
+    text-align: center;
+    flex-shrink: 0;
+  }
   .stats-ch-grid .stats-ch-conv-meter {
     position: relative;
     width: 60px;
@@ -4243,9 +4254,12 @@
         notesSaveTimer: null,
         notesFocus: null,
         // Vacancies mini-list under the chat. ``vacanciesFor`` drops stale
-        // responses when the user clicks another HR mid-flight.
+        // responses when the user clicks another HR mid-flight; ``vacanciesEpoch``
+        // дополнительно отсекает race из двух подряд request'ов на ОДНОГО
+        // и того же HR (например, рапид-флип статуса вакансии).
         vacancies: [],
         vacanciesFor: null,
+        vacanciesEpoch: 0,
         vacanciesLoading: false,
         // More-vert popover in the HR detail head (Слить / Blacklist /
         // Удалить). Single-flight by design — toggling another action
@@ -4302,6 +4316,7 @@
         detailLoading: false,
         vacancies: [],
         vacanciesFor: null,
+        vacanciesEpoch: 0,
         vacanciesLoading: false,
         hrs: [],
         hrsFor: null,
@@ -5525,6 +5540,7 @@
       status: h.status,
       explanation: h.explanation,
       applied: h.applied,
+      source: h.source,
     }));
     const events = (detail.events || []).map(e => ({
       kind: 'event',
@@ -7629,6 +7645,22 @@
       renderSection();
       return;
     }
+    // Contacts/HR и Contacts/Company панели держат свои кэши vacancies
+    // (loaded one-shot при выборе строки), и без явного refetch'а статус-бейдж
+    // там залипает в старом значении. Триггерим refresh, если изменённая
+    // вакансия числится в текущем кэше панели.
+    const hrSt = appState.contacts.hr;
+    if (hrSt && hrSt.vacanciesFor != null
+        && Array.isArray(hrSt.vacancies)
+        && hrSt.vacancies.some(v => v.id === p.vacancy_id)) {
+      requestContactsHrVacancies(hrSt.vacanciesFor);
+    }
+    const coSt = appState.contacts.company;
+    if (coSt && coSt.vacanciesFor != null
+        && Array.isArray(coSt.vacancies)
+        && coSt.vacancies.some(v => v.id === p.vacancy_id)) {
+      requestContactsCompanyVacancies(coSt.vacanciesFor);
+    }
     if (p.vacancy_id !== appState.vacancies.selectedId) return;
     // Close popover drafts and request fresh detail so header + timeline are
     // always server-sourced (single source of truth for applied flag, ts, etc.).
@@ -7980,8 +8012,12 @@
     if (!api || hrId == null) return;
     const st = appState.contacts.hr;
     st.vacanciesFor = hrId;
+    st.vacanciesEpoch = (st.vacanciesEpoch | 0) + 1;
     st.vacanciesLoading = true;
-    api.request_contacts_hr_vacancies(hrId);
+    api.request_contacts_hr_vacancies(JSON.stringify({
+      hr_id: hrId,
+      epoch: st.vacanciesEpoch,
+    }));
   }
 
   function onContactsHrVacanciesLoaded(payload) {
@@ -7989,7 +8025,8 @@
     try { p = JSON.parse(payload); } catch { return; }
     if (!p || !p.ok) return;
     const st = appState.contacts.hr;
-    if (p.hr_id !== st.vacanciesFor) return;  // stale
+    if (p.hr_id !== st.vacanciesFor) return;  // stale (other HR selected mid-flight)
+    if (p.epoch !== st.vacanciesEpoch) return;  // stale (newer request for same HR raced)
     st.vacancies = (p.vacancies || []).map(v => ({
       id: v.id,
       title: v.title,
@@ -9591,8 +9628,12 @@
     if (!api || companyId == null) return;
     const st = appState.contacts.company;
     st.vacanciesFor = companyId;
+    st.vacanciesEpoch = (st.vacanciesEpoch | 0) + 1;
     st.vacanciesLoading = true;
-    api.request_contacts_company_vacancies(companyId);
+    api.request_contacts_company_vacancies(JSON.stringify({
+      company_id: companyId,
+      epoch: st.vacanciesEpoch,
+    }));
   }
 
   function onContactsCompanyVacanciesLoaded(payload) {
@@ -9600,7 +9641,8 @@
     try { p = JSON.parse(payload); } catch { return; }
     if (!p || !p.ok) return;
     const st = appState.contacts.company;
-    if (p.company_id !== st.vacanciesFor) return;
+    if (p.company_id !== st.vacanciesFor) return;  // stale (other company selected mid-flight)
+    if (p.epoch !== st.vacanciesEpoch) return;  // stale (newer request for same company raced)
     st.vacancies = (p.vacancies || []).map(v => ({
       id: v.id,
       title: v.title,
@@ -13590,8 +13632,8 @@
         <div class="stats-ch-row v-answ${last}" data-channel-id="${c.id}">${c.answered}</div>
         <div class="stats-ch-row v-invite${last}" data-channel-id="${c.id}">${c.invite_plus}</div>
         <div class="stats-ch-row v-decline${last}" data-channel-id="${c.id}">${c.decline}</div>
-        <div class="stats-ch-row stats-ch-conv stats-ch-sep-l${last}" data-channel-id="${c.id}">${convA}<span class="stats-ch-conv-meter"><span class="stats-ch-conv-meter-fill" style="width:${convAW}%"></span></span></div>
-        <div class="stats-ch-row stats-ch-conv${last}" data-channel-id="${c.id}">${convI}<span class="stats-ch-conv-meter"><span class="stats-ch-conv-meter-fill" style="width:${convIW}%"></span></span></div>
+        <div class="stats-ch-row stats-ch-conv stats-ch-sep-l${last}" data-channel-id="${c.id}"><span class="stats-ch-conv-label">${convA}</span><span class="stats-ch-conv-meter"><span class="stats-ch-conv-meter-fill" style="width:${convAW}%"></span></span></div>
+        <div class="stats-ch-row stats-ch-conv${last}" data-channel-id="${c.id}"><span class="stats-ch-conv-label">${convI}</span><span class="stats-ch-conv-meter"><span class="stats-ch-conv-meter-fill" style="width:${convIW}%"></span></span></div>
       `;
     });
     return `<div class="stats-card stats-col-12">

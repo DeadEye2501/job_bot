@@ -30,7 +30,7 @@ import sqlite3
 import threading
 import time
 from concurrent.futures import CancelledError, Future
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
@@ -170,6 +170,25 @@ def _ok(data: dict | None = None) -> str:
 
 def _err(message: str, **extra: Any) -> str:
     return json.dumps({"ok": False, "error": message, **extra})
+
+
+def _iso(dt: datetime | None) -> str | None:
+    """ISO-8601 с обязательным TZ-суффиксом, под JS `Date.parse`.
+
+    SQLite + ``DateTime(timezone=True)`` хранит как text. Строки, записанные
+    через ``server_default=func.now()`` (vacancy_status_history.changed_at,
+    vacancy_event.created_at и т.п.) приходят обратно naive — без offset'а.
+    Голый ``.isoformat()`` шлёт `"2026-05-07T12:34:56"` без `Z`/`+00:00`,
+    а `Date.parse` без TZ интерпретирует строку как ЛОКАЛЬНОЕ время —
+    свежий эвент превращается в «N часов назад» на величину TZ-оффсета.
+    Naive значения трактуем как UTC (потому что вся запись идёт в UTC),
+    aware — отдаём как есть.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
 
 
 async def _do_list_models_for_creds(
@@ -2103,6 +2122,7 @@ class MainApi(QObject):
                     search=search,
                     limit=limit,
                     offset=offset,
+                    sort_by="last_activity",
                 )
             has_more = (limit is not None) and (len(rows) == limit)
             return _ok({
@@ -2116,25 +2136,37 @@ class MainApi(QObject):
 
         self._dispatch(self.contacts_hr_list_loaded, run())
 
-    @Slot(int)
-    def request_contacts_hr_vacancies(self, hr_id: int) -> None:
+    @Slot(str)
+    def request_contacts_hr_vacancies(self, payload_json: str) -> None:
         """Push the vacancy mini-list for the HR detail pane.
 
-        Returns ``hr_id`` in the payload so JS can drop stale responses
-        when the user clicks a different row mid-flight.
+        Payload: ``{hr_id, epoch}``. ``hr_id`` фильтрует ответ от другого
+        выбранного HR, ``epoch`` — от race'а двух подряд request'ов на ОДНОГО
+        и того же HR (например, рапид-флип статуса вакансии). Оба эхо'ятся
+        обратно в ответе, JS дропает stale.
         """
+        try:
+            payload = json.loads(payload_json)
+            hr_id = int(payload["hr_id"])
+            epoch = payload.get("epoch")
+        except (ValueError, TypeError, KeyError) as e:
+            _log_invalid_payload("request_contacts_hr_vacancies", e)
+            self.contacts_hr_vacancies_loaded.emit(_err(f"Неверные поля: {e}"))
+            return
+
         async def run() -> str:
             async with self._session_factory() as session:
                 rows = await repository.list_vacancies_for_hr(session, hr_id)
             return _ok({
                 "hr_id": hr_id,
+                "epoch": epoch,
                 "vacancies": [
                     {
                         "id": v.id,
                         "title": v.title or "",
                         "status": v.status.value if v.status else "New",
                         "score": v.score,
-                        "created_at": v.created_at.isoformat() if v.created_at else None,
+                        "created_at": _iso(v.created_at),
                     }
                     for v in rows
                 ],
@@ -2517,8 +2549,8 @@ class MainApi(QObject):
                         "tg_message_id": m.tg_message_id,
                         "is_incoming": m.is_incoming,
                         "text": m.text,
-                        "sent_at": m.sent_at.isoformat() if m.sent_at else None,
-                        "read_at": m.read_at.isoformat() if m.read_at else None,
+                        "sent_at": _iso(m.sent_at),
+                        "read_at": _iso(m.read_at),
                         "vacancy_id": m.vacancy_id,
                         "is_edited": m.is_edited,
                         "is_deleted": m.is_deleted,
@@ -2749,20 +2781,36 @@ class MainApi(QObject):
 
         self._dispatch(self.contacts_company_detail_loaded, run())
 
-    @Slot(int)
-    def request_contacts_company_vacancies(self, company_id: int) -> None:
+    @Slot(str)
+    def request_contacts_company_vacancies(self, payload_json: str) -> None:
+        """Push the vacancy mini-list for the Company detail pane.
+
+        Payload: ``{company_id, epoch}``. ``company_id`` фильтрует ответ при
+        переключении на другую компанию, ``epoch`` — race на одной и той же
+        компании (рапид-флип статуса вакансии). Оба эхо'ятся обратно.
+        """
+        try:
+            payload = json.loads(payload_json)
+            company_id = int(payload["company_id"])
+            epoch = payload.get("epoch")
+        except (ValueError, TypeError, KeyError) as e:
+            _log_invalid_payload("request_contacts_company_vacancies", e)
+            self.contacts_company_vacancies_loaded.emit(_err(f"Неверные поля: {e}"))
+            return
+
         async def run() -> str:
             async with self._session_factory() as session:
                 rows = await repository.list_vacancies_for_company(session, company_id)
             return _ok({
                 "company_id": company_id,
+                "epoch": epoch,
                 "vacancies": [
                     {
                         "id": v.id,
                         "title": v.title or "",
                         "status": v.status.value if v.status else "New",
                         "score": v.score,
-                        "created_at": v.created_at.isoformat() if v.created_at else None,
+                        "created_at": _iso(v.created_at),
                     }
                     for v in rows
                 ],
@@ -3909,8 +3957,8 @@ class MainApi(QObject):
                         "title": v.title or "",
                         "status": v.status.value if v.status else "New",
                         "score": v.score,
-                        "created_at": v.created_at.isoformat() if v.created_at else None,
-                        "posted_at": v.posted_at.isoformat() if v.posted_at else None,
+                        "created_at": _iso(v.created_at),
+                        "posted_at": _iso(v.posted_at),
                     }
                     for v in rows
                 ],
@@ -4585,7 +4633,7 @@ def _profile_to_dict(p, languages=None) -> dict | None:
             {"language": lang.language, "level": lang.level}
             for lang in (languages or [])
         ],
-        "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+        "updated_at": _iso(p.updated_at),
     }
 
 
@@ -4711,8 +4759,8 @@ def _vacancy_detail_to_dict(
         "source_url": v.source_url,
         "stack": _stack_items(v.stack, matched_set),
         "notes": v.notes,
-        "posted_at": v.posted_at.isoformat() if v.posted_at else None,
-        "created_at": v.created_at.isoformat() if v.created_at else None,
+        "posted_at": _iso(v.posted_at),
+        "created_at": _iso(v.created_at),
         "history": [
             {
                 "id": h.id,
@@ -4721,7 +4769,7 @@ def _vacancy_detail_to_dict(
                 "explanation": h.explanation,
                 "applied": h.applied,
                 "source": h.source.value,
-                "changed_at": h.changed_at.isoformat() if h.changed_at else None,
+                "changed_at": _iso(h.changed_at),
             }
             for h in detail.history
         ],
@@ -4730,7 +4778,7 @@ def _vacancy_detail_to_dict(
                 "id": e.id,
                 "kind": e.kind,
                 "payload": e.payload,
-                "created_at": e.created_at.isoformat() if e.created_at else None,
+                "created_at": _iso(e.created_at),
             }
             for e in detail.events
         ],
@@ -4782,7 +4830,7 @@ def _blacklist_row_to_dict(row: Blacklist) -> dict:
         "value": row.value,
         "reason": row.reason,
         "active": bool(row.active),
-        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "created_at": _iso(row.created_at),
     }
 
 
@@ -4852,9 +4900,9 @@ def _vacancy_list_row_to_dict(
         "salary_rub_max": v.salary_rub_max,
         "remote": v.remote,
         "stack": _stack_items(v.stack, matched_set),
-        "posted_at": v.posted_at.isoformat() if v.posted_at else None,
-        "created_at": v.created_at.isoformat() if v.created_at else None,
-        "last_activity_at": last_activity.isoformat() if last_activity else None,
+        "posted_at": _iso(v.posted_at),
+        "created_at": _iso(v.created_at),
+        "last_activity_at": _iso(last_activity),
     }
 
 

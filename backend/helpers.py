@@ -40,8 +40,16 @@ def extract_dm_text(msg) -> str:
     when the message is a reply. The quote is short — first 80 chars of the
     parent text (or a media placeholder), prefixed with «↪». Keeps the chat
     UI free of separate reply rows / new DB columns.
+
+    Voice-сообщения у Telegram приходят без text, но Pyrogram-у `Voice`
+    разрешает caption — и НЕ попадают в `_classify_media` (мы их не качаем).
+    Без подмены DB-row сохраняется с text="" (если caption нет) и в UI
+    рендерится пустой бабл; либо с голым текстом caption — теряется сам
+    факт, что это голосовое. Префиксим всегда, когда есть `voice`.
     """
     body = extract_text(msg)
+    if getattr(msg, "voice", None):
+        body = f"Голосовое сообщение: {body}" if body else "Голосовое сообщение"
     parent = getattr(msg, "reply_to_message", None)
     if parent is None:
         return body
