@@ -5589,10 +5589,13 @@
           : null;
         const value = draftVal != null ? draftVal : (it.explanation || '');
         if (isAuto) {
-          textHtml = `<span class="tl-history-row">`
-            + `<span class="status-name">${escapeHtml(it.status || '')}:</span>`
-            + `<span class="tl-event">${escapeHtml(value)}</span>`
-            + `</span>`;
+          // Inline-рендер (как у parsed/auto_send/linked_*): wrap идёт
+          // по словам, вторая строка ложится под label, а не под body
+          // (таблично выровненный «висячий» отступ выглядел грязно).
+          // Editable-ветка ниже всё ещё держит .tl-history-row — там
+          // flex нужен под textarea, который inline не wrap'ается.
+          textHtml = `<span class="status-name">${escapeHtml(it.status || '')}:</span> `
+            + `<span class="tl-event">${escapeHtml(value)}</span>`;
         } else {
           textHtml = `<span class="tl-history-row">`
             + `<span class="status-name">${escapeHtml(it.status || '')}:</span>`
