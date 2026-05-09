@@ -17,6 +17,9 @@ def make_client(tg: TgAccountConfig) -> Client:
     the app data dir). Otherwise falls back to a file-based session in the
     per-user data dir, expected to be populated on first interactive login.
     """
+    # ``sleep_threshold=60``: Pyrogram сам ждёт и ретраит FloodWait короче
+    # 60с (default 10с) — закрывает пиковые TG-rate-limit'ы во время
+    # batch-параллельного catch-up'а в backend/flows.py без промахов.
     if tg.session_string:
         return Client(
             name=SESSION_NAME,
@@ -24,6 +27,7 @@ def make_client(tg: TgAccountConfig) -> Client:
             api_id=tg.api_id,
             api_hash=tg.api_hash,
             in_memory=True,
+            sleep_threshold=60,
         )
     sessions_dir = get_data_dir() / "sessions"
     sessions_dir.mkdir(exist_ok=True)
@@ -34,6 +38,7 @@ def make_client(tg: TgAccountConfig) -> Client:
         phone_number=tg.phone,
         password=tg.password or None,
         workdir=str(sessions_dir),
+        sleep_threshold=60,
     )
 
 

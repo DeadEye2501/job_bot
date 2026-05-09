@@ -66,6 +66,15 @@ from backend.repository import (
 logger = logging.getLogger(__name__)
 
 
+# DM catch-up batching: ``BATCH_SIZE`` HR'ов параллельно через
+# ``asyncio.gather``, потом ``BATCH_DELAY_SEC`` пауза перед следующим
+# батчем — чтобы TG-rate-limit window успевал сбрасываться. Параметры
+# подобраны под flood_sleep_threshold=60 в adapters/telegram.py: даже
+# если внутри батча словим короткий FloodWait, Pyrogram съест его сам.
+_DM_CATCHUP_BATCH_SIZE = 20
+_DM_CATCHUP_BATCH_DELAY_SEC = 1.0
+
+
 async def process_dm(
     msg,
     lm_client,
@@ -304,11 +313,27 @@ async def backfill_hr_dm_history(
         else:
             return
     except FloodWait as e:
-        logger.warning(
-            "backfill: FloodWait %ds на hr %d — пропускаем",
-            getattr(e, "value", "?"), hr.id,
+        # Pyrogram не съел FloodWait сам (значит, он длиннее
+        # ``sleep_threshold`` из make_client). Ждём явно ровно столько,
+        # сколько просит TG, и ретраим один раз — этого достаточно для
+        # типичных peak'ов rate-limit'а во время batch catch-up'а. Если
+        # и второй раз FloodWait — значит, реально серьёзный штраф,
+        # дальше уже скипаем HR'а до следующего OFF→active цикла.
+        wait = int(getattr(e, "value", 30))
+        logger.info(
+            "backfill: FloodWait %ds на hr %d — жду и ретраим",
+            wait, hr.id,
         )
-        return
+        await asyncio.sleep(wait + 1)
+        try:
+            messages = []
+            async for msg in client.get_chat_history(target, limit=backfill_limit):
+                messages.append(msg)
+        except Exception:
+            logger.exception(
+                "backfill: retry после FloodWait не помог hr %d", hr.id,
+            )
+            return
     from backend.bot import _classify_media, _download_media
     had_new = False
     # Oldest-first so the chat order stays sane in the UI.
@@ -440,20 +465,36 @@ async def catch_up_missed_dms(
     """
     async with session_factory() as session:
         chats = await list_hrs_for_backfill(session)
-    logger.info("DM catch-up: %d HR(s)", len(chats))
-    for hr, _last_seen in chats:
-        try:
-            await backfill_hr_dm_history(
-                client, hr, lm_client, lm_chat_model, session_factory,
-                backfill_limit=backfill_limit,
-                on_message_persisted=on_message_persisted,
-                on_vacancies_changed=on_vacancies_changed,
-                schedule_classification=schedule_classification,
-            )
-        except Exception:
-            logger.exception(
-                "catch_up failed for hr %d", hr.id, extra={"hr_id": hr.id}
-            )
+    logger.info(
+        "DM catch-up: %d HR(s), batch=%d delay=%ss",
+        len(chats), _DM_CATCHUP_BATCH_SIZE, _DM_CATCHUP_BATCH_DELAY_SEC,
+    )
+    # Батчим, чтобы 300-500 HR'ов не превращались в 300-500 последовательных
+    # RPC'ов с заметной wall-time'ой. ``asyncio.gather`` внутри батча —
+    # параллельно; пауза между батчами даёт TG-rate-limit'у выдохнуть.
+    for batch_start in range(0, len(chats), _DM_CATCHUP_BATCH_SIZE):
+        batch = chats[batch_start:batch_start + _DM_CATCHUP_BATCH_SIZE]
+        results = await asyncio.gather(
+            *[
+                backfill_hr_dm_history(
+                    client, hr, lm_client, lm_chat_model, session_factory,
+                    backfill_limit=backfill_limit,
+                    on_message_persisted=on_message_persisted,
+                    on_vacancies_changed=on_vacancies_changed,
+                    schedule_classification=schedule_classification,
+                )
+                for hr, _last_seen in batch
+            ],
+            return_exceptions=True,
+        )
+        for (hr, _), result in zip(batch, results):
+            if isinstance(result, Exception):
+                logger.exception(
+                    "catch_up failed for hr %d", hr.id,
+                    exc_info=result,
+                )
+        if batch_start + _DM_CATCHUP_BATCH_SIZE < len(chats):
+            await asyncio.sleep(_DM_CATCHUP_BATCH_DELAY_SEC)
 
 
 def _build_candidate_profile(
