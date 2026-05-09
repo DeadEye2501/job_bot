@@ -4912,7 +4912,7 @@
     const diffMs = Math.max(0, Date.now() - ts);
     const min = Math.floor(diffMs / 60000);
     if (min < 1)   return 'только что';
-    if (min < 60)  return `${min} мин назад`;
+    if (min < 60)  return `${min} мин`;
     const hr = Math.floor(min / 60);
     if (hr < 24)   return `${hr} ч`;
     const day = Math.floor(hr / 24);
@@ -7847,6 +7847,18 @@
         // Не на вкладке — пометим как stale, при следующем открытии
         // секции запрос свежих данных уже сидит в applySectionSwitch.
         appState.vacancies.loaded = false;
+      }
+      // Contacts/HR + Contacts/Company детальные панели держат свой кеш
+      // vacancies (одноразовая загрузка по выбору строки). Без явного
+      // refetch'а статус-чип в HR/Company-detail залипает после авто-
+      // смены статуса (debounce-классификатор HR-ответа).
+      const hrSt = appState.contacts && appState.contacts.hr;
+      if (hrSt && hrSt.vacanciesFor != null && api) {
+        requestContactsHrVacancies(hrSt.vacanciesFor);
+      }
+      const coSt = appState.contacts && appState.contacts.company;
+      if (coSt && coSt.vacanciesFor != null && api) {
+        requestContactsCompanyVacancies(coSt.vacanciesFor);
       }
     }, PUSH_DEBOUNCE_MS);
   }
