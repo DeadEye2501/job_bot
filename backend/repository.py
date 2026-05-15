@@ -2405,7 +2405,7 @@ async def get_stats_hr_responses(
     applied_map = {vid: applied_at for vid, applied_at in applied_rows}
     msg_rows = (
         await session.execute(
-            select(Message.vacancy_id, Message.sent_at, Message.created_at)
+            select(Message.vacancy_id, Message.sent_at)
             .where(
                 Message.vacancy_id.in_(applied_map.keys()),
                 Message.is_incoming.is_(True),
@@ -2414,16 +2414,15 @@ async def get_stats_hr_responses(
         )
     ).all()
     first_resp_by_vid: dict[int, datetime] = {}
-    for vid, sent_at, created_at in msg_rows:
-        ts = sent_at or created_at
-        if ts is None:
+    for vid, sent_at in msg_rows:
+        if sent_at is None:
             continue
         applied_at = applied_map.get(vid)
-        if applied_at is None or ts <= applied_at:
+        if applied_at is None or sent_at <= applied_at:
             continue
         cur = first_resp_by_vid.get(vid)
-        if cur is None or ts < cur:
-            first_resp_by_vid[vid] = ts
+        if cur is None or sent_at < cur:
+            first_resp_by_vid[vid] = sent_at
 
     by_weekday = [0, 0, 0, 0, 0, 0, 0]  # Пн=0 … Вс=6 (Python weekday())
     deltas: list[float] = []
