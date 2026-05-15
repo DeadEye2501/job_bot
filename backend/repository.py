@@ -2997,7 +2997,13 @@ async def mark_ghosted_vacancies(
     from datetime import datetime, timedelta, timezone
     from backend.domain import GHOSTING_ELIGIBLE_FROM
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=timeout_days)
+    # SQLite + aiosqlite возвращает наивные datetime'ы даже при
+    # DateTime(timezone=True), поэтому для Python-side сравнения с
+    # v.created_at / max(sent_at) / max(changed_at) cutoff тоже должен
+    # быть naive (UTC по конвенции — server_default=func.now()).
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+        days=timeout_days
+    )
     eligible_status_values = [s for s in GHOSTING_ELIGIBLE_FROM]
     # Один round-trip вместо 1+2N: pre-агрегируем последние таймстампы
     # по vacancy_id (для входящих DM) и по (vacancy_id, status) — для
