@@ -8,6 +8,7 @@
 import pytest
 
 from backend.domain import (
+    GHOSTING_ELIGIBLE_FROM,
     decide_vacancy_status,
     is_terminal_for_auto,
     should_apply_status,
@@ -50,6 +51,16 @@ def test_every_status_is_known_to_the_gate(status):
     ways_out(status)
 
 
+def test_terminal_and_live_lists_cover_every_status():
+    """Рукописные списки TERMINAL и LIVE вместе называют весь VacancyStatus.
+
+    Статус, добавленный и в перечисление, и в граф, но забытый в обоих
+    рукописных списках, молча остался бы без параметризованной проверки —
+    KeyError его бы не поймал.
+    """
+    assert set(TERMINAL) | set(LIVE) == set(VacancyStatus)
+
+
 @pytest.mark.parametrize("status", TERMINAL)
 def test_no_automatic_transition_leaves_a_terminal_status(status):
     """Из терминального статуса ворота не пропускают ни одного перехода."""
@@ -74,11 +85,15 @@ def test_a_fresh_vacancy_can_only_become_applied():
     assert ways_out(VacancyStatus.NEW) == [VacancyStatus.APPLIED]
 
 
-def test_nothing_moves_a_vacancy_back_to_new():
-    """Обратно в New не ведёт ни один автопереход."""
+@pytest.mark.parametrize(
+    "initial",
+    [VacancyStatus.NEW, VacancyStatus.SCAM, VacancyStatus.NOT_FIT],
+)
+def test_nothing_moves_a_vacancy_into_an_initial_status(initial):
+    """Ни один автопереход не ведёт в начальный статус (New/Scam/Not Fit)."""
     assert not [
         status for status in VacancyStatus
-        if should_apply_status(status, VacancyStatus.NEW)
+        if should_apply_status(status, initial)
     ]
 
 
@@ -138,6 +153,19 @@ def test_the_send_button_opens_nothing_but_applied():
     assert not should_apply_status(
         VacancyStatus.NEW, VacancyStatus.OFFER, force=True
     )
+
+
+@pytest.mark.parametrize("status", list(VacancyStatus))
+def test_ghosting_eligibility_agrees_with_the_gate(status):
+    """Список кандидатов на Ghosting по таймеру совпадает с тем, что пропускают ворота.
+
+    `GHOSTING_ELIGIBLE_FROM` объявлен отдельно от графа переходов как защита
+    от расхождения (см. docstring в `backend/domain.py`). Здесь сверяются
+    два независимых источника, а не читается содержимое одного из них.
+    """
+    eligible = status in GHOSTING_ELIGIBLE_FROM
+    gate_allows = should_apply_status(status, VacancyStatus.GHOSTING)
+    assert eligible == gate_allows
 
 
 def test_an_unparseable_post_is_rejected_with_a_named_reason():
