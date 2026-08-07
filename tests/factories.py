@@ -63,9 +63,12 @@ def tg_account_row(**overrides) -> TgAccount:
     """Строка учётной записи Telegram. Шифротексты кладёт вызывающий.
 
     Таблица односрочная с проверкой `id = 1` на уровне базы, поэтому
-    идентификатор задан и переопределению не подлежит.
+    умолчание для идентификатора — 1, но переопределение сливается до
+    вызова конструктора: `id=` в overrides проходит, а не падает сырым
+    `TypeError` о повторном ключевом аргументе.
     """
     fields = {
+        "id": 1,
         "api_id": 26276902,
         "api_hash_encrypted": None,
         "phone": "+70000000000",
@@ -73,7 +76,7 @@ def tg_account_row(**overrides) -> TgAccount:
         "session_blob_encrypted": None,
     }
     fields.update(overrides)
-    return TgAccount(id=1, **fields)
+    return TgAccount(**fields)
 
 
 def llm_config_row(kind: LlmConfigKind, **overrides) -> LlmConfig:
@@ -87,9 +90,11 @@ def llm_config_row(kind: LlmConfigKind, **overrides) -> LlmConfig:
     return LlmConfig(kind=kind, **fields)
 
 
-def app_setting_row(key: str, value: str | None) -> AppSetting:
+def app_setting_row(key: str, value: str | None, **overrides) -> AppSetting:
     """Строка настройки в общем словаре ключ-значение."""
-    return AppSetting(key=key, value=value)
+    fields = {"key": key, "value": value}
+    fields.update(overrides)
+    return AppSetting(**fields)
 
 
 def bot_state_row(mode: BotMode) -> BotState:
