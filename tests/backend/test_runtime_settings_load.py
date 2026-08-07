@@ -6,20 +6,13 @@
 
 from backend.models import BotMode, LlmConfigKind
 from backend.runtime_settings import RuntimeSettings, encrypt_bytes, encrypt_str
+from tests.dbio import put
 from tests.factories import (
     app_setting_row,
     bot_state_row,
     llm_config_row,
     tg_account_row,
 )
-
-
-async def put(session_factory, *rows) -> None:
-    """Положить строки в базу до того, как настройки будут прочитаны."""
-    async with session_factory() as session:
-        async with session.begin():
-            for row in rows:
-                session.add(row)
 
 
 async def test_an_empty_database_yields_no_credentials(session_factory):
