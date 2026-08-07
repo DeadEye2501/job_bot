@@ -22,7 +22,7 @@ REQUIRED = {
 }
 
 
-async def parse(**sections):
+async def parse_sections(**sections):
     """Прогнать ответ модели с заданными разделами через настоящий разбор."""
     client = provider({
         CHAT: chat_response(json.dumps({"profile": REQUIRED, **sections}))
@@ -32,15 +32,19 @@ async def parse(**sections):
 
 async def one_skill(**fields):
     """Разобрать единственный навык и вернуть его."""
-    parsed = await parse(skills=[{"name": "Python", **fields}])
-    return parsed.skills[0] if parsed.skills else None
+    parsed = await parse_sections(skills=[{"name": "Python", **fields}])
+    if not parsed.skills:
+        raise AssertionError("навык не пережил разбор: parsed.skills пуст")
+    return parsed.skills[0]
 
 
 async def one_job(**fields):
     """Разобрать единственное место работы и вернуть его."""
     base = {"company": "ООО Ромашка", "role": "Разработчик", "start_date": "2020-03-01"}
-    parsed = await parse(experience=[{**base, **fields}])
-    return parsed.experience[0] if parsed.experience else None
+    parsed = await parse_sections(experience=[{**base, **fields}])
+    if not parsed.experience:
+        raise AssertionError("место работы не пережило разбор: parsed.experience пуст")
+    return parsed.experience[0]
 
 
 @pytest.mark.parametrize(
@@ -65,7 +69,7 @@ async def test_a_skill_without_a_level_gets_the_middle():
 
 async def test_a_skill_without_a_name_is_dropped():
     """Навык без названия не попадает в разбор."""
-    parsed = await parse(skills=[{"category": "Языки", "level": 5}])
+    parsed = await parse_sections(skills=[{"category": "Языки", "level": 5}])
 
     assert parsed.skills == []
 
@@ -98,9 +102,20 @@ async def test_blank_and_non_string_aliases_are_dropped():
 
 async def test_a_skill_that_is_not_an_object_is_dropped():
     """Не объект вместо навыка отбрасывается, а не роняет разбор."""
-    parsed = await parse(skills=["Python", None, {"name": "Django"}])
+    parsed = await parse_sections(skills=["Python", None, {"name": "Django"}])
 
     assert [s.name for s in parsed.skills] == ["Django"]
+
+
+async def test_a_job_that_is_not_an_object_is_dropped():
+    """Не объект вместо места работы отбрасывается, а не роняет разбор."""
+    parsed = await parse_sections(experience=[
+        "ООО Ромашка",
+        None,
+        {"company": "ООО Ромашка", "role": "Разработчик", "start_date": "2020-03-01"},
+    ])
+
+    assert [e.company for e in parsed.experience] == ["ООО Ромашка"]
 
 
 async def test_a_full_date_is_taken_as_is():
@@ -121,7 +136,7 @@ async def test_a_bare_year_becomes_the_first_of_january():
 @pytest.mark.parametrize("raw", ["2020-13", "2020-02-30", "февраль", "", None])
 async def test_a_job_with_an_unusable_start_date_is_dropped(raw):
     """Место работы без разборчивой даты начала не попадает в разбор."""
-    parsed = await parse(experience=[{
+    parsed = await parse_sections(experience=[{
         "company": "ООО Ромашка", "role": "Разработчик", "start_date": raw,
     }])
 
@@ -144,7 +159,7 @@ async def test_a_job_without_a_company_or_a_role_is_dropped(missing):
     base = {"company": "ООО Ромашка", "role": "Разработчик", "start_date": "2020-03-01"}
     del base[missing]
 
-    assert (await parse(experience=[base])).experience == []
+    assert (await parse_sections(experience=[base])).experience == []
 
 
 async def test_bullets_are_trimmed_and_cleaned_of_rubbish():
@@ -162,7 +177,7 @@ async def test_bullets_are_trimmed_and_cleaned_of_rubbish():
 
 async def test_the_order_of_jobs_is_preserved():
     """Порядок мест работы сохраняется таким, каким его дала модель."""
-    parsed = await parse(experience=[
+    parsed = await parse_sections(experience=[
         {"company": "Вторая", "role": "Р", "start_date": "2022"},
         {"company": "Первая", "role": "Р", "start_date": "2019"},
     ])
