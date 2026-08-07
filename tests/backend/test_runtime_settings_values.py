@@ -60,14 +60,33 @@ def test_anything_but_true_leaves_a_switch_off(raw):
     assert settings(wizard_completed=raw).wizard_completed is False
 
 
+@pytest.mark.parametrize(
+    "key, expected",
+    [("poll_interval_sec", 1800), ("backfill_limit", 15), ("dm_backfill_limit", 50)],
+)
+def test_a_missing_whole_number_setting_falls_back_to_its_default(key, expected):
+    """У целочисленных настроек опроса и бэкафилла есть умолчание."""
+    assert getattr(settings(), key) == expected
+
+
 def test_sending_is_locked_until_explicitly_allowed():
     """Отправка заперта по умолчанию: пустая база не разрешает слать в Telegram."""
     assert settings().send_locked is True
 
 
+def test_sending_unlocks_once_explicitly_allowed():
+    """Записанное «false» действительно снимает запор — в этом смысл настройки."""
+    assert settings(send_locked="false").send_locked is False
+
+
 def test_automatic_apply_is_on_by_default():
     """Автоматическая отправка откликов по умолчанию включена."""
     assert settings().auto_apply is True
+
+
+def test_automatic_apply_turns_off_when_set():
+    """Записанное «false» отключает авто-отправку откликов."""
+    assert settings(auto_apply="false").auto_apply is False
 
 
 @pytest.mark.parametrize(
@@ -98,6 +117,11 @@ def test_an_unusable_threshold_falls_back_to_the_baseline(raw):
 def test_a_stored_currency_rate_is_used():
     """Заданный курс берётся из настроек."""
     assert settings(salary_usd_to_rub="95").salary_usd_to_rub == 95
+
+
+def test_a_stored_eur_currency_rate_is_used():
+    """Заданный курс евро берётся из настроек, а не только доллара."""
+    assert settings(salary_eur_to_rub="105").salary_eur_to_rub == 105
 
 
 @pytest.mark.parametrize("raw", ["0", "-5", "не число", ""])
@@ -142,3 +166,8 @@ def test_a_garbled_whole_number_setting_crashes_instead_of_falling_back(key):
 def test_the_path_to_the_resume_is_empty_until_set():
     """Путь к резюме пуст, пока его не задали."""
     assert settings().cv_path == ""
+
+
+def test_a_stored_resume_path_is_used():
+    """Заданный путь к резюме берётся из настроек."""
+    assert settings(cv_path="/tmp/cv.pdf").cv_path == "/tmp/cv.pdf"
