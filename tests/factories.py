@@ -5,7 +5,7 @@
 фабрика не знает ни про сессию, ни про схему.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from backend.models import (
     AppSetting,
@@ -39,6 +39,16 @@ EPOCH = datetime(2026, 1, 1, 12, 0)
 def at(minutes: int) -> datetime:
     """Момент на `minutes` минут позже опорного."""
     return EPOCH + timedelta(minutes=minutes)
+
+
+def days_ago(days: float) -> datetime:
+    """Момент за `days` суток до сейчас, наивный по UTC.
+
+    Нужен там, где проверяемый код сам смотрит на текущее время и отмеряет
+    от него, — тогда опорный момент не годится: он лежит в прошлом на
+    неизвестном расстоянии, и проверка зависела бы от дня прогона.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
 
 def _empty_vacancy() -> dict:
