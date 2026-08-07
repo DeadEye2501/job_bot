@@ -53,3 +53,7 @@ env/
 build/
 dist/
 JobBot.exe
+
+# Тестовый прогон
+mutants/
+.mutmut-cache

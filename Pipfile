@@ -3,23 +3,36 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+# Боевые зависимости закреплены точными версиями намеренно. С "*" установка
+# любой dev-зависимости пересобирает замок целиком и молча поднимает версии
+# рабочих пакетов — так `pipenv install --dev` в этой ветке однажды подняло
+# cryptography, pypdf, sqlalchemy и ещё семнадцать пакетов. Приложение —
+# ежедневный рабочий инструмент; обновление версий должно быть отдельным
+# осознанным шагом, а не побочным эффектом.
 [packages]
-pyrogram = "*"
-tgcrypto = "*"
-sqlalchemy = {extras = ["asyncio"], version = "*"}
-aiosqlite = "*"
-alembic = "*"
-greenlet = "*"
-httpx = "*"
-rich = "*"
-tzdata = "*"
-numpy = "*"
-pyside6 = "*"
-pypdf = "*"
-keyring = "*"
-cryptography = "*"
+pyrogram = "==2.0.106"
+tgcrypto = "==1.2.5"
+sqlalchemy = {extras = ["asyncio"], version = "==2.0.49"}
+aiosqlite = "==0.22.1"
+alembic = "==1.18.4"
+greenlet = "==3.4.0"
+httpx = "==0.28.1"
+rich = "==15.0.0"
+tzdata = "==2026.2"
+numpy = "==2.4.4"
+pyside6 = "==6.11.0"
+pypdf = "==6.10.2"
+keyring = "==25.7.0"
+cryptography = "==47.0.0"
 
+# mutmut убран: 3.7.0 на Windows отказывается запускаться вообще
+# («please use the WSL» ещё до разбора аргументов), 2.4.5 не работает на
+# этой связке. Замена — tools/mutate.py. Зависимость, которую нельзя
+# запустить, — ловушка для следующего человека.
 [dev-packages]
+pytest = "*"
+pytest-asyncio = "*"
+ruff = "*"
 
 [requires]
 python_version = "3.13"
