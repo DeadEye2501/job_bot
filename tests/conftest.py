@@ -70,12 +70,16 @@ def _memory_keyring():
 def _appdata_guard():
     """Каталог данных не совпадает с боевым и не лежит внутри него.
 
-    Единственная защита от однажды написанного `monkeypatch.delenv("APPDATA")`
-    или подпроцесса с вычищенным окружением: без неё `config.get_data_dir()`
-    в таких случаях молча откатывается на боевой каталог пользователя
-    (`_REAL_DATA_DIR` или `_FALLBACK_DATA_DIR`), и туда же уедут любые
-    записи теста. Проверка идёт перед телом каждого теста — до того, как
-    он успеет что-то записать.
+    Ловит не `monkeypatch.delenv("APPDATA")` внутри теста — `monkeypatch`
+    сам возвращает переменную на место в teardown, до сборки следующего
+    теста, а у этой фикстуры нет `yield`: она отрабатывает только в setup,
+    до тела текущего теста. Реальный случай — правка `os.environ["APPDATA"]`
+    напрямую (без `monkeypatch`) или через `monkeypatch` сессионного/модульного
+    масштаба, не убранная за собой предыдущим тестом: тогда `config.get_data_dir()`
+    к моменту setup следующего теста уже молча смотрит на боевой каталог
+    пользователя (`_REAL_DATA_DIR` или `_FALLBACK_DATA_DIR`), и туда же уедут
+    любые записи. Проверка идёт перед телом каждого теста — до того, как он
+    успеет что-то записать.
     """
     from config import get_data_dir
 
@@ -190,8 +194,10 @@ async def session(_schema, database_url):
     maker = async_sessionmaker(bind=engine, expire_on_commit=False)
     opened = maker()
     try:
-        yield opened
+        try:
+            yield opened
+        finally:
+            await opened.close()
+            await _clear_all_tables(engine)
     finally:
-        await opened.close()
-        await _clear_all_tables(engine)
         await engine.dispose()
