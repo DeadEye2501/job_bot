@@ -33,7 +33,8 @@ import keyring  # noqa: E402 — только после подмены ката
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
-from sqlalchemy.ext.asyncio import async_sessionmaker  # noqa: E402
+from sqlalchemy import text  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker  # noqa: E402
 
 from config import APP_NAME  # noqa: E402
 from tests.fakes.keyring import MemoryKeyring  # noqa: E402
@@ -128,13 +129,56 @@ def _sending_locked(monkeypatch):
     monkeypatch.setattr(adapters.telegram, "SEND_LOCKED", True)
 
 
+async def _clear_all_tables(engine: AsyncEngine) -> None:
+    """Удаляет все строки из всех таблиц, кроме `alembic_version`.
+
+    Список таблиц берётся из `sqlite_master`, а не из `Base.metadata`: схема
+    поднята alembic'ом один раз до ревизии init, и если модели когда-нибудь
+    разойдутся со схемой, удаление по метаданным упадёт на несуществующей
+    таблице, а по `sqlite_master` — нет. `PRAGMA foreign_keys=OFF` на время
+    уборки снимает зависимость от порядка удаления. `sqlite_sequence`
+    (счётчики автоинкремента) чистится отдельно, если она вообще есть —
+    иначе идентификаторы поедут от прогона к прогону.
+    """
+    async with engine.connect() as connection:
+        await connection.execute(text("PRAGMA foreign_keys=OFF"))
+        tables = (
+            await connection.execute(
+                text(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='table' AND name != 'alembic_version' "
+                    "AND name NOT LIKE 'sqlite_%'"
+                )
+            )
+        ).scalars().all()
+        for table in tables:
+            await connection.execute(text(f'DELETE FROM "{table}"'))
+
+        has_sequence = (
+            await connection.execute(
+                text(
+                    "SELECT 1 FROM sqlite_master "
+                    "WHERE type='table' AND name = 'sqlite_sequence'"
+                )
+            )
+        ).first()
+        if has_sequence:
+            await connection.execute(text("DELETE FROM sqlite_sequence"))
+
+        await connection.commit()
+
+
 @pytest.fixture
 async def session(_schema, database_url):
-    """Сессия внутри транзакции, которая откатывается после теста.
+    """Сессия на отдельном движке; изоляция — уборкой таблиц, не откатом.
 
-    `join_transaction_mode="create_savepoint"` нужен потому, что репозиторий
-    местами открывает транзакцию сам через `async with session.begin()`: без
-    этого внутренний `begin()` подрался бы с внешней транзакцией отката.
+    Откат тут не работает: pysqlite (драйвер под `aiosqlite`) откладывает
+    `BEGIN` до первого DML и не даёт SQLAlchemy настоящей внешней
+    транзакции, которую можно было бы откатить, — `RELEASE SAVEPOINT`
+    фиксирует данные из-под `session.commit()` насовсем, независимо от
+    того, что потом делает внешняя транзакция (проверено отдельно:
+    `rollback()` её не отменяет). Поэтому после теста таблицы просто
+    чистятся, а не откатываются.
 
     Движок создаётся на каждый тест и закрывается после: пул соединений
     привязан к циклу событий, и переиспользование движка между тестами с
@@ -143,16 +187,11 @@ async def session(_schema, database_url):
     from adapters.db import make_engine
 
     engine = make_engine(database_url)
+    maker = async_sessionmaker(bind=engine, expire_on_commit=False)
+    opened = maker()
     try:
-        async with engine.connect() as connection:
-            transaction = await connection.begin()
-            maker = async_sessionmaker(
-                bind=connection,
-                join_transaction_mode="create_savepoint",
-                expire_on_commit=False,
-            )
-            async with maker() as opened:
-                yield opened
-            await transaction.rollback()
+        yield opened
     finally:
+        await opened.close()
+        await _clear_all_tables(engine)
         await engine.dispose()

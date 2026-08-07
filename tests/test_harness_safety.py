@@ -49,10 +49,10 @@ async def test_sending_a_dm_is_locked_during_tests():
 
 
 @pytest.mark.parametrize("run", [1, 2])
-async def test_inserted_row_does_not_survive_between_runs(session, run):
-    """Вставленная строка не переживает откат — двух прогонов подряд это не видно."""
+async def test_committed_row_does_not_survive_between_runs(session, run):
+    """Закоммиченная строка не переживает уборку — двух прогонов подряд это не видно."""
     session.add(Company(name="Изоляция"))
-    await session.flush()
+    await session.commit()
 
     total = await session.scalar(select(func.count()).select_from(Company))
     assert total == 1
