@@ -1,0 +1,20 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+filterwarnings = [
+    "error",
+    # pyrogram.sync вызывает asyncio.get_event_loop() на импорте, вне
+    # работающего цикла событий — предупреждение из самого asyncio, но
+    # триггерит его код pyrogram, поэтому глушим по модулю pyrogram.sync.
+    "ignore:There is no current event loop:DeprecationWarning:pyrogram.sync",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["F401", "ARG002", "C901", "PLR0912", "PLR0913", "PLR0915", "RUF100", "E402"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
