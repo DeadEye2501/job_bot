@@ -3,7 +3,12 @@
 Каждая — то, что легко испортить случайно: снятое условие отбора, перевёрнутое
 сравнение, наибольшее вместо наименьшего, перепутанная карта приоритетов,
 потерянный разрешитель спора.
+
+Где поломка захватывает конец строки, перевод пишется как `\\r\\n`: рабочее
+дерево здесь с виндовыми переводами, и поиск по `\\n` не находит ничего.
 """
+
+CRLF = "\r\n"
 
 MUTATIONS = [
     # list_vacancies: недоразобранные вакансии перестают отсеиваться
@@ -129,8 +134,8 @@ MUTATIONS = [
     # update_vacancy_notes: пробелы вокруг заметки срезаются
     (
         "backend/repository.py",
-        "        normalized = notes\n",
-        "        normalized = notes.strip()\n",
+        "        normalized = notes" + CRLF,
+        "        normalized = notes.strip()" + CRLF,
     ),
     # set_vacancy_hr: пропадает охрана от повторной привязки того же HR
     (
@@ -147,14 +152,14 @@ MUTATIONS = [
     # change_vacancy_status: комментарий без смены статуса помечается применённым
     (
         "backend/repository.py",
-        "        applied=status_changed,\n",
-        "        applied=True,\n",
+        "        applied=status_changed," + CRLF,
+        "        applied=True," + CRLF,
     ),
     # add_vacancy_event: пустая нагрузка записывается пустым словарём
     (
         "backend/repository.py",
-        "        payload=(payload or None),\n",
-        "        payload=payload,\n",
+        "        payload=(payload or None)," + CRLF,
+        "        payload=payload," + CRLF,
     ),
     # apply_classification: граф переходов перестаёт что-либо запрещать
     (
@@ -165,8 +170,8 @@ MUTATIONS = [
     # mark_ghosted_vacancies: наши собственные сообщения начинают считаться ответом
     (
         "backend/repository.py",
-        "        .where(Message.is_incoming.is_(True))\n",
-        "        .where(Message.is_incoming.is_(False))\n",
+        "        .where(Message.is_incoming.is_(True))" + CRLF,
+        "        .where(Message.is_incoming.is_(False))" + CRLF,
     ),
     # mark_ghosted_vacancies: в счёт идёт история любого статуса, а не нынешнего
     (
@@ -174,11 +179,13 @@ MUTATIONS = [
         "                    last_status_subq.c.status == Vacancy.status,",
         "                    last_status_subq.c.status != Vacancy.status,",
     ),
-    # list_vacancies_for_hr: недоразобранные перестают отсеиваться
+    # list_vacancies_for_hr: недоразобранные перестают отсеиваться.
+    # Отступ в двенадцать пробелов отличает мини-список от такого же условия
+    # в `find_latest_vacancy_id_for_hr`, где отступ восемь.
     (
         "backend/repository.py",
-        ".where(Vacancy.hr_id == hr_id, Vacancy.is_parsed.is_(True))",
-        ".where(Vacancy.hr_id == hr_id)",
+        "            .where(Vacancy.hr_id == hr_id, Vacancy.is_parsed.is_(True))",
+        "            .where(Vacancy.hr_id == hr_id)",
     ),
     # list_vacancies_for_company: недоразобранные перестают отсеиваться
     (
