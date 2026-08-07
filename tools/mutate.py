@@ -14,8 +14,18 @@ use the WSL" ещё до разбора аргументов. `mutmut 2.4.5` с�
 После каждого восстановления и ещё раз в конце файл сверяется с этим
 снимком байт-в-байт; расхождение — фатальная ошибка, а не тихий переход
 к следующей мутации.
+
+Снимок живёт только в памяти работающего процесса, поэтому смерть
+интерпретатора между записью мутации и восстановлением оставила бы боевой
+файл сломанным, и на диске не было бы ничего, из чего его вернуть. Отсюда
+предполётная проверка: мутируемые файлы обязаны быть чистыми по
+`git status`. Тогда `git restore` — всегда верное и однозначное
+восстановление, а оператор не спутает порчу с собственной незакоммиченной
+работой. Эту же команду инструмент печатает на каждом аварийном выходе.
 """
 
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -131,13 +141,64 @@ MUTATIONS = [
 ]
 
 
+def _child_env() -> dict[str, str]:
+    """Окружение для pytest в подпроцессе."""
+    env = dict(os.environ)
+    # Кэш байткода CPython считает `.pyc` свежим по времени правки исходника
+    # в целых секундах плюс его размеру. Мутация small_file_id → big_file_id
+    # длину файла не меняет, а прогон укладывается в секунду — дочерний
+    # процесс успел бы взять старый `.pyc`, мутация не подействовала бы, а
+    # инструмент отчитался бы «поймана». Ложное «поймана» — единственный
+    # вывод, которого этот инструмент не имеет права давать: весь проход
+    # существует ради проверки тестов, писавшихся без красной фазы.
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    # Без этого дочерний pytest пишет в трубу локальной кодировкой (cp1251)
+    # и со strict-обработкой ошибок: докстринги проверок с «↪» или тире
+    # обрывают его вывод `UnicodeEncodeError`'ом на середине. А это ровно
+    # тот вывод, по которому оператор разбирает выжившего мутанта.
+    # Родительская сторона декодирует явно тем же utf-8 (см. `run_tests`).
+    env["PYTHONIOENCODING"] = "utf-8"
+    return env
+
+
 def run_tests(test_path: str) -> tuple[bool, str]:
     done = subprocess.run(
         [sys.executable, "-m", "pytest", test_path, "-q", "-x"],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=_child_env(),
     )
     return done.returncode == 0, done.stdout + done.stderr
+
+
+def drop_bytecode_cache(names: list[str]) -> None:
+    """Сносит `__pycache__` мутируемых модулей.
+
+    `PYTHONDONTWRITEBYTECODE` не даёт писать новые `.pyc`, но уже лежащий
+    рядом устаревший всё равно был бы прочитан. Достаточно одного раза до
+    цикла: писать их дальше уже некому.
+    """
+    for cache in {Path(name).resolve().parent / "__pycache__" for name in names}:
+        shutil.rmtree(cache, ignore_errors=True)
+
+
+def restore_command(names: list[str]) -> str:
+    """Команда, которой оператор возвращает боевые файлы на место."""
+    return "git restore -- " + " ".join(Path(name).as_posix() for name in names)
+
+
+def dirty_files(names: list[str]) -> list[str] | None:
+    """Строки `git status --porcelain` по мутируемым файлам; None — git не ответил."""
+    done = subprocess.run(
+        ["git", "status", "--porcelain", "--", *names],
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if done.returncode != 0:
+        return None
+    return [line for line in done.stdout.splitlines() if line.strip()]
 
 
 def restore(path: Path, snapshot: bytes, context: str) -> None:
@@ -145,11 +206,47 @@ def restore(path: Path, snapshot: bytes, context: str) -> None:
     path.write_bytes(snapshot)
     if path.read_bytes() != snapshot:
         print(f"ФАТАЛЬНО: {path} не восстановлен байт-в-байт после {context}")
+        print(f"Боевой файл сломан. Восстановить: {restore_command([str(path)])}")
         raise SystemExit(3)
+
+
+def preflight(targets: list[str]) -> bool:
+    """Пускать ли инструмент к боевым файлам.
+
+    Единственная страховка от смерти интерпретатора посреди мутации —
+    `git restore`, а он однозначен только пока в дереве нет незакоммиченной
+    работы: иначе оператор не отличит порчу от своих правок и
+    восстановлением снесёт их вместе с ней.
+    """
+    dirty = dirty_files(targets)
+    if dirty is None:
+        print("git не ответил на `git status` — отказываюсь работать.")
+        print("Восстановление после аварии опирается на git, и без него")
+        print("сломанный боевой файл будет неоткуда вернуть.")
+        return False
+    if dirty:
+        print("мутируемые файлы изменены в рабочем дереве — отказываюсь работать:")
+        for line in dirty:
+            print(f"  {line}")
+        print("\nИнструмент правит боевой исходник, и восстановление после аварии")
+        print("опирается на `git restore`. Пока в дереве есть незакоммиченная")
+        print("работа, отличить её от порчи невозможно. Закоммитьте или спрячьте:")
+        print(f"  git stash push -- {' '.join(Path(n).as_posix() for n in targets)}")
+        return False
+    return True
 
 
 def main() -> int:
     test_path = sys.argv[1]
+
+    targets = sorted({name for name, _before, _after in MUTATIONS})
+
+    if not preflight(targets):
+        return 4
+
+    # Устаревший `.pyc` перевернул бы вердикт: мутация не подействовала бы,
+    # а инструмент отчитался бы «поймана». Сносим один раз до цикла.
+    drop_bytecode_cache(targets)
 
     baseline_ok, baseline_output = run_tests(test_path)
     if not baseline_ok:
@@ -161,10 +258,7 @@ def main() -> int:
     # восстановления и на всём протяжении прогона больше не перечитывается
     # с диска: перечитывание позволило бы испорченному состоянию одной
     # итерации стать «эталоном» для следующей.
-    snapshots: dict[str, bytes] = {}
-    for name, _before, _after in MUTATIONS:
-        if name not in snapshots:
-            snapshots[name] = Path(name).read_bytes()
+    snapshots: dict[str, bytes] = {name: Path(name).read_bytes() for name in targets}
 
     silent = []
     not_found = []
@@ -200,6 +294,7 @@ def main() -> int:
     for name, snapshot in snapshots.items():
         if Path(name).read_bytes() != snapshot:
             print(f"ФАТАЛЬНО: {name} не совпадает со снимком после прогона")
+            print(f"Боевой файл сломан. Восстановить: {restore_command([name])}")
             return 3
 
     print(
