@@ -38,6 +38,18 @@ def ways_out(status: VacancyStatus) -> list[VacancyStatus]:
     return [other for other in VacancyStatus if should_apply_status(status, other)]
 
 
+@pytest.mark.parametrize("status", list(VacancyStatus))
+def test_every_status_is_known_to_the_gate(status):
+    """Ворота знают каждый статус перечисления.
+
+    Новый статус без ключа в графе роняет `is_terminal_for_auto` с
+    `KeyError` в бою; рукописные списки `TERMINAL` и `LIVE` такого не
+    заметят — новый статус просто не попадёт ни в один прогон.
+    """
+    is_terminal_for_auto(status)
+    ways_out(status)
+
+
 @pytest.mark.parametrize("status", TERMINAL)
 def test_no_automatic_transition_leaves_a_terminal_status(status):
     """Из терминального статуса ворота не пропускают ни одного перехода."""
