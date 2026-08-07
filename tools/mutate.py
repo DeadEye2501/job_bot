@@ -57,8 +57,14 @@ def _child_env() -> dict[str, str]:
 
 
 def run_tests(test_path: str) -> tuple[bool, str]:
+    """Прогон набора. Путей может быть несколько — через пробел одним доводом.
+
+    Предмет покрытия к этому времени разошёлся по десятку файлов, а гонять
+    ради одной поломки весь каталог — минуты вместо секунд на каждую из
+    тридцати.
+    """
     done = subprocess.run(
-        [sys.executable, "-m", "pytest", test_path, "-q", "-x"],
+        [sys.executable, "-m", "pytest", *test_path.split(), "-q", "-x"],
         capture_output=True,
         encoding="utf-8",
         errors="replace",
