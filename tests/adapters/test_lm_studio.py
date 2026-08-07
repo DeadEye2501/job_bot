@@ -73,12 +73,13 @@ async def test_a_chat_model_that_fails_the_ping_does_not_pass():
     assert "500" in message
 
 
-async def test_an_unreachable_provider_reports_the_error_kind():
-    """Недоступный провайдер не роняет вызывающего, а называет род ошибки."""
+async def test_a_provider_error_response_names_its_kind_and_code():
+    """Провайдер ответил ошибкой на список моделей — сообщение называет её род и код."""
     client = provider({})
     passed, message = await check_chat(client, "qwen")
     assert passed is False
-    assert message
+    assert "HTTPStatusError" in message
+    assert "599" in message
 
 
 async def test_a_loaded_embedding_model_passes_the_check():
@@ -95,6 +96,17 @@ async def test_a_missing_embedding_model_fails_the_check():
     client = provider({MODELS: models_response("qwen")})
     passed, _ = await check_embed(client, "bge-m3")
     assert passed is False
+
+
+async def test_an_embedding_model_that_fails_the_ping_does_not_pass():
+    """Модель встраиваний в списке есть, но пинг не прошёл — проверка не пройдена."""
+    client = provider({
+        MODELS: models_response("bge-m3"),
+        EMBEDDINGS: httpx.Response(500, text="сломалось"),
+    })
+    passed, message = await check_embed(client, "bge-m3")
+    assert passed is False
+    assert "500" in message
 
 
 async def test_all_model_ids_come_back_when_no_kind_is_asked_for():
@@ -129,6 +141,16 @@ async def test_a_provider_without_the_native_endpoint_falls_back_by_name():
     ]
 
 
+async def test_a_native_endpoint_answering_with_non_json_falls_back_by_name():
+    """Родной путь ответил 200 не-JSON'ом — используется запасной путь по имени."""
+    client = provider({
+        NATIVE_MODELS: httpx.Response(200, text="not json"),
+        MODELS: models_response("qwen", "bge-m3"),
+    })
+    assert await list_models(client, kind="chat") == ["qwen"]
+    assert await list_models(client, kind="embed") == ["bge-m3"]
+
+
 async def test_an_embedding_comes_back_as_a_list_of_numbers():
     """Встраивание достаётся из ответа списком чисел."""
     client = provider({
@@ -150,4 +172,11 @@ async def test_an_embedding_without_numbers_fails_loudly():
         EMBEDDINGS: httpx.Response(200, json={"data": [{"embedding": None}]}),
     })
     with pytest.raises(RuntimeError, match="missing/invalid embedding"):
+        await embed(client, "bge-m3", "привет")
+
+
+async def test_embed_raises_when_the_provider_answers_with_an_error():
+    """Провайдер ответил ошибкой на встраивание — исключение, а не тихий сбой."""
+    client = provider({EMBEDDINGS: httpx.Response(500, text="сломалось")})
+    with pytest.raises(httpx.HTTPStatusError):
         await embed(client, "bge-m3", "привет")
