@@ -20,6 +20,10 @@ keyring = "*"
 cryptography = "*"
 
 [dev-packages]
+pytest = "*"
+pytest-asyncio = "*"
+ruff = "*"
+mutmut = "*"
 
 [requires]
 python_version = "3.13"
