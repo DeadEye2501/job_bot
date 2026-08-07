@@ -19,15 +19,25 @@ from backend.log_buffer import (
 
 @pytest.fixture
 def clean_root_logger():
-    """Возвращает корневой logger в исходное состояние после теста."""
+    """Возвращает корневой logger в исходное состояние после теста.
+
+    Помимо списка handlers/filters и уровня самого root logger, снимает и
+    восстанавливает уровень каждого уже навешенного обработчика: install()
+    правит level существующих handler'ов на месте (backend/log_buffer.py:146-154),
+    и без этого чужой обработчик (например, LogCaptureHandler у pytest) остался бы
+    испорченным после теста.
+    """
     root = logging.getLogger()
     handlers = list(root.handlers)
     filters = list(root.filters)
     level = root.level
+    handler_levels = {h: h.level for h in handlers}
     yield root
     root.handlers = handlers
     root.filters = filters
     root.setLevel(level)
+    for h, original_level in handler_levels.items():
+        h.setLevel(original_level)
 
 
 def record(msg: str, *, name: str = "проверка", level: int = logging.INFO):
