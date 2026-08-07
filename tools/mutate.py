@@ -2,10 +2,18 @@
 
 Запасной путь: `mutmut 3.7.0` на Windows отказывается запускаться вообще —
 `mutmut --help` и `mutmut run` падают с "To run mutmut on Windows, please
-use the WSL" ещё до разбора аргументов (см. task-6-report.md). Ломает не
-наугад: список поломок задаётся руками и содержит то, что легко испортить
-случайно — снятый флаг, перевёрнутое сравнение, перепутанный ключ, суженный
-диапазон.
+use the WSL" ещё до разбора аргументов. `mutmut 2.4.5` стартует в
+одноразовом окружении (см. task-6-report.md) — решение по нему отдельное.
+Ломает не наугад: список поломок задаётся руками и содержит то, что легко
+испортить случайно — снятый флаг, перевёрнутое сравнение, перепутанный
+ключ, суженный диапазон.
+
+Снимок каждого мутируемого файла читается один раз до цикла и хранится
+байтами (`read_bytes`/`write_bytes` — точность не зависит от того, что
+кодирование и декодирование UTF-8 обратны друг другу, и от перевода строк).
+После каждого восстановления и ещё раз в конце файл сверяется с этим
+снимком байт-в-байт; расхождение — фатальная ошибка, а не тихий переход
+к следующей мутации.
 """
 
 import subprocess
@@ -123,37 +131,82 @@ MUTATIONS = [
 ]
 
 
-def run_tests(test_path: str) -> bool:
+def run_tests(test_path: str) -> tuple[bool, str]:
     done = subprocess.run(
         [sys.executable, "-m", "pytest", test_path, "-q", "-x"],
         capture_output=True,
+        text=True,
     )
-    return done.returncode == 0
+    return done.returncode == 0, done.stdout + done.stderr
+
+
+def restore(path: Path, snapshot: bytes, context: str) -> None:
+    """Возвращает файл к снимку; падает, если результат разошёлся байтами."""
+    path.write_bytes(snapshot)
+    if path.read_bytes() != snapshot:
+        print(f"ФАТАЛЬНО: {path} не восстановлен байт-в-байт после {context}")
+        raise SystemExit(3)
 
 
 def main() -> int:
     test_path = sys.argv[1]
+
+    baseline_ok, baseline_output = run_tests(test_path)
+    if not baseline_ok:
+        print("тесты красные ДО мутаций — дальше нет смысла, сначала чинить набор:\n")
+        print(baseline_output)
+        return 2
+
+    # Снимок каждого файла — один раз, до цикла. Он же служит эталоном
+    # восстановления и на всём протяжении прогона больше не перечитывается
+    # с диска: перечитывание позволило бы испорченному состоянию одной
+    # итерации стать «эталоном» для следующей.
+    snapshots: dict[str, bytes] = {}
+    for name, _before, _after in MUTATIONS:
+        if name not in snapshots:
+            snapshots[name] = Path(name).read_bytes()
+
     silent = []
+    not_found = []
+    ambiguous = []
+
     for name, before, after in MUTATIONS:
         path = Path(name)
-        # newline="" — иначе Windows на записи переводит \n в \r\n, и
-        # восстановленный файл байт-в-байт отличается от исходного
-        # (обнаружено на живом прогоне: git status показал М после «отката»).
-        original = path.read_text(encoding="utf-8", newline="")
-        if before not in original:
+        snapshot = snapshots[name]
+        text = snapshot.decode("utf-8")
+        occurrences = text.count(before)
+        if occurrences == 0:
             print(f"НЕ НАЙДЕНО: {name}: {before!r}")
+            not_found.append((name, before))
             continue
-        path.write_text(original.replace(before, after, 1), encoding="utf-8", newline="")
+        if occurrences > 1:
+            print(f"НЕОДНОЗНАЧНО ({occurrences}x): {name}: {before!r}")
+            ambiguous.append((name, before))
+            continue
+        mutated = text.replace(before, after, 1).encode("utf-8")
         try:
-            if run_tests(test_path):
+            path.write_bytes(mutated)
+            if run_tests(test_path)[0]:
                 silent.append((name, before, after))
                 print(f"МОЛЧА ПРОШЛА: {name}: {before!r} -> {after!r}")
             else:
                 print(f"поймана: {name}: {before!r}")
         finally:
-            path.write_text(original, encoding="utf-8", newline="")
-    print(f"\nвсего поломок: {len(MUTATIONS)}, прошло молча: {len(silent)}")
-    return 1 if silent else 0
+            restore(path, snapshot, f"мутации {before!r}")
+
+    # Финальная сверка каждого затронутого файла со снимком — на случай,
+    # если что-то обошло восстановление внутри цикла способом, который тут
+    # не предусмотрен.
+    for name, snapshot in snapshots.items():
+        if Path(name).read_bytes() != snapshot:
+            print(f"ФАТАЛЬНО: {name} не совпадает со снимком после прогона")
+            return 3
+
+    print(
+        f"\nвсего поломок: {len(MUTATIONS)}, прошло молча: {len(silent)}, "
+        f"не найдено: {len(not_found)}, неоднозначно: {len(ambiguous)}"
+    )
+    return 1 if (silent or not_found or ambiguous) else 0
 
 
 if __name__ == "__main__":
