@@ -16,10 +16,13 @@ from backend.models import (
     LlmConfig,
     LlmConfigKind,
     ProfileSkill,
+    StatusHistorySource,
     TelegramChannel,
     TgAccount,
     Vacancy,
+    VacancyEvent,
     VacancyStatus,
+    VacancyStatusHistory,
 )
 from backend.payloads import ParsedVacancy
 
@@ -163,3 +166,22 @@ def channel_row(**overrides) -> TelegramChannel:
     fields = {"username": "pyjobs", "title": "Питон-вакансии"}
     fields.update(overrides)
     return TelegramChannel(**fields)
+
+
+def vacancy_event_row(vacancy_id: int, **overrides) -> VacancyEvent:
+    """Событие обработки вакансии. Метка времени задаётся явно — по ней сортируют."""
+    fields = {"kind": "parsed", "created_at": EPOCH}
+    fields.update(overrides)
+    return VacancyEvent(vacancy_id=vacancy_id, **fields)
+
+
+def status_history_row(vacancy_id: int, **overrides) -> VacancyStatusHistory:
+    """Запись о смене статуса. Метка времени задаётся явно — по ней сортируют."""
+    fields = {
+        "status": VacancyStatus.APPLIED,
+        "previous_status": VacancyStatus.NEW,
+        "source": StatusHistorySource.USER,
+        "changed_at": EPOCH,
+    }
+    fields.update(overrides)
+    return VacancyStatusHistory(vacancy_id=vacancy_id, **fields)
