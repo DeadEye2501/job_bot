@@ -1,9 +1,10 @@
 """Стенд: подмена каталога данных, хранилища ключей и базы.
 
-Порядок в этом файле — часть договора, а не оформление. Каталог подменяется
-до первого импорта проекта: `backend/bot.py` вычисляет `MEDIA_DIR` на импорте,
-и без подмены импорт модуля создал бы папку в боевом каталоге. Хранилище
-ключей подменяется до первого шифрования, схема поднимается после обоих.
+Порядок в этом файле — часть договора, а не оформление. Каталог данных и
+хранилище ключей подменяются на уровне модуля, до первого импорта проекта:
+`backend/bot.py` вычисляет `MEDIA_DIR` на импорте, и без подмены каталога
+импорт создал бы папку в боевом каталоге пользователя. Схема поднимается
+после обоих.
 """
 
 import os
@@ -12,13 +13,26 @@ import tempfile
 from pathlib import Path
 
 # Настоящее значение — до подмены строкой ниже. Нужно, чтобы потом сравнить
-# с ним `config.get_data_dir()` и поймать тест, который снимет `APPDATA`
+# с ним `config._user_data_dir()` и поймать тест, который снимет `APPDATA`
 # и тем самым откатит стенд на боевой каталог пользователя.
 _REAL_APPDATA = os.environ.get("APPDATA")
 
 TMP_ROOT = Path(tempfile.mkdtemp(prefix="jobbot-tests-"))
 os.environ["APPDATA"] = str(TMP_ROOT)
 os.environ["XDG_DATA_HOME"] = str(TMP_ROOT)
+
+import keyring  # noqa: E402 — только после подмены каталога
+
+from tests.fakes.keyring import MemoryKeyring  # noqa: E402
+
+# Подмена хранилища ключей — здесь, а не в фикстуре: фикстура срабатывает в
+# setup первого теста, а сбор тестов идёт раньше и уже импортирует всё дерево
+# проекта. Сегодня ни один модуль не читает мастер-ключ на импорте, но цена
+# ошибки — настоящий ключ шифрования пользователя в памяти тестового
+# процесса, поэтому подмена стоит там же, где подмена каталога: до первого
+# импорта проекта, а не после сбора.
+MEMORY_KEYRING = MemoryKeyring()
+keyring.set_keyring(MEMORY_KEYRING)
 
 # `adapters.telegram` тянет `pyrogram`, а тот на импорте зовёт
 # `asyncio.get_event_loop()`. На Windows `pytest-asyncio` в режиме auto
@@ -29,15 +43,18 @@ os.environ["XDG_DATA_HOME"] = str(TMP_ROOT)
 # кладёт модуль в кэш `sys.modules` — повторный `import` в фикстуре ниже
 # просто берёт его оттуда.
 import adapters.telegram  # noqa: E402, F401 — импорт только ради побочного эффекта
-import keyring  # noqa: E402 — только после подмены каталога
+import pyrogram  # noqa: E402
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from sqlalchemy import text  # noqa: E402
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker  # noqa: E402
+from sqlalchemy.ext.asyncio import (  # noqa: E402
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+)
 
 from config import APP_NAME  # noqa: E402
-from tests.fakes.keyring import MemoryKeyring  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -45,7 +62,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # данные и лежит вне репозитория — набор тестов стал бы невоспроизводимым.
 INIT_REVISION = "8ba64b863cb1"
 
-# Боевые каталоги данных — то, во что превращается `config.get_data_dir()`
+# Боевые каталоги данных — то, во что превращается `config._user_data_dir()`
 # без подмены `APPDATA`. `_REAL_DATA_DIR` — если переменная была задана до
 # подмены; `_FALLBACK_DATA_DIR` — путь, на который `config.py` откатывается,
 # когда `APPDATA` не задана вовсе (см. `config._user_data_dir`).
@@ -59,31 +76,34 @@ def _temporary_data_dir():
     shutil.rmtree(TMP_ROOT, ignore_errors=True)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _memory_keyring():
-    backend = MemoryKeyring()
-    keyring.set_keyring(backend)
-    return backend
+@pytest.fixture(scope="session")
+def memory_keyring() -> MemoryKeyring:
+    """Доступ к подставному хранилищу; сама подмена — на уровне модуля."""
+    return MEMORY_KEYRING
 
 
 @pytest.fixture(autouse=True)
 def _appdata_guard():
     """Каталог данных не совпадает с боевым и не лежит внутри него.
 
+    Зовёт `config._user_data_dir()`, а не `get_data_dir()`: второй делает
+    `mkdir`, то есть сторож создавал бы боевой каталог ровно в том случае,
+    от которого сторожит.
+
     Ловит не `monkeypatch.delenv("APPDATA")` внутри теста — `monkeypatch`
     сам возвращает переменную на место в teardown, до сборки следующего
     теста, а у этой фикстуры нет `yield`: она отрабатывает только в setup,
     до тела текущего теста. Реальный случай — правка `os.environ["APPDATA"]`
     напрямую (без `monkeypatch`) или через `monkeypatch` сессионного/модульного
-    масштаба, не убранная за собой предыдущим тестом: тогда `config.get_data_dir()`
+    масштаба, не убранная за собой предыдущим тестом: тогда каталог данных
     к моменту setup следующего теста уже молча смотрит на боевой каталог
     пользователя (`_REAL_DATA_DIR` или `_FALLBACK_DATA_DIR`), и туда же уедут
     любые записи. Проверка идёт перед телом каждого теста — до того, как он
     успеет что-то записать.
     """
-    from config import get_data_dir
+    import config
 
-    data_dir = get_data_dir()
+    data_dir = config._user_data_dir()
     for real_dir in (_REAL_DATA_DIR, _FALLBACK_DATA_DIR):
         if real_dir is None:
             continue
@@ -105,7 +125,7 @@ def database_url() -> str:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _schema(_memory_keyring, database_url):
+def _schema(database_url):
     """Схема поднимается один раз на прогон настоящим alembic'ом.
 
     Синхронная фикстура намеренно: alembic заводит свой цикл событий внутри,
@@ -116,17 +136,39 @@ def _schema(_memory_keyring, database_url):
     # URL сюда намеренно не кладём: `alembic/env.py` всё равно перезапишет
     # его через `config.get_database_url()` — владелец URL для миграций он,
     # а не этот `Config`. Параметр `database_url` фикстура держит явным
-    # порядок вычисления (после `_memory_keyring`), а не для использования.
+    # порядок вычисления, а не для использования.
     command.upgrade(cfg, INIT_REVISION)
 
 
 @pytest.fixture(autouse=True)
-def _sending_locked(monkeypatch):
-    """Отправка в Telegram заперта на всё время прогона.
+def _telegram_is_unreachable(monkeypatch):
+    """Ни один вызов не уходит в настоящий Telegram — из любого модуля.
 
-    В боевом коде `SEND_LOCKED = False`. Подделка клиента и так никуда не
-    ходит, но запор снимает целый класс аварий: тест, случайно получивший
-    настоящий клиент, не разошлёт сообщения живым людям.
+    `pyrogram.Client.invoke` — единственная воронка, через которую клиент
+    разговаривает с сервером: и `send_message`, и `send_photo`, и
+    `read_chat_history` в итоге зовут её. Запирать `adapters.telegram.
+    SEND_LOCKED` для этого мало — `backend/bot.py` зовёт методы клиента
+    напрямую, минуя `send_dm`. Подмена здесь превращает случайно попавший
+    в тест настоящий клиент в громкое падение вместо разосланных живым
+    людям сообщений.
+    """
+
+    async def _refuse(*_args, **_kwargs):
+        raise AssertionError(
+            "тест дотянулся до настоящего Telegram: вызван pyrogram.Client.invoke. "
+            "Передайте в проверяемый код подделку из tests/fakes/telegram.py."
+        )
+
+    monkeypatch.setattr(pyrogram.Client, "invoke", _refuse)
+
+
+@pytest.fixture(autouse=True)
+def _sending_locked(monkeypatch):
+    """Второй слой запора: в боевом коде `SEND_LOCKED = False`.
+
+    Читается ровно в `adapters.telegram.send_dm`. Держим вместе с подменой
+    `pyrogram.Client.invoke` выше: тот ловит уже совершённый вызов, а этот
+    не даёт `send_dm` дойти до вызова вообще.
     """
     import adapters.telegram
 
@@ -172,9 +214,65 @@ async def _clear_all_tables(engine: AsyncEngine) -> None:
         await connection.commit()
 
 
+@pytest.fixture(autouse=True)
+async def _clean_database(_schema, database_url):
+    """База пуста после каждого теста, как бы тест до неё ни добрался.
+
+    Уборка висит здесь, а не на фикстуре `session`, потому что через сессию
+    до базы доходят не все: `backend/runtime_settings.py` принимает фабрику
+    сессий и коммитит внутри себя, и тест, построивший фабрику поверх
+    собственного движка, оставил бы закоммиченные строки следующим файлам —
+    протекло бы падениями, зависящими от порядка.
+
+    Своя пара «движок + соединение» на уборку нужна потому, что движок
+    теста к этому моменту уже закрыт: фикстура автоиспользуемая, значит
+    поднимается раньше остальных функциональных и разбирается позже них.
+    Она же и причина, по которой упавшее `session.close()` не оставляет
+    базу грязной: pytest доводит до конца все финализаторы, даже если
+    предыдущий бросил.
+    """
+    yield
+
+    from adapters.db import make_engine
+
+    cleaner = make_engine(database_url)
+    try:
+        await _clear_all_tables(cleaner)
+    finally:
+        await cleaner.dispose()
+
+
 @pytest.fixture
-async def session(_schema, database_url):
-    """Сессия на отдельном движке; изоляция — уборкой таблиц, не откатом.
+async def engine(_schema, database_url):
+    """Движок на отдельный тест.
+
+    Создаётся на каждый тест и закрывается после: пул соединений привязан к
+    циклу событий, и переиспользование движка между тестами с разными
+    циклами ломается непредсказуемо.
+    """
+    from adapters.db import make_engine
+
+    created = make_engine(database_url)
+    try:
+        yield created
+    finally:
+        await created.dispose()
+
+
+@pytest.fixture
+def session_factory(engine) -> async_sessionmaker[AsyncSession]:
+    """Фабрика сессий — то, что принимают модули, коммитящие внутри себя.
+
+    `backend/runtime_settings.py` берёт именно её, а не готовую сессию:
+    каждый `set_*` открывает свою и коммитит. Стоит поверх того же движка,
+    что и `session`, — тест может пользоваться обоими сразу.
+    """
+    return async_sessionmaker(bind=engine, expire_on_commit=False)
+
+
+@pytest.fixture
+async def session(session_factory):
+    """Открытая сессия; изоляция — уборкой таблиц (`_clean_database`), не откатом.
 
     Откат тут не работает: pysqlite (драйвер под `aiosqlite`) откладывает
     `BEGIN` до первого DML и не даёт SQLAlchemy настоящей внешней
@@ -183,21 +281,9 @@ async def session(_schema, database_url):
     того, что потом делает внешняя транзакция (проверено отдельно:
     `rollback()` её не отменяет). Поэтому после теста таблицы просто
     чистятся, а не откатываются.
-
-    Движок создаётся на каждый тест и закрывается после: пул соединений
-    привязан к циклу событий, и переиспользование движка между тестами с
-    разными циклами ломается непредсказуемо.
     """
-    from adapters.db import make_engine
-
-    engine = make_engine(database_url)
-    maker = async_sessionmaker(bind=engine, expire_on_commit=False)
-    opened = maker()
+    opened = session_factory()
     try:
-        try:
-            yield opened
-        finally:
-            await opened.close()
-            await _clear_all_tables(engine)
+        yield opened
     finally:
-        await engine.dispose()
+        await opened.close()

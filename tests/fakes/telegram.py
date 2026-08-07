@@ -49,6 +49,7 @@ class FakeTelegramClient:
         return self._users.get(username)
 
     async def download_media(self, file_id, in_memory=False):
+        assert in_memory, "проект качает аватар только в память"
         self.download_calls.append(file_id)
         if self._download_error is not None:
             raise self._download_error
