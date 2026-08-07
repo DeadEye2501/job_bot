@@ -8,20 +8,29 @@
 from backend.models import ProfileSkill
 from backend.payloads import ParsedVacancy
 
-_EMPTY_VACANCY = {
-    "title": "Python-разработчик",
-    "description": None,
-    "company_name": None,
-    "company_website": None,
-    "hr_contact": None,
-    "other_contact": None,
-    "stack_required": [],
-    "stack_preferred": [],
-    "grade": None,
-    "salary": None,
-    "remote": None,
-    "location": None,
-}
+def _empty_vacancy() -> dict:
+    """Свежий словарь умолчаний на каждый вызов.
+
+    `stack_required`/`stack_preferred` — списки, и общий на все вызовы
+    словарь-константа отдавал бы один и тот же объект списка каждой
+    построенной вакансии: мутация в одном тесте протекала бы в другой.
+    Функция вместо константы гарантирует, что у двух вызовов подряд
+    списки — разные объекты.
+    """
+    return {
+        "title": "Python-разработчик",
+        "description": None,
+        "company_name": None,
+        "company_website": None,
+        "hr_contact": None,
+        "other_contact": None,
+        "stack_required": [],
+        "stack_preferred": [],
+        "grade": None,
+        "salary": None,
+        "remote": None,
+        "location": None,
+    }
 
 
 def parsed_vacancy(**overrides) -> ParsedVacancy:
@@ -30,7 +39,7 @@ def parsed_vacancy(**overrides) -> ParsedVacancy:
     Умолчание выбрано так, чтобы тест называл ровно те поля, которые
     проверяет: всё незаданное заведомо не влияет на результат.
     """
-    return ParsedVacancy(**{**_EMPTY_VACANCY, **overrides})
+    return ParsedVacancy(**{**_empty_vacancy(), **overrides})
 
 
 def profile_skill(
