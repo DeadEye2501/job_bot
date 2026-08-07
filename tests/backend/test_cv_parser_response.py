@@ -102,6 +102,13 @@ async def test_an_answer_that_is_not_json_yields_no_parse():
     assert await parse_cv("резюме", client, "qwen") is None
 
 
+async def test_a_body_that_is_not_json_at_all_yields_no_parse():
+    """Провайдер ответил двухсоткой, но тело — не JSON: разбора нет."""
+    client = provider({CHAT: httpx.Response(200, text="не json")})
+
+    assert await parse_cv("резюме", client, "qwen") is None
+
+
 async def test_a_truncated_answer_still_parses_what_it_can():
     """Упёршийся в предел ответ разбирается, если JSON в нём всё же целый."""
     client = provider({CHAT: chat_response(MINIMAL_CV, finish_reason="length")})
