@@ -192,6 +192,28 @@ async def test_activity_is_the_latest_of_the_four_sources(session, session_facto
     }
 
 
+async def test_the_latest_event_wins_when_there_is_no_status_history(
+    session, session_factory
+):
+    """Из нескольких событий берётся самое позднее и тогда, когда истории нет вовсе.
+
+    Проверено мутацией: в соседнем тесте, где есть и события, и история,
+    сведение событий подменялось наименьшим молча — итог всё равно решала
+    история, чьё время было позже. Здесь истории нет, и подмена видна.
+    """
+    vacancy = vacancy_row(created_at=at(0))
+    await put(session_factory, vacancy)
+    await put(
+        session_factory,
+        vacancy_event_row(vacancy.id, created_at=at(30)),
+        vacancy_event_row(vacancy.id, created_at=at(10)),
+    )
+
+    assert await list_vacancy_last_activity(session, [vacancy.id]) == {
+        vacancy.id: at(30)
+    }
+
+
 async def test_the_latest_is_taken_from_each_group_of_records(
     session, session_factory
 ):

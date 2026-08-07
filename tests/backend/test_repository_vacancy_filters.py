@@ -77,6 +77,28 @@ async def test_a_score_range_excludes_both_ends_beyond_it(titles, session_factor
     assert await titles(score_min=50, score_max=80) == ["в самый раз"]
 
 
+async def test_the_score_range_includes_both_of_its_own_ends(
+    titles, session_factory
+):
+    """Вакансия ровно на границе диапазона в отбор попадает, с обеих сторон.
+
+    Проверено мутацией: без этого теста замена нестрогого сравнения на
+    строгое проходила молча — все прочие наборы держали баллы в стороне от
+    границ, и разницы между «не меньше» и «больше» не возникало.
+    """
+    await put(
+        session_factory,
+        vacancy_row(title="ровно снизу", score=50),
+        vacancy_row(title="ровно сверху", score=80),
+        vacancy_row(title="на волос ниже", score=49),
+        vacancy_row(title="на волос выше", score=81),
+    )
+
+    got = await titles(score_min=50, score_max=80)
+
+    assert sorted(got) == sorted(["ровно снизу", "ровно сверху"])
+
+
 async def test_a_vacancy_without_a_score_never_matches_a_score_range(
     titles, session_factory
 ):
