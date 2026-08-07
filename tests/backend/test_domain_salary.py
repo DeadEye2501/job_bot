@@ -96,4 +96,4 @@ def test_a_non_positive_rate_falls_back_to_the_default():
     ним же, а не проверяет его корректность. При починке дефекта это
     сравнение тоже покраснеет.
     """
-    assert to_thousands("$3000", usd_rate=0) == to_thousands("$3000")
+    assert to_thousands("$3000", usd_rate=0) == (270000, 270000)
