@@ -140,21 +140,46 @@ def _schema(database_url):
     command.upgrade(cfg, INIT_REVISION)
 
 
+class TelegramReached(BaseException):
+    """Тест дотянулся до настоящего Telegram.
+
+    Наследник `BaseException`, а не `Exception`, намеренно: боевой код
+    оборачивает вызовы клиента в `except Exception` — `backend/bot.py:140`
+    вокруг `download_media`, `backend/bot.py:992` вокруг `read_chat_history`.
+    Наследника `Exception` эти блоки проглотили бы, и тест, ушедший в живой
+    Telegram, получил бы запись в лог и зелёный прогон — ровно тот отказ,
+    ради предотвращения которого запор и ставится.
+    """
+
+
 @pytest.fixture(autouse=True)
 def _telegram_is_unreachable(monkeypatch):
-    """Ни один вызов не уходит в настоящий Telegram — из любого модуля.
+    """Обычные запросы клиента не уходят в сеть: `Client.invoke` заперт.
 
-    `pyrogram.Client.invoke` — единственная воронка, через которую клиент
-    разговаривает с сервером: и `send_message`, и `send_photo`, и
-    `read_chat_history` в итоге зовут её. Запирать `adapters.telegram.
-    SEND_LOCKED` для этого мало — `backend/bot.py` зовёт методы клиента
-    напрямую, минуя `send_dm`. Подмена здесь превращает случайно попавший
-    в тест настоящий клиент в громкое падение вместо разосланных живым
-    людям сообщений.
+    Через `pyrogram.Client.invoke` приходят `send_message`, `send_photo`,
+    `send_document`, `read_chat_history` и прочие обычные вызовы. Запирать
+    `adapters.telegram.SEND_LOCKED` для этого мало — `backend/bot.py` зовёт
+    методы клиента напрямую, минуя `send_dm`.
+
+    Единственной воронкой Pyrogram `Client.invoke` НЕ является. Под часть
+    работы библиотека поднимает отдельные `Session` и зовёт `Session.invoke`,
+    то есть эти пути запор не покрывает:
+
+    * заливка файла — `pyrogram/methods/advanced/save_file.py:109`. Поэтому
+      `backend/bot.py:1123/1125` (`send_photo`/`send_document` с путём к
+      файлу) сначала зальют файл на сервера Telegram и упрутся в запор
+      только на последнем шаге — файл к тому моменту уже там;
+    * скачивание медиа — `pyrogram/client.py:891`, плюс CDN-сессия на `:946`.
+      Поэтому `backend/bot.py:139` (`download_media`) до запора не доходит
+      вообще;
+    * `Client.connect()` и авторизация.
+
+    Тестам, которым нужны эти пути, настоящий клиент передавать нельзя ни
+    при каких условиях — только подделку из `tests/fakes/telegram.py`.
     """
 
     async def _refuse(*_args, **_kwargs):
-        raise AssertionError(
+        raise TelegramReached(
             "тест дотянулся до настоящего Telegram: вызван pyrogram.Client.invoke. "
             "Передайте в проверяемый код подделку из tests/fakes/telegram.py."
         )
