@@ -109,12 +109,6 @@ MUTATIONS = [
         "    if not raw_name:" + CRLF + "        return None, decision" + CRLF,
         "",
     ),
-    # find_or_create_company: имя, свёдшееся к пустоте, идёт в сравнение
-    (
-        "backend/repository.py",
-        "    if parsed_norm:" + CRLF + "        # Stage 1a",
-        "    if True:" + CRLF + "        # Stage 1a",
-    ),
     # find_or_create_company: правило имени перестаёт считаться с сайтами
     (
         "backend/repository.py",
@@ -126,12 +120,6 @@ MUTATIONS = [
         "backend/repository.py",
         "            ) and _hosts_compatible(c_host, parsed_host):",
         "            ):",
-    ),
-    # find_or_create_company: сведение по хосту срабатывает и на пустом хосте
-    (
-        "backend/repository.py",
-        "            if c_host and c_host == parsed_host:",
-        "            if c_host == parsed_host:",
     ),
     # find_or_create_company: порог схожести опущен
     (

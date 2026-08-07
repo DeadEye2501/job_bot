@@ -164,13 +164,20 @@ async def test_a_spelling_already_known_is_not_remembered_twice(
 async def test_a_real_website_fills_an_empty_slot_but_never_replaces_one(
     session, session_factory
 ):
-    """Настоящий сайт из объявления заполняет пустое поле, но не затирает своё."""
+    """Настоящий сайт из объявления заполняет пустое поле, но не затирает своё.
+
+    Во второй половине сайт из объявления нарочно отличается от записанного:
+    подай тот же — и «не затирает» стало бы неотличимо от «затирает тем же».
+    Правило о разных сайтах здесь не мешает: сведение идёт по написанию,
+    добавленному в предыдущем вызове, и хосты сравниваются только у правил
+    имени и написаний, а до них дело доходит именно потому, что сайты разные.
+    """
     empty = company_row(name="Контур", website=None)
-    filled = company_row(name="Ромашка", website="https://romashka.ru")
+    filled = company_row(name="Ромашка", aliases=["Romashka"], website="https://romashka.ru")
     await put(session_factory, empty, filled)
 
     await find_or_create_company(session, "Контур", website="https://kontur.ru")
-    await find_or_create_company(session, "Ромашка", website="https://romashka.ru")
+    await find_or_create_company(session, "Ромашка", website="https://kontur.dev")
 
     assert (await session.get(Company, empty.id)).website == "https://kontur.ru"
     assert (await session.get(Company, filled.id)).website == "https://romashka.ru"

@@ -130,21 +130,28 @@ async def test_the_hr_list_leads_with_the_one_who_brought_more(
 
 
 async def test_an_equal_share_is_broken_by_name(session, session_factory):
-    """При равном вкладе порядок решает имя."""
+    """При равном вкладе порядок решает имя.
+
+    Проверено мутацией: на двух строках снятие разрешителя проходило молча —
+    база и без него возвращала нужную пару. Здесь их три, и ни порядок
+    заведения, ни обратный ему с ожидаемым не совпадают.
+    """
     company = company_row()
     await put(session_factory, company)
-    late = hr_row(name="Яна")
-    early = hr_row(name="Анна")
-    await put(session_factory, late, early)
+    third = hr_row(name="Яна")
+    first = hr_row(name="Анна")
+    second = hr_row(name="Борис")
+    await put(session_factory, third, first, second)
     await put(
         session_factory,
-        vacancy_row(company_id=company.id, hr_id=late.id),
-        vacancy_row(company_id=company.id, hr_id=early.id),
+        vacancy_row(company_id=company.id, hr_id=third.id),
+        vacancy_row(company_id=company.id, hr_id=first.id),
+        vacancy_row(company_id=company.id, hr_id=second.id),
     )
 
     got = await list_hrs_for_company(session, company.id)
 
-    assert [hr.name for hr, _ in got] == ["Анна", "Яна"]
+    assert [hr.name for hr, _ in got] == ["Анна", "Борис", "Яна"]
 
 
 async def test_hrs_of_another_company_stay_out(session, session_factory):
