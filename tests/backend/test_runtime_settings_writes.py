@@ -1,14 +1,19 @@
-"""Следствия записи настроек насквозь: в базу и в память сразу.
+"""Следствия записи настроек: у одних методов их два, у других — одно.
 
-Проверяется и то, и другое: запись, не дошедшая до базы, переживёт только до
-перезапуска, а запись, не дошедшая до памяти, не подействует до перезагрузки.
+У большинства set-методов запись идёт и в базу, и в кэш `RuntimeSettings`
+разом: запись, не дошедшая до базы, не переживёт перезапуск, а не дошедшая
+до кэша — не подействует до перезагрузки. Часть тестов проверяет оба
+следствия, часть — только одно (второе уже закреплено соседним тестом, и
+дублировать его смысла нет). У режима бота кэша в памяти нет вовсе:
+`RuntimeSettings` не хранит режим полем, `get_mode` каждый раз читает базу
+заново, — поэтому тесты режима проверяют только базу.
 """
 
 from sqlalchemy import select
 
 from backend.models import AppSetting, BotMode, BotState, LlmConfig, LlmConfigKind, TgAccount
 from backend.runtime_settings import RuntimeSettings, decrypt_bytes, decrypt_str
-from tests.factories import app_setting_row, bot_state_row, tg_account_row
+from tests.factories import app_setting_row, bot_state_row
 
 
 async def only_row(session_factory, model):
@@ -34,18 +39,25 @@ async def test_new_telegram_credentials_reach_both_the_database_and_memory(sessi
 
 
 async def test_the_secret_is_not_stored_in_the_clear(session_factory):
-    """В базе шифротекст, а не исходная строка."""
+    """В базе шифротекст настоящего Fernet, а не исходная строка и не её кодировка.
+
+    Префикс `gAAAAA` — версионный байт токена Fernet — закрепляет именно
+    алгоритм: подделка вроде `base64.b64encode` тоже прошла бы проверку на
+    отсутствие подстроки, потому что кириллица не входит в алфавит base64.
+    """
     settings = await RuntimeSettings.load(session_factory)
 
     await settings.set_tg(api_id=1, api_hash="шифр", phone="+7")
 
     row = await only_row(session_factory, TgAccount)
     assert "шифр" not in row.api_hash_encrypted
+    assert row.api_hash_encrypted.startswith("gAAAAA")
 
 
 async def test_an_empty_password_is_stored_as_absent(session_factory):
-    """Пустой пароль не шифруется, а записывается отсутствием."""
+    """Пустой пароль стирает прежний шифротекст, а не оставляет его в базе."""
     settings = await RuntimeSettings.load(session_factory)
+    await settings.set_tg(api_id=1, api_hash="ш", phone="+7", password="старый")
 
     await settings.set_tg(api_id=1, api_hash="ш", phone="+7", password="")
 
@@ -53,8 +65,9 @@ async def test_an_empty_password_is_stored_as_absent(session_factory):
 
 
 async def test_an_absent_session_is_stored_as_absent(session_factory):
-    """Отсутствие строки сессии записывается отсутствием: входа ещё не было."""
+    """Выход без строки сессии стирает прежний шифротекст, а не оставляет его."""
     settings = await RuntimeSettings.load(session_factory)
+    await settings.set_tg(api_id=1, api_hash="ш", phone="+7", session_string="старая")
 
     await settings.set_tg(api_id=1, api_hash="ш", phone="+7")
 
@@ -106,6 +119,21 @@ async def test_the_chat_provider_is_written_and_cached(session_factory):
     assert decrypt_str(row.api_key_encrypted) == "sk-1"
 
 
+async def test_writing_the_chat_provider_twice_updates_the_same_row(session_factory):
+    """Смена провайдера обновляет ту же строку, а не заводит вторую."""
+    settings = await RuntimeSettings.load(session_factory)
+
+    await settings.set_chat(base_url="http://a.test", api_key="sk-1", model="qwen")
+    await settings.set_chat(base_url="http://b.test", api_key="sk-2", model="llama")
+
+    async with session_factory() as session:
+        rows = (await session.scalars(select(LlmConfig))).all()
+    assert len(rows) == 1
+    assert rows[0].base_url == "http://b.test"
+    assert decrypt_str(rows[0].api_key_encrypted) == "sk-2"
+    assert rows[0].model == "llama"
+
+
 async def test_the_two_provider_kinds_do_not_overwrite_each_other(session_factory):
     """Запись одного рода провайдера не затирает другой."""
     settings = await RuntimeSettings.load(session_factory)
@@ -120,8 +148,9 @@ async def test_the_two_provider_kinds_do_not_overwrite_each_other(session_factor
 
 
 async def test_a_provider_without_a_key_stores_no_ciphertext(session_factory):
-    """Местный провайдер без ключа не получает шифротекста."""
+    """Переход на местный провайдер стирает прежний шифротекст, а не оставляет его."""
     settings = await RuntimeSettings.load(session_factory)
+    await settings.set_chat(base_url="http://a.test", api_key="sk-1", model="qwen")
 
     await settings.set_chat(base_url="http://a.test", api_key="", model="qwen")
 
