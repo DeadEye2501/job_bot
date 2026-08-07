@@ -24,7 +24,7 @@ use the WSL" ещё до разбора аргументов. `mutmut 2.4.5` с�
 работой. Эту же команду инструмент печатает на каждом аварийном выходе.
 """
 
-import importlib
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -136,8 +136,17 @@ def load_mutations(set_name: str) -> list[tuple[str, str, str]]:
 
     Наборов больше одного — по одному на предмет покрытия, — и держать их
     все в этом файле значило бы редактировать инструмент ради данных.
+
+    Грузится по пути к файлу, а не по имени пакета: инструмент запускают как
+    скрипт, и корень проекта в путях поиска не оказывается.
     """
-    module = importlib.import_module(f"tools.mutations.{set_name}")
+    source = Path(__file__).parent / "mutations" / f"{set_name}.py"
+    if not source.exists():
+        print(f"набора поломок {set_name!r} нет: ожидался {source}")
+        raise SystemExit(5)
+    spec = importlib.util.spec_from_file_location(f"mutations_{set_name}", source)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
     return module.MUTATIONS
 
 
