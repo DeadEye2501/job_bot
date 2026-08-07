@@ -34,8 +34,9 @@ MUTATIONS = [
     # find_latest_vacancy_id_for_hr: недоразобранные перестают отсеиваться
     (
         "backend/repository.py",
-        "        .where(Vacancy.hr_id == hr_id, Vacancy.is_parsed.is_(True))",
-        "        .where(Vacancy.hr_id == hr_id)",
+        "        .where(Vacancy.hr_id == hr_id, Vacancy.is_parsed.is_(True))" + CRLF
+        + "        .order_by(",
+        "        .where(Vacancy.hr_id == hr_id)" + CRLF + "        .order_by(",
     ),
     # find_latest_vacancy_id_for_hr: подстановка даты создания пропадает
     (
@@ -94,20 +95,36 @@ MUTATIONS = [
     # get_hr_detail: непрочитанными считаются и удалённые
     (
         "backend/repository.py",
-        "                Message.read_at.is_(None)," + CRLF + "                Message.is_deleted.is_(False)," + CRLF,
-        "                Message.read_at.is_(None)," + CRLF,
+        "                Message.hr_id == hr_id," + CRLF
+        + "                Message.is_incoming," + CRLF
+        + "                Message.read_at.is_(None)," + CRLF
+        + "                Message.is_deleted.is_(False)," + CRLF,
+        "                Message.hr_id == hr_id," + CRLF
+        + "                Message.is_incoming," + CRLF
+        + "                Message.read_at.is_(None)," + CRLF,
     ),
     # _hr_blacklist_value: выключенные записи снова видны
     (
         "backend/repository.py",
-        "                Blacklist.active.is_(True)," + CRLF + "            )" + CRLF + "            .order_by(Blacklist.id.asc())",
-        "            )" + CRLF + "            .order_by(Blacklist.id.asc())",
+        '                Blacklist.kind == "hr",' + CRLF
+        + "                Blacklist.value.in_(candidates)," + CRLF
+        + "                Blacklist.active.is_(True)," + CRLF,
+        '                Blacklist.kind == "hr",' + CRLF
+        + "                Blacklist.value.in_(candidates)," + CRLF,
     ),
     # _hr_blacklist_value: при двух написаниях побеждает заведённое позже
     (
         "backend/repository.py",
-        ".order_by(Blacklist.id.asc())",
-        ".order_by(Blacklist.id.desc())",
+        '                Blacklist.kind == "hr",' + CRLF
+        + "                Blacklist.value.in_(candidates)," + CRLF
+        + "                Blacklist.active.is_(True)," + CRLF
+        + "            )" + CRLF
+        + "            .order_by(Blacklist.id.asc())",
+        '                Blacklist.kind == "hr",' + CRLF
+        + "                Blacklist.value.in_(candidates)," + CRLF
+        + "                Blacklist.active.is_(True)," + CRLF
+        + "            )" + CRLF
+        + "            .order_by(Blacklist.id.desc())",
     ),
     # hr_blacklist_candidates: написание по идентификатору пропадает
     (
@@ -124,8 +141,16 @@ MUTATIONS = [
     # list_hr_with_counts: порядок выборщика теряет разрешитель по имени
     (
         "backend/repository.py",
-        ".order_by(func.count(Vacancy.id).desc(), HR.name.asc())",
-        ".order_by(func.count(Vacancy.id).desc())",
+        "        base = (" + CRLF
+        + '            select(HR, func.count(Vacancy.id).label("cnt"))' + CRLF
+        + "            .outerjoin(Vacancy, Vacancy.hr_id == HR.id)" + CRLF
+        + "            .group_by(HR.id)" + CRLF
+        + "            .order_by(func.count(Vacancy.id).desc(), HR.name.asc())",
+        "        base = (" + CRLF
+        + '            select(HR, func.count(Vacancy.id).label("cnt"))' + CRLF
+        + "            .outerjoin(Vacancy, Vacancy.hr_id == HR.id)" + CRLF
+        + "            .group_by(HR.id)" + CRLF
+        + "            .order_by(func.count(Vacancy.id).desc())",
     ),
     # list_hr_with_counts: у контактов порядок по давности перевёрнут
     (
@@ -160,8 +185,9 @@ MUTATIONS = [
     # list_hr_with_counts: в непрочитанные попадают и исходящие
     (
         "backend/repository.py",
-        "                Message.is_incoming," + CRLF + "                Message.read_at.is_(None)," + CRLF,
-        "                Message.read_at.is_(None)," + CRLF,
+        "                Message.hr_id.is_not(None)," + CRLF
+        + "                Message.is_incoming," + CRLF,
+        "                Message.hr_id.is_not(None)," + CRLF,
     ),
     # delete_hr: переписка переживает удаление человека
     (
