@@ -15,6 +15,7 @@ from backend.models import (
     HR,
     LlmConfig,
     LlmConfigKind,
+    Message,
     ProfileSkill,
     StatusHistorySource,
     TelegramChannel,
@@ -166,6 +167,19 @@ def channel_row(**overrides) -> TelegramChannel:
     fields = {"username": "pyjobs", "title": "Питон-вакансии"}
     fields.update(overrides)
     return TelegramChannel(**fields)
+
+
+def message_row(**overrides) -> Message:
+    """Строка переписки. Текст обязателен на уровне базы."""
+    fields = {
+        "text": "здравствуйте",
+        "is_incoming": True,
+        "hr_id": None,
+        "vacancy_id": None,
+        "sent_at": EPOCH,
+    }
+    fields.update(overrides)
+    return Message(**fields)
 
 
 def vacancy_event_row(vacancy_id: int, **overrides) -> VacancyEvent:
