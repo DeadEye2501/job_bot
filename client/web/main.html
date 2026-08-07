@@ -14675,6 +14675,8 @@
           const e = findExp(inp); if (!e) return;
           const endInp = inp.closest('.date-pair').querySelector('[data-field="end_date"]');
           if (inp.checked) {
+            // Отметка «по настоящее время» — реальное изменение (end_date → null),
+            // коммитим сразу. Пикер закрыт, ре-рендер после save безопасен.
             e.end_date = null;
             endInp.disabled = true;
             if (endInp._flatpickr) {
@@ -14683,8 +14685,18 @@
             } else {
               endInp.value = '';
             }
+            markDirty();
+            const sum = inp.closest('.exp-card').querySelector('.exp-summary');
+            if (sum) sum.innerHTML = expSummaryHtml(e);
+            saveExperienceNow();
           } else {
+            // Снятие галочки само по себе не меняет сохраняемое состояние
+            // (end_date всё ещё пустой). НЕ сохраняем здесь: круг
+            // save → request_experience → renderSection уничтожил бы только
+            // что открытый календарь. Просто включаем поле и открываем пикер —
+            // коммит произойдёт в onChange флэтпикера, когда выберут дату.
             endInp.disabled = false;
+            markDirty();
             if (endInp._flatpickr) {
               endInp._flatpickr.set('clickOpens', true);
               endInp._flatpickr.open();
@@ -14692,10 +14704,6 @@
               endInp.focus();
             }
           }
-          markDirty();
-          const sum = inp.closest('.exp-card').querySelector('.exp-summary');
-          if (sum) sum.innerHTML = expSummaryHtml(e);
-          saveExperienceNow();
         });
       }
     });
