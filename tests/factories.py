@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 from backend.models import (
     AppSetting,
+    Blacklist,
     BotMode,
     BotState,
     Company,
@@ -177,6 +178,13 @@ def channel_row(**overrides) -> TelegramChannel:
     fields = {"username": "pyjobs", "title": "Питон-вакансии"}
     fields.update(overrides)
     return TelegramChannel(**fields)
+
+
+def blacklist_row(kind: str, value: str, **overrides) -> Blacklist:
+    """Строка чёрного списка. Род и значение задаются явно: по ним и ищут."""
+    fields = {"reason": None, "active": True}
+    fields.update(overrides)
+    return Blacklist(kind=kind, value=value, **fields)
 
 
 def message_row(**overrides) -> Message:
