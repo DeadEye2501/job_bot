@@ -5,6 +5,7 @@
 """
 
 import keyring
+import pytest
 from sqlalchemy import func, select
 
 from backend.models import Company
@@ -47,16 +48,11 @@ async def test_sending_a_dm_is_locked_during_tests():
     assert client.sent == []
 
 
-async def test_a_row_inserted_here(session):
-    """Вставленная строка видна внутри своего теста."""
+@pytest.mark.parametrize("run", [1, 2])
+async def test_inserted_row_does_not_survive_between_runs(session, run):
+    """Вставленная строка не переживает откат — двух прогонов подряд это не видно."""
     session.add(Company(name="Изоляция"))
     await session.flush()
 
     total = await session.scalar(select(func.count()).select_from(Company))
     assert total == 1
-
-
-async def test_is_not_visible_in_the_next_test(session):
-    """И не видна в следующем: транзакция откатилась."""
-    total = await session.scalar(select(func.count()).select_from(Company))
-    assert total == 0

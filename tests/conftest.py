@@ -11,6 +11,11 @@ import shutil
 import tempfile
 from pathlib import Path
 
+# Настоящее значение — до подмены строкой ниже. Нужно, чтобы потом сравнить
+# с ним `config.get_data_dir()` и поймать тест, который снимет `APPDATA`
+# и тем самым откатит стенд на боевой каталог пользователя.
+_REAL_APPDATA = os.environ.get("APPDATA")
+
 TMP_ROOT = Path(tempfile.mkdtemp(prefix="jobbot-tests-"))
 os.environ["APPDATA"] = str(TMP_ROOT)
 os.environ["XDG_DATA_HOME"] = str(TMP_ROOT)
@@ -30,6 +35,7 @@ from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker  # noqa: E402
 
+from config import APP_NAME  # noqa: E402
 from tests.fakes.keyring import MemoryKeyring  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -37,6 +43,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # Ревизия init. До `head` не поднимаемся: следующая ревизия засевает личные
 # данные и лежит вне репозитория — набор тестов стал бы невоспроизводимым.
 INIT_REVISION = "8ba64b863cb1"
+
+# Боевые каталоги данных — то, во что превращается `config.get_data_dir()`
+# без подмены `APPDATA`. `_REAL_DATA_DIR` — если переменная была задана до
+# подмены; `_FALLBACK_DATA_DIR` — путь, на который `config.py` откатывается,
+# когда `APPDATA` не задана вовсе (см. `config._user_data_dir`).
+_REAL_DATA_DIR = Path(_REAL_APPDATA) / APP_NAME if _REAL_APPDATA else None
+_FALLBACK_DATA_DIR = Path.home() / "AppData" / "Roaming" / APP_NAME
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -50,6 +63,28 @@ def _memory_keyring():
     backend = MemoryKeyring()
     keyring.set_keyring(backend)
     return backend
+
+
+@pytest.fixture(autouse=True)
+def _appdata_guard():
+    """Каталог данных не совпадает с боевым и не лежит внутри него.
+
+    Единственная защита от однажды написанного `monkeypatch.delenv("APPDATA")`
+    или подпроцесса с вычищенным окружением: без неё `config.get_data_dir()`
+    в таких случаях молча откатывается на боевой каталог пользователя
+    (`_REAL_DATA_DIR` или `_FALLBACK_DATA_DIR`), и туда же уедут любые
+    записи теста. Проверка идёт перед телом каждого теста — до того, как
+    он успеет что-то записать.
+    """
+    from config import get_data_dir
+
+    data_dir = get_data_dir()
+    for real_dir in (_REAL_DATA_DIR, _FALLBACK_DATA_DIR):
+        if real_dir is None:
+            continue
+        assert not data_dir.is_relative_to(real_dir), (
+            f"каталог данных лежит в боевом каталоге: {data_dir}"
+        )
 
 
 @pytest.fixture(scope="session")
@@ -73,7 +108,10 @@ def _schema(_memory_keyring, database_url):
     """
     cfg = Config(str(PROJECT_ROOT / "alembic.ini"))
     cfg.set_main_option("script_location", str(PROJECT_ROOT / "alembic"))
-    cfg.set_main_option("sqlalchemy.url", database_url)
+    # URL сюда намеренно не кладём: `alembic/env.py` всё равно перезапишет
+    # его через `config.get_database_url()` — владелец URL для миграций он,
+    # а не этот `Config`. Параметр `database_url` фикстура держит явным
+    # порядок вычисления (после `_memory_keyring`), а не для использования.
     command.upgrade(cfg, INIT_REVISION)
 
 
