@@ -9,17 +9,10 @@
 заново, — поэтому тесты режима проверяют только базу.
 """
 
-from sqlalchemy import select
-
 from backend.models import AppSetting, BotMode, BotState, LlmConfig, LlmConfigKind, TgAccount
 from backend.runtime_settings import RuntimeSettings, decrypt_bytes, decrypt_str
+from tests.dbio import all_rows, only_row, put
 from tests.factories import app_setting_row, bot_state_row
-
-
-async def only_row(session_factory, model):
-    """Единственная строка таблицы, прочитанная заново из базы."""
-    async with session_factory() as session:
-        return (await session.scalars(select(model))).first()
 
 
 async def test_new_telegram_credentials_reach_both_the_database_and_memory(session_factory):
@@ -81,8 +74,7 @@ async def test_writing_credentials_twice_updates_the_same_row(session_factory):
     await settings.set_tg(api_id=1, api_hash="первый", phone="+7")
     await settings.set_tg(api_id=2, api_hash="второй", phone="+8")
 
-    async with session_factory() as session:
-        rows = (await session.scalars(select(TgAccount))).all()
+    rows = await all_rows(session_factory, TgAccount)
     assert len(rows) == 1
     assert decrypt_str(rows[0].api_hash_encrypted) == "второй"
 
@@ -126,8 +118,7 @@ async def test_writing_the_chat_provider_twice_updates_the_same_row(session_fact
     await settings.set_chat(base_url="http://a.test", api_key="sk-1", model="qwen")
     await settings.set_chat(base_url="http://b.test", api_key="sk-2", model="llama")
 
-    async with session_factory() as session:
-        rows = (await session.scalars(select(LlmConfig))).all()
+    rows = await all_rows(session_factory, LlmConfig)
     assert len(rows) == 1
     assert rows[0].base_url == "http://b.test"
     assert decrypt_str(rows[0].api_key_encrypted) == "sk-2"
@@ -143,8 +134,7 @@ async def test_the_two_provider_kinds_do_not_overwrite_each_other(session_factor
 
     assert settings.chat.model == "чат"
     assert settings.embed.model == "встраивания"
-    async with session_factory() as session:
-        assert len((await session.scalars(select(LlmConfig))).all()) == 2
+    assert len(await all_rows(session_factory, LlmConfig)) == 2
 
 
 async def test_a_provider_without_a_key_stores_no_ciphertext(session_factory):
@@ -169,15 +159,12 @@ async def test_a_new_setting_is_created(session_factory):
 
 async def test_an_existing_setting_is_updated_in_place(session_factory):
     """Знакомая настройка обновляется, а не задваивается."""
-    async with session_factory() as session:
-        async with session.begin():
-            session.add(app_setting_row("scoring_threshold", "10"))
+    await put(session_factory, app_setting_row("scoring_threshold", "10"))
     settings = await RuntimeSettings.load(session_factory)
 
     await settings.set_app("scoring_threshold", "42")
 
-    async with session_factory() as session:
-        rows = (await session.scalars(select(AppSetting))).all()
+    rows = await all_rows(session_factory, AppSetting)
     assert [(r.key, r.value) for r in rows] == [("scoring_threshold", "42")]
 
 
@@ -203,15 +190,12 @@ async def test_the_mode_is_created_when_the_row_is_missing(session_factory):
 
 async def test_changing_the_mode_updates_the_same_row(session_factory):
     """Повторная смена обновляет ту же строку: таблица односрочная."""
-    async with session_factory() as session:
-        async with session.begin():
-            session.add(bot_state_row(BotMode.OFF))
+    await put(session_factory, bot_state_row(BotMode.OFF))
     settings = await RuntimeSettings.load(session_factory)
 
     await settings.set_mode(BotMode.DM_ONLY)
 
-    async with session_factory() as session:
-        rows = (await session.scalars(select(BotState))).all()
+    rows = await all_rows(session_factory, BotState)
     assert len(rows) == 1
     assert rows[0].mode is BotMode.DM_ONLY
 
