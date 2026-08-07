@@ -24,6 +24,7 @@ use the WSL" ещё до разбора аргументов. `mutmut 2.4.5` с�
 работой. Эту же команду инструмент печатает на каждом аварийном выходе.
 """
 
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -33,112 +34,6 @@ from pathlib import Path
 # Консоль по умолчанию тут в cp1251 — «↪» и часть кириллицы не кодируются,
 # без этого print падает на середине списка мутаций.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-
-# (файл, что заменить, на что заменить) — по одной осмысленной поломке.
-MUTATIONS = [
-    # extract_text: пропадает запасной вариант через caption
-    (
-        "backend/helpers.py",
-        'return (msg.text or msg.caption or "").strip()',
-        'return (msg.text or "").strip()',
-    ),
-    # _media_placeholder: ветка «Фото» никогда не срабатывает
-    (
-        "backend/helpers.py",
-        'if getattr(msg, "photo", None):\r\n        return "[Фото]"',
-        'if False:\r\n        return "[Фото]"',
-    ),
-    # _media_placeholder: ветка «Документ» никогда не срабатывает
-    (
-        "backend/helpers.py",
-        'if getattr(msg, "document", None):\r\n        return "[Документ]"',
-        'if False:\r\n        return "[Документ]"',
-    ),
-    # extract_dm_text: голосовое больше не распознаётся
-    (
-        "backend/helpers.py",
-        'body = extract_text(msg)\r\n    if getattr(msg, "voice", None):',
-        "body = extract_text(msg)\r\n    if False:",
-    ),
-    # extract_dm_text: подпись голосового теряется
-    (
-        "backend/helpers.py",
-        'body = f"Голосовое сообщение: {body}" if body else "Голосовое сообщение"',
-        'body = "Голосовое сообщение"',
-    ),
-    # extract_dm_text: перевёрнутая проверка родителя
-    (
-        "backend/helpers.py",
-        "if parent is None:\r\n        return body",
-        "if parent is not None:\r\n        return body",
-    ),
-    # extract_dm_text: переводы строк в цитате не схлопываются
-    (
-        "backend/helpers.py",
-        'quote = quote.replace("\\n", " ").strip()',
-        "quote = quote.strip()",
-    ),
-    # extract_dm_text: порог обрезки цитаты расширен на порядок
-    (
-        "backend/helpers.py",
-        "if len(quote) > 80:",
-        "if len(quote) > 800:",
-    ),
-    # extract_dm_text: пустое тело больше не даёт «голую» цитату
-    (
-        "backend/helpers.py",
-        'return f"↪ {quote}\\n\\n{body}" if body else f"↪ {quote}"',
-        'return f"↪ {quote}\\n\\n{body}"',
-    ),
-    # normalize_username: http:// перестаёт распознаваться
-    (
-        "backend/helpers.py",
-        'for prefix in ("https://", "http://"):',
-        'for prefix in ("https://",):',
-    ),
-    # normalize_username: префикс t.me/ не снимается
-    (
-        "backend/helpers.py",
-        'if s.startswith("t.me/"):\r\n        s = s[len("t.me/"):]',
-        'if False:\r\n        s = s[len("t.me/"):]',
-    ),
-    # normalize_username: хвостовой слэш не срезается
-    (
-        "backend/helpers.py",
-        's = s.lstrip("@").strip().rstrip("/")',
-        's = s.lstrip("@").strip()',
-    ),
-    # normalize_username: при лишнем сегменте пути берётся не тот кусок
-    (
-        "backend/helpers.py",
-        'if "/" in s:\r\n        s = s.split("/", 1)[0]',
-        'if "/" in s:\r\n        s = s.split("/", 1)[-1]',
-    ),
-    # normalize_username: телефоны с «+» больше не отсеиваются
-    (
-        "backend/helpers.py",
-        'if not s or s.startswith("+"):',
-        "if not s:",
-    ),
-    # normalize_username: служебные пути Telegram (joinchat/c/...) не отсеиваются
-    (
-        "backend/helpers.py",
-        "if s.lower() in _TG_RESERVED_PATHS:",
-        "if False:",
-    ),
-    # fetch_telegram_avatar: перепутан приоритет small/big file_id
-    (
-        "backend/helpers.py",
-        'file_id = getattr(photo, "small_file_id", None) or getattr(photo, "big_file_id", None)',
-        'file_id = getattr(photo, "big_file_id", None) or getattr(photo, "small_file_id", None)',
-    ),
-    # resolve_hr_telegram: удалённый аккаунт больше не отсеивается
-    (
-        "backend/helpers.py",
-        'if getattr(user, "is_bot", False) or getattr(user, "is_deleted", False):',
-        'if getattr(user, "is_bot", False):',
-    ),
-]
 
 
 def _child_env() -> dict[str, str]:
@@ -162,8 +57,14 @@ def _child_env() -> dict[str, str]:
 
 
 def run_tests(test_path: str) -> tuple[bool, str]:
+    """Прогон набора. Путей может быть несколько — через пробел одним доводом.
+
+    Предмет покрытия к этому времени разошёлся по десятку файлов, а гонять
+    ради одной поломки весь каталог — минуты вместо секунд на каждую из
+    тридцати.
+    """
     done = subprocess.run(
-        [sys.executable, "-m", "pytest", test_path, "-q", "-x"],
+        [sys.executable, "-m", "pytest", *test_path.split(), "-q", "-x"],
         capture_output=True,
         encoding="utf-8",
         errors="replace",
@@ -236,10 +137,34 @@ def preflight(targets: list[str]) -> bool:
     return True
 
 
-def main() -> int:
-    test_path = sys.argv[1]
+def load_mutations(set_name: str) -> list[tuple[str, str, str]]:
+    """Список поломок из `tools/mutations/<имя>.py`.
 
-    targets = sorted({name for name, _before, _after in MUTATIONS})
+    Наборов больше одного — по одному на предмет покрытия, — и держать их
+    все в этом файле значило бы редактировать инструмент ради данных.
+
+    Грузится по пути к файлу, а не по имени пакета: инструмент запускают как
+    скрипт, и корень проекта в путях поиска не оказывается.
+    """
+    source = Path(__file__).parent / "mutations" / f"{set_name}.py"
+    if not source.exists():
+        print(f"набора поломок {set_name!r} нет: ожидался {source}")
+        raise SystemExit(5)
+    spec = importlib.util.spec_from_file_location(f"mutations_{set_name}", source)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.MUTATIONS
+
+
+def main() -> int:
+    if len(sys.argv) != 3:
+        print("нужно два довода: путь к тестам и имя набора поломок")
+        print("например: python tools/mutate.py tests/backend/test_helpers.py helpers")
+        return 5
+    test_path, set_name = sys.argv[1], sys.argv[2]
+
+    mutations = load_mutations(set_name)
+    targets = sorted({name for name, _before, _after in mutations})
 
     if not preflight(targets):
         return 4
@@ -264,7 +189,7 @@ def main() -> int:
     not_found = []
     ambiguous = []
 
-    for name, before, after in MUTATIONS:
+    for name, before, after in mutations:
         path = Path(name)
         snapshot = snapshots[name]
         text = snapshot.decode("utf-8")
@@ -298,7 +223,7 @@ def main() -> int:
             return 3
 
     print(
-        f"\nвсего поломок: {len(MUTATIONS)}, прошло молча: {len(silent)}, "
+        f"\nвсего поломок: {len(mutations)}, прошло молча: {len(silent)}, "
         f"не найдено: {len(not_found)}, неоднозначно: {len(ambiguous)}"
     )
     return 1 if (silent or not_found or ambiguous) else 0
