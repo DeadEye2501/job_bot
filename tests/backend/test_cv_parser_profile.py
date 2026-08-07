@@ -1,0 +1,169 @@
+"""Следствия разбора профиля и языков в `backend/cv_parser.py`.
+
+Все закрытые разборщики видны только через `parse_cv`: «модель вернула такой
+JSON — вышло такое». Ответ подставляется подделкой, путь до разбора настоящий.
+"""
+
+import json
+
+import pytest
+
+from backend.cv_parser import parse_cv
+from tests.fakes.llm import chat_response, provider
+
+CHAT = ("POST", "/v1/chat/completions")
+
+REQUIRED = {
+    "first_name": "Алексей",
+    "last_name": "Фролов",
+    "title": "Python-разработчик",
+    "email": "a@b.c",
+}
+
+
+async def parse(answer: str):
+    """Прогнать ответ модели через настоящий разбор."""
+    client = provider({CHAT: chat_response(answer)})
+    return await parse_cv("резюме", client, "qwen")
+
+
+async def parse_profile(**fields):
+    """Прогнать профиль с заданными полями, остальное — обязательный минимум."""
+    return await parse(json.dumps({"profile": {**REQUIRED, **fields}}))
+
+
+async def test_a_minimal_profile_is_enough_for_a_parse():
+    """Имя, фамилия, должность и почта — достаточный минимум."""
+    parsed = await parse_profile()
+
+    assert parsed is not None
+    assert parsed.profile.last_name == "Фролов"
+
+
+@pytest.mark.parametrize("missing", ["first_name", "last_name", "title", "email"])
+async def test_a_profile_without_a_required_field_kills_the_whole_parse(missing):
+    """Без любого обязательного поля разбора нет вовсе — не только профиля."""
+    fields = {k: v for k, v in REQUIRED.items() if k != missing}
+
+    assert await parse(json.dumps({"profile": fields})) is None
+
+
+async def test_an_answer_without_a_profile_yields_no_parse():
+    """Ответ без профиля — не резюме."""
+    assert await parse('{"languages": []}') is None
+
+
+async def test_blank_optional_fields_become_absent():
+    """Пустая строка в необязательном поле — это отсутствие, а не пустота."""
+    parsed = await parse_profile(phone="   ", location="")
+
+    assert parsed.profile.phone is None
+    assert parsed.profile.location is None
+
+
+async def test_a_non_string_optional_field_becomes_absent():
+    """Число вместо строки — тоже отсутствие, а не падение."""
+    parsed = await parse_profile(github_url=42)
+
+    assert parsed.profile.github_url is None
+
+
+async def test_only_known_work_formats_survive():
+    """Из формата работы остаётся только известное, в нижнем регистре."""
+    parsed = await parse_profile(work_format=["Remote", "office", "как получится"])
+
+    assert parsed.profile.work_format == ["remote", "office"]
+
+
+async def test_a_repeated_work_format_is_kept_once():
+    """Повтор формата не удваивается."""
+    parsed = await parse_profile(work_format=["remote", "REMOTE"])
+
+    assert parsed.profile.work_format == ["remote"]
+
+
+async def test_only_known_grades_survive():
+    """Из уровней остаётся только известное."""
+    parsed = await parse_profile(grades=["Senior", "гуру", "lead"])
+
+    assert parsed.profile.grades == ["senior", "lead"]
+
+
+async def test_a_non_list_work_format_becomes_empty():
+    """Не список вместо формата работы — пустой список, а не падение."""
+    parsed = await parse_profile(work_format="remote")
+
+    assert parsed.profile.work_format == []
+
+
+async def test_language_levels_come_back_uppercase():
+    """Уровень языка приводится к общему виду."""
+    parsed = await parse(json.dumps({
+        "profile": REQUIRED,
+        "languages": [{"language": "English", "level": "b2"}],
+    }))
+
+    assert [(x.language, x.level) for x in parsed.languages] == [("English", "B2")]
+
+
+@pytest.mark.parametrize("native", ["native", "родной"])
+async def test_a_native_language_is_recognised_in_both_spellings(native):
+    """Родной язык распознаётся и по-русски, и по-английски."""
+    parsed = await parse(json.dumps({
+        "profile": REQUIRED,
+        "languages": [{"language": "Русский", "level": native}],
+    }))
+
+    assert parsed.languages[0].level == "native"
+
+
+async def test_a_language_with_an_unknown_level_is_dropped():
+    """Язык с невнятным уровнем не попадает в разбор."""
+    parsed = await parse(json.dumps({
+        "profile": REQUIRED,
+        "languages": [{"language": "Deutsch", "level": "нулевой"}],
+    }))
+
+    assert parsed.languages == []
+
+
+async def test_a_language_without_a_name_is_dropped():
+    """Язык без названия не попадает в разбор."""
+    parsed = await parse(json.dumps({
+        "profile": REQUIRED,
+        "languages": [{"language": "", "level": "A1"}],
+    }))
+
+    assert parsed.languages == []
+
+
+async def test_a_repeated_language_keeps_the_first_spelling():
+    """Повтор языка не удваивается; остаётся первое написание."""
+    parsed = await parse(json.dumps({
+        "profile": REQUIRED,
+        "languages": [
+            {"language": "Русский", "level": "native"},
+            {"language": "русский", "level": "C1"},
+        ],
+    }))
+
+    assert [(x.language, x.level) for x in parsed.languages] == [("Русский", "native")]
+
+
+async def test_json_is_pulled_out_of_a_code_fence():
+    """JSON достаётся из заборчика, которым модель его обрамила."""
+    answer = "Вот результат:\n```json\n" + json.dumps({"profile": REQUIRED}) + "\n```"
+
+    assert await parse(answer) is not None
+
+
+async def test_curly_quotes_do_not_break_the_parse():
+    """Кавычки-ёлочки, которые подставляет модель, не ломают разбор."""
+    answer = json.dumps({"profile": REQUIRED}).replace('"', "“", 1)
+
+    assert await parse(answer) is not None
+
+
+async def test_broken_json_yields_no_parse():
+    """Оборванный JSON — не разбор."""
+    assert await parse('{"profile": {') is None
