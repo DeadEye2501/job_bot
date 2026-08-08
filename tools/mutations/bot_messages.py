@@ -12,108 +12,103 @@ CRLF = "\r\n"
 MUTATIONS = [
     # send: HR без адреса перестаёт отбиваться
     (
-        "backend/bot/client.py",
-        "        if target is None:" + CRLF
-        + "            logger.warning(" + CRLF
-        + '                "Bot.send: hr %s has no telegram_user_id or username,'
-        ' skipping (vacancy=%s)",' + CRLF
-        + "                hr.id, vacancy_id," + CRLF
-        + "            )" + CRLF
-        + "            return False" + CRLF,
+        "backend/bot/send.py",
+        "    if target is None:" + CRLF
+        + "        logger.warning(" + CRLF
+        + '            "Bot.send: hr %s has no telegram_user_id or username,'     ' skipping (vacancy=%s)",' + CRLF
+        + "            hr.id, vacancy_id," + CRLF
+        + "        )" + CRLF
+        + "        return False" + CRLF,
         "",
     ),
     # send: выключенный режим перестаёт отбивать отправку
     (
-        "backend/bot/client.py",
-        "        if (await self._current_mode()) is BotMode.OFF:" + CRLF
-        + "            logger.warning(" + CRLF
-        + '                "Bot.send: BotMode.OFF, suppressed send to %s (vacancy=%s)",'
-        + CRLF,
-        "        if False:" + CRLF
-        + "            logger.warning(" + CRLF
-        + '                "Bot.send: BotMode.OFF, suppressed send to %s (vacancy=%s)",'
-        + CRLF,
+        "backend/bot/send.py",
+        "    if (await bot._current_mode()) is BotMode.OFF:" + CRLF
+        + "        logger.warning(" + CRLF
+        + '            "Bot.send: BotMode.OFF, suppressed send to %s (vacancy=%s)",'     + CRLF,
+        "    if False:" + CRLF
+        + "        logger.warning(" + CRLF
+        + '            "Bot.send: BotMode.OFF, suppressed send to %s (vacancy=%s)",'     + CRLF,
     ),
     # send: чёрный список перестаёт отбивать отправку
     (
-        "backend/bot/client.py",
-        "        if bl_value:" + CRLF
-        + "            logger.warning(" + CRLF
-        + '                "Bot.send: hr %s in blacklist (%s), suppressed (vacancy=%s)",'
-        + CRLF,
-        "        if False:" + CRLF
-        + "            logger.warning(" + CRLF
-        + '                "Bot.send: hr %s in blacklist (%s), suppressed (vacancy=%s)",'
-        + CRLF,
+        "backend/bot/send.py",
+        "    if bl_value:" + CRLF
+        + "        logger.warning(" + CRLF
+        + '            "Bot.send: hr %s in blacklist (%s), suppressed (vacancy=%s)",'     + CRLF,
+        "    if False:" + CRLF
+        + "        logger.warning(" + CRLF
+        + '            "Bot.send: hr %s in blacklist (%s), suppressed (vacancy=%s)",'     + CRLF,
     ),
     # send: адрес выбирается именем, а не номером
     (
-        "backend/bot/client.py",
-        "        target = hr.telegram_user_id or hr.telegram_username" + CRLF
-        + "        if target is None:" + CRLF
-        + "            logger.warning(",
-        "        target = hr.telegram_username or hr.telegram_user_id" + CRLF
-        + "        if target is None:" + CRLF
-        + "            logger.warning(",
+        "backend/bot/send.py",
+        "    target = hr.telegram_user_id or hr.telegram_username" + CRLF
+        + "    if target is None:" + CRLF
+        + "        logger.warning(",
+        "    target = hr.telegram_username or hr.telegram_user_id" + CRLF
+        + "    if target is None:" + CRLF
+        + "        logger.warning(",
     ),
     # send: тестовый режим перестаёт заглушать отправку
     (
-        "backend/bot/client.py",
-        "        suppressed = self._dry_run or telegram.SEND_LOCKED",
-        "        suppressed = telegram.SEND_LOCKED",
+        "backend/bot/send.py",
+        "    suppressed = bot._dry_run or telegram.SEND_LOCKED",
+        "    suppressed = telegram.SEND_LOCKED",
     ),
     # send: заглушенная отправка всё равно пишет сообщение в переписку
     (
-        "backend/bot/client.py",
-        "                if not suppressed:" + CRLF + "                    session.add(",
-        "                if True:" + CRLF + "                    session.add(",
+        "backend/bot/send.py",
+        "            if not suppressed:" + CRLF + "                session.add(",
+        "            if True:" + CRLF + "                session.add(",
     ),
     # send: срок запрета не запоминается
     (
-        "backend/bot/client.py",
-        '                        "flood_wait_until_ts", str(until)',
-        '                        "flood_wait_until_ts", "0"',
+        "backend/bot/send.py",
+        '                    "flood_wait_until_ts", str(until)',
+        '                    "flood_wait_until_ts", "0"',
     ),
     # send: удачная отправка запомненный запрет не снимает
     (
-        "backend/bot/client.py",
-        "        if not suppressed and self._rs.flood_wait_until_ts > 0:",
-        "        if False:",
+        "backend/bot/send.py",
+        "    if not suppressed and bot._rs.flood_wait_until_ts > 0:",
+        "    if False:",
     ),
     # send: ручная отправка перестаёт отличаться от авто
     (
-        "backend/bot/client.py",
-        "                        kind_label = (" + CRLF
-        + '                            "Ручная отправка."' + CRLF
-        + "                            if force" + CRLF,
-        "                        kind_label = (" + CRLF
-        + '                            "Ручная отправка."' + CRLF
-        + "                            if not force" + CRLF,
+        "backend/bot/send.py",
+        "                    kind_label = (" + CRLF
+        + '                        "Ручная отправка."' + CRLF
+        + "                        if force" + CRLF,
+        "                    kind_label = (" + CRLF
+        + '                        "Ручная отправка."' + CRLF
+        + "                        if not force" + CRLF,
     ),
     # send: признак ручной отправки не доходит до охраны статуса
     (
-        "backend/bot/client.py",
-        "                    if v is not None and should_apply_status(" + CRLF
-        + "                        v.status, VacancyStatus.APPLIED, force=force" + CRLF
-        + "                    ):" + CRLF
-        + "                        previous_status = v.status",
-        "                    if v is not None and should_apply_status(" + CRLF
-        + "                        v.status, VacancyStatus.APPLIED, force=False" + CRLF
-        + "                    ):" + CRLF
-        + "                        previous_status = v.status",
+        "backend/bot/send.py",
+        "                if v is not None and should_apply_status(" + CRLF
+        + "                    v.status, VacancyStatus.APPLIED, force=force" + CRLF
+        + "                ):" + CRLF
+        + "                    previous_status = v.status",
+        "                if v is not None and should_apply_status(" + CRLF
+        + "                    v.status, VacancyStatus.APPLIED, force=False" + CRLF
+        + "                ):" + CRLF
+        + "                    previous_status = v.status",
     ),
     # send: запасная перестановка статуса пропадает
     (
-        "backend/bot/client.py",
-        "                            v.status = VacancyStatus.APPLIED" + CRLF
-        + "                            await session.commit()" + CRLF,
-        "                            pass" + CRLF,
+        "backend/bot/send.py",
+        "                        v.status = VacancyStatus.APPLIED" + CRLF
+        + "                        await session.commit()" + CRLF,
+        "                        pass" + CRLF,
     ),
     # send: отметка о заглушенной отправке врёт
     (
-        "backend/bot/client.py",
-        '                                "suppressed": suppressed,',
-        '                                "suppressed": False,',
+        "backend/bot/send.py",
+        '                            "suppressed": suppressed,',
+        '                            "suppressed": False,',
     ),
     # mark_hr_chat_read: выключенный бот всё равно гасит непрочитанное
     (
