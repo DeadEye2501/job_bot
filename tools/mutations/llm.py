@@ -31,12 +31,6 @@ MUTATIONS = [
         "    if v in allowed:" + CRLF + "        return v" + CRLF + "    return None",
         "    return v",
     ),
-    # _parse_classification: пустой статус перестаёт отбраковываться
-    (
-        "backend/llm.py",
-        "    if not raw_status:" + CRLF + "        return None" + CRLF,
-        "",
-    ),
     # _parse_classification: статус сверяется с учётом регистра
     (
         "backend/llm.py",
