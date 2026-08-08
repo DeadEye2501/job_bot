@@ -14,9 +14,7 @@ import pytest
 
 from backend.models import VacancyStatus
 from backend.llm import classify_hr_reply
-from tests.fakes.llm import chat_json, chat_response, messages_of, provider
-
-CHAT = ("POST", "/v1/chat/completions")
+from tests.fakes.llm import CHAT, chat_json, chat_response, messages_of, provider
 
 
 def _allowed_line(client) -> str:

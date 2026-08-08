@@ -9,9 +9,8 @@ import json
 import httpx
 
 from backend.cv_parser import parse_cv
-from tests.fakes.llm import chat_response, provider
+from tests.fakes.llm import CHAT, chat_response, provider
 
-CHAT = ("POST", "/v1/chat/completions")
 
 MINIMAL_CV = (
     '{"profile": {"first_name": "Алексей", "last_name": "Фролов",'

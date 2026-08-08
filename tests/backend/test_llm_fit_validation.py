@@ -23,9 +23,7 @@ from backend.llm import (
     validate_vacancy_fit,
 )
 from tests.factories import parsed_vacancy
-from tests.fakes.llm import chat_response, provider
-
-CHAT = ("POST", "/v1/chat/completions")
+from tests.fakes.llm import CHAT, chat_response, provider
 
 
 def _answer(verdict, reason=None) -> httpx.Response:

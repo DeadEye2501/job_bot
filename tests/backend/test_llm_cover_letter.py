@@ -15,9 +15,8 @@ import pytest
 
 from backend.llm import generate_cover_letter
 from tests.factories import parsed_vacancy
-from tests.fakes.llm import chat_response, messages_of, provider
+from tests.fakes.llm import CHAT, chat_response, messages_of, provider
 
-CHAT = ("POST", "/v1/chat/completions")
 PASSES = '{"verdict": "ok", "issues": []}'
 
 

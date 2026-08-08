@@ -12,9 +12,7 @@ import httpx
 import pytest
 
 from backend.llm import parse_vacancy
-from tests.fakes.llm import chat_json, chat_response, messages_of, provider
-
-CHAT = ("POST", "/v1/chat/completions")
+from tests.fakes.llm import CHAT, chat_json, chat_response, messages_of, provider
 
 
 def _parsed(**fields) -> httpx.Response:
