@@ -49,7 +49,7 @@ MUTATIONS = [
     # _save_new_vacancy: вектор не попадает в кэш
     (
         "backend/flows/pipeline.py",
-        "                self._append_embedding(new_vacancy.id, embedding)" + CRLF,
+        "                embeddings._append_embedding(self, new_vacancy.id, embedding)" + CRLF,
         "",
     ),
     # _save_new_vacancy: повторное заведение выдаётся за успех
@@ -64,28 +64,28 @@ MUTATIONS = [
     ),
     # _ensure_embedding_cache: кэш перечитывается на каждом обходе
     (
-        "backend/flows/pipeline.py",
-        "        if self._embedding_cache_loaded:" + CRLF + "            return" + CRLF,
+        "backend/flows/embeddings.py",
+        "    if pipeline._embedding_cache_loaded:" + CRLF + "        return" + CRLF,
         "",
     ),
     # _ensure_embedding_cache: вакансии без вектора попадают в кэш
     (
-        "backend/flows/pipeline.py",
-        "                    select(Vacancy.id, Vacancy.embedding).where(" + CRLF
-        + "                        Vacancy.embedding.is_not(None)" + CRLF
-        + "                    )" + CRLF,
-        "                    select(Vacancy.id, Vacancy.embedding)" + CRLF,
+        "backend/flows/embeddings.py",
+        "                select(Vacancy.id, Vacancy.embedding).where(" + CRLF
+        + "                    Vacancy.embedding.is_not(None)" + CRLF
+        + "                )" + CRLF,
+        "                select(Vacancy.id, Vacancy.embedding)" + CRLF,
     ),
     # _drop_embedding: вычёркивание отсутствующего рушит кэш
     (
-        "backend/flows/pipeline.py",
-        "        if idx.size == 0:" + CRLF + "            return" + CRLF,
+        "backend/flows/embeddings.py",
+        "    if idx.size == 0:" + CRLF + "        return" + CRLF,
         "",
     ),
     # _delete_vacancy: вектор удалённой вакансии остаётся в кэше
     (
         "backend/flows/pipeline.py",
-        "        self._drop_embedding(vacancy_id)" + CRLF
+        "        embeddings._drop_embedding(self, vacancy_id)" + CRLF
         + '        logger.info("vacancy %d: deleted from DB and embedding cache", vacancy_id)'
         + CRLF,
         '        logger.info("vacancy %d: deleted from DB and embedding cache", vacancy_id)'
