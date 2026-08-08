@@ -17,9 +17,10 @@ from backend.models import (
     Vacancy,
     VacancyStatus,
 )
+from backend.crypto import encrypt_str
 from backend.payloads import FitValidation
 from backend.repository import list_vacancies
-from backend.runtime_settings import RuntimeSettings, encrypt_str
+from backend.runtime_settings import RuntimeSettings
 from tests.dbio import only_row, put
 from tests.factories import (
     hr_row,
@@ -238,15 +239,12 @@ def deliver(session_factory):
 
 
 @pytest.fixture
-async def parsing(make_pipeline, session_factory, monkeypatch):
-    """Конвейер с подставным разбором объявления и вакансия под него.
+async def unparsed_vacancy(session_factory):
+    """Неразобранная вакансия с чужим приговором.
 
-    Разбор проверяется двумя слайсами — приговор и запись, — и обоим нужно
-    одно: чтобы обращения к языковой модели отдавали заготовленное, а
-    оценка по навыкам не отсекала всё на пороге.
+    Приговор именно чужой: с умолчаниями «осталась новой» проверка была бы
+    верна и до разбора, то есть не стерегла бы ничего.
     """
-    # Строка заводится с чужим приговором: с умолчаниями «осталась новой»
-    # было бы верно и до разбора, и проверка ничего бы не стерегла.
     await put(
         session_factory,
         vacancy_row(
@@ -257,8 +255,17 @@ async def parsing(make_pipeline, session_factory, monkeypatch):
             skip_reason="прошлый отказ",
         ),
     )
-    vacancy = await only_row(session_factory, Vacancy)
+    return await only_row(session_factory, Vacancy)
 
+
+@pytest.fixture
+async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory):
+    """Конвейер с подставным разбором объявления.
+
+    Разбор проверяется двумя слайсами — приговор и запись, — и обоим нужно
+    одно: чтобы обращения к языковой модели отдавали заготовленное, а
+    оценка по навыкам не отсекала всё на пороге.
+    """
     pipeline = await make_pipeline(_known_hr_client())
     pipeline.parsed = parsed_vacancy(
         title="Python-разработчик",
@@ -279,7 +286,7 @@ async def parsing(make_pipeline, session_factory, monkeypatch):
     await put(session_factory, profile_skill_row(profile.id, "Python"))
     await pipeline._reload_resources()
     await pipeline._rs.set_app("scoring_threshold", "1")
-    return pipeline, vacancy
+    return pipeline, unparsed_vacancy
 
 
 @pytest.fixture

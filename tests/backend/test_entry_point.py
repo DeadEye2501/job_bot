@@ -42,7 +42,7 @@ def entry(clean_root_logger, monkeypatch):
         return 0
 
     monkeypatch.setattr(
-        "backend.runtime_settings._check_keyring_backend", check_keyring
+        "backend.crypto._check_keyring_backend", check_keyring
     )
     monkeypatch.setattr("backend.bootstrap.ensure_schema", ensure_schema)
     monkeypatch.setitem(
@@ -83,7 +83,7 @@ def test_a_broken_key_store_stops_the_launch(entry, monkeypatch, capsys):
     def refuse():
         raise RuntimeError("хранилище пишет пароли открытым текстом")
 
-    monkeypatch.setattr("backend.runtime_settings._check_keyring_backend", refuse)
+    monkeypatch.setattr("backend.crypto._check_keyring_backend", refuse)
 
     assert module.main() == 2
     assert order == []

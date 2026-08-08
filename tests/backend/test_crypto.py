@@ -1,4 +1,4 @@
-"""Следствия шифрования и маскирования в `backend/runtime_settings.py`.
+"""Следствия шифрования секретов в `backend/crypto.py`.
 
 Хранилище ключей подменено стендом на подставное, но сам Fernet настоящий:
 шифрование и расшифровка идут по-честному, подменён только источник ключа.
@@ -7,11 +7,8 @@
 import keyring
 import pytest
 
-from backend.runtime_settings import (
-    LlmProviderConfig,
-    TgAccountConfig,
+from backend.crypto import (
     _check_keyring_backend,
-    _mask_phone,
     decrypt_bytes,
     decrypt_str,
     encrypt_bytes,
@@ -51,55 +48,20 @@ def test_both_ciphertexts_decrypt_to_the_same_string():
 
 
 def test_encrypted_bytes_come_back_unchanged():
-    """Двоичные данные переживают тот же путь."""
-    assert decrypt_bytes(encrypt_bytes(b"\x00\xff\x10")) == b"\x00\xff\x10"
+    """Двоичные данные переживают тот же путь, и шифрует их тот же Fernet.
+
+    Одного тождества мало: пропускалка, отдающая своё же на вход, прошла бы
+    его. Префикс `gAAAAA` закрепляет алгоритм — как и у строкового двойника.
+    """
+    ciphertext = encrypt_bytes(b"\x00\xff\x10")
+
+    assert decrypt_bytes(ciphertext) == b"\x00\xff\x10"
+    assert ciphertext.startswith(b"gAAAAA")
 
 
 def test_an_empty_string_survives_encryption():
     """Пустая строка шифруется и расшифровывается наравне с непустой."""
     assert decrypt_str(encrypt_str("")) == ""
-
-
-@pytest.mark.parametrize(
-    "raw, expected",
-    [
-        (None, "***"),
-        ("", "***"),
-        ("12345", "***"),
-        ("1234567", "***4567"),
-        ("+79991234567", "***4567"),
-    ],
-)
-def test_a_phone_shows_only_its_last_four_digits(raw, expected):
-    """В журнал попадают только последние четыре цифры, короткое — целиком скрыто."""
-    assert _mask_phone(raw) == expected
-
-
-def test_tg_account_config_repr_hides_secrets_but_shows_the_rest():
-    """repr() учётной записи Telegram не содержит секретов, но показывает остальное."""
-    cfg = TgAccountConfig(
-        api_id=1, api_hash="шифр", phone="+79991234567",
-        password="пароль", session_string="сессия",
-    )
-
-    r = repr(cfg)
-
-    assert "шифр" not in r
-    assert "пароль" not in r
-    assert "сессия" not in r
-    assert "api_id=1" in r
-    assert "+79991234567" in r
-
-
-def test_llm_provider_config_repr_hides_the_key_but_shows_the_rest():
-    """repr() настройки провайдера не содержит ключа, но показывает остальное."""
-    cfg = LlmProviderConfig(base_url="http://a.test", api_key="sk-секрет", model="qwen")
-
-    r = repr(cfg)
-
-    assert "sk-секрет" not in r
-    assert "http://a.test" in r
-    assert "qwen" in r
 
 
 def test_a_sound_key_store_passes_the_preflight():

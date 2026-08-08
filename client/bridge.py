@@ -3410,7 +3410,7 @@ class MainApi(QObject):
             # all», а не «delete most».
             try:
                 import keyring as _keyring
-                from backend.runtime_settings import (
+                from backend.crypto import (
                     _KEYRING_SERVICE,
                     _KEYRING_KEY,
                 )
