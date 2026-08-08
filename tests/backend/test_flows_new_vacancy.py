@@ -10,6 +10,7 @@
 заведена первым.
 """
 
+from backend.flows import embeddings
 from backend.models import TelegramChannel, Vacancy, VacancyEvent
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row, vacancy_row
@@ -63,7 +64,7 @@ async def test_the_new_vector_joins_the_cache(make_pipeline):
     вакансии: второе сравнивалось бы с памятью, где первого ещё нет.
     """
     pipeline = await make_pipeline()
-    await pipeline._ensure_embedding_cache()
+    await embeddings._ensure_embedding_cache(pipeline)
 
     new_id = await pipeline._save_new_vacancy(None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1, 0.2])
 
@@ -112,7 +113,7 @@ async def test_a_refused_row_leaves_no_vector_behind(make_pipeline, session_fact
     await put(session_factory, channel_row(username="jobs"))
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
-    await pipeline._ensure_embedding_cache()
+    await embeddings._ensure_embedding_cache(pipeline)
     first = await pipeline._save_new_vacancy(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
     await pipeline._save_new_vacancy(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])

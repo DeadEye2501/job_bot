@@ -15,6 +15,7 @@ from backend.domain.salary import normalize_salary_to_rub_thousands
 from backend.domain.scoring import score_parsed
 from backend.domain.transitions import is_terminal_for_auto
 from backend.domain.verdict import decide_vacancy_status, is_empty_vacancy
+from backend.flows import embeddings
 from backend.helpers import (
     extract_dm_text,
     extract_text,
@@ -1282,7 +1283,7 @@ class IngestionPipeline:
             )
             return
 
-        await self._ensure_embedding_cache()
+        await embeddings._ensure_embedding_cache(self)
         similar_id = cosine_top_match(
             np.asarray(embedding, dtype=np.float32),
             self._embedding_ids,
@@ -1354,7 +1355,7 @@ class IngestionPipeline:
                     )
                 )
                 await session.commit()
-                self._append_embedding(new_vacancy.id, embedding)
+                embeddings._append_embedding(self, new_vacancy.id, embedding)
                 logger.info(
                     "[@%s] %d -> vacancy %d",
                     channel_username,
@@ -1684,41 +1685,6 @@ class IngestionPipeline:
             "advance_cursor: channel=%d -> msg_id=%d", channel_id, msg_id,
         )
 
-    async def _ensure_embedding_cache(self) -> None:
-        if self._embedding_cache_loaded:
-            return
-        async with self._session_factory() as session:
-            rows = (
-                await session.execute(
-                    select(Vacancy.id, Vacancy.embedding).where(
-                        Vacancy.embedding.is_not(None)
-                    )
-                )
-            ).all()
-        if rows:
-            self._embedding_ids = np.array(
-                [r.id for r in rows], dtype=np.int64
-            )
-            self._embedding_matrix = np.array(
-                [r.embedding for r in rows], dtype=np.float32
-            )
-        self._embedding_cache_loaded = True
-        logger.debug("Embedding cache loaded: %d vectors", len(rows))
-
-    def _append_embedding(self, vacancy_id: int, embedding: list[float]) -> None:
-        vec = np.asarray(embedding, dtype=np.float32)
-        self._embedding_ids = np.append(self._embedding_ids, vacancy_id)
-        if self._embedding_matrix.size == 0:
-            self._embedding_matrix = vec.reshape(1, -1)
-        else:
-            self._embedding_matrix = np.vstack([self._embedding_matrix, vec])
-
-    def _drop_embedding(self, vacancy_id: int) -> None:
-        idx = np.where(self._embedding_ids == vacancy_id)[0]
-        if idx.size == 0:
-            return
-        self._embedding_ids = np.delete(self._embedding_ids, idx)
-        self._embedding_matrix = np.delete(self._embedding_matrix, idx, axis=0)
 
     async def _delete_vacancy(self, vacancy_id: int) -> None:
         # Route through the public repository delete so children
@@ -1728,7 +1694,7 @@ class IngestionPipeline:
         async with self._session_factory() as session:
             await _repo_delete_vacancy(session, vacancy_id)
             await session.commit()
-        self._drop_embedding(vacancy_id)
+        embeddings._drop_embedding(self, vacancy_id)
         logger.info("vacancy %d: deleted from DB and embedding cache", vacancy_id)
         # Vacancy_count у HR/Company изменился — пушим refresh.
         self._fire_contacts_changed()
@@ -1756,7 +1722,7 @@ class IngestionPipeline:
             )
             await _repo_delete_vacancy(session, vacancy_id)
             await session.commit()
-        self._drop_embedding(vacancy_id)
+        embeddings._drop_embedding(self, vacancy_id)
         logger.info(
             "vacancy %d: deleted as trash (event recorded for channel=%s)",
             vacancy_id, channel_id,

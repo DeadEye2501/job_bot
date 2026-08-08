@@ -10,6 +10,7 @@
 нечего — строка вакансии исчезает целиком.
 """
 
+from backend.flows import embeddings
 import pytest
 
 from backend.models import (
@@ -49,7 +50,7 @@ async def with_a_vacancy(make_pipeline, session_factory):
         vacancy_event_row(vacancy.id),
     )
     pipeline = await make_pipeline()
-    await pipeline._ensure_embedding_cache()
+    await embeddings._ensure_embedding_cache(pipeline)
     return pipeline, vacancy, channel
 
 
