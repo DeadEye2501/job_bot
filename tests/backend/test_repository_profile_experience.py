@@ -49,7 +49,9 @@ async def test_places_are_listed_newest_first(session, session_factory):
     [
         pytest.param("company", "   ", "название компании", id="без компании"),
         pytest.param("role", "", "должность", id="без должности"),
-        pytest.param("start_date", None, "дата начала", id="без даты начала"),
+        pytest.param(
+            "start_date", None, "не заполнена дата начала", id="без даты начала"
+        ),
         pytest.param("start_date", "вчера", "неверная дата начала", id="дата не дата"),
         pytest.param("end_date", "завтра", "неверная дата окончания", id="конец не дата"),
     ],
@@ -57,7 +59,12 @@ async def test_places_are_listed_newest_first(session, session_factory):
 async def test_an_invalid_row_is_named_by_its_number(
     session, session_factory, field, value, problem
 ):
-    """Неверная строка отвергается с её номером и понятной причиной."""
+    """Неверная строка отвергается с её номером и понятной причиной.
+
+    Причина у пустой даты названа целиком, а не общей подстрокой: пустая
+    дата иначе попала бы в разбор и вернулась бы с сообщением «неверная
+    дата начала», а проверка по общей подстроке этого не отличила бы.
+    """
     profile = profile_row()
     await put(session_factory, profile)
 
