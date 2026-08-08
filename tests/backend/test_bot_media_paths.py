@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.bot import (
+from backend.bot.client import (
     MEDIA_DIR,
     _classify_media,
     _looks_like_photo,

@@ -87,7 +87,7 @@ async def process_dm(
 
     media_kind, media_name, media_path = None, None, None
     if client is not None:
-        from backend.bot import _classify_media, _download_media
+        from backend.bot.client import _classify_media, _download_media
         media_kind, media_name = _classify_media(msg)
         if media_kind is not None:
             media_path = await _download_media(client, msg, hr_lookup.id)
@@ -293,7 +293,7 @@ async def backfill_hr_dm_history(
                 "backfill: retry после FloodWait не помог hr %d", hr.id,
             )
             return
-    from backend.bot import _classify_media, _download_media
+    from backend.bot.client import _classify_media, _download_media
     had_new = False
     # Oldest-first so the chat order stays sane in the UI.
     for msg in reversed(messages):

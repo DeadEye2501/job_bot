@@ -290,7 +290,7 @@ def _media_url(stored_path: str | None) -> str | None:
     """
     if not stored_path:
         return None
-    from backend.bot import MEDIA_DIR
+    from backend.bot.client import MEDIA_DIR
     p = Path(stored_path)
     if not p.is_absolute():
         p = (MEDIA_DIR / p).resolve()
@@ -1016,7 +1016,7 @@ class MainApi(QObject):
         callback to surface it.
         """
         async def _build_and_run() -> None:
-            from backend.bot import Bot
+            from backend.bot.client import Bot
 
             logger.info("Constructing Bot and starting run loop")
             self._bot = Bot(self._rs, self._session_factory)
