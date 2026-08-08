@@ -29,7 +29,7 @@ from backend.models import (
     VacancyStatusHistory,
     profile_experience_skills,
 )
-from backend.domain import should_apply_status
+from backend.domain.transitions import should_apply_status
 from backend.payloads import (
     Classification,
     ChannelDetail,
@@ -2995,7 +2995,7 @@ async def mark_ghosted_vacancies(
     оборачивает в session.begin() и выполняет commit.
     """
     from datetime import datetime, timedelta, timezone
-    from backend.domain import GHOSTING_ELIGIBLE_FROM
+    from backend.domain.transitions import GHOSTING_ELIGIBLE_FROM
 
     # SQLite + aiosqlite возвращает наивные datetime'ы даже при
     # DateTime(timezone=True), поэтому для Python-side сравнения с

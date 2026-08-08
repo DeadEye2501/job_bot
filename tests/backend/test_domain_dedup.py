@@ -8,7 +8,7 @@
 import numpy as np
 import pytest
 
-from backend.domain import cosine_top_match
+from backend.domain.dedup import cosine_top_match
 
 IDS = np.array([10, 20, 30])
 MATRIX = np.array([[1.0, 0.0], [0.0, 1.0], [0.9, 0.1]], dtype=np.float32)

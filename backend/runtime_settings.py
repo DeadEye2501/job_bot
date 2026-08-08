@@ -82,7 +82,7 @@ _APP_DEFAULTS: dict[str, str] = {
     # ручная отправка из UI через «Отправить отклик» работает.
     "auto_apply": "true",
     # FX-rates для перевода salary в RUB при range-фильтрации. Раньше
-    # были hardcoded 90/100 в backend/domain.py — устаревали без
+    # были hardcoded 90/100 в backend/domain/salary.py — устаревали без
     # возможности крутить. Юзер обновляет вручную через DBeaver когда
     # курс реально дрейфует за пределы своего bucket'а.
     "salary_usd_to_rub": "90",

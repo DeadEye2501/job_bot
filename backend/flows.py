@@ -9,15 +9,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from adapters import lm_studio, telegram
-from backend.domain import (
-    check_blacklist,
-    cosine_top_match,
-    decide_vacancy_status,
-    is_empty_vacancy,
-    is_terminal_for_auto,
-    normalize_salary_to_rub_thousands,
-    score_parsed,
-)
+from backend.domain.blacklist import check_blacklist
+from backend.domain.dedup import cosine_top_match
+from backend.domain.salary import normalize_salary_to_rub_thousands
+from backend.domain.scoring import score_parsed
+from backend.domain.transitions import is_terminal_for_auto
+from backend.domain.verdict import decide_vacancy_status, is_empty_vacancy
 from backend.helpers import (
     extract_dm_text,
     extract_text,
@@ -199,7 +196,7 @@ async def process_dm(
     # State-machine gate: если вакансия уже в терминальном для авто-
     # классификатора статусе (Offer/Decline/Scam/Not Fit), вообще не
     # тратим LLM на её сообщения и не пишем призрачные строки в
-    # vacancy_status_history. См. backend/domain.py::ALLOWED_AUTO_TRANSITIONS.
+    # vacancy_status_history. См. backend/domain/transitions.py.
     # Сообщение уже сохранено выше — это аудит-след входящего DM,
     # его и достаточно.
     async with session_factory() as session:
@@ -849,7 +846,7 @@ class IngestionPipeline:
         каждой 2 SQL-запроса (max(message), max(history)). Если
         кандидатов нет — ранний return.
         """
-        from backend.domain import GHOSTING_TIMEOUT_DAYS
+        from backend.domain.transitions import GHOSTING_TIMEOUT_DAYS
         from backend.repository import mark_ghosted_vacancies
 
         try:

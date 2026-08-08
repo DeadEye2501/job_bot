@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, replace
 
 import httpx
 
+from backend.domain.transitions import ALLOWED_AUTO_TRANSITIONS
 from backend.models import VacancyStatus
 from backend.payloads import Classification, FitValidation, FitVerdict, ParsedVacancy
 
@@ -512,10 +513,6 @@ async def classify_hr_reply(
     """
     if not text:
         return None
-    # Импорт внутри функции чтобы избежать circular import
-    # (domain → models → этот файл косвенно через payloads).
-    from backend.domain import ALLOWED_AUTO_TRANSITIONS
-
     # Список для LLM: разрешённые next + сам current (no-op), минус
     # Ghosting (его LLM не должен выставлять — это таймер-механизм).
     allowed_set = set(ALLOWED_AUTO_TRANSITIONS[current_status])
