@@ -230,73 +230,69 @@ MUTATIONS = [
     ),
     # _send_application: короткая приписка не заменяет полное письмо
     (
-        "backend/flows/pipeline.py",
-        "        if prior_count == 0:",
-        "        if True:",
+        "backend/flows/apply.py",
+        "    if prior_count == 0:",
+        "    if True:",
     ),
     # _send_application: полное письмо шлётся и на второй вакансии
     (
-        "backend/flows/pipeline.py",
-        "        if prior_count == 0:",
-        "        if prior_count >= 0:",
+        "backend/flows/apply.py",
+        "    if prior_count == 0:",
+        "    if prior_count >= 0:",
     ),
     # _send_application: пустая анкета отправку не останавливает
     (
-        "backend/flows/pipeline.py",
-        "            if not self._profile_block:" + CRLF
-        + "                logger.warning(" + CRLF
-        + '                    "vacancy %d: profile_block empty, skipping send",' + CRLF,
-        "            if False:" + CRLF
-        + "                logger.warning(" + CRLF
-        + '                    "vacancy %d: profile_block empty, skipping send",' + CRLF,
+        "backend/flows/apply.py",
+        "        if not pipeline._profile_block:" + CRLF
+        + "            logger.warning(" + CRLF
+        + '                "vacancy %d: profile_block empty, skipping send",' + CRLF,
+        "        if False:" + CRLF
+        + "            logger.warning(" + CRLF
+        + '                "vacancy %d: profile_block empty, skipping send",' + CRLF,
     ),
     # _send_application: отсутствие резюме отправку не останавливает
     (
-        "backend/flows/pipeline.py",
-        "            if cv_path is None or not cv_path.is_file():",
-        "            if False:",
+        "backend/flows/apply.py",
+        "        if cv_path is None or not cv_path.is_file():",
+        "        if False:",
     ),
     # _send_application: защита от повторной отправки снимается
     (
-        "backend/flows/pipeline.py",
-        "            if not force and v.status == VacancyStatus.APPLIED:",
-        "            if False:",
+        "backend/flows/apply.py",
+        "        if not force and v.status == VacancyStatus.APPLIED:",
+        "        if False:",
     ),
     # _send_application: решение пользователя защиту не перебивает
     (
-        "backend/flows/pipeline.py",
-        "            if not force and v.status == VacancyStatus.APPLIED:",
-        "            if v.status == VacancyStatus.APPLIED:",
+        "backend/flows/apply.py",
+        "        if not force and v.status == VacancyStatus.APPLIED:",
+        "        if v.status == VacancyStatus.APPLIED:",
     ),
     # _try_auto_send: окно запрета частоты перестаёт держать автоотправку
     (
-        "backend/flows/pipeline.py",
-        "            if remaining > 0:",
-        "            if False:",
+        "backend/flows/apply.py",
+        "        if remaining > 0:",
+        "        if False:",
     ),
     # send_application_for_vacancy: вакансия без HR всё равно идёт в отправку
     (
-        "backend/flows/pipeline.py",
-        "            if v.hr is None:" + CRLF
-        + "                logger.warning(" + CRLF
-        + '                    "send_application: vacancy %d has no HR linked", vacancy_id'
-        + CRLF,
-        "            if False:" + CRLF
-        + "                logger.warning(" + CRLF
-        + '                    "send_application: vacancy %d has no HR linked", vacancy_id'
-        + CRLF,
+        "backend/flows/apply.py",
+        "        if v.hr is None:" + CRLF
+        + "            logger.warning(" + CRLF
+        + '                "send_application: vacancy %d has no HR linked", vacancy_id'     + CRLF,
+        "        if False:" + CRLF
+        + "            logger.warning(" + CRLF
+        + '                "send_application: vacancy %d has no HR linked", vacancy_id'     + CRLF,
     ),
     # send_application_for_vacancy: повторное нажатие не отбивается
     (
-        "backend/flows/pipeline.py",
-        "            if v.status == VacancyStatus.APPLIED:" + CRLF
-        + "                logger.info(" + CRLF
-        + '                    "send_application: vacancy %d already APPLIED, refusing re-send",'
-        + CRLF,
-        "            if False:" + CRLF
-        + "                logger.info(" + CRLF
-        + '                    "send_application: vacancy %d already APPLIED, refusing re-send",'
-        + CRLF,
+        "backend/flows/apply.py",
+        "        if v.status == VacancyStatus.APPLIED:" + CRLF
+        + "            logger.info(" + CRLF
+        + '                "send_application: vacancy %d already APPLIED, refusing re-send",'     + CRLF,
+        "        if False:" + CRLF
+        + "            logger.info(" + CRLF
+        + '                "send_application: vacancy %d already APPLIED, refusing re-send",'     + CRLF,
     ),
     # recover_orphan_vacancies: разобранные вакансии подбираются заново
     (

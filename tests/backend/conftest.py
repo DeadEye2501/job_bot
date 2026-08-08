@@ -1,5 +1,6 @@
 """Фикстуры, общие для тестов слоя `backend`."""
 
+from backend.flows import apply
 from backend.flows import dm_classify
 import asyncio
 import logging
@@ -208,11 +209,11 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
         pipeline.validated = True
         return pipeline.verdict
 
-    async def try_auto_send(hr, parsed, vacancy_id):
+    async def try_auto_send(pipeline, hr, parsed, vacancy_id):
         pipeline.asked_to_send.append(vacancy_id)
         return True, "sent"
 
-    pipeline._try_auto_send = try_auto_send
+    monkeypatch.setattr(apply, "_try_auto_send", try_auto_send)
     monkeypatch.setattr("backend.flows.pipeline.parse_vacancy", parse_vacancy)
     monkeypatch.setattr("backend.flows.pipeline.validate_vacancy_fit", validate_vacancy_fit)
 
