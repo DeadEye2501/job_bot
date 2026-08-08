@@ -77,36 +77,36 @@ MUTATIONS = [
     ),
     # send_to_hr_media: картинка уходит документом
     (
-        "backend/bot/client.py",
-        "        if as_photo:" + CRLF
-        + "            pyro_msg = await self._client.send_photo(target, str(src))" + CRLF
-        + "        else:" + CRLF
-        + "            pyro_msg = await self._client.send_document(target, str(src))" + CRLF,
-        "        pyro_msg = await self._client.send_document(target, str(src))" + CRLF,
+        "backend/bot/chat.py",
+        "    if as_photo:" + CRLF
+        + "        pyro_msg = await bot._client.send_photo(target, str(src))" + CRLF
+        + "    else:" + CRLF
+        + "        pyro_msg = await bot._client.send_document(target, str(src))" + CRLF,
+        "    pyro_msg = await bot._client.send_document(target, str(src))" + CRLF,
     ),
     # send_to_hr_media: предел размера перестаёт зависеть от вида файла
     (
-        "backend/bot/client.py",
-        "        cap = media.PHOTO_SIZE_LIMIT if as_photo else media.DOCUMENT_SIZE_LIMIT",
-        "        cap = media.DOCUMENT_SIZE_LIMIT",
+        "backend/bot/chat.py",
+        "    cap = media.PHOTO_SIZE_LIMIT if as_photo else media.DOCUMENT_SIZE_LIMIT",
+        "    cap = media.DOCUMENT_SIZE_LIMIT",
     ),
     # send_to_hr_media: предел становится исключающим
     (
-        "backend/bot/client.py",
-        "        if size > cap:",
-        "        if size >= cap:",
+        "backend/bot/chat.py",
+        "    if size > cap:",
+        "    if size >= cap:",
     ),
     # send_to_hr_media: имя запоминается и у картинки
     (
-        "backend/bot/client.py",
-        "        media_name = None if as_photo else src.name",
-        "        media_name = src.name",
+        "backend/bot/chat.py",
+        "    media_name = None if as_photo else src.name",
+        "    media_name = src.name",
     ),
     # send_to_hr_media: несуществующий путь перестаёт отбиваться
     (
-        "backend/bot/client.py",
-        "        if not src.exists() or not src.is_file():" + CRLF
-        + '            raise RuntimeError(f"Файл не найден: {file_path}")' + CRLF,
+        "backend/bot/chat.py",
+        "    if not src.exists() or not src.is_file():" + CRLF
+        + '        raise RuntimeError(f"Файл не найден: {file_path}")' + CRLF,
         "",
     ),
 ]
