@@ -41,9 +41,29 @@ def chat(*, title=None, photo=None, **extra) -> SimpleNamespace:
     return SimpleNamespace(title=title, photo=photo, **extra)
 
 
-def user(*, is_bot=False, is_deleted=False, photo=None, **extra) -> SimpleNamespace:
-    """Собеседник Telegram."""
-    return SimpleNamespace(is_bot=is_bot, is_deleted=is_deleted, photo=photo, **extra)
+def user(
+    *,
+    is_bot=False,
+    is_deleted=False,
+    photo=None,
+    first_name=None,
+    last_name=None,
+    **extra,
+) -> SimpleNamespace:
+    """Собеседник Telegram.
+
+    Имя и фамилия заданы всегда, пусть и пустые: у настоящего собеседника
+    эти поля есть, и заведение HR читает их напрямую. Без них подделка
+    роняет боевой код там, где он работает.
+    """
+    return SimpleNamespace(
+        is_bot=is_bot,
+        is_deleted=is_deleted,
+        photo=photo,
+        first_name=first_name,
+        last_name=last_name,
+        **extra,
+    )
 
 
 class FakeTelegramClient:
