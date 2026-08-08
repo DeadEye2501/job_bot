@@ -7,6 +7,7 @@ from contextlib import suppress
 import pytest
 
 from backend.bot import MEDIA_DIR, Bot
+from backend.flows import IngestionPipeline
 from backend.models import (
     HR,
     BotMode,
@@ -81,6 +82,67 @@ def make_bot(session_factory, monkeypatch):
         return Bot(settings, session_factory, dry_run=dry_run)
 
     return build
+
+
+@pytest.fixture
+def make_pipeline(session_factory):
+    """Собирает `IngestionPipeline` на подделках вместо живых соединений.
+
+    Настоящий конвейер держит клиента Pyrogram и два клиента httpx.
+    Отдельно от `make_bot` он нужен потому, что проверяется сам конвейер, а
+    не бот вокруг него: собирать ради него бота значило бы тащить в тест
+    обработчики, цикл и настройки, к делу не относящиеся.
+
+    Отправка письма подменяется списком: конвейер зовёт её как обычную
+    сопрограмму, а тест смотрит, что и кому ушло.
+    """
+
+    async def build(client=None, *, sends=None):
+        settings = await RuntimeSettings.load(session_factory)
+        outgoing = sends if sends is not None else []
+
+        async def send(hr, text, attachment=None, vacancy_id=None, *, force=False):
+            outgoing.append((hr.id, text, attachment, vacancy_id, force))
+            return True
+
+        pipeline = IngestionPipeline(
+            client=client if client is not None else FakeTelegramClient(),
+            session_factory=session_factory,
+            lm_client=LmClient("http://provider.test"),
+            lm_embed_client=LmClient("http://provider.test"),
+            lm_chat_model="qwen",
+            lm_embed_model="bge",
+            send=send,
+            runtime_settings=settings,
+        )
+        pipeline.sent = outgoing
+        return pipeline
+
+    return build
+
+
+@pytest.fixture
+async def dm_pipeline(make_pipeline):
+    """Конвейер с подставным разбором ответа HR и невзводящимся таймером.
+
+    Накопитель входящих проверяется двумя слайсами — что в нём копится и
+    что с ним делает остановка, — и обоим нужно одно: чтобы разбор не
+    уходил в языковую модель и не срабатывал сам по себе. Тест, которому
+    нужно срабатывание, ставит своё ожидание.
+    """
+    built = await make_pipeline()
+    built.DM_CLASSIFY_DEBOUNCE_SEC = 30
+    built.classified = []
+
+    async def classify(hr_id):
+        built.classified.append(
+            (hr_id, list(built._dm_classify_buffer.get(hr_id, [])))
+        )
+        built._dm_classify_buffer.pop(hr_id, None)
+
+    built._classify_and_apply_for_hr = classify
+    yield built
+    await built.cancel_pending_dm_classifications()
 
 
 class Outbox:
