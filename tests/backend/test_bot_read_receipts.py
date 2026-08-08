@@ -98,6 +98,40 @@ async def test_the_read_mark_goes_to_telegram_too(chatting, session_factory):
     assert client.read_calls == [777]
 
 
+async def test_an_hr_known_only_by_name_is_marked_read_by_name(
+    chatting, session_factory
+):
+    """У HR без номера отметка уходит по имени.
+
+    Номер заводится позже, при первом разборе; до того имя — всё, что
+    есть, и молчать из-за его отсутствия значило бы не гасить подсветку
+    на телефоне вовсе.
+    """
+    bot, client, hr = await chatting(telegram_username="maria", telegram_user_id=None)
+    await put(session_factory, message_row(hr_id=hr.id, is_incoming=True, read_at=None))
+
+    await bot.mark_hr_chat_read(hr.id)
+
+    assert client.read_calls == ["maria"]
+
+
+async def test_an_hr_without_an_address_is_still_marked_read_locally(
+    chatting, session_factory
+):
+    """У HR без адреса непрочитанное гасится, а Telegram не трогают.
+
+    Счётчик в окне важнее подсветки на телефоне: слать отметку некуда, но
+    прочитанное всё равно прочитано.
+    """
+    bot, client, hr = await chatting(telegram_username=None, telegram_user_id=None)
+    await put(session_factory, message_row(hr_id=hr.id, is_incoming=True, read_at=None))
+
+    assert await bot.mark_hr_chat_read(hr.id) == 1
+
+    assert (await only_row(session_factory, Message)).read_at is not None
+    assert client.read_calls == []
+
+
 async def test_nothing_new_means_nothing_sent_to_telegram(chatting, session_factory):
     """Когда гасить нечего, Telegram не беспокоят."""
     bot, client, hr = await chatting(telegram_user_id=777)

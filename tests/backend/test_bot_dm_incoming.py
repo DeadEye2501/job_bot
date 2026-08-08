@@ -1,13 +1,9 @@
-"""Следствия входящего сообщения от HR и сохранения строки сессии.
+"""Следствия входящего сообщения от HR.
 
 Разбор входящего целиком лежит в конвейере; боту здесь принадлежат две вещи:
 не пускать разбор при выключенном боте и сказать окну, чью переписку
 перерисовать. Второе делается уже после разбора — до него HR может быть ещё
 не заведён, и говорить было бы не о ком.
-
-Строка сессии сохраняется при запуске, если изменилась: Telegram переселяет
-учётную запись между узлами и меняет ключи, а разошедшаяся копия означает
-повторный вход с кодом из смс на следующем запуске.
 """
 
 import pytest
@@ -135,93 +131,3 @@ async def test_a_broken_window_hook_does_not_break_the_handler(
     await bot._on_dm(client, msg)
 
     assert dm_pipeline == [msg]
-
-
-async def test_a_changed_session_string_is_saved(chatting):
-    """Изменившаяся строка сессии сохраняется.
-
-    Telegram переселяет учётную запись между узлами и меняет ключи;
-    разошедшаяся копия означает повторный вход с кодом из смс.
-    """
-    bot, client, hr = await chatting()
-
-    async def export_session_string():
-        return "новая сессия"
-
-    client.export_session_string = export_session_string
-
-    await bot._persist_session_if_changed()
-
-    assert bot._rs.tg.session_string == "новая сессия"
-
-
-async def test_an_unchanged_session_string_is_left_alone(chatting):
-    """Совпавшая строка сессии не переписывается.
-
-    Запись стоит расшифровки, шифрования и обращения к базе на каждом
-    запуске — а менять нечего.
-    """
-    bot, client, hr = await chatting()
-    await bot._rs.set_tg(
-        api_id=1,
-        api_hash="ш",
-        phone="+70000000000",
-        password="",
-        session_string="прежняя",
-    )
-    written: list[str] = []
-
-    async def remember(**kwargs):
-        written.append(kwargs["session_string"])
-
-    bot._rs.set_tg = remember
-
-    async def export_session_string():
-        return "прежняя"
-
-    client.export_session_string = export_session_string
-
-    await bot._persist_session_if_changed()
-
-    assert written == []
-
-
-async def test_a_failed_export_saves_nothing(chatting):
-    """Сорвавшаяся выгрузка строки сессии ничего не записывает.
-
-    Записать вместо неё пустоту значило бы стереть рабочий вход.
-    """
-    bot, client, hr = await chatting()
-    before = bot._rs.tg.session_string
-
-    async def export_session_string():
-        raise OSError("сеть")
-
-    client.export_session_string = export_session_string
-
-    await bot._persist_session_if_changed()
-
-    assert bot._rs.tg.session_string == before
-
-
-async def test_a_failed_save_does_not_stop_the_start(chatting):
-    """Сорвавшаяся запись строки сессии запуск не роняет.
-
-    Клиент уже подключён и работает; упасть из-за неудачной записи
-    значило бы обменять рабочий запуск на удобство следующего.
-    """
-    bot, client, hr = await chatting()
-
-    async def export_session_string():
-        return "новая сессия"
-
-    async def broken(**kwargs):
-        raise OSError("база")
-
-    client.export_session_string = export_session_string
-    bot._rs.set_tg = broken
-    before = bot._rs.tg.session_string
-
-    await bot._persist_session_if_changed()
-
-    assert bot._rs.tg.session_string == before

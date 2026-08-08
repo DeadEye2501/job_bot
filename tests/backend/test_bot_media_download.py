@@ -8,63 +8,38 @@
 равно сохранится, просто без файла.
 """
 
-from pathlib import Path
-
 import pytest
 
 from backend.bot import MEDIA_DIR, _download_media
-from tests.fakes.telegram import message
-
-
-class _Downloader:
-    """Подделка клиента: пишет файл туда, куда просят, и запоминает вызовы."""
-
-    def __init__(self, *, error=None, returns_nothing=False):
-        self._error = error
-        self._returns_nothing = returns_nothing
-        self.calls: list[tuple[int, str]] = []
-
-    async def download_media(self, msg, file_name):
-        self.calls.append((msg.id, file_name))
-        if self._error is not None:
-            raise self._error
-        if self._returns_nothing:
-            return None
-        Path(file_name).write_bytes(b"file")
-        return file_name
-
-
-def _document(name: str | None):
-    """Сообщение с документом заданного имени."""
-    doc = type("Doc", (), {"file_name": name})()
-    return message(id=42, photo=None, document=doc)
+from tests.fakes.telegram import FakeTelegramClient, document, message
 
 
 async def test_a_message_without_media_downloads_nothing():
     """Сообщение без вложения скачивать нечего, и клиент не трогается."""
-    client = _Downloader()
+    client = FakeTelegramClient()
 
     assert await _download_media(client, message(id=42), 7) is None
-    assert client.calls == []
+    assert client.download_calls == []
 
 
 async def test_a_photo_is_saved_as_a_jpeg():
     """Картинка сохраняется с расширением jpeg: Telegram отдаёт их только так."""
-    client = _Downloader()
+    client = FakeTelegramClient()
+    msg = message(id=42, photo=object())
 
-    got = await _download_media(client, message(id=42, photo=object()), 7)
+    got = await _download_media(client, msg, 7)
 
     assert got == "7/42.jpg"
-    assert client.calls == [(42, str(MEDIA_DIR / "7" / "42.jpg"))]
+    assert client.download_calls == [msg]
+    assert client.download_paths == [str(MEDIA_DIR / "7" / "42.jpg")]
 
 
 async def test_a_document_keeps_the_extension_of_its_name():
     """Документ сохраняется с расширением из своего имени."""
-    client = _Downloader()
+    client = FakeTelegramClient()
+    msg = message(id=42, photo=None, document=document("Тестовое.pdf"))
 
-    got = await _download_media(client, _document("Тестовое.pdf"), 7)
-
-    assert got == "7/42.pdf"
+    assert await _download_media(client, msg, 7) == "7/42.pdf"
 
 
 @pytest.mark.parametrize(
@@ -81,11 +56,10 @@ async def test_a_document_without_a_usable_name_gets_a_neutral_extension(name):
     Файл без расширения вовсе неудобен пользователю, а угадывать по
     содержимому здесь нечем.
     """
-    client = _Downloader()
+    client = FakeTelegramClient()
+    msg = message(id=42, photo=None, document=document(name))
 
-    got = await _download_media(client, _document(name), 7)
-
-    assert got == "7/42.bin"
+    assert await _download_media(client, msg, 7) == "7/42.bin"
 
 
 async def test_an_already_downloaded_file_is_not_fetched_again():
@@ -97,12 +71,12 @@ async def test_an_already_downloaded_file_is_not_fetched_again():
     target = MEDIA_DIR / "7" / "42.jpg"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes("уже здесь".encode())
-    client = _Downloader()
+    client = FakeTelegramClient()
 
     got = await _download_media(client, message(id=42, photo=object()), 7)
 
     assert got == "7/42.jpg"
-    assert client.calls == []
+    assert client.download_calls == []
     assert target.read_bytes() == "уже здесь".encode()
 
 
@@ -112,13 +86,13 @@ async def test_a_failed_download_does_not_break_the_message():
     Текст сообщения сохранится и без файла: потерять переписку из-за
     неудачной загрузки картинки было бы хуже.
     """
-    client = _Downloader(error=OSError("диск отвалился"))
+    client = FakeTelegramClient(fails={"download_media": OSError("диск отвалился")})
 
     assert await _download_media(client, message(id=42, photo=object()), 7) is None
 
 
 async def test_a_download_that_returned_nothing_yields_nothing():
     """Скачивание, ничего не вернувшее, вложения не даёт."""
-    client = _Downloader(returns_nothing=True)
+    client = FakeTelegramClient(media=None)
 
     assert await _download_media(client, message(id=42, photo=object()), 7) is None

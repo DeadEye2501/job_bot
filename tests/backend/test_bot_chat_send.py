@@ -15,7 +15,7 @@ import pytest
 from backend.models import BotMode, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import blacklist_row, message_row
-from tests.fakes.telegram import SENT_AT, FakeTelegramClient
+from tests.fakes.telegram import SENT_AT
 
 
 async def test_a_message_reaches_the_hr_and_the_chat(
@@ -142,23 +142,18 @@ async def test_a_message_the_handler_already_saved_is_not_doubled(
     """
     bot, client, hr = await chatting()
 
-    class Racing(FakeTelegramClient):
-        """Пока идёт отправка, строку успевает сохранить обработчик."""
+    async def saved_by_the_handler(answer):
+        await put(
+            session_factory,
+            message_row(
+                hr_id=hr.id,
+                is_incoming=False,
+                tg_message_id=answer.id,
+                text="сохранено обработчиком",
+            ),
+        )
 
-        async def send_message(self, target, text):
-            answer = await super().send_message(target, text)
-            await put(
-                session_factory,
-                message_row(
-                    hr_id=hr.id,
-                    is_incoming=False,
-                    tg_message_id=answer.id,
-                    text="сохранено обработчиком",
-                ),
-            )
-            return answer
-
-    bot._client = Racing()
+    client.on_send = saved_by_the_handler
 
     row = await bot.send_to_hr_chat(hr.id, "здравствуйте")
 

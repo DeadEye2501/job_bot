@@ -17,8 +17,8 @@ import pytest
 from backend.bot import MEDIA_DIR
 from backend.models import BotMode, Message
 from tests.dbio import only_row, put
-from tests.factories import blacklist_row
-from tests.fakes.telegram import SENT_AT, FakeTelegramClient
+from tests.factories import blacklist_row, message_row
+from tests.fakes.telegram import SENT_AT
 
 
 def _file(tmp_path, name: str, size: int = 4):
@@ -97,15 +97,10 @@ async def test_a_failed_copy_does_not_lose_the_message(
     bot, client, hr = await chatting()
     src = _file(tmp_path, "снимок.png")
 
-    class Vanishing(FakeTelegramClient):
-        """Файл исчезает сразу после отправки — копировать станет нечего."""
+    async def vanishes(answer):
+        src.unlink()
 
-        async def send_photo(self, target, path):
-            answer = await super().send_photo(target, path)
-            src.unlink()
-            return answer
-
-    bot._client = Vanishing()
+    client.on_send = vanishes
 
     row = await bot.send_to_hr_media(hr.id, str(src))
 
@@ -261,25 +256,18 @@ async def test_a_file_the_handler_already_saved_is_not_doubled(
     bot, client, hr = await chatting()
     src = _file(tmp_path, "снимок.png")
 
-    class Racing(FakeTelegramClient):
-        """Пока идёт отправка, строку успевает сохранить обработчик."""
+    async def saved_by_the_handler(answer):
+        await put(
+            session_factory,
+            message_row(
+                hr_id=hr.id,
+                is_incoming=False,
+                tg_message_id=answer.id,
+                text="сохранено обработчиком",
+            ),
+        )
 
-        async def send_photo(self, target, path):
-            answer = await super().send_photo(target, path)
-            from tests.factories import message_row
-
-            await put(
-                session_factory,
-                message_row(
-                    hr_id=hr.id,
-                    is_incoming=False,
-                    tg_message_id=answer.id,
-                    text="сохранено обработчиком",
-                ),
-            )
-            return answer
-
-    bot._client = Racing()
+    client.on_send = saved_by_the_handler
 
     row = await bot.send_to_hr_media(hr.id, str(src))
 

@@ -171,24 +171,20 @@ async def test_a_full_turn_walks_the_channels(chatting, caught_up):
     assert pipeline.full_calls == 1
 
 
-async def test_a_running_manual_poll_is_not_clobbered(chatting, caught_up):
+async def test_a_running_manual_poll_is_not_clobbered(chatting, caught_up, busy_slot):
     """Идущий ручной прогон оборотом не перебивается.
 
     Иначе два цикла крутились бы разом и дрались за кэш векторов и
     курсоры каналов.
     """
-    import asyncio
-
     bot, client, _ = await chatting(mode=BotMode.FULL)
     pipeline = FakeIngestion()
     wire(bot, pipeline)
-    bot._current_poll_task = asyncio.create_task(asyncio.sleep(30))
+    busy_slot(bot)
 
     await bot.run(once=True)
 
     assert pipeline.full_calls == 0
-
-    bot._current_poll_task.cancel()
 
 
 async def test_the_window_hears_both_ends_of_a_full_turn(chatting, caught_up):
@@ -227,9 +223,16 @@ async def test_leaving_the_loop_marks_the_shutdown_before_disconnecting(
     assert pipeline.log[-2:] == ["гасим", "отмена разбора"]
 
 
-async def test_leaving_the_loop_closes_the_model_connections(chatting, caught_up):
-    """Выход из цикла закрывает оба соединения с языковой моделью."""
-    bot, _, _ = await _one_turn(chatting, BotMode.OFF)
+async def test_leaving_the_loop_closes_both_model_connections(make_bot, caught_up):
+    """Выход из цикла закрывает оба соединения с языковой моделью.
+
+    Соединений два, когда чат и векторы живут на разных адресах. Забытое
+    открытым переживает бота и держит гнездо до конца работы приложения.
+    """
+    bot = wire(await make_bot(embed_url="http://векторы.test"), FakeIngestion())
+    assert bot._lm_embed_client is not bot._lm_client
+
+    await bot.run(once=True)
 
     assert bot._lm_client.closed == 1
     assert bot._lm_embed_client.closed == 1

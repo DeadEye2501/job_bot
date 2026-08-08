@@ -17,12 +17,18 @@ from tests.fakes.telegram import chat, message, user
 
 
 def _edit(*, chat_id=777, username=None, msg_id=10, text="новая редакция", mine=False):
-    """Правка сообщения в личной переписке."""
+    """Правка сообщения в личной переписке.
+
+    Отправитель проставлен и у своего сообщения: Pyrogram заполняет его в
+    обе стороны, и подделка, гасящая его вместе с признаком «своё»,
+    закрыла бы оба условия сразу — тогда ни одно из них по отдельности не
+    было бы проверено.
+    """
     return message(
         id=msg_id,
         text=text,
         chat=chat(id=chat_id, username=username),
-        from_user=None if mine else user(id=chat_id),
+        from_user=user(id=chat_id),
         outgoing=mine,
     )
 
@@ -205,5 +211,54 @@ async def test_a_broken_window_hook_does_not_lose_the_edit(chatting, session_fac
     bot.on_new_message = broken
 
     await bot._on_dm_edit(client, _edit())
+
+    assert (await only_row(session_factory, Message)).text == "новая редакция"
+
+
+async def test_an_edit_of_a_message_without_a_sender_lands_on_the_outgoing_row(
+    chatting, session_factory
+):
+    """Правка сообщения без отправителя правит исходящую строку.
+
+    Отправителя не бывает у служебных записей и пересылок из каналов.
+    Считать такую правку входящей значило бы искать строку не в той
+    половине переписки.
+    """
+    bot, client, hr = await chatting(telegram_user_id=777)
+    bot._ingestion = FakeIngestion()
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="входящее"),
+        message_row(hr_id=hr.id, is_incoming=False, tg_message_id=10, text="своё"),
+    )
+    faceless = message(
+        id=10,
+        text="новая редакция",
+        chat=chat(id=777, username=None),
+        from_user=None,
+        outgoing=False,
+    )
+
+    await bot._on_dm_edit(client, faceless)
+
+    by_direction = {m.is_incoming: m for m in await all_rows(session_factory, Message)}
+    assert by_direction[False].text == "новая редакция"
+    assert by_direction[True].text == "входящее"
+
+
+async def test_an_edit_finds_an_hr_known_only_by_name(chatting, session_factory):
+    """Правка находит HR, известного только по имени.
+
+    Номер собеседника у строки заводится позже, при первом разборе; до
+    того опознать её можно лишь по имени из переписки.
+    """
+    bot, client, hr = await chatting(telegram_username="maria", telegram_user_id=None)
+    bot._ingestion = FakeIngestion()
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="старая"),
+    )
+
+    await bot._on_dm_edit(client, _edit(chat_id=999, username="maria"))
 
     assert (await only_row(session_factory, Message)).text == "новая редакция"

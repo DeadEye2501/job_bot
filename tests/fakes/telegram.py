@@ -3,10 +3,17 @@
 Реализованы только те методы, которые проект действительно зовёт. Неизвестный
 метод даёт `AttributeError` сам собой — объекта-заглушки здесь нет намеренно:
 заглушка превращает «код зовёт не то» в зелёный тест.
+
+Расхождение подделки с настоящим клиентом опаснее её отсутствия: боевой код
+почти везде обёрнут широким `except`, и неверная подпись метода приходит туда
+же, куда пришла бы сетевая ошибка. Проверка «не качали» после этого зелена
+при любом исходе. Поэтому подписи здесь повторяют настоящие, а не удобные.
 """
 
+import asyncio
 import io
 from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 # Метка времени у исходящего — своя, не «сейчас»: тест сверяет её с тем, что
@@ -24,6 +31,11 @@ def photo(*, small_file_id=None, big_file_id=None) -> SimpleNamespace:
     return SimpleNamespace(small_file_id=small_file_id, big_file_id=big_file_id)
 
 
+def document(name: str | None) -> SimpleNamespace:
+    """Вложенный документ. Имя бывает и пустым, и отсутствующим."""
+    return SimpleNamespace(file_name=name)
+
+
 def chat(*, title=None, photo=None, **extra) -> SimpleNamespace:
     """Канал или чат в том виде, в каком его отдаёт `get_chat`."""
     return SimpleNamespace(title=title, photo=photo, **extra)
@@ -37,21 +49,40 @@ def user(*, is_bot=False, is_deleted=False, photo=None, **extra) -> SimpleNamesp
 class FakeTelegramClient:
     """Отдаёт заранее положенное и записывает, о чём его спрашивали."""
 
-    def __init__(self, *, users=None, avatar=None, chats=None, fails=None) -> None:
+    def __init__(
+        self, *, users=None, avatar=None, chats=None, media=b"file", fails=None
+    ) -> None:
         """`fails` — что бросить вместо ответа, по имени метода."""
         self._users = users or {}
         self._avatar = avatar
         self._chats = chats or {}
+        self._media = media
         self._fails = fails or {}
         self.get_users_calls: list[str] = []
         self.get_chat_calls: list[str] = []
-        self.download_calls: list[str] = []
+        self.download_calls: list = []
+        self.download_paths: list[str] = []
         self.read_calls: list = []
         self.outgoing: list[tuple] = []
         self.handlers: list = []
         self.lifecycle: list[str] = []
         self.last_message_id = 500
         self.session_string = "шифр"
+        self.logged_out = False
+        # Вклиниться в середину вызова: так проверяется гонка со встречным
+        # обработчиком, который успевает записать строку, пока идёт обращение.
+        self.on_send = None
+        self.on_download = None
+
+    @property
+    def loop(self):
+        """Цикл событий. Есть и у настоящего клиента: в паре с `executor`
+        через него Pyrogram уводит несопрограммные отборы в отдельный поток."""
+        return asyncio.get_running_loop()
+
+    # Отдельного пула нет нарочно: `None` означает «пул по умолчанию», и
+    # отбор всё равно исполнится — а свой пришлось бы закрывать руками.
+    executor = None
 
     def add_handler(self, handler) -> None:
         self.handlers.append(handler)
@@ -71,29 +102,46 @@ class FakeTelegramClient:
         self._fail_if_asked("get_users")
         return self._users.get(username)
 
-    async def download_media(self, file_id, in_memory=False):
-        assert in_memory, "проект качает аватар только в память"
-        self.download_calls.append(file_id)
-        self._fail_if_asked("download_media")
-        if self._avatar is None:
-            return None
-        return io.BytesIO(self._avatar)
+    async def download_media(self, target, file_name=None, in_memory=False):
+        """Скачивание в память по идентификатору файла или на диск по сообщению.
 
-    def _accept(self, kind: str, target, payload):
+        У Pyrogram это один метод: первым доводом он берёт и идентификатор
+        файла, и само сообщение, а куда положить — решают `in_memory` и
+        `file_name`. Двумя подделками эти формы разводить нельзя. Боевой
+        `_download_media` зовёт вторую, и подделка, знающая только первую,
+        отвечает `TypeError`; его глотает `except Exception` вокруг вызова,
+        и проверка «не качали» зеленеет независимо от того, качали или нет.
+        """
+        self.download_calls.append(target)
+        if self.on_download is not None:
+            await self.on_download(file_name)
+        self._fail_if_asked("download_media")
+        if in_memory:
+            return io.BytesIO(self._avatar) if self._avatar is not None else None
+        self.download_paths.append(file_name)
+        if self._media is None:
+            return None
+        Path(file_name).write_bytes(self._media)
+        return file_name
+
+    async def _accept(self, kind: str, target, payload):
         """Принимает исходящее и отдаёт то, что вернул бы Telegram."""
         self.outgoing.append((kind, target, payload))
         self._fail_if_asked(kind)
         self.last_message_id += 1
-        return SimpleNamespace(id=self.last_message_id, date=SENT_AT)
+        answer = SimpleNamespace(id=self.last_message_id, date=SENT_AT)
+        if self.on_send is not None:
+            await self.on_send(answer)
+        return answer
 
     async def send_message(self, target, text):
-        return self._accept("send_message", target, text)
+        return await self._accept("send_message", target, text)
 
     async def send_photo(self, target, path):
-        return self._accept("send_photo", target, path)
+        return await self._accept("send_photo", target, path)
 
     async def send_document(self, target, path):
-        return self._accept("send_document", target, path)
+        return await self._accept("send_document", target, path)
 
     async def read_chat_history(self, target):
         self.read_calls.append(target)
@@ -106,6 +154,10 @@ class FakeTelegramClient:
     async def stop(self):
         self.lifecycle.append("остановка")
         self._fail_if_asked("stop")
+
+    async def log_out(self):
+        self.logged_out = True
+        self._fail_if_asked("log_out")
 
     async def export_session_string(self):
         self._fail_if_asked("export_session_string")
