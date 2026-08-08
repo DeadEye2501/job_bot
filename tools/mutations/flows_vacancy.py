@@ -84,22 +84,20 @@ MUTATIONS = [
     ),
     # _delete_vacancy: вектор удалённой вакансии остаётся в кэше
     (
-        "backend/flows/pipeline.py",
-        "        embeddings._drop_embedding(self, vacancy_id)" + CRLF
-        + '        logger.info("vacancy %d: deleted from DB and embedding cache", vacancy_id)'
-        + CRLF,
-        '        logger.info("vacancy %d: deleted from DB and embedding cache", vacancy_id)'
-        + CRLF,
+        "backend/flows/cleanup.py",
+        "    embeddings._drop_embedding(pipeline, vacancy_id)" + CRLF
+        + '    logger.info("vacancy %d: deleted from DB and embedding cache", vacancy_id)'     + CRLF,
+        '    logger.info("vacancy %d: deleted from DB and embedding cache", vacancy_id)'     + CRLF,
     ),
     # _delete_vacancy_as_trash: отметка о мусоре не пишется
     (
-        "backend/flows/pipeline.py",
-        "            await record_trash_event(" + CRLF
-        + "                session," + CRLF
-        + "                source_channel_id=channel_id," + CRLF
-        + "                source_msg_id=msg_id," + CRLF
-        + "                reason=reason," + CRLF
-        + "            )" + CRLF,
+        "backend/flows/cleanup.py",
+        "        await record_trash_event(" + CRLF
+        + "            session," + CRLF
+        + "            source_channel_id=channel_id," + CRLF
+        + "            source_msg_id=msg_id," + CRLF
+        + "            reason=reason," + CRLF
+        + "        )" + CRLF,
         "",
     ),
     # _parse_and_update_vacancy: пустышка доходит до проверяльщика
