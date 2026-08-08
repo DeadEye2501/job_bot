@@ -30,12 +30,19 @@ async def test_some_kinds_have_nothing_to_suggest(session, session_factory, kind
 async def test_an_hr_without_any_identifier_is_not_suggested(
     session, session_factory
 ):
-    """HR без единого признака в подсказки не идёт — записывать нечего."""
+    """HR без единого признака в подсказки не идёт — записывать нечего.
+
+    Пустая строка вместо ника — отдельный случай: запрос отбирает по
+    «признак задан», и пустая строка ему подходит, а записывать в список из
+    неё нечего. Проверено мутацией: без такой строки охрану внутри цикла
+    можно было выбросить незаметно.
+    """
     await put(
         session_factory,
         hr_row(name="С ником", telegram_username="maria", telegram_user_id=None),
         hr_row(name="С номером", telegram_username=None, telegram_user_id=111),
         hr_row(name="Ни с чем", telegram_username=None, telegram_user_id=None),
+        hr_row(name="С пустым ником", telegram_username="", telegram_user_id=None),
     )
 
     got = await list_blacklist_candidates(session, "hr")
@@ -120,11 +127,17 @@ async def test_every_company_is_suggested_by_its_name(session, session_factory):
 async def test_a_channel_without_a_username_is_not_suggested(
     session, session_factory
 ):
-    """Канал без ника в подсказки не идёт — записывать нечего."""
+    """Канал без ника в подсказки не идёт — записывать нечего.
+
+    Пустая строка вместо ника — отдельный случай: запрос отбирает по «ник
+    задан», и пустая строка ему подходит. Проверено мутацией: без такой
+    строки отбор в запросе можно было снять незаметно.
+    """
     await put(
         session_factory,
         channel_row(username="pyjobs", title="Питон"),
         channel_row(username=None, title="Закрытый"),
+        channel_row(username="", title="С пустым ником"),
     )
 
     got = await list_blacklist_candidates(session, "channel")
