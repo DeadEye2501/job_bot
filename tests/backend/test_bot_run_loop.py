@@ -295,23 +295,22 @@ async def test_switching_off_drains_the_text_waiting_to_be_read(
     остановиться.
     """
     bot, client, _ = await chatting(mode=BotMode.FULL)
-
-    class SwitchesOff(FakeIngestion):
-        """Первый оборот выключает бота, слив на втором его и останавливает."""
-
-        async def poll_active_channels(self):
-            answer = await super().poll_active_channels()
-            await bot._rs.set_mode(BotMode.OFF)
-            return answer
-
-        async def cancel_pending_dm_classifications(self, drain=False):
-            await super().cancel_pending_dm_classifications(drain=drain)
-            if drain:
-                bot.request_stop()
-
-    pipeline = SwitchesOff()
+    pipeline = FakeIngestion()
     wire(bot, pipeline)
     await bot._rs.set_app("poll_interval_sec", "0")
+
+    # Останов повешен на чтение режима, а не на сам слив: слив здесь —
+    # предмет проверки, и если бы цикл кончался им, снятая строка вешала бы
+    # прогон вместо того, чтобы покрасить тест.
+    modes = [BotMode.FULL, BotMode.OFF]
+
+    async def next_mode():
+        if modes:
+            return modes.pop(0)
+        bot.request_stop()
+        return BotMode.OFF
+
+    bot._rs.get_mode = next_mode
 
     await bot.run()
 
