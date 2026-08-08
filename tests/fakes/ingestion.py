@@ -21,6 +21,33 @@ class FakeIngestion:
         self.full_calls = 0
         self.buffer_edits: list[tuple] = []
         self.buffer_removals: list[tuple] = []
+        self.log: list[str] = []
+        self.scheduled: list[tuple] = []
+        self.drains = 0
+        self.recovery_error: BaseException | None = None
+        self.ghosting_error: BaseException | None = None
+
+    async def recover_orphan_vacancies(self):
+        self.log.append("недоразобранные")
+        if self.recovery_error is not None:
+            raise self.recovery_error
+
+    async def check_ghosting_timeouts(self):
+        self.log.append("молчание")
+        if self.ghosting_error is not None:
+            raise self.ghosting_error
+
+    async def cancel_pending_dm_classifications(self, drain: bool = False):
+        self.log.append("слив" if drain else "отмена разбора")
+        if drain:
+            self.drains += 1
+
+    def mark_shutting_down(self):
+        self.log.append("гасим")
+
+    def schedule_dm_classification(self, hr_id, *rest):
+        self.log.append(f"разбор запланирован: {hr_id}")
+        self.scheduled.append((hr_id, *rest))
 
     def update_dm_buffer_text(self, hr_id: int, tg_message_id: int, text: str) -> None:
         self.buffer_edits.append((hr_id, tg_message_id, text))
@@ -34,6 +61,7 @@ class FakeIngestion:
 
     async def poll_active_channels(self):
         self.full_calls += 1
+        self.log.append("прогон каналов")
         return await self._answer()
 
     async def rerun_pipeline_for_vacancy(self, vacancy_id: int):
