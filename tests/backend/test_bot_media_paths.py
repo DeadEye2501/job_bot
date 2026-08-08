@@ -13,13 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.bot.client import (
-    MEDIA_DIR,
-    _classify_media,
-    _looks_like_photo,
-    _media_cache_path,
-    _media_path_for_db,
-)
+from backend.bot.media import MEDIA_DIR, _classify_media, _looks_like_photo, _media_cache_path, _media_path_for_db
 from tests.fakes.telegram import document, message
 
 

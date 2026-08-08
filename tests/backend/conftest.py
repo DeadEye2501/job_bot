@@ -9,7 +9,8 @@ from contextlib import suppress
 
 import pytest
 
-from backend.bot.client import MEDIA_DIR, Bot
+from backend.bot.media import MEDIA_DIR
+from backend.bot.client import Bot
 from backend.flows.dm import process_dm
 from backend.flows.pipeline import IngestionPipeline
 from backend.models import (

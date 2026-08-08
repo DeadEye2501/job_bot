@@ -9,49 +9,49 @@ CRLF = "\r\n"
 MUTATIONS = [
     # _looks_like_photo: непринимаемое расширение перестаёт отсеиваться
     (
-        "backend/bot/client.py",
+        "backend/bot/media.py",
         "    if suffix not in PHOTO_EXTS:" + CRLF + "        return False" + CRLF,
         "",
     ),
     # _looks_like_photo: регистр расширения перестаёт опускаться
     (
-        "backend/bot/client.py",
+        "backend/bot/media.py",
         "    suffix = path.suffix.lower()",
         "    suffix = path.suffix",
     ),
     # _looks_like_photo: список принимаемых расширений теряет одно
     (
-        "backend/bot/client.py",
+        "backend/bot/media.py",
         'PHOTO_EXTS = {".png", ".jpg", ".jpeg", ".webp"}',
         'PHOTO_EXTS = {".png", ".jpg", ".jpeg"}',
     ),
     # _media_cache_path: номер собеседника выпадает из пути
     (
-        "backend/bot/client.py",
+        "backend/bot/media.py",
         '    return MEDIA_DIR / str(hr_id) / f"{tg_message_id}{ext}"',
         '    return MEDIA_DIR / f"{tg_message_id}{ext}"',
     ),
     # _media_path_for_db: путь пишется целиком, а не относительно папки
     (
-        "backend/bot/client.py",
+        "backend/bot/media.py",
         "        return p.relative_to(MEDIA_DIR.resolve()).as_posix()",
         "        return p.as_posix()",
     ),
     # _download_media: картинка получает расширение документа
     (
-        "backend/bot/client.py",
+        "backend/bot/media.py",
         '        ext = ".jpg"  # Pyrogram delivers photos as JPEGs',
         '        ext = ".bin"',
     ),
     # _download_media: уже скачанный файл качается заново
     (
-        "backend/bot/client.py",
+        "backend/bot/media.py",
         "    if out.exists():" + CRLF + "        return _media_path_for_db(out)" + CRLF,
         "",
     ),
     # _download_media: сбой скачивания перестаёт быть отсутствием
     (
-        "backend/bot/client.py",
+        "backend/bot/media.py",
         "    if not path:" + CRLF + "        return None" + CRLF,
         "",
     ),
@@ -87,8 +87,8 @@ MUTATIONS = [
     # send_to_hr_media: предел размера перестаёт зависеть от вида файла
     (
         "backend/bot/client.py",
-        "        cap = PHOTO_SIZE_LIMIT if as_photo else DOCUMENT_SIZE_LIMIT",
-        "        cap = DOCUMENT_SIZE_LIMIT",
+        "        cap = media.PHOTO_SIZE_LIMIT if as_photo else media.DOCUMENT_SIZE_LIMIT",
+        "        cap = media.DOCUMENT_SIZE_LIMIT",
     ),
     # send_to_hr_media: предел становится исключающим
     (
