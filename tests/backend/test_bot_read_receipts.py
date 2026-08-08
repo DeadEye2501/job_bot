@@ -14,7 +14,12 @@
 
 from datetime import datetime, timezone
 
-from pyrogram.raw.types import PeerChat, PeerUser, UpdateReadHistoryOutbox
+from pyrogram.raw.types import (
+    PeerChat,
+    PeerUser,
+    UpdateReadHistoryInbox,
+    UpdateReadHistoryOutbox,
+)
 
 from backend.models import BotMode, Message
 from tests.dbio import all_rows, only_row, put
@@ -274,5 +279,31 @@ async def test_another_kind_of_update_is_ignored(chatting, session_factory):
     )
 
     await bot._on_raw_update(client, object(), {}, {})
+
+    assert (await only_row(session_factory, Message)).read_at is None
+
+
+async def test_our_own_reading_is_not_mistaken_for_the_hrs(chatting, session_factory):
+    """Прочтение с нашей стороны за прочтение HR не принимается.
+
+    Оповещение о том, что переписку открыли мы, устроено точно так же —
+    тот же собеседник, та же граница, — и различает их только род. Приняв
+    его за чужое, бот поставил бы двойную галочку на письма, которых HR
+    не открывал.
+    """
+    bot, client, hr = await chatting(telegram_user_id=777)
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, is_incoming=False, tg_message_id=10, read_at=None),
+    )
+    ours = UpdateReadHistoryInbox(
+        peer=PeerUser(user_id=777),
+        max_id=10,
+        still_unread_count=0,
+        pts=1,
+        pts_count=1,
+    )
+
+    await bot._on_raw_update(client, ours, {}, {})
 
     assert (await only_row(session_factory, Message)).read_at is None
