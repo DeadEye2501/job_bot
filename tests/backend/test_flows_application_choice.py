@@ -56,7 +56,7 @@ async def applying(make_pipeline, session_factory, tmp_path, monkeypatch):
         pipeline.asked_for_letter = (block, parsed, channel_ref)
         return pipeline.letter
 
-    monkeypatch.setattr("backend.flows.generate_cover_letter", generate_cover_letter)
+    monkeypatch.setattr("backend.flows.pipeline.generate_cover_letter", generate_cover_letter)
     return pipeline, hr, vacancy, resume
 
 

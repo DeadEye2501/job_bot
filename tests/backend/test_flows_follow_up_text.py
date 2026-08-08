@@ -12,7 +12,7 @@
 
 import pytest
 
-from backend.flows import _build_short_text, _format_channel_ref
+from backend.flows.pipeline import _build_short_text, _format_channel_ref
 
 
 @pytest.mark.parametrize(

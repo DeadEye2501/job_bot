@@ -52,7 +52,7 @@ async def reading(make_pipeline, session_factory, monkeypatch):
             raise pipeline.verdict
         return pipeline.verdict
 
-    monkeypatch.setattr("backend.flows.classify_hr_reply", classify_hr_reply)
+    monkeypatch.setattr("backend.flows.pipeline.classify_hr_reply", classify_hr_reply)
     return pipeline, hr, vacancy, message
 
 
