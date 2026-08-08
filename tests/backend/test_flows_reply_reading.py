@@ -223,3 +223,31 @@ async def test_a_broken_window_hook_does_not_undo_the_move(
     assert (
         await only_row(session_factory, Vacancy)
     ).status is VacancyStatus.INVITATION
+
+
+async def test_the_verdict_lands_on_the_vacancy_of_the_last_message(
+    reading, session_factory
+):
+    """Решение относят к вакансии последнего сообщения пакета.
+
+    HR за минуту успевает написать про две вакансии подряд; относить
+    вердикт к первой значило бы двигать не ту.
+    """
+    pipeline, hr, vacancy, message_row_ = reading
+    await put(
+        session_factory,
+        vacancy_row(title="вторая", status=VacancyStatus.APPLIED),
+    )
+    second = next(
+        v for v in await all_rows(session_factory, Vacancy) if v.title == "вторая"
+    )
+    pipeline._dm_classify_buffer[hr.id] = [
+        {"vacancy_id": vacancy.id, "msg_id": message_row_.id, "text": "про первую"},
+        {"vacancy_id": second.id, "msg_id": message_row_.id, "text": "и про вторую"},
+    ]
+
+    await pipeline._classify_and_apply_for_hr(hr.id)
+
+    by_title = {v.title: v for v in await all_rows(session_factory, Vacancy)}
+    assert by_title["вторая"].status is VacancyStatus.INVITATION
+    assert by_title["к отклику"].status is VacancyStatus.APPLIED

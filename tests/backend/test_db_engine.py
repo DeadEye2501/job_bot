@@ -60,14 +60,19 @@ async def test_a_busy_base_is_waited_for(engine_on_disk):
 async def test_every_connection_gets_the_settings(engine_on_disk):
     """Настройки достаются каждому соединению, а не первому.
 
-    Соединения берутся из общего запаса; новое приходит с чистыми
-    умолчаниями, и настроив однажды, приложение получило бы их обратно
-    на втором же обращении.
+    Соединения открываются здесь одновременно нарочно: последовательные
+    вернулись бы из общего запаса тем же самым, и «настроено однажды» не
+    отличалось бы от «настроено каждому». Приложение же ходит в базу из
+    трёх мест разом, и второму соединению умолчания достались бы чистые.
     """
-    first = await _pragma(engine_on_disk, "foreign_keys")
-    second = await _pragma(engine_on_disk, "foreign_keys")
+    async with engine_on_disk.connect() as first:
+        async with engine_on_disk.connect() as second:
+            values = [
+                (await conn.execute(text("PRAGMA foreign_keys"))).scalar_one()
+                for conn in (first, second)
+            ]
 
-    assert (first, second) == (1, 1)
+    assert values == [1, 1]
 
 
 async def test_the_check_names_the_engine_and_its_version(engine_on_disk):

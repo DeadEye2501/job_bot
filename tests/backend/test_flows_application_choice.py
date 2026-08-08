@@ -127,7 +127,9 @@ async def test_an_already_applied_vacancy_is_not_written_to_twice(
     """Вакансия, по которой отклик уже ушёл, второго письма не получает.
 
     Ручная отправка и очередной цикл сходятся на одной вакансии; без
-    этой проверки HR получил бы два письма подряд.
+    этой проверки HR получил бы два письма подряд. Проверка стоит до
+    сочинения письма: узнав об отказе после него, бот заплатил бы
+    обращением к модели впустую.
     """
     pipeline, hr, vacancy, _ = applying
     async with session_factory() as session:
@@ -135,11 +137,14 @@ async def test_an_already_applied_vacancy_is_not_written_to_twice(
         row.status = VacancyStatus.APPLIED
         await session.commit()
 
+    pipeline.asked_for_letter = None
+
     assert await pipeline._send_application(hr, parsed_vacancy(), vacancy.id) == (
         False,
         "race",
     )
     assert pipeline.sent == []
+    assert pipeline.asked_for_letter is None
 
 
 async def test_a_manual_application_overrides_the_race_guard(

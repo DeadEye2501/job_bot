@@ -18,23 +18,24 @@ from tests.factories import blacklist_row, hr_row, message_row
 from tests.fakes.telegram import SENT_AT, FakeTelegramClient, message, photo, user
 
 
-def _incoming(
-    *, user_id=777, username=None, is_bot=False, msg_id=10, avatar=None, **extra
-):
-    """Входящее сообщение от собеседника."""
+def _incoming(*, user_id=777, username=None, avatar=None, attachment=None, **who):
+    """Входящее сообщение от собеседника.
+
+    `who` уходит собеседнику: сегодня оттуда приходит только признак
+    бота, и заводить под него отдельный довод не из чего.
+    """
     return message(
-        id=msg_id,
+        id=10,
         text="здравствуйте",
         date=SENT_AT,
         from_user=user(
             id=user_id,
             username=username,
-            is_bot=is_bot,
             photo=photo(small_file_id=avatar) if avatar else None,
+            **who,
         ),
-        photo=None,
+        photo=attachment,
         document=None,
-        **extra,
     )
 
 
@@ -183,3 +184,23 @@ async def test_a_duplicate_letter_is_not_saved_twice(session_factory):
     await _deliver(session_factory, _incoming())
 
     assert (await only_row(session_factory, Message)).text == "уже было"
+
+
+async def test_a_stranger_costs_nothing_to_ignore(session_factory):
+    """Вложение от незаведённого собеседника даже не скачивается.
+
+    Отсев стоит раньше загрузки нарочно: рассылки приходят с картинками,
+    и качать их с серверов Telegram ради того, чтобы тут же выбросить, —
+    трафик и место на диске впустую.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777))
+    client = FakeTelegramClient()
+
+    await _deliver(
+        session_factory,
+        _incoming(user_id=999, attachment=object()),
+        client=client,
+    )
+
+    assert client.download_calls == []
+    assert await all_rows(session_factory, Message) == []

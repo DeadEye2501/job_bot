@@ -84,10 +84,10 @@ async def test_a_channel_that_has_a_picture_keeps_it(make_pipeline, session_fact
     assert client.download_calls == []
 
 
-async def test_an_unreachable_channel_does_not_stop_the_sweep(
+async def test_a_channel_telegram_does_not_know_does_not_stop_the_sweep(
     make_pipeline, session_factory
 ):
-    """Недоступный канал сводку не обрывает: соседние обновляются.
+    """Неизвестный Telegram канал сводку не обрывает: соседние обновляются.
 
     Каналы закрываются, переименовываются и пропадают; из-за одного
     такого не обновить остальные было бы дорого.
@@ -98,6 +98,31 @@ async def test_an_unreachable_channel_does_not_stop_the_sweep(
         channel_row(username="jobs", title="Было"),
     )
     client = FakeTelegramClient(chats={"jobs": chat(title="Стало")})
+    pipeline = await make_pipeline(client)
+
+    await pipeline._refresh_channel_metadata(saved)
+
+    titles = {c.username: c.title for c in await all_rows(session_factory, TelegramChannel)}
+    assert titles == {"broken": "Было", "jobs": "Стало"}
+
+
+async def test_a_failed_request_does_not_stop_the_sweep(
+    make_pipeline, session_factory
+):
+    """Сорвавшееся обращение к Telegram сводку тоже не обрывает.
+
+    Закрытый канал отвечает не отсутствием, а отказом; без перехвата он
+    уронил бы обновление названий у всех, кто дальше по списку.
+    """
+    saved = await _channels(
+        session_factory,
+        channel_row(username="broken", title="Было"),
+        channel_row(username="jobs", title="Было"),
+    )
+    client = FakeTelegramClient(
+        chats={"jobs": chat(title="Стало")},
+        fails={"get_chat": [OSError("канал закрыт"), None]},
+    )
     pipeline = await make_pipeline(client)
 
     await pipeline._refresh_channel_metadata(saved)

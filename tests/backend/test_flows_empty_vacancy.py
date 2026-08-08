@@ -24,7 +24,11 @@ from tests.fakes.telegram import FakeTelegramClient, photo, user
 
 @pytest.fixture
 async def emptied(make_pipeline, session_factory):
-    """Конвейер и вакансия с прошлым разбором в полях."""
+    """Конвейер и вакансия с прошлым разбором в полях.
+
+    Признак разбора снят нарочно: с ним «считается разобранной» было бы
+    верно и до вызова, и проверка ничего бы не стерегла.
+    """
     await put(
         session_factory,
         vacancy_row(
@@ -33,7 +37,7 @@ async def emptied(make_pipeline, session_factory):
             company_name="Прошлая",
             stack=["Python"],
             score=42,
-            is_parsed=True,
+            is_parsed=False,
         ),
     )
     vacancy = await only_row(session_factory, Vacancy)

@@ -260,3 +260,32 @@ async def test_a_reader_without_a_verdict_leaves_the_vacancy_alone(
     await _deliver(session_factory, _incoming(), schedule=None)
 
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
+
+
+async def test_the_quote_of_our_own_letter_does_not_go_to_the_reader(
+    session_factory
+):
+    """Цитата нашего же письма в разбор не уходит.
+
+    В переписке ответ HR показывается вместе с цитатой того, на что он
+    отвечает, — так читается разговор. Но разбирать эту цитату нельзя:
+    в ней наш собственный текст, и модель приняла бы его за слова HR.
+    """
+    hr, by_title = await _two_vacancies(session_factory)
+    scheduled: list[tuple] = []
+    quoted = message(
+        id=10,
+        text="да, давайте",
+        date=SENT_AT,
+        from_user=user(id=777, username=None),
+        photo=None,
+        document=None,
+        reply_to_message_id=None,
+        reply_to_message=message(text="Откликаюсь на вакансию", caption=None),
+    )
+
+    await _deliver(session_factory, quoted, schedule=lambda *a: scheduled.append(a))
+
+    saved = await only_row(session_factory, Message)
+    assert saved.text.startswith("↪ Откликаюсь на вакансию")
+    assert scheduled[0][3] == "да, давайте"
