@@ -54,7 +54,9 @@ def test_the_migrations_are_taken_from_the_project(upgrades):
     ensure_schema()
 
     cfg, _ = upgrades[0]
-    assert Path(cfg.get_main_option("script_location")).is_dir()
+    location = Path(cfg.get_main_option("script_location"))
+    assert location.is_absolute()
+    assert location.is_dir()
 
 
 def test_the_schema_is_brought_to_the_latest_revision(upgrades):
