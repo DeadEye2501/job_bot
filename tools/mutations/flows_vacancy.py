@@ -300,16 +300,16 @@ MUTATIONS = [
     ),
     # recover_orphan_vacancies: разобранные вакансии подбираются заново
     (
-        "backend/flows/pipeline.py",
-        "                        Vacancy.is_parsed.is_(False)," + CRLF
-        + "                        Vacancy.raw_text.is_not(None)," + CRLF,
-        "                        Vacancy.raw_text.is_not(None)," + CRLF,
+        "backend/flows/rerun.py",
+        "                    Vacancy.is_parsed.is_(False)," + CRLF
+        + "                    Vacancy.raw_text.is_not(None)," + CRLF,
+        "                    Vacancy.raw_text.is_not(None)," + CRLF,
     ),
     # recover_orphan_vacancies: удаление при подборе запрещается
     (
-        "backend/flows/pipeline.py",
-        "                    r.id, text, r.username or \"\", allow_delete=True",
-        "                    r.id, text, r.username or \"\", allow_delete=False",
+        "backend/flows/rerun.py",
+        "                r.id, text, r.username or \"\", allow_delete=True",
+        "                r.id, text, r.username or \"\", allow_delete=False",
     ),
     # _spawn_hr_backfill: законченный догон из списка не убирается
     (
