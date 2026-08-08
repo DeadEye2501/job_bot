@@ -20,7 +20,7 @@ def dm_reader(monkeypatch):
     async def process_dm(msg, *args, **kwargs):
         seen.append(msg)
 
-    monkeypatch.setattr("backend.bot.process_dm", process_dm)
+    monkeypatch.setattr("backend.bot.client.process_dm", process_dm)
     return seen
 
 
