@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from adapters import lm_studio, telegram
+from backend.flows import cleanup
 from backend.domain.blacklist import check_blacklist
 from backend.domain.dedup import cosine_top_match
 from backend.domain.salary import normalize_salary_to_rub_thousands
@@ -43,7 +44,7 @@ from backend.repository.hr_identify import count_recent_outgoing_with_vacancy_fo
 from backend.repository.hr_list import list_hrs_for_backfill, list_open_hr_chats
 from backend.repository.messages import save_incoming_message
 from backend.repository.profile import build_profile_block, get_profile, list_profile_languages, load_profile_skills
-from backend.repository.vacancies_life import apply_classification, delete_vacancy as _repo_delete_vacancy
+from backend.repository.vacancies_life import apply_classification
 
 
 logger = logging.getLogger(__name__)
@@ -822,39 +823,6 @@ class IngestionPipeline:
             except Exception:
                 logger.exception("on_vacancies_changed hook failed")
 
-    async def check_ghosting_timeouts(self) -> int:
-        """Сканирует Applied/In Progress вакансии и переводит в Ghosting
-        те, по которым HR молчит дольше GHOSTING_TIMEOUT_DAYS.
-
-        Дёргается из Bot.run loop'а раз в poll-tick (DM_ONLY и FULL —
-        в OFF не запускается, бот считается «на паузе»). Стоимость
-        низкая: только Applied/In Progress попадают в шорт-лист, для
-        каждой 2 SQL-запроса (max(message), max(history)). Если
-        кандидатов нет — ранний return.
-        """
-        from backend.domain.transitions import GHOSTING_TIMEOUT_DAYS
-        from backend.repository.vacancies_life import mark_ghosted_vacancies
-
-        try:
-            async with self._session_factory() as session:
-                async with session.begin():
-                    affected = await mark_ghosted_vacancies(
-                        session, timeout_days=GHOSTING_TIMEOUT_DAYS,
-                    )
-        except Exception:
-            logger.exception("check_ghosting_timeouts failed")
-            return 0
-        if affected:
-            logger.info(
-                "ghosting timer: marked %d vacancies (ids=%s)",
-                len(affected), affected,
-            )
-            if self.on_vacancies_changed is not None:
-                try:
-                    self.on_vacancies_changed()
-                except Exception:
-                    logger.exception("on_vacancies_changed hook failed")
-        return len(affected)
 
     async def cancel_pending_dm_classifications(
         self, *, drain: bool = False
@@ -1409,7 +1377,7 @@ class IngestionPipeline:
                     "vacancy %s: empty vacancy (no meaningful fields), deleting as trash",
                     vacancy_id,
                 )
-                await self._delete_vacancy_as_trash(
+                await cleanup._delete_vacancy_as_trash(self, 
                     vacancy_id, reason="empty: no meaningful fields"
                 )
                 return
@@ -1472,7 +1440,7 @@ class IngestionPipeline:
                         "vacancy %s: classified as trash by LLM (%s), deleting",
                         vacancy_id, validation.reason or "no reason",
                     )
-                    await self._delete_vacancy_as_trash(
+                    await cleanup._delete_vacancy_as_trash(self, 
                         vacancy_id,
                         reason=f"trash: {validation.reason or 'no reason'}",
                     )
@@ -1685,50 +1653,6 @@ class IngestionPipeline:
             "advance_cursor: channel=%d -> msg_id=%d", channel_id, msg_id,
         )
 
-
-    async def _delete_vacancy(self, vacancy_id: int) -> None:
-        # Route through the public repository delete so children
-        # (vacancy_status_history, vacancy_event) are explicitly cleaned up
-        # — SQLite has FK enforcement off in this engine, so a plain
-        # session.delete(vacancy) would leave orphan rows.
-        async with self._session_factory() as session:
-            await _repo_delete_vacancy(session, vacancy_id)
-            await session.commit()
-        embeddings._drop_embedding(self, vacancy_id)
-        logger.info("vacancy %d: deleted from DB and embedding cache", vacancy_id)
-        # Vacancy_count у HR/Company изменился — пушим refresh.
-        self._fire_contacts_changed()
-        self._fire_vacancies_changed()
-
-    async def _delete_vacancy_as_trash(
-        self, vacancy_id: int, reason: str | None
-    ) -> None:
-        """Auto-ingest trash deletion: ДО delete пишем строку в TrashEvent,
-        чтобы потом было что показывать в per-channel статистике (без этого
-        канал «прислал N мусора» не посчитать — Vacancy-ряд исчезает совсем).
-        Channel/msg-id берём из самой вакансии, всё в одной транзакции.
-        """
-        from backend.repository.vacancies_life import record_trash_event
-        from backend.models import Vacancy as _V
-        async with self._session_factory() as session:
-            v = await session.get(_V, vacancy_id)
-            channel_id = v.source_channel_id if v is not None else None
-            msg_id = v.source_msg_id if v is not None else None
-            await record_trash_event(
-                session,
-                source_channel_id=channel_id,
-                source_msg_id=msg_id,
-                reason=reason,
-            )
-            await _repo_delete_vacancy(session, vacancy_id)
-            await session.commit()
-        embeddings._drop_embedding(self, vacancy_id)
-        logger.info(
-            "vacancy %d: deleted as trash (event recorded for channel=%s)",
-            vacancy_id, channel_id,
-        )
-        self._fire_contacts_changed()
-        self._fire_vacancies_changed()
 
     def _fire_contacts_changed(self) -> None:
         if self.on_contacts_changed is None:
@@ -2168,3 +2092,6 @@ class IngestionPipeline:
         if not self._profile_block:
             await self._reload_resources()
         return await self._send_application(hr, parsed, vacancy_id, force=True)
+
+    async def check_ghosting_timeouts(self):
+        return await cleanup.check_ghosting_timeouts(self)
