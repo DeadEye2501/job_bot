@@ -91,7 +91,7 @@ MUTATIONS = [
     (
         "backend/bot/client.py",
         "        async with self._session_factory() as session:" + CRLF
-        + "            existing = await repository.find_channel_by_username("
+        + "            existing = await find_channel_by_username("
         "session, username)" + CRLF
         + "            if existing is not None:" + CRLF
         + '                return existing.id, "exists"' + CRLF,
@@ -100,7 +100,7 @@ MUTATIONS = [
     # add_channel: повтор после обращения перестаёт находиться
     (
         "backend/bot/client.py",
-        "                existing = await repository.find_channel_by_username("
+        "                existing = await find_channel_by_username("
         "session, username)" + CRLF
         + "                if existing is not None:" + CRLF
         + '                    return existing.id, "exists"' + CRLF,
