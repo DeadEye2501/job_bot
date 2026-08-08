@@ -212,12 +212,6 @@ MUTATIONS = [
         '        total = item["_total_vac"] + trash_events',
         '        total = item["_total_vac"]',
     ),
-    # get_stats_channels_pipeline: остаток годного уходит в минус
-    (
-        "backend/repository.py",
-        "        fit = max(0, total - trash - not_fit)",
-        "        fit = total - trash - not_fit",
-    ),
     # get_stats_channels_pipeline: «ответили» перестаёт считать отказы
     (
         "backend/repository.py",
