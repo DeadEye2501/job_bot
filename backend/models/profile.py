@@ -1,0 +1,108 @@
+"""Таблицы анкеты кандидата."""
+
+from datetime import date, datetime
+
+from sqlalchemy import (
+    JSON,
+    Column,
+    DateTime,
+    ForeignKey,
+    Table,
+    UniqueConstraint,
+    func,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from backend.models.base import Base
+
+profile_experience_skills = Table(
+    "profile_experience_skills",
+    Base.metadata,
+    Column("experience_id", ForeignKey("profile_experience.id"), primary_key=True),
+    Column("skill_id", ForeignKey("profile_skills.id"), primary_key=True),
+)
+
+
+class Profile(Base):
+    __tablename__ = "profile"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    first_name: Mapped[str]
+    last_name: Mapped[str]
+    title: Mapped[str]
+    email: Mapped[str]
+    phone: Mapped[str | None]
+    location: Mapped[str | None]
+    telegram_username: Mapped[str | None]
+    github_url: Mapped[str | None]
+    education: Mapped[str | None]
+    work_format: Mapped[list[str]] = mapped_column(
+        JSON, server_default=text("'[]'")
+    )  # подмножество {"office","remote","hybrid"}
+    grades: Mapped[list[str]] = mapped_column(
+        JSON, server_default=text("'[]'")
+    )  # подмножество {"junior","middle","senior","lead"}
+    free_preferences: Mapped[str | None]
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class ProfileLanguage(Base):
+    """Языки кандидата с уровнем владения для LLM-валидации.
+
+    Один профиль — несколько языков (Русский native, Английский B1, и т.д.).
+    Уровень — стандартный CEFR + "native". В промпт подмешивается строкой
+    "Русский — native, Английский — B1, Армянский — A2".
+
+    Уникальность по (profile_id, language) — нельзя дважды добавить тот
+    же язык; редактирование = upsert по этой паре.
+    """
+
+    __tablename__ = "profile_language"
+    __table_args__ = (
+        UniqueConstraint("profile_id", "language"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profile.id"))
+    language: Mapped[str]
+    level: Mapped[str]  # "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "native"
+
+
+class ProfileSkill(Base):
+    __tablename__ = "profile_skills"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profile.id"))
+    category: Mapped[str]
+    name: Mapped[str]
+    level: Mapped[int]
+    aliases: Mapped[list[str]] = mapped_column(
+        JSON, server_default=text("'[]'")
+    )
+
+
+class ProfileExperience(Base):
+    __tablename__ = "profile_experience"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profile.id"))
+    company: Mapped[str]
+    company_url: Mapped[str | None]
+    role: Mapped[str]
+    start_date: Mapped[date]
+    end_date: Mapped[date | None]
+    achievements: Mapped[list[str]] = mapped_column(
+        JSON, server_default=text("'[]'")
+    )
+    responsibilities: Mapped[list[str]] = mapped_column(
+        JSON, server_default=text("'[]'")
+    )
+    skills: Mapped[list["ProfileSkill"]] = relationship(
+        secondary=profile_experience_skills
+    )
