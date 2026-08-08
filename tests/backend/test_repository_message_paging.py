@@ -6,7 +6,7 @@
 листание по номеру тогда либо пропускает строки, либо показывает их дважды.
 """
 
-from backend.repository import list_messages_for_hr
+from backend.repository.messages import list_messages_for_hr
 from tests.dbio import put
 from tests.factories import at, hr_row, message_row
 

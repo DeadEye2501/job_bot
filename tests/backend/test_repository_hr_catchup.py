@@ -5,7 +5,7 @@
 отдаётся наибольший номер уже полученного сообщения: с него бот и продолжит.
 """
 
-from backend.repository import list_hrs_for_backfill, list_open_hr_chats
+from backend.repository.hr_list import list_hrs_for_backfill, list_open_hr_chats
 from tests.dbio import put
 from tests.factories import hr_row, message_row
 

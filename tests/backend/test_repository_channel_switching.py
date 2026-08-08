@@ -7,12 +7,7 @@
 from sqlalchemy import select
 
 from backend.models import TelegramChannel
-from backend.repository import (
-    deactivate_blacklisted_channels,
-    is_channel_blacklisted,
-    set_all_channels_active,
-    set_channel_active,
-)
+from backend.repository.channels import deactivate_blacklisted_channels, is_channel_blacklisted, set_all_channels_active, set_channel_active
 from tests.dbio import put
 from tests.factories import blacklist_row, channel_row
 

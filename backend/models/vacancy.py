@@ -186,7 +186,7 @@ class VacancyStatusHistory(Base):
     # Без explicit length — все остальные строковые поля в схеме объявлены
     # как `String` (SQLite всё равно хранит TEXT без cap'а на длину).
     # 2000-cap раньше отличал эту колонку без причины. Ограничение длины
-    # на стороне приложения — `_ensure_trailing_period` в repository.py
+    # на стороне приложения — `_ensure_trailing_period` в repository/vacancies_life.py
     # сам обрабатывает None/empty; UI textarea имеет maxlength=2000.
     explanation: Mapped[str | None] = mapped_column(String)
     applied: Mapped[bool] = mapped_column(server_default=expression.true())

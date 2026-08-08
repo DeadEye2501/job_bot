@@ -6,7 +6,8 @@
 экрана было бы нечем — строки в переписке уже нет.
 """
 
-from backend.repository import count_unread_incoming, list_hrs_with_unread
+from backend.repository.hr_list import list_hrs_with_unread
+from backend.repository.messages import count_unread_incoming
 from tests.dbio import put
 from tests.factories import at, hr_row, message_row
 

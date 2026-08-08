@@ -7,7 +7,7 @@
 from sqlalchemy import select
 
 from backend.models import Blacklist
-from backend.repository import delete_blacklist
+from backend.repository.blacklist import delete_blacklist
 from tests.dbio import put
 from tests.factories import blacklist_row
 

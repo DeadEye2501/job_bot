@@ -4,7 +4,8 @@
 всех, кого знает, и раз он выбрал «создать нового», значит так и хотел.
 """
 
-from backend.repository import create_hr, get_hr_detail
+from backend.repository.hr_card import get_hr_detail
+from backend.repository.hr_identify import create_hr
 
 
 async def test_a_new_hr_is_stored_with_the_given_fields(session):

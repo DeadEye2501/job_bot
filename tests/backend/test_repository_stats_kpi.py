@@ -10,7 +10,7 @@
 """
 
 from backend.models import VacancyStatus
-from backend.repository import get_stats_kpi
+from backend.repository.stats_summary import get_stats_kpi
 from tests.dbio import put
 from tests.factories import days_ago, status_history_row, vacancy_row
 

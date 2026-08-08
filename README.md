@@ -88,7 +88,7 @@ backend/
   cv_parser.py        # PDF-резюме → структурированные поля профиля
   llm/                # промпты и разбор ответов, по одному модулю на предмет
   models/             # SQLAlchemy-модели, по одному модулю на предмет
-  repository.py       # типизированные query-функции
+  repository/         # типизированные query-функции, по модулю на предмет
   runtime_settings.py # in-memory-кеш конфигурации (TG creds, LLM endpoints, app-settings)
   log_buffer.py       # ring-buffer для UI «Логи»
   payloads.py         # dataclass-структуры для bridge-обмена

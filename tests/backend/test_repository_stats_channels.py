@@ -10,7 +10,7 @@
 """
 
 from backend.models import TrashEvent, VacancyStatus
-from backend.repository import get_stats_channels_pipeline
+from backend.repository.stats_pipeline import get_stats_channels_pipeline
 from tests.dbio import put
 from tests.factories import channel_row, days_ago, status_history_row, vacancy_row
 

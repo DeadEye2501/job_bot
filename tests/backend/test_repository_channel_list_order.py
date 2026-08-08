@@ -6,7 +6,7 @@
 выключенный чёрным списком, иначе проваливался бы в самый низ.
 """
 
-from backend.repository import list_telegram_channels
+from backend.repository.channels import list_telegram_channels
 from tests.dbio import put
 from tests.factories import channel_row, vacancy_row
 

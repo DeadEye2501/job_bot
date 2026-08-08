@@ -58,7 +58,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from adapters import lm_studio
 from adapters.lm_studio import LlmProviderConfig
-from backend import repository
+from backend.repository import blacklist, channels as channels_repo, companies_card, companies_list, hr_card, hr_identify, hr_list, messages as messages_repo, profile as profile_repo, stats_pipeline, stats_summary, vacancies_card, vacancies_life, vacancies_list, vacancies_mini  # три псевдонима: имена заняты локальными переменными
 from backend.cv_parser import parse_cv
 from backend.domain.scoring import build_skill_lookup
 from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
@@ -802,7 +802,7 @@ class WizardApi(QObject):
 
         async with self._session_factory() as session:
             async with session.begin():
-                await repository.save_parsed_cv(session, parsed, cv_path=path)
+                await profile_repo.save_parsed_cv(session, parsed, cv_path=path)
         # Refresh in-memory cache so rs.cv_path reflects the just-written row.
         await self._rs.reload()
         logger.info(
@@ -1186,9 +1186,9 @@ class MainApi(QObject):
         """Push the current Profile + CV path to JS."""
         async def run() -> str:
             async with self._session_factory() as session:
-                profile = await repository.get_profile(session)
+                profile = await profile_repo.get_profile(session)
                 languages = (
-                    await repository.list_profile_languages(session)
+                    await profile_repo.list_profile_languages(session)
                     if profile is not None
                     else []
                 )
@@ -1240,10 +1240,10 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    profile = await repository.upsert_profile(
+                    profile = await profile_repo.upsert_profile(
                         session, **fields
                     )
-                    await repository.replace_profile_languages(
+                    await profile_repo.replace_profile_languages(
                         session, profile.id, languages
                     )
             return _ok()
@@ -1317,7 +1317,7 @@ class MainApi(QObject):
     def request_skills(self) -> None:
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_skills(session)
+                rows = await profile_repo.list_skills(session)
             return _ok({"skills": [_skill_to_dict(s) for s in rows]})
 
         self._dispatch(self.skills_changed, run())
@@ -1337,10 +1337,10 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    profile = await repository.get_profile(session)
+                    profile = await profile_repo.get_profile(session)
                     if profile is None:
                         return _err("Сначала сохраните профайл (CV-таб).")
-                    await repository.save_skills(session, rows, profile.id)
+                    await profile_repo.save_skills(session, rows, profile.id)
             return _ok()
 
         self._dispatch(self.skills_save_done, run())
@@ -1351,8 +1351,8 @@ class MainApi(QObject):
     def request_experience(self) -> None:
         async def run() -> str:
             async with self._session_factory() as session:
-                exps = await repository.list_experience(session)
-                skills = await repository.list_skills(session)
+                exps = await profile_repo.list_experience(session)
+                skills = await profile_repo.list_skills(session)
             return _ok(
                 {
                     "experience": [_exp_to_dict(e) for e in exps],
@@ -1378,12 +1378,12 @@ class MainApi(QObject):
             try:
                 async with self._session_factory() as session:
                     async with session.begin():
-                        profile = await repository.get_profile(session)
+                        profile = await profile_repo.get_profile(session)
                         if profile is None:
                             return _err("Сначала сохраните профайл (CV-таб).")
-                        await repository.save_experience(session, rows, profile.id)
+                        await profile_repo.save_experience(session, rows, profile.id)
                 return _ok()
-            except repository.SaveExperienceError as e:
+            except profile_repo.SaveExperienceError as e:
                 return _err(str(e))
 
         self._dispatch(self.experience_save_done, run())
@@ -1475,7 +1475,7 @@ class MainApi(QObject):
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_vacancies(
+                rows = await vacancies_list.list_vacancies(
                     session,
                     sort=sort_key,
                     search=search,
@@ -1494,15 +1494,15 @@ class MainApi(QObject):
                     limit=limit,
                     offset=offset,
                 )
-                skills = await repository.load_profile_skills(session)
-                activity_by_id = await repository.list_vacancy_last_activity(
+                skills = await profile_repo.load_profile_skills(session)
+                activity_by_id = await vacancies_list.list_vacancy_last_activity(
                     session, [v.id for v in rows]
                 )
                 # Filter-popover dropdown sources are intentionally fetched
                 # independent of the active filters — otherwise applying any
                 # filter would shrink the channels/companies dropdowns to
                 # whatever's still in the result set.
-                filter_options = await repository.list_vacancy_filter_options(session)
+                filter_options = await vacancies_list.list_vacancy_filter_options(session)
             matched_set = _build_matched_set(skills)
             # has_more is True only when SQL-level pagination is in play
             # (limit set AND no salary post-filter, which the repo skips
@@ -1536,8 +1536,8 @@ class MainApi(QObject):
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                detail = await repository.get_vacancy_detail(session, vacancy_id)
-                skills = await repository.load_profile_skills(session)
+                detail = await vacancies_card.get_vacancy_detail(session, vacancy_id)
+                skills = await profile_repo.load_profile_skills(session)
             if detail is None:
                 logger.warning("vacancy_id=%d not found on detail load", vacancy_id)
                 return _err("Вакансия не найдена.", id=vacancy_id)
@@ -1557,7 +1557,7 @@ class MainApi(QObject):
         Emits ``vacancy_notes_saved`` with ``{ok, vacancy_id, notes}`` on
         success (UI flashes the textarea border and adopts ``notes`` as the
         save-baseline) or ``{ok: false, error}`` on failure.
-        ``repository.update_vacancy_notes`` normalizes empty/whitespace-only
+        ``vacancies_card.update_vacancy_notes`` normalizes empty/whitespace-only
         ``notes`` to ``NULL`` — we echo back the post-normalization value so
         the JS baseline matches what's actually in the DB.
         """
@@ -1575,7 +1575,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    ok = await repository.update_vacancy_notes(
+                    ok = await vacancies_card.update_vacancy_notes(
                         session, vacancy_id, notes
                     )
                     persisted: str | None = None
@@ -1621,7 +1621,7 @@ class MainApi(QObject):
             saved: str | None = None
             async with self._session_factory() as session:
                 async with session.begin():
-                    ok = await repository.update_status_history_explanation(
+                    ok = await vacancies_life.update_status_history_explanation(
                         session, history_id, explanation,
                     )
                     if ok:
@@ -1681,7 +1681,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    row = await repository.change_vacancy_status(
+                    row = await vacancies_life.change_vacancy_status(
                         session,
                         vacancy_id=vacancy_id,
                         new_status=new_status,
@@ -1787,7 +1787,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    ok = await repository.delete_vacancy(session, vacancy_id)
+                    ok = await vacancies_life.delete_vacancy(session, vacancy_id)
             if not ok:
                 return _err(
                     "Вакансия не найдена.",
@@ -1822,7 +1822,7 @@ class MainApi(QObject):
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_hr_with_counts(session, search=search)
+                rows = await hr_list.list_hr_with_counts(session, search=search)
                 v = await session.get(Vacancy, vacancy_id)
                 if v is None:
                     return _err("Вакансия не найдена.", vacancy_id=vacancy_id)
@@ -1852,7 +1852,7 @@ class MainApi(QObject):
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_companies_with_counts(
+                rows = await companies_list.list_companies_with_counts(
                     session, search=search
                 )
                 v = await session.get(Vacancy, vacancy_id)
@@ -1889,7 +1889,7 @@ class MainApi(QObject):
             try:
                 async with self._session_factory() as session:
                     async with session.begin():
-                        ok = await repository.set_vacancy_hr(
+                        ok = await vacancies_card.set_vacancy_hr(
                             session, vacancy_id, hr_id
                         )
             except ValueError as e:
@@ -1925,7 +1925,7 @@ class MainApi(QObject):
             try:
                 async with self._session_factory() as session:
                     async with session.begin():
-                        ok = await repository.set_vacancy_company(
+                        ok = await vacancies_card.set_vacancy_company(
                             session, vacancy_id, company_id
                         )
             except ValueError as e:
@@ -1981,7 +1981,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    new_hr = await repository.create_hr(
+                    new_hr = await hr_identify.create_hr(
                         session,
                         name=name,
                         telegram_username=telegram_username,
@@ -1989,7 +1989,7 @@ class MainApi(QObject):
                         notes=notes,
                     )
                     created_id = new_hr.id
-                rows = await repository.list_hr_with_counts(session, search=search)
+                rows = await hr_list.list_hr_with_counts(session, search=search)
                 v = await session.get(Vacancy, vacancy_id)
                 current_hr_id = v.hr_id if v is not None else None
                 payload = {
@@ -2041,7 +2041,7 @@ class MainApi(QObject):
             try:
                 async with self._session_factory() as session:
                     async with session.begin():
-                        new_co = await repository.create_company(
+                        new_co = await companies_card.create_company(
                             session,
                             name=name,
                             website=website,
@@ -2049,7 +2049,7 @@ class MainApi(QObject):
                             notes=notes,
                         )
                         created_id = new_co.id
-                    rows = await repository.list_companies_with_counts(
+                    rows = await companies_list.list_companies_with_counts(
                         session, search=search
                     )
                     v = await session.get(Vacancy, vacancy_id)
@@ -2118,7 +2118,7 @@ class MainApi(QObject):
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_hr_with_counts(
+                rows = await hr_list.list_hr_with_counts(
                     session,
                     search=search,
                     limit=limit,
@@ -2157,7 +2157,7 @@ class MainApi(QObject):
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_vacancies_for_hr(session, hr_id)
+                rows = await vacancies_mini.list_vacancies_for_hr(session, hr_id)
             return _ok({
                 "hr_id": hr_id,
                 "epoch": epoch,
@@ -2184,7 +2184,7 @@ class MainApi(QObject):
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                detail = await repository.get_hr_detail(session, hr_id)
+                detail = await hr_card.get_hr_detail(session, hr_id)
             if detail is None:
                 return _err("HR не найден.", hr_id=hr_id)
             return _ok({
@@ -2337,7 +2337,7 @@ class MainApi(QObject):
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_hr_with_counts(session, search=search)
+                rows = await hr_list.list_hr_with_counts(session, search=search)
             return _ok({
                 "absorbed_id": absorbed_id,
                 "search": search or "",
@@ -2352,7 +2352,7 @@ class MainApi(QObject):
     @Slot(str)
     def contacts_merge_hr(self, payload_json: str) -> None:
         """Merge ``absorbed`` HR into ``survivor``: vacancies + messages get
-        repointed, absorbed row is deleted. Backed by ``repository.merge_hr``.
+        repointed, absorbed row is deleted. Backed by ``hr_card.merge_hr``.
         """
         try:
             payload = json.loads(payload_json)
@@ -2367,7 +2367,7 @@ class MainApi(QObject):
             try:
                 async with self._session_factory() as session:
                     async with session.begin():
-                        await repository.merge_hr(
+                        await hr_card.merge_hr(
                             session,
                             absorbed_id=absorbed_id,
                             survivor_id=survivor_id,
@@ -2392,10 +2392,10 @@ class MainApi(QObject):
 
     @Slot(int)
     def contacts_delete_hr(self, hr_id: int) -> None:
-        """Cascade-delete the HR row via ``repository.delete_hr``."""
+        """Cascade-delete the HR row via ``hr_card.delete_hr``."""
         async def run() -> str:
             async with self._session_factory() as session:
-                ok = await repository.delete_hr(session, hr_id)
+                ok = await hr_card.delete_hr(session, hr_id)
                 if not ok:
                     return _err("HR не найден.", hr_id=hr_id, action="delete_hr")
                 await session.commit()
@@ -2418,7 +2418,7 @@ class MainApi(QObject):
                 hr = await session.get(HR, hr_id)
                 if hr is None:
                     return _err("HR не найден.", hr_id=hr_id, action="unblacklist")
-                candidates = repository.hr_blacklist_candidates(hr)
+                candidates = hr_card.hr_blacklist_candidates(hr)
                 if not candidates:
                     return _err(
                         "У HR нет ни @username, ни telegram_user_id.",
@@ -2460,7 +2460,7 @@ class MainApi(QObject):
                 hr = await session.get(HR, hr_id)
                 if hr is None:
                     return _err("HR не найден.", hr_id=hr_id, action="blacklist")
-                value = repository.hr_blacklist_preferred_value(hr)
+                value = hr_card.hr_blacklist_preferred_value(hr)
                 if value is None:
                     return _err(
                         "У HR нет ни @username, ни telegram_user_id.",
@@ -2533,7 +2533,7 @@ class MainApi(QObject):
 
         async def run() -> str:
             async with self._session_factory() as session:
-                msgs, has_more = await repository.list_messages_for_hr(
+                msgs, has_more = await messages_repo.list_messages_for_hr(
                     session, hr_id, limit=50,
                     before_id=before_id,
                     before_sent_at=before_sent_at,
@@ -2602,7 +2602,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    ok = await repository.update_hr_fields(
+                    ok = await hr_card.update_hr_fields(
                         session, hr_id, **kwargs
                     )
             if not ok:
@@ -2653,7 +2653,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    new_hr = await repository.create_hr(
+                    new_hr = await hr_identify.create_hr(
                         session,
                         name=name,
                         telegram_username=telegram_username,
@@ -2698,7 +2698,7 @@ class MainApi(QObject):
     def _kick_unread(self) -> None:
         async def run() -> str:
             async with self._session_factory() as session:
-                count = await repository.count_unread_incoming(session)
+                count = await messages_repo.count_unread_incoming(session)
             return _ok({"count": count})
 
         self._dispatch(self.unread_changed, run())
@@ -2710,7 +2710,7 @@ class MainApi(QObject):
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_hrs_with_unread(session)
+                rows = await hr_list.list_hrs_with_unread(session)
             return _ok({"chats": rows})
 
         self._dispatch(self.unread_chats_loaded, run())
@@ -2747,7 +2747,7 @@ class MainApi(QObject):
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_companies_with_counts(
+                rows = await companies_list.list_companies_with_counts(
                     session, search=search, limit=limit, offset=offset,
                 )
             has_more = (limit is not None) and (len(rows) == limit)
@@ -2766,7 +2766,7 @@ class MainApi(QObject):
     def request_contacts_company_detail(self, company_id: int) -> None:
         async def run() -> str:
             async with self._session_factory() as session:
-                detail = await repository.get_company_detail(session, company_id)
+                detail = await companies_card.get_company_detail(session, company_id)
             if detail is None:
                 return _err("Компания не найдена.", company_id=company_id)
             return _ok({
@@ -2801,7 +2801,7 @@ class MainApi(QObject):
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_vacancies_for_company(session, company_id)
+                rows = await vacancies_mini.list_vacancies_for_company(session, company_id)
             return _ok({
                 "company_id": company_id,
                 "epoch": epoch,
@@ -2826,7 +2826,7 @@ class MainApi(QObject):
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_hrs_for_company(session, company_id)
+                rows = await hr_list.list_hrs_for_company(session, company_id)
             return _ok({
                 "company_id": company_id,
                 "hrs": [
@@ -2871,10 +2871,10 @@ class MainApi(QObject):
             try:
                 async with self._session_factory() as session:
                     async with session.begin():
-                        ok = await repository.update_blacklist(
+                        ok = await blacklist.update_blacklist(
                             session, blacklist_id, **kwargs
                         )
-            except repository.BlacklistUpdateError as e:
+            except blacklist.BlacklistUpdateError as e:
                 return _err(str(e), id=blacklist_id, action="update")
             if not ok:
                 return _err(
@@ -2933,7 +2933,7 @@ class MainApi(QObject):
             try:
                 async with self._session_factory() as session:
                     async with session.begin():
-                        row, created = await repository.create_blacklist(
+                        row, created = await blacklist.create_blacklist(
                             session, kind=kind, value=value, reason=reason,
                         )
                         new_id = row.id
@@ -2943,8 +2943,8 @@ class MainApi(QObject):
                         # картину (загорелось — но bot всё равно скипает).
                         deactivated = 0
                         if kind == "channel":
-                            deactivated = await repository.deactivate_blacklisted_channels(session)
-            except repository.BlacklistUpdateError as e:
+                            deactivated = await channels_repo.deactivate_blacklisted_channels(session)
+            except blacklist.BlacklistUpdateError as e:
                 return _err(str(e), action="create")
             # Новая (или реактивированная) запись блеклиста влияет на
             # `is_blacklisted` HR/Company/Channel list rows — пушим refresh.
@@ -2968,7 +2968,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    ok = await repository.delete_blacklist(session, blacklist_id)
+                    ok = await blacklist.delete_blacklist(session, blacklist_id)
             if not ok:
                 return _err(
                     "Запись не найдена.",
@@ -3016,7 +3016,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    ok = await repository.set_blacklist_active(
+                    ok = await blacklist.set_blacklist_active(
                         session, blacklist_id, active
                     )
             if not ok:
@@ -3742,7 +3742,7 @@ class MainApi(QObject):
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                data = await repository.get_stats_status_breakdown(
+                data = await stats_summary.get_stats_status_breakdown(
                     session, period=period,
                 )
             return _ok(data)
@@ -3756,7 +3756,7 @@ class MainApi(QObject):
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                data = await repository.get_stats_kpi(session, period=period)
+                data = await stats_summary.get_stats_kpi(session, period=period)
             return _ok(data)
 
         self._dispatch(self.stats_kpi_loaded, run())
@@ -3768,7 +3768,7 @@ class MainApi(QObject):
         get_stats_hr_responses в repository."""
         async def run() -> str:
             async with self._session_factory() as session:
-                data = await repository.get_stats_hr_responses(
+                data = await stats_summary.get_stats_hr_responses(
                     session, period=period,
                 )
             return _ok(data)
@@ -3780,7 +3780,7 @@ class MainApi(QObject):
         """Top-N skills (vacancy.stack tags за period) + флаг mine."""
         async def run() -> str:
             async with self._session_factory() as session:
-                data = await repository.get_stats_skills(
+                data = await stats_summary.get_stats_skills(
                     session, period=period,
                 )
             return _ok(data)
@@ -3792,7 +3792,7 @@ class MainApi(QObject):
         """Per-channel pipeline (Ингест / Воронка отклика / Конверсия)."""
         async def run() -> str:
             async with self._session_factory() as session:
-                data = await repository.get_stats_channels_pipeline(
+                data = await stats_pipeline.get_stats_channels_pipeline(
                     session, period=period,
                 )
             return _ok(data)
@@ -3807,7 +3807,7 @@ class MainApi(QObject):
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                items = await repository.list_blacklist_candidates(session, kind)
+                items = await blacklist.list_blacklist_candidates(session, kind)
             return _ok({"kind": kind, "items": items})
 
         self._dispatch(self.contacts_blacklist_candidates_loaded, run())
@@ -3819,7 +3819,7 @@ class MainApi(QObject):
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_blacklist(session)
+                rows = await blacklist.list_blacklist(session)
             return _ok({
                 "items": [_blacklist_row_to_dict(r) for r in rows],
             })
@@ -3852,8 +3852,8 @@ class MainApi(QObject):
                 # ⇒ is_active=false» — иначе bot polling всё ещё трогал бы
                 # запрещённые каналы.
                 async with session.begin():
-                    await repository.deactivate_blacklisted_channels(session)
-                rows = await repository.list_telegram_channels(session, search=search)
+                    await channels_repo.deactivate_blacklisted_channels(session)
+                rows = await channels_repo.list_telegram_channels(session, search=search)
             return _ok({
                 "search": search or "",
                 "channels": [_channel_row_to_dict(r) for r in rows],
@@ -3873,7 +3873,7 @@ class MainApi(QObject):
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                detail = await repository.get_channel_detail(session, channel_id)
+                detail = await channels_repo.get_channel_detail(session, channel_id)
             if detail is None:
                 return _err("Канал не найден.", channel_id=channel_id)
             ch = detail.channel
@@ -3923,7 +3923,7 @@ class MainApi(QObject):
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_vacancies_for_channel(
+                rows = await vacancies_mini.list_vacancies_for_channel(
                     session, channel_id, limit=limit, offset=offset,
                 )
                 # Diagnostic — раз баг проявляется: 0 здесь vs N в stats
@@ -3979,7 +3979,7 @@ class MainApi(QObject):
                 ch = await session.get(TelegramChannel, channel_id)
                 if ch is None:
                     return _err("Канал не найден.", channel_id=channel_id, action="blacklist")
-                value = repository.channel_blacklist_preferred_value(ch)
+                value = channels_repo.channel_blacklist_preferred_value(ch)
                 if value is None:
                     return _err(
                         "У канала нет @username.",
@@ -4031,7 +4031,7 @@ class MainApi(QObject):
                 ch = await session.get(TelegramChannel, channel_id)
                 if ch is None:
                     return _err("Канал не найден.", channel_id=channel_id, action="unblacklist")
-                candidates = repository.channel_blacklist_candidates(ch)
+                candidates = channels_repo.channel_blacklist_candidates(ch)
                 if not candidates:
                     return _err(
                         "У канала нет @username.",
@@ -4211,7 +4211,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    affected = await repository.set_all_channels_active(
+                    affected = await channels_repo.set_all_channels_active(
                         session, is_active
                     )
             return _ok({
@@ -4263,7 +4263,7 @@ class MainApi(QObject):
                     # Включить канал, который сейчас в blacklist'е, нельзя —
                     # блокируем на уровне бэка, чтобы любой канал-toggle (в
                     # т.ч. через bulk «Включить все») не оживлял запрещённое.
-                    if is_active and await repository.is_channel_blacklisted(
+                    if is_active and await channels_repo.is_channel_blacklisted(
                         session, channel_id
                     ):
                         return _err(
@@ -4272,7 +4272,7 @@ class MainApi(QObject):
                             is_active=is_active,
                             action="set_active",
                         )
-                    ok = await repository.set_channel_active(
+                    ok = await channels_repo.set_channel_active(
                         session, channel_id, is_active
                     )
             if not ok:
@@ -4310,7 +4310,7 @@ class MainApi(QObject):
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await repository.list_companies_with_counts(session, search=search)
+                rows = await companies_list.list_companies_with_counts(session, search=search)
             return _ok({
                 "absorbed_id": absorbed_id,
                 "search": search or "",
@@ -4344,7 +4344,7 @@ class MainApi(QObject):
         async def run() -> str:
             try:
                 async with self._session_factory() as session:
-                    co = await repository.create_company(
+                    co = await companies_card.create_company(
                         session,
                         name=name,
                         website=website,
@@ -4397,7 +4397,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    ok = await repository.update_company_fields(
+                    ok = await companies_card.update_company_fields(
                         session, company_id, **kwargs,
                     )
             if not ok:
@@ -4417,7 +4417,7 @@ class MainApi(QObject):
     def contacts_delete_company(self, company_id: int) -> None:
         async def run() -> str:
             async with self._session_factory() as session:
-                ok = await repository.delete_company(session, company_id)
+                ok = await companies_card.delete_company(session, company_id)
                 if not ok:
                     return _err(
                         "Компания не найдена.",
@@ -4443,7 +4443,7 @@ class MainApi(QObject):
             try:
                 async with self._session_factory() as session:
                     async with session.begin():
-                        await repository.merge_company(
+                        await companies_card.merge_company(
                             session,
                             absorbed_id=absorbed_id,
                             survivor_id=survivor_id,
@@ -4478,7 +4478,7 @@ class MainApi(QObject):
                         "Компания не найдена.",
                         company_id=company_id, action="blacklist",
                     )
-                value = repository.company_blacklist_preferred_value(co)
+                value = companies_card.company_blacklist_preferred_value(co)
                 if value is None:
                     return _err(
                         "У компании нет имени.",
@@ -4524,7 +4524,7 @@ class MainApi(QObject):
                         "Компания не найдена.",
                         company_id=company_id, action="unblacklist",
                     )
-                candidates = repository.company_blacklist_candidates(co)
+                candidates = companies_card.company_blacklist_candidates(co)
                 if not candidates:
                     return _err(
                         "У компании нет имени.",

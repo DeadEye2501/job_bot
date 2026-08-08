@@ -36,25 +36,13 @@ from backend.models import (
     VacancyStatus,
 )
 from backend.payloads import ParsedVacancy
-from backend.repository import (
-    apply_classification,
-    build_profile_block,
-    count_recent_outgoing_with_vacancy_for_hr,
-    delete_vacancy as _repo_delete_vacancy,
-    find_known_hr,
-    find_latest_vacancy_id_for_hr,
-    find_or_create_company,
-    find_or_create_hr,
-    list_hrs_for_backfill,
-    list_open_hr_chats,
-    list_profile_languages,
-    load_active_blacklist_patterns,
-    load_profile_skills,
-    get_profile,
-    refresh_hr_username,
-    resolve_reply_target_vacancy,
-    save_incoming_message,
-)
+from backend.repository.blacklist import load_active_blacklist_patterns
+from backend.repository.companies_matching import find_or_create_company
+from backend.repository.hr_identify import count_recent_outgoing_with_vacancy_for_hr, find_known_hr, find_latest_vacancy_id_for_hr, find_or_create_hr, refresh_hr_username, resolve_reply_target_vacancy
+from backend.repository.hr_list import list_hrs_for_backfill, list_open_hr_chats
+from backend.repository.messages import save_incoming_message
+from backend.repository.profile import build_profile_block, get_profile, list_profile_languages, load_profile_skills
+from backend.repository.vacancies_life import apply_classification, delete_vacancy as _repo_delete_vacancy
 
 
 logger = logging.getLogger(__name__)
@@ -99,7 +87,7 @@ async def process_dm(
     async with session_factory() as session:
         hr_lookup = await find_known_hr(session, sender_id, sender_username)
         if hr_lookup is not None:
-            from backend.repository import _hr_blacklist_value
+            from backend.repository.hr_card import _hr_blacklist_value
             bl_value = await _hr_blacklist_value(session, hr_lookup)
         else:
             bl_value = None
@@ -755,7 +743,7 @@ class IngestionPipeline:
         # blacklist взвели за время burst'а — текущий накопленный пакет
         # тоже надо отбросить, не классифицируя.
         async with self._session_factory() as session:
-            from backend.repository import _hr_blacklist_value
+            from backend.repository.hr_card import _hr_blacklist_value
             from backend.models import HR
             hr_row = await session.get(HR, hr_id)
             bl_value = (
@@ -844,7 +832,7 @@ class IngestionPipeline:
         кандидатов нет — ранний return.
         """
         from backend.domain.transitions import GHOSTING_TIMEOUT_DAYS
-        from backend.repository import mark_ghosted_vacancies
+        from backend.repository.vacancies_life import mark_ghosted_vacancies
 
         try:
             async with self._session_factory() as session:
@@ -1754,7 +1742,7 @@ class IngestionPipeline:
         канал «прислал N мусора» не посчитать — Vacancy-ряд исчезает совсем).
         Channel/msg-id берём из самой вакансии, всё в одной транзакции.
         """
-        from backend.repository import record_trash_event
+        from backend.repository.vacancies_life import record_trash_event
         from backend.models import Vacancy as _V
         async with self._session_factory() as session:
             v = await session.get(_V, vacancy_id)

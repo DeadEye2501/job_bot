@@ -4,7 +4,7 @@
 при разборе входящего поста.
 """
 
-from backend.repository import find_channel_by_username
+from backend.repository.channels import find_channel_by_username
 from tests.dbio import put
 from tests.factories import channel_row
 
