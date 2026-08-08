@@ -14,7 +14,7 @@
 
 import pytest
 
-from backend.bot.client import MEDIA_DIR
+from backend.bot.media import MEDIA_DIR
 from backend.models import BotMode, Message
 from tests.dbio import only_row, put
 from tests.factories import blacklist_row, message_row

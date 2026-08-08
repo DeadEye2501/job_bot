@@ -290,7 +290,7 @@ def _media_url(stored_path: str | None) -> str | None:
     """
     if not stored_path:
         return None
-    from backend.bot.client import MEDIA_DIR
+    from backend.bot.media import MEDIA_DIR
     p = Path(stored_path)
     if not p.is_absolute():
         p = (MEDIA_DIR / p).resolve()
