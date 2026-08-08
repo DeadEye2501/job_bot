@@ -3522,7 +3522,7 @@ async def find_or_create_company(
         if candidates:
             # Lazy import: repo не должен жёстко зависеть от llm-модуля при
             # импорте; LLM нужен только в этой ветке.
-            from backend.llm import dedupe_company_with_llm
+            from backend.llm.company import dedupe_company_with_llm
 
             shortlist = [c for c, _ in candidates]
             matched_id, reasoning = await dedupe_company_with_llm(

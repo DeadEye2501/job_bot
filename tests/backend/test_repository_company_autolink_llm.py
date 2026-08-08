@@ -47,7 +47,7 @@ def arbiter(monkeypatch):
 
     def install(**kwargs) -> Arbiter:
         fake = Arbiter(**kwargs)
-        monkeypatch.setattr("backend.llm.dedupe_company_with_llm", fake)
+        monkeypatch.setattr("backend.llm.company.dedupe_company_with_llm", fake)
         return fake
 
     return install

@@ -11,7 +11,7 @@
 
 import pytest
 
-from backend.llm import _capitalize_skill, _clean_stack_items, _strip_version
+from backend.llm.skills import _capitalize_skill, _clean_stack_items, _strip_version
 
 
 @pytest.mark.parametrize(

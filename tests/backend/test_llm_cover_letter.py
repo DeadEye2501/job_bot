@@ -13,7 +13,7 @@
 import httpx
 import pytest
 
-from backend.llm import generate_cover_letter
+from backend.llm.cover_letter import generate_cover_letter
 from tests.factories import parsed_vacancy
 from tests.fakes.llm import CHAT, chat_response, messages_of, provider
 
