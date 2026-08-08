@@ -34,7 +34,8 @@ from adapters import lm_studio, telegram
 from config import get_data_dir
 from backend.repository.channels import delete_channel, find_channel_by_username, reset_channel_cursor
 from backend.domain.transitions import should_apply_status
-from backend.flows.pipeline import IngestionPipeline, catch_up_missed_dms, process_dm
+from backend.flows.dm import catch_up_missed_dms, process_dm
+from backend.flows.pipeline import IngestionPipeline
 from backend.helpers import extract_dm_text, extract_text, fetch_telegram_avatar
 from backend.repository.hr_card import _hr_blacklist_value
 from backend.repository.hr_identify import find_known_hr

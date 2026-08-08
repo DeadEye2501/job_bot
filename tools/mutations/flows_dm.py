@@ -12,25 +12,25 @@ CRLF = "\r\n"
 MUTATIONS = [
     # process_dm: письмо от бота перестаёт отсеиваться
     (
-        "backend/flows/pipeline.py",
-        "    if not msg.from_user or msg.from_user.is_bot:" + CRLF,
-        "    if not msg.from_user:" + CRLF,
+        "backend/flows/dm.py",
+        "if not msg.from_user or msg.from_user.is_bot:" + CRLF,
+        "if not msg.from_user:" + CRLF,
     ),
     # process_dm: письмо без отправителя перестаёт отсеиваться
     (
-        "backend/flows/pipeline.py",
-        "    if not msg.from_user or msg.from_user.is_bot:" + CRLF,
-        "    if msg.from_user and msg.from_user.is_bot:" + CRLF,
+        "backend/flows/dm.py",
+        "if not msg.from_user or msg.from_user.is_bot:" + CRLF,
+        "if msg.from_user and msg.from_user.is_bot:" + CRLF,
     ),
     # process_dm: незаведённый собеседник перестаёт отсеиваться
     (
-        "backend/flows/pipeline.py",
+        "backend/flows/dm.py",
         "    if hr_lookup is None:" + CRLF + "        return" + CRLF,
         "",
     ),
     # process_dm: чёрный список перестаёт глушить входящее
     (
-        "backend/flows/pipeline.py",
+        "backend/flows/dm.py",
         "    if bl_value:" + CRLF
         + "        # HR в активном blacklist",
         "    if False:" + CRLF
@@ -38,32 +38,32 @@ MUTATIONS = [
     ),
     # process_dm: номер собеседника не дописывается в карточку
     (
-        "backend/flows/pipeline.py",
+        "backend/flows/dm.py",
         "            if hr.telegram_user_id is None:" + CRLF
         + "                hr.telegram_user_id = sender_id" + CRLF,
         "",
     ),
     # process_dm: смена имени собеседника не переносится в карточку
     (
-        "backend/flows/pipeline.py",
-        "            refresh_hr_username(hr, sender_username)" + CRLF,
+        "backend/flows/dm.py",
+        "        refresh_hr_username(hr, sender_username)" + CRLF,
         "",
     ),
     # process_dm: своя картинка карточки затирается чужой
     (
-        "backend/flows/pipeline.py",
-        "            if avatar_bytes is not None and hr.avatar is None:",
-        "            if avatar_bytes is not None:",
+        "backend/flows/dm.py",
+        "        if avatar_bytes is not None and hr.avatar is None:",
+        "        if avatar_bytes is not None:",
     ),
     # process_dm: аватар тянут и у карточки, где он уже есть
     (
-        "backend/flows/pipeline.py",
-        "    if client is not None and hr_lookup.avatar is None:",
-        "    if client is not None:",
+        "backend/flows/dm.py",
+        "if client is not None and hr_lookup.avatar is None:",
+        "if client is not None:",
     ),
     # process_dm: ответ перестаёт привязывать письмо к своей вакансии
     (
-        "backend/flows/pipeline.py",
+        "backend/flows/dm.py",
         "            if reply_to_id:" + CRLF
         + "                vacancy_id = await resolve_reply_target_vacancy(" + CRLF
         + "                    session, hr.id, reply_to_id," + CRLF
@@ -72,7 +72,7 @@ MUTATIONS = [
     ),
     # process_dm: запасная привязка к свежей вакансии пропадает
     (
-        "backend/flows/pipeline.py",
+        "backend/flows/dm.py",
         "            if vacancy_id is None:" + CRLF
         + "                vacancy_id = await find_latest_vacancy_id_for_hr(" + CRLF
         + "                    session, hr.id, as_of=msg.date," + CRLF
@@ -81,13 +81,13 @@ MUTATIONS = [
     ),
     # process_dm: в накопитель уходит текст с цитатой
     (
-        "backend/flows/pipeline.py",
-        "        schedule_classification(hr.id, vacancy_id, new_msg_id, classify_text)",
-        "        schedule_classification(hr.id, vacancy_id, new_msg_id, text)",
+        "backend/flows/dm.py",
+        "    schedule_classification(hr.id, vacancy_id, new_msg_id, classify_text)",
+        "    schedule_classification(hr.id, vacancy_id, new_msg_id, text)",
     ),
     # process_dm: вакансия вне досягаемости автоматики всё равно разбирается
     (
-        "backend/flows/pipeline.py",
+        "backend/flows/dm.py",
         "    if v_status is not None and is_terminal_for_auto(v_status):" + CRLF
         + "        logger.info(" + CRLF
         + '            "vacancy %s: status=%s terminal for auto, skip classification",'

@@ -15,7 +15,7 @@
 import pytest
 from pyrogram.errors import FloodWait, PeerIdInvalid
 
-from backend.flows.pipeline import backfill_hr_dm_history
+from backend.flows.dm import backfill_hr_dm_history
 from backend.models import HR, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import hr_row, message_row
@@ -320,7 +320,7 @@ async def test_without_a_buffer_the_vacancy_list_is_refreshed(
     async def process_dm(msg, *args, **kwargs):
         pass
 
-    monkeypatch.setattr("backend.flows.pipeline.process_dm", process_dm)
+    monkeypatch.setattr("backend.flows.dm.process_dm", process_dm)
     client = FakeTelegramClient()
     client.history = [_theirs(10, "привет")]
     heard: list[int] = []
@@ -350,7 +350,7 @@ async def test_with_a_buffer_the_vacancy_list_is_left_to_the_reader(
     async def process_dm(msg, *args, **kwargs):
         pass
 
-    monkeypatch.setattr("backend.flows.pipeline.process_dm", process_dm)
+    monkeypatch.setattr("backend.flows.dm.process_dm", process_dm)
     client = FakeTelegramClient()
     client.history = [_theirs(10, "привет")]
     heard: list[int] = []
