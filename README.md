@@ -87,7 +87,7 @@ backend/
   domain.py           # бизнес-логика без I/O (scoring, dedup, status transitions)
   cv_parser.py        # PDF-резюме → структурированные поля профиля
   llm.py              # промпты + клиенты для chat-LLM
-  models.py           # SQLAlchemy-модели
+  models/             # SQLAlchemy-модели, по одному модулю на предмет
   repository.py       # типизированные query-функции
   runtime_settings.py # in-memory-кеш конфигурации (TG creds, LLM endpoints, app-settings)
   log_buffer.py       # ring-buffer для UI «Логи»
