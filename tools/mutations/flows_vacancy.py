@@ -309,9 +309,9 @@ MUTATIONS = [
     ),
     # _spawn_hr_backfill: законченный догон из списка не убирается
     (
-        "backend/flows/pipeline.py",
-        "        task.add_done_callback(self._backfill_tasks.discard)",
-        "        pass",
+        "backend/flows/dm.py",
+        "    task.add_done_callback(pipeline._backfill_tasks.discard)",
+        "    pass",
     ),
     # mark_shutting_down: незаконченный догон не гасится
     (
