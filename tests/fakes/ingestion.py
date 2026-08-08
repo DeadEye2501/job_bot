@@ -19,6 +19,14 @@ class FakeIngestion:
         self.rerun_calls: list[int] = []
         self.application_calls: list[int] = []
         self.full_calls = 0
+        self.buffer_edits: list[tuple] = []
+        self.buffer_removals: list[tuple] = []
+
+    def update_dm_buffer_text(self, hr_id: int, tg_message_id: int, text: str) -> None:
+        self.buffer_edits.append((hr_id, tg_message_id, text))
+
+    def remove_dm_buffer_msg(self, hr_id: int, tg_message_id: int) -> None:
+        self.buffer_removals.append((hr_id, tg_message_id))
 
     async def poll_one_channel(self, channel_id: int):
         self.channel_calls.append(channel_id)
