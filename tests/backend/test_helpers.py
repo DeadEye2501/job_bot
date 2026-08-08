@@ -156,7 +156,7 @@ async def test_an_entity_without_a_photo_has_no_avatar():
 
 async def test_a_flood_wait_yields_no_avatar_and_does_not_raise():
     """Ожидание после флуда не даёт аватара и не роняет вызывающего."""
-    client = FakeTelegramClient(download_error=FloodWait(value=42))
+    client = FakeTelegramClient(fails={"download_media": FloodWait(value=42)})
     entity = user(photo=photo(small_file_id="small-1"))
 
     assert await fetch_telegram_avatar(client, entity) is None
@@ -210,6 +210,6 @@ async def test_an_unknown_username_resolves_to_nothing():
 
 async def test_a_flood_wait_while_resolving_does_not_raise():
     """Ожидание после флуда при поиске не роняет вызывающего."""
-    client = FakeTelegramClient(get_users_error=FloodWait(value=42))
+    client = FakeTelegramClient(fails={"get_users": FloodWait(value=42)})
 
     assert await resolve_hr_telegram(client, "@user_name") is None
