@@ -33,18 +33,18 @@ MUTATIONS = [
     # _ingest_post: недоразобранный повтор не дописывается
     (
         "backend/flows/ingest.py",
-        "        unparsed = await pipeline._is_unparsed_vacancy(similar_id)" + CRLF
+        "        unparsed = await parse._is_unparsed_vacancy(pipeline, similar_id)" + CRLF
         + "        if unparsed:",
-        "        unparsed = await pipeline._is_unparsed_vacancy(similar_id)" + CRLF
+        "        unparsed = await parse._is_unparsed_vacancy(pipeline, similar_id)" + CRLF
         + "        if False:",
     ),
     # _ingest_post: незаведённая строка всё равно идёт в разбор
     (
         "backend/flows/ingest.py",
         "    if new_vacancy_id is not None:" + CRLF
-        + "        await pipeline._parse_and_update_vacancy(" + CRLF,
+        + "        await parse._parse_and_update_vacancy(pipeline, " + CRLF,
         "    if True:" + CRLF
-        + "        await pipeline._parse_and_update_vacancy(" + CRLF,
+        + "        await parse._parse_and_update_vacancy(pipeline, " + CRLF,
     ),
     # _save_new_vacancy: вектор не попадает в кэш
     (
@@ -102,131 +102,131 @@ MUTATIONS = [
     ),
     # _parse_and_update_vacancy: пустышка доходит до проверяльщика
     (
-        "backend/flows/pipeline.py",
-        "        if is_empty_vacancy(parsed):",
-        "        if False:",
+        "backend/flows/parse.py",
+        "    if is_empty_vacancy(parsed):",
+        "    if False:",
     ),
     # _parse_and_update_vacancy: пустышку удаляют и при повторном прогоне
     (
-        "backend/flows/pipeline.py",
-        "        if is_empty_vacancy(parsed):" + CRLF
-        + "            if allow_delete:",
-        "        if is_empty_vacancy(parsed):" + CRLF + "            if True:",
+        "backend/flows/parse.py",
+        "    if is_empty_vacancy(parsed):" + CRLF
+        + "        if allow_delete:",
+        "    if is_empty_vacancy(parsed):" + CRLF + "        if True:",
     ),
     # _parse_and_update_vacancy: чёрный список читает обрезанный текст
     (
-        "backend/flows/pipeline.py",
-        "        blacklist_match = check_blacklist(text, self._blacklist_patterns)",
-        "        blacklist_match = check_blacklist(text[:100], self._blacklist_patterns)",
+        "backend/flows/parse.py",
+        "    blacklist_match = check_blacklist(text, pipeline._blacklist_patterns)",
+        "    blacklist_match = check_blacklist(text[:100], pipeline._blacklist_patterns)",
     ),
     # _parse_and_update_vacancy: проверяльщика зовут и для отсеянного
     (
-        "backend/flows/pipeline.py",
-        "        if status == VacancyStatus.NEW:" + CRLF
-        + "            validation = await validate_vacancy_fit(",
-        "        if True:" + CRLF
-        + "            validation = await validate_vacancy_fit(",
+        "backend/flows/parse.py",
+        "    if status == VacancyStatus.NEW:" + CRLF
+        + "        validation = await validate_vacancy_fit(",
+        "    if True:" + CRLF
+        + "        validation = await validate_vacancy_fit(",
     ),
     # _parse_and_update_vacancy: молчание проверяльщика читается как согласие
     (
-        "backend/flows/pipeline.py",
-        "            if validation is None:" + CRLF
-        + "                status = VacancyStatus.NOT_FIT" + CRLF,
-        "            if False:" + CRLF
-        + "                status = VacancyStatus.NOT_FIT" + CRLF,
+        "backend/flows/parse.py",
+        "        if validation is None:" + CRLF
+        + "            status = VacancyStatus.NOT_FIT" + CRLF,
+        "        if False:" + CRLF
+        + "            status = VacancyStatus.NOT_FIT" + CRLF,
     ),
     # _parse_and_update_vacancy: мусор удаляют и при повторном прогоне
     (
-        "backend/flows/pipeline.py",
-        '            elif validation.verdict == "trash":' + CRLF
-        + "                if allow_delete:",
-        '            elif validation.verdict == "trash":' + CRLF
-        + "                if True:",
+        "backend/flows/parse.py",
+        '        elif validation.verdict == "trash":' + CRLF
+        + "            if allow_delete:",
+        '        elif validation.verdict == "trash":' + CRLF
+        + "            if True:",
     ),
     # _parse_and_update_vacancy: отказ проверяльщика ни к чему не ведёт
     (
-        "backend/flows/pipeline.py",
-        '            elif validation.verdict == "reject":' + CRLF
-        + "                status = VacancyStatus.NOT_FIT" + CRLF,
-        '            elif False:' + CRLF
-        + "                status = VacancyStatus.NOT_FIT" + CRLF,
+        "backend/flows/parse.py",
+        '        elif validation.verdict == "reject":' + CRLF
+        + "            status = VacancyStatus.NOT_FIT" + CRLF,
+        '        elif False:' + CRLF
+        + "            status = VacancyStatus.NOT_FIT" + CRLF,
     ),
     # _parse_and_update_vacancy: признак разбора не ставится
     (
-        "backend/flows/pipeline.py",
-        "                v.is_parsed = True" + CRLF + CRLF + "                v.title",
-        "                v.title",
+        "backend/flows/parse.py",
+        "            v.is_parsed = True" + CRLF + CRLF + "            v.title",
+        "            v.title",
     ),
     # _parse_and_update_vacancy: пустой повторный разбор затирает стек
     (
-        "backend/flows/pipeline.py",
-        "                if parsed.stack:" + CRLF
-        + "                    v.stack = parsed.stack" + CRLF
-        + "                    v.score = score" + CRLF
-        + "                else:" + CRLF
-        + "                    v.stack = v.stack or []" + CRLF,
-        "                if True:" + CRLF
-        + "                    v.stack = parsed.stack" + CRLF
-        + "                    v.score = score" + CRLF
-        + "                else:" + CRLF
-        + "                    v.stack = v.stack or []" + CRLF,
+        "backend/flows/parse.py",
+        "            if parsed.stack:" + CRLF
+        + "                v.stack = parsed.stack" + CRLF
+        + "                v.score = score" + CRLF
+        + "            else:" + CRLF
+        + "                v.stack = v.stack or []" + CRLF,
+        "            if True:" + CRLF
+        + "                v.stack = parsed.stack" + CRLF
+        + "                v.score = score" + CRLF
+        + "            else:" + CRLF
+        + "                v.stack = v.stack or []" + CRLF,
     ),
     # _parse_and_update_vacancy: компания не привязывается
     (
-        "backend/flows/pipeline.py",
-        "                    if company is not None:" + CRLF
-        + "                        v.company_id = company.id" + CRLF,
+        "backend/flows/parse.py",
+        "                if company is not None:" + CRLF
+        + "                    v.company_id = company.id" + CRLF,
         "",
     ),
     # _parse_and_update_vacancy: HR не привязывается
     (
-        "backend/flows/pipeline.py",
-        "                    v.hr_id = hr.id" + CRLF
-        + "                    # Захватываем до выхода из сессии",
-        "                    # Захватываем до выхода из сессии",
+        "backend/flows/parse.py",
+        "                v.hr_id = hr.id" + CRLF
+        + "                # Захватываем до выхода из сессии",
+        "                # Захватываем до выхода из сессии",
     ),
     # _parse_and_update_vacancy: отклик уходит и у непригодной вакансии
     (
-        "backend/flows/pipeline.py",
-        "            status == VacancyStatus.NEW" + CRLF
-        + "            and hr_for_send is not None" + CRLF
-        + "            and self._rs.auto_apply" + CRLF,
-        "            hr_for_send is not None" + CRLF
-        + "            and self._rs.auto_apply" + CRLF,
+        "backend/flows/parse.py",
+        "        status == VacancyStatus.NEW" + CRLF
+        + "        and hr_for_send is not None" + CRLF
+        + "        and pipeline._rs.auto_apply" + CRLF,
+        "        hr_for_send is not None" + CRLF
+        + "        and pipeline._rs.auto_apply" + CRLF,
     ),
     # _parse_and_update_vacancy: выключенная автоотправка всё равно шлёт
     (
-        "backend/flows/pipeline.py",
-        "            status == VacancyStatus.NEW" + CRLF
-        + "            and hr_for_send is not None" + CRLF
-        + "            and self._rs.auto_apply" + CRLF,
-        "            status == VacancyStatus.NEW" + CRLF
-        + "            and hr_for_send is not None" + CRLF,
+        "backend/flows/parse.py",
+        "        status == VacancyStatus.NEW" + CRLF
+        + "        and hr_for_send is not None" + CRLF
+        + "        and pipeline._rs.auto_apply" + CRLF,
+        "        status == VacancyStatus.NEW" + CRLF
+        + "        and hr_for_send is not None" + CRLF,
     ),
     # _parse_and_update_vacancy: попытка отправки не записывается в ленту
     (
-        "backend/flows/pipeline.py",
-        "                            kind=\"auto_send\"," + CRLF
-        + '                            payload={"ok": ok, "reason": reason},' + CRLF,
-        "                            kind=\"auto_send\"," + CRLF
-        + '                            payload={"ok": True, "reason": "sent"},' + CRLF,
+        "backend/flows/parse.py",
+        "                        kind=\"auto_send\"," + CRLF
+        + '                        payload={"ok": ok, "reason": reason},' + CRLF,
+        "                        kind=\"auto_send\"," + CRLF
+        + '                        payload={"ok": True, "reason": "sent"},' + CRLF,
     ),
     # _save_empty_vacancy: признак разбора не ставится
     (
-        "backend/flows/pipeline.py",
-        "                v.is_parsed = True" + CRLF
-        + "                company_dedup_decision",
-        "                company_dedup_decision",
+        "backend/flows/parse.py",
+        "            v.is_parsed = True" + CRLF
+        + "            company_dedup_decision",
+        "            company_dedup_decision",
     ),
     # _save_empty_vacancy: прежний разбор не стирается
     (
-        "backend/flows/pipeline.py",
-        "                else:" + CRLF
-        + "                    v.title = None" + CRLF
-        + "                    v.description = None" + CRLF,
-        "                elif False:" + CRLF
-        + "                    v.title = None" + CRLF
-        + "                    v.description = None" + CRLF,
+        "backend/flows/parse.py",
+        "            else:" + CRLF
+        + "                v.title = None" + CRLF
+        + "                v.description = None" + CRLF,
+        "            elif False:" + CRLF
+        + "                v.title = None" + CRLF
+        + "                v.description = None" + CRLF,
     ),
     # _send_application: короткая приписка не заменяет полное письмо
     (

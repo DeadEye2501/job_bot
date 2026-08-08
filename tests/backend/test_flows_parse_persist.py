@@ -15,6 +15,7 @@
 отклик не ушёл.
 """
 
+from backend.flows import parse
 from backend.flows import apply
 import pytest
 
@@ -28,7 +29,7 @@ async def test_the_parsed_fields_land_in_the_row(parsing, session_factory):
     """Разобранные поля записываются в строку вакансии."""
     pipeline, vacancy = parsing
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -55,7 +56,7 @@ async def test_an_extra_way_to_apply_is_kept_in_the_notes(parsing, session_facto
         other_contact="jobs@example.com",
     )
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -73,7 +74,7 @@ async def test_a_reparse_without_skills_keeps_the_old_stack(
     карточка показала бы ноль баллов рядом с прежними тегами.
     """
     pipeline, vacancy = parsing
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
     before = await only_row(session_factory, Vacancy)
@@ -83,7 +84,7 @@ async def test_a_reparse_without_skills_keeps_the_old_stack(
         title="Python-разработчик", description="Ищем", salary="200000"
     )
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -99,7 +100,7 @@ async def test_the_company_is_created_and_linked(parsing, session_factory):
         title="Python-разработчик", stack_required=["Python"], company_name="Контур"
     )
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -116,7 +117,7 @@ async def test_the_hr_is_resolved_and_linked(parsing, session_factory):
         title="Python-разработчик", stack_required=["Python"], hr_contact="@maria"
     )
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -140,7 +141,7 @@ async def test_an_unfit_vacancy_keeps_its_company_and_hr(parsing, session_factor
         hr_contact="@maria",
     )
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -158,7 +159,7 @@ async def test_the_timeline_records_what_was_filled(parsing, session_factory):
     """
     pipeline, vacancy = parsing
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -186,7 +187,7 @@ async def test_a_fitting_vacancy_gets_an_application_sent(parsing, session_facto
     )
     await pipeline._rs.set_app("auto_apply", "true")
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -201,7 +202,7 @@ async def test_auto_apply_switched_off_sends_nothing(parsing):
     )
     await pipeline._rs.set_app("auto_apply", "false")
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -217,7 +218,7 @@ async def test_an_unfit_vacancy_gets_no_application(parsing):
     )
     await pipeline._rs.set_app("auto_apply", "true")
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -229,7 +230,7 @@ async def test_a_vacancy_without_an_hr_gets_no_application(parsing):
     pipeline, vacancy = parsing
     await pipeline._rs.set_app("auto_apply", "true")
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -262,7 +263,7 @@ async def test_every_attempt_is_recorded_in_the_timeline(monkeypatch,
 
     monkeypatch.setattr(apply, "_try_auto_send", try_auto_send)
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -281,7 +282,7 @@ async def test_a_vanished_vacancy_is_left_alone(parsing, session_factory):
     """
     pipeline, _ = parsing
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         404, "текст", "jobs", allow_delete=False
     )
 
@@ -295,7 +296,7 @@ async def test_the_window_hears_about_both_lists(parsing):
     pipeline.on_contacts_changed = lambda: heard.append("контакты")
     pipeline.on_vacancies_changed = lambda: heard.append("вакансии")
 
-    await pipeline._parse_and_update_vacancy(
+    await parse._parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 

@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 import numpy as np
 
 from adapters import lm_studio
+from backend.flows import parse
 from backend.domain.dedup import cosine_top_match
 from backend.helpers import extract_text
 from backend.models import Vacancy
@@ -49,7 +50,7 @@ async def _ingest_post(
         # half-built by a cancelled previous cycle (saved with raw_text
         # + embedding but no parsed fields). Detect the orphan and
         # finish parsing it now instead of skipping forever.
-        unparsed = await pipeline._is_unparsed_vacancy(similar_id)
+        unparsed = await parse._is_unparsed_vacancy(pipeline, similar_id)
         if unparsed:
             logger.info(
                 "[@%s] %d matched orphan vacancy %d, finishing parse",
@@ -60,7 +61,7 @@ async def _ingest_post(
             # text + channel hint and stamp it onto the original row. The
             # embedding match guarantees texts are near-identical, so this
             # is acceptable.
-            await pipeline._parse_and_update_vacancy(
+            await parse._parse_and_update_vacancy(pipeline, 
                 similar_id, text, channel_username
             )
         else:
@@ -74,7 +75,7 @@ async def _ingest_post(
         channel_id, channel_username, msg, text, embedding
     )
     if new_vacancy_id is not None:
-        await pipeline._parse_and_update_vacancy(
+        await parse._parse_and_update_vacancy(pipeline, 
             new_vacancy_id, text, channel_username
         )
 
