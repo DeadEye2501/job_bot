@@ -34,6 +34,21 @@ async def test_an_unfilled_field_is_skipped_rather_than_named(
     assert "Роль: Разработчик" in block
 
 
+async def test_an_empty_role_is_skipped_too(session, session_factory):
+    """Пустая роль пропускается так же, как незаполненная.
+
+    Роль объявлена обязательной, поэтому пустоты в ней не бывает — но
+    пустая строка бывает, и охрана рассчитана на неё. Проверено мутацией:
+    без этого случая охрану можно было выбросить незаметно.
+    """
+    await put(session_factory, profile_row(title="", location="Тбилиси"))
+
+    block = await build_profile_block(session)
+
+    assert "Роль" not in block
+    assert "Локация: Тбилиси" in block
+
+
 async def test_the_name_is_joined_from_both_halves(session, session_factory):
     """Имя склеивается из двух половин, и пустая половина не даёт лишнего пробела."""
     await put(session_factory, profile_row(first_name="Иван", last_name="Петров"))

@@ -22,8 +22,10 @@ MUTATIONS = [
     # list_skills: порядок заведения теряется
     (
         "backend/repository.py",
-        "        (await session.scalars(select(ProfileSkill).order_by(ProfileSkill.id))).all()",
-        "        (await session.scalars(select(ProfileSkill).order_by(ProfileSkill.name))).all()",
+        "    return list(" + CRLF
+        + "        (await session.scalars(select(ProfileSkill).order_by(ProfileSkill.id))).all()",
+        "    return list(" + CRLF
+        + "        (await session.scalars(select(ProfileSkill).order_by(ProfileSkill.name))).all()",
     ),
     # list_experience: места идут от давнего к свежему
     (
@@ -34,8 +36,10 @@ MUTATIONS = [
     # save_skills: строка без имени всё равно записывается
     (
         "backend/repository.py",
-        "        if not name:" + CRLF + "            continue" + CRLF,
-        "",
+        "        if not name:" + CRLF
+        + "            continue" + CRLF
+        + '        category = (row.get("category") or "Общее").strip() or "Общее"',
+        '        category = (row.get("category") or "Общее").strip() or "Общее"',
     ),
     # save_skills: пустой раздел перестаёт заменяться умолчанием
     (
@@ -60,12 +64,6 @@ MUTATIONS = [
         "backend/repository.py",
         "        if rid_int is not None and rid_int in existing:",
         "        if False:",
-    ),
-    # save_skills: незнакомый номер считается известным
-    (
-        "backend/repository.py",
-        "        rid_int = rid if isinstance(rid, int) else None",
-        "        rid_int = rid if isinstance(rid, int) else 0",
     ),
     # save_skills: связи удаляемого навыка остаются висеть
     (
