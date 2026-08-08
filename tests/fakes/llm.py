@@ -26,6 +26,8 @@ httpx.RequestError). Не кладите сюда исключением httpx.H
 кругу.
 """
 
+import json
+
 import httpx
 
 
@@ -90,6 +92,28 @@ def provider(
 def models_response(*ids: str) -> httpx.Response:
     """Ответ `/v1/models` в форме, совместимой с OpenAI."""
     return httpx.Response(200, json={"data": [{"id": one} for one in ids]})
+
+
+def chat_json(payload: dict, *, finish_reason: str = "stop") -> httpx.Response:
+    """Ответ чата, содержимое которого — объект JSON.
+
+    Так отвечает модель везде, где от неё ждут вердикта, а не текста, и
+    оборачивать словарь в строку в каждом файле тестов незачем.
+    """
+    return chat_response(
+        json.dumps(payload, ensure_ascii=False), finish_reason=finish_reason
+    )
+
+
+def messages_of(request: httpx.Request) -> dict[str, str]:
+    """Отправленные роли и их содержимое, разложенные по ролям.
+
+    Чтение по номеру в списке ломалось бы от смены порядка сообщений в
+    боевом коде, и падало бы обращением к несуществующему номеру вместо
+    внятного несовпадения.
+    """
+    body = json.loads(request.content)
+    return {m["role"]: m["content"] for m in body["messages"]}
 
 
 def chat_response(content: str, *, finish_reason: str = "stop") -> httpx.Response:
