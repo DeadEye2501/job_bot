@@ -117,42 +117,42 @@ MUTATIONS = [
     ),
     # mark_hr_chat_read: выключенный бот всё равно гасит непрочитанное
     (
-        "backend/bot/client.py",
-        "        if (await self._current_mode()) is BotMode.OFF:" + CRLF
-        + "            return 0" + CRLF,
+        "backend/bot/chat.py",
+        "    if (await bot._current_mode()) is BotMode.OFF:" + CRLF
+        + "        return 0" + CRLF,
         "",
     ),
     # mark_hr_chat_read: отметка ставится и на исходящие
     (
-        "backend/bot/client.py",
-        "                    Message.hr_id == hr_id," + CRLF
-        + "                    Message.is_incoming," + CRLF
-        + "                    Message.read_at.is_(None)," + CRLF,
-        "                    Message.hr_id == hr_id," + CRLF
-        + "                    Message.read_at.is_(None)," + CRLF,
+        "backend/bot/chat.py",
+        "                Message.hr_id == hr_id," + CRLF
+        + "                Message.is_incoming," + CRLF
+        + "                Message.read_at.is_(None)," + CRLF,
+        "                Message.hr_id == hr_id," + CRLF
+        + "                Message.read_at.is_(None)," + CRLF,
     ),
     # mark_hr_chat_read: уже прочитанное помечается заново
     (
-        "backend/bot/client.py",
-        "                    Message.hr_id == hr_id," + CRLF
-        + "                    Message.is_incoming," + CRLF
-        + "                    Message.read_at.is_(None)," + CRLF,
-        "                    Message.hr_id == hr_id," + CRLF
-        + "                    Message.is_incoming," + CRLF,
+        "backend/bot/chat.py",
+        "                Message.hr_id == hr_id," + CRLF
+        + "                Message.is_incoming," + CRLF
+        + "                Message.read_at.is_(None)," + CRLF,
+        "                Message.hr_id == hr_id," + CRLF
+        + "                Message.is_incoming," + CRLF,
     ),
     # mark_hr_chat_read: Telegram беспокоят и когда гасить нечего
     (
-        "backend/bot/client.py",
-        "        if updated > 0 and target is not None:",
-        "        if target is not None:",
+        "backend/bot/chat.py",
+        "    if updated > 0 and target is not None:",
+        "    if target is not None:",
     ),
     # mark_hr_chat_read: адрес выбирается именем, а не номером
     (
-        "backend/bot/client.py",
-        "            target = hr.telegram_user_id or hr.telegram_username" + CRLF
-        + "            res = await session.execute(",
-        "            target = hr.telegram_username or hr.telegram_user_id" + CRLF
-        + "            res = await session.execute(",
+        "backend/bot/chat.py",
+        "        target = hr.telegram_user_id or hr.telegram_username" + CRLF
+        + "        res = await session.execute(",
+        "        target = hr.telegram_username or hr.telegram_user_id" + CRLF
+        + "        res = await session.execute(",
     ),
     # _on_raw_update: чужой род оповещения перестаёт отсеиваться
     (
@@ -181,16 +181,16 @@ MUTATIONS = [
     ),
     # send_to_hr_chat: пустое сообщение перестаёт отбиваться
     (
-        "backend/bot/client.py",
-        "        if not clean:" + CRLF
-        + '            raise RuntimeError("Пустое сообщение.")' + CRLF,
+        "backend/bot/chat.py",
+        "    if not clean:" + CRLF
+        + '        raise RuntimeError("Пустое сообщение.")' + CRLF,
         "",
     ),
     # send_to_hr_chat: пробелы по краям перестают обрезаться
     (
-        "backend/bot/client.py",
-        '        clean = (text or "").strip()',
-        '        clean = text or ""',
+        "backend/bot/chat.py",
+        '    clean = (text or "").strip()',
+        '    clean = text or ""',
     ),
     # _on_dm_edit: пометка «изменено» не ставится
     (
