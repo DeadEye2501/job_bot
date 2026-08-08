@@ -12,7 +12,7 @@
 """
 
 from backend.flows import _build_candidate_profile
-from backend.llm import CandidateProfile
+from backend.llm.candidate import CandidateProfile
 from backend.models import ProfileLanguage
 from tests.factories import profile_row
 

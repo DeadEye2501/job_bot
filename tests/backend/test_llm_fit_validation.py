@@ -9,6 +9,9 @@
 в «подходит»: пропустить лишнюю вакансию на ручной просмотр дешевле, чем
 потерять настоящую. Мусор остаётся мусором, но без обоснования: сам пост
 скорее всего и правда реклама, а пускать её в рассылку по перевороту нельзя.
+
+Эти же тесты — единственный сторож `backend/llm/hallucination.py`: своего файла
+у него нет, потому что снаружи он виден только перевёрнутым вердиктом.
 """
 
 import json
@@ -16,12 +19,8 @@ import json
 import httpx
 import pytest
 
-from backend.llm import (
-    CandidateLanguage,
-    CandidateProfile,
-    _parse_fit_validation,
-    validate_vacancy_fit,
-)
+from backend.llm.candidate import CandidateLanguage, CandidateProfile
+from backend.llm.fit import _parse_fit_validation, validate_vacancy_fit
 from tests.factories import parsed_vacancy
 from tests.fakes.llm import CHAT, chat_response, provider
 

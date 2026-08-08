@@ -8,7 +8,7 @@
 
 import pytest
 
-from backend.llm import (
+from backend.llm.candidate import (
     CandidateLanguage,
     _format_free_preferences,
     _format_grades,

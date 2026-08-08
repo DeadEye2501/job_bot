@@ -7,6 +7,7 @@ from datetime import date
 import httpx
 
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
+from backend.llm.answers import QUOTE_TRANSLATION
 
 
 logger = logging.getLogger(__name__)
@@ -195,13 +196,6 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
-_QUOTE_TRANSLATION = str.maketrans({
-    "“": '"',
-    "”": '"',
-    "‘": "'",
-    "’": "'",
-})
-
 
 def _str_or_none(value) -> str | None:
     if not isinstance(value, str):
@@ -401,7 +395,7 @@ def _parse_experience(item) -> ParsedCvExperience | None:
 
 
 def _parse_cv_json(answer: str) -> ParsedCv | None:
-    cleaned = answer.translate(_QUOTE_TRANSLATION)
+    cleaned = answer.translate(QUOTE_TRANSLATION)
     match = _JSON_OBJECT_RE.search(cleaned)
     if match is None:
         return None

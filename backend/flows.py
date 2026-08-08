@@ -21,14 +21,11 @@ from backend.helpers import (
     fetch_telegram_avatar,
     resolve_hr_telegram,
 )
-from backend.llm import (
-    CandidateLanguage,
-    CandidateProfile,
-    classify_hr_reply,
-    generate_cover_letter,
-    parse_vacancy,
-    validate_vacancy_fit,
-)
+from backend.llm.candidate import CandidateLanguage, CandidateProfile
+from backend.llm.cover_letter import generate_cover_letter
+from backend.llm.fit import validate_vacancy_fit
+from backend.llm.hr_reply import classify_hr_reply
+from backend.llm.vacancy import parse_vacancy
 from backend.models import (
     Profile,
     ProfileLanguage,
