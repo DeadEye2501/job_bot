@@ -49,7 +49,9 @@ class FakeTelegramClient:
         self.read_calls: list = []
         self.outgoing: list[tuple] = []
         self.handlers: list = []
+        self.lifecycle: list[str] = []
         self.last_message_id = 500
+        self.session_string = "шифр"
 
     def add_handler(self, handler) -> None:
         self.handlers.append(handler)
@@ -96,3 +98,15 @@ class FakeTelegramClient:
     async def read_chat_history(self, target):
         self.read_calls.append(target)
         self._fail_if_asked("read_chat_history")
+
+    async def start(self):
+        self.lifecycle.append("запуск")
+        self._fail_if_asked("start")
+
+    async def stop(self):
+        self.lifecycle.append("остановка")
+        self._fail_if_asked("stop")
+
+    async def export_session_string(self):
+        self._fail_if_asked("export_session_string")
+        return self.session_string

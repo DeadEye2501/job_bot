@@ -36,6 +36,17 @@ def titles(session):
     return read
 
 
+class LmClient:
+    """Заглушка соединения с языковой моделью: помнит адрес и закрытие."""
+
+    def __init__(self, base_url: str) -> None:
+        self.base_url = base_url
+        self.closed = 0
+
+    async def aclose(self) -> None:
+        self.closed += 1
+
+
 @pytest.fixture
 def make_bot(session_factory, monkeypatch):
     """Собирает `Bot` на подставном клиенте Telegram и без соединений к LLM.
@@ -43,8 +54,9 @@ def make_bot(session_factory, monkeypatch):
     Настоящая сборка поднимает клиента Pyrogram и два клиента httpx — на
     каждый тест это и медленно, и заводит на диске файл сессии. Поэтому обе
     сборки подменяются: клиент Telegram становится подделкой, которую тест
-    получает обратно, а клиенты LLM — метками, по которым видно, какая
-    досталась чату, а какая векторам.
+    получает обратно, а клиенты LLM — заглушками, которые помнят свой адрес
+    и умеют закрываться. По адресу видно, какая досталась чату, а какая
+    векторам; по закрытию — что остановка их не забыла.
     """
 
     async def build(client=None, *, embed_url="http://provider.test") -> Bot:
@@ -60,7 +72,7 @@ def make_bot(session_factory, monkeypatch):
             "adapters.telegram.make_client", lambda tg: telegram_client
         )
         monkeypatch.setattr(
-            "adapters.lm_studio.make_client", lambda cfg: f"клиент {cfg.base_url}"
+            "adapters.lm_studio.make_client", lambda cfg: LmClient(cfg.base_url)
         )
         return Bot(settings, session_factory)
 
