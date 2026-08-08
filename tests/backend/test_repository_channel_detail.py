@@ -169,7 +169,12 @@ async def test_the_daily_rate_counts_only_the_last_thirty_days(
     """Темп считается по последним тридцати дням, а не по всей истории.
 
     Пятнадцать свежих вакансий за тридцать дней дают пол-вакансии в день.
-    Старая в счёт не идёт — иначе давно заглохший канал выглядел бы живым.
+    Старых столько же, и в счёт они не идут — иначе давно заглохший канал
+    выглядел бы вдвое живее, чем есть.
+
+    Проверено мутацией: с одной старой вакансией отсечка снималась молча —
+    шестнадцать за тридцать дней после округления до десятых дают те же
+    полвакансии, что и пятнадцать.
     """
     channel = channel_row()
     await put(session_factory, channel)
@@ -179,12 +184,15 @@ async def test_the_daily_rate_counts_only_the_last_thirty_days(
             vacancy_row(source_channel_id=channel.id, created_at=days_ago(1))
             for _ in range(15)
         ],
-        vacancy_row(source_channel_id=channel.id, created_at=days_ago(200)),
+        *[
+            vacancy_row(source_channel_id=channel.id, created_at=days_ago(200))
+            for _ in range(15)
+        ],
     )
 
     card = await get_channel_detail(session, channel.id)
 
-    assert card.stats.total == 16
+    assert card.stats.total == 30
     assert card.stats.vacancies_per_day == 0.5
 
 
