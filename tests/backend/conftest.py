@@ -1,8 +1,10 @@
 """Фикстуры, общие для тестов слоя `backend`."""
 
+import shutil
+
 import pytest
 
-from backend.bot import Bot
+from backend.bot import MEDIA_DIR, Bot
 from backend.models import (
     HR,
     BotMode,
@@ -85,19 +87,65 @@ class Outbox:
         return self.assigned_id
 
 
-@pytest.fixture
-def outbox(monkeypatch):
-    """Отправка, дошедшая до Telegram, — с подменённым отправителем.
+@pytest.fixture(autouse=True)
+def empty_media_dir():
+    """Пустая папка вложений на каждый тест.
 
-    По умолчанию стенд держит `SEND_LOCKED = True`, и боевой код отправку
-    имитирует: ветка настоящей отправки при этом не исполняется вовсе.
-    Признак снимается ровно вместе с подменой самого отправителя, поэтому
-    настоящий Pyrogram остаётся недостижим.
+    Файл в ней — состояние, которое проверяют сразу двое: пропуск
+    повторного скачивания и копия ушедшего. Остаток от соседнего теста
+    подменял бы «положили» на «уже было» и красил проверки зелёным в
+    зависимости от порядка запуска.
+    """
+    if MEDIA_DIR.exists():
+        shutil.rmtree(MEDIA_DIR)
+    yield
+    if MEDIA_DIR.exists():
+        shutil.rmtree(MEDIA_DIR)
+
+
+@pytest.fixture
+def chatting(session_factory, make_bot):
+    """Бот в заданном режиме, подставной клиент Telegram и сохранённый HR.
+
+    Переписка с HR проверяется тремя слайсами — отметки о прочтении,
+    сообщения, файлы, — и каждому нужно одно и то же: режим, в котором бот
+    вообще что-то делает, клиент, который запишет обращения, и HR с
+    адресом.
+    """
+
+    async def build(*, mode=BotMode.FULL, client=None, **hr_fields):
+        telegram_client = client if client is not None else FakeTelegramClient()
+        await put(session_factory, hr_row(**hr_fields))
+        bot = await make_bot(telegram_client)
+        await bot._rs.set_mode(mode)
+        return bot, telegram_client, await only_row(session_factory, HR)
+
+    return build
+
+
+@pytest.fixture
+def sending_unlocked(monkeypatch):
+    """Снимает признак заглушки: боевой код начинает отправлять по-настоящему.
+
+    По умолчанию стенд держит `SEND_LOCKED = True`, и ветки настоящей
+    отправки не исполняются вовсе. Снимать признак можно только тем,
+    у кого вместо клиента Pyrogram подделка: до сети иначе дойдёт.
+    """
+    import adapters.telegram
+
+    monkeypatch.setattr(adapters.telegram, "SEND_LOCKED", False)
+
+
+@pytest.fixture
+def outbox(monkeypatch, sending_unlocked):
+    """Отправка отклика с подменённым отправителем.
+
+    Подменяется `adapters.telegram.send_dm` целиком, поэтому настоящий
+    Pyrogram остаётся недостижим и со снятым признаком заглушки.
     """
     import adapters.telegram
 
     box = Outbox()
-    monkeypatch.setattr(adapters.telegram, "SEND_LOCKED", False)
     monkeypatch.setattr(adapters.telegram, "send_dm", box.send_dm)
     return box
 

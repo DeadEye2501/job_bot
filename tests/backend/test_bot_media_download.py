@@ -8,28 +8,12 @@
 равно сохранится, просто без файла.
 """
 
-import shutil
 from pathlib import Path
 
 import pytest
 
 from backend.bot import MEDIA_DIR, _download_media
 from tests.fakes.telegram import message
-
-
-@pytest.fixture(autouse=True)
-def empty_media_dir():
-    """Пустая папка вложений на каждый тест.
-
-    Пропуск повторного скачивания смотрит на файл: остаток от соседнего
-    теста подменял бы «скачали» на «уже было» и красил проверки зелёным
-    в зависимости от порядка запуска.
-    """
-    if MEDIA_DIR.exists():
-        shutil.rmtree(MEDIA_DIR)
-    yield
-    if MEDIA_DIR.exists():
-        shutil.rmtree(MEDIA_DIR)
 
 
 class _Downloader:
