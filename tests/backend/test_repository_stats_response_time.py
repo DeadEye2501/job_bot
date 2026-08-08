@@ -167,6 +167,44 @@ async def test_the_first_answer_after_the_application_is_the_one(
     assert got["median_seconds"] == timedelta(days=1).total_seconds()
 
 
+async def test_the_countdown_starts_at_the_first_application_not_the_last(
+    session, session_factory
+):
+    """Отсчёт идёт от первой отправки отклика, а не от последней.
+
+    Вакансию отправляли дважды: месяц назад и на днях. Ответ пришёл вчера.
+    Считать срок от последней отправки значило бы записать месяц ожидания в
+    один день.
+    """
+    hr = hr_row()
+    await put(session_factory, hr)
+    vacancy = vacancy_row(hr_id=hr.id)
+    await put(session_factory, vacancy)
+    first_applied = days_ago(31)
+    await put(
+        session_factory,
+        status_history_row(
+            vacancy.id, status=VacancyStatus.APPLIED, changed_at=first_applied
+        ),
+        status_history_row(
+            vacancy.id, status=VacancyStatus.APPLIED, changed_at=days_ago(2)
+        ),
+    )
+    await put(
+        session_factory,
+        message_row(
+            hr_id=hr.id,
+            vacancy_id=vacancy.id,
+            is_incoming=True,
+            sent_at=first_applied + timedelta(days=30),
+        ),
+    )
+
+    got = await get_stats_hr_responses(session, period="all")
+
+    assert got["median_seconds"] == timedelta(days=30).total_seconds()
+
+
 async def test_the_median_of_an_odd_count_is_the_middle_one(
     session, session_factory
 ):
@@ -176,11 +214,15 @@ async def test_the_median_of_an_odd_count_is_the_middle_one(
     некуда было бы заметить, и ошибка в выборе середины прошла бы молча.
     Сроки нарочно неравномерны — среднее арифметическое дало бы другое
     число.
+
+    Заводятся они вперемешку, а не по возрастанию: проверено мутацией, что
+    на упорядоченном наборе саму сортировку перед взятием середины можно
+    снять незаметно.
     """
     hr = hr_row()
     await put(session_factory, hr)
     applied_at = days_ago(60)
-    for waited in (1, 2, 4, 20, 40):
+    for waited in (20, 1, 40, 4, 2):
         vacancy = vacancy_row(hr_id=hr.id)
         await put(session_factory, vacancy)
         await put(

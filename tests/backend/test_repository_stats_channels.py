@@ -178,15 +178,19 @@ async def test_a_channel_known_only_by_its_junk_still_appears(
 
     Строк вакансий у него нет вовсе, и без отдельного добора он выпал бы —
     а это как раз тот канал, о котором пользователю стоит знать.
+
+    Заголовка у него нет нарочно: подпись такому каналу собирается в своей,
+    отдельной ветке добора, и на канале с заголовком её отступ к нику был бы
+    непроверяем.
     """
-    channel = channel_row(username="allspam", title="Один спам")
+    channel = channel_row(username="allspam", title=None)
     await put(session_factory, channel)
     await put(
         session_factory,
         TrashEvent(source_channel_id=channel.id, source_msg_id=1, reason="реклама"),
     )
 
-    row = (await rows_by_label(session, period="all"))["Один спам"]
+    row = (await rows_by_label(session, period="all"))["@allspam"]
 
     assert row["total"] == 1
     assert row["trash"] == 1
