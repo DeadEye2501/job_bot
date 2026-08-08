@@ -6,6 +6,8 @@ from datetime import date
 
 import httpx
 
+from backend.domain.taxonomy import GRADES, WORK_FORMATS
+
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +60,6 @@ class ParsedCv:
     languages: list[ParsedCvLanguage]
     skills: list[ParsedCvSkill]
     experience: list[ParsedCvExperience]
-
-
-_WORK_FORMAT_VALUES = frozenset({"remote", "hybrid", "office"})
-_GRADE_VALUES = frozenset({"junior", "middle", "senior", "lead"})
 
 
 # NOTE — known limitations of single-pass CV parsing.
@@ -226,7 +224,7 @@ def _normalize_work_formats(raw: object) -> list[str]:
         if not isinstance(item, str):
             continue
         v = item.strip().lower()
-        if v in _WORK_FORMAT_VALUES and v not in seen:
+        if v in WORK_FORMATS and v not in seen:
             seen.add(v)
             out.append(v)
     return out
@@ -241,7 +239,7 @@ def _normalize_grades(raw: object) -> list[str]:
         if not isinstance(item, str):
             continue
         v = item.strip().lower()
-        if v in _GRADE_VALUES and v not in seen:
+        if v in GRADES and v not in seen:
             seen.add(v)
             out.append(v)
     return out

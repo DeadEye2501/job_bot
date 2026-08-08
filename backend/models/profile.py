@@ -37,12 +37,14 @@ class Profile(Base):
     telegram_username: Mapped[str | None]
     github_url: Mapped[str | None]
     education: Mapped[str | None]
+    # Подмножества перечней из backend/domain/taxonomy.py. Колонка JSON, так
+    # что база чужое значение не отсеет — это делает код на входе.
     work_format: Mapped[list[str]] = mapped_column(
         JSON, server_default=text("'[]'")
-    )  # подмножество {"office","remote","hybrid"}
+    )
     grades: Mapped[list[str]] = mapped_column(
         JSON, server_default=text("'[]'")
-    )  # подмножество {"junior","middle","senior","lead"}
+    )
     free_preferences: Mapped[str | None]
 
     updated_at: Mapped[datetime] = mapped_column(

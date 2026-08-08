@@ -61,6 +61,7 @@ from adapters.lm_studio import LlmProviderConfig
 from backend import repository
 from backend.cv_parser import parse_cv
 from backend.domain.scoring import build_skill_lookup
+from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.models import (
     Blacklist,
     BotMode,
@@ -1218,9 +1219,9 @@ class MainApi(QObject):
                 "github_url": _none_if_empty(payload.get("github_url")),
                 "education": _none_if_empty(payload.get("education")),
                 "free_preferences": _none_if_empty(payload.get("free_preferences")),
-                "grades": _filter_set(payload.get("grades"), _GRADES_ALLOWED),
+                "grades": _filter_set(payload.get("grades"), GRADES),
                 "work_format": _filter_set(
-                    payload.get("work_format"), _WORK_FORMAT_ALLOWED
+                    payload.get("work_format"), WORK_FORMATS
                 ),
             }
             languages = _filter_languages(payload.get("languages"))
@@ -4606,8 +4607,6 @@ def _none_if_empty(v) -> str | None:
     return s if s else None
 
 
-_GRADES_ALLOWED = ("junior", "middle", "senior", "lead")
-_WORK_FORMAT_ALLOWED = ("office", "remote", "hybrid")
 _LANG_LEVELS_ALLOWED = frozenset(
     {"A1", "A2", "B1", "B2", "C1", "C2", "native"}
 )
