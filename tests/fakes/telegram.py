@@ -52,7 +52,12 @@ class FakeTelegramClient:
     def __init__(
         self, *, users=None, avatar=None, chats=None, media=b"file", fails=None
     ) -> None:
-        """`fails` — что бросить вместо ответа, по имени метода."""
+        """`fails` — что бросить вместо ответа, по имени метода.
+
+        Значением там может стоять список: тогда обращения обслуживаются по
+        очереди, и `None` в списке означает «на этот раз без ошибки». Так
+        проверяется повтор после отказа.
+        """
         self._users = users or {}
         self._avatar = avatar
         self._chats = chats or {}
@@ -60,6 +65,7 @@ class FakeTelegramClient:
         self._fails = fails or {}
         self.get_users_calls: list[str] = []
         self.get_chat_calls: list[str] = []
+        self.history_calls: list[tuple] = []
         self.download_calls: list = []
         self.download_paths: list[str] = []
         self.read_calls: list = []
@@ -68,6 +74,9 @@ class FakeTelegramClient:
         self.lifecycle: list[str] = []
         self.last_message_id = 500
         self.session_string = "шифр"
+        # Переписка, которую отдаёт `get_chat_history`. Ставится после
+        # сборки: пятый именованный довод конструктора упирается в предел.
+        self.history: list = []
         self.logged_out = False
         # Вклиниться в середину вызова: так проверяется гонка со встречным
         # обработчиком, который успевает записать строку, пока идёт обращение.
@@ -89,6 +98,8 @@ class FakeTelegramClient:
 
     def _fail_if_asked(self, method: str) -> None:
         error = self._fails.get(method)
+        if isinstance(error, list):
+            error = error.pop(0) if error else None
         if error is not None:
             raise error
 
@@ -96,6 +107,12 @@ class FakeTelegramClient:
         self.get_chat_calls.append(chat_id)
         self._fail_if_asked("get_chat")
         return self._chats.get(chat_id)
+
+    async def get_chat_history(self, target, limit=100):
+        self.history_calls.append((target, limit))
+        self._fail_if_asked("get_chat_history")
+        for msg in self.history[:limit]:
+            yield msg
 
     async def get_users(self, username):
         self.get_users_calls.append(username)
