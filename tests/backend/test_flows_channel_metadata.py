@@ -11,6 +11,7 @@
 должны.
 """
 
+from backend.flows import channels
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row
@@ -29,7 +30,7 @@ async def test_a_changed_title_is_written_down(make_pipeline, session_factory):
     client = FakeTelegramClient(chats={"jobs": chat(title="Стало")})
     pipeline = await make_pipeline(client)
 
-    await pipeline._refresh_channel_metadata(saved)
+    await channels._refresh_channel_metadata(pipeline, saved)
 
     assert (await only_row(session_factory, TelegramChannel)).title == "Стало"
 
@@ -42,7 +43,7 @@ async def test_an_unchanged_title_is_left_alone(make_pipeline, session_factory):
     heard: list[int] = []
     pipeline.on_channels_changed = lambda: heard.append(1)
 
-    await pipeline._refresh_channel_metadata(saved)
+    await channels._refresh_channel_metadata(pipeline, saved)
 
     assert heard == []
 
@@ -58,7 +59,7 @@ async def test_a_channel_without_a_picture_gets_one(make_pipeline, session_facto
     )
     pipeline = await make_pipeline(client)
 
-    await pipeline._refresh_channel_metadata(saved)
+    await channels._refresh_channel_metadata(pipeline, saved)
 
     assert (await only_row(session_factory, TelegramChannel)).avatar == b"\x89PNG"
 
@@ -78,7 +79,7 @@ async def test_a_channel_that_has_a_picture_keeps_it(make_pipeline, session_fact
     )
     pipeline = await make_pipeline(client)
 
-    await pipeline._refresh_channel_metadata(saved)
+    await channels._refresh_channel_metadata(pipeline, saved)
 
     assert (await only_row(session_factory, TelegramChannel)).avatar == b"\x89OWN"
     assert client.download_calls == []
@@ -100,7 +101,7 @@ async def test_a_channel_telegram_does_not_know_does_not_stop_the_sweep(
     client = FakeTelegramClient(chats={"jobs": chat(title="Стало")})
     pipeline = await make_pipeline(client)
 
-    await pipeline._refresh_channel_metadata(saved)
+    await channels._refresh_channel_metadata(pipeline, saved)
 
     titles = {c.username: c.title for c in await all_rows(session_factory, TelegramChannel)}
     assert titles == {"broken": "Было", "jobs": "Стало"}
@@ -125,7 +126,7 @@ async def test_a_failed_request_does_not_stop_the_sweep(
     )
     pipeline = await make_pipeline(client)
 
-    await pipeline._refresh_channel_metadata(saved)
+    await channels._refresh_channel_metadata(pipeline, saved)
 
     titles = {c.username: c.title for c in await all_rows(session_factory, TelegramChannel)}
     assert titles == {"broken": "Было", "jobs": "Стало"}
@@ -147,7 +148,7 @@ async def test_a_channel_deleted_mid_sweep_is_skipped(
         await session.delete(row)
         await session.commit()
 
-    await pipeline._refresh_channel_metadata(saved)
+    await channels._refresh_channel_metadata(pipeline, saved)
 
     assert await all_rows(session_factory, TelegramChannel) == []
 
@@ -160,7 +161,7 @@ async def test_the_window_hears_about_the_fresh_names(make_pipeline, session_fac
     heard: list[int] = []
     pipeline.on_channels_changed = lambda: heard.append(1)
 
-    await pipeline._refresh_channel_metadata(saved)
+    await channels._refresh_channel_metadata(pipeline, saved)
 
     assert heard == [1]
 
@@ -178,7 +179,7 @@ async def test_a_broken_window_hook_does_not_undo_the_names(
 
     pipeline.on_channels_changed = broken
 
-    await pipeline._refresh_channel_metadata(saved)
+    await channels._refresh_channel_metadata(pipeline, saved)
 
     assert (await only_row(session_factory, TelegramChannel)).title == "Стало"
 
