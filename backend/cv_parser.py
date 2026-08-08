@@ -6,7 +6,7 @@ from datetime import date
 
 import httpx
 
-from backend.domain.taxonomy import GRADES, WORK_FORMATS
+from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
 
 
 logger = logging.getLogger(__name__)
@@ -255,7 +255,7 @@ def _normalize_lang_level(value: object) -> str | None:
     if vl in ("native", "родной"):
         return "native"
     up = v.upper()
-    if up in ("A1", "A2", "B1", "B2", "C1", "C2"):
+    if up in CEFR_LEVELS:
         return up
     return None
 
