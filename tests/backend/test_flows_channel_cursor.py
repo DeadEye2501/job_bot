@@ -10,6 +10,7 @@
 вакансии названия тоже нет, но разобрана она полностью.
 """
 
+from backend.flows import channels
 from backend.models import TelegramChannel, VacancyStatus
 from tests.dbio import only_row, put
 from tests.factories import channel_row, vacancy_row
@@ -27,7 +28,7 @@ async def test_the_cursor_moves_to_the_message_just_handled(
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
 
-    await pipeline._advance_cursor(channel.id, 250)
+    await channels._advance_cursor(pipeline, channel.id, 250)
 
     assert (await only_row(session_factory, TelegramChannel)).last_processed_msg_id == 250
 
@@ -40,7 +41,7 @@ async def test_the_first_pass_sets_the_cursor_from_scratch(
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
 
-    await pipeline._advance_cursor(channel.id, 250)
+    await channels._advance_cursor(pipeline, channel.id, 250)
 
     assert (await only_row(session_factory, TelegramChannel)).last_processed_msg_id == 250
 
@@ -54,7 +55,7 @@ async def test_a_cursor_for_a_missing_channel_is_not_created(
     """
     pipeline = await make_pipeline()
 
-    await pipeline._advance_cursor(404, 250)
+    await channels._advance_cursor(pipeline, 404, 250)
 
     assert await only_row(session_factory, TelegramChannel) is None
 
