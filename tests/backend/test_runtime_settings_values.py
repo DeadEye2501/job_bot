@@ -69,6 +69,31 @@ def test_a_missing_whole_number_setting_falls_back_to_its_default(key, expected)
     assert getattr(settings(), key) == expected
 
 
+@pytest.mark.parametrize(
+    "key", ["poll_interval_sec", "backfill_limit", "dm_backfill_limit"]
+)
+def test_a_written_whole_number_setting_is_read_back(key):
+    """Записанное число читается обратно — в этом смысл настройки.
+
+    Значение подобрано отличным от всех умолчаний нарочно: совпади оно с
+    любым из них, «прочитали записанное» было бы неотличимо от «не
+    прочитали вовсе».
+    """
+    assert getattr(settings(**{key: "7"}), key) == 7
+
+
+@pytest.mark.parametrize(
+    "key", ["poll_interval_sec", "backfill_limit", "dm_backfill_limit"]
+)
+def test_a_written_whole_number_survives_stray_spaces(key):
+    """Пробелы вокруг числа не мешают его прочесть.
+
+    Настройки правят руками через просмотрщик базы, и лишний пробел там
+    появляется сам собой.
+    """
+    assert getattr(settings(**{key: "  7  "}), key) == 7
+
+
 def test_sending_is_locked_until_explicitly_allowed():
     """Отправка заперта по умолчанию: пустая база не разрешает слать в Telegram."""
     assert settings().send_locked is True

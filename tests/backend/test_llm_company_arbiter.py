@@ -13,9 +13,7 @@ import httpx
 import pytest
 
 from backend.llm import dedupe_company_with_llm
-from tests.fakes.llm import chat_json, chat_response, messages_of, provider
-
-CHAT = ("POST", "/v1/chat/completions")
+from tests.fakes.llm import CHAT, chat_json, chat_response, messages_of, provider
 
 
 class _Candidate:

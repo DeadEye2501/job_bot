@@ -10,9 +10,7 @@ import httpx
 import pytest
 
 from backend.llm import factcheck_cover_letter
-from tests.fakes.llm import chat_json, chat_response, provider
-
-CHAT = ("POST", "/v1/chat/completions")
+from tests.fakes.llm import CHAT, chat_json, chat_response, provider
 
 
 def _verdict(verdict, issues=None) -> httpx.Response:

@@ -11,11 +11,10 @@ import pytest
 
 from adapters.lm_studio import check_chat, check_embed, embed, list_models, make_client
 from backend.runtime_settings import LlmProviderConfig
-from tests.fakes.llm import models_response, provider
+from tests.fakes.llm import CHAT, models_response, provider
 
 MODELS = ("GET", "/v1/models")
 NATIVE_MODELS = ("GET", "/api/v0/models")
-CHAT = ("POST", "/v1/chat/completions")
 EMBEDDINGS = ("POST", "/v1/embeddings")
 
 
