@@ -21,7 +21,7 @@ from backend.bot import media
 logger = logging.getLogger(__name__)
 
 
-async def _on_raw_update(bot, _client, update, _users, _chats) -> None:
+async def on_raw_update(bot, _client, update, _users, _chats) -> None:
     """Catch ``UpdateReadHistoryOutbox`` to mark our outgoing rows as
     read by the HR. Everything else is ignored — raw updates fire on
     every server event so the cheap-out has to come first.
@@ -64,7 +64,7 @@ async def _on_raw_update(bot, _client, update, _users, _chats) -> None:
             logger.exception("on_hr_read hook failed")
 
 
-async def _on_dm_edit(bot, _client, msg) -> None:
+async def on_dm_edit(bot, _client, msg) -> None:
     """Sync Telegram edits — overwrite text + mark is_edited=True."""
     if (await bot._current_mode()) is BotMode.OFF:
         return
@@ -109,7 +109,7 @@ async def _on_dm_edit(bot, _client, msg) -> None:
             logger.exception("on_new_message hook failed")
 
 
-async def _on_dm_delete(bot, _client, messages) -> None:
+async def on_dm_delete(bot, _client, messages) -> None:
     """Sync Telegram deletes — set is_deleted=True, keep the row.
 
     Pyrogram delete updates are sparse: ``m.chat`` is often ``None`` for
@@ -226,7 +226,7 @@ async def _on_dm_delete(bot, _client, messages) -> None:
                 logger.exception("on_new_message hook failed")
 
 
-async def _on_dm_outgoing(bot, _client, msg) -> None:
+async def on_dm_outgoing(bot, _client, msg) -> None:
     """Capture messages the user typed from another TG client (phone /
     desktop) so the in-app chat stays in sync. Mirrors the OFF-mode
     gating of the incoming handler — OFF silences both directions.
@@ -314,7 +314,7 @@ async def _on_dm_outgoing(bot, _client, msg) -> None:
             logger.exception("on_new_message hook failed")
 
 
-async def _on_dm(bot, _client, msg) -> None:
+async def on_dm(bot, _client, msg) -> None:
     # Off mode silences everything, including reading HR replies.
     if (await bot._current_mode()) is BotMode.OFF:
         return
@@ -327,7 +327,7 @@ async def _on_dm(bot, _client, msg) -> None:
         schedule_classification=bot._ingestion.schedule_dm_classification,
     )
     # `on_vacancies_changed` НЕ пушим здесь — статус вакансии флипнется
-    # debounce-таском через ~60с после burst'а (см. IngestionPipeline.
+    # debounce-таском через ~60с после burst'а (см. flows/dm_classify.py,
     # _run_debounced_classify), он же сам пушнёт сигнал. До того статус
     # не менялся, любой ранний refetch вкладки «Вакансии» отдал бы
     # тот же набор статусов и зря грузил бы БД/UI.

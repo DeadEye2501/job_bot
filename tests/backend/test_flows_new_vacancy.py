@@ -29,7 +29,7 @@ async def test_the_text_and_the_vector_are_saved_before_the_parse(
     """
     pipeline = await make_pipeline()
 
-    new_id = await ingest._save_new_vacancy(pipeline, None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1, 0.2])
+    new_id = await ingest.save_new_vacancy(pipeline, None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1, 0.2])
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.id == new_id
@@ -50,7 +50,7 @@ async def test_the_new_row_remembers_where_it_came_from(
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
 
-    await ingest._save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
+    await ingest.save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.source_channel_id == channel.id
@@ -66,9 +66,9 @@ async def test_the_new_vector_joins_the_cache(make_pipeline):
     вакансии: второе сравнивалось бы с памятью, где первого ещё нет.
     """
     pipeline = await make_pipeline()
-    await embeddings._ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline)
 
-    new_id = await ingest._save_new_vacancy(pipeline, None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1, 0.2])
+    new_id = await ingest.save_new_vacancy(pipeline, None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1, 0.2])
 
     assert pipeline._embedding_ids.tolist() == [new_id]
 
@@ -79,7 +79,7 @@ async def test_the_timeline_records_where_it_was_ingested_from(
     """В ленте вакансии остаётся запись о том, откуда её взяли."""
     pipeline = await make_pipeline()
 
-    await ingest._save_new_vacancy(pipeline, None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
+    await ingest.save_new_vacancy(pipeline, None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
     event = await only_row(session_factory, VacancyEvent)
     assert event.kind == "ingested"
@@ -95,9 +95,9 @@ async def test_the_same_post_twice_makes_one_row(make_pipeline, session_factory)
     await put(session_factory, channel_row(username="jobs"))
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
-    first = await ingest._save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
+    first = await ingest.save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
-    second = await ingest._save_new_vacancy(pipeline, 
+    second = await ingest.save_new_vacancy(pipeline, 
         channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1]
     )
 
@@ -115,10 +115,10 @@ async def test_a_refused_row_leaves_no_vector_behind(make_pipeline, session_fact
     await put(session_factory, channel_row(username="jobs"))
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
-    await embeddings._ensure_embedding_cache(pipeline)
-    first = await ingest._save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
+    await embeddings.ensure_embedding_cache(pipeline)
+    first = await ingest.save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
-    await ingest._save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
+    await ingest.save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
     assert pipeline._embedding_ids.tolist() == [first]
 
@@ -134,7 +134,7 @@ async def test_an_unfinished_vacancy_is_picked_up_later(monkeypatch,
     async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         picked.append((vacancy_id, text, allow_delete))
 
-    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 1
     assert picked == [(1, "текст", True)]
@@ -149,7 +149,7 @@ async def test_a_parsed_vacancy_is_not_picked_up(monkeypatch, make_pipeline, ses
     async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         picked.append(vacancy_id)
 
-    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 0
     assert picked == []
@@ -166,7 +166,7 @@ async def test_a_vacancy_without_text_cannot_be_picked_up(monkeypatch,
     async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         picked.append(vacancy_id)
 
-    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 0
     assert picked == []
@@ -193,7 +193,7 @@ async def test_one_broken_orphan_does_not_stop_the_rest(monkeypatch,
             raise RuntimeError("не разобралось")
         done.append(text)
 
-    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 1
     assert done == ["вторая"]
@@ -211,7 +211,7 @@ async def test_the_window_hears_about_the_recovery(monkeypatch, make_pipeline, s
     async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         pass
 
-    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
     heard: list[tuple] = []
     pipeline.on_progress = lambda *args: heard.append(args)
 

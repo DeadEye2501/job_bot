@@ -34,7 +34,7 @@ async def test_the_saved_vectors_are_lifted_into_memory(
     )
     pipeline = await make_pipeline()
 
-    await embeddings._ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline)
 
     assert pipeline._embedding_ids.tolist() == [1]
     assert np.allclose(pipeline._embedding_matrix, [[0.1, 0.2]])
@@ -44,7 +44,7 @@ async def test_an_empty_base_leaves_the_cache_empty(make_pipeline):
     """На базе без векторов кэш остаётся пустым, а не ломается."""
     pipeline = await make_pipeline()
 
-    await embeddings._ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline)
 
     assert pipeline._embedding_ids.size == 0
     assert pipeline._embedding_matrix.size == 0
@@ -58,10 +58,10 @@ async def test_the_cache_is_loaded_only_once(make_pipeline, session_factory):
     """
     await put(session_factory, vacancy_row(title="первая", embedding=[0.1, 0.2]))
     pipeline = await make_pipeline()
-    await embeddings._ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline)
 
     await put(session_factory, vacancy_row(title="вторая", embedding=[0.3, 0.4]))
-    await embeddings._ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline)
 
     assert pipeline._embedding_ids.tolist() == [1]
 
@@ -73,9 +73,9 @@ async def test_a_new_vacancy_is_added_to_the_cache(make_pipeline):
     вакансии: второй сравнивался бы с памятью, где первого ещё нет.
     """
     pipeline = await make_pipeline()
-    await embeddings._ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline)
 
-    embeddings._append_embedding(pipeline, 7, [0.1, 0.2])
+    embeddings.append_embedding(pipeline, 7, [0.1, 0.2])
 
     assert pipeline._embedding_ids.tolist() == [7]
     assert np.allclose(pipeline._embedding_matrix, [[0.1, 0.2]])
@@ -84,10 +84,10 @@ async def test_a_new_vacancy_is_added_to_the_cache(make_pipeline):
 async def test_a_second_vacancy_is_added_below_the_first(make_pipeline):
     """Вторая вакансия ложится под первую, не затирая её."""
     pipeline = await make_pipeline()
-    await embeddings._ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline)
 
-    embeddings._append_embedding(pipeline, 7, [0.1, 0.2])
-    embeddings._append_embedding(pipeline, 8, [0.3, 0.4])
+    embeddings.append_embedding(pipeline, 7, [0.1, 0.2])
+    embeddings.append_embedding(pipeline, 8, [0.3, 0.4])
 
     assert pipeline._embedding_ids.tolist() == [7, 8]
     assert np.allclose(pipeline._embedding_matrix, [[0.1, 0.2], [0.3, 0.4]])
@@ -100,12 +100,12 @@ async def test_a_deleted_vacancy_leaves_the_cache(make_pipeline):
     повторами того, чего в базе больше нет.
     """
     pipeline = await make_pipeline()
-    await embeddings._ensure_embedding_cache(pipeline)
-    embeddings._append_embedding(pipeline, 7, [0.1, 0.2])
-    embeddings._append_embedding(pipeline, 8, [0.3, 0.4])
-    embeddings._append_embedding(pipeline, 9, [0.5, 0.6])
+    await embeddings.ensure_embedding_cache(pipeline)
+    embeddings.append_embedding(pipeline, 7, [0.1, 0.2])
+    embeddings.append_embedding(pipeline, 8, [0.3, 0.4])
+    embeddings.append_embedding(pipeline, 9, [0.5, 0.6])
 
-    embeddings._drop_embedding(pipeline, 8)
+    embeddings.drop_embedding(pipeline, 8)
 
     assert pipeline._embedding_ids.tolist() == [7, 9]
     assert np.allclose(pipeline._embedding_matrix, [[0.1, 0.2], [0.5, 0.6]])
@@ -118,10 +118,10 @@ async def test_dropping_something_absent_changes_nothing(make_pipeline):
     которой разбор не дошёл до конца.
     """
     pipeline = await make_pipeline()
-    await embeddings._ensure_embedding_cache(pipeline)
-    embeddings._append_embedding(pipeline, 7, [0.1, 0.2])
+    await embeddings.ensure_embedding_cache(pipeline)
+    embeddings.append_embedding(pipeline, 7, [0.1, 0.2])
 
-    embeddings._drop_embedding(pipeline, 99)
+    embeddings.drop_embedding(pipeline, 99)
 
     assert pipeline._embedding_ids.tolist() == [7]
     assert np.allclose(pipeline._embedding_matrix, [[0.1, 0.2]])
@@ -130,11 +130,11 @@ async def test_dropping_something_absent_changes_nothing(make_pipeline):
 async def test_the_cache_survives_being_emptied(make_pipeline):
     """Опустошённый кэш остаётся пригодным: в него снова можно дописывать."""
     pipeline = await make_pipeline()
-    await embeddings._ensure_embedding_cache(pipeline)
-    embeddings._append_embedding(pipeline, 7, [0.1, 0.2])
-    embeddings._drop_embedding(pipeline, 7)
+    await embeddings.ensure_embedding_cache(pipeline)
+    embeddings.append_embedding(pipeline, 7, [0.1, 0.2])
+    embeddings.drop_embedding(pipeline, 7)
 
-    embeddings._append_embedding(pipeline, 8, [0.3, 0.4])
+    embeddings.append_embedding(pipeline, 8, [0.3, 0.4])
 
     assert pipeline._embedding_ids.tolist() == [8]
     assert np.allclose(pipeline._embedding_matrix, [[0.3, 0.4]])
@@ -155,7 +155,7 @@ async def test_the_lifted_vectors_keep_their_vacancy_numbers(
     )
     pipeline = await make_pipeline()
 
-    await embeddings._ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline)
 
     lifted = dict(
         zip(pipeline._embedding_ids.tolist(), pipeline._embedding_matrix.tolist())

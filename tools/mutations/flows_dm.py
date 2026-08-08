@@ -186,7 +186,7 @@ MUTATIONS = [
         "    pipeline._dm_classify_buffer.clear()" + CRLF,
         "",
     ),
-    # _classify_and_apply_for_hr: чёрный список перестаёт отбрасывать пакет
+    # classify_and_apply_for_hr: чёрный список перестаёт отбрасывать пакет
     (
         "backend/flows/dm_classify.py",
         "    if bl_value:" + CRLF
@@ -196,19 +196,19 @@ MUTATIONS = [
         + "        logger.info(" + CRLF
         + '            "debounced classify: hr %d in blacklist (%s) — drop burst",'     + CRLF,
     ),
-    # _classify_and_apply_for_hr: сообщения склеиваются без границ
+    # classify_and_apply_for_hr: сообщения склеиваются без границ
     (
         "backend/flows/dm_classify.py",
         '    text = "\\n\\n".join(item["text"] for item in buf)',
         '    text = "".join(item["text"] for item in buf)',
     ),
-    # _classify_and_apply_for_hr: решение относят к первой вакансии пакета
+    # classify_and_apply_for_hr: решение относят к первой вакансии пакета
     (
         "backend/flows/dm_classify.py",
         "    last = buf[-1]",
         "    last = buf[0]",
     ),
-    # _classify_and_apply_for_hr: вакансия вне досягаемости всё равно разбирается
+    # classify_and_apply_for_hr: вакансия вне досягаемости всё равно разбирается
     (
         "backend/flows/dm_classify.py",
         "    if v_status is not None and is_terminal_for_auto(v_status):" + CRLF
@@ -218,7 +218,7 @@ MUTATIONS = [
         + "        logger.info(" + CRLF
         + '            "vacancy %s: status=%s terminal for auto, "' + CRLF,
     ),
-    # _classify_and_apply_for_hr: пустой вердикт всё равно применяется
+    # classify_and_apply_for_hr: пустой вердикт всё равно применяется
     (
         "backend/flows/dm_classify.py",
         "    if classification is None:" + CRLF

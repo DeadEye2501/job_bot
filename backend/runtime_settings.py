@@ -77,7 +77,7 @@ _APP_DEFAULTS: dict[str, str] = {
     # настройки на старте Bot.run.
     "send_locked": "true",
     # auto_apply: kill-switch для автоматической отправки cover-letter'ов
-    # из poll-цикла (auto-send branch в _parse_and_update_vacancy).
+    # из poll-цикла (auto-send branch в flows/parse.py, parse_and_update_vacancy).
     # При False parse-pipeline всё равно отрабатывает — статус NEW,
     # ручная отправка из UI через «Отправить отклик» работает.
     "auto_apply": "true",

@@ -34,7 +34,7 @@ MUTATIONS = [
     # poll_active_channels: сводка названий не делается вовсе
     (
         "backend/flows/channels.py",
-        "    await _refresh_channel_metadata(pipeline, all_named)" + CRLF,
+        "    await refresh_channel_metadata(pipeline, all_named)" + CRLF,
         "",
     ),
     # poll_active_channels: сорвавшийся канал роняет обход
@@ -66,19 +66,19 @@ MUTATIONS = [
         '        logger.exception("[@%s] manual poll failed", username)' + CRLF
         + "        return True" + CRLF,
     ),
-    # _refresh_channel_metadata: название переписывается и когда не менялось
+    # refresh_channel_metadata: название переписывается и когда не менялось
     (
         "backend/flows/channels.py",
         "        if new_title and new_title != ch.title:",
         "        if new_title:",
     ),
-    # _refresh_channel_metadata: своя картинка канала затирается чужой
+    # refresh_channel_metadata: своя картинка канала затирается чужой
     (
         "backend/flows/channels.py",
         '        if ch.avatar is None and getattr(chat, "photo", None) is not None:',
         '        if getattr(chat, "photo", None) is not None:',
     ),
-    # _refresh_channel_metadata: недоступный канал обрывает сводку
+    # refresh_channel_metadata: недоступный канал обрывает сводку
     (
         "backend/flows/channels.py",
         "        except Exception as e:" + CRLF
@@ -88,13 +88,13 @@ MUTATIONS = [
         + "            logger.warning(" + CRLF
         + '                "[@%s] get_chat failed: %s: %s",' + CRLF,
     ),
-    # _refresh_channel_metadata: удалённый канал воскрешается записью
+    # refresh_channel_metadata: удалённый канал воскрешается записью
     (
         "backend/flows/channels.py",
         "            if db_ch is None:" + CRLF + "                continue" + CRLF,
         "",
     ),
-    # _refresh_channel_metadata: окно не узнаёт о свежих названиях
+    # refresh_channel_metadata: окно не узнаёт о свежих названиях
     (
         "backend/flows/channels.py",
         "    if pipeline.on_channels_changed is not None:" + CRLF
@@ -110,34 +110,34 @@ MUTATIONS = [
         "    if not channel_ids:" + CRLF + "        return" + CRLF,
         "",
     ),
-    # _poll_channel: чтение не обрывается на уже разобранном
+    # poll_channel: чтение не обрывается на уже разобранном
     (
         "backend/flows/channels.py",
         "        if last_id is not None and msg.id <= last_id:" + CRLF
         + "            break" + CRLF,
         "",
     ),
-    # _poll_channel: сообщения разбираются от свежего к старому
+    # poll_channel: сообщения разбираются от свежего к старому
     (
         "backend/flows/channels.py",
         "    ordered = list(reversed(new_msgs))",
         "    ordered = list(new_msgs)",
     ),
-    # _poll_channel: отметка не досохраняется после обрыва
+    # poll_channel: отметка не досохраняется после обрыва
     (
         "backend/flows/channels.py",
         "    finally:" + CRLF
         + "        if cursor is not None:" + CRLF
-        + "            await _advance_cursor(pipeline, channel_id, cursor)" + CRLF,
+        + "            await advance_cursor(pipeline, channel_id, cursor)" + CRLF,
         "    finally:" + CRLF + "        pass" + CRLF,
     ),
-    # _poll_channel: сломанное сообщение отметку не двигает
+    # poll_channel: сломанное сообщение отметку не двигает
     (
         "backend/flows/channels.py",
         "            cursor = msg.id" + CRLF,
         "",
     ),
-    # _advance_cursor: отметка по удалённому каналу заводится заново
+    # advance_cursor: отметка по удалённому каналу заводится заново
     (
         "backend/flows/channels.py",
         "        if ch is None:" + CRLF + "            return" + CRLF

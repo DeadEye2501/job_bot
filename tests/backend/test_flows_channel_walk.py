@@ -36,7 +36,7 @@ async def walking(monkeypatch, make_pipeline):
         pipeline.walked.append(username)
 
     pipeline._reload_resources = reload
-    monkeypatch.setattr(channels, "_poll_channel", poll)
+    monkeypatch.setattr(channels, "poll_channel", poll)
     return pipeline
 
 
@@ -103,7 +103,7 @@ async def test_a_broken_channel_does_not_stop_the_walk(monkeypatch, walking, ses
             raise OSError("канал закрыт")
         walked.append(username)
 
-    monkeypatch.setattr(channels, "_poll_channel", poll)
+    monkeypatch.setattr(channels, "poll_channel", poll)
 
     await walking.poll_active_channels()
 
@@ -222,6 +222,6 @@ async def test_a_broken_read_on_demand_reports_failure(monkeypatch, walking, ses
     async def poll(pipeline, channel_id, username, last_id):
         raise OSError("канал закрыт")
 
-    monkeypatch.setattr(channels, "_poll_channel", poll)
+    monkeypatch.setattr(channels, "poll_channel", poll)
 
     assert await walking.poll_one_channel(rows[0].id) is False

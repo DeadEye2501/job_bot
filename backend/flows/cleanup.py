@@ -2,7 +2,7 @@
 
 import logging
 
-from backend.repository.vacancies_life import delete_vacancy as _repo_delete_vacancy
+from backend.repository.vacancies_life import delete_vacancy as repo_delete_vacancy
 
 from backend.flows import embeddings
 
@@ -44,22 +44,22 @@ async def check_ghosting_timeouts(pipeline) -> int:
     return len(affected)
 
 
-async def _delete_vacancy(pipeline, vacancy_id: int) -> None:
+async def delete_vacancy(pipeline, vacancy_id: int) -> None:
     # Route through the public repository delete so children
     # (vacancy_status_history, vacancy_event) are explicitly cleaned up
     # — SQLite has FK enforcement off in this engine, so a plain
     # session.delete(vacancy) would leave orphan rows.
     async with pipeline._session_factory() as session:
-        await _repo_delete_vacancy(session, vacancy_id)
+        await repo_delete_vacancy(session, vacancy_id)
         await session.commit()
-    embeddings._drop_embedding(pipeline, vacancy_id)
+    embeddings.drop_embedding(pipeline, vacancy_id)
     logger.info("vacancy %d: deleted from DB and embedding cache", vacancy_id)
     # Vacancy_count у HR/Company изменился — пушим refresh.
     pipeline._fire_contacts_changed()
     pipeline._fire_vacancies_changed()
 
 
-async def _delete_vacancy_as_trash(
+async def delete_vacancy_as_trash(
     pipeline, vacancy_id: int, reason: str | None
 ) -> None:
     """Auto-ingest trash deletion: ДО delete пишем строку в TrashEvent,
@@ -79,9 +79,9 @@ async def _delete_vacancy_as_trash(
             source_msg_id=msg_id,
             reason=reason,
         )
-        await _repo_delete_vacancy(session, vacancy_id)
+        await repo_delete_vacancy(session, vacancy_id)
         await session.commit()
-    embeddings._drop_embedding(pipeline, vacancy_id)
+    embeddings.drop_embedding(pipeline, vacancy_id)
     logger.info(
         "vacancy %d: deleted as trash (event recorded for channel=%s)",
         vacancy_id, channel_id,

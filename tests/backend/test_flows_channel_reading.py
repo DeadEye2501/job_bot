@@ -35,7 +35,7 @@ async def reading(monkeypatch, make_pipeline, session_factory):
     async def take(pipeline, channel_id, username, msg):
         pipeline.taken.append(msg.id)
 
-    monkeypatch.setattr(ingest_mod, "_ingest_post", take)
+    monkeypatch.setattr(ingest_mod, "ingest_post", take)
     return pipeline, client, channel
 
 
@@ -48,7 +48,7 @@ async def test_the_new_posts_are_taken_oldest_first(reading, session_factory):
     pipeline, client, channel = reading
     client.history = [post(12), post(11), post(10)]
 
-    await channels._poll_channel(pipeline, channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     assert pipeline.taken == [10, 11, 12]
 
@@ -62,7 +62,7 @@ async def test_reading_stops_at_the_mark(reading, session_factory):
     pipeline, client, channel = reading
     client.history = [post(12), post(11), post(10), post(9)]
 
-    await channels._poll_channel(pipeline, channel.id, "jobs", 10)
+    await channels.poll_channel(pipeline, channel.id, "jobs", 10)
 
     assert pipeline.taken == [11, 12]
 
@@ -72,7 +72,7 @@ async def test_a_channel_without_a_mark_is_read_whole(reading):
     pipeline, client, channel = reading
     client.history = [post(12), post(11)]
 
-    await channels._poll_channel(pipeline, channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     assert pipeline.taken == [11, 12]
 
@@ -82,7 +82,7 @@ async def test_the_mark_ends_up_on_the_lastpost(reading, session_factory):
     pipeline, client, channel = reading
     client.history = [post(12), post(11), post(10)]
 
-    await channels._poll_channel(pipeline, channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     saved = await only_row(session_factory, TelegramChannel)
     assert saved.last_processed_msg_id == 12
@@ -98,15 +98,15 @@ async def test_the_mark_is_saved_in_batches(monkeypatch, reading, session_factor
     await pipeline._rs.set_app("backfill_limit", "25")
     client.history = [post(msg_id) for msg_id in range(25, 0, -1)]
     saves: list[int] = []
-    real_advance = channels._advance_cursor
+    real_advance = channels.advance_cursor
 
     async def note(pipeline, channel_id, msg_id):
         saves.append(msg_id)
         await real_advance(pipeline, channel_id, msg_id)
 
-    monkeypatch.setattr(channels, "_advance_cursor", note)
+    monkeypatch.setattr(channels, "advance_cursor", note)
 
-    await channels._poll_channel(pipeline, channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     assert saves == [10, 20, 25]
 
@@ -122,11 +122,11 @@ async def test_nothing_new_leaves_the_mark_alone(monkeypatch, reading, session_f
     client.history = [post(12)]
     saves: list[int] = []
     monkeypatch.setattr(
-        channels, "_advance_cursor",
+        channels, "advance_cursor",
         lambda pipeline, channel_id, msg_id: saves.append(msg_id),
     )
 
-    await channels._poll_channel(pipeline, channel.id, "jobs", 12)
+    await channels.poll_channel(pipeline, channel.id, "jobs", 12)
 
     assert pipeline.taken == []
     assert saves == []
@@ -146,9 +146,9 @@ async def test_a_broken_post_still_moves_the_mark(monkeypatch, reading, session_
             raise RuntimeError("не разобралось")
         pipeline.taken.append(msg.id)
 
-    monkeypatch.setattr(ingest_mod, "_ingest_post", take)
+    monkeypatch.setattr(ingest_mod, "ingest_post", take)
 
-    await channels._poll_channel(pipeline, channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     assert pipeline.taken == [11]
     saved = await only_row(session_factory, TelegramChannel)
@@ -169,10 +169,10 @@ async def test_the_mark_survives_a_break_mid_channel(monkeypatch, reading, sessi
         if msg.id == 11:
             raise KeyboardInterrupt
 
-    monkeypatch.setattr(ingest_mod, "_ingest_post", take)
+    monkeypatch.setattr(ingest_mod, "ingest_post", take)
 
     with pytest.raises(KeyboardInterrupt):
-        await channels._poll_channel(pipeline, channel.id, "jobs", None)
+        await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     saved = await only_row(session_factory, TelegramChannel)
     assert saved.last_processed_msg_id == 10
@@ -189,7 +189,7 @@ async def test_the_window_is_told_where_inside_the_channel_it_is(reading):
     heard: list[tuple] = []
     pipeline.on_progress = lambda *args: heard.append(args)
 
-    await channels._poll_channel(pipeline, channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     assert heard == [
         ("message", "@jobs", 0, 2),
