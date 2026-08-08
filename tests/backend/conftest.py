@@ -3,11 +3,17 @@
 import pytest
 
 from backend.bot import Bot
-from backend.models import LlmConfigKind
+from backend.models import (
+    HR,
+    BotMode,
+    LlmConfigKind,
+    Vacancy,
+    VacancyStatus,
+)
 from backend.repository import list_vacancies
 from backend.runtime_settings import RuntimeSettings, encrypt_str
-from tests.dbio import put
-from tests.factories import llm_config_row, tg_account_row
+from tests.dbio import only_row, put
+from tests.factories import hr_row, llm_config_row, tg_account_row, vacancy_row
 from tests.fakes.telegram import FakeTelegramClient
 
 
@@ -55,5 +61,67 @@ def make_bot(session_factory, monkeypatch):
             "adapters.lm_studio.make_client", lambda cfg: f"клиент {cfg.base_url}"
         )
         return Bot(settings, session_factory)
+
+    return build
+
+
+class Outbox:
+    """Ушедшие письма вместо настоящей отправки.
+
+    Подменяет собой `adapters.telegram.send_dm` целиком: до Pyrogram вызов
+    не доходит, поэтому запор стенда остаётся нетронутым — снимается только
+    признак, по которому боевой код решает, имитировать отправку или нет.
+    """
+
+    def __init__(self) -> None:
+        self.sent: list[tuple] = []
+        self.error: BaseException | None = None
+        self.assigned_id = 1000
+
+    async def send_dm(self, _client, target, text, attachment=None):
+        if self.error is not None:
+            raise self.error
+        self.sent.append((target, text, attachment))
+        return self.assigned_id
+
+
+@pytest.fixture
+def outbox(monkeypatch):
+    """Отправка, дошедшая до Telegram, — с подменённым отправителем.
+
+    По умолчанию стенд держит `SEND_LOCKED = True`, и боевой код отправку
+    имитирует: ветка настоящей отправки при этом не исполняется вовсе.
+    Признак снимается ровно вместе с подменой самого отправителя, поэтому
+    настоящий Pyrogram остаётся недостижим.
+    """
+    import adapters.telegram
+
+    box = Outbox()
+    monkeypatch.setattr(adapters.telegram, "SEND_LOCKED", False)
+    monkeypatch.setattr(adapters.telegram, "send_dm", box.send_dm)
+    return box
+
+
+@pytest.fixture
+def ready_to_send(session_factory, make_bot):
+    """Бот в рабочем режиме, HR с адресом и вакансия в заданном статусе.
+
+    Отправка отклика проверяется тремя слайсами — отказы, следы, беды, — и
+    каждому нужна одна и та же обстановка: без рабочего режима отправка
+    отказывает, без адреса у HR тоже, а без вакансии не с чем сверять
+    статус.
+    """
+
+    async def build(*, status=VacancyStatus.NEW, mode=BotMode.FULL, hr=None):
+        await put(
+            session_factory,
+            hr if hr is not None else hr_row(),
+            vacancy_row(title="к отклику", status=status),
+        )
+        bot = await make_bot()
+        await bot._rs.set_mode(mode)
+        saved_hr = await only_row(session_factory, HR)
+        vacancy = await only_row(session_factory, Vacancy)
+        return bot, saved_hr, vacancy
 
     return build
