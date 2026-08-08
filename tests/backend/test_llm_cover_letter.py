@@ -10,14 +10,12 @@
 объектом. Поэтому ответы задаются очередью.
 """
 
-import json
-
 import httpx
 import pytest
 
 from backend.llm import generate_cover_letter
 from tests.factories import parsed_vacancy
-from tests.fakes.llm import chat_response, provider
+from tests.fakes.llm import chat_response, messages_of, provider
 
 CHAT = ("POST", "/v1/chat/completions")
 PASSES = '{"verdict": "ok", "issues": []}'
@@ -58,7 +56,7 @@ async def test_the_vacancy_reaches_the_model_as_data():
     """Сведения о вакансии уходят модели отдельным блоком данных."""
     client = _client("Здравствуйте.")
     vacancy = parsed_vacancy(
-        title="Python-разработчик",
+        title="Ведущий питонист",
         company_name="Контур",
         stack_required=["Python"],
         salary="$3000",
@@ -68,8 +66,8 @@ async def test_the_vacancy_reaches_the_model_as_data():
         "профиль", vacancy, client, "qwen", channel_ref="@pyjobs"
     )
 
-    user = json.loads(client.sent[0].content)["messages"][1]["content"]
-    assert "Python-разработчик" in user
+    user = messages_of(client.sent[0])["user"]
+    assert "Ведущий питонист" in user
     assert "Контур" in user
     assert "@pyjobs" in user
     assert "$3000" in user
@@ -81,8 +79,7 @@ async def test_an_unfilled_field_is_named_as_missing():
 
     await generate_cover_letter("профиль", parsed_vacancy(), client, "qwen")
 
-    user = json.loads(client.sent[0].content)["messages"][1]["content"]
-    assert "- Company: не указано" in user
+    assert "- Company: не указано" in messages_of(client.sent[0])["user"]
 
 
 async def test_the_placeholders_of_the_prompt_are_filled_in():
@@ -95,13 +92,13 @@ async def test_the_placeholders_of_the_prompt_are_filled_in():
 
     got = await generate_cover_letter(
         "профиль",
-        parsed_vacancy(title="Python-разработчик"),
+        parsed_vacancy(title="Ведущий питонист"),
         client,
         "qwen",
         channel_ref="@pyjobs",
     )
 
-    assert got == "Здравствуйте! Пишу про Python-разработчик из @pyjobs."
+    assert got == "Здравствуйте! Пишу про Ведущий питонист из @pyjobs."
 
 
 async def test_brackets_inside_the_title_are_removed_before_substitution():
@@ -249,11 +246,11 @@ async def test_the_factcheck_sees_the_letter_with_placeholders_filled_in():
     client = _client("Здравствуйте, пишу про {title}.")
 
     await generate_cover_letter(
-        "профиль", parsed_vacancy(title="Python-разработчик"), client, "qwen"
+        "профиль", parsed_vacancy(title="Ведущий питонист"), client, "qwen"
     )
 
-    second = json.loads(client.sent[1].content)["messages"][-1]["content"]
-    assert "Python-разработчик" in second
+    second = messages_of(client.sent[1])["user"]
+    assert "Ведущий питонист" in second
     assert "{title}" not in second
 
 

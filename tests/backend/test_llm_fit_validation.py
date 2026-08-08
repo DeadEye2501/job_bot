@@ -131,6 +131,40 @@ async def test_a_made_up_reason_for_rejection_flips_the_verdict():
     assert got.reason is None
 
 
+async def test_a_made_up_reason_is_caught_without_any_profile_data():
+    """Выдумка ловится и без сведений о кандидате — по общим приметам.
+
+    Приметы двух родов: общие, не зависящие от профиля, и построенные по
+    языкам кандидата. Профиль здесь пуст нарочно: вторые не построятся
+    вовсе, и сработать могут только первые — уровень языка, названный в
+    обосновании, но отсутствующий в объявлении.
+    """
+    client = provider({CHAT: _answer("reject", "требуется уровень B2")})
+
+    got = await _check(
+        client,
+        raw_text="Ищем питониста в бэкенд, оформление по договору",
+        profile=CandidateProfile(),
+    )
+
+    assert got.verdict == "fit"
+    assert got.reason is None
+
+
+async def test_a_level_named_in_the_post_is_not_taken_for_a_made_up_one():
+    """Уровень, названный в объявлении, выдумкой не считается."""
+    client = provider({CHAT: _answer("reject", "требуется уровень B2")})
+
+    got = await _check(
+        client,
+        raw_text="Ищем питониста, английский B2 обязателен",
+        profile=CandidateProfile(),
+    )
+
+    assert got.verdict == "reject"
+    assert got.reason == "требуется уровень B2"
+
+
 async def test_a_reason_backed_by_the_post_survives():
     """Обоснование, подкреплённое текстом объявления, остаётся как есть."""
     client = provider(

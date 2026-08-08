@@ -9,13 +9,11 @@
 без неё по записи не разобрать, чем всё кончилось.
 """
 
-import json
-
 import httpx
 import pytest
 
 from backend.llm import dedupe_company_with_llm
-from tests.fakes.llm import chat_response, provider
+from tests.fakes.llm import chat_json, chat_response, messages_of, provider
 
 CHAT = ("POST", "/v1/chat/completions")
 
@@ -32,11 +30,7 @@ class _Candidate:
 
 def _answer(matched_id=None, reasoning=None) -> httpx.Response:
     """Ответ арбитра в его обычной форме."""
-    return chat_response(
-        json.dumps(
-            {"matched_id": matched_id, "reasoning": reasoning}, ensure_ascii=False
-        )
-    )
+    return chat_json({"matched_id": matched_id, "reasoning": reasoning})
 
 
 async def _ask(client, candidates, name="Сбербанк Тех"):
@@ -127,7 +121,7 @@ async def test_the_candidates_are_shown_with_all_they_have():
         ],
     )
 
-    prompt = json.loads(client.sent[0].content)["messages"][0]["content"]
+    prompt = messages_of(client.sent[0])["system"]
     assert 'id=7, name="Сбербанк", aliases=[Sber], website="https://sber.ru"' in prompt
     assert 'id=8, name="Ромашка", aliases=[—], website="—"' in prompt
 
@@ -149,7 +143,7 @@ async def test_the_candidates_are_shown_with_all_they_have():
             id="чужая форма",
         ),
         pytest.param(
-            chat_response("совсем не json"), "unparseable_json", id="не объект"
+            chat_response("совсем не json"), "unparseable_json", id="не разбирается"
         ),
     ],
 )

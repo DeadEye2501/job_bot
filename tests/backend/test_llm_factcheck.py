@@ -6,22 +6,18 @@
 уже усилен запретами на выдумывание.
 """
 
-import json
-
 import httpx
 import pytest
 
 from backend.llm import factcheck_cover_letter
-from tests.fakes.llm import chat_response, provider
+from tests.fakes.llm import chat_json, chat_response, provider
 
 CHAT = ("POST", "/v1/chat/completions")
 
 
 def _verdict(verdict, issues=None) -> httpx.Response:
     """Ответ проверки в её обычной форме."""
-    return chat_response(
-        json.dumps({"verdict": verdict, "issues": issues}, ensure_ascii=False)
-    )
+    return chat_json({"verdict": verdict, "issues": issues})
 
 
 async def test_a_clean_verdict_lets_the_letter_through():
@@ -85,7 +81,7 @@ async def test_a_verdict_wrapped_in_a_code_fence_is_still_read():
         pytest.param(httpx.Response(500, text="упал"), id="отказ провайдера"),
         pytest.param(httpx.ConnectError("сеть отвалилась"), id="обрыв связи"),
         pytest.param(httpx.Response(200, json={"нет": "выборов"}), id="чужая форма"),
-        pytest.param(chat_response("совсем не json"), id="не объект"),
+        pytest.param(chat_response("совсем не json"), id="не разбирается"),
         pytest.param(chat_response('["список"]'), id="список вместо объекта"),
         pytest.param(chat_response('{"verdict": "может быть"}'), id="чужой вердикт"),
         pytest.param(chat_response("{}"), id="вердикта нет"),
