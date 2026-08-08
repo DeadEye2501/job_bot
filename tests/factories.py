@@ -5,7 +5,7 @@
 фабрика не знает ни про сессию, ни про схему.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from backend.models import (
     AppSetting,
@@ -17,6 +17,8 @@ from backend.models import (
     LlmConfig,
     LlmConfigKind,
     Message,
+    Profile,
+    ProfileExperience,
     ProfileSkill,
     StatusHistorySource,
     TelegramChannel,
@@ -178,6 +180,40 @@ def channel_row(**overrides) -> TelegramChannel:
     fields = {"username": "pyjobs", "title": "Питон-вакансии"}
     fields.update(overrides)
     return TelegramChannel(**fields)
+
+
+def profile_row(**overrides) -> Profile:
+    """Строка профиля кандидата. Обязательные поля заполнены."""
+    fields = {
+        "first_name": "Иван",
+        "last_name": "Петров",
+        "title": "Python-разработчик",
+        "email": "ivan@example.com",
+    }
+    fields.update(overrides)
+    return Profile(**fields)
+
+
+def profile_skill_row(profile_id: int, name: str, **overrides) -> ProfileSkill:
+    """Строка навыка профиля. Имя задаётся явно: по нему навык и ищут."""
+    fields = {"category": "backend", "level": 3, "aliases": []}
+    fields.update(overrides)
+    return ProfileSkill(profile_id=profile_id, name=name, **fields)
+
+
+def experience_row(profile_id: int, **overrides) -> ProfileExperience:
+    """Строка места работы. Дата начала обязательна на уровне базы."""
+    fields = {
+        "company": "Контур",
+        "company_url": None,
+        "role": "Разработчик",
+        "start_date": date(2020, 1, 1),
+        "end_date": None,
+        "achievements": [],
+        "responsibilities": [],
+    }
+    fields.update(overrides)
+    return ProfileExperience(profile_id=profile_id, **fields)
 
 
 def blacklist_row(kind: str, value: str, **overrides) -> Blacklist:
