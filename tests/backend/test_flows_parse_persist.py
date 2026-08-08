@@ -15,6 +15,7 @@
 отклик не ушёл.
 """
 
+from backend.flows import apply
 import pytest
 
 from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
@@ -242,7 +243,7 @@ async def test_a_vacancy_without_an_hr_gets_no_application(parsing):
         pytest.param(False, "cv_missing", id="не ушло"),
     ],
 )
-async def test_every_attempt_is_recorded_in_the_timeline(
+async def test_every_attempt_is_recorded_in_the_timeline(monkeypatch, 
     parsing, session_factory, outcome, reason
 ):
     """Каждая попытка отправки записывается в ленту, чем бы ни кончилась.
@@ -256,10 +257,10 @@ async def test_every_attempt_is_recorded_in_the_timeline(
     )
     await pipeline._rs.set_app("auto_apply", "true")
 
-    async def try_auto_send(hr, parsed, vacancy_id):
+    async def try_auto_send(pipeline, hr, parsed, vacancy_id):
         return outcome, reason
 
-    pipeline._try_auto_send = try_auto_send
+    monkeypatch.setattr(apply, "_try_auto_send", try_auto_send)
 
     await pipeline._parse_and_update_vacancy(
         vacancy.id, "текст", "jobs", allow_delete=False

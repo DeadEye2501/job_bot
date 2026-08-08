@@ -11,7 +11,7 @@
 отвязана от сессии.
 """
 
-from backend.flows.pipeline import _build_candidate_profile
+from backend.flows.apply import _build_candidate_profile
 from backend.llm.candidate import CandidateProfile
 from backend.models import ProfileLanguage
 from tests.factories import profile_row
