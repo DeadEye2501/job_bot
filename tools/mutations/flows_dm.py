@@ -99,137 +99,133 @@ MUTATIONS = [
     ),
     # schedule_dm_classification: сообщение без текста всё равно копится
     (
-        "backend/flows/pipeline.py",
-        "        if not text:" + CRLF
-        + "            # Медиа-only без подписи нечем классифицировать",
-        "        if False:" + CRLF
-        + "            # Медиа-only без подписи нечем классифицировать",
+        "backend/flows/dm_classify.py",
+        "    if not text:" + CRLF
+        + "        # Медиа-only без подписи нечем классифицировать",
+        "    if False:" + CRLF
+        + "        # Медиа-only без подписи нечем классифицировать",
     ),
     # schedule_dm_classification: останавливающийся бот всё равно копит
     (
-        "backend/flows/pipeline.py",
-        "        if self._shutting_down:" + CRLF
-        + "            return" + CRLF
-        + "        if not text:" + CRLF,
-        "        if not text:" + CRLF,
+        "backend/flows/dm_classify.py",
+        "    if pipeline._shutting_down:" + CRLF
+        + "        return" + CRLF
+        + "    if not text:" + CRLF,
+        "    if not text:" + CRLF,
     ),
     # schedule_dm_classification: очередь перестаёт обрезаться сверху
     (
-        "backend/flows/pipeline.py",
-        "        if len(buf) > self.DM_CLASSIFY_BUFFER_CAP:",
-        "        if False:",
+        "backend/flows/dm_classify.py",
+        "    if len(buf) > pipeline.DM_CLASSIFY_BUFFER_CAP:",
+        "    if False:",
     ),
     # schedule_dm_classification: очередь обрезается с конца, а не с начала
     (
-        "backend/flows/pipeline.py",
-        "            del buf[: dropped]",
-        "            del buf[-dropped:]",
+        "backend/flows/dm_classify.py",
+        "        del buf[: dropped]",
+        "        del buf[-dropped:]",
     ),
     # schedule_dm_classification: прежний таймер не гасится новым сообщением
     (
-        "backend/flows/pipeline.py",
-        "        prev = self._dm_classify_tasks.get(hr_id)" + CRLF
-        + "        if prev is not None and not prev.done():" + CRLF
-        + "            prev.cancel()" + CRLF,
+        "backend/flows/dm_classify.py",
+        "    prev = pipeline._dm_classify_tasks.get(hr_id)" + CRLF
+        + "    if prev is not None and not prev.done():" + CRLF
+        + "        prev.cancel()" + CRLF,
         "",
     ),
     # update_dm_buffer_text: правка меняет не то сообщение
     (
-        "backend/flows/pipeline.py",
-        '            if item["msg_id"] == msg_id:',
-        "            if True:",
+        "backend/flows/dm_classify.py",
+        '        if item["msg_id"] == msg_id:',
+        "        if True:",
     ),
     # update_dm_buffer_text: правка в пустоту оставляет отсутствие
     (
-        "backend/flows/pipeline.py",
-        '                item["text"] = new_text or ""',
-        '                item["text"] = new_text',
+        "backend/flows/dm_classify.py",
+        '            item["text"] = new_text or ""',
+        '            item["text"] = new_text',
     ),
     # remove_dm_buffer_msg: удаление выбрасывает не то сообщение
     (
-        "backend/flows/pipeline.py",
-        '            item for item in buf if item["msg_id"] != msg_id',
-        '            item for item in buf if item["msg_id"] == msg_id',
+        "backend/flows/dm_classify.py",
+        '        item for item in buf if item["msg_id"] != msg_id',
+        '        item for item in buf if item["msg_id"] == msg_id',
     ),
     # remove_dm_buffer_msg: опустевший накопитель остаётся жить
     (
-        "backend/flows/pipeline.py",
-        "        if not self._dm_classify_buffer[hr_id]:" + CRLF
-        + "            self._dm_classify_buffer.pop(hr_id, None)" + CRLF,
+        "backend/flows/dm_classify.py",
+        "    if not pipeline._dm_classify_buffer[hr_id]:" + CRLF
+        + "        pipeline._dm_classify_buffer.pop(hr_id, None)" + CRLF,
         "",
     ),
     # cancel_pending: выключение перестаёт сливать накопленное
     (
-        "backend/flows/pipeline.py",
-        "        if drain and not self._shutting_down:",
-        "        if False:",
+        "backend/flows/dm_classify.py",
+        "    if drain and not pipeline._shutting_down:",
+        "    if False:",
     ),
     # cancel_pending: слив идёт и у останавливающегося бота
     (
-        "backend/flows/pipeline.py",
-        "        if drain and not self._shutting_down:",
-        "        if drain:",
+        "backend/flows/dm_classify.py",
+        "    if drain and not pipeline._shutting_down:",
+        "    if drain:",
     ),
     # cancel_pending: сорвавшийся разбор роняет слив остальных
     (
-        "backend/flows/pipeline.py",
-        "                    return_exceptions=True," + CRLF
-        + "                )" + CRLF
-        + "                for hr_id, res in zip(hr_ids, results):",
-        "                    return_exceptions=False," + CRLF
-        + "                )" + CRLF
-        + "                for hr_id, res in zip(hr_ids, results):",
+        "backend/flows/dm_classify.py",
+        "                return_exceptions=True," + CRLF
+        + "            )" + CRLF
+        + "            for hr_id, res in zip(hr_ids, results):",
+        "                return_exceptions=False," + CRLF
+        + "            )" + CRLF
+        + "            for hr_id, res in zip(hr_ids, results):",
     ),
     # cancel_pending: накопленное не выбрасывается после гашения
     (
-        "backend/flows/pipeline.py",
-        "        self._dm_classify_buffer.clear()" + CRLF,
+        "backend/flows/dm_classify.py",
+        "    pipeline._dm_classify_buffer.clear()" + CRLF,
         "",
     ),
     # _classify_and_apply_for_hr: чёрный список перестаёт отбрасывать пакет
     (
-        "backend/flows/pipeline.py",
-        "        if bl_value:" + CRLF
-        + "            logger.info(" + CRLF
-        + '                "debounced classify: hr %d in blacklist (%s) — drop burst",'
-        + CRLF,
-        "        if False:" + CRLF
-        + "            logger.info(" + CRLF
-        + '                "debounced classify: hr %d in blacklist (%s) — drop burst",'
-        + CRLF,
+        "backend/flows/dm_classify.py",
+        "    if bl_value:" + CRLF
+        + "        logger.info(" + CRLF
+        + '            "debounced classify: hr %d in blacklist (%s) — drop burst",'     + CRLF,
+        "    if False:" + CRLF
+        + "        logger.info(" + CRLF
+        + '            "debounced classify: hr %d in blacklist (%s) — drop burst",'     + CRLF,
     ),
     # _classify_and_apply_for_hr: сообщения склеиваются без границ
     (
-        "backend/flows/pipeline.py",
-        '        text = "\\n\\n".join(item["text"] for item in buf)',
-        '        text = "".join(item["text"] for item in buf)',
+        "backend/flows/dm_classify.py",
+        '    text = "\\n\\n".join(item["text"] for item in buf)',
+        '    text = "".join(item["text"] for item in buf)',
     ),
     # _classify_and_apply_for_hr: решение относят к первой вакансии пакета
     (
-        "backend/flows/pipeline.py",
-        "        last = buf[-1]",
-        "        last = buf[0]",
+        "backend/flows/dm_classify.py",
+        "    last = buf[-1]",
+        "    last = buf[0]",
     ),
     # _classify_and_apply_for_hr: вакансия вне досягаемости всё равно разбирается
     (
-        "backend/flows/pipeline.py",
-        "        if v_status is not None and is_terminal_for_auto(v_status):" + CRLF
-        + "            logger.info(" + CRLF
-        + '                "vacancy %s: status=%s terminal for auto, "' + CRLF,
-        "        if False:" + CRLF
-        + "            logger.info(" + CRLF
-        + '                "vacancy %s: status=%s terminal for auto, "' + CRLF,
+        "backend/flows/dm_classify.py",
+        "    if v_status is not None and is_terminal_for_auto(v_status):" + CRLF
+        + "        logger.info(" + CRLF
+        + '            "vacancy %s: status=%s terminal for auto, "' + CRLF,
+        "    if False:" + CRLF
+        + "        logger.info(" + CRLF
+        + '            "vacancy %s: status=%s terminal for auto, "' + CRLF,
     ),
     # _classify_and_apply_for_hr: пустой вердикт всё равно применяется
     (
-        "backend/flows/pipeline.py",
-        "        if classification is None:" + CRLF
-        + "            logger.info(" + CRLF
-        + '                "vacancy %s: classifier returned None for hr %d '
-        '(%d msgs in burst)",' + CRLF,
-        "        if False:" + CRLF
-        + "            logger.info(" + CRLF
-        + '                "vacancy %s: classifier returned None for hr %d '
-        '(%d msgs in burst)",' + CRLF,
+        "backend/flows/dm_classify.py",
+        "    if classification is None:" + CRLF
+        + "        logger.info(" + CRLF
+        + '            "vacancy %s: classifier returned None for hr %d '     '(%d msgs in burst)",' + CRLF,
+        "    if False:" + CRLF
+        + "        logger.info(" + CRLF
+        + '            "vacancy %s: classifier returned None for hr %d '     '(%d msgs in burst)",' + CRLF,
     ),
 ]
