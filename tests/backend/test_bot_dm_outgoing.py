@@ -22,12 +22,12 @@ from tests.fakes.ingestion import FakeIngestion
 from tests.fakes.telegram import SENT_AT, FakeTelegramClient, chat, message
 
 
-def _echo(*, chat_id=777, msg_id=10, text="ответ с телефона", photo=None):
+def _echo(*, chat_id=777, username=None, msg_id=10, text="ответ с телефона", photo=None):
     """Эхо своего сообщения, отправленного из другого клиента Telegram."""
     return message(
         id=msg_id,
         text=None if photo is not None else text,
-        chat=chat(id=chat_id, username=None),
+        chat=chat(id=chat_id, username=username),
         date=SENT_AT,
         photo=photo,
         document=None,
@@ -252,3 +252,19 @@ async def test_a_broken_window_hook_does_not_lose_the_message(
     await bot._on_dm_outgoing(client, _echo())
 
     assert (await only_row(session_factory, Message)).text == "ответ с телефона"
+
+
+async def test_an_echo_finds_an_hr_known_only_by_name(chatting, session_factory):
+    """Эхо находит HR, известного только по имени.
+
+    Номер собеседника заводится позже; до того имя из объекта чата —
+    единственное, чем строку можно опознать.
+    """
+    bot, client, hr = await chatting(telegram_username="maria", telegram_user_id=None)
+    bot._ingestion = FakeIngestion()
+
+    await bot._on_dm_outgoing(client, _echo(chat_id=999, username="maria"))
+
+    saved = await only_row(session_factory, Message)
+    assert saved.hr_id == hr.id
+    assert saved.text == "ответ с телефона"

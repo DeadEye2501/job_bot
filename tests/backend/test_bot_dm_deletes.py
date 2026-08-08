@@ -13,6 +13,9 @@ Telegram присылает такие оповещения скупо: пере
 
 from datetime import datetime, timezone
 
+import pytest
+from pyrogram.enums import ChatType
+
 from backend.models import HR, BotMode, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import hr_row, message_row
@@ -293,3 +296,69 @@ async def test_deletions_in_two_chats_are_both_handled(chatting, session_factory
     )
 
     assert all(m.is_deleted for m in await all_rows(session_factory, Message))
+
+
+async def test_a_deletion_finds_an_hr_known_only_by_name(chatting, session_factory):
+    """Удаление находит HR, известного только по имени.
+
+    Номер собеседника заводится позже; до того опознать переписку можно
+    лишь по имени, которое Pyrogram кладёт в тот же объект чата.
+    """
+    bot, client, hr = await chatting(telegram_username="maria", telegram_user_id=None)
+    bot._ingestion = FakeIngestion()
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
+    )
+
+    await bot._on_dm_delete(client, [_tombstone(10, chat_id=999, username="maria")])
+
+    assert (await only_row(session_factory, Message)).is_deleted is True
+
+
+def _deletion_filter(client):
+    """Отбор, с которым обработчик удалений подписан на Pyrogram."""
+    from pyrogram.handlers import DeletedMessagesHandler
+
+    handlers = [h for h in client.handlers if isinstance(h, DeletedMessagesHandler)]
+    assert len(handlers) == 1, "обработчик удалений должен быть ровно один"
+    return handlers[0].filters
+
+
+@pytest.mark.parametrize(
+    ("kind", "expected"),
+    [
+        pytest.param(ChatType.PRIVATE, True, id="личная переписка"),
+        pytest.param(ChatType.BOT, True, id="переписка с ботом"),
+        pytest.param(ChatType.CHANNEL, False, id="канал"),
+        pytest.param(ChatType.SUPERGROUP, False, id="группа"),
+    ],
+)
+async def test_only_private_deletions_reach_the_handler(chatting, kind, expected):
+    """До обработчика доходят удаления только из личных переписок.
+
+    Удаления в каналах приходят тем же путём и пачками по сотне: разбирать
+    их значило бы на каждую чистку канала обходить всю таблицу сообщений.
+    """
+    bot, client, hr = await chatting()
+
+    reached = await _deletion_filter(client)(
+        client, message(id=10, chat=chat(id=777, type=kind))
+    )
+
+    assert bool(reached) is expected
+
+
+async def test_a_chatless_deletion_reaches_the_handler(chatting):
+    """Удаление без переписки до обработчика доходит.
+
+    Pyrogram для личных удалений ставит переписку в отсутствие — сведений
+    о собеседнике в таком оповещении просто нет. Обычный отбор «личная
+    переписка» на этом даёт отказ, и без отдельной ветки обработчик не
+    срабатывал бы на них вовсе.
+    """
+    bot, client, hr = await chatting()
+
+    reached = await _deletion_filter(client)(client, message(id=10, chat=None))
+
+    assert bool(reached) is True

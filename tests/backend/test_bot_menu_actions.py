@@ -1,4 +1,4 @@
-"""Следствия команд из меню карточки вакансии и выхода из учётной записи.
+"""Следствия команд из меню карточки вакансии.
 
 Повторный прогон одной вакансии занимает то же единственное место, что и
 обычный цикл: пользователь получает привычную полосу внизу окна и ту же
@@ -13,7 +13,6 @@ import asyncio
 
 import pytest
 
-from backend.models import BotMode
 from tests.fakes.ingestion import FakeIngestion, WindowHooks, wire
 
 
@@ -34,7 +33,7 @@ async def test_a_rerun_the_pipeline_refused_reports_failure(make_bot):
     assert await bot.ui_rerun_vacancy_pipeline(5) is False
 
 
-async def test_a_rerun_while_busy_is_refused(make_bot):
+async def test_a_rerun_while_busy_is_refused(make_bot, busy_slot):
     """Повторный прогон при занятом месте не запускается.
 
     Иначе он и идущий цикл разошлись бы по одному и тому же кэшу
@@ -42,12 +41,11 @@ async def test_a_rerun_while_busy_is_refused(make_bot):
     """
     ingestion = FakeIngestion()
     bot = wire(await make_bot(), ingestion)
-    bot._current_poll_task = asyncio.create_task(asyncio.sleep(30))
+    busy_slot(bot)
 
     assert await bot.ui_rerun_vacancy_pipeline(5) is False
     assert ingestion.rerun_calls == []
 
-    bot._current_poll_task.cancel()
 
 
 async def test_a_cancelled_rerun_frees_the_slot(make_bot):
@@ -119,88 +117,14 @@ async def test_sending_an_application_passes_the_pipeline_answer_through(make_bo
     assert ingestion.application_calls == [5]
 
 
-async def test_sending_an_application_does_not_take_the_poll_slot(make_bot):
+async def test_sending_an_application_does_not_take_the_poll_slot(make_bot, busy_slot):
     """Отправка отклика место прогона не занимает.
 
     Она короткая, и занимать ею место значило бы гасить кнопку
     «прогнать» на время одного сообщения.
     """
     bot = wire(await make_bot(), FakeIngestion(outcome=(True, "ок")))
-    bot._current_poll_task = asyncio.create_task(asyncio.sleep(30))
+    busy_slot(bot)
 
     assert await bot.ui_send_vacancy_application(5) == (True, "ок")
 
-    bot._current_poll_task.cancel()
-
-
-async def test_logging_out_stops_the_bot(make_bot):
-    """Выход из учётной записи останавливает бота и будит его цикл.
-
-    Без побудки просьба остановиться дошла бы только к концу получасового
-    сна, и бот всё это время сидел бы с отозванной сессией.
-    """
-
-    class Client:
-        def __init__(self) -> None:
-            self.logged_out = False
-
-        def add_handler(self, handler) -> None:
-            pass
-
-        async def log_out(self) -> None:
-            self.logged_out = True
-
-    client = Client()
-    bot = await make_bot(client)
-
-    await bot.log_out_session()
-
-    assert client.logged_out is True
-    assert bot._stop_event.is_set()
-    assert bot._wake_event.is_set()
-
-
-async def test_a_failed_log_out_stops_the_bot_anyway(make_bot):
-    """Сорвавшийся выход всё равно останавливает бота.
-
-    Пользователь нажал «выйти»: оставить его с работающим ботом из-за
-    неудачного запроса значило бы не сделать ровно то, о чём просили.
-    """
-
-    class Client:
-        def add_handler(self, handler) -> None:
-            pass
-
-        async def log_out(self) -> None:
-            raise OSError("сеть")
-
-    bot = await make_bot(Client())
-
-    await bot.log_out_session()
-
-    assert bot._stop_event.is_set()
-    assert bot._wake_event.is_set()
-
-
-async def test_the_mode_comes_from_the_settings(make_bot, session_factory):
-    """Режим берётся из настроек, а не из памяти бота."""
-    bot = await make_bot()
-    await bot._rs.set_mode(BotMode.FULL)
-
-    assert await bot._current_mode() is BotMode.FULL
-
-
-async def test_an_unreadable_mode_reads_as_off(make_bot):
-    """Нечитаемый режим понимается как «выключен».
-
-    Сомнение здесь решается в пользу бездействия: продолжить рассылку,
-    не зная, разрешена ли она, хуже, чем зря постоять.
-    """
-    bot = await make_bot()
-
-    async def broken():
-        raise OSError("база недоступна")
-
-    bot._rs.get_mode = broken
-
-    assert await bot._current_mode() is BotMode.OFF

@@ -1,6 +1,8 @@
 """Фикстуры, общие для тестов слоя `backend`."""
 
+import asyncio
 import shutil
+from contextlib import suppress
 
 import pytest
 
@@ -59,7 +61,9 @@ def make_bot(session_factory, monkeypatch):
     векторам; по закрытию — что остановка их не забыла.
     """
 
-    async def build(client=None, *, embed_url="http://provider.test") -> Bot:
+    async def build(
+        client=None, *, embed_url="http://provider.test", dry_run=False
+    ) -> Bot:
         await put(
             session_factory,
             tg_account_row(api_hash_encrypted=encrypt_str("шифр")),
@@ -74,7 +78,7 @@ def make_bot(session_factory, monkeypatch):
         monkeypatch.setattr(
             "adapters.lm_studio.make_client", lambda cfg: LmClient(cfg.base_url)
         )
-        return Bot(settings, session_factory)
+        return Bot(settings, session_factory, dry_run=dry_run)
 
     return build
 
@@ -125,14 +129,37 @@ def chatting(session_factory, make_bot):
     адресом.
     """
 
-    async def build(*, mode=BotMode.FULL, client=None, **hr_fields):
+    async def build(*, mode=BotMode.FULL, client=None, dry_run=False, **hr_fields):
         telegram_client = client if client is not None else FakeTelegramClient()
         await put(session_factory, hr_row(**hr_fields))
-        bot = await make_bot(telegram_client)
+        bot = await make_bot(telegram_client, dry_run=dry_run)
         await bot._rs.set_mode(mode)
         return bot, telegram_client, await only_row(session_factory, HR)
 
     return build
+
+
+@pytest.fixture
+async def busy_slot():
+    """Занимает место прогона задачей, которая сама не кончится.
+
+    Задача гасится после теста и досматривается до отмены: брошенная
+    жалуется в поток ошибок при сборке мусора, и жалоба всплывает посреди
+    чужого прогона.
+    """
+    occupied: list[asyncio.Task] = []
+
+    def occupy(bot) -> None:
+        task = asyncio.create_task(asyncio.sleep(30))
+        bot._current_poll_task = task
+        occupied.append(task)
+
+    yield occupy
+
+    for task in occupied:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
 
 
 @pytest.fixture
@@ -172,13 +199,15 @@ def ready_to_send(session_factory, make_bot):
     статус.
     """
 
-    async def build(*, status=VacancyStatus.NEW, mode=BotMode.FULL, hr=None):
+    async def build(
+        *, status=VacancyStatus.NEW, mode=BotMode.FULL, hr=None, dry_run=False
+    ):
         await put(
             session_factory,
             hr if hr is not None else hr_row(),
             vacancy_row(title="к отклику", status=status),
         )
-        bot = await make_bot()
+        bot = await make_bot(dry_run=dry_run)
         await bot._rs.set_mode(mode)
         saved_hr = await only_row(session_factory, HR)
         vacancy = await only_row(session_factory, Vacancy)

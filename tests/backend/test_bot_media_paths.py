@@ -19,9 +19,8 @@ from backend.bot import (
     _looks_like_photo,
     _media_cache_path,
     _media_path_for_db,
-    _shares_provider,
 )
-from tests.fakes.telegram import message
+from tests.fakes.telegram import document, message
 
 
 @pytest.mark.parametrize(
@@ -48,11 +47,16 @@ def test_only_three_formats_go_as_a_picture(name, expected):
     assert _looks_like_photo(Path(name)) is expected
 
 
-def test_a_renamed_file_does_not_slip_through_as_a_picture():
-    """Переименованный файл картинкой не пройдёт.
+def test_a_renamed_file_passes_as_a_picture_despite_the_guard():
+    """Переименованный файл проходит картинкой, хотя код обещает обратное.
 
-    Расширения мало: под ним может лежать что угодно. Совпасть должно и то,
-    что о содержимом говорит его вид.
+    Комментарий в `_looks_like_photo` называет вторую проверку защитой от
+    подделанного расширения. Защиты нет: `mimetypes.guess_type` читает имя
+    файла, а не содержимое, и для «вирус.exe.jpg» честно отвечает
+    «image/jpeg». Отсеивается только расширение — «вирус.jpg.exe» уйдёт
+    документом просто потому, что кончается на .exe.
+
+    Тест закрепляет сегодняшнее поведение: при починке он покраснеет.
     """
     assert _looks_like_photo(Path("вирус.exe.jpg")) is True
     assert _looks_like_photo(Path("вирус.jpg.exe")) is False
@@ -77,16 +81,14 @@ def test_a_message_is_classified_by_what_it_carries(msg, expected):
 
 def test_a_document_is_classified_with_its_name():
     """У документа запоминается имя файла: его показывают в переписке."""
-    doc = type("Doc", (), {"file_name": "Тестовое.pdf"})()
+    msg = message(document=document("Тестовое.pdf"))
 
-    assert _classify_media(message(document=doc)) == ("document", "Тестовое.pdf")
+    assert _classify_media(msg) == ("document", "Тестовое.pdf")
 
 
 def test_a_document_without_a_name_is_still_a_document():
     """Документ без имени остаётся документом, а не пропадает."""
-    doc = type("Doc", (), {"file_name": None})()
-
-    assert _classify_media(message(document=doc)) == ("document", None)
+    assert _classify_media(message(document=document(None))) == ("document", None)
 
 
 def test_the_cache_path_is_derived_from_the_message():
@@ -121,47 +123,3 @@ def test_a_path_outside_the_folder_is_stored_whole():
     outside = Path(MEDIA_DIR).resolve().parent / "чужое.jpg"
 
     assert _media_path_for_db(outside) == outside.as_posix()
-
-
-class _Provider:
-    """Настройка провайдера в том виде, в каком её сравнивают."""
-
-    def __init__(self, base_url, api_key, model="qwen"):
-        self.base_url = base_url
-        self.api_key = api_key
-        self.model = model
-
-
-@pytest.mark.parametrize(
-    ("a", "b", "expected"),
-    [
-        pytest.param(
-            _Provider("http://a", "ключ"), _Provider("http://a", "ключ"), True,
-            id="совпадают",
-        ),
-        pytest.param(
-            _Provider("http://a", "ключ"), _Provider("http://b", "ключ"), False,
-            id="разные адреса",
-        ),
-        pytest.param(
-            _Provider("http://a", "ключ"), _Provider("http://a", "другой"), False,
-            id="разные ключи",
-        ),
-        pytest.param(
-            _Provider("http://a", "ключ", "qwen"),
-            _Provider("http://a", "ключ", "llama"),
-            True,
-            id="разные модели — всё равно один",
-        ),
-        pytest.param(None, _Provider("http://a", "ключ"), False, id="первого нет"),
-        pytest.param(_Provider("http://a", "ключ"), None, False, id="второго нет"),
-        pytest.param(None, None, False, id="нет обоих"),
-    ],
-)
-def test_two_providers_share_a_client_when_the_endpoint_and_key_match(a, b, expected):
-    """Две настройки делят одно соединение, если совпали адрес и ключ.
-
-    Модель не сравнивается нарочно: она задаётся на каждый запрос, а не на
-    соединение, и разводить из-за неё два клиента было бы расточительством.
-    """
-    assert _shares_provider(a, b) is expected

@@ -38,19 +38,18 @@ async def test_a_channel_the_pipeline_could_not_take_reports_missing(make_bot):
     assert await bot.poll_channel_now(7) == "missing"
 
 
-async def test_a_manual_channel_poll_while_busy_is_refused(make_bot):
+async def test_a_manual_channel_poll_while_busy_is_refused(make_bot, busy_slot):
     """Второй прогон при занятом месте отказывается, а не встаёт рядом.
 
     Два цикла разом дерутся за кэш векторов и курсор канала.
     """
     ingestion = FakeIngestion()
     bot = wire(await make_bot(), ingestion)
-    bot._current_poll_task = asyncio.create_task(asyncio.sleep(30))
+    busy_slot(bot)
 
     assert await bot.poll_channel_now(7) == "busy"
     assert ingestion.channel_calls == []
 
-    bot._current_poll_task.cancel()
 
 
 async def test_a_cancelled_channel_poll_frees_the_slot(make_bot):
@@ -124,16 +123,15 @@ async def test_a_forced_full_poll_reports_success(make_bot):
     assert bot._current_poll_task is None
 
 
-async def test_a_forced_full_poll_while_busy_is_refused(make_bot):
+async def test_a_forced_full_poll_while_busy_is_refused(make_bot, busy_slot):
     """Полный прогон при занятом месте отказывается."""
     ingestion = FakeIngestion()
     bot = wire(await make_bot(), ingestion)
-    bot._current_poll_task = asyncio.create_task(asyncio.sleep(30))
+    busy_slot(bot)
 
     assert await bot.force_poll_once() == "busy"
     assert ingestion.full_calls == 0
 
-    bot._current_poll_task.cancel()
 
 
 async def test_a_cancelled_full_poll_frees_the_slot(make_bot):
