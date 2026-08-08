@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 def main() -> int:
     from backend import bootstrap
-    from backend.runtime_settings import _check_keyring_backend
+    from backend.crypto import _check_keyring_backend
     from client.shell import run_ui
 
     # Fail-fast если keyring-бэкенд небезопасный (PlaintextKeyring) или
