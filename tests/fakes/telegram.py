@@ -6,7 +6,12 @@
 """
 
 import io
+from datetime import datetime
 from types import SimpleNamespace
+
+# Метка времени у исходящего — своя, не «сейчас»: тест сверяет её с тем, что
+# легло в базу, а «сейчас» на такое сравнение не годится.
+SENT_AT = datetime(2026, 1, 1, 12, 0)
 
 
 def message(*, text=None, caption=None, **extra) -> SimpleNamespace:
@@ -41,7 +46,10 @@ class FakeTelegramClient:
         self.get_users_calls: list[str] = []
         self.get_chat_calls: list[str] = []
         self.download_calls: list[str] = []
+        self.read_calls: list = []
+        self.outgoing: list[tuple] = []
         self.handlers: list = []
+        self.last_message_id = 500
 
     def add_handler(self, handler) -> None:
         self.handlers.append(handler)
@@ -68,3 +76,23 @@ class FakeTelegramClient:
         if self._avatar is None:
             return None
         return io.BytesIO(self._avatar)
+
+    def _accept(self, kind: str, target, payload):
+        """Принимает исходящее и отдаёт то, что вернул бы Telegram."""
+        self.outgoing.append((kind, target, payload))
+        self._fail_if_asked(kind)
+        self.last_message_id += 1
+        return SimpleNamespace(id=self.last_message_id, date=SENT_AT)
+
+    async def send_message(self, target, text):
+        return self._accept("send_message", target, text)
+
+    async def send_photo(self, target, path):
+        return self._accept("send_photo", target, path)
+
+    async def send_document(self, target, path):
+        return self._accept("send_document", target, path)
+
+    async def read_chat_history(self, target):
+        self.read_calls.append(target)
+        self._fail_if_asked("read_chat_history")
