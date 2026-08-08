@@ -1,5 +1,6 @@
 """Фикстуры, общие для тестов слоя `backend`."""
 
+from backend.flows import dm_classify
 import asyncio
 import logging
 import shutil
@@ -290,7 +291,7 @@ async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)
 
 
 @pytest.fixture
-async def dm_pipeline(make_pipeline):
+async def dm_pipeline(monkeypatch, make_pipeline):
     """Конвейер с подставным разбором ответа HR и невзводящимся таймером.
 
     Накопитель входящих проверяется двумя слайсами — что в нём копится и
@@ -302,13 +303,13 @@ async def dm_pipeline(make_pipeline):
     built.DM_CLASSIFY_DEBOUNCE_SEC = 30
     built.classified = []
 
-    async def classify(hr_id):
+    async def classify(pipeline, hr_id):
         built.classified.append(
             (hr_id, list(built._dm_classify_buffer.get(hr_id, [])))
         )
         built._dm_classify_buffer.pop(hr_id, None)
 
-    built._classify_and_apply_for_hr = classify
+    monkeypatch.setattr(dm_classify, "_classify_and_apply_for_hr", classify)
     yield built
     await built.cancel_pending_dm_classifications()
 

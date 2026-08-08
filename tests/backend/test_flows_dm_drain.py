@@ -10,6 +10,7 @@
 нетронутом статусе вакансии.
 """
 
+from backend.flows import dm_classify
 import asyncio
 from contextlib import suppress
 
@@ -63,7 +64,7 @@ async def test_switching_off_reads_every_correspondent(dm_pipeline):
     assert sorted(hr_id for hr_id, _ in dm_pipeline.classified) == [7, 8]
 
 
-async def test_one_broken_reading_does_not_stop_the_others(dm_pipeline):
+async def test_one_broken_reading_does_not_stop_the_others(monkeypatch, dm_pipeline):
     """Сорвавшийся разбор одного собеседника не отменяет разбор остальных.
 
     Слив идёт при выключении и разом по всем: уронив его на первом, бот
@@ -73,12 +74,12 @@ async def test_one_broken_reading_does_not_stop_the_others(dm_pipeline):
     dm_pipeline.schedule_dm_classification(8, 2, 20, "от второго")
     good: list[int] = []
 
-    async def classify(hr_id):
+    async def classify(pipeline, hr_id):
         if hr_id == 7:
             raise RuntimeError("модель не ответила")
         good.append(hr_id)
 
-    dm_pipeline._classify_and_apply_for_hr = classify
+    monkeypatch.setattr(dm_classify, "_classify_and_apply_for_hr", classify)
 
     await dm_pipeline.cancel_pending_dm_classifications(drain=True)
 
@@ -114,7 +115,7 @@ async def test_a_stopping_bot_ignores_the_request_to_read(dm_pipeline):
     assert dm_pipeline._dm_classify_buffer == {}
 
 
-async def test_a_reading_already_under_way_is_not_waited_for_at_all(dm_pipeline):
+async def test_a_reading_already_under_way_is_not_waited_for_at_all(monkeypatch, dm_pipeline):
     """Начавшийся разбор остановка не дожидается вовсе.
 
     Ожидание в пять секунд заведено именно ради него: отмена — только
@@ -129,11 +130,11 @@ async def test_a_reading_already_under_way_is_not_waited_for_at_all(dm_pipeline)
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 0
     started = asyncio.Event()
 
-    async def hangs(hr_id):
+    async def hangs(pipeline, hr_id):
         started.set()
         await asyncio.sleep(30)
 
-    dm_pipeline._classify_and_apply_for_hr = hangs
+    monkeypatch.setattr(dm_classify, "_classify_and_apply_for_hr", hangs)
     dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
     running = dm_pipeline._dm_classify_tasks[7]
     await started.wait()
