@@ -35,7 +35,7 @@ async def spawning(make_pipeline, session_factory, monkeypatch):
             raise pipeline.caught
         pipeline.caught.append((hr_row_.id, kwargs))
 
-    monkeypatch.setattr("backend.flows.backfill_hr_dm_history", backfill)
+    monkeypatch.setattr("backend.flows.pipeline.backfill_hr_dm_history", backfill)
     return pipeline, hr
 
 

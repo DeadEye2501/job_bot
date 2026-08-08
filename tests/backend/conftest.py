@@ -8,7 +8,7 @@ from contextlib import suppress
 import pytest
 
 from backend.bot import MEDIA_DIR, Bot
-from backend.flows import IngestionPipeline, process_dm
+from backend.flows.pipeline import IngestionPipeline, process_dm
 from backend.models import (
     HR,
     BotMode,
@@ -212,8 +212,8 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
         return True, "sent"
 
     pipeline._try_auto_send = try_auto_send
-    monkeypatch.setattr("backend.flows.parse_vacancy", parse_vacancy)
-    monkeypatch.setattr("backend.flows.validate_vacancy_fit", validate_vacancy_fit)
+    monkeypatch.setattr("backend.flows.pipeline.parse_vacancy", parse_vacancy)
+    monkeypatch.setattr("backend.flows.pipeline.validate_vacancy_fit", validate_vacancy_fit)
 
 
 @pytest.fixture
