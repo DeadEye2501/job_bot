@@ -15,6 +15,7 @@
 
 import pytest
 
+from backend.flows import ingest as ingest_mod
 from backend.models import TelegramChannel
 from tests.dbio import only_row, put
 from tests.factories import channel_row
@@ -22,7 +23,7 @@ from tests.fakes.telegram import FakeTelegramClient, post
 
 
 @pytest.fixture
-async def reading(make_pipeline, session_factory):
+async def reading(monkeypatch, make_pipeline, session_factory):
     """Канал, конвейер с подставным приёмом поста и отметкой на месте."""
     await put(session_factory, channel_row(username="jobs", last_processed_msg_id=None))
     channel = await only_row(session_factory, TelegramChannel)
@@ -30,10 +31,10 @@ async def reading(make_pipeline, session_factory):
     pipeline = await make_pipeline(client)
     pipeline.taken = []
 
-    async def ingest(channel_id, username, msg):
+    async def take(pipeline, channel_id, username, msg):
         pipeline.taken.append(msg.id)
 
-    pipeline._ingest_post = ingest
+    monkeypatch.setattr(ingest_mod, "_ingest_post", take)
     return pipeline, client, channel
 
 
@@ -127,7 +128,7 @@ async def test_nothing_new_leaves_the_mark_alone(reading, session_factory):
     assert saves == []
 
 
-async def test_a_broken_post_still_moves_the_mark(reading, session_factory):
+async def test_a_broken_post_still_moves_the_mark(monkeypatch, reading, session_factory):
     """Сообщение, на котором разбор сорвался, отметку всё равно двигает.
 
     Иначе оно перечитывалось бы вечно, каждый обход упираясь в ту же
@@ -136,12 +137,12 @@ async def test_a_broken_post_still_moves_the_mark(reading, session_factory):
     pipeline, client, channel = reading
     client.history = [post(11), post(10)]
 
-    async def ingest(channel_id, username, msg):
+    async def take(pipeline, channel_id, username, msg):
         if msg.id == 10:
             raise RuntimeError("не разобралось")
         pipeline.taken.append(msg.id)
 
-    pipeline._ingest_post = ingest
+    monkeypatch.setattr(ingest_mod, "_ingest_post", take)
 
     await pipeline._poll_channel(channel.id, "jobs", None)
 
@@ -150,7 +151,7 @@ async def test_a_broken_post_still_moves_the_mark(reading, session_factory):
     assert saved.last_processed_msg_id == 11
 
 
-async def test_the_mark_survives_a_break_mid_channel(reading, session_factory):
+async def test_the_mark_survives_a_break_mid_channel(monkeypatch, reading, session_factory):
     """Отметка досохраняется, даже если обход оборвался на середине.
 
     Без этого следующий обход перечитал бы всё, что уже разобрано, — и
@@ -159,12 +160,12 @@ async def test_the_mark_survives_a_break_mid_channel(reading, session_factory):
     pipeline, client, channel = reading
     client.history = [post(12), post(11), post(10)]
 
-    async def ingest(channel_id, username, msg):
+    async def take(pipeline, channel_id, username, msg):
         pipeline.taken.append(msg.id)
         if msg.id == 11:
             raise KeyboardInterrupt
 
-    pipeline._ingest_post = ingest
+    monkeypatch.setattr(ingest_mod, "_ingest_post", take)
 
     with pytest.raises(KeyboardInterrupt):
         await pipeline._poll_channel(channel.id, "jobs", None)

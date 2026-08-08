@@ -8,15 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
-from adapters import lm_studio, telegram
+from adapters import telegram
+from backend.flows import ingest
 from backend.flows import cleanup
 from backend.domain.blacklist import check_blacklist
-from backend.domain.dedup import cosine_top_match
 from backend.domain.salary import normalize_salary_to_rub_thousands
 from backend.domain.scoring import score_parsed
 from backend.domain.transitions import is_terminal_for_auto
 from backend.domain.verdict import decide_vacancy_status, is_empty_vacancy
-from backend.flows import embeddings
 from backend.helpers import (
     extract_dm_text,
     extract_text,
@@ -1213,7 +1212,7 @@ class IngestionPipeline:
             for i, msg in enumerate(ordered):
                 self._emit_progress("message", f"@{channel_username}", i, total)
                 try:
-                    await self._ingest_post(channel_id, channel_username, msg)
+                    await ingest._ingest_post(self, channel_id, channel_username, msg)
                 except Exception:
                     # Advance cursor anyway — иначе сломанное сообщение
                     # реингестится бесконечно. Дубликаты (если ingest
@@ -1230,115 +1229,6 @@ class IngestionPipeline:
             if cursor is not None:
                 await self._advance_cursor(channel_id, cursor)
 
-    async def _ingest_post(
-        self, channel_id: int, channel_username: str, msg
-    ) -> None:
-        # Cursor advance'ится в `_poll_channel` (батчами), не здесь.
-        text = extract_text(msg)
-        if not text or msg.service is not None or msg.poll is not None:
-            return
-
-        try:
-            embedding = await lm_studio.embed(
-                self._lm_embed_client, self._lm_embed_model, text
-            )
-        except RuntimeError as e:
-            logger.warning(
-                "[@%s] %d embed shape error: %s, skipping",
-                channel_username,
-                msg.id,
-                e,
-            )
-            return
-
-        await embeddings._ensure_embedding_cache(self)
-        similar_id = cosine_top_match(
-            np.asarray(embedding, dtype=np.float32),
-            self._embedding_ids,
-            self._embedding_matrix,
-            threshold=self._rs.dedup_cosine_threshold,
-        )
-        if similar_id is not None:
-            # Could be a real duplicate, or the embedding of a vacancy left
-            # half-built by a cancelled previous cycle (saved with raw_text
-            # + embedding but no parsed fields). Detect the orphan and
-            # finish parsing it now instead of skipping forever.
-            unparsed = await self._is_unparsed_vacancy(similar_id)
-            if unparsed:
-                logger.info(
-                    "[@%s] %d matched orphan vacancy %d, finishing parse",
-                    channel_username, msg.id, similar_id,
-                )
-                # Note: if the orphan was originally ingested from a different
-                # channel (cross-channel re-post), we parse using THIS post's
-                # text + channel hint and stamp it onto the original row. The
-                # embedding match guarantees texts are near-identical, so this
-                # is acceptable.
-                await self._parse_and_update_vacancy(
-                    similar_id, text, channel_username
-                )
-            else:
-                logger.info(
-                    "[@%s] %d duplicate of vacancy %d, skipping",
-                    channel_username, msg.id, similar_id,
-                )
-            return
-
-        new_vacancy_id = await self._save_new_vacancy(
-            channel_id, channel_username, msg, text, embedding
-        )
-        if new_vacancy_id is not None:
-            await self._parse_and_update_vacancy(
-                new_vacancy_id, text, channel_username
-            )
-
-    async def _save_new_vacancy(
-        self,
-        channel_id: int,
-        channel_username: str,
-        msg,
-        text: str,
-        embedding: list[float],
-    ) -> int | None:
-        async with self._session_factory() as session:
-            try:
-                new_vacancy = Vacancy(
-                    source_channel_id=channel_id,
-                    source_msg_id=msg.id,
-                    raw_text=text,
-                    embedding=embedding,
-                    source_url=f"https://t.me/{channel_username}/{msg.id}",
-                    posted_at=msg.date,
-                )
-                session.add(new_vacancy)
-                await session.flush()
-                session.add(
-                    VacancyEvent(
-                        vacancy_id=new_vacancy.id,
-                        kind="ingested",
-                        payload={
-                            "channel": channel_username,
-                            "msg_id": msg.id,
-                        },
-                    )
-                )
-                await session.commit()
-                embeddings._append_embedding(self, new_vacancy.id, embedding)
-                logger.info(
-                    "[@%s] %d -> vacancy %d",
-                    channel_username,
-                    msg.id,
-                    new_vacancy.id,
-                )
-                return new_vacancy.id
-            except IntegrityError:
-                await session.rollback()
-                logger.info(
-                    "[@%s] %d uq_vacancy_source race, skipping",
-                    channel_username,
-                    msg.id,
-                )
-                return None
 
     async def _parse_and_update_vacancy(
         self,

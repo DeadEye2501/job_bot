@@ -12,55 +12,55 @@ CRLF = "\r\n"
 MUTATIONS = [
     # _ingest_post: служебная запись и опрос доходят до разбора
     (
-        "backend/flows/pipeline.py",
-        "        if not text or msg.service is not None or msg.poll is not None:" + CRLF
-        + "            return" + CRLF,
-        "        if not text:" + CRLF + "            return" + CRLF,
+        "backend/flows/ingest.py",
+        "    if not text or msg.service is not None or msg.poll is not None:" + CRLF
+        + "        return" + CRLF,
+        "    if not text:" + CRLF + "        return" + CRLF,
     ),
     # _ingest_post: объявление без текста доходит до разбора
     (
-        "backend/flows/pipeline.py",
-        "        if not text or msg.service is not None or msg.poll is not None:",
-        "        if msg.service is not None or msg.poll is not None:",
+        "backend/flows/ingest.py",
+        "    if not text or msg.service is not None or msg.poll is not None:",
+        "    if msg.service is not None or msg.poll is not None:",
     ),
     # _ingest_post: перепост заводит вторую вакансию
     (
-        "backend/flows/pipeline.py",
-        "        if similar_id is not None:" + CRLF
-        + "            # Could be a real duplicate",
-        "        if False:" + CRLF + "            # Could be a real duplicate",
+        "backend/flows/ingest.py",
+        "    if similar_id is not None:" + CRLF
+        + "        # Could be a real duplicate",
+        "    if False:" + CRLF + "        # Could be a real duplicate",
     ),
     # _ingest_post: недоразобранный повтор не дописывается
     (
-        "backend/flows/pipeline.py",
-        "            unparsed = await self._is_unparsed_vacancy(similar_id)" + CRLF
-        + "            if unparsed:",
-        "            unparsed = await self._is_unparsed_vacancy(similar_id)" + CRLF
-        + "            if False:",
+        "backend/flows/ingest.py",
+        "        unparsed = await pipeline._is_unparsed_vacancy(similar_id)" + CRLF
+        + "        if unparsed:",
+        "        unparsed = await pipeline._is_unparsed_vacancy(similar_id)" + CRLF
+        + "        if False:",
     ),
     # _ingest_post: незаведённая строка всё равно идёт в разбор
     (
-        "backend/flows/pipeline.py",
-        "        if new_vacancy_id is not None:" + CRLF
-        + "            await self._parse_and_update_vacancy(" + CRLF,
-        "        if True:" + CRLF
-        + "            await self._parse_and_update_vacancy(" + CRLF,
+        "backend/flows/ingest.py",
+        "    if new_vacancy_id is not None:" + CRLF
+        + "        await pipeline._parse_and_update_vacancy(" + CRLF,
+        "    if True:" + CRLF
+        + "        await pipeline._parse_and_update_vacancy(" + CRLF,
     ),
     # _save_new_vacancy: вектор не попадает в кэш
     (
-        "backend/flows/pipeline.py",
-        "                embeddings._append_embedding(self, new_vacancy.id, embedding)" + CRLF,
+        "backend/flows/ingest.py",
+        "            embeddings._append_embedding(pipeline, new_vacancy.id, embedding)" + CRLF,
         "",
     ),
     # _save_new_vacancy: повторное заведение выдаётся за успех
     (
-        "backend/flows/pipeline.py",
-        '                    msg.id,' + CRLF
-        + "                )" + CRLF
-        + "                return None" + CRLF,
-        '                    msg.id,' + CRLF
-        + "                )" + CRLF
-        + "                return 0" + CRLF,
+        "backend/flows/ingest.py",
+        '                msg.id,' + CRLF
+        + "            )" + CRLF
+        + "            return None" + CRLF,
+        '                msg.id,' + CRLF
+        + "            )" + CRLF
+        + "            return 0" + CRLF,
     ),
     # _ensure_embedding_cache: кэш перечитывается на каждом обходе
     (
