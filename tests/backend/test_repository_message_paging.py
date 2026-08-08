@@ -38,6 +38,33 @@ async def test_the_chat_reads_oldest_first_from_the_tail(session, session_factor
     assert has_more is False
 
 
+async def test_messages_of_the_same_moment_keep_the_order_they_arrived(
+    session, session_factory
+):
+    """Два сообщения одной секунды показываются в порядке появления.
+
+    Времена приходят от Telegram с точностью до секунды, и переписка в
+    несколько реплик подряд легко получает одно значение на всех. Без
+    разрешителя по номеру строки порядок задавала бы база, и реплики
+    менялись бы местами от загрузки к загрузке.
+
+    Проверено мутацией: набор для указателя эту ветку не задевал — там
+    разрешитель работает в условии отбора, а не в порядке выдачи.
+    """
+    hr = hr_row()
+    await put(session_factory, hr)
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, text="сначала", sent_at=at(20)),
+        message_row(hr_id=hr.id, text="потом", sent_at=at(20)),
+        message_row(hr_id=hr.id, text="раньше всех", sent_at=at(10)),
+    )
+
+    got, _ = await texts(session, hr.id)
+
+    assert got == ["раньше всех", "сначала", "потом"]
+
+
 async def test_a_full_page_reports_that_there_is_more(session, session_factory):
     """Полная страница сообщает, что старее ещё есть."""
     hr = hr_row()
