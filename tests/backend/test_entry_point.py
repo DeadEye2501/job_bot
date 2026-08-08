@@ -13,14 +13,22 @@
 вышел».
 """
 
-import pytest
+import sys
 
-import main as entry
+import pytest
 
 
 @pytest.fixture
-def steps(monkeypatch):
-    """Подменяет три шага запуска и записывает их порядок."""
+def entry(clean_root_logger, monkeypatch):
+    """Точка входа с подменёнными шагами запуска и возвращённым журналом.
+
+    Ввозится она внутри фикстуры нарочно: при ввозе модуль насовсем правит
+    корневой logger — вешает обработчик буфера, фильтр вымарывания секретов
+    и меняет уровни уже навешенных обработчиков, включая тот, которым
+    pytest ловит записи. На сборке это испортило бы журнал всему прогону.
+    """
+    import main as module
+
     order: list[str] = []
 
     def check_keyring():
@@ -38,56 +46,60 @@ def steps(monkeypatch):
     )
     monkeypatch.setattr("backend.bootstrap.ensure_schema", ensure_schema)
     monkeypatch.setitem(
-        __import__("sys").modules,
-        "client.shell",
-        type("Shell", (), {"run_ui": staticmethod(run_ui)}),
+        sys.modules, "client.shell", type("Shell", (), {"run_ui": staticmethod(run_ui)})
     )
-    return order
+    return module, order
 
 
-def test_the_launch_goes_through_all_three_steps(steps):
+def test_the_launch_goes_through_all_three_steps(entry):
     """Запуск проходит проверку ключей, схему базы и открывает окно."""
-    assert entry.main() == 0
-    assert steps == ["хранилище ключей", "схема базы", "окно"]
+    module, order = entry
+
+    assert module.main() == 0
+    assert order == ["хранилище ключей", "схема базы", "окно"]
 
 
-def test_the_schema_is_updated_before_the_window(steps):
+def test_the_schema_is_updated_before_the_window(entry):
     """Схема базы обновляется до окна.
 
     Обновление поднимает собственный цикл событий; внутри уже
     запущенного оконного цикла оно не стартует вовсе.
     """
-    entry.main()
+    module, order = entry
 
-    assert steps.index("схема базы") < steps.index("окно")
+    module.main()
+
+    assert order.index("схема базы") < order.index("окно")
 
 
-def test_a_broken_key_store_stops_the_launch(steps, monkeypatch, capsys):
+def test_a_broken_key_store_stops_the_launch(entry, monkeypatch, capsys):
     """Небезопасное хранилище ключей запуск останавливает.
 
     С ним секреты ушли бы на диск открытым текстом. Окна ещё нет, и
     показать беду можно только текстом в поток ошибок.
     """
+    module, order = entry
 
     def refuse():
         raise RuntimeError("хранилище пишет пароли открытым текстом")
 
     monkeypatch.setattr("backend.runtime_settings._check_keyring_backend", refuse)
 
-    assert entry.main() == 2
-    assert steps == []
+    assert module.main() == 2
+    assert order == []
     assert "хранилище пишет пароли открытым текстом" in capsys.readouterr().err
 
 
-def test_the_window_return_code_is_passed_through(steps, monkeypatch):
+def test_the_window_return_code_is_passed_through(entry, monkeypatch):
     """Код возврата окна передаётся наружу как есть.
 
     По нему запускающий отличает нормальный выход от аварийного.
     """
+    module, _ = entry
     monkeypatch.setitem(
-        __import__("sys").modules,
+        sys.modules,
         "client.shell",
         type("Shell", (), {"run_ui": staticmethod(lambda: 3)}),
     )
 
-    assert entry.main() == 3
+    assert module.main() == 3

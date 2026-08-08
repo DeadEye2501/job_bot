@@ -1,25 +1,59 @@
 """Фикстуры, общие для тестов слоя `backend`."""
 
 import asyncio
+import logging
 import shutil
 from contextlib import suppress
 
 import pytest
 
 from backend.bot import MEDIA_DIR, Bot
-from backend.flows import IngestionPipeline
+from backend.flows import IngestionPipeline, process_dm
 from backend.models import (
     HR,
     BotMode,
     LlmConfigKind,
+    Profile,
     Vacancy,
     VacancyStatus,
 )
+from backend.payloads import FitValidation
 from backend.repository import list_vacancies
 from backend.runtime_settings import RuntimeSettings, encrypt_str
 from tests.dbio import only_row, put
-from tests.factories import hr_row, llm_config_row, tg_account_row, vacancy_row
-from tests.fakes.telegram import FakeTelegramClient
+from tests.factories import (
+    hr_row,
+    llm_config_row,
+    parsed_vacancy,
+    profile_row,
+    profile_skill_row,
+    tg_account_row,
+    vacancy_row,
+)
+from tests.fakes.telegram import FakeTelegramClient, photo, user
+
+
+@pytest.fixture
+def clean_root_logger():
+    """Возвращает корневой logger в исходное состояние после теста.
+
+    Помимо списка обработчиков, фильтров и собственного уровня снимает и
+    восстанавливает уровень каждого уже навешенного обработчика: установка
+    буфера журнала правит их на месте, и без возврата чужой обработчик —
+    например, тот, которым pytest ловит записи, — остался бы испорченным
+    до конца прогона.
+    """
+    root = logging.getLogger()
+    handlers = list(root.handlers)
+    filters = list(root.filters)
+    level = root.level
+    handler_levels = {h: h.level for h in handlers}
+    yield root
+    root.handlers = handlers
+    root.filters = filters
+    root.setLevel(level)
+    for handler, original_level in handler_levels.items():
+        handler.setLevel(original_level)
 
 
 @pytest.fixture
@@ -85,7 +119,7 @@ def make_bot(session_factory, monkeypatch):
 
 
 @pytest.fixture
-def make_pipeline(session_factory):
+async def make_pipeline(session_factory):
     """Собирает `IngestionPipeline` на подделках вместо живых соединений.
 
     Настоящий конвейер держит клиента Pyrogram и два клиента httpx.
@@ -96,29 +130,156 @@ def make_pipeline(session_factory):
     Отправка письма подменяется списком: конвейер зовёт её как обычную
     сопрограмму, а тест смотрит, что и кому ушло.
     """
+    built: list = []
 
-    async def build(client=None, *, sends=None):
+    async def build(client=None):
         settings = await RuntimeSettings.load(session_factory)
-        outgoing = sends if sends is not None else []
-
-        async def send(hr, text, attachment=None, vacancy_id=None, *, force=False):
-            outgoing.append((hr.id, text, attachment, vacancy_id, force))
-            return True
-
-        pipeline = IngestionPipeline(
-            client=client if client is not None else FakeTelegramClient(),
-            session_factory=session_factory,
-            lm_client=LmClient("http://provider.test"),
-            lm_embed_client=LmClient("http://provider.test"),
-            lm_chat_model="qwen",
-            lm_embed_model="bge",
-            send=send,
-            runtime_settings=settings,
+        pipeline = _pipeline_on_fakes(
+            session_factory, client or FakeTelegramClient(), settings
         )
-        pipeline.sent = outgoing
+        built.append(pipeline)
         return pipeline
 
-    return build
+    yield build
+
+    await _put_out_backfills(built)
+
+
+def _pipeline_on_fakes(session_factory, client, settings) -> IngestionPipeline:
+    """Конвейер на подделках; отправку письма подменяет список `sent`."""
+    outgoing: list[tuple] = []
+
+    async def send(hr, text, attachment=None, vacancy_id=None, *, force=False):
+        outgoing.append((hr.id, text, attachment, vacancy_id, force))
+        return True
+
+    pipeline = IngestionPipeline(
+        client=client,
+        session_factory=session_factory,
+        lm_client=LmClient("http://provider.test"),
+        lm_embed_client=LmClient("http://provider.test"),
+        lm_chat_model="qwen",
+        lm_embed_model="bge",
+        send=send,
+        runtime_settings=settings,
+    )
+    pipeline.sent = outgoing
+    return pipeline
+
+
+async def _put_out_backfills(pipelines) -> None:
+    """Гасит фоновые догоны переписки, заведённые за время теста.
+
+    Разбор вакансии заводит их сам при появлении нового HR. Брошенная
+    задача жалуется в поток ошибок при сборке мусора, и жалоба всплывает
+    посреди чужого прогона.
+    """
+    for pipeline in pipelines:
+        for task in list(pipeline._backfill_tasks):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+
+def _known_hr_client() -> FakeTelegramClient:
+    """Подделка Telegram, знающая одного HR — с картинкой профиля."""
+    return FakeTelegramClient(
+        users={
+            "maria": user(
+                id=777,
+                username="maria",
+                first_name="Мария",
+                photo=photo(small_file_id="кар"),
+            )
+        },
+        avatar=b"\x89PNG",
+    )
+
+
+def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
+    """Подменяет разбор, проверку пригодности и отправку заготовленным."""
+
+    async def parse_vacancy(text, client_, model, **kwargs):
+        return pipeline.parsed
+
+    async def validate_vacancy_fit(parsed, text, client_, model, **kwargs):
+        pipeline.validated = True
+        return pipeline.verdict
+
+    async def try_auto_send(hr, parsed, vacancy_id):
+        pipeline.asked_to_send.append(vacancy_id)
+        return True, "sent"
+
+    pipeline._try_auto_send = try_auto_send
+    monkeypatch.setattr("backend.flows.parse_vacancy", parse_vacancy)
+    monkeypatch.setattr("backend.flows.validate_vacancy_fit", validate_vacancy_fit)
+
+
+@pytest.fixture
+def deliver(session_factory):
+    """Проводит письмо через разбор входящего.
+
+    Нужен двум слайсам — «кого слушают» и «к какой вакансии относят», — и
+    оба зовут одно и то же с разными подменами: клиентом Telegram и
+    накопителем отложенного разбора.
+    """
+
+    async def run(msg, *, client=None, schedule=None):
+        await process_dm(
+            msg,
+            None,
+            "qwen",
+            session_factory,
+            client=client,
+            schedule_classification=schedule,
+        )
+
+    return run
+
+
+@pytest.fixture
+async def parsing(make_pipeline, session_factory, monkeypatch):
+    """Конвейер с подставным разбором объявления и вакансия под него.
+
+    Разбор проверяется двумя слайсами — приговор и запись, — и обоим нужно
+    одно: чтобы обращения к языковой модели отдавали заготовленное, а
+    оценка по навыкам не отсекала всё на пороге.
+    """
+    # Строка заводится с чужим приговором: с умолчаниями «осталась новой»
+    # было бы верно и до разбора, и проверка ничего бы не стерегла.
+    await put(
+        session_factory,
+        vacancy_row(
+            title=None,
+            is_parsed=False,
+            raw_text="текст",
+            status=VacancyStatus.NOT_FIT,
+            skip_reason="прошлый отказ",
+        ),
+    )
+    vacancy = await only_row(session_factory, Vacancy)
+
+    pipeline = await make_pipeline(_known_hr_client())
+    pipeline.parsed = parsed_vacancy(
+        title="Python-разработчик",
+        description="Ищем в команду",
+        stack_required=["Python"],
+        grade="middle",
+        salary="200000",
+        remote="remote",
+        location="Ереван",
+    )
+    pipeline.verdict = FitValidation(verdict="fit", reason=None)
+    pipeline.validated = False
+    pipeline.asked_to_send = []
+    _answer_instead_of_the_model(pipeline, monkeypatch)
+
+    await put(session_factory, profile_row())
+    profile = await only_row(session_factory, Profile)
+    await put(session_factory, profile_skill_row(profile.id, "Python"))
+    await pipeline._reload_resources()
+    await pipeline._rs.set_app("scoring_threshold", "1")
+    return pipeline, vacancy
 
 
 @pytest.fixture

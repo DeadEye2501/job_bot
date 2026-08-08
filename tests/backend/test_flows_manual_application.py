@@ -146,3 +146,45 @@ async def test_a_refusal_from_the_sender_is_passed_through(carded):
         False,
         "cv_missing",
     )
+
+
+async def test_an_empty_profile_is_reloaded_before_the_send(carded):
+    """Пустой блок сведений о кандидате перечитывается перед отправкой.
+
+    Кнопку жмут из окна, а настройки читаются раз в цикл обхода: без
+    перечитывания первая же ручная отправка после запуска упёрлась бы в
+    «анкета пуста», хотя анкета заполнена.
+    """
+    pipeline, hr, vacancy = carded
+    pipeline._profile_block = ""
+    reloaded: list[int] = []
+
+    async def reload():
+        reloaded.append(1)
+        pipeline._profile_block = "Иван Петров"
+
+    pipeline._reload_resources = reload
+
+    await pipeline.send_application_for_vacancy(vacancy.id)
+
+    assert reloaded == [1]
+
+
+async def test_a_filled_profile_is_not_reloaded(carded):
+    """Заполненный блок сведений заново не читается.
+
+    Перезагрузка обходит четыре таблицы; делать её на каждое нажатие
+    незачем.
+    """
+    pipeline, hr, vacancy = carded
+    pipeline._profile_block = "Иван Петров"
+    reloaded: list[int] = []
+
+    async def reload():
+        reloaded.append(1)
+
+    pipeline._reload_resources = reload
+
+    await pipeline.send_application_for_vacancy(vacancy.id)
+
+    assert reloaded == []

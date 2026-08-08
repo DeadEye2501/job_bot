@@ -13,7 +13,7 @@ from tests.fakes.telegram import chat, message, user
 
 
 @pytest.fixture
-def dm_pipeline(monkeypatch):
+def dm_reader(monkeypatch):
     """Подменяет разбор входящего: он живёт в конвейере, а не в боте."""
     seen: list = []
 
@@ -34,18 +34,18 @@ def _incoming(*, user_id=777, username=None, msg_id=10):
     )
 
 
-async def test_an_incoming_message_goes_to_the_pipeline(chatting, dm_pipeline):
+async def test_an_incoming_message_goes_to_the_pipeline(chatting, dm_reader):
     """Входящее уходит в конвейер на разбор."""
     bot, client, hr = await chatting(telegram_user_id=777)
     msg = _incoming()
 
     await bot._on_dm(client, msg)
 
-    assert dm_pipeline == [msg]
+    assert dm_reader == [msg]
 
 
 async def test_a_switched_off_bot_does_not_read_incoming_messages(
-    chatting, dm_pipeline
+    chatting, dm_reader
 ):
     """Выключенный бот входящие не разбирает.
 
@@ -56,10 +56,10 @@ async def test_a_switched_off_bot_does_not_read_incoming_messages(
 
     await bot._on_dm(client, _incoming())
 
-    assert dm_pipeline == []
+    assert dm_reader == []
 
 
-async def test_the_window_hears_about_an_incoming_message(chatting, dm_pipeline):
+async def test_the_window_hears_about_an_incoming_message(chatting, dm_reader):
     """Окно узнаёт о входящем: открытая переписка обновится сразу."""
     bot, client, hr = await chatting(telegram_user_id=777)
     heard: list[int] = []
@@ -71,7 +71,7 @@ async def test_the_window_hears_about_an_incoming_message(chatting, dm_pipeline)
 
 
 async def test_a_message_from_a_stranger_does_not_reach_the_window(
-    chatting, dm_pipeline
+    chatting, dm_reader
 ):
     """О письме незнакомого собеседника окну не сообщают.
 
@@ -87,7 +87,7 @@ async def test_a_message_from_a_stranger_does_not_reach_the_window(
 
 
 async def test_a_message_without_a_sender_does_not_reach_the_window(
-    chatting, dm_pipeline
+    chatting, dm_reader
 ):
     """Сообщение без отправителя окну не показывают: чью переписку чинить."""
     bot, client, hr = await chatting(telegram_user_id=777)
@@ -97,11 +97,11 @@ async def test_a_message_without_a_sender_does_not_reach_the_window(
 
     await bot._on_dm(client, msg)
 
-    assert dm_pipeline == [msg]
+    assert dm_reader == [msg]
     assert heard == []
 
 
-async def test_an_hr_known_only_by_name_is_found_too(chatting, dm_pipeline):
+async def test_an_hr_known_only_by_name_is_found_too(chatting, dm_reader):
     """HR, известный только по имени, тоже опознаётся.
 
     Номер собеседника заводится позже — при первом разборе; до того у
@@ -117,7 +117,7 @@ async def test_an_hr_known_only_by_name_is_found_too(chatting, dm_pipeline):
 
 
 async def test_a_broken_window_hook_does_not_break_the_handler(
-    chatting, dm_pipeline
+    chatting, dm_reader
 ):
     """Сломанное оповещение окна разбор входящего не отменяет."""
     bot, client, hr = await chatting(telegram_user_id=777)
@@ -130,4 +130,4 @@ async def test_a_broken_window_hook_does_not_break_the_handler(
 
     await bot._on_dm(client, msg)
 
-    assert dm_pipeline == [msg]
+    assert dm_reader == [msg]

@@ -11,45 +11,25 @@
 
 import pytest
 
-from backend.flows import process_dm
 from backend.models import HR, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import blacklist_row, hr_row, message_row
-from tests.fakes.telegram import SENT_AT, FakeTelegramClient, message, photo, user
+from tests.fakes.telegram import (
+    SENT_AT,
+    FakeTelegramClient,
+    incoming,
+    message,
+    photo,
+    user,
+)
 
 
-def _incoming(*, user_id=777, username=None, avatar=None, attachment=None, **who):
-    """Входящее сообщение от собеседника.
-
-    `who` уходит собеседнику: сегодня оттуда приходит только признак
-    бота, и заводить под него отдельный довод не из чего.
-    """
-    return message(
-        id=10,
-        text="здравствуйте",
-        date=SENT_AT,
-        from_user=user(
-            id=user_id,
-            username=username,
-            photo=photo(small_file_id=avatar) if avatar else None,
-            **who,
-        ),
-        photo=attachment,
-        document=None,
-    )
-
-
-async def _deliver(session_factory, msg, client=None):
-    """Проводит сообщение через разбор входящего."""
-    await process_dm(msg, None, "qwen", session_factory, client=client)
-
-
-async def test_a_letter_from_a_known_hr_is_saved(session_factory):
+async def test_a_letter_from_a_known_hr_is_saved(session_factory, deliver):
     """Письмо от заведённого HR сохраняется в переписку."""
     await put(session_factory, hr_row(telegram_user_id=777))
     hr = await only_row(session_factory, HR)
 
-    await _deliver(session_factory, _incoming())
+    await deliver(incoming())
 
     saved = await only_row(session_factory, Message)
     assert saved.hr_id == hr.id
@@ -63,10 +43,12 @@ async def test_a_letter_from_a_known_hr_is_saved(session_factory):
     "msg",
     [
         pytest.param(message(text="ниоткуда", from_user=None), id="без отправителя"),
-        pytest.param(_incoming(is_bot=True), id="от бота"),
+        pytest.param(
+            incoming(from_user=user(id=777, is_bot=True)), id="от бота"
+        ),
     ],
 )
-async def test_a_letter_nobody_could_have_written_is_ignored(session_factory, msg):
+async def test_a_letter_nobody_could_have_written_is_ignored(session_factory, deliver, msg):
     """Письмо, которого не писал человек, не сохраняется.
 
     Отправителя не бывает у служебных записей, а боты пишут рассылками —
@@ -74,12 +56,12 @@ async def test_a_letter_nobody_could_have_written_is_ignored(session_factory, ms
     """
     await put(session_factory, hr_row(telegram_user_id=777))
 
-    await _deliver(session_factory, msg)
+    await deliver(msg)
 
     assert await all_rows(session_factory, Message) == []
 
 
-async def test_a_letter_from_a_stranger_is_not_saved(session_factory):
+async def test_a_letter_from_a_stranger_is_not_saved(session_factory, deliver):
     """Письмо от незаведённого собеседника не сохраняется.
 
     В личку пишут знакомые и рассылки; складывать их в «Контакты»
@@ -87,12 +69,12 @@ async def test_a_letter_from_a_stranger_is_not_saved(session_factory):
     """
     await put(session_factory, hr_row(telegram_user_id=777))
 
-    await _deliver(session_factory, _incoming(user_id=999))
+    await deliver(incoming(user_id=999))
 
     assert await all_rows(session_factory, Message) == []
 
 
-async def test_a_letter_from_a_blacklisted_hr_is_dropped(session_factory):
+async def test_a_letter_from_a_blacklisted_hr_is_dropped(session_factory, deliver):
     """Письмо от HR из чёрного списка не сохраняется вовсе.
 
     Переписка с ним глохнет в обе стороны: исходящее уже заперто, и
@@ -104,12 +86,12 @@ async def test_a_letter_from_a_blacklisted_hr_is_dropped(session_factory):
         blacklist_row("hr", "@maria"),
     )
 
-    await _deliver(session_factory, _incoming())
+    await deliver(incoming())
 
     assert await all_rows(session_factory, Message) == []
 
 
-async def test_the_first_letter_pins_the_correspondent_number(session_factory):
+async def test_the_first_letter_pins_the_correspondent_number(session_factory, deliver):
     """Первое письмо дописывает в карточку номер собеседника.
 
     Карточку заводят по имени из окна «Контакты», а номер узнаётся
@@ -118,38 +100,37 @@ async def test_the_first_letter_pins_the_correspondent_number(session_factory):
     """
     await put(session_factory, hr_row(telegram_username="maria", telegram_user_id=None))
 
-    await _deliver(session_factory, _incoming(username="maria"))
+    await deliver(incoming(username="maria"))
 
     assert (await only_row(session_factory, HR)).telegram_user_id == 777
 
 
-async def test_a_renamed_correspondent_is_renamed_in_the_card(session_factory):
+async def test_a_renamed_correspondent_is_renamed_in_the_card(session_factory, deliver):
     """Сменивший имя собеседник переименовывается и в карточке.
 
     Иначе в окне остаётся имя, по которому его больше не найти.
     """
     await put(session_factory, hr_row(telegram_user_id=777, telegram_username="maria"))
 
-    await _deliver(session_factory, _incoming(username="maria_hr"))
+    await deliver(incoming(username="maria_hr"))
 
     assert (await only_row(session_factory, HR)).telegram_username == "maria_hr"
 
 
-async def test_a_card_without_a_picture_gets_one(session_factory):
+async def test_a_card_without_a_picture_gets_one(session_factory, deliver):
     """Карточке без картинки подтягивается аватар собеседника."""
     await put(session_factory, hr_row(telegram_user_id=777, avatar=None))
     client = FakeTelegramClient(avatar=b"\x89PNG")
 
-    await _deliver(
-        session_factory,
-        _incoming(avatar="кар"),
+    await deliver(
+        incoming(from_user=user(id=777, photo=photo(small_file_id="кар"))),
         client=client,
     )
 
     assert (await only_row(session_factory, HR)).avatar == b"\x89PNG"
 
 
-async def test_a_card_that_already_has_a_picture_keeps_it(session_factory):
+async def test_a_card_that_already_has_a_picture_keeps_it(session_factory, deliver):
     """Карточка со своей картинкой чужую не берёт.
 
     Пользователь мог поставить её руками; перетирать её на каждом письме
@@ -158,9 +139,8 @@ async def test_a_card_that_already_has_a_picture_keeps_it(session_factory):
     await put(session_factory, hr_row(telegram_user_id=777, avatar=b"\x89OWN"))
     client = FakeTelegramClient(avatar=b"\x89PNG")
 
-    await _deliver(
-        session_factory,
-        _incoming(avatar="кар"),
+    await deliver(
+        incoming(from_user=user(id=777, photo=photo(small_file_id="кар"))),
         client=client,
     )
 
@@ -168,7 +148,7 @@ async def test_a_card_that_already_has_a_picture_keeps_it(session_factory):
     assert client.download_calls == []
 
 
-async def test_a_duplicate_letter_is_not_saved_twice(session_factory):
+async def test_a_duplicate_letter_is_not_saved_twice(session_factory, deliver):
     """То же письмо второй раз в переписку не попадает.
 
     Живой обработчик и догон пропущенного приходят к одному сообщению;
@@ -181,12 +161,12 @@ async def test_a_duplicate_letter_is_not_saved_twice(session_factory):
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="уже было"),
     )
 
-    await _deliver(session_factory, _incoming())
+    await deliver(incoming())
 
     assert (await only_row(session_factory, Message)).text == "уже было"
 
 
-async def test_a_stranger_costs_nothing_to_ignore(session_factory):
+async def test_a_stranger_costs_nothing_to_ignore(session_factory, deliver):
     """Вложение от незаведённого собеседника даже не скачивается.
 
     Отсев стоит раньше загрузки нарочно: рассылки приходят с картинками,
@@ -196,11 +176,7 @@ async def test_a_stranger_costs_nothing_to_ignore(session_factory):
     await put(session_factory, hr_row(telegram_user_id=777))
     client = FakeTelegramClient()
 
-    await _deliver(
-        session_factory,
-        _incoming(user_id=999, attachment=object()),
-        client=client,
-    )
+    await deliver(incoming(user_id=999, photo=object()), client=client)
 
     assert client.download_calls == []
     assert await all_rows(session_factory, Message) == []

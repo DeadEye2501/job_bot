@@ -16,7 +16,7 @@ from pyrogram.errors import FloodWait
 from backend.models import TelegramChannel, Vacancy
 from tests.dbio import only_row, put
 from tests.factories import channel_row, vacancy_row
-from tests.fakes.telegram import SENT_AT, FakeTelegramClient, message
+from tests.fakes.telegram import FakeTelegramClient, post
 
 
 class _WithMessages(FakeTelegramClient):
@@ -33,11 +33,6 @@ class _WithMessages(FakeTelegramClient):
         if self._error is not None:
             raise self._error
         return self._post
-
-
-def _post(text="свежий текст", *, empty=False):
-    """Исходный пост в том виде, в каком его отдаёт Telegram."""
-    return message(id=42, text=text, date=SENT_AT, empty=empty)
 
 
 @pytest.fixture
@@ -81,7 +76,7 @@ async def test_the_fresh_post_is_parsed_and_stored(rerunning, session_factory):
     означало бы повторить тот же разбор того же текста.
     """
     session_factory, vacancy, make_pipeline = rerunning
-    pipeline = await _prepare(make_pipeline, _WithMessages(post=_post()))
+    pipeline = await _prepare(make_pipeline, _WithMessages(post=post(42, text="свежий текст")))
 
     assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) is True
 
@@ -96,7 +91,7 @@ async def test_the_settings_are_reloaded_before_the_parse(rerunning):
     должен идти уже по новым правилам.
     """
     _, vacancy, make_pipeline = rerunning
-    pipeline = await _prepare(make_pipeline, _WithMessages(post=_post()))
+    pipeline = await _prepare(make_pipeline, _WithMessages(post=post(42, text="свежий текст")))
 
     await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
 
@@ -110,7 +105,7 @@ async def test_deletion_is_forbidden_on_a_rerun(rerunning):
     здесь оставляет карточку с пометкой «не подходит».
     """
     _, vacancy, make_pipeline = rerunning
-    pipeline = await _prepare(make_pipeline, _WithMessages(post=_post()))
+    pipeline = await _prepare(make_pipeline, _WithMessages(post=post(42, text="свежий текст")))
 
     await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
 
@@ -121,8 +116,8 @@ async def test_deletion_is_forbidden_on_a_rerun(rerunning):
     "answer",
     [
         pytest.param({"post": None}, id="поста больше нет"),
-        pytest.param({"post": _post(empty=True)}, id="пост пустой"),
-        pytest.param({"post": _post(text=None)}, id="в посте нет текста"),
+        pytest.param({"post": post(42, text="свежий текст", empty=True)}, id="пост пустой"),
+        pytest.param({"post": post(42, text=None)}, id="в посте нет текста"),
         pytest.param({"error": FloodWait(value=42)}, id="слишком часто"),
         pytest.param({"error": OSError("сеть")}, id="сеть отвалилась"),
     ],
@@ -145,7 +140,7 @@ async def test_an_unchanged_post_is_not_rewritten(rerunning, session_factory):
     """Совпавший текст поста заново не записывается: менять нечего."""
     session_factory, vacancy, make_pipeline = rerunning
     pipeline = await _prepare(
-        make_pipeline, _WithMessages(post=_post(text="сохранённый текст"))
+        make_pipeline, _WithMessages(post=post(42, text="сохранённый текст"))
     )
 
     await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
@@ -162,7 +157,7 @@ async def test_a_vacancy_without_a_source_is_parsed_from_the_cache(
     """
     await put(session_factory, vacancy_row(raw_text="сохранённый текст"))
     vacancy = await only_row(session_factory, Vacancy)
-    client = _WithMessages(post=_post())
+    client = _WithMessages(post=post(42, text="свежий текст"))
     pipeline = await _prepare(make_pipeline, client)
 
     assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) is True

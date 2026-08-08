@@ -18,12 +18,7 @@ import pytest
 from backend.models import TelegramChannel
 from tests.dbio import only_row, put
 from tests.factories import channel_row
-from tests.fakes.telegram import SENT_AT, FakeTelegramClient, message
-
-
-def _post(msg_id):
-    """Сообщение канала."""
-    return message(id=msg_id, text=f"объявление {msg_id}", date=SENT_AT)
+from tests.fakes.telegram import FakeTelegramClient, post
 
 
 @pytest.fixture
@@ -49,7 +44,7 @@ async def test_the_new_posts_are_taken_oldest_first(reading, session_factory):
     свежее первым, бот сдвинул бы её и потерял бы всё, что между.
     """
     pipeline, client, channel = reading
-    client.history = [_post(12), _post(11), _post(10)]
+    client.history = [post(12), post(11), post(10)]
 
     await pipeline._poll_channel(channel.id, "jobs", None)
 
@@ -63,7 +58,7 @@ async def test_reading_stops_at_the_mark(reading, session_factory):
     тратить обращение к модели на каждое старое объявление.
     """
     pipeline, client, channel = reading
-    client.history = [_post(12), _post(11), _post(10), _post(9)]
+    client.history = [post(12), post(11), post(10), post(9)]
 
     await pipeline._poll_channel(channel.id, "jobs", 10)
 
@@ -73,17 +68,17 @@ async def test_reading_stops_at_the_mark(reading, session_factory):
 async def test_a_channel_without_a_mark_is_read_whole(reading):
     """Канал без отметки читается целиком — так идёт первый обход."""
     pipeline, client, channel = reading
-    client.history = [_post(12), _post(11)]
+    client.history = [post(12), post(11)]
 
     await pipeline._poll_channel(channel.id, "jobs", None)
 
     assert pipeline.taken == [11, 12]
 
 
-async def test_the_mark_ends_up_on_the_last_post(reading, session_factory):
+async def test_the_mark_ends_up_on_the_lastpost(reading, session_factory):
     """После обхода отметка стоит на последнем разобранном сообщении."""
     pipeline, client, channel = reading
-    client.history = [_post(12), _post(11), _post(10)]
+    client.history = [post(12), post(11), post(10)]
 
     await pipeline._poll_channel(channel.id, "jobs", None)
 
@@ -99,7 +94,7 @@ async def test_the_mark_is_saved_in_batches(reading, session_factory):
     """
     pipeline, client, channel = reading
     await pipeline._rs.set_app("backfill_limit", "25")
-    client.history = [_post(msg_id) for msg_id in range(25, 0, -1)]
+    client.history = [post(msg_id) for msg_id in range(25, 0, -1)]
     saves: list[int] = []
     real_advance = pipeline._advance_cursor
 
@@ -122,7 +117,7 @@ async def test_nothing_new_leaves_the_mark_alone(reading, session_factory):
         row = await session.get(TelegramChannel, channel.id)
         row.last_processed_msg_id = 12
         await session.commit()
-    client.history = [_post(12)]
+    client.history = [post(12)]
     saves: list[int] = []
     pipeline._advance_cursor = lambda channel_id, msg_id: saves.append(msg_id)
 
@@ -139,7 +134,7 @@ async def test_a_broken_post_still_moves_the_mark(reading, session_factory):
     ошибку и не пропуская дальше ничего.
     """
     pipeline, client, channel = reading
-    client.history = [_post(11), _post(10)]
+    client.history = [post(11), post(10)]
 
     async def ingest(channel_id, username, msg):
         if msg.id == 10:
@@ -162,7 +157,7 @@ async def test_the_mark_survives_a_break_mid_channel(reading, session_factory):
     заплатил бы за это обращением к модели на каждое сообщение.
     """
     pipeline, client, channel = reading
-    client.history = [_post(12), _post(11), _post(10)]
+    client.history = [post(12), post(11), post(10)]
 
     async def ingest(channel_id, username, msg):
         pipeline.taken.append(msg.id)
@@ -185,7 +180,7 @@ async def test_the_window_is_told_where_inside_the_channel_it_is(reading):
     полоса в окне выглядит замершей.
     """
     pipeline, client, channel = reading
-    client.history = [_post(11), _post(10)]
+    client.history = [post(11), post(10)]
     heard: list[tuple] = []
     pipeline.on_progress = lambda *args: heard.append(args)
 

@@ -13,12 +13,7 @@
 from backend.models import TelegramChannel, Vacancy, VacancyEvent
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row, vacancy_row
-from tests.fakes.telegram import SENT_AT, message
-
-
-def _post(msg_id=42):
-    """Объявление из канала."""
-    return message(id=msg_id, text="Ищем Python-разработчика", date=SENT_AT)
+from tests.fakes.telegram import SENT_AT, post
 
 
 async def test_the_text_and_the_vector_are_saved_before_the_parse(
@@ -31,7 +26,7 @@ async def test_the_text_and_the_vector_are_saved_before_the_parse(
     """
     pipeline = await make_pipeline()
 
-    new_id = await pipeline._save_new_vacancy(None, "jobs", _post(), "текст", [0.1, 0.2])
+    new_id = await pipeline._save_new_vacancy(None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1, 0.2])
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.id == new_id
@@ -52,7 +47,7 @@ async def test_the_new_row_remembers_where_it_came_from(
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
 
-    await pipeline._save_new_vacancy(channel.id, "jobs", _post(), "текст", [0.1])
+    await pipeline._save_new_vacancy(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.source_channel_id == channel.id
@@ -70,7 +65,7 @@ async def test_the_new_vector_joins_the_cache(make_pipeline):
     pipeline = await make_pipeline()
     await pipeline._ensure_embedding_cache()
 
-    new_id = await pipeline._save_new_vacancy(None, "jobs", _post(), "текст", [0.1, 0.2])
+    new_id = await pipeline._save_new_vacancy(None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1, 0.2])
 
     assert pipeline._embedding_ids.tolist() == [new_id]
 
@@ -81,7 +76,7 @@ async def test_the_timeline_records_where_it_was_ingested_from(
     """В ленте вакансии остаётся запись о том, откуда её взяли."""
     pipeline = await make_pipeline()
 
-    await pipeline._save_new_vacancy(None, "jobs", _post(), "текст", [0.1])
+    await pipeline._save_new_vacancy(None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
     event = await only_row(session_factory, VacancyEvent)
     assert event.kind == "ingested"
@@ -97,10 +92,10 @@ async def test_the_same_post_twice_makes_one_row(make_pipeline, session_factory)
     await put(session_factory, channel_row(username="jobs"))
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
-    first = await pipeline._save_new_vacancy(channel.id, "jobs", _post(), "текст", [0.1])
+    first = await pipeline._save_new_vacancy(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
     second = await pipeline._save_new_vacancy(
-        channel.id, "jobs", _post(), "текст", [0.1]
+        channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1]
     )
 
     assert first is not None
@@ -118,9 +113,9 @@ async def test_a_refused_row_leaves_no_vector_behind(make_pipeline, session_fact
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
     await pipeline._ensure_embedding_cache()
-    first = await pipeline._save_new_vacancy(channel.id, "jobs", _post(), "текст", [0.1])
+    first = await pipeline._save_new_vacancy(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
-    await pipeline._save_new_vacancy(channel.id, "jobs", _post(), "текст", [0.1])
+    await pipeline._save_new_vacancy(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
     assert pipeline._embedding_ids.tolist() == [first]
 

@@ -163,3 +163,35 @@ async def test_one_broken_chat_does_not_stop_the_others(
     await _catch_up(session_factory)
 
     assert sorted(done) == sorted(h.id for h in hrs[1:])
+
+
+async def test_the_window_hooks_reach_every_chat(session_factory, monkeypatch):
+    """Оповещения окна доходят до догона каждой переписки.
+
+    Их передают вниз, а не держат наверху: переписка дорисовывается в
+    открытой вкладке по мере того, как её строки ложатся в базу.
+    """
+    await _hrs(session_factory, 2)
+    got: list[dict] = []
+
+    async def backfill(client, hr, *args, **kwargs):
+        got.append(kwargs)
+
+    monkeypatch.setattr("backend.flows.backfill_hr_dm_history", backfill)
+    heard: list[str] = []
+
+    await _catch_up(
+        session_factory,
+        on_message_persisted=lambda hr_id: heard.append("переписка"),
+        on_vacancies_changed=lambda: heard.append("вакансии"),
+        schedule_classification=lambda *args: heard.append("разбор"),
+    )
+
+    assert len(got) == 2
+    for kwargs in got:
+        kwargs["on_message_persisted"](1)
+        kwargs["on_vacancies_changed"]()
+        kwargs["schedule_classification"]()
+    assert heard.count("переписка") == 2
+    assert heard.count("вакансии") == 2
+    assert heard.count("разбор") == 2

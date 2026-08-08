@@ -11,25 +11,11 @@
 не доходит вовсе: он всё равно упёрся бы в ту же охрану, только за деньги.
 """
 
-from backend.flows import process_dm
 from backend.models import HR, Message, Vacancy, VacancyStatus
 from backend.payloads import Classification
 from tests.dbio import all_rows, only_row, put
 from tests.factories import at, hr_row, message_row, vacancy_row
-from tests.fakes.telegram import SENT_AT, message, user
-
-
-def _incoming(*, msg_id=10, reply_to=None):
-    """Входящее письмо от собеседника, возможно ответом на наше."""
-    return message(
-        id=msg_id,
-        text="да, давайте",
-        date=SENT_AT,
-        from_user=user(id=777, username=None),
-        photo=None,
-        document=None,
-        reply_to_message_id=reply_to,
-    )
+from tests.fakes.telegram import SENT_AT, incoming, message, user
 
 
 async def _two_vacancies(session_factory):
@@ -61,22 +47,14 @@ async def _two_vacancies(session_factory):
 
 
 def _ignore(*args):
-    """Накопитель, которому всё равно: разбор дальше не идёт."""
+    """Накопитель, которому всё равно.
 
-
-async def _deliver(session_factory, msg, schedule=_ignore):
-    """Проводит письмо через разбор входящего.
-
-    По умолчанию накопитель подставлен пустой: тесту про то, к какой
-    вакансии отнесли письмо, разбор уже не нужен, а без накопителя он
-    пошёл бы в языковую модель.
+    Подставляется там, где предмет проверки — привязка письма к вакансии:
+    без накопителя разбор пошёл бы в языковую модель, а он тут ни при чём.
     """
-    await process_dm(
-        msg, None, "qwen", session_factory, schedule_classification=schedule
-    )
 
 
-async def test_a_reply_lands_on_the_vacancy_it_answers(session_factory):
+async def test_a_reply_lands_on_the_vacancy_it_answers(session_factory, deliver):
     """Ответ на наше сообщение относится к вакансии того сообщения.
 
     Это единственный точный способ: у HR может быть пять вакансий, и по
@@ -93,13 +71,15 @@ async def test_a_reply_lands_on_the_vacancy_it_answers(session_factory):
         ),
     )
 
-    await _deliver(session_factory, _incoming(reply_to=100))
+    await deliver(
+        incoming(text="да, давайте", reply_to_message_id=100), schedule=_ignore
+    )
 
     saved = [m for m in await all_rows(session_factory, Message) if m.is_incoming]
     assert [m.vacancy_id for m in saved] == [by_title["старая"].id]
 
 
-async def test_a_letter_without_a_reply_lands_on_the_freshest(session_factory):
+async def test_a_letter_without_a_reply_lands_on_the_freshest(session_factory, deliver):
     """Письмо без ответа относится к самой свежей вакансии этого HR.
 
     Приближение, но для одного HR с одной вакансией верное всегда, а
@@ -107,14 +87,12 @@ async def test_a_letter_without_a_reply_lands_on_the_freshest(session_factory):
     """
     hr, by_title = await _two_vacancies(session_factory)
 
-    await _deliver(session_factory, _incoming())
+    await deliver(incoming(text="да, давайте"), schedule=_ignore)
 
     assert (await only_row(session_factory, Message)).vacancy_id == by_title["свежая"].id
 
 
-async def test_a_reply_to_something_unknown_falls_back_to_the_freshest(
-    session_factory
-):
+async def test_a_reply_to_something_unknown_falls_back_to_the_freshest(session_factory, deliver):
     """Ответ на неизвестное сообщение относят к самой свежей вакансии.
 
     Переписка могла начаться до появления приложения — тогда нашей
@@ -122,12 +100,14 @@ async def test_a_reply_to_something_unknown_falls_back_to_the_freshest(
     """
     hr, by_title = await _two_vacancies(session_factory)
 
-    await _deliver(session_factory, _incoming(reply_to=999))
+    await deliver(
+        incoming(text="да, давайте", reply_to_message_id=999), schedule=_ignore
+    )
 
     assert (await only_row(session_factory, Message)).vacancy_id == by_title["свежая"].id
 
 
-async def test_a_letter_from_an_hr_without_vacancies_is_still_saved(session_factory):
+async def test_a_letter_from_an_hr_without_vacancies_is_still_saved(session_factory, deliver):
     """Письмо от HR без вакансий всё равно попадает в переписку.
 
     Пользователь мог завести карточку руками и написать первым; терять
@@ -135,14 +115,14 @@ async def test_a_letter_from_an_hr_without_vacancies_is_still_saved(session_fact
     """
     await put(session_factory, hr_row(telegram_user_id=777))
 
-    await _deliver(session_factory, _incoming())
+    await deliver(incoming(text="да, давайте"))
 
     saved = await only_row(session_factory, Message)
     assert saved.vacancy_id is None
     assert saved.text == "да, давайте"
 
 
-async def test_a_letter_is_handed_to_the_buffer_when_there_is_one(session_factory):
+async def test_a_letter_is_handed_to_the_buffer_when_there_is_one(session_factory, deliver):
     """При наличии накопителя письмо уходит в него, а не разбирается сразу.
 
     Так собираются очереди: HR пишет тремя строками подряд, и разбор
@@ -151,9 +131,8 @@ async def test_a_letter_is_handed_to_the_buffer_when_there_is_one(session_factor
     hr, by_title = await _two_vacancies(session_factory)
     scheduled: list[tuple] = []
 
-    await _deliver(
-        session_factory,
-        _incoming(),
+    await deliver(
+        incoming(text="да, давайте"),
         schedule=lambda *args: scheduled.append(args),
     )
 
@@ -161,7 +140,7 @@ async def test_a_letter_is_handed_to_the_buffer_when_there_is_one(session_factor
     assert scheduled == [(hr.id, by_title["свежая"].id, saved.id, "да, давайте")]
 
 
-async def test_a_vacancy_beyond_automation_reaches_no_reader(session_factory):
+async def test_a_vacancy_beyond_automation_reaches_no_reader(session_factory, deliver):
     """Письмо по вакансии, которую автоматика не двигает, не разбирают.
 
     Сообщение при этом сохраняется: оно след разговора, и терять его
@@ -183,9 +162,8 @@ async def test_a_vacancy_beyond_automation_reaches_no_reader(session_factory):
     )
     scheduled: list[tuple] = []
 
-    await _deliver(
-        session_factory,
-        _incoming(),
+    await deliver(
+        incoming(text="да, давайте"),
         schedule=lambda *args: scheduled.append(args),
     )
 
@@ -193,9 +171,7 @@ async def test_a_vacancy_beyond_automation_reaches_no_reader(session_factory):
     assert (await only_row(session_factory, Message)).text == "да, давайте"
 
 
-async def test_without_a_buffer_the_letter_is_read_on_the_spot(
-    session_factory, monkeypatch
-):
+async def test_without_a_buffer_the_letter_is_read_on_the_spot(session_factory, monkeypatch, deliver):
     """Без накопителя письмо разбирается на месте.
 
     Этим путём идут догон пропущенного и запасной случай, когда
@@ -225,7 +201,7 @@ async def test_without_a_buffer_the_letter_is_read_on_the_spot(
 
     monkeypatch.setattr("backend.flows.classify_hr_reply", classify_hr_reply)
 
-    await _deliver(session_factory, _incoming(), schedule=None)
+    await deliver(incoming(text="да, давайте"), schedule=None)
 
     assert asked == ["да, давайте"]
     assert (
@@ -233,9 +209,7 @@ async def test_without_a_buffer_the_letter_is_read_on_the_spot(
     ).status is VacancyStatus.INVITATION
 
 
-async def test_a_reader_without_a_verdict_leaves_the_vacancy_alone(
-    session_factory, monkeypatch
-):
+async def test_a_reader_without_a_verdict_leaves_the_vacancy_alone(session_factory, monkeypatch, deliver):
     """Разбор без вердикта вакансию не двигает."""
     await put(
         session_factory,
@@ -257,14 +231,12 @@ async def test_a_reader_without_a_verdict_leaves_the_vacancy_alone(
 
     monkeypatch.setattr("backend.flows.classify_hr_reply", classify_hr_reply)
 
-    await _deliver(session_factory, _incoming(), schedule=None)
+    await deliver(incoming(text="да, давайте"), schedule=None)
 
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
 
 
-async def test_the_quote_of_our_own_letter_does_not_go_to_the_reader(
-    session_factory
-):
+async def test_the_quote_of_our_own_letter_does_not_go_to_the_reader(session_factory, deliver):
     """Цитата нашего же письма в разбор не уходит.
 
     В переписке ответ HR показывается вместе с цитатой того, на что он
@@ -284,7 +256,7 @@ async def test_the_quote_of_our_own_letter_does_not_go_to_the_reader(
         reply_to_message=message(text="Откликаюсь на вакансию", caption=None),
     )
 
-    await _deliver(session_factory, quoted, schedule=lambda *a: scheduled.append(a))
+    await deliver(quoted, schedule=lambda *a: scheduled.append(a))
 
     saved = await only_row(session_factory, Message)
     assert saved.text.startswith("↪ Откликаюсь на вакансию")
