@@ -61,7 +61,7 @@ from adapters.lm_studio import LlmProviderConfig
 from backend import repository
 from backend.cv_parser import parse_cv
 from backend.domain.scoring import build_skill_lookup
-from backend.domain.taxonomy import GRADES, WORK_FORMATS
+from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
 from backend.models import (
     Blacklist,
     BotMode,
@@ -4607,11 +4607,6 @@ def _none_if_empty(v) -> str | None:
     return s if s else None
 
 
-_LANG_LEVELS_ALLOWED = frozenset(
-    {"A1", "A2", "B1", "B2", "C1", "C2", "native"}
-)
-
-
 def _profile_to_dict(p, languages=None) -> dict | None:
     if p is None:
         return None
@@ -4663,7 +4658,7 @@ def _filter_languages(items) -> list[tuple[str, str]]:
         if not name:
             continue
         level = str(item.get("level") or "").strip()
-        if level not in _LANG_LEVELS_ALLOWED:
+        if level not in LANGUAGE_LEVELS:
             level = "B2"
         key = name.lower()
         if key in seen:
