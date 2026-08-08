@@ -57,21 +57,21 @@ MUTATIONS = [
     ),
     # _shares_provider: ключ перестаёт сравниваться
     (
-        "backend/bot/client.py",
+        "backend/bot/send.py",
         "        and a.base_url == b.base_url" + CRLF
         + "        and a.api_key == b.api_key" + CRLF,
         "        and a.base_url == b.base_url" + CRLF,
     ),
     # _shares_provider: сравнивается ещё и модель
     (
-        "backend/bot/client.py",
-        "        and a.api_key == b.api_key" + CRLF,
-        "        and a.api_key == b.api_key" + CRLF
-        + "        and a.model == b.model" + CRLF,
+        "backend/bot/send.py",
+        "    and a.api_key == b.api_key" + CRLF,
+        "    and a.api_key == b.api_key" + CRLF
+        + "    and a.model == b.model" + CRLF,
     ),
     # _shares_provider: отсутствие настройки перестаёт разводить клиентов
     (
-        "backend/bot/client.py",
+        "backend/bot/send.py",
         "        a is not None" + CRLF + "        and b is not None" + CRLF,
         "",
     ),
