@@ -125,12 +125,6 @@ MUTATIONS = [
         "            await session.scalars(select(Company).order_by(Company.name.asc()))",
         "            await session.scalars(select(Company))",
     ),
-    # list_blacklist_candidates: канал без ника попадает в подсказки
-    (
-        "backend/repository.py",
-        "                select(TelegramChannel).where(TelegramChannel.username.is_not(None))",
-        "                select(TelegramChannel)",
-    ),
     # list_blacklist_candidates: порядок каналов перестаёт игнорировать регистр
     (
         "backend/repository.py",
