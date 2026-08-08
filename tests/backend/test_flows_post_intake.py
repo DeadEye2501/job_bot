@@ -14,14 +14,7 @@
 
 import pytest
 
-from tests.fakes.telegram import SENT_AT, message
-
-
-def _post(*, text="Ищем Python-разработчика", **extra):
-    """Объявление из канала."""
-    fields = {"service": None, "poll": None}
-    fields.update(extra)
-    return message(id=10, text=text, date=SENT_AT, **fields)
+from tests.fakes.telegram import post
 
 
 @pytest.fixture
@@ -61,28 +54,33 @@ async def intake(make_pipeline, monkeypatch):
 
 async def test_a_fresh_post_is_saved_and_parsed(intake):
     """Незнакомое объявление сохраняется и уходит в разбор."""
-    await intake._ingest_post(1, "jobs", _post())
+    await intake._ingest_post(1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == [(1, 10, "Ищем Python-разработчика")]
     assert intake.parsed == [(7, "Ищем Python-разработчика")]
 
 
 @pytest.mark.parametrize(
-    "post",
+    "msg",
     [
-        pytest.param(_post(text=""), id="без текста"),
-        pytest.param(_post(text=None), id="текста нет вовсе"),
-        pytest.param(_post(service=object()), id="служебная запись"),
-        pytest.param(_post(poll=object()), id="опрос"),
+        pytest.param(post(10, text=""), id="без текста"),
+        pytest.param(post(10, text=None), id="текста нет вовсе"),
+        pytest.param(
+            post(10, text="Ищем Python-разработчика", service=object()),
+            id="служебная запись",
+        ),
+        pytest.param(
+            post(10, text="Ищем Python-разработчика", poll=object()), id="опрос"
+        ),
     ],
 )
-async def test_a_post_without_a_vacancy_goes_no_further(intake, post):
+async def test_a_post_without_a_vacancy_goes_no_further(intake, msg):
     """Объявление, в котором вакансии быть не может, дальше не идёт.
 
     Служебные записи о смене названия канала и опросы приходят тем же
     потоком; переводить их в вектор — платить за заведомо пустое.
     """
-    await intake._ingest_post(1, "jobs", post)
+    await intake._ingest_post(1, "jobs", msg)
 
     assert intake.saved == []
     assert intake.parsed == []
@@ -97,7 +95,7 @@ async def test_a_repost_is_skipped(intake):
     intake.similar_id = 3
     intake.unparsed = False
 
-    await intake._ingest_post(1, "jobs", _post())
+    await intake._ingest_post(1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == []
     assert intake.parsed == []
@@ -112,7 +110,7 @@ async def test_a_repost_of_a_half_parsed_vacancy_finishes_it(intake):
     intake.similar_id = 3
     intake.unparsed = True
 
-    await intake._ingest_post(1, "jobs", _post())
+    await intake._ingest_post(1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == []
     assert intake.parsed == [(3, "Ищем Python-разработчика")]
@@ -130,7 +128,7 @@ async def test_a_post_the_model_could_not_embed_is_skipped(intake, monkeypatch):
 
     monkeypatch.setattr("adapters.lm_studio.embed", broken)
 
-    await intake._ingest_post(1, "jobs", _post())
+    await intake._ingest_post(1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == []
     assert intake.parsed == []
@@ -143,6 +141,6 @@ async def test_a_vacancy_that_could_not_be_saved_is_not_parsed(intake):
     """
     intake.new_id = None
 
-    await intake._ingest_post(1, "jobs", _post())
+    await intake._ingest_post(1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.parsed == []

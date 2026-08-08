@@ -17,74 +17,10 @@
 
 import pytest
 
-from backend.models import (
-    HR,
-    Company,
-    Profile,
-    Vacancy,
-    VacancyEvent,
-    VacancyStatus,
-)
+from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
 from backend.payloads import FitValidation
-from tests.dbio import all_rows, only_row, put
-from tests.factories import parsed_vacancy, profile_row, profile_skill_row, vacancy_row
-from tests.fakes.telegram import FakeTelegramClient, photo, user
-
-
-@pytest.fixture
-async def parsing(make_pipeline, session_factory, monkeypatch):
-    """Конвейер с подставным разбором, готовый писать в базу."""
-    await put(session_factory, vacancy_row(title=None, is_parsed=False, raw_text="текст"))
-    vacancy = await only_row(session_factory, Vacancy)
-
-    client = FakeTelegramClient(
-        users={
-            "maria": user(
-                id=777,
-                username="maria",
-                first_name="Мария",
-                photo=photo(small_file_id="кар"),
-            )
-        },
-        avatar=b"\x89PNG",
-    )
-    pipeline = await make_pipeline(client)
-    pipeline.parsed = parsed_vacancy(
-        title="Python-разработчик",
-        description="Ищем в команду",
-        stack_required=["Python"],
-        grade="middle",
-        salary="200000",
-        remote="remote",
-        location="Ереван",
-    )
-    pipeline.verdict = FitValidation(verdict="fit", reason=None)
-
-    async def parse_vacancy(text, client_, model, **kwargs):
-        return pipeline.parsed
-
-    async def validate_vacancy_fit(parsed, text, client_, model, **kwargs):
-        return pipeline.verdict
-
-    await put(session_factory, profile_row())
-    profile = await only_row(session_factory, Profile)
-    await put(session_factory, profile_skill_row(profile.id, "Python"))
-    await pipeline._reload_resources()
-    await pipeline._rs.set_app("scoring_threshold", "1")
-
-    # Отправка подменена по умолчанию: предмет файла — что легло в базу, а
-    # настоящая ушла бы сочинять письмо в языковую модель.
-    pipeline.sent_for = []
-
-    async def try_auto_send(hr, parsed, vacancy_id):
-        pipeline.sent_for.append(vacancy_id)
-        return True, "sent"
-
-    pipeline._try_auto_send = try_auto_send
-
-    monkeypatch.setattr("backend.flows.parse_vacancy", parse_vacancy)
-    monkeypatch.setattr("backend.flows.validate_vacancy_fit", validate_vacancy_fit)
-    return pipeline, vacancy
+from tests.dbio import all_rows, only_row
+from tests.factories import parsed_vacancy
 
 
 async def test_the_parsed_fields_land_in_the_row(parsing, session_factory):
@@ -253,7 +189,7 @@ async def test_a_fitting_vacancy_gets_an_application_sent(parsing, session_facto
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
-    assert pipeline.sent_for == [vacancy.id]
+    assert pipeline.asked_to_send == [vacancy.id]
 
 
 async def test_auto_apply_switched_off_sends_nothing(parsing):
@@ -268,7 +204,7 @@ async def test_auto_apply_switched_off_sends_nothing(parsing):
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
-    assert pipeline.sent_for == []
+    assert pipeline.asked_to_send == []
 
 
 async def test_an_unfit_vacancy_gets_no_application(parsing):
@@ -284,7 +220,7 @@ async def test_an_unfit_vacancy_gets_no_application(parsing):
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
-    assert pipeline.sent_for == []
+    assert pipeline.asked_to_send == []
 
 
 async def test_a_vacancy_without_an_hr_gets_no_application(parsing):
@@ -296,7 +232,7 @@ async def test_a_vacancy_without_an_hr_gets_no_application(parsing):
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
-    assert pipeline.sent_for == []
+    assert pipeline.asked_to_send == []
 
 
 @pytest.mark.parametrize(

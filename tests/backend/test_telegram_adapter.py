@@ -5,9 +5,11 @@
 переживает переезд папки с данными. Без строки, то есть до первого входа,
 сессия ведётся файлом, и его надо где-то держать.
 
-Отправка прикрывается признаком, который по умолчанию снят. Пока он взведён,
-письмо не уходит, а причина остаётся в журнале — это единственная защита от
-рассылки живым HR во время разработки.
+Отправка прикрывается признаком, который в боевом коде по умолчанию снят, а
+на стенде взведён. Пока он взведён, письмо не уходит, а причина остаётся в
+журнале — это единственная защита от рассылки живым HR во время разработки.
+Снимают его тут только те проверки, которым нужна ушедшая отправка, и только
+на подставном клиенте.
 
 Номер ушедшего сообщения возвращается наружу: по нему потом опознаётся отметка
 о прочтении, и без него у исходящей строки нечему совпасть.
@@ -53,12 +55,6 @@ class _Sender:
 
     async def get_me(self):
         return "я"
-
-
-@pytest.fixture(autouse=True)
-def unlocked(monkeypatch):
-    """Снимает признак заглушки: клиент здесь подставной, до сети не дойдёт."""
-    monkeypatch.setattr(adapters.telegram, "SEND_LOCKED", False)
 
 
 def test_a_saved_session_keeps_the_client_in_memory():
@@ -121,7 +117,7 @@ def test_the_client_waits_out_short_rate_limits_itself(account):
     assert make_client(account).sleep_threshold == 60
 
 
-async def test_the_check_asks_who_we_are():
+async def test_the_check_asks_who_we_are(sending_unlocked):
     """Проверка соединения спрашивает у Telegram, кто мы.
 
     Ответ показывают в настройках: без имени учётной записи «подключение
@@ -130,7 +126,7 @@ async def test_the_check_asks_who_we_are():
     assert await check(_Sender()) == "я"
 
 
-async def test_a_message_goes_out_and_its_number_comes_back():
+async def test_a_message_goes_out_and_its_number_comes_back(sending_unlocked):
     """Сообщение уходит, и его номер возвращается наружу.
 
     По номеру потом опознаётся отметка о прочтении: без него у исходящей
@@ -142,7 +138,7 @@ async def test_a_message_goes_out_and_its_number_comes_back():
     assert client.calls == [("send_message", "maria", "письмо", None)]
 
 
-async def test_an_attachment_turns_the_message_into_a_document():
+async def test_an_attachment_turns_the_message_into_a_document(sending_unlocked):
     """С вложением сообщение уходит документом, а текст становится подписью.
 
     Отдельным сообщением текст пришёл бы раньше или позже файла, и HR

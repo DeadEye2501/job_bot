@@ -26,6 +26,49 @@ def message(*, text=None, caption=None, **extra) -> SimpleNamespace:
     return SimpleNamespace(text=text, caption=caption, **extra)
 
 
+def incoming(*, user_id=777, username=None, text="здравствуйте", **extra):
+    """Входящее личное сообщение от собеседника.
+
+    Поля, которые боевой код читает напрямую, заданы всегда: отсутствие
+    любого из них он встречает `AttributeError`, а не веткой.
+    """
+    fields = {
+        "id": 10,
+        "text": text,
+        "date": SENT_AT,
+        "photo": None,
+        "document": None,
+        "reply_to_message_id": None,
+    }
+    fields.update(extra)
+    sender = fields.pop("from_user", None)
+    return message(
+        from_user=sender if sender is not None else user(id=user_id, username=username),
+        **fields,
+    )
+
+
+# Отличает «текста не задали» от «текста нет»: второе — настоящий случай,
+# объявление из одной картинки, и `None` должен доходить до кода как есть.
+_UNSET = object()
+
+
+def post(msg_id: int, *, text=_UNSET, **extra):
+    """Объявление из канала. Текст по умолчанию несёт свой номер.
+
+    Номер в тексте нужен проверкам порядка: по нему видно, какое именно
+    объявление разобрано, когда их несколько.
+    """
+    fields = {"service": None, "poll": None}
+    fields.update(extra)
+    return message(
+        id=msg_id,
+        text=f"объявление {msg_id}" if text is _UNSET else text,
+        date=SENT_AT,
+        **fields,
+    )
+
+
 def photo(*, small_file_id=None, big_file_id=None) -> SimpleNamespace:
     """Фотография профиля с идентификаторами файлов."""
     return SimpleNamespace(small_file_id=small_file_id, big_file_id=big_file_id)
@@ -41,29 +84,21 @@ def chat(*, title=None, photo=None, **extra) -> SimpleNamespace:
     return SimpleNamespace(title=title, photo=photo, **extra)
 
 
-def user(
-    *,
-    is_bot=False,
-    is_deleted=False,
-    photo=None,
-    first_name=None,
-    last_name=None,
-    **extra,
-) -> SimpleNamespace:
+def user(*, username=None, photo=None, **extra) -> SimpleNamespace:
     """Собеседник Telegram.
 
-    Имя и фамилия заданы всегда, пусть и пустые: у настоящего собеседника
-    эти поля есть, и заведение HR читает их напрямую. Без них подделка
-    роняет боевой код там, где он работает.
+    Имя, фамилия, ник и признак бота заданы всегда, пусть и пустые: у
+    настоящего собеседника эти поля есть, и боевой код читает их напрямую.
+    Без них подделка роняет `AttributeError` там, где код работает.
     """
-    return SimpleNamespace(
-        is_bot=is_bot,
-        is_deleted=is_deleted,
-        photo=photo,
-        first_name=first_name,
-        last_name=last_name,
-        **extra,
-    )
+    fields = {
+        "is_bot": False,
+        "is_deleted": False,
+        "first_name": None,
+        "last_name": None,
+    }
+    fields.update(extra)
+    return SimpleNamespace(username=username, photo=photo, **fields)
 
 
 class FakeTelegramClient:

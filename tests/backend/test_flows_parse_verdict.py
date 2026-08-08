@@ -14,53 +14,9 @@
 вакансию, а не выбросить её.
 """
 
-import pytest
-
-from backend.models import Profile, TrashEvent, Vacancy, VacancyStatus
+from backend.models import TrashEvent, Vacancy, VacancyStatus
 from backend.payloads import FitValidation
-from tests.dbio import all_rows, only_row, put
-from tests.factories import (
-    parsed_vacancy,
-    profile_row,
-    profile_skill_row,
-    vacancy_row,
-)
-
-
-@pytest.fixture
-async def parsing(make_pipeline, session_factory, monkeypatch):
-    """Конвейер, вакансия и подставные разбор с проверкой пригодности."""
-    await put(session_factory, vacancy_row(title=None, is_parsed=False, raw_text="текст"))
-    vacancy = await only_row(session_factory, Vacancy)
-
-    pipeline = await make_pipeline()
-    pipeline.parsed = parsed_vacancy(
-        title="Python-разработчик",
-        description="Ищем в команду",
-        stack_required=["Python"],
-    )
-    pipeline.verdict = FitValidation(verdict="fit", reason=None)
-
-    async def parse_vacancy(text, client, model, **kwargs):
-        return pipeline.parsed
-
-    async def validate_vacancy_fit(parsed, text, client, model, **kwargs):
-        pipeline.validated = True
-        return pipeline.verdict
-
-    pipeline.validated = False
-    # Навык под стек объявления и низкий порог: предмет здесь — приговор,
-    # а не сама оценка. С пустым кэшем навыков любая вакансия падала бы на
-    # пороге, и до проверяльщика не доходило бы ничего.
-    await put(session_factory, profile_row())
-    profile = await only_row(session_factory, Profile)
-    await put(session_factory, profile_skill_row(profile.id, "Python"))
-    await pipeline._reload_resources()
-    await pipeline._rs.set_app("scoring_threshold", "1")
-
-    monkeypatch.setattr("backend.flows.parse_vacancy", parse_vacancy)
-    monkeypatch.setattr("backend.flows.validate_vacancy_fit", validate_vacancy_fit)
-    return pipeline, vacancy
+from tests.dbio import all_rows, only_row
 
 
 async def test_a_fitting_vacancy_stays_new(parsing, session_factory):

@@ -19,21 +19,12 @@ from backend.flows import backfill_hr_dm_history
 from backend.models import HR, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import hr_row, message_row
-from tests.fakes.telegram import SENT_AT, FakeTelegramClient, message, user
+from tests.fakes.telegram import SENT_AT, FakeTelegramClient, incoming, message, user
 
 
 def _theirs(msg_id, text):
     """Сообщение от собеседника."""
-    return message(
-        id=msg_id,
-        text=text,
-        date=SENT_AT,
-        outgoing=False,
-        from_user=user(id=777, username=None),
-        photo=None,
-        document=None,
-        reply_to_message_id=None,
-    )
+    return incoming(id=msg_id, text=text, outgoing=False)
 
 
 def _ours(msg_id, text):
@@ -311,6 +302,61 @@ async def test_nothing_new_means_the_window_is_not_told(
 
     await _catch_up(
         client, known_hr, session_factory, on_message_persisted=heard.append
+    )
+
+    assert heard == []
+
+
+async def test_without_a_buffer_the_vacancy_list_is_refreshed(
+    known_hr, session_factory, monkeypatch
+):
+    """Без накопителя догон сам сообщает окну о смене статусов.
+
+    С накопителем статус меняется через минуту после разбора, и сигнал
+    шлёт он же. Без накопителя разбор идёт на месте, и сообщить некому —
+    список вакансий остался бы с прежними статусами до перезапуска.
+    """
+
+    async def process_dm(msg, *args, **kwargs):
+        pass
+
+    monkeypatch.setattr("backend.flows.process_dm", process_dm)
+    client = FakeTelegramClient()
+    client.history = [_theirs(10, "привет")]
+    heard: list[int] = []
+
+    await backfill_hr_dm_history(
+        client,
+        known_hr,
+        None,
+        "qwen",
+        session_factory,
+        backfill_limit=50,
+        on_vacancies_changed=lambda: heard.append(1),
+    )
+
+    assert heard == [1]
+
+
+async def test_with_a_buffer_the_vacancy_list_is_left_to_the_reader(
+    known_hr, session_factory, monkeypatch
+):
+    """С накопителем догон окно о вакансиях не дёргает.
+
+    Пятьдесят сообщений на тридцать переписок дали бы полторы тысячи
+    оповещений за миллисекунду, а статус к этому мигу ещё не менялся.
+    """
+
+    async def process_dm(msg, *args, **kwargs):
+        pass
+
+    monkeypatch.setattr("backend.flows.process_dm", process_dm)
+    client = FakeTelegramClient()
+    client.history = [_theirs(10, "привет")]
+    heard: list[int] = []
+
+    await _catch_up(
+        client, known_hr, session_factory, on_vacancies_changed=lambda: heard.append(1)
     )
 
     assert heard == []
