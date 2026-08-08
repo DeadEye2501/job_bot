@@ -26,7 +26,7 @@ def caught_up(monkeypatch):
     async def catch_up_missed_dms(client, *args, **kwargs):
         calls.append(kwargs)
 
-    monkeypatch.setattr("backend.bot.client.catch_up_missed_dms", catch_up_missed_dms)
+    monkeypatch.setattr("backend.bot.loop.catch_up_missed_dms", catch_up_missed_dms)
     return calls
 
 
@@ -127,7 +127,7 @@ async def test_a_failed_catch_up_does_not_stop_the_turn(chatting, monkeypatch):
     async def catch_up_missed_dms(client, *args, **kwargs):
         raise OSError("сеть")
 
-    monkeypatch.setattr("backend.bot.client.catch_up_missed_dms", catch_up_missed_dms)
+    monkeypatch.setattr("backend.bot.loop.catch_up_missed_dms", catch_up_missed_dms)
 
     _, client, pipeline = await _one_turn(chatting, BotMode.FULL)
 

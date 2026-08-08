@@ -10,6 +10,7 @@ Telegram переселяет учётную запись между узлам�
 и работает.
 """
 
+from backend.bot import loop
 from tests.fakes.telegram import FakeTelegramClient
 
 
@@ -19,7 +20,7 @@ async def test_a_changed_session_string_is_saved(make_bot):
     client.session_string = "новая сессия"
     bot = await make_bot(client)
 
-    await bot._persist_session_if_changed()
+    await loop._persist_session_if_changed(bot)
 
     assert bot._rs.tg.session_string == "новая сессия"
 
@@ -47,7 +48,7 @@ async def test_an_unchanged_session_string_is_left_alone(make_bot):
 
     bot._rs.set_tg = remember
 
-    await bot._persist_session_if_changed()
+    await loop._persist_session_if_changed(bot)
 
     assert written == []
 
@@ -62,7 +63,7 @@ async def test_a_failed_export_saves_nothing(make_bot):
     )
     before = bot._rs.tg.session_string
 
-    await bot._persist_session_if_changed()
+    await loop._persist_session_if_changed(bot)
 
     assert bot._rs.tg.session_string == before
 
@@ -83,6 +84,6 @@ async def test_a_failed_save_does_not_stop_the_start(make_bot):
     bot._rs.set_tg = broken
     before = bot._rs.tg.session_string
 
-    await bot._persist_session_if_changed()
+    await loop._persist_session_if_changed(bot)
 
     assert bot._rs.tg.session_string == before

@@ -11,26 +11,26 @@ MUTATIONS = [
     (
         "backend/bot/client.py",
         '        logger.debug("Poll wake requested")' + CRLF
-        + "        loop = self._loop" + CRLF
-        + "        if loop is not None and not loop.is_closed():" + CRLF
-        + "            loop.call_soon_threadsafe(self._wake_event.set)" + CRLF,
+        + "        runner_loop = self._loop" + CRLF
+        + "        if runner_loop is not None and not runner_loop.is_closed():" + CRLF
+        + "            runner_loop.call_soon_threadsafe(self._wake_event.set)" + CRLF,
         '        logger.debug("Poll wake requested")' + CRLF
-        + "        loop = self._loop" + CRLF
-        + "        if loop is not None and not loop.is_closed():" + CRLF
+        + "        runner_loop = self._loop" + CRLF
+        + "        if runner_loop is not None and not runner_loop.is_closed():" + CRLF
         + "            pass" + CRLF,
     ),
     # kick: без живого цикла побудка теряется
     (
         "backend/bot/client.py",
-        "        if loop is not None and not loop.is_closed():" + CRLF
-        + "            loop.call_soon_threadsafe(self._wake_event.set)" + CRLF
+        "        if runner_loop is not None and not runner_loop.is_closed():" + CRLF
+        + "            runner_loop.call_soon_threadsafe(self._wake_event.set)" + CRLF
         + "        else:" + CRLF
         + "            self._wake_event.set()" + CRLF
         + CRLF
         + CRLF
         + "    def request_stop(",
-        "        if loop is not None and not loop.is_closed():" + CRLF
-        + "            loop.call_soon_threadsafe(self._wake_event.set)" + CRLF
+        "        if runner_loop is not None and not runner_loop.is_closed():" + CRLF
+        + "            runner_loop.call_soon_threadsafe(self._wake_event.set)" + CRLF
         + CRLF
         + CRLF
         + "    def request_stop(",
@@ -113,86 +113,83 @@ MUTATIONS = [
     ),
     # _persist_session_if_changed: совпавшая строка всё равно переписывается
     (
-        "backend/bot/client.py",
-        '        if new_str == (tg.session_string or ""):' + CRLF
-        + "            return" + CRLF,
+        "backend/bot/loop.py",
+        '    if new_str == (tg.session_string or ""):' + CRLF
+        + "        return" + CRLF,
         "",
     ),
     # _current_mode: сбой чтения режима даёт полный вместо выключенного
     (
-        "backend/bot/client.py",
-        "            return BotMode.OFF" + CRLF
-        + CRLF
-        + "    async def run(self, *, once: bool = False) -> None:",
-        "            return BotMode.FULL" + CRLF
-        + CRLF
-        + "    async def run(self, *, once: bool = False) -> None:",
+        "backend/bot/loop.py",
+        '        logger.exception("get_mode failed; falling back to Off")' + CRLF
+        + "        return BotMode.OFF",
+        '        logger.exception("get_mode failed; falling back to Off")' + CRLF
+        + "        return BotMode.FULL",
     ),
     # run: готовность объявляется до подключения клиента
     (
-        "backend/bot/client.py",
-        "        await self._client.start()" + CRLF,
-        "        self._loop = asyncio.get_running_loop()" + CRLF
-        + "        await self._client.start()" + CRLF,
+        "backend/bot/loop.py",
+        "    await bot._client.start()" + CRLF,
+        "    bot._loop = asyncio.get_running_loop()" + CRLF
+        + "    await bot._client.start()" + CRLF,
     ),
     # run: недоразобранные вакансии не подбираются
     (
-        "backend/bot/client.py",
-        "                await self._ingestion.recover_orphan_vacancies()",
-        "                pass",
+        "backend/bot/loop.py",
+        "            await bot._ingestion.recover_orphan_vacancies()",
+        "            pass",
     ),
     # run: слив ждущего разбора при выключении пропадает
     (
-        "backend/bot/client.py",
-        "                    await self._ingestion.cancel_pending_dm_classifications("
-        "drain=True)",
-        "                    pass",
+        "backend/bot/loop.py",
+        "                await bot._ingestion.cancel_pending_dm_classifications("     "drain=True)",
+        "                pass",
     ),
     # run: догон пропущенных писем не делается
     (
-        "backend/bot/client.py",
-        "                if mode is not BotMode.OFF and prev_mode is BotMode.OFF:",
-        "                if False:",
+        "backend/bot/loop.py",
+        "            if mode is not BotMode.OFF and prev_mode is BotMode.OFF:",
+        "            if False:",
     ),
     # run: проверка молчания HR идёт и в выключенном режиме
     (
-        "backend/bot/client.py",
-        "                if mode is not BotMode.OFF:" + CRLF
-        + "                    try:" + CRLF
-        + "                        await self._ingestion.check_ghosting_timeouts()" + CRLF,
-        "                if True:" + CRLF
-        + "                    try:" + CRLF
-        + "                        await self._ingestion.check_ghosting_timeouts()" + CRLF,
+        "backend/bot/loop.py",
+        "            if mode is not BotMode.OFF:" + CRLF
+        + "                try:" + CRLF
+        + "                    await bot._ingestion.check_ghosting_timeouts()" + CRLF,
+        "            if True:" + CRLF
+        + "                try:" + CRLF
+        + "                    await bot._ingestion.check_ghosting_timeouts()" + CRLF,
     ),
     # run: по каналам ходят и в режиме «только личные»
     (
-        "backend/bot/client.py",
-        "                if mode is BotMode.FULL and self._current_poll_task is None:",
-        "                if self._current_poll_task is None:",
+        "backend/bot/loop.py",
+        "            if mode is BotMode.FULL and bot._current_poll_task is None:",
+        "            if bot._current_poll_task is None:",
     ),
     # run: идущий ручной прогон перебивается оборотом
     (
-        "backend/bot/client.py",
-        "                if mode is BotMode.FULL and self._current_poll_task is None:",
-        "                if mode is BotMode.FULL:",
+        "backend/bot/loop.py",
+        "            if mode is BotMode.FULL and bot._current_poll_task is None:",
+        "            if mode is BotMode.FULL:",
     ),
     # run: признак остановки ставится после отключения клиента
     (
-        "backend/bot/client.py",
-        "            self._ingestion.mark_shutting_down()",
-        "            pass",
+        "backend/bot/loop.py",
+        "        bot._ingestion.mark_shutting_down()",
+        "        pass",
     ),
     # run: общее соединение с моделью закрывается дважды
     (
-        "backend/bot/client.py",
-        "            if self._lm_embed_client is not self._lm_client:" + CRLF
-        + "                await self._lm_embed_client.aclose()" + CRLF,
-        "            await self._lm_embed_client.aclose()" + CRLF,
+        "backend/bot/loop.py",
+        "        if bot._lm_embed_client is not bot._lm_client:" + CRLF
+        + "            await bot._lm_embed_client.aclose()" + CRLF,
+        "        await bot._lm_embed_client.aclose()" + CRLF,
     ),
     # run: соединение с моделью не закрывается вовсе
     (
-        "backend/bot/client.py",
-        "            await self._lm_client.aclose()",
-        "            pass",
+        "backend/bot/loop.py",
+        "        await bot._lm_client.aclose()",
+        "        pass",
     ),
 ]

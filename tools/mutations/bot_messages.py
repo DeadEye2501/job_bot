@@ -151,28 +151,28 @@ MUTATIONS = [
     ),
     # _on_raw_update: чужой род оповещения перестаёт отсеиваться
     (
-        "backend/bot/client.py",
-        "        if not isinstance(update, _UpdateReadHistoryOutbox):" + CRLF
-        + "            return" + CRLF,
+        "backend/bot/updates.py",
+        "    if not isinstance(update, _UpdateReadHistoryOutbox):" + CRLF
+        + "        return" + CRLF,
         "",
     ),
     # _on_raw_update: групповые чаты перестают отсеиваться
     (
-        "backend/bot/client.py",
-        "        if not isinstance(peer, _PeerUser):" + CRLF + "            return" + CRLF,
+        "backend/bot/updates.py",
+        "    if not isinstance(peer, _PeerUser):" + CRLF + "        return" + CRLF,
         "",
     ),
     # _on_raw_update: отметка заходит дальше названного сообщения
     (
-        "backend/bot/client.py",
-        "                    Message.tg_message_id <= max_id,",
-        "                    Message.tg_message_id >= max_id,",
+        "backend/bot/updates.py",
+        "                Message.tg_message_id <= max_id,",
+        "                Message.tg_message_id >= max_id,",
     ),
     # _on_raw_update: окно дёргают и когда ничего не изменилось
     (
-        "backend/bot/client.py",
-        "        if updated and self.on_hr_read is not None:",
-        "        if self.on_hr_read is not None:",
+        "backend/bot/updates.py",
+        "    if updated and bot.on_hr_read is not None:",
+        "    if bot.on_hr_read is not None:",
     ),
     # send_to_hr_chat: пустое сообщение перестаёт отбиваться
     (
@@ -189,115 +189,113 @@ MUTATIONS = [
     ),
     # _on_dm_edit: пометка «изменено» не ставится
     (
-        "backend/bot/client.py",
-        "                .values(text=extract_dm_text(msg), is_edited=True)",
-        "                .values(text=extract_dm_text(msg))",
+        "backend/bot/updates.py",
+        "            .values(text=extract_dm_text(msg), is_edited=True)",
+        "            .values(text=extract_dm_text(msg))",
     ),
     # _on_dm_edit: направление сообщения перестаёт учитываться
     (
-        "backend/bot/client.py",
-        "                    Message.tg_message_id == msg.id," + CRLF
-        + "                    Message.is_incoming.is_(is_incoming)," + CRLF,
-        "                    Message.tg_message_id == msg.id," + CRLF,
+        "backend/bot/updates.py",
+        "                Message.tg_message_id == msg.id," + CRLF
+        + "                Message.is_incoming.is_(is_incoming)," + CRLF,
+        "                Message.tg_message_id == msg.id," + CRLF,
     ),
     # _on_dm_edit: признак «своё» перестаёт влиять на направление
     (
-        "backend/bot/client.py",
-        '        is_incoming = bool(getattr(msg, "from_user", None)' + CRLF
-        + '                           and not getattr(msg, "outgoing", False))' + CRLF,
-        '        is_incoming = bool(getattr(msg, "from_user", None))' + CRLF,
+        "backend/bot/updates.py",
+        '    is_incoming = bool(getattr(msg, "from_user", None)' + CRLF
+        + '                       and not getattr(msg, "outgoing", False))' + CRLF,
+        '    is_incoming = bool(getattr(msg, "from_user", None))' + CRLF,
     ),
     # _on_dm_edit: отправитель перестаёт влиять на направление
     (
-        "backend/bot/client.py",
-        '        is_incoming = bool(getattr(msg, "from_user", None)' + CRLF
-        + '                           and not getattr(msg, "outgoing", False))' + CRLF,
-        '        is_incoming = not getattr(msg, "outgoing", False)' + CRLF,
+        "backend/bot/updates.py",
+        '    is_incoming = bool(getattr(msg, "from_user", None)' + CRLF
+        + '                       and not getattr(msg, "outgoing", False))' + CRLF,
+        '    is_incoming = not getattr(msg, "outgoing", False)' + CRLF,
     ),
     # _on_dm_edit: имя переписки перестаёт участвовать в опознании HR
     (
-        "backend/bot/client.py",
-        '        chat_username = getattr(msg.chat, "username", None)' + CRLF,
-        "        chat_username = None" + CRLF,
+        "backend/bot/updates.py",
+        '    chat_username = getattr(msg.chat, "username", None)' + CRLF,
+        "    chat_username = None" + CRLF,
     ),
     # _on_dm_edit: своя правка тоже правит текст, ждущий разбора
     (
-        "backend/bot/client.py",
-        "        if updated and is_incoming:",
-        "        if updated:",
+        "backend/bot/updates.py",
+        "    if updated and is_incoming:",
+        "    if updated:",
     ),
     # _on_dm_delete: строка выбрасывается вместо пометки
     (
-        "backend/bot/client.py",
-        "                .values(is_deleted=True)",
-        "                .values(is_deleted=False)",
+        "backend/bot/updates.py",
+        "            .values(is_deleted=True)",
+        "            .values(is_deleted=False)",
     ),
     # _on_dm_delete: непрочитанное надгробие продолжает числиться
     (
-        "backend/bot/client.py",
-        "                .where(*where_clauses, Message.is_incoming,"
-        " Message.read_at.is_(None))" + CRLF
-        + "                .values(read_at=now)" + CRLF,
-        "                .where(*where_clauses, Message.is_incoming,"
-        " Message.read_at.is_(None))" + CRLF
-        + "                .values()" + CRLF,
+        "backend/bot/updates.py",
+        "            .where(*where_clauses, Message.is_incoming,"     " Message.read_at.is_(None))" + CRLF
+        + "            .values(read_at=now)" + CRLF,
+        "            .where(*where_clauses, Message.is_incoming,"     " Message.read_at.is_(None))" + CRLF
+        + "            .values()" + CRLF,
     ),
     # _on_dm_delete: безымянная уборка задевает и исходящие
     (
-        "backend/bot/client.py",
-        "                        Message.tg_message_id.in_(chatless_ids)," + CRLF
-        + "                        Message.is_incoming," + CRLF
-        + "                    ]," + CRLF,
-        "                        Message.tg_message_id.in_(chatless_ids)," + CRLF
-        + "                    ]," + CRLF,
+        "backend/bot/updates.py",
+        "                    Message.tg_message_id.in_(chatless_ids)," + CRLF
+        + "                    Message.is_incoming," + CRLF
+        + "                ]," + CRLF,
+        "                    Message.tg_message_id.in_(chatless_ids)," + CRLF
+        + "                ]," + CRLF,
     ),
     # _on_dm_delete: имя переписки перестаёт участвовать в опознании HR
     (
-        "backend/bot/client.py",
-        '                        chat_username = getattr(chat, "username", None)' + CRLF,
-        "                        chat_username = None" + CRLF,
+        "backend/bot/updates.py",
+        '                    chat_username = getattr(chat, "username", None)' + CRLF,
+        "                    chat_username = None" + CRLF,
     ),
     # _on_dm_outgoing: эхо своей отправки пишется второй строкой
     (
-        "backend/bot/client.py",
-        "            if existing is not None:" + CRLF
-        + "                # Echo собственного Bot.send-а",
-        "            if False:" + CRLF + "                # Echo собственного Bot.send-а",
+        "backend/bot/updates.py",
+        "        if existing is not None:" + CRLF
+        + "            # Echo собственного Bot.send-а",
+        "        if False:" + CRLF + "            # Echo собственного Bot.send-а",
     ),
     # _on_dm_outgoing: выключенный бот всё равно подхватывает написанное
     (
-        "backend/bot/client.py",
-        "        if (await self._current_mode()) is BotMode.OFF:" + CRLF
-        + "            return" + CRLF
-        + "        if not msg.chat:" + CRLF
-        + "            return" + CRLF
+        "backend/bot/updates.py",
+        "    if (await bot._current_mode()) is BotMode.OFF:" + CRLF
+        + "        return" + CRLF
+        + "    if not msg.chat:" + CRLF
+        + "        return" + CRLF
         + CRLF
-        + "        recipient_id = msg.chat.id",
-        "        if not msg.chat:" + CRLF
-        + "            return" + CRLF
+        + "    recipient_id = msg.chat.id",
+        "    if not msg.chat:" + CRLF
+        + "        return" + CRLF
         + CRLF
-        + "        recipient_id = msg.chat.id",
+        + "    recipient_id = msg.chat.id",
     ),
     # _on_dm_outgoing: имя получателя перестаёт участвовать в опознании HR
     (
-        "backend/bot/client.py",
-        '        recipient_username = getattr(msg.chat, "username", None)',
-        "        recipient_username = None",
+        "backend/bot/updates.py",
+        '    recipient_username = getattr(msg.chat, "username", None)',
+        "    recipient_username = None",
     ),
     # _on_dm: выключенный бот всё равно разбирает входящее
     (
-        "backend/bot/client.py",
-        "        # Off mode silences everything, including reading HR replies." + CRLF
-        + "        if (await self._current_mode()) is BotMode.OFF:" + CRLF
-        + "            return" + CRLF,
+        "backend/bot/updates.py",
+        "    # Off mode silences everything, including reading HR replies." + CRLF
+        + "    if (await bot._current_mode()) is BotMode.OFF:" + CRLF
+        + "        return" + CRLF,
         "",
     ),
     # _on_dm: имя отправителя перестаёт участвовать в опознании HR
     (
-        "backend/bot/client.py",
-        "                    msg.from_user.id," + CRLF
-        + "                    msg.from_user.username," + CRLF,
-        "                    msg.from_user.id," + CRLF
-        + "                    None," + CRLF,
+        "backend/bot/updates.py",
+        "                msg.from_user.id," + CRLF
+        + "                msg.from_user.username," + CRLF,
+        "                msg.from_user.id," + CRLF
+        + "                None," + CRLF,
     ),
 ]
