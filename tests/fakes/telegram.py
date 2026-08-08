@@ -19,6 +19,11 @@ def photo(*, small_file_id=None, big_file_id=None) -> SimpleNamespace:
     return SimpleNamespace(small_file_id=small_file_id, big_file_id=big_file_id)
 
 
+def chat(*, title=None, photo=None, **extra) -> SimpleNamespace:
+    """Канал или чат в том виде, в каком его отдаёт `get_chat`."""
+    return SimpleNamespace(title=title, photo=photo, **extra)
+
+
 def user(*, is_bot=False, is_deleted=False, photo=None, **extra) -> SimpleNamespace:
     """Собеседник Telegram."""
     return SimpleNamespace(is_bot=is_bot, is_deleted=is_deleted, photo=photo, **extra)
@@ -27,32 +32,39 @@ def user(*, is_bot=False, is_deleted=False, photo=None, **extra) -> SimpleNamesp
 class FakeTelegramClient:
     """Отдаёт заранее положенное и записывает, о чём его спрашивали."""
 
-    def __init__(
-        self,
-        *,
-        users=None,
-        avatar=None,
-        get_users_error=None,
-        download_error=None,
-    ) -> None:
+    def __init__(self, *, users=None, avatar=None, chats=None, fails=None) -> None:
+        """`fails` — что бросить вместо ответа, по имени метода."""
         self._users = users or {}
         self._avatar = avatar
-        self._get_users_error = get_users_error
-        self._download_error = download_error
+        self._chats = chats or {}
+        self._fails = fails or {}
         self.get_users_calls: list[str] = []
+        self.get_chat_calls: list[str] = []
         self.download_calls: list[str] = []
+        self.handlers: list = []
+
+    def add_handler(self, handler) -> None:
+        self.handlers.append(handler)
+
+    def _fail_if_asked(self, method: str) -> None:
+        error = self._fails.get(method)
+        if error is not None:
+            raise error
+
+    async def get_chat(self, chat_id):
+        self.get_chat_calls.append(chat_id)
+        self._fail_if_asked("get_chat")
+        return self._chats.get(chat_id)
 
     async def get_users(self, username):
         self.get_users_calls.append(username)
-        if self._get_users_error is not None:
-            raise self._get_users_error
+        self._fail_if_asked("get_users")
         return self._users.get(username)
 
     async def download_media(self, file_id, in_memory=False):
         assert in_memory, "проект качает аватар только в память"
         self.download_calls.append(file_id)
-        if self._download_error is not None:
-            raise self._download_error
+        self._fail_if_asked("download_media")
         if self._avatar is None:
             return None
         return io.BytesIO(self._avatar)
