@@ -1,0 +1,362 @@
+"""Следствия догона переписки с одним HR.
+
+Пока приложение закрыто, разговор продолжается: HR пишет, пользователь
+отвечает с телефона. Догон вытягивает у Telegram хвост переписки и в обе
+стороны — иначе в окне видна половина разговора, а вторая только на телефоне.
+
+Заодно сверяется удалённое. Telegram не переигрывает пропущенные оповещения об
+удалении после переподключения, поэтому строка, попадающая в вытянутое окно, но
+отсутствующая в ответе Telegram, метится удалённой здесь.
+
+Порядок обратный: Telegram отдаёт свежее первым, а в переписку надо класть
+старое первым, иначе лента окна перевернётся.
+"""
+
+import pytest
+from pyrogram.errors import FloodWait, PeerIdInvalid
+
+from backend.flows import backfill_hr_dm_history
+from backend.models import HR, Message
+from tests.dbio import all_rows, only_row, put
+from tests.factories import hr_row, message_row
+from tests.fakes.telegram import SENT_AT, FakeTelegramClient, incoming, message, user
+
+
+def _theirs(msg_id, text):
+    """Сообщение от собеседника."""
+    return incoming(id=msg_id, text=text, outgoing=False)
+
+
+def _ours(msg_id, text):
+    """Своё сообщение, отправленное из другого клиента."""
+    return message(
+        id=msg_id,
+        text=text,
+        date=SENT_AT,
+        outgoing=True,
+        from_user=user(id=1, username=None),
+        photo=None,
+        document=None,
+    )
+
+
+async def _catch_up(client, hr, session_factory, **kwargs):
+    """Догоняет переписку с одним HR."""
+    await backfill_hr_dm_history(
+        client,
+        hr,
+        None,
+        "qwen",
+        session_factory,
+        backfill_limit=50,
+        schedule_classification=lambda *args: None,
+        **kwargs,
+    )
+
+
+@pytest.fixture
+async def known_hr(session_factory):
+    """Сохранённый HR с номером собеседника."""
+    await put(session_factory, hr_row(telegram_user_id=777))
+    return await only_row(session_factory, HR)
+
+
+async def test_the_missed_conversation_lands_in_the_chat(
+    known_hr, session_factory
+):
+    """Пропущенная переписка попадает в окно в обе стороны.
+
+    Без исходящих видна половина разговора, и пользователь отвечает
+    второй раз на то, что уже ответил с телефона.
+    """
+    client = FakeTelegramClient()
+    client.history = [_theirs(12, "и ещё"), _ours(11, "мой ответ"), _theirs(10, "привет")]
+
+    await _catch_up(client, known_hr, session_factory)
+
+    saved = await all_rows(session_factory, Message)
+    assert [(m.tg_message_id, m.is_incoming) for m in saved] == [
+        (10, True),
+        (11, False),
+        (12, True),
+    ]
+
+
+async def test_the_oldest_message_is_saved_first(known_hr, session_factory):
+    """Старое сохраняется раньше свежего, хотя Telegram отдаёт наоборот.
+
+    Порядок строк — это порядок ленты в окне; сохранив как пришло,
+    переписку показали бы вверх ногами.
+    """
+    client = FakeTelegramClient()
+    client.history = [_theirs(12, "последнее"), _theirs(10, "первое")]
+
+    await _catch_up(client, known_hr, session_factory)
+
+    saved = await all_rows(session_factory, Message)
+    assert [m.text for m in saved] == ["первое", "последнее"]
+
+
+async def test_an_hr_without_an_address_is_skipped(session_factory):
+    """У HR без адреса догонять нечего, и Telegram не спрашивают."""
+    await put(session_factory, hr_row(telegram_username=None, telegram_user_id=None))
+    hr = await only_row(session_factory, HR)
+    client = FakeTelegramClient()
+
+    await _catch_up(client, hr, session_factory)
+
+    assert client.history_calls == []
+
+
+async def test_an_already_saved_message_is_not_doubled(known_hr, session_factory):
+    """Уже сохранённое сообщение вторым не пишется."""
+    await put(
+        session_factory,
+        message_row(
+            hr_id=known_hr.id, is_incoming=False, tg_message_id=11, text="уже было"
+        ),
+    )
+    client = FakeTelegramClient()
+    client.history = [_ours(11, "мой ответ")]
+
+    await _catch_up(client, known_hr, session_factory)
+
+    assert [m.text for m in await all_rows(session_factory, Message)] == ["уже было"]
+
+
+async def test_a_message_deleted_while_offline_is_tombstoned(
+    known_hr, session_factory
+):
+    """Удалённое, пока приложение было закрыто, метится удалённым.
+
+    Telegram оповещения об удалении после переподключения не
+    переигрывает: строка, попавшая в вытянутое окно, но отсутствующая в
+    ответе, — и есть удалённая.
+    """
+    await put(
+        session_factory,
+        message_row(
+            hr_id=known_hr.id, is_incoming=True, tg_message_id=11, text="стёрли"
+        ),
+    )
+    client = FakeTelegramClient()
+    client.history = [_theirs(12, "осталось"), _theirs(10, "тоже осталось")]
+
+    await _catch_up(client, known_hr, session_factory)
+
+    by_id = {m.tg_message_id: m for m in await all_rows(session_factory, Message)}
+    assert by_id[11].is_deleted is True
+    assert by_id[11].read_at is not None
+    assert by_id[10].is_deleted is False
+
+
+async def test_a_message_older_than_the_window_is_left_alone(
+    known_hr, session_factory
+):
+    """Строка старше вытянутого окна удалённой не метится.
+
+    Её в ответе нет просто потому, что окно до неё не достало, а не
+    потому, что её стёрли.
+    """
+    await put(
+        session_factory,
+        message_row(
+            hr_id=known_hr.id, is_incoming=True, tg_message_id=5, text="давнее"
+        ),
+    )
+    client = FakeTelegramClient()
+    client.history = [_theirs(10, "свежее")]
+
+    await _catch_up(client, known_hr, session_factory)
+
+    by_id = {m.tg_message_id: m for m in await all_rows(session_factory, Message)}
+    assert by_id[5].is_deleted is False
+
+
+async def test_an_empty_history_tombstones_nothing(known_hr, session_factory):
+    """Пустой ответ Telegram ничего не метит удалённым.
+
+    Пустым он бывает и когда переписка недоступна; принять это за
+    удаление значило бы разом похоронить весь разговор.
+    """
+    await put(
+        session_factory,
+        message_row(
+            hr_id=known_hr.id, is_incoming=True, tg_message_id=10, text="цело"
+        ),
+    )
+    client = FakeTelegramClient()
+
+    await _catch_up(client, known_hr, session_factory)
+
+    assert (await only_row(session_factory, Message)).is_deleted is False
+
+
+async def test_an_unknown_peer_is_resolved_by_name(session_factory):
+    """Неизвестного Telegram собеседника ищут по имени и пробуют снова.
+
+    Telegram помнит собеседников по своему списку, и заведённого через
+    окно HR там может не быть вовсе, пока его не разыщут по имени.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777, telegram_username="maria"))
+    hr = await only_row(session_factory, HR)
+    client = FakeTelegramClient(fails={"get_chat_history": [PeerIdInvalid(), None]})
+    client.history = [_theirs(10, "нашлось")]
+
+    await _catch_up(client, hr, session_factory)
+
+    assert client.get_users_calls == ["maria"]
+    assert (await only_row(session_factory, Message)).text == "нашлось"
+
+
+async def test_an_unknown_peer_without_a_name_is_given_up(session_factory):
+    """Неизвестного собеседника без имени ищут не по чему, и его пропускают."""
+    await put(session_factory, hr_row(telegram_user_id=777, telegram_username=None))
+    hr = await only_row(session_factory, HR)
+    client = FakeTelegramClient(fails={"get_chat_history": PeerIdInvalid()})
+    client.history = [_theirs(10, "не дойдёт")]
+
+    await _catch_up(client, hr, session_factory)
+
+    assert client.get_users_calls == []
+    assert await all_rows(session_factory, Message) == []
+
+
+async def test_a_rate_limit_is_waited_out_once(known_hr, session_factory, monkeypatch):
+    """Отказ «слишком часто» пережидают и повторяют один раз.
+
+    Догон идёт пачками по два десятка переписок, и упереться в предел на
+    середине — обычное дело; бросать из-за этого весь хвост переписки
+    было бы расточительно.
+    """
+    import asyncio
+
+    slept: list[float] = []
+
+    async def note(seconds):
+        slept.append(seconds)
+
+    monkeypatch.setattr(asyncio, "sleep", note)
+    client = FakeTelegramClient(
+        fails={"get_chat_history": [FloodWait(value=42), None]}
+    )
+    client.history = [_theirs(10, "дошло со второго раза")]
+
+    await _catch_up(client, known_hr, session_factory)
+
+    assert slept == [43]
+    assert (
+        await only_row(session_factory, Message)
+    ).text == "дошло со второго раза"
+
+
+async def test_a_second_rate_limit_gives_up_on_this_hr(
+    known_hr, session_factory, monkeypatch
+):
+    """Второй отказ подряд — переписку пропускают до следующего раза.
+
+    Значит штраф серьёзный; долбиться в него дальше — верный способ
+    получить ещё больший.
+    """
+    import asyncio
+
+    async def note(seconds):
+        pass
+
+    monkeypatch.setattr(asyncio, "sleep", note)
+    client = FakeTelegramClient(
+        fails={"get_chat_history": [FloodWait(value=42), FloodWait(value=99)]}
+    )
+    client.history = [_theirs(10, "не дойдёт")]
+
+    await _catch_up(client, known_hr, session_factory)
+
+    assert await all_rows(session_factory, Message) == []
+
+
+async def test_the_window_hears_about_the_caught_up_chat(
+    known_hr, session_factory
+):
+    """Окно узнаёт о догнанной переписке — по одному разу на собеседника.
+
+    Оповещать на каждое из полусотни сообщений значило бы перерисовать
+    переписку полсотни раз подряд.
+    """
+    client = FakeTelegramClient()
+    client.history = [_theirs(11, "и ещё"), _theirs(10, "привет")]
+    heard: list[int] = []
+
+    await _catch_up(
+        client, known_hr, session_factory, on_message_persisted=heard.append
+    )
+
+    assert heard == [known_hr.id]
+
+
+async def test_nothing_new_means_the_window_is_not_told(
+    known_hr, session_factory
+):
+    """Когда нового нет, окно не дёргают."""
+    client = FakeTelegramClient()
+    heard: list[int] = []
+
+    await _catch_up(
+        client, known_hr, session_factory, on_message_persisted=heard.append
+    )
+
+    assert heard == []
+
+
+async def test_without_a_buffer_the_vacancy_list_is_refreshed(
+    known_hr, session_factory, monkeypatch
+):
+    """Без накопителя догон сам сообщает окну о смене статусов.
+
+    С накопителем статус меняется через минуту после разбора, и сигнал
+    шлёт он же. Без накопителя разбор идёт на месте, и сообщить некому —
+    список вакансий остался бы с прежними статусами до перезапуска.
+    """
+
+    async def process_dm(msg, *args, **kwargs):
+        pass
+
+    monkeypatch.setattr("backend.flows.process_dm", process_dm)
+    client = FakeTelegramClient()
+    client.history = [_theirs(10, "привет")]
+    heard: list[int] = []
+
+    await backfill_hr_dm_history(
+        client,
+        known_hr,
+        None,
+        "qwen",
+        session_factory,
+        backfill_limit=50,
+        on_vacancies_changed=lambda: heard.append(1),
+    )
+
+    assert heard == [1]
+
+
+async def test_with_a_buffer_the_vacancy_list_is_left_to_the_reader(
+    known_hr, session_factory, monkeypatch
+):
+    """С накопителем догон окно о вакансиях не дёргает.
+
+    Пятьдесят сообщений на тридцать переписок дали бы полторы тысячи
+    оповещений за миллисекунду, а статус к этому мигу ещё не менялся.
+    """
+
+    async def process_dm(msg, *args, **kwargs):
+        pass
+
+    monkeypatch.setattr("backend.flows.process_dm", process_dm)
+    client = FakeTelegramClient()
+    client.history = [_theirs(10, "привет")]
+    heard: list[int] = []
+
+    await _catch_up(
+        client, known_hr, session_factory, on_vacancies_changed=lambda: heard.append(1)
+    )
+
+    assert heard == []

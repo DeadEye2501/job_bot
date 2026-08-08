@@ -26,6 +26,49 @@ def message(*, text=None, caption=None, **extra) -> SimpleNamespace:
     return SimpleNamespace(text=text, caption=caption, **extra)
 
 
+def incoming(*, user_id=777, username=None, text="здравствуйте", **extra):
+    """Входящее личное сообщение от собеседника.
+
+    Поля, которые боевой код читает напрямую, заданы всегда: отсутствие
+    любого из них он встречает `AttributeError`, а не веткой.
+    """
+    fields = {
+        "id": 10,
+        "text": text,
+        "date": SENT_AT,
+        "photo": None,
+        "document": None,
+        "reply_to_message_id": None,
+    }
+    fields.update(extra)
+    sender = fields.pop("from_user", None)
+    return message(
+        from_user=sender if sender is not None else user(id=user_id, username=username),
+        **fields,
+    )
+
+
+# Отличает «текста не задали» от «текста нет»: второе — настоящий случай,
+# объявление из одной картинки, и `None` должен доходить до кода как есть.
+_UNSET = object()
+
+
+def post(msg_id: int, *, text=_UNSET, **extra):
+    """Объявление из канала. Текст по умолчанию несёт свой номер.
+
+    Номер в тексте нужен проверкам порядка: по нему видно, какое именно
+    объявление разобрано, когда их несколько.
+    """
+    fields = {"service": None, "poll": None}
+    fields.update(extra)
+    return message(
+        id=msg_id,
+        text=f"объявление {msg_id}" if text is _UNSET else text,
+        date=SENT_AT,
+        **fields,
+    )
+
+
 def photo(*, small_file_id=None, big_file_id=None) -> SimpleNamespace:
     """Фотография профиля с идентификаторами файлов."""
     return SimpleNamespace(small_file_id=small_file_id, big_file_id=big_file_id)
@@ -41,9 +84,21 @@ def chat(*, title=None, photo=None, **extra) -> SimpleNamespace:
     return SimpleNamespace(title=title, photo=photo, **extra)
 
 
-def user(*, is_bot=False, is_deleted=False, photo=None, **extra) -> SimpleNamespace:
-    """Собеседник Telegram."""
-    return SimpleNamespace(is_bot=is_bot, is_deleted=is_deleted, photo=photo, **extra)
+def user(*, username=None, photo=None, **extra) -> SimpleNamespace:
+    """Собеседник Telegram.
+
+    Имя, фамилия, ник и признак бота заданы всегда, пусть и пустые: у
+    настоящего собеседника эти поля есть, и боевой код читает их напрямую.
+    Без них подделка роняет `AttributeError` там, где код работает.
+    """
+    fields = {
+        "is_bot": False,
+        "is_deleted": False,
+        "first_name": None,
+        "last_name": None,
+    }
+    fields.update(extra)
+    return SimpleNamespace(username=username, photo=photo, **fields)
 
 
 class FakeTelegramClient:
@@ -52,7 +107,12 @@ class FakeTelegramClient:
     def __init__(
         self, *, users=None, avatar=None, chats=None, media=b"file", fails=None
     ) -> None:
-        """`fails` — что бросить вместо ответа, по имени метода."""
+        """`fails` — что бросить вместо ответа, по имени метода.
+
+        Значением там может стоять список: тогда обращения обслуживаются по
+        очереди, и `None` в списке означает «на этот раз без ошибки». Так
+        проверяется повтор после отказа.
+        """
         self._users = users or {}
         self._avatar = avatar
         self._chats = chats or {}
@@ -60,6 +120,7 @@ class FakeTelegramClient:
         self._fails = fails or {}
         self.get_users_calls: list[str] = []
         self.get_chat_calls: list[str] = []
+        self.history_calls: list[tuple] = []
         self.download_calls: list = []
         self.download_paths: list[str] = []
         self.read_calls: list = []
@@ -68,6 +129,9 @@ class FakeTelegramClient:
         self.lifecycle: list[str] = []
         self.last_message_id = 500
         self.session_string = "шифр"
+        # Переписка, которую отдаёт `get_chat_history`. Ставится после
+        # сборки: пятый именованный довод конструктора упирается в предел.
+        self.history: list = []
         self.logged_out = False
         # Вклиниться в середину вызова: так проверяется гонка со встречным
         # обработчиком, который успевает записать строку, пока идёт обращение.
@@ -89,6 +153,8 @@ class FakeTelegramClient:
 
     def _fail_if_asked(self, method: str) -> None:
         error = self._fails.get(method)
+        if isinstance(error, list):
+            error = error.pop(0) if error else None
         if error is not None:
             raise error
 
@@ -96,6 +162,12 @@ class FakeTelegramClient:
         self.get_chat_calls.append(chat_id)
         self._fail_if_asked("get_chat")
         return self._chats.get(chat_id)
+
+    async def get_chat_history(self, target, limit=100):
+        self.history_calls.append((target, limit))
+        self._fail_if_asked("get_chat_history")
+        for msg in self.history[:limit]:
+            yield msg
 
     async def get_users(self, username):
         self.get_users_calls.append(username)
