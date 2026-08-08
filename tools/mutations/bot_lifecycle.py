@@ -27,11 +27,13 @@ MUTATIONS = [
         + "        else:" + CRLF
         + "            self._wake_event.set()" + CRLF
         + CRLF
-        + "    async def poll_channel_now(",
+        + CRLF
+        + "    def request_stop(",
         "        if loop is not None and not loop.is_closed():" + CRLF
         + "            loop.call_soon_threadsafe(self._wake_event.set)" + CRLF
         + CRLF
-        + "    async def poll_channel_now(",
+        + CRLF
+        + "    def request_stop(",
     ),
     # request_stop: остановка перестаёт будить цикл
     (
@@ -42,43 +44,42 @@ MUTATIONS = [
     ),
     # cancel_current_poll: отмена не доходит до задачи
     (
-        "backend/bot/client.py",
-        "            loop.call_soon_threadsafe(task.cancel)" + CRLF
-        + "        else:" + CRLF
-        + "            task.cancel()" + CRLF,
-        "            pass" + CRLF + "        else:" + CRLF + "            pass" + CRLF,
+        "backend/bot/channels.py",
+        "        loop.call_soon_threadsafe(task.cancel)" + CRLF
+        + "    else:" + CRLF
+        + "        task.cancel()" + CRLF,
+        "        pass" + CRLF + "    else:" + CRLF + "        pass" + CRLF,
     ),
     # poll_channel_now: занятое место перестаёт отбивать второй прогон
     (
-        "backend/bot/client.py",
-        '                "poll_channel_now: another cycle is running, skipping'
-        ' (channel_id=%d)",' + CRLF
-        + "                channel_id," + CRLF
-        + "            )" + CRLF
-        + '            return "busy"' + CRLF,
-        '                "poll_channel_now: another cycle is running, skipping'
-        ' (channel_id=%d)",' + CRLF
-        + "                channel_id," + CRLF
-        + "            )" + CRLF,
+        "backend/bot/channels.py",
+        '            "poll_channel_now: another cycle is running, skipping'     ' (channel_id=%d)",' + CRLF
+        + "            channel_id," + CRLF
+        + "        )" + CRLF
+        + '        return "busy"' + CRLF,
+        '            "poll_channel_now: another cycle is running, skipping'     ' (channel_id=%d)",' + CRLF
+        + "            channel_id," + CRLF
+        + "        )" + CRLF,
     ),
     # poll_channel_now: отказ конвейера перестаёт быть «не найден»
     (
-        "backend/bot/client.py",
-        "                if not ok:" + CRLF
-        + '                    status = "missing"' + CRLF,
+        "backend/bot/channels.py",
+        "            if not ok:" + CRLF
+        + '                status = "missing"' + CRLF,
         "",
     ),
     # poll_channel_now: место не освобождается после прогона
     (
-        "backend/bot/client.py",
-        "            self._current_poll_task = None" + CRLF
-        + "            if self.on_cycle_end is not None:" + CRLF
-        + "                try: self.on_cycle_end()" + CRLF
-        + '                except Exception: logger.exception("on_cycle_end hook failed")'
+        "backend/bot/channels.py",
+        "        bot._current_poll_task = None" + CRLF
+        + "        if bot.on_cycle_end is not None:" + CRLF
+        + "            try: bot.on_cycle_end()" + CRLF
+        + '            except Exception: logger.exception("on_cycle_end hook failed")'
         + CRLF
-        + "        return status" + CRLF
+        + "    return status" + CRLF
         + CRLF
-        + "    async def reset_channel_cursor",
+        + CRLF
+        + "async def reset_channel_cursor",
         "            if self.on_cycle_end is not None:" + CRLF
         + "                try: self.on_cycle_end()" + CRLF
         + '                except Exception: logger.exception("on_cycle_end hook failed")'
@@ -89,28 +90,26 @@ MUTATIONS = [
     ),
     # add_channel: повтор до обращения к Telegram перестаёт находиться
     (
-        "backend/bot/client.py",
-        "        async with self._session_factory() as session:" + CRLF
-        + "            existing = await find_channel_by_username("
-        "session, username)" + CRLF
-        + "            if existing is not None:" + CRLF
-        + '                return existing.id, "exists"' + CRLF,
+        "backend/bot/channels.py",
+        "    async with bot._session_factory() as session:" + CRLF
+        + "        existing = await find_channel_by_username("     "session, username)" + CRLF
+        + "        if existing is not None:" + CRLF
+        + '            return existing.id, "exists"' + CRLF,
         "",
     ),
     # add_channel: повтор после обращения перестаёт находиться
     (
-        "backend/bot/client.py",
-        "                existing = await find_channel_by_username("
-        "session, username)" + CRLF
-        + "                if existing is not None:" + CRLF
-        + '                    return existing.id, "exists"' + CRLF,
+        "backend/bot/channels.py",
+        "            existing = await find_channel_by_username("     "session, username)" + CRLF
+        + "            if existing is not None:" + CRLF
+        + '                return existing.id, "exists"' + CRLF,
         "",
     ),
     # add_channel: имя перестаёт опускаться в строчные
     (
-        "backend/bot/client.py",
-        "                    username=username.lower(),",
-        "                    username=username,",
+        "backend/bot/channels.py",
+        "                username=username.lower(),",
+        "                username=username,",
     ),
     # _persist_session_if_changed: совпавшая строка всё равно переписывается
     (
