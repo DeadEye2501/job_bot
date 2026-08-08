@@ -128,8 +128,8 @@ MUTATIONS = [
     (
         "backend/llm.py",
         "    if not text:" + CRLF + "        return None" + CRLF
-        + "    # Импорт внутри функции",
-        "    # Импорт внутри функции",
+        + "    # Список для LLM:",
+        "    # Список для LLM:",
     ),
     # classify_hr_reply: «пропала без вести» предлагается модели
     (

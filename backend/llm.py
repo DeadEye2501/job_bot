@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, replace
 
 import httpx
 
+from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.domain.transitions import ALLOWED_AUTO_TRANSITIONS
 from backend.models import VacancyStatus
 from backend.payloads import Classification, FitValidation, FitVerdict, ParsedVacancy
@@ -266,9 +267,6 @@ def _extract_last_json(answer: str) -> str | None:
     matches = _JSON_OBJECT_RE.findall(cleaned)
     return matches[-1] if matches else None
 
-_GRADE_VALUES = {"junior", "middle", "senior", "lead"}
-_REMOTE_VALUES = {"remote", "hybrid", "office"}
-
 # Sanitiser для company_name: иногда LLM прилепляет URL прямо в название
 # («КА https://example.com/», «Brand foo.com»). Регексп ловит trailing
 # URL/домен и вырезает; в _parse_vacancy_json вырезанный URL уезжает в
@@ -283,7 +281,7 @@ _TRAILING_URL_RE = re.compile(
 _DESCRIPTION_MAX_CHARS = 1500
 
 
-def _normalize_enum(value, allowed: set[str]) -> str | None:
+def _normalize_enum(value, allowed: tuple[str, ...]) -> str | None:
     if not isinstance(value, str):
         return None
     v = value.strip().lower()
@@ -490,9 +488,9 @@ def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
         other_contact=_str_or_none("other_contact"),
         stack_required=stack_required,
         stack_preferred=stack_preferred,
-        grade=_normalize_enum(data.get("grade"), _GRADE_VALUES),
+        grade=_normalize_enum(data.get("grade"), GRADES),
         salary=_str_or_none("salary"),
-        remote=_normalize_enum(data.get("remote"), _REMOTE_VALUES),
+        remote=_normalize_enum(data.get("remote"), WORK_FORMATS),
         location=_str_or_none("location"),
     )
 
