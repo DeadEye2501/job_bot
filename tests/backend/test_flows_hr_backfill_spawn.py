@@ -48,7 +48,7 @@ async def test_the_history_is_caught_up_in_the_background(spawning):
     """
     pipeline, hr = spawning
 
-    dm._spawn_hr_backfill(pipeline, hr)
+    dm.spawn_hr_backfill(pipeline, hr)
     assert pipeline.caught == []
 
     await asyncio.sleep(0)
@@ -63,7 +63,7 @@ async def test_the_window_is_wired_to_the_background_catch_up(spawning):
     """
     pipeline, hr = spawning
 
-    dm._spawn_hr_backfill(pipeline, hr)
+    dm.spawn_hr_backfill(pipeline, hr)
     await asyncio.sleep(0)
 
     _, kwargs = pipeline.caught[0]
@@ -80,7 +80,7 @@ async def test_a_running_catch_up_is_remembered(spawning):
     pipeline, hr = spawning
     pipeline.hold = asyncio.Event()
 
-    dm._spawn_hr_backfill(pipeline, hr)
+    dm.spawn_hr_backfill(pipeline, hr)
     await asyncio.sleep(0)
 
     assert len(pipeline._backfill_tasks) == 1
@@ -97,7 +97,7 @@ async def test_a_finished_catch_up_is_forgotten(spawning):
     """
     pipeline, hr = spawning
 
-    dm._spawn_hr_backfill(pipeline, hr)
+    dm.spawn_hr_backfill(pipeline, hr)
     await asyncio.sleep(0)
     await asyncio.sleep(0)
 
@@ -113,7 +113,7 @@ async def test_a_broken_catch_up_does_not_surface(spawning):
     pipeline, hr = spawning
     pipeline.caught = RuntimeError("сеть")
 
-    dm._spawn_hr_backfill(pipeline, hr)
+    dm.spawn_hr_backfill(pipeline, hr)
     await asyncio.sleep(0)
     await asyncio.sleep(0)
 
@@ -128,7 +128,7 @@ async def test_stopping_the_bot_puts_out_the_catch_up(spawning):
     """
     pipeline, hr = spawning
     pipeline.hold = asyncio.Event()
-    dm._spawn_hr_backfill(pipeline, hr)
+    dm.spawn_hr_backfill(pipeline, hr)
     await asyncio.sleep(0)
     running = next(iter(pipeline._backfill_tasks))
 

@@ -112,7 +112,7 @@ async def send(
             )
         except FloodWait as e:
             # Persist'им «не пытайся до этого времени» в app_settings
-            # — IngestionPipeline._try_auto_send проверит и пропустит
+            # — apply.try_auto_send проверит и пропустит
             # auto-send'ы пока окно не закроется. Для manual UI-send
             # это просто возврат False — юзер увидит «Telegram отказался»
             # toast и попробует позже.
@@ -132,7 +132,7 @@ async def send(
                 )
             return False
     # При успешной отправке очистим flood_wait_until_ts (если он
-    # был — Telegram отпустил). Не критично, но тогда _try_auto_send
+    # был — Telegram отпустил). Не критично, но тогда try_auto_send
     # не будет проверять стэйл-окно после восстановления.
     if not suppressed and bot._rs.flood_wait_until_ts > 0:
         try:

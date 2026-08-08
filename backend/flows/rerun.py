@@ -96,7 +96,7 @@ async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> bool:
         logger.warning("rerun: vacancy %d has empty raw_text", vacancy_id)
         return False
     await pipeline._reload_resources()
-    await parse._parse_and_update_vacancy(pipeline, 
+    await parse.parse_and_update_vacancy(pipeline, 
         vacancy_id, text, channel_username, allow_delete=False
     )
     return True
@@ -104,8 +104,8 @@ async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> bool:
 
 async def recover_orphan_vacancies(pipeline) -> int:
     """Finish parsing rows that were ingested but never made it through
-    the LLM pipeline (process killed between ``_save_new_vacancy`` and
-    ``_parse_and_update_vacancy`` commits, or LLM call cancelled).
+    the LLM pipeline (process killed between ``save_new_vacancy`` and
+    ``parse_and_update_vacancy`` commits, or LLM call cancelled).
 
     Called once at startup before the polling loop kicks in, so the
     UI never shows half-built rows for long. Each orphan goes through
@@ -146,7 +146,7 @@ async def recover_orphan_vacancies(pipeline) -> int:
         if not text:
             continue
         try:
-            await parse._parse_and_update_vacancy(pipeline, 
+            await parse.parse_and_update_vacancy(pipeline, 
                 r.id, text, r.username or "", allow_delete=True
             )
             processed += 1

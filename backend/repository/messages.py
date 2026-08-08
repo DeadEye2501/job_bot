@@ -94,7 +94,7 @@ async def count_unread_incoming(session: AsyncSession) -> int:
 
     Excludes tombstones — a deleted incoming row that was never read
     would otherwise inflate the badge with no way to clear it from the UI.
-    ``_on_dm_delete`` also seals ``read_at`` defensively, but the filter
+    ``updates.on_dm_delete`` also seals ``read_at`` defensively, but the filter
     here protects against any future code that flips ``is_deleted`` only.
     """
     n = await session.scalar(

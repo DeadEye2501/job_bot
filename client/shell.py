@@ -73,7 +73,7 @@ def run_ui() -> int:
     engine = db.make_engine(get_database_url())
     # expire_on_commit=False — load-bearing: весь repository/ и bot.py
     # держит ORM-объекты живыми после session.close()/commit() (например,
-    # ``hr_for_send`` из flows._parse_and_update_vacancy используется уже
+    # ``hr_for_send`` из flows/parse.py, parse_and_update_vacancy, используется уже
     # вне сессии для авто-отправки). С expire_on_commit=True атрибут
     # доступ кинул бы DetachedInstanceError. Не трогать.
     session_factory = async_sessionmaker(engine, expire_on_commit=False)

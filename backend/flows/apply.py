@@ -84,14 +84,14 @@ def _build_short_text(
     return intro
 
 
-async def _try_auto_send(
+async def try_auto_send(
     pipeline, hr, parsed: ParsedVacancy, vacancy_id: int
 ) -> tuple[bool, str]:
-    """Wrapper над _send_application с уважением FloodWait-окна.
+    """Wrapper над send_application с уважением FloodWait-окна.
     Возвращает тот же (ok, reason) контракт; дополнительный reason-код
     ``flood_wait``.
     """
-    # FloodWait persist: Bot.send (через _send_application → _send)
+    # FloodWait persist: Bot.send (через send_application → _send)
     # на FloodWait выписывает в app_settings момент когда можно
     # пробовать снова. Дёргать send_dm раньше — гарантированный
     # повторный FloodWait и накопление штрафа.
@@ -105,10 +105,10 @@ async def _try_auto_send(
             )
             return False, "flood_wait"
 
-    return await _send_application(pipeline, hr, parsed, vacancy_id)
+    return await send_application(pipeline, hr, parsed, vacancy_id)
 
 
-async def _send_application(
+async def send_application(
     pipeline,
     hr,
     parsed: ParsedVacancy,
@@ -263,7 +263,7 @@ async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool,
     ParsedVacancy from the stored Vacancy row so the LLM-prompt has the
     same shape as the auto-send path. Returns (ok, reason). Reasons:
     'sent' / 'no_vacancy' / 'no_hr' / 'already_applied' / любой код
-    из _send_application."""
+    из send_application."""
     async with pipeline._session_factory() as session:
         v = (
             await session.scalars(
@@ -308,4 +308,4 @@ async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool,
         )
     if not pipeline._profile_block:
         await pipeline._reload_resources()
-    return await _send_application(pipeline, hr, parsed, vacancy_id, force=True)
+    return await send_application(pipeline, hr, parsed, vacancy_id, force=True)

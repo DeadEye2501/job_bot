@@ -34,7 +34,7 @@ async def poll_active_channels(pipeline) -> None:
     # `download_media`, всё пишется одной транзакцией. UI получает
     # свежие названия и аватары за десятки секунд, а не за десятки
     # минут (по ~5 мин на канал на парсинг сообщений).
-    await _refresh_channel_metadata(pipeline, all_named)
+    await refresh_channel_metadata(pipeline, all_named)
 
     active_named = [c for c in all_named if c.is_active]
     total = len(active_named)
@@ -46,7 +46,7 @@ async def poll_active_channels(pipeline) -> None:
     for idx, ch in enumerate(active_named):
         pipeline._emit_progress("channel", f"@{ch.username}", idx, total)
         try:
-            await _poll_channel(pipeline, 
+            await poll_channel(pipeline, 
                 ch.id, ch.username, ch.last_processed_msg_id
             )
         except Exception:
@@ -77,7 +77,7 @@ async def poll_one_channel(pipeline, channel_id: int) -> bool:
         last_id = ch.last_processed_msg_id
     await refresh_channel_metadata_for_ids(pipeline, [channel_id])
     try:
-        await _poll_channel(pipeline, channel_id, username, last_id)
+        await poll_channel(pipeline, channel_id, username, last_id)
     except Exception:
         logger.exception("[@%s] manual poll failed", username)
         return False
@@ -99,10 +99,10 @@ async def refresh_channel_metadata_for_ids(pipeline, channel_ids: list[int]) -> 
                 select(TelegramChannel).where(TelegramChannel.id.in_(channel_ids))
             )
         ).all()
-    await _refresh_channel_metadata(pipeline, list(rows))
+    await refresh_channel_metadata(pipeline, list(rows))
 
 
-async def _refresh_channel_metadata(pipeline, channels) -> None:
+async def refresh_channel_metadata(pipeline, channels) -> None:
     """Sweep metadata for every active channel before message polling.
 
     One `get_chat` call per channel (sequential — Pyrogram's session is
@@ -158,7 +158,7 @@ async def _refresh_channel_metadata(pipeline, channels) -> None:
             logger.exception("on_channels_changed hook failed")
 
 
-async def _poll_channel(
+async def poll_channel(
     pipeline,
     channel_id: int,
     channel_username: str,
@@ -185,7 +185,7 @@ async def _poll_channel(
         for i, msg in enumerate(ordered):
             pipeline._emit_progress("message", f"@{channel_username}", i, total)
             try:
-                await ingest._ingest_post(pipeline, channel_id, channel_username, msg)
+                await ingest.ingest_post(pipeline, channel_id, channel_username, msg)
             except Exception:
                 # Advance cursor anyway — иначе сломанное сообщение
                 # реингестится бесконечно. Дубликаты (если ingest
@@ -196,14 +196,14 @@ async def _poll_channel(
                 )
             cursor = msg.id
             if (i + 1) % BATCH_FLUSH_EVERY == 0:
-                await _advance_cursor(pipeline, channel_id, cursor)
+                await advance_cursor(pipeline, channel_id, cursor)
         pipeline._emit_progress("message", f"@{channel_username}", total, total)
     finally:
         if cursor is not None:
-            await _advance_cursor(pipeline, channel_id, cursor)
+            await advance_cursor(pipeline, channel_id, cursor)
 
 
-async def _advance_cursor(pipeline, channel_id: int, msg_id: int) -> None:
+async def advance_cursor(pipeline, channel_id: int, msg_id: int) -> None:
     async with pipeline._session_factory() as session:
         ch = await session.get(TelegramChannel, channel_id)
         if ch is None:

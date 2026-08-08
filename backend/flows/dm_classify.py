@@ -97,10 +97,10 @@ async def _run_debounced_classify(pipeline, hr_id: int) -> None:
     # LLM-вызова и БД-записи (sessions/clients уже закрываются).
     if pipeline._shutting_down:
         return
-    await _classify_and_apply_for_hr(pipeline, hr_id)
+    await classify_and_apply_for_hr(pipeline, hr_id)
 
 
-async def _classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
+async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
     """Drain burst-буфера для hr_id: один LLM-вызов на накопленный
     пакет → apply_classification. Используется и из debounce-тика,
     и из drain-on-OFF в `cancel_pending_dm_classifications`.
@@ -236,7 +236,7 @@ async def cancel_pending_dm_classifications(
             "because shutdown in progress"
         )
     if drain and not pipeline._shutting_down:
-        # Snapshot keys — _classify_and_apply_for_hr pop'ает буфер.
+        # Snapshot keys — classify_and_apply_for_hr pop'ает буфер.
         # Параллелим: 5 HR'ов × 3-5s LLM-RTT последовательно = ~25s
         # стола в OFF transition, в течение которого run-loop не
         # реагирует на stop_event/wake. asyncio.gather + return_exceptions
@@ -244,7 +244,7 @@ async def cancel_pending_dm_classifications(
         hr_ids = [hr_id for hr_id, buf in pipeline._dm_classify_buffer.items() if buf]
         if hr_ids:
             results = await asyncio.gather(
-                *(_classify_and_apply_for_hr(pipeline, hr_id) for hr_id in hr_ids),
+                *(classify_and_apply_for_hr(pipeline, hr_id) for hr_id in hr_ids),
                 return_exceptions=True,
             )
             for hr_id, res in zip(hr_ids, results):

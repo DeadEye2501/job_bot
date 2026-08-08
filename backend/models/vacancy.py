@@ -76,7 +76,7 @@ class Vacancy(Base):
     # Flips to True only after the LLM parse + classify pipeline finishes
     # and persists structured fields (title, stack, score, ...). False
     # while the row holds just raw_text + embedding — i.e. it was created
-    # by ``_save_new_vacancy`` but the follow-up ``_parse_and_update_vacancy``
+    # by ``ingest.save_new_vacancy`` but the follow-up ``parse.parse_and_update_vacancy``
     # was killed (process crash, cancellation) before it could commit.
     # The UI list filters on ``is_parsed = True`` so users never see a
     # half-built row, and ``recover_orphan_vacancies`` re-parses the

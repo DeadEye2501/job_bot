@@ -242,25 +242,25 @@ class Bot:
         return await send.send(self, hr, text, attachment, vacancy_id, force=force)
 
     async def _on_raw_update(self, _client, update, _users, _chats):
-        return await updates._on_raw_update(self, _client, update, _users, _chats)
+        return await updates.on_raw_update(self, _client, update, _users, _chats)
 
     async def _on_dm_edit(self, _client, msg):
-        return await updates._on_dm_edit(self, _client, msg)
+        return await updates.on_dm_edit(self, _client, msg)
 
     async def _on_dm_delete(self, _client, messages):
-        return await updates._on_dm_delete(self, _client, messages)
+        return await updates.on_dm_delete(self, _client, messages)
 
     async def _on_dm_outgoing(self, _client, msg):
-        return await updates._on_dm_outgoing(self, _client, msg)
+        return await updates.on_dm_outgoing(self, _client, msg)
 
     async def _on_dm(self, _client, msg):
-        return await updates._on_dm(self, _client, msg)
+        return await updates.on_dm(self, _client, msg)
 
     async def log_out_session(self):
         return await loop.log_out_session(self)
 
     async def _current_mode(self):
-        return await loop._current_mode(self)
+        return await loop.current_mode(self)
 
     async def run(self, *, once=False):
         return await loop.run(self, once=once)

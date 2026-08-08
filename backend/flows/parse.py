@@ -25,7 +25,7 @@ from backend.flows import cleanup
 logger = logging.getLogger(__name__)
 
 
-async def _parse_and_update_vacancy(
+async def parse_and_update_vacancy(
     pipeline,
     vacancy_id: int,
     text: str,
@@ -62,7 +62,7 @@ async def _parse_and_update_vacancy(
                 "vacancy %s: empty vacancy (no meaningful fields), deleting as trash",
                 vacancy_id,
             )
-            await cleanup._delete_vacancy_as_trash(pipeline, 
+            await cleanup.delete_vacancy_as_trash(pipeline, 
                 vacancy_id, reason="empty: no meaningful fields"
             )
             return
@@ -70,7 +70,7 @@ async def _parse_and_update_vacancy(
             "vacancy %s: empty vacancy (no meaningful fields), marking Not Fit (rerun, no auto-delete)",
             vacancy_id,
         )
-        await _save_empty_vacancy(pipeline, vacancy_id, parsed)
+        await save_empty_vacancy(pipeline, vacancy_id, parsed)
         return
 
     # blacklist scans the FULL raw text; parse_vacancy truncates to 6000
@@ -125,7 +125,7 @@ async def _parse_and_update_vacancy(
                     "vacancy %s: classified as trash by LLM (%s), deleting",
                     vacancy_id, validation.reason or "no reason",
                 )
-                await cleanup._delete_vacancy_as_trash(pipeline, 
+                await cleanup.delete_vacancy_as_trash(pipeline, 
                     vacancy_id,
                     reason=f"trash: {validation.reason or 'no reason'}",
                 )
@@ -285,7 +285,7 @@ async def _parse_and_update_vacancy(
         and hr_for_send is not None
         and pipeline._rs.auto_apply
     ):
-        ok, reason = await apply._try_auto_send(pipeline, 
+        ok, reason = await apply.try_auto_send(pipeline, 
             hr_for_send, parsed, vacancy_id
         )
         # Audit-event: фиксируем КАЖДУЮ попытку auto-send'а вне
@@ -313,10 +313,10 @@ async def _parse_and_update_vacancy(
     # свою row с vacancy_id'ом — и вставит дубль без vacancy_id, а
     # Bot.send'овский insert упадёт на UNIQUE.
     if hr_for_backfill is not None:
-        dm._spawn_hr_backfill(pipeline, hr_for_backfill)
+        dm.spawn_hr_backfill(pipeline, hr_for_backfill)
 
 
-async def _is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
+async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
     """A vacancy is 'orphaned' when its embedding row is in the cache
     but the LLM-pipeline never finished (parser cancelled, process
     crashed, LLM call failed silently). Reads the explicit
@@ -329,7 +329,7 @@ async def _is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
     return v is not None and not v.is_parsed
 
 
-async def _save_empty_vacancy(
+async def save_empty_vacancy(
     pipeline, vacancy_id: int, parsed: ParsedVacancy | None
 ) -> None:
     """Persist an empty/trash vacancy as Not Fit when auto-delete is off
@@ -458,4 +458,4 @@ async def _save_empty_vacancy(
             )
             return
     if hr_for_backfill is not None:
-        dm._spawn_hr_backfill(pipeline, hr_for_backfill)
+        dm.spawn_hr_backfill(pipeline, hr_for_backfill)

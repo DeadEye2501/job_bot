@@ -107,7 +107,7 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
         hr_id, pyro_msg.id, len(clean),
     )
 
-    # _on_dm_outgoing dispatches on the same client and may win the race —
+    # updates.on_dm_outgoing dispatches on the same client and may win the race —
     # it'll persist the row first and our INSERT then trips the
     # (hr_id, tg_message_id, is_incoming=False) UNIQUE. Treat that as
     # success and return the existing row.
@@ -197,7 +197,7 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
         src.name,
     )
 
-    # Copy into our media cache. Path matches what `_on_dm_outgoing`'s
+    # Copy into our media cache. Path matches what `updates.on_dm_outgoing`'s
     # `_download_media` would have written, so the racing handler that
     # downloads the same message can find the already-existing file
     # instead of re-fetching it from Telegram.

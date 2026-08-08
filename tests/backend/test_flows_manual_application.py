@@ -43,7 +43,7 @@ async def carded(monkeypatch, make_pipeline, session_factory):
         pipeline.asked.append((hr_row_.id, parsed, vacancy_id, force))
         return True, "sent"
 
-    monkeypatch.setattr(apply, "_send_application", send_application)
+    monkeypatch.setattr(apply, "send_application", send_application)
     return pipeline, hr, vacancy
 
 
@@ -141,7 +141,7 @@ async def test_a_refusal_from_the_sender_is_passed_through(monkeypatch, carded):
     async def send_application(pipeline, hr_row_, parsed, vacancy_id, *, force=False):
         return False, "cv_missing"
 
-    monkeypatch.setattr(apply, "_send_application", send_application)
+    monkeypatch.setattr(apply, "send_application", send_application)
 
     assert await pipeline.send_application_for_vacancy(vacancy.id) == (
         False,

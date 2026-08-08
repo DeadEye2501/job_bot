@@ -17,10 +17,10 @@ from backend.flows import embeddings
 logger = logging.getLogger(__name__)
 
 
-async def _ingest_post(
+async def ingest_post(
     pipeline, channel_id: int, channel_username: str, msg
 ) -> None:
-    # Cursor advance'ится в `_poll_channel` (батчами), не здесь.
+    # Cursor advance'ится в `poll_channel` (батчами), не здесь.
     text = extract_text(msg)
     if not text or msg.service is not None or msg.poll is not None:
         return
@@ -38,7 +38,7 @@ async def _ingest_post(
         )
         return
 
-    await embeddings._ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline)
     similar_id = cosine_top_match(
         np.asarray(embedding, dtype=np.float32),
         pipeline._embedding_ids,
@@ -50,7 +50,7 @@ async def _ingest_post(
         # half-built by a cancelled previous cycle (saved with raw_text
         # + embedding but no parsed fields). Detect the orphan and
         # finish parsing it now instead of skipping forever.
-        unparsed = await parse._is_unparsed_vacancy(pipeline, similar_id)
+        unparsed = await parse.is_unparsed_vacancy(pipeline, similar_id)
         if unparsed:
             logger.info(
                 "[@%s] %d matched orphan vacancy %d, finishing parse",
@@ -61,7 +61,7 @@ async def _ingest_post(
             # text + channel hint and stamp it onto the original row. The
             # embedding match guarantees texts are near-identical, so this
             # is acceptable.
-            await parse._parse_and_update_vacancy(pipeline, 
+            await parse.parse_and_update_vacancy(pipeline, 
                 similar_id, text, channel_username
             )
         else:
@@ -71,16 +71,16 @@ async def _ingest_post(
             )
         return
 
-    new_vacancy_id = await _save_new_vacancy(pipeline, 
+    new_vacancy_id = await save_new_vacancy(pipeline, 
         channel_id, channel_username, msg, text, embedding
     )
     if new_vacancy_id is not None:
-        await parse._parse_and_update_vacancy(pipeline, 
+        await parse.parse_and_update_vacancy(pipeline, 
             new_vacancy_id, text, channel_username
         )
 
 
-async def _save_new_vacancy(
+async def save_new_vacancy(
     pipeline,
     channel_id: int,
     channel_username: str,
@@ -111,7 +111,7 @@ async def _save_new_vacancy(
                 )
             )
             await session.commit()
-            embeddings._append_embedding(pipeline, new_vacancy.id, embedding)
+            embeddings.append_embedding(pipeline, new_vacancy.id, embedding)
             logger.info(
                 "[@%s] %d -> vacancy %d",
                 channel_username,

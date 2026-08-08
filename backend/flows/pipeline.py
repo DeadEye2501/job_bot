@@ -108,7 +108,7 @@ class IngestionPipeline:
         self._dm_classify_semaphore = asyncio.Semaphore(2)
 
         # Strong-references на in-flight per-HR backfill таски (kicked
-        # из _spawn_hr_backfill). Event loop держит на тасках только
+        # из flows/dm.py, spawn_hr_backfill). Event loop держит на тасках только
         # weak-ref'ы — без своего set'а Python может GC'нуть таск
         # посреди выполнения с warning'ом «Task was destroyed but it
         # is pending». На done-callback'е сам себя убираем из set'а.

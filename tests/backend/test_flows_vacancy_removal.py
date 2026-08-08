@@ -51,7 +51,7 @@ async def with_a_vacancy(make_pipeline, session_factory):
         vacancy_event_row(vacancy.id),
     )
     pipeline = await make_pipeline()
-    await embeddings._ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline)
     return pipeline, vacancy, channel
 
 
@@ -65,7 +65,7 @@ async def test_a_deleted_vacancy_takes_its_history_with_it(
     """
     pipeline, vacancy, _ = with_a_vacancy
 
-    await cleanup._delete_vacancy(pipeline, vacancy.id)
+    await cleanup.delete_vacancy(pipeline, vacancy.id)
 
     assert await all_rows(session_factory, Vacancy) == []
     assert await all_rows(session_factory, VacancyStatusHistory) == []
@@ -80,7 +80,7 @@ async def test_a_deleted_vacancy_leaves_the_embedding_cache(with_a_vacancy):
     """
     pipeline, vacancy, _ = with_a_vacancy
 
-    await cleanup._delete_vacancy(pipeline, vacancy.id)
+    await cleanup.delete_vacancy(pipeline, vacancy.id)
 
     assert pipeline._embedding_ids.tolist() == []
 
@@ -96,7 +96,7 @@ async def test_the_window_hears_about_both_lists(with_a_vacancy):
     pipeline.on_contacts_changed = lambda: heard.append("контакты")
     pipeline.on_vacancies_changed = lambda: heard.append("вакансии")
 
-    await cleanup._delete_vacancy(pipeline, vacancy.id)
+    await cleanup.delete_vacancy(pipeline, vacancy.id)
 
     assert heard == ["контакты", "вакансии"]
 
@@ -109,7 +109,7 @@ async def test_trash_leaves_a_mark_before_it_goes(with_a_vacancy, session_factor
     """
     pipeline, vacancy, channel = with_a_vacancy
 
-    await cleanup._delete_vacancy_as_trash(pipeline, vacancy.id, "не про работу")
+    await cleanup.delete_vacancy_as_trash(pipeline, vacancy.id, "не про работу")
 
     mark = await only_row(session_factory, TrashEvent)
     assert mark.source_channel_id == channel.id
@@ -122,7 +122,7 @@ async def test_trash_also_leaves_the_embedding_cache(with_a_vacancy):
     """Удалённый мусор из кэша векторов тоже вычёркивается."""
     pipeline, vacancy, _ = with_a_vacancy
 
-    await cleanup._delete_vacancy_as_trash(pipeline, vacancy.id, "не про работу")
+    await cleanup.delete_vacancy_as_trash(pipeline, vacancy.id, "не про работу")
 
     assert pipeline._embedding_ids.tolist() == []
 
@@ -137,7 +137,7 @@ async def test_a_mark_for_a_vanished_vacancy_names_no_channel(
     """
     pipeline = await make_pipeline()
 
-    await cleanup._delete_vacancy_as_trash(pipeline, 404, "не про работу")
+    await cleanup.delete_vacancy_as_trash(pipeline, 404, "не про работу")
 
     mark = await only_row(session_factory, TrashEvent)
     assert mark.source_channel_id is None

@@ -26,7 +26,7 @@ async def log_out_session(bot) -> None:
     bot._wake_event.set()
 
 
-async def _current_mode(bot) -> BotMode:
+async def current_mode(bot) -> BotMode:
     try:
         return await bot._rs.get_mode()
     except Exception:
@@ -58,7 +58,7 @@ async def run(bot, *, once: bool = False) -> None:
         "Telegram client connected (phone=%s)",
         _mask_phone(bot._rs.tg.phone if bot._rs.tg else None),
     )
-    await _persist_session_if_changed(bot)
+    await persist_session_if_changed(bot)
     try:
         # Re-parse any vacancies that were ingested but never finished
         # the LLM pipeline (previous process crashed mid-parse). Runs
@@ -77,7 +77,7 @@ async def run(bot, *, once: bool = False) -> None:
         # back-fills immediately and so does toggling out of OFF later.
         prev_mode = BotMode.OFF
         while True:
-            mode = await _current_mode(bot)
+            mode = await current_mode(bot)
             # Transition в OFF: гасим debounce-таймеры pending'овых
             # классификаций. Накопленные тексты пропадают, но сами
             # сообщения уже в БД — юзеру нужно будет переклассифицировать
@@ -190,7 +190,7 @@ async def run(bot, *, once: bool = False) -> None:
         await bot._lm_client.aclose()
 
 
-async def _persist_session_if_changed(bot) -> None:
+async def persist_session_if_changed(bot) -> None:
     """After client.start(), export the (possibly fresh) session_string and
     write it back to runtime_settings if it differs from what we loaded.
 

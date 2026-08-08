@@ -79,7 +79,7 @@ async def test_one_broken_reading_does_not_stop_the_others(monkeypatch, dm_pipel
             raise RuntimeError("модель не ответила")
         good.append(hr_id)
 
-    monkeypatch.setattr(dm_classify, "_classify_and_apply_for_hr", classify)
+    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", classify)
 
     await dm_pipeline.cancel_pending_dm_classifications(drain=True)
 
@@ -134,7 +134,7 @@ async def test_a_reading_already_under_way_is_not_waited_for_at_all(monkeypatch,
         started.set()
         await asyncio.sleep(30)
 
-    monkeypatch.setattr(dm_classify, "_classify_and_apply_for_hr", hangs)
+    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", hangs)
     dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
     running = dm_pipeline._dm_classify_tasks[7]
     await started.wait()

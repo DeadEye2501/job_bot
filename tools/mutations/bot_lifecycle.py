@@ -111,14 +111,14 @@ MUTATIONS = [
         "                username=username.lower(),",
         "                username=username,",
     ),
-    # _persist_session_if_changed: совпавшая строка всё равно переписывается
+    # persist_session_if_changed: совпавшая строка всё равно переписывается
     (
         "backend/bot/loop.py",
         '    if new_str == (tg.session_string or ""):' + CRLF
         + "        return" + CRLF,
         "",
     ),
-    # _current_mode: сбой чтения режима даёт полный вместо выключенного
+    # current_mode: сбой чтения режима даёт полный вместо выключенного
     (
         "backend/bot/loop.py",
         '        logger.exception("get_mode failed; falling back to Off")' + CRLF

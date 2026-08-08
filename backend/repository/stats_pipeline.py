@@ -50,7 +50,7 @@ async def get_stats_channels_pipeline(
     #
     # «Trash» — посты, отсеянные LLM-валидатором как мусор. В auto-ingest
     # режиме они УДАЛЯЮТСЯ из ``vacancy``, и счётчик хранится в отдельной
-    # таблице ``trash_event`` (см. _delete_vacancy_as_trash в flows.py).
+    # таблице ``trash_event`` (см. flows/cleanup.py, delete_vacancy_as_trash).
     # В rerun-режиме ряд остаётся как ``status=NOT_FIT`` + ``skip_reason``
     # начинается с "trash:" — таких добавим к trash-счётчику ниже.
     # Not Fit (clean) — отсев фит-валидатором по языку/локации/уровню,

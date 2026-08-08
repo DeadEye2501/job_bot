@@ -215,7 +215,7 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
         pipeline.asked_to_send.append(vacancy_id)
         return True, "sent"
 
-    monkeypatch.setattr(apply, "_try_auto_send", try_auto_send)
+    monkeypatch.setattr(apply, "try_auto_send", try_auto_send)
     monkeypatch.setattr("backend.flows.parse.parse_vacancy", parse_vacancy)
     monkeypatch.setattr("backend.flows.parse.validate_vacancy_fit", validate_vacancy_fit)
 
@@ -312,7 +312,7 @@ async def dm_pipeline(monkeypatch, make_pipeline):
         )
         built._dm_classify_buffer.pop(hr_id, None)
 
-    monkeypatch.setattr(dm_classify, "_classify_and_apply_for_hr", classify)
+    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", classify)
     yield built
     await built.cancel_pending_dm_classifications()
 

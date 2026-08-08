@@ -456,14 +456,14 @@ async def catch_up_missed_dms(
             await asyncio.sleep(_DM_CATCHUP_BATCH_DELAY_SEC)
 
 
-def _spawn_hr_backfill(pipeline, hr) -> None:
+def spawn_hr_backfill(pipeline, hr) -> None:
     """Per-HR DM backfill kicked when a freshly-created HR is wired up
     from a parsed vacancy. Runs as a background task so the parse loop
     doesn't block on Telegram history fetch + media downloads. Pushes
     ``on_new_message`` per HR once the rows land — open chat in UI
     fills in without restart.
 
-    Wajne: вызывать ПОСЛЕ ``_try_auto_send`` для свежесозданного HR'а,
+    Wajne: вызывать ПОСЛЕ ``try_auto_send`` для свежесозданного HR'а,
     иначе backfill может догнать через ``get_chat_history`` cover-
     letter сообщение раньше, чем ``Bot.send`` закоммитит свою row,
     и вставит её без ``vacancy_id`` (UNIQUE на (hr_id, tg_message_id,

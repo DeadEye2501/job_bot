@@ -65,7 +65,7 @@ async def _prepare(monkeypatch, make_pipeline, client):
     async def reload():
         pipeline.parsed.append("настройки")
 
-    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
     pipeline._reload_resources = reload
     return pipeline
 

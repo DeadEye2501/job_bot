@@ -48,15 +48,15 @@ async def intake(make_pipeline, monkeypatch):
         "backend.flows.ingest.cosine_top_match",
         lambda vec, ids, matrix, threshold: pipeline.similar_id,
     )
-    monkeypatch.setattr(ingest, "_save_new_vacancy", save)
-    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
-    monkeypatch.setattr(parse_mod, "_is_unparsed_vacancy", unparsed)
+    monkeypatch.setattr(ingest, "save_new_vacancy", save)
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
+    monkeypatch.setattr(parse_mod, "is_unparsed_vacancy", unparsed)
     return pipeline
 
 
 async def test_a_fresh_post_is_saved_and_parsed(intake):
     """Незнакомое объявление сохраняется и уходит в разбор."""
-    await ingest._ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == [(1, 10, "Ищем Python-разработчика")]
     assert intake.parsed == [(7, "Ищем Python-разработчика")]
@@ -82,7 +82,7 @@ async def test_a_post_without_a_vacancy_goes_no_further(intake, msg):
     Служебные записи о смене названия канала и опросы приходят тем же
     потоком; переводить их в вектор — платить за заведомо пустое.
     """
-    await ingest._ingest_post(intake, 1, "jobs", msg)
+    await ingest.ingest_post(intake, 1, "jobs", msg)
 
     assert intake.saved == []
     assert intake.parsed == []
@@ -97,7 +97,7 @@ async def test_a_repost_is_skipped(intake):
     intake.similar_id = 3
     intake.unparsed = False
 
-    await ingest._ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == []
     assert intake.parsed == []
@@ -112,7 +112,7 @@ async def test_a_repost_of_a_half_parsed_vacancy_finishes_it(intake):
     intake.similar_id = 3
     intake.unparsed = True
 
-    await ingest._ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == []
     assert intake.parsed == [(3, "Ищем Python-разработчика")]
@@ -130,7 +130,7 @@ async def test_a_post_the_model_could_not_embed_is_skipped(intake, monkeypatch):
 
     monkeypatch.setattr("adapters.lm_studio.embed", broken)
 
-    await ingest._ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == []
     assert intake.parsed == []
@@ -143,6 +143,6 @@ async def test_a_vacancy_that_could_not_be_saved_is_not_parsed(intake):
     """
     intake.new_id = None
 
-    await ingest._ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.parsed == []
