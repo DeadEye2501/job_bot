@@ -12,7 +12,7 @@
 
 import pytest
 
-from backend.domain import GHOSTING_TIMEOUT_DAYS
+from backend.domain.transitions import GHOSTING_TIMEOUT_DAYS
 from backend.models import Vacancy, VacancyStatus
 from tests.dbio import all_rows, put
 from tests.factories import days_ago, vacancy_row

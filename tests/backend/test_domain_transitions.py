@@ -1,4 +1,4 @@
-"""Следствия, которые наблюдают тесты графа статусов `backend/domain.py`.
+"""Следствия, которые наблюдают тесты `backend/domain/transitions.py`.
 
 Граф проверяется через `should_apply_status` — через ворота, которыми им
 пользуются, а не чтением словаря переходов. Словарь — объявление; ворота —
@@ -7,14 +7,12 @@
 
 import pytest
 
-from backend.domain import (
+from backend.domain.transitions import (
     GHOSTING_ELIGIBLE_FROM,
-    decide_vacancy_status,
     is_terminal_for_auto,
     should_apply_status,
 )
 from backend.models import VacancyStatus
-from tests.factories import parsed_vacancy
 
 TERMINAL = [
     VacancyStatus.OFFER,
@@ -160,49 +158,9 @@ def test_ghosting_eligibility_agrees_with_the_gate(status):
     """Список кандидатов на Ghosting по таймеру совпадает с тем, что пропускают ворота.
 
     `GHOSTING_ELIGIBLE_FROM` объявлен отдельно от графа переходов как защита
-    от расхождения (см. docstring в `backend/domain.py`). Здесь сверяются
-    два независимых источника, а не читается содержимое одного из них.
+    от расхождения (см. докстринг в `backend/domain/transitions.py`). Здесь
+    сверяются два независимых источника, а не читается содержимое одного.
     """
     eligible = status in GHOSTING_ELIGIBLE_FROM
     gate_allows = should_apply_status(status, VacancyStatus.GHOSTING)
     assert eligible == gate_allows
-
-
-def test_an_unparseable_post_is_rejected_with_a_named_reason():
-    """Пост, из которого ничего не извлеклось, уходит в Not Fit с причиной."""
-    assert decide_vacancy_status(None, 10, None, threshold=0) == (
-        VacancyStatus.NOT_FIT,
-        "unparseable",
-    )
-
-
-def test_a_blacklisted_vacancy_is_rejected_and_names_the_pattern():
-    """Отказ по чёрному списку называет сработавший образец."""
-    assert decide_vacancy_status(parsed_vacancy(), 10, "казино", threshold=0) == (
-        VacancyStatus.NOT_FIT,
-        "blacklist: казино",
-    )
-
-
-def test_a_low_score_is_rejected_and_shows_both_numbers():
-    """Отказ по баллам показывает и набранное, и порог."""
-    assert decide_vacancy_status(parsed_vacancy(), 2, None, threshold=5) == (
-        VacancyStatus.NOT_FIT,
-        "score 2 < 5",
-    )
-
-
-def test_a_vacancy_exactly_at_the_threshold_passes():
-    """Порог включающий: ровно threshold баллов проходит."""
-    assert decide_vacancy_status(parsed_vacancy(), 5, None, threshold=5) == (
-        VacancyStatus.NEW,
-        None,
-    )
-
-
-def test_the_blacklist_outranks_a_passing_score():
-    """Чёрный список сильнее набранных баллов, сколько бы их ни было."""
-    assert decide_vacancy_status(parsed_vacancy(), 100, "казино", threshold=5) == (
-        VacancyStatus.NOT_FIT,
-        "blacklist: казино",
-    )

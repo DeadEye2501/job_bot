@@ -1,16 +1,10 @@
-"""Следствия, которые наблюдают тесты подсчёта баллов `backend/domain.py`.
+"""Следствия, которые наблюдают тесты `backend/domain/scoring.py`.
 
-Закрытые `_build_skill_level_lookup`, `_word_match`, `_compile_word_pattern` и
-`_is_word_char` проверяются через публичные `score_parsed` и `check_blacklist`:
-снаружи они видны только начисленными баллами и сработавшим образцом.
+Закрытый `_build_skill_level_lookup` проверяется через публичный
+`score_parsed`: снаружи он виден только начисленными баллами.
 """
 
-from backend.domain import (
-    build_skill_lookup,
-    check_blacklist,
-    is_empty_vacancy,
-    score_parsed,
-)
+from backend.domain.scoring import build_skill_lookup, score_parsed
 from tests.factories import parsed_vacancy, profile_skill
 
 
@@ -108,63 +102,3 @@ def test_required_and_preferred_add_up_together():
         skills,
     )
     assert got == 3
-
-
-def test_an_empty_text_matches_no_pattern():
-    """В пустом тексте чёрный список ничего не находит."""
-    assert check_blacklist("", ["казино"]) is None
-
-
-def test_the_matched_pattern_comes_back_as_written():
-    """Возвращается сам образец, а не найденный кусок текста."""
-    assert check_blacklist("Ищем в казино", ["ставки", "казино"]) == "казино"
-
-
-def test_the_match_ignores_case():
-    """Регистр в тексте не мешает срабатыванию."""
-    assert check_blacklist("КАЗИНО ищет", ["казино"]) == "казино"
-
-
-def test_a_pattern_inside_a_longer_cyrillic_word_does_not_match():
-    """Границы слова считаются и для кириллицы: «нода» не ловится в «нодаль»."""
-    assert check_blacklist("нодаль", ["нода"]) is None
-
-
-def test_a_pattern_starting_with_punctuation_keeps_its_boundaries():
-    """«.NET» не ловится внутри «.netкафедра», но ловится отдельным словом."""
-    assert check_blacklist(".netкафедра", [".NET"]) is None
-    assert check_blacklist("нужен .net разработчик", [".NET"]) == ".NET"
-
-
-def test_an_empty_pattern_is_skipped():
-    """Пустой образец не считается совпадением с чем угодно."""
-    assert check_blacklist("любой текст", ["", "казино"]) is None
-
-
-def test_a_missing_parse_counts_as_an_empty_vacancy():
-    """Если разобрать не удалось вовсе — вакансия пустая."""
-    assert is_empty_vacancy(None)
-
-
-def test_a_title_alone_is_not_a_vacancy():
-    """Один заголовок без единого признака — мусор."""
-    assert is_empty_vacancy(parsed_vacancy())
-
-
-def test_a_single_signal_is_still_not_enough():
-    """Одного признака мало."""
-    assert is_empty_vacancy(parsed_vacancy(hr_contact="@anna_hr"))
-
-
-def test_two_signals_make_a_real_vacancy():
-    """Короткий, но настоящий пост: контакт и зарплата — уже вакансия."""
-    assert not is_empty_vacancy(
-        parsed_vacancy(hr_contact="@anna_hr", salary="150 000")
-    )
-
-
-def test_a_preferred_only_stack_still_counts_as_a_signal():
-    """Стек считается признаком, даже если он весь в желательной половине."""
-    assert not is_empty_vacancy(
-        parsed_vacancy(stack_preferred=["Python"], company_name="ООО Ромашка")
-    )

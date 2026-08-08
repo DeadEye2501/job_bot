@@ -1,4 +1,4 @@
-"""Следствия, которые наблюдают тесты разбора зарплаты `backend/domain.py`.
+"""Следствия, которые наблюдают тесты `backend/domain/salary.py`.
 
 Разбор намеренно приблизительный: его задача — питать фильтр диапазона в
 списке вакансий, а не считать деньги. Поэтому проверяется не точность, а то,
@@ -8,7 +8,7 @@
 
 import pytest
 
-from backend.domain import normalize_salary_to_rub_thousands as to_thousands
+from backend.domain.salary import normalize_salary_to_rub_thousands as to_thousands
 
 
 @pytest.mark.parametrize("raw", [None, "", "   ", "—"])

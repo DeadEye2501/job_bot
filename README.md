@@ -84,7 +84,7 @@ backend/
   bootstrap.py        # alembic upgrade + first-run setup
   bot.py              # Bot-класс, Pyrogram-клиент + цикл
   flows.py            # IngestionPipeline: опрос → парсинг → скоринг → отклик
-  domain.py           # бизнес-логика без I/O (scoring, dedup, status transitions)
+  domain/             # бизнес-логика без I/O, по одному модулю на предмет
   cv_parser.py        # PDF-резюме → структурированные поля профиля
   llm.py              # промпты + клиенты для chat-LLM
   models/             # SQLAlchemy-модели, по одному модулю на предмет

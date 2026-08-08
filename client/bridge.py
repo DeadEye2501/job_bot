@@ -60,7 +60,7 @@ from adapters import lm_studio
 from adapters.lm_studio import LlmProviderConfig
 from backend import repository
 from backend.cv_parser import parse_cv
-from backend.domain import build_skill_lookup
+from backend.domain.scoring import build_skill_lookup
 from backend.models import (
     Blacklist,
     BotMode,
@@ -4704,7 +4704,7 @@ def _exp_to_dict(e) -> dict:
 
 
 # Thin compat alias kept so the two existing call-sites read naturally
-# ("matched_set"). The actual lookup logic lives in ``domain.build_skill_lookup``
+# ("matched_set"). The actual lookup logic lives in ``domain.scoring.build_skill_lookup``
 # — one place defines what "this stack item is known to the profile" means
 # for both the UI chip highlighting and the scoring penalty.
 _build_matched_set = build_skill_lookup

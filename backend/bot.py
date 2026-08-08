@@ -33,7 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from adapters import lm_studio, telegram
 from config import get_data_dir
 from backend import repository
-from backend.domain import should_apply_status
+from backend.domain.transitions import should_apply_status
 from backend.flows import IngestionPipeline, catch_up_missed_dms, process_dm
 from backend.helpers import extract_dm_text, extract_text, fetch_telegram_avatar
 from backend.repository import (
