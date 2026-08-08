@@ -10,6 +10,7 @@
 заведена первым.
 """
 
+from backend.flows import parse as parse_mod
 from backend.flows import ingest
 from backend.flows import embeddings
 from backend.models import TelegramChannel, Vacancy, VacancyEvent
@@ -122,7 +123,7 @@ async def test_a_refused_row_leaves_no_vector_behind(make_pipeline, session_fact
     assert pipeline._embedding_ids.tolist() == [first]
 
 
-async def test_an_unfinished_vacancy_is_picked_up_later(
+async def test_an_unfinished_vacancy_is_picked_up_later(monkeypatch, 
     make_pipeline, session_factory
 ):
     """Недоразобранная вакансия подбирается на следующем запуске."""
@@ -130,31 +131,31 @@ async def test_an_unfinished_vacancy_is_picked_up_later(
     pipeline = await make_pipeline()
     picked: list[tuple] = []
 
-    async def parse(vacancy_id, text, username, allow_delete=False):
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         picked.append((vacancy_id, text, allow_delete))
 
-    pipeline._parse_and_update_vacancy = parse
+    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 1
     assert picked == [(1, "текст", True)]
 
 
-async def test_a_parsed_vacancy_is_not_picked_up(make_pipeline, session_factory):
+async def test_a_parsed_vacancy_is_not_picked_up(monkeypatch, make_pipeline, session_factory):
     """Разобранная вакансия повторно не подбирается."""
     await put(session_factory, vacancy_row(title="готова", is_parsed=True, raw_text="т"))
     pipeline = await make_pipeline()
     picked: list[int] = []
 
-    async def parse(vacancy_id, text, username, allow_delete=False):
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         picked.append(vacancy_id)
 
-    pipeline._parse_and_update_vacancy = parse
+    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 0
     assert picked == []
 
 
-async def test_a_vacancy_without_text_cannot_be_picked_up(
+async def test_a_vacancy_without_text_cannot_be_picked_up(monkeypatch, 
     make_pipeline, session_factory
 ):
     """Недоразобранная вакансия без текста не подбирается: разбирать нечего."""
@@ -162,16 +163,16 @@ async def test_a_vacancy_without_text_cannot_be_picked_up(
     pipeline = await make_pipeline()
     picked: list[int] = []
 
-    async def parse(vacancy_id, text, username, allow_delete=False):
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         picked.append(vacancy_id)
 
-    pipeline._parse_and_update_vacancy = parse
+    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 0
     assert picked == []
 
 
-async def test_one_broken_orphan_does_not_stop_the_rest(
+async def test_one_broken_orphan_does_not_stop_the_rest(monkeypatch, 
     make_pipeline, session_factory
 ):
     """Сорвавшийся подбор одной вакансии остальные не отменяет.
@@ -187,18 +188,18 @@ async def test_one_broken_orphan_does_not_stop_the_rest(
     pipeline = await make_pipeline()
     done: list[str] = []
 
-    async def parse(vacancy_id, text, username, allow_delete=False):
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         if text == "первая":
             raise RuntimeError("не разобралось")
         done.append(text)
 
-    pipeline._parse_and_update_vacancy = parse
+    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 1
     assert done == ["вторая"]
 
 
-async def test_the_window_hears_about_the_recovery(make_pipeline, session_factory):
+async def test_the_window_hears_about_the_recovery(monkeypatch, make_pipeline, session_factory):
     """Окно узнаёт о подборе и о его завершении.
 
     Подбор идёт до обхода каналов; без гашения полосы следующая стадия
@@ -207,10 +208,10 @@ async def test_the_window_hears_about_the_recovery(make_pipeline, session_factor
     await put(session_factory, vacancy_row(title=None, is_parsed=False, raw_text="т"))
     pipeline = await make_pipeline()
 
-    async def parse(vacancy_id, text, username, allow_delete=False):
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         pass
 
-    pipeline._parse_and_update_vacancy = parse
+    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
     heard: list[tuple] = []
     pipeline.on_progress = lambda *args: heard.append(args)
 

@@ -12,6 +12,7 @@
 Служебные записи и опросы до сравнения не доходят вовсе: вакансий в них нет.
 """
 
+from backend.flows import parse as parse_mod
 import pytest
 
 from backend.flows import ingest
@@ -36,10 +37,10 @@ async def intake(make_pipeline, monkeypatch):
         pipeline.saved.append((channel_id, msg.id, text))
         return pipeline.new_id
 
-    async def parse(vacancy_id, text, username):
+    async def parse(pipeline, vacancy_id, text, username):
         pipeline.parsed.append((vacancy_id, text))
 
-    async def unparsed(vacancy_id):
+    async def unparsed(pipeline, vacancy_id):
         return pipeline.unparsed
 
     monkeypatch.setattr("adapters.lm_studio.embed", embed)
@@ -48,8 +49,8 @@ async def intake(make_pipeline, monkeypatch):
         lambda vec, ids, matrix, threshold: pipeline.similar_id,
     )
     monkeypatch.setattr(ingest, "_save_new_vacancy", save)
-    pipeline._parse_and_update_vacancy = parse
-    pipeline._is_unparsed_vacancy = unparsed
+    monkeypatch.setattr(parse_mod, "_parse_and_update_vacancy", parse)
+    monkeypatch.setattr(parse_mod, "_is_unparsed_vacancy", unparsed)
     return pipeline
 
 

@@ -14,6 +14,7 @@
 как ошибка приложения.
 """
 
+from backend.flows import parse
 import pytest
 
 from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
@@ -54,7 +55,7 @@ async def test_an_empty_vacancy_is_marked_unfit_with_a_reason(
     """
     pipeline, vacancy = emptied
 
-    await pipeline._save_empty_vacancy(vacancy.id, parsed_vacancy(title="Хоть что-то"))
+    await parse._save_empty_vacancy(pipeline, vacancy.id, parsed_vacancy(title="Хоть что-то"))
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.status is VacancyStatus.NOT_FIT
@@ -70,7 +71,7 @@ async def test_an_empty_vacancy_counts_as_parsed(emptied, session_factory):
     """
     pipeline, vacancy = emptied
 
-    await pipeline._save_empty_vacancy(vacancy.id, parsed_vacancy(title="Хоть что-то"))
+    await parse._save_empty_vacancy(pipeline, vacancy.id, parsed_vacancy(title="Хоть что-то"))
 
     assert (await only_row(session_factory, Vacancy)).is_parsed is True
 
@@ -83,7 +84,7 @@ async def test_whatever_was_extracted_is_kept(emptied, session_factory):
     """
     pipeline, vacancy = emptied
 
-    await pipeline._save_empty_vacancy(
+    await parse._save_empty_vacancy(pipeline, 
         vacancy.id,
         parsed_vacancy(title="Python-разработчик", location="Ереван"),
     )
@@ -101,7 +102,7 @@ async def test_nothing_extracted_wipes_the_previous_parse(emptied, session_facto
     """
     pipeline, vacancy = emptied
 
-    await pipeline._save_empty_vacancy(vacancy.id, None)
+    await parse._save_empty_vacancy(pipeline, vacancy.id, None)
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.title is None
@@ -118,7 +119,7 @@ async def test_the_company_is_linked_even_here(emptied, session_factory):
     """
     pipeline, vacancy = emptied
 
-    await pipeline._save_empty_vacancy(
+    await parse._save_empty_vacancy(pipeline, 
         vacancy.id, parsed_vacancy(title="Что-то", company_name="Контур")
     )
 
@@ -139,7 +140,7 @@ async def test_the_hr_is_linked_even_here(session_factory, make_pipeline):
     await put(session_factory, vacancy_row(title="прошлое"))
     vacancy = await only_row(session_factory, Vacancy)
 
-    await pipeline._save_empty_vacancy(
+    await parse._save_empty_vacancy(pipeline, 
         vacancy.id, parsed_vacancy(title="Что-то", hr_contact="@maria")
     )
 
@@ -168,7 +169,7 @@ async def test_an_hr_avatar_is_picked_up_on_the_way(session_factory, make_pipeli
     await put(session_factory, vacancy_row(title="прошлое"))
     vacancy = await only_row(session_factory, Vacancy)
 
-    await pipeline._save_empty_vacancy(
+    await parse._save_empty_vacancy(pipeline, 
         vacancy.id, parsed_vacancy(title="Что-то", hr_contact="@maria")
     )
 
@@ -183,7 +184,7 @@ async def test_the_timeline_records_the_empty_parse(emptied, session_factory):
     """
     pipeline, vacancy = emptied
 
-    await pipeline._save_empty_vacancy(
+    await parse._save_empty_vacancy(pipeline, 
         vacancy.id, parsed_vacancy(title="Python-разработчик")
     )
 
@@ -199,7 +200,7 @@ async def test_the_timeline_says_nothing_was_filled(emptied, session_factory):
     """Когда не вытащено ничего, в ленте так и записано."""
     pipeline, vacancy = emptied
 
-    await pipeline._save_empty_vacancy(vacancy.id, None)
+    await parse._save_empty_vacancy(pipeline, vacancy.id, None)
 
     saved = await only_row(session_factory, VacancyEvent)
     assert saved.payload["fields_filled"] == []
@@ -212,7 +213,7 @@ async def test_a_vanished_vacancy_is_left_alone(make_pipeline, session_factory):
     """
     pipeline = await make_pipeline()
 
-    await pipeline._save_empty_vacancy(404, parsed_vacancy(title="Что-то"))
+    await parse._save_empty_vacancy(pipeline, 404, parsed_vacancy(title="Что-то"))
 
     assert await all_rows(session_factory, VacancyEvent) == []
 
@@ -228,6 +229,6 @@ async def test_the_window_hears_about_both_lists(emptied):
     pipeline.on_contacts_changed = lambda: heard.append("контакты")
     pipeline.on_vacancies_changed = lambda: heard.append("вакансии")
 
-    await pipeline._save_empty_vacancy(vacancy.id, parsed_vacancy(title="Что-то"))
+    await parse._save_empty_vacancy(pipeline, vacancy.id, parsed_vacancy(title="Что-то"))
 
     assert heard == ["контакты", "вакансии"]
