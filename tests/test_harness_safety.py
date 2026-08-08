@@ -43,6 +43,21 @@ async def test_a_call_into_real_telegram_blows_up():
         await pyrogram.Client.invoke(None, None)
 
 
+async def test_a_call_through_a_raw_session_blows_up_too():
+    """Вызов `Session.invoke` падает так же, а не уходит на сервер.
+
+    Часть работы Pyrogram делает не через клиент, а поднимая отдельную
+    сессию: так идут заливка файла, скачивание медиа и подключение. Через
+    первый из этих путей отправка файла заливала его на сервера Telegram и
+    упиралась в верхний запор только на последнем шаге — файл к тому
+    моменту уже был там.
+    """
+    import pyrogram
+
+    with pytest.raises(TelegramReached, match="настоящего Telegram"):
+        await pyrogram.session.Session.invoke(None, None)
+
+
 async def test_the_telegram_refusal_survives_an_except_exception_block():
     """Запор не проглатывается `except Exception` боевого кода.
 

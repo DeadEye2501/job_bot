@@ -162,17 +162,15 @@ def _telegram_is_unreachable(monkeypatch):
     методы клиента напрямую, минуя `send_dm`.
 
     Единственной воронкой Pyrogram `Client.invoke` НЕ является. Под часть
-    работы библиотека поднимает отдельные `Session` и зовёт `Session.invoke`,
-    то есть эти пути запор не покрывает:
+    работы библиотека поднимает отдельные `Session` и зовёт `Session.invoke`
+    напрямую: так идут заливка файла (`save_file`), скачивание медиа вместе с
+    обращением к раздающему узлу, подключение и авторизация. Через первый из
+    этих путей `send_photo`/`send_document` с путём к файлу сперва заливали
+    файл на сервера Telegram и упирались в запор только на последнем шаге —
+    файл к тому моменту уже был там.
 
-    * заливка файла — `pyrogram/methods/advanced/save_file.py:109`. Поэтому
-      `backend/bot.py:1123/1125` (`send_photo`/`send_document` с путём к
-      файлу) сначала зальют файл на сервера Telegram и упрутся в запор
-      только на последнем шаге — файл к тому моменту уже там;
-    * скачивание медиа — `pyrogram/client.py:891`, плюс CDN-сессия на `:946`.
-      Поэтому `backend/bot.py:139` (`download_media`) до запора не доходит
-      вообще;
-    * `Client.connect()` и авторизация.
+    Поэтому запор двойной: подменяются обе воронки. Нижняя, `Session.invoke`,
+    ловит и то, что до верхней не доходит.
 
     Тестам, которым нужны эти пути, настоящий клиент передавать нельзя ни
     при каких условиях — только подделку из `tests/fakes/telegram.py`.
@@ -180,11 +178,13 @@ def _telegram_is_unreachable(monkeypatch):
 
     async def _refuse(*_args, **_kwargs):
         raise TelegramReached(
-            "тест дотянулся до настоящего Telegram: вызван pyrogram.Client.invoke. "
-            "Передайте в проверяемый код подделку из tests/fakes/telegram.py."
+            "тест дотянулся до настоящего Telegram: вызван invoke у клиента или "
+            "сессии Pyrogram. Передайте в проверяемый код подделку из "
+            "tests/fakes/telegram.py."
         )
 
     monkeypatch.setattr(pyrogram.Client, "invoke", _refuse)
+    monkeypatch.setattr(pyrogram.session.Session, "invoke", _refuse)
 
 
 @pytest.fixture(autouse=True)
