@@ -6,7 +6,7 @@
 под этим именем или одним из написаний.
 """
 
-from backend.repository import get_stats_skills
+from backend.repository.stats_summary import get_stats_skills
 from tests.dbio import put
 from tests.factories import days_ago, profile_row, profile_skill_row, vacancy_row
 

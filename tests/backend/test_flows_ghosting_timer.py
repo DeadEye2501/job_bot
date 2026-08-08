@@ -165,7 +165,9 @@ async def test_a_failed_check_does_not_break_the_turn(
     async def broken(session, timeout_days):
         raise OSError("база недоступна")
 
-    monkeypatch.setattr("backend.repository.mark_ghosted_vacancies", broken)
+    monkeypatch.setattr(
+        "backend.repository.vacancies_life.mark_ghosted_vacancies", broken
+    )
 
     assert await pipeline.check_ghosting_timeouts() == 0
 

@@ -5,11 +5,7 @@
 известно не всё. Поэтому поиск проверяет оба, а кнопка «добавить» пишет одно.
 """
 
-from backend.repository import (
-    get_hr_detail,
-    hr_blacklist_candidates,
-    hr_blacklist_preferred_value,
-)
+from backend.repository.hr_card import get_hr_detail, hr_blacklist_candidates, hr_blacklist_preferred_value
 from tests.dbio import put
 from tests.factories import blacklist_row, hr_row
 

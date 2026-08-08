@@ -6,7 +6,8 @@
 сама запись.
 """
 
-from backend.repository import add_vacancy_event, get_vacancy_detail
+from backend.repository.vacancies_card import get_vacancy_detail
+from backend.repository.vacancies_life import add_vacancy_event
 from tests.dbio import put
 from tests.factories import vacancy_row
 

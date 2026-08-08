@@ -4,7 +4,7 @@
 раскладываются по строкам одним проходом — вместо запроса на каждый канал.
 """
 
-from backend.repository import list_telegram_channels
+from backend.repository.channels import list_telegram_channels
 from tests.dbio import put
 from tests.factories import blacklist_row, channel_row, vacancy_row
 

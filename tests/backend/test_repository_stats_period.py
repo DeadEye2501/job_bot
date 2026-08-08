@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from backend.repository import _stats_period_since
+from backend.repository.stats_summary import _stats_period_since
 
 
 @pytest.mark.parametrize(

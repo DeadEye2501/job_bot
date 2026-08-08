@@ -32,14 +32,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from adapters import lm_studio, telegram
 from config import get_data_dir
-from backend import repository
+from backend.repository.channels import delete_channel, find_channel_by_username, reset_channel_cursor
 from backend.domain.transitions import should_apply_status
 from backend.flows import IngestionPipeline, catch_up_missed_dms, process_dm
 from backend.helpers import extract_dm_text, extract_text, fetch_telegram_avatar
-from backend.repository import (
-    _hr_blacklist_value,
-    find_known_hr,
-)
+from backend.repository.hr_card import _hr_blacklist_value
+from backend.repository.hr_identify import find_known_hr
 from backend.models import (
     HR,
     BotMode,
@@ -379,7 +377,7 @@ class Bot:
         """UI «Сбросить курсор» — clears last_processed_msg_id."""
         async with self._session_factory() as session:
             async with session.begin():
-                return await repository.reset_channel_cursor(session, channel_id)
+                return await reset_channel_cursor(session, channel_id)
 
     async def delete_channel(self, channel_id: int) -> int | None:
         """UI «Удалить канал» — severs vacancy FKs and deletes the row.
@@ -387,7 +385,7 @@ class Bot:
         """
         async with self._session_factory() as session:
             async with session.begin():
-                return await repository.delete_channel(session, channel_id)
+                return await delete_channel(session, channel_id)
 
     async def add_channel(
         self, username: str
@@ -405,7 +403,7 @@ class Bot:
         выступает валидатором существования.
         """
         async with self._session_factory() as session:
-            existing = await repository.find_channel_by_username(session, username)
+            existing = await find_channel_by_username(session, username)
             if existing is not None:
                 return existing.id, "exists"
 
@@ -431,7 +429,7 @@ class Bot:
             async with session.begin():
                 # Race-guard: ещё одна вкладка/процесс могла успеть вставить
                 # за время `get_chat` — повторно проверяем дубль.
-                existing = await repository.find_channel_by_username(session, username)
+                existing = await find_channel_by_username(session, username)
                 if existing is not None:
                     return existing.id, "exists"
                 from backend.models import TelegramChannel

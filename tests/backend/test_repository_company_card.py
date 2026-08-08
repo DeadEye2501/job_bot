@@ -6,12 +6,8 @@
 её записывают именем — единственным написанием.
 """
 
-from backend.repository import (
-    company_blacklist_candidates,
-    company_blacklist_preferred_value,
-    get_company_detail,
-    list_hrs_for_company,
-)
+from backend.repository.companies_card import company_blacklist_candidates, company_blacklist_preferred_value, get_company_detail
+from backend.repository.hr_list import list_hrs_for_company
 from tests.dbio import put
 from tests.factories import blacklist_row, company_row, hr_row, vacancy_row
 

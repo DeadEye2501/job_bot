@@ -6,7 +6,7 @@
 """
 
 from backend.models import VacancyStatus
-from backend.repository import get_vacancy_detail
+from backend.repository.vacancies_card import get_vacancy_detail
 from tests.dbio import put
 from tests.factories import (
     at,

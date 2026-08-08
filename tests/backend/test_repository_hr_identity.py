@@ -5,7 +5,7 @@
 поэтому при споре он уступает.
 """
 
-from backend.repository import find_known_hr, refresh_hr_username
+from backend.repository.hr_identify import find_known_hr, refresh_hr_username
 from tests.dbio import put
 from tests.factories import hr_row
 

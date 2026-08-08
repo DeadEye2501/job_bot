@@ -4,7 +4,7 @@
 язык дважды» сама собой — сверять список построчно незачем.
 """
 
-from backend.repository import list_profile_languages, replace_profile_languages
+from backend.repository.profile import list_profile_languages, replace_profile_languages
 from tests.dbio import put
 from tests.factories import profile_row
 

@@ -19,7 +19,7 @@ from backend.models import (
 )
 from backend.crypto import encrypt_str
 from backend.payloads import FitValidation
-from backend.repository import list_vacancies
+from backend.repository.vacancies_list import list_vacancies
 from backend.runtime_settings import RuntimeSettings
 from tests.dbio import only_row, put
 from tests.factories import (

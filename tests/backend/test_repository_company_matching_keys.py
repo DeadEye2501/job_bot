@@ -9,15 +9,7 @@
 
 import pytest
 
-from backend.repository import (
-    _hosts_compatible,
-    _is_aggregator_host,
-    _normalize_company_name,
-    _normalize_host,
-    _real_corporate_website,
-    _signal_host,
-    _translit_cyr_to_latin,
-)
+from backend.repository.companies_matching import _hosts_compatible, _is_aggregator_host, _normalize_company_name, _normalize_host, _real_corporate_website, _signal_host, _translit_cyr_to_latin
 
 
 @pytest.mark.parametrize(

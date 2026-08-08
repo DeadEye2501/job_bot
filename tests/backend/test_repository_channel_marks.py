@@ -4,10 +4,7 @@
 ровно в том виде, в каком его пишет кнопка на экране.
 """
 
-from backend.repository import (
-    channel_blacklist_candidates,
-    channel_blacklist_preferred_value,
-)
+from backend.repository.channels import channel_blacklist_candidates, channel_blacklist_preferred_value
 from tests.factories import channel_row
 
 

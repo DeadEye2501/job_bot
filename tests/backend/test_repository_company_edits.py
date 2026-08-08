@@ -5,7 +5,7 @@
 вызов, а не одно поле.
 """
 
-from backend.repository import get_company_detail, update_company_fields
+from backend.repository.companies_card import get_company_detail, update_company_fields
 from tests.dbio import put
 from tests.factories import company_row
 

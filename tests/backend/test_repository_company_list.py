@@ -5,7 +5,7 @@
 сайт, — потому что искать компанию пользователь может по любому из них.
 """
 
-from backend.repository import list_companies_with_counts
+from backend.repository.companies_list import list_companies_with_counts
 from tests.dbio import put
 from tests.factories import blacklist_row, company_row, vacancy_row
 

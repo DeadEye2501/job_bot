@@ -7,11 +7,7 @@
 """
 
 from backend.models import VacancyStatus
-from backend.repository import (
-    list_vacancies_for_channel,
-    list_vacancies_for_company,
-    list_vacancies_for_hr,
-)
+from backend.repository.vacancies_mini import list_vacancies_for_channel, list_vacancies_for_company, list_vacancies_for_hr
 from tests.dbio import put
 from tests.factories import (
     at,
