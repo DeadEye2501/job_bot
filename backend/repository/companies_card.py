@@ -135,6 +135,9 @@ async def update_company_fields(
         changed.append("website")
     if aliases is not _COMPANY_FIELD_UNSET:
         # Accept list-of-str only; normalize: strip + dedup + drop empty.
+        # С именем компании набранное здесь не сверяется намеренно: список
+        # человек пишет руками, и выбросить написанное им значило бы стереть
+        # введённое молча. Слияние сверяется — там список копится сам.
         seen = set()
         cleaned_list: list[str] = []
         for a in (aliases or []):
@@ -218,12 +221,18 @@ async def merge_company(
     await session.delete(absorbed)
     await session.flush()
 
+    # Сравнение буквальное, без нормализации имён: список написаний читает не
+    # только сопоставление (ему хватило бы нормализованных форм), но и поиск по
+    # подстроке, и карточка компании. Написание, отброшенное как «сопоставлению
+    # ничего не даёт», исчезло бы из базы вместе с поглощённой строкой — а по
+    # нему компанию ищут словами.
     aliases = list(survivor.aliases or [])
-    seen = {a.casefold() for a in aliases}
+    known = {(survivor.name or "").casefold()}
+    known.update(a.casefold() for a in aliases)
     for candidate in abs_aliases + [abs_name]:
-        if candidate and candidate.casefold() not in seen:
+        if candidate and candidate.casefold() not in known:
             aliases.append(candidate)
-            seen.add(candidate.casefold())
+            known.add(candidate.casefold())
     survivor.aliases = aliases
 
     if not survivor.website and abs_website:

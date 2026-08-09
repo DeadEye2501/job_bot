@@ -244,8 +244,14 @@ MUTATIONS = [
     # merge_company: повтор написания добавляется второй раз
     (
         "backend/repository/companies_card.py",
-        "        if candidate and candidate.casefold() not in seen:",
+        "        if candidate and candidate.casefold() not in known:",
         "        if candidate:",
+    ),
+    # merge_company: собственное имя оставшейся перестаёт считаться написанием
+    (
+        "backend/repository/companies_card.py",
+        '    known = {(survivor.name or "").casefold()}',
+        "    known = set()",
     ),
     # merge_company: чужой сайт затирает свой
     (
