@@ -11,6 +11,7 @@
 
 import pytest
 
+from backend.bot.media import MEDIA_DIR
 from backend.models import HR, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import blacklist_row, hr_row, message_row
@@ -164,6 +165,28 @@ async def test_a_duplicate_letter_is_not_saved_twice(session_factory, deliver):
     await deliver(incoming())
 
     assert (await only_row(session_factory, Message)).text == "уже было"
+
+
+async def test_a_letter_survives_a_file_where_the_media_folder_belongs(
+    session_factory, deliver
+):
+    """Письмо с вложением доходит до переписки, даже если место занято.
+
+    Если по пути `media/<hr_id>` лежит файл, а не папка, скачать вложение
+    некуда. Само письмо от этого пропасть не должно: текст и отправитель
+    известны и без файла, а потерянное входящее не восстановить ничем.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777))
+    hr = await only_row(session_factory, HR)
+    MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    (MEDIA_DIR / str(hr.id)).write_bytes(b"")
+
+    await deliver(incoming(photo=photo()), client=FakeTelegramClient())
+
+    saved = await only_row(session_factory, Message)
+    assert saved.media_kind == "photo"
+    assert saved.media_path is None
+    assert saved.text == "здравствуйте"
 
 
 async def test_a_stranger_costs_nothing_to_ignore(session_factory, deliver):
