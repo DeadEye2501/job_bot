@@ -4,13 +4,12 @@ from sqlalchemy import JSON, BigInteger, Index, LargeBinary, text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import expression
 
-from backend.models.base import Base
+from backend.models.base import Base, IdMixin
 
 
-class TelegramChannel(Base):
+class TelegramChannel(IdMixin, Base):
     __tablename__ = "telegram_channel"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str | None]
     title: Mapped[str | None]
     is_active: Mapped[bool] = mapped_column(server_default=expression.true())
@@ -21,7 +20,7 @@ class TelegramChannel(Base):
     avatar: Mapped[bytes | None] = mapped_column(LargeBinary)
 
 
-class HR(Base):
+class HR(IdMixin, Base):
     __tablename__ = "hr"
     __table_args__ = (
         Index(
@@ -33,7 +32,6 @@ class HR(Base):
         ),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str | None]
     telegram_username: Mapped[str | None]
     telegram_user_id: Mapped[int | None] = mapped_column(BigInteger)
@@ -41,10 +39,9 @@ class HR(Base):
     avatar: Mapped[bytes | None] = mapped_column(LargeBinary)
 
 
-class Company(Base):
+class Company(IdMixin, Base):
     __tablename__ = "company"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(unique=True)
     aliases: Mapped[list[str]] = mapped_column(
         JSON, server_default=text("'[]'")

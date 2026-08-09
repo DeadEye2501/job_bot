@@ -17,12 +17,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import expression
 
-from backend.models.base import Base
+from backend.models.base import Base, CreatedAtMixin, IdMixin
 from backend.models.contacts import HR, Company, TelegramChannel
 from backend.models.enums import Currency, StatusHistorySource, VacancyStatus
 
 
-class Vacancy(Base):
+class Vacancy(IdMixin, CreatedAtMixin, Base):
     __tablename__ = "vacancy"
     # SQLite сам индексов на FK не создаёт — каждая отрисовка HR-карточки,
     # карточки компании, статистики канала иначе делает full-scan. Compound
@@ -41,7 +41,6 @@ class Vacancy(Base):
         Index("ix_vacancy_company_id_is_parsed", "company_id", "is_parsed"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     hr_id: Mapped[int | None] = mapped_column(ForeignKey("hr.id"))
     company_id: Mapped[int | None] = mapped_column(ForeignKey("company.id"))
     source_channel_id: Mapped[int | None] = mapped_column(
@@ -91,16 +90,12 @@ class Vacancy(Base):
     is_parsed: Mapped[bool] = mapped_column(server_default=expression.false())
     notes: Mapped[str | None]
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-    )
     hr: Mapped[HR | None] = relationship()
     company: Mapped[Company | None] = relationship()
     channel: Mapped[TelegramChannel | None] = relationship()
 
 
-class VacancyEvent(Base):
+class VacancyEvent(IdMixin, CreatedAtMixin, Base):
     """Pipeline / lifecycle events for the timeline (non-status changes).
 
     Status transitions go to ``vacancy_status_history``; everything else
@@ -113,17 +108,12 @@ class VacancyEvent(Base):
         Index("ix_vacancy_event_vacancy_created", "vacancy_id", "created_at"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     vacancy_id: Mapped[int] = mapped_column(ForeignKey("vacancy.id"))
     kind: Mapped[str]
     payload: Mapped[dict | None] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-    )
 
 
-class TrashEvent(Base):
+class TrashEvent(IdMixin, CreatedAtMixin, Base):
     """Запись о посте, отсеянном LLM-валидатором как trash и удалённом
     из БД (auto-ingest) либо помеченном Not Fit с trash-маркером (rerun).
 
@@ -150,19 +140,14 @@ class TrashEvent(Base):
         Index("ix_trash_event_channel_created", "source_channel_id", "created_at"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     source_channel_id: Mapped[int | None] = mapped_column(
         ForeignKey("telegram_channel.id", ondelete="SET NULL"),
     )
     source_msg_id: Mapped[int | None] = mapped_column(BigInteger)
     reason: Mapped[str | None]
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-    )
 
 
-class VacancyStatusHistory(Base):
+class VacancyStatusHistory(IdMixin, Base):
     __tablename__ = "vacancy_status_history"
     __table_args__ = (
         Index("ix_vsh_vacancy_changed", "vacancy_id", "changed_at"),
@@ -171,7 +156,6 @@ class VacancyStatusHistory(Base):
         Index("ix_vsh_status", "status"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     vacancy_id: Mapped[int] = mapped_column(ForeignKey("vacancy.id"))
     message_id: Mapped[int | None] = mapped_column(ForeignKey("message.id"))
     previous_status: Mapped[VacancyStatus | None] = mapped_column(

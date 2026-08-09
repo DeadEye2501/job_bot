@@ -6,10 +6,10 @@ from sqlalchemy import DateTime, ForeignKey, Index, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import expression
 
-from backend.models.base import Base
+from backend.models.base import Base, IdMixin
 
 
-class Message(Base):
+class Message(IdMixin, Base):
     __tablename__ = "message"
     # FK-индексы на hr_id / vacancy_id горячие: chat-list, HR-detail,
     # vacancy-delete-cascade ходят по ним в каждом UI-action'е.
@@ -24,7 +24,6 @@ class Message(Base):
         Index("ix_message_vacancy_id", "vacancy_id"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     is_incoming: Mapped[bool] = mapped_column(server_default=expression.false())
     hr_id: Mapped[int | None] = mapped_column(ForeignKey("hr.id"))
     vacancy_id: Mapped[int | None] = mapped_column(ForeignKey("vacancy.id"))

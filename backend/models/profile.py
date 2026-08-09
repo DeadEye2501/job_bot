@@ -1,20 +1,18 @@
 """Таблицы анкеты кандидата."""
 
-from datetime import date, datetime
+from datetime import date
 
 from sqlalchemy import (
     JSON,
     Column,
-    DateTime,
     ForeignKey,
     Table,
     UniqueConstraint,
-    func,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.models.base import Base
+from backend.models.base import Base, IdMixin, UpdatedAtMixin
 
 profile_experience_skills = Table(
     "profile_experience_skills",
@@ -24,10 +22,9 @@ profile_experience_skills = Table(
 )
 
 
-class Profile(Base):
+class Profile(IdMixin, UpdatedAtMixin, Base):
     __tablename__ = "profile"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     first_name: Mapped[str]
     last_name: Mapped[str]
     title: Mapped[str]
@@ -47,14 +44,8 @@ class Profile(Base):
     )
     free_preferences: Mapped[str | None]
 
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-    )
 
-
-class ProfileLanguage(Base):
+class ProfileLanguage(IdMixin, Base):
     """Языки кандидата с уровнем владения для LLM-валидации.
 
     Один профиль — несколько языков (Русский native, Английский B1, и т.д.).
@@ -70,16 +61,14 @@ class ProfileLanguage(Base):
         UniqueConstraint("profile_id", "language"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     profile_id: Mapped[int] = mapped_column(ForeignKey("profile.id"))
     language: Mapped[str]
     level: Mapped[str]  # "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "native"
 
 
-class ProfileSkill(Base):
+class ProfileSkill(IdMixin, Base):
     __tablename__ = "profile_skills"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     profile_id: Mapped[int] = mapped_column(ForeignKey("profile.id"))
     category: Mapped[str]
     name: Mapped[str]
@@ -89,10 +78,9 @@ class ProfileSkill(Base):
     )
 
 
-class ProfileExperience(Base):
+class ProfileExperience(IdMixin, Base):
     __tablename__ = "profile_experience"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     profile_id: Mapped[int] = mapped_column(ForeignKey("profile.id"))
     company: Mapped[str]
     company_url: Mapped[str | None]
