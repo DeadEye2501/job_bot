@@ -241,3 +241,26 @@ def test_the_running_application_writes_its_log_to_the_file(tmp_path):
     assert done.returncode == 0, done.stderr
     assert "после схемы" in written
     assert "Bearer abcDEF123456_secret-token" not in written
+
+
+def test_the_running_application_switches_its_output_to_utf8(tmp_path):
+    """Ввоз приложения перенастраивает вывод на UTF-8.
+
+    Проверяется подпроцессом и с чистым окружением: под `PYTHONIOENCODING`
+    поток и так был бы в UTF-8, и снятая перенастройка выглядела бы рабочей.
+    На Windows умолчание — однобайтовая кодировка системы, и без
+    перенастройки первая же русская строка в консоли ломается.
+    """
+    env = {
+        k: v for k, v in os.environ.items() if k not in ("PYTHONIOENCODING", "APPDATA")
+    }
+    done = subprocess.run(
+        [sys.executable, "-c", "import main, sys; print(sys.stdout.encoding)"],
+        cwd=str(ROOT),
+        env={**env, "APPDATA": str(tmp_path)},
+        capture_output=True,
+        text=True,
+    )
+
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip().lower() == "utf-8"
