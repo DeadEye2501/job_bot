@@ -124,20 +124,27 @@ def database_url() -> str:
     return get_database_url()
 
 
+def alembic_config() -> Config:
+    """`Config` для alembic, посчитанный от корня проекта.
+
+    URL сюда намеренно не кладётся: `alembic/env.py` всё равно перезапишет его
+    через `config.get_database_url()` — владелец URL для миграций он, а не этот
+    `Config`.
+    """
+    cfg = Config(str(PROJECT_ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(PROJECT_ROOT / "alembic"))
+    return cfg
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _schema(database_url):
     """Схема поднимается один раз на прогон настоящим alembic'ом.
 
     Синхронная фикстура намеренно: alembic заводит свой цикл событий внутри,
-    и из уже работающего цикла его звать нельзя.
+    и из уже работающего цикла его звать нельзя. Параметр `database_url`
+    фикстура держит явным порядок вычисления, а не для использования.
     """
-    cfg = Config(str(PROJECT_ROOT / "alembic.ini"))
-    cfg.set_main_option("script_location", str(PROJECT_ROOT / "alembic"))
-    # URL сюда намеренно не кладём: `alembic/env.py` всё равно перезапишет
-    # его через `config.get_database_url()` — владелец URL для миграций он,
-    # а не этот `Config`. Параметр `database_url` фикстура держит явным
-    # порядок вычисления, а не для использования.
-    command.upgrade(cfg, INIT_REVISION)
+    command.upgrade(alembic_config(), INIT_REVISION)
 
 
 class TelegramReached(BaseException):
