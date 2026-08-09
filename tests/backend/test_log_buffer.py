@@ -5,8 +5,11 @@
 """
 
 import logging
+import sys
 
 import pytest
+
+from config import get_log_path
 
 from backend.log_buffer import (
     MAX_RECORDS,
@@ -15,6 +18,20 @@ from backend.log_buffer import (
     install,
     install_secret_filter,
 )
+
+
+@pytest.fixture
+def clean_log_file():
+    """Пустой файл журнала на входе в тест и убранный на выходе.
+
+    В него обработчик буфера сообщает о своих бедах, минуя логирование.
+    Остаток от прошлого теста подменял бы «записалось сейчас» на «лежало
+    и раньше».
+    """
+    path = get_log_path()
+    path.unlink(missing_ok=True)
+    yield path
+    path.unlink(missing_ok=True)
 
 
 def record(msg: str, *, name: str = "проверка", level: int = logging.INFO):
@@ -166,12 +183,13 @@ def test_a_failing_subscriber_does_not_stop_buffering():
     assert handler.snapshot()[-1]["msg"] == "сообщение"
 
 
-def test_a_failing_subscriber_is_reported_and_not_swallowed(capsys):
+def test_a_failing_subscriber_is_reported_and_not_swallowed(clean_log_file):
     """Об упавшем подписчике сообщается, а не молчится.
 
     Записать беду обычным путём тут нельзя — это сам обработчик логов, и
-    запись из него ушла бы по кругу. Для такого у стандартной библиотеки
-    заведён `handleError`: он печатает трассировку в поток ошибок.
+    запись из него ушла бы по кругу. Штатный для такого `handleError`
+    печатает в поток ошибок, а в оконной сборке его нет вовсе — поэтому
+    сообщается прямо в файл журнала, мимо логирования.
     """
     handler = LogBufferHandler()
 
@@ -182,7 +200,63 @@ def test_a_failing_subscriber_is_reported_and_not_swallowed(capsys):
 
     handler.emit(record("сообщение"))
 
-    assert "подписчик сломался" in capsys.readouterr().err
+    assert "подписчик сломался" in clean_log_file.read_text(encoding="utf-8")
+
+
+def _unbuildable():
+    """Запись, у которой сообщение не собирается: доводов меньше, чем мест."""
+    return logging.LogRecord(
+        name="проверка", level=logging.ERROR, pathname=__file__, lineno=1,
+        msg="не хватает %s и %s", args=("одного",), exc_info=None,
+    )
+
+
+def test_a_record_that_cannot_be_built_leaves_a_trace_from_the_filter(
+    clean_log_file,
+):
+    """Неразбираемая запись оставляет след, а не проходит фильтр молча.
+
+    Собрать сообщение фильтр не смог — значит и вымарать секреты в нём не
+    смог. Пропустить такую запись дальше можно, промолчать о ней нельзя:
+    именно в ней секрет и уедет незамаскированным.
+    """
+    assert SecretRedactionFilter().filter(_unbuildable()) is True
+
+    assert "не хватает" in clean_log_file.read_text(encoding="utf-8")
+
+
+def test_a_record_that_cannot_be_built_leaves_a_trace_from_the_handler(
+    clean_log_file,
+):
+    """Та же запись оставляет след и в обработчике буфера."""
+    handler = LogBufferHandler()
+
+    handler.emit(_unbuildable())
+
+    assert handler.snapshot()[-1]["msg"] == "не хватает %s и %s"
+    assert "не хватает" in clean_log_file.read_text(encoding="utf-8")
+
+
+def test_an_unformattable_traceback_leaves_a_trace(clean_log_file):
+    """Несобравшаяся трассировка оставляет след, а не тихо теряется."""
+    handler = LogBufferHandler()
+
+    class Refuses(logging.Formatter):
+        def format(self, record):
+            raise RuntimeError(f"форматтер сломался на {record.name}")
+
+    handler.setFormatter(Refuses())
+    try:
+        raise ValueError("сломалось")
+    except ValueError:
+        entry = logging.LogRecord(
+            name="проверка", level=logging.ERROR, pathname=__file__, lineno=1,
+            msg="упало", args=(), exc_info=sys.exc_info(),
+        )
+    handler.emit(entry)
+
+    assert handler.snapshot()[-1]["details"] is None
+    assert "форматтер сломался" in clean_log_file.read_text(encoding="utf-8")
 
 
 def test_a_traceback_lands_in_the_details():
@@ -231,3 +305,81 @@ def test_installing_twice_attaches_one_handler(clean_root_logger):
     install()
 
     assert clean_root_logger.handlers.count(get_handler()) == 1
+
+
+def test_a_secret_in_an_unreadable_template_is_masked_in_the_file(clean_log_file):
+    """Секрет из несобравшейся записи не уезжает в файл открытым.
+
+    Вымарывать её обычным путём нечем — сообщение не собралось, — но именно
+    поэтому шаблон и попадает в отчёт целиком, а в шаблоне бывает всё.
+    """
+    entry = logging.LogRecord(
+        name="проверка", level=logging.ERROR, pathname=__file__, lineno=1,
+        msg="токен Bearer abcdefgh12345678 и %s и %s", args=("одного",), exc_info=None,
+    )
+
+    SecretRedactionFilter().filter(entry)
+
+    written = clean_log_file.read_text(encoding="utf-8")
+    assert "abcdefgh12345678" not in written
+    assert "***" in written
+
+
+def test_one_bad_record_is_reported_once_by_the_filter(clean_log_file):
+    """Одна негодная запись — один отчёт от фильтра, сколько бы их ни висело.
+
+    Фильтр вешается на каждый обработчик корня своим экземпляром, и без
+    отметки на записи о ней сообщил бы каждый: три обработчика — три
+    трассировки. Поток таких записей вытер бы историю, ради которой файл и
+    заведён.
+    """
+    entry = _unbuildable()
+
+    SecretRedactionFilter().filter(entry)
+    SecretRedactionFilter().filter(entry)
+    SecretRedactionFilter().filter(entry)
+
+    assert clean_log_file.read_text(encoding="utf-8").count("не собирается") == 1
+
+
+def test_a_template_that_cannot_be_read_does_not_break_the_caller():
+    """Логирование не роняет того, кто его позвал, даже на дикой записи.
+
+    Шаблон записи бывает не строкой, а объектом, и его `__repr__` тоже
+    бывает сломан. Раньше такая запись проходила фильтр молча; теперь о ней
+    сообщают — и это не должно превратить жалобу в падение.
+    """
+
+    class Wild:
+        def __repr__(self):
+            raise RuntimeError("шаблон не читается")
+
+    entry = logging.LogRecord(
+        name="проверка", level=logging.ERROR, pathname=__file__, lineno=1,
+        msg=Wild(), args=("лишний",), exc_info=None,
+    )
+
+    assert SecretRedactionFilter().filter(entry) is True
+
+
+def test_an_unavailable_file_is_reported_to_the_stream(monkeypatch, capsys, tmp_path):
+    """Когда и файл недоступен, беда уходит в поток ошибок."""
+    monkeypatch.setattr("backend.log_buffer.get_log_path", lambda: tmp_path)
+
+    LogBufferHandler().emit(_unbuildable())
+
+    assert "не собирается" in capsys.readouterr().err
+
+
+def test_nothing_blows_up_when_there_is_nowhere_to_complain(
+    monkeypatch, tmp_path
+):
+    """Когда некуда сказать вовсе, логирование всё равно не падает.
+
+    Каталог на месте файла плюс оконная сборка, где потока ошибок нет: это
+    последний рубеж, и дальше него жаловаться правда некуда.
+    """
+    monkeypatch.setattr("backend.log_buffer.get_log_path", lambda: tmp_path)
+    monkeypatch.setattr(sys, "stderr", None)
+
+    LogBufferHandler().emit(_unbuildable())
