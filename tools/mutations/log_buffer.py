@@ -22,4 +22,53 @@ MUTATIONS = [
         "            except ValueError:" + LF
         + "                # Уронить логирование подписчик не должен",
     ),
+    # filter: о неразбираемой записи снова молчат
+    (
+        "backend/log_buffer.py",
+        '                report_own_failure("запись не собирается", record)',
+        "                pass",
+    ),
+    # emit: о неразбираемой записи снова молчат
+    (
+        "backend/log_buffer.py",
+        '            report_own_failure("сообщение записи не собирается", record)',
+        "            pass",
+    ),
+    # emit: о несобравшейся трассировке снова молчат
+    (
+        "backend/log_buffer.py",
+        '                report_own_failure("трассировка записи не собирается", record)',
+        "                pass",
+    ),
+    # handleError: беда обработчика снова уходит в поток ошибок, а не в файл
+    (
+        "backend/log_buffer.py",
+        '        report_own_failure("обработчик буфера подавился записью", record)',
+        "        super().handleError(record)",
+    ),
+    # filter: отметка снята, и об одной записи сообщает каждый обработчик
+    (
+        "backend/log_buffer.py",
+        '            if not getattr(record, "own_failure_reported", False):' + LF
+        + "                record.own_failure_reported = True" + LF,
+        "            if True:" + LF,
+    ),
+    # report_own_failure: шаблон записи уезжает в файл без вымарывания
+    (
+        "backend/log_buffer.py",
+        '            f"{_redact(repr(record.msg))}',
+        '            f"{repr(record.msg)}',
+    ),
+    # report_own_failure: трассировка перестаёт дописываться к строке
+    (
+        "backend/log_buffer.py",
+        "            out.write(line + traceback.format_exc())",
+        "            out.write(line)",
+    ),
+    # report_own_failure: недоступный файл снова означает молчание
+    (
+        "backend/log_buffer.py",
+        "                traceback.print_exc()" + LF,
+        "                pass" + LF,
+    ),
 ]

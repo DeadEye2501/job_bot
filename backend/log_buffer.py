@@ -1,4 +1,6 @@
-"""In-memory ring buffer для UI-экрана «Логи».
+"""In-memory ring buffer для UI-экрана «Логи», вымарывание секретов и отчёт
+о собственной беде — три дела одного слоя, того, что стоит между записью и
+её получателями.
 
 Логи приложения уже идут в файл и, если есть куда, в поток вывода — см.
 `main._log_handlers`. Для UI параллельно навешиваем `LogBufferHandler` на
@@ -7,15 +9,24 @@
 
 Ring-buffer ограничен MAX_RECORDS — самые старые молча выпадают, чтобы
 не утекать память при многочасовом аптайме.
+
+`report_own_failure` — единственный способ пожаловаться, доступный тому, кто
+сам обслуживает жалобы: обычная запись ушла бы по кругу.
 """
 
 from __future__ import annotations
 
 import logging
 import re
+import sys
 import threading
+import traceback
 from collections import deque
+from contextlib import suppress
+from datetime import datetime
 from typing import Callable
+
+from config import get_log_path
 
 MAX_RECORDS = 5000
 
@@ -40,6 +51,40 @@ _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
 _REDACTED = "***"
 
 
+def report_own_failure(what: str, record: logging.LogRecord) -> None:
+    """Сказать о беде внутри самого журналирования, минуя логирование.
+
+    Обычная запись ушла бы по кругу: беда случилась в обработчике логов.
+    Штатный для такого `handleError` печатает в поток ошибок, а в оконной
+    сборке (`console=False`) потока нет вовсе — остаётся тот же файл, куда
+    идёт журнал. Довод записан здесь один раз; остальные места на него
+    ссылаются.
+
+    Файл открывается на одну запись и сразу закрывается: им владеет
+    `RotatingFileHandler`, и держать второй описатель открытым значит
+    однажды сорвать ему переход на новый файл.
+    """
+    try:
+        stamp = f"{datetime.now():%Y-%m-%d %H:%M:%S,%f}"[:-3]
+        # Шаблон читается и вымарывается здесь, а не у зовущего: `__repr__`
+        # у него бывает сломан, и тогда жалоба превратилась бы в падение
+        # того, кто просто позвал `logger.*`. Вымарывание обязательно —
+        # собрать сообщение не удалось, значит обычный путь секрет не убрал.
+        line = (
+            f"{stamp} [ERROR] backend.log_buffer: {what}: "
+            f"{_redact(repr(record.msg))}\n"
+        )
+        with open(get_log_path(), "a", encoding="utf-8", errors="replace") as out:
+            out.write(line + traceback.format_exc())
+    except Exception:
+        # Файла нет или он недоступен — остаётся поток ошибок, которого в
+        # оконной сборке нет. Дальше этого рубежа сказать нечем.
+        if sys.stderr is not None:
+            with suppress(OSError, ValueError):
+                sys.stderr.write(f"backend.log_buffer: {what}\n")
+                traceback.print_exc()
+
+
 def _redact(text: str) -> str:
     out = text
     for pat in _SECRET_PATTERNS:
@@ -55,6 +100,16 @@ class SecretRedactionFilter(logging.Filter):
         try:
             msg = record.getMessage()
         except Exception:
+            # Сообщение не собралось — значит и вымарать секрет в нём нечем.
+            # Запись пропускается дальше, но молчать о ней нельзя: именно в
+            # такой секрет и уедет незамаскированным.
+            #
+            # Отметка на записи — от размножения: фильтр висит на каждом
+            # обработчике своим экземпляром, и без неё об одной записи
+            # сообщили бы все трое.
+            if not getattr(record, "own_failure_reported", False):
+                record.own_failure_reported = True
+                report_own_failure("запись не собирается", record)
             return True
         scrubbed = _redact(msg)
         if scrubbed != msg:
@@ -94,6 +149,7 @@ class LogBufferHandler(logging.Handler):
         try:
             msg = record.getMessage()
         except Exception:
+            report_own_failure("сообщение записи не собирается", record)
             msg = record.msg
         # Traceback / exc-info → multi-line string; UI отображает в details.
         details: str | None = None
@@ -101,6 +157,7 @@ class LogBufferHandler(logging.Handler):
             try:
                 details = self.format(record).rstrip()
             except Exception:
+                report_own_failure("трассировка записи не собирается", record)
                 details = None
         with self._lock:
             self._counter += 1
@@ -118,10 +175,16 @@ class LogBufferHandler(logging.Handler):
                 self.on_record(entry)
             except Exception:
                 # Уронить логирование подписчик не должен, но и молчать о нём
-                # нельзя. Обычная запись в журнал ушла бы по кругу — это сам
-                # обработчик; `handleError` для того и заведён: печатает
-                # трассировку в поток ошибок, минуя логирование.
+                # нельзя. `handleError` для того и заведён — он же и переопределён
+                # ниже, потому что штатный печатает в поток ошибок.
                 self.handleError(record)
+
+    def handleError(self, record: logging.LogRecord) -> None:
+        """Сказать о беде обработчика в файл журнала, а не в поток ошибок.
+
+        Штатный `handleError` печатает в `sys.stderr`, а у оконной сборки его
+        нет — и всё, что он сообщал, пропадало."""
+        report_own_failure("обработчик буфера подавился записью", record)
 
     def snapshot(self) -> list[dict]:
         with self._lock:
