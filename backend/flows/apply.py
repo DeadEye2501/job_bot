@@ -1,4 +1,4 @@
-"""Отправка отклика на вакансию."""
+"""Решение отправить отклик: письмо, охраны от повтора и запись исхода."""
 
 import logging
 import time
@@ -7,38 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from adapters import telegram
-from backend.llm.candidate import CandidateLanguage
-from backend.llm.candidate import CandidateProfile
 from backend.llm.cover_letter import generate_cover_letter
-from backend.models import Profile
-from backend.models import ProfileLanguage
 from backend.models import Vacancy
 from backend.models import VacancyStatus
 from backend.payloads import ParsedVacancy
 from backend.repository.hr_identify import count_recent_outgoing_with_vacancy_for_hr
 
 logger = logging.getLogger(__name__)
-
-
-def _build_candidate_profile(
-    profile: Profile | None,
-    languages: list[ProfileLanguage],
-) -> CandidateProfile:
-    """Собирает срез данных профиля для LLM-валидатора. Если профиль ещё не
-    создан — возвращает пустой CandidateProfile (валидатор подставит '—' и
-    относится к этому как «нет ограничений»)."""
-    if profile is None:
-        return CandidateProfile()
-    return CandidateProfile(
-        title=profile.title,
-        location=profile.location,
-        grades=list(profile.grades or []),
-        work_formats=list(profile.work_format or []),
-        languages=[
-            CandidateLanguage(name=l.language, level=l.level) for l in languages
-        ],
-        free_preferences=profile.free_preferences,
-    )
 
 
 # ---------------------------------------------------------------- send-templates

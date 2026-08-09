@@ -3,6 +3,9 @@
 
 from dataclasses import dataclass, field
 
+from backend.models import Profile
+from backend.models import ProfileLanguage
+
 _GRADE_LABELS_RU = {
     "junior": "junior",
     "middle": "middle",
@@ -109,3 +112,24 @@ def _format_known_skills(skills) -> str:
         else:
             lines.append(f"- {name}")
     return "\n".join(lines) if lines else "—"
+
+
+def _build_candidate_profile(
+    profile: Profile | None,
+    languages: list[ProfileLanguage],
+) -> CandidateProfile:
+    """Собирает срез данных профиля для LLM-валидатора. Если профиль ещё не
+    создан — возвращает пустой CandidateProfile (валидатор подставит '—' и
+    относится к этому как «нет ограничений»)."""
+    if profile is None:
+        return CandidateProfile()
+    return CandidateProfile(
+        title=profile.title,
+        location=profile.location,
+        grades=list(profile.grades or []),
+        work_formats=list(profile.work_format or []),
+        languages=[
+            CandidateLanguage(name=l.language, level=l.level) for l in languages
+        ],
+        free_preferences=profile.free_preferences,
+    )

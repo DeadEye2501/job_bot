@@ -7,6 +7,7 @@
 
 import asyncio
 import logging
+from typing import Literal
 
 from pyrogram import filters
 from pyrogram.handlers import (
@@ -25,6 +26,8 @@ from backend.bot import send
 from backend.bot import chat
 from backend.bot import channels
 from backend.flows.pipeline import IngestionPipeline
+from backend.models import BotMode
+from backend.models import Message
 from backend.runtime_settings import RuntimeSettings
 
 
@@ -208,62 +211,62 @@ class Bot:
             self._wake_event.set()
 
 
-    async def poll_channel_now(self, channel_id):
+    async def poll_channel_now(self, channel_id) -> Literal["ok", "busy", "missing", "cancelled", "error"]:
         return await channels.poll_channel_now(self, channel_id)
 
-    async def reset_channel_cursor(self, channel_id):
+    async def reset_channel_cursor(self, channel_id) -> bool:
         return await channels.reset_channel_cursor(self, channel_id)
 
-    async def delete_channel(self, channel_id):
+    async def delete_channel(self, channel_id) -> int | None:
         return await channels.delete_channel(self, channel_id)
 
-    async def add_channel(self, username):
+    async def add_channel(self, username) -> tuple[int | None, Literal["created", "exists", "invalid"]]:
         return await channels.add_channel(self, username)
 
-    def cancel_current_poll(self):
+    def cancel_current_poll(self) -> None:
         return channels.cancel_current_poll(self)
 
-    async def force_poll_once(self):
+    async def force_poll_once(self) -> Literal["ok", "busy", "cancelled", "error"]:
         return await channels.force_poll_once(self)
 
-    async def mark_hr_chat_read(self, hr_id):
+    async def mark_hr_chat_read(self, hr_id) -> int:
         return await chat.mark_hr_chat_read(self, hr_id)
 
-    async def send_to_hr_chat(self, hr_id, text):
+    async def send_to_hr_chat(self, hr_id, text) -> Message:
         return await chat.send_to_hr_chat(self, hr_id, text)
 
-    async def send_to_hr_media(self, hr_id, file_path):
+    async def send_to_hr_media(self, hr_id, file_path) -> Message:
         return await chat.send_to_hr_media(self, hr_id, file_path)
 
-    async def ui_send_vacancy_application(self, vacancy_id):
+    async def ui_send_vacancy_application(self, vacancy_id) -> tuple[bool, str]:
         return await send.ui_send_vacancy_application(self, vacancy_id)
 
-    async def send(self, hr, text, attachment=None, vacancy_id=None, *, force=False):
+    async def send(self, hr, text, attachment=None, vacancy_id=None, *, force=False) -> bool:
         return await send.send(self, hr, text, attachment, vacancy_id, force=force)
 
-    async def _on_raw_update(self, _client, update, _users, _chats):
+    async def _on_raw_update(self, _client, update, _users, _chats) -> None:
         return await updates.on_raw_update(self, _client, update, _users, _chats)
 
-    async def _on_dm_edit(self, _client, msg):
+    async def _on_dm_edit(self, _client, msg) -> None:
         return await updates.on_dm_edit(self, _client, msg)
 
-    async def _on_dm_delete(self, _client, messages):
+    async def _on_dm_delete(self, _client, messages) -> None:
         return await updates.on_dm_delete(self, _client, messages)
 
-    async def _on_dm_outgoing(self, _client, msg):
+    async def _on_dm_outgoing(self, _client, msg) -> None:
         return await updates.on_dm_outgoing(self, _client, msg)
 
-    async def _on_dm(self, _client, msg):
+    async def _on_dm(self, _client, msg) -> None:
         return await updates.on_dm(self, _client, msg)
 
-    async def log_out_session(self):
+    async def log_out_session(self) -> None:
         return await loop.log_out_session(self)
 
-    async def _current_mode(self):
+    async def _current_mode(self) -> BotMode:
         return await loop.current_mode(self)
 
-    async def run(self, *, once=False):
+    async def run(self, *, once=False) -> None:
         return await loop.run(self, once=once)
 
-    async def ui_rerun_vacancy_pipeline(self, vacancy_id):
+    async def ui_rerun_vacancy_pipeline(self, vacancy_id) -> bool:
         return await rerun.ui_rerun_vacancy_pipeline(self, vacancy_id)
