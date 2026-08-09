@@ -113,8 +113,11 @@ class LogBufferHandler(logging.Handler):
             try:
                 self.on_record(entry)
             except Exception:
-                # Не даём UI-callback'у уронить логирование.
-                pass
+                # Уронить логирование подписчик не должен, но и молчать о нём
+                # нельзя. Обычная запись в журнал ушла бы по кругу — это сам
+                # обработчик; `handleError` для того и заведён: печатает
+                # трассировку в поток ошибок, минуя логирование.
+                self.handleError(record)
 
     def snapshot(self) -> list[dict]:
         with self._lock:

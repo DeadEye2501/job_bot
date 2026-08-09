@@ -103,3 +103,19 @@ def test_the_window_return_code_is_passed_through(entry, monkeypatch):
     )
 
     assert module.main() == 3
+
+
+def test_a_console_that_refuses_utf8_is_reported(entry, monkeypatch, capsys):
+    """Отказ консоли перейти на UTF-8 показывается, а не проглатывается."""
+    module, _ = entry
+
+    def refuses(**_kwargs):
+        raise OSError("консоль не отдаёт кодировку")
+
+    # Подменяется один вызов, а не весь поток вывода: подмена потока пережила
+    # бы тест и оставила бы прогон писать в мёртвый буфер.
+    monkeypatch.setattr(sys.stdout, "reconfigure", refuses, raising=False)
+
+    module._use_utf8_stdout()
+
+    assert "консоль не отдаёт кодировку" in capsys.readouterr().err

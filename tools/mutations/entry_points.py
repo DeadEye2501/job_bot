@@ -120,6 +120,18 @@ MUTATIONS = [
         '    cfg.set_main_option("script_location", str(_PROJECT_ROOT / "alembic"))',
         '    cfg.set_main_option("script_location", "alembic")',
     ),
+    # main: перенастройка вывода перестаёт вызываться вовсе
+    (
+        "main.py",
+        "_use_utf8_stdout()" + CRLF + CRLF + CRLF + "logging.basicConfig(",
+        "logging.basicConfig(",
+    ),
+    # _use_utf8_stdout: отказ консоли снова проглатывается молча
+    (
+        "main.py",
+        "        traceback.print_exc()",
+        "        pass",
+    ),
     # main: проверка хранилища ключей перестаёт останавливать запуск
     (
         "main.py",
