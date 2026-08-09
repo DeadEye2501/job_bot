@@ -207,8 +207,10 @@ def install() -> LogBufferHandler:
 
     Опускаем уровень корневого logger'а до DEBUG (если basicConfig поставил
     INFO), чтобы DEBUG-записи доходили до buffer'а — они нужны для
-    DEBUG-pill'а в UI. Stdout-handler (StreamHandler из basicConfig'а)
-    остаётся на INFO, чтобы консоль не засрать.
+    DEBUG-pill'а в UI. Остальные обработчики остаются на INFO, и это про оба:
+    консоль не засорить, а файл журнала не раздуть. DEBUG в цикле опроса и в
+    разборе оповещений идёт потоком, и пять мегабайт файла он съел бы за час,
+    вытеснив то, ради чего файл заведён, — историю до падения.
     """
     root = logging.getLogger()
     if _handler not in root.handlers:

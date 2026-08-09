@@ -38,6 +38,7 @@ pipenv run python main.py
 
 Внутри:
 - `jobbot.db` — основная SQLite-база (вакансии, контакты, переписка, настройки).
+- `jobbot.log` — журнал приложения; переходит на новый файл каждые 5 МБ, хранится четыре. В оконной сборке это единственное, что переживает закрытие окна: экран «Логи» показывает кольцевой буфер в памяти.
 - `sessions/` — Pyrogram-сессия (`.session`-файл).
 - `media/` — скачанные медиа из вакансий.
 
@@ -90,7 +91,7 @@ backend/
   models/             # SQLAlchemy-модели, по одному модулю на предмет
   repository/         # типизированные query-функции, по модулю на предмет
   runtime_settings.py # in-memory-кеш конфигурации (TG creds, LLM endpoints, app-settings)
-  log_buffer.py       # ring-buffer для UI «Логи»
+  log_buffer.py       # буфер для UI «Логи», вымарывание секретов, отчёт о своей беде
   payloads.py         # dataclass-структуры для bridge-обмена
 
 adapters/

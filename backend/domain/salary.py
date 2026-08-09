@@ -9,12 +9,19 @@ from backend.models import Currency
 # целым словом: иначе «k» в «KPI», «к» в «Краснодаре» и «m» в «month»
 # умножают зарплату на тысячу или на миллион.
 _AMOUNT_RE = re.compile(
-    r"(?P<num>\d+(?:[  ,.]\d{3})*(?:[.,]\d{1,2})?)(?!\d)(?!\s*%)"
-    r"(?:\s*(?P<scale>(?:k|к|тыс|m|млн|million)(?![a-zа-яё0-9])))?",
+    r"(?P<num>\d+(?:[    ,.]\d{3})*(?:[.,]\d{1,2})?)(?!\d)(?!\s*%)"
+    r"(?:\s*(?P<scale>(?:тысяч[аи]?|тыс|миллион[а-яё]*|млн|million|k|к|m)"
+    r"(?![a-zа-яё0-9])))?",
     re.IGNORECASE,
 )
-_SCALES = {"k": 1000, "к": 1000, "тыс": 1000, "m": 10**6, "млн": 10**6, "million": 10**6}
+# Числа одной вилки склеены между собой только тире, «до» и пробелами. Дальше
+# такой склейки пометка не идёт: в «300к, опыт от 5 лет» пять — это годы.
+_RANGE_GLUE_RE = re.compile(r"[\s\-–—]*(?:до)?[\s\-–—]*")
+_THOUSAND = ("k", "к", "тыс")
 _FRACTION_RE = re.compile(r"[.,]\d{1,2}$")
+# Предел колонки: не влезшее в неё уронило бы запись вакансии на коммите, и
+# она осталась бы неразобранной навсегда.
+_MAX_AMOUNT = 2**63 - 1
 # «Зарплата обсуждается / по договорённости» — тексты, где случайные числа
 # («30 дней отпуска», «5 лет опыта») зарплатой не являются. Голое «договор»
 # сюда не годится: «трудовой договор» и «договор ГПХ» стоят рядом с прямо
@@ -60,11 +67,30 @@ def _numbers(s: str) -> list[int]:
     отсёк бы вакансию от любого осмысленного отбора.
     """
     found: list[int] = []
-    for hit in _AMOUNT_RE.finditer(s):
-        value = _amount(hit.group("num"), hit.group("scale"))
-        if value > 0:
-            found.append(value)
+    for run in _runs(s):
+        marker = next((h["scale"] for h in reversed(run) if h["scale"]), None)
+        for hit in run:
+            value = _amount(hit["num"], hit["scale"] or marker)
+            if 0 < value <= _MAX_AMOUNT:
+                found.append(value)
     return sorted(found)
+
+
+def _runs(s: str) -> list[list[re.Match]]:
+    """Числа строки, разбитые на вилки.
+
+    Пометку пишут в конце вилки, а относится она ко всей: «150-200 тыс» — это
+    сто пятьдесят и двести тысяч. Чтобы раздать её своим и не задеть чужих,
+    числа собираются в связки по тому, что стоит между ними.
+    """
+    runs: list[list[re.Match]] = []
+    for hit in _AMOUNT_RE.finditer(s):
+        glued = runs and _RANGE_GLUE_RE.fullmatch(s[runs[-1][-1].end() : hit.start()])
+        if glued:
+            runs[-1].append(hit)
+        else:
+            runs.append([hit])
+    return runs
 
 
 def _amount(num: str, scale: str | None) -> int:
@@ -74,12 +100,19 @@ def _amount(num: str, scale: str | None) -> int:
     и различает их длина хвоста: «3,000» — три тысячи, «3,5» — три с
     половиной.
     """
-    body = num.replace(" ", " ")
-    if _FRACTION_RE.search(body):
-        value = float(body.replace(" ", "").replace(",", "."))
-    else:
-        value = int(re.sub(r"\D", "", body))
-    return int(value * _SCALES.get((scale or "").lower(), 1))
+    fraction = _FRACTION_RE.search(num)
+    whole = num[: fraction.start()] if fraction else num
+    value: float = int(re.sub(r"\D", "", whole))
+    if fraction:
+        value += float("0" + fraction.group().replace(",", "."))
+    return int(value * _scale(scale))
+
+
+def _scale(marker: str | None) -> int:
+    """Во сколько раз пометка раскрывает число."""
+    if not marker:
+        return 1
+    return 1000 if marker.lower().startswith(_THOUSAND) else 10**6
 
 
 def _currency(s: str) -> Currency | None:
