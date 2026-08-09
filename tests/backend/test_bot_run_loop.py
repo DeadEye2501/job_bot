@@ -300,16 +300,20 @@ async def test_switching_off_drains_the_text_waiting_to_be_read(
     bot, client, _ = await chatting(mode=BotMode.FULL)
     pipeline = FakeIngestion()
     wire(bot, pipeline)
-    await bot._rs.set_app("poll_interval_sec", "0")
+    # Секунда, а не ноль: нулевой интервал больше не берётся — он крутил бы
+    # цикл опроса встык, и настройки такое теперь откатывают к умолчанию.
+    await bot._rs.set_app("poll_interval_sec", "1")
 
     # Останов повешен на чтение режима, а не на сам слив: слив здесь —
     # предмет проверки, и если бы цикл кончался им, снятая строка вешала бы
     # прогон вместо того, чтобы покрасить тест.
-    modes = [BotMode.FULL, BotMode.OFF]
+    modes = [BotMode.FULL]
 
     async def next_mode():
         if modes:
             return modes.pop(0)
+        # Просьба об остановке идёт тем же вызовом, что отдаёт «выключено»:
+        # лишний оборот досиживал бы интервал опроса целиком.
         bot.request_stop()
         return BotMode.OFF
 

@@ -170,12 +170,12 @@ class RuntimeSettings:
 
     @property
     def poll_interval_sec(self) -> int:
-        return self._app_int("poll_interval_sec")
+        return self._app_int("poll_interval_sec", minimum=1)
 
     @property
     def backfill_limit(self) -> int:
         """How many recent messages to scrape per Telegram channel poll."""
-        return self._app_int("backfill_limit")
+        return self._app_int("backfill_limit", minimum=1)
 
     @property
     def dedup_cosine_threshold(self) -> float:
@@ -199,7 +199,7 @@ class RuntimeSettings:
         than the channel value so the offline-delete reconciliation window
         in `catch_up_missed_dms` is wide enough to cover edits/deletes the
         user made on another client while the bot was off."""
-        return self._app_int("dm_backfill_limit")
+        return self._app_int("dm_backfill_limit", minimum=1)
 
     @property
     def cv_path(self) -> str:
@@ -247,20 +247,27 @@ class RuntimeSettings:
         except ValueError:
             return 0.0
 
-    def _app_int(self, key: str) -> int:
+    def _app_int(self, key: str, *, minimum: int | None = None) -> int:
         """Целая настройка; негодное значение откатывается к умолчанию.
 
         Значения правят руками через DBeaver, и опечатка вроде «1 800» не
         должна ронять запуск — соседние числовые настройки её переживают.
+
+        Нижняя граница задаётся не всем: у порога оценки годится любое целое,
+        потому что и сам счёт бывает отрицательным, и «пропускать всё»
+        выражается именно отрицательным порогом.
         """
         raw = self._app_value(key)
         try:
-            return int(raw)
+            value = int(raw)
         except ValueError:
+            value = None
+        if value is None or (minimum is not None and value < minimum):
             logger.warning(
-                "настройка %s не целое (%r) — беру умолчание", key, raw
+                "настройка %s негодна (%r) — беру умолчание", key, raw
             )
             return int(_APP_DEFAULTS[key])
+        return value
 
     def _app_value(self, key: str) -> str:
         # Treat NULL / empty / whitespace-only values in the DB as "not
