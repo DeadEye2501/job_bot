@@ -1,6 +1,19 @@
 """Database engine helpers (SQLite via aiosqlite)."""
+import json
+
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+
+
+def _dump_json(value: object) -> str:
+    """Сериализация всех JSON-колонок без экранирования не-ASCII.
+
+    По умолчанию `json.dumps` пишет кириллицу как `\\uXXXX`. Питону это
+    безразлично — `json.loads` разбирает обе формы, — но записанное так
+    недостижимо для поиска по приведённой к строке колонке: подстроки
+    «тестирование» в записи `\\u0442\\u0435…` нет ни в каком регистре.
+    """
+    return json.dumps(value, ensure_ascii=False)
 
 
 def make_engine(database_url: str) -> AsyncEngine:
@@ -15,7 +28,7 @@ def make_engine(database_url: str) -> AsyncEngine:
     соединении (включая connections из pool'а) — это стандартный
     SQLAlchemy+SQLite-паттерн.
     """
-    engine = create_async_engine(database_url)
+    engine = create_async_engine(database_url, json_serializer=_dump_json)
 
     @event.listens_for(engine.sync_engine, "connect")
     def _set_sqlite_pragmas(dbapi_conn, _record):
