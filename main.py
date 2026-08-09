@@ -9,6 +9,9 @@ Run:
 import logging
 import sys
 import traceback
+from logging.handlers import RotatingFileHandler
+
+from config import get_log_path
 
 
 def _use_utf8_stdout() -> None:
@@ -32,10 +35,43 @@ def _use_utf8_stdout() -> None:
 _use_utf8_stdout()
 
 
+LOG_BYTES = 5 * 1024 * 1024
+LOG_KEPT = 3
+
+
+def _log_handlers() -> list[logging.Handler]:
+    """Куда пишется журнал приложения.
+
+    Файл — всегда: в оконной сборке (`console=False`) `sys.stdout` и
+    `sys.stderr` равны `None`, и обработчик, настроенный на поток, теряет всё
+    молча. Кольцевой буфер экрана «Логи» тоже не спасает — он в памяти и
+    пропадает вместе с окном, а разбирать падение приходится после него.
+
+    Кодировка задаётся явно: без неё файл открылся бы кодировкой системы, а
+    в журнал попадают тексты из Telegram — эмодзи и письменности, которых в
+    однобайтовой кодировке нет, сорвали бы запись.
+
+    Открытие отложено: без этого пустой файл заводился бы на каждый ввоз
+    модуля, в том числе прогоном тестов и инструментами.
+    """
+    handlers: list[logging.Handler] = [
+        RotatingFileHandler(
+            get_log_path(),
+            maxBytes=LOG_BYTES,
+            backupCount=LOG_KEPT,
+            encoding="utf-8",
+            delay=True,
+        )
+    ]
+    if sys.stdout is not None:
+        handlers.append(logging.StreamHandler(sys.stdout))
+    return handlers
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    stream=sys.stdout,
+    handlers=_log_handlers(),
 )
 # Attach the in-memory buffer handler that backs the UI «Логи» screen.
 # Идемпотентно — повторный install() не-op.
@@ -44,9 +80,10 @@ from backend.log_buffer import (
     install_secret_filter as _install_secret_filter,
 )
 _install_log_buffer()
-# Secret-redaction filter ставим ДО первого logger.* — чтобы Bearer-
-# токены / api_hash / session-string'и из третьих либ (httpx debug,
-# pyrogram, sqlalchemy echo) маскировались до stdout и UI-buffer'а.
+# Secret-redaction filter ставим ДО первого logger.* и ПОСЛЕ того, как все
+# обработчики на месте: он вешается на них, а не на logger. Иначе Bearer-
+# токены / api_hash / session-string'и из третьих либ (httpx debug, pyrogram,
+# sqlalchemy echo) легли бы в файл журнала как есть — и пережили бы окно.
 _install_secret_filter()
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)

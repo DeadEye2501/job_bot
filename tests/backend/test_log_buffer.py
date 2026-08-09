@@ -67,13 +67,34 @@ def test_redaction_keeps_a_record_with_args_readable():
 
 def test_installing_the_filter_twice_adds_it_once(clean_root_logger):
     """Повторная установка не добавляет второй фильтр."""
+    clean_root_logger.addHandler(LogBufferHandler())
     install_secret_filter()
     install_secret_filter()
 
     installed = [
-        f for f in clean_root_logger.filters if isinstance(f, SecretRedactionFilter)
+        f
+        for handler in clean_root_logger.handlers
+        for f in handler.filters
+        if isinstance(f, SecretRedactionFilter)
     ]
-    assert len(installed) == 1
+    assert len(installed) == len(clean_root_logger.handlers)
+
+
+def test_a_secret_from_someone_elses_logger_is_masked_too(clean_root_logger):
+    """Секрет из записи чужого logger'а вымарывается наравне со своим.
+
+    Фильтр на logger'е видит только записи, сделанные им самим: до
+    обработчиков предка запись доходит мимо его фильтров. А записи третьих
+    библиотек — httpx, pyrogram, sqlalchemy — идут именно так, и ради них
+    фильтр и заведён.
+    """
+    handler = LogBufferHandler()
+    clean_root_logger.addHandler(handler)
+    install_secret_filter()
+
+    logging.getLogger("httpx.child").warning("токен Bearer abcdefgh12345678")
+
+    assert "abcdefgh12345678" not in handler.snapshot()[-1]["msg"]
 
 
 def test_a_record_lands_in_the_snapshot_with_level_and_source():

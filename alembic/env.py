@@ -13,26 +13,14 @@ from config import get_database_url
 config = context.config
 config.set_main_option("sqlalchemy.url", get_database_url())
 
-if config.config_file_name is not None:
-    # disable_existing_loggers=False — сохраняем уже сконфигурированные
-    # логгеры. Но fileConfig всё равно ПЕРЕписывает handlers на root
-    # (root явно перечислен в alembic.ini), поэтому LogBufferHandler
-    # надо переставить вручную после fileConfig — иначе UI-логи
-    # перестанут получать всё что логируется после миграций.
+# Настройка журнала из `alembic.ini` нужна только запуску из командной
+# строки: там больше некому её сделать. Внутри приложения она вредна —
+# `fileConfig` переписывает обработчики корневого logger'а целиком (root в
+# `alembic.ini` перечислен явно), и приложение теряло после обновления схемы
+# и файл журнала, и буфер экрана «Логи». Поэтому спрашиваем, настроен ли
+# журнал уже: настроен — не трогаем.
+if config.config_file_name is not None and not logging.getLogger().handlers:
     fileConfig(config.config_file_name, disable_existing_loggers=False)
-    try:
-        from backend.log_buffer import install as _reinstall_log_buffer
-        _reinstall_log_buffer()
-    except Exception:
-        # Не падаем если log_buffer переехал/сломался — миграция важнее
-        # UI-логов, но молчать тоже нельзя: если это из-за ImportError'а,
-        # юзер бы хотел знать что UI «Логи» больше не получит сообщений
-        # после `alembic upgrade`.
-        logging.getLogger(__name__).warning(
-            "alembic env: failed to reinstall LogBufferHandler — "
-            "in-app log panel will miss migration output",
-            exc_info=True,
-        )
 
 target_metadata = Base.metadata
 

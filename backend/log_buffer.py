@@ -1,9 +1,9 @@
 """In-memory ring buffer для UI-экрана «Логи».
 
-Логи приложения уже идут в stderr через `logging.basicConfig`. Для UI
-параллельно навешиваем `LogBufferHandler` на корневой logger, который
-кладёт каждый record в bounded `deque`. UI забирает срез через bridge
-slot с фильтрами по level/source/search.
+Логи приложения уже идут в файл и, если есть куда, в поток вывода — см.
+`main._log_handlers`. Для UI параллельно навешиваем `LogBufferHandler` на
+корневой logger, который кладёт каждый record в bounded `deque`. UI забирает
+срез через bridge slot с фильтрами по level/source/search.
 
 Ring-buffer ограничен MAX_RECORDS — самые старые молча выпадают, чтобы
 не утекать память при многочасовом аптайме.
@@ -48,8 +48,8 @@ def _redact(text: str) -> str:
 
 
 class SecretRedactionFilter(logging.Filter):
-    """Применяет _redact к message и exc_text. Ставится на root logger
-    через ``install_secret_filter()``; работает на ВСЕ handlers одинаково."""
+    """Применяет _redact к message и exc_text. Ставится на обработчики
+    корневого logger'а через ``install_secret_filter()``."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
@@ -66,12 +66,16 @@ class SecretRedactionFilter(logging.Filter):
 
 
 def install_secret_filter() -> None:
-    """Идемпотентно ставит SecretRedactionFilter на root logger."""
-    root = logging.getLogger()
-    for f in root.filters:
-        if isinstance(f, SecretRedactionFilter):
-            return
-    root.addFilter(SecretRedactionFilter())
+    """Идемпотентно ставит SecretRedactionFilter на каждый обработчик корня.
+
+    На сам logger вешать нельзя, хотя и хочется: фильтр logger'а разбирает
+    только записи, сделанные им самим, а до обработчиков предка запись
+    доходит мимо его фильтров. Записи третьих библиотек — httpx, pyrogram,
+    sqlalchemy — идут именно так, и ради них фильтр и заведён.
+    """
+    for handler in logging.getLogger().handlers:
+        if not any(isinstance(f, SecretRedactionFilter) for f in handler.filters):
+            handler.addFilter(SecretRedactionFilter())
 
 
 class LogBufferHandler(logging.Handler):
