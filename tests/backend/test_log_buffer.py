@@ -368,7 +368,9 @@ def test_an_unavailable_file_is_reported_to_the_stream(monkeypatch, capsys, tmp_
 
     LogBufferHandler().emit(_unbuildable())
 
-    assert "не собирается" in capsys.readouterr().err
+    said = capsys.readouterr().err
+    assert "не собирается" in said
+    assert "Traceback" in said
 
 
 def test_nothing_blows_up_when_there_is_nowhere_to_complain(

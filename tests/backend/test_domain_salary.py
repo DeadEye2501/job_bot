@@ -103,6 +103,7 @@ def test_the_currency_is_recognised_by_word_as_well_as_by_sign(raw, currency):
         ("150 000 ₽, пишите рекрутеру", 150000),
         ("$3000 per month", 3000),
         ("3000 USD/mo", 3000),
+        ("$3000 monthly", 3000),
     ],
 )
 def test_a_letter_inside_a_word_is_not_a_thousands_marker(raw, expected):
@@ -164,9 +165,20 @@ def test_a_contract_mention_does_not_hide_a_named_salary(raw):
     assert parse_salary(raw)[:2] == (200000, 200000)
 
 
-@pytest.mark.parametrize("raw", ["по договорённости", "зарплата договорная"])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "по договорённости",
+        "зарплата договорная",
+        "по договорённости, вилка от 100 000 до 200 000 ₽",
+    ],
+)
 def test_a_salary_left_to_agreement_yields_nothing(raw):
-    """«По договорённости» — не зарплата."""
+    """«По договорённости» — не зарплата, даже когда рядом названы числа.
+
+    Числа при ней означают не вилку, а что угодно: прошлый оклад, порог
+    рынка, диапазон по грейдам. Брать их за зарплату — врать отбору.
+    """
     assert parse_salary(raw) == (None, None, None)
 
 
