@@ -10,7 +10,7 @@ from backend.domain.transitions import ALLOWED_AUTO_TRANSITIONS
 from backend.models import VacancyStatus
 from backend.payloads import Classification
 
-from backend.llm.answers import _extract_last_json
+from backend.llm.answers import extract_last_json
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ CLASSIFY_HR_REPLY_PROMPT_TEMPLATE = """Ты классифицируешь от�
 
 
 def _parse_classification(answer: str) -> Classification | None:
-    raw = _extract_last_json(answer)
+    raw = extract_last_json(answer)
     if raw is None:
         return None
     try:

@@ -11,9 +11,9 @@ import httpx
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.payloads import ParsedVacancy
 
-from backend.llm.answers import _extract_last_json, _normalize_enum
+from backend.llm.answers import extract_last_json, normalize_enum
 from backend.llm.candidate import _format_known_skills
-from backend.llm.skills import _clean_stack_items
+from backend.llm.skills import clean_stack_items
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +164,7 @@ _DESCRIPTION_MAX_CHARS = 1500
 
 
 def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
-    raw = _extract_last_json(answer)
+    raw = extract_last_json(answer)
     if raw is None:
         logger.debug("_parse_vacancy_json: no JSON block in LLM answer (%d chars)", len(answer))
         return None
@@ -187,10 +187,10 @@ def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
     # silent +0 from misclassifying everything as preferred).
     seen: set[str] = set()
     if "stack_required" in data or "stack_preferred" in data:
-        stack_required = _clean_stack_items(data.get("stack_required"), seen)
-        stack_preferred = _clean_stack_items(data.get("stack_preferred"), seen)
+        stack_required = clean_stack_items(data.get("stack_required"), seen)
+        stack_preferred = clean_stack_items(data.get("stack_preferred"), seen)
     else:
-        stack_required = _clean_stack_items(data.get("stack"), seen)
+        stack_required = clean_stack_items(data.get("stack"), seen)
         stack_preferred = []
 
     def _str_or_none(field: str) -> str | None:
@@ -230,9 +230,9 @@ def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
         other_contact=_str_or_none("other_contact"),
         stack_required=stack_required,
         stack_preferred=stack_preferred,
-        grade=_normalize_enum(data.get("grade"), GRADES),
+        grade=normalize_enum(data.get("grade"), GRADES),
         salary=_str_or_none("salary"),
-        remote=_normalize_enum(data.get("remote"), WORK_FORMATS),
+        remote=normalize_enum(data.get("remote"), WORK_FORMATS),
         location=_str_or_none("location"),
     )
 

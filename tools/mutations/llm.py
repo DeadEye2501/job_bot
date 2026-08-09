@@ -7,25 +7,25 @@
 CRLF = "\r\n"
 
 MUTATIONS = [
-    # _extract_last_json: берётся первый объект вместо последнего
+    # extract_last_json: берётся первый объект вместо последнего
     (
         "backend/llm/answers.py",
         "    return matches[-1] if matches else None",
         "    return matches[0] if matches else None",
     ),
-    # _extract_last_json: кавычки не выпрямляются
+    # extract_last_json: кавычки не выпрямляются
     (
         "backend/llm/answers.py",
         "    cleaned = answer.translate(QUOTE_TRANSLATION)",
         "    cleaned = answer",
     ),
-    # _normalize_enum: регистр перестаёт опускаться
+    # normalize_enum: регистр перестаёт опускаться
     (
         "backend/llm/answers.py",
         "    v = value.strip().lower()",
         "    v = value.strip()",
     ),
-    # _normalize_enum: значение вне набора проходит
+    # normalize_enum: значение вне набора проходит
     (
         "backend/llm/answers.py",
         "    if v in allowed:" + CRLF + "        return v" + CRLF + "    return None",
@@ -63,25 +63,25 @@ MUTATIONS = [
         + "            continue" + CRLF,
         "",
     ),
-    # _clean_stack_items: строка вместо списка перестаёт делиться запятой
+    # clean_stack_items: строка вместо списка перестаёт делиться запятой
     (
         "backend/llm/skills.py",
         '        items: list = raw.split(",")',
         "        items = []",
     ),
-    # _clean_stack_items: повторы перестают отсеиваться
+    # clean_stack_items: повторы перестают отсеиваться
     (
         "backend/llm/skills.py",
         "        if key in seen:" + CRLF + "            continue" + CRLF,
         "",
     ),
-    # _clean_stack_items: повтор ищется с учётом регистра
+    # clean_stack_items: повтор ищется с учётом регистра
     (
         "backend/llm/skills.py",
         "        key = cleaned.casefold()",
         "        key = cleaned",
     ),
-    # _clean_stack_items: не-строки проходят в стек
+    # clean_stack_items: не-строки проходят в стек
     (
         "backend/llm/skills.py",
         "        if not isinstance(s, str):" + CRLF + "            continue" + CRLF,
@@ -195,12 +195,14 @@ MUTATIONS = [
         '        == channel_username.lower()',
         "        == channel_username",
     ),
-    # _format_grades: незнакомый уровень проходит в промпт
+    # _format_labels: незнакомое значение проходит в промпт. Тело было
+    # написано дважды — под грейды и под форматы работы; осталось одно, и
+    # цель у него одна, но красить её обязаны обе стороны.
     (
         "backend/llm/candidate.py",
-        "        if key in _GRADE_LABELS_RU:" + CRLF
-        + "            parts.append(_GRADE_LABELS_RU[key])" + CRLF,
-        "        parts.append(_GRADE_LABELS_RU.get(key, key))" + CRLF,
+        "        if key in labels:" + CRLF
+        + "            parts.append(labels[key])" + CRLF,
+        "        parts.append(labels.get(key, key))" + CRLF,
     ),
     # _format_languages: язык без уровня попадает в промпт
     (
@@ -217,15 +219,16 @@ MUTATIONS = [
         '            lines.append(f"- {name} — {\', \'.join(aliases)}")',
         '            lines.append(f"- {name}")',
     ),
-    # _parse_fit_validation: незнакомый вердикт проходит
+    # _parse_fit_validation: незнакомый вердикт проходит. Лестница из трёх
+    # `if/elif` заменена разбором по набору — цель следует за ней.
     (
         "backend/llm/fit.py",
-        "        else:" + CRLF + "            return None" + CRLF + "    else:" + CRLF
+        "    verdict = normalize_enum(data.get(\"verdict\"), FIT_VERDICTS)" + CRLF
+        + "    if verdict is None:" + CRLF
         + "        return None" + CRLF,
-        "        else:" + CRLF + '            verdict = "fit"' + CRLF + "    else:" + CRLF
-        + "        return None" + CRLF,
+        "    verdict = normalize_enum(data.get(\"verdict\"), FIT_VERDICTS) or \"fit\"" + CRLF,
     ),
-    # _looks_hallucinated: общие маркеры перестают проверяться
+    # looks_hallucinated: общие маркеры перестают проверяться
     (
         "backend/llm/hallucination.py",
         "    for reason_re, text_re in _GENERIC_HALLUCINATION_MARKERS:" + CRLF
@@ -233,7 +236,7 @@ MUTATIONS = [
         + "            return reason_re.pattern" + CRLF,
         "",
     ),
-    # _looks_hallucinated: маркеры по языкам профиля перестают проверяться
+    # looks_hallucinated: маркеры по языкам профиля перестают проверяться
     (
         "backend/llm/hallucination.py",
         "    for reason_re, text_re in _build_profile_hallucination_markers(profile):" + CRLF
@@ -241,7 +244,7 @@ MUTATIONS = [
         + "            return reason_re.pattern" + CRLF,
         "",
     ),
-    # _looks_hallucinated: пересказ данных кандидата перестаёт ловиться
+    # looks_hallucinated: пересказ данных кандидата перестаёт ловиться
     (
         "backend/llm/hallucination.py",
         "    for style_re in _REASON_STYLE_VIOLATIONS:" + CRLF
@@ -249,7 +252,7 @@ MUTATIONS = [
         + "            return style_re.pattern" + CRLF,
         "",
     ),
-    # _looks_hallucinated: подкреплённое текстом обоснование тоже считается выдуманным
+    # looks_hallucinated: подкреплённое текстом обоснование тоже считается выдуманным
     (
         "backend/llm/hallucination.py",
         "        if reason_re.search(reason) and not text_re.search(raw_text):" + CRLF

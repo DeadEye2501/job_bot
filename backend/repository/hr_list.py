@@ -3,10 +3,31 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import Blacklist, Company, HR, Message, Vacancy
+from backend.models import Company, HR, Message, Vacancy
 from backend.payloads import HrWithCount
 
+from backend.repository.blacklist_marks import active_blacklist_values
 from backend.repository.hr_card import hr_blacklist_candidates
+from backend.repository.messages import UNREAD_INCOMING
+
+async def _with_last_incoming_id(
+    session: AsyncSession, hrs: list[HR]
+) -> list[tuple[HR, int]]:
+    """Каждому человеку — наибольший `tg_message_id` входящего, что у нас
+    уже есть, или ноль. С этой границы догон и продолжает читать.
+    """
+    result: list[tuple[HR, int]] = []
+    for hr in hrs:
+        last_seen = (
+            await session.scalars(
+                select(func.max(Message.tg_message_id)).where(
+                    Message.hr_id == hr.id, Message.is_incoming
+                )
+            )
+        ).first()
+        result.append((hr, last_seen or 0))
+    return result
+
 
 async def list_hrs_for_backfill(
     session: AsyncSession,
@@ -26,17 +47,7 @@ async def list_hrs_for_backfill(
             )
         ).all()
     )
-    result: list[tuple[HR, int]] = []
-    for hr in hrs:
-        last_seen = (
-            await session.scalars(
-                select(func.max(Message.tg_message_id)).where(
-                    Message.hr_id == hr.id, Message.is_incoming
-                )
-            )
-        ).first()
-        result.append((hr, last_seen or 0))
-    return result
+    return await _with_last_incoming_id(session, hrs)
 
 
 async def list_open_hr_chats(
@@ -55,17 +66,7 @@ async def list_open_hr_chats(
             )
         ).all()
     )
-    result: list[tuple[HR, int]] = []
-    for hr in hrs:
-        last_seen = (
-            await session.scalars(
-                select(func.max(Message.tg_message_id)).where(
-                    Message.hr_id == hr.id, Message.is_incoming
-                )
-            )
-        ).first()
-        result.append((hr, last_seen or 0))
-    return result
+    return await _with_last_incoming_id(session, hrs)
 
 
 async def list_hr_with_counts(
@@ -178,27 +179,14 @@ async def list_hr_with_counts(
             select(Message.hr_id, func.count(Message.id))
             .where(
                 Message.hr_id.is_not(None),
-                Message.is_incoming,
-                Message.read_at.is_(None),
-                Message.is_deleted.is_(False),
+                *UNREAD_INCOMING,
             )
             .group_by(Message.hr_id)
         )
     ).all()
     unread_by_hr: dict[int, int] = {hr_id: int(n) for hr_id, n in unread_rows}
 
-    # Active hr-blacklist values, all in one query — `is_blacklisted` is a
-    # set-membership check per HR.
-    bl_values = set(
-        (
-            await session.scalars(
-                select(Blacklist.value).where(
-                    Blacklist.kind == "hr",
-                    Blacklist.active.is_(True),
-                )
-            )
-        ).all()
-    )
+    bl_values = await active_blacklist_values(session, "hr")
 
     def _is_blacklisted(hr: HR) -> bool:
         return any(c in bl_values for c in hr_blacklist_candidates(hr))
@@ -248,11 +236,7 @@ async def list_hrs_with_unread(session: AsyncSession) -> list[dict]:
                 func.max(Message.sent_at).label("last_at"),
             )
             .join(Message, Message.hr_id == HR.id)
-            .where(
-                Message.is_incoming,
-                Message.read_at.is_(None),
-                Message.is_deleted.is_(False),
-            )
+            .where(*UNREAD_INCOMING)
             .group_by(HR.id)
             .order_by(func.max(Message.sent_at).desc())
         )

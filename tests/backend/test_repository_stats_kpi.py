@@ -36,6 +36,37 @@ async def test_the_total_counts_only_parsed_vacancies(session, session_factory):
     assert (await get_stats_kpi(session, period="all"))["total"] == 2
 
 
+async def test_an_unparsed_vacancy_stays_out_of_every_counter(
+    session, session_factory
+):
+    """Неразобранная вакансия не попадает ни в один счётчик, даже с историей.
+
+    Общий счётчик считает только разобранные, а ступени воронки идут по
+    истории статусов — и если их не соединить с вакансией, неразобранная
+    попадёт в «откликнулись», не попав в «всего». На экране это выглядит
+    как воронка, где первая ступень шире входа в неё.
+
+    Разобранная в наборе одна и до отклика доходила, неразобранных две и
+    обе доходили: без отбора «откликнулись» было бы три при «всего» один.
+    """
+    parsed = vacancy_row(is_parsed=True)
+    unparsed_one = vacancy_row(is_parsed=False)
+    unparsed_two = vacancy_row(is_parsed=False)
+    await put(session_factory, parsed, unparsed_one, unparsed_two)
+    await put(
+        session_factory,
+        status_history_row(parsed.id, changed_at=days_ago(1)),
+        status_history_row(unparsed_one.id, changed_at=days_ago(1)),
+        status_history_row(unparsed_two.id, changed_at=days_ago(1)),
+    )
+
+    kpi = await get_stats_kpi(session, period="week")
+
+    assert kpi["total"] == 1
+    assert kpi["applied_total"] == 1
+    assert kpi["applied_period"] == 1
+
+
 async def test_a_reverted_status_does_not_shrink_the_counter(
     session, session_factory
 ):

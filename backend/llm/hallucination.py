@@ -3,6 +3,7 @@
 
 import re
 
+from backend.domain.taxonomy import CEFR_LEVELS
 from backend.llm.candidate import CandidateProfile
 
 # Универсальные (профиль-независимые) маркеры галлюцинаций. Если LLM в reason
@@ -14,7 +15,8 @@ from backend.llm.candidate import CandidateProfile
 # используется и для reason, и для text — если в reason есть упоминание
 # уровня, а в посте нет ни одного — это галлюцинация.
 _CEFR_LEVEL_RE = re.compile(
-    r"\b(a1|a2|b1|b2\+?|c1|c2|upper[\s-]?intermediate|"
+    r"\b(" + "|".join(level.lower() for level in CEFR_LEVELS) + r"|"
+    r"upper[\s-]?intermediate|"
     r"intermediate|pre[\s-]?intermediate|elementary|beginner|"
     r"advanced|fluent)\b",
     re.IGNORECASE,
@@ -204,7 +206,7 @@ def _build_profile_hallucination_markers(
     return tuple(markers)
 
 
-def _looks_hallucinated(
+def looks_hallucinated(
     reason: str,
     raw_text: str,
     profile: CandidateProfile,

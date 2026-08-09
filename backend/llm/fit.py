@@ -6,9 +6,9 @@ import logging
 
 import httpx
 
-from backend.payloads import FitValidation, FitVerdict, ParsedVacancy
+from backend.payloads import FIT_VERDICTS, FitValidation, ParsedVacancy
 
-from backend.llm.answers import _extract_last_json
+from backend.llm.answers import extract_last_json, normalize_enum
 from backend.llm.candidate import (
     CandidateProfile,
     _format_free_preferences,
@@ -17,7 +17,7 @@ from backend.llm.candidate import (
     _format_languages,
     _format_work_formats,
 )
-from backend.llm.hallucination import _looks_hallucinated
+from backend.llm.hallucination import looks_hallucinated
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +245,7 @@ CANDIDATE_LOCATION: Армения/Ереван. ACCEPTED_FORMATS: удалён�
 
 
 def _parse_fit_validation(answer: str) -> FitValidation | None:
-    raw = _extract_last_json(answer)
+    raw = extract_last_json(answer)
     if raw is None:
         return None
     try:
@@ -253,18 +253,8 @@ def _parse_fit_validation(answer: str) -> FitValidation | None:
     except json.JSONDecodeError:
         return None
 
-    raw_verdict = data.get("verdict")
-    if isinstance(raw_verdict, str):
-        v = raw_verdict.strip().lower()
-        if v == "fit":
-            verdict: FitVerdict = "fit"
-        elif v == "reject":
-            verdict = "reject"
-        elif v == "trash":
-            verdict = "trash"
-        else:
-            return None
-    else:
+    verdict = normalize_enum(data.get("verdict"), FIT_VERDICTS)
+    if verdict is None:
         return None
 
     raw_reason = data.get("reason")
@@ -373,7 +363,7 @@ async def validate_vacancy_fit(
         parsed_validation.verdict in ("reject", "trash")
         and parsed_validation.reason is not None
     ):
-        marker = _looks_hallucinated(
+        marker = looks_hallucinated(
             parsed_validation.reason, raw_text, profile
         )
         if marker is not None:

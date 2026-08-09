@@ -40,6 +40,11 @@ class BotState(Base):
     )
 
 
+# `Blacklist.kind` — свободная строка: отсеять чужое значение может только
+# код, и вот единственное место, где набор родов объявлен.
+BLACKLIST_KINDS: tuple[str, ...] = ("keyword", "hr", "company", "channel")
+
+
 class Blacklist(Base):
     __tablename__ = "blacklist"
 

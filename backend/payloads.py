@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal, get_args
 
 from backend.models import (
     HR,
@@ -13,6 +13,24 @@ from backend.models import (
 
 
 FitVerdict = Literal["fit", "reject", "trash"]
+# Те же три значения, но набором — для разбора ответа модели. Берутся из
+# самого объявления, чтобы список и тип не разъехались.
+FIT_VERDICTS: tuple[str, ...] = get_args(FitVerdict)
+
+
+@dataclass(frozen=True)
+class ChannelPost:
+    """Пост канала в том виде, в каком его принимает конвейер: откуда взят
+    и что в нём написано.
+
+    Четыре значения ходят вместе от чтения канала до записи вакансии, и
+    порознь ни одно из них не значит ничего: `text` — уже извлечённый из
+    `msg`, а ник нужен и для ссылки, и для следа в журнале.
+    """
+    channel_id: int | None
+    channel_username: str
+    msg: Any
+    text: str
 
 
 @dataclass(frozen=True)

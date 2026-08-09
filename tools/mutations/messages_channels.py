@@ -64,21 +64,34 @@ MUTATIONS = [
         "            q.order_by(Message.sent_at.desc(), Message.id.desc())",
         "            q.order_by(Message.sent_at.desc())",
     ),
-    # count_unread_incoming: удалённые снова раздувают счётчик
+    # Предикат «непрочитанное входящее» сведён в `messages.UNREAD_INCOMING`, и
+    # цели вместе с ним: было четыре площадки в трёх модулях со своими копиями,
+    # осталась одна. Вопросов от этого не убавилось — их и было три на четверых,
+    # по одному на условие, — но привязки к площадке у них больше нет. Значит
+    # гонять набор надо против тестов всех четверых сразу: счётчика в подвале,
+    # карточки HR, перечня со счётчиками и всплывающего списка.
+    # UNREAD_INCOMING: наши собственные сообщения попадают в счётчик
     (
         "backend/repository/messages.py",
-        "            Message.is_incoming," + CRLF
-        + "            Message.read_at.is_(None)," + CRLF
-        + "            Message.is_deleted.is_(False)," + CRLF,
-        "            Message.is_incoming," + CRLF
-        + "            Message.read_at.is_(None)," + CRLF,
+        "    Message.is_incoming," + CRLF
+        + "    Message.read_at.is_(None)," + CRLF,
+        "    Message.read_at.is_(None)," + CRLF,
     ),
-    # count_unread_incoming: наши собственные сообщения попадают в счётчик
+    # UNREAD_INCOMING: удалённые снова раздувают счётчик
     (
         "backend/repository/messages.py",
-        "        select(func.count(Message.id)).where(" + CRLF
-        + "            Message.is_incoming," + CRLF,
-        "        select(func.count(Message.id)).where(" + CRLF,
+        "    Message.read_at.is_(None)," + CRLF
+        + "    Message.is_deleted.is_(False)," + CRLF,
+        "    Message.read_at.is_(None)," + CRLF,
+    ),
+    # UNREAD_INCOMING: прочитанное продолжает числиться непрочитанным
+    (
+        "backend/repository/messages.py",
+        "    Message.is_incoming," + CRLF
+        + "    Message.read_at.is_(None)," + CRLF
+        + "    Message.is_deleted.is_(False)," + CRLF,
+        "    Message.is_incoming," + CRLF
+        + "    Message.is_deleted.is_(False)," + CRLF,
     ),
     # list_hrs_with_unread: список идёт от старого непрочитанного к свежему
     (
@@ -86,20 +99,12 @@ MUTATIONS = [
         "            .order_by(func.max(Message.sent_at).desc())",
         "            .order_by(func.max(Message.sent_at).asc())",
     ),
-    # list_hrs_with_unread: свежесть меряется по всей переписке, а не по непрочитанному
+    # list_hrs_with_unread: во всплывающий список попадают и чужие сообщения
     (
         "backend/repository/hr_list.py",
-        "                Message.is_incoming," + CRLF
-        + "                Message.read_at.is_(None)," + CRLF
-        + "                Message.is_deleted.is_(False)," + CRLF
-        + "            )" + CRLF
-        + "            .group_by(HR.id)" + CRLF
-        + "            .order_by(func.max(Message.sent_at).desc())",
-        "                Message.is_incoming," + CRLF
-        + "                Message.is_deleted.is_(False)," + CRLF
-        + "            )" + CRLF
-        + "            .group_by(HR.id)" + CRLF
-        + "            .order_by(func.max(Message.sent_at).desc())",
+        "            .where(*UNREAD_INCOMING)" + CRLF
+        + "            .group_by(HR.id)",
+        "            .group_by(HR.id)",
     ),
     # channel_blacklist_candidates: собачка перед ником пропадает
     (
@@ -113,15 +118,7 @@ MUTATIONS = [
         '    return f"@{ch.username}"' + CRLF,
         "    return ch.username" + CRLF,
     ),
-    # _channel_blacklist_value: выключенные отметки снова видны
-    (
-        "backend/repository/channels.py",
-        '                Blacklist.kind == "channel",' + CRLF
-        + "                Blacklist.value.in_(candidates)," + CRLF
-        + "                Blacklist.active.is_(True)," + CRLF,
-        '                Blacklist.kind == "channel",' + CRLF
-        + "                Blacklist.value.in_(candidates)," + CRLF,
-    ),
+    # Отметка чёрного списка уехала в `blacklist_marks`, цель вместе с ней.
     # list_telegram_channels: ник вместо пустого заголовка не подставляется
     (
         "backend/repository/channels.py",
@@ -230,8 +227,10 @@ MUTATIONS = [
     # set_all_channels_active: обход применяется и к выключению
     (
         "backend/repository/channels.py",
-        "    if is_active:" + CRLF + "        bl_values = list(",
-        "    if True:" + CRLF + "        bl_values = list(",
+        "    if is_active:" + CRLF
+        + '        bl_values = await active_blacklist_values(session, "channel")',
+        "    if True:" + CRLF
+        + '        bl_values = await active_blacklist_values(session, "channel")',
     ),
     # reset_channel_cursor: отметка не стирается
     (

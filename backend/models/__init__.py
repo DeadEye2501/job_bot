@@ -22,6 +22,7 @@ from backend.models.profile import (
     profile_experience_skills,
 )
 from backend.models.settings import (
+    BLACKLIST_KINDS,
     AppSetting,
     Blacklist,
     BotState,
@@ -39,6 +40,7 @@ __all__ = [
     "HR",
     "AppSetting",
     "Base",
+    "BLACKLIST_KINDS",
     "Blacklist",
     "BotMode",
     "BotState",

@@ -11,6 +11,7 @@ from backend.domain.dedup import cosine_top_match
 from backend.helpers import extract_text
 from backend.models import Vacancy
 from backend.models import VacancyEvent
+from backend.payloads import ChannelPost
 
 from backend.flows import embeddings
 
@@ -71,8 +72,10 @@ async def ingest_post(
             )
         return
 
-    new_vacancy_id = await save_new_vacancy(pipeline, 
-        channel_id, channel_username, msg, text, embedding
+    new_vacancy_id = await save_new_vacancy(
+        pipeline,
+        ChannelPost(channel_id, channel_username, msg, text),
+        embedding,
     )
     if new_vacancy_id is not None:
         await parse.parse_and_update_vacancy(pipeline, 
@@ -82,21 +85,20 @@ async def ingest_post(
 
 async def save_new_vacancy(
     pipeline,
-    channel_id: int,
-    channel_username: str,
-    msg,
-    text: str,
+    post: ChannelPost,
     embedding: list[float],
 ) -> int | None:
     async with pipeline._session_factory() as session:
         try:
             new_vacancy = Vacancy(
-                source_channel_id=channel_id,
-                source_msg_id=msg.id,
-                raw_text=text,
+                source_channel_id=post.channel_id,
+                source_msg_id=post.msg.id,
+                raw_text=post.text,
                 embedding=embedding,
-                source_url=f"https://t.me/{channel_username}/{msg.id}",
-                posted_at=msg.date,
+                source_url=(
+                    f"https://t.me/{post.channel_username}/{post.msg.id}"
+                ),
+                posted_at=post.msg.date,
             )
             session.add(new_vacancy)
             await session.flush()
@@ -105,8 +107,8 @@ async def save_new_vacancy(
                     vacancy_id=new_vacancy.id,
                     kind="ingested",
                     payload={
-                        "channel": channel_username,
-                        "msg_id": msg.id,
+                        "channel": post.channel_username,
+                        "msg_id": post.msg.id,
                     },
                 )
             )
@@ -114,8 +116,8 @@ async def save_new_vacancy(
             embeddings.append_embedding(pipeline, new_vacancy.id, embedding)
             logger.info(
                 "[@%s] %d -> vacancy %d",
-                channel_username,
-                msg.id,
+                post.channel_username,
+                post.msg.id,
                 new_vacancy.id,
             )
             return new_vacancy.id
@@ -123,7 +125,7 @@ async def save_new_vacancy(
             await session.rollback()
             logger.info(
                 "[@%s] %d uq_vacancy_source race, skipping",
-                channel_username,
-                msg.id,
+                post.channel_username,
+                post.msg.id,
             )
             return None

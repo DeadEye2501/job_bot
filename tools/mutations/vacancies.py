@@ -205,4 +205,15 @@ MUTATIONS = [
         "order_by(status_rank.asc(), activity.desc(), Vacancy.id.desc())",
         "order_by(status_rank.desc(), activity.desc(), Vacancy.id.desc())",
     ),
+    # _CHANNEL_VAC_STATUS_RANK: две ступени в середине меняются местами.
+    # Переворот выше ловился и раньше, а перестановка внутри — нет: сторож
+    # называл четыре статуса из одиннадцати, и семь рангов между ними можно
+    # было тасовать незаметно.
+    (
+        "backend/repository/vacancies_mini.py",
+        "    VacancyStatus.INVITATION.value: 3," + CRLF
+        + "    VacancyStatus.TEST.value: 4," + CRLF,
+        "    VacancyStatus.INVITATION.value: 4," + CRLF
+        + "    VacancyStatus.TEST.value: 3," + CRLF,
+    ),
 ]

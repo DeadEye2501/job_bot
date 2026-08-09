@@ -138,23 +138,51 @@ async def test_the_channel_list_keeps_the_unparsed_ones_on_purpose(
     assert sorted(v.title for v in got) == sorted(["разобранная", "недоразобранная"])
 
 
+_HOTTEST_FIRST = [
+    VacancyStatus.OFFER,
+    VacancyStatus.IN_PROGRESS,
+    VacancyStatus.INVITATION,
+    VacancyStatus.TEST,
+    VacancyStatus.ANSWERED,
+    VacancyStatus.APPLIED,
+    VacancyStatus.NEW,
+    VacancyStatus.SCAM,
+    VacancyStatus.GHOSTING,
+    VacancyStatus.DECLINE,
+    VacancyStatus.NOT_FIT,
+]
+"""Порядок, в котором статусы должны выйти из списка канала — все одиннадцать.
+
+Названы поимённо все: на четырёх любую перестановку среди остальных семи
+прогон бы не заметил.
+"""
+
+
 async def test_the_channel_list_leads_with_the_hottest_status(
     session, session_factory
 ):
-    """Список канала ведёт самым горячим статусом, а «не подходит» уводит в самый низ."""
+    """Список канала идёт от самого горячего статуса к самому холодному.
+
+    Вакансии кладутся в обратном ожидаемому порядке нарочно: если ранг
+    статуса перестанет участвовать в сортировке вовсе, список выйдет в
+    порядке появления, то есть ровно наоборот — и проверка покраснеет,
+    а не совпадёт с ожидаемым по случайности.
+    """
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
     await put(
         session_factory,
-        vacancy_row(title="не подходит", source_channel_id=channel.id, status=VacancyStatus.NOT_FIT),
-        vacancy_row(title="новая", source_channel_id=channel.id, status=VacancyStatus.NEW),
-        vacancy_row(title="оффер", source_channel_id=channel.id, status=VacancyStatus.OFFER),
-        vacancy_row(title="в работе", source_channel_id=channel.id, status=VacancyStatus.IN_PROGRESS),
+        *[
+            vacancy_row(
+                title=status.value, source_channel_id=channel.id, status=status
+            )
+            for status in reversed(_HOTTEST_FIRST)
+        ],
     )
 
     got = await list_vacancies_for_channel(session, channel.id)
 
-    assert [v.title for v in got] == ["оффер", "в работе", "новая", "не подходит"]
+    assert [v.title for v in got] == [s.value for s in _HOTTEST_FIRST]
 
 
 async def test_inside_one_status_the_channel_list_prefers_the_posting_date(

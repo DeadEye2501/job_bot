@@ -63,11 +63,11 @@ from backend.cv_parser import parse_cv
 from backend.domain.scoring import build_skill_lookup
 from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
 from backend.models import (
+    BLACKLIST_KINDS,
     Blacklist,
     BotMode,
     Company,
     HR,
-    Message,
     TelegramChannel,
     Vacancy,
     VacancyStatus,
@@ -2918,7 +2918,7 @@ class MainApi(QObject):
             ))
             return
 
-        if kind not in ("keyword", "hr", "company", "channel"):
+        if kind not in BLACKLIST_KINDS:
             self.contacts_blacklist_action_done.emit(_err(
                 "Неверный тип записи.", action="create",
             ))

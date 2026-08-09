@@ -33,8 +33,8 @@ async def intake(make_pipeline, monkeypatch):
         pipeline.embedded = text
         return [0.1, 0.2]
 
-    async def save(pipeline, channel_id, username, msg, text, embedding):
-        pipeline.saved.append((channel_id, msg.id, text))
+    async def save(pipeline, post, embedding):
+        pipeline.saved.append((post.channel_id, post.msg.id, post.text))
         return pipeline.new_id
 
     async def parse(pipeline, vacancy_id, text, username):

@@ -7,6 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Message
 
+# Раскрывается звёздочкой в `.where(...)`: `.where(*UNREAD_INCOMING, ...)`.
+# Надгробие исключено намеренно — удалённое, но не прочитанное входящее иначе
+# раздувает счётчик, и погасить его из окна нечем.
+UNREAD_INCOMING = (
+    Message.is_incoming,
+    Message.read_at.is_(None),
+    Message.is_deleted.is_(False),
+)
+
+
 async def save_incoming_message(
     session: AsyncSession,
     hr_id: int,
@@ -92,16 +102,11 @@ async def list_messages_for_hr(
 async def count_unread_incoming(session: AsyncSession) -> int:
     """Count incoming HR messages whose read_at is still NULL.
 
-    Excludes tombstones — a deleted incoming row that was never read
-    would otherwise inflate the badge with no way to clear it from the UI.
-    ``updates.on_dm_delete`` also seals ``read_at`` defensively, but the filter
-    here protects against any future code that flips ``is_deleted`` only.
+    ``updates.on_dm_delete`` also seals ``read_at`` defensively, but the
+    tombstone filter inside ``UNREAD_INCOMING`` covers any future code that
+    flips ``is_deleted`` alone.
     """
     n = await session.scalar(
-        select(func.count(Message.id)).where(
-            Message.is_incoming,
-            Message.read_at.is_(None),
-            Message.is_deleted.is_(False),
-        )
+        select(func.count(Message.id)).where(*UNREAD_INCOMING)
     )
     return int(n or 0)

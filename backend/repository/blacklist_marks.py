@@ -1,0 +1,49 @@
+"""Активные строки чёрного списка, по которым предметы получают отметку."""
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.models import Blacklist
+
+
+async def active_blacklist_value(
+    session: AsyncSession, kind: str, candidates: list[str]
+) -> str | None:
+    """Точный `value` активной строки, под которой предмет числится в
+    чёрном списке, — для чипа в карточке. None, если не числится.
+
+    Порядок по возрастанию `id` не украшение: написаний у предмета бывает
+    несколько сразу (редко — повторное заведение после правки схемы), и без
+    него подпись чипа меняла бы значение от загрузки к загрузке.
+    """
+    if not candidates:
+        return None
+    row = (
+        await session.scalars(
+            select(Blacklist)
+            .where(
+                Blacklist.kind == kind,
+                Blacklist.value.in_(candidates),
+                Blacklist.active.is_(True),
+            )
+            .order_by(Blacklist.id.asc())
+            .limit(1)
+        )
+    ).first()
+    return row.value if row else None
+
+
+async def active_blacklist_values(session: AsyncSession, kind: str) -> set[str]:
+    """Все активные значения этого рода одним запросом: перечням нужна
+    проверка вхождения на каждую строку, а не запрос на каждую.
+    """
+    return set(
+        (
+            await session.scalars(
+                select(Blacklist.value).where(
+                    Blacklist.kind == kind,
+                    Blacklist.active.is_(True),
+                )
+            )
+        ).all()
+    )

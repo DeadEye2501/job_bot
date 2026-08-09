@@ -31,13 +31,25 @@ MUTATIONS = [
         "    base_filter = [Vacancy.is_parsed.is_(True)]" + CRLF + CRLF + "    total = int(",
         "    base_filter = []" + CRLF + CRLF + "    total = int(",
     ),
-    # get_stats_kpi: вакансия считается столько раз, сколько раз переходила
+    # _ever_in: вакансия считается столько раз, сколько раз переходила
     (
         "backend/repository/stats_summary.py",
-        "        select(func.count(func.distinct(VacancyStatusHistory.vacancy_id))).where(" + CRLF
-        + "            VacancyStatusHistory.status == VacancyStatus.APPLIED," + CRLF,
-        "        select(func.count(VacancyStatusHistory.vacancy_id)).where(" + CRLF
-        + "            VacancyStatusHistory.status == VacancyStatus.APPLIED," + CRLF,
+        "            select(func.count(func.distinct(VacancyStatusHistory.vacancy_id)))" + CRLF,
+        "            select(func.count(VacancyStatusHistory.vacancy_id))" + CRLF,
+    ),
+    # _ever_in: в ступени воронки попадают неразобранные вакансии
+    (
+        "backend/repository/stats_summary.py",
+        "            .join(Vacancy, Vacancy.id == VacancyStatusHistory.vacancy_id)" + CRLF
+        + "            .where(_status_cond(statuses), *base_filter)" + CRLF,
+        "            .where(_status_cond(statuses))" + CRLF,
+    ),
+    # _first_in_period: в прибавку за период попадают неразобранные
+    (
+        "backend/repository/stats_summary.py",
+        "                .join(Vacancy, Vacancy.id == sub.c.vid)" + CRLF
+        + "                .where(sub.c.first_at >= since, *base_filter)" + CRLF,
+        "                .where(sub.c.first_at >= since)" + CRLF,
     ),
     # get_stats_kpi: «в работе» перестаёт считать тестовые задания
     (
@@ -45,11 +57,13 @@ MUTATIONS = [
         "    in_progress_set = {VacancyStatus.INVITATION, VacancyStatus.TEST}",
         "    in_progress_set = {VacancyStatus.INVITATION}",
     ),
-    # get_stats_kpi: прибавка считается по последнему переходу
+    # first_transition_subq: прибавка считается по последнему переходу.
+    # Подзапрос сведён из двух копий, и цель у него теперь одна — гонять
+    # набор надо и против тестов воронки по каналам, второго потребителя.
     (
         "backend/repository/stats_summary.py",
-        '                    func.min(VacancyStatusHistory.changed_at).label("first_at"),',
-        '                    func.max(VacancyStatusHistory.changed_at).label("first_at"),',
+        '            func.min(VacancyStatusHistory.changed_at).label("first_at"),',
+        '            func.max(VacancyStatusHistory.changed_at).label("first_at"),',
     ),
     # get_stats_kpi: прибавка к общему счётчику не отсекается окном
     (
@@ -212,24 +226,29 @@ MUTATIONS = [
         '        total = item["_total_vac"] + trash_events',
         '        total = item["_total_vac"]',
     ),
-    # get_stats_channels_pipeline: «ответили» перестаёт считать отказы
+    # Перечни воронки уехали в `backend/domain/funnel.py`, цели вместе с ними:
+    # они были объявлены и там, и в `channels.py`, а теперь объявлены один раз.
+    # RESPONDED: «ответили» перестаёт считать отказы
     (
-        "backend/repository/stats_pipeline.py",
-        "        VacancyStatus.IN_PROGRESS, VacancyStatus.OFFER, VacancyStatus.DECLINE," + CRLF
-        + "    }" + CRLF
-        + "    invite_set = {",
-        "        VacancyStatus.IN_PROGRESS, VacancyStatus.OFFER," + CRLF
-        + "    }" + CRLF
-        + "    invite_set = {",
+        "backend/domain/funnel.py",
+        "    VacancyStatus.OFFER," + CRLF
+        + "    VacancyStatus.DECLINE," + CRLF
+        + "})" + CRLF
+        + CRLF
+        + "# `INVITED`",
+        "    VacancyStatus.OFFER," + CRLF
+        + "})" + CRLF
+        + CRLF
+        + "# `INVITED`",
     ),
-    # get_stats_channels_pipeline: «продвинулись» начинает считать отказы
+    # INVITED: «продвинулись» начинает считать отказы
     (
-        "backend/repository/stats_pipeline.py",
-        "        VacancyStatus.INVITATION, VacancyStatus.IN_PROGRESS, VacancyStatus.OFFER," + CRLF
-        + "    }" + CRLF,
-        "        VacancyStatus.INVITATION, VacancyStatus.IN_PROGRESS, VacancyStatus.OFFER," + CRLF
-        + "        VacancyStatus.DECLINE," + CRLF
-        + "    }" + CRLF,
+        "backend/domain/funnel.py",
+        "INVITED: frozenset[VacancyStatus] = frozenset({" + CRLF
+        + "    VacancyStatus.INVITATION," + CRLF,
+        "INVITED: frozenset[VacancyStatus] = frozenset({" + CRLF
+        + "    VacancyStatus.INVITATION," + CRLF
+        + "    VacancyStatus.DECLINE," + CRLF,
     ),
     # get_stats_channels_pipeline: доли считаются от присланного, а не от отправленного
     (

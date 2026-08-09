@@ -7,6 +7,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Message, ProfileSkill, Vacancy, VacancyStatus, VacancyStatusHistory
 
+def _status_cond(statuses):
+    """Условие «статус перехода тот самый». Принимает и одиночный статус,
+    и любой набор — звать с одним значением удобнее, чем с набором из него.
+    """
+    return (
+        VacancyStatusHistory.status.in_(statuses)
+        if isinstance(statuses, (frozenset, set, list, tuple))
+        else VacancyStatusHistory.status == statuses
+    )
+
+
+def first_transition_subq(statuses):
+    """Подзапрос «когда вакансия впервые перешла в эти статусы»: пара
+    из номера вакансии и самого раннего времени перехода.
+    """
+    return (
+        select(
+            VacancyStatusHistory.vacancy_id.label("vid"),
+            func.min(VacancyStatusHistory.changed_at).label("first_at"),
+        )
+        .where(_status_cond(statuses))
+        .group_by(VacancyStatusHistory.vacancy_id)
+        .subquery()
+    )
+
+
 def _stats_period_since(period: str) -> datetime | None:
     """Convert UI period code to a since-timestamp, or None for 'all'."""
     now = datetime.now(timezone.utc)
@@ -49,29 +75,23 @@ async def get_stats_kpi(
         select(func.count(Vacancy.id)).where(*base_filter)
     )).scalar_one())
 
-    applied_total = int((await session.execute(
-        select(func.count(func.distinct(VacancyStatusHistory.vacancy_id))).where(
-            VacancyStatusHistory.status == VacancyStatus.APPLIED,
-        )
-    )).scalar_one())
+    async def _ever_in(statuses) -> int:
+        """Сколько разобранных вакансий когда-либо побывало в этих статусах.
 
-    in_progress_total = int((await session.execute(
-        select(func.count(func.distinct(VacancyStatusHistory.vacancy_id))).where(
-            VacancyStatusHistory.status.in_(in_progress_set),
-        )
-    )).scalar_one())
+        Соединение с вакансией тут не ради полей, а ради `is_parsed`: без
+        него ступени воронки считались бы по всем строкам истории, включая
+        неразобранные, и «откликнулись» выходило бы больше, чем «всего».
+        """
+        return int((await session.execute(
+            select(func.count(func.distinct(VacancyStatusHistory.vacancy_id)))
+            .join(Vacancy, Vacancy.id == VacancyStatusHistory.vacancy_id)
+            .where(_status_cond(statuses), *base_filter)
+        )).scalar_one())
 
-    offer_total = int((await session.execute(
-        select(func.count(func.distinct(VacancyStatusHistory.vacancy_id))).where(
-            VacancyStatusHistory.status == VacancyStatus.OFFER,
-        )
-    )).scalar_one())
-
-    decline_total = int((await session.execute(
-        select(func.count(func.distinct(VacancyStatusHistory.vacancy_id))).where(
-            VacancyStatusHistory.status == VacancyStatus.DECLINE,
-        )
-    )).scalar_one())
+    applied_total = await _ever_in(VacancyStatus.APPLIED)
+    in_progress_total = await _ever_in(in_progress_set)
+    offer_total = await _ever_in(VacancyStatus.OFFER)
+    decline_total = await _ever_in(VacancyStatus.DECLINE)
 
     if since is not None:
         period_filter = [*base_filter, Vacancy.created_at >= since]
@@ -80,22 +100,11 @@ async def get_stats_kpi(
         )).scalar_one())
 
         async def _first_in_period(statuses) -> int:
-            cond = (
-                VacancyStatusHistory.status.in_(statuses)
-                if isinstance(statuses, (set, list, tuple))
-                else VacancyStatusHistory.status == statuses
-            )
-            sub = (
-                select(
-                    VacancyStatusHistory.vacancy_id.label("vid"),
-                    func.min(VacancyStatusHistory.changed_at).label("first_at"),
-                )
-                .where(cond)
-                .group_by(VacancyStatusHistory.vacancy_id)
-                .subquery()
-            )
+            sub = first_transition_subq(statuses)
             return int((await session.execute(
-                select(func.count(sub.c.vid)).where(sub.c.first_at >= since)
+                select(func.count(sub.c.vid))
+                .join(Vacancy, Vacancy.id == sub.c.vid)
+                .where(sub.c.first_at >= since, *base_filter)
             )).scalar_one())
 
         applied_period = await _first_in_period(VacancyStatus.APPLIED)

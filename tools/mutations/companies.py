@@ -155,15 +155,7 @@ MUTATIONS = [
         "            select(func.count(func.distinct(Vacancy.hr_id))).where(",
         "            select(func.count(Vacancy.hr_id)).where(",
     ),
-    # _company_blacklist_value: выключенные отметки снова видны
-    (
-        "backend/repository/companies_card.py",
-        '                Blacklist.kind == "company",' + CRLF
-        + "                Blacklist.value.in_(candidates)," + CRLF
-        + "                Blacklist.active.is_(True)," + CRLF,
-        '                Blacklist.kind == "company",' + CRLF
-        + "                Blacklist.value.in_(candidates)," + CRLF,
-    ),
+    # Отметка чёрного списка уехала в `blacklist_marks`, цель вместе с ней.
     # list_hrs_for_company: порядок теряет разрешитель по имени
     (
         "backend/repository/hr_list.py",

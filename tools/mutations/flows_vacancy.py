@@ -55,10 +55,10 @@ MUTATIONS = [
     # save_new_vacancy: повторное заведение выдаётся за успех
     (
         "backend/flows/ingest.py",
-        '                msg.id,' + CRLF
+        '                post.msg.id,' + CRLF
         + "            )" + CRLF
         + "            return None" + CRLF,
-        '                msg.id,' + CRLF
+        '                post.msg.id,' + CRLF
         + "            )" + CRLF
         + "            return 0" + CRLF,
     ),
@@ -309,7 +309,7 @@ MUTATIONS = [
     ),
     # spawn_hr_backfill: законченный догон из списка не убирается
     (
-        "backend/flows/dm.py",
+        "backend/flows/dm_backfill.py",
         "    task.add_done_callback(pipeline._backfill_tasks.discard)",
         "    pass",
     ),

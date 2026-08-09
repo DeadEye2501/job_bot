@@ -29,7 +29,7 @@ PHOTO_SIZE_LIMIT = 10 * 1024 * 1024
 DOCUMENT_SIZE_LIMIT = 50 * 1024 * 1024
 
 
-def _looks_like_photo(path: Path) -> bool:
+def looks_like_photo(path: Path) -> bool:
     """Эвристика для выбора send_photo vs send_document. Pyrogram (и сам
     Telegram) принимают в send_photo только JPEG/PNG/WEBP — поэтому
     photo-ветка ЖЁСТКО ограничена этими расширениями. HEIC/HEIF/BMP/TIFF
@@ -45,7 +45,7 @@ def _looks_like_photo(path: Path) -> bool:
     return bool(mime and mime.startswith("image/"))
 
 
-def _classify_media(msg) -> tuple[str | None, str | None]:
+def classify_media(msg) -> tuple[str | None, str | None]:
     """Return ``(media_kind, media_name)`` for a Pyrogram DM. We persist only
     photos and documents; everything else (sticker / video / voice / etc.)
     falls back to a text bubble with the placeholder set in ``extract_dm_text``.
@@ -58,18 +58,18 @@ def _classify_media(msg) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _media_cache_path(hr_id: int, tg_message_id: int, ext: str) -> Path:
+def media_cache_path(hr_id: int, tg_message_id: int, ext: str) -> Path:
     """Deterministic cache path so duplicate-row races (handler vs explicit
     send) collide on the same file rather than producing orphans.
     """
     return MEDIA_DIR / str(hr_id) / f"{tg_message_id}{ext}"
 
 
-def _media_path_for_db(path) -> str:
+def media_path_for_db(path) -> str:
     """Convert a media-cache absolute path into a posix string relative to
     ``MEDIA_DIR`` for storage. Falls back to the absolute posix form for any
     path outside MEDIA_DIR (shouldn't happen — every cache write goes
-    through ``_media_cache_path`` — but kept defensive).
+    through ``media_cache_path`` — but kept defensive).
     """
     p = Path(path).resolve()
     try:
@@ -78,22 +78,22 @@ def _media_path_for_db(path) -> str:
         return p.as_posix()
 
 
-async def _download_media(client, msg, hr_id: int) -> str | None:
+async def download_media(client, msg, hr_id: int) -> str | None:
     """Download a photo or document to ``media/{hr_id}/{tg_message_id}{ext}``.
     Returns the project-relative posix path or ``None`` if there's no
     supported media on the message. Skips re-download if the file already
     exists (handler/manual-send race writes the same path either way).
     """
-    kind, _ = _classify_media(msg)
+    kind, _ = classify_media(msg)
     if kind is None:
         return None
     if kind == "photo":
         ext = ".jpg"  # Pyrogram delivers photos as JPEGs
     else:
         ext = Path(getattr(msg.document, "file_name", "") or "").suffix or ".bin"
-    out = _media_cache_path(hr_id, msg.id, ext)
+    out = media_cache_path(hr_id, msg.id, ext)
     if out.exists():
-        return _media_path_for_db(out)
+        return media_path_for_db(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     try:
         path = await client.download_media(msg, file_name=str(out))
@@ -105,4 +105,4 @@ async def _download_media(client, msg, hr_id: int) -> str | None:
         return None
     if not path:
         return None
-    return _media_path_for_db(path)
+    return media_path_for_db(path)

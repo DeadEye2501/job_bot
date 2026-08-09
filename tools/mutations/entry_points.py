@@ -1,29 +1,30 @@
 """Поломки для входных точек: соединение с базой, клиент Telegram, запуск.
 
-Переводы строк здесь юниксовые, в отличие от файлов `backend/`: эти легли в
-дерево с `\\n`. Поиск по `\\r\\n` в них не находит ничего — проверено проходом,
-где двенадцать поломок из двадцати не совпали.
+Переводы строк тут разные, и это не мелочь: `adapters/` и `bootstrap.py` легли
+в дерево с `\\n`, а `main.py` — с `\\r\\n`. Поиск не той парой не находит ничего
+и молчит об этом, поэтому констант две, и берётся та, что под файл.
 """
 
-CRLF = "\n"
+LF = "\n"
+CRLF = "\r\n"
 
 MUTATIONS = [
     # make_engine: внешние ключи перестают стеречься
     (
         "adapters/db.py",
-        '            cursor.execute("PRAGMA foreign_keys=ON")' + CRLF,
+        '            cursor.execute("PRAGMA foreign_keys=ON")' + LF,
         "",
     ),
     # make_engine: журнал остаётся в режиме, где читатель ждёт писателя
     (
         "adapters/db.py",
-        '            cursor.execute("PRAGMA journal_mode=WAL")' + CRLF,
+        '            cursor.execute("PRAGMA journal_mode=WAL")' + LF,
         "",
     ),
     # make_engine: занятую базу перестают ждать
     (
         "adapters/db.py",
-        '            cursor.execute("PRAGMA busy_timeout=5000")' + CRLF,
+        '            cursor.execute("PRAGMA busy_timeout=5000")' + LF,
         "",
     ),
     # make_engine: настройки ставятся один раз, а не на каждое соединение
@@ -41,8 +42,8 @@ MUTATIONS = [
     # make_client: сохранённая сессия перестаёт жить в памяти
     (
         "adapters/telegram.py",
-        "            in_memory=True," + CRLF,
-        "            in_memory=False," + CRLF,
+        "            in_memory=True," + LF,
+        "            in_memory=False," + LF,
     ),
     # make_client: пустой пароль второго шага уходит как заданный
     (
@@ -53,26 +54,26 @@ MUTATIONS = [
     # make_client: короткие запреты частоты перестают пережидаться сами
     (
         "adapters/telegram.py",
-        "            in_memory=True," + CRLF + "            sleep_threshold=60," + CRLF,
-        "            in_memory=True," + CRLF,
+        "            in_memory=True," + LF + "            sleep_threshold=60," + LF,
+        "            in_memory=True," + LF,
     ),
     # make_client: сохранённая сессия не используется вовсе
     (
         "adapters/telegram.py",
-        "    if tg.session_string:" + CRLF,
-        "    if False:" + CRLF,
+        "    if tg.session_string:" + LF,
+        "    if False:" + LF,
     ),
     # send_dm: запор отправки снимается
     (
         "adapters/telegram.py",
-        "    if SEND_LOCKED:" + CRLF,
-        "    if False:" + CRLF,
+        "    if SEND_LOCKED:" + LF,
+        "    if False:" + LF,
     ),
     # send_dm: заглушенная отправка выдаёт номер, будто письмо ушло
     (
         "adapters/telegram.py",
-        '            len(text),' + CRLF + "        )" + CRLF + "        return None" + CRLF,
-        '            len(text),' + CRLF + "        )" + CRLF + "        return 0" + CRLF,
+        '            len(text),' + LF + "        )" + LF + "        return None" + LF,
+        '            len(text),' + LF + "        )" + LF + "        return 0" + LF,
     ),
     # send_dm: вложение уходит без текста-подписи
     (
@@ -83,8 +84,8 @@ MUTATIONS = [
     # send_dm: вложение теряется, уходит только текст
     (
         "adapters/telegram.py",
-        "    if attachment is not None:" + CRLF,
-        "    if False:" + CRLF,
+        "    if attachment is not None:" + LF,
+        "    if False:" + LF,
     ),
     # send_dm: номер ушедшего сообщения не возвращается
     (
@@ -95,7 +96,7 @@ MUTATIONS = [
     # ensure_schema: миграции применяются не к той базе
     (
         "backend/bootstrap.py",
-        '    cfg.set_main_option("sqlalchemy.url", get_database_url())' + CRLF,
+        '    cfg.set_main_option("sqlalchemy.url", get_database_url())' + LF,
         "",
     ),
     # ensure_schema: схема не доводится до последней ревизии

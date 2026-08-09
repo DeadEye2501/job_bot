@@ -5,9 +5,10 @@ import logging
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import Blacklist, Company, Vacancy
+from backend.models import Company, Vacancy
 from backend.payloads import CompanyDetail
 
+from backend.repository.blacklist_marks import active_blacklist_value
 from backend.repository.hr_card import _concat_notes
 
 logger = logging.getLogger(__name__)
@@ -64,22 +65,9 @@ def company_blacklist_preferred_value(co: Company) -> str | None:
 async def _company_blacklist_value(
     session: AsyncSession, co: Company
 ) -> str | None:
-    candidates = company_blacklist_candidates(co)
-    if not candidates:
-        return None
-    row = (
-        await session.scalars(
-            select(Blacklist)
-            .where(
-                Blacklist.kind == "company",
-                Blacklist.value.in_(candidates),
-                Blacklist.active.is_(True),
-            )
-            .order_by(Blacklist.id.asc())
-            .limit(1)
-        )
-    ).first()
-    return row.value if row else None
+    return await active_blacklist_value(
+        session, "company", company_blacklist_candidates(co)
+    )
 
 
 async def get_company_detail(

@@ -92,40 +92,15 @@ MUTATIONS = [
         "            .order_by(Vacancy.created_at.desc(), Vacancy.id.desc())" + CRLF + "            .limit(1)" + CRLF,
         "            .order_by(Vacancy.created_at.asc(), Vacancy.id.asc())" + CRLF + "            .limit(1)" + CRLF,
     ),
-    # get_hr_detail: непрочитанными считаются и удалённые
+    # get_hr_detail: в счётчик карточки попадает вся переписка
     (
         "backend/repository/hr_card.py",
         "                Message.hr_id == hr_id," + CRLF
-        + "                Message.is_incoming," + CRLF
-        + "                Message.read_at.is_(None)," + CRLF
-        + "                Message.is_deleted.is_(False)," + CRLF,
-        "                Message.hr_id == hr_id," + CRLF
-        + "                Message.is_incoming," + CRLF
-        + "                Message.read_at.is_(None)," + CRLF,
+        + "                *UNREAD_INCOMING," + CRLF,
+        "                Message.hr_id == hr_id," + CRLF,
     ),
-    # _hr_blacklist_value: выключенные записи снова видны
-    (
-        "backend/repository/hr_card.py",
-        '                Blacklist.kind == "hr",' + CRLF
-        + "                Blacklist.value.in_(candidates)," + CRLF
-        + "                Blacklist.active.is_(True)," + CRLF,
-        '                Blacklist.kind == "hr",' + CRLF
-        + "                Blacklist.value.in_(candidates)," + CRLF,
-    ),
-    # _hr_blacklist_value: при двух написаниях побеждает заведённое позже
-    (
-        "backend/repository/hr_card.py",
-        '                Blacklist.kind == "hr",' + CRLF
-        + "                Blacklist.value.in_(candidates)," + CRLF
-        + "                Blacklist.active.is_(True)," + CRLF
-        + "            )" + CRLF
-        + "            .order_by(Blacklist.id.asc())",
-        '                Blacklist.kind == "hr",' + CRLF
-        + "                Blacklist.value.in_(candidates)," + CRLF
-        + "                Blacklist.active.is_(True)," + CRLF
-        + "            )" + CRLF
-        + "            .order_by(Blacklist.id.desc())",
-    ),
+    # Отметка чёрного списка уехала в `blacklist_marks`, цели вместе с ней:
+    # тремя копиями искалось одно место, и цель у него теперь одна.
     # hr_blacklist_candidates: написание по идентификатору пропадает
     (
         "backend/repository/hr_card.py",
@@ -182,11 +157,11 @@ MUTATIONS = [
         "                    Vacancy.created_at.desc()," + CRLF + "                    Vacancy.id.desc()," + CRLF,
         "                    Vacancy.created_at.asc()," + CRLF + "                    Vacancy.id.asc()," + CRLF,
     ),
-    # list_hr_with_counts: в непрочитанные попадают и исходящие
+    # list_hr_with_counts: в непрочитанные попадает вся переписка
     (
         "backend/repository/hr_list.py",
         "                Message.hr_id.is_not(None)," + CRLF
-        + "                Message.is_incoming," + CRLF,
+        + "                *UNREAD_INCOMING," + CRLF,
         "                Message.hr_id.is_not(None)," + CRLF,
     ),
     # delete_hr: переписка переживает удаление человека

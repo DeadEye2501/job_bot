@@ -4,7 +4,7 @@ import logging
 import asyncio
 
 from adapters import telegram
-from backend.flows.dm import catch_up_missed_dms
+from backend.flows.dm_backfill import catch_up_missed_dms
 from backend.models import BotMode
 
 logger = logging.getLogger(__name__)

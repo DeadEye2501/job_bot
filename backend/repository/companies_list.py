@@ -3,9 +3,10 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import Blacklist, Company, Vacancy
+from backend.models import Company, Vacancy
 from backend.payloads import CompanyWithCount
 
+from backend.repository.blacklist_marks import active_blacklist_values
 from backend.repository.companies_card import company_blacklist_candidates
 
 
@@ -48,16 +49,7 @@ async def list_companies_with_counts(
     if limit is not None:
         rows = rows[offset : offset + limit]
 
-    bl_values = set(
-        (
-            await session.scalars(
-                select(Blacklist.value).where(
-                    Blacklist.kind == "company",
-                    Blacklist.active.is_(True),
-                )
-            )
-        ).all()
-    )
+    bl_values = await active_blacklist_values(session, "company")
 
     return [
         CompanyWithCount(

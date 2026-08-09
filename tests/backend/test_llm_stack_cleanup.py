@@ -11,7 +11,7 @@
 
 import pytest
 
-from backend.llm.skills import _capitalize_skill, _clean_stack_items, _strip_version
+from backend.llm.skills import _capitalize_skill, clean_stack_items, _strip_version
 
 
 @pytest.mark.parametrize(
@@ -93,12 +93,12 @@ def test_the_two_cleanups_are_applied_together():
     «fastapi 0.110» осталось бы с версией, потому что поднимать было бы
     нечего в цифрах.
     """
-    assert _clean_stack_items(["fastapi 0.110"], set()) == ["Fastapi"]
+    assert clean_stack_items(["fastapi 0.110"], set()) == ["Fastapi"]
 
 
 def test_a_repeat_is_kept_once():
     """Повтор внутри списка остаётся один раз, без учёта регистра."""
-    assert _clean_stack_items(["Python", "python", "PYTHON"], set()) == ["Python"]
+    assert clean_stack_items(["Python", "python", "PYTHON"], set()) == ["Python"]
 
 
 def test_a_repeat_across_the_two_groups_is_kept_once():
@@ -110,8 +110,8 @@ def test_a_repeat_across_the_two_groups_is_kept_once():
     """
     seen: set[str] = set()
 
-    required = _clean_stack_items(["Python", "Docker"], seen)
-    preferred = _clean_stack_items(["docker", "Redis"], seen)
+    required = clean_stack_items(["Python", "Docker"], seen)
+    preferred = clean_stack_items(["docker", "Redis"], seen)
 
     assert required == ["Python", "Docker"]
     assert preferred == ["Redis"]
@@ -119,7 +119,7 @@ def test_a_repeat_across_the_two_groups_is_kept_once():
 
 def test_a_version_and_a_bare_name_collapse_into_one():
     """«Python 3.13» и «Python» рядом схлопываются в одно название."""
-    assert _clean_stack_items(["Python 3.13", "Python"], set()) == ["Python"]
+    assert clean_stack_items(["Python 3.13", "Python"], set()) == ["Python"]
 
 
 @pytest.mark.parametrize(
@@ -140,9 +140,9 @@ def test_anything_but_a_list_is_handled_without_falling(raw, expected):
     Деление запятой оставлено для старого однострочного вида ответа: модель
     иногда возвращает его вместо списка.
     """
-    assert _clean_stack_items(raw, set()) == expected
+    assert clean_stack_items(raw, set()) == expected
 
 
 def test_junk_inside_the_list_is_skipped():
     """Мусор внутри списка пропускается, а не роняет разбор."""
-    assert _clean_stack_items(["Python", 42, None, "   ", ""], set()) == ["Python"]
+    assert clean_stack_items(["Python", 42, None, "   ", ""], set()) == ["Python"]
