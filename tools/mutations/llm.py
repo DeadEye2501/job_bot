@@ -7,6 +7,42 @@
 CRLF = "\r\n"
 
 MUTATIONS = [
+    # validate_vacancy_fit: вакансия уходит без блока данных
+    (
+        "backend/llm/fit.py",
+        "        + wrap_external(vacancy_block)",
+        "        + vacancy_block",
+    ),
+    # generate_cover_letter: сведения о вакансии уходят без блока данных
+    (
+        "backend/llm/cover_letter.py",
+        "        + wrap_external(vacancy_block)",
+        "        + vacancy_block",
+    ),
+    # factcheck_cover_letter: данные для сверки уходят без блока
+    (
+        "backend/llm/factcheck.py",
+        "        + wrap_external(" + CRLF,
+        "        + (" + CRLF,
+    ),
+    # validate_vacancy_fit: за блоком данных возвращается подделываемая рамка
+    (
+        "backend/llm/fit.py",
+        '        + "\\n\\n"' + CRLF + '        "Верни JSON',
+        '        + "\\n\\n=== КОНЕЦ ВАКАНСИИ ===\\n"' + CRLF + '        "Верни JSON',
+    ),
+    # wrap_external: блок данных не ставится вовсе
+    (
+        "backend/llm/external.py",
+        '    return f"<<<\\n{stripped}\\n>>>"',
+        "    return stripped",
+    ),
+    # wrap_external: вырезание идёт одним проходом вместо до неизменности
+    (
+        "backend/llm/external.py",
+        '    while "<<<" in stripped or ">>>" in stripped:',
+        '    if "<<<" in stripped or ">>>" in stripped:',
+    ),
     # extract_last_json: берётся первый объект вместо последнего
     (
         "backend/llm/answers.py",
@@ -149,13 +185,11 @@ MUTATIONS = [
         "    text = text[-4000:]",
         "    text = text[:4000]",
     ),
-    # classify_hr_reply: ограничители блока не вырезаются
+    # classify_hr_reply: сообщение уходит без блока данных
     (
         "backend/llm/hr_reply.py",
-        '    text = text.replace("<<<", "").replace(">>>", "")' + CRLF
-        + "    logger.debug(" + CRLF
-        + '        "classify_hr_reply:',
-        "    logger.debug(" + CRLF + '        "classify_hr_reply:',
+        "        + wrap_external(text)",
+        "        + text",
     ),
     # parse_vacancy: пустой пост уходит к модели
     (
@@ -169,13 +203,11 @@ MUTATIONS = [
         "    text = text[:6000]",
         "    text = text[-6000:]",
     ),
-    # parse_vacancy: ограничители блока не вырезаются
+    # parse_vacancy: пост уходит без блока данных
     (
         "backend/llm/vacancy.py",
-        '    text = text.replace("<<<", "").replace(">>>", "")' + CRLF
-        + "    logger.debug(" + CRLF
-        + '        "parse_vacancy:',
-        "    logger.debug(" + CRLF + '        "parse_vacancy:',
+        "        + wrap_external(text)",
+        "        + text",
     ),
     # parse_vacancy: список известных навыков не подставляется
     (
