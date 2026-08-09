@@ -59,7 +59,7 @@ async def check_chat(client: httpx.AsyncClient, model: str) -> tuple[bool, str]:
                 "max_tokens": 1,
             },
         )
-    except Exception as e:
+    except httpx.HTTPError as e:
         _log.exception("пробный запрос к чат-модели %s не прошёл", model)
         return False, f"{type(e).__name__}: {e}"
     if not r.is_success:
@@ -87,7 +87,7 @@ async def check_embed(client: httpx.AsyncClient, model: str) -> tuple[bool, str]
             "/v1/embeddings",
             json={"model": model, "input": "ping"},
         )
-    except Exception as e:
+    except httpx.HTTPError as e:
         _log.exception("пробный запрос к модели векторов %s не прошёл", model)
         return False, f"{type(e).__name__}: {e}"
     if not r.is_success:
