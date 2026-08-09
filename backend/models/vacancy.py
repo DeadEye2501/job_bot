@@ -19,7 +19,7 @@ from sqlalchemy.sql import expression
 
 from backend.models.base import Base
 from backend.models.contacts import HR, Company, TelegramChannel
-from backend.models.enums import StatusHistorySource, VacancyStatus
+from backend.models.enums import Currency, StatusHistorySource, VacancyStatus
 
 
 class Vacancy(Base):
@@ -58,8 +58,15 @@ class Vacancy(Base):
     stack: Mapped[list[str] | None] = mapped_column(JSON)
     grade: Mapped[str | None]
     salary: Mapped[str | None]
-    salary_rub_min: Mapped[int | None]
-    salary_rub_max: Mapped[int | None]
+    salary_min: Mapped[int | None]
+    salary_max: Mapped[int | None]
+    salary_currency: Mapped[Currency | None] = mapped_column(
+        SQLEnum(
+            Currency,
+            values_callable=lambda x: [e.value for e in x],
+            name="currency",
+        )
+    )
     remote: Mapped[str | None]
     location: Mapped[str | None]
     score: Mapped[int | None]

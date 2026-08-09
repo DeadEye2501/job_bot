@@ -4890,8 +4890,6 @@ def _vacancy_list_row_to_dict(
         "channel_username": channel_username,
         "grade": v.grade,
         "salary": v.salary,
-        "salary_rub_min": v.salary_rub_min,
-        "salary_rub_max": v.salary_rub_max,
         "remote": v.remote,
         "stack": _stack_items(v.stack, matched_set),
         "posted_at": _iso(v.posted_at),

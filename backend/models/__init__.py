@@ -9,6 +9,7 @@ from backend.models.base import Base
 from backend.models.contacts import HR, Company, TelegramChannel
 from backend.models.enums import (
     BotMode,
+    Currency,
     LlmConfigKind,
     StatusHistorySource,
     VacancyStatus,
@@ -45,6 +46,7 @@ __all__ = [
     "BotMode",
     "BotState",
     "Company",
+    "Currency",
     "LlmConfig",
     "LlmConfigKind",
     "Message",
