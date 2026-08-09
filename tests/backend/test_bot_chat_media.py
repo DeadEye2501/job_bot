@@ -113,26 +113,29 @@ async def test_a_failed_copy_does_not_lose_the_message(
     assert row.media_path is None
 
 
-async def test_a_file_where_the_folder_belongs_loses_the_sent_message(
+async def test_a_file_where_the_folder_belongs_keeps_the_sent_message(
     chatting, sending_unlocked, tmp_path
 ):
-    """Файл на месте папки вложений теряет уже отправленное сообщение.
+    """Файл на месте папки вложений сообщение не теряет.
 
-    Создание папки стоит снаружи разбора ошибок, и его сбой пробивает
-    наружу необработанным: файл у HR уже есть, а строки в переписке нет
-    и не будет — окно покажет ошибку, будто отправка не состоялась.
-
-    Тест закрепляет сегодняшнее поведение: при починке он покраснеет.
+    Беда с местом для копии — та же беда, что и неудачная копия: файл у HR
+    уже есть, и строка в переписке обязана появиться, пусть без
+    предпросмотра. Иначе окно покажет ошибку, будто отправка не состоялась.
     """
     bot, client, hr = await chatting()
     src = _file(tmp_path, "снимок.png")
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
     (MEDIA_DIR / str(hr.id)).write_bytes(b"")
 
-    with pytest.raises(FileExistsError):
-        await bot.send_to_hr_media(hr.id, str(src))
+    row = await bot.send_to_hr_media(hr.id, str(src))
 
     assert client.outgoing == [("send_photo", "maria", str(src))]
+    assert row.media_kind == "photo"
+    assert row.media_path is None
+    # Чужой файл, занявший место папки, остаётся цел. Без этого утверждения
+    # «починка» удалением препятствия прошла бы зелёной и выглядела бы как
+    # пропавший предпросмотр, а не как стёртый чужой файл.
+    assert (MEDIA_DIR / str(hr.id)).read_bytes() == b""
 
 
 @pytest.mark.parametrize(

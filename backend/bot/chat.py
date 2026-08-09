@@ -203,13 +203,13 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
     # instead of re-fetching it from Telegram.
     ext = ".jpg" if as_photo else (src.suffix or ".bin")
     dest = media.media_cache_path(hr_id, pyro_msg.id, ext)
-    dest.parent.mkdir(parents=True, exist_ok=True)
     try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dest)
         media_path = media.media_path_for_db(dest)
     except Exception:
         logger.exception(
-            "media cache copy failed",
+            "media cache copy failed (or its folder could not be made)",
             extra={"hr_id": hr_id, "src": str(src), "dest": str(dest)},
         )
         media_path = None
