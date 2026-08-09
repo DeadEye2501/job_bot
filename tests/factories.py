@@ -54,6 +54,23 @@ def days_ago(days: float) -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
 
+_PHOTO_HEADS = {
+    ".jpg": b"\xff\xd8\xff\xe0",
+    ".jpeg": b"\xff\xd8\xff\xe0",
+    ".png": b"\x89PNG\r\n\x1a\n",
+    ".webp": b"RIFF" + bytes(4) + b"WEBP",
+}
+
+
+def photo_head(suffix: str) -> bytes:
+    """Начало настоящей картинки такого вида; для прочего — пусто.
+
+    Выбор между картинкой и документом смотрит на содержимое, а не на имя,
+    поэтому файлу с картиночным расширением нужна и картиночная подпись.
+    """
+    return _PHOTO_HEADS.get(suffix.lower(), b"")
+
+
 def _empty_vacancy() -> dict:
     """Свежий словарь умолчаний на каждый вызов.
 
