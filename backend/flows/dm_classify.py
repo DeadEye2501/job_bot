@@ -97,7 +97,11 @@ async def _run_debounced_classify(pipeline, hr_id: int) -> None:
     # LLM-вызова и БД-записи (sessions/clients уже закрываются).
     if pipeline._shutting_down:
         return
-    await classify_and_apply_for_hr(pipeline, hr_id)
+    pipeline._dm_classify_running.add(current)
+    try:
+        await classify_and_apply_for_hr(pipeline, hr_id)
+    finally:
+        pipeline._dm_classify_running.discard(current)
 
 
 async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
@@ -190,6 +194,28 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
             logger.exception("on_vacancies_changed hook failed")
 
 
+async def _wait_out(pipeline, tasks: list, *, drain: bool) -> None:
+    """Переждать разборы, а на выключении погасить не уложившихся.
+
+    Выключение закрывает соединения, и опоздавший разбор пришёл бы в
+    закрытую сессию — потеря его пакета меньшее зло. Переход в OFF ничего
+    не закрывает, и там ему дают доработать.
+    """
+    _, pending = await asyncio.wait(
+        tasks, timeout=pipeline.DM_CLASSIFY_STOP_TIMEOUT_SEC
+    )
+    if not pending:
+        return
+    logger.warning(
+        "cancel_pending_dm_classifications: %d task(s) did not finish in time",
+        len(pending),
+    )
+    if drain:
+        return
+    for t in pending:
+        t.cancel()
+
+
 async def cancel_pending_dm_classifications(
     pipeline, *, drain: bool = False
 ) -> None:
@@ -201,6 +227,11 @@ async def cancel_pending_dm_classifications(
     могут уже быть закрыты в shutdown-пути. Поэтому ПОСЛЕ cancel'ов
     ждём с таймаутом, чтобы все живые task'и доработали или
     завершились по cancel'у.
+
+    Отмена достаётся только спящим на таймере: они числятся в
+    `_dm_classify_tasks`. Начавшийся разбор вычёркивает себя оттуда сам и
+    переходит в `_dm_classify_running` — его дожидаются, но не отменяют,
+    потому что пакет он уже вынул из буфера и отмена потеряла бы его.
 
     Edge race во время normal completion: tardy task мог проскочить
     cancel (был в commit'е) и сделать `apply_classification` уже
@@ -218,17 +249,11 @@ async def cancel_pending_dm_classifications(
     tasks = [t for t in pipeline._dm_classify_tasks.values() if not t.done()]
     for t in tasks:
         t.cancel()
-    if tasks:
-        try:
-            await asyncio.wait_for(
-                asyncio.gather(*tasks, return_exceptions=True),
-                timeout=5,
-            )
-        except asyncio.TimeoutError:
-            logger.warning(
-                "cancel_pending_dm_classifications: %d task(s) did not finish within 5s",
-                sum(1 for t in tasks if not t.done()),
-            )
+    # Начавшийся разбор отмену не получает: пакет он из буфера уже вынул, и
+    # отмена посреди обращения к модели потеряла бы его насовсем.
+    waited = tasks + [t for t in pipeline._dm_classify_running if not t.done()]
+    if waited:
+        await _wait_out(pipeline, waited, drain=drain)
     pipeline._dm_classify_tasks.clear()
     if drain and pipeline._shutting_down:
         logger.debug(

@@ -12,7 +12,6 @@
 
 from backend.flows import dm_classify
 import asyncio
-from contextlib import suppress
 
 
 async def test_stopping_puts_out_the_pending_timers(dm_pipeline):
@@ -115,38 +114,102 @@ async def test_a_stopping_bot_ignores_the_request_to_read(dm_pipeline):
     assert dm_pipeline._dm_classify_buffer == {}
 
 
-async def test_a_reading_already_under_way_is_not_waited_for_at_all(monkeypatch, dm_pipeline):
-    """Начавшийся разбор остановка не дожидается вовсе.
+async def test_a_reading_already_under_way_is_waited_out(monkeypatch, dm_pipeline):
+    """Начавшийся разбор остановка дожидается.
 
-    Ожидание в пять секунд заведено именно ради него: отмена — только
-    просьба, и разбор, уже прошедший таймер, её не заметит. Но ждут там
-    лишь тех, кто числится в списке таймеров, а разбор вычёркивает себя
-    оттуда прямо перед началом. Дождаться его поэтому невозможно, и он
-    продолжает работать после того, как остановка вернула управление, —
-    ровно то, от чего ожидание должно было уберечь.
-
-    Тест закрепляет сегодняшнее поведение: при починке он покраснеет.
+    Ожидание заведено именно ради него: отмена — только просьба, и разбор,
+    уже прошедший таймер, её не заметит. Не дождаться его значит вернуть
+    управление, пока он ещё ходит в базу и к модели, — а соединения к тому
+    времени закрываются.
     """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 0
     started = asyncio.Event()
+    release = asyncio.Event()
+    finished = False
 
-    async def hangs(pipeline, hr_id):
+    async def waits_to_be_let_go(pipeline, hr_id):
+        nonlocal finished
         started.set()
-        await asyncio.sleep(30)
+        await release.wait()
+        finished = True
 
-    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", hangs)
+    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", waits_to_be_let_go)
     dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
-    running = dm_pipeline._dm_classify_tasks[7]
     await started.wait()
+    asyncio.get_running_loop().call_later(0.05, release.set)
 
     await dm_pipeline.cancel_pending_dm_classifications()
 
-    assert dm_pipeline._dm_classify_tasks == {}
+    assert finished
+    # Доработавший разбор из списка ждущих уходит: иначе он копится всю
+    # сессию, и каждая следующая остановка ждёт давно завершённых.
+    assert dm_pipeline._dm_classify_running == set()
+
+
+async def test_switching_off_lets_a_slow_reading_finish(monkeypatch, dm_pipeline):
+    """Переход в выключенное разбор не гасит, даже не дождавшись.
+
+    Выключение соединений не закрывает, а пакет разбор уже вынул из буфера:
+    оборви его по истечении срока — и пакет пропадёт, хотя приходить ему
+    было некуда.
+    """
+    dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 0
+    dm_pipeline.DM_CLASSIFY_STOP_TIMEOUT_SEC = 0
+    started = asyncio.Event()
+
+    async def outlasts_the_wait(pipeline, hr_id):
+        # Буфер вынимается, как это делает настоящий разбор: иначе слив на
+        # выключении застанет его непустым и позовёт разбор второй раз.
+        pipeline._dm_classify_buffer.pop(hr_id, None)
+        started.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", outlasts_the_wait)
+    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    await started.wait()
+    running = next(iter(dm_pipeline._dm_classify_running))
+
+    await dm_pipeline.cancel_pending_dm_classifications(drain=True)
+
+    # Отмена доставляется не мгновенно, поэтому смотрим после оборотов цикла:
+    # сразу после `cancel()` задача ещё числится живой и утверждение соврало бы.
+    for _ in range(3):
+        await asyncio.sleep(0)
     assert not running.done()
 
     running.cancel()
-    with suppress(asyncio.CancelledError):
-        await running
+
+
+async def test_shutting_down_cuts_off_a_reading_that_outstayed(
+    monkeypatch, dm_pipeline
+):
+    """Выключение разбор, не уложившийся в срок, обрывает.
+
+    Тут соединения уже закрываются, и пришедший в них разбор упадёт сам —
+    громко и посреди чужой работы. Потеря пакета дешевле.
+    """
+    dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 0
+    dm_pipeline.DM_CLASSIFY_STOP_TIMEOUT_SEC = 0
+    started = asyncio.Event()
+
+    async def outlasts_the_wait(pipeline, hr_id):
+        # Буфер вынимается, как это делает настоящий разбор: иначе слив на
+        # выключении застанет его непустым и позовёт разбор второй раз.
+        pipeline._dm_classify_buffer.pop(hr_id, None)
+        started.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", outlasts_the_wait)
+    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    await started.wait()
+    running = next(iter(dm_pipeline._dm_classify_running))
+
+    await dm_pipeline.cancel_pending_dm_classifications()
+
+    # Как и в соседнем: отмена доставляется оборотом цикла, не вызовом.
+    for _ in range(3):
+        await asyncio.sleep(0)
+    assert running.cancelled()
 
 
 async def test_nothing_pending_means_nothing_to_wait_for(dm_pipeline):
