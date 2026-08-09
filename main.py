@@ -8,12 +8,28 @@ Run:
 
 import logging
 import sys
+import traceback
 
 
-try:
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-except Exception:
-    pass
+def _use_utf8_stdout() -> None:
+    """Перенастроить вывод на UTF-8, а неудачу показать, не проглотив.
+
+    Логирование к этому мигу ещё не настроено, поэтому сообщать можно только
+    прямо в поток ошибок. Молчать нельзя: без перенастройки вывод ломается на
+    кириллице, и виновника потом не найти.
+
+    В оконной сборке потока ошибок нет вовсе, и сообщение пропадёт — это
+    записано в роадмапу отдельным пунктом, здесь чинить нечем.
+    """
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        if sys.stderr is None:
+            return  # оконная сборка: писать некуда, см. роадмапу
+        traceback.print_exc()
+
+
+_use_utf8_stdout()
 
 
 logging.basicConfig(

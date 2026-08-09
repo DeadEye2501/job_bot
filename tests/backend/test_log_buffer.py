@@ -145,6 +145,25 @@ def test_a_failing_subscriber_does_not_stop_buffering():
     assert handler.snapshot()[-1]["msg"] == "сообщение"
 
 
+def test_a_failing_subscriber_is_reported_and_not_swallowed(capsys):
+    """Об упавшем подписчике сообщается, а не молчится.
+
+    Записать беду обычным путём тут нельзя — это сам обработчик логов, и
+    запись из него ушла бы по кругу. Для такого у стандартной библиотеки
+    заведён `handleError`: он печатает трассировку в поток ошибок.
+    """
+    handler = LogBufferHandler()
+
+    def failing_subscriber(entry):
+        raise RuntimeError("подписчик сломался")
+
+    handler.on_record = failing_subscriber
+
+    handler.emit(record("сообщение"))
+
+    assert "подписчик сломался" in capsys.readouterr().err
+
+
 def test_a_traceback_lands_in_the_details():
     """Трассировка попадает в подробности записи."""
     import sys
