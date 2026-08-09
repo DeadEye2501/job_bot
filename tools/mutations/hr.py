@@ -142,8 +142,20 @@ MUTATIONS = [
     # list_hr_with_counts: поиск перестаёт смотреть в ник
     (
         "backend/repository/hr_list.py",
-        '                or q in (hr.telegram_username or "").casefold()' + CRLF,
-        "",
+        "        if matches_search(search, hr.name, hr.telegram_username)",
+        "        if matches_search(search, hr.name)",
+    ),
+    # matches_search: пустой образец начинает отсеивать вместо того, чтобы пропускать
+    (
+        "backend/repository/search.py",
+        "    if not needle:" + CRLF + "        return True" + CRLF,
+        "    if not needle:" + CRLF + "        return False" + CRLF,
+    ),
+    # matches_search: пробелы по краям образца перестают срезаться
+    (
+        "backend/repository/search.py",
+        '    needle = (search or "").strip().casefold()',
+        '    needle = (search or "").casefold()',
     ),
     # list_hr_with_counts: страница режется до отбора
     (
