@@ -1633,9 +1633,8 @@
   .status-wrap.popover-open .status-badge .material-symbols-outlined {
     transform: rotate(180deg);
   }
-  /* Поп-ап смены статуса — структурно повторяет docs/ui-mockups/04-vacancies.html
-     (.popover.status-popover). Жёстко выравниваем шрифты/отступы под референс,
-     иначе поп-ап «вытягивается» из-за внутренних паддингов. */
+  /* Поп-ап смены статуса: шрифты и отступы заданы жёстко, иначе поп-ап
+     «вытягивается» из-за внутренних паддингов. */
   .status-popover {
     position: absolute;
     top: calc(100% + 4px);
@@ -1656,7 +1655,6 @@
     color: var(--text-tertiary);
     letter-spacing: 0.4px;
   }
-  /* More-menu: match docs/ui-mockups/04-vacancies.html (.popover.more-popover + .menu-item) */
   .actions-menu {
     position: relative;
     justify-self: end;
@@ -1676,7 +1674,6 @@
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
     cursor: default;
   }
-  /* Референс: docs/ui-mockups/04-vacancies.html — .menu-item 0.78rem / 5px 12px. */
   button.menu-item {
     width: 100%;
     margin: 0;
@@ -1769,7 +1766,7 @@
     border-color: #ff6b61;
     color: #ffb3ad;
   }
-  /* Модалка исходного текста вакансии — docs/ui-mockups/04-vacancies.html */
+  /* Модалка исходного текста вакансии. */
   .vac-raw-modal {
     width: min(720px, 92vw);
     max-height: min(440px, 88vh);
@@ -2099,7 +2096,7 @@
   }
   /* Create-mode: форма подменяет search + list + create-toggle. Окно
      поджимается по контенту (без фикс-высоты picker-режима) и сужается
-     до ~380px — см. docs/ui-mockups/05-contacts-hr.html .add-modal. */
+     до ~380px. */
   .vac-picker-modal.creating {
     width: min(380px, 92vw);
     height: auto;
@@ -5693,8 +5690,8 @@
     const options = STATUS_ORDER.map((status) => {
       const cls = statusToClass(status);
       const checked = status === selected ? ' checked' : '';
-      // Порядок строго как в референсе (docs/ui-mockups/04-vacancies.html):
-      // radio → status-dot → подпись. Иначе селекшен-точка съезжает.
+      // Порядок строго radio → status-dot → подпись: иначе селекшен-точка
+      // съезжает.
       return `
         <label class="status-option">
           <input type="radio" name="status-draft" value="${escapeAttr(status)}"${checked}>
