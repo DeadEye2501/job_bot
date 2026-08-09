@@ -139,23 +139,6 @@ def test_an_unusable_threshold_falls_back_to_the_baseline(raw):
     assert settings(dedup_cosine_threshold=raw).dedup_cosine_threshold == 0.92
 
 
-def test_a_stored_currency_rate_is_used():
-    """Заданный курс берётся из настроек."""
-    assert settings(salary_usd_to_rub="95").salary_usd_to_rub == 95
-
-
-def test_a_stored_eur_currency_rate_is_used():
-    """Заданный курс евро берётся из настроек, а не только доллара."""
-    assert settings(salary_eur_to_rub="105").salary_eur_to_rub == 105
-
-
-@pytest.mark.parametrize("raw", ["0", "-5", "не число", ""])
-def test_an_unusable_currency_rate_falls_back_to_the_default(raw):
-    """Ноль, отрицательное и мусор заменяются умолчанием: курс не бывает таким."""
-    assert settings(salary_usd_to_rub=raw).salary_usd_to_rub == 90
-    assert settings(salary_eur_to_rub=raw).salary_eur_to_rub == 100
-
-
 def test_a_stored_flood_window_is_read_as_a_moment_in_time():
     """Окно ожидания после флуда читается дробным числом."""
     got = settings(flood_wait_until_ts="1700000000.5").flood_wait_until_ts
@@ -183,8 +166,8 @@ def test_a_garbled_whole_number_setting_falls_back_to_its_default(key, default, 
     """Мусор в целочисленной настройке откатывается к умолчанию.
 
     Значения правят руками через DBeaver, и опечатка вроде «1 800» роняла
-    приложение на старте — при том, что соседние числовые настройки, курсы
-    валют и порог дедупа, такое переживают откатом.
+    приложение на старте — при том, что соседний порог дедупа такое
+    переживает откатом.
     """
     assert getattr(settings(**{key: raw}), key) == default
 
