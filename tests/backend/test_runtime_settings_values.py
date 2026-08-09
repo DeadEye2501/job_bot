@@ -170,22 +170,23 @@ def test_an_unusable_flood_window_means_no_wait(raw):
 
 
 @pytest.mark.parametrize(
-    "key",
-    ["scoring_threshold", "poll_interval_sec", "backfill_limit", "dm_backfill_limit"],
+    ("key", "default"),
+    [
+        ("scoring_threshold", 10),
+        ("poll_interval_sec", 1800),
+        ("backfill_limit", 15),
+        ("dm_backfill_limit", 50),
+    ],
 )
-def test_a_garbled_whole_number_setting_crashes_instead_of_falling_back(key):
-    """Мусор в целочисленной настройке роняет чтение.
+@pytest.mark.parametrize("raw", ["не число", "1 800"])
+def test_a_garbled_whole_number_setting_falls_back_to_its_default(key, default, raw):
+    """Мусор в целочисленной настройке откатывается к умолчанию.
 
-    ВНИМАНИЕ: закреплено текущее поведение, и оно выглядит недосмотром.
-    Соседние числовые свойства — курсы валют и порог дедупа — при негодном
-    значении откатываются к умолчанию, а эти четыре падают. При том, что
-    комментарии самого модуля предполагают ручную правку значений через
-    DBeaver: опечатка вроде «1 800» уронит приложение на старте. Тест держит
-    поведение до отдельного решения; когда его примут — покраснеет. Находка
-    записана в `docs/ROADMAP.md`.
+    Значения правят руками через DBeaver, и опечатка вроде «1 800» роняла
+    приложение на старте — при том, что соседние числовые настройки, курсы
+    валют и порог дедупа, такое переживают откатом.
     """
-    with pytest.raises(ValueError):
-        getattr(settings(**{key: "не число"}), key)
+    assert getattr(settings(**{key: raw}), key) == default
 
 
 def test_the_path_to_the_resume_is_empty_until_set():

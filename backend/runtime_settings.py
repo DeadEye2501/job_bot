@@ -166,16 +166,16 @@ class RuntimeSettings:
 
     @property
     def scoring_threshold(self) -> int:
-        return int(self._app_value("scoring_threshold"))
+        return self._app_int("scoring_threshold")
 
     @property
     def poll_interval_sec(self) -> int:
-        return int(self._app_value("poll_interval_sec"))
+        return self._app_int("poll_interval_sec")
 
     @property
     def backfill_limit(self) -> int:
         """How many recent messages to scrape per Telegram channel poll."""
-        return int(self._app_value("backfill_limit"))
+        return self._app_int("backfill_limit")
 
     @property
     def dedup_cosine_threshold(self) -> float:
@@ -199,7 +199,7 @@ class RuntimeSettings:
         than the channel value so the offline-delete reconciliation window
         in `catch_up_missed_dms` is wide enough to cover edits/deletes the
         user made on another client while the bot was off."""
-        return int(self._app_value("dm_backfill_limit"))
+        return self._app_int("dm_backfill_limit")
 
     @property
     def cv_path(self) -> str:
@@ -246,6 +246,21 @@ class RuntimeSettings:
             return float(self._app_value("flood_wait_until_ts"))
         except ValueError:
             return 0.0
+
+    def _app_int(self, key: str) -> int:
+        """Целая настройка; негодное значение откатывается к умолчанию.
+
+        Значения правят руками через DBeaver, и опечатка вроде «1 800» не
+        должна ронять запуск — соседние числовые настройки её переживают.
+        """
+        raw = self._app_value(key)
+        try:
+            return int(raw)
+        except ValueError:
+            logger.warning(
+                "настройка %s не целое (%r) — беру умолчание", key, raw
+            )
+            return int(_APP_DEFAULTS[key])
 
     def _app_value(self, key: str) -> str:
         # Treat NULL / empty / whitespace-only values in the DB as "not
