@@ -3,10 +3,9 @@ import logging
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from adapters.db import make_engine
 from backend.models import Base
 from config import get_database_url
 
@@ -44,14 +43,19 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
+    # Движок берётся у `adapters/db.py`, а не собирается здесь из секции
+    # `alembic.ini`: своя сборка ставила бы схему и сеяла данные соединением
+    # с чужими правилами, молча — расхождение видно не сразу, а на записанных
+    # данных.
+    connectable = make_engine(config.get_main_option("sqlalchemy.url"))
+    # `dispose` под `finally`, потому что движок проекта держит пул: упавшая
+    # на середине миграция иначе оставляет соединение живым, а вместе с ним —
+    # занятый файл базы и спутники `-wal`/`-shm` рядом.
+    try:
+        async with connectable.connect() as connection:
+            await connection.run_sync(do_run_migrations)
+    finally:
+        await connectable.dispose()
 
 
 def run_migrations_online() -> None:
