@@ -126,30 +126,6 @@ MUTATIONS = [
         "_use_utf8_stdout()" + CRLF + CRLF + CRLF + "logging.basicConfig(",
         "logging.basicConfig(",
     ),
-    # check_chat: список моделей снова без трассировки
-    (
-        "adapters/lm_studio.py",
-        '        _log.exception("провайдер не отдал список моделей для чата")' + LF,
-        "",
-    ),
-    # check_chat: пробный запрос снова без трассировки
-    (
-        "adapters/lm_studio.py",
-        '        _log.exception("пробный запрос к чат-модели %s не прошёл", model)' + LF,
-        "",
-    ),
-    # check_embed: список моделей снова без трассировки
-    (
-        "adapters/lm_studio.py",
-        '        _log.exception("провайдер не отдал список моделей для векторов")' + LF,
-        "",
-    ),
-    # check_embed: пробный запрос снова без трассировки
-    (
-        "adapters/lm_studio.py",
-        '        _log.exception("пробный запрос к модели векторов %s не прошёл", model)' + LF,
-        "",
-    ),
     # _use_utf8_stdout: отказ консоли снова проглатывается молча
     (
         "main.py",

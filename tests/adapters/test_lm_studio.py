@@ -210,8 +210,12 @@ async def test_a_failed_check_leaves_a_trace_in_the_log(check, routes, caplog):
     """
     model = "qwen" if check is check_chat else "bge-m3"
 
-    with caplog.at_level("ERROR"):
+    with caplog.at_level("ERROR", logger="adapters.lm_studio"):
         passed, _ = await check(provider(routes), model)
 
     assert passed is False
-    assert any(rec.exc_info for rec in caplog.records)
+    # Смотрим записи именно адаптера: по всему журналу трассировку мог бы
+    # оставить кто угодно, и сторож позеленел бы на чужой.
+    assert any(
+        rec.exc_info for rec in caplog.records if rec.name == "adapters.lm_studio"
+    )
