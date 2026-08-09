@@ -26,12 +26,13 @@ def make_engine(database_url: str) -> AsyncEngine:
     декларирует ``ondelete=SET NULL``, но без FK enforcement остаётся
     висячий integer). Listener выпускает три PRAGMA при каждом новом
     соединении (включая connections из pool'а) — это стандартный
-    SQLAlchemy+SQLite-паттерн.
+    SQLAlchemy+SQLite-паттерн. Там же подменяется ``lower()``: встроенный
+    складывает регистр только у латиницы.
     """
     engine = create_async_engine(database_url, json_serializer=_dump_json)
 
     @event.listens_for(engine.sync_engine, "connect")
-    def _set_sqlite_pragmas(dbapi_conn, _record):
+    def _prepare_connection(dbapi_conn, _record):
         cursor = dbapi_conn.cursor()
         try:
             cursor.execute("PRAGMA foreign_keys=ON")
@@ -39,8 +40,25 @@ def make_engine(database_url: str) -> AsyncEngine:
             cursor.execute("PRAGMA busy_timeout=5000")
         finally:
             cursor.close()
+        dbapi_conn.create_function("lower", 1, _lower, deterministic=True)
 
     return engine
+
+
+def _lower(value: object) -> object:
+    """LOWER() для SQLite, понимающий не только латиницу.
+
+    Встроенный складывает регистр у одной латиницы: «Питон» остаётся
+    «Питоном», а образец поиска питон опускает целиком, и совпасть им не на
+    чем — вакансия с русским названием не находится ни одним написанием
+    образца.
+
+    Со встроенным сходится на строках и на пустоте, расходится на числах и
+    двоичных данных: встроенный приводит их к тексту, эта отдаёт как есть.
+    Расхождение недостижимо, пока под `func.lower` ходят только текстовые
+    колонки, — а ходят сегодня только они.
+    """
+    return value.lower() if isinstance(value, str) else value
 
 
 async def check(engine: AsyncEngine) -> str:

@@ -220,12 +220,9 @@ async def list_vacancies(
             where_clauses.append(Vacancy.status.in_(enum_values))
 
     # NB: the channels/companies filters compare exactly (no LOWER) on
-    # purpose. SQLite's built-in LOWER() is ASCII-only, so a Russian name
-    # like "Яндекс" stays "Яндекс" SQL-side while Python lowers it to
-    # "яндекс" — the IN comparison silently misses every cyrillic row.
-    # Since the dropdown values are sourced from these very columns
-    # (see :func:`list_vacancy_filter_options`), exact match works
-    # case-correctly and avoids the UDF detour.
+    # purpose — the dropdown values are sourced from these very columns
+    # (see :func:`list_vacancy_filter_options`), so what comes back is
+    # spelled exactly as what's stored and folding case buys nothing.
 
     if channels:
         cleaned = [c for c in channels if c]

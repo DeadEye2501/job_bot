@@ -36,6 +36,12 @@ MUTATIONS = [
         '            cursor.execute("PRAGMA busy_timeout=5000")' + LF,
         "",
     ),
+    # make_engine: приведение к нижнему регистру снова знает только латиницу
+    (
+        "adapters/db.py",
+        '        dbapi_conn.create_function("lower", 1, _lower, deterministic=True)' + LF,
+        "",
+    ),
     # make_engine: настройки ставятся один раз, а не на каждое соединение
     (
         "adapters/db.py",
