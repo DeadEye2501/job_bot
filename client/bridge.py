@@ -1504,12 +1504,7 @@ class MainApi(QObject):
                 # whatever's still in the result set.
                 filter_options = await vacancies_list.list_vacancy_filter_options(session)
             matched_set = _build_matched_set(skills)
-            # has_more is True only when SQL-level pagination is in play
-            # (limit set AND no salary post-filter, which the repo skips
-            # the LIMIT for). When salary is active, the result is the
-            # complete filtered set — single page, has_more=False.
-            has_salary = (salary_min is not None or salary_max is not None)
-            has_more = (limit is not None) and (not has_salary) and (len(rows) == limit)
+            has_more = (limit is not None) and (len(rows) == limit)
             return _ok({
                 "vacancies": [
                     _vacancy_list_row_to_dict(v, matched_set, activity_by_id)

@@ -5115,26 +5115,19 @@
         }
       }
     }
-    // Salary filter — пост-фетч в бэке (regex по строке vacancy.salary),
-    // поэтому пагинация при активном salary не работает: limit мог бы
-    // отрезать ещё не отфильтрованные строки. Когда salary активен —
-    // не шлём limit/offset, бэк отдаёт весь срез одной страницей.
-    const hasSalaryFilter = (payload.salary_min !== undefined) || (payload.salary_max !== undefined);
-    if (!hasSalaryFilter) {
-      if (mode === 'append') {
-        payload.offset = appState.vacancies.allList.length;
-        payload.limit = VAC_PAGE_SIZE;
-      } else if (mode === 'refresh') {
-        payload.offset = 0;
-        // Кап ~200, чтобы polling раз в 5 сек не таскал безгранично весь
-        // подгруженный хвост (юзер может проскроллить в тысячу строк и
-        // уйти в другой таб — не хочется гонять такой payload каждые 5 сек).
-        const n = appState.vacancies.allList.length || VAC_PAGE_SIZE;
-        payload.limit = Math.min(200, Math.max(VAC_PAGE_SIZE, n));
-      } else {
-        payload.offset = 0;
-        payload.limit = VAC_PAGE_SIZE;
-      }
+    if (mode === 'append') {
+      payload.offset = appState.vacancies.allList.length;
+      payload.limit = VAC_PAGE_SIZE;
+    } else if (mode === 'refresh') {
+      payload.offset = 0;
+      // Кап ~200, чтобы polling раз в 5 сек не таскал безгранично весь
+      // подгруженный хвост (юзер может проскроллить в тысячу строк и
+      // уйти в другой таб — не хочется гонять такой payload каждые 5 сек).
+      const n = appState.vacancies.allList.length || VAC_PAGE_SIZE;
+      payload.limit = Math.min(200, Math.max(VAC_PAGE_SIZE, n));
+    } else {
+      payload.offset = 0;
+      payload.limit = VAC_PAGE_SIZE;
     }
     return JSON.stringify(payload);
   }
