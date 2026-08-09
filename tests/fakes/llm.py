@@ -124,6 +124,17 @@ def messages_of(request: httpx.Request) -> dict[str, str]:
     return {m["role"]: m["content"] for m in body["messages"]}
 
 
+def data_block(request: httpx.Request) -> str:
+    """Содержимое блока данных, отправленного модели.
+
+    Отсутствие блока названо словами: разбор по номеру дал бы `IndexError`,
+    из которого не видно, что именно не так.
+    """
+    user = messages_of(request)["user"]
+    assert "<<<\n" in user and "\n>>>" in user, "в запросе нет блока данных"
+    return user.split("<<<\n", 1)[1].rsplit("\n>>>", 1)[0]
+
+
 def chat_response(content: str, *, finish_reason: str = "stop") -> httpx.Response:
     """Ответ чата в форме, которую разбирает боевой код."""
     return httpx.Response(

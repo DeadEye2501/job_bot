@@ -17,6 +17,7 @@ from backend.llm.candidate import (
     _format_languages,
     _format_work_formats,
 )
+from backend.llm.external import wrap_external
 from backend.llm.hallucination import looks_hallucinated
 
 logger = logging.getLogger(__name__)
@@ -295,8 +296,7 @@ async def validate_vacancy_fit(
             _format_free_preferences(profile.free_preferences),
         )
     )
-    user_msg = (
-        "=== ВАКАНСИЯ К ПРОВЕРКЕ (это РЕАЛЬНЫЕ данные, не пример из промпта) ===\n\n"
+    vacancy_block = (
         "Распарсенные поля:\n"
         f"- title: {parsed.title!r}\n"
         f"- description: {parsed.description!r}\n"
@@ -308,10 +308,12 @@ async def validate_vacancy_fit(
         f"- remote: {parsed.remote!r}\n"
         f"- location: {parsed.location!r}\n\n"
         "Оригинальный текст вакансии:\n"
-        "<<<\n"
-        f"{raw_text[:3000]}\n"
-        ">>>\n\n"
-        "=== КОНЕЦ ВАКАНСИИ ===\n"
+        f"{raw_text[:3000]}"
+    )
+    user_msg = (
+        "Вакансия к проверке — это РЕАЛЬНЫЕ данные, не пример из промпта:\n\n"
+        + wrap_external(vacancy_block)
+        + "\n\n"
         "Верни JSON {\"verdict\": ..., \"reason\": ...}. reason ОБЯЗАН ссылаться на конкретные слова/факты из текста выше, а не из примеров промпта."
     )
     try:
