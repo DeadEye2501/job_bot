@@ -189,6 +189,38 @@ def test_a_garbled_whole_number_setting_falls_back_to_its_default(key, default, 
     assert getattr(settings(**{key: raw}), key) == default
 
 
+@pytest.mark.parametrize(
+    ("key", "raw", "default"),
+    [
+        ("poll_interval_sec", "0", 1800),
+        ("poll_interval_sec", "-30", 1800),
+        ("backfill_limit", "0", 15),
+        ("dm_backfill_limit", "0", 50),
+    ],
+)
+def test_a_whole_number_setting_outside_its_range_falls_back(key, raw, default):
+    """Число вне допустимого откатывается к умолчанию наравне с мусором.
+
+    Нулевой предел выборки у Telegram означает «вся история», нулевой
+    интервал опроса крутит цикл встык, а отрицательный порог оценки пускает
+    в новые то, что оценка отбраковала. Числом такое значение быть может,
+    годным — нет.
+    """
+    assert getattr(settings(**{key: raw}), key) == default
+
+
+@pytest.mark.parametrize("raw", ["0", "-5"])
+def test_a_scoring_threshold_below_zero_is_taken_as_given(raw):
+    """Порог оценки берётся любым целым, в том числе отрицательным.
+
+    Сам счёт бывает отрицательным — за каждый незнакомый обязательный
+    навык снимается балл, — и «пропускать всё» выражается именно порогом
+    ниже нуля. Границы снизу у него поэтому нет, в отличие от пределов
+    выборки, где ноль означает у Telegram «вся история».
+    """
+    assert settings(scoring_threshold=raw).scoring_threshold == int(raw)
+
+
 def test_the_path_to_the_resume_is_empty_until_set():
     """Путь к резюме пуст, пока его не задали."""
     assert settings().cv_path == ""
