@@ -46,7 +46,7 @@ MUTATIONS = [
     # process_dm: смена имени собеседника не переносится в карточку
     (
         "backend/flows/dm.py",
-        "        refresh_hr_username(hr, sender_username)" + CRLF,
+        "            refresh_hr_username(hr, sender_username)" + CRLF,
         "",
     ),
     # process_dm: своя картинка карточки затирается чужой

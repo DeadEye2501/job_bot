@@ -43,28 +43,28 @@ class CandidateProfile:
     free_preferences: str | None = None
 
 
-def _format_grades(grades: list[str] | None) -> str:
-    """'middle, senior, lead/team-lead' либо '—' если пусто."""
-    if not grades:
+def _format_labels(values: list[str] | None, labels: dict[str, str]) -> str:
+    """Подписи выбранных значений через запятую либо «—», если выбирать
+    нечего или ни одно значение не нашлось в справочнике подписей.
+    """
+    if not values:
         return "—"
     parts: list[str] = []
-    for g in grades:
-        key = (g or "").strip().lower()
-        if key in _GRADE_LABELS_RU:
-            parts.append(_GRADE_LABELS_RU[key])
+    for value in values:
+        key = (value or "").strip().lower()
+        if key in labels:
+            parts.append(labels[key])
     return ", ".join(parts) if parts else "—"
+
+
+def _format_grades(grades: list[str] | None) -> str:
+    """'middle, senior, lead/team-lead' либо '—' если пусто."""
+    return _format_labels(grades, _GRADE_LABELS_RU)
 
 
 def _format_work_formats(formats: list[str] | None) -> str:
     """'удалёнка, гибрид' либо '—' если пусто."""
-    if not formats:
-        return "—"
-    parts: list[str] = []
-    for f in formats:
-        key = (f or "").strip().lower()
-        if key in _FORMAT_LABELS_RU:
-            parts.append(_FORMAT_LABELS_RU[key])
-    return ", ".join(parts) if parts else "—"
+    return _format_labels(formats, _FORMAT_LABELS_RU)
 
 
 def _format_languages(languages: list[CandidateLanguage] | None) -> str:

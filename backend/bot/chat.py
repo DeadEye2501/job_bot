@@ -172,7 +172,7 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
             f"HR в blacklist ({bl_value}). Сначала уберите из blacklist."
         )
 
-    as_photo = media._looks_like_photo(src)
+    as_photo = media.looks_like_photo(src)
     try:
         size = src.stat().st_size
     except OSError as e:
@@ -198,15 +198,15 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
     )
 
     # Copy into our media cache. Path matches what `updates.on_dm_outgoing`'s
-    # `_download_media` would have written, so the racing handler that
+    # `download_media` would have written, so the racing handler that
     # downloads the same message can find the already-existing file
     # instead of re-fetching it from Telegram.
     ext = ".jpg" if as_photo else (src.suffix or ".bin")
-    dest = media._media_cache_path(hr_id, pyro_msg.id, ext)
+    dest = media.media_cache_path(hr_id, pyro_msg.id, ext)
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
         shutil.copy2(src, dest)
-        media_path = media._media_path_for_db(dest)
+        media_path = media.media_path_for_db(dest)
     except Exception:
         logger.exception(
             "media cache copy failed",

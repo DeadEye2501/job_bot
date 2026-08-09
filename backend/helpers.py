@@ -42,7 +42,7 @@ def extract_dm_text(msg) -> str:
     UI free of separate reply rows / new DB columns.
 
     Voice-сообщения у Telegram приходят без text, но Pyrogram-у `Voice`
-    разрешает caption — и НЕ попадают в `_classify_media` (мы их не качаем).
+    разрешает caption — и НЕ попадают в `classify_media` (мы их не качаем).
     Без подмены DB-row сохраняется с text="" (если caption нет) и в UI
     рендерится пустой бабл; либо с голым текстом caption — теряется сам
     факт, что это голосовое. Префиксим всегда, когда есть `voice`.

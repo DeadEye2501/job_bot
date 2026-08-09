@@ -209,7 +209,10 @@ def _str_list(value) -> list[str]:
     return [s.strip() for s in value if isinstance(s, str) and s.strip()]
 
 
-def _normalize_work_formats(raw: object) -> list[str]:
+def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]:
+    """Значения из ответа модели, оставленные по справочнику: не строки и
+    незнакомое отброшены, повторы сведены, порядок исходный.
+    """
     if not isinstance(raw, list):
         return []
     out: list[str] = []
@@ -218,22 +221,7 @@ def _normalize_work_formats(raw: object) -> list[str]:
         if not isinstance(item, str):
             continue
         v = item.strip().lower()
-        if v in WORK_FORMATS and v not in seen:
-            seen.add(v)
-            out.append(v)
-    return out
-
-
-def _normalize_grades(raw: object) -> list[str]:
-    if not isinstance(raw, list):
-        return []
-    out: list[str] = []
-    seen: set[str] = set()
-    for item in raw:
-        if not isinstance(item, str):
-            continue
-        v = item.strip().lower()
-        if v in GRADES and v not in seen:
+        if v in allowed and v not in seen:
             seen.add(v)
             out.append(v)
     return out
@@ -331,8 +319,8 @@ def _parse_profile(data: dict) -> ParsedCvProfile | None:
         telegram_username=_str_or_none(data.get("telegram_username")),
         github_url=_str_or_none(data.get("github_url")),
         education=_str_or_none(data.get("education")),
-        work_format=_normalize_work_formats(data.get("work_format")),
-        grades=_normalize_grades(data.get("grades")),
+        work_format=_normalize_enum_list(data.get("work_format"), WORK_FORMATS),
+        grades=_normalize_enum_list(data.get("grades"), GRADES),
         free_preferences=_str_or_none(data.get("free_preferences")),
     )
 

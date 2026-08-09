@@ -5,8 +5,11 @@ import logging
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import Blacklist, Company, HR, Message, Vacancy
+from backend.models import Company, HR, Message, Vacancy
 from backend.payloads import HrDetail
+
+from backend.repository.blacklist_marks import active_blacklist_value
+from backend.repository.messages import UNREAD_INCOMING
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +92,7 @@ async def get_hr_detail(
         await session.scalar(
             select(func.count(Message.id)).where(
                 Message.hr_id == hr_id,
-                Message.is_incoming,
-                Message.read_at.is_(None),
-                Message.is_deleted.is_(False),
+                *UNREAD_INCOMING,
             )
         )
         or 0
@@ -124,25 +125,7 @@ def hr_blacklist_candidates(hr: HR) -> list[str]:
 
 
 async def _hr_blacklist_value(session: AsyncSession, hr: HR) -> str | None:
-    candidates = hr_blacklist_candidates(hr)
-    if not candidates:
-        return None
-    # Deterministic when both forms exist (rare — re-add across schema
-    # changes): smallest id wins so the head chip's `title` doesn't
-    # flicker between rows on different page loads.
-    row = (
-        await session.scalars(
-            select(Blacklist)
-            .where(
-                Blacklist.kind == "hr",
-                Blacklist.value.in_(candidates),
-                Blacklist.active.is_(True),
-            )
-            .order_by(Blacklist.id.asc())
-            .limit(1)
-        )
-    ).first()
-    return row.value if row else None
+    return await active_blacklist_value(session, "hr", hr_blacklist_candidates(hr))
 
 
 async def delete_hr(session: AsyncSession, hr_id: int) -> bool:

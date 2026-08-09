@@ -273,9 +273,9 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
                 except Exception:
                     logger.exception("on_new_message hook failed")
             return
-    media_kind, media_name = media._classify_media(msg)
+    media_kind, media_name = media.classify_media(msg)
     media_path = (
-        await media._download_media(bot._client, msg, hr_id_for_media)
+        await media.download_media(bot._client, msg, hr_id_for_media)
         if media_kind is not None else None
     )
     async with bot._session_factory() as session:

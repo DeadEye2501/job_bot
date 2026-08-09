@@ -146,56 +146,56 @@ MUTATIONS = [
     ),
     # backfill: HR без адреса всё равно идёт в догон
     (
-        "backend/flows/dm.py",
+        "backend/flows/dm_backfill.py",
         "    if target is None:" + CRLF + "        return" + CRLF + "    messages = []",
         "    messages = []",
     ),
     # backfill: переписка кладётся от свежего к старому
     (
-        "backend/flows/dm.py",
+        "backend/flows/dm_backfill.py",
         "for msg in reversed(messages):",
         "for msg in messages:",
     ),
     # backfill: удалённое за время простоя не метится
     (
-        "backend/flows/dm.py",
-        "            row.is_deleted = True" + CRLF,
+        "backend/flows/dm_backfill.py",
+        "                row.is_deleted = True" + CRLF,
         "",
     ),
     # backfill: удалённым метят и то, что старше вытянутого окна
     (
-        "backend/flows/dm.py",
+        "backend/flows/dm_backfill.py",
         "                        Message.tg_message_id >= min_id," + CRLF,
         "",
     ),
     # backfill: пустой ответ Telegram метит всю переписку удалённой
     (
-        "backend/flows/dm.py",
+        "backend/flows/dm_backfill.py",
         "    if messages:" + CRLF + "        seen_ids = {m.id for m in messages}",
         "    if True:" + CRLF + "        seen_ids = {m.id for m in messages}",
     ),
     # backfill: окно не узнаёт о догнанной переписке
     (
-        "backend/flows/dm.py",
+        "backend/flows/dm_backfill.py",
         "if (had_new or tombstoned) and on_message_persisted is not None:",
         "if False:",
     ),
     # backfill: окно дёргают и когда ничего не изменилось
     (
-        "backend/flows/dm.py",
+        "backend/flows/dm_backfill.py",
         "if (had_new or tombstoned) and on_message_persisted is not None:",
         "if on_message_persisted is not None:",
     ),
     # catch_up: пачки идут без паузы между собой
     (
-        "backend/flows/dm.py",
+        "backend/flows/dm_backfill.py",
         "        if batch_start + _DM_CATCHUP_BATCH_SIZE < len(chats):" + CRLF
         + "            await asyncio.sleep(_DM_CATCHUP_BATCH_DELAY_SEC)" + CRLF,
         "",
     ),
     # catch_up: сорвавшаяся переписка роняет пачку
     (
-        "backend/flows/dm.py",
+        "backend/flows/dm_backfill.py",
         "            return_exceptions=True," + CRLF
         + "        )" + CRLF
         + "        for (hr, _), result in zip(batch, results):",

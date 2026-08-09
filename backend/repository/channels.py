@@ -6,41 +6,16 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import Blacklist, TelegramChannel, TrashEvent, Vacancy, VacancyStatus
+from backend.domain.funnel import APPLIED, FIT_EXCLUDE, RESPONDED
+from backend.models import TelegramChannel, TrashEvent, Vacancy, VacancyStatus
 from backend.payloads import ChannelDetail, ChannelStats, ChannelWithCount
 
+from backend.repository.blacklist_marks import (
+    active_blacklist_value,
+    active_blacklist_values,
+)
+
 logger = logging.getLogger(__name__)
-
-
-# Voronka classification — derived once, reused by `get_channel_detail`:
-# - `_FIT_EXCLUDE`: статусы, которые НЕ считаются подходящими — либо
-#   валидатор отверг как Not Fit, либо это Scam (мы заведомо не будем
-#   взаимодействовать с источником).
-# - `_APPLIED`: что мы реально отправили, либо ответ уже пришёл / заглох.
-#   New = подходит, но ещё не отправили.
-# - `_RESPONDED`: получили ответ от работодателя (включая отказ — Decline
-#   тоже ответ). Applied = ждём, Ghosting = тишина.
-_FIT_EXCLUDE: frozenset[VacancyStatus] = frozenset({
-    VacancyStatus.NOT_FIT, VacancyStatus.SCAM,
-})
-_APPLIED: frozenset[VacancyStatus] = frozenset({
-    VacancyStatus.APPLIED,
-    VacancyStatus.ANSWERED,
-    VacancyStatus.TEST,
-    VacancyStatus.INVITATION,
-    VacancyStatus.IN_PROGRESS,
-    VacancyStatus.OFFER,
-    VacancyStatus.DECLINE,
-    VacancyStatus.GHOSTING,
-})
-_RESPONDED: frozenset[VacancyStatus] = frozenset({
-    VacancyStatus.ANSWERED,
-    VacancyStatus.TEST,
-    VacancyStatus.INVITATION,
-    VacancyStatus.IN_PROGRESS,
-    VacancyStatus.OFFER,
-    VacancyStatus.DECLINE,
-})
 
 
 def channel_blacklist_candidates(ch: TelegramChannel) -> list[str]:
@@ -66,22 +41,9 @@ async def _channel_blacklist_value(
     """Если канал сейчас активно в blacklist'е, возвращаем точный
     `value` строки (для UI-чипа в detail-pane). None — если не в нём.
     """
-    candidates = channel_blacklist_candidates(ch)
-    if not candidates:
-        return None
-    row = (
-        await session.scalars(
-            select(Blacklist)
-            .where(
-                Blacklist.kind == "channel",
-                Blacklist.value.in_(candidates),
-                Blacklist.active.is_(True),
-            )
-            .order_by(Blacklist.id.asc())
-            .limit(1)
-        )
-    ).first()
-    return row.value if row is not None else None
+    return await active_blacklist_value(
+        session, "channel", channel_blacklist_candidates(ch)
+    )
 
 
 async def list_telegram_channels(
@@ -124,16 +86,7 @@ async def list_telegram_channels(
                 or q in (ch.username or "").casefold()
             ]
 
-    bl_values = set(
-        (
-            await session.scalars(
-                select(Blacklist.value).where(
-                    Blacklist.kind == "channel",
-                    Blacklist.active.is_(True),
-                )
-            )
-        ).all()
-    )
+    bl_values = await active_blacklist_values(session, "channel")
 
     def _is_blacklisted(ch: TelegramChannel) -> bool:
         return any(c in bl_values for c in channel_blacklist_candidates(ch))
@@ -184,13 +137,13 @@ async def get_channel_detail(
 
     total = sum(counts_by_enum.values())
     fit_total = sum(
-        n for s, n in counts_by_enum.items() if s not in _FIT_EXCLUDE
+        n for s, n in counts_by_enum.items() if s not in FIT_EXCLUDE
     )
     applied_total = sum(
-        n for s, n in counts_by_enum.items() if s in _APPLIED
+        n for s, n in counts_by_enum.items() if s in APPLIED
     )
     responded_total = sum(
-        n for s, n in counts_by_enum.items() if s in _RESPONDED
+        n for s, n in counts_by_enum.items() if s in RESPONDED
     )
 
     since = datetime.now(timezone.utc) - timedelta(days=_CHANNEL_RATE_WINDOW_DAYS)
@@ -278,16 +231,7 @@ async def deactivate_blacklisted_channels(session: AsyncSession) -> int:
     Зеркалит matching-логику ``list_telegram_channels._is_blacklisted``
     (exact match, case-sensitive). Caller wraps в ``session.begin()``.
     """
-    bl_values = set(
-        (
-            await session.scalars(
-                select(Blacklist.value).where(
-                    Blacklist.kind == "channel",
-                    Blacklist.active.is_(True),
-                )
-            )
-        ).all()
-    )
+    bl_values = await active_blacklist_values(session, "channel")
     if not bl_values:
         return 0
     channels = (
@@ -329,16 +273,7 @@ async def set_all_channels_active(
     """
     stmt = update(TelegramChannel).values(is_active=bool(is_active))
     if is_active:
-        bl_values = list(
-            (
-                await session.scalars(
-                    select(Blacklist.value).where(
-                        Blacklist.kind == "channel",
-                        Blacklist.active.is_(True),
-                    )
-                )
-            ).all()
-        )
+        bl_values = await active_blacklist_values(session, "channel")
         if bl_values:
             # Совпадение по `@username` — то же exact-match, что в
             # `channel_blacklist_candidates`.

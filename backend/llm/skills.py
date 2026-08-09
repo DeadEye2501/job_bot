@@ -66,7 +66,7 @@ def _capitalize_skill(s: str) -> str:
     return " ".join(out)
 
 
-def _clean_stack_items(
+def clean_stack_items(
     raw: object, seen: set[str]
 ) -> list[str]:
     """Apply ``_strip_version`` + ``_capitalize_skill`` and de-duplicate

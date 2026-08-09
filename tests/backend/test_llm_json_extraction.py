@@ -10,7 +10,7 @@
 
 import pytest
 
-from backend.llm.answers import _extract_last_json
+from backend.llm.answers import extract_last_json
 
 
 @pytest.mark.parametrize(
@@ -34,7 +34,7 @@ from backend.llm.answers import _extract_last_json
 )
 def test_the_last_object_is_taken_from_the_answer(answer, expected):
     """Из ответа берётся последний объект, а без объекта — ничего."""
-    assert _extract_last_json(answer) == expected
+    assert extract_last_json(answer) == expected
 
 
 def test_curly_quotes_are_straightened_before_the_search():
@@ -43,7 +43,7 @@ def test_curly_quotes_are_straightened_before_the_search():
     Модель, отвечающая по-русски, ставит их сама, и разбор падал бы на
     первой же такой кавычке.
     """
-    assert _extract_last_json('{“a”: ‘b’}') == '{"a": \'b\'}'
+    assert extract_last_json('{“a”: ‘b’}') == '{"a": \'b\'}'
 
 
 def test_a_nested_object_is_not_matched():
@@ -53,4 +53,4 @@ def test_a_nested_object_is_not_matched():
     вложенностью совпадёт только внутренняя часть. Тест закрепляет
     сегодняшнее поведение: разбор такого ответа даст не то, что ждали.
     """
-    assert _extract_last_json('{"outer": {"inner": 1}}') == '{"inner": 1}'
+    assert extract_last_json('{"outer": {"inner": 1}}') == '{"inner": 1}'

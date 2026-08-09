@@ -2,7 +2,7 @@
 
 import logging
 
-from backend.flows import dm
+from backend.flows import dm_backfill
 from backend.domain.blacklist import check_blacklist
 from backend.domain.salary import normalize_salary_to_rub_thousands
 from backend.domain.scoring import score_parsed
@@ -313,7 +313,7 @@ async def parse_and_update_vacancy(
     # свою row с vacancy_id'ом — и вставит дубль без vacancy_id, а
     # Bot.send'овский insert упадёт на UNIQUE.
     if hr_for_backfill is not None:
-        dm.spawn_hr_backfill(pipeline, hr_for_backfill)
+        dm_backfill.spawn_hr_backfill(pipeline, hr_for_backfill)
 
 
 async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
@@ -458,4 +458,4 @@ async def save_empty_vacancy(
             )
             return
     if hr_for_backfill is not None:
-        dm.spawn_hr_backfill(pipeline, hr_for_backfill)
+        dm_backfill.spawn_hr_backfill(pipeline, hr_for_backfill)

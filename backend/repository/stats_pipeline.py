@@ -3,15 +3,18 @@
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.funnel import INVITED, RESPONDED
 from backend.models import (
     TelegramChannel,
     TrashEvent,
     Vacancy,
     VacancyStatus,
-    VacancyStatusHistory,
 )
 
-from backend.repository.stats_summary import _stats_period_since
+from backend.repository.stats_summary import (
+    _stats_period_since,
+    first_transition_subq,
+)
 
 async def get_stats_channels_pipeline(
     session: AsyncSession, *, period: str
@@ -107,29 +110,8 @@ async def get_stats_channels_pipeline(
     # (min(changed_at)) попал в окно period. Привязка к самому факту
     # перехода, а не к Vacancy.created_at — чтобы funnel показывал именно
     # «прогресс за период», совпадая с верхним KPI-блоком.
-    answered_set = {
-        VacancyStatus.ANSWERED, VacancyStatus.TEST, VacancyStatus.INVITATION,
-        VacancyStatus.IN_PROGRESS, VacancyStatus.OFFER, VacancyStatus.DECLINE,
-    }
-    invite_set = {
-        VacancyStatus.INVITATION, VacancyStatus.IN_PROGRESS, VacancyStatus.OFFER,
-    }
-
     async def _first_in_period_by_channel(statuses) -> dict[int, set[int]]:
-        cond = (
-            VacancyStatusHistory.status.in_(statuses)
-            if isinstance(statuses, (set, list, tuple))
-            else VacancyStatusHistory.status == statuses
-        )
-        sub = (
-            select(
-                VacancyStatusHistory.vacancy_id.label("vid"),
-                func.min(VacancyStatusHistory.changed_at).label("first_at"),
-            )
-            .where(cond)
-            .group_by(VacancyStatusHistory.vacancy_id)
-            .subquery()
-        )
+        sub = first_transition_subq(statuses)
         q = (
             select(Vacancy.source_channel_id, sub.c.vid)
             .join(sub, sub.c.vid == Vacancy.id)
@@ -145,8 +127,8 @@ async def get_stats_channels_pipeline(
         return by_ch
 
     sent_by_ch = await _first_in_period_by_channel(VacancyStatus.APPLIED)
-    answered_by_ch = await _first_in_period_by_channel(answered_set)
-    invite_by_ch = await _first_in_period_by_channel(invite_set)
+    answered_by_ch = await _first_in_period_by_channel(RESPONDED)
+    invite_by_ch = await _first_in_period_by_channel(INVITED)
     decline_by_ch = await _first_in_period_by_channel(VacancyStatus.DECLINE)
 
     # Сводим. Канал должен попасть в таблицу, если в окне периода у него

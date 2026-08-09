@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.bot.media import MEDIA_DIR, _classify_media, _looks_like_photo, _media_cache_path, _media_path_for_db
+from backend.bot.media import MEDIA_DIR, classify_media, looks_like_photo, media_cache_path, media_path_for_db
 from tests.fakes.telegram import document, message
 
 
@@ -38,13 +38,13 @@ def test_only_three_formats_go_as_a_picture(name, expected):
     Telegram принимает в отправку картинкой лишь их, а на прочих падает уже
     на своей стороне — и файл не доходит вовсе.
     """
-    assert _looks_like_photo(Path(name)) is expected
+    assert looks_like_photo(Path(name)) is expected
 
 
 def test_a_renamed_file_passes_as_a_picture_despite_the_guard():
     """Переименованный файл проходит картинкой, хотя код обещает обратное.
 
-    Комментарий в `_looks_like_photo` называет вторую проверку защитой от
+    Комментарий в `looks_like_photo` называет вторую проверку защитой от
     подделанного расширения. Защиты нет: `mimetypes.guess_type` читает имя
     файла, а не содержимое, и для «вирус.exe.jpg» честно отвечает
     «image/jpeg». Отсеивается только расширение — «вирус.jpg.exe» уйдёт
@@ -52,8 +52,8 @@ def test_a_renamed_file_passes_as_a_picture_despite_the_guard():
 
     Тест закрепляет сегодняшнее поведение: при починке он покраснеет.
     """
-    assert _looks_like_photo(Path("вирус.exe.jpg")) is True
-    assert _looks_like_photo(Path("вирус.jpg.exe")) is False
+    assert looks_like_photo(Path("вирус.exe.jpg")) is True
+    assert looks_like_photo(Path("вирус.jpg.exe")) is False
 
 
 @pytest.mark.parametrize(
@@ -70,19 +70,19 @@ def test_a_message_is_classified_by_what_it_carries(msg, expected):
     Хранятся только картинки и документы; всё прочее становится пузырём с
     подписью вместо вложения.
     """
-    assert _classify_media(msg) == expected
+    assert classify_media(msg) == expected
 
 
 def test_a_document_is_classified_with_its_name():
     """У документа запоминается имя файла: его показывают в переписке."""
     msg = message(document=document("Тестовое.pdf"))
 
-    assert _classify_media(msg) == ("document", "Тестовое.pdf")
+    assert classify_media(msg) == ("document", "Тестовое.pdf")
 
 
 def test_a_document_without_a_name_is_still_a_document():
     """Документ без имени остаётся документом, а не пропадает."""
-    assert _classify_media(message(document=document(None))) == ("document", None)
+    assert classify_media(message(document=document(None))) == ("document", None)
 
 
 def test_the_cache_path_is_derived_from_the_message():
@@ -91,10 +91,10 @@ def test_the_cache_path_is_derived_from_the_message():
     Обработчик входящего и ручная отправка могут скачивать одно и то же
     одновременно: общий путь сводит их к одному файлу вместо двух осиротевших.
     """
-    got = _media_cache_path(7, 42, ".jpg")
+    got = media_cache_path(7, 42, ".jpg")
 
     assert got == MEDIA_DIR / "7" / "42.jpg"
-    assert _media_cache_path(7, 42, ".jpg") == got
+    assert media_cache_path(7, 42, ".jpg") == got
 
 
 def test_a_cached_path_is_stored_relative_to_its_folder():
@@ -105,7 +105,7 @@ def test_a_cached_path_is_stored_relative_to_its_folder():
     """
     absolute = MEDIA_DIR / "7" / "42.jpg"
 
-    assert _media_path_for_db(absolute) == "7/42.jpg"
+    assert media_path_for_db(absolute) == "7/42.jpg"
 
 
 def test_a_path_outside_the_folder_is_stored_whole():
@@ -116,4 +116,4 @@ def test_a_path_outside_the_folder_is_stored_whole():
     """
     outside = Path(MEDIA_DIR).resolve().parent / "чужое.jpg"
 
-    assert _media_path_for_db(outside) == outside.as_posix()
+    assert media_path_for_db(outside) == outside.as_posix()
