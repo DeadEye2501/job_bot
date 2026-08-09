@@ -97,6 +97,36 @@ MUTATIONS = [
         + '            "vacancy %s: status=%s terminal for auto, skip classification",'
         + CRLF,
     ),
+    # cancel_pending_dm_classifications: начавшийся разбор снова не ждут
+    (
+        "backend/flows/dm_classify.py",
+        "    waited = tasks + [t for t in pipeline._dm_classify_running if not t.done()]",
+        "    waited = tasks",
+    ),
+    # cancel_pending_dm_classifications: переход в OFF снова гасит разбор
+    (
+        "backend/flows/dm_classify.py",
+        "    if drain:" + CRLF + "        return",
+        "    if False:" + CRLF + "        return",
+    ),
+    # cancel_pending_dm_classifications: выключение перестаёт гасить опоздавших
+    (
+        "backend/flows/dm_classify.py",
+        "    for t in pending:" + CRLF + "        t.cancel()",
+        "    for t in pending:" + CRLF + "        pass",
+    ),
+    # _run_debounced_classify: доработавший разбор остаётся в списке ждущих
+    (
+        "backend/flows/dm_classify.py",
+        "        pipeline._dm_classify_running.discard(current)",
+        "        pass",
+    ),
+    # _run_debounced_classify: начавшийся разбор не попадает в список ждущих
+    (
+        "backend/flows/dm_classify.py",
+        "    pipeline._dm_classify_running.add(current)",
+        "    pipeline._dm_classify_running.discard(current)",
+    ),
     # schedule_dm_classification: сообщение без текста всё равно копится
     (
         "backend/flows/dm_classify.py",

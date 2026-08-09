@@ -102,6 +102,12 @@ class IngestionPipeline:
         # сообщения в burst'е.
         self._dm_classify_buffer: dict[int, list[dict]] = {}
         self._dm_classify_tasks: dict[int, asyncio.Task] = {}
+        # Разборы, уже прошедшие таймер. Держатся отдельно, потому что из
+        # словаря таймеров задача вычёркивает себя перед разбором — иначе
+        # свежее сообщение отменило бы разбор посреди обращения к модели, и
+        # пакет, уже вынутый из буфера, пропал бы. Остановке же дождаться их
+        # нужно: отмена по ним не работает, а соединения она закрывает.
+        self._dm_classify_running: set[asyncio.Task] = set()
         # Семафор на одновременные LLM-классификации. Catch-up на OFF→active
         # transition'е может разом разбудить debounce'ры по всем HR'ам, что
         # на локальной LM Studio превращается в 30 параллельных httpx.post
@@ -137,6 +143,10 @@ class IngestionPipeline:
     # раздувает память и rам прибавляет ничего полезного — LLM всё равно
     # отрежет хвост в classify_hr_reply.
     DM_CLASSIFY_BUFFER_CAP = 50
+    # Сколько остановка ждёт начавшийся разбор. Названа отдельно, потому что
+    # на выключении по её истечении разбор всё-таки гасят, и проверить это,
+    # не просидев пять секунд, иначе нечем.
+    DM_CLASSIFY_STOP_TIMEOUT_SEC = 5.0
 
 
     def _emit_progress(self, stage: str, label: str, current: int, total: int) -> None:
