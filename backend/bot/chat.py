@@ -136,7 +136,6 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
             if row is None:
                 raise
             return row
-        await session.refresh(row)
     return row
 
 
@@ -244,5 +243,4 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
             if row is None:
                 raise
             return row
-        await session.refresh(row)
     return row
