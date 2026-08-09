@@ -9,6 +9,15 @@ LF = "\n"
 CRLF = "\r\n"
 
 MUTATIONS = [
+    # make_engine: кириллица в JSON-колонках снова экранируется.
+    # Убийца лежит вне обычного круга этого набора —
+    # tests/backend/test_repository_vacancy_joins.py, проверка про поиск по
+    # стеку: форму хранения снаружи видно только через неё.
+    (
+        "adapters/db.py",
+        "    return json.dumps(value, ensure_ascii=False)",
+        "    return json.dumps(value)",
+    ),
     # make_engine: внешние ключи перестают стеречься
     (
         "adapters/db.py",

@@ -83,15 +83,19 @@ async def test_search_cannot_find_a_capital_cyrillic_word_at_all(
     assert await titles(search="питон") == ["разработчик питон"]
 
 
-async def test_search_cannot_reach_a_cyrillic_word_inside_the_stack(
+async def test_search_reaches_a_cyrillic_word_inside_the_stack(
     titles, session_factory
 ):
-    """Кириллица в стеке поиском недостижима даже в нижнем регистре.
+    """Кириллица в стеке находится поиском, если написана в том же регистре.
 
-    Стек лежит колонкой JSON, а сериализатор экранирует не-ASCII: в базе
-    вместо «тестирование» лежит `\\u0442\\u0435...`. Приведение колонки к
-    строке отдаёт эту запись как есть, и подстроки в ней нет. Латиница в
-    стеке находится — её экранировать не во что.
+    Стек лежит колонкой JSON, и сериализатор по умолчанию экранирует
+    не-ASCII: в базе оказывалось `\\u0442\\u0435...` вместо «тестирование».
+    Приведение колонки к строке отдавало эту запись как есть, и подстроки
+    в ней не было ни в каком регистре.
+
+    Регистр здесь совпадает нарочно: приведение к нижнему у SQLite кириллицу
+    не трогает, и «Тестирование» с заглавной по-прежнему не найдётся. Это
+    отдельный пункт роадмапы про `func.lower`, и закрывается он не здесь.
     """
     await put(
         session_factory,
@@ -99,7 +103,7 @@ async def test_search_cannot_reach_a_cyrillic_word_inside_the_stack(
         vacancy_row(title="латинский стек", stack=["testing"]),
     )
 
-    assert await titles(search="тестирование") == []
+    assert await titles(search="тестирование") == ["русский стек"]
     assert await titles(search="testing") == ["латинский стек"]
 
 
