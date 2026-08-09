@@ -115,12 +115,12 @@ async def download_media(client, msg, hr_id: int) -> str | None:
     out = media_cache_path(hr_id, msg.id, ext)
     if out.exists():
         return media_path_for_db(out)
-    out.parent.mkdir(parents=True, exist_ok=True)
     try:
+        out.parent.mkdir(parents=True, exist_ok=True)
         path = await client.download_media(msg, file_name=str(out))
     except Exception:
         logger.exception(
-            "media download failed",
+            "media download failed (or its folder could not be made)",
             extra={"hr_id": hr_id, "tg_message_id": msg.id, "kind": kind},
         )
         return None

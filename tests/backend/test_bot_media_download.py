@@ -91,6 +91,28 @@ async def test_a_failed_download_does_not_break_the_message():
     assert await download_media(client, message(id=42, photo=object()), 7) is None
 
 
+async def test_a_file_where_the_folder_belongs_does_not_break_the_message():
+    """Файл на месте папки вложений не роняет разбор входящего.
+
+    Беда с местом для файла — та же беда, что и неудачное скачивание:
+    вложения не будет, а вызов вернёт пусто вместо броска. Что письмо при
+    этом доходит до переписки, наблюдает сторож уровня потока —
+    `test_a_letter_survives_a_file_where_the_media_folder_belongs`.
+    """
+    MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    blocker = MEDIA_DIR / "7"
+    blocker.write_bytes(b"")
+    client = FakeTelegramClient()
+
+    assert await download_media(client, message(id=42, photo=object()), 7) is None
+    # До Telegram дело не дошло: упала подготовка места, а не загрузка.
+    assert client.download_calls == []
+    # Чужой файл, занявший место папки, остаётся цел — иначе «починкой»
+    # сошло бы удаление препятствия, и потеря чужого файла читалась бы как
+    # пропавшее вложение.
+    assert blocker.read_bytes() == b""
+
+
 async def test_a_download_that_returned_nothing_yields_nothing():
     """Скачивание, ничего не вернувшее, вложения не даёт."""
     client = FakeTelegramClient(media=None)

@@ -69,6 +69,14 @@ MUTATIONS = [
         "    if out.exists():" + CRLF + "        return media_path_for_db(out)" + CRLF,
         "",
     ),
+    # download_media: место для файла готовится мимо разбора ошибок
+    (
+        "backend/bot/media.py",
+        "    try:" + CRLF
+        + "        out.parent.mkdir(parents=True, exist_ok=True)" + CRLF,
+        "    out.parent.mkdir(parents=True, exist_ok=True)" + CRLF
+        + "    try:" + CRLF,
+    ),
     # download_media: сбой скачивания перестаёт быть отсутствием
     (
         "backend/bot/media.py",
