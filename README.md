@@ -112,7 +112,8 @@ alembic/
   env.py
 
 docs/
-  ui-mockups/*.html   # самодостаточные HTML-макеты экранов (источник правды по UX)
+  not-duplicates.md   # разобранные пары «это не повторы», с отпечатками
+  Статусы.md          # граф переходов статусов вакансии (источник правды)
 
 main.py               # CLI-entrypoint
 config.py             # пути к user-data-dir

@@ -6,9 +6,11 @@
 # DB + RuntimeSettings._APP_DEFAULTS + the first-run wizard.
 alembic/versions/aa4e0de05368_seed_initial_data.py
 
-# Local-only design / brainstorm artifacts (UI mockups with personal CV
-# content, status-color spec, etc.). Repo is code-only.
-docs/
+# Черновики под документацией и карты кода: карты собираются из самого кода
+# одной командой, хранить их под версией незачем.
+docs/temp/
+docs/maps/
+
 .superpowers/
 
 # Personal CV files. Other users put their own PDF here and point cv_path at it.
