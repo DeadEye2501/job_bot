@@ -6,7 +6,7 @@
 
 import pytest
 
-from backend.repository import create_company, get_company_detail
+from backend.repository.companies_card import create_company, get_company_detail
 
 
 async def test_a_new_company_is_stored_with_the_given_fields(session):

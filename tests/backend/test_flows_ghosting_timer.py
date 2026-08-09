@@ -12,7 +12,7 @@
 
 import pytest
 
-from backend.domain import GHOSTING_TIMEOUT_DAYS
+from backend.domain.transitions import GHOSTING_TIMEOUT_DAYS
 from backend.models import Vacancy, VacancyStatus
 from tests.dbio import all_rows, put
 from tests.factories import days_ago, vacancy_row
@@ -165,7 +165,9 @@ async def test_a_failed_check_does_not_break_the_turn(
     async def broken(session, timeout_days):
         raise OSError("база недоступна")
 
-    monkeypatch.setattr("backend.repository.mark_ghosted_vacancies", broken)
+    monkeypatch.setattr(
+        "backend.repository.vacancies_life.mark_ghosted_vacancies", broken
+    )
 
     assert await pipeline.check_ghosting_timeouts() == 0
 

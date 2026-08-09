@@ -8,7 +8,7 @@
 
 import pytest
 
-from backend.repository import find_or_create_company
+from backend.repository.companies_matching import find_or_create_company
 from tests.dbio import put
 from tests.factories import company_row
 
@@ -47,7 +47,7 @@ def arbiter(monkeypatch):
 
     def install(**kwargs) -> Arbiter:
         fake = Arbiter(**kwargs)
-        monkeypatch.setattr("backend.llm.dedupe_company_with_llm", fake)
+        monkeypatch.setattr("backend.llm.company.dedupe_company_with_llm", fake)
         return fake
 
     return install

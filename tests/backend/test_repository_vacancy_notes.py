@@ -9,7 +9,7 @@
 через неё — но предмет здесь запись, а не чтение.
 """
 
-from backend.repository import get_vacancy_detail, update_vacancy_notes
+from backend.repository.vacancies_card import get_vacancy_detail, update_vacancy_notes
 from tests.dbio import put
 from tests.factories import vacancy_row
 

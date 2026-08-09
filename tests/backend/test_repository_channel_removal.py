@@ -7,7 +7,7 @@
 from sqlalchemy import select
 
 from backend.models import TelegramChannel, TrashEvent, Vacancy
-from backend.repository import delete_channel
+from backend.repository.channels import delete_channel
 from tests.dbio import put
 from tests.factories import channel_row, vacancy_row
 

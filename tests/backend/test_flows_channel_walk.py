@@ -9,6 +9,7 @@
 гасятся, иначе нижняя так и застынет на счётчике последнего канала.
 """
 
+from backend.flows import channels
 import pytest
 
 from backend.models import TelegramChannel
@@ -18,7 +19,7 @@ from tests.fakes.telegram import FakeTelegramClient, chat
 
 
 @pytest.fixture
-async def walking(make_pipeline):
+async def walking(monkeypatch, make_pipeline):
     """Конвейер с подставным чтением канала и без перезагрузки ресурсов.
 
     Предмет здесь — сам обход: кого он обходит, в каком порядке и что
@@ -31,11 +32,11 @@ async def walking(make_pipeline):
     async def reload():
         pipeline.walked.append("настройки")
 
-    async def poll(channel_id, username, last_id):
+    async def poll(pipeline, channel_id, username, last_id):
         pipeline.walked.append(username)
 
     pipeline._reload_resources = reload
-    pipeline._poll_channel = poll
+    monkeypatch.setattr(channels, "poll_channel", poll)
     return pipeline
 
 
@@ -84,7 +85,7 @@ async def test_the_settings_are_reloaded_before_the_walk(walking, session_factor
     assert walking.walked[0] == "настройки"
 
 
-async def test_a_broken_channel_does_not_stop_the_walk(walking, session_factory):
+async def test_a_broken_channel_does_not_stop_the_walk(monkeypatch, walking, session_factory):
     """Сорвавшийся канал обход не обрывает.
 
     Каналов полтора десятка, цикл идёт полтора часа; уронив его на
@@ -97,12 +98,12 @@ async def test_a_broken_channel_does_not_stop_the_walk(walking, session_factory)
     )
     walked: list[str] = []
 
-    async def poll(channel_id, username, last_id):
+    async def poll(pipeline, channel_id, username, last_id):
         if username == "broken":
             raise OSError("канал закрыт")
         walked.append(username)
 
-    walking._poll_channel = poll
+    monkeypatch.setattr(channels, "poll_channel", poll)
 
     await walking.poll_active_channels()
 
@@ -209,7 +210,7 @@ async def test_a_channel_without_a_name_on_demand_reports_failure(
     assert await walking.poll_one_channel(rows[0].id) is False
 
 
-async def test_a_broken_read_on_demand_reports_failure(walking, session_factory):
+async def test_a_broken_read_on_demand_reports_failure(monkeypatch, walking, session_factory):
     """Сорвавшийся прогон одного канала сообщает о неудаче.
 
     Окно показывает по этому ответу подсказку; проглотив сбой молча, оно
@@ -218,9 +219,9 @@ async def test_a_broken_read_on_demand_reports_failure(walking, session_factory)
     await put(session_factory, channel_row(username="broken", is_active=True))
     rows = await all_rows(session_factory, TelegramChannel)
 
-    async def poll(channel_id, username, last_id):
+    async def poll(pipeline, channel_id, username, last_id):
         raise OSError("канал закрыт")
 
-    walking._poll_channel = poll
+    monkeypatch.setattr(channels, "poll_channel", poll)
 
     assert await walking.poll_one_channel(rows[0].id) is False

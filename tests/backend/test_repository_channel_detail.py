@@ -9,7 +9,7 @@
 import pytest
 
 from backend.models import VacancyStatus
-from backend.repository import _percent_or_none, get_channel_detail
+from backend.repository.channels import _percent_or_none, get_channel_detail
 from tests.dbio import put
 from tests.factories import blacklist_row, channel_row, days_ago, vacancy_row
 

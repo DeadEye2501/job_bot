@@ -5,7 +5,7 @@
 """
 
 from backend.models import TelegramChannel
-from backend.repository import reset_channel_cursor
+from backend.repository.channels import reset_channel_cursor
 from tests.dbio import put
 from tests.factories import channel_row
 

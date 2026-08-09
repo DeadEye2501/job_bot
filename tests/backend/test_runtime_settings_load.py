@@ -4,8 +4,9 @@
 `_from_tg_row` и `_from_llm_row` видны только тем, что оказалось в кэше.
 """
 
+from backend.crypto import encrypt_bytes, encrypt_str
 from backend.models import BotMode, LlmConfigKind
-from backend.runtime_settings import RuntimeSettings, encrypt_bytes, encrypt_str
+from backend.runtime_settings import RuntimeSettings
 from tests.dbio import put
 from tests.factories import (
     app_setting_row,

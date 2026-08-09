@@ -14,7 +14,7 @@ filterwarnings = [
 line-length = 100
 
 [tool.ruff.lint]
-select = ["F401", "ARG002", "C901", "PLR0912", "PLR0913", "PLR0915", "RUF100", "E402"]
+select = ["F401", "F821", "ARG002", "C901", "PLR0912", "PLR0913", "PLR0915", "RUF100", "E402"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

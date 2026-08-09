@@ -13,7 +13,7 @@ import json
 
 import pytest
 
-from backend.llm import _parse_vacancy_json
+from backend.llm.vacancy import _parse_vacancy_json
 
 
 def _answer(**fields) -> str:

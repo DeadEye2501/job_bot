@@ -7,7 +7,7 @@
 
 import pytest
 
-from backend.repository import list_blacklist_candidates
+from backend.repository.blacklist import list_blacklist_candidates
 from tests.dbio import put
 from tests.factories import channel_row, company_row, hr_row
 

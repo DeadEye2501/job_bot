@@ -9,8 +9,9 @@
 заново, — поэтому тесты режима проверяют только базу.
 """
 
+from backend.crypto import decrypt_bytes, decrypt_str
 from backend.models import AppSetting, BotMode, BotState, LlmConfig, LlmConfigKind, TgAccount
-from backend.runtime_settings import RuntimeSettings, decrypt_bytes, decrypt_str
+from backend.runtime_settings import RuntimeSettings
 from tests.dbio import all_rows, only_row, put
 from tests.factories import app_setting_row, bot_state_row
 

@@ -5,7 +5,7 @@
 «PostgreSQL» с таким написанием, а «Docker-Compose» — «docker compose».
 """
 
-from backend.repository import _normalize_skill_key
+from backend.repository.profile import _normalize_skill_key
 
 
 def test_a_skill_key_ignores_case_spacing_and_punctuation():

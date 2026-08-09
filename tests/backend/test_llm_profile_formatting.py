@@ -8,7 +8,7 @@
 
 import pytest
 
-from backend.llm import (
+from backend.llm.candidate import (
     CandidateLanguage,
     _format_free_preferences,
     _format_grades,
@@ -26,6 +26,9 @@ from backend.llm import (
         pytest.param(["senior"], "senior", id="один уровень"),
         pytest.param(["  SENIOR  "], "senior", id="регистр и пробелы"),
         pytest.param(["middle", "senior"], "middle, senior", id="два уровня"),
+        # Единственный уровень, чьё обозначение не совпадает с ключом: без
+        # этого случая строку словаря можно удалить, и прогон промолчит.
+        pytest.param(["lead"], "lead/team-lead", id="обозначение шире ключа"),
         pytest.param(["architect"], "—", id="уровень не из набора"),
         pytest.param(["senior", "architect"], "senior", id="лишний отсеивается"),
     ],
@@ -43,6 +46,7 @@ def test_grades_are_named_by_their_known_labels(grades, expected):
         pytest.param(["remote"], "удалёнка", id="один формат"),
         pytest.param(["  REMOTE  "], "удалёнка", id="регистр и пробелы"),
         pytest.param(["remote", "hybrid"], "удалёнка, гибрид", id="два формата"),
+        pytest.param(["office"], "офис", id="офис"),
         pytest.param(["anywhere"], "—", id="формат не из набора"),
     ],
 )

@@ -10,12 +10,8 @@ import pytest
 from sqlalchemy import select
 
 from backend.models import Message, Vacancy, VacancyEvent, VacancyStatusHistory
-from backend.repository import (
-    delete_vacancy,
-    get_vacancy_detail,
-    set_vacancy_company,
-    set_vacancy_hr,
-)
+from backend.repository.vacancies_card import get_vacancy_detail, set_vacancy_company, set_vacancy_hr
+from backend.repository.vacancies_life import delete_vacancy
 from tests.dbio import put
 from tests.factories import (
     company_row,

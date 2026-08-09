@@ -5,10 +5,7 @@
 сообщения.
 """
 
-from backend.repository import (
-    find_latest_vacancy_id_for_hr,
-    resolve_reply_target_vacancy,
-)
+from backend.repository.hr_identify import find_latest_vacancy_id_for_hr, resolve_reply_target_vacancy
 from tests.dbio import put
 from tests.factories import at, hr_row, message_row, vacancy_row
 

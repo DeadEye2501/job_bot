@@ -6,6 +6,9 @@ from datetime import date
 
 import httpx
 
+from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
+from backend.llm.answers import QUOTE_TRANSLATION
+
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +61,6 @@ class ParsedCv:
     languages: list[ParsedCvLanguage]
     skills: list[ParsedCvSkill]
     experience: list[ParsedCvExperience]
-
-
-_WORK_FORMAT_VALUES = frozenset({"remote", "hybrid", "office"})
-_GRADE_VALUES = frozenset({"junior", "middle", "senior", "lead"})
 
 
 # NOTE — known limitations of single-pass CV parsing.
@@ -197,13 +196,6 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
-_QUOTE_TRANSLATION = str.maketrans({
-    "“": '"',
-    "”": '"',
-    "‘": "'",
-    "’": "'",
-})
-
 
 def _str_or_none(value) -> str | None:
     if not isinstance(value, str):
@@ -226,7 +218,7 @@ def _normalize_work_formats(raw: object) -> list[str]:
         if not isinstance(item, str):
             continue
         v = item.strip().lower()
-        if v in _WORK_FORMAT_VALUES and v not in seen:
+        if v in WORK_FORMATS and v not in seen:
             seen.add(v)
             out.append(v)
     return out
@@ -241,7 +233,7 @@ def _normalize_grades(raw: object) -> list[str]:
         if not isinstance(item, str):
             continue
         v = item.strip().lower()
-        if v in _GRADE_VALUES and v not in seen:
+        if v in GRADES and v not in seen:
             seen.add(v)
             out.append(v)
     return out
@@ -257,7 +249,7 @@ def _normalize_lang_level(value: object) -> str | None:
     if vl in ("native", "родной"):
         return "native"
     up = v.upper()
-    if up in ("A1", "A2", "B1", "B2", "C1", "C2"):
+    if up in CEFR_LEVELS:
         return up
     return None
 
@@ -403,7 +395,7 @@ def _parse_experience(item) -> ParsedCvExperience | None:
 
 
 def _parse_cv_json(answer: str) -> ParsedCv | None:
-    cleaned = answer.translate(_QUOTE_TRANSLATION)
+    cleaned = answer.translate(QUOTE_TRANSLATION)
     match = _JSON_OBJECT_RE.search(cleaned)
     if match is None:
         return None

@@ -10,6 +10,8 @@
 вакансии названия тоже нет, но разобрана она полностью.
 """
 
+from backend.flows import parse
+from backend.flows import channels
 from backend.models import TelegramChannel, VacancyStatus
 from tests.dbio import only_row, put
 from tests.factories import channel_row, vacancy_row
@@ -27,7 +29,7 @@ async def test_the_cursor_moves_to_the_message_just_handled(
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
 
-    await pipeline._advance_cursor(channel.id, 250)
+    await channels.advance_cursor(pipeline, channel.id, 250)
 
     assert (await only_row(session_factory, TelegramChannel)).last_processed_msg_id == 250
 
@@ -40,7 +42,7 @@ async def test_the_first_pass_sets_the_cursor_from_scratch(
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
 
-    await pipeline._advance_cursor(channel.id, 250)
+    await channels.advance_cursor(pipeline, channel.id, 250)
 
     assert (await only_row(session_factory, TelegramChannel)).last_processed_msg_id == 250
 
@@ -54,7 +56,7 @@ async def test_a_cursor_for_a_missing_channel_is_not_created(
     """
     pipeline = await make_pipeline()
 
-    await pipeline._advance_cursor(404, 250)
+    await channels.advance_cursor(pipeline, 404, 250)
 
     assert await only_row(session_factory, TelegramChannel) is None
 
@@ -68,7 +70,7 @@ async def test_an_unfinished_parse_is_recognised(make_pipeline, session_factory)
     await put(session_factory, vacancy_row(title=None, is_parsed=False))
     pipeline = await make_pipeline()
 
-    assert await pipeline._is_unparsed_vacancy(1) is True
+    assert await parse.is_unparsed_vacancy(pipeline, 1) is True
 
 
 async def test_a_finished_parse_is_not_mistaken_for_unfinished(
@@ -78,7 +80,7 @@ async def test_a_finished_parse_is_not_mistaken_for_unfinished(
     await put(session_factory, vacancy_row(title="разобрана", is_parsed=True))
     pipeline = await make_pipeline()
 
-    assert await pipeline._is_unparsed_vacancy(1) is False
+    assert await parse.is_unparsed_vacancy(pipeline, 1) is False
 
 
 async def test_a_rejected_vacancy_without_a_title_is_still_parsed(
@@ -101,7 +103,7 @@ async def test_a_rejected_vacancy_without_a_title_is_still_parsed(
     )
     pipeline = await make_pipeline()
 
-    assert await pipeline._is_unparsed_vacancy(1) is False
+    assert await parse.is_unparsed_vacancy(pipeline, 1) is False
 
 
 async def test_a_vacancy_that_no_longer_exists_is_not_unfinished(make_pipeline):
@@ -112,4 +114,4 @@ async def test_a_vacancy_that_no_longer_exists_is_not_unfinished(make_pipeline):
     """
     pipeline = await make_pipeline()
 
-    assert await pipeline._is_unparsed_vacancy(404) is False
+    assert await parse.is_unparsed_vacancy(pipeline, 404) is False

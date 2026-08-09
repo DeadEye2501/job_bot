@@ -5,7 +5,7 @@
 но данных вакансий не отдают: один возвращает названия, другой — времена.
 """
 
-from backend.repository import list_vacancy_filter_options, list_vacancy_last_activity
+from backend.repository.vacancies_list import list_vacancy_filter_options, list_vacancy_last_activity
 from tests.dbio import put
 from tests.factories import (
     at,

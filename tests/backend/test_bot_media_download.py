@@ -10,7 +10,7 @@
 
 import pytest
 
-from backend.bot import MEDIA_DIR, _download_media
+from backend.bot.media import MEDIA_DIR, _download_media
 from tests.fakes.telegram import FakeTelegramClient, document, message
 
 

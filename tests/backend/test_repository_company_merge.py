@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import select
 
 from backend.models import Company, Vacancy
-from backend.repository import merge_company
+from backend.repository.companies_card import merge_company
 from tests.dbio import put
 from tests.factories import company_row, vacancy_row
 

@@ -10,6 +10,7 @@
 или настройки.
 """
 
+from backend.flows import apply
 import pytest
 
 from backend.models import HR, TelegramChannel, Vacancy, VacancyStatus
@@ -56,7 +57,7 @@ async def applying(make_pipeline, session_factory, tmp_path, monkeypatch):
         pipeline.asked_for_letter = (block, parsed, channel_ref)
         return pipeline.letter
 
-    monkeypatch.setattr("backend.flows.generate_cover_letter", generate_cover_letter)
+    monkeypatch.setattr("backend.flows.apply.generate_cover_letter", generate_cover_letter)
     return pipeline, hr, vacancy, resume
 
 
@@ -64,7 +65,7 @@ async def test_the_first_application_carries_the_letter_and_the_resume(applying)
     """Первый отклик уходит письмом от модели и с резюме."""
     pipeline, hr, vacancy, resume = applying
 
-    ok, reason = await pipeline._send_application(hr, parsed_vacancy(), vacancy.id)
+    ok, reason = await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id)
 
     assert (ok, reason) == (True, "sent")
     assert pipeline.sent == [
@@ -76,7 +77,7 @@ async def test_the_letter_is_written_about_this_channel(applying):
     """Письмо сочиняется с оглядкой на канал, где вакансия найдена."""
     pipeline, hr, vacancy, _ = applying
 
-    await pipeline._send_application(hr, parsed_vacancy(), vacancy.id)
+    await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id)
 
     _, _, channel_ref = pipeline.asked_for_letter
     assert channel_ref == "@pyjobs"
@@ -102,7 +103,7 @@ async def test_a_second_application_is_short_and_carries_nothing(
     )
     pipeline.asked_for_letter = None
 
-    ok, reason = await pipeline._send_application(hr, parsed_vacancy(), vacancy.id)
+    ok, reason = await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id)
 
     assert (ok, reason) == (True, "sent")
     assert pipeline.asked_for_letter is None
@@ -115,7 +116,7 @@ async def test_an_application_for_a_vanished_vacancy_says_so(applying):
     """Отклик по исчезнувшей вакансии называет причину отказа."""
     pipeline, hr, _, _ = applying
 
-    assert await pipeline._send_application(hr, parsed_vacancy(), 404) == (
+    assert await apply.send_application(pipeline, hr, parsed_vacancy(), 404) == (
         False,
         "no_vacancy",
     )
@@ -139,7 +140,7 @@ async def test_an_already_applied_vacancy_is_not_written_to_twice(
 
     pipeline.asked_for_letter = None
 
-    assert await pipeline._send_application(hr, parsed_vacancy(), vacancy.id) == (
+    assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
         "race",
     )
@@ -161,7 +162,7 @@ async def test_a_manual_application_overrides_the_race_guard(
         row.status = VacancyStatus.APPLIED
         await session.commit()
 
-    ok, reason = await pipeline._send_application(
+    ok, reason = await apply.send_application(pipeline, 
         hr, parsed_vacancy(), vacancy.id, force=True
     )
 
@@ -176,7 +177,7 @@ async def test_an_empty_profile_stops_the_full_letter(applying):
     pipeline, hr, vacancy, _ = applying
     pipeline._profile_block = ""
 
-    assert await pipeline._send_application(hr, parsed_vacancy(), vacancy.id) == (
+    assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
         "profile_empty",
     )
@@ -188,7 +189,7 @@ async def test_a_letter_the_model_did_not_write_stops_the_send(applying):
     pipeline, hr, vacancy, _ = applying
     pipeline.letter = None
 
-    assert await pipeline._send_application(hr, parsed_vacancy(), vacancy.id) == (
+    assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
         "cover_letter_failed",
     )
@@ -204,7 +205,7 @@ async def test_a_missing_resume_stops_the_full_letter(applying, session_factory)
     pipeline, hr, vacancy, resume = applying
     resume.unlink()
 
-    assert await pipeline._send_application(hr, parsed_vacancy(), vacancy.id) == (
+    assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
         "cv_missing",
     )
@@ -224,7 +225,7 @@ async def test_a_resume_that_vanished_at_the_last_moment_says_so(applying):
 
     pipeline._send = send
 
-    assert await pipeline._send_application(hr, parsed_vacancy(), vacancy.id) == (
+    assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
         "cv_missing",
     )
@@ -243,7 +244,7 @@ async def test_a_refused_send_is_named_blocked(applying):
 
     pipeline._send = send
 
-    assert await pipeline._send_application(hr, parsed_vacancy(), vacancy.id) == (
+    assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
         "blocked",
     )
@@ -262,7 +263,7 @@ async def test_a_broken_send_is_named_a_telegram_error(applying):
 
     pipeline._send = send
 
-    assert await pipeline._send_application(hr, parsed_vacancy(), vacancy.id) == (
+    assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
         "telegram_error",
     )
@@ -291,7 +292,7 @@ async def test_a_vacancy_without_a_title_is_still_written_about(
         ),
     )
 
-    ok, reason = await pipeline._send_application(hr, parsed_vacancy(), vacancy.id)
+    ok, reason = await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id)
 
     assert (ok, reason) == (True, "sent")
     assert "вашу вакансию" in pipeline.sent[0][1]
@@ -307,7 +308,7 @@ async def test_a_rate_limit_window_holds_the_auto_send(applying):
     pipeline, hr, vacancy, _ = applying
     await pipeline._rs.set_app("flood_wait_until_ts", str(time.time() + 999))
 
-    assert await pipeline._try_auto_send(hr, parsed_vacancy(), vacancy.id) == (
+    assert await apply.try_auto_send(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
         "flood_wait",
     )
@@ -321,6 +322,6 @@ async def test_an_expired_rate_limit_window_lets_the_send_through(applying):
     pipeline, hr, vacancy, _ = applying
     await pipeline._rs.set_app("flood_wait_until_ts", str(time.time() - 10))
 
-    ok, reason = await pipeline._try_auto_send(hr, parsed_vacancy(), vacancy.id)
+    ok, reason = await apply.try_auto_send(pipeline, hr, parsed_vacancy(), vacancy.id)
 
     assert (ok, reason) == (True, "sent")

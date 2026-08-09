@@ -5,7 +5,7 @@
 """
 
 from backend.models import Blacklist
-from backend.repository import set_blacklist_active
+from backend.repository.blacklist import set_blacklist_active
 from tests.dbio import put
 from tests.factories import blacklist_row
 

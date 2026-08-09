@@ -8,7 +8,7 @@
 
 import pytest
 
-from backend.repository import _parse_usd_range
+from backend.repository.vacancies_list import _parse_usd_range
 from tests.dbio import put
 from tests.factories import vacancy_row
 

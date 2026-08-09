@@ -4,7 +4,7 @@
 которой страдает поиск по вакансиям.
 """
 
-from backend.repository import list_telegram_channels
+from backend.repository.channels import list_telegram_channels
 from tests.dbio import put
 from tests.factories import channel_row
 
