@@ -12,6 +12,7 @@
 по последней фразе.
 """
 
+from backend.flows import dm_classify
 import pytest
 
 from backend.models import HR, Message, Vacancy, VacancyStatus, VacancyStatusHistory
@@ -52,7 +53,7 @@ async def reading(make_pipeline, session_factory, monkeypatch):
             raise pipeline.verdict
         return pipeline.verdict
 
-    monkeypatch.setattr("backend.flows.classify_hr_reply", classify_hr_reply)
+    monkeypatch.setattr("backend.flows.dm_classify.classify_hr_reply", classify_hr_reply)
     return pipeline, hr, vacancy, message
 
 
@@ -74,7 +75,7 @@ async def test_the_whole_burst_goes_to_the_model_at_once(reading):
     pipeline, hr, vacancy, message = reading
     _buffer(pipeline, hr, vacancy, message, "привет", "давайте созвонимся")
 
-    await pipeline._classify_and_apply_for_hr(hr.id)
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     assert pipeline.asked == [
         ("привет\n\nдавайте созвонимся", VacancyStatus.APPLIED),
@@ -86,7 +87,7 @@ async def test_the_verdict_moves_the_vacancy(reading, session_factory):
     pipeline, hr, vacancy, message = reading
     _buffer(pipeline, hr, vacancy, message, "давайте созвонимся")
 
-    await pipeline._classify_and_apply_for_hr(hr.id)
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     assert (
         await only_row(session_factory, Vacancy)
@@ -102,7 +103,7 @@ async def test_the_buffer_is_emptied_by_the_reading(reading):
     pipeline, hr, vacancy, message = reading
     _buffer(pipeline, hr, vacancy, message, "давайте созвонимся")
 
-    await pipeline._classify_and_apply_for_hr(hr.id)
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     assert hr.id not in pipeline._dm_classify_buffer
 
@@ -111,7 +112,7 @@ async def test_an_empty_buffer_asks_the_model_nothing(reading):
     """Пустой накопитель до модели не доходит."""
     pipeline, hr, _, _ = reading
 
-    await pipeline._classify_and_apply_for_hr(hr.id)
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     assert pipeline.asked == []
 
@@ -126,7 +127,7 @@ async def test_a_blacklisted_hr_is_not_read_at_all(reading, session_factory):
     await put(session_factory, blacklist_row("hr", "@maria"))
     _buffer(pipeline, hr, vacancy, message, "давайте созвонимся")
 
-    await pipeline._classify_and_apply_for_hr(hr.id)
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     assert pipeline.asked == []
     assert hr.id not in pipeline._dm_classify_buffer
@@ -151,7 +152,7 @@ async def test_a_vacancy_beyond_automation_is_not_read_either(
         await session.commit()
     _buffer(pipeline, hr, vacancy, message, "давайте созвонимся")
 
-    await pipeline._classify_and_apply_for_hr(hr.id)
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     assert pipeline.asked == []
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.DECLINE
@@ -169,7 +170,7 @@ async def test_a_model_that_gave_no_verdict_changes_nothing(
     pipeline.verdict = None
     _buffer(pipeline, hr, vacancy, message, "спасибо, посмотрим")
 
-    await pipeline._classify_and_apply_for_hr(hr.id)
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     assert (
         await only_row(session_factory, Vacancy)
@@ -187,7 +188,7 @@ async def test_a_broken_model_call_changes_nothing(reading, session_factory):
     pipeline.verdict = RuntimeError("модель не ответила")
     _buffer(pipeline, hr, vacancy, message, "давайте созвонимся")
 
-    await pipeline._classify_and_apply_for_hr(hr.id)
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     assert (
         await only_row(session_factory, Vacancy)
@@ -201,7 +202,7 @@ async def test_the_window_hears_about_the_moved_vacancy(reading):
     pipeline.on_vacancies_changed = lambda: heard.append(1)
     _buffer(pipeline, hr, vacancy, message, "давайте созвонимся")
 
-    await pipeline._classify_and_apply_for_hr(hr.id)
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     assert heard == [1]
 
@@ -218,7 +219,7 @@ async def test_a_broken_window_hook_does_not_undo_the_move(
     pipeline.on_vacancies_changed = broken
     _buffer(pipeline, hr, vacancy, message, "давайте созвонимся")
 
-    await pipeline._classify_and_apply_for_hr(hr.id)
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     assert (
         await only_row(session_factory, Vacancy)
@@ -246,7 +247,7 @@ async def test_the_verdict_lands_on_the_vacancy_of_the_last_message(
         {"vacancy_id": second.id, "msg_id": message_row_.id, "text": "и про вторую"},
     ]
 
-    await pipeline._classify_and_apply_for_hr(hr.id)
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     by_title = {v.title: v for v in await all_rows(session_factory, Vacancy)}
     assert by_title["вторая"].status is VacancyStatus.INVITATION

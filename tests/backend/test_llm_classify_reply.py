@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 from backend.models import VacancyStatus
-from backend.llm import classify_hr_reply
+from backend.llm.hr_reply import classify_hr_reply
 from tests.fakes.llm import CHAT, chat_json, chat_response, messages_of, provider
 
 

@@ -1,5 +1,7 @@
 """Фикстуры, общие для тестов слоя `backend`."""
 
+from backend.flows import apply
+from backend.flows import dm_classify
 import asyncio
 import logging
 import shutil
@@ -7,8 +9,10 @@ from contextlib import suppress
 
 import pytest
 
-from backend.bot import MEDIA_DIR, Bot
-from backend.flows import IngestionPipeline, process_dm
+from backend.bot.media import MEDIA_DIR
+from backend.bot.client import Bot
+from backend.flows.dm import process_dm
+from backend.flows.pipeline import IngestionPipeline
 from backend.models import (
     HR,
     BotMode,
@@ -17,9 +21,10 @@ from backend.models import (
     Vacancy,
     VacancyStatus,
 )
+from backend.crypto import encrypt_str
 from backend.payloads import FitValidation
-from backend.repository import list_vacancies
-from backend.runtime_settings import RuntimeSettings, encrypt_str
+from backend.repository.vacancies_list import list_vacancies
+from backend.runtime_settings import RuntimeSettings
 from tests.dbio import only_row, put
 from tests.factories import (
     hr_row,
@@ -206,13 +211,13 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
         pipeline.validated = True
         return pipeline.verdict
 
-    async def try_auto_send(hr, parsed, vacancy_id):
+    async def try_auto_send(pipeline, hr, parsed, vacancy_id):
         pipeline.asked_to_send.append(vacancy_id)
         return True, "sent"
 
-    pipeline._try_auto_send = try_auto_send
-    monkeypatch.setattr("backend.flows.parse_vacancy", parse_vacancy)
-    monkeypatch.setattr("backend.flows.validate_vacancy_fit", validate_vacancy_fit)
+    monkeypatch.setattr(apply, "try_auto_send", try_auto_send)
+    monkeypatch.setattr("backend.flows.parse.parse_vacancy", parse_vacancy)
+    monkeypatch.setattr("backend.flows.parse.validate_vacancy_fit", validate_vacancy_fit)
 
 
 @pytest.fixture
@@ -238,15 +243,12 @@ def deliver(session_factory):
 
 
 @pytest.fixture
-async def parsing(make_pipeline, session_factory, monkeypatch):
-    """Конвейер с подставным разбором объявления и вакансия под него.
+async def unparsed_vacancy(session_factory):
+    """Неразобранная вакансия с чужим приговором.
 
-    Разбор проверяется двумя слайсами — приговор и запись, — и обоим нужно
-    одно: чтобы обращения к языковой модели отдавали заготовленное, а
-    оценка по навыкам не отсекала всё на пороге.
+    Приговор именно чужой: с умолчаниями «осталась новой» проверка была бы
+    верна и до разбора, то есть не стерегла бы ничего.
     """
-    # Строка заводится с чужим приговором: с умолчаниями «осталась новой»
-    # было бы верно и до разбора, и проверка ничего бы не стерегла.
     await put(
         session_factory,
         vacancy_row(
@@ -257,8 +259,17 @@ async def parsing(make_pipeline, session_factory, monkeypatch):
             skip_reason="прошлый отказ",
         ),
     )
-    vacancy = await only_row(session_factory, Vacancy)
+    return await only_row(session_factory, Vacancy)
 
+
+@pytest.fixture
+async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory):
+    """Конвейер с подставным разбором объявления.
+
+    Разбор проверяется двумя слайсами — приговор и запись, — и обоим нужно
+    одно: чтобы обращения к языковой модели отдавали заготовленное, а
+    оценка по навыкам не отсекала всё на пороге.
+    """
     pipeline = await make_pipeline(_known_hr_client())
     pipeline.parsed = parsed_vacancy(
         title="Python-разработчик",
@@ -279,11 +290,11 @@ async def parsing(make_pipeline, session_factory, monkeypatch):
     await put(session_factory, profile_skill_row(profile.id, "Python"))
     await pipeline._reload_resources()
     await pipeline._rs.set_app("scoring_threshold", "1")
-    return pipeline, vacancy
+    return pipeline, unparsed_vacancy
 
 
 @pytest.fixture
-async def dm_pipeline(make_pipeline):
+async def dm_pipeline(monkeypatch, make_pipeline):
     """Конвейер с подставным разбором ответа HR и невзводящимся таймером.
 
     Накопитель входящих проверяется двумя слайсами — что в нём копится и
@@ -295,13 +306,13 @@ async def dm_pipeline(make_pipeline):
     built.DM_CLASSIFY_DEBOUNCE_SEC = 30
     built.classified = []
 
-    async def classify(hr_id):
+    async def classify(pipeline, hr_id):
         built.classified.append(
             (hr_id, list(built._dm_classify_buffer.get(hr_id, [])))
         )
         built._dm_classify_buffer.pop(hr_id, None)
 
-    built._classify_and_apply_for_hr = classify
+    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", classify)
     yield built
     await built.cancel_pending_dm_classifications()
 

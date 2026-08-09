@@ -5,7 +5,7 @@
 проходом — вместо запроса на каждого.
 """
 
-from backend.repository import list_hr_with_counts
+from backend.repository.hr_list import list_hr_with_counts
 from tests.dbio import put
 from tests.factories import (
     at,

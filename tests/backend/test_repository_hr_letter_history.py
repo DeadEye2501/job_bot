@@ -4,7 +4,7 @@
 за окно, или короткое напоминание, если уже писали.
 """
 
-from backend.repository import count_recent_outgoing_with_vacancy_for_hr
+from backend.repository.hr_identify import count_recent_outgoing_with_vacancy_for_hr
 from tests.dbio import put
 from tests.factories import days_ago, hr_row, message_row, vacancy_row
 

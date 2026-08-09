@@ -5,7 +5,7 @@
 при работающем боте, остался бы с пустым чатом до перезапуска.
 """
 
-from backend.repository import find_or_create_hr
+from backend.repository.hr_identify import find_or_create_hr
 from tests.dbio import put
 from tests.factories import hr_row
 from tests.fakes.telegram import user

@@ -13,8 +13,10 @@
 перечитывалось бы вечно, каждый цикл упираясь в ту же ошибку.
 """
 
+from backend.flows import channels
 import pytest
 
+from backend.flows import ingest as ingest_mod
 from backend.models import TelegramChannel
 from tests.dbio import only_row, put
 from tests.factories import channel_row
@@ -22,7 +24,7 @@ from tests.fakes.telegram import FakeTelegramClient, post
 
 
 @pytest.fixture
-async def reading(make_pipeline, session_factory):
+async def reading(monkeypatch, make_pipeline, session_factory):
     """Канал, конвейер с подставным приёмом поста и отметкой на месте."""
     await put(session_factory, channel_row(username="jobs", last_processed_msg_id=None))
     channel = await only_row(session_factory, TelegramChannel)
@@ -30,10 +32,10 @@ async def reading(make_pipeline, session_factory):
     pipeline = await make_pipeline(client)
     pipeline.taken = []
 
-    async def ingest(channel_id, username, msg):
+    async def take(pipeline, channel_id, username, msg):
         pipeline.taken.append(msg.id)
 
-    pipeline._ingest_post = ingest
+    monkeypatch.setattr(ingest_mod, "ingest_post", take)
     return pipeline, client, channel
 
 
@@ -46,7 +48,7 @@ async def test_the_new_posts_are_taken_oldest_first(reading, session_factory):
     pipeline, client, channel = reading
     client.history = [post(12), post(11), post(10)]
 
-    await pipeline._poll_channel(channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     assert pipeline.taken == [10, 11, 12]
 
@@ -60,7 +62,7 @@ async def test_reading_stops_at_the_mark(reading, session_factory):
     pipeline, client, channel = reading
     client.history = [post(12), post(11), post(10), post(9)]
 
-    await pipeline._poll_channel(channel.id, "jobs", 10)
+    await channels.poll_channel(pipeline, channel.id, "jobs", 10)
 
     assert pipeline.taken == [11, 12]
 
@@ -70,7 +72,7 @@ async def test_a_channel_without_a_mark_is_read_whole(reading):
     pipeline, client, channel = reading
     client.history = [post(12), post(11)]
 
-    await pipeline._poll_channel(channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     assert pipeline.taken == [11, 12]
 
@@ -80,13 +82,13 @@ async def test_the_mark_ends_up_on_the_lastpost(reading, session_factory):
     pipeline, client, channel = reading
     client.history = [post(12), post(11), post(10)]
 
-    await pipeline._poll_channel(channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     saved = await only_row(session_factory, TelegramChannel)
     assert saved.last_processed_msg_id == 12
 
 
-async def test_the_mark_is_saved_in_batches(reading, session_factory):
+async def test_the_mark_is_saved_in_batches(monkeypatch, reading, session_factory):
     """Отметка сохраняется пачками, а не после каждого сообщения.
 
     Полтора десятка каналов по полтора десятка сообщений дали бы сотни
@@ -96,20 +98,20 @@ async def test_the_mark_is_saved_in_batches(reading, session_factory):
     await pipeline._rs.set_app("backfill_limit", "25")
     client.history = [post(msg_id) for msg_id in range(25, 0, -1)]
     saves: list[int] = []
-    real_advance = pipeline._advance_cursor
+    real_advance = channels.advance_cursor
 
-    async def note(channel_id, msg_id):
+    async def note(pipeline, channel_id, msg_id):
         saves.append(msg_id)
-        await real_advance(channel_id, msg_id)
+        await real_advance(pipeline, channel_id, msg_id)
 
-    pipeline._advance_cursor = note
+    monkeypatch.setattr(channels, "advance_cursor", note)
 
-    await pipeline._poll_channel(channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     assert saves == [10, 20, 25]
 
 
-async def test_nothing_new_leaves_the_mark_alone(reading, session_factory):
+async def test_nothing_new_leaves_the_mark_alone(monkeypatch, reading, session_factory):
     """Когда нового нет, отметка не трогается и записи не идёт."""
     pipeline, client, channel = reading
     await put(session_factory, channel_row(username="other"))
@@ -119,15 +121,18 @@ async def test_nothing_new_leaves_the_mark_alone(reading, session_factory):
         await session.commit()
     client.history = [post(12)]
     saves: list[int] = []
-    pipeline._advance_cursor = lambda channel_id, msg_id: saves.append(msg_id)
+    monkeypatch.setattr(
+        channels, "advance_cursor",
+        lambda pipeline, channel_id, msg_id: saves.append(msg_id),
+    )
 
-    await pipeline._poll_channel(channel.id, "jobs", 12)
+    await channels.poll_channel(pipeline, channel.id, "jobs", 12)
 
     assert pipeline.taken == []
     assert saves == []
 
 
-async def test_a_broken_post_still_moves_the_mark(reading, session_factory):
+async def test_a_broken_post_still_moves_the_mark(monkeypatch, reading, session_factory):
     """Сообщение, на котором разбор сорвался, отметку всё равно двигает.
 
     Иначе оно перечитывалось бы вечно, каждый обход упираясь в ту же
@@ -136,21 +141,21 @@ async def test_a_broken_post_still_moves_the_mark(reading, session_factory):
     pipeline, client, channel = reading
     client.history = [post(11), post(10)]
 
-    async def ingest(channel_id, username, msg):
+    async def take(pipeline, channel_id, username, msg):
         if msg.id == 10:
             raise RuntimeError("не разобралось")
         pipeline.taken.append(msg.id)
 
-    pipeline._ingest_post = ingest
+    monkeypatch.setattr(ingest_mod, "ingest_post", take)
 
-    await pipeline._poll_channel(channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     assert pipeline.taken == [11]
     saved = await only_row(session_factory, TelegramChannel)
     assert saved.last_processed_msg_id == 11
 
 
-async def test_the_mark_survives_a_break_mid_channel(reading, session_factory):
+async def test_the_mark_survives_a_break_mid_channel(monkeypatch, reading, session_factory):
     """Отметка досохраняется, даже если обход оборвался на середине.
 
     Без этого следующий обход перечитал бы всё, что уже разобрано, — и
@@ -159,15 +164,15 @@ async def test_the_mark_survives_a_break_mid_channel(reading, session_factory):
     pipeline, client, channel = reading
     client.history = [post(12), post(11), post(10)]
 
-    async def ingest(channel_id, username, msg):
+    async def take(pipeline, channel_id, username, msg):
         pipeline.taken.append(msg.id)
         if msg.id == 11:
             raise KeyboardInterrupt
 
-    pipeline._ingest_post = ingest
+    monkeypatch.setattr(ingest_mod, "ingest_post", take)
 
     with pytest.raises(KeyboardInterrupt):
-        await pipeline._poll_channel(channel.id, "jobs", None)
+        await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     saved = await only_row(session_factory, TelegramChannel)
     assert saved.last_processed_msg_id == 10
@@ -184,7 +189,7 @@ async def test_the_window_is_told_where_inside_the_channel_it_is(reading):
     heard: list[tuple] = []
     pipeline.on_progress = lambda *args: heard.append(args)
 
-    await pipeline._poll_channel(channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
     assert heard == [
         ("message", "@jobs", 0, 2),

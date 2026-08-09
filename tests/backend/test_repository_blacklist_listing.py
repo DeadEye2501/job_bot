@@ -5,7 +5,7 @@
 визуальной группировки.
 """
 
-from backend.repository import list_blacklist, set_blacklist_active
+from backend.repository.blacklist import list_blacklist, set_blacklist_active
 from tests.dbio import put
 from tests.factories import blacklist_row
 

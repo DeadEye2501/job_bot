@@ -6,7 +6,7 @@
 от `None`.
 """
 
-from backend.repository import get_hr_detail, update_hr_fields
+from backend.repository.hr_card import get_hr_detail, update_hr_fields
 from tests.dbio import put
 from tests.factories import hr_row
 

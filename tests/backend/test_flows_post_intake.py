@@ -12,8 +12,10 @@
 Служебные записи и опросы до сравнения не доходят вовсе: вакансий в них нет.
 """
 
+from backend.flows import parse as parse_mod
 import pytest
 
+from backend.flows import ingest
 from tests.fakes.telegram import post
 
 
@@ -31,30 +33,30 @@ async def intake(make_pipeline, monkeypatch):
         pipeline.embedded = text
         return [0.1, 0.2]
 
-    async def save(channel_id, username, msg, text, embedding):
+    async def save(pipeline, channel_id, username, msg, text, embedding):
         pipeline.saved.append((channel_id, msg.id, text))
         return pipeline.new_id
 
-    async def parse(vacancy_id, text, username):
+    async def parse(pipeline, vacancy_id, text, username):
         pipeline.parsed.append((vacancy_id, text))
 
-    async def unparsed(vacancy_id):
+    async def unparsed(pipeline, vacancy_id):
         return pipeline.unparsed
 
     monkeypatch.setattr("adapters.lm_studio.embed", embed)
     monkeypatch.setattr(
-        "backend.flows.cosine_top_match",
+        "backend.flows.ingest.cosine_top_match",
         lambda vec, ids, matrix, threshold: pipeline.similar_id,
     )
-    pipeline._save_new_vacancy = save
-    pipeline._parse_and_update_vacancy = parse
-    pipeline._is_unparsed_vacancy = unparsed
+    monkeypatch.setattr(ingest, "save_new_vacancy", save)
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
+    monkeypatch.setattr(parse_mod, "is_unparsed_vacancy", unparsed)
     return pipeline
 
 
 async def test_a_fresh_post_is_saved_and_parsed(intake):
     """Незнакомое объявление сохраняется и уходит в разбор."""
-    await intake._ingest_post(1, "jobs", post(10, text="Ищем Python-разработчика"))
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == [(1, 10, "Ищем Python-разработчика")]
     assert intake.parsed == [(7, "Ищем Python-разработчика")]
@@ -80,7 +82,7 @@ async def test_a_post_without_a_vacancy_goes_no_further(intake, msg):
     Служебные записи о смене названия канала и опросы приходят тем же
     потоком; переводить их в вектор — платить за заведомо пустое.
     """
-    await intake._ingest_post(1, "jobs", msg)
+    await ingest.ingest_post(intake, 1, "jobs", msg)
 
     assert intake.saved == []
     assert intake.parsed == []
@@ -95,7 +97,7 @@ async def test_a_repost_is_skipped(intake):
     intake.similar_id = 3
     intake.unparsed = False
 
-    await intake._ingest_post(1, "jobs", post(10, text="Ищем Python-разработчика"))
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == []
     assert intake.parsed == []
@@ -110,7 +112,7 @@ async def test_a_repost_of_a_half_parsed_vacancy_finishes_it(intake):
     intake.similar_id = 3
     intake.unparsed = True
 
-    await intake._ingest_post(1, "jobs", post(10, text="Ищем Python-разработчика"))
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == []
     assert intake.parsed == [(3, "Ищем Python-разработчика")]
@@ -128,7 +130,7 @@ async def test_a_post_the_model_could_not_embed_is_skipped(intake, monkeypatch):
 
     monkeypatch.setattr("adapters.lm_studio.embed", broken)
 
-    await intake._ingest_post(1, "jobs", post(10, text="Ищем Python-разработчика"))
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == []
     assert intake.parsed == []
@@ -141,6 +143,6 @@ async def test_a_vacancy_that_could_not_be_saved_is_not_parsed(intake):
     """
     intake.new_id = None
 
-    await intake._ingest_post(1, "jobs", post(10, text="Ищем Python-разработчика"))
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.parsed == []

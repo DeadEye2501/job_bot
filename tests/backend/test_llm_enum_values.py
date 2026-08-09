@@ -7,7 +7,7 @@
 
 import pytest
 
-from backend.llm import _normalize_enum
+from backend.llm.answers import _normalize_enum
 
 
 @pytest.mark.parametrize(
@@ -28,4 +28,4 @@ def test_a_value_outside_the_allowed_set_is_dropped(value, expected):
     Модель охотно выдумывает уровни вроде «architect», и пустить такое в
     базу значило бы завести статус, которого экран не знает.
     """
-    assert _normalize_enum(value, {"junior", "middle", "senior", "lead"}) == expected
+    assert _normalize_enum(value, ("junior", "middle", "senior", "lead")) == expected

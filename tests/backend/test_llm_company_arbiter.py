@@ -12,7 +12,7 @@
 import httpx
 import pytest
 
-from backend.llm import dedupe_company_with_llm
+from backend.llm.company import dedupe_company_with_llm
 from tests.fakes.llm import CHAT, chat_json, chat_response, messages_of, provider
 
 

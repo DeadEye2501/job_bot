@@ -10,6 +10,9 @@
 заведена первым.
 """
 
+from backend.flows import parse as parse_mod
+from backend.flows import ingest
+from backend.flows import embeddings
 from backend.models import TelegramChannel, Vacancy, VacancyEvent
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row, vacancy_row
@@ -26,7 +29,7 @@ async def test_the_text_and_the_vector_are_saved_before_the_parse(
     """
     pipeline = await make_pipeline()
 
-    new_id = await pipeline._save_new_vacancy(None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1, 0.2])
+    new_id = await ingest.save_new_vacancy(pipeline, None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1, 0.2])
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.id == new_id
@@ -47,7 +50,7 @@ async def test_the_new_row_remembers_where_it_came_from(
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
 
-    await pipeline._save_new_vacancy(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
+    await ingest.save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.source_channel_id == channel.id
@@ -63,9 +66,9 @@ async def test_the_new_vector_joins_the_cache(make_pipeline):
     вакансии: второе сравнивалось бы с памятью, где первого ещё нет.
     """
     pipeline = await make_pipeline()
-    await pipeline._ensure_embedding_cache()
+    await embeddings.ensure_embedding_cache(pipeline)
 
-    new_id = await pipeline._save_new_vacancy(None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1, 0.2])
+    new_id = await ingest.save_new_vacancy(pipeline, None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1, 0.2])
 
     assert pipeline._embedding_ids.tolist() == [new_id]
 
@@ -76,7 +79,7 @@ async def test_the_timeline_records_where_it_was_ingested_from(
     """В ленте вакансии остаётся запись о том, откуда её взяли."""
     pipeline = await make_pipeline()
 
-    await pipeline._save_new_vacancy(None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
+    await ingest.save_new_vacancy(pipeline, None, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
     event = await only_row(session_factory, VacancyEvent)
     assert event.kind == "ingested"
@@ -92,9 +95,9 @@ async def test_the_same_post_twice_makes_one_row(make_pipeline, session_factory)
     await put(session_factory, channel_row(username="jobs"))
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
-    first = await pipeline._save_new_vacancy(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
+    first = await ingest.save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
-    second = await pipeline._save_new_vacancy(
+    second = await ingest.save_new_vacancy(pipeline, 
         channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1]
     )
 
@@ -112,15 +115,15 @@ async def test_a_refused_row_leaves_no_vector_behind(make_pipeline, session_fact
     await put(session_factory, channel_row(username="jobs"))
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
-    await pipeline._ensure_embedding_cache()
-    first = await pipeline._save_new_vacancy(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
+    await embeddings.ensure_embedding_cache(pipeline)
+    first = await ingest.save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
-    await pipeline._save_new_vacancy(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
+    await ingest.save_new_vacancy(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст", [0.1])
 
     assert pipeline._embedding_ids.tolist() == [first]
 
 
-async def test_an_unfinished_vacancy_is_picked_up_later(
+async def test_an_unfinished_vacancy_is_picked_up_later(monkeypatch, 
     make_pipeline, session_factory
 ):
     """Недоразобранная вакансия подбирается на следующем запуске."""
@@ -128,31 +131,31 @@ async def test_an_unfinished_vacancy_is_picked_up_later(
     pipeline = await make_pipeline()
     picked: list[tuple] = []
 
-    async def parse(vacancy_id, text, username, allow_delete=False):
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         picked.append((vacancy_id, text, allow_delete))
 
-    pipeline._parse_and_update_vacancy = parse
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 1
     assert picked == [(1, "текст", True)]
 
 
-async def test_a_parsed_vacancy_is_not_picked_up(make_pipeline, session_factory):
+async def test_a_parsed_vacancy_is_not_picked_up(monkeypatch, make_pipeline, session_factory):
     """Разобранная вакансия повторно не подбирается."""
     await put(session_factory, vacancy_row(title="готова", is_parsed=True, raw_text="т"))
     pipeline = await make_pipeline()
     picked: list[int] = []
 
-    async def parse(vacancy_id, text, username, allow_delete=False):
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         picked.append(vacancy_id)
 
-    pipeline._parse_and_update_vacancy = parse
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 0
     assert picked == []
 
 
-async def test_a_vacancy_without_text_cannot_be_picked_up(
+async def test_a_vacancy_without_text_cannot_be_picked_up(monkeypatch, 
     make_pipeline, session_factory
 ):
     """Недоразобранная вакансия без текста не подбирается: разбирать нечего."""
@@ -160,16 +163,16 @@ async def test_a_vacancy_without_text_cannot_be_picked_up(
     pipeline = await make_pipeline()
     picked: list[int] = []
 
-    async def parse(vacancy_id, text, username, allow_delete=False):
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         picked.append(vacancy_id)
 
-    pipeline._parse_and_update_vacancy = parse
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 0
     assert picked == []
 
 
-async def test_one_broken_orphan_does_not_stop_the_rest(
+async def test_one_broken_orphan_does_not_stop_the_rest(monkeypatch, 
     make_pipeline, session_factory
 ):
     """Сорвавшийся подбор одной вакансии остальные не отменяет.
@@ -185,18 +188,18 @@ async def test_one_broken_orphan_does_not_stop_the_rest(
     pipeline = await make_pipeline()
     done: list[str] = []
 
-    async def parse(vacancy_id, text, username, allow_delete=False):
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         if text == "первая":
             raise RuntimeError("не разобралось")
         done.append(text)
 
-    pipeline._parse_and_update_vacancy = parse
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 1
     assert done == ["вторая"]
 
 
-async def test_the_window_hears_about_the_recovery(make_pipeline, session_factory):
+async def test_the_window_hears_about_the_recovery(monkeypatch, make_pipeline, session_factory):
     """Окно узнаёт о подборе и о его завершении.
 
     Подбор идёт до обхода каналов; без гашения полосы следующая стадия
@@ -205,10 +208,10 @@ async def test_the_window_hears_about_the_recovery(make_pipeline, session_factor
     await put(session_factory, vacancy_row(title=None, is_parsed=False, raw_text="т"))
     pipeline = await make_pipeline()
 
-    async def parse(vacancy_id, text, username, allow_delete=False):
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         pass
 
-    pipeline._parse_and_update_vacancy = parse
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
     heard: list[tuple] = []
     pipeline.on_progress = lambda *args: heard.append(args)
 

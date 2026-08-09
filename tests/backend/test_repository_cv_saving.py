@@ -25,12 +25,7 @@ from backend.models import (
     ProfileSkill,
     profile_experience_skills,
 )
-from backend.repository import (
-    get_profile,
-    list_experience,
-    load_profile_skills,
-    save_parsed_cv,
-)
+from backend.repository.profile import get_profile, list_experience, load_profile_skills, save_parsed_cv
 from tests.dbio import put
 from tests.factories import experience_row, profile_row, profile_skill_row
 

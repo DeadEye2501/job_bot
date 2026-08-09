@@ -5,7 +5,7 @@
 сообщений и стоит ли он в чёрном списке.
 """
 
-from backend.repository import get_hr_detail
+from backend.repository.hr_card import get_hr_detail
 from tests.dbio import put
 from tests.factories import at, company_row, hr_row, message_row, vacancy_row
 

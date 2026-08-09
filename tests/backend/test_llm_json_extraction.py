@@ -10,7 +10,7 @@
 
 import pytest
 
-from backend.llm import _extract_last_json
+from backend.llm.answers import _extract_last_json
 
 
 @pytest.mark.parametrize(

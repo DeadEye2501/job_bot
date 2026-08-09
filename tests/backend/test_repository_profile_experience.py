@@ -12,11 +12,7 @@ import pytest
 from sqlalchemy import select
 
 from backend.models import ProfileExperience
-from backend.repository import (
-    SaveExperienceError,
-    list_experience,
-    save_experience,
-)
+from backend.repository.profile import SaveExperienceError, list_experience, save_experience
 from tests.dbio import put
 from tests.factories import experience_row, profile_row, profile_skill_row
 

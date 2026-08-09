@@ -8,7 +8,7 @@
 from sqlalchemy import select
 
 from backend.models import HR, Message, Vacancy
-from backend.repository import delete_hr
+from backend.repository.hr_card import delete_hr
 from tests.dbio import put
 from tests.factories import hr_row, message_row, vacancy_row
 

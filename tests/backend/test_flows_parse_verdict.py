@@ -14,6 +14,7 @@
 вакансию, а не выбросить её.
 """
 
+from backend.flows import parse
 from backend.models import TrashEvent, Vacancy, VacancyStatus
 from backend.payloads import FitValidation
 from tests.dbio import all_rows, only_row
@@ -23,7 +24,7 @@ async def test_a_fitting_vacancy_stays_new(parsing, session_factory):
     """Прошедшая всё вакансия остаётся новой и ждёт отклика."""
     pipeline, vacancy = parsing
 
-    await pipeline._parse_and_update_vacancy(vacancy.id, "текст", "jobs")
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs")
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.status is VacancyStatus.NEW
@@ -39,7 +40,7 @@ async def test_an_empty_post_is_thrown_out_on_ingest(parsing, session_factory):
     pipeline, vacancy = parsing
     pipeline.parsed = None
 
-    await pipeline._parse_and_update_vacancy(vacancy.id, "текст", "jobs", allow_delete=True)
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=True)
 
     assert await all_rows(session_factory, Vacancy) == []
     mark = await only_row(session_factory, TrashEvent)
@@ -55,7 +56,7 @@ async def test_an_empty_post_is_only_marked_on_a_rerun(parsing, session_factory)
     pipeline, vacancy = parsing
     pipeline.parsed = None
 
-    await pipeline._parse_and_update_vacancy(vacancy.id, "текст", "jobs", allow_delete=False)
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.status is VacancyStatus.NOT_FIT
@@ -71,7 +72,7 @@ async def test_an_empty_post_never_reaches_the_validator(parsing):
     pipeline, vacancy = parsing
     pipeline.parsed = None
 
-    await pipeline._parse_and_update_vacancy(vacancy.id, "текст", "jobs", allow_delete=False)
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
 
     assert pipeline.validated is False
 
@@ -81,7 +82,7 @@ async def test_a_blacklisted_post_is_marked_unfit(parsing, session_factory):
     pipeline, vacancy = parsing
     pipeline._blacklist_patterns = ["казино"]
 
-    await pipeline._parse_and_update_vacancy(
+    await parse.parse_and_update_vacancy(pipeline, 
         vacancy.id, "Ищем в казино", "jobs", allow_delete=False
     )
 
@@ -100,7 +101,7 @@ async def test_the_blacklist_reads_the_whole_post(parsing, session_factory):
     pipeline._blacklist_patterns = ["казино"]
     long_tail = "а" * 7000 + " казино"
 
-    await pipeline._parse_and_update_vacancy(
+    await parse.parse_and_update_vacancy(pipeline, 
         vacancy.id, long_tail, "jobs", allow_delete=False
     )
 
@@ -112,7 +113,7 @@ async def test_a_blacklisted_post_never_reaches_the_validator(parsing):
     pipeline, vacancy = parsing
     pipeline._blacklist_patterns = ["казино"]
 
-    await pipeline._parse_and_update_vacancy(
+    await parse.parse_and_update_vacancy(pipeline, 
         vacancy.id, "Ищем в казино", "jobs", allow_delete=False
     )
 
@@ -128,7 +129,7 @@ async def test_a_rejected_vacancy_carries_the_reason(parsing, session_factory):
     pipeline, vacancy = parsing
     pipeline.verdict = FitValidation(verdict="reject", reason="нужен C++")
 
-    await pipeline._parse_and_update_vacancy(vacancy.id, "текст", "jobs")
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs")
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.status is VacancyStatus.NOT_FIT
@@ -144,7 +145,7 @@ async def test_a_validator_without_an_answer_means_unfit(parsing, session_factor
     pipeline, vacancy = parsing
     pipeline.verdict = None
 
-    await pipeline._parse_and_update_vacancy(vacancy.id, "текст", "jobs")
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs")
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.status is VacancyStatus.NOT_FIT
@@ -158,7 +159,7 @@ async def test_trash_from_the_validator_is_thrown_out_on_ingest(
     pipeline, vacancy = parsing
     pipeline.verdict = FitValidation(verdict="trash", reason="это реклама курсов")
 
-    await pipeline._parse_and_update_vacancy(vacancy.id, "текст", "jobs", allow_delete=True)
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=True)
 
     assert await all_rows(session_factory, Vacancy) == []
     assert (await only_row(session_factory, TrashEvent)).reason == (
@@ -173,7 +174,7 @@ async def test_trash_from_the_validator_is_only_marked_on_a_rerun(
     pipeline, vacancy = parsing
     pipeline.verdict = FitValidation(verdict="trash", reason="это реклама курсов")
 
-    await pipeline._parse_and_update_vacancy(
+    await parse.parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -191,7 +192,7 @@ async def test_a_low_score_is_not_sent_to_the_validator(parsing, session_factory
     pipeline, vacancy = parsing
     await pipeline._rs.set_app("scoring_threshold", "100")
 
-    await pipeline._parse_and_update_vacancy(vacancy.id, "текст", "jobs", allow_delete=False)
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
 
     assert pipeline.validated is False
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NOT_FIT

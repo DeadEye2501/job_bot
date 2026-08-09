@@ -9,7 +9,7 @@
 import httpx
 import pytest
 
-from backend.llm import factcheck_cover_letter
+from backend.llm.factcheck import factcheck_cover_letter
 from tests.fakes.llm import CHAT, chat_json, chat_response, provider
 
 

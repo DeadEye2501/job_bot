@@ -8,7 +8,7 @@
 import pytest
 
 from backend.models import Blacklist
-from backend.repository import BlacklistUpdateError, update_blacklist
+from backend.repository.blacklist import BlacklistUpdateError, update_blacklist
 from tests.dbio import put
 from tests.factories import blacklist_row
 

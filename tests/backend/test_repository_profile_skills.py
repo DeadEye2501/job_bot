@@ -9,7 +9,7 @@
 from sqlalchemy import select
 
 from backend.models import ProfileSkill, profile_experience_skills
-from backend.repository import list_skills, save_skills
+from backend.repository.profile import list_skills, save_skills
 from tests.dbio import put
 from tests.factories import experience_row, profile_row, profile_skill_row
 

@@ -11,6 +11,7 @@
 письмо тому же человеку.
 """
 
+from backend.flows import apply
 import pytest
 
 from backend.models import HR, Vacancy, VacancyStatus
@@ -19,7 +20,7 @@ from tests.factories import hr_row, vacancy_row
 
 
 @pytest.fixture
-async def carded(make_pipeline, session_factory):
+async def carded(monkeypatch, make_pipeline, session_factory):
     """Конвейер и вакансия с привязанным HR — то, что видно в карточке."""
     await put(session_factory, hr_row())
     hr = await only_row(session_factory, HR)
@@ -38,11 +39,11 @@ async def carded(make_pipeline, session_factory):
     pipeline = await make_pipeline()
     pipeline.asked = []
 
-    async def send_application(hr_row_, parsed, vacancy_id, *, force=False):
+    async def send_application(pipeline, hr_row_, parsed, vacancy_id, *, force=False):
         pipeline.asked.append((hr_row_.id, parsed, vacancy_id, force))
         return True, "sent"
 
-    pipeline._send_application = send_application
+    monkeypatch.setattr(apply, "send_application", send_application)
     return pipeline, hr, vacancy
 
 
@@ -129,7 +130,7 @@ async def test_a_second_press_is_refused(carded, session_factory):
     assert pipeline.asked == []
 
 
-async def test_a_refusal_from_the_sender_is_passed_through(carded):
+async def test_a_refusal_from_the_sender_is_passed_through(monkeypatch, carded):
     """Отказ, пришедший изнутри отправки, передаётся окну как есть.
 
     Причин там с полдесятка, и переводить их обратно в общее «не
@@ -137,10 +138,10 @@ async def test_a_refusal_from_the_sender_is_passed_through(carded):
     """
     pipeline, _, vacancy = carded
 
-    async def send_application(hr_row_, parsed, vacancy_id, *, force=False):
+    async def send_application(pipeline, hr_row_, parsed, vacancy_id, *, force=False):
         return False, "cv_missing"
 
-    pipeline._send_application = send_application
+    monkeypatch.setattr(apply, "send_application", send_application)
 
     assert await pipeline.send_application_for_vacancy(vacancy.id) == (
         False,

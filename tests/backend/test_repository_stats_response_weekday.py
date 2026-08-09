@@ -8,7 +8,7 @@
 from datetime import datetime, timedelta, timezone
 
 from backend.models import VacancyStatus
-from backend.repository import get_stats_hr_responses
+from backend.repository.stats_summary import get_stats_hr_responses
 from tests.dbio import put
 from tests.factories import hr_row, message_row, status_history_row, vacancy_row
 

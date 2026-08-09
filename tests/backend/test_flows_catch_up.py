@@ -12,7 +12,7 @@
 
 import asyncio
 
-from backend.flows import _DM_CATCHUP_BATCH_SIZE, catch_up_missed_dms
+from backend.flows.dm import _DM_CATCHUP_BATCH_SIZE, catch_up_missed_dms
 from backend.models import HR
 from tests.dbio import all_rows, put
 from tests.factories import hr_row
@@ -46,7 +46,7 @@ async def test_every_known_hr_is_caught_up(session_factory, monkeypatch):
     async def backfill(client, hr, *args, **kwargs):
         visited.append(hr.id)
 
-    monkeypatch.setattr("backend.flows.backfill_hr_dm_history", backfill)
+    monkeypatch.setattr("backend.flows.dm.backfill_hr_dm_history", backfill)
 
     await _catch_up(session_factory)
 
@@ -60,7 +60,7 @@ async def test_an_empty_address_book_is_no_work(session_factory, monkeypatch):
     async def backfill(client, hr, *args, **kwargs):
         visited.append(hr.id)
 
-    monkeypatch.setattr("backend.flows.backfill_hr_dm_history", backfill)
+    monkeypatch.setattr("backend.flows.dm.backfill_hr_dm_history", backfill)
 
     await _catch_up(session_factory)
 
@@ -84,7 +84,7 @@ async def test_a_batch_runs_its_chats_side_by_side(session_factory, monkeypatch)
         await asyncio.sleep(0)
         started -= 1
 
-    monkeypatch.setattr("backend.flows.backfill_hr_dm_history", backfill)
+    monkeypatch.setattr("backend.flows.dm.backfill_hr_dm_history", backfill)
 
     await _catch_up(session_factory)
 
@@ -102,7 +102,7 @@ async def test_batches_are_spaced_out(session_factory, monkeypatch):
     async def backfill(client, hr, *args, **kwargs):
         pass
 
-    monkeypatch.setattr("backend.flows.backfill_hr_dm_history", backfill)
+    monkeypatch.setattr("backend.flows.dm.backfill_hr_dm_history", backfill)
     slept: list[float] = []
     real_sleep = asyncio.sleep
 
@@ -126,7 +126,7 @@ async def test_the_last_batch_is_not_followed_by_a_pause(
     async def backfill(client, hr, *args, **kwargs):
         pass
 
-    monkeypatch.setattr("backend.flows.backfill_hr_dm_history", backfill)
+    monkeypatch.setattr("backend.flows.dm.backfill_hr_dm_history", backfill)
     slept: list[float] = []
     real_sleep = asyncio.sleep
 
@@ -158,7 +158,7 @@ async def test_one_broken_chat_does_not_stop_the_others(
             raise OSError("сеть")
         done.append(hr.id)
 
-    monkeypatch.setattr("backend.flows.backfill_hr_dm_history", backfill)
+    monkeypatch.setattr("backend.flows.dm.backfill_hr_dm_history", backfill)
 
     await _catch_up(session_factory)
 
@@ -177,7 +177,7 @@ async def test_the_window_hooks_reach_every_chat(session_factory, monkeypatch):
     async def backfill(client, hr, *args, **kwargs):
         got.append(kwargs)
 
-    monkeypatch.setattr("backend.flows.backfill_hr_dm_history", backfill)
+    monkeypatch.setattr("backend.flows.dm.backfill_hr_dm_history", backfill)
     heard: list[str] = []
 
     await _catch_up(

@@ -5,7 +5,7 @@
 переспросить Telegram будет нечем.
 """
 
-from backend.repository import save_incoming_message
+from backend.repository.messages import save_incoming_message
 from tests.dbio import put
 from tests.factories import at, hr_row, vacancy_row
 
