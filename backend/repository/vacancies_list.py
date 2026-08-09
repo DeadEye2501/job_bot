@@ -1,6 +1,5 @@
 """Отбор вакансий для списка на экране."""
 
-import re
 from datetime import datetime
 
 from sqlalchemy import String, case, cast, func, or_, select
@@ -76,36 +75,6 @@ _STATUS_PRIORITY_NEW_FIRST = {
 }
 
 
-_SALARY_TOKEN_RE = re.compile(r"\d+(?:[.,]\d+)?\s*[kк]?", re.IGNORECASE)
-
-
-def _parse_usd_range(salary: str | None) -> tuple[float, float] | None:
-    """Port of the original JS parseUsdRange used by the salary filter.
-
-    Returns ``(min, max)`` in absolute USD when the string mentions ``$``
-    or ``usd``; otherwise ``None`` (those vacancies are intentionally
-    excluded from a salary-range filter — same behaviour as the JS).
-    Numbers with ``K`` / ``к`` suffix are multiplied by 1000.
-    """
-    if not salary:
-        return None
-    s = salary.lower()
-    if s == "—" or ("$" not in s and "usd" not in s):
-        return None
-    values: list[float] = []
-    for tok in _SALARY_TOKEN_RE.findall(s):
-        has_k = "k" in tok.lower() or "к" in tok.lower()
-        cleaned = re.sub(r"[^\d.,]", "", tok).replace(",", ".")
-        try:
-            num = float(cleaned)
-        except ValueError:
-            continue
-        values.append(num * 1000 if has_k else num)
-    if not values:
-        return None
-    return min(values), max(values)
-
-
 def _greatest_pair(a, b):
     # NULL-safe row-wise greatest: SQLite has no GREATEST(), and
     # NULL > anything is NULL, so we have to spell it out.
@@ -159,6 +128,10 @@ async def list_vacancies(
       linked ``company.name`` and the raw ``vacancy.company_name`` so unbinded
       vacancies still show up.
     - ``score_min`` / ``score_max`` — integer range; NULL scores never match.
+    - ``salary_min`` / ``salary_max`` — window that has to overlap the
+      vacancy's own ``salary_min``/``salary_max`` pair; both ends are
+      inclusive. Rows whose salary held no number never match, whatever the
+      window. Currency is not consulted: the numbers are compared as written.
     - ``grade`` / ``remote`` — substring match on the respective columns.
     - ``hr_contact`` — ``"with"`` / ``"without"`` filters by ``hr_id``
       presence; anything else (incl. ``None`` / ``"all"``) is a no-op.
@@ -276,6 +249,14 @@ async def list_vacancies(
     if score_max is not None:
         where_clauses.append(Vacancy.score <= score_max)
 
+    # Окно и вилка вакансии сравниваются на пересечение, поэтому границы
+    # сходятся крест-накрест. У вакансии без чисел обе колонки пусты, и
+    # сравнение с пустотой отсеивает её само.
+    if salary_min is not None:
+        where_clauses.append(Vacancy.salary_max >= salary_min)
+    if salary_max is not None:
+        where_clauses.append(Vacancy.salary_min <= salary_max)
+
     if grade:
         where_clauses.append(func.lower(Vacancy.grade).like(f"%{grade.lower()}%"))
 
@@ -306,8 +287,6 @@ async def list_vacancies(
             TelegramChannel, TelegramChannel.id == Vacancy.source_channel_id
         )
 
-    has_salary_filter = (salary_min is not None or salary_max is not None)
-
     final_stmt = (
         stmt
         .where(*where_clauses)
@@ -318,32 +297,11 @@ async def list_vacancies(
         )
         .order_by(*order_by)
     )
-    # SQL-level pagination is skipped when the salary filter is active —
-    # salary is a Python post-fetch filter (USD-string regex parse) and a
-    # mid-cut LIMIT would silently chop rows that haven't been salary-tested
-    # yet, leaving subsequent offsets pointing past phantom rows. The bridge
-    # signals this to the UI by reporting has_more=False so the user sees
-    # the complete (filtered) list as a single page.
-    if limit is not None and not has_salary_filter:
+    if limit is not None:
         final_stmt = final_stmt.limit(limit).offset(offset)
 
     rows = await session.scalars(final_stmt)
-    results = list(rows.all())
-
-    if has_salary_filter:
-        def _matches(v: Vacancy) -> bool:
-            r = _parse_usd_range(v.salary)
-            if r is None:
-                return False
-            lo, hi = r
-            if salary_min is not None and hi < salary_min:
-                return False
-            if salary_max is not None and lo > salary_max:
-                return False
-            return True
-        results = [v for v in results if _matches(v)]
-
-    return results
+    return list(rows.all())
 
 
 async def list_vacancy_filter_options(

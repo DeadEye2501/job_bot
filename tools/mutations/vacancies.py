@@ -59,29 +59,35 @@ MUTATIONS = [
         "order_by = (activity_ts.asc().nulls_last(), Vacancy.id.asc())",
         "order_by = (activity_ts.asc().nulls_last(), Vacancy.id.desc())",
     ),
-    # list_vacancies: предел страницы применяется и при отборе по зарплате
+    # list_vacancies: смещение страницы теряется
     (
         "backend/repository/vacancies_list.py",
-        "if limit is not None and not has_salary_filter:",
-        "if limit is not None:",
+        "final_stmt = final_stmt.limit(limit).offset(offset)",
+        "final_stmt = final_stmt.limit(limit)",
     ),
-    # list_vacancies: верхняя граница зарплаты сравнивается не с тем концом
+    # list_vacancies: нижняя граница окна зарплаты становится строгой
     (
         "backend/repository/vacancies_list.py",
-        "if salary_min is not None and hi < salary_min:",
-        "if salary_min is not None and lo < salary_min:",
+        "where_clauses.append(Vacancy.salary_max >= salary_min)",
+        "where_clauses.append(Vacancy.salary_max > salary_min)",
     ),
-    # _parse_usd_range: суффикс тысяч перестаёт умножать
+    # list_vacancies: верхняя граница окна зарплаты становится строгой
     (
         "backend/repository/vacancies_list.py",
-        "values.append(num * 1000 if has_k else num)",
-        "values.append(num)",
+        "where_clauses.append(Vacancy.salary_min <= salary_max)",
+        "where_clauses.append(Vacancy.salary_min < salary_max)",
     ),
-    # _parse_usd_range: границы диапазона меняются местами
+    # list_vacancies: нижняя граница окна зарплаты сравнивается не с тем концом вилки
     (
         "backend/repository/vacancies_list.py",
-        "return min(values), max(values)",
-        "return max(values), min(values)",
+        "where_clauses.append(Vacancy.salary_max >= salary_min)",
+        "where_clauses.append(Vacancy.salary_min >= salary_min)",
+    ),
+    # list_vacancies: верхняя граница окна зарплаты сравнивается не с тем концом вилки
+    (
+        "backend/repository/vacancies_list.py",
+        "where_clauses.append(Vacancy.salary_min <= salary_max)",
+        "where_clauses.append(Vacancy.salary_max <= salary_max)",
     ),
     # list_vacancy_filter_options: прочерк перестаёт отсеиваться
     (
