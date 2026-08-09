@@ -39,3 +39,12 @@ def get_database_url() -> str:
     """Async SQLAlchemy URL for the local SQLite database."""
     db_file = get_data_dir() / "jobbot.db"
     return f"sqlite+aiosqlite:///{db_file.as_posix()}"
+
+
+def get_log_path() -> Path:
+    """Файл журнала — рядом с базой, а не рядом с приложением.
+
+    Каталог приложения бывает недоступен на запись, а этот заведомо наш: в
+    нём уже лежат база и вложения.
+    """
+    return get_data_dir() / "jobbot.log"

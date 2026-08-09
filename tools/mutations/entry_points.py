@@ -129,8 +129,52 @@ MUTATIONS = [
     # main: перенастройка вывода перестаёт вызываться вовсе
     (
         "main.py",
-        "_use_utf8_stdout()" + CRLF + CRLF + CRLF + "logging.basicConfig(",
-        "logging.basicConfig(",
+        "_use_utf8_stdout()" + CRLF + CRLF + CRLF + "LOG_BYTES",
+        "LOG_BYTES",
+    ),
+    # main: журнал снова настраивается на поток, а не на собранные обработчики
+    (
+        "main.py",
+        "    handlers=_log_handlers(),",
+        "    stream=sys.stdout,",
+    ),
+    # _log_handlers: обработчик заводится и на отсутствующий поток
+    (
+        "main.py",
+        "    if sys.stdout is not None:" + CRLF,
+        "    if True:" + CRLF,
+    ),
+    # _log_handlers: кодировка файла journal'а отдаётся на откуп системе
+    (
+        "main.py",
+        "            encoding=\"utf-8\"," + CRLF,
+        "",
+    ),
+    # _log_handlers: журнал перестаёт переходить на новый файл по размеру
+    (
+        "main.py",
+        "            maxBytes=LOG_BYTES,",
+        "            maxBytes=0,",
+    ),
+    # get_log_path: журнал уезжает из каталога данных в рабочий каталог
+    (
+        "config.py",
+        '    return get_data_dir() / "jobbot.log"',
+        '    return Path("jobbot.log")',
+    ),
+    # env: настройка журнала из alembic.ini снова затирает обработчики приложения
+    (
+        "alembic/env.py",
+        "if config.config_file_name is not None and not logging.getLogger().handlers:",
+        "if config.config_file_name is not None:",
+    ),
+    # install_secret_filter: вымарывание секретов снова вешается на logger
+    (
+        "backend/log_buffer.py",
+        "    for handler in logging.getLogger().handlers:" + LF
+        + "        if not any(isinstance(f, SecretRedactionFilter) for f in handler.filters):" + LF
+        + "            handler.addFilter(SecretRedactionFilter())" + LF,
+        "    logging.getLogger().addFilter(SecretRedactionFilter())" + LF,
     ),
     # _use_utf8_stdout: отказ консоли снова проглатывается молча
     (

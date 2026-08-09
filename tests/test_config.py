@@ -6,7 +6,7 @@
 платформе упадут: пропуска для них нет — проект собирается только под Windows.
 """
 
-from config import APP_NAME, get_data_dir, get_database_url
+from config import APP_NAME, get_data_dir, get_database_url, get_log_path
 from tests.conftest import TMP_ROOT
 
 
@@ -49,3 +49,18 @@ def test_the_database_url_follows_the_data_dir(monkeypatch, tmp_path):
     url = get_database_url()
 
     assert tmp_path.as_posix() in url
+
+
+def test_the_log_path_points_at_a_file_in_the_data_dir():
+    """Файл журнала лежит в каталоге данных, рядом с базой."""
+    path = get_log_path()
+
+    assert path.name == "jobbot.log"
+    assert path.parent == get_data_dir()
+
+
+def test_the_log_path_follows_the_data_dir(monkeypatch, tmp_path):
+    """Файл журнала переезжает вслед за каталогом."""
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+
+    assert get_log_path().parent == tmp_path / APP_NAME
