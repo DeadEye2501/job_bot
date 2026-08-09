@@ -12,9 +12,6 @@
 
 from pathlib import Path
 
-import pytest
-from sqlalchemy.exc import PendingRollbackError
-
 from backend.models import BotMode, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import message_row
@@ -184,21 +181,15 @@ async def test_an_attachment_typed_elsewhere_is_downloaded(
     assert len(downloaded) == 1
 
 
-async def test_a_duplicate_that_slipped_in_meanwhile_blows_up(
+async def test_a_duplicate_that_slipped_in_meanwhile_is_passed_over(
     chatting, session_factory
 ):
-    """Строка, вставленная за время скачивания, роняет обработчик.
+    """Строка, вставленная за время скачивания, обработчик не роняет.
 
     Ветка «уже сохранено» задумана тихой: повтор ловится уникальностью и
-    обработчик выходит. Но запись в журнал внутри неё читает поле HR, а
-    сессия после сорвавшейся вставки требует отката — обращение к полю
-    поднимает `PendingRollbackError`, и он уходит наружу вместо тихого
-    выхода. Окно о сообщении так и не узнаёт.
-
-    Случай тот самый, ради которого ветка и написана: отправка из окна
-    успевает записать своё, пока грузится вложение эха.
-
-    Тест закрепляет сегодняшнее поведение: при починке он покраснеет.
+    обработчик выходит, оставив в переписке ту строку, что успела лечь
+    первой. Случай тот самый, ради которого ветка и написана: отправка из
+    окна успевает записать своё, пока грузится вложение эха.
     """
     client = FakeTelegramClient()
     bot, _, hr = await chatting(client=client, telegram_user_id=777)
@@ -216,11 +207,33 @@ async def test_a_duplicate_that_slipped_in_meanwhile_blows_up(
 
     client.download_media = download_media
 
-    with pytest.raises(PendingRollbackError):
-        await bot._on_dm_outgoing(client, _echo(photo=object()))
+    await bot._on_dm_outgoing(client, _echo(photo=object()))
 
-    saved = await only_row(session_factory, Message)
-    assert saved.text == "успела отправка"
+    saved = await all_rows(session_factory, Message)
+    assert [row.text for row in saved] == ["успела отправка"]
+
+
+async def test_a_write_that_fell_through_stays_quiet(
+    chatting, session_factory, monkeypatch
+):
+    """Сорвавшаяся запись эха обработчик не роняет.
+
+    Это колбэк насоса обновлений: улетевшее отсюда исключение поймать
+    некому, и падает чтение обновлений целиком — из-за одной зеркальной
+    строки, без которой переписка проживёт.
+
+    Срыв устроен негодным значением поля, а не подменённым коммитом:
+    только тогда сессия по-настоящему попадает в состояние «нужен откат»,
+    в котором обращение к полю HR и поднимало исключение из записи в
+    журнал. С подменённым коммитом ветка выглядела бы исправной, не будучи ею.
+    """
+    bot, client, hr = await chatting(telegram_user_id=777)
+    bot._ingestion = FakeIngestion()
+    monkeypatch.setattr("backend.bot.updates.extract_dm_text", lambda msg: object())
+
+    await bot._on_dm_outgoing(client, _echo())
+
+    assert await all_rows(session_factory, Message) == []
 
 
 async def test_the_window_hears_about_a_message_typed_elsewhere(

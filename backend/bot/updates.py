@@ -282,10 +282,14 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
         hr = await find_known_hr(session, recipient_id, recipient_username)
         if hr is None:
             return
+        # Номер берётся до попытки записи: сорвавшийся flush протухает
+        # объекты и при `expire_on_commit=False`, и обращение к полю подняло
+        # бы `PendingRollbackError` из самой записи в журнал.
+        hr_id = hr.id
         try:
             session.add(Message(
                 is_incoming=False,
-                hr_id=hr.id,
+                hr_id=hr_id,
                 text=extract_dm_text(msg),
                 tg_message_id=msg.id,
                 sent_at=msg.date,
@@ -297,16 +301,15 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
         except IntegrityError:
             logger.debug(
                 "Outgoing DM dedup: hr=%d tg_msg=%d already saved",
-                hr.id, msg.id,
+                hr_id, msg.id,
             )
             return  # already saved (e.g. via send_to_hr_chat)
         except Exception:
             logger.exception(
                 "outgoing DM persistence failed",
-                extra={"hr_id": hr.id, "tg_message_id": msg.id},
+                extra={"hr_id": hr_id, "tg_message_id": msg.id},
             )
             return
-        hr_id = hr.id
     if bot.on_new_message is not None:
         try:
             bot.on_new_message(hr_id)

@@ -149,6 +149,20 @@ MUTATIONS = [
         "        target = hr.telegram_username or hr.telegram_user_id" + CRLF
         + "        res = await session.execute(",
     ),
+    # _on_dm_outgoing: номер снова читается у HR после сорвавшейся вставки
+    (
+        "backend/bot/updates.py",
+        '                "Outgoing DM dedup: hr=%d tg_msg=%d already saved",' + CRLF
+        + "                hr_id, msg.id,",
+        '                "Outgoing DM dedup: hr=%d tg_msg=%d already saved",' + CRLF
+        + "                hr.id, msg.id,",
+    ),
+    # _on_dm_outgoing: номер снова читается у HR в общей ветке разбора
+    (
+        "backend/bot/updates.py",
+        '                extra={"hr_id": hr_id, "tg_message_id": msg.id},',
+        '                extra={"hr_id": hr.id, "tg_message_id": msg.id},',
+    ),
     # on_raw_update: чужой род оповещения перестаёт отсеиваться
     (
         "backend/bot/updates.py",
