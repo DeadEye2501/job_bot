@@ -4,7 +4,7 @@ import logging
 
 from backend.flows import dm_backfill
 from backend.domain.blacklist import check_blacklist
-from backend.domain.salary import normalize_salary_to_rub_thousands
+from backend.domain.salary import parse_salary
 from backend.domain.scoring import score_parsed
 from backend.domain.verdict import decide_vacancy_status
 from backend.domain.verdict import is_empty_vacancy
@@ -195,13 +195,7 @@ async def parse_and_update_vacancy(
                     v.score = score
             v.grade = parsed.grade
             v.salary = parsed.salary
-            v.salary_rub_min, v.salary_rub_max = (
-                normalize_salary_to_rub_thousands(
-                    parsed.salary,
-                    usd_rate=pipeline._rs.salary_usd_to_rub,
-                    eur_rate=pipeline._rs.salary_eur_to_rub,
-                )
-            )
+            v.salary_min, v.salary_max, v.salary_currency = parse_salary(parsed.salary)
             v.remote = parsed.remote
             v.location = parsed.location
             v.notes = (
@@ -386,12 +380,8 @@ async def save_empty_vacancy(
                 v.stack = parsed.stack
                 v.grade = parsed.grade
                 v.salary = parsed.salary
-                v.salary_rub_min, v.salary_rub_max = (
-                    normalize_salary_to_rub_thousands(
-                    parsed.salary,
-                    usd_rate=pipeline._rs.salary_usd_to_rub,
-                    eur_rate=pipeline._rs.salary_eur_to_rub,
-                )
+                v.salary_min, v.salary_max, v.salary_currency = parse_salary(
+                    parsed.salary
                 )
                 v.remote = parsed.remote
                 v.location = parsed.location
@@ -425,8 +415,9 @@ async def save_empty_vacancy(
                 v.stack = []
                 v.grade = None
                 v.salary = None
-                v.salary_rub_min = None
-                v.salary_rub_max = None
+                v.salary_min = None
+                v.salary_max = None
+                v.salary_currency = None
                 v.remote = None
                 v.location = None
                 v.notes = None

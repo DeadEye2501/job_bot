@@ -15,11 +15,13 @@
 отклик не ушёл.
 """
 
+from dataclasses import replace
+
 from backend.flows import parse
 from backend.flows import apply
 import pytest
 
-from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
+from backend.models import HR, Company, Currency, Vacancy, VacancyEvent, VacancyStatus
 from backend.payloads import FitValidation
 from tests.dbio import all_rows, only_row
 from tests.factories import parsed_vacancy
@@ -38,9 +40,29 @@ async def test_the_parsed_fields_land_in_the_row(parsing, session_factory):
     assert saved.description == "Ищем в команду"
     assert saved.grade == "middle"
     assert saved.salary == "200000"
+    assert saved.salary_min == 200000
+    assert saved.salary_max == 200000
     assert saved.remote == "remote"
     assert saved.location == "Ереван"
     assert saved.is_parsed is True
+
+
+async def test_the_currency_of_the_salary_lands_in_the_row(parsing, session_factory):
+    """Валюта из строки зарплаты доезжает до базы и читается обратно.
+
+    Колонка перечислением: чужое значение не пустит сама база, а вот
+    несовпадение имён перечисления с тем, что в схеме, видно только здесь.
+    """
+    pipeline, vacancy = parsing
+    pipeline.parsed = replace(pipeline.parsed, salary="от 3000 до 5000 $")
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=False
+    )
+
+    saved = await only_row(session_factory, Vacancy)
+    assert (saved.salary_min, saved.salary_max) == (3000, 5000)
+    assert saved.salary_currency is Currency.USD
 
 
 async def test_an_extra_way_to_apply_is_kept_in_the_notes(parsing, session_factory):

@@ -1,98 +1,92 @@
-"""Приведение свободной строки зарплаты к тысячам рублей."""
+"""Разбор свободной строки зарплаты: число, как записано, и валюта."""
 
-import logging
 import re
 
-logger = logging.getLogger(__name__)
+from backend.models import Currency
 
-_SALARY_USD_TO_RUB = 90
-_SALARY_EUR_TO_RUB = 100
+# Число вместе со своими разрядами, дробной частью и собственной пометкой
+# масштаба. Пометка ищется не по всей строке, а вплотную к числу и только
+# целым словом: иначе «k» в «KPI», «к» в «Краснодаре» и «m» в «month»
+# умножают зарплату на тысячу или на миллион.
+_AMOUNT_RE = re.compile(
+    r"(?P<num>\d+(?:[  ,.]\d{3})*(?:[.,]\d{1,2})?)(?!\d)(?!\s*%)"
+    r"(?:\s*(?P<scale>(?:k|к|тыс|m|млн|million)(?![a-zа-яё0-9])))?",
+    re.IGNORECASE,
+)
+_SCALES = {"k": 1000, "к": 1000, "тыс": 1000, "m": 10**6, "млн": 10**6, "million": 10**6}
+_FRACTION_RE = re.compile(r"[.,]\d{1,2}$")
+# «Зарплата обсуждается / по договорённости» — тексты, где случайные числа
+# («30 дней отпуска», «5 лет опыта») зарплатой не являются. Голое «договор»
+# сюда не годится: «трудовой договор» и «договор ГПХ» стоят рядом с прямо
+# названной суммой.
+_NEGOTIABLE_RE = re.compile(r"собесед|договорённ|договоренн|договорн|обсужд|negotia")
+# Название валюты берётся целым словом: «евро» внутри «Европы» и «eur»
+# внутри «europe» превращали рублёвую вакансию в валютную.
+_CURRENCIES: tuple[tuple[Currency, re.Pattern[str]], ...] = (
+    (Currency.USD, re.compile(r"\$|(?<![a-z])usd(?![a-z])|долл")),
+    (Currency.EUR, re.compile(r"€|(?<![a-z])eur(?![a-z])|евро(?![а-яё])")),
+    (Currency.RUB, re.compile(r"₽|(?<![a-z])rub(?![a-z])|руб")),
+)
 
-_SALARY_NUM_RE = re.compile(r"\d[\d\s ]*\d|\d")
-_SALARY_USD_RE = re.compile(r"\$|usd|долл")
-_SALARY_EUR_RE = re.compile(r"€|eur|евро")
-# K, К (cyrillic), к (cyrillic), m / млн etc — both Latin and Cyrillic forms
-# show up because parser output is mixed. Treat ' k ' / 'k.' / 'k$' all as
-# the thousands suffix.
-_SALARY_THOUSANDS_RE = re.compile(r"(?<![a-zа-я])(?:k|к|тыс)", re.IGNORECASE)
-_SALARY_MILLIONS_RE = re.compile(r"(?<![a-zа-я])(?:m|млн|million)", re.IGNORECASE)
-# «Зарплата обсуждается / по итогам собеса / по договорённости» — тексты,
-# где случайные числа («30 days vacation», «5 лет опыта») не являются
-# зарплатой. Ловим до того, как _SALARY_NUM_RE их выловит и насуёт в
-# salary_rub_min/max бессмысленные значения, ломающие range-фильтр.
-_SALARY_NEGOTIABLE_RE = re.compile(r"собесед|договор|обсужд|negotia")
 
-
-def normalize_salary_to_rub_thousands(
+def parse_salary(
     salary: str | None,
-    *,
-    usd_rate: int | None = None,
-    eur_rate: int | None = None,
-) -> tuple[int | None, int | None]:
-    """Parse a free-form salary string into (min, max) in thousands of RUB.
+) -> tuple[int | None, int | None, Currency | None]:
+    """Достать из строки диапазон и валюту, не пересчитывая их.
 
-    The parser is intentionally lossy — it only needs to be good enough to
-    drive the range filter in the vacancy list. Currency rates можно
-    передать (per RuntimeSettings.salary_usd_to_rub / _eur_to_rub); если
-    не переданы — используются дефолты модуля (90 / 100).
-
-    Returns ``(None, None)`` when no number can be extracted (NULL salary,
-    "—", "по итогам собеседования", etc.). When only one number is found,
-    both bounds are equal.
+    Число остаётся тем, что записано в объявлении, — раскрывается только
+    пометка тысяч и миллионов, без которой «300к» не сравнить с «300000».
+    Отдаёт ``(None, None, None)``, когда числа в строке нет вовсе или она
+    вообще не о деньгах. Одно число даёт равные границы. Валюта, не названная
+    в строке, остаётся неизвестной: догадка «раз без знака, то рубли»
+    отправила бы долларовую вакансию в рублёвую выдачу.
     """
     if not salary:
-        return (None, None)
+        return (None, None, None)
     s = salary.strip().lower()
-    if not s:
-        return (None, None)
-    if _SALARY_NEGOTIABLE_RE.search(s):
-        # «По итогам собеседования + 30 дней отпуска» извлёк бы 30 в
-        # min/max — мусорное значение. Лучше None — UI покажет «—»
-        # вместо ложного «30 тыс ₽».
-        return (None, None)
+    if _NEGOTIABLE_RE.search(s):
+        return (None, None, None)
 
-    usd_rate = usd_rate if usd_rate and usd_rate > 0 else _SALARY_USD_TO_RUB
-    eur_rate = eur_rate if eur_rate and eur_rate > 0 else _SALARY_EUR_TO_RUB
-    if _SALARY_USD_RE.search(s):
-        currency_mult = usd_rate
-    elif _SALARY_EUR_RE.search(s):
-        currency_mult = eur_rate
+    numbers = _numbers(s)
+    if not numbers:
+        return (None, None, None)
+    return (numbers[0], numbers[-1], _currency(s))
+
+
+def _numbers(s: str) -> list[int]:
+    """Числа строки, раскрытые по своей пометке и разложенные по возрастанию.
+
+    Ноль отбрасывается: нулевой зарплаты не бывает, а нижней границей он
+    отсёк бы вакансию от любого осмысленного отбора.
+    """
+    found: list[int] = []
+    for hit in _AMOUNT_RE.finditer(s):
+        value = _amount(hit.group("num"), hit.group("scale"))
+        if value > 0:
+            found.append(value)
+    return sorted(found)
+
+
+def _amount(num: str, scale: str | None) -> int:
+    """Одно число: разряды склеены, дробная часть учтена, пометка раскрыта.
+
+    Разделитель разрядов и десятичный знак пишут одними и теми же символами,
+    и различает их длина хвоста: «3,000» — три тысячи, «3,5» — три с
+    половиной.
+    """
+    body = num.replace(" ", " ")
+    if _FRACTION_RE.search(body):
+        value = float(body.replace(" ", "").replace(",", "."))
     else:
-        currency_mult = 1
+        value = int(re.sub(r"\D", "", body))
+    return int(value * _SCALES.get((scale or "").lower(), 1))
 
-    has_thousands = _SALARY_THOUSANDS_RE.search(s) is not None
-    has_millions = _SALARY_MILLIONS_RE.search(s) is not None
 
-    raw_nums: list[int] = []
-    for m in _SALARY_NUM_RE.findall(s):
-        digits = re.sub(r"\D", "", m)
-        if digits:
-            raw_nums.append(int(digits))
-    if not raw_nums:
-        return (None, None)
+def _currency(s: str) -> Currency | None:
+    """Валюта строки — только если она в ней одна.
 
-    if has_millions:
-        # "5 млн" / "5M" → 5000 thousand
-        normalized = [n * 1000 for n in raw_nums]
-    elif has_thousands:
-        # "300K" / "300 тыс" → 300 thousand
-        normalized = list(raw_nums)
-    else:
-        # No marker. Bare numbers > 10_000 are almost certainly whole RUB
-        # (e.g. "150 000 — 300 000") and get divided. Smaller bare numbers
-        # are ambiguous: "1500-3000" could be either kilorubles or whole
-        # rubles, but whole rubles is implausibly low — assume kilorubles
-        # and leave them. We log unconverted ranges so we can audit real
-        # LLM output and tune later.
-        normalized = [n // 1000 if n > 10_000 else n for n in raw_nums]
-        if any(0 < n <= 10_000 for n in raw_nums):
-            logger.debug(
-                "normalize_salary: no K/M marker, treating as kilorubles: %r -> %r",
-                salary, normalized,
-            )
-
-    in_rub_thousands = [int(n * currency_mult) for n in normalized if n > 0]
-    if not in_rub_thousands:
-        return (None, None)
-    in_rub_thousands.sort()
-    return (in_rub_thousands[0], in_rub_thousands[-1])
+    Названы две — диапазон не имеет смысла ни в одной из них, и выбор первой
+    попавшейся спрятал бы вакансию от отбора по второй.
+    """
+    named = [currency for currency, pattern in _CURRENCIES if pattern.search(s)]
+    return named[0] if len(named) == 1 else None
