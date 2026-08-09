@@ -1,3 +1,10 @@
+"""Сборка конвейера: его состояние, общие ресурсы и поверхность для зовущих.
+
+Работы здесь нет — она разошлась по соседям пакета, а класс держит их вместе:
+владеет соединениями, кэшами анкеты и чёрного списка, оповещениями окна и даёт
+одно имя, к которому обращаются бот и мост.
+"""
+
 import asyncio
 import logging
 from pathlib import Path
@@ -9,18 +16,14 @@ from backend.flows import dm_classify
 from backend.flows import channels
 from backend.flows import rerun
 from backend.flows import cleanup
+from backend.llm import candidate
 from backend.llm.candidate import CandidateProfile
-from backend.models import (
-    ProfileSkill,
-)
+from backend.models import ProfileSkill
 from backend.repository.blacklist import load_active_blacklist_patterns
 from backend.repository.profile import build_profile_block, get_profile, list_profile_languages, load_profile_skills
 
 
 logger = logging.getLogger(__name__)
-
-
-
 
 
 
@@ -176,7 +179,7 @@ class IngestionPipeline:
             )
             profile = await get_profile(session)
             languages = await list_profile_languages(session)
-            self._profile_cache = apply._build_candidate_profile(profile, languages)
+            self._profile_cache = candidate._build_candidate_profile(profile, languages)
             self._profile_block = await build_profile_block(session)
         logger.info(
             "loaded resources: %d skills, %d blacklist patterns, "
@@ -197,35 +200,35 @@ class IngestionPipeline:
         return Path(raw)
 
 
-    async def check_ghosting_timeouts(self):
+    async def check_ghosting_timeouts(self) -> int:
         return await cleanup.check_ghosting_timeouts(self)
 
-    async def rerun_pipeline_for_vacancy(self, vacancy_id):
+    async def rerun_pipeline_for_vacancy(self, vacancy_id) -> bool:
         return await rerun.rerun_pipeline_for_vacancy(self, vacancy_id)
 
-    async def recover_orphan_vacancies(self):
+    async def recover_orphan_vacancies(self) -> int:
         return await rerun.recover_orphan_vacancies(self)
 
-    async def poll_active_channels(self):
+    async def poll_active_channels(self) -> None:
         return await channels.poll_active_channels(self)
 
-    async def poll_one_channel(self, channel_id):
+    async def poll_one_channel(self, channel_id) -> bool:
         return await channels.poll_one_channel(self, channel_id)
 
-    async def refresh_channel_metadata_for_ids(self, channel_ids):
+    async def refresh_channel_metadata_for_ids(self, channel_ids) -> None:
         return await channels.refresh_channel_metadata_for_ids(self, channel_ids)
 
-    def update_dm_buffer_text(self, hr_id, msg_id, new_text):
+    def update_dm_buffer_text(self, hr_id, msg_id, new_text) -> None:
         return dm_classify.update_dm_buffer_text(self, hr_id, msg_id, new_text)
 
-    def remove_dm_buffer_msg(self, hr_id, msg_id):
+    def remove_dm_buffer_msg(self, hr_id, msg_id) -> None:
         return dm_classify.remove_dm_buffer_msg(self, hr_id, msg_id)
 
-    def schedule_dm_classification(self, hr_id, vacancy_id, msg_id, text):
+    def schedule_dm_classification(self, hr_id, vacancy_id, msg_id, text) -> None:
         return dm_classify.schedule_dm_classification(self, hr_id, vacancy_id, msg_id, text)
 
-    async def cancel_pending_dm_classifications(self, *, drain=False):
+    async def cancel_pending_dm_classifications(self, *, drain=False) -> None:
         return await dm_classify.cancel_pending_dm_classifications(self, drain=drain)
 
-    async def send_application_for_vacancy(self, vacancy_id):
+    async def send_application_for_vacancy(self, vacancy_id) -> tuple[bool, str]:
         return await apply.send_application_for_vacancy(self, vacancy_id)
