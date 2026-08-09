@@ -135,8 +135,8 @@ MUTATIONS = [
     # list_telegram_channels: поиск перестаёт смотреть в ник
     (
         "backend/repository/channels.py",
-        '                or q in (ch.username or "").casefold()' + CRLF,
-        "",
+        "        (ch, cnt) for ch, cnt in rows if matches_search(search, ch.title, ch.username)",
+        "        (ch, cnt) for ch, cnt in rows if matches_search(search, ch.title)",
     ),
     # _percent_or_none: пустое основание даёт ноль вместо отсутствия
     (

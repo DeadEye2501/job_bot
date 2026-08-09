@@ -175,17 +175,32 @@ MUTATIONS = [
     # list_companies_with_counts: поиск перестаёт смотреть в написания
     (
         "backend/repository/companies_list.py",
-        "                for alias in (co.aliases or []):" + CRLF
-        + "                    if isinstance(alias, str) and q in alias.casefold():" + CRLF
-        + "                        return True" + CRLF,
-        "",
+        "        if matches_search(search, c.name, c.website, *_spellings(c))",
+        "        if matches_search(search, c.name, c.website)",
     ),
     # list_companies_with_counts: поиск перестаёт смотреть в сайт
     (
         "backend/repository/companies_list.py",
-        "                if co.website and q in co.website.casefold():" + CRLF
-        + "                    return True" + CRLF,
-        "",
+        "        if matches_search(search, c.name, c.website, *_spellings(c))",
+        "        if matches_search(search, c.name, *_spellings(c))",
+    ),
+    # _spellings: не-список на месте написаний снова разворачивается
+    (
+        "backend/repository/companies_list.py",
+        "    return company.aliases if isinstance(company.aliases, list) else []",
+        "    return company.aliases or []",
+    ),
+    # matches_search: не-строка среди значений перестаёт пропускаться
+    (
+        "backend/repository/search.py",
+        "    return any(isinstance(v, str) and needle in v.casefold() for v in values)",
+        "    return any(needle in v.casefold() for v in values)",
+    ),
+    # matches_search: регистр перестаёт складываться у значения
+    (
+        "backend/repository/search.py",
+        "    return any(isinstance(v, str) and needle in v.casefold() for v in values)",
+        "    return any(isinstance(v, str) and needle in v for v in values)",
     ),
     # list_companies_with_counts: страница режется до отбора
     (

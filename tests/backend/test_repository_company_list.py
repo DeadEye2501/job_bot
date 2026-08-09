@@ -69,8 +69,8 @@ async def test_search_looks_at_the_name_the_aliases_and_the_website(
 async def test_search_finds_capital_cyrillic(session, session_factory):
     """Поиск находит заглавную кириллицу в любом написании образца.
 
-    Отбор идёт в питоне, а не в запросе, поэтому кириллической дыры, которой
-    страдает поиск по вакансиям, здесь нет.
+    Регистр складывает `casefold`, и складывает его у обеих сторон сразу —
+    у образца и у значения.
     """
     await put(session_factory, company_row(name="Ромашка"), company_row(name="Контур"))
 
@@ -88,6 +88,21 @@ async def test_a_non_string_alias_does_not_break_the_search(session, session_fac
 
     assert await names(session, search="romashka") == ["Ромашка"]
     assert await names(session, search="контур") == []
+
+
+async def test_a_spellings_column_that_is_not_a_list_does_not_break_the_pane(
+    session, session_factory
+):
+    """Не-список на месте написаний не роняет перечень компаний.
+
+    Роняет он его не при поиске, а всегда: перебор написаний идёт через
+    разворачивание, и не-список не развернулся бы даже тогда, когда искать
+    не просили.
+    """
+    await put(session_factory, company_row(name="Ромашка", aliases=42))
+
+    assert await names(session) == ["Ромашка"]
+    assert await names(session, search="ромашка") == ["Ромашка"]
 
 
 async def test_the_page_is_cut_after_the_search(session, session_factory):

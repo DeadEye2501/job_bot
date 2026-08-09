@@ -9,6 +9,7 @@ from backend.payloads import HrWithCount
 from backend.repository.blacklist_marks import active_blacklist_values
 from backend.repository.hr_card import hr_blacklist_candidates
 from backend.repository.messages import UNREAD_INCOMING
+from backend.repository.search import matches_search
 
 async def _with_last_incoming_id(
     session: AsyncSession, hrs: list[HR]
@@ -92,9 +93,8 @@ async def list_hr_with_counts(
     vacancies were. "Most recent" wins on purpose — older context is
     misleading for a picker.
 
-    ``search`` is filtered Python-side via ``str.casefold()`` because
-    SQLite's built-in ``lower()`` only handles ASCII — pure-SQL
-    LIKE matching would silently miss Cyrillic case variants.
+    ``search`` is filtered Python-side — see
+    :func:`backend.repository.search.matches_search`.
 
     ``limit``/``offset`` slice the result *after* the search filter so the
     caller can implement infinite-scroll. ``None`` limit (default) returns
@@ -134,14 +134,11 @@ async def list_hr_with_counts(
         )
     counts = (await session.execute(base)).all()
 
-    if search:
-        q = search.strip().casefold()
-        if q:
-            counts = [
-                (hr, cnt) for hr, cnt in counts
-                if q in (hr.name or "").casefold()
-                or q in (hr.telegram_username or "").casefold()
-            ]
+    counts = [
+        (hr, cnt)
+        for hr, cnt in counts
+        if matches_search(search, hr.name, hr.telegram_username)
+    ]
 
     if limit is not None:
         counts = counts[offset : offset + limit]

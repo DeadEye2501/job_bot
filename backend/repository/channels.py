@@ -14,6 +14,7 @@ from backend.repository.blacklist_marks import (
     active_blacklist_value,
     active_blacklist_values,
 )
+from backend.repository.search import matches_search
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +58,9 @@ async def list_telegram_channels(
     (forced is_active=false) сваливались бы в самый низ списка, чего юзер
     не просил.
 
-    ``search`` is matched against title and ``@username`` Python-side via
-    ``str.casefold()`` — Cyrillic safety, same as HR/Company lists.
+    ``search`` is matched against title and ``username`` (stored without the
+    leading ``@``) Python-side — see
+    :func:`backend.repository.search.matches_search`.
 
     No pagination: channel lists are tiny (tens, not thousands).
     """
@@ -77,14 +79,9 @@ async def list_telegram_channels(
     )
     rows = (await session.execute(base)).all()
 
-    if search:
-        q = search.strip().casefold()
-        if q:
-            rows = [
-                (ch, cnt) for ch, cnt in rows
-                if q in (ch.title or "").casefold()
-                or q in (ch.username or "").casefold()
-            ]
+    rows = [
+        (ch, cnt) for ch, cnt in rows if matches_search(search, ch.title, ch.username)
+    ]
 
     bl_values = await active_blacklist_values(session, "channel")
 
