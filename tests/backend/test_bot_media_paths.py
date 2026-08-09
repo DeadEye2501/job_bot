@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from backend.bot.media import MEDIA_DIR, classify_media, looks_like_photo, media_cache_path, media_path_for_db
+from tests.factories import photo_head
 from tests.fakes.telegram import document, message
 
 
@@ -32,28 +33,55 @@ from tests.fakes.telegram import document, message
         pytest.param("безымянный", False, id="без расширения"),
     ],
 )
-def test_only_three_formats_go_as_a_picture(name, expected):
+def test_only_three_formats_go_as_a_picture(tmp_path, name, expected):
     """Картинкой уходят только три формата, остальное — документом.
 
     Telegram принимает в отправку картинкой лишь их, а на прочих падает уже
     на своей стороне — и файл не доходит вовсе.
     """
-    assert looks_like_photo(Path(name)) is expected
+    path = tmp_path / name
+    # Непринимаемому расширению достаётся содержимое настоящей картинки:
+    # иначе отказ приходил бы от проверки содержимого, и отсев по расширению
+    # не наблюдал бы никто.
+    path.write_bytes((photo_head(path.suffix) or photo_head(".jpg")).ljust(12, b"\0"))
+
+    assert looks_like_photo(path) is expected
 
 
-def test_a_renamed_file_passes_as_a_picture_despite_the_guard():
-    """Переименованный файл проходит картинкой, хотя код обещает обратное.
+def test_a_renamed_executable_goes_as_a_document(tmp_path):
+    """Переименованный .exe уходит документом, а не картинкой.
 
-    Комментарий в `looks_like_photo` называет вторую проверку защитой от
-    подделанного расширения. Защиты нет: `mimetypes.guess_type` читает имя
-    файла, а не содержимое, и для «вирус.exe.jpg» честно отвечает
-    «image/jpeg». Отсеивается только расширение — «вирус.jpg.exe» уйдёт
-    документом просто потому, что кончается на .exe.
-
-    Тест закрепляет сегодняшнее поведение: при починке он покраснеет.
+    По одному расширению файл ушёл бы в send_photo, и Telegram отказал бы
+    уже на своей стороне — то есть не дошёл бы вовсе. Документом доходит.
     """
-    assert looks_like_photo(Path("вирус.exe.jpg")) is True
-    assert looks_like_photo(Path("вирус.jpg.exe")) is False
+    path = tmp_path / "вирус.exe.jpg"
+    path.write_bytes(b"MZ\x90\x00" + bytes(8))
+
+    assert looks_like_photo(path) is False
+
+
+def test_a_riff_container_that_is_not_a_picture_goes_as_a_document(tmp_path):
+    """Контейнер RIFF, который не картинка, уходит документом.
+
+    У WEBP подпись разорвана: `RIFF`, четыре байта длины, и только потом
+    `WEBP`. Проверь одно начало — и переименованный звук прошёл бы картинкой.
+    """
+    path = tmp_path / "звук.webp"
+    path.write_bytes(b"RIFF" + bytes(4) + b"WAVE")
+
+    assert looks_like_photo(path) is False
+
+
+def test_an_unreadable_file_goes_as_a_document(tmp_path):
+    """Нечитаемое уходит документом, а не роняет выбор способа.
+
+    Беду с файлом разбирает вызывающий: он читает размер следом и сообщает
+    о ней внятно. Выбор между картинкой и документом на этом падать не должен.
+    """
+    path = tmp_path / "папка.jpg"
+    path.mkdir()
+
+    assert looks_like_photo(path) is False
 
 
 @pytest.mark.parametrize(

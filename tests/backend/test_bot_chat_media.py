@@ -17,14 +17,19 @@ import pytest
 from backend.bot.media import MEDIA_DIR
 from backend.models import BotMode, Message
 from tests.dbio import only_row, put
-from tests.factories import blacklist_row, message_row
+from tests.factories import blacklist_row, message_row, photo_head
 from tests.fakes.telegram import SENT_AT
 
 
 def _file(tmp_path, name: str, size: int = 4):
-    """Файл заданного имени и размера."""
+    """Файл заданного имени, не короче `size`; картинке достаётся её подпись.
+
+    Подпись длиннее запрошенного размера не режется: файл в четыре байта
+    картинкой уже не будет, а размер тут задают только там, где проверяют
+    предел, и он много больше подписи.
+    """
     path = tmp_path / name
-    path.write_bytes(b"\0" * size)
+    path.write_bytes(photo_head(path.suffix).ljust(size, b"\0"))
     return path
 
 

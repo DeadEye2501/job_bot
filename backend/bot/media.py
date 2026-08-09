@@ -1,7 +1,6 @@
 """Вложения: распознание, кэш и скачивание."""
 
 import logging
-import mimetypes
 
 from config import get_data_dir
 from pathlib import Path
@@ -19,6 +18,14 @@ MEDIA_DIR = get_data_dir() / "media"
 PHOTO_EXTS = {".png", ".jpg", ".jpeg", ".webp"}  # GIFs go via send_document → preserved as animation
 
 
+# WEBP сюда не попадает: у него подпись разорвана — `RIFF`, четыре байта
+# длины, и только потом `WEBP`, поэтому она проверяется отдельно.
+_PHOTO_SIGNATURES = (
+    b"\xff\xd8\xff",
+    b"\x89PNG\r\n\x1a\n",
+)
+
+
 # User-facing caps на upload. Telegram regular doc-limit ≈ 2 GB, но без
 # прогресс-индикатора и cancel'а файлы такого размера повесят UI; эти
 # границы — практический разумный максимум для job-bot use-case (резюме,
@@ -29,20 +36,34 @@ PHOTO_SIZE_LIMIT = 10 * 1024 * 1024
 DOCUMENT_SIZE_LIMIT = 50 * 1024 * 1024
 
 
+def _has_photo_content(path: Path) -> bool:
+    """Начало файла — подпись JPEG, PNG или WEBP.
+
+    Читается содержимое, а не имя: расширение подделывается, а send_photo на
+    подделке падает уже на стороне Telegram, и файл не доходит вовсе.
+    """
+    try:
+        with path.open("rb") as f:
+            head = f.read(12)
+    except OSError:
+        logger.warning("не удалось прочесть начало файла %s", path)
+        return False
+    if head.startswith(_PHOTO_SIGNATURES):
+        return True
+    return head[:4] == b"RIFF" and head[8:12] == b"WEBP"
+
+
 def looks_like_photo(path: Path) -> bool:
     """Эвристика для выбора send_photo vs send_document. Pyrogram (и сам
     Telegram) принимают в send_photo только JPEG/PNG/WEBP — поэтому
     photo-ветка ЖЁСТКО ограничена этими расширениями. HEIC/HEIF/BMP/TIFF
-    и т.п. — изображения по MIME, но send_photo на них падает на сервере;
+    и т.п. — тоже изображения, но send_photo на них падает на сервере;
     их (как и GIF) уводим в send_document, чтобы файл хотя бы дошёл.
-    MIME-проверка тут — защита от переименованного .exe-в-.jpg: даже
-    при правильном расширении из PHOTO_EXTS, если mimetypes не распознал
-    image/*, отправляем документом."""
+    Содержимое проверяется вторым: расширения мало, оно врёт."""
     suffix = path.suffix.lower()
     if suffix not in PHOTO_EXTS:
         return False
-    mime, _ = mimetypes.guess_type(str(path))
-    return bool(mime and mime.startswith("image/"))
+    return _has_photo_content(path)
 
 
 def classify_media(msg) -> tuple[str | None, str | None]:

@@ -25,6 +25,26 @@ MUTATIONS = [
         'PHOTO_EXTS = {".png", ".jpg", ".jpeg", ".webp"}',
         'PHOTO_EXTS = {".png", ".jpg", ".jpeg"}',
     ),
+    # looks_like_photo: содержимое перестаёт проверяться, верят расширению
+    (
+        "backend/bot/media.py",
+        "    return _has_photo_content(path)",
+        "    return True",
+    ),
+    # _has_photo_content: подпись WEBP перестаёт узнаваться
+    (
+        "backend/bot/media.py",
+        '    return head[:4] == b"RIFF" and head[8:12] == b"WEBP"',
+        "    return False",
+    ),
+    # _has_photo_content: нечитаемый файл уходит картинкой
+    (
+        "backend/bot/media.py",
+        '        logger.warning("не удалось прочесть начало файла %s", path)' + CRLF
+        + "        return False",
+        '        logger.warning("не удалось прочесть начало файла %s", path)' + CRLF
+        + "        return True",
+    ),
     # media_cache_path: номер собеседника выпадает из пути
     (
         "backend/bot/media.py",
