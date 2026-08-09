@@ -237,8 +237,8 @@ def test_the_running_application_writes_its_log_to_the_file(tmp_path):
         errors="replace",
     )
 
-    written = (tmp_path / "JobBot" / "jobbot.log").read_text(encoding="utf-8")
     assert done.returncode == 0, done.stderr
+    written = (tmp_path / "JobBot" / "jobbot.log").read_text(encoding="utf-8")
     assert "после схемы" in written
     assert "Bearer abcDEF123456_secret-token" not in written
 
