@@ -75,6 +75,24 @@ async def test_every_connection_gets_the_settings(engine_on_disk):
     assert values == [1, 1]
 
 
+async def test_every_connection_folds_cyrillic_case(engine_on_disk):
+    """Приведение к нижнему регистру знает кириллицу, и на каждом соединении.
+
+    Встроенное у SQLite складывает только латиницу: «Ж» осталось бы «Ж», а
+    образец поиска питон опускает целиком, и совпасть им было бы не на чем.
+    Соединения открываются одновременно по той же причине, что и у настроек
+    выше: последовательные вернулись бы из запаса тем же самым.
+    """
+    async with engine_on_disk.connect() as first:
+        async with engine_on_disk.connect() as second:
+            folded = [
+                (await conn.execute(text("SELECT lower('Ж')"))).scalar_one()
+                for conn in (first, second)
+            ]
+
+    assert folded == ["ж", "ж"]
+
+
 async def test_the_check_names_the_engine_and_its_version(engine_on_disk):
     """Проверка соединения называет движок и его версию.
 

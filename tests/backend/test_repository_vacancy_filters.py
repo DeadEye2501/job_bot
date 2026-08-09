@@ -126,28 +126,6 @@ async def test_a_grade_filter_matches_a_substring_regardless_of_case(
     assert await titles(grade="senior") == ["старшая"]
 
 
-async def test_a_grade_with_a_capital_cyrillic_letter_is_unfindable(
-    titles, session_factory
-):
-    """Грейд с заглавной кириллицей не находится ни одним написанием образца.
-
-    Приведение к нижнему регистру идёт с двух сторон и работает по-разному:
-    питон опускает «Старший» до «старший», а `lower()` у SQLite знает только
-    латиницу и оставляет колонку как есть. Совпасть им не на чем — какой бы
-    образец ни ввёл пользователь, строка не найдётся. Строчная кириллица
-    находится: опускать в ней нечего. Тест закрепляет сегодняшнее поведение,
-    при починке он покраснеет.
-    """
-    await put(
-        session_factory,
-        vacancy_row(title="с заглавной", grade="Старший"),
-        vacancy_row(title="со строчной", grade="старший"),
-    )
-
-    assert await titles(grade="старший") == ["со строчной"]
-    assert await titles(grade="Старший") == ["со строчной"]
-
-
 async def test_a_remote_filter_matches_a_substring(titles, session_factory):
     """Отбор по удалённости ищет подстроку."""
     await put(
