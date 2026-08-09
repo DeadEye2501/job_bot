@@ -41,6 +41,9 @@ async def check_chat(client: httpx.AsyncClient, model: str) -> tuple[bool, str]:
         r.raise_for_status()
         models = [m["id"] for m in r.json().get("data", [])]
     except Exception as e:
+        # Наружу уходит короткое «род и текст» — его показывают подсказкой
+        # в окне. Трассировка нужна там, где её потом читают.
+        _log.exception("провайдер не отдал список моделей для чата")
         return False, f"{type(e).__name__}: {e}"
 
     if model not in models:
@@ -57,6 +60,7 @@ async def check_chat(client: httpx.AsyncClient, model: str) -> tuple[bool, str]:
             },
         )
     except Exception as e:
+        _log.exception("пробный запрос к чат-модели %s не прошёл", model)
         return False, f"{type(e).__name__}: {e}"
     if not r.is_success:
         return False, f"{model} (ping failed: HTTP {r.status_code})"
@@ -70,6 +74,9 @@ async def check_embed(client: httpx.AsyncClient, model: str) -> tuple[bool, str]
         r.raise_for_status()
         models = [m["id"] for m in r.json().get("data", [])]
     except Exception as e:
+        # Наружу уходит короткое «род и текст» — его показывают подсказкой
+        # в окне. Трассировка нужна там, где её потом читают.
+        _log.exception("провайдер не отдал список моделей для векторов")
         return False, f"{type(e).__name__}: {e}"
 
     if model not in models:
@@ -81,6 +88,7 @@ async def check_embed(client: httpx.AsyncClient, model: str) -> tuple[bool, str]
             json={"model": model, "input": "ping"},
         )
     except Exception as e:
+        _log.exception("пробный запрос к модели векторов %s не прошёл", model)
         return False, f"{type(e).__name__}: {e}"
     if not r.is_success:
         return False, f"{model} (ping failed: HTTP {r.status_code})"
