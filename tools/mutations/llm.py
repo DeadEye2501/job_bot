@@ -79,17 +79,29 @@ MUTATIONS = [
         '    explanation = (data.get("explanation") or "").strip() or None',
         '    explanation = (data.get("explanation") or "").strip()',
     ),
-    # _strip_version: защита коротких имён пропадает
+    # _strip_version: защита от среза без букв пропадает
     (
         "backend/llm/skills.py",
-        "    if len(cleaned) < 3 or not any(ch.isalpha() for ch in cleaned):",
+        "    if not any(ch.isalpha() for ch in cleaned):",
         "    if False:",
     ),
-    # _strip_version: порог защиты поднят
+    # _strip_version: имена со своей цифрой перестают отличаться от версий
     (
         "backend/llm/skills.py",
-        "    if len(cleaned) < 3 or",
-        "    if len(cleaned) < 5 or",
+        "    if s.strip().casefold() in _DIGIT_BELONGS_TO_NAME:",
+        "    if False:",
+    ),
+    # _strip_version: список имён со своей цифрой сверяется по регистру
+    (
+        "backend/llm/skills.py",
+        "    if s.strip().casefold() in _DIGIT_BELONGS_TO_NAME:",
+        "    if s.strip() in _DIGIT_BELONGS_TO_NAME:",
+    ),
+    # _strip_version: разделитель перед версией снова обязателен
+    (
+        "backend/llm/skills.py",
+        r'_VERSION_SUFFIX_RE = re.compile(r"[\s.\-_]*[vV]?\d+(?:[.\-_]\d+)*\+?\s*$")',
+        r'_VERSION_SUFFIX_RE = re.compile(r"[\s.\-_]+[vV]?\d+(?:[.\-_]\d+)*\+?\s*$")',
     ),
     # _capitalize_skill: канонический вид названий ломается
     (

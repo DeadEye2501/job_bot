@@ -11,23 +11,33 @@ logger = logging.getLogger(__name__)
 # Срезает хвост с цифровым суффиксом: "Python 3.13" → "Python", "Python3.13"
 # → "Python", "Java 17" → "Java", "Java17" → "Java", "PostgreSQL 14.5" →
 # "PostgreSQL", "Node.js 20" → "Node.js", "Go 1.22+" → "Go", "Kafka v2.5"
-# → "Kafka". Whitespace перед версией опционален (раньше был обязателен —
-# "Python3.13" проскакивал).
-# Min-length guard: оставляем только если в результате ≥3 символов с
-# буквой. Это спасает "Web3", "S3", "C4" — они идут в стек как есть, без
-# срезания цифры на конце ("Web" / "S" / "C" — бессмысленно).
-_VERSION_SUFFIX_RE = re.compile(r"\s*v?\d+(?:[.\-_]\d+)*\+?\s*$")
+# → "Kafka". Разделитель перед версией опционален: пробел, точка, дефис,
+# подчёркивание или ничего.
+_VERSION_SUFFIX_RE = re.compile(r"[\s.\-_]*[vV]?\d+(?:[.\-_]\d+)*\+?\s*$")
+
+# Имена, у которых цифра на конце — своя, а не версия. Перечислены поимённо
+# потому, что формой их от версии не отличить: «Web3» и «Java17» устроены
+# одинаково, и любое правило по виду цифры ошибается на одном из них.
+# Ошибка в эту сторону дешевле обратной: лишний тег «Web» просто не найдётся
+# в анкете, а срезанная цифра у «Python3» ломает сверку и мешает схлопывать
+# повторы. Список растёт по мере встреч.
+_DIGIT_BELONGS_TO_NAME = frozenset({
+    "s3", "c4", "web3", "html5", "css3", "oauth1", "oauth2",
+    "ipv4", "ipv6", "sha1", "sha256", "sha512", "md5", "base64",
+    "utf-8", "utf8", "es5", "es6", "socks5", "x11", "x86_64", "h2",
+})
 
 
 def _strip_version(s: str) -> str:
     """Strip trailing version suffix from a stack tech name."""
+    if s.strip().casefold() in _DIGIT_BELONGS_TO_NAME:
+        return s
     cleaned = _VERSION_SUFFIX_RE.sub("", s).strip()
     if not cleaned:
         return s
-    # Защита от over-strip'а: если после среза осталось <3 символов или
-    # ни одной буквы — значит исходник был «короткое имя + цифра в составе
-    # имени» (Web3, S3, C4), не «версия». Возвращаем оригинал.
-    if len(cleaned) < 3 or not any(ch.isalpha() for ch in cleaned):
+    # Защита от over-strip'а: если после среза не осталось ни одной буквы,
+    # исходник был не «имя + версия», а чем-то вроде «1.0 2.0».
+    if not any(ch.isalpha() for ch in cleaned):
         return s
     return cleaned
 
