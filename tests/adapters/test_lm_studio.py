@@ -179,3 +179,39 @@ async def test_embed_raises_when_the_provider_answers_with_an_error():
     client = provider({EMBEDDINGS: httpx.Response(500, text="сломалось")})
     with pytest.raises(httpx.HTTPStatusError):
         await embed(client, "bge-m3", "привет")
+
+
+@pytest.mark.parametrize(
+    ("check", "routes"),
+    [
+        pytest.param(check_chat, {}, id="чат, список моделей"),
+        pytest.param(
+            check_chat,
+            {MODELS: models_response("qwen"), CHAT: httpx.ConnectError("оборвалось")},
+            id="чат, пробный запрос",
+        ),
+        pytest.param(check_embed, {}, id="векторы, список моделей"),
+        pytest.param(
+            check_embed,
+            {
+                MODELS: models_response("bge-m3"),
+                EMBEDDINGS: httpx.ConnectError("оборвалось"),
+            },
+            id="векторы, пробный запрос",
+        ),
+    ],
+)
+async def test_a_failed_check_leaves_a_trace_in_the_log(check, routes, caplog):
+    """Неудачная проверка оставляет трассировку в журнале.
+
+    Наружу уходит короткое «род и текст» — этого хватает подсказке в окне,
+    но не хватает, чтобы понять, где именно оборвалось. Трассировка нужна
+    там, где её потом читают: в журнале.
+    """
+    model = "qwen" if check is check_chat else "bge-m3"
+
+    with caplog.at_level("ERROR"):
+        passed, _ = await check(provider(routes), model)
+
+    assert passed is False
+    assert any(rec.exc_info for rec in caplog.records)
