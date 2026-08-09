@@ -92,15 +92,13 @@ async def test_a_spelling_already_known_is_not_added_twice(session, session_fact
     assert kept.aliases == ["Kontur", "skb"]
 
 
-async def test_a_spelling_equal_to_the_survivors_own_name_is_still_added(
+async def test_a_spelling_equal_to_the_survivors_own_name_is_dropped(
     session, session_factory
 ):
-    """Написание, совпадающее с именем оставшейся, всё равно попадает в список.
+    """Написание, совпадающее с именем оставшейся, в список не попадает.
 
-    Совпадение ищут только среди уже записанных написаний, а собственное имя
-    в этот набор не входит. В списке заводится написание, слово в слово
-    повторяющее имя рядом, — на экране это видно как пустая строка-дубль.
-    Тест закрепляет сегодняшнее поведение: при починке он покраснеет.
+    Иначе рядом с именем заводится строка, слово в слово его повторяющая, —
+    на экране это выглядит как дубль на пустом месте.
     """
     absorbed = company_row(name="СКБ КОНТУР", aliases=[])
     survivor = company_row(name="СКБ Контур", aliases=[])
@@ -109,7 +107,25 @@ async def test_a_spelling_equal_to_the_survivors_own_name_is_still_added(
     await merge_company(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
 
     kept = await session.get(Company, survivor.id)
-    assert kept.aliases == ["СКБ КОНТУР"]
+    assert kept.aliases == []
+
+
+async def test_a_spelling_repeated_inside_the_absorbed_lands_once(
+    session, session_factory
+):
+    """Написание, повторённое внутри поглощённой, попадает в список один раз.
+
+    Сверяться с одним лишь исходным списком мало: «Kontur» и «KONTUR» пришли
+    бы оба, потому что в списке оставшейся не было ни того, ни другого.
+    """
+    absorbed = company_row(name="KONTUR", aliases=["Kontur"])
+    survivor = company_row(name="СКБ Контур", aliases=["SKB"])
+    await put(session_factory, absorbed, survivor)
+
+    await merge_company(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
+
+    kept = await session.get(Company, survivor.id)
+    assert kept.aliases == ["SKB", "Kontur"]
 
 
 async def test_a_website_is_taken_only_when_the_survivor_has_none(
