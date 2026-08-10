@@ -161,6 +161,12 @@ MUTATIONS = [
         '            "previous_name": previous_name,',
         '            "previous_name": link.display(target) if target else None,',
     ),
+    # _move_status: запись автоматики подписывается пользователем
+    (
+        "backend/repository/vacancies_life.py",
+        "        source=source," + CRLF,
+        "        source=StatusHistorySource.USER," + CRLF,
+    ),
     # _move_status: комментарий без смены статуса помечается применённым
     (
         "backend/repository/vacancies_life.py",
