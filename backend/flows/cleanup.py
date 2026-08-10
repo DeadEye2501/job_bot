@@ -41,7 +41,15 @@ async def check_ghosting_timeouts(pipeline) -> int:
     return len(affected)
 
 
-async def delete_vacancy(pipeline, vacancy_id: int) -> None:
+async def forget_vacancy(pipeline, vacancy_id: int) -> None:
+    """Удалить вакансию и забыть её вектор.
+
+    Отличается от репозиторной тёзки ровно этим хвостом: строку удаляет
+    она же, а сверх того вычёркивается вектор из кэша отсева перепостов и
+    оповещается окно. Без вычёркивания кэш держит вектор удалённой строки,
+    и следующее похожее объявление отсеется как повтор того, чего больше
+    нет.
+    """
     # Route through the public repository delete so children
     # (vacancy_status_history, vacancy_event) are explicitly cleaned up
     # — SQLite has FK enforcement off in this engine, so a plain
