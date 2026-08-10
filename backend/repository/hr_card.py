@@ -123,7 +123,7 @@ def hr_blacklist_candidates(hr: HR) -> list[str]:
     `contacts_add_hr_to_blacklist` slot writes. Both forms are checked so
     a row added under one identifier (username) still surfaces if the HR
     later only has the other (user_id), or vice versa.
-    
+
     Порядок значим: первое написание — то, что запишет кнопка
     «в чёрный список» (см. `preferred_blacklist_value`).
     """

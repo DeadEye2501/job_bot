@@ -68,7 +68,7 @@ async def _ensure_can_send(bot) -> None:
         raise RuntimeError("Отправка отключена: защита от случайной отправки.")
 
 
-async def _resolve_target(bot, hr_id: int):
+async def _resolve_target(bot, hr_id: int) -> int | str:
     """Кому слать: адрес HR, если он есть и не помечен чёрным списком.
 
     Адрес предпочитает номер пользователя имени: имя HR может сменить, и

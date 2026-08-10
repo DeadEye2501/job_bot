@@ -224,6 +224,13 @@ MUTATIONS = [
         "    if hr is not None:" + CRLF
         + "        dm_backfill.spawn_hr_backfill(pipeline, hr)" + CRLF,
     ),
+    # save_empty_vacancy: догон переписки не заводят вовсе
+    (
+        "backend/flows/parse.py",
+        "    if hr_created:" + CRLF
+        + "        dm_backfill.spawn_hr_backfill(pipeline, hr)" + CRLF,
+        "",
+    ),
     # _apply_parsed_fields: прежний разбор не стирается
     (
         "backend/flows/parse.py",

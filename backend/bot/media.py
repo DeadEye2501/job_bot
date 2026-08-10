@@ -146,12 +146,10 @@ async def download_media(client, msg, hr_id: int) -> str | None:
     supported media on the message. Skips re-download if the file already
     exists (handler/manual-send race writes the same path either way).
     """
-    kind, _ = classify_media(msg)
+    kind, name = classify_media(msg)
     if kind is None:
         return None
-    ext = _cache_ext(
-        kind == "photo", getattr(getattr(msg, "document", None), "file_name", None)
-    )
+    ext = _cache_ext(kind == "photo", name)
     out = media_cache_path(hr_id, msg.id, ext)
     if out.exists():
         return media_path_for_db(out)

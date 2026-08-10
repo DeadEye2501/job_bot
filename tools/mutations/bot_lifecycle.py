@@ -44,7 +44,7 @@ MUTATIONS = [
     ),
     # cancel_current_poll: отмена не доходит до задачи
     (
-        "backend/bot/channels.py",
+        "backend/bot/slot.py",
         "        loop.call_soon_threadsafe(task.cancel)" + CRLF
         + "    else:" + CRLF
         + "        task.cancel()" + CRLF,

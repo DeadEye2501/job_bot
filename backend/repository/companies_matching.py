@@ -132,9 +132,15 @@ async def _create_company_row(
             )
         ).first()
         if company is not None:
-            # Race produced a row with same name. Применяем тот же
-            # enrichment, что в match-ветках: parsed-данные не должны
-            # теряться от того, что concurrent ingest нас опередил.
+            # Ветка отрабатывает и без всякой гонки, и это норма: имя
+            # решает — компания с таким же именем считается той же самой
+            # (решение человека от 10.08.2026), а уникальность
+            # `Company.name` — правило, а не случайность. Сюда приходит и
+            # «то же имя, другой сайт»: три правила выше развели бы их, а
+            # уникальность сводит. Применяем тот же enrichment, что в
+            # match-ветках: parsed-данные не должны теряться ни от
+            # сведения по имени, ни от того, что concurrent ingest нас
+            # опередил.
             _enrich_company_with_parsed(company, name, website)
             decision["stage"] = "create_race_fallback"
             decision["matched_id"] = company.id
@@ -161,6 +167,10 @@ async def find_or_create_company(
         stage:    "rule_name" | "rule_alias" | "rule_website" |
                   "llm_match" | "llm_no_match" | "create" |
                   "create_race_fallback" | "skip"
+                  Имя `create_race_fallback` осталось от времён, когда
+                  сведение по имени считалось дефектом: сегодня эта
+                  стадия означает и сведение однофамильцев, а не только
+                  гонку вставок.
         matched_id:    int | None — id того row'а, к которому свелось
         candidates:    [{id, name, website}, ...] | None — shortlist для
                        LLM (заполняется только когда LLM вызывался)
