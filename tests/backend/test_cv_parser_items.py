@@ -4,13 +4,12 @@
 Значения уровней и дат сняты прогоном настоящих функций.
 """
 
-import json
 from datetime import date
 
 import pytest
 
 from backend.cv_parser import parse_cv
-from tests.fakes.llm import CHAT, chat_response, provider
+from tests.fakes.llm import CHAT, chat_json, provider
 
 
 REQUIRED = {
@@ -23,9 +22,7 @@ REQUIRED = {
 
 async def parse_sections(**sections):
     """Прогнать ответ модели с заданными разделами через настоящий разбор."""
-    client = provider({
-        CHAT: chat_response(json.dumps({"profile": REQUIRED, **sections}))
-    })
+    client = provider({CHAT: chat_json({"profile": REQUIRED, **sections})})
     return await parse_cv("резюме", client, "qwen")
 
 

@@ -22,14 +22,19 @@ import pytest
 from backend.llm.candidate import CandidateLanguage, CandidateProfile
 from backend.llm.fit import _parse_fit_validation, validate_vacancy_fit
 from tests.factories import parsed_vacancy
-from tests.fakes.llm import CHAT, chat_response, data_block, messages_of, provider
+from tests.fakes.llm import (
+    CHAT,
+    chat_json,
+    chat_response,
+    data_block,
+    messages_of,
+    provider,
+)
 
 
 def _answer(verdict, reason=None) -> httpx.Response:
     """Ответ модели с вердиктом пригодности."""
-    return chat_response(
-        json.dumps({"verdict": verdict, "reason": reason}, ensure_ascii=False)
-    )
+    return chat_json({"verdict": verdict, "reason": reason})
 
 
 async def _check(client, *, raw_text="обычный текст вакансии", profile=None, parsed=None):
