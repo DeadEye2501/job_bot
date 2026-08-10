@@ -6,12 +6,22 @@
 JSON остаются настоящими.
 """
 
+import logging
+
 import httpx
 import pytest
 
-from adapters.lm_studio import check_chat, check_embed, embed, list_models, make_client
+from adapters.lm_studio import (
+    ChatRequest,
+    chat,
+    check_chat,
+    check_embed,
+    embed,
+    list_models,
+    make_client,
+)
 from backend.runtime_settings import LlmProviderConfig
-from tests.fakes.llm import CHAT, models_response, provider
+from tests.fakes.llm import CHAT, chat_response, models_response, provider
 
 MODELS = ("GET", "/v1/models")
 NATIVE_MODELS = ("GET", "/api/v0/models")
@@ -219,3 +229,23 @@ async def test_a_failed_check_leaves_a_trace_in_the_log(check, routes, caplog):
     assert any(
         rec.exc_info for rec in caplog.records if rec.name == "adapters.lm_studio"
     )
+
+
+async def test_a_request_with_its_own_deadline_carries_it_to_the_provider():
+    """Своё время ожидания доезжает до провайдера.
+
+    Оно заведено там, где обращение заведомо длиннее прочих: разбор
+    резюме на слабой локальной модели идёт минутами. Не доехав, такой
+    запрос обрывался бы по общему сроку клиента, и длинная работа не
+    заканчивалась бы никогда.
+    """
+    client = provider({CHAT: chat_response("готово")})
+
+    await chat(
+        client,
+        "qwen",
+        ChatRequest(purpose="разбор резюме", messages=[], max_tokens=8, timeout=300.0),
+        logging.getLogger(__name__),
+    )
+
+    assert client.sent[0].extensions["timeout"]["read"] == 300.0

@@ -173,6 +173,20 @@ def test_a_garbled_whole_number_setting_falls_back_to_its_default(key, default, 
 
 
 @pytest.mark.parametrize(
+    "key", ["poll_interval_sec", "backfill_limit", "dm_backfill_limit"]
+)
+def test_a_whole_number_setting_right_on_its_bound_is_accepted(key):
+    """Значение, равное нижней границе, принимается, а не откатывается.
+
+    Граница названа наименьшим годным, а не первым негодным: единица —
+    это «опрашивать раз в секунду» и «брать по одному сообщению», оба
+    осмысленны. Откат отсюда молча вернул бы получасовой интервал там,
+    где человек просил секунду.
+    """
+    assert getattr(settings(**{key: "1"}), key) == 1
+
+
+@pytest.mark.parametrize(
     ("key", "raw", "default"),
     [
         ("poll_interval_sec", "0", 1800),
