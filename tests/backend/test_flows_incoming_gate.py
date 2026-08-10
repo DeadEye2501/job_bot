@@ -131,6 +131,36 @@ async def test_a_card_without_a_picture_gets_one(session_factory, deliver):
     assert (await only_row(session_factory, HR)).avatar == b"\x89PNG"
 
 
+async def test_a_picture_that_arrived_while_downloading_is_not_overwritten(
+    session_factory, deliver
+):
+    """Картинка, появившаяся пока шло скачивание, чужой не затирается.
+
+    Между чтением карточки и записью проходит время скачивания, и за него
+    карточку мог заполнить сосед: разбор второго сообщения от того же
+    собеседника или опознание HR, которое тоже кладёт аватар. Поэтому
+    «картинки ещё нет» проверяется дважды: до скачивания и перед записью.
+    """
+    hr = hr_row(telegram_user_id=777, avatar=None)
+    await put(session_factory, hr)
+    client = FakeTelegramClient(avatar=b"\x89PNG")
+
+    async def fill_it_meanwhile(_file_name):
+        async with session_factory() as other:
+            row = await other.get(HR, hr.id)
+            row.avatar = b"\x89OWN"
+            await other.commit()
+
+    client.on_download = fill_it_meanwhile
+
+    await deliver(
+        incoming(from_user=user(id=777, photo=photo(small_file_id="кар"))),
+        client=client,
+    )
+
+    assert (await only_row(session_factory, HR)).avatar == b"\x89OWN"
+
+
 async def test_a_card_that_already_has_a_picture_keeps_it(session_factory, deliver):
     """Карточка со своей картинкой чужую не берёт.
 

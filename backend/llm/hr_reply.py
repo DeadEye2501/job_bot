@@ -12,7 +12,7 @@ from backend.domain.transitions import ALLOWED_AUTO_TRANSITIONS
 from backend.models import VacancyStatus
 from backend.payloads import Classification
 
-from backend.llm.answers import extract_last_json
+from backend.llm.answers import extract_last_json, str_or_none
 from backend.llm.external import wrap_external
 
 logger = logging.getLogger(__name__)
@@ -146,8 +146,9 @@ def _parse_classification(answer: str) -> Classification | None:
     if status is None:
         return None
 
-    explanation = (data.get("explanation") or "").strip() or None
-    return Classification(status=status, explanation=explanation)
+    return Classification(
+        status=status, explanation=str_or_none(data.get("explanation"))
+    )
 
 
 async def classify_hr_reply(

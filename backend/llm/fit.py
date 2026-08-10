@@ -10,7 +10,7 @@ from adapters.lm_studio import ChatRequest, chat
 
 from backend.payloads import FIT_VERDICTS, FitValidation, ParsedVacancy
 
-from backend.llm.answers import extract_last_json, normalize_enum
+from backend.llm.answers import extract_last_json, normalize_enum, str_or_none
 from backend.llm.candidate import (
     CandidateProfile,
     _format_free_preferences,
@@ -260,11 +260,7 @@ def _parse_fit_validation(answer: str) -> FitValidation | None:
     if verdict is None:
         return None
 
-    raw_reason = data.get("reason")
-    reason = raw_reason.strip() if isinstance(raw_reason, str) else None
-    if reason == "":
-        reason = None
-    return FitValidation(verdict=verdict, reason=reason)
+    return FitValidation(verdict=verdict, reason=str_or_none(data.get("reason")))
 
 
 async def validate_vacancy_fit(

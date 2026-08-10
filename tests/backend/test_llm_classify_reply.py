@@ -97,6 +97,23 @@ async def test_an_empty_reason_becomes_absence():
     assert got.explanation is None
 
 
+async def test_a_reason_that_is_not_a_string_becomes_absence():
+    """Пояснение не строкой становится отсутствием, а не роняет разбор.
+
+    Модель отвечает свободно и в поле пояснения кладёт что угодно — число,
+    словарь, `null`. Падение здесь стоило бы не самого сообщения (оно уже
+    записано и в переписке видно), а накопленного пакета и смены статуса
+    вакансии: зовущие ловят его широким `except`, и наружу это выглядит как
+    «HR ответил, а карточка не сдвинулась».
+    """
+    client = provider({CHAT: _verdict("Invitation", 5)})
+
+    got = await classify_hr_reply("текст", VacancyStatus.APPLIED, client, "qwen")
+
+    assert got.status is VacancyStatus.INVITATION
+    assert got.explanation is None
+
+
 async def test_a_refusal_by_the_provider_yields_nothing():
     """Отказ провайдера вердикта не даёт и наружу не пробрасывается."""
     client = provider({CHAT: httpx.Response(500, text="упал")})

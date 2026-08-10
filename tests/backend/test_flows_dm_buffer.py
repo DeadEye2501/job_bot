@@ -71,6 +71,24 @@ async def test_a_new_message_pushes_the_reading_back(dm_pipeline):
     assert [item["text"] for item in dm_pipeline.classified[0][1]] == ["привет", "и ещё"]
 
 
+async def test_the_reading_waits_out_the_last_message_and_not_the_first(dm_pipeline):
+    """Разбор идёт по сроку последнего сообщения, а не первого.
+
+    Соседняя проверка ждёт дольше обоих сроков сразу и потому не различает,
+    по чьему сроку разобрали. Здесь смотрят в тот единственный миг, когда
+    срок первого сообщения уже вышел, а срок второго ещё нет: сторожится
+    перевзвод отсчёта на каждом новом сообщении.
+    """
+    dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 0.3
+    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    await asyncio.sleep(0.2)
+    dm_pipeline.schedule_dm_classification(7, 1, 11, "и ещё")
+
+    await asyncio.sleep(0.2)
+
+    assert dm_pipeline.classified == []
+
+
 async def test_two_correspondents_are_read_apart(dm_pipeline):
     """Два собеседника разбираются порознь: у каждого свой накопитель."""
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 0
