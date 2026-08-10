@@ -31,6 +31,12 @@ def incoming(*, user_id=777, username=None, text="здравствуйте", **e
 
     Поля, которые боевой код читает напрямую, заданы всегда: отсутствие
     любого из них он встречает `AttributeError`, а не веткой.
+
+    С чатом иначе: его отсутствие — настоящий случай, и код на него
+    ветвится (в оповещении об удалении Pyrogram кладёт `None`). Задан он
+    здесь потому, что в личной переписке чат и есть собеседник, и собран
+    из того же отправителя: иначе подменённый отправитель разъезжался бы
+    с чатом по номеру. Проверки про «чата нет» сообщение собирают сами.
     """
     fields = {
         "id": 10,
@@ -42,10 +48,10 @@ def incoming(*, user_id=777, username=None, text="здравствуйте", **e
     }
     fields.update(extra)
     sender = fields.pop("from_user", None)
-    return message(
-        from_user=sender if sender is not None else user(id=user_id, username=username),
-        **fields,
-    )
+    if sender is None:
+        sender = user(id=user_id, username=username)
+    fields.setdefault("chat", chat(id=sender.id, username=sender.username))
+    return message(from_user=sender, **fields)
 
 
 # Отличает «текста не задали» от «текста нет»: второе — настоящий случай,
