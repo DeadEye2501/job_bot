@@ -8,6 +8,8 @@
 к прямым до разбора — иначе разбор JSON падает на своей же кавычке.
 """
 
+import json
+
 import pytest
 
 from backend.llm.answers import extract_last_json
@@ -54,3 +56,18 @@ def test_a_nested_object_is_not_matched():
     сегодняшнее поведение: разбор такого ответа даст не то, что ждали.
     """
     assert extract_last_json('{"outer": {"inner": 1}}') == '{"inner": 1}'
+
+
+
+def test_typographic_quotes_inside_a_value_do_not_break_the_object():
+    """Объект с кавычками-ёлочками внутри значения остаётся читаемым.
+
+    Выпрямление кавычек заведено ради моделей, которые ставят ёлочки вместо
+    кавычек JSON. Но в тексте ответа они встречаются и по-русски: выпрямив их
+    внутри значения, мы ломаем годный объект и теряем ответ модели целиком.
+    """
+    answer = '{"reasoning": "“Сбер” и ПАО Сбербанк — одно"}'
+
+    assert json.loads(extract_last_json(answer)) == {
+        "reasoning": "“Сбер” и ПАО Сбербанк — одно"
+    }

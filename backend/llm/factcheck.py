@@ -3,12 +3,12 @@
 
 import json
 import logging
-import re
 import time
 
 import httpx
 
 from adapters.lm_studio import ChatRequest, chat
+from backend.llm.answers import extract_last_json
 from backend.llm.external import wrap_external
 
 logger = logging.getLogger(__name__)
@@ -107,11 +107,15 @@ async def factcheck_cover_letter(
         return True, []
     answer = reply.text
 
-    answer = re.sub(
-        r"^```(?:json)?\s*|\s*```$", "", answer.strip(), flags=re.IGNORECASE
-    )
+    raw = extract_last_json(answer)
+    if raw is None:
+        logger.warning(
+            "factcheck_cover_letter: no JSON object in answer %r — fail-open",
+            answer[:200],
+        )
+        return True, []
     try:
-        obj = json.loads(answer)
+        obj = json.loads(raw)
     except (json.JSONDecodeError, TypeError) as e:
         logger.warning(
             "factcheck_cover_letter: unparseable JSON %r: %s — fail-open",
@@ -119,11 +123,6 @@ async def factcheck_cover_letter(
         )
         return True, []
 
-    if not isinstance(obj, dict):
-        logger.warning(
-            "factcheck_cover_letter: non-dict response %r — fail-open", obj
-        )
-        return True, []
 
     verdict = obj.get("verdict")
     issues_raw = obj.get("issues") or []
