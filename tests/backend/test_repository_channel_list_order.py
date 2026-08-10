@@ -6,20 +6,11 @@
 выключенный чёрным списком, иначе проваливался бы в самый низ.
 """
 
-from backend.repository.channels import list_telegram_channels
 from tests.dbio import put
 from tests.factories import channel_row, vacancy_row
 
 
-async def titles_of(session, **kwargs) -> list[str]:
-    """Заголовки каналов в порядке выдачи."""
-    return [
-        row.channel.title for row in await list_telegram_channels(session, **kwargs)
-    ]
-
-
-async def test_the_list_leads_with_the_most_prolific_channel(
-    session, session_factory
+async def test_the_list_leads_with_the_most_prolific_channel(channel_titles, session_factory
 ):
     """Вперёд идёт канал, откуда пришло больше вакансий.
 
@@ -37,10 +28,10 @@ async def test_the_list_leads_with_the_most_prolific_channel(
         vacancy_row(source_channel_id=few.id),
     )
 
-    assert await titles_of(session) == ["Много", "Немного", "Пусто"]
+    assert await channel_titles() == ["Много", "Немного", "Пусто"]
 
 
-async def test_an_equal_count_is_broken_by_the_title(session, session_factory):
+async def test_an_equal_count_is_broken_by_the_title(channel_titles, session_factory):
     """При равном числе вакансий порядок решает заголовок."""
     await put(
         session_factory,
@@ -49,11 +40,10 @@ async def test_an_equal_count_is_broken_by_the_title(session, session_factory):
         channel_row(username="be", title="Берёза"),
     )
 
-    assert await titles_of(session) == ["Акация", "Берёза", "Ясень"]
+    assert await channel_titles() == ["Акация", "Берёза", "Ясень"]
 
 
-async def test_a_channel_without_a_title_is_ordered_by_its_username(
-    session, session_factory
+async def test_a_channel_without_a_title_is_ordered_by_its_username(channel_titles, session_factory
 ):
     """Канал без заголовка встаёт по нику, а не в начало списка.
 
@@ -73,14 +63,14 @@ async def test_a_channel_without_a_title_is_ordered_by_its_username(
         channel_row(username="ignored2", title="zulu"),
     )
 
-    assert await titles_of(session) == ["alpha", None, "zulu"]
+    assert await channel_titles() == ["alpha", None, "zulu"]
 
 
-async def test_a_deactivated_channel_keeps_its_place(session, session_factory):
+async def test_a_deactivated_channel_keeps_its_place(channel_titles, session_factory):
     """Выключенный канал остаётся на своём месте по числу вакансий."""
     off = channel_row(username="a", title="Выключён", is_active=False)
     on = channel_row(username="b", title="Включён", is_active=True)
     await put(session_factory, off, on)
     await put(session_factory, vacancy_row(source_channel_id=off.id))
 
-    assert await titles_of(session) == ["Выключён", "Включён"]
+    assert await channel_titles() == ["Выключён", "Включён"]

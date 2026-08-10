@@ -6,17 +6,11 @@
 выбранное.
 """
 
-from backend.repository.hr_list import list_hr_with_counts
 from tests.dbio import put
 from tests.factories import hr_row
 
 
-async def names(session, **kwargs) -> list[str]:
-    """Имена HR в порядке выдачи."""
-    return [row.hr.name for row in await list_hr_with_counts(session, **kwargs)]
-
-
-async def test_search_looks_at_the_name_and_the_username(session, session_factory):
+async def test_search_looks_at_the_name_and_the_username(hr_names, session_factory):
     """Поиск смотрит и в имя, и в ник."""
     await put(
         session_factory,
@@ -25,11 +19,11 @@ async def test_search_looks_at_the_name_and_the_username(session, session_factor
         hr_row(name="Виктор", telegram_username="vik"),
     )
 
-    assert await names(session, search="анна") == ["Анна"]
-    assert await names(session, search="recruiter") == ["Борис"]
+    assert await hr_names(search="анна") == ["Анна"]
+    assert await hr_names(search="recruiter") == ["Борис"]
 
 
-async def test_search_finds_capital_cyrillic(session, session_factory):
+async def test_search_finds_capital_cyrillic(hr_names, session_factory):
     """Поиск находит заглавную кириллицу любым написанием образца.
 
     Регистр складывает `casefold`, и складывает его у обеих сторон сразу —
@@ -37,19 +31,19 @@ async def test_search_finds_capital_cyrillic(session, session_factory):
     """
     await put(session_factory, hr_row(name="Мария"), hr_row(name="Ольга"))
 
-    assert await names(session, search="Мария") == ["Мария"]
-    assert await names(session, search="мария") == ["Мария"]
-    assert await names(session, search="МАРИЯ") == ["Мария"]
+    assert await hr_names(search="Мария") == ["Мария"]
+    assert await hr_names(search="мария") == ["Мария"]
+    assert await hr_names(search="МАРИЯ") == ["Мария"]
 
 
-async def test_a_blank_search_selects_everyone(session, session_factory):
+async def test_a_blank_search_selects_everyone(hr_names, session_factory):
     """Поиск из одних пробелов никого не отсекает."""
     await put(session_factory, hr_row(name="Анна"), hr_row(name="Борис"))
 
-    assert await names(session, search="   ") == ["Анна", "Борис"]
+    assert await hr_names(search="   ") == ["Анна", "Борис"]
 
 
-async def test_the_page_is_cut_after_the_search_not_before(session, session_factory):
+async def test_the_page_is_cut_after_the_search_not_before(hr_names, session_factory):
     """Страница режется после отбора, а не до него.
 
     Иначе предел выбирал бы строки из полного списка, а поиск отсеивал уже
@@ -63,8 +57,8 @@ async def test_the_page_is_cut_after_the_search_not_before(session, session_fact
         hr_row(name="Галина", telegram_username="ivanovskaya"),
     )
 
-    assert await names(session, search="ivanov", limit=2) == ["Анна", "Виктор"]
-    assert await names(session, search="ivanov", limit=2, offset=1) == [
+    assert await hr_names(search="ivanov", limit=2) == ["Анна", "Виктор"]
+    assert await hr_names(search="ivanov", limit=2, offset=1) == [
         "Виктор",
         "Галина",
     ]
