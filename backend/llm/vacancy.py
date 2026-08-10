@@ -209,7 +209,7 @@ def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
     # URL pollution: если LLM прилепил URL к company_name, вырезаем его
     # из имени и (если company_website пуст) кладём туда. Это закрывает
     # memory-TODO project_known_issue_company_name_pollution и заодно
-    # делает dedup-нормалайзер _normalize_company_name эффективным —
+    # делает dedup-нормалайзер normalize_company_name эффективным —
     # без URL-хвоста «КА https://example.com/» теперь матчится с
     # существующей «КА» компанией.
     if company_name:

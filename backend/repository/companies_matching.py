@@ -1,7 +1,6 @@
 """Сведение разобранной из вакансии компании с уже заведённой."""
 
 import logging
-import re
 from difflib import SequenceMatcher
 from typing import Any
 
@@ -10,166 +9,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company
-
-logger = logging.getLogger(__name__)
-
-
-# Минимальная транслитерация русского кириллического алфавита в латиницу
-# для дедупа имён вида «МТС» / «MTS». Ё → e (как в большинстве passport
-# transliteration — для match'а это надёжнее, чем yo).
-_CYR_TO_LAT = {
-    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e",
-    "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
-    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
-    "ф": "f", "х": "kh", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch",
-    "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
-}
-
-
-def _translit_cyr_to_latin(s: str) -> str:
-    return "".join(_CYR_TO_LAT.get(ch, ch) for ch in s.lower())
-
-
-# Юр.формы вырезаются из имени до сравнения: «ПАО Сбербанк» → «sberbank».
-# Регистр и кириллица — после lower() и transliterate.
-_LEGAL_SUFFIX_RE = re.compile(
-    r"\b(pao|oao|ao|zao|ooo|jsc|llc|ltd|inc|corp|gmbh|sa|ag|nv|bv|plc|sas)\b\.?"
+from backend.repository.companies_keys import (
+    hosts_compatible,
+    normalize_company_name,
+    normalize_host,
+    real_corporate_website,
+    signal_host,
 )
 
-
-_QUOTE_CHARS = set("«»\"'`“”„‚‘’")
-
-
-def _normalize_company_name(s: str | None) -> str:
-    """Нормализованная форма имени для deterministic match: lowercase +
-    транслитерация + срезанные юр.суффиксы + сглаженные пробелы."""
-    if not s:
-        return ""
-    s = "".join(ch for ch in s.strip() if ch not in _QUOTE_CHARS)
-    s = _translit_cyr_to_latin(s)
-    s = _LEGAL_SUFFIX_RE.sub(" ", s)
-    s = re.sub(r"[^a-z0-9]+", " ", s)
-    return " ".join(s.split())
-
-
-def _normalize_host(url: str | None) -> str:
-    """Хост сайта без схемы / www. / порта / пути / query / fragment /
-    завершающей точки. Пустая строка для None или невалидного URL.
-    Полный host (а не registrable domain) — чтобы `pay.yandex.ru` ≠
-    `yandex.ru` (subsidiary trap)."""
-    if not url:
-        return ""
-    s = url.strip().lower()
-    s = re.sub(r"^[a-z][a-z0-9+.\-]*://", "", s)
-    s = s.lstrip("/")
-    # Срезаем path / query / fragment ДО того, как лезть в port:
-    # "sber.ru?utm=foo" без strip-а query превратился бы в host
-    # "sber.ru?utm=foo" и сломал бы host-match.
-    s = s.split("/", 1)[0]
-    s = s.split("?", 1)[0]
-    s = s.split("#", 1)[0]
-    s = s.split(":", 1)[0]
-    if s.startswith("www."):
-        s = s[4:]
-    # FQDN с завершающей точкой ("example.com.") — нормализуем к
-    # "example.com", иначе host-match отказывает на пустяковом расхождении.
-    s = s.rstrip(".")
-    return s
-
-
-# Хосты, которые НЕ являются «домашним сайтом компании»: агрегаторы
-# вакансий, соцсети, мессенджеры, блог-платформы. Если parser ошибся и
-# сунул в `company_website` ссылку на канал/профиль/пост, Stage 1c (host-
-# match) мог бы склеить две разные компании по этому общему host'у. Для
-# таких host'ов host-match пропускается; останутся только name/alias-match
-# и Stage 2 LLM.
-_AGGREGATOR_HOSTS = frozenset({
-    "t.me",
-    "telegram.me",
-    "telegram.org",
-    "linkedin.com",
-    "hh.ru",
-    "habr.com",
-    "vc.ru",
-    "github.com",
-    "gitlab.com",
-    "avito.ru",
-    "superjob.ru",
-    "facebook.com",
-    "instagram.com",
-    "twitter.com",
-    "x.com",
-    "vk.com",
-    "ok.ru",
-    "youtube.com",
-    "behance.net",
-    "dribbble.com",
-    "medium.com",
-    # Шеринговые хостинги job-страниц / резидент-каталоги: на одном
-    # хосте сидит много разных компаний → Stage 1c (website-match) на
-    # таком общем домене склеит их в одну. Любой *.potok.io,
-    # *.huntflow.io и т.п. — это резюме-/job-board, а не сайт компании.
-    "potok.io",
-    "huntflow.io",
-    "huntflow.ru",
-    "amazingjobs.ru",
-    "getmatch.ru",
-    "jobs.ru",
-    "talantix.ru",
-    "rabota.ru",
-    "trudvsem.ru",
-    "career.ru",
-})
-
-
-def _is_aggregator_host(host: str) -> bool:
-    """True если host — агрегатор/соцсеть/мессенджер, а не корпоративный
-    сайт. Suffix-match: ловит и `linkedin.com`, и `m.linkedin.com`,
-    `careers.hh.ru` и т.п."""
-    if not host:
-        return False
-    for h in _AGGREGATOR_HOSTS:
-        if host == h or host.endswith("." + h):
-            return True
-    return False
-
-
-def _signal_host(host: str) -> str:
-    """Хост, очищенный от «нет сигнала о компании». Для всего, что
-    является агрегатором/соцсетью/мессенджером, возвращает пустую
-    строку: hard-rule по хостам тогда не вето́рит, а обращается с этим
-    как с «website не указан». Альтернатива (вето́рить) ломала бы
-    очевидные кейсы вроде `(Acme, acme.com)` vs `(Acme, t.me/Acme)`,
-    где парсер сунул в company_website ссылку на канал — на самом деле
-    это та же компания, и решение должно приниматься по name-match."""
-    if not host or _is_aggregator_host(host):
-        return ""
-    return host
-
-
-def _real_corporate_website(url: str | None) -> str | None:
-    """Возвращает очищенный URL ТОЛЬКО если это настоящий корпоративный
-    домен. Для aggregator/соцсеть/мессенджер ссылок (t.me/Acme,
-    linkedin.com/Acme, hh.ru/employer/...) вернёт None — такие URL'ы
-    не должны попадать в `company.website`, иначе UI показал бы юзеру
-    ссылку-на-канал как «официальный сайт компании», а будущие парсы
-    ничего полезного из этого host'а извлечь не смогут.
-    Используется как enrichment-гейт И как фильтр при создании новой
-    строки — оба пути иначе персистили бы aggregator-URL'ы."""
-    cleaned = (url or "").strip() or None
-    if not cleaned:
-        return None
-    if not _signal_host(_normalize_host(cleaned)):
-        return None
-    return cleaned
-
-
-def _hosts_compatible(a: str, b: str) -> bool:
-    """Hard-rule: разные непустые хосты = разные компании. Если один
-    хост пустой (компания без указанного сайта) — не блокируем match."""
-    if not a or not b:
-        return True
-    return a == b
+logger = logging.getLogger(__name__)
 
 
 def _enrich_company_with_parsed(
@@ -180,7 +28,7 @@ def _enrich_company_with_parsed(
     """Подсасываем parsed-данные в существующую строку:
     1. website — если в БД пусто и у нас приехал НАСТОЯЩИЙ корпоративный
        домен (не aggregator-URL: aggregator пропускаем через
-       `_real_corporate_website`, чтобы не оседали как «официальный сайт
+       `real_corporate_website`, чтобы не оседали как «официальный сайт
        компании» — это и неверная семантика для UI, и испорченный сигнал
        для будущих host-match'ей).
     2. parsed_name — добавляем в aliases, если такого написания ещё не
@@ -188,15 +36,15 @@ def _enrich_company_with_parsed(
     Не трогает decision/log — это чистая мутация модели, чтобы её можно
     было переиспользовать и из match-веток, и из race-fallback пути.
     """
-    real_website = _real_corporate_website(parsed_website)
+    real_website = real_corporate_website(parsed_website)
     if real_website and not company.website:
         company.website = real_website
 
-    parsed_norm = _normalize_company_name(parsed_name)
+    parsed_norm = normalize_company_name(parsed_name)
     if parsed_norm:
-        existing_norms = {_normalize_company_name(company.name)}
+        existing_norms = {normalize_company_name(company.name)}
         existing_norms.update(
-            _normalize_company_name(a) for a in (company.aliases or [])
+            normalize_company_name(a) for a in (company.aliases or [])
         )
         if parsed_norm not in existing_norms:
             aliases = list(company.aliases or [])
@@ -224,7 +72,7 @@ def _accept_company_match(
         stage,
         company.id,
         parsed_name,
-        _normalize_host(parsed_website),
+        normalize_host(parsed_website),
         company.name,
     )
     return company, decision
@@ -250,7 +98,7 @@ async def _create_company_row(
     # причинам, что в _enrich_company_with_parsed: «канальная» ссылка не
     # является корпоративным сайтом. None в этой колонке честнее, чем
     # ложный t.me/AcmeChannel, и не отравляет будущий host-match.
-    persisted_website = _real_corporate_website(website)
+    persisted_website = real_corporate_website(website)
     prior_stage = decision.get("stage")
     if prior_stage and prior_stage not in ("skip", None):
         decision["pre_create_stage"] = prior_stage
@@ -332,27 +180,27 @@ async def find_or_create_company(
     if not raw_name:
         return None, decision
 
-    parsed_norm = _normalize_company_name(raw_name)
+    parsed_norm = normalize_company_name(raw_name)
     # Hard-rule по host'ам должен опираться только на «настоящие» сигналы:
     # агрегаторы (t.me, linkedin, hh.ru…) обращаемся как с пустым host'ом —
     # иначе попавшая в company_website ссылка на канал/профиль ломала бы
     # name-match для одной и той же компании. Coerce делаем здесь, дальше
     # везде используем уже очищенный host.
-    parsed_host = _signal_host(_normalize_host(website))
+    parsed_host = signal_host(normalize_host(website))
 
     rows = list((await session.scalars(select(Company))).all())
     # Pre-вычисляем нормализованные представления каждой компании, чтобы не
     # повторять normalize в трёх внутренних циклах. c_host тоже сразу
-    # пропускаем через _signal_host — для legacy-данных, где в БД могла
+    # пропускаем через signal_host — для legacy-данных, где в БД могла
     # лечь ссылка на t.me как website.
     norms: list[tuple[Company, str, list[str], str]] = []
     for c in rows:
         norms.append(
             (
                 c,
-                _normalize_company_name(c.name),
-                [_normalize_company_name(a) for a in (c.aliases or [])],
-                _signal_host(_normalize_host(c.website)),
+                normalize_company_name(c.name),
+                [normalize_company_name(a) for a in (c.aliases or [])],
+                signal_host(normalize_host(c.website)),
             )
         )
 
@@ -373,7 +221,7 @@ async def find_or_create_company(
             if (
                 c_name_norm
                 and c_name_norm == parsed_norm
-                and _hosts_compatible(c_host, parsed_host)
+                and hosts_compatible(c_host, parsed_host)
             ):
                 return _accept_company_match(
                     c, raw_name, website, decision, "rule_name"
@@ -383,13 +231,13 @@ async def find_or_create_company(
         for c, _name, c_aliases, c_host in norms:
             if any(
                 a and a == parsed_norm for a in c_aliases
-            ) and _hosts_compatible(c_host, parsed_host):
+            ) and hosts_compatible(c_host, parsed_host):
                 return _accept_company_match(
                     c, raw_name, website, decision, "rule_alias"
                 )
 
     # Stage 1c — точный match по хосту. Агрегаторы уже скоэрсены в "" в
-    # _signal_host, поэтому если parsed_host здесь непустой — это реальный
+    # signal_host, поэтому если parsed_host здесь непустой — это реальный
     # corporate-домен. То же по c_host у каждого row.
     #
     # Намеренная асимметрия с user-rule «одинаковое имя + разные сайты =
@@ -414,7 +262,7 @@ async def find_or_create_company(
     if parsed_norm and lm_client is not None and lm_model:
         candidates: list[tuple[Company, float]] = []
         for c, c_name_norm, c_aliases, c_host in norms:
-            if not _hosts_compatible(c_host, parsed_host):
+            if not hosts_compatible(c_host, parsed_host):
                 continue
             ratio_name = (
                 SequenceMatcher(None, parsed_norm, c_name_norm).ratio()
@@ -481,7 +329,7 @@ async def find_or_create_company(
                 "company_dedup: llm_no_match parsed_name=%r parsed_host=%r "
                 "shortlist_ids=%r reasoning=%r",
                 raw_name,
-                _normalize_host(website),
+                normalize_host(website),
                 [c.id for c in shortlist],
                 reasoning,
             )
