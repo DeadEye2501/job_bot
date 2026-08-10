@@ -4,6 +4,7 @@ Despite the historical module name, this works against any OpenAI-compatible
 endpoint: LM Studio, Ollama, OpenAI itself, OpenRouter, Grok, custom vLLM, etc.
 """
 import logging
+from dataclasses import dataclass
 
 import httpx
 
@@ -21,6 +22,87 @@ _log = logging.getLogger(__name__)
 # по таймауту, а не по содержанию. Удалённые провайдеры (OpenAI/OpenRouter)
 # обычно отвечают быстро, для них этот лимит избыточен, но не критичен.
 LLM_REQUEST_TIMEOUT_SEC = 180.0
+
+
+@dataclass(frozen=True)
+class ChatRequest:
+    """Одно обращение к чат-модели: что спрашиваем и в каких рамках.
+
+    Свёрнуто в предмет, а не разложено доводами, потому что это одна группа:
+    рамки обращения задаются вместе и вместе же меняются, когда меняется сам
+    запрос. `purpose` попадает в записи журнала — по ним потом видно, кто
+    именно не дождался ответа.
+    """
+
+    purpose: str
+    messages: list[dict[str, str]]
+    max_tokens: int
+    temperature: float = 0.0
+    # Своё время ожидания нужно там, где одно обращение заведомо длиннее
+    # прочих: разбор резюме на слабой локальной модели идёт минутами.
+    timeout: float | None = None
+
+
+@dataclass(frozen=True)
+class ChatAnswer:
+    """Ответ чат-модели либо причина, по которой его нет.
+
+    Откат у зовущих разный — от `None` до «считаем проверку пройденной», — и
+    остаётся по местам; сюда попадает только то, чем они этот откат выбирают.
+    """
+
+    text: str | None = None
+    finish_reason: str | None = None
+    error: str | None = None
+
+
+async def chat(
+    client: httpx.AsyncClient,
+    model: str,
+    request: ChatRequest,
+    log: logging.Logger,
+) -> ChatAnswer:
+    """Спрашивает чат-модель и отдаёт текст с признаком завершения.
+
+    Сеть, отказ провайдера и неразбираемый ответ разбираются здесь: наружу
+    уходит `error`, по которому зовущий выбирает свой откат. Иначе этот же
+    разбор пришлось бы писать заново в каждом месте, где к модели обращаются.
+
+    Пишет в журнал логгером зовущего, а не своим: в окне журнала у строки
+    виден источник, и обращения семерых иначе схлопнулись бы в одно имя.
+    """
+    body = {
+        "model": model,
+        "messages": request.messages,
+        "max_tokens": request.max_tokens,
+        "temperature": request.temperature,
+    }
+    # Своё время ожидания подставляется, только когда оно задано: у httpx
+    # явный `timeout=None` означает «ждать без предела», а не «как у клиента».
+    extra = {} if request.timeout is None else {"timeout": request.timeout}
+    try:
+        r = await client.post("/v1/chat/completions", json=body, **extra)
+        r.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        log.warning(
+            "%s: провайдер ответил HTTP %s", request.purpose, e.response.status_code
+        )
+        return ChatAnswer(error=f"llm_http_error: {e.response.status_code}")
+    except httpx.RequestError as e:
+        log.warning(
+            "%s: запрос не дошёл: %s: %s", request.purpose, type(e).__name__, e
+        )
+        return ChatAnswer(error=f"llm_request_error: {type(e).__name__}")
+
+    try:
+        choice = r.json()["choices"][0]
+        text = choice["message"]["content"].strip()
+        finish_reason = choice.get("finish_reason")
+    except (IndexError, KeyError, ValueError) as e:
+        log.warning("%s: ответ провайдера не разобрать: %s", request.purpose, e)
+        return ChatAnswer(error=f"malformed_response: {e}")
+
+    return ChatAnswer(text=text, finish_reason=finish_reason)
 
 
 def make_client(config: LlmProviderConfig) -> httpx.AsyncClient:

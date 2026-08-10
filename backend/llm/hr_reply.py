@@ -6,6 +6,8 @@ import logging
 
 import httpx
 
+from adapters.lm_studio import ChatRequest, chat
+
 from backend.domain.transitions import ALLOWED_AUTO_TRANSITIONS
 from backend.models import VacancyStatus
 from backend.payloads import Classification
@@ -192,37 +194,22 @@ async def classify_hr_reply(
         "верни только JSON-вердикт по правилам system prompt'а.\n\n"
         + wrap_external(text)
     )
-    try:
-        r = await client.post(
-            "/v1/chat/completions",
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content},
-                ],
-                "max_tokens": 200,
-                "temperature": 0,
-            },
-        )
-        r.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        logger.warning(
-            "classify_hr_reply: LM Studio returned HTTP %s",
-            e.response.status_code,
-        )
+    reply = await chat(
+        client,
+        model,
+        ChatRequest(
+            purpose="classify_hr_reply",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            max_tokens=200,
+        ),
+        logger,
+    )
+    if reply.text is None:
         return None
-    except httpx.RequestError as e:
-        logger.warning(
-            "classify_hr_reply: request failed: %s: %s", type(e).__name__, e
-        )
-        return None
-
-    try:
-        answer = r.json()["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, ValueError) as e:
-        logger.warning("classify_hr_reply: malformed LLM response: %s", e)
-        return None
+    answer = reply.text
 
     parsed = _parse_classification(answer)
     if parsed is None:

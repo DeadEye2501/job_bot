@@ -51,4 +51,30 @@ MUTATIONS = [
         "    except ValueError as e:" + CRLF
         + '        _log.exception("пробный запрос к модели векторов %s не прошёл", model)',
     ),
+    # chat: отказ провайдера перестаёт быть отказом
+    (
+        "adapters/lm_studio.py",
+        '        r = await client.post("/v1/chat/completions", json=body, **extra)'
+        + CRLF
+        + "        r.raise_for_status()",
+        '        r = await client.post("/v1/chat/completions", json=body, **extra)',
+    ),
+    # chat: своё время ожидания не доезжает до запроса
+    (
+        "adapters/lm_studio.py",
+        '    extra = {} if request.timeout is None else {"timeout": request.timeout}',
+        "    extra = {}",
+    ),
+    # chat: признак завершения теряется по дороге
+    (
+        "adapters/lm_studio.py",
+        "    return ChatAnswer(text=text, finish_reason=finish_reason)",
+        "    return ChatAnswer(text=text)",
+    ),
+    # chat: неразбираемый ответ отдаётся как пустой, без причины
+    (
+        "adapters/lm_studio.py",
+        '        return ChatAnswer(error=f"malformed_response: {e}")',
+        "        return ChatAnswer()",
+    ),
 ]
