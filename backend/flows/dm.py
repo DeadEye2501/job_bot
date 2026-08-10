@@ -1,6 +1,8 @@
-"""Приём личного сообщения от HR: запись, привязка, разбор."""
+"""Личная переписка с HR: запись сообщения в обе стороны, привязка, разбор."""
 
 import logging
+
+from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -12,14 +14,69 @@ from backend.helpers import extract_text
 from backend.helpers import fetch_telegram_avatar
 from backend.llm.hr_reply import classify_hr_reply
 from backend.models import Vacancy
+from backend.payloads import OutgoingMessage
 from backend.repository.hr_identify import find_known_hr
 from backend.repository.hr_identify import find_latest_vacancy_id_for_hr
 from backend.repository.hr_identify import refresh_hr_username
 from backend.repository.hr_identify import resolve_reply_target_vacancy
+from backend.repository.messages import find_outgoing_message
 from backend.repository.messages import save_incoming_message
+from backend.repository.messages import save_outgoing_message
 from backend.repository.vacancies_life import apply_classification
 
 logger = logging.getLogger(__name__)
+
+OutgoingDmOutcome = Literal["stored", "already_stored", "not_stored"]
+
+
+async def persist_outgoing_dm(session_factory, client, msg, hr_id: int) -> OutgoingDmOutcome:
+    """Записать наше исходящее из Telegram; сказать, чем дело кончилось.
+
+    Своё сообщение прилетает и эхом от Telegram, и хвостом при догоне
+    переписки, а строку о нём мог завести ещё и сам отправитель. Поэтому
+    исходов три, и зовущие разбирают их по-своему: «записали впервые»,
+    «строка уже лежала» и «записать не вышло».
+
+    **Проверка «уже лежит» стоит до скачивания вложения нарочно.** Путь в
+    кэше собран из номера сообщения, то есть повторная загрузка целится в
+    тот же файл, который в это время может читать окно, и оставляет его
+    рваным — `download_media` гонится с `shutil.copy2` за один путь.
+    """
+    async with session_factory() as session:
+        if await find_outgoing_message(session, hr_id, msg.id) is not None:
+            return "already_stored"
+    media_kind, media_name = classify_media(msg)
+    media_path = (
+        await download_media(client, msg, hr_id) if media_kind is not None else None
+    )
+    async with session_factory() as session:
+        try:
+            _, saved = await save_outgoing_message(
+                session,
+                OutgoingMessage(
+                    hr_id=hr_id,
+                    text=extract_dm_text(msg),
+                    tg_message_id=msg.id,
+                    sent_at=msg.date,
+                    media_kind=media_kind,
+                    media_path=media_path,
+                    media_name=media_name,
+                ),
+            )
+            if not saved:
+                logger.debug(
+                    "Outgoing DM dedup: hr=%d tg_msg=%d already saved",
+                    hr_id, msg.id,
+                )
+                return "not_stored"
+            await session.commit()
+        except Exception:
+            logger.exception(
+                "outgoing DM persistence failed",
+                extra={"hr_id": hr_id, "tg_message_id": msg.id},
+            )
+            return "not_stored"
+    return "stored"
 
 
 async def process_dm(

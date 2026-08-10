@@ -5,12 +5,9 @@ import asyncio
 
 from sqlalchemy import select
 
-from backend.bot.media import classify_media, download_media
-from backend.flows.dm import process_dm
-from backend.helpers import extract_dm_text, telegram_peer
-from backend.payloads import OutgoingMessage
+from backend.flows.dm import persist_outgoing_dm, process_dm
+from backend.helpers import telegram_peer
 from backend.repository.hr_list import list_hrs_for_backfill
-from backend.repository.messages import save_outgoing_message
 from backend.notify import fire
 
 logger = logging.getLogger(__name__)
@@ -110,34 +107,25 @@ async def backfill_hr_dm_history(
     # Oldest-first so the chat order stays sane in the UI.
     for msg in reversed(messages):
         if msg.outgoing:
-            # Direct insert — outgoing doesn't need LLM classification.
-            text = extract_dm_text(msg)
-            media_kind, media_name = classify_media(msg)
-            media_path = (
-                await download_media(client, msg, hr.id)
-                if media_kind is not None else None
-            )
+            # Своё сообщение разбора моделью не требует — его пишут как есть,
+            # тем же объявлением, что и эхо из Telegram.
+            #
+            # Беда одного сообщения не должна уносить весь догон: дальше по
+            # списку идут и остальная переписка, и сверка удалённого, и
+            # оповещение окна о том, что уже легло. Догон вдобавок гоняют по
+            # два десятка переписок разом, и запертая на запись база — здесь
+            # обычное дело, а не диковина.
             try:
-                async with session_factory() as session:
-                    _, saved = await save_outgoing_message(
-                        session,
-                        OutgoingMessage(
-                            hr_id=hr.id,
-                            text=text,
-                            tg_message_id=msg.id,
-                            sent_at=msg.date,
-                            media_kind=media_kind,
-                            media_path=media_path,
-                            media_name=media_name,
-                        ),
-                    )
-                    await session.commit()
-                had_new = had_new or saved
+                outcome = await persist_outgoing_dm(
+                    session_factory, client, msg, hr.id
+                )
             except Exception:
                 logger.exception(
                     "backfill outgoing insert failed",
                     extra={"hr_id": hr.id, "tg_message_id": msg.id},
                 )
+                continue
+            had_new = had_new or outcome == "stored"
         else:
             # Incoming routed through the same pipeline as live DMs so
             # classification + vacancy-linking stay consistent. The
@@ -217,9 +205,9 @@ async def catch_up_missed_dms(
     Outgoing messages cover the case where the user typed from their phone
     or another TG client while the bot was off — without this we'd only
     see what we sent from our own app + what HRs sent us, missing half the
-    conversation. Повторы отсеивает `save_outgoing_message`: уже лежащая
-    строка возвращается с признаком «записали не мы», и догон её не
-    считает новой.
+    conversation. Повторы отсеивает `persist_outgoing_dm`: он же и решает,
+    считать ли сообщение новым, — уже лежащую строку догон новой не
+    считает и окно из-за неё не будит.
 
     Also reconciles deletes that happened while the bot was offline:
     Telegram doesn't replay ``DeletedMessagesHandler`` updates after a

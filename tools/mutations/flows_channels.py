@@ -173,8 +173,8 @@ MUTATIONS = [
     # backfill: повтор засчитывается как новая строка
     (
         "backend/flows/dm_backfill.py",
-        "                had_new = had_new or saved" + CRLF,
-        "                had_new = True" + CRLF,
+        '            had_new = had_new or outcome == "stored"' + CRLF,
+        "            had_new = True" + CRLF,
     ),
     # backfill: окно не узнаёт о догнанной переписке
     (
