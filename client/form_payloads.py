@@ -6,7 +6,7 @@
 молча, а мост уже за пределом строк и растить его нельзя.
 """
 
-from backend.helpers import normalize_username
+from backend.helpers import typed_username
 
 
 def none_if_empty(value) -> str | None:
@@ -71,23 +71,16 @@ def read_new_hr_fields(payload: dict) -> dict:
     записанное, оно нашлось бы только в тот миг, когда отправка не находит
     собеседника и не может сказать почему.
 
-    **Это про заведение, а не про колонку вообще:** правка того же поля на
-    карточке HR идёт своим путём (`repository/hr_card.update_hr_fields`) и
-    пока срезает одну собачку, не разбирая остального. Записано отдельным
-    пунктом плана.
+    Правка того же поля на карточке HR (`repository/hr_card.update_hr_fields`)
+    разбирает ник тем же объявлением: форма правки не может принимать то,
+    что форма заведения отвергает.
 
     Нечисловой номер учётной записи роняет `ValueError` по той же причине:
     молча положенный ноль привязал бы HR к чужой учётной записи. Оба броска
     ловит слот и отвечает окну «Неверные поля».
     """
-    typed = none_if_empty(payload.get("telegram_username"))
-    # Один «@» — это незаполненное поле, а не негодный ник: собачку
-    # набирают первой и стирают вместе со всем остальным.
-    username = none_if_empty(typed.lstrip("@")) if typed is not None else None
-    if username is not None:
-        username = normalize_username(username)
-        if username is None:
-            raise ValueError("ник не похож на телеграмовский")
+    typed = payload.get("telegram_username")
+    username = None if typed is None else typed_username(typed)
     raw_user_id = payload.get("telegram_user_id")
     return {
         "name": none_if_empty(payload.get("name")),

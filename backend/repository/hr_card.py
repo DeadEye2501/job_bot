@@ -5,6 +5,7 @@ import logging
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.helpers import typed_username
 from backend.models import Company, HR, Message, Vacancy
 from backend.payloads import HrDetail
 
@@ -38,6 +39,12 @@ async def update_hr_fields(
     Sentinel ``_HR_FIELD_UNSET`` distinguishes "don't touch" from "set to
     NULL", so a single call can patch any subset of columns. Empty strings
     collapse to NULL — the schema treats absence and empty equivalently.
+
+    Ник разбирается тем же объявлением, что и при заведении: правка того же
+    поля не может принимать то, что форма заведения отвергает. Не
+    телеграмовское роняет ``ValueError`` — прежний ник при этом остаётся
+    цел, а молча записанное имя человека обнаружилось бы только тогда,
+    когда отправка перестала находить собеседника.
     """
     hr = await session.get(HR, hr_id)
     if hr is None:
@@ -47,13 +54,9 @@ async def update_hr_fields(
         hr.name = (str(name).strip() or None) if name is not None else None
         changed.append("name")
     if telegram_username is not _HR_FIELD_UNSET:
-        if telegram_username is None:
-            hr.telegram_username = None
-        else:
-            cleaned = str(telegram_username).strip()
-            if cleaned.startswith("@"):
-                cleaned = cleaned[1:].strip()
-            hr.telegram_username = cleaned or None
+        hr.telegram_username = (
+            None if telegram_username is None else typed_username(telegram_username)
+        )
         changed.append("telegram_username")
     if notes is not _HR_FIELD_UNSET:
         hr.notes = (str(notes).strip() or None) if notes is not None else None

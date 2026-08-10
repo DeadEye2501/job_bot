@@ -2,6 +2,31 @@
 
 # (файл, что заменить, на что заменить) — по одной осмысленной поломке.
 MUTATIONS = [
+    # typed_username: негодный ник молча становится отсутствием
+    (
+        "backend/helpers.py",
+        "    if handle is None:\r\n"
+        '        raise ValueError("ник не похож на телеграмовский")\r\n',
+        "",
+    ),
+    # typed_username: одна собачка перестаёт считаться пустым полем
+    (
+        "backend/helpers.py",
+        '    typed = str(value).strip().lstrip("@").strip()',
+        "    typed = str(value).strip()",
+    ),
+    # typed_username: ник из формы разбирают правилом объявления
+    (
+        "backend/helpers.py",
+        "    handle = normalize_username(typed, typed_by_a_person=True)",
+        "    handle = normalize_username(typed)",
+    ),
+    # normalize_username: поблажка по длине достаётся и разбору объявления
+    (
+        "backend/helpers.py",
+        "    allowed = _TG_TYPED_USERNAME_RE if typed_by_a_person else _TG_USERNAME_RE",
+        "    allowed = _TG_TYPED_USERNAME_RE",
+    ),
     # extract_text: пропадает запасной вариант через caption
     (
         "backend/helpers.py",

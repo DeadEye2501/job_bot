@@ -81,11 +81,11 @@ MUTATIONS = [
         "hr.name = (str(name).strip() or None) if name is not None else None",
         "hr.name = str(name) if name is not None else None",
     ),
-    # update_hr_fields: собачка в нике не срезается
+    # update_hr_fields: правка ника перестаёт разбирать введённое
     (
         "backend/repository/hr_card.py",
-        "                cleaned = cleaned[1:].strip()",
-        "                cleaned = cleaned.strip()",
+        "            None if telegram_username is None else typed_username(telegram_username)",
+        "            None if telegram_username is None else str(telegram_username)",
     ),
     # get_hr_detail: последняя компания берётся от старой вакансии
     (

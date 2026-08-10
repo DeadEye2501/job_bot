@@ -8,6 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 _TG_USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
+# Ник, набранный человеком, принимается и от четырёх символов: новым такие
+# Telegram не выдаёт, но выданные до ужесточения работают, и собеседник с
+# таким ником обычен. В объявлении о работе та же поблажка опасна — «Anna»
+# там имя, а не ник, и разыскав по нему живую чужую учётную запись, отклик
+# ушёл бы постороннему. Разница не в строгости, а в том, кто отвечает за
+# написанное: за формой стоит человек, за объявлением никто.
+_TG_TYPED_USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{3,31}$")
 _TG_RESERVED_PATHS = {"joinchat", "c", "s", "bot", "dl", "addstickers"}
 
 
@@ -60,7 +67,14 @@ def extract_dm_text(msg) -> str:
     return f"↪ {quote}\n\n{body}" if body else f"↪ {quote}"
 
 
-def normalize_username(hr_contact: str | None) -> str | None:
+def normalize_username(hr_contact: str | None, *, typed_by_a_person: bool = False) -> str | None:
+    """Ник из записи контакта: голое написание или отсутствие.
+
+    ``typed_by_a_person`` опускает нижнюю границу длины до четырёх — см.
+    `_TG_TYPED_USERNAME_RE`. Своим доводом, а не отдельным объявлением,
+    потому что различается только эта граница, а разбор ссылки, собачки и
+    хвоста у обоих один.
+    """
     if not hr_contact:
         return None
     s = hr_contact.strip()
@@ -76,9 +90,36 @@ def normalize_username(hr_contact: str | None) -> str | None:
         return None
     if s.lower() in _TG_RESERVED_PATHS:
         return None
-    if not _TG_USERNAME_RE.match(s):
+    allowed = _TG_TYPED_USERNAME_RE if typed_by_a_person else _TG_USERNAME_RE
+    if not allowed.match(s):
         return None
     return s
+
+
+def typed_username(value) -> str | None:
+    """Ник, введённый человеком в поле формы: пусто — отсутствие, негодное —
+    отказ.
+
+    Отличается от `normalize_username` тем, что различает «поле пустое» и
+    «поле заполнено чем-то не тем». Первое законно — ник знают не про
+    каждого HR; второе молча превратилось бы в отсутствие, и человек узнал
+    бы об этом, только когда отправка перестала находить собеседника.
+
+    Одна собачка считается пустым полем: её набирают первой и стирают
+    вместе со всем остальным.
+
+    Четырёхбуквенные ники здесь проходят, а в разборе объявления нет: за
+    формой стоит человек, который написанное подтверждает.
+    """
+    if value is None:
+        return None
+    typed = str(value).strip().lstrip("@").strip()
+    if not typed:
+        return None
+    handle = normalize_username(typed, typed_by_a_person=True)
+    if handle is None:
+        raise ValueError("ник не похож на телеграмовский")
+    return handle
 
 
 def telegram_peer(hr) -> int | str | None:
