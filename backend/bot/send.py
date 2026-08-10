@@ -3,18 +3,20 @@
 import logging
 
 from adapters import telegram
-from backend.domain.transitions import should_apply_status
 from backend.models import BotMode
 from backend.models import HR
 from backend.models import Message
-from backend.models import Vacancy
-from backend.models import VacancyEvent
-from backend.models import VacancyStatus
-from backend.models import VacancyStatusHistory
 from backend.helpers import telegram_peer
 from backend.repository.hr_card import _hr_blacklist_value
+from backend.repository.vacancies_life import add_vacancy_event
+from backend.repository.vacancies_life import mark_vacancy_applied
 
 logger = logging.getLogger(__name__)
+
+
+def _applied_label(force: bool) -> str:
+    """Чем подписан перевод в «отклик отправлен» в истории вакансии."""
+    return "Ручная отправка." if force else "Авто-отправка отклика."
 
 
 def _shares_provider(a, b) -> bool:
@@ -167,36 +169,13 @@ async def send(
                 )
             applied_now = False
             if vacancy_id is not None:
-                v = await session.get(Vacancy, vacancy_id)
-                if v is not None and should_apply_status(
-                    v.status, VacancyStatus.APPLIED, force=force
-                ):
-                    previous_status = v.status
-                    v.status = VacancyStatus.APPLIED
-                    applied_now = True
-                    # Status-history row нужен чтобы таймлайн вакансии
-                    # показал «Applied: …» — без этого NEW→APPLIED-флип
-                    # из Bot.send проходил молча, в UI было видно
-                    # только applied_sent VacancyEvent (без статус-цвета).
-                    kind_label = (
-                        "Ручная отправка."
-                        if force
-                        else "Авто-отправка отклика."
-                    )
-                    # SEND_LOCKED-пометка раньше дописывалась в
-                    # explanation — но это делало timeline-запись разной
-                    # в dev и проде. Аудит факта суппрессии живёт в
-                    # VacancyEvent(kind="applied_sent").payload.suppressed.
-                    session.add(
-                        VacancyStatusHistory(
-                            vacancy_id=vacancy_id,
-                            message_id=None,
-                            previous_status=previous_status,
-                            status=VacancyStatus.APPLIED,
-                            explanation=kind_label,
-                            applied=True,
-                        )
-                    )
+                # SEND_LOCKED-пометка раньше дописывалась в explanation —
+                # но это делало запись в истории разной в dev и проде.
+                # Аудит факта суппрессии живёт в
+                # VacancyEvent(kind="applied_sent").payload.suppressed.
+                applied_now = await mark_vacancy_applied(
+                    session, vacancy_id, _applied_label(force), force=force
+                )
             await session.commit()
     except Exception:
         logger.error(
@@ -210,11 +189,9 @@ async def send(
         if vacancy_id is not None:
             try:
                 async with bot._session_factory() as session:
-                    v = await session.get(Vacancy, vacancy_id)
-                    if v is not None and should_apply_status(
-                        v.status, VacancyStatus.APPLIED, force=force
+                    if await mark_vacancy_applied(
+                        session, vacancy_id, _applied_label(force), force=force
                     ):
-                        v.status = VacancyStatus.APPLIED
                         await session.commit()
                         logger.info(
                             "vacancy %s status -> APPLIED via fallback "
@@ -240,18 +217,17 @@ async def send(
     if vacancy_id is not None:
         try:
             async with bot._session_factory() as session:
-                session.add(
-                    VacancyEvent(
-                        vacancy_id=vacancy_id,
-                        kind="applied_sent",
-                        payload={
-                            "hr_id": hr.id,
-                            "force": force,
-                            "suppressed": suppressed,
-                            "cover_letter_chars": len(text),
-                            "tg_message_id": tg_msg_id,
-                        },
-                    )
+                await add_vacancy_event(
+                    session,
+                    vacancy_id,
+                    "applied_sent",
+                    {
+                        "hr_id": hr.id,
+                        "force": force,
+                        "suppressed": suppressed,
+                        "cover_letter_chars": len(text),
+                        "tg_message_id": tg_msg_id,
+                    },
                 )
                 await session.commit()
         except Exception:

@@ -2,6 +2,7 @@
 
 import logging
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from adapters import telegram
@@ -11,6 +12,7 @@ from backend.models import Message
 from backend.helpers import telegram_peer
 from backend.payloads import OutgoingMessage
 from backend.repository.hr_card import _hr_blacklist_value
+from backend.repository.messages import mark_incoming_read
 from backend.repository.messages import save_outgoing_message
 
 from backend.bot import media
@@ -30,25 +32,14 @@ async def mark_hr_chat_read(bot, hr_id: int) -> int:
     """
     if (await bot._current_mode()) is BotMode.OFF:
         return 0
-    from sqlalchemy import update as _sa_update
-    from datetime import datetime as _dt, timezone as _tz
-    now = _dt.now(_tz.utc)
+    now = datetime.now(timezone.utc)
     async with bot._session_factory() as session:
         hr = await session.get(HR, hr_id)
         if hr is None:
             return 0
         target = telegram_peer(hr)
-        res = await session.execute(
-            _sa_update(Message)
-            .where(
-                Message.hr_id == hr_id,
-                Message.is_incoming,
-                Message.read_at.is_(None),
-            )
-            .values(read_at=now)
-        )
+        updated = await mark_incoming_read(session, hr_id, now)
         await session.commit()
-        updated = res.rowcount or 0
 
     if updated > 0 and target is not None:
         try:

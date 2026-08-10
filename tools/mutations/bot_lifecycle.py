@@ -98,11 +98,11 @@ MUTATIONS = [
         + '                return existing.id, "exists"' + CRLF,
         "",
     ),
-    # add_channel: имя перестаёт опускаться в строчные
+    # create_channel: имя перестаёт опускаться в строчные
     (
-        "backend/bot/channels.py",
-        "                username=username.lower(),",
-        "                username=username,",
+        "backend/repository/channels.py",
+        "        username=username.lower(),",
+        "        username=username,",
     ),
     # persist_session_if_changed: совпавшая строка всё равно переписывается
     (

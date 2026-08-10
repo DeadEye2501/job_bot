@@ -35,6 +35,41 @@ def _ensure_trailing_period(s: str | None) -> str | None:
     return trimmed + "."
 
 
+async def mark_vacancy_applied(
+    session: AsyncSession, vacancy_id: int, explanation: str | None, *, force: bool
+) -> bool:
+    """Перевести вакансию в «отклик отправлен» и записать это в историю.
+
+    Липкость статуса уважается: у отказа и у оффера отклик уже ничего не
+    решает, и автоматика их не двигает — `force` приходит от нажатия в
+    окне, где решает человек.
+
+    Отвечает, состоялся ли перевод. Историю пишет всегда, когда перевод
+    состоялся: без неё карточка показывает сменившийся статус без следа
+    о том, кто и когда его тронул.
+
+    Транзакцию закрывает зовущий.
+    """
+    vacancy = await session.get(Vacancy, vacancy_id)
+    if vacancy is None or not should_apply_status(
+        vacancy.status, VacancyStatus.APPLIED, force=force
+    ):
+        return False
+    previous = vacancy.status
+    vacancy.status = VacancyStatus.APPLIED
+    session.add(
+        VacancyStatusHistory(
+            vacancy_id=vacancy_id,
+            message_id=None,
+            previous_status=previous,
+            status=VacancyStatus.APPLIED,
+            explanation=_ensure_trailing_period(explanation),
+            applied=True,
+        )
+    )
+    return True
+
+
 async def change_vacancy_status(
     session: AsyncSession,
     vacancy_id: int,

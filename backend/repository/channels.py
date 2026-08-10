@@ -196,6 +196,28 @@ async def find_channel_by_username(
     ).first()
 
 
+async def create_channel(
+    session: AsyncSession, username: str, title: str | None, avatar: bytes | None
+) -> int:
+    """Завести канал-источник и отдать его номер.
+
+    Ник приводится к нижнему регистру: Telegram на регистр не смотрит, а
+    колонка смотрит — иначе «PyJobs» и «pyjobs» лягут двумя каналами, и
+    поиск по нику найдёт то один, то другой.
+
+    Транзакцию закрывает зовущий.
+    """
+    channel = TelegramChannel(
+        username=username.lower(),
+        title=title,
+        is_active=True,
+        avatar=avatar,
+    )
+    session.add(channel)
+    await session.flush()
+    return channel.id
+
+
 async def set_channel_active(
     session: AsyncSession, channel_id: int, is_active: bool
 ) -> bool:

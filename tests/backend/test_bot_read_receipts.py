@@ -21,9 +21,9 @@ from pyrogram.raw.types import (
     UpdateReadHistoryOutbox,
 )
 
-from backend.models import BotMode, Message
+from backend.models import HR, BotMode, Message
 from tests.dbio import all_rows, only_row, put
-from tests.factories import message_row
+from tests.factories import hr_row, message_row
 from tests.fakes.telegram import FakeTelegramClient
 
 
@@ -32,6 +32,50 @@ def _outbox_read(user_id: int, max_id: int):
     return UpdateReadHistoryOutbox(
         peer=PeerUser(user_id=user_id), max_id=max_id, pts=1, pts_count=1
     )
+
+
+async def test_opening_one_chat_leaves_the_other_alone(chatting, session_factory):
+    """Открытая переписка гасит непрочитанное только у своего собеседника.
+
+    Счётчик непрочитанного показан у каждого HR отдельно; погасив разом
+    все, окно сказало бы, что писем нет, там где они есть.
+    """
+    bot, _, hr = await chatting()
+    await put(session_factory, hr_row(name="Пётр", telegram_username="petr"))
+    other = next(
+        row for row in await all_rows(session_factory, HR) if row.id != hr.id
+    )
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, is_incoming=True, read_at=None),
+        message_row(hr_id=other.id, is_incoming=True, read_at=None, tg_message_id=2),
+    )
+
+    assert await bot.mark_hr_chat_read(hr.id) == 1
+
+    theirs = next(
+        m for m in await all_rows(session_factory, Message) if m.hr_id == other.id
+    )
+    assert theirs.read_at is None
+
+
+async def test_a_deleted_but_unread_message_is_sealed_too(
+    chatting, session_factory
+):
+    """Надгробие непрочитанного письма гасится наравне с живым.
+
+    Удалённое, но так и не прочитанное входящее иначе держит счётчик
+    вечно: в окне его уже нет, и погасить нечем.
+    """
+    bot, _, hr = await chatting()
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, is_incoming=True, read_at=None, is_deleted=True),
+    )
+
+    assert await bot.mark_hr_chat_read(hr.id) == 1
+
+    assert (await only_row(session_factory, Message)).read_at is not None
 
 
 async def test_opening_a_chat_marks_its_incoming_messages_read(
