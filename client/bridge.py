@@ -45,15 +45,6 @@ from PySide6.QtWidgets import (
 )
 from sqlalchemy import func, select, text as sa_text
 from sqlalchemy.exc import IntegrityError
-from pyrogram.client import Client as PyrogramClient
-from pyrogram.errors import (
-    BadRequest,
-    FloodWait,
-    PhoneCodeExpired,
-    PhoneCodeInvalid,
-    PhoneNumberInvalid,
-    SessionPasswordNeeded,
-)
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from adapters import lm_studio
@@ -74,6 +65,7 @@ from backend.models import (
     VacancyStatus,
     VacancyStatusHistory,
 )
+from backend.telegram_login import TelegramLogin
 from backend.runtime_settings import RuntimeSettings
 
 
@@ -243,32 +235,98 @@ async def _do_llm_probe(
         await client.aclose()
 
 
-async def _safe_disconnect(client) -> None:
-    """Best-effort disconnect для PyrogramClient. Используется для cleanup
-    временного login-клиента: сокет всегда стоит закрыть, даже если
-    клиент в полу-открытом состоянии и `disconnect()` сам кинет.
+def _dispatch_json(api, signal: Signal, coro: Coroutine[Any, Any, Any]) -> None:
+    """Отправить корутину на runner и отдать её ответ окну сигналом.
 
-    Бросаем в DEBUG (с traceback'ом) — molчaть полностью неудобно при
-    диагностике редких socket-leak'ов: ConnectionResetError /
-    OSError(EPIPE) ловится тут регулярно, и хорошо видеть в логе что это
-    именно `_safe_disconnect`-swallow, а не что-то странное."""
-    if client is None:
-        return
+    Объявлено один раз на оба класса: общие чтения нагрузки зовут отправку,
+    не зная, у какого из них они в руках, — а разойдись эти отправки, у
+    мастера и настроек разошлось бы и поведение при закрытии окна.
+
+    Отмену при остановке не показываем: обработчик в окне к этому мигу уже
+    отвалился, и «CancelledError» уходило бы в умирающую страницу. Обе
+    породы отмены ловятся вместе — runner отдаёт свою, корутина свою.
+    """
+    future = api._runner.submit(coro)
+
+    def on_done(f: Future) -> None:
+        try:
+            payload = f.result()
+        except (CancelledError, asyncio.CancelledError):
+            return
+        except Exception as e:
+            logger.exception(
+                "bridge: unexpected error in coroutine %s",
+                getattr(coro, "__qualname__", "?"),
+            )
+            payload = _err(f"{type(e).__name__}: {e}")
+        signal.emit(payload)
+
+    future.add_done_callback(on_done)
+
+
+async def _login_json(step_coro) -> str:
+    """Дождаться шага входа в Telegram и перевести его исход в ответ окну."""
+    step = await step_coro
+    return _err(step.error) if step.error is not None else _ok(step.payload)
+
+
+def _login_send_code(api, payload_json: str) -> None:
+    """Запросить код входа по нагрузке формы.
+
+    Три чтения нагрузки живут здесь, а не в классах: слоты нужны обоим —
+    мастеру и настройкам, — а тела у них одни и те же, и разойтись им нельзя.
+    """
     try:
-        await client.disconnect()
-    except Exception:
-        logger.debug("_safe_disconnect swallowed", exc_info=True)
+        payload = json.loads(payload_json)
+        api_id = int(payload["api_id"])
+        api_hash = str(payload["api_hash"]).strip()
+        phone = str(payload["phone"]).strip()
+    except (KeyError, ValueError, TypeError) as e:
+        _log_invalid_payload("telegram_send_code", e)
+        api.telegram_send_code_done.emit(_err(f"Неверные поля: {e}"))
+        return
+    api._dispatch(
+        api.telegram_send_code_done,
+        _login_json(api._login.send_code(api_id, api_hash, phone)),
+    )
 
 
-def _humanize_duration(seconds: int) -> str:
-    """'12418 sec' → '3 ч 27 мин'. Для FloodWait-сообщений в UI."""
-    if seconds < 60:
-        return f"{seconds} сек"
-    minutes, secs = divmod(seconds, 60)
-    if minutes < 60:
-        return f"{minutes} мин" + (f" {secs} сек" if secs else "")
-    hours, mins = divmod(minutes, 60)
-    return f"{hours} ч" + (f" {mins} мин" if mins else "")
+def _login_confirm_code(api, payload_json: str) -> None:
+    """Подтвердить код входа по нагрузке формы."""
+    try:
+        code = str(json.loads(payload_json)["code"]).strip()
+    except (KeyError, ValueError, TypeError) as e:
+        _log_invalid_payload("telegram_confirm_code", e)
+        api.telegram_confirm_code_done.emit(_err(f"Неверные поля: {e}"))
+        return
+    if not api._login.awaiting_code:
+        api.telegram_confirm_code_done.emit(
+            _err("Сначала запросите код подтверждения.")
+        )
+        return
+    api._dispatch(
+        api.telegram_confirm_code_done,
+        _login_json(api._login.confirm_code(code)),
+    )
+
+
+def _login_confirm_password(api, payload_json: str) -> None:
+    """Подтвердить облачный пароль по нагрузке формы."""
+    try:
+        password = str(json.loads(payload_json)["password"])
+    except (KeyError, ValueError, TypeError) as e:
+        _log_invalid_payload("telegram_confirm_password", e)
+        api.telegram_confirm_password_done.emit(_err(f"Неверные поля: {e}"))
+        return
+    if not api._login.awaiting_password:
+        api.telegram_confirm_password_done.emit(
+            _err("Сначала пройдите шаг с кодом подтверждения.")
+        )
+        return
+    api._dispatch(
+        api.telegram_confirm_password_done,
+        _login_json(api._login.confirm_password(password)),
+    )
 
 
 def _log_invalid_payload(slot: str, exc: Exception) -> None:
@@ -329,9 +387,7 @@ class WizardApi(QObject):
         self._parent_widget = parent_widget
         self._window = window
         self._on_enter_main = on_enter_main
-        self._tg_client: PyrogramClient | None = None
-        self._tg_phone_code_hash: str | None = None
-        self._tg_creds: dict[str, Any] | None = None
+        self._login = TelegramLogin("job_bot_wizard", rs)
 
     @Slot(result=str)
     def initial_state(self) -> str:
@@ -389,226 +445,35 @@ class WizardApi(QObject):
 
     def cleanup(self) -> None:
         """Disconnect Pyrogram session. Runner shutdown is owned by shell."""
-        if self._tg_client is not None:
-            try:
-                self._runner.submit(self._tg_client.disconnect()).result(timeout=3)
-            except Exception:
-                logger.exception("WizardApi: tg disconnect on cleanup failed")
-            self._tg_client = None
-        # Чистим OTP-state тоже, чтобы при relaunch'е (тот же процесс,
-        # новый Wizard) не было stale phone_code_hash от предыдущей
-        # сессии. Парные creds — на случай если включена телеметрия и
-        # они куда-то утекут с repr'ом.
-        self._tg_phone_code_hash = None
-        self._tg_creds = None
+        # Ждём здесь, а не отпускаем fire-and-forget: за `cleanup` идёт
+        # закрытие окна, и незакрытый сокет пережил бы сам runner. Ходим на
+        # runner только когда есть что закрывать: до входа он занят
+        # запуском бота, и ждать его три секунды впустую незачем.
+        if not self._login.active:
+            return
+        try:
+            self._runner.submit(self._login.forget()).result(timeout=3)
+        except Exception:
+            logger.exception("WizardApi: tg disconnect on cleanup failed")
 
     # --- helpers -----------------------------------------------------------
 
     def _dispatch(self, signal: Signal, coro: Coroutine[Any, Any, Any]) -> None:
-        """Schedule a coroutine and emit its JSON result on `signal`.
-
-        CancelledError при shutdown'е WizardApi (закрытие окна / переход
-        в MainApi) — не error, JS-handler уже отвалился. Глушим, чтобы
-        не сыпать «CancelledError: » в умирающий UI. Согласовано с
-        MainApi._dispatch.
-        """
-        future = self._runner.submit(coro)
-
-        def on_done(f: Future) -> None:
-            try:
-                payload = f.result()
-            except asyncio.CancelledError:
-                logger.debug("bridge: coroutine cancelled during shutdown")
-                return
-            except Exception as e:
-                logger.exception("bridge: unexpected error in coroutine")
-                payload = _err(f"{type(e).__name__}: {e}")
-            signal.emit(payload)
-
-        future.add_done_callback(on_done)
+        _dispatch_json(self, signal, coro)
 
     # --- Telegram OTP flow -------------------------------------------------
 
     @Slot(str)
     def telegram_send_code(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            api_id = int(payload["api_id"])
-            api_hash = str(payload["api_hash"]).strip()
-            phone = str(payload["phone"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("telegram_send_code", e)
-            self.telegram_send_code_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        # password is filled later from the 2FA screen if Telegram requires it.
-        self._tg_creds = {
-            "api_id": api_id,
-            "api_hash": api_hash,
-            "phone": phone,
-            "password": "",
-        }
-        self._dispatch(
-            self.telegram_send_code_done,
-            self._do_telegram_send_code(api_id, api_hash, phone),
-        )
-
-    async def _do_telegram_send_code(
-        self, api_id: int, api_hash: str, phone: str
-    ) -> str:
-        # Cleanup старого клиента: если юзер нажал «Назад → ввести
-        # другой номер», предыдущий PyrogramClient мог остаться полу-
-        # подключённым и держать сокет. Идём через _safe_disconnect
-        # вместо inline try/except — match'ит паттерн MainApi.
-        await _safe_disconnect(self._tg_client)
-        self._tg_client = None
-        self._tg_phone_code_hash = None
-        new_client: PyrogramClient | None = None
-        try:
-            new_client = PyrogramClient(
-                name="job_bot_wizard",
-                api_id=api_id,
-                api_hash=api_hash,
-                phone_number=phone,
-                in_memory=True,
-            )
-            await new_client.connect()
-            sent = await new_client.send_code(phone)
-            # Только после успешного send_code'а биндим к self —
-            # иначе на ошибке полу-построенный клиент висит на self,
-            # а cleanup() при выходе пытается его disconnect'нуть.
-            self._tg_client = new_client
-            self._tg_phone_code_hash = sent.phone_code_hash
-            from backend.runtime_settings import _mask_phone
-            return _ok({"message": f"Код отправлен в Telegram на {_mask_phone(phone)}."})
-        except PhoneNumberInvalid:
-            await _safe_disconnect(new_client)
-            return _err("Неверный номер телефона.")
-        except FloodWait as e:
-            secs = int(getattr(e, "value", 0) or 0)
-            await _safe_disconnect(new_client)
-            return _err(
-                f"Telegram попросил подождать {_humanize_duration(secs)} "
-                "перед следующей попыткой отправить код."
-            )
-        except BadRequest as e:
-            await _safe_disconnect(new_client)
-            return _err(f"Telegram отклонил запрос: {e}")
-        except Exception as e:
-            logger.exception("telegram_send_code failed")
-            await _safe_disconnect(new_client)
-            return _err(f"{type(e).__name__}: {e}")
+        _login_send_code(self, payload_json)
 
     @Slot(str)
     def telegram_confirm_code(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            code = str(payload["code"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("telegram_confirm_code", e)
-            self.telegram_confirm_code_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        if (
-            self._tg_client is None
-            or self._tg_phone_code_hash is None
-            or self._tg_creds is None
-        ):
-            self.telegram_confirm_code_done.emit(
-                _err("Сначала запросите код подтверждения.")
-            )
-            return
-        self._dispatch(
-            self.telegram_confirm_code_done,
-            self._do_telegram_confirm_code(code),
-        )
-
-    async def _do_telegram_confirm_code(self, code: str) -> str:
-        assert self._tg_client is not None
-        assert self._tg_phone_code_hash is not None
-        assert self._tg_creds is not None
-        try:
-            await self._tg_client.sign_in(
-                phone_number=self._tg_creds["phone"],
-                phone_code_hash=self._tg_phone_code_hash,
-                phone_code=code,
-            )
-        except SessionPasswordNeeded:
-            return _ok({"need_password": True})
-        except PhoneCodeInvalid:
-            return _err("Неверный код.")
-        except PhoneCodeExpired:
-            return _err("Код устарел — запросите новый.")
-        except Exception as e:
-            logger.exception("telegram_confirm_code failed")
-            return _err(f"{type(e).__name__}: {e}")
-
-        return await self._finalize_telegram_login()
+        _login_confirm_code(self, payload_json)
 
     @Slot(str)
     def telegram_confirm_password(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            password = str(payload["password"])
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("telegram_confirm_password", e)
-            self.telegram_confirm_password_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        if self._tg_client is None or self._tg_creds is None:
-            self.telegram_confirm_password_done.emit(
-                _err("Сначала пройдите шаг с кодом подтверждения.")
-            )
-            return
-        self._tg_creds["password"] = password
-        self._dispatch(
-            self.telegram_confirm_password_done,
-            self._do_telegram_confirm_password(password),
-        )
-
-    async def _do_telegram_confirm_password(self, password: str) -> str:
-        assert self._tg_client is not None
-        try:
-            await self._tg_client.check_password(password)
-        except BadRequest:
-            return _err("Неверный облачный пароль.")
-        except Exception as e:
-            logger.exception("telegram_confirm_password failed")
-            return _err(f"{type(e).__name__}: {e}")
-        return await self._finalize_telegram_login()
-
-    async def _finalize_telegram_login(self) -> str:
-        assert self._tg_client is not None
-        assert self._tg_creds is not None
-        client = self._tg_client
-        # try/finally чтобы disconnect выполнился даже на ошибке
-        # export_session_string'а — иначе сокет утекает (паттерн уже в
-        # MainApi._finalize_telegram_relogin, тут backport).
-        session_string: str | None = None
-        try:
-            try:
-                session_string = await client.export_session_string()
-            except Exception as e:
-                logger.exception("telegram session export failed")
-                return _err(f"{type(e).__name__}: {e}")
-        finally:
-            await _safe_disconnect(client)
-
-        c = self._tg_creds
-        await self._rs.set_tg(
-            api_id=c["api_id"],
-            api_hash=c["api_hash"],
-            phone=c["phone"],
-            password=c.get("password") or "",
-            session_string=session_string,
-        )
-        self._tg_client = None
-        self._tg_phone_code_hash = None
-        self._tg_creds = None
-        from backend.runtime_settings import _mask_phone
-        logger.info(
-            "Telegram session saved (api_id=%s, phone=%s)",
-            c["api_id"],
-            _mask_phone(c.get("phone")),
-        )
-        return _ok({"done": True})
+        _login_confirm_password(self, payload_json)
 
     # --- LLM check / save --------------------------------------------------
 
@@ -964,13 +829,12 @@ class MainApi(QObject):
         # `_logs_subscribed` flag — ставится из JS при заходе на logs-tab,
         # снимается при уходе/выключении auto-refresh, чтобы не сжигать
         # JSON-сериализацию + cross-thread dispatch на чужих экранах.
-        # Auth-flow state для re-login через экран Настройки (зеркало
-        # WizardApi). Используется отдельный временный PyrogramClient,
-        # чтобы не пересекаться с self._bot._client (если он стартанёт
-        # позже).
-        self._tg_login_client: PyrogramClient | None = None
-        self._tg_login_phone_code_hash: str | None = None
-        self._tg_login_creds: dict[str, Any] | None = None
+        # Вход через экран «Настройки» держит свой временный клиент —
+        # отдельный от `self._bot._client`, который стартует позже. Имя
+        # сессии тоже своё: под общим они делили бы один файл.
+        self._login = TelegramLogin(
+            "job_bot_relogin", rs, on_saved=self._after_login_saved
+        )
         # Кэш TG-username: бот стартует медленно (Pyrogram session-load
         # + connect — секунды), а UI запрашивает settings сразу после
         # логина или открытия таба. Кэш заполняется при успешном get_me()
@@ -1073,24 +937,7 @@ class MainApi(QObject):
     # --- helpers ----------------------------------------------------------
 
     def _dispatch(self, signal: Signal, coro: Coroutine[Any, Any, Any]) -> None:
-        future = self._runner.submit(coro)
-
-        def on_done(f: Future) -> None:
-            try:
-                payload = f.result()
-            except (CancelledError, asyncio.CancelledError):
-                # Runner отменяет in-flight задачи при shutdown — это
-                # штатно, не имеет смысла эмитить сигнал в умирающий UI.
-                return
-            except Exception as e:
-                logger.exception(
-                    "MainApi: unexpected error in coroutine %s",
-                    getattr(coro, "__qualname__", "?"),
-                )
-                payload = _err(f"{type(e).__name__}: {e}")
-            signal.emit(payload)
-
-        future.add_done_callback(on_done)
+        _dispatch_json(self, signal, coro)
 
     def _dispatch_action(
         self,
@@ -3411,7 +3258,7 @@ class MainApi(QObject):
             # Если в момент logout открыта модалка re-auth, закрываем её
             # бэкенд-state тоже — иначе при следующем «Войти» налетим на
             # «уже отправили код».
-            await self._cleanup_login_client()
+            await self._login.forget()
             if bot is not None:
                 bot.cancel_current_poll()
                 await bot.log_out_session()
@@ -3434,22 +3281,13 @@ class MainApi(QObject):
         self._bot_task = None
         self._dispatch(self.system_telegram_logout_done, run())
 
-    async def _cleanup_login_client(self) -> None:
-        """Закрывает временный login-клиент и сбрасывает связанный state."""
-        old = self._tg_login_client
-        self._tg_login_client = None
-        self._tg_login_phone_code_hash = None
-        self._tg_login_creds = None
-        if old is not None:
-            await _safe_disconnect(old)
-
     @Slot()
     def cancel_telegram_login(self) -> None:
         """Юзер закрыл модалку re-auth до завершения. Чистим временный
         Pyrogram-клиент и обнуляем OTP-state, чтобы не оставлять открытый
         сокет и не уйти в «уже отправили код» при следующей попытке.
         """
-        self._dispatch_noop(self._cleanup_login_client())
+        self._dispatch_noop(self._login.forget())
 
     def _dispatch_noop(self, coro: Coroutine[Any, Any, Any]) -> None:
         """Fire-and-forget: запускаем корутину на runner'е, ошибки в лог.
@@ -3468,195 +3306,32 @@ class MainApi(QObject):
         future.add_done_callback(_on_done)
 
     # --- Telegram OTP flow (re-login через Настройки) ---------------------
-    # Зеркало WizardApi.telegram_send_code/confirm_code/confirm_password.
-    # Отдельные slots на MainApi нужны потому что QWebChannel регистрирует
-    # один объект "api" — после онбординга на канале сидит MainApi, и
-    # WizardApi'шные методы недоступны.
+    # Отдельные slots нужны потому что QWebChannel регистрирует один объект
+    # "api" — после онбординга на канале сидит MainApi, и WizardApi'шные
+    # методы недоступны. Сам вход у обоих один и тот же.
 
     @Slot(str)
     def telegram_send_code(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            api_id = int(payload["api_id"])
-            api_hash = str(payload["api_hash"]).strip()
-            phone = str(payload["phone"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("telegram_send_code", e)
-            self.telegram_send_code_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        self._tg_login_creds = {
-            "api_id": api_id,
-            "api_hash": api_hash,
-            "phone": phone,
-            "password": "",
-        }
-        self._dispatch(
-            self.telegram_send_code_done,
-            self._do_telegram_send_code(api_id, api_hash, phone),
-        )
-
-    async def _do_telegram_send_code(
-        self, api_id: int, api_hash: str, phone: str
-    ) -> str:
-        # Если предыдущая попытка оставила висящий клиент — закрываем и
-        # обнуляем перед новой. Делаем это ДО создания нового, чтобы
-        # одна и та же ссылка `self._tg_login_client` не указывала
-        # одновременно на старый и новый объект.
-        await self._cleanup_login_client()
-        new_client: PyrogramClient | None = None
-        try:
-            new_client = PyrogramClient(
-                name="job_bot_relogin",
-                api_id=api_id,
-                api_hash=api_hash,
-                phone_number=phone,
-                in_memory=True,
-            )
-            await new_client.connect()
-            sent = await new_client.send_code(phone)
-            self._tg_login_client = new_client
-            self._tg_login_phone_code_hash = sent.phone_code_hash
-            from backend.runtime_settings import _mask_phone
-            return _ok({"message": f"Код отправлен в Telegram на {_mask_phone(phone)}."})
-        except PhoneNumberInvalid:
-            await _safe_disconnect(new_client)
-            return _err("Неверный номер телефона.")
-        except FloodWait as e:
-            await _safe_disconnect(new_client)
-            secs = int(getattr(e, "value", 0) or 0)
-            human = _humanize_duration(secs) if secs else "некоторое время"
-            return _err(
-                f"Telegram попросил подождать {human} перед следующей попыткой "
-                f"входа (rate-limit на auth.SendCode)."
-            )
-        except BadRequest as e:
-            await _safe_disconnect(new_client)
-            return _err(f"Telegram отклонил запрос: {e}")
-        except Exception as e:
-            await _safe_disconnect(new_client)
-            logger.exception("telegram_send_code failed")
-            return _err(f"{type(e).__name__}: {e}")
+        _login_send_code(self, payload_json)
 
     @Slot(str)
     def telegram_confirm_code(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            code = str(payload["code"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("telegram_confirm_code", e)
-            self.telegram_confirm_code_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        if (
-            self._tg_login_client is None
-            or self._tg_login_phone_code_hash is None
-            or self._tg_login_creds is None
-        ):
-            self.telegram_confirm_code_done.emit(
-                _err("Сначала запросите код подтверждения.")
-            )
-            return
-        self._dispatch(
-            self.telegram_confirm_code_done,
-            self._do_telegram_confirm_code(code),
-        )
-
-    async def _do_telegram_confirm_code(self, code: str) -> str:
-        assert self._tg_login_client is not None
-        assert self._tg_login_phone_code_hash is not None
-        assert self._tg_login_creds is not None
-        try:
-            await self._tg_login_client.sign_in(
-                phone_number=self._tg_login_creds["phone"],
-                phone_code_hash=self._tg_login_phone_code_hash,
-                phone_code=code,
-            )
-        except SessionPasswordNeeded:
-            return _ok({"need_password": True})
-        except PhoneCodeInvalid:
-            return _err("Неверный код.")
-        except PhoneCodeExpired:
-            return _err("Код устарел — запросите новый.")
-        except Exception as e:
-            logger.exception("telegram_confirm_code failed")
-            return _err(f"{type(e).__name__}: {e}")
-        return await self._finalize_telegram_relogin()
+        _login_confirm_code(self, payload_json)
 
     @Slot(str)
     def telegram_confirm_password(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            password = str(payload["password"])
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("telegram_confirm_password", e)
-            self.telegram_confirm_password_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        if self._tg_login_client is None or self._tg_login_creds is None:
-            self.telegram_confirm_password_done.emit(
-                _err("Сначала пройдите шаг с кодом подтверждения.")
-            )
-            return
-        self._tg_login_creds["password"] = password
-        self._dispatch(
-            self.telegram_confirm_password_done,
-            self._do_telegram_confirm_password(password),
-        )
+        _login_confirm_password(self, payload_json)
 
-    async def _do_telegram_confirm_password(self, password: str) -> str:
-        assert self._tg_login_client is not None
-        try:
-            await self._tg_login_client.check_password(password)
-        except BadRequest:
-            return _err("Неверный облачный пароль.")
-        except Exception as e:
-            logger.exception("telegram_confirm_password failed")
-            return _err(f"{type(e).__name__}: {e}")
-        return await self._finalize_telegram_relogin()
+    def _after_login_saved(self, username: str | None) -> None:
+        """Новая сессия сохранена: запомнить ник и поднять бота, если он лежит.
 
-    async def _finalize_telegram_relogin(self) -> str:
-        assert self._tg_login_client is not None
-        assert self._tg_login_creds is not None
-        client = self._tg_login_client
-        try:
-            # me() пока login-клиент ещё подключён — это самый надёжный
-            # способ узнать username; bot стартует чуть позже и его
-            # _client не сразу станет connected.
-            try:
-                me = await client.get_me()
-                self._username_cache = me.username or ""
-            except Exception:
-                logger.debug("relogin get_me failed", exc_info=True)
-            session_string = await client.export_session_string()
-        except Exception as e:
-            logger.exception("telegram session export failed")
-            self._tg_login_client = None
-            return _err(f"{type(e).__name__}: {e}")
-        finally:
-            # disconnect() всегда — даже если export_session_string() кинул;
-            # _safe_disconnect идемпотентен.
-            await _safe_disconnect(client)
-
-        c = self._tg_login_creds
-        await self._rs.set_tg(
-            api_id=c["api_id"],
-            api_hash=c["api_hash"],
-            phone=c["phone"],
-            password=c.get("password") or "",
-            session_string=session_string,
-        )
-        self._tg_login_client = None
-        self._tg_login_phone_code_hash = None
-        self._tg_login_creds = None
-        from backend.runtime_settings import _mask_phone
-        logger.info(
-            "Telegram session saved via re-login (api_id=%s, phone=%s)",
-            c["api_id"],
-            _mask_phone(c.get("phone")),
-        )
-        # Бот не запущен после logout/первого старта без session — теперь
-        # есть новая сессия, поднимаем его.
+        Не спросившийся ник (`None`) прежний в кэше не трогает: показать
+        старый вернее, чем стереть его до первого удачного `get_me` у бота.
+        """
+        if username is not None:
+            self._username_cache = username
         if self._bot is None:
             self._start_bot()
-        return _ok({"done": True})
 
     @Slot(str)
     def request_stats_status_breakdown(self, period: str) -> None:

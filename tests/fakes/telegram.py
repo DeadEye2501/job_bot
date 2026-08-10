@@ -139,6 +139,12 @@ class FakeTelegramClient:
         # сборки: пятый именованный довод конструктора упирается в предел.
         self.history: list = []
         self.logged_out = False
+        # Вход по коду: чем отвечает Telegram и о чём его спрашивали.
+        self.phone_code_hash = "отпечаток"
+        self.me = user(id=1, username="я")
+        self.code_requests: list[str] = []
+        self.sign_in_calls: list[tuple] = []
+        self.passwords: list[str] = []
         # Вклиниться в середину вызова: так проверяется гонка со встречным
         # обработчиком, который успевает записать строку, пока идёт обращение.
         self.on_send = None
@@ -224,6 +230,34 @@ class FakeTelegramClient:
     async def read_chat_history(self, target):
         self.read_calls.append(target)
         self._fail_if_asked("read_chat_history")
+
+    async def connect(self):
+        self.lifecycle.append("подключение")
+        self._fail_if_asked("connect")
+
+    async def disconnect(self):
+        self.lifecycle.append("отключение")
+        self._fail_if_asked("disconnect")
+
+    async def send_code(self, phone):
+        self.code_requests.append(phone)
+        self._fail_if_asked("send_code")
+        return SimpleNamespace(phone_code_hash=self.phone_code_hash)
+
+    async def sign_in(self, phone_number=None, phone_code_hash=None, phone_code=None):
+        self.sign_in_calls.append((phone_number, phone_code_hash, phone_code))
+        self._fail_if_asked("sign_in")
+
+    async def check_password(self, password):
+        self.passwords.append(password)
+        self._fail_if_asked("check_password")
+
+    async def get_me(self):
+        # В журнал жизни, а не в свой список: у вопроса о себе важно не
+        # только то, задали ли его, но и то, что задали до отключения.
+        self.lifecycle.append("кто я")
+        self._fail_if_asked("get_me")
+        return self.me
 
     async def start(self):
         self.lifecycle.append("запуск")
