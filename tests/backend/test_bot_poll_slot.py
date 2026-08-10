@@ -90,6 +90,9 @@ async def test_the_window_hears_both_ends_of_a_channel_poll(make_bot, error):
     await bot.poll_channel_now(7)
 
     assert hooks.log == ["начало", "конец"]
+    # Полоса с долей сделанного — примета одного только ручного прогона
+    # вакансии: у обхода канала шкалы нет, и трогать её незачем.
+    assert hooks.progress == []
 
 
 async def test_a_broken_start_hook_does_not_stop_the_poll(make_bot):
