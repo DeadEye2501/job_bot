@@ -8,17 +8,13 @@ from pyrogram.raw.types import PeerUser as _PeerUser
 from pyrogram.raw.types import UpdateReadHistoryOutbox as _UpdateReadHistoryOutbox
 from sqlalchemy import select
 
-from backend.flows.dm import process_dm
+from backend.flows.dm import persist_outgoing_dm, process_dm
 from backend.helpers import extract_dm_text
 from backend.helpers import extract_text
 from backend.models import BotMode
 from backend.models import Message
-from backend.payloads import OutgoingMessage
 from backend.repository.hr_identify import find_known_hr
-from backend.repository.messages import find_outgoing_message
-from backend.repository.messages import save_outgoing_message
 
-from backend.bot import media
 from backend.notify import fire
 
 logger = logging.getLogger(__name__)
@@ -225,8 +221,9 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
     gating of the incoming handler — OFF silences both directions.
 
     Resolves HR by recipient's user_id (msg.chat.id for private chats).
-    Dedup via the UNIQUE constraint — when we sent the message ourselves
-    from this app the row already exists with the same tg_message_id.
+    Записью и отсевом повторов заведует `persist_outgoing_dm`, общий с
+    догоном переписки; здесь остаётся опознание собеседника и решение,
+    будить ли окно.
     """
     if (await bot._current_mode()) is BotMode.OFF:
         return
@@ -239,64 +236,14 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
         hr = await find_known_hr(session, recipient_id, recipient_username)
         if hr is None:
             return
-        hr_id_for_media = hr.id
-        # Если эта же исходящая уже вставлена нашим send_to_hr_chat /
-        # send_to_hr_media (UNIQUE на (hr_id, tg_message_id, is_incoming)),
-        # повторно качать медиа и копаться в БД незачем — мы получили
-        # echo собственного отправленного сообщения. Без этой проверки
-        # download_media гонится с shutil.copy2 за один и тот же путь
-        # и оставляет рваный файл в кэше.
-        existing = await find_outgoing_message(session, hr_id_for_media, msg.id)
-        if existing is not None:
-            # Echo собственного Bot.send-а: row уже была вписана при
-            # отправке cover-letter'а, повторно её писать не надо, но
-            # UI ещё не уведомлён — chat должен обновиться синхронно
-            # с прилётом echo из Telegram.
-            fire(bot.on_new_message, "on_new_message", hr_id_for_media)
-            return
-    media_kind, media_name = media.classify_media(msg)
-    media_path = (
-        await media.download_media(bot._client, msg, hr_id_for_media)
-        if media_kind is not None else None
-    )
-    async with bot._session_factory() as session:
-        hr = await find_known_hr(session, recipient_id, recipient_username)
-        if hr is None:
-            return
-        # Номер берётся до попытки записи, и это прикрывает две разные
-        # беды. Повтор: `save_outgoing_message` откатывает сессию сам, а
-        # откат протухает всю карту объектов, включая этот `hr`, — чтение
-        # поля полезло бы в базу и подняло `MissingGreenlet`. Сорвавшаяся
-        # запись: отката не было, и сессия требует его, — то же чтение
-        # подняло бы `PendingRollbackError`. Оба раза из самой записи в
-        # журнал, то есть в обработчике беды.
         hr_id = hr.id
-        try:
-            _, saved = await save_outgoing_message(
-                session,
-                OutgoingMessage(
-                    hr_id=hr_id,
-                    text=extract_dm_text(msg),
-                    tg_message_id=msg.id,
-                    sent_at=msg.date,
-                    media_kind=media_kind,
-                    media_path=media_path,
-                    media_name=media_name,
-                ),
-            )
-            if not saved:
-                logger.debug(
-                    "Outgoing DM dedup: hr=%d tg_msg=%d already saved",
-                    hr_id, msg.id,
-                )
-                return  # already saved (e.g. via send_to_hr_chat)
-            await session.commit()
-        except Exception:
-            logger.exception(
-                "outgoing DM persistence failed",
-                extra={"hr_id": hr_id, "tg_message_id": msg.id},
-            )
-            return
+    outcome = await persist_outgoing_dm(bot._session_factory, bot._client, msg, hr_id)
+    # Уже лежащая строка — это эхо нашей же отправки: писать нечего, а вот
+    # окно ещё не знает и должно обновиться синхронно с прилётом эха.
+    # Несостоявшаяся запись — другое дело: там либо гонка, и оповестит тот,
+    # кто выиграл, либо беда, и оповещать не о чем.
+    if outcome == "not_stored":
+        return
     fire(bot.on_new_message, "on_new_message", hr_id)
 
 

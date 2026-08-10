@@ -19,7 +19,14 @@ from backend.flows.dm_backfill import backfill_hr_dm_history
 from backend.models import HR, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import hr_row, message_row
-from tests.fakes.telegram import SENT_AT, FakeTelegramClient, incoming, message, user
+from tests.fakes.telegram import (
+    SENT_AT,
+    FakeTelegramClient,
+    incoming,
+    message,
+    photo,
+    user,
+)
 
 
 def _theirs(msg_id, text):
@@ -27,7 +34,7 @@ def _theirs(msg_id, text):
     return incoming(id=msg_id, text=text, outgoing=False)
 
 
-def _ours(msg_id, text):
+def _ours(msg_id, text, *, photo=None):
     """Своё сообщение, отправленное из другого клиента."""
     return message(
         id=msg_id,
@@ -35,7 +42,7 @@ def _ours(msg_id, text):
         date=SENT_AT,
         outgoing=True,
         from_user=user(id=1, username=None),
-        photo=None,
+        photo=photo,
         document=None,
     )
 
@@ -122,6 +129,30 @@ async def test_an_already_saved_message_is_not_doubled(known_hr, session_factory
     await _catch_up(client, known_hr, session_factory)
 
     assert [m.text for m in await all_rows(session_factory, Message)] == ["уже было"]
+
+
+async def test_an_already_saved_attachment_is_not_downloaded_again(
+    known_hr, session_factory
+):
+    """Вложение уже сохранённого исходящего второй раз не качают.
+
+    Догон проходит по всей доступной истории при каждом запуске и почти
+    всегда видит уже записанное. Путь в кэше собран из номера сообщения,
+    то есть повторная загрузка целится в тот же файл, который в это время
+    может читать окно, — и оставляет его рваным.
+    """
+    await put(
+        session_factory,
+        message_row(
+            hr_id=known_hr.id, is_incoming=False, tg_message_id=11, text=""
+        ),
+    )
+    client = FakeTelegramClient()
+    client.history = [_ours(11, None, photo=photo(big_file_id="big"))]
+
+    await _catch_up(client, known_hr, session_factory)
+
+    assert client.download_calls == []
 
 
 async def test_nothing_but_duplicates_means_the_window_is_not_told(
@@ -310,6 +341,25 @@ async def test_the_window_hears_about_the_caught_up_chat(
     """
     client = FakeTelegramClient()
     client.history = [_theirs(11, "и ещё"), _theirs(10, "привет")]
+    heard: list[int] = []
+
+    await _catch_up(
+        client, known_hr, session_factory, on_message_persisted=heard.append
+    )
+
+    assert heard == [known_hr.id]
+
+
+async def test_the_window_hears_about_a_caught_up_message_of_our_own(
+    known_hr, session_factory
+):
+    """Догнанное своё сообщение доводит окно до оповещения.
+
+    Половина пропущенного разговора — это написанное с телефона, и без
+    оповещения переписка в окне останется без него до перезапуска.
+    """
+    client = FakeTelegramClient()
+    client.history = [_ours(11, "мой ответ с телефона")]
     heard: list[int] = []
 
     await _catch_up(

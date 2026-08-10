@@ -232,14 +232,20 @@ async def test_a_write_that_fell_through_stays_quiet(
     только тогда сессия по-настоящему попадает в состояние «нужен откат»,
     в котором обращение к полю HR и поднимало исключение из записи в
     журнал. С подменённым коммитом ветка выглядела бы исправной, не будучи ею.
+
+    Тишина здесь и про окно: строки не появилось, и звать переписку
+    перерисовываться не за чем — она покажет ровно то же, что и была.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
     bot._ingestion = FakeIngestion()
-    monkeypatch.setattr("backend.bot.updates.extract_dm_text", lambda msg: object())
+    monkeypatch.setattr("backend.flows.dm.extract_dm_text", lambda msg: object())
+    heard: list[int] = []
+    bot.on_new_message = heard.append
 
     await bot._on_dm_outgoing(client, _echo())
 
     assert await all_rows(session_factory, Message) == []
+    assert heard == []
 
 
 async def test_the_window_hears_about_a_message_typed_elsewhere(

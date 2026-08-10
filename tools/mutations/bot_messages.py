@@ -149,11 +149,20 @@ MUTATIONS = [
         "    if updated > 0 and target is not None:",
         "    if target is not None:",
     ),
-    # _on_dm_outgoing: повтор считается новой записью и будит окно
+    # persist_outgoing_dm: повтор считается новой записью и будит окно
     (
-        "backend/bot/updates.py",
+        "backend/flows/dm.py",
         "            if not saved:" + CRLF,
         "            if False:" + CRLF,
+    ),
+    # persist_outgoing_dm: заслон снят, и вложение качают поверх кэша.
+    # Строки не стираются, а обессмысливаются условием: снос оставил бы
+    # `async with` без тела, а несобираемый файл инструмент засчитал бы
+    # пойманным, не дойдя до проверок.
+    (
+        "backend/flows/dm.py",
+        "        if await find_outgoing_message(session, hr_id, msg.id) is not None:" + CRLF,
+        "        if False:" + CRLF,
     ),
     # save_outgoing_message: после конфликта сессия не откатывается
     (
@@ -161,11 +170,11 @@ MUTATIONS = [
         "        await session.rollback()" + CRLF,
         "",
     ),
-    # _on_dm_outgoing: номер снова читается у HR в общей ветке разбора
+    # _on_dm_outgoing: эхо своей же отправки перестаёт будить окно
     (
         "backend/bot/updates.py",
-        '                extra={"hr_id": hr_id, "tg_message_id": msg.id},',
-        '                extra={"hr_id": hr.id, "tg_message_id": msg.id},',
+        '    if outcome == "not_stored":' + CRLF,
+        '    if outcome != "stored":' + CRLF,
     ),
     # on_raw_update: чужой род оповещения перестаёт отсеиваться
     (
@@ -274,12 +283,11 @@ MUTATIONS = [
         '                    chat_username = getattr(chat, "username", None)' + CRLF,
         "                    chat_username = None" + CRLF,
     ),
-    # on_dm_outgoing: эхо своей отправки пишется второй строкой
+    # persist_outgoing_dm: эхо своей отправки пишется второй строкой
     (
-        "backend/bot/updates.py",
-        "        if existing is not None:" + CRLF
-        + "            # Echo собственного Bot.send-а",
-        "        if False:" + CRLF + "            # Echo собственного Bot.send-а",
+        "backend/flows/dm.py",
+        '            return "already_stored"' + CRLF,
+        '            pass' + CRLF,
     ),
     # on_dm_outgoing: выключенный бот всё равно подхватывает написанное
     (
