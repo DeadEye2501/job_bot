@@ -2,6 +2,9 @@
 
 import logging
 
+from dataclasses import dataclass
+from typing import Any, Callable
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -91,94 +94,97 @@ async def update_vacancy_notes(
     return True
 
 
-async def set_vacancy_hr(
-    session: AsyncSession, vacancy_id: int, hr_id: int | None
+@dataclass(frozen=True, slots=True)
+class _Link:
+    """Чем перепривязка вакансии к одному предмету отличается от другой.
+
+    Сам распорядок у них общий: не изменилось — молчим, не существует —
+    отказ, а состоявшаяся перепривязка попадает в ленту с именами до и
+    после. Различаются колонка, таблица, род записи в ленте и то, как у
+    предмета спросить имя.
+    """
+
+    column: str
+    model: type
+    kind: str
+    display: Callable[[Any], str | None]
+    # Имя действия, а не рода записи в ленте: текст отказа мост
+    # показывает пользователю подсказкой как есть.
+    operation: str
+
+
+_HR_LINK = _Link(
+    column="hr_id",
+    model=HR,
+    kind="linked_hr",
+    display=lambda hr: hr.name or hr.telegram_username,
+    operation="set_vacancy_hr",
+)
+
+
+_COMPANY_LINK = _Link(
+    column="company_id",
+    model=Company,
+    kind="linked_company",
+    display=lambda company: company.name,
+    operation="set_vacancy_company",
+)
+
+
+async def _relink(
+    session: AsyncSession, vacancy_id: int, new_id: int | None, link: _Link
 ) -> bool:
-    """Link or unlink the HR for a vacancy. Returns False if vacancy missing."""
+    """Перепривязать вакансию к предмету. False — вакансии нет вовсе.
+
+    Совпадение с прежним значением возвращает успех, ничего не записав:
+    иначе лента карточки полнилась бы строками «ничего не изменилось».
+    """
     vacancy = await session.get(Vacancy, vacancy_id)
     if vacancy is None:
         return False
-    previous_hr_id = vacancy.hr_id
-    target_hr: HR | None = None
-    if hr_id is not None:
-        target_hr = await session.get(HR, hr_id)
-        if target_hr is None:
-            raise ValueError(f"set_vacancy_hr: HR {hr_id} does not exist")
-    if previous_hr_id == hr_id:
-        # No effective change -> no timeline noise.
+    previous_id = getattr(vacancy, link.column)
+    target = None
+    if new_id is not None:
+        target = await session.get(link.model, new_id)
+        if target is None:
+            raise ValueError(
+                f"{link.operation}: {link.model.__name__} {new_id} does not exist"
+            )
+    if previous_id == new_id:
         return True
     previous_name: str | None = None
-    if previous_hr_id is not None:
-        prev_hr = await session.get(HR, previous_hr_id)
-        if prev_hr is not None:
-            previous_name = prev_hr.name or prev_hr.telegram_username
-    next_name: str | None = None
-    if target_hr is not None:
-        next_name = target_hr.name or target_hr.telegram_username
-    vacancy.hr_id = hr_id
+    if previous_id is not None:
+        previous = await session.get(link.model, previous_id)
+        if previous is not None:
+            previous_name = link.display(previous)
+    setattr(vacancy, link.column, new_id)
     await add_vacancy_event(
         session,
         vacancy_id,
-        kind="linked_hr",
+        kind=link.kind,
         payload={
-            "previous_id": previous_hr_id,
+            "previous_id": previous_id,
             "previous_name": previous_name,
-            "new_id": hr_id,
-            "new_name": next_name,
+            "new_id": new_id,
+            "new_name": link.display(target) if target is not None else None,
         },
     )
     await session.flush()
     logger.info(
-        "vacancy %d: hr_id %s -> %s",
-        vacancy_id,
-        previous_hr_id,
-        hr_id,
+        "vacancy %d: %s %s -> %s", vacancy_id, link.column, previous_id, new_id
     )
     return True
+
+
+async def set_vacancy_hr(
+    session: AsyncSession, vacancy_id: int, hr_id: int | None
+) -> bool:
+    """Link or unlink the HR for a vacancy. Returns False if vacancy missing."""
+    return await _relink(session, vacancy_id, hr_id, _HR_LINK)
 
 
 async def set_vacancy_company(
     session: AsyncSession, vacancy_id: int, company_id: int | None
 ) -> bool:
     """Link or unlink the company for a vacancy. False if vacancy missing."""
-    vacancy = await session.get(Vacancy, vacancy_id)
-    if vacancy is None:
-        return False
-    previous_company_id = vacancy.company_id
-    target_company: Company | None = None
-    if company_id is not None:
-        target_company = await session.get(Company, company_id)
-        if target_company is None:
-            raise ValueError(
-                f"set_vacancy_company: company {company_id} does not exist"
-            )
-    if previous_company_id == company_id:
-        return True
-    previous_name: str | None = None
-    if previous_company_id is not None:
-        prev_company = await session.get(Company, previous_company_id)
-        if prev_company is not None:
-            previous_name = prev_company.name
-    next_name: str | None = None
-    if target_company is not None:
-        next_name = target_company.name
-    vacancy.company_id = company_id
-    await add_vacancy_event(
-        session,
-        vacancy_id,
-        kind="linked_company",
-        payload={
-            "previous_id": previous_company_id,
-            "previous_name": previous_name,
-            "new_id": company_id,
-            "new_name": next_name,
-        },
-    )
-    await session.flush()
-    logger.info(
-        "vacancy %d: company_id %s -> %s",
-        vacancy_id,
-        previous_company_id,
-        company_id,
-    )
-    return True
+    return await _relink(session, vacancy_id, company_id, _COMPANY_LINK)
