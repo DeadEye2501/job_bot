@@ -2450,7 +2450,6 @@ class MainApi(QObject):
         Does NOT delete the HR — that's a separate action.
         """
         async def run() -> str:
-            from sqlalchemy import select as _select
             async with self._session_factory() as session:
                 hr = await session.get(HR, hr_id)
                 if hr is None:
@@ -2461,35 +2460,17 @@ class MainApi(QObject):
                         "У HR нет ни @username, ни telegram_user_id.",
                         hr_id=hr_id, action="blacklist",
                     )
-                existing = (
-                    await session.scalars(
-                        _select(Blacklist).where(
-                            Blacklist.kind == "hr",
-                            Blacklist.value == value,
-                        )
-                    )
-                ).first()
-                existed = False
-                was_inactive = False
-                if existing is not None:
-                    existed = True
-                    if not existing.active:
-                        was_inactive = True
-                        existing.active = True
-                else:
-                    session.add(Blacklist(
-                        kind="hr",
-                        value=value,
-                        active=True,
-                    ))
+                _, outcome = await blacklist.create_blacklist(
+                    session, kind="hr", value=value,
+                )
                 await session.commit()
             self.contacts_lists_changed.emit()
             return _ok({
                 "action": "blacklist",
                 "hr_id": hr_id,
                 "value": value,
-                "existed": existed,
-                "was_inactive": was_inactive,
+                "existed": outcome != "created",
+                "was_inactive": outcome == "reactivated",
             })
 
         self._dispatch(self.contacts_hr_action_done, run())
@@ -2928,7 +2909,7 @@ class MainApi(QObject):
             try:
                 async with self._session_factory() as session:
                     async with session.begin():
-                        row, created = await blacklist.create_blacklist(
+                        row, outcome = await blacklist.create_blacklist(
                             session, kind=kind, value=value, reason=reason,
                         )
                         new_id = row.id
@@ -2946,7 +2927,7 @@ class MainApi(QObject):
             self.contacts_lists_changed.emit()
             return _ok({
                 "id": new_id,
-                "created": created,
+                "created": outcome == "created",
                 "deactivated_channels": deactivated,
                 "action": "create",
             })
@@ -3980,27 +3961,9 @@ class MainApi(QObject):
                         "У канала нет @username.",
                         channel_id=channel_id, action="blacklist",
                     )
-                existing = (
-                    await session.scalars(
-                        select(Blacklist).where(
-                            Blacklist.kind == "channel",
-                            Blacklist.value == value,
-                        )
-                    )
-                ).first()
-                existed = False
-                was_inactive = False
-                if existing is not None:
-                    existed = True
-                    if not existing.active:
-                        was_inactive = True
-                        existing.active = True
-                else:
-                    session.add(Blacklist(
-                        kind="channel",
-                        value=value,
-                        active=True,
-                    ))
+                _, outcome = await blacklist.create_blacklist(
+                    session, kind="channel", value=value,
+                )
                 # Канал в blacklist → автоматически выключаем сам канал,
                 # чтобы UI-toggle отражал реальное «канал не работает».
                 if ch.is_active:
@@ -4011,8 +3974,8 @@ class MainApi(QObject):
                 "action": "blacklist",
                 "channel_id": channel_id,
                 "value": value,
-                "existed": existed,
-                "was_inactive": was_inactive,
+                "existed": outcome != "created",
+                "was_inactive": outcome == "reactivated",
             })
 
         self._dispatch(self.contacts_channel_action_done, run())
@@ -4465,7 +4428,6 @@ class MainApi(QObject):
         company. Value is the company name. Idempotent.
         """
         async def run() -> str:
-            from sqlalchemy import select as _select
             async with self._session_factory() as session:
                 co = await session.get(Company, company_id)
                 if co is None:
@@ -4479,31 +4441,17 @@ class MainApi(QObject):
                         "У компании нет имени.",
                         company_id=company_id, action="blacklist",
                     )
-                existing = (
-                    await session.scalars(
-                        _select(Blacklist).where(
-                            Blacklist.kind == "company",
-                            Blacklist.value == value,
-                        )
-                    )
-                ).first()
-                existed = False
-                was_inactive = False
-                if existing is not None:
-                    existed = True
-                    if not existing.active:
-                        was_inactive = True
-                        existing.active = True
-                else:
-                    session.add(Blacklist(kind="company", value=value, active=True))
+                _, outcome = await blacklist.create_blacklist(
+                    session, kind="company", value=value,
+                )
                 await session.commit()
             self.contacts_lists_changed.emit()
             return _ok({
                 "action": "blacklist",
                 "company_id": company_id,
                 "value": value,
-                "existed": existed,
-                "was_inactive": was_inactive,
+                "existed": outcome != "created",
+                "was_inactive": outcome == "reactivated",
             })
 
         self._dispatch(self.contacts_company_action_done, run())
@@ -4820,6 +4768,18 @@ def _blacklist_row_to_dict(row: Blacklist) -> dict:
         "reason": row.reason,
         "active": bool(row.active),
         "created_at": _iso(row.created_at),
+    }
+
+
+def _blacklist_add_to_dict(outcome: BlacklistOutcome) -> dict:
+    """Исход заведения в том виде, в каком его читает карточка.
+
+    Окно различает три случая двумя признаками, а не словом: подсказка
+    выбирается сперва по `was_inactive`, потом по `existed`.
+    """
+    return {
+        "existed": outcome != "created",
+        "was_inactive": outcome == "reactivated",
     }
 
 

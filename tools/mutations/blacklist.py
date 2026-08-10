@@ -68,8 +68,26 @@ MUTATIONS = [
     # create_blacklist: повтор сообщается как заведение
     (
         "backend/repository/blacklist.py",
-        "        return existing, False",
-        "        return existing, True",
+        "        return existing, outcome",
+        '        return existing, "created"',
+    ),
+    # create_blacklist: новая строка не доезжает до таблицы
+    (
+        "backend/repository/blacklist.py",
+        "    session.add(row)" + CRLF,
+        "",
+    ),
+    # create_blacklist: новая строка остаётся без номера
+    (
+        "backend/repository/blacklist.py",
+        "    await session.flush()" + CRLF,
+        "",
+    ),
+    # create_blacklist: оживление не отличают от попадания в уже включённую
+    (
+        "backend/repository/blacklist.py",
+        '            outcome = "reactivated"' + CRLF,
+        "",
     ),
     # create_blacklist: новая строка заводится погашенной
     (

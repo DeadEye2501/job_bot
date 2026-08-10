@@ -14,17 +14,37 @@ from tests.dbio import put
 from tests.factories import blacklist_row
 
 
-async def test_a_new_row_is_created_active(session):
-    """Новая строка заводится включённой, и об этом сообщается."""
-    row, created = await create_blacklist(
+async def test_a_new_row_reaches_the_table_switched_on_and_numbered(session):
+    """Новая строка доезжает до таблицы включённой и с номером.
+
+    Номер нужен окну сразу: ответ на «Добавить» несёт `id`, по которому
+    экран находит только что заведённую строку. Поэтому смотреть надо не
+    на возвращённый объект — он остаётся верным и не доехав, — а на то,
+    что читается из таблицы.
+    """
+    row, outcome = await create_blacklist(session, kind="hr", value="@maria")
+
+    assert outcome == "created"
+    stored = (await session.scalars(select(Blacklist))).all()
+    assert [(r.id, r.kind, r.value, r.active) for r in stored] == [
+        (row.id, "hr", "@maria", True)
+    ]
+    assert row.id is not None
+
+
+async def test_spaces_around_the_value_and_the_reason_are_trimmed(session):
+    """Пробелы по краям срезаются у значения и у причины.
+
+    Иначе «Контур» с экрана чёрного списка и « Контур » из карточки легли
+    бы двумя строками про одну компанию, и погашение одной не сняло бы
+    отметку.
+    """
+    row, _ = await create_blacklist(
         session, kind="hr", value="  @maria  ", reason="  грубит  "
     )
 
-    assert created is True
-    assert row.kind == "hr"
     assert row.value == "@maria"
     assert row.reason == "грубит"
-    assert row.active is True
 
 
 async def test_an_empty_value_or_kind_is_refused(session):
@@ -53,9 +73,8 @@ async def test_adding_the_same_pair_twice_returns_the_first_row(
     existing = blacklist_row("hr", "@maria", reason="грубит")
     await put(session_factory, existing)
 
-    row, created = await create_blacklist(session, kind="hr", value="@maria")
+    row, _ = await create_blacklist(session, kind="hr", value="@maria")
 
-    assert created is False
     assert row.id == existing.id
     assert len((await session.scalars(select(Blacklist))).all()) == 1
 
@@ -70,10 +89,10 @@ async def test_the_same_value_of_another_kind_is_a_separate_row(
     """
     await put(session_factory, blacklist_row("hr", "@maria"))
 
-    row, created = await create_blacklist(session, kind="channel", value="@maria")
+    row, _ = await create_blacklist(session, kind="channel", value="@maria")
 
-    assert created is True
     assert row.kind == "channel"
+    assert len((await session.scalars(select(Blacklist))).all()) == 2
 
 
 async def test_adding_a_switched_off_pair_switches_it_back_on(
@@ -83,10 +102,30 @@ async def test_adding_a_switched_off_pair_switches_it_back_on(
     existing = blacklist_row("hr", "@maria", active=False)
     await put(session_factory, existing)
 
-    row, created = await create_blacklist(session, kind="hr", value="@maria")
+    row, _ = await create_blacklist(session, kind="hr", value="@maria")
 
-    assert created is False
     assert row.active is True
+
+
+async def test_switching_a_pair_back_on_is_told_apart_from_an_already_on_one(
+    session, session_factory
+):
+    """Оживление погашенной пары и попадание в уже включённую — разные исходы.
+
+    Обе не заводят строки, но окно говорит о них по-разному: «возвращён в
+    чёрный список» против «уже в чёрном списке», — и различить их нечем,
+    если исход у обеих один.
+    """
+    await put(
+        session_factory,
+        blacklist_row("hr", "@maria", active=False),
+        blacklist_row("hr", "@olga", active=True),
+    )
+
+    _, switched_back_on = await create_blacklist(session, kind="hr", value="@maria")
+    _, already_on = await create_blacklist(session, kind="hr", value="@olga")
+
+    assert switched_back_on != already_on
 
 
 async def test_a_reason_fills_an_empty_one_but_never_replaces_it(
