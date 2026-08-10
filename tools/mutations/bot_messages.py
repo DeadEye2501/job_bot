@@ -102,12 +102,11 @@ MUTATIONS = [
         + "        return 0" + CRLF,
         "",
     ),
-    # mark_vacancy_applied: перевод статуса остаётся в истории без подписи
+    # _move_status: перевод статуса остаётся в истории без подписи
     (
         "backend/repository/vacancies_life.py",
-        "            explanation=_ensure_trailing_period(explanation)," + CRLF
-        + "            applied=True," + CRLF,
-        "            explanation=None," + CRLF + "            applied=True," + CRLF,
+        "        explanation=_ensure_trailing_period(explanation)," + CRLF,
+        "        explanation=None," + CRLF,
     ),
     # mark_incoming_read: отметка ставится и на исходящие
     (

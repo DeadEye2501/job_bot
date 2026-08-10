@@ -35,6 +35,44 @@ def _ensure_trailing_period(s: str | None) -> str | None:
     return trimmed + "."
 
 
+def _move_status(
+    vacancy: Vacancy,
+    new_status: VacancyStatus,
+    explanation: str | None,
+    *,
+    message_id: int | None = None,
+    source: StatusHistorySource = StatusHistorySource.SYSTEM,
+) -> VacancyStatusHistory:
+    """Оформить переход вакансии в ``new_status``.
+
+    Решать, переводить ли, остаётся зовущему — у каждого пути своё условие
+    (`force` у отклика, граф переходов у классификатора, срок молчания у
+    гашения, воля пользователя у экрана).
+
+    Отметка «применено» снята только там, где статус остался прежним, а это
+    бывает у одного пути из четырёх — у экрана, где комментарий пишется и к
+    нынешнему статусу. Трём остальным равный переход не достаётся вовсе:
+    `should_apply_status` отвергает его первой же строкой, а в «пропала»
+    уходят только из «отклик отправлен» и «в работе».
+
+    Строку зовущий кладёт в сессию сам: он же решает, нужен ли ему сразу
+    её идентификатор.
+    """
+    previous = vacancy.status
+    applied = previous != new_status
+    if applied:
+        vacancy.status = new_status
+    return VacancyStatusHistory(
+        vacancy_id=vacancy.id,
+        message_id=message_id,
+        previous_status=previous,
+        status=new_status,
+        explanation=_ensure_trailing_period(explanation),
+        applied=applied,
+        source=source,
+    )
+
+
 async def mark_vacancy_applied(
     session: AsyncSession, vacancy_id: int, explanation: str | None, *, force: bool
 ) -> bool:
@@ -55,18 +93,7 @@ async def mark_vacancy_applied(
         vacancy.status, VacancyStatus.APPLIED, force=force
     ):
         return False
-    previous = vacancy.status
-    vacancy.status = VacancyStatus.APPLIED
-    session.add(
-        VacancyStatusHistory(
-            vacancy_id=vacancy_id,
-            message_id=None,
-            previous_status=previous,
-            status=VacancyStatus.APPLIED,
-            explanation=_ensure_trailing_period(explanation),
-            applied=True,
-        )
-    )
+    session.add(_move_status(vacancy, VacancyStatus.APPLIED, explanation))
     return True
 
 
@@ -83,10 +110,6 @@ async def change_vacancy_status(
     request. Use ``apply_classification`` for the auto-classifier path
     that *should* respect stickiness.
 
-    The ``applied`` flag in the history row reflects whether this row
-    actually mutated ``vacancy.status``: same status + non-empty
-    explanation = comment-only, ``applied=False``.
-
     No-op short-circuit: if the status is unchanged AND the explanation
     is empty/whitespace, no row is written and ``None`` is returned —
     avoids history pollution from accidental "Применить" clicks. Returns
@@ -99,29 +122,20 @@ async def change_vacancy_status(
         return None
     previous = vacancy.status
     cleaned_explanation = _ensure_trailing_period(explanation)
-    status_changed = previous != new_status
-    if not status_changed and cleaned_explanation is None:
+    if previous == new_status and cleaned_explanation is None:
         return None
-    if status_changed:
-        vacancy.status = new_status
-    history = VacancyStatusHistory(
-        vacancy_id=vacancy_id,
-        message_id=None,
-        previous_status=previous,
-        status=new_status,
-        explanation=cleaned_explanation,
-        applied=status_changed,
-        source=StatusHistorySource.USER,
+    history = _move_status(
+        vacancy, new_status, cleaned_explanation, source=StatusHistorySource.USER
     )
     session.add(history)
     await session.flush()
-    if status_changed:
+    if history.applied:
         logger.info(
             "vacancy %d: status %s -> %s (manual, applied=%s)",
             vacancy_id,
             previous.value if previous else None,
             new_status.value,
-            status_changed,
+            history.applied,
         )
     else:
         logger.debug(
@@ -234,8 +248,8 @@ async def apply_classification(
         logger.warning("apply_classification: vacancy %s not found", vacancy_id)
         return
     previous = vacancy.status
-    applied = should_apply_status(previous, classification.status)
-    if not applied:
+    allowed = should_apply_status(previous, classification.status)
+    if not allowed:
         # Переход не разрешён state-machine'ом (например, classifier
         # выдал Invitation для уже-Decline вакансии). Раньше тут писали
         # призрачную VacancyStatusHistory с applied=False — она вылезала
@@ -251,7 +265,6 @@ async def apply_classification(
             message_id,
         )
         return
-    vacancy.status = classification.status
     logger.info(
         "vacancy %d: status %s -> %s (auto, msg=%d)",
         vacancy_id,
@@ -260,13 +273,11 @@ async def apply_classification(
         message_id,
     )
     session.add(
-        VacancyStatusHistory(
-            vacancy_id=vacancy_id,
+        _move_status(
+            vacancy,
+            classification.status,
+            classification.explanation,
             message_id=message_id,
-            previous_status=previous,
-            status=classification.status,
-            explanation=_ensure_trailing_period(classification.explanation),
-            applied=True,
         )
     )
 
@@ -355,22 +366,14 @@ async def mark_ghosted_vacancies(
         last_activity = max(timestamps)
         if last_activity >= cutoff:
             continue
-        # Перевод в Ghosting. message_id=None — это системное событие,
-        # не привязано к конкретной HR-реплике. source ложится на
-        # server_default 'system'.
-        previous = v.status
-        v.status = VacancyStatus.GHOSTING
+        # Перевод в Ghosting ни на какую реплику HR не ссылается: молчание
+        # и есть повод, а сообщения, которого не было, у события нет.
         session.add(
-            VacancyStatusHistory(
-                vacancy_id=v.id,
-                message_id=None,
-                previous_status=previous,
-                status=VacancyStatus.GHOSTING,
-                explanation=(
-                    f"HR не отвечает более {timeout_days} дней — "
-                    "автоматически помечено как ghosting."
-                ),
-                applied=True,
+            _move_status(
+                v,
+                VacancyStatus.GHOSTING,
+                f"HR не отвечает более {timeout_days} дней — "
+                "автоматически помечено как ghosting.",
             )
         )
         affected.append(v.id)
