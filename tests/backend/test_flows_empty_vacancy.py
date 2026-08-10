@@ -15,11 +15,13 @@
 """
 
 from backend.flows import parse
+import asyncio
+
 import pytest
 
 from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
 from tests.dbio import all_rows, only_row, put
-from tests.factories import parsed_vacancy, vacancy_row
+from tests.factories import hr_row, parsed_vacancy, vacancy_row
 from tests.fakes.telegram import FakeTelegramClient, photo, user
 
 
@@ -176,6 +178,65 @@ async def test_an_hr_avatar_is_picked_up_on_the_way(session_factory, make_pipeli
     assert (await only_row(session_factory, HR)).avatar == b"\x89PNG"
 
 
+@pytest.fixture
+def caught_backfills(monkeypatch):
+    """Кто из HR ушёл в фоновый догон переписки."""
+    caught: list[int] = []
+
+    async def backfill(client, hr_row_, *args, **kwargs):
+        caught.append(hr_row_.id)
+
+    monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)
+    return caught
+
+
+async def test_a_first_time_hr_gets_his_history_caught_up(
+    session_factory, make_pipeline, caught_backfills
+):
+    """У впервые заведённого HR переписка догоняется фоном.
+
+    В окне у него пусто, и прежние письма появились бы в лучшем случае
+    после перезапуска.
+    """
+    client = FakeTelegramClient(
+        users={"maria": user(id=777, username="maria", first_name="Мария")}
+    )
+    pipeline = await make_pipeline(client)
+    await put(session_factory, vacancy_row(title="прошлое"))
+    vacancy = await only_row(session_factory, Vacancy)
+
+    await parse.save_empty_vacancy(
+        pipeline, vacancy.id, parsed_vacancy(title="Что-то", hr_contact="@maria")
+    )
+    await asyncio.sleep(0)
+
+    assert caught_backfills == [(await only_row(session_factory, HR)).id]
+
+
+async def test_a_known_hr_is_not_caught_up_again(
+    session_factory, make_pipeline, caught_backfills
+):
+    """По уже знакомому HR догон заново не заводится.
+
+    Он тянет всю историю переписки — сеть и вложения, — и на каждой
+    следующей вакансии от того же человека это была бы работа впустую.
+    """
+    client = FakeTelegramClient(
+        users={"maria": user(id=777, username="maria", first_name="Мария")}
+    )
+    pipeline = await make_pipeline(client)
+    await put(session_factory, hr_row(telegram_user_id=777))
+    await put(session_factory, vacancy_row(title="прошлое"))
+    vacancy = await only_row(session_factory, Vacancy)
+
+    await parse.save_empty_vacancy(
+        pipeline, vacancy.id, parsed_vacancy(title="Что-то", hr_contact="@maria")
+    )
+    await asyncio.sleep(0)
+
+    assert caught_backfills == []
+
+
 async def test_the_timeline_records_the_empty_parse(emptied, session_factory):
     """В ленте вакансии остаётся запись о разборе с нулевой оценкой.
 
@@ -194,6 +255,28 @@ async def test_the_timeline_records_the_empty_parse(emptied, session_factory):
     assert event.payload["status"] == VacancyStatus.NOT_FIT.value
     assert event.payload["fields_filled"] == ["title"]
     assert event.payload["skip_reason"] == "empty: no meaningful fields"
+
+
+async def test_the_timeline_names_every_field_that_got_filled(
+    emptied, session_factory
+):
+    """В ленте названы все поля, которые всё же заполнились.
+
+    Пустышкой объявление считается по нехватке сигналов, а не по их
+    отсутствию: один из пяти в нём бывает. Названное «чем заполнено»
+    обязано совпадать с тем, что легло в строку, иначе лента врёт про
+    ту самую компанию, ссылку на которую окно уже показывает.
+    """
+    pipeline, vacancy = emptied
+
+    await parse.save_empty_vacancy(
+        pipeline,
+        vacancy.id,
+        parsed_vacancy(title="Python-разработчик", company_name="Контур"),
+    )
+
+    event = await only_row(session_factory, VacancyEvent)
+    assert event.payload["fields_filled"] == ["title", "company_name"]
 
 
 async def test_the_timeline_says_nothing_was_filled(emptied, session_factory):

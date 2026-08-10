@@ -151,39 +151,32 @@ MUTATIONS = [
         '        elif False:' + CRLF
         + "            status = VacancyStatus.NOT_FIT" + CRLF,
     ),
-    # parse_and_update_vacancy: признак разбора не ставится
+    # _persist_parse_outcome: признак разбора не ставится
     (
         "backend/flows/parse.py",
-        "            v.is_parsed = True" + CRLF + CRLF + "            v.title",
-        "            v.title",
+        "            v.is_parsed = True" + CRLF
+        + "            _apply_parsed_fields(v, parsed, outcome)",
+        "            _apply_parsed_fields(v, parsed, outcome)",
     ),
-    # parse_and_update_vacancy: пустой повторный разбор затирает стек
+    # _apply_parsed_fields: пустой повторный разбор затирает стек
     (
         "backend/flows/parse.py",
-        "            if parsed.stack:" + CRLF
-        + "                v.stack = parsed.stack" + CRLF
-        + "                v.score = score" + CRLF
-        + "            else:" + CRLF
-        + "                v.stack = v.stack or []" + CRLF,
-        "            if True:" + CRLF
-        + "                v.stack = parsed.stack" + CRLF
-        + "                v.score = score" + CRLF
-        + "            else:" + CRLF
-        + "                v.stack = v.stack or []" + CRLF,
+        "    if parsed.stack or not outcome.keep_previous_stack:" + CRLF
+        + "        v.stack = parsed.stack" + CRLF,
+        "    if True:" + CRLF + "        v.stack = parsed.stack" + CRLF,
     ),
-    # parse_and_update_vacancy: компания не привязывается
+    # _persist_parse_outcome: компания не привязывается
     (
         "backend/flows/parse.py",
         "                if company is not None:" + CRLF
         + "                    v.company_id = company.id" + CRLF,
         "",
     ),
-    # parse_and_update_vacancy: HR не привязывается
+    # _persist_parse_outcome: HR не привязывается
     (
         "backend/flows/parse.py",
-        "                v.hr_id = hr.id" + CRLF
-        + "                # Захватываем до выхода из сессии",
-        "                # Захватываем до выхода из сессии",
+        "                v.hr_id = hr.id" + CRLF,
+        "",
     ),
     # parse_and_update_vacancy: отклик уходит и у непригодной вакансии
     (
@@ -211,22 +204,32 @@ MUTATIONS = [
         "                        kind=\"auto_send\"," + CRLF
         + '                        payload={"ok": True, "reason": "sent"},' + CRLF,
     ),
-    # save_empty_vacancy: признак разбора не ставится
+    # _fields_filled: заполненная компания в ленту не попадает
     (
         "backend/flows/parse.py",
-        "            v.is_parsed = True" + CRLF
-        + "            company_dedup_decision",
-        "            company_dedup_decision",
+        '            ("company_name", v.company_name),' + CRLF,
+        "",
     ),
-    # save_empty_vacancy: прежний разбор не стирается
+    # save_empty_vacancy: пустой разбор щадит прежний стек наравне с обычным
     (
         "backend/flows/parse.py",
-        "            else:" + CRLF
-        + "                v.title = None" + CRLF
-        + "                v.description = None" + CRLF,
-        "            elif False:" + CRLF
-        + "                v.title = None" + CRLF
-        + "                v.description = None" + CRLF,
+        "            keep_previous_stack=False," + CRLF,
+        "            keep_previous_stack=True," + CRLF,
+    ),
+    # save_empty_vacancy: догон переписки заводят и по знакомому HR
+    (
+        "backend/flows/parse.py",
+        "    if hr_created:" + CRLF
+        + "        dm_backfill.spawn_hr_backfill(pipeline, hr)" + CRLF,
+        "    if hr is not None:" + CRLF
+        + "        dm_backfill.spawn_hr_backfill(pipeline, hr)" + CRLF,
+    ),
+    # _apply_parsed_fields: прежний разбор не стирается
+    (
+        "backend/flows/parse.py",
+        "        _clear_parsed_fields(v, outcome.score)" + CRLF
+        + "        return" + CRLF,
+        "        return" + CRLF,
     ),
     # send_application: короткая приписка не заменяет полное письмо
     (
