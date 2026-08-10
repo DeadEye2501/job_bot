@@ -25,11 +25,14 @@ async def test_a_new_row_reaches_the_table_switched_on_and_numbered(session):
     row, outcome = await create_blacklist(session, kind="hr", value="@maria")
 
     assert outcome == "created"
+    # Номер спрашиваем до запроса: запрос сам сбросил бы строку в базу, и
+    # проверка зеленела бы даже без сброса внутри заведения — а окну номер
+    # нужен раньше, чем закроется транзакция.
+    assert row.id is not None
     stored = (await session.scalars(select(Blacklist))).all()
     assert [(r.id, r.kind, r.value, r.active) for r in stored] == [
         (row.id, "hr", "@maria", True)
     ]
-    assert row.id is not None
 
 
 async def test_spaces_around_the_value_and_the_reason_are_trimmed(session):

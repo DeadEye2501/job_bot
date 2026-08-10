@@ -4,11 +4,12 @@
 развёрткой словаря, и переименованный ключ роняет форму у пользователя,
 ничего не записав. Отсюда цели на сами ключи, а не только на правила.
 
-Где поломка захватывает конец строки, перевод пишется через `CRLF`: рабочее
-дерево здесь с виндовыми переводами, и поиск по `\\n` не находит ничего.
+Где поломка захватывает конец строки, перевод берётся из `EOL`. У этого
+файла он свой: `client/` лежит в дереве с переводами в один знак, а
+`backend/` — в два, и общей постоянной на все наборы тут нет.
 """
 
-CRLF = "\r\n"
+EOL = "\n"
 
 MUTATIONS = [
     # read_new_hr_fields: ник не разбирается и едет в колонку как введён
@@ -38,9 +39,9 @@ MUTATIONS = [
     # read_new_company_fields: написания списком перестают читаться
     (
         "client/form_payloads.py",
-        "    elif not isinstance(raw_aliases, list):" + CRLF
-        + "        raw_aliases = []" + CRLF,
-        "    else:" + CRLF + "        raw_aliases = []" + CRLF,
+        "    elif not isinstance(raw_aliases, list):" + EOL
+        + "        raw_aliases = []" + EOL,
+        "    else:" + EOL + "        raw_aliases = []" + EOL,
     ),
     # read_new_company_fields: пустое написание попадает в перечень
     (
@@ -57,7 +58,7 @@ MUTATIONS = [
     # none_if_empty: пробельная строка перестаёт считаться отсутствием
     (
         "client/form_payloads.py",
-        "    text = str(value).strip()" + CRLF,
-        "    text = str(value)" + CRLF,
+        "    text = str(value).strip()" + EOL,
+        "    text = str(value)" + EOL,
     ),
 ]
