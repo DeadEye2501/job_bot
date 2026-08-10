@@ -57,11 +57,11 @@ MUTATIONS = [
         "        return p.relative_to(MEDIA_DIR.resolve()).as_posix()",
         "        return p.as_posix()",
     ),
-    # download_media: картинка получает расширение документа
+    # _cache_ext: картинка получает расширение документа
     (
         "backend/bot/media.py",
-        '        ext = ".jpg"  # Pyrogram delivers photos as JPEGs',
-        '        ext = ".bin"',
+        '        return ".jpg"',
+        '        return ".bin"',
     ),
     # download_media: уже скачанный файл качается заново
     (

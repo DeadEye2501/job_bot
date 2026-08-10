@@ -4,12 +4,13 @@ import logging
 import asyncio
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from backend.bot.media import classify_media, download_media
 from backend.flows.dm import process_dm
 from backend.helpers import extract_dm_text, telegram_peer
+from backend.payloads import OutgoingMessage
 from backend.repository.hr_list import list_hrs_for_backfill
+from backend.repository.messages import save_outgoing_message
 
 logger = logging.getLogger(__name__)
 
@@ -117,20 +118,20 @@ async def backfill_hr_dm_history(
             )
             try:
                 async with session_factory() as session:
-                    session.add(Message(
-                        is_incoming=False,
-                        hr_id=hr.id,
-                        text=text,
-                        tg_message_id=msg.id,
-                        sent_at=msg.date,
-                        media_kind=media_kind,
-                        media_path=media_path,
-                        media_name=media_name,
-                    ))
+                    _, saved = await save_outgoing_message(
+                        session,
+                        OutgoingMessage(
+                            hr_id=hr.id,
+                            text=text,
+                            tg_message_id=msg.id,
+                            sent_at=msg.date,
+                            media_kind=media_kind,
+                            media_path=media_path,
+                            media_name=media_name,
+                        ),
+                    )
                     await session.commit()
-                had_new = True
-            except IntegrityError:
-                pass  # already stored
+                had_new = had_new or saved
             except Exception:
                 logger.exception(
                     "backfill outgoing insert failed",
@@ -223,8 +224,9 @@ async def catch_up_missed_dms(
     Outgoing messages cover the case where the user typed from their phone
     or another TG client while the bot was off — without this we'd only
     see what we sent from our own app + what HRs sent us, missing half the
-    conversation. Dedup by ``UNIQUE (hr_id, tg_message_id, is_incoming)``;
-    IntegrityError = «already had it», skip silently.
+    conversation. Повторы отсеивает `save_outgoing_message`: уже лежащая
+    строка возвращается с признаком «записали не мы», и догон её не
+    считает новой.
 
     Also reconciles deletes that happened while the bot was offline:
     Telegram doesn't replay ``DeletedMessagesHandler`` updates after a

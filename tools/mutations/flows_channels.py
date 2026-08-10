@@ -174,6 +174,12 @@ MUTATIONS = [
         "    if messages:" + CRLF + "        seen_ids = {m.id for m in messages}",
         "    if True:" + CRLF + "        seen_ids = {m.id for m in messages}",
     ),
+    # backfill: повтор засчитывается как новая строка
+    (
+        "backend/flows/dm_backfill.py",
+        "                had_new = had_new or saved" + CRLF,
+        "                had_new = True" + CRLF,
+    ),
     # backfill: окно не узнаёт о догнанной переписке
     (
         "backend/flows/dm_backfill.py",

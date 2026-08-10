@@ -3,9 +3,11 @@
 from datetime import datetime
 
 from sqlalchemy import and_, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Message
+from backend.payloads import OutgoingMessage
 
 # Раскрывается звёздочкой в `.where(...)`: `.where(*UNREAD_INCOMING, ...)`.
 # Надгробие исключено намеренно — удалённое, но не прочитанное входящее иначе
@@ -43,6 +45,59 @@ async def save_incoming_message(
     session.add(new_msg)
     await session.flush()
     return new_msg
+
+
+async def find_outgoing_message(
+    session: AsyncSession, hr_id: int, tg_message_id: int
+) -> Message | None:
+    """Наше исходящее с этим номером, если оно уже записано.
+
+    Чем опознаётся наша исходящая, сказано здесь один раз: то же условие
+    держит уникальность, по которой ловится гонка.
+    """
+    return (
+        await session.scalars(
+            select(Message).where(
+                Message.hr_id == hr_id,
+                Message.tg_message_id == tg_message_id,
+                Message.is_incoming.is_(False),
+            )
+        )
+    ).first()
+
+
+async def save_outgoing_message(
+    session: AsyncSession, out: OutgoingMessage
+) -> tuple[Message, bool]:
+    """Записать наше исходящее; отдать строку и «записали впервые».
+
+    Повтор — штатный случай, а не сбой: одно письмо приходит и от нас, и
+    эхом из Telegram, и кто из двоих успел первым, заранее не известно.
+    Ловится он уникальностью `(hr_id, tg_message_id, is_incoming)`, и
+    проигравший гонку получает уже лежащую строку, а не отказ.
+    """
+    row = Message(
+        is_incoming=False,
+        hr_id=out.hr_id,
+        text=out.text,
+        tg_message_id=out.tg_message_id,
+        sent_at=out.sent_at,
+        media_kind=out.media_kind,
+        media_path=out.media_path,
+        media_name=out.media_name,
+    )
+    session.add(row)
+    try:
+        await session.flush()
+    except IntegrityError:
+        await session.rollback()
+        stored = await find_outgoing_message(
+            session, out.hr_id, out.tg_message_id
+        )
+        if stored is None:
+            raise
+        return stored, False
+    return row, True
 
 
 async def list_messages_for_hr(

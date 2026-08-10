@@ -206,11 +206,17 @@ async def test_a_duplicate_that_slipped_in_meanwhile_is_passed_over(
         return file_name
 
     client.download_media = download_media
+    heard: list[int] = []
+    bot.on_new_message = heard.append
 
     await bot._on_dm_outgoing(client, _echo(photo=object()))
 
     saved = await all_rows(session_factory, Message)
     assert [row.text for row in saved] == ["успела отправка"]
+    # Тихо — это и про окно: строку оно уже получило от самой отправки,
+    # и второе оповещение о том же сообщении перерисовало бы переписку
+    # впустую.
+    assert heard == []
 
 
 async def test_a_write_that_fell_through_stays_quiet(
