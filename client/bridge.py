@@ -59,6 +59,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from adapters import lm_studio
 from adapters.lm_studio import LlmProviderConfig
 from backend.repository import blacklist, channels as channels_repo, companies_card, companies_list, hr_card, hr_identify, hr_list, messages as messages_repo, profile as profile_repo, stats_pipeline, stats_summary, vacancies_card, vacancies_life, vacancies_list, vacancies_mini  # три псевдонима: имена заняты локальными переменными
+from client.form_payloads import hr_is_identified, none_if_empty as _none_if_empty, read_new_company_fields, read_new_hr_fields
 from backend.cv_parser import parse_cv
 from backend.domain.scoring import build_skill_lookup, skill_key
 from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
@@ -1950,15 +1951,7 @@ class MainApi(QObject):
         try:
             payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
-            name = _none_if_empty(payload.get("name"))
-            telegram_username = _none_if_empty(payload.get("telegram_username"))
-            notes = _none_if_empty(payload.get("notes"))
-            tg_user_id_raw = payload.get("telegram_user_id")
-            telegram_user_id: int | None
-            if tg_user_id_raw in (None, ""):
-                telegram_user_id = None
-            else:
-                telegram_user_id = int(tg_user_id_raw)
+            fields = read_new_hr_fields(payload)
             search = payload.get("search")
             if search is not None:
                 search = str(search)
@@ -1967,7 +1960,7 @@ class MainApi(QObject):
             self.hr_picker_loaded.emit(_err(f"Неверные поля: {e}"))
             return
 
-        if not name and not telegram_username and telegram_user_id is None:
+        if not hr_is_identified(fields):
             self.hr_picker_loaded.emit(
                 _err("Укажите хотя бы имя или @username.", vacancy_id=vacancy_id)
             )
@@ -1976,13 +1969,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    new_hr = await hr_identify.create_hr(
-                        session,
-                        name=name,
-                        telegram_username=telegram_username,
-                        telegram_user_id=telegram_user_id,
-                        notes=notes,
-                    )
+                    new_hr = await hr_identify.create_hr(session, **fields)
                     created_id = new_hr.id
                 rows = await hr_list.list_hr_with_counts(session, search=search)
                 v = await session.get(Vacancy, vacancy_id)
@@ -2008,16 +1995,8 @@ class MainApi(QObject):
         try:
             payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
-            name = _none_if_empty(payload.get("name")) or ""
-            website = _none_if_empty(payload.get("website"))
-            notes = _none_if_empty(payload.get("notes"))
-            aliases_raw = payload.get("aliases") or []
-            if isinstance(aliases_raw, str):
-                aliases = [a.strip() for a in aliases_raw.split(",") if a.strip()]
-            elif isinstance(aliases_raw, list):
-                aliases = [str(a).strip() for a in aliases_raw if str(a).strip()]
-            else:
-                aliases = []
+            fields = read_new_company_fields(payload)
+            name = fields["name"]
             search = payload.get("search")
             if search is not None:
                 search = str(search)
@@ -2037,11 +2016,7 @@ class MainApi(QObject):
                 async with self._session_factory() as session:
                     async with session.begin():
                         new_co = await companies_card.create_company(
-                            session,
-                            name=name,
-                            website=website,
-                            aliases=aliases,
-                            notes=notes,
+                            session, **fields
                         )
                         created_id = new_co.id
                     rows = await companies_list.list_companies_with_counts(
@@ -2593,41 +2568,22 @@ class MainApi(QObject):
         """
         try:
             payload = json.loads(payload_json)
-            name = _none_if_empty(payload.get("name"))
-            telegram_username = _none_if_empty(payload.get("telegram_username"))
-            notes = _none_if_empty(payload.get("notes"))
-            tg_user_id_raw = payload.get("telegram_user_id")
-            telegram_user_id: int | None
-            if tg_user_id_raw in (None, ""):
-                telegram_user_id = None
-            else:
-                telegram_user_id = int(tg_user_id_raw)
+            fields = read_new_hr_fields(payload)
         except (ValueError, TypeError, KeyError) as e:
             _log_invalid_payload("contacts_create_hr", e)
             self.contacts_hr_action_done.emit(_err(f"Неверные поля: {e}"))
             return
 
-        if not name and not telegram_username and telegram_user_id is None:
+        if not hr_is_identified(fields):
             self.contacts_hr_action_done.emit(
                 _err("Укажите хотя бы имя или @username.")
             )
             return
 
-        # Strip leading «@» from the username — the input may include or omit
-        # it; the column stores the bare handle.
-        if telegram_username and telegram_username.startswith("@"):
-            telegram_username = telegram_username[1:].strip() or None
-
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    new_hr = await hr_identify.create_hr(
-                        session,
-                        name=name,
-                        telegram_username=telegram_username,
-                        telegram_user_id=telegram_user_id,
-                        notes=notes,
-                    )
+                    new_hr = await hr_identify.create_hr(session, **fields)
                     created_id = new_hr.id
             return _ok({"action": "create_hr", "created_id": created_id})
 
@@ -4268,11 +4224,8 @@ class MainApi(QObject):
     def contacts_create_company(self, payload_json: str) -> None:
         try:
             payload = json.loads(payload_json)
-            name = str(payload.get("name") or "").strip()
-            website = (payload.get("website") or "").strip() or None
-            aliases_raw = payload.get("aliases") or ""
-            aliases = [a.strip() for a in str(aliases_raw).split(",") if a.strip()]
-            notes = (payload.get("notes") or "").strip() or None
+            fields = read_new_company_fields(payload)
+            name = fields["name"]
         except (ValueError, TypeError) as e:
             _log_invalid_payload("contacts_create_company", e)
             self.contacts_company_action_done.emit(_err(f"Неверные поля: {e}"))
@@ -4286,13 +4239,7 @@ class MainApi(QObject):
         async def run() -> str:
             try:
                 async with self._session_factory() as session:
-                    co = await companies_card.create_company(
-                        session,
-                        name=name,
-                        website=website,
-                        aliases=aliases,
-                        notes=notes,
-                    )
+                    co = await companies_card.create_company(session, **fields)
                     await session.commit()
             except IntegrityError:
                 return _err(
@@ -4517,13 +4464,6 @@ class MainApi(QObject):
             return _ok(results)
 
         self._dispatch(self.health_changed, run())
-
-
-def _none_if_empty(v) -> str | None:
-    if v is None:
-        return None
-    s = str(v).strip()
-    return s if s else None
 
 
 def _profile_to_dict(p, languages=None) -> dict | None:
