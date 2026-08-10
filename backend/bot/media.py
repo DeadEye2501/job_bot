@@ -1,6 +1,7 @@
 """Вложения: распознание, кэш и скачивание."""
 
 import logging
+import shutil
 
 from config import get_data_dir
 from pathlib import Path
@@ -86,6 +87,46 @@ def media_cache_path(hr_id: int, tg_message_id: int, ext: str) -> Path:
     return MEDIA_DIR / str(hr_id) / f"{tg_message_id}{ext}"
 
 
+def _cache_ext(as_photo: bool, name: str | None) -> str:
+    """Расширение файла в кэше.
+
+    Картинку Telegram отдаёт JPEG независимо от того, чем она была у
+    отправителя, поэтому у фото расширение своё, а не исходное. Документ
+    без расширения вовсе получает `.bin`: путь в кэше собирается из
+    номера сообщения, и без расширения два разных вложения одного HR
+    легли бы в один файл.
+    """
+    if as_photo:
+        return ".jpg"
+    return Path(name or "").suffix or ".bin"
+
+
+def cache_sent_file(
+    src: Path, hr_id: int, tg_message_id: int, *, as_photo: bool
+) -> str | None:
+    """Положить отправленный файл в кэш вложений; отдать путь для базы.
+
+    Путь тот же, что написал бы скачиватель входящего, — обработчик,
+    догнавший это же сообщение, найдёт готовый файл вместо повторной
+    загрузки из Telegram.
+
+    Каталог заводится здесь: разметку пути знает этот модуль, и зовущим
+    незачем повторять её задом наперёд. Не вышло — сообщение всё равно
+    уходит и сохраняется, только без предпросмотра.
+    """
+    dest = media_cache_path(hr_id, tg_message_id, _cache_ext(as_photo, src.name))
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        return media_path_for_db(dest)
+    except Exception:
+        logger.exception(
+            "media cache copy failed (or its folder could not be made)",
+            extra={"hr_id": hr_id, "src": str(src), "dest": str(dest)},
+        )
+        return None
+
+
 def media_path_for_db(path) -> str:
     """Convert a media-cache absolute path into a posix string relative to
     ``MEDIA_DIR`` for storage. Falls back to the absolute posix form for any
@@ -108,10 +149,9 @@ async def download_media(client, msg, hr_id: int) -> str | None:
     kind, _ = classify_media(msg)
     if kind is None:
         return None
-    if kind == "photo":
-        ext = ".jpg"  # Pyrogram delivers photos as JPEGs
-    else:
-        ext = Path(getattr(msg.document, "file_name", "") or "").suffix or ".bin"
+    ext = _cache_ext(
+        kind == "photo", getattr(getattr(msg, "document", None), "file_name", None)
+    )
     out = media_cache_path(hr_id, msg.id, ext)
     if out.exists():
         return media_path_for_db(out)

@@ -1,7 +1,6 @@
 """Переписка с HR из окна: отправка текста, файла и отметка о прочтении."""
 
 import logging
-import shutil
 
 from pathlib import Path
 from sqlalchemy import select
@@ -64,17 +63,11 @@ async def mark_hr_chat_read(bot, hr_id: int) -> int:
     return updated
 
 
-async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
-    """Send a chat message to an HR from the Contacts/HR pane (slice 5).
+async def _ensure_can_send(bot) -> None:
+    """Заслоны, общие для всякой отправки из окна.
 
-    Resolves the Telegram target as ``telegram_user_id`` (preferred —
-    works even if the HR's username changed) with ``telegram_username``
-    as fallback. Returns the persisted Message row.
-
-    Raises ``RuntimeError`` for any failure mode the UI can usefully
-    surface (DRY-RUN / SEND_LOCKED suppression, missing HR, missing
-    Telegram contact, Pyrogram errors). Bridge converts the message
-    into a toast.
+    Каждый отказ — своими словами: мост показывает их подсказкой, и
+    «выключен» с «тестовым режимом» пользователь чинит по-разному.
     """
     if (await bot._current_mode()) is BotMode.OFF:
         raise RuntimeError("Бот выключен. Включите DM Only или Full.")
@@ -83,10 +76,13 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
     if telegram.SEND_LOCKED:
         raise RuntimeError("Отправка отключена: защита от случайной отправки.")
 
-    clean = (text or "").strip()
-    if not clean:
-        raise RuntimeError("Пустое сообщение.")
 
+async def _resolve_target(bot, hr_id: int):
+    """Кому слать: адрес HR, если он есть и не помечен чёрным списком.
+
+    Адрес предпочитает номер пользователя имени: имя HR может сменить, и
+    отправка по нему ушла бы не туда или никуда.
+    """
     async with bot._session_factory() as session:
         hr = await session.get(HR, hr_id)
         if hr is None:
@@ -101,6 +97,23 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
         raise RuntimeError(
             f"HR в blacklist ({bl_value}). Сначала уберите из blacklist."
         )
+    return target
+
+
+async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
+    """Send a chat message to an HR from the Contacts/HR pane (slice 5).
+
+    Returns the persisted Message row. Raises ``RuntimeError`` for any
+    failure mode the UI can usefully surface — мост показывает текст
+    отказа подсказкой.
+    """
+    await _ensure_can_send(bot)
+
+    clean = (text or "").strip()
+    if not clean:
+        raise RuntimeError("Пустое сообщение.")
+
+    target = await _resolve_target(bot, hr_id)
 
     pyro_msg = await bot._client.send_message(target, clean)
     logger.info(
@@ -146,31 +159,13 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
     cache so the chat UI can render it without re-downloading from
     Telegram.
     """
-    if (await bot._current_mode()) is BotMode.OFF:
-        raise RuntimeError("Бот выключен. Включите DM Only или Full.")
-    if bot._dry_run:
-        raise RuntimeError("Отправка отключена: тестовый режим.")
-    if telegram.SEND_LOCKED:
-        raise RuntimeError("Отправка отключена: защита от случайной отправки.")
+    await _ensure_can_send(bot)
 
     src = Path(file_path)
     if not src.exists() or not src.is_file():
         raise RuntimeError(f"Файл не найден: {file_path}")
 
-    async with bot._session_factory() as session:
-        hr = await session.get(HR, hr_id)
-        if hr is None:
-            raise RuntimeError(f"HR id={hr_id} не найден.")
-        target = telegram_peer(hr)
-        bl_value = await _hr_blacklist_value(session, hr)
-    if target is None:
-        raise RuntimeError(
-            "У HR нет ни telegram_user_id, ни @username — нечем отправить."
-        )
-    if bl_value:
-        raise RuntimeError(
-            f"HR в blacklist ({bl_value}). Сначала уберите из blacklist."
-        )
+    target = await _resolve_target(bot, hr_id)
 
     as_photo = media.looks_like_photo(src)
     try:
@@ -197,22 +192,9 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
         src.name,
     )
 
-    # Copy into our media cache. Path matches what `updates.on_dm_outgoing`'s
-    # `download_media` would have written, so the racing handler that
-    # downloads the same message can find the already-existing file
-    # instead of re-fetching it from Telegram.
-    ext = ".jpg" if as_photo else (src.suffix or ".bin")
-    dest = media.media_cache_path(hr_id, pyro_msg.id, ext)
-    try:
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dest)
-        media_path = media.media_path_for_db(dest)
-    except Exception:
-        logger.exception(
-            "media cache copy failed (or its folder could not be made)",
-            extra={"hr_id": hr_id, "src": str(src), "dest": str(dest)},
-        )
-        media_path = None
+    media_path = media.cache_sent_file(
+        src, hr_id, pyro_msg.id, as_photo=as_photo
+    )
     media_kind = "photo" if as_photo else "document"
     media_name = None if as_photo else src.name
 

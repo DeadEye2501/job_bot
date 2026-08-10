@@ -130,9 +130,9 @@ MUTATIONS = [
         "    media_name = None if as_photo else src.name",
         "    media_name = src.name",
     ),
-    # send_to_hr_media: место для копии готовится мимо разбора ошибок
+    # cache_sent_file: место для копии готовится мимо разбора ошибок
     (
-        "backend/bot/chat.py",
+        "backend/bot/media.py",
         "    try:" + CRLF
         + "        dest.parent.mkdir(parents=True, exist_ok=True)" + CRLF,
         "    dest.parent.mkdir(parents=True, exist_ok=True)" + CRLF
