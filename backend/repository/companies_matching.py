@@ -83,17 +83,25 @@ async def _create_company_row(
     name: str,
     website: str | None,
     decision: dict,
+    seen_ids: set[int],
 ) -> tuple[Company | None, dict]:
-    """Создание новой строки. На race по UNIQUE(name) — re-lookup точного
+    """Создание новой строки. На срыве по UNIQUE(name) — re-lookup точного
     совпадения (детерминированное, без LLM, чтобы не закольцеваться) и
     обогащение найденной строки тем же enrichment'ом, что в match-ветках
     (website-fill / alias-fold) — чтобы concurrent ingest не терял
     parsed-данные.
 
+    ``seen_ids`` — строки, которые разбор видел в своей выборке; по ним
+    срыв и делится на два исхода. Найденная среди них означает сведение по
+    имени: правила её не взяли (у неё другой сайт), а уникальность имени
+    свела — это ежедневный путь, ради которого enrichment здесь и стоит.
+    Не найденная означает настоящую гонку: строка появилась между выборкой
+    и вставкой.
+
     Если decision["stage"] уже несёт сигнал «LLM был вызван и не
-    сматчил» (`llm_no_match`), сохраняем его в `pre_create_stage` ДО
-    перезаписи на `create`, иначе DB-only audit не отличит «LLM пробовали»
-    от «LLM не вызывался»."""
+    сматчил» (`llm_no_match`), сохраняем его в `pre_create_stage` ДО того,
+    как исход перезапишет стадию, иначе DB-only audit не отличит «LLM
+    пробовали» от «LLM не вызывался»."""
     # Aggregator-URL'ы НЕ персистим как website новой компании по тем же
     # причинам, что в _enrich_company_with_parsed: «канальная» ссылка не
     # является корпоративным сайтом. None в этой колонке честнее, чем
@@ -132,22 +140,18 @@ async def _create_company_row(
             )
         ).first()
         if company is not None:
-            # Ветка отрабатывает и без всякой гонки, и это норма: имя
-            # решает — компания с таким же именем считается той же самой
-            # (решение человека от 10.08.2026), а уникальность
-            # `Company.name` — правило, а не случайность. Сюда приходит и
-            # «то же имя, другой сайт»: три правила выше развели бы их, а
-            # уникальность сводит. Применяем тот же enrichment, что в
-            # match-ветках: parsed-данные не должны теряться ни от
-            # сведения по имени, ни от того, что concurrent ingest нас
-            # опередил.
-            _enrich_company_with_parsed(company, name, website)
-            decision["stage"] = "create_race_fallback"
-            decision["matched_id"] = company.id
-            logger.info(
-                "company_dedup: race fallback id=%d name=%r",
-                company.id,
-                name_clean,
+            # Исход тот же, что у трёх правил выше — использованная чужая
+            # строка, — поэтому и оформляется он тем же объявлением: со
+            # своим enrichment и своей строкой аудита эта ветка разошлась
+            # бы с ними молча.
+            return _accept_company_match(
+                company,
+                name,
+                website,
+                decision,
+                "rule_name_unique"
+                if company.id in seen_ids
+                else "create_race_fallback",
             )
         return company, decision
 
@@ -166,11 +170,14 @@ async def find_or_create_company(
     decision — dict с полями:
         stage:    "rule_name" | "rule_alias" | "rule_website" |
                   "llm_match" | "llm_no_match" | "create" |
-                  "create_race_fallback" | "skip"
-                  Имя `create_race_fallback` осталось от времён, когда
-                  сведение по имени считалось дефектом: сегодня эта
-                  стадия означает и сведение однофамильцев, а не только
-                  гонку вставок.
+                  "rule_name_unique" | "create_race_fallback" | "skip"
+                  `rule_name_unique` и `create_race_fallback` — два исхода
+                  сорвавшейся вставки, и различает их то, была ли строка
+                  видна в выборке: первое — рядовое сведение однофамильцев,
+                  второе — настоящая гонка вставок.
+                  Ярлык уезжает в ленту вакансии навсегда, поэтому одним
+                  словом они не зовутся; в уже записанных событиях гонкой
+                  названо и то, и другое.
         matched_id:    int | None — id того row'а, к которому свелось
         candidates:    [{id, name, website}, ...] | None — shortlist для
                        LLM (заполняется только когда LLM вызывался)
@@ -345,4 +352,6 @@ async def find_or_create_company(
             )
 
     # Stage 3 — создаём новую.
-    return await _create_company_row(session, raw_name, website, decision)
+    return await _create_company_row(
+        session, raw_name, website, decision, {c.id for c in rows}
+    )

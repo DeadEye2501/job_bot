@@ -98,6 +98,14 @@ MUTATIONS = [
         "    persisted_website = real_corporate_website(website)",
         "    persisted_website = website",
     ),
+    # _create_company_row: сорвавшаяся вставка всегда зовётся гонкой
+    (
+        "backend/repository/companies_matching.py",
+        '                "rule_name_unique"' + CRLF
+        + "                if company.id in seen_ids" + CRLF,
+        '                "rule_name_unique"' + CRLF
+        + "                if seen_ids" + CRLF,
+    ),
     # _create_company_row: отметка «модель спрашивали» теряется
     (
         "backend/repository/companies_matching.py",

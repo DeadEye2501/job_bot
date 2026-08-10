@@ -16,7 +16,7 @@
 from sqlalchemy import select
 
 from backend.models import Company
-from backend.repository.companies_matching import find_or_create_company
+from backend.repository.companies_matching import _create_company_row, find_or_create_company
 from tests.dbio import put
 from tests.factories import company_row
 
@@ -224,11 +224,16 @@ async def test_the_same_name_with_a_different_website_folds_into_the_old_row(
     """Имя решает: компания с таким же именем — та же самая.
 
     Правила сведения разные сайты не склеивают, а завести вторую строку не
-    даёт уникальность имени: вставка срывается, и ветка гонки отдаёт
-    старую запись. **Решение человека от 10 августа 2026: так и остаётся.**
+    даёт уникальность имени: вставка срывается, и старую запись отдаёт
+    пересмотр. **Решение человека от 10 августа 2026: так и остаётся.**
     Имена компаний на практике не пересекаются, а разделение их по сайту
     потребовало бы правки схемы и сняло бы защиту от двух одинаковых
     строк без сайта вовсе.
+
+    Стадия называет это сведением по имени, а не гонкой: строку было видно
+    в выборке, с которой начинался разбор, и в ленте вакансии ярлык
+    остаётся навсегда — по нему потом отличают рядовой случай от настоящей
+    гонки вставок.
     """
     existing = company_row(name="Контур", website="https://kontur.ru")
     await put(session_factory, existing)
@@ -238,5 +243,33 @@ async def test_the_same_name_with_a_different_website_folds_into_the_old_row(
     )
 
     assert company.id == existing.id
-    assert decision["stage"] == "create_race_fallback"
+    assert decision["stage"] == "rule_name_unique"
     assert len((await session.scalars(select(Company))).all()) == 1
+
+
+async def test_a_row_that_appeared_after_the_lookup_is_called_a_race(
+    session, session_factory
+):
+    """Строка, которой в выборке не было, помечается гонкой вставок.
+
+    Через `find_or_create_company` этот случай не изобразить: выборка читает
+    все строки разом, и любая существующая в ней есть. Чужой писатель между
+    выборкой и вставкой тоже не вклинится — к этому мигу база уже держит
+    запись на нас. Поэтому заведение зовётся напрямую с тем же перечнем
+    увиденного, который оно получает от разбора.
+
+    Перечень непустой нарочно: в нём номер соседней строки, а не
+    столкнувшейся. С пустым проверка сторожила бы «выборка вообще пуста», и
+    подмена условия на такую прошла бы незамеченной.
+    """
+    existing = company_row(name="Контур", website="https://kontur.ru")
+    other = company_row(name="Ромашка")
+    await put(session_factory, existing, other)
+    decision = {"stage": "skip", "matched_id": None}
+
+    company, decision = await _create_company_row(
+        session, "Контур", "https://kontur.dev", decision, {other.id}
+    )
+
+    assert company.id == existing.id
+    assert decision["stage"] == "create_race_fallback"
