@@ -14,14 +14,15 @@ MUTATIONS = [
     # active_mark_of: отметку снимают и с погашенных строк
     (
         "backend/repository/blacklist_marks.py",
-        "        Blacklist.active.is_(True)," + CRLF,
-        "",
+        "        Blacklist.value.in_(candidates)," + CRLF
+        + "        Blacklist.active.is_(True)," + CRLF,
+        "        Blacklist.value.in_(candidates)," + CRLF,
     ),
     # active_mark_of: отметка ищется по значению без оглядки на род
     (
         "backend/repository/blacklist_marks.py",
-        "        Blacklist.kind == kind," + CRLF,
-        "",
+        "    return and_(" + CRLF + "        Blacklist.kind == kind," + CRLF,
+        "    return and_(" + CRLF,
     ),
     # deactivate_blacklist_values: погашенные строки не считаются
     (
