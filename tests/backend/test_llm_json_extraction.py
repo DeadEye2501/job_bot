@@ -39,6 +39,31 @@ def test_the_last_object_is_taken_from_the_answer(answer, expected):
     assert extract_last_json(answer) == expected
 
 
+def test_the_text_as_it_came_is_tried_before_the_straightened_one():
+    """Сначала разбирается текст как есть, и только потом выпрямленный.
+
+    Выпрямление заведено ради моделей, ставящих ёлочки вместо кавычек
+    JSON, но те же ёлочки встречаются и внутри значений по-русски.
+    Начни мы с выпрямленного — и годный объект уступил бы место тому,
+    который стал разбираемым только после подмены кавычек.
+    """
+    answer = 'Сначала: {"a": 1}\nПотом: {“b”: 2}'
+
+    assert extract_last_json(answer) == '{"a": 1}'
+
+
+def test_the_last_scrap_is_returned_when_nothing_parses():
+    """Когда не разбирается ничто, отдаётся последний огрызок.
+
+    Зовущий сообщит о неразбираемом ответе одинаково при любом из них,
+    но правило то же, что и у разбираемых: ответ модели дописывается в
+    конце, и последнее слово за ним.
+    """
+    answer = 'Черновик: {"a": 1,}\nОтвет: {"b": 2,}'
+
+    assert extract_last_json(answer) == '{"b": 2,}'
+
+
 def test_curly_quotes_are_straightened_before_the_search():
     """Кавычки-ёлочки и лапки выпрямляются до поиска объекта.
 
