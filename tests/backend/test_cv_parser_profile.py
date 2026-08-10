@@ -81,6 +81,18 @@ async def test_a_repeated_work_format_is_kept_once():
     assert parsed.profile.work_format == ["remote"]
 
 
+async def test_a_non_string_inside_work_format_is_dropped():
+    """Не строка среди форматов работы выбрасывается, а не роняет разбор.
+
+    Список приходит из ответа модели, где на месте строки может оказаться что
+    угодно — число, словарь, `null`. Без этой охраны одно такое значение
+    отменяло бы разбор всего резюме.
+    """
+    parsed = await parse_profile(work_format=["remote", 42, None, {"office": True}])
+
+    assert parsed.profile.work_format == ["remote"]
+
+
 async def test_only_known_grades_survive():
     """Из уровней остаётся только известное."""
     parsed = await parse_profile(grades=["Senior", "гуру", "lead"])
@@ -88,9 +100,14 @@ async def test_only_known_grades_survive():
     assert parsed.profile.grades == ["senior", "lead"]
 
 
-async def test_a_non_list_work_format_becomes_empty():
-    """Не список вместо формата работы — пустой список, а не падение."""
-    parsed = await parse_profile(work_format="remote")
+@pytest.mark.parametrize("raw", ["remote", 42])
+async def test_a_non_list_work_format_becomes_empty(raw):
+    """Не список вместо формата работы — пустой список, а не падение.
+
+    Число взято вторым входом нарочно: строку перебор проходит по буквам и
+    без охраны, а по числу спотыкается — на нём и видно, что охрана есть.
+    """
+    parsed = await parse_profile(work_format=raw)
 
     assert parsed.profile.work_format == []
 

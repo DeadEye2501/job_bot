@@ -8,7 +8,7 @@ import httpx
 
 from adapters.lm_studio import ChatRequest, chat
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
-from backend.llm.answers import QUOTE_TRANSLATION, str_or_none
+from backend.llm.answers import QUOTE_TRANSLATION, normalize_enum, str_or_none
 
 
 logger = logging.getLogger(__name__)
@@ -205,20 +205,13 @@ def _str_list(value) -> list[str]:
 
 
 def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]:
-    """Значения из ответа модели, оставленные по справочнику: не строки и
-    незнакомое отброшены, повторы сведены, порядок исходный.
-    """
     if not isinstance(raw, list):
         return []
     out: list[str] = []
-    seen: set[str] = set()
     for item in raw:
-        if not isinstance(item, str):
-            continue
-        v = item.strip().lower()
-        if v in allowed and v not in seen:
-            seen.add(v)
-            out.append(v)
+        value = normalize_enum(item, allowed)
+        if value is not None and value not in out:
+            out.append(value)
     return out
 
 
