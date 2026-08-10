@@ -2528,14 +2528,12 @@ class MainApi(QObject):
             self.contacts_hr_action_done.emit(_err(f"Неверные поля: {e}"))
             return
 
-        kwargs: dict = {}
-        if "name" in payload:
-            kwargs["name"] = payload["name"]
-        if "telegram_username" in payload:
-            kwargs["telegram_username"] = payload["telegram_username"]
-        if "notes" in payload:
-            kwargs["notes"] = payload["notes"]
-
+        # Только присланные поля: отсутствие ключа значит «не трогать».
+        kwargs = {
+            key: payload[key]
+            for key in ("name", "telegram_username", "notes")
+            if key in payload
+        }
         if not kwargs:
             self.contacts_hr_action_done.emit(
                 _err("Нечего обновлять.", hr_id=hr_id)
@@ -2543,11 +2541,12 @@ class MainApi(QObject):
             return
 
         async def run() -> str:
-            async with self._session_factory() as session:
-                async with session.begin():
-                    ok = await hr_card.update_hr_fields(
-                        session, hr_id, **kwargs
-                    )
+            try:
+                async with self._session_factory() as session:
+                    async with session.begin():
+                        ok = await hr_card.update_hr_fields(session, hr_id, **kwargs)
+            except ValueError as e:  # негодный ник — ответ формы, а не сбой
+                return _err(f"Неверные поля: {e}", hr_id=hr_id, action="update_hr")
             if not ok:
                 return _err("HR не найден.", hr_id=hr_id, action="update_hr")
             return _ok({
