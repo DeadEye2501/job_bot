@@ -143,17 +143,23 @@ MUTATIONS = [
         "        normalized = notes" + CRLF,
         "        normalized = notes.strip()" + CRLF,
     ),
-    # set_vacancy_hr: пропадает охрана от повторной привязки того же HR
+    # _relink: пропадает охрана от повторной привязки того же предмета
     (
         "backend/repository/vacancies_card.py",
-        "if previous_hr_id == hr_id:",
-        "if False:",
+        "    if previous_id == new_id:",
+        "    if False:",
     ),
-    # set_vacancy_company: пропадает охрана от повторной привязки той же компании
+    # set_vacancy_hr: проводник подставляет чужое описание связи
     (
         "backend/repository/vacancies_card.py",
-        "if previous_company_id == company_id:",
-        "if False:",
+        "    return await _relink(session, vacancy_id, hr_id, _HR_LINK)",
+        "    return await _relink(session, vacancy_id, hr_id, _COMPANY_LINK)",
+    ),
+    # _relink: имя предмета в ленте берётся от другой стороны привязки
+    (
+        "backend/repository/vacancies_card.py",
+        '            "previous_name": previous_name,',
+        '            "previous_name": link.display(target) if target else None,',
     ),
     # change_vacancy_status: комментарий без смены статуса помечается применённым
     (
@@ -185,19 +191,29 @@ MUTATIONS = [
         "                    last_status_subq.c.status == Vacancy.status,",
         "                    last_status_subq.c.status != Vacancy.status,",
     ),
-    # list_vacancies_for_hr: недоразобранные перестают отсеиваться.
-    # Отступ в двенадцать пробелов отличает мини-список от такого же условия
-    # в `find_latest_vacancy_id_for_hr`, где отступ восемь.
+    # _list_linked: недоразобранные перестают отсеиваться
     (
         "backend/repository/vacancies_mini.py",
-        "            .where(Vacancy.hr_id == hr_id, Vacancy.is_parsed.is_(True))",
-        "            .where(Vacancy.hr_id == hr_id)",
+        "            .where(linked_to, Vacancy.is_parsed.is_(True))",
+        "            .where(linked_to)",
     ),
-    # list_vacancies_for_company: недоразобранные перестают отсеиваться
+    # _list_linked: список идёт старыми вперёд
     (
         "backend/repository/vacancies_mini.py",
-        ".where(Vacancy.company_id == company_id, Vacancy.is_parsed.is_(True))",
-        ".where(Vacancy.company_id == company_id)",
+        "            .order_by(Vacancy.created_at.desc(), Vacancy.id.desc())" + CRLF
+        + "        )" + CRLF
+        + "    ).all()" + CRLF
+        + "    return list(rows)" + CRLF
+        + CRLF
+        + CRLF
+        + "async def list_vacancies_for_hr(",
+        "            .order_by(Vacancy.created_at, Vacancy.id)" + CRLF
+        + "        )" + CRLF
+        + "    ).all()" + CRLF
+        + "    return list(rows)" + CRLF
+        + CRLF
+        + CRLF
+        + "async def list_vacancies_for_hr(",
     ),
     # list_vacancies_for_channel: дата появления берётся от создания, а не от публикации
     (

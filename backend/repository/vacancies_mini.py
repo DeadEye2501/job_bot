@@ -31,38 +31,37 @@ _CHANNEL_VAC_STATUS_RANK: dict[str, int] = {
 }
 
 
+async def _list_linked(session: AsyncSession, linked_to) -> list[Vacancy]:
+    """Разобранные вакансии, привязанные к предмету, свежими вперёд.
+
+    Недоразобранные не показываются: строка, оставшаяся от прерванного
+    прогона, в списке карточки выглядела бы пустой.
+    """
+    rows = (
+        await session.scalars(
+            select(Vacancy)
+            .where(linked_to, Vacancy.is_parsed.is_(True))
+            .order_by(Vacancy.created_at.desc(), Vacancy.id.desc())
+        )
+    ).all()
+    return list(rows)
+
+
 async def list_vacancies_for_hr(
     session: AsyncSession,
     hr_id: int,
 ) -> list[Vacancy]:
     """All parsed vacancies for an HR, newest-first. Powers the «список
     вакансий» mini-list in the Contacts/HR detail pane.
-
-    Skips ``is_parsed=False`` rows so half-built (crash-recovered) vacancies
-    don't surface in the chip — the same gate the main vacancies list uses.
     """
-    rows = (
-        await session.scalars(
-            select(Vacancy)
-            .where(Vacancy.hr_id == hr_id, Vacancy.is_parsed.is_(True))
-            .order_by(Vacancy.created_at.desc(), Vacancy.id.desc())
-        )
-    ).all()
-    return list(rows)
+    return await _list_linked(session, Vacancy.hr_id == hr_id)
 
 
 async def list_vacancies_for_company(
     session: AsyncSession, company_id: int
 ) -> list[Vacancy]:
     """All parsed vacancies linked to this company, newest-first."""
-    rows = (
-        await session.scalars(
-            select(Vacancy)
-            .where(Vacancy.company_id == company_id, Vacancy.is_parsed.is_(True))
-            .order_by(Vacancy.created_at.desc(), Vacancy.id.desc())
-        )
-    ).all()
-    return list(rows)
+    return await _list_linked(session, Vacancy.company_id == company_id)
 
 
 async def list_vacancies_for_channel(
