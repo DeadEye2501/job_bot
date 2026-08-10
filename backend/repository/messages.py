@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,6 +45,30 @@ async def save_incoming_message(
     session.add(new_msg)
     await session.flush()
     return new_msg
+
+
+async def mark_incoming_read(
+    session: AsyncSession, hr_id: int, now: datetime
+) -> int:
+    """Пометить прочитанными все входящие от этого HR; сколько пометили.
+
+    Надгробия гасятся наравне с живыми строками, и поэтому условие здесь
+    своё, а не `UNREAD_INCOMING`: у того есть третья часть «не надгробие»,
+    а удалённое, но непрочитанное входящее иначе держит счётчик вечно —
+    погасить его из окна будет нечем.
+
+    Транзакцию закрывает зовущий.
+    """
+    done = await session.execute(
+        update(Message)
+        .where(
+            Message.hr_id == hr_id,
+            Message.is_incoming,
+            Message.read_at.is_(None),
+        )
+        .values(read_at=now)
+    )
+    return done.rowcount or 0
 
 
 async def find_outgoing_message(

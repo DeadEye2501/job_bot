@@ -68,37 +68,32 @@ MUTATIONS = [
     # send: ручная отправка перестаёт отличаться от авто
     (
         "backend/bot/send.py",
-        "                    kind_label = (" + CRLF
-        + '                        "Ручная отправка."' + CRLF
-        + "                        if force" + CRLF,
-        "                    kind_label = (" + CRLF
-        + '                        "Ручная отправка."' + CRLF
-        + "                        if not force" + CRLF,
+        '    return "Ручная отправка." if force else "Авто-отправка отклика."',
+        '    return "Ручная отправка." if not force '
+        'else "Авто-отправка отклика."',
     ),
     # send: признак ручной отправки не доходит до охраны статуса
     (
-        "backend/bot/send.py",
-        "                if v is not None and should_apply_status(" + CRLF
-        + "                    v.status, VacancyStatus.APPLIED, force=force" + CRLF
-        + "                ):" + CRLF
-        + "                    previous_status = v.status",
-        "                if v is not None and should_apply_status(" + CRLF
-        + "                    v.status, VacancyStatus.APPLIED, force=False" + CRLF
-        + "                ):" + CRLF
-        + "                    previous_status = v.status",
+        "backend/repository/vacancies_life.py",
+        "    if vacancy is None or not should_apply_status(" + CRLF
+        + "        vacancy.status, VacancyStatus.APPLIED, force=force" + CRLF,
+        "    if vacancy is None or not should_apply_status(" + CRLF
+        + "        vacancy.status, VacancyStatus.APPLIED, force=False" + CRLF,
     ),
     # send: запасная перестановка статуса пропадает
     (
         "backend/bot/send.py",
-        "                        v.status = VacancyStatus.APPLIED" + CRLF
-        + "                        await session.commit()" + CRLF,
-        "                        pass" + CRLF,
+        "                    if await mark_vacancy_applied(" + CRLF
+        + "                        session, vacancy_id, _applied_label(force), force=force"
+        + CRLF
+        + "                    ):" + CRLF,
+        "                    if False:" + CRLF,
     ),
     # send: отметка о заглушенной отправке врёт
     (
         "backend/bot/send.py",
-        '                            "suppressed": suppressed,',
-        '                            "suppressed": False,',
+        '                        "suppressed": suppressed,',
+        '                        "suppressed": False,',
     ),
     # mark_hr_chat_read: выключенный бот всё равно гасит непрочитанное
     (
@@ -107,23 +102,46 @@ MUTATIONS = [
         + "        return 0" + CRLF,
         "",
     ),
-    # mark_hr_chat_read: отметка ставится и на исходящие
+    # mark_vacancy_applied: перевод статуса остаётся в истории без подписи
     (
-        "backend/bot/chat.py",
-        "                Message.hr_id == hr_id," + CRLF
-        + "                Message.is_incoming," + CRLF
-        + "                Message.read_at.is_(None)," + CRLF,
-        "                Message.hr_id == hr_id," + CRLF
-        + "                Message.read_at.is_(None)," + CRLF,
+        "backend/repository/vacancies_life.py",
+        "            explanation=_ensure_trailing_period(explanation)," + CRLF
+        + "            applied=True," + CRLF,
+        "            explanation=None," + CRLF + "            applied=True," + CRLF,
     ),
-    # mark_hr_chat_read: уже прочитанное помечается заново
+    # mark_incoming_read: отметка ставится и на исходящие
     (
-        "backend/bot/chat.py",
-        "                Message.hr_id == hr_id," + CRLF
-        + "                Message.is_incoming," + CRLF
-        + "                Message.read_at.is_(None)," + CRLF,
-        "                Message.hr_id == hr_id," + CRLF
-        + "                Message.is_incoming," + CRLF,
+        "backend/repository/messages.py",
+        "            Message.hr_id == hr_id," + CRLF
+        + "            Message.is_incoming," + CRLF
+        + "            Message.read_at.is_(None)," + CRLF,
+        "            Message.hr_id == hr_id," + CRLF
+        + "            Message.read_at.is_(None)," + CRLF,
+    ),
+    # mark_incoming_read: отметка ставится всем HR разом
+    (
+        "backend/repository/messages.py",
+        "            Message.hr_id == hr_id," + CRLF
+        + "            Message.is_incoming," + CRLF,
+        "            Message.is_incoming," + CRLF,
+    ),
+    # mark_incoming_read: надгробия непрочитанного не гасятся
+    (
+        "backend/repository/messages.py",
+        "            Message.hr_id == hr_id," + CRLF
+        + "            Message.is_incoming," + CRLF
+        + "            Message.read_at.is_(None)," + CRLF,
+        "            Message.hr_id == hr_id," + CRLF
+        + "            *UNREAD_INCOMING," + CRLF,
+    ),
+    # mark_incoming_read: уже прочитанное помечается заново
+    (
+        "backend/repository/messages.py",
+        "            Message.hr_id == hr_id," + CRLF
+        + "            Message.is_incoming," + CRLF
+        + "            Message.read_at.is_(None)," + CRLF,
+        "            Message.hr_id == hr_id," + CRLF
+        + "            Message.is_incoming," + CRLF,
     ),
     # mark_hr_chat_read: Telegram беспокоят и когда гасить нечего
     (

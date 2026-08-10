@@ -8,6 +8,7 @@ from backend.bot import slot
 from backend.helpers import fetch_telegram_avatar
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
 from backend.repository.channels import (
+    create_channel,
     delete_channel as repo_delete_channel,
     find_channel_by_username,
     reset_channel_cursor as repo_reset_channel_cursor,
@@ -105,16 +106,7 @@ async def add_channel(
             existing = await find_channel_by_username(session, username)
             if existing is not None:
                 return existing.id, "exists"
-            from backend.models import TelegramChannel
-            ch = TelegramChannel(
-                username=username.lower(),
-                title=title,
-                is_active=True,
-                avatar=avatar,
-            )
-            session.add(ch)
-            await session.flush()
-            channel_id = ch.id
+            channel_id = await create_channel(session, username, title, avatar)
     return channel_id, "created"
 
 

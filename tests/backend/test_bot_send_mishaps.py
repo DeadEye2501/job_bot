@@ -14,7 +14,13 @@ import time
 
 from pyrogram.errors import FloodWait
 
-from backend.models import Message, Vacancy, VacancyEvent, VacancyStatus
+from backend.models import (
+    Message,
+    Vacancy,
+    VacancyEvent,
+    VacancyStatus,
+    VacancyStatusHistory,
+)
 from tests.dbio import all_rows, only_row
 
 
@@ -151,6 +157,31 @@ async def test_a_failed_record_still_moves_the_vacancy(
 
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
     assert await all_rows(session_factory, Message) == []
+
+
+async def test_a_fallback_move_is_written_into_the_history(
+    ready_to_send, session_factory, outbox
+):
+    """Запасной перевод статуса попадает в историю вакансии.
+
+    Перевод тот же самый, что и при удачной записи, и в карточке он
+    должен читаться так же. Без строки в истории статус выглядит
+    сменившимся сам собой, и понять, кто и когда его тронул, нечем.
+    Прочего следа у этого пути нет: ни строки письма, ни события
+    «отклик отправлен» — их и потеряла сорвавшаяся запись.
+    """
+    bot, hr, vacancy = await ready_to_send()
+    bot._session_factory = _BrokenCommits(session_factory, failures=1)
+
+    await bot.send(hr, "письмо", vacancy_id=vacancy.id)
+
+    history = await only_row(session_factory, VacancyStatusHistory)
+    assert history.previous_status is VacancyStatus.NEW
+    assert history.status is VacancyStatus.APPLIED
+    assert history.applied is True
+    # Подпись — единственное, чем в карточке отличается сам собой ушедший
+    # отклик от отправленного нажатием.
+    assert history.explanation == "Авто-отправка отклика."
 
 
 async def test_a_send_survives_a_failure_of_the_fallback_too(
