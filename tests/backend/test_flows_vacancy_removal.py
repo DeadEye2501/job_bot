@@ -65,7 +65,7 @@ async def test_a_deleted_vacancy_takes_its_history_with_it(
     """
     pipeline, vacancy, _ = with_a_vacancy
 
-    await cleanup.delete_vacancy(pipeline, vacancy.id)
+    await cleanup.forget_vacancy(pipeline, vacancy.id)
 
     assert await all_rows(session_factory, Vacancy) == []
     assert await all_rows(session_factory, VacancyStatusHistory) == []
@@ -80,7 +80,7 @@ async def test_a_deleted_vacancy_leaves_the_embedding_cache(with_a_vacancy):
     """
     pipeline, vacancy, _ = with_a_vacancy
 
-    await cleanup.delete_vacancy(pipeline, vacancy.id)
+    await cleanup.forget_vacancy(pipeline, vacancy.id)
 
     assert pipeline._embedding_ids.tolist() == []
 
@@ -96,7 +96,7 @@ async def test_the_window_hears_about_both_lists(with_a_vacancy):
     pipeline.on_contacts_changed = lambda: heard.append("контакты")
     pipeline.on_vacancies_changed = lambda: heard.append("вакансии")
 
-    await cleanup.delete_vacancy(pipeline, vacancy.id)
+    await cleanup.forget_vacancy(pipeline, vacancy.id)
 
     assert heard == ["контакты", "вакансии"]
 
