@@ -97,12 +97,8 @@ MUTATIONS = [
     # refresh_channel_metadata: окно не узнаёт о свежих названиях
     (
         "backend/flows/channels.py",
-        "    if pipeline.on_channels_changed is not None:" + CRLF
-        + "        try:" + CRLF
-        + "            pipeline.on_channels_changed()" + CRLF,
-        "    if False:" + CRLF
-        + "        try:" + CRLF
-        + "            pipeline.on_channels_changed()" + CRLF,
+        '    fire(pipeline.on_channels_changed, "on_channels_changed")' + CRLF,
+        "",
     ),
     # refresh_channel_metadata_for_ids: пустой список всё равно идёт в сводку
     (
@@ -183,14 +179,14 @@ MUTATIONS = [
     # backfill: окно не узнаёт о догнанной переписке
     (
         "backend/flows/dm_backfill.py",
-        "if (had_new or tombstoned) and on_message_persisted is not None:",
-        "if False:",
+        "    if had_new or tombstoned:" + CRLF,
+        "    if False:" + CRLF,
     ),
     # backfill: окно дёргают и когда ничего не изменилось
     (
         "backend/flows/dm_backfill.py",
-        "if (had_new or tombstoned) and on_message_persisted is not None:",
-        "if on_message_persisted is not None:",
+        "    if had_new or tombstoned:" + CRLF,
+        "    if True:" + CRLF,
     ),
     # catch_up: пачки идут без паузы между собой
     (

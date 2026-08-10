@@ -11,6 +11,7 @@ from backend.helpers import extract_dm_text, telegram_peer
 from backend.payloads import OutgoingMessage
 from backend.repository.hr_list import list_hrs_for_backfill
 from backend.repository.messages import save_outgoing_message
+from backend.notify import fire
 
 logger = logging.getLogger(__name__)
 
@@ -156,16 +157,11 @@ async def backfill_hr_dm_history(
                 # × 30 HR'ов = 1500 пушей за миллисекунду.
                 # Без планировщика (legacy путь) — классификация
                 # inline, тогда сигнал нужен.
-                if (
-                    schedule_classification is None
-                    and on_vacancies_changed is not None
-                ):
-                    try:
-                        on_vacancies_changed()
-                    except Exception:
-                        logger.exception(
-                            "backfill: on_vacancies_changed hook failed"
-                        )
+                if schedule_classification is None:
+                    # Имя с приставкой: запись о поломке идёт под общим
+                    # логгером оповещений, и без неё догон не отличить от
+                    # трёх других мест, где зовут тот же обработчик.
+                    fire(on_vacancies_changed, "backfill: on_vacancies_changed")
             except Exception:
                 logger.exception(
                     "backfill incoming process failed",
@@ -201,11 +197,8 @@ async def backfill_hr_dm_history(
                 tombstoned = True
             if tombstoned:
                 await session.commit()
-    if (had_new or tombstoned) and on_message_persisted is not None:
-        try:
-            on_message_persisted(hr.id)
-        except Exception:
-            logger.exception("on_message_persisted hook failed")
+    if had_new or tombstoned:
+        fire(on_message_persisted, "on_message_persisted", hr.id)
 
 
 async def catch_up_missed_dms(

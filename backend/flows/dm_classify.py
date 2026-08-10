@@ -9,6 +9,7 @@ from backend.domain.transitions import is_terminal_for_auto
 from backend.llm.hr_reply import classify_hr_reply
 from backend.models import Vacancy
 from backend.repository.vacancies_life import apply_classification
+from backend.notify import fire
 
 logger = logging.getLogger(__name__)
 
@@ -187,11 +188,7 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
                 extra={"vacancy_id": vacancy_id, "hr_id": hr_id},
             )
             return
-    if pipeline.on_vacancies_changed is not None:
-        try:
-            pipeline.on_vacancies_changed()
-        except Exception:
-            logger.exception("on_vacancies_changed hook failed")
+    fire(pipeline.on_vacancies_changed, "on_vacancies_changed")
 
 
 async def _wait_out(pipeline, tasks: list, *, drain: bool) -> None:

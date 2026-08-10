@@ -8,6 +8,7 @@ from backend.helpers import fetch_telegram_avatar
 from backend.models import TelegramChannel
 
 from backend.flows import ingest
+from backend.notify import fire
 
 logger = logging.getLogger(__name__)
 
@@ -151,11 +152,7 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
         "refresh_channel_metadata: %d title(s), %d avatar(s) updated",
         len(title_updates), len(avatar_updates),
     )
-    if pipeline.on_channels_changed is not None:
-        try:
-            pipeline.on_channels_changed()
-        except Exception:
-            logger.exception("on_channels_changed hook failed")
+    fire(pipeline.on_channels_changed, "on_channels_changed")
 
 
 async def poll_channel(
