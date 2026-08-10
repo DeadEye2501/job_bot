@@ -195,6 +195,30 @@ async def test_an_allowed_automatic_verdict_moves_the_vacancy(
     assert card.history[0].explanation == "зовут на созвон."
 
 
+async def test_an_automatic_verdict_is_signed_by_the_system(session, session_factory):
+    """Автоматический перевод подписан системой, а не человеком.
+
+    Подписью строка от разбора ответа и отличается в ленте от строки, которую
+    человек поставил с экрана: остальные колонки у них совпадают, и
+    перепутанная подпись выдала бы приговор классификатора за решение
+    пользователя.
+    """
+    vacancy = vacancy_row(status=VacancyStatus.APPLIED)
+    await put(session_factory, vacancy)
+    reply = message_row(text="приглашаем", vacancy_id=vacancy.id)
+    await put(session_factory, reply)
+
+    await apply_classification(
+        session,
+        vacancy.id,
+        reply.id,
+        Classification(status=VacancyStatus.INVITATION, explanation="зовут"),
+    )
+
+    card = await get_vacancy_detail(session, vacancy.id)
+    assert card.history[0].source is StatusHistorySource.SYSTEM
+
+
 async def test_a_blocked_automatic_verdict_leaves_no_trace(session, session_factory):
     """Запрещённый графом приговор не пишет в ленту ничего.
 

@@ -161,10 +161,10 @@ MUTATIONS = [
         '            "previous_name": previous_name,',
         '            "previous_name": link.display(target) if target else None,',
     ),
-    # change_vacancy_status: комментарий без смены статуса помечается применённым
+    # _move_status: комментарий без смены статуса помечается применённым
     (
         "backend/repository/vacancies_life.py",
-        "        applied=status_changed," + CRLF,
+        "        applied=applied," + CRLF,
         "        applied=True," + CRLF,
     ),
     # add_vacancy_event: пустая нагрузка записывается пустым словарём
@@ -176,8 +176,8 @@ MUTATIONS = [
     # apply_classification: граф переходов перестаёт что-либо запрещать
     (
         "backend/repository/vacancies_life.py",
-        "applied = should_apply_status(previous, classification.status)",
-        "applied = True",
+        "allowed = should_apply_status(previous, classification.status)",
+        "allowed = True",
     ),
     # mark_ghosted_vacancies: наши собственные сообщения начинают считаться ответом
     (
