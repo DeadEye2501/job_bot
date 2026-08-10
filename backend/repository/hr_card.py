@@ -9,6 +9,11 @@ from backend.models import Company, HR, Message, Vacancy
 from backend.payloads import HrDetail
 
 from backend.repository.blacklist_marks import active_blacklist_value
+from backend.repository.merging import (
+    concat_notes,
+    load_merge_pair,
+    repoint_vacancies,
+)
 from backend.repository.messages import UNREAD_INCOMING
 
 logger = logging.getLogger(__name__)
@@ -191,15 +196,13 @@ async def merge_hr(
     * Name falls back from absorbed only when survivor's is empty.
     * Notes are concatenated so nothing is silently lost.
     """
-    if absorbed_id == survivor_id:
-        raise ValueError("merge_hr: absorbed_id == survivor_id")
-    absorbed = await session.get(HR, absorbed_id)
-    survivor = await session.get(HR, survivor_id)
-    if absorbed is None or survivor is None:
-        raise ValueError(
-            f"merge_hr: not found "
-            f"(absorbed={absorbed_id}, survivor={survivor_id})"
-        )
+    absorbed, survivor = await load_merge_pair(
+        session,
+        HR,
+        absorbed_id=absorbed_id,
+        survivor_id=survivor_id,
+        subject="merge_hr",
+    )
 
     abs_tg_user_id = absorbed.telegram_user_id
     abs_tg_username = absorbed.telegram_username
@@ -207,13 +210,9 @@ async def merge_hr(
     abs_notes = absorbed.notes
     survivor_has_tg = survivor.telegram_user_id is not None
 
-    moved_vacancies = (
-        await session.execute(
-            update(Vacancy)
-            .where(Vacancy.hr_id == absorbed_id)
-            .values(hr_id=survivor_id)
-        )
-    ).rowcount or 0
+    moved_vacancies = await repoint_vacancies(
+        session, Vacancy.hr_id, absorbed_id=absorbed_id, survivor_id=survivor_id
+    )
     if survivor_has_tg:
         dropped_messages = (
             await session.execute(
@@ -243,18 +242,9 @@ async def merge_hr(
             survivor.telegram_username = abs_tg_username
     if not survivor.name and abs_name:
         survivor.name = abs_name
-    survivor.notes = _concat_notes(survivor.notes, abs_notes)
+    survivor.notes = concat_notes(survivor.notes, abs_notes)
 
     logger.info(
         "merged HR #%d -> #%d (vacancies=%d, messages moved=%d, dropped=%d)",
         absorbed_id, survivor_id, moved_vacancies, moved_messages, dropped_messages,
     )
-
-
-def _concat_notes(survivor: str | None, absorbed: str | None) -> str | None:
-    parts = [p.strip() for p in (survivor, absorbed) if p and p.strip()]
-    if not parts:
-        return None
-    if len(parts) == 1:
-        return parts[0]
-    return "\n---\n".join(parts)

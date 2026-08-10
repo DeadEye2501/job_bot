@@ -9,7 +9,11 @@ from backend.models import Company, Vacancy
 from backend.payloads import CompanyDetail
 
 from backend.repository.blacklist_marks import active_blacklist_value
-from backend.repository.hr_card import _concat_notes
+from backend.repository.merging import (
+    concat_notes,
+    load_merge_pair,
+    repoint_vacancies,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -195,28 +199,25 @@ async def merge_company(
 
     Caller must wrap in ``session.begin()``.
     """
-    if absorbed_id == survivor_id:
-        raise ValueError("merge_company: absorbed_id == survivor_id")
-    absorbed = await session.get(Company, absorbed_id)
-    survivor = await session.get(Company, survivor_id)
-    if absorbed is None or survivor is None:
-        raise ValueError(
-            f"merge_company: not found "
-            f"(absorbed={absorbed_id}, survivor={survivor_id})"
-        )
+    absorbed, survivor = await load_merge_pair(
+        session,
+        Company,
+        absorbed_id=absorbed_id,
+        survivor_id=survivor_id,
+        subject="merge_company",
+    )
 
     abs_name = absorbed.name
     abs_aliases = list(absorbed.aliases or [])
     abs_website = absorbed.website
     abs_notes = absorbed.notes
 
-    moved_vacancies = (
-        await session.execute(
-            update(Vacancy)
-            .where(Vacancy.company_id == absorbed_id)
-            .values(company_id=survivor_id)
-        )
-    ).rowcount or 0
+    moved_vacancies = await repoint_vacancies(
+        session,
+        Vacancy.company_id,
+        absorbed_id=absorbed_id,
+        survivor_id=survivor_id,
+    )
 
     await session.delete(absorbed)
     await session.flush()
@@ -237,7 +238,7 @@ async def merge_company(
 
     if not survivor.website and abs_website:
         survivor.website = abs_website
-    survivor.notes = _concat_notes(survivor.notes, abs_notes)
+    survivor.notes = concat_notes(survivor.notes, abs_notes)
 
     logger.info(
         "merged company #%d -> #%d (vacancies=%d)",
