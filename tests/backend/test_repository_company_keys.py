@@ -9,7 +9,15 @@
 
 import pytest
 
-from backend.repository.companies_matching import _hosts_compatible, _is_aggregator_host, _normalize_company_name, _normalize_host, _real_corporate_website, _signal_host, _translit_cyr_to_latin
+from backend.repository.companies_keys import (
+    _is_aggregator_host,
+    _translit_cyr_to_latin,
+    hosts_compatible,
+    normalize_company_name,
+    normalize_host,
+    real_corporate_website,
+    signal_host,
+)
 
 
 @pytest.mark.parametrize(
@@ -53,7 +61,7 @@ def test_a_company_name_is_reduced_to_its_comparable_form(raw, expected):
     отдельное вырезание кавычек было бы недоказуемым. Внутри слова разница
     видна — вырезание даёт «sberbank», замена на пробел дала бы «sber bank».
     """
-    assert _normalize_company_name(raw) == expected
+    assert normalize_company_name(raw) == expected
 
 
 def test_two_spellings_of_one_company_reduce_to_the_same_form():
@@ -62,7 +70,7 @@ def test_two_spellings_of_one_company_reduce_to_the_same_form():
     Это и есть предмет приведения: сравнивать «ПАО Сбербанк» с «Sberbank LLC»
     буква в букву бесполезно.
     """
-    assert _normalize_company_name("ПАО Сбербанк") == _normalize_company_name(
+    assert normalize_company_name("ПАО Сбербанк") == normalize_company_name(
         'ООО "Sberbank"'
     )
 
@@ -72,7 +80,7 @@ def test_a_legal_form_inside_a_word_is_not_cut():
 
     Правило ищет отдельное слово: иначе «Ooolala» превратилось бы в «lala».
     """
-    assert _normalize_company_name("Ooolala") == "ooolala"
+    assert normalize_company_name("Ooolala") == "ooolala"
 
 
 @pytest.mark.parametrize(
@@ -99,7 +107,7 @@ def test_a_website_is_reduced_to_its_bare_host(raw, expected):
     Поддомен сохраняется нарочно: `pay.acme.com` и `acme.com` — разные
     хозяйства внутри одной группы, и склеивать их по общему домену нельзя.
     """
-    assert _normalize_host(raw) == expected
+    assert normalize_host(raw) == expected
 
 
 def test_a_query_is_cut_even_without_a_path():
@@ -108,7 +116,7 @@ def test_a_query_is_cut_even_without_a_path():
     Без этого «sber.ru?utm=foo» стал бы хостом целиком и не совпал бы ни с
     чем.
     """
-    assert _normalize_host("https://sber.ru?utm=foo") == "sber.ru"
+    assert normalize_host("https://sber.ru?utm=foo") == "sber.ru"
 
 
 @pytest.mark.parametrize(
@@ -136,9 +144,9 @@ def test_an_aggregator_host_carries_no_signal_about_a_company():
     сравнение пары «Acme с acme.com» и «Acme со ссылкой на канал», хотя это
     одна компания и решать должно имя.
     """
-    assert _signal_host("acme.com") == "acme.com"
-    assert _signal_host("t.me") == ""
-    assert _signal_host("") == ""
+    assert signal_host("acme.com") == "acme.com"
+    assert signal_host("t.me") == ""
+    assert signal_host("") == ""
 
 
 @pytest.mark.parametrize(
@@ -161,7 +169,7 @@ def test_only_a_corporate_website_is_worth_storing(raw, expected):
     исходная строка, а не голый хост: в базе хранят ссылку, по которой можно
     перейти.
     """
-    assert _real_corporate_website(raw) == expected
+    assert real_corporate_website(raw) == expected
 
 
 @pytest.mark.parametrize(
@@ -176,4 +184,4 @@ def test_only_a_corporate_website_is_worth_storing(raw, expected):
 )
 def test_different_known_hosts_mean_different_companies(a, b, expected):
     """Разные известные хосты — разные компании; неизвестный сравнению не мешает."""
-    assert _hosts_compatible(a, b) is expected
+    assert hosts_compatible(a, b) is expected

@@ -1,4 +1,5 @@
-"""Поломки для `backend/repository/companies_matching.py` и `companies_card.py`.
+"""Поломки для `backend/repository/companies_keys.py`, `companies_matching.py`
+и `companies_card.py`.
 
 Где поломка захватывает конец строки, перевод пишется через `CRLF`: рабочее
 дерево здесь с виндовыми переводами, и поиск по `\\n` не находит ничего.
@@ -9,73 +10,73 @@ CRLF = "\r\n"
 MUTATIONS = [
     # _translit_cyr_to_latin: регистр перестаёт опускаться
     (
-        "backend/repository/companies_matching.py",
+        "backend/repository/companies_keys.py",
         'return "".join(_CYR_TO_LAT.get(ch, ch) for ch in s.lower())',
         'return "".join(_CYR_TO_LAT.get(ch, ch) for ch in s)',
     ),
-    # _normalize_company_name: кавычки не вырезаются
+    # normalize_company_name: кавычки не вырезаются
     (
-        "backend/repository/companies_matching.py",
+        "backend/repository/companies_keys.py",
         's = "".join(ch for ch in s.strip() if ch not in _QUOTE_CHARS)',
         "s = s.strip()",
     ),
-    # _normalize_company_name: юридическая форма не срезается
+    # normalize_company_name: юридическая форма не срезается
     (
-        "backend/repository/companies_matching.py",
+        "backend/repository/companies_keys.py",
         '    s = _LEGAL_SUFFIX_RE.sub(" ", s)' + CRLF,
         "",
     ),
-    # _normalize_company_name: лишние пробелы не схлопываются
+    # normalize_company_name: лишние пробелы не схлопываются
     (
-        "backend/repository/companies_matching.py",
+        "backend/repository/companies_keys.py",
         '    return " ".join(s.split())',
         "    return s",
     ),
-    # _normalize_host: запрос не срезается
+    # normalize_host: запрос не срезается
     (
-        "backend/repository/companies_matching.py",
+        "backend/repository/companies_keys.py",
         '    s = s.split("?", 1)[0]' + CRLF,
         "",
     ),
-    # _normalize_host: порт не срезается
+    # normalize_host: порт не срезается
     (
-        "backend/repository/companies_matching.py",
+        "backend/repository/companies_keys.py",
         '    s = s.split(":", 1)[0]' + CRLF,
         "",
     ),
-    # _normalize_host: www не срезается
+    # normalize_host: www не срезается
     (
-        "backend/repository/companies_matching.py",
+        "backend/repository/companies_keys.py",
         '    if s.startswith("www."):',
         "    if False:",
     ),
-    # _normalize_host: завершающая точка остаётся
+    # normalize_host: завершающая точка остаётся
     (
-        "backend/repository/companies_matching.py",
+        "backend/repository/companies_keys.py",
         '    s = s.rstrip(".")' + CRLF,
         "",
     ),
     # _is_aggregator_host: поддомены агрегатора больше не опознаются
     (
-        "backend/repository/companies_matching.py",
+        "backend/repository/companies_keys.py",
         'if host == h or host.endswith("." + h):',
         "if host == h:",
     ),
-    # _signal_host: агрегатор снова считается сигналом о компании
+    # signal_host: агрегатор снова считается сигналом о компании
     (
-        "backend/repository/companies_matching.py",
+        "backend/repository/companies_keys.py",
         "    if not host or _is_aggregator_host(host):",
         "    if not host:",
     ),
-    # _real_corporate_website: ссылка на канал сохраняется как сайт
+    # real_corporate_website: ссылка на канал сохраняется как сайт
     (
-        "backend/repository/companies_matching.py",
-        "    if not _signal_host(_normalize_host(cleaned)):",
+        "backend/repository/companies_keys.py",
+        "    if not signal_host(normalize_host(cleaned)):",
         "    if False:",
     ),
-    # _hosts_compatible: пустой хост начинает блокировать сведение
+    # hosts_compatible: пустой хост начинает блокировать сведение
     (
-        "backend/repository/companies_matching.py",
+        "backend/repository/companies_keys.py",
         "    if not a or not b:" + CRLF + "        return True" + CRLF,
         "",
     ),
@@ -94,7 +95,7 @@ MUTATIONS = [
     # _create_company_row: ссылка на канал оседает сайтом новой компании
     (
         "backend/repository/companies_matching.py",
-        "    persisted_website = _real_corporate_website(website)",
+        "    persisted_website = real_corporate_website(website)",
         "    persisted_website = website",
     ),
     # _create_company_row: отметка «модель спрашивали» теряется
@@ -112,13 +113,13 @@ MUTATIONS = [
     # find_or_create_company: правило имени перестаёт считаться с сайтами
     (
         "backend/repository/companies_matching.py",
-        "                and _hosts_compatible(c_host, parsed_host)" + CRLF,
+        "                and hosts_compatible(c_host, parsed_host)" + CRLF,
         "",
     ),
     # find_or_create_company: правило написаний перестаёт считаться с сайтами
     (
         "backend/repository/companies_matching.py",
-        "            ) and _hosts_compatible(c_host, parsed_host):",
+        "            ) and hosts_compatible(c_host, parsed_host):",
         "            ):",
     ),
     # find_or_create_company: порог схожести опущен
