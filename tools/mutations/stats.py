@@ -128,14 +128,17 @@ MUTATIONS = [
         '        "skills": items[:limit],',
         '        "skills": items,',
     ),
-    # get_stats_skills: написания навыка не участвуют в отметке «мой»
+    # get_stats_skills: отметка «мой» перестаёт смотреть на анкету
     (
         "backend/repository/stats_summary.py",
-        "        if s.aliases:" + CRLF
-        + "            for a in s.aliases:" + CRLF
-        + "                if isinstance(a, str) and a.strip():" + CRLF
-        + "                    profile_set.add(a.strip().casefold())" + CRLF,
-        "",
+        "    profile_set = build_skill_lookup(list(skill_rows))" + CRLF,
+        "    profile_set = set()" + CRLF,
+    ),
+    # get_stats_skills: ключ технологии считается не тем правилом
+    (
+        "backend/repository/stats_summary.py",
+        '            "mine": skill_key(canon) in profile_set,',
+        '            "mine": canon in profile_set,',
     ),
     # get_stats_skills: недоразобранные вакансии дают теги
     (

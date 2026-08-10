@@ -60,7 +60,7 @@ from adapters import lm_studio
 from adapters.lm_studio import LlmProviderConfig
 from backend.repository import blacklist, channels as channels_repo, companies_card, companies_list, hr_card, hr_identify, hr_list, messages as messages_repo, profile as profile_repo, stats_pipeline, stats_summary, vacancies_card, vacancies_life, vacancies_list, vacancies_mini  # три псевдонима: имена заняты локальными переменными
 from backend.cv_parser import parse_cv
-from backend.domain.scoring import build_skill_lookup
+from backend.domain.scoring import build_skill_lookup, skill_key
 from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
 from backend.models import (
     BLACKLIST_KINDS,
@@ -4704,7 +4704,7 @@ def _stack_items(stack, matched_set: set[str]) -> list[dict]:
     for item in (stack or []):
         if isinstance(item, str) and item:
             out.append(
-                {"name": item, "matched": item.casefold() in matched_set}
+                {"name": item, "matched": skill_key(item) in matched_set}
             )
     return out
 

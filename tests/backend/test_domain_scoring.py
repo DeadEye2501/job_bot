@@ -13,6 +13,36 @@ def test_a_skill_name_is_found_regardless_of_case():
     assert "python" in build_skill_lookup([profile_skill("Python", 3)])
 
 
+def test_a_stray_space_around_the_name_does_not_cost_points():
+    """Пробел по краям имени навыка на счёт не влияет.
+
+    Пробел в анкете — опечатка ввода, а не другой навык. Экран
+    статистики его уже отбрасывал, и без того же правила здесь один и тот
+    же навык считался своим в статистике и чужим в баллах: вакансия
+    получала минус за незнакомое требование вместо плюса за уровень.
+    """
+    score = score_parsed(
+        parsed_vacancy(stack_required=["Python"]),
+        [profile_skill("  Python  ", 3)],
+    )
+
+    assert score == 3
+
+
+def test_a_whitespace_only_skill_matches_nothing():
+    """Навык из одних пробелов не делает знакомой любую пустую строку.
+
+    Он свёлся бы к пустому ключу, и такой ключ нашёлся бы для всякой
+    пробельной строки в стеке вакансии: вместо штрафа за незнакомое
+    требование вакансия получала бы плюс за уровень.
+    """
+    score = score_parsed(
+        parsed_vacancy(stack_required=["   "]), [profile_skill("   ", 3)]
+    )
+
+    assert score == -1
+
+
 def test_aliases_land_in_the_lookup_next_to_the_name():
     """Псевдонимы ищутся наравне с именем."""
     lookup = build_skill_lookup(
