@@ -8,7 +8,7 @@ import httpx
 
 from adapters.lm_studio import ChatRequest, chat
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
-from backend.llm.answers import QUOTE_TRANSLATION
+from backend.llm.answers import QUOTE_TRANSLATION, str_or_none
 
 
 logger = logging.getLogger(__name__)
@@ -198,12 +198,6 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
 
-def _str_or_none(value) -> str | None:
-    if not isinstance(value, str):
-        return None
-    return value.strip() or None
-
-
 def _str_list(value) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -246,7 +240,7 @@ def _normalize_lang_level(value: object) -> str | None:
 def _parse_language_item(item) -> ParsedCvLanguage | None:
     if not isinstance(item, dict):
         return None
-    language = _str_or_none(item.get("language"))
+    language = str_or_none(item.get("language"))
     if not language:
         return None
     level = _normalize_lang_level(item.get("level"))
@@ -304,10 +298,10 @@ def _parse_date(value) -> date | None:
 def _parse_profile(data: dict) -> ParsedCvProfile | None:
     if not isinstance(data, dict):
         return None
-    first_name = _str_or_none(data.get("first_name"))
-    last_name = _str_or_none(data.get("last_name"))
-    title = _str_or_none(data.get("title"))
-    email = _str_or_none(data.get("email"))
+    first_name = str_or_none(data.get("first_name"))
+    last_name = str_or_none(data.get("last_name"))
+    title = str_or_none(data.get("title"))
+    email = str_or_none(data.get("email"))
     if not (first_name and last_name and title and email):
         return None
     return ParsedCvProfile(
@@ -315,22 +309,22 @@ def _parse_profile(data: dict) -> ParsedCvProfile | None:
         last_name=last_name,
         title=title,
         email=email,
-        phone=_str_or_none(data.get("phone")),
-        location=_str_or_none(data.get("location")),
-        telegram_username=_str_or_none(data.get("telegram_username")),
-        github_url=_str_or_none(data.get("github_url")),
-        education=_str_or_none(data.get("education")),
+        phone=str_or_none(data.get("phone")),
+        location=str_or_none(data.get("location")),
+        telegram_username=str_or_none(data.get("telegram_username")),
+        github_url=str_or_none(data.get("github_url")),
+        education=str_or_none(data.get("education")),
         work_format=_normalize_enum_list(data.get("work_format"), WORK_FORMATS),
         grades=_normalize_enum_list(data.get("grades"), GRADES),
-        free_preferences=_str_or_none(data.get("free_preferences")),
+        free_preferences=str_or_none(data.get("free_preferences")),
     )
 
 
 def _parse_skill(item) -> ParsedCvSkill | None:
     if not isinstance(item, dict):
         return None
-    category = _str_or_none(item.get("category")) or "Общее"
-    name = _str_or_none(item.get("name"))
+    category = str_or_none(item.get("category")) or "Общее"
+    name = str_or_none(item.get("name"))
     if not name:
         return None
     raw_level = item.get("level")
@@ -366,14 +360,14 @@ def _parse_skill(item) -> ParsedCvSkill | None:
 def _parse_experience(item) -> ParsedCvExperience | None:
     if not isinstance(item, dict):
         return None
-    company = _str_or_none(item.get("company"))
-    role = _str_or_none(item.get("role"))
+    company = str_or_none(item.get("company"))
+    role = str_or_none(item.get("role"))
     start = _parse_date(item.get("start_date"))
     if not (company and role and start):
         return None
     return ParsedCvExperience(
         company=company,
-        company_url=_str_or_none(item.get("company_url")),
+        company_url=str_or_none(item.get("company_url")),
         role=role,
         start_date=start,
         end_date=_parse_date(item.get("end_date")),

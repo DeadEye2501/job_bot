@@ -12,6 +12,7 @@ from backend.payloads import ChannelDetail, ChannelStats, ChannelWithCount
 
 from backend.repository.blacklist_marks import (
     active_blacklist_value,
+    preferred_blacklist_value,
     active_blacklist_values,
 )
 from backend.repository.search import matches_search
@@ -31,9 +32,7 @@ def channel_blacklist_candidates(ch: TelegramChannel) -> list[str]:
 
 
 def channel_blacklist_preferred_value(ch: TelegramChannel) -> str | None:
-    if not ch.username:
-        return None
-    return f"@{ch.username}"
+    return preferred_blacklist_value(channel_blacklist_candidates(ch))
 
 
 async def _channel_blacklist_value(

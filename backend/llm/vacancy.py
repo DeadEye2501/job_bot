@@ -12,7 +12,7 @@ from adapters.lm_studio import ChatRequest, chat
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.payloads import ParsedVacancy
 
-from backend.llm.answers import extract_last_json, normalize_enum
+from backend.llm.answers import extract_last_json, normalize_enum, str_or_none
 from backend.llm.candidate import _format_known_skills
 from backend.llm.external import wrap_external
 from backend.llm.skills import clean_stack_items
@@ -196,10 +196,7 @@ def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
         stack_preferred = []
 
     def _str_or_none(field: str) -> str | None:
-        v = data.get(field)
-        if not isinstance(v, str):
-            return None
-        return v.strip() or None
+        return str_or_none(data.get(field))
 
     description = _str_or_none("description")
     if description and len(description) > _DESCRIPTION_MAX_CHARS:

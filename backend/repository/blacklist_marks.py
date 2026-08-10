@@ -47,3 +47,13 @@ async def active_blacklist_values(session: AsyncSession, kind: str) -> set[str]:
             )
         ).all()
     )
+
+
+def preferred_blacklist_value(candidates: list[str]) -> str | None:
+    """Написание, которое кнопка «в чёрный список» и запишет.
+
+    Первое из перечня: перечень собран в порядке предпочтения — ник
+    читается на экране, а номер годится, когда ника нет. Порядок его и
+    есть договор, менять перечень значит менять то, что пишет кнопка.
+    """
+    return candidates[0] if candidates else None

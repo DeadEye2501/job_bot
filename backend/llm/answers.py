@@ -39,6 +39,18 @@ def extract_last_json(answer: str) -> str | None:
     return matches[-1] if matches else None
 
 
+def str_or_none(value) -> str | None:
+    """Строка из ответа модели, а пустая и не-строка — как отсутствие.
+
+    Модель на «нет значения» отвечает то пропуском поля, то пустой
+    строкой, то пробелами, то числом; зовущим все четыре случая значат
+    одно.
+    """
+    if not isinstance(value, str):
+        return None
+    return value.strip() or None
+
+
 def normalize_enum(value, allowed: tuple[str, ...]) -> str | None:
     if not isinstance(value, str):
         return None
