@@ -2408,7 +2408,6 @@ class MainApi(QObject):
         expected UX for a «убрать из blacklist» from this screen.
         """
         async def run() -> str:
-            from sqlalchemy import update as _sa_update
             async with self._session_factory() as session:
                 hr = await session.get(HR, hr_id)
                 if hr is None:
@@ -2419,17 +2418,10 @@ class MainApi(QObject):
                         "У HR нет ни @username, ни telegram_user_id.",
                         hr_id=hr_id, action="unblacklist",
                     )
-                res = await session.execute(
-                    _sa_update(Blacklist)
-                    .where(
-                        Blacklist.kind == "hr",
-                        Blacklist.value.in_(candidates),
-                        Blacklist.active.is_(True),
-                    )
-                    .values(active=False)
+                updated = await blacklist.deactivate_blacklist_values(
+                    session, "hr", candidates,
                 )
                 await session.commit()
-                updated = res.rowcount or 0
             self.contacts_lists_changed.emit()
             return _ok({
                 "action": "unblacklist",
@@ -3984,7 +3976,6 @@ class MainApi(QObject):
     def contacts_remove_channel_from_blacklist(self, channel_id: int) -> None:
         """Deactivate any kind="channel" blacklist row for this channel."""
         async def run() -> str:
-            from sqlalchemy import update as _sa_update
             async with self._session_factory() as session:
                 ch = await session.get(TelegramChannel, channel_id)
                 if ch is None:
@@ -3995,17 +3986,10 @@ class MainApi(QObject):
                         "У канала нет @username.",
                         channel_id=channel_id, action="unblacklist",
                     )
-                res = await session.execute(
-                    _sa_update(Blacklist)
-                    .where(
-                        Blacklist.kind == "channel",
-                        Blacklist.value.in_(candidates),
-                        Blacklist.active.is_(True),
-                    )
-                    .values(active=False)
+                updated = await blacklist.deactivate_blacklist_values(
+                    session, "channel", candidates,
                 )
                 await session.commit()
-                updated = res.rowcount or 0
             self.contacts_lists_changed.emit()
             return _ok({
                 "action": "unblacklist",
@@ -4459,7 +4443,6 @@ class MainApi(QObject):
     @Slot(int)
     def contacts_remove_company_from_blacklist(self, company_id: int) -> None:
         async def run() -> str:
-            from sqlalchemy import update as _sa_update
             async with self._session_factory() as session:
                 co = await session.get(Company, company_id)
                 if co is None:
@@ -4473,17 +4456,10 @@ class MainApi(QObject):
                         "У компании нет имени.",
                         company_id=company_id, action="unblacklist",
                     )
-                res = await session.execute(
-                    _sa_update(Blacklist)
-                    .where(
-                        Blacklist.kind == "company",
-                        Blacklist.value.in_(candidates),
-                        Blacklist.active.is_(True),
-                    )
-                    .values(active=False)
+                updated = await blacklist.deactivate_blacklist_values(
+                    session, "company", candidates,
                 )
                 await session.commit()
-                updated = res.rowcount or 0
             self.contacts_lists_changed.emit()
             return _ok({
                 "action": "unblacklist",
@@ -4768,18 +4744,6 @@ def _blacklist_row_to_dict(row: Blacklist) -> dict:
         "reason": row.reason,
         "active": bool(row.active),
         "created_at": _iso(row.created_at),
-    }
-
-
-def _blacklist_add_to_dict(outcome: BlacklistOutcome) -> dict:
-    """Исход заведения в том виде, в каком его читает карточка.
-
-    Окно различает три случая двумя признаками, а не словом: подсказка
-    выбирается сперва по `was_inactive`, потом по `existed`.
-    """
-    return {
-        "existed": outcome != "created",
-        "was_inactive": outcome == "reactivated",
     }
 
 

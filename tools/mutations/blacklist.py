@@ -1,4 +1,8 @@
-"""Поломки для `backend/repository/blacklist.py`.
+"""Поломки для ведения чёрного списка и для отметки, которую он ставит.
+
+Два файла, а не один: условие «предмет отмечен» объявлено в
+`blacklist_marks.py`, а гасят и заводят строки в `blacklist.py`, и поломки
+одного из них видны следствиями другого.
 
 Где поломка захватывает конец строки, перевод пишется через `CRLF`: рабочее
 дерево здесь с виндовыми переводами, и поиск по `\\n` не находит ничего.
@@ -7,6 +11,24 @@
 CRLF = "\r\n"
 
 MUTATIONS = [
+    # active_mark_of: отметку снимают и с погашенных строк
+    (
+        "backend/repository/blacklist_marks.py",
+        "        Blacklist.active.is_(True)," + CRLF,
+        "",
+    ),
+    # active_mark_of: отметка ищется по значению без оглядки на род
+    (
+        "backend/repository/blacklist_marks.py",
+        "        Blacklist.kind == kind," + CRLF,
+        "",
+    ),
+    # deactivate_blacklist_values: погашенные строки не считаются
+    (
+        "backend/repository/blacklist.py",
+        "    return done.rowcount or 0",
+        "    return 0",
+    ),
     # set_blacklist_active: переключение не доходит до строки
     (
         "backend/repository/blacklist.py",

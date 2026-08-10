@@ -4,11 +4,12 @@ import logging
 
 from typing import Literal
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Blacklist, Company, HR, TelegramChannel
 
+from backend.repository.blacklist_marks import active_mark_of
 from backend.repository.channels import channel_blacklist_preferred_value
 from backend.repository.hr_card import hr_blacklist_preferred_value
 
@@ -38,6 +39,31 @@ async def set_blacklist_active(
             row.value,
         )
     return True
+
+
+async def deactivate_blacklist_values(
+    session: AsyncSession, kind: str, candidates: list[str]
+) -> int:
+    """Погасить активные строки этого рода под любым из написаний предмета.
+
+    Отдаёт число погашенных: окно по нему отличает «убрали» от «нечего
+    было убирать». Строки не удаляются — решение остаётся видимым на
+    экране чёрного списка с выключенной отметкой, и его можно вернуть.
+
+    Написаний у предмета бывает несколько сразу (у HR ник и номер учётной
+    записи), и гасить надо все: оставшееся держало бы отметку дальше.
+
+    Что считать отметкой, объявлено один раз — в `active_mark_of`, откуда
+    его берёт и чтение отметки для чипа карточки.
+
+    Транзакцию закрывает зовущий.
+    """
+    done = await session.execute(
+        update(Blacklist)
+        .where(active_mark_of(kind, candidates))
+        .values(active=False)
+    )
+    return done.rowcount or 0
 
 
 _BLACKLIST_FIELD_UNSET = object()
