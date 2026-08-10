@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from backend.bot.media import classify_media, download_media
 from backend.flows.dm import process_dm
-from backend.helpers import extract_dm_text
+from backend.helpers import extract_dm_text, telegram_peer
 from backend.repository.hr_list import list_hrs_for_backfill
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ async def backfill_hr_dm_history(
     from backend.models import Message
     from pyrogram.errors import FloodWait, PeerIdInvalid
 
-    target = hr.telegram_user_id or hr.telegram_username
+    target = telegram_peer(hr)
     if target is None:
         return
     messages = []

@@ -11,6 +11,7 @@ from adapters import telegram
 from backend.models import BotMode
 from backend.models import HR
 from backend.models import Message
+from backend.helpers import telegram_peer
 from backend.repository.hr_card import _hr_blacklist_value
 
 from backend.bot import media
@@ -37,7 +38,7 @@ async def mark_hr_chat_read(bot, hr_id: int) -> int:
         hr = await session.get(HR, hr_id)
         if hr is None:
             return 0
-        target = hr.telegram_user_id or hr.telegram_username
+        target = telegram_peer(hr)
         res = await session.execute(
             _sa_update(Message)
             .where(
@@ -90,7 +91,7 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
         hr = await session.get(HR, hr_id)
         if hr is None:
             raise RuntimeError(f"HR id={hr_id} не найден.")
-        target = hr.telegram_user_id or hr.telegram_username
+        target = telegram_peer(hr)
         bl_value = await _hr_blacklist_value(session, hr)
     if target is None:
         raise RuntimeError(
@@ -160,7 +161,7 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
         hr = await session.get(HR, hr_id)
         if hr is None:
             raise RuntimeError(f"HR id={hr_id} не найден.")
-        target = hr.telegram_user_id or hr.telegram_username
+        target = telegram_peer(hr)
         bl_value = await _hr_blacklist_value(session, hr)
     if target is None:
         raise RuntimeError(

@@ -11,6 +11,7 @@ from backend.models import Vacancy
 from backend.models import VacancyEvent
 from backend.models import VacancyStatus
 from backend.models import VacancyStatusHistory
+from backend.helpers import telegram_peer
 from backend.repository.hr_card import _hr_blacklist_value
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ async def send(
     (VacancyStatusHistory etc.) проходят как при настоящей отправке.
     Текст письма уходит в логи WARNING — для аудита/тестов.
     """
-    target = hr.telegram_user_id or hr.telegram_username
+    target = telegram_peer(hr)
     if target is None:
         logger.warning(
             "Bot.send: hr %s has no telegram_user_id or username, skipping (vacancy=%s)",

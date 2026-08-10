@@ -52,8 +52,15 @@ MUTATIONS = [
     # extract_last_json: кавычки не выпрямляются
     (
         "backend/llm/answers.py",
-        "    cleaned = answer.translate(QUOTE_TRANSLATION)",
-        "    cleaned = answer",
+        "    straightened = answer.translate(QUOTE_TRANSLATION)",
+        "    straightened = answer",
+    ),
+    # extract_last_json: выпрямленный текст пробуется первым, и ёлочки
+    # внутри значения снова ломают годный ответ
+    (
+        "backend/llm/answers.py",
+        "    for text in (answer, straightened):",
+        "    for text in (straightened, answer):",
     ),
     # normalize_enum: регистр перестаёт опускаться
     (
