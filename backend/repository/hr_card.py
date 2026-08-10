@@ -8,7 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import Company, HR, Message, Vacancy
 from backend.payloads import HrDetail
 
-from backend.repository.blacklist_marks import active_blacklist_value
+from backend.repository.blacklist_marks import (
+    active_blacklist_value,
+    preferred_blacklist_value,
+)
 from backend.repository.merging import (
     concat_notes,
     load_merge_pair,
@@ -120,6 +123,9 @@ def hr_blacklist_candidates(hr: HR) -> list[str]:
     `contacts_add_hr_to_blacklist` slot writes. Both forms are checked so
     a row added under one identifier (username) still surfaces if the HR
     later only has the other (user_id), or vice versa.
+    
+    Порядок значим: первое написание — то, что запишет кнопка
+    «в чёрный список» (см. `preferred_blacklist_value`).
     """
     out: list[str] = []
     if hr.telegram_username:
@@ -170,11 +176,7 @@ def hr_blacklist_preferred_value(hr: HR) -> str | None:
     Prefers @username (human-readable on the Blacklist screen); falls
     back to user_id when no username is set.
     """
-    if hr.telegram_username:
-        return f"@{hr.telegram_username}"
-    if hr.telegram_user_id is not None:
-        return f"user_id:{hr.telegram_user_id}"
-    return None
+    return preferred_blacklist_value(hr_blacklist_candidates(hr))
 
 
 async def merge_hr(

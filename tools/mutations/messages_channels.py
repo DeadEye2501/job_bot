@@ -112,11 +112,12 @@ MUTATIONS = [
         '    return [f"@{ch.username}"]',
         "    return [ch.username]",
     ),
-    # channel_blacklist_preferred_value: кнопка пишет ник без собачки
+    # channel_blacklist_preferred_value: кнопка пишет не то написание
     (
         "backend/repository/channels.py",
-        '    return f"@{ch.username}"' + CRLF,
-        "    return ch.username" + CRLF,
+        "    return preferred_blacklist_value(channel_blacklist_candidates(ch))"
+        + CRLF,
+        "    return None" + CRLF,
     ),
     # Отметка чёрного списка уехала в `blacklist_marks`, цель вместе с ней.
     # list_telegram_channels: ник вместо пустого заголовка не подставляется

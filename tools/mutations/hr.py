@@ -111,8 +111,8 @@ MUTATIONS = [
     # hr_blacklist_preferred_value: кнопка пишет номер вместо ника
     (
         "backend/repository/hr_card.py",
-        '    if hr.telegram_username:' + CRLF + '        return f"@{hr.telegram_username}"' + CRLF,
-        "    if False:" + CRLF + '        return f"@{hr.telegram_username}"' + CRLF,
+        "    return preferred_blacklist_value(hr_blacklist_candidates(hr))" + CRLF,
+        "    return hr_blacklist_candidates(hr)[-1]" + CRLF,
     ),
     # list_hr_with_counts: порядок выборщика теряет разрешитель по имени
     (
