@@ -15,11 +15,29 @@ logger = logging.getLogger(__name__)
 CycleOutcome = Literal["ok", "busy", "cancelled", "error"]
 
 
+def cancel_current_poll(bot) -> None:
+    """Cancel an in-flight poll cycle without stopping the whole bot.
+
+    Thread-safe: см. ``kick``. Task.cancel() из чужого треда мутирует
+    внутреннее состояние Task'а и пытается loop.call_soon — обязан
+    идти через call_soon_threadsafe.
+    """
+    task = bot._current_poll_task
+    if task is None or task.done():
+        return
+    logger.info("Cancel current poll requested")
+    loop = bot._loop
+    if loop is not None and not loop.is_closed():
+        loop.call_soon_threadsafe(task.cancel)
+    else:
+        task.cancel()
+
+
 async def run_in_slot(
     bot,
     work: Callable[[], Any],
     label: str,
-    progress: tuple | None = None,
+    progress: tuple[str, str, int, int] | None = None,
 ) -> tuple[CycleOutcome, Any]:
     """Прогнать работу в единственном месте прогона.
 

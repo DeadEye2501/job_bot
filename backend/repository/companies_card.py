@@ -61,9 +61,9 @@ def company_blacklist_candidates(co: Company) -> list[str]:
     Just the company name — no other identifiers exist (no @username
     equivalent for companies). Returned as a list to mirror the HR helper
     so callers can use the same `value.in_(candidates)` shape.
-    
-    Порядок значим: первое написание — то, что запишет кнопка
-    «в чёрный список» (см. `preferred_blacklist_value`).
+
+    Написание одно, и оно же попадает в кнопку «в чёрный список»
+    (см. `preferred_blacklist_value`).
     """
     return [co.name] if co.name else []
 

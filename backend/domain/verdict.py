@@ -3,6 +3,8 @@
 from backend.models import VacancyStatus
 from backend.payloads import ParsedVacancy
 
+EMPTY_SKIP_REASON = "empty: no meaningful fields"
+
 
 def is_empty_vacancy(parsed: ParsedVacancy | None) -> bool:
     """True если вакансия — очевидная пустышка/мусор и должна уходить в trash

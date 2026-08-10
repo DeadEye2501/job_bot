@@ -110,24 +110,6 @@ async def add_channel(
     return channel_id, "created"
 
 
-def cancel_current_poll(bot) -> None:
-    """Cancel an in-flight poll cycle without stopping the whole bot.
-
-    Thread-safe: см. ``kick``. Task.cancel() из чужого треда мутирует
-    внутреннее состояние Task'а и пытается loop.call_soon — обязан
-    идти через call_soon_threadsafe.
-    """
-    task = bot._current_poll_task
-    if task is None or task.done():
-        return
-    logger.info("Cancel current poll requested")
-    loop = bot._loop
-    if loop is not None and not loop.is_closed():
-        loop.call_soon_threadsafe(task.cancel)
-    else:
-        task.cancel()
-
-
 async def force_poll_once(bot) -> Literal["ok", "busy", "cancelled", "error"]:
     """Manual one-shot poll, fired regardless of bot_state.mode. Used by
     the refresh button so the user always sees something happen.

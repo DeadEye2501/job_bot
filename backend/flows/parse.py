@@ -9,6 +9,7 @@ from backend.domain.salary import parse_salary
 from backend.domain.scoring import score_parsed
 from backend.domain.verdict import decide_vacancy_status
 from backend.domain.verdict import is_empty_vacancy
+from backend.domain.verdict import EMPTY_SKIP_REASON
 from backend.helpers import fetch_telegram_avatar
 from backend.helpers import resolve_hr_telegram
 from backend.llm.fit import validate_vacancy_fit
@@ -25,8 +26,6 @@ from backend.flows import apply
 from backend.flows import cleanup
 
 logger = logging.getLogger(__name__)
-
-EMPTY_SKIP_REASON = "empty: no meaningful fields"
 
 
 @dataclass(frozen=True, slots=True)
@@ -317,7 +316,12 @@ def _fields_filled(v: Vacancy) -> list[str]:
 async def _persist_parse_outcome(
     pipeline, vacancy_id: int, parsed: ParsedVacancy | None, outcome: _Outcome
 ) -> tuple[HR | None, bool]:
-    """Записать исход разбора: поля, компанию, HR и запись в ленту.
+    """Разыскать HR в Telegram и записать исход разбора: поля, компанию,
+    HR и запись в ленту.
+
+    Розыск идёт первым и стоит двух сетевых обращений — это самая
+    медленная и самая ломкая часть работы, и она здесь именно потому,
+    что в сессии ей не место (см. `_resolve_hr`).
 
     Отдаёт привязанного HR и признак того, что строка HR только что
     заведена. Наружу они уходят потому, что здесь их деть некуда:
@@ -400,9 +404,11 @@ async def save_empty_vacancy(
     pipeline, vacancy_id: int, parsed: ParsedVacancy | None
 ) -> None:
     """Persist an empty/trash vacancy as Not Fit when auto-delete is off
-    (rerun path). Fills whatever fields LLM did extract (just title in
-    the typical case) so the user can see the vacancy in the UI and
-    decide what to do manually.
+    (rerun path). Fills whatever fields LLM did extract — заголовок и, как
+    правило, ещё один сигнал из пяти, по которым выносится приговор
+    «пусто», — so the user can see the vacancy in the UI and decide what
+    to do manually. Что именно записалось, считается по строке после
+    записи (`_fields_filled`), а не предполагается заранее.
 
     When ``parsed is None`` (LLM failed to even extract a title — e.g.
     rerun on a stale row that was previously parsed but now triggers an

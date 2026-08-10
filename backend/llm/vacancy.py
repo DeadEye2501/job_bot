@@ -195,15 +195,15 @@ def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
         stack_required = clean_stack_items(data.get("stack"), seen)
         stack_preferred = []
 
-    def _str_or_none(field: str) -> str | None:
+    def _text_field(field: str) -> str | None:
         return str_or_none(data.get(field))
 
-    description = _str_or_none("description")
+    description = _text_field("description")
     if description and len(description) > _DESCRIPTION_MAX_CHARS:
         description = description[:_DESCRIPTION_MAX_CHARS].rstrip() + "…"
 
-    company_name = _str_or_none("company_name")
-    company_website = _str_or_none("company_website")
+    company_name = _text_field("company_name")
+    company_website = _text_field("company_website")
     # URL pollution: если LLM прилепил URL к company_name, вырезаем его
     # из имени и (если company_website пуст) кладём туда. Это закрывает
     # memory-TODO project_known_issue_company_name_pollution и заодно
@@ -225,14 +225,14 @@ def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
         description=description,
         company_name=company_name,
         company_website=company_website,
-        hr_contact=_str_or_none("hr_contact"),
-        other_contact=_str_or_none("other_contact"),
+        hr_contact=_text_field("hr_contact"),
+        other_contact=_text_field("other_contact"),
         stack_required=stack_required,
         stack_preferred=stack_preferred,
         grade=normalize_enum(data.get("grade"), GRADES),
-        salary=_str_or_none("salary"),
+        salary=_text_field("salary"),
         remote=normalize_enum(data.get("remote"), WORK_FORMATS),
-        location=_str_or_none("location"),
+        location=_text_field("location"),
     )
 
 

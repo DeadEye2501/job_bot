@@ -25,6 +25,7 @@ from backend.bot import updates
 from backend.bot import send
 from backend.bot import chat
 from backend.bot import channels
+from backend.bot import slot
 from backend.flows.pipeline import IngestionPipeline
 from backend.models import BotMode
 from backend.models import Message
@@ -224,7 +225,7 @@ class Bot:
         return await channels.add_channel(self, username)
 
     def cancel_current_poll(self) -> None:
-        return channels.cancel_current_poll(self)
+        return slot.cancel_current_poll(self)
 
     async def force_poll_once(self) -> Literal["ok", "busy", "cancelled", "error"]:
         return await channels.force_poll_once(self)
