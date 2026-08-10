@@ -62,6 +62,14 @@ MUTATIONS = [
         "    for text in (answer, straightened):",
         "    for text in (straightened, answer):",
     ),
+    # normalize_enum: не-строка перестаёт считаться отсутствием
+    (
+        "backend/llm/answers.py",
+        "    if not isinstance(value, str):" + CRLF + "        return None" + CRLF
+        + "    v = value.strip().lower()",
+        "    if False:" + CRLF + "        return None" + CRLF
+        + "    v = value.strip().lower()",
+    ),
     # normalize_enum: регистр перестаёт опускаться
     (
         "backend/llm/answers.py",
