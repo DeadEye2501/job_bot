@@ -20,12 +20,37 @@ def test_the_at_sign_never_reaches_the_column():
     """Ведущий «@» до колонки не доезжает.
 
     Колонка хранит голое написание: кнопка «в чёрный список» строит из него
-    `@{username}`, и с «@» в колонке записала бы «@@ivan», а отправка искала
-    бы собеседника по несуществующему нику.
+    `@{username}`, и с «@» в колонке записала бы «@@ivanov», а отправка
+    искала бы собеседника по несуществующему нику.
     """
-    fields = read_new_hr_fields({"telegram_username": "@ivan"})
+    fields = read_new_hr_fields({"telegram_username": "@ivanov"})
 
-    assert fields["telegram_username"] == "ivan"
+    assert fields["telegram_username"] == "ivanov"
+
+
+def test_a_pasted_telegram_link_becomes_the_bare_handle():
+    """Вставленная ссылка на переписку становится голым ником.
+
+    Ник чаще всего копируют не по буквам, а ссылкой из шапки чата. Легла
+    бы она в колонку как есть — отправка пошла бы искать собеседника с
+    именем «t.me/ivan» и не нашла никого.
+    """
+    for pasted in ("t.me/ivanov", "https://t.me/ivanov", "http://t.me/ivanov/"):
+        assert read_new_hr_fields({"telegram_username": pasted})[
+            "telegram_username"
+        ] == "ivanov"
+
+
+def test_what_is_not_a_telegram_handle_is_refused():
+    """Не телеграмовское в поле ника отвергается, а не пишется как есть.
+
+    В колонке ника осмысленно только то, чем Telegram умеет искать
+    собеседника. Имя человека, номер телефона или чужая ссылка молча легли
+    бы туда — и отправка потом не нашла бы никого, не сказав почему.
+    """
+    for wrong in ("Иван Петров", "+79991234567", "https://example.com/ivan"):
+        with pytest.raises(ValueError):
+            read_new_hr_fields({"telegram_username": wrong})
 
 
 def test_an_empty_field_is_read_as_absence():
@@ -79,7 +104,7 @@ def test_notes_alone_do_not_make_a_hr_worth_saving():
 def test_any_single_way_to_name_the_person_is_enough():
     """Хватает любого одного: имени, ника или номера учётной записи."""
     assert hr_is_identified(read_new_hr_fields({"name": "Иван"})) is True
-    assert hr_is_identified(read_new_hr_fields({"telegram_username": "@ivan"})) is True
+    assert hr_is_identified(read_new_hr_fields({"telegram_username": "@ivanov"})) is True
     assert hr_is_identified(read_new_hr_fields({"telegram_user_id": "77"})) is True
 
 
@@ -105,7 +130,7 @@ async def test_the_read_fields_reach_the_hr_row_as_they_were_typed(session):
         **read_new_hr_fields(
             {
                 "name": "Иван",
-                "telegram_username": "@ivan",
+                "telegram_username": "@ivanov",
                 "telegram_user_id": "77",
                 "notes": "звонил в среду",
             }
@@ -114,7 +139,7 @@ async def test_the_read_fields_reach_the_hr_row_as_they_were_typed(session):
 
     assert (hr.name, hr.telegram_username, hr.telegram_user_id, hr.notes) == (
         "Иван",
-        "ivan",
+        "ivanov",
         77,
         "звонил в среду",
     )

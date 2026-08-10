@@ -11,12 +11,25 @@
 CRLF = "\r\n"
 
 MUTATIONS = [
-    # read_new_hr_fields: ведущий «@» доезжает до колонки
+    # read_new_hr_fields: ник не разбирается и едет в колонку как введён
     (
         "client/form_payloads.py",
-        "    if username and username.startswith(\"@\"):" + CRLF
-        + "        username = none_if_empty(username[1:])" + CRLF,
+        "        username = normalize_username(username)" + CRLF,
         "",
+    ),
+    # read_new_hr_fields: негодный ник молча становится отсутствием
+    (
+        "client/form_payloads.py",
+        "        if username is None:" + CRLF
+        + '            raise ValueError("ник не похож на телеграмовский")' + CRLF,
+        "        if False:" + CRLF
+        + '            raise ValueError("ник не похож на телеграмовский")' + CRLF,
+    ),
+    # read_new_hr_fields: одна собачка перестаёт считаться пустым полем
+    (
+        "client/form_payloads.py",
+        '    username = none_if_empty(typed.lstrip("@")) if typed is not None else None',
+        "    username = typed",
     ),
     # read_new_hr_fields: ключ ника разошёлся с подписью заведения
     (
