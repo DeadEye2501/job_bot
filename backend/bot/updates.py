@@ -19,6 +19,7 @@ from backend.repository.messages import find_outgoing_message
 from backend.repository.messages import save_outgoing_message
 
 from backend.bot import media
+from backend.notify import fire
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +60,8 @@ async def on_raw_update(bot, _client, update, _users, _chats) -> None:
         await session.commit()
         updated = res.rowcount or 0
         hr_id = hr.id
-    if updated and bot.on_hr_read is not None:
-        try:
-            bot.on_hr_read(hr_id, max_id)
-        except Exception:
-            logger.exception("on_hr_read hook failed")
+    if updated:
+        fire(bot.on_hr_read, "on_hr_read", hr_id, max_id)
 
 
 async def on_dm_edit(bot, _client, msg) -> None:
@@ -104,11 +102,8 @@ async def on_dm_edit(bot, _client, msg) -> None:
             "DM edit synced: hr=%d tg_msg=%d incoming=%s",
             hr_id, msg.id, is_incoming,
         )
-    if updated and bot.on_new_message is not None:
-        try:
-            bot.on_new_message(hr_id)
-        except Exception:
-            logger.exception("on_new_message hook failed")
+    if updated:
+        fire(bot.on_new_message, "on_new_message", hr_id)
 
 
 async def on_dm_delete(bot, _client, messages) -> None:
@@ -221,11 +216,7 @@ async def on_dm_delete(bot, _client, messages) -> None:
             len(touched_hr_ids),
         )
     for hr_id in touched_hr_ids:
-        if bot.on_new_message is not None:
-            try:
-                bot.on_new_message(hr_id)
-            except Exception:
-                logger.exception("on_new_message hook failed")
+        fire(bot.on_new_message, "on_new_message", hr_id)
 
 
 async def on_dm_outgoing(bot, _client, msg) -> None:
@@ -261,11 +252,7 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
             # отправке cover-letter'а, повторно её писать не надо, но
             # UI ещё не уведомлён — chat должен обновиться синхронно
             # с прилётом echo из Telegram.
-            if bot.on_new_message is not None:
-                try:
-                    bot.on_new_message(hr_id_for_media)
-                except Exception:
-                    logger.exception("on_new_message hook failed")
+            fire(bot.on_new_message, "on_new_message", hr_id_for_media)
             return
     media_kind, media_name = media.classify_media(msg)
     media_path = (
@@ -310,11 +297,7 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
                 extra={"hr_id": hr_id, "tg_message_id": msg.id},
             )
             return
-    if bot.on_new_message is not None:
-        try:
-            bot.on_new_message(hr_id)
-        except Exception:
-            logger.exception("on_new_message hook failed")
+    fire(bot.on_new_message, "on_new_message", hr_id)
 
 
 async def on_dm(bot, _client, msg) -> None:
@@ -338,6 +321,8 @@ async def on_dm(bot, _client, msg) -> None:
     # refresh in real time without polling. We look up hr_id after
     # process_dm rather than threading a callback through it — keeps
     # process_dm's signature clean and avoids touching unrelated flows.
+    # Пустой обработчик отсеивается и здесь, хотя `fire` умеет это сам:
+    # без окна не нужен и поиск HR в базе, который идёт следом.
     if bot.on_new_message is None:
         return
     if not msg.from_user:
@@ -350,6 +335,8 @@ async def on_dm(bot, _client, msg) -> None:
                 msg.from_user.username,
             )
         if hr is not None:
-            bot.on_new_message(hr.id)
+            fire(bot.on_new_message, "on_new_message", hr.id)
     except Exception:
-        logger.exception("on_new_message hook failed")
+        # Поломку самого оповещения глотает `fire`; сюда долетает только
+        # сбой поиска HR, то есть обращение к базе.
+        logger.exception("echo lookup for the window failed")

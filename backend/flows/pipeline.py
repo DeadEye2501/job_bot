@@ -11,6 +11,8 @@ from pathlib import Path
 
 import numpy as np
 
+from backend.notify import fire
+
 from backend.flows import apply
 from backend.flows import dm_classify
 from backend.flows import channels
@@ -150,29 +152,13 @@ class IngestionPipeline:
 
 
     def _emit_progress(self, stage: str, label: str, current: int, total: int) -> None:
-        if self.on_progress is None:
-            return
-        try:
-            self.on_progress(stage, label, current, total)
-        except Exception:
-            logger.exception("on_progress hook failed")
-
+        fire(self.on_progress, "on_progress", stage, label, current, total)
 
     def _fire_contacts_changed(self) -> None:
-        if self.on_contacts_changed is None:
-            return
-        try:
-            self.on_contacts_changed()
-        except Exception:
-            logger.exception("on_contacts_changed hook failed")
+        fire(self.on_contacts_changed, "on_contacts_changed")
 
     def _fire_vacancies_changed(self) -> None:
-        if self.on_vacancies_changed is None:
-            return
-        try:
-            self.on_vacancies_changed()
-        except Exception:
-            logger.exception("on_vacancies_changed hook failed")
+        fire(self.on_vacancies_changed, "on_vacancies_changed")
 
 
     async def _reload_resources(self) -> None:

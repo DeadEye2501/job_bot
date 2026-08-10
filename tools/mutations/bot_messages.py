@@ -189,8 +189,9 @@ MUTATIONS = [
     # on_raw_update: окно дёргают и когда ничего не изменилось
     (
         "backend/bot/updates.py",
-        "    if updated and bot.on_hr_read is not None:",
-        "    if bot.on_hr_read is not None:",
+        "    if updated:" + CRLF
+        + '        fire(bot.on_hr_read, "on_hr_read", hr_id, max_id)' + CRLF,
+        '    fire(bot.on_hr_read, "on_hr_read", hr_id, max_id)' + CRLF,
     ),
     # send_to_hr_chat: пустое сообщение перестаёт отбиваться
     (

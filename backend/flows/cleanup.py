@@ -5,6 +5,7 @@ import logging
 from backend.repository.vacancies_life import delete_vacancy as repo_delete_vacancy
 
 from backend.flows import embeddings
+from backend.notify import fire
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,7 @@ async def check_ghosting_timeouts(pipeline) -> int:
             "ghosting timer: marked %d vacancies (ids=%s)",
             len(affected), affected,
         )
-        if pipeline.on_vacancies_changed is not None:
-            try:
-                pipeline.on_vacancies_changed()
-            except Exception:
-                logger.exception("on_vacancies_changed hook failed")
+        fire(pipeline.on_vacancies_changed, "on_vacancies_changed")
     return len(affected)
 
 
