@@ -5,17 +5,11 @@ HR» вперёд идут те, у кого вакансий больше, в �
 переписывались. Спор при равенстве решает имя.
 """
 
-from backend.repository.hr_list import list_hr_with_counts
 from tests.dbio import put
 from tests.factories import at, hr_row, message_row, vacancy_row
 
 
-async def names(session, **kwargs) -> list[str]:
-    """Имена HR в порядке выдачи."""
-    return [row.hr.name for row in await list_hr_with_counts(session, **kwargs)]
-
-
-async def test_the_picker_leads_with_the_most_prolific_hr(session, session_factory):
+async def test_the_picker_leads_with_the_most_prolific_hr(hr_names, session_factory):
     """В выборщике вперёд идёт тот, у кого вакансий больше.
 
     Порядок вставки обратен ожидаемому нарочно: совпади они — и выдача без
@@ -32,10 +26,10 @@ async def test_the_picker_leads_with_the_most_prolific_hr(session, session_facto
         vacancy_row(hr_id=few.id),
     )
 
-    assert await names(session) == ["Борис", "Анна", "Виктор"]
+    assert await hr_names() == ["Борис", "Анна", "Виктор"]
 
 
-async def test_an_equal_count_is_broken_by_name(session, session_factory):
+async def test_an_equal_count_is_broken_by_name(hr_names, session_factory):
     """При равном числе вакансий порядок решает имя.
 
     Имена выбраны так, чтобы алфавит спорил с порядком заведения: без
@@ -48,10 +42,10 @@ async def test_an_equal_count_is_broken_by_name(session, session_factory):
         hr_row(name="Борис"),
     )
 
-    assert await names(session) == ["Анна", "Борис", "Яна"]
+    assert await hr_names() == ["Анна", "Борис", "Яна"]
 
 
-async def test_contacts_lead_with_the_latest_conversation(session, session_factory):
+async def test_contacts_lead_with_the_latest_conversation(hr_names, session_factory):
     """В контактах вперёд идёт тот, с кем переписывались позже.
 
     Число вакансий здесь спорит с давностью переписки: у самого свежего
@@ -69,22 +63,21 @@ async def test_contacts_lead_with_the_latest_conversation(session, session_facto
         message_row(hr_id=older.id, sent_at=at(10)),
     )
 
-    assert await names(session, sort_by="last_activity") == ["Анна", "Борис"]
-    assert await names(session) == ["Борис", "Анна"]
+    assert await hr_names(sort_by="last_activity") == ["Анна", "Борис"]
+    assert await hr_names() == ["Борис", "Анна"]
 
 
-async def test_an_hr_without_any_conversation_goes_last(session, session_factory):
+async def test_an_hr_without_any_conversation_goes_last(hr_names, session_factory):
     """В контактах те, с кем не переписывались, уходят в хвост."""
     talked = hr_row(name="Яна")
     silent = hr_row(name="Анна")
     await put(session_factory, talked, silent)
     await put(session_factory, message_row(hr_id=talked.id, sent_at=at(10)))
 
-    assert await names(session, sort_by="last_activity") == ["Яна", "Анна"]
+    assert await hr_names(sort_by="last_activity") == ["Яна", "Анна"]
 
 
-async def test_a_deleted_message_does_not_count_as_a_conversation(
-    session, session_factory
+async def test_a_deleted_message_does_not_count_as_a_conversation(hr_names, session_factory
 ):
     """Удалённое сообщение свежести переписке не добавляет."""
     only_deleted = hr_row(name="Анна")
@@ -96,4 +89,4 @@ async def test_a_deleted_message_does_not_count_as_a_conversation(
         message_row(hr_id=alive.id, sent_at=at(10)),
     )
 
-    assert await names(session, sort_by="last_activity") == ["Яна", "Анна"]
+    assert await hr_names(sort_by="last_activity") == ["Яна", "Анна"]

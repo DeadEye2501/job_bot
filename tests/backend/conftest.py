@@ -23,6 +23,8 @@ from backend.models import (
 )
 from backend.crypto import encrypt_str
 from backend.payloads import FitValidation
+from backend.repository.channels import list_telegram_channels
+from backend.repository.hr_list import list_hr_with_counts
 from backend.repository.vacancies_list import list_vacancies
 from backend.runtime_settings import RuntimeSettings
 from tests.dbio import only_row, put
@@ -74,6 +76,34 @@ def titles(session):
 
     async def read(**kwargs) -> list[str]:
         return [v.title for v in await list_vacancies(session, **kwargs)]
+
+    return read
+
+
+@pytest.fixture
+def hr_names(session):
+    """Имена HR в порядке выдачи — по прецеденту `titles`.
+
+    Перечень HR проверяется отбором и порядком, и обоим нужно одно: кто
+    вернулся и в каком порядке. Список компаний свёл бы сюда же, но у
+    него другой предмет и другое объявление в репозитории.
+    """
+
+    async def read(**kwargs) -> list[str]:
+        return [row.hr.name for row in await list_hr_with_counts(session, **kwargs)]
+
+    return read
+
+
+@pytest.fixture
+def channel_titles(session):
+    """Заголовки каналов в порядке выдачи — по тому же прецеденту."""
+
+    async def read(**kwargs) -> list[str]:
+        return [
+            row.channel.title
+            for row in await list_telegram_channels(session, **kwargs)
+        ]
 
     return read
 
