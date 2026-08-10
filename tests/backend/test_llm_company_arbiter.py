@@ -160,10 +160,14 @@ async def test_any_trouble_becomes_a_refusal_that_names_itself(prepared, marker)
 
 
 async def test_an_answer_that_is_not_an_object_becomes_a_refusal():
-    """Ответ не объектом становится отказом, а не падением."""
+    """Ответ не объектом становится отказом, а не падением.
+
+    Причина отказа называет сам ответ: объекта в нём нет вовсе, читать нечего, и в
+    разборе сведения это видно словами, а не пустой строкой.
+    """
     client = provider({CHAT: chat_response("[7]")})
 
     matched, reasoning = await _ask(client, [_Candidate(7, "Сбербанк")])
 
     assert matched is None
-    assert reasoning == ""
+    assert reasoning == "unparseable_json: [7]"

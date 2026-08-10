@@ -3,11 +3,11 @@
 
 import json
 import logging
-import re
 
 import httpx
 
 from adapters.lm_studio import ChatRequest, chat
+from backend.llm.answers import extract_last_json
 
 logger = logging.getLogger(__name__)
 
@@ -97,22 +97,22 @@ async def dedupe_company_with_llm(
         return None, reply.error
     answer = reply.text
 
-    # Иногда модели оборачивают JSON в ```json ... ``` — снимаем обёртку.
-    answer = re.sub(
-        r"^```(?:json)?\s*|\s*```$", "", answer.strip(), flags=re.IGNORECASE
-    )
+    raw = extract_last_json(answer)
+    if raw is None:
+        logger.warning(
+            "dedupe_company: no JSON object in LLM answer %r", answer[:200]
+        )
+        return None, f"unparseable_json: {answer[:120]}"
     try:
-        obj = json.loads(answer)
+        obj = json.loads(raw)
     except (json.JSONDecodeError, TypeError) as e:
         logger.warning(
             "dedupe_company: unparseable LLM JSON %r: %s", answer[:200], e
         )
         return None, f"unparseable_json: {answer[:120]}"
 
-    matched_id = obj.get("matched_id") if isinstance(obj, dict) else None
-    reasoning = (
-        obj.get("reasoning") if isinstance(obj, dict) else None
-    ) or ""
+    matched_id = obj.get("matched_id")
+    reasoning = obj.get("reasoning") or ""
 
     if matched_id is None:
         return None, reasoning
