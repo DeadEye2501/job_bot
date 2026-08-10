@@ -7,14 +7,16 @@ import logging
 from pyrogram.raw.types import PeerUser as _PeerUser
 from pyrogram.raw.types import UpdateReadHistoryOutbox as _UpdateReadHistoryOutbox
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from backend.flows.dm import process_dm
 from backend.helpers import extract_dm_text
 from backend.helpers import extract_text
 from backend.models import BotMode
 from backend.models import Message
+from backend.payloads import OutgoingMessage
 from backend.repository.hr_identify import find_known_hr
+from backend.repository.messages import find_outgoing_message
+from backend.repository.messages import save_outgoing_message
 
 from backend.bot import media
 
@@ -253,15 +255,7 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
         # echo собственного отправленного сообщения. Без этой проверки
         # download_media гонится с shutil.copy2 за один и тот же путь
         # и оставляет рваный файл в кэше.
-        existing = (
-            await session.scalars(
-                select(Message).where(
-                    Message.hr_id == hr_id_for_media,
-                    Message.tg_message_id == msg.id,
-                    Message.is_incoming.is_(False),
-                )
-            )
-        ).first()
+        existing = await find_outgoing_message(session, hr_id_for_media, msg.id)
         if existing is not None:
             # Echo собственного Bot.send-а: row уже была вписана при
             # отправке cover-letter'а, повторно её писать не надо, но
@@ -282,28 +276,34 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
         hr = await find_known_hr(session, recipient_id, recipient_username)
         if hr is None:
             return
-        # Номер берётся до попытки записи: сорвавшийся flush протухает
-        # объекты и при `expire_on_commit=False`, и обращение к полю подняло
-        # бы `PendingRollbackError` из самой записи в журнал.
+        # Номер берётся до попытки записи, и это прикрывает две разные
+        # беды. Повтор: `save_outgoing_message` откатывает сессию сам, а
+        # откат протухает всю карту объектов, включая этот `hr`, — чтение
+        # поля полезло бы в базу и подняло `MissingGreenlet`. Сорвавшаяся
+        # запись: отката не было, и сессия требует его, — то же чтение
+        # подняло бы `PendingRollbackError`. Оба раза из самой записи в
+        # журнал, то есть в обработчике беды.
         hr_id = hr.id
         try:
-            session.add(Message(
-                is_incoming=False,
-                hr_id=hr_id,
-                text=extract_dm_text(msg),
-                tg_message_id=msg.id,
-                sent_at=msg.date,
-                media_kind=media_kind,
-                media_path=media_path,
-                media_name=media_name,
-            ))
-            await session.commit()
-        except IntegrityError:
-            logger.debug(
-                "Outgoing DM dedup: hr=%d tg_msg=%d already saved",
-                hr_id, msg.id,
+            _, saved = await save_outgoing_message(
+                session,
+                OutgoingMessage(
+                    hr_id=hr_id,
+                    text=extract_dm_text(msg),
+                    tg_message_id=msg.id,
+                    sent_at=msg.date,
+                    media_kind=media_kind,
+                    media_path=media_path,
+                    media_name=media_name,
+                ),
             )
-            return  # already saved (e.g. via send_to_hr_chat)
+            if not saved:
+                logger.debug(
+                    "Outgoing DM dedup: hr=%d tg_msg=%d already saved",
+                    hr_id, msg.id,
+                )
+                return  # already saved (e.g. via send_to_hr_chat)
+            await session.commit()
         except Exception:
             logger.exception(
                 "outgoing DM persistence failed",

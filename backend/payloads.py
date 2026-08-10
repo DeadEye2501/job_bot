@@ -34,6 +34,25 @@ class ChannelPost:
 
 
 @dataclass(frozen=True)
+class OutgoingMessage:
+    """Наше письмо HR в том виде, в каком оно уже ушло в Telegram.
+
+    Одно и то же письмо приходит к нам двумя дорогами — из окна, когда мы
+    его отправили, и эхом из Telegram, когда его увидел другой клиент, — и
+    оба раза записывается одинаково. Значения ходят вместе: без номера
+    сообщения не распознать повтор, без времени письмо не встанет в
+    переписке на своё место.
+    """
+    hr_id: int
+    text: str
+    tg_message_id: int
+    sent_at: Any
+    media_kind: str | None = None
+    media_path: str | None = None
+    media_name: str | None = None
+
+
+@dataclass(frozen=True)
 class Classification:
     status: VacancyStatus
     explanation: str | None

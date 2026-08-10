@@ -131,13 +131,17 @@ MUTATIONS = [
         "    if updated > 0 and target is not None:",
         "    if target is not None:",
     ),
-    # _on_dm_outgoing: номер снова читается у HR после сорвавшейся вставки
+    # _on_dm_outgoing: повтор считается новой записью и будит окно
     (
         "backend/bot/updates.py",
-        '                "Outgoing DM dedup: hr=%d tg_msg=%d already saved",' + CRLF
-        + "                hr_id, msg.id,",
-        '                "Outgoing DM dedup: hr=%d tg_msg=%d already saved",' + CRLF
-        + "                hr.id, msg.id,",
+        "            if not saved:" + CRLF,
+        "            if False:" + CRLF,
+    ),
+    # save_outgoing_message: после конфликта сессия не откатывается
+    (
+        "backend/repository/messages.py",
+        "        await session.rollback()" + CRLF,
+        "",
     ),
     # _on_dm_outgoing: номер снова читается у HR в общей ветке разбора
     (

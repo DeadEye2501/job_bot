@@ -3,15 +3,15 @@
 import logging
 
 from pathlib import Path
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from adapters import telegram
 from backend.models import BotMode
 from backend.models import HR
 from backend.models import Message
 from backend.helpers import telegram_peer
+from backend.payloads import OutgoingMessage
 from backend.repository.hr_card import _hr_blacklist_value
+from backend.repository.messages import save_outgoing_message
 
 from backend.bot import media
 
@@ -121,35 +121,17 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
         hr_id, pyro_msg.id, len(clean),
     )
 
-    # updates.on_dm_outgoing dispatches on the same client and may win the race —
-    # it'll persist the row first and our INSERT then trips the
-    # (hr_id, tg_message_id, is_incoming=False) UNIQUE. Treat that as
-    # success and return the existing row.
     async with bot._session_factory() as session:
-        row = Message(
-            is_incoming=False,
-            hr_id=hr_id,
-            text=clean,
-            tg_message_id=pyro_msg.id,
-            sent_at=pyro_msg.date,
+        row, _ = await save_outgoing_message(
+            session,
+            OutgoingMessage(
+                hr_id=hr_id,
+                text=clean,
+                tg_message_id=pyro_msg.id,
+                sent_at=pyro_msg.date,
+            ),
         )
-        session.add(row)
-        try:
-            await session.commit()
-        except IntegrityError:
-            await session.rollback()
-            row = (
-                await session.scalars(
-                    select(Message).where(
-                        Message.hr_id == hr_id,
-                        Message.tg_message_id == pyro_msg.id,
-                        Message.is_incoming.is_(False),
-                    )
-                )
-            ).first()
-            if row is None:
-                raise
-            return row
+        await session.commit()
     return row
 
 
@@ -199,31 +181,17 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
     media_name = None if as_photo else src.name
 
     async with bot._session_factory() as session:
-        row = Message(
-            is_incoming=False,
-            hr_id=hr_id,
-            text="",
-            tg_message_id=pyro_msg.id,
-            sent_at=pyro_msg.date,
-            media_kind=media_kind,
-            media_path=media_path,
-            media_name=media_name,
+        row, _ = await save_outgoing_message(
+            session,
+            OutgoingMessage(
+                hr_id=hr_id,
+                text="",
+                tg_message_id=pyro_msg.id,
+                sent_at=pyro_msg.date,
+                media_kind=media_kind,
+                media_path=media_path,
+                media_name=media_name,
+            ),
         )
-        session.add(row)
-        try:
-            await session.commit()
-        except IntegrityError:
-            await session.rollback()
-            row = (
-                await session.scalars(
-                    select(Message).where(
-                        Message.hr_id == hr_id,
-                        Message.tg_message_id == pyro_msg.id,
-                        Message.is_incoming.is_(False),
-                    )
-                )
-            ).first()
-            if row is None:
-                raise
-            return row
+        await session.commit()
     return row

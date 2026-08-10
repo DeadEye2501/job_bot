@@ -124,6 +124,32 @@ async def test_an_already_saved_message_is_not_doubled(known_hr, session_factory
     assert [m.text for m in await all_rows(session_factory, Message)] == ["уже было"]
 
 
+async def test_nothing_but_duplicates_means_the_window_is_not_told(
+    known_hr, session_factory
+):
+    """Догон, встретивший одни повторы, окно не дёргает.
+
+    Он проходит по всей доступной истории и почти всегда видит уже
+    записанное; оповещая на каждый повтор, переписку перерисовывали бы
+    впустую при каждом запуске.
+    """
+    await put(
+        session_factory,
+        message_row(
+            hr_id=known_hr.id, is_incoming=False, tg_message_id=11, text="уже было"
+        ),
+    )
+    client = FakeTelegramClient()
+    client.history = [_ours(11, "мой ответ")]
+    heard: list[int] = []
+
+    await _catch_up(
+        client, known_hr, session_factory, on_message_persisted=heard.append
+    )
+
+    assert heard == []
+
+
 async def test_a_message_deleted_while_offline_is_tombstoned(
     known_hr, session_factory
 ):
