@@ -2,6 +2,8 @@
 
 import logging
 
+from typing import Literal
+
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +13,8 @@ from backend.repository.channels import channel_blacklist_preferred_value
 from backend.repository.hr_card import hr_blacklist_preferred_value
 
 logger = logging.getLogger(__name__)
+
+BlacklistOutcome = Literal["created", "reactivated", "already_active"]
 
 
 async def set_blacklist_active(
@@ -63,8 +67,8 @@ async def update_blacklist(
     ``session.begin()``.
 
     TODO: дедуп с другими активными рядами того же `kind` — сейчас можно
-    инлайн-эдитом сделать (kind=hr, value=@x) дублем, хотя
-    `contacts_add_hr_to_blacklist` для add-flow это не даёт. Добавить
+    инлайн-эдитом сделать (kind=hr, value=@x) дублем, хотя заведение
+    (`create_blacklist`) этого не даёт. Добавить
     проверку `select(...).where(kind == row.kind, value == new_value,
     id != row.id)` и кидать ``BlacklistUpdateError("Уже существует")``.
     """
@@ -88,16 +92,22 @@ async def create_blacklist(
     kind: str,
     value: str,
     reason: str | None = None,
-) -> tuple[Blacklist, bool]:
+) -> tuple[Blacklist, BlacklistOutcome]:
     """Insert a blacklist row, дедупликация по (kind, value).
 
     Если строка с теми же (kind, value) уже есть:
-    - active=True → возвращаем её как есть, created=False
-    - active=False → ре-активируем и возвращаем, created=False
+    - active=True → возвращаем её как есть, "already_active"
+    - active=False → ре-активируем и возвращаем, "reactivated"
 
-    Иначе вставляем новую с active=True, created=True.
+    Иначе вставляем новую с active=True, "created".
 
-    Returns (row, created). Caller wraps in ``session.begin()``.
+    Исход назван словом, а не признаком «завели ли»: карточка HR, компании
+    и канала говорит о трёх случаях по-разному («добавлен», «возвращён»,
+    «уже в списке»), и признаком из двух значений средний не выражается.
+    Экран чёрного списка читает из этого только «завели ли» — ему хватало
+    и прежнего признака.
+
+    Returns (row, outcome). Caller wraps in ``session.begin()``.
     """
     normalized_value = (value or "").strip()
     if not normalized_value:
@@ -118,8 +128,10 @@ async def create_blacklist(
         )
     ).first()
     if existing is not None:
+        outcome: BlacklistOutcome = "already_active"
         if not existing.active:
             existing.active = True
+            outcome = "reactivated"
             logger.info(
                 "Blacklist reactivated id=%d kind=%s value=%r",
                 existing.id,
@@ -128,7 +140,7 @@ async def create_blacklist(
             )
         if normalized_reason and not existing.reason:
             existing.reason = normalized_reason
-        return existing, False
+        return existing, outcome
 
     row = Blacklist(
         kind=normalized_kind,
@@ -145,7 +157,7 @@ async def create_blacklist(
         normalized_value,
         normalized_reason,
     )
-    return row, True
+    return row, "created"
 
 
 async def delete_blacklist(
