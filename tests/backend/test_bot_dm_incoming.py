@@ -9,7 +9,7 @@
 import pytest
 
 from backend.models import BotMode
-from tests.fakes.telegram import chat, message, user
+from tests.fakes.telegram import chat, incoming, message
 
 
 @pytest.fixture
@@ -24,20 +24,10 @@ def dm_reader(monkeypatch):
     return seen
 
 
-def _incoming(*, user_id=777, username=None, msg_id=10):
-    """Входящее сообщение от собеседника."""
-    return message(
-        id=msg_id,
-        text="здравствуйте",
-        chat=chat(id=user_id, username=username),
-        from_user=user(id=user_id, username=username),
-    )
-
-
 async def test_an_incoming_message_goes_to_the_pipeline(chatting, dm_reader):
     """Входящее уходит в конвейер на разбор."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    msg = _incoming()
+    msg = incoming()
 
     await bot._on_dm(client, msg)
 
@@ -54,7 +44,7 @@ async def test_a_switched_off_bot_does_not_read_incoming_messages(
     """
     bot, client, hr = await chatting(mode=BotMode.OFF, telegram_user_id=777)
 
-    await bot._on_dm(client, _incoming())
+    await bot._on_dm(client, incoming())
 
     assert dm_reader == []
 
@@ -65,7 +55,7 @@ async def test_the_window_hears_about_an_incoming_message(chatting, dm_reader):
     heard: list[int] = []
     bot.on_new_message = heard.append
 
-    await bot._on_dm(client, _incoming())
+    await bot._on_dm(client, incoming())
 
     assert heard == [hr.id]
 
@@ -81,7 +71,7 @@ async def test_a_message_from_a_stranger_does_not_reach_the_window(
     heard: list[int] = []
     bot.on_new_message = heard.append
 
-    await bot._on_dm(client, _incoming(user_id=999))
+    await bot._on_dm(client, incoming(user_id=999))
 
     assert heard == []
 
@@ -111,7 +101,7 @@ async def test_an_hr_known_only_by_name_is_found_too(chatting, dm_reader):
     heard: list[int] = []
     bot.on_new_message = heard.append
 
-    await bot._on_dm(client, _incoming(user_id=999, username="maria"))
+    await bot._on_dm(client, incoming(user_id=999, username="maria"))
 
     assert heard == [hr.id]
 
@@ -126,7 +116,7 @@ async def test_a_broken_window_hook_does_not_break_the_handler(
         raise RuntimeError("окно")
 
     bot.on_new_message = broken
-    msg = _incoming()
+    msg = incoming()
 
     await bot._on_dm(client, msg)
 
