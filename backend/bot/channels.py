@@ -1,10 +1,10 @@
 """Правка каналов из окна: заведение, удаление, чтение по требованию."""
 
 import logging
-import asyncio
 
 from typing import Literal
 
+from backend.bot import slot
 from backend.helpers import fetch_telegram_avatar
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
 from backend.repository.channels import (
@@ -21,11 +21,10 @@ async def poll_channel_now(
 ) -> Literal["ok", "busy", "missing", "cancelled", "error"]:
     """UI «Прогнать сейчас» — single-channel manual poll.
 
-    Wraps the same `_current_poll_task` slot + `on_cycle_start/end`
-    hooks as the global cycle so the bottom-bar progress indicator,
-    stop-button (`cancel_current_poll`), и all other "идёт цикл"
-    UI affordances работают одинаково для ручного single-channel
-    прогона.
+    Идёт в общем месте прогона, как и полный обход: отсюда нижняя полоса
+    прогресса, кнопка «остановить» (`cancel_current_poll`) и все прочие
+    «идёт цикл» приметы окна работают одинаково для ручного прогона
+    одного канала.
 
     Returns a status string so the bridge can give a tailored toast
     for each outcome instead of one generic «не найден» error:
@@ -35,38 +34,14 @@ async def poll_channel_now(
     - "cancelled": user clicked stop mid-poll.
     - "error": unexpected exception inside `poll_one_channel`.
     """
-    if bot._current_poll_task is not None:
-        logger.info(
-            "poll_channel_now: another cycle is running, skipping (channel_id=%d)",
-            channel_id,
-        )
-        return "busy"
-    if bot.on_cycle_start is not None:
-        try: bot.on_cycle_start()
-        except Exception: logger.exception("on_cycle_start hook failed")
-    status: Literal["ok", "missing", "cancelled", "error"] = "ok"
-    try:
-        bot._current_poll_task = asyncio.create_task(
-            bot._ingestion.poll_one_channel(channel_id)
-        )
-        try:
-            ok = await bot._current_poll_task
-            if not ok:
-                status = "missing"
-        except asyncio.CancelledError:
-            logger.info(
-                "manual poll for channel %d cancelled by user", channel_id
-            )
-            status = "cancelled"
-    except Exception:
-        logger.exception("manual single-channel poll failed (channel_id=%d)", channel_id)
-        status = "error"
-    finally:
-        bot._current_poll_task = None
-        if bot.on_cycle_end is not None:
-            try: bot.on_cycle_end()
-            except Exception: logger.exception("on_cycle_end hook failed")
-    return status
+    outcome, ok = await slot.run_in_slot(
+        bot,
+        lambda: bot._ingestion.poll_one_channel(channel_id),
+        f"manual poll for channel {channel_id}",
+    )
+    if outcome == "ok" and not ok:
+        return "missing"
+    return outcome
 
 
 async def reset_channel_cursor(bot, channel_id: int) -> bool:
@@ -165,32 +140,10 @@ async def force_poll_once(bot) -> Literal["ok", "busy", "cancelled", "error"]:
     """Manual one-shot poll, fired regardless of bot_state.mode. Used by
     the refresh button so the user always sees something happen.
 
-    Returns "busy" if another cycle is already running (UI's stop button
-    takes precedence) — two concurrent cycles would race on the embedding
-    cache and the channel cursor. UI surfaces "busy" as a toast.
+    Отдаёт "busy", если место прогона занято, — окно показывает это
+    подсказкой.
     """
-    if bot._current_poll_task is not None:
-        logger.info("force_poll_once: another cycle is already running, skipping")
-        return "busy"
-    if bot.on_cycle_start is not None:
-        try: bot.on_cycle_start()
-        except Exception: logger.exception("on_cycle_start hook failed")
-    status: Literal["ok", "cancelled", "error"] = "ok"
-    try:
-        bot._current_poll_task = asyncio.create_task(
-            bot._ingestion.poll_active_channels()
-        )
-        try:
-            await bot._current_poll_task
-        except asyncio.CancelledError:
-            logger.info("forced poll cycle cancelled by user")
-            status = "cancelled"
-    except Exception:
-        logger.exception("forced poll cycle failed")
-        status = "error"
-    finally:
-        bot._current_poll_task = None
-        if bot.on_cycle_end is not None:
-            try: bot.on_cycle_end()
-            except Exception: logger.exception("on_cycle_end hook failed")
-    return status
+    outcome, _ = await slot.run_in_slot(
+        bot, lambda: bot._ingestion.poll_active_channels(), "forced poll cycle"
+    )
+    return outcome

@@ -50,43 +50,36 @@ MUTATIONS = [
         + "        task.cancel()" + CRLF,
         "        pass" + CRLF + "    else:" + CRLF + "        pass" + CRLF,
     ),
-    # poll_channel_now: занятое место перестаёт отбивать второй прогон
+    # run_in_slot: занятое место перестаёт отбивать второй прогон
+    (
+        "backend/bot/slot.py",
+        '        logger.info("%s: another cycle is already running, skipping", label)'
+        + CRLF
+        + '        return "busy", None' + CRLF,
+        '        logger.info("%s: another cycle is already running, skipping", label)'
+        + CRLF,
+    ),
+    # poll_channel_now: обход канала начинает трогать полосу прогресса
     (
         "backend/bot/channels.py",
-        '            "poll_channel_now: another cycle is running, skipping'     ' (channel_id=%d)",' + CRLF
-        + "            channel_id," + CRLF
-        + "        )" + CRLF
-        + '        return "busy"' + CRLF,
-        '            "poll_channel_now: another cycle is running, skipping'     ' (channel_id=%d)",' + CRLF
-        + "            channel_id," + CRLF
-        + "        )" + CRLF,
+        '        f"manual poll for channel {channel_id}",' + CRLF + "    )" + CRLF,
+        '        f"manual poll for channel {channel_id}",' + CRLF
+        + '        progress=("poll", "", 0, 0),' + CRLF
+        + "    )" + CRLF,
     ),
     # poll_channel_now: отказ конвейера перестаёт быть «не найден»
     (
         "backend/bot/channels.py",
-        "            if not ok:" + CRLF
-        + '                status = "missing"' + CRLF,
+        '    if outcome == "ok" and not ok:' + CRLF
+        + '        return "missing"' + CRLF,
         "",
     ),
-    # poll_channel_now: место не освобождается после прогона
+    # run_in_slot: место не освобождается после прогона
     (
-        "backend/bot/channels.py",
+        "backend/bot/slot.py",
         "        bot._current_poll_task = None" + CRLF
-        + "        if bot.on_cycle_end is not None:" + CRLF
-        + "            try: bot.on_cycle_end()" + CRLF
-        + '            except Exception: logger.exception("on_cycle_end hook failed")'
-        + CRLF
-        + "    return status" + CRLF
-        + CRLF
-        + CRLF
-        + "async def reset_channel_cursor",
-        "            if self.on_cycle_end is not None:" + CRLF
-        + "                try: self.on_cycle_end()" + CRLF
-        + '                except Exception: logger.exception("on_cycle_end hook failed")'
-        + CRLF
-        + "        return status" + CRLF
-        + CRLF
-        + "    async def reset_channel_cursor",
+        + '        fire(bot.on_cycle_end, "on_cycle_end")' + CRLF,
+        '        fire(bot.on_cycle_end, "on_cycle_end")' + CRLF,
     ),
     # add_channel: повтор до обращения к Telegram перестаёт находиться
     (
@@ -164,14 +157,8 @@ MUTATIONS = [
     # run: по каналам ходят и в режиме «только личные»
     (
         "backend/bot/loop.py",
-        "            if mode is BotMode.FULL and bot._current_poll_task is None:",
-        "            if bot._current_poll_task is None:",
-    ),
-    # run: идущий ручной прогон перебивается оборотом
-    (
-        "backend/bot/loop.py",
-        "            if mode is BotMode.FULL and bot._current_poll_task is None:",
-        "            if mode is BotMode.FULL:",
+        "            if mode is BotMode.FULL:" + CRLF,
+        "            if True:" + CRLF,
     ),
     # run: признак остановки ставится после отключения клиента
     (

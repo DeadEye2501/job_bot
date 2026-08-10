@@ -4,6 +4,7 @@ import logging
 import asyncio
 
 from adapters import telegram
+from backend.bot import slot
 from backend.flows.dm_backfill import catch_up_missed_dms
 from backend.models import BotMode
 
@@ -116,29 +117,12 @@ async def run(bot, *, once: bool = False) -> None:
             # Channel polling and outbound applications are Full-only.
             # DM Only and Off both skip ingestion (DM Only still reacts
             # to incoming HR messages via the registered MessageHandler).
-            if mode is BotMode.FULL and bot._current_poll_task is None:
-                # Гард от клоббера: если ручной `poll_channel_now` или
-                # `force_poll_once` сейчас держит слот, не перетираем
-                # его новой задачей — иначе обе крутятся параллельно
-                # и гонят embedding-кэш и курсоры каналов.
-                if bot.on_cycle_start is not None:
-                    try: bot.on_cycle_start()
-                    except Exception: logger.exception("on_cycle_start hook failed")
-                try:
-                    bot._current_poll_task = asyncio.create_task(
-                        bot._ingestion.poll_active_channels()
-                    )
-                    try:
-                        await bot._current_poll_task
-                    except asyncio.CancelledError:
-                        logger.info("poll cycle cancelled by user")
-                except Exception:
-                    logger.exception("poll cycle failed")
-                finally:
-                    bot._current_poll_task = None
-                    if bot.on_cycle_end is not None:
-                        try: bot.on_cycle_end()
-                        except Exception: logger.exception("on_cycle_end hook failed")
+            if mode is BotMode.FULL:
+                # Оборот может тихо не сделать ничего: место прогона мог
+                # занять ручной прогон из окна.
+                await slot.run_in_slot(
+                    bot, lambda: bot._ingestion.poll_active_channels(), "poll cycle"
+                )
             prev_mode = mode
             if once or bot._stop_event.is_set():
                 # finally-блок ниже логирует «Bot run-loop exiting» —
