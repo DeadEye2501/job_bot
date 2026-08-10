@@ -6,6 +6,7 @@ from datetime import date
 
 import httpx
 
+from adapters.lm_studio import ChatRequest, chat
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
 from backend.llm.answers import QUOTE_TRANSLATION
 
@@ -422,43 +423,26 @@ async def parse_cv(
     if not text or not text.strip():
         return None
     text = text[:20000]
-    try:
-        r = await client.post(
-            "/v1/chat/completions",
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": PARSE_CV_PROMPT},
-                    {"role": "user", "content": text},
-                ],
-                "max_tokens": 4500,
-                "temperature": 0,
-            },
-            # Resume parsing is a one-shot heavy generation — a small local
-            # model may run for minutes; the adapter's 30s default is way
-            # too tight for this specific call.
+    reply = await chat(
+        client,
+        model,
+        ChatRequest(
+            purpose="parse_cv",
+            messages=[
+                {"role": "system", "content": PARSE_CV_PROMPT},
+                {"role": "user", "content": text},
+            ],
+            max_tokens=4500,
+            # Разбор резюме — одно тяжёлое обращение: слабая местная
+            # модель считает его минутами, и общего запаса ей мало.
             timeout=300.0,
-        )
-        r.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        logger.warning(
-            "parse_cv: LM Studio returned HTTP %s",
-            e.response.status_code,
-        )
+        ),
+        logger,
+    )
+    if reply.text is None:
         return None
-    except httpx.RequestError as e:
-        logger.warning(
-            "parse_cv: request failed: %s: %s", type(e).__name__, e
-        )
-        return None
-
-    try:
-        choice = r.json()["choices"][0]
-        answer = choice["message"]["content"].strip()
-        finish_reason = choice.get("finish_reason")
-    except (KeyError, IndexError, ValueError) as e:
-        logger.warning("parse_cv: malformed LLM response: %s", e)
-        return None
+    answer = reply.text
+    finish_reason = reply.finish_reason
 
     if finish_reason == "length":
         logger.warning("parse_cv: LLM hit token limit, output may be truncated")

@@ -7,6 +7,8 @@ import re
 
 import httpx
 
+from adapters.lm_studio import ChatRequest, chat
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,7 +52,7 @@ async def dedupe_company_with_llm(
     parsed_name: str,
     parsed_website: str | None,
     candidates: list,
-) -> tuple[int | None, str]:
+) -> tuple[int | None, str | None]:
     """Возвращает (matched_id, reasoning). matched_id — id одной из
     компаний-кандидатов, либо None, если LLM решил, что подходящей нет
     (или произошла техническая ошибка — вырождаемся в «создать новую»,
@@ -76,34 +78,24 @@ async def dedupe_company_with_llm(
         parsed_website=parsed_website or "—",
         candidates_block="\n".join(cand_lines),
     )
-    try:
-        r = await client.post(
-            "/v1/chat/completions",
-            json={
-                "model": model,
-                "messages": [{"role": "system", "content": prompt}],
-                "max_tokens": 250,
-                "temperature": 0,
-            },
-        )
-        r.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        logger.warning(
-            "dedupe_company: LM Studio returned HTTP %s",
-            e.response.status_code,
-        )
-        return None, f"llm_http_error: {e.response.status_code}"
-    except httpx.RequestError as e:
-        logger.warning(
-            "dedupe_company: request failed: %s: %s", type(e).__name__, e
-        )
-        return None, f"llm_request_error: {type(e).__name__}"
-
-    try:
-        answer = r.json()["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, ValueError) as e:
-        logger.warning("dedupe_company: malformed LLM response: %s", e)
-        return None, f"malformed_response: {e}"
+    reply = await chat(
+        client,
+        model,
+        ChatRequest(
+            purpose="dedupe_company",
+            messages=[
+                {"role": "system", "content": prompt},
+            ],
+            max_tokens=250,
+        ),
+        logger,
+    )
+    if reply.text is None:
+        # Причина уходит в решение и доходит до человека: её показывают в
+        # разборе сведения компаний, поэтому она остаётся строкой провайдера,
+        # а не сводится к общему «не получилось».
+        return None, reply.error
+    answer = reply.text
 
     # Иногда модели оборачивают JSON в ```json ... ``` — снимаем обёртку.
     answer = re.sub(

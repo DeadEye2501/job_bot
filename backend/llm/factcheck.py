@@ -8,6 +8,7 @@ import time
 
 import httpx
 
+from adapters.lm_studio import ChatRequest, chat
 from backend.llm.external import wrap_external
 
 logger = logging.getLogger(__name__)
@@ -89,38 +90,22 @@ async def factcheck_cover_letter(
         + "\n\nВерни JSON {\"verdict\": ..., \"issues\": [...]}."
     )
     t0 = time.monotonic()
-    try:
-        r = await client.post(
-            "/v1/chat/completions",
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": FACT_CHECK_COVER_LETTER_PROMPT},
-                    {"role": "user", "content": user_msg},
-                ],
-                "max_tokens": 400,
-                "temperature": 0,
-            },
-        )
-        r.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        logger.warning(
-            "factcheck_cover_letter: LM Studio returned HTTP %s — fail-open",
-            e.response.status_code,
-        )
+    reply = await chat(
+        client,
+        model,
+        ChatRequest(
+            purpose="factcheck_cover_letter",
+            messages=[
+                {"role": "system", "content": FACT_CHECK_COVER_LETTER_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+            max_tokens=400,
+        ),
+        logger,
+    )
+    if reply.text is None:
         return True, []
-    except httpx.RequestError as e:
-        logger.warning(
-            "factcheck_cover_letter: request failed: %s: %s — fail-open",
-            type(e).__name__, e,
-        )
-        return True, []
-
-    try:
-        answer = r.json()["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, ValueError) as e:
-        logger.warning("factcheck_cover_letter: malformed LLM response: %s — fail-open", e)
-        return True, []
+    answer = reply.text
 
     answer = re.sub(
         r"^```(?:json)?\s*|\s*```$", "", answer.strip(), flags=re.IGNORECASE

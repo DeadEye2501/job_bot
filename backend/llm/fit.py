@@ -6,6 +6,8 @@ import logging
 
 import httpx
 
+from adapters.lm_studio import ChatRequest, chat
+
 from backend.payloads import FIT_VERDICTS, FitValidation, ParsedVacancy
 
 from backend.llm.answers import extract_last_json, normalize_enum
@@ -316,37 +318,22 @@ async def validate_vacancy_fit(
         + "\n\n"
         "Верни JSON {\"verdict\": ..., \"reason\": ...}. reason ОБЯЗАН ссылаться на конкретные слова/факты из текста выше, а не из примеров промпта."
     )
-    try:
-        r = await client.post(
-            "/v1/chat/completions",
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_msg},
-                ],
-                "max_tokens": 400,
-                "temperature": 0,
-            },
-        )
-        r.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        logger.warning(
-            "validate_vacancy_fit: LM Studio returned HTTP %s",
-            e.response.status_code,
-        )
+    reply = await chat(
+        client,
+        model,
+        ChatRequest(
+            purpose="validate_vacancy_fit",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_msg},
+            ],
+            max_tokens=400,
+        ),
+        logger,
+    )
+    if reply.text is None:
         return None
-    except httpx.RequestError as e:
-        logger.warning(
-            "validate_vacancy_fit: request failed: %s: %s", type(e).__name__, e
-        )
-        return None
-
-    try:
-        answer = r.json()["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, ValueError) as e:
-        logger.warning("validate_vacancy_fit: malformed LLM response: %s", e)
-        return None
+    answer = reply.text
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
