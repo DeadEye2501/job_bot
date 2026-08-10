@@ -1,9 +1,25 @@
 """Активные строки чёрного списка, по которым предметы получают отметку."""
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Blacklist
+
+
+def active_mark_of(kind: str, candidates: list[str]):
+    """Условие «предмет отмечен»: активная строка своего рода под любым из
+    написаний предмета.
+
+    Что считать отметкой, решается здесь одним объявлением: по этому же
+    условию отметку и снимают (`blacklist.deactivate_blacklist_values`), а
+    разойдись эти два правила — снятие переставало бы гасить то, что
+    карточка показывает чипом.
+    """
+    return and_(
+        Blacklist.kind == kind,
+        Blacklist.value.in_(candidates),
+        Blacklist.active.is_(True),
+    )
 
 
 async def active_blacklist_value(
@@ -21,11 +37,7 @@ async def active_blacklist_value(
     row = (
         await session.scalars(
             select(Blacklist)
-            .where(
-                Blacklist.kind == kind,
-                Blacklist.value.in_(candidates),
-                Blacklist.active.is_(True),
-            )
+            .where(active_mark_of(kind, candidates))
             .order_by(Blacklist.id.asc())
             .limit(1)
         )
