@@ -1,4 +1,5 @@
-"""Поломки для `backend/repository/hr_identify.py`, `hr_list.py` и `hr_card.py`.
+"""Поломки для `backend/repository/hr_identify.py`, `hr_list.py`, `hr_card.py`
+и `merging.py`.
 
 Где поломка захватывает конец строки, перевод пишется через `CRLF`: рабочее
 дерево здесь с виндовыми переводами, и поиск по `\\n` не находит ничего.
@@ -188,11 +189,11 @@ MUTATIONS = [
         "            update(Vacancy).where(Vacancy.hr_id == hr_id).values(hr_id=None)",
         "            delete(Vacancy).where(Vacancy.hr_id == hr_id)",
     ),
-    # merge_hr: слияние записи самой с собой проходит
+    # load_merge_pair: слияние записи самой с собой проходит
     (
-        "backend/repository/hr_card.py",
-        '        raise ValueError("merge_hr: absorbed_id == survivor_id")',
-        "        return None",
+        "backend/repository/merging.py",
+        '        raise ValueError(f"{subject}: absorbed_id == survivor_id")',
+        "        pass",
     ),
     # merge_hr: наличие учётной записи определяется по нику
     (
@@ -206,9 +207,9 @@ MUTATIONS = [
         "    if not survivor.name and abs_name:",
         "    if abs_name:",
     ),
-    # _concat_notes: разделитель между заметками пропадает
+    # concat_notes: разделитель между заметками пропадает
     (
-        "backend/repository/hr_card.py",
+        "backend/repository/merging.py",
         'return "\\n---\\n".join(parts)',
         'return "".join(parts)',
     ),

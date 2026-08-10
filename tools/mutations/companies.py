@@ -1,5 +1,5 @@
-"""Поломки для `backend/repository/companies_keys.py`, `companies_matching.py`
-и `companies_card.py`.
+"""Поломки для `backend/repository/companies_keys.py`, `companies_matching.py`,
+`companies_card.py` и `merging.py`.
 
 Где поломка захватывает конец строки, перевод пишется через `CRLF`: рабочее
 дерево здесь с виндовыми переводами, и поиск по `\\n` не находит ничего.
@@ -260,10 +260,12 @@ MUTATIONS = [
         "    if not survivor.website and abs_website:",
         "    if abs_website:",
     ),
-    # merge_company: слияние записи самой с собой проходит
+    # load_merge_pair: слияние записи самой с собой проходит. Цель та же,
+    # что и в наборе HR, — общий заслон один, но ловят его свои тесты
+    # каждого предмета.
     (
-        "backend/repository/companies_card.py",
-        '        raise ValueError("merge_company: absorbed_id == survivor_id")',
-        "        return None",
+        "backend/repository/merging.py",
+        '        raise ValueError(f"{subject}: absorbed_id == survivor_id")',
+        "        pass",
     ),
 ]
