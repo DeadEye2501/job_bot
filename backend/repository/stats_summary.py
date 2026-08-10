@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.scoring import build_skill_lookup, skill_key
 from backend.models import Message, ProfileSkill, Vacancy, VacancyStatus, VacancyStatusHistory
 
 def _status_cond(statuses):
@@ -170,14 +171,9 @@ async def get_stats_skills(
         base_filter.append(Vacancy.created_at >= since)
 
     skill_rows = (await session.scalars(select(ProfileSkill))).all()
-    profile_set: set[str] = set()
-    for s in skill_rows:
-        if s.name:
-            profile_set.add(s.name.strip().casefold())
-        if s.aliases:
-            for a in s.aliases:
-                if isinstance(a, str) and a.strip():
-                    profile_set.add(a.strip().casefold())
+    # Тот же ключ, что и у баллов: иначе один навык считался бы здесь
+    # своим, а в оценке вакансии чужим.
+    profile_set = build_skill_lookup(list(skill_rows))
 
     rows = (
         await session.scalars(select(Vacancy.stack).where(*base_filter))
@@ -208,7 +204,7 @@ async def get_stats_skills(
         items.append({
             "label": canon,
             "count": cnt,
-            "mine": canon.casefold() in profile_set,
+            "mine": skill_key(canon) in profile_set,
         })
     items.sort(key=lambda it: (-it["count"], it["label"].casefold()))
     return {

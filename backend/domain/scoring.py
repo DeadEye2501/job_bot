@@ -8,12 +8,24 @@ from backend.payloads import ParsedVacancy
 logger = logging.getLogger(__name__)
 
 
+def skill_key(name: str) -> str:
+    """Ключ, по которому навык анкеты узнаётся в стеке вакансии.
+
+    Пробел по краям срезается: в анкете это опечатка ввода, а не другой
+    навык. То же правило держит экран статистики — без него один и тот
+    же навык считался бы там своим, а в баллах чужим.
+    """
+    return name.strip().casefold()
+
+
 def _build_skill_level_lookup(
     skills: list[ProfileSkill],
 ) -> dict[str, int]:
-    """Casefolded ``{name|alias: level}`` map. ``level`` for an alias is
-    inherited from its parent ``ProfileSkill`` — aliases are just other
-    spellings of the same skill and must score the same.
+    """``{ключ навыка: уровень}``, ключи по `skill_key`.
+
+    ``level`` for an alias is inherited from its parent ``ProfileSkill``
+    — aliases are just other spellings of the same skill and must score
+    the same.
 
     If the user has two profile skills whose aliases overlap (shouldn't
     happen in seed data, but the schema doesn't forbid it), the LAST one
@@ -35,11 +47,14 @@ def _build_skill_level_lookup(
         out[key] = level
 
     for s in skills:
-        if s.name:
-            _put(s.name.casefold(), s.level, f"name={s.name!r}")
+        # Пустота проверяется по ключу, а не по сырой строке: имя из одних
+        # пробелов дало бы пустой ключ, и любая пробельная строка в стеке
+        # вакансии находила бы его как знакомый навык.
+        if s.name and skill_key(s.name):
+            _put(skill_key(s.name), s.level, f"name={s.name!r}")
         for alias in (s.aliases or []):
-            if isinstance(alias, str) and alias:
-                _put(alias.casefold(), s.level, f"alias={alias!r}")
+            if isinstance(alias, str) and skill_key(alias):
+                _put(skill_key(alias), s.level, f"alias={alias!r}")
     return out
 
 
@@ -49,8 +64,8 @@ def build_skill_lookup(skills: list[ProfileSkill]) -> set[str]:
     Выводится из `_build_skill_level_lookup`, а не собирается своим обходом:
     иначе зелёный чип в карточке и начисленный балл могли бы разойтись во
     мнении о том, что анкета знает. Уровень подсветке не нужен, ей достаточно
-    самого факта, — зовёт отсюда только окно
-    (`client.bridge._build_matched_set`).
+    самого факта. Зовут отсюда двое: окно — за зелёные чипы карточки, и
+    экран статистики — за отметку «мой» у технологии.
     """
     return set(_build_skill_level_lookup(skills))
 
@@ -86,7 +101,7 @@ def score_parsed(
     for item in parsed.stack_required:
         if not isinstance(item, str) or not item:
             continue
-        level = level_lookup.get(item.casefold())
+        level = level_lookup.get(skill_key(item))
         if level is None:
             total -= 1
         else:
@@ -94,7 +109,7 @@ def score_parsed(
     for item in parsed.stack_preferred:
         if not isinstance(item, str) or not item:
             continue
-        level = level_lookup.get(item.casefold())
+        level = level_lookup.get(skill_key(item))
         if level is None:
             continue
         total += level - 1
