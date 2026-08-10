@@ -81,6 +81,17 @@ def normalize_username(hr_contact: str | None) -> str | None:
     return s
 
 
+def telegram_peer(hr) -> int | str | None:
+    """Адресат HR в Telegram: учётная запись, иначе ник, иначе ничего.
+
+    Порядок важен: номер учётной записи не меняется, а ник человек
+    меняет когда угодно — по старому письмо уйдёт чужому человеку или не
+    уйдёт вовсе. Ничего — значит писать некуда; что делать дальше, решает
+    зовущий.
+    """
+    return hr.telegram_user_id or hr.telegram_username
+
+
 async def fetch_telegram_avatar(client, entity) -> bytes | None:
     """Download the small profile photo from a Pyrogram User or Chat.
 

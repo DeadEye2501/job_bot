@@ -41,16 +41,6 @@ MUTATIONS = [
         + "        logger.warning(" + CRLF
         + '            "Bot.send: hr %s in blacklist (%s), suppressed (vacancy=%s)",'     + CRLF,
     ),
-    # send: адрес выбирается именем, а не номером
-    (
-        "backend/bot/send.py",
-        "    target = hr.telegram_user_id or hr.telegram_username" + CRLF
-        + "    if target is None:" + CRLF
-        + "        logger.warning(",
-        "    target = hr.telegram_username or hr.telegram_user_id" + CRLF
-        + "    if target is None:" + CRLF
-        + "        logger.warning(",
-    ),
     # send: тестовый режим перестаёт заглушать отправку
     (
         "backend/bot/send.py",
@@ -140,14 +130,6 @@ MUTATIONS = [
         "backend/bot/chat.py",
         "    if updated > 0 and target is not None:",
         "    if target is not None:",
-    ),
-    # mark_hr_chat_read: адрес выбирается именем, а не номером
-    (
-        "backend/bot/chat.py",
-        "        target = hr.telegram_user_id or hr.telegram_username" + CRLF
-        + "        res = await session.execute(",
-        "        target = hr.telegram_username or hr.telegram_user_id" + CRLF
-        + "        res = await session.execute(",
     ),
     # _on_dm_outgoing: номер снова читается у HR после сорвавшейся вставки
     (
@@ -311,5 +293,13 @@ MUTATIONS = [
         + "                msg.from_user.username," + CRLF,
         "                msg.from_user.id," + CRLF
         + "                None," + CRLF,
+    ),
+    # telegram_peer: ник предпочитается учётной записи — письмо уйдёт
+    # чужому человеку, если ник сменили. Ломается чужой файл нарочно:
+    # строка живёт в `helpers`, а убивают её проверки этого набора.
+    (
+        "backend/helpers.py",
+        "    return hr.telegram_user_id or hr.telegram_username",
+        "    return hr.telegram_username or hr.telegram_user_id",
     ),
 ]
