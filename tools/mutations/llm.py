@@ -88,11 +88,11 @@ MUTATIONS = [
         "        (m for m in VacancyStatus if m.value.lower() == normalized),",
         "        (m for m in VacancyStatus if m.value == normalized),",
     ),
-    # _parse_classification: пустое пояснение сохраняется пустой строкой
+    # _parse_classification: пояснение едет в базу как пришло от модели
     (
         "backend/llm/hr_reply.py",
-        '    explanation = (data.get("explanation") or "").strip() or None',
-        '    explanation = (data.get("explanation") or "").strip()',
+        "        status=status, explanation=str_or_none(data.get(\"explanation\"))",
+        '        status=status, explanation=data.get("explanation")',
     ),
     # _strip_version: защита от среза без букв пропадает
     (
