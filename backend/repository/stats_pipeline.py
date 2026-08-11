@@ -13,6 +13,7 @@ from backend.models import (
 )
 
 from backend.repository.stats_summary import (
+    PARSED_ONLY,
     _stats_period_since,
     first_transition_subq,
 )
@@ -59,7 +60,7 @@ async def get_stats_channels_pipeline(
     Сортировка: по total desc, тай-брейкер по label.
     """
     since = _stats_period_since(period)
-    base_filter = [Vacancy.is_parsed.is_(True)]
+    base_filter = [PARSED_ONLY]
     if since is not None:
         base_filter.append(Vacancy.created_at >= since)
 
@@ -133,7 +134,7 @@ async def get_stats_channels_pipeline(
         q = (
             select(Vacancy.source_channel_id, sub.c.vid)
             .join(sub, sub.c.vid == Vacancy.id)
-            .where(Vacancy.is_parsed.is_(True))
+            .where(PARSED_ONLY)
         )
         if since is not None:
             q = q.where(sub.c.first_at >= since)

@@ -374,9 +374,41 @@ async def test_an_unparsed_vacancy_is_not_counted(session, session_factory):
     await put(
         session_factory,
         vacancy_row(source_channel_id=channel.id, is_parsed=True),
+        vacancy_row(source_channel_id=channel.id, is_parsed=True),
         vacancy_row(source_channel_id=channel.id, is_parsed=False),
     )
 
     row = (await rows_by_label(session, period="all"))["Канал"]
 
-    assert row["total"] == 1
+    # Разобранных две против одной неразобранной нарочно: на равном наборе
+    # перевёрнутый отбор дал бы то же число, и подмена осталась бы незаметной.
+    assert row["total"] == 2
+
+
+async def test_an_unparsed_vacancy_walks_no_funnel_step(
+    session, session_factory
+):
+    """Неразобранная вакансия не идёт ни по одной ступени воронки.
+
+    Отбор «только разобранные» объявлен один на всю статистику, но
+    применяет его каждая ступень сама: пропустит одна — «откликнулись» у
+    канала разойдётся с шапкой статистики молча.
+    """
+    channel = channel_row(username="ch", title="Канал")
+    await put(session_factory, channel)
+    parsed = vacancy_row(source_channel_id=channel.id, is_parsed=True)
+    unparsed = vacancy_row(source_channel_id=channel.id, is_parsed=False)
+    await put(session_factory, parsed, unparsed)
+    await put(
+        session_factory,
+        status_history_row(parsed.id, status=VacancyStatus.APPLIED),
+        status_history_row(unparsed.id, status=VacancyStatus.APPLIED),
+        status_history_row(unparsed.id, status=VacancyStatus.INVITATION),
+        status_history_row(unparsed.id, status=VacancyStatus.DECLINE),
+    )
+
+    row = (await rows_by_label(session, period="all"))["Канал"]
+
+    assert (
+        row["sent"], row["answered"], row["invite_plus"], row["decline"]
+    ) == (1, 0, 0, 0)
