@@ -50,16 +50,37 @@ async def test_the_telegram_id_wins_over_the_username(session, session_factory):
 
     Ник у Telegram меняется свободно и мог достаться другому человеку;
     идентификатор — нет.
+
+    Соперник по нику взят без идентификатора нарочно: с чужим идентификатором
+    запасной путь его не берёт вовсе, спорить стало бы не с кем, и порядок
+    двух путей остался бы непроверенным.
     """
     await put(
         session_factory,
         hr_row(name="по идентификатору", telegram_user_id=111, telegram_username="old"),
-        hr_row(name="по нику", telegram_user_id=999, telegram_username="maria"),
+        hr_row(name="по нику", telegram_user_id=None, telegram_username="maria"),
     )
 
     found = await find_known_hr(session, 111, "maria")
 
     assert found.name == "по идентификатору"
+
+
+async def test_a_username_taken_over_by_someone_else_leads_nowhere(
+    session, session_factory
+):
+    """Ник, доставшийся другому человеку, к старой записи не приводит.
+
+    Идентификатор Telegram не меняется, ник — свободно. Запись с чужим
+    идентификатором под тем же ником принадлежит другому, и письмо нового
+    владельца ника не должно попасть в её переписку.
+    """
+    await put(
+        session_factory,
+        hr_row(name="Мария", telegram_user_id=999, telegram_username="maria"),
+    )
+
+    assert await find_known_hr(session, 222, "maria") is None
 
 
 async def test_an_unknown_sender_is_not_found(session, session_factory):
