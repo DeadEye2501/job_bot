@@ -117,3 +117,22 @@ async def test_switching_everything_on_skips_the_blacklisted(
 
     assert (await session.get(TelegramChannel, listed.id)).is_active is False
     assert (await session.get(TelegramChannel, clean.id)).is_active is True
+
+
+async def test_switching_everything_on_ignores_a_mark_that_misses_the_channel(
+    session, session_factory
+):
+    """«Включить все» смотрит на ту же отметку, что и карточка канала.
+
+    Строка без собачки каналу не принадлежит: карточка чипа не показывает,
+    разовый проход канал не гасит. Значит и сплошное включение обязано его
+    включить — иначе канал остаётся выключенным навсегда, а причины этого не
+    видно ни на одном экране.
+    """
+    channel = channel_row(username="listed", is_active=False)
+    await put(session_factory, channel)
+    await put(session_factory, blacklist_row("channel", "listed"))
+
+    assert await is_channel_blacklisted(session, channel.id) is False
+    assert await set_all_channels_active(session, True) == 1
+    assert (await session.get(TelegramChannel, channel.id)).is_active is True

@@ -97,7 +97,7 @@ async def count_recent_outgoing_with_vacancy_for_hr(
     session: AsyncSession,
     hr_id: int,
     *,
-    window_days: int = 14,
+    window_days: int,
 ) -> int:
     """Сколько cover-letter'ов мы отправили этому HR'у за последние
     ``window_days`` дней. Считаются только outgoing rows с привязанным

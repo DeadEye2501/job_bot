@@ -286,15 +286,3 @@ async def list_blacklist(session: AsyncSession) -> list[Blacklist]:
         )
     ).all()
     return list(rows)
-
-
-async def load_active_blacklist_patterns(
-    session: AsyncSession,
-) -> list[str]:
-    return list(
-        (
-            await session.scalars(
-                select(Blacklist.value).where(Blacklist.active)
-            )
-        ).all()
-    )

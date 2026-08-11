@@ -8,6 +8,9 @@ EMPTY_SKIP_REASON = "empty: no meaningful fields"
 # экран каналов. Объявлена здесь, рядом с приговором, — иначе одна сторона
 # сменила бы написание, а вторая молча перестала бы находить свои строки.
 TRASH_SKIP_PREFIX = "trash: "
+# Метка отказа самой модели — тем же правилом, что и мусор: причину пишет
+# разбор, читает её экран вакансии.
+LLM_SKIP_PREFIX = "llm: "
 
 
 def is_empty_vacancy(parsed: ParsedVacancy | None) -> bool:

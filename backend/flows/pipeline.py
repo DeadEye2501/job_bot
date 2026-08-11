@@ -21,7 +21,7 @@ from backend.flows import cleanup
 from backend.llm import candidate
 from backend.llm.candidate import CandidateProfile
 from backend.models import ProfileSkill
-from backend.repository.blacklist import load_active_blacklist_patterns
+from backend.repository.blacklist_marks import load_active_blacklist_patterns
 from backend.repository.profile import build_profile_block, get_profile, list_profile_languages, list_skills
 
 

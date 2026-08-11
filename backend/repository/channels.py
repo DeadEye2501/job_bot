@@ -35,6 +35,16 @@ def channel_blacklist_preferred_value(ch: TelegramChannel) -> str | None:
     return preferred_blacklist_value(channel_blacklist_candidates(ch))
 
 
+def _is_blacklisted(ch: TelegramChannel, bl_values: set[str]) -> bool:
+    """Отмечен ли канал одной из активных строк, прочитанных заранее.
+
+    Отдельное объявление, потому что зовущих трое — перечень, разовый проход
+    и сплошное включение, — и разойдись они, канал считался бы отмеченным на
+    одном экране и чистым на другом.
+    """
+    return any(c in bl_values for c in channel_blacklist_candidates(ch))
+
+
 async def _channel_blacklist_value(
     session: AsyncSession, ch: TelegramChannel
 ) -> str | None:
@@ -84,14 +94,11 @@ async def list_telegram_channels(
 
     bl_values = await active_blacklist_values(session, "channel")
 
-    def _is_blacklisted(ch: TelegramChannel) -> bool:
-        return any(c in bl_values for c in channel_blacklist_candidates(ch))
-
     return [
         ChannelWithCount(
             channel=ch,
             vacancy_count=int(cnt or 0),
-            is_blacklisted=_is_blacklisted(ch),
+            is_blacklisted=_is_blacklisted(ch, bl_values),
         )
         for ch, cnt in rows
     ]
@@ -246,8 +253,8 @@ async def deactivate_blacklisted_channels(session: AsyncSession) -> int:
     совпадают с активной строкой kind=channel. Idempotent: уже-выключенные
     не трогаем. Returns count flipped — для логов/тостов.
 
-    Зеркалит matching-логику ``list_telegram_channels._is_blacklisted``
-    (exact match, case-sensitive). Caller wraps в ``session.begin()``.
+    Отметку читает ``_is_blacklisted`` — то же правило, что у перечня и у
+    сплошного включения. Caller wraps в ``session.begin()``.
     """
     bl_values = await active_blacklist_values(session, "channel")
     if not bl_values:
@@ -259,7 +266,7 @@ async def deactivate_blacklisted_channels(session: AsyncSession) -> int:
     ).all()
     flipped = 0
     for ch in channels:
-        if any(c in bl_values for c in channel_blacklist_candidates(ch)):
+        if _is_blacklisted(ch, bl_values):
             ch.is_active = False
             flipped += 1
     if flipped:
@@ -293,10 +300,13 @@ async def set_all_channels_active(
     if is_active:
         bl_values = await active_blacklist_values(session, "channel")
         if bl_values:
-            # Совпадение по `@username` — то же exact-match, что в
-            # `channel_blacklist_candidates`.
-            stripped = [v.lstrip("@") for v in bl_values]
-            stmt = stmt.where(TelegramChannel.username.notin_(stripped))
+            # Отмеченные отбираются тем же правилом, что и везде, а не
+            # обратным предикатом по SQL: перечень каналов невелик (десятки),
+            # и лишний проход по нему дешевле второго написания правила.
+            channels = (await session.scalars(select(TelegramChannel))).all()
+            marked = [ch.id for ch in channels if _is_blacklisted(ch, bl_values)]
+            if marked:
+                stmt = stmt.where(TelegramChannel.id.notin_(marked))
     result = await session.execute(stmt)
     affected = int(result.rowcount or 0)
     logger.info(

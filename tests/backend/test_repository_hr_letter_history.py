@@ -31,7 +31,9 @@ async def test_letters_without_a_vacancy_are_not_counted(session, session_factor
         ),
     )
 
-    assert await count_recent_outgoing_with_vacancy_for_hr(session, hr.id) == 1
+    assert await count_recent_outgoing_with_vacancy_for_hr(
+        session, hr.id, window_days=14
+    ) == 1
 
 
 async def test_letters_older_than_the_window_are_not_counted(
@@ -54,7 +56,9 @@ async def test_letters_older_than_the_window_are_not_counted(
         ),
     )
 
-    assert await count_recent_outgoing_with_vacancy_for_hr(session, hr.id) == 1
+    assert await count_recent_outgoing_with_vacancy_for_hr(
+        session, hr.id, window_days=14
+    ) == 1
     assert await count_recent_outgoing_with_vacancy_for_hr(
         session, hr.id, window_days=60
     ) == 2
@@ -65,4 +69,6 @@ async def test_an_hr_we_never_wrote_to_has_a_count_of_zero(session, session_fact
     hr = hr_row()
     await put(session_factory, hr)
 
-    assert await count_recent_outgoing_with_vacancy_for_hr(session, hr.id) == 0
+    assert await count_recent_outgoing_with_vacancy_for_hr(
+        session, hr.id, window_days=14
+    ) == 0
