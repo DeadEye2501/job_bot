@@ -3,11 +3,8 @@
 import logging
 import asyncio
 
-from sqlalchemy import select
-
-from backend.domain.transitions import is_terminal_for_auto
+from backend.flows.auto_gate import status_open_for_auto
 from backend.llm.hr_reply import classify_hr_reply
-from backend.models import Vacancy
 from backend.repository.vacancies_life import apply_classification
 from backend.notify import fire
 
@@ -139,16 +136,13 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
     last = buf[-1]
     vacancy_id = last["vacancy_id"]
     msg_id = last["msg_id"]
-    # Re-check state-machine: статус мог уйти в терминальный за время
-    # debounce-окна (например, юзер вручную выставил Decline), и
-    # классифицировать burst уже бессмысленно — apply_classification
-    # всё равно отбьёт `should_apply_status`. Лучше срезать здесь —
-    # экономим LLM-вызов.
-    async with pipeline._session_factory() as session:
-        v_status = await session.scalar(
-            select(Vacancy.status).where(Vacancy.id == vacancy_id)
-        )
-    if v_status is not None and is_terminal_for_auto(v_status):
+    # Срезаем здесь, а не полагаемся на `should_apply_status` внутри
+    # `apply_classification`: тот отобьёт вердикт уже после обращения к
+    # модели, то есть заплатив за него.
+    is_open, v_status = await status_open_for_auto(
+        pipeline._session_factory, vacancy_id
+    )
+    if not is_open:
         logger.info(
             "vacancy %s: status=%s terminal for auto, "
             "drop debounced burst (hr %d, %d msgs)",
