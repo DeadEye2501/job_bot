@@ -4,7 +4,6 @@ from datetime import datetime
 
 from sqlalchemy import String, case, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from backend.models import (
     Company,
@@ -15,6 +14,7 @@ from backend.models import (
     VacancyStatus,
     VacancyStatusHistory,
 )
+from backend.repository.vacancies_card import VACANCY_NEIGHBOURS
 
 # Status codes from the UI map to VacancyStatus enum members. The codes are
 # the same kebab-case identifiers used in CSS classes / JS state.
@@ -88,6 +88,47 @@ def _greatest(*cols):
     return out
 
 
+def _activity_aggs(ids: list[int] | None = None):
+    """Свежайшее событие и свежайшая смена статуса — по одной строке на вакансию.
+
+    Названные номера сужают обе группировки: спрашивая метку для полусотни
+    показанных строк, незачем группировать всю ленту событий. Список так
+    сузить нельзя — он отбирает уже после соединения, — поэтому довод
+    необязательный.
+    """
+    event_q = select(
+        VacancyEvent.vacancy_id.label("vid"),
+        func.max(VacancyEvent.created_at).label("max_at"),
+    )
+    status_q = select(
+        VacancyStatusHistory.vacancy_id.label("vid"),
+        func.max(VacancyStatusHistory.changed_at).label("max_at"),
+    )
+    if ids is not None:
+        event_q = event_q.where(VacancyEvent.vacancy_id.in_(ids))
+        status_q = status_q.where(VacancyStatusHistory.vacancy_id.in_(ids))
+    return (
+        event_q.group_by(VacancyEvent.vacancy_id).subquery("event_agg"),
+        status_q.group_by(VacancyStatusHistory.vacancy_id).subquery("status_agg"),
+    )
+
+
+def _activity_ts(event_agg, status_agg):
+    """Метка активности вакансии — позднейшее из четырёх времён.
+
+    Перечень источников один на обе дороги: по нему список сортирует прямо в
+    запросе, по нему же окно спрашивает метку для показанных строк. Написанный
+    порознь, он разошёлся бы молча — вакансия стояла бы первой, показывая дату
+    второй.
+    """
+    return _greatest(
+        Vacancy.created_at,
+        Vacancy.posted_at,
+        event_agg.c.max_at,
+        status_agg.c.max_at,
+    )
+
+
 async def list_vacancies(
     session: AsyncSession,
     sort: str = "newest",
@@ -109,11 +150,9 @@ async def list_vacancies(
 ) -> list[Vacancy]:
     """Vacancies ordered per ``sort`` key, HR / company / channel eager-loaded.
 
-    Activity timestamp (used by newest/oldest and as the tiebreaker for the
-    other sorts) is the per-row max of ``vacancy.created_at``,
-    ``vacancy.posted_at``, latest ``vacancy_event.created_at`` and latest
-    ``vacancy_status_history.changed_at`` — same shape as
-    :func:`list_vacancy_last_activity`, computed inline so SQL can sort on it.
+    Метка активности (по ней идут newest/oldest и она же разрешает споры в
+    остальных сортировках) — :func:`_activity_ts`, одна и та же на сортировку
+    и на :func:`list_vacancy_last_activity`.
 
     Filters (all optional, AND-combined):
 
@@ -145,29 +184,8 @@ async def list_vacancies(
     if sort not in VACANCY_SORTS:
         sort = "newest"
 
-    event_agg = (
-        select(
-            VacancyEvent.vacancy_id.label("vid"),
-            func.max(VacancyEvent.created_at).label("max_at"),
-        )
-        .group_by(VacancyEvent.vacancy_id)
-        .subquery("event_agg")
-    )
-    status_agg = (
-        select(
-            VacancyStatusHistory.vacancy_id.label("vid"),
-            func.max(VacancyStatusHistory.changed_at).label("max_at"),
-        )
-        .group_by(VacancyStatusHistory.vacancy_id)
-        .subquery("status_agg")
-    )
-
-    activity_ts = _greatest(
-        Vacancy.created_at,
-        Vacancy.posted_at,
-        event_agg.c.max_at,
-        status_agg.c.max_at,
-    )
+    event_agg, status_agg = _activity_aggs()
+    activity_ts = _activity_ts(event_agg, status_agg)
 
     if sort == "oldest":
         order_by = (activity_ts.asc().nulls_last(), Vacancy.id.asc())
@@ -289,11 +307,7 @@ async def list_vacancies(
     final_stmt = (
         stmt
         .where(*where_clauses)
-        .options(
-            selectinload(Vacancy.hr),
-            selectinload(Vacancy.company),
-            selectinload(Vacancy.channel),
-        )
+        .options(*VACANCY_NEIGHBOURS)
         .order_by(*order_by)
     )
     if limit is not None:
@@ -370,52 +384,26 @@ async def list_vacancy_filter_options(
 async def list_vacancy_last_activity(
     session: AsyncSession, vacancy_ids: list[int]
 ) -> dict[int, datetime]:
-    """Return latest activity timestamp per vacancy id.
+    """Метка последней активности для каждой из названных вакансий.
 
-    Activity is the max timestamp among:
-    - vacancy.created_at / vacancy.posted_at
-    - latest VacancyEvent.created_at
-    - latest VacancyStatusHistory.changed_at
+    Источники те же и в том же порядке, что у сортировки списка: их перечень
+    объявлен один раз в :func:`_activity_ts`.
     """
     ids = [int(x) for x in vacancy_ids if x is not None]
     if not ids:
         return {}
 
-    event_rows = (
+    event_agg, status_agg = _activity_aggs(ids)
+    rows = (
         await session.execute(
-            select(
-                VacancyEvent.vacancy_id,
-                func.max(VacancyEvent.created_at).label("max_event_at"),
-            )
-            .where(VacancyEvent.vacancy_id.in_(ids))
-            .group_by(VacancyEvent.vacancy_id)
+            select(Vacancy.id, _activity_ts(event_agg, status_agg))
+            .outerjoin(event_agg, event_agg.c.vid == Vacancy.id)
+            .outerjoin(status_agg, status_agg.c.vid == Vacancy.id)
+            .where(Vacancy.id.in_(ids))
         )
     ).all()
-    status_rows = (
-        await session.execute(
-            select(
-                VacancyStatusHistory.vacancy_id,
-                func.max(VacancyStatusHistory.changed_at).label("max_status_at"),
-            )
-            .where(VacancyStatusHistory.vacancy_id.in_(ids))
-            .group_by(VacancyStatusHistory.vacancy_id)
-        )
-    ).all()
-
-    event_by_id = {int(v_id): ts for v_id, ts in event_rows if v_id is not None and ts is not None}
-    status_by_id = {int(v_id): ts for v_id, ts in status_rows if v_id is not None and ts is not None}
-
-    out: dict[int, datetime] = {}
-    base_rows = (
-        await session.execute(
-            select(Vacancy.id, Vacancy.posted_at, Vacancy.created_at).where(Vacancy.id.in_(ids))
-        )
-    ).all()
-    for v_id, posted_at, created_at in base_rows:
-        if v_id is None:
-            continue
-        candidates = [created_at, posted_at, event_by_id.get(int(v_id)), status_by_id.get(int(v_id))]
-        vals = [x for x in candidates if x is not None]
-        if vals:
-            out[int(v_id)] = max(vals)
-    return out
+    return {
+        int(v_id): ts
+        for v_id, ts in rows
+        if v_id is not None and ts is not None
+    }

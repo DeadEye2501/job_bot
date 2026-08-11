@@ -5,7 +5,10 @@
 но данных вакансий не отдают: один возвращает названия, другой — времена.
 """
 
-from backend.repository.vacancies_list import list_vacancy_filter_options, list_vacancy_last_activity
+from backend.repository.vacancies_list import (
+    list_vacancy_filter_options,
+    list_vacancy_last_activity,
+)
 from tests.dbio import put
 from tests.factories import (
     at,
@@ -157,10 +160,16 @@ async def test_no_ids_asked_means_no_activity_returned(session, session_factory)
     assert await list_vacancy_last_activity(session, [None]) == {}
 
 
-async def test_an_unknown_id_is_simply_absent_from_the_answer(session, session_factory):
-    """Идентификатор, которого нет в базе, в ответе просто отсутствует."""
+async def test_only_the_vacancies_asked_about_come_back(session, session_factory):
+    """В ответе ровно те вакансии, о которых спросили.
+
+    Рядом лежит вторая, о которой не спрашивали: без неё запрос без отбора
+    по номерам отдавал бы то же самое, и отбор остался бы непроверенным.
+    Идентификатор, которого нет в базе, ответ не роняет и в него не попадает.
+    """
     known = vacancy_row(created_at=at(10))
-    await put(session_factory, known)
+    unasked = vacancy_row(created_at=at(20))
+    await put(session_factory, known, unasked)
 
     got = await list_vacancy_last_activity(session, [known.id, known.id + 1000])
 
