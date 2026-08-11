@@ -7,7 +7,7 @@ import time
 import httpx
 
 from adapters.lm_studio import ChatRequest, chat
-from backend.llm.answers import json_object
+from backend.llm.answers import json_object, log_unparseable
 from backend.llm.external import wrap_external
 
 logger = logging.getLogger(__name__)
@@ -108,10 +108,7 @@ async def factcheck_cover_letter(
 
     obj = json_object(answer, logger, "factcheck_cover_letter")
     if obj is None:
-        logger.warning(
-            "factcheck_cover_letter: ответ модели не даёт объекта %r — пропускаем",
-            answer[:200],
-        )
+        log_unparseable(answer, logger, "factcheck_cover_letter")
         return True, []
 
     verdict = obj.get("verdict")

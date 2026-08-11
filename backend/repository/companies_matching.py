@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company
+from backend.payloads import str_list
 from backend.repository.companies_card import create_company
 from backend.repository.companies_keys import (
     hosts_compatible,
@@ -45,10 +46,13 @@ def _enrich_company_with_parsed(
     if parsed_norm:
         existing_norms = {normalize_company_name(company.name)}
         existing_norms.update(
-            normalize_company_name(a) for a in (company.aliases or [])
+            normalize_company_name(a) for a in str_list(company.aliases)
         )
         if parsed_norm not in existing_norms:
-            aliases = list(company.aliases or [])
+            # Через `str_list`, а не `or []`: колонка JSON, и негодное её
+            # содержимое здесь не сохраняется. Потерять его дешевле, чем
+            # уронить разбор вакансии, — строками оно всё равно не было.
+            aliases = str_list(company.aliases)
             aliases.append(parsed_name.strip())
             company.aliases = aliases
 
@@ -216,7 +220,7 @@ async def find_or_create_company(
             (
                 c,
                 normalize_company_name(c.name),
-                [normalize_company_name(a) for a in (c.aliases or [])],
+                [normalize_company_name(a) for a in str_list(c.aliases)],
                 signal_host(normalize_host(c.website)),
             )
         )

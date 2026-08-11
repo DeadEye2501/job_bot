@@ -59,6 +59,48 @@ async def test_a_known_alias_matches(session, session_factory):
     assert decision["stage"] == "rule_alias"
 
 
+async def test_a_junk_spelling_does_not_stop_the_matching(
+    session, session_factory
+):
+    """Негодное написание сведение не роняет, а годное рядом всё равно сводит.
+
+    Колонка написаний — JSON, и что в ней лежит, код не обещает: строки
+    заводились и сырым SQL мимо заведения из окна. Одно число посреди списка
+    роняло весь разбор вакансии, а не одну эту компанию.
+    """
+    existing = company_row(name="СКБ Контур", aliases=[42, "Kontur"], website=None)
+    await put(session_factory, existing)
+
+    company, decision = await find_or_create_company(session, "контур")
+
+    assert company.id == existing.id
+    assert decision["stage"] == "rule_alias"
+
+
+async def test_a_spelling_list_that_is_not_a_list_is_replaced_not_kept(
+    session, session_factory
+):
+    """Колонка написаний не списком сведение не роняет, а новое написание пишется.
+
+    В колонке JSON лежит что положили, и списком это бывает не всегда. Терять
+    из-за такой строки весь разбор вакансии дороже, чем потерять негодное
+    содержимое самой колонки: строками оно всё равно не было.
+    """
+    existing = company_row(name="СКБ Контур", aliases=[], website="https://kontur.ru")
+    await put(session_factory, existing)
+    async with session_factory() as broken:
+        row = await broken.get(Company, existing.id)
+        row.aliases = 42
+        await broken.commit()
+
+    _, decision = await find_or_create_company(
+        session, "Контур", website="https://kontur.ru"
+    )
+
+    assert decision["stage"] == "rule_website"
+    assert (await session.get(Company, existing.id)).aliases == ["Контур"]
+
+
 async def test_a_conflicting_website_blocks_the_alias_rule_too(
     session, session_factory
 ):

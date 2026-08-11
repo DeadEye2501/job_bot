@@ -49,6 +49,29 @@ class _Outcome:
     keep_previous_stack: bool
 
 
+async def _dropped_as_trash(
+    pipeline, vacancy_id: int, reason: str, *, allow_delete: bool
+) -> bool:
+    """Убрать непригодную вакансию, если убирать разрешено; сказать, убрали ли.
+
+    Приговор «непригодна» выносят дважды — пустышке и вердикту «мусор», — и
+    развилка у него одна. При обычном разборе строку удаляют: пост оказался
+    не вакансией, и держать его незачем. При повторном разборе не удаляют
+    вовсе — строку человек открыл руками, и исчезнуть у него из-под курсора
+    она не должна; непригодность остаётся пометкой в причине отказа. Разойдись
+    развилка, одна из двух дорог удаляла бы там, где человек этого не просил.
+    """
+    if not allow_delete:
+        logger.info(
+            "vacancy %s: %s, marking Not Fit (rerun, no auto-delete)",
+            vacancy_id, reason,
+        )
+        return False
+    logger.info("vacancy %s: %s, deleting as trash", vacancy_id, reason)
+    await cleanup.delete_vacancy_as_trash(pipeline, vacancy_id, reason=reason)
+    return True
+
+
 async def parse_and_update_vacancy(
     pipeline,
     vacancy_id: int,
@@ -81,19 +104,10 @@ async def parse_and_update_vacancy(
     # либо удаляем (auto-ingest), либо помечаем явным skip_reason
     # для ручного просмотра (rerun).
     if is_empty_vacancy(parsed):
-        if allow_delete:
-            logger.info(
-                "vacancy %s: empty vacancy (no meaningful fields), deleting as trash",
-                vacancy_id,
-            )
-            await cleanup.delete_vacancy_as_trash(pipeline,
-                vacancy_id, reason=EMPTY_SKIP_REASON
-            )
+        if await _dropped_as_trash(
+            pipeline, vacancy_id, EMPTY_SKIP_REASON, allow_delete=allow_delete
+        ):
             return
-        logger.info(
-            "vacancy %s: empty vacancy (no meaningful fields), marking Not Fit (rerun, no auto-delete)",
-            vacancy_id,
-        )
         await save_empty_vacancy(pipeline, vacancy_id, parsed)
         return
 
@@ -146,20 +160,10 @@ async def parse_and_update_vacancy(
         elif validation.verdict == "trash":
             trash_reason = validation.reason or "no reason"
             trash_skip_reason = f"{TRASH_SKIP_PREFIX}{trash_reason}"
-            if allow_delete:
-                logger.info(
-                    "vacancy %s: classified as trash by LLM (%s), deleting",
-                    vacancy_id, trash_reason,
-                )
-                await cleanup.delete_vacancy_as_trash(pipeline,
-                    vacancy_id,
-                    reason=trash_skip_reason,
-                )
+            if await _dropped_as_trash(
+                pipeline, vacancy_id, trash_skip_reason, allow_delete=allow_delete
+            ):
                 return
-            logger.info(
-                "vacancy %s: trash verdict, marking Not Fit (rerun, no auto-delete)",
-                vacancy_id,
-            )
             status = VacancyStatus.NOT_FIT
             skip_reason = trash_skip_reason
         elif validation.verdict == "reject":

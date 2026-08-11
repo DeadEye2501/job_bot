@@ -4,20 +4,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company, Vacancy
-from backend.payloads import CompanyWithCount
+from backend.payloads import CompanyWithCount, str_list
 
 from backend.repository.blacklist_marks import active_blacklist_values
 from backend.repository.companies_card import company_blacklist_candidates
 from backend.repository.search import matches_search
-
-
-def _spellings(company: Company) -> list:
-    """Написания компании, годные к перебору.
-
-    Колонка JSON, и что в ней лежит, код не обещает. Не-список пришлось бы
-    разворачивать звёздочкой, а это уронило бы весь перечень компаний — даже
-    когда искать не просили."""
-    return company.aliases if isinstance(company.aliases, list) else []
 
 
 async def list_companies_with_counts(
@@ -45,7 +36,7 @@ async def list_companies_with_counts(
     rows = [
         (c, cnt)
         for c, cnt in rows
-        if matches_search(search, c.name, c.website, *_spellings(c))
+        if matches_search(search, c.name, c.website, *str_list(c.aliases))
     ]
 
     if limit is not None:

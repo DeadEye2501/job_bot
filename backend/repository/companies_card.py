@@ -6,7 +6,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company, Vacancy
-from backend.payloads import CompanyDetail
+from backend.payloads import CompanyDetail, str_list
 
 from backend.repository.blacklist_marks import (
     active_blacklist_value,
@@ -185,9 +185,7 @@ async def update_company_fields(
         # С именем компании набранное здесь не сверяется намеренно: список
         # человек пишет руками, и выбросить написанное им значило бы стереть
         # введённое молча. Слияние сверяется — там список копится сам.
-        co.aliases = _new_spellings(
-            [a.strip() for a in (aliases or []) if isinstance(a, str)], set()
-        )
+        co.aliases = _new_spellings(str_list(aliases), set())
         changed.append("aliases")
     if notes is not _COMPANY_FIELD_UNSET:
         co.notes = (
