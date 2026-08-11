@@ -114,13 +114,25 @@ def parsed_vacancy(**overrides) -> ParsedVacancy:
     return ParsedVacancy(**{**_empty_vacancy(), **overrides})
 
 
+def skill_fields(**overrides) -> dict:
+    """Умолчания навыка — одни и на строку в базе, и на разобранный из резюме.
+
+    Отдаются новым словарём на каждый зов: перечень прозвищ изменяем, и один
+    список на все строки связал бы их между собой.
+    """
+    return {"category": "backend", "level": 3, "aliases": [], **overrides}
+
+
 def profile_skill(
-    name: str, level: int, aliases: list | None = None
+    name: str, level: int | None = None, aliases: list | None = None, **overrides
 ) -> ProfileSkill:
-    """Навык профиля вне сессии — в базу не пишется, нужен как вход в подсчёт."""
-    return ProfileSkill(
-        name=name, level=level, aliases=aliases or [], category="backend"
-    )
+    """Навык профиля — и как вход в подсчёт, и как строка в базе."""
+    fields = skill_fields(**overrides)
+    if level is not None:
+        fields["level"] = level
+    if aliases is not None:
+        fields["aliases"] = aliases
+    return ProfileSkill(name=name, **fields)
 
 
 def tg_account_row(**overrides) -> TgAccount:
@@ -208,28 +220,35 @@ def channel_row(**overrides) -> TelegramChannel:
     return TelegramChannel(**fields)
 
 
-def profile_row(**overrides) -> Profile:
-    """Строка профиля кандидата. Обязательные поля заполнены."""
-    fields = {
+def person_fields(**overrides) -> dict:
+    """Кто такой подопытный кандидат — одно описание на строку анкеты и на её
+    разбор из резюме. Разойдись эти два, проверка «разобранное легло в анкету»
+    сравнивала бы двух разных людей.
+    """
+    return {
         "first_name": "Иван",
         "last_name": "Петров",
         "title": "Python-разработчик",
         "email": "ivan@example.com",
+        **overrides,
     }
-    fields.update(overrides)
-    return Profile(**fields)
+
+
+def profile_row(**overrides) -> Profile:
+    """Строка профиля кандидата. Обязательные поля заполнены."""
+    return Profile(**person_fields(**overrides))
 
 
 def profile_skill_row(profile_id: int, name: str, **overrides) -> ProfileSkill:
     """Строка навыка профиля. Имя задаётся явно: по нему навык и ищут."""
-    fields = {"category": "backend", "level": 3, "aliases": []}
-    fields.update(overrides)
-    return ProfileSkill(profile_id=profile_id, name=name, **fields)
+    return profile_skill(name, profile_id=profile_id, **overrides)
 
 
-def experience_row(profile_id: int, **overrides) -> ProfileExperience:
-    """Строка места работы. Дата начала обязательна на уровне базы."""
-    fields = {
+def experience_fields(**overrides) -> dict:
+    """Умолчания места работы — одни и на строку в базе, и на разобранное из
+    резюме. Дата начала обязательна на уровне базы, поэтому задана.
+    """
+    return {
         "company": "Контур",
         "company_url": None,
         "role": "Разработчик",
@@ -237,9 +256,13 @@ def experience_row(profile_id: int, **overrides) -> ProfileExperience:
         "end_date": None,
         "achievements": [],
         "responsibilities": [],
+        **overrides,
     }
-    fields.update(overrides)
-    return ProfileExperience(profile_id=profile_id, **fields)
+
+
+def experience_row(profile_id: int, **overrides) -> ProfileExperience:
+    """Строка места работы."""
+    return ProfileExperience(profile_id=profile_id, **experience_fields(**overrides))
 
 
 def blacklist_row(kind: str, value: str, **overrides) -> Blacklist:
@@ -260,6 +283,43 @@ def message_row(**overrides) -> Message:
     }
     fields.update(overrides)
     return Message(**fields)
+
+
+def unread_probe(hr_id: int) -> list[Message]:
+    """Четыре письма одного человека, из которых непрочитанным считается ровно
+    одно.
+
+    Рядом с подходящим лежит по нарушителю каждого из трёх условий:
+    прочитанное, наше и удалённое. Отпадёт любое условие — счётчик изменится,
+    и это единственная причина, по которой набор именно такой. Собран здесь
+    один раз: считают непрочитанное трое — подвал, карточка и перечень, — и
+    разойдись их обстановки, ослабленное условие осталось бы под сторожем
+    только в одном из трёх.
+    """
+    return [
+        message_row(hr_id=hr_id, text="подходит", is_incoming=True, read_at=None),
+        message_row(hr_id=hr_id, text="прочитано", is_incoming=True, read_at=at(10)),
+        message_row(hr_id=hr_id, text="наше", is_incoming=False, read_at=None),
+        message_row(
+            hr_id=hr_id, text="удалено", is_incoming=True, read_at=None,
+            is_deleted=True,
+        ),
+    ]
+
+
+def channel_marks() -> list[Blacklist]:
+    """Три отметки, которыми проверяется правило «канал в чёрном списке»:
+    включённая своего рода, снятая своего рода и включённая чужого.
+
+    Обстановка одна на всех, кто это правило читает: карточка, перечень и
+    опознание. Разойдись они — снятая отметка осталась бы проверенной на
+    одном экране и забытой на другом.
+    """
+    return [
+        blacklist_row("channel", "@listed"),
+        blacklist_row("channel", "@off", active=False),
+        blacklist_row("hr", "@hr_like"),
+    ]
 
 
 def vacancy_event_row(vacancy_id: int, **overrides) -> VacancyEvent:

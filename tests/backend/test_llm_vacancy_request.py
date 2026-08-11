@@ -18,15 +18,15 @@ from tests.fakes.llm import (
     chat_response,
     data_block,
     messages_of,
+    parsed_vacancy_answer,
     provider,
+    provider_trouble,
 )
 
 
 def _parsed(**fields) -> httpx.Response:
-    """Ответ модели с разобранной вакансией."""
-    base = {"title": "Python-разработчик"}
-    base.update(fields)
-    return chat_json(base)
+    """Тот же ответ, но доставленный провайдером."""
+    return chat_json(parsed_vacancy_answer(**fields))
 
 
 async def test_an_empty_post_is_not_sent_anywhere():
@@ -55,14 +55,7 @@ async def test_an_unparseable_answer_yields_nothing():
     assert await parse_vacancy("текст", client, "qwen") is None
 
 
-@pytest.mark.parametrize(
-    "prepared",
-    [
-        pytest.param(httpx.Response(500, text="упал"), id="отказ провайдера"),
-        pytest.param(httpx.ConnectError("сеть отвалилась"), id="обрыв связи"),
-        pytest.param(httpx.Response(200, json={"нет": "выборов"}), id="чужая форма"),
-    ],
-)
+@pytest.mark.parametrize("prepared", provider_trouble())
 async def test_trouble_with_the_provider_yields_nothing(prepared):
     """Беда с провайдером вакансии не даёт и наружу не пробрасывается."""
     client = provider({CHAT: prepared})
@@ -180,7 +173,7 @@ async def test_an_answer_cut_by_the_token_limit_is_still_parsed_if_it_can_be():
     удастся, либо нет, и отдельно отвергать за признак обрыва незачем.
     """
     client = provider(
-        {CHAT: chat_json({"title": "Python-разработчик"}, finish_reason="length")}
+        {CHAT: chat_json(parsed_vacancy_answer(), finish_reason="length")}
     )
 
     got = await parse_vacancy("текст", client, "qwen")

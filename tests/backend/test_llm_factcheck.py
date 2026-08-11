@@ -10,7 +10,14 @@ import httpx
 import pytest
 
 from backend.llm.factcheck import factcheck_cover_letter
-from tests.fakes.llm import CHAT, chat_json, chat_response, data_block, provider
+from tests.fakes.llm import (
+    CHAT,
+    chat_json,
+    chat_response,
+    data_block,
+    provider,
+    provider_trouble,
+)
 
 
 def _verdict(verdict, issues=None) -> httpx.Response:
@@ -111,15 +118,12 @@ async def test_a_verdict_wrapped_in_a_code_fence_is_still_read():
 
 @pytest.mark.parametrize(
     "prepared",
-    [
-        pytest.param(httpx.Response(500, text="упал"), id="отказ провайдера"),
-        pytest.param(httpx.ConnectError("сеть отвалилась"), id="обрыв связи"),
-        pytest.param(httpx.Response(200, json={"нет": "выборов"}), id="чужая форма"),
+    provider_trouble(
         pytest.param(chat_response("совсем не json"), id="не разбирается"),
         pytest.param(chat_response('["список"]'), id="список вместо объекта"),
         pytest.param(chat_response('{"verdict": "может быть"}'), id="чужой вердикт"),
         pytest.param(chat_response("{}"), id="вердикта нет"),
-    ],
+    ),
 )
 async def test_any_trouble_lets_the_letter_through(prepared):
     """Любая беда с проверкой письмо пропускает, а не задерживает.

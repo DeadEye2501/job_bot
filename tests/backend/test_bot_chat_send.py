@@ -14,8 +14,7 @@ import pytest
 
 from backend.models import BotMode, Message
 from tests.dbio import all_rows, only_row, put
-from tests.factories import blacklist_row, message_row
-from tests.fakes.telegram import SENT_AT
+from tests.factories import EPOCH, blacklist_row, message_row
 
 
 async def test_a_message_reaches_the_hr_and_the_chat(
@@ -34,7 +33,7 @@ async def test_a_message_reaches_the_hr_and_the_chat(
     assert row.is_incoming is False
     assert row.text == "здравствуйте"
     assert row.tg_message_id == client.last_message_id
-    assert row.sent_at == SENT_AT
+    assert row.sent_at == EPOCH
     assert (await only_row(session_factory, Message)).id == row.id
 
 

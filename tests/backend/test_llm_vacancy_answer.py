@@ -14,13 +14,12 @@ import json
 import pytest
 
 from backend.llm.vacancy import _parse_vacancy_json
+from tests.fakes.llm import parsed_vacancy_answer
 
 
 def _answer(**fields) -> str:
-    """Ответ модели с заданными полями."""
-    base = {"title": "Python-разработчик"}
-    base.update(fields)
-    return json.dumps(base, ensure_ascii=False)
+    """Ответ модели строкой: разбор читает её до всякого клиента."""
+    return json.dumps(parsed_vacancy_answer(**fields), ensure_ascii=False)
 
 
 def test_an_answer_without_an_object_is_not_parsed():

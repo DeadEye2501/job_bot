@@ -21,6 +21,7 @@ from tests.fakes.llm import (
     data_block,
     messages_of,
     provider,
+    provider_trouble,
 )
 
 
@@ -114,29 +115,10 @@ async def test_a_reason_that_is_not_a_string_becomes_absence():
     assert got.explanation is None
 
 
-async def test_a_refusal_by_the_provider_yields_nothing():
-    """Отказ провайдера вердикта не даёт и наружу не пробрасывается."""
-    client = provider({CHAT: httpx.Response(500, text="упал")})
-
-    assert (
-        await classify_hr_reply("текст", VacancyStatus.APPLIED, client, "qwen")
-        is None
-    )
-
-
-async def test_a_broken_connection_yields_nothing():
-    """Обрыв связи вердикта не даёт и наружу не пробрасывается."""
-    client = provider({CHAT: httpx.ConnectError("сеть отвалилась")})
-
-    assert (
-        await classify_hr_reply("текст", VacancyStatus.APPLIED, client, "qwen")
-        is None
-    )
-
-
-async def test_an_answer_of_an_unexpected_shape_yields_nothing():
-    """Ответ провайдера чужой формы вердикта не даёт."""
-    client = provider({CHAT: httpx.Response(200, json={"нет": "выборов"})})
+@pytest.mark.parametrize("prepared", provider_trouble())
+async def test_trouble_with_the_provider_yields_nothing(prepared):
+    """Беда с провайдером вердикта не даёт и наружу не пробрасывается."""
+    client = provider({CHAT: prepared})
 
     assert (
         await classify_hr_reply("текст", VacancyStatus.APPLIED, client, "qwen")

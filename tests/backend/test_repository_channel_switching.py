@@ -9,7 +9,7 @@ from sqlalchemy import select
 from backend.models import TelegramChannel
 from backend.repository.channels import deactivate_blacklisted_channels, is_channel_blacklisted, set_all_channels_active, set_channel_active
 from tests.dbio import put
-from tests.factories import blacklist_row, channel_row
+from tests.factories import blacklist_row, channel_marks, channel_row
 
 
 async def test_switching_a_missing_channel_reports_failure(session):
@@ -36,12 +36,7 @@ async def test_a_blacklisted_channel_is_recognised_as_such(session, session_fact
     other_kind = channel_row(username="hr_like")
     nameless = channel_row(username=None)
     await put(session_factory, listed, switched_off, other_kind, nameless)
-    await put(
-        session_factory,
-        blacklist_row("channel", "@listed"),
-        blacklist_row("channel", "@off", active=False),
-        blacklist_row("hr", "@hr_like"),
-    )
+    await put(session_factory, *channel_marks())
 
     assert await is_channel_blacklisted(session, listed.id) is True
     assert await is_channel_blacklisted(session, switched_off.id) is False

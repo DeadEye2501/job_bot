@@ -14,9 +14,9 @@ from pathlib import Path
 
 from backend.models import BotMode, Message
 from tests.dbio import all_rows, only_row, put
-from tests.factories import message_row
+from tests.factories import EPOCH, message_row
 from tests.fakes.ingestion import FakeIngestion
-from tests.fakes.telegram import SENT_AT, FakeTelegramClient, chat, message
+from tests.fakes.telegram import FakeTelegramClient, chat, message
 
 
 def _echo(*, chat_id=777, username=None, msg_id=10, text="ответ с телефона", photo=None):
@@ -25,7 +25,7 @@ def _echo(*, chat_id=777, username=None, msg_id=10, text="ответ с теле
         id=msg_id,
         text=None if photo is not None else text,
         chat=chat(id=chat_id, username=username),
-        date=SENT_AT,
+        date=EPOCH,
         photo=photo,
         document=None,
     )
@@ -49,7 +49,7 @@ async def test_a_message_typed_elsewhere_shows_up_in_the_chat(
     assert saved.hr_id == hr.id
     assert saved.text == "ответ с телефона"
     assert saved.tg_message_id == 10
-    assert saved.sent_at == SENT_AT
+    assert saved.sent_at == EPOCH
 
 
 async def test_an_echo_of_our_own_send_is_not_written_twice(

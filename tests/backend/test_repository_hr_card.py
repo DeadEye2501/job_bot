@@ -7,7 +7,14 @@
 
 from backend.repository.hr_card import get_hr_detail
 from tests.dbio import put
-from tests.factories import at, company_row, hr_row, message_row, vacancy_row
+from tests.factories import (
+    at,
+    company_row,
+    hr_row,
+    message_row,
+    unread_probe,
+    vacancy_row,
+)
 
 
 async def test_a_missing_hr_has_no_card(session, session_factory):
@@ -98,10 +105,7 @@ async def test_only_unread_incoming_messages_are_counted(session, session_factor
     await put(session_factory, hr, other)
     await put(
         session_factory,
-        message_row(hr_id=hr.id, is_incoming=True, read_at=None),
-        message_row(hr_id=hr.id, is_incoming=True, read_at=at(10)),
-        message_row(hr_id=hr.id, is_incoming=False, read_at=None),
-        message_row(hr_id=hr.id, is_incoming=True, read_at=None, is_deleted=True),
+        *unread_probe(hr.id),
         message_row(hr_id=other.id, is_incoming=True, read_at=None),
     )
 

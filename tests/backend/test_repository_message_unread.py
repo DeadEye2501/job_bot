@@ -9,7 +9,7 @@
 from backend.repository.hr_list import list_hrs_with_unread
 from backend.repository.messages import count_unread_incoming
 from tests.dbio import put
-from tests.factories import at, hr_row, message_row
+from tests.factories import at, hr_row, message_row, unread_probe
 
 
 async def test_an_empty_database_has_nothing_unread(session):
@@ -28,15 +28,7 @@ async def test_only_unread_incoming_alive_messages_are_counted(
     """
     hr = hr_row()
     await put(session_factory, hr)
-    await put(
-        session_factory,
-        message_row(hr_id=hr.id, text="подходит", is_incoming=True, read_at=None),
-        message_row(hr_id=hr.id, text="прочитано", is_incoming=True, read_at=at(10)),
-        message_row(hr_id=hr.id, text="наше", is_incoming=False, read_at=None),
-        message_row(
-            hr_id=hr.id, text="удалено", is_incoming=True, read_at=None, is_deleted=True
-        ),
-    )
+    await put(session_factory, *unread_probe(hr.id))
 
     assert await count_unread_incoming(session) == 1
 

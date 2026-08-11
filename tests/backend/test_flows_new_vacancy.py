@@ -16,8 +16,8 @@ from backend.flows import embeddings
 from backend.models import TelegramChannel, Vacancy, VacancyEvent
 from backend.payloads import ChannelPost
 from tests.dbio import all_rows, only_row, put
-from tests.factories import channel_row, vacancy_row
-from tests.fakes.telegram import SENT_AT, post
+from tests.factories import EPOCH, channel_row, vacancy_row
+from tests.fakes.telegram import post
 
 
 async def test_the_text_and_the_vector_are_saved_before_the_parse(
@@ -57,7 +57,7 @@ async def test_the_new_row_remembers_where_it_came_from(
     assert saved.source_channel_id == channel.id
     assert saved.source_msg_id == 42
     assert saved.source_url == "https://t.me/jobs/42"
-    assert saved.posted_at == SENT_AT
+    assert saved.posted_at == EPOCH
 
 
 async def test_the_new_vector_joins_the_cache(make_pipeline):
