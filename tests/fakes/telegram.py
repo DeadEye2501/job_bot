@@ -208,9 +208,15 @@ class FakeTelegramClient:
         Path(file_name).write_bytes(self._media)
         return file_name
 
-    async def _accept(self, kind: str, target, payload):
-        """Принимает исходящее и отдаёт то, что вернул бы Telegram."""
-        self.outgoing.append((kind, target, payload))
+    async def _accept(self, kind: str, target, payload, caption=None):
+        """Принимает исходящее и отдаёт то, что вернул бы Telegram.
+
+        Запись у всех родов одной формы, и подпись в ней есть даже там, где
+        её не бывает: разбирать записи по длине зовущему пришлось бы иначе, а
+        у документа без подписи «ушёл файл» не отличить от «ушёл файл без
+        единого слова».
+        """
+        self.outgoing.append((kind, target, payload, caption))
         self._fail_if_asked(kind)
         self.last_message_id += 1
         answer = SimpleNamespace(id=self.last_message_id, date=SENT_AT)
@@ -224,8 +230,10 @@ class FakeTelegramClient:
     async def send_photo(self, target, path):
         return await self._accept("send_photo", target, path)
 
-    async def send_document(self, target, path):
-        return await self._accept("send_document", target, path)
+    async def send_document(self, target, path, caption=None):
+        # Подпись — это текст письма: отправка отклика с резюме шлёт файл и
+        # письмо одним вызовом, чтобы HR не получил их порознь.
+        return await self._accept("send_document", target, path, caption)
 
     async def read_chat_history(self, target):
         self.read_calls.append(target)

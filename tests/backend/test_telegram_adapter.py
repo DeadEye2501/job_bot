@@ -22,6 +22,7 @@ import pytest
 import adapters.telegram
 from adapters.telegram import SESSION_NAME, check, make_client, send_dm
 from backend.runtime_settings import TgAccountConfig
+from tests.fakes.telegram import FakeTelegramClient
 from config import get_data_dir
 
 
@@ -36,25 +37,6 @@ def _account(**overrides):
     }
     fields.update(overrides)
     return TgAccountConfig(**fields)
-
-
-class _Sender:
-    """Подделка клиента: запоминает, что и как ушло."""
-
-    def __init__(self, *, message_id=500) -> None:
-        self._message_id = message_id
-        self.calls: list[tuple] = []
-
-    async def send_message(self, user, text):
-        self.calls.append(("send_message", user, text, None))
-        return type("Msg", (), {"id": self._message_id})()
-
-    async def send_document(self, user, path, caption=None):
-        self.calls.append(("send_document", user, caption, path))
-        return type("Msg", (), {"id": self._message_id})()
-
-    async def get_me(self):
-        return "я"
 
 
 def test_a_saved_session_keeps_the_client_in_memory():
@@ -123,7 +105,13 @@ async def test_the_check_asks_who_we_are(sending_unlocked):
     Ответ показывают в настройках: без имени учётной записи «подключение
     есть» не отличить от заглушки.
     """
-    assert await check(_Sender()) == "я"
+    client = FakeTelegramClient()
+
+    assert await check(client) is client.me
+    # Вопрос должен быть задан, а не отвечен из памяти: у настоящего клиента
+    # это поле до входа пусто, а после обрыва связи устаревает — и в
+    # настройках «подключение есть» показалось бы по стухшему ответу.
+    assert client.lifecycle == ["кто я"]
 
 
 async def test_a_message_goes_out_and_its_number_comes_back(sending_unlocked):
@@ -132,10 +120,10 @@ async def test_a_message_goes_out_and_its_number_comes_back(sending_unlocked):
     По номеру потом опознаётся отметка о прочтении: без него у исходящей
     строки нечему совпасть.
     """
-    client = _Sender(message_id=777)
+    client = FakeTelegramClient()
 
-    assert await send_dm(client, "maria", "письмо") == 777
-    assert client.calls == [("send_message", "maria", "письмо", None)]
+    assert await send_dm(client, "maria", "письмо") == client.last_message_id
+    assert client.outgoing == [("send_message", "maria", "письмо", None)]
 
 
 async def test_an_attachment_turns_the_message_into_a_document(sending_unlocked):
@@ -144,12 +132,12 @@ async def test_an_attachment_turns_the_message_into_a_document(sending_unlocked)
     Отдельным сообщением текст пришёл бы раньше или позже файла, и HR
     получил бы письмо, оторванное от резюме.
     """
-    client = _Sender()
+    client = FakeTelegramClient()
 
     await send_dm(client, "maria", "письмо", Path("Резюме.pdf"))
 
-    assert client.calls == [
-        ("send_document", "maria", "письмо", "Резюме.pdf"),
+    assert client.outgoing == [
+        ("send_document", "maria", "Резюме.pdf", "письмо"),
     ]
 
 
@@ -160,16 +148,16 @@ async def test_the_guard_stops_the_message_and_reports_nothing_sent(monkeypatch)
     отсутствие номера говорит вызывающему, что письма не было.
     """
     monkeypatch.setattr(adapters.telegram, "SEND_LOCKED", True)
-    client = _Sender()
+    client = FakeTelegramClient()
 
     assert await send_dm(client, "maria", "письмо") is None
-    assert client.calls == []
+    assert client.outgoing == []
 
 
 async def test_the_guard_stops_an_attachment_too(monkeypatch):
     """Взведённый признак останавливает и отправку с вложением."""
     monkeypatch.setattr(adapters.telegram, "SEND_LOCKED", True)
-    client = _Sender()
+    client = FakeTelegramClient()
 
     assert await send_dm(client, "maria", "письмо", Path("Резюме.pdf")) is None
-    assert client.calls == []
+    assert client.outgoing == []

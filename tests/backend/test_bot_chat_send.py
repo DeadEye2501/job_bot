@@ -30,7 +30,7 @@ async def test_a_message_reaches_the_hr_and_the_chat(
 
     row = await bot.send_to_hr_chat(hr.id, "здравствуйте")
 
-    assert client.outgoing == [("send_message", "maria", "здравствуйте")]
+    assert client.outgoing == [("send_message", "maria", "здравствуйте", None)]
     assert row.is_incoming is False
     assert row.text == "здравствуйте"
     assert row.tg_message_id == client.last_message_id
@@ -46,7 +46,7 @@ async def test_surrounding_whitespace_is_dropped(
 
     row = await bot.send_to_hr_chat(hr.id, "  здравствуйте  ")
 
-    assert client.outgoing == [("send_message", "maria", "здравствуйте")]
+    assert client.outgoing == [("send_message", "maria", "здравствуйте", None)]
     assert row.text == "здравствуйте"
 
 
