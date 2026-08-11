@@ -124,9 +124,18 @@ class SecretRedactionFilter(logging.Filter):
         # текст исключения до всякого вымарывания. Собранное кладётся в саму
         # запись, форматтер потом берёт готовое.
         if record.exc_info and not record.exc_text:
-            record.exc_text = "".join(
-                traceback.format_exception(*record.exc_info)
-            ).rstrip("\n")
+            try:
+                record.exc_text = "".join(
+                    traceback.format_exception(*record.exc_info)
+                ).rstrip("\n")
+            except Exception:
+                # Фильтр работает до защитного перехвата вокруг записи, и своё
+                # падение здесь ушло бы наружу — тому, кто просто позвал
+                # `logger.exception` внутри своего `except`. Трассировку в
+                # этом случае соберёт форматтер: он-то как раз под защитой.
+                if not getattr(record, "own_failure_reported", False):
+                    record.own_failure_reported = True
+                    report_own_failure("трассировка записи не собирается", record)
         if record.exc_text:
             record.exc_text = _redact(record.exc_text)
         return True

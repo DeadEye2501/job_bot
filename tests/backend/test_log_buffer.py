@@ -115,6 +115,21 @@ def test_a_secret_from_someone_elses_logger_is_masked_too(clean_root_logger):
     assert "abcdefgh12345678" not in handler.snapshot()[-1]["msg"]
 
 
+def test_an_unrenderable_traceback_does_not_reach_the_caller(clean_log_file):
+    """Неотрисовываемая трассировка не выходит наружу к зовущему.
+
+    Фильтр работает до защитного перехвата вокруг записи: своё падение здесь
+    ушло бы тому, кто просто позвал `logger.exception` внутри своего `except`,
+    и жалоба на беду стала бы второй бедой. Собрать трассировку в таком
+    случае остаётся форматтеру — он-то как раз под защитой.
+    """
+    entry = record("запрос не прошёл")
+    entry.exc_info = (ValueError, "не исключение", None)
+
+    assert SecretRedactionFilter().filter(entry) is True
+    assert entry.exc_text is None
+
+
 def test_a_secret_in_a_traceback_is_masked_too(clean_root_logger, clean_log_file):
     """Секрет из трассировки вымарывается наравне с секретом из сообщения.
 

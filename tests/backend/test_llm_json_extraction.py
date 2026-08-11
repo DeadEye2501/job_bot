@@ -110,3 +110,19 @@ def test_an_unreadable_answer_leaves_a_trace_in_the_log(caplog):
         assert json_object("я не понял", logging.getLogger("проверка"), "разбор") is None
 
     assert any(rec.name == "проверка" for rec in caplog.records)
+
+def test_an_object_that_will_not_parse_yields_nothing(caplog):
+    """Похожее на объект, но неразбираемое даёт отсутствие, а не падение.
+
+    Модель отвечает и так: скобки на месте, а внутри оборванная строка или
+    висящая запятая. Зовущий на такое обязан получить свой откат, а не
+    исключение посреди разбора.
+    """
+    with caplog.at_level(logging.DEBUG, logger="проверка"):
+        answer = json_object(
+            '{"verdict": "ok",}', logging.getLogger("проверка"), "разбор"
+        )
+
+    assert answer is None
+    assert any(rec.exc_info for rec in caplog.records if rec.name == "проверка")
+
