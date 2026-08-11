@@ -7,7 +7,7 @@ from backend.models import Company, HR, Message, Vacancy
 from backend.payloads import HrWithCount
 
 from backend.repository.blacklist_marks import active_blacklist_values
-from backend.repository.hr_card import hr_blacklist_candidates
+from backend.repository.hr_card import LAST_VACANCY_ORDER, hr_blacklist_candidates
 from backend.repository.hr_identify import HAS_TELEGRAM_IDENTITY
 from backend.repository.messages import UNREAD_INCOMING
 from backend.repository.search import matches_search
@@ -142,13 +142,7 @@ async def list_hr_with_counts(
             Vacancy.hr_id.label("hr_id"),
             Vacancy.company_id.label("company_id"),
             func.row_number()
-            .over(
-                partition_by=Vacancy.hr_id,
-                order_by=(
-                    Vacancy.created_at.desc(),
-                    Vacancy.id.desc(),
-                ),
-            )
+            .over(partition_by=Vacancy.hr_id, order_by=LAST_VACANCY_ORDER)
             .label("rn"),
         )
         .where(Vacancy.hr_id.is_not(None))

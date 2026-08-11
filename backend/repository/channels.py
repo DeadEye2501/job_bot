@@ -7,7 +7,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.funnel import APPLIED, FIT_EXCLUDE, RESPONDED
-from backend.models import TelegramChannel, TrashEvent, Vacancy, VacancyStatus
+from backend.models import TelegramChannel, TrashEvent, Vacancy
 from backend.payloads import ChannelDetail, ChannelStats, ChannelWithCount
 
 from backend.repository.blacklist_marks import (
@@ -16,6 +16,7 @@ from backend.repository.blacklist_marks import (
     active_blacklist_values,
 )
 from backend.repository.search import matches_search
+from backend.repository.vacancies_common import count_by_status
 
 logger = logging.getLogger(__name__)
 
@@ -155,17 +156,9 @@ async def get_channel_detail(
     if ch is None:
         return None
 
-    rows = (
-        await session.execute(
-            select(Vacancy.status, func.count(Vacancy.id))
-            .where(Vacancy.source_channel_id == channel_id)
-            .group_by(Vacancy.status)
-        )
-    ).all()
-
-    counts_by_enum: dict[VacancyStatus, int] = {}
-    for status_enum, cnt in rows:
-        counts_by_enum[status_enum] = int(cnt or 0)
+    counts_by_enum = await count_by_status(
+        session, Vacancy.source_channel_id == channel_id
+    )
 
     total = sum(counts_by_enum.values())
     fit_total = sum(
@@ -193,7 +186,7 @@ async def get_channel_detail(
     vacancies_per_day = round(recent_count / _CHANNEL_RATE_WINDOW_DAYS, 1)
 
     status_counts = {
-        status.value: counts_by_enum.get(status, 0) for status in VacancyStatus
+        status.value: count for status, count in counts_by_enum.items()
     }
 
     blacklist_value = await _channel_blacklist_value(session, ch)

@@ -171,6 +171,37 @@ async def test_the_leftover_is_zero_when_everything_was_junk(
     assert row["fit"] == 0
 
 
+async def test_a_channel_pulled_in_by_the_funnel_alone_looks_like_the_others(
+    session, session_factory
+):
+    """Канал, попавший в окно только воронкой, показан так же, как с рядами.
+
+    Вакансия у него старая — в окно она не попадает, — а вот отклик по ней
+    отправлен внутри окна, и это как раз прогресс за период. Строка ему
+    собирается отдельной веткой добора, и без общей сборки у неё разъехались
+    бы и подпись, и счётчики: сравнивается она здесь с соседом, у которого
+    ряды в окне есть.
+    """
+    quiet = channel_row(username="quiet", title=None)
+    loud = channel_row(username="loud", title=None)
+    await put(session_factory, quiet, loud)
+    old = vacancy_row(source_channel_id=quiet.id, created_at=days_ago(40))
+    fresh = vacancy_row(source_channel_id=loud.id, created_at=days_ago(1))
+    await put(session_factory, old, fresh)
+    await put(
+        session_factory,
+        status_history_row(
+            old.id, status=VacancyStatus.APPLIED, changed_at=days_ago(1)
+        ),
+    )
+
+    rows = await rows_by_label(session, period="week")
+
+    assert set(rows) == {"@quiet", "@loud"}
+    assert (rows["@quiet"]["total"], rows["@quiet"]["trash"]) == (0, 0)
+    assert rows["@quiet"]["sent"] == 1
+
+
 async def test_a_channel_known_only_by_its_junk_still_appears(
     session, session_factory
 ):

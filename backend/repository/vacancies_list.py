@@ -15,6 +15,7 @@ from backend.models import (
     VacancyStatusHistory,
 )
 from backend.repository.vacancies_card import VACANCY_NEIGHBOURS
+from backend.repository.vacancies_common import PARSED_ONLY
 
 # Status codes from the UI map to VacancyStatus enum members. The codes are
 # the same kebab-case identifiers used in CSS classes / JS state.
@@ -208,7 +209,7 @@ async def list_vacancies(
     else:  # newest
         order_by = (activity_ts.desc().nulls_last(), Vacancy.id.desc())
 
-    where_clauses = [Vacancy.is_parsed.is_(True)]
+    where_clauses = [PARSED_ONLY]
     needs_hr_join = False
     needs_company_join = False
     needs_channel_join = False
@@ -317,6 +318,30 @@ async def list_vacancies(
     return list(rows.all())
 
 
+def _first_spelling_wins(names: list[str]) -> list[str]:
+    """Варианты отбора без повторов; из двух написаний остаётся встреченное первым.
+
+    Правило несущее: по предложенному варианту потом идёт сам отбор в
+    `list_vacancies`, и вакансия со вторым написанием названия обязана через
+    него доставаться. Оттого и первое, а не последнее: порядок выдачи базы
+    ничем не задан, и побеждай последний, список менялся бы от запроса к
+    запросу.
+
+    Пустое отсеивается тут же — ключ у него пустой. Что ещё считать негодным
+    (у компаний это прочерк) и срезать ли пробелы, решает зовущий: у канала
+    ник приходит из Telegram, у компании название пишет человек.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for name in names:
+        key = (name or "").lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(name)
+    return out
+
+
 async def list_vacancy_filter_options(
     session: AsyncSession,
 ) -> dict[str, list[str]]:
@@ -333,50 +358,35 @@ async def list_vacancy_filter_options(
         select(TelegramChannel.username)
         .join(Vacancy, Vacancy.source_channel_id == TelegramChannel.id)
         .where(
-            Vacancy.is_parsed.is_(True),
+            PARSED_ONLY,
             TelegramChannel.username.is_not(None),
         )
         .distinct()
     )
-    channels: list[str] = []
-    seen_ch: set[str] = set()
-    for (name,) in channel_rows.all():
-        if not name:
-            continue
-        key = name.lower()
-        if key in seen_ch:
-            continue
-        seen_ch.add(key)
-        channels.append(name)
+    channels = _first_spelling_wins([name for (name,) in channel_rows.all()])
 
     linked_rows = await session.execute(
         select(Company.name)
         .join(Vacancy, Vacancy.company_id == Company.id)
-        .where(Vacancy.is_parsed.is_(True), Company.name.is_not(None))
+        .where(PARSED_ONLY, Company.name.is_not(None))
         .distinct()
     )
     raw_rows = await session.execute(
         select(Vacancy.company_name)
         .where(
-            Vacancy.is_parsed.is_(True),
+            PARSED_ONLY,
             Vacancy.company_name.is_not(None),
         )
         .distinct()
     )
-    companies: list[str] = []
-    seen_co: set[str] = set()
-    for source in (linked_rows.all(), raw_rows.all()):
-        for (name,) in source:
-            if not name:
-                continue
-            cleaned = name.strip()
-            if not cleaned or cleaned == "—":
-                continue
-            key = cleaned.lower()
-            if key in seen_co:
-                continue
-            seen_co.add(key)
-            companies.append(cleaned)
+    companies = _first_spelling_wins(
+        [
+            name.strip()
+            for source in (linked_rows.all(), raw_rows.all())
+            for (name,) in source
+            if name and name.strip() != "—"
+        ]
+    )
 
     return {"channels": channels, "companies": companies}
 

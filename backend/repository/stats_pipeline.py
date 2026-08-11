@@ -13,22 +13,36 @@ from backend.models import (
 )
 
 from backend.repository.stats_summary import (
-    PARSED_ONLY,
     _stats_period_since,
     first_transition_subq,
 )
+from backend.repository.vacancies_common import PARSED_ONLY
 
-def _channel_label(title: str | None, username: str | None, ch_id: int) -> str:
-    """Как канал зовётся в таблице статистики.
+def _channel_item(
+    ch_id: int,
+    title: str | None,
+    username: str | None,
+    counts: tuple[int, int, int] = (0, 0, 0),
+) -> dict:
+    """Строка канала в таблице статистики.
 
-    Строку канала собирают два прохода — по тем, кто прислал что-то в
-    окне, и по тем, кто попал в него только воронкой. Разойдись правило,
-    один и тот же канал звался бы в таблице по-разному в зависимости от
-    того, каким проходом он туда попал.
+    Строку собирают два прохода — по тем, кто прислал что-то в окне, и по
+    тем, кто попал в неё только воронкой. Разойдись сборка, один и тот же
+    канал выглядел бы в таблице по-разному в зависимости от того, каким
+    проходом он туда попал.
+
+    Счётчики приходят тройкой, потому что тройкой их и отдаёт запрос; у
+    канала, попавшего в таблицу воронкой, их нет вовсе, и нули у него значат
+    «ничего не было», а не «пока неизвестно».
     """
-    if title:
-        return title
-    return f"@{username}" if username else f"#{ch_id}"
+    total_vac, rerun_trash, not_fit = counts
+    return {
+        "id": ch_id,
+        "label": title or (f"@{username}" if username else f"#{ch_id}"),
+        "_total_vac": int(total_vac or 0),
+        "_rerun_trash": int(rerun_trash or 0),
+        "not_fit": int(not_fit or 0),
+    }
 
 
 async def get_stats_channels_pipeline(
@@ -156,13 +170,9 @@ async def get_stats_channels_pipeline(
     # статус внутри окна).
     items_by_ch: dict[int, dict] = {}
     for ch_id, title, username, total_vac, rerun_trash, not_fit in rows:
-        items_by_ch[ch_id] = {
-            "id": ch_id,
-            "label": _channel_label(title, username, ch_id),
-            "_total_vac": int(total_vac or 0),
-            "_rerun_trash": int(rerun_trash or 0),
-            "not_fit": int(not_fit or 0),
-        }
+        items_by_ch[ch_id] = _channel_item(
+            ch_id, title, username, (total_vac, rerun_trash, not_fit)
+        )
     needed_ch_ids: set[int] = set()
     needed_ch_ids.update(trash_events_by_ch.keys())
     needed_ch_ids.update(sent_by_ch.keys())
@@ -178,13 +188,7 @@ async def get_stats_channels_pipeline(
             )
         ).all()
         for ch_id, title, username in orphan_rows:
-            items_by_ch[ch_id] = {
-                "id": ch_id,
-                "label": _channel_label(title, username, ch_id),
-                "_total_vac": 0,
-                "_rerun_trash": 0,
-                "not_fit": 0,
-            }
+            items_by_ch[ch_id] = _channel_item(ch_id, title, username)
     if not items_by_ch:
         return {"period": period, "channels": []}
 

@@ -7,6 +7,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import HR, Message, Vacancy
+from backend.repository.vacancies_common import PARSED_ONLY, VACANCY_APPEARED_AT
 
 logger = logging.getLogger(__name__)
 
@@ -91,17 +92,12 @@ async def find_latest_vacancy_id_for_hr(
     """
     stmt = (
         select(Vacancy)
-        .where(Vacancy.hr_id == hr_id, Vacancy.is_parsed.is_(True))
-        .order_by(
-            func.coalesce(Vacancy.posted_at, Vacancy.created_at).desc(),
-            Vacancy.id.desc(),
-        )
+        .where(Vacancy.hr_id == hr_id, PARSED_ONLY)
+        .order_by(VACANCY_APPEARED_AT.desc(), Vacancy.id.desc())
         .limit(1)
     )
     if as_of is not None:
-        stmt = stmt.where(
-            func.coalesce(Vacancy.posted_at, Vacancy.created_at) <= as_of
-        )
+        stmt = stmt.where(VACANCY_APPEARED_AT <= as_of)
     latest = (await session.scalars(stmt)).first()
     return latest.id if latest else None
 
