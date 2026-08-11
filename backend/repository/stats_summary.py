@@ -245,21 +245,13 @@ async def get_stats_hr_responses(
     since = _stats_period_since(period)
 
     # Шаг 1: первый Applied на каждую vacancy, ограниченный period
-    first_applied_subq = (
-        select(
-            VacancyStatusHistory.vacancy_id.label("vid"),
-            func.min(VacancyStatusHistory.changed_at).label("applied_at"),
-        )
-        .where(VacancyStatusHistory.status == VacancyStatus.APPLIED)
-        .group_by(VacancyStatusHistory.vacancy_id)
-        .subquery()
-    )
+    first_applied_subq = first_transition_subq(VacancyStatus.APPLIED)
     where_clauses = []
     if since is not None:
-        where_clauses.append(first_applied_subq.c.applied_at >= since)
+        where_clauses.append(first_applied_subq.c.first_at >= since)
     applied_rows = (
         await session.execute(
-            select(first_applied_subq.c.vid, first_applied_subq.c.applied_at)
+            select(first_applied_subq.c.vid, first_applied_subq.c.first_at)
             .where(*where_clauses)
         )
     ).all()

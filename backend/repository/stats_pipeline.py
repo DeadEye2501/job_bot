@@ -17,6 +17,19 @@ from backend.repository.stats_summary import (
     first_transition_subq,
 )
 
+def _channel_label(title: str | None, username: str | None, ch_id: int) -> str:
+    """Как канал зовётся в таблице статистики.
+
+    Строку канала собирают два прохода — по тем, кто прислал что-то в
+    окне, и по тем, кто попал в него только воронкой. Разойдись правило,
+    один и тот же канал звался бы в таблице по-разному в зависимости от
+    того, каким проходом он туда попал.
+    """
+    if title:
+        return title
+    return f"@{username}" if username else f"#{ch_id}"
+
+
 async def get_stats_channels_pipeline(
     session: AsyncSession, *, period: str
 ) -> dict:
@@ -144,7 +157,7 @@ async def get_stats_channels_pipeline(
     for ch_id, title, username, total_vac, rerun_trash, not_fit in rows:
         items_by_ch[ch_id] = {
             "id": ch_id,
-            "label": title or (f"@{username}" if username else f"#{ch_id}"),
+            "label": _channel_label(title, username, ch_id),
             "_total_vac": int(total_vac or 0),
             "_rerun_trash": int(rerun_trash or 0),
             "not_fit": int(not_fit or 0),
@@ -166,7 +179,7 @@ async def get_stats_channels_pipeline(
         for ch_id, title, username in orphan_rows:
             items_by_ch[ch_id] = {
                 "id": ch_id,
-                "label": title or (f"@{username}" if username else f"#{ch_id}"),
+                "label": _channel_label(title, username, ch_id),
                 "_total_vac": 0,
                 "_rerun_trash": 0,
                 "not_fit": 0,
