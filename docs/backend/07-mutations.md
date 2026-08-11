@@ -94,6 +94,13 @@
   гашение прежнего таймера, `if not channel_ids`, `idx.size == 0` в
   `drop_embedding`, первая проверка «уже откликались» и `PRAGMA
   busy_timeout=5000`;
+- **три вокруг метки активности вакансии** (найдено рецензентом по тестам на
+  слайсе 5 этапа 1): левая ветка `case((a.is_(None), b), …)` в `_greatest_pair`
+  недостижима — накопитель начинается с `Vacancy.created_at`, объявленного
+  непустым, и пустым не бывает ни на одном шаге; из того же корня мертвы
+  `.nulls_last()` у сортировки по активности и отсев `ts is not None` в
+  `list_vacancy_last_activity`. Все три станут несущими, если с `created_at`
+  снимут `NOT NULL`;
 - **три в `backend/bot/`** — `task.done()` в `cancel_current_poll`, охрана
   `if getattr(chat, "photo", None) is not None` в `add_channel`, охрана
   `if not msg.from_user` в `on_dm`.

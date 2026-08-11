@@ -16,6 +16,19 @@ from backend.repository.vacancies_life import add_vacancy_event
 
 logger = logging.getLogger(__name__)
 
+VACANCY_NEIGHBOURS = (
+    selectinload(Vacancy.hr),
+    selectinload(Vacancy.company),
+    selectinload(Vacancy.channel),
+)
+"""Соседи вакансии, без которых её не показать: HR, компания, канал.
+
+Подгружаются они и карточкой, и списком, и перечень у них один. Забытый здесь
+сосед не превращается в пустое поле: связь читают уже за пределами сессии, и
+незагруженная бросает — а бросок съедает диспетчер моста, отвечая окну пустым
+списком. Это уже наблюдали, и след записан у `vacancies_mini`.
+"""
+
 
 async def get_vacancy_detail(
     session: AsyncSession, vacancy_id: int
@@ -31,11 +44,7 @@ async def get_vacancy_detail(
         await session.scalars(
             select(Vacancy)
             .where(Vacancy.id == vacancy_id)
-            .options(
-                selectinload(Vacancy.hr),
-                selectinload(Vacancy.company),
-                selectinload(Vacancy.channel),
-            )
+            .options(*VACANCY_NEIGHBOURS)
         )
     ).first()
     if vacancy is None:
