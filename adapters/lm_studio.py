@@ -116,126 +116,142 @@ def make_client(config: LlmProviderConfig) -> httpx.AsyncClient:
     )
 
 
-async def check_chat(client: httpx.AsyncClient, model: str) -> tuple[bool, str]:
-    """Verify the chat model is available and responds to a 1-token ping."""
+def _ping_request(model: str, kind: str) -> tuple[str, dict]:
+    """Чем щупается модель рода: путь и тело пробного запроса.
+
+    Пробный запрос настоящий, а не запрос списка: модель может числиться у
+    провайдера и не отвечать — из-за нехватки памяти, чужой занятости или
+    несовместимости с родом обращения.
+    """
+    if kind == "chat":
+        return "/v1/chat/completions", {
+            "model": model,
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 1,
+        }
+    return "/v1/embeddings", {"model": model, "input": "ping"}
+
+
+async def _check_model(
+    client: httpx.AsyncClient, model: str, kind: str
+) -> tuple[bool, str]:
+    """Есть ли модель у провайдера и отвечает ли она.
+
+    Ответ читает окно настроек: `True` с именем модели либо `False` с
+    причиной, годной для подсказки. Наружу уходит короткое «род и текст» —
+    трассировка нужна там, где её потом читают, то есть в журнале.
+    """
+    named = "чата" if kind == "chat" else "векторов"
     try:
-        r = await client.get("/v1/models")
-        r.raise_for_status()
-        models = [m["id"] for m in r.json().get("data", [])]
+        # Без рода нарочно: проверяется вхождение в полный перечень
+        # провайдера. Отбор по роду у тех, кто рода не отдаёт, идёт гаданием
+        # по имени, и живая модель с неудачным именем стала бы «отсутствующей».
+        models = await list_models(client)
     except Exception as e:
-        # Наружу уходит короткое «род и текст» — его показывают подсказкой
-        # в окне. Трассировка нужна там, где её потом читают.
-        _log.exception("провайдер не отдал список моделей для чата")
+        _log.exception("провайдер не отдал список моделей для %s", named)
         return False, f"{type(e).__name__}: {e}"
 
     if model not in models:
         preview = ", ".join(models[:3]) or "no models loaded"
         return False, f"{model!r} not available (have: {preview})"
 
+    path, body = _ping_request(model, kind)
     try:
-        r = await client.post(
-            "/v1/chat/completions",
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": "ping"}],
-                "max_tokens": 1,
-            },
-        )
+        r = await client.post(path, json=body)
     except httpx.HTTPError as e:
-        _log.exception("пробный запрос к чат-модели %s не прошёл", model)
+        _log.exception("пробный запрос к модели %s для %s не прошёл", model, named)
         return False, f"{type(e).__name__}: {e}"
     if not r.is_success:
         return False, f"{model} (ping failed: HTTP {r.status_code})"
     return True, model
+
+
+async def check_chat(client: httpx.AsyncClient, model: str) -> tuple[bool, str]:
+    """Проверить чат-модель. Зовётся окном настроек по имени рода."""
+    return await _check_model(client, model, "chat")
 
 
 async def check_embed(client: httpx.AsyncClient, model: str) -> tuple[bool, str]:
-    """Verify the embedding model is available and responds."""
-    try:
-        r = await client.get("/v1/models")
-        r.raise_for_status()
-        models = [m["id"] for m in r.json().get("data", [])]
-    except Exception as e:
-        # Наружу уходит короткое «род и текст» — его показывают подсказкой
-        # в окне. Трассировка нужна там, где её потом читают.
-        _log.exception("провайдер не отдал список моделей для векторов")
-        return False, f"{type(e).__name__}: {e}"
+    """Проверить модель векторов. Зовётся окном настроек по имени рода."""
+    return await _check_model(client, model, "embed")
 
-    if model not in models:
-        return False, f"{model!r} not available"
 
+# Топовые семейства моделей встраиваний в Ollama / OpenAI: `bge-*` (BAAI),
+# `e5-*` (Microsoft), `nomic-embed-*` (Nomic), `text-embedding-*` (OpenAI).
+# Голое «ada» приметой не годится: поймало бы «yi-chat-ada» и «llama-canada»
+# и спрятало бы их из выбора чат-моделей.
+_EMBED_MARKERS = ("embed", "text-embedding-", "bge-", "e5-", "nomic-")
+
+
+def _looks_like_embed(name: str) -> bool:
+    """Похоже ли имя модели на встраивания.
+
+    Гадание по имени — единственное, что остаётся у провайдеров, чей
+    `/v1/models` рода не отдаёт. Без него встраивания протекают в выбор
+    чат-моделей и наоборот, а выбравший не то получает «not a chat model».
+    """
+    lowered = name.lower()
+    return any(mark in lowered for mark in _EMBED_MARKERS)
+
+
+async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | None:
+    """Загруженные модели рода у LM Studio, либо `None`, если пути нет.
+
+    Родной путь LM Studio знает и род модели, и то, загружена ли она.
+    `/v1/models` у неё отдаёт все настроенные, и выбор выгруженной запускает
+    подкачку на полминуты — для выбора в окне это негодно.
+
+    Два пустых ответа тут разные, и путать их нельзя. `None` — родного пути у
+    провайдера нет, спрашивать надо `/v1/models`. Пустой список — путь есть и
+    ответил: этого рода не загружено ничего. Спросить после него `/v1/models`
+    значило бы вернуть в окно ровно те выгруженные модели, ради которых
+    родной путь и заведён.
+    """
     try:
-        r = await client.post(
-            "/v1/embeddings",
-            json={"model": model, "input": "ping"},
-        )
-    except httpx.HTTPError as e:
-        _log.exception("пробный запрос к модели векторов %s не прошёл", model)
-        return False, f"{type(e).__name__}: {e}"
-    if not r.is_success:
-        return False, f"{model} (ping failed: HTTP {r.status_code})"
-    return True, model
+        r = await client.get("/api/v0/models")
+        if not r.is_success:
+            _log.debug(
+                "LM Studio /api/v0/models returned HTTP %s; falling back to /v1/models",
+                r.status_code,
+            )
+            return None
+        data = r.json().get("data") or []
+    except Exception:
+        # Сюда влетает, например, если /api/v0/models вернул не-JSON
+        # (Ollama / OpenAI proper). Уровень отладочный нарочно: у провайдера
+        # без родного пути это не беда, а обычный ход.
+        _log.debug("/api/v0/models probe failed; falling back to /v1/models", exc_info=True)
+        return None
+    wanted_type = "llm" if kind == "chat" else "embeddings"
+    return [
+        m["id"]
+        for m in data
+        if isinstance(m, dict)
+        and m.get("id")
+        and m.get("state") == "loaded"
+        and m.get("type") == wanted_type
+    ]
 
 
 async def list_models(client: httpx.AsyncClient, *, kind: str | None = None) -> list[str]:
     """Return ids of models exposed by the provider.
 
-    Когда ``kind`` задан ('chat' | 'embed') и провайдер поддерживает
-    LM Studio's native ``/api/v0/models`` — отфильтровываем по
-    ``state == "loaded"`` и ``type == "llm" | "embeddings"``. Это нужно
-    для UI-picker'а: ``/v1/models`` у LM Studio возвращает ВСЕ
-    настроенные модели, и выбор выгруженной триггерит JIT-load (≥ 30 сек),
-    что плохой UX.
-
-    Без ``kind`` (например, healthcheck) — поведение прежнее: полный
-    список через OpenAI-совместимый ``/v1/models``.
+    С родом ('chat' | 'embed') сперва спрашивается родной путь LM Studio —
+    он один умеет отобрать загруженные (см. `_loaded_models`). Без рода
+    (например, для проверки связи) — полный список через совместимый с OpenAI
+    ``/v1/models``.
     """
     if kind is not None:
-        try:
-            r = await client.get("/api/v0/models")
-            if r.is_success:
-                data = r.json().get("data") or []
-                wanted_type = "llm" if kind == "chat" else "embeddings"
-                ids: list[str] = []
-                for m in data:
-                    if not isinstance(m, dict) or not m.get("id"):
-                        continue
-                    if m.get("state") != "loaded":
-                        continue
-                    if m.get("type") != wanted_type:
-                        continue
-                    ids.append(m["id"])
-                return ids
-            _log.debug(
-                "LM Studio /api/v0/models returned HTTP %s; falling back to /v1/models",
-                r.status_code,
-            )
-        except Exception as e:
-            # Сюда влетает, например, если /api/v0/models вернул не-JSON
-            # (Ollama / OpenAI proper). Фолбэк на /v1/models — безопасный
-            # путь, но без фильтра по state/type.
-            _log.debug("/api/v0/models probe failed (%s); falling back to /v1/models", e)
-        # Fallthrough: провайдер без /api/v0 — возвращаем полный список.
+        loaded = await _loaded_models(client, kind)
+        if loaded is not None:
+            return loaded
+        # Родного пути нет: полный список, и род придётся угадывать по имени —
+        # ни ``state``, ни ``type`` в нём не приходит.
     r = await client.get("/v1/models")
     r.raise_for_status()
     ids = [m["id"] for m in r.json().get("data", []) if isinstance(m, dict) and m.get("id")]
     if kind is None:
         return ids
-    # Для не-LM-Studio провайдеров (/v1/models не отдаёт type) heuristic-
-    # фильтр по имени. Покрытие — топовые семейства embedding-моделей в
-    # Ollama / OpenAI: `bge-*` (BAAI), `e5-*` (Microsoft), `nomic-embed-*`
-    # (Nomic), `*ada*` / `text-embedding-*` (OpenAI), generic `*embed*`.
-    # Без этого фильтра embedding'и протекают в chat-picker (и наоборот),
-    # юзер выбирает не то — LLM-вызовы валятся с «not a chat model».
-    # `text-embedding-ada-` уже покрывает OpenAI ada-семейство; bare
-    # «ada» как substring опасен — поймает гипотетический «yi-chat-ada»
-    # / «llama-canada-tuned» и спрячет их из chat-picker'а.
-    embed_markers = (
-        "embed", "text-embedding-", "bge-", "e5-", "nomic-",
-    )
-    def _looks_like_embed(name: str) -> bool:
-        n = name.lower()
-        return any(mark in n for mark in embed_markers)
     if kind == "embed":
         return [i for i in ids if _looks_like_embed(i)]
     return [i for i in ids if not _looks_like_embed(i)]

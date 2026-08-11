@@ -100,11 +100,17 @@ async def test_a_loaded_embedding_model_passes_the_check():
     assert await check_embed(client, "bge-m3") == (True, "bge-m3")
 
 
-async def test_a_missing_embedding_model_fails_the_check():
-    """Отсутствующая модель встраиваний проверку не проходит."""
-    client = provider({MODELS: models_response("qwen")})
-    passed, _ = await check_embed(client, "bge-m3")
+async def test_a_missing_embedding_model_is_told_what_there_is_too():
+    """Отсутствующая модель встраиваний проверку не проходит, и отказ называет,
+    что у провайдера есть.
+
+    Оба рода моделей выбираются на одном экране настроек, и опечатку человек
+    сверяет по перечню. Без перечня у одного из двух сверять нечем.
+    """
+    client = provider({MODELS: models_response("qwen", "llama")})
+    passed, message = await check_embed(client, "bge-m3")
     assert passed is False
+    assert "qwen" in message and "llama" in message
 
 
 async def test_an_embedding_model_that_fails_the_ping_does_not_pass():
@@ -158,6 +164,44 @@ async def test_a_native_endpoint_answering_with_non_json_falls_back_by_name():
     })
     assert await list_models(client, kind="chat") == ["qwen"]
     assert await list_models(client, kind="embed") == ["bge-m3"]
+
+
+async def test_a_broken_native_endpoint_leaves_its_trace_in_the_log(caplog):
+    """Отказ родного пути оставляет в журнале трассировку.
+
+    Запасной путь работает, и снаружи разницы не видно — кроме того, что род
+    модели угадывается по имени, а не берётся у провайдера. Разбирать, почему
+    выбор моделей стал врать, придётся по журналу.
+    """
+    client = provider({
+        NATIVE_MODELS: httpx.Response(200, text="not json"),
+        MODELS: models_response("qwen"),
+    })
+
+    with caplog.at_level(logging.DEBUG, logger="adapters.lm_studio"):
+        await list_models(client, kind="chat")
+
+    # Смотрим записи именно адаптера: по всему журналу трассировку мог бы
+    # оставить кто угодно, и сторож позеленел бы на чужой.
+    assert any(
+        rec.exc_info for rec in caplog.records if rec.name == "adapters.lm_studio"
+    )
+
+
+async def test_nothing_loaded_is_not_the_same_as_no_native_path():
+    """Родной путь ответил пустотой — выгруженные модели наверх не идут.
+
+    Пустой ответ родного пути значит «этого рода не загружено ничего», а не
+    «пути нет». Спроси после него общий список — и в выбор вернутся ровно те
+    выгруженные модели, ради которых родной путь и заведён: выбравший такую
+    ждёт полминуты подкачки.
+    """
+    client = provider({
+        NATIVE_MODELS: httpx.Response(200, json={"data": []}),
+        MODELS: models_response("qwen"),
+    })
+
+    assert await list_models(client, kind="chat") == []
 
 
 async def test_an_embedding_comes_back_as_a_list_of_numbers():
