@@ -11,6 +11,8 @@
 должны.
 """
 
+import logging
+
 from backend.flows import channels
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, only_row, put
@@ -130,6 +132,26 @@ async def test_a_failed_request_does_not_stop_the_sweep(
 
     titles = {c.username: c.title for c in await all_rows(session_factory, TelegramChannel)}
     assert titles == {"broken": "Было", "jobs": "Стало"}
+
+
+async def test_a_failed_request_leaves_its_trace_in_the_log(
+    make_pipeline, session_factory, caplog
+):
+    """Пропущенный канал оставляет в журнале трассировку отказа.
+
+    Наружу пропуск не виден вовсе: название остаётся прежним, а сводка идёт
+    дальше. Узнать, почему канал перестал обновляться, можно только отсюда.
+    """
+    saved = await _channels(session_factory, channel_row(username="broken"))
+    pipeline = await make_pipeline(
+        FakeTelegramClient(fails={"get_chat": OSError("канал закрыт")})
+    )
+
+    with caplog.at_level(logging.WARNING):
+        await channels.refresh_channel_metadata(pipeline, saved)
+
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "OSError: канал закрыт" in caplog.text
 
 
 async def test_a_channel_deleted_mid_sweep_is_skipped(

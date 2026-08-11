@@ -4,6 +4,8 @@
 он виден только подстановкой в цитату ответа.
 """
 
+import logging
+
 import pytest
 from pyrogram.errors import FloodWait
 
@@ -185,6 +187,22 @@ async def test_a_flood_wait_yields_no_avatar_and_does_not_raise():
     assert await fetch_telegram_avatar(client, entity) is None
 
 
+async def test_a_failed_download_leaves_its_trace_in_the_log(caplog):
+    """Сорванное скачивание аватара оставляет в журнале трассировку.
+
+    Наружу отказ выглядит как «аватара нет» — тем же самым, чем выглядит
+    собеседник без фотографии. Различить их можно только по журналу.
+    """
+    client = FakeTelegramClient(fails={"download_media": OSError("сеть")})
+    entity = user(photo=photo(small_file_id="small-1"))
+
+    with caplog.at_level(logging.WARNING):
+        await fetch_telegram_avatar(client, entity)
+
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "OSError: сеть" in caplog.text
+
+
 async def test_an_empty_download_yields_no_avatar():
     """Пустой ответ на скачивание даёт отсутствие аватара."""
     client = FakeTelegramClient(avatar=None)
@@ -236,3 +254,18 @@ async def test_a_flood_wait_while_resolving_does_not_raise():
     client = FakeTelegramClient(fails={"get_users": FloodWait(value=42)})
 
     assert await resolve_hr_telegram(client, "@user_name") is None
+
+
+async def test_a_failed_lookup_leaves_its_trace_in_the_log(caplog):
+    """Сорванный поиск собеседника оставляет в журнале трассировку.
+
+    Ответ у отказа тот же, что у неизвестного имени, — отсутствие. HR при
+    этом остаётся без адреса, и письмо ему потом не уходит вовсе.
+    """
+    client = FakeTelegramClient(fails={"get_users": OSError("сеть")})
+
+    with caplog.at_level(logging.WARNING):
+        await resolve_hr_telegram(client, "@user_name")
+
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "OSError: сеть" in caplog.text

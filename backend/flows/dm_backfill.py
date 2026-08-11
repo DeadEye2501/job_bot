@@ -73,10 +73,9 @@ async def backfill_hr_dm_history(
                     hr.telegram_username, limit=backfill_limit
                 ):
                     messages.append(msg)
-            except Exception as e:
-                logger.warning(
-                    "backfill: resolve fallback failed для hr %d: %s",
-                    hr.id, e,
+            except Exception:
+                logger.exception(
+                    "backfill: resolve fallback failed для hr %d", hr.id
                 )
                 return
         else:

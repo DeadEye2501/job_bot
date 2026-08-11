@@ -154,10 +154,8 @@ async def fetch_telegram_avatar(client, entity) -> bytes | None:
             "fetch_telegram_avatar: FloodWait %ds, skipping", getattr(e, "value", "?")
         )
         return None
-    except Exception as e:
-        logger.warning(
-            "fetch_telegram_avatar: failed: %s: %s", type(e).__name__, e
-        )
+    except Exception:
+        logger.exception("fetch_telegram_avatar: failed")
         return None
     if buf is None:
         return None
@@ -175,13 +173,8 @@ async def resolve_hr_telegram(client, hr_contact: str):
             "resolve_hr_telegram: FloodWait %ds, skipping", getattr(e, "value", "?")
         )
         return None
-    except Exception as e:
-        logger.warning(
-            "resolve_hr_telegram: failed for %r: %s: %s",
-            hr_contact,
-            type(e).__name__,
-            e,
-        )
+    except Exception:
+        logger.exception("resolve_hr_telegram: failed for %r", hr_contact)
         return None
 
     if user is None:

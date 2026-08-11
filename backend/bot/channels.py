@@ -83,11 +83,8 @@ async def add_channel(
 
     try:
         chat = await bot._client.get_chat(username)
-    except Exception as e:
-        logger.warning(
-            "add_channel: get_chat(%s) failed: %s: %s",
-            username, type(e).__name__, e,
-        )
+    except Exception:
+        logger.exception("add_channel: get_chat(%s) failed", username)
         return None, "invalid"
     if chat is None:
         return None, "invalid"

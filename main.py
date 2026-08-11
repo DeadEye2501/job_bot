@@ -8,6 +8,7 @@ Run:
 
 import logging
 import sys
+import threading
 import traceback
 
 from backend.log_buffer import LogFileHandler
@@ -89,6 +90,31 @@ _install_log_buffer()
 _install_secret_filter()
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+
+
+def _log_uncaught(exc_type, exc, tb) -> None:
+    """Отдать в журнал падение, которое некому было поймать.
+
+    Штатный ответ на такое — печать трассировки в поток ошибок, а у оконной
+    сборки его нет: в файле оставались бы обычная работа и обрыв на полуслове.
+    """
+    logger.critical("Необработанное исключение", exc_info=(exc_type, exc, tb))
+
+
+def _log_uncaught_in_thread(args) -> None:
+    """То же для постороннего потока: у них своя дорога мимо `sys.excepthook`.
+
+    `SystemExit` пропускается — так же, как его пропускает штатный крючок:
+    поток, завершивший себя сам, падением не является, а запись о нём
+    зажгла бы счётчик ошибок в окне.
+    """
+    if args.exc_type is SystemExit:
+        return
+    _log_uncaught(args.exc_type, args.exc_value, args.exc_traceback)
+
+
+sys.excepthook = _log_uncaught
+threading.excepthook = _log_uncaught_in_thread
 
 
 def main() -> int:
