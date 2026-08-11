@@ -26,7 +26,7 @@ from backend.models import (
     ProfileSkill,
     profile_experience_skills,
 )
-from backend.repository.profile import get_profile, list_experience, load_profile_skills, save_parsed_cv
+from backend.repository.profile import get_profile, list_experience, list_skills, save_parsed_cv
 from tests.dbio import put
 from tests.factories import experience_row, profile_row, profile_skill_row
 
@@ -117,7 +117,7 @@ async def test_the_previous_profile_is_wiped_not_merged(session, session_factory
     assert [p.first_name for p in (await session.scalars(select(Profile))).all()] == [
         "Иван"
     ]
-    assert [s.name for s in await load_profile_skills(session)] == []
+    assert [s.name for s in await list_skills(session)] == []
     assert [e.company for e in await list_experience(session)] == []
     assert (await session.scalars(select(ProfileLanguage))).all() == []
     assert (
