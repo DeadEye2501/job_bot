@@ -71,6 +71,28 @@ class BlacklistUpdateError(ValueError):
     """Soft-validation ошибка inline-edit'а blacklist'а."""
 
 
+def _required_value(value) -> str:
+    """Значение строки без пробелов по краям; пустое — отказ.
+
+    Пустое значение бесполезно: оно никогда ни с чем не совпадёт, а в списке
+    очищенный ряд не отличить от заготовки. Отказывают обе дороги — заведение
+    и правка на месте, — и одним текстом: человек видит один и тот же экран.
+    """
+    normalized = (value or "").strip()
+    if not normalized:
+        raise BlacklistUpdateError("Значение не может быть пустым.")
+    return normalized
+
+
+def _optional_reason(reason) -> str | None:
+    """Причина без пробелов по краям, а пустая — как отсутствие.
+
+    Пустую причину окно шлёт и пропуском поля, и пустой строкой, и одними
+    пробелами; в колонке все три значат одно, и хранится там `NULL`.
+    """
+    return (reason or "").strip() or None
+
+
 async def update_blacklist(
     session: AsyncSession,
     blacklist_id: int,
@@ -82,10 +104,8 @@ async def update_blacklist(
     отличает «не передали» от «передали None» — `reason` может быть
     NULL'ом (пустая причина), и UI должен иметь возможность это сохранить.
 
-    Raises ``BlacklistUpdateError`` если value передан и оказался пустой
-    после strip — пустое value семантически бесполезно (никогда ни с чем
-    не совпадёт), плюс пользователь не сможет визуально отличить
-    очищенный ряд от placeholder'а.
+    Raises ``BlacklistUpdateError`` на пустом значении — почему, сказано
+    у `_required_value`.
 
     Returns False if the row is missing. Caller wraps in
     ``session.begin()``.
@@ -100,13 +120,9 @@ async def update_blacklist(
     if row is None:
         return False
     if value is not _BLACKLIST_FIELD_UNSET:
-        normalized_value = (value or "").strip()
-        if not normalized_value:
-            raise BlacklistUpdateError("Значение не может быть пустым.")
-        row.value = normalized_value
+        row.value = _required_value(value)
     if reason is not _BLACKLIST_FIELD_UNSET:
-        normalized_reason = (reason or "").strip()
-        row.reason = normalized_reason or None
+        row.reason = _optional_reason(reason)
     return True
 
 
@@ -133,15 +149,11 @@ async def create_blacklist(
 
     Returns (row, outcome). Caller wraps in ``session.begin()``.
     """
-    normalized_value = (value or "").strip()
-    if not normalized_value:
-        raise BlacklistUpdateError("Значение не может быть пустым.")
+    normalized_value = _required_value(value)
     normalized_kind = (kind or "").strip()
     if not normalized_kind:
         raise BlacklistUpdateError("Тип обязателен.")
-    normalized_reason = (reason or "").strip() if reason is not None else None
-    if normalized_reason == "":
-        normalized_reason = None
+    normalized_reason = _optional_reason(reason)
 
     existing = (
         await session.scalars(

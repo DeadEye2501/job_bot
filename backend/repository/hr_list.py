@@ -8,6 +8,7 @@ from backend.payloads import HrWithCount
 
 from backend.repository.blacklist_marks import active_blacklist_values
 from backend.repository.hr_card import hr_blacklist_candidates
+from backend.repository.hr_identify import HAS_TELEGRAM_IDENTITY
 from backend.repository.messages import UNREAD_INCOMING
 from backend.repository.search import matches_search
 
@@ -39,14 +40,7 @@ async def list_hrs_for_backfill(
     ``list_open_hr_chats``, which only covers HRs we ever messaged first.
     """
     hrs = list(
-        (
-            await session.scalars(
-                select(HR).where(
-                    (HR.telegram_user_id.is_not(None))
-                    | (HR.telegram_username.is_not(None))
-                )
-            )
-        ).all()
+        (await session.scalars(select(HR).where(HAS_TELEGRAM_IDENTITY))).all()
     )
     return await _with_last_incoming_id(session, hrs)
 

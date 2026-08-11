@@ -2,10 +2,9 @@
 
 import logging
 
-from sqlalchemy import select
-
 from backend.helpers import read_channel_metadata
 from backend.models import TelegramChannel
+from backend.repository.channels import list_named_channels
 
 from backend.flows import ingest
 from backend.notify import fire
@@ -21,14 +20,7 @@ async def poll_active_channels(pipeline) -> None:
     # ожидает свежие данные. Активность гейтит только обработку
     # сообщений ниже.
     async with pipeline._session_factory() as session:
-        channels = (
-            await session.scalars(
-                select(TelegramChannel).where(
-                    TelegramChannel.username.is_not(None)
-                )
-            )
-        ).all()
-    all_named = list(channels)
+        all_named = await list_named_channels(session)
 
     # Быстрый sweep метаданных по всему списку до тяжёлой обработки
     # сообщений: один `get_chat` на канал, плюс backfill аватара через
@@ -71,11 +63,11 @@ async def poll_one_channel(pipeline, channel_id: int) -> bool:
     """
     await pipeline._reload_resources()
     async with pipeline._session_factory() as session:
-        ch = await session.get(TelegramChannel, channel_id)
-        if ch is None or not ch.username:
+        named = await list_named_channels(session, ids=[channel_id])
+        if not named:
             return False
-        username = ch.username
-        last_id = ch.last_processed_msg_id
+        username = named[0].username
+        last_id = named[0].last_processed_msg_id
     await refresh_channel_metadata_for_ids(pipeline, [channel_id])
     try:
         await poll_channel(pipeline, channel_id, username, last_id)
@@ -95,12 +87,8 @@ async def refresh_channel_metadata_for_ids(pipeline, channel_ids: list[int]) -> 
         return
     logger.debug("refresh metadata for %d channel(s)", len(channel_ids))
     async with pipeline._session_factory() as session:
-        rows = (
-            await session.scalars(
-                select(TelegramChannel).where(TelegramChannel.id.in_(channel_ids))
-            )
-        ).all()
-    await refresh_channel_metadata(pipeline, list(rows))
+        rows = await list_named_channels(session, ids=channel_ids)
+    await refresh_channel_metadata(pipeline, rows)
 
 
 async def refresh_channel_metadata(pipeline, channels) -> None:

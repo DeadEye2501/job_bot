@@ -1,13 +1,17 @@
 """Подсказки «кого предложить в чёрный список» для окна заведения."""
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import Company, HR, TelegramChannel
+from backend.models import Company, HR
 
-from backend.repository.channels import channel_blacklist_preferred_value
+from backend.repository.channels import (
+    channel_blacklist_preferred_value,
+    list_named_channels,
+)
 from backend.repository.companies_card import company_blacklist_preferred_value
 from backend.repository.hr_card import hr_blacklist_preferred_value
+from backend.repository.hr_identify import HAS_TELEGRAM_IDENTITY
 
 
 def _named_candidates(named: list[tuple[str | None, str | None]]) -> list[dict]:
@@ -42,11 +46,7 @@ async def list_blacklist_candidates(
     """
     if kind == "hr":
         rows = (
-            await session.scalars(
-                select(HR).where(
-                    or_(HR.telegram_username.is_not(None), HR.telegram_user_id.is_not(None))
-                )
-            )
+            await session.scalars(select(HR).where(HAS_TELEGRAM_IDENTITY))
         ).all()
         return _named_candidates(
             [(hr_blacklist_preferred_value(hr), hr.name) for hr in rows]
@@ -63,12 +63,10 @@ async def list_blacklist_candidates(
             out.append({"value": value, "label": co.name, "sub": co.website or None})
         return out
     if kind == "channel":
-        rows = (
-            await session.scalars(
-                select(TelegramChannel).where(TelegramChannel.username.is_not(None))
-            )
-        ).all()
         return _named_candidates(
-            [(channel_blacklist_preferred_value(ch), ch.title) for ch in rows]
+            [
+                (channel_blacklist_preferred_value(ch), ch.title)
+                for ch in await list_named_channels(session)
+            ]
         )
     return []

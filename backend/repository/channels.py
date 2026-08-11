@@ -20,11 +20,40 @@ from backend.repository.search import matches_search
 logger = logging.getLogger(__name__)
 
 
+async def list_named_channels(
+    session: AsyncSession, *, ids: list[int] | None = None
+) -> list[TelegramChannel]:
+    """Каналы, у которых есть ник, — все или только названные номерами.
+
+    Ник — единственный адрес, по которому канал спрашивают у Telegram, и
+    пустая строка адресом не является. Отсеивается она наравне с
+    отсутствующей: колонка объявлена обнуляемой, а строки заводились и сырым
+    SQL мимо `create_channel` — об этом говорит докстрока
+    `find_channel_by_username`.
+
+    Одно объявление на всех, потому что зовущих трое — обход, прогон одного
+    канала и сводка по номерам, — и разойдись они, канал без адреса доехал
+    бы до обращения одной из дорог.
+    """
+    query = select(TelegramChannel).where(
+        TelegramChannel.username.is_not(None),
+        TelegramChannel.username != "",
+    )
+    if ids is not None:
+        query = query.where(TelegramChannel.id.in_(ids))
+    return list((await session.scalars(query)).all())
+
+
 def channel_blacklist_candidates(ch: TelegramChannel) -> list[str]:
-    """Возможные blacklist `value` строки для канала. Используется для
-    case-insensitive lookup'а — username может быть mixed-case или нет.
-    Сейчас возвращаем только @username; формат и регистр совпадает с
-    тем, что пишет ``contacts_add_channel_to_blacklist`` slot.
+    """Написания, под которыми канал может стоять в чёрном списке.
+
+    Написание одно — `@ник`, — а объявление всё равно отдаёт список: под тем
+    же договором живут написания HR и компании, и отметку по ним ищет один
+    перебор в `blacklist_marks`.
+
+    Регистр не приводится: то же написание пишет и кнопка «в чёрный список»,
+    потому что зовёт `channel_blacklist_preferred_value` — то есть это
+    объявление.
     """
     if not ch.username:
         return []

@@ -35,12 +35,31 @@
       `cv_parser._parse_languages` против `bridge._filter_languages` — одно
       правило с противоположными ответами, половина пары в мосте. Разбор —
       `docs/temp/reviews/2026-08-12-A-duplicates.md`.
-- [ ] **Б. Чёрный список и признаки предметов** — 7, 11, 17, 25, 27, 28, 31.
+- [x] **Б. Чёрный список и признаки предметов** — 7, 11, 17, 25, 27, 28, 31.
       `repository/blacklist.py`, `hr_card.py`, `companies_card.py`,
       `channels.py`, `flows/channels.py`
+
+      Сверкой закрыты без правки: **27** — все три `*_blacklist_preferred_value`
+      уже однострочные проводники к `blacklist_marks.preferred_blacklist_value`,
+      слайс 21 плана `2026-08-10` свёл это до конца; **28** — вердикт строкой.
+      Питоновская половина **11** (`helpers.telegram_peer` против
+      `hr_card.hr_blacklist_candidates`) тоже вердикт: разные вопросы и разные
+      порядки полей. Попутно сведена чистка причины в `blacklist.py`.
+
+      Найдено рецензентами и в заход не входило: четвёртая дорога к нику канала
+      в `flows/rerun.py:39-42`; отвязка вакансий тремя телами
+      (`hr_card.py`, `companies_card.py`, `channels.py`) при готовом
+      `merging.repoint_vacancies`; «пометить прочитанным по времени» в
+      `bot/updates.py` против `repository/messages.py`. Разбор —
+      `docs/temp/reviews/2026-08-12-B-duplicates.md`.
 - [ ] **В. Списки, отборы и статистика** — 5, 6, 10, 14, 15.
       `repository/vacancies_list.py`, `vacancies_mini.py`, `stats_summary.py`,
       `stats_pipeline.py`, `channels.py`, `hr_card.py`, `hr_list.py`
+
+      **К находке 15:** заход Б завёл `companies_card._new_spellings` —
+      «добавить написание, если такого ключа ещё нет» на плоском `casefold`.
+      Правило находки 15 то же самое; решить про дом надо один раз, иначе два
+      захода сведут одно и то же врозь.
 - [ ] **Г. Личная переписка и отклик** — 8, 12, 18, 19, 20.
       `flows/dm.py`, `dm_classify.py`, `dm_backfill.py`, `flows/apply.py`,
       `bot/chat.py`, `bot/send.py`, `flows/parse.py`
