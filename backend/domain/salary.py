@@ -14,9 +14,14 @@ _AMOUNT_RE = re.compile(
     r"(?![a-zа-яё0-9])))?",
     re.IGNORECASE,
 )
-# Числа одной вилки склеены между собой только тире, «до» и пробелами. Дальше
-# такой склейки пометка не идёт: в «300к, опыт от 5 лет» пять — это годы.
-_RANGE_GLUE_RE = re.compile(r"[\s\-–—]*(?:до)?[\s\-–—]*")
+# Валюта, названная знаком или словом. Стоит и у каждой границы вилки, и
+# одна на всю строку, поэтому служит и склейке чисел, и опознанию валюты.
+_CURRENCY_WORD = r"₽|\$|€|руб[а-яё.]*|долл[а-яё.]*|евро|usd|eur|rub"
+# Числа одной вилки склеены между собой только тире, «до», знаком валюты и
+# пробелами. Дальше такой склейки пометка не идёт: в «300к, опыт от 5 лет»
+# пять — это годы. Знак валюты входит в склейку потому, что его пишут у
+# каждой границы: «от 150 000 ₽ до 250 000 ₽».
+_RANGE_GLUE_RE = re.compile(rf"[\s\-–—]*(?:{_CURRENCY_WORD})?[\s\-–—]*(?:до)?[\s\-–—]*")
 _THOUSAND = ("k", "к", "тыс")
 _FRACTION_RE = re.compile(r"[.,]\d{1,2}$")
 # Предел колонки: не влезшее в неё уронило бы запись вакансии на коммите, и
@@ -27,6 +32,20 @@ _MAX_AMOUNT = 2**63 - 1
 # сюда не годится: «трудовой договор» и «договор ГПХ» стоят рядом с прямо
 # названной суммой.
 _NEGOTIABLE_RE = re.compile(r"собесед|договорённ|договоренн|договорн|обсужд|negotia")
+# Слова, которыми число вводят: стоят перед ним и говорят, что это не
+# зарплата, а стаж или надбавка. Ищутся вплотную к связке, а не по всей
+# строке: в «оклад 100 000 ₽ + KPI» между числом и словом стоит знак валюты,
+# и связка остаётся зарплатой.
+_LEADING_NOT_MONEY_RE = re.compile(r"опыт\w*|стаж\w*|бонус\w*|преми\w*|kpi")
+# Слова, которыми число заканчивают. Врозь с предыдущими они потому, что
+# сторона у примет разная: «бонус» вводит следующее число и предыдущему —
+# окладу — ничего не говорит, а «лет» относится к своему.
+_TRAILING_NOT_MONEY_RE = re.compile(r"лет|года?")
+# Предлог вилки стоит между словом и её первым числом и слова не заслоняет:
+# в «опыт от 5 лет» приметой служит «опыт», а не «от».
+_WORD_BEFORE_RE = re.compile(r"([a-zа-яё]+)(?:\s+(?:от|до|с))?\s*$")
+# Наращение при числе своё слово не заслоняет: «от 3-х лет» — тот же срок.
+_WORD_AFTER_RE = re.compile(r"^(?:-[а-яё]{1,2})?\s*([a-zа-яё]+)")
 # Название валюты берётся целым словом: «евро» внутри «Европы» и «eur»
 # внутри «europe» превращали рублёвую вакансию в валютную.
 _CURRENCIES: tuple[tuple[Currency, re.Pattern[str]], ...] = (
@@ -54,25 +73,51 @@ def parse_salary(
     if _NEGOTIABLE_RE.search(s):
         return (None, None, None)
 
-    numbers = _numbers(s)
+    numbers = _first_money_range(s)
     if not numbers:
         return (None, None, None)
     return (numbers[0], numbers[-1], _currency(s))
 
 
-def _numbers(s: str) -> list[int]:
-    """Числа строки, раскрытые по своей пометке и разложенные по возрастанию.
+def _first_money_range(s: str) -> list[int]:
+    """Числа первой связки, в которой речь о деньгах.
+
+    Вилка в объявлении одна, а чисел вокруг неё бывает много: срок работы,
+    требуемый стаж, надбавка. Пока границами служили крайние числа всей
+    строки, «300к, опыт от 5 лет» давало вилку от пяти рублей, а
+    «фикс 150 000 ₽, бонус 50 000 ₽» — от пятидесяти тысяч.
+    """
+    for run in _runs(s):
+        if not _about_money(s, run):
+            continue
+        values = _values(run)
+        if values:
+            return values
+    return []
+
+
+def _about_money(s: str, run: list[re.Match]) -> bool:
+    """Связка о деньгах, пока вплотную к ней не стоит слово о другом."""
+    before = _WORD_BEFORE_RE.search(s[: run[0].start()])
+    after = _WORD_AFTER_RE.match(s[run[-1].end() :])
+    return not (
+        (before and _LEADING_NOT_MONEY_RE.fullmatch(before.group(1)))
+        or (after and _TRAILING_NOT_MONEY_RE.fullmatch(after.group(1)))
+    )
+
+
+def _values(run: list[re.Match]) -> list[int]:
+    """Числа связки, раскрытые по её пометке и разложенные по возрастанию.
 
     Ноль отбрасывается: нулевой зарплаты не бывает, а нижней границей он
     отсёк бы вакансию от любого осмысленного отбора.
     """
+    marker = next((h["scale"] for h in reversed(run) if h["scale"]), None)
     found: list[int] = []
-    for run in _runs(s):
-        marker = next((h["scale"] for h in reversed(run) if h["scale"]), None)
-        for hit in run:
-            value = _amount(hit["num"], hit["scale"] or marker)
-            if 0 < value <= _MAX_AMOUNT:
-                found.append(value)
+    for hit in run:
+        value = _amount(hit["num"], hit["scale"] or marker)
+        if 0 < value <= _MAX_AMOUNT:
+            found.append(value)
     return sorted(found)
 
 
