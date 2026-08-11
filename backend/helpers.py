@@ -133,6 +133,28 @@ def telegram_peer(hr) -> int | str | None:
     return hr.telegram_user_id or hr.telegram_username
 
 
+async def read_channel_metadata(
+    client, chat, *, current_avatar: bytes | None = None
+) -> tuple[str | None, bytes | None]:
+    """Название и картинка канала из ответа Telegram.
+
+    Спрашивают об этом двое — заведение канала из окна и сводка обновления
+    перед обходом.
+
+    **Название отдаётся как есть,** и что с ним делать, решает зовущий: у
+    заведения строка новая и перебивать нечего, сводка сравнивает с прежним.
+
+    **Картинка берётся только в пустое место,** и это правило объявления, а не
+    зовущего: однажды взятая остаётся, иначе свежую затирала бы устаревшая с
+    любого запоздавшего пути. Отсюда и довод `current_avatar` — без него
+    сводка качала бы картинку на каждом обходе, чтобы тут же её выбросить.
+    """
+    title = getattr(chat, "title", None)
+    if current_avatar is not None:
+        return title, None
+    return title, await fetch_telegram_avatar(client, chat)
+
+
 async def fetch_telegram_avatar(client, entity) -> bytes | None:
     """Download the small profile photo from a Pyrogram User or Chat.
 

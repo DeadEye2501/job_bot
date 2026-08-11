@@ -4,7 +4,7 @@ import logging
 
 from sqlalchemy import select
 
-from backend.helpers import fetch_telegram_avatar
+from backend.helpers import read_channel_metadata
 from backend.models import TelegramChannel
 
 from backend.flows import ingest
@@ -108,10 +108,10 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
 
     One `get_chat` call per channel (sequential — Pyrogram's session is
     not thread-safe and concurrent calls can trip FloodWait); the same
-    response carries both ``title`` and ``photo``. Title is updated on
-    every change; avatar is backfill-only (matches the HR policy in
-    ``refresh_hr_from_telegram`` — once captured, we don't overwrite). All
-    diffs land in a single transaction. Failures are logged and skipped.
+    response carries both ``title`` and ``photo``. Что берётся у ответа и по
+    какому правилу — в `helpers.read_channel_metadata`; здесь остаётся своё:
+    название обновляется только изменившееся, а всё собранное ложится одной
+    транзакцией. Failures are logged and skipped.
     """
     title_updates: dict[int, str] = {}
     avatar_updates: dict[int, bytes] = {}
@@ -123,13 +123,13 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
             continue
         if chat is None:
             continue
-        new_title = getattr(chat, "title", None)
+        new_title, blob = await read_channel_metadata(
+            pipeline._client, chat, current_avatar=ch.avatar
+        )
         if new_title and new_title != ch.title:
             title_updates[ch.id] = new_title
-        if ch.avatar is None and getattr(chat, "photo", None) is not None:
-            blob = await fetch_telegram_avatar(pipeline._client, chat)
-            if blob:
-                avatar_updates[ch.id] = blob
+        if blob:
+            avatar_updates[ch.id] = blob
     if not title_updates and not avatar_updates:
         return
     touched_ids = set(title_updates) | set(avatar_updates)
@@ -142,6 +142,9 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
             if new_title is not None and db_ch.title != new_title:
                 db_ch.title = new_title
             blob = avatar_updates.get(channel_id)
+            # «Пусто ли место» спрашивается второй раз нарочно: строка
+            # перечитана в новой сессии, и картинка могла появиться у неё за
+            # время обхода — обход идёт по каналам последовательно.
             if blob is not None and db_ch.avatar is None:
                 db_ch.avatar = blob
         await session.commit()
