@@ -11,6 +11,7 @@ from backend.models import Blacklist, Company, HR, TelegramChannel
 
 from backend.repository.blacklist_marks import active_mark_of
 from backend.repository.channels import channel_blacklist_preferred_value
+from backend.repository.companies_card import company_blacklist_preferred_value
 from backend.repository.hr_card import hr_blacklist_preferred_value
 
 logger = logging.getLogger(__name__)
@@ -206,6 +207,23 @@ async def delete_blacklist(
     return True
 
 
+def _named_candidates(named: list[tuple[str | None, str | None]]) -> list[dict]:
+    """Строки списка «добавить в чёрный список» у предмета с названием.
+
+    Принимает пары «отсеиваемое значение, название». Годится тем, у кого
+    название отдельно от значения: у собеседника это имя против ника, у
+    канала — заголовок против ника. Компания такой формы не имеет —
+    уточнением там служит сайт, а порядок задаёт сам запрос.
+    """
+    out: list[dict] = []
+    for value, title in named:
+        if value is None:
+            continue
+        out.append({"value": value, "label": title or value, "sub": value if title else None})
+    out.sort(key=lambda x: (x["label"] or "").casefold())
+    return out
+
+
 async def list_blacklist_candidates(
     session: AsyncSession, kind: str
 ) -> list[dict]:
@@ -227,40 +245,29 @@ async def list_blacklist_candidates(
                 )
             )
         ).all()
-        out: list[dict] = []
-        for hr in rows:
-            value = hr_blacklist_preferred_value(hr)
-            if value is None:
-                continue
-            label = hr.name or value
-            sub = value if hr.name else None
-            out.append({"value": value, "label": label, "sub": sub})
-        out.sort(key=lambda x: (x["label"] or "").casefold())
-        return out
+        return _named_candidates(
+            [(hr_blacklist_preferred_value(hr), hr.name) for hr in rows]
+        )
     if kind == "company":
         rows = (
             await session.scalars(select(Company).order_by(Company.name.asc()))
         ).all()
-        return [
-            {"value": co.name, "label": co.name, "sub": co.website or None}
-            for co in rows if co.name
-        ]
+        out: list[dict] = []
+        for co in rows:
+            value = company_blacklist_preferred_value(co)
+            if value is None:
+                continue
+            out.append({"value": value, "label": co.name, "sub": co.website or None})
+        return out
     if kind == "channel":
         rows = (
             await session.scalars(
                 select(TelegramChannel).where(TelegramChannel.username.is_not(None))
             )
         ).all()
-        out = []
-        for ch in rows:
-            value = channel_blacklist_preferred_value(ch)
-            if value is None:
-                continue
-            label = ch.title or value
-            sub = value if ch.title else None
-            out.append({"value": value, "label": label, "sub": sub})
-        out.sort(key=lambda x: (x["label"] or "").casefold())
-        return out
+        return _named_candidates(
+            [(channel_blacklist_preferred_value(ch), ch.title) for ch in rows]
+        )
     return []
 
 
