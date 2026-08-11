@@ -157,6 +157,12 @@ async def create_hr(
     No deduping by username — the UI's HR-picker already shows existing
     HRs and the user has to explicitly click "Создать нового HR". If they
     chose to create rather than link, we trust that.
+
+    Единственное место, где заводится строка собеседника: и по кнопке из
+    окна, и опознанием автора вакансии в `find_or_create_hr`. Картинка
+    профиля довода не получила нарочно: приносит её только второй путь, и
+    дописывает он её сам — тем же присваиванием, каким дополняет уже
+    найденную строку.
     """
     hr = HR(
         name=(name or None),
@@ -167,10 +173,11 @@ async def create_hr(
     session.add(hr)
     await session.flush()
     logger.info(
-        "Created HR id=%d name=%r username=%s",
+        "Created HR id=%d name=%r username=%s telegram_user_id=%s",
         hr.id,
         name,
         telegram_username,
+        telegram_user_id,
     )
     return hr
 
@@ -204,21 +211,13 @@ async def find_or_create_hr(
     ).strip() or None
 
     if hr is None:
-        hr = HR(
-            telegram_user_id=user.id,
-            telegram_username=user.username,
+        hr = await create_hr(
+            session,
             name=full_name,
-            avatar=avatar,
+            telegram_username=user.username,
+            telegram_user_id=user.id,
         )
-        session.add(hr)
-        await session.flush()
-        logger.info(
-            "Created HR id=%d telegram_user_id=%s username=%s name=%r",
-            hr.id,
-            user.id,
-            user.username,
-            full_name,
-        )
+        hr.avatar = avatar
         return hr, True
 
     if hr.telegram_user_id is None:
