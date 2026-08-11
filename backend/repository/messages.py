@@ -1,6 +1,6 @@
 """Хранение переписки с HR."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -69,6 +69,39 @@ async def mark_incoming_read(
         .values(read_at=now)
     )
     return done.rowcount or 0
+
+
+async def tombstone_messages(session: AsyncSession, *where) -> int:
+    """Поставить надгробия отобранным строкам; сколько поставили.
+
+    Отбор — дело зовущего: удаление приходит то пачкой номеров по чату, то
+    россыпью без чата, то вычисляется догоном как «в нашей переписке есть, а
+    в ответе Telegram нет». Общее у всех троих — что значит «удалено».
+
+    Уже надгробия из отбора выпадают, и это не бережливость: одну и ту же
+    строку накрывают оба пути — оповещение об удалении и догон переписки,
+    вычисляющий удалённое сам, — а зовущие по числу задетых строк решают,
+    будить ли окно. Второй по счёту не должен перерисовывать переписку, в
+    которой ничего не изменилось.
+
+    Непрочитанное входящее заодно гасится. Счётчики непрочитанного надгробий
+    и так не считают, так что это подстраховка — на случай, если строку
+    похоронит кто-то мимо этого объявления. Запроса поэтому два — исходящим
+    время прочтения не ставится вовсе, — и время ставится первым: после
+    надгробий эти же строки из отбора выпадут.
+
+    Транзакцию закрывает зовущий.
+    """
+    alive = (*where, Message.is_deleted.is_(False))
+    await session.execute(
+        update(Message)
+        .where(*alive, Message.is_incoming, Message.read_at.is_(None))
+        .values(read_at=datetime.now(timezone.utc))
+    )
+    buried = await session.execute(
+        update(Message).where(*alive).values(is_deleted=True)
+    )
+    return buried.rowcount or 0
 
 
 async def find_outgoing_message(
@@ -184,7 +217,7 @@ async def list_messages_for_hr(
 async def count_unread_incoming(session: AsyncSession) -> int:
     """Count incoming HR messages whose read_at is still NULL.
 
-    ``updates.on_dm_delete`` also seals ``read_at`` defensively, but the
+    ``tombstone_messages`` also seals ``read_at`` defensively, but the
     tombstone filter inside ``UNREAD_INCOMING`` covers any future code that
     flips ``is_deleted`` alone.
     """

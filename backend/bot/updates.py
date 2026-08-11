@@ -14,6 +14,7 @@ from backend.helpers import extract_text
 from backend.models import BotMode
 from backend.models import Message
 from backend.repository.hr_identify import find_known_hr
+from backend.repository.messages import tombstone_messages
 
 from backend.notify import fire
 
@@ -117,14 +118,12 @@ async def on_dm_delete(bot, _client, messages) -> None:
     Outgoing tombstones missed here will be reconciled the next time we
     load the chat from Telegram on app restart.
 
-    Deleted incoming rows that were still unread also get ``read_at``
-    set so the unread badge doesn't latch on a tombstone forever.
+    Что значит «удалено» — надгробие, гашение непрочитанного входящего и
+    оговорка «уже похороненное не трогаем» — объявлено один раз в
+    ``repository.messages.tombstone_messages``; здесь остаётся только отбор.
     """
     if (await bot._current_mode()) is BotMode.OFF:
         return
-    from datetime import datetime as _dt, timezone as _tz
-    from sqlalchemy import update as _sa_update
-
     with_chat: dict[int, list[int]] = {}
     chatless_ids: list[int] = []
     for m in messages:
@@ -137,23 +136,7 @@ async def on_dm_delete(bot, _client, messages) -> None:
     if not with_chat and not chatless_ids:
         return
 
-    now = _dt.now(_tz.utc)
     touched_hr_ids: set[int] = set()
-
-    async def _flip_deleted(session, where_clauses) -> int:
-        # Two updates so we can also seal read_at on incoming tombstones
-        # that were still unread, without overwriting outgoing rows.
-        res = await session.execute(
-            _sa_update(Message)
-            .where(*where_clauses)
-            .values(is_deleted=True)
-        )
-        await session.execute(
-            _sa_update(Message)
-            .where(*where_clauses, Message.is_incoming, Message.read_at.is_(None))
-            .values(read_at=now)
-        )
-        return res.rowcount or 0
 
     for chat_id, msg_ids in with_chat.items():
         async with bot._session_factory() as session:
@@ -168,9 +151,10 @@ async def on_dm_delete(bot, _client, messages) -> None:
             hr = await find_known_hr(session, chat_id, chat_username)
             if hr is None:
                 continue
-            rowcount = await _flip_deleted(
+            rowcount = await tombstone_messages(
                 session,
-                [Message.hr_id == hr.id, Message.tg_message_id.in_(msg_ids)],
+                Message.hr_id == hr.id,
+                Message.tg_message_id.in_(msg_ids),
             )
             await session.commit()
             if rowcount:
@@ -185,21 +169,23 @@ async def on_dm_delete(bot, _client, messages) -> None:
             # Chatless sweep — narrowed to incoming so we never flip an
             # outgoing row that happens to share a tg_message_id with a
             # delete from a different HR.
+            # Отбор тот же, что у писателя, вместе с оговоркой «не надгробие»:
+            # иначе в смешанной пачке уже похороненная строка чужого HR
+            # разбудила бы окно за переписку, в которой ничего не изменилось.
             hr_id_rows = (
                 await session.execute(
                     select(Message.hr_id).where(
                         Message.tg_message_id.in_(chatless_ids),
                         Message.is_incoming,
                         Message.hr_id.is_not(None),
+                        Message.is_deleted.is_(False),
                     )
                 )
             ).all()
-            rowcount = await _flip_deleted(
+            rowcount = await tombstone_messages(
                 session,
-                [
-                    Message.tg_message_id.in_(chatless_ids),
-                    Message.is_incoming,
-                ],
+                Message.tg_message_id.in_(chatless_ids),
+                Message.is_incoming,
             )
             await session.commit()
             if rowcount:
