@@ -49,7 +49,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from adapters import lm_studio
 from adapters.lm_studio import LlmProviderConfig
-from backend.repository import blacklist, channels as channels_repo, companies_card, companies_list, hr_card, hr_identify, hr_list, messages as messages_repo, profile as profile_repo, stats_pipeline, stats_summary, vacancies_card, vacancies_life, vacancies_list, vacancies_mini  # три псевдонима: имена заняты локальными переменными
+from backend.repository import blacklist, blacklist_candidates, channels as channels_repo, companies_card, companies_list, hr_card, hr_identify, hr_list, messages as messages_repo, profile as profile_repo, stats_pipeline, stats_summary, vacancies_card, vacancies_life, vacancies_list, vacancies_mini  # три псевдонима: имена заняты локальными переменными
 from client.form_payloads import hr_is_identified, none_if_empty as _none_if_empty, read_new_company_fields, read_new_hr_fields
 from backend.cv_parser import parse_cv
 from backend.domain.scoring import build_skill_lookup, skill_key
@@ -3405,7 +3405,9 @@ class MainApi(QObject):
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                items = await blacklist.list_blacklist_candidates(session, kind)
+                items = await blacklist_candidates.list_blacklist_candidates(
+                    session, kind
+                )
             return _ok({"kind": kind, "items": items})
 
         self._dispatch(self.contacts_blacklist_candidates_loaded, run())
