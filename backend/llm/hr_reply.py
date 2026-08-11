@@ -1,7 +1,6 @@
 """Разбор ответа HR: на каком этапе теперь отклик."""
 
 
-import json
 import logging
 
 import httpx
@@ -12,7 +11,7 @@ from backend.domain.transitions import ALLOWED_AUTO_TRANSITIONS
 from backend.models import VacancyStatus
 from backend.payloads import Classification
 
-from backend.llm.answers import extract_last_json, str_or_none
+from backend.llm.answers import json_object, str_or_none
 from backend.llm.external import wrap_external
 
 logger = logging.getLogger(__name__)
@@ -127,12 +126,8 @@ CLASSIFY_HR_REPLY_PROMPT_TEMPLATE = """Ты классифицируешь от�
 
 
 def _parse_classification(answer: str) -> Classification | None:
-    raw = extract_last_json(answer)
-    if raw is None:
-        return None
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
+    data = json_object(answer, logger, "classify_hr_reply")
+    if data is None:
         return None
 
     raw_status = str(data.get("status") or "").strip()

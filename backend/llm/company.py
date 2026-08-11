@@ -1,13 +1,12 @@
 """Арбитр: та же это компания, что уже заведена, или новая."""
 
 
-import json
 import logging
 
 import httpx
 
 from adapters.lm_studio import ChatRequest, chat
-from backend.llm.answers import extract_last_json
+from backend.llm.answers import json_object
 
 logger = logging.getLogger(__name__)
 
@@ -97,17 +96,10 @@ async def dedupe_company_with_llm(
         return None, reply.error
     answer = reply.text
 
-    raw = extract_last_json(answer)
-    if raw is None:
+    obj = json_object(answer, logger, "dedupe_company")
+    if obj is None:
         logger.warning(
-            "dedupe_company: no JSON object in LLM answer %r", answer[:200]
-        )
-        return None, f"unparseable_json: {answer[:120]}"
-    try:
-        obj = json.loads(raw)
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.warning(
-            "dedupe_company: unparseable LLM JSON %r: %s", answer[:200], e
+            "dedupe_company: ответ модели не даёт объекта %r", answer[:200]
         )
         return None, f"unparseable_json: {answer[:120]}"
 

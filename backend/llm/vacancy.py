@@ -1,7 +1,6 @@
 """Разбор объявления о вакансии в структурированные поля."""
 
 
-import json
 import logging
 import re
 from dataclasses import replace
@@ -12,7 +11,7 @@ from adapters.lm_studio import ChatRequest, chat
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.payloads import ParsedVacancy
 
-from backend.llm.answers import extract_last_json, normalize_enum, str_or_none
+from backend.llm.answers import json_object, normalize_enum, str_or_none
 from backend.llm.candidate import _format_known_skills
 from backend.llm.external import wrap_external
 from backend.llm.skills import clean_stack_items
@@ -166,14 +165,8 @@ _DESCRIPTION_MAX_CHARS = 1500
 
 
 def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
-    raw = extract_last_json(answer)
-    if raw is None:
-        logger.debug("_parse_vacancy_json: no JSON block in LLM answer (%d chars)", len(answer))
-        return None
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as e:
-        logger.debug("_parse_vacancy_json: JSONDecodeError %s on %r", e, raw[:200])
+    data = json_object(answer, logger, "parse_vacancy")
+    if data is None:
         return None
 
     raw_title = data.get("title")
