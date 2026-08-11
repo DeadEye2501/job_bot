@@ -2,7 +2,7 @@
 
 import logging
 
-from backend.domain.skill_names import skill_key
+from backend.domain.skill_names import index_by_key, skill_key
 from backend.models import ProfileSkill
 from backend.payloads import ParsedVacancy
 
@@ -19,34 +19,22 @@ def _build_skill_level_lookup(
     the same.
 
     Два навыка с общим ключом — схема такого не запрещает — разрешаются в
-    пользу первого: порядок выдачи базы ничем не задан, и побеждай
-    последний, балл вакансии зависел бы от него. То же правило держит
-    `repository/profile._index_skill_keys`.
+    пользу первого; само правило живёт в `domain/skill_names.index_by_key`.
+    Жалуемся вполголоса и только на спор уровней: одинаковый уровень под
+    общим ключом баллу вакансии ничего не меняет.
     """
     out: dict[str, int] = {}
-
-    def _put(key: str, level: int, source: str) -> None:
-        prev = out.get(key)
-        if prev is not None:
-            if prev != level:
+    for s in skills:
+        for name, key, existing in index_by_key(
+            out, (s.name, *(s.aliases or [])), s.level
+        ):
+            if existing != s.level:
                 logger.debug(
                     "profile skill key collision: %r already mapped to "
-                    "level=%d, %s with level=%d ignored",
-                    key, prev, source, level,
+                    "level=%d, %s %r with level=%d ignored",
+                    key, existing,
+                    "name" if name == s.name else "alias", name, s.level,
                 )
-            return
-        out[key] = level
-
-    for s in skills:
-        # Сырая строка проверяется только на пустое значение, пустота — по
-        # ключу: имя из одних пробелов дало бы пустой ключ, и любая
-        # пробельная строка в стеке вакансии находила бы его как знакомый
-        # навык.
-        if s.name and skill_key(s.name):
-            _put(skill_key(s.name), s.level, f"name={s.name!r}")
-        for alias in (s.aliases or []):
-            if isinstance(alias, str) and skill_key(alias):
-                _put(skill_key(alias), s.level, f"alias={alias!r}")
     return out
 
 

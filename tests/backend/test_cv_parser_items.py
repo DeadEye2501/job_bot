@@ -75,6 +75,18 @@ async def test_an_alias_repeating_the_name_is_dropped():
     assert skill.aliases == ["Postgres"]
 
 
+async def test_an_alias_differing_only_by_a_separator_is_dropped():
+    """Псевдоним, отличающийся от названия одним разделителем, отбрасывается.
+
+    «Node.js» и «node js» — одно и то же по ключу сравнения навыков, и в
+    анкете такая пара сталкивается: строка записывается под первый ключ, а
+    второе написание молча теряет привязку.
+    """
+    skill = await one_skill(name="Node.js", aliases=["node js", "Nodejs"])
+
+    assert skill.aliases == ["Nodejs"]
+
+
 async def test_repeated_aliases_are_kept_once():
     """Повторяющиеся псевдонимы не удваиваются."""
     skill = await one_skill(aliases=["py", "PY", "Py"])
@@ -83,8 +95,12 @@ async def test_repeated_aliases_are_kept_once():
 
 
 async def test_blank_and_non_string_aliases_are_dropped():
-    """Мусор в псевдонимах отбрасывается."""
-    skill = await one_skill(aliases=["py", "", "   ", 42, None])
+    """Мусор в псевдонимах отбрасывается.
+
+    Написание из одних разделителей — тот же мусор: ключа у него нет, а
+    значит и привязать по нему нечего.
+    """
+    skill = await one_skill(aliases=["py", "", "   ", "///", "-", 42, None])
 
     assert skill.aliases == ["py"]
 

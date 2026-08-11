@@ -192,7 +192,7 @@ async def get_stats_skills(
         await session.scalars(select(Vacancy.stack).where(*base_filter))
     ).all()
     counts: dict[str, int] = {}
-    canon_by_lower: dict[str, str] = {}
+    canon_by_key: dict[str, str] = {}
     for stack in rows:
         if not isinstance(stack, list):
             continue
@@ -204,23 +204,23 @@ async def get_stats_skills(
             # Пустое и написанное одними разделителями («///») технологией не
             # считается: ключ у такого пустой, и своей строки в списке оно не
             # получает.
-            lo = skill_key(tag)
-            if not lo:
+            key = skill_key(tag)
+            if not key:
                 continue
-            if lo in seen_in_row:
+            if key in seen_in_row:
                 continue
-            seen_in_row.add(lo)
-            canon = canon_by_lower.setdefault(lo, tag)
-            counts[canon] = counts.get(canon, 0) + 1
+            seen_in_row.add(key)
+            canon_by_key.setdefault(key, tag)
+            counts[key] = counts.get(key, 0) + 1
 
     items = []
-    for canon, cnt in counts.items():
+    for key, cnt in counts.items():
         if cnt < min_count:
             continue
         items.append({
-            "label": canon,
+            "label": canon_by_key[key],
             "count": cnt,
-            "mine": skill_key(canon) in profile_set,
+            "mine": key in profile_set,
         })
     items.sort(key=lambda it: (-it["count"], it["label"].casefold()))
     return {
