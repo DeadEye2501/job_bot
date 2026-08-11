@@ -9,10 +9,11 @@
 """
 
 import json
+import logging
 
 import pytest
 
-from backend.llm.answers import extract_last_json
+from backend.llm.answers import extract_last_json, json_object
 
 
 @pytest.mark.parametrize(
@@ -96,3 +97,16 @@ def test_typographic_quotes_inside_a_value_do_not_break_the_object():
     assert json.loads(extract_last_json(answer)) == {
         "reasoning": "“Сбер” и ПАО Сбербанк — одно"
     }
+
+def test_an_unreadable_answer_leaves_a_trace_in_the_log(caplog):
+    """Ответ, из которого объект не собрался, оставляет след в журнале.
+
+    Наружу неудача уходит откатом: у одного зовущего пусто, у другого пара с
+    причиной, у третьего «пропускаем». Двое из пятерых при этом молчат совсем,
+    и без этой записи разбирать, почему модель перестала отвечать объектом,
+    было бы нечем.
+    """
+    with caplog.at_level(logging.DEBUG, logger="проверка"):
+        assert json_object("я не понял", logging.getLogger("проверка"), "разбор") is None
+
+    assert any(rec.name == "проверка" for rec in caplog.records)

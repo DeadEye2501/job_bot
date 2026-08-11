@@ -1,7 +1,6 @@
 """Приговор о пригодности вакансии кандидату."""
 
 
-import json
 import logging
 
 import httpx
@@ -10,7 +9,7 @@ from adapters.lm_studio import ChatRequest, chat
 
 from backend.payloads import FIT_VERDICTS, FitValidation, ParsedVacancy
 
-from backend.llm.answers import extract_last_json, normalize_enum, str_or_none
+from backend.llm.answers import json_object, normalize_enum, str_or_none
 from backend.llm.candidate import (
     CandidateProfile,
     _format_free_preferences,
@@ -248,12 +247,8 @@ CANDIDATE_LOCATION: Армения/Ереван. ACCEPTED_FORMATS: удалён�
 
 
 def _parse_fit_validation(answer: str) -> FitValidation | None:
-    raw = extract_last_json(answer)
-    if raw is None:
-        return None
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
+    data = json_object(answer, logger, "validate_vacancy_fit")
+    if data is None:
         return None
 
     verdict = normalize_enum(data.get("verdict"), FIT_VERDICTS)

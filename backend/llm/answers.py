@@ -2,6 +2,7 @@
 
 
 import json
+import logging
 import re
 
 _JSON_OBJECT_RE = re.compile(r"\{[^{}]*\}", re.DOTALL)
@@ -37,6 +38,31 @@ def extract_last_json(answer: str) -> str | None:
             return candidate
     matches = _JSON_OBJECT_RE.findall(straightened)
     return matches[-1] if matches else None
+
+
+def json_object(answer: str, log: logging.Logger, purpose: str) -> dict | None:
+    """Объект JSON из ответа модели, а неразбираемое — как отсутствие.
+
+    Ответ модели превращают в словарь пятеро, и различаются они не разбором,
+    а тем, что делают с неудачей: у одного откат `None`, у другого пара с
+    причиной, у третьего «не поймали — пропускаем». Поэтому здесь только
+    разбор; откат остаётся делом зовущего.
+
+    Пишет логгером зовущего: в окне журнала у строки виден источник, и пять
+    обращений иначе схлопнулись бы под одним именем. Уровень отладочный,
+    потому что громко о неудаче говорит тот, кому она чего-то стоила: двое
+    зовущих пишут предупреждение поверх, а трое молчат — им довольно и этой
+    записи, единственной, где сказано, что именно не разобралось.
+    """
+    raw = extract_last_json(answer)
+    if raw is None:
+        log.debug("%s: в ответе модели нет объекта JSON (%r)", purpose, answer[:200])
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        log.debug("%s: объект не разбирается (%r)", purpose, raw[:200], exc_info=True)
+        return None
 
 
 def str_or_none(value) -> str | None:

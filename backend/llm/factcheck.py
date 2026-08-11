@@ -1,14 +1,13 @@
 """Сверка письма-отклика с тем, что о кандидате известно."""
 
 
-import json
 import logging
 import time
 
 import httpx
 
 from adapters.lm_studio import ChatRequest, chat
-from backend.llm.answers import extract_last_json
+from backend.llm.answers import json_object
 from backend.llm.external import wrap_external
 
 logger = logging.getLogger(__name__)
@@ -107,22 +106,13 @@ async def factcheck_cover_letter(
         return True, []
     answer = reply.text
 
-    raw = extract_last_json(answer)
-    if raw is None:
+    obj = json_object(answer, logger, "factcheck_cover_letter")
+    if obj is None:
         logger.warning(
-            "factcheck_cover_letter: no JSON object in answer %r — fail-open",
+            "factcheck_cover_letter: ответ модели не даёт объекта %r — пропускаем",
             answer[:200],
         )
         return True, []
-    try:
-        obj = json.loads(raw)
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.warning(
-            "factcheck_cover_letter: unparseable JSON %r: %s — fail-open",
-            answer[:200], e,
-        )
-        return True, []
-
 
     verdict = obj.get("verdict")
     issues_raw = obj.get("issues") or []
