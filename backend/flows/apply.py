@@ -59,6 +59,26 @@ def _build_short_text(
     return intro
 
 
+def _send_refusal(v, *, force: bool, when: str) -> str | None:
+    """Почему отклик слать нельзя: код отказа для окна, а можно — пусто.
+
+    Заслон спрашивают дважды — до сборки письма и после задержки на модель;
+    двойная проверка задумана, а вот правило чтения одно, и разойдись оно,
+    окно получало бы на одной и той же гонке разные ответы. `when` идёт
+    только в журнал: по нему видно, какой из двух заслонов сработал.
+    """
+    if v is None:
+        return "no_vacancy"
+    if not force and v.status == VacancyStatus.APPLIED:
+        logger.info(
+            "vacancy %d: status already APPLIED %s "
+            "(race with manual UI or parallel auto-flow)",
+            v.id, when,
+        )
+        return "race"
+    return None
+
+
 async def try_auto_send(
     pipeline, hr, parsed: ParsedVacancy, vacancy_id: int
 ) -> tuple[bool, str]:
@@ -126,15 +146,9 @@ async def send_application(
                 .options(selectinload(Vacancy.channel))
             )
         ).first()
-        if v is None:
-            return False, "no_vacancy"
-        if not force and v.status == VacancyStatus.APPLIED:
-            logger.info(
-                "vacancy %d: status already APPLIED at send-time "
-                "(race with manual UI or parallel auto-flow)",
-                vacancy_id,
-            )
-            return False, "race"
+        refusal = _send_refusal(v, force=force, when="at send-time")
+        if refusal is not None:
+            return False, refusal
         prior_count = await count_recent_outgoing_with_vacancy_for_hr(
             session, hr.id, window_days=_RECENT_SEND_WINDOW_DAYS,
         )
@@ -185,15 +199,9 @@ async def send_application(
     if not force:
         async with pipeline._session_factory() as session:
             v = await session.get(Vacancy, vacancy_id)
-            if v is None:
-                return False, "no_vacancy"
-            if v.status == VacancyStatus.APPLIED:
-                logger.info(
-                    "vacancy %d: status flipped to APPLIED during "
-                    "send-prep (race with manual UI or parallel auto-flow)",
-                    vacancy_id,
-                )
-                return False, "race"
+            refusal = _send_refusal(v, force=force, when="during send-prep")
+            if refusal is not None:
+                return False, refusal
     try:
         sent = await pipeline._send(
             hr, text, attachment=attachment, vacancy_id=vacancy_id,

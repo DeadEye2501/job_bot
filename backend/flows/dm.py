@@ -11,7 +11,7 @@ from backend.flows.auto_gate import status_open_for_auto
 from backend.helpers import extract_dm_text
 from backend.helpers import extract_text
 from backend.helpers import fetch_telegram_avatar
-from backend.llm.hr_reply import classify_hr_reply
+from backend.flows.dm_classify import classify_and_apply
 from backend.payloads import OutgoingMessage
 from backend.repository.hr_identify import find_known_hr
 from backend.repository.hr_identify import find_latest_vacancy_id_for_hr
@@ -20,7 +20,6 @@ from backend.repository.hr_identify import resolve_reply_target_vacancy
 from backend.repository.messages import find_outgoing_message
 from backend.repository.messages import save_incoming_message
 from backend.repository.messages import save_outgoing_message
-from backend.repository.vacancies_life import apply_classification
 
 logger = logging.getLogger(__name__)
 
@@ -209,36 +208,10 @@ async def process_dm(
         schedule_classification(hr.id, vacancy_id, new_msg_id, classify_text)
         return
 
-    classification = await classify_hr_reply(
-        classify_text, v_status, lm_client, lm_chat_model
+    await classify_and_apply(
+        session_factory,
+        lm_client,
+        lm_chat_model,
+        classify_text,
+        (vacancy_id, new_msg_id, v_status),
     )
-    if classification is None:
-        logger.info(
-            "vacancy %s: classifier returned None, skipping status update",
-            vacancy_id,
-            extra={"vacancy_id": vacancy_id, "tg_message_id": msg.id},
-        )
-        return
-    logger.info(
-        "vacancy %s: classifier verdict=%s -> applying",
-        vacancy_id,
-        classification.status.value,
-    )
-
-    async with session_factory() as session:
-        try:
-            await apply_classification(
-                session, vacancy_id, new_msg_id, classification
-            )
-            await session.commit()
-            logger.info(
-                "vacancy %s: classification committed (msg=%d)",
-                vacancy_id,
-                new_msg_id,
-            )
-        except Exception:
-            logger.exception(
-                "classification apply failed",
-                extra={"vacancy_id": vacancy_id, "message_id": new_msg_id},
-            )
-

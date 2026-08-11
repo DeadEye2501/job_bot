@@ -1,10 +1,11 @@
-"""Отложенный разбор накопленной переписки с HR."""
+"""Разбор переписки с HR языковой моделью."""
 
 import logging
 import asyncio
 
 from backend.flows.auto_gate import status_open_for_auto
 from backend.llm.hr_reply import classify_hr_reply
+from backend.models import VacancyStatus
 from backend.repository.vacancies_life import apply_classification
 from backend.notify import fire
 
@@ -74,6 +75,47 @@ def schedule_dm_classification(
     pipeline._dm_classify_tasks[hr_id] = asyncio.create_task(
         _run_debounced_classify(pipeline, hr_id)
     )
+
+
+async def classify_and_apply(
+    session_factory,
+    lm_client,
+    lm_chat_model,
+    text: str,
+    target: tuple[int, int, VacancyStatus],
+) -> bool:
+    """Спросить модель о письме и применить вердикт; отдать, применён ли он.
+
+    Дорог две — отложенный разбор пачки и разбор одного письма на месте, — и
+    правило у них одно: пустой вердикт ничего не двигает, а применение идёт
+    своей транзакцией, потому что чужой рядом нет.
+
+    `target` — «вакансия, письмо, её нынешний статус»: три довода, которые
+    все три описывают одно, к чему прикладывают вердикт, и порознь ни один
+    из них здесь не нужен.
+    """
+    vacancy_id, msg_id, status = target
+    verdict = await classify_hr_reply(text, status, lm_client, lm_chat_model)
+    if verdict is None:
+        logger.info("vacancy %s: classifier gave nothing", vacancy_id)
+        return False
+    logger.info(
+        "vacancy %s: classifier verdict=%s -> applying",
+        vacancy_id, verdict.status.value,
+    )
+    async with session_factory() as session:
+        try:
+            await apply_classification(
+                session, vacancy_id, msg_id, verdict
+            )
+            await session.commit()
+        except Exception:
+            logger.exception(
+                "classification apply failed",
+                extra={"vacancy_id": vacancy_id, "message_id": msg_id},
+            )
+            return False
+    return True
 
 
 async def _run_debounced_classify(pipeline, hr_id: int) -> None:
@@ -149,10 +191,18 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
             vacancy_id, v_status.value, hr_id, len(buf),
         )
         return
+    logger.info(
+        "debounced classify: hr %d, %d msgs in burst -> vacancy %s",
+        hr_id, len(buf), vacancy_id,
+    )
     try:
         async with pipeline._dm_classify_semaphore:
-            classification = await classify_hr_reply(
-                text, v_status, pipeline._lm_client, pipeline._lm_chat_model
+            applied = await classify_and_apply(
+                pipeline._session_factory,
+                pipeline._lm_client,
+                pipeline._lm_chat_model,
+                text,
+                (vacancy_id, msg_id, v_status),
             )
     except Exception:
         logger.exception(
@@ -160,29 +210,8 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
             hr_id, len(buf),
         )
         return
-    if classification is None:
-        logger.info(
-            "vacancy %s: classifier returned None for hr %d (%d msgs in burst)",
-            vacancy_id, hr_id, len(buf),
-        )
-        return
-    logger.info(
-        "vacancy %s: classifier verdict=%s -> applying (hr %d, %d msgs in burst)",
-        vacancy_id, classification.status.value, hr_id, len(buf),
-    )
-    async with pipeline._session_factory() as session:
-        try:
-            await apply_classification(
-                session, vacancy_id, msg_id, classification
-            )
-            await session.commit()
-        except Exception:
-            logger.exception(
-                "debounced classify apply failed",
-                extra={"vacancy_id": vacancy_id, "hr_id": hr_id},
-            )
-            return
-    fire(pipeline.on_vacancies_changed, "on_vacancies_changed")
+    if applied:
+        fire(pipeline.on_vacancies_changed, "on_vacancies_changed")
 
 
 async def _wait_out(pipeline, tasks: list, *, drain: bool) -> None:

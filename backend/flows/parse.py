@@ -24,6 +24,7 @@ from backend.models import VacancyStatus
 from backend.payloads import ParsedVacancy
 from backend.repository.companies_matching import find_or_create_company
 from backend.repository.hr_identify import find_or_create_hr
+from backend.flows.events import record_vacancy_event
 from backend.repository.vacancies_life import add_vacancy_event
 
 from backend.flows import apply
@@ -193,20 +194,12 @@ async def parse_and_update_vacancy(
         # зависимости от исхода — иначе юзер смотрит на NEW-вакансию
         # через месяцы и не может понять «почему авто-отправка не
         # сработала, ведь HR резолвлен и score прошёл».
-        try:
-            async with pipeline._session_factory() as session:
-                await add_vacancy_event(
-                    session,
-                    vacancy_id,
-                    "auto_send",
-                    {"ok": ok, "reason": reason},
-                )
-                await session.commit()
-        except Exception:
-            logger.exception(
-                "auto_send event persist failed",
-                extra={"vacancy_id": vacancy_id},
-            )
+        await record_vacancy_event(
+            pipeline._session_factory,
+            vacancy_id,
+            "auto_send",
+            {"ok": ok, "reason": reason},
+        )
 
     # ПОСЛЕ auto-send'а: иначе backfill может через get_chat_history
     # вытащить cover-letter сообщение раньше, чем Bot.send закоммитит

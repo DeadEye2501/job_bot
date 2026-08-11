@@ -14,7 +14,7 @@ from backend.helpers import extract_text
 from backend.models import BotMode
 from backend.models import Message
 from backend.repository.hr_identify import find_known_hr
-from backend.repository.messages import tombstone_messages
+from backend.repository.messages import mark_outgoing_read, tombstone_messages
 
 from backend.notify import fire
 
@@ -34,7 +34,6 @@ async def on_raw_update(bot, _client, update, _users, _chats) -> None:
     if (await bot._current_mode()) is BotMode.OFF:
         return
     from datetime import datetime as _dt, timezone as _tz
-    from sqlalchemy import update as _sa_update
 
     user_id = peer.user_id
     max_id = update.max_id
@@ -43,19 +42,8 @@ async def on_raw_update(bot, _client, update, _users, _chats) -> None:
         hr = await find_known_hr(session, user_id, None)
         if hr is None:
             return
-        res = await session.execute(
-            _sa_update(Message)
-            .where(
-                Message.hr_id == hr.id,
-                Message.is_incoming.is_(False),
-                Message.tg_message_id <= max_id,
-                Message.tg_message_id.is_not(None),
-                Message.read_at.is_(None),
-            )
-            .values(read_at=now)
-        )
+        updated = await mark_outgoing_read(session, hr.id, max_id, now)
         await session.commit()
-        updated = res.rowcount or 0
         hr_id = hr.id
     if updated:
         fire(bot.on_hr_read, "on_hr_read", hr_id, max_id)
