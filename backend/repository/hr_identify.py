@@ -147,9 +147,41 @@ async def resolve_reply_target_vacancy(
     return await session.scalar(stmt)
 
 
-def refresh_hr_username(hr: HR, sender_username: str | None) -> None:
-    if sender_username and hr.telegram_username != sender_username:
-        hr.telegram_username = sender_username
+def telegram_full_name(user) -> str | None:
+    """Имя собеседника, собранное из имени и фамилии Telegram."""
+    return " ".join(filter(None, [user.first_name, user.last_name])).strip() or None
+
+
+def refresh_hr_from_telegram(hr: HR, user, *, avatar: bytes | None) -> None:
+    """Дополнить найденную запись тем, что пришло от Telegram.
+
+    Номер собеседника узнаётся только с первым его письмом: карточку
+    заводят одним ником из окна «Контакты», и пока номера нет, поиск идёт
+    запасным путём. Проставленный, он переводит все следующие поиски на
+    прямое попадание.
+
+    Заполняется только пустое: записанное имя и картинку правят руками в
+    окне, и написанное там точнее того, как собеседник назвался сам. Ник —
+    наоборот: он не наш, а его, и сменившийся подхватывается.
+
+    **Пустота не удерживается:** очистка поля в окне тоже пустота, и
+    следующее же входящее письмо впишет туда имя из Telegram. Отличить «не
+    было никогда» от «стёрли нарочно» нечем — для этого нужна ещё колонка.
+
+    Картинка держится того же правила намеренно: обновляй её каждый раз, и
+    свежая заменялась бы устаревшей с любого запоздавшего пути. Цена
+    известна: сменивший фотографию собеседник остаётся со старой, пока
+    колонку не очистят руками.
+    """
+    if hr.telegram_user_id is None:
+        hr.telegram_user_id = user.id
+    if user.username and hr.telegram_username != user.username:
+        hr.telegram_username = user.username
+    full_name = telegram_full_name(user)
+    if not hr.name and full_name:
+        hr.name = full_name
+    if avatar is not None and hr.avatar is None:
+        hr.avatar = avatar
 
 
 async def create_hr(
@@ -169,8 +201,8 @@ async def create_hr(
     Единственное место, где заводится строка собеседника: и по кнопке из
     окна, и опознанием автора вакансии в `find_or_create_hr`. Картинка
     профиля довода не получила нарочно: приносит её только второй путь, и
-    дописывает он её сам — тем же присваиванием, каким дополняет уже
-    найденную строку.
+    дописывает он её сам, сразу за заведением, — у новой строки перебивать
+    нечего, поэтому оговорок `refresh_hr_from_telegram` ей не нужно.
     """
     hr = HR(
         name=(name or None),
@@ -201,30 +233,15 @@ async def find_or_create_hr(
     пустым чатом до рестарта."""
     hr = await find_known_hr(session, user.id, user.username)
 
-    full_name = " ".join(
-        filter(None, [user.first_name, user.last_name])
-    ).strip() or None
-
     if hr is None:
         hr = await create_hr(
             session,
-            name=full_name,
+            name=telegram_full_name(user),
             telegram_username=user.username,
             telegram_user_id=user.id,
         )
         hr.avatar = avatar
         return hr, True
 
-    if hr.telegram_user_id is None:
-        hr.telegram_user_id = user.id
-    if user.username and hr.telegram_username != user.username:
-        hr.telegram_username = user.username
-    if not hr.name and full_name:
-        hr.name = full_name
-    # Backfill only when empty — keeps a freshly-fetched photo from being
-    # overwritten by a stale fetch on a later flow. Trade-off: if the HR
-    # changes their Telegram photo, the bot keeps the old one until the
-    # column is manually cleared.
-    if avatar is not None and hr.avatar is None:
-        hr.avatar = avatar
+    refresh_hr_from_telegram(hr, user, avatar=avatar)
     return hr, False

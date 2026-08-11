@@ -2,12 +2,17 @@
 
 Опознание идёт по идентификатору Telegram, а если его в записи ещё нет — по
 нику. Ник у Telegram меняется свободно и может достаться другому человеку,
-поэтому при споре он уступает.
+поэтому при споре он уступает, а запись с чужим идентификатором запасной путь
+не берёт вовсе.
+
+Здесь же заслон дополнения записи на пустом нике: остальное, что дописывается с
+первым письмом, наблюдается по дороге переписки.
 """
 
-from backend.repository.hr_identify import find_known_hr, refresh_hr_username
+from backend.repository.hr_identify import find_known_hr, refresh_hr_from_telegram
 from tests.dbio import put
 from tests.factories import hr_row
+from tests.fakes.telegram import user
 
 
 async def test_an_hr_is_found_by_telegram_id(session, session_factory):
@@ -91,15 +96,6 @@ async def test_an_unknown_sender_is_not_found(session, session_factory):
     assert await find_known_hr(session, 222, "olga") is None
 
 
-def test_a_changed_username_is_picked_up():
-    """Сменившийся ник подхватывается из входящего сообщения."""
-    hr = hr_row(telegram_username="old")
-
-    refresh_hr_username(hr, "new")
-
-    assert hr.telegram_username == "new"
-
-
 def test_an_absent_username_does_not_erase_the_stored_one():
     """Отсутствие ника в сообщении не стирает сохранённый.
 
@@ -108,7 +104,7 @@ def test_an_absent_username_does_not_erase_the_stored_one():
     """
     hr = hr_row(telegram_username="maria")
 
-    refresh_hr_username(hr, None)
-    refresh_hr_username(hr, "")
+    refresh_hr_from_telegram(hr, user(id=777, username=None), avatar=None)
+    refresh_hr_from_telegram(hr, user(id=777, username=""), avatar=None)
 
     assert hr.telegram_username == "maria"

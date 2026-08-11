@@ -5,8 +5,9 @@
 что пришло от уже заведённого HR.
 
 Первое письмо от HR ещё и дописывает его карточку: до него строка может знать
-одно лишь имя, а номер собеседника узнаётся ровно в этот миг. Заодно
-подтягивается аватар — но только если своего у карточки ещё нет.
+один лишь ник, а номер собеседника узнаётся ровно в этот миг. Заодно
+подтягиваются имя и аватар — но только в пустое место: записанное руками в окне
+точнее того, как собеседник назвался сам.
 """
 
 import pytest
@@ -116,6 +117,39 @@ async def test_a_renamed_correspondent_is_renamed_in_the_card(session_factory, d
     await deliver(incoming(username="maria_hr"))
 
     assert (await only_row(session_factory, HR)).telegram_username == "maria_hr"
+
+
+async def test_a_card_without_a_name_gets_the_one_from_telegram(
+    session_factory, deliver
+):
+    """Карточке без имени первое письмо дописывает имя собеседника.
+
+    Карточку заводят одним ником из окна «Контакты», и до первого письма
+    показать в ней некого: в списке она стоит пустой строкой. Имя приходит
+    в том же сообщении, что и номер собеседника.
+    """
+    await put(session_factory, hr_row(name=None, telegram_user_id=777))
+
+    await deliver(
+        incoming(from_user=user(id=777, first_name="Мария", last_name="Ким"))
+    )
+
+    assert (await only_row(session_factory, HR)).name == "Мария Ким"
+
+
+async def test_a_card_with_a_name_keeps_it(session_factory, deliver):
+    """Своё имя карточки письмо не перебивает.
+
+    Имя правят руками в окне, и оно точнее того, как собеседник назвался
+    в Telegram.
+    """
+    await put(session_factory, hr_row(name="Мария из Контура", telegram_user_id=777))
+
+    await deliver(
+        incoming(from_user=user(id=777, first_name="Мария", last_name="Ким"))
+    )
+
+    assert (await only_row(session_factory, HR)).name == "Мария из Контура"
 
 
 async def test_a_card_without_a_picture_gets_one(session_factory, deliver):
