@@ -7,6 +7,7 @@ from datetime import date
 import httpx
 
 from adapters.lm_studio import ChatRequest, chat
+from backend.domain.skill_names import skill_key
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
 from backend.llm.answers import QUOTE_TRANSLATION, normalize_enum, str_or_none
 from backend.payloads import str_list
@@ -329,11 +330,16 @@ def _parse_skill(item) -> ParsedCvSkill | None:
         logger.warning("parse_cv: skill %r got non-numeric level %r, defaulting to 3", name, raw_level)
         level = 3
     level = max(1, min(5, level))
-    seen: set[str] = {name.casefold()}
+    # Ключ тот же, что у сравнения навыков: иначе «Node.js» и «node js»
+    # доезжали бы до анкеты двумя написаниями, там сталкивались по ключу, и
+    # второе молча теряло бы привязку. Написание, у которого ключ пуст
+    # («-», «///»), прозвищем не считается вовсе: привязать по нему нечего,
+    # а в окне оно копилось бы повторами.
+    seen = {skill_key(name)}
     aliases: list[str] = []
     for a in str_list(item.get("aliases")):
-        key = a.casefold()
-        if key in seen:
+        key = skill_key(a)
+        if not key or key in seen:
             continue
         seen.add(key)
         aliases.append(a)

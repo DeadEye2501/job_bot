@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.cv_parser import ParsedCv
-from backend.domain.skill_names import skill_key
+from backend.domain.skill_names import index_by_key, skill_key
 from backend.models import (
     AppSetting,
     Profile,
@@ -29,24 +29,17 @@ def _index_skill_keys(
 ) -> None:
     """Записать строку навыка под ключи её написаний; первая выигрывает.
 
-    Первая, а не последняя, потому что порядок выдачи базы ничем не задан:
-    два написания одного навыка («Node.js» и «Node JS») иначе отдавали бы
-    привязку то одному, то другому, и человек, назвавший один навык, после
-    перечитывания видел бы другой. О столкновении сообщаем: в анкете его
-    быть не должно, а схема его не запрещает.
+    Само правило живёт в `domain/skill_names.index_by_key`; здесь остаётся
+    жалоба. Жалуемся громко и только на спор двух разных строк: в анкете
+    такого быть не должно, а схема не запрещает. Столкновение написания с
+    собственным названием строки — не спор, а обычное дело.
     """
-    for name in names:
-        key = skill_key(name)
-        if not key:
-            continue
-        existing = lookup.get(key)
-        if existing is not None and existing is not row:
+    for _name, key, existing in index_by_key(lookup, names, row):
+        if existing is not row:
             logger.warning(
                 "%s: skill key %r collides between %r and %r, keeping first",
                 where, key, existing.name, row.name,
             )
-            continue
-        lookup[key] = row
 
 
 def _skills_by_key(rows: list[ProfileSkill]) -> dict[str, ProfileSkill]:
