@@ -4,6 +4,7 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.funnel import INVITED, RESPONDED
+from backend.domain.verdict import TRASH_SKIP_PREFIX
 from backend.models import (
     TelegramChannel,
     TrashEvent,
@@ -24,7 +25,7 @@ async def get_stats_channels_pipeline(
     Ингест-колонки (по `Vacancy.created_at >= since`):
       - total: всё, что канал прислал в окно (Vacancy-ряды + trash_events)
       - trash: auto-ingest deletions (`trash_event`) + ряды с
-        `status=NOT_FIT` и `skip_reason LIKE 'trash:%'` (rerun-режим)
+        `status=NOT_FIT` и `skip_reason` с меткой `TRASH_SKIP_PREFIX` (rerun-режим)
       - not_fit: `status=NOT_FIT` БЕЗ trash-маркера (отсев фит-валидатором)
       - fit = max(0, total − trash − not_fit)
 
@@ -55,18 +56,22 @@ async def get_stats_channels_pipeline(
     # режиме они УДАЛЯЮТСЯ из ``vacancy``, и счётчик хранится в отдельной
     # таблице ``trash_event`` (см. flows/cleanup.py, delete_vacancy_as_trash).
     # В rerun-режиме ряд остаётся как ``status=NOT_FIT`` + ``skip_reason``
-    # начинается с "trash:" — таких добавим к trash-счётчику ниже.
+    # начинается с ``TRASH_SKIP_PREFIX`` — таких добавим к trash-счётчику ниже.
     # Not Fit (clean) — отсев фит-валидатором по языку/локации/уровню,
     # т.е. ``status=NOT_FIT`` БЕЗ trash-маркера в skip_reason.
+    # Образец один на два условия: они обязаны быть отрицанием друг друга,
+    # а набранные порознь разъехались бы молча. Пробел у метки в образец
+    # не идёт — за ним следует сама причина.
+    marked_trash = Vacancy.skip_reason.like(f"{TRASH_SKIP_PREFIX.rstrip()}%")
     is_rerun_trash = and_(
         Vacancy.status == VacancyStatus.NOT_FIT,
-        Vacancy.skip_reason.like("trash:%"),
+        marked_trash,
     )
     is_not_fit_clean = and_(
         Vacancy.status == VacancyStatus.NOT_FIT,
         or_(
             Vacancy.skip_reason.is_(None),
-            ~Vacancy.skip_reason.like("trash:%"),
+            ~marked_trash,
         ),
     )
     rows = (

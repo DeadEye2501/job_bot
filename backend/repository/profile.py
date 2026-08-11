@@ -16,6 +16,7 @@ from backend.models import (
     ProfileSkill,
     profile_experience_skills,
 )
+from backend.payloads import str_list
 
 logger = logging.getLogger(__name__)
 
@@ -219,10 +220,7 @@ async def save_skills(
             level = int(row.get("level") or 1)
         except (TypeError, ValueError):
             level = 1
-        aliases = [
-            a for a in (row.get("aliases") or [])
-            if isinstance(a, str) and a.strip()
-        ]
+        aliases = str_list(row.get("aliases"))
         rid = row.get("id")
         rid_int = rid if isinstance(rid, int) else None
 
@@ -328,12 +326,8 @@ async def save_experience(
             role=row["role"].strip(),
             start_date=start_date,
             end_date=end_date,
-            achievements=[
-                a for a in (row.get("achievements") or []) if isinstance(a, str) and a.strip()
-            ],
-            responsibilities=[
-                r for r in (row.get("responsibilities") or []) if isinstance(r, str) and r.strip()
-            ],
+            achievements=str_list(row.get("achievements")),
+            responsibilities=str_list(row.get("responsibilities")),
         )
         for sname in (row.get("skill_names") or []):
             s = skills_by_name.get(skill_key(str(sname)))

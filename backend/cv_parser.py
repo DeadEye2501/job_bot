@@ -9,6 +9,7 @@ import httpx
 from adapters.lm_studio import ChatRequest, chat
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
 from backend.llm.answers import QUOTE_TRANSLATION, normalize_enum, str_or_none
+from backend.payloads import str_list
 
 
 logger = logging.getLogger(__name__)
@@ -198,12 +199,6 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
 
-def _str_list(value) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [s.strip() for s in value if isinstance(s, str) and s.strip()]
-
-
 def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]:
     if not isinstance(raw, list):
         return []
@@ -336,7 +331,7 @@ def _parse_skill(item) -> ParsedCvSkill | None:
     level = max(1, min(5, level))
     seen: set[str] = {name.casefold()}
     aliases: list[str] = []
-    for a in _str_list(item.get("aliases")):
+    for a in str_list(item.get("aliases")):
         key = a.casefold()
         if key in seen:
             continue
@@ -364,9 +359,9 @@ def _parse_experience(item) -> ParsedCvExperience | None:
         role=role,
         start_date=start,
         end_date=_parse_date(item.get("end_date")),
-        achievements=_str_list(item.get("achievements")),
-        responsibilities=_str_list(item.get("responsibilities")),
-        stack=_str_list(item.get("stack")),
+        achievements=str_list(item.get("achievements")),
+        responsibilities=str_list(item.get("responsibilities")),
+        stack=str_list(item.get("stack")),
     )
 
 

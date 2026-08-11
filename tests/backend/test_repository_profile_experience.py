@@ -123,8 +123,8 @@ async def test_a_place_keeps_everything_it_was_given(session, session_factory):
                 role="  Старший разработчик  ",
                 start_date="2020-03-01",
                 end_date="2023-06-30",
-                achievements=["ускорил сборку", "  ", "", 42, None],
-                responsibilities=["правил ошибки", None],
+                achievements=["  ускорил сборку  ", "  ", "", 42, None],
+                responsibilities=42,
             )
         ],
         profile.id,
@@ -136,8 +136,10 @@ async def test_a_place_keeps_everything_it_was_given(session, session_factory):
     assert saved.role == "Старший разработчик"
     assert saved.start_date == date(2020, 3, 1)
     assert saved.end_date == date(2023, 6, 30)
+    # Пробелы по краям срезаются, а не-список читается как пустой: пункты
+    # приходят из формы окна, и уронить сохранение места они не должны.
     assert saved.achievements == ["ускорил сборку"]
-    assert saved.responsibilities == ["правил ошибки"]
+    assert saved.responsibilities == []
 
 
 async def test_a_place_without_an_end_is_still_going(session, session_factory):

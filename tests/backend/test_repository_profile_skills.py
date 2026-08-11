@@ -175,6 +175,48 @@ async def test_a_row_without_a_name_is_ignored(session, session_factory):
     ]
 
 
+async def test_a_garbled_alias_list_does_not_break_the_save(
+    session, session_factory
+):
+    """Не-список в прозвищах не роняет сохранение, а читается как пустой.
+
+    Уровень и категорию испорченными окно уже переживает, а прозвища роняли
+    правку целиком: обход не-списка бросал, бросок уходил в широкий
+    перехватчик моста, и человек видел, что список навыков просто не
+    сохранился.
+    """
+    profile = profile_row()
+    await put(session_factory, profile)
+
+    await save_skills(
+        session,
+        [{"name": "Python", "level": 3, "aliases": 42}],
+        profile.id,
+    )
+
+    saved = (await session.scalars(select(ProfileSkill))).all()
+    assert [(s.name, s.aliases) for s in saved] == [("Python", [])]
+
+
+async def test_an_alias_keeps_no_stray_spaces(session, session_factory):
+    """Пробелы по краям прозвища не доезжают до записи.
+
+    Отбор здесь и раньше шёл по обрезанному, а запись — как есть: прозвище
+    ложилось в базу с пробелами и в окне выглядело опечаткой.
+    """
+    profile = profile_row()
+    await put(session_factory, profile)
+
+    await save_skills(
+        session,
+        [{"name": "Python", "level": 3, "aliases": ["  py  "]}],
+        profile.id,
+    )
+
+    saved = (await session.scalars(select(ProfileSkill))).all()
+    assert [s.aliases for s in saved] == [["py"]]
+
+
 async def test_missing_or_garbled_details_fall_back_to_defaults(
     session, session_factory
 ):

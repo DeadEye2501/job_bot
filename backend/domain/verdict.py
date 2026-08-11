@@ -4,6 +4,10 @@ from backend.models import VacancyStatus
 from backend.payloads import ParsedVacancy
 
 EMPTY_SKIP_REASON = "empty: no meaningful fields"
+# Метка мусора в `skip_reason`: её пишет разбор, по ней же считает мусор
+# экран каналов. Объявлена здесь, рядом с приговором, — иначе одна сторона
+# сменила бы написание, а вторая молча перестала бы находить свои строки.
+TRASH_SKIP_PREFIX = "trash: "
 
 
 def is_empty_vacancy(parsed: ParsedVacancy | None) -> bool:
