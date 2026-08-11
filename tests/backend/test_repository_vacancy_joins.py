@@ -3,8 +3,12 @@
 Поиск, каналы и компании тянут за собой стыки, а отбор по датам считает
 метку активности из четырёх источников. Всё это работает не по колонке
 вакансии, и потому вынесено отдельно от отбора по колонкам.
+
+Список вариантов фильтра проверяется своим файлом; здесь его зовут лишь
+затем, чтобы отбор сверялся с тем, что окно действительно предлагает.
 """
 
+from backend.repository.vacancies_list import list_vacancy_filter_options
 from tests.dbio import put
 from tests.factories import (
     at,
@@ -182,24 +186,62 @@ async def test_a_company_filter_matches_both_the_linked_and_the_raw_name(
     assert sorted(got) == ["не привязана", "привязана"]
 
 
-async def test_a_company_filter_is_case_sensitive_on_purpose(titles, session_factory):
-    """Отбор по компании сравнивает точно, включая регистр, с обеих сторон.
+async def test_a_company_option_finds_every_spelling_it_was_folded_from(
+    titles, session, session_factory
+):
+    """Вариант из выпадающего списка находит все написания, что в него слились.
 
-    Значения выпадающего списка берутся из этих же колонок, поэтому точное
-    сравнение попадает всегда, а `lower()` у SQLite промахнулся бы по
-    кириллице. Что попадание вообще есть, закрепляет соседний тест; здесь
-    предмет — промах в другом регистре, и он проверяется сразу и на
-    связанной строке, и на сыром названии.
+    Список сводит «Контур» и «контур» в одну строку и показывает первое
+    встреченное написание. Сравнивай отбор точно — вакансия со вторым
+    написанием молча выпадала бы из выдачи, и добраться до неё через фильтр
+    было бы нельзя вовсе: её собственного написания список не предлагает.
     """
     company = company_row(name="Контур")
     await put(session_factory, company)
     await put(
         session_factory,
         vacancy_row(title="привязана", company_id=company.id),
-        vacancy_row(title="не привязана", company_name="Контур"),
+        vacancy_row(title="сырое строчное", company_name="контур"),
+        vacancy_row(title="мимо", company_name="Ромашка"),
     )
+    both = ["привязана", "сырое строчное"]
 
-    assert await titles(companies=["контур"]) == []
+    options = await list_vacancy_filter_options(session)
+    assert sorted(options["companies"]) == ["Контур", "Ромашка"]
+
+    assert sorted(await titles(companies=["Контур"])) == both
+    # Написание, которого нет ни в одной колонке: регистр обязаны складывать
+    # обе стороны сравнения. Какое из двух написаний попадёт в список,
+    # решает порядок выдачи базы, и опираться на него нельзя.
+    assert sorted(await titles(companies=["КОНТУР"])) == both
+
+
+async def test_a_channel_option_finds_every_spelling_it_was_folded_from(
+    titles, session, session_factory
+):
+    """То же у каналов: одна строка списка находит оба написания имени.
+
+    Имя канала в Telegram регистронезависимо, и «@PyJobs» с «@pyjobs» — один
+    и тот же канал. Отбор обязан складывать регистр с обеих сторон: своё
+    написание одна из двух строк справочника в списке не получает.
+    """
+    upper = channel_row(username="PyJobs")
+    lower = channel_row(username="pyjobs")
+    other = channel_row(username="jsjobs")
+    await put(session_factory, upper, lower, other)
+    await put(
+        session_factory,
+        vacancy_row(title="через заглавное", source_channel_id=upper.id),
+        vacancy_row(title="через строчное", source_channel_id=lower.id),
+        vacancy_row(title="мимо", source_channel_id=other.id),
+    )
+    both = ["через заглавное", "через строчное"]
+
+    options = await list_vacancy_filter_options(session)
+    assert len(options["channels"]) == 2
+
+    assert sorted(await titles(channels=["PYJOBS"])) == both
+    assert sorted(await titles(channels=["pyjobs"])) == both
 
 
 async def test_a_date_range_cuts_by_the_activity_timestamp(titles, session_factory):

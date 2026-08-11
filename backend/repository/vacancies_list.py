@@ -219,24 +219,26 @@ async def list_vacancies(
         if enum_values:
             where_clauses.append(Vacancy.status.in_(enum_values))
 
-    # NB: the channels/companies filters compare exactly (no LOWER) on
-    # purpose — the dropdown values are sourced from these very columns
-    # (see :func:`list_vacancy_filter_options`), so what comes back is
-    # spelled exactly as what's stored and folding case buys nothing.
+    # Регистр здесь сводится потому, что его сводит и выпадающий список
+    # (см. :func:`list_vacancy_filter_options`): из «Контур» и «контур» он
+    # оставляет первое встреченное написание, второго не предлагает вовсе, и
+    # точное сравнение оставило бы вакансию со вторым написанием недостижимой
+    # через фильтр. `lower` здесь свой, зарегистрированный в `adapters/db.py`,
+    # и кириллицу он понимает.
 
     if channels:
-        cleaned = [c for c in channels if c]
+        cleaned = [c.lower() for c in channels if c]
         if cleaned:
-            where_clauses.append(TelegramChannel.username.in_(cleaned))
+            where_clauses.append(func.lower(TelegramChannel.username).in_(cleaned))
             needs_channel_join = True
 
     if companies:
-        cleaned = [c for c in companies if c]
+        cleaned = [c.lower() for c in companies if c]
         if cleaned:
             where_clauses.append(
                 or_(
-                    Company.name.in_(cleaned),
-                    Vacancy.company_name.in_(cleaned),
+                    func.lower(Company.name).in_(cleaned),
+                    func.lower(Vacancy.company_name).in_(cleaned),
                 )
             )
             needs_company_join = True
