@@ -12,6 +12,7 @@
 
 import pytest
 
+from backend.bot import can_send
 from backend.models import BotMode, Message, Vacancy, VacancyEvent, VacancyStatus
 from tests.dbio import all_rows, only_row, put
 from tests.factories import blacklist_row, hr_row
@@ -77,6 +78,29 @@ async def test_a_blacklisted_hr_is_not_written_to(
     """
     await put(session_factory, blacklist_row("hr", value))
     bot, saved_hr, vacancy = await ready_to_send(hr=hr_row(**hr_fields))
+
+    assert await bot.send(saved_hr, "письмо", vacancy_id=vacancy.id) is False
+
+    assert outbox.sent == []
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NEW
+
+
+async def test_an_unknown_refusal_does_not_count_as_a_sent_application(
+    ready_to_send, session_factory, outbox, monkeypatch
+):
+    """Незнакомая причина отказа отклик не засчитывает.
+
+    Заглушают отправку ровно два замка, и оба названы поимённо. Причина, о
+    которой отправка не знает, — это причина, заведённая позже; сочти её
+    заглушкой, и вакансия пометится откликнутой без письма, то есть закроется
+    от следующей попытки навсегда.
+    """
+    bot, saved_hr, vacancy = await ready_to_send()
+
+    async def refuse_for_a_new_reason(bot, hr):
+        return can_send.SendPermission(target=1, refusal="причина из будущего")
+
+    monkeypatch.setattr(can_send, "can_send_to_hr", refuse_for_a_new_reason)
 
     assert await bot.send(saved_hr, "письмо", vacancy_id=vacancy.id) is False
 

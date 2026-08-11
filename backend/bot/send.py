@@ -3,11 +3,9 @@
 import logging
 
 from adapters import telegram
-from backend.models import BotMode
+from backend.bot import can_send
 from backend.models import HR
 from backend.models import Message
-from backend.helpers import telegram_peer
-from backend.repository.hr_card import _hr_blacklist_value
 from backend.repository.vacancies_life import add_vacancy_event
 from backend.repository.vacancies_life import mark_vacancy_applied
 
@@ -60,31 +58,19 @@ async def send(
     (VacancyStatusHistory etc.) проходят как при настоящей отправке.
     Текст письма уходит в логи WARNING — для аудита/тестов.
     """
-    target = telegram_peer(hr)
-    if target is None:
+    # Заслоны те же, что у переписки из окна: одно объявление на двоих.
+    permission = await can_send.can_send_to_hr(bot, hr)
+    target = permission.target
+    # Заглушают отправку ровно два замка, и оба названы поимённо. Причина, о
+    # которой мы не знаем, — заведённая позже, и зачесть по ней отклик значило
+    # бы пометить вакансию откликнутой без письма, то есть закрыть её от
+    # следующей попытки навсегда. Умолчание тут — отказ.
+    suppressed = permission.refusal in (can_send.DRY_RUN, can_send.SENDING_LOCKED)
+    if permission.refusal is not None and not suppressed:
         logger.warning(
-            "Bot.send: hr %s has no telegram_user_id or username, skipping (vacancy=%s)",
-            hr.id, vacancy_id,
-        )
-        return False
-    # OFF mode = «бот в покое». Авто-цикл туда не дойдёт (poll пропускает),
-    # но manual «Отправить отклик» из UI должен тоже уважать стоп-режим.
-    if (await bot._current_mode()) is BotMode.OFF:
-        logger.warning(
-            "Bot.send: BotMode.OFF, suppressed send to %s (vacancy=%s)",
-            target, vacancy_id,
-        )
-        return False
-    # Blacklist: HR мог попасть туда между парсингом вакансии и отправкой
-    # отклика (особенно для авто-flow, где между парсингом и send'ом
-    # может пройти время на LLM-генерацию). Зеркалит проверку из
-    # send_to_hr_chat / send_to_hr_media.
-    async with bot._session_factory() as session:
-        bl_value = await _hr_blacklist_value(session, hr)
-    if bl_value:
-        logger.warning(
-            "Bot.send: hr %s in blacklist (%s), suppressed (vacancy=%s)",
-            hr.id, bl_value, vacancy_id,
+            "Bot.send: %s (hr=%s, адресат=%s, чёрный список=%s, vacancy=%s)",
+            permission.refusal, hr.id, target,
+            permission.blacklist_value, vacancy_id,
         )
         return False
     # SEND_LOCKED / dry_run: имитируем успешную отправку — реального
@@ -94,13 +80,11 @@ async def send(
     # работодатели, скилы из profile_block); если нужен аудит сэмули-
     # рованной отправки — смотри Message-row, она пишется в БД даже в
     # suppressed-режиме.
-    suppressed = bot._dry_run or telegram.SEND_LOCKED
     tg_msg_id: int | None = None
     if suppressed:
-        tag = "[DRY-RUN]" if bot._dry_run else "[SEND_LOCKED]"
         logger.warning(
-            "%s would have sent DM to %s (vacancy=%s, %d chars, attachment=%s)",
-            tag, target, vacancy_id, len(text), attachment,
+            "[%s] would have sent DM to %s (vacancy=%s, %d chars, attachment=%s)",
+            permission.refusal, target, vacancy_id, len(text), attachment,
         )
     else:
         logger.info(

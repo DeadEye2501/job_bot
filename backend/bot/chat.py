@@ -5,16 +5,15 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from adapters import telegram
 from backend.models import BotMode
 from backend.models import HR
 from backend.models import Message
 from backend.helpers import telegram_peer
 from backend.payloads import OutgoingMessage
-from backend.repository.hr_card import _hr_blacklist_value
 from backend.repository.messages import mark_incoming_read
 from backend.repository.messages import save_outgoing_message
 
+from backend.bot import can_send
 from backend.bot import media
 
 logger = logging.getLogger(__name__)
@@ -54,41 +53,35 @@ async def mark_hr_chat_read(bot, hr_id: int) -> int:
     return updated
 
 
-async def _ensure_can_send(bot) -> None:
-    """Заслоны, общие для всякой отправки из окна.
-
-    Каждый отказ — своими словами: мост показывает их подсказкой, и
-    «выключен» с «тестовым режимом» пользователь чинит по-разному.
-    """
-    if (await bot._current_mode()) is BotMode.OFF:
-        raise RuntimeError("Бот выключен. Включите DM Only или Full.")
-    if bot._dry_run:
-        raise RuntimeError("Отправка отключена: тестовый режим.")
-    if telegram.SEND_LOCKED:
-        raise RuntimeError("Отправка отключена: защита от случайной отправки.")
+_REFUSAL_TEXTS = {
+    can_send.NO_TARGET: (
+        "У HR нет ни telegram_user_id, ни @username — нечем отправить."
+    ),
+    can_send.BOT_OFF: "Бот выключен. Включите DM Only или Full.",
+    can_send.BLACKLISTED: "HR в blacklist ({value}). Сначала уберите из blacklist.",
+    can_send.DRY_RUN: "Отправка отключена: тестовый режим.",
+    can_send.SENDING_LOCKED: "Отправка отключена: защита от случайной отправки.",
+}
 
 
-async def _resolve_target(bot, hr_id: int) -> int | str:
-    """Кому слать: адрес HR, если он есть и не помечен чёрным списком.
+async def _target_or_refuse(bot, hr_id: int) -> int | str:
+    """Кому слать — либо отказ словами, которые окно покажет подсказкой.
 
-    Адрес предпочитает номер пользователя имени: имя HR может сменить, и
-    отправка по нему ушла бы не туда или никуда.
+    Заслоны спрашиваются общим объявлением (`can_send`), своё здесь только
+    слова: причина, годная для журнала, человеку ничего не говорит. Слово без
+    перевода роняет отправку нарочно — молчаливый отказ окно показать не может.
     """
     async with bot._session_factory() as session:
         hr = await session.get(HR, hr_id)
-        if hr is None:
-            raise RuntimeError(f"HR id={hr_id} не найден.")
-        target = telegram_peer(hr)
-        bl_value = await _hr_blacklist_value(session, hr)
-    if target is None:
-        raise RuntimeError(
-            "У HR нет ни telegram_user_id, ни @username — нечем отправить."
-        )
-    if bl_value:
-        raise RuntimeError(
-            f"HR в blacklist ({bl_value}). Сначала уберите из blacklist."
-        )
-    return target
+    if hr is None:
+        raise RuntimeError(f"HR id={hr_id} не найден.")
+
+    permission = await can_send.can_send_to_hr(bot, hr)
+    if permission.refusal is None:
+        return permission.target
+    raise RuntimeError(
+        _REFUSAL_TEXTS[permission.refusal].format(value=permission.blacklist_value)
+    )
 
 
 async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
@@ -98,13 +91,11 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
     failure mode the UI can usefully surface — мост показывает текст
     отказа подсказкой.
     """
-    await _ensure_can_send(bot)
+    target = await _target_or_refuse(bot, hr_id)
 
     clean = (text or "").strip()
     if not clean:
         raise RuntimeError("Пустое сообщение.")
-
-    target = await _resolve_target(bot, hr_id)
 
     pyro_msg = await bot._client.send_message(target, clean)
     logger.info(
@@ -132,13 +123,11 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
     cache so the chat UI can render it without re-downloading from
     Telegram.
     """
-    await _ensure_can_send(bot)
+    target = await _target_or_refuse(bot, hr_id)
 
     src = Path(file_path)
     if not src.exists() or not src.is_file():
         raise RuntimeError(f"Файл не найден: {file_path}")
-
-    target = await _resolve_target(bot, hr_id)
 
     as_photo = media.looks_like_photo(src)
     try:
