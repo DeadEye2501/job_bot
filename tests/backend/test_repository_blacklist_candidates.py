@@ -91,8 +91,8 @@ async def test_channel_suggestions_are_sorted_by_label_ignoring_case(
 ):
     """Подсказки по каналам упорядочены по подписи, без учёта регистра.
 
-    Порядок у каналов свой, отдельный от порядка у людей: это два разных
-    списка в коде, и проверка одного о втором ничего не говорит. Порядок
+    Порядок у каналов проверяется отдельно от порядка у людей: подпись у
+    них берётся из разных полей, и предмет отбора тоже свой. Порядок
     заведения обратен ожидаемому, регистр разный — сравнение по кодам
     символов поставило бы заглавные впереди строчных.
     """
@@ -122,6 +122,24 @@ async def test_every_company_is_suggested_by_its_name(session, session_factory):
         {"value": "Контур", "label": "Контур", "sub": None},
         {"value": "Ромашка", "label": "Ромашка", "sub": "https://romashka.ru"},
     ]
+
+
+async def test_a_company_without_a_name_is_not_suggested(session, session_factory):
+    """Компания без имени в список не попадает: отсеивать по ней нечего.
+
+    У собеседника и канала такой случай проверен нарочно — у компании он
+    держится на том же правиле написания предмета, и без сторожа снятие
+    охраны прошло бы молча: в окне появилась бы строка с пустым значением.
+    """
+    await put(
+        session_factory,
+        company_row(name=""),
+        company_row(name="Контур"),
+    )
+
+    got = await list_blacklist_candidates(session, "company")
+
+    assert [c["value"] for c in got] == ["Контур"]
 
 
 async def test_a_channel_without_a_username_is_not_suggested(
