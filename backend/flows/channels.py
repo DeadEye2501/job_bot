@@ -110,7 +110,7 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
     not thread-safe and concurrent calls can trip FloodWait); the same
     response carries both ``title`` and ``photo``. Title is updated on
     every change; avatar is backfill-only (matches the HR policy in
-    ``find_or_create_hr`` — once captured, we don't overwrite). All
+    ``refresh_hr_from_telegram`` — once captured, we don't overwrite). All
     diffs land in a single transaction. Failures are logged and skipped.
     """
     title_updates: dict[int, str] = {}

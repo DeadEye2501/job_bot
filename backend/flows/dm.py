@@ -17,7 +17,7 @@ from backend.models import Vacancy
 from backend.payloads import OutgoingMessage
 from backend.repository.hr_identify import find_known_hr
 from backend.repository.hr_identify import find_latest_vacancy_id_for_hr
-from backend.repository.hr_identify import refresh_hr_username
+from backend.repository.hr_identify import refresh_hr_from_telegram
 from backend.repository.hr_identify import resolve_reply_target_vacancy
 from backend.repository.messages import find_outgoing_message
 from backend.repository.messages import save_incoming_message
@@ -145,14 +145,7 @@ async def process_dm(
             hr = await find_known_hr(session, sender_id, sender_username)
             if hr is None:
                 return
-            # Backfill telegram_user_id when the HR was created via @username
-            # only (Contacts/HR pane). First incoming DM is when we learn
-            # their actual id — pin it so future lookups hit the fast path.
-            if hr.telegram_user_id is None:
-                hr.telegram_user_id = sender_id
-            refresh_hr_username(hr, sender_username)
-            if avatar_bytes is not None and hr.avatar is None:
-                hr.avatar = avatar_bytes
+            refresh_hr_from_telegram(hr, msg.from_user, avatar=avatar_bytes)
             # Reply-attribution: если HR ответил на наше конкретное
             # сообщение через Telegram-reply, мы точно знаем, на какую
             # вакансию это реакция (наша outgoing-row в Message с этим
