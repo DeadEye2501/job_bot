@@ -9,7 +9,11 @@ from backend.domain.salary import parse_salary
 from backend.domain.scoring import score_parsed
 from backend.domain.verdict import decide_vacancy_status
 from backend.domain.verdict import is_empty_vacancy
-from backend.domain.verdict import EMPTY_SKIP_REASON, TRASH_SKIP_PREFIX
+from backend.domain.verdict import (
+    EMPTY_SKIP_REASON,
+    LLM_SKIP_PREFIX,
+    TRASH_SKIP_PREFIX,
+)
 from backend.helpers import fetch_telegram_avatar
 from backend.helpers import resolve_hr_telegram
 from backend.llm.fit import validate_vacancy_fit
@@ -134,19 +138,20 @@ async def parse_and_update_vacancy(
         # so the user can re-evaluate manually rather than auto-applying
         if validation is None:
             status = VacancyStatus.NOT_FIT
-            skip_reason = "llm: validation unavailable"
+            skip_reason = f"{LLM_SKIP_PREFIX}validation unavailable"
             logger.warning(
                 "validate_vacancy_fit unavailable for vacancy parse, marking Not Fit"
             )
         elif validation.verdict == "trash":
+            trash_reason = validation.reason or "no reason"
             if allow_delete:
                 logger.info(
                     "vacancy %s: classified as trash by LLM (%s), deleting",
-                    vacancy_id, validation.reason or "no reason",
+                    vacancy_id, trash_reason,
                 )
-                await cleanup.delete_vacancy_as_trash(pipeline, 
+                await cleanup.delete_vacancy_as_trash(pipeline,
                     vacancy_id,
-                    reason=f"{TRASH_SKIP_PREFIX}{validation.reason or 'no reason'}",
+                    reason=f"{TRASH_SKIP_PREFIX}{trash_reason}",
                 )
                 return
             logger.info(
@@ -154,10 +159,10 @@ async def parse_and_update_vacancy(
                 vacancy_id,
             )
             status = VacancyStatus.NOT_FIT
-            skip_reason = f"{TRASH_SKIP_PREFIX}{validation.reason or 'no reason'}"
+            skip_reason = f"{TRASH_SKIP_PREFIX}{trash_reason}"
         elif validation.verdict == "reject":
             status = VacancyStatus.NOT_FIT
-            skip_reason = f"llm: {validation.reason or 'rejected'}"
+            skip_reason = f"{LLM_SKIP_PREFIX}{validation.reason or 'rejected'}"
 
     hr_for_send, hr_created = await _persist_parse_outcome(
         pipeline,

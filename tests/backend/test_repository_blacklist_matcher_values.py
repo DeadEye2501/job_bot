@@ -4,7 +4,7 @@
 вакансии отсеивает одинаково. Погашенные строки в отбор не идут.
 """
 
-from backend.repository.blacklist import load_active_blacklist_patterns
+from backend.repository.blacklist_marks import load_active_blacklist_patterns
 from tests.dbio import put
 from tests.factories import blacklist_row
 

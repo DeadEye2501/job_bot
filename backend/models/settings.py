@@ -2,7 +2,6 @@
 
 from sqlalchemy import (
     CheckConstraint,
-    Enum as SQLEnum,
     LargeBinary,
     UniqueConstraint,
     text,
@@ -10,7 +9,13 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import expression
 
-from backend.models.base import Base, CreatedAtMixin, IdMixin, UpdatedAtMixin
+from backend.models.base import (
+    Base,
+    CreatedAtMixin,
+    IdMixin,
+    UpdatedAtMixin,
+    enum_column,
+)
 from backend.models.enums import BotMode, LlmConfigKind
 
 
@@ -26,11 +31,7 @@ class BotState(IdMixin, Base):
     )
 
     mode: Mapped[BotMode] = mapped_column(
-        SQLEnum(
-            BotMode,
-            values_callable=lambda x: [e.value for e in x],
-            name="bot_mode",
-        ),
+        enum_column(BotMode, "bot_mode"),
         server_default=text("'Off'"),
     )
 
@@ -78,11 +79,7 @@ class LlmConfig(IdMixin, UpdatedAtMixin, Base):
     )
 
     kind: Mapped[LlmConfigKind] = mapped_column(
-        SQLEnum(
-            LlmConfigKind,
-            values_callable=lambda x: [e.value for e in x],
-            name="llm_config_kind",
-        ),
+        enum_column(LlmConfigKind, "llm_config_kind"),
     )
     base_url: Mapped[str | None]
     api_key_encrypted: Mapped[str | None]

@@ -6,7 +6,6 @@ from sqlalchemy import (
     JSON,
     BigInteger,
     DateTime,
-    Enum as SQLEnum,
     ForeignKey,
     Index,
     String,
@@ -17,7 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import expression
 
-from backend.models.base import Base, CreatedAtMixin, IdMixin
+from backend.models.base import Base, CreatedAtMixin, IdMixin, enum_column
 from backend.models.contacts import HR, Company, TelegramChannel
 from backend.models.enums import Currency, StatusHistorySource, VacancyStatus
 
@@ -60,11 +59,7 @@ class Vacancy(IdMixin, CreatedAtMixin, Base):
     salary_min: Mapped[int | None]
     salary_max: Mapped[int | None]
     salary_currency: Mapped[Currency | None] = mapped_column(
-        SQLEnum(
-            Currency,
-            values_callable=lambda x: [e.value for e in x],
-            name="currency",
-        )
+        enum_column(Currency, "currency")
     )
     remote: Mapped[str | None]
     location: Mapped[str | None]
@@ -72,11 +67,7 @@ class Vacancy(IdMixin, CreatedAtMixin, Base):
     skip_reason: Mapped[str | None]
     source_url: Mapped[str | None]
     status: Mapped[VacancyStatus] = mapped_column(
-        SQLEnum(
-            VacancyStatus,
-            values_callable=lambda x: [e.value for e in x],
-            name="vacancy_status",
-        ),
+        enum_column(VacancyStatus, "vacancy_status"),
         server_default=text("'New'"),
     )
     # Flips to True only after the LLM parse + classify pipeline finishes
@@ -159,20 +150,10 @@ class VacancyStatusHistory(IdMixin, Base):
     vacancy_id: Mapped[int] = mapped_column(ForeignKey("vacancy.id"))
     message_id: Mapped[int | None] = mapped_column(ForeignKey("message.id"))
     previous_status: Mapped[VacancyStatus | None] = mapped_column(
-        SQLEnum(
-            VacancyStatus,
-            values_callable=lambda x: [e.value for e in x],
-            name="vacancy_status",
-            create_type=False,
-        ),
+        enum_column(VacancyStatus, "vacancy_status", create_type=False),
     )
     status: Mapped[VacancyStatus] = mapped_column(
-        SQLEnum(
-            VacancyStatus,
-            values_callable=lambda x: [e.value for e in x],
-            name="vacancy_status",
-            create_type=False,
-        ),
+        enum_column(VacancyStatus, "vacancy_status", create_type=False),
     )
     # Без explicit length — все остальные строковые поля в схеме объявлены
     # как `String` (SQLite всё равно хранит TEXT без cap'а на длину).
@@ -182,11 +163,7 @@ class VacancyStatusHistory(IdMixin, Base):
     explanation: Mapped[str | None] = mapped_column(String)
     applied: Mapped[bool] = mapped_column(server_default=expression.true())
     source: Mapped[StatusHistorySource] = mapped_column(
-        SQLEnum(
-            StatusHistorySource,
-            values_callable=lambda x: [e.value for e in x],
-            name="status_history_source",
-        ),
+        enum_column(StatusHistorySource, "status_history_source"),
         server_default=text("'system'"),
     )
     changed_at: Mapped[datetime] = mapped_column(

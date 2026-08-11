@@ -61,6 +61,23 @@ async def active_blacklist_values(session: AsyncSession, kind: str) -> set[str]:
     )
 
 
+async def load_active_blacklist_patterns(session: AsyncSession) -> list[str]:
+    """Все активные значения списка, любого рода, — образцы для сверки с
+    текстом объявления.
+
+    Род здесь не спрашивается нарочно: по тексту поста отсеивают и по
+    названию компании, и по ключевому слову, и знать заранее, чем именно
+    совпадёт, конвейеру незачем.
+    """
+    return list(
+        (
+            await session.scalars(
+                select(Blacklist.value).where(Blacklist.active)
+            )
+        ).all()
+    )
+
+
 def preferred_blacklist_value(candidates: list[str]) -> str | None:
     """Написание, которое кнопка «в чёрный список» и запишет.
 
