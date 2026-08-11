@@ -23,6 +23,11 @@ async def find_known_hr(
     via the Pyrogram payload, but the row still has user_id NULL. Caller
     is responsible for backfilling ``hr.telegram_user_id`` after a username
     match so subsequent lookups hit the fast path.
+
+    Ник в Telegram свободно достаётся другому человеку, поэтому запись с
+    чужим идентификатором под тем же ником принадлежит не отправителю.
+    Оговорка «либо идентификатор равен искомому» не написана нарочно: своя
+    запись до запасного пути не доходит, её отдаёт поиск по идентификатору.
     """
     hr = (
         await session.scalars(
@@ -34,7 +39,10 @@ async def find_known_hr(
     if telegram_username:
         hr = (
             await session.scalars(
-                select(HR).where(HR.telegram_username == telegram_username)
+                select(HR).where(
+                    HR.telegram_username == telegram_username,
+                    HR.telegram_user_id.is_(None),
+                )
             )
         ).first()
     return hr
@@ -191,20 +199,7 @@ async def find_or_create_hr(
     Catch-up для всех HR'ов крутится только на OFF→active transition;
     новый HR, созданный в активном режиме, без этого хука остался бы с
     пустым чатом до рестарта."""
-    hr = (
-        await session.scalars(
-            select(HR).where(HR.telegram_user_id == user.id)
-        )
-    ).first()
-    if hr is None and user.username:
-        hr = (
-            await session.scalars(
-                select(HR).where(
-                    HR.telegram_username == user.username,
-                    HR.telegram_user_id.is_(None),
-                )
-            )
-        ).first()
+    hr = await find_known_hr(session, user.id, user.username)
 
     full_name = " ".join(
         filter(None, [user.first_name, user.last_name])
