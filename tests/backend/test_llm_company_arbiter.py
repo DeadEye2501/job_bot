@@ -131,6 +131,21 @@ async def test_the_candidates_are_shown_with_all_they_have():
     assert 'id=8, name="Ромашка", aliases=[—], website="—"' in prompt
 
 
+async def test_a_junk_spelling_does_not_stop_the_question():
+    """Негодное написание кандидата вопрос к арбитру не срывает.
+
+    Колонка написаний — JSON, и что в ней лежит, код не обещает: строки
+    заводились и сырым SQL мимо заведения из окна. Одно число посреди списка
+    роняло весь разбор вакансии — обёртки вокруг этого зова нет.
+    """
+    client = provider({CHAT: _answer(None, "нет")})
+
+    await _ask(client, [_Candidate(7, "Сбербанк", [42, "Sber"])])
+
+    prompt = messages_of(client.sent[0])["system"]
+    assert 'id=7, name="Сбербанк", aliases=[Sber]' in prompt
+
+
 @pytest.mark.parametrize(
     ("prepared", "marker"),
     provider_trouble_named(

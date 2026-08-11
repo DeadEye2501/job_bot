@@ -6,7 +6,8 @@ import logging
 import httpx
 
 from adapters.lm_studio import ChatRequest, chat
-from backend.llm.answers import json_object
+from backend.llm.answers import json_object, log_unparseable
+from backend.payloads import str_list
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ async def dedupe_company_with_llm(
         return None, "no_candidates"
     cand_lines = []
     for i, c in enumerate(candidates, start=1):
-        aliases = ", ".join(c.aliases or []) or "—"
+        aliases = ", ".join(str_list(c.aliases)) or "—"
         cand_lines.append(
             f'{i}. id={c.id}, name="{c.name}", aliases=[{aliases}], '
             f'website="{c.website or "—"}"'
@@ -98,9 +99,7 @@ async def dedupe_company_with_llm(
 
     obj = json_object(answer, logger, "dedupe_company")
     if obj is None:
-        logger.warning(
-            "dedupe_company: ответ модели не даёт объекта %r", answer[:200]
-        )
+        log_unparseable(answer, logger, "dedupe_company")
         return None, f"unparseable_json: {answer[:120]}"
 
     matched_id = obj.get("matched_id")

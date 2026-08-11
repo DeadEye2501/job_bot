@@ -130,8 +130,8 @@ def _parse_classification(answer: str) -> Classification | None:
     if data is None:
         return None
 
-    raw_status = str(data.get("status") or "").strip()
-    if not raw_status:
+    raw_status = str_or_none(data.get("status"))
+    if raw_status is None:
         return None
     normalized = raw_status.lower()
     status = next(

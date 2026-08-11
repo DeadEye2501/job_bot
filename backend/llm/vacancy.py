@@ -175,9 +175,8 @@ def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
     if data is None:
         return None
 
-    raw_title = data.get("title")
-    title = raw_title.strip() if isinstance(raw_title, str) else ""
-    if not title:
+    title = str_or_none(data.get("title"))
+    if title is None:
         logger.debug("_parse_vacancy_json: empty/missing title in JSON keys=%s", list(data.keys()))
         return None
 
