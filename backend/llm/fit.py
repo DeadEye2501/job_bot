@@ -17,10 +17,10 @@ from backend.llm.answers import (
 )
 from backend.llm.candidate import (
     CandidateProfile,
-    _format_free_preferences,
     _format_grades,
     _format_known_skills,
     _format_languages,
+    _format_text,
     _format_work_formats,
 )
 from backend.llm.external import wrap_external
@@ -275,10 +275,8 @@ async def validate_vacancy_fit(
     logger.debug("validate_vacancy_fit: title=%r", parsed.title)
     system_prompt = (
         VALIDATE_VACANCY_FIT_PROMPT
-        .replace("{CANDIDATE_TITLE}", (profile.title or "—").strip() or "—")
-        .replace(
-            "{CANDIDATE_LOCATION}", (profile.location or "—").strip() or "—"
-        )
+        .replace("{CANDIDATE_TITLE}", _format_text(profile.title))
+        .replace("{CANDIDATE_LOCATION}", _format_text(profile.location))
         .replace("{ACCEPTED_GRADES}", _format_grades(profile.grades))
         .replace(
             "{ACCEPTED_FORMATS}", _format_work_formats(profile.work_formats)
@@ -289,10 +287,7 @@ async def validate_vacancy_fit(
         .replace(
             "{CANDIDATE_SKILLS}", _format_known_skills(known_skills)
         )
-        .replace(
-            "{FREE_PREFERENCES}",
-            _format_free_preferences(profile.free_preferences),
-        )
+        .replace("{FREE_PREFERENCES}", _format_text(profile.free_preferences))
     )
     vacancy_block = (
         "Распарсенные поля:\n"

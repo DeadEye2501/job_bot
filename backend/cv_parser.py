@@ -7,7 +7,7 @@ from datetime import date
 import httpx
 
 from adapters.lm_studio import ChatRequest, chat
-from backend.domain.skill_names import skill_key
+from backend.domain.skill_names import dedupe_by_key, skill_key
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
 from backend.llm.answers import (
     QUOTE_TRANSLATION,
@@ -217,10 +217,8 @@ def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]:
 
 
 def _normalize_lang_level(value: object) -> str | None:
-    if not isinstance(value, str):
-        return None
-    v = value.strip()
-    if not v:
+    v = str_or_none(value)
+    if v is None:
         return None
     vl = v.lower()
     if vl in ("native", "родной"):
@@ -265,10 +263,8 @@ _YEAR_RE = re.compile(r"^(\d{4})$")
 
 
 def _parse_date(value) -> date | None:
-    if not isinstance(value, str):
-        return None
-    v = value.strip()
-    if not v:
+    v = str_or_none(value)
+    if v is None:
         return None
     try:
         return date.fromisoformat(v)
@@ -337,22 +333,12 @@ def _parse_skill(item) -> ParsedCvSkill | None:
     level = max(1, min(5, level))
     # Ключ тот же, что у сравнения навыков: иначе «Node.js» и «node js»
     # доезжали бы до анкеты двумя написаниями, там сталкивались по ключу, и
-    # второе молча теряло бы привязку. Написание, у которого ключ пуст
-    # («-», «///»), прозвищем не считается вовсе: привязать по нему нечего,
-    # а в окне оно копилось бы повторами.
-    seen = {skill_key(name)}
-    aliases: list[str] = []
-    for a in str_list(item.get("aliases")):
-        key = skill_key(a)
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        aliases.append(a)
+    # второе молча теряло бы привязку.
     return ParsedCvSkill(
         category=category,
         name=name,
         level=level,
-        aliases=aliases,
+        aliases=dedupe_by_key(str_list(item.get("aliases")), {skill_key(name)}),
     )
 
 

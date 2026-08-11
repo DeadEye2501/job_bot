@@ -86,8 +86,12 @@ def _format_languages(languages: list[CandidateLanguage] | None) -> str:
     return ", ".join(parts) if parts else "—"
 
 
-def _format_free_preferences(text: str | None) -> str:
-    """Свободный текст личных предпочтений, либо '—' если пусто."""
+def _format_text(text: str | None) -> str:
+    """Свободный текст в слот промпта, либо «—», если пусто.
+
+    Прочерк, а не пустота: незаполненный слот оставил бы в промпте
+    оборванную строку, и модель дописала бы её сама.
+    """
     s = (text or "").strip()
     return s if s else "—"
 

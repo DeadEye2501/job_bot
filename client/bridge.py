@@ -1342,7 +1342,7 @@ class MainApi(QObject):
                     limit=limit,
                     offset=offset,
                 )
-                skills = await profile_repo.load_profile_skills(session)
+                skills = await profile_repo.list_skills(session)
                 activity_by_id = await vacancies_list.list_vacancy_last_activity(
                     session, [v.id for v in rows]
                 )
@@ -1380,7 +1380,7 @@ class MainApi(QObject):
         async def run() -> str:
             async with self._session_factory() as session:
                 detail = await vacancies_card.get_vacancy_detail(session, vacancy_id)
-                skills = await profile_repo.load_profile_skills(session)
+                skills = await profile_repo.list_skills(session)
             if detail is None:
                 logger.warning("vacancy_id=%d not found on detail load", vacancy_id)
                 return _err("Вакансия не найдена.", id=vacancy_id)

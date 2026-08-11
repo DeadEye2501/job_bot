@@ -4,7 +4,7 @@
 import logging
 import re
 
-from backend.domain.skill_names import skill_key
+from backend.domain.skill_names import dedupe_by_key
 
 logger = logging.getLogger(__name__)
 
@@ -106,21 +106,16 @@ def clean_stack_items(
         items = raw
     else:
         return []
-    out: list[str] = []
-    for s in items:
-        if not isinstance(s, str):
-            continue
-        cleaned = _capitalize_skill(_strip_version(s.strip()))
-        if not cleaned:
-            continue
-        # Дедупликация — на случай если LLM вернул "Python 3.13" и "Python"
-        # одновременно (после срезки версии оба → "Python"), либо положил
-        # один и тот же навык в required и в preferred. Ключ тот же, что у
-        # анкеты: иначе «CI/CD» и «ci cd» пережили бы дедупликацию и дали
-        # двойной балл за один навык.
-        key = skill_key(cleaned)
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(cleaned)
-    return out
+    # Дедупликация — на случай если LLM вернул "Python 3.13" и "Python"
+    # одновременно (после срезки версии оба → "Python"), либо положил один и
+    # тот же навык в required и в preferred. Ключ тот же, что у анкеты: иначе
+    # «CI/CD» и «ci cd» пережили бы дедупликацию и дали двойной балл за один
+    # навык.
+    return dedupe_by_key(
+        [
+            _capitalize_skill(_strip_version(s.strip()))
+            for s in items
+            if isinstance(s, str)
+        ],
+        seen,
+    )
