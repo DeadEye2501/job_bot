@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.scoring import build_skill_lookup
 from backend.domain.skill_names import skill_key
-from backend.models import Message, ProfileSkill, Vacancy, VacancyStatus, VacancyStatusHistory
+from backend.models import Message, Vacancy, VacancyStatus, VacancyStatusHistory
+from backend.repository.profile import list_skills
 
 PARSED_ONLY = Vacancy.is_parsed.is_(True)
 """Отбор «разобранная вакансия» — общий для ступеней воронки, сводных
@@ -183,10 +184,10 @@ async def get_stats_skills(
     if since is not None:
         base_filter.append(Vacancy.created_at >= since)
 
-    skill_rows = (await session.scalars(select(ProfileSkill))).all()
     # Тот же ключ, что и у баллов: иначе один навык считался бы здесь
-    # своим, а в оценке вакансии чужим.
-    profile_set = build_skill_lookup(list(skill_rows))
+    # своим, а в оценке вакансии чужим. И тот же читатель анкеты — иначе
+    # «свой» на этом экране решался бы по своему набору строк.
+    profile_set = build_skill_lookup(await list_skills(session))
 
     rows = (
         await session.scalars(select(Vacancy.stack).where(*base_filter))

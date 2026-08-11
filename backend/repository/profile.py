@@ -55,12 +55,6 @@ def _skills_by_key(rows: list[ProfileSkill]) -> dict[str, ProfileSkill]:
     return lookup
 
 
-async def load_profile_skills(session: AsyncSession) -> list[ProfileSkill]:
-    return list(
-        (await session.scalars(select(ProfileSkill))).all()
-    )
-
-
 async def save_parsed_cv(
     session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None = None
 ) -> None:
@@ -165,10 +159,30 @@ async def save_parsed_cv(
 
 
 async def list_skills(session: AsyncSession) -> list[ProfileSkill]:
-    """All ProfileSkill rows ordered by id (preserves user-set order)."""
+    """All ProfileSkill rows ordered by id (preserves user-set order).
+
+    Порядок здесь не украшение: столкновение ключей навыков разрешается в
+    пользу первого (`domain/skill_names.index_by_key`), и без `order_by`
+    «первый» назначал бы читатель, ничем этого не обещавший.
+    """
     return list(
         (await session.scalars(select(ProfileSkill).order_by(ProfileSkill.id))).all()
     )
+
+
+async def load_profile_skills(session: AsyncSession) -> list[ProfileSkill]:
+    """То же, что `list_skills`; второе имя держит только мост.
+
+    Зовут его `client/bridge.py:1354` и `:1387`, а мост в этом плане не
+    трогают — он переписывается своим этапом, и тогда имя уйдёт вместе с
+    обоими зовущими. Свои на `list_skills` переведены.
+
+    До сведения здесь стоял свой `select` без порядка. Наблюдаемой пляски он
+    не давал — `id` на SQLite псевдоним `rowid`, и сплошной проход и так шёл
+    по нему, — но порядок держался на устройстве базы, а не на обещании
+    читателя.
+    """
+    return await list_skills(session)
 
 
 async def list_experience(session: AsyncSession) -> list[ProfileExperience]:

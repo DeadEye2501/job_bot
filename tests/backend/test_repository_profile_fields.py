@@ -4,7 +4,7 @@
 навыков и мест работы не касаясь: у тех свои пути записи.
 """
 
-from backend.repository.profile import get_profile, load_profile_skills, upsert_profile
+from backend.repository.profile import get_profile, list_skills, upsert_profile
 from tests.dbio import put
 from tests.factories import profile_row, profile_skill_row
 
@@ -12,7 +12,7 @@ from tests.factories import profile_row, profile_skill_row
 async def test_an_empty_database_has_no_profile(session):
     """На пустой базе профиля нет, и это не ошибка."""
     assert await get_profile(session) is None
-    assert await load_profile_skills(session) == []
+    assert await list_skills(session) == []
 
 
 async def test_the_first_write_creates_the_profile(session):
@@ -62,4 +62,4 @@ async def test_writing_basics_does_not_touch_skills(session, session_factory):
 
     await upsert_profile(session, title="Другая роль")
 
-    assert [s.name for s in await load_profile_skills(session)] == ["Python"]
+    assert [s.name for s in await list_skills(session)] == ["Python"]
