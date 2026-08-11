@@ -2,10 +2,12 @@
 о собственной беде — три дела одного слоя, того, что стоит между записью и
 её получателями.
 
-Логи приложения уже идут в файл и, если есть куда, в поток вывода — см.
-`main._log_handlers`. Для UI параллельно навешиваем `LogBufferHandler` на
-корневой logger, который кладёт каждый record в bounded `deque`. UI забирает
-срез через bridge slot с фильтрами по level/source/search.
+Логи приложения уже идут в файл и, если есть куда, в поток вывода — собирает
+эту связку `main._log_handlers`, а сам файловый обработчик объявлен здесь: о
+своей беде он отчитывается тем же способом, что и буфер. Для UI параллельно
+навешиваем `LogBufferHandler` на корневой logger, который кладёт каждый record
+в bounded `deque`. UI забирает срез через bridge slot с фильтрами по
+level/source/search.
 
 Ring-buffer ограничен MAX_RECORDS — самые старые молча выпадают, чтобы
 не утекать память при многочасовом аптайме.
@@ -24,6 +26,7 @@ import traceback
 from collections import deque
 from contextlib import suppress
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 from typing import Callable
 
 from config import get_log_path
@@ -131,6 +134,28 @@ def install_secret_filter() -> None:
     for handler in logging.getLogger().handlers:
         if not any(isinstance(f, SecretRedactionFilter) for f in handler.filters):
             handler.addFilter(SecretRedactionFilter())
+
+
+class LogFileHandler(RotatingFileHandler):
+    """Обработчик файла журнала, говорящий о своей беде — и только раз.
+
+    Беда у него одна и повторяющаяся: переход на новый файл. Пока файл открыт
+    кем-то ещё, Windows не даёт его переименовать, `doRollover` отвечает
+    отказом — и в тот же отказ упирается каждая следующая запись, потому что
+    разросшийся файл так и остался на месте.
+
+    Отсюда и засов. Жалоба на каждую запись была бы не лучше молчания:
+    ограничивать размер файла уже нечем, и повторяющаяся трассировка растила
+    бы ровно тот файл, которому не удаётся повернуться.
+    """
+
+    _complained = False
+
+    def handleError(self, record: logging.LogRecord) -> None:
+        if self._complained:
+            return
+        self._complained = True
+        report_own_failure("файл журнала не принял запись", record)
 
 
 class LogBufferHandler(logging.Handler):

@@ -207,6 +207,45 @@ def test_the_log_rotates_by_size(entry, monkeypatch):
     assert kept.exists()
 
 
+def test_a_torn_rotation_says_so_in_the_log_once(entry, monkeypatch, capsys):
+    """Сорванный переход на новый файл ложится в тот же журнал, и один раз.
+
+    На «пишу без ротации» обработчик не переходит: в сорванный переход
+    упирается каждая следующая запись, и без жалобы журнал молчит до
+    перезапуска — разбирать потом нечего.
+
+    Жалоба на каждую запись была бы не лучше молчания: переход сорван, размер
+    файла больше ничем не ограничен, и повторяющаяся трассировка растила бы
+    ровно тот файл, которому уже нечем поворачиваться.
+    """
+    module, _ = entry
+    from config import get_log_path
+
+    get_log_path().unlink(missing_ok=True)
+    monkeypatch.setattr(module, "LOG_BYTES", 200)
+    handlers = module._log_handlers()
+
+    def refuse_rollover():
+        raise PermissionError("файл занят другим процессом")
+
+    monkeypatch.setattr(handlers[0], "doRollover", refuse_rollover)
+    try:
+        for n in range(20):
+            record = logging.LogRecord(
+                "проверка", logging.WARNING, __file__, 0, f"строка {n}", None, None
+            )
+            for handler in handlers:
+                handler.handle(record)
+    finally:
+        for handler in handlers:
+            handler.close()
+
+    written = get_log_path().read_text(encoding="utf-8")
+    assert written.count("файл журнала не принял запись") == 1
+    assert "PermissionError" in written
+    assert capsys.readouterr().err == ""
+
+
 def test_the_running_application_writes_its_log_to_the_file(tmp_path):
     """Запущенное приложение пишет журнал в файл, и пишет его до конца.
 

@@ -9,8 +9,8 @@ Run:
 import logging
 import sys
 import traceback
-from logging.handlers import RotatingFileHandler
 
+from backend.log_buffer import LogFileHandler
 from config import get_log_path
 
 
@@ -57,7 +57,7 @@ def _log_handlers() -> list[logging.Handler]:
     модуля, в том числе прогоном тестов и инструментами.
     """
     handlers: list[logging.Handler] = [
-        RotatingFileHandler(
+        LogFileHandler(
             get_log_path(),
             maxBytes=LOG_BYTES,
             backupCount=LOG_KEPT,
