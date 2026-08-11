@@ -4,16 +4,14 @@ import logging
 
 from typing import Literal
 
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from backend.bot.media import classify_media, download_media
-from backend.domain.transitions import is_terminal_for_auto
+from backend.flows.auto_gate import status_open_for_auto
 from backend.helpers import extract_dm_text
 from backend.helpers import extract_text
 from backend.helpers import fetch_telegram_avatar
 from backend.llm.hr_reply import classify_hr_reply
-from backend.models import Vacancy
 from backend.payloads import OutgoingMessage
 from backend.repository.hr_identify import find_known_hr
 from backend.repository.hr_identify import find_latest_vacancy_id_for_hr
@@ -192,17 +190,11 @@ async def process_dm(
     if vacancy_id is None:
         return
 
-    # State-machine gate: если вакансия уже в терминальном для авто-
-    # классификатора статусе (Offer/Decline/Scam/Not Fit), вообще не
-    # тратим LLM на её сообщения и не пишем призрачные строки в
-    # vacancy_status_history. См. backend/domain/transitions.py.
-    # Сообщение уже сохранено выше — это аудит-след входящего DM,
-    # его и достаточно.
-    async with session_factory() as session:
-        v_status = await session.scalar(
-            select(Vacancy.status).where(Vacancy.id == vacancy_id)
-        )
-    if v_status is not None and is_terminal_for_auto(v_status):
+    # Сообщение уже сохранено выше — это аудит-след входящего DM, и его
+    # достаточно: разбора терминальная вакансия не получит, а призрачной
+    # строки в vacancy_status_history не появится.
+    is_open, v_status = await status_open_for_auto(session_factory, vacancy_id)
+    if not is_open:
         logger.info(
             "vacancy %s: status=%s terminal for auto, skip classification",
             vacancy_id, v_status.value,
