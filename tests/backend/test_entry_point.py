@@ -297,6 +297,24 @@ def test_an_exception_in_a_side_thread_reaches_the_log(entry, caplog):
     assert "ValueError: некому ловить в потоке" in caplog.text
 
 
+def test_an_interrupt_from_the_console_is_not_called_a_crash(entry, caplog):
+    """Прерывание с клавиатуры падением не считается.
+
+    Так же, как завершение потока: это остановка по воле человека, а не
+    беда. Записанное `CRITICAL`ом, оно зажгло бы в окне счётчик ошибок на
+    обычном выходе из приложения.
+    """
+    try:
+        raise KeyboardInterrupt
+    except KeyboardInterrupt:
+        stop = sys.exc_info()
+
+    with caplog.at_level(logging.CRITICAL):
+        sys.excepthook(*stop)
+
+    assert caplog.text == ""
+
+
 def test_a_thread_that_ended_itself_is_not_called_a_crash(entry, caplog):
     """Поток, завершивший себя сам, падением не считается.
 

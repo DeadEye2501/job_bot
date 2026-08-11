@@ -90,6 +90,10 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
     Returns the persisted Message row. Raises ``RuntimeError`` for any
     failure mode the UI can usefully surface — мост показывает текст
     отказа подсказкой.
+
+    Заслоны спрашиваются первыми, до проверки самого сообщения: «этому HR
+    писать нельзя» — беда, которую человек чинит правкой HR или переключа-
+    телем, а пустое поле ввода он видит и так.
     """
     target = await _target_or_refuse(bot, hr_id)
 
