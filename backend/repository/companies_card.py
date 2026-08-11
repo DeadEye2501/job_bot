@@ -31,9 +31,14 @@ async def create_company(
 ) -> Company:
     """Insert a new Company row. Raises if name is empty.
 
+    Единственное место, где заводится строка компании: и по кнопке из окна,
+    и сведением разобранной вакансии. Сайт готовит зовущий — конвейер не
+    пускает в колонку ссылки на агрегаторы, окно кладёт введённое как есть.
+
     Unique constraint on ``company.name`` will surface as IntegrityError if
-    the user tries to create a duplicate; caller can convert that into a
-    user-facing message.
+    the user tries to create a duplicate. Окно превращает его в сообщение
+    человеку, конвейер — в два исхода сведения, поэтому здесь он не
+    перехватывается.
     """
     normalized = (name or "").strip()
     if not normalized:

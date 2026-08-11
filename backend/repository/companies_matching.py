@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company
+from backend.repository.companies_card import create_company
 from backend.repository.companies_keys import (
     hosts_compatible,
     normalize_company_name,
@@ -112,14 +113,13 @@ async def _create_company_row(
         decision["pre_create_stage"] = prior_stage
     name_clean = name.strip()
     try:
+        # Вложенная сделка нужна только здесь: срыв по UNIQUE(name) тут
+        # разбирается на два исхода, и без точки отката сорвавшаяся вставка
+        # утащила бы за собой всю запись вакансии.
         async with session.begin_nested():
-            company = Company(
-                name=name_clean,
-                aliases=[],
-                website=persisted_website,
+            company = await create_company(
+                session, name=name_clean, website=persisted_website
             )
-            session.add(company)
-            await session.flush()
         decision["stage"] = "create"
         decision["matched_id"] = company.id
         logger.info(
