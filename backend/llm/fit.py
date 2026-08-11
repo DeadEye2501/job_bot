@@ -9,7 +9,12 @@ from adapters.lm_studio import ChatRequest, chat
 
 from backend.payloads import FIT_VERDICTS, FitValidation, ParsedVacancy
 
-from backend.llm.answers import json_object, normalize_enum, str_or_none
+from backend.llm.answers import (
+    json_object,
+    log_unparseable,
+    normalize_enum,
+    str_or_none,
+)
 from backend.llm.candidate import (
     CandidateProfile,
     _format_free_preferences,
@@ -334,9 +339,7 @@ async def validate_vacancy_fit(
 
     parsed_validation = _parse_fit_validation(answer)
     if parsed_validation is None:
-        logger.warning(
-            "validate_vacancy_fit: LLM returned unparseable output %r", answer
-        )
+        log_unparseable(answer, logger, "validate_vacancy_fit")
         return None
 
     if (

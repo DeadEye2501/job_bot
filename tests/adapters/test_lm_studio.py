@@ -301,3 +301,32 @@ async def test_a_request_with_its_own_deadline_carries_it_to_the_provider():
     )
 
     assert client.sent[0].extensions["timeout"]["read"] == 300.0
+
+
+async def test_an_answer_cut_by_the_token_limit_names_its_purpose(caplog):
+    """Упёршееся в предел обращение оставляет в журнале своё имя.
+
+    Обрыв по пределу — не отказ: обрезанный ответ иногда разбирается, и
+    решает это зовущий. Но разбирать потом, почему разбор соврал, придётся по
+    журналу, а обращений к модели семеро — без имени строка не скажет,
+    которое из них не доехало.
+    """
+    client = provider({CHAT: chat_response('{"a":', finish_reason="length")})
+    log = logging.getLogger("tests.token_limit")
+
+    with caplog.at_level(logging.WARNING, logger="tests.token_limit"):
+        answer = await chat(
+            client,
+            "qwen",
+            ChatRequest(purpose="разбор вакансии", messages=[], max_tokens=8),
+            log,
+        )
+
+    assert answer.text == '{"a":'
+    assert [
+        rec.getMessage()
+        for rec in caplog.records
+        if rec.name == "tests.token_limit"
+    ] == [
+        "разбор вакансии: модель упёрлась в предел токенов, ответ может быть обрезан"
+    ]

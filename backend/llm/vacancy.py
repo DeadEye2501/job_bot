@@ -11,7 +11,12 @@ from adapters.lm_studio import ChatRequest, chat
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.payloads import ParsedVacancy
 
-from backend.llm.answers import json_object, normalize_enum, str_or_none
+from backend.llm.answers import (
+    json_object,
+    log_unparseable,
+    normalize_enum,
+    str_or_none,
+)
 from backend.llm.candidate import _format_known_skills
 from backend.llm.external import wrap_external
 from backend.llm.skills import clean_stack_items
@@ -271,14 +276,10 @@ async def parse_vacancy(
     if reply.text is None:
         return None
     answer = reply.text
-    finish_reason = reply.finish_reason
-
-    if finish_reason == "length":
-        logger.warning("parse_vacancy: LLM hit token limit, output may be truncated")
 
     parsed = _parse_vacancy_json(answer)
     if parsed is None:
-        logger.warning("parse_vacancy: LLM returned unparseable output %r", answer)
+        log_unparseable(answer, logger, "parse_vacancy")
         return None
 
     if (

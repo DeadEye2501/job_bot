@@ -13,7 +13,7 @@ import logging
 
 import pytest
 
-from backend.llm.answers import extract_last_json, json_object
+from backend.llm.answers import extract_last_json, json_object, log_unparseable
 
 
 @pytest.mark.parametrize(
@@ -110,6 +110,29 @@ def test_an_unreadable_answer_leaves_a_trace_in_the_log(caplog):
         assert json_object("я не понял", logging.getLogger("проверка"), "разбор") is None
 
     assert any(rec.name == "проверка" for rec in caplog.records)
+
+def test_a_complaint_about_an_unparsed_answer_names_the_purpose(caplog):
+    """Громкая жалоба на неразобранный ответ называет обращение и показывает
+    оба края ответа.
+
+    Четверо зовущих писали её своими руками, и трое не обрезали ответ вовсе —
+    разбор резюме уезжал в журнал целиком. Обрезка при этом не может быть
+    только по началу: у рассуждающей модели начало занято размышлением, а
+    объект, из-за которого всё и сломалось, лежит в конце.
+    """
+    answer = "начало" + "ш" * 900 + "конец"
+
+    with caplog.at_level(logging.WARNING, logger="проверка"):
+        log_unparseable(answer, logging.getLogger("проверка"), "разбор вакансии")
+
+    written = [
+        rec.getMessage() for rec in caplog.records if rec.name == "проверка"
+    ]
+    assert len(written) == 1
+    assert "разбор вакансии" in written[0]
+    assert "начало" in written[0] and "конец" in written[0]
+    assert "ш" * 900 not in written[0]
+
 
 def test_an_object_that_will_not_parse_yields_nothing(caplog):
     """Похожее на объект, но неразбираемое даёт отсутствие, а не падение.

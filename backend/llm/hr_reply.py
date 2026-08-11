@@ -11,7 +11,7 @@ from backend.domain.transitions import ALLOWED_AUTO_TRANSITIONS
 from backend.models import VacancyStatus
 from backend.payloads import Classification
 
-from backend.llm.answers import json_object, str_or_none
+from backend.llm.answers import json_object, log_unparseable, str_or_none
 from backend.llm.external import wrap_external
 
 logger = logging.getLogger(__name__)
@@ -209,7 +209,7 @@ async def classify_hr_reply(
 
     parsed = _parse_classification(answer)
     if parsed is None:
-        logger.warning("classify_hr_reply: LLM returned unparseable output %r", answer)
+        log_unparseable(answer, logger, "classify_hr_reply")
     else:
         logger.debug(
             "classify_hr_reply: status=%s",
