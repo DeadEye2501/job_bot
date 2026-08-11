@@ -230,6 +230,28 @@ async def test_refreshing_by_number_reaches_the_named_channels(
     assert titles == {"jobs": "Стало", "other": "Было"}
 
 
+async def test_refreshing_by_number_skips_a_channel_without_a_name(
+    make_pipeline, session_factory
+):
+    """Обновление по номерам о канале без имени Telegram не спрашивает.
+
+    Спрашивать нечем: ник — единственный адрес. Беда была прикрыта
+    случайно — обращение падало внутри широкого перехвата, и канал молча
+    выпадал из сводки одной строкой в журнале.
+    """
+    saved = await _channels(
+        session_factory,
+        channel_row(username=None, title="Было"),
+        channel_row(username="", title="Было"),
+    )
+    client = FakeTelegramClient()
+    pipeline = await make_pipeline(client)
+
+    await pipeline.refresh_channel_metadata_for_ids([row.id for row in saved])
+
+    assert client.get_chat_calls == []
+
+
 async def test_refreshing_nothing_asks_telegram_nothing(
     make_pipeline, session_factory
 ):

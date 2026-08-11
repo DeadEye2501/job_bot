@@ -1,14 +1,27 @@
-"""Сопоставление входящего сообщения с записью HR."""
+"""Соответствие записи HR данным Telegram."""
 
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import HR, Message, Vacancy
 
 logger = logging.getLogger(__name__)
+
+
+HAS_TELEGRAM_IDENTITY = or_(
+    HR.telegram_user_id.is_not(None), HR.telegram_username.is_not(None)
+)
+"""Отбор «человека есть чем опознать в Telegram»: номер учётной записи либо ник.
+
+Одно объявление на двоих — догон переписки и подсказки чёрного списка, — потому
+что согласны они сегодня лишь тем, что никто не забыл вторую половину «или».
+Что расхождение здесь достижимо, видно по `hr_list.list_open_hr_chats`: тот
+сужен до одного номера учётной записи нарочно, и правило отбора людей в проекте
+уже не одно.
+"""
 
 
 async def find_known_hr(

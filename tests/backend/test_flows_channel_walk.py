@@ -26,8 +26,10 @@ async def walking(monkeypatch, make_pipeline):
     сообщает окну. Чтение сообщений и перезагрузка настроек — работа
     соседних слайсов.
     """
-    pipeline = await make_pipeline(FakeTelegramClient())
+    client = FakeTelegramClient()
+    pipeline = await make_pipeline(client)
     pipeline.walked = []
+    pipeline.telegram = client
 
     async def reload():
         pipeline.walked.append("настройки")
@@ -70,6 +72,26 @@ async def test_a_channel_without_a_name_is_not_walked(walking, session_factory):
     await walking.poll_active_channels()
 
     assert [step for step in walking.walked if step != "настройки"] == ["on"]
+
+
+async def test_a_channel_with_an_empty_name_is_not_walked(walking, session_factory):
+    """Канал с пустым именем не обходят наравне с безымянным.
+
+    Колонка обнуляемая, а строки заводились и сырым SQL мимо заведения из
+    окна: пустая строка адресом в Telegram не является так же, как её
+    отсутствие. Спрошенное у Telegram проверяется рядом — иначе канал
+    выпадал бы из обхода, но обращение всё равно уходило.
+    """
+    await put(
+        session_factory,
+        channel_row(username="", is_active=True),
+        channel_row(username="on", is_active=True),
+    )
+
+    await walking.poll_active_channels()
+
+    assert [step for step in walking.walked if step != "настройки"] == ["on"]
+    assert walking.telegram.get_chat_calls == ["on"]
 
 
 async def test_the_settings_are_reloaded_before_the_walk(walking, session_factory):
@@ -208,6 +230,21 @@ async def test_a_channel_without_a_name_on_demand_reports_failure(
     rows = await all_rows(session_factory, TelegramChannel)
 
     assert await walking.poll_one_channel(rows[0].id) is False
+
+
+async def test_a_channel_with_an_empty_name_on_demand_reports_failure(
+    walking, session_factory
+):
+    """Прогон канала с пустым именем сообщает о неудаче наравне с безымянным.
+
+    Третья дорога к каналам, и правило у неё общее с двумя другими; своей
+    проверки здесь не осталось, а окно по этому ответу показывает подсказку.
+    """
+    await put(session_factory, channel_row(username=""))
+    rows = await all_rows(session_factory, TelegramChannel)
+
+    assert await walking.poll_one_channel(rows[0].id) is False
+    assert walking.telegram.get_chat_calls == []
 
 
 async def test_a_broken_read_on_demand_reports_failure(monkeypatch, walking, session_factory):
