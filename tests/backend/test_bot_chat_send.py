@@ -89,6 +89,43 @@ async def test_the_send_guard_refuses_and_says_why(chatting, session_factory):
     assert client.outgoing == []
 
 
+async def test_an_hr_without_an_address_is_refused_by_a_switched_off_bot_too(
+    chatting, session_factory, sending_unlocked
+):
+    """У HR без адреса причина отказа одна, включён бот или нет.
+
+    Тот же вопрос — можно ли писать этому HR — конвейер откликов задаёт
+    своим набором заслонов, и на выключенном боте без адреса он называет
+    «нет адресата». Два разных ответа на один вопрос значат, что заслоны
+    разъехались, а пользователь по подсказке чинит не то.
+    """
+    bot, client, hr = await chatting(
+        mode=BotMode.OFF, telegram_username=None, telegram_user_id=None
+    )
+
+    with pytest.raises(RuntimeError, match="нечем отправить"):
+        await bot.send_to_hr_chat(hr.id, "здравствуйте")
+
+    assert client.outgoing == []
+
+
+async def test_a_blacklisted_hr_is_named_ahead_of_the_send_lock(
+    chatting, session_factory
+):
+    """У HR из чёрного списка отказ называет список, а не замок отправки.
+
+    Замок снимается одним переключателем, чёрный список — нет. Назови окно
+    замок, и человек снимет его, чтобы упереться в то же самое.
+    """
+    await put(session_factory, blacklist_row("hr", "@maria"))
+    bot, client, hr = await chatting(telegram_username="maria")
+
+    with pytest.raises(RuntimeError, match="blacklist"):
+        await bot.send_to_hr_chat(hr.id, "здравствуйте")
+
+    assert client.outgoing == []
+
+
 async def test_a_missing_hr_is_named_in_the_refusal(
     chatting, session_factory, sending_unlocked
 ):
