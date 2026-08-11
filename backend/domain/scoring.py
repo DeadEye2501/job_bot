@@ -18,23 +18,23 @@ def _build_skill_level_lookup(
     — aliases are just other spellings of the same skill and must score
     the same.
 
-    If the user has two profile skills whose aliases overlap (shouldn't
-    happen in seed data, but the schema doesn't forbid it), the LAST one
-    wins — the shared key just gets overwritten. Acceptable: this is
-    user-controlled data, and we'd rather not silently aggregate. We do
-    log a debug message on collision so the operator can spot a misseeded
-    profile when scores look off.
+    Два навыка с общим ключом — схема такого не запрещает — разрешаются в
+    пользу первого: порядок выдачи базы ничем не задан, и побеждай
+    последний, балл вакансии зависел бы от него. То же правило держит
+    `repository/profile._index_skill_keys`.
     """
     out: dict[str, int] = {}
 
     def _put(key: str, level: int, source: str) -> None:
         prev = out.get(key)
-        if prev is not None and prev != level:
-            logger.debug(
-                "profile skill key collision: %r already mapped to "
-                "level=%d, overwritten by %s with level=%d",
-                key, prev, source, level,
-            )
+        if prev is not None:
+            if prev != level:
+                logger.debug(
+                    "profile skill key collision: %r already mapped to "
+                    "level=%d, %s with level=%d ignored",
+                    key, prev, source, level,
+                )
+            return
         out[key] = level
 
     for s in skills:

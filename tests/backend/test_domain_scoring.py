@@ -77,6 +77,23 @@ def test_a_required_skill_the_profile_has_adds_its_level():
     assert got == 3
 
 
+def test_of_two_names_sharing_a_key_the_first_one_scores():
+    """Из двух навыков с одним ключом баллы даёт заведённый первым.
+
+    «CI/CD» и «ci cd» сводятся к одному ключу, и порядок выдачи базы ничем
+    не задан. Побеждай последний — балл вакансии зависел бы от того, в каком
+    порядке база вернула строки анкеты. Разбор резюме и правка мест работы
+    уже разрешают это столкновение в пользу первого, и правило должно быть
+    одно: иначе один и тот же навык весит на экране статистики иначе, чем в
+    оценке вакансии.
+    """
+    got = score_parsed(
+        parsed_vacancy(stack_required=["ci cd"]),
+        [profile_skill("CI/CD", 3), profile_skill("ci cd", 1)],
+    )
+    assert got == 3
+
+
 def test_a_separator_inside_a_name_does_not_cost_points():
     """Разделитель внутри названия — не другой навык.
 
