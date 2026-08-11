@@ -10,7 +10,7 @@ import pytest
 
 from backend.llm.candidate import (
     CandidateLanguage,
-    _format_free_preferences,
+    _format_text,
     _format_grades,
     _format_known_skills,
     _format_languages,
@@ -107,9 +107,13 @@ def test_a_language_without_a_level_does_not_spoil_the_rest():
         pytest.param("  готов к переезду  ", "готов к переезду", id="обрезается"),
     ],
 )
-def test_free_preferences_are_passed_as_written(text, expected):
-    """Свободные пожелания передаются как написаны, пустые — прочерком."""
-    assert _format_free_preferences(text) == expected
+def test_a_free_text_slot_is_passed_as_written(text, expected):
+    """Свободный текст доезжает до промпта как написан, пустой — прочерком.
+
+    Слотов на этом объявлении три — роль, локация и пожелания, — и прочерк
+    у них общий: пустой слот оставил бы в промпте оборванную строку.
+    """
+    assert _format_text(text) == expected
 
 
 class _Skill:

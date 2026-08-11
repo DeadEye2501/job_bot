@@ -170,21 +170,6 @@ async def list_skills(session: AsyncSession) -> list[ProfileSkill]:
     )
 
 
-async def load_profile_skills(session: AsyncSession) -> list[ProfileSkill]:
-    """То же, что `list_skills`; второе имя держит только мост.
-
-    Зовут его `client/bridge.py:1354` и `:1387`, а мост в этом плане не
-    трогают — он переписывается своим этапом, и тогда имя уйдёт вместе с
-    обоими зовущими. Свои на `list_skills` переведены.
-
-    До сведения здесь стоял свой `select` без порядка. Наблюдаемой пляски он
-    не давал — `id` на SQLite псевдоним `rowid`, и сплошной проход и так шёл
-    по нему, — но порядок держался на устройстве базы, а не на обещании
-    читателя.
-    """
-    return await list_skills(session)
-
-
 async def list_experience(session: AsyncSession) -> list[ProfileExperience]:
     """All ProfileExperience rows newest-first, with skills relationship loaded."""
     from sqlalchemy.orm import selectinload
@@ -356,7 +341,7 @@ async def upsert_profile(session: AsyncSession, **fields) -> Profile:
     Caller must wrap in ``session.begin()``. Skills and experience are NOT
     touched here — those have their own write paths.
     """
-    profile = (await session.scalars(select(Profile).limit(1))).first()
+    profile = await get_profile(session)
     if profile is None:
         profile = Profile(**fields)
         session.add(profile)
@@ -414,20 +399,12 @@ async def build_profile_block(session: AsyncSession) -> str:
     «Дополнительно», чтобы LLM могла учесть пожелания (про релокацию, гео,
     специфичные предпочтения).
     """
-    profile = (await session.scalars(select(Profile).limit(1))).first()
+    profile = await get_profile(session)
     if profile is None:
         return ""
 
-    skills = list(
-        (await session.scalars(select(ProfileSkill).order_by(ProfileSkill.id))).all()
-    )
-    experiences = list(
-        (
-            await session.scalars(
-                select(ProfileExperience).order_by(ProfileExperience.start_date.desc())
-            )
-        ).all()
-    )
+    skills = await list_skills(session)
+    experiences = await list_experience(session)
 
     skills_by_cat: dict[str, list[str]] = {}
     for s in skills:
