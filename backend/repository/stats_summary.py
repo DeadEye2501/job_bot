@@ -9,6 +9,19 @@ from backend.domain.scoring import build_skill_lookup
 from backend.domain.skill_names import skill_key
 from backend.models import Message, ProfileSkill, Vacancy, VacancyStatus, VacancyStatusHistory
 
+PARSED_ONLY = Vacancy.is_parsed.is_(True)
+"""Отбор «разобранная вакансия» — общий для ступеней воронки, сводных
+счётчиков и таблицы каналов.
+
+Каждая ступень отбирает по нему сама, и написанный порознь он разъезжается
+молча: забудет один — «откликнулись» в шапке разойдётся с таблицей каналов
+ровно тогда, когда числа возьмутся сверять.
+
+`get_stats_hr_responses` сюда **не входит**: она не отбирает по разбору вовсе
+и считает по всем строкам истории. Так было и до этого объявления.
+"""
+
+
 def _status_cond(statuses):
     """Условие «статус перехода тот самый». Принимает и одиночный статус,
     и любой набор — звать с одним значением удобнее, чем с набором из него.
@@ -71,7 +84,7 @@ async def get_stats_kpi(
 
     in_progress_set = {VacancyStatus.INVITATION, VacancyStatus.TEST}
 
-    base_filter = [Vacancy.is_parsed.is_(True)]
+    base_filter = [PARSED_ONLY]
 
     total = int((await session.execute(
         select(func.count(Vacancy.id)).where(*base_filter)
@@ -139,9 +152,7 @@ async def get_stats_status_breakdown(
     Используется для funnel-карточки и all-status-сounters.
     """
     since = _stats_period_since(period)
-    base = select(Vacancy.status, func.count(Vacancy.id)).where(
-        Vacancy.is_parsed.is_(True)
-    )
+    base = select(Vacancy.status, func.count(Vacancy.id)).where(PARSED_ONLY)
     if since is not None:
         base = base.where(Vacancy.created_at >= since)
     rows = (await session.execute(base.group_by(Vacancy.status))).all()
@@ -168,7 +179,7 @@ async def get_stats_skills(
       Топ-N по count desc, тай-брейкер casefold.
     """
     since = _stats_period_since(period)
-    base_filter = [Vacancy.is_parsed.is_(True), Vacancy.stack.is_not(None)]
+    base_filter = [PARSED_ONLY, Vacancy.stack.is_not(None)]
     if since is not None:
         base_filter.append(Vacancy.created_at >= since)
 
