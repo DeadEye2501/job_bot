@@ -64,6 +64,36 @@ async def test_letters_older_than_the_window_are_not_counted(
     ) == 2
 
 
+async def test_the_window_is_counted_from_today_by_whole_days(
+    session, session_factory
+):
+    """Граница окна отмеряется от сегодняшнего дня, а не от начала переписки.
+
+    Письмо тринадцатидневной давности в окно из четырнадцати дней попадает,
+    пятнадцатидневное — нет. Сместись отсчёт хоть на сутки, и HR получил бы
+    полный отклик вместо короткого напоминания — или наоборот.
+    """
+    hr = hr_row()
+    await put(session_factory, hr)
+    vacancy = vacancy_row(hr_id=hr.id)
+    await put(session_factory, vacancy)
+    await put(
+        session_factory,
+        message_row(
+            hr_id=hr.id, vacancy_id=vacancy.id, tg_message_id=1,
+            is_incoming=False, sent_at=days_ago(13),
+        ),
+        message_row(
+            hr_id=hr.id, vacancy_id=vacancy.id, tg_message_id=2,
+            is_incoming=False, sent_at=days_ago(15),
+        ),
+    )
+
+    assert await count_recent_outgoing_with_vacancy_for_hr(
+        session, hr.id, window_days=14
+    ) == 1
+
+
 async def test_an_hr_we_never_wrote_to_has_a_count_of_zero(session, session_factory):
     """У HR без переписки счётчик равен нулю, а не пустоте."""
     hr = hr_row()

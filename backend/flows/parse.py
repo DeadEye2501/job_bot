@@ -144,6 +144,7 @@ async def parse_and_update_vacancy(
             )
         elif validation.verdict == "trash":
             trash_reason = validation.reason or "no reason"
+            trash_skip_reason = f"{TRASH_SKIP_PREFIX}{trash_reason}"
             if allow_delete:
                 logger.info(
                     "vacancy %s: classified as trash by LLM (%s), deleting",
@@ -151,7 +152,7 @@ async def parse_and_update_vacancy(
                 )
                 await cleanup.delete_vacancy_as_trash(pipeline,
                     vacancy_id,
-                    reason=f"{TRASH_SKIP_PREFIX}{trash_reason}",
+                    reason=trash_skip_reason,
                 )
                 return
             logger.info(
@@ -159,7 +160,7 @@ async def parse_and_update_vacancy(
                 vacancy_id,
             )
             status = VacancyStatus.NOT_FIT
-            skip_reason = f"{TRASH_SKIP_PREFIX}{trash_reason}"
+            skip_reason = trash_skip_reason
         elif validation.verdict == "reject":
             status = VacancyStatus.NOT_FIT
             skip_reason = f"{LLM_SKIP_PREFIX}{validation.reason or 'rejected'}"
