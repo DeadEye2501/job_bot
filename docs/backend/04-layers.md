@@ -101,7 +101,8 @@ Telegram, и работу с хранилищем:
 Карта пишет про модуль «ответственность не названа», и по делу: в нём и
 вытаскивание текста сообщения, и чистые правила ника (`normalize_username`,
 `typed_username`), и асинхронные походы в Telegram (`fetch_telegram_avatar`,
-`resolve_hr_telegram`) — оттого модуль ввозит `pyrogram.errors`.
+`resolve_hr_telegram`, а со слайса 11 ещё и `read_channel_metadata`) — оттого
+модуль ввозит `pyrogram.errors`.
 
 Следствие видно с слайса 10 этапа 1: разбор объявления (`backend/llm/`) стал
 звать общее правило ника — и потянул Pyrogram в замыкание ввозов слоя, которому

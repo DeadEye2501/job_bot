@@ -5,7 +5,7 @@ import logging
 from typing import Literal
 
 from backend.bot import slot
-from backend.helpers import fetch_telegram_avatar
+from backend.helpers import read_channel_metadata
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
 from backend.repository.channels import (
     create_channel,
@@ -89,12 +89,7 @@ async def add_channel(
     if chat is None:
         return None, "invalid"
 
-    title = getattr(chat, "title", None)
-    avatar = (
-        await fetch_telegram_avatar(bot._client, chat)
-        if getattr(chat, "photo", None) is not None
-        else None
-    )
+    title, avatar = await read_channel_metadata(bot._client, chat)
 
     async with bot._session_factory() as session:
         async with session.begin():
