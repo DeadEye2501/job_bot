@@ -84,6 +84,18 @@ async def _target_or_refuse(bot, hr_id: int) -> int | str:
     )
 
 
+async def _persist_outgoing(bot, outgoing: OutgoingMessage) -> Message:
+    """Записать наше исходящее своей транзакцией и отдать строку.
+
+    Обе отправки из окна — текстом и вложением — кладут строку одинаково
+    устроенной; своё у каждой только то, чем заполнена сама `OutgoingMessage`.
+    """
+    async with bot._session_factory() as session:
+        row, _ = await save_outgoing_message(session, outgoing)
+        await session.commit()
+    return row
+
+
 async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
     """Send a chat message to an HR from the Contacts/HR pane (slice 5).
 
@@ -107,25 +119,24 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
         hr_id, pyro_msg.id, len(clean),
     )
 
-    async with bot._session_factory() as session:
-        row, _ = await save_outgoing_message(
-            session,
-            OutgoingMessage(
-                hr_id=hr_id,
-                text=clean,
-                tg_message_id=pyro_msg.id,
-                sent_at=pyro_msg.date,
-            ),
-        )
-        await session.commit()
-    return row
+    return await _persist_outgoing(
+        bot,
+        OutgoingMessage(
+            hr_id=hr_id,
+            text=clean,
+            tg_message_id=pyro_msg.id,
+            sent_at=pyro_msg.date,
+        ),
+    )
 
 
 async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
-    """Send a photo or document to the HR. Mirrors ``send_to_hr_chat``'s
-    guards and race handling. The file is also copied into our ``media/``
-    cache so the chat UI can render it without re-downloading from
-    Telegram.
+    """Send a photo or document to the HR.
+
+    Заслоны те же, что у отправки текстом, — одно объявление на двоих; строка
+    в переписке кладётся тем же `_persist_outgoing`. Своё здесь — проверки
+    самого файла и копия в кэше ``media/``, чтобы окно показало вложение, не
+    забирая его из Telegram заново.
     """
     target = await _target_or_refuse(bot, hr_id)
 
@@ -164,18 +175,15 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
     media_kind = "photo" if as_photo else "document"
     media_name = None if as_photo else src.name
 
-    async with bot._session_factory() as session:
-        row, _ = await save_outgoing_message(
-            session,
-            OutgoingMessage(
-                hr_id=hr_id,
-                text="",
-                tg_message_id=pyro_msg.id,
-                sent_at=pyro_msg.date,
-                media_kind=media_kind,
-                media_path=media_path,
-                media_name=media_name,
-            ),
-        )
-        await session.commit()
-    return row
+    return await _persist_outgoing(
+        bot,
+        OutgoingMessage(
+            hr_id=hr_id,
+            text="",
+            tg_message_id=pyro_msg.id,
+            sent_at=pyro_msg.date,
+            media_kind=media_kind,
+            media_path=media_path,
+            media_name=media_name,
+        ),
+    )

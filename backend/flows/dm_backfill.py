@@ -45,13 +45,23 @@ async def backfill_hr_dm_history(
     from backend.models import Message
     from pyrogram.errors import FloodWait, PeerIdInvalid
 
+    async def history(peer) -> list:
+        """Переписка с собеседником списком, свежими вперёд.
+
+        Читается она трижды — первым заходом, после отказа опознать
+        собеседника и после ожидания по требованию Telegram, — и порознь
+        три обхода разъезжались бы глубиной чтения.
+        """
+        return [
+            msg
+            async for msg in client.get_chat_history(peer, limit=backfill_limit)
+        ]
+
     target = telegram_peer(hr)
     if target is None:
         return
-    messages = []
     try:
-        async for msg in client.get_chat_history(target, limit=backfill_limit):
-            messages.append(msg)
+        messages = await history(target)
     except PeerIdInvalid:
         # Pyrogram peer-cache не знает этого id (HR добавлен по
         # @username без предыдущего DM, либо session сброшен).
@@ -64,13 +74,8 @@ async def backfill_hr_dm_history(
         if hr.telegram_username:
             try:
                 await client.get_users(hr.telegram_username)
-                # После get_users peer попадает в cache; повторим
-                # get_chat_history.
-                messages = []
-                async for msg in client.get_chat_history(
-                    hr.telegram_username, limit=backfill_limit
-                ):
-                    messages.append(msg)
+                # После get_users peer попадает в cache; повторим чтение.
+                messages = await history(hr.telegram_username)
             except Exception:
                 logger.exception(
                     "backfill: resolve fallback failed для hr %d", hr.id
@@ -92,9 +97,7 @@ async def backfill_hr_dm_history(
         )
         await asyncio.sleep(wait + 1)
         try:
-            messages = []
-            async for msg in client.get_chat_history(target, limit=backfill_limit):
-                messages.append(msg)
+            messages = await history(target)
         except Exception:
             logger.exception(
                 "backfill: retry после FloodWait не помог hr %d", hr.id,

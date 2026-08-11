@@ -72,6 +72,35 @@ async def mark_incoming_read(
     return done.rowcount or 0
 
 
+async def mark_outgoing_read(
+    session: AsyncSession, hr_id: int, up_to_tg_id: int, now: datetime
+) -> int:
+    """Пометить прочитанными наши письма этому HR до названного номера.
+
+    Telegram сообщает о прочтении не строкой, а границей: «всё до этого
+    номера прочитано». Строки без номера в границу не попадают вовсе — они
+    писались под замком отправки, и в Telegram их не существует.
+
+    Живёт рядом с отметкой входящих нарочно: что значит «прочитано», у обеих
+    сторон переписки одно, а писал это прежде обработчик события своим
+    запросом.
+
+    Транзакцию закрывает зовущий.
+    """
+    done = await session.execute(
+        update(Message)
+        .where(
+            Message.hr_id == hr_id,
+            Message.is_incoming.is_(False),
+            Message.tg_message_id.is_not(None),
+            Message.tg_message_id <= up_to_tg_id,
+            Message.read_at.is_(None),
+        )
+        .values(read_at=now)
+    )
+    return done.rowcount or 0
+
+
 async def tombstone_messages(session: AsyncSession, *where) -> int:
     """Поставить надгробия отобранным строкам; сколько поставили.
 

@@ -6,7 +6,7 @@ from adapters import telegram
 from backend.bot import can_send
 from backend.models import HR
 from backend.models import Message
-from backend.repository.vacancies_life import add_vacancy_event
+from backend.flows.events import record_vacancy_event
 from backend.repository.vacancies_life import mark_vacancy_applied
 
 logger = logging.getLogger(__name__)
@@ -198,24 +198,16 @@ async def send(
     # без явной строки «отклик отправлен» в истории. force=True от
     # ручного UI выделяем отдельным флагом.
     if vacancy_id is not None:
-        try:
-            async with bot._session_factory() as session:
-                await add_vacancy_event(
-                    session,
-                    vacancy_id,
-                    "applied_sent",
-                    {
-                        "hr_id": hr.id,
-                        "force": force,
-                        "suppressed": suppressed,
-                        "cover_letter_chars": len(text),
-                        "tg_message_id": tg_msg_id,
-                    },
-                )
-                await session.commit()
-        except Exception:
-            logger.exception(
-                "applied_sent VacancyEvent persist failed",
-                extra={"vacancy_id": vacancy_id},
-            )
+        await record_vacancy_event(
+            bot._session_factory,
+            vacancy_id,
+            "applied_sent",
+            {
+                "hr_id": hr.id,
+                "force": force,
+                "suppressed": suppressed,
+                "cover_letter_chars": len(text),
+                "tg_message_id": tg_msg_id,
+            },
+        )
     return True
