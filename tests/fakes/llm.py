@@ -29,6 +29,7 @@ httpx.RequestError). Не кладите сюда исключением httpx.H
 import json
 
 import httpx
+import pytest
 
 
 # Пары «метод, путь», по которым подделка раскладывает заготовленные ответы.
@@ -37,6 +38,49 @@ import httpx
 CHAT = ("POST", "/v1/chat/completions")
 EMBEDDINGS = ("POST", "/v1/embeddings")
 MODELS = ("GET", "/v1/models")
+
+
+def _troubles() -> list[tuple[str, object, str]]:
+    """Три беды провайдера: имя случая, заготовленное для подделки и метка,
+    которой боевой код называет эту беду в журнале и в причине отказа.
+
+    Отказ кодом состояния, обрыв связи и ответ чужой формы ждёт каждое
+    обращение к модели, поэтому перечень один на все проверки: выписанный по
+    месту, он расходился бы, и ветка, забытая в одном файле, выглядела бы
+    проверенной.
+
+    Собирается заново на каждый зов: подделка проставляет обращение в ошибку
+    связи, а один объект достался бы всем файлам сразу.
+    """
+    return [
+        ("отказ провайдера", httpx.Response(500, text="упал"), "llm_http_error"),
+        ("обрыв связи", httpx.ConnectError("сеть отвалилась"), "llm_request_error"),
+        (
+            "чужая форма",
+            httpx.Response(200, json={"нет": "выборов"}),
+            "malformed_response",
+        ),
+    ]
+
+
+def provider_trouble(*extra):
+    """Беды провайдера, на которых обращение к модели обязано отдать пустое.
+
+    `extra` — беды, свойственные одному предмету: у проверки фактов сверх
+    общих есть ещё четыре формы неразбираемого вердикта.
+    """
+    return [pytest.param(prepared, id=name) for name, prepared, _ in _troubles()] + list(
+        extra
+    )
+
+
+def provider_trouble_named(*extra):
+    """То же, но парой «беда, метка»: разбор сведения компаний не просто
+    отказывает, а называет причину, и сверяется именно она.
+    """
+    return [
+        pytest.param(prepared, mark, id=name) for name, prepared, mark in _troubles()
+    ] + list(extra)
 
 
 def _picker(routes: dict):
@@ -100,6 +144,16 @@ def provider(
 def models_response(*ids: str) -> httpx.Response:
     """Ответ `/v1/models` в форме, совместимой с OpenAI."""
     return httpx.Response(200, json={"data": [{"id": one} for one in ids]})
+
+
+def parsed_vacancy_answer(**fields) -> dict:
+    """Разобранная вакансия в ответе модели: одно название, остальное по месту.
+
+    Название — единственное поле, без которого разбор отвергает ответ вовсе,
+    поэтому минимум состоит из него. Проверки, которым нужно ещё что-то,
+    дописывают своё доводами, а не собирают ответ заново.
+    """
+    return {"title": "Python-разработчик", **fields}
 
 
 def chat_json(payload: dict, *, finish_reason: str = "stop") -> httpx.Response:

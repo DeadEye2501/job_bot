@@ -46,7 +46,6 @@ import adapters.telegram  # noqa: E402, F401 — импорт только ра�
 import pyrogram  # noqa: E402
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402
-from alembic.config import Config  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import (  # noqa: E402
     AsyncEngine,
@@ -54,9 +53,9 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
     async_sessionmaker,
 )
 
+from backend.bootstrap import alembic_config  # noqa: E402
 from config import APP_NAME  # noqa: E402
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Ревизия init. До `head` не поднимаемся: следующая ревизия засевает личные
 # данные и лежит вне репозитория — набор тестов стал бы невоспроизводимым.
@@ -67,7 +66,26 @@ INIT_REVISION = "8ba64b863cb1"
 # подмены; `_FALLBACK_DATA_DIR` — путь, на который `config.py` откатывается,
 # когда `APPDATA` не задана вовсе (см. `config._user_data_dir`).
 _REAL_DATA_DIR = Path(_REAL_APPDATA) / APP_NAME if _REAL_APPDATA else None
-_FALLBACK_DATA_DIR = Path.home() / "AppData" / "Roaming" / APP_NAME
+
+
+def _data_dir_without_appdata() -> Path:
+    """Куда `config.py` откатывается, когда `APPDATA` не задана вовсе.
+
+    Спрашивается у самого `config`, а не переписывается сюда: путь отката —
+    его решение, и вторая запись разошлась бы с ним молча, оставив охрану
+    ниже сторожить каталог, которого больше нет.
+    """
+    import config
+
+    saved = os.environ.pop("APPDATA", None)
+    try:
+        return config._user_data_dir()
+    finally:
+        if saved is not None:
+            os.environ["APPDATA"] = saved
+
+
+_FALLBACK_DATA_DIR = _data_dir_without_appdata()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -124,16 +142,20 @@ def database_url() -> str:
     return get_database_url()
 
 
-def alembic_config() -> Config:
-    """`Config` для alembic, посчитанный от корня проекта.
+@pytest.fixture
+def migrations_target(tmp_path, monkeypatch) -> Path:
+    """Уводит настоящий прогон миграций на свежий файл базы и отдаёт его путь.
 
-    URL сюда намеренно не кладётся: `alembic/env.py` всё равно перезапишет его
-    через `config.get_database_url()` — владелец URL для миграций он, а не этот
-    `Config`.
+    Путь подменяется у `config`, а не в `Config`: `alembic/env.py` первой же
+    строкой перезаписывает `sqlalchemy.url` тем, что вернёт
+    `get_database_url()`, — переданный в `Config` не прижился бы.
     """
-    cfg = Config(str(PROJECT_ROOT / "alembic.ini"))
-    cfg.set_main_option("script_location", str(PROJECT_ROOT / "alembic"))
-    return cfg
+    db_file = tmp_path / "fresh.db"
+    monkeypatch.setattr(
+        "config.get_database_url",
+        lambda: f"sqlite+aiosqlite:///{db_file.as_posix()}",
+    )
+    return db_file
 
 
 @pytest.fixture(scope="session", autouse=True)

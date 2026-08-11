@@ -6,7 +6,7 @@
 
 from backend.repository.channels import list_telegram_channels
 from tests.dbio import put
-from tests.factories import blacklist_row, channel_row, vacancy_row
+from tests.factories import channel_marks, channel_row, vacancy_row
 
 
 async def test_the_row_carries_its_count_and_blacklist_mark(
@@ -20,9 +20,7 @@ async def test_the_row_carries_its_count_and_blacklist_mark(
     await put(
         session_factory,
         vacancy_row(source_channel_id=listed.id),
-        blacklist_row("channel", "@listed"),
-        blacklist_row("channel", "@off", active=False),
-        blacklist_row("hr", "@hr_like"),
+        *channel_marks(),
     )
 
     rows = {r.channel.title: r for r in await list_telegram_channels(session)}

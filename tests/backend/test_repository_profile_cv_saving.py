@@ -28,48 +28,48 @@ from backend.models import (
 )
 from backend.repository.profile import get_profile, list_experience, list_skills, save_parsed_cv
 from tests.dbio import put
-from tests.factories import experience_row, profile_row, profile_skill_row
+from tests.factories import (
+    experience_fields,
+    experience_row,
+    person_fields,
+    profile_row,
+    profile_skill_row,
+    skill_fields,
+)
 
 
 def _profile(**overrides) -> ParsedCvProfile:
-    """Разобранный профиль: обязательное заполнено, остальное пусто."""
-    fields = {
-        "first_name": "Иван",
-        "last_name": "Петров",
-        "title": "Python-разработчик",
-        "email": "ivan@example.com",
-        "phone": None,
-        "location": None,
-        "telegram_username": None,
-        "github_url": None,
-        "education": None,
-        "work_format": [],
-        "grades": [],
-        "free_preferences": None,
-    }
+    """Разобранный профиль: обязательное заполнено, остальное пусто.
+
+    Тот же человек, что и в строке анкеты, — иначе проверка «разобранное легло
+    в анкету» сравнивала бы двух разных.
+    """
+    fields = person_fields(
+        phone=None,
+        location=None,
+        telegram_username=None,
+        github_url=None,
+        education=None,
+        work_format=[],
+        grades=[],
+        free_preferences=None,
+    )
     fields.update(overrides)
     return ParsedCvProfile(**fields)
 
 
 def _skill(name: str, **overrides) -> ParsedCvSkill:
-    """Разобранный навык."""
-    fields = {"category": "backend", "level": 3, "aliases": []}
-    fields.update(overrides)
-    return ParsedCvSkill(name=name, **fields)
+    """Разобранный навык — с теми же умолчаниями, что и строка в базе."""
+    return ParsedCvSkill(name=name, **skill_fields(**overrides))
 
 
 def _place(**overrides) -> ParsedCvExperience:
-    """Разобранное место работы."""
-    fields = {
-        "company": "Контур",
-        "company_url": None,
-        "role": "Разработчик",
-        "start_date": date(2020, 1, 1),
-        "end_date": None,
-        "achievements": [],
-        "responsibilities": [],
-        "stack": [],
-    }
+    """Разобранное место работы — с теми же умолчаниями, что и строка в базе.
+
+    Своё поле здесь одно: стек места работы разбор из резюме приносит, а
+    колонки под него нет.
+    """
+    fields = experience_fields(stack=[])
     fields.update(overrides)
     return ParsedCvExperience(**fields)
 

@@ -6,7 +6,7 @@
 
 from backend.repository.profile import get_profile, list_skills, upsert_profile
 from tests.dbio import put
-from tests.factories import profile_row, profile_skill_row
+from tests.factories import person_fields, profile_row, profile_skill_row
 
 
 async def test_an_empty_database_has_no_profile(session):
@@ -17,16 +17,12 @@ async def test_an_empty_database_has_no_profile(session):
 
 async def test_the_first_write_creates_the_profile(session):
     """Первая запись заводит профиль."""
-    profile = await upsert_profile(
-        session,
-        first_name="Иван",
-        last_name="Петров",
-        title="Python-разработчик",
-        email="ivan@example.com",
-    )
+    fields = person_fields()
+
+    profile = await upsert_profile(session, **fields)
 
     assert profile.id is not None
-    assert (await get_profile(session)).first_name == "Иван"
+    assert (await get_profile(session)).first_name == fields["first_name"]
 
 
 async def test_a_later_write_edits_the_same_row(session, session_factory):

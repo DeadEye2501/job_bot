@@ -10,12 +10,18 @@
 объектом. Поэтому ответы задаются очередью.
 """
 
-import httpx
 import pytest
 
 from backend.llm.cover_letter import generate_cover_letter
 from tests.factories import parsed_vacancy
-from tests.fakes.llm import CHAT, chat_response, data_block, messages_of, provider
+from tests.fakes.llm import (
+    CHAT,
+    chat_response,
+    data_block,
+    messages_of,
+    provider,
+    provider_trouble,
+)
 
 PASSES = '{"verdict": "ok", "issues": []}'
 
@@ -283,14 +289,7 @@ async def test_a_rejected_letter_never_reaches_the_factcheck():
     assert len(client.sent) == 1
 
 
-@pytest.mark.parametrize(
-    "prepared",
-    [
-        pytest.param(httpx.Response(500, text="упал"), id="отказ провайдера"),
-        pytest.param(httpx.ConnectError("сеть отвалилась"), id="обрыв связи"),
-        pytest.param(httpx.Response(200, json={"нет": "выборов"}), id="чужая форма"),
-    ],
-)
+@pytest.mark.parametrize("prepared", provider_trouble())
 async def test_trouble_with_the_first_call_yields_no_letter(prepared):
     """Беда с первым обращением письма не даёт и наружу не пробрасывается."""
     client = provider({CHAT: prepared})

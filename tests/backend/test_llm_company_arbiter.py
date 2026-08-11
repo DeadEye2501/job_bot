@@ -13,7 +13,14 @@ import httpx
 import pytest
 
 from backend.llm.company import dedupe_company_with_llm
-from tests.fakes.llm import CHAT, chat_json, chat_response, messages_of, provider
+from tests.fakes.llm import (
+    CHAT,
+    chat_json,
+    chat_response,
+    messages_of,
+    provider,
+    provider_trouble_named,
+)
 
 
 class _Candidate:
@@ -126,24 +133,11 @@ async def test_the_candidates_are_shown_with_all_they_have():
 
 @pytest.mark.parametrize(
     ("prepared", "marker"),
-    [
-        pytest.param(
-            httpx.Response(500, text="упал"), "llm_http_error", id="отказ провайдера"
-        ),
-        pytest.param(
-            httpx.ConnectError("сеть отвалилась"),
-            "llm_request_error",
-            id="обрыв связи",
-        ),
-        pytest.param(
-            httpx.Response(200, json={"нет": "выборов"}),
-            "malformed_response",
-            id="чужая форма",
-        ),
+    provider_trouble_named(
         pytest.param(
             chat_response("совсем не json"), "unparseable_json", id="не разбирается"
         ),
-    ],
+    ),
 )
 async def test_any_trouble_becomes_a_refusal_that_names_itself(prepared, marker):
     """Любая беда становится отказом, и причина называет, какая именно.

@@ -17,8 +17,7 @@ import pytest
 from backend.bot.media import MEDIA_DIR
 from backend.models import BotMode, Message
 from tests.dbio import only_row, put
-from tests.factories import blacklist_row, message_row, photo_head
-from tests.fakes.telegram import SENT_AT
+from tests.factories import EPOCH, blacklist_row, message_row, photo_head
 
 
 def _file(tmp_path, name: str, size: int = 4):
@@ -49,7 +48,7 @@ async def test_a_picture_goes_as_a_photo(
     assert row.media_kind == "photo"
     assert row.media_name is None
     assert row.text == ""
-    assert row.sent_at == SENT_AT
+    assert row.sent_at == EPOCH
 
 
 async def test_anything_else_goes_as_a_document_under_its_name(

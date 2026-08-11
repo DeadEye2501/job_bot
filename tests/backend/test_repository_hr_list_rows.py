@@ -13,6 +13,7 @@ from tests.factories import (
     company_row,
     hr_row,
     message_row,
+    unread_probe,
     vacancy_row,
 )
 
@@ -39,10 +40,7 @@ async def test_the_row_carries_its_counts_and_last_company(session, session_fact
         vacancy_row(hr_id=hr.id, company_id=now.id, created_at=at(50)),
         vacancy_row(hr_id=hr.id, company_id=was.id, created_at=at(10)),
         vacancy_row(hr_id=other.id),
-        message_row(hr_id=hr.id, is_incoming=True, read_at=None),
-        message_row(hr_id=hr.id, is_incoming=True, read_at=at(10)),
-        message_row(hr_id=hr.id, is_incoming=False, read_at=None),
-        message_row(hr_id=hr.id, is_incoming=True, read_at=None, is_deleted=True),
+        *unread_probe(hr.id),
         message_row(hr_id=other.id, is_incoming=True, read_at=None),
     )
 

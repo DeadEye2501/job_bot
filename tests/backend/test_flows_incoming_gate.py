@@ -15,9 +15,8 @@ import pytest
 from backend.bot.media import MEDIA_DIR
 from backend.models import HR, Message
 from tests.dbio import all_rows, only_row, put
-from tests.factories import blacklist_row, hr_row, message_row
+from tests.factories import EPOCH, blacklist_row, hr_row, message_row
 from tests.fakes.telegram import (
-    SENT_AT,
     FakeTelegramClient,
     incoming,
     message,
@@ -38,7 +37,7 @@ async def test_a_letter_from_a_known_hr_is_saved(session_factory, deliver):
     assert saved.is_incoming is True
     assert saved.text == "здравствуйте"
     assert saved.tg_message_id == 10
-    assert saved.sent_at == SENT_AT
+    assert saved.sent_at == EPOCH
 
 
 @pytest.mark.parametrize(

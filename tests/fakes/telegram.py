@@ -12,13 +12,10 @@
 
 import asyncio
 import io
-from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
-# Метка времени у исходящего — своя, не «сейчас»: тест сверяет её с тем, что
-# легло в базу, а «сейчас» на такое сравнение не годится.
-SENT_AT = datetime(2026, 1, 1, 12, 0)
+from tests.factories import EPOCH
 
 
 def message(*, text=None, caption=None, **extra) -> SimpleNamespace:
@@ -41,7 +38,7 @@ def incoming(*, user_id=777, username=None, text="здравствуйте", **e
     fields = {
         "id": 10,
         "text": text,
-        "date": SENT_AT,
+        "date": EPOCH,
         "photo": None,
         "document": None,
         "reply_to_message_id": None,
@@ -70,7 +67,7 @@ def post(msg_id: int, *, text=_UNSET, **extra):
     return message(
         id=msg_id,
         text=f"объявление {msg_id}" if text is _UNSET else text,
-        date=SENT_AT,
+        date=EPOCH,
         **fields,
     )
 
@@ -219,7 +216,7 @@ class FakeTelegramClient:
         self.outgoing.append((kind, target, payload, caption))
         self._fail_if_asked(kind)
         self.last_message_id += 1
-        answer = SimpleNamespace(id=self.last_message_id, date=SENT_AT)
+        answer = SimpleNamespace(id=self.last_message_id, date=EPOCH)
         if self.on_send is not None:
             await self.on_send(answer)
         return answer

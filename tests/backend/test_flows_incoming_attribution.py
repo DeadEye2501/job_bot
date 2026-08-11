@@ -14,8 +14,8 @@
 from backend.models import HR, Message, Vacancy, VacancyStatus
 from backend.payloads import Classification
 from tests.dbio import all_rows, only_row, put
-from tests.factories import at, hr_row, message_row, vacancy_row
-from tests.fakes.telegram import SENT_AT, incoming, message, user
+from tests.factories import EPOCH, at, hr_row, message_row, vacancy_row
+from tests.fakes.telegram import incoming, message, user
 
 
 async def _two_vacancies(session_factory):
@@ -248,7 +248,7 @@ async def test_the_quote_of_our_own_letter_does_not_go_to_the_reader(session_fac
     quoted = message(
         id=10,
         text="да, давайте",
-        date=SENT_AT,
+        date=EPOCH,
         from_user=user(id=777, username=None),
         photo=None,
         document=None,

@@ -29,6 +29,7 @@ from tests.fakes.llm import (
     data_block,
     messages_of,
     provider,
+    provider_trouble,
 )
 
 
@@ -146,12 +147,9 @@ async def test_a_verdict_comes_back_with_its_reason():
 
 @pytest.mark.parametrize(
     "prepared",
-    [
-        pytest.param(httpx.Response(500, text="упал"), id="отказ провайдера"),
-        pytest.param(httpx.ConnectError("сеть отвалилась"), id="обрыв связи"),
-        pytest.param(httpx.Response(200, json={"нет": "выборов"}), id="чужая форма"),
+    provider_trouble(
         pytest.param(chat_response("я не понял"), id="неразбираемый ответ"),
-    ],
+    ),
 )
 async def test_trouble_yields_no_verdict(prepared):
     """Беда с провайдером вердикта не даёт и наружу не пробрасывается."""

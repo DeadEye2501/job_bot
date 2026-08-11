@@ -11,7 +11,7 @@ import pytest
 from backend.models import VacancyStatus
 from backend.repository.channels import _percent_or_none, get_channel_detail
 from tests.dbio import put
-from tests.factories import blacklist_row, channel_row, days_ago, vacancy_row
+from tests.factories import channel_marks, channel_row, days_ago, vacancy_row
 
 
 _FUNNEL_SET = (
@@ -204,12 +204,7 @@ async def test_the_card_shows_an_active_mark_of_its_own_kind(
     switched_off = channel_row(username="off")
     other_kind = channel_row(username="hr_like")
     await put(session_factory, listed, switched_off, other_kind)
-    await put(
-        session_factory,
-        blacklist_row("channel", "@listed"),
-        blacklist_row("channel", "@off", active=False),
-        blacklist_row("hr", "@hr_like"),
-    )
+    await put(session_factory, *channel_marks())
 
     assert (await get_channel_detail(session, listed.id)).blacklist_value == "@listed"
     assert (await get_channel_detail(session, switched_off.id)).blacklist_value is None
