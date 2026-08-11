@@ -9,18 +9,10 @@ from backend.domain.scoring import build_skill_lookup
 from backend.domain.skill_names import skill_key
 from backend.models import Message, Vacancy, VacancyStatus, VacancyStatusHistory
 from backend.repository.profile import list_skills
+from backend.repository.vacancies_common import PARSED_ONLY, count_by_status
 
-PARSED_ONLY = Vacancy.is_parsed.is_(True)
-"""Отбор «разобранная вакансия» — общий для ступеней воронки, сводных
-счётчиков и таблицы каналов.
-
-Каждая ступень отбирает по нему сама, и написанный порознь он разъезжается
-молча: забудет один — «откликнулись» в шапке разойдётся с таблицей каналов
-ровно тогда, когда числа возьмутся сверять.
-
-`get_stats_hr_responses` сюда **не входит**: она не отбирает по разбору вовсе
-и считает по всем строкам истории. Так было и до этого объявления.
-"""
+# `get_stats_hr_responses` по разбору не отбирает вовсе и считает по всем
+# строкам истории — так было и до того, как отбор получил имя.
 
 
 def _status_cond(statuses):
@@ -153,14 +145,14 @@ async def get_stats_status_breakdown(
     Используется для funnel-карточки и all-status-сounters.
     """
     since = _stats_period_since(period)
-    base = select(Vacancy.status, func.count(Vacancy.id)).where(PARSED_ONLY)
+    conditions = [PARSED_ONLY]
     if since is not None:
-        base = base.where(Vacancy.created_at >= since)
-    rows = (await session.execute(base.group_by(Vacancy.status))).all()
-    counts: dict[str, int] = {s.value: 0 for s in VacancyStatus}
-    for status_enum, cnt in rows:
-        counts[status_enum.value] = int(cnt or 0)
-    return {"period": period, "counts": counts}
+        conditions.append(Vacancy.created_at >= since)
+    by_status = await count_by_status(session, *conditions)
+    return {
+        "period": period,
+        "counts": {status.value: n for status, n in by_status.items()},
+    }
 
 
 async def get_stats_skills(

@@ -1,9 +1,11 @@
 """Короткие списки вакансий для карточек других предметов."""
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Vacancy, VacancyStatus
+from backend.repository.hr_card import LAST_VACANCY_ORDER
+from backend.repository.vacancies_common import PARSED_ONLY, VACANCY_APPEARED_AT
 
 # Channel mini-list sort order — UI requirement: hottest funnel statuses
 # first (Offer / In Progress / Invitation / Test / Answered / Applied / New),
@@ -40,8 +42,8 @@ async def _list_linked(session: AsyncSession, linked_to) -> list[Vacancy]:
     rows = (
         await session.scalars(
             select(Vacancy)
-            .where(linked_to, Vacancy.is_parsed.is_(True))
-            .order_by(Vacancy.created_at.desc(), Vacancy.id.desc())
+            .where(linked_to, PARSED_ONLY)
+            .order_by(*LAST_VACANCY_ORDER)
         )
     ).all()
     return list(rows)
@@ -90,12 +92,15 @@ async def list_vacancies_for_channel(
         value=Vacancy.status,
         else_=99,
     )
-    activity = func.coalesce(Vacancy.posted_at, Vacancy.created_at)
     rows = (
         await session.scalars(
             select(Vacancy)
             .where(Vacancy.source_channel_id == channel_id)
-            .order_by(status_rank.asc(), activity.desc(), Vacancy.id.desc())
+            .order_by(
+                status_rank.asc(),
+                VACANCY_APPEARED_AT.desc(),
+                Vacancy.id.desc(),
+            )
             .limit(limit)
             .offset(offset)
         )

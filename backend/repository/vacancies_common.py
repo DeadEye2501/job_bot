@@ -1,0 +1,49 @@
+"""Чтение вакансий, общее для всех экранов."""
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.models import Vacancy, VacancyStatus
+
+PARSED_ONLY = Vacancy.is_parsed.is_(True)
+"""Отбор «вакансия разобрана до конца».
+
+Недоразобранная строка существует только потому, что конвейер делит заведение
+и разбор на два шага; человеку она не показывается нигде. Зовут отбор все
+экраны разом — список, мини-списки карточек, статистика, поиск последней
+вакансии человека, — и забудь его кто-то один, недоразобранная строка вылезла
+бы на экран или числа разошлись бы между экранами, причём молча.
+"""
+
+VACANCY_APPEARED_AT = func.coalesce(Vacancy.posted_at, Vacancy.created_at)
+"""Когда вакансия появилась: время поста, а без него — время заведения.
+
+Первое непустое, а **не** наибольшее из меток времени. Наибольшее считает
+соседний `vacancies_list._activity_ts`, но отвечает он на другой вопрос —
+«последняя активность», — и ответы у них систематически разные: пост почти
+всегда старше заведения. Имя здесь заведено ровно для того, чтобы эти два
+вопроса не путались.
+"""
+
+
+async def count_by_status(
+    session: AsyncSession, *conditions
+) -> dict[VacancyStatus, int]:
+    """Сколько вакансий в каждом статусе среди отобранных условиями.
+
+    В ответе присутствуют **все** статусы: которого не было ни у одной
+    строки — нулём, а не пропуском. Этот договор и есть предмет объявления:
+    по разбивке считают доли и рисуют воронку, и пропуск вместо нуля дал бы
+    то дыру в таблице, то поломку на делении.
+    """
+    rows = (
+        await session.execute(
+            select(Vacancy.status, func.count(Vacancy.id))
+            .where(*conditions)
+            .group_by(Vacancy.status)
+        )
+    ).all()
+    counts = {status: 0 for status in VacancyStatus}
+    for status, cnt in rows:
+        counts[status] = int(cnt or 0)
+    return counts

@@ -23,6 +23,22 @@ from backend.repository.messages import UNREAD_INCOMING
 logger = logging.getLogger(__name__)
 
 
+LAST_VACANCY_ORDER = (Vacancy.created_at.desc(), Vacancy.id.desc())
+"""Порядок «самая свежая вакансия человека», по которому берут его компанию.
+
+Одно объявление на карточку и на список: спрашивают они одно и то же, а
+приёмы разные — карточке хватает одной строки с ограничением, списку нужна
+оконная нумерация по всем людям разом. Разойдись порядки, два экрана называли
+бы разные компании, и заметить это было бы нечем.
+
+Разрешитель по идентификатору не украшение: время заведения проставляет база
+одним `CURRENT_TIMESTAMP`, и две вакансии подряд легко получают одну метку.
+
+Свежую вакансию без компании оба читают одинаково — как «компании нет»:
+важно, с кем человек работает сейчас, а не с кем работал когда-то.
+"""
+
+
 _HR_FIELD_UNSET = object()
 
 
@@ -72,8 +88,9 @@ async def get_hr_detail(
 ) -> HrDetail | None:
     """Detail payload for the Contacts / HR pane (05).
 
-    Returns the HR row + most-recent linked company (id + name, by
-    ``vacancy.created_at desc``) + total vacancy count + count of unread
+    Returns the HR row + компания с самой свежей его вакансии (id + name,
+    порядок — `LAST_VACANCY_ORDER`; пусто, если та вакансия ни к какой
+    компании не привязана) + total vacancy count + count of unread
     incoming messages. Returns ``None`` if the HR row is gone.
     """
     hr = await session.get(HR, hr_id)
@@ -90,9 +107,10 @@ async def get_hr_detail(
     last_co_row = (
         await session.execute(
             select(Company.id, Company.name)
-            .join(Vacancy, Vacancy.company_id == Company.id)
+            .select_from(Vacancy)
+            .outerjoin(Company, Company.id == Vacancy.company_id)
             .where(Vacancy.hr_id == hr_id)
-            .order_by(Vacancy.created_at.desc(), Vacancy.id.desc())
+            .order_by(*LAST_VACANCY_ORDER)
             .limit(1)
         )
     ).first()

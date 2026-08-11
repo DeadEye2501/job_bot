@@ -84,6 +84,36 @@ async def test_the_last_company_comes_from_the_freshest_vacancy(
     assert card.last_company_name == "Ромашка"
 
 
+async def test_an_unlinked_freshest_vacancy_leaves_the_card_without_a_company(
+    session, session_factory
+):
+    """Если самая свежая вакансия ни к какой компании не привязана, компании нет.
+
+    То же правило, что у строки списка: важно, с кем этот человек работает
+    сейчас, а не с кем работал когда-то. Прежде карточка брала компанию с
+    той, что постарше, и два экрана называли разные компании — расхождение
+    не удерживалось ничем.
+
+    Непривязанная вакансия вставлена раньше привязанной: иначе отбор по
+    времени можно было бы снять — по идентификатору победила бы та же
+    строка, и ответ не изменился бы.
+    """
+    hr = hr_row()
+    await put(session_factory, hr)
+    company = company_row(name="Контур")
+    await put(session_factory, company)
+    await put(
+        session_factory,
+        vacancy_row(hr_id=hr.id, company_id=None, created_at=at(50)),
+        vacancy_row(hr_id=hr.id, company_id=company.id, created_at=at(10)),
+    )
+
+    card = await get_hr_detail(session, hr.id)
+
+    assert card.last_company_id is None
+    assert card.last_company_name is None
+
+
 async def test_a_vacancy_without_a_company_leaves_the_card_without_one(
     session, session_factory
 ):
