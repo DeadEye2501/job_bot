@@ -11,8 +11,6 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 
-from config import get_database_url
-
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +26,6 @@ def ensure_schema() -> None:
     """
     cfg = Config(str(_PROJECT_ROOT / "alembic.ini"))
     cfg.set_main_option("script_location", str(_PROJECT_ROOT / "alembic"))
-    cfg.set_main_option("sqlalchemy.url", get_database_url())
     logger.info("Running alembic upgrade head")
     command.upgrade(cfg, "head")
     logger.info("Alembic upgrade complete")
