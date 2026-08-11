@@ -8,6 +8,7 @@
 
 from datetime import date
 
+import pytest
 from sqlalchemy import select
 
 from backend.cv_parser import (
@@ -193,13 +194,22 @@ async def test_a_place_is_linked_to_the_skills_it_names(session):
     assert sorted(s.name for s in places[0].skills) == ["PostgreSQL", "Python"]
 
 
-async def test_a_stack_item_is_matched_loosely(session):
-    """Название из стека сопоставляется без учёта регистра и разделителей."""
+@pytest.mark.parametrize(
+    "written",
+    ["docker-compose", "docker_compose", "docker/compose", "docker.compose"],
+)
+async def test_a_stack_item_is_matched_loosely(session, written):
+    """Название из стека сопоставляется без учёта регистра и разделителей.
+
+    Разделители названы поимённо: точка нужна «Node.js», косая черта —
+    «CI/CD», подчёркивание приезжает из машинных выгрузок. Одного дефиса
+    мало — правило обещает все четыре.
+    """
     await save_parsed_cv(
         session,
         _cv(
             skills=[_skill("Docker Compose")],
-            experience=[_place(stack=["docker-compose"])],
+            experience=[_place(stack=[written])],
         ),
     )
 

@@ -59,6 +59,27 @@ async def test_spellings_of_one_tag_collapse_keeping_the_first_seen(
     assert [(x["label"], x["count"]) for x in got["skills"]] == [("FastAPI", 3)]
 
 
+async def test_a_separator_inside_a_tag_does_not_split_the_count(
+    session, session_factory
+):
+    """Разделитель внутри названия второй строки в списке не заводит.
+
+    «Docker-Compose» и «docker compose» — одна технология, и отметка «мой»
+    решается по правилу, которое их сводит. Пока счётчик считал по своему,
+    более строгому правилу, тег распадался на две строки, каждая с половиной
+    счёта, и обе могли не дотянуть до порога.
+    """
+    await put(
+        session_factory,
+        vacancy_row(stack=["Docker-Compose"]),
+        vacancy_row(stack=["docker compose"]),
+    )
+
+    got = await get_stats_skills(session, period="all", min_count=2)
+
+    assert [(x["label"], x["count"]) for x in got["skills"]] == [("Docker-Compose", 2)]
+
+
 async def test_rare_tags_are_hidden_behind_the_threshold(session, session_factory):
     """Редкие теги прячутся за порогом: иначе список утонул бы в шуме."""
     await put(

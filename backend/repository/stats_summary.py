@@ -5,7 +5,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.scoring import build_skill_lookup, skill_key
+from backend.domain.scoring import build_skill_lookup
+from backend.domain.skill_names import skill_key
 from backend.models import Message, ProfileSkill, Vacancy, VacancyStatus, VacancyStatusHistory
 
 def _status_cond(statuses):
@@ -156,12 +157,13 @@ async def get_stats_skills(
     """Топ-N технологий из `Vacancy.stack` за period с маркировкой
     «есть в моём профиле».
 
-    - Считаем частоту по casefold-канону (одна технология = один счётчик
-      даже если в посте написана «Python» / «python» / «PYTHON»).
+    - Считаем частоту по канону ``skill_key`` (одна технология = один
+      счётчик, как бы её ни написали: «Python» / «python» / «PYTHON»,
+      «Docker-Compose» / «docker compose»).
     - Дедупликация в рамках одной вакансии: «Python» в стеке два раза
       = +1, не +2.
-    - mine = canon ∈ profile_set, где profile_set — casefold(name) +
-      casefold(aliases) для всех `ProfileSkill`.
+    - mine = canon ∈ profile_set, где profile_set — ключи name и aliases
+      всех `ProfileSkill`.
     - Фильтруем шум: показываем теги с count >= ``min_count`` (по умолч. 2).
       Топ-N по count desc, тай-брейкер casefold.
     """
@@ -188,9 +190,12 @@ async def get_stats_skills(
             if not isinstance(item, str):
                 continue
             tag = item.strip()
-            if not tag:
+            # Пустое и написанное одними разделителями («///») технологией не
+            # считается: ключ у такого пустой, и своей строки в списке оно не
+            # получает.
+            lo = skill_key(tag)
+            if not lo:
                 continue
-            lo = tag.casefold()
             if lo in seen_in_row:
                 continue
             seen_in_row.add(lo)
