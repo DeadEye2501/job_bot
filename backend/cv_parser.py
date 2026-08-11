@@ -9,7 +9,12 @@ import httpx
 from adapters.lm_studio import ChatRequest, chat
 from backend.domain.skill_names import skill_key
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
-from backend.llm.answers import QUOTE_TRANSLATION, normalize_enum, str_or_none
+from backend.llm.answers import (
+    QUOTE_TRANSLATION,
+    log_unparseable,
+    normalize_enum,
+    str_or_none,
+)
 from backend.payloads import str_list
 
 
@@ -430,12 +435,8 @@ async def parse_cv(
     if reply.text is None:
         return None
     answer = reply.text
-    finish_reason = reply.finish_reason
-
-    if finish_reason == "length":
-        logger.warning("parse_cv: LLM hit token limit, output may be truncated")
 
     parsed = _parse_cv_json(answer)
     if parsed is None:
-        logger.warning("parse_cv: LLM returned unparseable output %r", answer[:300])
+        log_unparseable(answer, logger, "parse_cv")
     return parsed
