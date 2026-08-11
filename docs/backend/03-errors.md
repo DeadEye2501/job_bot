@@ -10,10 +10,11 @@
 
 ## Как это брать: два захода
 
-| Заход | Пункты | Что трогает |
-|---|---|---|
-| **А. Обращение к модели и разбор** | 1, 5 | `adapters/lm_studio.py`, `llm/hr_reply.py`, `flows/auto_gate.py`, `flows/dm.py` |
-| **Б. Живучесть окружения** | 2, 3, 4, 6 | `log_buffer.py`, `alembic/`, `repository/stats_summary.py`, `helpers.py` |
+- [ ] **А. Обращение к модели и разбор** — пункты 1, 5.
+      `adapters/lm_studio.py`, `llm/hr_reply.py`, `flows/auto_gate.py`,
+      `flows/dm.py`
+- [ ] **Б. Живучесть окружения** — 2, 3, 4, 6.
+      `log_buffer.py`, `alembic/`, `repository/stats_summary.py`, `helpers.py`
 
 Пункт 6 (три написания ссылки на канал) правится в `normalize_username`, то есть
 задевает `helpers.py` — там же, где живёт долг из пункта 4 этапа 4; если оба

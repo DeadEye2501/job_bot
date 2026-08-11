@@ -10,10 +10,12 @@
 
 ## Как это брать: два захода
 
-| Заход | Пункты | Что трогает |
-|---|---|---|
-| **А. Записи мимо репозитория** | 1, 2 | `bot/updates.py`, `repository/messages.py`, `flows/parse.py`, `repository/vacancies_life.py` |
-| **Б. Разъезд модулей** | 3, 4 | `repository/stats_summary.py`, `stats_pipeline.py`, `helpers.py` и шесть мест, пишущих отбор «разобранная вакансия» руками |
+- [ ] **А. Записи мимо репозитория** — пункты 1, 2.
+      `bot/updates.py`, `repository/messages.py`, `flows/parse.py`,
+      `repository/vacancies_life.py`
+- [ ] **Б. Разъезд модулей** — 3, 4.
+      `repository/stats_summary.py`, `stats_pipeline.py`, `helpers.py` и шесть
+      мест, пишущих отбор «разобранная вакансия» руками
 
 Заход Б несёт решение человека от 12.08.2026 — нейтральный дом отбору
 «разобранная вакансия»; заход А берётся после слайса 1 этапа 1 (тот трогает те же
