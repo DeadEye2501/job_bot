@@ -10,8 +10,8 @@ from backend.flows import parse
 from backend.domain.dedup import cosine_top_match
 from backend.helpers import extract_text
 from backend.models import Vacancy
-from backend.models import VacancyEvent
 from backend.payloads import ChannelPost
+from backend.repository.vacancies_life import add_vacancy_event
 
 from backend.flows import embeddings
 
@@ -102,15 +102,14 @@ async def save_new_vacancy(
             )
             session.add(new_vacancy)
             await session.flush()
-            session.add(
-                VacancyEvent(
-                    vacancy_id=new_vacancy.id,
-                    kind="ingested",
-                    payload={
-                        "channel": post.channel_username,
-                        "msg_id": post.msg.id,
-                    },
-                )
+            await add_vacancy_event(
+                session,
+                new_vacancy.id,
+                "ingested",
+                {
+                    "channel": post.channel_username,
+                    "msg_id": post.msg.id,
+                },
             )
             await session.commit()
             embeddings.append_embedding(pipeline, new_vacancy.id, embedding)

@@ -16,11 +16,11 @@ from backend.llm.fit import validate_vacancy_fit
 from backend.llm.vacancy import parse_vacancy
 from backend.models import HR
 from backend.models import Vacancy
-from backend.models import VacancyEvent
 from backend.models import VacancyStatus
 from backend.payloads import ParsedVacancy
 from backend.repository.companies_matching import find_or_create_company
 from backend.repository.hr_identify import find_or_create_hr
+from backend.repository.vacancies_life import add_vacancy_event
 
 from backend.flows import apply
 from backend.flows import cleanup
@@ -189,17 +189,16 @@ async def parse_and_update_vacancy(
         # сработала, ведь HR резолвлен и score прошёл».
         try:
             async with pipeline._session_factory() as session:
-                session.add(
-                    VacancyEvent(
-                        vacancy_id=vacancy_id,
-                        kind="auto_send",
-                        payload={"ok": ok, "reason": reason},
-                    )
+                await add_vacancy_event(
+                    session,
+                    vacancy_id,
+                    "auto_send",
+                    {"ok": ok, "reason": reason},
                 )
                 await session.commit()
         except Exception:
             logger.exception(
-                "auto_send VacancyEvent persist failed",
+                "auto_send event persist failed",
                 extra={"vacancy_id": vacancy_id},
             )
 
@@ -379,12 +378,11 @@ async def _persist_parse_outcome(
             }
             if company_dedup_decision is not None:
                 event_payload["company_dedup"] = company_dedup_decision
-            session.add(
-                VacancyEvent(
-                    vacancy_id=vacancy_id,
-                    kind="parsed",
-                    payload=event_payload,
-                )
+            await add_vacancy_event(
+                session,
+                vacancy_id,
+                "parsed",
+                event_payload,
             )
             await session.commit()
         except Exception:
