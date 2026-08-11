@@ -259,6 +259,30 @@ async def test_the_window_hears_about_each_touched_chat_once(
     assert heard == [hr.id]
 
 
+async def test_a_repeated_deletion_does_not_wake_the_window_again(
+    chatting, session_factory
+):
+    """Повторное оповещение об уже удалённом окно не будит.
+
+    Одну и ту же строку накрывают оба пути: оповещение об удалении и догон
+    переписки, который вычисляет удалённое сам. Строка уже надгробие, менять
+    в ней нечего — а окно перерисовывало бы переписку заново.
+    """
+    bot, client, hr = await chatting(telegram_user_id=777)
+    bot._ingestion = FakeIngestion()
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
+    )
+    await bot._on_dm_delete(client, [_tombstone(10)])
+
+    heard: list[int] = []
+    bot.on_new_message = heard.append
+    await bot._on_dm_delete(client, [_tombstone(10)])
+
+    assert heard == []
+
+
 async def test_the_window_hears_about_a_chatless_deletion_too(
     chatting, session_factory
 ):

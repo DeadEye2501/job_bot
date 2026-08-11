@@ -3,11 +3,10 @@
 import logging
 import asyncio
 
-from sqlalchemy import select
-
 from backend.flows.dm import persist_outgoing_dm, process_dm
 from backend.helpers import telegram_peer
 from backend.repository.hr_list import list_hrs_for_backfill
+from backend.repository.messages import tombstone_messages
 from backend.notify import fire
 
 logger = logging.getLogger(__name__)
@@ -43,7 +42,6 @@ async def backfill_hr_dm_history(
     the chat would show only the cover-letter we just sent, prior history
     invisible until the next OFF→active transition).
     """
-    from datetime import datetime, timezone
     from backend.models import Message
     from pyrogram.errors import FloodWait, PeerIdInvalid
 
@@ -162,26 +160,15 @@ async def backfill_hr_dm_history(
         seen_ids = {m.id for m in messages}
         min_id = min(seen_ids)
         async with session_factory() as session:
-            local_rows = list(
-                (
-                    await session.scalars(
-                        select(Message).where(
-                            Message.hr_id == hr.id,
-                            Message.tg_message_id.is_not(None),
-                            Message.tg_message_id >= min_id,
-                            Message.is_deleted.is_(False),
-                        )
-                    )
-                ).all()
+            tombstoned = bool(
+                await tombstone_messages(
+                    session,
+                    Message.hr_id == hr.id,
+                    Message.tg_message_id.is_not(None),
+                    Message.tg_message_id >= min_id,
+                    Message.tg_message_id.notin_(seen_ids),
+                )
             )
-            now = datetime.now(timezone.utc)
-            for row in local_rows:
-                if row.tg_message_id in seen_ids:
-                    continue
-                row.is_deleted = True
-                if row.is_incoming and row.read_at is None:
-                    row.read_at = now
-                tombstoned = True
             if tombstoned:
                 await session.commit()
     if had_new or tombstoned:
