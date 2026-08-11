@@ -45,7 +45,7 @@ async def test_a_picture_goes_as_a_photo(
 
     row = await bot.send_to_hr_media(hr.id, str(src))
 
-    assert client.outgoing == [("send_photo", "maria", str(src))]
+    assert client.outgoing == [("send_photo", "maria", str(src), None)]
     assert row.media_kind == "photo"
     assert row.media_name is None
     assert row.text == ""
@@ -61,7 +61,7 @@ async def test_anything_else_goes_as_a_document_under_its_name(
 
     row = await bot.send_to_hr_media(hr.id, str(src))
 
-    assert client.outgoing == [("send_document", "maria", str(src))]
+    assert client.outgoing == [("send_document", "maria", str(src), None)]
     assert row.media_kind == "document"
     assert row.media_name == "Резюме.pdf"
 
@@ -129,7 +129,7 @@ async def test_a_file_where_the_folder_belongs_keeps_the_sent_message(
 
     row = await bot.send_to_hr_media(hr.id, str(src))
 
-    assert client.outgoing == [("send_photo", "maria", str(src))]
+    assert client.outgoing == [("send_photo", "maria", str(src), None)]
     assert row.media_kind == "photo"
     assert row.media_path is None
     # Чужой файл, занявший место папки, остаётся цел. Без этого утверждения
@@ -171,7 +171,7 @@ async def test_a_file_at_the_limit_still_goes(
 
     await bot.send_to_hr_media(hr.id, str(src))
 
-    assert client.outgoing == [("send_photo", "maria", str(src))]
+    assert client.outgoing == [("send_photo", "maria", str(src), None)]
 
 
 @pytest.mark.parametrize(
