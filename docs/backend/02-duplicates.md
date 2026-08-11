@@ -22,15 +22,30 @@
 Красная фаза остаётся у каждой находки своя: тест до кода там, где меняется
 поведение.
 
-| Заход | Находки | Что трогает |
-|---|---|---|
-| **А. Анкета и навыки** | 4, 13, 16, 22, 24, 26 | `repository/profile.py`, `cv_parser.py`, `llm/skills.py`, `llm/candidate.py`, `llm/fit.py` |
-| **Б. Чёрный список и признаки предметов** | 7, 11, 17, 25, 27, 28, 31 | `repository/blacklist.py`, `hr_card.py`, `companies_card.py`, `channels.py`, `flows/channels.py` |
-| **В. Списки, отборы и статистика** | 5, 6, 10, 14, 15 | `repository/vacancies_list.py`, `vacancies_mini.py`, `stats_summary.py`, `stats_pipeline.py`, `channels.py`, `hr_card.py`, `hr_list.py` |
-| **Г. Личная переписка и отклик** | 8, 12, 18, 19, 20 | `flows/dm.py`, `dm_classify.py`, `dm_backfill.py`, `flows/apply.py`, `bot/chat.py`, `bot/send.py`, `flows/parse.py` |
-| **Д. Обращения к модели и разбор ответа** | 1, 9, 21, 23, 30 | `adapters/lm_studio.py`, `llm/answers.py`, `llm/company.py`, `llm/factcheck.py`, `llm/fit.py`, `llm/hr_reply.py`, `llm/vacancy.py`, `flows/parse.py` |
-| **Е. Заведение и удаление строк** | 2, 3 | `repository/hr_identify.py`, `companies_card.py`, `companies_matching.py`, `flows/cleanup.py` |
-| **Ж. Мелочь и вердикты** | 29, 32 | по картам; 32 — строка в `docs/not-duplicates.md`, не правка кода |
+**Галочка ставится на заход целиком, после его ревью и коммита.** Находки —
+адреса внутри захода, своей галочки у них нет.
+
+- [ ] **А. Анкета и навыки** — находки 4, 13, 16, 22, 24, 26.
+      `repository/profile.py`, `cv_parser.py`, `llm/skills.py`,
+      `llm/candidate.py`, `llm/fit.py`
+- [ ] **Б. Чёрный список и признаки предметов** — 7, 11, 17, 25, 27, 28, 31.
+      `repository/blacklist.py`, `hr_card.py`, `companies_card.py`,
+      `channels.py`, `flows/channels.py`
+- [ ] **В. Списки, отборы и статистика** — 5, 6, 10, 14, 15.
+      `repository/vacancies_list.py`, `vacancies_mini.py`, `stats_summary.py`,
+      `stats_pipeline.py`, `channels.py`, `hr_card.py`, `hr_list.py`
+- [ ] **Г. Личная переписка и отклик** — 8, 12, 18, 19, 20.
+      `flows/dm.py`, `dm_classify.py`, `dm_backfill.py`, `flows/apply.py`,
+      `bot/chat.py`, `bot/send.py`, `flows/parse.py`
+- [ ] **Д. Обращения к модели и разбор ответа** — 1, 9, 21, 23, 30.
+      `adapters/lm_studio.py`, `llm/answers.py`, `llm/company.py`,
+      `llm/factcheck.py`, `llm/fit.py`, `llm/hr_reply.py`, `llm/vacancy.py`,
+      `flows/parse.py`
+- [ ] **Е. Заведение и удаление строк** — 2, 3.
+      `repository/hr_identify.py`, `companies_card.py`,
+      `companies_matching.py`, `flows/cleanup.py`
+- [ ] **Ж. Мелочь и вердикты** — 29, 32. По картам; 32 — строка в
+      `docs/not-duplicates.md`, не правка кода
 
 **Порядок между заходами.** Б берётся после слайса 14 этапа 1 (тот делит
 `blacklist.py`). В включает переезд отбора «разобранная вакансия» в нейтральный

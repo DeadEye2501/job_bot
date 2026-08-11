@@ -11,11 +11,16 @@
 
 ## Как это брать: три захода
 
-| Заход | Пункты | Что трогает |
-|---|---|---|
-| **А. Разделить `conftest` и свести повторы** | 1, 2 | `tests/backend/conftest.py`, `tests/fakes/telegram.py`, файлы проверок бота и личной переписки |
-| **Б. Тесты, которые ничего не стерегут** | 3, 4, 5 | `test_bot_read_receipts.py`, `test_flows_empty_vacancy.py`, `test_flows_parse_persist.py`, `test_domain_transitions.py`, плюс сторожа на `caplog` |
-| **В. Беды самого прогона** | 6, 7 | три файла проверок вакансий, `tests/conftest.py`, `test_bootstrap_schema.py` |
+- [ ] **А. Разделить `conftest` и свести повторы** — пункты 1, 2.
+      `tests/backend/conftest.py`, `tests/fakes/telegram.py`, файлы проверок
+      бота и личной переписки
+- [ ] **Б. Тесты, которые ничего не стерегут** — 3, 4, 5.
+      `test_bot_read_receipts.py`, `test_flows_empty_vacancy.py`,
+      `test_flows_parse_persist.py`, `test_domain_transitions.py`, плюс сторожа
+      на `caplog`
+- [ ] **В. Беды самого прогона** — 6, 7.
+      три файла проверок вакансий, `tests/conftest.py`,
+      `test_bootstrap_schema.py`
 
 Заход А обязан идти первым: пока `conftest` у предела, выносить общее некуда.
 Заход В закрывается **до** этапа 7 — там наборы гоняются по путям, и беда со
