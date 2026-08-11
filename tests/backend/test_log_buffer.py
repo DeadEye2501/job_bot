@@ -14,6 +14,7 @@ from config import get_log_path
 from backend.log_buffer import (
     MAX_RECORDS,
     LogBufferHandler,
+    LogFileHandler,
     SecretRedactionFilter,
     install,
     install_secret_filter,
@@ -112,6 +113,28 @@ def test_a_secret_from_someone_elses_logger_is_masked_too(clean_root_logger):
     logging.getLogger("httpx.child").warning("токен Bearer abcdefgh12345678")
 
     assert "abcdefgh12345678" not in handler.snapshot()[-1]["msg"]
+
+
+def test_a_secret_in_a_traceback_is_masked_too(clean_root_logger, clean_log_file):
+    """Секрет из трассировки вымарывается наравне с секретом из сообщения.
+
+    Трассировку собирает форматтер, а он работает уже внутри обработчика —
+    то есть после фильтров. Достаётся это первому обработчику по списку: он
+    заполняет трассировку в самой записи, и следующим она приходит уже
+    собранной. В бою первый — файловый, и секрет из текста исключения
+    третьей библиотеки лёг бы в файл как есть.
+    """
+    handler = LogFileHandler(clean_log_file, encoding="utf-8", delay=True)
+    clean_root_logger.handlers.insert(0, handler)
+    install_secret_filter()
+
+    try:
+        raise RuntimeError("токен Bearer abcdefgh12345678")
+    except RuntimeError:
+        logging.getLogger("httpx.child").exception("запрос не прошёл")
+    handler.close()
+
+    assert "abcdefgh12345678" not in clean_log_file.read_text(encoding="utf-8")
 
 
 def test_a_record_lands_in_the_snapshot_with_level_and_source():

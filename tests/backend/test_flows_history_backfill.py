@@ -12,6 +12,8 @@
 старое первым, иначе лента окна перевернётся.
 """
 
+import logging
+
 import pytest
 from pyrogram.errors import FloodWait, PeerIdInvalid
 
@@ -277,6 +279,28 @@ async def test_an_unknown_peer_without_a_name_is_given_up(session_factory):
 
     assert client.get_users_calls == []
     assert await all_rows(session_factory, Message) == []
+
+
+async def test_a_failed_second_try_leaves_its_trace_in_the_log(
+    session_factory, caplog
+):
+    """Сорванная вторая попытка оставляет в журнале трассировку.
+
+    Догон по этому HR просто заканчивается: ни строки в переписке, ни следа
+    в окне. Отличить «переписки не было» от «до Telegram не достучались»
+    можно только по журналу.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777, telegram_username="maria"))
+    hr = await only_row(session_factory, HR)
+    client = FakeTelegramClient(
+        fails={"get_chat_history": [PeerIdInvalid(), OSError("сеть")]}
+    )
+
+    with caplog.at_level(logging.WARNING):
+        await _catch_up(client, hr, session_factory)
+
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "OSError: сеть" in caplog.text
 
 
 async def test_a_rate_limit_is_waited_out_once(known_hr, session_factory, monkeypatch):

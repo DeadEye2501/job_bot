@@ -118,6 +118,15 @@ class SecretRedactionFilter(logging.Filter):
         if scrubbed != msg:
             record.msg = scrubbed
             record.args = ()
+        # Трассировку приходится собирать здесь самим. Обычно её собирает
+        # форматтер, но он работает уже внутри обработчика, то есть после
+        # фильтров: первый обработчик по списку — в бою файловый — записал бы
+        # текст исключения до всякого вымарывания. Собранное кладётся в саму
+        # запись, форматтер потом берёт готовое.
+        if record.exc_info and not record.exc_text:
+            record.exc_text = "".join(
+                traceback.format_exception(*record.exc_info)
+            ).rstrip("\n")
         if record.exc_text:
             record.exc_text = _redact(record.exc_text)
         return True

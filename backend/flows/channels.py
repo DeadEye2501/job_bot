@@ -118,11 +118,8 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
     for ch in channels:
         try:
             chat = await pipeline._client.get_chat(ch.username)
-        except Exception as e:
-            logger.warning(
-                "[@%s] get_chat failed: %s: %s",
-                ch.username, type(e).__name__, e,
-            )
+        except Exception:
+            logger.exception("[@%s] get_chat failed", ch.username)
             continue
         if chat is None:
             continue

@@ -17,6 +17,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -30,10 +31,20 @@ def entry(clean_root_logger, monkeypatch):
 
     Ввозится она внутри фикстуры нарочно: при ввозе модуль насовсем правит
     корневой logger — вешает обработчик буфера, фильтр вымарывания секретов
-    и меняет уровни уже навешенных обработчиков, включая тот, которым
-    pytest ловит записи. На сборке это испортило бы журнал всему прогону.
+    и меняет уровни навешенных обработчиков, включая тот, которым pytest
+    ловит записи. На сборке это испортило бы журнал всему прогону. Тем же
+    ввозом подменяются оба крючка на необработанное падение, и один
+    из них — свой у pytest: им он ловит падения фоновых потоков и роняет
+    тест. Не вернув его, мы сняли бы этого сторожа со всего остального
+    набора. А возвращённые, они уже не ставятся заново: ввоз один на весь
+    прогон, — поэтому ставим их здесь. Что их ставит сам ввоз, сторожит
+    проверка, запускающая приложение подпроцессом.
     """
+    hooks = (sys.excepthook, threading.excepthook)
     import main as module
+
+    sys.excepthook = module._log_uncaught
+    threading.excepthook = module._log_uncaught_in_thread
 
     order: list[str] = []
 
@@ -54,7 +65,8 @@ def entry(clean_root_logger, monkeypatch):
     monkeypatch.setitem(
         sys.modules, "client.shell", type("Shell", (), {"run_ui": staticmethod(run_ui)})
     )
-    return module, order
+    yield module, order
+    sys.excepthook, threading.excepthook = hooks
 
 
 def test_the_launch_goes_through_all_three_steps(entry):
@@ -246,6 +258,63 @@ def test_a_torn_rotation_says_so_in_the_log_once(entry, monkeypatch, capsys):
     assert capsys.readouterr().err == ""
 
 
+def test_an_exception_nobody_caught_reaches_the_log(entry, caplog):
+    """Некому пойманное исключение становится записью журнала с трассировкой.
+
+    Штатный ответ интерпретатора — печать в поток ошибок, а у оконной сборки
+    его нет: причина падения пропадала вместе с потоком. Наблюдается здесь
+    именно запись; что записи журнала доезжают до файла, сторожит отдельная
+    проверка, запускающая приложение подпроцессом.
+    """
+    try:
+        raise ValueError("некому ловить")
+    except ValueError:
+        crash = sys.exc_info()
+
+    with caplog.at_level(logging.CRITICAL):
+        sys.excepthook(*crash)
+
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "ValueError: некому ловить" in caplog.text
+
+
+def test_an_exception_in_a_side_thread_reaches_the_log(entry, caplog):
+    """Упавший поток тоже оставляет след, а не пропадает молча.
+
+    Окно работает многопоточным, и падение в постороннем потоке идёт мимо
+    `sys.excepthook` — у потоков свой.
+    """
+
+    def fall():
+        raise ValueError("некому ловить в потоке")
+
+    with caplog.at_level(logging.CRITICAL):
+        thread = threading.Thread(target=fall)
+        thread.start()
+        thread.join()
+
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "ValueError: некому ловить в потоке" in caplog.text
+
+
+def test_a_thread_that_ended_itself_is_not_called_a_crash(entry, caplog):
+    """Поток, завершивший себя сам, падением не считается.
+
+    Штатный крючок `SystemExit` пропускает, и не зря: запись о нём зажгла бы
+    счётчик ошибок в окне на обычном завершении работы.
+    """
+
+    def leave():
+        sys.exit(0)
+
+    with caplog.at_level(logging.CRITICAL):
+        thread = threading.Thread(target=leave)
+        thread.start()
+        thread.join()
+
+    assert caplog.text == ""
+
+
 def test_the_running_application_writes_its_log_to_the_file(tmp_path):
     """Запущенное приложение пишет журнал в файл, и пишет его до конца.
 
@@ -280,6 +349,37 @@ def test_the_running_application_writes_its_log_to_the_file(tmp_path):
     written = (tmp_path / "JobBot" / "jobbot.log").read_text(encoding="utf-8")
     assert "после схемы" in written
     assert "Bearer abcDEF123456_secret-token" not in written
+
+
+def test_the_running_application_writes_down_a_thread_that_fell(tmp_path):
+    """Запущенное приложение пишет в файл падение постороннего потока.
+
+    Проверяется подпроцессом, потому что иначе не увидеть главного: что
+    крючки на необработанное падение ставит сам ввоз. В общем прогоне их
+    ставит фикстура, и снятая проводка выглядела бы рабочей.
+    """
+    done = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import main, threading\n"
+            "def fall():\n"
+            "    raise ValueError('поток не дожил')\n"
+            "worker = threading.Thread(target=fall)\n"
+            "worker.start()\n"
+            "worker.join()\n",
+        ],
+        cwd=str(ROOT),
+        env={**os.environ, "APPDATA": str(tmp_path), "PYTHONIOENCODING": "utf-8"},
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert done.returncode == 0, done.stderr
+    written = (tmp_path / "JobBot" / "jobbot.log").read_text(encoding="utf-8")
+    assert "ValueError: поток не дожил" in written
 
 
 def test_the_running_application_switches_its_output_to_utf8(tmp_path):

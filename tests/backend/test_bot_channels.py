@@ -9,6 +9,8 @@
 строку может успеть вставить соседнее окно.
 """
 
+import logging
+
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row
@@ -58,6 +60,21 @@ async def test_a_telegram_failure_is_not_written_down_either(
 
     assert await bot.add_channel("jobs") == (None, "invalid")
     assert await all_rows(session_factory, TelegramChannel) == []
+
+
+async def test_a_telegram_failure_leaves_its_trace_in_the_log(make_bot, caplog):
+    """Отказ Telegram оставляет в журнале трассировку, а не только род и текст.
+
+    Причина отказа тут одна на всех — «invalid», — и по ней потом не отличить
+    опечатку в имени от оборванной сети. Разбирать это можно только по журналу.
+    """
+    bot = await make_bot(FakeTelegramClient(fails={"get_chat": OSError("сеть")}))
+
+    with caplog.at_level(logging.WARNING):
+        await bot.add_channel("jobs")
+
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "OSError: сеть" in caplog.text
 
 
 async def test_a_new_channel_keeps_the_title_telegram_gave(
