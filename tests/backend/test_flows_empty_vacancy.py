@@ -20,9 +20,10 @@ import asyncio
 import pytest
 
 from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
+from tests.backend.conftest import known_hr_client
 from tests.dbio import all_rows, only_row, put
 from tests.factories import hr_row, parsed_vacancy, vacancy_row
-from tests.fakes.telegram import FakeTelegramClient, photo, user
+from tests.fakes.telegram import FakeTelegramClient, user
 
 
 @pytest.fixture
@@ -156,17 +157,7 @@ async def test_an_hr_avatar_is_picked_up_on_the_way(session_factory, make_pipeli
     Второе обращение к Telegram ради картинки стоило бы отдельного
     ожидания, а собеседник уже под рукой.
     """
-    client = FakeTelegramClient(
-        users={
-            "maria": user(
-                id=777,
-                username="maria",
-                first_name="Мария",
-                photo=photo(small_file_id="кар"),
-            )
-        },
-        avatar=b"\x89PNG",
-    )
+    client = known_hr_client()
     pipeline = await make_pipeline(client)
     await put(session_factory, vacancy_row(title="прошлое"))
     vacancy = await only_row(session_factory, Vacancy)

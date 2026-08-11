@@ -21,11 +21,19 @@ from adapters.lm_studio import (
     make_client,
 )
 from backend.runtime_settings import LlmProviderConfig
-from tests.fakes.llm import CHAT, chat_response, models_response, provider
+from tests.fakes.llm import (
+    CHAT,
+    EMBEDDINGS,
+    MODELS,
+    chat_response,
+    models_response,
+    provider,
+)
 
-MODELS = ("GET", "/v1/models")
+# Своё, потому что зовущий один: путь родной для LM Studio, и спрашивают его
+# только проверки отбора загруженных моделей. Общие пары лежат у подделки —
+# они нужны и её собственным проверкам.
 NATIVE_MODELS = ("GET", "/api/v0/models")
-EMBEDDINGS = ("POST", "/v1/embeddings")
 
 
 def test_a_provider_without_a_key_gets_no_authorization_header():

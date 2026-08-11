@@ -216,7 +216,7 @@ async def _put_out_backfills(pipelines) -> None:
                 await task
 
 
-def _known_hr_client() -> FakeTelegramClient:
+def known_hr_client() -> FakeTelegramClient:
     """Подделка Telegram, знающая одного HR — с картинкой профиля."""
     return FakeTelegramClient(
         users={
@@ -300,7 +300,7 @@ async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)
     одно: чтобы обращения к языковой модели отдавали заготовленное, а
     оценка по навыкам не отсекала всё на пороге.
     """
-    pipeline = await make_pipeline(_known_hr_client())
+    pipeline = await make_pipeline(known_hr_client())
     pipeline.parsed = parsed_vacancy(
         title="Python-разработчик",
         description="Ищем в команду",
