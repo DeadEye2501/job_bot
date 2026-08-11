@@ -9,6 +9,7 @@ import httpx
 
 from adapters.lm_studio import ChatRequest, chat
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
+from backend.helpers import normalize_username
 from backend.payloads import ParsedVacancy
 
 from backend.llm.answers import (
@@ -282,11 +283,13 @@ async def parse_vacancy(
         log_unparseable(answer, logger, "parse_vacancy")
         return None
 
+    # Ник из контакта приводится общим правилом, а не своими руками: своими
+    # хвост ссылки становится ником, и `t.me/канал/1481` даёт «1481».
+    contact_username = normalize_username(parsed.hr_contact)
     if (
         channel_username
-        and parsed.hr_contact
-        and parsed.hr_contact.lstrip("@").rstrip("/").rsplit("/", 1)[-1].lower()
-        == channel_username.lower()
+        and contact_username
+        and contact_username.lower() == channel_username.lower()
     ):
         parsed = replace(parsed, hr_contact=None)
     logger.debug(

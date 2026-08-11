@@ -126,7 +126,7 @@ async def test_the_known_skills_reach_the_prompt():
         pytest.param("@pyjobs", id="с собачкой"),
         pytest.param("PyJobs", id="в другом регистре"),
         pytest.param("https://t.me/pyjobs", id="ссылкой"),
-        pytest.param("t.me/pyjobs/", id="ссылкой с косой чертой"),
+        pytest.param("https://t.me/pyjobs/1481", id="ссылкой на само объявление"),
     ],
 )
 async def test_the_source_channel_is_not_taken_for_an_hr_contact(hr_contact):
@@ -138,6 +138,11 @@ async def test_the_source_channel_is_not_taken_for_an_hr_contact(hr_contact):
     Ник канала задан с заглавными буквами: с полностью строчным приведение
     к нижнему регистру у второй стороны сравнения можно было бы снять
     незаметно.
+
+    Записи разобраны построчно у самого приведения (`test_helpers.py`);
+    здесь их четыре, и каждая держит свою строку связки. Пятая — «ссылкой с
+    косой чертой» — снята: её роняло всё, что роняет «ссылкой», то есть она
+    обещала охрану, которой не давала.
     """
     client = provider({CHAT: _parsed(hr_contact=hr_contact)})
 
