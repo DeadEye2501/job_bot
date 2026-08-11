@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from backend.models import Profile
 from backend.models import ProfileLanguage
+from backend.payloads import str_list
 
 _GRADE_LABELS_RU = {
     "junior": "junior",
@@ -102,11 +103,7 @@ def _format_known_skills(skills) -> str:
         name = (getattr(s, "name", "") or "").strip()
         if not name:
             continue
-        aliases = [
-            a.strip()
-            for a in (getattr(s, "aliases", None) or [])
-            if isinstance(a, str) and a.strip()
-        ]
+        aliases = str_list(getattr(s, "aliases", None))
         if aliases:
             lines.append(f"- {name} — {', '.join(aliases)}")
         else:

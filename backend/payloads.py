@@ -196,3 +196,16 @@ class ChannelDetail:
     channel: TelegramChannel
     stats: ChannelStats
     blacklist_value: str | None = None
+
+
+def str_list(value) -> list[str]:
+    """Непустые строки нагрузки, обрезанные по краям.
+
+    Нагрузку составляет не наш код: список приходит то от модели, то из
+    формы окна, и приходит в нём что угодно — не список вовсе, числа
+    вперемешку со строками, пробелы по краям. Зовущим все эти случаи
+    значат одно: взять то, что годится, и не уронить разбор.
+    """
+    if not isinstance(value, list):
+        return []
+    return [s.strip() for s in value if isinstance(s, str) and s.strip()]

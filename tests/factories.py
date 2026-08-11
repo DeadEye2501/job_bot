@@ -96,6 +96,15 @@ def _empty_vacancy() -> dict:
     }
 
 
+CV_REQUIRED_PROFILE = {
+    "first_name": "Алексей",
+    "last_name": "Фролов",
+    "title": "Python-разработчик",
+    "email": "a@b.c",
+}
+"""Минимум полей анкеты, без которого разбор резюме отдаёт пустоту."""
+
+
 def parsed_vacancy(**overrides) -> ParsedVacancy:
     """Разобранная вакансия: заголовок есть, остальное пусто.
 

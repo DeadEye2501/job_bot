@@ -9,20 +9,13 @@ from datetime import date
 import pytest
 
 from backend.cv_parser import parse_cv
+from tests.factories import CV_REQUIRED_PROFILE
 from tests.fakes.llm import CHAT, chat_json, provider
-
-
-REQUIRED = {
-    "first_name": "Алексей",
-    "last_name": "Фролов",
-    "title": "Python-разработчик",
-    "email": "a@b.c",
-}
 
 
 async def parse_sections(**sections):
     """Прогнать ответ модели с заданными разделами через настоящий разбор."""
-    client = provider({CHAT: chat_json({"profile": REQUIRED, **sections})})
+    client = provider({CHAT: chat_json({"profile": CV_REQUIRED_PROFILE, **sections})})
     return await parse_cv("резюме", client, "qwen")
 
 

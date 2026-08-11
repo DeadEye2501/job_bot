@@ -9,15 +9,8 @@ import json
 import pytest
 
 from backend.cv_parser import parse_cv
+from tests.factories import CV_REQUIRED_PROFILE
 from tests.fakes.llm import CHAT, chat_response, provider
-
-
-REQUIRED = {
-    "first_name": "Алексей",
-    "last_name": "Фролов",
-    "title": "Python-разработчик",
-    "email": "a@b.c",
-}
 
 
 async def parse_answer(answer: str):
@@ -28,7 +21,7 @@ async def parse_answer(answer: str):
 
 async def parse_profile(**fields):
     """Прогнать профиль с заданными полями, остальное — обязательный минимум."""
-    return await parse_answer(json.dumps({"profile": {**REQUIRED, **fields}}))
+    return await parse_answer(json.dumps({"profile": {**CV_REQUIRED_PROFILE, **fields}}))
 
 
 async def test_a_minimal_profile_is_enough_for_a_parse():
@@ -42,7 +35,7 @@ async def test_a_minimal_profile_is_enough_for_a_parse():
 @pytest.mark.parametrize("missing", ["first_name", "last_name", "title", "email"])
 async def test_a_profile_without_a_required_field_kills_the_whole_parse(missing):
     """Без любого обязательного поля разбора нет вовсе — не только профиля."""
-    fields = {k: v for k, v in REQUIRED.items() if k != missing}
+    fields = {k: v for k, v in CV_REQUIRED_PROFILE.items() if k != missing}
 
     assert await parse_answer(json.dumps({"profile": fields})) is None
 
@@ -115,7 +108,7 @@ async def test_a_non_list_work_format_becomes_empty(raw):
 async def test_language_levels_come_back_uppercase():
     """Уровень языка приводится к общему виду."""
     parsed = await parse_answer(json.dumps({
-        "profile": REQUIRED,
+        "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "English", "level": "b2"}],
     }))
 
@@ -126,7 +119,7 @@ async def test_language_levels_come_back_uppercase():
 async def test_a_native_language_is_recognised_in_both_spellings(native):
     """Родной язык распознаётся и по-русски, и по-английски."""
     parsed = await parse_answer(json.dumps({
-        "profile": REQUIRED,
+        "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "Русский", "level": native}],
     }))
 
@@ -136,7 +129,7 @@ async def test_a_native_language_is_recognised_in_both_spellings(native):
 async def test_a_language_with_an_unknown_level_is_dropped():
     """Язык с невнятным уровнем не попадает в разбор."""
     parsed = await parse_answer(json.dumps({
-        "profile": REQUIRED,
+        "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "Deutsch", "level": "нулевой"}],
     }))
 
@@ -146,7 +139,7 @@ async def test_a_language_with_an_unknown_level_is_dropped():
 async def test_a_language_without_a_name_is_dropped():
     """Язык без названия не попадает в разбор."""
     parsed = await parse_answer(json.dumps({
-        "profile": REQUIRED,
+        "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "", "level": "A1"}],
     }))
 
@@ -156,7 +149,7 @@ async def test_a_language_without_a_name_is_dropped():
 async def test_a_repeated_language_keeps_the_first_spelling():
     """Повтор языка не удваивается; остаётся первое написание."""
     parsed = await parse_answer(json.dumps({
-        "profile": REQUIRED,
+        "profile": CV_REQUIRED_PROFILE,
         "languages": [
             {"language": "Русский", "level": "native"},
             {"language": "русский", "level": "C1"},
@@ -168,14 +161,14 @@ async def test_a_repeated_language_keeps_the_first_spelling():
 
 async def test_json_is_pulled_out_of_a_code_fence():
     """JSON достаётся из заборчика, которым модель его обрамила."""
-    answer = "Вот результат:\n```json\n" + json.dumps({"profile": REQUIRED}) + "\n```"
+    answer = "Вот результат:\n```json\n" + json.dumps({"profile": CV_REQUIRED_PROFILE}) + "\n```"
 
     assert await parse_answer(answer) is not None
 
 
 async def test_curly_quotes_do_not_break_the_parse():
     """Кавычки-ёлочки, которые подставляет модель, не ломают разбор."""
-    answer = json.dumps({"profile": REQUIRED}).replace('"', "“", 1)
+    answer = json.dumps({"profile": CV_REQUIRED_PROFILE}).replace('"', "“", 1)
 
     assert await parse_answer(answer) is not None
 
@@ -188,7 +181,7 @@ async def test_a_json_object_with_a_syntax_error_yields_no_parse():
 async def test_a_language_that_is_not_an_object_is_dropped():
     """Не объект вместо языка отбрасывается, а не роняет разбор."""
     parsed = await parse_answer(json.dumps({
-        "profile": REQUIRED,
+        "profile": CV_REQUIRED_PROFILE,
         "languages": ["English", None, {"language": "Deutsch", "level": "B2"}],
     }))
 
