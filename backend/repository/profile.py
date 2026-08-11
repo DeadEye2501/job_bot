@@ -1,13 +1,13 @@
 """Хранение анкеты кандидата."""
 
 import logging
-import re
 from datetime import date
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.cv_parser import ParsedCv
+from backend.domain.skill_names import skill_key
 from backend.models import (
     AppSetting,
     Profile,
@@ -20,22 +20,51 @@ from backend.models import (
 logger = logging.getLogger(__name__)
 
 
+def _index_skill_keys(
+    lookup: dict[str, ProfileSkill],
+    names: tuple[str, ...],
+    row: ProfileSkill,
+    where: str,
+) -> None:
+    """Записать строку навыка под ключи её написаний; первая выигрывает.
+
+    Первая, а не последняя, потому что порядок выдачи базы ничем не задан:
+    два написания одного навыка («Node.js» и «Node JS») иначе отдавали бы
+    привязку то одному, то другому, и человек, назвавший один навык, после
+    перечитывания видел бы другой. О столкновении сообщаем: в анкете его
+    быть не должно, а схема его не запрещает.
+    """
+    for name in names:
+        key = skill_key(name)
+        if not key:
+            continue
+        existing = lookup.get(key)
+        if existing is not None and existing is not row:
+            logger.warning(
+                "%s: skill key %r collides between %r and %r, keeping first",
+                where, key, existing.name, row.name,
+            )
+            continue
+        lookup[key] = row
+
+
+def _skills_by_key(rows: list[ProfileSkill]) -> dict[str, ProfileSkill]:
+    """Навыки анкеты по ключу их названия; прозвища сюда не идут.
+
+    Прозвища знает разбор резюме, потому что стек места работы приходит от
+    модели любым написанием. Окно же присылает выбранное из списка, то есть
+    само название, и лишний ключ там только множил бы столкновения.
+    """
+    lookup: dict[str, ProfileSkill] = {}
+    for row in rows:
+        _index_skill_keys(lookup, (row.name,), row, "save_experience")
+    return lookup
+
+
 async def load_profile_skills(session: AsyncSession) -> list[ProfileSkill]:
     return list(
         (await session.scalars(select(ProfileSkill))).all()
     )
-
-
-_SKILL_KEY_RE = re.compile(r"[\s\-_./]+")
-
-
-def _normalize_skill_key(s: str) -> str:
-    """Lower-cased, whitespace-/punctuation-collapsed key for skill matching.
-
-    Lets ``stack: ["Postgres"]`` find a ProfileSkill named "PostgreSQL" with
-    alias "Postgres", and tolerates "Docker-Compose" vs "docker compose".
-    """
-    return _SKILL_KEY_RE.sub(" ", s.strip().lower()).strip()
 
 
 async def save_parsed_cv(
@@ -97,18 +126,7 @@ async def save_parsed_cv(
             aliases=list(s.aliases),
         )
         session.add(row)
-        for key_src in (s.name, *s.aliases):
-            key = _normalize_skill_key(key_src)
-            if not key:
-                continue
-            existing = skill_lookup.get(key)
-            if existing is not None and existing is not row:
-                logger.warning(
-                    "save_parsed_cv: skill key %r collides between %r and %r, keeping first",
-                    key, existing.name, row.name,
-                )
-                continue
-            skill_lookup[key] = row
+        _index_skill_keys(skill_lookup, (s.name, *s.aliases), row, "save_parsed_cv")
     await session.flush()
 
     for e in parsed.experience:
@@ -123,7 +141,7 @@ async def save_parsed_cv(
             responsibilities=list(e.responsibilities),
         )
         for tech in e.stack:
-            key = _normalize_skill_key(tech)
+            key = skill_key(tech)
             row = skill_lookup.get(key) if key else None
             if row is not None:
                 exp.skills.append(row)
@@ -268,9 +286,7 @@ async def save_experience(
 
     Caller wraps in ``session.begin()``.
     """
-    skills_by_name: dict[str, ProfileSkill] = {
-        s.name.lower(): s for s in await list_skills(session)
-    }
+    skills_by_name = _skills_by_key(await list_skills(session))
 
     # Validate everything first — fail fast, no half-applied state.
     parsed_rows: list[tuple[dict, date, date | None]] = []
@@ -320,7 +336,7 @@ async def save_experience(
             ],
         )
         for sname in (row.get("skill_names") or []):
-            s = skills_by_name.get(str(sname).lower())
+            s = skills_by_name.get(skill_key(str(sname)))
             if s is not None:
                 exp.skills.append(s)
         session.add(exp)

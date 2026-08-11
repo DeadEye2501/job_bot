@@ -178,6 +178,29 @@ async def test_named_skills_are_linked_ignoring_case(session, session_factory):
     assert sorted(s.name for s in got[0].skills) == ["Docker", "Python"]
 
 
+async def test_two_skills_sharing_one_key_do_not_swallow_each_other(
+    session, session_factory
+):
+    """Из двух навыков с одним ключом сравнения побеждает заведённый первым.
+
+    «Node.js» и «Node JS» сводятся к одному ключу, и раньше место работы
+    привязывалось к последнему по номеру строки: пользователь называл один
+    навык, а после перечитывания видел другой. Первый — то же правило, что
+    у разбора резюме, и оно единственное, которое не зависит от порядка
+    выдачи базы.
+    """
+    profile = profile_row()
+    await put(session_factory, profile)
+    first = profile_skill_row(profile.id, "Node.js")
+    second = profile_skill_row(profile.id, "Node JS")
+    await put(session_factory, first, second)
+
+    await save_experience(session, [_row(skill_names=["Node.js"])], profile.id)
+
+    got = await list_experience(session)
+    assert [s.name for s in got[0].skills] == ["Node.js"]
+
+
 async def test_an_unknown_skill_name_is_dropped_silently(session, session_factory):
     """Неизвестное имя навыка молча выбрасывается.
 

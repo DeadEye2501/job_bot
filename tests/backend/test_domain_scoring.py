@@ -77,6 +77,21 @@ def test_a_required_skill_the_profile_has_adds_its_level():
     assert got == 3
 
 
+def test_a_separator_inside_a_name_does_not_cost_points():
+    """Разделитель внутри названия — не другой навык.
+
+    «Docker-Compose» в анкете и «docker compose» в стеке вакансии — одно и
+    то же, и так их уже читал разбор резюме. Пока баллы считались по своему,
+    более строгому правилу, такой навык отнимал балл как незнакомый — и
+    вакансия могла не пройти порог из-за написания через дефис.
+    """
+    got = score_parsed(
+        parsed_vacancy(stack_required=["docker compose"]),
+        [profile_skill("Docker-Compose", 3)],
+    )
+    assert got == 3
+
+
 def test_a_required_skill_the_profile_lacks_costs_a_point():
     """Обязательный навык, которого нет, отнимает балл."""
     got = score_parsed(

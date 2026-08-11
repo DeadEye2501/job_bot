@@ -156,6 +156,16 @@ def test_anything_but_a_list_is_handled_without_falling(raw, expected):
     assert clean_stack_items(raw, set()) == expected
 
 
+def test_two_spellings_of_one_name_are_kept_once():
+    """Разделители внутри названия одного навыка не заводят второй.
+
+    «CI/CD» и «ci cd» — одна технология, и сравнивают её тем же ключом, что
+    и навык анкеты. Оставь модель оба написания в стеке — вакансия получила
+    бы двойной балл за один навык.
+    """
+    assert clean_stack_items(["CI/CD", "ci cd"], set()) == ["CI/CD"]
+
+
 def test_junk_inside_the_list_is_skipped():
     """Мусор внутри списка пропускается, а не роняет разбор."""
     assert clean_stack_items(["Python", 42, None, "   ", ""], set()) == ["Python"]

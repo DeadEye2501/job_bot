@@ -4,6 +4,8 @@
 import logging
 import re
 
+from backend.domain.skill_names import skill_key
+
 logger = logging.getLogger(__name__)
 
 
@@ -111,12 +113,12 @@ def clean_stack_items(
         cleaned = _capitalize_skill(_strip_version(s.strip()))
         if not cleaned:
             continue
-        # case-insensitive дедупликация — на случай если LLM вернул
-        # "Python 3.13" и "Python" одновременно (после strip оба → "Python"),
-        # либо положил один и тот же скилл в required и в preferred.
-        # ``casefold`` вместо ``lower`` для корректной нормализации не-ASCII
-        # (ß, İ, …) и согласованности с ``_build_skill_level_lookup``.
-        key = cleaned.casefold()
+        # Дедупликация — на случай если LLM вернул "Python 3.13" и "Python"
+        # одновременно (после срезки версии оба → "Python"), либо положил
+        # один и тот же навык в required и в preferred. Ключ тот же, что у
+        # анкеты: иначе «CI/CD» и «ci cd» пережили бы дедупликацию и дали
+        # двойной балл за один навык.
+        key = skill_key(cleaned)
         if key in seen:
             continue
         seen.add(key)

@@ -2,20 +2,11 @@
 
 import logging
 
+from backend.domain.skill_names import skill_key
 from backend.models import ProfileSkill
 from backend.payloads import ParsedVacancy
 
 logger = logging.getLogger(__name__)
-
-
-def skill_key(name: str) -> str:
-    """Ключ, по которому навык анкеты узнаётся в стеке вакансии.
-
-    Пробел по краям срезается: в анкете это опечатка ввода, а не другой
-    навык. То же правило держит экран статистики — без него один и тот
-    же навык считался бы там своим, а в баллах чужим.
-    """
-    return name.strip().casefold()
 
 
 def _build_skill_level_lookup(
@@ -29,7 +20,7 @@ def _build_skill_level_lookup(
 
     If the user has two profile skills whose aliases overlap (shouldn't
     happen in seed data, but the schema doesn't forbid it), the LAST one
-    wins — same casefold key just gets overwritten. Acceptable: this is
+    wins — the shared key just gets overwritten. Acceptable: this is
     user-controlled data, and we'd rather not silently aggregate. We do
     log a debug message on collision so the operator can spot a misseeded
     profile when scores look off.
@@ -87,7 +78,7 @@ def score_parsed(
     | preferred, profile lacks it   | 0            |
 
     Notes:
-    - "Profile has it" = case-insensitive match on profile skill name OR
+    - "Profile has it" = ``skill_key`` match on profile skill name OR
       any of its aliases. LLM is instructed to map mentions to canonical
       profile names, so most matches will be on ``name``; alias-fallback
       handles the case where LLM missed the canonicalization step.
