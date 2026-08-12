@@ -325,11 +325,12 @@ async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool,
                 "send_application: vacancy %d has no HR linked", vacancy_id
             )
             return False, "no_hr"
-        # Защита от повторной отправки: если статус уже APPLIED, юзер
-        # уже отправлял этот отклик. force=True ниже всё равно пройдёт
-        # через should_apply_status, но Bot.send уже SEND_DM'ит ДО
-        # status-flip'а, что приводит к реальному двойному сообщению
-        # тому же HR. Лучше отказать в UI с понятной причиной.
+        # Отказ здесь, а не ниже: `force=True` минует заслон `_send_refusal`,
+        # а письмо уходит до перевода статуса — HR получил бы второе, и то,
+        # что граф переходов потом не пустит `APPLIED → APPLIED`, уже неважно.
+        # Читается то же, что в `_send_refusal`, а слово окну другое, и это
+        # записанный вердикт (`docs/not-duplicates.md`): там гонка с моделью,
+        # здесь человек нажал сам и должен услышать, что отклик уже был.
         if v.status == VacancyStatus.APPLIED:
             logger.info(
                 "send_application: vacancy %d already APPLIED, refusing re-send",
