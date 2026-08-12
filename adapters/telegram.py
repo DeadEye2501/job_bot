@@ -6,15 +6,14 @@
 собирается и как через него уходит письмо.
 
 `SEND_LOCKED` живёт тут же, потому что читает его отсюда общий заслон
-(`bot/can_send`). Сам он не запирает ничего: заслон спрашивают все дороги
-отправки, включая переписку из окна, а та письмо шлёт своим зовом мимо
-`send_dm`.
+(`bot/can_send`) — а заслон спрашивают все дороги отправки, включая переписку
+из окна, которая письмо шлёт своим зовом мимо `send_dm`. Проверка в самом
+`send_dm` — второй рубеж, на случай дороги, заслон не спросившей.
 """
 
 from pathlib import Path
 
 from pyrogram import Client
-from pyrogram.types import User
 
 from backend.runtime_settings import TgAccountConfig
 from config import get_data_dir
@@ -32,7 +31,7 @@ def make_client(tg: TgAccountConfig) -> Client:
     """
     # ``sleep_threshold=60``: Pyrogram сам ждёт и ретраит FloodWait короче
     # 60с (default 10с) — закрывает пиковые TG-rate-limit'ы во время
-    # batch-параллельного catch-up'а в backend/flows.py без промахов.
+    # batch-параллельного добора пропущенных сообщений без промахов.
     if tg.session_string:
         return Client(
             name=SESSION_NAME,
@@ -55,21 +54,19 @@ def make_client(tg: TgAccountConfig) -> Client:
     )
 
 
-async def check(client: Client) -> User:
-    return await client.get_me()
-
-
 import logging
 
 _log = logging.getLogger(__name__)
 
 
-# === DEV SAFETY LOCK =======================================================
-# True блочит реальную отправку DM (только лог). Нужно для тестов, чтобы не
-# спамить HR'ов случайно. Снимать только когда юзер сознательно готов
-# выпустить бота в реальную работу.
+# Запор боевой отправки: `True` — письмо не уходит. Хозяин запора не здесь, а в
+# настройке `send_locked`, и в базе она по умолчанию `true`; сюда значение
+# переписывают на старте бота и при правке настроек, чтобы горячий путь отправки
+# не ходил за ним в базу. Поэтому `False` в объявлении значит «до первой
+# синхронизации», а не «отправка разрешена».
+# Спрашивают его двое и делают разное: общий заслон (`bot/can_send`) отвечает
+# окну отказом, а `send_dm` под запором пишет в журнал вместо отправки.
 SEND_LOCKED = False
-# ==========================================================================
 
 
 async def send_dm(
@@ -81,7 +78,7 @@ async def send_dm(
     """Отправляет DM. Возвращает Telegram message_id ответа Pyrogram'а,
     либо None если отправка заглушена SEND_LOCKED — caller использует id
     для записи в Message.tg_message_id (закрывает UNIQUE-дыру с NULL'ами
-    для outgoing-row'ов, см. cover-letter review C2)."""
+    для outgoing-row'ов)."""
     if SEND_LOCKED:
         _log.warning(
             "send_dm: SEND_LOCKED=True — would have sent to %r"

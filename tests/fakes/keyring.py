@@ -10,7 +10,7 @@ import keyring.backend
 class MemoryKeyring(keyring.backend.KeyringBackend):
     """Пары «служба + имя» в словаре. Живёт один прогон."""
 
-    priority = 1  # type: ignore[assignment]
+    priority = 1
 
     def __init__(self) -> None:
         super().__init__()

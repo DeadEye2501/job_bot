@@ -160,11 +160,11 @@ async def _blacklisted_now(pipeline, hr_id: int) -> str | None:
     накопленный до этого пакет разбирать тоже незачем.
     """
     from backend.models import HR
-    from backend.repository.hr_card import _hr_blacklist_value
+    from backend.repository.hr_card import hr_blacklist_value
 
     async with pipeline._session_factory() as session:
         hr_row = await session.get(HR, hr_id)
-        return await _hr_blacklist_value(session, hr_row) if hr_row else None
+        return await hr_blacklist_value(session, hr_row) if hr_row else None
 
 
 async def _ask_and_apply(pipeline, hr_id: int, burst: list, target) -> None:

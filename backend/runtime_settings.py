@@ -32,7 +32,7 @@ from backend.models import (
 logger = logging.getLogger(__name__)
 
 
-def _mask_phone(phone: str | None) -> str:
+def mask_phone(phone: str | None) -> str:
     """Безопасное представление phone для логов: показывает только last4
     для нормальных номеров (>=7 цифр), иначе полностью маскирует.
     Возвращает строку всегда, чтобы можно было передавать в %s без if'ов.
@@ -108,7 +108,7 @@ def _log_tg_updated(
     logger.info(
         "Telegram credentials updated (api_id=%d, phone=%s, has_password=%s, has_session=%s)",
         api_id,
-        _mask_phone(phone),
+        mask_phone(phone),
         bool(password),
         session_string is not None,
     )
@@ -173,8 +173,6 @@ class RuntimeSettings:
             self._embed is not None,
             len(self._app),
         )
-
-    # === Read-only typed views ===
 
     @property
     def tg(self) -> TgAccountConfig | None:
@@ -309,8 +307,6 @@ class RuntimeSettings:
         raw = self._app.get(key, "")
         v = raw.strip() if raw else ""
         return v if v else _APP_DEFAULTS.get(key, "")
-
-    # === Setters: write-through to DB and update the cache ===
 
     async def set_tg(
         self,

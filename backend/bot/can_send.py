@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from adapters import telegram
 from backend.domain.telegram_identity import telegram_peer
 from backend.models import BotMode
-from backend.repository.hr_card import _hr_blacklist_value
+from backend.repository.hr_card import hr_blacklist_value
 
 NO_TARGET = "нет адресата"
 BOT_OFF = "бот выключен"
@@ -48,7 +48,7 @@ async def can_send_to_hr(bot, hr) -> SendPermission:
     if (await bot._current_mode()) is BotMode.OFF:
         return SendPermission(target=target, refusal=BOT_OFF)
     async with bot._session_factory() as session:
-        blacklisted = await _hr_blacklist_value(session, hr)
+        blacklisted = await hr_blacklist_value(session, hr)
     if blacklisted:
         return SendPermission(
             target=target, refusal=BLACKLISTED, blacklist_value=blacklisted

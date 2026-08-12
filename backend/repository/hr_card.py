@@ -148,7 +148,7 @@ async def get_hr_detail(
         last_company_id=last_company_id,
         last_company_name=last_company_name,
         unread_count=await _unread_count_of(session, hr_id),
-        blacklist_value=await _hr_blacklist_value(session, hr),
+        blacklist_value=await hr_blacklist_value(session, hr),
     )
 
 
@@ -169,7 +169,7 @@ def hr_blacklist_candidates(hr: HR) -> list[str]:
     return out
 
 
-async def _hr_blacklist_value(session: AsyncSession, hr: HR) -> str | None:
+async def hr_blacklist_value(session: AsyncSession, hr: HR) -> str | None:
     return await active_blacklist_value(session, "hr", hr_blacklist_candidates(hr))
 
 

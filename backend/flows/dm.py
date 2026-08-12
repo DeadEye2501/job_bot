@@ -128,7 +128,7 @@ async def _sender_to_listen_to(session_factory, msg):
     исходящее блокируют заслоны отправки. Ни строки, ни разбора, ни смены
     статуса вакансии заблокированный не получает.
     """
-    from backend.repository.hr_card import _hr_blacklist_value
+    from backend.repository.hr_card import hr_blacklist_value
 
     logger.debug(
         "DM received: sender_id=%s username=%s",
@@ -138,7 +138,7 @@ async def _sender_to_listen_to(session_factory, msg):
         hr = await find_known_hr(session, msg.from_user.id, msg.from_user.username)
         if hr is None:
             return None
-        blacklisted = await _hr_blacklist_value(session, hr)
+        blacklisted = await hr_blacklist_value(session, hr)
     if not blacklisted:
         return hr
     logger.info(

@@ -1,6 +1,7 @@
 """Обработчики оповещений Telegram: входящее, эхо, правка, удаление, отметка о прочтении."""
 
 import logging
+from datetime import datetime, timezone
 
 # На верхнем уровне, чтобы обработчик оповещений не платил поиском по
 # ``sys.modules`` на каждое событие сервера.
@@ -47,11 +48,9 @@ async def on_raw_update(bot, _client, update, _users, _chats) -> None:
         return
     if await _muted(bot):
         return
-    from datetime import datetime as _dt, timezone as _tz
-
     user_id = peer.user_id
     max_id = update.max_id
-    now = _dt.now(_tz.utc)
+    now = datetime.now(timezone.utc)
     async with bot._session_factory() as session:
         hr = await find_known_hr(session, user_id, None)
         if hr is None:

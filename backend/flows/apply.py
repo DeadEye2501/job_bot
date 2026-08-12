@@ -17,7 +17,6 @@ from backend.repository.hr_identify import count_recent_outgoing_with_vacancy_fo
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------- send-templates
 # Окно «недавно отправляли cover letter этому HR'у» (см.
 # count_recent_outgoing_with_vacancy_for_hr). Старше — шлём полный
 # cover letter + CV, как первый раз.
