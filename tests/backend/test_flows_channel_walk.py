@@ -199,7 +199,7 @@ async def test_one_channel_on_demand_is_read(walking, session_factory):
     rows = await all_rows(session_factory, TelegramChannel)
     wanted = next(c for c in rows if c.username == "wanted")
 
-    assert await walking.poll_one_channel(wanted.id) is True
+    assert await walking.poll_one_channel(wanted.id) == "ok"
     assert [step for step in walking.walked if step != "настройки"] == ["wanted"]
 
 
@@ -214,12 +214,12 @@ async def test_a_switched_off_channel_is_still_read_on_demand(
     await put(session_factory, channel_row(username="off", is_active=False))
     rows = await all_rows(session_factory, TelegramChannel)
 
-    assert await walking.poll_one_channel(rows[0].id) is True
+    assert await walking.poll_one_channel(rows[0].id) == "ok"
 
 
 async def test_a_missing_channel_on_demand_reports_failure(walking):
     """Прогон несуществующего канала сообщает о неудаче."""
-    assert await walking.poll_one_channel(404) is False
+    assert await walking.poll_one_channel(404) == "missing"
 
 
 async def test_a_channel_without_a_name_on_demand_reports_failure(
@@ -229,7 +229,7 @@ async def test_a_channel_without_a_name_on_demand_reports_failure(
     await put(session_factory, channel_row(username=None))
     rows = await all_rows(session_factory, TelegramChannel)
 
-    assert await walking.poll_one_channel(rows[0].id) is False
+    assert await walking.poll_one_channel(rows[0].id) == "missing"
 
 
 async def test_a_channel_with_an_empty_name_on_demand_reports_failure(
@@ -243,15 +243,17 @@ async def test_a_channel_with_an_empty_name_on_demand_reports_failure(
     await put(session_factory, channel_row(username=""))
     rows = await all_rows(session_factory, TelegramChannel)
 
-    assert await walking.poll_one_channel(rows[0].id) is False
+    assert await walking.poll_one_channel(rows[0].id) == "missing"
     assert walking.telegram.get_chat_calls == []
 
 
 async def test_a_broken_read_on_demand_reports_failure(monkeypatch, walking, session_factory):
-    """Сорвавшийся прогон одного канала сообщает о неудаче.
+    """Сорвавшийся прогон отвечает поломкой, а не «канала нет».
 
-    Окно показывает по этому ответу подсказку; проглотив сбой молча, оно
-    сказало бы пользователю, что всё прошло.
+    Окно по этим двум ответам говорит разное, и правильно только одно:
+    «канал не найден» посылает человека искать запись, которая на месте, а
+    настоящую причину — закрытый канал, просьбу подождать, молчание модели —
+    оставляет только в журнале.
     """
     await put(session_factory, channel_row(username="broken", is_active=True))
     rows = await all_rows(session_factory, TelegramChannel)
@@ -261,4 +263,4 @@ async def test_a_broken_read_on_demand_reports_failure(monkeypatch, walking, ses
 
     monkeypatch.setattr(channels, "poll_channel", poll)
 
-    assert await walking.poll_one_channel(rows[0].id) is False
+    assert await walking.poll_one_channel(rows[0].id) == "error"

@@ -7,6 +7,7 @@
 
 import asyncio
 import logging
+from typing import Literal
 from pathlib import Path
 
 import numpy as np
@@ -239,7 +240,7 @@ class IngestionPipeline:
     async def poll_active_channels(self) -> None:
         return await channels.poll_active_channels(self)
 
-    async def poll_one_channel(self, channel_id) -> bool:
+    async def poll_one_channel(self, channel_id) -> Literal["ok", "missing", "error"]:
         return await channels.poll_one_channel(self, channel_id)
 
     async def refresh_channel_metadata_for_ids(self, channel_ids) -> None:

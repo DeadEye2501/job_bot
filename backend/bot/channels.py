@@ -33,16 +33,20 @@ async def poll_channel_now(
     - "busy": another cycle was already in flight (skip).
     - "missing": channel row не существует / без @username.
     - "cancelled": user clicked stop mid-poll.
-    - "error": unexpected exception inside `poll_one_channel`.
+    - "error": обход сломался — закрытый канал, просьба подождать, молчание
+      модели. Своё слово ему нужно: «не найден» послал бы человека искать
+      запись, которая на месте, а причина осталась бы только в журнале.
+
+    Место прогона отвечает о своём — занято, отменено, сорвалось наружу, — а
+    об исходе самого обхода говорит он сам, и его ответ сильнее: место видит
+    удачей всё, что не бросило исключение.
     """
-    outcome, ok = await slot.run_in_slot(
+    outcome, walk = await slot.run_in_slot(
         bot,
         lambda: bot._ingestion.poll_one_channel(channel_id),
         f"manual poll for channel {channel_id}",
     )
-    if outcome == "ok" and not ok:
-        return "missing"
-    return outcome
+    return walk if outcome == "ok" else outcome
 
 
 async def reset_channel_cursor(bot, channel_id: int) -> bool:

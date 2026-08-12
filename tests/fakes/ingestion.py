@@ -11,8 +11,13 @@ import asyncio
 class FakeIngestion:
     """Сообщает, чем кончился прогон, и записывает, о чём его просили."""
 
-    def __init__(self, *, outcome=True, error=None, hangs=False) -> None:
+    def __init__(
+        self, *, outcome=True, channel_outcome="ok", error=None, hangs=False
+    ) -> None:
         self._outcome = outcome
+        # У обхода одного канала исход свой: он говорит тремя словами, а не
+        # «да/нет», — «нет записи» и «обход сломался» окно называет разным.
+        self._channel_outcome = channel_outcome
         self._error = error
         self._hangs = hangs
         self.channel_calls: list[int] = []
@@ -57,7 +62,7 @@ class FakeIngestion:
 
     async def poll_one_channel(self, channel_id: int):
         self.channel_calls.append(channel_id)
-        return await self._answer()
+        return await self._answer(outcome=self._channel_outcome)
 
     async def poll_active_channels(self):
         self.full_calls += 1
@@ -72,12 +77,19 @@ class FakeIngestion:
         self.application_calls.append(vacancy_id)
         return await self._answer()
 
-    async def _answer(self):
+    _OWN = object()
+
+    async def _answer(self, *, outcome=_OWN):
+        """Ответ подделки: общий или свой у обхода одного канала.
+
+        Часовой, а не `None`: у обхода `None` — такой же осмысленный ответ,
+        как и прочие, и проверка «нечего не передали» съела бы его.
+        """
         if self._hangs:
             await asyncio.sleep(30)
         if self._error is not None:
             raise self._error
-        return self._outcome
+        return self._outcome if outcome is self._OWN else outcome
 
 
 class WindowHooks:

@@ -33,7 +33,7 @@ async def test_a_channel_the_pipeline_could_not_take_reports_missing(make_bot):
     Так окно скажет про удалённую строку или канал без имени по-своему,
     а не общей «ошибкой».
     """
-    bot = wire(await make_bot(), FakeIngestion(outcome=False))
+    bot = wire(await make_bot(), FakeIngestion(channel_outcome="missing"))
 
     assert await bot.poll_channel_now(7) == "missing"
 
