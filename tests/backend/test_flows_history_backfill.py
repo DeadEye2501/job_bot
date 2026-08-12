@@ -20,13 +20,12 @@ from pyrogram.errors import FloodWait, PeerIdInvalid
 from backend.flows.dm_backfill import backfill_hr_dm_history
 from backend.models import HR, Message
 from tests.dbio import all_rows, only_row, put
-from tests.factories import EPOCH, hr_row, message_row
+from tests.factories import hr_row, message_row
 from tests.fakes.telegram import (
     FakeTelegramClient,
     incoming,
-    message,
+    outgoing,
     photo,
-    user,
 )
 
 
@@ -37,15 +36,7 @@ def _theirs(msg_id, text):
 
 def _ours(msg_id, text, *, photo=None):
     """Своё сообщение, отправленное из другого клиента."""
-    return message(
-        id=msg_id,
-        text=text,
-        date=EPOCH,
-        outgoing=True,
-        from_user=user(id=1, username=None),
-        photo=photo,
-        document=None,
-    )
+    return outgoing(id=msg_id, text=text, photo=photo)
 
 
 async def _catch_up(client, hr, session_factory, **kwargs):

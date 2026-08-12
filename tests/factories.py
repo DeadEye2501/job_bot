@@ -295,6 +295,12 @@ def unread_probe(hr_id: int) -> list[Message]:
     один раз: считают непрочитанное трое — подвал, карточка и перечень, — и
     разойдись их обстановки, ослабленное условие осталось бы под сторожем
     только в одном из трёх.
+
+    Четвёртый читатель того же отбора — всплывающий список у подвала
+    (`list_hrs_with_unread`) — набор не берёт, и это долг, а не решение: свою
+    обстановку он строит сам и нарушителей условий «входящее» и «неудалённое»
+    не кладёт вовсе, то есть попадает ровно в ту беду, от которой набор и
+    заведён.
     """
     return [
         message_row(hr_id=hr_id, text="подходит", is_incoming=True, read_at=None),
@@ -304,6 +310,21 @@ def unread_probe(hr_id: int) -> list[Message]:
             hr_id=hr_id, text="удалено", is_incoming=True, read_at=None,
             is_deleted=True,
         ),
+    ]
+
+
+def unread_probe_with_a_neighbour(hr_id: int, other_hr_id: int) -> list[Message]:
+    """Тот же набор плюс непрочитанное соседа — четвёртый нарушитель.
+
+    Счётчик у карточки и в перечне считает непрочитанное одного человека, а
+    не всех сразу: отбор по хозяину — такое же условие, как «входящее» и
+    «неудалённое», и снимается так же молча. Подвал в этот набор не входит
+    нарочно — он как раз складывает по всем, и сосед был бы там не
+    нарушителем, а слагаемым.
+    """
+    return [
+        *unread_probe(hr_id),
+        message_row(hr_id=other_hr_id, is_incoming=True, read_at=None),
     ]
 
 
@@ -319,6 +340,23 @@ def channel_marks() -> list[Blacklist]:
         blacklist_row("channel", "@listed"),
         blacklist_row("channel", "@off", active=False),
         blacklist_row("hr", "@hr_like"),
+    ]
+
+
+def marked_channels() -> list[TelegramChannel]:
+    """Три канала под отметки `channel_marks()`: в списке, со снятой отметкой и
+    чужого рода.
+
+    Ники здесь — вторая половина самих отметок (`@listed`, `@off`,
+    `@hr_like`), и порознь эти половины расходятся молча: переименуй ник в
+    одной из них, и на трёх экранах проверка «отметки нет» останется зелёной
+    по другой причине, чем задумана. Заголовки заданы затем, что перечень
+    каналов раскладывает ответ по ним.
+    """
+    return [
+        channel_row(username="listed", title="В списке"),
+        channel_row(username="off", title="Отметка снята"),
+        channel_row(username="hr_like", title="Чужой род"),
     ]
 
 

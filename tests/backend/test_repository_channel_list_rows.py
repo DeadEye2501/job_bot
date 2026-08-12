@@ -6,16 +6,14 @@
 
 from backend.repository.channels import list_telegram_channels
 from tests.dbio import put
-from tests.factories import channel_marks, channel_row, vacancy_row
+from tests.factories import channel_marks, marked_channels, vacancy_row
 
 
 async def test_the_row_carries_its_count_and_blacklist_mark(
     session, session_factory
 ):
     """В строке списка едут счётчик вакансий и отметка чёрного списка."""
-    listed = channel_row(username="listed", title="В списке")
-    switched_off = channel_row(username="off", title="Отметка снята")
-    other_kind = channel_row(username="hr_like", title="Чужой род")
+    listed, switched_off, other_kind = marked_channels()
     await put(session_factory, listed, switched_off, other_kind)
     await put(
         session_factory,

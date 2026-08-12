@@ -16,8 +16,9 @@ import pytest
 
 from backend.bot.media import MEDIA_DIR
 from backend.models import BotMode, Message
+from tests.backend.fixtures.bot import row_saved_mid_send
 from tests.dbio import only_row, put
-from tests.factories import EPOCH, blacklist_row, message_row, photo_head
+from tests.factories import EPOCH, blacklist_row, photo_head
 
 
 def _file(tmp_path, name: str, size: int = 4):
@@ -263,18 +264,7 @@ async def test_a_file_the_handler_already_saved_is_not_doubled(
     bot, client, hr = await chatting()
     src = _file(tmp_path, "снимок.png")
 
-    async def saved_by_the_handler(answer):
-        await put(
-            session_factory,
-            message_row(
-                hr_id=hr.id,
-                is_incoming=False,
-                tg_message_id=answer.id,
-                text="сохранено обработчиком",
-            ),
-        )
-
-    client.on_send = saved_by_the_handler
+    client.on_send = row_saved_mid_send(session_factory, hr.id)
 
     row = await bot.send_to_hr_media(hr.id, str(src))
 

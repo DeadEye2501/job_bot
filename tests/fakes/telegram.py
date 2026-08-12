@@ -17,6 +17,11 @@ from types import SimpleNamespace
 
 from tests.factories import EPOCH
 
+# Номер нашей собственной учётной записи. У своего сообщения Telegram ставит
+# отправителем нас, а не собеседника, и `FakeTelegramClient.me` отвечает тем же
+# номером: разойдись они, «кто я» и «от кого письмо» указывали бы на разных.
+OUR_USER_ID = 1
+
 
 def message(*, text=None, caption=None, **extra) -> SimpleNamespace:
     """Сообщение. `text` и `caption` задаются всегда: код читает их напрямую."""
@@ -49,6 +54,24 @@ def incoming(*, user_id=777, username=None, text="здравствуйте", **e
         sender = user(id=user_id, username=username)
     fields.setdefault("chat", chat(id=sender.id, username=sender.username))
     return message(from_user=sender, **fields)
+
+
+def outgoing(*, peer_id=777, peer_username=None, **extra):
+    """Своё сообщение в личной переписке — написанное из другого клиента.
+
+    Отправитель и собеседник здесь разные лица, и это не мелочь оформления:
+    у настоящего своего сообщения `from_user` — мы сами, а `chat` — тот, кому
+    пишут. Обработчик эха и обработчик правки опознают HR **по чату**, и
+    слитые в один номер лица сделали бы подмену `msg.chat` на `msg.from_user`
+    незаметной: HR нашёлся бы тот же самый, а в бою написанное с телефона
+    перестало бы попадать в переписку окна вовсе.
+    """
+    return incoming(
+        user_id=OUR_USER_ID,
+        chat=chat(id=peer_id, username=peer_username),
+        outgoing=True,
+        **extra,
+    )
 
 
 # Отличает «текста не задали» от «текста нет»: второе — настоящий случай,
@@ -138,7 +161,7 @@ class FakeTelegramClient:
         self.logged_out = False
         # Вход по коду: чем отвечает Telegram и о чём его спрашивали.
         self.phone_code_hash = "отпечаток"
-        self.me = user(id=1, username="я")
+        self.me = user(id=OUR_USER_ID, username="я")
         self.code_requests: list[str] = []
         self.sign_in_calls: list[tuple] = []
         self.passwords: list[str] = []

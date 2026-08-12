@@ -9,7 +9,27 @@ from sqlalchemy import select
 from backend.models import TelegramChannel
 from backend.repository.channels import deactivate_blacklisted_channels, is_channel_blacklisted, set_all_channels_active, set_channel_active
 from tests.dbio import put
-from tests.factories import blacklist_row, channel_marks, channel_row
+from tests.factories import (
+    blacklist_row,
+    channel_marks,
+    channel_row,
+    marked_channels,
+)
+
+
+async def _listed_and_clean(session_factory, *, is_active: bool):
+    """Два канала одной включённости: один внесён в чёрный список, второй нет.
+
+    Обстановка одна на три проверки — разовый проход, «выключить все» и
+    «включить все», — и во всех трёх смысл её один: видно, что действие
+    разбирает каналы по отметке, а не по счёту. Останься чистый канал без
+    пары — любая из трёх зеленела бы и на «трогаем всех подряд».
+    """
+    listed = channel_row(username="listed", is_active=is_active)
+    clean = channel_row(username="clean", is_active=is_active)
+    await put(session_factory, listed, clean)
+    await put(session_factory, blacklist_row("channel", "@listed"))
+    return listed, clean
 
 
 async def test_switching_a_missing_channel_reports_failure(session):
@@ -31,9 +51,7 @@ async def test_a_channel_switches_both_ways(session, session_factory):
 
 async def test_a_blacklisted_channel_is_recognised_as_such(session, session_factory):
     """Канал опознаётся как внесённый в список только по включённой отметке своего рода."""
-    listed = channel_row(username="listed")
-    switched_off = channel_row(username="off")
-    other_kind = channel_row(username="hr_like")
+    listed, switched_off, other_kind = marked_channels()
     nameless = channel_row(username=None)
     await put(session_factory, listed, switched_off, other_kind, nameless)
     await put(session_factory, *channel_marks())
@@ -49,10 +67,7 @@ async def test_blacklisted_channels_are_switched_off_in_bulk(
     session, session_factory
 ):
     """Разовый проход гасит все каналы из чёрного списка и только их."""
-    listed = channel_row(username="listed", is_active=True)
-    clean = channel_row(username="clean", is_active=True)
-    await put(session_factory, listed, clean)
-    await put(session_factory, blacklist_row("channel", "@listed"))
+    listed, clean = await _listed_and_clean(session_factory, is_active=True)
 
     assert await deactivate_blacklisted_channels(session) == 1
 
@@ -84,10 +99,7 @@ async def test_an_empty_blacklist_switches_nothing_off(session, session_factory)
 
 async def test_switching_everything_off_spares_nobody(session, session_factory):
     """«Выключить все» гасит и те каналы, что в чёрном списке."""
-    listed = channel_row(username="listed", is_active=True)
-    clean = channel_row(username="clean", is_active=True)
-    await put(session_factory, listed, clean)
-    await put(session_factory, blacklist_row("channel", "@listed"))
+    await _listed_and_clean(session_factory, is_active=True)
 
     assert await set_all_channels_active(session, False) == 2
 
@@ -103,10 +115,7 @@ async def test_switching_everything_on_skips_the_blacklisted(
     Их нельзя включить никаким способом: иначе кнопка «включить все» была бы
     обходным путём вокруг запрета.
     """
-    listed = channel_row(username="listed", is_active=False)
-    clean = channel_row(username="clean", is_active=False)
-    await put(session_factory, listed, clean)
-    await put(session_factory, blacklist_row("channel", "@listed"))
+    listed, clean = await _listed_and_clean(session_factory, is_active=False)
 
     assert await set_all_channels_active(session, True) == 1
 

@@ -16,18 +16,17 @@ from backend.models import BotMode, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import EPOCH, message_row
 from tests.fakes.ingestion import FakeIngestion
-from tests.fakes.telegram import FakeTelegramClient, chat, message
+from tests.fakes.telegram import FakeTelegramClient, message, outgoing
 
 
 def _echo(*, chat_id=777, username=None, msg_id=10, text="ответ с телефона", photo=None):
     """Эхо своего сообщения, отправленного из другого клиента Telegram."""
-    return message(
+    return outgoing(
         id=msg_id,
+        peer_id=chat_id,
+        peer_username=username,
         text=None if photo is not None else text,
-        chat=chat(id=chat_id, username=username),
-        date=EPOCH,
         photo=photo,
-        document=None,
     )
 
 
