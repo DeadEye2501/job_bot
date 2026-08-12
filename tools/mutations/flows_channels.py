@@ -116,8 +116,8 @@ MUTATIONS = [
     # poll_channel: сообщения разбираются от свежего к старому
     (
         "backend/flows/channels.py",
-        "    ordered = list(reversed(new_msgs))",
-        "    ordered = list(new_msgs)",
+        "    return list(reversed(new_msgs))",
+        "    return list(new_msgs)",
     ),
     # poll_channel: отметка не досохраняется после обрыва
     (
@@ -191,7 +191,7 @@ MUTATIONS = [
     # catch_up: пачки идут без паузы между собой
     (
         "backend/flows/dm_backfill.py",
-        "        if batch_start + _DM_CATCHUP_BATCH_SIZE < len(chats):" + CRLF
+        "        if index + 1 < len(batches):" + CRLF
         + "            await asyncio.sleep(_DM_CATCHUP_BATCH_DELAY_SEC)" + CRLF,
         "",
     ),
@@ -200,9 +200,9 @@ MUTATIONS = [
         "backend/flows/dm_backfill.py",
         "            return_exceptions=True," + CRLF
         + "        )" + CRLF
-        + "        for (hr, _), result in zip(batch, results):",
+        + "        _report_failed(batch, results)",
         "            return_exceptions=False," + CRLF
         + "        )" + CRLF
-        + "        for (hr, _), result in zip(batch, results):",
+        + "        _report_failed(batch, results)",
     ),
 ]

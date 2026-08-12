@@ -26,6 +26,55 @@ logger = logging.getLogger(__name__)
 OutgoingDmOutcome = Literal["stored", "already_stored", "not_stored"]
 
 
+@dataclass(frozen=True, slots=True)
+class _Media:
+    """Вложение письма: чем оно является, где лежит и как называлось."""
+
+    kind: str | None
+    path: str | None
+    name: str | None
+
+
+async def _store_outgoing_row(
+    session_factory, msg, hr_id: int, media: _Media
+) -> OutgoingDmOutcome:
+    """Положить строку своего сообщения; сказать, чем дело кончилось.
+
+    Отбитый повтор и сорвавшаяся запись отвечают одинаково — «не легло»:
+    зовущему в обоих случаях делать нечего, а различие видно в журнале.
+
+    Строка собирается здесь же, под тем же перехватом: чтение текста и
+    времени у сообщения Pyrogram тоже может сорваться, и уйди такая беда
+    выше — её поймал бы не зовущий, а диспетчер Telegram.
+    """
+    async with session_factory() as session:
+        try:
+            row = OutgoingMessage(
+                hr_id=hr_id,
+                text=extract_dm_text(msg),
+                tg_message_id=msg.id,
+                sent_at=msg.date,
+                media_kind=media.kind,
+                media_path=media.path,
+                media_name=media.name,
+            )
+            _, saved = await save_outgoing_message(session, row)
+            if not saved:
+                logger.debug(
+                    "Outgoing DM dedup: hr=%d tg_msg=%d already saved",
+                    row.hr_id, row.tg_message_id,
+                )
+                return "not_stored"
+            await session.commit()
+        except Exception:
+            logger.exception(
+                "outgoing DM persistence failed",
+                extra={"hr_id": hr_id, "tg_message_id": msg.id},
+            )
+            return "not_stored"
+    return "stored"
+
+
 async def persist_outgoing_dm(session_factory, client, msg, hr_id: int) -> OutgoingDmOutcome:
     """Записать наше исходящее из Telegram; сказать, чем дело кончилось.
 
@@ -46,34 +95,9 @@ async def persist_outgoing_dm(session_factory, client, msg, hr_id: int) -> Outgo
     media_path = (
         await download_media(client, msg, hr_id) if media_kind is not None else None
     )
-    async with session_factory() as session:
-        try:
-            _, saved = await save_outgoing_message(
-                session,
-                OutgoingMessage(
-                    hr_id=hr_id,
-                    text=extract_dm_text(msg),
-                    tg_message_id=msg.id,
-                    sent_at=msg.date,
-                    media_kind=media_kind,
-                    media_path=media_path,
-                    media_name=media_name,
-                ),
-            )
-            if not saved:
-                logger.debug(
-                    "Outgoing DM dedup: hr=%d tg_msg=%d already saved",
-                    hr_id, msg.id,
-                )
-                return "not_stored"
-            await session.commit()
-        except Exception:
-            logger.exception(
-                "outgoing DM persistence failed",
-                extra={"hr_id": hr_id, "tg_message_id": msg.id},
-            )
-            return "not_stored"
-    return "stored"
+    return await _store_outgoing_row(
+        session_factory, msg, hr_id, _Media(media_kind, media_path, media_name)
+    )
 
 
 @dataclass(frozen=True, slots=True)

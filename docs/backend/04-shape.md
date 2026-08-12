@@ -91,7 +91,7 @@
       — шесть тел из семи разняты; `profile.build_profile_block` 59 не тронут:
       `profile.py` упёрся в предел правила 4 (495 из 500), тот же упор, что
       остановил половину захода Р. Ждёт того же ответа человека
-- [ ] **Ц. Конвейер:** `dm_backfill.catch_up_missed_dms` 58, `rerun` 57,
+- [x] **Ц. Конвейер:** `dm_backfill.catch_up_missed_dms` 58, `rerun` 57,
       `apply` 51, `channels` (50, 43), `dm.persist_outgoing_dm` 48, `ingest` 45
 - [ ] **Ч. Бот и учётная запись:** `bot/chat.send_to_hr_media` 57,
       `telegram_login` (48, 45), `bot/slot` 42, `runtime_settings.set_tg` 42

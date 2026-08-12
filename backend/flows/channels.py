@@ -91,6 +91,27 @@ async def refresh_channel_metadata_for_ids(pipeline, channel_ids: list[int]) -> 
     await refresh_channel_metadata(pipeline, rows)
 
 
+async def _store_metadata(
+    pipeline, title_updates: dict[int, str], avatar_updates: dict[int, bytes]
+) -> None:
+    """Записать собранное за обход — всё одной транзакцией."""
+    async with pipeline._session_factory() as session:
+        for channel_id in set(title_updates) | set(avatar_updates):
+            db_ch = await session.get(TelegramChannel, channel_id)
+            if db_ch is None:
+                continue
+            new_title = title_updates.get(channel_id)
+            if new_title is not None and db_ch.title != new_title:
+                db_ch.title = new_title
+            blob = avatar_updates.get(channel_id)
+            # «Пусто ли место» спрашивается второй раз нарочно: строка
+            # перечитана в новой сессии, и картинка могла появиться у неё за
+            # время обхода — обход идёт по каналам последовательно.
+            if blob is not None and db_ch.avatar is None:
+                db_ch.avatar = blob
+        await session.commit()
+
+
 async def refresh_channel_metadata(pipeline, channels) -> None:
     """Sweep metadata for every active channel before message polling.
 
@@ -120,27 +141,30 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
             avatar_updates[ch.id] = blob
     if not title_updates and not avatar_updates:
         return
-    touched_ids = set(title_updates) | set(avatar_updates)
-    async with pipeline._session_factory() as session:
-        for channel_id in touched_ids:
-            db_ch = await session.get(TelegramChannel, channel_id)
-            if db_ch is None:
-                continue
-            new_title = title_updates.get(channel_id)
-            if new_title is not None and db_ch.title != new_title:
-                db_ch.title = new_title
-            blob = avatar_updates.get(channel_id)
-            # «Пусто ли место» спрашивается второй раз нарочно: строка
-            # перечитана в новой сессии, и картинка могла появиться у неё за
-            # время обхода — обход идёт по каналам последовательно.
-            if blob is not None and db_ch.avatar is None:
-                db_ch.avatar = blob
-        await session.commit()
+    await _store_metadata(pipeline, title_updates, avatar_updates)
     logger.info(
         "refresh_channel_metadata: %d title(s), %d avatar(s) updated",
         len(title_updates), len(avatar_updates),
     )
     fire(pipeline.on_channels_changed, "on_channels_changed")
+
+
+async def _unseen_posts(pipeline, channel_username: str, last_id: int | None):
+    """Посты канала, которых мы ещё не видели, — старые первыми.
+
+    Читаем свежими вперёд и останавливаемся на первом уже виденном: канал
+    отдаёт хвост в обратном порядке, и идти дальше незачем. В ответ порядок
+    переворачивается — разбирать посты надо в том порядке, в каком их
+    писали.
+    """
+    new_msgs = []
+    async for msg in pipeline._client.get_chat_history(
+        channel_username, limit=pipeline._rs.backfill_limit
+    ):
+        if last_id is not None and msg.id <= last_id:
+            break
+        new_msgs.append(msg)
+    return list(reversed(new_msgs))
 
 
 async def poll_channel(
@@ -149,15 +173,7 @@ async def poll_channel(
     channel_username: str,
     last_id: int | None,
 ) -> None:
-    new_msgs = []
-    async for msg in pipeline._client.get_chat_history(
-        channel_username, limit=pipeline._rs.backfill_limit
-    ):
-        if last_id is not None and msg.id <= last_id:
-            break
-        new_msgs.append(msg)
-
-    ordered = list(reversed(new_msgs))
+    ordered = await _unseen_posts(pipeline, channel_username, last_id)
     total = len(ordered)
     # Cursor flush'ится батчами вместо коммита на каждое сообщение —
     # backfill_limit=15 × 50 каналов = ~750 fsync'ов на цикл иначе.
