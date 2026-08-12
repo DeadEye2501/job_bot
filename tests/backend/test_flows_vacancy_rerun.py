@@ -58,9 +58,11 @@ async def _prepare(monkeypatch, make_pipeline, client):
     """Конвейер с подставным разбором и без перезагрузки настроек."""
     pipeline = await make_pipeline(client)
     pipeline.parsed = []
+    pipeline.parse_done = True
 
     async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
         pipeline.parsed.append((vacancy_id, text, username, allow_delete))
+        return pipeline.parse_done
 
     async def reload():
         pipeline.parsed.append("настройки")
@@ -97,6 +99,25 @@ async def test_the_settings_are_reloaded_before_the_parse(monkeypatch, rerunning
     await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
 
     assert pipeline.parsed[0] == "настройки"
+
+
+async def test_a_rerun_that_could_not_ask_the_model_reports_failure(
+    monkeypatch, rerunning
+):
+    """Прогон, не сумевший спросить модель, отвечает отказом.
+
+    На отказ окно показывает «не удалось перезапустить», и человек жмёт
+    кнопку снова. Ответь прогон успехом — он показал бы «готово» там, где
+    карточка не менялась вовсе: приговора не было, а значит и переспрашивать
+    вроде бы незачем.
+    """
+    _, vacancy, make_pipeline = rerunning
+    pipeline = await _prepare(
+        monkeypatch, make_pipeline, _WithMessages(post=post(42, text="свежий текст"))
+    )
+    pipeline.parse_done = False
+
+    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) is False
 
 
 async def test_deletion_is_forbidden_on_a_rerun(monkeypatch, rerunning):

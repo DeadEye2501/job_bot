@@ -332,15 +332,33 @@ async def test_an_answer_cut_by_the_token_limit_names_its_purpose(caplog):
     ]
 
 
-async def test_an_answer_without_content_becomes_a_refusal_that_names_itself(caplog):
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param(None, id="null вместо содержимого"),
+        pytest.param([], id="содержимое блоками"),
+        pytest.param("   ", id="одни пробелы"),
+    ],
+)
+async def test_an_answer_without_content_becomes_a_refusal_that_names_itself(
+    caplog, content
+):
     """Ответ без содержимого становится отказом и оставляет в журнале имя.
 
-    Форма ответа при этом правильная — модель просто не сказала ничего.
-    Зовущему это обязано достаться отказом: разбирать пустоту он не умеет и
-    получил бы исключение вместо своего отката. А разбирать потом, кто
-    именно остался без ответа, придётся по журналу, где обращений семеро.
+    Форма ответа при этом правильная — модель просто не сказала ничего, и
+    говорит она это тремя способами: `null`, пустым списком блоков (так
+    отвечают провайдеры, совместимые с OpenAI наполовину) и пустой строкой.
+    Последняя ходовее прочих: так отвечает рассуждающая модель, потратившая
+    весь предел токенов на размышление.
+
+    Зовущему это обязано достаться отказом, а не пустым текстом. Пустоту он
+    разбирать не умеет: у `null` и списка `.strip()` даёт исключение, а
+    пустая строка тихо доезжает до приговора и читается как «в посте ничего
+    нет» — то есть отказ провайдера превращается в приговор объявлению, и
+    живая вакансия уходит в мусор. Разбирать потом, кто именно остался без
+    ответа, придётся по журналу, где обращений семеро.
     """
-    client = provider({CHAT: chat_response(None)})
+    client = provider({CHAT: chat_response(content)})
     log = logging.getLogger("tests.empty_content")
 
     with caplog.at_level(logging.WARNING, logger="tests.empty_content"):
@@ -388,3 +406,27 @@ async def test_an_empty_answer_that_hit_the_token_limit_names_the_limit_too(capl
         "разбор вакансии: модель упёрлась в предел токенов, ответ может быть обрезан",
         "разбор вакансии: провайдер ответил без содержимого",
     ]
+
+
+async def test_an_answer_without_a_message_at_all_is_malformed_not_empty():
+    """Ответ без самого сообщения — неразбираемый, а не пустой.
+
+    `"message": null` присылают провайдеры, совместимые с OpenAI наполовину.
+    Отличать его от пустого содержимого стоит: пустое содержимое — ответ
+    правильной формы, а здесь сломан конверт, и метка отказа ведёт разбор
+    беды в другую сторону. До правки такой ответ уходил зовущему
+    исключением, мимо его ловушки.
+    """
+    client = provider(
+        {CHAT: httpx.Response(200, json={"choices": [{"message": None}]})}
+    )
+
+    answer = await chat(
+        client,
+        "qwen",
+        ChatRequest(purpose="разбор вакансии", messages=[], max_tokens=8),
+        logging.getLogger(__name__),
+    )
+
+    assert answer.text is None
+    assert answer.error.startswith("malformed_response")

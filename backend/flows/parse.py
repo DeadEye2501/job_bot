@@ -136,21 +136,29 @@ async def _parsed_or_dropped(
     сверх названия, то есть это мем, обрывок или рекламная строчка, и второе
     обращение к модели ей не положено. Дальше две дороги — удалить или
     пометить, — и выбор между ними держит `_dropped_as_trash`.
+
+    Не состоявшееся обращение к модели на эти дороги не выходит вовсе и
+    отдаётся отдельно: приговора не было, значит и выбрасывать нечего.
+    Строка остаётся неразобранной, за ней вернётся подбор недоразобранного.
+    Удали её здесь — и пост не вернётся ничем: курсор канала уже сдвинут.
     """
-    parsed = await parse_vacancy(
+    parsed, refusal = await parse_vacancy(
         text,
         pipeline._lm_client,
         pipeline._lm_chat_model,
         channel_username=channel_username,
         known_skills=pipeline._skills_cache,
     )
+    if refusal is not None:
+        logger.warning("vacancy %s: разбор не состоялся (%s)", vacancy_id, refusal)
+        return None, refusal
     if not is_empty_vacancy(parsed):
-        return parsed
+        return parsed, None
     if not await _dropped_as_trash(
         pipeline, vacancy_id, EMPTY_SKIP_REASON, allow_delete=allow_delete
     ):
         await save_empty_vacancy(pipeline, vacancy_id, parsed)
-    return None
+    return None, None
 
 
 async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple:
@@ -190,35 +198,53 @@ async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: _Outcome) ->
         dm_backfill.spawn_hr_backfill(pipeline, hr)
 
 
-async def parse_and_update_vacancy(
-    pipeline, vacancy_id: int, text: str, channel_username: str,
-    *, allow_delete: bool = True,
-) -> None:
-    """Разобрать объявление, вынести приговор и записать исход.
+async def _thrown_out_by_the_verdict(
+    pipeline, vacancy_id: int, skip_reason: str | None, allow_delete: bool
+) -> bool:
+    """Убрать строку, если так решил вердикт модели; сказать, убрали ли.
 
-    ``allow_delete`` разводит две дороги: при обычном обходе непригодную
-    строку удаляют, при повторном разборе — никогда, потому что её открыл
-    человек. Умолчание истинно только ради обхода.
+    Метку мусора ставит только вердикт (`_fit_refusal`), и она же —
+    единственный повод убрать строку. Кто заведёт её с другой стороны, тот и
+    отвечает за удаление.
     """
-    parsed = await _parsed_or_dropped(
-        pipeline, vacancy_id, text, channel_username, allow_delete
-    )
-    if parsed is None:
-        return
-    status, skip_reason, score = await _verdict_for(
-        pipeline, parsed, text, vacancy_id
-    )
-    # Метку мусора ставит только вердикт модели (`_fit_refusal`), и она же —
-    # единственный повод убрать строку. Кто заведёт её с другой стороны, тот и
-    # отвечает за удаление.
-    if (
+    return bool(
         skip_reason
         and skip_reason.startswith(TRASH_SKIP_PREFIX)
         and await _dropped_as_trash(
             pipeline, vacancy_id, skip_reason, allow_delete=allow_delete
         )
+    )
+
+
+async def parse_and_update_vacancy(
+    pipeline, vacancy_id: int, text: str, channel_username: str,
+    *, allow_delete: bool = True,
+) -> bool:
+    """Разобрать объявление, вынести приговор и записать исход; сказать, вышло ли.
+
+    ``allow_delete`` разводит две дороги: при обычном обходе непригодную
+    строку удаляют, при повторном разборе — никогда, потому что её открыл
+    человек. Умолчание истинно только ради обхода.
+
+    «Не вышло» значит одно: спросить модель не удалось. Пустой разбор — это
+    состоявшийся приговор, и он истина. Различие нужно окну: на отказе оно
+    говорит «не удалось перезапустить» вместо «готово» над карточкой,
+    которая не менялась.
+    """
+    parsed, refusal = await _parsed_or_dropped(
+        pipeline, vacancy_id, text, channel_username, allow_delete
+    )
+    if refusal is not None:
+        return False
+    if parsed is None:
+        return True
+    status, skip_reason, score = await _verdict_for(
+        pipeline, parsed, text, vacancy_id
+    )
+    if await _thrown_out_by_the_verdict(
+        pipeline, vacancy_id, skip_reason, allow_delete
     ):
-        return
+        return True
     await _finish_parse(
         pipeline,
         vacancy_id,
@@ -230,6 +256,7 @@ async def parse_and_update_vacancy(
             keep_previous_stack=True,
         ),
     )
+    return True
 
 
 async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
