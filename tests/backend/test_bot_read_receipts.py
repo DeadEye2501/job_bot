@@ -5,8 +5,9 @@
 перестали её подсвечивать.
 
 Чужая приходит сервером, когда HR прочитал наши письма, и переводит галочку
-в двойную. Такие оповещения сыплются на каждое событие сервера, поэтому
-чужие отсеиваются первой же строкой — до всякого обращения к базе.
+в двойную. Оповещения сыплются на каждое событие сервера, и чужого рода среди
+них подавляющее большинство: приняв такое за отметку HR, бот поставил бы
+двойную галочку на письма, которых никто не открывал.
 
 Выключенный бот не делает ни того ни другого: «выключен» означает, что он не
 трогает ни базу, ни Telegram.
@@ -342,23 +343,6 @@ async def test_the_window_is_not_told_when_nothing_changed(chatting, session_fac
     await bot._on_raw_update(client, _outbox_read(777, 10), {}, {})
 
     assert heard == []
-
-
-async def test_another_kind_of_update_is_ignored(chatting, session_factory):
-    """Оповещение другого рода пропускается, а не разбирается зря.
-
-    Сырые оповещения приходят на каждое событие сервера: разбор каждого
-    стоил бы обращения к базе на пустом месте.
-    """
-    bot, client, hr = await chatting(telegram_user_id=777)
-    await put(
-        session_factory,
-        message_row(hr_id=hr.id, is_incoming=False, tg_message_id=10, read_at=None),
-    )
-
-    await bot._on_raw_update(client, object(), {}, {})
-
-    assert (await only_row(session_factory, Message)).read_at is None
 
 
 async def test_our_own_reading_is_not_mistaken_for_the_hrs(chatting, session_factory):

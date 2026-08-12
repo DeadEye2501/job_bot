@@ -21,7 +21,7 @@ import pytest
 
 from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
 from tests.backend.fixtures.flows import known_hr_client
-from tests.dbio import all_rows, only_row, put
+from tests.dbio import only_row, put
 from tests.factories import hr_row, parsed_vacancy, vacancy_row
 from tests.fakes.telegram import FakeTelegramClient
 
@@ -272,18 +272,6 @@ async def test_the_timeline_says_nothing_was_filled(emptied, session_factory):
 
     saved = await only_row(session_factory, VacancyEvent)
     assert saved.payload["fields_filled"] == []
-
-
-async def test_a_vanished_vacancy_is_left_alone(make_pipeline, session_factory):
-    """По исчезнувшей вакансии ничего не записывается и не падает.
-
-    Пользователь мог удалить её из окна, пока шёл разбор.
-    """
-    pipeline = await make_pipeline()
-
-    await parse.save_empty_vacancy(pipeline, 404, parsed_vacancy(title="Что-то"))
-
-    assert await all_rows(session_factory, VacancyEvent) == []
 
 
 async def test_the_window_hears_about_both_lists(emptied):

@@ -21,15 +21,12 @@ TERMINAL = [
     VacancyStatus.NOT_FIT,
 ]
 
-LIVE = [
-    VacancyStatus.NEW,
-    VacancyStatus.APPLIED,
-    VacancyStatus.ANSWERED,
-    VacancyStatus.INVITATION,
-    VacancyStatus.TEST,
-    VacancyStatus.IN_PROGRESS,
-    VacancyStatus.GHOSTING,
-]
+# Живое — всё, что не названо терминальным. Выписанный руками второй список
+# пришлось бы сверять с перечислением отдельной проверкой, а такая проверка
+# стережёт свои же фикстуры: статус, забытый в обоих списках, молча не попал
+# бы ни в один прогон. Здесь он попадает в живые сам, и если он на деле
+# терминальный — краснеет проверка выходов, а не молчит перечень.
+LIVE = [status for status in VacancyStatus if status not in TERMINAL]
 
 
 def ways_out(status: VacancyStatus) -> list[VacancyStatus]:
@@ -49,16 +46,6 @@ def test_every_status_is_known_to_the_gate(status):
     ways_out(status)
 
 
-def test_terminal_and_live_lists_cover_every_status():
-    """Рукописные списки TERMINAL и LIVE вместе называют весь VacancyStatus.
-
-    Статус, добавленный и в перечисление, и в граф, но забытый в обоих
-    рукописных списках, молча остался бы без параметризованной проверки —
-    KeyError его бы не поймал.
-    """
-    assert set(TERMINAL) | set(LIVE) == set(VacancyStatus)
-
-
 @pytest.mark.parametrize("status", TERMINAL)
 def test_no_automatic_transition_leaves_a_terminal_status(status):
     """Из терминального статуса ворота не пропускают ни одного перехода."""
@@ -73,9 +60,15 @@ def test_a_live_status_has_at_least_one_way_out(status):
     assert ways_out(status)
 
 
-def test_the_same_status_is_never_reapplied():
-    """Переход в тот же самый статус ворота не пропускают."""
-    assert not should_apply_status(VacancyStatus.APPLIED, VacancyStatus.APPLIED)
+@pytest.mark.parametrize("status", list(VacancyStatus))
+def test_the_same_status_is_never_reapplied(status):
+    """Переход в тот же самый статус ворота не пропускают — ни из одного.
+
+    Отдельной охраны у этого запрета нет: его держит сам граф тем, что в
+    нём нет петель. Значит и щупать надо каждый статус — петля, заведённая
+    у любого из них, иначе прошла бы весь набор незамеченной.
+    """
+    assert not should_apply_status(status, status)
 
 
 def test_a_fresh_vacancy_can_only_become_applied():

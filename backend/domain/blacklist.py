@@ -37,10 +37,16 @@ def _word_match(text_lower: str, variant: str) -> bool:
 
 
 def check_blacklist(raw_text: str, patterns: list[str]) -> str | None:
-    if not raw_text:
-        return None
+    """Первый образец из списка, нашедшийся в тексте по границам слова.
+
+    Ни пустой текст, ни пустой образец отдельного отсева здесь не имеют:
+    по пустому тексту поиск и так не находит ничего, а пустой образец
+    отсекает `_word_match` — он же и обязан, потому что дальше читает
+    первый символ. Отсев поверх этих двух был бы вторым объявлением того
+    же знания, и разъехаться они могли бы молча.
+    """
     text_lower = raw_text.lower()
     for pattern in patterns:
-        if pattern and _word_match(text_lower, pattern.lower()):
+        if _word_match(text_lower, pattern.lower()):
             return pattern
     return None
