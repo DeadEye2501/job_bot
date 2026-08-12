@@ -2,7 +2,7 @@
 
 import logging
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company, Vacancy
@@ -12,11 +12,8 @@ from backend.repository.blacklist_marks import (
     active_blacklist_value,
     preferred_blacklist_value,
 )
-from backend.repository.merging import (
-    concat_notes,
-    load_merge_pair,
-    repoint_vacancies,
-)
+from backend.repository.merging import concat_notes, load_merge_pair
+from backend.repository.vacancies_life import repoint_vacancies
 
 logger = logging.getLogger(__name__)
 
@@ -209,13 +206,9 @@ async def delete_company(session: AsyncSession, company_id: int) -> bool:
     if co is None:
         return False
     co_name = co.name
-    detached = (
-        await session.execute(
-            update(Vacancy)
-            .where(Vacancy.company_id == company_id)
-            .values(company_id=None)
-        )
-    ).rowcount
+    detached = await repoint_vacancies(
+        session, Vacancy.company_id, absorbed_id=company_id, survivor_id=None
+    )
     await session.delete(co)
     logger.info(
         "Deleted company %d (%r), detached %d vacancies",

@@ -17,6 +17,7 @@ from backend.repository.blacklist_marks import (
 )
 from backend.repository.search import matches_search
 from backend.repository.vacancies_common import count_by_status
+from backend.repository.vacancies_life import repoint_vacancies
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +33,10 @@ async def list_named_channels(
     SQL мимо `create_channel` — об этом говорит докстрока
     `find_channel_by_username`.
 
-    Одно объявление на всех, потому что зовущих трое — обход, прогон одного
-    канала и сводка по номерам, — и разойдись они, канал без адреса доехал
-    бы до обращения одной из дорог.
+    Одно объявление на всех, потому что зовущих пятеро — обход, прогон
+    одного канала, сводка по номерам, повторный разбор вакансии и подсказки
+    чёрного списка, — и разойдись они, канал без адреса доехал бы до
+    обращения одной из дорог.
     """
     query = select(TelegramChannel).where(
         TelegramChannel.username.is_not(None),
@@ -363,13 +365,9 @@ async def delete_channel(
     if ch is None:
         return None
     ch_username = ch.username
-    detached = (
-        await session.execute(
-            update(Vacancy)
-            .where(Vacancy.source_channel_id == channel_id)
-            .values(source_channel_id=None)
-        )
-    ).rowcount
+    detached = await repoint_vacancies(
+        session, Vacancy.source_channel_id, absorbed_id=channel_id, survivor_id=None
+    )
     # TrashEvent держит ondelete=SET NULL — PRAGMA foreign_keys=ON
     # (adapters/db.py) сделает это автоматически при session.delete(ch).
     # Дублирующий UPDATE — defense-in-depth: если FK по какой-то причине
