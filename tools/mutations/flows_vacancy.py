@@ -27,24 +27,23 @@ MUTATIONS = [
     (
         "backend/flows/ingest.py",
         "    if similar_id is not None:" + CRLF
-        + "        # Could be a real duplicate",
-        "    if False:" + CRLF + "        # Could be a real duplicate",
+        + "        await _resume_or_skip(pipeline, similar_id, post)" + CRLF,
+        "    if False:" + CRLF
+        + "        await _resume_or_skip(pipeline, similar_id, post)" + CRLF,
     ),
     # ingest_post: недоразобранный повтор не дописывается
     (
         "backend/flows/ingest.py",
-        "        unparsed = await parse.is_unparsed_vacancy(pipeline, similar_id)" + CRLF
-        + "        if unparsed:",
-        "        unparsed = await parse.is_unparsed_vacancy(pipeline, similar_id)" + CRLF
-        + "        if False:",
+        "    if not await parse.is_unparsed_vacancy(pipeline, similar_id):",
+        "    if True:",
     ),
     # ingest_post: незаведённая строка всё равно идёт в разбор
     (
         "backend/flows/ingest.py",
         "    if new_vacancy_id is not None:" + CRLF
-        + "        await parse.parse_and_update_vacancy(pipeline, " + CRLF,
+        + "        await parse.parse_and_update_vacancy(pipeline," + CRLF,
         "    if True:" + CRLF
-        + "        await parse.parse_and_update_vacancy(pipeline, " + CRLF,
+        + "        await parse.parse_and_update_vacancy(pipeline," + CRLF,
     ),
     # save_new_vacancy: вектор не попадает в кэш
     (

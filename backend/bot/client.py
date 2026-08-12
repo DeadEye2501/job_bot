@@ -108,7 +108,12 @@ def _declare_loop_controls(bot) -> None:
 
 
 def _declare_ui_hooks(bot) -> None:
-    """Места, куда окно вписывает свои отклики; без окна все остаются пустыми."""
+    """Места, куда окно вписывает свои отклики на события бота.
+
+    Без окна все остаются пустыми, и бот работает молча. Пять из семи
+    приходят от конвейера — их пересылает `_forward_pipeline_hooks`, — а
+    два своих бот толкает сам.
+    """
     # Optional UI hooks fired around each Full-mode poll cycle.
     bot.on_cycle_start = None  # filled in by client.bridge.MainApi if running under the UI
     bot.on_cycle_end = None    # filled in by client.bridge.MainApi if running under the UI

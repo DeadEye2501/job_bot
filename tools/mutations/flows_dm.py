@@ -198,12 +198,12 @@ MUTATIONS = [
     # cancel_pending: сорвавшийся разбор роняет слив остальных
     (
         "backend/flows/dm_classify.py",
-        "                return_exceptions=True," + CRLF
-        + "            )" + CRLF
-        + "            for hr_id, res in zip(hr_ids, results):",
-        "                return_exceptions=False," + CRLF
-        + "            )" + CRLF
-        + "            for hr_id, res in zip(hr_ids, results):",
+        "        return_exceptions=True," + CRLF
+        + "    )" + CRLF
+        + "    for hr_id, res in zip(hr_ids, results):",
+        "        return_exceptions=False," + CRLF
+        + "    )" + CRLF
+        + "    for hr_id, res in zip(hr_ids, results):",
     ),
     # cancel_pending: накопленное не выбрасывается после гашения
     (
@@ -224,8 +224,8 @@ MUTATIONS = [
     # classify_and_apply_for_hr: сообщения склеиваются без границ
     (
         "backend/flows/dm_classify.py",
-        '    text = "\\n\\n".join(item["text"] for item in buf)',
-        '    text = "".join(item["text"] for item in buf)',
+        '    return "\\n\\n".join(item["text"] for item in buf)',
+        '    return "".join(item["text"] for item in buf)',
     ),
     # classify_and_apply_for_hr: решение относят к первой вакансии пакета
     (
