@@ -42,6 +42,11 @@ async def find_known_hr(
     чужим идентификатором под тем же ником принадлежит не отправителю.
     Оговорка «либо идентификатор равен искомому» не написана нарочно: своя
     запись до запасного пути не доходит, её отдаёт поиск по идентификатору.
+
+    Ник сличается без оглядки на регистр: Telegram его не различает, а в
+    карточку он попадает как набран — ссылкой, со вставки, заглавными. Сличай
+    посимвольно, и первое же письмо от знакомого HR заведёт вторую его запись,
+    оставив набранную руками карточку сиротой.
     """
     hr = (
         await session.scalars(
@@ -54,7 +59,7 @@ async def find_known_hr(
         hr = (
             await session.scalars(
                 select(HR).where(
-                    HR.telegram_username == telegram_username,
+                    func.lower(HR.telegram_username) == telegram_username.lower(),
                     HR.telegram_user_id.is_(None),
                 )
             )

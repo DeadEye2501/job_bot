@@ -50,6 +50,29 @@ async def test_an_hr_added_by_username_is_found_before_the_id_is_known(
     assert (await find_known_hr(session, 111, "olga")).name == "Ольга"
 
 
+async def test_a_username_written_in_another_case_is_the_same_username(
+    session, session_factory
+):
+    """Ник, записанный в другом регистре, — тот же самый ник.
+
+    В Telegram он регистра не различает: `Anna_HR` и `anna_hr` — один человек.
+    Запись в карточку приходит как её набрали (ссылкой, заглавными, со
+    вставки), а во входящем письме — как её отдаёт Telegram. Сличай их
+    посимвольно, и первое же письмо от знакомого HR заведёт вторую его запись,
+    а набранная руками карточка останется сиротой без переписки.
+
+    Рядом лежит второй безымянный по идентификатору — иначе запасной путь
+    вернул бы единственную строку, какой бы ник ни искали.
+    """
+    await put(
+        session_factory,
+        hr_row(name="Мария", telegram_user_id=None, telegram_username="Maria_HR"),
+        hr_row(name="Ольга", telegram_user_id=None, telegram_username="olga"),
+    )
+
+    assert (await find_known_hr(session, 111, "maria_hr")).name == "Мария"
+
+
 async def test_the_telegram_id_wins_over_the_username(session, session_factory):
     """При споре идентификатор перевешивает ник.
 

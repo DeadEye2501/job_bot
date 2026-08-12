@@ -18,10 +18,20 @@ from backend.domain.telegram_identity import normalize_username, typed_username
         ("t.me/s/user_name", "user_name"),
         ("telegram.me/user_name", "user_name"),
         ("www.t.me/user_name", "user_name"),
+        ("HTTPS://T.ME/user_name", "user_name"),
+        ("Https://T.me/user_name", "user_name"),
+        ("t.me/S/user_name", "user_name"),
     ],
 )
 def test_the_username_is_extracted_from_any_link_form(raw, expected):
-    """Имя вытаскивается из любой записи ссылки."""
+    """Имя вытаскивается из любой записи ссылки.
+
+    Верхний регистр в схеме и домене — такая же запись, как прочие: её
+    оставляют автоподстановка почтовых клиентов и сами объявления. Не узнав
+    её, разбор оставит в карточке мусорную строку, а приговор о пустоте
+    засчитает её за настоящий контакт — то есть отодвинет пустышку от
+    «мусора» на целое деление.
+    """
     assert normalize_username(raw) == expected
 
 

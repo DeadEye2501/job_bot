@@ -7,7 +7,7 @@ import time
 import httpx
 
 from adapters.lm_studio import ChatRequest, chat
-from backend.llm.answers import json_object, log_unparseable
+from backend.llm.answers import json_object, log_unparseable, normalize_enum
 from backend.llm.external import wrap_external
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,8 @@ def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]:
     хуже, чем пропустить письмо, которое первый слой счёл годным. Замечаний
     берётся не больше трёх — их читает человек, а не машина.
     """
-    verdict = obj.get("verdict")
+    raw = obj.get("verdict")
+    verdict = normalize_enum(raw, ("ok", "reject"))
     issues = [x for x in (obj.get("issues") or []) if isinstance(x, str)][:3]
     if verdict == "reject":
         logger.debug("factcheck_cover_letter: reject in %.2fs", elapsed)
@@ -105,9 +106,13 @@ def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]:
     if verdict == "ok":
         logger.debug("factcheck_cover_letter: ok in %.2fs", elapsed)
         return True, []
+    # В журнал идёт сырое написание, а не сведённое: сведённое здесь всегда
+    # пусто, и три разных беды — поля нет, пришло число, пришло незнакомое
+    # слово — слились бы в одну запись. Чем именно отвечает модель, видно
+    # только отсюда.
     logger.warning(
         "factcheck_cover_letter: unknown verdict %r — fail-open (%.2fs)",
-        verdict, elapsed,
+        raw, elapsed,
     )
     return True, []
 
