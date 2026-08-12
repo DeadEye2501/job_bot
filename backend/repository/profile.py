@@ -6,7 +6,6 @@ from datetime import date
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.cv_parser import ParsedCv
 from backend.domain.skill_names import index_by_key, skill_key
 from backend.models import (
     AppSetting,
@@ -16,7 +15,7 @@ from backend.models import (
     ProfileSkill,
     profile_experience_skills,
 )
-from backend.payloads import str_list, text_or_none
+from backend.payloads import ParsedCv, str_list, text_or_none
 
 logger = logging.getLogger(__name__)
 

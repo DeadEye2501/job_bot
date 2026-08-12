@@ -11,7 +11,7 @@ from datetime import date
 import pytest
 from sqlalchemy import select
 
-from backend.cv_parser import (
+from backend.payloads import (
     ParsedCv,
     ParsedCvExperience,
     ParsedCvLanguage,

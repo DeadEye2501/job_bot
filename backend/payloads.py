@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal, get_args
 
 from backend.models import (
@@ -121,6 +121,60 @@ class PendingReply:
     message_id: int
     tg_message_id: int
     text: str
+
+
+# Разобранное резюме — пять связанных значений об одном человеке. Живут здесь
+# по тому же договору, что и разобранная вакансия: разбор их собирает, а
+# читает анкета, то есть держать их у разбора значило бы вести ввоз из
+# репозитория в слой модели.
+@dataclass(frozen=True)
+class ParsedCvProfile:
+    first_name: str
+    last_name: str
+    title: str
+    email: str
+    phone: str | None
+    location: str | None
+    telegram_username: str | None
+    github_url: str | None
+    education: str | None
+    work_format: list[str]
+    grades: list[str]
+    free_preferences: str | None
+
+
+@dataclass(frozen=True)
+class ParsedCvLanguage:
+    language: str
+    level: str
+
+
+@dataclass(frozen=True)
+class ParsedCvSkill:
+    category: str
+    name: str
+    level: int
+    aliases: list[str]
+
+
+@dataclass(frozen=True)
+class ParsedCvExperience:
+    company: str
+    company_url: str | None
+    role: str
+    start_date: date
+    end_date: date | None
+    achievements: list[str]
+    responsibilities: list[str]
+    stack: list[str]
+
+
+@dataclass(frozen=True)
+class ParsedCv:
+    profile: ParsedCvProfile
+    languages: list[ParsedCvLanguage]
+    skills: list[ParsedCvSkill]
+    experience: list[ParsedCvExperience]
 
 
 @dataclass(frozen=True)

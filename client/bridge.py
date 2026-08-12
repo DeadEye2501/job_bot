@@ -52,7 +52,7 @@ from adapters.lm_studio import LlmProviderConfig
 from backend.repository import blacklist, blacklist_candidates, channels as channels_repo, companies_card, companies_list, hr_card, hr_identify, hr_list, messages as messages_repo, profile as profile_repo, stats_pipeline, stats_summary, vacancies_card, vacancies_life, vacancies_list, vacancies_mini  # три псевдонима: имена заняты локальными переменными
 from backend.payloads import text_or_none as _none_if_empty
 from client.form_payloads import hr_is_identified, read_company_spellings, read_new_company_fields, read_new_hr_fields
-from backend.cv_parser import parse_cv
+from backend.llm.cv import parse_cv
 from backend.domain.scoring import build_skill_lookup, skill_key
 from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
 from backend.domain.telegram_identity import normalize_username
