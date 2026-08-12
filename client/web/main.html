@@ -12703,10 +12703,12 @@
 
   function _renderPipelineSection() {
     const st = appState.system.settings;
-    const p = st.pipeline || { scoring_threshold: 10, poll_interval_sec: 1800, backfill_limit: 15, dm_backfill_limit: 50, send_locked: true };
+    // Своих умолчаний здесь нет нарочно: экран рисуется только после загрузки
+    // настроек, а мост шлёт этот блок целиком и всегда. Запасные числа тут
+    // однажды уже разошлись с настоящими — порог остался 10, когда стал 5.
+    const p = st.pipeline;
     const SCORE_MAX = 20;
-    const score = Number.isFinite(p.scoring_threshold) ? p.scoring_threshold : 10;
-    const scoreClamped = Math.max(0, Math.min(SCORE_MAX, score));
+    const scoreClamped = Math.max(0, Math.min(SCORE_MAX, p.scoring_threshold));
     const scorePct = (scoreClamped / SCORE_MAX) * 100;
     const sendLocked = p.send_locked !== false;
     return `
