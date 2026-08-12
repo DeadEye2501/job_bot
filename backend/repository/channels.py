@@ -88,6 +88,27 @@ async def _channel_blacklist_value(
     )
 
 
+def _channels_with_counts_query():
+    """Каналы со счётчиком вакансий, плодовитые сверху.
+
+    ``coalesce(title, username)`` для сортировки совпадает с тем, как UI
+    выбирает заголовок ряда (title если есть, иначе @username) — иначе
+    NULL-title каналы в SQLite ASC всплывают наверх и порядок ломается.
+    """
+    title_or_username = func.coalesce(
+        TelegramChannel.title, TelegramChannel.username
+    )
+    return (
+        select(TelegramChannel, func.count(Vacancy.id).label("cnt"))
+        .outerjoin(Vacancy, Vacancy.source_channel_id == TelegramChannel.id)
+        .group_by(TelegramChannel.id)
+        .order_by(
+            func.count(Vacancy.id).desc(),
+            title_or_username.asc(),
+        )
+    )
+
+
 async def list_telegram_channels(
     session: AsyncSession,
     search: str | None = None,
@@ -105,21 +126,7 @@ async def list_telegram_channels(
 
     No pagination: channel lists are tiny (tens, not thousands).
     """
-    # ``coalesce(title, username)`` для сортировки совпадает с тем, как UI
-    # выбирает заголовок ряда (title если есть, иначе @username) — иначе
-    # NULL-title каналы в SQLite ASC всплывают наверх и порядок ломается.
-    title_or_username = func.coalesce(TelegramChannel.title, TelegramChannel.username)
-    base = (
-        select(TelegramChannel, func.count(Vacancy.id).label("cnt"))
-        .outerjoin(Vacancy, Vacancy.source_channel_id == TelegramChannel.id)
-        .group_by(TelegramChannel.id)
-        .order_by(
-            func.count(Vacancy.id).desc(),
-            title_or_username.asc(),
-        )
-    )
-    rows = (await session.execute(base)).all()
-
+    rows = (await session.execute(_channels_with_counts_query())).all()
     rows = [
         (ch, cnt) for ch, cnt in rows if matches_search(search, ch.title, ch.username)
     ]

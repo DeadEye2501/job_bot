@@ -11,6 +11,20 @@ from backend.repository.companies_card import company_blacklist_candidates
 from backend.repository.search import matches_search
 
 
+def _companies_with_counts_query():
+    """Компании со счётчиком вакансий, плодовитые сверху.
+
+    Разрешитель по имени не украшение: у компаний без вакансий счёт один и
+    тот же, и без него порядок списка менялся бы от прогона к прогону.
+    """
+    return (
+        select(Company, func.count(Vacancy.id).label("cnt"))
+        .outerjoin(Vacancy, Vacancy.company_id == Company.id)
+        .group_by(Company.id)
+        .order_by(func.count(Vacancy.id).desc(), Company.name.asc())
+    )
+
+
 async def list_companies_with_counts(
     session: AsyncSession,
     search: str | None = None,
@@ -25,14 +39,7 @@ async def list_companies_with_counts(
     ``limit``/``offset`` slice the result *after* the search filter so the
     Contacts/Companies pane can implement infinite scroll.
     """
-    base = (
-        select(Company, func.count(Vacancy.id).label("cnt"))
-        .outerjoin(Vacancy, Vacancy.company_id == Company.id)
-        .group_by(Company.id)
-        .order_by(func.count(Vacancy.id).desc(), Company.name.asc())
-    )
-    rows = (await session.execute(base)).all()
-
+    rows = (await session.execute(_companies_with_counts_query())).all()
     rows = [
         (c, cnt)
         for c, cnt in rows

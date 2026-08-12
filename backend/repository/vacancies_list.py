@@ -327,19 +327,9 @@ async def list_vacancies(
     return list(rows.all())
 
 
-async def list_vacancy_filter_options(
-    session: AsyncSession,
-) -> dict[str, list[str]]:
-    """Distinct channel usernames + company names available as filter options.
-
-    Returns the full set of channels / companies that appear on at least one
-    parsed vacancy, irrespective of the currently-active filters. Companies
-    cover both linked ``Company.name`` and the raw ``Vacancy.company_name``
-    so that unbound vacancies still contribute their company to the picker.
-    Names are deduplicated case-insensitively (the first-seen casing wins),
-    then sorted by ``ru`` collation client-side.
-    """
-    channel_rows = await session.execute(
+async def _channel_options(session: AsyncSession) -> list[str]:
+    """Каналы, у которых есть хоть одна разобранная вакансия."""
+    rows = await session.execute(
         select(TelegramChannel.username)
         .join(Vacancy, Vacancy.source_channel_id == TelegramChannel.id)
         .where(
@@ -348,10 +338,20 @@ async def list_vacancy_filter_options(
         )
         .distinct()
     )
-    channels = dedupe_first_wins(
-        [name for (name,) in channel_rows.all()], str.lower
-    )
+    return dedupe_first_wins([name for (name,) in rows.all()], str.lower)
 
+
+async def _company_options(session: AsyncSession) -> list[str]:
+    """Компании из отбора — и привязанные строкой, и названные в вакансии.
+
+    Вторые берутся затем, что вакансия без привязанной компании иначе не
+    попала бы в отбор своим названием вовсе.
+
+    Ключ здесь `lower`, а у написаний той же компании в её карточке —
+    `casefold`: одно название сравнивается двумя правилами. Расходятся они
+    на «ß» и «İ», то есть сегодня недостижимо, и намеренным это никогда не
+    объявлялось. Кто заведёт такое название, тот и сводит правила.
+    """
     linked_rows = await session.execute(
         select(Company.name)
         .join(Vacancy, Vacancy.company_id == Company.id)
@@ -366,11 +366,7 @@ async def list_vacancy_filter_options(
         )
         .distinct()
     )
-    # Ключ здесь `lower`, а у написаний той же компании в её карточке —
-    # `casefold`: одно название сравнивается двумя правилами. Расходятся они
-    # на «ß» и «İ», то есть сегодня недостижимо, и намеренным это никогда не
-    # объявлялось. Кто заведёт такое название, тот и сводит правила.
-    companies = dedupe_first_wins(
+    return dedupe_first_wins(
         [
             name.strip()
             for source in (linked_rows.all(), raw_rows.all())
@@ -380,7 +376,23 @@ async def list_vacancy_filter_options(
         str.lower,
     )
 
-    return {"channels": channels, "companies": companies}
+
+async def list_vacancy_filter_options(
+    session: AsyncSession,
+) -> dict[str, list[str]]:
+    """Distinct channel usernames + company names available as filter options.
+
+    Returns the full set of channels / companies that appear on at least one
+    parsed vacancy, irrespective of the currently-active filters. Companies
+    cover both linked ``Company.name`` and the raw ``Vacancy.company_name``
+    so that unbound vacancies still contribute their company to the picker.
+    Names are deduplicated case-insensitively (the first-seen casing wins),
+    then sorted by ``ru`` collation client-side.
+    """
+    return {
+        "channels": await _channel_options(session),
+        "companies": await _company_options(session),
+    }
 
 
 async def list_vacancy_last_activity(

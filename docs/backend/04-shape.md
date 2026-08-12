@@ -88,6 +88,9 @@
       `vacancies_card` (45, 43)
 - [ ] **Х. Перечни и жизнь:** `vacancies_life` (47, 43), `profile` 59,
       `vacancies_list` 54, `messages` 52, `channels` 46, `companies_list` 41
+      — шесть тел из семи разняты; `profile.build_profile_block` 59 не тронут:
+      `profile.py` упёрся в предел правила 4 (495 из 500), тот же упор, что
+      остановил половину захода Р. Ждёт того же ответа человека
 - [ ] **Ц. Конвейер:** `dm_backfill.catch_up_missed_dms` 58, `rerun` 57,
       `apply` 51, `channels` (50, 43), `dm.persist_outgoing_dm` 48, `ingest` 45
 - [ ] **Ч. Бот и учётная запись:** `bot/chat.send_to_hr_media` 57,

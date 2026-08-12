@@ -43,8 +43,8 @@ MUTATIONS = [
     # list_messages_for_hr: запасной путь по одному номеру пропадает
     (
         "backend/repository/messages.py",
-        "        q = q.where(Message.id < before_id)",
-        "        pass",
+        "        return q.where(Message.id < before_id)",
+        "        return q",
     ),
     # list_messages_for_hr: страница выбирается без запаса, «есть ещё» всегда ложь
     (
@@ -123,8 +123,8 @@ MUTATIONS = [
     # list_telegram_channels: ник вместо пустого заголовка не подставляется
     (
         "backend/repository/channels.py",
-        "    title_or_username = func.coalesce(TelegramChannel.title, TelegramChannel.username)",
-        "    title_or_username = TelegramChannel.title",
+        "        TelegramChannel.title, TelegramChannel.username" + CRLF,
+        "        TelegramChannel.title, TelegramChannel.title" + CRLF,
     ),
     # list_telegram_channels: порядок теряет разрешитель по заголовку
     (

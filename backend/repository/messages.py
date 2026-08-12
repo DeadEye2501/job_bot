@@ -250,6 +250,34 @@ async def save_outgoing_message(
     return row, True
 
 
+def _older_than(q, before_id: int | None, before_sent_at: datetime | None):
+    """Отсечь страницу по составной метке «время и номер».
+
+    Пагинация идёт по паре `(sent_at, id)`, а НЕ по чистому `id`. Догон
+    заливает исторические письма офлайн-периода уже после свежих: у более
+    старого по времени письма номер может оказаться больше, чем у
+    показанного. Отсечка по одному номеру тогда либо пропускает письма,
+    либо возвращает их дважды.
+
+    Пара сравнивается развёрнутым `ИЛИ`, а не построчным сравнением: SQLite
+    его понимает с 3.15, но привязываться к этому незачем. Клиент, не
+    приславший времени, получает прежнюю отсечку по номеру.
+    """
+    if before_sent_at is not None and before_id is not None:
+        return q.where(
+            or_(
+                Message.sent_at < before_sent_at,
+                and_(
+                    Message.sent_at == before_sent_at,
+                    Message.id < before_id,
+                ),
+            )
+        )
+    if before_id is not None:
+        return q.where(Message.id < before_id)
+    return q
+
+
 async def list_messages_for_hr(
     session: AsyncSession,
     hr_id: int,
@@ -266,32 +294,11 @@ async def list_messages_for_hr(
     Returns ``(messages, has_more)`` so the UI knows whether to keep
     offering "load older".
 
-    Cursor пагинация по составной паре `(sent_at, id)` — НЕ по чистому
-    `id`. Catch-up бэкаппит исторические DM-ы офлайн-периода после ингеста
-    свежих realtime-сообщений: id у "более старого по времени" ряда может
-    оказаться выше, чем у уже отображённого. Чистая пагинация по
-    `id < before_id` тогда либо пропускает ряды, либо возвращает дубли.
-    Composite-cursor устраняет это.
+    Отсечка страницы — :func:`_older_than`.
     """
-    q = select(Message).where(Message.hr_id == hr_id)
-    if before_sent_at is not None and before_id is not None:
-        # SQL row-value: (sent_at, id) < (before_sent_at, before_id).
-        # SQLite поддерживает row-value сравнения с 3.15+ — у нас новее,
-        # но на всякий случай пишем эквивалентный OR-вариант, чтобы не
-        # привязываться к конкретной реализации row-value.
-        q = q.where(
-            or_(
-                Message.sent_at < before_sent_at,
-                and_(
-                    Message.sent_at == before_sent_at,
-                    Message.id < before_id,
-                ),
-            )
-        )
-    elif before_id is not None:
-        # Backwards-compat для старых клиентов, не присылающих
-        # before_sent_at: оставляем прежнее поведение.
-        q = q.where(Message.id < before_id)
+    q = _older_than(
+        select(Message).where(Message.hr_id == hr_id), before_id, before_sent_at
+    )
     rows = (
         await session.scalars(
             q.order_by(Message.sent_at.desc(), Message.id.desc())

@@ -122,6 +122,43 @@ async def mark_vacancy_applied(
     return True
 
 
+def _log_status_change(vacancy_id: int, previous, new_status, detail: str) -> None:
+    """Строка журнала о смене статуса — одна на ручную правку и на разбор.
+
+    Отличаются они только хвостом в скобках, и порознь эти две строки
+    разъезжались бы молча: их читают вперемешку, отвечая на вопрос «почему
+    вакансия оказалась здесь».
+    """
+    logger.info(
+        "vacancy %d: status %s -> %s (%s)",
+        vacancy_id,
+        previous.value if previous else None,
+        new_status.value,
+        detail,
+    )
+
+
+def _log_manual_change(
+    history: VacancyStatusHistory, vacancy_id: int, previous, new_status
+) -> None:
+    """След ручной правки — своим уровнем у смены статуса и у заметки.
+
+    Смена статуса — событие, о котором спрашивают потом («почему вакансия
+    в отказе»), и она пишется громко. Заметка без смены статуса громкой
+    строки не заслуживает: её видно в самой ленте карточки.
+    """
+    if history.applied:
+        _log_status_change(
+            vacancy_id, previous, new_status, f"manual, applied={history.applied}"
+        )
+    else:
+        logger.debug(
+            "vacancy %d: comment-only history added (status=%s)",
+            vacancy_id,
+            new_status.value,
+        )
+
+
 async def change_vacancy_status(
     session: AsyncSession,
     vacancy_id: int,
@@ -154,20 +191,7 @@ async def change_vacancy_status(
     )
     session.add(history)
     await session.flush()
-    if history.applied:
-        logger.info(
-            "vacancy %d: status %s -> %s (manual, applied=%s)",
-            vacancy_id,
-            previous.value if previous else None,
-            new_status.value,
-            history.applied,
-        )
-    else:
-        logger.debug(
-            "vacancy %d: comment-only history added (status=%s)",
-            vacancy_id,
-            new_status.value,
-        )
+    _log_manual_change(history, vacancy_id, previous, new_status)
     return history
 
 
@@ -262,6 +286,27 @@ async def add_vacancy_event(
     return event
 
 
+def _log_blocked_verdict(
+    vacancy_id: int, previous, classification: Classification, message_id: int
+) -> None:
+    """След вердикта, который не пустил заслон переходов.
+
+    Так бывает, когда разбор присылает «приглашение» на вакансию, уже
+    стоящую в отказе. В ленту такой вердикт не пишется вовсе: раньше туда
+    клали переход с признаком «не применён», он вылезал отдельной строкой и
+    сбивал с толку. Входящее письмо уже сохранено выше по стеку — этого
+    следа хватает.
+    """
+    logger.info(
+        "vacancy %d: classifier verdict %s blocked by state-machine "
+        "(current=%s, msg=%d) — no history row written",
+        vacancy_id,
+        classification.status.value,
+        previous.value if previous else None,
+        message_id,
+    )
+
+
 async def apply_classification(
     session: AsyncSession,
     vacancy_id: int,
@@ -273,29 +318,11 @@ async def apply_classification(
         logger.warning("apply_classification: vacancy %s not found", vacancy_id)
         return
     previous = vacancy.status
-    allowed = should_apply_status(previous, classification.status)
-    if not allowed:
-        # Переход не разрешён state-machine'ом (например, classifier
-        # выдал Invitation для уже-Decline вакансии). Раньше тут писали
-        # призрачную VacancyStatusHistory с applied=False — она вылезала
-        # в timeline отдельной строкой и сбивала с толку. Теперь не
-        # пишем ничего: входящий DM уже сохранён как Message выше по
-        # стеку, этого аудит-следа достаточно.
-        logger.info(
-            "vacancy %d: classifier verdict %s blocked by state-machine "
-            "(current=%s, msg=%d) — no history row written",
-            vacancy_id,
-            classification.status.value,
-            previous.value if previous else None,
-            message_id,
-        )
+    if not should_apply_status(previous, classification.status):
+        _log_blocked_verdict(vacancy_id, previous, classification, message_id)
         return
-    logger.info(
-        "vacancy %d: status %s -> %s (auto, msg=%d)",
-        vacancy_id,
-        previous.value if previous else None,
-        classification.status.value,
-        message_id,
+    _log_status_change(
+        vacancy_id, previous, classification.status, f"auto, msg={message_id}"
     )
     session.add(
         _move_status(
