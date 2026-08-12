@@ -64,8 +64,11 @@ class LlmProviderConfig:
 
 # Defaults applied when an app_settings key is missing in the DB.
 # Stored as strings (the table column is TEXT); typed at the property level.
+#
+# Это единственное объявление умолчаний: засев кладёт в базу только то, что от
+# них отличается, а окно настроек своих запасных чисел не держит вовсе.
 _APP_DEFAULTS: dict[str, str] = {
-    "scoring_threshold": "10",
+    "scoring_threshold": "5",
     "poll_interval_sec": "1800",
     "backfill_limit": "15",
     "dm_backfill_limit": "50",

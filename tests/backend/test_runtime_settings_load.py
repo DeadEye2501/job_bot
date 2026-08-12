@@ -140,7 +140,7 @@ async def test_a_null_value_reads_as_absent_and_the_default_applies(session_fact
     """Пустое значение в базе — это «не задано», и работает умолчание."""
     await put(session_factory, app_setting_row("scoring_threshold", None))
 
-    assert (await RuntimeSettings.load(session_factory)).scoring_threshold == 10
+    assert (await RuntimeSettings.load(session_factory)).scoring_threshold == 5
 
 
 async def test_a_reload_picks_up_a_change_made_afterwards(session_factory):
@@ -148,7 +148,7 @@ async def test_a_reload_picks_up_a_change_made_afterwards(session_factory):
     settings = await RuntimeSettings.load(session_factory)
     await put(session_factory, app_setting_row("scoring_threshold", "42"))
 
-    assert settings.scoring_threshold == 10
+    assert settings.scoring_threshold == 5
     await settings.reload()
     assert settings.scoring_threshold == 42
 

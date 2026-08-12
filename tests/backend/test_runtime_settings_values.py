@@ -29,13 +29,13 @@ def settings(**app) -> RuntimeSettings:
 
 def test_a_missing_key_falls_back_to_the_default():
     """Отсутствующий ключ отдаёт умолчание."""
-    assert settings().scoring_threshold == 10
+    assert settings().scoring_threshold == 5
 
 
 @pytest.mark.parametrize("raw", ["", "   "])
 def test_a_blank_value_counts_as_not_set(raw):
     """Пустое значение и одни пробелы — это «не задано»."""
-    assert settings(scoring_threshold=raw).scoring_threshold == 10
+    assert settings(scoring_threshold=raw).scoring_threshold == 5
 
 
 def test_a_stored_value_wins_over_the_default():
@@ -155,7 +155,7 @@ def test_an_unusable_flood_window_means_no_wait(raw):
 @pytest.mark.parametrize(
     ("key", "default"),
     [
-        ("scoring_threshold", 10),
+        ("scoring_threshold", 5),
         ("poll_interval_sec", 1800),
         ("backfill_limit", 15),
         ("dm_backfill_limit", 50),
