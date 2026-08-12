@@ -5,6 +5,7 @@
 переспросить Telegram будет нечем.
 """
 
+from backend.payloads import IncomingMessage
 from backend.repository.messages import save_incoming_message
 from tests.dbio import put
 from tests.factories import at, hr_row, vacancy_row
@@ -21,14 +22,16 @@ async def test_an_incoming_message_is_stored_with_all_it_carries(
 
     saved = await save_incoming_message(
         session,
-        hr.id,
-        vacancy.id,
-        "приглашаем на созвон",
-        tg_message_id=42,
-        received_at=at(10),
-        media_kind="document",
-        media_path="cv/answer.pdf",
-        media_name="Тестовое.pdf",
+        IncomingMessage(
+            hr_id=hr.id,
+            vacancy_id=vacancy.id,
+            text="приглашаем на созвон",
+            tg_message_id=42,
+            received_at=at(10),
+            media_kind="document",
+            media_path="cv/answer.pdf",
+            media_name="Тестовое.pdf",
+        ),
     )
 
     assert saved.is_incoming is True
@@ -50,7 +53,14 @@ async def test_a_message_without_media_or_vacancy_is_stored_too(
     await put(session_factory, hr)
 
     saved = await save_incoming_message(
-        session, hr.id, None, "просто текст", tg_message_id=1, received_at=at(10)
+        session,
+        IncomingMessage(
+            hr_id=hr.id,
+            vacancy_id=None,
+            text="просто текст",
+            tg_message_id=1,
+            received_at=at(10),
+        ),
     )
 
     assert saved.vacancy_id is None

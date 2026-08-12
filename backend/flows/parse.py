@@ -208,6 +208,9 @@ async def parse_and_update_vacancy(
     status, skip_reason, score = await _verdict_for(
         pipeline, parsed, text, vacancy_id
     )
+    # Метку мусора ставит только вердикт модели (`_fit_refusal`), и она же —
+    # единственный повод убрать строку. Кто заведёт её с другой стороны, тот и
+    # отвечает за удаление.
     if (
         skip_reason
         and skip_reason.startswith(TRASH_SKIP_PREFIX)

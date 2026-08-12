@@ -197,9 +197,9 @@ async def test_a_letter_about_a_vanished_vacancy_does_not_break_the_intake(
     )
     vacancy = await only_row(session_factory, Vacancy)
 
-    async def save_and_lose_the_vacancy(session, hr_id, vacancy_id, *args, **kwargs):
-        saved = await save_incoming_message(session, hr_id, vacancy_id, *args, **kwargs)
-        await delete_vacancy(session, vacancy_id)
+    async def save_and_lose_the_vacancy(session, incoming):
+        saved = await save_incoming_message(session, incoming)
+        await delete_vacancy(session, incoming.vacancy_id)
         return saved
 
     monkeypatch.setattr(

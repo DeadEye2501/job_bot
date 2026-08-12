@@ -182,7 +182,7 @@
    **Сторож:** обе дороги оставляют кэш векторов без вектора удалённой строки.
 
 4. **Анкета читается мимо своих же читателей.**
-   `build_profile_block` (`backend/repository/profile.py:401`) переписывает
+   `build_profile_block` (`backend/repository/profile_block.py`) переписывает
    своими руками тела `get_profile`, `list_skills` и `list_experience`, причём
    последнее — без `selectinload`. Остаться должны трое названных.
    **Сторож:** блок для письма и экран анкеты называют один и тот же опыт.

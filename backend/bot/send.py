@@ -89,7 +89,9 @@ async def _clear_flood_wait(bot) -> None:
         logger.exception("Bot.send: failed to clear flood_wait_until_ts")
 
 
-async def _deliver_dm(bot, target, text: str, attachment) -> tuple[int | None, bool]:
+async def _deliver_dm(
+    bot, target, text: str, attachment, vacancy_id
+) -> tuple[int | None, bool]:
     """Отдать письмо Telegram; отдать его номер и можно ли считать дело сделанным.
 
     Отказ по частоте — единственный, после которого продолжать нельзя:
@@ -99,7 +101,9 @@ async def _deliver_dm(bot, target, text: str, attachment) -> tuple[int | None, b
     """
     from pyrogram.errors import FloodWait
 
-    logger.info("Sending DM to hr %s (%d chars)", target, len(text))
+    logger.info(
+        "Sending DM to hr %s (vacancy=%s, %d chars)", target, vacancy_id, len(text)
+    )
     try:
         tg_msg_id = await telegram.send_dm(bot._client, target, text, attachment)
     except FloodWait as e:
@@ -183,7 +187,9 @@ async def _flip_applied_alone(bot, outcome: _Outcome) -> None:
         )
 
 
-async def _hand_over(bot, permission, text: str, attachment) -> tuple[int | None, bool]:
+async def _hand_over(
+    bot, permission, text: str, attachment, vacancy_id
+) -> tuple[int | None, bool]:
     """Отдать письмо Telegram или сымитировать отправку под замком.
 
     Имитация нужна затем, что иначе конвейер нельзя было бы обкатать без
@@ -195,11 +201,11 @@ async def _hand_over(bot, permission, text: str, attachment) -> tuple[int | None
     """
     if permission.refusal is not None:
         logger.warning(
-            "[%s] would have sent DM to %s (%d chars, attachment=%s)",
-            permission.refusal, permission.target, len(text), attachment,
+            "[%s] would have sent DM to %s (vacancy=%s, %d chars, attachment=%s)",
+            permission.refusal, permission.target, vacancy_id, len(text), attachment,
         )
         return None, True
-    return await _deliver_dm(bot, permission.target, text, attachment)
+    return await _deliver_dm(bot, permission.target, text, attachment, vacancy_id)
 
 
 async def _audit_sent(bot, hr_id: int, chars: int, outcome: _Outcome) -> None:
@@ -243,7 +249,9 @@ async def send(
     if permission.refusal is not None and not suppressed:
         _log_refusal(permission, hr, vacancy_id)
         return False
-    tg_msg_id, delivered = await _hand_over(bot, permission, text, attachment)
+    tg_msg_id, delivered = await _hand_over(
+        bot, permission, text, attachment, vacancy_id
+    )
     if not delivered:
         return False
     outcome = _Outcome(vacancy_id, tg_msg_id, suppressed, force)
