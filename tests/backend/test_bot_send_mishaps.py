@@ -1,15 +1,19 @@
 """Что остаётся после отправки, пошедшей не так.
 
-Две беды разной природы. Telegram может отказать «слишком часто» — тогда
-письма нет вовсе, и час запрета запоминается, чтобы автоматика не долбилась
-в закрытую дверь. А может не удаться запись о письме, которое уже ушло, —
-и вот это назад не отыграть: сообщение у HR есть.
+Беды разной природы. Telegram может отказать «слишком часто» — тогда письма
+нет вовсе, и час запрета запоминается, чтобы автоматика не долбилась в
+закрытую дверь. А может не удаться запись о письме, которое уже ушло, — и вот
+это назад не отыграть: сообщение у HR есть.
+
+Третий случай бедой только выглядит: строку письма успело положить эхо из
+Telegram. Это штатная гонка, и путь обязан пройти до конца молча.
 
 Во втором случае статус переставляется отдельной короткой сделкой. Запись о
 письме потеряна, зато повторная отправка отобьётся проверкой «уже
 откликались» — второе письмо тому же HR хуже дырки в истории.
 """
 
+import logging
 import time
 
 from pyrogram.errors import FloodWait
@@ -21,7 +25,8 @@ from backend.models import (
     VacancyStatus,
     VacancyStatusHistory,
 )
-from tests.dbio import all_rows, only_row
+from tests.dbio import all_rows, only_row, put
+from tests.factories import message_row
 
 
 class _BrokenCommits:
@@ -126,6 +131,43 @@ async def test_a_suppressed_send_leaves_a_rate_limit_alone(ready_to_send, sessio
     await bot.send(hr, "письмо", vacancy_id=vacancy.id)
 
     assert bot._rs.flood_wait_until_ts == 555
+
+
+async def test_a_letter_already_written_by_the_echo_is_not_a_mishap(
+    ready_to_send, session_factory, outbox, caplog
+):
+    """Строка, положенная эхом раньше нас, бедой не считается.
+
+    Своё письмо приходит к нам двумя дорогами — отсюда и эхом из Telegram, —
+    и кто успел первым, заранее неизвестно. Повтор здесь штатный, а не сбой:
+    строка одна, статус переведён, и жаловаться не на что. Ответь база
+    отказом уникальности — в журнал ушла бы запись о сорвавшейся записи, и
+    счётчик ошибок в окне зажёгся бы на ровном месте.
+    """
+    bot, hr, vacancy = await ready_to_send()
+    await put(
+        session_factory,
+        message_row(
+            hr_id=hr.id,
+            is_incoming=False,
+            tg_message_id=outbox.assigned_id,
+            text="эхо успело раньше",
+        ),
+    )
+
+    with caplog.at_level(logging.ERROR):
+        assert await bot.send(hr, "письмо", vacancy_id=vacancy.id) is True
+
+    assert len(await all_rows(session_factory, Message)) == 1
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
+    assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
+    # Отметка в ленте — единственный долговечный след того, что путь прошёл
+    # до конца: журнал переживёт ротацию, а она остаётся.
+    assert (await only_row(session_factory, VacancyEvent)).kind == "applied_sent"
+    # Привязка к вакансии достаётся уцелевшей строке: эхо её не знает, а без
+    # неё следующее обращение к тому же HR уйдёт полным письмом с резюме
+    # вместо короткого догона, и ответ HR отнесётся не к той вакансии.
+    assert (await only_row(session_factory, Message)).vacancy_id == vacancy.id
 
 
 async def test_a_sent_letter_counts_even_when_the_record_failed(

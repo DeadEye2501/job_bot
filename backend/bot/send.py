@@ -2,12 +2,14 @@
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from adapters import telegram
 from backend.bot import can_send
 from backend.models import HR
-from backend.models import Message
+from backend.payloads import OutgoingMessage
 from backend.flows.events import record_vacancy_event
+from backend.repository.messages import save_outgoing_message
 from backend.repository.vacancies_life import mark_vacancy_applied
 
 logger = logging.getLogger(__name__)
@@ -123,18 +125,27 @@ async def _commit_send(bot, hr: HR, text: str, outcome: _Outcome) -> bool:
     В подпись перевода статуса заглушка не дописывается по той же причине,
     по которой не пишется строка: запись в истории обязана быть одинаковой
     на тестовом стенде и в бою, иначе две базы читаются по-разному.
+
+    Зов репозитория идёт первым в сделке нарочно: на повторе он откатывает
+    сессию, а другой незакрытой работы к этому мигу быть не должно. Повтор
+    здесь — выигранная эхом гонка, и его строка вакансии не знает вовсе.
+    Дописываем: без привязки счётчик недавних писем вернёт ноль, и следующее
+    обращение к тому же HR уйдёт полным письмом с резюме вместо короткого
+    догона, а ответ HR отнесётся не к той вакансии.
     """
     async with bot._session_factory() as session:
         if not outcome.suppressed:
-            session.add(
-                Message(
-                    is_incoming=False,
+            stored, _ = await save_outgoing_message(
+                session,
+                OutgoingMessage(
                     hr_id=hr.id,
-                    vacancy_id=outcome.vacancy_id,
                     text=text,
                     tg_message_id=outcome.tg_message_id,
-                )
+                    sent_at=datetime.now(timezone.utc),
+                    vacancy_id=outcome.vacancy_id,
+                ),
             )
+            stored.vacancy_id = outcome.vacancy_id
         applied_now = False
         if outcome.vacancy_id is not None:
             applied_now = await mark_vacancy_applied(
@@ -231,6 +242,30 @@ async def _audit_sent(bot, hr_id: int, chars: int, outcome: _Outcome) -> None:
     )
 
 
+async def _record_send(bot, hr: HR, text: str, outcome: _Outcome, permission) -> None:
+    """Записать следствия ушедшего письма, пережив беду записи.
+
+    Отыгрывать нечего: письмо у HR. Поэтому сорвавшаяся запись не поднимается
+    выше — статус переводится отдельной короткой сделкой, и только он удержит
+    повторную отправку тому же человеку.
+    """
+    try:
+        applied_now = await _commit_send(bot, hr, text, outcome)
+    except Exception:
+        logger.exception(
+            "Bot.send: запись следствий сорвалась после%s отправки к %s "
+            "(vacancy=%s, %d знаков); письмо ушло, строки переписки нет. "
+            "Перевожу статус отдельно, чтобы отбить повторную отправку.",
+            " заглушённой" if outcome.suppressed else "",
+            permission.target, outcome.vacancy_id, len(text),
+        )
+        await _flip_applied_alone(bot, outcome)
+        return
+    if applied_now:
+        logger.info("vacancy %s status -> APPLIED after send", outcome.vacancy_id)
+    await _audit_sent(bot, hr.id, len(text), outcome)
+
+
 async def send(
     bot, hr: HR, text: str, attachment=None, vacancy_id: int | None = None,
     *, force: bool = False,
@@ -254,22 +289,9 @@ async def send(
     )
     if not delivered:
         return False
-    outcome = _Outcome(vacancy_id, tg_msg_id, suppressed, force)
-    # С этого момента письмо у HR (или сымитировано), и повторять отправку
-    # нельзя ни при какой беде записи — отсюда `True` в обеих дорогах.
-    try:
-        applied_now = await _commit_send(bot, hr, text, outcome)
-    except Exception:
-        logger.exception(
-            "Bot.send: запись следствий сорвалась после%s отправки к %s "
-            "(vacancy=%s, %d знаков); письмо ушло, строки переписки нет. "
-            "Перевожу статус отдельно, чтобы отбить повторную отправку.",
-            " заглушённой" if suppressed else "",
-            permission.target, vacancy_id, len(text),
-        )
-        await _flip_applied_alone(bot, outcome)
-        return True
-    if applied_now:
-        logger.info("vacancy %s status -> APPLIED after send", vacancy_id)
-    await _audit_sent(bot, hr.id, len(text), outcome)
+    # С этого момента письмо у HR (или сымитировано), и отсюда «сделано» уже
+    # не зависит от того, чем кончилась запись: повторять отправку нельзя.
+    await _record_send(
+        bot, hr, text, _Outcome(vacancy_id, tg_msg_id, suppressed, force), permission
+    )
     return True

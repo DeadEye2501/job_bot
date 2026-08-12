@@ -68,11 +68,16 @@ class OutgoingMessage:
     оба раза записывается одинаково. Значения ходят вместе: без номера
     сообщения не распознать повтор, без времени письмо не встанет в
     переписке на своё место.
+
+    Вакансия пустует у всех, кроме отклика: эхо и догон знают только
+    переписку, а к вакансии письмо привязывает лишь тот, кто по ней и
+    отвечал.
     """
     hr_id: int
     text: str
     tg_message_id: int
     sent_at: Any
+    vacancy_id: int | None = None
     media_kind: str | None = None
     media_path: str | None = None
     media_name: str | None = None

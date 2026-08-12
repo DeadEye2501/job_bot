@@ -246,6 +246,7 @@ async def save_outgoing_message(
     row = Message(
         is_incoming=False,
         hr_id=out.hr_id,
+        vacancy_id=out.vacancy_id,
         text=out.text,
         tg_message_id=out.tg_message_id,
         sent_at=out.sent_at,
