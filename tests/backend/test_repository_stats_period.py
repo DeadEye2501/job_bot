@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from backend.repository.stats_summary import _stats_period_since
+from backend.repository.stats_common import stats_period_since
 
 
 @pytest.mark.parametrize(
@@ -29,7 +29,7 @@ def test_a_rolling_period_counts_back_from_now(period, days):
     """
     before = datetime.now(timezone.utc) - timedelta(days=days)
 
-    since = _stats_period_since(period)
+    since = stats_period_since(period)
 
     after = datetime.now(timezone.utc) - timedelta(days=days)
     assert before - timedelta(minutes=1) <= since <= after + timedelta(minutes=1)
@@ -41,7 +41,7 @@ def test_today_counts_from_the_start_of_the_day():
     Разница видна: скользящий период в один день дал бы момент вчерашний,
     а начало суток — сегодняшний, с нулями во всех долях.
     """
-    since = _stats_period_since("today")
+    since = stats_period_since("today")
 
     now = datetime.now(timezone.utc)
     assert since.date() == now.date()
@@ -60,4 +60,4 @@ def test_everything_else_means_no_boundary(period):
     его случайно, а падение статистики из-за опечатки в коде периода
     обошлось бы дороже, чем показ всей истории.
     """
-    assert _stats_period_since(period) is None
+    assert stats_period_since(period) is None

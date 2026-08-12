@@ -8,9 +8,9 @@ from sqlalchemy.exc import IntegrityError
 
 from backend.bot.media import classify_media, download_media
 from backend.flows.auto_gate import status_open_for_auto
-from backend.helpers import extract_dm_text
-from backend.helpers import extract_text
-from backend.helpers import fetch_telegram_avatar
+from backend.message_text import extract_dm_text
+from backend.message_text import extract_text
+from backend.telegram_lookup import fetch_telegram_avatar
 from backend.flows.dm_classify import classify_and_apply
 from backend.payloads import OutgoingMessage
 from backend.repository.hr_identify import find_known_hr

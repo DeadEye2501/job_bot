@@ -5,7 +5,7 @@ import logging
 from typing import Literal
 
 from backend.bot import slot
-from backend.helpers import read_channel_metadata
+from backend.telegram_lookup import read_channel_metadata
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
 from backend.repository.channels import (
     create_channel,

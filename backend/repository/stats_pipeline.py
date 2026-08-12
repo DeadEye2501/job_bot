@@ -12,9 +12,9 @@ from backend.models import (
     VacancyStatus,
 )
 
-from backend.repository.stats_summary import (
-    _stats_period_since,
+from backend.repository.stats_common import (
     first_transition_subq,
+    stats_period_since,
 )
 from backend.repository.vacancies_common import PARSED_ONLY
 
@@ -73,7 +73,7 @@ async def get_stats_channels_pipeline(
 
     Сортировка: по total desc, тай-брейкер по label.
     """
-    since = _stats_period_since(period)
+    since = stats_period_since(period)
     base_filter = [PARSED_ONLY]
     if since is not None:
         base_filter.append(Vacancy.created_at >= since)

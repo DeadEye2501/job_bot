@@ -326,9 +326,9 @@ MUTATIONS = [
     ),
     # telegram_peer: ник предпочитается учётной записи — письмо уйдёт
     # чужому человеку, если ник сменили. Ломается чужой файл нарочно:
-    # строка живёт в `helpers`, а убивают её проверки этого набора.
+    # строка живёт в `usernames`, а убивают её проверки этого набора.
     (
-        "backend/helpers.py",
+        "backend/domain/telegram_identity.py",
         "    return hr.telegram_user_id or hr.telegram_username",
         "    return hr.telegram_username or hr.telegram_user_id",
     ),

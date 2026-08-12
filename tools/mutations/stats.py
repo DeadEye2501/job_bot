@@ -7,21 +7,21 @@
 CRLF = "\r\n"
 
 MUTATIONS = [
-    # _stats_period_since: «сегодня» отсчитывается от текущего часа
+    # stats_period_since: «сегодня» отсчитывается от текущего часа
     (
-        "backend/repository/stats_summary.py",
+        "backend/repository/stats_common.py",
         '        return now.replace(hour=0, minute=0, second=0, microsecond=0)',
         "        return now",
     ),
-    # _stats_period_since: неделя стала месяцем
+    # stats_period_since: неделя стала месяцем
     (
-        "backend/repository/stats_summary.py",
+        "backend/repository/stats_common.py",
         '    if period == "week":' + CRLF + "        return now - timedelta(days=7)" + CRLF,
         '    if period == "week":' + CRLF + "        return now - timedelta(days=30)" + CRLF,
     ),
-    # _stats_period_since: квартал стал месяцем
+    # stats_period_since: квартал стал месяцем
     (
-        "backend/repository/stats_summary.py",
+        "backend/repository/stats_common.py",
         '    if period == "quarter":' + CRLF + "        return now - timedelta(days=90)" + CRLF,
         '    if period == "quarter":' + CRLF + "        return now - timedelta(days=30)" + CRLF,
     ),
@@ -41,8 +41,8 @@ MUTATIONS = [
     (
         "backend/repository/stats_summary.py",
         "            .join(Vacancy, Vacancy.id == VacancyStatusHistory.vacancy_id)" + CRLF
-        + "            .where(_status_cond(statuses), *base_filter)" + CRLF,
-        "            .where(_status_cond(statuses))" + CRLF,
+        + "            .where(status_cond(statuses), *base_filter)" + CRLF,
+        "            .where(status_cond(statuses))" + CRLF,
     ),
     # _first_in_period: в прибавку за период попадают неразобранные
     (
@@ -61,7 +61,7 @@ MUTATIONS = [
     # Подзапрос сведён из двух копий, и цель у него теперь одна — гонять
     # набор надо и против тестов воронки по каналам, второго потребителя.
     (
-        "backend/repository/stats_summary.py",
+        "backend/repository/stats_common.py",
         '            func.min(VacancyStatusHistory.changed_at).label("first_at"),',
         '            func.max(VacancyStatusHistory.changed_at).label("first_at"),',
     ),

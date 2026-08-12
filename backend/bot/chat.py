@@ -8,7 +8,7 @@ from pathlib import Path
 from backend.models import BotMode
 from backend.models import HR
 from backend.models import Message
-from backend.helpers import telegram_peer
+from backend.domain.telegram_identity import telegram_peer
 from backend.payloads import OutgoingMessage
 from backend.repository.messages import mark_incoming_read
 from backend.repository.messages import save_outgoing_message

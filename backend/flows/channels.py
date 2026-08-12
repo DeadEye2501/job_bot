@@ -2,7 +2,7 @@
 
 import logging
 
-from backend.helpers import read_channel_metadata
+from backend.telegram_lookup import read_channel_metadata
 from backend.models import TelegramChannel
 from backend.repository.channels import list_named_channels
 
@@ -97,7 +97,7 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
     One `get_chat` call per channel (sequential — Pyrogram's session is
     not thread-safe and concurrent calls can trip FloodWait); the same
     response carries both ``title`` and ``photo``. Что берётся у ответа и по
-    какому правилу — в `helpers.read_channel_metadata`; здесь остаётся своё:
+    какому правилу — в `telegram_lookup.read_channel_metadata`; здесь остаётся своё:
     название обновляется только изменившееся, а всё собранное ложится одной
     транзакцией. Failures are logged and skipped.
     """

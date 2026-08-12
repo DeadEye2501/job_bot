@@ -12,7 +12,7 @@
 from dataclasses import dataclass
 
 from adapters import telegram
-from backend.helpers import telegram_peer
+from backend.domain.telegram_identity import telegram_peer
 from backend.models import BotMode
 from backend.repository.hr_card import _hr_blacklist_value
 

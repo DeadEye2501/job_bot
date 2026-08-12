@@ -38,7 +38,7 @@
 - [x] **Г. Записи мимо репозитория** — 8, 9, 18.
       `bot/updates.py`, `repository/messages.py`, `flows/parse.py`,
       `repository/vacancies_life.py`
-- [ ] **Д. Разъезд модулей** — 10, 11.
+- [x] **Д. Разъезд модулей** — 10, 11.
       `repository/stats_summary.py`, `stats_pipeline.py`, `helpers.py` и шесть
       мест, пишущих отбор «разобранная вакансия» руками
 

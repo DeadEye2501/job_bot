@@ -14,8 +14,8 @@ from backend.domain.verdict import (
     LLM_SKIP_PREFIX,
     TRASH_SKIP_PREFIX,
 )
-from backend.helpers import fetch_telegram_avatar
-from backend.helpers import resolve_hr_telegram
+from backend.telegram_lookup import fetch_telegram_avatar
+from backend.telegram_lookup import resolve_hr_telegram
 from backend.llm.fit import validate_vacancy_fit
 from backend.llm.vacancy import parse_vacancy
 from backend.models import HR

@@ -5,7 +5,7 @@ import logging
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.helpers import typed_username
+from backend.domain.telegram_identity import typed_username
 from backend.models import Company, HR, Message, Vacancy
 from backend.payloads import HrDetail
 
