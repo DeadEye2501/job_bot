@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import String, case, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.spellings import dedupe_first_wins
 from backend.models import (
     Company,
     HR,
@@ -318,30 +319,6 @@ async def list_vacancies(
     return list(rows.all())
 
 
-def _first_spelling_wins(names: list[str]) -> list[str]:
-    """Варианты отбора без повторов; из двух написаний остаётся встреченное первым.
-
-    Правило несущее: по предложенному варианту потом идёт сам отбор в
-    `list_vacancies`, и вакансия со вторым написанием названия обязана через
-    него доставаться. Оттого и первое, а не последнее: порядок выдачи базы
-    ничем не задан, и побеждай последний, список менялся бы от запроса к
-    запросу.
-
-    Пустое отсеивается тут же — ключ у него пустой. Что ещё считать негодным
-    (у компаний это прочерк) и срезать ли пробелы, решает зовущий: у канала
-    ник приходит из Telegram, у компании название пишет человек.
-    """
-    out: list[str] = []
-    seen: set[str] = set()
-    for name in names:
-        key = (name or "").lower()
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        out.append(name)
-    return out
-
-
 async def list_vacancy_filter_options(
     session: AsyncSession,
 ) -> dict[str, list[str]]:
@@ -363,7 +340,9 @@ async def list_vacancy_filter_options(
         )
         .distinct()
     )
-    channels = _first_spelling_wins([name for (name,) in channel_rows.all()])
+    channels = dedupe_first_wins(
+        [name for (name,) in channel_rows.all()], str.lower
+    )
 
     linked_rows = await session.execute(
         select(Company.name)
@@ -379,13 +358,18 @@ async def list_vacancy_filter_options(
         )
         .distinct()
     )
-    companies = _first_spelling_wins(
+    # Ключ здесь `lower`, а у написаний той же компании в её карточке —
+    # `casefold`: одно название сравнивается двумя правилами. Расходятся они
+    # на «ß» и «İ», то есть сегодня недостижимо, и намеренным это никогда не
+    # объявлялось. Кто заведёт такое название, тот и сводит правила.
+    companies = dedupe_first_wins(
         [
             name.strip()
             for source in (linked_rows.all(), raw_rows.all())
             for (name,) in source
             if name and name.strip() != "—"
-        ]
+        ],
+        str.lower,
     )
 
     return {"channels": channels, "companies": companies}
