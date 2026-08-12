@@ -1,11 +1,14 @@
-import logging
+"""Правила опознания собеседника в Telegram по написанному о нём.
+
+Чистое правило, как соседи по `backend/domain/`: ни базы, ни сети, ни
+Pyrogram. От `adapters/telegram.py` отличается тем, что тот разговаривает с
+Telegram, а здесь только решают, годится ли написанное в ник и чем из двух
+опознаний адресовать письмо. Пока эти правила лежали рядом с походами за
+собеседником, `pyrogram` попадал в замыкание ввозов всякого, кто спрашивал
+«ник ли это», — включая разбор объявления, которому Telegram не нужен вовсе.
+"""
+
 import re
-
-from pyrogram.errors import FloodWait
-
-
-logger = logging.getLogger(__name__)
-
 
 _TG_USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
 # Ник, набранный человеком, принимается и от четырёх символов: новым такие
@@ -16,55 +19,6 @@ _TG_USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
 # написанное: за формой стоит человек, за объявлением никто.
 _TG_TYPED_USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{3,31}$")
 _TG_RESERVED_PATHS = {"joinchat", "c", "s", "bot", "dl", "addstickers"}
-
-
-def extract_text(msg) -> str:
-    return (msg.text or msg.caption or "").strip()
-
-
-def _media_placeholder(msg) -> str:
-    if getattr(msg, "photo", None):
-        return "[Фото]"
-    if getattr(msg, "document", None):
-        return "[Документ]"
-    if getattr(msg, "sticker", None):
-        return "[Стикер]"
-    if getattr(msg, "video", None):
-        return "[Видео]"
-    if getattr(msg, "voice", None):
-        return "[Голосовое]"
-    if getattr(msg, "video_note", None):
-        return "[Видеосообщение]"
-    if getattr(msg, "animation", None):
-        return "[GIF]"
-    if getattr(msg, "audio", None):
-        return "[Аудио]"
-    return "[Сообщение]"
-
-
-def extract_dm_text(msg) -> str:
-    """Like extract_text, but prefixes the body with an inline reply quote
-    when the message is a reply. The quote is short — first 80 chars of the
-    parent text (or a media placeholder), prefixed with «↪». Keeps the chat
-    UI free of separate reply rows / new DB columns.
-
-    Voice-сообщения у Telegram приходят без text, но Pyrogram-у `Voice`
-    разрешает caption — и НЕ попадают в `classify_media` (мы их не качаем).
-    Без подмены DB-row сохраняется с text="" (если caption нет) и в UI
-    рендерится пустой бабл; либо с голым текстом caption — теряется сам
-    факт, что это голосовое. Префиксим всегда, когда есть `voice`.
-    """
-    body = extract_text(msg)
-    if getattr(msg, "voice", None):
-        body = f"Голосовое сообщение: {body}" if body else "Голосовое сообщение"
-    parent = getattr(msg, "reply_to_message", None)
-    if parent is None:
-        return body
-    quote = extract_text(parent) or _media_placeholder(parent)
-    quote = quote.replace("\n", " ").strip()
-    if len(quote) > 80:
-        quote = quote[:79].rstrip() + "…"
-    return f"↪ {quote}\n\n{body}" if body else f"↪ {quote}"
 
 
 def _strip_link_prefixes(s: str) -> str:
@@ -152,76 +106,3 @@ def telegram_peer(hr) -> int | str | None:
     зовущий.
     """
     return hr.telegram_user_id or hr.telegram_username
-
-
-async def read_channel_metadata(
-    client, chat, *, current_avatar: bytes | None = None
-) -> tuple[str | None, bytes | None]:
-    """Название и картинка канала из ответа Telegram.
-
-    Спрашивают об этом двое — заведение канала из окна и сводка обновления
-    перед обходом.
-
-    **Название отдаётся как есть,** и что с ним делать, решает зовущий: у
-    заведения строка новая и перебивать нечего, сводка сравнивает с прежним.
-
-    **Картинка берётся только в пустое место,** и это правило объявления, а не
-    зовущего: однажды взятая остаётся, иначе свежую затирала бы устаревшая с
-    любого запоздавшего пути. Отсюда и довод `current_avatar` — без него
-    сводка качала бы картинку на каждом обходе, чтобы тут же её выбросить.
-    """
-    title = getattr(chat, "title", None)
-    if current_avatar is not None:
-        return title, None
-    return title, await fetch_telegram_avatar(client, chat)
-
-
-async def fetch_telegram_avatar(client, entity) -> bytes | None:
-    """Download the small profile photo from a Pyrogram User or Chat.
-
-    Duck-typed on ``.photo`` — both ``pyrogram.types.User`` and
-    ``pyrogram.types.Chat`` carry the same ``ChatPhoto`` shape with
-    ``small_file_id`` / ``big_file_id``, so the same fetch path covers
-    HR contacts and Telegram channels alike.
-    """
-    photo = getattr(entity, "photo", None)
-    if photo is None:
-        return None
-    file_id = getattr(photo, "small_file_id", None) or getattr(photo, "big_file_id", None)
-    if not file_id:
-        return None
-    try:
-        buf = await client.download_media(file_id, in_memory=True)
-    except FloodWait as e:
-        logger.warning(
-            "fetch_telegram_avatar: FloodWait %ds, skipping", getattr(e, "value", "?")
-        )
-        return None
-    except Exception:
-        logger.exception("fetch_telegram_avatar: failed")
-        return None
-    if buf is None:
-        return None
-    return buf.getvalue()
-
-
-async def resolve_hr_telegram(client, hr_contact: str):
-    username = normalize_username(hr_contact)
-    if not username:
-        return None
-    try:
-        user = await client.get_users(username)
-    except FloodWait as e:
-        logger.warning(
-            "resolve_hr_telegram: FloodWait %ds, skipping", getattr(e, "value", "?")
-        )
-        return None
-    except Exception:
-        logger.exception("resolve_hr_telegram: failed for %r", hr_contact)
-        return None
-
-    if user is None:
-        return None
-    if getattr(user, "is_bot", False) or getattr(user, "is_deleted", False):
-        return None
-    return user

@@ -6,7 +6,7 @@
 молча, а мост уже за пределом строк и растить его нельзя.
 """
 
-from backend.helpers import typed_username
+from backend.domain.telegram_identity import typed_username
 
 
 def none_if_empty(value) -> str | None:

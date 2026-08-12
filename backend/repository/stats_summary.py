@@ -1,6 +1,6 @@
 """Сводные числа для экрана статистики."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,47 +9,12 @@ from backend.domain.scoring import build_skill_lookup
 from backend.domain.skill_names import skill_key
 from backend.models import Message, Vacancy, VacancyStatus, VacancyStatusHistory
 from backend.repository.profile import list_skills
+from backend.repository.stats_common import (
+    first_transition_subq,
+    stats_period_since,
+    status_cond,
+)
 from backend.repository.vacancies_common import PARSED_ONLY, count_by_status
-
-
-def _status_cond(statuses):
-    """Условие «статус перехода тот самый». Принимает и одиночный статус,
-    и любой набор — звать с одним значением удобнее, чем с набором из него.
-    """
-    return (
-        VacancyStatusHistory.status.in_(statuses)
-        if isinstance(statuses, (frozenset, set, list, tuple))
-        else VacancyStatusHistory.status == statuses
-    )
-
-
-def first_transition_subq(statuses):
-    """Подзапрос «когда вакансия впервые перешла в эти статусы»: пара
-    из номера вакансии и самого раннего времени перехода.
-    """
-    return (
-        select(
-            VacancyStatusHistory.vacancy_id.label("vid"),
-            func.min(VacancyStatusHistory.changed_at).label("first_at"),
-        )
-        .where(_status_cond(statuses))
-        .group_by(VacancyStatusHistory.vacancy_id)
-        .subquery()
-    )
-
-
-def _stats_period_since(period: str) -> datetime | None:
-    """Convert UI period code to a since-timestamp, or None for 'all'."""
-    now = datetime.now(timezone.utc)
-    if period == "today":
-        return now.replace(hour=0, minute=0, second=0, microsecond=0)
-    if period == "week":
-        return now - timedelta(days=7)
-    if period == "month":
-        return now - timedelta(days=30)
-    if period == "quarter":
-        return now - timedelta(days=90)
-    return None  # all-time
 
 
 async def get_stats_kpi(
@@ -70,7 +35,7 @@ async def get_stats_kpi(
     Дельты — `*_period`: для total — created_at в окне; для остальных —
     первый переход в соответствующий статус (min(changed_at)) в окне.
     """
-    since = _stats_period_since(period)
+    since = stats_period_since(period)
 
     in_progress_set = {VacancyStatus.INVITATION, VacancyStatus.TEST}
 
@@ -90,7 +55,7 @@ async def get_stats_kpi(
         return int((await session.execute(
             select(func.count(func.distinct(VacancyStatusHistory.vacancy_id)))
             .join(Vacancy, Vacancy.id == VacancyStatusHistory.vacancy_id)
-            .where(_status_cond(statuses), *base_filter)
+            .where(status_cond(statuses), *base_filter)
         )).scalar_one())
 
     applied_total = await _ever_in(VacancyStatus.APPLIED)
@@ -141,7 +106,7 @@ async def get_stats_status_breakdown(
     """Counts по всем статусам за период (или lifetime для 'all').
     Используется для funnel-карточки и all-status-сounters.
     """
-    since = _stats_period_since(period)
+    since = stats_period_since(period)
     conditions = [PARSED_ONLY]
     if since is not None:
         conditions.append(Vacancy.created_at >= since)
@@ -168,7 +133,7 @@ async def get_stats_skills(
     - Фильтруем шум: показываем теги с count >= ``min_count`` (по умолч. 2).
       Топ-N по count desc, тай-брейкер casefold.
     """
-    since = _stats_period_since(period)
+    since = stats_period_since(period)
     base_filter = [PARSED_ONLY, Vacancy.stack.is_not(None)]
     if since is not None:
         base_filter.append(Vacancy.created_at >= since)
@@ -245,7 +210,7 @@ async def get_stats_hr_responses(
          - no_response_pct: процент applied вакансий БЕЗ first-response
          - applied_count / responded_count: голые числа
     """
-    since = _stats_period_since(period)
+    since = stats_period_since(period)
 
     # Шаг 1: первый Applied на каждую vacancy, ограниченный period
     first_applied_subq = first_transition_subq(VacancyStatus.APPLIED)

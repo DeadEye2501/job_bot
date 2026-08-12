@@ -5,7 +5,7 @@ import logging
 from sqlalchemy import select
 
 from backend.flows import parse
-from backend.helpers import extract_text
+from backend.message_text import extract_text
 from backend.models import TelegramChannel
 from backend.models import Vacancy
 from backend.repository.channels import list_named_channels

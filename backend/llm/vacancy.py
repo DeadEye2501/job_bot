@@ -9,7 +9,7 @@ import httpx
 
 from adapters.lm_studio import ChatRequest, chat
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
-from backend.helpers import normalize_username
+from backend.domain.telegram_identity import normalize_username
 from backend.payloads import ParsedVacancy
 
 from backend.llm.answers import (

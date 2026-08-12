@@ -8,7 +8,7 @@ import numpy as np
 from adapters import lm_studio
 from backend.flows import parse
 from backend.domain.dedup import cosine_top_match
-from backend.helpers import extract_text
+from backend.message_text import extract_text
 from backend.models import Vacancy
 from backend.payloads import ChannelPost
 from backend.repository.vacancies_life import add_vacancy_event

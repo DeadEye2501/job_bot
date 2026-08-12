@@ -54,6 +54,7 @@ from client.form_payloads import hr_is_identified, none_if_empty as _none_if_emp
 from backend.cv_parser import parse_cv
 from backend.domain.scoring import build_skill_lookup, skill_key
 from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
+from backend.domain.telegram_identity import normalize_username
 from backend.models import (
     BLACKLIST_KINDS,
     Blacklist,
@@ -3716,8 +3717,6 @@ class MainApi(QObject):
         ``created=false`` so the UI selects the existing row instead of
         showing an error. Metadata fetch is opportunistic on the backend.
         """
-        from backend.helpers import normalize_username
-
         try:
             payload = json.loads(payload_json) if payload_json else {}
             raw = (payload.get("input") or "").strip()

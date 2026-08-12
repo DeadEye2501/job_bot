@@ -159,7 +159,7 @@ def load_mutations(set_name: str) -> list[tuple[str, str, str]]:
 def main() -> int:
     if len(sys.argv) != 3:
         print("нужно два довода: путь к тестам и имя набора поломок")
-        print("например: python tools/mutate.py tests/backend/test_helpers.py helpers")
+        print("например: python tools/mutate.py tests/backend/test_usernames.py usernames")
         return 5
     test_path, set_name = sys.argv[1], sys.argv[2]
 

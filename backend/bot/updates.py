@@ -8,8 +8,8 @@ from pyrogram.raw.types import PeerUser as _PeerUser
 from pyrogram.raw.types import UpdateReadHistoryOutbox as _UpdateReadHistoryOutbox
 
 from backend.flows.dm import persist_outgoing_dm, process_dm
-from backend.helpers import extract_dm_text
-from backend.helpers import extract_text
+from backend.message_text import extract_dm_text
+from backend.message_text import extract_text
 from backend.models import BotMode
 from backend.models import Message
 from backend.repository.hr_identify import find_known_hr

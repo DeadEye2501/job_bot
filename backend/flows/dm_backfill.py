@@ -4,7 +4,7 @@ import logging
 import asyncio
 
 from backend.flows.dm import persist_outgoing_dm, process_dm
-from backend.helpers import telegram_peer
+from backend.domain.telegram_identity import telegram_peer
 from backend.repository.hr_list import list_hrs_for_backfill
 from backend.repository.messages import tombstone_messages
 from backend.notify import fire
