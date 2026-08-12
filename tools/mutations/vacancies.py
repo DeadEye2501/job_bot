@@ -14,25 +14,25 @@ MUTATIONS = [
     # list_vacancies: недоразобранные вакансии перестают отсеиваться
     (
         "backend/repository/vacancies_list.py",
-        "where_clauses = [Vacancy.is_parsed.is_(True)]",
+        "clauses: list = [PARSED_ONLY]",
         "where_clauses = []",
     ),
     # list_vacancies: нижняя граница баллов становится строгой
     (
         "backend/repository/vacancies_list.py",
-        "where_clauses.append(Vacancy.score >= score_min)",
+        "clauses.append(Vacancy.score >= f.score_min)",
         "where_clauses.append(Vacancy.score > score_min)",
     ),
     # list_vacancies: «с контактом HR» и «без контакта» меняются местами
     (
         "backend/repository/vacancies_list.py",
-        "where_clauses.append(Vacancy.hr_id.is_not(None))",
+        "clauses.append(Vacancy.hr_id.is_not(None))",
         "where_clauses.append(Vacancy.hr_id.is_(None))",
     ),
     # list_vacancies: у «сначала новых по статусу» подменена карта приоритетов
     (
         "backend/repository/vacancies_list.py",
-        "*[(Vacancy.status == s, p) for s, p in _STATUS_PRIORITY_NEW_FIRST.items()],",
+        "*[(Vacancy.status == s, p) for s, p in ranks.items()], else_=999",
         "*[(Vacancy.status == s, p) for s, p in _STATUS_PRIORITY_ACTIVE_FIRST.items()],",
     ),
     # list_vacancies: у событий берётся наименьшее время вместо наибольшего
@@ -50,43 +50,43 @@ MUTATIONS = [
     # list_vacancies: пропадает разрешитель спора у «сначала новых»
     (
         "backend/repository/vacancies_list.py",
-        "order_by = (activity_ts.desc().nulls_last(), Vacancy.id.desc())",
+        "return (activity_ts.desc().nulls_last(), Vacancy.id.desc())",
         "order_by = (activity_ts.desc().nulls_last(),)",
     ),
     # list_vacancies: у «сначала старых» разрешитель спора смотрит в другую сторону
     (
         "backend/repository/vacancies_list.py",
-        "order_by = (activity_ts.asc().nulls_last(), Vacancy.id.asc())",
+        "return (activity_ts.asc().nulls_last(), Vacancy.id.asc())",
         "order_by = (activity_ts.asc().nulls_last(), Vacancy.id.desc())",
     ),
     # list_vacancies: смещение страницы теряется
     (
         "backend/repository/vacancies_list.py",
-        "final_stmt = final_stmt.limit(limit).offset(offset)",
+        "final_stmt = final_stmt.limit(f.limit).offset(f.offset)",
         "final_stmt = final_stmt.limit(limit)",
     ),
     # list_vacancies: нижняя граница окна зарплаты становится строгой
     (
         "backend/repository/vacancies_list.py",
-        "where_clauses.append(Vacancy.salary_max >= salary_min)",
+        "clauses.append(Vacancy.salary_max >= f.salary_min)",
         "where_clauses.append(Vacancy.salary_max > salary_min)",
     ),
     # list_vacancies: верхняя граница окна зарплаты становится строгой
     (
         "backend/repository/vacancies_list.py",
-        "where_clauses.append(Vacancy.salary_min <= salary_max)",
+        "clauses.append(Vacancy.salary_min <= f.salary_max)",
         "where_clauses.append(Vacancy.salary_min < salary_max)",
     ),
     # list_vacancies: нижняя граница окна зарплаты сравнивается не с тем концом вилки
     (
         "backend/repository/vacancies_list.py",
-        "where_clauses.append(Vacancy.salary_max >= salary_min)",
+        "clauses.append(Vacancy.salary_max >= f.salary_min)",
         "where_clauses.append(Vacancy.salary_min >= salary_min)",
     ),
     # list_vacancies: верхняя граница окна зарплаты сравнивается не с тем концом вилки
     (
         "backend/repository/vacancies_list.py",
-        "where_clauses.append(Vacancy.salary_min <= salary_max)",
+        "clauses.append(Vacancy.salary_min <= f.salary_max)",
         "where_clauses.append(Vacancy.salary_max <= salary_max)",
     ),
     # list_vacancy_filter_options: прочерк перестаёт отсеиваться

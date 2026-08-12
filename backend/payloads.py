@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Literal, get_args
 
 from backend.models import (
@@ -196,6 +197,58 @@ class ChannelDetail:
     channel: TelegramChannel
     stats: ChannelStats
     blacklist_value: str | None = None
+
+
+@dataclass(frozen=True)
+class VacancyFilter:
+    """Отбор списка вакансий: что показать, в каком порядке и сколько.
+
+    Шестнадцать значений об одном предмете — что именно человек выбрал в
+    окне, — и порознь они не ходят: экран шлёт их одной пачкой, а список
+    складывает все непустые через И.
+
+    - ``sort`` — ключ порядка; незнакомый молча становится «сначала
+      свежие».
+    - ``search`` — подстрока без учёта регистра по названию, описанию,
+      имени компании (и своему, и связанной), заметкам, зарплате, грейду,
+      имени и нику HR, плюс по сырому JSON стека.
+    - ``statuses`` — коды статусов через дефис (`in-progress`);
+      незнакомые молча отбрасываются.
+    - ``channels`` — ники каналов без учёта регистра. Вакансия без канала
+      не совпадает никогда.
+    - ``companies`` — имена компаний без учёта регистра; совпадает и со
+      связанной строкой, и с сырым именем, чтобы непривязанные вакансии
+      тоже находились.
+    - ``score_min`` / ``score_max`` — целые границы; вакансия без баллов
+      не совпадает никогда.
+    - ``salary_min`` / ``salary_max`` — окно, которое обязано пересечься с
+      вилкой вакансии; обе границы включительны. Строка, где чисел не
+      нашлось, не совпадает ни с каким окном. Валюта не спрашивается —
+      числа сравниваются как записаны.
+    - ``grade`` / ``remote`` — подстрока по своей колонке.
+    - ``hr_contact`` — `"with"` или `"without"` по наличию HR; всё прочее
+      (включая `None` и `"all"`) ничего не отбирает.
+    - ``date_from`` / ``date_to`` — границы по метке активности, той же,
+      по которой идёт порядок.
+    - ``limit`` / ``offset`` — страница; без предела смещение не читается.
+    """
+
+    sort: str = "newest"
+    search: str | None = None
+    statuses: list[str] | None = None
+    channels: list[str] | None = None
+    companies: list[str] | None = None
+    score_min: int | None = None
+    score_max: int | None = None
+    salary_min: float | None = None
+    salary_max: float | None = None
+    grade: str | None = None
+    remote: str | None = None
+    hr_contact: str | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+    limit: int | None = None
+    offset: int = 0
 
 
 def str_list(value) -> list[str]:

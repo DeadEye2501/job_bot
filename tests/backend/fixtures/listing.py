@@ -4,6 +4,7 @@ import pytest
 
 from backend.repository.channels import list_telegram_channels
 from backend.repository.hr_list import list_hr_with_counts
+from backend.payloads import VacancyFilter
 from backend.repository.vacancies_list import list_vacancies
 
 
@@ -19,7 +20,10 @@ def titles(session):
     """
 
     async def read(**kwargs) -> list[str]:
-        return [v.title for v in await list_vacancies(session, **kwargs)]
+        return [
+            v.title
+            for v in await list_vacancies(session, VacancyFilter(**kwargs))
+        ]
 
     return read
 

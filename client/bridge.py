@@ -55,6 +55,7 @@ from backend.cv_parser import parse_cv
 from backend.domain.scoring import build_skill_lookup, skill_key
 from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
 from backend.domain.telegram_identity import normalize_username
+from backend.payloads import VacancyFilter
 from backend.models import (
     BLACKLIST_KINDS,
     Blacklist,
@@ -1326,22 +1327,24 @@ class MainApi(QObject):
             async with self._session_factory() as session:
                 rows = await vacancies_list.list_vacancies(
                     session,
-                    sort=sort_key,
-                    search=search,
-                    statuses=statuses,
-                    channels=channels,
-                    companies=companies,
-                    score_min=score_min,
-                    score_max=score_max,
-                    salary_min=salary_min,
-                    salary_max=salary_max,
-                    grade=grade,
-                    remote=remote,
-                    hr_contact=hr_contact,
-                    date_from=date_from,
-                    date_to=date_to,
-                    limit=limit,
-                    offset=offset,
+                    VacancyFilter(
+                        sort=sort_key,
+                        search=search,
+                        statuses=statuses,
+                        channels=channels,
+                        companies=companies,
+                        score_min=score_min,
+                        score_max=score_max,
+                        salary_min=salary_min,
+                        salary_max=salary_max,
+                        grade=grade,
+                        remote=remote,
+                        hr_contact=hr_contact,
+                        date_from=date_from,
+                        date_to=date_to,
+                        limit=limit,
+                        offset=offset,
+                    ),
                 )
                 skills = await profile_repo.list_skills(session)
                 activity_by_id = await vacancies_list.list_vacancy_last_activity(

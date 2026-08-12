@@ -15,6 +15,7 @@ from backend.models import (
     VacancyStatus,
     VacancyStatusHistory,
 )
+from backend.payloads import VacancyFilter
 from backend.repository.vacancies_card import VACANCY_NEIGHBOURS
 from backend.repository.vacancies_common import PARSED_ONLY
 
@@ -131,177 +132,185 @@ def _activity_ts(event_agg, status_agg):
     )
 
 
-async def list_vacancies(
-    session: AsyncSession,
-    sort: str = "newest",
-    search: str | None = None,
-    statuses: list[str] | None = None,
-    channels: list[str] | None = None,
-    companies: list[str] | None = None,
-    score_min: int | None = None,
-    score_max: int | None = None,
-    salary_min: float | None = None,
-    salary_max: float | None = None,
-    grade: str | None = None,
-    remote: str | None = None,
-    hr_contact: str | None = None,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
-    limit: int | None = None,
-    offset: int = 0,
-) -> list[Vacancy]:
-    """Vacancies ordered per ``sort`` key, HR / company / channel eager-loaded.
+def _order_for(sort: str, activity_ts):
+    """Порядок выдачи по ключу сортировки; незнакомый ключ — «сначала свежие».
 
-    Метка активности (по ней идут newest/oldest и она же разрешает споры в
-    остальных сортировках) — :func:`_activity_ts`, одна и та же на сортировку
-    и на :func:`list_vacancy_last_activity`.
+    Номер строки идёт последним у каждого ключа: у меток активности бывают
+    совпадения, и без него порядок двух таких строк решался бы случаем — от
+    страницы к странице они менялись бы местами.
 
-    Filters (all optional, AND-combined):
-
-    - ``search`` — case-insensitive substring match on title / description /
-      company_name / linked company.name / notes / salary / grade / HR name /
-      HR telegram username, plus the raw JSON of ``vacancy.stack``.
-    - ``statuses`` — list of status codes (kebab-case, e.g. ``"in-progress"``);
-      unknown codes are dropped silently.
-    - ``channels`` — list of channel usernames (case-insensitive). Vacancies
-      with no linked channel never match.
-    - ``companies`` — list of company names (case-insensitive). Matches both
-      linked ``company.name`` and the raw ``vacancy.company_name`` so unbinded
-      vacancies still show up.
-    - ``score_min`` / ``score_max`` — integer range; NULL scores never match.
-    - ``salary_min`` / ``salary_max`` — window that has to overlap the
-      vacancy's own ``salary_min``/``salary_max`` pair; both ends are
-      inclusive. Rows whose salary held no number never match, whatever the
-      window. Currency is not consulted: the numbers are compared as written.
-    - ``grade`` / ``remote`` — substring match on the respective columns.
-    - ``hr_contact`` — ``"with"`` / ``"without"`` filters by ``hr_id``
-      presence; anything else (incl. ``None`` / ``"all"``) is a no-op.
-
-    Excludes orphan rows (``is_parsed = False``) — those exist only because
-    the parsing pipeline was interrupted between the row insert and the
-    parse commit, and the UI shouldn't show them. They're picked up by
-    ``IngestionPipeline.recover_orphan_vacancies`` on the next startup
-    and either re-parsed or deleted as trash.
+    Незнакомый ключ отсекается здесь, а не у зовущего: перечень известных
+    и разбор по ним — одно знание, и порознь они разъехались бы.
     """
     if sort not in VACANCY_SORTS:
-        sort = "newest"
-
-    event_agg, status_agg = _activity_aggs()
-    activity_ts = _activity_ts(event_agg, status_agg)
-
+        return (activity_ts.desc().nulls_last(), Vacancy.id.desc())
     if sort == "oldest":
-        order_by = (activity_ts.asc().nulls_last(), Vacancy.id.asc())
-    elif sort == "score_desc":
-        order_by = (Vacancy.score.desc().nulls_last(), activity_ts.desc(), Vacancy.id.desc())
-    elif sort == "score_asc":
-        order_by = (Vacancy.score.asc().nulls_last(), activity_ts.desc(), Vacancy.id.desc())
-    elif sort == "status_active_first":
+        return (activity_ts.asc().nulls_last(), Vacancy.id.asc())
+    if sort == "score_desc":
+        return (
+            Vacancy.score.desc().nulls_last(),
+            activity_ts.desc(),
+            Vacancy.id.desc(),
+        )
+    if sort == "score_asc":
+        return (
+            Vacancy.score.asc().nulls_last(),
+            activity_ts.desc(),
+            Vacancy.id.desc(),
+        )
+    if sort in ("status_active_first", "status_new_first"):
+        ranks = (
+            _STATUS_PRIORITY_ACTIVE_FIRST
+            if sort == "status_active_first"
+            else _STATUS_PRIORITY_NEW_FIRST
+        )
         priority = case(
-            *[(Vacancy.status == s, p) for s, p in _STATUS_PRIORITY_ACTIVE_FIRST.items()],
-            else_=999,
+            *[(Vacancy.status == s, p) for s, p in ranks.items()], else_=999
         )
-        order_by = (priority.asc(), activity_ts.desc(), Vacancy.id.desc())
-    elif sort == "status_new_first":
-        priority = case(
-            *[(Vacancy.status == s, p) for s, p in _STATUS_PRIORITY_NEW_FIRST.items()],
-            else_=999,
-        )
-        order_by = (priority.asc(), activity_ts.desc(), Vacancy.id.desc())
-    else:  # newest
-        order_by = (activity_ts.desc().nulls_last(), Vacancy.id.desc())
+        return (priority.asc(), activity_ts.desc(), Vacancy.id.desc())
+    return (activity_ts.desc().nulls_last(), Vacancy.id.desc())
 
-    where_clauses = [PARSED_ONLY]
-    needs_hr_join = False
-    needs_company_join = False
-    needs_channel_join = False
 
-    if search and search.strip():
-        q = f"%{search.strip().lower()}%"
-        where_clauses.append(
-            or_(
-                func.lower(Vacancy.title).like(q),
-                func.lower(Vacancy.description).like(q),
-                func.lower(Vacancy.company_name).like(q),
-                func.lower(Vacancy.notes).like(q),
-                func.lower(Vacancy.salary).like(q),
-                func.lower(Vacancy.grade).like(q),
-                func.lower(HR.name).like(q),
-                func.lower(HR.telegram_username).like(q),
-                func.lower(Company.name).like(q),
-                func.lower(cast(Vacancy.stack, String)).like(q),
-            )
-        )
-        needs_hr_join = True
-        needs_company_join = True
+def _search_clauses(search: str | None) -> tuple[list, set[str]]:
+    """Условие поиска подстрокой и соседи, которых оно требует.
 
-    if statuses:
-        enum_values = [_STATUS_BY_CODE[s] for s in statuses if s in _STATUS_BY_CODE]
+    Ищется по девяти колонкам и по сырому JSON стека — по всему, что человек
+    видит в строке списка. Имя HR и имя компании лежат в своих таблицах,
+    поэтому соседи называются здесь же: знание «какое условие без какого
+    соседа не читается» живёт при самом условии, а не у зовущего.
+    """
+    if not search or not search.strip():
+        return [], set()
+    q = f"%{search.strip().lower()}%"
+    matched = or_(
+        func.lower(Vacancy.title).like(q),
+        func.lower(Vacancy.description).like(q),
+        func.lower(Vacancy.company_name).like(q),
+        func.lower(Vacancy.notes).like(q),
+        func.lower(Vacancy.salary).like(q),
+        func.lower(Vacancy.grade).like(q),
+        func.lower(HR.name).like(q),
+        func.lower(HR.telegram_username).like(q),
+        func.lower(Company.name).like(q),
+        func.lower(cast(Vacancy.stack, String)).like(q),
+    )
+    return [matched], {"hr", "company"}
+
+
+def _choice_clauses(f: VacancyFilter) -> tuple[list, set[str]]:
+    """Условия по спискам выбранного в окне и соседи, которых они требуют.
+
+    Регистр сводится потому, что его сводит и выпадающий список (см.
+    :func:`list_vacancy_filter_options`): из «Контур» и «контур» он оставляет
+    первое встреченное написание, второго не предлагает вовсе, и точное
+    сравнение оставило бы вакансию со вторым написанием недостижимой через
+    фильтр. `lower` здесь свой, зарегистрированный в `adapters/db.py`, и
+    кириллицу он понимает.
+    """
+    clauses: list = []
+    joins: set[str] = set()
+    if f.statuses:
+        enum_values = [_STATUS_BY_CODE[s] for s in f.statuses if s in _STATUS_BY_CODE]
         if enum_values:
-            where_clauses.append(Vacancy.status.in_(enum_values))
-
-    # Регистр здесь сводится потому, что его сводит и выпадающий список
-    # (см. :func:`list_vacancy_filter_options`): из «Контур» и «контур» он
-    # оставляет первое встреченное написание, второго не предлагает вовсе, и
-    # точное сравнение оставило бы вакансию со вторым написанием недостижимой
-    # через фильтр. `lower` здесь свой, зарегистрированный в `adapters/db.py`,
-    # и кириллицу он понимает.
-
-    if channels:
-        cleaned = [c.lower() for c in channels if c]
+            clauses.append(Vacancy.status.in_(enum_values))
+    if f.channels:
+        cleaned = [c.lower() for c in f.channels if c]
         if cleaned:
-            where_clauses.append(func.lower(TelegramChannel.username).in_(cleaned))
-            needs_channel_join = True
-
-    if companies:
-        cleaned = [c.lower() for c in companies if c]
+            clauses.append(func.lower(TelegramChannel.username).in_(cleaned))
+            joins.add("channel")
+    if f.companies:
+        cleaned = [c.lower() for c in f.companies if c]
         if cleaned:
-            where_clauses.append(
+            clauses.append(
                 or_(
                     func.lower(Company.name).in_(cleaned),
                     func.lower(Vacancy.company_name).in_(cleaned),
                 )
             )
-            needs_company_join = True
+            joins.add("company")
+    return clauses, joins
 
-    if score_min is not None:
-        where_clauses.append(Vacancy.score >= score_min)
-    if score_max is not None:
-        where_clauses.append(Vacancy.score <= score_max)
 
-    # Окно и вилка вакансии сравниваются на пересечение, поэтому границы
-    # сходятся крест-накрест. У вакансии без чисел обе колонки пусты, и
-    # сравнение с пустотой отсеивает её само.
-    if salary_min is not None:
-        where_clauses.append(Vacancy.salary_max >= salary_min)
-    if salary_max is not None:
-        where_clauses.append(Vacancy.salary_min <= salary_max)
+def _range_clauses(f: VacancyFilter, activity_ts) -> list:
+    """Условия по числовым и временным границам.
 
-    if grade:
-        where_clauses.append(func.lower(Vacancy.grade).like(f"%{grade.lower()}%"))
+    Окно зарплаты и вилка вакансии сравниваются на пересечение, поэтому
+    границы сходятся крест-накрест. У вакансии без чисел обе колонки пусты,
+    и сравнение с пустотой отсеивает её само.
+    """
+    clauses: list = []
+    if f.score_min is not None:
+        clauses.append(Vacancy.score >= f.score_min)
+    if f.score_max is not None:
+        clauses.append(Vacancy.score <= f.score_max)
+    if f.salary_min is not None:
+        clauses.append(Vacancy.salary_max >= f.salary_min)
+    if f.salary_max is not None:
+        clauses.append(Vacancy.salary_min <= f.salary_max)
+    if f.date_from is not None:
+        clauses.append(activity_ts >= f.date_from)
+    if f.date_to is not None:
+        clauses.append(activity_ts <= f.date_to)
+    return clauses
 
-    if remote:
-        where_clauses.append(func.lower(Vacancy.remote).like(f"%{remote.lower()}%"))
 
-    if hr_contact == "with":
-        where_clauses.append(Vacancy.hr_id.is_not(None))
-    elif hr_contact == "without":
-        where_clauses.append(Vacancy.hr_id.is_(None))
+def _column_clauses(f: VacancyFilter) -> list:
+    """Условия по одиночным колонкам вакансии."""
+    clauses: list = []
+    if f.grade:
+        clauses.append(func.lower(Vacancy.grade).like(f"%{f.grade.lower()}%"))
+    if f.remote:
+        clauses.append(func.lower(Vacancy.remote).like(f"%{f.remote.lower()}%"))
+    if f.hr_contact == "with":
+        clauses.append(Vacancy.hr_id.is_not(None))
+    elif f.hr_contact == "without":
+        clauses.append(Vacancy.hr_id.is_(None))
+    return clauses
 
-    if date_from is not None:
-        where_clauses.append(activity_ts >= date_from)
-    if date_to is not None:
-        where_clauses.append(activity_ts <= date_to)
 
+def _where_and_joins(f: VacancyFilter, activity_ts) -> tuple[list, set[str]]:
+    """Все условия отбора разом и имена соседей, без которых они не читаются.
+
+    Соседи подтягиваются по требованию, а не всегда: список открывают без
+    фильтров чаще, чем с ними, и три лишних соединения на каждой странице
+    стоили бы дороже, чем ветвление здесь.
+    """
+    clauses: list = [PARSED_ONLY]
+    joins: set[str] = set()
+    for found, needed in (_search_clauses(f.search), _choice_clauses(f)):
+        clauses.extend(found)
+        joins.update(needed)
+    clauses.extend(_range_clauses(f, activity_ts))
+    clauses.extend(_column_clauses(f))
+    return clauses, joins
+
+
+async def list_vacancies(
+    session: AsyncSession, filters: VacancyFilter
+) -> list[Vacancy]:
+    """Вакансии в порядке, заданном отбором; соседи подтянуты сразу.
+
+    Что можно отобрать — у `VacancyFilter`; метка активности, по которой
+    идёт порядок, одна и та же у списка и у `list_vacancy_last_activity`.
+    Недоразобранные строки не показываются вовсе: они существуют только
+    потому, что конвейер прервался между заведением строки и записью
+    разбора, а подберёт их следующий запуск —
+    `IngestionPipeline.recover_orphan_vacancies`.
+    """
+    f = filters
+    event_agg, status_agg = _activity_aggs()
+    activity_ts = _activity_ts(event_agg, status_agg)
+    where_clauses, joins = _where_and_joins(f, activity_ts)
     stmt = (
         select(Vacancy)
         .outerjoin(event_agg, event_agg.c.vid == Vacancy.id)
         .outerjoin(status_agg, status_agg.c.vid == Vacancy.id)
     )
-    if needs_hr_join:
+    if "hr" in joins:
         stmt = stmt.outerjoin(HR, HR.id == Vacancy.hr_id)
-    if needs_company_join:
+    if "company" in joins:
         stmt = stmt.outerjoin(Company, Company.id == Vacancy.company_id)
-    if needs_channel_join:
+    if "channel" in joins:
         stmt = stmt.outerjoin(
             TelegramChannel, TelegramChannel.id == Vacancy.source_channel_id
         )
@@ -310,11 +319,10 @@ async def list_vacancies(
         stmt
         .where(*where_clauses)
         .options(*VACANCY_NEIGHBOURS)
-        .order_by(*order_by)
+        .order_by(*_order_for(f.sort, activity_ts))
     )
-    if limit is not None:
-        final_stmt = final_stmt.limit(limit).offset(offset)
-
+    if f.limit is not None:
+        final_stmt = final_stmt.limit(f.limit).offset(f.offset)
     rows = await session.scalars(final_stmt)
     return list(rows.all())
 
