@@ -11,7 +11,7 @@ import sys
 import threading
 import traceback
 
-from backend.log_buffer import LogFileHandler
+from backend.log_file import LogFileHandler
 from config import get_log_path
 
 
@@ -78,16 +78,13 @@ logging.basicConfig(
 )
 # Attach the in-memory buffer handler that backs the UI «Логи» screen.
 # Идемпотентно — повторный install() не-op.
-from backend.log_buffer import (
-    install as _install_log_buffer,
-    install_secret_filter as _install_secret_filter,
-)
-_install_log_buffer()
+from backend import log_buffer as _log_buffer, log_secrets as _log_secrets
+_log_buffer.install()
 # Secret-redaction filter ставим ДО первого logger.* и ПОСЛЕ того, как все
 # обработчики на месте: он вешается на них, а не на logger. Иначе Bearer-
 # токены / api_hash / session-string'и из третьих либ (httpx debug, pyrogram,
 # sqlalchemy echo) легли бы в файл журнала как есть — и пережили бы окно.
-_install_secret_filter()
+_log_secrets.install_secret_filter()
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 

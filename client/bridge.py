@@ -206,7 +206,7 @@ async def _do_list_models_for_creds(
         # в repr exception'а. Прогоняем через root-logger SecretRedaction-
         # Filter руками — он висит на root, но мы тут просто текст
         # формируем без logger.* вызова.
-        from backend.log_buffer import _redact
+        from backend.log_secrets import _redact
         return {"ok": False, "error": _redact(f"{type(e).__name__}: {e}")}
     finally:
         await client.aclose()
