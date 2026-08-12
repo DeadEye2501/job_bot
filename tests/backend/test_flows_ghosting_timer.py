@@ -12,20 +12,26 @@
 
 import pytest
 
-from backend.domain.transitions import GHOSTING_TIMEOUT_DAYS
 from backend.models import Vacancy, VacancyStatus
 from tests.dbio import all_rows, put
 from tests.factories import days_ago, vacancy_row
 
+# Границы названы числами нарочно, а не через `GHOSTING_TIMEOUT_DAYS`. Считай
+# их из самого срока — и проверки поедут вместе с ним: смени его на четверо
+# суток, и всё останется зелёным, а отклики уходили бы в «молчание» через
+# четыре дня. Две недели — обещание пользователю, и сторожить надо его.
+_SILENT_DAYS = 15
+_STILL_WAITING_DAYS = 13
+
 
 def _long_ago():
     """Время, с которого молчание уже считается затянувшимся."""
-    return days_ago(GHOSTING_TIMEOUT_DAYS + 1)
+    return days_ago(_SILENT_DAYS)
 
 
 def _recently():
     """Время, с которого ждать ответа ещё рано."""
-    return days_ago(GHOSTING_TIMEOUT_DAYS - 1)
+    return days_ago(_STILL_WAITING_DAYS)
 
 
 async def test_a_long_silence_moves_the_vacancy(make_pipeline, session_factory):

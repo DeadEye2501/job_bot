@@ -15,6 +15,21 @@ from backend.payloads import PendingReply
 import asyncio
 
 
+def _outlasts_the_wait(started: asyncio.Event):
+    """Разбор, который начался и не кончится, — на нём проверяют оба срока.
+
+    Буфер он вынимает, как это делает настоящий разбор: иначе слив на
+    выключении застанет копилку непустой и позовёт разбор второй раз.
+    """
+
+    async def reading(pipeline, hr_id):
+        pipeline._dm_classify_buffer.pop(hr_id, None)
+        started.set()
+        await asyncio.Event().wait()
+
+    return reading
+
+
 async def test_stopping_puts_out_the_pending_timers(dm_pipeline):
     """Остановка гасит взведённые таймеры.
 
@@ -158,14 +173,9 @@ async def test_switching_off_lets_a_slow_reading_finish(monkeypatch, dm_pipeline
     dm_pipeline.DM_CLASSIFY_STOP_TIMEOUT_SEC = 0
     started = asyncio.Event()
 
-    async def outlasts_the_wait(pipeline, hr_id):
-        # Буфер вынимается, как это делает настоящий разбор: иначе слив на
-        # выключении застанет его непустым и позовёт разбор второй раз.
-        pipeline._dm_classify_buffer.pop(hr_id, None)
-        started.set()
-        await asyncio.Event().wait()
-
-    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", outlasts_the_wait)
+    monkeypatch.setattr(
+        dm_classify, "classify_and_apply_for_hr", _outlasts_the_wait(started)
+    )
     dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     await started.wait()
     running = next(iter(dm_pipeline._dm_classify_running))
@@ -193,14 +203,9 @@ async def test_shutting_down_cuts_off_a_reading_that_outstayed(
     dm_pipeline.DM_CLASSIFY_STOP_TIMEOUT_SEC = 0
     started = asyncio.Event()
 
-    async def outlasts_the_wait(pipeline, hr_id):
-        # Буфер вынимается, как это делает настоящий разбор: иначе слив на
-        # выключении застанет его непустым и позовёт разбор второй раз.
-        pipeline._dm_classify_buffer.pop(hr_id, None)
-        started.set()
-        await asyncio.Event().wait()
-
-    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", outlasts_the_wait)
+    monkeypatch.setattr(
+        dm_classify, "classify_and_apply_for_hr", _outlasts_the_wait(started)
+    )
     dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     await started.wait()
     running = next(iter(dm_pipeline._dm_classify_running))
