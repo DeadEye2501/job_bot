@@ -115,8 +115,10 @@ async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> bool:
     кешированный ``v.raw_text`` — см. :func:`_fetch_fresh_text`.
     Profile skills / blacklist тоже переподгружаются,
     чтобы юзер мог отредактировать их и сразу пере-оценить вакансии
-    под новые правила. Returns False если вакансии нет или у неё
-    пустой ``raw_text`` (и Telegram-фетч тоже ничего не дал).
+    под новые правила. Returns False если вакансии нет, у неё пустой
+    ``raw_text`` (и Telegram-фетч тоже ничего не дал) или спросить
+    модель не вышло: приговора в этом случае нет, и «готово» над
+    неизменившейся карточкой было бы неправдой.
     """
     origin = await _vacancy_origin(pipeline, vacancy_id)
     if origin is None:
@@ -133,10 +135,9 @@ async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> bool:
         logger.warning("rerun: vacancy %d has empty raw_text", vacancy_id)
         return False
     await pipeline._reload_resources()
-    await parse.parse_and_update_vacancy(pipeline, 
+    return await parse.parse_and_update_vacancy(pipeline,
         vacancy_id, text, channel_username, allow_delete=False
     )
-    return True
 
 
 async def _orphan_rows(pipeline) -> list:

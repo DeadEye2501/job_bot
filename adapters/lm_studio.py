@@ -117,12 +117,19 @@ def _answer_or_empty(
 ) -> ChatAnswer:
     """Ответ модели или отказ «пусто».
 
-    `null` вместо содержимого — ответ правильной формы, в котором модель не
-    сказала ничего. Разбирается проверкой, а не перехватом: `.strip()` у
-    пустоты дал бы `AttributeError`, который в ловушку зовущего не входит и
-    ушёл бы ему исключением вместо его отката.
+    Пусто здесь всё, из чего не выходит текста: `null`, содержимое блоками
+    (`"content": []` шлют провайдеры, совместимые с OpenAI наполовину) и
+    строка из одних пробелов — так отвечает рассуждающая модель, потратившая
+    весь предел токенов на размышление.
+
+    Первые две разбираются проверкой, а не перехватом: `.strip()` у них дал
+    бы `AttributeError`, который в ловушку зовущего не входит и ушёл бы ему
+    исключением вместо его отката. Третья опаснее двух первых именно тем,
+    что не падает: пустой текст доезжает до приговора зовущего и читается
+    как «в объявлении ничего нет», то есть отказ провайдера превращается в
+    приговор объявлению.
     """
-    if content is None:
+    if not isinstance(content, str) or not content.strip():
         log.warning("%s: провайдер ответил без содержимого", purpose)
         return ChatAnswer(error="empty_content")
     return ChatAnswer(text=content.strip(), finish_reason=finish_reason)
@@ -149,7 +156,7 @@ async def chat(
         choice = r.json()["choices"][0]
         content = choice["message"]["content"]
         finish_reason = choice.get("finish_reason")
-    except (IndexError, KeyError, ValueError) as e:
+    except (IndexError, KeyError, TypeError, ValueError) as e:
         log.warning("%s: ответ провайдера не разобрать: %s", request.purpose, e)
         return ChatAnswer(error=f"malformed_response: {e}")
     # Жалоба о пределе идёт до проверки на пустоту нарочно: так отвечает

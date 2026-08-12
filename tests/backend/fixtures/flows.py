@@ -81,7 +81,7 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
     """Подменяет разбор, проверку пригодности и отправку заготовленным."""
 
     async def parse_vacancy(text, client_, model, **kwargs):
-        return pipeline.parsed
+        return pipeline.parsed, pipeline.parse_refusal
 
     async def validate_vacancy_fit(parsed, text, client_, model, **kwargs):
         pipeline.validated = True
@@ -183,6 +183,7 @@ async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)
         remote="remote",
         location="Ереван",
     )
+    pipeline.parse_refusal = None
     pipeline.verdict = FitValidation(verdict="fit", reason=None)
     pipeline.validated = False
     pipeline.asked_to_send = []

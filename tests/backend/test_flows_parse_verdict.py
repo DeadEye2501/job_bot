@@ -47,6 +47,33 @@ async def test_an_empty_post_is_thrown_out_on_ingest(parsing, session_factory):
     assert mark.reason == "empty: no meaningful fields"
 
 
+async def test_a_vacancy_survives_a_provider_that_did_not_answer(
+    parsing, session_factory
+):
+    """Не ответивший провайдер объявление не выбрасывает.
+
+    Отказ модели и приговор «это не вакансия» — разные вещи, и удалять
+    строку имеет право только второй. Наблюдается это тем, что чужой
+    приговор из обстановки остался нетронутым: своего разбор не выносил,
+    а значит строку подберёт следующий заход.
+    """
+    pipeline, vacancy = parsing
+    pipeline.parsed = None
+    pipeline.parse_refusal = "empty_content"
+
+    done = await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=True
+    )
+
+    saved = await only_row(session_factory, Vacancy)
+    assert saved.id == vacancy.id
+    assert saved.is_parsed is False
+    # Чужой приговор из обстановки — на месте: своего разбор не выносил.
+    assert saved.skip_reason == "прошлый отказ"
+    assert await all_rows(session_factory, TrashEvent) == []
+    assert done is False
+
+
 async def test_an_empty_post_is_only_marked_on_a_rerun(parsing, session_factory):
     """Пустышка при повторном прогоне остаётся карточкой с пометкой.
 

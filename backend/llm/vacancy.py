@@ -293,6 +293,18 @@ def _without_channel_as_hr(
     return parsed
 
 
+def _log_parsed(parsed: ParsedVacancy) -> None:
+    logger.debug(
+        "parse_vacancy: title=%r company=%r hr=%s other=%s stack_req=%d stack_pref=%d",
+        parsed.title,
+        parsed.company_name,
+        parsed.hr_contact,
+        parsed.other_contact,
+        len(parsed.stack_required or []),
+        len(parsed.stack_preferred or []),
+    )
+
+
 async def parse_vacancy(
     text: str,
     client: httpx.AsyncClient,
@@ -300,9 +312,19 @@ async def parse_vacancy(
     channel_username: str | None = None,
     *,
     known_skills=None,
-) -> ParsedVacancy | None:
+) -> tuple[ParsedVacancy | None, str | None]:
+    """Разбор объявления либо причина, по которой спросить не вышло.
+
+    Причина отделена от пустого разбора нарочно: «модель ответила, а брать в
+    посте нечего» — приговор объявлению, «спросить не вышло» — не приговор
+    ничему. Что делать с этим различием, решает зовущий; здесь только не
+    схлопывается то, что схлопнуть потом уже нельзя.
+
+    Неразбираемый ответ причиной не считается: модель ответила, а сказала
+    несуразицу — это по-прежнему пустой разбор.
+    """
     if not text:
-        return None
+        return None, None
     text = text[:6000]
     logger.debug(
         "parse_vacancy: %d chars channel=@%s",
@@ -313,19 +335,11 @@ async def parse_vacancy(
         client, model, _parse_request(text, known_skills), logger
     )
     if reply.text is None:
-        return None
+        return None, reply.error
     parsed = _parse_vacancy_json(reply.text)
     if parsed is None:
         log_unparseable(reply.text, logger, "parse_vacancy")
-        return None
+        return None, None
     parsed = _without_channel_as_hr(parsed, channel_username)
-    logger.debug(
-        "parse_vacancy: title=%r company=%r hr=%s other=%s stack_req=%d stack_pref=%d",
-        parsed.title,
-        parsed.company_name,
-        parsed.hr_contact,
-        parsed.other_contact,
-        len(parsed.stack_required or []),
-        len(parsed.stack_preferred or []),
-    )
-    return parsed
+    _log_parsed(parsed)
+    return parsed, None

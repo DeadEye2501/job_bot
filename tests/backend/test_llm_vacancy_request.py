@@ -20,7 +20,7 @@ from tests.fakes.llm import (
     messages_of,
     parsed_vacancy_answer,
     provider,
-    provider_trouble,
+    provider_trouble_named,
 )
 
 
@@ -33,7 +33,7 @@ async def test_an_empty_post_is_not_sent_anywhere():
     """Пустой пост к модели не отправляется вовсе."""
     client = provider({})
 
-    assert await parse_vacancy("", client, "qwen") is None
+    assert await parse_vacancy("", client, "qwen") == (None, None)
     assert client.sent == []
 
 
@@ -41,26 +41,41 @@ async def test_a_parsed_vacancy_comes_back():
     """Разобранная вакансия возвращается наружу."""
     client = provider({CHAT: _parsed(company_name="Контур", salary="$3000")})
 
-    got = await parse_vacancy("текст вакансии", client, "qwen")
+    got, _ = await parse_vacancy("текст вакансии", client, "qwen")
 
     assert got.title == "Python-разработчик"
     assert got.company_name == "Контур"
     assert got.salary == "$3000"
 
 
-async def test_an_unparseable_answer_yields_nothing():
-    """Неразбираемый ответ вакансии не даёт."""
+async def test_an_unparseable_answer_yields_nothing_and_blames_nobody():
+    """Неразбираемый ответ вакансии не даёт, но отказом не считается.
+
+    Модель ответила — сказала несуразицу. Это пустой разбор, и приговор по
+    нему выносит зовущий на общих основаниях; назови это отказом, и пост,
+    который и правда не вакансия, остался бы в списке навсегда.
+    """
     client = provider({CHAT: chat_response("я не понял задание")})
 
-    assert await parse_vacancy("текст", client, "qwen") is None
+    assert await parse_vacancy("текст", client, "qwen") == (None, None)
 
 
-@pytest.mark.parametrize("prepared", provider_trouble())
-async def test_trouble_with_the_provider_yields_nothing(prepared):
-    """Беда с провайдером вакансии не даёт и наружу не пробрасывается."""
+@pytest.mark.parametrize("prepared, mark", provider_trouble_named())
+async def test_trouble_with_the_provider_comes_back_named(prepared, mark):
+    """Беда с провайдером наружу не пробрасывается, а называет себя.
+
+    Названная, она отличима от пустого разбора — и только по этому различию
+    зовущий решает, выбрасывать объявление или оставить его до следующего
+    захода. Метка при этом сверяется своя у каждой беды: с общим «хоть
+    что-нибудь» разбор беды по журналу опирался бы на строку, которую никто
+    не стережёт.
+    """
     client = provider({CHAT: prepared})
 
-    assert await parse_vacancy("текст", client, "qwen") is None
+    parsed, refusal = await parse_vacancy("текст", client, "qwen")
+
+    assert parsed is None
+    assert mark in refusal
 
 
 async def test_a_long_post_is_cut_from_the_end():
@@ -139,7 +154,7 @@ async def test_the_source_channel_is_not_taken_for_an_hr_contact(hr_contact):
     """
     client = provider({CHAT: _parsed(hr_contact=hr_contact)})
 
-    got = await parse_vacancy("текст", client, "qwen", channel_username="PyJobs")
+    got, _ = await parse_vacancy("текст", client, "qwen", channel_username="PyJobs")
 
     assert got.hr_contact is None
 
@@ -154,7 +169,7 @@ async def test_the_source_channel_is_recognised_through_the_second_domain():
     """
     client = provider({CHAT: _parsed(hr_contact="telegram.me/pyjobs")})
 
-    got = await parse_vacancy("текст", client, "qwen", channel_username="PyJobs")
+    got, _ = await parse_vacancy("текст", client, "qwen", channel_username="PyJobs")
 
     assert got.hr_contact is None
 
@@ -163,7 +178,7 @@ async def test_a_real_contact_survives():
     """Настоящий контакт HR остаётся на месте."""
     client = provider({CHAT: _parsed(hr_contact="@maria_hr")})
 
-    got = await parse_vacancy("текст", client, "qwen", channel_username="PyJobs")
+    got, _ = await parse_vacancy("текст", client, "qwen", channel_username="PyJobs")
 
     assert got.hr_contact == "@maria_hr"
 
@@ -176,7 +191,7 @@ async def test_without_a_known_channel_the_contact_is_left_alone():
     """
     client = provider({CHAT: _parsed(hr_contact="@pyjobs")})
 
-    got = await parse_vacancy("текст", client, "qwen")
+    got, _ = await parse_vacancy("текст", client, "qwen")
 
     assert got.hr_contact == "@pyjobs"
 
@@ -191,6 +206,6 @@ async def test_an_answer_cut_by_the_token_limit_is_still_parsed_if_it_can_be():
         {CHAT: chat_json(parsed_vacancy_answer(), finish_reason="length")}
     )
 
-    got = await parse_vacancy("текст", client, "qwen")
+    got, _ = await parse_vacancy("текст", client, "qwen")
 
     assert got.title == "Python-разработчик"
