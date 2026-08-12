@@ -358,3 +358,33 @@ async def test_an_answer_without_content_becomes_a_refusal_that_names_itself(cap
         for rec in caplog.records
         if rec.name == "tests.empty_content"
     ] == ["разбор ответа HR: провайдер ответил без содержимого"]
+
+
+async def test_an_empty_answer_that_hit_the_token_limit_names_the_limit_too(caplog):
+    """Пустой ответ, упёршийся в предел токенов, называет и предел.
+
+    Так отвечает модель, потратившая весь предел на размышление: содержимого
+    нет, а причина этому — упёршийся предел. Одной записи мало: она называет
+    симптом и молчит о причине, тогда как поднять предел — единственное, что
+    по этой беде вообще можно сделать.
+    """
+    client = provider({CHAT: chat_response(None, finish_reason="length")})
+    log = logging.getLogger("tests.empty_at_the_limit")
+
+    with caplog.at_level(logging.WARNING, logger="tests.empty_at_the_limit"):
+        answer = await chat(
+            client,
+            "qwen",
+            ChatRequest(purpose="разбор вакансии", messages=[], max_tokens=8),
+            log,
+        )
+
+    assert answer.error == "empty_content"
+    assert [
+        rec.getMessage()
+        for rec in caplog.records
+        if rec.name == "tests.empty_at_the_limit"
+    ] == [
+        "разбор вакансии: модель упёрлась в предел токенов, ответ может быть обрезан",
+        "разбор вакансии: провайдер ответил без содержимого",
+    ]
