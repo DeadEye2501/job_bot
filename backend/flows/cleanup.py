@@ -1,4 +1,13 @@
-"""Удаление вакансий и гашение по сроку молчания."""
+"""Удаление вакансии конвейером — вместе с её вектором в кэше.
+
+Дорога здесь одна: приговор «мусор» при разборе. Удаление по кнопке из окна
+идёт мимо, прямо в репозиторий, и кэш векторов за собой не чистит — это
+записано отдельным пунктом плана, `forget_vacancy` пока не зовёт никто, кроме
+тестов.
+
+Гашение по сроку молчания уехало соседом (`flows/ghosting.py`): вакансия там
+не пропадает, а меняет статус.
+"""
 
 import logging
 
@@ -7,41 +16,10 @@ from backend.repository.vacancies_life import delete_vacancy as repo_delete_vaca
 from backend.repository.vacancies_life import record_trash_event
 
 from backend.flows import embeddings
-from backend.notify import fire
 
 logger = logging.getLogger(__name__)
 
 _NO_TRASH_EVENT = object()
-
-
-async def check_ghosting_timeouts(pipeline) -> int:
-    """Сканирует Applied/In Progress вакансии и переводит в Ghosting
-    те, по которым HR молчит дольше GHOSTING_TIMEOUT_DAYS.
-
-    Дёргается из Bot.run loop'а раз в poll-tick (DM_ONLY и FULL —
-    в OFF не запускается, бот считается «на паузе»). Стоимость
-    низкая: только Applied/In Progress попадают в шорт-лист, и берётся
-    он одним заходом в базу — см. `vacancies_life._silence_candidates`.
-    """
-    from backend.domain.transitions import GHOSTING_TIMEOUT_DAYS
-    from backend.repository.vacancies_life import mark_ghosted_vacancies
-
-    try:
-        async with pipeline._session_factory() as session:
-            async with session.begin():
-                affected = await mark_ghosted_vacancies(
-                    session, timeout_days=GHOSTING_TIMEOUT_DAYS,
-                )
-    except Exception:
-        logger.exception("check_ghosting_timeouts failed")
-        return 0
-    if affected:
-        logger.info(
-            "ghosting timer: marked %d vacancies (ids=%s)",
-            len(affected), affected,
-        )
-        fire(pipeline.on_vacancies_changed, "on_vacancies_changed")
-    return len(affected)
 
 
 async def _delete_and_forget(
