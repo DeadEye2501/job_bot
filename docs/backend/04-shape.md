@@ -95,7 +95,7 @@
       `apply` 51, `channels` (50, 43), `dm.persist_outgoing_dm` 48, `ingest` 45
 - [x] **Ч. Бот и учётная запись:** `bot/chat.send_to_hr_media` 57,
       `telegram_login` (48, 45), `bot/slot` 42, `runtime_settings.set_tg` 42
-- [ ] **Ш. Модель и правила:** `llm/factcheck` 59, `llm/hallucination` 54,
+- [x] **Ш. Модель и правила:** `llm/factcheck` 59, `llm/hallucination` 54,
       `domain/scoring` 44, `llm/skills` 42
 
 **Заход Е закрыт 12.08.2026, и группы развёрнуты по его числам.** Пункт, который

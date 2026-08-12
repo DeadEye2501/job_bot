@@ -129,8 +129,8 @@ MUTATIONS = [
     # clean_stack_items: строка вместо списка перестаёт делиться запятой
     (
         "backend/llm/skills.py",
-        '        items: list = raw.split(",")',
-        "        items = []",
+        '        return raw.split(",")',
+        "        return []",
     ),
     # clean_stack_items: повторы перестают отсеиваться
     (
@@ -375,8 +375,8 @@ MUTATIONS = [
     # factcheck_cover_letter: замечаний берётся сколько прислали
     (
         "backend/llm/factcheck.py",
-        "    issues = [x for x in issues_raw if isinstance(x, str)][:3]",
-        "    issues = [x for x in issues_raw if isinstance(x, str)]",
+        '    issues = [x for x in (obj.get("issues") or []) if isinstance(x, str)][:3]',
+        '    issues = [x for x in (obj.get("issues") or []) if isinstance(x, str)]',
     ),
     # factcheck_cover_letter: незнакомый вердикт становится отказом
     (
