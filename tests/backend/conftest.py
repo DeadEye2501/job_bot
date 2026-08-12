@@ -6,6 +6,7 @@
 назван именем модуля, из которого она приехала.
 """
 
+from tests.backend.fixtures.backfill import known_hr
 from tests.backend.fixtures.bot import (
     busy_slot,
     chatting,
@@ -34,6 +35,7 @@ __all__ = [
     "dm_pipeline",
     "empty_media_dir",
     "hr_names",
+    "known_hr",
     "make_bot",
     "make_pipeline",
     "outbox",

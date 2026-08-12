@@ -4,60 +4,22 @@
 отвечает с телефона. Догон вытягивает у Telegram хвост переписки и в обе
 стороны — иначе в окне видна половина разговора, а вторая только на телефоне.
 
-Заодно сверяется удалённое. Telegram не переигрывает пропущенные оповещения об
-удалении после переподключения, поэтому строка, попадающая в вытянутое окно, но
-отсутствующая в ответе Telegram, метится удалённой здесь.
-
 Порядок обратный: Telegram отдаёт свежее первым, а в переписку надо класть
 старое первым, иначе лента окна перевернётся.
+
+Сверка удалённого — предмет соседнего файла, `test_flows_backfill_deletes.py`.
 """
 
 import logging
 
-import pytest
 from pyrogram.errors import FloodWait, PeerIdInvalid
 
 from backend.flows.dm_backfill import backfill_hr_dm_history
 from backend.models import HR, Message
+from tests.backend.fixtures.backfill import catch_up as _catch_up, ours as _ours, theirs as _theirs
 from tests.dbio import all_rows, only_row, put
 from tests.factories import hr_row, message_row
-from tests.fakes.telegram import (
-    FakeTelegramClient,
-    incoming,
-    outgoing,
-    photo,
-)
-
-
-def _theirs(msg_id, text):
-    """Сообщение от собеседника."""
-    return incoming(id=msg_id, text=text, outgoing=False)
-
-
-def _ours(msg_id, text, *, photo=None):
-    """Своё сообщение, отправленное из другого клиента."""
-    return outgoing(id=msg_id, text=text, photo=photo)
-
-
-async def _catch_up(client, hr, session_factory, **kwargs):
-    """Догоняет переписку с одним HR."""
-    await backfill_hr_dm_history(
-        client,
-        hr,
-        None,
-        "qwen",
-        session_factory,
-        backfill_limit=50,
-        schedule_classification=lambda *args: None,
-        **kwargs,
-    )
-
-
-@pytest.fixture
-async def known_hr(session_factory):
-    """Сохранённый HR с номером собеседника."""
-    await put(session_factory, hr_row(telegram_user_id=777))
-    return await only_row(session_factory, HR)
+from tests.fakes.telegram import FakeTelegramClient, photo
 
 
 async def test_the_missed_conversation_lands_in_the_chat(
@@ -172,73 +134,6 @@ async def test_nothing_but_duplicates_means_the_window_is_not_told(
 
     assert heard == []
 
-
-async def test_a_message_deleted_while_offline_is_tombstoned(
-    known_hr, session_factory
-):
-    """Удалённое, пока приложение было закрыто, метится удалённым.
-
-    Telegram оповещения об удалении после переподключения не
-    переигрывает: строка, попавшая в вытянутое окно, но отсутствующая в
-    ответе, — и есть удалённая.
-    """
-    await put(
-        session_factory,
-        message_row(
-            hr_id=known_hr.id, is_incoming=True, tg_message_id=11, text="стёрли"
-        ),
-    )
-    client = FakeTelegramClient()
-    client.history = [_theirs(12, "осталось"), _theirs(10, "тоже осталось")]
-
-    await _catch_up(client, known_hr, session_factory)
-
-    by_id = {m.tg_message_id: m for m in await all_rows(session_factory, Message)}
-    assert by_id[11].is_deleted is True
-    assert by_id[11].read_at is not None
-    assert by_id[10].is_deleted is False
-
-
-async def test_a_message_older_than_the_window_is_left_alone(
-    known_hr, session_factory
-):
-    """Строка старше вытянутого окна удалённой не метится.
-
-    Её в ответе нет просто потому, что окно до неё не достало, а не
-    потому, что её стёрли.
-    """
-    await put(
-        session_factory,
-        message_row(
-            hr_id=known_hr.id, is_incoming=True, tg_message_id=5, text="давнее"
-        ),
-    )
-    client = FakeTelegramClient()
-    client.history = [_theirs(10, "свежее")]
-
-    await _catch_up(client, known_hr, session_factory)
-
-    by_id = {m.tg_message_id: m for m in await all_rows(session_factory, Message)}
-    assert by_id[5].is_deleted is False
-
-
-async def test_an_empty_history_tombstones_nothing(known_hr, session_factory):
-    """Пустой ответ Telegram ничего не метит удалённым.
-
-    Пустым он бывает и когда переписка недоступна; принять это за
-    удаление значило бы разом похоронить весь разговор.
-    """
-    await put(
-        session_factory,
-        message_row(
-            hr_id=known_hr.id, is_incoming=True, tg_message_id=10, text="цело"
-        ),
-    )
-    client = FakeTelegramClient()
-
-    await _catch_up(client, known_hr, session_factory)
-
-    assert (await only_row(session_factory, Message)).is_deleted is False
 
 
 async def test_an_unknown_peer_is_resolved_by_name(session_factory):

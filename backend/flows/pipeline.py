@@ -245,14 +245,14 @@ class IngestionPipeline:
     async def refresh_channel_metadata_for_ids(self, channel_ids) -> None:
         return await channels.refresh_channel_metadata_for_ids(self, channel_ids)
 
-    def update_dm_buffer_text(self, hr_id, msg_id, new_text) -> None:
-        return dm_classify.update_dm_buffer_text(self, hr_id, msg_id, new_text)
+    def update_dm_buffer_text(self, hr_id, tg_msg_id, new_text) -> None:
+        return dm_classify.update_dm_buffer_text(self, hr_id, tg_msg_id, new_text)
 
-    def remove_dm_buffer_msg(self, hr_id, msg_id) -> None:
-        return dm_classify.remove_dm_buffer_msg(self, hr_id, msg_id)
+    def remove_dm_buffer_msg(self, hr_id, tg_msg_id) -> None:
+        return dm_classify.remove_dm_buffer_msg(self, hr_id, tg_msg_id)
 
-    def schedule_dm_classification(self, hr_id, vacancy_id, msg_id, text) -> None:
-        return dm_classify.schedule_dm_classification(self, hr_id, vacancy_id, msg_id, text)
+    def schedule_dm_classification(self, hr_id, reply) -> None:
+        return dm_classify.schedule_dm_classification(self, hr_id, reply)
 
     async def cancel_pending_dm_classifications(self, *, drain=False) -> None:
         return await dm_classify.cancel_pending_dm_classifications(self, drain=drain)

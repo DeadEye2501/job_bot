@@ -14,7 +14,7 @@
 import logging
 
 from backend.models import HR, Message, Vacancy, VacancyStatus
-from backend.payloads import Classification
+from backend.payloads import Classification, PendingReply
 from backend.repository.messages import save_incoming_message
 from backend.repository.vacancies_life import delete_vacancy
 from tests.dbio import all_rows, only_row, put
@@ -131,8 +131,16 @@ async def test_a_letter_is_handed_to_the_buffer_when_there_is_one(session_factor
 
     Так собираются очереди: HR пишет тремя строками подряд, и разбор
     ждёт, пока он замолчит.
+
+    Прежнее письмо в переписке лежит затем, чтобы номер строки не совпал с
+    номером вакансии: совпади они, перестановка первых двух полей груза
+    прошла бы молча — числа-то оба целые.
     """
     hr, by_title = await _two_vacancies(session_factory)
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, is_incoming=True, tg_message_id=1, text="раньше"),
+    )
     scheduled: list[tuple] = []
 
     await deliver(
@@ -140,8 +148,19 @@ async def test_a_letter_is_handed_to_the_buffer_when_there_is_one(session_factor
         schedule=lambda *args: scheduled.append(args),
     )
 
-    saved = await only_row(session_factory, Message)
-    assert scheduled == [(hr.id, by_title["свежая"].id, saved.id, "да, давайте")]
+    saved = (await all_rows(session_factory, Message))[-1]
+    assert saved.id != by_title["свежая"].id
+    assert scheduled == [
+        (
+            hr.id,
+            PendingReply(
+                vacancy_id=by_title["свежая"].id,
+                message_id=saved.id,
+                tg_message_id=saved.tg_message_id,
+                text="да, давайте",
+            ),
+        )
+    ]
 
 
 async def test_a_vacancy_beyond_automation_reaches_no_reader(session_factory, deliver):
@@ -305,4 +324,4 @@ async def test_the_quote_of_our_own_letter_does_not_go_to_the_reader(session_fac
 
     saved = await only_row(session_factory, Message)
     assert saved.text.startswith("↪ Откликаюсь на вакансию")
-    assert scheduled[0][3] == "да, давайте"
+    assert scheduled[0][1].text == "да, давайте"

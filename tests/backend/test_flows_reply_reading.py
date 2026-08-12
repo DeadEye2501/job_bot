@@ -63,7 +63,12 @@ async def reading(make_pipeline, session_factory, monkeypatch):
 def _buffer(pipeline, hr, vacancy, message, *texts):
     """Кладёт в накопитель пакет от собеседника."""
     pipeline._dm_classify_buffer[hr.id] = [
-        {"vacancy_id": vacancy.id, "msg_id": message.id, "text": text}
+        {
+            "vacancy_id": vacancy.id,
+            "msg_id": message.id,
+            "tg_msg_id": message.tg_message_id,
+            "text": text,
+        }
         for text in texts
     ]
 
@@ -276,8 +281,18 @@ async def test_the_verdict_lands_on_the_vacancy_of_the_last_message(
         v for v in await all_rows(session_factory, Vacancy) if v.title == "вторая"
     )
     pipeline._dm_classify_buffer[hr.id] = [
-        {"vacancy_id": vacancy.id, "msg_id": message_row_.id, "text": "про первую"},
-        {"vacancy_id": second.id, "msg_id": message_row_.id, "text": "и про вторую"},
+        {
+            "vacancy_id": vacancy.id,
+            "msg_id": message_row_.id,
+            "tg_msg_id": message_row_.tg_message_id,
+            "text": "про первую",
+        },
+        {
+            "vacancy_id": second.id,
+            "msg_id": message_row_.id,
+            "tg_msg_id": message_row_.tg_message_id,
+            "text": "и про вторую",
+        },
     ]
 
     await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)

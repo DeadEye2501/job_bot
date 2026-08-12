@@ -101,6 +101,24 @@ class IncomingMessage:
 
 
 @dataclass(frozen=True)
+class PendingReply:
+    """Письмо HR, ждущее отложенного разбора.
+
+    Номера у письма два, и нужны оба. По номеру строки записывается вердикт:
+    на него ссылается история статуса вакансии. По номеру Telegram письмо
+    находят правка и удаление — оповещения о них другого номера не знают.
+
+    Сведи их в один, и разойдутся они молча: правка уйдёт в пустоту, и модель
+    разберёт текст, которого HR уже не писал, а удалённое письмо из копилки
+    не выпадет и продолжит двигать статус вакансии.
+    """
+    vacancy_id: int
+    message_id: int
+    tg_message_id: int
+    text: str
+
+
+@dataclass(frozen=True)
 class Classification:
     status: VacancyStatus
     explanation: str | None

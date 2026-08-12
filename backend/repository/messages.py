@@ -159,6 +159,25 @@ async def hr_ids_of_live_messages(session: AsyncSession, *where) -> set[int]:
     return {hr_id for (hr_id,) in rows}
 
 
+async def newest_tg_message_id(session: AsyncSession, hr_id: int) -> int:
+    """Наибольший номер Telegram, что у нас есть по этому человеку, или ноль.
+
+    Отметка снимается перед догоном и служит верхней границей сверки
+    удалённого: всё, что появилось выше неё, пришло уже во время прохода, а
+    значит отсутствует в ответе Telegram не потому, что стёрто.
+
+    Обе стороны переписки, в отличие от соседней отметки в
+    `hr_list.list_open_hr_chats`: та говорит догону, с какого места читать, и
+    считает поэтому одни входящие. Удаляют же и своё.
+    """
+    newest = (
+        await session.scalars(
+            select(func.max(Message.tg_message_id)).where(Message.hr_id == hr_id)
+        )
+    ).first()
+    return newest or 0
+
+
 async def tombstone_messages(session: AsyncSession, *where) -> int:
     """Поставить надгробия отобранным строкам; сколько поставили.
 

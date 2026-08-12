@@ -12,7 +12,7 @@ from backend.message_text import extract_dm_text
 from backend.message_text import extract_text
 from backend.telegram_lookup import fetch_telegram_avatar
 from backend.flows.dm_classify import classify_and_apply
-from backend.payloads import IncomingMessage, OutgoingMessage
+from backend.payloads import IncomingMessage, OutgoingMessage, PendingReply
 from backend.repository.hr_identify import find_known_hr
 from backend.repository.hr_identify import find_latest_vacancy_id_for_hr
 from backend.repository.hr_identify import refresh_hr_from_telegram
@@ -271,7 +271,8 @@ async def process_dm(
     # без него — на месте.
     classify_text = extract_text(msg)
     if schedule_classification is not None:
-        schedule_classification(hr_lookup.id, vacancy_id, new_msg_id, classify_text)
+        reply = PendingReply(vacancy_id, new_msg_id, msg.id, classify_text)
+        schedule_classification(hr_lookup.id, reply)
         return
 
     await classify_and_apply(

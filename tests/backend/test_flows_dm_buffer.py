@@ -14,6 +14,8 @@ import asyncio
 
 import pytest
 
+from backend.payloads import PendingReply
+
 
 def _texts(pipeline, hr_id):
     """Тексты, накопленные для собеседника."""
@@ -23,7 +25,7 @@ def _texts(pipeline, hr_id):
 async def test_a_message_waits_in_the_buffer_before_being_read(dm_pipeline):
     """Сообщение сперва ложится в накопитель, а не разбирается сразу."""
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
 
     assert _texts(dm_pipeline, 7) == ["привет"]
     assert dm_pipeline.classified == []
@@ -36,9 +38,9 @@ async def test_a_burst_is_read_as_one_whole(dm_pipeline):
     двигали бы статус вакансии по неполному тексту.
     """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 0
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
-    dm_pipeline.schedule_dm_classification(7, 1, 11, "посмотрел резюме")
-    dm_pipeline.schedule_dm_classification(7, 1, 12, "давайте созвонимся")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 11, 11, "посмотрел резюме"))
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 12, 12, "давайте созвонимся"))
     await asyncio.sleep(0.05)
 
     assert len(dm_pipeline.classified) == 1
@@ -58,9 +60,9 @@ async def test_a_new_message_pushes_the_reading_back(dm_pipeline):
     каждой — и статус вакансии прыгал бы по полуфразам.
     """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 0.06
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     await asyncio.sleep(0.02)
-    dm_pipeline.schedule_dm_classification(7, 1, 11, "и ещё")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 11, 11, "и ещё"))
     await asyncio.sleep(0.03)
 
     assert dm_pipeline.classified == []
@@ -80,9 +82,9 @@ async def test_the_reading_waits_out_the_last_message_and_not_the_first(dm_pipel
     перевзвод отсчёта на каждом новом сообщении.
     """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 0.3
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     await asyncio.sleep(0.2)
-    dm_pipeline.schedule_dm_classification(7, 1, 11, "и ещё")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 11, 11, "и ещё"))
 
     await asyncio.sleep(0.2)
 
@@ -92,8 +94,8 @@ async def test_the_reading_waits_out_the_last_message_and_not_the_first(dm_pipel
 async def test_two_correspondents_are_read_apart(dm_pipeline):
     """Два собеседника разбираются порознь: у каждого свой накопитель."""
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 0
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "от первого")
-    dm_pipeline.schedule_dm_classification(8, 2, 20, "от второго")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "от первого"))
+    dm_pipeline.schedule_dm_classification(8, PendingReply(2, 20, 20, "от второго"))
     await asyncio.sleep(0.05)
 
     assert sorted(hr_id for hr_id, _ in dm_pipeline.classified) == [7, 8]
@@ -106,7 +108,7 @@ async def test_a_message_without_text_is_not_buffered(dm_pipeline):
     лежит и в переписке видно.
     """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, ""))
 
     assert 7 not in dm_pipeline._dm_classify_buffer
     assert 7 not in dm_pipeline._dm_classify_tasks
@@ -120,7 +122,7 @@ async def test_a_stopping_bot_buffers_nothing(dm_pipeline):
     """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
     dm_pipeline.mark_shutting_down()
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
 
     assert 7 not in dm_pipeline._dm_classify_buffer
 
@@ -134,7 +136,9 @@ async def test_an_overlong_burst_keeps_only_its_tail(dm_pipeline):
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
     cap = dm_pipeline.DM_CLASSIFY_BUFFER_CAP
     for number in range(cap + 3):
-        dm_pipeline.schedule_dm_classification(7, 1, number, f"строка {number}")
+        dm_pipeline.schedule_dm_classification(
+            7, PendingReply(1, number, number, f"строка {number}")
+        )
 
     kept = _texts(dm_pipeline, 7)
     assert len(kept) == cap
@@ -143,10 +147,17 @@ async def test_an_overlong_burst_keeps_only_its_tail(dm_pipeline):
 
 
 async def test_an_edited_message_is_updated_in_place(dm_pipeline):
-    """Правка меняет текст в накопителе, не трогая порядок и соседей."""
+    """Правка меняет текст в накопителе, не трогая порядок и соседей.
+
+    Ищется письмо по номеру Telegram: оповещение о правке приходит оттуда и
+    другого номера не знает. Номера здесь потому и разведены — с одним и тем
+    же числом в обоих проверка прошла бы и при поиске по номеру строки базы,
+    то есть не стерегла бы ничего: правка уходила бы в пустоту, а модель
+    разбирала текст, которого HR уже не писал.
+    """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "первое")
-    dm_pipeline.schedule_dm_classification(7, 1, 11, "второе")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 500, 10, "первое"))
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 501, 11, "второе"))
 
     dm_pipeline.update_dm_buffer_text(7, 10, "первое, исправленное")
 
@@ -160,7 +171,7 @@ async def test_an_edit_emptied_to_nothing_leaves_an_empty_string(dm_pipeline):
     уронило бы склейку на первом же таком сообщении.
     """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "первое")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "первое"))
 
     dm_pipeline.update_dm_buffer_text(7, 10, None)
 
@@ -179,7 +190,7 @@ async def test_an_edit_of_something_not_buffered_changes_nothing(
 ):
     """Правка того, чего в накопителе нет, ничего не меняет и не падает."""
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "первое")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "первое"))
 
     dm_pipeline.update_dm_buffer_text(hr_id, msg_id, "мимо")
 
@@ -191,10 +202,14 @@ async def test_a_deleted_message_leaves_the_buffer(dm_pipeline):
 
     Учитывать в решении то, что собеседник забрал назад, — прямой путь к
     неверному статусу вакансии.
+
+    Номера разведены по той же причине, что и у правки: оповещение об
+    удалении знает только номер Telegram. Уцелевший сосед в проверке не для
+    красоты — он отличает «выбыло нужное» от «стёрлось всё разом».
     """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "первое")
-    dm_pipeline.schedule_dm_classification(7, 1, 11, "второе")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 500, 10, "первое"))
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 501, 11, "второе"))
 
     dm_pipeline.remove_dm_buffer_msg(7, 10)
 
@@ -208,7 +223,7 @@ async def test_removing_the_last_message_drops_the_buffer_itself(dm_pipeline):
     с пустым пакетом.
     """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "единственное")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "единственное"))
 
     dm_pipeline.remove_dm_buffer_msg(7, 10)
 
@@ -227,7 +242,7 @@ async def test_removing_something_not_buffered_changes_nothing(
 ):
     """Удаление того, чего в накопителе нет, ничего не меняет и не падает."""
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "первое")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "первое"))
 
     dm_pipeline.remove_dm_buffer_msg(hr_id, msg_id)
 
