@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 import adapters.telegram
-from adapters.telegram import check, make_client, send_dm
+from adapters.telegram import make_client, send_dm
 from backend.runtime_settings import TgAccountConfig
 from tests.fakes.telegram import FakeTelegramClient
 from config import get_data_dir
@@ -102,21 +102,6 @@ def test_the_client_waits_out_short_rate_limits_itself(account):
     переписок пачками, и каждый такой пик выходил бы наружу ошибкой.
     """
     assert make_client(account).sleep_threshold == 60
-
-
-async def test_the_check_asks_who_we_are(sending_unlocked):
-    """Проверка соединения спрашивает у Telegram, кто мы.
-
-    Ответ показывают в настройках: без имени учётной записи «подключение
-    есть» не отличить от заглушки.
-    """
-    client = FakeTelegramClient()
-
-    assert await check(client) is client.me
-    # Вопрос должен быть задан, а не отвечен из памяти: у настоящего клиента
-    # это поле до входа пусто, а после обрыва связи устаревает — и в
-    # настройках «подключение есть» показалось бы по стухшему ответу.
-    assert client.lifecycle == ["кто я"]
 
 
 async def test_a_message_goes_out_and_its_number_comes_back(sending_unlocked):

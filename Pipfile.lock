@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "869bbe8c6d2eac48e02d65e7b62d87de3522ad6385ddcf105e79e108b9c364cf"
+            "sha256": "6eb7955cd1aba9d9a99726258ca1cf63b5f174a00734f02ce394aed5e781950a"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -352,14 +352,6 @@
             "markers": "python_version >= '3.10'",
             "version": "==1.4.1"
         },
-        "markdown-it-py": {
-            "hashes": [
-                "sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49",
-                "sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a"
-            ],
-            "markers": "python_version >= '3.10'",
-            "version": "==4.2.0"
-        },
         "markupsafe": {
             "hashes": [
                 "sha256:0303439a41979d9e74d18ff5e2dd8c43ed6c6001fd40e5bf2e43f7bd9bbc523f",
@@ -454,14 +446,6 @@
             ],
             "markers": "python_version >= '3.9'",
             "version": "==3.0.3"
-        },
-        "mdurl": {
-            "hashes": [
-                "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8",
-                "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"
-            ],
-            "markers": "python_version >= '3.7'",
-            "version": "==0.1.2"
         },
         "more-itertools": {
             "hashes": [
@@ -564,14 +548,6 @@
             "markers": "python_version >= '3.10'",
             "version": "==3.0"
         },
-        "pygments": {
-            "hashes": [
-                "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f",
-                "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176"
-            ],
-            "markers": "python_version >= '3.9'",
-            "version": "==2.20.0"
-        },
         "pypdf": {
             "hashes": [
                 "sha256:7d09ce108eff6bf67465d461b6ef352dcb8d84f7a91befc02f904455c6eea11d",
@@ -640,15 +616,6 @@
             ],
             "markers": "python_version >= '3.6'",
             "version": "==0.2.3"
-        },
-        "rich": {
-            "hashes": [
-                "sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb",
-                "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36"
-            ],
-            "index": "pypi",
-            "markers": "python_full_version >= '3.9.0'",
-            "version": "==15.0.0"
         },
         "shiboken6": {
             "hashes": [

@@ -52,7 +52,6 @@ _GENERIC_HALLUCINATION_MARKERS: tuple[tuple[re.Pattern[str], re.Pattern[str]], .
 # естественно скопирует формулировку «не готов / не рассматриваю» из
 # {FREE_PREFERENCES}.
 _REASON_STYLE_VIOLATIONS: tuple[re.Pattern[str], ...] = (
-    # === RU ===
     # «у кандидата только B1», «у кандидата лишь middle» и т.п. — явное
     # перетягивание данных кандидата в reason
     re.compile(
@@ -84,7 +83,8 @@ _REASON_STYLE_VIOLATIONS: tuple[re.Pattern[str], ...] = (
         re.IGNORECASE,
     ),
 
-    # === EN === (для англоязычных reason'ов; иначе safety-net молча отключается)
+    # То же по-английски: модель отвечает на языке вакансии, и без этих
+    # образцов заслон на англоязычном отказе молча выключался бы целиком.
     # «candidate has only B1», «candidate only has middle», «candidate has just A2»
     re.compile(
         r"\bcandidate\s+(only\s+has|has\s+only|has\s+just|only\s+speaks|"

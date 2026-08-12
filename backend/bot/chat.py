@@ -97,7 +97,7 @@ async def _persist_outgoing(bot, outgoing: OutgoingMessage) -> Message:
 
 
 async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
-    """Send a chat message to an HR from the Contacts/HR pane (slice 5).
+    """Send a chat message to an HR from the Contacts/HR pane.
 
     Returns the persisted Message row. Raises ``RuntimeError`` for any
     failure mode the UI can usefully surface — мост показывает текст

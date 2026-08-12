@@ -1,7 +1,7 @@
 """Database engine helpers (SQLite via aiosqlite)."""
 import json
 
-from sqlalchemy import event, text
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 
@@ -59,11 +59,3 @@ def _lower(value: object) -> object:
     колонки, — а ходят сегодня только они.
     """
     return value.lower() if isinstance(value, str) else value
-
-
-async def check(engine: AsyncEngine) -> str:
-    async with engine.connect() as conn:
-        version = (
-            await conn.execute(text("SELECT sqlite_version()"))
-        ).scalar_one()
-    return f"SQLite {version}"

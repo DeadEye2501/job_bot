@@ -13,7 +13,7 @@ SQLite по умолчанию внешние ключи не стережёт, 
 import pytest
 from sqlalchemy import text
 
-from adapters.db import check, make_engine
+from adapters.db import make_engine
 
 
 @pytest.fixture
@@ -91,15 +91,3 @@ async def test_every_connection_folds_cyrillic_case(engine_on_disk):
             ]
 
     assert folded == ["ж", "ж"]
-
-
-async def test_the_check_names_the_engine_and_its_version(engine_on_disk):
-    """Проверка соединения называет движок и его версию.
-
-    Её ответ показывают пользователю в настройках: «подключение есть» без
-    подробностей не отличить от заглушки.
-    """
-    answer = await check(engine_on_disk)
-
-    assert answer.startswith("SQLite ")
-    assert answer.split()[1][0].isdigit()

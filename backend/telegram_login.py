@@ -24,7 +24,7 @@ from pyrogram.errors import (
     SessionPasswordNeeded,
 )
 
-from backend.runtime_settings import _mask_phone
+from backend.runtime_settings import mask_phone
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +193,7 @@ class TelegramLogin:
             self._client = new_client
             self._phone_code_hash = sent.phone_code_hash
             return LoginStep(
-                payload={"message": f"Код отправлен в Telegram на {_mask_phone(phone)}."}
+                payload={"message": f"Код отправлен в Telegram на {mask_phone(phone)}."}
             )
         except PhoneNumberInvalid:
             return await self._failed(new_client, "Неверный номер телефона.")
@@ -289,7 +289,7 @@ class TelegramLogin:
             "Telegram session saved (session=%s, api_id=%s, phone=%s)",
             self._session_name,
             creds["api_id"],
-            _mask_phone(creds.get("phone")),
+            mask_phone(creds.get("phone")),
         )
         if self._on_saved is not None:
             self._on_saved(username)

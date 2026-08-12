@@ -8,7 +8,7 @@ from backend.runtime_settings import (
     LlmProviderConfig,
     RuntimeSettings,
     TgAccountConfig,
-    _mask_phone,
+    mask_phone,
 )
 
 
@@ -24,14 +24,14 @@ from backend.runtime_settings import (
 )
 def test_a_phone_shows_only_its_last_four_digits(raw, expected):
     """В журнал попадают только последние четыре цифры, короткое — целиком скрыто."""
-    assert _mask_phone(raw) == expected
+    assert mask_phone(raw) == expected
 
 
 async def test_the_saved_phone_reaches_the_log_masked(session_factory, caplog):
     """Записанный номер попадает в журнал только хвостом, а не целиком.
 
     Сокрытие проверено у самого помощника, но помощника можно и не позвать:
-    замени `_mask_phone(phone)` на `phone` в записи об обновлении учётных
+    замени `mask_phone(phone)` на `phone` в записи об обновлении учётных
     данных — и мобильный уедет в журнал открытым текстом, а весь набор
     останется зелёным.
     """

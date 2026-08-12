@@ -3,7 +3,7 @@
 Запасной путь: `mutmut 3.7.0` на Windows отказывается запускаться вообще —
 `mutmut --help` и `mutmut run` падают с "To run mutmut on Windows, please
 use the WSL" ещё до разбора аргументов. `mutmut 2.4.5` стартует в
-одноразовом окружении (см. task-6-report.md) — решение по нему отдельное.
+одноразовом окружении — решение по нему отдельное.
 Ломает не наугад: список поломок задаётся руками и содержит то, что легко
 испортить случайно — снятый флаг, перевёрнутое сравнение, перепутанный
 ключ, суженный диапазон.
@@ -208,7 +208,7 @@ def files_match_snapshots(snapshots: dict[str, bytes]) -> bool:
 def main() -> int:
     if len(sys.argv) != 3:
         print("нужно два довода: путь к тестам и имя набора поломок")
-        print("например: python tools/mutate.py tests/backend/test_usernames.py usernames")
+        print("например: python tools/mutate.py tests/backend/test_bot_dry_run.py hr")
         return 5
     test_path, set_name = sys.argv[1], sys.argv[2]
 
