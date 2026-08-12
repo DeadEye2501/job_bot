@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.funnel import APPLIED, FIT_EXCLUDE, RESPONDED
+from backend.domain.funnel import APPLIED, FIT_EXCLUDE, RESPONDED, percent_or_none
 from backend.models import TelegramChannel, TrashEvent, Vacancy
 from backend.payloads import ChannelDetail, ChannelStats, ChannelWithCount
 
@@ -146,12 +146,6 @@ async def list_telegram_channels(
 _CHANNEL_RATE_WINDOW_DAYS = 30
 
 
-def _percent_or_none(numerator: int, denominator: int) -> int | None:
-    if denominator <= 0:
-        return None
-    return int(round(numerator / denominator * 100))
-
-
 async def _vacancies_per_day(session: AsyncSession, channel_id: int) -> float:
     """Сколько вакансий в день канал приносит в последнем окне.
 
@@ -201,9 +195,9 @@ async def _channel_stats(
         },
         total=total,
         vacancies_per_day=per_day,
-        fit_percent=_percent_or_none(fit_total, total),
-        apply_percent=_percent_or_none(applied_total, fit_total),
-        response_percent=_percent_or_none(responded_total, applied_total),
+        fit_percent=percent_or_none(fit_total, total),
+        apply_percent=percent_or_none(applied_total, fit_total),
+        response_percent=percent_or_none(responded_total, applied_total),
     )
 
 

@@ -4,12 +4,12 @@
 развёрткой словаря, и переименованный ключ роняет форму у пользователя,
 ничего не записав. Отсюда цели на сами ключи, а не только на правила.
 
-Где поломка захватывает конец строки, перевод берётся из `EOL`. В хранилище
+Где поломка захватывает конец строки, перевод берётся из `CRLF`. В хранилище
 этот файл лежит с переводами в один знак, а в рабочем дереве — в два: их
 ставит сам git при выгрузке, и набор читает именно дерево.
 """
 
-EOL = "\r\n"
+CRLF = "\r\n"
 
 MUTATIONS = [
     # read_new_hr_fields: ник не разбирается и едет в колонку как введён
@@ -39,9 +39,9 @@ MUTATIONS = [
     # read_company_spellings: написания списком перестают читаться
     (
         "client/form_payloads.py",
-        "    elif not isinstance(raw, list):" + EOL
-        + "        raw = []" + EOL,
-        "    else:" + EOL + "        raw = []" + EOL,
+        "    elif not isinstance(raw, list):" + CRLF
+        + "        raw = []" + CRLF,
+        "    else:" + CRLF + "        raw = []" + CRLF,
     ),
     # read_company_spellings: пустое написание попадает в перечень
     (
@@ -58,7 +58,7 @@ MUTATIONS = [
     # none_if_empty: пробельная строка перестаёт считаться отсутствием
     (
         "client/form_payloads.py",
-        "    text = str(value).strip()" + EOL,
-        "    text = str(value)" + EOL,
+        "    text = str(value).strip()" + CRLF,
+        "    text = str(value)" + CRLF,
     ),
 ]
