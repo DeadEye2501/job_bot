@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.telegram_identity import typed_username
 from backend.models import Company, HR, Message, Vacancy
-from backend.payloads import HrDetail
+from backend.payloads import HrDetail, text_or_none
 
 from backend.repository.blacklist_marks import (
     active_blacklist_value,
@@ -65,7 +65,7 @@ async def update_hr_fields(
         return False
     changed = []
     if name is not _HR_FIELD_UNSET:
-        hr.name = (str(name).strip() or None) if name is not None else None
+        hr.name = text_or_none(name)
         changed.append("name")
     if telegram_username is not _HR_FIELD_UNSET:
         hr.telegram_username = (
@@ -73,7 +73,7 @@ async def update_hr_fields(
         )
         changed.append("telegram_username")
     if notes is not _HR_FIELD_UNSET:
-        hr.notes = (str(notes).strip() or None) if notes is not None else None
+        hr.notes = text_or_none(notes)
         changed.append("notes")
     await session.flush()
     if changed:

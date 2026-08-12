@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.spellings import dedupe_first_wins
 from backend.models import Company, Vacancy
-from backend.payloads import CompanyDetail, str_list
+from backend.payloads import CompanyDetail, str_list, text_or_none
 
 from backend.repository.blacklist_marks import (
     active_blacklist_value,
@@ -154,17 +154,13 @@ async def update_company_fields(
         co.name = cleaned
         changed.append("name")
     if website is not _COMPANY_FIELD_UNSET:
-        co.website = (
-            (str(website).strip() or None) if website is not None else None
-        )
+        co.website = text_or_none(website)
         changed.append("website")
     if aliases is not _COMPANY_FIELD_UNSET:
         _set_aliases(co, aliases)
         changed.append("aliases")
     if notes is not _COMPANY_FIELD_UNSET:
-        co.notes = (
-            (str(notes).strip() or None) if notes is not None else None
-        )
+        co.notes = text_or_none(notes)
         changed.append("notes")
     await session.flush()
     if changed:

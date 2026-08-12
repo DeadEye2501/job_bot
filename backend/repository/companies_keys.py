@@ -8,6 +8,8 @@
 
 import re
 
+from backend.payloads import text_or_none
+
 
 # Минимальная транслитерация русского кириллического алфавита в латиницу
 # для дедупа имён вида «МТС» / «MTS». Ё → e (как в большинстве passport
@@ -151,8 +153,8 @@ def real_corporate_website(url: str | None) -> str | None:
     ничего полезного из этого host'а извлечь не смогут.
     Используется как enrichment-гейт И как фильтр при создании новой
     строки — оба пути иначе персистили бы aggregator-URL'ы."""
-    cleaned = (url or "").strip() or None
-    if not cleaned:
+    cleaned = text_or_none(url)
+    if cleaned is None:
         return None
     if not signal_host(normalize_host(cleaned)):
         return None

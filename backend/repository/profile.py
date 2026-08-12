@@ -16,7 +16,7 @@ from backend.models import (
     ProfileSkill,
     profile_experience_skills,
 )
-from backend.payloads import str_list
+from backend.payloads import str_list, text_or_none
 
 logger = logging.getLogger(__name__)
 
@@ -389,7 +389,7 @@ def _add_experience_rows(
         exp = ProfileExperience(
             profile_id=profile_id,
             company=row["company"].strip(),
-            company_url=(row.get("company_url") or "").strip() or None,
+            company_url=text_or_none(row.get("company_url")),
             role=row["role"].strip(),
             start_date=start_date,
             end_date=end_date,
