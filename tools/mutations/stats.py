@@ -159,11 +159,11 @@ MUTATIONS = [
         + "            )" + CRLF
         + "        )" + CRLF
         + "    ).all()" + CRLF
-        + "    first_resp_by_vid",
+        + "    first_by_vid",
         "            )" + CRLF
         + "        )" + CRLF
         + "    ).all()" + CRLF
-        + "    first_resp_by_vid",
+        + "    first_by_vid",
     ),
     # get_stats_hr_responses: ответом считается и пришедшее до отправки
     (
@@ -183,23 +183,23 @@ MUTATIONS = [
         '            func.min(VacancyStatusHistory.changed_at).label("applied_at"),',
         '            func.max(VacancyStatusHistory.changed_at).label("applied_at"),',
     ),
-    # get_stats_hr_responses: срединный срок при чётном числе берёт один элемент
+    # _median: середина при чётном числе берёт один элемент
     (
         "backend/repository/stats_summary.py",
-        "            median_seconds = (deltas[n // 2 - 1] + deltas[n // 2]) / 2",
-        "            median_seconds = float(deltas[n // 2])",
+        "    return (ordered[n // 2 - 1] + ordered[n // 2]) / 2",
+        "    return float(ordered[n // 2])",
     ),
-    # get_stats_hr_responses: срединный срок при нечётном числе съезжает
+    # _median: середина при нечётном числе съезжает
     (
         "backend/repository/stats_summary.py",
-        "            median_seconds = float(deltas[n // 2])" + CRLF + "        else:",
-        "            median_seconds = float(deltas[n // 2 - 1])" + CRLF + "        else:",
+        "        return float(ordered[n // 2])" + CRLF + "    return (",
+        "        return float(ordered[n // 2 - 1])" + CRLF + "    return (",
     ),
-    # get_stats_hr_responses: сроки перестают упорядочиваться перед взятием середины
+    # _median: ряд перестаёт упорядочиваться перед взятием середины
     (
         "backend/repository/stats_summary.py",
-        "    deltas.sort()" + CRLF,
-        "",
+        "    ordered = sorted(values)" + CRLF,
+        "    ordered = values" + CRLF,
     ),
     # get_stats_hr_responses: окно перестаёт отсекать по первой отправке
     (

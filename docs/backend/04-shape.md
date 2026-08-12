@@ -64,7 +64,7 @@
       `llm/fit.validate_vacancy_fit` 106
 - [x] **О. Бот:** `bot/loop.run` 137, `bot/client.__init__` 135 — второе
       конструктор, там разнимается сборка, а не логика
-- [ ] **П. Репозиторий:** `repository/hr_list.list_hr_with_counts` 122,
+- [x] **П. Репозиторий:** `repository/hr_list.list_hr_with_counts` 122,
       `repository/stats_summary.get_stats_hr_responses` 111
 
 *60–99 строк — двадцать два тела, пачками по модулю.*
