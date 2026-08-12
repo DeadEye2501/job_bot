@@ -119,7 +119,7 @@ MUTATIONS = [
         '        logger.exception("get_mode failed; falling back to Off")' + CRLF
         + "        return BotMode.FULL",
     ),
-    # run: готовность объявляется до подключения клиента
+    # _connect: готовность объявляется до подключения клиента
     (
         "backend/bot/loop.py",
         "    await bot._client.start()" + CRLF,
@@ -132,51 +132,51 @@ MUTATIONS = [
         "            await bot._ingestion.recover_orphan_vacancies()",
         "            pass",
     ),
-    # run: слив ждущего разбора при выключении пропадает
+    # _on_mode_switch: слив ждущего разбора при выключении пропадает
     (
         "backend/bot/loop.py",
-        "                await bot._ingestion.cancel_pending_dm_classifications("     "drain=True)",
-        "                pass",
-    ),
-    # run: догон пропущенных писем не делается
-    (
-        "backend/bot/loop.py",
-        "            if mode is not BotMode.OFF and prev_mode is BotMode.OFF:",
-        "            if False:",
-    ),
-    # run: проверка молчания HR идёт и в выключенном режиме
-    (
-        "backend/bot/loop.py",
-        "            if mode is not BotMode.OFF:" + CRLF
-        + "                try:" + CRLF
-        + "                    await bot._ingestion.check_ghosting_timeouts()" + CRLF,
-        "            if True:" + CRLF
-        + "                try:" + CRLF
-        + "                    await bot._ingestion.check_ghosting_timeouts()" + CRLF,
-    ),
-    # run: по каналам ходят и в режиме «только личные»
-    (
-        "backend/bot/loop.py",
-        "            if mode is BotMode.FULL:" + CRLF,
-        "            if True:" + CRLF,
-    ),
-    # run: признак остановки ставится после отключения клиента
-    (
-        "backend/bot/loop.py",
-        "        bot._ingestion.mark_shutting_down()",
+        "        await bot._ingestion.cancel_pending_dm_classifications("     "drain=True)",
         "        pass",
     ),
-    # run: общее соединение с моделью закрывается дважды
+    # _on_mode_switch: догон пропущенных писем не делается
     (
         "backend/bot/loop.py",
-        "        if bot._lm_embed_client is not bot._lm_client:" + CRLF
-        + "            await bot._lm_embed_client.aclose()" + CRLF,
-        "        await bot._lm_embed_client.aclose()" + CRLF,
+        "    if mode is not BotMode.OFF and prev_mode is BotMode.OFF:",
+        "    if False:",
     ),
-    # run: соединение с моделью не закрывается вовсе
+    # _tick: проверка молчания HR идёт и в выключенном режиме
     (
         "backend/bot/loop.py",
-        "        await bot._lm_client.aclose()",
-        "        pass",
+        "    if mode is not BotMode.OFF:" + CRLF
+        + "        try:" + CRLF
+        + "            await bot._ingestion.check_ghosting_timeouts()" + CRLF,
+        "    if True:" + CRLF
+        + "        try:" + CRLF
+        + "            await bot._ingestion.check_ghosting_timeouts()" + CRLF,
+    ),
+    # _tick: по каналам ходят и в режиме «только личные»
+    (
+        "backend/bot/loop.py",
+        "    if mode is BotMode.FULL:" + CRLF,
+        "    if True:" + CRLF,
+    ),
+    # _disconnect: признак остановки ставится после отключения клиента
+    (
+        "backend/bot/loop.py",
+        "    bot._ingestion.mark_shutting_down()",
+        "    pass",
+    ),
+    # _disconnect: общее соединение с моделью закрывается дважды
+    (
+        "backend/bot/loop.py",
+        "    if bot._lm_embed_client is not bot._lm_client:" + CRLF
+        + "        await bot._lm_embed_client.aclose()" + CRLF,
+        "    await bot._lm_embed_client.aclose()" + CRLF,
+    ),
+    # _disconnect: соединение с моделью не закрывается вовсе
+    (
+        "backend/bot/loop.py",
+        "    await bot._lm_client.aclose()",
+        "    pass",
     ),
 ]

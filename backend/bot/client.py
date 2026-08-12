@@ -35,7 +35,138 @@ from backend.runtime_settings import RuntimeSettings
 logger = logging.getLogger(__name__)
 
 
+def _open_connections(bot, runtime_settings: RuntimeSettings) -> None:
+    """Соединения на весь срок жизни бота: Telegram и две модели."""
+    # If construction fails partway through, any half-built httpx
+    # clients will be closed by GC (with a ResourceWarning). We don't
+    # try to clean them up here because httpx has no sync close() and
+    # we can't await from sync __init__ — and init failure means the
+    # process is about to exit anyway.
+    bot._client = telegram.make_client(runtime_settings.tg)
+    bot._lm_client = lm_studio.make_client(runtime_settings.chat)
+    bot._lm_chat_model = runtime_settings.chat.model
+    # Reuse the chat httpx client for embeddings if both providers point
+    # at the same endpoint with the same auth.
+    bot._lm_embed_client = (
+        bot._lm_client
+        if send._shares_provider(runtime_settings.chat, runtime_settings.embed)
+        else lm_studio.make_client(runtime_settings.embed)
+    )
+    bot._lm_embed_model = runtime_settings.embed.model
+
+
+def _subscribe_to_updates(bot) -> None:
+    """Подписки на события Telegram: личные сообщения и сырые обновления."""
+    bot._client.add_handler(
+        MessageHandler(bot._on_dm, filters.private & filters.incoming)
+    )
+    bot._client.add_handler(
+        MessageHandler(
+            bot._on_dm_outgoing, filters.private & filters.outgoing
+        )
+    )
+    bot._client.add_handler(
+        EditedMessageHandler(bot._on_dm_edit, filters.private)
+    )
+    # NOTE: `filters.private` НЕ годится для DeletedMessagesHandler.
+    # Pyrogram'овский parse_deleted_messages для UpdateDeleteMessages
+    # (все приватные удаления) ставит msg.chat=None — peer info в этом
+    # апдейте не приходит. filters.private требует m.chat.type in
+    # {PRIVATE, BOT}, и для chat=None даёт False — handler не срабатывает
+    # вообще. Поэтому пропускаем chatless-stub'ы и явные private-чаты,
+    # отсекая каналы (UpdateDeleteChannelMessages приходит уже с
+    # chat=Channel).
+    bot._client.add_handler(
+        DeletedMessagesHandler(
+            bot._on_dm_delete,
+            filters.private | filters.create(
+                lambda _, __, m: getattr(m, "chat", None) is None
+            ),
+        )
+    )
+    # UpdateReadHistoryOutbox carries the «HR has read up to msg N» signal
+    # for our outgoing DMs. Filter out everything else inside the handler;
+    # raw updates fire for every server event.
+    bot._client.add_handler(RawUpdateHandler(bot._on_raw_update))
+
+
+def _declare_loop_controls(bot) -> None:
+    """Рычаги, которыми окно правит уже запущенный цикл."""
+    # Wake event = "skip the rest of the current sleep, poll now". Set
+    # by kick(). Stop event = "shutdown after current iteration". Set
+    # by stop().
+    bot._wake_event = asyncio.Event()
+    bot._stop_event = asyncio.Event()
+    # Capture loop в run() — нужен для thread-safe kick / cancel /
+    # request_stop из Qt-треда. Эти Event-ы и Task-и живут на
+    # runner-loop'е; .set() / .cancel() из чужого треда — undefined
+    # behavior (CPython его прощает, но контракт asyncio нарушается).
+    bot._loop = None
+    # Reference to the currently-running poll task so the UI's stop
+    # button can cancel it without killing the whole bot loop.
+    bot._current_poll_task = None
+
+
+def _declare_ui_hooks(bot) -> None:
+    """Места, куда окно вписывает свои отклики; без окна все остаются пустыми."""
+    # Optional UI hooks fired around each Full-mode poll cycle.
+    bot.on_cycle_start = None  # filled in by client.bridge.MainApi if running under the UI
+    bot.on_cycle_end = None    # filled in by client.bridge.MainApi if running under the UI
+    # Forwarded from IngestionPipeline; Bridge wires this to a Qt signal.
+    # Signature: on_progress(stage, label, current, total)
+    bot.on_progress = None     # filled in by client.bridge.MainApi if running under the UI
+    # Real-time chat push — fires after a new incoming HR DM is saved.
+    # Signature: on_new_message(hr_id: int). Bridge wires to a Qt signal
+    # the Contacts/HR pane listens for.
+    bot.on_new_message = None
+    # Real-time HR-read-receipt push. Signature:
+    # on_hr_read(hr_id: int, max_tg_id: int). Cheaper than on_new_message
+    # because the UI only needs to flip ✓ → ✓✓ on already-rendered rows
+    # rather than refetch the whole chat.
+    bot.on_hr_read = None
+    # Real-time push for the Contacts/Channels pane: fires once per poll
+    # cycle, right after the title sweep writes any new titles into the
+    # DB. UI re-fetches the list so the user sees fresh names without
+    # having to switch tabs or restart.
+    bot.on_channels_changed = None
+    # Real-time push for Contacts/HR + Contacts/Companies: fires after
+    # каждой commit'а с парсингом вакансии, который мог через
+    # find_or_create_* создать/обновить HR/Company. Дёргается во время
+    # длинных циклов (90 минут на 18 каналов), а не только по
+    # завершении ingestion_finished.
+    bot.on_contacts_changed = None
+    # Real-time push для вкладки «Вакансии». Заменяет 5-сек JS-таймер:
+    # каждый раз когда в БД меняется Vacancy — фронт сразу делает
+    # refetch.
+    bot.on_vacancies_changed = None
+
+
+def _forward_pipeline_hooks(bot) -> None:
+    """Отклики конвейера пересылаются наружу — тому, кто вписан в бота."""
+    bot._ingestion.on_progress = lambda stage, label, cur, tot: (
+        bot.on_progress and bot.on_progress(stage, label, cur, tot)
+    )
+    bot._ingestion.on_channels_changed = lambda: (
+        bot.on_channels_changed and bot.on_channels_changed()
+    )
+    bot._ingestion.on_contacts_changed = lambda: (
+        bot.on_contacts_changed and bot.on_contacts_changed()
+    )
+    bot._ingestion.on_vacancies_changed = lambda: (
+        bot.on_vacancies_changed and bot.on_vacancies_changed()
+    )
+    bot._ingestion.on_new_message = lambda hr_id: (
+        bot.on_new_message and bot.on_new_message(hr_id)
+    )
+
+
 class Bot:
+    # Оба поля ставит `_declare_loop_controls`, а объявлены они здесь:
+    # присвоение по чужому полю (`bot._loop = ...`) тип не записывает,
+    # и без этих двух строк класс не объявляет ни одного своего поля.
+    _loop: asyncio.AbstractEventLoop | None
+    _current_poll_task: asyncio.Task | None
+
     def __init__(
         self,
         runtime_settings: RuntimeSettings,
@@ -53,24 +184,7 @@ class Bot:
 
         self._rs = runtime_settings
         self._session_factory = session_factory
-
-        # If construction fails partway through, any half-built httpx
-        # clients will be closed by GC (with a ResourceWarning). We don't
-        # try to clean them up here because httpx has no sync close() and
-        # we can't await from sync __init__ — and init failure means the
-        # process is about to exit anyway.
-        self._client = telegram.make_client(runtime_settings.tg)
-        self._lm_client = lm_studio.make_client(runtime_settings.chat)
-        self._lm_chat_model = runtime_settings.chat.model
-        # Reuse the chat httpx client for embeddings if both providers point
-        # at the same endpoint with the same auth.
-        self._lm_embed_client = (
-            self._lm_client
-            if send._shares_provider(runtime_settings.chat, runtime_settings.embed)
-            else lm_studio.make_client(runtime_settings.embed)
-        )
-        self._lm_embed_model = runtime_settings.embed.model
-
+        _open_connections(self, runtime_settings)
         self._ingestion = IngestionPipeline(
             client=self._client,
             session_factory=self._session_factory,
@@ -81,96 +195,10 @@ class Bot:
             send=self.send,
             runtime_settings=self._rs,
         )
-        self._client.add_handler(
-            MessageHandler(self._on_dm, filters.private & filters.incoming)
-        )
-        self._client.add_handler(
-            MessageHandler(
-                self._on_dm_outgoing, filters.private & filters.outgoing
-            )
-        )
-        self._client.add_handler(
-            EditedMessageHandler(self._on_dm_edit, filters.private)
-        )
-        # NOTE: `filters.private` НЕ годится для DeletedMessagesHandler.
-        # Pyrogram'овский parse_deleted_messages для UpdateDeleteMessages
-        # (все приватные удаления) ставит msg.chat=None — peer info в этом
-        # апдейте не приходит. filters.private требует m.chat.type in
-        # {PRIVATE, BOT}, и для chat=None даёт False — handler не срабатывает
-        # вообще. Поэтому пропускаем chatless-stub'ы и явные private-чаты,
-        # отсекая каналы (UpdateDeleteChannelMessages приходит уже с
-        # chat=Channel).
-        self._client.add_handler(
-            DeletedMessagesHandler(
-                self._on_dm_delete,
-                filters.private | filters.create(
-                    lambda _, __, m: getattr(m, "chat", None) is None
-                ),
-            )
-        )
-        # UpdateReadHistoryOutbox carries the «HR has read up to msg N» signal
-        # for our outgoing DMs. Filter out everything else inside the handler;
-        # raw updates fire for every server event.
-        self._client.add_handler(RawUpdateHandler(self._on_raw_update))
-
-        # Wake event = "skip the rest of the current sleep, poll now". Set
-        # by kick(). Stop event = "shutdown after current iteration". Set
-        # by stop().
-        self._wake_event = asyncio.Event()
-        self._stop_event = asyncio.Event()
-        # Capture loop в run() — нужен для thread-safe kick / cancel /
-        # request_stop из Qt-треда. Эти Event-ы и Task-и живут на
-        # runner-loop'е; .set() / .cancel() из чужого треда — undefined
-        # behavior (CPython его прощает, но контракт asyncio нарушается).
-        self._loop: asyncio.AbstractEventLoop | None = None
-        # Optional UI hooks fired around each Full-mode poll cycle.
-        self.on_cycle_start = None  # filled in by client.bridge.MainApi if running under the UI
-        self.on_cycle_end = None    # filled in by client.bridge.MainApi if running under the UI
-        # Forwarded from IngestionPipeline; Bridge wires this to a Qt signal.
-        # Signature: on_progress(stage, label, current, total)
-        self.on_progress = None     # filled in by client.bridge.MainApi if running under the UI
-        # Real-time chat push — fires after a new incoming HR DM is saved.
-        # Signature: on_new_message(hr_id: int). Bridge wires to a Qt signal
-        # the Contacts/HR pane listens for.
-        self.on_new_message = None
-        # Real-time HR-read-receipt push. Signature:
-        # on_hr_read(hr_id: int, max_tg_id: int). Cheaper than on_new_message
-        # because the UI only needs to flip ✓ → ✓✓ on already-rendered rows
-        # rather than refetch the whole chat.
-        self.on_hr_read = None
-        # Real-time push for the Contacts/Channels pane: fires once per poll
-        # cycle, right after the title sweep writes any new titles into the
-        # DB. UI re-fetches the list so the user sees fresh names without
-        # having to switch tabs or restart.
-        self.on_channels_changed = None
-        # Real-time push for Contacts/HR + Contacts/Companies: fires after
-        # каждой commit'а с парсингом вакансии, который мог через
-        # find_or_create_* создать/обновить HR/Company. Дёргается во время
-        # длинных циклов (90 минут на 18 каналов), а не только по
-        # завершении ingestion_finished.
-        self.on_contacts_changed = None
-        # Real-time push для вкладки «Вакансии». Заменяет 5-сек JS-таймер:
-        # каждый раз когда в БД меняется Vacancy — фронт сразу делает
-        # refetch.
-        self.on_vacancies_changed = None
-        self._ingestion.on_progress = lambda stage, label, cur, tot: (
-            self.on_progress and self.on_progress(stage, label, cur, tot)
-        )
-        self._ingestion.on_channels_changed = lambda: (
-            self.on_channels_changed and self.on_channels_changed()
-        )
-        self._ingestion.on_contacts_changed = lambda: (
-            self.on_contacts_changed and self.on_contacts_changed()
-        )
-        self._ingestion.on_vacancies_changed = lambda: (
-            self.on_vacancies_changed and self.on_vacancies_changed()
-        )
-        self._ingestion.on_new_message = lambda hr_id: (
-            self.on_new_message and self.on_new_message(hr_id)
-        )
-        # Reference to the currently-running poll task so the UI's stop
-        # button can cancel it without killing the whole bot loop.
-        self._current_poll_task: asyncio.Task | None = None
+        _subscribe_to_updates(self)
+        _declare_loop_controls(self)
+        _declare_ui_hooks(self)
+        _forward_pipeline_hooks(self)
 
     @property
     def is_ready(self) -> bool:
