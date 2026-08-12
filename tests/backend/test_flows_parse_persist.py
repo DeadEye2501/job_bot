@@ -308,13 +308,13 @@ async def test_a_vanished_vacancy_is_left_alone(parsing, session_factory, caplog
     """
     pipeline, _ = parsing
 
-    with caplog.at_level(logging.ERROR, logger="backend.flows.parse"):
+    with caplog.at_level(logging.ERROR, logger="backend.flows.parse_write"):
         await parse.parse_and_update_vacancy(
             pipeline, 404, "текст", "jobs", allow_delete=False
         )
 
     assert await all_rows(session_factory, VacancyEvent) == []
-    assert [r for r in caplog.records if r.name == "backend.flows.parse"] == []
+    assert [r for r in caplog.records if r.name == "backend.flows.parse_write"] == []
 
 
 async def test_the_window_hears_about_both_lists(parsing):

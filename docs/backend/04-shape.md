@@ -80,7 +80,7 @@
 - [x] **С. Репозиторий, остальное:** `vacancies_life` 96, `companies_matching` 75,
       `hr_card` 71, `blacklist` 68, `channels` 60
 - [x] **Т. Конвейер:** `pipeline.__init__` 97, `rerun` 90, `dm_classify` (68, 63),
-      `parse._persist_parse_outcome` 64, `ingest` 63
+      `parse_write.persist_parse_outcome` 64, `ingest` 63
 - [x] **У. Модель и края:** `bot/updates.on_dm_delete` 92, `adapters/lm_studio.chat`
       76, `llm/company` 70, `llm/hr_reply` 70, `llm/vacancy` (67, 62)
 
@@ -334,7 +334,8 @@ Telegram, и работу с хранилищем:
 
 ## 9. Запись исхода разбора живёт в конвейере, а слой для неё есть
 
-`_persist_parse_outcome` (`backend/flows/parse.py:316`) берёт `Vacancy` по
+`persist_parse_outcome` (`backend/flows/parse_write.py`; до разреза слайсом 19
+жила в `flows/parse.py`) берёт `Vacancy` по
 номеру, переписывает поля и дописывает строку в ленту руками через
 `session.add(VacancyEvent(...))` — а в `backend/repository/vacancies_life.py` для
 этого уже есть `add_vacancy_event`, в чьей докстроке род `parsed` назван
@@ -565,7 +566,7 @@ dedupe_company_with_llm` 70 · `llm/hr_reply.py classify_hr_reply` 70 ·
 `flows/dm_classify.py classify_and_apply_for_hr` 68 · `repository/blacklist.py
 create_blacklist` 68 · `llm/vacancy.py parse_vacancy` 67 ·
 `repository/profile.py save_experience` 66, `repository/stats_summary.py
-get_stats_skills` 66 · `flows/parse.py _persist_parse_outcome` 64 ·
+get_stats_skills` 66 · `flows/parse_write.py persist_parse_outcome` 64 ·
 `flows/dm_classify.py cancel_pending_dm_classifications` 63 · `flows/ingest.py
 ingest_post` 63 · `llm/vacancy.py _parse_vacancy_json` 62 ·
 `repository/profile.py save_skills` 61 · `repository/channels.py
@@ -617,7 +618,7 @@ Ruff считает не то же самое, и его числа ниже (з
 **Что должно остаться:** один кортеж имён прямых полей на уровне модуля;
 производные (`stack`/`score`, тройка зарплаты, `notes`) остаются в телах.
 
-**Взято в заход Г:** тот и так делит `_persist_parse_outcome` на управление
+**Взято в заход Г:** тот и так делит `persist_parse_outcome` на управление
 сессией и запись строки, то есть открывает тот же файл.
 
 ---
