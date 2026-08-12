@@ -45,64 +45,34 @@ def _channel_item(
     }
 
 
-async def get_stats_channels_pipeline(
-    session: AsyncSession, *, period: str
-) -> dict:
-    """Per-channel pipeline-таблица для карточки «Каналы».
+def _trash_predicates():
+    """Два условия «мусор» и «просто не подошло», набранные одним образцом.
 
-    Ингест-колонки (по `Vacancy.created_at >= since`):
-      - total: всё, что канал прислал в окно (Vacancy-ряды + trash_events)
-      - trash: auto-ingest deletions (`trash_event`) + ряды с
-        `status=NOT_FIT` и `skip_reason` с меткой `TRASH_SKIP_PREFIX` (rerun-режим)
-      - not_fit: `status=NOT_FIT` БЕЗ trash-маркера (отсев фит-валидатором)
-      - fit = max(0, total − trash − not_fit)
+    Мусор — посты, отсеянные валидатором. При обычном разборе строку
+    удаляют, и счёт хранится в `trash_event`; при повторном строка остаётся
+    со статусом «не подходит» и меткой в причине отказа. Чистое «не
+    подошло» — тот же статус **без** метки: отсев по языку, месту, уровню.
 
-    Funnel-колонки (по `min(changed_at) >= since` — distinct vacancy_id,
-    у которых ПЕРВЫЙ переход в соответствующий набор статусов случился
-    в окне period; для period='all' — лайфтайм без фильтра по времени):
-      - sent: первый переход в Applied
-      - answered: первый переход в любой из
-        {Answered, Test, Invitation, In Progress, Offer, Decline}
-      - invite_plus: первый переход в {Invitation, In Progress, Offer}
-      - decline: первый переход в Decline
-      - conv_answ_sent = answered/sent (None если sent=0)
-      - conv_invite_sent = invite_plus/sent (None если sent=0)
-
-    Канал попадает в таблицу, если в окне есть хоть что-то: ингест,
-    trash-event или funnel-активность.
-
-    Сортировка: по total desc, тай-брейкер по label.
+    Образец один на оба условия нарочно: они обязаны быть отрицанием друг
+    друга, а набранные порознь разъехались бы молча. Пробел у метки в
+    образец не идёт — за ним следует сама причина.
     """
-    since = stats_period_since(period)
+    marked_trash = Vacancy.skip_reason.like(f"{TRASH_SKIP_PREFIX.rstrip()}%")
+    is_rerun_trash = and_(Vacancy.status == VacancyStatus.NOT_FIT, marked_trash)
+    is_not_fit_clean = and_(
+        Vacancy.status == VacancyStatus.NOT_FIT,
+        or_(Vacancy.skip_reason.is_(None), ~marked_trash),
+    )
+    return is_rerun_trash, is_not_fit_clean
+
+
+async def _ingest_by_channel(session: AsyncSession, since) -> list:
+    """Сколько каждый канал прислал за окно: всего, мусора, «не подошло»."""
+    is_rerun_trash, is_not_fit_clean = _trash_predicates()
     base_filter = [PARSED_ONLY]
     if since is not None:
         base_filter.append(Vacancy.created_at >= since)
-
-    # Шаг 1: total / trash / not_fit per channel.
-    #
-    # «Trash» — посты, отсеянные LLM-валидатором как мусор. В auto-ingest
-    # режиме они УДАЛЯЮТСЯ из ``vacancy``, и счётчик хранится в отдельной
-    # таблице ``trash_event`` (см. flows/cleanup.py, delete_vacancy_as_trash).
-    # В rerun-режиме ряд остаётся как ``status=NOT_FIT`` + ``skip_reason``
-    # начинается с ``TRASH_SKIP_PREFIX`` — таких добавим к trash-счётчику ниже.
-    # Not Fit (clean) — отсев фит-валидатором по языку/локации/уровню,
-    # т.е. ``status=NOT_FIT`` БЕЗ trash-маркера в skip_reason.
-    # Образец один на два условия: они обязаны быть отрицанием друг друга,
-    # а набранные порознь разъехались бы молча. Пробел у метки в образец
-    # не идёт — за ним следует сама причина.
-    marked_trash = Vacancy.skip_reason.like(f"{TRASH_SKIP_PREFIX.rstrip()}%")
-    is_rerun_trash = and_(
-        Vacancy.status == VacancyStatus.NOT_FIT,
-        marked_trash,
-    )
-    is_not_fit_clean = and_(
-        Vacancy.status == VacancyStatus.NOT_FIT,
-        or_(
-            Vacancy.skip_reason.is_(None),
-            ~marked_trash,
-        ),
-    )
-    rows = (
+    return (
         await session.execute(
             select(
                 TelegramChannel.id,
@@ -118,109 +88,158 @@ async def get_stats_channels_pipeline(
         )
     ).all()
 
-    # Шаг 1b: trash-events за period (auto-ingest deletions). Per-channel
-    # COUNT(*) по той же временной рамке, что и Vacancy.created_at.
-    trash_event_filter = []
-    if since is not None:
-        trash_event_filter.append(TrashEvent.created_at >= since)
-    trash_events_rows = (
+
+async def _trash_events_by_channel(session: AsyncSession, since) -> dict[int, int]:
+    """Сколько мусора удалено у каждого канала за то же окно.
+
+    Отдельным запросом потому, что удалённых строк в `vacancy` уже нет:
+    счёт живёт своей таблицей, и рамка времени у неё своя, но та же.
+    """
+    where = [TrashEvent.created_at >= since] if since is not None else []
+    rows = (
         await session.execute(
-            select(
-                TrashEvent.source_channel_id,
-                func.count(TrashEvent.id),
-            )
-            .where(*trash_event_filter)
+            select(TrashEvent.source_channel_id, func.count(TrashEvent.id))
+            .where(*where)
             .group_by(TrashEvent.source_channel_id)
         )
     ).all()
-    trash_events_by_ch: dict[int, int] = {}
-    for ch_id, cnt in trash_events_rows:
+    return {ch_id: int(cnt or 0) for ch_id, cnt in rows if ch_id is not None}
+
+
+async def _first_in_period_by_channel(
+    session: AsyncSession, statuses, since
+) -> dict[int, set[int]]:
+    """Чьи вакансии впервые дошли до этих статусов внутри окна.
+
+    Считается по самому переходу, а не по заведению вакансии: воронка
+    показывает продвижение за период и обязана сходиться с верхними
+    числами экрана, которые считаются так же.
+    """
+    sub = first_transition_subq(statuses)
+    q = (
+        select(Vacancy.source_channel_id, sub.c.vid)
+        .join(sub, sub.c.vid == Vacancy.id)
+        .where(PARSED_ONLY)
+    )
+    if since is not None:
+        q = q.where(sub.c.first_at >= since)
+    by_ch: dict[int, set[int]] = {}
+    for ch_id, vid in (await session.execute(q)).all():
         if ch_id is not None:
-            trash_events_by_ch[ch_id] = int(cnt or 0)
-
-    # Шаг 2: history-based «sent / answered / invite+ / decline» per channel.
-    # Distinct vacancy_id, у которых ПЕРВЫЙ переход в нужный набор статусов
-    # (min(changed_at)) попал в окно period. Привязка к самому факту
-    # перехода, а не к Vacancy.created_at — чтобы funnel показывал именно
-    # «прогресс за период», совпадая с верхним KPI-блоком.
-    async def _first_in_period_by_channel(statuses) -> dict[int, set[int]]:
-        sub = first_transition_subq(statuses)
-        q = (
-            select(Vacancy.source_channel_id, sub.c.vid)
-            .join(sub, sub.c.vid == Vacancy.id)
-            .where(PARSED_ONLY)
-        )
-        if since is not None:
-            q = q.where(sub.c.first_at >= since)
-        by_ch: dict[int, set[int]] = {}
-        for ch_id, vid in (await session.execute(q)).all():
-            if ch_id is None:
-                continue
             by_ch.setdefault(ch_id, set()).add(vid)
-        return by_ch
+    return by_ch
 
-    sent_by_ch = await _first_in_period_by_channel(VacancyStatus.APPLIED)
-    answered_by_ch = await _first_in_period_by_channel(RESPONDED)
-    invite_by_ch = await _first_in_period_by_channel(INVITED)
-    decline_by_ch = await _first_in_period_by_channel(VacancyStatus.DECLINE)
 
-    # Сводим. Канал должен попасть в таблицу, если в окне периода у него
-    # есть хоть что-то: Vacancy-ряды (ингест), TrashEvent (auto-deletions)
-    # или funnel-активность (старая вакансия впервые перешла в нужный
-    # статус внутри окна).
+async def _funnel_by_channel(
+    session: AsyncSession, since
+) -> dict[str, dict[int, set[int]]]:
+    """Четыре ступени воронки, разложенные по каналам.
+
+    Ключи здесь — это имена колонок в ответе окну: `_pipeline_row` кладёт
+    их в строку как есть. Переименуй ступень тут — и колонка на экране
+    опустеет, потому что окно читает её по имени.
+    """
+    return {
+        "sent": await _first_in_period_by_channel(
+            session, VacancyStatus.APPLIED, since
+        ),
+        "answered": await _first_in_period_by_channel(session, RESPONDED, since),
+        "invite_plus": await _first_in_period_by_channel(session, INVITED, since),
+        "decline": await _first_in_period_by_channel(
+            session, VacancyStatus.DECLINE, since
+        ),
+    }
+
+
+async def _channels_without_ingest(
+    session: AsyncSession, missing_ids: set[int]
+) -> dict[int, dict]:
+    """Пустые строки для каналов, у которых в окне не было ингеста.
+
+    Старая вакансия могла впервые дойти до нужного статуса внутри окна, а
+    мусор — удалиться, не оставив строки. Без этих строк такой канал из
+    таблицы выпал бы, хотя за период у него кое-что было.
+    """
+    if not missing_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(
+                TelegramChannel.id, TelegramChannel.title, TelegramChannel.username
+            ).where(TelegramChannel.id.in_(missing_ids))
+        )
+    ).all()
+    return {
+        ch_id: _channel_item(ch_id, title, username) for ch_id, title, username in rows
+    }
+
+
+def _pipeline_row(ch_id: int, item: dict, trash_events: int, funnel) -> dict:
+    """Строка таблицы по одному каналу: ингест, воронка и две доли.
+
+    Всего — это и строки вакансий, и удалённый мусор: последнего в
+    `vacancy` уже нет, а прислан каналом он был. Доли считаются от
+    отправленного, и при нуле отправленных их нет вовсе — ноль там означал
+    бы «отвечают нулю процентов», а не «спрашивать не с чего».
+    """
+    total = item["_total_vac"] + trash_events
+    trash = trash_events + item["_rerun_trash"]
+    not_fit = item["not_fit"]
+    counts = {
+        name: len(by_ch.get(ch_id, set())) for name, by_ch in funnel.items()
+    }
+    sent = counts["sent"]
+
+    def share(reached: int) -> float | None:
+        return round(reached / sent * 100, 1) if sent > 0 else None
+
+    return {
+        "id": ch_id,
+        "label": item["label"],
+        "total": total,
+        "trash": trash,
+        "not_fit": not_fit,
+        "fit": max(0, total - trash - not_fit),
+        **counts,
+        "conv_answ_sent": share(counts["answered"]),
+        "conv_invite_sent": share(counts["invite_plus"]),
+    }
+
+
+async def get_stats_channels_pipeline(
+    session: AsyncSession, *, period: str
+) -> dict:
+    """Таблица «что канал прислал и куда это дошло» за выбранное окно.
+
+    Ингест считается по времени заведения вакансии, воронка — по времени
+    самого перехода; состав строки и обе доли — у `_pipeline_row`, ступени
+    воронки — у `_funnel_by_channel`. Окно `all` времени не спрашивает.
+
+    Канал попадает в таблицу, если в окне у него было хоть что-то: ингест,
+    удалённый мусор или продвижение по воронке. Порядок — по «всего»
+    убыванием, споры решает подпись.
+    """
+    since = stats_period_since(period)
+    trash_events_by_ch = await _trash_events_by_channel(session, since)
+    funnel = await _funnel_by_channel(session, since)
+
     items_by_ch: dict[int, dict] = {}
-    for ch_id, title, username, total_vac, rerun_trash, not_fit in rows:
+    for ch_id, title, username, total_vac, rerun_trash, not_fit in (
+        await _ingest_by_channel(session, since)
+    ):
         items_by_ch[ch_id] = _channel_item(
             ch_id, title, username, (total_vac, rerun_trash, not_fit)
         )
-    needed_ch_ids: set[int] = set()
-    needed_ch_ids.update(trash_events_by_ch.keys())
-    needed_ch_ids.update(sent_by_ch.keys())
-    needed_ch_ids.update(answered_by_ch.keys())
-    needed_ch_ids.update(invite_by_ch.keys())
-    needed_ch_ids.update(decline_by_ch.keys())
-    orphan_ids = [c for c in needed_ch_ids if c not in items_by_ch]
-    if orphan_ids:
-        orphan_rows = (
-            await session.execute(
-                select(TelegramChannel.id, TelegramChannel.title, TelegramChannel.username)
-                .where(TelegramChannel.id.in_(orphan_ids))
-            )
-        ).all()
-        for ch_id, title, username in orphan_rows:
-            items_by_ch[ch_id] = _channel_item(ch_id, title, username)
-    if not items_by_ch:
-        return {"period": period, "channels": []}
+    seen_elsewhere = set(trash_events_by_ch)
+    for by_ch in funnel.values():
+        seen_elsewhere.update(by_ch)
+    items_by_ch.update(
+        await _channels_without_ingest(session, seen_elsewhere - set(items_by_ch))
+    )
 
-    items = []
-    for ch_id, item in items_by_ch.items():
-        trash_events = trash_events_by_ch.get(ch_id, 0)
-        # total = всё что канал «прислал» за period: Vacancy-ряды + trash_events
-        # (auto-ingest deletions, которых уже нет в vacancy table)
-        total = item["_total_vac"] + trash_events
-        # Полный trash = удалённые auto-ingest + помеченные rerun
-        trash = trash_events + item["_rerun_trash"]
-        not_fit = item["not_fit"]
-        fit = max(0, total - trash - not_fit)
-        sent = len(sent_by_ch.get(ch_id, set()))
-        answered = len(answered_by_ch.get(ch_id, set()))
-        invite_plus = len(invite_by_ch.get(ch_id, set()))
-        decline = len(decline_by_ch.get(ch_id, set()))
-        conv_answ = (answered / sent * 100) if sent > 0 else None
-        conv_invite = (invite_plus / sent * 100) if sent > 0 else None
-        items.append({
-            "id": ch_id,
-            "label": item["label"],
-            "total": total,
-            "trash": trash,
-            "not_fit": not_fit,
-            "fit": fit,
-            "sent": sent,
-            "answered": answered,
-            "invite_plus": invite_plus,
-            "decline": decline,
-            "conv_answ_sent": (round(conv_answ, 1) if conv_answ is not None else None),
-            "conv_invite_sent": (round(conv_invite, 1) if conv_invite is not None else None),
-        })
+    items = [
+        _pipeline_row(ch_id, item, trash_events_by_ch.get(ch_id, 0), funnel)
+        for ch_id, item in items_by_ch.items()
+    ]
     items.sort(key=lambda it: (-it["total"], it["label"].casefold()))
     return {"period": period, "channels": items}

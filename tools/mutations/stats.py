@@ -226,8 +226,8 @@ MUTATIONS = [
     # get_stats_channels_pipeline: удалённый при разборе мусор не считается присланным
     (
         "backend/repository/stats_pipeline.py",
-        '        total = item["_total_vac"] + trash_events',
-        '        total = item["_total_vac"]',
+        '    total = item["_total_vac"] + trash_events',
+        '    total = item["_total_vac"]',
     ),
     # Перечни воронки уехали в `backend/domain/funnel.py`, цели вместе с ними:
     # они были объявлены и там, и в `channels.py`, а теперь объявлены один раз.
@@ -256,8 +256,8 @@ MUTATIONS = [
     # get_stats_channels_pipeline: доли считаются от присланного, а не от отправленного
     (
         "backend/repository/stats_pipeline.py",
-        "        conv_answ = (answered / sent * 100) if sent > 0 else None",
-        "        conv_answ = (answered / total * 100) if total > 0 else None",
+        "        return round(reached / sent * 100, 1) if sent > 0 else None",
+        "        return round(reached / total * 100, 1) if total > 0 else None",
     ),
     # get_stats_channels_pipeline: порядок теряет разрешитель по подписи
     (
@@ -268,8 +268,8 @@ MUTATIONS = [
     # get_stats_channels_pipeline: канал с одними отметками о мусоре выпадает
     (
         "backend/repository/stats_pipeline.py",
-        "    if orphan_ids:" + CRLF,
-        "    if False:" + CRLF,
+        "    if not orphan_ids:" + CRLF,
+        "    if True:" + CRLF,
     ),
     # get_stats_channels_pipeline: подпись перестаёт отступать к нику
     (
