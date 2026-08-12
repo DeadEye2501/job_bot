@@ -147,6 +147,28 @@ async def _upsert_cv_path(session: AsyncSession, cv_path: str) -> None:
     await session.flush()
 
 
+def _new_profile(p) -> Profile:
+    """Строка анкеты из разобранного резюме.
+
+    Списки копируются, а не берутся ссылкой: разобранное резюме живёт своей
+    жизнью, и правка анкеты в окне не должна доставать до него.
+    """
+    return Profile(
+        first_name=p.first_name,
+        last_name=p.last_name,
+        title=p.title,
+        email=p.email,
+        phone=p.phone,
+        location=p.location,
+        telegram_username=p.telegram_username,
+        github_url=p.github_url,
+        education=p.education,
+        work_format=list(p.work_format),
+        grades=list(p.grades),
+        free_preferences=p.free_preferences,
+    )
+
+
 async def save_parsed_cv(
     session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None = None
 ) -> None:
@@ -161,21 +183,7 @@ async def save_parsed_cv(
     """
     await _wipe_profile(session)
 
-    p = parsed.profile
-    profile = Profile(
-        first_name=p.first_name,
-        last_name=p.last_name,
-        title=p.title,
-        email=p.email,
-        phone=p.phone,
-        location=p.location,
-        telegram_username=p.telegram_username,
-        github_url=p.github_url,
-        education=p.education,
-        work_format=list(p.work_format),
-        grades=list(p.grades),
-        free_preferences=p.free_preferences,
-    )
+    profile = _new_profile(parsed.profile)
     session.add(profile)
     await session.flush()
 
@@ -230,6 +238,72 @@ async def list_experience(session: AsyncSession) -> list[ProfileExperience]:
     )
 
 
+def _skill_columns(row: dict) -> dict | None:
+    """Поля навыка из строки окна; пусто — в строке нет названия.
+
+    Уровень, пришедший не числом, считается первым: анкету правит человек, и
+    опечатка в поле не повод отказать ему в записи всей строки.
+    """
+    name = (row.get("name") or "").strip()
+    if not name:
+        return None
+    try:
+        level = int(row.get("level") or 1)
+    except (TypeError, ValueError):
+        level = 1
+    return {
+        "category": (row.get("category") or "Общее").strip() or "Общее",
+        "name": name,
+        "level": level,
+        "aliases": str_list(row.get("aliases")),
+    }
+
+
+def _upsert_skills(
+    session: AsyncSession, rows: list[dict], existing: dict, profile_id: int
+) -> set[int]:
+    """Записать присланные навыки; отдать номера уцелевших строк.
+
+    Строка с известным номером правится на месте — так связки «место работы
+    — навык» переживают даже переименование навыка. Всё остальное заводится
+    заново.
+    """
+    keep_ids: set[int] = set()
+    for row in rows:
+        columns = _skill_columns(row)
+        if columns is None:
+            continue
+        rid = row.get("id")
+        rid_int = rid if isinstance(rid, int) else None
+        if rid_int is not None and rid_int in existing:
+            s = existing[rid_int]
+            s.category = columns["category"]
+            s.name = columns["name"]
+            s.level = columns["level"]
+            s.aliases = columns["aliases"]
+            keep_ids.add(rid_int)
+        else:
+            session.add(ProfileSkill(profile_id=profile_id, **columns))
+    return keep_ids
+
+
+async def _drop_skills(
+    session: AsyncSession, existing: dict, drop_ids: set[int]
+) -> None:
+    """Снести навыки, которых человек в анкете не оставил.
+
+    Delete rows the user removed. Junction has no ON DELETE CASCADE on
+    SQLite by default, so wipe the links explicitly first.
+    """
+    for sid in drop_ids:
+        await session.execute(
+            delete(profile_experience_skills).where(
+                profile_experience_skills.c.skill_id == sid
+            )
+        )
+        await session.delete(existing[sid])
+
+
 async def save_skills(
     session: AsyncSession,
     rows: list[dict],
@@ -246,47 +320,9 @@ async def save_skills(
     Caller wraps in ``session.begin()``.
     """
     existing = {s.id: s for s in await list_skills(session)}
-    keep_ids: set[int] = set()
-
-    for row in rows:
-        name = (row.get("name") or "").strip()
-        if not name:
-            continue
-        category = (row.get("category") or "Общее").strip() or "Общее"
-        try:
-            level = int(row.get("level") or 1)
-        except (TypeError, ValueError):
-            level = 1
-        aliases = str_list(row.get("aliases"))
-        rid = row.get("id")
-        rid_int = rid if isinstance(rid, int) else None
-
-        if rid_int is not None and rid_int in existing:
-            s = existing[rid_int]
-            s.category = category
-            s.name = name
-            s.level = level
-            s.aliases = aliases
-            keep_ids.add(rid_int)
-        else:
-            session.add(ProfileSkill(
-                profile_id=profile_id,
-                category=category,
-                name=name,
-                level=level,
-                aliases=aliases,
-            ))
-
-    # Delete rows the user removed. Junction has no ON DELETE CASCADE on
-    # SQLite by default, so wipe the links explicitly first.
+    keep_ids = _upsert_skills(session, rows, existing, profile_id)
     drop_ids = set(existing.keys()) - keep_ids
-    for sid in drop_ids:
-        await session.execute(
-            delete(profile_experience_skills).where(
-                profile_experience_skills.c.skill_id == sid
-            )
-        )
-        await session.delete(existing[sid])
+    await _drop_skills(session, existing, drop_ids)
     await session.flush()
     logger.debug(
         "Saved skills: kept=%d dropped=%d", len(keep_ids), len(drop_ids)
@@ -306,6 +342,67 @@ class SaveExperienceError(ValueError):
         super().__init__(f"Запись #{index}: {problem}")
 
 
+def _checked_experience_rows(
+    rows: list[dict],
+) -> list[tuple[dict, date, date | None]]:
+    """Проверить все строки мест работы и разобрать их даты.
+
+    Проверка идёт до первой записи в базу: сорвись она посередине, человек
+    потерял бы уже введённое. Номер строки едет в отказ, чтобы окно показало
+    беду там, где она есть.
+    """
+    checked: list[tuple[dict, date, date | None]] = []
+    for i, row in enumerate(rows, start=1):
+        if not (row.get("company") or "").strip():
+            raise SaveExperienceError(i, "не заполнено название компании")
+        if not (row.get("role") or "").strip():
+            raise SaveExperienceError(i, "не заполнена должность")
+        start_iso = (row.get("start_date") or "").strip()
+        if not start_iso:
+            raise SaveExperienceError(i, "не заполнена дата начала")
+        try:
+            start_date = date.fromisoformat(start_iso)
+        except ValueError:
+            raise SaveExperienceError(i, f"неверная дата начала: {start_iso!r}")
+        end_iso = (row.get("end_date") or "").strip()
+        end_date: date | None = None
+        if end_iso:
+            try:
+                end_date = date.fromisoformat(end_iso)
+            except ValueError:
+                raise SaveExperienceError(
+                    i, f"неверная дата окончания: {end_iso!r}"
+                )
+        checked.append((row, start_date, end_date))
+    return checked
+
+
+def _add_experience_rows(
+    session: AsyncSession, checked: list, profile_id: int, skills_by_name: dict
+) -> None:
+    """Записать места работы из окна, связав названные навыки с анкетой.
+
+    Незнакомое название навыка отбрасывается молча: окно предлагает выбирать
+    из заведённых, и своё сюда попадает разве что из устаревшей вкладки.
+    """
+    for row, start_date, end_date in checked:
+        exp = ProfileExperience(
+            profile_id=profile_id,
+            company=row["company"].strip(),
+            company_url=(row.get("company_url") or "").strip() or None,
+            role=row["role"].strip(),
+            start_date=start_date,
+            end_date=end_date,
+            achievements=str_list(row.get("achievements")),
+            responsibilities=str_list(row.get("responsibilities")),
+        )
+        for sname in (row.get("skill_names") or []):
+            s = skills_by_name.get(skill_key(str(sname)))
+            if s is not None:
+                exp.skills.append(s)
+        session.add(exp)
+
+
 async def save_experience(
     session: AsyncSession,
     rows: list[dict],
@@ -322,54 +419,10 @@ async def save_experience(
     Caller wraps in ``session.begin()``.
     """
     skills_by_name = _skills_by_key(await list_skills(session))
-
-    # Validate everything first — fail fast, no half-applied state.
-    parsed_rows: list[tuple[dict, date, date | None]] = []
-    for i, row in enumerate(rows, start=1):
-        company = (row.get("company") or "").strip()
-        role = (row.get("role") or "").strip()
-        start_iso = (row.get("start_date") or "").strip()
-        if not company:
-            raise SaveExperienceError(i, "не заполнено название компании")
-        if not role:
-            raise SaveExperienceError(i, "не заполнена должность")
-        if not start_iso:
-            raise SaveExperienceError(i, "не заполнена дата начала")
-        try:
-            start_date = date.fromisoformat(start_iso)
-        except ValueError:
-            raise SaveExperienceError(i, f"неверная дата начала: {start_iso!r}")
-        end_iso = (row.get("end_date") or "").strip()
-        end_date: date | None = None
-        if end_iso:
-            try:
-                end_date = date.fromisoformat(end_iso)
-            except ValueError:
-                raise SaveExperienceError(
-                    i, f"неверная дата окончания: {end_iso!r}"
-                )
-        parsed_rows.append((row, start_date, end_date))
-
+    parsed_rows = _checked_experience_rows(rows)
     await _wipe_experience(session)
     await session.flush()
-
-    for row, start_date, end_date in parsed_rows:
-        company_url = (row.get("company_url") or "").strip() or None
-        exp = ProfileExperience(
-            profile_id=profile_id,
-            company=row["company"].strip(),
-            company_url=company_url,
-            role=row["role"].strip(),
-            start_date=start_date,
-            end_date=end_date,
-            achievements=str_list(row.get("achievements")),
-            responsibilities=str_list(row.get("responsibilities")),
-        )
-        for sname in (row.get("skill_names") or []):
-            s = skills_by_name.get(skill_key(str(sname)))
-            if s is not None:
-                exp.skills.append(s)
-        session.add(exp)
+    _add_experience_rows(session, parsed_rows, profile_id, skills_by_name)
     await session.flush()
     logger.debug("Saved experiences: %d rows", len(parsed_rows))
 
@@ -432,64 +485,3 @@ async def replace_profile_languages(
         )
     await session.flush()
     logger.debug("Profile languages replaced (count=%d)", len(items))
-
-
-async def build_profile_block(session: AsyncSession) -> str:
-    """Текстовый блок «Информация о кандидате» для cover-letter промпта.
-
-    Собирает имя/роль/локацию/годы опыта (вычисляются по самой ранней
-    ProfileExperience), скиллы по категориям и список мест работы. Если
-    ``Profile.free_preferences`` заполнен — добавляется отдельной секцией
-    «Дополнительно», чтобы LLM могла учесть пожелания (про релокацию, гео,
-    специфичные предпочтения).
-    """
-    profile = await get_profile(session)
-    if profile is None:
-        return ""
-
-    skills = await list_skills(session)
-    experiences = await list_experience(session)
-
-    skills_by_cat: dict[str, list[str]] = {}
-    for s in skills:
-        skills_by_cat.setdefault(s.category, []).append(s.name)
-    skills_lines = [f"- {cat}: {', '.join(names)}" for cat, names in skills_by_cat.items()]
-
-    # Незаполненные поля (None в БД) пропускаем целиком, иначе LLM получит
-    # «Имя: None None» / «Роль: None» и попытается включить это в письмо.
-    full_name = " ".join(
-        p for p in (profile.first_name, profile.last_name) if p
-    ).strip()
-    header_lines: list[str] = []
-    if full_name:
-        header_lines.append(f"Имя: {full_name}")
-    if profile.title:
-        header_lines.append(f"Роль: {profile.title}")
-    if profile.location:
-        header_lines.append(f"Локация: {profile.location}")
-    if experiences:
-        min_start = min(e.start_date for e in experiences)
-        today = date.today()
-        years = today.year - min_start.year - (
-            (today.month, today.day) < (min_start.month, min_start.day)
-        )
-        years = max(years, 0)
-        header_lines.append(f"Опыт: {years}+ лет в IT")
-
-    exp_lines = []
-    for e in experiences:
-        end = e.end_date.strftime("%m.%Y") if e.end_date else "настоящее время"
-        start = e.start_date.strftime("%m.%Y")
-        suffix = f": {e.achievements[0]}" if e.achievements else ""
-        exp_lines.append(f"- {e.company} ({e.role}, {start} — {end}){suffix}")
-
-    sections: list[str] = []
-    if header_lines:
-        sections.append("\n".join(header_lines))
-    if skills_lines:
-        sections.append("Стек:\n" + "\n".join(skills_lines))
-    if exp_lines:
-        sections.append("Опыт работы:\n" + "\n".join(exp_lines))
-    if profile.free_preferences:
-        sections.append("Дополнительно:\n" + profile.free_preferences.strip())
-    return "\n\n".join(sections)

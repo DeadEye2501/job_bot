@@ -36,22 +36,20 @@ MUTATIONS = [
     # save_skills: строка без имени всё равно записывается
     (
         "backend/repository/profile.py",
-        "        if not name:" + CRLF
-        + "            continue" + CRLF
-        + '        category = (row.get("category") or "Общее").strip() or "Общее"',
-        '        category = (row.get("category") or "Общее").strip() or "Общее"',
+        "    if not name:" + CRLF + "        return None" + CRLF,
+        "    if False:" + CRLF + "        return None" + CRLF,
     ),
     # save_skills: пустой раздел перестаёт заменяться умолчанием
     (
         "backend/repository/profile.py",
-        '        category = (row.get("category") or "Общее").strip() or "Общее"',
-        '        category = (row.get("category") or "Общее").strip()',
+        '        "category": (row.get("category") or "Общее").strip() or "Общее",',
+        '        "category": (row.get("category") or "Общее").strip(),',
     ),
     # save_skills: мусорный уровень роняет сохранение
     (
         "backend/repository/profile.py",
-        "        except (TypeError, ValueError):" + CRLF + "            level = 1" + CRLF,
-        "        except KeyError:" + CRLF + "            level = 1" + CRLF,
+        "    except (TypeError, ValueError):" + CRLF + "        level = 1" + CRLF,
+        "    except KeyError:" + CRLF + "        level = 1" + CRLF,
     ),
     # save_skills: среди написаний остаются пустые и не-строки
     (
@@ -84,14 +82,14 @@ MUTATIONS = [
     # save_experience: пустая компания перестаёт отвергаться
     (
         "backend/repository/profile.py",
-        "        if not company:" + CRLF
+        '        if not (row.get("company") or "").strip():' + CRLF
         + '            raise SaveExperienceError(i, "не заполнено название компании")' + CRLF,
         "",
     ),
     # save_experience: пустая должность перестаёт отвергаться
     (
         "backend/repository/profile.py",
-        "        if not role:" + CRLF
+        '        if not (row.get("role") or "").strip():' + CRLF
         + '            raise SaveExperienceError(i, "не заполнена должность")' + CRLF,
         "",
     ),
@@ -126,8 +124,8 @@ MUTATIONS = [
     # save_experience: пустая ссылка на компанию сохраняется пустой строкой
     (
         "backend/repository/profile.py",
-        '        company_url = (row.get("company_url") or "").strip() or None',
-        '        company_url = (row.get("company_url") or "").strip()',
+        '            company_url=(row.get("company_url") or "").strip() or None,',
+        '            company_url=(row.get("company_url") or "").strip(),',
     ),
     # save_experience: в достижения попадают пустые и не-строки
     (
@@ -206,45 +204,45 @@ MUTATIONS = [
     ),
     # build_profile_block: незаполненная роль называется пустотой
     (
-        "backend/repository/profile.py",
+        "backend/repository/profile_block.py",
         "    if profile.title:" + CRLF
         + '        header_lines.append(f"Роль: {profile.title}")' + CRLF,
         '    header_lines.append(f"Роль: {profile.title}")' + CRLF,
     ),
     # build_profile_block: незаполненная локация называется пустотой
     (
-        "backend/repository/profile.py",
+        "backend/repository/profile_block.py",
         "    if profile.location:" + CRLF
         + '        header_lines.append(f"Локация: {profile.location}")' + CRLF,
         '    header_lines.append(f"Локация: {profile.location}")' + CRLF,
     ),
     # build_profile_block: годы опыта считаются от самого позднего места
     (
-        "backend/repository/profile.py",
-        "        min_start = min(e.start_date for e in experiences)",
-        "        min_start = max(e.start_date for e in experiences)",
+        "backend/repository/profile_block.py",
+        "    min_start = min(e.start_date for e in experiences)",
+        "    min_start = max(e.start_date for e in experiences)",
     ),
     # build_profile_block: у текущего места вместо срока пустота
     (
-        "backend/repository/profile.py",
+        "backend/repository/profile_block.py",
         '        end = e.end_date.strftime("%m.%Y") if e.end_date else "настоящее время"',
         '        end = e.end_date.strftime("%m.%Y") if e.end_date else ""',
     ),
     # build_profile_block: к месту приписывается последнее достижение
     (
-        "backend/repository/profile.py",
+        "backend/repository/profile_block.py",
         '        suffix = f": {e.achievements[0]}" if e.achievements else ""',
         '        suffix = f": {e.achievements[-1]}" if e.achievements else ""',
     ),
     # build_profile_block: пожелания уходят в запрос всегда
     (
-        "backend/repository/profile.py",
+        "backend/repository/profile_block.py",
         "    if profile.free_preferences:" + CRLF,
         "    if profile.free_preferences is not None or True:" + CRLF,
     ),
     # build_profile_block: без профиля возвращается не пустая строка
     (
-        "backend/repository/profile.py",
+        "backend/repository/profile_block.py",
         "    if profile is None:" + CRLF + '        return ""' + CRLF,
         "",
     ),
