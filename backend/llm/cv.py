@@ -1,7 +1,16 @@
+"""Разбор резюме моделью: из текста файла — заполненная анкета.
+
+Сосед по слою — `llm/vacancy.py`, и устройство у них одно: собрать запрос,
+спросить модель, разобрать ответ, привести поля к нашим справочникам. Отличает
+предмет: там объявление, которое читают, здесь резюме, которое пишут.
+
+Разобранные значения живут в `backend/payloads.py` рядом с прочими: собирает их
+разбор, а читают анкета и окно.
+"""
+
 import json
 import logging
 import re
-from dataclasses import dataclass
 from datetime import date
 
 import httpx
@@ -16,60 +25,17 @@ from backend.llm.answers import (
     normalize_enum,
     str_or_none,
 )
-from backend.payloads import str_list
+from backend.payloads import (
+    ParsedCv,
+    ParsedCvExperience,
+    ParsedCvLanguage,
+    ParsedCvProfile,
+    ParsedCvSkill,
+    str_list,
+)
 
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class ParsedCvProfile:
-    first_name: str
-    last_name: str
-    title: str
-    email: str
-    phone: str | None
-    location: str | None
-    telegram_username: str | None
-    github_url: str | None
-    education: str | None
-    work_format: list[str]
-    grades: list[str]
-    free_preferences: str | None
-
-
-@dataclass(frozen=True)
-class ParsedCvLanguage:
-    language: str
-    level: str
-
-
-@dataclass(frozen=True)
-class ParsedCvSkill:
-    category: str
-    name: str
-    level: int
-    aliases: list[str]
-
-
-@dataclass(frozen=True)
-class ParsedCvExperience:
-    company: str
-    company_url: str | None
-    role: str
-    start_date: date
-    end_date: date | None
-    achievements: list[str]
-    responsibilities: list[str]
-    stack: list[str]
-
-
-@dataclass(frozen=True)
-class ParsedCv:
-    profile: ParsedCvProfile
-    languages: list[ParsedCvLanguage]
-    skills: list[ParsedCvSkill]
-    experience: list[ParsedCvExperience]
 
 
 # NOTE — known limitations of single-pass CV parsing.

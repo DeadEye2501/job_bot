@@ -1,4 +1,4 @@
-"""Следствия разбора профиля и языков в `backend/cv_parser.py`.
+"""Следствия разбора профиля и языков в `backend/llm/cv.py`.
 
 Все закрытые разборщики видны только через `parse_cv`: «модель вернула такой
 JSON — вышло такое». Ответ подставляется подделкой, путь до разбора настоящий.
@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from backend.cv_parser import parse_cv
+from backend.llm.cv import parse_cv
 from tests.factories import CV_REQUIRED_PROFILE
 from tests.fakes.llm import CHAT, chat_response, provider
 

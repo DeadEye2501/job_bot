@@ -8,7 +8,7 @@ import json
 
 import httpx
 
-from backend.cv_parser import parse_cv
+from backend.llm.cv import parse_cv
 from tests.factories import CV_REQUIRED_PROFILE
 from tests.fakes.llm import CHAT, chat_response, provider
 

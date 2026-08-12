@@ -1,4 +1,4 @@
-"""Следствия разбора навыков и опыта работы в `backend/cv_parser.py`.
+"""Следствия разбора навыков и опыта работы в `backend/llm/cv.py`.
 
 Проверяется через `parse_cv`: «модель вернула такой JSON — вышло такое».
 Значения уровней и дат сняты прогоном настоящих функций.
@@ -8,7 +8,7 @@ from datetime import date
 
 import pytest
 
-from backend.cv_parser import parse_cv
+from backend.llm.cv import parse_cv
 from tests.factories import CV_REQUIRED_PROFILE
 from tests.fakes.llm import CHAT, chat_json, provider
 
