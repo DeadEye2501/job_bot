@@ -1633,9 +1633,15 @@ class MainApi(QObject):
             return
 
         async def run() -> str:
-            async with self._session_factory() as session:
-                async with session.begin():
-                    ok = await vacancies_life.delete_vacancy(session, vacancy_id)
+            # Через конвейер, а не прямо в репозиторий: вместе со строкой
+            # уходит её вектор из кэша отсева перепостов. Без бота кэша нет
+            # вовсе — тогда довольно строки.
+            if self._bot is not None:
+                ok = await self._bot.ui_forget_vacancy(vacancy_id)
+            else:
+                async with self._session_factory() as session:
+                    async with session.begin():
+                        ok = await vacancies_life.delete_vacancy(session, vacancy_id)
             if not ok:
                 return _err(
                     "Вакансия не найдена.",

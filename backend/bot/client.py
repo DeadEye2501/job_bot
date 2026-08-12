@@ -293,3 +293,6 @@ class Bot:
 
     async def ui_rerun_vacancy_pipeline(self, vacancy_id) -> bool:
         return await rerun.ui_rerun_vacancy_pipeline(self, vacancy_id)
+
+    async def ui_forget_vacancy(self, vacancy_id) -> bool:
+        return await self._ingestion.forget_vacancy(vacancy_id)

@@ -12,7 +12,7 @@ import threading
 import traceback
 
 from backend.log_file import LogFileHandler
-from config import get_log_path
+from config import get_lock_path, get_log_path
 
 
 def _use_utf8_stdout() -> None:
@@ -123,23 +123,36 @@ threading.excepthook = _log_uncaught_in_thread
 def main() -> int:
     from backend import bootstrap
     from backend.crypto import _check_keyring_backend
+    from backend.single_instance import hold_the_only_copy
     from client.shell import run_ui
 
-    # Fail-fast если keyring-бэкенд небезопасный (PlaintextKeyring) или
-    # сломан (fail.Keyring) — иначе secrets улетят в открытом виде на
-    # диск или потеряются после первого старта. Друже сообщение в stderr
-    # вместо raw traceback'а — Qt UI ещё не поднят, диалог показать
-    # негде, но юзер хотя бы поймёт причину выхода вместо «упало непонятно».
-    try:
-        _check_keyring_backend()
-    except RuntimeError as e:
-        logger.critical("keyring pre-flight failed: %s", e)
-        print(f"\n[Job Bot] Не удалось запуститься: {e}\n", file=sys.stderr)
-        return 2
-    # Schema must be ensured BEFORE the Qt event loop starts because alembic
-    # spins its own asyncio.run inside.
-    bootstrap.ensure_schema()
-    return run_ui()
+    # Замок берётся первым и держится до самого конца: живёт он, пока жив
+    # дескриптор. Две копии над одним каталогом данных делят файл журнала — а
+    # тот поворачивается переименованием, и после первой же ротации одна из
+    # копий пишет в переименованный файл, который сотрут следующей.
+    the_only_copy = hold_the_only_copy(get_lock_path())
+    if the_only_copy is None:
+        # Своей записи здесь нет нарочно, и дело не только в повторе: `CRITICAL`
+        # зажигает в окне счётчик ошибок, а запущенное второй раз приложение —
+        # не беда, а обычное дело. Сам отказ замок уже записал.
+        print("\n[Job Bot] Приложение уже запущено.\n", file=sys.stderr)
+        return 3
+    with the_only_copy:
+        # Fail-fast если keyring-бэкенд небезопасный (PlaintextKeyring) или
+        # сломан (fail.Keyring) — иначе secrets улетят в открытом виде на
+        # диск или потеряются после первого старта. Друже сообщение в stderr
+        # вместо raw traceback'а — Qt UI ещё не поднят, диалог показать
+        # негде, но юзер хотя бы поймёт причину выхода вместо «упало непонятно».
+        try:
+            _check_keyring_backend()
+        except RuntimeError as e:
+            logger.critical("keyring pre-flight failed: %s", e)
+            print(f"\n[Job Bot] Не удалось запуститься: {e}\n", file=sys.stderr)
+            return 2
+        # Schema must be ensured BEFORE the Qt event loop starts because alembic
+        # spins its own asyncio.run inside.
+        bootstrap.ensure_schema()
+        return run_ui()
 
 
 if __name__ == "__main__":

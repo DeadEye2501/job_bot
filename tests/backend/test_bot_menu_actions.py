@@ -26,6 +26,31 @@ async def test_a_rerun_reaches_the_pipeline_and_frees_the_slot(make_bot):
     assert bot._current_poll_task is None
 
 
+async def test_a_delete_from_the_window_reaches_the_pipeline(make_bot):
+    """Удаление по кнопке из окна доходит до конвейера, а не до репозитория.
+
+    Мимо конвейера строка исчезла бы, а её вектор остался в кэше отсева
+    перепостов — и следующее похожее объявление молча отсеклось бы как повтор
+    того, чего больше нет.
+    """
+    ingestion = FakeIngestion()
+    bot = wire(await make_bot(), ingestion)
+
+    assert await bot.ui_forget_vacancy(5) is True
+    assert ingestion.forget_calls == [5]
+
+
+async def test_a_delete_of_a_gone_vacancy_reports_failure(make_bot):
+    """Удаление строки, которой уже нет, отвечает окну отказом.
+
+    По этому ответу окно говорит «вакансия не найдена»: строку мог убрать
+    другой экран или сам конвейер, пока карточка была открыта.
+    """
+    bot = wire(await make_bot(), FakeIngestion(outcome=False))
+
+    assert await bot.ui_forget_vacancy(5) is False
+
+
 async def test_a_rerun_the_pipeline_refused_reports_failure(make_bot):
     """Прогон, за который конвейер не взялся, сообщает о неудаче."""
     bot = wire(await make_bot(), FakeIngestion(outcome=False))
