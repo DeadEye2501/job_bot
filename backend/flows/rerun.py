@@ -8,6 +8,7 @@ from backend.flows import parse
 from backend.helpers import extract_text
 from backend.models import TelegramChannel
 from backend.models import Vacancy
+from backend.repository.channels import list_named_channels
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,11 @@ async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> bool:
         channel_username = ""
         source_msg_id = v.source_msg_id
         if v.source_channel_id is not None:
-            ch = await session.get(TelegramChannel, v.source_channel_id)
-            if ch is not None and ch.username:
-                channel_username = ch.username
+            named = await list_named_channels(
+                session, ids=[v.source_channel_id]
+            )
+            if named:
+                channel_username = named[0].username
 
     from pyrogram.errors import FloodWait
 

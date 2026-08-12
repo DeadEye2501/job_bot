@@ -21,6 +21,18 @@ from backend.payloads import str_list
 logger = logging.getLogger(__name__)
 
 
+async def _wipe_experience(session: AsyncSession) -> None:
+    """Стереть места работы вместе со связками «место — навык».
+
+    Порядок несущий: проверка внешних ключей у этого движка включена, и
+    сотри места первыми — база отказала бы, потому что на них ещё смотрят
+    связки. Стирают опыт две дороги — разбор резюме и запись из окна, — и
+    порядок у них один.
+    """
+    await session.execute(delete(profile_experience_skills))
+    await session.execute(delete(ProfileExperience))
+
+
 def _index_skill_keys(
     lookup: dict[str, ProfileSkill],
     names: tuple[str, ...],
@@ -69,8 +81,7 @@ async def save_parsed_cv(
     wizard implies a fresh write — partial merging would cause stale skills
     to silently linger.
     """
-    await session.execute(delete(profile_experience_skills))
-    await session.execute(delete(ProfileExperience))
+    await _wipe_experience(session)
     await session.execute(delete(ProfileSkill))
     await session.execute(delete(ProfileLanguage))
     await session.execute(delete(Profile))
@@ -94,15 +105,14 @@ async def save_parsed_cv(
     session.add(profile)
     await session.flush()
 
-    for lang in parsed.languages:
-        session.add(
-            ProfileLanguage(
-                profile_id=profile.id,
-                language=lang.language,
-                level=lang.level,
-            )
-        )
-    await session.flush()
+    # Стирание внутри писателя здесь холостое — таблица снесена целиком выше.
+    # Так и оставлено: свой цикл ради экономии одного запроса на разбор резюме
+    # означал бы второе место, знающее устройство строки языка.
+    await replace_profile_languages(
+        session,
+        profile.id,
+        [(lang.language, lang.level) for lang in parsed.languages],
+    )
 
     skill_lookup: dict[str, ProfileSkill] = {}
     for s in parsed.skills:
@@ -305,8 +315,7 @@ async def save_experience(
                 )
         parsed_rows.append((row, start_date, end_date))
 
-    await session.execute(delete(profile_experience_skills))
-    await session.execute(delete(ProfileExperience))
+    await _wipe_experience(session)
     await session.flush()
 
     for row, start_date, end_date in parsed_rows:

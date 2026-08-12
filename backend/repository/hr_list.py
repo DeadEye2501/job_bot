@@ -12,6 +12,14 @@ from backend.repository.hr_identify import HAS_TELEGRAM_IDENTITY
 from backend.repository.messages import UNREAD_INCOMING
 from backend.repository.search import matches_search
 
+_HR_BY_VACANCY_COUNT = (func.count(Vacancy.id).desc(), HR.name.asc())
+"""Порядок «кто принёс больше вакансий», а при равенстве — по имени.
+
+Одно объявление на два перечня — общий и по компании: разойдись они, один и
+тот же человек стоял бы в двух списках по-разному без всякой причины.
+"""
+
+
 async def _with_last_incoming_id(
     session: AsyncSession, hrs: list[HR]
 ) -> list[tuple[HR, int]]:
@@ -124,7 +132,7 @@ async def list_hr_with_counts(
             select(HR, func.count(Vacancy.id).label("cnt"))
             .outerjoin(Vacancy, Vacancy.hr_id == HR.id)
             .group_by(HR.id)
-            .order_by(func.count(Vacancy.id).desc(), HR.name.asc())
+            .order_by(*_HR_BY_VACANCY_COUNT)
         )
     counts = (await session.execute(base)).all()
 
@@ -200,7 +208,7 @@ async def list_hrs_for_company(
             .join(Vacancy, Vacancy.hr_id == HR.id)
             .where(Vacancy.company_id == company_id)
             .group_by(HR.id)
-            .order_by(func.count(Vacancy.id).desc(), HR.name.asc())
+            .order_by(*_HR_BY_VACANCY_COUNT)
         )
     ).all()
     return [(hr, int(cnt or 0)) for hr, cnt in rows]

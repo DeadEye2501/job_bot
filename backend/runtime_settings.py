@@ -93,6 +93,23 @@ _APP_DEFAULTS: dict[str, str] = {
 }
 
 
+async def _tg_row(session: AsyncSession) -> TgAccount | None:
+    """Единственная строка учётной записи Telegram, если она заведена."""
+    return (await session.scalars(select(TgAccount))).first()
+
+
+async def _state_row(session: AsyncSession) -> BotState | None:
+    """Единственная строка состояния бота, если она заведена."""
+    return (await session.scalars(select(BotState))).first()
+
+
+async def _llm_row(session: AsyncSession, kind: LlmConfigKind) -> LlmConfig | None:
+    """Строка настроек поставщика моделей своего рода, если она заведена."""
+    return (
+        await session.scalars(select(LlmConfig).where(LlmConfig.kind == kind))
+    ).first()
+
+
 class RuntimeSettings:
     """In-memory cache of runtime settings, backed by SQLite."""
 
@@ -115,21 +132,13 @@ class RuntimeSettings:
 
     async def reload(self) -> None:
         async with self._session_factory() as session:
-            tg_row = (await session.scalars(select(TgAccount))).first()
+            tg_row = await _tg_row(session)
             self._tg = _from_tg_row(tg_row) if tg_row else None
 
-            chat_row = (
-                await session.scalars(
-                    select(LlmConfig).where(LlmConfig.kind == LlmConfigKind.CHAT)
-                )
-            ).first()
+            chat_row = await _llm_row(session, LlmConfigKind.CHAT)
             self._chat = _from_llm_row(chat_row) if chat_row else None
 
-            embed_row = (
-                await session.scalars(
-                    select(LlmConfig).where(LlmConfig.kind == LlmConfigKind.EMBED)
-                )
-            ).first()
+            embed_row = await _llm_row(session, LlmConfigKind.EMBED)
             self._embed = _from_llm_row(embed_row) if embed_row else None
 
             self._app = {
@@ -179,13 +188,7 @@ class RuntimeSettings:
         (cosine ≥ 0 для нормированных векторов всегда), 1.0 эффективно
         выключил бы дедуп. NaN/Inf тоже отбиваем.
         """
-        try:
-            v = float(self._app_value("dedup_cosine_threshold"))
-        except ValueError:
-            return 0.92
-        if not math.isfinite(v):
-            return 0.92
-        return max(0.5, min(0.999, v))
+        return max(0.5, min(0.999, self._app_float("dedup_cosine_threshold")))
 
     @property
     def dm_backfill_limit(self) -> int:
@@ -201,7 +204,7 @@ class RuntimeSettings:
 
     @property
     def wizard_completed(self) -> bool:
-        return self._app_value("wizard_completed").lower() == "true"
+        return self._app_bool("wizard_completed")
 
     @property
     def send_locked(self) -> bool:
@@ -209,21 +212,51 @@ class RuntimeSettings:
         dev-тестов). Авторитетный источник — здесь; ``telegram.SEND_LOCKED``
         синкается с этой настройкой на старте Bot.run и при изменении
         через UI."""
-        return self._app_value("send_locked").lower() == "true"
+        return self._app_bool("send_locked")
 
     @property
     def auto_apply(self) -> bool:
         """Если False, авто-отправка cover-letter'ов из poll-цикла
         отключена (parse-pipeline отрабатывает, ручная отправка через
         UI работает)."""
-        return self._app_value("auto_apply").lower() == "true"
+        return self._app_bool("auto_apply")
 
     @property
     def flood_wait_until_ts(self) -> float:
+        return self._app_float("flood_wait_until_ts")
+
+    def _app_bool(self, key: str) -> bool:
+        """Булева настройка; истина — только слово «true» в любом регистре.
+
+        Что считать истиной, договорено здесь один раз на всех: значения
+        правят руками через DBeaver, и напиши кто-то «1» или «yes» — три
+        настройки ответили бы одинаково лишь потому, что писались за один
+        раз одним человеком.
+        """
+        return self._app_value(key).lower() == "true"
+
+    def _app_float(self, key: str) -> float:
+        """Дробная настройка; негодное значение откатывается к умолчанию.
+
+        Умолчание берётся из общего перечня, как у целых: два места, знающих
+        одно и то же число, разошлись бы молча. Бесконечность и `NaN` тут же
+        и отбиваются — они «числа», но ни один зовущий их не переживёт:
+        порог дедупа с ними отсеял бы всё или ничего, а метка времени
+        ожидания заперла бы отправку навсегда.
+
+        Дальнейшие оговорки — зажим у порога — остаются зовущему.
+        """
+        raw = self._app_value(key)
         try:
-            return float(self._app_value("flood_wait_until_ts"))
+            value = float(raw)
         except ValueError:
-            return 0.0
+            value = math.nan
+        if not math.isfinite(value):
+            logger.warning(
+                "настройка %s негодна (%r) — беру умолчание", key, raw
+            )
+            return float(_APP_DEFAULTS[key])
+        return value
 
     def _app_int(self, key: str, *, minimum: int | None = None) -> int:
         """Целая настройка; негодное значение откатывается к умолчанию.
@@ -269,7 +302,7 @@ class RuntimeSettings:
     ) -> None:
         async with self._session_factory() as session:
             async with session.begin():
-                row = (await session.scalars(select(TgAccount))).first()
+                row = await _tg_row(session)
                 if row is None:
                     row = TgAccount(id=1)
                     session.add(row)
@@ -308,7 +341,7 @@ class RuntimeSettings:
         """
         async with self._session_factory() as session:
             async with session.begin():
-                row = (await session.scalars(select(TgAccount))).first()
+                row = await _tg_row(session)
                 if row is not None:
                     await session.delete(row)
         self._tg = None
@@ -333,11 +366,7 @@ class RuntimeSettings:
     ) -> None:
         async with self._session_factory() as session:
             async with session.begin():
-                row = (
-                    await session.scalars(
-                        select(LlmConfig).where(LlmConfig.kind == kind)
-                    )
-                ).first()
+                row = await _llm_row(session, kind)
                 if row is None:
                     row = LlmConfig(kind=kind)
                     session.add(row)
@@ -381,13 +410,13 @@ class RuntimeSettings:
 
     async def get_mode(self) -> BotMode:
         async with self._session_factory() as session:
-            row = (await session.scalars(select(BotState))).first()
+            row = await _state_row(session)
             return row.mode if row is not None else BotMode.OFF
 
     async def set_mode(self, mode: BotMode) -> None:
         async with self._session_factory() as session:
             async with session.begin():
-                row = (await session.scalars(select(BotState))).first()
+                row = await _state_row(session)
                 prev = row.mode.value if row is not None else None
                 if row is None:
                     row = BotState(id=1, mode=mode)

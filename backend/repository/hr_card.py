@@ -13,11 +13,8 @@ from backend.repository.blacklist_marks import (
     active_blacklist_value,
     preferred_blacklist_value,
 )
-from backend.repository.merging import (
-    concat_notes,
-    load_merge_pair,
-    repoint_vacancies,
-)
+from backend.repository.merging import concat_notes, load_merge_pair
+from backend.repository.vacancies_life import repoint_vacancies
 from backend.repository.messages import UNREAD_INCOMING
 
 logger = logging.getLogger(__name__)
@@ -175,11 +172,9 @@ async def delete_hr(session: AsyncSession, hr_id: int) -> bool:
     msgs_deleted = (
         await session.execute(delete(Message).where(Message.hr_id == hr_id))
     ).rowcount
-    detached = (
-        await session.execute(
-            update(Vacancy).where(Vacancy.hr_id == hr_id).values(hr_id=None)
-        )
-    ).rowcount
+    detached = await repoint_vacancies(
+        session, Vacancy.hr_id, absorbed_id=hr_id, survivor_id=None
+    )
     await session.delete(hr)
     logger.info(
         "Deleted HR %d (%r), messages purged=%d, vacancies detached=%d",
