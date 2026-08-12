@@ -31,10 +31,8 @@ MUTATIONS = [
     # process_dm: чёрный список перестаёт глушить входящее
     (
         "backend/flows/dm.py",
-        "    if bl_value:" + CRLF
-        + "        # HR в активном blacklist",
-        "    if False:" + CRLF
-        + "        # HR в активном blacklist",
+        "    if not blacklisted:" + CRLF + "        return hr" + CRLF,
+        "    if True:" + CRLF + "        return hr" + CRLF,
     ),
     # process_dm: номер собеседника не дописывается в карточку
     (
@@ -64,26 +62,23 @@ MUTATIONS = [
     # process_dm: ответ перестаёт привязывать письмо к своей вакансии
     (
         "backend/flows/dm.py",
-        "            if reply_to_id:" + CRLF
-        + "                vacancy_id = await resolve_reply_target_vacancy(" + CRLF
-        + "                    session, hr.id, reply_to_id," + CRLF
-        + "                )" + CRLF,
+        "    if reply_to_id:" + CRLF
+        + "        by_reply = await resolve_reply_target_vacancy(session, hr_id, reply_to_id)" + CRLF
+        + "        if by_reply is not None:" + CRLF
+        + "            return by_reply" + CRLF,
         "",
     ),
     # process_dm: запасная привязка к свежей вакансии пропадает
     (
         "backend/flows/dm.py",
-        "            if vacancy_id is None:" + CRLF
-        + "                vacancy_id = await find_latest_vacancy_id_for_hr(" + CRLF
-        + "                    session, hr.id, as_of=msg.date," + CRLF
-        + "                )" + CRLF,
-        "",
+        "    return await find_latest_vacancy_id_for_hr(session, hr_id, as_of=msg.date)" + CRLF,
+        "    return None" + CRLF,
     ),
     # process_dm: в накопитель уходит текст с цитатой
     (
         "backend/flows/dm.py",
-        "    schedule_classification(hr.id, vacancy_id, new_msg_id, classify_text)",
-        "    schedule_classification(hr.id, vacancy_id, new_msg_id, text)",
+        "        schedule_classification(hr_lookup.id, vacancy_id, new_msg_id, classify_text)",
+        "        schedule_classification(hr_lookup.id, vacancy_id, new_msg_id, extract_dm_text(msg))",
     ),
     # process_dm: вакансия вне досягаемости автоматики всё равно разбирается
     (

@@ -72,22 +72,70 @@ async def _dropped_as_trash(
     return True
 
 
-async def parse_and_update_vacancy(
-    pipeline,
-    vacancy_id: int,
-    text: str,
-    channel_username: str,
-    *,
-    allow_delete: bool = True,
-) -> None:
-    """Parse + classify + persist for a vacancy.
+async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> str | None:
+    """Причина, по которой модель отвергла вакансию; пустота — годится.
 
-    ``allow_delete=True`` preserves the historical auto-ingest behavior
-    (trash verdict → row gone) and is the default only for backwards
-    compatibility with that path. **New callers should normally pass
-    ``False``** — silent deletion under a user-initiated action is
-    almost always the wrong UX, and bulk channel ingest is the only
-    place where it makes sense.
+    Неразобранный ответ считается отказом нарочно: закрытая дверь тут
+    дешевле открытой — человек пересмотрит вакансию руками, а вот отклик,
+    ушедший по невнятному вердикту, не отзовёшь. Причина с меткой мусора
+    отличается от прочих тем, что по ней строку можно убрать вовсе; решает
+    это зовущий.
+    """
+    validation = await validate_vacancy_fit(
+        parsed,
+        text,
+        pipeline._lm_client,
+        pipeline._lm_chat_model,
+        profile=pipeline._profile_cache,
+        known_skills=pipeline._skills_cache,
+    )
+    logger.debug(
+        "vacancy %s: fit verdict=%s reason=%r",
+        vacancy_id,
+        validation.verdict if validation else None,
+        validation.reason if validation else None,
+    )
+    if validation is None:
+        logger.warning(
+            "validate_vacancy_fit unavailable for vacancy parse, marking Not Fit"
+        )
+        return f"{LLM_SKIP_PREFIX}validation unavailable"
+    if validation.verdict == "trash":
+        return f"{TRASH_SKIP_PREFIX}{validation.reason or 'no reason'}"
+    if validation.verdict == "reject":
+        return f"{LLM_SKIP_PREFIX}{validation.reason or 'rejected'}"
+    return None
+
+
+async def _auto_send_if_allowed(
+    pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus
+) -> None:
+    """Отправить отклик, если можно; попытку записать при любом исходе.
+
+    Запись нужна затем, что через месяцы человек смотрит на новую вакансию
+    с опознанным HR и пройденным порогом и не понимает, почему отклик так
+    и не ушёл. Без строки в ленте ответа на это нет нигде.
+    """
+    if status != VacancyStatus.NEW or hr is None or not pipeline._rs.auto_apply:
+        return
+    ok, reason = await apply.try_auto_send(pipeline, hr, parsed, vacancy_id)
+    await record_vacancy_event(
+        pipeline._session_factory,
+        vacancy_id,
+        "auto_send",
+        {"ok": ok, "reason": reason},
+    )
+
+
+async def _parsed_or_dropped(
+    pipeline, vacancy_id: int, text: str, channel_username: str, allow_delete: bool
+):
+    """Разобрать объявление; пустота в ответ — с ним уже покончено.
+
+    Пустышку отсеиваем до модели-оценщика: разбор не вытащил ни одного поля
+    сверх названия, то есть это мем, обрывок или рекламная строчка, и второе
+    обращение к модели ей не положено. Дальше две дороги — удалить или
+    пометить, — и выбор между ними держит `_dropped_as_trash`.
     """
     parsed = await parse_vacancy(
         text,
@@ -96,81 +144,79 @@ async def parse_and_update_vacancy(
         channel_username=channel_username,
         known_skills=pipeline._skills_cache,
     )
-
-    # Раннее отсеивание пустышек: если LLM вообще не извлек структуру
-    # (parsed=None) или извлек только title без любых других полезных
-    # полей — это мусорный пост (мем, обрывок, рекламная строчка).
-    # Не тратим токены на LLM-валидатор и не оставляем в Not Fit:
-    # либо удаляем (auto-ingest), либо помечаем явным skip_reason
-    # для ручного просмотра (rerun).
-    if is_empty_vacancy(parsed):
-        if await _dropped_as_trash(
-            pipeline, vacancy_id, EMPTY_SKIP_REASON, allow_delete=allow_delete
-        ):
-            return
+    if not is_empty_vacancy(parsed):
+        return parsed
+    if not await _dropped_as_trash(
+        pipeline, vacancy_id, EMPTY_SKIP_REASON, allow_delete=allow_delete
+    ):
         await save_empty_vacancy(pipeline, vacancy_id, parsed)
-        return
+    return None
 
-    # blacklist scans the FULL raw text; parse_vacancy truncates to 6000
-    # chars due to LLM token budget — patterns past the cutoff still apply
+
+async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple:
+    """Приговор объявлению: статус, причина отказа и баллы.
+
+    Чёрный список читает весь исходный текст: разбору он достаётся урезанным
+    по бюджету модели, и образец за обрезом всё равно ловится. Оценщика
+    спрашивают только у тех, кого не отсеяли раньше, — второе обращение к
+    модели стоит денег.
+    """
     blacklist_match = check_blacklist(text, pipeline._blacklist_patterns)
-    # Score is computed over LLM-extracted required/preferred stack
-    # (already canonicalized via {KNOWN_SKILLS_BLOCK}, deduped, capitalized).
-    # required: +level / -1, preferred: +(level-1) / 0. See score_parsed.
-    # ``parsed`` is guaranteed non-None here: ``is_empty_vacancy(None)`` is
-    # True and we'd have returned above. ``assert`` is purely for type
-    # narrowing.
-    assert parsed is not None
     score = score_parsed(parsed, pipeline._skills_cache)
     logger.debug(
         "vacancy %s: score=%d threshold=%d blacklist=%s",
-        vacancy_id,
-        score,
-        pipeline._rs.scoring_threshold,
-        blacklist_match,
+        vacancy_id, score, pipeline._rs.scoring_threshold, blacklist_match,
     )
     status, skip_reason = decide_vacancy_status(
-        parsed, score, blacklist_match,
-        threshold=pipeline._rs.scoring_threshold,
+        parsed, score, blacklist_match, threshold=pipeline._rs.scoring_threshold,
     )
-
     if status == VacancyStatus.NEW:
-        validation = await validate_vacancy_fit(
-            parsed,
-            text,
-            pipeline._lm_client,
-            pipeline._lm_chat_model,
-            profile=pipeline._profile_cache,
-            known_skills=pipeline._skills_cache,
-        )
-        logger.debug(
-            "vacancy %s: fit verdict=%s reason=%r",
-            vacancy_id,
-            validation.verdict if validation else None,
-            validation.reason if validation else None,
-        )
-        # fail-closed: missing/unparseable validation routes to Not Fit
-        # so the user can re-evaluate manually rather than auto-applying
-        if validation is None:
-            status = VacancyStatus.NOT_FIT
-            skip_reason = f"{LLM_SKIP_PREFIX}validation unavailable"
-            logger.warning(
-                "validate_vacancy_fit unavailable for vacancy parse, marking Not Fit"
-            )
-        elif validation.verdict == "trash":
-            trash_reason = validation.reason or "no reason"
-            trash_skip_reason = f"{TRASH_SKIP_PREFIX}{trash_reason}"
-            if await _dropped_as_trash(
-                pipeline, vacancy_id, trash_skip_reason, allow_delete=allow_delete
-            ):
-                return
-            status = VacancyStatus.NOT_FIT
-            skip_reason = trash_skip_reason
-        elif validation.verdict == "reject":
-            status = VacancyStatus.NOT_FIT
-            skip_reason = f"{LLM_SKIP_PREFIX}{validation.reason or 'rejected'}"
+        refusal = await _fit_refusal(pipeline, parsed, text, vacancy_id)
+        if refusal is not None:
+            status, skip_reason = VacancyStatus.NOT_FIT, refusal
+    return status, skip_reason, score
 
-    hr_for_send, hr_created = await _persist_parse_outcome(
+
+async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: _Outcome) -> None:
+    """Записать исход, отправить отклик, если можно, и догнать переписку.
+
+    Догон идёт последним нарочно: пойди он раньше, вытащил бы наше же
+    письмо прежде, чем отправка закоммитит свою строку, — и в переписке
+    появился бы дубль без вакансии.
+    """
+    hr, created = await _persist_parse_outcome(pipeline, vacancy_id, parsed, outcome)
+    await _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id, outcome.status)
+    if created:
+        dm_backfill.spawn_hr_backfill(pipeline, hr)
+
+
+async def parse_and_update_vacancy(
+    pipeline, vacancy_id: int, text: str, channel_username: str,
+    *, allow_delete: bool = True,
+) -> None:
+    """Разобрать объявление, вынести приговор и записать исход.
+
+    ``allow_delete`` разводит две дороги: при обычном обходе непригодную
+    строку удаляют, при повторном разборе — никогда, потому что её открыл
+    человек. Умолчание истинно только ради обхода.
+    """
+    parsed = await _parsed_or_dropped(
+        pipeline, vacancy_id, text, channel_username, allow_delete
+    )
+    if parsed is None:
+        return
+    status, skip_reason, score = await _verdict_for(
+        pipeline, parsed, text, vacancy_id
+    )
+    if (
+        skip_reason
+        and skip_reason.startswith(TRASH_SKIP_PREFIX)
+        and await _dropped_as_trash(
+            pipeline, vacancy_id, skip_reason, allow_delete=allow_delete
+        )
+    ):
+        return
+    await _finish_parse(
         pipeline,
         vacancy_id,
         parsed,
@@ -181,36 +227,6 @@ async def parse_and_update_vacancy(
             keep_previous_stack=True,
         ),
     )
-
-    # Авто-отправка отклика: вакансия прошла score-threshold + LLM-fit-
-    # validator (status остался NEW), HR резолвлен в Telegram-юзера,
-    # юзер не выключил auto_apply, лимиты не превышены — генерируем
-    # cover letter и отправляем с прикреплённым CV.
-    if (
-        status == VacancyStatus.NEW
-        and hr_for_send is not None
-        and pipeline._rs.auto_apply
-    ):
-        ok, reason = await apply.try_auto_send(pipeline, 
-            hr_for_send, parsed, vacancy_id
-        )
-        # Audit-event: фиксируем КАЖДУЮ попытку auto-send'а вне
-        # зависимости от исхода — иначе юзер смотрит на NEW-вакансию
-        # через месяцы и не может понять «почему авто-отправка не
-        # сработала, ведь HR резолвлен и score прошёл».
-        await record_vacancy_event(
-            pipeline._session_factory,
-            vacancy_id,
-            "auto_send",
-            {"ok": ok, "reason": reason},
-        )
-
-    # ПОСЛЕ auto-send'а: иначе backfill может через get_chat_history
-    # вытащить cover-letter сообщение раньше, чем Bot.send закоммитит
-    # свою row с vacancy_id'ом — и вставит дубль без vacancy_id, а
-    # Bot.send'овский insert упадёт на UNIQUE.
-    if hr_created:
-        dm_backfill.spawn_hr_backfill(pipeline, hr_for_send)
 
 
 async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
