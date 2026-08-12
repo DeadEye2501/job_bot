@@ -151,12 +151,12 @@ MUTATIONS = [
         '        elif False:' + CRLF
         + "            status = VacancyStatus.NOT_FIT" + CRLF,
     ),
-    # _persist_parse_outcome: признак разбора не ставится
+    # _write_parsed_row: признак разбора не ставится
     (
         "backend/flows/parse.py",
-        "            v.is_parsed = True" + CRLF
-        + "            _apply_parsed_fields(v, parsed, outcome)",
-        "            _apply_parsed_fields(v, parsed, outcome)",
+        "    v.is_parsed = True" + CRLF
+        + "    _apply_parsed_fields(v, parsed, outcome)",
+        "    _apply_parsed_fields(v, parsed, outcome)",
     ),
     # _apply_parsed_fields: пустой повторный разбор затирает стек
     (
@@ -165,17 +165,17 @@ MUTATIONS = [
         + "        v.stack = parsed.stack" + CRLF,
         "    if True:" + CRLF + "        v.stack = parsed.stack" + CRLF,
     ),
-    # _persist_parse_outcome: компания не привязывается
+    # _link_company: компания не привязывается
     (
         "backend/flows/parse.py",
-        "                if company is not None:" + CRLF
-        + "                    v.company_id = company.id" + CRLF,
+        "    if company is not None:" + CRLF
+        + "        v.company_id = company.id" + CRLF,
         "",
     ),
-    # _persist_parse_outcome: HR не привязывается
+    # _link_resolved_hr: HR не привязывается
     (
         "backend/flows/parse.py",
-        "                v.hr_id = hr.id" + CRLF,
+        "    v.hr_id = hr.id" + CRLF,
         "",
     ),
     # parse_and_update_vacancy: отклик уходит и у непригодной вакансии
@@ -204,12 +204,12 @@ MUTATIONS = [
         "                        kind=\"auto_send\"," + CRLF
         + '                        payload={"ok": True, "reason": "sent"},' + CRLF,
     ),
-    # _fields_filled: заполненная компания в ленту не попадает
-    (
-        "backend/flows/parse.py",
-        '            ("company_name", v.company_name),' + CRLF,
-        "",
-    ),
+    # Поломки «поле пропало из ленты» здесь больше нет, и завести её нечем:
+    # заходом Г этапа 4 три перечня прямых полей сведены в
+    # `_DIRECT_PARSED_FIELDS`, и вынутое оттуда имя пропадает разом из
+    # стирания, записи и ленты. Такая поломка красит половину набора и
+    # проверяет не то, ради чего заводилась, — «забыли поле в одном из трёх
+    # перечней». Забыть его теперь негде.
     # save_empty_vacancy: пустой разбор щадит прежний стек наравне с обычным
     (
         "backend/flows/parse.py",
