@@ -1,6 +1,7 @@
 """Сведение разобранной из вакансии компании с уже заведённой."""
 
 import logging
+from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Any
 
@@ -20,6 +21,21 @@ from backend.repository.companies_keys import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _known_spellings(company: Company) -> tuple[str, list[str]]:
+    """Известные написания компании, приведённые к сравнимому виду.
+
+    Имя и прозвища отдаются порознь, а не общим набором: отбор правилами
+    различает, чем именно совпало — своим именем или прозвищем, — и ярлык
+    сведения от этого разный. Обязательство при этом одно: что считать
+    написанием и как его сравнивать, — и порознь эти две половины
+    («известное написание» против «нового») разошлись бы молча.
+    """
+    return (
+        normalize_company_name(company.name),
+        [normalize_company_name(a) for a in str_list(company.aliases)],
+    )
 
 
 def _enrich_company_with_parsed(
@@ -44,11 +60,8 @@ def _enrich_company_with_parsed(
 
     parsed_norm = normalize_company_name(parsed_name)
     if parsed_norm:
-        existing_norms = {normalize_company_name(company.name)}
-        existing_norms.update(
-            normalize_company_name(a) for a in str_list(company.aliases)
-        )
-        if parsed_norm not in existing_norms:
+        name_norm, alias_norms = _known_spellings(company)
+        if parsed_norm not in {name_norm, *alias_norms}:
             # Через `str_list`, а не `or []`: колонка JSON, и негодное её
             # содержимое здесь не сохраняется. Потерять его дешевле, чем
             # уронить разбор вакансии, — строками оно всё равно не было.
@@ -160,18 +173,39 @@ async def _create_company_row(
         return company, decision
 
 
-async def find_or_create_company(
-    session: AsyncSession,
-    name: str,
-    *,
-    website: str | None = None,
-    lm_client: Any = None,
-    lm_model: str | None = None,
-) -> tuple[Company | None, dict]:
-    """Резолв распарсенной (name, website) пары к существующей компании
-    или создание новой. Возвращает кортеж (company, decision).
+@dataclass(frozen=True, slots=True)
+class _Parsed:
+    """Разобранная пара «имя и сайт», приведённая к сравнимому виду.
 
-    decision — dict с полями:
+    Четыре значения об одном предмете, и порознь они не ходят: имя как
+    написано — для записи и журнала, нормализованное — для сравнения, хост —
+    для правил, исходная ссылка — для обогащения найденной строки.
+
+    Хост уже пропущен через `signal_host`: агрегаторы (t.me, linkedin, hh.ru)
+    считаются пустым хостом, иначе попавшая в поле сайта ссылка на канал
+    ломала бы сведение по имени у одной и той же компании.
+    """
+
+    raw_name: str
+    norm: str
+    host: str
+    website: str | None
+
+    @classmethod
+    def of(cls, raw_name: str, website: str | None) -> "_Parsed":
+        """Привести пришедшее из разбора к сравнимому виду."""
+        return cls(
+            raw_name=raw_name,
+            norm=normalize_company_name(raw_name),
+            host=signal_host(normalize_host(website)),
+            website=website,
+        )
+
+
+def _new_decision() -> dict:
+    """Пустой протокол сведения — то, что уедет в ленту вакансии.
+
+    Поля:
         stage:    "rule_name" | "rule_alias" | "rule_website" |
                   "llm_match" | "llm_no_match" | "create" |
                   "rule_name_unique" | "create_race_fallback" | "skip"
@@ -186,176 +220,224 @@ async def find_or_create_company(
         candidates:    [{id, name, website}, ...] | None — shortlist для
                        LLM (заполняется только когда LLM вызывался)
         llm_reasoning: str | None — короткий ответ LLM
-
-    ``lm_client`` / ``lm_model`` опциональны: без них Stage 2 пропускается,
-    схема вырождается в чистые правила + create. Это удобно для тестов и
-    для путей, где LLM-вызов нежелателен.
     """
-    decision: dict = {
+    return {
         "stage": "skip",
         "matched_id": None,
         "candidates": None,
         "llm_reasoning": None,
     }
+
+
+def _company_norms(rows) -> list[tuple[Company, str, list[str], str]]:
+    """Нормализованные представления каждой компании, посчитанные один раз.
+
+    Три прохода отбора спрашивают об одном и том же — имя, прозвища, хост, —
+    и нормализация в каждом стоила бы втрое. `signal_host` здесь же: у старых
+    строк в поле сайта могла лежать ссылка на канал, и без коэрса она
+    сработала бы как настоящий корпоративный домен.
+    """
+    return [
+        (c, *_known_spellings(c), signal_host(normalize_host(c.website)))
+        for c in rows
+    ]
+
+
+def _same_name(norms, parsed: _Parsed) -> Company | None:
+    """Компания с тем же нормализованным именем и несопротивляющимся хостом.
+
+    Ловит только варианты одного написания: МТС/MTС/MTS после транслитерации,
+    «ПАО Сбербанк» → «Сбербанк» после снятия юр.формы. «Бренд против полного
+    названия» (Сбер против Сбербанк) сюда не попадает — норм-формы у них
+    разные, — это территория арбитра.
+    """
+    for c, c_name_norm, _aliases, c_host in norms:
+        if (
+            c_name_norm
+            and c_name_norm == parsed.norm
+            and hosts_compatible(c_host, parsed.host)
+        ):
+            return c
+    return None
+
+
+def _same_alias(norms, parsed: _Parsed) -> Company | None:
+    """Компания, у которой это имя записано прозвищем."""
+    for c, _name, c_aliases, c_host in norms:
+        if any(a and a == parsed.norm for a in c_aliases) and hosts_compatible(
+            c_host, parsed.host
+        ):
+            return c
+    return None
+
+
+def _same_host(norms, parsed: _Parsed) -> Company | None:
+    """Компания с тем же корпоративным доменом.
+
+    Агрегаторы уже сведены к пустоте в `signal_host`, поэтому непустой хост
+    здесь — настоящий корпоративный домен, с обеих сторон.
+
+    Асимметрия с правилом «одинаковое имя и разные сайты — разные компании»
+    намеренная: обратный случай — разные имена при одном сайте — склеивается
+    без обращения к модели. Домен тут сильный сигнал: ребрендинг, бренд
+    против юр.названия, вариация разбора одной и той же страницы.
+    """
+    for c, _name, _aliases, c_host in norms:
+        if c_host and c_host == parsed.host:
+            return c
+    return None
+
+
+def _rule_match(norms, parsed: _Parsed):
+    """Кто из компаний сведён правилами; отдаёт его и ярлык сработавшего.
+
+    Три правила подряд — имя, прозвище, хост, — и порядок у них по силе
+    сигнала: первое сработавшее решает.
+
+    Пустое нормализованное имя до первых двух не доходит: на входе была одна
+    юр.форма («ПАО», «LLC») без бренд-ядра, и пустая строка совпала бы с любой
+    другой такой же, склеив заведомо разные компании. Отбор по хосту при этом
+    работает как обычно — он безопаснее.
+    """
+    if parsed.norm:
+        by_name = _same_name(norms, parsed)
+        if by_name is not None:
+            return by_name, "rule_name"
+        by_alias = _same_alias(norms, parsed)
+        if by_alias is not None:
+            return by_alias, "rule_alias"
+    if parsed.host:
+        found = _same_host(norms, parsed)
+        if found is not None:
+            return found, "rule_website"
+    return None
+
+
+def _llm_shortlist(norms, parsed: _Parsed) -> list[Company]:
+    """Кого показать арбитру: похожие по имени и не спорящие по хосту.
+
+    Порог схожести и длина списка стоят здесь, а не доводами: задавать их
+    по-своему некому, а доводов у зовущего и так пять.
+
+    Пустое нормализованное имя сюда не приходит, и это забота зовущего:
+    `SequenceMatcher` вернул бы на нём единицу против любой другой пустой
+    строки и показал бы арбитру все «голые» юр.формы разом.
+    """
+    scored: list[tuple[Company, float]] = []
+    for c, c_name_norm, c_aliases, c_host in norms:
+        if not hosts_compatible(c_host, parsed.host):
+            continue
+        ratio_name = (
+            SequenceMatcher(None, parsed.norm, c_name_norm).ratio()
+            if c_name_norm
+            else 0.0
+        )
+        ratio_alias = max(
+            (SequenceMatcher(None, parsed.norm, a).ratio() for a in c_aliases if a),
+            default=0.0,
+        )
+        best = max(ratio_name, ratio_alias)
+        if best >= 0.7:
+            scored.append((c, best))
+    scored.sort(key=lambda x: -x[1])
+    return [c for c, _ in scored[:5]]
+
+
+def _log_no_match(parsed: _Parsed, shortlist, reasoning: str | None) -> None:
+    """Модель звали, и она решила «не то».
+
+    Без этой записи следующая строка про заведение выглядела бы так, будто
+    модель не звали вовсе. Хост пишется до коэрса — чтобы видеть, какая
+    ссылка пришла из вакансии, а не пустоту после него.
+    """
+    logger.info(
+        "company_dedup: llm_no_match parsed_name=%r parsed_host=%r "
+        "shortlist_ids=%r reasoning=%r",
+        parsed.raw_name,
+        normalize_host(parsed.website),
+        [c.id for c in shortlist],
+        reasoning,
+    )
+
+
+async def _llm_arbitrate(
+    lm_client: Any, lm_model: str, parsed: _Parsed, shortlist
+) -> tuple[Company | None, dict]:
+    """Спросить модель, кто из показанных — та же компания.
+
+    Отдаёт найденного и приписку к протоколу, а не правит протокол сам: чем
+    кончилось дело, решает зовущий, а приписка ложится при любом исходе.
+    Номер вне списка — модель возвращает и такой — сохраняется в протоколе:
+    иначе след от него остаётся только в свободном тексте рассуждения. Ввоз
+    слоя модели внутри тела: репозиторий не должен зависеть от него на
+    импорте, а нужен он только здесь и только когда до арбитра дошло.
+    """
+    from backend.llm.company import dedupe_company_with_llm
+
+    matched_id, reasoning = await dedupe_company_with_llm(
+        lm_client,
+        lm_model,
+        parsed_name=parsed.raw_name,
+        parsed_website=parsed.website,
+        candidates=shortlist,
+    )
+    patch: dict = {
+        "candidates": [
+            {"id": c.id, "name": c.name, "website": c.website} for c in shortlist
+        ],
+        "llm_reasoning": reasoning,
+    }
+    if matched_id is not None:
+        match = next((c for c in shortlist if c.id == matched_id), None)
+        if match is not None:
+            return match, patch
+        patch["llm_hallucinated_id"] = matched_id
+        logger.warning(
+            "company_dedup: LLM hallucinated id=%r outside shortlist=%r",
+            matched_id,
+            [c.id for c in shortlist],
+        )
+    _log_no_match(parsed, shortlist, reasoning)
+    return None, patch
+
+
+async def find_or_create_company(
+    session: AsyncSession,
+    name: str,
+    *,
+    website: str | None = None,
+    lm_client: Any = None,
+    lm_model: str | None = None,
+) -> tuple[Company | None, dict]:
+    """Свести разобранную пару «имя и сайт» с компанией или завести новую.
+
+    Ступени идут по силе сигнала: правила, арбитр из языковой модели по
+    короткому списку похожих, заведение. Без клиента модели арбитр
+    пропускается; протокол описан у `_new_decision`.
+    """
+    decision = _new_decision()
     raw_name = (name or "").strip()
     if not raw_name:
         return None, decision
-
-    parsed_norm = normalize_company_name(raw_name)
-    # Hard-rule по host'ам должен опираться только на «настоящие» сигналы:
-    # агрегаторы (t.me, linkedin, hh.ru…) обращаемся как с пустым host'ом —
-    # иначе попавшая в company_website ссылка на канал/профиль ломала бы
-    # name-match для одной и той же компании. Coerce делаем здесь, дальше
-    # везде используем уже очищенный host.
-    parsed_host = signal_host(normalize_host(website))
-
+    parsed = _Parsed.of(raw_name, website)
     rows = list((await session.scalars(select(Company))).all())
-    # Pre-вычисляем нормализованные представления каждой компании, чтобы не
-    # повторять normalize в трёх внутренних циклах. c_host тоже сразу
-    # пропускаем через signal_host — для legacy-данных, где в БД могла
-    # лечь ссылка на t.me как website.
-    norms: list[tuple[Company, str, list[str], str]] = []
-    for c in rows:
-        norms.append(
-            (
-                c,
-                normalize_company_name(c.name),
-                [normalize_company_name(a) for a in str_list(c.aliases)],
-                signal_host(normalize_host(c.website)),
-            )
-        )
+    norms = _company_norms(rows)
+    ruled = _rule_match(norms, parsed)
+    if ruled is not None:
+        matched, stage = ruled
+        return _accept_company_match(matched, raw_name, website, decision, stage)
 
-    # Если нормализация ужала имя в пустую строку — это значит на входе
-    # пришёл только legal-suffix (например, "SAS"/"LLC"/"ПАО") без бренд-
-    # ядра, либо имя из символов, которые мы выкинули как пунктуацию. Не
-    # пускаем в name/alias-match: пустая строка совпала бы с любой другой
-    # такой же пустой и склеила бы заведомо разные «голые» юр.формы.
-    # Хост-match (Stage 1c) работает дальше как обычно — это безопаснее.
-    if parsed_norm:
-        # Stage 1a — точное совпадение нормализованного имени.
-        # NB: ловит только варианты одного и того же написания (МТС/MTС/MTS
-        # после транслитерации, ПАО Сбербанк → Сбербанк после strip'а суффикса).
-        # «Бренд vs полное юр.название» (Сбер vs Сбербанк) сюда не
-        # попадает — норм-формы у них разные ("sber" vs "sberbank") — это
-        # территория Stage 2 (LLM-арбитр).
-        for c, c_name_norm, _aliases, c_host in norms:
-            if (
-                c_name_norm
-                and c_name_norm == parsed_norm
-                and hosts_compatible(c_host, parsed_host)
-            ):
+    if parsed.norm and lm_client is not None and lm_model:
+        shortlist = _llm_shortlist(norms, parsed)
+        if shortlist:
+            match, patch = await _llm_arbitrate(lm_client, lm_model, parsed, shortlist)
+            decision.update(patch)
+            if match is not None:
                 return _accept_company_match(
-                    c, raw_name, website, decision, "rule_name"
-                )
-
-        # Stage 1b — алиас совпал.
-        for c, _name, c_aliases, c_host in norms:
-            if any(
-                a and a == parsed_norm for a in c_aliases
-            ) and hosts_compatible(c_host, parsed_host):
-                return _accept_company_match(
-                    c, raw_name, website, decision, "rule_alias"
-                )
-
-    # Stage 1c — точный match по хосту. Агрегаторы уже скоэрсены в "" в
-    # signal_host, поэтому если parsed_host здесь непустой — это реальный
-    # corporate-домен. То же по c_host у каждого row.
-    #
-    # Намеренная асимметрия с user-rule «одинаковое имя + разные сайты =
-    # разные компании»: ОБРАТНЫЙ кейс — «разные имена + одинаковый сайт» —
-    # здесь склеивается без обращения к LLM. Логика: corporate-домен —
-    # это сильный сигнал (rebrand / brand-vs-legal-name / parser-вариация
-    # на одной и той же странице). Если в будущем выяснится, что и этот
-    # путь даёт false-positives, можно ввести Левенштейн-порог по имени и
-    # роутить low-similarity случаи через Stage 2.
-    if parsed_host:
-        for c, _name, _aliases, c_host in norms:
-            if c_host and c_host == parsed_host:
-                return _accept_company_match(
-                    c, raw_name, website, decision, "rule_website"
-                )
-
-    # Stage 2 — LLM-арбитр. Кандидатами идут только те, кто прошёл по
-    # similarity И не нарушает hard-rule по хостам. Иначе LLM не вызываем.
-    # При пустом parsed_norm (имя свелось к пустоте после нормализации)
-    # SequenceMatcher вернул бы 1.0 на любую другую пустую — и склеил бы
-    # «голые» legal-suffix-имена. Skip'аем Stage 2, идём в create.
-    if parsed_norm and lm_client is not None and lm_model:
-        candidates: list[tuple[Company, float]] = []
-        for c, c_name_norm, c_aliases, c_host in norms:
-            if not hosts_compatible(c_host, parsed_host):
-                continue
-            ratio_name = (
-                SequenceMatcher(None, parsed_norm, c_name_norm).ratio()
-                if c_name_norm
-                else 0.0
-            )
-            ratio_alias = max(
-                (
-                    SequenceMatcher(None, parsed_norm, a).ratio()
-                    for a in c_aliases
-                    if a
-                ),
-                default=0.0,
-            )
-            best = max(ratio_name, ratio_alias)
-            if best >= 0.7:
-                candidates.append((c, best))
-        candidates.sort(key=lambda x: -x[1])
-        candidates = candidates[:5]
-        if candidates:
-            # Lazy import: repo не должен жёстко зависеть от llm-модуля при
-            # импорте; LLM нужен только в этой ветке.
-            from backend.llm.company import dedupe_company_with_llm
-
-            shortlist = [c for c, _ in candidates]
-            matched_id, reasoning = await dedupe_company_with_llm(
-                lm_client,
-                lm_model,
-                parsed_name=raw_name,
-                parsed_website=website,
-                candidates=shortlist,
-            )
-            decision["candidates"] = [
-                {"id": c.id, "name": c.name, "website": c.website}
-                for c in shortlist
-            ]
-            decision["llm_reasoning"] = reasoning
-            if matched_id is not None:
-                # Hallucination-guard: LLM может вернуть id, которого мы
-                # ему не давали. Принимаем только то, что было в shortlist.
-                match = next(
-                    (c for c in shortlist if c.id == matched_id), None
-                )
-                if match is not None:
-                    return _accept_company_match(
-                        match, raw_name, website, decision, "llm_match"
-                    )
-                # Galлюцинация: LLM ответил id'шник, которого мы ему не
-                # давали. Сохраняем его в decision для post-hoc grep'а —
-                # иначе следы только в reasoning-тексте, нечитаемо.
-                decision["llm_hallucinated_id"] = matched_id
-                logger.warning(
-                    "company_dedup: LLM hallucinated id=%r outside shortlist=%r",
-                    matched_id,
-                    [c.id for c in shortlist],
+                    match, raw_name, website, decision, "llm_match"
                 )
             decision["stage"] = "llm_no_match"
-            # Аудит-лог: LLM был вызван, но решил «не то». Без отдельной
-            # записи следующий logger.info("created ...") выглядит так,
-            # будто LLM не вызывался вовсе. parsed_host логируем raw-
-            # нормализованный (не signal-coerced) — чтобы видеть, какой
-            # URL пришёл из вакансии, а не пустую строку после coercion.
-            logger.info(
-                "company_dedup: llm_no_match parsed_name=%r parsed_host=%r "
-                "shortlist_ids=%r reasoning=%r",
-                raw_name,
-                normalize_host(website),
-                [c.id for c in shortlist],
-                reasoning,
-            )
 
-    # Stage 3 — создаём новую.
     return await _create_company_row(
         session, raw_name, website, decision, {c.id for c in rows}
     )
