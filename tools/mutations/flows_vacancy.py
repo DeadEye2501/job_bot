@@ -1,4 +1,4 @@
-"""Поломки для работы с вакансией в `backend/flows/parse.py`.
+"""Поломки для работы с вакансией — в разборе и в записи его исхода.
 
 Приём объявления, заведение и удаление строки, кэш векторов, разбор, приговор
 и отправка отклика.
@@ -145,28 +145,28 @@ MUTATIONS = [
     ),
     # _write_parsed_row: признак разбора не ставится
     (
-        "backend/flows/parse.py",
+        "backend/flows/parse_write.py",
         "    v.is_parsed = True" + CRLF
         + "    _apply_parsed_fields(v, parsed, outcome)",
         "    _apply_parsed_fields(v, parsed, outcome)",
     ),
     # _apply_parsed_fields: пустой повторный разбор затирает стек
     (
-        "backend/flows/parse.py",
+        "backend/flows/parse_write.py",
         "    if parsed.stack or not outcome.keep_previous_stack:" + CRLF
         + "        v.stack = parsed.stack" + CRLF,
         "    if True:" + CRLF + "        v.stack = parsed.stack" + CRLF,
     ),
     # _link_company: компания не привязывается
     (
-        "backend/flows/parse.py",
+        "backend/flows/parse_write.py",
         "    if company is not None:" + CRLF
         + "        v.company_id = company.id" + CRLF,
         "",
     ),
     # _link_resolved_hr: HR не привязывается
     (
-        "backend/flows/parse.py",
+        "backend/flows/parse_write.py",
         "    v.hr_id = hr.id" + CRLF,
         "",
     ),
@@ -198,13 +198,13 @@ MUTATIONS = [
     # перечней». Забыть его теперь негде.
     # save_empty_vacancy: пустой разбор щадит прежний стек наравне с обычным
     (
-        "backend/flows/parse.py",
+        "backend/flows/parse_write.py",
         "            keep_previous_stack=False," + CRLF,
         "            keep_previous_stack=True," + CRLF,
     ),
     # save_empty_vacancy: догон переписки заводят и по знакомому HR
     (
-        "backend/flows/parse.py",
+        "backend/flows/parse_write.py",
         "    if hr_created:" + CRLF
         + "        dm_backfill.spawn_hr_backfill(pipeline, hr)" + CRLF,
         "    if hr is not None:" + CRLF
@@ -212,14 +212,14 @@ MUTATIONS = [
     ),
     # save_empty_vacancy: догон переписки не заводят вовсе
     (
-        "backend/flows/parse.py",
+        "backend/flows/parse_write.py",
         "    if hr_created:" + CRLF
         + "        dm_backfill.spawn_hr_backfill(pipeline, hr)" + CRLF,
         "",
     ),
     # _apply_parsed_fields: прежний разбор не стирается
     (
-        "backend/flows/parse.py",
+        "backend/flows/parse_write.py",
         "        _clear_parsed_fields(v, outcome.score)" + CRLF
         + "        return" + CRLF,
         "        return" + CRLF,

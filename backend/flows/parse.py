@@ -1,11 +1,15 @@
-"""Разбор объявления с приговором и записью."""
+"""Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
+
+Всё здесь про одно — чем объявление кончилось: спросить модель, свериться с
+чёрным списком, вынести приговор, выбросить мусор, отправить отклик пригодному,
+пометить пустышку. Куда исход ложится, знает сосед (`flows/parse_write`);
+зовут его отсюда, а не наоборот.
+"""
 
 import logging
-from dataclasses import dataclass
 
 from backend.flows import dm_backfill
 from backend.domain.blacklist import check_blacklist
-from backend.domain.salary import parse_salary
 from backend.domain.scoring import score_parsed
 from backend.domain.verdict import decide_vacancy_status
 from backend.domain.verdict import is_empty_vacancy
@@ -14,39 +18,18 @@ from backend.domain.verdict import (
     LLM_SKIP_PREFIX,
     TRASH_SKIP_PREFIX,
 )
-from backend.telegram_lookup import fetch_telegram_avatar
-from backend.telegram_lookup import resolve_hr_telegram
 from backend.llm.fit import validate_vacancy_fit
 from backend.llm.vacancy import parse_vacancy
-from backend.models import HR
 from backend.models import Vacancy
+from backend.payloads import ParsedVacancy
 from backend.models import VacancyStatus
-from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
-from backend.repository.companies_matching import find_or_create_company
-from backend.repository.hr_identify import find_or_create_hr
 from backend.flows.events import record_vacancy_event
-from backend.repository.vacancies_life import add_vacancy_event
 
 from backend.flows import apply
 from backend.flows import cleanup
+from backend.flows.parse_write import Outcome, persist_parse_outcome
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, slots=True)
-class _Outcome:
-    """Чем кончился разбор объявления и что из этого следует для записи.
-
-    ``keep_previous_stack`` разводит две ветки. У обычного разбора пустой
-    стек означает осечку модели, и прежние теги вместе с прежней оценкой
-    перезапись переживают. У пустышки он означает сам приговор, и в
-    строку идёт то, что пришло.
-    """
-
-    status: VacancyStatus
-    skip_reason: str | None
-    score: int
-    keep_previous_stack: bool
 
 
 async def _dropped_as_trash(
@@ -185,14 +168,14 @@ async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple:
     return status, skip_reason, score
 
 
-async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: _Outcome) -> None:
+async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> None:
     """Записать исход, отправить отклик, если можно, и догнать переписку.
 
     Догон идёт последним нарочно: пойди он раньше, вытащил бы наше же
     письмо прежде, чем отправка закоммитит свою строку, — и в переписке
     появился бы дубль без вакансии.
     """
-    hr, created = await _persist_parse_outcome(pipeline, vacancy_id, parsed, outcome)
+    hr, created = await persist_parse_outcome(pipeline, vacancy_id, parsed, outcome)
     await _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id, outcome.status)
     if created:
         dm_backfill.spawn_hr_backfill(pipeline, hr)
@@ -249,7 +232,7 @@ async def parse_and_update_vacancy(
         pipeline,
         vacancy_id,
         parsed,
-        _Outcome(
+        Outcome(
             status=status,
             skip_reason=skip_reason,
             score=score,
@@ -272,201 +255,6 @@ async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
     return v is not None and not v.is_parsed
 
 
-async def _resolve_hr(pipeline, parsed: ParsedVacancy | None):
-    """Разыскать HR в Telegram и забрать заодно его аватар.
-
-    Идёт до открытия сессии: иначе SQLite ждал бы ответа сети в
-    незакоммиченном состоянии.
-    """
-    if parsed is None or not parsed.hr_contact:
-        return None, None
-    user = await resolve_hr_telegram(pipeline._client, parsed.hr_contact)
-    if user is None:
-        return None, None
-    return user, await fetch_telegram_avatar(pipeline._client, user)
-
-
-def _clear_parsed_fields(v: Vacancy, score: int) -> None:
-    """Стереть прошлый разбор: колонки в пусто, стек — пустым списком.
-
-    Оценка приходит доводом, а не нулём по месту: «разобрать не вышло» —
-    тоже исход разбора, и число ему назначает тот, кто исход вынес.
-    """
-    for name in DIRECT_PARSED_FIELDS:
-        setattr(v, name, None)
-    v.stack = []
-    v.score = score
-    v.salary_min = None
-    v.salary_max = None
-    v.salary_currency = None
-    v.notes = None
-
-
-def _apply_parsed_fields(
-    v: Vacancy, parsed: ParsedVacancy | None, outcome: _Outcome
-) -> None:
-    """Перенести разобранное в строку вакансии.
-
-    Разбора нет вовсе — прежние поля стираются: иначе в карточке рядом с
-    причиной «пусто» висел бы прошлый разбор, и это читалось бы как
-    поломка приложения.
-    """
-    if parsed is None:
-        _clear_parsed_fields(v, outcome.score)
-        return
-    for name in DIRECT_PARSED_FIELDS:
-        setattr(v, name, getattr(parsed, name))
-    if parsed.stack or not outcome.keep_previous_stack:
-        v.stack = parsed.stack
-        v.score = outcome.score
-    else:
-        # Стек и оценка держатся парой: оценка считается от стека, и
-        # записав пустой стек с нулевой оценкой, карточка показала бы
-        # ноль баллов рядом с прежними тегами.
-        v.stack = v.stack or []
-        if v.score is None:
-            v.score = outcome.score
-    v.salary_min, v.salary_max, v.salary_currency = parse_salary(parsed.salary)
-    v.notes = (
-        f"Контакты: {parsed.other_contact}" if parsed.other_contact else None
-    )
-
-
-def _fields_filled(v: Vacancy) -> list[str]:
-    """Чем строка вакансии после записи заполнена — это уходит в ленту.
-
-    Стек в общий перечень не входит — он не переносится из разбора, а
-    пересчитывается вместе с оценкой, — но встаёт сразу за контактом HR, а не
-    в хвост: порядок здесь не оформление, а часть уже записанных строк ленты,
-    и перестановка развела бы новые строки со старыми молча.
-    """
-    names = list(DIRECT_PARSED_FIELDS)
-    names.insert(names.index("hr_contact") + 1, "stack")
-    return [name for name in names if getattr(v, name)]
-
-
-async def _write_parsed_row(
-    session, vacancy_id: int, parsed: ParsedVacancy | None, outcome: _Outcome
-) -> Vacancy | None:
-    """Записать исход разбора в саму строку вакансии; отдать её или пустоту.
-
-    Пустота означает «строки больше нет»: пользователь мог удалить её из
-    окна, пока шёл разбор. Отвечать на это исключением нечем — исход уже
-    вынесен, писать его некуда, и работа на этом кончается.
-
-    Признак «разобрано» ставится здесь же, в той же транзакции, что и поля:
-    упади запись между ними, строка осталась бы помеченной разобранной с
-    полями от прошлого раза.
-    """
-    v = await session.get(Vacancy, vacancy_id)
-    if v is None:
-        return None
-    v.status = outcome.status
-    v.skip_reason = outcome.skip_reason
-    v.is_parsed = True
-    _apply_parsed_fields(v, parsed, outcome)
-    return v
-
-
-async def _link_company(session, v: Vacancy, parsed, pipeline) -> dict | None:
-    """Привязать компанию по имени из разбора; отдать решение о сведении.
-
-    Решение отдаётся наружу затем, что уходит в ленту: сведение компаний
-    спрашивает языковую модель, и по чему именно она решила, разбирают
-    потом по строке ленты, а не по журналу.
-
-    Компания привязывается и у непригодной вакансии — как и собеседник:
-    ссылки из карточки в «Компании» и «HR» должны работать одинаково у
-    любой строки, иначе имя компании в карточке есть, а перехода на неё
-    нет.
-    """
-    if parsed is None or not parsed.company_name:
-        return None
-    company, decision = await find_or_create_company(
-        session,
-        parsed.company_name,
-        website=parsed.company_website,
-        lm_client=pipeline._lm_client,
-        lm_model=pipeline._lm_chat_model,
-    )
-    if company is not None:
-        v.company_id = company.id
-    return decision
-
-
-async def _link_resolved_hr(session, v: Vacancy, resolved) -> tuple[HR | None, bool]:
-    """Привязать разысканного собеседника; отдать его и признак «только заведён».
-
-    Признак нужен зовущему, а не здесь: по нему решается, догонять ли
-    переписку, и догон обязан идти уже после закрытия сессии.
-    """
-    user, avatar = resolved
-    if user is None:
-        return None, False
-    hr, created = await find_or_create_hr(session, user, avatar=avatar)
-    v.hr_id = hr.id
-    return hr, created
-
-
-def _parsed_event_payload(v: Vacancy, outcome: _Outcome, decision) -> dict:
-    """Что уходит в ленту строкой «разобрано».
-
-    Решение о сведении компании кладётся только когда оно было: пустое
-    поле в ленте читалось бы как «сводили и не свели».
-    """
-    payload: dict = {
-        "score": outcome.score,
-        "status": outcome.status.value,
-        "fields_filled": _fields_filled(v),
-        "skip_reason": outcome.skip_reason,
-    }
-    if decision is not None:
-        payload["company_dedup"] = decision
-    return payload
-
-
-async def _persist_parse_outcome(
-    pipeline, vacancy_id: int, parsed: ParsedVacancy | None, outcome: _Outcome
-) -> tuple[HR | None, bool]:
-    """Провести исход разбора через сессию: розыск, запись, оповещение окна.
-
-    Сама запись разложена по трём объявлениям выше — строка, компания,
-    собеседник; здесь остаётся чужое им: сессия, поломка посреди записи и
-    оповещение окна после. Розыск идёт первым и стоит двух сетевых
-    обращений — это самая медленная и ломкая часть работы, и в сессии ей
-    не место (см. `_resolve_hr`).
-
-    Отдаёт HR и признак «только что заведён»: отклик пустышке не положен,
-    а догон переписки обязан идти и после закрытия сессии, и после
-    отправки отклика — иначе он вытащит наше же письмо раньше, чем оно
-    запишется. Вне сессии HR пригоден: ``expire_on_commit=False``.
-    """
-    resolved = await _resolve_hr(pipeline, parsed)
-    hr, hr_created = None, False
-    async with pipeline._session_factory() as session:
-        try:
-            v = await _write_parsed_row(session, vacancy_id, parsed, outcome)
-            if v is None:
-                return None, False
-            decision = await _link_company(session, v, parsed, pipeline)
-            hr, hr_created = await _link_resolved_hr(session, v, resolved)
-            await add_vacancy_event(
-                session, vacancy_id, "parsed",
-                _parsed_event_payload(v, outcome, decision),
-            )
-            await session.commit()
-        except Exception:
-            logger.exception(
-                "vacancy %s: parse persist failed", vacancy_id,
-                extra={"vacancy_id": vacancy_id},
-            )
-            return None, False
-
-    pipeline._fire_contacts_changed()
-    pipeline._fire_vacancies_changed()
-    return hr, hr_created
-
-
 async def save_empty_vacancy(
     pipeline, vacancy_id: int, parsed: ParsedVacancy | None
 ) -> None:
@@ -483,11 +271,11 @@ async def save_empty_vacancy(
     show the previous parse output alongside skip_reason="empty",
     which is misleading.
     """
-    hr, hr_created = await _persist_parse_outcome(
+    hr, hr_created = await persist_parse_outcome(
         pipeline,
         vacancy_id,
         parsed,
-        _Outcome(
+        Outcome(
             status=VacancyStatus.NOT_FIT,
             skip_reason=EMPTY_SKIP_REASON,
             score=0,
