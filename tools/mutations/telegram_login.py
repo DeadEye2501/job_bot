@@ -18,14 +18,14 @@ MUTATIONS = [
     # send_code: клиент собирается с файлом сессии на диске
     (
         "backend/telegram_login.py",
-        "                in_memory=True," + CRLF,
-        "                in_memory=False," + CRLF,
+        "            in_memory=True," + CRLF,
+        "            in_memory=False," + CRLF,
     ),
     # send_code: имя сессии у обоих входов становится общим
     (
         "backend/telegram_login.py",
-        "                name=self._session_name," + CRLF,
-        '                name="job_bot",' + CRLF,
+        "            name=self._session_name," + CRLF,
+        '            name="job_bot",' + CRLF,
     ),
     # send_code: отпечаток кода не запоминается
     (
@@ -42,8 +42,8 @@ MUTATIONS = [
     # send_code: срок без числа снова показывается нулём секунд
     (
         "backend/telegram_login.py",
-        '            waiting = _humanize_duration(secs) if secs else "некоторое время"',
-        "            waiting = _humanize_duration(secs)",
+        '    waiting = _humanize_duration(secs) if secs else "некоторое время"',
+        "    waiting = _humanize_duration(secs)",
     ),
     # confirm_code: код уходит в Telegram без отпечатка своей отправки
     (

@@ -130,20 +130,20 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
     )
 
 
-async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
-    """Send a photo or document to the HR.
+def _checked_kind(src: Path, file_path: str) -> bool:
+    """Отбить файл, которого нет или который Telegram не примет; сказать вид.
 
-    Заслоны те же, что у отправки текстом, — одно объявление на двоих; строка
-    в переписке кладётся тем же `_persist_outgoing`. Своё здесь — проверки
-    самого файла и копия в кэше ``media/``, чтобы окно показало вложение, не
-    забирая его из Telegram заново.
+    Отказ идёт до отправки и словами человека: он выбирал файл руками, и
+    молчаливый отказ выглядел бы потерянным сообщением. Путь называется тем
+    же написанием, каким пришёл из окна, — приведённый выглядел бы чужим.
+
+    Вид вложения решается **после** проверки существования: узнавание фото
+    читает начало файла, и на несуществующем оно сыпало бы в журнал лишнее
+    предупреждение. Пределы размера у фото и документа разные, потому вид и
+    нужен здесь же.
     """
-    target = await _target_or_refuse(bot, hr_id)
-
-    src = Path(file_path)
     if not src.exists() or not src.is_file():
         raise RuntimeError(f"Файл не найден: {file_path}")
-
     as_photo = media.looks_like_photo(src)
     try:
         size = src.stat().st_size
@@ -157,6 +157,20 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
             f"Слишком большой {kind_ru}: {size / (1024*1024):.1f} MB "
             f"> лимит {mb_cap} MB."
         )
+    return as_photo
+
+
+async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
+    """Send a photo or document to the HR.
+
+    Заслоны те же, что у отправки текстом, — одно объявление на двоих; строка
+    в переписке кладётся тем же `_persist_outgoing`. Своё здесь — проверки
+    самого файла и копия в кэше ``media/``, чтобы окно показало вложение, не
+    забирая его из Telegram заново.
+    """
+    target = await _target_or_refuse(bot, hr_id)
+    src = Path(file_path)
+    as_photo = _checked_kind(src, file_path)
     if as_photo:
         pyro_msg = await bot._client.send_photo(target, str(src))
     else:
@@ -169,12 +183,7 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
         src.name,
     )
 
-    media_path = media.cache_sent_file(
-        src, hr_id, pyro_msg.id, as_photo=as_photo
-    )
-    media_kind = "photo" if as_photo else "document"
-    media_name = None if as_photo else src.name
-
+    media_path = media.cache_sent_file(src, hr_id, pyro_msg.id, as_photo=as_photo)
     return await _persist_outgoing(
         bot,
         OutgoingMessage(
@@ -182,8 +191,10 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
             text="",
             tg_message_id=pyro_msg.id,
             sent_at=pyro_msg.date,
-            media_kind=media_kind,
+            media_kind="photo" if as_photo else "document",
             media_path=media_path,
-            media_name=media_name,
+            # У фото имени нет: Telegram его не хранит, и окно показывает
+            # само изображение, а не строку с названием файла.
+            media_name=None if as_photo else src.name,
         ),
     )

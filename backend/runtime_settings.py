@@ -93,6 +93,24 @@ _APP_DEFAULTS: dict[str, str] = {
 }
 
 
+def _log_tg_updated(
+    api_id: int, phone: str, password: str, session_string: str | None
+) -> None:
+    """След смены учётной записи Telegram — без самих секретов.
+
+    Номер пишется хвостом, чтобы мобильный не утекал в журнал открытым.
+    Отпечаток приложения в журнал не идёт вовсе, а про пароль и строку
+    сеанса говорится только «есть или нет».
+    """
+    logger.info(
+        "Telegram credentials updated (api_id=%d, phone=%s, has_password=%s, has_session=%s)",
+        api_id,
+        _mask_phone(phone),
+        bool(password),
+        session_string is not None,
+    )
+
+
 async def _tg_row(session: AsyncSession) -> TgAccount | None:
     """Единственная строка учётной записи Telegram, если она заведена."""
     return (await session.scalars(select(TgAccount))).first()
@@ -324,15 +342,7 @@ class RuntimeSettings:
             password=password,
             session_string=session_string,
         )
-        # Phone в логах — last4, чтобы не утекало мобильное в plaintext.
-        # api_hash / password / session_string наружу не пишем вовсе.
-        logger.info(
-            "Telegram credentials updated (api_id=%d, phone=%s, has_password=%s, has_session=%s)",
-            api_id,
-            _mask_phone(phone),
-            bool(password),
-            session_string is not None,
-        )
+        _log_tg_updated(api_id, phone, password, session_string)
 
     async def clear_tg(self) -> None:
         """Полное удаление TG-креденшалов: row в БД сносится, in-memory
