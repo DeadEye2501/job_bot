@@ -6,44 +6,47 @@ import asyncio
 from backend.flows.auto_gate import status_open_for_auto
 from backend.llm.hr_reply import classify_hr_reply
 from backend.models import VacancyStatus
+from backend.payloads import PendingReply
 from backend.repository.vacancies_life import apply_classification
 from backend.notify import fire
 
 logger = logging.getLogger(__name__)
 
 
-def update_dm_buffer_text(pipeline, hr_id: int, msg_id: int, new_text: str) -> None:
+def update_dm_buffer_text(pipeline, hr_id: int, tg_msg_id: int, new_text: str) -> None:
     """HR отредактировал сообщение пока оно сидит в debounce-буфере —
-    обновим текст, чтобы LLM-классификатор видел свежее содержимое."""
+    обновим текст, чтобы LLM-классификатор видел свежее содержимое.
+
+    Ищется письмо по номеру Telegram: оповещение о правке приходит оттуда и
+    другого номера не знает. Номер строки базы лежит в копилке рядом и
+    служит другому — записи вердикта.
+    """
     buf = pipeline._dm_classify_buffer.get(hr_id)
     if not buf:
         return
     for item in buf:
-        if item["msg_id"] == msg_id:
+        if item["tg_msg_id"] == tg_msg_id:
             item["text"] = new_text or ""
             break
 
 
-def remove_dm_buffer_msg(pipeline, hr_id: int, msg_id: int) -> None:
+def remove_dm_buffer_msg(pipeline, hr_id: int, tg_msg_id: int) -> None:
     """HR удалил сообщение пока оно сидит в debounce-буфере — выкинем
-    его из burst'а, чтобы не учитывать в классификации."""
+    его из burst'а, чтобы не учитывать в классификации.
+
+    По номеру Telegram, по той же причине, что и правка.
+    """
     buf = pipeline._dm_classify_buffer.get(hr_id)
     if not buf:
         return
     pipeline._dm_classify_buffer[hr_id] = [
-        item for item in buf if item["msg_id"] != msg_id
+        item for item in buf if item["tg_msg_id"] != tg_msg_id
     ]
     if not pipeline._dm_classify_buffer[hr_id]:
         pipeline._dm_classify_buffer.pop(hr_id, None)
 
 
-def schedule_dm_classification(
-    pipeline,
-    hr_id: int,
-    vacancy_id: int,
-    msg_id: int,
-    text: str,
-) -> None:
+def schedule_dm_classification(pipeline, hr_id: int, reply: PendingReply) -> None:
     """Append text to per-HR burst buffer и (пере-)взводит таймер на
     DM_CLASSIFY_DEBOUNCE_SEC. Когда таймер дотикает (новых сообщений
     от HR не приходило), таск ``_run_debounced_classify`` соберёт
@@ -51,12 +54,17 @@ def schedule_dm_classification(
     """
     if pipeline._shutting_down:
         return
-    if not text:
+    if not reply.text:
         # Медиа-only без подписи нечем классифицировать. Пропускаем
         # тихо — само сообщение уже в БД.
         return
     buf = pipeline._dm_classify_buffer.setdefault(hr_id, [])
-    buf.append({"vacancy_id": vacancy_id, "msg_id": msg_id, "text": text})
+    buf.append({
+        "vacancy_id": reply.vacancy_id,
+        "msg_id": reply.message_id,
+        "tg_msg_id": reply.tg_message_id,
+        "text": reply.text,
+    })
     # Cap: спам / зацикленный HR не должен раздувать память.
     # Drop oldest, оставляя последние DM_CLASSIFY_BUFFER_CAP штук —
     # «свежий сигнал» важнее «полной истории», тем более что

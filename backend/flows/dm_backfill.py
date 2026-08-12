@@ -10,7 +10,7 @@ from backend.flows.dm import persist_outgoing_dm, process_dm
 from backend.domain.telegram_identity import telegram_peer
 from backend.models import Message
 from backend.repository.hr_list import list_hrs_for_backfill
-from backend.repository.messages import tombstone_messages
+from backend.repository.messages import newest_tg_message_id, tombstone_messages
 from backend.notify import fire
 
 logger = logging.getLogger(__name__)
@@ -165,12 +165,25 @@ async def _walk_messages(messages: list, walk: _Walk) -> bool:
     return had_new
 
 
-async def _reconcile_deletes(session_factory, hr_id: int, messages: list) -> bool:
+async def _reconcile_deletes(
+    session_factory, hr_id: int, messages: list, newest_before: int
+) -> bool:
     """Похоронить строки, пропавшие из ответа Telegram; сказать, были ли такие.
 
     Telegram не переигрывает пропущенные оповещения об удалении после
     переподключения. Окно сверки — номера, накрытые вытянутым хвостом: всё,
     что в него попадает, но в ответе не пришло, удалено, пока нас не было.
+
+    Границы у окна две, и верхняя не менее важна нижней. Ниже окна лежит
+    переписка, до которой хвост не достал. Выше — письмо, пришедшее живым
+    обработчиком, пока догон читал: в ответе его нет по той же причине, по
+    какой нет удалённого, ответ собран раньше.
+
+    Различает их только ``newest_before`` — отметка, снятая **до** запроса
+    истории. Что было у нас тогда, то Telegram и обязан был вернуть, а
+    появившееся позже вернуть не мог. Возьми верхней границей `max` по
+    ответу — и удалённое последнее письмо не похоронится уже никогда, потому
+    что других путей у этой строки нет.
     """
     if not messages:
         return False
@@ -182,6 +195,7 @@ async def _reconcile_deletes(session_factory, hr_id: int, messages: list) -> boo
                 Message.hr_id == hr_id,
                 Message.tg_message_id.is_not(None),
                 Message.tg_message_id >= min(seen_ids),
+                Message.tg_message_id <= max(max(seen_ids), newest_before),
                 Message.tg_message_id.notin_(seen_ids),
             )
         )
@@ -191,23 +205,22 @@ async def _reconcile_deletes(session_factory, hr_id: int, messages: list) -> boo
 
 
 async def backfill_hr_dm_history(
-    client,
-    hr,
-    lm_client,
-    lm_chat_model,
-    session_factory,
+    client, hr, lm_client, lm_chat_model, session_factory,
     *,
     backfill_limit: int,
-    on_message_persisted=None,
-    on_vacancies_changed=None,
-    schedule_classification=None,
+    on_message_persisted=None, on_vacancies_changed=None,
+    schedule_classification=None, newest_before: int = 0,
 ) -> None:
     """Pull the DM history of one HR and persist it.
 
     Used by ``catch_up_missed_dms`` (per-HR loop) and the auto-apply path
-    (when ``find_or_create_hr`` just minted a new HR — without this hook
-    the chat would show only the cover-letter we just sent, prior history
-    invisible until the next OFF→active transition).
+    (when ``find_or_create_hr`` just minted a new HR — without this hook the
+    chat would show only the cover-letter we just sent).
+
+    ``newest_before`` — наибольший номер письма, что был у нас **до** прохода;
+    им сверка удалённого и отличает стёртое от пришедшего, пока мы читали.
+    Снимает его зовущий: здесь это была бы работа с базой внутри задачи,
+    которую гасят при остановке. Ноль значит «у нас ничего не было».
     """
     messages = await _fetch_history(client, hr, backfill_limit)
     if messages is None:
@@ -224,7 +237,9 @@ async def backfill_hr_dm_history(
             on_vacancies_changed=on_vacancies_changed,
         ),
     )
-    tombstoned = await _reconcile_deletes(session_factory, hr.id, messages)
+    tombstoned = await _reconcile_deletes(
+        session_factory, hr.id, messages, newest_before
+    )
     if had_new or tombstoned:
         fire(on_message_persisted, "on_message_persisted", hr.id)
 
@@ -244,22 +259,21 @@ def _report_failed(batch: list, results: list) -> None:
 
 
 async def catch_up_missed_dms(
-    client,
-    lm_client,
-    lm_chat_model,
-    session_factory,
-    backfill_limit: int,
+    client, lm_client, lm_chat_model, session_factory, backfill_limit: int,
     *,
-    on_message_persisted=None,
-    on_vacancies_changed=None,
+    on_message_persisted=None, on_vacancies_changed=None,
     schedule_classification=None,
 ) -> None:
     """Pull recent DM history per known HR, both directions.
 
     Обе стороны — :func:`_store_outgoing`, удаления — :func:`_reconcile_deletes`.
     """
+    # Отметки снимаются здесь и разом: до прохода, одной сессией и вне задач,
+    # которые гасят при остановке. Ими сверка удалённого отличает стёртое от
+    # пришедшего, пока шёл проход.
     async with session_factory() as session:
         chats = await list_hrs_for_backfill(session)
+        newest = {hr.id: await newest_tg_message_id(session, hr.id) for hr, _ in chats}
     logger.info(
         "DM catch-up: %d HR(s), batch=%d delay=%ss",
         len(chats), _DM_CATCHUP_BATCH_SIZE, _DM_CATCHUP_BATCH_DELAY_SEC,
@@ -276,6 +290,7 @@ async def catch_up_missed_dms(
                     on_message_persisted=on_message_persisted,
                     on_vacancies_changed=on_vacancies_changed,
                     schedule_classification=schedule_classification,
+                    newest_before=newest[hr.id],
                 )
                 for hr, _last_seen in batch
             ],

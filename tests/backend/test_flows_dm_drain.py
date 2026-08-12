@@ -11,6 +11,7 @@
 """
 
 from backend.flows import dm_classify
+from backend.payloads import PendingReply
 import asyncio
 
 
@@ -20,7 +21,7 @@ async def test_stopping_puts_out_the_pending_timers(dm_pipeline):
     Через минуту такой таймер полез бы в базу и в языковую модель, а к
     этому времени соединения уже закрыты.
     """
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     timer = dm_pipeline._dm_classify_tasks[7]
 
     await dm_pipeline.cancel_pending_dm_classifications()
@@ -31,7 +32,7 @@ async def test_stopping_puts_out_the_pending_timers(dm_pipeline):
 
 async def test_stopping_reads_nothing(dm_pipeline):
     """Остановка накопленное не разбирает: соединения уже закрываются."""
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
 
     await dm_pipeline.cancel_pending_dm_classifications()
 
@@ -45,7 +46,7 @@ async def test_switching_off_reads_what_was_collected(dm_pipeline):
     Соединения ещё живы. Молча выбросив очередь, набранную за минуту до
     нажатия, пользователю показали бы ответ HR при нетронутом статусе.
     """
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
 
     await dm_pipeline.cancel_pending_dm_classifications(drain=True)
 
@@ -55,8 +56,8 @@ async def test_switching_off_reads_what_was_collected(dm_pipeline):
 
 async def test_switching_off_reads_every_correspondent(dm_pipeline):
     """Выключение разбирает всех накопленных, а не первого попавшегося."""
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "от первого")
-    dm_pipeline.schedule_dm_classification(8, 2, 20, "от второго")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "от первого"))
+    dm_pipeline.schedule_dm_classification(8, PendingReply(2, 20, 20, "от второго"))
 
     await dm_pipeline.cancel_pending_dm_classifications(drain=True)
 
@@ -69,8 +70,8 @@ async def test_one_broken_reading_does_not_stop_the_others(monkeypatch, dm_pipel
     Слив идёт при выключении и разом по всем: уронив его на первом, бот
     потерял бы очереди всех прочих.
     """
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "от первого")
-    dm_pipeline.schedule_dm_classification(8, 2, 20, "от второго")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "от первого"))
+    dm_pipeline.schedule_dm_classification(8, PendingReply(2, 20, 20, "от второго"))
     good: list[int] = []
 
     async def classify(pipeline, hr_id):
@@ -91,7 +92,7 @@ async def test_an_empty_buffer_is_not_read(dm_pipeline):
     Обращение к модели с пустым пакетом — деньги и секунды за ответ ни о
     чём.
     """
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     dm_pipeline.remove_dm_buffer_msg(7, 10)
 
     await dm_pipeline.cancel_pending_dm_classifications(drain=True)
@@ -105,7 +106,7 @@ async def test_a_stopping_bot_ignores_the_request_to_read(dm_pipeline):
     Признак остановки перевешивает: соединения уже закрываются, и разбор
     пошёл бы в закрытое.
     """
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     dm_pipeline.mark_shutting_down()
 
     await dm_pipeline.cancel_pending_dm_classifications(drain=True)
@@ -134,7 +135,7 @@ async def test_a_reading_already_under_way_is_waited_out(monkeypatch, dm_pipelin
         finished = True
 
     monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", waits_to_be_let_go)
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     await started.wait()
     asyncio.get_running_loop().call_later(0.05, release.set)
 
@@ -165,7 +166,7 @@ async def test_switching_off_lets_a_slow_reading_finish(monkeypatch, dm_pipeline
         await asyncio.Event().wait()
 
     monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", outlasts_the_wait)
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     await started.wait()
     running = next(iter(dm_pipeline._dm_classify_running))
 
@@ -200,7 +201,7 @@ async def test_shutting_down_cuts_off_a_reading_that_outstayed(
         await asyncio.Event().wait()
 
     monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", outlasts_the_wait)
-    dm_pipeline.schedule_dm_classification(7, 1, 10, "привет")
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     await started.wait()
     running = next(iter(dm_pipeline._dm_classify_running))
 
