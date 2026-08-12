@@ -13,8 +13,9 @@
 import pytest
 
 from backend.models import BotMode, Message
+from tests.backend.fixtures.bot import row_saved_mid_send
 from tests.dbio import all_rows, only_row, put
-from tests.factories import EPOCH, blacklist_row, message_row
+from tests.factories import EPOCH, blacklist_row
 
 
 async def test_a_message_reaches_the_hr_and_the_chat(
@@ -178,18 +179,7 @@ async def test_a_message_the_handler_already_saved_is_not_doubled(
     """
     bot, client, hr = await chatting()
 
-    async def saved_by_the_handler(answer):
-        await put(
-            session_factory,
-            message_row(
-                hr_id=hr.id,
-                is_incoming=False,
-                tg_message_id=answer.id,
-                text="сохранено обработчиком",
-            ),
-        )
-
-    client.on_send = saved_by_the_handler
+    client.on_send = row_saved_mid_send(session_factory, hr.id)
 
     row = await bot.send_to_hr_chat(hr.id, "здравствуйте")
 

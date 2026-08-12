@@ -20,10 +20,10 @@ import asyncio
 import pytest
 
 from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
-from tests.backend.conftest import known_hr_client
+from tests.backend.fixtures.flows import known_hr_client
 from tests.dbio import all_rows, only_row, put
 from tests.factories import hr_row, parsed_vacancy, vacancy_row
-from tests.fakes.telegram import FakeTelegramClient, user
+from tests.fakes.telegram import FakeTelegramClient
 
 
 @pytest.fixture
@@ -136,9 +136,7 @@ async def test_the_hr_is_linked_even_here(session_factory, make_pipeline):
     Тот же довод: переход на карточку HR из детали вакансии должен
     работать одинаково для любой вакансии.
     """
-    client = FakeTelegramClient(
-        users={"maria": user(id=777, username="maria", first_name="Мария")}
-    )
+    client = known_hr_client()
     pipeline = await make_pipeline(client)
     await put(session_factory, vacancy_row(title="прошлое"))
     vacancy = await only_row(session_factory, Vacancy)
@@ -189,9 +187,7 @@ async def test_a_first_time_hr_gets_his_history_caught_up(
     В окне у него пусто, и прежние письма появились бы в лучшем случае
     после перезапуска.
     """
-    client = FakeTelegramClient(
-        users={"maria": user(id=777, username="maria", first_name="Мария")}
-    )
+    client = known_hr_client()
     pipeline = await make_pipeline(client)
     await put(session_factory, vacancy_row(title="прошлое"))
     vacancy = await only_row(session_factory, Vacancy)
@@ -212,9 +208,7 @@ async def test_a_known_hr_is_not_caught_up_again(
     Он тянет всю историю переписки — сеть и вложения, — и на каждой
     следующей вакансии от того же человека это была бы работа впустую.
     """
-    client = FakeTelegramClient(
-        users={"maria": user(id=777, username="maria", first_name="Мария")}
-    )
+    client = known_hr_client()
     pipeline = await make_pipeline(client)
     await put(session_factory, hr_row(telegram_user_id=777))
     await put(session_factory, vacancy_row(title="прошлое"))

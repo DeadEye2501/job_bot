@@ -11,8 +11,7 @@ from tests.factories import (
     at,
     company_row,
     hr_row,
-    message_row,
-    unread_probe,
+    unread_probe_with_a_neighbour,
     vacancy_row,
 )
 
@@ -133,11 +132,7 @@ async def test_only_unread_incoming_messages_are_counted(session, session_factor
     hr = hr_row()
     other = hr_row(name="соседний")
     await put(session_factory, hr, other)
-    await put(
-        session_factory,
-        *unread_probe(hr.id),
-        message_row(hr_id=other.id, is_incoming=True, read_at=None),
-    )
+    await put(session_factory, *unread_probe_with_a_neighbour(hr.id, other.id))
 
     card = await get_hr_detail(session, hr.id)
 

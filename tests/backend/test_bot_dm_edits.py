@@ -13,24 +13,23 @@ from backend.models import BotMode, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import message_row
 from tests.fakes.ingestion import FakeIngestion
-from tests.fakes.telegram import chat, message, user
+from tests.fakes.telegram import chat, incoming, message, outgoing
 
 
 def _edit(*, chat_id=777, username=None, msg_id=10, text="новая редакция", mine=False):
-    """Правка сообщения в личной переписке.
+    """Правка сообщения в личной переписке; `mine` — своё оно или чужое.
 
-    Отправитель проставлен и у своего сообщения: Pyrogram заполняет его в
-    обе стороны, и подделка, гасящая его вместе с признаком «своё»,
-    закрыла бы оба условия сразу — тогда ни одно из них по отдельности не
-    было бы проверено.
+    Своё и чужое собираются разными построителями, а не одним признаком у
+    общего: у своего отправитель — мы, у чужого — собеседник. Отправитель
+    проставлен в обе стороны, потому что Pyrogram заполняет его в обе, и
+    подделка, гасящая его вместе с признаком «своё», закрыла бы оба условия
+    разом — тогда ни одно из них по отдельности не было бы проверено.
     """
-    return message(
-        id=msg_id,
-        text=text,
-        chat=chat(id=chat_id, username=username),
-        from_user=user(id=chat_id),
-        outgoing=mine,
-    )
+    if mine:
+        return outgoing(
+            id=msg_id, peer_id=chat_id, peer_username=username, text=text
+        )
+    return incoming(id=msg_id, user_id=chat_id, username=username, text=text)
 
 
 async def test_an_edit_overwrites_the_saved_text(chatting, session_factory):

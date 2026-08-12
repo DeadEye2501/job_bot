@@ -11,7 +11,13 @@ import pytest
 from backend.models import VacancyStatus
 from backend.repository.channels import _percent_or_none, get_channel_detail
 from tests.dbio import put
-from tests.factories import channel_marks, channel_row, days_ago, vacancy_row
+from tests.factories import (
+    channel_marks,
+    channel_row,
+    days_ago,
+    marked_channels,
+    vacancy_row,
+)
 
 
 _FUNNEL_SET = (
@@ -200,9 +206,7 @@ async def test_the_card_shows_an_active_mark_of_its_own_kind(
     session, session_factory
 ):
     """Отметка показывается, только если она включена и заведена для канала."""
-    listed = channel_row(username="listed")
-    switched_off = channel_row(username="off")
-    other_kind = channel_row(username="hr_like")
+    listed, switched_off, other_kind = marked_channels()
     await put(session_factory, listed, switched_off, other_kind)
     await put(session_factory, *channel_marks())
 
