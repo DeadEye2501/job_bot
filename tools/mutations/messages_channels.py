@@ -154,14 +154,14 @@ MUTATIONS = [
     # get_channel_detail: доля откликов считается от общего, а не от подошедшего
     (
         "backend/repository/channels.py",
-        "            apply_percent=_percent_or_none(applied_total, fit_total),",
-        "            apply_percent=_percent_or_none(applied_total, total),",
+        "        apply_percent=_percent_or_none(applied_total, fit_total),",
+        "        apply_percent=_percent_or_none(applied_total, total),",
     ),
     # get_channel_detail: доля ответов считается от общего
     (
         "backend/repository/channels.py",
-        "            response_percent=_percent_or_none(responded_total, applied_total),",
-        "            response_percent=_percent_or_none(responded_total, total),",
+        "        response_percent=_percent_or_none(responded_total, applied_total),",
+        "        response_percent=_percent_or_none(responded_total, total),",
     ),
     # get_channel_detail: в разбивке остаются только встреченные статусы
     (
