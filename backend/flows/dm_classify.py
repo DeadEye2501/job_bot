@@ -186,9 +186,9 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
     )
     if not is_open:
         logger.info(
-            "vacancy %s: status=%s terminal for auto, "
+            "vacancy %s: status=%s closed for auto, "
             "drop debounced burst (hr %d, %d msgs)",
-            vacancy_id, v_status.value, hr_id, len(buf),
+            vacancy_id, v_status.value if v_status else "gone", hr_id, len(buf),
         )
         return
     logger.info(

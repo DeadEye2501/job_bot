@@ -11,8 +11,12 @@
 не доходит вовсе: он всё равно упёрся бы в ту же охрану, только за деньги.
 """
 
+import logging
+
 from backend.models import HR, Message, Vacancy, VacancyStatus
 from backend.payloads import Classification
+from backend.repository.messages import save_incoming_message
+from backend.repository.vacancies_life import delete_vacancy
 from tests.dbio import all_rows, only_row, put
 from tests.factories import EPOCH, at, hr_row, message_row, vacancy_row
 from tests.fakes.telegram import incoming, message, user
@@ -169,6 +173,47 @@ async def test_a_vacancy_beyond_automation_reaches_no_reader(session_factory, de
 
     assert scheduled == []
     assert (await only_row(session_factory, Message)).text == "да, давайте"
+
+
+async def test_a_letter_about_a_vanished_vacancy_does_not_break_the_intake(
+    session_factory, monkeypatch, deliver, caplog
+):
+    """Письмо по вакансии, удалённой пока оно шло, приём не роняет.
+
+    Вакансию привязывают в одной сессии, а о её статусе спрашивают в
+    следующей — в этот промежуток окно успевает её удалить. Изображено
+    удалением из-под самой записи письма: внешние ключи не дают завести
+    письмо со ссылкой на вакансию, которой уже нет, поэтому «пропала
+    заранее» стендом не показать.
+
+    Запись в журнале сверяется потому, что без неё «разбора не было»
+    держалось бы на пустом клиенте модели в стенде, а не на заслоне.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777))
+    hr = await only_row(session_factory, HR)
+    await put(
+        session_factory,
+        vacancy_row(title="к отклику", hr_id=hr.id, status=VacancyStatus.APPLIED),
+    )
+    vacancy = await only_row(session_factory, Vacancy)
+
+    async def save_and_lose_the_vacancy(session, hr_id, vacancy_id, *args, **kwargs):
+        saved = await save_incoming_message(session, hr_id, vacancy_id, *args, **kwargs)
+        await delete_vacancy(session, vacancy_id)
+        return saved
+
+    monkeypatch.setattr(
+        "backend.flows.dm.save_incoming_message", save_and_lose_the_vacancy
+    )
+
+    with caplog.at_level(logging.INFO, logger="backend.flows.dm"):
+        await deliver(incoming(text="да, давайте"), schedule=None)
+
+    assert (await only_row(session_factory, Message)).text == "да, давайте"
+    assert await all_rows(session_factory, Vacancy) == []
+    assert [
+        rec.getMessage() for rec in caplog.records if rec.name == "backend.flows.dm"
+    ] == [f"vacancy {vacancy.id}: status=gone closed for auto, skip classification"]
 
 
 async def test_without_a_buffer_the_letter_is_read_on_the_spot(session_factory, monkeypatch, deliver):

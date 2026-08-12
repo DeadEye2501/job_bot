@@ -195,8 +195,8 @@ async def process_dm(
     is_open, v_status = await status_open_for_auto(session_factory, vacancy_id)
     if not is_open:
         logger.info(
-            "vacancy %s: status=%s terminal for auto, skip classification",
-            vacancy_id, v_status.value,
+            "vacancy %s: status=%s closed for auto, skip classification",
+            vacancy_id, v_status.value if v_status else "gone",
         )
         return
 
