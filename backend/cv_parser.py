@@ -7,7 +7,8 @@ from datetime import date
 import httpx
 
 from adapters.lm_studio import ChatRequest, chat
-from backend.domain.skill_names import dedupe_by_key, skill_key
+from backend.domain.skill_names import skill_key
+from backend.domain.spellings import dedupe_first_wins
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
 from backend.llm.answers import (
     QUOTE_TRANSLATION,
@@ -208,12 +209,12 @@ _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
 def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]:
     if not isinstance(raw, list):
         return []
-    out: list[str] = []
-    for item in raw:
-        value = normalize_enum(item, allowed)
-        if value is not None and value not in out:
-            out.append(value)
-    return out
+    # Значение и есть свой ключ: оно уже сведено к справочнику, и сравнивать
+    # его больше нечем. Чужое `normalize_enum` отдаёт пустым, и обход его
+    # отсеивает вместе с прочей пустотой.
+    return dedupe_first_wins(
+        [normalize_enum(item, allowed) for item in raw], lambda value: value
+    )
 
 
 def _normalize_lang_level(value: object) -> str | None:
@@ -244,18 +245,11 @@ def _parse_language_item(item) -> ParsedCvLanguage | None:
 def _parse_languages(raw: object) -> list[ParsedCvLanguage]:
     if not isinstance(raw, list):
         return []
-    out: list[ParsedCvLanguage] = []
-    seen: set[str] = set()
-    for it in raw:
-        row = _parse_language_item(it)
-        if row is None:
-            continue
-        key = row.language.casefold()
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(row)
-    return out
+    rows = [_parse_language_item(it) for it in raw]
+    return dedupe_first_wins(
+        [row for row in rows if row is not None],
+        lambda row: row.language.casefold(),
+    )
 
 
 _YEAR_MONTH_RE = re.compile(r"^(\d{4})-(\d{1,2})$")
@@ -338,7 +332,9 @@ def _parse_skill(item) -> ParsedCvSkill | None:
         category=category,
         name=name,
         level=level,
-        aliases=dedupe_by_key(str_list(item.get("aliases")), {skill_key(name)}),
+        aliases=dedupe_first_wins(
+            str_list(item.get("aliases")), skill_key, {skill_key(name)}
+        ),
     )
 
 

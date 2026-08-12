@@ -5,6 +5,7 @@ import logging
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.spellings import dedupe_first_wins
 from backend.models import Company, Vacancy
 from backend.payloads import CompanyDetail, str_list
 
@@ -16,38 +17,6 @@ from backend.repository.merging import concat_notes, load_merge_pair
 from backend.repository.vacancies_life import repoint_vacancies
 
 logger = logging.getLogger(__name__)
-
-
-def _new_spellings(candidates: list[str], known: set[str]) -> list[str]:
-    """Написания, которых под их ключом ещё нет.
-
-    Ключ плоский — `casefold` без приведения разделителей: у компании
-    «Сбер-Тех» и «Сбер Тех» это два разных написания, и схлопывать их нельзя.
-    Тем он и отличается от ключа навыка.
-
-    Занятые ключи приходят доводом, и чем их засеять, решает зовущий: правка
-    руками с названием компании не сверяется — список человек пишет сам, и
-    выбросить написанное им значило бы стереть введённое молча, — а слияние
-    сверяется, потому что там список копится сам. Переданный набор не
-    меняется: читать его после зова некому.
-
-    Пробелов по краям не срезает: слияние берёт написания из базы как есть.
-    """
-    known = set(known)
-    out: list[str] = []
-    for candidate in candidates:
-        # Пустое отсеивается до ключа, а не по ключу: в списке поглощённой
-        # строки лежит то, что записала база, и `None` там достижим правкой
-        # сырым SQL. Вывести из него ключ значило бы уронить слияние уже
-        # после удаления строки, то есть откатом всей сделки.
-        if not candidate:
-            continue
-        key = candidate.casefold()
-        if key in known:
-            continue
-        known.add(key)
-        out.append(candidate)
-    return out
 
 
 async def create_company(
@@ -182,7 +151,7 @@ async def update_company_fields(
         # С именем компании набранное здесь не сверяется намеренно: список
         # человек пишет руками, и выбросить написанное им значило бы стереть
         # введённое молча. Слияние сверяется — там список копится сам.
-        co.aliases = _new_spellings(str_list(aliases), set())
+        co.aliases = dedupe_first_wins(str_list(aliases), str.casefold)
         changed.append("aliases")
     if notes is not _COMPANY_FIELD_UNSET:
         co.notes = (
@@ -257,7 +226,9 @@ async def merge_company(
     aliases = list(survivor.aliases or [])
     known = {(survivor.name or "").casefold()}
     known.update(a.casefold() for a in aliases)
-    survivor.aliases = aliases + _new_spellings(abs_aliases + [abs_name], known)
+    survivor.aliases = aliases + dedupe_first_wins(
+        abs_aliases + [abs_name], str.casefold, known
+    )
 
     if not survivor.website and abs_website:
         survivor.website = abs_website

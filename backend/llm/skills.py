@@ -4,7 +4,8 @@
 import logging
 import re
 
-from backend.domain.skill_names import dedupe_by_key
+from backend.domain.skill_names import skill_key
+from backend.domain.spellings import dedupe_first_wins
 
 logger = logging.getLogger(__name__)
 
@@ -111,11 +112,12 @@ def clean_stack_items(
     # тот же навык в required и в preferred. Ключ тот же, что у анкеты: иначе
     # «CI/CD» и «ci cd» пережили бы дедупликацию и дали двойной балл за один
     # навык.
-    return dedupe_by_key(
+    return dedupe_first_wins(
         [
             _capitalize_skill(_strip_version(s.strip()))
             for s in items
             if isinstance(s, str)
         ],
+        skill_key,
         seen,
     )

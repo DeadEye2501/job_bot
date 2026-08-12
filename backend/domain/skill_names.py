@@ -55,24 +55,3 @@ def index_by_key(
             continue
         lookup[key] = value
     return collisions
-
-
-def dedupe_by_key(names: Iterable[str], seen: set[str]) -> list[str]:
-    """Отсеять повторы написаний по ключу; первое написание выигрывает.
-
-    Набор виденных ключей приходит доводом и пополняется — так зовущий либо
-    засевает его тем, что уже занято, либо продолжает отсев между двумя
-    вызовами. Отдаётся исходное написание: сравнивается ключ, а показывается
-    то, что написали.
-
-    Написание с пустым ключом («///», «-») не идёт в ответ вовсе: сравнить
-    его не с чем, а ляг оно в набор — второе такое молча потерялось бы.
-    """
-    out: list[str] = []
-    for name in names:
-        key = skill_key(name)
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        out.append(name)
-    return out
