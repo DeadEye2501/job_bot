@@ -1,6 +1,7 @@
 """Доставка отклика в Telegram: вложение, ограничения сервиса, след в базе."""
 
 import logging
+from dataclasses import dataclass
 
 from adapters import telegram
 from backend.bot import can_send
@@ -39,175 +40,228 @@ async def ui_send_vacancy_application(bot, vacancy_id: int) -> tuple[bool, str]:
     return await bot._ingestion.send_application_for_vacancy(vacancy_id)
 
 
-async def send(
-    bot,
-    hr: HR,
-    text: str,
-    attachment=None,
-    vacancy_id: int | None = None,
-    *,
-    force: bool = False,
-) -> bool:
-    """DM-send для cover-letter flow. Возвращает True когда отклик
-    зачтён (реально ушёл в Telegram ИЛИ заглушен SEND_LOCKED/dry_run
-    — но БД-эффект состоялся). False — когда отклик НЕ должен
-    считаться сделанным: hr без target, BotMode.OFF, blacklist.
+@dataclass(frozen=True, slots=True)
+class _Outcome:
+    """Чем кончилась отправка — то, что после неё надо записать.
 
-    Под замком отправки (`SEND_LOCKED`, тестовый режим) настоящего вызова
-    Telegram нет, а всё остальное идёт как при отправке: вакансия переходит
-    в «откликнулись», история статусов и лента пишутся. Строка сообщения —
-    единственное исключение: её не пишут нарочно, потому что номера
-    сообщения в Telegram не существует, а строка с пустым номером показала
-    бы в переписке письмо, которого HR не получал.
+    Четыре значения ходят вместе от самой отправки до строки в ленте:
+    номер вакансии, номер письма в Telegram, признак заглушки и признак
+    ручной отправки. Порознь ни одно из них не значит ничего: по номеру
+    письма пишется строка переписки, по заглушке решается, писать ли её
+    вовсе, а признак ручной отправки решает, пропускать ли переход статуса
+    поверх графа.
     """
-    # Заслоны те же, что у переписки из окна: одно объявление на двоих.
-    permission = await can_send.can_send_to_hr(bot, hr)
-    target = permission.target
-    # Заглушают отправку ровно два замка, и оба названы поимённо. Причина, о
-    # которой мы не знаем, — заведённая позже, и зачесть по ней отклик значило
-    # бы пометить вакансию откликнутой без письма, то есть закрыть её от
-    # следующей попытки навсегда. Умолчание тут — отказ.
-    suppressed = permission.refusal in (can_send.DRY_RUN, can_send.SENDING_LOCKED)
-    if permission.refusal is not None and not suppressed:
-        logger.warning(
-            "Bot.send: %s (hr=%s, адресат=%s, чёрный список=%s, vacancy=%s)",
-            permission.refusal, hr.id, target,
-            permission.blacklist_value, vacancy_id,
-        )
-        return False
-    # Под замком имитируем удачную отправку: не сделав этого, конвейер
-    # нельзя было бы обкатать без живых HR. Текст письма в журнал не идёт —
-    # в нём имя, работодатели и навыки из анкеты; след суппрессии остаётся
-    # отметкой в ленте вакансии.
-    tg_msg_id: int | None = None
-    if suppressed:
-        logger.warning(
-            "[%s] would have sent DM to %s (vacancy=%s, %d chars, attachment=%s)",
-            permission.refusal, target, vacancy_id, len(text), attachment,
-        )
-    else:
-        logger.info(
-            "Sending DM to hr %s (vacancy=%s, %d chars)",
-            target, vacancy_id, len(text),
-        )
-        from pyrogram.errors import FloodWait
-        import time as _time
-        try:
-            tg_msg_id = await telegram.send_dm(
-                bot._client, target, text, attachment
-            )
-        except FloodWait as e:
-            # Persist'им «не пытайся до этого времени» в app_settings
-            # — apply.try_auto_send проверит и пропустит
-            # auto-send'ы пока окно не закроется. Для manual UI-send
-            # это просто возврат False — юзер увидит «Telegram отказался»
-            # toast и попробует позже.
-            secs = int(getattr(e, "value", 0) or 0)
-            until = _time.time() + secs
-            logger.warning(
-                "Bot.send: FloodWait %d сек, persist'у flood_wait_until_ts",
-                secs,
-            )
-            try:
-                await bot._rs.set_app(
-                    "flood_wait_until_ts", str(until)
+
+    vacancy_id: int | None
+    tg_message_id: int | None
+    suppressed: bool
+    force: bool
+
+
+async def _note_flood_wait(bot, error) -> None:
+    """Запомнить, до какого времени Telegram просил не писать.
+
+    Запись переживает перезапуск нарочно: автоотправка спрашивает её перед
+    каждым откликом и молчит, пока окно не закроется. Ручной отправке из
+    окна это просто отказ — человек увидит подсказку и попробует позже.
+    """
+    import time as _time
+
+    secs = int(getattr(error, "value", 0) or 0)
+    logger.warning("Bot.send: FloodWait %d сек, persist'у flood_wait_until_ts", secs)
+    try:
+        await bot._rs.set_app("flood_wait_until_ts", str(_time.time() + secs))
+    except Exception:
+        logger.exception("Bot.send: failed to persist flood_wait_until_ts")
+
+
+async def _clear_flood_wait(bot) -> None:
+    """Снять запрет: Telegram отпустил, и ждать больше нечего.
+
+    Не сняв его, автоотправка после восстановления сверялась бы с
+    просроченным окном и молчала бы дольше, чем просили.
+    """
+    if bot._rs.flood_wait_until_ts <= 0:
+        return
+    try:
+        await bot._rs.set_app("flood_wait_until_ts", "0")
+    except Exception:
+        logger.exception("Bot.send: failed to clear flood_wait_until_ts")
+
+
+async def _deliver_dm(bot, target, text: str, attachment) -> tuple[int | None, bool]:
+    """Отдать письмо Telegram; отдать его номер и можно ли считать дело сделанным.
+
+    Отказ по частоте — единственный, после которого продолжать нельзя:
+    письма нет, и зачесть отклик значило бы закрыть вакансию от следующей
+    попытки навсегда. Текст письма в журнал не идёт — в нём имя,
+    работодатели и навыки из анкеты.
+    """
+    from pyrogram.errors import FloodWait
+
+    logger.info("Sending DM to hr %s (%d chars)", target, len(text))
+    try:
+        tg_msg_id = await telegram.send_dm(bot._client, target, text, attachment)
+    except FloodWait as e:
+        await _note_flood_wait(bot, e)
+        return None, False
+    await _clear_flood_wait(bot)
+    return tg_msg_id, True
+
+
+async def _commit_send(bot, hr: HR, text: str, outcome: _Outcome) -> bool:
+    """Записать следствия ушедшего письма; сказать, удалось ли записать.
+
+    Строка переписки под заглушкой не пишется нарочно: номера сообщения в
+    Telegram не существует, и строка с пустым номером показала бы в окне
+    письмо, которого HR не получал. След заглушки остаётся отметкой в ленте.
+
+    В подпись перевода статуса заглушка не дописывается по той же причине,
+    по которой не пишется строка: запись в истории обязана быть одинаковой
+    на тестовом стенде и в бою, иначе две базы читаются по-разному.
+    """
+    async with bot._session_factory() as session:
+        if not outcome.suppressed:
+            session.add(
+                Message(
+                    is_incoming=False,
+                    hr_id=hr.id,
+                    vacancy_id=outcome.vacancy_id,
+                    text=text,
+                    tg_message_id=outcome.tg_message_id,
                 )
-            except Exception:
-                logger.exception(
-                    "Bot.send: failed to persist flood_wait_until_ts"
-                )
-            return False
-    # При успешной отправке очистим flood_wait_until_ts (если он
-    # был — Telegram отпустил). Не критично, но тогда try_auto_send
-    # не будет проверять стэйл-окно после восстановления.
-    if not suppressed and bot._rs.flood_wait_until_ts > 0:
-        try:
-            await bot._rs.set_app("flood_wait_until_ts", "0")
-        except Exception:
-            logger.exception(
-                "Bot.send: failed to clear flood_wait_until_ts"
             )
-    # С этого момента сообщение УШЛО к HR (или сэмулировано). Если
-    # коммит ниже упадёт — сообщение в Telegram реальное, а Message-row
-    # в БД нет. Чтобы повторное «Отправить отклик» НЕ отправило DM
-    # ещё раз, делаем fallback-flip status=APPLIED отдельной тонкой
-    # транзакцией: пусть аудит-row потерян, но re-send отбивается
-    # стандартной already_applied-проверкой в send_application_for_vacancy.
-    # SEND_LOCKED / dry_run: Message-row НЕ пишем (раньше писали «для
-    # аудита», но получалось что in-app HR-чат показывал фантомное
-    # сообщение, которого в реальном Telegram нет — юзеры путались).
-    # Аудит покрыт VacancyEvent(kind="applied_sent") ниже + флагом
-    # suppressed=True в его payload'е.
+        applied_now = False
+        if outcome.vacancy_id is not None:
+            applied_now = await mark_vacancy_applied(
+                session,
+                outcome.vacancy_id,
+                _applied_label(outcome.force),
+                force=outcome.force,
+            )
+        await session.commit()
+    return applied_now
+
+
+def _log_refusal(permission, hr: HR, vacancy_id: int | None) -> None:
+    """Записать отказ заслона: кому не написали и почему."""
+    logger.warning(
+        "Bot.send: %s (hr=%s, адресат=%s, чёрный список=%s, vacancy=%s)",
+        permission.refusal, hr.id, permission.target,
+        permission.blacklist_value, vacancy_id,
+    )
+
+
+async def _flip_applied_alone(bot, outcome: _Outcome) -> None:
+    """Перевести вакансию в «откликнулись» отдельной тонкой сделкой.
+
+    Зовётся, когда письмо уже ушло, а запись следствий сорвалась. Строку
+    аудита в этом случае теряем, зато повторная отправка отобьётся обычной
+    проверкой «уже откликались» — а она смотрит на статус.
+    """
+    if outcome.vacancy_id is None:
+        return
     try:
         async with bot._session_factory() as session:
-            if not suppressed:
-                session.add(
-                    Message(
-                        is_incoming=False,
-                        hr_id=hr.id,
-                        vacancy_id=vacancy_id,
-                        text=text,
-                        tg_message_id=tg_msg_id,
-                    )
+            if await mark_vacancy_applied(
+                session,
+                outcome.vacancy_id,
+                _applied_label(outcome.force),
+                force=outcome.force,
+            ):
+                await session.commit()
+                logger.info(
+                    "vacancy %s status -> APPLIED via fallback "
+                    "(audit Message-row missing)",
+                    outcome.vacancy_id,
                 )
-            applied_now = False
-            if vacancy_id is not None:
-                # SEND_LOCKED-пометка раньше дописывалась в explanation —
-                # но это делало запись в истории разной в dev и проде.
-                # Аудит факта суппрессии живёт в
-                # VacancyEvent(kind="applied_sent").payload.suppressed.
-                applied_now = await mark_vacancy_applied(
-                    session, vacancy_id, _applied_label(force), force=force
-                )
-            await session.commit()
     except Exception:
-        logger.error(
-            "Bot.send: DB commit FAILED after%s telegram send to %s "
-            "(vacancy=%s, %d chars); message is sent but no Message row "
-            "recorded. Attempting standalone status flip to block re-send.",
-            " (suppressed)" if suppressed else "",
-            target, vacancy_id, len(text),
-            exc_info=True,
+        logger.exception(
+            "Bot.send: fallback status-flip also FAILED for "
+            "vacancy=%s — re-send protection broken, watch out",
+            outcome.vacancy_id,
         )
-        if vacancy_id is not None:
-            try:
-                async with bot._session_factory() as session:
-                    if await mark_vacancy_applied(
-                        session, vacancy_id, _applied_label(force), force=force
-                    ):
-                        await session.commit()
-                        logger.info(
-                            "vacancy %s status -> APPLIED via fallback "
-                            "(audit Message-row missing)",
-                            vacancy_id,
-                        )
-            except Exception:
-                logger.exception(
-                    "Bot.send: fallback status-flip also FAILED for "
-                    "vacancy=%s — re-send protection broken, watch out",
-                    vacancy_id,
-                )
-        # Возвращаем True — в Telegram сообщение реально ушло (или
-        # сэмулировано в SEND_LOCKED-режиме), повторная отправка не нужна.
+
+
+async def _hand_over(bot, permission, text: str, attachment) -> tuple[int | None, bool]:
+    """Отдать письмо Telegram или сымитировать отправку под замком.
+
+    Имитация нужна затем, что иначе конвейер нельзя было бы обкатать без
+    живых HR: всё, кроме самого вызова Telegram, идёт как при отправке.
+
+    **Условие входа:** уцелевший отказ здесь означает замок и только его —
+    незнакомые отказы зовущий отбил раньше. Текст письма в журнал не идёт
+    ни на одной из двух дорог: в нём имя, работодатели и навыки из анкеты.
+    """
+    if permission.refusal is not None:
+        logger.warning(
+            "[%s] would have sent DM to %s (%d chars, attachment=%s)",
+            permission.refusal, permission.target, len(text), attachment,
+        )
+        return None, True
+    return await _deliver_dm(bot, permission.target, text, attachment)
+
+
+async def _audit_sent(bot, hr_id: int, chars: int, outcome: _Outcome) -> None:
+    """Отметить в ленте вакансии, что отклик ушёл.
+
+    Без этой строки у человека остаются только письмо в переписке и
+    сменившийся статус — а «отклик отправлен» отдельной строкой в истории
+    не видно. Ручная отправка помечается своим признаком.
+    """
+    if outcome.vacancy_id is None:
+        return
+    await record_vacancy_event(
+        bot._session_factory,
+        outcome.vacancy_id,
+        "applied_sent",
+        {
+            "hr_id": hr_id,
+            "force": outcome.force,
+            "suppressed": outcome.suppressed,
+            "cover_letter_chars": chars,
+            "tg_message_id": outcome.tg_message_id,
+        },
+    )
+
+
+async def send(
+    bot, hr: HR, text: str, attachment=None, vacancy_id: int | None = None,
+    *, force: bool = False,
+) -> bool:
+    """Отправить отклик HR; сказать, считать ли отклик сделанным.
+
+    Отказ значит, что вакансия остаётся открытой для следующей попытки: нет
+    адреса, бот выключен, чёрный список, Telegram попросил подождать.
+    Заглушка отказом не считается — при ней состоялось всё, кроме вызова."""
+    # Заслоны те же, что у переписки из окна: одно объявление на двоих.
+    # Заглушают отправку ровно два замка, и оба названы поимённо: незнакомая
+    # причина — заведённая позже, и зачесть по ней отклик значило бы закрыть
+    # вакансию от следующей попытки навсегда. Умолчание тут — отказ.
+    permission = await can_send.can_send_to_hr(bot, hr)
+    suppressed = permission.refusal in (can_send.DRY_RUN, can_send.SENDING_LOCKED)
+    if permission.refusal is not None and not suppressed:
+        _log_refusal(permission, hr, vacancy_id)
+        return False
+    tg_msg_id, delivered = await _hand_over(bot, permission, text, attachment)
+    if not delivered:
+        return False
+    outcome = _Outcome(vacancy_id, tg_msg_id, suppressed, force)
+    # С этого момента письмо у HR (или сымитировано), и повторять отправку
+    # нельзя ни при какой беде записи — отсюда `True` в обеих дорогах.
+    try:
+        applied_now = await _commit_send(bot, hr, text, outcome)
+    except Exception:
+        logger.exception(
+            "Bot.send: запись следствий сорвалась после%s отправки к %s "
+            "(vacancy=%s, %d знаков); письмо ушло, строки переписки нет. "
+            "Перевожу статус отдельно, чтобы отбить повторную отправку.",
+            " заглушённой" if suppressed else "",
+            permission.target, vacancy_id, len(text),
+        )
+        await _flip_applied_alone(bot, outcome)
         return True
     if applied_now:
         logger.info("vacancy %s status -> APPLIED after send", vacancy_id)
-    # Audit-event: фиксируем факт фактической отправки cover-letter'а
-    # (real DM или SEND_LOCKED-имитация) — это нужно для UI-таймлайна
-    # вакансии, иначе у юзера только Message-row + status flip,
-    # без явной строки «отклик отправлен» в истории. force=True от
-    # ручного UI выделяем отдельным флагом.
-    if vacancy_id is not None:
-        await record_vacancy_event(
-            bot._session_factory,
-            vacancy_id,
-            "applied_sent",
-            {
-                "hr_id": hr.id,
-                "force": force,
-                "suppressed": suppressed,
-                "cover_letter_chars": len(text),
-                "tg_message_id": tg_msg_id,
-            },
-        )
+    await _audit_sent(bot, hr.id, len(text), outcome)
     return True
