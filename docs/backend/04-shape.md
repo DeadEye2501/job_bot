@@ -62,7 +62,7 @@
       139, `flows/apply.send_application` 136
 - [x] **Н. Модель:** `llm/cover_letter.generate_cover_letter` 138,
       `llm/fit.validate_vacancy_fit` 106
-- [ ] **О. Бот:** `bot/loop.run` 137, `bot/client.__init__` 135 — второе
+- [x] **О. Бот:** `bot/loop.run` 137, `bot/client.__init__` 135 — второе
       конструктор, там разнимается сборка, а не логика
 - [ ] **П. Репозиторий:** `repository/hr_list.list_hr_with_counts` 122,
       `repository/stats_summary.get_stats_hr_responses` 111

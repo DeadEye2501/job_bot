@@ -35,7 +35,8 @@ async def current_mode(bot) -> BotMode:
         return BotMode.OFF
 
 
-async def run(bot, *, once: bool = False) -> None:
+async def _connect(bot) -> None:
+    """Поднять соединение и объявить бота готовым к обращениям из окна."""
     if bot._dry_run:
         logger.warning("DRY-RUN mode: outgoing TG messages will NOT be sent")
     # Синкаем dev-safety lock из БД-настройки в module-level guard
@@ -60,6 +61,104 @@ async def run(bot, *, once: bool = False) -> None:
         _mask_phone(bot._rs.tg.phone if bot._rs.tg else None),
     )
     await persist_session_if_changed(bot)
+
+
+async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None:
+    """Что делается один раз на переходе между режимами, а не каждый оборот."""
+    # Transition в OFF: гасим debounce-таймеры pending'овых
+    # классификаций. Накопленные тексты пропадают, но сами
+    # сообщения уже в БД — юзеру нужно будет переклассифицировать
+    # вручную через UI если нужно.
+    if mode is BotMode.OFF and prev_mode is not BotMode.OFF:
+        logger.info("Transition into OFF; draining DM debouncers")
+        await bot._ingestion.cancel_pending_dm_classifications(drain=True)
+    if mode is not BotMode.OFF and prev_mode is BotMode.OFF:
+        logger.info(
+            "Transition into active mode (%s); running DM catch-up",
+            mode.value,
+        )
+        try:
+            await catch_up_missed_dms(
+                bot._client,
+                bot._lm_client,
+                bot._lm_chat_model,
+                bot._session_factory,
+                backfill_limit=bot._rs.dm_backfill_limit,
+                on_message_persisted=bot.on_new_message,
+                on_vacancies_changed=bot.on_vacancies_changed,
+                schedule_classification=bot._ingestion.schedule_dm_classification,
+            )
+        except Exception:
+            logger.exception("dm catch-up failed")
+
+
+async def _tick(bot, mode: BotMode) -> None:
+    """Работа одного оборота: сроки молчания и, в полном режиме, обход каналов."""
+    # Ghosting timer: дёргается каждый tick в активных
+    # режимах (DM_ONLY и FULL). В OFF не запускается — бот
+    # на паузе, не должен сам менять статусы. Сама проверка
+    # дешёвая: только Applied/In Progress попадают в шорт-
+    # лист, и при пустом списке ранний return.
+    if mode is not BotMode.OFF:
+        try:
+            await bot._ingestion.check_ghosting_timeouts()
+        except Exception:
+            logger.exception("ghosting timer tick failed")
+    # Channel polling and outbound applications are Full-only.
+    # DM Only and Off both skip ingestion (DM Only still reacts
+    # to incoming HR messages via the registered MessageHandler).
+    if mode is BotMode.FULL:
+        # Оборот может тихо не сделать ничего: место прогона мог
+        # занять ручной прогон из окна.
+        await slot.run_in_slot(
+            bot, lambda: bot._ingestion.poll_active_channels(), "poll cycle"
+        )
+
+
+async def _sleep_until_wake(bot) -> None:
+    """Дождаться срока следующего оборота или досрочного окрика из окна."""
+    bot._wake_event.clear()
+    try:
+        await asyncio.wait_for(
+            bot._wake_event.wait(),
+            timeout=bot._rs.poll_interval_sec,
+        )
+    except asyncio.TimeoutError:
+        pass
+
+
+async def _disconnect(bot) -> None:
+    """Погасить всё, что переживёт цикл: таски, соединение, клиенты модели."""
+    logger.info("Bot run-loop exiting")
+    # Shutdown-флаг ДО client.stop(): Pyrogram'овский DM-handler,
+    # успевший отстрелить уже после teardown'а, увидит флаг и
+    # no-op'нет вместо того, чтобы пытаться писать в закрытый
+    # session_factory или дёргать httpx-клиенты, которые мы
+    # сейчас будем aclose'ить.
+    bot._ingestion.mark_shutting_down()
+    # Висящие debounce-таски DM-классификации не должны жить дольше
+    # бота — иначе при reload'е RuntimeSettings (новый Bot) старые
+    # таски попытаются использовать закрытый httpx-клиент.
+    try:
+        await bot._ingestion.cancel_pending_dm_classifications()
+    except Exception:
+        logger.exception("cancel_pending_dm_classifications failed")
+    # log_out_session() уже отключил клиент; повторный stop()
+    # упадёт ConnectionError("Client is already terminated").
+    # Глушим — логируем как debug.
+    try:
+        await bot._client.stop()
+    except ConnectionError:
+        logger.debug("Pyrogram client already terminated; skip stop()")
+    except Exception:
+        logger.exception("Pyrogram client.stop() failed")
+    if bot._lm_embed_client is not bot._lm_client:
+        await bot._lm_embed_client.aclose()
+    await bot._lm_client.aclose()
+
+
+async def run(bot, *, once: bool = False) -> None:
+    await _connect(bot)
     try:
         # Re-parse any vacancies that were ingested but never finished
         # the LLM pipeline (previous process crashed mid-parse). Runs
@@ -79,53 +178,11 @@ async def run(bot, *, once: bool = False) -> None:
         prev_mode = BotMode.OFF
         while True:
             mode = await current_mode(bot)
-            # Transition в OFF: гасим debounce-таймеры pending'овых
-            # классификаций. Накопленные тексты пропадают, но сами
-            # сообщения уже в БД — юзеру нужно будет переклассифицировать
-            # вручную через UI если нужно.
-            if mode is BotMode.OFF and prev_mode is not BotMode.OFF:
-                logger.info("Transition into OFF; draining DM debouncers")
-                await bot._ingestion.cancel_pending_dm_classifications(drain=True)
-            if mode is not BotMode.OFF and prev_mode is BotMode.OFF:
-                logger.info(
-                    "Transition into active mode (%s); running DM catch-up",
-                    mode.value,
-                )
-                try:
-                    await catch_up_missed_dms(
-                        bot._client,
-                        bot._lm_client,
-                        bot._lm_chat_model,
-                        bot._session_factory,
-                        backfill_limit=bot._rs.dm_backfill_limit,
-                        on_message_persisted=bot.on_new_message,
-                        on_vacancies_changed=bot.on_vacancies_changed,
-                        schedule_classification=bot._ingestion.schedule_dm_classification,
-                    )
-                except Exception:
-                    logger.exception("dm catch-up failed")
-            # Ghosting timer: дёргается каждый tick в активных
-            # режимах (DM_ONLY и FULL). В OFF не запускается — бот
-            # на паузе, не должен сам менять статусы. Сама проверка
-            # дешёвая: только Applied/In Progress попадают в шорт-
-            # лист, и при пустом списке ранний return.
-            if mode is not BotMode.OFF:
-                try:
-                    await bot._ingestion.check_ghosting_timeouts()
-                except Exception:
-                    logger.exception("ghosting timer tick failed")
-            # Channel polling and outbound applications are Full-only.
-            # DM Only and Off both skip ingestion (DM Only still reacts
-            # to incoming HR messages via the registered MessageHandler).
-            if mode is BotMode.FULL:
-                # Оборот может тихо не сделать ничего: место прогона мог
-                # занять ручной прогон из окна.
-                await slot.run_in_slot(
-                    bot, lambda: bot._ingestion.poll_active_channels(), "poll cycle"
-                )
+            await _on_mode_switch(bot, prev_mode, mode)
+            await _tick(bot, mode)
             prev_mode = mode
             if once or bot._stop_event.is_set():
-                # finally-блок ниже логирует «Bot run-loop exiting» —
+                # `_disconnect` логирует «Bot run-loop exiting» —
                 # детали (once / stop_event) пишем DEBUG, чтобы не
                 # дублировать INFO-строку.
                 logger.debug(
@@ -134,44 +191,12 @@ async def run(bot, *, once: bool = False) -> None:
                     bot._stop_event.is_set(),
                 )
                 return
-            bot._wake_event.clear()
-            try:
-                await asyncio.wait_for(
-                    bot._wake_event.wait(),
-                    timeout=bot._rs.poll_interval_sec,
-                )
-            except asyncio.TimeoutError:
-                pass
+            await _sleep_until_wake(bot)
             if bot._stop_event.is_set():
                 logger.debug("Run-loop exiting after stop request")
                 return
     finally:
-        logger.info("Bot run-loop exiting")
-        # Shutdown-флаг ДО client.stop(): Pyrogram'овский DM-handler,
-        # успевший отстрелить уже после teardown'а, увидит флаг и
-        # no-op'нет вместо того, чтобы пытаться писать в закрытый
-        # session_factory или дёргать httpx-клиенты, которые мы
-        # сейчас будем aclose'ить.
-        bot._ingestion.mark_shutting_down()
-        # Висящие debounce-таски DM-классификации не должны жить дольше
-        # бота — иначе при reload'е RuntimeSettings (новый Bot) старые
-        # таски попытаются использовать закрытый httpx-клиент.
-        try:
-            await bot._ingestion.cancel_pending_dm_classifications()
-        except Exception:
-            logger.exception("cancel_pending_dm_classifications failed")
-        # log_out_session() уже отключил клиент; повторный stop()
-        # упадёт ConnectionError("Client is already terminated").
-        # Глушим — логируем как debug.
-        try:
-            await bot._client.stop()
-        except ConnectionError:
-            logger.debug("Pyrogram client already terminated; skip stop()")
-        except Exception:
-            logger.exception("Pyrogram client.stop() failed")
-        if bot._lm_embed_client is not bot._lm_client:
-            await bot._lm_embed_client.aclose()
-        await bot._lm_client.aclose()
+        await _disconnect(bot)
 
 
 async def persist_session_if_changed(bot) -> None:
