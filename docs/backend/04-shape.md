@@ -52,7 +52,7 @@
 
 - [x] **Ж. `repository/companies_matching.find_or_create_company`** — 199 строк
 - [x] **З. `repository/vacancies_list.list_vacancies`** — 186 строк, 17 доводов
-- [ ] **И. `repository/stats_pipeline.get_stats_channels_pipeline`** — 179
+- [x] **И. `repository/stats_pipeline.get_stats_channels_pipeline`** — 179
 - [ ] **К. `bot/send.send`** — 172 строки, 6 доводов
 - [ ] **Л. `flows/dm_backfill.backfill_hr_dm_history`** — 153 строки, 9 доводов
 
