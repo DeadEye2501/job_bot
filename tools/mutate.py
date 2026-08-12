@@ -156,6 +156,55 @@ def load_mutations(set_name: str) -> list[tuple[str, str, str]]:
     return module.MUTATIONS
 
 
+def run_mutations(mutations, snapshots: dict[str, bytes], test_path: str):
+    """Прогнать каждую поломку и разобрать исходы: молчаливые, ненайденные,
+    неоднозначные.
+
+    Восстановление стоит под `finally` у каждой поломки, а не одним разом в
+    конце: убитый прогон иначе оставил бы боевой файл мутированным.
+    """
+    silent, not_found, ambiguous = [], [], []
+    for name, before, after in mutations:
+        path = Path(name)
+        snapshot = snapshots[name]
+        text = snapshot.decode("utf-8")
+        occurrences = text.count(before)
+        if occurrences == 0:
+            print(f"НЕ НАЙДЕНО: {name}: {before!r}")
+            not_found.append((name, before))
+            continue
+        if occurrences > 1:
+            print(f"НЕОДНОЗНАЧНО ({occurrences}x): {name}: {before!r}")
+            ambiguous.append((name, before))
+            continue
+        mutated = text.replace(before, after, 1).encode("utf-8")
+        try:
+            path.write_bytes(mutated)
+            if run_tests(test_path)[0]:
+                silent.append((name, before, after))
+                print(f"МОЛЧА ПРОШЛА: {name}: {before!r} -> {after!r}")
+            else:
+                print(f"поймана: {name}: {before!r}")
+        finally:
+            restore(path, snapshot, f"мутации {before!r}")
+    return silent, not_found, ambiguous
+
+
+def files_match_snapshots(snapshots: dict[str, bytes]) -> bool:
+    """Сверить каждый затронутый файл со снимком; сказать, всё ли цело.
+
+    На случай, если что-то обошло восстановление внутри цикла способом,
+    который там не предусмотрен: оставленный мутированным боевой файл
+    дороже любого вердикта прогона.
+    """
+    for name, snapshot in snapshots.items():
+        if Path(name).read_bytes() != snapshot:
+            print(f"ФАТАЛЬНО: {name} не совпадает со снимком после прогона")
+            print(f"Боевой файл сломан. Восстановить: {restore_command([name])}")
+            return False
+    return True
+
+
 def main() -> int:
     if len(sys.argv) != 3:
         print("нужно два довода: путь к тестам и имя набора поломок")
@@ -185,42 +234,10 @@ def main() -> int:
     # итерации стать «эталоном» для следующей.
     snapshots: dict[str, bytes] = {name: Path(name).read_bytes() for name in targets}
 
-    silent = []
-    not_found = []
-    ambiguous = []
+    silent, not_found, ambiguous = run_mutations(mutations, snapshots, test_path)
 
-    for name, before, after in mutations:
-        path = Path(name)
-        snapshot = snapshots[name]
-        text = snapshot.decode("utf-8")
-        occurrences = text.count(before)
-        if occurrences == 0:
-            print(f"НЕ НАЙДЕНО: {name}: {before!r}")
-            not_found.append((name, before))
-            continue
-        if occurrences > 1:
-            print(f"НЕОДНОЗНАЧНО ({occurrences}x): {name}: {before!r}")
-            ambiguous.append((name, before))
-            continue
-        mutated = text.replace(before, after, 1).encode("utf-8")
-        try:
-            path.write_bytes(mutated)
-            if run_tests(test_path)[0]:
-                silent.append((name, before, after))
-                print(f"МОЛЧА ПРОШЛА: {name}: {before!r} -> {after!r}")
-            else:
-                print(f"поймана: {name}: {before!r}")
-        finally:
-            restore(path, snapshot, f"мутации {before!r}")
-
-    # Финальная сверка каждого затронутого файла со снимком — на случай,
-    # если что-то обошло восстановление внутри цикла способом, который тут
-    # не предусмотрен.
-    for name, snapshot in snapshots.items():
-        if Path(name).read_bytes() != snapshot:
-            print(f"ФАТАЛЬНО: {name} не совпадает со снимком после прогона")
-            print(f"Боевой файл сломан. Восстановить: {restore_command([name])}")
-            return 3
+    if not files_match_snapshots(snapshots):
+        return 3
 
     print(
         f"\nвсего поломок: {len(mutations)}, прошло молча: {len(silent)}, "

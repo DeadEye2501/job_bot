@@ -214,6 +214,19 @@ async def test_a_gain_counts_the_first_move_not_the_latest(
     assert kpi["applied_period"] == 0
 
 
+def _four_steps(vacancy_id: int, when):
+    """Все четыре ступени воронки, пройденные одной вакансией в один день."""
+    return [
+        status_history_row(vacancy_id, status=status, changed_at=when)
+        for status in (
+            VacancyStatus.APPLIED,
+            VacancyStatus.TEST,
+            VacancyStatus.OFFER,
+            VacancyStatus.DECLINE,
+        )
+    ]
+
+
 async def test_every_gain_respects_the_window(session, session_factory):
     """Окно действует на все четыре прибавки, а не на одну."""
     fresh = vacancy_row(created_at=days_ago(1))
@@ -221,30 +234,8 @@ async def test_every_gain_respects_the_window(session, session_factory):
     await put(session_factory, fresh, stale)
     await put(
         session_factory,
-        status_history_row(
-            fresh.id, status=VacancyStatus.APPLIED, changed_at=days_ago(1)
-        ),
-        status_history_row(
-            fresh.id, status=VacancyStatus.TEST, changed_at=days_ago(1)
-        ),
-        status_history_row(
-            fresh.id, status=VacancyStatus.OFFER, changed_at=days_ago(1)
-        ),
-        status_history_row(
-            fresh.id, status=VacancyStatus.DECLINE, changed_at=days_ago(1)
-        ),
-        status_history_row(
-            stale.id, status=VacancyStatus.APPLIED, changed_at=days_ago(40)
-        ),
-        status_history_row(
-            stale.id, status=VacancyStatus.TEST, changed_at=days_ago(40)
-        ),
-        status_history_row(
-            stale.id, status=VacancyStatus.OFFER, changed_at=days_ago(40)
-        ),
-        status_history_row(
-            stale.id, status=VacancyStatus.DECLINE, changed_at=days_ago(40)
-        ),
+        *_four_steps(fresh.id, days_ago(1)),
+        *_four_steps(stale.id, days_ago(40)),
     )
 
     kpi = await get_stats_kpi(session, period="week")
