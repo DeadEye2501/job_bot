@@ -85,6 +85,29 @@ async def test_a_deleted_vacancy_leaves_the_embedding_cache(with_a_vacancy):
     assert pipeline._embedding_ids.tolist() == []
 
 
+async def test_the_facade_says_the_vacancy_was_forgotten(with_a_vacancy):
+    """Через фасад конвейера удаление доходит и отвечает «удалено».
+
+    Фасадом зовёт бот, а бота — кнопка удаления в окне. Что уносится вместе
+    со строкой, сторожат соседи выше; здесь наблюдается ответ, по которому
+    окно решает, что показать человеку.
+    """
+    pipeline, vacancy, _ = with_a_vacancy
+
+    assert await pipeline.forget_vacancy(vacancy.id) is True
+
+
+async def test_the_facade_says_when_there_was_nothing_to_delete(with_a_vacancy):
+    """Удаление несуществующей строки отвечает отказом, а не молчанием.
+
+    Окно по этому ответу говорит «вакансия не найдена»: строку мог убрать
+    другой экран или сам конвейер, пока карточка была открыта.
+    """
+    pipeline, _, _ = with_a_vacancy
+
+    assert await pipeline.forget_vacancy(10_000) is False
+
+
 async def test_the_window_hears_about_both_lists(with_a_vacancy):
     """Окно узнаёт и о списке вакансий, и о контактах.
 

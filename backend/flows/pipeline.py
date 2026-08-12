@@ -18,6 +18,7 @@ from backend.flows import apply
 from backend.flows import dm_classify
 from backend.flows import channels
 from backend.flows import rerun
+from backend.flows import cleanup
 from backend.flows import ghosting
 from backend.llm import candidate
 from backend.llm.candidate import CandidateProfile
@@ -239,6 +240,9 @@ class IngestionPipeline:
 
     async def poll_active_channels(self) -> None:
         return await channels.poll_active_channels(self)
+
+    async def forget_vacancy(self, vacancy_id) -> bool:
+        return await cleanup.forget_vacancy(self, vacancy_id)
 
     async def poll_one_channel(self, channel_id) -> Literal["ok", "missing", "error"]:
         return await channels.poll_one_channel(self, channel_id)

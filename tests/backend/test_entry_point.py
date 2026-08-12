@@ -26,7 +26,22 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture
-def entry(clean_root_logger, monkeypatch):
+def lock_of_its_own(monkeypatch, tmp_path):
+    """Замок единственной копии — в своём каталоге, а не в боевом.
+
+    Боевой лежит рядом с базой человека, и прогон при запущенном приложении
+    получал бы отказ запуска вместо проверяемого поведения.
+
+    Ввоз здесь такой же отложенный и по той же причине, что у соседней
+    фикстуры: модуль насовсем правит корневой logger.
+    """
+    import main as module
+
+    monkeypatch.setattr(module, "get_lock_path", lambda: tmp_path / "jobbot.lock")
+
+
+@pytest.fixture
+def entry(clean_root_logger, lock_of_its_own, monkeypatch):
     """Точка входа с подменёнными шагами запуска и возвращённым журналом.
 
     Ввозится она внутри фикстуры нарочно: при ввозе модуль насовсем правит
@@ -88,6 +103,45 @@ def test_the_schema_is_updated_before_the_window(entry):
     module.main()
 
     assert order.index("схема базы") < order.index("окно")
+
+
+def test_a_second_copy_does_not_start(entry, capsys):
+    """Вторая копия не запускается и говорит об этом человеку.
+
+    Замок берётся до всех шагов: обе копии делят файл журнала, а тот
+    поворачивается переименованием — после первой же ротации одна из копий
+    пишет в переименованный файл, который сотрут следующей.
+
+    Код возврата свой: запускающему из командной строки «уже запущено» — не то
+    же, что «отработал и вышел», и не то же, что сломанное хранилище ключей.
+    """
+    module, order = entry
+    from backend.single_instance import hold_the_only_copy
+
+    first = hold_the_only_copy(module.get_lock_path())
+
+    assert module.main() == 3
+    assert order == []
+    assert "уже запущено" in capsys.readouterr().err
+
+    first.close()
+
+
+def test_the_lock_is_let_go_when_the_window_closes(entry):
+    """Закрытое окно замок отпускает.
+
+    Иначе второй запуск после штатного выхода упирался бы в самого себя —
+    замок сняла бы только перезагрузка.
+    """
+    module, _ = entry
+    from backend.single_instance import hold_the_only_copy
+
+    module.main()
+
+    after_the_window = hold_the_only_copy(module.get_lock_path())
+
+    assert after_the_window is not None
+    after_the_window.close()
 
 
 def test_a_broken_key_store_stops_the_launch(entry, monkeypatch, capsys):
