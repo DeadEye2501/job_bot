@@ -21,6 +21,7 @@ from adapters import db
 from backend.models import BotMode
 from backend.runtime_settings import RuntimeSettings
 from client.bridge import AsyncRunner, MainApi, WizardApi
+from client import raise_window
 from config import get_database_url
 
 
@@ -114,6 +115,11 @@ def run_ui() -> int:
     window = QMainWindow()
     window.setWindowTitle("Job Bot")
     window.setWindowIcon(icon)
+    # Слушаем просьбы второй копии сразу, как появилось что показывать, — до
+    # загрузки страницы и до `show()`: всё это время человек уже может нажать
+    # ярлык второй раз. Имя держится до конца работы, потому что слушатель жив,
+    # пока на него ссылаются.
+    _second_copy_listener = raise_window.listen(window)
 
     view = QWebEngineView()
     # Suppress the default browser right-click menu (Back / Reload / View

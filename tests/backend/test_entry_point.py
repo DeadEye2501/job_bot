@@ -105,12 +105,17 @@ def test_the_schema_is_updated_before_the_window(entry):
     assert order.index("схема базы") < order.index("окно")
 
 
-def test_a_second_copy_does_not_start(entry, capsys):
-    """Вторая копия не запускается и говорит об этом человеку.
+def test_a_second_copy_does_not_start(entry, capsys, monkeypatch):
+    """Вторая копия не начинает работу, а просит показать уже открытое окно.
 
     Замок берётся до всех шагов: обе копии делят файл журнала, а тот
     поворачивается переименованием — после первой же ротации одна из копий
     пишет в переименованный файл, который сотрут следующей.
+
+    Человеку при этом не говорится ничего: он нажал ярлык, ожидая окна, а не
+    объяснений, и показать их всё равно негде — в оконной сборке нет ни
+    консоли, ни потока ошибок. Молчание здесь проверяется наравне с просьбой:
+    сообщение, ушедшее в никуда, выглядело бы работающим.
 
     Код возврата свой: запускающему из командной строки «уже запущено» — не то
     же, что «отработал и вышел», и не то же, что сломанное хранилище ключей.
@@ -118,11 +123,16 @@ def test_a_second_copy_does_not_start(entry, capsys):
     module, order = entry
     from backend.single_instance import hold_the_only_copy
 
+    asked: list[bool] = []
+    monkeypatch.setattr(
+        "client.raise_window.ask_to_raise", lambda: asked.append(True)
+    )
     first = hold_the_only_copy(module.get_lock_path())
 
     assert module.main() == 3
     assert order == []
-    assert "уже запущено" in capsys.readouterr().err
+    assert asked == [True]
+    assert capsys.readouterr().err == ""
 
     first.close()
 
