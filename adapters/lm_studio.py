@@ -56,20 +56,17 @@ class ChatAnswer:
     error: str | None = None
 
 
-async def chat(
+async def _post_chat(
     client: httpx.AsyncClient,
     model: str,
     request: ChatRequest,
     log: logging.Logger,
-) -> ChatAnswer:
-    """Спрашивает чат-модель и отдаёт текст с признаком завершения.
+):
+    """Обратиться к провайдеру: ответ либо готовый отказ, второе пусто.
 
-    Сеть, отказ провайдера и неразбираемый ответ разбираются здесь: наружу
-    уходит `error`, по которому зовущий выбирает свой откат. Иначе этот же
-    разбор пришлось бы писать заново в каждом месте, где к модели обращаются.
-
-    Пишет в журнал логгером зовущего, а не своим: в окне журнала у строки
-    виден источник, и обращения семерых иначе схлопнулись бы в одно имя.
+    Сеть и отказ провайдера разбираются здесь, а не у зовущих: иначе этот
+    же разбор пришлось бы писать заново в каждом месте, где к модели
+    обращаются.
     """
     body = {
         "model": model,
@@ -87,13 +84,67 @@ async def chat(
         log.warning(
             "%s: провайдер ответил HTTP %s", request.purpose, e.response.status_code
         )
-        return ChatAnswer(error=f"llm_http_error: {e.response.status_code}")
+        return None, ChatAnswer(error=f"llm_http_error: {e.response.status_code}")
     except httpx.RequestError as e:
         log.warning(
             "%s: запрос не дошёл: %s: %s", request.purpose, type(e).__name__, e
         )
-        return ChatAnswer(error=f"llm_request_error: {type(e).__name__}")
+        return None, ChatAnswer(error=f"llm_request_error: {type(e).__name__}")
+    return r, None
 
+
+def _warn_if_truncated(finish_reason, purpose: str, log: logging.Logger) -> None:
+    """Пожаловаться в журнал, если модель упёрлась в предел токенов.
+
+    Жалоба здесь, а не у зовущих: признак приходит сюда, имя обращения —
+    тоже. Сам обрыв не отказ: обрезанный ответ иногда разбирается, и решает
+    это зовущий.
+
+    Запись досталась всем семерым, а раньше её писали двое, и у одного из
+    пяти новых суждение точнее: `generate_cover_letter` считает обрыв бедой
+    только у письма, не кончившегося точкой. Пусть так: здесь записан факт
+    (модель не договорила), а решение о нём остаётся наверху и у него.
+    """
+    if finish_reason == "length":
+        log.warning(
+            "%s: модель упёрлась в предел токенов, ответ может быть обрезан",
+            purpose,
+        )
+
+
+def _answer_or_empty(
+    content, finish_reason, purpose: str, log: logging.Logger
+) -> ChatAnswer:
+    """Ответ модели или отказ «пусто».
+
+    `null` вместо содержимого — ответ правильной формы, в котором модель не
+    сказала ничего. Разбирается проверкой, а не перехватом: `.strip()` у
+    пустоты дал бы `AttributeError`, который в ловушку зовущего не входит и
+    ушёл бы ему исключением вместо его отката.
+    """
+    if content is None:
+        log.warning("%s: провайдер ответил без содержимого", purpose)
+        return ChatAnswer(error="empty_content")
+    return ChatAnswer(text=content.strip(), finish_reason=finish_reason)
+
+
+async def chat(
+    client: httpx.AsyncClient,
+    model: str,
+    request: ChatRequest,
+    log: logging.Logger,
+) -> ChatAnswer:
+    """Спрашивает чат-модель и отдаёт текст с признаком завершения.
+
+    Сеть, отказ провайдера и неразбираемый ответ разбираются здесь: наружу
+    уходит `error`, по которому зовущий выбирает свой откат.
+
+    Пишет в журнал логгером зовущего, а не своим: в окне журнала у строки
+    виден источник, и обращения семерых иначе схлопнулись бы в одно имя.
+    """
+    r, refusal = await _post_chat(client, model, request, log)
+    if refusal is not None:
+        return refusal
     try:
         choice = r.json()["choices"][0]
         content = choice["message"]["content"]
@@ -101,37 +152,12 @@ async def chat(
     except (IndexError, KeyError, ValueError) as e:
         log.warning("%s: ответ провайдера не разобрать: %s", request.purpose, e)
         return ChatAnswer(error=f"malformed_response: {e}")
-
-    # Об упёршемся в предел жалуемся здесь, а не у зовущих: признак приходит
-    # сюда, имя обращения — тоже, и каждый зовущий писал об этом сам одними и
-    # теми же словами. Сам обрыв не отказ: обрезанный ответ иногда
-    # разбирается, и решает это зовущий.
-    #
-    # Запись досталась всем семерым, а раньше её писали двое, и у одного из
-    # пяти новых суждение точнее: `generate_cover_letter` считает обрыв бедой
-    # только у письма, не кончившегося точкой. Пусть так: здесь записан факт
-    # (модель не договорила), а решение о нём остаётся наверху и у него.
-    if finish_reason == "length":
-        log.warning(
-            "%s: модель упёрлась в предел токенов, ответ может быть обрезан",
-            request.purpose,
-        )
-
-    # `null` вместо содержимого — ответ правильной формы, в котором модель не
-    # сказала ничего. Разбирается здесь, а не перехватом выше: `.strip()` у
-    # пустоты дал бы `AttributeError`, который в ловушку не входит и уходит
-    # зовущему исключением вместо его отката.
-    #
-    # Стоит ниже записи о пределе нарочно: так отвечает модель, потратившая
-    # весь предел на размышление, и выйди отказ раньше — журнал называл бы
-    # симптом, умалчивая о единственной причине, с которой можно что-то
-    # сделать.
-    if content is None:
-        log.warning("%s: провайдер ответил без содержимого", request.purpose)
-        return ChatAnswer(error="empty_content")
-
-    text = content.strip()
-    return ChatAnswer(text=text, finish_reason=finish_reason)
+    # Жалоба о пределе идёт до проверки на пустоту нарочно: так отвечает
+    # модель, потратившая весь предел на размышление, и выйди отказ раньше —
+    # журнал называл бы симптом, умалчивая о единственной причине, с которой
+    # можно что-то сделать.
+    _warn_if_truncated(finish_reason, request.purpose, log)
+    return _answer_or_empty(content, finish_reason, request.purpose, log)
 
 
 def make_client(config: LlmProviderConfig) -> httpx.AsyncClient:

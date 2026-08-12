@@ -45,6 +45,57 @@ DEDUPE_COMPANY_PROMPT = """Ты определяешь, является ли р
 """
 
 
+def _dedupe_request(
+    parsed_name: str, parsed_website: str | None, candidates: list
+) -> ChatRequest:
+    """Что спросить у модели: разобранное имя и все кандидаты списком.
+
+    Прозвища кандидатов идут в тот же список: компания, названная в
+    вакансии прозвищем, иначе не свелась бы со своей строкой.
+    """
+    cand_lines = []
+    for i, c in enumerate(candidates, start=1):
+        aliases = ", ".join(str_list(c.aliases)) or "—"
+        cand_lines.append(
+            f'{i}. id={c.id}, name="{c.name}", aliases=[{aliases}], '
+            f'website="{c.website or "—"}"'
+        )
+    prompt = DEDUPE_COMPANY_PROMPT.format(
+        parsed_name=parsed_name,
+        parsed_website=parsed_website or "—",
+        candidates_block="\n".join(cand_lines),
+    )
+    return ChatRequest(
+        purpose="dedupe_company",
+        messages=[{"role": "system", "content": prompt}],
+        max_tokens=250,
+    )
+
+
+def _matched_id(answer: str) -> tuple[int | None, str | None]:
+    """Разобрать ответ модели: номер сведённой строки и пояснение.
+
+    Непригодный номер не роняет сведение, а вырождает его в «завести
+    новую»: неверно склеенные компании поправить нельзя, лишнюю — можно.
+    """
+    obj = json_object(answer, logger, "dedupe_company")
+    if obj is None:
+        log_unparseable(answer, logger, "dedupe_company")
+        return None, f"unparseable_json: {answer[:120]}"
+    matched_id = obj.get("matched_id")
+    reasoning = obj.get("reasoning") or ""
+    if matched_id is None:
+        return None, reasoning
+    try:
+        return int(matched_id), reasoning
+    except (TypeError, ValueError):
+        logger.warning(
+            "dedupe_company: invalid matched_id %r in LLM response",
+            matched_id,
+        )
+        return None, f"invalid_id: {matched_id!r}"
+
+
 async def dedupe_company_with_llm(
     client: httpx.AsyncClient,
     model: str,
@@ -66,28 +117,10 @@ async def dedupe_company_with_llm(
     )
     if not candidates:
         return None, "no_candidates"
-    cand_lines = []
-    for i, c in enumerate(candidates, start=1):
-        aliases = ", ".join(str_list(c.aliases)) or "—"
-        cand_lines.append(
-            f'{i}. id={c.id}, name="{c.name}", aliases=[{aliases}], '
-            f'website="{c.website or "—"}"'
-        )
-    prompt = DEDUPE_COMPANY_PROMPT.format(
-        parsed_name=parsed_name,
-        parsed_website=parsed_website or "—",
-        candidates_block="\n".join(cand_lines),
-    )
     reply = await chat(
         client,
         model,
-        ChatRequest(
-            purpose="dedupe_company",
-            messages=[
-                {"role": "system", "content": prompt},
-            ],
-            max_tokens=250,
-        ),
+        _dedupe_request(parsed_name, parsed_website, candidates),
         logger,
     )
     if reply.text is None:
@@ -95,23 +128,4 @@ async def dedupe_company_with_llm(
         # разборе сведения компаний, поэтому она остаётся строкой провайдера,
         # а не сводится к общему «не получилось».
         return None, reply.error
-    answer = reply.text
-
-    obj = json_object(answer, logger, "dedupe_company")
-    if obj is None:
-        log_unparseable(answer, logger, "dedupe_company")
-        return None, f"unparseable_json: {answer[:120]}"
-
-    matched_id = obj.get("matched_id")
-    reasoning = obj.get("reasoning") or ""
-
-    if matched_id is None:
-        return None, reasoning
-    try:
-        return int(matched_id), reasoning
-    except (TypeError, ValueError):
-        logger.warning(
-            "dedupe_company: invalid matched_id %r in LLM response",
-            matched_id,
-        )
-        return None, f"invalid_id: {matched_id!r}"
+    return _matched_id(reply.text)

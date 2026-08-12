@@ -162,45 +162,48 @@ MUTATIONS = [
         "    if description and len(description) > _DESCRIPTION_MAX_CHARS:",
         "    if False:",
     ),
-    # _parse_vacancy_json: старое поле стека берётся всегда
+    # _split_stack: старое поле стека берётся всегда
     (
         "backend/llm/vacancy.py",
         '    if "stack_required" in data or "stack_preferred" in data:',
         "    if False:",
     ),
-    # _parse_vacancy_json: ссылка не вырезается из названия компании
+    # _company_name_and_site: ссылка не вырезается из названия компании
     (
         "backend/llm/vacancy.py",
-        "        m = _TRAILING_URL_RE.search(company_name)",
-        "        m = None",
+        "    m = _TRAILING_URL_RE.search(company_name)",
+        "    m = None",
     ),
-    # _parse_vacancy_json: вырезанная ссылка затирает уже присланный сайт
+    # _company_name_and_site: вырезанная ссылка затирает уже присланный сайт
     (
         "backend/llm/vacancy.py",
-        "                if not company_website:" + CRLF
-        + "                    company_website = stripped_url" + CRLF,
-        "                company_website = stripped_url" + CRLF,
+        "    if company_website:" + CRLF
+        + "        return cleaned_name, company_website" + CRLF,
+        "    if False:" + CRLF
+        + "        return cleaned_name, company_website" + CRLF,
     ),
-    # _parse_vacancy_json: название из одной ссылки опустошается
+    # _company_name_and_site: название из одной ссылки опустошается
     (
         "backend/llm/vacancy.py",
-        "            if cleaned_name:" + CRLF + "                company_name = cleaned_name",
-        "            if True:" + CRLF + "                company_name = cleaned_name",
+        "    if not cleaned_name:" + CRLF
+        + "        return company_name, company_website" + CRLF,
+        "    if False:" + CRLF
+        + "        return company_name, company_website" + CRLF,
     ),
     # classify_hr_reply: пустое сообщение уходит к модели
     (
         "backend/llm/hr_reply.py",
         "    if not text:" + CRLF + "        return None" + CRLF
-        + "    # Список для LLM:",
-        "    # Список для LLM:",
+        + "    allowed_str = _allowed_next(current_status)",
+        "    allowed_str = _allowed_next(current_status)",
     ),
-    # classify_hr_reply: «пропала без вести» предлагается модели
+    # _allowed_next: «пропала без вести» предлагается модели
     (
         "backend/llm/hr_reply.py",
         "    allowed_set.discard(VacancyStatus.GHOSTING)" + CRLF,
         "",
     ),
-    # classify_hr_reply: нынешний статус модели не предлагают
+    # _allowed_next: нынешний статус модели не предлагают
     (
         "backend/llm/hr_reply.py",
         "    allowed_set.add(current_status)" + CRLF,
@@ -242,13 +245,13 @@ MUTATIONS = [
         '        "{KNOWN_SKILLS_BLOCK}", _format_known_skills(known_skills)',
         '        "{KNOWN_SKILLS_BLOCK}", "—"',
     ),
-    # parse_vacancy: ник канала остаётся контактом HR
+    # _without_channel_as_hr: ник канала остаётся контактом HR
     (
         "backend/llm/vacancy.py",
-        "        parsed = replace(parsed, hr_contact=None)" + CRLF,
-        "",
+        "        return replace(parsed, hr_contact=None)" + CRLF,
+        "        return parsed" + CRLF,
     ),
-    # parse_vacancy: сравнение с ником канала идёт с учётом регистра
+    # _without_channel_as_hr: сравнение с ником канала идёт с учётом регистра
     (
         "backend/llm/vacancy.py",
         '        == channel_username.lower()',
