@@ -27,6 +27,11 @@ def _strip_link_prefixes(s: str) -> str:
     Порядок обязателен: домен ищут в том, что осталось от схемы, а путь
     веб-просмотра — в том, что осталось от домена.
 
+    Сравнивается всё это без оглядки на регистр, а отрезается по длине: схему
+    и домен пишут и заглавными — так их оставляют автоподстановка и сами
+    объявления, — а вот ник дальше идёт как написан, и складывать его регистр
+    нельзя, он попадёт в карточку.
+
     `www.` снимается вместе с доменом, а не отдельной строкой до него: сам по
     себе он ничего не говорит, и снятый заранее превращал бы `www.jobsboard`
     в ник `jobsboard` — запись, которая ником не является вовсе.
@@ -36,12 +41,12 @@ def _strip_link_prefixes(s: str) -> str:
     с `t.me/c/12345`, то есть ссылка на канал считалась бы негодной.
     """
     for prefix in ("https://", "http://"):
-        if s.startswith(prefix):
+        if s.lower().startswith(prefix):
             s = s[len(prefix):]
     for host in ("t.me/", "telegram.me/", "www.t.me/", "www.telegram.me/"):
-        if s.startswith(host):
+        if s.lower().startswith(host):
             s = s[len(host):]
-            if s.startswith("s/"):
+            if s.lower().startswith("s/"):
                 s = s[len("s/"):]
             break
     return s

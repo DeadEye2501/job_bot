@@ -83,6 +83,23 @@ async def test_a_rejecting_verdict_stops_the_letter_and_names_why():
     assert issues == ["выдумал Kubernetes", "перепутал компании"]
 
 
+@pytest.mark.parametrize("raw", ["Reject", "REJECT", "  reject  "])
+async def test_a_rejection_written_otherwise_still_stops_the_letter(raw):
+    """Отказ, написанный иначе, письмо всё равно останавливает.
+
+    Модель отвечает свободным текстом — то с заглавной, то с пробелами по
+    краям. Сличай вердикт посимвольно, и такой ответ попадёт в ветку
+    «незнакомый», а она пропускает: письмо с выдуманным фактом уйдёт HR
+    именно тогда, когда сверка его и поймала.
+    """
+    client = provider({CHAT: _verdict(raw, ["выдумал Kubernetes"])})
+
+    ok, issues = await factcheck_cover_letter("профиль", "письмо", client, "qwen")
+
+    assert ok is False
+    assert issues == ["выдумал Kubernetes"]
+
+
 async def test_no_more_than_three_reasons_are_kept():
     """Замечаний берётся не больше трёх: остальное в интерфейс не помещается."""
     client = provider({CHAT: _verdict("reject", ["раз", "два", "три", "четыре"])})
