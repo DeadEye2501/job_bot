@@ -139,21 +139,14 @@ async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> bool:
     return True
 
 
-async def recover_orphan_vacancies(pipeline) -> int:
-    """Finish parsing rows that were ingested but never made it through
-    the LLM pipeline (process killed between ``save_new_vacancy`` and
-    ``parse_and_update_vacancy`` commits, or LLM call cancelled).
+async def _orphan_rows(pipeline) -> list:
+    """Вакансии, заведённые, но так и не разобранные, старые первыми.
 
-    Called once at startup before the polling loop kicks in, so the
-    UI never shows half-built rows for long. Each orphan goes through
-    the auto-ingest path (``allow_delete=True``) — that's what would
-    have happened on the original ingest if the process hadn't died.
-    Trash / empty verdicts therefore delete the row, same as a fresh
-    ingest. Returns the number of orphans processed.
+    Ник канала берётся внешним соединением: канал могли снести, а вакансия
+    от этого недоразобранной быть не перестаёт.
     """
-    await pipeline._reload_resources()
     async with pipeline._session_factory() as session:
-        rows = (
+        return (
             await session.execute(
                 select(
                     Vacancy.id,
@@ -171,6 +164,22 @@ async def recover_orphan_vacancies(pipeline) -> int:
                 .order_by(Vacancy.id.asc())
             )
         ).all()
+
+
+async def recover_orphan_vacancies(pipeline) -> int:
+    """Finish parsing rows that were ingested but never made it through
+    the LLM pipeline (process killed between ``save_new_vacancy`` and
+    ``parse_and_update_vacancy`` commits, or LLM call cancelled).
+
+    Called once at startup before the polling loop kicks in, so the
+    UI never shows half-built rows for long. Each orphan goes through
+    the auto-ingest path (``allow_delete=True``) — that's what would
+    have happened on the original ingest if the process hadn't died.
+    Trash / empty verdicts therefore delete the row, same as a fresh
+    ingest. Returns the number of orphans processed.
+    """
+    await pipeline._reload_resources()
+    rows = await _orphan_rows(pipeline)
     if not rows:
         return 0
     logger.info("recovering %d orphan vacancy/vacancies", len(rows))

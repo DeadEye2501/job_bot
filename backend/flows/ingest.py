@@ -94,6 +94,22 @@ async def ingest_post(
         )
 
 
+def _vacancy_row(post: ChannelPost, embedding: list[float]) -> Vacancy:
+    """Строка вакансии из поста канала — ещё не разобранная.
+
+    Ссылка собирается из ника и номера поста: по ней человек открывает
+    исходное объявление прямо из карточки.
+    """
+    return Vacancy(
+        source_channel_id=post.channel_id,
+        source_msg_id=post.msg.id,
+        raw_text=post.text,
+        embedding=embedding,
+        source_url=f"https://t.me/{post.channel_username}/{post.msg.id}",
+        posted_at=post.msg.date,
+    )
+
+
 async def save_new_vacancy(
     pipeline,
     post: ChannelPost,
@@ -101,16 +117,7 @@ async def save_new_vacancy(
 ) -> int | None:
     async with pipeline._session_factory() as session:
         try:
-            new_vacancy = Vacancy(
-                source_channel_id=post.channel_id,
-                source_msg_id=post.msg.id,
-                raw_text=post.text,
-                embedding=embedding,
-                source_url=(
-                    f"https://t.me/{post.channel_username}/{post.msg.id}"
-                ),
-                posted_at=post.msg.date,
-            )
+            new_vacancy = _vacancy_row(post, embedding)
             session.add(new_vacancy)
             await session.flush()
             await add_vacancy_event(

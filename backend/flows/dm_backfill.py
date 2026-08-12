@@ -97,6 +97,12 @@ async def _store_outgoing(walk: _Walk, msg) -> bool:
 
     Разбора моделью оно не требует — пишется как есть, тем же объявлением,
     что и эхо из Telegram.
+
+    Свои сообщения тянутся из хвоста затем, что человек мог писать HR с
+    телефона или другого клиента, пока бот стоял: без них в переписке
+    видно только отправленное нами и присланное HR, то есть половина
+    разговора. Повторы отсекает `persist_outgoing_dm` — он же решает,
+    считать ли сообщение новым, и уже лежащую строку новой не считает.
     """
     try:
         outcome = await persist_outgoing_dm(
@@ -222,6 +228,32 @@ async def backfill_hr_dm_history(
         fire(on_message_persisted, "on_message_persisted", hr.id)
 
 
+def _in_batches(chats: list) -> list[list]:
+    """Разбить людей на пачки — по ним зовущий и идёт.
+
+    Пачки нужны затем, чтобы 300-500 HR'ов не превращались в 300-500
+    последовательных обращений к Telegram с заметным временем ожидания.
+    """
+    return [
+        chats[i:i + _DM_CATCHUP_BATCH_SIZE]
+        for i in range(0, len(chats), _DM_CATCHUP_BATCH_SIZE)
+    ]
+
+
+def _report_failed(batch: list, results: list) -> None:
+    """Пожаловаться на людей, чей проход сорвался.
+
+    Сорвавшийся проход одного человека остальных не роняет: пачка собрана
+    с `return_exceptions=True`, то есть беда приходит сюда значением, а не
+    исключением, и разбирается после того, как пачка дошла целиком.
+    """
+    for (hr, _), result in zip(batch, results):
+        if isinstance(result, Exception):
+            logger.exception(
+                "catch_up failed for hr %d", hr.id, exc_info=result,
+            )
+
+
 async def catch_up_missed_dms(
     client,
     lm_client,
@@ -235,18 +267,7 @@ async def catch_up_missed_dms(
 ) -> None:
     """Pull recent DM history per known HR, both directions.
 
-    Outgoing messages cover the case where the user typed from their phone
-    or another TG client while the bot was off — without this we'd only
-    see what we sent from our own app + what HRs sent us, missing half the
-    conversation. Повторы отсеивает `persist_outgoing_dm`: он же и решает,
-    считать ли сообщение новым, — уже лежащую строку догон новой не
-    считает и окно из-за неё не будит.
-
-    Also reconciles deletes that happened while the bot was offline:
-    Telegram doesn't replay ``DeletedMessagesHandler`` updates after a
-    reconnect, so any local row whose ``tg_message_id`` falls inside the
-    fetched window but is missing from Telegram's response is flipped to
-    ``is_deleted=True`` here.
+    Обе стороны — :func:`_store_outgoing`, удаления — :func:`_reconcile_deletes`.
     """
     async with session_factory() as session:
         chats = await list_hrs_for_backfill(session)
@@ -254,11 +275,9 @@ async def catch_up_missed_dms(
         "DM catch-up: %d HR(s), batch=%d delay=%ss",
         len(chats), _DM_CATCHUP_BATCH_SIZE, _DM_CATCHUP_BATCH_DELAY_SEC,
     )
-    # Батчим, чтобы 300-500 HR'ов не превращались в 300-500 последовательных
-    # RPC'ов с заметной wall-time'ой. ``asyncio.gather`` внутри батча —
-    # параллельно; пауза между батчами даёт TG-rate-limit'у выдохнуть.
-    for batch_start in range(0, len(chats), _DM_CATCHUP_BATCH_SIZE):
-        batch = chats[batch_start:batch_start + _DM_CATCHUP_BATCH_SIZE]
+    batches = _in_batches(chats)
+    for index, batch in enumerate(batches):
+        # Внутри пачки — параллельно, пауза после неё — ради ограничителя.
         results = await asyncio.gather(
             *[
                 backfill_hr_dm_history(
@@ -272,13 +291,8 @@ async def catch_up_missed_dms(
             ],
             return_exceptions=True,
         )
-        for (hr, _), result in zip(batch, results):
-            if isinstance(result, Exception):
-                logger.exception(
-                    "catch_up failed for hr %d", hr.id,
-                    exc_info=result,
-                )
-        if batch_start + _DM_CATCHUP_BATCH_SIZE < len(chats):
+        _report_failed(batch, results)
+        if index + 1 < len(batches):
             await asyncio.sleep(_DM_CATCHUP_BATCH_DELAY_SEC)
 
 

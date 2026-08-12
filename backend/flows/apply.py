@@ -281,6 +281,30 @@ async def send_application(
     return True, "sent"
 
 
+def _parsed_from_row(v: Vacancy) -> ParsedVacancy:
+    """Собрать разобранную вакансию обратно из строки базы.
+
+    Наставлению модели нужен тот же вид, что и на самотёке, иначе письмо
+    вручную сочинялось бы по другим данным. Сайт компании и второй контакт
+    в строке не хранятся вовсе, а стек хранится одним списком — в
+    обязательный он и уходит: занизить требование хуже, чем завысить.
+    """
+    return ParsedVacancy(
+        title=v.title or "",
+        description=v.description,
+        company_name=v.company_name,
+        company_website=None,
+        hr_contact=v.hr_contact,
+        other_contact=None,
+        stack_required=list(v.stack or []),
+        stack_preferred=[],
+        grade=v.grade,
+        salary=v.salary,
+        remote=v.remote,
+        location=v.location,
+    )
+
+
 async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool, str]:
     """Manual cover-letter send (UI «Отправить отклик»). Reconstructs
     ParsedVacancy from the stored Vacancy row so the LLM-prompt has the
@@ -315,20 +339,7 @@ async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool,
             )
             return False, "already_applied"
         hr = v.hr
-        parsed = ParsedVacancy(
-            title=v.title or "",
-            description=v.description,
-            company_name=v.company_name,
-            company_website=None,
-            hr_contact=v.hr_contact,
-            other_contact=None,
-            stack_required=list(v.stack or []),
-            stack_preferred=[],
-            grade=v.grade,
-            salary=v.salary,
-            remote=v.remote,
-            location=v.location,
-        )
+        parsed = _parsed_from_row(v)
     if not pipeline._profile_block:
         await pipeline._reload_resources()
     return await send_application(pipeline, hr, parsed, vacancy_id, force=True)
