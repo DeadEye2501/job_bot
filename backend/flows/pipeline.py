@@ -18,7 +18,7 @@ from backend.flows import apply
 from backend.flows import dm_classify
 from backend.flows import channels
 from backend.flows import rerun
-from backend.flows import cleanup
+from backend.flows import ghosting
 from backend.llm import candidate
 from backend.llm.candidate import CandidateProfile
 from backend.models import ProfileSkill
@@ -229,7 +229,7 @@ class IngestionPipeline:
 
 
     async def check_ghosting_timeouts(self) -> int:
-        return await cleanup.check_ghosting_timeouts(self)
+        return await ghosting.check_ghosting_timeouts(self)
 
     async def rerun_pipeline_for_vacancy(self, vacancy_id) -> bool:
         return await rerun.rerun_pipeline_for_vacancy(self, vacancy_id)
