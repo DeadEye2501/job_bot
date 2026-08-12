@@ -96,11 +96,21 @@ async def chat(
 
     try:
         choice = r.json()["choices"][0]
-        text = choice["message"]["content"].strip()
+        content = choice["message"]["content"]
         finish_reason = choice.get("finish_reason")
     except (IndexError, KeyError, ValueError) as e:
         log.warning("%s: ответ провайдера не разобрать: %s", request.purpose, e)
         return ChatAnswer(error=f"malformed_response: {e}")
+
+    # `null` вместо содержимого — ответ правильной формы, в котором модель не
+    # сказала ничего. Разбирается здесь, а не перехватом выше: `.strip()` у
+    # пустоты дал бы `AttributeError`, который в ловушку не входит и уходит
+    # зовущему исключением вместо его отката.
+    if content is None:
+        log.warning("%s: провайдер ответил без содержимого", request.purpose)
+        return ChatAnswer(error="empty_content")
+
+    text = content.strip()
 
     # Об упёршемся в предел жалуемся здесь, а не у зовущих: признак приходит
     # сюда, имя обращения — тоже, и каждый зовущий писал об этом сам одними и

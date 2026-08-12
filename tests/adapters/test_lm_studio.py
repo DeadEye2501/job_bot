@@ -330,3 +330,31 @@ async def test_an_answer_cut_by_the_token_limit_names_its_purpose(caplog):
     ] == [
         "разбор вакансии: модель упёрлась в предел токенов, ответ может быть обрезан"
     ]
+
+
+async def test_an_answer_without_content_becomes_a_refusal_that_names_itself(caplog):
+    """Ответ без содержимого становится отказом и оставляет в журнале имя.
+
+    Форма ответа при этом правильная — модель просто не сказала ничего.
+    Зовущему это обязано достаться отказом: разбирать пустоту он не умеет и
+    получил бы исключение вместо своего отката. А разбирать потом, кто
+    именно остался без ответа, придётся по журналу, где обращений семеро.
+    """
+    client = provider({CHAT: chat_response(None)})
+    log = logging.getLogger("tests.empty_content")
+
+    with caplog.at_level(logging.WARNING, logger="tests.empty_content"):
+        answer = await chat(
+            client,
+            "qwen",
+            ChatRequest(purpose="разбор ответа HR", messages=[], max_tokens=8),
+            log,
+        )
+
+    assert answer.text is None
+    assert answer.error == "empty_content"
+    assert [
+        rec.getMessage()
+        for rec in caplog.records
+        if rec.name == "tests.empty_content"
+    ] == ["разбор ответа HR: провайдер ответил без содержимого"]

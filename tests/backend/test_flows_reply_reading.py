@@ -13,10 +13,13 @@
 """
 
 from backend.flows import dm_classify
+import logging
+
 import pytest
 
 from backend.models import HR, Message, Vacancy, VacancyStatus, VacancyStatusHistory
 from backend.payloads import Classification
+from backend.repository.vacancies_life import delete_vacancy
 from tests.dbio import all_rows, only_row, put
 from tests.factories import blacklist_row, hr_row, message_row, vacancy_row
 
@@ -156,6 +159,36 @@ async def test_a_vacancy_beyond_automation_is_not_read_either(
 
     assert pipeline.asked == []
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.DECLINE
+
+
+async def test_a_vanished_vacancy_drops_the_burst_instead_of_breaking_the_task(
+    reading, session_factory, caplog
+):
+    """Пакет по вакансии, удалённой за время ожидания, отбрасывают целиком.
+
+    Удалить её мог пользователь, пока накопитель ждал тишины: номер в
+    накопителе остаётся, а строки уже нет. Разбирать ответ по вакансии,
+    которой нет, не о чем — а падать на этом тем более незачем, потому что
+    отложенный разбор идёт своей задачей, и некому поймать её исключение.
+    """
+    pipeline, hr, vacancy, message = reading
+    async with session_factory() as session:
+        await delete_vacancy(session, vacancy.id)
+        await session.commit()
+    _buffer(pipeline, hr, vacancy, message, "давайте созвонимся")
+
+    with caplog.at_level(logging.INFO, logger="backend.flows.dm_classify"):
+        await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
+
+    assert pipeline.asked == []
+    assert [
+        rec.getMessage()
+        for rec in caplog.records
+        if rec.name == "backend.flows.dm_classify"
+    ] == [
+        f"vacancy {vacancy.id}: status=gone closed for auto, "
+        f"drop debounced burst (hr {hr.id}, 1 msgs)"
+    ]
 
 
 async def test_a_model_that_gave_no_verdict_changes_nothing(
