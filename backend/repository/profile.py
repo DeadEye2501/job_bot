@@ -67,6 +67,86 @@ def _skills_by_key(rows: list[ProfileSkill]) -> dict[str, ProfileSkill]:
     return lookup
 
 
+async def _wipe_profile(session: AsyncSession) -> None:
+    """Стереть анкету целиком — разбор резюме пишет её заново, а не дописывает.
+
+    Частичное слияние оставляло бы в анкете навыки и языки из прошлого
+    резюме, и человек об этом не узнал бы.
+    """
+    await _wipe_experience(session)
+    await session.execute(delete(ProfileSkill))
+    await session.execute(delete(ProfileLanguage))
+    await session.execute(delete(Profile))
+    await session.flush()
+
+
+async def _add_parsed_skills(
+    session: AsyncSession, profile_id: int, skills
+) -> dict[str, ProfileSkill]:
+    """Записать навыки из резюме и вернуть их по ключам названий и прозвищ.
+
+    Прозвища идут в ключи затем, что стек места работы приходит от модели
+    любым написанием: по ним места и связываются с навыками.
+    """
+    lookup: dict[str, ProfileSkill] = {}
+    for s in skills:
+        row = ProfileSkill(
+            profile_id=profile_id,
+            category=s.category,
+            name=s.name,
+            level=s.level,
+            aliases=list(s.aliases),
+        )
+        session.add(row)
+        _index_skill_keys(lookup, (s.name, *s.aliases), row, "save_parsed_cv")
+    await session.flush()
+    return lookup
+
+
+async def _add_parsed_experience(
+    session: AsyncSession, profile_id: int, experience,
+    skill_lookup: dict[str, ProfileSkill],
+) -> None:
+    """Записать места работы из резюме, связав их стек с навыками анкеты.
+
+    Технология, которой в анкете не нашлось, пропадает из связок с жалобой в
+    журнал: молча потерянная связь выглядела бы как отсутствие опыта.
+    """
+    for e in experience:
+        exp = ProfileExperience(
+            profile_id=profile_id,
+            company=e.company,
+            company_url=e.company_url,
+            role=e.role,
+            start_date=e.start_date,
+            end_date=e.end_date,
+            achievements=list(e.achievements),
+            responsibilities=list(e.responsibilities),
+        )
+        for tech in e.stack:
+            key = skill_key(tech)
+            row = skill_lookup.get(key) if key else None
+            if row is not None:
+                exp.skills.append(row)
+            else:
+                logger.warning(
+                    "save_parsed_cv: experience %r stack item %r not matched to any ProfileSkill",
+                    e.company, tech,
+                )
+        session.add(exp)
+    await session.flush()
+
+
+async def _upsert_cv_path(session: AsyncSession, cv_path: str) -> None:
+    """Запомнить, из какого файла анкета разобрана."""
+    existing = await session.get(AppSetting, "cv_path")
+    if existing is None:
+        session.add(AppSetting(key="cv_path", value=cv_path))
+    else:
+        existing.value = cv_path
+    await session.flush()
+
+
 async def save_parsed_cv(
     session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None = None
 ) -> None:
@@ -77,15 +157,9 @@ async def save_parsed_cv(
     (otherwise a crash between the two writes leaves a parsed profile with
     no recorded source file).
 
-    Caller must wrap in ``session.begin()``. Wipes existing rows because the
-    wizard implies a fresh write — partial merging would cause stale skills
-    to silently linger.
+    Caller must wrap in ``session.begin()``.
     """
-    await _wipe_experience(session)
-    await session.execute(delete(ProfileSkill))
-    await session.execute(delete(ProfileLanguage))
-    await session.execute(delete(Profile))
-    await session.flush()
+    await _wipe_profile(session)
 
     p = parsed.profile
     profile = Profile(
@@ -113,51 +187,12 @@ async def save_parsed_cv(
         profile.id,
         [(lang.language, lang.level) for lang in parsed.languages],
     )
-
-    skill_lookup: dict[str, ProfileSkill] = {}
-    for s in parsed.skills:
-        row = ProfileSkill(
-            profile_id=profile.id,
-            category=s.category,
-            name=s.name,
-            level=s.level,
-            aliases=list(s.aliases),
-        )
-        session.add(row)
-        _index_skill_keys(skill_lookup, (s.name, *s.aliases), row, "save_parsed_cv")
-    await session.flush()
-
-    for e in parsed.experience:
-        exp = ProfileExperience(
-            profile_id=profile.id,
-            company=e.company,
-            company_url=e.company_url,
-            role=e.role,
-            start_date=e.start_date,
-            end_date=e.end_date,
-            achievements=list(e.achievements),
-            responsibilities=list(e.responsibilities),
-        )
-        for tech in e.stack:
-            key = skill_key(tech)
-            row = skill_lookup.get(key) if key else None
-            if row is not None:
-                exp.skills.append(row)
-            else:
-                logger.warning(
-                    "save_parsed_cv: experience %r stack item %r not matched to any ProfileSkill",
-                    e.company, tech,
-                )
-        session.add(exp)
-    await session.flush()
-
+    skill_lookup = await _add_parsed_skills(session, profile.id, parsed.skills)
+    await _add_parsed_experience(
+        session, profile.id, parsed.experience, skill_lookup
+    )
     if cv_path is not None:
-        existing = await session.get(AppSetting, "cv_path")
-        if existing is None:
-            session.add(AppSetting(key="cv_path", value=cv_path))
-        else:
-            existing.value = cv_path
-        await session.flush()
+        await _upsert_cv_path(session, cv_path)
 
     logger.info(
         "Profile replaced: languages=%d skills=%d experiences=%d cv_path=%s",

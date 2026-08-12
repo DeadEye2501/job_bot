@@ -17,14 +17,96 @@ from backend.repository.stats_common import (
 from backend.repository.vacancies_common import PARSED_ONLY, count_by_status
 
 
+_IN_PROGRESS = frozenset({VacancyStatus.INVITATION, VacancyStatus.TEST})
+"""«В процессе» — это два статуса сразу, и на экране они одна ступень.
+
+Набор неизменяемый: он лежит на уровне модуля, и обычный сделал бы ступень
+воронки переписываемой любым зовущим.
+"""
+
+
+async def _ever_in(session: AsyncSession, statuses) -> int:
+    """Сколько разобранных вакансий когда-либо побывало в этих статусах.
+
+    Соединение с вакансией тут не ради полей, а ради `is_parsed`: без него
+    ступени воронки считались бы по всем строкам истории, включая
+    неразобранные, и «откликнулись» выходило бы больше, чем «всего».
+    """
+    return int((await session.execute(
+        select(func.count(func.distinct(VacancyStatusHistory.vacancy_id)))
+        .join(Vacancy, Vacancy.id == VacancyStatusHistory.vacancy_id)
+        .where(status_cond(statuses), PARSED_ONLY)
+    )).scalar_one())
+
+
+async def _first_in_period(
+    session: AsyncSession, statuses, since: datetime
+) -> int:
+    """Сколько вакансий впервые дошло до этих статусов внутри окна."""
+    sub = first_transition_subq(statuses)
+    return int((await session.execute(
+        select(func.count(sub.c.vid))
+        .join(Vacancy, Vacancy.id == sub.c.vid)
+        .where(sub.c.first_at >= since, PARSED_ONLY)
+    )).scalar_one())
+
+
+async def _kpi_totals(session: AsyncSession) -> dict:
+    """Лайфтайм-счётчики верхней строки экрана.
+
+    Все, кроме `total`, считаются по истории — вакансии, у которых КОГДА-ЛИБО
+    был переход в статус. Счётчики от этого монотонные: ручной откат статуса
+    назад их не уменьшает.
+    """
+    return {
+        "total": int((await session.execute(
+            select(func.count(Vacancy.id)).where(PARSED_ONLY)
+        )).scalar_one()),
+        "applied_total": await _ever_in(session, VacancyStatus.APPLIED),
+        "in_progress_total": await _ever_in(session, _IN_PROGRESS),
+        "offer_total": await _ever_in(session, VacancyStatus.OFFER),
+        "decline_total": await _ever_in(session, VacancyStatus.DECLINE),
+    }
+
+
+async def _kpi_deltas(session: AsyncSession, since: datetime | None) -> dict:
+    """Дельты за окно; без окна дельт нет вовсе, и это не ноль, а пусто.
+
+    У `total` окно считается по `created_at`, у остальных — по первому
+    переходу в статус: ступень принадлежит тому окну, в котором её прошли.
+    """
+    if since is None:
+        return {
+            "total_period": None,
+            "applied_period": None,
+            "in_progress_period": None,
+            "offer_period": None,
+            "decline_period": None,
+        }
+    return {
+        "total_period": int((await session.execute(
+            select(func.count(Vacancy.id))
+            .where(PARSED_ONLY, Vacancy.created_at >= since)
+        )).scalar_one()),
+        "applied_period": await _first_in_period(
+            session, VacancyStatus.APPLIED, since
+        ),
+        "in_progress_period": await _first_in_period(
+            session, _IN_PROGRESS, since
+        ),
+        "offer_period": await _first_in_period(
+            session, VacancyStatus.OFFER, since
+        ),
+        "decline_period": await _first_in_period(
+            session, VacancyStatus.DECLINE, since
+        ),
+    }
+
+
 async def get_stats_kpi(
     session: AsyncSession, *, period: str
 ) -> dict:
     """Top-row KPIs для экрана Statistics: 5 счётчиков с дельтой за period.
-
-    Все KPI кроме total — history-based (distinct vacancy_id, у которых
-    КОГДА-ЛИБО был переход в соответствующий статус). Это монотонно
-    растущие счётчики: ручной флип статуса назад не уменьшает их.
 
     - total: лайфтайм count всех parsed-вакансий.
     - applied_total: когда-либо были в Applied.
@@ -32,71 +114,16 @@ async def get_stats_kpi(
     - offer_total: когда-либо доходили до Offer.
     - decline_total: когда-либо были в Decline.
 
-    Дельты — `*_period`: для total — created_at в окне; для остальных —
-    первый переход в соответствующий статус (min(changed_at)) в окне.
+    Рядом с каждым идёт своя дельта за окно — `total_period`,
+    `applied_period`, `in_progress_period`, `offer_period`, `decline_period`;
+    чем она считается и почему при `period="all"` это пустота, а не ноль, —
+    :func:`_kpi_deltas`.
     """
     since = stats_period_since(period)
-
-    in_progress_set = {VacancyStatus.INVITATION, VacancyStatus.TEST}
-
-    base_filter = [PARSED_ONLY]
-
-    total = int((await session.execute(
-        select(func.count(Vacancy.id)).where(*base_filter)
-    )).scalar_one())
-
-    async def _ever_in(statuses) -> int:
-        """Сколько разобранных вакансий когда-либо побывало в этих статусах.
-
-        Соединение с вакансией тут не ради полей, а ради `is_parsed`: без
-        него ступени воронки считались бы по всем строкам истории, включая
-        неразобранные, и «откликнулись» выходило бы больше, чем «всего».
-        """
-        return int((await session.execute(
-            select(func.count(func.distinct(VacancyStatusHistory.vacancy_id)))
-            .join(Vacancy, Vacancy.id == VacancyStatusHistory.vacancy_id)
-            .where(status_cond(statuses), *base_filter)
-        )).scalar_one())
-
-    applied_total = await _ever_in(VacancyStatus.APPLIED)
-    in_progress_total = await _ever_in(in_progress_set)
-    offer_total = await _ever_in(VacancyStatus.OFFER)
-    decline_total = await _ever_in(VacancyStatus.DECLINE)
-
-    if since is not None:
-        period_filter = [*base_filter, Vacancy.created_at >= since]
-        total_period = int((await session.execute(
-            select(func.count(Vacancy.id)).where(*period_filter)
-        )).scalar_one())
-
-        async def _first_in_period(statuses) -> int:
-            sub = first_transition_subq(statuses)
-            return int((await session.execute(
-                select(func.count(sub.c.vid))
-                .join(Vacancy, Vacancy.id == sub.c.vid)
-                .where(sub.c.first_at >= since, *base_filter)
-            )).scalar_one())
-
-        applied_period = await _first_in_period(VacancyStatus.APPLIED)
-        in_progress_period = await _first_in_period(in_progress_set)
-        offer_period = await _first_in_period(VacancyStatus.OFFER)
-        decline_period = await _first_in_period(VacancyStatus.DECLINE)
-    else:
-        total_period = applied_period = decline_period = None
-        in_progress_period = offer_period = None
-
     return {
         "period": period,
-        "total": total,
-        "applied_total": applied_total,
-        "in_progress_total": in_progress_total,
-        "offer_total": offer_total,
-        "decline_total": decline_total,
-        "total_period": total_period,
-        "applied_period": applied_period,
-        "in_progress_period": in_progress_period,
-        "offer_period": offer_period,
-        "decline_period": decline_period,
+        **await _kpi_totals(session),
+        **await _kpi_deltas(session, since),
     }
 
 
@@ -117,38 +144,17 @@ async def get_stats_status_breakdown(
     }
 
 
-async def get_stats_skills(
-    session: AsyncSession, *, period: str, limit: int = 27, min_count: int = 2,
-) -> dict:
-    """Топ-N технологий из `Vacancy.stack` за period с маркировкой
-    «есть в моём профиле».
+def _count_stack_tags(stacks) -> tuple[dict[str, int], dict[str, str]]:
+    """Частота технологий по канону и написание, под которым их показывать.
 
-    - Считаем частоту по канону ``skill_key`` (одна технология = один
-      счётчик, как бы её ни написали: «Python» / «python» / «PYTHON»,
-      «Docker-Compose» / «docker compose»).
-    - Дедупликация в рамках одной вакансии: «Python» в стеке два раза
-      = +1, не +2.
-    - mine = canon ∈ profile_set, где profile_set — ключи name и aliases
-      всех `ProfileSkill`.
-    - Фильтруем шум: показываем теги с count >= ``min_count`` (по умолч. 2).
-      Топ-N по count desc, тай-брейкер casefold.
+    Частота считается по ключу `skill_key` — одна технология даёт один
+    счётчик, как бы её ни написали («Python» / «python» / «PYTHON»,
+    «Docker-Compose» / «docker compose»). Внутри одной вакансии повтор не
+    считается дважды. Показывается первое встреченное написание.
     """
-    since = stats_period_since(period)
-    base_filter = [PARSED_ONLY, Vacancy.stack.is_not(None)]
-    if since is not None:
-        base_filter.append(Vacancy.created_at >= since)
-
-    # Тот же ключ, что и у баллов: иначе один навык считался бы здесь
-    # своим, а в оценке вакансии чужим. И тот же читатель анкеты — иначе
-    # «свой» на этом экране решался бы по своему набору строк.
-    profile_set = build_skill_lookup(await list_skills(session))
-
-    rows = (
-        await session.scalars(select(Vacancy.stack).where(*base_filter))
-    ).all()
     counts: dict[str, int] = {}
     canon_by_key: dict[str, str] = {}
-    for stack in rows:
+    for stack in stacks:
         if not isinstance(stack, list):
             continue
         seen_in_row: set[str] = set()
@@ -167,17 +173,54 @@ async def get_stats_skills(
             seen_in_row.add(key)
             canon_by_key.setdefault(key, tag)
             counts[key] = counts.get(key, 0) + 1
+    return counts, canon_by_key
 
-    items = []
-    for key, cnt in counts.items():
-        if cnt < min_count:
-            continue
-        items.append({
-            "label": canon_by_key[key],
-            "count": cnt,
-            "mine": key in profile_set,
-        })
+
+def _skill_items(
+    counts: dict[str, int], canon_by_key: dict[str, str],
+    profile_set, min_count: int,
+) -> list[dict]:
+    """Строки списка технологий: частые сверху, редкие отсеяны.
+
+    Отсев по `min_count` — против шума: технология, встреченная однажды, о
+    рынке не говорит ничего. При равной частоте порядок решает написание,
+    приведённое `casefold`, — иначе «python» и «Python» стояли бы по разные
+    стороны списка из-за одного регистра.
+    """
+    items = [
+        {"label": canon_by_key[key], "count": cnt, "mine": key in profile_set}
+        for key, cnt in counts.items()
+        if cnt >= min_count
+    ]
     items.sort(key=lambda it: (-it["count"], it["label"].casefold()))
+    return items
+
+
+async def get_stats_skills(
+    session: AsyncSession, *, period: str, limit: int = 27, min_count: int = 2,
+) -> dict:
+    """Топ-N технологий из `Vacancy.stack` за period с маркировкой
+    «есть в моём профиле».
+
+    Как считается частота — :func:`_count_stack_tags`, как собирается сам
+    список — :func:`_skill_items`. `mine` — ключ технологии среди ключей
+    названий и прозвищ всех `ProfileSkill`.
+    """
+    since = stats_period_since(period)
+    base_filter = [PARSED_ONLY, Vacancy.stack.is_not(None)]
+    if since is not None:
+        base_filter.append(Vacancy.created_at >= since)
+
+    # Тот же ключ, что и у баллов: иначе один навык считался бы здесь
+    # своим, а в оценке вакансии чужим. И тот же читатель анкеты — иначе
+    # «свой» на этом экране решался бы по своему набору строк.
+    profile_set = build_skill_lookup(await list_skills(session))
+
+    stacks = (
+        await session.scalars(select(Vacancy.stack).where(*base_filter))
+    ).all()
+    counts, canon_by_key = _count_stack_tags(stacks)
+    items = _skill_items(counts, canon_by_key, profile_set, min_count)
     return {
         "period": period,
         "min_count": min_count,

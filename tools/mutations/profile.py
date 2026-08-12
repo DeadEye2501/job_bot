@@ -196,13 +196,13 @@ MUTATIONS = [
         "    if cv_path is not None:" + CRLF,
         "    if False:" + CRLF,
     ),
-    # save_parsed_cv: прежний путь к файлу задваивается
+    # _upsert_cv_path: прежний путь к файлу задваивается
     (
         "backend/repository/profile.py",
-        "        if existing is None:" + CRLF
-        + '            session.add(AppSetting(key="cv_path", value=cv_path))' + CRLF,
-        "        if True:" + CRLF
-        + '            session.add(AppSetting(key="cv_path", value=cv_path))' + CRLF,
+        "    if existing is None:" + CRLF
+        + '        session.add(AppSetting(key="cv_path", value=cv_path))' + CRLF,
+        "    if True:" + CRLF
+        + '        session.add(AppSetting(key="cv_path", value=cv_path))' + CRLF,
     ),
     # build_profile_block: незаполненная роль называется пустотой
     (
