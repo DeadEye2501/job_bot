@@ -1,6 +1,7 @@
 """Ведение записей о компаниях."""
 
 import logging
+from dataclasses import dataclass
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -119,6 +120,17 @@ async def get_company_detail(
 _COMPANY_FIELD_UNSET = object()
 
 
+def _set_aliases(co: Company, aliases) -> None:
+    """Записать написания компании, не сверяя их с её именем.
+
+    Accept list-of-str only; normalize: strip + dedup + drop empty. А вот с
+    именем компании набранное здесь не сверяется намеренно: список человек
+    пишет руками, и выбросить написанное им значило бы стереть введённое
+    молча. Слияние сверяется — там список копится сам.
+    """
+    co.aliases = dedupe_first_wins(str_list(aliases), str.casefold)
+
+
 async def update_company_fields(
     session: AsyncSession,
     company_id: int,
@@ -147,11 +159,7 @@ async def update_company_fields(
         )
         changed.append("website")
     if aliases is not _COMPANY_FIELD_UNSET:
-        # Accept list-of-str only; normalize: strip + dedup + drop empty.
-        # С именем компании набранное здесь не сверяется намеренно: список
-        # человек пишет руками, и выбросить написанное им значило бы стереть
-        # введённое молча. Слияние сверяется — там список копится сам.
-        co.aliases = dedupe_first_wins(str_list(aliases), str.casefold)
+        _set_aliases(co, aliases)
         changed.append("aliases")
     if notes is not _COMPANY_FIELD_UNSET:
         co.notes = (
@@ -188,6 +196,42 @@ async def delete_company(session: AsyncSession, company_id: int) -> bool:
     return True
 
 
+@dataclass(frozen=True, slots=True)
+class _AbsorbedCompany:
+    """Что уносится с поглощаемой компанией; читается до удаления строки."""
+
+    name: str
+    aliases: list
+    website: str | None
+    notes: str | None
+
+
+def _carry_company_to_survivor(
+    survivor: Company, taken: _AbsorbedCompany
+) -> None:
+    """Перенести на выжившую компанию то, что не пропадает с поглощённой.
+
+    Имя поглощённой становится её написанием: по нему компанию продолжают
+    искать словами. Сравнение буквальное, без нормализации имён: список
+    написаний читает не только сопоставление (ему хватило бы нормализованных
+    форм), но и поиск по подстроке, и карточка компании. Написание,
+    отброшенное как «сопоставлению ничего не даёт», исчезло бы из базы вместе
+    с поглощённой строкой.
+
+    Сайт берётся, только если своего нет, а заметки склеиваются — иначе
+    написанное человеком пропадало бы молча.
+    """
+    aliases = list(survivor.aliases or [])
+    known = {(survivor.name or "").casefold()}
+    known.update(a.casefold() for a in aliases)
+    survivor.aliases = aliases + dedupe_first_wins(
+        taken.aliases + [taken.name], str.casefold, known
+    )
+    if not survivor.website and taken.website:
+        survivor.website = taken.website
+    survivor.notes = concat_notes(survivor.notes, taken.notes)
+
+
 async def merge_company(
     session: AsyncSession, *, absorbed_id: int, survivor_id: int
 ) -> None:
@@ -202,37 +246,21 @@ async def merge_company(
         survivor_id=survivor_id,
         subject="merge_company",
     )
-
-    abs_name = absorbed.name
-    abs_aliases = list(absorbed.aliases or [])
-    abs_website = absorbed.website
-    abs_notes = absorbed.notes
-
+    taken = _AbsorbedCompany(
+        name=absorbed.name,
+        aliases=list(absorbed.aliases or []),
+        website=absorbed.website,
+        notes=absorbed.notes,
+    )
     moved_vacancies = await repoint_vacancies(
         session,
         Vacancy.company_id,
         absorbed_id=absorbed_id,
         survivor_id=survivor_id,
     )
-
     await session.delete(absorbed)
     await session.flush()
-
-    # Сравнение буквальное, без нормализации имён: список написаний читает не
-    # только сопоставление (ему хватило бы нормализованных форм), но и поиск по
-    # подстроке, и карточка компании. Написание, отброшенное как «сопоставлению
-    # ничего не даёт», исчезло бы из базы вместе с поглощённой строкой — а по
-    # нему компанию ищут словами.
-    aliases = list(survivor.aliases or [])
-    known = {(survivor.name or "").casefold()}
-    known.update(a.casefold() for a in aliases)
-    survivor.aliases = aliases + dedupe_first_wins(
-        abs_aliases + [abs_name], str.casefold, known
-    )
-
-    if not survivor.website and abs_website:
-        survivor.website = abs_website
-    survivor.notes = concat_notes(survivor.notes, abs_notes)
+    _carry_company_to_survivor(survivor, taken)
 
     logger.info(
         "merged company #%d -> #%d (vacancies=%d)",

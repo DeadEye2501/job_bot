@@ -30,6 +30,42 @@ VACANCY_NEIGHBOURS = (
 """
 
 
+async def _status_history_of(session: AsyncSession, vacancy_id: int) -> list:
+    """Переходы статусов вакансии, свежие сверху.
+
+    Разрешитель по идентификатору не украшение: время перехода проставляет
+    база, и два перехода подряд легко получают одну метку.
+    """
+    return list(
+        (
+            await session.scalars(
+                select(VacancyStatusHistory)
+                .where(VacancyStatusHistory.vacancy_id == vacancy_id)
+                .order_by(
+                    VacancyStatusHistory.changed_at.desc(),
+                    VacancyStatusHistory.id.desc(),
+                )
+            )
+        ).all()
+    )
+
+
+async def _events_of(session: AsyncSession, vacancy_id: int) -> list:
+    """События конвейера по вакансии, свежие сверху."""
+    return list(
+        (
+            await session.scalars(
+                select(VacancyEvent)
+                .where(VacancyEvent.vacancy_id == vacancy_id)
+                .order_by(
+                    VacancyEvent.created_at.desc(),
+                    VacancyEvent.id.desc(),
+                )
+            )
+        ).all()
+    )
+
+
 async def get_vacancy_detail(
     session: AsyncSession, vacancy_id: int
 ) -> VacancyDetail | None:
@@ -50,31 +86,11 @@ async def get_vacancy_detail(
     if vacancy is None:
         return None
 
-    history = list(
-        (
-            await session.scalars(
-                select(VacancyStatusHistory)
-                .where(VacancyStatusHistory.vacancy_id == vacancy_id)
-                .order_by(
-                    VacancyStatusHistory.changed_at.desc(),
-                    VacancyStatusHistory.id.desc(),
-                )
-            )
-        ).all()
+    return VacancyDetail(
+        vacancy=vacancy,
+        history=await _status_history_of(session, vacancy_id),
+        events=await _events_of(session, vacancy_id),
     )
-    events = list(
-        (
-            await session.scalars(
-                select(VacancyEvent)
-                .where(VacancyEvent.vacancy_id == vacancy_id)
-                .order_by(
-                    VacancyEvent.created_at.desc(),
-                    VacancyEvent.id.desc(),
-                )
-            )
-        ).all()
-    )
-    return VacancyDetail(vacancy=vacancy, history=history, events=events)
 
 
 async def update_vacancy_notes(
@@ -140,6 +156,21 @@ _COMPANY_LINK = _Link(
 )
 
 
+async def _link_name(
+    session: AsyncSession, link: _Link, row_id: int | None
+) -> str | None:
+    """Как назвать привязанный предмет в ленте; пусто — назвать нечем.
+
+    Имя записывается в саму строку ленты, а не берётся по ссылке при показе:
+    предмет могут переименовать или снести, и тогда прошлая запись ленты
+    осталась бы без объяснения, что именно поменяли.
+    """
+    if row_id is None:
+        return None
+    row = await session.get(link.model, row_id)
+    return link.display(row) if row is not None else None
+
+
 async def _relink(
     session: AsyncSession, vacancy_id: int, new_id: int | None, link: _Link
 ) -> bool:
@@ -161,11 +192,8 @@ async def _relink(
             )
     if previous_id == new_id:
         return True
-    previous_name: str | None = None
-    if previous_id is not None:
-        previous = await session.get(link.model, previous_id)
-        if previous is not None:
-            previous_name = link.display(previous)
+    # До присвоения: чтение по промаху карты объектов сбрасывает висящие правки.
+    previous_name = await _link_name(session, link, previous_id)
     setattr(vacancy, link.column, new_id)
     await add_vacancy_event(
         session,

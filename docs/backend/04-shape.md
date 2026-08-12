@@ -84,7 +84,7 @@
 
 *41–59 строк — двадцать восемь тел, тем же порядком.*
 
-- [ ] **Ф. Карточки репозитория:** `hr_card` 54, `companies_card` (50, 43),
+- [x] **Ф. Карточки репозитория:** `hr_card` 54, `companies_card` (50, 43),
       `vacancies_card` (45, 43)
 - [ ] **Х. Перечни и жизнь:** `vacancies_life` (47, 43), `profile` 59,
       `vacancies_list` 54, `messages` 52, `channels` 46, `companies_list` 41

@@ -81,6 +81,52 @@ async def update_hr_fields(
     return True
 
 
+async def _vacancy_count_of(session: AsyncSession, hr_id: int) -> int:
+    """Сколько вакансий человек принёс за всё время."""
+    return int(
+        await session.scalar(
+            select(func.count(Vacancy.id)).where(Vacancy.hr_id == hr_id)
+        )
+        or 0
+    )
+
+
+async def _last_company_of(
+    session: AsyncSession, hr_id: int
+) -> tuple[int | None, str | None]:
+    """Компания последней вакансии человека — номер и имя.
+
+    Соединение внешнее: последняя вакансия могла быть без компании, и тогда
+    у карточки нет её ни номером, ни именем. Порядок — общий
+    `LAST_VACANCY_ORDER`: разойдись он со списком, карточка и перечень
+    называли бы разные компании.
+    """
+    row = (
+        await session.execute(
+            select(Company.id, Company.name)
+            .select_from(Vacancy)
+            .outerjoin(Company, Company.id == Vacancy.company_id)
+            .where(Vacancy.hr_id == hr_id)
+            .order_by(*LAST_VACANCY_ORDER)
+            .limit(1)
+        )
+    ).first()
+    return (row[0], row[1]) if row else (None, None)
+
+
+async def _unread_count_of(session: AsyncSession, hr_id: int) -> int:
+    """Сколько непрочитанных входящих у человека."""
+    return int(
+        await session.scalar(
+            select(func.count(Message.id)).where(
+                Message.hr_id == hr_id,
+                *UNREAD_INCOMING,
+            )
+        )
+        or 0
+    )
+
+
 async def get_hr_detail(
     session: AsyncSession, hr_id: int
 ) -> HrDetail | None:
@@ -94,46 +140,15 @@ async def get_hr_detail(
     hr = await session.get(HR, hr_id)
     if hr is None:
         return None
-
-    vacancy_count = int(
-        await session.scalar(
-            select(func.count(Vacancy.id)).where(Vacancy.hr_id == hr_id)
-        )
-        or 0
-    )
-
-    last_co_row = (
-        await session.execute(
-            select(Company.id, Company.name)
-            .select_from(Vacancy)
-            .outerjoin(Company, Company.id == Vacancy.company_id)
-            .where(Vacancy.hr_id == hr_id)
-            .order_by(*LAST_VACANCY_ORDER)
-            .limit(1)
-        )
-    ).first()
-    last_company_id = last_co_row[0] if last_co_row else None
-    last_company_name = last_co_row[1] if last_co_row else None
-
-    unread_count = int(
-        await session.scalar(
-            select(func.count(Message.id)).where(
-                Message.hr_id == hr_id,
-                *UNREAD_INCOMING,
-            )
-        )
-        or 0
-    )
-
-    blacklist_value = await _hr_blacklist_value(session, hr)
-
+    vacancy_count = await _vacancy_count_of(session, hr_id)
+    last_company_id, last_company_name = await _last_company_of(session, hr_id)
     return HrDetail(
         hr=hr,
         vacancy_count=vacancy_count,
         last_company_id=last_company_id,
         last_company_name=last_company_name,
-        unread_count=unread_count,
-        blacklist_value=blacklist_value,
+        unread_count=await _unread_count_of(session, hr_id),
+        blacklist_value=await _hr_blacklist_value(session, hr),
     )
 
 
