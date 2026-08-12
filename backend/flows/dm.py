@@ -12,7 +12,7 @@ from backend.message_text import extract_dm_text
 from backend.message_text import extract_text
 from backend.telegram_lookup import fetch_telegram_avatar
 from backend.flows.dm_classify import classify_and_apply
-from backend.payloads import OutgoingMessage
+from backend.payloads import IncomingMessage, OutgoingMessage
 from backend.repository.hr_identify import find_known_hr
 from backend.repository.hr_identify import find_latest_vacancy_id_for_hr
 from backend.repository.hr_identify import refresh_hr_from_telegram
@@ -27,16 +27,24 @@ OutgoingDmOutcome = Literal["stored", "already_stored", "not_stored"]
 
 
 @dataclass(frozen=True, slots=True)
-class _Media:
-    """Вложение письма: чем оно является, где лежит и как называлось."""
+class _Attachment:
+    """Вложение письма: что это, где лежит и как называлось.
 
-    kind: str | None
-    path: str | None
-    name: str | None
+    Три значения об одном предмете и ходят вместе: род решает, качать ли
+    вообще, путь появляется только после скачивания, имя показывают в
+    переписке. Порознь ни одно из них не значит ничего.
+
+    Одно на обе стороны переписки: у нашего письма и у письма HR вложение
+    ложится в те же три колонки, и порознь снимки разъехались бы молча.
+    """
+
+    kind: str | None = None
+    path: str | None = None
+    name: str | None = None
 
 
 async def _store_outgoing_row(
-    session_factory, msg, hr_id: int, media: _Media
+    session_factory, msg, hr_id: int, media: _Attachment
 ) -> OutgoingDmOutcome:
     """Положить строку своего сообщения; сказать, чем дело кончилось.
 
@@ -96,22 +104,8 @@ async def persist_outgoing_dm(session_factory, client, msg, hr_id: int) -> Outgo
         await download_media(client, msg, hr_id) if media_kind is not None else None
     )
     return await _store_outgoing_row(
-        session_factory, msg, hr_id, _Media(media_kind, media_path, media_name)
+        session_factory, msg, hr_id, _Attachment(media_kind, media_path, media_name)
     )
-
-
-@dataclass(frozen=True, slots=True)
-class _Attachment:
-    """Вложение входящего письма: что это, где лежит и как называлось.
-
-    Три значения об одном предмете и ходят вместе: род решает, качать ли
-    вообще, путь появляется только после скачивания, имя показывают в
-    переписке. Порознь ни одно из них не значит ничего.
-    """
-
-    kind: str | None = None
-    path: str | None = None
-    name: str | None = None
 
 
 async def _sender_to_listen_to(session_factory, msg):
@@ -173,6 +167,26 @@ async def _attributed_vacancy(session, hr_id: int, msg) -> int | None:
     return await find_latest_vacancy_id_for_hr(session, hr_id, as_of=msg.date)
 
 
+def _incoming_row(
+    msg, hr_id: int, vacancy_id: int | None, attachment: _Attachment
+) -> IncomingMessage:
+    """Свёртка входящего письма из сообщения Telegram и того, что о нём знают.
+
+    Текст достаётся общим правилом (`extract_dm_text`): вложение без подписи
+    даёт пустой текст, и подпись под ним берётся оттуда же, откуда у эха.
+    """
+    return IncomingMessage(
+        hr_id=hr_id,
+        vacancy_id=vacancy_id,
+        text=extract_dm_text(msg),
+        tg_message_id=msg.id,
+        received_at=msg.date,
+        media_kind=attachment.kind,
+        media_path=attachment.path,
+        media_name=attachment.name,
+    )
+
+
 async def _save_incoming(session_factory, msg, attachment: _Attachment, avatar):
     """Записать входящее письмо; отдать номер вакансии и номер строки.
 
@@ -180,7 +194,6 @@ async def _save_incoming(session_factory, msg, attachment: _Attachment, avatar):
     живого с догоном) или не записалось. HR ищется заново нарочно: первый
     поиск шёл в своей сессии ради номера, куда класть файл.
     """
-    text = extract_dm_text(msg)
     async with session_factory() as session:
         try:
             hr = await find_known_hr(
@@ -191,10 +204,7 @@ async def _save_incoming(session_factory, msg, attachment: _Attachment, avatar):
             refresh_hr_from_telegram(hr, msg.from_user, avatar=avatar)
             vacancy_id = await _attributed_vacancy(session, hr.id, msg)
             new_msg = await save_incoming_message(
-                session, hr.id, vacancy_id, text, msg.id, msg.date,
-                media_kind=attachment.kind,
-                media_path=attachment.path,
-                media_name=attachment.name,
+                session, _incoming_row(msg, hr.id, vacancy_id, attachment)
             )
             await session.commit()
             return vacancy_id, new_msg.id

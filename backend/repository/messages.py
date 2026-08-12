@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Message
-from backend.payloads import OutgoingMessage
+from backend.payloads import IncomingMessage, OutgoingMessage
 
 # Раскрывается звёздочкой в `.where(...)`: `.where(*UNREAD_INCOMING, ...)`.
 # Надгробие исключено намеренно — удалённое, но не прочитанное входящее иначе
@@ -20,27 +20,25 @@ UNREAD_INCOMING = (
 
 
 async def save_incoming_message(
-    session: AsyncSession,
-    hr_id: int,
-    vacancy_id: int | None,
-    text: str,
-    tg_message_id: int,
-    received_at: datetime,
-    *,
-    media_kind: str | None = None,
-    media_path: str | None = None,
-    media_name: str | None = None,
+    session: AsyncSession, incoming: IncomingMessage
 ) -> Message:
+    """Положить письмо HR в переписку.
+
+    Письмо приходит свёрткой, а не россыпью доводов: девять значений здесь —
+    одно письмо, и порознь ни одно из них строку не составляет. Зеркально
+    исходящему (`save_outgoing_message`), у которого свёртка была с самого
+    начала.
+    """
     new_msg = Message(
         is_incoming=True,
-        hr_id=hr_id,
-        vacancy_id=vacancy_id,
-        text=text,
-        tg_message_id=tg_message_id,
-        sent_at=received_at,
-        media_kind=media_kind,
-        media_path=media_path,
-        media_name=media_name,
+        hr_id=incoming.hr_id,
+        vacancy_id=incoming.vacancy_id,
+        text=incoming.text,
+        tg_message_id=incoming.tg_message_id,
+        sent_at=incoming.received_at,
+        media_kind=incoming.media_kind,
+        media_path=incoming.media_path,
+        media_name=incoming.media_name,
     )
     session.add(new_msg)
     await session.flush()

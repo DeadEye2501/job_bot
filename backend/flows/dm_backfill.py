@@ -2,6 +2,7 @@
 
 import logging
 import asyncio
+from itertools import batched
 from dataclasses import dataclass
 from typing import Any
 
@@ -228,18 +229,6 @@ async def backfill_hr_dm_history(
         fire(on_message_persisted, "on_message_persisted", hr.id)
 
 
-def _in_batches(chats: list) -> list[list]:
-    """Разбить людей на пачки — по ним зовущий и идёт.
-
-    Пачки нужны затем, чтобы 300-500 HR'ов не превращались в 300-500
-    последовательных обращений к Telegram с заметным временем ожидания.
-    """
-    return [
-        chats[i:i + _DM_CATCHUP_BATCH_SIZE]
-        for i in range(0, len(chats), _DM_CATCHUP_BATCH_SIZE)
-    ]
-
-
 def _report_failed(batch: list, results: list) -> None:
     """Пожаловаться на людей, чей проход сорвался.
 
@@ -275,9 +264,10 @@ async def catch_up_missed_dms(
         "DM catch-up: %d HR(s), batch=%d delay=%ss",
         len(chats), _DM_CATCHUP_BATCH_SIZE, _DM_CATCHUP_BATCH_DELAY_SEC,
     )
-    batches = _in_batches(chats)
+    # Пачками — иначе 300-500 HR'ов дают столько же последовательных
+    # обращений; внутри пачки параллельно, пауза после — ради ограничителя.
+    batches = list(batched(chats, _DM_CATCHUP_BATCH_SIZE))
     for index, batch in enumerate(batches):
-        # Внутри пачки — параллельно, пауза после неё — ради ограничителя.
         results = await asyncio.gather(
             *[
                 backfill_hr_dm_history(

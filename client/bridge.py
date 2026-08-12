@@ -2937,7 +2937,7 @@ class MainApi(QObject):
             if connected:
                 asked = await username_of(client)
                 if asked is None:
-                    logger.warning("get_me() failed for settings")
+                    logger.warning("get_me() failed for settings", exc_info=True)
             if asked is None:
                 # Спросить не вышло или бот ещё не подключился — отдаём кэш.
                 username = self._username_cache

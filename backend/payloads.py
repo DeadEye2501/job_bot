@@ -79,6 +79,28 @@ class OutgoingMessage:
 
 
 @dataclass(frozen=True)
+class IncomingMessage:
+    """Письмо HR в том виде, в каком оно ложится в переписку.
+
+    Зеркало `OutgoingMessage`: те же семь значений об одном письме плюс
+    вакансия, к которой его отнесли. Ходят они вместе — без номера не
+    распознать повтор, без времени письмо не встанет в переписке на своё
+    место, а без вакансии переписка не свяжется с откликом.
+
+    Вакансия здесь может пустовать, и это не забывчивость: письмо от HR,
+    которому мы ещё не писали, относить не к чему.
+    """
+    hr_id: int
+    vacancy_id: int | None
+    text: str
+    tg_message_id: int
+    received_at: Any
+    media_kind: str | None = None
+    media_path: str | None = None
+    media_name: str | None = None
+
+
+@dataclass(frozen=True)
 class Classification:
     status: VacancyStatus
     explanation: str | None

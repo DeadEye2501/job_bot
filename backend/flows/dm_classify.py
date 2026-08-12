@@ -159,11 +159,14 @@ async def _blacklisted_now(pipeline, hr_id: int) -> str | None:
         return await _hr_blacklist_value(session, hr_row) if hr_row else None
 
 
-async def _ask_and_apply(pipeline, hr_id: int, text: str, target) -> None:
+async def _ask_and_apply(pipeline, hr_id: int, burst: list, target) -> None:
     """Спросить модель по склеенному пакету и применить вердикт.
 
     Одновременных обращений столько, сколько разрешает семафор конвейера:
     без него переход в рабочий режим будит разборы по всем людям разом.
+
+    Размер пачки идёт в запись о поломке: сама пачка к этому мигу уже вынута
+    из копилки и потеряна, и число — единственное, что о ней скажет.
     """
     try:
         async with pipeline._dm_classify_semaphore:
@@ -171,11 +174,13 @@ async def _ask_and_apply(pipeline, hr_id: int, text: str, target) -> None:
                 pipeline._session_factory,
                 pipeline._lm_client,
                 pipeline._lm_chat_model,
-                text,
+                _burst_text(burst),
                 target,
             )
     except Exception:
-        logger.exception("debounced classify failed for hr %d", hr_id)
+        logger.exception(
+            "debounced classify failed for hr %d (%d msgs)", hr_id, len(burst)
+        )
         return
     if applied:
         fire(pipeline.on_vacancies_changed, "on_vacancies_changed")
@@ -207,7 +212,6 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
     buf = pipeline._dm_classify_buffer.pop(hr_id, [])
     if not buf:
         return
-    text = _burst_text(buf)
     last = buf[-1]
     vacancy_id = last["vacancy_id"]
     msg_id = last["msg_id"]
@@ -228,7 +232,7 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
         "debounced classify: hr %d, %d msgs in burst -> vacancy %s",
         hr_id, len(buf), vacancy_id,
     )
-    await _ask_and_apply(pipeline, hr_id, text, (vacancy_id, msg_id, v_status))
+    await _ask_and_apply(pipeline, hr_id, buf, (vacancy_id, msg_id, v_status))
 
 
 async def _wait_out(pipeline, tasks: list, *, drain: bool) -> None:

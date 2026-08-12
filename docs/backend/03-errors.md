@@ -14,10 +14,10 @@
       `adapters/lm_studio.py`, `llm/hr_reply.py`, `flows/auto_gate.py`,
       `flows/dm.py`
 - [x] **Б. Живучесть окружения** — 2, 3, 4, 6.
-      `log_buffer.py`, `alembic/`, `repository/stats_summary.py`, `helpers.py`
+      `log_buffer.py`, `alembic/`, `repository/stats_summary.py`, `message_text.py`
 
 Пункт 6 (три написания ссылки на канал) правится в `normalize_username`, то есть
-задевает `helpers.py` — там же, где живёт долг из пункта 11 этапа 4; если оба
+задевает `message_text.py` — наследника снесённого `helpers.py`; если оба
 берутся в один заход, ревью читает один предмет.
 
 ## 1. `"content": null` в ответе модели пробивает разбор наружу
@@ -110,7 +110,7 @@ Windows не даёт переименовать файл, открытый др
 
 ## 6. Три написания ссылки на канал приведение ника не разбирает
 
-`normalize_username` (`backend/helpers.py`) знает префиксы `https://`,
+`normalize_username` (`backend/domain/telegram_identity.py`) знает префиксы `https://`,
 `http://` и `t.me/`. Мимо проходят `t.me/s/канал` (зарезервированный путь `s`),
 `telegram.me/канал` и `www.t.me/канал` — у всех трёх ответ пустой.
 

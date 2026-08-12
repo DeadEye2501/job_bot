@@ -10,19 +10,19 @@ MUTATIONS = [
     # save_incoming_message: сообщение записывается как исходящее
     (
         "backend/repository/messages.py",
-        "        is_incoming=True," + CRLF + "        hr_id=hr_id," + CRLF,
-        "        is_incoming=False," + CRLF + "        hr_id=hr_id," + CRLF,
+        "        is_incoming=True," + CRLF + "        hr_id=incoming.hr_id," + CRLF,
+        "        is_incoming=False," + CRLF + "        hr_id=incoming.hr_id," + CRLF,
     ),
     # save_incoming_message: время подменяется серверным умолчанием
     (
         "backend/repository/messages.py",
-        "        sent_at=received_at," + CRLF,
+        "        sent_at=incoming.received_at," + CRLF,
         "",
     ),
     # save_incoming_message: имя вложения теряется
     (
         "backend/repository/messages.py",
-        "        media_name=media_name," + CRLF,
+        "        media_name=incoming.media_name," + CRLF,
         "",
     ),
     # list_messages_for_hr: составной указатель вырождается в сравнение по времени
