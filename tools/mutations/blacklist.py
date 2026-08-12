@@ -72,27 +72,26 @@ MUTATIONS = [
     # create_blacklist: сведение повторов идёт по одному значению, без рода
     (
         "backend/repository/blacklist.py",
-        "                Blacklist.kind == normalized_kind," + CRLF
-        + "                Blacklist.value == normalized_value," + CRLF,
-        "                Blacklist.value == normalized_value," + CRLF,
+        "                Blacklist.kind == kind, Blacklist.value == value" + CRLF,
+        "                Blacklist.value == value" + CRLF,
     ),
     # create_blacklist: погашенная строка не оживает
     (
         "backend/repository/blacklist.py",
-        "        if not existing.active:" + CRLF + "            existing.active = True" + CRLF,
-        "        if False:" + CRLF + "            existing.active = True" + CRLF,
+        "    if not existing.active:" + CRLF + "        existing.active = True" + CRLF,
+        "    if False:" + CRLF + "        existing.active = True" + CRLF,
     ),
     # create_blacklist: новая причина затирает прежнюю
     (
         "backend/repository/blacklist.py",
-        "        if normalized_reason and not existing.reason:",
-        "        if normalized_reason:",
+        "    if reason and not existing.reason:",
+        "    if reason:",
     ),
     # create_blacklist: повтор сообщается как заведение
     (
         "backend/repository/blacklist.py",
-        "        return existing, outcome",
-        '        return existing, "created"',
+        "    return outcome",
+        '    return "created"',
     ),
     # create_blacklist: новая строка не доезжает до таблицы
     (
@@ -109,14 +108,14 @@ MUTATIONS = [
     # create_blacklist: оживление не отличают от попадания в уже включённую
     (
         "backend/repository/blacklist.py",
-        '            outcome = "reactivated"' + CRLF,
+        '        outcome = "reactivated"' + CRLF,
         "",
     ),
     # create_blacklist: новая строка заводится погашенной
     (
         "backend/repository/blacklist.py",
-        "        reason=normalized_reason," + CRLF + "        active=True," + CRLF,
-        "        reason=normalized_reason," + CRLF + "        active=False," + CRLF,
+        "    row = Blacklist(kind=kind, value=value, reason=reason, active=True)",
+        "    row = Blacklist(kind=kind, value=value, reason=reason, active=False)",
     ),
     # delete_blacklist: строка не удаляется
     (

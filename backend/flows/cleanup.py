@@ -20,9 +20,8 @@ async def check_ghosting_timeouts(pipeline) -> int:
 
     Дёргается из Bot.run loop'а раз в poll-tick (DM_ONLY и FULL —
     в OFF не запускается, бот считается «на паузе»). Стоимость
-    низкая: только Applied/In Progress попадают в шорт-лист, для
-    каждой 2 SQL-запроса (max(message), max(history)). Если
-    кандидатов нет — ранний return.
+    низкая: только Applied/In Progress попадают в шорт-лист, и берётся
+    он одним заходом в базу — см. `vacancies_life._silence_candidates`.
     """
     from backend.domain.transitions import GHOSTING_TIMEOUT_DAYS
     from backend.repository.vacancies_life import mark_ghosted_vacancies

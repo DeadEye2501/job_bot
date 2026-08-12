@@ -96,6 +96,59 @@ def _accept_company_match(
     return company, decision
 
 
+def _keep_pre_create_stage(decision: dict) -> None:
+    """Сохранить стадию, с которой пришли к созданию строки.
+
+    Если в решении уже стоит сигнал «модель звали, и она не свела»
+    (`llm_no_match`), исход создания его перезапишет — и разбор по одной
+    базе перестанет отличать «модель пробовали» от «модель не звали».
+    """
+    prior_stage = decision.get("stage")
+    if prior_stage and prior_stage not in ("skip", None):
+        decision["pre_create_stage"] = prior_stage
+
+
+async def _insert_company(
+    session: AsyncSession, name: str, website: str | None, decision: dict
+) -> Company | None:
+    """Завести строку компании; пусто — имя уже занято.
+
+    Вложенная сделка нужна только здесь: срыв по UNIQUE(name) разбирается
+    зовущим на два исхода, и без точки отката сорвавшаяся вставка утащила
+    бы за собой всю запись вакансии.
+    """
+    try:
+        async with session.begin_nested():
+            company = await create_company(
+                session, name=name, website=website
+            )
+    except IntegrityError:
+        return None
+    decision["stage"] = "create"
+    decision["matched_id"] = company.id
+    logger.info(
+        "company_dedup: created id=%d name=%r website=%r",
+        company.id,
+        name,
+        website,
+    )
+    return company
+
+
+async def _company_by_exact_name(
+    session: AsyncSession, name: str
+) -> Company | None:
+    """Строка, столкнувшаяся с нами по имени.
+
+    Ищем ровно тем написанием, которым пытались вставить: UNIQUE(name) в
+    SQLite чувствителен к регистру, и поиск по приведённому имени вернул бы
+    строку, которая столкновения не вызывала.
+    """
+    return (
+        await session.scalars(select(Company).where(Company.name == name))
+    ).first()
+
+
 async def _create_company_row(
     session: AsyncSession,
     name: str,
@@ -103,74 +156,39 @@ async def _create_company_row(
     decision: dict,
     seen_ids: set[int],
 ) -> tuple[Company | None, dict]:
-    """Создание новой строки. На срыве по UNIQUE(name) — re-lookup точного
-    совпадения (детерминированное, без LLM, чтобы не закольцеваться) и
-    обогащение найденной строки тем же enrichment'ом, что в match-ветках
-    (website-fill / alias-fold) — чтобы concurrent ingest не терял
-    parsed-данные.
+    """Создание новой строки. На срыве по UNIQUE(name) — поиск точного
+    совпадения (детерминированный, без модели, чтобы не закольцеваться) и
+    обогащение найденной тем же образом, что в ветках сведения: иначе
+    разбор, пришедший вторым, потерял бы разобранные им данные.
 
     ``seen_ids`` — строки, которые разбор видел в своей выборке; по ним
     срыв и делится на два исхода. Найденная среди них означает сведение по
     имени: правила её не взяли (у неё другой сайт), а уникальность имени
-    свела — это ежедневный путь, ради которого enrichment здесь и стоит.
-    Не найденная означает настоящую гонку: строка появилась между выборкой
-    и вставкой.
-
-    Если decision["stage"] уже несёт сигнал «LLM был вызван и не
-    сматчил» (`llm_no_match`), сохраняем его в `pre_create_stage` ДО того,
-    как исход перезапишет стадию, иначе DB-only audit не отличит «LLM
-    пробовали» от «LLM не вызывался»."""
+    свела — это ежедневный путь. Не найденная означает настоящую гонку:
+    строка появилась между выборкой и вставкой.
+    """
     # Aggregator-URL'ы НЕ персистим как website новой компании по тем же
     # причинам, что в _enrich_company_with_parsed: «канальная» ссылка не
     # является корпоративным сайтом. None в этой колонке честнее, чем
     # ложный t.me/AcmeChannel, и не отравляет будущий host-match.
     persisted_website = real_corporate_website(website)
-    prior_stage = decision.get("stage")
-    if prior_stage and prior_stage not in ("skip", None):
-        decision["pre_create_stage"] = prior_stage
+    _keep_pre_create_stage(decision)
     name_clean = name.strip()
-    try:
-        # Вложенная сделка нужна только здесь: срыв по UNIQUE(name) тут
-        # разбирается на два исхода, и без точки отката сорвавшаяся вставка
-        # утащила бы за собой всю запись вакансии.
-        async with session.begin_nested():
-            company = await create_company(
-                session, name=name_clean, website=persisted_website
-            )
-        decision["stage"] = "create"
-        decision["matched_id"] = company.id
-        logger.info(
-            "company_dedup: created id=%d name=%r website=%r",
-            company.id,
-            name_clean,
-            persisted_website,
-        )
+    company = await _insert_company(
+        session, name_clean, persisted_website, decision
+    )
+    if company is not None:
         return company, decision
-    except IntegrityError:
-        # UNIQUE(name) в SQLite case-sensitive: IntegrityError срабатывает
-        # только на точное совпадение. Re-lookup делаем по той же точной
-        # строке, что и пытались insert'ить — иначе case-insensitive lower()
-        # мог бы вернуть row, который НЕ был причиной race-collision.
-        company = (
-            await session.scalars(
-                select(Company).where(Company.name == name_clean)
-            )
-        ).first()
-        if company is not None:
-            # Исход тот же, что у трёх правил выше — использованная чужая
-            # строка, — поэтому и оформляется он тем же объявлением: со
-            # своим enrichment и своей строкой аудита эта ветка разошлась
-            # бы с ними молча.
-            return _accept_company_match(
-                company,
-                name,
-                website,
-                decision,
-                "rule_name_unique"
-                if company.id in seen_ids
-                else "create_race_fallback",
-            )
-        return company, decision
+    company = await _company_by_exact_name(session, name_clean)
+    if company is None:
+        return None, decision
+    # Исход тот же, что у трёх правил выше — использованная чужая строка, —
+    # поэтому и оформляется он тем же объявлением: со своим enrichment и
+    # своей строкой аудита эта ветка разошлась бы с ними молча.
+    stage = (
+        "rule_name_unique" if company.id in seen_ids else "create_race_fallback"
+    )
+    return _accept_company_match(company, name, website, decision, stage)
 
 
 @dataclass(frozen=True, slots=True)

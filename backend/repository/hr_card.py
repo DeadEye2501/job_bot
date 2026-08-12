@@ -1,6 +1,7 @@
 """Одна запись HR: чтение, правка, слияние, удаление."""
 
 import logging
+from dataclasses import dataclass
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -195,24 +196,76 @@ def hr_blacklist_preferred_value(hr: HR) -> str | None:
     return preferred_blacklist_value(hr_blacklist_candidates(hr))
 
 
+@dataclass(frozen=True, slots=True)
+class _AbsorbedHr:
+    """Что уносится с поглощаемым человеком.
+
+    Снимок читается **до** удаления строки: после него обращение к полям
+    удалённой записи — уже не чтение, а поведение сессии.
+    """
+
+    telegram_user_id: int | None
+    telegram_username: str | None
+    name: str | None
+    notes: str | None
+
+
+async def _move_or_drop_chat(
+    session: AsyncSession, absorbed_id: int, survivor_id: int,
+    survivor_has_tg: bool,
+) -> tuple[int, int]:
+    """Переписка поглощаемого: перенести или стереть. Сколько того и другого.
+
+    Учётная запись Telegram и переписка ходят вместе: у выжившего своя
+    запись — чужая переписка стирается вместе с ней, нет своей — переписка
+    переезжает на него целиком.
+    """
+    if survivor_has_tg:
+        dropped = (
+            await session.execute(
+                delete(Message).where(Message.hr_id == absorbed_id)
+            )
+        ).rowcount or 0
+        return 0, dropped
+    moved = (
+        await session.execute(
+            update(Message)
+            .where(Message.hr_id == absorbed_id)
+            .values(hr_id=survivor_id)
+        )
+    ).rowcount or 0
+    return moved, 0
+
+
+def _carry_to_survivor(
+    survivor: HR, taken: _AbsorbedHr, survivor_has_tg: bool
+) -> None:
+    """Перенести на выжившего то, что не пропадает вместе с поглощённым.
+
+    Учётная запись Telegram достаётся только тому, у кого своей не было —
+    вместе с перееханной перепиской. Один ник учётной записью не считается:
+    без числового идентификатора это ручная подсказка, а не аккаунт. Имя
+    берётся, только если у выжившего пусто, а заметки склеиваются — иначе
+    написанное человеком пропадало бы молча.
+    """
+    if not survivor_has_tg:
+        if taken.telegram_user_id is not None:
+            survivor.telegram_user_id = taken.telegram_user_id
+        if taken.telegram_username:
+            survivor.telegram_username = taken.telegram_username
+    if not survivor.name and taken.name:
+        survivor.name = taken.name
+    survivor.notes = concat_notes(survivor.notes, taken.notes)
+
+
 async def merge_hr(
     session: AsyncSession, *, absorbed_id: int, survivor_id: int
 ) -> None:
     """Merge ``absorbed`` HR into ``survivor``. Irreversible.
 
-    Caller must wrap in ``session.begin()``.
-
-    Semantics:
-    * Vacancies are unioned (absorbed's get repointed onto survivor).
-    * **TG account + chat history travel together as one unit.** If
-      survivor has a ``telegram_user_id`` → keep its TG identity + chat,
-      DROP absorbed's chat (and its TG identity is discarded with it). If
-      survivor has no ``telegram_user_id`` → take absorbed's
-      ``telegram_user_id`` + ``telegram_username`` AND move its chat onto
-      survivor. Username alone doesn't count as an account — without a
-      user_id it's just a manual hint.
-    * Name falls back from absorbed only when survivor's is empty.
-    * Notes are concatenated so nothing is silently lost.
+    Caller must wrap in ``session.begin()``. Вакансии объединяются, а что
+    делается с учётной записью, перепиской, именем и заметками — см.
+    :func:`_move_or_drop_chat` и :func:`_carry_to_survivor`.
     """
     absorbed, survivor = await load_merge_pair(
         session,
@@ -221,46 +274,23 @@ async def merge_hr(
         survivor_id=survivor_id,
         subject="merge_hr",
     )
-
-    abs_tg_user_id = absorbed.telegram_user_id
-    abs_tg_username = absorbed.telegram_username
-    abs_name = absorbed.name
-    abs_notes = absorbed.notes
+    taken = _AbsorbedHr(
+        telegram_user_id=absorbed.telegram_user_id,
+        telegram_username=absorbed.telegram_username,
+        name=absorbed.name,
+        notes=absorbed.notes,
+    )
     survivor_has_tg = survivor.telegram_user_id is not None
 
     moved_vacancies = await repoint_vacancies(
         session, Vacancy.hr_id, absorbed_id=absorbed_id, survivor_id=survivor_id
     )
-    if survivor_has_tg:
-        dropped_messages = (
-            await session.execute(
-                delete(Message).where(Message.hr_id == absorbed_id)
-            )
-        ).rowcount or 0
-        moved_messages = 0
-    else:
-        moved_messages = (
-            await session.execute(
-                update(Message)
-                .where(Message.hr_id == absorbed_id)
-                .values(hr_id=survivor_id)
-            )
-        ).rowcount or 0
-        dropped_messages = 0
-
+    moved_messages, dropped_messages = await _move_or_drop_chat(
+        session, absorbed_id, survivor_id, survivor_has_tg
+    )
     await session.delete(absorbed)
     await session.flush()
-
-    if not survivor_has_tg:
-        # TG identity travels with the chat — only adopt absorbed's tg
-        # when survivor didn't have an account of its own.
-        if abs_tg_user_id is not None:
-            survivor.telegram_user_id = abs_tg_user_id
-        if abs_tg_username:
-            survivor.telegram_username = abs_tg_username
-    if not survivor.name and abs_name:
-        survivor.name = abs_name
-    survivor.notes = concat_notes(survivor.notes, abs_notes)
+    _carry_to_survivor(survivor, taken, survivor_has_tg)
 
     logger.info(
         "merged HR #%d -> #%d (vacancies=%d, messages moved=%d, dropped=%d)",

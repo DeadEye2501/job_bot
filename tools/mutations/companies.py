@@ -101,10 +101,9 @@ MUTATIONS = [
     # _create_company_row: сорвавшаяся вставка всегда зовётся гонкой
     (
         "backend/repository/companies_matching.py",
-        '                "rule_name_unique"' + CRLF
-        + "                if company.id in seen_ids" + CRLF,
-        '                "rule_name_unique"' + CRLF
-        + "                if seen_ids" + CRLF,
+        '        "rule_name_unique" if company.id in seen_ids '
+        + 'else "create_race_fallback"',
+        '        "rule_name_unique" if seen_ids else "create_race_fallback"',
     ),
     # _create_company_row: отметка «модель спрашивали» теряется
     (

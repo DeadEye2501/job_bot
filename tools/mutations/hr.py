@@ -204,8 +204,8 @@ MUTATIONS = [
     # merge_hr: чужое имя затирает своё
     (
         "backend/repository/hr_card.py",
-        "    if not survivor.name and abs_name:",
-        "    if abs_name:",
+        "    if not survivor.name and taken.name:",
+        "    if taken.name:",
     ),
     # concat_notes: разделитель между заметками пропадает
     (

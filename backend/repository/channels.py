@@ -145,34 +145,12 @@ def _percent_or_none(numerator: int, denominator: int) -> int | None:
     return int(round(numerator / denominator * 100))
 
 
-async def get_channel_detail(
-    session: AsyncSession, channel_id: int
-) -> ChannelDetail | None:
-    """Detail-pane payload: the channel itself + computed stats.
+async def _vacancies_per_day(session: AsyncSession, channel_id: int) -> float:
+    """Сколько вакансий в день канал приносит в последнем окне.
 
-    Two queries: one for the channel row, one GROUP BY status to compute
-    counts. Per-day rate is a separate windowed COUNT(*) over the last
-    30 days. KPI ratios come from the lifetime status_counts.
+    Окно своё, а не «за всё время»: канал, замолчавший полгода назад,
+    иначе выглядел бы таким же живым, как вчерашний.
     """
-    ch = await session.get(TelegramChannel, channel_id)
-    if ch is None:
-        return None
-
-    counts_by_enum = await count_by_status(
-        session, Vacancy.source_channel_id == channel_id
-    )
-
-    total = sum(counts_by_enum.values())
-    fit_total = sum(
-        n for s, n in counts_by_enum.items() if s not in FIT_EXCLUDE
-    )
-    applied_total = sum(
-        n for s, n in counts_by_enum.items() if s in APPLIED
-    )
-    responded_total = sum(
-        n for s, n in counts_by_enum.items() if s in RESPONDED
-    )
-
     since = datetime.now(timezone.utc) - timedelta(days=_CHANNEL_RATE_WINDOW_DAYS)
     recent_count = int(
         (
@@ -185,25 +163,63 @@ async def get_channel_detail(
             )
         ).scalar_one()
     )
-    vacancies_per_day = round(recent_count / _CHANNEL_RATE_WINDOW_DAYS, 1)
+    return round(recent_count / _CHANNEL_RATE_WINDOW_DAYS, 1)
 
-    status_counts = {
-        status.value: count for status, count in counts_by_enum.items()
-    }
 
-    blacklist_value = await _channel_blacklist_value(session, ch)
+async def _channel_stats(
+    session: AsyncSession, channel_id: int, counts_by_enum: dict
+) -> ChannelStats:
+    """Числа карточки канала: разбивка по статусам, темп и три доли.
 
+    Доли считаются одна от другой, ступенями воронки: годные от всех,
+    отклики от годных, ответы от откликов — каждая отвечает на свой вопрос
+    о канале, и общий знаменатель смазал бы все три. Считаются они за всё
+    время, а темп — за окно: доли говорят, каков канал вообще, темп — жив
+    ли он сейчас.
+    """
+    per_day = await _vacancies_per_day(session, channel_id)
+    total = sum(counts_by_enum.values())
+    fit_total = sum(
+        n for s, n in counts_by_enum.items() if s not in FIT_EXCLUDE
+    )
+    applied_total = sum(
+        n for s, n in counts_by_enum.items() if s in APPLIED
+    )
+    responded_total = sum(
+        n for s, n in counts_by_enum.items() if s in RESPONDED
+    )
+    return ChannelStats(
+        status_counts={
+            status.value: count for status, count in counts_by_enum.items()
+        },
+        total=total,
+        vacancies_per_day=per_day,
+        fit_percent=_percent_or_none(fit_total, total),
+        apply_percent=_percent_or_none(applied_total, fit_total),
+        response_percent=_percent_or_none(responded_total, applied_total),
+    )
+
+
+async def get_channel_detail(
+    session: AsyncSession, channel_id: int
+) -> ChannelDetail | None:
+    """Detail-pane payload: the channel itself + computed stats.
+
+    Запросов четыре: сама строка канала, разбивка по статусам одной
+    группировкой, окно темпа (:func:`_channel_stats`) и отметка чёрного
+    списка.
+    """
+    ch = await session.get(TelegramChannel, channel_id)
+    if ch is None:
+        return None
+    counts_by_enum = await count_by_status(
+        session, Vacancy.source_channel_id == channel_id
+    )
+    stats = await _channel_stats(session, channel_id, counts_by_enum)
     return ChannelDetail(
         channel=ch,
-        stats=ChannelStats(
-            status_counts=status_counts,
-            total=total,
-            vacancies_per_day=vacancies_per_day,
-            fit_percent=_percent_or_none(fit_total, total),
-            apply_percent=_percent_or_none(applied_total, fit_total),
-            response_percent=_percent_or_none(responded_total, applied_total),
-        ),
-        blacklist_value=blacklist_value,
+        stats=stats,
+        blacklist_value=await _channel_blacklist_value(session, ch),
     )
 
 

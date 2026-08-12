@@ -14,6 +14,13 @@ from backend.repository.blacklist_marks import active_mark_of
 logger = logging.getLogger(__name__)
 
 BlacklistOutcome = Literal["created", "reactivated", "already_active"]
+"""Чем кончилось добавление в список.
+
+Исход назван словом, а не признаком «завели ли»: карточка HR, компании и
+канала говорит о трёх случаях по-разному («добавлен», «возвращён», «уже в
+списке»), и признаком из двух значений средний не выражается. Экран чёрного
+списка читает из этого только «завели ли» — ему хватало и прежнего признака.
+"""
 
 
 async def set_blacklist_active(
@@ -126,6 +133,58 @@ async def update_blacklist(
     return True
 
 
+async def _same_entry(
+    session: AsyncSession, kind: str, value: str
+) -> Blacklist | None:
+    """Уже заведённая строка с тем же родом и значением."""
+    return (
+        await session.scalars(
+            select(Blacklist).where(
+                Blacklist.kind == kind, Blacklist.value == value
+            )
+        )
+    ).first()
+
+
+def _reuse_existing(existing: Blacklist, reason: str | None) -> BlacklistOutcome:
+    """Поднять уже заведённую строку и сказать, чем это кончилось.
+
+    Снятая строка возвращается в список, поднятая остаётся как была.
+    Причина дописывается только в пустое: у строки, заведённой раньше,
+    объяснение уже своё, и затирать его новым нельзя.
+    """
+    outcome: BlacklistOutcome = "already_active"
+    if not existing.active:
+        existing.active = True
+        outcome = "reactivated"
+        logger.info(
+            "Blacklist reactivated id=%d kind=%s value=%r",
+            existing.id,
+            existing.kind,
+            existing.value,
+        )
+    if reason and not existing.reason:
+        existing.reason = reason
+    return outcome
+
+
+async def _insert_blacklist(
+    session: AsyncSession, kind: str, value: str, reason: str | None
+) -> Blacklist:
+    """Завести новую строку списка — сразу действующую."""
+    row = Blacklist(kind=kind, value=value, reason=reason, active=True)
+    session.add(row)
+    await session.flush()
+    logger.info(
+        "Blacklist created id=%d kind=%s value=%r reason=%r",
+        row.id,
+        kind,
+        value,
+        reason,
+    )
+    return row
+
+
 async def create_blacklist(
     session: AsyncSession,
     *,
@@ -135,17 +194,8 @@ async def create_blacklist(
 ) -> tuple[Blacklist, BlacklistOutcome]:
     """Insert a blacklist row, дедупликация по (kind, value).
 
-    Если строка с теми же (kind, value) уже есть:
-    - active=True → возвращаем её как есть, "already_active"
-    - active=False → ре-активируем и возвращаем, "reactivated"
-
-    Иначе вставляем новую с active=True, "created".
-
-    Исход назван словом, а не признаком «завели ли»: карточка HR, компании
-    и канала говорит о трёх случаях по-разному («добавлен», «возвращён»,
-    «уже в списке»), и признаком из двух значений средний не выражается.
-    Экран чёрного списка читает из этого только «завели ли» — ему хватало
-    и прежнего признака.
+    Если строка с теми же (kind, value) уже есть — она и возвращается, с
+    исходом от :func:`_reuse_existing`; иначе вставляется новая, активная.
 
     Returns (row, outcome). Caller wraps in ``session.begin()``.
     """
@@ -155,45 +205,12 @@ async def create_blacklist(
         raise BlacklistUpdateError("Тип обязателен.")
     normalized_reason = _optional_reason(reason)
 
-    existing = (
-        await session.scalars(
-            select(Blacklist).where(
-                Blacklist.kind == normalized_kind,
-                Blacklist.value == normalized_value,
-            )
-        )
-    ).first()
+    existing = await _same_entry(session, normalized_kind, normalized_value)
     if existing is not None:
-        outcome: BlacklistOutcome = "already_active"
-        if not existing.active:
-            existing.active = True
-            outcome = "reactivated"
-            logger.info(
-                "Blacklist reactivated id=%d kind=%s value=%r",
-                existing.id,
-                normalized_kind,
-                normalized_value,
-            )
-        if normalized_reason and not existing.reason:
-            existing.reason = normalized_reason
-        return existing, outcome
-
-    row = Blacklist(
-        kind=normalized_kind,
-        value=normalized_value,
-        reason=normalized_reason,
-        active=True,
-    )
-    session.add(row)
-    await session.flush()
-    logger.info(
-        "Blacklist created id=%d kind=%s value=%r reason=%r",
-        row.id,
-        normalized_kind,
-        normalized_value,
-        normalized_reason,
-    )
-    return row, "created"
+        return existing, _reuse_existing(existing, normalized_reason)
+    return await _insert_blacklist(
+        session, normalized_kind, normalized_value, normalized_reason
+    ), "created"
 
 
 async def delete_blacklist(
