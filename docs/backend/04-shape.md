@@ -45,25 +45,55 @@
 **Потом длина.** Пункт 13 — семь тел свыше 150 строк — берётся по одному: у
 двухсотстрочной функции свой дифф и свой риск.
 
-- [ ] **Е. Замер заново** — пункт 12. Числа сняты 11 августа, заходы А–Д часть
-      тел укоротят; по свежему списку правятся галочки Ж–Р
-- [ ] **Ж. `repository/vacancies_list.list_vacancies`** — 213 строк, 17 доводов
-- [ ] **З. `repository/companies_matching.find_or_create_company`** — 199
-- [ ] **И. `repository/stats_pipeline.get_stats_channels_pipeline`** — 189
-- [ ] **К. `bot/send.send`** — 180
-- [ ] **Л. `flows/dm.process_dm`** — 177
-- [ ] **М. `flows/parse.parse_and_update_vacancy`** — 165
-- [ ] **Н. `flows/dm_backfill.backfill_hr_dm_history`** — 150, 9 доводов
-- [ ] **О. 100–149 строк, девять штук** — пункт 14, по двое-трое, группируя по
-      модулю
-- [ ] **П. 60–99 строк, двадцать две штуки** — пункт 15, заходом на модуль, а не
-      на функцию
-- [ ] **Р. 41–59 строк, тридцать три штуки** — пункт 15, тем же порядком,
-      пачками по модулю
+- [x] **Е. Замер заново** — пункт 12. Числа сняты 12 августа после заходов
+      А–Д; по свежему списку развёрнуты галочки Ж–Ш
 
-**О, П и Р — группы, а не заходы.** Замер (Е) разворачивает каждую в галочку на
-заход: пункт, который не закрывается за три подхода, роняет охрану нонстопа
-досрочно — значит это не пункт, а несколько.
+*Свыше 150 строк — пять тел, каждое своим заходом.*
+
+- [ ] **Ж. `repository/companies_matching.find_or_create_company`** — 199 строк
+- [ ] **З. `repository/vacancies_list.list_vacancies`** — 186 строк, 17 доводов
+- [ ] **И. `repository/stats_pipeline.get_stats_channels_pipeline`** — 179
+- [ ] **К. `bot/send.send`** — 172 строки, 6 доводов
+- [ ] **Л. `flows/dm_backfill.backfill_hr_dm_history`** — 153 строки, 9 доводов
+
+*100–149 строк — девять тел, заходом на слой.*
+
+- [ ] **М. Конвейер:** `flows/dm.process_dm` 139, `flows/parse.parse_and_update_vacancy`
+      139, `flows/apply.send_application` 136
+- [ ] **Н. Модель:** `llm/cover_letter.generate_cover_letter` 138,
+      `llm/fit.validate_vacancy_fit` 106
+- [ ] **О. Бот:** `bot/loop.run` 137, `bot/client.__init__` 135 — второе
+      конструктор, там разнимается сборка, а не логика
+- [ ] **П. Репозиторий:** `repository/hr_list.list_hr_with_counts` 122,
+      `repository/stats_summary.get_stats_hr_responses` 111
+
+*60–99 строк — двадцать два тела, пачками по модулю.*
+
+- [ ] **Р. `repository/profile.py`** (99, 66, 61) и **`stats_summary.py`** (81, 66)
+- [ ] **С. Репозиторий, остальное:** `vacancies_life` 96, `companies_matching` 75,
+      `hr_card` 71, `blacklist` 68, `channels` 60
+- [ ] **Т. Конвейер:** `pipeline.__init__` 97, `rerun` 90, `dm_classify` (68, 63),
+      `parse._persist_parse_outcome` 64, `ingest` 63
+- [ ] **У. Модель и края:** `bot/updates.on_dm_delete` 92, `adapters/lm_studio.chat`
+      76, `llm/company` 70, `llm/hr_reply` 70, `llm/vacancy` (67, 62)
+
+*41–59 строк — двадцать восемь тел, тем же порядком.*
+
+- [ ] **Ф. Карточки репозитория:** `hr_card` 54, `companies_card` (50, 43),
+      `vacancies_card` (45, 43)
+- [ ] **Х. Перечни и жизнь:** `vacancies_life` (47, 43), `profile` 59,
+      `vacancies_list` 54, `messages` 52, `channels` 46, `companies_list` 41
+- [ ] **Ц. Конвейер:** `dm_backfill.catch_up_missed_dms` 58, `rerun` 57,
+      `apply` 51, `channels` (50, 43), `dm.persist_outgoing_dm` 48, `ingest` 45
+- [ ] **Ч. Бот и учётная запись:** `bot/chat.send_to_hr_media` 57,
+      `telegram_login` (48, 45), `bot/slot` 42, `runtime_settings.set_tg` 42
+- [ ] **Ш. Модель и правила:** `llm/factcheck` 59, `llm/hallucination` 54,
+      `domain/scoring` 44, `llm/skills` 42
+
+**Заход Е закрыт 12.08.2026, и группы развёрнуты по его числам.** Пункт, который
+не закрывается за три подхода, роняет охрану нонстопа досрочно — значит это не
+пункт, а несколько; поэтому в заходе от четырёх до семи тел и все они из одного
+слоя, а свыше полутора сотен строк каждое идёт своим.
 
 ### Почему порядок такой
 
@@ -383,12 +413,14 @@ Telegram не нужен вовсе. Ребро при этом верное (`l
 # Длина и доводы
 
 Правило 5 манифеста: функция — 40 строк, 3 уровня вложенности, 4 довода. Больше —
-разнимать. Замер 11 августа 2026 по `backend/`, `adapters/`, `main.py`:
-**71 функция длиннее сорока строк** и **32 функции с более чем четырьмя
-доводами**, худшая — семнадцать.
+разнимать. Замер 12 августа 2026 по `backend/`, `adapters/`, `main.py`, после
+заходов А–Д: **64 функции длиннее сорока строк** и **34 функции с более чем
+четырьмя доводами**, худшая — семнадцать.
 
-Старая роадмапа называла 128 и 29: первое число измерено до разбиения больших
-файлов и с тех пор упало почти вдвое.
+Числа 11 августа были 71 и 32; исходная роадмапа называла 128 и 29. Первое
+падало дважды — на разбиении больших файлов и на заходах этого этапа, — а
+второе слегка выросло: сведения заводят объявления с доводами вместо прежних
+запросов по месту.
 
 ## Соглашение по доводам — принято человеком
 
@@ -399,66 +431,61 @@ Telegram не нужен вовсе. Ребро при этом верное (`l
 По этому правилу `Bot.send` свёртке **не подлежит**: шесть его доводов — шесть
 разных живых вещей. Он чинится разниманием тела.
 
-## 12. Замер заново
+## 12. Замер заново — сделан
 
-Числа ниже сняты 11 августа; заходы А–Д укоротят часть тел, и брать в работу
-надо свежий список, а не этот. По нему же правятся галочки Ж–Р, и три
-последние — группы — разворачиваются в галочку на заход.
+*Заход Е закрыт 12.08.2026.* Числа ниже сняты после А–Д, галочки Ж–Ш развёрнуты
+по ним. Разнимание — единственная часть плана, где дробить **по одной** бывает
+правильно: у двухсотстрочной функции свой дифф и свой риск. У мелочи (41–59
+строк) это чистая переплата за обвязку, и она берётся пачками по модулю.
 
-Разнимание — единственная часть плана, где дробить **по одной** бывает правильно:
-у двухсотстрочной функции свой дифф и свой риск. Но у мелочи (41–59 строк) это
-чистая переплата за обвязку, и она берётся пачками по модулю.
-
-## 13. Свыше 150 строк — семь штук, каждая своим заходом
+## 13. Свыше 150 строк — пять, каждая своим заходом
 
 | Функция | Строк | Доводов |
 |---|---|---|
-| `repository/vacancies_list.py list_vacancies` | 213 | 17 |
 | `repository/companies_matching.py find_or_create_company` | 199 | 5 |
-| `repository/stats_pipeline.py get_stats_channels_pipeline` | 189 | — |
-| `bot/send.py send` | 180 | 6 |
-| `flows/dm.py process_dm` | 177 | 6 |
-| `flows/parse.py parse_and_update_vacancy` | 165 | 5 |
-| `flows/dm_backfill.py backfill_hr_dm_history` | 150 | 9 |
+| `repository/vacancies_list.py list_vacancies` | 186 | 17 |
+| `repository/stats_pipeline.py get_stats_channels_pipeline` | 179 | 2 |
+| `bot/send.py send` | 172 | 6 |
+| `flows/dm_backfill.py backfill_hr_dm_history` | 153 | 9 |
 
-`list_vacancies` — худшая по обоим измерениям разом, и семнадцать доводов у неё
-**группа настоящая**: это отбор списка вакансий, то есть кандидат на свёртку, а
-не на разнимание.
+`process_dm` (177 → 139) и `parse_and_update_vacancy` (165 → 139) из этой
+семёрки выбыли: первую укоротил этап 3, вторую — заход Г, разделивший запись
+исхода разбора. Ровно то, ради чего длина и стояла последней.
+
+`list_vacancies` — худшая по доводам, и семнадцать у неё **группа настоящая**:
+это отбор списка вакансий, то есть кандидат на свёртку, а не на разнимание.
 
 ## 14. 100–149 строк — девять штук
 
-`flows/apply.py send_application` 148 · `llm/cover_letter.py
-generate_cover_letter` 138 · `bot/loop.py run` 137 · `bot/client.py __init__` 135
-· `repository/hr_list.py list_hr_with_counts` 128 · `llm/fit.py
-validate_vacancy_fit` 113 · `repository/stats_summary.py get_stats_hr_responses`
-108 · `bot/updates.py on_dm_delete` 102 · `repository/profile.py save_parsed_cv`
-101.
+`flows/dm.py process_dm` 139 · `flows/parse.py parse_and_update_vacancy` 139 ·
+`llm/cover_letter.py generate_cover_letter` 138 · `bot/loop.py run` 137 ·
+`flows/apply.py send_application` 136 · `bot/client.py __init__` 135 ·
+`repository/hr_list.py list_hr_with_counts` 122 · `repository/stats_summary.py
+get_stats_hr_responses` 111 · `llm/fit.py validate_vacancy_fit` 106.
 
 `bot/client.py __init__` на 135 строк и `flows/pipeline.py __init__` на 97 — оба
 конструктора; там разнимается не логика, а сборка, и это отдельный разговор.
 
-## 15. 41–99 строк — пятьдесят пять штук
+## 15. 41–99 строк — пятьдесят штук
 
-**60–99, двадцать две:** `flows/pipeline.py __init__` 97 ·
-`repository/vacancies_life.py mark_ghosted_vacancies` 96 · `flows/rerun.py
-rerun_pipeline_for_vacancy` 88 · `flows/parse.py _persist_parse_outcome` 85 ·
-`flows/dm_classify.py classify_and_apply_for_hr` 84 ·
-`repository/stats_summary.py get_stats_kpi` 81 ·
-`repository/companies_matching.py _create_company_row` 75 ·
-`repository/blacklist.py create_blacklist` 72 · `llm/company.py
-dedupe_company_with_llm` 72 · `repository/hr_card.py merge_hr` 71 ·
-`llm/hr_reply.py classify_hr_reply` 70 · `llm/vacancy.py parse_vacancy` 69 ·
-`repository/channels.py get_channel_detail` 68 · `repository/profile.py
-save_experience` 67, `build_profile_block` 67 · `repository/stats_summary.py
-get_stats_skills` 66 · `flows/dm_classify.py cancel_pending_dm_classifications`
-63 · `flows/ingest.py ingest_post` 63 · `llm/vacancy.py _parse_vacancy_json` 63 ·
-`llm/factcheck.py factcheck_cover_letter` 62 · `repository/vacancies_list.py
-list_vacancy_filter_options` 62 · `repository/profile.py save_skills` 61.
+**60–99, двадцать две:** `repository/profile.py save_parsed_cv` 99 ·
+`flows/pipeline.py __init__` 97 · `repository/vacancies_life.py
+mark_ghosted_vacancies` 96 · `bot/updates.py on_dm_delete` 92 · `flows/rerun.py
+rerun_pipeline_for_vacancy` 90 · `repository/stats_summary.py get_stats_kpi` 81 ·
+`adapters/lm_studio.py chat` 76 · `repository/companies_matching.py
+_create_company_row` 75 · `repository/hr_card.py merge_hr` 71 · `llm/company.py
+dedupe_company_with_llm` 70 · `llm/hr_reply.py classify_hr_reply` 70 ·
+`flows/dm_classify.py classify_and_apply_for_hr` 68 · `repository/blacklist.py
+create_blacklist` 68 · `llm/vacancy.py parse_vacancy` 67 ·
+`repository/profile.py save_experience` 66, `repository/stats_summary.py
+get_stats_skills` 66 · `flows/parse.py _persist_parse_outcome` 64 ·
+`flows/dm_classify.py cancel_pending_dm_classifications` 63 · `flows/ingest.py
+ingest_post` 63 · `llm/vacancy.py _parse_vacancy_json` 62 ·
+`repository/profile.py save_skills` 61 · `repository/channels.py
+get_channel_detail` 60.
 
-**41–59, тридцать три:** по одной строке на заход их не берут — собираются
-пачками по модулю: `flows/channels.py` (три), `repository/vacancies_card.py`
-(две), `repository/companies_card.py` (две), `telegram_login.py` (две) и так
-далее.
+**41–59, двадцать восемь:** по одной строке на заход их не берут — собираются
+пачками по модулю и по слою, как расписано в галочках Ф–Ш.
 
 ## Многодоводные сверх названных
 
@@ -474,14 +501,15 @@ list_vacancy_filter_options` 62 · `repository/profile.py save_skills` 61.
 
 ## Признак, стоящий рядом
 
-**`E402` — импорт после кода:** `adapters/telegram.py:49`. Директивой не чинится;
+**`E402` — импорт после кода:** `adapters/telegram.py:49` и `main.py:81`.
+Директивой не чинится;
 почти всегда означает, что модуль держит и общее, и поверхность сразу. Смотреть
 вместе с разниманием, а не отдельно.
 
 ## Как мерить
 
-Ruff считает не то же самое, и его числа ниже: `C901` 16, `PLR0912` 10,
-`PLR0913` 9 (порог у него пять доводов, а не четыре), `PLR0915` 6. Мерять по
+Ruff считает не то же самое, и его числа ниже (замер 12.08.2026): `C901` 14, `PLR0912` 9,
+`PLR0913` 9 (порог у него пять доводов, а не четыре), `PLR0915` 4. Мерять по
 манифесту — длиной тела и числом доводов; ruff держит только прирост и
 проваливает пятый довод.
 
