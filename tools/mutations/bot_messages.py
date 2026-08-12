@@ -50,20 +50,20 @@ MUTATIONS = [
     # send: заглушенная отправка всё равно пишет сообщение в переписку
     (
         "backend/bot/send.py",
-        "            if not suppressed:" + CRLF + "                session.add(",
-        "            if True:" + CRLF + "                session.add(",
+        "        if not outcome.suppressed:" + CRLF + "            session.add(",
+        "        if True:" + CRLF + "            session.add(",
     ),
     # send: срок запрета не запоминается
     (
         "backend/bot/send.py",
-        '                    "flood_wait_until_ts", str(until)',
-        '                    "flood_wait_until_ts", "0"',
+        '        await bot._rs.set_app("flood_wait_until_ts", str(_time.time() + secs))',
+        '        await bot._rs.set_app("flood_wait_until_ts", "0")',
     ),
     # send: удачная отправка запомненный запрет не снимает
     (
         "backend/bot/send.py",
-        "    if not suppressed and bot._rs.flood_wait_until_ts > 0:",
-        "    if False:",
+        "    if bot._rs.flood_wait_until_ts <= 0:" + CRLF + "        return" + CRLF,
+        "    if True:" + CRLF + "        return" + CRLF,
     ),
     # send: ручная отправка перестаёт отличаться от авто
     (
@@ -83,11 +83,8 @@ MUTATIONS = [
     # send: запасная перестановка статуса пропадает
     (
         "backend/bot/send.py",
-        "                    if await mark_vacancy_applied(" + CRLF
-        + "                        session, vacancy_id, _applied_label(force), force=force"
-        + CRLF
-        + "                    ):" + CRLF,
-        "                    if False:" + CRLF,
+        "            if await mark_vacancy_applied(" + CRLF,
+        "            if False and await mark_vacancy_applied(" + CRLF,
     ),
     # send: отметка о заглушенной отправке врёт
     (
