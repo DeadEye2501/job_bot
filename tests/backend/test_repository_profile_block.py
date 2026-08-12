@@ -7,7 +7,7 @@
 
 from datetime import date
 
-from backend.repository.profile import build_profile_block
+from backend.repository.profile_block import build_profile_block
 from tests.dbio import put
 from tests.factories import experience_row, profile_row, profile_skill_row
 
