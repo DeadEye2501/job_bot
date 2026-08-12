@@ -10,13 +10,13 @@ MUTATIONS = [
     # validate_vacancy_fit: вакансия уходит без блока данных
     (
         "backend/llm/fit.py",
-        "        + wrap_external(vacancy_block)",
+        "        + wrap_external(_vacancy_block(parsed, raw_text))",
         "        + vacancy_block",
     ),
     # generate_cover_letter: сведения о вакансии уходят без блока данных
     (
         "backend/llm/cover_letter.py",
-        "        + wrap_external(vacancy_block)",
+        "                    + wrap_external(vacancy_block)",
         "        + vacancy_block",
     ),
     # factcheck_cover_letter: данные для сверки уходят без блока
@@ -28,8 +28,8 @@ MUTATIONS = [
     # validate_vacancy_fit: за блоком данных возвращается подделываемая рамка
     (
         "backend/llm/fit.py",
-        '        + "\\n\\n"' + CRLF + '        "Верни JSON',
-        '        + "\\n\\n=== КОНЕЦ ВАКАНСИИ ===\\n"' + CRLF + '        "Верни JSON',
+        '        + "\\n\\nВерни JSON',
+        '        + "\\n\\n=== КОНЕЦ ВАКАНСИИ ===\\nВерни JSON',
     ),
     # wrap_external: блок данных не ставится вовсе
     (
@@ -324,19 +324,19 @@ MUTATIONS = [
     # validate_vacancy_fit: вердикт «подходит» тоже проверяется на выдуманность
     (
         "backend/llm/fit.py",
-        '        parsed_validation.verdict in ("reject", "trash")',
+        '    if validation.verdict not in ("reject", "trash") or validation.reason is None:',
         "        parsed_validation.verdict is not None",
     ),
     # validate_vacancy_fit: мусор переворачивается в «подходит»
     (
         "backend/llm/fit.py",
-        '            if parsed_validation.verdict == "reject":',
+        '    if validation.verdict == "reject":',
         "            if True:",
     ),
     # validate_vacancy_fit: у мусора остаётся выдуманное обоснование
     (
         "backend/llm/fit.py",
-        '            return FitValidation(verdict="trash", reason=None)',
+        '    return FitValidation(verdict="trash", reason=None)',
         "            return parsed_validation",
     ),
     # dedupe_company_with_llm: пустой список кандидатов идёт к модели
@@ -390,7 +390,7 @@ MUTATIONS = [
     # generate_cover_letter: заготовки промпта не подставляются
     (
         "backend/llm/cover_letter.py",
-        '    text = raw_text.replace("{title}", title_value).replace("{channel}", channel_value)',
+        '    return raw_text.replace("{title}", title_value).replace(',
         "    text = raw_text",
     ),
     # generate_cover_letter: скобки в названии вакансии не вычищаются
@@ -402,38 +402,38 @@ MUTATIONS = [
     # generate_cover_letter: предел подписи поднят
     (
         "backend/llm/cover_letter.py",
-        "    too_many_chars = len(text) > 1024 if text else False",
-        "    too_many_chars = len(text) > 4096 if text else False",
+        "    if len(text) > 1024:",
+        "    if len(text) > 4096:",
     ),
     # generate_cover_letter: оставшиеся заготовки перестают отвергаться
     (
         "backend/llm/cover_letter.py",
-        '    has_bracket_placeholder = any(ch in text for ch in "[]{}")',
-        "    has_bracket_placeholder = False",
+        '    if any(ch in text for ch in "[]{}") or _TEMPLATE_PLACEHOLDER_RE.search(text):',
+        "    if False:",
     ),
     # generate_cover_letter: утечка углового шаблона перестаёт отвергаться
     (
         "backend/llm/cover_letter.py",
-        "    has_template_leak = bool(_TEMPLATE_PLACEHOLDER_RE.search(text))",
-        "    has_template_leak = False",
+        '    if _ATTACHMENT_RE.search(text):' + CRLF + '        return "поминает вложение"' + CRLF,
+        "    if False:" + CRLF + '        return "поминает вложение"' + CRLF,
     ),
     # generate_cover_letter: оборванное письмо отправляется
     (
         "backend/llm/cover_letter.py",
-        '    truncated = finish_reason == "length" and bool(text) and text[-1] not in ".!?…"',
+        '    if finish_reason == "length" and text[-1] not in ".!?…":',
         "    truncated = False",
     ),
     # generate_cover_letter: успевшее закончиться письмо считается оборванным
     (
         "backend/llm/cover_letter.py",
-        'and bool(text) and text[-1] not in ".!?…"',
-        "and bool(text)",
+        '    if finish_reason == "length" and text[-1] not in ".!?…":',
+        '    if finish_reason == "length":',
     ),
-    # generate_cover_letter: упоминание вложения перестаёт отвергаться
+    # generate_cover_letter: пустое письмо перестаёт отвергаться
     (
         "backend/llm/cover_letter.py",
-        "    mentions_attachment = bool(text and _ATTACHMENT_RE.search(text))",
-        "    mentions_attachment = False",
+        "    if not text:" + CRLF + '        return "пусто"' + CRLF,
+        "    if False:" + CRLF + '        return "пусто"' + CRLF,
     ),
     # generate_cover_letter: сверка фактов перестаёт влиять на исход
     (
