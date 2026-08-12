@@ -8,7 +8,7 @@
 
 - **UI** — PySide6 + QWebEngineView, фронт на чистом HTML/JS (`client/web/main.html`, `wizard.html`).
 - **Bridge** — `client/bridge.py`, два QObject (`WizardApi` для онбординга, `MainApi` для основного режима), общаются с JS через QWebChannel.
-- **Бот** — `backend/bot.py`, Pyrogram-клиент в фоновом asyncio-loop, цикл опроса каналов в `backend/flows.py`.
+- **Бот** — `backend/bot/`, Pyrogram-клиент в фоновом asyncio-loop, цикл опроса каналов в `backend/flows/`.
 - **БД** — SQLite через async SQLAlchemy + Alembic-миграции. Креды (api_hash, password, session_string) шифруются через `cryptography` Fernet, ключ хранится в OS keyring.
 - **LLM-адаптер** — `adapters/lm_studio.py`, OpenAI-совместимый. Используется и для chat-моделей (парсинг/классификация), и для embedding-моделей (similarity).
 
