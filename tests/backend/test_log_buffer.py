@@ -1,4 +1,8 @@
-"""Следствия, которые наблюдают тесты `backend/log_buffer.py`.
+"""Следствия, которые наблюдают тесты журналирования.
+
+Трое соседей по слою: кольцо записей для окна (`log_buffer`), вымарывание
+секретов вместе с жалобой на свою беду (`log_secrets`) и файл журнала
+(`log_file`).
 
 Корневой logger — общее состояние процесса: каждый тест, который его трогает,
 возвращает как было, иначе следующий тест видит чужие обработчики.
@@ -12,14 +16,9 @@ import pytest
 
 from config import get_log_path
 
-from backend.log_buffer import (
-    MAX_RECORDS,
-    LogBufferHandler,
-    LogFileHandler,
-    SecretRedactionFilter,
-    install,
-    install_secret_filter,
-)
+from backend.log_buffer import MAX_RECORDS, LogBufferHandler, install
+from backend.log_file import LogFileHandler
+from backend.log_secrets import SecretRedactionFilter, install_secret_filter
 
 
 @pytest.fixture
@@ -433,7 +432,7 @@ def test_a_template_that_cannot_be_read_does_not_break_the_caller():
 
 def test_an_unavailable_file_is_reported_to_the_stream(monkeypatch, capsys, tmp_path):
     """Когда и файл недоступен, беда уходит в поток ошибок."""
-    monkeypatch.setattr("backend.log_buffer.get_log_path", lambda: tmp_path)
+    monkeypatch.setattr("backend.log_secrets.get_log_path", lambda: tmp_path)
 
     LogBufferHandler().emit(_unbuildable())
 
@@ -450,7 +449,7 @@ def test_nothing_blows_up_when_there_is_nowhere_to_complain(
     Каталог на месте файла плюс оконная сборка, где потока ошибок нет: это
     последний рубеж, и дальше него жаловаться правда некуда.
     """
-    monkeypatch.setattr("backend.log_buffer.get_log_path", lambda: tmp_path)
+    monkeypatch.setattr("backend.log_secrets.get_log_path", lambda: tmp_path)
     monkeypatch.setattr(sys, "stderr", None)
 
     LogBufferHandler().emit(_unbuildable())
