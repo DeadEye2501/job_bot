@@ -34,28 +34,28 @@ MUTATIONS = [
     # _ever_in: вакансия считается столько раз, сколько раз переходила
     (
         "backend/repository/stats_summary.py",
-        "            select(func.count(func.distinct(VacancyStatusHistory.vacancy_id)))" + CRLF,
-        "            select(func.count(VacancyStatusHistory.vacancy_id))" + CRLF,
+        "        select(func.count(func.distinct(VacancyStatusHistory.vacancy_id)))" + CRLF,
+        "        select(func.count(VacancyStatusHistory.vacancy_id))" + CRLF,
     ),
     # _ever_in: в ступени воронки попадают неразобранные вакансии
     (
         "backend/repository/stats_summary.py",
-        "            .join(Vacancy, Vacancy.id == VacancyStatusHistory.vacancy_id)" + CRLF
-        + "            .where(status_cond(statuses), *base_filter)" + CRLF,
-        "            .where(status_cond(statuses))" + CRLF,
+        "        .join(Vacancy, Vacancy.id == VacancyStatusHistory.vacancy_id)" + CRLF
+        + "        .where(status_cond(statuses), PARSED_ONLY)" + CRLF,
+        "        .where(status_cond(statuses))" + CRLF,
     ),
     # _first_in_period: в прибавку за период попадают неразобранные
     (
         "backend/repository/stats_summary.py",
-        "                .join(Vacancy, Vacancy.id == sub.c.vid)" + CRLF
-        + "                .where(sub.c.first_at >= since, *base_filter)" + CRLF,
-        "                .where(sub.c.first_at >= since)" + CRLF,
+        "        .join(Vacancy, Vacancy.id == sub.c.vid)" + CRLF
+        + "        .where(sub.c.first_at >= since, PARSED_ONLY)" + CRLF,
+        "        .where(sub.c.first_at >= since)" + CRLF,
     ),
-    # get_stats_kpi: «в работе» перестаёт считать тестовые задания
+    # _IN_PROGRESS: «в работе» перестаёт считать тестовые задания
     (
         "backend/repository/stats_summary.py",
-        "    in_progress_set = {VacancyStatus.INVITATION, VacancyStatus.TEST}",
-        "    in_progress_set = {VacancyStatus.INVITATION}",
+        "_IN_PROGRESS = frozenset({VacancyStatus.INVITATION, VacancyStatus.TEST})",
+        "_IN_PROGRESS = frozenset({VacancyStatus.INVITATION})",
     ),
     # first_transition_subq: прибавка считается по последнему переходу.
     # Подзапрос сведён из двух копий, и цель у него теперь одна — гонять
@@ -65,17 +65,17 @@ MUTATIONS = [
         '            func.min(VacancyStatusHistory.changed_at).label("first_at"),',
         '            func.max(VacancyStatusHistory.changed_at).label("first_at"),',
     ),
-    # get_stats_kpi: прибавка к общему счётчику не отсекается окном
+    # _kpi_deltas: прибавка к общему счётчику не отсекается окном
     (
         "backend/repository/stats_summary.py",
-        "        period_filter = [*base_filter, Vacancy.created_at >= since]",
-        "        period_filter = [*base_filter]",
+        "            .where(PARSED_ONLY, Vacancy.created_at >= since)",
+        "            .where(PARSED_ONLY)",
     ),
-    # get_stats_kpi: прибавки считаются и за всё время
+    # _kpi_deltas: прибавки считаются и за всё время
     (
         "backend/repository/stats_summary.py",
-        "    if since is not None:" + CRLF + "        period_filter = [*base_filter",
-        "    if True:" + CRLF + "        period_filter = [*base_filter",
+        "    if since is None:" + CRLF + "        return {" + CRLF,
+        "    if False:" + CRLF + "        return {" + CRLF,
     ),
     # get_stats_status_breakdown: недоразобранные попадают в разбивку
     (
@@ -113,8 +113,8 @@ MUTATIONS = [
     # get_stats_skills: порог перестаёт отсекать редкое
     (
         "backend/repository/stats_summary.py",
-        "        if cnt < min_count:" + CRLF + "            continue" + CRLF,
-        "",
+        "        if cnt >= min_count" + CRLF,
+        "        if True" + CRLF,
     ),
     # get_stats_skills: порядок теряет разрешитель по названию
     (
