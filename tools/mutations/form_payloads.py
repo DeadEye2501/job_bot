@@ -4,12 +4,12 @@
 развёрткой словаря, и переименованный ключ роняет форму у пользователя,
 ничего не записав. Отсюда цели на сами ключи, а не только на правила.
 
-Где поломка захватывает конец строки, перевод берётся из `EOL`. У этого
-файла он свой: `client/` лежит в дереве с переводами в один знак, а
-`backend/` — в два, и общей постоянной на все наборы тут нет.
+Где поломка захватывает конец строки, перевод берётся из `EOL`. В хранилище
+этот файл лежит с переводами в один знак, а в рабочем дереве — в два: их
+ставит сам git при выгрузке, и набор читает именно дерево.
 """
 
-EOL = "\n"
+EOL = "\r\n"
 
 MUTATIONS = [
     # read_new_hr_fields: ник не разбирается и едет в колонку как введён
@@ -36,18 +36,18 @@ MUTATIONS = [
         '        "website": none_if_empty(payload.get("website")),',
         '        "site": none_if_empty(payload.get("website")),',
     ),
-    # read_new_company_fields: написания списком перестают читаться
+    # read_company_spellings: написания списком перестают читаться
     (
         "client/form_payloads.py",
-        "    elif not isinstance(raw_aliases, list):" + EOL
-        + "        raw_aliases = []" + EOL,
-        "    else:" + EOL + "        raw_aliases = []" + EOL,
+        "    elif not isinstance(raw, list):" + EOL
+        + "        raw = []" + EOL,
+        "    else:" + EOL + "        raw = []" + EOL,
     ),
-    # read_new_company_fields: пустое написание попадает в перечень
+    # read_company_spellings: пустое написание попадает в перечень
     (
         "client/form_payloads.py",
-        "            spelling for spelling in (str(a).strip() for a in raw_aliases) if spelling",
-        "            spelling for spelling in (str(a).strip() for a in raw_aliases)",
+        "        spelling for spelling in (str(a).strip() for a in raw) if spelling",
+        "        spelling for spelling in (str(a).strip() for a in raw)",
     ),
     # hr_is_identified: заметки сходят за способ назвать человека
     (

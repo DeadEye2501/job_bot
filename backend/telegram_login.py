@@ -53,7 +53,7 @@ async def _safe_disconnect(client) -> None:
         logger.debug("_safe_disconnect swallowed", exc_info=True)
 
 
-async def _username_of(client) -> str | None:
+async def username_of(client) -> str | None:
     """Ник вошедшего; пусто — спросить не вышло.
 
     Спрашивается, пока клиент входа ещё подключён: бот встанет позже, и его
@@ -266,7 +266,7 @@ class TelegramLogin:
         username: str | None = None
         try:
             if self._on_saved is not None:
-                username = await _username_of(client)
+                username = await username_of(client)
             session_string = await client.export_session_string()
         except Exception as e:
             logger.exception("telegram session export failed")
