@@ -2,12 +2,16 @@
 
 import logging
 
+from backend.models import Vacancy
 from backend.repository.vacancies_life import delete_vacancy as repo_delete_vacancy
+from backend.repository.vacancies_life import record_trash_event
 
 from backend.flows import embeddings
 from backend.notify import fire
 
 logger = logging.getLogger(__name__)
+
+_NO_TRASH_EVENT = object()
 
 
 async def check_ghosting_timeouts(pipeline) -> int:
@@ -41,55 +45,67 @@ async def check_ghosting_timeouts(pipeline) -> int:
     return len(affected)
 
 
-async def forget_vacancy(pipeline, vacancy_id: int) -> None:
-    """Удалить вакансию и забыть её вектор.
+async def _delete_and_forget(
+    pipeline, vacancy_id: int, *, trash_reason=_NO_TRASH_EVENT
+) -> int | None:
+    """Удалить вакансию, забыть её вектор и разбудить окно; отдать её канал.
 
-    Отличается от репозиторной тёзки ровно этим хвостом: строку удаляет
-    она же, а сверх того вычёркивается вектор из кэша отсева перепостов и
-    оповещается окно. Без вычёркивания кэш держит вектор удалённой строки,
+    Дорог к удалению две — забыть вакансию насовсем и удалить её приговором
+    «мусор», — и различие у них ровно одно: вторая до удаления оставляет
+    отметку о мусоре, иначе «канал прислал N мусора» посчитать нечем, строка
+    исчезает совсем. Часовой отличает «отметки не надо» от «отметка без
+    причины»: причина бывает и пустой.
+
+    **Третья дорога идёт мимо и это долг, а не задумка:** удаление по кнопке
+    в окне зовёт репозиторий напрямую, то есть вектор в кэше оставляет. Долг
+    записан в `docs/backend/04-layers.md`, пункт 5.
+
+    Вычёркивание вектора не украшение: оставь кэш вектор удалённой строки,
     и следующее похожее объявление отсеется как повтор того, чего больше
-    нет.
+    нет. Разойдись дороги, одна из двух эту память бы и оставляла.
+
+    Удаление идёт через репозиторий, а не своим `session.delete`: у этого
+    движка проверка внешних ключей выключена, и дети строки — история
+    статусов и лента — остались бы сиротами.
     """
-    # Route through the public repository delete so children
-    # (vacancy_status_history, vacancy_event) are explicitly cleaned up
-    # — SQLite has FK enforcement off in this engine, so a plain
-    # session.delete(vacancy) would leave orphan rows.
     async with pipeline._session_factory() as session:
+        v = await session.get(Vacancy, vacancy_id)
+        channel_id = v.source_channel_id if v is not None else None
+        if trash_reason is not _NO_TRASH_EVENT:
+            await record_trash_event(
+                session,
+                source_channel_id=channel_id,
+                source_msg_id=v.source_msg_id if v is not None else None,
+                reason=trash_reason,
+            )
         await repo_delete_vacancy(session, vacancy_id)
         await session.commit()
     embeddings.drop_embedding(pipeline, vacancy_id)
-    logger.info("vacancy %d: deleted from DB and embedding cache", vacancy_id)
     # Vacancy_count у HR/Company изменился — пушим refresh.
     pipeline._fire_contacts_changed()
     pipeline._fire_vacancies_changed()
+    return channel_id
+
+
+async def forget_vacancy(pipeline, vacancy_id: int) -> None:
+    """Удалить вакансию по просьбе человека.
+
+    Тёзка в репозитории удаляет только строку. Звать её отсюда напрямую —
+    ловушка: вектор остался бы в кэше отсева перепостов, и следующее похожее
+    объявление отсеклось бы как повтор того, чего больше нет.
+    """
+    await _delete_and_forget(pipeline, vacancy_id)
+    logger.info("vacancy %d: deleted from DB and embedding cache", vacancy_id)
 
 
 async def delete_vacancy_as_trash(
     pipeline, vacancy_id: int, reason: str | None
 ) -> None:
-    """Auto-ingest trash deletion: ДО delete пишем строку в TrashEvent,
-    чтобы потом было что показывать в per-channel статистике (без этого
-    канал «прислал N мусора» не посчитать — Vacancy-ряд исчезает совсем).
-    Channel/msg-id берём из самой вакансии, всё в одной транзакции.
-    """
-    from backend.repository.vacancies_life import record_trash_event
-    from backend.models import Vacancy as _V
-    async with pipeline._session_factory() as session:
-        v = await session.get(_V, vacancy_id)
-        channel_id = v.source_channel_id if v is not None else None
-        msg_id = v.source_msg_id if v is not None else None
-        await record_trash_event(
-            session,
-            source_channel_id=channel_id,
-            source_msg_id=msg_id,
-            reason=reason,
-        )
-        await repo_delete_vacancy(session, vacancy_id)
-        await session.commit()
-    embeddings.drop_embedding(pipeline, vacancy_id)
+    """Удалить вакансию приговором «мусор», оставив отметку о ней."""
+    channel_id = await _delete_and_forget(
+        pipeline, vacancy_id, trash_reason=reason
+    )
     logger.info(
         "vacancy %d: deleted as trash (event recorded for channel=%s)",
         vacancy_id, channel_id,
     )
-    pipeline._fire_contacts_changed()
-    pipeline._fire_vacancies_changed()
