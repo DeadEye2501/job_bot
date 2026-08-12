@@ -1,7 +1,7 @@
 """Личная переписка с HR: запись сообщения в обе стороны, привязка, разбор."""
 
 import logging
-
+from dataclasses import dataclass
 from typing import Literal
 
 from sqlalchemy.exc import IntegrityError
@@ -76,136 +76,168 @@ async def persist_outgoing_dm(session_factory, client, msg, hr_id: int) -> Outgo
     return "stored"
 
 
-async def process_dm(
-    msg,
-    lm_client,
-    lm_chat_model,
-    session_factory,
-    *,
-    client=None,
-    schedule_classification=None,
-) -> None:
-    if not msg.from_user or msg.from_user.is_bot:
-        return
-    sender_id = msg.from_user.id
-    sender_username = msg.from_user.username
-    # ``text`` идёт в БД (в чат-ленту) с reply-quote prefix'ом «↪…».
-    # ``classify_text`` идёт в LLM-классификатор — без quote'а, чтобы
-    # классификатор не оценивал как реплику HR то, что мы сами же
-    # цитируем (cover-letter intro, бывшая реплика HR'а и т.п.).
-    text = extract_dm_text(msg)
-    classify_text = extract_text(msg)
+@dataclass(frozen=True, slots=True)
+class _Attachment:
+    """Вложение входящего письма: что это, где лежит и как называлось.
+
+    Три значения об одном предмете и ходят вместе: род решает, качать ли
+    вообще, путь появляется только после скачивания, имя показывают в
+    переписке. Порознь ни одно из них не значит ничего.
+    """
+
+    kind: str | None = None
+    path: str | None = None
+    name: str | None = None
+
+
+async def _sender_to_listen_to(session_factory, msg):
+    """Кого слушать по этому письму: известный HR не из чёрного списка.
+
+    Пустота значит «разбирать нечего»: либо отправитель нам незнаком, либо
+    он в списке — и тогда переписка глохнет в обе стороны, потому что
+    исходящее блокируют заслоны отправки. Ни строки, ни разбора, ни смены
+    статуса вакансии заблокированный не получает.
+    """
+    from backend.repository.hr_card import _hr_blacklist_value
+
     logger.debug(
-        "DM received: sender_id=%s username=%s len=%d",
-        sender_id,
-        sender_username,
-        len(text or ""),
+        "DM received: sender_id=%s username=%s",
+        msg.from_user.id, msg.from_user.username,
     )
-
-    # Identify HR up-front so we know where to download media to.
     async with session_factory() as session:
-        hr_lookup = await find_known_hr(session, sender_id, sender_username)
-        if hr_lookup is not None:
-            from backend.repository.hr_card import _hr_blacklist_value
-            bl_value = await _hr_blacklist_value(session, hr_lookup)
-        else:
-            bl_value = None
-    if hr_lookup is None:
-        return
-    if bl_value:
-        # HR в активном blacklist — игнорим входящее: не пишем в БД, не
-        # классифицируем, не апдейтим статус вакансии. Тем самым переписка
-        # с заблеклистенным HR полностью «глохнет» в обе стороны (исходящее
-        # блочит ``send_to_hr_chat`` / ``send_to_hr_media``).
-        logger.info(
-            "DM from blacklisted HR ignored",
-            extra={
-                "hr_id": hr_lookup.id,
-                "blacklist_value": bl_value,
-                "tg_message_id": msg.id,
-            },
-        )
-        return
+        hr = await find_known_hr(session, msg.from_user.id, msg.from_user.username)
+        if hr is None:
+            return None
+        blacklisted = await _hr_blacklist_value(session, hr)
+    if not blacklisted:
+        return hr
+    logger.info(
+        "DM from blacklisted HR ignored",
+        extra={
+            "hr_id": hr.id,
+            "blacklist_value": blacklisted,
+            "tg_message_id": msg.id,
+        },
+    )
+    return None
 
-    media_kind, media_name, media_path = None, None, None
-    if client is not None:
-        media_kind, media_name = classify_media(msg)
-        if media_kind is not None:
-            media_path = await download_media(client, msg, hr_lookup.id)
 
-    avatar_bytes = None
-    if client is not None and hr_lookup.avatar is None:
-        avatar_bytes = await fetch_telegram_avatar(client, msg.from_user)
+async def _incoming_attachment(client, msg, hr_id: int) -> _Attachment:
+    """Скачать вложение письма, если оно есть и есть чем качать."""
+    if client is None:
+        return _Attachment()
+    kind, name = classify_media(msg)
+    if kind is None:
+        return _Attachment(name=name)
+    return _Attachment(kind, await download_media(client, msg, hr_id), name)
 
+
+async def _attributed_vacancy(session, hr_id: int, msg) -> int | None:
+    """К какой вакансии относится письмо HR.
+
+    Ответ на наше конкретное сообщение говорит это точно: у нашей строки
+    записан номер вакансии. Без ответа берётся самая свежая вакансия
+    этого HR — приближение верное, пока вакансия у него одна, а на пяти
+    оно промахивается: HR пишет про вторую, а мы относим к пятой. Цепочка
+    ответов эту беду и решает.
+    """
+    reply_to_id = getattr(msg, "reply_to_message_id", None)
+    if reply_to_id:
+        by_reply = await resolve_reply_target_vacancy(session, hr_id, reply_to_id)
+        if by_reply is not None:
+            return by_reply
+    return await find_latest_vacancy_id_for_hr(session, hr_id, as_of=msg.date)
+
+
+async def _save_incoming(session_factory, msg, attachment: _Attachment, avatar):
+    """Записать входящее письмо; отдать номер вакансии и номер строки.
+
+    Пустая пара значит «дальше не идём»: HR исчез, письмо уже лежит (гонка
+    живого с догоном) или не записалось. HR ищется заново нарочно: первый
+    поиск шёл в своей сессии ради номера, куда класть файл.
+    """
+    text = extract_dm_text(msg)
     async with session_factory() as session:
         try:
-            hr = await find_known_hr(session, sender_id, sender_username)
+            hr = await find_known_hr(
+                session, msg.from_user.id, msg.from_user.username
+            )
             if hr is None:
-                return
-            refresh_hr_from_telegram(hr, msg.from_user, avatar=avatar_bytes)
-            # Reply-attribution: если HR ответил на наше конкретное
-            # сообщение через Telegram-reply, мы точно знаем, на какую
-            # вакансию это реакция (наша outgoing-row в Message с этим
-            # tg_message_id хранит её vacancy_id). Иначе fallback на
-            # «самая свежая вакансия HR'а» — это правильное приближение
-            # для одиночных HR-ов, но для multi-vacancy HR'а может
-            # ошибиться (HR пишет про вторую из пяти, бот атрибутирует
-            # на пятую). Reply-цепочка эту проблему как раз и решает.
-            vacancy_id = None
-            reply_to_id = getattr(msg, "reply_to_message_id", None)
-            if reply_to_id:
-                vacancy_id = await resolve_reply_target_vacancy(
-                    session, hr.id, reply_to_id,
-                )
-            if vacancy_id is None:
-                vacancy_id = await find_latest_vacancy_id_for_hr(
-                    session, hr.id, as_of=msg.date,
-                )
+                return None, None
+            refresh_hr_from_telegram(hr, msg.from_user, avatar=avatar)
+            vacancy_id = await _attributed_vacancy(session, hr.id, msg)
             new_msg = await save_incoming_message(
                 session, hr.id, vacancy_id, text, msg.id, msg.date,
-                media_kind=media_kind,
-                media_path=media_path,
-                media_name=media_name,
+                media_kind=attachment.kind,
+                media_path=attachment.path,
+                media_name=attachment.name,
             )
             await session.commit()
-            new_msg_id = new_msg.id
+            return vacancy_id, new_msg.id
         except IntegrityError:
-            # Duplicate (live MessageHandler racing with catch_up, or two
-            # catch_ups overlapping). The row is already in the DB —
-            # classification was applied on the first pass. Debug-only so
-            # ops can grep if duplicates start appearing systematically.
+            # Повтор: живой обработчик наложился на догон или два догона
+            # пересеклись; строка уже в базе, разбор по ней прошёл первым
+            # проходом. Запись отладочная — под поиск систематических.
             logger.debug(
                 "DM duplicate skipped",
-                extra={"sender_id": sender_id, "tg_message_id": msg.id},
+                extra={"sender_id": msg.from_user.id, "tg_message_id": msg.id},
             )
-            return
+            return None, None
         except Exception:
             logger.exception(
                 "DM persistence failed",
-                extra={"sender_id": sender_id, "tg_message_id": msg.id},
+                extra={"sender_id": msg.from_user.id, "tg_message_id": msg.id},
             )
-            return
+            return None, None
 
+
+async def _status_open_for_reply(session_factory, vacancy_id: int):
+    """Статус вакансии, если она ещё открыта для разбора; иначе пустота.
+
+    Письмо к этому времени уже записано, и следа достаточно: закрытая
+    вакансия разбора не получит, а призрачной строки в истории не появится.
+    """
+    is_open, v_status = await status_open_for_auto(session_factory, vacancy_id)
+    if is_open:
+        return v_status
+    logger.info(
+        "vacancy %s: status=%s closed for auto, skip classification",
+        vacancy_id, v_status.value if v_status else "gone",
+    )
+    return None
+
+
+async def process_dm(
+    msg, lm_client, lm_chat_model, session_factory,
+    *, client=None, schedule_classification=None,
+) -> None:
+    """Провести входящее письмо: записать, отнести к вакансии, разобрать.
+
+    В базу текст идёт с цитатой ответа, в разбор — без неё: иначе разборщик
+    оценил бы как слова HR то, что мы сами же процитировали.
+    """
+    if not msg.from_user or msg.from_user.is_bot:
+        return
+    hr_lookup = await _sender_to_listen_to(session_factory, msg)
+    if hr_lookup is None:
+        return
+    attachment = await _incoming_attachment(client, msg, hr_lookup.id)
+    avatar = None
+    if client is not None and hr_lookup.avatar is None:
+        avatar = await fetch_telegram_avatar(client, msg.from_user)
+    vacancy_id, new_msg_id = await _save_incoming(
+        session_factory, msg, attachment, avatar
+    )
     if vacancy_id is None:
         return
-
-    # Сообщение уже сохранено выше — это аудит-след входящего DM, и его
-    # достаточно: разбора терминальная вакансия не получит, а призрачной
-    # строки в vacancy_status_history не появится.
-    is_open, v_status = await status_open_for_auto(session_factory, vacancy_id)
-    if not is_open:
-        logger.info(
-            "vacancy %s: status=%s closed for auto, skip classification",
-            vacancy_id, v_status.value if v_status else "gone",
-        )
+    v_status = await _status_open_for_reply(session_factory, vacancy_id)
+    if v_status is None:
         return
-
-    # С debounce-планировщиком (production-путь) — сообщение в буфере,
-    # классификация отложена. Без планировщика (тесты / fallback) —
-    # классифицируем inline как раньше. В обоих случаях идёт
-    # ``classify_text`` (без reply-quote prefix'а), не ``text``.
+    # С планировщиком письмо ложится в накопитель и разбирается отложенно;
+    # без него — на месте.
+    classify_text = extract_text(msg)
     if schedule_classification is not None:
-        schedule_classification(hr.id, vacancy_id, new_msg_id, classify_text)
+        schedule_classification(hr_lookup.id, vacancy_id, new_msg_id, classify_text)
         return
 
     await classify_and_apply(

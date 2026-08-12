@@ -103,15 +103,14 @@ MUTATIONS = [
     # parse_and_update_vacancy: пустышка доходит до проверяльщика
     (
         "backend/flows/parse.py",
-        "    if is_empty_vacancy(parsed):",
-        "    if False:",
+        "    if not is_empty_vacancy(parsed):" + CRLF + "        return parsed" + CRLF,
+        "    if True:" + CRLF + "        return parsed" + CRLF,
     ),
     # parse_and_update_vacancy: пустышку удаляют и при повторном прогоне
     (
         "backend/flows/parse.py",
-        "    if is_empty_vacancy(parsed):" + CRLF
-        + "        if allow_delete:",
-        "    if is_empty_vacancy(parsed):" + CRLF + "        if True:",
+        "        pipeline, vacancy_id, EMPTY_SKIP_REASON, allow_delete=allow_delete" + CRLF,
+        "        pipeline, vacancy_id, EMPTY_SKIP_REASON, allow_delete=True" + CRLF,
     ),
     # parse_and_update_vacancy: чёрный список читает обрезанный текст
     (
@@ -123,33 +122,27 @@ MUTATIONS = [
     (
         "backend/flows/parse.py",
         "    if status == VacancyStatus.NEW:" + CRLF
-        + "        validation = await validate_vacancy_fit(",
+        + "        refusal = await _fit_refusal(",
         "    if True:" + CRLF
-        + "        validation = await validate_vacancy_fit(",
+        + "        refusal = await _fit_refusal(",
     ),
     # parse_and_update_vacancy: молчание проверяльщика читается как согласие
     (
         "backend/flows/parse.py",
-        "        if validation is None:" + CRLF
-        + "            status = VacancyStatus.NOT_FIT" + CRLF,
-        "        if False:" + CRLF
-        + "            status = VacancyStatus.NOT_FIT" + CRLF,
+        "    if validation is None:" + CRLF,
+        "    if False:" + CRLF,
     ),
     # parse_and_update_vacancy: мусор удаляют и при повторном прогоне
     (
         "backend/flows/parse.py",
-        '        elif validation.verdict == "trash":' + CRLF
-        + "            if allow_delete:",
-        '        elif validation.verdict == "trash":' + CRLF
-        + "            if True:",
+        "            pipeline, vacancy_id, skip_reason, allow_delete=allow_delete" + CRLF,
+        "            pipeline, vacancy_id, skip_reason, allow_delete=True" + CRLF,
     ),
     # parse_and_update_vacancy: отказ проверяльщика ни к чему не ведёт
     (
         "backend/flows/parse.py",
-        '        elif validation.verdict == "reject":' + CRLF
-        + "            status = VacancyStatus.NOT_FIT" + CRLF,
-        '        elif False:' + CRLF
-        + "            status = VacancyStatus.NOT_FIT" + CRLF,
+        '    if validation.verdict == "reject":' + CRLF,
+        '    if False:' + CRLF,
     ),
     # _write_parsed_row: признак разбора не ставится
     (
@@ -181,20 +174,14 @@ MUTATIONS = [
     # parse_and_update_vacancy: отклик уходит и у непригодной вакансии
     (
         "backend/flows/parse.py",
-        "        status == VacancyStatus.NEW" + CRLF
-        + "        and hr_for_send is not None" + CRLF
-        + "        and pipeline._rs.auto_apply" + CRLF,
-        "        hr_for_send is not None" + CRLF
-        + "        and pipeline._rs.auto_apply" + CRLF,
+        "    if status != VacancyStatus.NEW or hr is None or not pipeline._rs.auto_apply:" + CRLF,
+        "    if hr is None or not pipeline._rs.auto_apply:" + CRLF,
     ),
     # parse_and_update_vacancy: выключенная автоотправка всё равно шлёт
     (
         "backend/flows/parse.py",
-        "        status == VacancyStatus.NEW" + CRLF
-        + "        and hr_for_send is not None" + CRLF
-        + "        and pipeline._rs.auto_apply" + CRLF,
-        "        status == VacancyStatus.NEW" + CRLF
-        + "        and hr_for_send is not None" + CRLF,
+        "    if status != VacancyStatus.NEW or hr is None or not pipeline._rs.auto_apply:" + CRLF,
+        "    if status != VacancyStatus.NEW or hr is None:" + CRLF,
     ),
     # parse_and_update_vacancy: попытка отправки не записывается в ленту
     (
@@ -253,18 +240,16 @@ MUTATIONS = [
     # send_application: пустая анкета отправку не останавливает
     (
         "backend/flows/apply.py",
-        "        if not pipeline._profile_block:" + CRLF
-        + "            logger.warning(" + CRLF
-        + '                "vacancy %d: profile_block empty, skipping send",' + CRLF,
-        "        if False:" + CRLF
-        + "            logger.warning(" + CRLF
-        + '                "vacancy %d: profile_block empty, skipping send",' + CRLF,
+        "    if not pipeline._profile_block:" + CRLF
+        + '        logger.warning("vacancy %d: profile_block empty, skipping send", vacancy_id)' + CRLF,
+        "    if False:" + CRLF
+        + '        logger.warning("vacancy %d: profile_block empty, skipping send", vacancy_id)' + CRLF,
     ),
     # send_application: отсутствие резюме отправку не останавливает
     (
         "backend/flows/apply.py",
-        "        if cv_path is None or not cv_path.is_file():",
-        "        if False:",
+        "    if cv_path is None or not cv_path.is_file():",
+        "    if False:",
     ),
     # send_application: защита от повторной отправки снимается
     (
