@@ -185,61 +185,42 @@ async def get_stats_skills(
     }
 
 
-async def get_stats_hr_responses(
-    session: AsyncSession, *, period: str
-) -> dict:
-    """HR-response-time + weekday-распределение ответов.
+async def _applied_in_period(
+    session: AsyncSession, since: datetime | None
+) -> dict[int, datetime]:
+    """Когда откликнулись — по вакансиям, отклик на которые попал в окно.
 
-    Алгоритм:
-      1. На вход берём разобранные вакансии, у которых ПЕРВЫЙ переход в
-         Applied случился внутри `period` (по
-         `VacancyStatusHistory.changed_at`). Это «application-window» —
-         ровно те отклики, которые мы делали в этот период. Отбор по
-         разбору тот же, что у соседних ступеней экрана: считая по своему
-         множеству, ступень разводила бы числа двух экранов молча.
-      2. Для каждой такой вакансии ищем первый incoming-Message с
-         `sent_at > applied_at` — реальный ответ HR (Telegram-сообщение).
-         Берём `Message.sent_at` (когда HR нажал «отправить»), а не
-         `created_at` (когда наш бот сохранил), чтобы weekday отражал
-         именно «когда HR живой».
-      3. Метрики:
-         - by_weekday: распределение first-response.sent_at по дням
-           недели (0=Пн … 6=Вс)
-         - median_seconds: median(first_response_sent_at − applied_at)
-           среди тех, кто ответил
-         - no_response_pct: процент applied вакансий БЕЗ first-response
-         - applied_count / responded_count: голые числа
+    Берём разобранные вакансии, у которых ПЕРВЫЙ переход в Applied случился
+    внутри окна (по `VacancyStatusHistory.changed_at`): ровно те отклики,
+    которые мы делали в этот период. Отбор по разбору тот же, что у соседних
+    ступеней экрана — считая по своему множеству, ступень разводила бы числа
+    двух экранов молча.
     """
-    since = stats_period_since(period)
-
-    # Шаг 1: первый Applied на каждую vacancy, ограниченный period
     first_applied_subq = first_transition_subq(VacancyStatus.APPLIED)
     where_clauses = [PARSED_ONLY]
     if since is not None:
         where_clauses.append(first_applied_subq.c.first_at >= since)
-    applied_rows = (
+    rows = (
         await session.execute(
             select(first_applied_subq.c.vid, first_applied_subq.c.first_at)
             .join(Vacancy, Vacancy.id == first_applied_subq.c.vid)
             .where(*where_clauses)
         )
     ).all()
-    if not applied_rows:
-        return {
-            "period": period,
-            "by_weekday": [0, 0, 0, 0, 0, 0, 0],
-            "median_seconds": None,
-            "no_response_pct": None,
-            "applied_count": 0,
-            "responded_count": 0,
-        }
+    return {vid: applied_at for vid, applied_at in rows}
 
-    # Шаг 2 + 3: для каждой vacancy ищем первый incoming-Message после
-    # applied_at и копим weekday/delta. Bulk-запрос, чтобы не делать
-    # N round-trips: тянем все incoming Message'ы и группируем в Python
-    # (выборки маленькие — десятки/сотни вакансий).
-    applied_map = {vid: applied_at for vid, applied_at in applied_rows}
-    msg_rows = (
+
+async def _first_response_at(
+    session: AsyncSession, applied_map: dict[int, datetime]
+) -> dict[int, datetime]:
+    """Когда HR ответил впервые — первое входящее позже нашего отклика.
+
+    Берём `Message.sent_at` (когда HR нажал «отправить»), а не `created_at`
+    (когда наш бот сохранил): день недели должен отражать, когда живой HR.
+    Одним запросом, а не по вакансии: выборки маленькие — десятки-сотни, —
+    и группировка в Python дешевле N обращений к базе.
+    """
+    rows = (
         await session.execute(
             select(Message.vacancy_id, Message.sent_at)
             .where(
@@ -249,19 +230,25 @@ async def get_stats_hr_responses(
             )
         )
     ).all()
-    first_resp_by_vid: dict[int, datetime] = {}
-    for vid, sent_at in msg_rows:
+    first_by_vid: dict[int, datetime] = {}
+    for vid, sent_at in rows:
         if sent_at is None:
             continue
         applied_at = applied_map.get(vid)
         if applied_at is None or sent_at <= applied_at:
             continue
-        cur = first_resp_by_vid.get(vid)
+        cur = first_by_vid.get(vid)
         if cur is None or sent_at < cur:
-            first_resp_by_vid[vid] = sent_at
+            first_by_vid[vid] = sent_at
+    return first_by_vid
 
-    by_weekday = [0, 0, 0, 0, 0, 0, 0]  # Пн=0 … Вс=6 (Python weekday())
-    deltas: list[float] = []
+
+def _weekdays_and_waits(
+    applied_map: dict[int, datetime], first_resp_by_vid: dict[int, datetime]
+) -> tuple[list[int], list[float]]:
+    """Ответы по дням недели (Пн=0 … Вс=6) и сроки ожидания в секундах."""
+    by_weekday = [0, 0, 0, 0, 0, 0, 0]
+    waits: list[float] = []
     for vid, applied_at in applied_map.items():
         resp_ts = first_resp_by_vid.get(vid)
         if resp_ts is None:
@@ -269,19 +256,47 @@ async def get_stats_hr_responses(
         by_weekday[resp_ts.weekday()] += 1
         delta = (resp_ts - applied_at).total_seconds()
         if delta > 0:
-            deltas.append(delta)
-    deltas.sort()
+            waits.append(delta)
+    return by_weekday, waits
 
-    median_seconds: float | None
-    if deltas:
-        n = len(deltas)
-        if n % 2 == 1:
-            median_seconds = float(deltas[n // 2])
-        else:
-            median_seconds = (deltas[n // 2 - 1] + deltas[n // 2]) / 2
-    else:
-        median_seconds = None
 
+def _median(values: list[float]) -> float | None:
+    """Середина ряда; на пустом ряду середины нет."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    n = len(ordered)
+    if n % 2 == 1:
+        return float(ordered[n // 2])
+    return (ordered[n // 2 - 1] + ordered[n // 2]) / 2
+
+
+async def get_stats_hr_responses(
+    session: AsyncSession, *, period: str
+) -> dict:
+    """HR-response-time + weekday-распределение ответов.
+
+    Метрики:
+      - by_weekday: распределение first-response.sent_at по дням недели
+        (0=Пн … 6=Вс)
+      - median_seconds: median(first_response_sent_at − applied_at) среди
+        тех, кто ответил
+      - no_response_pct: процент applied вакансий БЕЗ first-response
+      - applied_count / responded_count: голые числа
+    """
+    applied_map = await _applied_in_period(session, stats_period_since(period))
+    if not applied_map:
+        return {
+            "period": period,
+            "by_weekday": [0, 0, 0, 0, 0, 0, 0],
+            "median_seconds": None,
+            "no_response_pct": None,
+            "applied_count": 0,
+            "responded_count": 0,
+        }
+    first_resp_by_vid = await _first_response_at(session, applied_map)
+    by_weekday, waits = _weekdays_and_waits(applied_map, first_resp_by_vid)
+    median_seconds = _median(waits)
     applied_count = len(applied_map)
     responded_count = len(first_resp_by_vid)
     no_response_pct = (

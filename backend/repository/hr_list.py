@@ -72,6 +72,112 @@ async def list_open_hr_chats(
     return await _with_last_incoming_id(session, hrs)
 
 
+def _hr_counts_query(sort_by: str):
+    """Люди со счётчиком вакансий, в порядке, которого просит зовущий.
+
+    ``"vacancy_count"`` (по умолчанию, окно связывания): счёт по убыванию,
+    при равенстве по имени — плодовитые наверху, естественный порядок для
+    выбора. ``"last_activity"`` (вкладка «Контакты/HR»): последняя переписка
+    по убыванию, пустые в конец, дальше по имени.
+    """
+    if sort_by != "last_activity":
+        return (
+            select(HR, func.count(Vacancy.id).label("cnt"))
+            .outerjoin(Vacancy, Vacancy.hr_id == HR.id)
+            .group_by(HR.id)
+            .order_by(*_HR_BY_VACANCY_COUNT)
+        )
+    # Пре-агрегируем последнюю переписку отдельным GROUP BY hr_id вместо
+    # коррелированного scalar-subquery в ORDER BY: иначе SQLite заново
+    # сканировал бы message-таблицу по разу на каждого HR при сортировке.
+    # Здесь — один проход по message с использованием ix_message_hr_id,
+    # дальше LEFT JOIN на HR.
+    last_act_subq = (
+        select(
+            Message.hr_id.label("hr_id"),
+            func.max(Message.sent_at).label("last_act"),
+        )
+        .where(Message.is_deleted.is_(False))
+        .group_by(Message.hr_id)
+        .subquery()
+    )
+    return (
+        select(HR, func.count(Vacancy.id).label("cnt"))
+        .outerjoin(Vacancy, Vacancy.hr_id == HR.id)
+        .outerjoin(last_act_subq, last_act_subq.c.hr_id == HR.id)
+        .group_by(HR.id, last_act_subq.c.last_act)
+        .order_by(
+            last_act_subq.c.last_act.desc().nullslast(),
+            HR.name.asc(),
+        )
+    )
+
+
+async def _last_company_by_hr(session: AsyncSession) -> dict[int, str]:
+    """Компания последней вакансии каждого человека.
+
+    Пусто, если у самой свежей вакансии компании нет, — даже когда она была
+    у вакансий постарше. Свежая выигрывает нарочно: в окне связывания старое
+    окружение вводит в заблуждение.
+    """
+    latest_subq = (
+        select(
+            Vacancy.hr_id.label("hr_id"),
+            Vacancy.company_id.label("company_id"),
+            func.row_number()
+            .over(partition_by=Vacancy.hr_id, order_by=LAST_VACANCY_ORDER)
+            .label("rn"),
+        )
+        .where(Vacancy.hr_id.is_not(None))
+        .subquery()
+    )
+    rows = (
+        await session.execute(
+            select(latest_subq.c.hr_id, Company.name)
+            .join(Company, Company.id == latest_subq.c.company_id)
+            .where(latest_subq.c.rn == 1)
+        )
+    ).all()
+    return {hr_id: name for hr_id, name in rows}
+
+
+async def _unread_by_hr(session: AsyncSession) -> dict[int, int]:
+    """Сколько непрочитанных входящих у каждого человека — для лаймового значка.
+
+    Один запрос с группировкой: раздельные счёты дали бы N обращений к базе
+    на один показ списка.
+    """
+    rows = (
+        await session.execute(
+            select(Message.hr_id, func.count(Message.id))
+            .where(
+                Message.hr_id.is_not(None),
+                *UNREAD_INCOMING,
+            )
+            .group_by(Message.hr_id)
+        )
+    ).all()
+    return {hr_id: int(n) for hr_id, n in rows}
+
+
+def _found_page(rows, search: str | None, limit: int | None, offset: int):
+    """Строки, подходящие под искомое, и из них — запрошенная страница.
+
+    Отбор идёт в Python (см. :func:`backend.repository.search.matches_search`),
+    и страница отрезается **после** него: иначе бесконечная прокрутка
+    считала бы страницы по одному множеству, а показывала другое. Без
+    предела возвращается всё — так это окно связывания и звало всегда.
+    """
+    found = [
+        (hr, cnt)
+        for hr, cnt in rows
+        if matches_search(search, hr.name, hr.telegram_username)
+    ]
+    if limit is None:
+        return found
+    return found[offset : offset + limit]
+
+
 async def list_hr_with_counts(
     session: AsyncSession,
     search: str | None = None,
@@ -84,113 +190,25 @@ async def list_hr_with_counts(
 
     Used by the "Связать с HR" picker AND the Contacts/HR pane (05).
 
-    ``sort_by``:
-    - ``"vacancy_count"`` (default, picker): vacancy count DESC, then name —
-      keeps prolific HRs at the top, the natural order for a linker.
-    - ``"last_activity"`` (Contacts/HR): max(message.sent_at) DESC NULLS LAST,
-      then name — последние, с кем была переписка, наверху.
-
-    ``last_company_name`` is the company of the HR's most recent vacancy;
-    NULL if that vacancy isn't linked to any company, even if older
-    vacancies were. "Most recent" wins on purpose — older context is
-    misleading for a picker.
-
-    ``search`` is filtered Python-side — see
-    :func:`backend.repository.search.matches_search`.
-
-    ``limit``/``offset`` slice the result *after* the search filter so the
-    caller can implement infinite-scroll. ``None`` limit (default) returns
-    everything — preserves the picker's existing behaviour.
+    Договор с зовущим разошёлся по помощникам: порядок — ``sort_by``,
+    :func:`_hr_counts_query`; отбор по ``search`` и страница ``limit``/
+    ``offset`` — :func:`_found_page`; ``last_company_name`` —
+    :func:`_last_company_by_hr`.
     """
-    if sort_by == "last_activity":
-        # Пре-агрегируем последнюю переписку отдельным GROUP BY hr_id вместо
-        # коррелированного scalar-subquery в ORDER BY: иначе SQLite заново
-        # сканировал бы message-таблицу по разу на каждого HR при сортировке.
-        # Здесь — один проход по message с использованием ix_message_hr_id,
-        # дальше LEFT JOIN на HR.
-        last_act_subq = (
-            select(
-                Message.hr_id.label("hr_id"),
-                func.max(Message.sent_at).label("last_act"),
-            )
-            .where(Message.is_deleted.is_(False))
-            .group_by(Message.hr_id)
-            .subquery()
-        )
-        base = (
-            select(HR, func.count(Vacancy.id).label("cnt"))
-            .outerjoin(Vacancy, Vacancy.hr_id == HR.id)
-            .outerjoin(last_act_subq, last_act_subq.c.hr_id == HR.id)
-            .group_by(HR.id, last_act_subq.c.last_act)
-            .order_by(
-                last_act_subq.c.last_act.desc().nullslast(),
-                HR.name.asc(),
-            )
-        )
-    else:
-        base = (
-            select(HR, func.count(Vacancy.id).label("cnt"))
-            .outerjoin(Vacancy, Vacancy.hr_id == HR.id)
-            .group_by(HR.id)
-            .order_by(*_HR_BY_VACANCY_COUNT)
-        )
-    counts = (await session.execute(base)).all()
-
-    counts = [
-        (hr, cnt)
-        for hr, cnt in counts
-        if matches_search(search, hr.name, hr.telegram_username)
-    ]
-
-    if limit is not None:
-        counts = counts[offset : offset + limit]
-
-    latest_subq = (
-        select(
-            Vacancy.hr_id.label("hr_id"),
-            Vacancy.company_id.label("company_id"),
-            func.row_number()
-            .over(partition_by=Vacancy.hr_id, order_by=LAST_VACANCY_ORDER)
-            .label("rn"),
-        )
-        .where(Vacancy.hr_id.is_not(None))
-        .subquery()
-    )
-    last_co_rows = (
-        await session.execute(
-            select(latest_subq.c.hr_id, Company.name)
-            .join(Company, Company.id == latest_subq.c.company_id)
-            .where(latest_subq.c.rn == 1)
-        )
-    ).all()
-    last_co: dict[int, str] = {hr_id: name for hr_id, name in last_co_rows}
-
-    # Per-HR unread incoming count for the lime badge in the list pane.
-    # Single GROUP BY query — beats N+1 separate counts.
-    unread_rows = (
-        await session.execute(
-            select(Message.hr_id, func.count(Message.id))
-            .where(
-                Message.hr_id.is_not(None),
-                *UNREAD_INCOMING,
-            )
-            .group_by(Message.hr_id)
-        )
-    ).all()
-    unread_by_hr: dict[int, int] = {hr_id: int(n) for hr_id, n in unread_rows}
-
+    rows = (await session.execute(_hr_counts_query(sort_by))).all()
+    counts = _found_page(rows, search, limit, offset)
+    last_co = await _last_company_by_hr(session)
+    unread_by_hr = await _unread_by_hr(session)
     bl_values = await active_blacklist_values(session, "hr")
-
-    def _is_blacklisted(hr: HR) -> bool:
-        return any(c in bl_values for c in hr_blacklist_candidates(hr))
-
     return [
         HrWithCount(
             hr=hr,
             vacancy_count=int(cnt or 0),
             last_company_name=last_co.get(hr.id),
             unread_count=unread_by_hr.get(hr.id, 0),
-            is_blacklisted=_is_blacklisted(hr),
+            is_blacklisted=any(
+                c in bl_values for c in hr_blacklist_candidates(hr)
+            ),
         )
         for hr, cnt in counts
     ]

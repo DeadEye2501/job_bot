@@ -131,14 +131,14 @@ MUTATIONS = [
     # list_hr_with_counts: у контактов порядок по давности перевёрнут
     (
         "backend/repository/hr_list.py",
-        "                last_act_subq.c.last_act.desc().nullslast(),",
-        "                last_act_subq.c.last_act.asc().nullslast(),",
+        "            last_act_subq.c.last_act.desc().nullslast(),",
+        "            last_act_subq.c.last_act.asc().nullslast(),",
     ),
     # list_hr_with_counts: удалённые сообщения снова считаются перепиской
     (
         "backend/repository/hr_list.py",
-        "            .where(Message.is_deleted.is_(False))" + CRLF + "            .group_by(Message.hr_id)" + CRLF,
-        "            .group_by(Message.hr_id)" + CRLF,
+        "        .where(Message.is_deleted.is_(False))" + CRLF + "        .group_by(Message.hr_id)" + CRLF,
+        "        .group_by(Message.hr_id)" + CRLF,
     ),
     # list_hr_with_counts: поиск перестаёт смотреть в ник
     (
@@ -158,11 +158,11 @@ MUTATIONS = [
         '    needle = (search or "").strip().casefold()',
         '    needle = (search or "").casefold()',
     ),
-    # list_hr_with_counts: страница режется до отбора
+    # _found_page: запрошенная страница отрезается пустой
     (
         "backend/repository/hr_list.py",
-        "        counts = counts[offset : offset + limit]",
-        "        counts = counts[offset:offset]",
+        "    return found[offset : offset + limit]",
+        "    return found[offset:offset]",
     ),
     # list_hr_with_counts: последняя компания выбирается по старой вакансии
     (
