@@ -84,18 +84,24 @@ def test_redaction_keeps_a_record_with_args_readable():
 
 
 def test_installing_the_filter_twice_adds_it_once(clean_root_logger):
-    """Повторная установка не добавляет второй фильтр."""
-    clean_root_logger.addHandler(LogBufferHandler())
+    """Повторная установка не добавляет второй фильтр — и никого не обходит.
+
+    Обработчиков двое нарочно, и считается фильтр у каждого по отдельности:
+    по общему числу «два на одном и ноль на другом» неотличимо от «по одному
+    на каждом», а это и есть беда — необойдённый обработчик пишет секрет как
+    есть.
+    """
+    ours = [LogBufferHandler(), logging.StreamHandler()]
+    for handler in ours:
+        clean_root_logger.addHandler(handler)
     install_secret_filter()
     install_secret_filter()
 
-    installed = [
-        f
-        for handler in clean_root_logger.handlers
-        for f in handler.filters
-        if isinstance(f, SecretRedactionFilter)
+    per_handler = [
+        sum(isinstance(f, SecretRedactionFilter) for f in handler.filters)
+        for handler in ours
     ]
-    assert len(installed) == len(clean_root_logger.handlers)
+    assert per_handler == [1, 1]
 
 
 def test_a_secret_from_someone_elses_logger_is_masked_too(clean_root_logger):

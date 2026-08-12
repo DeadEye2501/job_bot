@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 import adapters.telegram
-from adapters.telegram import SESSION_NAME, check, make_client, send_dm
+from adapters.telegram import check, make_client, send_dm
 from backend.runtime_settings import TgAccountConfig
 from tests.fakes.telegram import FakeTelegramClient
 from config import get_data_dir
@@ -48,7 +48,6 @@ def test_a_saved_session_keeps_the_client_in_memory():
     client = make_client(_account(session_string="сессия"))
 
     assert client.in_memory is True
-    assert client.name == SESSION_NAME
 
 
 def test_a_first_login_keeps_the_session_in_a_file():
@@ -60,7 +59,13 @@ def test_a_first_login_keeps_the_session_in_a_file():
     client = make_client(_account())
 
     assert not client.in_memory
-    assert Path(client.workdir) == get_data_dir() / "sessions"
+    # Сверяется сам путь файла, а не имя из настроек: имя — довод, который мы
+    # же и передали, а следствие у него одно — куда ляжет сессия. Путь назван
+    # строкой нарочно: смени его в коде, и Pyrogram заведёт новый файл, а
+    # старый осиротеет — то есть человека попросят войти заново.
+    assert Path(client.storage.database) == (
+        get_data_dir() / "sessions" / "job_bot.session"
+    )
     assert Path(client.workdir).is_dir()
 
 

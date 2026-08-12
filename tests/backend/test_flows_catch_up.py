@@ -39,8 +39,12 @@ async def _hrs(session_factory, count):
 
 
 async def test_every_known_hr_is_caught_up(session_factory, monkeypatch):
-    """Догон обходит всех известных HR, а не первого попавшегося."""
-    await _hrs(session_factory, 3)
+    """Догон обходит всех известных HR, а не первого попавшегося.
+
+    Сверяется список посещённых, а не его длина: по длине трёхкратный заход к
+    одному собеседнику выглядит так же, как обход троих.
+    """
+    hrs = await _hrs(session_factory, 3)
     visited: list[int] = []
 
     async def backfill(client, hr, *args, **kwargs):
@@ -50,7 +54,7 @@ async def test_every_known_hr_is_caught_up(session_factory, monkeypatch):
 
     await _catch_up(session_factory)
 
-    assert len(visited) == 3
+    assert sorted(visited) == sorted(hr.id for hr in hrs)
 
 
 async def test_an_empty_address_book_is_no_work(session_factory, monkeypatch):
