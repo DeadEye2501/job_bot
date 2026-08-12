@@ -263,33 +263,13 @@ def _parse_fit_validation(answer: str) -> FitValidation | None:
     return FitValidation(verdict=verdict, reason=str_or_none(data.get("reason")))
 
 
-async def validate_vacancy_fit(
-    parsed: ParsedVacancy,
-    raw_text: str,
-    client: httpx.AsyncClient,
-    model: str,
-    *,
-    profile: CandidateProfile,
-    known_skills=None,
-) -> FitValidation | None:
-    logger.debug("validate_vacancy_fit: title=%r", parsed.title)
-    system_prompt = (
-        VALIDATE_VACANCY_FIT_PROMPT
-        .replace("{CANDIDATE_TITLE}", _format_text(profile.title))
-        .replace("{CANDIDATE_LOCATION}", _format_text(profile.location))
-        .replace("{ACCEPTED_GRADES}", _format_grades(profile.grades))
-        .replace(
-            "{ACCEPTED_FORMATS}", _format_work_formats(profile.work_formats)
-        )
-        .replace(
-            "{LANGUAGE_REQUIREMENTS}", _format_languages(profile.languages)
-        )
-        .replace(
-            "{CANDIDATE_SKILLS}", _format_known_skills(known_skills)
-        )
-        .replace("{FREE_PREFERENCES}", _format_text(profile.free_preferences))
-    )
-    vacancy_block = (
+def _vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str:
+    """Вакансия для модели: разобранные поля и кусок исходника.
+
+    Исходник нужен затем, чтобы обоснование отказа ссылалось на настоящие
+    слова вакансии, а не на примеры из наставления.
+    """
+    return (
         "Распарсенные поля:\n"
         f"- title: {parsed.title!r}\n"
         f"- description: {parsed.description!r}\n"
@@ -303,69 +283,82 @@ async def validate_vacancy_fit(
         "Оригинальный текст вакансии:\n"
         f"{raw_text[:3000]}"
     )
+
+
+def _fit_request(parsed: ParsedVacancy, raw_text: str, profile, known_skills):
+    """Что спросить у модели: мерки кандидата и вакансия к проверке."""
+    system_prompt = (
+        VALIDATE_VACANCY_FIT_PROMPT
+        .replace("{CANDIDATE_TITLE}", _format_text(profile.title))
+        .replace("{CANDIDATE_LOCATION}", _format_text(profile.location))
+        .replace("{ACCEPTED_GRADES}", _format_grades(profile.grades))
+        .replace("{ACCEPTED_FORMATS}", _format_work_formats(profile.work_formats))
+        .replace("{LANGUAGE_REQUIREMENTS}", _format_languages(profile.languages))
+        .replace("{CANDIDATE_SKILLS}", _format_known_skills(known_skills))
+        .replace("{FREE_PREFERENCES}", _format_text(profile.free_preferences))
+    )
     user_msg = (
         "Вакансия к проверке — это РЕАЛЬНЫЕ данные, не пример из промпта:\n\n"
-        + wrap_external(vacancy_block)
-        + "\n\n"
-        "Верни JSON {\"verdict\": ..., \"reason\": ...}. reason ОБЯЗАН ссылаться на конкретные слова/факты из текста выше, а не из примеров промпта."
+        + wrap_external(_vacancy_block(parsed, raw_text))
+        + "\n\nВерни JSON {\"verdict\": ..., \"reason\": ...}. reason ОБЯЗАН ссылаться на конкретные слова/факты из текста выше, а не из примеров промпта."
     )
+    return ChatRequest(
+        purpose="validate_vacancy_fit",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_msg},
+        ],
+        max_tokens=400,
+    )
+
+
+def _without_invented_reason(validation: FitValidation, raw_text: str, profile):
+    """Обезвредить отказ, обоснованный тем, чего в вакансии нет.
+
+    Две дороги, и они не симметричны нарочно. Выдуманное обоснование
+    отказа переводит вердикт в «годится»: пропустить вакансию к ручному
+    просмотру дешевле, чем потерять подходящую. Выдуманное обоснование
+    «мусора» вердикт сохраняет и гасит только само обоснование — сама
+    вакансия скорее всего и правда реклама или дайджест, а пускать
+    рекламу в отклик по такому перевороту нельзя.
+    """
+    if validation.verdict not in ("reject", "trash") or validation.reason is None:
+        return validation
+    marker = looks_hallucinated(validation.reason, raw_text, profile)
+    if marker is None:
+        return validation
+    logger.warning(
+        "validate_vacancy_fit: обоснование вердикта %s не найдено в тексте "
+        "(маркер %s), гашу обоснование. reason=%r",
+        validation.verdict, marker, validation.reason,
+    )
+    if validation.verdict == "reject":
+        return FitValidation(verdict="fit", reason=None)
+    return FitValidation(verdict="trash", reason=None)
+
+
+async def validate_vacancy_fit(
+    parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str,
+    *, profile: CandidateProfile, known_skills=None,
+) -> FitValidation | None:
+    """Годится ли вакансия кандидату; пустота — модель не ответила.
+
+    Неразобранный ответ тоже пустота: зовущий считает её отказом и
+    отправляет вакансию на ручной просмотр.
+    """
+    logger.debug("validate_vacancy_fit: title=%r", parsed.title)
     reply = await chat(
-        client,
-        model,
-        ChatRequest(
-            purpose="validate_vacancy_fit",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_msg},
-            ],
-            max_tokens=400,
-        ),
-        logger,
+        client, model, _fit_request(parsed, raw_text, profile, known_skills), logger
     )
     if reply.text is None:
         return None
-    answer = reply.text
-
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "validate_vacancy_fit: title=%r raw_text[:200]=%r answer=%r",
-            parsed.title, raw_text[:200], answer,
+            parsed.title, raw_text[:200], reply.text,
         )
-
-    parsed_validation = _parse_fit_validation(answer)
-    if parsed_validation is None:
-        log_unparseable(answer, logger, "validate_vacancy_fit")
+    validation = _parse_fit_validation(reply.text)
+    if validation is None:
+        log_unparseable(reply.text, logger, "validate_vacancy_fit")
         return None
-
-    if (
-        parsed_validation.verdict in ("reject", "trash")
-        and parsed_validation.reason is not None
-    ):
-        marker = looks_hallucinated(
-            parsed_validation.reason, raw_text, profile
-        )
-        if marker is not None:
-            # reject с галлюцинированным reason → flip к fit: лучше пропустить
-            # к ручному просмотру, чем терять реально подходящие вакансии.
-            # trash с галлюцинированным reason → оставляем verdict=trash, но
-            # обнуляем reason: сама вакансия скорее всего реально мусор
-            # (реклама, дайджест), просто LLM подобрал бессмысленное обоснование.
-            # Пускать рекламу в outreach по флипу к fit нельзя — это станет
-            # критично, когда реальная отправка HR будет раскомментирована.
-            if parsed_validation.verdict == "reject":
-                logger.warning(
-                    "validate_vacancy_fit: suspected hallucinated reject reason "
-                    "(marker %s not found in raw_text), overriding to fit. "
-                    "title=%r reason=%r",
-                    marker, parsed.title, parsed_validation.reason,
-                )
-                return FitValidation(verdict="fit", reason=None)
-            logger.warning(
-                "validate_vacancy_fit: suspected hallucinated trash reason "
-                "(marker %s not found in raw_text), keeping verdict=trash but "
-                "clearing reason. title=%r reason=%r",
-                marker, parsed.title, parsed_validation.reason,
-            )
-            return FitValidation(verdict="trash", reason=None)
-
-    return parsed_validation
+    return _without_invented_reason(validation, raw_text, profile)
