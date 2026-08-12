@@ -26,6 +26,22 @@ async def test_a_new_company_is_stored_with_the_given_fields(session):
     assert card.company.notes == "через знакомых"
 
 
+async def test_the_spellings_of_a_new_company_lose_their_repeats(session):
+    """Повторы среди написаний не ложатся в колонку и при заведении.
+
+    Правило у написаний компании одно на всех, кто пишет колонку: правку
+    карточки, слияние, разбор вакансии и заведение. Разделители при этом не
+    схлопываются — «Сбер-Тех» и «Сбер Тех» разные, — а вот регистр не
+    считается: список человек набирает руками, и «Контур» с «контур» в нём
+    одно и то же.
+    """
+    company = await create_company(
+        session, name="Ромашка", aliases=["Контур", "контур", "Kontur"]
+    )
+
+    assert company.aliases == ["Контур", "Kontur"]
+
+
 async def test_a_company_without_a_name_is_refused(session):
     """Компанию без имени завести нельзя: имя — её единственный признак."""
     with pytest.raises(ValueError, match="name is required"):

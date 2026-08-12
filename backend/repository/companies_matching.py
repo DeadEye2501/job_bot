@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company
+from backend.domain.spellings import dedupe_first_wins
 from backend.payloads import str_list
 from backend.repository.companies_card import create_company
 from backend.repository.companies_keys import (
@@ -58,16 +59,27 @@ def _enrich_company_with_parsed(
     if real_website and not company.website:
         company.website = real_website
 
-    parsed_norm = normalize_company_name(parsed_name)
-    if parsed_norm:
-        name_norm, alias_norms = _known_spellings(company)
-        if parsed_norm not in {name_norm, *alias_norms}:
-            # Через `str_list`, а не `or []`: колонка JSON, и негодное её
-            # содержимое здесь не сохраняется. Потерять его дешевле, чем
-            # уронить разбор вакансии, — строками оно всё равно не было.
-            aliases = str_list(company.aliases)
-            aliases.append(parsed_name.strip())
-            company.aliases = aliases
+    if not normalize_company_name(parsed_name):
+        return
+    # Отсев тем же правилом и той же формой, что у слияния: разделители у
+    # компании не схлопываются, «Сбер-Тех» и «Сбер Тех» — разные написания.
+    # Схлопывающий ключ выше отвечает на другой вопрос, «та же ли это
+    # компания», и списку написаний он не судья: сличи им — и второе написание
+    # не запомнилось бы, а список для того и копится.
+    #
+    # Отсев идёт по приходящему, а лежащее не трогается вовсе: там бывает и
+    # строка, равная имени компании, — правка карточки её не выбрасывает
+    # нарочно, и фоновому разбору вычищать набранное человеком незачем.
+    #
+    # Через `str_list`, а не `or []`: колонка JSON, и негодное её содержимое
+    # здесь не сохраняется. Потерять его дешевле, чем уронить разбор вакансии,
+    # — строками оно всё равно не было.
+    known = {(company.name or "").casefold()}
+    aliases = str_list(company.aliases)
+    known.update(a.casefold() for a in aliases)
+    company.aliases = aliases + dedupe_first_wins(
+        [parsed_name.strip()], str.casefold, known
+    )
 
 
 def _accept_company_match(
