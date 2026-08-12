@@ -161,20 +161,20 @@ MUTATIONS = [
     # backfill: удалённым метят и то, что старше вытянутого окна
     (
         "backend/flows/dm_backfill.py",
-        "                        Message.tg_message_id >= min_id," + CRLF,
+        "                Message.tg_message_id >= min(seen_ids)," + CRLF,
         "",
     ),
     # backfill: пустой ответ Telegram метит всю переписку удалённой
     (
         "backend/flows/dm_backfill.py",
-        "    if messages:" + CRLF + "        seen_ids = {m.id for m in messages}",
-        "    if True:" + CRLF + "        seen_ids = {m.id for m in messages}",
+        "    if not messages:" + CRLF + "        return False" + CRLF,
+        "    if False:" + CRLF + "        return False" + CRLF,
     ),
     # backfill: повтор засчитывается как новая строка
     (
         "backend/flows/dm_backfill.py",
-        '            had_new = had_new or outcome == "stored"' + CRLF,
-        "            had_new = True" + CRLF,
+        '    return outcome == "stored"' + CRLF,
+        "    return True" + CRLF,
     ),
     # backfill: окно не узнаёт о догнанной переписке
     (
