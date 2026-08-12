@@ -17,29 +17,38 @@ def none_if_empty(value) -> str | None:
     return text or None
 
 
+def read_company_spellings(raw) -> list[str]:
+    """Написания компании из нагрузки формы.
+
+    Приходят с одного экрана строкой через запятую, с другого — готовым
+    списком, и читаются оба: список, прочитанный как строка, лёг бы в
+    колонку одним куском вида «['ООО Контур']», и ни одно написание не
+    нашлось бы при сведении компаний. Пустые и пробельные выпадают: в
+    списке они не значат ничего, а на экране выглядят пропавшей строкой.
+    """
+    if isinstance(raw, str):
+        raw = raw.split(",")
+    elif not isinstance(raw, list):
+        raw = []
+    return [
+        spelling for spelling in (str(a).strip() for a in raw) if spelling
+    ]
+
+
 def read_new_company_fields(payload: dict) -> dict:
     """Поля новой компании из нагрузки формы «добавить компанию».
 
-    Написания приходят с одного экрана строкой через запятую, с другого —
-    готовым списком, и читаются оба: список, прочитанный как строка, лёг
-    бы в колонку одним куском вида «['ООО Контур']», и ни одно написание
-    не нашлось бы при сведении компаний.
+    Написания читает :func:`read_company_spellings` — их же читает правка
+    карточки.
 
     Название отдаётся строкой, а не отсутствием: слот отвечает на пустое
     «Название обязательно», и различать «не прислали» и «прислали пустое»
     ему незачем.
     """
-    raw_aliases = payload.get("aliases")
-    if isinstance(raw_aliases, str):
-        raw_aliases = raw_aliases.split(",")
-    elif not isinstance(raw_aliases, list):
-        raw_aliases = []
     return {
         "name": none_if_empty(payload.get("name")) or "",
         "website": none_if_empty(payload.get("website")),
-        "aliases": [
-            spelling for spelling in (str(a).strip() for a in raw_aliases) if spelling
-        ],
+        "aliases": read_company_spellings(payload.get("aliases")),
         "notes": none_if_empty(payload.get("notes")),
     }
 

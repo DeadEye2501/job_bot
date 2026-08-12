@@ -50,7 +50,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from adapters import lm_studio
 from adapters.lm_studio import LlmProviderConfig
 from backend.repository import blacklist, blacklist_candidates, channels as channels_repo, companies_card, companies_list, hr_card, hr_identify, hr_list, messages as messages_repo, profile as profile_repo, stats_pipeline, stats_summary, vacancies_card, vacancies_life, vacancies_list, vacancies_mini  # три псевдонима: имена заняты локальными переменными
-from client.form_payloads import hr_is_identified, none_if_empty as _none_if_empty, read_new_company_fields, read_new_hr_fields
+from client.form_payloads import hr_is_identified, none_if_empty as _none_if_empty, read_company_spellings, read_new_company_fields, read_new_hr_fields
 from backend.cv_parser import parse_cv
 from backend.domain.scoring import build_skill_lookup, skill_key
 from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
@@ -67,7 +67,7 @@ from backend.models import (
     VacancyStatus,
     VacancyStatusHistory,
 )
-from backend.telegram_login import TelegramLogin
+from backend.telegram_login import TelegramLogin, username_of
 from backend.runtime_settings import RuntimeSettings
 
 
@@ -2923,7 +2923,6 @@ class MainApi(QObject):
         bot = self._bot
 
         async def run() -> str:
-            username = ""
             client = getattr(bot, "_client", None) if bot is not None else None
             # На холодном старте Pyrogram session-load + connect занимает
             # пару секунд; UI запросит settings раньше. Ждём короткий
@@ -2933,16 +2932,20 @@ class MainApi(QObject):
                     await asyncio.sleep(0.2)
                     if getattr(client, "is_connected", False):
                         break
-            if client is not None and getattr(client, "is_connected", False):
-                try:
-                    me = await client.get_me()
-                    username = me.username or ""
-                    self._username_cache = username
-                except Exception:
-                    logger.warning("get_me() failed for settings", exc_info=True)
-            # Бот ещё не успел подключиться — отдаём кэш, если он есть.
-            if not username:
+            asked = None
+            connected = client is not None and getattr(client, "is_connected", False)
+            if connected:
+                asked = await username_of(client)
+                if asked is None:
+                    logger.warning("get_me() failed for settings")
+            if asked is None:
+                # Спросить не вышло или бот ещё не подключился — отдаём кэш.
                 username = self._username_cache
+            else:
+                # Пустая строка — это ответ «ника нет», и он перебивает кэш:
+                # снятый ник иначе остался бы на экране прежним.
+                username = asked
+                self._username_cache = asked
             return _ok({
                 "tg": {
                     "api_id": str(tg.api_id) if tg else "",
@@ -3946,15 +3949,12 @@ class MainApi(QObject):
                 kwargs[key] = payload[key]
         if "aliases" in payload:
             raw = payload["aliases"]
-            if isinstance(raw, str):
-                kwargs["aliases"] = [a.strip() for a in raw.split(",") if a.strip()]
-            elif isinstance(raw, list):
-                kwargs["aliases"] = raw
-            else:
+            if not isinstance(raw, (str, list)):
                 self.contacts_company_action_done.emit(
                     _err("aliases должен быть list или строка через запятую.")
                 )
                 return
+            kwargs["aliases"] = read_company_spellings(raw)
         if not kwargs:
             self.contacts_company_action_done.emit(
                 _err("Нечего обновлять.", company_id=company_id)

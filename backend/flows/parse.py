@@ -21,7 +21,7 @@ from backend.llm.vacancy import parse_vacancy
 from backend.models import HR
 from backend.models import Vacancy
 from backend.models import VacancyStatus
-from backend.payloads import ParsedVacancy
+from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
 from backend.repository.companies_matching import find_or_create_company
 from backend.repository.hr_identify import find_or_create_hr
 from backend.flows.events import record_vacancy_event
@@ -256,31 +256,13 @@ async def _resolve_hr(pipeline, parsed: ParsedVacancy | None):
     return user, await fetch_telegram_avatar(pipeline._client, user)
 
 
-# Прямые поля разбора: у модели они лежат один в один, без пересчёта, и имя
-# у вакансии то же самое. Перечень один на троих — стереть прошлое, записать
-# новое, назвать заполненное, — потому что зеркальны эти трое только по
-# уговору: забытое в одной из них поле оставит на экране прошлый разбор, и
-# молча. Производные — стек с оценкой, тройка зарплаты и заметки — сюда не
-# входят: у каждого своё правило, и оно живёт в теле.
-_DIRECT_PARSED_FIELDS = (
-    "title",
-    "description",
-    "company_name",
-    "hr_contact",
-    "grade",
-    "salary",
-    "remote",
-    "location",
-)
-
-
 def _clear_parsed_fields(v: Vacancy, score: int) -> None:
     """Стереть прошлый разбор: колонки в пусто, стек — пустым списком.
 
     Оценка приходит доводом, а не нулём по месту: «разобрать не вышло» —
     тоже исход разбора, и число ему назначает тот, кто исход вынес.
     """
-    for name in _DIRECT_PARSED_FIELDS:
+    for name in DIRECT_PARSED_FIELDS:
         setattr(v, name, None)
     v.stack = []
     v.score = score
@@ -302,7 +284,7 @@ def _apply_parsed_fields(
     if parsed is None:
         _clear_parsed_fields(v, outcome.score)
         return
-    for name in _DIRECT_PARSED_FIELDS:
+    for name in DIRECT_PARSED_FIELDS:
         setattr(v, name, getattr(parsed, name))
     if parsed.stack or not outcome.keep_previous_stack:
         v.stack = parsed.stack
@@ -328,7 +310,7 @@ def _fields_filled(v: Vacancy) -> list[str]:
     в хвост: порядок здесь не оформление, а часть уже записанных строк ленты,
     и перестановка развела бы новые строки со старыми молча.
     """
-    names = list(_DIRECT_PARSED_FIELDS)
+    names = list(DIRECT_PARSED_FIELDS)
     names.insert(names.index("hr_contact") + 1, "stack")
     return [name for name in names if getattr(v, name)]
 

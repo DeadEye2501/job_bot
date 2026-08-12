@@ -15,22 +15,29 @@ logger = logging.getLogger(__name__)
 CycleOutcome = Literal["ok", "busy", "cancelled", "error"]
 
 
-def cancel_current_poll(bot) -> None:
-    """Cancel an in-flight poll cycle without stopping the whole bot.
+def on_runner_loop(bot, action: Callable[[], Any]) -> None:
+    """Сделать это на цикле бота, а не в том потоке, откуда позвали.
 
-    Thread-safe: см. ``kick``. Task.cancel() из чужого треда мутирует
-    внутреннее состояние Task'а и пытается loop.call_soon — обязан
-    идти через call_soon_threadsafe.
+    Зовут отсюда из потока окна, а `asyncio.Event` и `Task` изнутри ходят по
+    своим ожидающим и сами планируют `loop.call_soon` — из чужого потока это
+    иногда роняет. Пока цикла нет (бот ещё не поднялся) или он уже закрыт,
+    делаем прямо: ожидающих у события в этот миг нет, а задачи прогона нет и
+    подавно.
     """
+    loop = bot._loop
+    if loop is not None and not loop.is_closed():
+        loop.call_soon_threadsafe(action)
+    else:
+        action()
+
+
+def cancel_current_poll(bot) -> None:
+    """Cancel an in-flight poll cycle without stopping the whole bot."""
     task = bot._current_poll_task
     if task is None or task.done():
         return
     logger.info("Cancel current poll requested")
-    loop = bot._loop
-    if loop is not None and not loop.is_closed():
-        loop.call_soon_threadsafe(task.cancel)
-    else:
-        task.cancel()
+    on_runner_loop(bot, task.cancel)
 
 
 async def _run_task(bot, work: Callable[[], Any], label: str):

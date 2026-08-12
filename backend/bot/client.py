@@ -217,17 +217,11 @@ class Bot:
     def kick(self) -> None:
         """Wake the loop so the next poll runs immediately instead of waiting.
 
-        Thread-safe: вызывается из Qt-треда. Через ``call_soon_threadsafe``
-        планируем .set() на runner-loop'е, чтобы не мутить Event из чужого
-        треда напрямую (asyncio.Event внутри ходит по _waiters и пытается
-        loop.call_soon — без call_soon_threadsafe это иногда роняет).
+        Зовётся из потока окна — почему через `slot.on_runner_loop`, сказано
+        там же.
         """
         logger.debug("Poll wake requested")
-        runner_loop = self._loop
-        if runner_loop is not None and not runner_loop.is_closed():
-            runner_loop.call_soon_threadsafe(self._wake_event.set)
-        else:
-            self._wake_event.set()
+        slot.on_runner_loop(self, self._wake_event.set)
 
 
     def request_stop(self) -> None:
@@ -236,13 +230,8 @@ class Bot:
         Thread-safe: см. ``kick``.
         """
         logger.info("Stop requested")
-        runner_loop = self._loop
-        if runner_loop is not None and not runner_loop.is_closed():
-            runner_loop.call_soon_threadsafe(self._stop_event.set)
-            runner_loop.call_soon_threadsafe(self._wake_event.set)
-        else:
-            self._stop_event.set()
-            self._wake_event.set()
+        slot.on_runner_loop(self, self._stop_event.set)
+        slot.on_runner_loop(self, self._wake_event.set)
 
 
     async def poll_channel_now(self, channel_id) -> Literal["ok", "busy", "missing", "cancelled", "error"]:

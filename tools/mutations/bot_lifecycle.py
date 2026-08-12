@@ -7,48 +7,32 @@
 CRLF = "\r\n"
 
 MUTATIONS = [
-    # kick: побудка на живом цикле уходит мимо него
+    # on_runner_loop: действие на живом цикле уходит мимо него
     (
-        "backend/bot/client.py",
-        '        logger.debug("Poll wake requested")' + CRLF
-        + "        runner_loop = self._loop" + CRLF
-        + "        if runner_loop is not None and not runner_loop.is_closed():" + CRLF
-        + "            runner_loop.call_soon_threadsafe(self._wake_event.set)" + CRLF,
-        '        logger.debug("Poll wake requested")' + CRLF
-        + "        runner_loop = self._loop" + CRLF
-        + "        if runner_loop is not None and not runner_loop.is_closed():" + CRLF
-        + "            pass" + CRLF,
+        "backend/bot/slot.py",
+        "    if loop is not None and not loop.is_closed():" + CRLF
+        + "        loop.call_soon_threadsafe(action)" + CRLF,
+        "    if loop is not None and not loop.is_closed():" + CRLF
+        + "        pass" + CRLF,
     ),
-    # kick: без живого цикла побудка теряется
+    # on_runner_loop: без живого цикла действие теряется
     (
-        "backend/bot/client.py",
-        "        if runner_loop is not None and not runner_loop.is_closed():" + CRLF
-        + "            runner_loop.call_soon_threadsafe(self._wake_event.set)" + CRLF
-        + "        else:" + CRLF
-        + "            self._wake_event.set()" + CRLF
-        + CRLF
-        + CRLF
-        + "    def request_stop(",
-        "        if runner_loop is not None and not runner_loop.is_closed():" + CRLF
-        + "            runner_loop.call_soon_threadsafe(self._wake_event.set)" + CRLF
-        + CRLF
-        + CRLF
-        + "    def request_stop(",
+        "backend/bot/slot.py",
+        "    else:" + CRLF + "        action()" + CRLF,
+        "    else:" + CRLF + "        pass" + CRLF,
     ),
     # request_stop: остановка перестаёт будить цикл
     (
         "backend/bot/client.py",
-        "            self._stop_event.set()" + CRLF
-        + "            self._wake_event.set()" + CRLF,
-        "            self._stop_event.set()" + CRLF,
+        "        slot.on_runner_loop(self, self._stop_event.set)" + CRLF
+        + "        slot.on_runner_loop(self, self._wake_event.set)" + CRLF,
+        "        slot.on_runner_loop(self, self._stop_event.set)" + CRLF,
     ),
     # cancel_current_poll: отмена не доходит до задачи
     (
         "backend/bot/slot.py",
-        "        loop.call_soon_threadsafe(task.cancel)" + CRLF
-        + "    else:" + CRLF
-        + "        task.cancel()" + CRLF,
-        "        pass" + CRLF + "    else:" + CRLF + "        pass" + CRLF,
+        "    on_runner_loop(bot, task.cancel)" + CRLF,
+        "    pass" + CRLF,
     ),
     # run_in_slot: занятое место перестаёт отбивать второй прогон
     (

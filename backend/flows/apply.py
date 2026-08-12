@@ -11,7 +11,7 @@ from adapters import telegram
 from backend.llm.cover_letter import generate_cover_letter
 from backend.models import Vacancy
 from backend.models import VacancyStatus
-from backend.payloads import ParsedVacancy
+from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
 from backend.repository.hr_identify import count_recent_outgoing_with_vacancy_for_hr
 
 logger = logging.getLogger(__name__)
@@ -285,23 +285,22 @@ def _parsed_from_row(v: Vacancy) -> ParsedVacancy:
     """Собрать разобранную вакансию обратно из строки базы.
 
     Наставлению модели нужен тот же вид, что и на самотёке, иначе письмо
-    вручную сочинялось бы по другим данным. Сайт компании и второй контакт
-    в строке не хранятся вовсе, а стек хранится одним списком — в
-    обязательный он и уходит: занизить требование хуже, чем завысить.
+    вручную сочинялось бы по другим данным. Прямые поля берутся перечнем
+    `DIRECT_PARSED_FIELDS` — тем же, каким разбор их и записывал: со своим
+    списком новое поле до ручного отклика не доехало бы молча.
+
+    Остальное собирается здесь: пустое название вакансии становится пустой
+    строкой (у разобранной оно не пустует), сайт компании и второй контакт в
+    строке не хранятся вовсе, а стек хранится одним списком — в обязательный
+    он и уходит: занизить требование хуже, чем завысить.
     """
+    direct = {name: getattr(v, name) for name in DIRECT_PARSED_FIELDS}
     return ParsedVacancy(
-        title=v.title or "",
-        description=v.description,
-        company_name=v.company_name,
+        **{**direct, "title": v.title or ""},
         company_website=None,
-        hr_contact=v.hr_contact,
         other_contact=None,
         stack_required=list(v.stack or []),
         stack_preferred=[],
-        grade=v.grade,
-        salary=v.salary,
-        remote=v.remote,
-        location=v.location,
     )
 
 
