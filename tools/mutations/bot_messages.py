@@ -276,8 +276,8 @@ MUTATIONS = [
     # on_dm_delete: имя переписки перестаёт участвовать в опознании HR
     (
         "backend/bot/updates.py",
-        '                    chat_username = getattr(chat, "username", None)' + CRLF,
-        "                    chat_username = None" + CRLF,
+        '            return getattr(chat, "username", None)' + CRLF,
+        "            return None" + CRLF,
     ),
     # persist_outgoing_dm: эхо своей отправки пишется второй строкой
     (

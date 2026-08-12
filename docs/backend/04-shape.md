@@ -79,7 +79,7 @@
       `hr_card` 71, `blacklist` 68, `channels` 60
 - [x] **Т. Конвейер:** `pipeline.__init__` 97, `rerun` 90, `dm_classify` (68, 63),
       `parse._persist_parse_outcome` 64, `ingest` 63
-- [ ] **У. Модель и края:** `bot/updates.on_dm_delete` 92, `adapters/lm_studio.chat`
+- [x] **У. Модель и края:** `bot/updates.on_dm_delete` 92, `adapters/lm_studio.chat`
       76, `llm/company` 70, `llm/hr_reply` 70, `llm/vacancy` (67, 62)
 
 *41–59 строк — двадцать восемь тел, тем же порядком.*

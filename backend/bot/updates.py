@@ -90,27 +90,14 @@ async def on_dm_edit(bot, _client, msg) -> None:
         fire(bot.on_new_message, "on_new_message", hr_id)
 
 
-async def on_dm_delete(bot, _client, messages) -> None:
-    """Sync Telegram deletes — set is_deleted=True, keep the row.
+def _split_by_chat(messages) -> tuple[dict[int, list[int]], list[int]]:
+    """Разложить надгробия по перепискам; безадресные — отдельным списком.
 
     Pyrogram delete updates are sparse: ``m.chat`` is often ``None`` for
     secret-chat / channel-less tombstones, and only ``m.id`` is
-    guaranteed. We group by chat when we have it; otherwise fall back to
-    a chatless sweep restricted to incoming rows. ``tg_message_id`` is
-    per-chat in Telegram (NOT globally unique — two HRs routinely share
-    early ids 1, 2, 3...), so the chatless branch could in principle
-    flip an unrelated HR's row. We narrow to incoming because chatless
-    deletes practically only happen for secret/channel sources we don't
-    store anyway, and incoming-only further shrinks the collision window.
-    Outgoing tombstones missed here will be reconciled the next time we
-    load the chat from Telegram on app restart.
-
-    Что значит «удалено» — надгробие, гашение непрочитанного входящего и
-    оговорка «уже похороненное не трогаем» — объявлено один раз в
-    ``repository.messages.tombstone_messages``; здесь остаётся только отбор.
+    guaranteed. Группируем по переписке, когда она известна; остальное
+    уходит в сплошной проход (см. :func:`_tombstone_chatless`).
     """
-    if (await bot._current_mode()) is BotMode.OFF:
-        return
     with_chat: dict[int, list[int]] = {}
     chatless_ids: list[int] = []
     for m in messages:
@@ -120,60 +107,99 @@ async def on_dm_delete(bot, _client, messages) -> None:
             chatless_ids.append(m.id)
         else:
             with_chat.setdefault(chat_id, []).append(m.id)
+    return with_chat, chatless_ids
+
+
+def _chat_username(messages, chat_id: int) -> str | None:
+    """Ник переписки из пачки надгробий.
+
+    Нужен затем, что человек мог быть заведён по одному нику, без
+    числового идентификатора, — по нему его и найдут.
+    """
+    for m in messages:
+        chat = getattr(m, "chat", None)
+        if chat and getattr(chat, "id", None) == chat_id:
+            return getattr(chat, "username", None)
+    return None
+
+
+async def _tombstone_in_chat(bot, chat_id: int, msg_ids: list[int], messages):
+    """Похоронить письма одной переписки; отдать человека, если что-то легло."""
+    async with bot._session_factory() as session:
+        hr = await find_known_hr(
+            session, chat_id, _chat_username(messages, chat_id)
+        )
+        if hr is None:
+            return None
+        rowcount = await tombstone_messages(
+            session,
+            Message.hr_id == hr.id,
+            Message.tg_message_id.in_(msg_ids),
+        )
+        await session.commit()
+        if not rowcount:
+            return None
+        # Похороненное письмо выкидывается из копилки разбора, чтобы не
+        # попасть в классификацию. Делается это до выхода из сессии — там же,
+        # где делалось всегда: между похоронами и вычисткой не должно быть
+        # ничего, на чём разбор успел бы вынуть копилку.
+        #
+        # Счётчик считает только живые строки, поэтому письмо, похороненное
+        # другим путём, пока оно лежало в копилке, из неё не выпадет.
+        # Разводить этот случай с «строк не нашлось вовсе» — где копилку
+        # трогать нельзя — можно только вторым запросом, и он этого не стоит.
+        for tg_msg_id in msg_ids:
+            bot._ingestion.remove_dm_buffer_msg(hr.id, tg_msg_id)
+        return hr.id
+
+
+async def _tombstone_chatless(bot, chatless_ids: list[int]) -> set[int]:
+    """Похоронить безадресные надгробия; отдать задетых людей.
+
+    ``tg_message_id`` в Telegram свой у каждой переписки (NOT globally
+    unique — two HRs routinely share early ids 1, 2, 3...), поэтому такой
+    проход в принципе может задеть чужую строку. Сужаем до входящих: без
+    переписки удаления приходят практически только из секретных чатов и
+    каналов, которых мы не храним, а входящие сужают окно ошибки ещё
+    сильнее. Пропущенные здесь исходящие сверятся при следующей загрузке
+    переписки из Telegram.
+
+    Спрашиваем до похорон и тем же отбором: иначе в смешанной пачке уже
+    похороненная строка чужого человека разбудила бы окно за переписку, в
+    которой ничего не изменилось.
+    """
+    async with bot._session_factory() as session:
+        chatless = (
+            Message.tg_message_id.in_(chatless_ids),
+            Message.is_incoming,
+        )
+        hr_ids = await hr_ids_of_live_messages(session, *chatless)
+        rowcount = await tombstone_messages(session, *chatless)
+        await session.commit()
+    return hr_ids if rowcount else set()
+
+
+async def on_dm_delete(bot, _client, messages) -> None:
+    """Sync Telegram deletes — set is_deleted=True, keep the row.
+
+    Что значит «удалено» — надгробие, гашение непрочитанного входящего и
+    оговорка «уже похороненное не трогаем» — объявлено один раз в
+    ``repository.messages.tombstone_messages``; здесь остаётся только отбор,
+    а он у надгробий двух родов разный: см. :func:`_split_by_chat`.
+    """
+    if (await bot._current_mode()) is BotMode.OFF:
+        return
+    with_chat, chatless_ids = _split_by_chat(messages)
     if not with_chat and not chatless_ids:
         return
 
     touched_hr_ids: set[int] = set()
-
     for chat_id, msg_ids in with_chat.items():
-        async with bot._session_factory() as session:
-            # Resolve HR by chat_id; for username-only HRs we need the
-            # username fallback that Pyrogram supplies on chat objects.
-            chat_username = None
-            for m in messages:
-                chat = getattr(m, "chat", None)
-                if chat and getattr(chat, "id", None) == chat_id:
-                    chat_username = getattr(chat, "username", None)
-                    break
-            hr = await find_known_hr(session, chat_id, chat_username)
-            if hr is None:
-                continue
-            rowcount = await tombstone_messages(
-                session,
-                Message.hr_id == hr.id,
-                Message.tg_message_id.in_(msg_ids),
-            )
-            await session.commit()
-            if rowcount:
-                touched_hr_ids.add(hr.id)
-                # Если удалённое сообщение всё ещё сидит в debounce-буфере
-                # — выкинем его оттуда, чтобы не учитывать в классификации.
-                #
-                # Счётчик считает только живые строки, поэтому сообщение,
-                # похороненное другим путём, пока оно лежало в буфере, из
-                # буфера не выпадет. Разводить этот случай с «строк не
-                # нашлось вовсе» — где буфер трогать нельзя — можно только
-                # вторым запросом, и он этого не стоит.
-                for tg_msg_id in msg_ids:
-                    bot._ingestion.remove_dm_buffer_msg(hr.id, tg_msg_id)
-
+        hr_id = await _tombstone_in_chat(bot, chat_id, msg_ids, messages)
+        if hr_id is not None:
+            touched_hr_ids.add(hr_id)
     if chatless_ids:
-        async with bot._session_factory() as session:
-            # Chatless sweep — narrowed to incoming so we never flip an
-            # outgoing row that happens to share a tg_message_id with a
-            # delete from a different HR.
-            # Спрашиваем до похорон и тем же отбором: иначе в смешанной пачке
-            # уже похороненная строка чужого HR разбудила бы окно за переписку,
-            # в которой ничего не изменилось.
-            chatless = (
-                Message.tg_message_id.in_(chatless_ids),
-                Message.is_incoming,
-            )
-            hr_ids = await hr_ids_of_live_messages(session, *chatless)
-            rowcount = await tombstone_messages(session, *chatless)
-            await session.commit()
-            if rowcount:
-                touched_hr_ids |= hr_ids
+        touched_hr_ids |= await _tombstone_chatless(bot, chatless_ids)
 
     if touched_hr_ids:
         logger.info(

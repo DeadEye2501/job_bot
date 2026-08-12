@@ -68,8 +68,8 @@ MUTATIONS = [
     # chat: признак завершения теряется по дороге
     (
         "adapters/lm_studio.py",
-        "    return ChatAnswer(text=text, finish_reason=finish_reason)",
-        "    return ChatAnswer(text=text)",
+        "    return ChatAnswer(text=content.strip(), finish_reason=finish_reason)",
+        "    return ChatAnswer(text=content.strip())",
     ),
     # chat: неразбираемый ответ отдаётся как пустой, без причины
     (
