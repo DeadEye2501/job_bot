@@ -2,9 +2,12 @@
 
 import logging
 import asyncio
+from dataclasses import dataclass
+from typing import Any
 
 from backend.flows.dm import persist_outgoing_dm, process_dm
 from backend.domain.telegram_identity import telegram_peer
+from backend.models import Message
 from backend.repository.hr_list import list_hrs_for_backfill
 from backend.repository.messages import tombstone_messages
 from backend.notify import fire
@@ -21,6 +24,163 @@ _DM_CATCHUP_BATCH_SIZE = 20
 
 
 _DM_CATCHUP_BATCH_DELAY_SEC = 1.0
+
+
+@dataclass(frozen=True, slots=True)
+class _Walk:
+    """Один проход по переписке: чей он и с чьей помощью идёт.
+
+    **Это не свёртка группы значений, а носильщик сотрудников** — и разница
+    названа нарочно. Соглашение плана сворачивает только настоящие группы, а
+    здесь собраны Telegram, модель, база, планировщик и окно, то есть ровно
+    тот мешок, который план отверг для `Bot.send`. Заведён он по другой
+    причине: без него разнимание тела упирается в предел доводов у каждого
+    куска. Публичная подпись догона при этом не тронута — её девять доводов
+    остались доводами, и это записано в плане.
+
+    Держит поля вместе один предмет — номер HR, чью переписку разбирают: все
+    они живут ровно от первого сообщения прохода до последнего.
+    """
+
+    hr_id: int
+    client: Any
+    lm_client: Any
+    lm_chat_model: str | None
+    session_factory: Any
+    schedule_classification: Any
+    on_vacancies_changed: Any
+
+
+async def _fetch_history(client, hr, limit: int) -> list | None:
+    """Хвост переписки, свежими вперёд; `None` — прочитать не удалось.
+
+    Пустой список этим не считается: он значит «переписки нет», и зовущий идёт
+    дальше. Две беды чинятся здесь, обе одной попыткой. Неизвестный собеседник:
+    номера нет в кэше, и `get_users` зовётся ради побочного действия — он
+    кладёт собеседника туда, оттого второе чтение и проходит. Просьба
+    подождать: сюда доходят только долгие (короткие Pyrogram пережидает сам),
+    потому одной попытки и хватает, а второй отказ значит штраф до включения.
+    """
+    from pyrogram.errors import FloodWait, PeerIdInvalid
+
+    async def read(peer) -> list:
+        return [msg async for msg in client.get_chat_history(peer, limit=limit)]
+
+    target = telegram_peer(hr)
+    if target is None:
+        return None
+    try:
+        return await read(target)
+    except PeerIdInvalid:
+        logger.warning("backfill: PeerIdInvalid у hr %d — пробую по нику", hr.id)
+        if not hr.telegram_username:
+            return None
+        try:
+            await client.get_users(hr.telegram_username)
+            return await read(hr.telegram_username)
+        except Exception:
+            logger.exception("backfill: resolve fallback failed для hr %d", hr.id)
+            return None
+    except FloodWait as e:
+        wait = int(getattr(e, "value", 30))
+        logger.info("backfill: FloodWait %ds на hr %d — жду и ретраим", wait, hr.id)
+        await asyncio.sleep(wait + 1)
+        try:
+            return await read(target)
+        except Exception:
+            logger.exception("backfill: retry после FloodWait не помог hr %d", hr.id)
+            return None
+
+
+async def _store_outgoing(walk: _Walk, msg) -> bool:
+    """Записать своё сообщение из хвоста; сказать, легло ли новое.
+
+    Разбора моделью оно не требует — пишется как есть, тем же объявлением,
+    что и эхо из Telegram.
+    """
+    try:
+        outcome = await persist_outgoing_dm(
+            walk.session_factory, walk.client, msg, walk.hr_id
+        )
+    except Exception:
+        logger.exception(
+            "backfill outgoing insert failed",
+            extra={"hr_id": walk.hr_id, "tg_message_id": msg.id},
+        )
+        return False
+    return outcome == "stored"
+
+
+async def _store_incoming(walk: _Walk, msg) -> bool:
+    """Провести чужое сообщение той же дорогой, что и живое.
+
+    Разбор и привязка к вакансии обязаны совпадать с живым путём, а повтор
+    отсекает уникальность номера сообщения внутри `save_incoming_message`.
+
+    С отложенным разбором о смене статуса оповещает он же, и отсюда сигнал
+    не дублируется: после включения это полсотни сообщений на три десятка
+    HR — полторы тысячи оповещений за миг. Без планировщика разбор идёт на
+    месте, и сигнал нужен. Имя с приставкой: без неё запись о поломке не
+    отличить от трёх других мест с тем же крючком.
+    """
+    try:
+        await process_dm(
+            msg, walk.lm_client, walk.lm_chat_model, walk.session_factory,
+            client=walk.client,
+            schedule_classification=walk.schedule_classification,
+        )
+    except Exception:
+        logger.exception(
+            "backfill incoming process failed",
+            extra={"hr_id": walk.hr_id, "tg_message_id": msg.id},
+        )
+        return False
+    if walk.schedule_classification is None:
+        fire(walk.on_vacancies_changed, "backfill: on_vacancies_changed")
+    return True
+
+
+async def _walk_messages(messages: list, walk: _Walk) -> bool:
+    """Записать вытянутую переписку; сказать, появилось ли новое.
+
+    Старое первым: Telegram отдаёт свежее вперёд, а в переписке окна порядок
+    обратный. Беда одного сообщения весь догон не уносит — дальше идут и
+    остальная переписка, и сверка удалённого, и оповещение окна; догон
+    вдобавок гоняют по два десятка переписок разом, и запертая на запись
+    база тут обычное дело.
+    """
+    had_new = False
+    for msg in reversed(messages):
+        if msg.outgoing:
+            had_new = await _store_outgoing(walk, msg) or had_new
+        else:
+            had_new = await _store_incoming(walk, msg) or had_new
+    return had_new
+
+
+async def _reconcile_deletes(session_factory, hr_id: int, messages: list) -> bool:
+    """Похоронить строки, пропавшие из ответа Telegram; сказать, были ли такие.
+
+    Telegram не переигрывает пропущенные оповещения об удалении после
+    переподключения. Окно сверки — номера, накрытые вытянутым хвостом: всё,
+    что в него попадает, но в ответе не пришло, удалено, пока нас не было.
+    """
+    if not messages:
+        return False
+    seen_ids = {m.id for m in messages}
+    async with session_factory() as session:
+        buried = bool(
+            await tombstone_messages(
+                session,
+                Message.hr_id == hr_id,
+                Message.tg_message_id.is_not(None),
+                Message.tg_message_id >= min(seen_ids),
+                Message.tg_message_id.notin_(seen_ids),
+            )
+        )
+        if buried:
+            await session.commit()
+    return buried
 
 
 async def backfill_hr_dm_history(
@@ -42,138 +202,22 @@ async def backfill_hr_dm_history(
     the chat would show only the cover-letter we just sent, prior history
     invisible until the next OFF→active transition).
     """
-    from backend.models import Message
-    from pyrogram.errors import FloodWait, PeerIdInvalid
-
-    async def history(peer) -> list:
-        """Переписка с собеседником списком, свежими вперёд.
-
-        Читается она трижды — первым заходом, после отказа опознать
-        собеседника и после ожидания по требованию Telegram, — и порознь
-        три обхода разъезжались бы глубиной чтения.
-        """
-        return [
-            msg
-            async for msg in client.get_chat_history(peer, limit=backfill_limit)
-        ]
-
-    target = telegram_peer(hr)
-    if target is None:
+    messages = await _fetch_history(client, hr, backfill_limit)
+    if messages is None:
         return
-    try:
-        messages = await history(target)
-    except PeerIdInvalid:
-        # Pyrogram peer-cache не знает этого id (HR добавлен по
-        # @username без предыдущего DM, либо session сброшен).
-        # Пробуем resolve по username, если есть; иначе skip.
-        logger.warning(
-            "backfill: PeerIdInvalid для hr %d (target=%s) — пробую "
-            "resolve по @username",
-            hr.id, target,
-        )
-        if hr.telegram_username:
-            try:
-                await client.get_users(hr.telegram_username)
-                # После get_users peer попадает в cache; повторим чтение.
-                messages = await history(hr.telegram_username)
-            except Exception:
-                logger.exception(
-                    "backfill: resolve fallback failed для hr %d", hr.id
-                )
-                return
-        else:
-            return
-    except FloodWait as e:
-        # Pyrogram не съел FloodWait сам (значит, он длиннее
-        # ``sleep_threshold`` из make_client). Ждём явно ровно столько,
-        # сколько просит TG, и ретраим один раз — этого достаточно для
-        # типичных peak'ов rate-limit'а во время batch catch-up'а. Если
-        # и второй раз FloodWait — значит, реально серьёзный штраф,
-        # дальше уже скипаем HR'а до следующего OFF→active цикла.
-        wait = int(getattr(e, "value", 30))
-        logger.info(
-            "backfill: FloodWait %ds на hr %d — жду и ретраим",
-            wait, hr.id,
-        )
-        await asyncio.sleep(wait + 1)
-        try:
-            messages = await history(target)
-        except Exception:
-            logger.exception(
-                "backfill: retry после FloodWait не помог hr %d", hr.id,
-            )
-            return
-    had_new = False
-    # Oldest-first so the chat order stays sane in the UI.
-    for msg in reversed(messages):
-        if msg.outgoing:
-            # Своё сообщение разбора моделью не требует — его пишут как есть,
-            # тем же объявлением, что и эхо из Telegram.
-            #
-            # Беда одного сообщения не должна уносить весь догон: дальше по
-            # списку идут и остальная переписка, и сверка удалённого, и
-            # оповещение окна о том, что уже легло. Догон вдобавок гоняют по
-            # два десятка переписок разом, и запертая на запись база — здесь
-            # обычное дело, а не диковина.
-            try:
-                outcome = await persist_outgoing_dm(
-                    session_factory, client, msg, hr.id
-                )
-            except Exception:
-                logger.exception(
-                    "backfill outgoing insert failed",
-                    extra={"hr_id": hr.id, "tg_message_id": msg.id},
-                )
-                continue
-            had_new = had_new or outcome == "stored"
-        else:
-            # Incoming routed through the same pipeline as live DMs so
-            # classification + vacancy-linking stay consistent. The
-            # UNIQUE constraint inside save_incoming_message dedupes.
-            try:
-                await process_dm(
-                    msg, lm_client, lm_chat_model, session_factory,
-                    client=client,
-                    schedule_classification=schedule_classification,
-                )
-                had_new = True
-                # С debounce-планировщиком статус НЕ меняется
-                # синхронно — он флипнется через 60с после burst'а.
-                # Тогда же отдельный таск пушит on_vacancies_changed
-                # сам. Не дублируем сигнал отсюда — в catch-up
-                # после OFF→active это особенно важно: 50 сообщений
-                # × 30 HR'ов = 1500 пушей за миллисекунду.
-                # Без планировщика (legacy путь) — классификация
-                # inline, тогда сигнал нужен.
-                if schedule_classification is None:
-                    # Имя с приставкой: запись о поломке идёт под общим
-                    # логгером оповещений, и без неё догон не отличить от
-                    # трёх других мест, где зовут тот же обработчик.
-                    fire(on_vacancies_changed, "backfill: on_vacancies_changed")
-            except Exception:
-                logger.exception(
-                    "backfill incoming process failed",
-                    extra={"hr_id": hr.id, "tg_message_id": msg.id},
-                )
-    # Delete reconciliation. Window = ids covered by the fetched
-    # history; anything in our DB inside that window not present in
-    # the response was deleted while we were offline.
-    tombstoned = False
-    if messages:
-        seen_ids = {m.id for m in messages}
-        min_id = min(seen_ids)
-        async with session_factory() as session:
-            tombstoned = bool(
-                await tombstone_messages(
-                    session,
-                    Message.hr_id == hr.id,
-                    Message.tg_message_id.is_not(None),
-                    Message.tg_message_id >= min_id,
-                    Message.tg_message_id.notin_(seen_ids),
-                )
-            )
-            if tombstoned:
-                await session.commit()
+    had_new = await _walk_messages(
+        messages,
+        _Walk(
+            hr_id=hr.id,
+            client=client,
+            lm_client=lm_client,
+            lm_chat_model=lm_chat_model,
+            session_factory=session_factory,
+            schedule_classification=schedule_classification,
+            on_vacancies_changed=on_vacancies_changed,
+        ),
+    )
+    tombstoned = await _reconcile_deletes(session_factory, hr.id, messages)
     if had_new or tombstoned:
         fire(on_message_persisted, "on_message_persisted", hr.id)
 
