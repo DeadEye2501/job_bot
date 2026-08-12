@@ -158,7 +158,7 @@ MUTATIONS = [
     # _relink: имя предмета в ленте берётся от другой стороны привязки
     (
         "backend/repository/vacancies_card.py",
-        '            "previous_name": previous_name,',
+        '            "previous_name": await _link_name(session, link, previous_id),',
         '            "previous_name": link.display(target) if target else None,',
     ),
     # _move_status: запись автоматики подписывается пользователем

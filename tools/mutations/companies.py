@@ -264,8 +264,8 @@ MUTATIONS = [
     # merge_company: чужой сайт затирает свой
     (
         "backend/repository/companies_card.py",
-        "    if not survivor.website and abs_website:",
-        "    if abs_website:",
+        "    if not survivor.website and taken.website:",
+        "    if taken.website:",
     ),
     # load_merge_pair: слияние записи самой с собой проходит. Цель та же,
     # что и в наборе HR, — общий заслон один, но ловят его свои тесты
