@@ -35,7 +35,7 @@
 
 **Потом слои.**
 
-- [ ] **Г. Записи мимо репозитория** — 8, 9, 18.
+- [x] **Г. Записи мимо репозитория** — 8, 9, 18.
       `bot/updates.py`, `repository/messages.py`, `flows/parse.py`,
       `repository/vacancies_life.py`
 - [ ] **Д. Разъезд модулей** — 10, 11.

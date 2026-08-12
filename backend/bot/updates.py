@@ -6,7 +6,6 @@ import logging
 # ``sys.modules`` на каждое событие сервера.
 from pyrogram.raw.types import PeerUser as _PeerUser
 from pyrogram.raw.types import UpdateReadHistoryOutbox as _UpdateReadHistoryOutbox
-from sqlalchemy import select
 
 from backend.flows.dm import persist_outgoing_dm, process_dm
 from backend.helpers import extract_dm_text
@@ -14,7 +13,12 @@ from backend.helpers import extract_text
 from backend.models import BotMode
 from backend.models import Message
 from backend.repository.hr_identify import find_known_hr
-from backend.repository.messages import mark_outgoing_read, tombstone_messages
+from backend.repository.messages import (
+    hr_ids_of_live_messages,
+    mark_outgoing_read,
+    overwrite_message_text,
+    tombstone_messages,
+)
 
 from backend.notify import fire
 
@@ -55,8 +59,6 @@ async def on_dm_edit(bot, _client, msg) -> None:
         return
     if not msg.chat:
         return
-    from sqlalchemy import update as _sa_update
-
     chat_id = msg.chat.id
     chat_username = getattr(msg.chat, "username", None)
     is_incoming = bool(getattr(msg, "from_user", None)
@@ -65,17 +67,14 @@ async def on_dm_edit(bot, _client, msg) -> None:
         hr = await find_known_hr(session, chat_id, chat_username)
         if hr is None:
             return
-        res = await session.execute(
-            _sa_update(Message)
-            .where(
-                Message.hr_id == hr.id,
-                Message.tg_message_id == msg.id,
-                Message.is_incoming.is_(is_incoming),
-            )
-            .values(text=extract_dm_text(msg), is_edited=True)
+        updated = await overwrite_message_text(
+            session,
+            hr.id,
+            msg.id,
+            is_incoming=is_incoming,
+            text=extract_dm_text(msg),
         )
         await session.commit()
-        updated = res.rowcount or 0
         hr_id = hr.id
     # Если это сообщение всё ещё сидит в debounce-буфере (HR отредак-
     # тировал в первые 60 сек) — обновим текст там тоже, чтобы
@@ -163,28 +162,18 @@ async def on_dm_delete(bot, _client, messages) -> None:
             # Chatless sweep — narrowed to incoming so we never flip an
             # outgoing row that happens to share a tg_message_id with a
             # delete from a different HR.
-            # Отбор тот же, что у писателя, вместе с оговоркой «не надгробие»:
-            # иначе в смешанной пачке уже похороненная строка чужого HR
-            # разбудила бы окно за переписку, в которой ничего не изменилось.
-            hr_id_rows = (
-                await session.execute(
-                    select(Message.hr_id).where(
-                        Message.tg_message_id.in_(chatless_ids),
-                        Message.is_incoming,
-                        Message.hr_id.is_not(None),
-                        Message.is_deleted.is_(False),
-                    )
-                )
-            ).all()
-            rowcount = await tombstone_messages(
-                session,
+            # Спрашиваем до похорон и тем же отбором: иначе в смешанной пачке
+            # уже похороненная строка чужого HR разбудила бы окно за переписку,
+            # в которой ничего не изменилось.
+            chatless = (
                 Message.tg_message_id.in_(chatless_ids),
                 Message.is_incoming,
             )
+            hr_ids = await hr_ids_of_live_messages(session, *chatless)
+            rowcount = await tombstone_messages(session, *chatless)
             await session.commit()
             if rowcount:
-                for (hr_id,) in hr_id_rows:
-                    touched_hr_ids.add(hr_id)
+                touched_hr_ids |= hr_ids
 
     if touched_hr_ids:
         logger.info(
