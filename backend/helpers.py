@@ -67,6 +67,32 @@ def extract_dm_text(msg) -> str:
     return f"↪ {quote}\n\n{body}" if body else f"↪ {quote}"
 
 
+def _strip_link_prefixes(s: str) -> str:
+    """Снять с записи всё, что стоит перед самим ником.
+
+    Порядок обязателен: домен ищут в том, что осталось от схемы, а путь
+    веб-просмотра — в том, что осталось от домена.
+
+    `www.` снимается вместе с доменом, а не отдельной строкой до него: сам по
+    себе он ничего не говорит, и снятый заранее превращал бы `www.jobsboard`
+    в ник `jobsboard` — запись, которая ником не является вовсе.
+
+    `s/` разбирается здесь, а не общим правилом хвоста: сам `s` числится
+    служебным путём, и без этой строки `t.me/s/канал` отсеивался бы наравне
+    с `t.me/c/12345`, то есть ссылка на канал считалась бы негодной.
+    """
+    for prefix in ("https://", "http://"):
+        if s.startswith(prefix):
+            s = s[len(prefix):]
+    for host in ("t.me/", "telegram.me/", "www.t.me/", "www.telegram.me/"):
+        if s.startswith(host):
+            s = s[len(host):]
+            if s.startswith("s/"):
+                s = s[len("s/"):]
+            break
+    return s
+
+
 def normalize_username(hr_contact: str | None, *, typed_by_a_person: bool = False) -> str | None:
     """Ник из записи контакта: голое написание или отсутствие.
 
@@ -77,12 +103,7 @@ def normalize_username(hr_contact: str | None, *, typed_by_a_person: bool = Fals
     """
     if not hr_contact:
         return None
-    s = hr_contact.strip()
-    for prefix in ("https://", "http://"):
-        if s.startswith(prefix):
-            s = s[len(prefix):]
-    if s.startswith("t.me/"):
-        s = s[len("t.me/"):]
+    s = _strip_link_prefixes(hr_contact.strip())
     s = s.lstrip("@").strip().rstrip("/")
     if "/" in s:
         s = s.split("/", 1)[0]

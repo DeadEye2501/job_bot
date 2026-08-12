@@ -104,6 +104,9 @@ def test_a_reply_to_a_document_quotes_its_own_placeholder():
         ("t.me/user_name/", "user_name"),
         ("t.me/user_name/123", "user_name"),
         ("  @user_name  ", "user_name"),
+        ("t.me/s/user_name", "user_name"),
+        ("telegram.me/user_name", "user_name"),
+        ("www.t.me/user_name", "user_name"),
     ],
 )
 def test_the_username_is_extracted_from_any_link_form(raw, expected):
@@ -142,6 +145,7 @@ def test_a_four_letter_word_from_an_ad_is_not_taken_for_a_handle():
         "+79991234567",
         "t.me/joinchat/AAAA",
         "t.me/c/12345",
+        "www.jobsboard",
         "abc",
         "1user_name",
         "user-name",

@@ -11,9 +11,6 @@ from backend.models import Message, Vacancy, VacancyStatus, VacancyStatusHistory
 from backend.repository.profile import list_skills
 from backend.repository.vacancies_common import PARSED_ONLY, count_by_status
 
-# `get_stats_hr_responses` по разбору не отбирает вовсе и считает по всем
-# строкам истории — так было и до того, как отбор получил имя.
-
 
 def _status_cond(statuses):
     """Условие «статус перехода тот самый». Принимает и одиночный статус,
@@ -229,10 +226,12 @@ async def get_stats_hr_responses(
     """HR-response-time + weekday-распределение ответов.
 
     Алгоритм:
-      1. На вход берём вакансии, у которых ПЕРВЫЙ переход в Applied
-         случился внутри `period` (по `VacancyStatusHistory.changed_at`).
-         Это «application-window» — ровно те отклики, которые мы делали в
-         этот период.
+      1. На вход берём разобранные вакансии, у которых ПЕРВЫЙ переход в
+         Applied случился внутри `period` (по
+         `VacancyStatusHistory.changed_at`). Это «application-window» —
+         ровно те отклики, которые мы делали в этот период. Отбор по
+         разбору тот же, что у соседних ступеней экрана: считая по своему
+         множеству, ступень разводила бы числа двух экранов молча.
       2. Для каждой такой вакансии ищем первый incoming-Message с
          `sent_at > applied_at` — реальный ответ HR (Telegram-сообщение).
          Берём `Message.sent_at` (когда HR нажал «отправить»), а не
@@ -250,12 +249,13 @@ async def get_stats_hr_responses(
 
     # Шаг 1: первый Applied на каждую vacancy, ограниченный period
     first_applied_subq = first_transition_subq(VacancyStatus.APPLIED)
-    where_clauses = []
+    where_clauses = [PARSED_ONLY]
     if since is not None:
         where_clauses.append(first_applied_subq.c.first_at >= since)
     applied_rows = (
         await session.execute(
             select(first_applied_subq.c.vid, first_applied_subq.c.first_at)
+            .join(Vacancy, Vacancy.id == first_applied_subq.c.vid)
             .where(*where_clauses)
         )
     ).all()
