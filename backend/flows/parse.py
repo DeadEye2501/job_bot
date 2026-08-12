@@ -362,6 +362,11 @@ async def _link_company(session, v: Vacancy, parsed, pipeline) -> dict | None:
     Решение отдаётся наружу затем, что уходит в ленту: сведение компаний
     спрашивает языковую модель, и по чему именно она решила, разбирают
     потом по строке ленты, а не по журналу.
+
+    Компания привязывается и у непригодной вакансии — как и собеседник:
+    ссылки из карточки в «Компании» и «HR» должны работать одинаково у
+    любой строки, иначе имя компании в карточке есть, а перехода на неё
+    нет.
     """
     if parsed is None or not parsed.company_name:
         return None
@@ -391,63 +396,56 @@ async def _link_resolved_hr(session, v: Vacancy, resolved) -> tuple[HR | None, b
     return hr, created
 
 
+def _parsed_event_payload(v: Vacancy, outcome: _Outcome, decision) -> dict:
+    """Что уходит в ленту строкой «разобрано».
+
+    Решение о сведении компании кладётся только когда оно было: пустое
+    поле в ленте читалось бы как «сводили и не свели».
+    """
+    payload: dict = {
+        "score": outcome.score,
+        "status": outcome.status.value,
+        "fields_filled": _fields_filled(v),
+        "skip_reason": outcome.skip_reason,
+    }
+    if decision is not None:
+        payload["company_dedup"] = decision
+    return payload
+
+
 async def _persist_parse_outcome(
     pipeline, vacancy_id: int, parsed: ParsedVacancy | None, outcome: _Outcome
 ) -> tuple[HR | None, bool]:
     """Провести исход разбора через сессию: розыск, запись, оповещение окна.
 
     Сама запись разложена по трём объявлениям выше — строка, компания,
-    собеседник; здесь остаётся то, что к ним не относится: чем открыта
-    сессия, что делать с поломкой посреди записи и кого будить после.
-    Порознь они потому, что записывающему нужна открытая сессия, а
-    открывающему — знать, что делать, когда записать не вышло.
+    собеседник; здесь остаётся чужое им: сессия, поломка посреди записи и
+    оповещение окна после. Розыск идёт первым и стоит двух сетевых
+    обращений — это самая медленная и ломкая часть работы, и в сессии ей
+    не место (см. `_resolve_hr`).
 
-    Розыск идёт первым и стоит двух сетевых обращений — это самая
-    медленная и самая ломкая часть работы, и она здесь именно потому,
-    что в сессии ей не место (см. `_resolve_hr`).
-
-    Отдаёт привязанного HR и признак того, что строка HR только что
-    заведена. Наружу они уходят потому, что здесь их деть некуда:
-    отклик пустышке не положен вовсе, а догон переписки обязан идти и
-    после закрытия сессии, и после отправки отклика — иначе он вытащит
-    наше же письмо раньше, чем оно запишется. HR остаётся пригодным за
-    пределами сессии: ``session_factory`` собран с
-    ``expire_on_commit=False``.
-
-    Компания и HR привязываются и у непригодной вакансии: ссылки из
-    карточки в «Компании» и «HR» должны работать одинаково у любой
-    строки, иначе имя компании в карточке есть, а перехода на неё нет.
+    Отдаёт HR и признак «только что заведён»: отклик пустышке не положен,
+    а догон переписки обязан идти и после закрытия сессии, и после
+    отправки отклика — иначе он вытащит наше же письмо раньше, чем оно
+    запишется. Вне сессии HR пригоден: ``expire_on_commit=False``.
     """
     resolved = await _resolve_hr(pipeline, parsed)
-    hr: HR | None = None
-    hr_created = False
+    hr, hr_created = None, False
     async with pipeline._session_factory() as session:
         try:
             v = await _write_parsed_row(session, vacancy_id, parsed, outcome)
             if v is None:
                 return None, False
-            company_dedup_decision = await _link_company(session, v, parsed, pipeline)
+            decision = await _link_company(session, v, parsed, pipeline)
             hr, hr_created = await _link_resolved_hr(session, v, resolved)
-
-            event_payload: dict = {
-                "score": outcome.score,
-                "status": outcome.status.value,
-                "fields_filled": _fields_filled(v),
-                "skip_reason": outcome.skip_reason,
-            }
-            if company_dedup_decision is not None:
-                event_payload["company_dedup"] = company_dedup_decision
             await add_vacancy_event(
-                session,
-                vacancy_id,
-                "parsed",
-                event_payload,
+                session, vacancy_id, "parsed",
+                _parsed_event_payload(v, outcome, decision),
             )
             await session.commit()
         except Exception:
             logger.exception(
-                "vacancy %s: parse persist failed",
-                vacancy_id,
+                "vacancy %s: parse persist failed", vacancy_id,
                 extra={"vacancy_id": vacancy_id},
             )
             return None, False

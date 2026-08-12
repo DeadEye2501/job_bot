@@ -144,23 +144,59 @@ async def _run_debounced_classify(pipeline, hr_id: int) -> None:
         pipeline._dm_classify_running.discard(current)
 
 
+async def _blacklisted_now(pipeline, hr_id: int) -> str | None:
+    """Написание, из-за которого HR числится в чёрном списке прямо сейчас.
+
+    Спрашивается заново: человек мог попасть в список между приходом
+    письма и сроком разбора. Входящие от него в копилку уже не ложатся, но
+    накопленный до этого пакет разбирать тоже незачем.
+    """
+    from backend.models import HR
+    from backend.repository.hr_card import _hr_blacklist_value
+
+    async with pipeline._session_factory() as session:
+        hr_row = await session.get(HR, hr_id)
+        return await _hr_blacklist_value(session, hr_row) if hr_row else None
+
+
+async def _ask_and_apply(pipeline, hr_id: int, text: str, target) -> None:
+    """Спросить модель по склеенному пакету и применить вердикт.
+
+    Одновременных обращений столько, сколько разрешает семафор конвейера:
+    без него переход в рабочий режим будит разборы по всем людям разом.
+    """
+    try:
+        async with pipeline._dm_classify_semaphore:
+            applied = await classify_and_apply(
+                pipeline._session_factory,
+                pipeline._lm_client,
+                pipeline._lm_chat_model,
+                text,
+                target,
+            )
+    except Exception:
+        logger.exception("debounced classify failed for hr %d", hr_id)
+        return
+    if applied:
+        fire(pipeline.on_vacancies_changed, "on_vacancies_changed")
+
+
+def _burst_text(buf: list[dict]) -> str:
+    """Склеить пакет в один текст двойным переносом.
+
+    Перенос двойной затем, чтобы модель видела границы отдельных сообщений
+    и выбирала самый продвинутый признак (предложение > приглашение >
+    тестовое > отказ > ответили) по всему пакету, а не по последней строке.
+    """
+    return "\n\n".join(item["text"] for item in buf)
+
+
 async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
     """Drain burst-буфера для hr_id: один LLM-вызов на накопленный
     пакет → apply_classification. Используется и из debounce-тика,
     и из drain-on-OFF в `cancel_pending_dm_classifications`.
     """
-    # Re-check blacklist: HR мог попасть туда между process_dm-time
-    # (когда мы пропустили входящее в фильтре) и фактическим debounce-
-    # тиком. process_dm уже не пишет такие сообщения в буфер, но если
-    # blacklist взвели за время burst'а — текущий накопленный пакет
-    # тоже надо отбросить, не классифицируя.
-    async with pipeline._session_factory() as session:
-        from backend.repository.hr_card import _hr_blacklist_value
-        from backend.models import HR
-        hr_row = await session.get(HR, hr_id)
-        bl_value = (
-            await _hr_blacklist_value(session, hr_row) if hr_row else None
-        )
+    bl_value = await _blacklisted_now(pipeline, hr_id)
     if bl_value:
         logger.info(
             "debounced classify: hr %d in blacklist (%s) — drop burst",
@@ -171,10 +207,7 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
     buf = pipeline._dm_classify_buffer.pop(hr_id, [])
     if not buf:
         return
-    # Склеиваем тексты с двойным переносом — чтобы LLM видела границы
-    # отдельных сообщений и могла выбрать самый продвинутый сигнал
-    # (Offer > Invitation > Test > Decline > Answered) на ВСЕМ пакете.
-    text = "\n\n".join(item["text"] for item in buf)
+    text = _burst_text(buf)
     last = buf[-1]
     vacancy_id = last["vacancy_id"]
     msg_id = last["msg_id"]
@@ -195,23 +228,7 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
         "debounced classify: hr %d, %d msgs in burst -> vacancy %s",
         hr_id, len(buf), vacancy_id,
     )
-    try:
-        async with pipeline._dm_classify_semaphore:
-            applied = await classify_and_apply(
-                pipeline._session_factory,
-                pipeline._lm_client,
-                pipeline._lm_chat_model,
-                text,
-                (vacancy_id, msg_id, v_status),
-            )
-    except Exception:
-        logger.exception(
-            "debounced classify failed for hr %d (%d msgs)",
-            hr_id, len(buf),
-        )
-        return
-    if applied:
-        fire(pipeline.on_vacancies_changed, "on_vacancies_changed")
+    await _ask_and_apply(pipeline, hr_id, text, (vacancy_id, msg_id, v_status))
 
 
 async def _wait_out(pipeline, tasks: list, *, drain: bool) -> None:
@@ -236,6 +253,46 @@ async def _wait_out(pipeline, tasks: list, *, drain: bool) -> None:
         t.cancel()
 
 
+async def _cancel_and_wait(pipeline, *, drain: bool) -> None:
+    """Отменить спящие разборы и дождаться уже начавшихся.
+
+    Отмена достаётся только спящим на таймере: они и числятся в
+    `_dm_classify_tasks`. Начавшийся разбор вычёркивает себя оттуда сам и
+    переходит в `_dm_classify_running` — его дожидаются, но не отменяют:
+    пакет он из буфера уже вынул, и отмена потеряла бы его насовсем.
+    """
+    tasks = [t for t in pipeline._dm_classify_tasks.values() if not t.done()]
+    for t in tasks:
+        t.cancel()
+    waited = tasks + [t for t in pipeline._dm_classify_running if not t.done()]
+    if waited:
+        await _wait_out(pipeline, waited, drain=drain)
+
+
+async def _drain_buffers(pipeline) -> None:
+    """Разобрать напоследок всё, что осталось в копилках при уходе в OFF.
+
+    Иначе пакет, накопленный за срок ожидания, пропадает молча, и человек
+    видит «HR ответил, а статус не двинулся». Разбираются люди разом, а не
+    по очереди: пятеро подряд — это полминуты, в которые цикл не отвечает
+    ни на остановку, ни на побудку. Сломавшийся разбор одного человека
+    остальных не роняет.
+    """
+    # Ключи снимаются заранее: `classify_and_apply_for_hr` вынимает копилку.
+    hr_ids = [hr_id for hr_id, buf in pipeline._dm_classify_buffer.items() if buf]
+    if not hr_ids:
+        return
+    results = await asyncio.gather(
+        *(classify_and_apply_for_hr(pipeline, hr_id) for hr_id in hr_ids),
+        return_exceptions=True,
+    )
+    for hr_id, res in zip(hr_ids, results):
+        if isinstance(res, Exception):
+            logger.exception(
+                "drain classify on OFF failed for hr %d", hr_id, exc_info=res,
+            )
+
+
 async def cancel_pending_dm_classifications(
     pipeline, *, drain: bool = False
 ) -> None:
@@ -248,11 +305,6 @@ async def cancel_pending_dm_classifications(
     ждём с таймаутом, чтобы все живые task'и доработали или
     завершились по cancel'у.
 
-    Отмена достаётся только спящим на таймере: они числятся в
-    `_dm_classify_tasks`. Начавшийся разбор вычёркивает себя оттуда сам и
-    переходит в `_dm_classify_running` — его дожидаются, но не отменяют,
-    потому что пакет он уже вынул из буфера и отмена потеряла бы его.
-
     Edge race во время normal completion: tardy task мог проскочить
     cancel (был в commit'е) и сделать `apply_classification` уже
     ПОСЛЕ pipeline._dm_classify_tasks.clear(). Корректность не нарушается —
@@ -260,20 +312,11 @@ async def cancel_pending_dm_classifications(
     некоторое время будет содержать ссылку на завершившийся task,
     пока следующий schedule_dm_classification его не перезапишет.
 
-    ``drain=True`` (OFF transition) — после cancel'ов проходим по
-    каждому непустому буферу и делаем финальную классификацию: иначе
-    burst, накопленный за debounce-окном, пропадает молча и юзер
-    получает «вакансия в Answered, но статус не двинулся». Shutdown
-    путь использует drain=False — клиенты/сессии уже закрываются.
+    ``drain=True`` (OFF transition) — накопленное разбирается напоследок,
+    см. :func:`_drain_buffers`. Shutdown путь использует drain=False —
+    клиенты/сессии уже закрываются.
     """
-    tasks = [t for t in pipeline._dm_classify_tasks.values() if not t.done()]
-    for t in tasks:
-        t.cancel()
-    # Начавшийся разбор отмену не получает: пакет он из буфера уже вынул, и
-    # отмена посреди обращения к модели потеряла бы его насовсем.
-    waited = tasks + [t for t in pipeline._dm_classify_running if not t.done()]
-    if waited:
-        await _wait_out(pipeline, waited, drain=drain)
+    await _cancel_and_wait(pipeline, drain=drain)
     pipeline._dm_classify_tasks.clear()
     if drain and pipeline._shutting_down:
         logger.debug(
@@ -281,21 +324,5 @@ async def cancel_pending_dm_classifications(
             "because shutdown in progress"
         )
     if drain and not pipeline._shutting_down:
-        # Snapshot keys — classify_and_apply_for_hr pop'ает буфер.
-        # Параллелим: 5 HR'ов × 3-5s LLM-RTT последовательно = ~25s
-        # стола в OFF transition, в течение которого run-loop не
-        # реагирует на stop_event/wake. asyncio.gather + return_exceptions
-        # — пусть один сломанный classify не валит остальные.
-        hr_ids = [hr_id for hr_id, buf in pipeline._dm_classify_buffer.items() if buf]
-        if hr_ids:
-            results = await asyncio.gather(
-                *(classify_and_apply_for_hr(pipeline, hr_id) for hr_id in hr_ids),
-                return_exceptions=True,
-            )
-            for hr_id, res in zip(hr_ids, results):
-                if isinstance(res, Exception):
-                    logger.exception(
-                        "drain classify on OFF failed for hr %d",
-                        hr_id, exc_info=res,
-                    )
+        await _drain_buffers(pipeline)
     pipeline._dm_classify_buffer.clear()

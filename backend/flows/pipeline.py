@@ -33,7 +33,98 @@ logger = logging.getLogger(__name__)
 
 
 
+def _declare_caches(pipeline) -> None:
+    """Слепки, которые конвейер держит при себе, — и у них два хозяина.
+
+    Анкету и чёрный список перестраивает `_reload_resources` разом; до
+    первой загрузки они пусты, и валидатор подставит «—» во все слоты, что
+    равносильно «нет ограничений». Кэш векторов живёт своей жизнью в
+    `flows/embeddings.py`: `_reload_resources` его не трогает вовсе, он
+    наполняется по требованию и признаком помнит, наполнялся ли.
+    """
+    # Текстовый блок «Информация о кандидате» для cover-letter prompt'а.
+    pipeline._profile_block = ""
+    pipeline._embedding_ids = np.empty((0,), dtype=np.int64)
+    pipeline._embedding_matrix = np.empty((0, 0), dtype=np.float32)
+    pipeline._embedding_cache_loaded = False
+    pipeline._skills_cache = []
+    # Срез данных профиля для LLM-валидатора.
+    pipeline._profile_cache = CandidateProfile()
+    pipeline._blacklist_patterns = []
+
+
+def _declare_window_hooks(pipeline) -> None:
+    """Отклики, которые конвейер толкает по ходу работы.
+
+    Заполняет их бот своими — теми же именами, но своими полями, — и
+    делает это отдельным объявлением. Конвейер про бота не знает нарочно:
+    знал бы — завёлся бы круг ввозов.
+    """
+    # Optional UI hook: called as on_progress(stage, label, current, total).
+    # stage: "channel" — across channels in poll_active_channels;
+    #        "message" — across messages inside the current channel.
+    # Semantics: current = "how many already done", so it ranges 0..total.
+    pipeline.on_progress = None
+    # Optional UI hook: called with no args after the title sweep at the
+    # start of a poll cycle has written one or more title changes. Lets
+    # the Contacts/Channels pane auto-refresh in real time without the
+    # user having to switch tabs or restart the app.
+    pipeline.on_channels_changed = None
+    # Optional UI hook: called with no args after a vacancy parse commit
+    # that may have created/updated HR or Company rows (via
+    # find_or_create_*). Drives real-time refresh of Contacts/HR and
+    # Contacts/Companies lists during long poll cycles — а не только по
+    # завершении ingestion_finished.
+    pipeline.on_contacts_changed = None
+    # Optional UI hook: called with no args after любого commit'а,
+    # который меняет состояние Vacancy (новая распарсенная вакансия,
+    # delete, или DM-classifier изменил статус). Drives real-time
+    # refresh вкладки «Вакансии» — push-аналог 5-сек polling-таймера,
+    # который раньше был на JS-стороне.
+    pipeline.on_vacancies_changed = None
+    # Optional UI hook: called as on_new_message(hr_id) после persist'а
+    # сообщения (в т.ч. backfill'ом нового HR'а из автоаплая).
+    pipeline.on_new_message = None
+
+
+def _declare_dm_debounce(pipeline) -> None:
+    """Копилка и таймеры пачки писем от одного HR.
+
+    Юзеры (особенно русскоязычные) часто пишут одну мысль 3-5 короткими
+    сообщениями подряд. Классификация каждой по отдельности → лишние
+    LLM-вызовы и шанс что верно классифицируется только одно (часто
+    последнее, но не всегда). Накапливаем 60 сек после последнего сообщения
+    от HR, потом одна классификация на склеенный текст, а вердикт по ней
+    прикладывается к вакансии и письму **последнего** в пачке.
+    """
+    pipeline._dm_classify_buffer = {}
+    pipeline._dm_classify_tasks = {}
+    # Разборы, уже прошедшие таймер. Держатся отдельно, потому что из
+    # словаря таймеров задача вычёркивает себя перед разбором — иначе
+    # свежее сообщение отменило бы разбор посреди обращения к модели, и
+    # пакет, уже вынутый из буфера, пропал бы. Остановке же дождаться их
+    # нужно: отмена по ним не работает, а соединения она закрывает.
+    pipeline._dm_classify_running = set()
+    # Семафор на одновременные LLM-классификации. Catch-up на OFF→active
+    # transition'е может разом разбудить debounce'ры по всем HR'ам, что
+    # на локальной LM Studio превращается в 30 параллельных httpx.post
+    # к одному серверу — она ставит их в очередь, начинает таймаутить и
+    # часть вердиктов теряется. 2 одновременных вызова — компромисс
+    # между throughput'ом и не-OOM'нуть LM Studio.
+    pipeline._dm_classify_semaphore = asyncio.Semaphore(2)
+
+
 class IngestionPipeline:
+    # Поля ставят объявления выше, а объявлены они здесь: присвоение по
+    # чужому полю (`pipeline._skills_cache = ...`) тип не записывает.
+    _profile_block: str
+    _skills_cache: list[ProfileSkill]
+    _profile_cache: CandidateProfile
+    _blacklist_patterns: list[str]
+    _dm_classify_buffer: dict[int, list[dict]]
+    _dm_classify_tasks: dict[int, asyncio.Task]
+    _dm_classify_running: set[asyncio.Task]
+
     def __init__(
         self,
         client,
@@ -53,70 +144,9 @@ class IngestionPipeline:
         self._lm_embed_model = lm_embed_model
         self._send = send
         self._rs = runtime_settings
-        # Текстовый блок «Информация о кандидате» для cover-letter prompt'а.
-        # Перестраивается в _reload_resources рядом с skills/blacklist.
-        self._profile_block: str = ""
-        self._embedding_ids: np.ndarray = np.empty((0,), dtype=np.int64)
-        self._embedding_matrix: np.ndarray = np.empty((0, 0), dtype=np.float32)
-        self._embedding_cache_loaded = False
-        self._skills_cache: list[ProfileSkill] = []
-        # Срез данных профиля для LLM-валидатора. Перестраивается в
-        # _reload_resources вместе со skills/blacklist. До первой загрузки —
-        # пустой профиль, валидатор подставит "—" во все слоты (равносильно
-        # «нет ограничений»).
-        self._profile_cache: CandidateProfile = CandidateProfile()
-        self._blacklist_patterns: list[str] = []
-        # Optional UI hook: called as on_progress(stage, label, current, total).
-        # stage: "channel" — across channels in poll_active_channels;
-        #        "message" — across messages inside the current channel.
-        # Semantics: current = "how many already done", so it ranges 0..total.
-        self.on_progress = None  # filled in by Bot.__init__ if running under the UI
-        # Optional UI hook: called with no args after the title sweep at the
-        # start of a poll cycle has written one or more title changes. Lets
-        # the Contacts/Channels pane auto-refresh in real time without the
-        # user having to switch tabs or restart the app.
-        self.on_channels_changed = None
-        # Optional UI hook: called with no args after a vacancy parse commit
-        # that may have created/updated HR or Company rows (via
-        # find_or_create_*). Drives real-time refresh of Contacts/HR and
-        # Contacts/Companies lists during long poll cycles — а не только по
-        # завершении ingestion_finished.
-        self.on_contacts_changed = None
-        # Optional UI hook: called with no args after любого commit'а,
-        # который меняет состояние Vacancy (новая распарсенная вакансия,
-        # delete, или DM-classifier изменил статус). Drives real-time
-        # refresh вкладки «Вакансии» — push-аналог 5-сек polling-таймера,
-        # который раньше был на JS-стороне.
-        self.on_vacancies_changed = None
-        # Optional UI hook: called as on_new_message(hr_id) после persist'а
-        # сообщения (в т.ч. backfill'ом нового HR'а из автоаплая). Bot
-        # форвардит сюда свой self.on_new_message, чтобы IngestionPipeline
-        # мог толкать chat-update без обратной зависимости на Bot.
-        self.on_new_message = None
-
-        # === DM burst-debounce =========================================
-        # Юзеры (особенно русскоязычные) часто пишут одну мысль 3-5
-        # короткими сообщениями подряд. Классификация каждой по отдельности
-        # → лишние LLM-вызовы и шанс что верно классифицируется только
-        # одно (часто последнее, но не всегда). Накапливаем 60 сек после
-        # последнего сообщения от HR, потом одна классификация на склеенный
-        # текст. Apply применяется к vacancy_id и msg_id ПОСЛЕДНЕГО
-        # сообщения в burst'е.
-        self._dm_classify_buffer: dict[int, list[dict]] = {}
-        self._dm_classify_tasks: dict[int, asyncio.Task] = {}
-        # Разборы, уже прошедшие таймер. Держатся отдельно, потому что из
-        # словаря таймеров задача вычёркивает себя перед разбором — иначе
-        # свежее сообщение отменило бы разбор посреди обращения к модели, и
-        # пакет, уже вынутый из буфера, пропал бы. Остановке же дождаться их
-        # нужно: отмена по ним не работает, а соединения она закрывает.
-        self._dm_classify_running: set[asyncio.Task] = set()
-        # Семафор на одновременные LLM-классификации. Catch-up на OFF→active
-        # transition'е может разом разбудить debounce'ры по всем HR'ам, что
-        # на локальной LM Studio превращается в 30 параллельных httpx.post
-        # к одному серверу — она ставит их в очередь, начинает таймаутить и
-        # часть вердиктов теряется. 2 одновременных вызова — компромисс
-        # между throughput'ом и не-OOM'нуть LM Studio.
-        self._dm_classify_semaphore = asyncio.Semaphore(2)
+        _declare_caches(self)
+        _declare_window_hooks(self)
+        _declare_dm_debounce(self)
 
         # Strong-references на in-flight per-HR backfill таски (kicked
         # из flows/dm.py, spawn_hr_backfill). Event loop держит на тасках только
