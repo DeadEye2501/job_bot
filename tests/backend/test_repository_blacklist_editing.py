@@ -51,6 +51,24 @@ async def test_an_emptied_reason_becomes_absence(session, session_factory):
     assert (await session.get(Blacklist, row.id)).reason is None
 
 
+async def test_a_reason_that_came_as_a_number_does_not_break_the_edit(
+    session, session_factory
+):
+    """Причина, пришедшая не строкой, правку не роняет.
+
+    Нагрузку из окна составляет не наш код, и в текстовом поле оттуда
+    приходит что угодно. Так же это читают правка карточки HR и правка
+    компании — там правило стоит по четырём местам, — а здесь пятое
+    написание падало на первом же таком значении, унося с собой всю правку.
+    """
+    row = blacklist_row("hr", "@maria", reason="грубит")
+    await put(session_factory, row)
+
+    assert await update_blacklist(session, row.id, reason=42) is True
+
+    assert (await session.get(Blacklist, row.id)).reason == "42"
+
+
 async def test_an_emptied_value_is_refused(session, session_factory):
     """Стереть значение правкой нельзя — оно и есть предмет записи."""
     row = blacklist_row("hr", "@maria")

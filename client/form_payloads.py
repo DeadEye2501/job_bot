@@ -7,14 +7,7 @@
 """
 
 from backend.domain.telegram_identity import typed_username
-
-
-def none_if_empty(value) -> str | None:
-    """Пустое и пробельное — как отсутствие."""
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
+from backend.payloads import text_or_none
 
 
 def read_company_spellings(raw) -> list[str]:
@@ -46,10 +39,10 @@ def read_new_company_fields(payload: dict) -> dict:
     ему незачем.
     """
     return {
-        "name": none_if_empty(payload.get("name")) or "",
-        "website": none_if_empty(payload.get("website")),
+        "name": text_or_none(payload.get("name")) or "",
+        "website": text_or_none(payload.get("website")),
         "aliases": read_company_spellings(payload.get("aliases")),
-        "notes": none_if_empty(payload.get("notes")),
+        "notes": text_or_none(payload.get("notes")),
     }
 
 
@@ -92,8 +85,8 @@ def read_new_hr_fields(payload: dict) -> dict:
     username = None if typed is None else typed_username(typed)
     raw_user_id = payload.get("telegram_user_id")
     return {
-        "name": none_if_empty(payload.get("name")),
+        "name": text_or_none(payload.get("name")),
         "telegram_username": username,
         "telegram_user_id": None if raw_user_id in (None, "") else int(raw_user_id),
-        "notes": none_if_empty(payload.get("notes")),
+        "notes": text_or_none(payload.get("notes")),
     }

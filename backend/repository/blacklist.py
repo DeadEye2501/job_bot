@@ -8,6 +8,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Blacklist
+from backend.payloads import text_or_none
 
 from backend.repository.blacklist_marks import active_mark_of
 
@@ -91,15 +92,6 @@ def _required_value(value) -> str:
     return normalized
 
 
-def _optional_reason(reason) -> str | None:
-    """Причина без пробелов по краям, а пустая — как отсутствие.
-
-    Пустую причину окно шлёт и пропуском поля, и пустой строкой, и одними
-    пробелами; в колонке все три значат одно, и хранится там `NULL`.
-    """
-    return (reason or "").strip() or None
-
-
 async def update_blacklist(
     session: AsyncSession,
     blacklist_id: int,
@@ -129,7 +121,7 @@ async def update_blacklist(
     if value is not _BLACKLIST_FIELD_UNSET:
         row.value = _required_value(value)
     if reason is not _BLACKLIST_FIELD_UNSET:
-        row.reason = _optional_reason(reason)
+        row.reason = text_or_none(reason)
     return True
 
 
@@ -203,7 +195,7 @@ async def create_blacklist(
     normalized_kind = (kind or "").strip()
     if not normalized_kind:
         raise BlacklistUpdateError("Тип обязателен.")
-    normalized_reason = _optional_reason(reason)
+    normalized_reason = text_or_none(reason)
 
     existing = await _same_entry(session, normalized_kind, normalized_value)
     if existing is not None:
