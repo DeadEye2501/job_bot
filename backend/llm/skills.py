@@ -79,6 +79,24 @@ def _capitalize_skill(s: str) -> str:
     return " ".join(out)
 
 
+def _as_items(raw: object) -> list:
+    """Список технологий из того, что прислала модель.
+
+    Строка вместо списка — нарушенный договор ответа, и она разбирается
+    запятыми как встарь; жалоба в журнал остаётся, потому что это признак:
+    либо наставление надо подтянуть, либо модель просела. Всё остальное
+    считается пустотой.
+    """
+    if isinstance(raw, str):
+        logger.debug(
+            "stack item is a string, falling back to comma-split: %r", raw
+        )
+        return raw.split(",")
+    if isinstance(raw, list):
+        return raw
+    return []
+
+
 def clean_stack_items(
     raw: object, seen: set[str]
 ) -> list[str]:
@@ -94,19 +112,7 @@ def clean_stack_items(
     Accepts ``list``, ``str`` (split by comma — legacy single-line format),
     or anything else (treated as empty).
     """
-    if isinstance(raw, str):
-        # LLM нарушил schema-контракт и вернул строку вместо list — попытка
-        # восстановления через split(',') как legacy-fallback. Логируем,
-        # потому что это сигнал что промпт надо подтянуть либо модель
-        # деградировала.
-        logger.debug(
-            "stack item is a string, falling back to comma-split: %r", raw
-        )
-        items: list = raw.split(",")
-    elif isinstance(raw, list):
-        items = raw
-    else:
-        return []
+    items = _as_items(raw)
     # Дедупликация — на случай если LLM вернул "Python 3.13" и "Python"
     # одновременно (после срезки версии оба → "Python"), либо положил один и
     # тот же навык в required и в preferred. Ключ тот же, что у анкеты: иначе

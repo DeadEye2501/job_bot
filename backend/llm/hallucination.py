@@ -115,8 +115,7 @@ _REASON_STYLE_VIOLATIONS: tuple[re.Pattern[str], ...] = (
 # короткими словами вроде «Hi» (приветствие) или «Hin» (короткие префиксы).
 #
 # ВНИМАНИЕ: это закрытый набор (≈25 ходовых языков). Для языков ВНЕ списка
-# используется грубая эвристика name[:-2] (см. _build_profile_hallucination_markers
-# ниже). Эвристика срабатывает корректно для большинства склоняемых имён, но
+# используется грубая эвристика name[:-2] (см. _language_root ниже). Эвристика срабатывает корректно для большинства склоняемых имён, но
 # для коротких/иноалфавитных имён (например, «中文», «हिन्दी», «한국어»)
 # safety-net по галлюцинациям этого языка работает грубее. Универсальные
 # детекторы (CEFR-маркеры в _GENERIC_HALLUCINATION_MARKERS) работают всегда.
@@ -150,6 +149,49 @@ _LANGUAGE_ROOT_OVERRIDES: dict[str, str] = {
 _MIN_LANG_ROOT_LEN = 4
 
 
+def _language_root(name: str) -> str | None:
+    """Корень названия языка для поиска по тексту; пусто — маркера не будет.
+
+    Длинное имя теряет хвост склонения, короткое берётся как есть, а
+    известные исключения перечислены отдельно. Слишком короткий корень
+    маркера не даёт вовсе: он ловился бы в случайных приставках, и отказ
+    объявлялся бы выдуманным на ровном месте.
+    """
+    if not name:
+        return None
+    key = name.lower()
+    if key in _LANGUAGE_ROOT_OVERRIDES:
+        root = _LANGUAGE_ROOT_OVERRIDES[key]
+    elif len(name) > 6:
+        root = name[:-2]
+    else:
+        root = name
+    return root if len(root) >= _MIN_LANG_ROOT_LEN else None
+
+
+def _language_marker(
+    root: str, name: str, inference_verbs: str, cefr_text: str
+) -> tuple[re.Pattern[str], re.Pattern[str]]:
+    """Пара образцов для одного языка: что искать в обосновании и в тексте.
+
+    В обосновании — вывод «подразумевает <язык>», «требуется <язык>». В
+    тексте — сам язык, любой уровень CEFR или «<lang>-speaking»: нашлось
+    хоть что-то из этого — вывод подкреплён, не нашлось — выдуман.
+    """
+    root_re = re.escape(root)
+    return (
+        re.compile(
+            inference_verbs + r"[а-яё\s,\-—]{0,80}?" + root_re,
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"(" + root_re + r"|" + cefr_text + r"|"
+            + re.escape(name) + r"[\s-]?speaking)",
+            re.IGNORECASE,
+        ),
+    )
+
+
 def _build_profile_hallucination_markers(
     profile: CandidateProfile,
 ) -> tuple[tuple[re.Pattern[str], re.Pattern[str]], ...]:
@@ -160,9 +202,8 @@ def _build_profile_hallucination_markers(
     поста.
 
     Возвращает кортеж пар (regex_in_reason, regex_in_text). Логика идентична
-    _GENERIC_HALLUCINATION_MARKERS. Для коротких/неизвестных имён языка
-    (root короче _MIN_LANG_ROOT_LEN) маркер не строится — слишком высокий
-    риск false-positive по случайным префиксам.
+    _GENERIC_HALLUCINATION_MARKERS. Какие имена маркера не получают — см.
+    :func:`_language_root`.
     """
     markers: list[tuple[re.Pattern[str], re.Pattern[str]]] = []
     inference_verbs = (
@@ -175,34 +216,12 @@ def _build_profile_hallucination_markers(
     )
     for lang in profile.languages:
         name = (lang.name or "").strip()
-        if not name:
+        root = _language_root(name)
+        if root is None:
             continue
-        key = name.lower()
-        if key in _LANGUAGE_ROOT_OVERRIDES:
-            root = _LANGUAGE_ROOT_OVERRIDES[key]
-        elif len(name) > 6:
-            # длинное имя — обрезаем хвост склонения (≈2 символа)
-            root = name[:-2]
-        else:
-            # короткое имя — берём как есть, но не строим маркер если
-            # после нормализации длина < min, чтобы не словить коллизию
-            root = name
-        if len(root) < _MIN_LANG_ROOT_LEN:
-            continue
-        root_re = re.escape(root)
-        # Reason: «подразумевает <язык>», «требуется <язык>», ...
-        reason_re = re.compile(
-            inference_verbs + r"[а-яё\s,\-—]{0,80}?" + root_re,
-            re.IGNORECASE,
+        markers.append(
+            _language_marker(root, name, inference_verbs, cefr_text)
         )
-        # Text: упоминание этого языка ИЛИ любого CEFR-маркера ИЛИ
-        # «<lang>-speaking». Если ничего из этого нет — галлюцинация.
-        text_re = re.compile(
-            r"(" + root_re + r"|" + cefr_text + r"|"
-            + re.escape(name) + r"[\s-]?speaking)",
-            re.IGNORECASE,
-        )
-        markers.append((reason_re, text_re))
     return tuple(markers)
 
 

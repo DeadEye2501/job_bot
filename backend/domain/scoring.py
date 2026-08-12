@@ -50,6 +50,30 @@ def build_skill_lookup(skills: list[ProfileSkill]) -> set[str]:
     return set(_build_skill_level_lookup(skills))
 
 
+def _required_points(level_lookup: dict[str, int], item: object) -> int:
+    """Вклад обязательной технологии: уровень свой или штраф за чужую.
+
+    Штраф здесь несущий: вакансия, требующая незнакомого, должна опускаться
+    ниже вакансии, не требующей ничего.
+    """
+    if not isinstance(item, str) or not item:
+        return 0
+    level = level_lookup.get(skill_key(item))
+    return -1 if level is None else level
+
+
+def _preferred_points(level_lookup: dict[str, int], item: object) -> int:
+    """Вклад желательной технологии: уровень минус единица, чужая — ноль.
+
+    Единица вычитается нарочно: желательный навык начального уровня не
+    поднимает вакансию над остальными, а незнание желательного не наказывает.
+    """
+    if not isinstance(item, str) or not item:
+        return 0
+    level = level_lookup.get(skill_key(item))
+    return 0 if level is None else level - 1
+
+
 def score_parsed(
     parsed: ParsedVacancy, skills: list[ProfileSkill]
 ) -> int:
@@ -70,27 +94,14 @@ def score_parsed(
       any of its aliases. LLM is instructed to map mentions to canonical
       profile names, so most matches will be on ``name``; alias-fallback
       handles the case where LLM missed the canonicalization step.
-    - ``preferred`` with ``level == 1`` → +0 (formula not clamped). This
-      is intentional: a desirable basic skill shouldn't bump the score
-      above default.
+    - почему у желательного вычитается единица — :func:`_preferred_points`,
+      почему у обязательного стоит штраф — :func:`_required_points`.
     """
     if not skills:
         return 0
     level_lookup = _build_skill_level_lookup(skills)
-    total = 0
-    for item in parsed.stack_required:
-        if not isinstance(item, str) or not item:
-            continue
-        level = level_lookup.get(skill_key(item))
-        if level is None:
-            total -= 1
-        else:
-            total += level
-    for item in parsed.stack_preferred:
-        if not isinstance(item, str) or not item:
-            continue
-        level = level_lookup.get(skill_key(item))
-        if level is None:
-            continue
-        total += level - 1
-    return total
+    return sum(
+        _required_points(level_lookup, item) for item in parsed.stack_required
+    ) + sum(
+        _preferred_points(level_lookup, item) for item in parsed.stack_preferred
+    )
