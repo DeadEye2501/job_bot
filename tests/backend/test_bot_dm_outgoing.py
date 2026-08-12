@@ -10,6 +10,7 @@
 и оставляла бы в папке рваный.
 """
 
+import logging
 from pathlib import Path
 
 from backend.models import BotMode, Message
@@ -178,6 +179,29 @@ async def test_an_attachment_typed_elsewhere_is_downloaded(
     assert saved.media_kind == "photo"
     assert saved.media_path == f"{hr.id}/10.jpg"
     assert len(downloaded) == 1
+
+
+async def test_an_attachment_without_a_client_is_not_chased(
+    chatting, session_factory, caplog
+):
+    """Без клиента Telegram вложение даже не пробуют скачать.
+
+    Качать нечем, а попытка осела бы в журнале записью об ошибке — то есть
+    счётчик ошибок в окне загорелся бы там, где всё идёт как задумано. Письмо
+    при этом ложится: род вложения известен и без файла, и в переписке по нему
+    виден пузырь.
+    """
+    bot, _, _ = await chatting(client=FakeTelegramClient(), telegram_user_id=777)
+    bot._ingestion = FakeIngestion()
+    bot._client = None
+
+    with caplog.at_level(logging.ERROR):
+        await bot._on_dm_outgoing(None, _echo(photo=object()))
+
+    saved = await only_row(session_factory, Message)
+    assert saved.media_kind == "photo"
+    assert saved.media_path is None
+    assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
 
 
 async def test_a_duplicate_that_slipped_in_meanwhile_is_passed_over(

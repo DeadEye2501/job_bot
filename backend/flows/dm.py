@@ -43,6 +43,22 @@ class _Attachment:
     name: str | None = None
 
 
+async def _attachment_of(client, msg, hr_id: int) -> _Attachment:
+    """Вложение письма: род и имя всегда, путь — если было чем скачать.
+
+    Род и имя читаются из самого сообщения, поэтому снимаются и без файла: по
+    ним в переписке виден пузырь «была картинка».
+
+    Пустой клиент — не боевой случай, а подпись разбора: он там необязателен,
+    и без него зовут со стенда. Ветка есть затем, что иначе загрузка дошла бы
+    до `None.download_media` и осела бы в журнале записью об ошибке.
+    """
+    kind, name = classify_media(msg)
+    if kind is None or client is None:
+        return _Attachment(kind, None, name)
+    return _Attachment(kind, await download_media(client, msg, hr_id), name)
+
+
 async def _store_outgoing_row(
     session_factory, msg, hr_id: int, media: _Attachment
 ) -> OutgoingDmOutcome:
@@ -99,12 +115,8 @@ async def persist_outgoing_dm(session_factory, client, msg, hr_id: int) -> Outgo
     async with session_factory() as session:
         if await find_outgoing_message(session, hr_id, msg.id) is not None:
             return "already_stored"
-    media_kind, media_name = classify_media(msg)
-    media_path = (
-        await download_media(client, msg, hr_id) if media_kind is not None else None
-    )
     return await _store_outgoing_row(
-        session_factory, msg, hr_id, _Attachment(media_kind, media_path, media_name)
+        session_factory, msg, hr_id, await _attachment_of(client, msg, hr_id)
     )
 
 
@@ -138,16 +150,6 @@ async def _sender_to_listen_to(session_factory, msg):
         },
     )
     return None
-
-
-async def _incoming_attachment(client, msg, hr_id: int) -> _Attachment:
-    """Скачать вложение письма, если оно есть и есть чем качать."""
-    if client is None:
-        return _Attachment()
-    kind, name = classify_media(msg)
-    if kind is None:
-        return _Attachment(name=name)
-    return _Attachment(kind, await download_media(client, msg, hr_id), name)
 
 
 async def _attributed_vacancy(session, hr_id: int, msg) -> int | None:
@@ -255,7 +257,7 @@ async def process_dm(
     hr_lookup = await _sender_to_listen_to(session_factory, msg)
     if hr_lookup is None:
         return
-    attachment = await _incoming_attachment(client, msg, hr_lookup.id)
+    attachment = await _attachment_of(client, msg, hr_lookup.id)
     avatar = None
     if client is not None and hr_lookup.avatar is None:
         avatar = await fetch_telegram_avatar(client, msg.from_user)
