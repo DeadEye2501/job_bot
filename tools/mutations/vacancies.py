@@ -182,8 +182,8 @@ MUTATIONS = [
     # apply_classification: граф переходов перестаёт что-либо запрещать
     (
         "backend/repository/vacancies_life.py",
-        "allowed = should_apply_status(previous, classification.status)",
-        "allowed = True",
+        "    if not should_apply_status(previous, classification.status):",
+        "    if False:",
     ),
     # mark_ghosted_vacancies: наши собственные сообщения начинают считаться ответом
     (
