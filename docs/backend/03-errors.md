@@ -13,7 +13,7 @@
 - [x] **А. Обращение к модели и разбор** — пункты 1, 5.
       `adapters/lm_studio.py`, `llm/hr_reply.py`, `flows/auto_gate.py`,
       `flows/dm.py`
-- [ ] **Б. Живучесть окружения** — 2, 3, 4, 6.
+- [x] **Б. Живучесть окружения** — 2, 3, 4, 6.
       `log_buffer.py`, `alembic/`, `repository/stats_summary.py`, `helpers.py`
 
 Пункт 6 (три написания ссылки на канал) правится в `normalize_username`, то есть

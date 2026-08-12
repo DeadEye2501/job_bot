@@ -51,6 +51,44 @@ async def test_an_application_without_an_answer_is_counted_as_silence(
     assert got["median_seconds"] is None
 
 
+async def test_an_unparsed_vacancy_moves_neither_the_silence_nor_the_median(
+    session, session_factory
+):
+    """Неразобранная вакансия ни долю молчания, ни медиану срока не двигает.
+
+    Соседние ступени — шапка, разбивка по статусам, теги, таблица каналов —
+    считают только разобранные. Ступень, считающая по своему множеству,
+    разводит числа двух экранов молча: правдоподобно они выглядят на обоих.
+
+    На неразобранную нарочно отвечают, и с другим сроком: без ответа она
+    двигала бы одну лишь долю молчания, а медиана в имени не сторожилась бы.
+    """
+    hr = hr_row()
+    await put(session_factory, hr)
+    answered = vacancy_row(hr_id=hr.id)
+    unparsed = vacancy_row(hr_id=hr.id, is_parsed=False)
+    await put(session_factory, answered, unparsed)
+    applied_at = days_ago(30)
+    rows = [
+        status_history_row(v.id, status=VacancyStatus.APPLIED, changed_at=applied_at)
+        for v in (answered, unparsed)
+    ]
+    rows += [
+        message_row(
+            hr_id=hr.id, vacancy_id=v.id, is_incoming=True,
+            sent_at=applied_at + timedelta(days=waited),
+        )
+        for v, waited in ((answered, 1), (unparsed, 9))
+    ]
+    await put(session_factory, *rows)
+
+    got = await get_stats_hr_responses(session, period="all")
+
+    assert got["applied_count"] == 1
+    assert got["responded_count"] == 1
+    assert got["median_seconds"] == timedelta(days=1).total_seconds()
+
+
 async def test_our_own_letter_is_not_an_answer(session, session_factory):
     """Наше собственное письмо ответом не считается."""
     hr = hr_row()

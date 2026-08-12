@@ -144,6 +144,21 @@ async def test_the_source_channel_is_not_taken_for_an_hr_contact(hr_contact):
     assert got.hr_contact is None
 
 
+async def test_the_source_channel_is_recognised_through_the_second_domain():
+    """Канал, записанный через `telegram.me`, контактом HR тоже не остаётся.
+
+    Домен у Telegram не один, и в объявлениях встречаются оба. Не узнав
+    записи, разбор оставит в карточке мусорную строку — а приговор о
+    пустоте считает заполненные поля и засчитает её за настоящий контакт,
+    то есть отодвинет пустышку от «мусора» на целое деление.
+    """
+    client = provider({CHAT: _parsed(hr_contact="telegram.me/pyjobs")})
+
+    got = await parse_vacancy("текст", client, "qwen", channel_username="PyJobs")
+
+    assert got.hr_contact is None
+
+
 async def test_a_real_contact_survives():
     """Настоящий контакт HR остаётся на месте."""
     client = provider({CHAT: _parsed(hr_contact="@maria_hr")})
