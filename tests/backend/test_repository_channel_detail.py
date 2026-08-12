@@ -9,7 +9,8 @@
 import pytest
 
 from backend.models import VacancyStatus
-from backend.repository.channels import _percent_or_none, get_channel_detail
+from backend.domain.funnel import percent_or_none
+from backend.repository.channels import get_channel_detail
 from tests.dbio import put
 from tests.factories import (
     channel_marks,
@@ -66,7 +67,7 @@ def test_a_share_is_a_whole_percent_or_nothing(part, whole, expected):
     а 37,5 — 38. Так работает округление в питоне, и на воронке это видно
     при восьми вакансиях.
     """
-    assert _percent_or_none(part, whole) == expected
+    assert percent_or_none(part, whole) == expected
 
 
 async def test_a_missing_channel_has_no_card(session, session_factory):

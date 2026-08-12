@@ -25,6 +25,16 @@ from backend.notify import fire
 logger = logging.getLogger(__name__)
 
 
+async def _muted(bot) -> bool:
+    """Молчит ли бот сейчас — один вопрос на все пять обработчиков.
+
+    Выключенный не читает ничего: ни писем, ни правок, ни удалений, ни
+    отметок о прочтении. Спрашивают его первой строкой все пятеро, и разойдись
+    они, одна дорога продолжала бы писать в базу у выключенного бота.
+    """
+    return (await bot._current_mode()) is BotMode.OFF
+
+
 async def on_raw_update(bot, _client, update, _users, _chats) -> None:
     """Catch ``UpdateReadHistoryOutbox`` to mark our outgoing rows as
     read by the HR. Everything else is ignored — raw updates fire on
@@ -35,7 +45,7 @@ async def on_raw_update(bot, _client, update, _users, _chats) -> None:
     peer = getattr(update, "peer", None)
     if not isinstance(peer, _PeerUser):
         return
-    if (await bot._current_mode()) is BotMode.OFF:
+    if await _muted(bot):
         return
     from datetime import datetime as _dt, timezone as _tz
 
@@ -55,7 +65,7 @@ async def on_raw_update(bot, _client, update, _users, _chats) -> None:
 
 async def on_dm_edit(bot, _client, msg) -> None:
     """Sync Telegram edits — overwrite text + mark is_edited=True."""
-    if (await bot._current_mode()) is BotMode.OFF:
+    if await _muted(bot):
         return
     if not msg.chat:
         return
@@ -187,7 +197,7 @@ async def on_dm_delete(bot, _client, messages) -> None:
     ``repository.messages.tombstone_messages``; здесь остаётся только отбор,
     а он у надгробий двух родов разный: см. :func:`_split_by_chat`.
     """
-    if (await bot._current_mode()) is BotMode.OFF:
+    if await _muted(bot):
         return
     with_chat, chatless_ids = _split_by_chat(messages)
     if not with_chat and not chatless_ids:
@@ -220,7 +230,7 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
     догоном переписки; здесь остаётся опознание собеседника и решение,
     будить ли окно.
     """
-    if (await bot._current_mode()) is BotMode.OFF:
+    if await _muted(bot):
         return
     if not msg.chat:
         return
@@ -244,7 +254,7 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
 
 async def on_dm(bot, _client, msg) -> None:
     # Off mode silences everything, including reading HR replies.
-    if (await bot._current_mode()) is BotMode.OFF:
+    if await _muted(bot):
         return
     await process_dm(
         msg,

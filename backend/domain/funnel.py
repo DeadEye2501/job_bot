@@ -40,3 +40,19 @@ INVITED: frozenset[VacancyStatus] = frozenset({
     VacancyStatus.IN_PROGRESS,
     VacancyStatus.OFFER,
 })
+
+
+def percent_or_none(numerator: int, denominator: int) -> int | None:
+    """Целая доля от целого, а при пустом целом — пусто, а не ноль.
+
+    Пусто и ноль здесь разное: «откликов не было» и «откликнулись, ответов
+    ноль» на экране читаются по-разному, и второе — беда, о которой человеку
+    надо знать. Округление до целого: доли ступеней показываются числом без
+    дробной части.
+
+    Доли с дробью считает `stats_pipeline`, и своим правилом: у него другой
+    договор о виде ответа, а не то же самое в третьем написании.
+    """
+    if denominator <= 0:
+        return None
+    return int(round(numerator / denominator * 100))

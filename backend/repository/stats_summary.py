@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.funnel import percent_or_none
 from backend.domain.scoring import build_skill_lookup
 from backend.domain.skill_names import skill_key
 from backend.models import Message, Vacancy, VacancyStatus, VacancyStatusHistory
@@ -342,9 +343,8 @@ async def get_stats_hr_responses(
     median_seconds = _median(waits)
     applied_count = len(applied_map)
     responded_count = len(first_resp_by_vid)
-    no_response_pct = (
-        round((applied_count - responded_count) / applied_count * 100)
-        if applied_count > 0 else None
+    no_response_pct = percent_or_none(
+        applied_count - responded_count, applied_count
     )
     return {
         "period": period,
