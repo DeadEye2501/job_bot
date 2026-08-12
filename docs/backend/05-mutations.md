@@ -17,12 +17,35 @@
 
 - [ ] **1. Починить сам инструмент** — поломка, сносящая единственное тело
       `if`, засчитывается пойманной; плюс сухой прогон-сторож
-- [ ] **2. Починить наборы** — девятнадцать поломок в исчезнувшие строки, семь
+- [ ] **2. Починить наборы** — семьдесят поломок в исчезнувшие строки, семь
       объявлений без поломок вовсе, набор под `cv_parser.py`, снятие
       недостижимой цели
 - [ ] **3. Прогнать и разобрать** — наборы поодиночке, `git status` после
       каждого
 - [ ] **4. Разобрать выживших и дописать тесты**
+
+### Сколько целей съехало — сверено 13 августа 2026
+
+Пересчитано по коду после этапа 6: из **310** целей поломок **70 не находятся** в
+своём файле. Задето 17 наборов из 25:
+
+| Набор | Съехало | Куда целится |
+|---|---|---|
+| `companies.py` | 9 | `repository/companies_card`, `companies_list`, `companies_matching` |
+| `vacancies.py` | 8 | `repository/vacancies_card`, `vacancies_list`, `vacancies_mini` |
+| `messages_channels.py` | 7 | `repository/channels` |
+| `hr.py`, `profile.py`, `stats.py` | по 6 | `repository/hr_card`, `hr_identify`, `profile`, `stats_summary` |
+| `bot_messages.py` | 5 | `bot/send`, `bot/updates` |
+| `flows_dm.py`, `message_text.py` | по 4 | `flows/dm`, `dm_classify`, `message_text` |
+| `blacklist.py`, `log_buffer.py` | по 3 | `repository/blacklist`, `log_buffer` |
+| `entry_points.py`, `flows_vacancy.py`, `telegram_identity.py` | по 2 | `adapters/db`, `bootstrap`, `flows/apply`, `domain/telegram_identity` |
+| `flows_channels.py`, `form_payloads.py`, `llm.py` | по 1 | `flows/channels`, `client/form_payloads`, `llm/skills` |
+
+Считалось так: у каждой поломки берутся первые два значения кортежа — путь и
+искомая строка, — и строка ищется в файле по пути. Съехало не только от этапа 6:
+часть наборов писалась против кода, который переехал ещё разбиением. Число это —
+работа пункта 2, и мерить его надо заново перед началом: каждая правка любого
+этапа его меняет.
 
 ### 1. Починить сам инструмент
 

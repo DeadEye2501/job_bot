@@ -2,7 +2,7 @@
 
 Порядок в этом файле — часть договора, а не оформление. Каталог данных и
 хранилище ключей подменяются на уровне модуля, до первого импорта проекта:
-`backend/bot.py` вычисляет `MEDIA_DIR` на импорте, и без подмены каталога
+`backend/bot/media.py` вычисляет `MEDIA_DIR` на импорте, и без подмены каталога
 импорт создал бы папку в боевом каталоге пользователя. Схема поднимается
 после обоих.
 """
@@ -173,8 +173,8 @@ class TelegramReached(BaseException):
     """Тест дотянулся до настоящего Telegram.
 
     Наследник `BaseException`, а не `Exception`, намеренно: боевой код
-    оборачивает вызовы клиента в `except Exception` — `backend/bot.py:140`
-    вокруг `download_media`, `backend/bot.py:992` вокруг `read_chat_history`.
+    оборачивает вызовы клиента в `except Exception` — `bot/media.download_media`
+    вокруг скачивания и `bot/chat` вокруг `read_chat_history`.
     Наследника `Exception` эти блоки проглотили бы, и тест, ушедший в живой
     Telegram, получил бы запись в лог и зелёный прогон — ровно тот отказ,
     ради предотвращения которого запор и ставится.
@@ -187,7 +187,7 @@ def _telegram_is_unreachable(monkeypatch):
 
     Через `pyrogram.Client.invoke` приходят `send_message`, `send_photo`,
     `send_document`, `read_chat_history` и прочие обычные вызовы. Запирать
-    `adapters.telegram.SEND_LOCKED` для этого мало — `backend/bot.py` зовёт
+    `adapters.telegram.SEND_LOCKED` для этого мало — `backend/bot/` зовёт
     методы клиента напрямую, минуя `send_dm`.
 
     Единственной воронкой Pyrogram `Client.invoke` НЕ является. Под часть

@@ -35,7 +35,7 @@ async def test_a_call_into_real_telegram_blows_up():
     """Вызов `Client.invoke` падает, а не уходит на сервер.
 
     Через него идут обычные запросы клиента, включая те, что
-    `backend/bot.py` делает мимо `adapters.telegram.send_dm`.
+    `backend/bot/` делает мимо `adapters.telegram.send_dm`.
     """
     import pyrogram
 
@@ -61,7 +61,7 @@ async def test_a_call_through_a_raw_session_blows_up_too():
 async def test_the_telegram_refusal_survives_an_except_exception_block():
     """Запор не проглатывается `except Exception` боевого кода.
 
-    `backend/bot.py:140` и `:992` оборачивают вызовы клиента именно так —
+    `bot/media.download_media` и `bot/chat` оборачивают вызовы клиента именно так —
     наследник `Exception` дал бы там запись в лог и зелёный прогон.
     """
     import pyrogram

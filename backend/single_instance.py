@@ -64,5 +64,7 @@ def hold_the_only_copy(lock_path: Path | str):
     if _take_the_lock(fd):
         return os.fdopen(fd, "r+b")
     os.close(fd)
-    logger.info("single instance: lock at %s is already held", lock_path)
+    # Записи здесь нет нарочно: файл журнала — ровно то, что замок сторожит, и
+    # у предела размера одна эта строка запустила бы поворот, то есть саму беду.
+    # Сказать о себе второй копии — дело зовущего, у которого есть поток вывода.
     return None

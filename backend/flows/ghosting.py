@@ -2,7 +2,9 @@
 
 import logging
 
+from backend.domain.transitions import GHOSTING_TIMEOUT_DAYS
 from backend.notify import fire
+from backend.repository.vacancies_life import mark_ghosted_vacancies
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +18,6 @@ async def check_ghosting_timeouts(pipeline) -> int:
     низкая: только Applied/In Progress попадают в шорт-лист, и берётся
     он одним заходом в базу — см. `vacancies_life._silence_candidates`.
     """
-    from backend.domain.transitions import GHOSTING_TIMEOUT_DAYS
-    from backend.repository.vacancies_life import mark_ghosted_vacancies
 
     try:
         async with pipeline._session_factory() as session:
