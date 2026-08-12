@@ -33,6 +33,26 @@ def cancel_current_poll(bot) -> None:
         task.cancel()
 
 
+async def _run_task(bot, work: Callable[[], Any], label: str):
+    """Прогнать работу задачей; отдать исход и её ответ.
+
+    Задача заводится нарочно, а не ожидается корутина: отмену из окна
+    получает именно она, и по ней же читается занятость места. Отмена и
+    сбой разводятся здесь: первое — решение человека, второе — беда, и
+    зовущий говорит о них разными словами.
+    """
+    try:
+        bot._current_poll_task = asyncio.create_task(work())
+        try:
+            return "ok", await bot._current_poll_task
+        except asyncio.CancelledError:
+            logger.info("%s cancelled by user", label)
+            return "cancelled", None
+    except Exception:
+        logger.exception("%s failed", label)
+        return "error", None
+
+
 async def run_in_slot(
     bot,
     work: Callable[[], Any],
@@ -59,18 +79,8 @@ async def run_in_slot(
     fire(bot.on_cycle_start, "on_cycle_start")
     if progress is not None:
         fire(bot.on_progress, "on_progress", *progress)
-    outcome: CycleOutcome = "ok"
-    result: Any = None
     try:
-        bot._current_poll_task = asyncio.create_task(work())
-        try:
-            result = await bot._current_poll_task
-        except asyncio.CancelledError:
-            logger.info("%s cancelled by user", label)
-            outcome = "cancelled"
-    except Exception:
-        logger.exception("%s failed", label)
-        outcome = "error"
+        outcome, result = await _run_task(bot, work, label)
     finally:
         bot._current_poll_task = None
         fire(bot.on_cycle_end, "on_cycle_end")

@@ -53,6 +53,36 @@ async def _safe_disconnect(client) -> None:
         logger.debug("_safe_disconnect swallowed", exc_info=True)
 
 
+async def _username_of(client) -> str | None:
+    """Ник вошедшего; пусто — спросить не вышло.
+
+    Спрашивается, пока клиент входа ещё подключён: бот встанет позже, и его
+    собственное соединение будет готово не сразу. Пустая строка при этом
+    значит «ника у вошедшего нет», а пустота — «не спросили или не
+    ответили», и это разные вещи для того, кто ник показывает.
+    """
+    try:
+        me = await client.get_me()
+        return me.username or ""
+    except Exception:
+        logger.debug("login get_me failed", exc_info=True)
+        return None
+
+
+def _flood_wait_refusal(e) -> str:
+    """Отказ «Telegram попросил подождать» словами человека.
+
+    Срок Telegram называет не всегда, и «подождите 0 сек» на экране —
+    приглашение повторить прямо сейчас и получить тот же запрет.
+    """
+    secs = int(getattr(e, "value", 0) or 0)
+    waiting = _humanize_duration(secs) if secs else "некоторое время"
+    return (
+        f"Telegram попросил подождать {waiting} "
+        "перед следующей попыткой отправить код."
+    )
+
+
 def _humanize_duration(seconds: int) -> str:
     """«12418 сек» → «3 ч 26 мин». Для сообщений о запрете частых попыток."""
     if seconds < 60:
@@ -126,6 +156,21 @@ class TelegramLogin:
         self._drop()
         await _safe_disconnect(old)
 
+    def _new_client(self, api_id: int, api_hash: str, phone: str) -> PyrogramClient:
+        """Клиент Telegram для попытки входа — в памяти, без файла сеанса.
+
+        Файл сеанса тут не нужен: удавшийся вход отдаёт строку, а её
+        сохраняет уже настройка. Полусобранный клиент к держателю не
+        привязывается, поэтому и отдаётся зовущему.
+        """
+        return PyrogramClient(
+            name=self._session_name,
+            api_id=api_id,
+            api_hash=api_hash,
+            phone_number=phone,
+            in_memory=True,
+        )
+
     async def send_code(self, api_id: int, api_hash: str, phone: str) -> LoginStep:
         """Первый шаг: попросить Telegram прислать код на номер."""
         await self.forget()
@@ -139,13 +184,7 @@ class TelegramLogin:
         }
         new_client: PyrogramClient | None = None
         try:
-            new_client = PyrogramClient(
-                name=self._session_name,
-                api_id=api_id,
-                api_hash=api_hash,
-                phone_number=phone,
-                in_memory=True,
-            )
+            new_client = self._new_client(api_id, api_hash, phone)
             await new_client.connect()
             sent = await new_client.send_code(phone)
             # К себе привязываем только после удачной отправки: иначе
@@ -159,16 +198,7 @@ class TelegramLogin:
         except PhoneNumberInvalid:
             return await self._failed(new_client, "Неверный номер телефона.")
         except FloodWait as e:
-            secs = int(getattr(e, "value", 0) or 0)
-            # Срок Telegram называет не всегда, и «подождите 0 сек» на
-            # экране — приглашение повторить прямо сейчас и получить тот же
-            # запрет.
-            waiting = _humanize_duration(secs) if secs else "некоторое время"
-            return await self._failed(
-                new_client,
-                f"Telegram попросил подождать {waiting} "
-                "перед следующей попыткой отправить код.",
-            )
+            return await self._failed(new_client, _flood_wait_refusal(e))
         except BadRequest as e:
             return await self._failed(new_client, f"Telegram отклонил запрос: {e}")
         except Exception as e:
@@ -233,18 +263,10 @@ class TelegramLogin:
         assert self._creds is not None
         client = self._client
         creds = self._creds
-        # None означает «не спрашивали или не ответили» — в отличие от
-        # пустой строки, которая значит «ника у вошедшего нет».
         username: str | None = None
         try:
             if self._on_saved is not None:
-                # Спрашиваем, пока клиент входа ещё подключён: бот встанет
-                # позже, и его собственное соединение будет готово не сразу.
-                try:
-                    me = await client.get_me()
-                    username = me.username or ""
-                except Exception:
-                    logger.debug("login get_me failed", exc_info=True)
+                username = await _username_of(client)
             session_string = await client.export_session_string()
         except Exception as e:
             logger.exception("telegram session export failed")

@@ -127,8 +127,8 @@ MUTATIONS = [
     # send_to_hr_media: имя запоминается и у картинки
     (
         "backend/bot/chat.py",
-        "    media_name = None if as_photo else src.name",
-        "    media_name = src.name",
+        "            media_name=None if as_photo else src.name,",
+        "            media_name=src.name,",
     ),
     # cache_sent_file: место для копии готовится мимо разбора ошибок
     (
