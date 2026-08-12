@@ -235,5 +235,3 @@ async def test_deleting_a_vacancy_keeps_the_conversation(session, session_factor
     rows = (await session.scalars(select(Message))).all()
     assert sorted(m.text for m in rows) == sorted(["про эту вакансию", "просто так"])
     assert all(m.vacancy_id is None for m in rows)
-
-
