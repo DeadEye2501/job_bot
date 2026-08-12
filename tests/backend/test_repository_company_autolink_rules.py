@@ -203,6 +203,72 @@ async def test_a_spelling_already_known_is_not_remembered_twice(
     assert (await session.get(Company, existing.id)).aliases == ["Kontur"]
 
 
+async def test_a_hand_typed_spelling_survives_a_background_parse(
+    session, session_factory
+):
+    """Написание, набранное человеком, фоновый разбор не стирает.
+
+    В списке бывает и строка, равная имени компании: правка карточки его не
+    выбрасывает нарочно — человек написал, значит зачем-то надо. Разбор
+    вакансии проходит по той же колонке, и его дело добавить своё, а не
+    вычищать чужое.
+    """
+    existing = company_row(
+        name="Контур", aliases=["Контур", "Kontur"], website="https://kontur.ru"
+    )
+    await put(session_factory, existing)
+
+    await find_or_create_company(session, "СКБ Контур", website="https://kontur.ru")
+
+    saved = await session.get(Company, existing.id)
+    assert saved.aliases[:2] == ["Контур", "Kontur"]
+
+
+async def test_a_name_that_boils_down_to_nothing_is_not_a_spelling(
+    session, session_factory
+):
+    """Имя, свёдшееся к пустоте, написанием не становится.
+
+    «ООО» и «ПАО» после срезания юридических суффиксов не оставляют ничего:
+    имени в них нет. В списке написаний такая строка ничего не опознает, а
+    человеку видна чипом на карточке и уезжает арбитру сведения в запрос.
+    """
+    existing = company_row(name="Контур", aliases=[], website="https://kontur.ru")
+    await put(session_factory, existing)
+
+    await find_or_create_company(session, "ООО", website="https://kontur.ru")
+
+    assert (await session.get(Company, existing.id)).aliases == []
+
+
+async def test_a_spelling_differing_by_a_separator_is_remembered(
+    session, session_factory
+):
+    """Написание, отличающееся разделителем, запоминается своим.
+
+    У компании разделители не схлопываются — так объявлено общим правилом
+    отсева написаний, и на то есть довод: «Сбер-Тех» и «Сбер Тех» бывают
+    разными юридическими лицами. Список написаний для того и копится, чтобы
+    следующее совпадение нашлось по нему, а не по догадке.
+
+    Сведение компаний тем временем сличает написания схлопывающим ключом — это
+    другой вопрос, «та же ли это компания». Ответ на него здесь и виден:
+    сработало правило написаний, потому что «Сбер-Тех» и «Сбер Тех» сводятся к
+    одному ключу, — а в колонку они всё равно легли обоими.
+    """
+    existing = company_row(name="СберТех", aliases=["Сбер Тех"], website=None)
+    await put(session_factory, existing)
+
+    company, decision = await find_or_create_company(session, "Сбер-Тех")
+
+    assert decision["stage"] == "rule_alias"
+    assert company.id == existing.id
+    assert (await session.get(Company, existing.id)).aliases == [
+        "Сбер Тех",
+        "Сбер-Тех",
+    ]
+
+
 async def test_a_real_website_fills_an_empty_slot_but_never_replaces_one(
     session, session_factory
 ):
@@ -223,6 +289,9 @@ async def test_a_real_website_fills_an_empty_slot_but_never_replaces_one(
 
     assert (await session.get(Company, empty.id)).website == "https://kontur.ru"
     assert (await session.get(Company, filled.id)).website == "https://romashka.ru"
+    # Имя своим же написанием не становится: в чипах карточки оно повторилось
+    # бы рядом с заголовком, а опознать по нему нечего — оно и так имя.
+    assert (await session.get(Company, empty.id)).aliases == []
 
 
 async def test_a_channel_link_never_becomes_a_website(session, session_factory):

@@ -44,7 +44,7 @@ async def create_company(
         raise ValueError("create_company: name is required")
     company = Company(
         name=normalized,
-        aliases=list(aliases or []),
+        aliases=dedupe_first_wins(str_list(aliases), str.casefold),
         website=(website or None),
         notes=(notes or None),
     )
