@@ -1,7 +1,9 @@
 """Стенд моста: поверхность окна поверх настоящей базы, без окна и без канала.
 
-Мост зовётся напрямую питоном, а ответ ловится подпиской на сигнал — ровно то,
-что увидело бы окно. Ни `QApplication`, ни `QWebEngineView`, ни `QWebChannel`
+Мост зовётся напрямую питоном — ровно так, как позвало бы окно. Ответ ловится
+двояко, пока поверхностей две: у переехавших доменов он возвращается зовущему
+(фикстура `ask`, зов из чужого потока), у непереехавших приезжает сигналом
+(ловушка `Caught`). Ни `QApplication`, ни `QWebEngineView`, ни `QWebChannel`
 здесь не создаются: канал переезжает на pywebview, и тест, знающий про него,
 переезд бы не пережил.
 
@@ -19,6 +21,7 @@ from PySide6.QtWidgets import QFileDialog
 from backend.log_buffer import get_handler
 from backend.runtime_settings import RuntimeSettings
 from client.bridge import MainApi, WizardApi
+from client.bridge.api import Api
 from tests.fakes.ui_bot import UiBot
 
 
@@ -31,29 +34,20 @@ class LoopRunner:
     исполняет корутины там же, где живёт движок.
 
     Ответ отдаётся тем же `concurrent.futures.Future`, что и у настоящего:
-    `_dispatch_json` вешает на него обработчик и ждёт от него исход.
+    `reply` ждёт от него исход, `_dispatch_json` вешает на него обработчик.
+
+    Отправка идёт через `run_coroutine_threadsafe`, как у настоящего, и по той
+    же причине: `reply` зовут из чужого потока, а завести задачу в цикле оттуда
+    иначе нельзя.
     """
 
     def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
         self.loop = loop
-        self.tasks: list[asyncio.Task] = []
+        self.tasks: list[Future] = []
 
     def submit(self, coro) -> Future:
-        answer: Future = Future()
-        task = self.loop.create_task(coro)
-        self.tasks.append(task)
-
-        def _finish(done: asyncio.Task) -> None:
-            if done.cancelled():
-                answer.set_exception(asyncio.CancelledError())
-                return
-            error = done.exception()
-            if error is not None:
-                answer.set_exception(error)
-            else:
-                answer.set_result(done.result())
-
-        task.add_done_callback(_finish)
+        answer = asyncio.run_coroutine_threadsafe(coro, self.loop)
+        self.tasks.append(answer)
         return answer
 
     async def drain(self) -> None:
@@ -64,7 +58,10 @@ class LoopRunner:
         """
         while self.tasks:
             started, self.tasks = self.tasks, []
-            await asyncio.gather(*started, return_exceptions=True)
+            await asyncio.gather(
+                *(asyncio.wrap_future(one) for one in started),
+                return_exceptions=True,
+            )
 
 
 class Caught:
@@ -143,6 +140,33 @@ async def main_api(runtime_settings, session_factory, runner) -> MainApi:
 def watch():
     """Ловушка сигнала: `watch(api.vacancies_changed)`."""
     return Caught
+
+
+@pytest.fixture
+async def api(session_factory, runner) -> Api:
+    """Переехавшая поверхность: домены, отвечающие значением.
+
+    Порождённых работ дожидаемся все, как и у соседних поверхностей: метод
+    отвечает своей, но попутную заводит молча, и такая открывает свою сессию
+    уже после конца теста — движок к тому мигу закрыт.
+    """
+    yield Api(runner, session_factory)
+    await runner.drain()
+
+
+@pytest.fixture
+def ask():
+    """Зов моста из чужого потока: `await ask(api.stats.kpi, "week")`.
+
+    Метод домена ждёт ответа с мотора, и позванный прямо из цикла теста он
+    запер бы этот цикл — работа, которой он ждёт, идёт в нём же. pywebview
+    зовёт его так же со стороны: из своего потока, а не из мотора.
+    """
+
+    async def _ask(method, *args):
+        return await asyncio.to_thread(method, *args)
+
+    return _ask
 
 
 @pytest.fixture

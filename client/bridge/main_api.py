@@ -37,7 +37,6 @@ from client.bridge.state import (
     _UNREAD_INTERVAL_MS,
     WindowStateSlots,
 )
-from client.bridge.stats import StatsSlots
 from client.bridge.vacancies import VacancySlots
 from client.bridge.vacancy_actions import VacancyActionSlots
 from client.bridge.vacancy_links import VacancyLinkSlots
@@ -64,7 +63,7 @@ _CLOSING_WAIT_S = 5.0
 class MainApi(
     BlacklistSlots, ChannelActionSlots, ChannelSlots, CompanySlots, CvSlots,
     DesktopSlots, HrChatSlots, HrSlots, JournalSlots, LlmSlots, ProfileSlots,
-    SettingsSlots, StatsSlots,
+    SettingsSlots,
     TelegramLoginSlots, VacancyActionSlots, VacancyLinkSlots, VacancySlots,
     WindowStateSlots, WipeSlots,
     QObject,
