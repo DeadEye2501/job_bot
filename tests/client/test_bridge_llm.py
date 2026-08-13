@@ -266,3 +266,79 @@ async def test_an_answering_model_lights_the_lamp_green(
     main_api.request_initial()
 
     assert (await caught.next())["chat"] is True
+
+
+async def test_the_lamp_answers_about_the_base_and_telegram_too(
+    main_api, watch, session_factory
+):
+    """Лампочка отвечает про базу и Telegram, а не только про модели.
+
+    Три ответа окно рисует тремя разными огоньками. Пропади ключ или уедь
+    он к соседу — человек чинил бы Telegram, глядя на погасшую базу.
+    """
+    caught = watch(main_api.health_changed)
+
+    main_api.request_initial()
+
+    answer = await caught.next()
+    assert answer["db"] is True
+    assert answer["tg"] is False
+
+
+async def test_the_model_is_not_asked_again_within_the_minute(
+    main_api, watch, provider_says, runtime_settings
+):
+    """Второй удар часов не идёт к модели заново, а показывает прошлый ответ.
+
+    Вопрос к модели — настоящая генерация: спрашивай его каждые пять секунд,
+    и модель не выгрузится из памяти никогда, а неподнятый поставщик завалит
+    журнал трассировками ровно тогда, когда человек ещё заполняет мастер.
+    """
+    caught = watch(main_api.health_changed)
+    provider_says({
+        MODELS: models_response("qwen"),
+        CHAT: httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}]},
+        ),
+    })
+    await runtime_settings.set_chat(
+        base_url="http://localhost:1234", api_key="", model="qwen"
+    )
+
+    main_api.request_initial()
+    assert (await caught.next())["chat"] is True
+
+    # Поставщик замолчал — но минута не прошла, и лампочка держит прошлый ответ.
+    provider_says({MODELS: httpx.Response(500, text="упал")})
+    main_api.request_initial()
+
+    assert (await caught.next())["chat"] is True
+
+
+async def test_a_slow_provider_is_not_asked_twice_at_once(
+    main_api, watch, provider_says, runtime_settings
+):
+    """Пока проба в полёте, вторая не заводится.
+
+    Часы бьют раз в пять секунд, а поставщик отвечает и минутами: LM Studio
+    подгружает модель. Без этого заслона каждый удар заводил бы новую пару
+    настоящих генераций поверх незакончившихся, и модель уже никогда не
+    выгрузилась бы из памяти.
+    """
+    caught = watch(main_api.health_changed)
+    provider_says({
+        MODELS: models_response("qwen"),
+        CHAT: httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}]},
+        ),
+    })
+    await runtime_settings.set_chat(
+        base_url="http://localhost:1234", api_key="", model="qwen"
+    )
+
+    main_api._models_in_flight = True
+    main_api.request_initial()
+
+    assert (await caught.next())["chat"] is False

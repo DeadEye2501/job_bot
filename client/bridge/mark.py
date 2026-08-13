@@ -95,17 +95,6 @@ async def mark(session, subject: MarkSubject, entity_id: int) -> tuple[str, bool
     _, outcome = await blacklist_repo.create_blacklist(
         session, kind=subject.kind, value=value,
     )
-    if subject.kind == "channel":
-        # «Канал в отсеве» и «канал работает» — состояния несовместимые, и
-        # держит их одно объявление репозитория. Прежде эта же строка была
-        # написана здесь руками (`ch.is_active = False`) и гасила только тот
-        # канал, по кнопке которого нажали, — а написание отсева совпадает и
-        # с одноимённым соседом.
-        #
-        # Проверка рода стоит здесь, а не внутри репозитория, из-за
-        # направления ввозов: `blacklist_marks` ввозят и карточки, и каналы,
-        # и встречный ввоз замкнул бы круг. Хвост записан в плане этапа.
-        await channels_repo.deactivate_blacklisted_channels(session)
     await session.commit()
     return _ok({
         "action": "blacklist",

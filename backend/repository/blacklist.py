@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import Blacklist
 from backend.payloads import text_or_none
 
+from backend.repository import channels
 from backend.repository.blacklist_marks import active_mark_of
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,21 @@ BlacklistOutcome = Literal["created", "reactivated", "already_active"]
 """
 
 
+async def _hold_the_channel_rule(session: AsyncSession, kind: str) -> None:
+    """Держать правило «канал в отсеве не работает» при каждой записи отметки.
+
+    Состояния несовместимы: канал, попавший в отсев, не должен опрашиваться.
+    Прежде это правило звали три дороги из пяти — карточка канала, заведение
+    записи с экрана списка и самопочинка на показе, — а тумблер строки и
+    правка её значения не звали, и отсеянный канал продолжал носить вакансии
+    до ближайшего открытия списка.
+
+    Зов стоит здесь, у самой записи, чтобы забыть о нём не мог никто.
+    """
+    if kind == "channel":
+        await channels.deactivate_blacklisted_channels(session)
+
+
 async def set_blacklist_active(
     session: AsyncSession, blacklist_id: int, active: bool
 ) -> bool:
@@ -35,6 +51,8 @@ async def set_blacklist_active(
         return False
     prev = row.active
     row.active = bool(active)
+    if row.active:
+        await _hold_the_channel_rule(session, row.kind)
     if prev != row.active:
         logger.info(
             "Blacklist %d active %s -> %s (kind=%s value=%r)",
@@ -120,6 +138,7 @@ async def update_blacklist(
         return False
     if value is not _BLACKLIST_FIELD_UNSET:
         row.value = _required_value(value)
+        await _hold_the_channel_rule(session, row.kind)
     if reason is not _BLACKLIST_FIELD_UNSET:
         row.reason = text_or_none(reason)
     return True
@@ -189,6 +208,9 @@ async def create_blacklist(
     Если строка с теми же (kind, value) уже есть — она и возвращается, с
     исходом от :func:`_reuse_existing`; иначе вставляется новая, активная.
 
+    Канальную строку сопровождает гашение самих каналов — см.
+    `_hold_the_channel_rule`.
+
     Returns (row, outcome). Caller wraps in ``session.begin()``.
     """
     normalized_value = _required_value(value)
@@ -199,10 +221,13 @@ async def create_blacklist(
 
     existing = await _same_entry(session, normalized_kind, normalized_value)
     if existing is not None:
-        return existing, _reuse_existing(existing, normalized_reason)
-    return await _insert_blacklist(
-        session, normalized_kind, normalized_value, normalized_reason
-    ), "created"
+        row, outcome = existing, _reuse_existing(existing, normalized_reason)
+    else:
+        row, outcome = await _insert_blacklist(
+            session, normalized_kind, normalized_value, normalized_reason
+        ), "created"
+    await _hold_the_channel_rule(session, normalized_kind)
+    return row, outcome
 
 
 async def delete_blacklist(

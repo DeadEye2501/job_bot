@@ -280,3 +280,49 @@ async def test_a_deleted_vacancy_leaves_the_list(main_api, watch, session_factor
 
     main_api.request_vacancies()
     assert (await listed.next())["vacancies"] == []
+
+
+async def test_the_saved_note_comes_back_as_it_was_written_down(
+    main_api, watch, session_factory
+):
+    """Окну возвращается то, что легло в колонку, а не то, что оно прислало.
+
+    Заметку из одних пробелов база сводит к пустоте. Верни мост присланное —
+    окно приняло бы пробелы за сохранённое и на следующем нажатии отправило
+    бы их снова, затирая набранное человеком в это время.
+    """
+    caught = watch(main_api.vacancy_notes_saved)
+    vacancy = vacancy_row(notes="было")
+    await put(session_factory, vacancy)
+
+    main_api.update_vacancy_notes(
+        json.dumps({"vacancy_id": vacancy.id, "notes": "   "})
+    )
+
+    assert (await caught.next())["notes"] is None
+
+
+async def test_the_saved_explanation_comes_back_with_its_period(
+    main_api, watch, session_factory
+):
+    """Пояснение возвращается с точкой, которую дописала запись.
+
+    Точку ставит репозиторий — в ленте событий строки идут вперемешку, и без
+    неё соседние выглядели бы по-разному. Верни мост присланное без точки,
+    и окно считало бы исходным то, чего в базе нет.
+    """
+    caught = watch(main_api.vacancy_history_explanation_saved)
+    vacancy = vacancy_row()
+    await put(session_factory, vacancy)
+    history = status_history_row(vacancy_id=vacancy.id, explanation="старое")
+    await put(session_factory, history)
+
+    main_api.update_status_history_explanation(
+        json.dumps({
+            "vacancy_id": vacancy.id,
+            "history_id": history.id,
+            "explanation": "передумал",
+        })
+    )
+
+    assert (await caught.next())["explanation"] == "передумал."

@@ -151,17 +151,27 @@ class WindowStateSlots:
         Свой срок у этого вопроса потому, что он дорог: см.
         `_MODEL_PROBE_INTERVAL_S`. База и Telegram спрашиваются каждый удар
         часов, модели — раз в минуту.
+
+        Отметка ставится **до** опроса, а не после, и пока опрос в полёте,
+        второго не заводится. Иначе срок держался бы только на быстром
+        поставщике: медленный отвечает дольше, чем бьют часы, — LM Studio
+        подгружает модель до трёх минут, — и каждый удар заводил бы новую
+        пару настоящих генераций поверх незакончившихся.
         """
         now = time.monotonic()
-        if now - self._models_probed_at < _MODEL_PROBE_INTERVAL_S:
+        stale = now - self._models_probed_at >= _MODEL_PROBE_INTERVAL_S
+        if self._models_in_flight or not stale:
             return self._models_health_cache
-        answers = (
-            await health.model_alive(self._rs.chat, "chat"),
-            await health.model_alive(self._rs.embed, "embed"),
-        )
         self._models_probed_at = now
-        self._models_health_cache = answers
-        return answers
+        self._models_in_flight = True
+        try:
+            self._models_health_cache = (
+                await health.model_alive(self._rs.chat, "chat"),
+                await health.model_alive(self._rs.embed, "embed"),
+            )
+        finally:
+            self._models_in_flight = False
+        return self._models_health_cache
 
     def _kick_health(self) -> None:
         """Спросить, живо ли то, на чём держится работа, и отдать окну.

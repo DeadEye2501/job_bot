@@ -75,16 +75,31 @@ async def test_a_file_held_by_someone_else_is_reported(data_dir, monkeypatch):
 
 
 async def test_the_journal_is_let_go_before_the_files_are_removed(data_dir):
-    """Обработчики журнала закрываются до удаления — иначе Windows файл не отдаст.
+    """Обработчик журнала закрывается **до** удаления, а не после.
 
-    Держит его сам процесс, и снос без этого молча оставлял бы на диске
-    единственное, что человек точно считает своим.
+    Держит файл сам процесс: закрой его позже — Windows не отдаст файл, и
+    снос молча оставит на диске единственное, что человек точно считает
+    своим. Порядок и наблюдаем: обработчик запоминает, лежал ли файл на
+    месте в тот миг, когда его закрывали.
     """
+    log = data_dir / "jobbot.log"
     root = logging.getLogger()
-    handler = logging.FileHandler(data_dir / "jobbot.log", encoding="utf-8")
+
+    class Remembering(logging.FileHandler):
+        """Обработчик, который помнит, был ли файл на месте при закрытии."""
+
+        file_was_there: bool | None = None
+
+        def close(self) -> None:
+            self.file_was_there = log.exists()
+            super().close()
+
+    handler = Remembering(log, encoding="utf-8")
     root.addHandler(handler)
     try:
         await wipe_all(None)
-        assert handler not in root.handlers
     finally:
         root.removeHandler(handler)
+
+    assert handler.file_was_there is True, "журнал закрыли уже после удаления"
+    assert not log.exists()

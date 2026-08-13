@@ -240,3 +240,45 @@
   из границы «мост не трогаем»:** две строки вызова в `client/bridge.py`
   переводятся на `list_skills`, и только они. Пункт 26 в
   [02-duplicates.md](02-duplicates.md).
+
+## Вторжение этапа 4 клиента, 13 августа 2026
+
+Этап дедупликации клиента (`docs/client/04-dedup.md`) правил зону бэкенда с
+разрешения человека: девять находок разведки лежали так, что вторая их сторона
+в `backend/`, `adapters/` или `config.py`, и три поломки из четырёх иначе не
+чинились вовсе. Тронуто 26 файлов вне `client/`.
+
+**Что заведено:** `backend/repository/paging.py` (страница ответа и признак
+продолжения), `backend/health.py` (жива ли база, Telegram, модель),
+`backend/wipe.py` (снос каталога данных), `config.data_files`/`data_dirs`/
+`LOG_KEPT`, `adapters/db.ping`, `adapters/telegram.SESSIONS_DIR`,
+`adapters/lm_studio.check_model` (был `_check_model`), `backend/crypto.forget_master_key`,
+`backend/single_instance.release_the_lock`, `backend/models.status_code`,
+`backend/payloads.int_or_none`/`float_or_none`/`moment_or_none`,
+`backend/bot/client.Bot.is_connected`, `LogBufferHandler.page`.
+
+**Что изменило договор:** пять объявлений репозитория отдают
+`(строки, есть_ли_ещё)` вместо списка (`vacancies_list.list_vacancies`,
+`vacancies_mini.list_vacancies_for_channel`, `hr_list.list_hr_with_counts`,
+`companies_list.list_companies_with_counts`, `messages.list_messages_for_hr`);
+`vacancies_card.update_vacancy_notes` и `vacancies_life.update_status_history_explanation`
+отдают саму строку вместо признака «получилось».
+
+**Что оставлено бэкенду хвостами:**
+
+- **четыре повтора, обе стороны которых вне `client/`** — приписывание
+  написаний компании (`companies_matching.py:77` ↔ `companies_card.py:220`),
+  закрытые перечни, выписанные образцами в `llm/hallucination.py:57,97` при
+  живом `domain/taxonomy`, порог `0.92` в `domain/dedup.py:14` и
+  `runtime_settings.py:91`, категория «Общее» в `llm/cv.py:276` и
+  `repository/profile.py:254`. Разбор каждого — в
+  `docs/client/04-dedup-research.md`, раздел «Повторы на границе»;
+- **разбор резюме моделью остался без единого боевого потребителя.**
+  `backend/llm/cv.py:parse_cv` (около 390 строк) и
+  `repository/profile.save_parsed_cv` зовут теперь только тесты: мастер
+  отвечает «CV parsing временно отключён», и снятие мёртвой дороги к ним
+  сделало это видимым. Возможность запаркована нарочно — оживлять её или
+  сносить, решать человеку;
+- **логика из слотов, не взятая клиентом.** Решение человека 13 августа
+  ограничило слайсы той логикой, которая порождала повторы; остальное из
+  тридцати трёх слотов — в `docs/client/04-dedup-research.md`, раздел 3.
