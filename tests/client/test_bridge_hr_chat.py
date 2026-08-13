@@ -6,27 +6,8 @@
 
 import json
 
-import pytest
-from PySide6.QtWidgets import QFileDialog
-
 from tests.dbio import put
 from tests.factories import hr_row, message_row, unread_probe
-
-
-@pytest.fixture
-def chosen_file(monkeypatch):
-    """Отвечает за человека в диалоге выбора файла.
-
-    Диалог — статический вызов Qt, поднимающий настоящее окно; подменяется он
-    целиком, иначе прогон встал бы на первом же тесте, ожидая нажатия.
-    """
-
-    def _choose(path: str) -> None:
-        monkeypatch.setattr(
-            QFileDialog, "getOpenFileName", lambda *a, **k: (path, "")
-        )
-
-    return _choose
 
 
 async def test_the_chat_tells_ours_from_theirs(main_api, watch, session_factory):
