@@ -8,23 +8,8 @@ Telegram и модели мост не заходит ни разу, он зов
 
 import json
 
-import pytest
-
 from tests.dbio import put
 from tests.factories import vacancy_row
-from tests.fakes.ui_bot import UiBot
-
-
-@pytest.fixture
-def with_bot(main_api):
-    """Ставит подделку бота на место настоящего и отдаёт её же."""
-
-    def _put(**answers) -> UiBot:
-        bot = UiBot(**answers)
-        main_api._bot = bot
-        return bot
-
-    return _put
 
 
 async def test_a_manual_run_before_the_bot_is_up_says_nothing(main_api, watch):

@@ -18,6 +18,7 @@ import pytest
 from backend.log_buffer import get_handler
 from backend.runtime_settings import RuntimeSettings
 from client.bridge import MainApi
+from tests.fakes.ui_bot import UiBot
 
 
 class LoopRunner:
@@ -34,10 +35,12 @@ class LoopRunner:
 
     def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
         self.loop = loop
+        self.tasks: list[asyncio.Task] = []
 
     def submit(self, coro) -> Future:
         answer: Future = Future()
         task = self.loop.create_task(coro)
+        self.tasks.append(task)
 
         def _finish(done: asyncio.Task) -> None:
             if done.cancelled():
@@ -108,6 +111,14 @@ async def main_api(runtime_settings, session_factory, runner) -> MainApi:
     Обработчик журнала возвращается на место после теста: `__init__` вешает
     свой на общий буфер, и без возврата следующий тест писал бы в мост,
     которого уже нет.
+
+    Порождённых работ дожидаемся все, а не только те, чей ответ тест поймал:
+    слоты попутно обновляют счётчик непрочитанного, и такая работа открывает
+    свою сессию уже после конца теста — движок к тому мигу закрыт, а
+    соединение остаётся висеть до сборщика мусора.
+
+    Ждём в цикле, а не одним снимком списка: работа порождает следующую, и
+    заведённая уже во время ожидания в снимок не попала бы.
     """
     handler = get_handler()
     previous = handler.on_record
@@ -116,6 +127,9 @@ async def main_api(runtime_settings, session_factory, runner) -> MainApi:
         yield api
     finally:
         api.cleanup()
+        while runner.tasks:
+            started, runner.tasks = runner.tasks, []
+            await asyncio.gather(*started, return_exceptions=True)
         handler.on_record = previous
 
 
@@ -123,3 +137,15 @@ async def main_api(runtime_settings, session_factory, runner) -> MainApi:
 def watch():
     """Ловушка сигнала: `watch(api.vacancies_changed)`."""
     return Caught
+
+
+@pytest.fixture
+def with_bot(main_api):
+    """Ставит подделку бота на место настоящего и отдаёт её же."""
+
+    def _put(**answers) -> UiBot:
+        bot = UiBot(**answers)
+        main_api._bot = bot
+        return bot
+
+    return _put
