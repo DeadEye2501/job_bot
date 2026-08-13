@@ -9,7 +9,9 @@ import logging
 from PySide6.QtCore import Signal, Slot
 
 from backend.telegram_login import username_of
+from adapters.lm_studio import LlmProviderConfig
 from client.bridge.answer import _err, _ok
+from client.bridge.llm import read_llm_creds
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.wire import _llm_provider_to_dict
 
@@ -113,42 +115,35 @@ class SettingsSlots:
         embed = payload.get("embed") if isinstance(payload.get("embed"), dict) else None
         app = payload.get("app") if isinstance(payload.get("app"), dict) else None
 
-        # Pre-validate: пустой model — почти всегда last-blur'на стерлась
-        # в tab-switch'е (см. main.html guards). Раньше уходило в
-        # _set_llm как пустая строка, _from_llm_row возвращал None и
-        # config «исчезал» — юзер думал «починилось», а LLM-вызовы
-        # начинали валиться. Лучше отбить рано с понятной ошибкой.
+        # Читаем до записи и тем же правилом, что проба и мастер: пустое поле
+        # почти всегда стёрлось последним переводом фокуса (см. заслоны в
+        # main.html). Уйди оно в запись, поставщик пропал бы с экрана целиком —
+        # `_from_llm_row` отдаёт `None` на пустоте, — и человек считал бы, что
+        # починилось, пока не упал первый разбор вакансии.
+        creds: dict[str, LlmProviderConfig] = {}
         for kind_name, payload in (("chat", chat), ("embed", embed)):
             if payload is None:
                 continue
-            model_val = str(payload.get("model") or "").strip()
-            if not model_val:
-                logger.warning(
-                    "save_settings: empty model for %s — refusing to save",
-                    kind_name,
-                )
-                self.settings_save_done.emit(
-                    _err(f"{kind_name}: пустое имя модели — сохранение отклонено")
-                )
+            try:
+                creds[kind_name] = read_llm_creds(payload)
+            except (AttributeError, ValueError, TypeError) as e:
+                logger.warning("save_settings: %s refused: %s", kind_name, e)
+                self.settings_save_done.emit(_err(f"{kind_name}: {e}"))
                 return
 
         async def run() -> str:
             applied: list[str] = []
             try:
-                if chat is not None:
-                    await self._rs.set_chat(
-                        base_url=str(chat.get("base_url") or "").strip().rstrip("/"),
-                        api_key=str(chat.get("api_key") or ""),
-                        model=str(chat.get("model") or "").strip(),
+                for kind_name, setter in (
+                    ("chat", self._rs.set_chat), ("embed", self._rs.set_embed)
+                ):
+                    cfg = creds.get(kind_name)
+                    if cfg is None:
+                        continue
+                    await setter(
+                        base_url=cfg.base_url, api_key=cfg.api_key, model=cfg.model
                     )
-                    applied.append("chat")
-                if embed is not None:
-                    await self._rs.set_embed(
-                        base_url=str(embed.get("base_url") or "").strip().rstrip("/"),
-                        api_key=str(embed.get("api_key") or ""),
-                        model=str(embed.get("model") or "").strip(),
-                    )
-                    applied.append("embed")
+                    applied.append(kind_name)
                 if app is not None:
                     # Whitelist: чтобы UI не мог по ошибке/опечатке писать
                     # произвольные ключи в app_settings.

@@ -14,6 +14,9 @@ async def test_an_empty_model_name_is_refused_before_saving(main_api, watch):
     С пустым именем каждый запрос к модели вернёт отказ, а выглядеть это
     будет как поломка разбора вакансий. Сохранись оно — искать причину
     пришлось бы в журнале, а не в форме, где её видно сразу.
+
+    Отказ называет поставщика: экран настроек правит обоих сразу, и без
+    имени человек не знает, в каком из двух полей стёрлось.
     """
     caught = watch(main_api.settings_save_done)
 
@@ -23,7 +26,7 @@ async def test_an_empty_model_name_is_refused_before_saving(main_api, watch):
 
     answer = await caught.next()
     assert answer["ok"] is False
-    assert "пустое имя модели" in answer["error"]
+    assert answer["error"] == "chat: Заполните base_url и модель."
 
 
 async def test_saved_settings_come_back_on_the_next_request(main_api, watch):
@@ -70,3 +73,21 @@ async def test_an_unknown_setting_is_ignored_not_written(main_api, watch):
     answer = await caught.next()
     assert answer["ok"] is True
     assert answer["applied"] == []
+
+
+async def test_saving_a_provider_without_an_address_is_refused(main_api, watch):
+    """Пустой адрес поставщика не сохраняют молча.
+
+    Записанная пустота стирает поставщика целиком: экран показывает пустые
+    поля, будто их никто не заполнял, а разбор вакансий перестаёт работать —
+    и связать одно с другим человеку нечем.
+    """
+    caught = watch(main_api.settings_save_done)
+
+    main_api.save_settings(
+        json.dumps({"chat": {"base_url": "", "api_key": "", "model": "qwen"}})
+    )
+
+    answer = await caught.next()
+    assert answer["ok"] is False
+    assert "Заполните base_url и модель." in answer["error"]

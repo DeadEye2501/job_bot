@@ -72,8 +72,9 @@ async def _do_llm_probe(
 def read_llm_creds(payload: dict) -> LlmProviderConfig:
     """Черновые учётные данные поставщика из нагрузки окна.
 
-    Читаются одним правилом на все три экрана — пробу, мастер и настройки.
-    Прежде их было три: мастер ронял разбор на пропущенном поле, окно
+    Читаются одним правилом на всех, кто спрашивает поставщика: проба, обе
+    проверки мастера и оба его сохранения, оба сохранения настроек. Прежде
+    правил было три — мастер ронял разбор на пропущенном поле, окно
     подставляло пустую строку, настройки смотрели только на модель, — и одна
     и та же форма принималась по-разному в зависимости от того, откуда её
     открыли.
@@ -85,6 +86,8 @@ def read_llm_creds(payload: dict) -> LlmProviderConfig:
     пустота выглядит как настроенный поставщик, и беду ищут потом где угодно,
     только не здесь.
     """
+    if not isinstance(payload, dict):
+        raise ValueError(LLM_FIELDS_REQUIRED)
     base_url = str(payload.get("base_url") or "").strip().rstrip("/")
     api_key = str(payload.get("api_key") or "")
     model = str(payload.get("model") or "").strip()
@@ -109,7 +112,7 @@ def models_coro(payload_json: str):
         kind = str(payload.get("kind") or "")
         base_url = str(payload.get("base_url") or "").strip().rstrip("/")
         api_key = str(payload.get("api_key") or "")
-    except (ValueError, TypeError):
+    except (AttributeError, ValueError, TypeError):
         return None
     if not base_url or kind not in ("chat", "embed"):
         return None

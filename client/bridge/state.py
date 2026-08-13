@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from PySide6.QtCore import Signal, Slot
 from sqlalchemy import text as sa_text
@@ -19,6 +20,19 @@ logger = logging.getLogger(__name__)
 
 _HEALTHCHECK_INTERVAL_MS = 5_000
 _UNREAD_INTERVAL_MS = 15_000
+
+_MODEL_PROBE_INTERVAL_S = 60.0
+"""Как часто лампочка спрашивает саму модель, а не только базу и Telegram.
+
+Реже остальных нарочно. Вопрос к модели — это перечень имён плюс пробное
+обращение, то есть настоящая, пусть и однословная, генерация: спрашивай его
+каждые пять секунд, и модель уже никогда не выгрузится из памяти, а
+неподнятый провайдер напишет в журнал двадцать четыре трассировки в минуту —
+ровно на первом запуске, пока человек заполняет мастер.
+
+Ответ между опросами берётся прошлый: лампочка показывает положение дел
+минутной давности, и это честнее, чем греть модель ради секундной точности.
+"""
 
 
 async def _model_answers(cfg, check_fn, kind: str) -> bool:
@@ -160,6 +174,24 @@ class WindowStateSlots:
 
         self._dispatch(self.unread_chats_loaded, run())
 
+    async def _models_health(self) -> tuple[bool, bool]:
+        """Отвечают ли обе модели — с прошлым ответом между опросами.
+
+        Свой срок у этого вопроса потому, что он дорог: см.
+        `_MODEL_PROBE_INTERVAL_S`. База и Telegram спрашиваются каждый удар
+        часов, модели — раз в минуту.
+        """
+        now = time.monotonic()
+        if now - self._models_probed_at < _MODEL_PROBE_INTERVAL_S:
+            return self._models_health_cache
+        answers = (
+            await _model_answers(self._rs.chat, lm_studio.check_chat, "chat"),
+            await _model_answers(self._rs.embed, lm_studio.check_embed, "embed"),
+        )
+        self._models_probed_at = now
+        self._models_health_cache = answers
+        return answers
+
     def _kick_health(self) -> None:
         async def run() -> str:
             results = {"db": False, "tg": False, "chat": False, "embed": False}
@@ -185,12 +217,7 @@ class WindowStateSlots:
                 and getattr(self._bot._client, "is_connected", False)
             )
 
-            results["chat"] = await _model_answers(
-                self._rs.chat, lm_studio.check_chat, "chat"
-            )
-            results["embed"] = await _model_answers(
-                self._rs.embed, lm_studio.check_embed, "embed"
-            )
+            results["chat"], results["embed"] = await self._models_health()
 
             return _ok(results)
 

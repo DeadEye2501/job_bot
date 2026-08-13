@@ -132,13 +132,15 @@ class WizardApi(TelegramLoginSlots, QObject):
         check_fn: Callable[[httpx.AsyncClient, str], Any],
     ) -> None:
         try:
-            cfg = read_llm_creds(json.loads(payload_json))
-        except ValueError as e:
-            signal.emit(_err(str(e)))
-            return
-        except (KeyError, TypeError) as e:
+            payload = json.loads(payload_json)
+        except (ValueError, TypeError) as e:
             _log_invalid_payload("_make_llm_check", e)
             signal.emit(_err(f"Неверные поля: {e}"))
+            return
+        try:
+            cfg = read_llm_creds(payload)
+        except ValueError as e:
+            signal.emit(_err(str(e)))
             return
 
         async def run() -> str:
@@ -180,13 +182,15 @@ class WizardApi(TelegramLoginSlots, QObject):
         различаются только тем, куда записать и каким сигналом ответить.
         """
         try:
-            cfg = read_llm_creds(json.loads(payload_json))
-        except ValueError as e:
-            signal.emit(_err(str(e)))
-            return
-        except (KeyError, TypeError) as e:
+            payload = json.loads(payload_json)
+        except (ValueError, TypeError) as e:
             _log_invalid_payload("_make_llm_save", e)
             signal.emit(_err(f"Неверные поля: {e}"))
+            return
+        try:
+            cfg = read_llm_creds(payload)
+        except ValueError as e:
+            signal.emit(_err(str(e)))
             return
 
         async def run() -> str:
