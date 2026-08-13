@@ -11,6 +11,7 @@ from PySide6.QtCore import Signal, Slot
 from backend.telegram_login import username_of
 from adapters.lm_studio import LlmProviderConfig
 from client.bridge.answer import _err, _ok
+from client.bridge.bot_stop import stop_bot
 from client.bridge.llm import read_llm_creds
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.wire import _llm_provider_to_dict
@@ -199,18 +200,9 @@ class SettingsSlots:
             # бэкенд-state тоже — иначе при следующем «Войти» налетим на
             # «уже отправили код».
             await self._login.forget()
-            if bot is not None:
-                bot.cancel_current_poll()
-                await bot.log_out_session()
-            if bot_task is not None:
-                try:
-                    await asyncio.wait_for(
-                        asyncio.wrap_future(bot_task), timeout=10
-                    )
-                except asyncio.TimeoutError:
-                    logger.warning("logout: bot did not stop within 10s")
-                except Exception:
-                    logger.exception("logout: bot task raised")
+            await stop_bot(
+                bot, bot_task, bot.log_out_session if bot is not None else None
+            )
             await self._rs.clear_tg()
             self._username_cache = ""
             return _ok({})

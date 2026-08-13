@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from backend.telegram_login import TelegramLogin
 from backend.runtime_settings import RuntimeSettings
+from client.bridge.bot_stop import stop_bot
 from client.bridge.answer import _dispatch_json, _err, _ok
 from client.bridge.blacklist import BlacklistSlots
 from client.bridge.channel_actions import ChannelActionSlots
@@ -46,6 +47,19 @@ from client.bridge.wipe import WipeSlots
 
 logger = logging.getLogger(__name__)
 
+
+
+_CLOSING_WAIT_S = 5.0
+"""Сколько закрывающееся окно ждёт остановки бота.
+
+Меньше, чем ждут выход из учётной записи и снос (`bot_stop.STOP_TIMEOUT_S`):
+там человек ждёт ответа на нажатие, а здесь смотрит на застывшее окно, которое
+уже попросил закрыть. Срок уезжает доводом внутрь, а снаружи остаётся секунда
+запаса — на случай, если мотор занят чужой работой.
+
+Зависший обход переживёт оба срока: мотор гасит оболочка следом
+(`shell.run_ui`), и хвост подбирает `runner.stop()`.
+"""
 
 
 class MainApi(
@@ -250,16 +264,20 @@ class MainApi(
         self._health_timer.stop()
         self._unread_timer.stop()
         if self._bot is not None and self._bot_task is not None:
-            self._bot.cancel_current_poll()
-            self._bot.request_stop()
+            # Те же шаги, что у выхода из учётной записи и у сноса данных, —
+            # но ждём их отсюда, с окна: `cleanup` идёт по нажатию «закрыть»
+            # на потоке Qt, и корутину ему надо отправить на мотор.
             try:
-                self._bot_task.result(timeout=5)
+                self._runner.submit(
+                    stop_bot(self._bot, self._bot_task, timeout=_CLOSING_WAIT_S)
+                ).result(timeout=_CLOSING_WAIT_S + 1)
             except TimeoutError:
                 logger.warning(
-                    "MainApi cleanup: bot task did not stop within 5s"
+                    "MainApi cleanup: bot did not stop within %ss",
+                    _CLOSING_WAIT_S,
                 )
             except Exception:
-                logger.exception("MainApi cleanup: bot task raised on shutdown")
+                logger.exception("MainApi cleanup: bot stop raised on shutdown")
 
     def _dispatch_noop(self, coro: Coroutine[Any, Any, Any]) -> None:
         """Fire-and-forget: запускаем корутину на runner'е, ошибки в лог.
