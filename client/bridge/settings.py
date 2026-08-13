@@ -11,6 +11,7 @@ from PySide6.QtCore import Signal, Slot
 from backend.telegram_login import username_of
 from client.bridge.answer import _err, _ok
 from client.bridge.payload import _log_invalid_payload
+from client.bridge.wire import _llm_provider_to_dict
 
 
 logger = logging.getLogger(__name__)
@@ -76,16 +77,8 @@ class SettingsSlots:
                     "has_session": bool(tg and tg.session_string),
                     "username": username,
                 },
-                "chat": {
-                    "base_url": chat.base_url if chat else "",
-                    "api_key": chat.api_key if chat else "",
-                    "model": chat.model if chat else "",
-                },
-                "embed": {
-                    "base_url": embed.base_url if embed else "",
-                    "api_key": embed.api_key if embed else "",
-                    "model": embed.model if embed else "",
-                },
+                "chat": _llm_provider_to_dict(chat),
+                "embed": _llm_provider_to_dict(embed),
                 "pipeline": {
                     "scoring_threshold": self._rs.scoring_threshold,
                     "poll_interval_sec": self._rs.poll_interval_sec,

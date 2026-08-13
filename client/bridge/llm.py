@@ -14,6 +14,7 @@ from adapters import lm_studio
 from adapters.lm_studio import LlmProviderConfig
 from client.bridge.answer import _err, _ok
 from client.bridge.payload import _log_invalid_payload
+from client.bridge.refusals import LLM_FIELDS_REQUIRED
 
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,58 @@ async def _do_llm_probe(
         await client.aclose()
 
 
+def read_llm_creds(payload: dict) -> LlmProviderConfig:
+    """Черновые учётные данные поставщика из нагрузки окна.
+
+    Читаются одним правилом на все три экрана — пробу, мастер и настройки.
+    Прежде их было три: мастер ронял разбор на пропущенном поле, окно
+    подставляло пустую строку, настройки смотрели только на модель, — и одна
+    и та же форма принималась по-разному в зависимости от того, откуда её
+    открыли.
+
+    Хвостовая косая у адреса срезается: человек копирует адрес из браузера
+    вместе с ней, а склейка пути дала бы двойную.
+
+    Пустой адрес или пустое имя модели роняет `ValueError`: сохранённая
+    пустота выглядит как настроенный поставщик, и беду ищут потом где угодно,
+    только не здесь.
+    """
+    base_url = str(payload.get("base_url") or "").strip().rstrip("/")
+    api_key = str(payload.get("api_key") or "")
+    model = str(payload.get("model") or "").strip()
+    if not base_url or not model:
+        raise ValueError(LLM_FIELDS_REQUIRED)
+    return LlmProviderConfig(base_url=base_url, api_key=api_key, model=model)
+
+
+def models_coro(payload_json: str):
+    """Корутина ответа «какие модели у поставщика есть», или пусто.
+
+    Пусто значит «спрашивать нечего» — нет адреса или неизвестен род; окну в
+    этом случае не отвечают вовсе, потому что оно спрашивает на каждый
+    набранный знак адреса.
+
+    Одна на два окна: мастер и настройки спрашивают одно и то же и отдают
+    ответ каждый в свой сигнал — имена сигналов знает разметка, и сводить их
+    этому этапу нельзя.
+    """
+    try:
+        payload = json.loads(payload_json) if payload_json else {}
+        kind = str(payload.get("kind") or "")
+        base_url = str(payload.get("base_url") or "").strip().rstrip("/")
+        api_key = str(payload.get("api_key") or "")
+    except (ValueError, TypeError):
+        return None
+    if not base_url or kind not in ("chat", "embed"):
+        return None
+
+    async def run() -> str:
+        result = await _do_list_models_for_creds(base_url, api_key, kind=kind)
+        return json.dumps({"kind": kind, **result})
+
+    return run()
+
+
 class LlmSlots:
     """Проверка модели и опрос её имён по просьбе окна.
 
@@ -94,19 +147,14 @@ class LlmSlots:
         try:
             payload = json.loads(payload_json) if payload_json else {}
             kind = str(payload.get("kind", "")).strip()
-            base_url = str(payload.get("base_url", "")).strip().rstrip("/")
-            api_key = str(payload.get("api_key", ""))
-            model = str(payload.get("model", "")).strip()
             if kind not in ("chat", "embed"):
                 raise ValueError(f"bad kind: {kind!r}")
-            if not base_url or not model:
-                raise ValueError("base_url и model обязательны")
+            cfg = read_llm_creds(payload)
         except (ValueError, TypeError) as e:
             _log_invalid_payload("request_llm_probe", e)
             self.llm_probe_done.emit(_err(f"Неверные поля: {e}", kind=kind))
             return
 
-        cfg = LlmProviderConfig(base_url=base_url, api_key=api_key, model=model)
         check_fn = lm_studio.check_chat if kind == "chat" else lm_studio.check_embed
 
         async def run() -> str:
@@ -128,18 +176,6 @@ class LlmSlots:
         ``/api/v0/models`` с фильтром по type/state (см. lm_studio.list_models),
         фолбэк на OpenAI-совместимый ``/v1/models``. Best-effort, ошибки в
         payload."""
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-            kind = str(payload.get("kind") or "")
-            base_url = str(payload.get("base_url") or "").strip().rstrip("/")
-            api_key = str(payload.get("api_key") or "")
-        except (ValueError, TypeError):
-            return
-        if not base_url or kind not in ("chat", "embed"):
-            return
-
-        async def run() -> str:
-            result = await _do_list_models_for_creds(base_url, api_key, kind=kind)
-            return json.dumps({"kind": kind, **result})
-
-        self._dispatch(self.llm_models_listed, run())
+        coro = models_coro(payload_json)
+        if coro is not None:
+            self._dispatch(self.llm_models_listed, coro)
