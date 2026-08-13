@@ -66,6 +66,7 @@ class HrChatSlots:
             })
 
         self._dispatch(self.contacts_hr_action_done, run())
+
     @Slot(str)
     def contacts_send_hr_message(self, payload_json: str) -> None:
         """Send a chat message to an HR (slice 5a).
@@ -111,6 +112,7 @@ class HrChatSlots:
             })
 
         self._dispatch(self.contacts_hr_action_done, run())
+
     @Slot(int)
     def contacts_pick_and_send_hr_media(self, hr_id: int) -> None:
         """Open native file picker, then ship the chosen file to the HR.
@@ -150,6 +152,7 @@ class HrChatSlots:
             })
 
         self._dispatch(self.contacts_hr_action_done, run())
+
     @Slot(str)
     def request_contacts_hr_messages(self, payload_json: str) -> None:
         """Push a page of chat messages for the HR detail pane.

@@ -30,8 +30,9 @@ class HrSlots:
 
     Подмешивающий обязан держать `_session_factory` и `_dispatch`, а сверх того
     — сигнал `contacts_lists_changed`, которым окно узнаёт, что списки надо
-    перечитать целиком, и `_kick_unread` из `WindowStateSlots`: правка чёрного
-    списка меняет счётчик непрочитанного.
+    перечитать целиком, и `_kick_unread` из `WindowStateSlots`: слияние и
+    удаление человека уносят его непрочитанные письма, и счётчик надо
+    пересчитать сразу.
     """
 
     contacts_hr_list_loaded = Signal(str)
@@ -102,6 +103,7 @@ class HrSlots:
             })
 
         self._dispatch(self.contacts_hr_list_loaded, run())
+
     @Slot(str)
     def request_contacts_hr_vacancies(self, payload_json: str) -> None:
         """Push the vacancy mini-list for the HR detail pane.
@@ -139,6 +141,7 @@ class HrSlots:
             })
 
         self._dispatch(self.contacts_hr_vacancies_loaded, run())
+
     @Slot(int)
     def request_contacts_hr_detail(self, hr_id: int) -> None:
         """Push the HR-detail payload for the Contacts / HR pane (05).
@@ -166,6 +169,7 @@ class HrSlots:
             })
 
         self._dispatch(self.contacts_hr_detail_loaded, run())
+
     @Slot(str)
     def request_contacts_hr_merge_picker(self, payload_json: str) -> None:
         """List of HRs eligible to absorb the current HR. Same row shape as
@@ -195,6 +199,7 @@ class HrSlots:
             })
 
         self._dispatch(self.contacts_hr_merge_picker_loaded, run())
+
     @Slot(str)
     def contacts_merge_hr(self, payload_json: str) -> None:
         """Merge ``absorbed`` HR into ``survivor``: vacancies + messages get
@@ -235,6 +240,7 @@ class HrSlots:
             })
 
         self._dispatch(self.contacts_hr_action_done, run())
+
     @Slot(int)
     def contacts_delete_hr(self, hr_id: int) -> None:
         """Cascade-delete the HR row via ``hr_card.delete_hr``."""
@@ -248,6 +254,7 @@ class HrSlots:
             return _ok({"action": "delete_hr", "hr_id": hr_id})
 
         self._dispatch(self.contacts_hr_action_done, run())
+
     @Slot(int)
     def contacts_remove_hr_from_blacklist(self, hr_id: int) -> None:
         """Deactivate any kind="hr" blacklist row matching this HR.
@@ -279,6 +286,7 @@ class HrSlots:
             })
 
         self._dispatch(self.contacts_hr_action_done, run())
+
     @Slot(int)
     def contacts_add_hr_to_blacklist(self, hr_id: int) -> None:
         """Insert a kind="hr" row into the blacklist for this HR.
@@ -314,6 +322,7 @@ class HrSlots:
             })
 
         self._dispatch(self.contacts_hr_action_done, run())
+
     @Slot(str)
     def contacts_update_hr(self, payload_json: str) -> None:
         """Patch one or more HR columns from inline form fields (slice 3+).
@@ -362,6 +371,7 @@ class HrSlots:
             })
 
         self._dispatch(self.contacts_hr_action_done, run())
+
     @Slot(str)
     def contacts_create_hr(self, payload_json: str) -> None:
         """Insert a new HR from the «Добавить HR» modal in Contacts / HR.
