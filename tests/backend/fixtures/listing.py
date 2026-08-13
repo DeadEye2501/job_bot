@@ -20,10 +20,8 @@ def titles(session):
     """
 
     async def read(**kwargs) -> list[str]:
-        return [
-            v.title
-            for v in await list_vacancies(session, VacancyFilter(**kwargs))
-        ]
+        rows, _ = await list_vacancies(session, VacancyFilter(**kwargs))
+        return [v.title for v in rows]
 
     return read
 
@@ -38,7 +36,8 @@ def hr_names(session):
     """
 
     async def read(**kwargs) -> list[str]:
-        return [row.hr.name for row in await list_hr_with_counts(session, **kwargs)]
+        rows, _ = await list_hr_with_counts(session, **kwargs)
+        return [row.hr.name for row in rows]
 
     return read
 

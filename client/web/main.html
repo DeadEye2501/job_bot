@@ -4131,8 +4131,8 @@
       // до того, что осталось в результирующем срезе.
       filterOptions: { channels: [], companies: [] },
       // Курсорная пагинация: грузим первую страницу при входе/смене
-      // фильтра/сорта/поиска, дозагружаем по скроллу. hasMore сбрасывается
-      // когда бэк отдаёт меньше limit — список закончился.
+      // фильтра/сорта/поиска, дозагружаем по скроллу. hasMore приходит
+      // ответом бэка — из длины страницы он не выводится.
       hasMore: false, loadingMore: false,
       scoreThreshold: null,
       // Request-epoch guard: every replace/refresh dispatch инкрементит
@@ -4276,8 +4276,8 @@
           absorbedId: null,
         },
         // Infinite-scroll bookkeeping: mirrors appState.vacancies.
-        // hasMore — true пока бэк отдаёт ровно `limit` строк (потенциально
-        //   есть следующая страница). loadingMore — append уже летит, не
+        // hasMore — приходит ответом бэка: есть ли строки за этой
+        //   страницей. loadingMore — append уже летит, не
         //   шлём второй. replacing — replace/refresh в полёте, любой
         //   append с устаревшим offset'ом игнорим. requestEpoch бампится
         //   на replace/refresh, чтобы дропать ответы старых эпох.

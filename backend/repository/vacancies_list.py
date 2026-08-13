@@ -16,6 +16,7 @@ from backend.models import (
     VacancyStatusHistory,
 )
 from backend.payloads import VacancyFilter
+from backend.repository.paging import trim_page
 from backend.repository.vacancies_card import VACANCY_NEIGHBOURS
 from backend.repository.vacancies_common import PARSED_ONLY
 
@@ -287,8 +288,8 @@ def _where_and_joins(f: VacancyFilter, activity_ts) -> tuple[list, set[str]]:
 
 async def list_vacancies(
     session: AsyncSession, filters: VacancyFilter
-) -> list[Vacancy]:
-    """Вакансии в порядке, заданном отбором; соседи подтянуты сразу.
+) -> tuple[list[Vacancy], bool]:
+    """Вакансии в порядке, заданном отбором, и есть ли за ними ещё.
 
     Что можно отобрать — у `VacancyFilter`; метка активности, по которой
     идёт порядок, одна и та же у списка и у `list_vacancy_last_activity`.
@@ -296,8 +297,26 @@ async def list_vacancies(
     потому, что конвейер прервался между заведением строки и записью
     разбора, а подберёт их следующий запуск —
     `IngestionPipeline.recover_orphan_vacancies`.
+
+    Признак продолжения отдаётся ответом, а не выводится зовущим из длины
+    страницы — почему, сказано у `paging.trim_page`.
     """
     f = filters
+    stmt = _listing_stmt(f)
+    if f.limit is not None:
+        stmt = stmt.limit(f.limit + 1).offset(f.offset)
+    rows = list((await session.scalars(stmt)).all())
+    return trim_page(rows, f.limit)
+
+
+def _listing_stmt(f: VacancyFilter):
+    """Запрос списка без страницы: отбор, соседи и порядок.
+
+    Соседние таблицы соединяются по требованию — какие именно, решает
+    `_where_and_joins`: список открывают без отбора чаще, чем с ним. Сами же
+    соседи вакансии (`VACANCY_NEIGHBOURS`) подтягиваются всегда — их рисует
+    каждая строка.
+    """
     event_agg, status_agg = _activity_aggs()
     activity_ts = _activity_ts(event_agg, status_agg)
     where_clauses, joins = _where_and_joins(f, activity_ts)
@@ -314,17 +333,12 @@ async def list_vacancies(
         stmt = stmt.outerjoin(
             TelegramChannel, TelegramChannel.id == Vacancy.source_channel_id
         )
-
-    final_stmt = (
+    return (
         stmt
         .where(*where_clauses)
         .options(*VACANCY_NEIGHBOURS)
         .order_by(*_order_for(f.sort, activity_ts))
     )
-    if f.limit is not None:
-        final_stmt = final_stmt.limit(f.limit).offset(f.offset)
-    rows = await session.scalars(final_stmt)
-    return list(rows.all())
 
 
 async def _channel_options(session: AsyncSession) -> list[str]:

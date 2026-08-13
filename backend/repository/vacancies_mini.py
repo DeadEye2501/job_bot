@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Vacancy, VacancyStatus
 from backend.repository.hr_card import LAST_VACANCY_ORDER
+from backend.repository.paging import trim_page
 from backend.repository.vacancies_common import PARSED_ONLY, VACANCY_APPEARED_AT
 
 # Channel mini-list sort order — UI requirement: hottest funnel statuses
@@ -72,10 +73,12 @@ async def list_vacancies_for_channel(
     *,
     limit: int = 50,
     offset: int = 0,
-) -> list[Vacancy]:
-    """Все вакансии из канала, sorted by status priority then by recency.
-    Pagination via limit/offset — каналы могут накапливать тысячи вакансий,
-    мини-список в detail-pane грузит их пачками.
+) -> tuple[list[Vacancy], bool]:
+    """Страница вакансий канала и есть ли за ней ещё.
+
+    Порядок — по горячести статуса, потом по свежести. Страница нужна потому,
+    что каналы накапливают тысячи вакансий, и мини-список карточки грузит их
+    пачками; признак продолжения отдаёт запрос — см. `paging.trim_page`.
 
     is_parsed-фильтр НЕ применяем: badge канала и stats-блок считают все
     вакансии (без этого фильтра), и фильтрация мини-списка по is_parsed=True
@@ -101,8 +104,8 @@ async def list_vacancies_for_channel(
                 VACANCY_APPEARED_AT.desc(),
                 Vacancy.id.desc(),
             )
-            .limit(limit)
+            .limit(limit + 1)
             .offset(offset)
         )
     ).all()
-    return list(rows)
+    return trim_page(list(rows), limit)

@@ -62,10 +62,9 @@ class CompanySlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await companies_list.list_companies_with_counts(
+                rows, has_more = await companies_list.list_companies_with_counts(
                     session, search=search, limit=page.limit, offset=page.offset,
                 )
-            has_more = (page.limit is not None) and (len(rows) == page.limit)
             return _ok({
                 "search": search or "",
                 "companies": [_company_picker_row_to_dict(r) for r in rows],
@@ -171,7 +170,7 @@ class CompanySlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await companies_list.list_companies_with_counts(session, search=search)
+                rows, _ = await companies_list.list_companies_with_counts(session, search=search)
             return _ok({
                 "absorbed_id": absorbed_id,
                 "search": search or "",

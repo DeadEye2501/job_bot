@@ -59,7 +59,9 @@ class VacancySlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await vacancies_list.list_vacancies(session, filters)
+                rows, has_more = await vacancies_list.list_vacancies(
+                    session, filters
+                )
                 skills = await profile_repo.list_skills(session)
                 activity_by_id = await vacancies_list.list_vacancy_last_activity(
                     session, [v.id for v in rows]
@@ -70,7 +72,6 @@ class VacancySlots:
                 # whatever's still in the result set.
                 filter_options = await vacancies_list.list_vacancy_filter_options(session)
             matched_set = build_skill_lookup(skills)
-            has_more = (page.limit is not None) and (len(rows) == page.limit)
             return _ok({
                 "vacancies": [
                     _vacancy_list_row_to_dict(v, matched_set, activity_by_id)
