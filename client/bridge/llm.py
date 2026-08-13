@@ -1,15 +1,19 @@
-"""Пробные обращения к поставщику модели."""
+"""Разговор с поставщиком модели: проба связи и опрос имён."""
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from typing import Any, Callable
 
 import httpx
+from PySide6.QtCore import Signal, Slot
 
 from adapters import lm_studio
 from adapters.lm_studio import LlmProviderConfig
+from client.bridge.answer import _err, _ok
+from client.bridge.payload import _log_invalid_payload
 
 
 logger = logging.getLogger(__name__)
@@ -62,3 +66,80 @@ async def _do_llm_probe(
         return ok, detail, models, latency_ms
     finally:
         await client.aclose()
+
+
+class LlmSlots:
+    """Проверка модели и опрос её имён по просьбе окна.
+
+    Проверяют они не сохранённые настройки, а присланные окном черновые —
+    человек должен увидеть исход до записи. Подмешивающий обязан держать
+    `_dispatch`.
+    """
+
+    llm_probe_done = Signal(str)
+    llm_models_listed = Signal(str)
+
+    @Slot(str)
+    def request_llm_probe(self, payload_json: str) -> None:
+        """Connectivity check for an LLM provider (chat / embed).
+
+        Payload: ``{kind: 'chat'|'embed', base_url, api_key, model}``.
+        Использует draft-значения из UI, не текущий rs — чтобы юзер мог
+        проверить новые настройки до сохранения. Замеряем latency полного
+        check'а (list_models + 1-token ping).
+        """
+        # Init defaults ДО try, чтобы все error-ветки могли echo'нуть kind
+        # обратно — JS использует его для роутинга в нужный *Probe-state.
+        kind = ""
+        try:
+            payload = json.loads(payload_json) if payload_json else {}
+            kind = str(payload.get("kind", "")).strip()
+            base_url = str(payload.get("base_url", "")).strip().rstrip("/")
+            api_key = str(payload.get("api_key", ""))
+            model = str(payload.get("model", "")).strip()
+            if kind not in ("chat", "embed"):
+                raise ValueError(f"bad kind: {kind!r}")
+            if not base_url or not model:
+                raise ValueError("base_url и model обязательны")
+        except (ValueError, TypeError) as e:
+            _log_invalid_payload("request_llm_probe", e)
+            self.llm_probe_done.emit(_err(f"Неверные поля: {e}", kind=kind))
+            return
+
+        cfg = LlmProviderConfig(base_url=base_url, api_key=api_key, model=model)
+        check_fn = lm_studio.check_chat if kind == "chat" else lm_studio.check_embed
+
+        async def run() -> str:
+            try:
+                ok, detail, _models, latency_ms = await _do_llm_probe(cfg, check_fn)
+            except Exception as e:
+                logger.exception("llm probe failed")
+                return _err(f"{type(e).__name__}: {e}", kind=kind)
+            if not ok:
+                return _err(detail, kind=kind)
+            return _ok({"kind": kind, "model": cfg.model, "latency_ms": latency_ms})
+
+        self._dispatch(self.llm_probe_done, run())
+
+    @Slot(str)
+    def request_llm_models(self, payload_json: str) -> None:
+        """Background-fetch списка моделей — UI наполняет datalist для
+        автокомплита поля «Модель». Под LM Studio предпочтительно
+        ``/api/v0/models`` с фильтром по type/state (см. lm_studio.list_models),
+        фолбэк на OpenAI-совместимый ``/v1/models``. Best-effort, ошибки в
+        payload."""
+        try:
+            payload = json.loads(payload_json) if payload_json else {}
+            kind = str(payload.get("kind") or "")
+            base_url = str(payload.get("base_url") or "").strip().rstrip("/")
+            api_key = str(payload.get("api_key") or "")
+        except (ValueError, TypeError):
+            return
+        if not base_url or kind not in ("chat", "embed"):
+            return
+
+        async def run() -> str:
+            result = await _do_list_models_for_creds(base_url, api_key, kind=kind)
+            return json.dumps({"kind": kind, **result})
+
+        self._dispatch(self.llm_models_listed, run())
