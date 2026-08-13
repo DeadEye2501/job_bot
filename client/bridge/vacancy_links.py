@@ -8,6 +8,7 @@ from PySide6.QtCore import Signal, Slot
 from sqlalchemy.exc import IntegrityError
 
 from backend.models import Vacancy
+from backend.payloads import text_or_none
 from backend.repository import (
     companies_card,
     companies_list,
@@ -49,9 +50,7 @@ class VacancyLinkSlots:
         try:
             payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
-            search = payload.get("search")
-            if search is not None:
-                search = str(search)
+            search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
             _log_invalid_payload("request_hr_picker", e)
             self.hr_picker_loaded.emit(_err(f"Неверные поля: {e}"))
@@ -79,9 +78,7 @@ class VacancyLinkSlots:
         try:
             payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
-            search = payload.get("search")
-            if search is not None:
-                search = str(search)
+            search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
             _log_invalid_payload("request_company_picker", e)
             self.company_picker_loaded.emit(_err(f"Неверные поля: {e}"))
@@ -193,9 +190,7 @@ class VacancyLinkSlots:
             payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
             fields = read_new_hr_fields(payload)
-            search = payload.get("search")
-            if search is not None:
-                search = str(search)
+            search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
             _log_invalid_payload("picker_create_hr", e)
             self.hr_picker_loaded.emit(_err(f"Неверные поля: {e}"))
@@ -238,9 +233,7 @@ class VacancyLinkSlots:
             vacancy_id = int(payload["vacancy_id"])
             fields = read_new_company_fields(payload)
             name = fields["name"]
-            search = payload.get("search")
-            if search is not None:
-                search = str(search)
+            search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
             _log_invalid_payload("picker_create_company", e)
             self.company_picker_loaded.emit(_err(f"Неверные поля: {e}"))
