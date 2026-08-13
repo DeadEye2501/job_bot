@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-import json
-
-from PySide6.QtCore import Signal, Slot
 from sqlalchemy.exc import IntegrityError
 
 from backend.models import Vacancy
 from backend.payloads import text_or_none
-from backend.repository import (
-    companies_card,
-    hr_identify,
-    vacancies_card,
+from backend.repository import companies_card, hr_identify, vacancies_card
+from client.bridge.answer import Denied, bad_fields, denied, reply
+from client.bridge.refusals import (
+    COMPANY_EXISTS,
+    IDENTITY_REQUIRED,
+    NAME_REQUIRED,
+    NO_VACANCY,
 )
-from client.bridge.answer import _err, _ok
-from client.bridge.refusals import COMPANY_EXISTS, IDENTITY_REQUIRED, NAME_REQUIRED, NO_VACANCY
-from client.bridge.payload import _log_invalid_payload
 from client.bridge.pickers import COMPANY_PICKER, HR_PICKER, link_picker
 from client.form_payloads import (
     hr_is_identified,
@@ -25,226 +22,164 @@ from client.form_payloads import (
 )
 
 
-class VacancyLinkSlots:
+class VacancyLinks:
     """Кого и что окно привязывает к вакансии, и как оно их ищет.
 
-    Подмешивающий обязан держать `_session_factory` и `_dispatch`, а сверх
-    того — сигнал `vacancy_action_done` из `VacancyActionSlots`: привязка
-    отвечает окну тем же сигналом, что и остальные действия над карточкой,
-    потому что окно перерисовывает её одним обработчиком.
+    Собирающий обязан держать `_hub`: из него берутся мотор и сессии.
     """
 
-    hr_picker_loaded = Signal(str)
-    company_picker_loaded = Signal(str)
+    def hr_picker(self, payload: dict) -> dict:
+        """Список людей для окна «Связать с HR».
 
-    @Slot(str)
-    def request_hr_picker(self, payload_json: str) -> None:
-        """Push the HR-picker payload for the «Связать с HR» modal.
-
-        ``vacancy_id`` is echoed back as ``current_hr_id`` (the HR currently
-        linked to that vacancy, NULL if unlinked) so the JS can mark the
-        active row without a second round-trip. ``search`` is server-side
-        casefold-filtered (Cyrillic-safe) — see ``list_hr_with_counts``.
+        Привязанный сейчас возвращается эхом, чтобы окно отметило строку не
+        спрашивая второй раз. Поиск отбирает база — с приведением регистра,
+        годным и для кириллицы.
         """
         try:
-            payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
             search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("request_hr_picker", e)
-            self.hr_picker_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("hr_picker", e)
 
-        async def run() -> str:
-            async with self._session_factory() as session:
-                v = await session.get(Vacancy, vacancy_id)
-                if v is None:
-                    return _err(NO_VACANCY, vacancy_id=vacancy_id)
-                payload = await link_picker(session, HR_PICKER, v, search)
-            return _ok({"vacancy_id": vacancy_id, **payload})
+        return reply(self._hub.runner, self._picker(HR_PICKER, vacancy_id, search))
 
-        self._dispatch(self.hr_picker_loaded, run())
-
-    @Slot(str)
-    def request_company_picker(self, payload_json: str) -> None:
-        """Push the Company-picker payload for the «Связать с компанией» modal."""
+    def company_picker(self, payload: dict) -> dict:
+        """Список компаний для окна «Связать с компанией»."""
         try:
-            payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
             search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("request_company_picker", e)
-            self.company_picker_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("company_picker", e)
 
-        async def run() -> str:
-            async with self._session_factory() as session:
-                v = await session.get(Vacancy, vacancy_id)
-                if v is None:
-                    return _err(NO_VACANCY, vacancy_id=vacancy_id)
-                payload = await link_picker(session, COMPANY_PICKER, v, search)
-            return _ok({"vacancy_id": vacancy_id, **payload})
+        return reply(self._hub.runner, self._picker(COMPANY_PICKER, vacancy_id, search))
 
-        self._dispatch(self.company_picker_loaded, run())
+    def link_hr(self, payload: dict) -> dict:
+        """Привязать человека к вакансии или снять привязку.
 
-    @Slot(str)
-    def link_vacancy_hr(self, payload_json: str) -> None:
-        """Set / unset ``vacancy.hr_id`` from the HR-picker «Связать» button.
-
-        ``hr_id`` may be null to unlink. Reuses ``vacancy_action_done`` with
-        ``action="link_hr"`` so the existing toast/refresh flow lights up.
+        Пустой номер значит «отвязать». Ответ помечен тем же действием, что и
+        остальные кнопки карточки: окно перерисовывает её одним обработчиком.
         """
         try:
-            payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
             raw = payload.get("hr_id")
             hr_id = int(raw) if raw is not None else None
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("link_vacancy_hr", e)
-            self.vacancy_action_done.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("link_hr", e)
 
-        async def run() -> str:
-            try:
-                async with self._session_factory() as session:
-                    async with session.begin():
-                        ok = await vacancies_card.set_vacancy_hr(
-                            session, vacancy_id, hr_id
-                        )
-            except ValueError as e:
-                return _err(str(e), vacancy_id=vacancy_id, action="link_hr")
-            if not ok:
-                return _err(
-                    NO_VACANCY,
-                    vacancy_id=vacancy_id,
-                    action="link_hr",
-                )
-            return _ok({
-                "vacancy_id": vacancy_id,
-                "hr_id": hr_id,
-                "action": "link_hr",
-            })
+        async def run() -> dict:
+            await self._linked(
+                vacancies_card.set_vacancy_hr, vacancy_id, hr_id, "link_hr"
+            )
+            return {"vacancy_id": vacancy_id, "hr_id": hr_id, "action": "link_hr"}
 
-        self._dispatch(self.vacancy_action_done, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def link_vacancy_company(self, payload_json: str) -> None:
-        """Set / unset ``vacancy.company_id`` from the Company-picker «Связать»."""
+    def link_company(self, payload: dict) -> dict:
+        """Привязать компанию к вакансии или снять привязку."""
         try:
-            payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
             raw = payload.get("company_id")
             company_id = int(raw) if raw is not None else None
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("link_vacancy_company", e)
-            self.vacancy_action_done.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("link_company", e)
 
-        async def run() -> str:
-            try:
-                async with self._session_factory() as session:
-                    async with session.begin():
-                        ok = await vacancies_card.set_vacancy_company(
-                            session, vacancy_id, company_id
-                        )
-            except ValueError as e:
-                return _err(str(e), vacancy_id=vacancy_id, action="link_company")
-            if not ok:
-                return _err(
-                    NO_VACANCY,
-                    vacancy_id=vacancy_id,
-                    action="link_company",
-                )
-            return _ok({
+        async def run() -> dict:
+            await self._linked(
+                vacancies_card.set_vacancy_company,
+                vacancy_id,
+                company_id,
+                "link_company",
+            )
+            return {
                 "vacancy_id": vacancy_id,
                 "company_id": company_id,
                 "action": "link_company",
-            })
+            }
 
-        self._dispatch(self.vacancy_action_done, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def picker_create_hr(self, payload_json: str) -> None:
-        """Insert a new HR from the picker's inline-create form.
+    def create_hr(self, payload: dict) -> dict:
+        """Завести человека прямо из подборщика и вернуть обновлённый список.
 
-        On success, re-emits the picker list so the modal can refresh in
-        place. ``created_id`` lets JS pre-select the new row; the actual
-        ``vacancy.hr_id`` link still requires the user to click «Связать».
+        Номер заведённого едет ответом, чтобы окно подсветило строку; сама
+        привязка по-прежнему за кнопкой «Связать».
         """
         try:
-            payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
             fields = read_new_hr_fields(payload)
             search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("picker_create_hr", e)
-            self.hr_picker_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("create_hr", e)
 
         if not hr_is_identified(fields):
-            self.hr_picker_loaded.emit(
-                _err(IDENTITY_REQUIRED, vacancy_id=vacancy_id)
-            )
-            return
+            return denied(IDENTITY_REQUIRED, vacancy_id=vacancy_id)
 
-        async def run() -> str:
-            async with self._session_factory() as session:
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
                 async with session.begin():
-                    new_hr = await hr_identify.create_hr(session, **fields)
-                    created_id = new_hr.id
-                v = await session.get(Vacancy, vacancy_id)
-                payload = await link_picker(session, HR_PICKER, v, search)
-            return _ok({
-                "vacancy_id": vacancy_id, **payload, "created_id": created_id
-            })
+                    created_id = (await hr_identify.create_hr(session, **fields)).id
+                listed = await self._listing(session, HR_PICKER, vacancy_id, search)
+            return {**listed, "created_id": created_id}
 
-        self._dispatch(self.hr_picker_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def picker_create_company(self, payload_json: str) -> None:
-        """Insert a new Company from the picker's inline-create form.
-
-        Catches ``IntegrityError`` from the unique-name constraint and turns
-        it into a user-facing message instead of bubbling up a SQL error.
-        """
+    def create_company(self, payload: dict) -> dict:
+        """Завести компанию прямо из подборщика и вернуть обновлённый список."""
         try:
-            payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
             fields = read_new_company_fields(payload)
             name = fields["name"]
             search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("picker_create_company", e)
-            self.company_picker_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("create_company", e)
 
         if not name:
-            self.company_picker_loaded.emit(
-                _err(NAME_REQUIRED, vacancy_id=vacancy_id)
-            )
-            return
+            return denied(NAME_REQUIRED, vacancy_id=vacancy_id)
 
-        async def run() -> str:
+        async def run() -> dict:
             try:
-                async with self._session_factory() as session:
+                async with self._hub.session_factory() as session:
                     async with session.begin():
-                        new_co = await companies_card.create_company(
-                            session, **fields
-                        )
-                        created_id = new_co.id
-                    v = await session.get(Vacancy, vacancy_id)
-                    payload = {
-                        "vacancy_id": vacancy_id,
-                        **await link_picker(session, COMPANY_PICKER, v, search),
-                        "created_id": created_id,
-                    }
+                        created = await companies_card.create_company(session, **fields)
+                        created_id = created.id
+                    listed = await self._listing(
+                        session, COMPANY_PICKER, vacancy_id, search
+                    )
             except IntegrityError:
-                return _err(
-                    COMPANY_EXISTS.format(name=name),
-                    vacancy_id=vacancy_id,
-                )
+                raise Denied(COMPANY_EXISTS.format(name=name), vacancy_id=vacancy_id)
             except ValueError as e:
-                return _err(str(e), vacancy_id=vacancy_id)
-            return _ok(payload)
+                raise Denied(str(e), vacancy_id=vacancy_id)
+            return {**listed, "created_id": created_id}
 
-        self._dispatch(self.company_picker_loaded, run())
+        return reply(self._hub.runner, run())
+
+    async def _picker(self, kind, vacancy_id: int, search: str | None) -> dict:
+        """Открыть подборщик: без вакансии открывать нечего."""
+        async with self._hub.session_factory() as session:
+            if await session.get(Vacancy, vacancy_id) is None:
+                raise Denied(NO_VACANCY, vacancy_id=vacancy_id)
+            return await self._listing(session, kind, vacancy_id, search)
+
+    async def _listing(self, session, kind, vacancy_id: int, search: str | None) -> dict:
+        """Список подборщика вместе с эхом вакансии, для которой он собран.
+
+        Вакансии может уже не быть — её снесли в соседнем окне, пока здесь
+        заводили человека. Отказывать поздно: запись легла, и показать список
+        всё равно есть смысл; привязанного в нём тогда просто нет.
+        """
+        vacancy = await session.get(Vacancy, vacancy_id)
+        return {
+            "vacancy_id": vacancy_id,
+            **await link_picker(session, kind, vacancy, search),
+        }
+
+    async def _linked(self, setting, vacancy_id: int, other_id: int | None, action: str):
+        """Привязка одной стороны: отказ базы и пропажу вакансии — словами."""
+        try:
+            async with self._hub.session_factory() as session:
+                async with session.begin():
+                    linked = await setting(session, vacancy_id, other_id)
+        except ValueError as e:
+            raise Denied(str(e), vacancy_id=vacancy_id, action=action)
+        if not linked:
+            raise Denied(NO_VACANCY, vacancy_id=vacancy_id, action=action)

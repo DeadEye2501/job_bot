@@ -22,12 +22,12 @@ async def test_the_answer_reaches_the_window_as_a_signal(main_api, watch):
     Слот возвращает `None` сразу же — окно узнаёт исход только сигналом, и
     порвись эта дорога, интерфейс молчал бы, не показывая никакой ошибки.
     """
-    caught = watch(main_api.vacancy_notes_saved)
+    caught = watch(main_api.profile_changed)
 
     async def answered() -> str:
         return json.dumps({"ok": True, "notes": "готово"})
 
-    main_api._dispatch(main_api.vacancy_notes_saved, answered())
+    main_api._dispatch(main_api.profile_changed, answered())
 
     assert await caught.next() == {"ok": True, "notes": "готово"}
 
@@ -42,13 +42,13 @@ async def test_a_broken_coroutine_becomes_a_refusal_not_a_silence(
     человеку было что показать, а трассировка — в журнал, чтобы было что
     читать потом.
     """
-    caught = watch(main_api.vacancy_notes_saved)
+    caught = watch(main_api.profile_changed)
 
     async def broken() -> str:
         raise RuntimeError("база не отвечает")
 
     with caplog.at_level(logging.ERROR, logger="client.bridge.answer"):
-        main_api._dispatch(main_api.vacancy_notes_saved, broken())
+        main_api._dispatch(main_api.profile_changed, broken())
         answer = await caught.next()
 
     assert answer == {"ok": False, "error": "RuntimeError: база не отвечает"}
@@ -62,7 +62,7 @@ async def test_a_cancelled_request_says_nothing_at_all(main_api, watch):
     отвалился, и «работа отменена» уехало бы в умирающую страницу — человек
     увидел бы ошибку там, где просто закрыл окно.
     """
-    caught = watch(main_api.vacancy_notes_saved)
+    caught = watch(main_api.profile_changed)
     started = asyncio.Event()
 
     async def endless() -> str:
@@ -71,7 +71,7 @@ async def test_a_cancelled_request_says_nothing_at_all(main_api, watch):
         return ""
 
     coro = endless()
-    main_api._dispatch(main_api.vacancy_notes_saved, coro)
+    main_api._dispatch(main_api.profile_changed, coro)
     await started.wait()
     for task in asyncio.all_tasks():
         if task.get_coro() is coro:
@@ -80,41 +80,37 @@ async def test_a_cancelled_request_says_nothing_at_all(main_api, watch):
     assert await caught.silent()
 
 
-async def test_a_rejected_payload_never_lands_in_the_journal(main_api, watch, caplog):
+async def test_a_rejected_payload_never_lands_in_the_journal(api, ask, caplog):
     """Про неверную нагрузку пишут, чем она плоха, но не что в ней было.
 
-    Через те же слоты ходят ключ доступа к модели, пароль и текст переписки.
+    Через те же методы ходят ключ доступа к модели, пароль и текст переписки.
     Запиши обработчик нагрузку целиком — секрет лёг бы в файл журнала, откуда
     его уже не вынуть.
     """
-    caught = watch(main_api.vacancy_notes_saved)
-
     with caplog.at_level(logging.WARNING, logger="client.bridge.payload"):
-        main_api.update_vacancy_notes(
-            json.dumps({"vacancy_id": "sk-секретный-ключ", "notes": "тайна"})
+        answer = await ask(
+            api.vacancies.save_notes,
+            {"vacancy_id": "sk-секретный-ключ", "notes": "тайна"},
         )
 
-    answer = await caught.next()
-    assert answer["ok"] is False
+    assert answer["fail"] == "fields"
     written = "\n".join(record.getMessage() for record in caplog.records)
-    assert "update_vacancy_notes" in written
+    assert "save_notes" in written
     assert "sk-секретный-ключ" not in written
     assert "тайна" not in written
 
 
-async def test_a_missing_field_is_named_in_the_journal(main_api, watch, caplog):
+async def test_a_missing_field_is_named_in_the_journal(api, ask, caplog):
     """Про недостающее поле говорят, какое именно.
 
     Имя поля значением не является: оно написано нашей же формой, и без него
     запись сообщала бы только «нагрузка плоха» — по такой не понять, разошлись
     ли окно и мост в имени или человек оставил графу пустой.
     """
-    caught = watch(main_api.vacancy_notes_saved)
-
     with caplog.at_level(logging.WARNING, logger="client.bridge.payload"):
-        main_api.update_vacancy_notes(json.dumps({"notes": "без вакансии"}))
+        answer = await ask(api.vacancies.save_notes, {"notes": "без вакансии"})
 
-    assert (await caught.next())["ok"] is False
+    assert answer["fail"] == "fields"
     written = "\n".join(record.getMessage() for record in caplog.records)
     assert "vacancy_id" in written
     assert "без вакансии" not in written

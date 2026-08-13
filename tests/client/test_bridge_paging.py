@@ -19,21 +19,18 @@ from tests.factories import channel_row, company_row, hr_row, vacancy_row
 
 
 async def test_a_full_page_of_vacancies_does_not_promise_more(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Полная страница вакансий не обещает продолжения, которого нет.
 
     Обещай она — окно уйдёт за следующей страницей и получит пустую: человек
     увидит вечный «загружаем ещё» под последней вакансией.
     """
-    caught = watch(main_api.vacancies_changed)
     await put(session_factory, *[vacancy_row(title=f"Вакансия {i}") for i in range(3)])
 
-    main_api.request_vacancies(json.dumps({"limit": 3}))
-    assert (await caught.next())["has_more"] is False
+    assert (await ask(api.vacancies.list, {"limit": 3}))["ok"]["has_more"] is False
 
-    main_api.request_vacancies(json.dumps({"limit": 2}))
-    assert (await caught.next())["has_more"] is True
+    assert (await ask(api.vacancies.list, {"limit": 2}))["ok"]["has_more"] is True
 
 
 async def test_a_full_page_of_people_does_not_promise_more(

@@ -138,20 +138,19 @@ async def main_api(runtime_settings, session_factory, runner) -> MainApi:
 
 @pytest.fixture
 def watch():
-    """Ловушка сигнала: `watch(api.vacancies_changed)`."""
+    """Ловушка сигнала непереехавшего домена: `watch(main_api.profile_changed)`."""
     return Caught
 
 
 @pytest.fixture
-async def api(session_factory, runner) -> Api:
+async def api(main_api) -> Api:
     """Переехавшая поверхность: домены, отвечающие значением.
 
-    Порождённых работ дожидаемся все, как и у соседних поверхностей: метод
-    отвечает своей, но попутную заводит молча, и такая открывает свою сессию
-    уже после конца теста — движок к тому мигу закрыт.
+    Хозяйство у неё общее со старой — то же, что у живого окна: бот один, и
+    подделка, поставленная фикстурой `with_bot`, видна обеим. За порождёнными
+    работами прибирает та же фикстура, что и за старой поверхностью.
     """
-    yield Api(runner, session_factory)
-    await runner.drain()
+    return Api(main_api._hub)
 
 
 @pytest.fixture
