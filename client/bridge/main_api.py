@@ -1,8 +1,4 @@
-"""Сборка поверхности основного окна из предметов.
-
-Предметы разъезжаются своими файлами до конца этапа 3; пока часть их
-лежит прямо здесь.
-"""
+"""Сборка поверхности основного окна из предметов."""
 
 from __future__ import annotations
 
@@ -12,16 +8,14 @@ import logging
 from concurrent.futures import CancelledError, Future
 from typing import Any, Coroutine
 
-from PySide6.QtCore import QObject, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
 )
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
-from adapters import lm_studio
-from adapters.lm_studio import LlmProviderConfig
-from backend.telegram_login import TelegramLogin, username_of
+from backend.telegram_login import TelegramLogin
 from backend.runtime_settings import RuntimeSettings
 from client.bridge.answer import _dispatch_json, _err, _ok
 from client.bridge.blacklist import BlacklistSlots
@@ -33,15 +27,16 @@ from client.bridge.desktop import DesktopSlots
 from client.bridge.hr import HrSlots
 from client.bridge.hr_chat import HrChatSlots
 from client.bridge.journal import JournalSlots
-from client.bridge.llm import _do_list_models_for_creds, _do_llm_probe
+from client.bridge.llm import LlmSlots
 from client.bridge.login import TelegramLoginSlots
-from client.bridge.payload import _log_invalid_payload
 from client.bridge.profile import ProfileSlots
 from client.bridge.runner import AsyncRunner
+from client.bridge.settings import SettingsSlots
 from client.bridge.stats import StatsSlots
 from client.bridge.vacancies import VacancySlots
 from client.bridge.vacancy_actions import VacancyActionSlots
 from client.bridge.vacancy_links import VacancyLinkSlots
+from client.bridge.wipe import WipeSlots
 from client.bridge.state import (
     _HEALTHCHECK_INTERVAL_MS,
     _UNREAD_INTERVAL_MS,
@@ -55,23 +50,21 @@ logger = logging.getLogger(__name__)
 
 class MainApi(
     BlacklistSlots, ChannelActionSlots, ChannelSlots, CompanySlots, CvSlots,
-    DesktopSlots, HrChatSlots, HrSlots, JournalSlots, ProfileSlots, StatsSlots,
+    DesktopSlots, HrChatSlots, HrSlots, JournalSlots, LlmSlots, ProfileSlots,
+    SettingsSlots, StatsSlots,
     TelegramLoginSlots, VacancyActionSlots, VacancyLinkSlots, VacancySlots,
-    WindowStateSlots,
+    WindowStateSlots, WipeSlots,
     QObject,
 ):
     """Один объект «api», который канал отдаёт основному окну.
 
-    Держит бота, часы общего состояния и предметы окна — своими примесями
-    и, пока идёт этап 3, своими слотами прямо здесь.
+    Своих слотов не держит: предметы приходят примесями, а здесь — бот,
+    часы общего состояния, отправка работы на мотор и уборка. Два сигнала
+    объявлены тут же, потому что испускает их бот, а не предмет: списки
+    контактов и список вакансий меняются сами по себе, когда сбор находит
+    новое.
     """
 
-    system_settings_loaded = Signal(str)
-    system_telegram_logout_done = Signal(str)
-    llm_probe_done = Signal(str)
-    llm_models_listed = Signal(str)
-    settings_save_done = Signal(str)
-    delete_all_data_done = Signal(str)
     contacts_lists_changed = Signal()
     vacancies_list_changed = Signal()
 
@@ -263,392 +256,6 @@ class MainApi(
                 )
             except Exception:
                 logger.exception("MainApi cleanup: bot task raised on shutdown")
-
-    @Slot()
-    def request_system_settings(self) -> None:
-        """Snapshot of current runtime settings for the Settings screen.
-
-        api_hash отправляем — eye-toggle в UI должен уметь показать значение.
-        QWebChannel живёт только в локальном Qt-окне, не уезжает в сеть.
-        """
-        tg = self._rs.tg
-        chat = self._rs.chat
-        embed = self._rs.embed
-        bot = self._bot
-
-        async def run() -> str:
-            client = getattr(bot, "_client", None) if bot is not None else None
-            # На холодном старте Pyrogram session-load + connect занимает
-            # пару секунд; UI запросит settings раньше. Ждём короткий
-            # connect-window (до 3 сек).
-            if client is not None and not getattr(client, "is_connected", False):
-                for _ in range(15):
-                    await asyncio.sleep(0.2)
-                    if getattr(client, "is_connected", False):
-                        break
-            asked = None
-            connected = client is not None and getattr(client, "is_connected", False)
-            if connected:
-                asked = await username_of(client)
-                if asked is None:
-                    logger.warning("get_me() failed for settings", exc_info=True)
-            if asked is None:
-                # Спросить не вышло или бот ещё не подключился — отдаём кэш.
-                username = self._username_cache
-            else:
-                # Пустая строка — это ответ «ника нет», и он перебивает кэш:
-                # снятый ник иначе остался бы на экране прежним.
-                username = asked
-                self._username_cache = asked
-            return _ok({
-                "tg": {
-                    "api_id": str(tg.api_id) if tg else "",
-                    "api_hash": tg.api_hash if tg else "",
-                    "phone": tg.phone if tg else "",
-                    "has_password": bool(tg and tg.password),
-                    "has_session": bool(tg and tg.session_string),
-                    "username": username,
-                },
-                "chat": {
-                    "base_url": chat.base_url if chat else "",
-                    "api_key": chat.api_key if chat else "",
-                    "model": chat.model if chat else "",
-                },
-                "embed": {
-                    "base_url": embed.base_url if embed else "",
-                    "api_key": embed.api_key if embed else "",
-                    "model": embed.model if embed else "",
-                },
-                "pipeline": {
-                    "scoring_threshold": self._rs.scoring_threshold,
-                    "poll_interval_sec": self._rs.poll_interval_sec,
-                    "backfill_limit": self._rs.backfill_limit,
-                    "dm_backfill_limit": self._rs.dm_backfill_limit,
-                    "send_locked": self._rs.send_locked,
-                },
-            })
-
-        self._dispatch(self.system_settings_loaded, run())
-
-    @Slot(str)
-    def request_llm_probe(self, payload_json: str) -> None:
-        """Connectivity check for an LLM provider (chat / embed).
-
-        Payload: ``{kind: 'chat'|'embed', base_url, api_key, model}``.
-        Использует draft-значения из UI, не текущий rs — чтобы юзер мог
-        проверить новые настройки до сохранения. Замеряем latency полного
-        check'а (list_models + 1-token ping).
-        """
-        # Init defaults ДО try, чтобы все error-ветки могли echo'нуть kind
-        # обратно — JS использует его для роутинга в нужный *Probe-state.
-        kind = ""
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-            kind = str(payload.get("kind", "")).strip()
-            base_url = str(payload.get("base_url", "")).strip().rstrip("/")
-            api_key = str(payload.get("api_key", ""))
-            model = str(payload.get("model", "")).strip()
-            if kind not in ("chat", "embed"):
-                raise ValueError(f"bad kind: {kind!r}")
-            if not base_url or not model:
-                raise ValueError("base_url и model обязательны")
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("request_llm_probe", e)
-            self.llm_probe_done.emit(_err(f"Неверные поля: {e}", kind=kind))
-            return
-
-        cfg = LlmProviderConfig(base_url=base_url, api_key=api_key, model=model)
-        check_fn = lm_studio.check_chat if kind == "chat" else lm_studio.check_embed
-
-        async def run() -> str:
-            try:
-                ok, detail, _models, latency_ms = await _do_llm_probe(cfg, check_fn)
-            except Exception as e:
-                logger.exception("llm probe failed")
-                return _err(f"{type(e).__name__}: {e}", kind=kind)
-            if not ok:
-                return _err(detail, kind=kind)
-            return _ok({"kind": kind, "model": cfg.model, "latency_ms": latency_ms})
-
-        self._dispatch(self.llm_probe_done, run())
-
-    @Slot(str)
-    def save_settings(self, payload_json: str) -> None:
-        """Apply a partial settings patch — autosave из UI на blur/change.
-
-        Payload — словарь с любыми из ключей:
-        - chat: {base_url, api_key, model}
-        - embed: {base_url, api_key, model}
-        - app: {scoring_threshold, poll_interval_sec, backfill_limit,
-          dm_backfill_limit, ...}
-        Применяем через rs.set_chat / rs.set_embed / rs.set_app. Ошибки
-        возвращаем в payload, UI показывает toast.
-        """
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("save_settings", e)
-            self.settings_save_done.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        chat = payload.get("chat") if isinstance(payload.get("chat"), dict) else None
-        embed = payload.get("embed") if isinstance(payload.get("embed"), dict) else None
-        app = payload.get("app") if isinstance(payload.get("app"), dict) else None
-
-        # Pre-validate: пустой model — почти всегда last-blur'на стерлась
-        # в tab-switch'е (см. main.html guards). Раньше уходило в
-        # _set_llm как пустая строка, _from_llm_row возвращал None и
-        # config «исчезал» — юзер думал «починилось», а LLM-вызовы
-        # начинали валиться. Лучше отбить рано с понятной ошибкой.
-        for kind_name, payload in (("chat", chat), ("embed", embed)):
-            if payload is None:
-                continue
-            model_val = str(payload.get("model") or "").strip()
-            if not model_val:
-                logger.warning(
-                    "save_settings: empty model for %s — refusing to save",
-                    kind_name,
-                )
-                self.settings_save_done.emit(
-                    _err(f"{kind_name}: пустое имя модели — сохранение отклонено")
-                )
-                return
-
-        async def run() -> str:
-            applied: list[str] = []
-            try:
-                if chat is not None:
-                    await self._rs.set_chat(
-                        base_url=str(chat.get("base_url") or "").strip().rstrip("/"),
-                        api_key=str(chat.get("api_key") or ""),
-                        model=str(chat.get("model") or "").strip(),
-                    )
-                    applied.append("chat")
-                if embed is not None:
-                    await self._rs.set_embed(
-                        base_url=str(embed.get("base_url") or "").strip().rstrip("/"),
-                        api_key=str(embed.get("api_key") or ""),
-                        model=str(embed.get("model") or "").strip(),
-                    )
-                    applied.append("embed")
-                if app is not None:
-                    # Whitelist: чтобы UI не мог по ошибке/опечатке писать
-                    # произвольные ключи в app_settings.
-                    allowed = {
-                        "scoring_threshold", "poll_interval_sec",
-                        "backfill_limit", "dm_backfill_limit",
-                        "send_locked",
-                    }
-                    for key, value in app.items():
-                        if key not in allowed:
-                            logger.warning("save_settings: unknown app key %r ignored", key)
-                            continue
-                        # Bool → "true"/"false": app_settings хранит строки,
-                        # rs.send_locked парсит обратно в lower-case bool
-                        # (см. RuntimeSettings.send_locked). True/False через
-                        # str() дали бы "True"/"False" — не пройдут .lower()
-                        # сравнение с "true".
-                        if isinstance(value, bool):
-                            value = "true" if value else "false"
-                        await self._rs.set_app(str(key), str(value))
-                        applied.append(f"app.{key}")
-                    # Sync send_locked в adapters.telegram чтобы новое значение
-                    # начало действовать без рестарта бота. Авторитет —
-                    # rs.send_locked; константа — кеш для горячего пути отправки.
-                    if "send_locked" in app:
-                        from adapters import telegram as _tg
-                        _tg.SEND_LOCKED = self._rs.send_locked
-            except Exception as e:
-                logger.exception("save_settings failed")
-                return _err(f"{type(e).__name__}: {e}", applied=applied)
-            return _ok({"applied": applied})
-
-        self._dispatch(self.settings_save_done, run())
-
-    @Slot()
-    def request_delete_all_data(self) -> None:
-        """Опасная зона → «Удалить всё». Останавливает бота, закрывает
-        DB-engine, удаляет файлы (jobbot.db + sidecars, sessions/, media/),
-        и завершает приложение через QApplication.quit() (юзер сам
-        перезапустит — следующий старт уйдёт в визард, т.к. все настройки
-        стерты вместе с БД).
-        """
-        bot = self._bot
-        bot_task = self._bot_task
-        # Захватываем сразу, потом null'им — чтобы health-timer не дёрнулся
-        # на полу-удалённой БД. И, главное, тут же тушим сами таймеры
-        # (health/unread) — иначе после engine.dispose() их следующий тик
-        # откроет fresh connection из пула и Windows откажется удалять
-        # jobbot.db с открытым handle'ом.
-        self._bot = None
-        self._bot_task = None
-        self._health_timer.stop()
-        self._unread_timer.stop()
-
-        async def run() -> str:
-            import shutil
-            from config import get_data_dir
-            errors: list[str] = []
-
-            # 1) Стопаем бота — Pyrogram-сессия закроется, файлы освободятся.
-            if bot is not None:
-                try:
-                    bot.cancel_current_poll()
-                except Exception:
-                    logger.debug("delete_all: cancel_current_poll failed", exc_info=True)
-                try:
-                    bot.request_stop()
-                except Exception:
-                    logger.debug("delete_all: request_stop failed", exc_info=True)
-            if bot_task is not None:
-                try:
-                    await asyncio.wait_for(asyncio.wrap_future(bot_task), timeout=10)
-                except asyncio.TimeoutError:
-                    logger.warning("delete_all: bot did not stop within 10s")
-                except Exception:
-                    logger.exception("delete_all: bot task raised")
-
-            # 2) Закрываем engine — иначе Windows не даст удалить jobbot.db.
-            if self._engine is not None:
-                try:
-                    await self._engine.dispose()
-                except Exception as e:
-                    errors.append(f"engine.dispose: {e}")
-                    logger.exception("delete_all: engine.dispose failed")
-
-            # 3) Удаляем файлы.
-            data_dir = get_data_dir()
-            for name in ("jobbot.db", "jobbot.db-shm", "jobbot.db-wal"):
-                p = data_dir / name
-                if p.exists():
-                    try:
-                        p.unlink()
-                    except Exception as e:
-                        errors.append(f"{name}: {e}")
-                        logger.exception("delete_all: failed to remove %s", p)
-            for sub in ("sessions", "media"):
-                d = data_dir / sub
-                if d.exists():
-                    try:
-                        shutil.rmtree(d)
-                    except Exception as e:
-                        errors.append(f"{sub}/: {e}")
-                        logger.exception("delete_all: failed to remove %s", d)
-
-            # 4) Удаляем Fernet master key из OS-keychain'а. Без этого
-            # после reinstall'а у юзера висит мёртвая запись в Windows
-            # Credential Manager / macOS Keychain — некритично (новый
-            # ключ перегенерится), но «delete all» должно быть «delete
-            # all», а не «delete most».
-            try:
-                import keyring as _keyring
-                from backend.crypto import (
-                    _KEYRING_SERVICE,
-                    _KEYRING_KEY,
-                )
-                _keyring.delete_password(_KEYRING_SERVICE, _KEYRING_KEY)
-            except Exception as e:
-                # delete_password может бросить если записи нет — это OK.
-                logger.debug("delete_all: keyring entry already absent (%s)", e)
-
-            if errors:
-                return _err("Не все файлы удалось удалить: " + "; ".join(errors))
-            return _ok({})
-
-        # После завершения корутины (успех/ошибка) — эмитим результат и
-        # сразу убиваем процесс через os._exit(0). Штатный QApplication.quit()
-        # здесь приводит к зависанию: aboutToQuit → api.cleanup() →
-        # runner.stop() → gather отменяемых тасков, и какой-то из них
-        # натыкается на удалённую sessions/jobbot.db и блокирует unwind.
-        # Для «wipe everything» все нужные действия (бот остановлен,
-        # engine disposed, файлы удалены) уже сделаны выше — штатный
-        # cleanup нам не нужен.
-        future = self._runner.submit(run())
-
-        def _on_done(f: Future) -> None:
-            try:
-                payload = f.result()
-            except Exception as e:
-                payload = _err(f"{type(e).__name__}: {e}")
-            self.delete_all_data_done.emit(payload)
-            import os
-            os._exit(0)
-
-        future.add_done_callback(_on_done)
-
-    @Slot(str)
-    def request_llm_models(self, payload_json: str) -> None:
-        """Background-fetch списка моделей — UI наполняет datalist для
-        автокомплита поля «Модель». Под LM Studio предпочтительно
-        ``/api/v0/models`` с фильтром по type/state (см. lm_studio.list_models),
-        фолбэк на OpenAI-совместимый ``/v1/models``. Best-effort, ошибки в
-        payload."""
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-            kind = str(payload.get("kind") or "")
-            base_url = str(payload.get("base_url") or "").strip().rstrip("/")
-            api_key = str(payload.get("api_key") or "")
-        except (ValueError, TypeError):
-            return
-        if not base_url or kind not in ("chat", "embed"):
-            return
-
-        async def run() -> str:
-            result = await _do_list_models_for_creds(base_url, api_key, kind=kind)
-            return json.dumps({"kind": kind, **result})
-
-        self._dispatch(self.llm_models_listed, run())
-
-    @Slot()
-    def request_telegram_logout(self) -> None:
-        """Stop the bot, revoke server-side TG session, clear creds in DB.
-
-        Sequence:
-          1. cancel current poll + ask bot to stop (via log_out_session, which
-             sends DROP_AUTH then sets stop_event)
-          2. wait for the bot run-task to finish (its finally calls
-             client.stop() — already disconnected after log_out, no-op)
-          3. clear session_string + password in DB so health/UI flip to
-             "Нет сессии"
-          4. null out _bot/_bot_task — re-login starts a fresh bot
-        """
-        bot = self._bot
-        bot_task = self._bot_task
-
-        async def run() -> str:
-            # Если в момент logout открыта модалка re-auth, закрываем её
-            # бэкенд-state тоже — иначе при следующем «Войти» налетим на
-            # «уже отправили код».
-            await self._login.forget()
-            if bot is not None:
-                bot.cancel_current_poll()
-                await bot.log_out_session()
-            if bot_task is not None:
-                try:
-                    await asyncio.wait_for(
-                        asyncio.wrap_future(bot_task), timeout=10
-                    )
-                except asyncio.TimeoutError:
-                    logger.warning("logout: bot did not stop within 10s")
-                except Exception:
-                    logger.exception("logout: bot task raised")
-            await self._rs.clear_tg()
-            self._username_cache = ""
-            return _ok({})
-
-        # Null out before dispatch so concurrent slots don't try to use a
-        # half-stopped bot.
-        self._bot = None
-        self._bot_task = None
-        self._dispatch(self.system_telegram_logout_done, run())
-
-    @Slot()
-    def cancel_telegram_login(self) -> None:
-        """Юзер закрыл модалку re-auth до завершения. Чистим временный
-        Pyrogram-клиент и обнуляем OTP-state, чтобы не оставлять открытый
-        сокет и не уйти в «уже отправили код» при следующей попытке.
-        """
-        self._dispatch_noop(self._login.forget())
 
     def _dispatch_noop(self, coro: Coroutine[Any, Any, Any]) -> None:
         """Fire-and-forget: запускаем корутину на runner'е, ошибки в лог.
