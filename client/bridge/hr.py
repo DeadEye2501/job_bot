@@ -20,7 +20,8 @@ from client.bridge.mark import HR_MARK, mark, unmark
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
-from client.bridge.wire import _hr_picker_row_to_dict, _iso
+from client.bridge.pickers import HR_PICKER, merge_picker
+from client.bridge.wire import _vacancy_mini_row_to_dict, _hr_picker_row_to_dict
 from client.form_payloads import hr_is_identified, read_new_hr_fields
 
 
@@ -106,14 +107,7 @@ class HrSlots:
                 "hr_id": hr_id,
                 "epoch": epoch,
                 "vacancies": [
-                    {
-                        "id": v.id,
-                        "title": v.title or "",
-                        "status": v.status.value if v.status else "New",
-                        "score": v.score,
-                        "created_at": _iso(v.created_at),
-                    }
-                    for v in rows
+                    _vacancy_mini_row_to_dict(v) for v in rows
                 ],
             })
 
@@ -163,15 +157,9 @@ class HrSlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows, _ = await hr_list.list_hr_with_counts(session, search=search)
-            return _ok({
-                "absorbed_id": absorbed_id,
-                "search": search or "",
-                "hrs": [
-                    _hr_picker_row_to_dict(r) for r in rows
-                    if r.hr.id != absorbed_id
-                ],
-            })
+                return _ok(
+                    await merge_picker(session, HR_PICKER, absorbed_id, search)
+                )
 
         self._dispatch(self.contacts_hr_merge_picker_loaded, run())
 

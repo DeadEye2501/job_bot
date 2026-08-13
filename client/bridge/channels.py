@@ -16,7 +16,7 @@ from client.bridge.refusals import NO_CHANNEL
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
-from client.bridge.wire import _channel_row_to_dict, _iso
+from client.bridge.wire import _vacancy_mini_row_to_dict, _channel_row_to_dict
 
 
 logger = logging.getLogger(__name__)
@@ -151,15 +151,7 @@ class ChannelSlots:
                 "mode": page.mode,
                 "has_more": has_more,
                 "vacancies": [
-                    {
-                        "id": v.id,
-                        "title": v.title or "",
-                        "status": v.status.value if v.status else "New",
-                        "score": v.score,
-                        "created_at": _iso(v.created_at),
-                        "posted_at": _iso(v.posted_at),
-                    }
-                    for v in rows
+                    _vacancy_mini_row_to_dict(v) for v in rows
                 ],
             })
 
