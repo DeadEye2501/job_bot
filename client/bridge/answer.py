@@ -1,4 +1,9 @@
-"""Единый конверт ответа окну — от исхода работы до сигнала."""
+"""Единый конверт ответа окну — от исхода работы до ответа зовущему.
+
+Отправок здесь две, и это ненадолго: `reply` отдаёт ответ значением, как его
+ждёт pywebview, а `_dispatch_json` — сигналом, как его ждал Qt. Вторая уходит
+вместе с последним переехавшим доменом, слайсом А2.9.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +20,11 @@ from client.bridge.runner import AsyncRunner
 
 logger = logging.getLogger(__name__)
 
+# Срок назначен, а не выведен: он заведомо больше самой долгой работы, какую
+# сегодня делает один метод, и заведомо меньше того времени, за которое человек
+# решает, что окно повисло, и убивает его. Мерится в А3, где появляется окно.
+REPLY_SECONDS = 60.0
+
 
 def _ok(data: dict | None = None) -> str:
     return json.dumps({"ok": True, **(data or {})})
@@ -22,6 +32,55 @@ def _ok(data: dict | None = None) -> str:
 
 def _err(message: str, **extra: Any) -> str:
     return json.dumps({"ok": False, "error": message, **extra})
+
+
+def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict:
+    """Сделать работу на моторе и вернуть её исход зовущему одним конвертом.
+
+    Зовут отсюда из потока канала, а работа идёт на моторе, поэтому ждём мы
+    здесь, а не там: pywebview отдаёт странице то, что вернул метод.
+
+    Исход бывает четырёх родов, и все четыре — ответ. Молчания не бывает ни при
+    каком: прежний канал на сорвавшейся работе просто не присылал сигнала, и
+    окно оставалось со спиннером навсегда.
+
+    **Отмена здесь отвечает, а рядом, в `_dispatch_json`, молчит** — и это не
+    разнобой. Там ответ уезжал сигналом в страницу, которая при остановке уже
+    отвалилась; здесь ответа ждёт зов, и промолчать значит держать его до срока
+    впустую.
+
+    Начатую работу срок не отменяет: `Future` от `run_coroutine_threadsafe`
+    отзывает только то, что ещё не пошло. Отвечаем зовущему и оставляем работу
+    доделываться — её исход просто некому будет прочесть.
+
+    Звать это из потока самого мотора нельзя: работа, которой мы ждём, идёт в
+    нём же, и ждать её значит запереть его на полный срок. Сегодня оттуда никто
+    и не зовёт — там обратные вызовы бота, они кладут событие в очередь.
+    """
+    future = None
+    try:
+        future = runner.submit(coro)
+        return {"ok": future.result(REPLY_SECONDS)}
+    except (CancelledError, asyncio.CancelledError):
+        return {"fail": "cancelled"}
+    except Exception as e:
+        if _our_deadline(e, future):
+            return {"fail": "timeout"}
+        logger.exception(
+            "bridge: unexpected error in coroutine %s",
+            getattr(coro, "__qualname__", "?"),
+        )
+        return {"fail": "broken", "detail": f"{type(e).__name__}: {e}"}
+
+
+def _our_deadline(error: Exception, future: Future | None) -> bool:
+    """Это наш срок вышел, а не работа сама не дождалась своего.
+
+    Бьют они одним классом: внутренних сроков в мосте хватает — остановка бота,
+    ожидание клиента. Различает их то, кончилась ли работа: наш срок застаёт её
+    идущей, свой приходит вместе с её концом.
+    """
+    return isinstance(error, TimeoutError) and future is not None and not future.done()
 
 
 def _dispatch_json(

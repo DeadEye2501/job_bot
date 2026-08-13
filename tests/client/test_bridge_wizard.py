@@ -123,8 +123,7 @@ async def test_entering_the_main_window_marks_the_setup_as_done(
     wizard = wizard_with_handoff
 
     wizard.enter_main_app()
-    for started in list(wizard._runner.tasks):
-        await started
+    await wizard._runner.drain()
 
     assert handoff.entered == 1
     assert (await RuntimeSettings.load(session_factory)).wizard_completed is True
