@@ -17,32 +17,27 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
 )
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from adapters import lm_studio
 from adapters.lm_studio import LlmProviderConfig
-from backend.repository import blacklist, blacklist_candidates, channels as channels_repo, stats_pipeline, stats_summary, vacancies_mini  # псевдоним: имя занято локальной переменной
-from backend.domain.telegram_identity import normalize_username
-from backend.models import (
-    BLACKLIST_KINDS,
-    TelegramChannel,
-    Vacancy,
-)
+from backend.repository import blacklist, blacklist_candidates, channels as channels_repo, stats_pipeline, stats_summary  # псевдоним: имя занято локальной переменной
+from backend.models import BLACKLIST_KINDS
 from backend.telegram_login import TelegramLogin, username_of
 from backend.runtime_settings import RuntimeSettings
 from client.bridge.answer import _dispatch_json, _err, _ok
+from client.bridge.channel_actions import ChannelActionSlots
+from client.bridge.channels import ChannelSlots
+from client.bridge.companies import CompanySlots
 from client.bridge.cv import CvSlots
 from client.bridge.desktop import DesktopSlots
+from client.bridge.hr import HrSlots
+from client.bridge.hr_chat import HrChatSlots
 from client.bridge.llm import _do_list_models_for_creds, _do_llm_probe
 from client.bridge.login import TelegramLoginSlots
-from client.bridge.media import _avatar_data_url
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.profile import ProfileSlots
 from client.bridge.runner import AsyncRunner
-from client.bridge.companies import CompanySlots
-from client.bridge.hr import HrSlots
-from client.bridge.hr_chat import HrChatSlots
 from client.bridge.vacancies import VacancySlots
 from client.bridge.vacancy_actions import VacancyActionSlots
 from client.bridge.vacancy_links import VacancyLinkSlots
@@ -51,11 +46,7 @@ from client.bridge.state import (
     _UNREAD_INTERVAL_MS,
     WindowStateSlots,
 )
-from client.bridge.wire import (
-    _blacklist_row_to_dict,
-    _channel_row_to_dict,
-    _iso,
-)
+from client.bridge.wire import _blacklist_row_to_dict
 
 
 logger = logging.getLogger(__name__)
@@ -63,7 +54,8 @@ logger = logging.getLogger(__name__)
 
 
 class MainApi(
-    CompanySlots, CvSlots, DesktopSlots, HrChatSlots, HrSlots, ProfileSlots,
+    ChannelActionSlots, ChannelSlots, CompanySlots, CvSlots, DesktopSlots,
+    HrChatSlots, HrSlots, ProfileSlots,
     TelegramLoginSlots, VacancyActionSlots, VacancyLinkSlots, VacancySlots,
     WindowStateSlots,
     QObject,
@@ -91,11 +83,6 @@ class MainApi(
     llm_models_listed = Signal(str)
     settings_save_done = Signal(str)
     delete_all_data_done = Signal(str)
-    contacts_channel_list_loaded = Signal(str)
-    contacts_channel_detail_loaded = Signal(str)
-    contacts_channel_vacancies_loaded = Signal(str)
-    contacts_channel_action_done = Signal(str)
-    contacts_channels_changed = Signal()
     contacts_lists_changed = Signal()
     vacancies_list_changed = Signal()
 
@@ -1086,445 +1073,4 @@ class MainApi(
             })
 
         self._dispatch(self.contacts_blacklist_list_loaded, run())
-
-    @Slot(str)
-    def request_contacts_channel_list(self, payload_json: str) -> None:
-        """Full list of Telegram channels for the Contacts/Channels pane.
-
-        No pagination — channel sets are tiny. Echoes the request epoch so
-        the UI can drop stale responses when search races.
-        """
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-            search = payload.get("search")
-            if search is not None:
-                search = str(search)
-            epoch = payload.get("epoch")
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("request_contacts_channel_list", e)
-            self.contacts_channel_list_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        async def run() -> str:
-            async with self._session_factory() as session:
-                # Self-heal: тушим каналы, попавшие в blacklist, но всё ещё
-                # помеченные is_active=true (исторический дрейф / правки БД
-                # мимо UI). Идемпотентно, и держит инвариант «blacklisted
-                # ⇒ is_active=false» — иначе bot polling всё ещё трогал бы
-                # запрещённые каналы.
-                async with session.begin():
-                    await channels_repo.deactivate_blacklisted_channels(session)
-                rows = await channels_repo.list_telegram_channels(session, search=search)
-            return _ok({
-                "search": search or "",
-                "channels": [_channel_row_to_dict(r) for r in rows],
-                "epoch": epoch,
-            })
-
-        self._dispatch(self.contacts_channel_list_loaded, run())
-
-    @Slot(int)
-    def request_contacts_channel_detail(self, channel_id: int) -> None:
-        """Detail-pane payload for one Telegram channel.
-
-        Echoes ``channel_id`` so the UI drops stale responses when the user
-        clicks another row mid-flight (mirrors HR/Company detail pattern).
-        Includes computed stats (status breakdown + KPI ratios + recent
-        ingestion rate) — see ``ChannelStats`` for shape.
-        """
-        async def run() -> str:
-            async with self._session_factory() as session:
-                detail = await channels_repo.get_channel_detail(session, channel_id)
-            if detail is None:
-                return _err("Канал не найден.", channel_id=channel_id)
-            ch = detail.channel
-            stats = detail.stats
-            return _ok({
-                "channel_id": ch.id,
-                "username": ch.username,
-                "title": ch.title,
-                "is_active": bool(ch.is_active),
-                "avatar": _avatar_data_url(ch.avatar),
-                "stats": {
-                    "status_counts": stats.status_counts,
-                    "total": stats.total,
-                    "vacancies_per_day": stats.vacancies_per_day,
-                    "fit_percent": stats.fit_percent,
-                    "apply_percent": stats.apply_percent,
-                    "response_percent": stats.response_percent,
-                },
-                "blacklist_value": detail.blacklist_value,
-            })
-
-        self._dispatch(self.contacts_channel_detail_loaded, run())
-
-    @Slot(str)
-    def request_contacts_channel_vacancies(self, payload_json: str) -> None:
-        """Pagination-aware vacancies fetch for the channels detail pane.
-
-        Payload: ``{channel_id, limit, offset, mode}``. ``mode`` ∈
-        {"replace", "append"} — replace wipes JS-side list, append concat'ит
-        к существующему. Backend echoes channel_id + offset + has_more
-        чтобы фронт мог дропать stale-ответы при гонке скролла/выбора.
-        """
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-            channel_id = int(payload["channel_id"])
-            limit = int(payload.get("limit") or 50)
-            if limit > 200:
-                limit = 200
-            offset = int(payload.get("offset") or 0)
-            mode = payload.get("mode") or "replace"
-            if mode not in ("replace", "append"):
-                mode = "replace"
-        except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("request_contacts_channel_vacancies", e)
-            self.contacts_channel_vacancies_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        async def run() -> str:
-            async with self._session_factory() as session:
-                rows = await vacancies_mini.list_vacancies_for_channel(
-                    session, channel_id, limit=limit, offset=offset,
-                )
-                # Diagnostic — раз баг проявляется: 0 здесь vs N в stats
-                # помогает понять, в репо ли проблема или в bridge-эхо.
-                if not rows:
-                    total_for_channel = int(
-                        (
-                            await session.execute(
-                                select(func.count(Vacancy.id))
-                                .where(Vacancy.source_channel_id == channel_id)
-                            )
-                        ).scalar_one()
-                    )
-                    if total_for_channel > 0:
-                        logger.warning(
-                            "channel %d: list_vacancies_for_channel returned 0 "
-                            "but %d rows match source_channel_id (limit=%d offset=%d) "
-                            "— investigate query mismatch with stats",
-                            channel_id,
-                            total_for_channel,
-                            limit,
-                            offset,
-                        )
-            return _ok({
-                "channel_id": channel_id,
-                "offset": offset,
-                "mode": mode,
-                "has_more": len(rows) == limit,
-                "vacancies": [
-                    {
-                        "id": v.id,
-                        "title": v.title or "",
-                        "status": v.status.value if v.status else "New",
-                        "score": v.score,
-                        "created_at": _iso(v.created_at),
-                        "posted_at": _iso(v.posted_at),
-                    }
-                    for v in rows
-                ],
-            })
-
-        self._dispatch(self.contacts_channel_vacancies_loaded, run())
-
-    @Slot(int)
-    def contacts_add_channel_to_blacklist(self, channel_id: int) -> None:
-        """Insert kind="channel" blacklist row for this channel.
-        Value = `@{username}`. Idempotent (re-activates inactive row).
-        Mirrors HR/Company patterns. Pushes contacts_lists_changed so
-        cross-tab `is_blacklisted` flags refresh.
-        """
-        async def run() -> str:
-            async with self._session_factory() as session:
-                ch = await session.get(TelegramChannel, channel_id)
-                if ch is None:
-                    return _err("Канал не найден.", channel_id=channel_id, action="blacklist")
-                value = channels_repo.channel_blacklist_preferred_value(ch)
-                if value is None:
-                    return _err(
-                        "У канала нет @username.",
-                        channel_id=channel_id, action="blacklist",
-                    )
-                _, outcome = await blacklist.create_blacklist(
-                    session, kind="channel", value=value,
-                )
-                # Канал в blacklist → автоматически выключаем сам канал,
-                # чтобы UI-toggle отражал реальное «канал не работает».
-                if ch.is_active:
-                    ch.is_active = False
-                await session.commit()
-            self.contacts_lists_changed.emit()
-            return _ok({
-                "action": "blacklist",
-                "channel_id": channel_id,
-                "value": value,
-                "existed": outcome != "created",
-                "was_inactive": outcome == "reactivated",
-            })
-
-        self._dispatch(self.contacts_channel_action_done, run())
-
-    @Slot(int)
-    def contacts_remove_channel_from_blacklist(self, channel_id: int) -> None:
-        """Deactivate any kind="channel" blacklist row for this channel."""
-        async def run() -> str:
-            async with self._session_factory() as session:
-                ch = await session.get(TelegramChannel, channel_id)
-                if ch is None:
-                    return _err("Канал не найден.", channel_id=channel_id, action="unblacklist")
-                candidates = channels_repo.channel_blacklist_candidates(ch)
-                if not candidates:
-                    return _err(
-                        "У канала нет @username.",
-                        channel_id=channel_id, action="unblacklist",
-                    )
-                updated = await blacklist.deactivate_blacklist_values(
-                    session, "channel", candidates,
-                )
-                await session.commit()
-            self.contacts_lists_changed.emit()
-            return _ok({
-                "action": "unblacklist",
-                "channel_id": channel_id,
-                "updated": updated,
-            })
-
-        self._dispatch(self.contacts_channel_action_done, run())
-
-    @Slot(int)
-    def request_channel_poll_now(self, channel_id: int) -> None:
-        """UI «Прогнать сейчас» — single-channel poll."""
-        async def run() -> str:
-            if self._bot is None:
-                return _err("Бот ещё не готов.", channel_id=channel_id, action="poll_now")
-            status = await self._bot.poll_channel_now(channel_id)
-            if status == "ok":
-                return _ok({
-                    "channel_id": channel_id,
-                    "action": "poll_now",
-                    "status": status,
-                })
-            messages = {
-                "busy": "Уже идёт другой цикл, попробуйте позже.",
-                "missing": "Канал не найден или без @username.",
-                "cancelled": "Поллинг канала отменён.",
-                "error": "Не удалось прогнать канал — см. логи.",
-            }
-            return _err(
-                messages.get(status, "Не удалось прогнать канал."),
-                channel_id=channel_id,
-                action="poll_now",
-                status=status,
-            )
-
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(),
-            action="poll_now", channel_id=channel_id,
-        )
-
-    @Slot(int)
-    def request_channel_reset_cursor(self, channel_id: int) -> None:
-        """UI «Сбросить курсор» — clears last_processed_msg_id."""
-        async def run() -> str:
-            if self._bot is None:
-                return _err("Бот ещё не готов.", channel_id=channel_id, action="reset_cursor")
-            ok = await self._bot.reset_channel_cursor(channel_id)
-            if not ok:
-                return _err(
-                    "Канал не найден.",
-                    channel_id=channel_id,
-                    action="reset_cursor",
-                )
-            return _ok({"channel_id": channel_id, "action": "reset_cursor"})
-
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(),
-            action="reset_cursor", channel_id=channel_id,
-        )
-
-    @Slot(int)
-    def request_channel_delete(self, channel_id: int) -> None:
-        """UI «Удалить канал» — nulls vacancy FKs, deletes row."""
-        async def run() -> str:
-            if self._bot is None:
-                return _err("Бот ещё не готов.", channel_id=channel_id, action="delete")
-            detached = await self._bot.delete_channel(channel_id)
-            if detached is None:
-                return _err(
-                    "Канал не найден.",
-                    channel_id=channel_id,
-                    action="delete",
-                )
-            return _ok({
-                "channel_id": channel_id,
-                "detached_vacancies": detached,
-                "action": "delete",
-            })
-
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(),
-            action="delete", channel_id=channel_id,
-        )
-
-    @Slot(str)
-    def request_create_channel(self, payload_json: str) -> None:
-        """Add a new TelegramChannel from the UI «Добавить канал» modal.
-
-        Accepts raw input — `@username`, plain `username`, or any t.me URL
-        — and normalizes via the same parser used for HR contacts. On
-        duplicate (channel already exists), returns ``ok=true`` with
-        ``created=false`` so the UI selects the existing row instead of
-        showing an error. Metadata fetch is opportunistic on the backend.
-        """
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-            raw = (payload.get("input") or "").strip()
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("request_create_channel", e)
-            self.contacts_channel_action_done.emit(
-                _err(f"Неверные поля: {e}", action="create")
-            )
-            return
-
-        if not raw:
-            self.contacts_channel_action_done.emit(
-                _err("Укажите @username или ссылку на канал.", action="create")
-            )
-            return
-
-        username = normalize_username(raw)
-        if not username:
-            self.contacts_channel_action_done.emit(
-                _err(
-                    "Не удалось распознать @username канала. "
-                    "Поддерживаются форматы: @name, name, t.me/name.",
-                    action="create",
-                )
-            )
-            return
-
-        async def run() -> str:
-            if self._bot is None:
-                return _err("Бот ещё не готов.", action="create")
-            channel_id, status = await self._bot.add_channel(username)
-            if status == "invalid":
-                return _err(
-                    f"Telegram не нашёл канал @{username}. Проверьте имя.",
-                    action="create",
-                    status=status,
-                )
-            return _ok({
-                "channel_id": channel_id,
-                "username": username,
-                "created": status == "created",
-                "action": "create",
-                "status": status,
-            })
-
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(), action="create",
-        )
-
-    @Slot(str)
-    def set_all_channels_active(self, payload_json: str) -> None:
-        """Bulk-flip is_active на всех каналах. Echoes ``is_active`` чтобы
-        фронт мог откатить optimistic-update на ошибке.
-        """
-        try:
-            payload = json.loads(payload_json)
-            is_active = bool(payload["is_active"])
-        except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("set_all_channels_active", e)
-            self.contacts_channel_action_done.emit(_err(
-                f"Неверные поля: {e}", action="set_all_active",
-            ))
-            return
-
-        async def run() -> str:
-            async with self._session_factory() as session:
-                async with session.begin():
-                    affected = await channels_repo.set_all_channels_active(
-                        session, is_active
-                    )
-            return _ok({
-                "is_active": is_active,
-                "affected": affected,
-                "action": "set_all_active",
-            })
-
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(),
-            action="set_all_active", is_active=is_active,
-        )
-
-    @Slot(str)
-    def set_channel_active(self, payload_json: str) -> None:
-        """Toggle TelegramChannel.is_active for one row.
-
-        Echoes ``channel_id`` and the requested ``is_active`` so the UI can
-        rollback its optimistic flip on error without re-querying the list.
-        """
-        # Парсим осторожно: если payload неполный, тянем сколько смогли,
-        # чтобы action+channel_id всё же попали в _err — иначе фронт не
-        # знает, какой именно ряд откатывать.
-        channel_id = None
-        is_active = None
-        try:
-            payload = json.loads(payload_json)
-            raw_id = payload.get("channel_id")
-            if raw_id is not None:
-                channel_id = int(raw_id)
-            raw_active = payload.get("is_active")
-            if raw_active is not None:
-                is_active = bool(raw_active)
-            if channel_id is None or is_active is None:
-                raise KeyError("channel_id / is_active")
-        except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("set_channel_active", e)
-            self.contacts_channel_action_done.emit(_err(
-                f"Неверные поля: {e}",
-                action="set_active",
-                channel_id=channel_id,
-                is_active=is_active,
-            ))
-            return
-
-        async def run() -> str:
-            async with self._session_factory() as session:
-                async with session.begin():
-                    # Включить канал, который сейчас в blacklist'е, нельзя —
-                    # блокируем на уровне бэка, чтобы любой канал-toggle (в
-                    # т.ч. через bulk «Включить все») не оживлял запрещённое.
-                    if is_active and await channels_repo.is_channel_blacklisted(
-                        session, channel_id
-                    ):
-                        return _err(
-                            "Канал в blacklist — нельзя включить.",
-                            channel_id=channel_id,
-                            is_active=is_active,
-                            action="set_active",
-                        )
-                    ok = await channels_repo.set_channel_active(
-                        session, channel_id, is_active
-                    )
-            if not ok:
-                return _err(
-                    "Канал не найден.",
-                    channel_id=channel_id,
-                    is_active=is_active,
-                    action="set_active",
-                )
-            return _ok({
-                "channel_id": channel_id,
-                "is_active": is_active,
-                "action": "set_active",
-            })
-
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(),
-            action="set_active",
-            channel_id=channel_id,
-            is_active=is_active,
-        )
 
