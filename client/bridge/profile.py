@@ -13,6 +13,7 @@ from client.bridge.answer import _err, _ok
 from client.bridge.choices import _filter_languages, _filter_set
 from client.bridge.cv_file import _stat_cv
 from client.bridge.payload import _log_invalid_payload
+from client.bridge.refusals import PROFILE_FIRST
 from client.bridge.wire import _exp_to_dict, _profile_to_dict, _skill_to_dict
 
 
@@ -112,28 +113,45 @@ class ProfileSlots:
 
         self._dispatch(self.skills_changed, run())
 
-    @Slot(str)
-    def save_skills(self, payload_json: str) -> None:
+    def _save_rows(self, payload_json: str, key: str, signal: Signal, saving):
+        """Прочитать перечень строк анкеты и отдать его сохранению.
+
+        Навыки и места работы приходят одной формой — списком объектов под
+        своим ключом, — и различаются только этим ключом, объявлением записи
+        и сигналом ответа.
+
+        Отказ «сначала сохраните профайл» стоит внутри сделки нарочно: строки
+        анкеты цепляются к её номеру, и без анкеты цеплять их не к чему.
+        """
         try:
             payload = json.loads(payload_json)
-            rows = payload.get("skills") or []
+            rows = payload.get(key) or []
             if not isinstance(rows, list):
-                raise ValueError("skills must be a list")
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("save_skills", e)
-            self.skills_save_done.emit(_err(f"Неверные поля: {e}"))
+                raise ValueError(f"{key} must be a list")
+        except (AttributeError, ValueError, TypeError) as e:
+            _log_invalid_payload(f"save_{key}", e)
+            signal.emit(_err(f"Неверные поля: {e}"))
             return
 
         async def run() -> str:
-            async with self._session_factory() as session:
-                async with session.begin():
-                    profile = await profile_repo.get_profile(session)
-                    if profile is None:
-                        return _err("Сначала сохраните профайл (CV-таб).")
-                    await profile_repo.save_skills(session, rows, profile.id)
+            try:
+                async with self._session_factory() as session:
+                    async with session.begin():
+                        profile = await profile_repo.get_profile(session)
+                        if profile is None:
+                            return _err(PROFILE_FIRST)
+                        await saving(session, rows, profile.id)
+            except profile_repo.SaveExperienceError as e:
+                return _err(str(e))
             return _ok()
 
-        self._dispatch(self.skills_save_done, run())
+        self._dispatch(signal, run())
+
+    @Slot(str)
+    def save_skills(self, payload_json: str) -> None:
+        self._save_rows(
+            payload_json, "skills", self.skills_save_done, profile_repo.save_skills
+        )
 
     @Slot()
     def request_experience(self) -> None:
@@ -152,26 +170,9 @@ class ProfileSlots:
 
     @Slot(str)
     def save_experience(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            rows = payload.get("experience") or []
-            if not isinstance(rows, list):
-                raise ValueError("experience must be a list")
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("save_experience", e)
-            self.experience_save_done.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        async def run() -> str:
-            try:
-                async with self._session_factory() as session:
-                    async with session.begin():
-                        profile = await profile_repo.get_profile(session)
-                        if profile is None:
-                            return _err("Сначала сохраните профайл (CV-таб).")
-                        await profile_repo.save_experience(session, rows, profile.id)
-                return _ok()
-            except profile_repo.SaveExperienceError as e:
-                return _err(str(e))
-
-        self._dispatch(self.experience_save_done, run())
+        self._save_rows(
+            payload_json,
+            "experience",
+            self.experience_save_done,
+            profile_repo.save_experience,
+        )

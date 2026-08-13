@@ -18,7 +18,7 @@ async def test_notes_of_a_missing_vacancy_are_not_written(session, session_facto
     """Заметку несуществующей вакансии записать нельзя, и вызов об этом сообщает."""
     await put(session_factory, vacancy_row())
 
-    assert await update_vacancy_notes(session, 10_000, "что-то") is False
+    assert await update_vacancy_notes(session, 10_000, "что-то") is None
 
 
 async def test_notes_are_stored_as_given(session, session_factory):
@@ -26,7 +26,8 @@ async def test_notes_are_stored_as_given(session, session_factory):
     vacancy = vacancy_row(notes=None)
     await put(session_factory, vacancy)
 
-    assert await update_vacancy_notes(session, vacancy.id, "созвон в четверг") is True
+    saved = await update_vacancy_notes(session, vacancy.id, "созвон в четверг")
+    assert saved.notes == "созвон в четверг"
 
     card = await get_vacancy_detail(session, vacancy.id)
     assert card.vacancy.notes == "созвон в четверг"
@@ -44,7 +45,7 @@ async def test_notes_of_only_whitespace_are_stored_as_absence(
     vacancy = vacancy_row(notes="было что-то")
     await put(session_factory, vacancy)
 
-    assert await update_vacancy_notes(session, vacancy.id, "   \n  ") is True
+    assert (await update_vacancy_notes(session, vacancy.id, "   \n  ")).notes is None
 
     card = await get_vacancy_detail(session, vacancy.id)
     assert card.vacancy.notes is None
@@ -55,7 +56,7 @@ async def test_clearing_notes_with_none_also_stores_absence(session, session_fac
     vacancy = vacancy_row(notes="было что-то")
     await put(session_factory, vacancy)
 
-    assert await update_vacancy_notes(session, vacancy.id, None) is True
+    assert (await update_vacancy_notes(session, vacancy.id, None)).notes is None
 
     card = await get_vacancy_detail(session, vacancy.id)
     assert card.vacancy.notes is None
