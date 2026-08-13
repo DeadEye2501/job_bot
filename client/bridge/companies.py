@@ -9,6 +9,7 @@ from PySide6.QtCore import Signal, Slot
 from sqlalchemy.exc import IntegrityError
 
 from backend.models import Company
+from backend.payloads import int_or_none, text_or_none
 from backend.repository import (
     blacklist,
     companies_card,
@@ -18,6 +19,7 @@ from backend.repository import (
 )
 from client.bridge.answer import _err, _ok
 from client.bridge.media import _avatar_data_url
+from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.wire import _company_picker_row_to_dict, _iso
 from client.form_payloads import read_company_spellings, read_new_company_fields
@@ -51,19 +53,8 @@ class CompanySlots:
         """
         try:
             payload = json.loads(payload_json) if payload_json else {}
-            search = payload.get("search")
-            if search is not None:
-                search = str(search)
-            limit = payload.get("limit")
-            limit = int(limit) if limit is not None else 50
-            if limit > 200:
-                limit = 200
-            offset = payload.get("offset")
-            offset = int(offset) if offset is not None else 0
-            mode = payload.get("mode") or "replace"
-            if mode not in ("replace", "append", "refresh"):
-                mode = "replace"
-            epoch = payload.get("epoch")
+            search = text_or_none(payload.get("search"))
+            page = read_page(payload, default_limit=50)
         except (ValueError, TypeError) as e:
             _log_invalid_payload("request_contacts_company_list", e)
             self.contacts_company_list_loaded.emit(_err(f"Неверные поля: {e}"))
@@ -72,16 +63,16 @@ class CompanySlots:
         async def run() -> str:
             async with self._session_factory() as session:
                 rows = await companies_list.list_companies_with_counts(
-                    session, search=search, limit=limit, offset=offset,
+                    session, search=search, limit=page.limit, offset=page.offset,
                 )
-            has_more = (limit is not None) and (len(rows) == limit)
+            has_more = (page.limit is not None) and (len(rows) == page.limit)
             return _ok({
                 "search": search or "",
                 "companies": [_company_picker_row_to_dict(r) for r in rows],
                 "has_more": has_more,
-                "mode": mode,
-                "offset": offset,
-                "epoch": epoch,
+                "mode": page.mode,
+                "offset": page.offset,
+                "epoch": page.epoch,
             })
 
         self._dispatch(self.contacts_company_list_loaded, run())
@@ -117,7 +108,7 @@ class CompanySlots:
         try:
             payload = json.loads(payload_json)
             company_id = int(payload["company_id"])
-            epoch = payload.get("epoch")
+            epoch = int_or_none(payload.get("epoch"))
         except (ValueError, TypeError, KeyError) as e:
             _log_invalid_payload("request_contacts_company_vacancies", e)
             self.contacts_company_vacancies_loaded.emit(_err(f"Неверные поля: {e}"))
@@ -172,9 +163,7 @@ class CompanySlots:
         try:
             payload = json.loads(payload_json)
             absorbed_id = int(payload["absorbed_id"])
-            search = payload.get("search")
-            if search is not None:
-                search = str(search)
+            search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
             _log_invalid_payload("request_contacts_company_merge_picker", e)
             self.contacts_company_merge_picker_loaded.emit(_err(f"Неверные поля: {e}"))

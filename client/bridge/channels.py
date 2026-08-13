@@ -9,9 +9,11 @@ from PySide6.QtCore import Signal, Slot
 from sqlalchemy import func, select
 
 from backend.models import Vacancy
+from backend.payloads import int_or_none, text_or_none
 from backend.repository import channels as channels_repo, vacancies_mini
 from client.bridge.answer import _err, _ok
 from client.bridge.media import _avatar_data_url
+from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.wire import _channel_row_to_dict, _iso
 
@@ -38,10 +40,8 @@ class ChannelSlots:
         """
         try:
             payload = json.loads(payload_json) if payload_json else {}
-            search = payload.get("search")
-            if search is not None:
-                search = str(search)
-            epoch = payload.get("epoch")
+            search = text_or_none(payload.get("search"))
+            epoch = int_or_none(payload.get("epoch"))
         except (ValueError, TypeError) as e:
             _log_invalid_payload("request_contacts_channel_list", e)
             self.contacts_channel_list_loaded.emit(_err(f"Неверные поля: {e}"))
@@ -112,13 +112,7 @@ class ChannelSlots:
         try:
             payload = json.loads(payload_json) if payload_json else {}
             channel_id = int(payload["channel_id"])
-            limit = int(payload.get("limit") or 50)
-            if limit > 200:
-                limit = 200
-            offset = int(payload.get("offset") or 0)
-            mode = payload.get("mode") or "replace"
-            if mode not in ("replace", "append"):
-                mode = "replace"
+            page = read_page(payload, default_limit=50, modes=("replace", "append"))
         except (ValueError, TypeError, KeyError) as e:
             _log_invalid_payload("request_contacts_channel_vacancies", e)
             self.contacts_channel_vacancies_loaded.emit(_err(f"Неверные поля: {e}"))
@@ -127,7 +121,7 @@ class ChannelSlots:
         async def run() -> str:
             async with self._session_factory() as session:
                 rows = await vacancies_mini.list_vacancies_for_channel(
-                    session, channel_id, limit=limit, offset=offset,
+                    session, channel_id, limit=page.limit, offset=page.offset,
                 )
                 # Diagnostic — раз баг проявляется: 0 здесь vs N в stats
                 # помогает понять, в репо ли проблема или в bridge-эхо.
@@ -147,14 +141,14 @@ class ChannelSlots:
                             "— investigate query mismatch with stats",
                             channel_id,
                             total_for_channel,
-                            limit,
-                            offset,
+                            page.limit,
+                            page.offset,
                         )
             return _ok({
                 "channel_id": channel_id,
-                "offset": offset,
-                "mode": mode,
-                "has_more": len(rows) == limit,
+                "offset": page.offset,
+                "mode": page.mode,
+                "has_more": len(rows) == page.limit,
                 "vacancies": [
                     {
                         "id": v.id,

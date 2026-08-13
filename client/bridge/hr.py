@@ -8,6 +8,7 @@ import logging
 from PySide6.QtCore import Signal, Slot
 
 from backend.models import HR
+from backend.payloads import int_or_none, text_or_none
 from backend.repository import (
     blacklist,
     hr_card,
@@ -17,6 +18,7 @@ from backend.repository import (
 )
 from client.bridge.answer import _err, _ok
 from client.bridge.media import _avatar_data_url
+from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.wire import _hr_picker_row_to_dict, _iso
 from client.form_payloads import hr_is_identified, read_new_hr_fields
@@ -52,32 +54,8 @@ class HrSlots:
         """
         try:
             payload = json.loads(payload_json) if payload_json else {}
-            search = payload.get("search")
-            if search is not None:
-                search = str(search)
-
-            def _int(key: str) -> int | None:
-                raw = payload.get(key)
-                if raw in (None, ""):
-                    return None
-                try:
-                    return int(raw)
-                except (TypeError, ValueError):
-                    return None
-
-            limit = _int("limit")
-            # Sanity cap — JS uses 30 / 200, but a malformed payload could
-            # request millions; the post-filter slice walks all rows in
-            # Python, so we want a hard ceiling at the boundary.
-            if limit is not None and limit > 200:
-                limit = 200
-            offset = _int("offset") or 0
-            mode_raw = str(payload.get("mode") or "replace")
-            mode = (
-                mode_raw if mode_raw in {"replace", "append", "refresh"}
-                else "replace"
-            )
-            epoch = _int("epoch")
+            search = text_or_none(payload.get("search"))
+            page = read_page(payload)
         except (ValueError, TypeError) as e:
             _log_invalid_payload("request_contacts_hr_list", e)
             self.contacts_hr_list_loaded.emit(_err(f"Неверные поля: {e}"))
@@ -88,18 +66,18 @@ class HrSlots:
                 rows = await hr_list.list_hr_with_counts(
                     session,
                     search=search,
-                    limit=limit,
-                    offset=offset,
+                    limit=page.limit,
+                    offset=page.offset,
                     sort_by="last_activity",
                 )
-            has_more = (limit is not None) and (len(rows) == limit)
+            has_more = (page.limit is not None) and (len(rows) == page.limit)
             return _ok({
                 "search": search or "",
                 "hrs": [_hr_picker_row_to_dict(r) for r in rows],
                 "has_more": has_more,
-                "mode": mode,
-                "offset": offset,
-                "epoch": epoch,
+                "mode": page.mode,
+                "offset": page.offset,
+                "epoch": page.epoch,
             })
 
         self._dispatch(self.contacts_hr_list_loaded, run())
@@ -116,7 +94,7 @@ class HrSlots:
         try:
             payload = json.loads(payload_json)
             hr_id = int(payload["hr_id"])
-            epoch = payload.get("epoch")
+            epoch = int_or_none(payload.get("epoch"))
         except (ValueError, TypeError, KeyError) as e:
             _log_invalid_payload("request_contacts_hr_vacancies", e)
             self.contacts_hr_vacancies_loaded.emit(_err(f"Неверные поля: {e}"))
@@ -178,9 +156,7 @@ class HrSlots:
         try:
             payload = json.loads(payload_json)
             absorbed_id = int(payload["absorbed_id"])
-            search = payload.get("search")
-            if search is not None:
-                search = str(search)
+            search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
             _log_invalid_payload("request_contacts_hr_merge_picker", e)
             self.contacts_hr_merge_picker_loaded.emit(_err(f"Неверные поля: {e}"))

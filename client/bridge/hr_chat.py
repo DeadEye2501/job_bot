@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
 
 from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import QFileDialog
 
+from backend.payloads import int_or_none, moment_or_none
 from backend.repository import messages as messages_repo
 from client.bridge.answer import _err, _ok
 from client.bridge.media import _media_url
+from client.bridge.page import read_mode
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.wire import _iso
 
@@ -166,20 +167,11 @@ class HrChatSlots:
             payload = json.loads(payload_json) if payload_json else {}
             hr_id = int(payload["hr_id"])
             before_id = payload.get("before_id")
-            before_sent_at_raw = payload.get("before_sent_at")
-            mode = payload.get("mode") or "tail"
-            epoch = payload.get("epoch")
+            mode = read_mode(payload, ("tail", "older"))
+            epoch = int_or_none(payload.get("epoch"))
             if before_id is not None:
                 before_id = int(before_id)
-            before_sent_at = None
-            if before_sent_at_raw:
-                text = str(before_sent_at_raw)
-                if text.endswith("Z"):
-                    text = text[:-1] + "+00:00"
-                try:
-                    before_sent_at = datetime.fromisoformat(text)
-                except ValueError:
-                    before_sent_at = None
+            before_sent_at = moment_or_none(payload.get("before_sent_at"))
         except (ValueError, TypeError, KeyError) as e:
             _log_invalid_payload("request_contacts_hr_messages", e)
             self.contacts_hr_messages_loaded.emit(_err(f"Неверные поля: {e}"))

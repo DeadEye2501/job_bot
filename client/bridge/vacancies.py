@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
 
 from PySide6.QtCore import Signal, Slot
 
 from backend.domain.scoring import build_skill_lookup
 from backend.models import Vacancy, VacancyStatus, VacancyStatusHistory
-from backend.payloads import VacancyFilter
+from backend.payloads import (
+    VacancyFilter,
+    int_or_none,
+    moment_or_none,
+    str_list,
+    text_or_none,
+)
 from backend.repository import (
     profile as profile_repo,
     vacancies_card,
@@ -18,6 +23,7 @@ from backend.repository import (
     vacancies_list,
 )
 from client.bridge.answer import _err, _ok
+from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.wire import _vacancy_detail_to_dict, _vacancy_list_row_to_dict
 
@@ -55,23 +61,7 @@ class VacancySlots:
         except (TypeError, ValueError):
             payload = {}
         sort_key = payload.get("sort") or "newest"
-        search = payload.get("search") or None
-
-        def _list(key: str) -> list[str] | None:
-            raw = payload.get(key)
-            if not isinstance(raw, list):
-                return None
-            cleaned = [str(x) for x in raw if x]
-            return cleaned or None
-
-        def _int(key: str) -> int | None:
-            raw = payload.get(key)
-            if raw in (None, ""):
-                return None
-            try:
-                return int(raw)
-            except (TypeError, ValueError):
-                return None
+        search = text_or_none(payload.get("search"))
 
         def _float(key: str) -> float | None:
             raw = payload.get(key)
@@ -82,40 +72,19 @@ class VacancySlots:
             except (TypeError, ValueError):
                 return None
 
-        def _datetime(key: str) -> datetime | None:
-            raw = payload.get(key)
-            if not raw:
-                return None
-            text = str(raw)
-            # JS Date.toISOString emits a trailing 'Z'; older Pythons reject
-            # it on fromisoformat. 3.11+ handles it, but normalize anyway.
-            if text.endswith("Z"):
-                text = text[:-1] + "+00:00"
-            try:
-                return datetime.fromisoformat(text)
-            except ValueError:
-                return None
-
-        statuses = _list("statuses")
-        channels = _list("channels")
-        companies = _list("companies")
-        score_min = _int("score_min")
-        score_max = _int("score_max")
+        statuses = str_list(payload.get("statuses")) or None
+        channels = str_list(payload.get("channels")) or None
+        companies = str_list(payload.get("companies")) or None
+        score_min = int_or_none(payload.get("score_min"))
+        score_max = int_or_none(payload.get("score_max"))
         salary_min = _float("salary_min")
         salary_max = _float("salary_max")
         grade = (payload.get("grade") or None)
         remote = (payload.get("remote") or None)
         hr_contact = (payload.get("hr_contact") or None)
-        date_from = _datetime("date_from")
-        date_to = _datetime("date_to")
-        limit = _int("limit")
-        offset = _int("offset") or 0
-        # Валидируем mode по белому списку: иначе опечатка из JS вернётся
-        # эхом, фронт получит mode='apend' и трактует как replace, тихо
-        # потеряв append-страницу.
-        mode_raw = str(payload.get("mode") or "replace")
-        mode = mode_raw if mode_raw in {"replace", "append", "refresh"} else "replace"
-        epoch = _int("epoch")
+        date_from = moment_or_none(payload.get("date_from"))
+        date_to = moment_or_none(payload.get("date_to"))
+        page = read_page(payload)
 
         async def run() -> str:
             async with self._session_factory() as session:
@@ -136,8 +105,8 @@ class VacancySlots:
                         hr_contact=hr_contact,
                         date_from=date_from,
                         date_to=date_to,
-                        limit=limit,
-                        offset=offset,
+                        limit=page.limit,
+                        offset=page.offset,
                     ),
                 )
                 skills = await profile_repo.list_skills(session)
@@ -150,7 +119,7 @@ class VacancySlots:
                 # whatever's still in the result set.
                 filter_options = await vacancies_list.list_vacancy_filter_options(session)
             matched_set = build_skill_lookup(skills)
-            has_more = (limit is not None) and (len(rows) == limit)
+            has_more = (page.limit is not None) and (len(rows) == page.limit)
             return _ok({
                 "vacancies": [
                     _vacancy_list_row_to_dict(v, matched_set, activity_by_id)
@@ -158,9 +127,9 @@ class VacancySlots:
                 ],
                 "filter_options": filter_options,
                 "has_more": has_more,
-                "mode": mode,
-                "offset": offset,
-                "epoch": epoch,
+                "mode": page.mode,
+                "offset": page.offset,
+                "epoch": page.epoch,
                 "score_threshold": self._rs.scoring_threshold,
             })
 
