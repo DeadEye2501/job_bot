@@ -93,8 +93,7 @@ def run_ui() -> int:
     # их — security review L3.
     if rs.tg is not None and rs.tg.session_string:
         try:
-            from config import get_data_dir as _gdd
-            sessions_dir = _gdd() / "sessions"
+            from adapters.telegram import SESSIONS_DIR as sessions_dir
             if sessions_dir.exists():
                 removed = 0
                 for p in sessions_dir.iterdir():

@@ -67,6 +67,22 @@ def _get_or_create_master_key() -> bytes:
     return new_key
 
 
+def forget_master_key() -> None:
+    """Забыть главный ключ, лежащий в хранилище ключей ОС.
+
+    Открытое объявление, потому что зовёт его снос данных: прежде он тянул
+    оттуда два закрытых имени и звал `keyring` сам — то есть знал про
+    устройство хранилища больше, чем ему положено.
+
+    Отсутствие записи бедой не считается: снести уже снесённое — это то же
+    самое состояние, ради которого зовут.
+    """
+    try:
+        keyring.delete_password(_KEYRING_SERVICE, _KEYRING_KEY)
+    except Exception as e:
+        logger.debug("master key already absent (%s)", e)
+
+
 def _cipher() -> Fernet:
     return Fernet(_get_or_create_master_key())
 

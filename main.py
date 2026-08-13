@@ -12,7 +12,7 @@ import threading
 import traceback
 
 from backend.log_file import LogFileHandler
-from config import get_lock_path, get_log_path
+from config import LOG_KEPT, get_lock_path, get_log_path
 
 
 def _use_utf8_stdout() -> None:
@@ -39,7 +39,6 @@ _use_utf8_stdout()
 
 
 LOG_BYTES = 5 * 1024 * 1024
-LOG_KEPT = 3
 
 
 def _log_handlers() -> list[logging.Handler]:

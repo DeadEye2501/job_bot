@@ -19,6 +19,13 @@ from backend.runtime_settings import TgAccountConfig
 from config import get_data_dir
 
 
+SESSIONS_DIR = get_data_dir() / "sessions"
+"""Папка, в которой Pyrogram держит файл сеанса.
+
+Объявлена здесь, а не у зовущего: имя знает и снос данных, и оболочка, что
+ищет осиротевшие файлы сеанса.
+"""
+
 SESSION_NAME = "job_bot"
 
 
@@ -41,7 +48,7 @@ def make_client(tg: TgAccountConfig) -> Client:
             in_memory=True,
             sleep_threshold=60,
         )
-    sessions_dir = get_data_dir() / "sessions"
+    sessions_dir = SESSIONS_DIR
     sessions_dir.mkdir(exist_ok=True)
     return Client(
         name=SESSION_NAME,

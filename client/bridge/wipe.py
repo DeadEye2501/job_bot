@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import Future
+from concurrent.futures import CancelledError, Future
 
 from PySide6.QtCore import Signal, Slot
 
 from client.bridge.answer import _err, _ok
+from backend.crypto import forget_master_key
+from backend.wipe import wipe_all
 from client.bridge.bot_stop import stop_bot
 
 
@@ -27,80 +29,37 @@ class WipeSlots:
 
     @Slot()
     def request_delete_all_data(self) -> None:
-        """Опасная зона → «Удалить всё». Останавливает бота, закрывает
-        DB-engine, удаляет файлы (jobbot.db + sidecars, sessions/, media/),
-        и завершает приложение через QApplication.quit() (юзер сам
-        перезапустит — следующий старт уйдёт в визард, т.к. все настройки
-        стерты вместе с БД).
+        """Опасная зона → «Удалить всё».
+
+        Слот только просит: останавливает бота, зовёт снос
+        (`backend.wipe.wipe_all`), забывает ключ и убивает процесс. Из чего
+        состоит каталог данных, он не знает — это дело `config`.
+
+        Следующий запуск уйдёт в мастер: настройки стёрты вместе с базой.
         """
         bot = self._bot
         bot_task = self._bot_task
         # Захватываем сразу, потом null'им — чтобы health-timer не дёрнулся
-        # на полу-удалённой БД. И, главное, тут же тушим сами таймеры
-        # (health/unread) — иначе после engine.dispose() их следующий тик
-        # откроет fresh connection из пула и Windows откажется удалять
-        # jobbot.db с открытым handle'ом.
+        # на полу-удалённой базе. И, главное, тут же тушим сами таймеры
+        # (здоровье и непрочитанное) — иначе после закрытия движка их
+        # следующий удар откроет новое соединение из пула, и Windows
+        # откажется удалять файл базы с открытым держателем.
         self._bot = None
         self._bot_task = None
         self._health_timer.stop()
         self._unread_timer.stop()
 
         async def run() -> str:
-            import shutil
-            from config import get_data_dir
-            errors: list[str] = []
-
-            # 1) Стопаем бота — Pyrogram-сессия закроется, файлы освободятся.
-            # Беду глотаем: снос обязан дойти до конца, даже если бот уже
-            # не отвечает, — иначе останутся и данные, и полуудалённый след.
+            # Беду остановки глотаем: снос обязан дойти до конца, даже если
+            # бот уже не отвечает, — иначе останутся и данные, и полуудалённый
+            # след.
             try:
                 await stop_bot(bot, bot_task)
             except Exception:
                 logger.exception("delete_all: bot stop failed")
 
-            # 2) Закрываем engine — иначе Windows не даст удалить jobbot.db.
-            if self._engine is not None:
-                try:
-                    await self._engine.dispose()
-                except Exception as e:
-                    errors.append(f"engine.dispose: {e}")
-                    logger.exception("delete_all: engine.dispose failed")
-
-            # 3) Удаляем файлы.
-            data_dir = get_data_dir()
-            for name in ("jobbot.db", "jobbot.db-shm", "jobbot.db-wal"):
-                p = data_dir / name
-                if p.exists():
-                    try:
-                        p.unlink()
-                    except Exception as e:
-                        errors.append(f"{name}: {e}")
-                        logger.exception("delete_all: failed to remove %s", p)
-            for sub in ("sessions", "media"):
-                d = data_dir / sub
-                if d.exists():
-                    try:
-                        shutil.rmtree(d)
-                    except Exception as e:
-                        errors.append(f"{sub}/: {e}")
-                        logger.exception("delete_all: failed to remove %s", d)
-
-            # 4) Удаляем Fernet master key из OS-keychain'а. Без этого
-            # после reinstall'а у юзера висит мёртвая запись в Windows
-            # Credential Manager / macOS Keychain — некритично (новый
-            # ключ перегенерится), но «delete all» должно быть «delete
-            # all», а не «delete most».
-            try:
-                import keyring as _keyring
-                from backend.crypto import (
-                    _KEYRING_SERVICE,
-                    _KEYRING_KEY,
-                )
-                _keyring.delete_password(_KEYRING_SERVICE, _KEYRING_KEY)
-            except Exception as e:
-                # delete_password может бросить если записи нет — это OK.
-                logger.debug("delete_all: keyring entry already absent (%s)", e)
-
+            errors = await wipe_all(self._engine)
+            forget_master_key()
             if errors:
                 return _err("Не все файлы удалось удалить: " + "; ".join(errors))
             return _ok({})
@@ -118,6 +77,10 @@ class WipeSlots:
         def _on_done(f: Future) -> None:
             try:
                 payload = f.result()
+            except CancelledError:
+                # Отмена наследует BaseException и мимо перехвата ниже прошла
+                # бы молча: окно не узнало бы ничего, а приложение не вышло.
+                payload = _err("Снос отменён.")
             except Exception as e:
                 payload = _err(f"{type(e).__name__}: {e}")
             self.delete_all_data_done.emit(payload)
