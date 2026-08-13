@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from concurrent.futures import Future
 
 from PySide6.QtCore import Signal, Slot
 
 from client.bridge.answer import _err, _ok
+from client.bridge.bot_stop import stop_bot
 
 
 logger = logging.getLogger(__name__)
@@ -51,22 +51,12 @@ class WipeSlots:
             errors: list[str] = []
 
             # 1) Стопаем бота — Pyrogram-сессия закроется, файлы освободятся.
-            if bot is not None:
-                try:
-                    bot.cancel_current_poll()
-                except Exception:
-                    logger.debug("delete_all: cancel_current_poll failed", exc_info=True)
-                try:
-                    bot.request_stop()
-                except Exception:
-                    logger.debug("delete_all: request_stop failed", exc_info=True)
-            if bot_task is not None:
-                try:
-                    await asyncio.wait_for(asyncio.wrap_future(bot_task), timeout=10)
-                except asyncio.TimeoutError:
-                    logger.warning("delete_all: bot did not stop within 10s")
-                except Exception:
-                    logger.exception("delete_all: bot task raised")
+            # Беду глотаем: снос обязан дойти до конца, даже если бот уже
+            # не отвечает, — иначе останутся и данные, и полуудалённый след.
+            try:
+                await stop_bot(bot, bot_task)
+            except Exception:
+                logger.exception("delete_all: bot stop failed")
 
             # 2) Закрываем engine — иначе Windows не даст удалить jobbot.db.
             if self._engine is not None:
