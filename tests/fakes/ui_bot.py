@@ -24,6 +24,10 @@ ANSWERS = {
     "read": 1,
     "sent": 1,
     "refusal": None,
+    "channel_poll": "ok",
+    "cursor_reset": True,
+    "detached": 0,
+    "added": (1, "created"),
 }
 
 
@@ -78,3 +82,19 @@ class UiBot:
         self.calls.append(("send_to_hr_media", hr_id, file_path))
         self._refuse_if_asked()
         return Sent(id=self.answers["sent"])
+
+    async def poll_channel_now(self, channel_id: int) -> str:
+        self.calls.append(("poll_channel_now", channel_id))
+        return self.answers["channel_poll"]
+
+    async def reset_channel_cursor(self, channel_id: int) -> bool:
+        self.calls.append(("reset_channel_cursor", channel_id))
+        return self.answers["cursor_reset"]
+
+    async def delete_channel(self, channel_id: int) -> int | None:
+        self.calls.append(("delete_channel", channel_id))
+        return self.answers["detached"]
+
+    async def add_channel(self, username: str) -> tuple[int | None, str]:
+        self.calls.append(("add_channel", username))
+        return self.answers["added"]
