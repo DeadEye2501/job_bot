@@ -8,7 +8,7 @@ import logging
 from PySide6.QtCore import Signal, Slot
 
 from backend.domain.scoring import build_skill_lookup
-from backend.models import Vacancy, VacancyStatus, VacancyStatusHistory
+from backend.models import Vacancy, VacancyStatus
 from backend.repository import (
     profile as profile_repo,
     vacancies_card,
@@ -137,21 +137,11 @@ class VacancySlots:
         async def run() -> str:
             async with self._session_factory() as session:
                 async with session.begin():
-                    ok = await vacancies_card.update_vacancy_notes(
+                    saved = await vacancies_card.update_vacancy_notes(
                         session, vacancy_id, notes
                     )
-                    persisted: str | None = None
-                    if ok:
-                        # Re-read the post-normalization value (NULL on
-                        # whitespace-only input) so the client adopts the
-                        # exact DB state as its save-baseline. Without this,
-                        # any keystrokes the user typed between sending and
-                        # receiving the reply would be silently dropped on
-                        # the next debounce.
-                        v = await session.get(Vacancy, vacancy_id)
-                        if v is not None:
-                            persisted = v.notes
-            if not ok:
+                    persisted = saved.notes if saved is not None else None
+            if saved is None:
                 return _err(NO_VACANCY, vacancy_id=vacancy_id)
             return _ok({"vacancy_id": vacancy_id, "notes": persisted})
 
@@ -180,19 +170,13 @@ class VacancySlots:
             return
 
         async def run() -> str:
-            saved: str | None = None
             async with self._session_factory() as session:
                 async with session.begin():
-                    ok = await vacancies_life.update_status_history_explanation(
+                    row = await vacancies_life.update_status_history_explanation(
                         session, history_id, explanation,
                     )
-                    if ok:
-                        # Re-read post-normalization (NULL для empty/whitespace),
-                        # чтобы UI-baseline совпадал с тем, что в DB.
-                        row = await session.get(VacancyStatusHistory, history_id)
-                        if row is not None:
-                            saved = row.explanation
-            if not ok:
+                    saved = row.explanation if row is not None else None
+            if row is None:
                 logger.warning(
                     "history_id=%d not found (vacancy=%d)",
                     history_id,

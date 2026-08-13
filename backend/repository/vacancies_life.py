@@ -211,14 +211,17 @@ async def update_status_history_explanation(
 
     Зеркалит поведение ``update_vacancy_notes``: empty / whitespace-only
     нормализуется в ``NULL`` (UI рендерит «без комментария» для NULL,
-    отличая «удалили коммент» от «забыли набрать»). Returns False если
-    history-id не найден. Caller wraps in ``session.begin()``.
+    отличая «удалили коммент» от «забыли набрать»). Отдаётся сама запись, а
+    не признак «записали»: окно принимает ответ за исходное состояние поля, и
+    знать ему надо, что именно легло — здесь к пояснению ещё и дописывается
+    точка. `None` значит «такой записи нет». Caller wraps in
+    ``session.begin()``.
     """
     row = await session.get(VacancyStatusHistory, history_id)
     if row is None:
-        return False
+        return None
     row.explanation = _ensure_trailing_period(explanation)
-    return True
+    return row
 
 
 async def record_trash_event(

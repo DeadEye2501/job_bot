@@ -132,7 +132,7 @@ async def test_an_explanation_of_a_missing_history_row_is_not_written(
     session, session_factory
 ):
     """Пояснение к несуществующей записи истории не пишется, и вызов об этом сообщает."""
-    assert await update_status_history_explanation(session, 10_000, "текст") is False
+    assert await update_status_history_explanation(session, 10_000, "текст") is None
 
 
 async def test_an_explanation_can_be_replaced_and_cleared(session, session_factory):
@@ -143,11 +143,15 @@ async def test_an_explanation_can_be_replaced_and_cleared(session, session_facto
         session, vacancy.id, VacancyStatus.APPLIED, "первая версия"
     )
 
-    assert await update_status_history_explanation(session, history.id, "вторая") is True
+    assert (await update_status_history_explanation(
+        session, history.id, "вторая"
+    )).explanation == "вторая."
     card = await get_vacancy_detail(session, vacancy.id)
     assert card.history[0].explanation == "вторая."
 
-    assert await update_status_history_explanation(session, history.id, "   ") is True
+    assert (await update_status_history_explanation(
+        session, history.id, "   "
+    )).explanation is None
     card = await get_vacancy_detail(session, vacancy.id)
     assert card.history[0].explanation is None
 

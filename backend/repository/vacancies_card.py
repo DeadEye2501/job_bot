@@ -105,10 +105,16 @@ async def update_vacancy_notes(
     JS-side baseline (``notesLastSaved``) matches the textarea content
     character-for-character on the next debounce — otherwise we'd be re-saving
     the same trimmed string on every keystroke.
+
+    Отдаётся сама строка, а не признак «записали»: окно принимает ответ за
+    исходное состояние поля, и знать ему надо не «получилось ли», а что
+    именно легло после сведения пустого к `NULL`. Строка эта уже в руках —
+    зовущему пришлось бы читать её вторым запросом. `None` значит «такой
+    вакансии нет».
     """
     vacancy = await session.get(Vacancy, vacancy_id)
     if vacancy is None:
-        return False
+        return None
     normalized: str | None
     if notes is None or not notes.strip():
         normalized = None
@@ -116,7 +122,7 @@ async def update_vacancy_notes(
         normalized = notes
     vacancy.notes = normalized
     await session.flush()
-    return True
+    return vacancy
 
 
 @dataclass(frozen=True, slots=True)
