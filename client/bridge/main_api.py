@@ -132,6 +132,9 @@ class MainApi(
         self._models_probed_at: float = float("-inf")
         self._models_health_cache: tuple[bool, bool] = (False, False)
         self._logs_subscribed = False
+        # Когда журнал спрашивали в прошлый раз — заслон от частых обращений
+        # (`journal._LOGS_REQUEST_INTERVAL_S`).
+        self._logs_request_last_ts: float = float("-inf")
         from backend.log_buffer import get_handler
         # Recursion-guard: если внутри _on_record логнуть warning, тот warning
         # снова попадёт в LogBufferHandler.emit → on_record → бесконечная

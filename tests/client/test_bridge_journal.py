@@ -53,24 +53,6 @@ async def test_the_journal_shows_what_was_written(main_api, watch, journal):
     assert answer["records"][0]["msg"] == "канал не отвечает"
 
 
-async def test_the_journal_can_be_narrowed_to_one_level(main_api, watch, journal):
-    """Отбор по уровню оставляет на экране только нужные записи.
-
-    За час работы в кольцо ложатся тысячи строк, и найти среди них поломку
-    без отбора нельзя. При этом общий счёт остаётся полным — иначе, отобрав
-    ошибки, человек увидел бы «всего: 1» и решил, что других записей не было.
-    """
-    caught = watch(main_api.system_logs_loaded)
-    logging.getLogger("проверка").info("всё хорошо")
-    logging.getLogger("проверка").error("всё плохо")
-
-    main_api.request_system_logs(json.dumps({"level": "ERROR"}))
-
-    answer = await caught.next()
-    assert [row["msg"] for row in answer["records"]] == ["всё плохо"]
-    assert answer["total"] == 2
-
-
 async def test_a_request_too_soon_after_the_last_one_stays_silent(
     main_api, watch, journal
 ):
@@ -82,11 +64,13 @@ async def test_a_request_too_soon_after_the_last_one_stays_silent(
 
     Отметку прошлого запроса ставим сами, а не полагаемся на то, что два
     вызова подряд уложатся в секунду: на занятой машине они бы не уложились,
-    и тест падал бы от чужой нагрузки, а не от поломки.
+    и тест падал бы от чужой нагрузки, а не от поломки. Часы те же, что у
+    заслона: разойдись они, отметка стала бы бессмысленной, а проверка —
+    зелёной при любом сроке.
     """
     caught = watch(main_api.system_logs_loaded)
     logging.getLogger("проверка").info("раз")
-    main_api._logs_request_last_ts = time.time()
+    main_api._logs_request_last_ts = time.monotonic()
 
     main_api.request_system_logs(json.dumps({}))
 

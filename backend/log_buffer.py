@@ -82,6 +82,37 @@ class LogBufferHandler(logging.Handler):
         with self._lock:
             return list(self._records)
 
+    def page(self, limit: int) -> dict:
+        """Страница журнала для окна: записи, счёт по уровням и всего.
+
+        Один снимок на всё: возьми записи и счётчики порознь — между двумя
+        обращениями в кольцо успеет лечь новая запись, и число в пилюле не
+        сойдётся со списком под ней.
+
+        `CRITICAL` считается `ERROR`'ом: окно рисует их одним цветом, и
+        отдельная пилюля с единицей заставляла бы искать разницу, которой
+        человеку не показывают. В питоне это правило теперь одно — прежде
+        было написано дважды; третье написание живёт в разметке, у отбора,
+        который окно делает у себя.
+
+        Перечня источников в ответе нет: окно его не читает — берёт
+        `records`, `level_counts` и `total`.
+
+        Свежие сверху: окно рисует список сверху вниз. Потолок режет ровно
+        то, что уедет в окно; больше кольца (`MAX_RECORDS`) в нём и не
+        бывает.
+        """
+        records = self.snapshot()
+        level_counts: dict[str, int] = {}
+        for entry in records:
+            level = "ERROR" if entry["level"] == "CRITICAL" else entry["level"]
+            level_counts[level] = level_counts.get(level, 0) + 1
+        return {
+            "records": list(reversed(records))[:limit],
+            "level_counts": level_counts,
+            "total": len(records),
+        }
+
     def clear(self) -> int:
         with self._lock:
             n = len(self._records)

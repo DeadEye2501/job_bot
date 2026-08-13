@@ -459,3 +459,37 @@ def test_nothing_blows_up_when_there_is_nowhere_to_complain(
     monkeypatch.setattr(sys, "stderr", None)
 
     LogBufferHandler().emit(_unbuildable())
+
+
+def test_a_critical_record_is_counted_as_an_error():
+    """Записи `CRITICAL` считаются ошибками, а не отдельной породой.
+
+    Окно рисует их одним цветом и одной пилюлей: заведи счёт отдельно —
+    человек увидел бы «ошибок: 0» рядом с красной строкой и решил бы, что
+    счётчик врёт.
+    """
+    handler = LogBufferHandler()
+    handler.emit(record("обычная беда", level=logging.ERROR))
+    handler.emit(record("беда пострашнее", level=logging.CRITICAL))
+
+    counts = handler.page(limit=10)["level_counts"]
+
+    assert counts["ERROR"] == 2
+    assert "CRITICAL" not in counts
+
+
+def test_the_page_shows_the_newest_first_and_counts_them_all():
+    """На странице свежие сверху, а счёт остаётся полным.
+
+    Окно рисует список сверху вниз и показывает рядом «всего». Считай мы
+    страницу, а не кольцо, — человек, открывший журнал с потолком в одну
+    запись, прочёл бы «всего: 1» и решил, что остальное потерялось.
+    """
+    handler = LogBufferHandler()
+    for n in range(3):
+        handler.emit(record(f"запись {n}"))
+
+    page = handler.page(limit=2)
+
+    assert [row["msg"] for row in page["records"]] == ["запись 2", "запись 1"]
+    assert page["total"] == 3

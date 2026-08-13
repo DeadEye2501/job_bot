@@ -4,15 +4,27 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 
 from PySide6.QtCore import Signal, Slot
 
-from backend.log_buffer import get_handler
+from backend.log_buffer import MAX_RECORDS, get_handler
+from backend.payloads import int_or_none
 from client.bridge.answer import _err, _ok
 from client.bridge.payload import _log_invalid_payload
 
 
 logger = logging.getLogger(__name__)
+
+_LOGS_PAGE = 1000
+"""Сколько записей уезжает в окно, если оно не просило иного."""
+
+_LOGS_REQUEST_INTERVAL_S = 1.0
+"""Чаще раза в секунду журнал не спрашивают.
+
+Окно опрашивает его по своим часам, а новые записи и так приходят подпиской:
+второе обращение за ту же секунду отдало бы тот же снимок.
+"""
 
 
 class JournalSlots:
@@ -30,74 +42,34 @@ class JournalSlots:
 
     @Slot(str)
     def request_system_logs(self, payload_json: str) -> None:
-        """Snapshot текущего log-buffer'а с фильтрами по level/source/search.
+        """Страница журнала для экрана «Логи».
 
-        Payload: ``{level?, source?, search?, limit?}``. level — точное
-        совпадение на levelname, source — startswith (logger 'backend.flows'
-        матчит фильтр 'backend'), search — substring case-insensitive по
-        msg+details.
+        Нагрузка — `{limit?}`. Отбора здесь нет нарочно: окно берёт весь
+        буфер и отбирает у себя, потому что счётчики в пилюлях считают полный
+        буфер независимо от выбранного уровня. Три ветки отбора, стоявшие
+        тут прежде, окно не просило ни разу — и одна из них разошлась с
+        общим правилом поиска.
 
-        Дешёвая 1-сек защита от auto-fire'а из JS (например, log-poll'а в
-        пол-секунды): второй вызов в окне 1 секунды считается избыточным,
-        UI всё равно перерендерится через подписку на push-сигнал.
+        Заслон от частых обращений: окно опрашивает журнал по своим часам, и
+        второе обращение за секунду ничего не добавит — записи оно и так
+        получит подпиской.
         """
-        import time as _time
-        last_ts = getattr(self, "_logs_request_last_ts", 0.0)
-        now = _time.time()
-        if now - last_ts < 1.0:
-            logger.debug("request_system_logs: debounced (interval %.2fs)", now - last_ts)
+        now = time.monotonic()
+        if now - self._logs_request_last_ts < _LOGS_REQUEST_INTERVAL_S:
+            logger.debug("request_system_logs: too often, skipped")
             return
         self._logs_request_last_ts = now
         try:
             payload = json.loads(payload_json) if payload_json else {}
-            level = payload.get("level")
-            source = payload.get("source")
-            search = payload.get("search")
-            limit = int(payload.get("limit") or 1000)
-            if limit > 5000:
-                limit = 5000
-        except (ValueError, TypeError) as e:
+            limit = int_or_none(payload.get("limit")) or _LOGS_PAGE
+            limit = min(limit, MAX_RECORDS)
+        except (AttributeError, ValueError, TypeError) as e:
             _log_invalid_payload("request_system_logs", e)
             self.system_logs_loaded.emit(_err(f"Неверные поля: {e}"))
             return
 
         async def run() -> str:
-            # Один snapshot для всего: иначе race между среза'ми может
-            # дать инконсистентные records vs counts.
-            all_records = get_handler().snapshot()
-            sources = sorted({r["source"] for r in all_records})
-            level_counts: dict[str, int] = {}
-            for r in all_records:
-                lvl = r["level"]
-                # CRITICAL рендерится как ERROR в UI — счётчик объединяем,
-                # чтобы ERROR-pill не недоучитывал.
-                if lvl == "CRITICAL":
-                    lvl = "ERROR"
-                level_counts[lvl] = level_counts.get(lvl, 0) + 1
-
-            records = all_records
-            if level:
-                if level == "ERROR":
-                    records = [r for r in records if r["level"] in ("ERROR", "CRITICAL")]
-                else:
-                    records = [r for r in records if r["level"] == level]
-            if source:
-                records = [r for r in records if r["source"].startswith(source)]
-            if search:
-                q = search.casefold()
-                records = [
-                    r for r in records
-                    if q in r["msg"].casefold()
-                    or (r.get("details") and q in r["details"].casefold())
-                ]
-            # Newest-first; UI рендерит сверху-вниз.
-            records = list(reversed(records))[:limit]
-            return _ok({
-                "records": records,
-                "sources": sources,
-                "level_counts": level_counts,
-                "total": len(all_records),
-            })
+            return _ok(get_handler().page(limit))
 
         self._dispatch(self.system_logs_loaded, run())
 
