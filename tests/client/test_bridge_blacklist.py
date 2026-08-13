@@ -5,15 +5,13 @@
 своим файлом: они ничего не заводят, а только смотрят на уже известных.
 """
 
-import json
-
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, put
 from tests.factories import blacklist_row, channel_row, company_row
 
 
 async def test_the_list_carries_kind_value_and_whether_it_is_on(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Строка перечня несёт род, значение и признак действия.
 
@@ -21,47 +19,40 @@ async def test_the_list_carries_kind_value_and_whether_it_is_on(
     вернут. Пропади признак, погашенная выглядела бы работающей, и человек
     считал бы себя огороженным.
     """
-    caught = watch(main_api.contacts_blacklist_list_loaded)
     await put(session_factory, blacklist_row("keyword", "казино", active=False))
 
-    main_api.request_contacts_blacklist_list()
+    answer = await ask(api.blacklist.list)
 
-    row = (await caught.next())["items"][0]
+    row = answer["ok"]["items"][0]
     assert row["kind"] == "keyword"
     assert row["value"] == "казино"
     assert row["active"] is False
 
 
-async def test_an_unknown_kind_is_refused(main_api, watch):
+async def test_an_unknown_kind_is_refused(api, ask):
     """Неизвестный род записи не заводят.
 
     Родов четыре, и по роду идёт сверка: запись с выдуманным родом не
     совпала бы ни с чем и молча ничего не ограждала бы.
     """
-    caught = watch(main_api.contacts_blacklist_action_done)
-
-    main_api.request_create_blacklist(
-        json.dumps({"kind": "выдуманный", "value": "что-то"})
+    answer = await ask(
+        api.blacklist.create, {"kind": "выдуманный", "value": "что-то"}
     )
 
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert answer["error"] == "Неверный тип записи."
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Неверный тип записи."
 
 
-async def test_an_empty_value_is_refused(main_api, watch):
+async def test_an_empty_value_is_refused(api, ask):
     """Пустое значение не заводят: сверять будет нечего."""
-    caught = watch(main_api.contacts_blacklist_action_done)
+    answer = await ask(api.blacklist.create, {"kind": "keyword", "value": "   "})
 
-    main_api.request_create_blacklist(json.dumps({"kind": "keyword", "value": "   "}))
-
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert answer["error"] == "Значение не может быть пустым."
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Значение не может быть пустым."
 
 
 async def test_the_same_entry_twice_does_not_make_a_second_one(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Повторное заведение не плодит вторую запись, а признаётся в первой.
 
@@ -69,41 +60,36 @@ async def test_the_same_entry_twice_does_not_make_a_second_one(
     вторая — гашение одной оставило бы вторую работать, и человек не понял бы,
     почему заслон держится после снятия.
     """
-    done = watch(main_api.contacts_blacklist_action_done)
-    listed = watch(main_api.contacts_blacklist_list_loaded)
+    first = await ask(api.blacklist.create, {"kind": "keyword", "value": "казино"})
+    assert first["ok"]["created"] is True
 
-    main_api.request_create_blacklist(json.dumps({"kind": "keyword", "value": "казино"}))
-    assert (await done.next())["created"] is True
+    again = await ask(api.blacklist.create, {"kind": "keyword", "value": "казино"})
+    assert again["ok"]["created"] is False
 
-    main_api.request_create_blacklist(json.dumps({"kind": "keyword", "value": "казино"}))
-    assert (await done.next())["created"] is False
-
-    main_api.request_contacts_blacklist_list()
-    assert len((await listed.next())["items"]) == 1
+    listed = await ask(api.blacklist.list)
+    assert len(listed["ok"]["items"]) == 1
 
 
 async def test_repeating_a_switched_off_entry_brings_it_back(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Заведение погашенной записи заново её оживляет.
 
     Человек не помнит, что уже гасил её; он просто заводит снова. Останься
     запись погашенной, заслон не работал бы, а окно отвечало бы успехом.
     """
-    caught = watch(main_api.contacts_blacklist_action_done)
     entry = blacklist_row("keyword", "казино", active=False)
     await put(session_factory, entry)
 
-    main_api.request_create_blacklist(json.dumps({"kind": "keyword", "value": "казино"}))
-    assert (await caught.next())["created"] is False
+    answer = await ask(api.blacklist.create, {"kind": "keyword", "value": "казино"})
+    assert answer["ok"]["created"] is False
 
-    listed = watch(main_api.contacts_blacklist_list_loaded)
-    main_api.request_contacts_blacklist_list()
-    assert (await listed.next())["items"][0]["active"] is True
+    listed = await ask(api.blacklist.list)
+    assert listed["ok"]["items"][0]["active"] is True
 
 
 async def test_barring_a_channel_switches_it_off_right_away(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Запись про канал гасит совпавшие каналы сразу.
 
@@ -112,102 +98,88 @@ async def test_barring_a_channel_switches_it_off_right_away(
     базу, а не в список: показ списка чинит дрейф сам, и через него зелено
     было бы и без правила.
     """
-    caught = watch(main_api.contacts_blacklist_action_done)
     await put(session_factory, channel_row(username="spam", title="Спам"))
 
-    main_api.request_create_blacklist(
-        json.dumps({"kind": "channel", "value": "@spam"})
-    )
+    answer = await ask(api.blacklist.create, {"kind": "channel", "value": "@spam"})
 
-    assert (await caught.next())["ok"] is True
+    assert "ok" in answer
 
     rows = await all_rows(session_factory, TelegramChannel)
     assert [row.is_active for row in rows] == [False]
 
 
 async def test_an_update_without_either_field_is_refused(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Правку, не назвавшую ни значения, ни причины, отбивают.
 
     Править нечего, а ответ об успехе окно приняло бы за сохранение и
     показало бы новое состояние, которого в записи нет.
     """
-    caught = watch(main_api.contacts_blacklist_action_done)
     entry = blacklist_row("keyword", "казино")
     await put(session_factory, entry)
 
-    main_api.update_blacklist(json.dumps({"id": entry.id}))
+    answer = await ask(api.blacklist.update, {"id": entry.id})
 
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert "value / reason" in answer["error"]
+    assert answer["fail"] == "fields"
+    assert "value / reason" in answer["detail"]
 
 
 async def test_an_update_to_an_empty_value_is_refused(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Значение нельзя стереть правкой — сверять станет нечем."""
-    caught = watch(main_api.contacts_blacklist_action_done)
     entry = blacklist_row("keyword", "казино")
     await put(session_factory, entry)
 
-    main_api.update_blacklist(json.dumps({"id": entry.id, "value": "  "}))
+    answer = await ask(api.blacklist.update, {"id": entry.id, "value": "  "})
 
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert answer["error"] == "Значение не может быть пустым."
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Значение не может быть пустым."
 
 
 async def test_a_switched_off_entry_stays_in_the_list(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Погашенная запись остаётся в перечне, но помечена погашенной.
 
     Гасят её, чтобы вернуть потом, — удаление для этого есть отдельное.
     Пропади она из перечня, включить её обратно было бы нечем.
     """
-    done = watch(main_api.contacts_blacklist_action_done)
-    listed = watch(main_api.contacts_blacklist_list_loaded)
     entry = blacklist_row("keyword", "казино")
     await put(session_factory, entry)
 
-    main_api.set_blacklist_active(json.dumps({"id": entry.id, "active": False}))
-    assert (await done.next())["ok"] is True
+    switched = await ask(api.blacklist.set_active, {"id": entry.id, "active": False})
+    assert "ok" in switched
 
-    main_api.request_contacts_blacklist_list()
-    items = (await listed.next())["items"]
+    listed = await ask(api.blacklist.list)
+    items = listed["ok"]["items"]
     assert len(items) == 1
     assert items[0]["active"] is False
 
 
-async def test_deleting_a_missing_entry_is_refused(main_api, watch):
+async def test_deleting_a_missing_entry_is_refused(api, ask):
     """Удаление несуществующей записи отбивают, а не считают удавшимся."""
-    caught = watch(main_api.contacts_blacklist_action_done)
+    answer = await ask(api.blacklist.delete, 404)
 
-    main_api.delete_blacklist(404)
-
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert answer["error"] == "Запись не найдена."
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Запись не найдена."
 
 
-async def test_a_deleted_entry_leaves_the_list(main_api, watch, session_factory):
+async def test_a_deleted_entry_leaves_the_list(api, ask, session_factory):
     """Удалённая запись исчезает из перечня насовсем."""
-    done = watch(main_api.contacts_blacklist_action_done)
-    listed = watch(main_api.contacts_blacklist_list_loaded)
     entry = blacklist_row("company", "Рога")
     await put(session_factory, entry, company_row(name="Рога"))
 
-    main_api.delete_blacklist(entry.id)
-    assert (await done.next())["ok"] is True
+    answer = await ask(api.blacklist.delete, entry.id)
+    assert "ok" in answer
 
-    main_api.request_contacts_blacklist_list()
-    assert (await listed.next())["items"] == []
+    listed = await ask(api.blacklist.list)
+    assert listed["ok"]["items"] == []
 
 
 async def test_switching_a_barred_row_back_on_stops_its_channel(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Возвращённая в отсев запись гасит канал так же, как заведённая.
 
@@ -216,13 +188,29 @@ async def test_switching_a_barred_row_back_on_stops_its_channel(
     продолжал носить вакансии до ближайшего открытия экрана каналов — а
     человек считал, что оградился.
     """
-    caught = watch(main_api.contacts_blacklist_action_done)
     channel = channel_row(username="spam", title="Спам")
     row = blacklist_row(kind="channel", value="@spam", active=False)
     await put(session_factory, channel, row)
 
-    main_api.set_blacklist_active(json.dumps({"id": row.id, "active": True}))
+    answer = await ask(api.blacklist.set_active, {"id": row.id, "active": True})
 
-    assert (await caught.next())["ok"] is True
+    assert "ok" in answer
     rows = await all_rows(session_factory, TelegramChannel)
     assert [one.is_active for one in rows] == [False]
+
+
+async def test_a_new_entry_tells_the_lists_to_reread_themselves(api, ask, hub):
+    """Заведённая запись кладёт в очередь весть, что списки устарели.
+
+    Отметка отсева запечена в строках людей, компаний и каналов: не узнав про
+    новую запись, соседние экраны показывали бы человека незаблокированным до
+    следующей правки руками.
+
+    Красной фазы у этого сторожа не было — оповещение дописано вместе с
+    переездом домена, и доверие оно заслужит итоговым проходом.
+    """
+    await ask(api.blacklist.create, {"kind": "keyword", "value": "казино"})
+
+    news = await hub.events.take(after=0, timeout=0.01)
+
+    assert [one["kind"] for one in news["events"]] == ["contacts_lists_changed"]

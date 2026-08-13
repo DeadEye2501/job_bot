@@ -2,11 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import logging
-
-from PySide6.QtCore import Signal, Slot
-
 from backend.payloads import int_or_none, text_or_none
 from backend.repository import (
     hr_card,
@@ -14,56 +9,51 @@ from backend.repository import (
     hr_list,
     vacancies_mini,
 )
-from client.bridge.answer import _err, _ok
-from client.bridge.refusals import IDENTITY_REQUIRED, NOTHING_TO_UPDATE, NO_HR
-from client.bridge.mark import HR_MARK, mark, unmark
+from client.bridge.answer import Denied, bad_fields, denied, reply
+from client.bridge.hr_chat import HrChat
+from client.bridge.mark import HR_MARK, mark_or_refuse, unmark_or_refuse
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
-from client.bridge.payload import _log_invalid_payload
 from client.bridge.pickers import HR_PICKER, merge_picker
-from client.bridge.wire import _vacancy_mini_row_to_dict, _hr_picker_row_to_dict
+from client.bridge.refusals import IDENTITY_REQUIRED, NOTHING_TO_UPDATE, NO_HR
+from client.bridge.wire import _hr_picker_row_to_dict, _vacancy_mini_row_to_dict
 from client.form_payloads import hr_is_identified, read_new_hr_fields
 
 
-logger = logging.getLogger(__name__)
-
-
-class HrSlots:
+class Hr(HrChat):
     """Человек как запись в контактах: найти, показать, поправить, убрать.
 
-    Подмешивающий обязан держать `_session_factory` и `_dispatch`, а сверх того
-    — сигнал `contacts_lists_changed`, которым окно узнаёт, что списки надо
-    перечитать целиком, и `_kick_unread` из `WindowStateSlots`: слияние и
-    удаление человека уносят его непрочитанные письма, и счётчик надо
-    пересчитать сразу.
+    Разрезано на два файла по ответственности: карточка и правки в ней здесь,
+    переписка с тем же человеком — у примеси рядом. Поверхность у них при этом
+    одна: окно видит одного человека, а не карточку отдельно от переписки, и
+    примесь здесь — способ разложить эту поверхность по файлам, а не задел под
+    вторую реализацию. Складывать её вложенным полем (`api.hr.chat.*`) значило
+    бы завести домен, которого в плане нет.
+
+    Слияние и снос кладут в очередь две вести — списки контактов и счётчик
+    непрочитанного собраны из того же, — а заслон меняет только списки. Не
+    сказав, окно осталось бы со вчерашними числами.
     """
 
-    contacts_hr_list_loaded = Signal(str)
-    contacts_hr_detail_loaded = Signal(str)
-    contacts_hr_action_done = Signal(str)
-    contacts_hr_vacancies_loaded = Signal(str)
-    contacts_hr_merge_picker_loaded = Signal(str)
+    def __init__(self, hub) -> None:
+        self._hub = hub
 
-    @Slot(str)
-    def request_contacts_hr_list(self, payload_json: str) -> None:
-        """Push the HR-list payload for Contacts / HR (05).
+    def list(self, payload: dict | None = None) -> dict:
+        """Перечень людей с поиском и бесконечной прокруткой.
 
-        Same backing query as the picker (``list_hr_with_counts``) but with
-        infinite-scroll: ``mode``/``offset``/``limit`` mirror the vacancies
-        list. ``epoch`` is echoed back so the JS can drop stale responses
-        when filters/search/sort change mid-flight.
+        Запрос под ним тот же, что у подборщика (`list_hr_with_counts`), но со
+        страницами: потолок, сдвиг и режим читаются как у списка вакансий.
+        Порядковый знак уезжает эхом — по нему окно отбрасывает ответ,
+        устаревший, пока менялись поиск или порядок.
         """
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-            search = text_or_none(payload.get("search"))
-            page = read_page(payload)
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("request_contacts_hr_list", e)
-            self.contacts_hr_list_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+        # Не-объект сводится к пустоте, а не роняет разбор: поиск — дело окна,
+        # и испорченная нагрузка не должна отнимать у человека весь перечень.
+        payload = payload if isinstance(payload, dict) else {}
+        search = text_or_none(payload.get("search"))
+        page = read_page(payload)
 
-        async def run() -> str:
-            async with self._session_factory() as session:
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
                 rows, has_more = await hr_list.list_hr_with_counts(
                     session,
                     search=search,
@@ -71,61 +61,30 @@ class HrSlots:
                     offset=page.offset,
                     sort_by="last_activity",
                 )
-            return _ok({
+            return {
                 "search": search or "",
                 "hrs": [_hr_picker_row_to_dict(r) for r in rows],
                 "has_more": has_more,
                 "mode": page.mode,
                 "offset": page.offset,
                 "epoch": page.epoch,
-            })
+            }
 
-        self._dispatch(self.contacts_hr_list_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def request_contacts_hr_vacancies(self, payload_json: str) -> None:
-        """Push the vacancy mini-list for the HR detail pane.
+    def detail(self, hr_id: int) -> dict:
+        """Карточка одного человека целиком.
 
-        Payload: ``{hr_id, epoch}``. ``hr_id`` фильтрует ответ от другого
-        выбранного HR, ``epoch`` — от race'а двух подряд request'ов на ОДНОГО
-        и того же HR (например, рапид-флип статуса вакансии). Оба эхо'ятся
-        обратно в ответе, JS дропает stale.
+        Номер едет обратно в ответе: по нему окно отбрасывает ответ про
+        строку, с которой человек уже ушёл, нажав соседнюю.
         """
-        try:
-            payload = json.loads(payload_json)
-            hr_id = int(payload["hr_id"])
-            epoch = int_or_none(payload.get("epoch"))
-        except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("request_contacts_hr_vacancies", e)
-            self.contacts_hr_vacancies_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
 
-        async def run() -> str:
-            async with self._session_factory() as session:
-                rows = await vacancies_mini.list_vacancies_for_hr(session, hr_id)
-            return _ok({
-                "hr_id": hr_id,
-                "epoch": epoch,
-                "vacancies": [
-                    _vacancy_mini_row_to_dict(v) for v in rows
-                ],
-            })
-
-        self._dispatch(self.contacts_hr_vacancies_loaded, run())
-
-    @Slot(int)
-    def request_contacts_hr_detail(self, hr_id: int) -> None:
-        """Push the HR-detail payload for the Contacts / HR pane (05).
-
-        Returns ``hr_id`` in the payload so JS can drop stale responses
-        when the user clicks a different row mid-flight.
-        """
-        async def run() -> str:
-            async with self._session_factory() as session:
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
                 detail = await hr_card.get_hr_detail(session, hr_id)
             if detail is None:
-                return _err(NO_HR, hr_id=hr_id)
-            return _ok({
+                raise Denied(NO_HR, hr_id=hr_id)
+            return {
                 "hr_id": detail.hr.id,
                 "name": detail.hr.name,
                 "telegram_username": detail.hr.telegram_username,
@@ -137,49 +96,68 @@ class HrSlots:
                 "unread_count": detail.unread_count,
                 "blacklist_value": detail.blacklist_value,
                 "avatar": _avatar_data_url(detail.hr.avatar),
-            })
+            }
 
-        self._dispatch(self.contacts_hr_detail_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def request_contacts_hr_merge_picker(self, payload_json: str) -> None:
-        """List of HRs eligible to absorb the current HR. Same row shape as
-        the vacancies HR-picker, minus the absorbed HR itself.
+    def vacancies(self, payload: dict) -> dict:
+        """Короткий список вакансий этого человека — для его карточки.
+
+        Нагрузка: `{hr_id, epoch}`. Номер отсеивает ответ про другого
+        выбранного, порядковый знак — про того же самого, спрошенного дважды
+        подряд (например, быстрым переключением статуса вакансии). Оба уезжают
+        обратно эхом, устаревшее окно отбрасывает.
         """
         try:
-            payload = json.loads(payload_json)
+            hr_id = int(payload["hr_id"])
+            epoch = int_or_none(payload.get("epoch"))
+        except (ValueError, TypeError, KeyError) as e:
+            return bad_fields("vacancies", e)
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                rows = await vacancies_mini.list_vacancies_for_hr(session, hr_id)
+            return {
+                "hr_id": hr_id,
+                "epoch": epoch,
+                "vacancies": [_vacancy_mini_row_to_dict(v) for v in rows],
+            }
+
+        return reply(self._hub.runner, run())
+
+    def merge_picker(self, payload: dict) -> dict:
+        """Кандидаты, в которых можно влить эту карточку.
+
+        Строка та же, что у подборщика вакансий, за вычетом самой
+        поглощаемой карточки.
+        """
+        try:
             absorbed_id = int(payload["absorbed_id"])
             search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("request_contacts_hr_merge_picker", e)
-            self.contacts_hr_merge_picker_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("merge_picker", e)
 
-        async def run() -> str:
-            async with self._session_factory() as session:
-                return _ok(
-                    await merge_picker(session, HR_PICKER, absorbed_id, search)
-                )
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                return await merge_picker(session, HR_PICKER, absorbed_id, search)
 
-        self._dispatch(self.contacts_hr_merge_picker_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def contacts_merge_hr(self, payload_json: str) -> None:
-        """Merge ``absorbed`` HR into ``survivor``: vacancies + messages get
-        repointed, absorbed row is deleted. Backed by ``hr_card.merge_hr``.
+    def merge(self, payload: dict) -> dict:
+        """Влить поглощаемую карточку в оставшуюся.
+
+        Вакансии и переписка переезжают на оставшегося, поглощённая строка
+        сносится; дело делает `hr_card.merge_hr`.
         """
         try:
-            payload = json.loads(payload_json)
             absorbed_id = int(payload["absorbed_id"])
             survivor_id = int(payload["survivor_id"])
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("contacts_merge_hr", e)
-            self.contacts_hr_action_done.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("merge", e)
 
-        async def run() -> str:
+        async def run() -> dict:
             try:
-                async with self._session_factory() as session:
+                async with self._hub.session_factory() as session:
                     async with session.begin():
                         await hr_card.merge_hr(
                             session,
@@ -187,92 +165,79 @@ class HrSlots:
                             survivor_id=survivor_id,
                         )
             except ValueError as e:
-                return _err(str(e), absorbed_id=absorbed_id, action="merge_hr")
-            except Exception as e:
-                logger.exception("contacts_merge_hr failed")
-                return _err(
-                    f"{type(e).__name__}: {e}",
-                    absorbed_id=absorbed_id,
-                    action="merge_hr",
-                )
-            self._kick_unread()
-            return _ok({
+                raise Denied(str(e), absorbed_id=absorbed_id, action="merge_hr")
+            self._hub.events.add("contacts_lists_changed")
+            self._hub.events.add("unread_changed")
+            return {
                 "action": "merge_hr",
                 "absorbed_id": absorbed_id,
                 "survivor_id": survivor_id,
-            })
+            }
 
-        self._dispatch(self.contacts_hr_action_done, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(int)
-    def contacts_delete_hr(self, hr_id: int) -> None:
-        """Cascade-delete the HR row via ``hr_card.delete_hr``."""
-        async def run() -> str:
-            async with self._session_factory() as session:
-                ok = await hr_card.delete_hr(session, hr_id)
-                if not ok:
-                    return _err(NO_HR, hr_id=hr_id, action="delete_hr")
+    def delete(self, hr_id: int) -> dict:
+        """Снести карточку человека вместе с перепиской (`hr_card.delete_hr`)."""
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                if not await hr_card.delete_hr(session, hr_id):
+                    raise Denied(NO_HR, hr_id=hr_id, action="delete_hr")
                 await session.commit()
-            self._kick_unread()
-            return _ok({"action": "delete_hr", "hr_id": hr_id})
+            self._hub.events.add("contacts_lists_changed")
+            self._hub.events.add("unread_changed")
+            return {"action": "delete_hr", "hr_id": hr_id}
 
-        self._dispatch(self.contacts_hr_action_done, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(int)
-    def contacts_remove_hr_from_blacklist(self, hr_id: int) -> None:
-        """Deactivate any kind="hr" blacklist row matching this HR.
+    def block(self, hr_id: int) -> dict:
+        """Занести человека в чёрный список.
 
-        Sets ``active=False`` rather than deleting — the blacklist screen
-        keeps inactive rows visible with the toggle off, which is the
-        expected UX for a «убрать из blacklist» from this screen.
+        Написание — `@{username}`, если ник есть, иначе `user_id:{id}`.
+        Повторное нажатие второй записи не заводит: погашенная оживает, живая
+        остаётся как есть, и ответ говорит об этом полем `existed`. Причина
+        остаётся пустой — её дописывают на экране самого списка. Карточку это
+        не сносит: снос — отдельная кнопка.
         """
-        async def run() -> str:
-            async with self._session_factory() as session:
-                answer, ok = await unmark(session, HR_MARK, hr_id)
-            if ok:
-                self.contacts_lists_changed.emit()
-            return answer
 
-        self._dispatch(self.contacts_hr_action_done, run())
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                marked = await mark_or_refuse(session, HR_MARK, hr_id)
+            self._hub.events.add("contacts_lists_changed")
+            return marked
 
-    @Slot(int)
-    def contacts_add_hr_to_blacklist(self, hr_id: int) -> None:
-        """Insert a kind="hr" row into the blacklist for this HR.
+        return reply(self._hub.runner, run())
 
-        Value is ``@{username}`` if the HR has one, else ``user_id:{id}``.
-        Idempotent: if a matching row already exists it is re-activated;
-        if active already, no-op (returns ok with ``existed=True``).
-        Reason left NULL — the blacklist screen lets the user fill it later.
-        Does NOT delete the HR — that's a separate action.
+    def unblock(self, hr_id: int) -> dict:
+        """Убрать человека из чёрного списка.
+
+        Запись гасится, а не сносится: экран списка держит погашенные строки
+        видимыми, с выключенным тумблером, — этого от кнопки «убрать» здесь и
+        ждут.
         """
-        async def run() -> str:
-            async with self._session_factory() as session:
-                answer, ok = await mark(session, HR_MARK, hr_id)
-            if ok:
-                self.contacts_lists_changed.emit()
-            return answer
 
-        self._dispatch(self.contacts_hr_action_done, run())
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                unmarked = await unmark_or_refuse(session, HR_MARK, hr_id)
+            self._hub.events.add("contacts_lists_changed")
+            return unmarked
 
-    @Slot(str)
-    def contacts_update_hr(self, payload_json: str) -> None:
-        """Patch one or more HR columns from inline form fields (slice 3+).
+        return reply(self._hub.runner, run())
 
-        Payload shape: ``{"hr_id": int, "name"?: str, "telegram_username"?:
-        str, "notes"?: str}``. Missing keys mean «leave unchanged» (sentinel
-        on the repo side). Empty strings collapse to NULL.
+    def update(self, payload: dict) -> dict:
+        """Поправить одно или несколько полей карточки.
 
-        Re-emits the contacts list so the row's name/username refresh, and
-        the detail payload so the head + form pick up canonicalised values
-        (e.g. stripped «@»).
+        Нагрузка: `{"hr_id": int, "name"?: str, "telegram_username"?: str,
+        "notes"?: str}`. Пропущенный ключ значит «не трогать» — часового
+        держит репозиторий; пустая строка сводится к пустоте.
+
+        Ответ называет поправленные поля: окно перечитывает по нему карточку
+        и берёт из неё приведённые написания — например, ник без «@».
         """
         try:
-            payload = json.loads(payload_json)
             hr_id = int(payload["hr_id"])
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("contacts_update_hr", e)
-            self.contacts_hr_action_done.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("update", e)
 
         # Только присланные поля: отсутствие ключа значит «не трогать».
         kwargs = {
@@ -281,55 +246,45 @@ class HrSlots:
             if key in payload
         }
         if not kwargs:
-            self.contacts_hr_action_done.emit(
-                _err(NOTHING_TO_UPDATE, hr_id=hr_id)
-            )
-            return
+            return denied(NOTHING_TO_UPDATE, hr_id=hr_id)
 
-        async def run() -> str:
+        async def run() -> dict:
             try:
-                async with self._session_factory() as session:
+                async with self._hub.session_factory() as session:
                     async with session.begin():
                         ok = await hr_card.update_hr_fields(session, hr_id, **kwargs)
             except ValueError as e:  # негодный ник — ответ формы, а не сбой
-                return _err(f"Неверные поля: {e}", hr_id=hr_id, action="update_hr")
+                raise Denied(f"Неверные поля: {e}", hr_id=hr_id, action="update_hr")
             if not ok:
-                return _err(NO_HR, hr_id=hr_id, action="update_hr")
-            return _ok({
+                raise Denied(NO_HR, hr_id=hr_id, action="update_hr")
+            return {
                 "action": "update_hr",
                 "hr_id": hr_id,
                 "fields": list(kwargs.keys()),
-            })
+            }
 
-        self._dispatch(self.contacts_hr_action_done, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def contacts_create_hr(self, payload_json: str) -> None:
-        """Insert a new HR from the «Добавить HR» modal in Contacts / HR.
+    def create(self, payload: dict) -> dict:
+        """Завести человека из окна «Добавить HR».
 
-        On success returns ``created_id`` so JS can pre-select the new row,
-        and the caller is expected to re-issue ``request_contacts_hr_list``
-        to refresh.
+        Номер заведённого едет ответом, чтобы окно подсветило новую строку;
+        перечень оно перечитывает следом само.
         """
         try:
-            payload = json.loads(payload_json)
             fields = read_new_hr_fields(payload)
-        except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("contacts_create_hr", e)
-            self.contacts_hr_action_done.emit(_err(f"Неверные поля: {e}"))
-            return
+        # `AttributeError` — про не-объект в нагрузке: помощник читает её
+        # ключами, и спотыкается он до мотора, мимо конверта.
+        except (AttributeError, ValueError, TypeError, KeyError) as e:
+            return bad_fields("create", e)
 
         if not hr_is_identified(fields):
-            self.contacts_hr_action_done.emit(
-                _err(IDENTITY_REQUIRED)
-            )
-            return
+            return denied(IDENTITY_REQUIRED)
 
-        async def run() -> str:
-            async with self._session_factory() as session:
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
                 async with session.begin():
-                    new_hr = await hr_identify.create_hr(session, **fields)
-                    created_id = new_hr.id
-            return _ok({"action": "create_hr", "created_id": created_id})
+                    created_id = (await hr_identify.create_hr(session, **fields)).id
+            return {"action": "create_hr", "created_id": created_id}
 
-        self._dispatch(self.contacts_hr_action_done, run())
+        return reply(self._hub.runner, run())

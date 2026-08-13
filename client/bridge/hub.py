@@ -12,12 +12,15 @@
 
 from __future__ import annotations
 
+from client.bridge.events import Events
+
 
 class Hub:
-    """То, из чего собран домен: мотор, сессии, настройки, бот."""
+    """То, из чего собран домен: мотор, сессии, настройки, бот, события."""
 
     def __init__(self, runner, session_factory, rs) -> None:
         self.runner = runner
         self.session_factory = session_factory
         self.rs = rs
         self.bot = None
+        self.events = Events()

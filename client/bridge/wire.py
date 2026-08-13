@@ -7,7 +7,7 @@ from typing import Any
 
 from backend.domain.scoring import skill_key
 from backend.models import Blacklist
-from client.bridge.media import _avatar_data_url
+from client.bridge.media import _avatar_data_url, _media_url
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -212,6 +212,27 @@ def _hr_picker_row_to_dict(item) -> dict:
         "unread_count": item.unread_count,
         "is_blacklisted": getattr(item, "is_blacklisted", False),
         "avatar": _avatar_data_url(hr.avatar),
+    }
+
+
+def _message_row_to_dict(m) -> dict:
+    """Письмо переписки — тем, из чего окно рисует пузырь.
+
+    Вложение уезжает адресом, а не байтами: через канал байты не ходят.
+    """
+    return {
+        "id": m.id,
+        "tg_message_id": m.tg_message_id,
+        "is_incoming": m.is_incoming,
+        "text": m.text,
+        "sent_at": _iso(m.sent_at),
+        "read_at": _iso(m.read_at),
+        "vacancy_id": m.vacancy_id,
+        "is_edited": m.is_edited,
+        "is_deleted": m.is_deleted,
+        "media_kind": m.media_kind,
+        "media_path": _media_url(m.media_path),
+        "media_name": m.media_name,
     }
 
 

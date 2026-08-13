@@ -34,17 +34,14 @@ async def test_a_full_page_of_vacancies_does_not_promise_more(
 
 
 async def test_a_full_page_of_people_does_not_promise_more(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """То же на экране людей: страница вровень с найденным — это конец списка."""
-    caught = watch(main_api.contacts_hr_list_loaded)
     await put(session_factory, *[hr_row(name=f"Человек {i}") for i in range(3)])
 
-    main_api.request_contacts_hr_list(json.dumps({"limit": 3}))
-    assert (await caught.next())["has_more"] is False
+    assert (await ask(api.hr.list, {"limit": 3}))["ok"]["has_more"] is False
 
-    main_api.request_contacts_hr_list(json.dumps({"limit": 2}))
-    assert (await caught.next())["has_more"] is True
+    assert (await ask(api.hr.list, {"limit": 2}))["ok"]["has_more"] is True
 
 
 async def test_a_full_page_of_companies_does_not_promise_more(

@@ -18,14 +18,11 @@ from backend.telegram_login import TelegramLogin
 from backend.runtime_settings import RuntimeSettings
 from client.bridge.bot_stop import stop_bot
 from client.bridge.answer import _dispatch_json, _err, _ok
-from client.bridge.blacklist import BlacklistSlots
 from client.bridge.channel_actions import ChannelActionSlots
 from client.bridge.channels import ChannelSlots
 from client.bridge.companies import CompanySlots
 from client.bridge.cv import CvSlots
 from client.bridge.desktop import DesktopSlots
-from client.bridge.hr import HrSlots
-from client.bridge.hr_chat import HrChatSlots
 from client.bridge.hub import Hub
 from client.bridge.journal import JournalSlots
 from client.bridge.llm import LlmSlots
@@ -59,8 +56,8 @@ _CLOSING_WAIT_S = 5.0
 
 
 class MainApi(
-    BlacklistSlots, ChannelActionSlots, ChannelSlots, CompanySlots, CvSlots,
-    DesktopSlots, HrChatSlots, HrSlots, JournalSlots, LlmSlots, ProfileSlots,
+    ChannelActionSlots, ChannelSlots, CompanySlots, CvSlots,
+    DesktopSlots, JournalSlots, LlmSlots, ProfileSlots,
     SettingsSlots,
     TelegramLoginSlots,
     WindowStateSlots, WipeSlots,
@@ -69,14 +66,17 @@ class MainApi(
     """Один объект «api», который канал отдаёт основному окну.
 
     Своих слотов не держит: предметы приходят примесями, а здесь — бот,
-    часы общего состояния, отправка работы на мотор и уборка. Два сигнала
+    часы общего состояния, отправка работы на мотор и уборка. Четыре сигнала
     объявлены тут же, потому что испускает их бот, а не предмет: списки
     контактов и список вакансий меняются сами по себе, когда сбор находит
-    новое.
+    новое, а письмо от человека и его отметка о прочтении приходят от
+    собеседника — их дом, очередь событий, ждёт слайса А2.9.
     """
 
     contacts_lists_changed = Signal()
     vacancies_list_changed = Signal()
+    contacts_hr_messages_arrived = Signal(str)
+    contacts_hr_read_receipt = Signal(str)
 
     def __init__(
         self,
@@ -273,6 +273,9 @@ class MainApi(
         shutdown is fast even mid-Full-cycle (otherwise Qt's main thread
         would freeze for the rest of the channel pull).
         """
+        # Ждущие запросы отпускаются сразу: без этого последний из них догорал
+        # бы свой срок, держа на себе закрытие приложения.
+        self._hub.events.close()
         self._health_timer.stop()
         self._unread_timer.stop()
         if self._bot is not None and self._bot_task is not None:
