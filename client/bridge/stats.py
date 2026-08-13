@@ -9,9 +9,8 @@ from client.bridge.answer import reply
 class Stats:
     """Пять чтений одной формы: спросили за срок — ответили числами."""
 
-    def __init__(self, runner, session_factory) -> None:
-        self._runner = runner
-        self._session_factory = session_factory
+    def __init__(self, hub) -> None:
+        self._hub = hub
 
     def _read(self, period: str, reading) -> dict:
         """Спросить показатель за срок и отдать окну.
@@ -24,10 +23,10 @@ class Stats:
         """
 
         async def run() -> dict:
-            async with self._session_factory() as session:
+            async with self._hub.session_factory() as session:
                 return await reading(session, period=period)
 
-        return reply(self._runner, run())
+        return reply(self._hub.runner, run())
 
     def kpi(self, period: str) -> dict:
         """Верхний ряд показателей экрана. Срок ∈ {today, week, month,

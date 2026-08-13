@@ -2,126 +2,97 @@
 
 from __future__ import annotations
 
-import json
-
-from PySide6.QtCore import Signal, Slot
-
 from backend.repository import vacancies_life
-from client.bridge.answer import _err, _ok
+from client.bridge.answer import Denied, bad_fields, reply
 from client.bridge.refusals import NO_BOT, NO_VACANCY
-from client.bridge.payload import _log_invalid_payload
 
 
-class VacancyActionSlots:
+# Коды отказа конвейера — словами человеку. Совпадает с тем, чем отвечают
+# `IngestionPipeline.send_application_for_vacancy` и `Bot.send`: иначе человек не
+# отличит настоящую отправку от запрета, отсутствия резюме и поломки модели.
+SEND_REFUSALS = {
+    "no_vacancy": NO_VACANCY,
+    "no_hr": "К вакансии не привязан HR.",
+    "already_applied": "Отклик по этой вакансии уже отправлен.",
+    "profile_empty": "Профиль пуст — нечем заполнить cover letter.",
+    "cover_letter_failed": "Cover letter не прошёл проверку (длина / формат — см. логи).",
+    "cv_missing": "Файл резюме не найден — проверьте путь в настройках.",
+    "blocked": "Отправка заблокирована (OFF mode / blacklist / у HR нет ни id, ни @username).",
+    "telegram_error": "Telegram отказался принять сообщение (см. логи).",
+    "race": "Статус вакансии успел измениться — отправка отменена.",
+}
+
+
+class VacancyActions:
     """Кнопки карточки вакансии — то, что меняет её судьбу, а не вид.
 
-    Подмешивающий обязан держать `_bot`, `_session_factory` и `_dispatch`.
+    Собирающий обязан держать `_hub`: из него берутся мотор, сессии и бот.
     """
 
-    vacancy_action_done = Signal(str)
-
-    @Slot(str)
-    def rerun_vacancy_pipeline(self, payload_json: str) -> None:
-        """Прогнать разбор вакансии моделью заново — кнопка «Прогнать заново»."""
+    def rerun(self, payload: dict) -> dict:
+        """Прогнать разбор вакансии моделью заново."""
         try:
-            payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("rerun_vacancy_pipeline", e)
-            self.vacancy_action_done.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("rerun", e)
 
-        async def run() -> str:
-            if self._bot is None:
-                return _err(NO_BOT)
-            ok = await self._bot.ui_rerun_vacancy_pipeline(vacancy_id)
-            if not ok:
-                return _err(
-                    "Не удалось перезапустить парсинг (нет вакансии или пустой raw_text).",
+        async def run() -> dict:
+            bot = self._hub.bot
+            if bot is None:
+                raise Denied(NO_BOT, vacancy_id=vacancy_id, action="rerun")
+            if not await bot.ui_rerun_vacancy_pipeline(vacancy_id):
+                raise Denied(
+                    "Не удалось перезапустить парсинг "
+                    "(нет вакансии или пустой raw_text).",
                     vacancy_id=vacancy_id,
                     action="rerun",
                 )
-            return _ok({"vacancy_id": vacancy_id, "action": "rerun"})
+            return {"vacancy_id": vacancy_id, "action": "rerun"}
 
-        self._dispatch(self.vacancy_action_done, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def send_vacancy_application(self, payload_json: str) -> None:
-        """Manual cover-letter send для конкретной вакансии — кнопка
-        «Отправить отклик». Backend сам генерит письмо, прикрепляет резюме
-        и шлёт связанному HR. Skip-причины пробрасываются в UI как
-        конкретные сообщения, иначе юзер не отличит реальную отправку от
-        SEND_LOCKED / отсутствия CV / поломки LLM."""
+    def send_application(self, payload: dict) -> dict:
+        """Отправить отклик по вакансии: письмо, резюме и всё остальное — на боте."""
         try:
-            payload = json.loads(payload_json)
             vacancy_id = int(payload["vacancy_id"])
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("send_vacancy_application", e)
-            self.vacancy_action_done.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("send_application", e)
 
-        # Skip-коды → human-readable. Совпадает с тем, что emit'ит
-        # IngestionPipeline.send_application_for_vacancy и Bot.send.
-        REASONS = {
-            "no_vacancy":         NO_VACANCY,
-            "no_hr":              "К вакансии не привязан HR.",
-            "already_applied":    "Отклик по этой вакансии уже отправлен.",
-            "profile_empty":      "Профиль пуст — нечем заполнить cover letter.",
-            "cover_letter_failed":"Cover letter не прошёл проверку (длина / формат — см. логи).",
-            "cv_missing":         "Файл резюме не найден — проверьте путь в настройках.",
-            "blocked":            "Отправка заблокирована (OFF mode / blacklist / у HR нет ни id, ни @username).",
-            "telegram_error":     "Telegram отказался принять сообщение (см. логи).",
-            "race":               "Статус вакансии успел измениться — отправка отменена.",
-        }
-        # Success-коды тоже доходят до UI на случай будущих кодов
-        # (sent — единственный сейчас, note=None → toast не показываем,
-        # UI сам нарисует обычный success).
-        SUCCESS_NOTES = {
-            "sent":               None,
-        }
-
-        async def run() -> str:
-            if self._bot is None:
-                return _err(NO_BOT)
-            ok, reason = await self._bot.ui_send_vacancy_application(vacancy_id)
-            if not ok:
-                msg = REASONS.get(reason, f"Не удалось отправить: {reason}")
-                return _err(msg, vacancy_id=vacancy_id, action="send")
-            payload = {"vacancy_id": vacancy_id, "action": "send", "reason": reason}
-            note = SUCCESS_NOTES.get(reason)
-            if note is not None:
-                payload["note"] = note
-            return _ok(payload)
-
-        self._dispatch(self.vacancy_action_done, run())
-
-    @Slot(str)
-    def delete_vacancy(self, payload_json: str) -> None:
-        """Hard-delete vacancy + history/events; nulls message.vacancy_id."""
-        try:
-            payload = json.loads(payload_json)
-            vacancy_id = int(payload["vacancy_id"])
-        except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("delete_vacancy", e)
-            self.vacancy_action_done.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        async def run() -> str:
-            # Через конвейер, а не прямо в репозиторий: вместе со строкой
-            # уходит её вектор из кэша отсева перепостов. Без бота кэша нет
-            # вовсе — тогда довольно строки.
-            if self._bot is not None:
-                ok = await self._bot.ui_forget_vacancy(vacancy_id)
-            else:
-                async with self._session_factory() as session:
-                    async with session.begin():
-                        ok = await vacancies_life.delete_vacancy(session, vacancy_id)
-            if not ok:
-                return _err(
-                    NO_VACANCY,
+        async def run() -> dict:
+            bot = self._hub.bot
+            if bot is None:
+                raise Denied(NO_BOT, vacancy_id=vacancy_id, action="send")
+            sent, reason = await bot.ui_send_vacancy_application(vacancy_id)
+            if not sent:
+                raise Denied(
+                    SEND_REFUSALS.get(reason, f"Не удалось отправить: {reason}"),
                     vacancy_id=vacancy_id,
-                    action="delete",
+                    action="send",
                 )
-            return _ok({"vacancy_id": vacancy_id, "action": "delete"})
+            return {"vacancy_id": vacancy_id, "action": "send", "reason": reason}
 
-        self._dispatch(self.vacancy_action_done, run())
+        return reply(self._hub.runner, run())
+
+    def delete(self, payload: dict) -> dict:
+        """Снести вакансию вместе с историей и событиями."""
+        try:
+            vacancy_id = int(payload["vacancy_id"])
+        except (ValueError, TypeError, KeyError) as e:
+            return bad_fields("delete", e)
+
+        async def run() -> dict:
+            # Через конвейер, а не прямо в репозиторий: вместе со строкой уходит
+            # её вектор из кэша отсева перепостов. Без бота кэша нет вовсе —
+            # тогда довольно строки.
+            bot = self._hub.bot
+            if bot is not None:
+                gone = await bot.ui_forget_vacancy(vacancy_id)
+            else:
+                async with self._hub.session_factory() as session:
+                    async with session.begin():
+                        gone = await vacancies_life.delete_vacancy(session, vacancy_id)
+            if not gone:
+                raise Denied(NO_VACANCY, vacancy_id=vacancy_id, action="delete")
+            return {"vacancy_id": vacancy_id, "action": "delete"}
+
+        return reply(self._hub.runner, run())

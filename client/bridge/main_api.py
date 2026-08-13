@@ -26,6 +26,7 @@ from client.bridge.cv import CvSlots
 from client.bridge.desktop import DesktopSlots
 from client.bridge.hr import HrSlots
 from client.bridge.hr_chat import HrChatSlots
+from client.bridge.hub import Hub
 from client.bridge.journal import JournalSlots
 from client.bridge.llm import LlmSlots
 from client.bridge.login import TelegramLoginSlots
@@ -37,9 +38,6 @@ from client.bridge.state import (
     _UNREAD_INTERVAL_MS,
     WindowStateSlots,
 )
-from client.bridge.vacancies import VacancySlots
-from client.bridge.vacancy_actions import VacancyActionSlots
-from client.bridge.vacancy_links import VacancyLinkSlots
 from client.bridge.wipe import WipeSlots
 
 
@@ -64,7 +62,7 @@ class MainApi(
     BlacklistSlots, ChannelActionSlots, ChannelSlots, CompanySlots, CvSlots,
     DesktopSlots, HrChatSlots, HrSlots, JournalSlots, LlmSlots, ProfileSlots,
     SettingsSlots,
-    TelegramLoginSlots, VacancyActionSlots, VacancyLinkSlots, VacancySlots,
+    TelegramLoginSlots,
     WindowStateSlots, WipeSlots,
     QObject,
 ):
@@ -94,7 +92,7 @@ class MainApi(
         self._runner = runner
         self._parent_widget = parent_widget
         self._engine = engine  # для dispose() в delete_all_data
-        self._bot = None
+        self._hub = Hub(runner, session_factory, rs)
         self._bot_task: Future | None = None
 
         self._health_timer = QTimer(self)
@@ -161,6 +159,20 @@ class MainApi(
             self._start_bot()
         else:
             logger.info("No TG session — bot start deferred until user logs in via Settings")
+
+    @property
+    def _bot(self):
+        """Бот лежит в общем хозяйстве, а не здесь.
+
+        Переехавшие домены берут его оттуда же: две ссылки на одного бота
+        разъехались бы на первом же перезапуске, и половина поверхности отвечала
+        бы «бот ещё не готов» при живом боте.
+        """
+        return self._hub.bot
+
+    @_bot.setter
+    def _bot(self, bot) -> None:
+        self._hub.bot = bot
 
     def _start_bot(self) -> None:
         """Construct AND run the Bot inside the runner loop.

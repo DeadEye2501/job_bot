@@ -4,17 +4,20 @@
 сам, обходом полей. Отсюда и раскладка: домен — поле корня, а не примесь в один
 плоский класс, как того требовал канал Qt с его единственным именем.
 
-Домен здесь сейчас один. Остальные восемь переезжают слайсами А2.2–А2.9, и пока
+Доменов здесь сейчас два. Остальные семь переезжают слайсами А2.3–А2.9, и пока
 переехали не все, рядом живёт `main_api.MainApi` со старой поверхностью.
 """
 
 from __future__ import annotations
 
+from client.bridge.hub import Hub
 from client.bridge.stats import Stats
+from client.bridge.vacancies import Vacancies
 
 
 class Api:
-    """Корень поверхности: держит домены и общее, из чего они собраны."""
+    """Корень поверхности: держит домены, собранные из одного хозяйства."""
 
-    def __init__(self, runner, session_factory) -> None:
-        self.stats = Stats(runner, session_factory)
+    def __init__(self, hub: Hub) -> None:
+        self.stats = Stats(hub)
+        self.vacancies = Vacancies(hub)

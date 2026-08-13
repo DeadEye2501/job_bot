@@ -15,6 +15,7 @@ from typing import Any, Coroutine
 
 from PySide6.QtCore import SignalInstance
 
+from client.bridge.payload import _log_invalid_payload
 from client.bridge.runner import AsyncRunner
 
 
@@ -32,6 +33,41 @@ def _ok(data: dict | None = None) -> str:
 
 def _err(message: str, **extra: Any) -> str:
     return json.dumps({"ok": False, "error": message, **extra})
+
+
+class Denied(Exception):
+    """Отказ, случившийся уже внутри работы: строки нет, имя занято.
+
+    До мотора такое отвечается прямо, `denied`; изнутри работы отвечать нечем —
+    возврат там занят исходом, — и отказ поднимается сюда броском. Ловит его
+    `reply` и складывает тот же конверт.
+    """
+
+    def __init__(self, reason: str, **extra: Any) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.extra = extra
+
+
+def denied(reason: str, **extra: Any) -> dict:
+    """Отказ по делу: предмета нет, имя занято, поле пустое.
+
+    Род один на все такие отказы, а различает их фраза: она и есть то, что
+    человек прочтёт, и живёт она в `refusals`. Заводить род на каждую фразу
+    незачем — окно показывает их одной плашкой и по роду не ветвится.
+    """
+    return {"fail": "denied", "detail": reason, **extra}
+
+
+def bad_fields(where: str, error: Exception) -> dict:
+    """Нагрузка не разобралась: жалоба в журнал без секретов, отказ окну.
+
+    Три эти строки стояли своим телом в каждом слоте, читающем нагрузку, — на
+    сорока восьми местах. Разъезжались они молча: чей-то слот забывал жалобу, и
+    беда пропадала целиком.
+    """
+    _log_invalid_payload(where, error)
+    return {"fail": "fields", "detail": f"Неверные поля: {error}"}
 
 
 def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict:
@@ -61,6 +97,8 @@ def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict:
     try:
         future = runner.submit(coro)
         return {"ok": future.result(REPLY_SECONDS)}
+    except Denied as e:
+        return denied(e.reason, **e.extra)
     except (CancelledError, asyncio.CancelledError):
         return {"fail": "cancelled"}
     except Exception as e:
