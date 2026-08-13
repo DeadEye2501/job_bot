@@ -13,8 +13,9 @@ single-user app, JS живёт в embedded WebView, не по сети):
 по соответствующим slot'ам.
 """
 
-from client.bridge.main_api import MainApi, WizardApi
+from client.bridge.main_api import MainApi
 from client.bridge.runner import AsyncRunner
+from client.bridge.wizard import WizardApi
 
 
 __all__ = ["AsyncRunner", "MainApi", "WizardApi"]

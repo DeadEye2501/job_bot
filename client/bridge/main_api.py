@@ -1,7 +1,7 @@
-"""Поверхность окна: основное окно и мастер первого запуска.
+"""Поверхность основного окна.
 
-Двух поверхностей в одном модуле быть не должно — мастер уезжает своим файлом
-следующим слайсом этапа 3.
+Пока держит и предметы, и сборщики словарей — они разъезжаются своими файлами
+до конца этапа 3.
 """
 
 from __future__ import annotations
@@ -10,13 +10,11 @@ import asyncio
 import base64
 import json
 import logging
-import time
 from concurrent.futures import CancelledError, Future
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Coroutine
+from typing import Any, Coroutine
 
-import httpx
 from PySide6.QtCore import QObject, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
@@ -34,7 +32,6 @@ from adapters.lm_studio import LlmProviderConfig
 from backend.repository import blacklist, blacklist_candidates, channels as channels_repo, companies_card, companies_list, hr_card, hr_identify, hr_list, messages as messages_repo, profile as profile_repo, stats_pipeline, stats_summary, vacancies_card, vacancies_life, vacancies_list, vacancies_mini  # три псевдонима: имена заняты локальными переменными
 from backend.payloads import text_or_none as _none_if_empty
 from client.form_payloads import hr_is_identified, read_company_spellings, read_new_company_fields, read_new_hr_fields
-from backend.llm.cv import parse_cv
 from backend.domain.scoring import build_skill_lookup, skill_key
 from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
 from backend.domain.telegram_identity import normalize_username
@@ -53,126 +50,13 @@ from backend.models import (
 from backend.telegram_login import TelegramLogin, username_of
 from backend.runtime_settings import RuntimeSettings
 from client.bridge.answer import _dispatch_json, _err, _iso, _ok
+from client.bridge.llm import _do_list_models_for_creds, _do_llm_probe
+from client.bridge.login import TelegramLoginSlots
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.runner import AsyncRunner
 
 
 logger = logging.getLogger(__name__)
-
-
-async def _do_list_models_for_creds(
-    base_url: str, api_key: str, *, kind: str | None = None
-) -> dict:
-    """Best-effort fetch списка моделей. Никогда не raise — на ошибку
-    отдаём {ok: False, error: ...}, на успех — {ok: True, models: [...]}.
-    Если ``kind`` задан, передаём в адаптер для type-фильтра (LM Studio
-    API v0 различает llm / embeddings).
-    """
-    cfg = LlmProviderConfig(base_url=base_url, api_key=api_key, model="x")
-    client = lm_studio.make_client(cfg)
-    try:
-        models = await lm_studio.list_models(client, kind=kind)
-        return {"ok": True, "models": models}
-    except Exception as e:
-        # httpx иногда сериализует request включая Authorization-header
-        # в repr exception'а. Прогоняем через root-logger SecretRedaction-
-        # Filter руками — он висит на root, но мы тут просто текст
-        # формируем без logger.* вызова.
-        from backend.log_secrets import _redact
-        return {"ok": False, "error": _redact(f"{type(e).__name__}: {e}")}
-    finally:
-        await client.aclose()
-
-
-async def _do_llm_probe(
-    cfg: LlmProviderConfig,
-    check_fn: Callable[[httpx.AsyncClient, str], Any],
-) -> tuple[bool, str, list[str], int]:
-    """Запускает chat/embed-проверку и возвращает кортеж (ok, detail, models, latency_ms).
-
-    Используется и WizardApi._make_llm_check, и MainApi.request_llm_probe.
-    `client.aclose()` гарантирован через finally — иначе при cancellation
-    httpx-сокет утекает.
-    """
-    client = lm_studio.make_client(cfg)
-    t0 = time.monotonic()
-    try:
-        ok, detail = await check_fn(client, cfg.model)
-        latency_ms = int((time.monotonic() - t0) * 1000)
-        models: list[str] = []
-        if ok:
-            try:
-                models = await lm_studio.list_models(client)
-            except Exception as e:
-                logger.debug("post-check list_models failed: %s", e)
-        return ok, detail, models, latency_ms
-    finally:
-        await client.aclose()
-
-
-async def _login_json(step_coro) -> str:
-    """Дождаться шага входа в Telegram и перевести его исход в ответ окну."""
-    step = await step_coro
-    return _err(step.error) if step.error is not None else _ok(step.payload)
-
-
-def _login_send_code(api, payload_json: str) -> None:
-    """Запросить код входа по нагрузке формы.
-
-    Три чтения нагрузки живут здесь, а не в классах: слоты нужны обоим —
-    мастеру и настройкам, — а тела у них одни и те же, и разойтись им нельзя.
-    """
-    try:
-        payload = json.loads(payload_json)
-        api_id = int(payload["api_id"])
-        api_hash = str(payload["api_hash"]).strip()
-        phone = str(payload["phone"]).strip()
-    except (KeyError, ValueError, TypeError) as e:
-        _log_invalid_payload("telegram_send_code", e)
-        api.telegram_send_code_done.emit(_err(f"Неверные поля: {e}"))
-        return
-    api._dispatch(
-        api.telegram_send_code_done,
-        _login_json(api._login.send_code(api_id, api_hash, phone)),
-    )
-
-
-def _login_confirm_code(api, payload_json: str) -> None:
-    """Подтвердить код входа по нагрузке формы."""
-    try:
-        code = str(json.loads(payload_json)["code"]).strip()
-    except (KeyError, ValueError, TypeError) as e:
-        _log_invalid_payload("telegram_confirm_code", e)
-        api.telegram_confirm_code_done.emit(_err(f"Неверные поля: {e}"))
-        return
-    if not api._login.awaiting_code:
-        api.telegram_confirm_code_done.emit(
-            _err("Сначала запросите код подтверждения.")
-        )
-        return
-    api._dispatch(
-        api.telegram_confirm_code_done,
-        _login_json(api._login.confirm_code(code)),
-    )
-
-
-def _login_confirm_password(api, payload_json: str) -> None:
-    """Подтвердить облачный пароль по нагрузке формы."""
-    try:
-        password = str(json.loads(payload_json)["password"])
-    except (KeyError, ValueError, TypeError) as e:
-        _log_invalid_payload("telegram_confirm_password", e)
-        api.telegram_confirm_password_done.emit(_err(f"Неверные поля: {e}"))
-        return
-    if not api._login.awaiting_password:
-        api.telegram_confirm_password_done.emit(
-            _err("Сначала пройдите шаг с кодом подтверждения.")
-        )
-        return
-    api._dispatch(
-        api.telegram_confirm_password_done,
-        _login_json(api._login.confirm_password(password)),
-    )
 
 
 def _media_url(stored_path: str | None) -> str | None:
@@ -191,377 +75,11 @@ def _media_url(stored_path: str | None) -> str | None:
     return p.as_uri()
 
 
-class WizardApi(QObject):
-    """Exposed to JS as `window.api`. All long-running ops are non-blocking;
-    JS must connect to the matching `*_done` signal to get the result."""
-
-    telegram_send_code_done = Signal(str)
-    telegram_confirm_code_done = Signal(str)
-    telegram_confirm_password_done = Signal(str)
-    chat_check_done = Signal(str)
-    chat_save_done = Signal(str)
-    embed_check_done = Signal(str)
-    embed_save_done = Signal(str)
-    cv_save_done = Signal(str)
-    finish_done = Signal(str)
-    models_listed = Signal(str)
-
-    def __init__(
-        self,
-        rs: RuntimeSettings,
-        session_factory: async_sessionmaker,
-        runner: AsyncRunner,
-        parent_widget: QWidget | None = None,
-        window: QMainWindow | None = None,
-        on_enter_main: Callable[[], None] | None = None,
-    ) -> None:
-        super().__init__()
-        self._rs = rs
-        self._session_factory = session_factory
-        self._runner = runner
-        self._parent_widget = parent_widget
-        self._window = window
-        self._on_enter_main = on_enter_main
-        self._login = TelegramLogin("job_bot_wizard", rs)
-
-    @Slot(result=str)
-    def initial_state(self) -> str:
-        """Snapshot what the wizard already has in the DB so the UI can resume
-        at the first incomplete step instead of starting over.
-
-        Returns LLM api_key in cleartext — safe because this slot is only
-        callable from the local Qt window (no network surface). Don't expose
-        this method via any other channel without re-evaluating that.
-        """
-        tg = self._rs.tg
-        chat = self._rs.chat
-        embed = self._rs.embed
-        cv_path = self._rs.cv_path
-        wizard_completed = self._rs.wizard_completed
-
-        completed: list[int] = []
-        # Step 1 is "done" only if Telegram login produced a session string —
-        # raw creds without a session won't let the bot connect.
-        if tg is not None and getattr(tg, "session_string", None):
-            completed.append(1)
-        if chat is not None:
-            completed.append(2)
-        if embed is not None:
-            completed.append(3)
-        # Step 4 counts as done either when a CV path is set OR when the
-        # wizard was previously finished via the "skip" branch (where cv_path
-        # is intentionally empty but the step is acknowledged).
-        if cv_path or wizard_completed:
-            completed.append(4)
-
-        return _ok(
-            {
-                "completed": completed,
-                "wizard_completed": wizard_completed,
-                "tg": {
-                    "api_id": str(tg.api_id) if tg else "",
-                    "api_hash": tg.api_hash if tg else "",
-                    "phone": tg.phone if tg else "",
-                    "password": tg.password if tg else "",
-                },
-                "chat": {
-                    "base_url": chat.base_url if chat else "",
-                    "api_key": chat.api_key if chat else "",
-                    "model": chat.model if chat else "",
-                },
-                "embed": {
-                    "base_url": embed.base_url if embed else "",
-                    "api_key": embed.api_key if embed else "",
-                    "model": embed.model if embed else "",
-                },
-                "cv_path": cv_path,
-            }
-        )
-
-    def cleanup(self) -> None:
-        """Disconnect Pyrogram session. Runner shutdown is owned by shell."""
-        # Ждём здесь, а не отпускаем fire-and-forget: за `cleanup` идёт
-        # закрытие окна, и незакрытый сокет пережил бы сам runner. Ходим на
-        # runner только когда есть что закрывать: до входа он занят
-        # запуском бота, и ждать его три секунды впустую незачем.
-        if not self._login.active:
-            return
-        try:
-            self._runner.submit(self._login.forget()).result(timeout=3)
-        except Exception:
-            logger.exception("WizardApi: tg disconnect on cleanup failed")
-
-    # --- helpers -----------------------------------------------------------
-
-    def _dispatch(self, signal: Signal, coro: Coroutine[Any, Any, Any]) -> None:
-        _dispatch_json(self._runner, signal, coro)
-
-    # --- Telegram OTP flow -------------------------------------------------
-
-    @Slot(str)
-    def telegram_send_code(self, payload_json: str) -> None:
-        _login_send_code(self, payload_json)
-
-    @Slot(str)
-    def telegram_confirm_code(self, payload_json: str) -> None:
-        _login_confirm_code(self, payload_json)
-
-    @Slot(str)
-    def telegram_confirm_password(self, payload_json: str) -> None:
-        _login_confirm_password(self, payload_json)
-
-    # --- LLM check / save --------------------------------------------------
-
-    def _make_llm_check(
-        self,
-        payload_json: str,
-        signal: Signal,
-        check_fn: Callable[[httpx.AsyncClient, str], Any],
-    ) -> None:
-        try:
-            payload = json.loads(payload_json)
-            base_url = str(payload["base_url"]).strip().rstrip("/")
-            api_key = str(payload.get("api_key") or "")
-            model = str(payload["model"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("_make_llm_check", e)
-            signal.emit(_err(f"Неверные поля: {e}"))
-            return
-        if not base_url or not model:
-            signal.emit(_err("Заполните base_url и модель."))
-            return
-
-        async def run() -> str:
-            cfg = LlmProviderConfig(base_url=base_url, api_key=api_key, model=model)
-            ok, detail, models, _latency_ms = await _do_llm_probe(cfg, check_fn)
-            if not ok:
-                return _err(detail)
-            return _ok({"detail": detail, "models": models})
-
-        self._dispatch(signal, run())
-
-    @Slot(str)
-    def chat_check(self, payload_json: str) -> None:
-        self._make_llm_check(payload_json, self.chat_check_done, lm_studio.check_chat)
-
-    @Slot(str)
-    def embed_check(self, payload_json: str) -> None:
-        self._make_llm_check(
-            payload_json, self.embed_check_done, lm_studio.check_embed
-        )
-
-    @Slot(str)
-    def list_models_for(self, payload_json: str) -> None:
-        """Background-fetch списка моделей провайдера; UI наполняет
-        datalist для автокомплита. Best-effort: ошибки глотаем, чтобы
-        юзер мог напечатать модель руками.
-
-        Фильтруем по type/state — UX визарда и Настроек должен совпадать:
-        в datalist только actually-loaded модели подходящего типа,
-        иначе LM Studio тихо JIT-загружает выгруженную при первом probe.
-        """
-        try:
-            payload = json.loads(payload_json)
-            kind = str(payload.get("kind") or "")
-            base_url = str(payload["base_url"]).strip().rstrip("/")
-            api_key = str(payload.get("api_key") or "")
-        except (KeyError, ValueError, TypeError):
-            return
-        if not base_url or kind not in ("chat", "embed"):
-            return
-
-        async def run() -> str:
-            result = await _do_list_models_for_creds(base_url, api_key, kind=kind)
-            return json.dumps({"kind": kind, **result})
-
-        self._dispatch(self.models_listed, run())
-
-    @Slot(str)
-    def chat_save(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            base_url = str(payload["base_url"]).strip().rstrip("/")
-            api_key = str(payload.get("api_key") or "")
-            model = str(payload["model"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("chat_save", e)
-            self.chat_save_done.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        async def run() -> str:
-            await self._rs.set_chat(base_url=base_url, api_key=api_key, model=model)
-            return _ok()
-
-        self._dispatch(self.chat_save_done, run())
-
-    @Slot(str)
-    def embed_save(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            base_url = str(payload["base_url"]).strip().rstrip("/")
-            api_key = str(payload.get("api_key") or "")
-            model = str(payload["model"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("embed_save", e)
-            self.embed_save_done.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        async def run() -> str:
-            await self._rs.set_embed(base_url=base_url, api_key=api_key, model=model)
-            return _ok()
-
-        self._dispatch(self.embed_save_done, run())
-
-    # --- CV ---------------------------------------------------------------
-
-    @Slot(result=str)
-    def pick_cv_file(self) -> str:
-        path, _ = QFileDialog.getOpenFileName(
-            self._parent_widget,
-            "Выберите файл резюме",
-            "",
-            "Резюме (*.pdf *.PDF *.md *.MD *.txt *.TXT);;Все файлы (*)",
-        )
-        if not path:
-            return _err("cancelled")
-        p = Path(path)
-        try:
-            size = p.stat().st_size
-        except OSError as e:
-            return _err(f"{type(e).__name__}: {e}")
-        return _ok({"path": str(p), "name": p.name, "size": size})
-
-    @Slot(str)
-    def cv_save(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            mode = str(payload.get("mode") or "").strip()
-            path = str(payload.get("path") or "").strip()
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("cv_save", e)
-            self.cv_save_done.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        if mode == "skip":
-            async def run_skip() -> str:
-                await self._rs.set_app("cv_path", "")
-                return _ok({"mode": "skip"})
-
-            self._dispatch(self.cv_save_done, run_skip())
-            return
-
-        if not path:
-            self.cv_save_done.emit(_err("Сначала выберите файл резюме."))
-            return
-
-        if mode == "attach":
-            async def run_attach() -> str:
-                await self._rs.set_app("cv_path", path)
-                return _ok({"mode": "attach"})
-
-            self._dispatch(self.cv_save_done, run_attach())
-            return
-
-        if mode == "parse":
-            # CV parse временно отключён в wizard'е (wizard.html step 3
-            # рендерит кнопку с disabled=True + «Функция находится в
-            # разработке»). UI сюда не должен попасть, но если payload
-            # пришёл от прямого JS-вызова или от устаревшей версии HTML —
-            # отбиваем явно, не запуская PDF-парсер с известными issues
-            # из feedback_*-памяти.
-            self.cv_save_done.emit(
-                _err("CV parsing временно отключён — выберите 'attach'.")
-            )
-            return
-
-        self.cv_save_done.emit(_err(f"Неизвестный режим: {mode!r}"))
-
-    async def _do_cv_parse_and_save(self, path: str) -> str:
-        if self._rs.chat is None:
-            return _err(
-                "Сначала настройте чат-LLM на шаге 2 — без него парсинг невозможен."
-            )
-
-        logger.info("Parsing CV: %s", Path(path).name)
-        try:
-            text = _read_cv_text(Path(path))
-        except Exception as e:
-            return _err(f"Не удалось прочитать файл: {type(e).__name__}: {e}")
-        if not text.strip():
-            return _err("Файл пустой или не содержит текста.")
-
-        chat = self._rs.chat
-        client = lm_studio.make_client(chat)
-        try:
-            parsed = await parse_cv(text, client, chat.model)
-        finally:
-            await client.aclose()
-
-        if parsed is None:
-            logger.warning("CV parse: LLM returned None for %s", path)
-            return _err("LLM не смогла распознать структуру резюме.")
-
-        async with self._session_factory() as session:
-            async with session.begin():
-                await profile_repo.save_parsed_cv(session, parsed, cv_path=path)
-        # Refresh in-memory cache so rs.cv_path reflects the just-written row.
-        await self._rs.reload()
-        logger.info(
-            "CV parsed and saved (skills=%d, experience=%d)",
-            len(parsed.skills),
-            len(parsed.experience),
-        )
-        return _ok(
-            {
-                "mode": "parse",
-                "skills_count": len(parsed.skills),
-                "experience_count": len(parsed.experience),
-            }
-        )
-
-    # --- Finish -----------------------------------------------------------
-
-    @Slot()
-    def finish(self) -> None:
-        # Раньше: mark_wizard_completed здесь, до клика «Открыть Job Bot».
-        # Если приложение крашилось между finish и enter_main_app, следующий
-        # запуск шёл сразу в Main и юзер пропускал handoff-screen. Теперь
-        # mark_wizard_completed отложен в enter_main_app — оба события
-        # становятся атомарными с UX-точки зрения.
-        logger.info("Wizard finish requested")
-        self.finish_done.emit(_ok())
-
-    @Slot()
-    def close_window(self) -> None:
-        if self._window is not None:
-            self._window.close()
-
-    @Slot()
-    def enter_main_app(self) -> None:
-        """Hand off from wizard to the main app — shell does the actual swap.
-
-        ``mark_wizard_completed`` живёт здесь, а не в ``finish``: иначе при
-        крахе приложения между finish и реальным переходом в Main юзер на
-        следующем старте оказался бы в Main без полноценного handoff'а.
-        """
-        async def _mark() -> None:
-            try:
-                await self._rs.mark_wizard_completed()
-            except Exception:
-                logger.exception("mark_wizard_completed failed on enter_main_app")
-        self._runner.submit(_mark())
-        if self._on_enter_main is not None:
-            self._on_enter_main()
-
-
-# === MainApi (post-wizard window) ===========================================
-
-
 _HEALTHCHECK_INTERVAL_MS = 5_000
 _UNREAD_INTERVAL_MS = 15_000
 
 
-class MainApi(QObject):
+class MainApi(TelegramLoginSlots, QObject):
     """Bridge for the post-wizard main window. Owns periodic timers for
     healthcheck and unread-count, and exposes mode + ingestion controls.
     Long-running ops emit a `*_changed` / `*_finished` signal when ready."""
@@ -619,9 +137,6 @@ class MainApi(QObject):
     llm_models_listed = Signal(str)
     settings_save_done = Signal(str)
     delete_all_data_done = Signal(str)
-    telegram_send_code_done = Signal(str)
-    telegram_confirm_code_done = Signal(str)
-    telegram_confirm_password_done = Signal(str)
     contacts_channel_list_loaded = Signal(str)
     contacts_channel_detail_loaded = Signal(str)
     contacts_channel_vacancies_loaded = Signal(str)
@@ -3151,23 +2666,6 @@ class MainApi(QObject):
 
         future.add_done_callback(_on_done)
 
-    # --- Telegram OTP flow (re-login через Настройки) ---------------------
-    # Отдельные slots нужны потому что QWebChannel регистрирует один объект
-    # "api" — после онбординга на канале сидит MainApi, и WizardApi'шные
-    # методы недоступны. Сам вход у обоих один и тот же.
-
-    @Slot(str)
-    def telegram_send_code(self, payload_json: str) -> None:
-        _login_send_code(self, payload_json)
-
-    @Slot(str)
-    def telegram_confirm_code(self, payload_json: str) -> None:
-        _login_confirm_code(self, payload_json)
-
-    @Slot(str)
-    def telegram_confirm_password(self, payload_json: str) -> None:
-        _login_confirm_password(self, payload_json)
-
     def _after_login_saved(self, username: str | None) -> None:
         """Новая сессия сохранена: запомнить ник и поднять бота, если он лежит.
 
@@ -4283,19 +3781,3 @@ def _stat_cv(cv_path: str) -> dict | None:
         return {"name": p.name, "size": st.st_size, "exists": True}
     except OSError:
         return {"name": Path(cv_path).name, "size": 0, "exists": False}
-
-
-def _read_cv_text(path: Path) -> str:
-    suffix = path.suffix.lower()
-    if suffix == ".pdf":
-        from pypdf import PdfReader
-
-        reader = PdfReader(str(path))
-        return "\n\n".join(page.extract_text() or "" for page in reader.pages)
-    raw = path.read_bytes()
-    for enc in ("utf-8-sig", "utf-8", "cp1251"):
-        try:
-            return raw.decode(enc)
-        except UnicodeDecodeError:
-            continue
-    return raw.decode("utf-8", errors="replace")
