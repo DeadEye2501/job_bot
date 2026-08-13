@@ -1,0 +1,112 @@
+"""Живые события окна: копит случившееся с номерами и отдаёт всё новее названного.
+
+Одиннадцать сообщений бэкенд рождает сам, и девять из них — в потоке мотора.
+Прежний канал доставлял их сигналом Qt; здесь окно спрашивает само, а запрос
+ждёт появления нового или срока. Из питона в браузер при этом не лезет никто, и
+вопрос о том, из какого потока это законно, не встаёт вовсе.
+
+Кольцо ограничено: страница, ушедшая на перезагрузку посреди обхода, вернётся не
+сразу, а прогресс за это время нашлёт десятки сообщений. Выпавшее из кольца
+названо потерей в ответе — неполная картина, выданная за полную, оставила бы
+экран врать до следующей правки руками.
+
+Соседи по слою — `runner` (поток, в котором ждёт запрос) и `answer` (конверт, в
+котором ответ уезжает окну). Ближайшее по делу — кольцо журнала
+`backend/log_buffer.py`: там тоже словари под замком и монотонный номер, но
+номер лежит в записи для показа, срез берётся с хвоста, а ждать появления нового
+кольцо не умеет и не должно — страницу журнала спрашивают по кнопке. Разбор пары
+записан в `docs/not-duplicates.md`.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import threading
+from collections import deque
+
+
+logger = logging.getLogger(__name__)
+
+KEEP_EVENTS = 500
+# Срок назначен, а не замерен: мерить его нечем, пока нет окна. Ждущий запрос
+# занимает у канала запись о себе, и сколько их выдержит pywebview, покажет
+# слайс А3, где окно появляется. До тех пор четверть минуты — величина,
+# заведомо меньшая тех минут, за которые человек успевает заметить простой.
+WAIT_SECONDS = 25.0
+
+
+class Events:
+    """Очередь случившегося: кладут из любого потока, забирают по номеру."""
+
+    def __init__(self, keep: int = KEEP_EVENTS) -> None:
+        self._items: deque[dict] = deque(maxlen=keep)
+        self._lock = threading.Lock()
+        self._counter = 0
+        self._dropped = 0
+        self._waiters: list[tuple[asyncio.AbstractEventLoop, asyncio.Future]] = []
+        self._closed = False
+
+    def add(self, kind: str, payload: dict | None = None) -> None:
+        """Записать случившееся и разбудить всех, кто ждёт нового."""
+        with self._lock:
+            self._counter += 1
+            # Что выпало из кольца, считается, а не вычитывается из него: кольцо
+            # о выпавшем не помнит, а пустое ещё и не отдало бы первую запись.
+            self._dropped = max(0, self._counter - self._items.maxlen)
+            self._items.append({"n": self._counter, "kind": kind, "payload": payload or {}})
+            waiters, self._waiters = self._waiters, []
+        _wake(waiters)
+
+    async def take(self, after: int, timeout: float = WAIT_SECONDS) -> dict:
+        """Всё, что новее названного номера; пусто — ждать до срока.
+
+        Проверка и запись в очередь ждущих идут под одним замком: между ними
+        событие успело бы лечь незамеченным, и запрос ждал бы до срока при уже
+        готовом ответе.
+        """
+        loop = asyncio.get_running_loop()
+        waiter = loop.create_future()
+        with self._lock:
+            answer = self._since(after)
+            if answer["events"] or answer["missed"] or self._closed:
+                return answer
+            self._waiters.append((loop, waiter))
+        try:
+            # `wait`, а не `wait_for`: тишина за отведённый срок — обычный ход, и
+            # отвечать на неё исключением, чтобы тут же его проглотить, незачем.
+            await asyncio.wait([waiter], timeout=timeout)
+        finally:
+            # Отмена задачи при остановке мотора проносит `CancelledError` мимо
+            # этой строки, и ждущий остался бы в очереди навсегда.
+            with self._lock:
+                self._waiters = [one for one in self._waiters if one[1] is not waiter]
+        with self._lock:
+            return self._since(after)
+
+    def close(self) -> None:
+        """Окно закрывают: отпустить ждущих сразу, не дожидаясь их сроков."""
+        with self._lock:
+            self._closed = True
+            waiters, self._waiters = self._waiters, []
+        _wake(waiters)
+
+    def _since(self, after: int) -> dict:
+        """Зовётся под замком: обход кольца и его же правка иначе разойдутся."""
+        return {
+            "events": [one for one in self._items if one["n"] > after],
+            "missed": after < self._dropped,
+        }
+
+
+def _wake(waiters: list[tuple[asyncio.AbstractEventLoop, asyncio.Future]]) -> None:
+    for loop, waiter in waiters:
+        try:
+            loop.call_soon_threadsafe(_finish, waiter)
+        except RuntimeError:
+            logger.debug("ждущий не разбужен: его цикл уже закрыт")
+
+
+def _finish(waiter: asyncio.Future) -> None:
+    if not waiter.done():
+        waiter.set_result(None)
