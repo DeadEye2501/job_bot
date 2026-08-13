@@ -1,64 +1,22 @@
 """Следствия слотов резюме — файла, путь к которому помнит окно.
 
-Предмет отделён от анкеты: резюме не поле записи, а вложение на диске. Оба
-окна умеют его выбирать, и оба здесь: мастер первого запуска спрашивает файл
-теми же руками, что и основное окно потом.
+Предмет отделён от анкеты: резюме не поле записи, а вложение на диске. Выбирать
+файл умеет только мастер первого запуска: у основного окна диалог был Qt'шный и
+ушёл вместе с переездом домена — путь туда называет страница.
 """
 
 import json
 
 
-async def test_choosing_a_file_answers_the_call_itself(
-    main_api, chosen_file, tmp_path
-):
-    """Выбор файла отвечает возвратом вызова, а не сигналом.
-
-    Это один из двух слотов моста, устроенных так: окно ждёт ответа прямо на
-    месте, потому что следующий шаг — показать выбранное имя в форме, и
-    показывать его надо сразу, а не когда-нибудь потом.
-    """
-    resume = tmp_path / "резюме.pdf"
-    resume.write_bytes(b"%PDF-1.4 ")
-    chosen_file(str(resume))
-
-    answer = json.loads(main_api.pick_cv_file_main())
-
-    assert answer["ok"] is True
-    assert answer["path"] == str(resume)
-    assert answer["name"] == "резюме.pdf"
-
-
-async def test_a_cancelled_choice_is_told_apart_from_a_failure(
-    main_api, chosen_file
-):
-    """Передумавшего отличают от поломки отдельным словом.
-
-    Закрытое окно выбора — обычный отказ от намерения, и окну надо просто
-    ничего не менять. Приди сюда общая ошибка, человек увидел бы сообщение о
-    поломке всякий раз, когда просто передумал.
-    """
-    chosen_file("")
-
-    answer = json.loads(main_api.pick_cv_file_main())
-
-    assert answer["ok"] is False
-    assert answer["error"] == "cancelled"
-
-
-async def test_an_empty_path_is_refused(main_api, watch):
+async def test_an_empty_path_is_refused(api, ask):
     """Пустой путь не сохраняют: подставлять в отклик будет нечего."""
-    caught = watch(main_api.cv_replace_done)
+    answer = await ask(api.profile.replace, {"path": "   "})
 
-    main_api.replace_cv(json.dumps({"path": "   "}))
-
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert answer["error"] == "Путь пустой."
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Путь пустой."
 
 
-async def test_a_replaced_resume_shows_up_in_the_profile(
-    main_api, watch, tmp_path
-):
+async def test_a_replaced_resume_shows_up_in_the_profile(api, ask, tmp_path):
     """Заменённое резюме видно на экране анкеты, а не только в ответе.
 
     Путь помнят настройки, а показывает его анкета — это единственное место,
@@ -66,21 +24,15 @@ async def test_a_replaced_resume_shows_up_in_the_profile(
     """
     resume = tmp_path / "новое.pdf"
     resume.write_bytes(b"%PDF-1.4 ")
-    replaced = watch(main_api.cv_replace_done)
-    shown = watch(main_api.profile_changed)
 
-    main_api.replace_cv(json.dumps({"path": str(resume)}))
-    answer = await replaced.next()
-    assert answer["ok"] is True
-    assert answer["exists"] is True
+    answer = await ask(api.profile.replace, {"path": str(resume)})
+    assert answer["ok"]["exists"] is True
 
-    main_api.request_profile()
-    assert (await shown.next())["cv_path"] == str(resume)
+    shown = await ask(api.profile.get)
+    assert shown["ok"]["cv_path"] == str(resume)
 
 
-async def test_a_resume_that_went_missing_is_reported_as_missing(
-    main_api, watch, tmp_path
-):
+async def test_a_resume_that_went_missing_is_reported_as_missing(api, ask, tmp_path):
     """Про пропавший с диска файл говорят прямо, а не молчат.
 
     Путь помнится в настройках, а файл человек мог переложить или удалить.
@@ -89,22 +41,21 @@ async def test_a_resume_that_went_missing_is_reported_as_missing(
     """
     resume = tmp_path / "было.pdf"
     resume.write_bytes(b"%PDF-1.4 ")
-    replaced = watch(main_api.cv_replace_done)
-    main_api.replace_cv(json.dumps({"path": str(resume)}))
-    await replaced.next()
+    await ask(api.profile.replace, {"path": str(resume)})
 
     resume.unlink()
-    shown = watch(main_api.profile_changed)
 
-    main_api.request_profile()
+    shown = await ask(api.profile.get)
 
-    assert (await shown.next())["cv_meta"]["exists"] is False
+    assert shown["ok"]["cv_meta"]["exists"] is False
 
 
-async def test_the_wizard_asks_for_the_file_the_same_way(wizard_api, chosen_file, tmp_path):
-    """Мастер первого запуска спрашивает файл тем же способом.
+async def test_the_wizard_asks_for_the_file_itself(
+    wizard_api, chosen_file, tmp_path
+):
+    """Мастер первого запуска спрашивает файл сам, диалогом.
 
-    Оба окна зовут один и тот же диалог и отвечают возвратом вызова: мастер
+    Диалог остался только у него и отвечает возвратом вызова: мастер
     показывает выбранное имя на своём шаге, и ждать его сигналом там нечем —
     шага впереди ещё нет.
     """
@@ -149,7 +100,7 @@ async def test_the_wizard_refuses_to_attach_nothing(wizard_api, watch):
 
 
 async def test_an_attached_resume_is_remembered_for_the_main_window(
-    wizard_api, watch, main_api, tmp_path
+    wizard_api, watch, api, ask, tmp_path
 ):
     """Приложенное в мастере резюме видно основному окну.
 
@@ -160,10 +111,82 @@ async def test_an_attached_resume_is_remembered_for_the_main_window(
     resume = tmp_path / "из мастера.pdf"
     resume.write_bytes(b"%PDF-1.4 ")
     saved = watch(wizard_api.cv_save_done)
-    shown = watch(main_api.profile_changed)
 
     wizard_api.cv_save(json.dumps({"mode": "attach", "path": str(resume)}))
     assert (await saved.next())["ok"] is True
 
-    main_api.request_profile()
-    assert (await shown.next())["cv_path"] == str(resume)
+    shown = await ask(api.profile.get)
+    assert shown["ok"]["cv_path"] == str(resume)
+
+
+async def test_a_resume_nobody_chose_is_not_handed_to_the_system(api, ask):
+    """Открывать нечего — окну говорят словами, а не молчанием.
+
+    Кнопка «Открыть» стоит на экране и до того, как резюме выбрано; молчание в
+    ответ человек читает как поломку приложения.
+    """
+    answer = await ask(api.profile.open)
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Резюме не выбрано."
+
+
+async def test_a_chosen_resume_goes_to_the_system_by_its_full_path(
+    api, ask, runtime_settings, monkeypatch, tmp_path
+):
+    """Выбранное резюме уезжает системе полным путём, а не тем, что записано.
+
+    Настройки помнят путь таким, каким его назвал человек, — он бывает и
+    относительным. Система же открывает от своего рабочего каталога, а он у
+    собранного приложения чужой.
+    """
+    (tmp_path / "резюме.pdf").write_bytes(b"%PDF-1.4")
+    monkeypatch.chdir(tmp_path)
+    await runtime_settings.set_app("cv_path", "резюме.pdf")
+    handed: list[str] = []
+    monkeypatch.setattr(
+        "client.bridge.cv.open_in_system", lambda path: handed.append(path) or True
+    )
+
+    answer = await ask(api.profile.open)
+
+    assert handed == [str((tmp_path / "резюме.pdf").resolve())]
+    assert answer["ok"]["path"] == "резюме.pdf"
+
+
+async def test_a_resume_the_system_would_not_open_is_not_called_opened(
+    api, ask, runtime_settings, monkeypatch
+):
+    """Не открывшееся резюме названо отказом, а не успехом.
+
+    Экран анкеты в этот же миг показывает, что файла по пути нет; ответь мы
+    «открыли», человек читал бы на одном экране два противоположных
+    утверждения.
+    """
+    await runtime_settings.set_app("cv_path", "C:/нет/такого.pdf")
+    monkeypatch.setattr("client.bridge.cv.open_in_system", lambda path: False)
+
+    answer = await ask(api.profile.open)
+
+    assert answer["fail"] == "denied"
+    assert answer["path"] == "C:/нет/такого.pdf"
+
+
+async def test_a_cancelled_choice_is_told_apart_from_a_failure(
+    wizard_api, chosen_file
+):
+    """Передумавшего отличают от поломки отдельным словом.
+
+    Закрытое окно выбора — обычный отказ от намерения, и окну надо просто
+    ничего не менять. Приди сюда общая ошибка, человек увидел бы сообщение о
+    поломке всякий раз, когда просто передумал.
+
+    Сторож переехал с поверхности основного окна на мастера: диалог остался
+    только у него, а различение живо и там.
+    """
+    chosen_file("")
+
+    answer = json.loads(wizard_api.pick_cv_file())
+
+    assert answer["ok"] is False
+    assert answer["error"] == "cancelled"

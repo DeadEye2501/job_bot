@@ -28,7 +28,7 @@ from backend.repository import (
     hr_card,
 )
 from backend.repository.blacklist_marks import preferred_blacklist_value
-from client.bridge.answer import Denied, _err, _ok
+from client.bridge.answer import Denied
 from client.bridge.refusals import NO_CHANNEL, NO_COMPANY, NO_HR
 
 
@@ -72,7 +72,7 @@ CHANNEL_MARK = MarkSubject(
 )
 
 
-async def mark_or_refuse(session, subject: MarkSubject, entity_id: int) -> dict:
+async def mark(session, subject: MarkSubject, entity_id: int) -> dict:
     """Завести отметку и отдать написание, под которым она легла.
 
     Написание берётся первым из перечня — тем же, по которому отметку потом
@@ -101,7 +101,7 @@ async def mark_or_refuse(session, subject: MarkSubject, entity_id: int) -> dict:
     }
 
 
-async def unmark_or_refuse(session, subject: MarkSubject, entity_id: int) -> dict:
+async def unmark(session, subject: MarkSubject, entity_id: int) -> dict:
     """Погасить отметки предмета и сказать, сколько их погасло.
 
     Гасятся все написания сразу, а не одно: запись могли завести под ником,
@@ -125,31 +125,3 @@ async def unmark_or_refuse(session, subject: MarkSubject, entity_id: int) -> dic
         subject.key: entity_id,
         "updated": updated,
     }
-
-
-async def mark(session, subject: MarkSubject, entity_id: int) -> tuple[str, bool]:
-    """То же самое конвертом-строкой — для непереехавших карточек."""
-    return await _in_words(mark_or_refuse, session, subject, entity_id)
-
-
-async def unmark(session, subject: MarkSubject, entity_id: int) -> tuple[str, bool]:
-    """То же самое конвертом-строкой — для непереехавших карточек."""
-    return await _in_words(unmark_or_refuse, session, subject, entity_id)
-
-
-async def _in_words(
-    marking, session, subject: MarkSubject, entity_id: int
-) -> tuple[str, bool]:
-    """Прежний ответ кнопки: конверт строкой и «не отказ» вторым.
-
-    Карточки компании и канала отвечают окну сигналом, и ответ им нужен
-    строкой; по второму члену они решают, гнать ли окно перечитывать списки.
-    Карточка человека переехала на возврат и зовёт `*_or_refuse` напрямую.
-
-    Три эти объявления уходят вместе с последней такой карточкой, слайсом
-    А2.5, и `mark` с `unmark` тогда же вернут себе прежние имена.
-    """
-    try:
-        return _ok(await marking(session, subject, entity_id)), True
-    except Denied as e:
-        return _err(e.reason, **e.extra), False

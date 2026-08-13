@@ -2,92 +2,89 @@
 
 from __future__ import annotations
 
-import json
 import logging
 
-from PySide6.QtCore import Signal, Slot
 from sqlalchemy import func, select
 
 from backend.models import Vacancy
 from backend.payloads import int_or_none, text_or_none
 from backend.repository import channels as channels_repo, vacancies_mini
-from client.bridge.answer import _err, _ok
-from client.bridge.refusals import NO_CHANNEL
+from client.bridge.answer import Denied, bad_fields, reply
+from client.bridge.channel_actions import ChannelActions
 from client.bridge.media import _avatar_data_url
-from client.bridge.page import read_page
-from client.bridge.payload import _log_invalid_payload
-from client.bridge.wire import _vacancy_mini_row_to_dict, _channel_row_to_dict
+from client.bridge.page import Page, read_page
+from client.bridge.refusals import NO_CHANNEL
+from client.bridge.wire import _channel_row_to_dict, _vacancy_mini_row_to_dict
 
 
 logger = logging.getLogger(__name__)
 
 
-class ChannelSlots:
+class Channels(ChannelActions):
     """Канал как запись в контактах: найти и показать.
 
-    Подмешивающий обязан держать `_session_factory` и `_dispatch`.
+    Разрезано на два файла по ответственности: перечень и карточка здесь, всё,
+    чем канал трогают, — у примеси рядом. Поверхность у них при этом одна: окно
+    видит один канал, а не список отдельно от кнопок в его карточке, и примесь
+    здесь — способ разложить эту поверхность по файлам, а не задел под вторую
+    реализацию.
     """
 
-    contacts_channel_list_loaded = Signal(str)
-    contacts_channel_detail_loaded = Signal(str)
-    contacts_channel_vacancies_loaded = Signal(str)
+    def __init__(self, hub) -> None:
+        self._hub = hub
 
-    @Slot(str)
-    def request_contacts_channel_list(self, payload_json: str) -> None:
-        """Full list of Telegram channels for the Contacts/Channels pane.
+    def list(self, payload: dict | None = None) -> dict:
+        """Все каналы разом — без страниц: их мало.
 
-        No pagination — channel sets are tiny. Echoes the request epoch so
-        the UI can drop stale responses when search races.
+        Порядковый знак уезжает эхом: по нему окно отбрасывает ответ,
+        устаревший, пока менялась строка поиска.
         """
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-            search = text_or_none(payload.get("search"))
-            epoch = int_or_none(payload.get("epoch"))
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("request_contacts_channel_list", e)
-            self.contacts_channel_list_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+        # Не-объект сводится к пустоте, а не роняет разбор: поиск — дело окна,
+        # и испорченная нагрузка не должна отнимать у человека весь перечень.
+        payload = payload if isinstance(payload, dict) else {}
+        search = text_or_none(payload.get("search"))
+        epoch = int_or_none(payload.get("epoch"))
 
-        async def run() -> str:
-            async with self._session_factory() as session:
-                # Self-heal: тушим каналы, попавшие в blacklist, но всё ещё
-                # помеченные is_active=true (исторический дрейф / правки БД
-                # мимо UI). Идемпотентно, и держит инвариант «blacklisted
-                # ⇒ is_active=false» — иначе bot polling всё ещё трогал бы
-                # запрещённые каналы.
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                # Само-лечение: гасим каналы, попавшие в отсев, но всё ещё
+                # помеченные работающими, — так бывает от правок базы мимо окна.
+                # Дело идемпотентное и держит правило «в отсеве значит
+                # выключен»: иначе обход продолжал бы читать запрещённые.
                 async with session.begin():
                     await channels_repo.deactivate_blacklisted_channels(session)
-                rows = await channels_repo.list_telegram_channels(session, search=search)
-            return _ok({
+                rows = await channels_repo.list_telegram_channels(
+                    session, search=search
+                )
+            return {
                 "search": search or "",
                 "channels": [_channel_row_to_dict(r) for r in rows],
                 "epoch": epoch,
-            })
+            }
 
-        self._dispatch(self.contacts_channel_list_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(int)
-    def request_contacts_channel_detail(self, channel_id: int) -> None:
-        """Detail-pane payload for one Telegram channel.
+    def detail(self, channel_id: int) -> dict:
+        """Карточка одного канала целиком, вместе с его числами.
 
-        Echoes ``channel_id`` so the UI drops stale responses when the user
-        clicks another row mid-flight.
-        Includes computed stats (status breakdown + KPI ratios + recent
-        ingestion rate) — see ``ChannelStats`` for shape.
+        Номер едет обратно в отказе: по нему окно гасит строку, за которой
+        канала уже нет, — перечень, из которого её открыли, мог устареть.
+        Числа — разбивка по положениям дел и доли отклика, см. `ChannelStats`.
         """
-        async def run() -> str:
-            async with self._session_factory() as session:
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
                 detail = await channels_repo.get_channel_detail(session, channel_id)
             if detail is None:
-                return _err(NO_CHANNEL, channel_id=channel_id)
-            ch = detail.channel
+                raise Denied(NO_CHANNEL, channel_id=channel_id)
+            channel = detail.channel
             stats = detail.stats
-            return _ok({
-                "channel_id": ch.id,
-                "username": ch.username,
-                "title": ch.title,
-                "is_active": bool(ch.is_active),
-                "avatar": _avatar_data_url(ch.avatar),
+            return {
+                "channel_id": channel.id,
+                "username": channel.username,
+                "title": channel.title,
+                "is_active": bool(channel.is_active),
+                "avatar": _avatar_data_url(channel.avatar),
                 "stats": {
                     "status_counts": stats.status_counts,
                     "total": stats.total,
@@ -97,62 +94,52 @@ class ChannelSlots:
                     "response_percent": stats.response_percent,
                 },
                 "blacklist_value": detail.blacklist_value,
-            })
+            }
 
-        self._dispatch(self.contacts_channel_detail_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def request_contacts_channel_vacancies(self, payload_json: str) -> None:
-        """Pagination-aware vacancies fetch for the channels detail pane.
+    def vacancies(self, payload: dict) -> dict:
+        """Страница вакансий этого канала — для его карточки.
 
-        Payload: ``{channel_id, limit, offset, mode}``. ``mode`` ∈
-        {"replace", "append"} — replace wipes JS-side list, append concat'ит
-        к существующему. Backend echoes channel_id + offset + has_more
-        чтобы фронт мог дропать stale-ответы при гонке скролла/выбора.
+        Нагрузка: `{channel_id, limit, offset, mode}`. Режима два: заменить
+        показанное или дописать к нему. Номер, сдвиг и признак продолжения
+        уезжают эхом — по ним окно отбрасывает ответ, устаревший на гонке
+        прокрутки и выбора соседней строки.
         """
         try:
-            payload = json.loads(payload_json) if payload_json else {}
             channel_id = int(payload["channel_id"])
             page = read_page(payload, default_limit=50, modes=("replace", "append"))
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("request_contacts_channel_vacancies", e)
-            self.contacts_channel_vacancies_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("vacancies", e)
 
-        async def run() -> str:
-            async with self._session_factory() as session:
-                rows, has_more = await vacancies_mini.list_vacancies_for_channel(
-                    session, channel_id, limit=page.limit, offset=page.offset,
+        return reply(self._hub.runner, self._paged(channel_id, page))
+
+    async def _paged(self, channel_id: int, page: Page) -> dict:
+        """Страница вакансий канала и эхо того, о чём спрашивали."""
+        async with self._hub.session_factory() as session:
+            rows, has_more = await vacancies_mini.list_vacancies_for_channel(
+                session, channel_id, limit=page.limit, offset=page.offset,
+            )
+            # Жалоба на живую беду: пусто здесь при непустом счёте в карточке.
+            # По одному пустому списку не видно, где она — в запросе перечня
+            # или в эхе моста; ноль против N различает эти два места.
+            if not rows:
+                counted = await session.execute(
+                    select(func.count(Vacancy.id))
+                    .where(Vacancy.source_channel_id == channel_id)
                 )
-                # Diagnostic — раз баг проявляется: 0 здесь vs N в stats
-                # помогает понять, в репо ли проблема или в bridge-эхо.
-                if not rows:
-                    total_for_channel = int(
-                        (
-                            await session.execute(
-                                select(func.count(Vacancy.id))
-                                .where(Vacancy.source_channel_id == channel_id)
-                            )
-                        ).scalar_one()
+                total = int(counted.scalar_one())
+                if total > 0:
+                    logger.warning(
+                        "канал %d: перечень вакансий пуст, а строк с этим "
+                        "источником %d (потолок=%d сдвиг=%d) — разойтись со "
+                        "счётчиком карточки он не должен",
+                        channel_id, total, page.limit, page.offset,
                     )
-                    if total_for_channel > 0:
-                        logger.warning(
-                            "channel %d: list_vacancies_for_channel returned 0 "
-                            "but %d rows match source_channel_id (limit=%d offset=%d) "
-                            "— investigate query mismatch with stats",
-                            channel_id,
-                            total_for_channel,
-                            page.limit,
-                            page.offset,
-                        )
-            return _ok({
-                "channel_id": channel_id,
-                "offset": page.offset,
-                "mode": page.mode,
-                "has_more": has_more,
-                "vacancies": [
-                    _vacancy_mini_row_to_dict(v) for v in rows
-                ],
-            })
-
-        self._dispatch(self.contacts_channel_vacancies_loaded, run())
+        return {
+            "channel_id": channel_id,
+            "offset": page.offset,
+            "mode": page.mode,
+            "has_more": has_more,
+            "vacancies": [_vacancy_mini_row_to_dict(v) for v in rows],
+        }

@@ -2,9 +2,34 @@
 
 from __future__ import annotations
 
+import logging
+import os
+
 from PySide6.QtCore import QUrl, Slot
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication
+
+
+logger = logging.getLogger(__name__)
+
+
+def open_in_system(target: str) -> bool:
+    """Отдать путь или ссылку тому, чем система их открывает, и сказать, дошло ли.
+
+    Без Qt: переехавшим доменам он недоступен, а дело у этой просьбы то же
+    самое. `startfile` есть только на Windows — под неё приложение и
+    собирается; на чужой системе его нет вовсе, и это тот же исход «не
+    смогли», потому `AttributeError` ловится рядом с `OSError`.
+
+    Ответ нужен зовущему: «открыли» и «не смогли» человек различает только по
+    нашему слову — окна-то он не увидит.
+    """
+    try:
+        os.startfile(target)
+    except (AttributeError, OSError):
+        logger.exception("не удалось открыть системой: %s", target)
+        return False
+    return True
 
 
 class DesktopSlots:

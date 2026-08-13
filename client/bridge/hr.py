@@ -11,7 +11,7 @@ from backend.repository import (
 )
 from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.hr_chat import HrChat
-from client.bridge.mark import HR_MARK, mark_or_refuse, unmark_or_refuse
+from client.bridge.mark import HR_MARK, mark, unmark
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
 from client.bridge.pickers import HR_PICKER, merge_picker
@@ -202,7 +202,7 @@ class Hr(HrChat):
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
-                marked = await mark_or_refuse(session, HR_MARK, hr_id)
+                marked = await mark(session, HR_MARK, hr_id)
             self._hub.events.add("contacts_lists_changed")
             return marked
 
@@ -218,7 +218,7 @@ class Hr(HrChat):
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
-                unmarked = await unmark_or_refuse(session, HR_MARK, hr_id)
+                unmarked = await unmark(session, HR_MARK, hr_id)
             self._hub.events.add("contacts_lists_changed")
             return unmarked
 

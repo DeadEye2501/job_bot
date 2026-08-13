@@ -22,12 +22,12 @@ async def test_the_answer_reaches_the_window_as_a_signal(main_api, watch):
     Слот возвращает `None` сразу же — окно узнаёт исход только сигналом, и
     порвись эта дорога, интерфейс молчал бы, не показывая никакой ошибки.
     """
-    caught = watch(main_api.profile_changed)
+    caught = watch(main_api.system_settings_loaded)
 
     async def answered() -> str:
         return json.dumps({"ok": True, "notes": "готово"})
 
-    main_api._dispatch(main_api.profile_changed, answered())
+    main_api._dispatch(main_api.system_settings_loaded, answered())
 
     assert await caught.next() == {"ok": True, "notes": "готово"}
 
@@ -42,13 +42,13 @@ async def test_a_broken_coroutine_becomes_a_refusal_not_a_silence(
     человеку было что показать, а трассировка — в журнал, чтобы было что
     читать потом.
     """
-    caught = watch(main_api.profile_changed)
+    caught = watch(main_api.system_settings_loaded)
 
     async def broken() -> str:
         raise RuntimeError("база не отвечает")
 
     with caplog.at_level(logging.ERROR, logger="client.bridge.answer"):
-        main_api._dispatch(main_api.profile_changed, broken())
+        main_api._dispatch(main_api.system_settings_loaded, broken())
         answer = await caught.next()
 
     assert answer == {"ok": False, "error": "RuntimeError: база не отвечает"}
@@ -62,7 +62,7 @@ async def test_a_cancelled_request_says_nothing_at_all(main_api, watch):
     отвалился, и «работа отменена» уехало бы в умирающую страницу — человек
     увидел бы ошибку там, где просто закрыл окно.
     """
-    caught = watch(main_api.profile_changed)
+    caught = watch(main_api.system_settings_loaded)
     started = asyncio.Event()
 
     async def endless() -> str:
@@ -71,7 +71,7 @@ async def test_a_cancelled_request_says_nothing_at_all(main_api, watch):
         return ""
 
     coro = endless()
-    main_api._dispatch(main_api.profile_changed, coro)
+    main_api._dispatch(main_api.system_settings_loaded, coro)
     await started.wait()
     for task in asyncio.all_tasks():
         if task.get_coro() is coro:

@@ -17,17 +17,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from backend.telegram_login import TelegramLogin
 from backend.runtime_settings import RuntimeSettings
 from client.bridge.bot_stop import stop_bot
-from client.bridge.answer import _dispatch_json, _err, _ok
-from client.bridge.channel_actions import ChannelActionSlots
-from client.bridge.channels import ChannelSlots
-from client.bridge.companies import CompanySlots
-from client.bridge.cv import CvSlots
+from client.bridge.answer import _dispatch_json, _ok
 from client.bridge.desktop import DesktopSlots
 from client.bridge.hub import Hub
 from client.bridge.journal import JournalSlots
 from client.bridge.llm import LlmSlots
 from client.bridge.login import TelegramLoginSlots
-from client.bridge.profile import ProfileSlots
 from client.bridge.runner import AsyncRunner
 from client.bridge.settings import SettingsSlots
 from client.bridge.state import (
@@ -56,8 +51,7 @@ _CLOSING_WAIT_S = 5.0
 
 
 class MainApi(
-    ChannelActionSlots, ChannelSlots, CompanySlots, CvSlots,
-    DesktopSlots, JournalSlots, LlmSlots, ProfileSlots,
+    DesktopSlots, JournalSlots, LlmSlots,
     SettingsSlots,
     TelegramLoginSlots,
     WindowStateSlots, WipeSlots,
@@ -66,14 +60,15 @@ class MainApi(
     """Один объект «api», который канал отдаёт основному окну.
 
     Своих слотов не держит: предметы приходят примесями, а здесь — бот,
-    часы общего состояния, отправка работы на мотор и уборка. Четыре сигнала
+    часы общего состояния, отправка работы на мотор и уборка. Пять сигналов
     объявлены тут же, потому что испускает их бот, а не предмет: списки
-    контактов и список вакансий меняются сами по себе, когда сбор находит
-    новое, а письмо от человека и его отметка о прочтении приходят от
-    собеседника — их дом, очередь событий, ждёт слайса А2.9.
+    контактов, список каналов и список вакансий меняются сами по себе, когда
+    сбор находит новое, а письмо от человека и его отметка о прочтении
+    приходят от собеседника — их дом, очередь событий, ждёт слайса А2.9.
     """
 
     contacts_lists_changed = Signal()
+    contacts_channels_changed = Signal()
     vacancies_list_changed = Signal()
     contacts_hr_messages_arrived = Signal(str)
     contacts_hr_read_receipt = Signal(str)
@@ -240,31 +235,6 @@ class MainApi(
 
     def _dispatch(self, signal: Signal, coro: Coroutine[Any, Any, Any]) -> None:
         _dispatch_json(self._runner, signal, coro)
-
-    def _dispatch_action(
-        self,
-        signal: Signal,
-        coro: Coroutine[Any, Any, str],
-        *,
-        action: str,
-        **error_extra,
-    ) -> None:
-        """Like ``_dispatch``, but wraps the coroutine so an unexpected
-        exception is converted to a structured ``_err`` payload carrying
-        the ``action`` discriminator + caller-provided extras (typically
-        ``channel_id``). Without this, an exception lands in ``_dispatch``'s
-        outer except and is emitted as a bare ``_err(message)`` without
-        ``action`` — the JS handler then can't route it to the right branch
-        and the UI ends up stuck (spinner stays / saving=true / popover
-        ghost / optimistic flip never rolled back).
-        """
-        async def safe() -> str:
-            try:
-                return await coro
-            except Exception as e:
-                logger.exception("MainApi: action %s failed", action)
-                return _err(f"{type(e).__name__}: {e}", action=action, **error_extra)
-        self._dispatch(signal, safe())
 
     def cleanup(self) -> None:
         """Stop timers + the background bot. Runner shutdown is owned by shell.

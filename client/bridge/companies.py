@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import logging
-
-from PySide6.QtCore import Signal, Slot
 from sqlalchemy.exc import IntegrityError
 
 from backend.payloads import int_or_none, text_or_none
@@ -15,76 +11,74 @@ from backend.repository import (
     hr_list,
     vacancies_mini,
 )
-from client.bridge.answer import _err, _ok
-from client.bridge.refusals import COMPANY_EXISTS, NAME_REQUIRED, NOTHING_TO_UPDATE, NO_COMPANY
+from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.mark import COMPANY_MARK, mark, unmark
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
-from client.bridge.payload import _log_invalid_payload
 from client.bridge.pickers import COMPANY_PICKER, merge_picker
-from client.bridge.wire import _vacancy_mini_row_to_dict, _company_picker_row_to_dict
+from client.bridge.refusals import (
+    COMPANY_EXISTS,
+    NAME_REQUIRED,
+    NOTHING_TO_UPDATE,
+    NO_COMPANY,
+)
+from client.bridge.wire import _company_picker_row_to_dict, _vacancy_mini_row_to_dict
 from client.form_payloads import read_company_spellings, read_new_company_fields
 
 
-logger = logging.getLogger(__name__)
-
-
-class CompanySlots:
+class Companies:
     """Компания как запись в контактах: найти, показать, поправить, убрать.
 
-    Подмешивающий обязан держать `_session_factory` и `_dispatch`, а сверх того
-    — сигнал `contacts_lists_changed`, которым окно узнаёт, что списки надо
-    перечитать целиком.
+    Заслон и его снятие кладут в очередь весть о том, что списки контактов
+    устарели: отметка отсева запечена в строках людей, компаний и каналов, и
+    без вести соседние экраны показывали бы компанию незаслонённой.
     """
 
-    contacts_company_list_loaded = Signal(str)
-    contacts_company_detail_loaded = Signal(str)
-    contacts_company_vacancies_loaded = Signal(str)
-    contacts_company_hrs_loaded = Signal(str)
-    contacts_company_merge_picker_loaded = Signal(str)
-    contacts_company_action_done = Signal(str)
+    def __init__(self, hub) -> None:
+        self._hub = hub
 
-    @Slot(str)
-    def request_contacts_company_list(self, payload_json: str) -> None:
-        """Page of Companies for the Contacts/Companies pane.
+    def list(self, payload: dict | None = None) -> dict:
+        """Страница перечня компаний.
 
-        Payload mirrors `request_contacts_hr_list` — search + epoch +
-        offset/limit + replace/append/refresh mode. Backend echoes epoch
-        so JS can drop stale responses when search/scroll race.
+        Нагрузка та же, что у перечня людей: поиск, потолок со сдвигом, режим
+        показа и порядковый знак. Знак уезжает эхом — по нему окно отбрасывает
+        ответ, устаревший, пока менялись поиск или прокрутка.
         """
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-            search = text_or_none(payload.get("search"))
-            page = read_page(payload, default_limit=50)
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("request_contacts_company_list", e)
-            self.contacts_company_list_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+        # Не-объект сводится к пустоте, а не роняет разбор: поиск — дело окна,
+        # и испорченная нагрузка не должна отнимать у человека весь перечень.
+        payload = payload if isinstance(payload, dict) else {}
+        search = text_or_none(payload.get("search"))
+        page = read_page(payload, default_limit=50)
 
-        async def run() -> str:
-            async with self._session_factory() as session:
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
                 rows, has_more = await companies_list.list_companies_with_counts(
                     session, search=search, limit=page.limit, offset=page.offset,
                 )
-            return _ok({
+            return {
                 "search": search or "",
                 "companies": [_company_picker_row_to_dict(r) for r in rows],
                 "has_more": has_more,
                 "mode": page.mode,
                 "offset": page.offset,
                 "epoch": page.epoch,
-            })
+            }
 
-        self._dispatch(self.contacts_company_list_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(int)
-    def request_contacts_company_detail(self, company_id: int) -> None:
-        async def run() -> str:
-            async with self._session_factory() as session:
+    def detail(self, company_id: int) -> dict:
+        """Карточка одной компании целиком.
+
+        Номер едет обратно в отказе: по нему окно убирает строку, за которой
+        компании уже нет, — перечень, из которого её открыли, мог устареть.
+        """
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
                 detail = await companies_card.get_company_detail(session, company_id)
             if detail is None:
-                return _err(NO_COMPANY, company_id=company_id)
-            return _ok({
+                raise Denied(NO_COMPANY, company_id=company_id)
+            return {
                 "company_id": detail.company.id,
                 "name": detail.company.name,
                 "website": detail.company.website,
@@ -93,191 +87,96 @@ class CompanySlots:
                 "vacancy_count": detail.vacancy_count,
                 "hr_count": detail.hr_count,
                 "blacklist_value": detail.blacklist_value,
-            })
+            }
 
-        self._dispatch(self.contacts_company_detail_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def request_contacts_company_vacancies(self, payload_json: str) -> None:
-        """Push the vacancy mini-list for the Company detail pane.
+    def vacancies(self, payload: dict) -> dict:
+        """Короткий список вакансий этой компании — для её карточки.
 
-        Payload: ``{company_id, epoch}``. ``company_id`` фильтрует ответ при
-        переключении на другую компанию, ``epoch`` — race на одной и той же
-        компании (рапид-флип статуса вакансии). Оба эхо'ятся обратно.
+        Нагрузка: `{company_id, epoch}`. Номер отсеивает ответ про другую
+        выбранную, порядковый знак — про ту же самую, спрошенную дважды подряд.
+        Оба уезжают обратно эхом, устаревшее окно отбрасывает.
         """
         try:
-            payload = json.loads(payload_json)
             company_id = int(payload["company_id"])
             epoch = int_or_none(payload.get("epoch"))
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("request_contacts_company_vacancies", e)
-            self.contacts_company_vacancies_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("vacancies", e)
 
-        async def run() -> str:
-            async with self._session_factory() as session:
-                rows = await vacancies_mini.list_vacancies_for_company(session, company_id)
-            return _ok({
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                rows = await vacancies_mini.list_vacancies_for_company(
+                    session, company_id
+                )
+            return {
                 "company_id": company_id,
                 "epoch": epoch,
-                "vacancies": [
-                    _vacancy_mini_row_to_dict(v) for v in rows
-                ],
-            })
+                "vacancies": [_vacancy_mini_row_to_dict(v) for v in rows],
+            }
 
-        self._dispatch(self.contacts_company_vacancies_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(int)
-    def request_contacts_company_hrs(self, company_id: int) -> None:
-        """HRs that have at least one vacancy at this company, with
-        per-HR vacancy count restricted to that company.
+    def people(self, company_id: int) -> dict:
+        """Люди, у которых есть хоть одна вакансия в этой компании.
+
+        Счёт вакансий у каждого — только по этой компании, а не по всем: в её
+        карточке общее число говорило бы не о ней.
         """
-        async def run() -> str:
-            async with self._session_factory() as session:
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
                 rows = await hr_list.list_hrs_for_company(session, company_id)
-            return _ok({
+            return {
                 "company_id": company_id,
                 "hrs": [
                     {
                         "id": hr.id,
                         "name": hr.name,
                         "telegram_username": hr.telegram_username,
-                        "vacancy_count": cnt,
+                        "vacancy_count": count,
                         "avatar": _avatar_data_url(hr.avatar),
                     }
-                    for hr, cnt in rows
+                    for hr, count in rows
                 ],
-            })
+            }
 
-        self._dispatch(self.contacts_company_hrs_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def request_contacts_company_merge_picker(self, payload_json: str) -> None:
+    def merge_picker(self, payload: dict) -> dict:
+        """Кандидаты, в которых можно влить эту карточку.
+
+        Строка та же, что у подборщика вакансий, за вычетом самой поглощаемой
+        карточки.
+        """
         try:
-            payload = json.loads(payload_json)
             absorbed_id = int(payload["absorbed_id"])
             search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("request_contacts_company_merge_picker", e)
-            self.contacts_company_merge_picker_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("merge_picker", e)
 
-        async def run() -> str:
-            async with self._session_factory() as session:
-                return _ok(
-                    await merge_picker(session, COMPANY_PICKER, absorbed_id, search)
-                )
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                return await merge_picker(session, COMPANY_PICKER, absorbed_id, search)
 
-        self._dispatch(self.contacts_company_merge_picker_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def contacts_create_company(self, payload_json: str) -> None:
+    def merge(self, payload: dict) -> dict:
+        """Влить поглощаемую карточку в оставшуюся.
+
+        Вакансии переезжают на оставшуюся, а прежнее имя остаётся у неё
+        написанием: оно продолжает приходить в новых объявлениях, и потеряй его
+        карточка — следующая вакансия завела бы компанию заново.
+        """
         try:
-            payload = json.loads(payload_json)
-            fields = read_new_company_fields(payload)
-            name = fields["name"]
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("contacts_create_company", e)
-            self.contacts_company_action_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        if not name:
-            self.contacts_company_action_done.emit(
-                _err(NAME_REQUIRED, action="create_company")
-            )
-            return
-
-        async def run() -> str:
-            try:
-                async with self._session_factory() as session:
-                    co = await companies_card.create_company(session, **fields)
-                    await session.commit()
-            except IntegrityError:
-                return _err(
-                    COMPANY_EXISTS.format(name=name),
-                    action="create_company",
-                )
-            except Exception as e:
-                logger.exception("contacts_create_company failed")
-                return _err(f"{type(e).__name__}: {e}", action="create_company")
-            return _ok({"action": "create_company", "created_id": co.id})
-
-        self._dispatch(self.contacts_company_action_done, run())
-
-    @Slot(str)
-    def contacts_update_company(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            company_id = int(payload["company_id"])
-        except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("contacts_update_company", e)
-            self.contacts_company_action_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        kwargs: dict = {}
-        for key in ("name", "website", "notes"):
-            if key in payload:
-                kwargs[key] = payload[key]
-        if "aliases" in payload:
-            raw = payload["aliases"]
-            if not isinstance(raw, (str, list)):
-                self.contacts_company_action_done.emit(
-                    _err("aliases должен быть list или строка через запятую.")
-                )
-                return
-            kwargs["aliases"] = read_company_spellings(raw)
-        if not kwargs:
-            self.contacts_company_action_done.emit(
-                _err(NOTHING_TO_UPDATE, company_id=company_id)
-            )
-            return
-
-        async def run() -> str:
-            async with self._session_factory() as session:
-                async with session.begin():
-                    ok = await companies_card.update_company_fields(
-                        session, company_id, **kwargs,
-                    )
-            if not ok:
-                return _err(
-                    "Компания не найдена или название пустое.",
-                    company_id=company_id, action="update_company",
-                )
-            return _ok({
-                "action": "update_company",
-                "company_id": company_id,
-                "fields": list(kwargs.keys()),
-            })
-
-        self._dispatch(self.contacts_company_action_done, run())
-
-    @Slot(int)
-    def contacts_delete_company(self, company_id: int) -> None:
-        async def run() -> str:
-            async with self._session_factory() as session:
-                ok = await companies_card.delete_company(session, company_id)
-                if not ok:
-                    return _err(
-                        NO_COMPANY,
-                        company_id=company_id, action="delete_company",
-                    )
-                await session.commit()
-            return _ok({"action": "delete_company", "company_id": company_id})
-
-        self._dispatch(self.contacts_company_action_done, run())
-
-    @Slot(str)
-    def contacts_merge_company(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
             absorbed_id = int(payload["absorbed_id"])
             survivor_id = int(payload["survivor_id"])
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("contacts_merge_company", e)
-            self.contacts_company_action_done.emit(_err(f"Неверные поля: {e}"))
-            return
+            return bad_fields("merge", e)
 
-        async def run() -> str:
+        async def run() -> dict:
             try:
-                async with self._session_factory() as session:
+                async with self._hub.session_factory() as session:
                     async with session.begin():
                         await companies_card.merge_company(
                             session,
@@ -285,42 +184,133 @@ class CompanySlots:
                             survivor_id=survivor_id,
                         )
             except ValueError as e:
-                return _err(str(e), absorbed_id=absorbed_id, action="merge_company")
-            except Exception as e:
-                logger.exception("contacts_merge_company failed")
-                return _err(
-                    f"{type(e).__name__}: {e}",
-                    absorbed_id=absorbed_id, action="merge_company",
-                )
-            return _ok({
+                raise Denied(str(e), absorbed_id=absorbed_id, action="merge_company")
+            return {
                 "action": "merge_company",
                 "absorbed_id": absorbed_id,
                 "survivor_id": survivor_id,
-            })
+            }
 
-        self._dispatch(self.contacts_company_action_done, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(int)
-    def contacts_add_company_to_blacklist(self, company_id: int) -> None:
-        """Insert / re-activate a kind="company" blacklist row for this
-        company. Value is the company name. Idempotent.
+    def create(self, payload: dict) -> dict:
+        """Завести компанию из окна «Добавить компанию».
+
+        Номер заведённой едет ответом, чтобы окно подсветило новую строку.
+        Занятое имя объясняется словами, а не отказом базы: компании с
+        одинаковым именем считаются одной, и заводящий вторую должен узнать
+        про первую.
         """
-        async def run() -> str:
-            async with self._session_factory() as session:
-                answer, ok = await mark(session, COMPANY_MARK, company_id)
-            if ok:
-                self.contacts_lists_changed.emit()
-            return answer
+        try:
+            fields = read_new_company_fields(payload)
+        # `AttributeError` — про не-объект в нагрузке: помощник читает её
+        # ключами, и спотыкается он до мотора, мимо конверта.
+        except (AttributeError, ValueError, TypeError) as e:
+            return bad_fields("create", e)
 
-        self._dispatch(self.contacts_company_action_done, run())
+        name = fields["name"]
+        if not name:
+            return denied(NAME_REQUIRED, action="create_company")
 
-    @Slot(int)
-    def contacts_remove_company_from_blacklist(self, company_id: int) -> None:
-        async def run() -> str:
-            async with self._session_factory() as session:
-                answer, ok = await unmark(session, COMPANY_MARK, company_id)
-            if ok:
-                self.contacts_lists_changed.emit()
-            return answer
+        async def run() -> dict:
+            try:
+                async with self._hub.session_factory() as session:
+                    company = await companies_card.create_company(session, **fields)
+                    await session.commit()
+            except IntegrityError:
+                raise Denied(COMPANY_EXISTS.format(name=name), action="create_company")
+            return {"action": "create_company", "created_id": company.id}
 
-        self._dispatch(self.contacts_company_action_done, run())
+        return reply(self._hub.runner, run())
+
+    def update(self, payload: dict) -> dict:
+        """Поправить одно или несколько полей карточки.
+
+        Пропущенный ключ значит «не трогать». Написания приходят то строкой
+        через запятую, то готовым списком; всё прочее отбивается до базы —
+        молчаливое приведение стёрло бы их разом.
+        """
+        try:
+            company_id = int(payload["company_id"])
+        except (ValueError, TypeError, KeyError) as e:
+            return bad_fields("update", e)
+
+        kwargs = {
+            key: payload[key]
+            for key in ("name", "website", "notes")
+            if key in payload
+        }
+        if "aliases" in payload:
+            raw = payload["aliases"]
+            if not isinstance(raw, (str, list)):
+                return denied("aliases должен быть list или строка через запятую.")
+            kwargs["aliases"] = read_company_spellings(raw)
+        if not kwargs:
+            return denied(NOTHING_TO_UPDATE, company_id=company_id)
+
+        return reply(self._hub.runner, self._updated(company_id, kwargs))
+
+    async def _updated(self, company_id: int, kwargs: dict) -> dict:
+        """Записать прочитанные поля и назвать окну, какие из них поправлены."""
+        async with self._hub.session_factory() as session:
+            async with session.begin():
+                saved = await companies_card.update_company_fields(
+                    session, company_id, **kwargs,
+                )
+        if not saved:
+            raise Denied(
+                "Компания не найдена или название пустое.",
+                company_id=company_id, action="update_company",
+            )
+        return {
+            "action": "update_company",
+            "company_id": company_id,
+            "fields": list(kwargs.keys()),
+        }
+
+    def delete(self, company_id: int) -> dict:
+        """Убрать карточку компании (`companies_card.delete_company`)."""
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                if not await companies_card.delete_company(session, company_id):
+                    raise Denied(
+                        NO_COMPANY, company_id=company_id, action="delete_company"
+                    )
+                await session.commit()
+            return {"action": "delete_company", "company_id": company_id}
+
+        return reply(self._hub.runner, run())
+
+    def block(self, company_id: int) -> dict:
+        """Занести компанию в чёрный список.
+
+        Написание — имя компании: другого значения у неё нет, и именно его
+        сверяет заслон отправки. Повторное нажатие второй записи не заводит:
+        погашенная оживает, живая остаётся как есть, и ответ говорит об этом
+        полем `existed`. Карточку это не сносит: снос — отдельная кнопка.
+        """
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                marked = await mark(session, COMPANY_MARK, company_id)
+            self._hub.events.add("contacts_lists_changed")
+            return marked
+
+        return reply(self._hub.runner, run())
+
+    def unblock(self, company_id: int) -> dict:
+        """Убрать компанию из чёрного списка.
+
+        Запись гасится, а не сносится: экран списка держит погашенные строки
+        видимыми, с выключенным тумблером, — этого от кнопки «убрать» здесь и
+        ждут.
+        """
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                unmarked = await unmark(session, COMPANY_MARK, company_id)
+            self._hub.events.add("contacts_lists_changed")
+            return unmarked
+
+        return reply(self._hub.runner, run())
