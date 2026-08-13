@@ -7,9 +7,9 @@ import json
 from PySide6.QtCore import Signal, Slot
 
 from backend.domain.telegram_identity import normalize_username
-from backend.models import TelegramChannel
-from backend.repository import blacklist, channels as channels_repo
+from backend.repository import channels as channels_repo
 from client.bridge.answer import _err, _ok
+from client.bridge.mark import CHANNEL_MARK, mark, unmark
 from client.bridge.payload import _log_invalid_payload
 
 
@@ -36,31 +36,10 @@ class ChannelActionSlots:
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                ch = await session.get(TelegramChannel, channel_id)
-                if ch is None:
-                    return _err("Канал не найден.", channel_id=channel_id, action="blacklist")
-                value = channels_repo.channel_blacklist_preferred_value(ch)
-                if value is None:
-                    return _err(
-                        "У канала нет @username.",
-                        channel_id=channel_id, action="blacklist",
-                    )
-                _, outcome = await blacklist.create_blacklist(
-                    session, kind="channel", value=value,
-                )
-                # Канал в blacklist → автоматически выключаем сам канал,
-                # чтобы UI-toggle отражал реальное «канал не работает».
-                if ch.is_active:
-                    ch.is_active = False
-                await session.commit()
-            self.contacts_lists_changed.emit()
-            return _ok({
-                "action": "blacklist",
-                "channel_id": channel_id,
-                "value": value,
-                "existed": outcome != "created",
-                "was_inactive": outcome == "reactivated",
-            })
+                answer, ok = await mark(session, CHANNEL_MARK, channel_id)
+            if ok:
+                self.contacts_lists_changed.emit()
+            return answer
 
         self._dispatch(self.contacts_channel_action_done, run())
 
@@ -69,25 +48,10 @@ class ChannelActionSlots:
         """Deactivate any kind="channel" blacklist row for this channel."""
         async def run() -> str:
             async with self._session_factory() as session:
-                ch = await session.get(TelegramChannel, channel_id)
-                if ch is None:
-                    return _err("Канал не найден.", channel_id=channel_id, action="unblacklist")
-                candidates = channels_repo.channel_blacklist_candidates(ch)
-                if not candidates:
-                    return _err(
-                        "У канала нет @username.",
-                        channel_id=channel_id, action="unblacklist",
-                    )
-                updated = await blacklist.deactivate_blacklist_values(
-                    session, "channel", candidates,
-                )
-                await session.commit()
-            self.contacts_lists_changed.emit()
-            return _ok({
-                "action": "unblacklist",
-                "channel_id": channel_id,
-                "updated": updated,
-            })
+                answer, ok = await unmark(session, CHANNEL_MARK, channel_id)
+            if ok:
+                self.contacts_lists_changed.emit()
+            return answer
 
         self._dispatch(self.contacts_channel_action_done, run())
 

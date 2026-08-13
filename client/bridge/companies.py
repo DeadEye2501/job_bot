@@ -8,16 +8,15 @@ import logging
 from PySide6.QtCore import Signal, Slot
 from sqlalchemy.exc import IntegrityError
 
-from backend.models import Company
 from backend.payloads import int_or_none, text_or_none
 from backend.repository import (
-    blacklist,
     companies_card,
     companies_list,
     hr_list,
     vacancies_mini,
 )
 from client.bridge.answer import _err, _ok
+from client.bridge.mark import COMPANY_MARK, mark, unmark
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
@@ -319,30 +318,10 @@ class CompanySlots:
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                co = await session.get(Company, company_id)
-                if co is None:
-                    return _err(
-                        "Компания не найдена.",
-                        company_id=company_id, action="blacklist",
-                    )
-                value = companies_card.company_blacklist_preferred_value(co)
-                if value is None:
-                    return _err(
-                        "У компании нет имени.",
-                        company_id=company_id, action="blacklist",
-                    )
-                _, outcome = await blacklist.create_blacklist(
-                    session, kind="company", value=value,
-                )
-                await session.commit()
-            self.contacts_lists_changed.emit()
-            return _ok({
-                "action": "blacklist",
-                "company_id": company_id,
-                "value": value,
-                "existed": outcome != "created",
-                "was_inactive": outcome == "reactivated",
-            })
+                answer, ok = await mark(session, COMPANY_MARK, company_id)
+            if ok:
+                self.contacts_lists_changed.emit()
+            return answer
 
         self._dispatch(self.contacts_company_action_done, run())
 
@@ -350,27 +329,9 @@ class CompanySlots:
     def contacts_remove_company_from_blacklist(self, company_id: int) -> None:
         async def run() -> str:
             async with self._session_factory() as session:
-                co = await session.get(Company, company_id)
-                if co is None:
-                    return _err(
-                        "Компания не найдена.",
-                        company_id=company_id, action="unblacklist",
-                    )
-                candidates = companies_card.company_blacklist_candidates(co)
-                if not candidates:
-                    return _err(
-                        "У компании нет имени.",
-                        company_id=company_id, action="unblacklist",
-                    )
-                updated = await blacklist.deactivate_blacklist_values(
-                    session, "company", candidates,
-                )
-                await session.commit()
-            self.contacts_lists_changed.emit()
-            return _ok({
-                "action": "unblacklist",
-                "company_id": company_id,
-                "updated": updated,
-            })
+                answer, ok = await unmark(session, COMPANY_MARK, company_id)
+            if ok:
+                self.contacts_lists_changed.emit()
+            return answer
 
         self._dispatch(self.contacts_company_action_done, run())

@@ -7,16 +7,15 @@ import logging
 
 from PySide6.QtCore import Signal, Slot
 
-from backend.models import HR
 from backend.payloads import int_or_none, text_or_none
 from backend.repository import (
-    blacklist,
     hr_card,
     hr_identify,
     hr_list,
     vacancies_mini,
 )
 from client.bridge.answer import _err, _ok
+from client.bridge.mark import HR_MARK, mark, unmark
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
@@ -240,25 +239,10 @@ class HrSlots:
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                hr = await session.get(HR, hr_id)
-                if hr is None:
-                    return _err("HR не найден.", hr_id=hr_id, action="unblacklist")
-                candidates = hr_card.hr_blacklist_candidates(hr)
-                if not candidates:
-                    return _err(
-                        "У HR нет ни @username, ни telegram_user_id.",
-                        hr_id=hr_id, action="unblacklist",
-                    )
-                updated = await blacklist.deactivate_blacklist_values(
-                    session, "hr", candidates,
-                )
-                await session.commit()
-            self.contacts_lists_changed.emit()
-            return _ok({
-                "action": "unblacklist",
-                "hr_id": hr_id,
-                "updated": updated,
-            })
+                answer, ok = await unmark(session, HR_MARK, hr_id)
+            if ok:
+                self.contacts_lists_changed.emit()
+            return answer
 
         self._dispatch(self.contacts_hr_action_done, run())
 
@@ -274,27 +258,10 @@ class HrSlots:
         """
         async def run() -> str:
             async with self._session_factory() as session:
-                hr = await session.get(HR, hr_id)
-                if hr is None:
-                    return _err("HR не найден.", hr_id=hr_id, action="blacklist")
-                value = hr_card.hr_blacklist_preferred_value(hr)
-                if value is None:
-                    return _err(
-                        "У HR нет ни @username, ни telegram_user_id.",
-                        hr_id=hr_id, action="blacklist",
-                    )
-                _, outcome = await blacklist.create_blacklist(
-                    session, kind="hr", value=value,
-                )
-                await session.commit()
-            self.contacts_lists_changed.emit()
-            return _ok({
-                "action": "blacklist",
-                "hr_id": hr_id,
-                "value": value,
-                "existed": outcome != "created",
-                "was_inactive": outcome == "reactivated",
-            })
+                answer, ok = await mark(session, HR_MARK, hr_id)
+            if ok:
+                self.contacts_lists_changed.emit()
+            return answer
 
         self._dispatch(self.contacts_hr_action_done, run())
 
