@@ -1,7 +1,7 @@
-"""Поверхность основного окна.
+"""Сборка поверхности основного окна из предметов.
 
-Двенадцать предметов пока лежат в одном файле — они разъезжаются своими до
-конца этапа 3.
+Предметы разъезжаются своими файлами до конца этапа 3; пока часть их
+лежит прямо здесь.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
 )
-from sqlalchemy import func, select, text as sa_text
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
@@ -36,7 +36,6 @@ from backend.domain.telegram_identity import normalize_username
 from backend.payloads import VacancyFilter
 from backend.models import (
     BLACKLIST_KINDS,
-    BotMode,
     Company,
     HR,
     TelegramChannel,
@@ -55,6 +54,11 @@ from client.bridge.login import TelegramLoginSlots
 from client.bridge.media import _avatar_data_url, _media_url
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.runner import AsyncRunner
+from client.bridge.state import (
+    _HEALTHCHECK_INTERVAL_MS,
+    _UNREAD_INTERVAL_MS,
+    WindowStateSlots,
+)
 from client.bridge.wire import (
     _blacklist_row_to_dict,
     _channel_row_to_dict,
@@ -72,22 +76,14 @@ from client.bridge.wire import (
 logger = logging.getLogger(__name__)
 
 
-_HEALTHCHECK_INTERVAL_MS = 5_000
-_UNREAD_INTERVAL_MS = 15_000
 
+class MainApi(TelegramLoginSlots, WindowStateSlots, QObject):
+    """Один объект «api», который канал отдаёт основному окну.
 
-class MainApi(TelegramLoginSlots, QObject):
-    """Bridge for the post-wizard main window. Owns periodic timers for
-    healthcheck and unread-count, and exposes mode + ingestion controls.
-    Long-running ops emit a `*_changed` / `*_finished` signal when ready."""
+    Держит бота, часы общего состояния и предметы окна — своими примесями
+    и, пока идёт этап 3, своими слотами прямо здесь.
+    """
 
-    health_changed = Signal(str)
-    unread_changed = Signal(str)
-    mode_changed = Signal(str)
-    ingestion_started = Signal()
-    ingestion_finished = Signal(str)
-    ingestion_action_done = Signal(str)
-    progress_update = Signal(str)
     profile_changed = Signal(str)
     profile_save_done = Signal(str)
     cv_replace_done = Signal(str)
@@ -141,7 +137,6 @@ class MainApi(TelegramLoginSlots, QObject):
     contacts_channels_changed = Signal()
     contacts_lists_changed = Signal()
     vacancies_list_changed = Signal()
-    unread_chats_loaded = Signal(str)
 
     def __init__(
         self,
@@ -310,69 +305,6 @@ class MainApi(TelegramLoginSlots, QObject):
                 logger.exception("MainApi: action %s failed", action)
                 return _err(f"{type(e).__name__}: {e}", action=action, **error_extra)
         self._dispatch(signal, safe())
-
-    # --- Public slots -----------------------------------------------------
-
-    @Slot()
-    def request_initial(self) -> None:
-        """Push every cached state to JS via signals — called once on UI boot."""
-        self._kick_health()
-        self._kick_unread()
-        self._kick_mode()
-
-    @Slot(str)
-    def set_mode(self, mode_str: str) -> None:
-        try:
-            mode = BotMode(mode_str)
-        except ValueError:
-            logger.warning("set_mode: unknown mode requested: %r", mode_str)
-            self.mode_changed.emit(_err(f"Неизвестный режим: {mode_str!r}"))
-            return
-
-        logger.info("Mode change requested: %s", mode.value)
-        async def run() -> str:
-            await self._rs.set_mode(mode)
-            # Wake the bot so it picks up the new mode without waiting for
-            # the next poll tick.
-            if self._bot is not None:
-                self._bot.kick()
-            return _ok({"mode": mode.value})
-
-        self._dispatch(self.mode_changed, run())
-
-    @Slot()
-    def trigger_ingestion(self) -> None:
-        """Refresh button — force a one-shot poll regardless of bot mode.
-
-        Если уже идёт другой цикл — показываем toast «уже идёт цикл,
-        пропустил», иначе пользователь жмёт кнопку и не понимает почему
-        ничего не происходит.
-        """
-        if self._bot is None:
-            return
-        logger.info("Manual ingestion triggered")
-
-        async def run() -> str:
-            status = await self._bot.force_poll_once()
-            if status == "busy":
-                return _err("Уже идёт другой цикл, попробуйте позже.", action="trigger_ingestion", status=status)
-            if status == "ok":
-                return _ok({"action": "trigger_ingestion", "status": status})
-            messages = {
-                "cancelled": "Поллинг отменён.",
-                "error": "Не удалось прогнать каналы — см. логи.",
-            }
-            return _err(messages.get(status, "Не удалось прогнать."), action="trigger_ingestion", status=status)
-
-        self._dispatch(self.ingestion_action_done, run())
-
-    @Slot()
-    def stop_ingestion(self) -> None:
-        """Stop button — cancel the in-flight poll cycle (if any)."""
-        if self._bot is None:
-            return
-        logger.info("Ingestion cancel requested")
-        self._bot.cancel_current_poll()
 
     # --- Profile / CV ---------------------------------------------------
 
@@ -1810,35 +1742,6 @@ class MainApi(TelegramLoginSlots, QObject):
                 )
             except Exception:
                 logger.exception("MainApi cleanup: bot task raised on shutdown")
-
-    # --- Background tickers ----------------------------------------------
-
-    def _kick_mode(self) -> None:
-        async def run() -> str:
-            mode = await self._rs.get_mode()
-            return _ok({"mode": mode.value})
-
-        self._dispatch(self.mode_changed, run())
-
-    def _kick_unread(self) -> None:
-        async def run() -> str:
-            async with self._session_factory() as session:
-                count = await messages_repo.count_unread_incoming(session)
-            return _ok({"count": count})
-
-        self._dispatch(self.unread_changed, run())
-
-    @Slot()
-    def request_unread_chats(self) -> None:
-        """List of HRs with at least one unread incoming message — feeds the
-        footer pop-up (TODO #4). Ordered by most recent unread first.
-        """
-        async def run() -> str:
-            async with self._session_factory() as session:
-                rows = await hr_list.list_hrs_with_unread(session)
-            return _ok({"chats": rows})
-
-        self._dispatch(self.unread_chats_loaded, run())
 
     # === Contacts / Companies (06) =====================================
 
@@ -3427,52 +3330,3 @@ class MainApi(TelegramLoginSlots, QObject):
             })
 
         self._dispatch(self.contacts_company_action_done, run())
-
-    def _kick_health(self) -> None:
-        async def run() -> str:
-            results = {"db": False, "tg": False, "chat": False, "embed": False}
-
-            try:
-                async with self._session_factory() as session:
-                    await session.execute(sa_text("SELECT 1"))
-                results["db"] = True
-            except Exception as e:
-                logger.debug("healthcheck: db probe failed: %s", e)
-
-            # TG: проверяем живость уже работающего Pyrogram-клиента в
-            # Bot.run. ``is_connected`` отражает state MTProto-сессии и
-            # отваливается, когда Pyrogram'овский heartbeat ловит timeout
-            # (≈30-60с после реального отключения сети). Параллельный
-            # connect отсюда устроил бы конфликт сессий, поэтому смотрим
-            # только на бот'овский клиент. До старта бота (нет
-            # session_string или ранний этап init'а) — false: пока сессия
-            # не поднята, считать TG здоровым нечестно.
-            results["tg"] = bool(
-                self._bot is not None
-                and self._bot.is_ready
-                and getattr(self._bot._client, "is_connected", False)
-            )
-
-            if self._rs.chat is not None:
-                client = lm_studio.make_client(self._rs.chat)
-                try:
-                    models = await lm_studio.list_models(client)
-                    results["chat"] = self._rs.chat.model in models
-                except Exception as e:
-                    logger.debug("healthcheck: chat probe failed: %s", e)
-                finally:
-                    await client.aclose()
-
-            if self._rs.embed is not None:
-                client = lm_studio.make_client(self._rs.embed)
-                try:
-                    models = await lm_studio.list_models(client)
-                    results["embed"] = self._rs.embed.model in models
-                except Exception as e:
-                    logger.debug("healthcheck: embed probe failed: %s", e)
-                finally:
-                    await client.aclose()
-
-            return _ok(results)
-
-        self._dispatch(self.health_changed, run())
