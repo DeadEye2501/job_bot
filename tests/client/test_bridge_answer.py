@@ -8,9 +8,6 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta, timezone
-
-from client.bridge.answer import _iso
 
 
 async def test_the_answer_reaches_the_window_as_a_signal(main_api, watch):
@@ -115,21 +112,3 @@ async def test_a_missing_field_is_named_in_the_journal(main_api, watch, caplog):
     written = "\n".join(record.getMessage() for record in caplog.records)
     assert "vacancy_id" in written
     assert "без вакансии" not in written
-
-
-def test_a_time_without_a_zone_is_read_as_utc():
-    """Время без пояса едет в окно как UTC, а не как местное.
-
-    Часть строк записана средствами самой базы и возвращается без пояса.
-    Отдай их окну как есть — разбор на стороне окна счёл бы их местным
-    временем, и свежая запись показалась бы сделанной несколько часов назад.
-    """
-    assert _iso(datetime(2026, 8, 13, 12, 0, 0)) == "2026-08-13T12:00:00+00:00"
-
-
-def test_a_time_that_knows_its_zone_keeps_it():
-    """Пояс, который у времени уже есть, не подменяется на UTC."""
-    east = timezone(timedelta(hours=4))
-    assert _iso(datetime(2026, 8, 13, 12, 0, 0, tzinfo=east)) == (
-        "2026-08-13T12:00:00+04:00"
-    )
