@@ -6,8 +6,8 @@
 """
 
 import pytest
-
-from client import bridge
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import QApplication
 
 
 @pytest.fixture
@@ -15,7 +15,7 @@ def opened(monkeypatch) -> list:
     """Ловит адреса вместо того, чтобы открывать их в браузере."""
     addresses: list[str] = []
     monkeypatch.setattr(
-        bridge.QDesktopServices, "openUrl", lambda url: addresses.append(url.toString())
+        QDesktopServices, "openUrl", lambda url: addresses.append(url.toString())
     )
     return addresses
 
@@ -29,7 +29,7 @@ def clipboard(monkeypatch) -> list:
         def setText(self, text: str) -> None:
             copied.append(text)
 
-    monkeypatch.setattr(bridge.QApplication, "clipboard", lambda: Buffer())
+    monkeypatch.setattr(QApplication, "clipboard", lambda: Buffer())
     return copied
 
 
