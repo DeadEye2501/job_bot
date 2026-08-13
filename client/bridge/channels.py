@@ -12,6 +12,7 @@ from backend.models import Vacancy
 from backend.payloads import int_or_none, text_or_none
 from backend.repository import channels as channels_repo, vacancies_mini
 from client.bridge.answer import _err, _ok
+from client.bridge.refusals import NO_CHANNEL
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
@@ -78,7 +79,7 @@ class ChannelSlots:
             async with self._session_factory() as session:
                 detail = await channels_repo.get_channel_detail(session, channel_id)
             if detail is None:
-                return _err("Канал не найден.", channel_id=channel_id)
+                return _err(NO_CHANNEL, channel_id=channel_id)
             ch = detail.channel
             stats = detail.stats
             return _ok({

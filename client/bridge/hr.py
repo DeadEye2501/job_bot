@@ -15,6 +15,7 @@ from backend.repository import (
     vacancies_mini,
 )
 from client.bridge.answer import _err, _ok
+from client.bridge.refusals import IDENTITY_REQUIRED, NOTHING_TO_UPDATE, NO_HR
 from client.bridge.mark import HR_MARK, mark, unmark
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
@@ -129,7 +130,7 @@ class HrSlots:
             async with self._session_factory() as session:
                 detail = await hr_card.get_hr_detail(session, hr_id)
             if detail is None:
-                return _err("HR не найден.", hr_id=hr_id)
+                return _err(NO_HR, hr_id=hr_id)
             return _ok({
                 "hr_id": detail.hr.id,
                 "name": detail.hr.name,
@@ -222,7 +223,7 @@ class HrSlots:
             async with self._session_factory() as session:
                 ok = await hr_card.delete_hr(session, hr_id)
                 if not ok:
-                    return _err("HR не найден.", hr_id=hr_id, action="delete_hr")
+                    return _err(NO_HR, hr_id=hr_id, action="delete_hr")
                 await session.commit()
             self._kick_unread()
             return _ok({"action": "delete_hr", "hr_id": hr_id})
@@ -293,7 +294,7 @@ class HrSlots:
         }
         if not kwargs:
             self.contacts_hr_action_done.emit(
-                _err("Нечего обновлять.", hr_id=hr_id)
+                _err(NOTHING_TO_UPDATE, hr_id=hr_id)
             )
             return
 
@@ -305,7 +306,7 @@ class HrSlots:
             except ValueError as e:  # негодный ник — ответ формы, а не сбой
                 return _err(f"Неверные поля: {e}", hr_id=hr_id, action="update_hr")
             if not ok:
-                return _err("HR не найден.", hr_id=hr_id, action="update_hr")
+                return _err(NO_HR, hr_id=hr_id, action="update_hr")
             return _ok({
                 "action": "update_hr",
                 "hr_id": hr_id,
@@ -332,7 +333,7 @@ class HrSlots:
 
         if not hr_is_identified(fields):
             self.contacts_hr_action_done.emit(
-                _err("Укажите хотя бы имя или @username.")
+                _err(IDENTITY_REQUIRED)
             )
             return
 

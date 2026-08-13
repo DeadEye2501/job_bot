@@ -16,6 +16,7 @@ from backend.repository import (
     vacancies_mini,
 )
 from client.bridge.answer import _err, _ok
+from client.bridge.refusals import COMPANY_EXISTS, NAME_REQUIRED, NOTHING_TO_UPDATE, NO_COMPANY
 from client.bridge.mark import COMPANY_MARK, mark, unmark
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
@@ -81,7 +82,7 @@ class CompanySlots:
             async with self._session_factory() as session:
                 detail = await companies_card.get_company_detail(session, company_id)
             if detail is None:
-                return _err("Компания не найдена.", company_id=company_id)
+                return _err(NO_COMPANY, company_id=company_id)
             return _ok({
                 "company_id": detail.company.id,
                 "name": detail.company.name,
@@ -193,7 +194,7 @@ class CompanySlots:
             return
         if not name:
             self.contacts_company_action_done.emit(
-                _err("Название обязательно.", action="create_company")
+                _err(NAME_REQUIRED, action="create_company")
             )
             return
 
@@ -204,7 +205,7 @@ class CompanySlots:
                     await session.commit()
             except IntegrityError:
                 return _err(
-                    f"Компания «{name}» уже существует.",
+                    COMPANY_EXISTS.format(name=name),
                     action="create_company",
                 )
             except Exception as e:
@@ -237,7 +238,7 @@ class CompanySlots:
             kwargs["aliases"] = read_company_spellings(raw)
         if not kwargs:
             self.contacts_company_action_done.emit(
-                _err("Нечего обновлять.", company_id=company_id)
+                _err(NOTHING_TO_UPDATE, company_id=company_id)
             )
             return
 
@@ -267,7 +268,7 @@ class CompanySlots:
                 ok = await companies_card.delete_company(session, company_id)
                 if not ok:
                     return _err(
-                        "Компания не найдена.",
+                        NO_COMPANY,
                         company_id=company_id, action="delete_company",
                     )
                 await session.commit()

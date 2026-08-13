@@ -16,6 +16,7 @@ from backend.repository import (
     vacancies_list,
 )
 from client.bridge.answer import _err, _ok
+from client.bridge.refusals import NO_VACANCY
 from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.vacancy_filter import read_vacancy_filter
@@ -101,7 +102,7 @@ class VacancySlots:
                 skills = await profile_repo.list_skills(session)
             if detail is None:
                 logger.warning("vacancy_id=%d not found on detail load", vacancy_id)
-                return _err("Вакансия не найдена.", id=vacancy_id)
+                return _err(NO_VACANCY, id=vacancy_id)
             matched_set = build_skill_lookup(skills)
             return _ok({
                 "vacancy": _vacancy_detail_to_dict(
@@ -151,7 +152,7 @@ class VacancySlots:
                         if v is not None:
                             persisted = v.notes
             if not ok:
-                return _err("Вакансия не найдена.", vacancy_id=vacancy_id)
+                return _err(NO_VACANCY, vacancy_id=vacancy_id)
             return _ok({"vacancy_id": vacancy_id, "notes": persisted})
 
         self._dispatch(self.vacancy_notes_saved, run())
@@ -254,7 +255,7 @@ class VacancySlots:
                 async with self._session_factory() as session:
                     v = await session.get(Vacancy, vacancy_id)
                 if v is None:
-                    return _err("Вакансия не найдена.", vacancy_id=vacancy_id)
+                    return _err(NO_VACANCY, vacancy_id=vacancy_id)
             return _ok({"vacancy_id": vacancy_id})
 
         self._dispatch(self.vacancy_status_saved, run())

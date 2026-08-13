@@ -8,6 +8,7 @@ from PySide6.QtCore import Signal, Slot
 
 from backend.repository import vacancies_life
 from client.bridge.answer import _err, _ok
+from client.bridge.refusals import NO_BOT, NO_VACANCY
 from client.bridge.payload import _log_invalid_payload
 
 
@@ -32,7 +33,7 @@ class VacancyActionSlots:
 
         async def run() -> str:
             if self._bot is None:
-                return _err("Бот ещё не готов.")
+                return _err(NO_BOT)
             ok = await self._bot.ui_rerun_vacancy_pipeline(vacancy_id)
             if not ok:
                 return _err(
@@ -62,7 +63,7 @@ class VacancyActionSlots:
         # Skip-коды → human-readable. Совпадает с тем, что emit'ит
         # IngestionPipeline.send_application_for_vacancy и Bot.send.
         REASONS = {
-            "no_vacancy":         "Вакансия не найдена.",
+            "no_vacancy":         NO_VACANCY,
             "no_hr":              "К вакансии не привязан HR.",
             "already_applied":    "Отклик по этой вакансии уже отправлен.",
             "profile_empty":      "Профиль пуст — нечем заполнить cover letter.",
@@ -81,7 +82,7 @@ class VacancyActionSlots:
 
         async def run() -> str:
             if self._bot is None:
-                return _err("Бот ещё не готов.")
+                return _err(NO_BOT)
             ok, reason = await self._bot.ui_send_vacancy_application(vacancy_id)
             if not ok:
                 msg = REASONS.get(reason, f"Не удалось отправить: {reason}")
@@ -117,7 +118,7 @@ class VacancyActionSlots:
                         ok = await vacancies_life.delete_vacancy(session, vacancy_id)
             if not ok:
                 return _err(
-                    "Вакансия не найдена.",
+                    NO_VACANCY,
                     vacancy_id=vacancy_id,
                     action="delete",
                 )

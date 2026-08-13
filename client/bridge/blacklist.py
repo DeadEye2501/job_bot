@@ -14,6 +14,8 @@ from backend.repository import (
 )
 from client.bridge.answer import _err, _ok
 from client.bridge.payload import _log_invalid_payload
+from client.bridge.refusals import NO_ENTRY
+from client.form_payloads import read_toggle
 from client.bridge.wire import _blacklist_row_to_dict
 
 
@@ -64,7 +66,7 @@ class BlacklistSlots:
                 return _err(str(e), id=blacklist_id, action="update")
             if not ok:
                 return _err(
-                    "Запись не найдена.",
+                    NO_ENTRY,
                     id=blacklist_id, action="update",
                 )
             # value мог поменяться → `is_blacklisted` в HR/Company может
@@ -157,7 +159,7 @@ class BlacklistSlots:
                     ok = await blacklist_repo.delete_blacklist(session, blacklist_id)
             if not ok:
                 return _err(
-                    "Запись не найдена.",
+                    NO_ENTRY,
                     id=blacklist_id,
                     action="delete",
                 )
@@ -181,12 +183,7 @@ class BlacklistSlots:
         active = None
         try:
             payload = json.loads(payload_json)
-            raw_id = payload.get("id")
-            if raw_id is not None:
-                blacklist_id = int(raw_id)
-            raw_active = payload.get("active")
-            if raw_active is not None:
-                active = bool(raw_active)
+            blacklist_id, active = read_toggle(payload, "id", "active")
             if blacklist_id is None or active is None:
                 raise KeyError("id / active")
         except (ValueError, TypeError, KeyError) as e:
@@ -207,7 +204,7 @@ class BlacklistSlots:
                     )
             if not ok:
                 return _err(
-                    "Запись не найдена.",
+                    NO_ENTRY,
                     id=blacklist_id,
                     active=active,
                     action="set_active",

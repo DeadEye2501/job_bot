@@ -17,6 +17,7 @@ from backend.repository import (
     vacancies_card,
 )
 from client.bridge.answer import _err, _ok
+from client.bridge.refusals import COMPANY_EXISTS, IDENTITY_REQUIRED, NAME_REQUIRED, NO_VACANCY
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.wire import _company_picker_row_to_dict, _hr_picker_row_to_dict
 from client.form_payloads import (
@@ -61,7 +62,7 @@ class VacancyLinkSlots:
                 rows, _ = await hr_list.list_hr_with_counts(session, search=search)
                 v = await session.get(Vacancy, vacancy_id)
                 if v is None:
-                    return _err("Вакансия не найдена.", vacancy_id=vacancy_id)
+                    return _err(NO_VACANCY, vacancy_id=vacancy_id)
                 payload = {
                     "vacancy_id": vacancy_id,
                     "current_hr_id": v.hr_id,
@@ -91,7 +92,7 @@ class VacancyLinkSlots:
                 )
                 v = await session.get(Vacancy, vacancy_id)
                 if v is None:
-                    return _err("Вакансия не найдена.", vacancy_id=vacancy_id)
+                    return _err(NO_VACANCY, vacancy_id=vacancy_id)
                 payload = {
                     "vacancy_id": vacancy_id,
                     "current_company_id": v.company_id,
@@ -130,7 +131,7 @@ class VacancyLinkSlots:
                 return _err(str(e), vacancy_id=vacancy_id, action="link_hr")
             if not ok:
                 return _err(
-                    "Вакансия не найдена.",
+                    NO_VACANCY,
                     vacancy_id=vacancy_id,
                     action="link_hr",
                 )
@@ -166,7 +167,7 @@ class VacancyLinkSlots:
                 return _err(str(e), vacancy_id=vacancy_id, action="link_company")
             if not ok:
                 return _err(
-                    "Вакансия не найдена.",
+                    NO_VACANCY,
                     vacancy_id=vacancy_id,
                     action="link_company",
                 )
@@ -198,7 +199,7 @@ class VacancyLinkSlots:
 
         if not hr_is_identified(fields):
             self.hr_picker_loaded.emit(
-                _err("Укажите хотя бы имя или @username.", vacancy_id=vacancy_id)
+                _err(IDENTITY_REQUIRED, vacancy_id=vacancy_id)
             )
             return
 
@@ -241,7 +242,7 @@ class VacancyLinkSlots:
 
         if not name:
             self.company_picker_loaded.emit(
-                _err("Название обязательно.", vacancy_id=vacancy_id)
+                _err(NAME_REQUIRED, vacancy_id=vacancy_id)
             )
             return
 
@@ -267,7 +268,7 @@ class VacancyLinkSlots:
                     }
             except IntegrityError:
                 return _err(
-                    f"Компания «{name}» уже существует.",
+                    COMPANY_EXISTS.format(name=name),
                     vacancy_id=vacancy_id,
                 )
             except ValueError as e:
