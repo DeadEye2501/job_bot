@@ -427,6 +427,20 @@ def int_or_none(value) -> int | None:
         return None
 
 
+def float_or_none(value) -> float | None:
+    """Дробное поле нагрузки: пропуск, пустота и негодное значат отсутствие.
+
+    Читается тем же договором, что и целое: границы вилки зарплаты приходят
+    из тех же полей ввода и теми же тремя видами пустоты.
+    """
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def moment_or_none(value) -> datetime | None:
     """Момент времени из нагрузки, записанный по ISO.
 

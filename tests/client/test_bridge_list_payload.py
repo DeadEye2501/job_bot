@@ -32,6 +32,25 @@ async def test_a_filter_value_with_stray_spaces_still_finds_the_vacancy(
     assert titles == ["Питонист"]
 
 
+async def test_a_single_choice_filter_with_stray_spaces_still_matches(
+    main_api, watch, session_factory
+):
+    """Одиночный выбор с пробелом по краям находит вакансию так же, как список.
+
+    Грейд, формат работы и наличие HR приходят из тех же полей окна, что и
+    списки выбранного, и правило у них одно. Разойдись оно — человек, вставив
+    значение из буфера, увидел бы пустой экран на одном фильтре и полный на
+    соседнем, ничем эти два случая не различая.
+    """
+    caught = watch(main_api.vacancies_changed)
+    await put(session_factory, vacancy_row(title="Питонист", grade="Junior"))
+
+    main_api.request_vacancies(json.dumps({"grade": " Junior "}))
+
+    titles = [row["title"] for row in (await caught.next())["vacancies"]]
+    assert titles == ["Питонист"]
+
+
 async def test_the_request_ordinal_comes_back_as_a_number(
     main_api, watch, session_factory
 ):
