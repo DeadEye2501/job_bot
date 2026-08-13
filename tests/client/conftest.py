@@ -14,10 +14,11 @@ import json
 from concurrent.futures import Future
 
 import pytest
+from PySide6.QtWidgets import QFileDialog
 
 from backend.log_buffer import get_handler
 from backend.runtime_settings import RuntimeSettings
-from client.bridge import MainApi
+from client.bridge import MainApi, WizardApi
 from tests.fakes.ui_bot import UiBot
 
 
@@ -137,6 +138,34 @@ async def main_api(runtime_settings, session_factory, runner) -> MainApi:
 def watch():
     """Ловушка сигнала: `watch(api.vacancies_changed)`."""
     return Caught
+
+
+@pytest.fixture
+async def wizard_api(runtime_settings, session_factory, runner) -> WizardApi:
+    """Поверхность окна первого запуска.
+
+    Ни таймеров, ни бота у мастера нет — прибирать за ним нечего, но работы он
+    порождает тем же способом, и дождаться их надо так же.
+    """
+    api = WizardApi(runtime_settings, session_factory, runner)
+    yield api
+    while runner.tasks:
+        started, runner.tasks = runner.tasks, []
+        await asyncio.gather(*started, return_exceptions=True)
+
+
+@pytest.fixture
+def chosen_file(monkeypatch):
+    """Отвечает за человека в диалоге выбора файла.
+
+    Диалог — статический вызов Qt, поднимающий настоящее окно; подменяется он
+    целиком, иначе прогон встал бы на первом же тесте, ожидая нажатия.
+    """
+
+    def _choose(path: str) -> None:
+        monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *a, **k: (path, ""))
+
+    return _choose
 
 
 @pytest.fixture
