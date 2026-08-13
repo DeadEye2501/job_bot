@@ -134,7 +134,7 @@ async def test_the_channel_list_keeps_the_unparsed_ones_on_purpose(
         ),
     )
 
-    got = await list_vacancies_for_channel(session, channel.id)
+    got, _ = await list_vacancies_for_channel(session, channel.id)
 
     assert sorted(v.title for v in got) == sorted(["разобранная", "недоразобранная"])
 
@@ -181,7 +181,7 @@ async def test_the_channel_list_leads_with_the_hottest_status(
         ],
     )
 
-    got = await list_vacancies_for_channel(session, channel.id)
+    got, _ = await list_vacancies_for_channel(session, channel.id)
 
     assert [v.title for v in got] == [s.value for s in _HOTTEST_FIRST]
 
@@ -213,7 +213,7 @@ async def test_inside_one_status_the_channel_list_prefers_the_posting_date(
         ),
     )
 
-    got = await list_vacancies_for_channel(session, channel.id)
+    got, _ = await list_vacancies_for_channel(session, channel.id)
 
     assert [v.title for v in got] == ["опубликована позже", "создана позже"]
 
@@ -236,8 +236,8 @@ async def test_the_channel_list_pages(session, session_factory):
         vacancy_row(title="третья", source_channel_id=channel.id, created_at=at(30)),
     )
 
-    first = await list_vacancies_for_channel(session, channel.id, limit=2)
-    second = await list_vacancies_for_channel(session, channel.id, limit=2, offset=2)
+    first, _ = await list_vacancies_for_channel(session, channel.id, limit=2)
+    second, _ = await list_vacancies_for_channel(session, channel.id, limit=2, offset=2)
 
     assert [v.title for v in first] == ["первая", "вторая"]
     assert [v.title for v in second] == ["третья", "четвёртая"]
@@ -255,6 +255,6 @@ async def test_a_neighbouring_channels_vacancies_stay_out(session, session_facto
         vacancy_row(title="ничья", source_channel_id=None),
     )
 
-    got = await list_vacancies_for_channel(session, mine.id)
+    got, _ = await list_vacancies_for_channel(session, mine.id)
 
     assert [v.title for v in got] == ["моя"]

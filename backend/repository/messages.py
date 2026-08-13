@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Message
 from backend.payloads import IncomingMessage, OutgoingMessage
+from backend.repository.paging import trim_page
 
 # Раскрывается звёздочкой в `.where(...)`: `.where(*UNREAD_INCOMING, ...)`.
 # Надгробие исключено намеренно — удалённое, но не прочитанное входящее иначе
@@ -324,10 +325,8 @@ async def list_messages_for_hr(
             .limit(limit + 1)
         )
     ).all()
-    has_more = len(rows) > limit
-    if has_more:
-        rows = rows[:limit]
-    return list(reversed(rows)), has_more
+    page, has_more = trim_page(list(rows), limit)
+    return list(reversed(page)), has_more
 
 
 async def count_unread_incoming(session: AsyncSession) -> int:

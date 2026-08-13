@@ -42,7 +42,8 @@ async def test_the_row_carries_its_counts_and_last_company(session, session_fact
         *unread_probe_with_a_neighbour(hr.id, other.id),
     )
 
-    row = next(r for r in await list_hr_with_counts(session) if r.hr.id == hr.id)
+    found, _ = await list_hr_with_counts(session)
+    row = next(r for r in found if r.hr.id == hr.id)
 
     assert row.vacancy_count == 2
     assert row.last_company_name == "Ромашка"
@@ -70,7 +71,8 @@ async def test_vacancies_of_the_same_moment_are_broken_by_id(
         vacancy_row(hr_id=hr.id, company_id=second.id, created_at=at(20)),
     )
 
-    row = next(r for r in await list_hr_with_counts(session) if r.hr.id == hr.id)
+    found, _ = await list_hr_with_counts(session)
+    row = next(r for r in found if r.hr.id == hr.id)
 
     assert row.last_company_name == "Ромашка"
 
@@ -97,7 +99,8 @@ async def test_an_unlinked_freshest_vacancy_leaves_the_company_empty(
         vacancy_row(hr_id=hr.id, company_id=company.id, created_at=at(10)),
     )
 
-    row = next(r for r in await list_hr_with_counts(session) if r.hr.id == hr.id)
+    found, _ = await list_hr_with_counts(session)
+    row = next(r for r in found if r.hr.id == hr.id)
 
     assert row.last_company_name is None
 
@@ -118,6 +121,7 @@ async def test_the_blacklist_mark_is_set_under_either_spelling(
         blacklist_row("channel", "@vik"),
     )
 
-    marks = {r.hr.name: r.is_blacklisted for r in await list_hr_with_counts(session)}
+    found, _ = await list_hr_with_counts(session)
+    marks = {r.hr.name: r.is_blacklisted for r in found}
 
     assert marks == {"Анна": True, "Борис": True, "Виктор": False}

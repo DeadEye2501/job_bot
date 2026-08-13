@@ -12,7 +12,8 @@ from tests.factories import blacklist_row, company_row, vacancy_row
 
 async def names(session, **kwargs) -> list[str]:
     """Названия компаний в порядке выдачи."""
-    return [row.company.name for row in await list_companies_with_counts(session, **kwargs)]
+    rows, _ = await list_companies_with_counts(session, **kwargs)
+    return [row.company.name for row in rows]
 
 
 async def test_the_list_leads_with_the_most_prolific_company(
@@ -136,7 +137,8 @@ async def test_the_row_carries_its_count_and_blacklist_mark(session, session_fac
         blacklist_row("hr", "Берёзка"),
     )
 
-    rows = {r.company.name: r for r in await list_companies_with_counts(session)}
+    found, _ = await list_companies_with_counts(session)
+    rows = {r.company.name: r for r in found}
 
     assert rows["Контур"].vacancy_count == 1
     assert rows["Контур"].is_blacklisted is True

@@ -63,14 +63,13 @@ class HrSlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await hr_list.list_hr_with_counts(
+                rows, has_more = await hr_list.list_hr_with_counts(
                     session,
                     search=search,
                     limit=page.limit,
                     offset=page.offset,
                     sort_by="last_activity",
                 )
-            has_more = (page.limit is not None) and (len(rows) == page.limit)
             return _ok({
                 "search": search or "",
                 "hrs": [_hr_picker_row_to_dict(r) for r in rows],
@@ -164,7 +163,7 @@ class HrSlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await hr_list.list_hr_with_counts(session, search=search)
+                rows, _ = await hr_list.list_hr_with_counts(session, search=search)
             return _ok({
                 "absorbed_id": absorbed_id,
                 "search": search or "",

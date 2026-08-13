@@ -58,7 +58,7 @@ class VacancyLinkSlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await hr_list.list_hr_with_counts(session, search=search)
+                rows, _ = await hr_list.list_hr_with_counts(session, search=search)
                 v = await session.get(Vacancy, vacancy_id)
                 if v is None:
                     return _err("Вакансия не найдена.", vacancy_id=vacancy_id)
@@ -86,7 +86,7 @@ class VacancyLinkSlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await companies_list.list_companies_with_counts(
+                rows, _ = await companies_list.list_companies_with_counts(
                     session, search=search
                 )
                 v = await session.get(Vacancy, vacancy_id)
@@ -207,7 +207,7 @@ class VacancyLinkSlots:
                 async with session.begin():
                     new_hr = await hr_identify.create_hr(session, **fields)
                     created_id = new_hr.id
-                rows = await hr_list.list_hr_with_counts(session, search=search)
+                rows, _ = await hr_list.list_hr_with_counts(session, search=search)
                 v = await session.get(Vacancy, vacancy_id)
                 current_hr_id = v.hr_id if v is not None else None
                 payload = {
@@ -253,7 +253,7 @@ class VacancyLinkSlots:
                             session, **fields
                         )
                         created_id = new_co.id
-                    rows = await companies_list.list_companies_with_counts(
+                    rows, _ = await companies_list.list_companies_with_counts(
                         session, search=search
                     )
                     v = await session.get(Vacancy, vacancy_id)

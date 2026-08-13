@@ -10,6 +10,7 @@ from backend.repository.blacklist_marks import active_blacklist_values
 from backend.repository.hr_card import LAST_VACANCY_ORDER, hr_blacklist_candidates
 from backend.repository.hr_identify import HAS_TELEGRAM_IDENTITY
 from backend.repository.messages import UNREAD_INCOMING
+from backend.repository.paging import slice_page
 from backend.repository.search import matches_search
 
 _HR_BY_VACANCY_COUNT = (func.count(Vacancy.id).desc(), HR.name.asc())
@@ -161,21 +162,18 @@ async def _unread_by_hr(session: AsyncSession) -> dict[int, int]:
 
 
 def _found_page(rows, search: str | None, limit: int | None, offset: int):
-    """Строки, подходящие под искомое, и из них — запрошенная страница.
+    """Строки, подходящие под искомое, из них страница и есть ли за ней ещё.
 
     Отбор идёт в Python (см. :func:`backend.repository.search.matches_search`),
-    и страница отрезается **после** него: иначе бесконечная прокрутка
-    считала бы страницы по одному множеству, а показывала другое. Без
-    предела возвращается всё — так это окно связывания и звало всегда.
+    и страница отрезается после него — почему, сказано у `paging.slice_page`.
+    Без предела возвращается всё: так это окно связывания и звало всегда.
     """
     found = [
         (hr, cnt)
         for hr, cnt in rows
         if matches_search(search, hr.name, hr.telegram_username)
     ]
-    if limit is None:
-        return found
-    return found[offset : offset + limit]
+    return slice_page(found, limit, offset)
 
 
 async def list_hr_with_counts(
@@ -185,8 +183,8 @@ async def list_hr_with_counts(
     limit: int | None = None,
     offset: int = 0,
     sort_by: str = "vacancy_count",
-) -> list[HrWithCount]:
-    """All HRs with their vacancy count and most recent linked company.
+) -> tuple[list[HrWithCount], bool]:
+    """Страница людей со счётом вакансий и последней компанией, и есть ли за ней ещё.
 
     Used by the "Связать с HR" picker AND the Contacts/HR pane (05).
 
@@ -196,7 +194,7 @@ async def list_hr_with_counts(
     :func:`_last_company_by_hr`.
     """
     rows = (await session.execute(_hr_counts_query(sort_by))).all()
-    counts = _found_page(rows, search, limit, offset)
+    counts, has_more = _found_page(rows, search, limit, offset)
     last_co = await _last_company_by_hr(session)
     unread_by_hr = await _unread_by_hr(session)
     bl_values = await active_blacklist_values(session, "hr")
@@ -211,7 +209,7 @@ async def list_hr_with_counts(
             ),
         )
         for hr, cnt in counts
-    ]
+    ], has_more
 
 
 async def list_hrs_for_company(

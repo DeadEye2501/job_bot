@@ -120,7 +120,7 @@ class ChannelSlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await vacancies_mini.list_vacancies_for_channel(
+                rows, has_more = await vacancies_mini.list_vacancies_for_channel(
                     session, channel_id, limit=page.limit, offset=page.offset,
                 )
                 # Diagnostic — раз баг проявляется: 0 здесь vs N в stats
@@ -148,7 +148,7 @@ class ChannelSlots:
                 "channel_id": channel_id,
                 "offset": page.offset,
                 "mode": page.mode,
-                "has_more": len(rows) == page.limit,
+                "has_more": has_more,
                 "vacancies": [
                     {
                         "id": v.id,
