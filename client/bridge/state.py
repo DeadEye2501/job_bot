@@ -21,6 +21,33 @@ _HEALTHCHECK_INTERVAL_MS = 5_000
 _UNREAD_INTERVAL_MS = 15_000
 
 
+async def _model_answers(cfg, check_fn, kind: str) -> bool:
+    """Отвечает ли модель поставщика — тем же вопросом, что и кнопка проверки.
+
+    Проверка спрашивает у поставщика перечень имён **и** шлёт пробное
+    обращение: модель числится и не отвечает чаще, чем кажется, — из-за
+    нехватки памяти, чужой занятости или несовместимости с родом обращения.
+    Лампочка, смотревшая только на перечень, горела зелёным там, где кнопка
+    в настройках отвечала красным, на одном и том же наборе настроек.
+
+    Цена — одно пробное обращение на поставщика раз в
+    `_HEALTHCHECK_INTERVAL_MS`; при нынешних пяти секундах это двадцать
+    четыре обращения в минуту на двоих. Ритм лампочки — вопрос к человеку,
+    он записан хвостом в плане этапа.
+    """
+    if cfg is None:
+        return False
+    client = lm_studio.make_client(cfg)
+    try:
+        ok, _detail = await check_fn(client, cfg.model)
+        return ok
+    except Exception as e:
+        logger.debug("healthcheck: %s probe failed: %s", kind, e)
+        return False
+    finally:
+        await client.aclose()
+
+
 class WindowStateSlots:
     """То, что окно показывает всегда, на каком бы экране ни стояло.
 
@@ -158,25 +185,12 @@ class WindowStateSlots:
                 and getattr(self._bot._client, "is_connected", False)
             )
 
-            if self._rs.chat is not None:
-                client = lm_studio.make_client(self._rs.chat)
-                try:
-                    models = await lm_studio.list_models(client)
-                    results["chat"] = self._rs.chat.model in models
-                except Exception as e:
-                    logger.debug("healthcheck: chat probe failed: %s", e)
-                finally:
-                    await client.aclose()
-
-            if self._rs.embed is not None:
-                client = lm_studio.make_client(self._rs.embed)
-                try:
-                    models = await lm_studio.list_models(client)
-                    results["embed"] = self._rs.embed.model in models
-                except Exception as e:
-                    logger.debug("healthcheck: embed probe failed: %s", e)
-                finally:
-                    await client.aclose()
+            results["chat"] = await _model_answers(
+                self._rs.chat, lm_studio.check_chat, "chat"
+            )
+            results["embed"] = await _model_answers(
+                self._rs.embed, lm_studio.check_embed, "embed"
+            )
 
             return _ok(results)
 

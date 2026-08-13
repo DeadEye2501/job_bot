@@ -200,3 +200,43 @@ async def test_a_saved_model_reaches_the_settings(wizard_api, main_api, watch):
 
     main_api.request_system_settings()
     assert (await shown.next())["chat"]["model"] == "qwen"
+
+
+async def test_a_listed_but_silent_model_lights_the_lamp_red(
+    main_api, watch, provider_says, runtime_settings
+):
+    """Лампочка в шапке гаснет от той же беды, что и кнопка проверки.
+
+    Модель числится у провайдера и не отвечает — из-за нехватки памяти или
+    чужой занятости. Смотри лампочка только перечень имён, человек видел бы
+    зелёное в шапке и красное в настройках на одном и том же наборе, и не
+    понял бы, чему верить.
+    """
+    caught = watch(main_api.health_changed)
+    provider_says({
+        MODELS: models_response("qwen"),
+        CHAT: httpx.Response(500, text="модель выгружена"),
+    })
+    await runtime_settings.set_chat(
+        base_url="http://localhost:1234", api_key="", model="qwen"
+    )
+
+    main_api.request_initial()
+
+    assert (await caught.next())["chat"] is False
+
+
+async def test_saving_a_provider_without_a_model_is_refused(wizard_api, watch):
+    """Пустую модель не сохраняют молча.
+
+    Сохранённая пустота выглядит как настроенный поставщик: экран показывает
+    заполненный адрес, а первый же разбор вакансии падает на пустом имени
+    модели — и ищут беду где угодно, только не в мастере.
+    """
+    caught = watch(wizard_api.chat_save_done)
+
+    wizard_api.chat_save(json.dumps({"base_url": "http://localhost:1234", "model": ""}))
+
+    answer = await caught.next()
+    assert answer["ok"] is False
+    assert answer["error"] == "Заполните base_url и модель."

@@ -13,17 +13,17 @@ from PySide6.QtWidgets import QFileDialog, QMainWindow, QWidget
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from adapters import lm_studio
-from adapters.lm_studio import LlmProviderConfig
 from backend.llm.cv import parse_cv
 from backend.repository import profile as profile_repo
 from backend.runtime_settings import RuntimeSettings
 from backend.telegram_login import TelegramLogin
 from client.bridge.answer import _dispatch_json, _err, _ok
 from client.bridge.cv_file import _read_cv_text
-from client.bridge.llm import _do_list_models_for_creds, _do_llm_probe
+from client.bridge.llm import _do_llm_probe, models_coro, read_llm_creds
 from client.bridge.login import TelegramLoginSlots
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.runner import AsyncRunner
+from client.bridge.wire import _llm_provider_to_dict
 
 
 logger = logging.getLogger(__name__)
@@ -99,16 +99,8 @@ class WizardApi(TelegramLoginSlots, QObject):
                     "phone": tg.phone if tg else "",
                     "password": tg.password if tg else "",
                 },
-                "chat": {
-                    "base_url": chat.base_url if chat else "",
-                    "api_key": chat.api_key if chat else "",
-                    "model": chat.model if chat else "",
-                },
-                "embed": {
-                    "base_url": embed.base_url if embed else "",
-                    "api_key": embed.api_key if embed else "",
-                    "model": embed.model if embed else "",
-                },
+                "chat": _llm_provider_to_dict(chat),
+                "embed": _llm_provider_to_dict(embed),
                 "cv_path": cv_path,
             }
         )
@@ -140,20 +132,16 @@ class WizardApi(TelegramLoginSlots, QObject):
         check_fn: Callable[[httpx.AsyncClient, str], Any],
     ) -> None:
         try:
-            payload = json.loads(payload_json)
-            base_url = str(payload["base_url"]).strip().rstrip("/")
-            api_key = str(payload.get("api_key") or "")
-            model = str(payload["model"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
+            cfg = read_llm_creds(json.loads(payload_json))
+        except ValueError as e:
+            signal.emit(_err(str(e)))
+            return
+        except (KeyError, TypeError) as e:
             _log_invalid_payload("_make_llm_check", e)
             signal.emit(_err(f"Неверные поля: {e}"))
             return
-        if not base_url or not model:
-            signal.emit(_err("Заполните base_url и модель."))
-            return
 
         async def run() -> str:
-            cfg = LlmProviderConfig(base_url=base_url, api_key=api_key, model=model)
             ok, detail, models, _latency_ms = await _do_llm_probe(cfg, check_fn)
             if not ok:
                 return _err(detail)
@@ -181,57 +169,41 @@ class WizardApi(TelegramLoginSlots, QObject):
         в datalist только actually-loaded модели подходящего типа,
         иначе LM Studio тихо JIT-загружает выгруженную при первом probe.
         """
+        coro = models_coro(payload_json)
+        if coro is not None:
+            self._dispatch(self.models_listed, coro)
+
+    def _make_llm_save(self, payload_json: str, signal: Signal, setter) -> None:
+        """Сохранить черновые учётные данные поставщика.
+
+        Приём тот же, что у `_make_llm_check` рядом: два поставщика
+        различаются только тем, куда записать и каким сигналом ответить.
+        """
         try:
-            payload = json.loads(payload_json)
-            kind = str(payload.get("kind") or "")
-            base_url = str(payload["base_url"]).strip().rstrip("/")
-            api_key = str(payload.get("api_key") or "")
-        except (KeyError, ValueError, TypeError):
+            cfg = read_llm_creds(json.loads(payload_json))
+        except ValueError as e:
+            signal.emit(_err(str(e)))
             return
-        if not base_url or kind not in ("chat", "embed"):
+        except (KeyError, TypeError) as e:
+            _log_invalid_payload("_make_llm_save", e)
+            signal.emit(_err(f"Неверные поля: {e}"))
             return
 
         async def run() -> str:
-            result = await _do_list_models_for_creds(base_url, api_key, kind=kind)
-            return json.dumps({"kind": kind, **result})
+            await setter(
+                base_url=cfg.base_url, api_key=cfg.api_key, model=cfg.model
+            )
+            return _ok()
 
-        self._dispatch(self.models_listed, run())
+        self._dispatch(signal, run())
 
     @Slot(str)
     def chat_save(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            base_url = str(payload["base_url"]).strip().rstrip("/")
-            api_key = str(payload.get("api_key") or "")
-            model = str(payload["model"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("chat_save", e)
-            self.chat_save_done.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        async def run() -> str:
-            await self._rs.set_chat(base_url=base_url, api_key=api_key, model=model)
-            return _ok()
-
-        self._dispatch(self.chat_save_done, run())
+        self._make_llm_save(payload_json, self.chat_save_done, self._rs.set_chat)
 
     @Slot(str)
     def embed_save(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            base_url = str(payload["base_url"]).strip().rstrip("/")
-            api_key = str(payload.get("api_key") or "")
-            model = str(payload["model"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("embed_save", e)
-            self.embed_save_done.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        async def run() -> str:
-            await self._rs.set_embed(base_url=base_url, api_key=api_key, model=model)
-            return _ok()
-
-        self._dispatch(self.embed_save_done, run())
+        self._make_llm_save(payload_json, self.embed_save_done, self._rs.set_embed)
 
     # --- CV ---------------------------------------------------------------
 
