@@ -333,14 +333,13 @@ def _login_confirm_password(api, payload_json: str) -> None:
 
 
 def _log_invalid_payload(slot: str, exc: Exception) -> None:
-    """Стандартный WARNING для всех `_err(f"Неверные поля: {e}")` ветвей.
-
-    Логируем только класс и текст исключения — payload может содержать
-    api_key, текст сообщения, пароль; никогда не выводим его целиком.
+    """Порода ошибки без её текста: `int()` вставляет туда само значение, а
+    нагрузка несёт api_hash, ключ модели и пароль — образцы вымарывания хэш
+    без имени поля рядом не ловят. У `KeyError` текст — имя поля, и оно живёт.
     """
-    logger.warning(
-        "%s: invalid payload: %s: %s", slot, type(exc).__name__, exc
-    )
+    missing = exc.args[0] if isinstance(exc, KeyError) and exc.args else None
+    said = f"нет поля {missing!r}" if missing is not None else type(exc).__name__
+    logger.warning("%s: invalid payload: %s", slot, said)
 
 
 def _media_url(stored_path: str | None) -> str | None:
