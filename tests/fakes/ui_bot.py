@@ -83,6 +83,9 @@ class UiBot:
         self._refuse_if_asked()
         return Sent(id=self.answers["sent"])
 
+    async def log_out_session(self) -> None:
+        self.calls.append(("log_out_session",))
+
     async def poll_channel_now(self, channel_id: int) -> str:
         self.calls.append(("poll_channel_now", channel_id))
         return self.answers["channel_poll"]
