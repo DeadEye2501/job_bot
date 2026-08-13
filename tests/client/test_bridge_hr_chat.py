@@ -91,7 +91,7 @@ async def test_marking_read_before_the_bot_is_up_is_refused(
 
     answer = await caught.next()
     assert answer["ok"] is False
-    assert answer["error"] == "Бот ещё не запущен."
+    assert answer["error"] == "Бот ещё не готов."
 
 
 async def test_marking_read_reaches_the_bot(main_api, watch, with_bot, session_factory):
@@ -206,3 +206,4 @@ async def test_a_chosen_file_travels_to_the_bot(
 
     assert (await caught.next())["message_id"] == 99
     assert ("send_to_hr_media", hr.id, "C:/резюме.pdf") in bot.calls
+

@@ -11,6 +11,7 @@ from adapters import lm_studio
 from backend.models import BotMode
 from backend.repository import hr_list, messages as messages_repo
 from client.bridge.answer import _err, _ok
+from client.bridge.refusals import BUSY_CYCLE
 
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,7 @@ class WindowStateSlots:
         async def run() -> str:
             status = await self._bot.force_poll_once()
             if status == "busy":
-                return _err("Уже идёт другой цикл, попробуйте позже.", action="trigger_ingestion", status=status)
+                return _err(BUSY_CYCLE, action="trigger_ingestion", status=status)
             if status == "ok":
                 return _ok({"action": "trigger_ingestion", "status": status})
             messages = {

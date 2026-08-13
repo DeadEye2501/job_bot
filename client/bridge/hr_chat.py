@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QFileDialog
 from backend.payloads import int_or_none, moment_or_none
 from backend.repository import messages as messages_repo
 from client.bridge.answer import _err, _ok
+from client.bridge.refusals import NO_BOT
 from client.bridge.media import _media_url
 from client.bridge.page import read_mode
 from client.bridge.payload import _log_invalid_payload
@@ -48,7 +49,7 @@ class HrChatSlots:
         """
         async def run() -> str:
             if self._bot is None:
-                return _err("Бот ещё не запущен.", hr_id=hr_id)
+                return _err(NO_BOT, hr_id=hr_id)
             try:
                 updated = await self._bot.mark_hr_chat_read(hr_id)
             except Exception as e:
@@ -94,7 +95,7 @@ class HrChatSlots:
 
         async def run() -> str:
             if self._bot is None:
-                return _err("Бот ещё не запущен.", hr_id=hr_id)
+                return _err(NO_BOT, hr_id=hr_id)
             try:
                 msg = await self._bot.send_to_hr_chat(hr_id, text)
             except RuntimeError as e:
@@ -134,7 +135,7 @@ class HrChatSlots:
 
         async def run() -> str:
             if self._bot is None:
-                return _err("Бот ещё не запущен.", hr_id=hr_id)
+                return _err(NO_BOT, hr_id=hr_id)
             try:
                 msg = await self._bot.send_to_hr_media(hr_id, path)
             except RuntimeError as e:

@@ -9,8 +9,10 @@ from PySide6.QtCore import Signal, Slot
 from backend.domain.telegram_identity import normalize_username
 from backend.repository import channels as channels_repo
 from client.bridge.answer import _err, _ok
+from client.bridge.refusals import BUSY_CYCLE, NO_BOT, NO_CHANNEL
 from client.bridge.mark import CHANNEL_MARK, mark, unmark
 from client.bridge.payload import _log_invalid_payload
+from client.form_payloads import read_toggle
 
 
 class ChannelActionSlots:
@@ -60,7 +62,7 @@ class ChannelActionSlots:
         """UI «Прогнать сейчас» — single-channel poll."""
         async def run() -> str:
             if self._bot is None:
-                return _err("Бот ещё не готов.", channel_id=channel_id, action="poll_now")
+                return _err(NO_BOT, channel_id=channel_id, action="poll_now")
             status = await self._bot.poll_channel_now(channel_id)
             if status == "ok":
                 return _ok({
@@ -69,7 +71,7 @@ class ChannelActionSlots:
                     "status": status,
                 })
             messages = {
-                "busy": "Уже идёт другой цикл, попробуйте позже.",
+                "busy": BUSY_CYCLE,
                 "missing": "Канал не найден или без @username.",
                 "cancelled": "Поллинг канала отменён.",
                 "error": "Не удалось прогнать канал — см. логи.",
@@ -91,11 +93,11 @@ class ChannelActionSlots:
         """UI «Сбросить курсор» — clears last_processed_msg_id."""
         async def run() -> str:
             if self._bot is None:
-                return _err("Бот ещё не готов.", channel_id=channel_id, action="reset_cursor")
+                return _err(NO_BOT, channel_id=channel_id, action="reset_cursor")
             ok = await self._bot.reset_channel_cursor(channel_id)
             if not ok:
                 return _err(
-                    "Канал не найден.",
+                    NO_CHANNEL,
                     channel_id=channel_id,
                     action="reset_cursor",
                 )
@@ -111,11 +113,11 @@ class ChannelActionSlots:
         """UI «Удалить канал» — nulls vacancy FKs, deletes row."""
         async def run() -> str:
             if self._bot is None:
-                return _err("Бот ещё не готов.", channel_id=channel_id, action="delete")
+                return _err(NO_BOT, channel_id=channel_id, action="delete")
             detached = await self._bot.delete_channel(channel_id)
             if detached is None:
                 return _err(
-                    "Канал не найден.",
+                    NO_CHANNEL,
                     channel_id=channel_id,
                     action="delete",
                 )
@@ -169,7 +171,7 @@ class ChannelActionSlots:
 
         async def run() -> str:
             if self._bot is None:
-                return _err("Бот ещё не готов.", action="create")
+                return _err(NO_BOT, action="create")
             channel_id, status = await self._bot.add_channel(username)
             if status == "invalid":
                 return _err(
@@ -235,12 +237,7 @@ class ChannelActionSlots:
         is_active = None
         try:
             payload = json.loads(payload_json)
-            raw_id = payload.get("channel_id")
-            if raw_id is not None:
-                channel_id = int(raw_id)
-            raw_active = payload.get("is_active")
-            if raw_active is not None:
-                is_active = bool(raw_active)
+            channel_id, is_active = read_toggle(payload, "channel_id", "is_active")
             if channel_id is None or is_active is None:
                 raise KeyError("channel_id / is_active")
         except (ValueError, TypeError, KeyError) as e:
@@ -273,7 +270,7 @@ class ChannelActionSlots:
                     )
             if not ok:
                 return _err(
-                    "Канал не найден.",
+                    NO_CHANNEL,
                     channel_id=channel_id,
                     is_active=is_active,
                     action="set_active",

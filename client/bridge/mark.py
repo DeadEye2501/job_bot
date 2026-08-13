@@ -29,6 +29,7 @@ from backend.repository import (
 )
 from backend.repository.blacklist_marks import preferred_blacklist_value
 from client.bridge.answer import _err, _ok
+from client.bridge.refusals import NO_CHANNEL, NO_COMPANY, NO_HR
 
 
 @dataclass(frozen=True)
@@ -47,7 +48,7 @@ HR_MARK = MarkSubject(
     kind="hr",
     model=HR,
     key="hr_id",
-    missing="HR не найден.",
+    missing=NO_HR,
     unnamed="У HR нет ни @username, ни telegram_user_id.",
     candidates=hr_card.hr_blacklist_candidates,
 )
@@ -56,7 +57,7 @@ COMPANY_MARK = MarkSubject(
     kind="company",
     model=Company,
     key="company_id",
-    missing="Компания не найдена.",
+    missing=NO_COMPANY,
     unnamed="У компании нет имени.",
     candidates=companies_card.company_blacklist_candidates,
 )
@@ -65,7 +66,7 @@ CHANNEL_MARK = MarkSubject(
     kind="channel",
     model=TelegramChannel,
     key="channel_id",
-    missing="Канал не найден.",
+    missing=NO_CHANNEL,
     unnamed="У канала нет @username.",
     candidates=channels_repo.channel_blacklist_candidates,
 )
