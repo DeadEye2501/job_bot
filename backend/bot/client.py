@@ -214,6 +214,21 @@ class Bot:
         gate-проверок (`if bot is not None and bot.is_ready: ...`)."""
         return self._loop is not None
 
+    @property
+    def is_connected(self) -> bool:
+        """Держится ли сейчас связь с Telegram.
+
+        Отдельно от `is_ready`: тот говорит, что бот запустился, а этот — что
+        сессия жива прямо сейчас. Отваливается он не мгновенно: биение
+        Pyrogram ловит обрыв за полминуты-минуту.
+
+        Объявлено здесь, потому что спрашивает лампочка окна, а лазить в
+        закрытый `_client` снаружи ей нечем — и прежде она делала именно это.
+        """
+        return bool(
+            self.is_ready and getattr(self._client, "is_connected", False)
+        )
+
     def kick(self) -> None:
         """Wake the loop so the next poll runs immediately instead of waiting.
 
