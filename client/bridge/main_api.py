@@ -10,7 +10,6 @@ from typing import Any, Coroutine
 
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import (
-    QMainWindow,
     QWidget,
 )
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
@@ -88,7 +87,6 @@ class MainApi(
         session_factory: async_sessionmaker,
         runner: AsyncRunner,
         parent_widget: QWidget | None = None,
-        window: QMainWindow | None = None,
         engine: AsyncEngine | None = None,
     ) -> None:
         super().__init__()
@@ -96,7 +94,6 @@ class MainApi(
         self._session_factory = session_factory
         self._runner = runner
         self._parent_widget = parent_widget
-        self._window = window
         self._engine = engine  # для dispose() в delete_all_data
         self._bot = None
         self._bot_task: Future | None = None

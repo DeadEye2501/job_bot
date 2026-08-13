@@ -125,6 +125,6 @@ config.py             # пути к user-data-dir
 - `pyrogram` + `tgcrypto`
 - `pyside6` (Qt 6.x)
 - `sqlalchemy` (async) + `aiosqlite` + `alembic`
-- `httpx`, `cryptography`, `keyring`, `pypdf`, `numpy`
+- `httpx`, `cryptography`, `keyring`, `numpy`
 
 LLM-провайдер не привязан к коду — нужен любой OpenAI-совместимый endpoint с `/v1/chat/completions`, `/v1/embeddings` и `/v1/models`. Для LM Studio используется и его native `/api/v0/models` (фильтрация по `state=loaded` + `type` для UI-picker'а).
