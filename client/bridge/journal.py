@@ -8,7 +8,7 @@ import time
 
 from PySide6.QtCore import Signal, Slot
 
-from backend.log_buffer import MAX_RECORDS, get_handler
+from backend.log_buffer import get_handler
 from backend.payloads import int_or_none
 from client.bridge.answer import _err, _ok
 from client.bridge.payload import _log_invalid_payload
@@ -53,6 +53,10 @@ class JournalSlots:
         Заслон от частых обращений: окно опрашивает журнал по своим часам, и
         второе обращение за секунду ничего не добавит — записи оно и так
         получит подпиской.
+
+        Потолок не зажимается: больше кольца (`log_buffer.MAX_RECORDS`) в
+        ответе и не бывает, а зажим на границе выглядел бы правилом, которого
+        нет.
         """
         now = time.monotonic()
         if now - self._logs_request_last_ts < _LOGS_REQUEST_INTERVAL_S:
@@ -62,7 +66,6 @@ class JournalSlots:
         try:
             payload = json.loads(payload_json) if payload_json else {}
             limit = int_or_none(payload.get("limit")) or _LOGS_PAGE
-            limit = min(limit, MAX_RECORDS)
         except (AttributeError, ValueError, TypeError) as e:
             _log_invalid_payload("request_system_logs", e)
             self.system_logs_loaded.emit(_err(f"Неверные поля: {e}"))

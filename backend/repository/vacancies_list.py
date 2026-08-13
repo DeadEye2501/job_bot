@@ -1,5 +1,6 @@
 """Отбор вакансий для списка на экране."""
 
+import logging
 from datetime import datetime
 
 from sqlalchemy import String, case, cast, func, or_, select
@@ -14,27 +15,22 @@ from backend.models import (
     VacancyEvent,
     VacancyStatus,
     VacancyStatusHistory,
+    status_code,
 )
 from backend.payloads import VacancyFilter
 from backend.repository.paging import trim_page
 from backend.repository.vacancies_card import VACANCY_NEIGHBOURS
 from backend.repository.vacancies_common import PARSED_ONLY
 
-# Status codes from the UI map to VacancyStatus enum members. The codes are
-# the same kebab-case identifiers used in CSS classes / JS state.
-_STATUS_BY_CODE = {
-    "new": VacancyStatus.NEW,
-    "applied": VacancyStatus.APPLIED,
-    "answered": VacancyStatus.ANSWERED,
-    "test": VacancyStatus.TEST,
-    "invitation": VacancyStatus.INVITATION,
-    "in-progress": VacancyStatus.IN_PROGRESS,
-    "offer": VacancyStatus.OFFER,
-    "decline": VacancyStatus.DECLINE,
-    "ghosting": VacancyStatus.GHOSTING,
-    "scam": VacancyStatus.SCAM,
-    "not-fit": VacancyStatus.NOT_FIT,
-}
+logger = logging.getLogger(__name__)
+
+_STATUS_BY_CODE = {status_code(s): s for s in VacancyStatus}
+"""Положение дел по коду, которым его называет окно.
+
+Собирается правилом (`models.status_code`), а не выписывается руками: таблица
+руками разошлась бы с перечислением на первом же новом положении дел, и отбор
+по нему перестал бы работать молча.
+"""
 
 
 VACANCY_SORTS = {
@@ -47,8 +43,9 @@ VACANCY_SORTS = {
 }
 
 
-# Mirrors STATUS_PRIORITY_ACTIVE_FIRST / NEW_FIRST in client/web/main.html.
-# Statuses outside the explicit list fall to the tail (priority 999).
+# Порядок «горячее сверху» и «новое сверху»: чем ближе к оферу (или чем
+# свежее), тем выше. Зеркала в разметке у них нет — сортировка целиком на
+# стороне запроса. Положения дел вне перечня уходят в хвост (999).
 _STATUS_PRIORITY_ACTIVE_FIRST = {
     VacancyStatus.OFFER: 0,
     VacancyStatus.TEST: 1,
@@ -211,6 +208,11 @@ def _choice_clauses(f: VacancyFilter) -> tuple[list, set[str]]:
     clauses: list = []
     joins: set[str] = set()
     if f.statuses:
+        unknown = [code for code in f.statuses if code not in _STATUS_BY_CODE]
+        if unknown:
+            # Молча отбросить нельзя: для человека это «фильтр нажат и не
+            # действует», и увидеть причину ему негде.
+            logger.warning("unknown status codes in filter: %s", unknown)
         enum_values = [_STATUS_BY_CODE[s] for s in f.statuses if s in _STATUS_BY_CODE]
         if enum_values:
             clauses.append(Vacancy.status.in_(enum_values))
