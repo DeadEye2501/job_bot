@@ -56,6 +56,16 @@ class LoopRunner:
         task.add_done_callback(_finish)
         return answer
 
+    async def drain(self) -> None:
+        """Дожидается всех порождённых работ, включая заведённые по дороге.
+
+        Ждём в цикле, а не одним снимком списка: работа порождает следующую,
+        и заведённая уже во время ожидания в снимок не попала бы.
+        """
+        while self.tasks:
+            started, self.tasks = self.tasks, []
+            await asyncio.gather(*started, return_exceptions=True)
+
 
 class Caught:
     """Копит нагрузку одного сигнала и ждёт следующую.
@@ -117,9 +127,6 @@ async def main_api(runtime_settings, session_factory, runner) -> MainApi:
     слоты попутно обновляют счётчик непрочитанного, и такая работа открывает
     свою сессию уже после конца теста — движок к тому мигу закрыт, а
     соединение остаётся висеть до сборщика мусора.
-
-    Ждём в цикле, а не одним снимком списка: работа порождает следующую, и
-    заведённая уже во время ожидания в снимок не попала бы.
     """
     handler = get_handler()
     previous = handler.on_record
@@ -128,9 +135,7 @@ async def main_api(runtime_settings, session_factory, runner) -> MainApi:
         yield api
     finally:
         api.cleanup()
-        while runner.tasks:
-            started, runner.tasks = runner.tasks, []
-            await asyncio.gather(*started, return_exceptions=True)
+        await runner.drain()
         handler.on_record = previous
 
 
@@ -149,9 +154,7 @@ async def wizard_api(runtime_settings, session_factory, runner) -> WizardApi:
     """
     api = WizardApi(runtime_settings, session_factory, runner)
     yield api
-    while runner.tasks:
-        started, runner.tasks = runner.tasks, []
-        await asyncio.gather(*started, return_exceptions=True)
+    await runner.drain()
 
 
 @pytest.fixture
