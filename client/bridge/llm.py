@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from functools import partial
 from typing import Any, Callable
 
 import httpx
@@ -158,7 +159,7 @@ class LlmSlots:
             self.llm_probe_done.emit(_err(f"Неверные поля: {e}", kind=kind))
             return
 
-        check_fn = lm_studio.check_chat if kind == "chat" else lm_studio.check_embed
+        check_fn = partial(lm_studio.check_model, kind=kind)
 
         async def run() -> str:
             try:

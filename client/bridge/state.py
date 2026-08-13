@@ -6,9 +6,7 @@ import logging
 import time
 
 from PySide6.QtCore import Signal, Slot
-from sqlalchemy import text as sa_text
-
-from adapters import lm_studio
+from backend import health
 from backend.models import BotMode
 from backend.repository import hr_list, messages as messages_repo
 from client.bridge.answer import _err, _ok
@@ -33,33 +31,6 @@ _MODEL_PROBE_INTERVAL_S = 60.0
 Ответ между опросами берётся прошлый: лампочка показывает положение дел
 минутной давности, и это честнее, чем греть модель ради секундной точности.
 """
-
-
-async def _model_answers(cfg, check_fn, kind: str) -> bool:
-    """Отвечает ли модель поставщика — тем же вопросом, что и кнопка проверки.
-
-    Проверка спрашивает у поставщика перечень имён **и** шлёт пробное
-    обращение: модель числится и не отвечает чаще, чем кажется, — из-за
-    нехватки памяти, чужой занятости или несовместимости с родом обращения.
-    Лампочка, смотревшая только на перечень, горела зелёным там, где кнопка
-    в настройках отвечала красным, на одном и том же наборе настроек.
-
-    Цена — одно пробное обращение на поставщика раз в
-    `_HEALTHCHECK_INTERVAL_MS`; при нынешних пяти секундах это двадцать
-    четыре обращения в минуту на двоих. Ритм лампочки — вопрос к человеку,
-    он записан хвостом в плане этапа.
-    """
-    if cfg is None:
-        return False
-    client = lm_studio.make_client(cfg)
-    try:
-        ok, _detail = await check_fn(client, cfg.model)
-        return ok
-    except Exception as e:
-        logger.debug("healthcheck: %s probe failed: %s", kind, e)
-        return False
-    finally:
-        await client.aclose()
 
 
 class WindowStateSlots:
@@ -185,40 +156,29 @@ class WindowStateSlots:
         if now - self._models_probed_at < _MODEL_PROBE_INTERVAL_S:
             return self._models_health_cache
         answers = (
-            await _model_answers(self._rs.chat, lm_studio.check_chat, "chat"),
-            await _model_answers(self._rs.embed, lm_studio.check_embed, "embed"),
+            await health.model_alive(self._rs.chat, "chat"),
+            await health.model_alive(self._rs.embed, "embed"),
         )
         self._models_probed_at = now
         self._models_health_cache = answers
         return answers
 
     def _kick_health(self) -> None:
+        """Спросить, живо ли то, на чём держится работа, и отдать окну.
+
+        Сами вопросы задаёт `backend.health`; здесь только ритм: базу и
+        Telegram спрашиваем каждый удар часов, модели — раз в минуту.
+        """
         async def run() -> str:
-            results = {"db": False, "tg": False, "chat": False, "embed": False}
-
-            try:
-                async with self._session_factory() as session:
-                    await session.execute(sa_text("SELECT 1"))
-                results["db"] = True
-            except Exception as e:
-                logger.debug("healthcheck: db probe failed: %s", e)
-
-            # TG: проверяем живость уже работающего Pyrogram-клиента в
-            # Bot.run. ``is_connected`` отражает state MTProto-сессии и
-            # отваливается, когда Pyrogram'овский heartbeat ловит timeout
-            # (≈30-60с после реального отключения сети). Параллельный
-            # connect отсюда устроил бы конфликт сессий, поэтому смотрим
-            # только на бот'овский клиент. До старта бота (нет
-            # session_string или ранний этап init'а) — false: пока сессия
-            # не поднята, считать TG здоровым нечестно.
-            results["tg"] = bool(
-                self._bot is not None
-                and self._bot.is_ready
-                and getattr(self._bot._client, "is_connected", False)
-            )
-
-            results["chat"], results["embed"] = await self._models_health()
-
-            return _ok(results)
+            # Порядок значим: база спрашивается первой, пока тик молодой.
+            # Вопрос к моделям ждёт ответа поставщика до нескольких минут, и
+            # соединение с базой, открытое после него, пришлось бы на уже
+            # закрытый движок — снос данных гасит таймеры именно поэтому.
+            alive = {
+                "db": await health.database_alive(self._session_factory),
+                "tg": health.telegram_alive(self._bot),
+            }
+            chat, embed = await self._models_health()
+            return _ok({**alive, "chat": chat, "embed": embed})
 
         self._dispatch(self.health_changed, run())

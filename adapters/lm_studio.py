@@ -194,10 +194,14 @@ def _ping_request(model: str, kind: str) -> tuple[str, dict]:
     return "/v1/embeddings", {"model": model, "input": "ping"}
 
 
-async def _check_model(
+async def check_model(
     client: httpx.AsyncClient, model: str, kind: str
 ) -> tuple[bool, str]:
     """Есть ли модель у провайдера и отвечает ли она.
+
+    Род приходит доводом, и выбирать по нему объявление зовущим не нужно:
+    выбор этот стоял двумя телами — у лампочки здоровья и у кнопки пробы, — и
+    один из них вдобавок проверял род, а другой нет.
 
     Ответ читает окно настроек: `True` с именем модели либо `False` с
     причиной, годной для подсказки. Наружу уходит короткое «род и текст» —
@@ -229,13 +233,13 @@ async def _check_model(
 
 
 async def check_chat(client: httpx.AsyncClient, model: str) -> tuple[bool, str]:
-    """Проверить чат-модель. Зовётся окном настроек по имени рода."""
-    return await _check_model(client, model, "chat")
+    """Проверить чат-модель. Зовётся мастером первого запуска по имени рода."""
+    return await check_model(client, model, "chat")
 
 
 async def check_embed(client: httpx.AsyncClient, model: str) -> tuple[bool, str]:
-    """Проверить модель векторов. Зовётся окном настроек по имени рода."""
-    return await _check_model(client, model, "embed")
+    """Проверить модель векторов. Зовётся мастером по имени рода."""
+    return await check_model(client, model, "embed")
 
 
 # Топовые семейства моделей встраиваний в Ollama / OpenAI: `bge-*` (BAAI),

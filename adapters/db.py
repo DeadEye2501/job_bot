@@ -1,8 +1,17 @@
-"""Database engine helpers (SQLite via aiosqlite)."""
+"""Соединение с базой: как его завести и как спросить, живо ли оно.
+
+Одно и то же знание: настройки соединения и простейший вопрос к нему. Вопрос
+живёт здесь, а не у лампочки окна, ровно потому, что ответ на него зависит от
+этих настроек — от журнального режима до времени ожидания замка.
+"""
 import json
+import logging
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+
+
+logger = logging.getLogger(__name__)
 
 
 def _dump_json(value: object) -> str:
@@ -59,3 +68,21 @@ def _lower(value: object) -> object:
     колонки, — а ходят сегодня только они.
     """
     return value.lower() if isinstance(value, str) else value
+
+
+async def ping(session) -> bool:
+    """Отвечает ли база на простейший вопрос.
+
+    Простейший нарочно: лампочке нужно знать, что соединение живо и файл на
+    месте, а не что в нём лежит. Беда любой породы значит одно — «не
+    отвечает», и разбирать её здесь нечем: показать человеку всё равно нечего,
+    кроме погасшей лампочки.
+    """
+    from sqlalchemy import text as sa_text
+
+    try:
+        await session.execute(sa_text("SELECT 1"))
+        return True
+    except Exception:
+        logger.debug("db ping failed", exc_info=True)
+        return False

@@ -1,0 +1,68 @@
+"""Живо ли то, на чём держится работа: база, Telegram и модели.
+
+Заведено потому, что спрашивало об этом окно — и спрашивало своими руками:
+сырым `SELECT 1`, чтением закрытого поля у бота и переписанной половиной
+проверки модели. Обработчику события такое не положено: он зовёт того, кто
+умеет, а умеют здесь.
+
+Что делать с ответом — не наше дело: лампочка в шапке рисует его как есть, а
+как часто спрашивать, решает тот, у кого часы.
+"""
+
+from __future__ import annotations
+
+import logging
+
+from adapters import db, lm_studio
+
+
+logger = logging.getLogger(__name__)
+
+
+async def database_alive(session_factory) -> bool:
+    """Отвечает ли база.
+
+    Открытие сессии считается частью вопроса: движок бывает уже закрыт — так
+    делает снос данных, — и выброс отсюда унёс бы весь ответ лампочки целиком.
+    Окно такой ответ выбрасывает молча, и человек видел бы застывшую зелёную
+    лампочку вместо красной.
+    """
+    try:
+        async with session_factory() as session:
+            return await db.ping(session)
+    except Exception:
+        logger.debug("healthcheck: no session", exc_info=True)
+        return False
+
+
+def telegram_alive(bot) -> bool:
+    """Держится ли связь с Telegram.
+
+    Бот, которого нет вовсе, — это «нет», а не «неизвестно»: пока сессия не
+    поднята, считать Telegram здоровым нечестно.
+    """
+    return bot is not None and bot.is_connected
+
+
+async def model_alive(cfg, kind: str) -> bool:
+    """Отвечает ли модель поставщика — тем же вопросом, что и кнопка проверки.
+
+    Проверка спрашивает перечень имён **и** шлёт пробное обращение: модель
+    числится и не отвечает чаще, чем кажется, — из-за нехватки памяти, чужой
+    занятости или несовместимости с родом обращения. Спрашивай только
+    перечень, и лампочка горела бы зелёным там, где кнопка в настройках
+    отвечает красным, на одном и том же наборе настроек.
+
+    Обращение это дорогое, и часто звать его нельзя — срок держит зовущий.
+    """
+    if cfg is None:
+        return False
+    client = lm_studio.make_client(cfg)
+    try:
+        ok, _detail = await lm_studio.check_model(client, cfg.model, kind)
+        return ok
+    except Exception:
+        logger.debug("healthcheck: %s probe failed", kind, exc_info=True)
+        return False
+    finally:
+        await client.aclose()
