@@ -9,13 +9,6 @@ from PySide6.QtCore import Signal, Slot
 
 from backend.domain.scoring import build_skill_lookup
 from backend.models import Vacancy, VacancyStatus, VacancyStatusHistory
-from backend.payloads import (
-    VacancyFilter,
-    int_or_none,
-    moment_or_none,
-    str_list,
-    text_or_none,
-)
 from backend.repository import (
     profile as profile_repo,
     vacancies_card,
@@ -25,6 +18,7 @@ from backend.repository import (
 from client.bridge.answer import _err, _ok
 from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
+from client.bridge.vacancy_filter import read_vacancy_filter
 from client.bridge.wire import _vacancy_detail_to_dict, _vacancy_list_row_to_dict
 
 
@@ -52,63 +46,20 @@ class VacancySlots:
         окно подсвечивает нужные чипы, не спрашивая навыки отдельно.
 
         Нагрузка — объект JSON с полями отбора; пустая или негодная сводится к
-        умолчаниям (``sort="newest"``, без поиска). Списки для выпадающих
-        меню фильтра берутся мимо самого фильтра — иначе любой отбор сжимал бы
-        их до того, что уцелело в выдаче.
+        умолчаниям `VacancyFilter`. Списки для выпадающих меню фильтра берутся
+        мимо самого фильтра — иначе любой отбор сжимал бы их до того, что
+        уцелело в выдаче.
         """
         try:
             payload = json.loads(payload_json) if payload_json else {}
         except (TypeError, ValueError):
             payload = {}
-        sort_key = payload.get("sort") or "newest"
-        search = text_or_none(payload.get("search"))
-
-        def _float(key: str) -> float | None:
-            raw = payload.get(key)
-            if raw in (None, ""):
-                return None
-            try:
-                return float(raw)
-            except (TypeError, ValueError):
-                return None
-
-        statuses = str_list(payload.get("statuses")) or None
-        channels = str_list(payload.get("channels")) or None
-        companies = str_list(payload.get("companies")) or None
-        score_min = int_or_none(payload.get("score_min"))
-        score_max = int_or_none(payload.get("score_max"))
-        salary_min = _float("salary_min")
-        salary_max = _float("salary_max")
-        grade = (payload.get("grade") or None)
-        remote = (payload.get("remote") or None)
-        hr_contact = (payload.get("hr_contact") or None)
-        date_from = moment_or_none(payload.get("date_from"))
-        date_to = moment_or_none(payload.get("date_to"))
         page = read_page(payload)
+        filters = read_vacancy_filter(payload, page)
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows = await vacancies_list.list_vacancies(
-                    session,
-                    VacancyFilter(
-                        sort=sort_key,
-                        search=search,
-                        statuses=statuses,
-                        channels=channels,
-                        companies=companies,
-                        score_min=score_min,
-                        score_max=score_max,
-                        salary_min=salary_min,
-                        salary_max=salary_max,
-                        grade=grade,
-                        remote=remote,
-                        hr_contact=hr_contact,
-                        date_from=date_from,
-                        date_to=date_to,
-                        limit=page.limit,
-                        offset=page.offset,
-                    ),
-                )
+                rows = await vacancies_list.list_vacancies(session, filters)
                 skills = await profile_repo.list_skills(session)
                 activity_by_id = await vacancies_list.list_vacancy_last_activity(
                     session, [v.id for v in rows]
