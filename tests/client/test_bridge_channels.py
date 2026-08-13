@@ -1,10 +1,8 @@
-"""Следствия слотов канала, которым хватает одной базы.
+"""Следствия домена канала, которым хватает одной базы.
 
 Предмет — запись о канале: перечень, карточка, включение, заслон. Заведение
 канала и обход его сообщений лежат своим файлом: там без бота ничего не выйдет.
 """
-
-import json
 
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, put
@@ -12,48 +10,43 @@ from tests.factories import channel_row, vacancy_row
 
 
 async def test_the_list_counts_vacancies_and_shows_whether_it_is_on(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Строка перечня несёт счёт вакансий и признак включения.
 
     По ним канал и оценивают: выключенный молчит, а включённый, не давший ни
     одной вакансии за месяц, — повод его выключить.
     """
-    caught = watch(main_api.contacts_channel_list_loaded)
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
     await put(session_factory, vacancy_row(source_channel_id=channel.id))
 
-    main_api.request_contacts_channel_list(json.dumps({}))
+    answer = await ask(api.channels.list, {})
 
-    row = (await caught.next())["channels"][0]
+    row = answer["ok"]["channels"][0]
     assert row["vacancy_count"] == 1
     assert row["is_active"] is True
 
 
-async def test_a_card_of_a_missing_channel_is_refused_with_the_number(main_api, watch):
+async def test_a_card_of_a_missing_channel_is_refused_with_the_number(api, ask):
     """На пропавший канал отвечают отказом с его номером.
 
     Карточку открывают из перечня, который мог устареть: канал удалили или он
     ушёл в заслон вместе с чисткой. Без номера окно не поймёт, какую строку
     гасить, и оставит на экране запись, которой уже нет.
     """
-    caught = watch(main_api.contacts_channel_detail_loaded)
+    answer = await ask(api.channels.detail, 404)
 
-    main_api.request_contacts_channel_detail(404)
-
-    answer = await caught.next()
-    assert answer["ok"] is False
+    assert answer["fail"] == "denied"
     assert answer["channel_id"] == 404
 
 
-async def test_only_this_channel_vacancies_are_shown(main_api, watch, session_factory):
+async def test_only_this_channel_vacancies_are_shown(api, ask, session_factory):
     """В карточке видны вакансии только этого канала.
 
     По ним решают, стоит ли его держать включённым. Попади туда чужая —
     молчащий канал выглядел бы работающим, и выключить его было бы не за что.
     """
-    caught = watch(main_api.contacts_channel_vacancies_loaded)
     mine = channel_row(username="pyjobs")
     other = channel_row(username="jsjobs")
     await put(session_factory, mine, other)
@@ -63,35 +56,33 @@ async def test_only_this_channel_vacancies_are_shown(main_api, watch, session_fa
         vacancy_row(title="Чужая", source_channel_id=other.id),
     )
 
-    main_api.request_contacts_channel_vacancies(json.dumps({"channel_id": mine.id}))
+    answer = await ask(api.channels.vacancies, {"channel_id": mine.id})
 
-    titles = [row["title"] for row in (await caught.next())["vacancies"]]
+    titles = [row["title"] for row in answer["ok"]["vacancies"]]
     assert titles == ["Моя"]
 
 
-async def test_turning_a_channel_off_reaches_the_list(main_api, watch, session_factory):
+async def test_turning_a_channel_off_reaches_the_list(api, ask, session_factory):
     """Выключение видно в перечне, а не только в ответе.
 
     Выключенный канал перестаёт опрашиваться. Останься признак только в
     ответе, перечень показывал бы его работающим, и человек ждал бы от него
     вакансий, которых не будет.
     """
-    done = watch(main_api.contacts_channel_action_done)
-    listed = watch(main_api.contacts_channel_list_loaded)
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
 
-    main_api.set_channel_active(
-        json.dumps({"channel_id": channel.id, "is_active": False})
+    switched = await ask(
+        api.channels.set_active, {"channel_id": channel.id, "is_active": False}
     )
-    assert (await done.next())["ok"] is True
+    assert "ok" in switched
 
-    main_api.request_contacts_channel_list(json.dumps({}))
-    assert (await listed.next())["channels"][0]["is_active"] is False
+    listed = await ask(api.channels.list, {})
+    assert listed["ok"]["channels"][0]["is_active"] is False
 
 
 async def test_a_blacklisted_channel_cannot_be_turned_back_on(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Занесённый в заслон канал включить нельзя, и об этом говорят словами.
 
@@ -99,24 +90,21 @@ async def test_a_blacklisted_channel_cannot_be_turned_back_on(
     вернулся бы в опрос молча, и заслон оказался бы отменён нажатием, которое
     про него ничего не знает.
     """
-    caught = watch(main_api.contacts_channel_action_done)
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
 
-    main_api.contacts_add_channel_to_blacklist(channel.id)
-    await caught.next()
+    await ask(api.channels.block, channel.id)
 
-    main_api.set_channel_active(
-        json.dumps({"channel_id": channel.id, "is_active": True})
+    answer = await ask(
+        api.channels.set_active, {"channel_id": channel.id, "is_active": True}
     )
 
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert answer["error"] == "Канал в blacklist — нельзя включить."
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Канал в blacklist — нельзя включить."
 
 
 async def test_blacklisting_sweeps_the_namesake_channel_too(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Заслон гасит все каналы под этим написанием, а не только нажатый.
 
@@ -126,13 +114,11 @@ async def test_blacklisting_sweeps_the_namesake_channel_too(
     заметить это было бы нечем: в списке он выглядит включённым по своей
     воле.
     """
-    done = watch(main_api.contacts_channel_action_done)
     clicked = channel_row(username="pyjobs", title="Питон-вакансии")
     namesake = channel_row(username="pyjobs", title="Он же, заведённый заново")
     await put(session_factory, clicked, namesake)
 
-    main_api.contacts_add_channel_to_blacklist(clicked.id)
-    await done.next()
+    assert "ok" in await ask(api.channels.block, clicked.id)
 
     # Смотрим в базу, а не в список: показ списка сам чинит дрейф тем же
     # объявлением, и через него зелено было бы и без правки.
@@ -140,48 +126,39 @@ async def test_blacklisting_sweeps_the_namesake_channel_too(
     assert [row.is_active for row in rows] == [False, False]
 
 
-async def test_blacklisting_turns_the_channel_off_at_once(
-    main_api, watch, session_factory
-):
+async def test_blacklisting_turns_the_channel_off_at_once(api, ask, session_factory):
     """Заслон гасит канал сразу, а не оставляет включённым до перечитывания.
 
     Иначе между заслоном и следующим обходом канал успел бы принести ещё
     вакансий — ровно от них и ограждались.
     """
-    done = watch(main_api.contacts_channel_action_done)
-    shown = watch(main_api.contacts_channel_detail_loaded)
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
 
-    main_api.contacts_add_channel_to_blacklist(channel.id)
-    answer = await done.next()
-    assert answer["value"] == "@pyjobs"
+    answer = await ask(api.channels.block, channel.id)
+    assert answer["ok"]["value"] == "@pyjobs"
 
-    main_api.request_contacts_channel_detail(channel.id)
-    card = await shown.next()
-    assert card["is_active"] is False
-    assert card["blacklist_value"] == "@pyjobs"
+    card = await ask(api.channels.detail, channel.id)
+    assert card["ok"]["is_active"] is False
+    assert card["ok"]["blacklist_value"] == "@pyjobs"
 
 
-async def test_removing_the_blacklist_clears_the_card(main_api, watch, session_factory):
+async def test_removing_the_blacklist_clears_the_card(api, ask, session_factory):
     """Снятый заслон виден в карточке: значения там больше нет."""
-    done = watch(main_api.contacts_channel_action_done)
-    shown = watch(main_api.contacts_channel_detail_loaded)
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
 
-    main_api.contacts_add_channel_to_blacklist(channel.id)
-    await done.next()
+    await ask(api.channels.block, channel.id)
 
-    main_api.contacts_remove_channel_from_blacklist(channel.id)
-    assert (await done.next())["updated"] == 1
+    removed = await ask(api.channels.unblock, channel.id)
+    assert removed["ok"]["updated"] == 1
 
-    main_api.request_contacts_channel_detail(channel.id)
-    assert (await shown.next())["blacklist_value"] is None
+    shown = await ask(api.channels.detail, channel.id)
+    assert shown["ok"]["blacklist_value"] is None
 
 
 async def test_turning_all_on_leaves_the_blacklisted_ones_off(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Сплошное включение обходит огороженные каналы стороной.
 
@@ -189,23 +166,24 @@ async def test_turning_all_on_leaves_the_blacklisted_ones_off(
     и за что выключали. Включи она заслонённых — те вернулись бы в опрос без
     единого слова об этом.
     """
-    done = watch(main_api.contacts_channel_action_done)
-    listed = watch(main_api.contacts_channel_list_loaded)
     plain = channel_row(username="pyjobs")
     barred = channel_row(username="spam")
     await put(session_factory, plain, barred)
 
-    main_api.contacts_add_channel_to_blacklist(barred.id)
-    await done.next()
+    await ask(api.channels.block, barred.id)
 
     # Оба гасим до сплошного включения: канал заводится уже включённым, и на
     # готовых умолчаниях тест зеленел бы, даже не включив ничего.
-    main_api.set_channel_active(json.dumps({"channel_id": plain.id, "is_active": False}))
-    assert (await done.next())["ok"] is True
+    switched = await ask(
+        api.channels.set_active, {"channel_id": plain.id, "is_active": False}
+    )
+    assert "ok" in switched
 
-    main_api.set_all_channels_active(json.dumps({"is_active": True}))
-    assert (await done.next())["affected"] == 1
+    turned = await ask(api.channels.set_all_active, {"is_active": True})
+    assert turned["ok"]["affected"] == 1
 
-    main_api.request_contacts_channel_list(json.dumps({}))
-    state = {row["username"]: row["is_active"] for row in (await listed.next())["channels"]}
+    listed = await ask(api.channels.list, {})
+    state = {
+        row["username"]: row["is_active"] for row in listed["ok"]["channels"]
+    }
     assert state == {"pyjobs": True, "spam": False}

@@ -6,8 +6,6 @@
 окно шлёт одно и то же, а получает разное.
 """
 
-import json
-
 from tests.dbio import put
 from tests.factories import company_row, hr_row, vacancy_row
 
@@ -50,7 +48,7 @@ async def test_a_single_choice_filter_with_stray_spaces_still_matches(
 
 
 async def test_the_request_ordinal_comes_back_as_a_number(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Порядковый знак возвращается числом, каким бы ни пришёл.
 
@@ -58,15 +56,14 @@ async def test_the_request_ordinal_comes_back_as_a_number(
     один ответ не совпал бы со своим запросом, и список вакансий компании
     остался бы пустым навсегда.
     """
-    caught = watch(main_api.contacts_company_vacancies_loaded)
     company = company_row(name="Контур")
     await put(session_factory, company)
 
-    main_api.request_contacts_company_vacancies(
-        json.dumps({"company_id": company.id, "epoch": "7"})
+    answer = await ask(
+        api.companies.vacancies, {"company_id": company.id, "epoch": "7"}
     )
 
-    assert (await caught.next())["epoch"] == 7
+    assert answer["ok"]["epoch"] == 7
 
 
 async def test_an_unknown_chat_mode_comes_back_as_the_first_one(

@@ -138,7 +138,7 @@ async def main_api(runtime_settings, session_factory, runner) -> MainApi:
 
 @pytest.fixture
 def watch():
-    """Ловушка сигнала непереехавшего домена: `watch(main_api.profile_changed)`."""
+    """Ловушка сигнала непереехавшего домена: `watch(main_api.system_settings_loaded)`."""
     return Caught
 
 

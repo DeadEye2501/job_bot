@@ -12,8 +12,6 @@
 проверяется ответ, и одинаковый у всех четверых.
 """
 
-import json
-
 from tests.dbio import put
 from tests.factories import channel_row, company_row, hr_row, vacancy_row
 
@@ -45,24 +43,20 @@ async def test_a_full_page_of_people_does_not_promise_more(
 
 
 async def test_a_full_page_of_companies_does_not_promise_more(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """То же на экране компаний."""
-    caught = watch(main_api.contacts_company_list_loaded)
     await put(session_factory, *[company_row(name=f"Компания {i}") for i in range(3)])
 
-    main_api.request_contacts_company_list(json.dumps({"limit": 3}))
-    assert (await caught.next())["has_more"] is False
+    assert (await ask(api.companies.list, {"limit": 3}))["ok"]["has_more"] is False
 
-    main_api.request_contacts_company_list(json.dumps({"limit": 2}))
-    assert (await caught.next())["has_more"] is True
+    assert (await ask(api.companies.list, {"limit": 2}))["ok"]["has_more"] is True
 
 
 async def test_a_full_page_of_channel_vacancies_does_not_promise_more(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """То же в карточке канала, где вакансий копятся тысячи."""
-    caught = watch(main_api.contacts_channel_vacancies_loaded)
     channel = channel_row()
     await put(session_factory, channel)
     await put(
@@ -73,12 +67,8 @@ async def test_a_full_page_of_channel_vacancies_does_not_promise_more(
         ],
     )
 
-    main_api.request_contacts_channel_vacancies(
-        json.dumps({"channel_id": channel.id, "limit": 3})
-    )
-    assert (await caught.next())["has_more"] is False
+    asked = {"channel_id": channel.id, "limit": 3}
+    assert (await ask(api.channels.vacancies, asked))["ok"]["has_more"] is False
 
-    main_api.request_contacts_channel_vacancies(
-        json.dumps({"channel_id": channel.id, "limit": 2})
-    )
-    assert (await caught.next())["has_more"] is True
+    asked = {"channel_id": channel.id, "limit": 2}
+    assert (await ask(api.channels.vacancies, asked))["ok"]["has_more"] is True

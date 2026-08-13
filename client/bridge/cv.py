@@ -1,69 +1,52 @@
-"""Файл резюме, на который смотрит окно: выбрать, заменить, открыть."""
+"""Файл резюме, на который смотрит окно: запомнить путь, открыть."""
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from PySide6.QtCore import QUrl, Signal, Slot
-from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QFileDialog
-
-from client.bridge.answer import _err, _ok
+from client.bridge.answer import denied, reply
 from client.bridge.cv_file import _stat_cv
-from client.bridge.payload import _log_invalid_payload
+from client.bridge.desktop import open_in_system
 
 
-class CvSlots:
+class Cv:
     """Резюме как файл, а не как разобранная анкета.
 
-    Слоты окна: выбрать файл, запомнить путь, открыть. Внутрь файла не
-    заглядывает никто: разбор резюме моделью отключён, и чтение его текста
-    снято вместе с последней дорогой к нему. `cv_file` знает о файле ровно
-    то, что говорит о нём файловая система.
+    Внутрь файла не заглядывает никто: разбор резюме моделью отключён, и чтение
+    его текста снято вместе с последней дорогой к нему. `cv_file` знает о файле
+    ровно то, что говорит о нём файловая система.
 
-    Подмешивающий обязан держать `_rs`, `_parent_widget` и `_dispatch`.
+    Поверхность окна файл больше не выбирает: диалог был Qt'шный, а окно
+    теперь поднимает pywebview. Путь называет страница — она же и спросит его у
+    человека диалогом окна. У мастера первого запуска свой выбор пока жив, он
+    переезжает А2.9.
     """
 
-    cv_replace_done = Signal(str)
-
-    @Slot(result=str)
-    def pick_cv_file_main(self) -> str:
-        """File picker for replacing the CV. Returns the selected file's
-        metadata (path + name + size) without saving anything."""
-        path, _ = QFileDialog.getOpenFileName(
-            self._parent_widget,
-            "Выберите файл резюме",
-            "",
-            "Резюме (*.pdf *.PDF *.md *.MD *.txt *.TXT);;Все файлы (*)",
-        )
+    def replace(self, payload: dict) -> dict:
+        """Запомнить новый путь к резюме и рассказать, что по нему лежит."""
+        payload = payload if isinstance(payload, dict) else {}
+        path = str(payload.get("path") or "").strip()
         if not path:
-            return _err("cancelled")
-        return _ok({"path": path, **(_stat_cv(path) or {})})
+            return denied("Путь пустой.")
 
-    @Slot(str)
-    def replace_cv(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            path = str(payload.get("path") or "").strip()
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("replace_cv", e)
-            self.cv_replace_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        if not path:
-            self.cv_replace_done.emit(_err("Путь пустой."))
-            return
+        async def run() -> dict:
+            await self._hub.rs.set_app("cv_path", path)
+            return {"path": path, **(_stat_cv(path) or {})}
 
-        async def run() -> str:
-            await self._rs.set_app("cv_path", path)
-            return _ok({"path": path, **(_stat_cv(path) or {})})
+        return reply(self._hub.runner, run())
 
-        self._dispatch(self.cv_replace_done, run())
+    def open(self) -> dict:
+        """Открыть нынешнее резюме тем, чем его открывает система.
 
-    @Slot()
-    def open_cv_file(self) -> None:
-        """Open the current CV with the OS-default application."""
-        cv_path = self._rs.cv_path
+        Ответ пустой, но он есть: у зова, который ничего не вернул, окно не
+        отличит «открыли» от «не дошло».
+        """
+        cv_path = self._hub.rs.cv_path
         if not cv_path:
-            return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(cv_path).resolve())))
+            return denied("Резюме не выбрано.")
+        # Полным путём: настройки помнят его таким, каким назвал человек, а
+        # система открывает от своего рабочего каталога — у собранного
+        # приложения он чужой.
+        if not open_in_system(str(Path(cv_path).resolve())):
+            return denied("Не удалось открыть резюме.", path=cv_path)
+        return {"ok": {"path": cv_path}}

@@ -2,288 +2,251 @@
 
 from __future__ import annotations
 
-import json
-
-from PySide6.QtCore import Signal, Slot
-
 from backend.domain.telegram_identity import normalize_username
 from backend.repository import channels as channels_repo
-from client.bridge.answer import _err, _ok
-from client.bridge.refusals import BUSY_CYCLE, NO_BOT, NO_CHANNEL
+from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.mark import CHANNEL_MARK, mark, unmark
-from client.bridge.payload import _log_invalid_payload
+from client.bridge.refusals import BUSY_CYCLE, NO_BOT, NO_CHANNEL
 from client.form_payloads import read_toggle
 
 
-class ChannelActionSlots:
+class ChannelActions:
     """Правки над каналом — всё, чем окно его трогает, а не показывает.
 
-    Подмешивающий обязан держать `_bot`, `_session_factory`, `_dispatch` и
-    `_dispatch_action`, а сверх того — сигнал `contacts_lists_changed`, которым
-    окно узнаёт, что списки надо перечитать целиком.
+    Собирающий обязан держать `_hub`: из него берутся мотор, сессии, бот и
+    очередь событий.
 
-    Сигнал `contacts_channels_changed` объявлен здесь, а испускает его бот:
-    каналы меняются и сами по себе, когда сбор находит новый.
+    Заслон и его снятие кладут в очередь весть о том, что списки контактов
+    устарели: отметка отсева запечена в строках людей, компаний и каналов.
+    Весть о самих каналах живёт не здесь — каналы меняются и сами по себе,
+    когда сбор находит новый, и рассказывает об этом бот.
     """
 
-    contacts_channel_action_done = Signal(str)
-    contacts_channels_changed = Signal()
+    def block(self, channel_id: int) -> dict:
+        """Занести канал в чёрный список.
 
-    @Slot(int)
-    def contacts_add_channel_to_blacklist(self, channel_id: int) -> None:
-        """Insert kind="channel" blacklist row for this channel.
-        Value = `@{username}`. Idempotent (re-activates inactive row).
-        Pushes contacts_lists_changed so
-        cross-tab `is_blacklisted` flags refresh.
+        Написание — `@{username}`. Повторное нажатие второй записи не заводит:
+        погашенная оживает, живая остаётся как есть. Канал при этом гаснет
+        сразу — иначе он успел бы принести ещё объявлений, ровно от которых и
+        ограждались.
         """
-        async def run() -> str:
-            async with self._session_factory() as session:
-                answer, ok = await mark(session, CHANNEL_MARK, channel_id)
-            if ok:
-                self.contacts_lists_changed.emit()
-            return answer
 
-        self._dispatch(self.contacts_channel_action_done, run())
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                marked = await mark(session, CHANNEL_MARK, channel_id)
+            self._hub.events.add("contacts_lists_changed")
+            return marked
 
-    @Slot(int)
-    def contacts_remove_channel_from_blacklist(self, channel_id: int) -> None:
-        """Deactivate any kind="channel" blacklist row for this channel."""
-        async def run() -> str:
-            async with self._session_factory() as session:
-                answer, ok = await unmark(session, CHANNEL_MARK, channel_id)
-            if ok:
-                self.contacts_lists_changed.emit()
-            return answer
+        return reply(self._hub.runner, run())
 
-        self._dispatch(self.contacts_channel_action_done, run())
+    def unblock(self, channel_id: int) -> dict:
+        """Убрать канал из чёрного списка.
 
-    @Slot(int)
-    def request_channel_poll_now(self, channel_id: int) -> None:
-        """UI «Прогнать сейчас» — single-channel poll."""
-        async def run() -> str:
-            if self._bot is None:
-                return _err(NO_BOT, channel_id=channel_id, action="poll_now")
-            status = await self._bot.poll_channel_now(channel_id)
+        Запись гасится, а не сносится: экран списка держит погашенные строки
+        видимыми, с выключенным тумблером.
+        """
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                unmarked = await unmark(session, CHANNEL_MARK, channel_id)
+            self._hub.events.add("contacts_lists_changed")
+            return unmarked
+
+        return reply(self._hub.runner, run())
+
+    def poll_now(self, channel_id: int) -> dict:
+        """Прогнать один канал вне очереди — кнопка «Прогнать сейчас».
+
+        Незнакомый исход тоже получает ответ: исходы заводит бэкенд, и новый
+        появится там раньше перевода здесь, а промолчи мост — кнопка осталась
+        бы нажатой навсегда.
+        """
+
+        async def run() -> dict:
+            bot = self._hub.bot
+            if bot is None:
+                raise Denied(NO_BOT, channel_id=channel_id, action="poll_now")
+            status = await bot.poll_channel_now(channel_id)
             if status == "ok":
-                return _ok({
+                return {
                     "channel_id": channel_id,
                     "action": "poll_now",
                     "status": status,
-                })
+                }
             messages = {
                 "busy": BUSY_CYCLE,
                 "missing": "Канал не найден или без @username.",
                 "cancelled": "Поллинг канала отменён.",
                 "error": "Не удалось прогнать канал — см. логи.",
             }
-            return _err(
+            raise Denied(
                 messages.get(status, "Не удалось прогнать канал."),
                 channel_id=channel_id,
                 action="poll_now",
                 status=status,
             )
 
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(),
-            action="poll_now", channel_id=channel_id,
-        )
+        return reply(self._hub.runner, run())
 
-    @Slot(int)
-    def request_channel_reset_cursor(self, channel_id: int) -> None:
-        """UI «Сбросить курсор» — clears last_processed_msg_id."""
-        async def run() -> str:
-            if self._bot is None:
-                return _err(NO_BOT, channel_id=channel_id, action="reset_cursor")
-            ok = await self._bot.reset_channel_cursor(channel_id)
-            if not ok:
-                return _err(
-                    NO_CHANNEL,
-                    channel_id=channel_id,
-                    action="reset_cursor",
-                )
-            return _ok({"channel_id": channel_id, "action": "reset_cursor"})
+    def reset_cursor(self, channel_id: int) -> dict:
+        """Отмотать отметку прочитанного: канал перечитают с начала.
 
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(),
-            action="reset_cursor", channel_id=channel_id,
-        )
+        Единственный способ вернуть пропущенные объявления.
+        """
 
-    @Slot(int)
-    def request_channel_delete(self, channel_id: int) -> None:
-        """UI «Удалить канал» — nulls vacancy FKs, deletes row."""
-        async def run() -> str:
-            if self._bot is None:
-                return _err(NO_BOT, channel_id=channel_id, action="delete")
-            detached = await self._bot.delete_channel(channel_id)
+        async def run() -> dict:
+            bot = self._hub.bot
+            if bot is None:
+                raise Denied(NO_BOT, channel_id=channel_id, action="reset_cursor")
+            if not await bot.reset_channel_cursor(channel_id):
+                raise Denied(NO_CHANNEL, channel_id=channel_id, action="reset_cursor")
+            return {"channel_id": channel_id, "action": "reset_cursor"}
+
+        return reply(self._hub.runner, run())
+
+    def delete(self, channel_id: int) -> dict:
+        """Убрать канал.
+
+        Вакансии при этом остаются, но теряют ссылку на источник; сколько их
+        столько, едет ответом — по этому числу человек и решает, сносить ли.
+        """
+
+        async def run() -> dict:
+            bot = self._hub.bot
+            if bot is None:
+                raise Denied(NO_BOT, channel_id=channel_id, action="delete")
+            detached = await bot.delete_channel(channel_id)
             if detached is None:
-                return _err(
-                    NO_CHANNEL,
-                    channel_id=channel_id,
-                    action="delete",
-                )
-            return _ok({
+                raise Denied(NO_CHANNEL, channel_id=channel_id, action="delete")
+            return {
                 "channel_id": channel_id,
                 "detached_vacancies": detached,
                 "action": "delete",
-            })
+            }
 
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(),
-            action="delete", channel_id=channel_id,
-        )
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def request_create_channel(self, payload_json: str) -> None:
-        """Add a new TelegramChannel from the UI «Добавить канал» modal.
+    def create(self, payload: dict | None = None) -> dict:
+        """Завести канал из окна «Добавить канал».
 
-        Accepts raw input — `@username`, plain `username`, or any t.me URL
-        — and normalizes via the same parser used for HR contacts. On
-        duplicate (channel already exists), returns ``ok=true`` with
-        ``created=false`` so the UI selects the existing row instead of
-        showing an error. Metadata fetch is opportunistic on the backend.
+        Имя приходит как попало — `@name`, голое `name`, любой адрес `t.me` — и
+        сводится к одному написанию тем же разбором, что и ник человека. Уже
+        заведённый канал отказом не считается: ответ говорит `created: false`,
+        и окно открывает готовую карточку вместо жалобы.
         """
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-            raw = (payload.get("input") or "").strip()
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("request_create_channel", e)
-            self.contacts_channel_action_done.emit(
-                _err(f"Неверные поля: {e}", action="create")
-            )
-            return
-
+        payload = payload if isinstance(payload, dict) else {}
+        raw = (payload.get("input") or "").strip()
         if not raw:
-            self.contacts_channel_action_done.emit(
-                _err("Укажите @username или ссылку на канал.", action="create")
-            )
-            return
+            return denied("Укажите @username или ссылку на канал.", action="create")
 
         username = normalize_username(raw)
         if not username:
-            self.contacts_channel_action_done.emit(
-                _err(
-                    "Не удалось распознать @username канала. "
-                    "Поддерживаются форматы: @name, name, t.me/name.",
-                    action="create",
-                )
+            return denied(
+                "Не удалось распознать @username канала. "
+                "Поддерживаются форматы: @name, name, t.me/name.",
+                action="create",
             )
-            return
 
-        async def run() -> str:
-            if self._bot is None:
-                return _err(NO_BOT, action="create")
-            channel_id, status = await self._bot.add_channel(username)
+        async def run() -> dict:
+            bot = self._hub.bot
+            if bot is None:
+                raise Denied(NO_BOT, action="create")
+            channel_id, status = await bot.add_channel(username)
             if status == "invalid":
-                return _err(
+                raise Denied(
                     f"Telegram не нашёл канал @{username}. Проверьте имя.",
-                    action="create",
-                    status=status,
+                    action="create", status=status,
                 )
-            return _ok({
+            return {
                 "channel_id": channel_id,
                 "username": username,
                 "created": status == "created",
                 "action": "create",
                 "status": status,
-            })
+            }
 
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(), action="create",
-        )
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def set_all_channels_active(self, payload_json: str) -> None:
-        """Bulk-flip is_active на всех каналах. Echoes ``is_active`` чтобы
-        фронт мог откатить optimistic-update на ошибке.
+    def set_active(self, payload: dict) -> dict:
+        """Включить или выключить один канал.
+
+        Номер и признак возвращаются эхом: по ним окно откатывает тумблер,
+        нажатый до ответа, не перечитывая перечень. Читаются они «сколько
+        смогли» — прочитанная половина уезжает и в отказ, иначе окно не знало
+        бы, какой именно тумблер возвращать на место.
+        """
+        channel_id = None
+        is_active = None
+        try:
+            channel_id, is_active = read_toggle(payload, "channel_id", "is_active")
+            if channel_id is None or is_active is None:
+                raise KeyError("channel_id / is_active")
+        # `AttributeError` ловится вместе с остальными: чтение нагрузки идёт
+        # через помощника, и не-объект спотыкается уже внутри него — а беда
+        # синхронная, до мотора, и мимо конверта ушла бы прямо в канал.
+        except (AttributeError, ValueError, TypeError, KeyError) as e:
+            return bad_fields(
+                "set_active", e,
+                action="set_active", channel_id=channel_id, is_active=is_active,
+            )
+
+        return reply(self._hub.runner, self._switched(channel_id, is_active))
+
+    async def _switched(self, channel_id: int, is_active: bool) -> dict:
+        """Переключить один канал, не оживив запрещённого.
+
+        Заслон стоит здесь, а не в окне: канал в отсеве не читают, и пройди
+        включение — заслон оказался бы отменён нажатием, которое про него
+        ничего не знает.
+        """
+        async with self._hub.session_factory() as session:
+            async with session.begin():
+                if is_active and await channels_repo.is_channel_blacklisted(
+                    session, channel_id
+                ):
+                    raise Denied(
+                        "Канал в blacklist — нельзя включить.",
+                        channel_id=channel_id,
+                        is_active=is_active,
+                        action="set_active",
+                    )
+                switched = await channels_repo.set_channel_active(
+                    session, channel_id, is_active
+                )
+        if not switched:
+            raise Denied(
+                NO_CHANNEL,
+                channel_id=channel_id, is_active=is_active, action="set_active",
+            )
+        return {
+            "channel_id": channel_id,
+            "is_active": is_active,
+            "action": "set_active",
+        }
+
+    def set_all_active(self, payload: dict) -> dict:
+        """Включить или выключить все каналы разом.
+
+        Признак возвращается эхом — по нему окно откатывает отметку,
+        поставленную до ответа. Заслонённые сплошное включение обходит
+        стороной, и держит это репозиторий: включить отмеченный канал нельзя
+        никаким путём.
         """
         try:
-            payload = json.loads(payload_json)
             is_active = bool(payload["is_active"])
         except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("set_all_channels_active", e)
-            self.contacts_channel_action_done.emit(_err(
-                f"Неверные поля: {e}", action="set_all_active",
-            ))
-            return
+            return bad_fields("set_all_active", e, action="set_all_active")
 
-        async def run() -> str:
-            async with self._session_factory() as session:
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
                 async with session.begin():
                     affected = await channels_repo.set_all_channels_active(
                         session, is_active
                     )
-            return _ok({
+            return {
                 "is_active": is_active,
                 "affected": affected,
                 "action": "set_all_active",
-            })
+            }
 
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(),
-            action="set_all_active", is_active=is_active,
-        )
-
-    @Slot(str)
-    def set_channel_active(self, payload_json: str) -> None:
-        """Toggle TelegramChannel.is_active for one row.
-
-        Echoes ``channel_id`` and the requested ``is_active`` so the UI can
-        rollback its optimistic flip on error without re-querying the list.
-        """
-        # Парсим осторожно: если payload неполный, тянем сколько смогли,
-        # чтобы action+channel_id всё же попали в _err — иначе фронт не
-        # знает, какой именно ряд откатывать.
-        channel_id = None
-        is_active = None
-        try:
-            payload = json.loads(payload_json)
-            channel_id, is_active = read_toggle(payload, "channel_id", "is_active")
-            if channel_id is None or is_active is None:
-                raise KeyError("channel_id / is_active")
-        except (ValueError, TypeError, KeyError) as e:
-            _log_invalid_payload("set_channel_active", e)
-            self.contacts_channel_action_done.emit(_err(
-                f"Неверные поля: {e}",
-                action="set_active",
-                channel_id=channel_id,
-                is_active=is_active,
-            ))
-            return
-
-        async def run() -> str:
-            async with self._session_factory() as session:
-                async with session.begin():
-                    # Включить канал, который сейчас в blacklist'е, нельзя —
-                    # блокируем на уровне бэка, чтобы любой канал-toggle (в
-                    # т.ч. через bulk «Включить все») не оживлял запрещённое.
-                    if is_active and await channels_repo.is_channel_blacklisted(
-                        session, channel_id
-                    ):
-                        return _err(
-                            "Канал в blacklist — нельзя включить.",
-                            channel_id=channel_id,
-                            is_active=is_active,
-                            action="set_active",
-                        )
-                    ok = await channels_repo.set_channel_active(
-                        session, channel_id, is_active
-                    )
-            if not ok:
-                return _err(
-                    NO_CHANNEL,
-                    channel_id=channel_id,
-                    is_active=is_active,
-                    action="set_active",
-                )
-            return _ok({
-                "channel_id": channel_id,
-                "is_active": is_active,
-                "action": "set_active",
-            })
-
-        self._dispatch_action(
-            self.contacts_channel_action_done, run(),
-            action="set_active",
-            channel_id=channel_id,
-            is_active=is_active,
-        )
+        return reply(self._hub.runner, run())
