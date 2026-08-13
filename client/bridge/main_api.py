@@ -11,13 +11,10 @@ import json
 import logging
 from concurrent.futures import CancelledError, Future
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Coroutine
 
-from PySide6.QtCore import QObject, QTimer, QUrl, Signal, Slot
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from PySide6.QtWidgets import (
-    QApplication,
     QFileDialog,
     QMainWindow,
     QWidget,
@@ -29,9 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from adapters import lm_studio
 from adapters.lm_studio import LlmProviderConfig
 from backend.repository import blacklist, blacklist_candidates, channels as channels_repo, companies_card, companies_list, hr_card, hr_identify, hr_list, messages as messages_repo, profile as profile_repo, stats_pipeline, stats_summary, vacancies_card, vacancies_life, vacancies_list, vacancies_mini  # три псевдонима: имена заняты локальными переменными
-from backend.payloads import text_or_none as _none_if_empty
 from client.form_payloads import hr_is_identified, read_company_spellings, read_new_company_fields, read_new_hr_fields
-from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.domain.telegram_identity import normalize_username
 from backend.payloads import VacancyFilter
 from backend.models import (
@@ -45,14 +40,15 @@ from backend.models import (
 )
 from backend.telegram_login import TelegramLogin, username_of
 from backend.runtime_settings import RuntimeSettings
-from client.bridge.answer import _dispatch_json, _err, _ok
 from backend.domain.scoring import build_skill_lookup
-from client.bridge.choices import _filter_languages, _filter_set
-from client.bridge.cv_file import _stat_cv
+from client.bridge.answer import _dispatch_json, _err, _ok
+from client.bridge.cv import CvSlots
+from client.bridge.desktop import DesktopSlots
 from client.bridge.llm import _do_list_models_for_creds, _do_llm_probe
 from client.bridge.login import TelegramLoginSlots
 from client.bridge.media import _avatar_data_url, _media_url
 from client.bridge.payload import _log_invalid_payload
+from client.bridge.profile import ProfileSlots
 from client.bridge.runner import AsyncRunner
 from client.bridge.state import (
     _HEALTHCHECK_INTERVAL_MS,
@@ -63,11 +59,8 @@ from client.bridge.wire import (
     _blacklist_row_to_dict,
     _channel_row_to_dict,
     _company_picker_row_to_dict,
-    _exp_to_dict,
     _hr_picker_row_to_dict,
     _iso,
-    _profile_to_dict,
-    _skill_to_dict,
     _vacancy_detail_to_dict,
     _vacancy_list_row_to_dict,
 )
@@ -77,20 +70,16 @@ logger = logging.getLogger(__name__)
 
 
 
-class MainApi(TelegramLoginSlots, WindowStateSlots, QObject):
+class MainApi(
+    CvSlots, DesktopSlots, ProfileSlots, TelegramLoginSlots, WindowStateSlots,
+    QObject,
+):
     """Один объект «api», который канал отдаёт основному окну.
 
     Держит бота, часы общего состояния и предметы окна — своими примесями
     и, пока идёт этап 3, своими слотами прямо здесь.
     """
 
-    profile_changed = Signal(str)
-    profile_save_done = Signal(str)
-    cv_replace_done = Signal(str)
-    skills_changed = Signal(str)
-    skills_save_done = Signal(str)
-    experience_changed = Signal(str)
-    experience_save_done = Signal(str)
     vacancies_changed = Signal(str)
     vacancy_detail_changed = Signal(str)
     vacancy_notes_saved = Signal(str)
@@ -305,215 +294,6 @@ class MainApi(TelegramLoginSlots, WindowStateSlots, QObject):
                 logger.exception("MainApi: action %s failed", action)
                 return _err(f"{type(e).__name__}: {e}", action=action, **error_extra)
         self._dispatch(signal, safe())
-
-    # --- Profile / CV ---------------------------------------------------
-
-    @Slot()
-    def request_profile(self) -> None:
-        """Push the current Profile + CV path to JS."""
-        async def run() -> str:
-            async with self._session_factory() as session:
-                profile = await profile_repo.get_profile(session)
-                languages = (
-                    await profile_repo.list_profile_languages(session)
-                    if profile is not None
-                    else []
-                )
-            cv_path = self._rs.cv_path
-            cv_meta = _stat_cv(cv_path)
-            return _ok(
-                {
-                    "profile": _profile_to_dict(profile, languages),
-                    "cv_path": cv_path,
-                    "cv_meta": cv_meta,
-                }
-            )
-
-        self._dispatch(self.profile_changed, run())
-
-    @Slot(str)
-    def save_profile(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            fields = {
-                "first_name": str(payload.get("first_name") or "").strip(),
-                "last_name": str(payload.get("last_name") or "").strip(),
-                "title": str(payload.get("title") or "").strip(),
-                "email": str(payload.get("email") or "").strip(),
-                "phone": _none_if_empty(payload.get("phone")),
-                "location": _none_if_empty(payload.get("location")),
-                "telegram_username": _none_if_empty(payload.get("telegram_username")),
-                "github_url": _none_if_empty(payload.get("github_url")),
-                "education": _none_if_empty(payload.get("education")),
-                "free_preferences": _none_if_empty(payload.get("free_preferences")),
-                "grades": _filter_set(payload.get("grades"), GRADES),
-                "work_format": _filter_set(
-                    payload.get("work_format"), WORK_FORMATS
-                ),
-            }
-            languages = _filter_languages(payload.get("languages"))
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("save_profile", e)
-            self.profile_save_done.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        for required in ("first_name", "last_name", "title", "email"):
-            if not fields[required]:
-                self.profile_save_done.emit(
-                    _err(f"Поле '{required}' обязательно.")
-                )
-                return
-
-        async def run() -> str:
-            async with self._session_factory() as session:
-                async with session.begin():
-                    profile = await profile_repo.upsert_profile(
-                        session, **fields
-                    )
-                    await profile_repo.replace_profile_languages(
-                        session, profile.id, languages
-                    )
-            return _ok()
-
-        self._dispatch(self.profile_save_done, run())
-
-    @Slot(result=str)
-    def pick_cv_file_main(self) -> str:
-        """File picker for replacing the CV. Returns the selected file's
-        metadata (path + name + size) without saving anything."""
-        path, _ = QFileDialog.getOpenFileName(
-            self._parent_widget,
-            "Выберите файл резюме",
-            "",
-            "Резюме (*.pdf *.PDF *.md *.MD *.txt *.TXT);;Все файлы (*)",
-        )
-        if not path:
-            return _err("cancelled")
-        return _ok({"path": path, **(_stat_cv(path) or {})})
-
-    @Slot(str)
-    def replace_cv(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            path = str(payload.get("path") or "").strip()
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("replace_cv", e)
-            self.cv_replace_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        if not path:
-            self.cv_replace_done.emit(_err("Путь пустой."))
-            return
-
-        async def run() -> str:
-            await self._rs.set_app("cv_path", path)
-            return _ok({"path": path, **(_stat_cv(path) or {})})
-
-        self._dispatch(self.cv_replace_done, run())
-
-    @Slot()
-    def open_cv_file(self) -> None:
-        """Open the current CV with the OS-default application."""
-        cv_path = self._rs.cv_path
-        if not cv_path:
-            return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(cv_path).resolve())))
-
-    @Slot(str)
-    def open_external_url(self, url: str) -> None:
-        """Hand a URL off to the OS-default browser / Telegram client.
-
-        Used by the vacancies UI for "go to source post"
-        (vacancy.source_url) and "DM the HR" (https://t.me/{username})
-        actions — QWebEngineView swallows ``<a target="_blank">`` clicks
-        by default, so the JS side calls this slot instead.
-        """
-        if not url:
-            return
-        QDesktopServices.openUrl(QUrl(url))
-
-    @Slot(str)
-    def copy_to_clipboard(self, text: str) -> None:
-        """Копирование в системный буфер для WebEngine UI (Clipboard API там часто недоступен)."""
-        cb = QApplication.clipboard()
-        if cb:
-            cb.setText(text or "")
-
-    # --- Skills ---------------------------------------------------------
-
-    @Slot()
-    def request_skills(self) -> None:
-        async def run() -> str:
-            async with self._session_factory() as session:
-                rows = await profile_repo.list_skills(session)
-            return _ok({"skills": [_skill_to_dict(s) for s in rows]})
-
-        self._dispatch(self.skills_changed, run())
-
-    @Slot(str)
-    def save_skills(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            rows = payload.get("skills") or []
-            if not isinstance(rows, list):
-                raise ValueError("skills must be a list")
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("save_skills", e)
-            self.skills_save_done.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        async def run() -> str:
-            async with self._session_factory() as session:
-                async with session.begin():
-                    profile = await profile_repo.get_profile(session)
-                    if profile is None:
-                        return _err("Сначала сохраните профайл (CV-таб).")
-                    await profile_repo.save_skills(session, rows, profile.id)
-            return _ok()
-
-        self._dispatch(self.skills_save_done, run())
-
-    # --- Experience -----------------------------------------------------
-
-    @Slot()
-    def request_experience(self) -> None:
-        async def run() -> str:
-            async with self._session_factory() as session:
-                exps = await profile_repo.list_experience(session)
-                skills = await profile_repo.list_skills(session)
-            return _ok(
-                {
-                    "experience": [_exp_to_dict(e) for e in exps],
-                    "skills_index": [_skill_to_dict(s) for s in skills],
-                }
-            )
-
-        self._dispatch(self.experience_changed, run())
-
-    @Slot(str)
-    def save_experience(self, payload_json: str) -> None:
-        try:
-            payload = json.loads(payload_json)
-            rows = payload.get("experience") or []
-            if not isinstance(rows, list):
-                raise ValueError("experience must be a list")
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("save_experience", e)
-            self.experience_save_done.emit(_err(f"Неверные поля: {e}"))
-            return
-
-        async def run() -> str:
-            try:
-                async with self._session_factory() as session:
-                    async with session.begin():
-                        profile = await profile_repo.get_profile(session)
-                        if profile is None:
-                            return _err("Сначала сохраните профайл (CV-таб).")
-                        await profile_repo.save_experience(session, rows, profile.id)
-                return _ok()
-            except profile_repo.SaveExperienceError as e:
-                return _err(str(e))
-
-        self._dispatch(self.experience_save_done, run())
 
     # --- Vacancies ------------------------------------------------------
 
