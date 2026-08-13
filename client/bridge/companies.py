@@ -21,7 +21,8 @@ from client.bridge.mark import COMPANY_MARK, mark, unmark
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
 from client.bridge.payload import _log_invalid_payload
-from client.bridge.wire import _company_picker_row_to_dict, _iso
+from client.bridge.pickers import COMPANY_PICKER, merge_picker
+from client.bridge.wire import _vacancy_mini_row_to_dict, _company_picker_row_to_dict
 from client.form_payloads import read_company_spellings, read_new_company_fields
 
 
@@ -120,14 +121,7 @@ class CompanySlots:
                 "company_id": company_id,
                 "epoch": epoch,
                 "vacancies": [
-                    {
-                        "id": v.id,
-                        "title": v.title or "",
-                        "status": v.status.value if v.status else "New",
-                        "score": v.score,
-                        "created_at": _iso(v.created_at),
-                    }
-                    for v in rows
+                    _vacancy_mini_row_to_dict(v) for v in rows
                 ],
             })
 
@@ -170,15 +164,9 @@ class CompanySlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows, _ = await companies_list.list_companies_with_counts(session, search=search)
-            return _ok({
-                "absorbed_id": absorbed_id,
-                "search": search or "",
-                "companies": [
-                    _company_picker_row_to_dict(r) for r in rows
-                    if r.company.id != absorbed_id
-                ],
-            })
+                return _ok(
+                    await merge_picker(session, COMPANY_PICKER, absorbed_id, search)
+                )
 
         self._dispatch(self.contacts_company_merge_picker_loaded, run())
 

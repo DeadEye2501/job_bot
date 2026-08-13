@@ -11,15 +11,13 @@ from backend.models import Vacancy
 from backend.payloads import text_or_none
 from backend.repository import (
     companies_card,
-    companies_list,
     hr_identify,
-    hr_list,
     vacancies_card,
 )
 from client.bridge.answer import _err, _ok
 from client.bridge.refusals import COMPANY_EXISTS, IDENTITY_REQUIRED, NAME_REQUIRED, NO_VACANCY
 from client.bridge.payload import _log_invalid_payload
-from client.bridge.wire import _company_picker_row_to_dict, _hr_picker_row_to_dict
+from client.bridge.pickers import COMPANY_PICKER, HR_PICKER, link_picker
 from client.form_payloads import (
     hr_is_identified,
     read_new_company_fields,
@@ -59,17 +57,11 @@ class VacancyLinkSlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows, _ = await hr_list.list_hr_with_counts(session, search=search)
                 v = await session.get(Vacancy, vacancy_id)
                 if v is None:
                     return _err(NO_VACANCY, vacancy_id=vacancy_id)
-                payload = {
-                    "vacancy_id": vacancy_id,
-                    "current_hr_id": v.hr_id,
-                    "search": search or "",
-                    "hrs": [_hr_picker_row_to_dict(r) for r in rows],
-                }
-            return _ok(payload)
+                payload = await link_picker(session, HR_PICKER, v, search)
+            return _ok({"vacancy_id": vacancy_id, **payload})
 
         self._dispatch(self.hr_picker_loaded, run())
 
@@ -87,19 +79,11 @@ class VacancyLinkSlots:
 
         async def run() -> str:
             async with self._session_factory() as session:
-                rows, _ = await companies_list.list_companies_with_counts(
-                    session, search=search
-                )
                 v = await session.get(Vacancy, vacancy_id)
                 if v is None:
                     return _err(NO_VACANCY, vacancy_id=vacancy_id)
-                payload = {
-                    "vacancy_id": vacancy_id,
-                    "current_company_id": v.company_id,
-                    "search": search or "",
-                    "companies": [_company_picker_row_to_dict(r) for r in rows],
-                }
-            return _ok(payload)
+                payload = await link_picker(session, COMPANY_PICKER, v, search)
+            return _ok({"vacancy_id": vacancy_id, **payload})
 
         self._dispatch(self.company_picker_loaded, run())
 
@@ -208,17 +192,11 @@ class VacancyLinkSlots:
                 async with session.begin():
                     new_hr = await hr_identify.create_hr(session, **fields)
                     created_id = new_hr.id
-                rows, _ = await hr_list.list_hr_with_counts(session, search=search)
                 v = await session.get(Vacancy, vacancy_id)
-                current_hr_id = v.hr_id if v is not None else None
-                payload = {
-                    "vacancy_id": vacancy_id,
-                    "current_hr_id": current_hr_id,
-                    "search": search or "",
-                    "hrs": [_hr_picker_row_to_dict(r) for r in rows],
-                    "created_id": created_id,
-                }
-            return _ok(payload)
+                payload = await link_picker(session, HR_PICKER, v, search)
+            return _ok({
+                "vacancy_id": vacancy_id, **payload, "created_id": created_id
+            })
 
         self._dispatch(self.hr_picker_loaded, run())
 
@@ -254,16 +232,10 @@ class VacancyLinkSlots:
                             session, **fields
                         )
                         created_id = new_co.id
-                    rows, _ = await companies_list.list_companies_with_counts(
-                        session, search=search
-                    )
                     v = await session.get(Vacancy, vacancy_id)
-                    current_company_id = v.company_id if v is not None else None
                     payload = {
                         "vacancy_id": vacancy_id,
-                        "current_company_id": current_company_id,
-                        "search": search or "",
-                        "companies": [_company_picker_row_to_dict(r) for r in rows],
+                        **await link_picker(session, COMPANY_PICKER, v, search),
                         "created_id": created_id,
                     }
             except IntegrityError:
