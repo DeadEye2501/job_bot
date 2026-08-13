@@ -6,7 +6,8 @@
 
 import json
 
-from tests.dbio import put
+from backend.models import TelegramChannel
+from tests.dbio import all_rows, put
 from tests.factories import channel_row, vacancy_row
 
 
@@ -112,6 +113,31 @@ async def test_a_blacklisted_channel_cannot_be_turned_back_on(
     answer = await caught.next()
     assert answer["ok"] is False
     assert answer["error"] == "Канал в blacklist — нельзя включить."
+
+
+async def test_blacklisting_sweeps_the_namesake_channel_too(
+    main_api, watch, session_factory
+):
+    """Заслон гасит все каналы под этим написанием, а не только нажатый.
+
+    Одно и то же написание в базе бывает дважды — канал завели повторно, а
+    старую строку не убрали. Погаси заслон только нажатый, второй продолжил
+    бы носить вакансии из того самого источника, от которого ограждались, и
+    заметить это было бы нечем: в списке он выглядит включённым по своей
+    воле.
+    """
+    done = watch(main_api.contacts_channel_action_done)
+    clicked = channel_row(username="pyjobs", title="Питон-вакансии")
+    namesake = channel_row(username="pyjobs", title="Он же, заведённый заново")
+    await put(session_factory, clicked, namesake)
+
+    main_api.contacts_add_channel_to_blacklist(clicked.id)
+    await done.next()
+
+    # Смотрим в базу, а не в список: показ списка сам чинит дрейф тем же
+    # объявлением, и через него зелено было бы и без правки.
+    rows = await all_rows(session_factory, TelegramChannel)
+    assert [row.is_active for row in rows] == [False, False]
 
 
 async def test_blacklisting_turns_the_channel_off_at_once(

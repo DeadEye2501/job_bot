@@ -203,10 +203,12 @@ async def delete_hr(session: AsyncSession, hr_id: int) -> bool:
 
 
 def hr_blacklist_preferred_value(hr: HR) -> str | None:
-    """The single value the «Add to blacklist» action should write.
+    """Написание, под которым человек попадёт в подсказки экрана отсева.
 
-    Prefers @username (human-readable on the Blacklist screen); falls
-    back to user_id when no username is set.
+    Первое из перечня — ник, если он есть: на экране списка его читают
+    глазами, а номер учётной записи не говорит ничего. Кнопка карточки
+    берёт то же написание, но не отсюда: она зовёт общее объявление
+    `preferred_blacklist_value` над тем же перечнем.
     """
     return preferred_blacklist_value(hr_blacklist_candidates(hr))
 
