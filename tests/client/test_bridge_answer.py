@@ -10,7 +10,7 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 
-from client.bridge import _iso
+from client.bridge.answer import _iso
 
 
 async def test_the_answer_reaches_the_window_as_a_signal(main_api, watch):
@@ -44,7 +44,7 @@ async def test_a_broken_coroutine_becomes_a_refusal_not_a_silence(
     async def broken() -> str:
         raise RuntimeError("база не отвечает")
 
-    with caplog.at_level(logging.ERROR, logger="client.bridge"):
+    with caplog.at_level(logging.ERROR, logger="client.bridge.answer"):
         main_api._dispatch(main_api.vacancy_notes_saved, broken())
         answer = await caught.next()
 
@@ -86,7 +86,7 @@ async def test_a_rejected_payload_never_lands_in_the_journal(main_api, watch, ca
     """
     caught = watch(main_api.vacancy_notes_saved)
 
-    with caplog.at_level(logging.WARNING, logger="client.bridge"):
+    with caplog.at_level(logging.WARNING, logger="client.bridge.payload"):
         main_api.update_vacancy_notes(
             json.dumps({"vacancy_id": "sk-секретный-ключ", "notes": "тайна"})
         )
@@ -108,7 +108,7 @@ async def test_a_missing_field_is_named_in_the_journal(main_api, watch, caplog):
     """
     caught = watch(main_api.vacancy_notes_saved)
 
-    with caplog.at_level(logging.WARNING, logger="client.bridge"):
+    with caplog.at_level(logging.WARNING, logger="client.bridge.payload"):
         main_api.update_vacancy_notes(json.dumps({"notes": "без вакансии"}))
 
     assert (await caught.next())["ok"] is False

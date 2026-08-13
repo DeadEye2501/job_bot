@@ -1,23 +1,7 @@
-"""QWebChannel bridge between the wizard UI (JS) and Python.
+"""Поверхность окна: основное окно и мастер первого запуска.
 
-Pyrogram and httpx are async, Qt's event loop is not — so we run a single
-asyncio loop in a background thread and schedule coroutines onto it from
-the @Slot methods. Results come back to JS via Qt signals.
-
-Slots return immediately; JS connects to the matching signal to receive
-the JSON result.
-
-SECURITY — cleartext secrets through QWebChannel:
-Несколько slot'ов сознательно отдают plaintext-секреты во фронт (это
-single-user app, JS живёт в embedded WebView, не по сети):
-- ``initial_state`` / ``request_system_settings`` — chat/embed api_key,
-  Telegram api_id+api_hash, расшифрованный CV-path.
-- ``request_profile`` — PII профиля (email, phone, telegram_username,
-  github_url, location, education) + абсолютный путь к CV.
-Прежде чем добавлять новые slot'ы, отдающие секреты, подумайте:
-заслуживает ли поле статус «можно вернуть как есть», или его лучше
-скрыть/подменить (eye-toggle паттерн на UI). Audit-trail см. git blame
-по соответствующим slot'ам.
+Двух поверхностей в одном модуле быть не должно — мастер уезжает своим файлом
+следующим слайсом этапа 3.
 """
 
 from __future__ import annotations
@@ -26,11 +10,9 @@ import asyncio
 import base64
 import json
 import logging
-import sqlite3
-import threading
 import time
 from concurrent.futures import CancelledError, Future
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
@@ -70,122 +52,12 @@ from backend.models import (
 )
 from backend.telegram_login import TelegramLogin, username_of
 from backend.runtime_settings import RuntimeSettings
+from client.bridge.answer import _dispatch_json, _err, _iso, _ok
+from client.bridge.payload import _log_invalid_payload
+from client.bridge.runner import AsyncRunner
 
 
 logger = logging.getLogger(__name__)
-
-
-# === Async runner =========================================================
-
-
-class AsyncRunner:
-    """Owns an asyncio loop running in a background thread."""
-
-    def __init__(self) -> None:
-        self.loop = asyncio.new_event_loop()
-        self._thread = threading.Thread(
-            target=self._run_loop, daemon=True, name="WizardAsyncLoop"
-        )
-        self._thread.start()
-        logger.info("AsyncRunner started (thread=%s)", self._thread.name)
-
-    def _run_loop(self) -> None:
-        asyncio.set_event_loop(self.loop)
-        # Pyrogram'ский race во время shutdown / log_out: внутренний таск
-        # Client.handle_updates догоняет с update'ом для уже закрытой
-        # SQLite-storage / стопнутого loop'а / частично-разобранного
-        # клиента. Делать тут нечего — apply'нуть уже не во что,
-        # фильтруем шум, чтобы он не прыгал в stderr и не пугал юзера.
-        # Список расширен по review-concurrency.md M4: помимо
-        # ProgrammingError("closed database") теперь глушатся и
-        # RuntimeError("Event loop is closed"), и AttributeError на
-        # частично-разобранных Pyrogram-объектах при teardown'е.
-        def _quiet_pyrogram_shutdown(loop, context):
-            exc = context.get("exception")
-            msg = str(exc) if exc else ""
-            # WARNING (а не DEBUG): если эти исключения всплывают вне
-            # shutdown'а — это значит мы где-то закрыли DB-pool / loop
-            # рано, и тихий DEBUG это спрячет. WARNING шумит ровно один
-            # раз на teardown — приемлемо. Если ловите эти warning'и не
-            # при выходе из приложения / log_out / delete_all_data —
-            # значит появился реальный bug.
-            if isinstance(exc, sqlite3.ProgrammingError) and \
-               "closed database" in msg:
-                logger.warning("Pyrogram shutdown race swallowed: %s", exc)
-                return
-            if isinstance(exc, RuntimeError) and \
-               "Event loop is closed" in msg:
-                logger.warning("Pyrogram shutdown race swallowed: %s", exc)
-                return
-            if isinstance(exc, AttributeError):
-                # AttributeError при teardown'е остаётся DEBUG — самый шумный
-                # из трёх (pyrogram дёргает self.<attr> на уже-обнулённом
-                # объекте по нескольку раз за teardown). WARNING'и от sqlite3/
-                # RuntimeError выше — точечный сигнал «бд/loop закрыты вне
-                # shutdown'а», AttributeError диагностически слабее.
-                logger.debug("AttributeError during teardown swallowed: %s", exc)
-                return
-            loop.default_exception_handler(context)
-        self.loop.set_exception_handler(_quiet_pyrogram_shutdown)
-        self.loop.run_forever()
-
-    def submit(self, coro: Coroutine[Any, Any, Any]) -> Future:
-        return asyncio.run_coroutine_threadsafe(coro, self.loop)
-
-    def stop(self) -> None:
-        if not self.loop.is_running():
-            return
-        logger.info("AsyncRunner stopping")
-        # Cancel pending tasks so aclose / disconnect handlers в finally
-        # блоках Bot.run / IngestionPipeline получают шанс отработать
-        # до смерти loop'а. Таймаут расширен с 3с до 15с — Bot.run
-        # finally делает `await client.stop()` Pyrogram'а + два
-        # `await lm_*.aclose()`, на flaky-сети это легко 5-10с.
-        # Раньше cancel_pending уезжал по таймауту и тут же loop.stop()
-        # рубил cleanup'ы посередине.
-        async def _cancel_pending() -> None:
-            tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-            for t in tasks:
-                t.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-        try:
-            asyncio.run_coroutine_threadsafe(_cancel_pending(), self.loop).result(timeout=15)
-        except Exception:
-            logger.exception("AsyncRunner: cancel_pending failed during stop")
-        self.loop.call_soon_threadsafe(self.loop.stop)
-        self._thread.join(timeout=15)
-        if self._thread.is_alive():
-            logger.warning("AsyncRunner thread did not exit within 15s join timeout")
-
-
-# === Bridge ===============================================================
-
-
-def _ok(data: dict | None = None) -> str:
-    return json.dumps({"ok": True, **(data or {})})
-
-
-def _err(message: str, **extra: Any) -> str:
-    return json.dumps({"ok": False, "error": message, **extra})
-
-
-def _iso(dt: datetime | None) -> str | None:
-    """ISO-8601 с обязательным TZ-суффиксом, под JS `Date.parse`.
-
-    SQLite + ``DateTime(timezone=True)`` хранит как text. Строки, записанные
-    через ``server_default=func.now()`` (vacancy_status_history.changed_at,
-    vacancy_event.created_at и т.п.) приходят обратно naive — без offset'а.
-    Голый ``.isoformat()`` шлёт `"2026-05-07T12:34:56"` без `Z`/`+00:00`,
-    а `Date.parse` без TZ интерпретирует строку как ЛОКАЛЬНОЕ время —
-    свежий эвент превращается в «N часов назад» на величину TZ-оффсета.
-    Naive значения трактуем как UTC (потому что вся запись идёт в UTC),
-    aware — отдаём как есть.
-    """
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.isoformat()
 
 
 async def _do_list_models_for_creds(
@@ -236,35 +108,6 @@ async def _do_llm_probe(
         return ok, detail, models, latency_ms
     finally:
         await client.aclose()
-
-
-def _dispatch_json(api, signal: Signal, coro: Coroutine[Any, Any, Any]) -> None:
-    """Отправить корутину на runner и отдать её ответ окну сигналом.
-
-    Объявлено один раз на оба класса: общие чтения нагрузки зовут отправку,
-    не зная, у какого из них они в руках, — а разойдись эти отправки, у
-    мастера и настроек разошлось бы и поведение при закрытии окна.
-
-    Отмену при остановке не показываем: обработчик в окне к этому мигу уже
-    отвалился, и «CancelledError» уходило бы в умирающую страницу. Обе
-    породы отмены ловятся вместе — runner отдаёт свою, корутина свою.
-    """
-    future = api._runner.submit(coro)
-
-    def on_done(f: Future) -> None:
-        try:
-            payload = f.result()
-        except (CancelledError, asyncio.CancelledError):
-            return
-        except Exception as e:
-            logger.exception(
-                "bridge: unexpected error in coroutine %s",
-                getattr(coro, "__qualname__", "?"),
-            )
-            payload = _err(f"{type(e).__name__}: {e}")
-        signal.emit(payload)
-
-    future.add_done_callback(on_done)
 
 
 async def _login_json(step_coro) -> str:
@@ -330,16 +173,6 @@ def _login_confirm_password(api, payload_json: str) -> None:
         api.telegram_confirm_password_done,
         _login_json(api._login.confirm_password(password)),
     )
-
-
-def _log_invalid_payload(slot: str, exc: Exception) -> None:
-    """Порода ошибки без её текста: `int()` вставляет туда само значение, а
-    нагрузка несёт api_hash, ключ модели и пароль — образцы вымарывания хэш
-    без имени поля рядом не ловят. У `KeyError` текст — имя поля, и оно живёт.
-    """
-    missing = exc.args[0] if isinstance(exc, KeyError) and exc.args else None
-    said = f"нет поля {missing!r}" if missing is not None else type(exc).__name__
-    logger.warning("%s: invalid payload: %s", slot, said)
 
 
 def _media_url(stored_path: str | None) -> str | None:
@@ -461,7 +294,7 @@ class WizardApi(QObject):
     # --- helpers -----------------------------------------------------------
 
     def _dispatch(self, signal: Signal, coro: Coroutine[Any, Any, Any]) -> None:
-        _dispatch_json(self, signal, coro)
+        _dispatch_json(self._runner, signal, coro)
 
     # --- Telegram OTP flow -------------------------------------------------
 
@@ -939,7 +772,7 @@ class MainApi(QObject):
     # --- helpers ----------------------------------------------------------
 
     def _dispatch(self, signal: Signal, coro: Coroutine[Any, Any, Any]) -> None:
-        _dispatch_json(self, signal, coro)
+        _dispatch_json(self._runner, signal, coro)
 
     def _dispatch_action(
         self,

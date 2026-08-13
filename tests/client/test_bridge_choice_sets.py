@@ -10,7 +10,7 @@
 """
 
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
-from client.bridge import _filter_set
+from client.bridge.main_api import _filter_set
 
 
 def test_the_declared_order_wins_over_the_order_of_clicks():
