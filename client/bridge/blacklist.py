@@ -10,7 +10,6 @@ from backend.models import BLACKLIST_KINDS
 from backend.repository import (
     blacklist as blacklist_repo,
     blacklist_candidates,
-    channels as channels_repo,
 )
 from client.bridge.answer import _err, _ok
 from client.bridge.payload import _log_invalid_payload
@@ -125,13 +124,6 @@ class BlacklistSlots:
                             session, kind=kind, value=value, reason=reason,
                         )
                         new_id = row.id
-                        # kind=channel → автоматически выключаем подходящие
-                        # каналы. Без этого канал остался бы is_active=true
-                        # после блокировки, и UI-toggle давал бы запутанную
-                        # картину (загорелось — но bot всё равно скипает).
-                        deactivated = 0
-                        if kind == "channel":
-                            deactivated = await channels_repo.deactivate_blacklisted_channels(session)
             except blacklist_repo.BlacklistUpdateError as e:
                 return _err(str(e), action="create")
             # Новая (или реактивированная) запись блеклиста влияет на
@@ -140,7 +132,6 @@ class BlacklistSlots:
             return _ok({
                 "id": new_id,
                 "created": outcome == "created",
-                "deactivated_channels": deactivated,
                 "action": "create",
             })
 

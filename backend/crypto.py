@@ -79,8 +79,11 @@ def forget_master_key() -> None:
     """
     try:
         keyring.delete_password(_KEYRING_SERVICE, _KEYRING_KEY)
-    except Exception as e:
-        logger.debug("master key already absent (%s)", e)
+    except Exception:
+        # С трассировкой, а не одной строкой: отсутствие записи — обычное
+        # дело, но сюда же приходит и сломанное хранилище ключей ОС, и
+        # различить их потом можно только по ней.
+        logger.debug("master key not forgotten", exc_info=True)
 
 
 def _cipher() -> Fernet:

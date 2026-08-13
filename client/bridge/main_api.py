@@ -128,6 +128,7 @@ class MainApi(
         # модели — настоящая генерация, см. `_MODEL_PROBE_INTERVAL_S`.
         self._models_probed_at: float = float("-inf")
         self._models_health_cache: tuple[bool, bool] = (False, False)
+        self._models_in_flight = False
         self._logs_subscribed = False
         # Когда журнал спрашивали в прошлый раз — заслон от частых обращений
         # (`journal._LOGS_REQUEST_INTERVAL_S`).

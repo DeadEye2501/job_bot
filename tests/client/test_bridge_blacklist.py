@@ -7,7 +7,8 @@
 
 import json
 
-from tests.dbio import put
+from backend.models import TelegramChannel
+from tests.dbio import all_rows, put
 from tests.factories import blacklist_row, channel_row, company_row
 
 
@@ -104,25 +105,24 @@ async def test_repeating_a_switched_off_entry_brings_it_back(
 async def test_barring_a_channel_switches_it_off_right_away(
     main_api, watch, session_factory
 ):
-    """Запись про канал гасит совпавшие каналы и говорит, сколько погасила.
+    """Запись про канал гасит совпавшие каналы сразу.
 
     Иначе канал остался бы в опросе до следующего перечитывания списка и
-    успел бы принести ещё объявлений — ровно от них и ограждались.
+    успел бы принести ещё объявлений — ровно от них и ограждались. Смотрим в
+    базу, а не в список: показ списка чинит дрейф сам, и через него зелено
+    было бы и без правила.
     """
     caught = watch(main_api.contacts_blacklist_action_done)
-    listed = watch(main_api.contacts_channel_list_loaded)
     await put(session_factory, channel_row(username="spam", title="Спам"))
 
     main_api.request_create_blacklist(
         json.dumps({"kind": "channel", "value": "@spam"})
     )
 
-    answer = await caught.next()
-    assert answer["ok"] is True
-    assert answer["deactivated_channels"] == 1
+    assert (await caught.next())["ok"] is True
 
-    main_api.request_contacts_channel_list(json.dumps({}))
-    assert (await listed.next())["channels"][0]["is_active"] is False
+    rows = await all_rows(session_factory, TelegramChannel)
+    assert [row.is_active for row in rows] == [False]
 
 
 async def test_an_update_without_either_field_is_refused(
@@ -204,3 +204,25 @@ async def test_a_deleted_entry_leaves_the_list(main_api, watch, session_factory)
 
     main_api.request_contacts_blacklist_list()
     assert (await listed.next())["items"] == []
+
+
+async def test_switching_a_barred_row_back_on_stops_its_channel(
+    main_api, watch, session_factory
+):
+    """Возвращённая в отсев запись гасит канал так же, как заведённая.
+
+    Отметку в списке снимают и возвращают тумблером, и до этого правило
+    держали только заведение и показ списка: канал, отсеянный тумблером,
+    продолжал носить вакансии до ближайшего открытия экрана каналов — а
+    человек считал, что оградился.
+    """
+    caught = watch(main_api.contacts_blacklist_action_done)
+    channel = channel_row(username="spam", title="Спам")
+    row = blacklist_row(kind="channel", value="@spam", active=False)
+    await put(session_factory, channel, row)
+
+    main_api.set_blacklist_active(json.dumps({"id": row.id, "active": True}))
+
+    assert (await caught.next())["ok"] is True
+    rows = await all_rows(session_factory, TelegramChannel)
+    assert [one.is_active for one in rows] == [False]
