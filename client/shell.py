@@ -144,7 +144,7 @@ def run_ui() -> int:
                 logger.exception("deregisterObject failed for previous API")
         new_api = MainApi(
             rs, session_factory, runner,
-            parent_widget=window, window=window, engine=engine,
+            parent_widget=window, engine=engine,
         )
         channel.registerObject("api", new_api)
         active_api["obj"] = new_api
@@ -161,7 +161,6 @@ def run_ui() -> int:
             session_factory,
             runner,
             parent_widget=window,
-            window=window,
             on_enter_main=lambda: install_main_api(recenter=True),
         )
         channel.registerObject("api", wizard_api)

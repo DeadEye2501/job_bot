@@ -9,16 +9,13 @@ from typing import Any, Callable, Coroutine
 
 import httpx
 from PySide6.QtCore import QObject, Signal, Slot
-from PySide6.QtWidgets import QFileDialog, QMainWindow, QWidget
+from PySide6.QtWidgets import QFileDialog, QWidget
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from adapters import lm_studio
-from backend.llm.cv import parse_cv
-from backend.repository import profile as profile_repo
 from backend.runtime_settings import RuntimeSettings
 from backend.telegram_login import TelegramLogin
 from client.bridge.answer import _dispatch_json, _err, _ok
-from client.bridge.cv_file import _read_cv_text
 from client.bridge.llm import _do_llm_probe, models_coro, read_llm_creds
 from client.bridge.login import TelegramLoginSlots
 from client.bridge.payload import _log_invalid_payload
@@ -47,7 +44,6 @@ class WizardApi(TelegramLoginSlots, QObject):
         session_factory: async_sessionmaker,
         runner: AsyncRunner,
         parent_widget: QWidget | None = None,
-        window: QMainWindow | None = None,
         on_enter_main: Callable[[], None] | None = None,
     ) -> None:
         super().__init__()
@@ -55,7 +51,6 @@ class WizardApi(TelegramLoginSlots, QObject):
         self._session_factory = session_factory
         self._runner = runner
         self._parent_widget = parent_widget
-        self._window = window
         self._on_enter_main = on_enter_main
         self._login = TelegramLogin("job_bot_wizard", rs)
 
@@ -273,49 +268,6 @@ class WizardApi(TelegramLoginSlots, QObject):
 
         self.cv_save_done.emit(_err(f"Неизвестный режим: {mode!r}"))
 
-    async def _do_cv_parse_and_save(self, path: str) -> str:
-        if self._rs.chat is None:
-            return _err(
-                "Сначала настройте чат-LLM на шаге 2 — без него парсинг невозможен."
-            )
-
-        logger.info("Parsing CV: %s", Path(path).name)
-        try:
-            text = _read_cv_text(Path(path))
-        except Exception as e:
-            return _err(f"Не удалось прочитать файл: {type(e).__name__}: {e}")
-        if not text.strip():
-            return _err("Файл пустой или не содержит текста.")
-
-        chat = self._rs.chat
-        client = lm_studio.make_client(chat)
-        try:
-            parsed = await parse_cv(text, client, chat.model)
-        finally:
-            await client.aclose()
-
-        if parsed is None:
-            logger.warning("CV parse: LLM returned None for %s", path)
-            return _err("LLM не смогла распознать структуру резюме.")
-
-        async with self._session_factory() as session:
-            async with session.begin():
-                await profile_repo.save_parsed_cv(session, parsed, cv_path=path)
-        # Refresh in-memory cache so rs.cv_path reflects the just-written row.
-        await self._rs.reload()
-        logger.info(
-            "CV parsed and saved (skills=%d, experience=%d)",
-            len(parsed.skills),
-            len(parsed.experience),
-        )
-        return _ok(
-            {
-                "mode": "parse",
-                "skills_count": len(parsed.skills),
-                "experience_count": len(parsed.experience),
-            }
-        )
-
     # --- Finish -----------------------------------------------------------
 
     @Slot()
@@ -328,10 +280,6 @@ class WizardApi(TelegramLoginSlots, QObject):
         logger.info("Wizard finish requested")
         self.finish_done.emit(_ok())
 
-    @Slot()
-    def close_window(self) -> None:
-        if self._window is not None:
-            self._window.close()
 
     @Slot()
     def enter_main_app(self) -> None:

@@ -27,16 +27,6 @@ class Handoff:
         self.entered += 1
 
 
-class Window:
-    """Окно, которому мастер умеет сказать «закройся»."""
-
-    def __init__(self) -> None:
-        self.closed = 0
-
-    def close(self) -> None:
-        self.closed += 1
-
-
 @pytest.fixture
 def handoff() -> Handoff:
     return Handoff()
@@ -44,12 +34,11 @@ def handoff() -> Handoff:
 
 @pytest.fixture
 async def wizard_with_handoff(runtime_settings, session_factory, runner, handoff):
-    """Мастер, которому есть куда передать управление и что закрыть."""
-    window = Window()
+    """Мастер, которому есть куда передать управление."""
     api = WizardApi(
-        runtime_settings, session_factory, runner, window=window, on_enter_main=handoff
+        runtime_settings, session_factory, runner, on_enter_main=handoff
     )
-    yield api, window
+    yield api
     await runner.drain()
 
 
@@ -131,7 +120,7 @@ async def test_entering_the_main_window_marks_the_setup_as_done(
     увидит сейчас. Пропади первая, мастер открывался бы каждый раз заново;
     пропади вторая — человек остался бы на последнем экране мастера навсегда.
     """
-    wizard, _ = wizard_with_handoff
+    wizard = wizard_with_handoff
 
     wizard.enter_main_app()
     for started in list(wizard._runner.tasks):
@@ -141,26 +130,3 @@ async def test_entering_the_main_window_marks_the_setup_as_done(
     assert (await RuntimeSettings.load(session_factory)).wizard_completed is True
 
 
-async def test_closing_the_window_asks_the_window_itself(wizard_with_handoff):
-    """Закрытие просит закрыться то самое окно, что мастеру дали.
-
-    Своего окна у моста нет — он держит переданное ему. Закрой он не то или
-    промолчи, последний экран мастера остался бы висеть поверх основного.
-    """
-    wizard, window = wizard_with_handoff
-
-    wizard.close_window()
-
-    assert window.closed == 1
-
-
-async def test_closing_without_a_window_leaves_the_wizard_alive(wizard_api):
-    """Без окна закрытие проходит молча, и мастер продолжает отвечать.
-
-    Окно мастеру дают только в настоящем запуске. Упади он на этом нажатии,
-    сломалось бы всё приложение — а следствие видно по тому, что следующий
-    же вопрос к мастеру получает ответ.
-    """
-    wizard_api.close_window()
-
-    assert json.loads(wizard_api.initial_state())["ok"] is True

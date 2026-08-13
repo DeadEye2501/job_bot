@@ -209,3 +209,29 @@ def test_a_company_name_of_spaces_is_read_as_no_name():
     поиском, ни сведением, а в чёрный список оно пошло бы пустой строкой.
     """
     assert read_new_company_fields({"name": "   "})["name"] == ""
+
+
+def test_a_number_among_the_spellings_is_dropped_not_written():
+    """Число среди написаний компании выпадает, а не становится написанием.
+
+    Написания сводят карточки: по ним компания из объявления узнаётся в уже
+    заведённой. Приведи мост число к строке — в колонке появилось бы
+    написание «2024», и первая же вакансия с этим числом в имени слилась бы
+    с чужой компанией.
+    """
+    fields = read_new_company_fields({"name": "Контур", "aliases": [2024, "Контур"]})
+
+    assert fields["aliases"] == ["Контур"]
+
+
+def test_spellings_come_the_same_way_from_both_screens():
+    """Строка через запятую и готовый список читаются одинаково.
+
+    Одна и та же форма открывается из карточки вакансии и из контактов, и
+    шлёт она разное: одна строку, другая список. Разойдись чтение — на одном
+    экране написания легли бы в колонку одним куском.
+    """
+    from_line = read_new_company_fields({"name": "Контур", "aliases": " Контур , ООО "})
+    from_list = read_new_company_fields({"name": "Контур", "aliases": [" Контур ", "ООО"]})
+
+    assert from_line["aliases"] == from_list["aliases"] == ["Контур", "ООО"]

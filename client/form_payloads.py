@@ -8,7 +8,7 @@
 """
 
 from backend.domain.telegram_identity import typed_username
-from backend.payloads import int_or_none, text_or_none
+from backend.payloads import int_or_none, str_list, text_or_none
 
 
 def read_toggle(
@@ -37,16 +37,16 @@ def read_company_spellings(raw) -> list[str]:
     Приходят с одного экрана строкой через запятую, с другого — готовым
     списком, и читаются оба: список, прочитанный как строка, лёг бы в
     колонку одним куском вида «['ООО Контур']», и ни одно написание не
-    нашлось бы при сведении компаний. Пустые и пробельные выпадают: в
-    списке они не значат ничего, а на экране выглядят пропавшей строкой.
+    нашлось бы при сведении компаний.
+
+    Своего здесь только разбор строки; дальше читает `str_list` — то же
+    объявление, которым читают этот список и обе стороны в репозитории.
+    Пустые, пробельные и не-строки выпадают там, и это разъезжалось: здесь
+    число приводилось к строке и становилось написанием компании.
     """
     if isinstance(raw, str):
         raw = raw.split(",")
-    elif not isinstance(raw, list):
-        raw = []
-    return [
-        spelling for spelling in (str(a).strip() for a in raw) if spelling
-    ]
+    return str_list(raw)
 
 
 def read_new_company_fields(payload: dict) -> dict:
