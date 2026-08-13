@@ -32,16 +32,16 @@ from client.bridge.login import TelegramLoginSlots
 from client.bridge.profile import ProfileSlots
 from client.bridge.runner import AsyncRunner
 from client.bridge.settings import SettingsSlots
-from client.bridge.stats import StatsSlots
-from client.bridge.vacancies import VacancySlots
-from client.bridge.vacancy_actions import VacancyActionSlots
-from client.bridge.vacancy_links import VacancyLinkSlots
-from client.bridge.wipe import WipeSlots
 from client.bridge.state import (
     _HEALTHCHECK_INTERVAL_MS,
     _UNREAD_INTERVAL_MS,
     WindowStateSlots,
 )
+from client.bridge.stats import StatsSlots
+from client.bridge.vacancies import VacancySlots
+from client.bridge.vacancy_actions import VacancyActionSlots
+from client.bridge.vacancy_links import VacancyLinkSlots
+from client.bridge.wipe import WipeSlots
 
 
 logger = logging.getLogger(__name__)
