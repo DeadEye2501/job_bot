@@ -70,7 +70,7 @@ async def test_the_request_ordinal_comes_back_as_a_number(
 
 
 async def test_an_unknown_chat_mode_comes_back_as_the_first_one(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Незнакомый режим переписки схлопывается в «свежие», а не едет эхом.
 
@@ -78,15 +78,12 @@ async def test_an_unknown_chat_mode_comes_back_as_the_first_one(
     заменить показанное целиком. Опечатка, вернувшаяся как есть, читается им
     как замена — и уже догруженная история переписки пропадает с экрана.
     """
-    caught = watch(main_api.contacts_hr_messages_loaded)
     hr = hr_row(name="Иван")
     await put(session_factory, hr)
 
-    main_api.request_contacts_hr_messages(
-        json.dumps({"hr_id": hr.id, "mode": "как-нибудь"})
-    )
+    answer = await ask(api.hr.messages, {"hr_id": hr.id, "mode": "как-нибудь"})
 
-    assert (await caught.next())["mode"] == "tail"
+    assert answer["ok"]["mode"] == "tail"
 
 
 async def test_a_page_asked_beyond_the_ceiling_comes_back_cut(

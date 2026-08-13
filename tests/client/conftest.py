@@ -143,6 +143,12 @@ def watch():
 
 
 @pytest.fixture
+def hub(main_api):
+    """Хозяйство живого окна: из него смотрят на очередь событий."""
+    return main_api._hub
+
+
+@pytest.fixture
 async def api(main_api) -> Api:
     """Переехавшая поверхность: домены, отвечающие значением.
 

@@ -59,15 +59,18 @@ def denied(reason: str, **extra: Any) -> dict:
     return {"fail": "denied", "detail": reason, **extra}
 
 
-def bad_fields(where: str, error: Exception) -> dict:
+def bad_fields(where: str, error: Exception, **extra: Any) -> dict:
     """Нагрузка не разобралась: жалоба в журнал без секретов, отказ окну.
 
     Три эти строки стояли своим телом в каждом слоте, читающем нагрузку, — на
     сорока восьми местах. Разъезжались они молча: чей-то слот забывал жалобу, и
     беда пропадала целиком.
+
+    Поля рядом с отказом нужны там, где окно правит строку списка на месте:
+    имя действия и номер строки говорят ему, какую именно отметку откатывать.
     """
     _log_invalid_payload(where, error)
-    return {"fail": "fields", "detail": f"Неверные поля: {error}"}
+    return {"fail": "fields", "detail": f"Неверные поля: {error}", **extra}
 
 
 def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict:

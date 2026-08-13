@@ -28,7 +28,7 @@ from backend.repository import (
     hr_card,
 )
 from backend.repository.blacklist_marks import preferred_blacklist_value
-from client.bridge.answer import _err, _ok
+from client.bridge.answer import Denied, _err, _ok
 from client.bridge.refusals import NO_CHANNEL, NO_COMPANY, NO_HR
 
 
@@ -72,62 +72,84 @@ CHANNEL_MARK = MarkSubject(
 )
 
 
-async def mark(session, subject: MarkSubject, entity_id: int) -> tuple[str, bool]:
-    """Завести отметку; вторым — дошло ли дело до записи.
+async def mark_or_refuse(session, subject: MarkSubject, entity_id: int) -> dict:
+    """Завести отметку и отдать написание, под которым она легла.
 
     Написание берётся первым из перечня — тем же, по которому отметку потом
     и ищут. Исход возвращается словом: карточка рисует «уже был в списке» и
     «вернули в список» по-разному, и признака «завели ли» ей мало.
 
-    Второй член кортежа — не «менялось ли», а «не отказ»: по нему зовущий
-    решает, гнать ли окно перечитывать списки. Повторное нажатие на уже
-    отмеченном предмете ничего не меняет, но списки перечитать просит — как
-    и раньше, потому что чип в карточке рисуется по ним.
+    Отказ бросается, а не возвращается: возврат занят нагрузкой, а конверт
+    складывает `reply` у зовущего.
     """
     row = await session.get(subject.model, entity_id)
     if row is None:
-        return _err(subject.missing, action="blacklist", **{subject.key: entity_id}), False
+        raise Denied(subject.missing, action="blacklist", **{subject.key: entity_id})
     value = preferred_blacklist_value(subject.candidates(row))
     if value is None:
-        return _err(
-            subject.unnamed, action="blacklist", **{subject.key: entity_id}
-        ), False
+        raise Denied(subject.unnamed, action="blacklist", **{subject.key: entity_id})
     _, outcome = await blacklist_repo.create_blacklist(
         session, kind=subject.kind, value=value,
     )
     await session.commit()
-    return _ok({
+    return {
         "action": "blacklist",
         subject.key: entity_id,
         "value": value,
         "existed": outcome != "created",
         "was_inactive": outcome == "reactivated",
-    }), True
+    }
 
 
-async def unmark(session, subject: MarkSubject, entity_id: int) -> tuple[str, bool]:
-    """Погасить отметки предмета; вторым — дошло ли дело до записи.
+async def unmark_or_refuse(session, subject: MarkSubject, entity_id: int) -> dict:
+    """Погасить отметки предмета и сказать, сколько их погасло.
 
     Гасятся все написания сразу, а не одно: запись могли завести под ником,
     а предмет с тех пор остался с одним номером — и чип в карточке продолжал
     бы гореть по написанию, которого кнопка уже не видит.
+
+    Отказ бросается по тому же доводу, что и у соседки выше.
     """
     row = await session.get(subject.model, entity_id)
     if row is None:
-        return _err(
-            subject.missing, action="unblacklist", **{subject.key: entity_id}
-        ), False
+        raise Denied(subject.missing, action="unblacklist", **{subject.key: entity_id})
     candidates = subject.candidates(row)
     if not candidates:
-        return _err(
-            subject.unnamed, action="unblacklist", **{subject.key: entity_id}
-        ), False
+        raise Denied(subject.unnamed, action="unblacklist", **{subject.key: entity_id})
     updated = await blacklist_repo.deactivate_blacklist_values(
         session, subject.kind, candidates,
     )
     await session.commit()
-    return _ok({
+    return {
         "action": "unblacklist",
         subject.key: entity_id,
         "updated": updated,
-    }), True
+    }
+
+
+async def mark(session, subject: MarkSubject, entity_id: int) -> tuple[str, bool]:
+    """То же самое конвертом-строкой — для непереехавших карточек."""
+    return await _in_words(mark_or_refuse, session, subject, entity_id)
+
+
+async def unmark(session, subject: MarkSubject, entity_id: int) -> tuple[str, bool]:
+    """То же самое конвертом-строкой — для непереехавших карточек."""
+    return await _in_words(unmark_or_refuse, session, subject, entity_id)
+
+
+async def _in_words(
+    marking, session, subject: MarkSubject, entity_id: int
+) -> tuple[str, bool]:
+    """Прежний ответ кнопки: конверт строкой и «не отказ» вторым.
+
+    Карточки компании и канала отвечают окну сигналом, и ответ им нужен
+    строкой; по второму члену они решают, гнать ли окно перечитывать списки.
+    Карточка человека переехала на возврат и зовёт `*_or_refuse` напрямую.
+
+    Три эти объявления уходят вместе с последней такой карточкой, слайсом
+    А2.5, и `mark` с `unmark` тогда же вернут себе прежние имена.
+    """
+    try:
+        return _ok(await marking(session, subject, entity_id)), True
+    except Denied as e:
+        return _err(e.reason, **e.extra), False
