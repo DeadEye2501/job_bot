@@ -240,3 +240,29 @@ async def test_saving_a_provider_without_a_model_is_refused(wizard_api, watch):
     answer = await caught.next()
     assert answer["ok"] is False
     assert answer["error"] == "Заполните base_url и модель."
+
+
+async def test_an_answering_model_lights_the_lamp_green(
+    main_api, watch, provider_says, runtime_settings
+):
+    """Отвечающая модель зажигает лампочку зелёной.
+
+    Стоит рядом с проверкой молчащей нарочно: та одна была бы зелена и на
+    лампочке, погасшей навсегда, — а погасшая насовсем отправляет человека
+    чинить то, что работает.
+    """
+    caught = watch(main_api.health_changed)
+    provider_says({
+        MODELS: models_response("qwen"),
+        CHAT: httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}]},
+        ),
+    })
+    await runtime_settings.set_chat(
+        base_url="http://localhost:1234", api_key="", model="qwen"
+    )
+
+    main_api.request_initial()
+
+    assert (await caught.next())["chat"] is True

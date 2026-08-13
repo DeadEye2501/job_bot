@@ -113,6 +113,10 @@ class MainApi(
         # (или сразу после re-login) и переживает несколько запросов
         # пока bot._client не поднимется.
         self._username_cache: str = ""
+        # Лампочка спрашивает модели реже, чем базу и Telegram: вопрос к
+        # модели — настоящая генерация, см. `_MODEL_PROBE_INTERVAL_S`.
+        self._models_probed_at: float = float("-inf")
+        self._models_health_cache: tuple[bool, bool] = (False, False)
         self._logs_subscribed = False
         from backend.log_buffer import get_handler
         # Recursion-guard: если внутри _on_record логнуть warning, тот warning
