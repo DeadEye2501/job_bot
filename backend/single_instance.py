@@ -8,6 +8,32 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+_held = None
+"""Открытый файл замка, пока копия работает.
+
+Помнится здесь, а не только у зовущего, потому что отпустить замок надо и
+изнутри: снос данных удаляет сам файл замка, а Windows занятый файл удалить не
+даёт.
+"""
+
+
+def release_the_lock() -> None:
+    """Отпустить замок и забыть его.
+
+    Зовёт снос данных — ему нужно удалить файл, который мы же и держим. После
+    этого вторая копия войдёт беспрепятственно, и это верно: данных, ради
+    которых копии не пускали друг к другу, сейчас не станет.
+    """
+    global _held
+    if _held is None:
+        return
+    try:
+        _held.close()
+    except OSError:
+        logger.exception("single instance: lock release failed")
+    _held = None
+
+
 def _take_the_lock(fd: int) -> bool:
     """Занять открытый файл — или сказать, что он уже занят.
 
@@ -62,7 +88,9 @@ def hold_the_only_copy(lock_path: Path | str):
         logger.exception("single instance: no lock at %s, starting unguarded", lock_path)
         return nullcontext()
     if _take_the_lock(fd):
-        return os.fdopen(fd, "r+b")
+        global _held
+        _held = os.fdopen(fd, "r+b")
+        return _held
     os.close(fd)
     # Записи здесь нет нарочно: файл журнала — ровно то, что замок сторожит, и
     # у предела размера одна эта строка запустила бы поворот, то есть саму беду.
