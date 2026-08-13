@@ -5,6 +5,8 @@
 причиной.
 """
 
+import logging
+
 from backend.models import VacancyStatus
 from tests.dbio import put
 from tests.factories import at, hr_row, vacancy_row
@@ -195,3 +197,21 @@ async def test_an_unknown_sort_key_falls_back_to_newest(titles, session_factory)
     )
 
     assert await titles(sort="по-своему") == ["свежая", "старая"]
+
+
+async def test_an_unknown_status_code_is_not_dropped_in_silence(
+    titles, session_factory, caplog
+):
+    """Незнакомый код отбора попадает в журнал, а не исчезает молча.
+
+    Для человека это выглядит как «фильтр нажат и не действует»: список тот
+    же, объяснения нет. Единственное место, где причину можно увидеть, —
+    журнал, и запись туда обязана быть.
+    """
+    await put(session_factory, vacancy_row(title="отказ", status=VacancyStatus.DECLINE))
+
+    with caplog.at_level(logging.WARNING, logger="backend.repository.vacancies_list"):
+        assert await titles(statuses=["decline", "выдумка"]) == ["отказ"]
+
+    complained = [entry for entry in caplog.records if "выдумка" in entry.getMessage()]
+    assert complained, "о незнакомом коде не сказано ничего"

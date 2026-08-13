@@ -13,6 +13,7 @@ from backend.models.enums import (
     LlmConfigKind,
     StatusHistorySource,
     VacancyStatus,
+    status_code,
 )
 from backend.models.message import Message
 from backend.models.profile import (
@@ -55,6 +56,7 @@ __all__ = [
     "ProfileLanguage",
     "ProfileSkill",
     "StatusHistorySource",
+    "status_code",
     "TelegramChannel",
     "TgAccount",
     "TrashEvent",
