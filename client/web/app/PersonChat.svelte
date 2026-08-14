@@ -97,6 +97,15 @@
     return refresh();
   }
 
+  /** Открыть вложение тем, чем его открывает система.
+   *
+   * Открывает не страница: путь приезжает адресом `file://`, а раздача окна
+   * отдаёт только собранный фронт. Отказ показывает плашкой сам зов.
+   */
+  function open(message) {
+    return ask('system.open_url', message.media_path);
+  }
+
   /** Показать конец ленты: свежие письма внизу, и читают их оттуда.
    *
    * Ждём отрисовки: до неё у ленты прежняя высота, и прокрутка встала бы на
@@ -141,7 +150,7 @@
     {#each days as one (one.key)}
       <div class="chat-day">{one.day}</div>
       {#each one.messages as message (message.id)}
-        <ChatBubble {message} />
+        <ChatBubble {message} onopen={open} />
       {/each}
     {/each}
   {/if}
