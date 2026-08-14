@@ -11,6 +11,7 @@
 
   import { call } from '$api/bridge.js';
   import { listener } from '$api/events.js';
+  import ContactsScreen from './ContactsScreen.svelte';
   import LogsScreen from './LogsScreen.svelte';
   import ProfileScreen from './ProfileScreen.svelte';
   import SettingsScreen from './SettingsScreen.svelte';
@@ -218,6 +219,8 @@
   <main class="main">
     {#if section === 'profile'}
       <ProfileScreen {ask} />
+    {:else if section === 'contacts'}
+      <ContactsScreen {ask} {say} events={heard} />
     {:else if section === 'stats'}
       <StatsScreen {ask} />
     {:else if section === 'system'}

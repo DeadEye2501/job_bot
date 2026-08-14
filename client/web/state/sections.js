@@ -23,3 +23,9 @@ export const PROFILE_TABS = [
   { key: 'skills', label: 'Skills' },
   { key: 'experience', label: 'Experience' },
 ];
+
+/** Вкладки раздела «Контакты». Каналы первыми — с них начинается сбор. */
+export const CONTACTS_TABS = [
+  { key: 'channels', label: 'Каналы' },
+  { key: 'blacklist', label: 'Чёрный список' },
+];

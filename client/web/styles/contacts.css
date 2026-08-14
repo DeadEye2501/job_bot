@@ -1,0 +1,235 @@
+/* Списки контактов: шапка с поиском, строки и отметки родов. */
+
+.list-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.list-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.list-count {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  flex: 1;
+  max-width: 320px;
+}
+
+.search-box .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--text-tertiary);
+}
+
+.search-input {
+  background: transparent;
+  border: 0;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.83rem;
+  width: 100%;
+}
+
+.search-input:focus {
+  outline: none;
+}
+
+.contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.contact-row:hover {
+  background: var(--accent-row-hover);
+}
+
+/* Строка канала из отсева приглушена: он остаётся в списке, но обход его не
+   читает, и выглядеть как рабочий он не должен. */
+.contact-row.blocked {
+  opacity: 0.55;
+}
+
+.contact-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.avatar-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  font-size: 16px;
+}
+
+.contact-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.contact-name {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-handle {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+}
+
+.contact-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.kind-pills {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+
+.kind-pill {
+  padding: 2px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+}
+
+.kind-pill:hover {
+  border-color: var(--accent);
+  color: var(--text-secondary);
+}
+
+.kind-pill.active {
+  background: var(--selected-bg);
+  border-color: var(--accent-muted);
+  color: var(--accent);
+}
+
+.blacklist-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.blacklist-row:hover {
+  background: var(--accent-row-hover);
+}
+
+/* Выключенная строка отсева не действует — и видно это должно быть сразу. */
+.blacklist-row.off {
+  opacity: 0.5;
+}
+
+.kind-tag {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 7px;
+  text-align: center;
+}
+
+.blacklist-value,
+.blacklist-reason {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  border-radius: 3px;
+  padding: 3px 6px;
+  font-family: inherit;
+  font-size: 0.83rem;
+  width: 100%;
+}
+
+.blacklist-reason {
+  color: var(--text-secondary);
+}
+
+.blacklist-value:hover,
+.blacklist-reason:hover {
+  border-color: var(--border);
+}
+
+.blacklist-value:focus,
+.blacklist-reason:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg-secondary);
+}
+
+/* Цвет рода — тот же, каким род красится везде: человек, компания, канал,
+   слово. Набор лежит в палитре под подписью «виды записей чёрного списка». */
+.kind-tag[data-kind='hr'] {
+  background: var(--kind-hr-bg);
+  color: var(--info);
+  border-color: transparent;
+}
+
+.kind-tag[data-kind='company'] {
+  background: var(--kind-company-bg);
+  color: var(--kind-company-fg);
+  border-color: transparent;
+}
+
+.kind-tag[data-kind='channel'] {
+  background: var(--kind-channel-bg);
+  color: var(--kind-channel-fg);
+  border-color: transparent;
+}
+
+.kind-tag[data-kind='keyword'] {
+  background: var(--kind-keyword-bg);
+  color: var(--kind-keyword-fg);
+  border-color: transparent;
+}
