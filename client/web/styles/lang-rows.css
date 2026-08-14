@@ -1,0 +1,41 @@
+/* Языки анкеты: строка на язык и кнопка добавления под списком. */
+
+.lang-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lang-row {
+  display: grid;
+  grid-template-columns: 1fr 96px 20px;
+  gap: 4px;
+  align-items: center;
+}
+
+.lang-row .input {
+  padding: 4px 8px;
+  font-size: 0.82rem;
+}
+
+.lang-remove {
+  color: var(--text-tertiary);
+  text-align: center;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.lang-remove:hover {
+  color: var(--danger);
+}
+
+.lang-add {
+  margin-top: 3px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  align-self: flex-start;
+}
+
+.lang-add:hover {
+  color: var(--accent);
+}

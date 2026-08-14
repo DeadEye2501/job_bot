@@ -5,7 +5,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { askDelay, emptyText, levelTone, logTime, mayHide, shown, toggled } from '../state/logs.js';
+import { toggled } from '../state/chosen.js';
+import { askDelay, emptyText, levelTone, logTime, mayHide, shown } from '../state/logs.js';
 
 describe('строка журнала', () => {
   it('время показано до миллисекунд', () => {

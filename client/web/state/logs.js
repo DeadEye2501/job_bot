@@ -62,18 +62,6 @@ export function shown(records, selected) {
   return records.filter((one) => selected.has(pillOf(one.level)));
 }
 
-/** Набор с переключённым значением: было — вычеркнуть, не было — добавить.
- *
- * Новый набор, а не правка прежнего: руны Svelte замечают присваивание, а не
- * правку внутри, и от `set.add` экран не перерисовался бы — человек жал бы на
- * пилюлю и не видел отклика.
- */
-export function toggled(set, value) {
-  const next = new Set(set);
-  if (!next.delete(value)) next.add(value);
-  return next;
-}
-
 /** Можно ли погасить эту пилюлю: последнюю зажатую не гасят.
  *
  * Погашены все — список пуст без всякой видимой причины, и человек читает это

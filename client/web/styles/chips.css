@@ -1,0 +1,64 @@
+/* Короткие подписи россыпью: синонимы навыка, стек места работы. */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px 1px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  max-width: 180px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chip-x {
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.chip:hover .chip-x {
+  color: var(--danger);
+}
+
+.chip-add {
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.chip-add:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Поле набора той же ширины, что и подпись рядом: иначе строка дёргается,
+   стоит начать печатать. */
+.chip-input {
+  width: 90px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  font-family: inherit;
+  padding: 1px 7px;
+}
+
+.chip-input:focus {
+  outline: none;
+}

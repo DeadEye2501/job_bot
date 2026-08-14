@@ -1,0 +1,86 @@
+/* Навыки: строка навыка внутри категории.
+   Сама коробка категории — общая, в collapsible.css. */
+
+/* Имя категории правится на месте: отдельного окошка переименования тут не
+   заводили, а рамка появляется под курсором — иначе поле не отличить от
+   заголовка и никто не догадается его тронуть. */
+.cat-name {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex: 0 1 auto;
+  min-width: 80px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: inherit;
+}
+
+.cat-name:hover {
+  border-color: var(--border);
+}
+
+.cat-name:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg-secondary);
+}
+
+.cat-spacer {
+  flex: 1;
+}
+
+.skill-row {
+  display: grid;
+  grid-template-columns: 150px 130px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--border);
+  font-size: 0.83rem;
+}
+
+.skill-row:hover {
+  background: var(--accent-row-hover);
+}
+
+.skill-row:hover input[type='range'].slider::-webkit-slider-thumb,
+.skill-row:hover input[type='range'].slider::-moz-range-thumb {
+  opacity: 1;
+}
+
+/* Имя навыка правится на месте, как и имя категории. */
+.skill-name {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 3px 6px;
+  border-radius: 3px;
+}
+
+.skill-name:hover {
+  border-color: var(--border);
+}
+
+.skill-name:focus {
+  background: var(--bg-secondary);
+}
+
+.level {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.level-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  min-width: 32px;
+  text-align: right;
+}

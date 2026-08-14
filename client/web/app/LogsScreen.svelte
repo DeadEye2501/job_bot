@@ -9,6 +9,7 @@
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import LogLevelPill from '$components/LogLevelPill.svelte';
   import LogRow from '$components/LogRow.svelte';
+  import { toggled } from '$state/chosen.js';
   import {
     AT_FIRST,
     LEVELS,
@@ -18,7 +19,6 @@
     logTime,
     mayHide,
     shown,
-    toggled,
   } from '$state/logs.js';
 
   let { ask, events, say } = $props();

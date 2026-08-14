@@ -1,23 +1,32 @@
-/* Поле ввода и поле для секрета рядом с глазом. */
+/* Поле ввода, многострочное поле и поле для секрета рядом с глазом.
+   Экран настроек уменьшает их своим правилом — там полей вдвое больше. */
 
-.input {
-  background: var(--bg-tertiary);
+.input,
+.textarea {
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: 3px;
-  padding: 5px 9px;
-  font-size: 0.83rem;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
   font-family: inherit;
   width: 100%;
 }
 
-.input:focus {
+.input:focus,
+.textarea:focus {
   outline: none;
   border-color: var(--accent);
 }
 
-.input::placeholder {
+.input::placeholder,
+.textarea::placeholder {
   color: var(--text-tertiary);
+}
+
+.textarea {
+  min-height: 70px;
+  resize: vertical;
 }
 
 .secret-input {

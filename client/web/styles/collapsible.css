@@ -1,0 +1,39 @@
+/* Коробка со сворачиваемой шапкой: категория навыков, место работы.
+   Что внутри — своими файлами. */
+
+.collapsible {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.collapsible-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px 5px 4px;
+  background: var(--bg-tertiary);
+  min-width: 0;
+}
+
+/* Стрелка ложится набок у свёрнутой — так же, как в дереве файлов. */
+.collapsible-head .material-symbols-outlined {
+  transition: transform 0.12s;
+}
+
+.collapsible.collapsed .collapsible-head .material-symbols-outlined {
+  transform: rotate(-90deg);
+}
+
+/* Кнопка «добавить ещё одну» под списком коробок. */
+.add-more {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.add-more:hover {
+  color: var(--accent);
+}
