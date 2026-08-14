@@ -7,11 +7,10 @@
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import DonutChart from '$components/DonutChart.svelte';
   import { channelName } from '$state/contacts.js';
+  import { PAGE, appended } from '$state/paging.js';
   import { donut } from '$state/stats.js';
 
   let { ask, say, channelId, onclose, onchanged } = $props();
-
-  const PAGE = 50;
 
   let card = $state(null);
   let vacancies = $state([]);
@@ -46,7 +45,7 @@
       mode,
     });
     if (page === null || !alive) return;
-    vacancies = mode === 'append' ? [...vacancies, ...page.vacancies] : page.vacancies;
+    vacancies = mode === 'append' ? appended(vacancies, page.vacancies) : page.vacancies;
     hasMore = page.has_more;
   }
 

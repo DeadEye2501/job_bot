@@ -1,0 +1,35 @@
+/* Карточка компании: числа под именем и списки людей и вакансий под полями. */
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.72rem;
+}
+
+.card-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  padding: 1px 7px;
+  border-radius: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-meta-item .material-symbols-outlined {
+  font-size: 12px;
+}
+
+/* Людей у компании бывают десятки — список прокручивается сам, чтобы окно
+   осталось в размерах экрана. Перечень вакансий рядом со своим потолком в
+   contacts.css: он длиннее, и потолки у них разные не по недосмотру. */
+.card-people {
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

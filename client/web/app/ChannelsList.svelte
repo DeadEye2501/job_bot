@@ -6,9 +6,8 @@
   import ChannelCard from './ChannelCard.svelte';
   import AskDialog from '$components/AskDialog.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
-  import SearchBox from '$components/SearchBox.svelte';
+  import SearchList from '$components/SearchList.svelte';
   import { fresher } from '$state/contacts.js';
-  import { plural } from '$state/words.js';
 
   let { ask, say, events } = $props();
 
@@ -87,37 +86,35 @@
   });
 </script>
 
-<div class="list-head">
-  <SearchBox value={search} placeholder="Поиск по каналам" onsearch={find} />
-  <div class="list-actions">
+<SearchList
+  {search}
+  placeholder="Поиск по каналам"
+  onsearch={find}
+  {loaded}
+  count={rows.length}
+  words={['канал', 'канала', 'каналов']}
+  filtered={!!search}
+  nothing="Ничего не найдено"
+  empty="Каналов пока нет — добавьте первый"
+>
+  {#snippet actions()}
     <button class="btn" type="button" onclick={() => toggleAll(true)}>Включить все</button>
     <button class="btn" type="button" onclick={() => toggleAll(false)}>Выключить все</button>
     <button class="btn primary" type="button" onclick={() => (adding = true)}>
       <span class="material-symbols-outlined">add</span>
       Канал
     </button>
-  </div>
-</div>
+  {/snippet}
 
-{#if !loaded}
-  <div class="empty-note">Загрузка…</div>
-{:else if !rows.length}
-  <div class="empty-note">
-    {search ? 'Ничего не найдено' : 'Каналов пока нет — добавьте первый'}
-  </div>
-{:else}
-  <div class="list-count">{rows.length} {plural(rows.length, 'канал', 'канала', 'каналов')}</div>
-  <div class="contact-list">
-    {#each rows as channel (channel.id)}
-      <ChannelRow
-        {channel}
-        onpick={() => (opened = channel.id)}
-        ontoggle={(on) => toggle(channel, on)}
-        onremove={() => (leaving = channel)}
-      />
-    {/each}
-  </div>
-{/if}
+  {#each rows as channel (channel.id)}
+    <ChannelRow
+      {channel}
+      onpick={() => (opened = channel.id)}
+      ontoggle={(on) => toggle(channel, on)}
+      onremove={() => (leaving = channel)}
+    />
+  {/each}
+</SearchList>
 
 {#if adding}
   <AskDialog

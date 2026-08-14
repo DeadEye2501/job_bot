@@ -7,9 +7,8 @@
 
   import AskDialog from '$components/AskDialog.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
-  import SearchBox from '$components/SearchBox.svelte';
+  import SearchList from '$components/SearchList.svelte';
   import { BLACKLIST_KINDS, blacklistShown } from '$state/contacts.js';
-  import { plural } from '$state/words.js';
 
   let { ask, say, events } = $props();
 
@@ -80,66 +79,66 @@
   });
 </script>
 
-<div class="list-head">
-  <SearchBox value={search} placeholder="Поиск по значению и причине" onsearch={(text) => (search = text)} />
-  <div class="list-actions">
+<SearchList
+  {search}
+  placeholder="Поиск по значению и причине"
+  onsearch={(text) => (search = text)}
+  {loaded}
+  count={shown.length}
+  words={['строка', 'строки', 'строк']}
+  filtered={rows.length > 0}
+  nothing="Ничего не найдено"
+  empty="Чёрный список пуст"
+>
+  {#snippet actions()}
     <button class="btn primary" type="button" onclick={() => (adding = true)}>
       <span class="material-symbols-outlined">add</span>
       Строка
     </button>
-  </div>
-</div>
+  {/snippet}
 
-<div class="kind-pills">
-  {#each BLACKLIST_KINDS as one (one.key)}
-    <button
-      class="kind-pill"
-      class:active={kind === one.key}
-      type="button"
-      onclick={() => (kind = one.key)}
-    >
-      {one.label}
-    </button>
-  {/each}
-</div>
-
-{#if !loaded}
-  <div class="empty-note">Загрузка…</div>
-{:else if !shown.length}
-  <div class="empty-note">
-    {rows.length ? 'Ничего не найдено' : 'Чёрный список пуст'}
-  </div>
-{:else}
-  <div class="list-count">{shown.length} {plural(shown.length, 'строка', 'строки', 'строк')}</div>
-  <div class="contact-list">
-    {#each shown as row (`${row.id}:${row.value}:${row.reason}`)}
-      <div class="blacklist-row" class:off={!row.active}>
-        <span class="kind-tag" data-kind={row.kind}>{row.kind}</span>
-        <input
-          class="blacklist-value"
-          value={row.value}
-          onblur={(event) => edit(row, { value: event.currentTarget.value.trim() })}
-        />
-        <input
-          class="blacklist-reason"
-          placeholder="Причина"
-          value={row.reason || ''}
-          onblur={(event) => edit(row, { reason: event.currentTarget.value.trim() })}
-        />
-        <input
-          type="checkbox"
-          class="pipeline-toggle"
-          checked={row.active}
-          title="Строка действует"
-          onchange={(event) => toggle(row, event.currentTarget.checked)}
-        />
-        <button class="icon-btn" type="button" title="Удалить" onclick={() => (leaving = row)}>
-          <span class="material-symbols-outlined">delete</span>
+  {#snippet filters()}
+    <div class="kind-pills">
+      {#each BLACKLIST_KINDS as one (one.key)}
+        <button
+          class="kind-pill"
+          class:active={kind === one.key}
+          type="button"
+          onclick={() => (kind = one.key)}
+        >
+          {one.label}
         </button>
-      </div>
-    {/each}
-  </div>
-{/if}
+      {/each}
+    </div>
+  {/snippet}
+
+  {#each shown as row (`${row.id}:${row.value}:${row.reason}`)}
+    <div class="blacklist-row" class:off={!row.active}>
+      <span class="kind-tag" data-kind={row.kind}>{row.kind}</span>
+      <input
+        class="blacklist-value"
+        value={row.value}
+        onblur={(event) => edit(row, { value: event.currentTarget.value.trim() })}
+      />
+      <input
+        class="blacklist-reason"
+        placeholder="Причина"
+        value={row.reason || ''}
+        onblur={(event) => edit(row, { reason: event.currentTarget.value.trim() })}
+      />
+      <input
+        type="checkbox"
+        class="pipeline-toggle"
+        checked={row.active}
+        title="Строка действует"
+        onchange={(event) => toggle(row, event.currentTarget.checked)}
+      />
+      <button class="icon-btn" type="button" title="Удалить" onclick={() => (leaving = row)}>
+        <span class="material-symbols-outlined">delete</span>
+      </button>
+    </div>
+  {/each}
+</SearchList>
 
 {#if adding}
   <AskDialog

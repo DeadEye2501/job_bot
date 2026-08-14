@@ -25,6 +25,18 @@ export function channelName(channel) {
   return { name: `Канал #${channel.id}`, handle: '' };
 }
 
+/** Как назвать человека в чужой карточке.
+ *
+ * Имя приходит из переписки и бывает пустым, ник есть почти всегда — по нему
+ * человека и узнают в самом Telegram. Нет ни того ни другого (учётная запись
+ * скрыла ник) — остаётся номер: строка должна читаться, а не пустовать.
+ */
+export function personName(person) {
+  if (person.name) return person.name;
+  if (person.telegram_username) return `@${person.telegram_username}`;
+  return `Человек #${person.id}`;
+}
+
 /** Строки отсева, прошедшие род и поиск.
  *
  * Поиск идёт и по значению, и по причине: причину пишут словами, и по ней
