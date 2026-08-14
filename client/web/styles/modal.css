@@ -1,0 +1,41 @@
+/* Окно поверх окна: затемнение на весь экран и коробка по центру. */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Выше всего на странице, кроме плашки отказа: та говорит о беде и обязана
+     быть видна поверх любого спрашивающего окна. */
+  z-index: 1000;
+}
+
+.modal-dialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
+  min-width: 320px;
+  max-width: 440px;
+  box-shadow: 0 12px 36px var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-message {
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  /* Переносы строк в вопросе значимы: ими отделяют само действие от того, чего
+     оно не трогает. */
+  white-space: pre-line;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}

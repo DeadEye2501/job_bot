@@ -1,0 +1,66 @@
+/* Строка журнала: время, уровень, источник, сообщение — и трассировка под
+   ними, когда строку развернули. */
+
+.logs-row {
+  display: grid;
+  grid-template-columns: 130px 60px 220px 1fr;
+  gap: 12px;
+  padding: 3px 14px;
+  border-bottom: 1px solid var(--border);
+  align-items: start;
+  cursor: pointer;
+}
+
+.logs-row:hover { background: var(--accent-row-hover); }
+.logs-row.expanded { background: var(--bg-secondary); }
+
+.logs-time {
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.logs-level {
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 0.72rem;
+  align-self: center;
+}
+
+.logs-level[data-tone='error'] { color: var(--danger); }
+.logs-level[data-tone='warn'] { color: var(--alert-text); }
+.logs-level[data-tone='info'] { color: var(--info); }
+.logs-level[data-tone='debug'] { color: var(--text-tertiary); }
+
+.logs-source {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Свёрнутая строка режется по ширине, развёрнутая переносится: иначе длинное
+   сообщение раздвигало бы колонки соседних строк. */
+.logs-msg {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logs-row.expanded .logs-msg {
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.logs-details {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  padding: 8px 10px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  font-size: 0.74rem;
+  line-height: 1.5;
+}

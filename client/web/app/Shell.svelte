@@ -1,24 +1,29 @@
 <script>
-  // Оболочка окна: собирает боковое меню, поле раздела и нижнюю полосу и
-  // связывает их с мостом.
+  // Оболочка окна: боковое меню, поле раздела и нижняя полоса.
   //
-  // Единственное место, которое ходит в мост и держит живое состояние окна.
-  // Компоненты о мосте не знают ничего — им всё приходит параметрами, а
-  // наружу уходят колбэки.
+  // Держит состояние, общее для всего окна, и отдаёт экранам три вещи, которых
+  // на окно по одной: зов моста с плашкой отказа, саму плашку и слушатель
+  // вестей. Свои зовы у экранов свои — общее тут не «ходить в мост», а не
+  // заводить второй плашки и второго цикла событий.
+  //
+  // Компоненты о мосте не знают ничего: им всё приходит параметрами, а наружу
+  // уходят колбэки.
 
   import { call } from '$api/bridge.js';
   import { listener } from '$api/events.js';
+  import LogsScreen from './LogsScreen.svelte';
   import HealthLamp from '$components/HealthLamp.svelte';
   import ModeToggle from '$components/ModeToggle.svelte';
   import NavGroup from '$components/NavGroup.svelte';
   import Plaque from '$components/Plaque.svelte';
   import ProgressBars from '$components/ProgressBars.svelte';
   import RunButton from '$components/RunButton.svelte';
+  import TopTabs from '$components/TopTabs.svelte';
   import UnreadBadge from '$components/UnreadBadge.svelte';
   import { LAMPS, allAlive, blockedTip, shouldTurnOff } from '$state/health.js';
   import { OFF } from '$state/modes.js';
   import { bar, caption } from '$state/progress.js';
-  import { SECTIONS } from '$state/sections.js';
+  import { SECTIONS, SYSTEM_TABS } from '$state/sections.js';
 
   const PLAQUE_MS = 2800;
 
@@ -36,7 +41,13 @@
   const MODE_TITLE = 'Режим бота: выключен, только переписка, полный вперёд';
   const RUN_TITLE = 'Обход каналов помимо расписания';
 
+  // Слушатель заведён здесь, а не в эффекте: экраны получают его параметром и
+  // подписываются в своих эффектах, а те срабатывают раньше нашего. Цикл при
+  // этом заводит всё равно эффект — до него слушатель молчит.
+  const heard = listener((after) => call('system.events', after));
+
   let section = $state(SECTIONS[0].key);
+  let systemTab = $state(SYSTEM_TABS[0].key);
   let expanded = $state(false);
   let health = $state(null);
   let unread = $state(0);
@@ -51,6 +62,7 @@
   const lockedTip = $derived(blockedTip(health));
   const captionText = $derived(caption(channels, messages));
   const sectionLabel = $derived(SECTIONS.find((one) => one.key === section).label);
+  const systemTabLabel = $derived(SYSTEM_TABS.find((one) => one.key === systemTab).label);
 
   let plaqueTimer = null;
   let alive = true;
@@ -152,26 +164,24 @@
   }
 
   function watch() {
-    const events = listener((after) => call('system.events', after));
-    events.on('ingestion_started', started);
-    events.on('ingestion_finished', finished);
-    events.on('progress_update', moved);
-    events.on('unread_changed', askUnread);
+    heard.on('ingestion_started', started);
+    heard.on('ingestion_finished', finished);
+    heard.on('progress_update', moved);
+    heard.on('unread_changed', askUnread);
     // Потеря значит, что часть случившегося выпала из кольца: чем гадать,
     // чего именно не хватает, дешевле перечитать всё разом.
-    events.on('missed', refresh);
-    events.run();
-    return events;
+    heard.on('missed', refresh);
+    heard.run();
   }
 
   $effect(() => {
-    const events = watch();
+    watch();
     const health_clock = setInterval(askHealth, HEALTH_EVERY_MS);
     const unread_clock = setInterval(askUnread, UNREAD_EVERY_MS);
     refresh();
     return () => {
       alive = false;
-      events.stop();
+      heard.stop();
       clearInterval(health_clock);
       clearInterval(unread_clock);
       clearTimeout(plaqueTimer);
@@ -203,9 +213,20 @@
   </aside>
 
   <main class="main">
-    <div class="placeholder-content">
-      Раздел «{sectionLabel}» — экран ещё не переехал
-    </div>
+    {#if section === 'system'}
+      <TopTabs tabs={SYSTEM_TABS} active={systemTab} onpick={(key) => (systemTab = key)} />
+      {#if systemTab === 'logs'}
+        <LogsScreen {ask} {say} events={heard} />
+      {:else}
+        <div class="placeholder-content">
+          Раздел «Система / {systemTabLabel}» — экран ещё не переехал
+        </div>
+      {/if}
+    {:else}
+      <div class="placeholder-content">
+        Раздел «{sectionLabel}» — экран ещё не переехал
+      </div>
+    {/if}
   </main>
 
   <div class="bottom-bar">

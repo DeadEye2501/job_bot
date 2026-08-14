@@ -4,7 +4,7 @@
 </script>
 
 <button
-  class="run-btn"
+  class="icon-btn run-btn"
   class:is-disabled={disabled}
   data-running={running}
   {title}

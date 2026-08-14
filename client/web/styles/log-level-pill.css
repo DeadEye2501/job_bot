@@ -1,0 +1,65 @@
+/* Пилюля уровня: значок, имя и счёт записей этого уровня во всём буфере.
+
+   Цвет зажатой берётся по тону, и тон тот же, что у уровня в строке списка
+   (`log-row.css`): разойдись они, красная строка стояла бы под жёлтой
+   пилюлей. */
+
+.logs-level-pill {
+  padding: 3px 9px 3px 7px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-family: ui-monospace, monospace;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.logs-level-pill .material-symbols-outlined {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.logs-level-pill:hover {
+  border-color: var(--accent);
+  color: var(--text-secondary);
+}
+
+.logs-level-pill .count {
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.logs-level-pill.active {
+  font-weight: 500;
+}
+
+.logs-level-pill.active .material-symbols-outlined { opacity: 1; }
+.logs-level-pill.active .count { color: inherit; opacity: 0.7; }
+
+.logs-level-pill.active[data-tone='error'] {
+  background: var(--err-fill);
+  border-color: var(--err-muted);
+  color: var(--danger);
+}
+
+.logs-level-pill.active[data-tone='warn'] {
+  background: var(--alert-fill);
+  border-color: var(--alert-muted);
+  color: var(--alert-text);
+}
+
+.logs-level-pill.active[data-tone='info'] {
+  background: var(--info-fill);
+  border-color: var(--info-muted);
+  color: var(--info);
+}
+
+.logs-level-pill.active[data-tone='debug'] {
+  background: var(--bg-tertiary);
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}

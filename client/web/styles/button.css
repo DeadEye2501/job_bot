@@ -1,0 +1,33 @@
+/* Кнопка с подписью. Значковые — в icon-button.css: у тех нет ни рамки, ни
+   подложки, и общего с этими только сброс из base.css. */
+
+.btn {
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  transition: border-color 0.1s, background 0.1s;
+}
+
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Необратимое действие названо цветом заранее: подтверждение читают
+   невнимательно, и красная кнопка — последнее, что может остановить руку. */
+.btn.danger {
+  background: var(--err-btn-bg);
+  color: var(--danger-btn);
+  border-color: var(--danger-btn);
+  font-weight: 500;
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: var(--err-btn-bg-hover);
+  border-color: var(--danger-btn);
+}
