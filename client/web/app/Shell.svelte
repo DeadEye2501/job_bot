@@ -66,11 +66,14 @@
   let crawling = $state(false);
   let channels = $state(NOTHING_YET.channels);
   let messages = $state(NOTHING_YET.messages);
+  // Работа без счёта — прогон одной вакансии: полосам показать нечего, а
+  // сказать есть что, и говорит она за них обеих.
+  let single = $state('');
   let plaque = $state({ message: '', danger: false });
 
   const locked = $derived(!allAlive(health));
   const lockedTip = $derived(blockedTip(health));
-  const captionText = $derived(caption(channels, messages));
+  const captionText = $derived(single || caption(channels, messages));
   const sectionLabel = $derived(SECTIONS.find((one) => one.key === section).label);
   const systemTabLabel = $derived(SYSTEM_TABS.find((one) => one.key === systemTab).label);
 
@@ -166,6 +169,7 @@
   function started() {
     crawling = true;
     running = true;
+    single = '';
     channels = NOTHING_YET.channels;
     messages = NOTHING_YET.messages;
   }
@@ -177,12 +181,12 @@
 
   /** Подвинуть полосу, которой касается весть.
    *
-   * Стадий у вести больше двух — есть ещё прогон одной вакансии и восстановление,
-   * — но зажечь их сегодня некому: обе приходят с экрана вакансий, а он
-   * переезжает частью Б. Разбор им пишется вместе с ним, иначе он приедет сюда
-   * непроверенным и незамеченным.
+   * У прогона одной вакансии счёта нет вовсе — бот шлёт нули, — и полосы по
+   * нему не двигаются: двинь их, они показали бы пустоту вместо хода. Своё имя
+   * он говорит подписью, и она же гаснет с началом обхода.
    */
   function moved(step) {
+    if (step.stage === 'rerun') single = step.label;
     if (step.stage === 'channel') channels = { ...step };
     if (step.stage === 'message') messages = { current: step.current, total: step.total };
   }
@@ -246,7 +250,7 @@
     {#if section === 'profile'}
       <ProfileScreen {ask} />
     {:else if section === 'contacts'}
-      <ContactsScreen {ask} {say} events={heard} />
+      <ContactsScreen {ask} {say} {lockedTip} events={heard} />
     {:else if section === 'stats'}
       <StatsScreen {ask} />
     {:else if section === 'vacancies'}

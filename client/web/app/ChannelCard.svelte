@@ -12,7 +12,7 @@
   import { PAGE, appended } from '$state/paging.js';
   import { donut } from '$state/stats.js';
 
-  let { ask, say, channelId, onclose, onchanged } = $props();
+  let { ask, say, lockedTip, channelId, onclose, onchanged } = $props();
 
   let card = $state(null);
   let vacancies = $state([]);
@@ -51,7 +51,14 @@
     hasMore = page.has_more;
   }
 
+  /** Опросить канал сейчас.
+   *
+   * Просьба уходит боту, а он при погасших лампах не поднят вовсе: отвечать
+   * человеку «канал опрашивается» значило бы врать. Заслон назван теми же
+   * словами, что и на кнопке обхода внизу окна.
+   */
   async function pollNow() {
+    if (lockedTip) return say(lockedTip, true);
     const done = await ask('channels.poll_now', channelId);
     if (done === null) return;
     say('Канал опрашивается');

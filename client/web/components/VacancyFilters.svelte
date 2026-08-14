@@ -60,7 +60,7 @@
   });
 </script>
 
-<div class="filter-wrap">
+<div class="pop-wrap filter-wrap">
   <button
     class="icon-btn filter-btn"
     class:active={activeCount(applied, new Date()) > 0}
@@ -72,7 +72,7 @@
   </button>
 
   {#if shown}
-    <div class="filter-panel">
+    <div class="pop filter-panel">
       <div class="filter-head">
         <span class="material-symbols-outlined">filter_list</span>
         <span class="filter-title">Фильтры</span>
