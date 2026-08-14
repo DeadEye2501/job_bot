@@ -39,3 +39,47 @@ async def test_the_first_request_brings_the_whole_snapshot(api, ask):
     assert snapshot["health"]["db"] is True
     assert snapshot["unread"]["count"] == 0
     assert snapshot["mode"] == "Off"
+
+
+async def test_the_page_can_ask_the_queue_what_is_new(api, ask, hub):
+    """Страница спрашивает очередь тем же зовом, что и всё остальное.
+
+    Без метода поверхности очередь была бы вещью в себе: копит, ждёт, отдаёт —
+    и некому спросить. Живые события до страницы не дошли бы вовсе.
+    """
+    hub.events.add("ingestion_started")
+
+    answer = await ask(api.system.events, 0)
+
+    assert [one["kind"] for one in answer["ok"]["events"]] == ["ingestion_started"]
+
+
+async def test_the_page_learns_that_the_queue_is_closed(api, ask, hub):
+    """Закрытую очередь страница узнаёт по ответу, а не по молчанию.
+
+    По этому признаку её цикл и останавливается. Не доедь он до страницы, та
+    спрашивала бы мост, которого уже нет, до самой смерти окна.
+    """
+    hub.events.close()
+
+    answer = await ask(api.system.events, 0)
+
+    assert answer["ok"]["closed"] is True
+
+
+async def test_a_broken_number_does_not_spin_the_page_against_the_bridge(api, ask, hub):
+    """Испорченный номер не заводит страницу и мост в плотную петлю.
+
+    Кольцо считает потерянным всё старше названного номера, и на отрицательном
+    объявляет потерю даже пустое. Ответ тогда приходит мгновенно, номер не
+    двигается — и цикл страницы крутится без передышки, съедая ядро.
+
+    Очередь закрыта нарочно: живая на пустой вопрос ждёт свои двадцать пять
+    секунд, и сторож жёг бы их на каждом прогоне.
+    """
+    hub.events.close()
+
+    answer = await ask(api.system.events, -5)
+
+    assert answer["ok"]["missed"] is False
+    assert answer["ok"]["events"] == []

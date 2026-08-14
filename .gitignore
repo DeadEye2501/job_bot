@@ -59,3 +59,7 @@ JobBot.exe
 # Тестовый прогон
 mutants/
 .mutmut-cache
+
+# Зависимости фронта: ставятся из package-lock.json, весят на порядок больше
+# самого проекта и в истории не нужны.
+node_modules/

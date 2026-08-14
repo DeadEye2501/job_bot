@@ -18,6 +18,7 @@ import time
 
 from backend import health
 from backend.models import BotMode
+from backend.payloads import int_or_none
 from backend.repository import hr_list, messages as messages_repo
 from client.bridge.answer import Denied, denied, reply
 from client.bridge.desktop import Desktop
@@ -167,6 +168,21 @@ class System(Journal, Wipe, Desktop):
 
         return reply(self._hub.runner, run())
 
+    def events(self, after) -> dict:
+        """Что случилось само по себе после названного номера.
+
+        Единственный зов, который может не ответить сразу: он ждёт появления
+        нового или своего срока (`events.WAIT_SECONDS`). Ждать здесь дёшево —
+        замерено слайсом А3: зовы моста разбираются каждый на своём потоке, и
+        ждущий не занимает собой остальных.
+
+        Номер приходит от страницы, а не хранится тут: страниц у окна бывает
+        несколько за одну жизнь моста — перезагрузка заводит новую, — и своя
+        отметка у моста означала бы, что вернувшаяся страница не досчитается
+        того, что случилось без неё.
+        """
+        return reply(self._hub.runner, self._hub.events.take(_after(after)))
+
     def health(self) -> dict:
         """Живо ли то, на чём держится работа: база, Telegram, обе модели."""
         return reply(self._hub.runner, self._health())
@@ -237,3 +253,19 @@ class System(Journal, Wipe, Desktop):
             await health.model_alive(self._hub.rs.chat, "chat"),
             await health.model_alive(self._hub.rs.embed, "embed"),
         )
+
+
+def _after(asked) -> int:
+    """Номер, после которого страница хочет новое, приведённый к целому от нуля.
+
+    Негодное и отрицательное читаются как ноль — «с самого начала»: страница
+    присылает сюда то, что сама же получила прошлым ответом, и порча этого
+    числа означает её собственную поломку, а не злой умысел. Отказ в ответ
+    остановил бы её цикл совсем, а ноль всего лишь пришлёт уже виденное.
+
+    Ноль здесь несущий, и потому отрицательное отсекается отдельно: кольцо
+    считает потерянным всё, что старше названного номера, и на отрицательном
+    объявляет потерю даже пустое. Ответ тогда приходит мгновенно, номер не
+    двигается — и страница с мостом сходятся в плотную петлю без передышки.
+    """
+    return max(0, int_or_none(asked) or 0)
