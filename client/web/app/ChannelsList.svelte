@@ -2,6 +2,8 @@
   // Вкладка «Каналы»: список с поиском, переключением опроса и заведением.
 
   import ChannelRow from '$components/ChannelRow.svelte';
+
+  import ChannelCard from './ChannelCard.svelte';
   import AskDialog from '$components/AskDialog.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import SearchBox from '$components/SearchBox.svelte';
@@ -16,6 +18,7 @@
   let adding = $state(false);
   let draft = $state('');
   let leaving = $state(null);
+  let opened = $state(null);
 
   let asked = 0;
   let alive = true;
@@ -108,6 +111,7 @@
     {#each rows as channel (channel.id)}
       <ChannelRow
         {channel}
+        onpick={() => (opened = channel.id)}
         ontoggle={(on) => toggle(channel, on)}
         onremove={() => (leaving = channel)}
       />
@@ -133,6 +137,16 @@
       onkeydown={(event) => event.key === 'Enter' && create()}
     />
   </AskDialog>
+{/if}
+
+{#if opened}
+  <ChannelCard
+    {ask}
+    {say}
+    channelId={opened}
+    onclose={() => (opened = null)}
+    onchanged={refresh}
+  />
 {/if}
 
 {#if leaving}

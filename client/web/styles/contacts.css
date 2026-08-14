@@ -233,3 +233,42 @@
   color: var(--kind-keyword-fg);
   border-color: transparent;
 }
+
+/* Карточка канала: шире обычного окна — в ней числа и кольцо рядом. */
+.card-dialog {
+  min-width: 520px;
+  max-width: 560px;
+}
+
+.card-handle {
+  color: var(--text-tertiary);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.card-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+/* Шапка карточки: значок, имя, ник и отметка отсева в одну строку. */
+.card-head {
+  gap: 8px;
+}
+
+.card-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Перечень вакансий канала прокручивается сам: их бывают сотни, а окно должно
+   остаться в размерах экрана. */
+.card-vacancies {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
