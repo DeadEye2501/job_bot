@@ -1,0 +1,159 @@
+/* Мастер первого запуска: окно из трёх полос — шаги, тело, подвал.
+
+   Полосы те же, что у самого приложения, и это нарочно: мастер — не отдельная
+   программа, а первый разговор с этой. */
+
+.wiz-window {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  background: var(--bg-secondary);
+}
+
+.wiz-steps {
+  display: flex;
+  align-items: center;
+  padding: 10px 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Приглушены на обложках: шагами они не считаются. */
+.wiz-steps.dimmed {
+  opacity: 0.4;
+}
+
+.wiz-step {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.wiz-step-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.wiz-step[data-mark='active'] .wiz-step-mark {
+  background: var(--accent);
+  color: var(--bg-primary);
+}
+
+.wiz-step[data-mark='done'] .wiz-step-mark {
+  background: var(--accent-chip-selected);
+  color: var(--accent);
+}
+
+.wiz-step-label {
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.wiz-step[data-mark='active'] .wiz-step-label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.wiz-step[data-mark='done'] .wiz-step-label {
+  color: var(--text-secondary);
+}
+
+.wiz-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 16px 28px;
+  overflow-y: auto;
+}
+
+.wiz-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wiz-head .material-symbols-outlined {
+  color: var(--accent);
+  font-size: 28px;
+}
+
+.wiz-head h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+.wiz-title {
+  color: var(--text-primary);
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.wiz-text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.wiz-text strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.wiz-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+
+.wiz-foot-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Причина стоит рядом с кнопкой, которую она держит: плашкой поверх окна она
+   ушла бы туда, куда человек в этот миг не смотрит. */
+.wiz-trouble {
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+}
+
+.wiz-done {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.wiz-done .material-symbols-outlined {
+  color: var(--accent);
+  font-size: 36px;
+}
+
+.wiz-done h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.wiz-done .wiz-text {
+  max-width: 380px;
+}
