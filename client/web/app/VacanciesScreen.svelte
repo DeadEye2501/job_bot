@@ -7,12 +7,14 @@
   import SearchList from '$components/SearchList.svelte';
   import VacancyFilters from '$components/VacancyFilters.svelte';
   import VacancyRow from '$components/VacancyRow.svelte';
+
+  import VacancyCard from './VacancyCard.svelte';
   import { attempts } from '$state/attempts.js';
   import { PAGE, appended, refreshLimit } from '$state/paging.js';
   import { blankFilter, filterPayload } from '$state/vacancy_filter.js';
   import { SORTS, sortKey } from '$state/vacancies.js';
 
-  let { ask, events } = $props();
+  let { ask, say, events } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -20,6 +22,7 @@
   let search = $state('');
   let sort = $state(SORTS[0].label);
   let threshold = $state(null);
+  let opened = $state(null);
   let applied = $state(blankFilter());
   // Границы срока замораживаются в миг применения: пересчитай их к следующей
   // странице, скользящее окно «за неделю» уехало бы вперёд, а `offset`
@@ -127,7 +130,7 @@
     {/snippet}
 
     {#each rows as vacancy (vacancy.id)}
-      <VacancyRow {vacancy} {threshold} />
+      <VacancyRow {vacancy} {threshold} onpick={() => (opened = vacancy.id)} />
     {/each}
 
     {#if hasMore}
@@ -135,3 +138,13 @@
     {/if}
   </SearchList>
 </div>
+
+{#if opened !== null}
+  <VacancyCard
+    {ask}
+    {say}
+    vacancyId={opened}
+    onclose={() => (opened = null)}
+    onchanged={() => refresh(refreshLimit(rows.length))}
+  />
+{/if}

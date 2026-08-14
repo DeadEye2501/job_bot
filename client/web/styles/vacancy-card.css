@@ -1,0 +1,97 @@
+/* Карточка вакансии: шапка со статусом, чипы разбора, стек, текст и связи.
+   Лента переходов — в timeline.css, выбор статуса — в status-picker.css. */
+
+.vac-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 120px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.68rem;
+}
+
+.status-badge:hover {
+  border-color: var(--accent);
+}
+
+.status-label {
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-badge .material-symbols-outlined {
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.vac-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.info-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+/* Оценка говорит не сама о себе, а о своём отношении к порогу отбора: залитая
+   акцентом — взятая уверенно, под порогом — отвергнутая. */
+.info-chip.score {
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-weight: 500;
+}
+
+.info-chip.score[data-tone='warn'] {
+  background: var(--score-warn);
+}
+
+.info-chip.score[data-tone='bad'] {
+  background: var(--err);
+}
+
+.vac-card-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.vac-text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  /* Описание читают целиком, а иногда и переносят в письмо руками. */
+  user-select: text;
+}
+
+.vac-contacts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.vac-dim {
+  color: var(--text-tertiary);
+}

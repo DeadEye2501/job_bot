@@ -22,6 +22,13 @@ export const SORTS = [
 // с моста, — а второе их написание разошлось бы с первым молча.
 const GRADES = Object.fromEntries(PROFILE_GRADES.map((one) => [one.value, one.label]));
 
+/** Грейд, каким его читают. Мост отдаёт значение разбора (`senior`), а иногда и
+ *  то, чего в перечне нет вовсе, — такое показывается как есть: своё написание
+ *  человек узнает, а прочерк скрыл бы, что в объявлении грейд был. */
+export function gradeLabel(grade) {
+  return grade ? GRADES[grade] || grade : '—';
+}
+
 // Сколько пунктов стека помещается в строку. Строка держится в одну высоту, а
 // остальное человек увидит в карточке.
 const CHIPS = 3;
@@ -46,7 +53,7 @@ export function vacancyLine(vacancy, now) {
   return {
     title: vacancy.title || '—',
     company: vacancy.company || '—',
-    grade: vacancy.grade ? GRADES[vacancy.grade] || vacancy.grade : '—',
+    grade: gradeLabel(vacancy.grade),
     salary: vacancy.salary || '—',
     when: ago(vacancy.last_activity_at || vacancy.posted_at || vacancy.created_at, now),
   };

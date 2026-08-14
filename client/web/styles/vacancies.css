@@ -11,6 +11,10 @@
   width: 100%;
 }
 
+.vac-row:hover {
+  background: var(--accent-row-hover);
+}
+
 .vac-row-head {
   display: flex;
   align-items: center;
