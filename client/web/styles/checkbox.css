@@ -1,0 +1,15 @@
+/* Галочка с подписью в одну строку: подпись нажимается вместе с квадратиком. */
+
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.checkbox-row input {
+  accent-color: var(--accent);
+  margin: 0;
+}

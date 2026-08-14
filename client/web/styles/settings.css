@@ -1,0 +1,48 @@
+/* Экран настроек: колонка секций посреди поля.
+   Что внутри секций — сетка полей, пороги, опасная зона — своими файлами. */
+
+.settings-page {
+  overflow: auto;
+  padding: 14px 20px;
+  min-height: 0;
+  flex: 1;
+}
+
+/* Ширина ограничена: поля во всю ширину окна читаются плохо, а подпись у
+   дальнего края теряет связь со своим полем. */
+.settings-inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+}
+
+.settings-row .span-2 {
+  grid-column: span 2;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.session-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+  grid-column: span 2;
+}
+
+.session-info {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+}
+

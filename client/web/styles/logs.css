@@ -19,20 +19,6 @@
   flex: 1;
 }
 
-.logs-auto-refresh {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.logs-auto-refresh input {
-  accent-color: var(--accent);
-  margin: 0;
-}
-
 .logs-list {
   flex: 1;
   overflow-y: auto;
@@ -41,9 +27,3 @@
   line-height: 1.5;
 }
 
-.logs-empty {
-  color: var(--text-tertiary);
-  text-align: center;
-  padding: 40px 16px;
-  font-size: 0.85rem;
-}

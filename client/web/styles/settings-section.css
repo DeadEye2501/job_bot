@@ -1,0 +1,61 @@
+/* Секция настроек: коробка с заголовком-шапкой. */
+
+.settings-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.settings-section-title .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+/* Опасная зона отличается от прочих секций только цветом рамки и заголовка:
+   всё внутри устроено так же, и разводить её отдельной коробкой незачем. */
+.settings-section.danger {
+  background: var(--err-zone-bg);
+  border-color: var(--err-zone-border);
+}
+
+.settings-section.danger .settings-section-title,
+.settings-section.danger .settings-section-title .material-symbols-outlined {
+  color: var(--danger);
+}
+
+.danger-row {
+  display: grid;
+  grid-template-columns: 1fr 170px;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.danger-text {
+  font-size: 0.82rem;
+}
+
+.danger-sub {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+.danger-row .btn {
+  width: 100%;
+  justify-content: center;
+}

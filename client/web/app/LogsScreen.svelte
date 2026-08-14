@@ -153,7 +153,7 @@
 
   <div class="logs-toolbar-gap"></div>
 
-  <label class="logs-auto-refresh">
+  <label class="checkbox-row">
     <input
       type="checkbox"
       checked={following}
@@ -178,7 +178,7 @@
 
 <div class="logs-list">
   {#if emptyText({ loaded, total, showing: visible.length })}
-    <div class="logs-empty">{emptyText({ loaded, total, showing: visible.length })}</div>
+    <div class="empty-note">{emptyText({ loaded, total, showing: visible.length })}</div>
   {:else}
     {#each visible as one (one.id)}
       <LogRow
