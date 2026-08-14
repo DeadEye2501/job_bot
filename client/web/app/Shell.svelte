@@ -14,6 +14,7 @@
   import LogsScreen from './LogsScreen.svelte';
   import ProfileScreen from './ProfileScreen.svelte';
   import SettingsScreen from './SettingsScreen.svelte';
+  import StatsScreen from './StatsScreen.svelte';
   import HealthLamp from '$components/HealthLamp.svelte';
   import ModeToggle from '$components/ModeToggle.svelte';
   import NavGroup from '$components/NavGroup.svelte';
@@ -217,6 +218,8 @@
   <main class="main">
     {#if section === 'profile'}
       <ProfileScreen {ask} />
+    {:else if section === 'stats'}
+      <StatsScreen {ask} />
     {:else if section === 'system'}
       <TopTabs tabs={SYSTEM_TABS} active={systemTab} onpick={(key) => (systemTab = key)} />
       {#if systemTab === 'logs'}
