@@ -1,0 +1,14 @@
+<script>
+  // Кнопка обхода: треугольник в покое, квадрат на ходу.
+  let { running, disabled, title, onpress } = $props();
+</script>
+
+<button
+  class="run-btn"
+  class:is-disabled={disabled}
+  data-running={running}
+  {title}
+  aria-disabled={disabled}
+  aria-label={running ? 'Остановить обход' : 'Запустить обход'}
+  onclick={() => onpress()}
+></button>

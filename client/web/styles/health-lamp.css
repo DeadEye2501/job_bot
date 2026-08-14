@@ -1,0 +1,34 @@
+/* Лампочка состояния: точка и короткое имя под ней. */
+
+.health {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.health .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  box-shadow: none;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.health[data-state='ok'] .dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow-inner), 0 0 6px 1px var(--accent-glow-outer);
+}
+
+.health[data-state='err'] .dot {
+  background: var(--err);
+  box-shadow: 0 0 0 2px var(--err-glow-inner), 0 0 6px 1px var(--err-glow-outer);
+}
+
+.health-label {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.3px;
+}

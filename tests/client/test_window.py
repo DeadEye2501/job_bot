@@ -155,6 +155,22 @@ def test_the_window_opens_at_the_size_the_layout_needs(opened):
     assert fake.created["width"] == 900
 
 
+def test_the_window_is_painted_before_the_page_opens(opened):
+    """Окну назван цвет, которым система заливает его до страницы.
+
+    Без этого довода pywebview заливает окно белым, и при растягивании — пока
+    WebView2 не догнал новый размер — вместо оболочки видна ярко-белая вспышка
+    со шлейфом прежнего кадра. Наблюдалось глазами на живом окне.
+    """
+    fake, _order = opened
+
+    window_module.run_ui()
+
+    # Значением, а не через саму постоянную: сверка её с собой прошла бы и на
+    # белом, то есть ровно на том, из-за чего довод и появился.
+    assert fake.created["background_color"] == "#2d2d2f"
+
+
 def test_the_page_is_served_and_not_opened_from_the_disk(opened):
     """Страница отдаётся окну раздачей, а не открывается файлом с диска.
 

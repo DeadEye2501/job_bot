@@ -41,7 +41,10 @@ export function listener(ask) {
   async function run() {
     while (alive) {
       const news = await asked();
-      if (news === null) continue;
+      // Проверяем ещё раз: вопрос ждёт на той стороне до четверти минуты, и
+      // страница успевает уйти, пока он висит. Раздать её слушателям пачку,
+      // пришедшую после ухода, значит рисовать в разметку, которой уже нет.
+      if (news === null || !alive) continue;
       deliver(news);
       if (news.closed) return;
     }

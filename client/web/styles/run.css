@@ -1,0 +1,51 @@
+/* Кнопка обхода: пуск и остановка одним значком. */
+
+.run-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  transition: color 0.1s, background 0.1s;
+}
+
+.run-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.run-btn.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.run-btn.is-disabled:hover {
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+/* Значок рисуется правилами, а не шрифтом: у привезённого начертания нет оси
+   заливки, и залитые треугольник с квадратом им не набрать. */
+.run-btn::before {
+  content: '';
+  display: block;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 8px 0 8px 13px;
+  border-color: transparent transparent transparent var(--ok);
+}
+
+.run-btn[data-running='true']::before {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  background: var(--err);
+  border-radius: 1px;
+}
+
+.run-btn[data-running='true']:hover {
+  background: var(--err-stop-hover);
+}
