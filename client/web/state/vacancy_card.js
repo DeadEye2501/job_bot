@@ -13,6 +13,7 @@ const HIDDEN = new Set(['applied_sent']);
 // (`backend/flows/apply.py`), и это единственное место, где человек узнаёт,
 // почему отклик не ушёл сам.
 const SEND_FAILS = {
+  no_vacancy: 'вакансия уже удалена',
   profile_empty: 'профиль пуст',
   cover_letter_failed: 'письмо не прошло проверку',
   cv_missing: 'файл резюме не найден',
