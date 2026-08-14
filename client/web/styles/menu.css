@@ -1,0 +1,51 @@
+/* Меню действий: что стоит внутри списка под кнопкой-значком. Оправа окошка —
+   общая, в popover.css. */
+
+.menu {
+  right: 0;
+  width: 250px;
+  padding: 4px 0;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 12px;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.menu-item:hover {
+  background: var(--selected-bg);
+}
+
+.menu-item .material-symbols-outlined {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Запертый пункт приглушён, но нажимаем: по нажатию он говорит, почему нельзя,
+   а неотзывчивая строка оставила бы человека гадать. */
+.menu-item.blocked,
+.menu-item.blocked .material-symbols-outlined {
+  color: var(--text-tertiary);
+}
+
+.menu-item.danger,
+.menu-item.danger .material-symbols-outlined {
+  color: var(--danger);
+}
+
+.menu-item.danger:hover {
+  background: var(--danger-tint);
+}
+
+.menu-line {
+  height: 1px;
+  margin: 3px 0;
+  background: var(--border);
+}

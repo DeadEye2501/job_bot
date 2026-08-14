@@ -7,9 +7,9 @@
 
   import CardDialog from '$components/CardDialog.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
-  import MergePicker from '$components/MergePicker.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import PersonRow from '$components/PersonRow.svelte';
+  import PickerDialog from '$components/PickerDialog.svelte';
   import { personName } from '$state/contacts.js';
   import { plural } from '$state/words.js';
 
@@ -208,7 +208,8 @@
 {/if}
 
 {#if asking === 'merge'}
-  <MergePicker
+  <PickerDialog
+    icon="merge"
     title={`Слить «${shown}» с другим`}
     placeholder="Поиск по имени и нику"
     words={['человек', 'человека', 'человек']}
@@ -221,7 +222,7 @@
         <PersonRow {person} onpick={() => (chosen = person)} />
       {/each}
     {/snippet}
-  </MergePicker>
+  </PickerDialog>
 {/if}
 
 {#if chosen}

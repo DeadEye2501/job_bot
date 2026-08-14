@@ -40,6 +40,8 @@ import './styles/contacts.css';
 import './styles/contact-card.css';
 import './styles/vacancies.css';
 import './styles/vacancy-card.css';
+import './styles/popover.css';
+import './styles/menu.css';
 import './styles/status-picker.css';
 import './styles/timeline.css';
 import './styles/vacancy-filters.css';

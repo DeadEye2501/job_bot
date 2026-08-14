@@ -4,6 +4,7 @@
   import { untrack } from 'svelte';
 
   import AskDialog from '$components/AskDialog.svelte';
+  import NewCompanyFields from '$components/NewCompanyFields.svelte';
   import CompanyRow from '$components/CompanyRow.svelte';
   import SearchList from '$components/SearchList.svelte';
   import { attempts } from '$state/attempts.js';
@@ -128,17 +129,7 @@
     onconfirm={create}
     oncancel={() => (adding = false)}
   >
-    <!-- svelte-ignore a11y_autofocus -->
-    <input
-      class="input"
-      autofocus
-      placeholder="Название"
-      bind:value={draft.name}
-      onkeydown={(event) => event.key === 'Enter' && create()}
-    />
-    <input class="input" placeholder="Сайт или домен" bind:value={draft.website} />
-    <input class="input" placeholder="Другие написания через запятую" bind:value={draft.aliases} />
-    <textarea class="textarea" placeholder="Заметки" bind:value={draft.notes}></textarea>
+    <NewCompanyFields {draft} onenter={create} />
   </AskDialog>
 {/if}
 

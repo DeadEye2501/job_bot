@@ -225,7 +225,7 @@
     {:else if section === 'stats'}
       <StatsScreen {ask} />
     {:else if section === 'vacancies'}
-      <VacanciesScreen {ask} {say} events={heard} />
+      <VacanciesScreen {ask} {say} {lockedTip} events={heard} />
     {:else if section === 'system'}
       <TopTabs tabs={SYSTEM_TABS} active={systemTab} onpick={(key) => (systemTab = key)} />
       {#if systemTab === 'logs'}

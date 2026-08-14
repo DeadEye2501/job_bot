@@ -14,7 +14,10 @@
   import { blankFilter, filterPayload } from '$state/vacancy_filter.js';
   import { SORTS, sortKey } from '$state/vacancies.js';
 
-  let { ask, say, events } = $props();
+  // `lockedTip` приходит сверху, а не спрашивается здесь: лампы состояния
+  // опрашивает оболочка для нижней полосы, и второй опрос из карточки дал бы
+  // две разные правды об одном.
+  let { ask, say, lockedTip, events } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -143,6 +146,8 @@
   <VacancyCard
     {ask}
     {say}
+    {events}
+    {lockedTip}
     vacancyId={opened}
     onclose={() => (opened = null)}
     onchanged={() => refresh(refreshLimit(rows.length))}

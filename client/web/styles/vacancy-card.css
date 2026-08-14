@@ -95,3 +95,28 @@
 .vac-dim {
   color: var(--text-tertiary);
 }
+
+.raw-note {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+
+/* Исходный текст показывается как пришёл — с переносами и отступами
+   объявления: по ним и видно, чего разбор не разобрал. */
+.raw-text {
+  max-height: 50vh;
+  margin: 0;
+  padding: 8px 10px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  user-select: text;
+}
