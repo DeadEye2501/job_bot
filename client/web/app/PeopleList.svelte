@@ -142,6 +142,7 @@
   <PersonCard
     {ask}
     {say}
+    {events}
     personId={opened}
     onclose={() => (opened = null)}
     onchanged={() => refresh(refreshLimit(rows.length))}

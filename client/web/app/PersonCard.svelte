@@ -1,8 +1,9 @@
 <script>
   // Карточка человека: его числа, поля и действия над ним.
   //
-  // Переписка сюда приедет вторым заходом слайса; пока карточка рассказывает
-  // то, что знает про человека сам список контактов.
+  // Открывается поверх списка: человека правят и пишут ему, глядя на его же
+  // переписку, — уводить ради этого с экрана значило бы терять из виду соседей
+  // по списку.
 
   import CardDialog from '$components/CardDialog.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
@@ -12,7 +13,9 @@
   import { personName } from '$state/contacts.js';
   import { plural } from '$state/words.js';
 
-  let { ask, say, personId, onclose, onchanged } = $props();
+  import PersonChat from './PersonChat.svelte';
+
+  let { ask, say, events, personId, onclose, onchanged } = $props();
 
   let card = $state(null);
   let vacancies = $state([]);
@@ -159,6 +162,17 @@
   ></textarea>
 
   <MiniVacancies {vacancies} empty="Вакансий от этого человека ещё нет" />
+
+  <PersonChat
+    {ask}
+    {say}
+    {events}
+    {card}
+    onread={async () => {
+      await refresh();
+      onchanged();
+    }}
+  />
 
   <div class="modal-actions card-actions">
     <button class="btn" type="button" onclick={() => (asking = 'merge')}>
