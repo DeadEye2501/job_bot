@@ -10,6 +10,7 @@
   import BlacklistList from './BlacklistList.svelte';
   import ChannelsList from './ChannelsList.svelte';
   import CompaniesList from './CompaniesList.svelte';
+  import PeopleList from './PeopleList.svelte';
 
   let { ask, say, events } = $props();
 
@@ -23,6 +24,8 @@
     <ChannelsList {ask} {say} {events} />
   {:else if tab === 'companies'}
     <CompaniesList {ask} {say} {events} />
+  {:else if tab === 'people'}
+    <PeopleList {ask} {say} {events} />
   {:else}
     <BlacklistList {ask} {say} {events} />
   {/if}

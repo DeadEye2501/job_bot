@@ -4,8 +4,10 @@
   // Открывается поверх списка: канал правят, глядя на его же числа, и уводить
   // ради этого с экрана значило бы терять из виду соседей по списку.
 
+  import CardDialog from '$components/CardDialog.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import DonutChart from '$components/DonutChart.svelte';
+  import MiniVacancies from '$components/MiniVacancies.svelte';
   import { channelName } from '$state/contacts.js';
   import { PAGE, appended } from '$state/paging.js';
   import { donut } from '$state/stats.js';
@@ -86,103 +88,73 @@
   });
 </script>
 
-<div class="modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && onclose()}>
-  <div class="modal-dialog card-dialog" role="dialog" aria-modal="true">
-    {#if trouble}
-      <div class="empty-note">{trouble}</div>
-      <div class="modal-actions">
-        <button class="btn" type="button" onclick={() => onclose()}>Закрыть</button>
-      </div>
-    {:else if !card}
-      <div class="empty-note">Загрузка…</div>
+<CardDialog {trouble} ready={!!card} {onclose}>
+  <div class="modal-title card-head">
+    {#if card.avatar}
+      <img class="avatar" src={card.avatar} alt="" />
     {:else}
-      <div class="modal-title card-head">
-        {#if card.avatar}
-          <img class="avatar" src={card.avatar} alt="" />
-        {:else}
-          <span class="avatar avatar-empty material-symbols-outlined">campaign</span>
-        {/if}
-        <span class="card-name">{shown.name}</span>
-        {#if shown.handle}<span class="card-handle">{shown.handle}</span>{/if}
-        {#if card.blacklist_value}<span class="kind-tag" data-kind="channel">в отсеве</span>{/if}
-      </div>
-
-      <div class="status-card">
-        <div class="stat-lines">
-          <div class="stat-line">
-            <span class="stat-name">Вакансий собрано</span>
-            <span class="stat-value">{card.stats.total}</span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-name">В день</span>
-            <span class="stat-value">{card.stats.vacancies_per_day ?? '—'}</span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-name">Годных</span>
-            <span class="stat-value">{card.stats.fit_percent ?? '—'}%</span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-name">Откликов</span>
-            <span class="stat-value">{card.stats.apply_percent ?? '—'}%</span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-name">Ответили</span>
-            <span class="stat-value">{card.stats.response_percent ?? '—'}%</span>
-          </div>
-        </div>
-        <!-- Легенда рядом с кольцом: одиннадцать цветов без подписей не
-             читаются, а подписать сегменты внутри кольца негде. -->
-        <div class="status-list">
-          {#each statuses as one (one.name)}
-            <div class="status-item">
-              <span class="status-dot" data-status={one.name}></span>
-              <span class="status-name">{one.name}</span>
-              <span class="status-count">{one.count}</span>
-            </div>
-          {/each}
-        </div>
-        <DonutChart parts={statuses} total={card.stats.total} label="Всего" />
-      </div>
-
-      <div class="card-vacancies">
-        {#if !vacancies.length}
-          <div class="empty-note">С этого канала вакансий ещё нет</div>
-        {:else}
-          {#each vacancies as one (one.id)}
-            <div class="stat-line">
-              <span class="stat-name">{one.title || 'Без названия'}</span>
-              <span class="stat-value">
-                <span class="status-dot" data-status={one.status}></span>
-                {one.score ?? '—'}
-              </span>
-            </div>
-          {/each}
-          {#if hasMore}
-            <button class="add-more" type="button" onclick={() => loadVacancies('append')}>
-              Показать ещё
-            </button>
-          {/if}
-        {/if}
-      </div>
-
-      <div class="modal-actions card-actions">
-        <button class="btn" type="button" onclick={pollNow}>
-          <span class="material-symbols-outlined">refresh</span>
-          Опросить сейчас
-        </button>
-        <button class="btn" type="button" onclick={() => (asking = 'reset')}>
-          <span class="material-symbols-outlined">restart_alt</span>
-          Сбросить отметку
-        </button>
-        <button class="btn danger" type="button" onclick={switchBlock}>
-          <span class="material-symbols-outlined">block</span>
-          {card.blacklist_value ? 'Убрать из отсева' : 'В чёрный список'}
-        </button>
-        <button class="btn" type="button" onclick={() => onclose()}>Закрыть</button>
-      </div>
+      <span class="avatar avatar-empty material-symbols-outlined">campaign</span>
     {/if}
+    <span class="card-name">{shown.name}</span>
+    {#if shown.handle}<span class="card-handle">{shown.handle}</span>{/if}
+    {#if card.blacklist_value}<span class="kind-tag" data-kind="channel">в отсеве</span>{/if}
   </div>
-</div>
+
+  <div class="status-card">
+    <div class="stat-lines">
+      <div class="stat-line">
+        <span class="stat-name">Вакансий собрано</span>
+        <span class="stat-value">{card.stats.total}</span>
+      </div>
+      <div class="stat-line">
+        <span class="stat-name">В день</span>
+        <span class="stat-value">{card.stats.vacancies_per_day ?? '—'}</span>
+      </div>
+      <div class="stat-line">
+        <span class="stat-name">Годных</span>
+        <span class="stat-value">{card.stats.fit_percent ?? '—'}%</span>
+      </div>
+      <div class="stat-line">
+        <span class="stat-name">Откликов</span>
+        <span class="stat-value">{card.stats.apply_percent ?? '—'}%</span>
+      </div>
+      <div class="stat-line">
+        <span class="stat-name">Ответили</span>
+        <span class="stat-value">{card.stats.response_percent ?? '—'}%</span>
+      </div>
+    </div>
+    <!-- Легенда рядом с кольцом: одиннадцать цветов без подписей не
+         читаются, а подписать сегменты внутри кольца негде. -->
+    <div class="status-list">
+      {#each statuses as one (one.name)}
+        <div class="status-item">
+          <span class="status-dot" data-status={one.name}></span>
+          <span class="status-name">{one.name}</span>
+          <span class="status-count">{one.count}</span>
+        </div>
+      {/each}
+    </div>
+    <DonutChart parts={statuses} total={card.stats.total} label="Всего" />
+  </div>
+
+  <MiniVacancies {vacancies} empty="С этого канала вакансий ещё нет" hasMore={hasMore} onmore={() => loadVacancies('append')} />
+
+  <div class="modal-actions card-actions">
+    <button class="btn" type="button" onclick={pollNow}>
+      <span class="material-symbols-outlined">refresh</span>
+      Опросить сейчас
+    </button>
+    <button class="btn" type="button" onclick={() => (asking = 'reset')}>
+      <span class="material-symbols-outlined">restart_alt</span>
+      Сбросить отметку
+    </button>
+    <button class="btn danger" type="button" onclick={switchBlock}>
+      <span class="material-symbols-outlined">block</span>
+      {card.blacklist_value ? 'Убрать из отсева' : 'В чёрный список'}
+    </button>
+    <button class="btn" type="button" onclick={() => onclose()}>Закрыть</button>
+  </div>
+</CardDialog>
 
 {#if asking === 'reset'}
   <ConfirmDialog
