@@ -12,6 +12,7 @@
   import { call } from '$api/bridge.js';
   import { listener } from '$api/events.js';
   import LogsScreen from './LogsScreen.svelte';
+  import SettingsScreen from './SettingsScreen.svelte';
   import HealthLamp from '$components/HealthLamp.svelte';
   import ModeToggle from '$components/ModeToggle.svelte';
   import NavGroup from '$components/NavGroup.svelte';
@@ -218,9 +219,7 @@
       {#if systemTab === 'logs'}
         <LogsScreen {ask} {say} events={heard} />
       {:else}
-        <div class="placeholder-content">
-          Раздел «Система / {systemTabLabel}» — экран ещё не переехал
-        </div>
+        <SettingsScreen {ask} {say} />
       {/if}
     {:else}
       <div class="placeholder-content">

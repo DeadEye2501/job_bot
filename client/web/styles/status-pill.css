@@ -1,0 +1,21 @@
+/* Плашка состояния в шапке секции: прижата к правому краю. */
+
+.status-pill {
+  margin-left: auto;
+  font-size: 0.7rem;
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.status-pill[data-tone='ok'] {
+  background: var(--ok-fill);
+  color: var(--ok-text);
+}
+
+.status-pill[data-tone='err'] {
+  background: var(--err-fill-strong);
+  color: var(--danger);
+}

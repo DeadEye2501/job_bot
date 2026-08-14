@@ -1,0 +1,31 @@
+/* Поле ввода и поле для секрета рядом с глазом. */
+
+.input {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 3px;
+  padding: 5px 9px;
+  font-size: 0.83rem;
+  font-family: inherit;
+  width: 100%;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.secret-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.secret-input .input {
+  flex: 1;
+}
