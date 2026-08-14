@@ -1,0 +1,97 @@
+/* Список вакансий: строка в три этажа — заголовок, подпись, стек. */
+
+.vac-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  width: 100%;
+}
+
+.vac-row-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vac-title {
+  color: var(--text-primary);
+  font-size: 0.83rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.vac-meta {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vac-meta .v-co {
+  color: var(--text-primary);
+}
+
+.vac-meta .sep {
+  color: var(--text-tertiary);
+  margin: 0 3px;
+}
+
+.vac-meta .when {
+  color: var(--text-tertiary);
+}
+
+/* Оценка говорит не сама о себе, а о своём отношении к порогу отбора: под
+   порогом — отвергнутая, сразу над ним — взятая с натяжкой. */
+.vac-score {
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  background: var(--bg-tertiary);
+  padding: 0 5px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.vac-score[data-tone='warn'] {
+  color: var(--score-warn);
+}
+
+.vac-score[data-tone='bad'] {
+  color: var(--err);
+}
+
+.vac-stack {
+  display: flex;
+  gap: 3px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.mini-chip {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  padding: 0 5px;
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+.mini-chip.more {
+  color: var(--text-tertiary);
+}
+
+/* Совпавшее с анкетой подсвечено: по нему решают, стоит ли открывать. */
+.mini-chip.matched {
+  background: var(--accent-chip-bg);
+  color: var(--accent);
+}
