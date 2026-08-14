@@ -1,0 +1,53 @@
+/* Переключатель режима бота: слово, дорожка и бегунок на ней. */
+
+.mode-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Ширина слова закреплена: без неё переключатель ездил бы влево-вправо на
+   каждой смене Off ↔ DM Only ↔ Full. */
+.mode-text {
+  font-size: 0.72rem;
+  min-width: 56px;
+  text-align: right;
+  transition: color 0.15s;
+}
+
+.mode-track {
+  position: relative;
+  width: 44px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s;
+}
+
+.mode-knob {
+  position: absolute;
+  top: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  transition: left 0.18s ease, background 0.18s;
+}
+
+.mode-control[data-mode='Off'] .mode-knob { left: 1px; background: var(--err); }
+.mode-control[data-mode='Off'] .mode-text { color: var(--err); }
+.mode-control[data-mode='Off'] .mode-track { border-color: var(--err-muted); }
+
+.mode-control[data-mode='DM Only'] .mode-knob { left: 15px; background: var(--warn); }
+.mode-control[data-mode='DM Only'] .mode-text { color: var(--warn); }
+.mode-control[data-mode='DM Only'] .mode-track { border-color: var(--warn-muted); }
+
+.mode-control[data-mode='Full'] .mode-knob { left: 29px; background: var(--accent); }
+.mode-control[data-mode='Full'] .mode-text { color: var(--accent); }
+.mode-control[data-mode='Full'] .mode-track { border-color: var(--accent-muted); }
+
+.mode-control.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

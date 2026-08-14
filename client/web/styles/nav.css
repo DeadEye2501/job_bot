@@ -1,0 +1,94 @@
+/* Боковое меню: разделы и кнопка разворота. */
+
+.sidebar {
+  grid-column: 1;
+  grid-row: 1;
+  background: var(--bg-tertiary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 6px 0;
+}
+
+/* Обе строки меню — кнопки: по меню ходят и с клавиатуры. Собственный вид
+   кнопки снят в base.css, здесь только геометрия строки. */
+.nav-group,
+.sidebar-toggle {
+  width: 100%;
+  height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.nav-group {
+  text-align: left;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  position: relative;
+  transition: color 0.1s, background 0.1s;
+}
+
+/* Ширина рельса не зависит от разворота — на ней всё и держится: значок стоит
+   по центру рельса, а не меню, и при развороте не сдвигается ни на точку. */
+.nav-icon-rail {
+  width: var(--rail-w);
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-icon-rail .material-symbols-outlined {
+  font-size: 20px;
+  color: inherit;
+}
+
+.nav-label {
+  padding-right: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Подпись именно убирается, а не гасится прозрачностью: гаснущая заняла бы
+   место и растянула бы меню раньше времени. */
+.app-frame:not(.sidebar-expanded) .nav-label {
+  display: none;
+}
+
+.nav-group:hover {
+  color: var(--text-primary);
+}
+
+.nav-group.active {
+  color: var(--text-primary);
+  background: var(--selected-bg);
+  /* Полоса слева нарисована внутренней тенью, а не рамкой: рамка сдвинула бы
+     содержимое строки на свою толщину. */
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.nav-group.active .nav-icon-rail .material-symbols-outlined {
+  color: var(--text-primary);
+}
+
+.sidebar-spacer {
+  flex: 1;
+}
+
+.sidebar-toggle {
+  justify-content: center;
+  color: var(--text-tertiary);
+  border-top: 1px solid var(--border);
+  transition: color 0.1s;
+}
+
+.sidebar-toggle:hover {
+  color: var(--text-primary);
+}
+
+.sidebar-toggle .material-symbols-outlined {
+  font-size: 18px;
+}

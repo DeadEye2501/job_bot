@@ -1,0 +1,23 @@
+/* Счёт непрочитанного: пилюля со значком письма.
+   Ни курсора-руки, ни подсветки по наведению — почему, сказано в компоненте. */
+
+.badge-unread {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  transition: background 0.1s, color 0.1s;
+}
+
+.badge-unread .material-symbols-outlined {
+  font-size: 13px;
+}
+
+.badge-unread[data-has-unread='true'] {
+  background: var(--selected-bg);
+  color: var(--accent);
+}

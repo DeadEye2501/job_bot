@@ -1,0 +1,40 @@
+/* Рама нижней полосы: три её места и то, как они делят ширину.
+   Что стоит внутри — лампочки, режим, ход обхода, счётчик — своими файлами. */
+
+.bottom-bar {
+  grid-column: 1 / span 2;
+  grid-row: 2;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 0.75rem;
+  position: relative;
+}
+
+.bb-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bb-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: end;
+}
+
+/* Ось нулевой ширины по центру полосы, вынутая из сетки. Полосы висят слева от
+   неё, подпись справа — и подпись, меняясь в длине, не двигает полосы. Сделай
+   это обычной ячейкой, и каждое новое имя канала дёргало бы их. */
+.bb-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  pointer-events: none;
+}
