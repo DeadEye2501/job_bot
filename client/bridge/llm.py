@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from functools import partial
@@ -79,12 +78,11 @@ async def _do_llm_probe(
 def read_llm_creds(payload: dict) -> LlmProviderConfig:
     """Черновые учётные данные поставщика из нагрузки окна.
 
-    Читаются одним правилом на всех, кто спрашивает поставщика: проба, обе
-    проверки мастера и оба его сохранения, оба сохранения настроек. Прежде
-    правил было три — мастер ронял разбор на пропущенном поле, окно
-    подставляло пустую строку, настройки смотрели только на модель, — и одна
-    и та же форма принималась по-разному в зависимости от того, откуда её
-    открыли.
+    Читаются одним правилом на всех, кто спрашивает поставщика: проба связи и
+    запись обоих поставщиков. Прежде правил было три — мастер ронял разбор на
+    пропущенном поле, окно подставляло пустую строку, настройки смотрели только
+    на модель, — и одна и та же форма принималась по-разному в зависимости от
+    того, откуда её открыли.
 
     Хвостовая косая у адреса срезается: человек копирует адрес из браузера
     вместе с ней, а склейка пути дала бы двойную.
@@ -104,43 +102,13 @@ def read_llm_creds(payload: dict) -> LlmProviderConfig:
 
 
 def read_models_ask(payload) -> tuple[str, str, str]:
-    """О чём спрашивают поставщика: род, адрес и ключ.
-
-    Читается одним правилом на два окна: имена моделей спрашивают и мастер, и
-    настройки, и спрашивают одно и то же.
-    """
+    """О чём спрашивают поставщика: род, адрес и ключ."""
     payload = payload if isinstance(payload, dict) else {}
     return (
         str(payload.get("kind") or ""),
         str(payload.get("base_url") or "").strip().rstrip("/"),
         str(payload.get("api_key") or ""),
     )
-
-
-def models_coro(payload_json: str):
-    """Корутина ответа «какие модели у поставщика есть», или пусто.
-
-    Пусто значит «спрашивать нечего» — нет адреса или неизвестен род; окну в
-    этом случае не отвечают вовсе, потому что оно спрашивает на каждый
-    набранный знак адреса.
-
-    Осталась мастеру первого запуска: он отвечает сигналом до слайса А2.9, а
-    экран настроек уже отвечает возвратом, и общее у них — сам поход к
-    поставщику, объявленный выше.
-    """
-    try:
-        payload = json.loads(payload_json) if payload_json else {}
-    except (ValueError, TypeError):
-        return None
-    kind, base_url, api_key = read_models_ask(payload)
-    if not base_url or kind not in ("chat", "embed"):
-        return None
-
-    async def run() -> str:
-        result = await _do_list_models_for_creds(base_url, api_key, kind=kind)
-        return json.dumps({"kind": kind, **result})
-
-    return run()
 
 
 class Llm:

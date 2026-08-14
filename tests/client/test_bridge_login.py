@@ -1,13 +1,10 @@
 """Следствия входа в Telegram: три шага, о которых окно спрашивает по одному.
 
 Предмет — сама последовательность: код, подтверждение, облачный пароль. Шаги
-есть в обоих окнах — и в мастере первого запуска, и в настройках, — но общее у
-них объявлено один раз (`client/bridge/login.py`), а порознь написан скелет
-слота. Проверяются они на настройках, где вход бывает повторным; у мастера
-сторожатся два следствия, которые у него свои, — заслон шага и слова отказа.
+одни и те же, откуда бы в них ни вошли — с первого запуска или из настроек:
+написаны они один раз (`client/bridge/login.py`), и второго написания больше
+нет.
 """
-
-import json
 
 from backend.telegram_login import LoginStep
 from tests.fakes.ui_login import UiLogin
@@ -140,39 +137,3 @@ async def test_logging_out_lets_the_bot_go(api, ask, hub, with_bot):
     assert "ok" in answer
     assert ("log_out_session",) in bot.calls
     assert hub.bot is None
-
-
-async def test_the_wizard_asks_for_the_code_before_the_password(wizard_api, watch):
-    """Мастер отбивает пароль, о котором не спрашивали.
-
-    Шаги входа идут по одному, и второй заслон — единственное, что стоит между
-    набранным паролем и живым клиентом Telegram, у которого его никто не ждёт.
-    Дорога у мастера своя, сигнальная, и заслон на ней тот же, что у настроек.
-
-    Красной фазы у этого сторожа не было — он дописан по находке ревью: слоты
-    входа мастера не сторожил никто, а немеют они молча.
-    """
-    caught = watch(wizard_api.telegram_confirm_password_done)
-
-    wizard_api.telegram_confirm_password(json.dumps({"password": "тайна"}))
-
-    answer = await caught.next()
-    assert answer["ok"] is False
-
-
-async def test_the_wizard_names_the_field_it_did_not_get(wizard_api, watch):
-    """Мастер говорит, какого поля не хватило, теми же словами, что и настройки.
-
-    Слова отказа у двух дорог общие: разойдись они, человек, вошедший через
-    мастера, и человек, вошедший через настройки, читали бы о своей опечатке
-    по-разному.
-
-    Красной фазы у этого сторожа не было — дописан по той же находке.
-    """
-    caught = watch(wizard_api.telegram_send_code_done)
-
-    wizard_api.telegram_send_code(json.dumps({"api_id": 1}))
-
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert answer["error"].startswith("Неверные поля")

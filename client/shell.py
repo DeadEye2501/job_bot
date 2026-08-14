@@ -1,7 +1,13 @@
-"""Qt window that hosts the HTML/CSS UI via QWebEngineView.
+"""Окно Qt, показывавшее страницу через QWebEngineView.
 
-Entry point lives in the project-root `main.py` (`--ui` flag); this module
-exposes `run_ui()` which it calls.
+Точка входа зовёт отсюда `run_ui()` — так было и так остаётся до слайса А3, где
+её место занимает окно pywebview (`client/window.py`).
+
+**Моста в этом окне больше нет.** Публиковать поверхность канал Qt умел только
+объектами `QObject` со слотами, а поверхность стала деревом обычных доменов,
+отвечающих возвратом. Пока окна pywebview не существует, страница здесь
+открывается без `api` — приложение на этой ветке всё равно не открывается с
+первого же переехавшего домена, и довод записан в плане.
 """
 
 import logging
@@ -12,7 +18,6 @@ from typing import Any
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QIcon
-from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication, QMainWindow
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -20,7 +25,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from adapters import db
 from backend.models import BotMode
 from backend.runtime_settings import RuntimeSettings
-from client.bridge import AsyncRunner, MainApi, WizardApi
+from client.bridge import AsyncRunner
 from client import raise_window
 from config import get_database_url
 
@@ -124,59 +129,17 @@ def run_ui() -> int:
     # Suppress the default browser right-click menu (Back / Reload / View
     # source ...) — this is a desktop app, not a browser.
     view.setContextMenuPolicy(Qt.NoContextMenu)
-    page = view.page()
-    channel = QWebChannel(page)
-    page.setWebChannel(channel)
-
-    # Holds the currently-active bridge object so cleanup hooks can reach it.
-    active_api: dict[str, Any] = {"obj": None}
-
-    def install_main_api(*, recenter: bool) -> None:
-        old = active_api["obj"]
-        if old is not None:
-            try:
-                old.cleanup()
-            except Exception:
-                logger.exception("Previous API cleanup failed during channel swap")
-            try:
-                channel.deregisterObject(old)
-            except Exception:
-                logger.exception("deregisterObject failed for previous API")
-        new_api = MainApi(
-            rs, session_factory, runner,
-            parent_widget=window, engine=engine,
-        )
-        channel.registerObject("api", new_api)
-        active_api["obj"] = new_api
-        logger.info("Main API registered (recenter=%s)", recenter)
-        _enter_main_mode(window, view, recenter_around_existing=recenter)
-
     if rs.wizard_completed:
         logger.info("Wizard completed; entering main app")
-        install_main_api(recenter=False)
+        _enter_main_mode(window, view)
     else:
         logger.info("Wizard incomplete; showing wizard screen")
-        wizard_api = WizardApi(
-            rs,
-            session_factory,
-            runner,
-            parent_widget=window,
-            on_enter_main=lambda: install_main_api(recenter=True),
-        )
-        channel.registerObject("api", wizard_api)
-        active_api["obj"] = wizard_api
         _enter_wizard_mode(window, view)
 
     window.setCentralWidget(view)
 
     def on_quit() -> None:
         logger.info("Application quit requested")
-        api = active_api["obj"]
-        if api is not None:
-            try:
-                api.cleanup()
-            except Exception:
-                logger.exception("API cleanup on quit failed")
         runner.stop()
 
     app.aboutToQuit.connect(on_quit)
@@ -193,24 +156,8 @@ def _enter_wizard_mode(window: QMainWindow, view: QWebEngineView) -> None:
     view.load(QUrl.fromLocalFile(str(WIZARD_HTML.resolve())))
 
 
-def _enter_main_mode(
-    window: QMainWindow,
-    view: QWebEngineView,
-    *,
-    recenter_around_existing: bool = False,
-) -> None:
+def _enter_main_mode(window: QMainWindow, view: QWebEngineView) -> None:
     window.setMaximumSize(16777215, 16777215)
     window.setMinimumSize(*MAIN_WINDOW_MIN)
-
-    new_w, new_h = MAIN_WINDOW_DEFAULT
-    if recenter_around_existing and window.isVisible():
-        # Switching from wizard mode while visible: anchor to the wizard's
-        # center so the new pixels grow evenly in all directions.
-        geom = window.frameGeometry()
-        new_x = geom.x() - (new_w - geom.width()) // 2
-        new_y = geom.y() - (new_h - geom.height()) // 2
-        window.setGeometry(new_x, new_y, new_w, new_h)
-    else:
-        window.resize(new_w, new_h)
-
+    window.resize(*MAIN_WINDOW_DEFAULT)
     view.load(QUrl.fromLocalFile(str(MAIN_HTML.resolve())))

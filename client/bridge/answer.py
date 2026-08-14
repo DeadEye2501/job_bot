@@ -1,19 +1,15 @@
 """Единый конверт ответа окну — от исхода работы до ответа зовущему.
 
-Отправок здесь две, и это ненадолго: `reply` отдаёт ответ значением, как его
-ждёт pywebview, а `_dispatch_json` — сигналом, как его ждал Qt. Вторая уходит
-вместе с последним переехавшим доменом, слайсом А2.9.
+Отправка одна: `reply` отдаёт ответ значением, как его ждёт pywebview. Вторая,
+сигнальная, ушла вместе с каналом Qt и мастером, который ею отвечал.
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from concurrent.futures import CancelledError, Future
 from typing import Any, Coroutine
-
-from PySide6.QtCore import SignalInstance
 
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.runner import AsyncRunner
@@ -25,14 +21,6 @@ logger = logging.getLogger(__name__)
 # сегодня делает один метод, и заведомо меньше того времени, за которое человек
 # решает, что окно повисло, и убивает его. Мерится в А3, где появляется окно.
 REPLY_SECONDS = 60.0
-
-
-def _ok(data: dict | None = None) -> str:
-    return json.dumps({"ok": True, **(data or {})})
-
-
-def _err(message: str, **extra: Any) -> str:
-    return json.dumps({"ok": False, "error": message, **extra})
 
 
 class Denied(Exception):
@@ -73,17 +61,6 @@ def bad_fields(where: str, error: Exception, **extra: Any) -> dict:
     return {"fail": "fields", "detail": f"Неверные поля: {error}", **extra}
 
 
-def bad_fields_json(where: str, error: Exception) -> str:
-    """То же, что `bad_fields`, но строкой: сигнальная дорога везёт JSON.
-
-    Уйдёт вместе с ней, слайсом А2.9. Пока живёт здесь, а не у мастера: слова
-    отказа у двух дорог обязаны совпадать, а написанные порознь они разъедутся
-    первой же правкой.
-    """
-    _log_invalid_payload(where, error)
-    return _err(f"Неверные поля: {error}")
-
-
 def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict:
     """Сделать работу на моторе и вернуть её исход зовущему одним конвертом.
 
@@ -94,10 +71,8 @@ def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict:
     каком: прежний канал на сорвавшейся работе просто не присылал сигнала, и
     окно оставалось со спиннером навсегда.
 
-    **Отмена здесь отвечает, а рядом, в `_dispatch_json`, молчит** — и это не
-    разнобой. Там ответ уезжал сигналом в страницу, которая при остановке уже
-    отвалилась; здесь ответа ждёт зов, и промолчать значит держать его до срока
-    впустую.
+    **Отмена тоже отвечает.** Ответа ждёт зов, и промолчать значит держать его
+    до срока впустую.
 
     Начатую работу срок не отменяет: `Future` от `run_coroutine_threadsafe`
     отзывает только то, что ещё не пошло. Отвечаем зовущему и оставляем работу
@@ -133,34 +108,3 @@ def _our_deadline(error: Exception, future: Future | None) -> bool:
     идущей, свой приходит вместе с её концом.
     """
     return isinstance(error, TimeoutError) and future is not None and not future.done()
-
-
-def _dispatch_json(
-    runner: AsyncRunner, signal: SignalInstance, coro: Coroutine[Any, Any, Any]
-) -> None:
-    """Отправить корутину на runner и отдать её ответ окну сигналом.
-
-    Объявлено один раз на оба класса: общие чтения нагрузки зовут отправку,
-    не зная, у какого из них они в руках, — а разойдись эти отправки, у
-    мастера и настроек разошлось бы и поведение при закрытии окна.
-
-    Отмену при остановке не показываем: обработчик в окне к этому мигу уже
-    отвалился, и «CancelledError» уходило бы в умирающую страницу. Обе
-    породы отмены ловятся вместе — runner отдаёт свою, корутина свою.
-    """
-    future = runner.submit(coro)
-
-    def on_done(f: Future) -> None:
-        try:
-            payload = f.result()
-        except (CancelledError, asyncio.CancelledError):
-            return
-        except Exception as e:
-            logger.exception(
-                "bridge: unexpected error in coroutine %s",
-                getattr(coro, "__qualname__", "?"),
-            )
-            payload = _err(f"{type(e).__name__}: {e}")
-        signal.emit(payload)
-
-    future.add_done_callback(on_done)

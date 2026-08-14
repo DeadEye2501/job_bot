@@ -1,11 +1,9 @@
-"""Следствия слотов резюме — файла, путь к которому помнит окно.
+"""Следствия резюме — файла, путь к которому помнит окно.
 
-Предмет отделён от анкеты: резюме не поле записи, а вложение на диске. Выбирать
-файл умеет только мастер первого запуска: у основного окна диалог был Qt'шный и
-ушёл вместе с переездом домена — путь туда называет страница.
+Предмет отделён от анкеты: резюме не поле записи, а вложение на диске. Файл
+мосту не выбирает никто: диалог был Qt'шный и ушёл вместе с каналом — путь
+называет страница, а спрашивает его у человека диалог самого окна.
 """
-
-import json
 
 
 async def test_an_empty_path_is_refused(api, ask):
@@ -48,75 +46,6 @@ async def test_a_resume_that_went_missing_is_reported_as_missing(api, ask, tmp_p
     shown = await ask(api.profile.get)
 
     assert shown["ok"]["cv_meta"]["exists"] is False
-
-
-async def test_the_wizard_asks_for_the_file_itself(
-    wizard_api, chosen_file, tmp_path
-):
-    """Мастер первого запуска спрашивает файл сам, диалогом.
-
-    Диалог остался только у него и отвечает возвратом вызова: мастер
-    показывает выбранное имя на своём шаге, и ждать его сигналом там нечем —
-    шага впереди ещё нет.
-    """
-    resume = tmp_path / "первое.pdf"
-    resume.write_bytes(b"%PDF-1.4 ")
-    chosen_file(str(resume))
-
-    answer = json.loads(wizard_api.pick_cv_file())
-
-    assert answer["ok"] is True
-    assert answer["name"] == "первое.pdf"
-
-
-async def test_the_wizard_lets_the_resume_be_skipped(wizard_api, watch):
-    """Резюме можно не прикладывать вовсе, и мастер это принимает.
-
-    Отклик без файла всё равно уйдёт — письмо важнее вложения. Отбей мастер
-    пропуск, человек застрял бы на первом запуске, не имея файла под рукой.
-    """
-    caught = watch(wizard_api.cv_save_done)
-
-    wizard_api.cv_save(json.dumps({"mode": "skip"}))
-
-    answer = await caught.next()
-    assert answer["ok"] is True
-    assert answer["mode"] == "skip"
-
-
-async def test_the_wizard_refuses_to_attach_nothing(wizard_api, watch):
-    """Приложить нечего — так и говорят, вместо того чтобы записать пустоту.
-
-    Пустой путь дошёл бы до настроек и всплыл бы позже: отклик ушёл бы без
-    обещанного вложения, и заметить это было бы уже нельзя.
-    """
-    caught = watch(wizard_api.cv_save_done)
-
-    wizard_api.cv_save(json.dumps({"mode": "attach", "path": "  "}))
-
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert answer["error"] == "Сначала выберите файл резюме."
-
-
-async def test_an_attached_resume_is_remembered_for_the_main_window(
-    wizard_api, watch, api, ask, tmp_path
-):
-    """Приложенное в мастере резюме видно основному окну.
-
-    Мастер и основное окно — разные объекты моста, и настройки для них общие
-    только через записанное. Не доедь путь, человек прошёл бы мастер и увидел
-    в анкете пустое поле резюме.
-    """
-    resume = tmp_path / "из мастера.pdf"
-    resume.write_bytes(b"%PDF-1.4 ")
-    saved = watch(wizard_api.cv_save_done)
-
-    wizard_api.cv_save(json.dumps({"mode": "attach", "path": str(resume)}))
-    assert (await saved.next())["ok"] is True
-
-    shown = await ask(api.profile.get)
-    assert shown["ok"]["cv_path"] == str(resume)
 
 
 async def test_a_resume_nobody_chose_is_not_handed_to_the_system(api, ask):
@@ -170,23 +99,3 @@ async def test_a_resume_the_system_would_not_open_is_not_called_opened(
 
     assert answer["fail"] == "denied"
     assert answer["path"] == "C:/нет/такого.pdf"
-
-
-async def test_a_cancelled_choice_is_told_apart_from_a_failure(
-    wizard_api, chosen_file
-):
-    """Передумавшего отличают от поломки отдельным словом.
-
-    Закрытое окно выбора — обычный отказ от намерения, и окну надо просто
-    ничего не менять. Приди сюда общая ошибка, человек увидел бы сообщение о
-    поломке всякий раз, когда просто передумал.
-
-    Сторож переехал с поверхности основного окна на мастера: диалог остался
-    только у него, а различение живо и там.
-    """
-    chosen_file("")
-
-    answer = json.loads(wizard_api.pick_cv_file())
-
-    assert answer["ok"] is False
-    assert answer["error"] == "cancelled"
