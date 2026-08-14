@@ -2,16 +2,13 @@
   // Строка канала: значок, имя, счёт вакансий и переключатель работы.
   import { channelName } from '$state/contacts.js';
 
-  let { channel, ontoggle, onremove } = $props();
+  let { channel, onpick, ontoggle, onremove } = $props();
 
   const shown = $derived(channelName(channel));
 </script>
 
 <div class="contact-row" class:blocked={channel.is_blacklisted}>
-  <!-- Строка не нажимается: карточки канала в окне пока нет, и нажатие,
-       которое ничего не открывает, обещало бы её. Приедет карточка — приедет
-       и нажатие. -->
-  <div class="contact-main">
+  <button class="contact-main" type="button" onclick={() => onpick()}>
     {#if channel.avatar}
       <img class="avatar" src={channel.avatar} alt="" />
     {:else}
@@ -22,7 +19,7 @@
       {#if shown.handle}<span class="contact-handle">{shown.handle}</span>{/if}
     </span>
     <span class="contact-count">{channel.vacancy_count}</span>
-  </div>
+  </button>
 
   <!-- Канал из отсева включить нельзя: обход всё равно его пропустит, и
        включённый переключатель обещал бы работу, которой не будет. -->
