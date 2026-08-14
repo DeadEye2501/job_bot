@@ -15,10 +15,16 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from adapters import lm_studio
 from backend.runtime_settings import RuntimeSettings
 from backend.telegram_login import TelegramLogin
-from client.bridge.answer import _dispatch_json, _err, _ok
+from client.bridge.answer import _dispatch_json, _err, _ok, bad_fields_json
 from client.bridge.llm import _do_llm_probe, models_coro, read_llm_creds
-from client.bridge.login import TelegramLoginSlots
-from client.bridge.payload import _log_invalid_payload
+from client.bridge.login import (
+    code_step,
+    password_step,
+    read_code,
+    read_credentials,
+    read_password,
+)
+from client.bridge.payload import PAYLOAD_ERRORS, _log_invalid_payload
 from client.bridge.runner import AsyncRunner
 from client.bridge.wire import _llm_provider_to_dict
 
@@ -26,10 +32,30 @@ from client.bridge.wire import _llm_provider_to_dict
 logger = logging.getLogger(__name__)
 
 
-class WizardApi(TelegramLoginSlots, QObject):
-    """Exposed to JS as `window.api`. All long-running ops are non-blocking;
-    JS must connect to the matching `*_done` signal to get the result."""
+async def _login_json(step_coro) -> str:
+    """Исход шага входа строкой-конвертом, как его ждёт канал Qt.
 
+    Второй такой конверт — у переехавшего домена настроек, и он отдаёт исход
+    возвратом. Общее у двоих осталось общим: разбор нагрузки, заслоны шагов и
+    слова отказа объявлены в `login.py` и зовутся отсюда.
+    """
+    step = await step_coro
+    return _err(step.error) if step.error is not None else _ok(step.payload)
+
+
+class WizardApi(QObject):
+    """Exposed to JS as `window.api`. All long-running ops are non-blocking;
+    JS must connect to the matching `*_done` signal to get the result.
+
+    Три шага входа в Telegram объявлены здесь своими слотами, хотя тот же вход
+    есть и на экране настроек: настройки уехали на возврат значения, а мастер
+    отвечает сигналом до слайса А2.9. Задвоены только конверты — сами шаги
+    общие.
+    """
+
+    telegram_send_code_done = Signal(str)
+    telegram_confirm_code_done = Signal(str)
+    telegram_confirm_password_done = Signal(str)
     chat_check_done = Signal(str)
     chat_save_done = Signal(str)
     embed_check_done = Signal(str)
@@ -117,6 +143,43 @@ class WizardApi(TelegramLoginSlots, QObject):
 
     def _dispatch(self, signal: Signal, coro: Coroutine[Any, Any, Any]) -> None:
         _dispatch_json(self._runner, signal, coro)
+
+    # --- Вход в Telegram ----------------------------------------------------
+
+    @Slot(str)
+    def telegram_send_code(self, payload_json: str) -> None:
+        try:
+            api_id, api_hash, phone = read_credentials(json.loads(payload_json))
+        except PAYLOAD_ERRORS as e:
+            self.telegram_send_code_done.emit(bad_fields_json("telegram_send_code", e))
+            return
+        self._dispatch(
+            self.telegram_send_code_done,
+            _login_json(self._login.send_code(api_id, api_hash, phone)),
+        )
+
+    @Slot(str)
+    def telegram_confirm_code(self, payload_json: str) -> None:
+        try:
+            code = read_code(json.loads(payload_json))
+        except PAYLOAD_ERRORS as e:
+            self.telegram_confirm_code_done.emit(bad_fields_json("telegram_confirm_code", e))
+            return
+        self._dispatch(
+            self.telegram_confirm_code_done, _login_json(code_step(self._login, code))
+        )
+
+    @Slot(str)
+    def telegram_confirm_password(self, payload_json: str) -> None:
+        try:
+            password = read_password(json.loads(payload_json))
+        except PAYLOAD_ERRORS as e:
+            self.telegram_confirm_password_done.emit(bad_fields_json("telegram_confirm_password", e))
+            return
+        self._dispatch(
+            self.telegram_confirm_password_done,
+            _login_json(password_step(self._login, password)),
+        )
 
     # --- LLM check / save --------------------------------------------------
 

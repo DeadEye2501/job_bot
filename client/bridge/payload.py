@@ -16,3 +16,11 @@ def _log_invalid_payload(slot: str, exc: Exception) -> None:
     missing = exc.args[0] if isinstance(exc, KeyError) and exc.args else None
     said = f"нет поля {missing!r}" if missing is not None else type(exc).__name__
     logger.warning("%s: invalid payload: %s", slot, said)
+
+
+PAYLOAD_ERRORS = (AttributeError, KeyError, TypeError, ValueError)
+"""Чем спотыкается чтение нагрузки: не-объект, нет ключа, не тот род, не то
+значение. Кортеж один на всех, кто её читает: написанный по месту, он
+разъезжался — половина мест не ловила `AttributeError`, и не-объект уходил
+мимо конверта прямо в канал.
+"""

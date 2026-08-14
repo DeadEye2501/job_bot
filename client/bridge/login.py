@@ -2,86 +2,121 @@
 
 from __future__ import annotations
 
-import json
-
-from PySide6.QtCore import Signal, Slot
-
-from client.bridge.answer import _err, _ok
-from client.bridge.payload import _log_invalid_payload
+from backend.telegram_login import LoginStep
+from client.bridge.answer import Denied, bad_fields, reply
+from client.bridge.refusals import CODE_FIRST, CODE_STEP_FIRST
 
 
-async def _login_json(step_coro) -> str:
-    """Дождаться шага входа в Telegram и перевести его исход в ответ окну."""
+def read_credentials(payload: dict) -> tuple[int, str, str]:
+    """Учётные данные из формы входа: номер приложения, ключ и телефон.
+
+    Номер приложения приводится к числу здесь: из окна всё приезжает текстом, а
+    Telegram ждёт число. Уйди он строкой — библиотека отказала бы уже на
+    соединении, и человек увидел бы поломку вместо понятного «проверьте api_id».
+    """
+    return (
+        int(payload["api_id"]),
+        str(payload["api_hash"]).strip(),
+        str(payload["phone"]).strip(),
+    )
+
+
+def read_code(payload: dict) -> str:
+    """Код подтверждения из формы."""
+    return str(payload["code"]).strip()
+
+
+def read_password(payload: dict) -> str:
+    """Облачный пароль ровно тем, что набрали.
+
+    Ни обрезки пробелов, ни приведения регистра: сверяет пароль Telegram, и
+    любая правка по дороге обернулась бы необъяснимым отказом на верном.
+    """
+    return str(payload["password"])
+
+
+async def code_step(login, code: str) -> LoginStep:
+    """Второй шаг с заслоном: код, введённый до запроса, дальше не идёт.
+
+    Окно может остаться открытым с прошлой попытки, а попытка к тому времени
+    уже закрыта. Уйди код в закрытую попытку — ответом была бы поломка
+    библиотеки вместо понятного «сначала запросите код».
+    """
+    if not login.awaiting_code:
+        return LoginStep(error=CODE_FIRST)
+    return await login.confirm_code(code)
+
+
+async def password_step(login, password: str) -> LoginStep:
+    """Третий шаг с заслоном: пароль до шага с кодом не принимают.
+
+    Пароль спрашивают не всегда — только если он включён у учётной записи.
+    Прими его мост раньше времени, он ушёл бы в попытку, которая его не ждёт, и
+    потерялся бы молча.
+    """
+    if not login.awaiting_password:
+        return LoginStep(error=CODE_STEP_FIRST)
+    return await login.confirm_password(password)
+
+
+async def step_payload(step_coro) -> dict:
+    """Исход шага возвратом: нагрузка — ответом, отказ Telegram — броском.
+
+    Отказы входа предметные, и чинятся они по-разному: неверный код
+    перенабирают, за устаревшим идут заново. Своди мост их к общему «не
+    получилось» — человек не понял бы, что делать.
+    """
     step = await step_coro
-    return _err(step.error) if step.error is not None else _ok(step.payload)
+    if step.error is not None:
+        raise Denied(step.error)
+    return step.payload or {}
 
 
-class TelegramLoginSlots:
-    """Три шага входа, подмешиваемые обеим поверхностям окна.
+class Login:
+    """Три шага входа в Telegram, какими их проходят с экрана настроек.
 
-    QWebChannel регистрирует один объект «api»: после первого запуска на
-    канале сидит основное окно, и методы мастера ему недоступны. Сам вход у
-    обоих один и тот же — поэтому объявлен один раз и подмешивается, а не
-    переписывается дважды.
+    Собирающий обязан держать `_hub`: оттуда берутся мотор и сам вход. Вход
+    лежит в хозяйстве, а не здесь, потому что он общий с окном: удавшийся вход
+    поднимает бота, а бот рождается и умирает вместе с окном.
 
-    Подмешивающий обязан держать `_dispatch` и `_login`. Сам `_login` у двоих
-    разный, и разница за пределами входа: у мастера это чистый `TelegramLogin`,
-    у основного окна — `TelegramLogin` с `on_saved`, который после удачного
-    входа запоминает ник и поднимает бота. Шаги входа об этом не знают.
+    Тела шагов объявлены рядом, а не в этих методах: те же три шага есть у
+    мастера первого запуска, и до слайса А2.9 он отвечает сигналом. Общее у
+    двоих — разбор нагрузки, заслоны и слова отказа; своё — только конверт, в
+    котором исход уезжает окну.
     """
 
-    telegram_send_code_done = Signal(str)
-    telegram_confirm_code_done = Signal(str)
-    telegram_confirm_password_done = Signal(str)
-
-    @Slot(str)
-    def telegram_send_code(self, payload_json: str) -> None:
+    def send_code(self, payload: dict) -> dict:
+        """Первый шаг: попросить Telegram прислать код на номер."""
         try:
-            payload = json.loads(payload_json)
-            api_id = int(payload["api_id"])
-            api_hash = str(payload["api_hash"]).strip()
-            phone = str(payload["phone"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("telegram_send_code", e)
-            self.telegram_send_code_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        self._dispatch(
-            self.telegram_send_code_done,
-            _login_json(self._login.send_code(api_id, api_hash, phone)),
+            api_id, api_hash, phone = read_credentials(payload)
+        # `AttributeError` и `TypeError` — про не-объект в нагрузке: читают её
+        # ключами, и спотыкается разбор до мотора, мимо конверта.
+        except (AttributeError, KeyError, TypeError, ValueError) as e:
+            return bad_fields("send_code", e)
+
+        return reply(
+            self._hub.runner,
+            step_payload(self._hub.login.send_code(api_id, api_hash, phone)),
         )
 
-    @Slot(str)
-    def telegram_confirm_code(self, payload_json: str) -> None:
+    def confirm_code(self, payload: dict) -> dict:
+        """Второй шаг: отдать Telegram код из сообщения."""
         try:
-            code = str(json.loads(payload_json)["code"]).strip()
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("telegram_confirm_code", e)
-            self.telegram_confirm_code_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        if not self._login.awaiting_code:
-            self.telegram_confirm_code_done.emit(
-                _err("Сначала запросите код подтверждения.")
-            )
-            return
-        self._dispatch(
-            self.telegram_confirm_code_done,
-            _login_json(self._login.confirm_code(code)),
+            code = read_code(payload)
+        except (AttributeError, KeyError, TypeError, ValueError) as e:
+            return bad_fields("confirm_code", e)
+
+        return reply(
+            self._hub.runner, step_payload(code_step(self._hub.login, code))
         )
 
-    @Slot(str)
-    def telegram_confirm_password(self, payload_json: str) -> None:
+    def confirm_password(self, payload: dict) -> dict:
+        """Третий шаг, если Telegram спросил: облачный пароль."""
         try:
-            password = str(json.loads(payload_json)["password"])
-        except (KeyError, ValueError, TypeError) as e:
-            _log_invalid_payload("telegram_confirm_password", e)
-            self.telegram_confirm_password_done.emit(_err(f"Неверные поля: {e}"))
-            return
-        if not self._login.awaiting_password:
-            self.telegram_confirm_password_done.emit(
-                _err("Сначала пройдите шаг с кодом подтверждения.")
-            )
-            return
-        self._dispatch(
-            self.telegram_confirm_password_done,
-            _login_json(self._login.confirm_password(password)),
+            password = read_password(payload)
+        except (AttributeError, KeyError, TypeError, ValueError) as e:
+            return bad_fields("confirm_password", e)
+
+        return reply(
+            self._hub.runner, step_payload(password_step(self._hub.login, password))
         )

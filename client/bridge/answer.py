@@ -73,6 +73,17 @@ def bad_fields(where: str, error: Exception, **extra: Any) -> dict:
     return {"fail": "fields", "detail": f"Неверные поля: {error}", **extra}
 
 
+def bad_fields_json(where: str, error: Exception) -> str:
+    """То же, что `bad_fields`, но строкой: сигнальная дорога везёт JSON.
+
+    Уйдёт вместе с ней, слайсом А2.9. Пока живёт здесь, а не у мастера: слова
+    отказа у двух дорог обязаны совпадать, а написанные порознь они разъедутся
+    первой же правкой.
+    """
+    _log_invalid_payload(where, error)
+    return _err(f"Неверные поля: {error}")
+
+
 def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict:
     """Сделать работу на моторе и вернуть её исход зовущему одним конвертом.
 
