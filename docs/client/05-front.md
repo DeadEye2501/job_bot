@@ -1040,6 +1040,37 @@ Qt цел до слияния.
       заново; отказ `hr.mark_read` при неподнятом боте покажет красную плашку,
       о которой человек не просил.
 - [ ] **Б8. Вакансии: список, отбор, календарь** (~1500).
+
+      **Разведка домена, чтобы следующий заход не тратил на неё время.**
+      Поверхность `vacancies` собрана тремя примесями: сам список и карточка
+      (`vacancies.py`: `list`, `detail`, `save_notes`,
+      `save_history_explanation`, `change_status`), действия
+      (`vacancy_actions.py`: `rerun`, `send_application`, `delete`) и связи
+      (`vacancy_links.py`: `hr_picker`, `company_picker`, `link_hr`,
+      `link_company`, `create_hr`, `create_company`) — четырнадцать методов.
+      Подборщики те же, что у слияния, но вторая их порода — `link_picker` из
+      `pickers.py`: выбор там ведёт не к подтверждению, а к привязке, поэтому
+      `MergePicker` из Б7 им не годится, а `SearchList` — годится.
+
+      **`list` берёт отбор одной пачкой** (`vacancy_filter.read_vacancy_filter`
+      → `backend/payloads.VacancyFilter`), шестнадцать полей: `sort`, `search`,
+      `statuses`, `channels`, `companies`, `score_min`/`score_max`,
+      `salary_min`/`salary_max`, `grade`, `remote`, `hr_contact`
+      (`with`/`without`), `date_from`/`date_to` плюс страница. Пустой список
+      значит «не отбирали», а не «отобрали пустым». Порядков шесть, и считает
+      их база: `newest`, `oldest`, `score_desc`, `score_asc`,
+      `status_active_first`, `status_new_first`.
+
+      В ответе, кроме строк: `filter_options` — все каналы и компании, какие
+      вообще встречаются (собраны мимо самого отбора, иначе меню сжималось бы
+      до выдачи), `has_more`, эхо страницы и `score_threshold`. Строка списка —
+      `wire._vacancy_list_row_to_dict`, и у каждого пункта стека стоит
+      `matched`: навыки анкеты мост сверяет сам, спрашивать их отдельно не
+      надо.
+
+      **Календарь отдельным методом в мосте не стоит:** он рисуется из тех же
+      строк по метке активности (`last_activity_at`), по ней же идут
+      `date_from`/`date_to` и порядок.
 - [ ] **Б9. Вакансии: карточка и действия** (~1460). **Вакансии — единственное,
       что разделено:** 2962 строки в один дифф не читаются.
 - [ ] **Б10. Мастер первого запуска** (1225) — восемь шагов, второе окно.
