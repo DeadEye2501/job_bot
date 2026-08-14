@@ -123,7 +123,7 @@ def main() -> int:
     from backend import bootstrap
     from backend.crypto import _check_keyring_backend
     from backend.single_instance import hold_the_only_copy
-    from client.shell import run_ui
+    from client.window import run_ui
 
     # Замок берётся первым и держится до самого конца: живёт он, пока жив
     # дескриптор. Две копии над одним каталогом данных делят файл журнала — а
@@ -146,7 +146,7 @@ def main() -> int:
         # Fail-fast если keyring-бэкенд небезопасный (PlaintextKeyring) или
         # сломан (fail.Keyring) — иначе secrets улетят в открытом виде на
         # диск или потеряются после первого старта. Друже сообщение в stderr
-        # вместо raw traceback'а — Qt UI ещё не поднят, диалог показать
+        # вместо raw traceback'а — окно ещё не поднято, диалог показать
         # негде, но юзер хотя бы поймёт причину выхода вместо «упало непонятно».
         try:
             _check_keyring_backend()
@@ -154,8 +154,9 @@ def main() -> int:
             logger.critical("keyring pre-flight failed: %s", e)
             print(f"\n[Job Bot] Не удалось запуститься: {e}\n", file=sys.stderr)
             return 2
-        # Schema must be ensured BEFORE the Qt event loop starts because alembic
-        # spins its own asyncio.run inside.
+        # Схема доводится до порядка ДО того, как поднимется окно: alembic
+        # крутит внутри себя свой asyncio.run, и делать это под живым циклом
+        # окна нельзя.
         bootstrap.ensure_schema()
         return run_ui()
 

@@ -78,7 +78,7 @@ def entry(clean_root_logger, lock_of_its_own, monkeypatch):
     )
     monkeypatch.setattr("backend.bootstrap.ensure_schema", ensure_schema)
     monkeypatch.setitem(
-        sys.modules, "client.shell", type("Shell", (), {"run_ui": staticmethod(run_ui)})
+        sys.modules, "client.window", type("Window", (), {"run_ui": staticmethod(run_ui)})
     )
     yield module, order
     sys.excepthook, threading.excepthook = hooks
@@ -180,8 +180,8 @@ def test_the_window_return_code_is_passed_through(entry, monkeypatch):
     module, _ = entry
     monkeypatch.setitem(
         sys.modules,
-        "client.shell",
-        type("Shell", (), {"run_ui": staticmethod(lambda: 3)}),
+        "client.window",
+        type("Window", (), {"run_ui": staticmethod(lambda: 3)}),
     )
 
     assert module.main() == 3

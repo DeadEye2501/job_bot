@@ -2,11 +2,11 @@
 
 Десктоп-приложение, которое автоматизирует поиск работы в Telegram-каналах. Бот опрашивает выбранные каналы, парсит вакансии через LLM, сравнивает их с вашим резюме по эмбеддингам, и отправляет HR-ам отклики через ваш собственный Telegram-аккаунт.
 
-Всё локально: PySide6-окно, SQLite, Pyrogram-сессия. Облако не требуется — LLM можно подключить локальный (LM Studio, Ollama) или внешний по OpenAI-совместимому API.
+Всё локально: окно pywebview, SQLite, Pyrogram-сессия. Облако не требуется — LLM можно подключить локальный (LM Studio, Ollama) или внешний по OpenAI-совместимому API.
 
 ## Стек
 
-- **UI** — PySide6 + QWebEngineView, фронт на чистом HTML/JS (`client/web/main.html`, `wizard.html`).
+- **UI** — pywebview поверх системного WebView2; фронт переезжает на Svelte, разметка на чистом HTML/JS пока жива (`client/web/main.html`, `wizard.html`).
 - **Bridge** — `client/bridge.py`, два QObject (`WizardApi` для онбординга, `MainApi` для основного режима), общаются с JS через QWebChannel.
 - **Бот** — `backend/bot/`, Pyrogram-клиент в фоновом asyncio-loop, цикл опроса каналов в `backend/flows/`.
 - **БД** — SQLite через async SQLAlchemy + Alembic-миграции. Креды (api_hash, password, session_string) шифруются через `cryptography` Fernet, ключ хранится в OS keyring.
@@ -100,7 +100,8 @@ adapters/
   db.py               # фабрика SQLAlchemy-engine
 
 client/
-  shell.py            # точка входа Qt; QApplication + QMainWindow + QWebChannel
+  window.py           # окно pywebview: подъём хозяйства моста и его гашение
+  serving.py          # раздача собранного фронта окну по http
   bridge.py           # WizardApi + MainApi (все @Slot и Signal'ы для JS)
   web/
     main.html         # основное приложение (4 секции + Система)
@@ -123,7 +124,7 @@ config.py             # пути к user-data-dir
 
 - Python 3.13+
 - `pyrogram` + `tgcrypto`
-- `pyside6` (Qt 6.x)
+- `pywebview` (системный WebView2)
 - `sqlalchemy` (async) + `aiosqlite` + `alembic`
 - `httpx`, `cryptography`, `keyring`, `numpy`
 
