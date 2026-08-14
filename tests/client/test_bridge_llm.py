@@ -97,7 +97,7 @@ async def test_a_silent_provider_is_told_apart_from_a_working_one(
 
 
 async def test_a_probe_answers_about_the_model_it_was_asked_about(
-    main_api, watch, provider_says
+    api, ask, provider_says
 ):
     """Проверка возвращает имя модели, которую проверяла.
 
@@ -105,7 +105,6 @@ async def test_a_probe_answers_about_the_model_it_was_asked_about(
     Без эха имени ответ о работающей модели лёг бы рядом с только что
     введённым другим именем, и человек сохранил бы непроверенное.
     """
-    caught = watch(main_api.llm_probe_done)
     provider_says(
         {
             MODELS: models_response("qwen"),
@@ -118,70 +117,60 @@ async def test_a_probe_answers_about_the_model_it_was_asked_about(
         }
     )
 
-    main_api.request_llm_probe(
-        json.dumps(
-            {"kind": "chat", "base_url": "http://provider.test", "model": "qwen"}
-        )
+    answer = await ask(
+        api.settings.probe_model,
+        {"kind": "chat", "base_url": "http://provider.test", "model": "qwen"},
     )
 
-    answer = await caught.next()
-    assert answer["ok"] is True
-    assert answer["model"] == "qwen"
+    assert answer["ok"]["model"] == "qwen"
 
 
-async def test_a_probe_of_an_unknown_kind_is_refused_by_kind(main_api, watch):
+async def test_a_probe_of_an_unknown_kind_is_refused_by_kind(api, ask):
     """Отказ проверки возвращается вместе с родом, который проверяли.
 
-    Проверок на экране две — чат и векторы, — и обе отвечают одним сигналом.
-    Без рода окно не поймёт, у какой из двух показывать ошибку.
+    Проверок на экране две — чат и векторы, — и без рода окно не поймёт, у
+    какой из двух показывать ошибку.
     """
-    caught = watch(main_api.llm_probe_done)
-
-    main_api.request_llm_probe(
-        json.dumps({"kind": "выдумка", "base_url": "http://provider.test", "model": "q"})
+    answer = await ask(
+        api.settings.probe_model,
+        {"kind": "выдумка", "base_url": "http://provider.test", "model": "q"},
     )
 
-    answer = await caught.next()
-    assert answer["ok"] is False
+    assert answer["fail"] == "fields"
     assert answer["kind"] == "выдумка"
 
 
-async def test_a_broken_listing_answers_instead_of_raising(
-    main_api, watch, provider_says
-):
+async def test_a_broken_listing_answers_instead_of_raising(api, ask, provider_says):
     """Недоступный провайдер не роняет запрос списка, а отвечает отказом.
 
     Список моделей просят при каждом открытии настроек, в том числе когда
     провайдер ещё не запущен. Поднимись тут исключение — экран настроек не
     открывался бы вовсе.
     """
-    caught = watch(main_api.llm_models_listed)
     provider_says({MODELS: httpx.ConnectError("соединение отклонено")})
 
-    main_api.request_llm_models(
-        json.dumps({"kind": "chat", "base_url": "http://provider.test"})
+    answer = await ask(
+        api.settings.list_models,
+        {"kind": "chat", "base_url": "http://provider.test"},
     )
 
-    answer = await caught.next()
-    assert answer["ok"] is False
+    assert answer["fail"] == "denied"
     assert answer["kind"] == "chat"
 
 
-async def test_a_listing_without_an_address_stays_silent(main_api, watch):
-    """Запрос списка без адреса остаётся без ответа вовсе.
+async def test_a_listing_without_an_address_answers_with_nothing(api, ask):
+    """Запрос списка без адреса отвечает пустым перечнем, а не отказом.
 
     Поле адреса пусто, пока человек его не ввёл, а запрос уходит на каждое
     нажатие клавиши. Отвечай мост отказом — экран настроек мигал бы ошибкой
     на каждой букве.
     """
-    caught = watch(main_api.llm_models_listed)
+    answer = await ask(api.settings.list_models, {"kind": "chat", "base_url": ""})
 
-    main_api.request_llm_models(json.dumps({"kind": "chat", "base_url": ""}))
-
-    assert await caught.silent()
+    assert answer["ok"]["models"] == []
 
 
-async def test_a_saved_model_reaches_the_settings(wizard_api, main_api, watch):
+async def test_a_saved_model_reaches_the_settings(wizard_api, watch, api, ask):
     """Сохранённое мастером видно на экране настроек.
 
     Мастер и основное окно — разные объекты моста, и общее у них только
@@ -189,7 +178,6 @@ async def test_a_saved_model_reaches_the_settings(wizard_api, main_api, watch):
     поля модели в настройках.
     """
     saved = watch(wizard_api.chat_save_done)
-    shown = watch(main_api.system_settings_loaded)
 
     wizard_api.chat_save(
         json.dumps(
@@ -198,8 +186,8 @@ async def test_a_saved_model_reaches_the_settings(wizard_api, main_api, watch):
     )
     assert (await saved.next())["ok"] is True
 
-    main_api.request_system_settings()
-    assert (await shown.next())["chat"]["model"] == "qwen"
+    answer = await ask(api.settings.get)
+    assert answer["ok"]["chat"]["model"] == "qwen"
 
 
 async def test_a_listed_but_silent_model_lights_the_lamp_red(
@@ -342,3 +330,22 @@ async def test_a_slow_provider_is_not_asked_twice_at_once(
     main_api.request_initial()
 
     assert (await caught.next())["chat"] is False
+
+
+async def test_a_bad_address_is_refused_with_its_kind(api, ask):
+    """Негодный адрес поставщика возвращается отказом со своим родом.
+
+    Проверок на экране две, и род — единственное, чем окно их различает: без
+    него ожидание погаснет не у той. Адрес человек набирает руками, и порт из
+    букв — обычная опечатка, а не поломка приложения.
+
+    Красной фазы у этого сторожа не было: он дописан по находке ревью вместе с
+    правкой, и доверие заслужит итоговым проходом.
+    """
+    answer = await ask(
+        api.settings.probe_model,
+        {"kind": "chat", "base_url": "http://localhost:12ab", "model": "qwen"},
+    )
+
+    assert answer["fail"] == "denied"
+    assert answer["kind"] == "chat"

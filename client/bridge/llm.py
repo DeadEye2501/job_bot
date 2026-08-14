@@ -9,12 +9,10 @@ from functools import partial
 from typing import Any, Callable
 
 import httpx
-from PySide6.QtCore import Signal, Slot
 
 from adapters import lm_studio
 from adapters.lm_studio import LlmProviderConfig
-from client.bridge.answer import _err, _ok
-from client.bridge.payload import _log_invalid_payload
+from client.bridge.answer import Denied, bad_fields, reply
 from client.bridge.refusals import LLM_FIELDS_REQUIRED
 
 
@@ -54,7 +52,15 @@ async def _do_llm_probe(
     `client.aclose()` гарантирован через finally — иначе при cancellation
     httpx-сокет утекает.
     """
-    client = lm_studio.make_client(cfg)
+    try:
+        client = lm_studio.make_client(cfg)
+    except Exception as e:
+        # Сборка клиента спотыкается о негодный адрес — `http://localhost:12ab`
+        # человек набирает легко. Отвечаем исходом, а не броском: у поломки в
+        # конверте нет рода, а без рода окно не знает, у которой из двух
+        # проверок гасить ожидание.
+        logger.exception("не собрался клиент поставщика: %s", cfg.base_url)
+        return False, f"Неверный адрес поставщика: {e}", [], 0
     t0 = time.monotonic()
     try:
         ok, detail = await check_fn(client, cfg.model)
@@ -97,6 +103,20 @@ def read_llm_creds(payload: dict) -> LlmProviderConfig:
     return LlmProviderConfig(base_url=base_url, api_key=api_key, model=model)
 
 
+def read_models_ask(payload) -> tuple[str, str, str]:
+    """О чём спрашивают поставщика: род, адрес и ключ.
+
+    Читается одним правилом на два окна: имена моделей спрашивают и мастер, и
+    настройки, и спрашивают одно и то же.
+    """
+    payload = payload if isinstance(payload, dict) else {}
+    return (
+        str(payload.get("kind") or ""),
+        str(payload.get("base_url") or "").strip().rstrip("/"),
+        str(payload.get("api_key") or ""),
+    )
+
+
 def models_coro(payload_json: str):
     """Корутина ответа «какие модели у поставщика есть», или пусто.
 
@@ -104,17 +124,15 @@ def models_coro(payload_json: str):
     этом случае не отвечают вовсе, потому что оно спрашивает на каждый
     набранный знак адреса.
 
-    Одна на два окна: мастер и настройки спрашивают одно и то же и отдают
-    ответ каждый в свой сигнал — имена сигналов знает разметка, и сводить их
-    этому этапу нельзя.
+    Осталась мастеру первого запуска: он отвечает сигналом до слайса А2.9, а
+    экран настроек уже отвечает возвратом, и общее у них — сам поход к
+    поставщику, объявленный выше.
     """
     try:
         payload = json.loads(payload_json) if payload_json else {}
-        kind = str(payload.get("kind") or "")
-        base_url = str(payload.get("base_url") or "").strip().rstrip("/")
-        api_key = str(payload.get("api_key") or "")
-    except (AttributeError, ValueError, TypeError):
+    except (ValueError, TypeError):
         return None
+    kind, base_url, api_key = read_models_ask(payload)
     if not base_url or kind not in ("chat", "embed"):
         return None
 
@@ -125,61 +143,64 @@ def models_coro(payload_json: str):
     return run()
 
 
-class LlmSlots:
+class Llm:
     """Проверка модели и опрос её имён по просьбе окна.
 
     Проверяют они не сохранённые настройки, а присланные окном черновые —
-    человек должен увидеть исход до записи. Подмешивающий обязан держать
-    `_dispatch`.
+    человек должен увидеть исход до записи. Собирающий обязан держать `_hub`:
+    оттуда берётся мотор.
     """
 
-    llm_probe_done = Signal(str)
-    llm_models_listed = Signal(str)
+    def probe_model(self, payload: dict) -> dict:
+        """Проверка связи с поставщиком: перечень имён и однословный вопрос.
 
-    @Slot(str)
-    def request_llm_probe(self, payload_json: str) -> None:
-        """Connectivity check for an LLM provider (chat / embed).
+        Нагрузка: `{kind: 'chat'|'embed', base_url, api_key, model}` —
+        черновая, из формы, а не сохранённая: человек должен узнать исход до
+        записи. Мерится время всей проверки, вместе с перечнем имён.
 
-        Payload: ``{kind: 'chat'|'embed', base_url, api_key, model}``.
-        Использует draft-значения из UI, не текущий rs — чтобы юзер мог
-        проверить новые настройки до сохранения. Замеряем latency полного
-        check'а (list_models + 1-token ping).
+        Род уезжает обратно в каждом ответе, включая отказы: проверок на экране
+        две, и без рода окно не знает, у которой из них показывать исход.
         """
-        # Init defaults ДО try, чтобы все error-ветки могли echo'нуть kind
-        # обратно — JS использует его для роутинга в нужный *Probe-state.
         kind = ""
         try:
-            payload = json.loads(payload_json) if payload_json else {}
+            payload = payload if isinstance(payload, dict) else {}
             kind = str(payload.get("kind", "")).strip()
             if kind not in ("chat", "embed"):
-                raise ValueError(f"bad kind: {kind!r}")
+                raise ValueError(f"неизвестный род: {kind!r}")
             cfg = read_llm_creds(payload)
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("request_llm_probe", e)
-            self.llm_probe_done.emit(_err(f"Неверные поля: {e}", kind=kind))
-            return
+        except (AttributeError, TypeError, ValueError) as e:
+            return bad_fields("probe_model", e, kind=kind)
 
         check_fn = partial(lm_studio.check_model, kind=kind)
 
-        async def run() -> str:
-            try:
-                ok, detail, _models, latency_ms = await _do_llm_probe(cfg, check_fn)
-            except Exception as e:
-                logger.exception("llm probe failed")
-                return _err(f"{type(e).__name__}: {e}", kind=kind)
+        async def run() -> dict:
+            ok, detail, _models, latency_ms = await _do_llm_probe(cfg, check_fn)
             if not ok:
-                return _err(detail, kind=kind)
-            return _ok({"kind": kind, "model": cfg.model, "latency_ms": latency_ms})
+                raise Denied(detail, kind=kind)
+            return {"kind": kind, "model": cfg.model, "latency_ms": latency_ms}
 
-        self._dispatch(self.llm_probe_done, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def request_llm_models(self, payload_json: str) -> None:
-        """Background-fetch списка моделей — UI наполняет datalist для
-        автокомплита поля «Модель». Под LM Studio предпочтительно
-        ``/api/v0/models`` с фильтром по type/state (см. lm_studio.list_models),
-        фолбэк на OpenAI-совместимый ``/v1/models``. Best-effort, ошибки в
-        payload."""
-        coro = models_coro(payload_json)
-        if coro is not None:
-            self._dispatch(self.llm_models_listed, coro)
+    def list_models(self, payload: dict) -> dict:
+        """Имена моделей у поставщика — окно подсказывает ими поле «Модель».
+
+        Под LM Studio спрашивается `/api/v0/models` с отбором по роду и
+        состоянию, с откатом на `/v1/models` (см. `lm_studio.list_models`):
+        в подсказке должны стоять только поднятые модели подходящего рода,
+        иначе первая же проба тихо подгрузит выгруженную.
+
+        Недописанный адрес и незнакомый род — не отказ, а пустой перечень:
+        спрашивают на каждый набранный знак, и плашка отказа мигала бы на
+        каждой букве.
+        """
+        kind, base_url, api_key = read_models_ask(payload)
+
+        async def run() -> dict:
+            if not base_url or kind not in ("chat", "embed"):
+                return {"kind": kind, "models": []}
+            answer = await _do_list_models_for_creds(base_url, api_key, kind=kind)
+            if not answer["ok"]:
+                raise Denied(answer["error"], kind=kind)
+            return {"kind": kind, "models": answer["models"]}
+
+        return reply(self._hub.runner, run())

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-from concurrent.futures import CancelledError, Future
+from concurrent.futures import Future
 from typing import Any, Coroutine
 
 from PySide6.QtCore import QObject, QTimer, Signal
@@ -21,10 +20,7 @@ from client.bridge.answer import _dispatch_json, _ok
 from client.bridge.desktop import DesktopSlots
 from client.bridge.hub import Hub
 from client.bridge.journal import JournalSlots
-from client.bridge.llm import LlmSlots
-from client.bridge.login import TelegramLoginSlots
 from client.bridge.runner import AsyncRunner
-from client.bridge.settings import SettingsSlots
 from client.bridge.state import (
     _HEALTHCHECK_INTERVAL_MS,
     _UNREAD_INTERVAL_MS,
@@ -51,9 +47,7 @@ _CLOSING_WAIT_S = 5.0
 
 
 class MainApi(
-    DesktopSlots, JournalSlots, LlmSlots,
-    SettingsSlots,
-    TelegramLoginSlots,
+    DesktopSlots, JournalSlots,
     WindowStateSlots, WipeSlots,
     QObject,
 ):
@@ -88,7 +82,7 @@ class MainApi(
         self._parent_widget = parent_widget
         self._engine = engine  # для dispose() в delete_all_data
         self._hub = Hub(runner, session_factory, rs)
-        self._bot_task: Future | None = None
+        self._bot_task = None
 
         self._health_timer = QTimer(self)
         self._health_timer.timeout.connect(self._kick_health)
@@ -98,24 +92,14 @@ class MainApi(
         self._unread_timer.timeout.connect(self._kick_unread)
         self._unread_timer.start(_UNREAD_INTERVAL_MS)
 
-        # Hook log-buffer → Qt signal: each new LogRecord pushed (debounce
-        # is on the JS side via existing patterns). Emit must be JSON-string
-        # for Signal(str), so serialize the entry inline. Push gated на
-        # `_logs_subscribed` flag — ставится из JS при заходе на logs-tab,
-        # снимается при уходе/выключении auto-refresh, чтобы не сжигать
-        # JSON-сериализацию + cross-thread dispatch на чужих экранах.
-        # Вход через экран «Настройки» держит свой временный клиент —
-        # отдельный от `self._bot._client`, который стартует позже. Имя
-        # сессии тоже своё: под общим они делили бы один файл.
-        self._login = TelegramLogin(
+        # Вход кладётся в хозяйство, как до него бот: заводит его окно, а
+        # спрашивает переехавший домен настроек.
+        #
+        # Клиент у него свой, временный — отдельный от того, что поднимает бот
+        # позже. Имя сеанса тоже своё: под общим они делили бы один файл.
+        self._hub.login = TelegramLogin(
             "job_bot_relogin", rs, on_saved=self._after_login_saved
         )
-        # Кэш TG-username: бот стартует медленно (Pyrogram session-load
-        # + connect — секунды), а UI запрашивает settings сразу после
-        # логина или открытия таба. Кэш заполняется при успешном get_me()
-        # (или сразу после re-login) и переживает несколько запросов
-        # пока bot._client не поднимется.
-        self._username_cache: str = ""
         # Лампочка спрашивает модели реже, чем базу и Telegram: вопрос к
         # модели — настоящая генерация, см. `_MODEL_PROBE_INTERVAL_S`.
         self._models_probed_at: float = float("-inf")
@@ -125,6 +109,12 @@ class MainApi(
         # Когда журнал спрашивали в прошлый раз — заслон от частых обращений
         # (`journal._LOGS_REQUEST_INTERVAL_S`).
         self._logs_request_last_ts: float = float("-inf")
+        # Hook log-buffer → Qt signal: each new LogRecord pushed (debounce
+        # is on the JS side via existing patterns). Emit must be JSON-string
+        # for Signal(str), so serialize the entry inline. Push gated на
+        # `_logs_subscribed` flag — ставится из JS при заходе на logs-tab,
+        # снимается при уходе/выключении auto-refresh, чтобы не сжигать
+        # JSON-сериализацию + cross-thread dispatch на чужих экранах.
         from backend.log_buffer import get_handler
         # Recursion-guard: если внутри _on_record логнуть warning, тот warning
         # снова попадёт в LogBufferHandler.emit → on_record → бесконечная
@@ -168,6 +158,20 @@ class MainApi(
     @_bot.setter
     def _bot(self, bot) -> None:
         self._hub.bot = bot
+
+    @property
+    def _bot_task(self) -> Future | None:
+        """Работа бота лежит там же, где он сам, и по той же причине.
+
+        Останавливают его три дороги, и одна из них — выход из учётной записи —
+        уже переехала в домен настроек. Разъедься эти две ссылки, выход дождался
+        бы не той работы, а то и вовсе никакой.
+        """
+        return self._hub.bot_task
+
+    @_bot_task.setter
+    def _bot_task(self, task: Future | None) -> None:
+        self._hub.bot_task = task
 
     def _start_bot(self) -> None:
         """Construct AND run the Bot inside the runner loop.
@@ -264,22 +268,6 @@ class MainApi(
             except Exception:
                 logger.exception("MainApi cleanup: bot stop raised on shutdown")
 
-    def _dispatch_noop(self, coro: Coroutine[Any, Any, Any]) -> None:
-        """Fire-and-forget: запускаем корутину на runner'е, ошибки в лог.
-        Сигнал обратно не нужен — UI закрывает модалку оптимистично.
-        """
-        future = self._runner.submit(coro)
-
-        def _on_done(f: Future) -> None:
-            try:
-                f.result()
-            except (CancelledError, asyncio.CancelledError):
-                pass
-            except Exception:
-                logger.warning("noop dispatch failed", exc_info=True)
-
-        future.add_done_callback(_on_done)
-
     def _after_login_saved(self, username: str | None) -> None:
         """Новая сессия сохранена: запомнить ник и поднять бота, если он лежит.
 
@@ -287,7 +275,7 @@ class MainApi(
         старый вернее, чем стереть его до первого удачного `get_me` у бота.
         """
         if username is not None:
-            self._username_cache = username
+            self._hub.username_cache = username
         if self._bot is None:
             self._start_bot()
 

@@ -3,220 +3,243 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 
-from PySide6.QtCore import Signal, Slot
-
-from backend.telegram_login import username_of
 from adapters.lm_studio import LlmProviderConfig
-from client.bridge.answer import _err, _ok
+from backend.telegram_login import username_of
+from client.bridge.answer import denied, reply
 from client.bridge.bot_stop import stop_bot
-from client.bridge.llm import read_llm_creds
-from client.bridge.payload import _log_invalid_payload
+from client.bridge.llm import Llm, read_llm_creds
+from client.bridge.login import Login
 from client.bridge.wire import _llm_provider_to_dict
 
 
 logger = logging.getLogger(__name__)
 
+_CONNECT_TRIES = 15
+_CONNECT_STEP_S = 0.2
+"""Сколько ждать соединения бота, прежде чем спрашивать у него ник.
 
-class SettingsSlots:
+На холодном старте Pyrogram читает сеанс и соединяется пару секунд, а экран
+настроек спрашивают раньше. Три секунды — заведомо больше обычного соединения и
+заведомо меньше того, за что человек считает экран повисшим.
+"""
+
+APP_KEYS = (
+    "scoring_threshold",
+    "poll_interval_sec",
+    "backfill_limit",
+    "dm_backfill_limit",
+    "send_locked",
+)
+"""Что окну позволено писать в настройки приложения.
+
+Перечнем, а не как придётся: опечатка в имени легла бы в настройки своим
+ключом и осталась бы там навсегда, никем не читаемая.
+"""
+
+
+class Settings(Login, Llm):
     """Настройки времени выполнения, какими их правит окно.
 
-    Подмешивающий обязан держать `_rs`, `_bot`, `_bot_task`, `_login`,
-    `_username_cache`, `_dispatch` и `_dispatch_noop`.
+    Разрезано на три файла по ответственности: сами настройки здесь, вход в
+    Telegram и разговор с поставщиком модели — у примесей рядом. Поверхность у
+    них при этом одна: окно видит один экран настроек, а не три, и примесь
+    здесь — способ разложить этот экран по файлам, а не задел под вторую
+    реализацию.
 
-    SECURITY: `request_system_settings` отдаёт во фронт ключи доступа к
-    моделям и `api_hash` Telegram как есть — окно умеет показать их по
-    нажатию, а канал живёт только внутри приложения и в сеть не выходит.
+    Секреты: снимок настроек отдаёт ключи доступа к моделям и `api_hash`
+    Telegram как есть — окно умеет показать их по нажатию, а живёт оно своим
+    окном и в сеть не выходит.
     """
 
-    system_settings_loaded = Signal(str)
-    settings_save_done = Signal(str)
-    system_telegram_logout_done = Signal(str)
+    def __init__(self, hub) -> None:
+        self._hub = hub
 
-    @Slot()
-    def request_system_settings(self) -> None:
-        """Snapshot of current runtime settings for the Settings screen.
+    def get(self) -> dict:
+        """Снимок настроек: учётная запись Telegram, обе модели, пороги отбора.
 
-        api_hash отправляем — eye-toggle в UI должен уметь показать значение.
-        QWebChannel живёт только в локальном Qt-окне, не уезжает в сеть.
+        Ник вошедшего спрашивается у Telegram, а не берётся из настроек: там
+        его нет вовсе, он живёт у самой учётной записи.
         """
-        tg = self._rs.tg
-        chat = self._rs.chat
-        embed = self._rs.embed
-        bot = self._bot
 
-        async def run() -> str:
-            client = getattr(bot, "_client", None) if bot is not None else None
-            # На холодном старте Pyrogram session-load + connect занимает
-            # пару секунд; UI запросит settings раньше. Ждём короткий
-            # connect-window (до 3 сек).
-            if client is not None and not getattr(client, "is_connected", False):
-                for _ in range(15):
-                    await asyncio.sleep(0.2)
-                    if getattr(client, "is_connected", False):
-                        break
-            asked = None
-            connected = client is not None and getattr(client, "is_connected", False)
-            if connected:
-                asked = await username_of(client)
-                if asked is None:
-                    logger.warning("get_me() failed for settings", exc_info=True)
-            if asked is None:
-                # Спросить не вышло или бот ещё не подключился — отдаём кэш.
-                username = self._username_cache
-            else:
-                # Пустая строка — это ответ «ника нет», и он перебивает кэш:
-                # снятый ник иначе остался бы на экране прежним.
-                username = asked
-                self._username_cache = asked
-            return _ok({
+        async def run() -> dict:
+            rs = self._hub.rs
+            tg = rs.tg
+            return {
                 "tg": {
                     "api_id": str(tg.api_id) if tg else "",
                     "api_hash": tg.api_hash if tg else "",
                     "phone": tg.phone if tg else "",
                     "has_password": bool(tg and tg.password),
                     "has_session": bool(tg and tg.session_string),
-                    "username": username,
+                    "username": await self._username(),
                 },
-                "chat": _llm_provider_to_dict(chat),
-                "embed": _llm_provider_to_dict(embed),
+                "chat": _llm_provider_to_dict(rs.chat),
+                "embed": _llm_provider_to_dict(rs.embed),
                 "pipeline": {
-                    "scoring_threshold": self._rs.scoring_threshold,
-                    "poll_interval_sec": self._rs.poll_interval_sec,
-                    "backfill_limit": self._rs.backfill_limit,
-                    "dm_backfill_limit": self._rs.dm_backfill_limit,
-                    "send_locked": self._rs.send_locked,
+                    "scoring_threshold": rs.scoring_threshold,
+                    "poll_interval_sec": rs.poll_interval_sec,
+                    "backfill_limit": rs.backfill_limit,
+                    "dm_backfill_limit": rs.dm_backfill_limit,
+                    "send_locked": rs.send_locked,
                 },
-            })
+            }
 
-        self._dispatch(self.system_settings_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(str)
-    def save_settings(self, payload_json: str) -> None:
-        """Apply a partial settings patch — autosave из UI на blur/change.
+    def save(self, payload: dict | None = None) -> dict:
+        """Записать присланную часть настроек: поставщиков и пороги отбора.
 
-        Payload — словарь с любыми из ключей:
-        - chat: {base_url, api_key, model}
-        - embed: {base_url, api_key, model}
-        - app: {scoring_threshold, poll_interval_sec, backfill_limit,
-          dm_backfill_limit, ...}
-        Применяем через rs.set_chat / rs.set_embed / rs.set_app. Ошибки
-        возвращаем в payload, UI показывает toast.
+        Нагрузка — словарь с любыми из ключей `chat`, `embed` и `app`;
+        пропущенный значит «не трогать». Ответ называет применённое поимённо —
+        нынешний экран этот перечень выбрасывает и читает только исход, но
+        экран пишется заново (Б2), и различить «записали поставщика» от
+        «записали пороги» будет нечем, кроме него.
         """
+        # Не-объект сводится к пустоте, а не роняет разбор: спотыкался бы он до
+        # мотора, мимо конверта, прямо в канал.
+        payload = payload if isinstance(payload, dict) else {}
         try:
-            payload = json.loads(payload_json) if payload_json else {}
-        except (ValueError, TypeError) as e:
-            _log_invalid_payload("save_settings", e)
-            self.settings_save_done.emit(_err(f"Неверные поля: {e}"))
-            return
+            creds = _read_providers(payload)
+        except ValueError as e:
+            return denied(str(e))
 
-        chat = payload.get("chat") if isinstance(payload.get("chat"), dict) else None
-        embed = payload.get("embed") if isinstance(payload.get("embed"), dict) else None
-        app = payload.get("app") if isinstance(payload.get("app"), dict) else None
+        app = payload.get("app")
+        app = app if isinstance(app, dict) else None
 
-        # Читаем до записи и тем же правилом, что проба и мастер: пустое поле
-        # почти всегда стёрлось последним переводом фокуса (см. заслоны в
-        # main.html). Уйди оно в запись, поставщик пропал бы с экрана целиком —
-        # `_from_llm_row` отдаёт `None` на пустоте, — и человек считал бы, что
-        # починилось, пока не упал первый разбор вакансии.
-        creds: dict[str, LlmProviderConfig] = {}
-        for kind_name, payload in (("chat", chat), ("embed", embed)):
-            if payload is None:
-                continue
-            try:
-                creds[kind_name] = read_llm_creds(payload)
-            except (AttributeError, ValueError, TypeError) as e:
-                logger.warning("save_settings: %s refused: %s", kind_name, e)
-                self.settings_save_done.emit(_err(f"{kind_name}: {e}"))
-                return
+        async def run() -> dict:
+            applied = await self._apply_providers(creds)
+            if app is not None:
+                applied += await self._apply_app(app)
+            return {"applied": applied}
 
-        async def run() -> str:
-            applied: list[str] = []
-            try:
-                for kind_name, setter in (
-                    ("chat", self._rs.set_chat), ("embed", self._rs.set_embed)
-                ):
-                    cfg = creds.get(kind_name)
-                    if cfg is None:
-                        continue
-                    await setter(
-                        base_url=cfg.base_url, api_key=cfg.api_key, model=cfg.model
-                    )
-                    applied.append(kind_name)
-                if app is not None:
-                    # Whitelist: чтобы UI не мог по ошибке/опечатке писать
-                    # произвольные ключи в app_settings.
-                    allowed = {
-                        "scoring_threshold", "poll_interval_sec",
-                        "backfill_limit", "dm_backfill_limit",
-                        "send_locked",
-                    }
-                    for key, value in app.items():
-                        if key not in allowed:
-                            logger.warning("save_settings: unknown app key %r ignored", key)
-                            continue
-                        # Bool → "true"/"false": app_settings хранит строки,
-                        # rs.send_locked парсит обратно в lower-case bool
-                        # (см. RuntimeSettings.send_locked). True/False через
-                        # str() дали бы "True"/"False" — не пройдут .lower()
-                        # сравнение с "true".
-                        if isinstance(value, bool):
-                            value = "true" if value else "false"
-                        await self._rs.set_app(str(key), str(value))
-                        applied.append(f"app.{key}")
-                    # Sync send_locked в adapters.telegram чтобы новое значение
-                    # начало действовать без рестарта бота. Авторитет —
-                    # rs.send_locked; константа — кеш для горячего пути отправки.
-                    if "send_locked" in app:
-                        from adapters import telegram as _tg
-                        _tg.SEND_LOCKED = self._rs.send_locked
-            except Exception as e:
-                logger.exception("save_settings failed")
-                return _err(f"{type(e).__name__}: {e}", applied=applied)
-            return _ok({"applied": applied})
+        return reply(self._hub.runner, run())
 
-        self._dispatch(self.settings_save_done, run())
+    def logout(self) -> dict:
+        """Выйти из Telegram: отпустить бота и стереть учётную запись.
 
-    @Slot()
-    def request_telegram_logout(self) -> None:
-        """Stop the bot, revoke server-side TG session, clear creds in DB.
-
-        Sequence:
-          1. cancel current poll + ask bot to stop (via log_out_session, which
-             sends DROP_AUTH then sets stop_event)
-          2. wait for the bot run-task to finish (its finally calls
-             client.stop() — already disconnected after log_out, no-op)
-          3. clear session_string + password in DB so health/UI flip to
-             "Нет сессии"
-          4. null out _bot/_bot_task — re-login starts a fresh bot
+        Порядок шагов важен. Сперва закрывается недоведённый вход — открытое
+        окно повторного входа иначе оставит после себя «код уже отправлен».
+        Потом бот просит Telegram отозвать ключ на сервере и останавливается:
+        останься он работать, следующий его запрос ушёл бы с учётными данными,
+        которых в настройках уже нет. И только после этого стирается сеанс,
+        отчего экран и лампочка показывают «нет сессии».
         """
-        bot = self._bot
-        bot_task = self._bot_task
+        bot = self._hub.bot
+        bot_task = self._hub.bot_task
+        # Обнуляем до отправки работы: соседний зов иначе взял бы
+        # полуостановленного бота.
+        self._hub.bot = None
+        self._hub.bot_task = None
 
-        async def run() -> str:
-            # Если в момент logout открыта модалка re-auth, закрываем её
-            # бэкенд-state тоже — иначе при следующем «Войти» налетим на
-            # «уже отправили код».
-            await self._login.forget()
+        async def run() -> dict:
+            await self._hub.login.forget()
             await stop_bot(
                 bot, bot_task, bot.log_out_session if bot is not None else None
             )
-            await self._rs.clear_tg()
-            self._username_cache = ""
-            return _ok({})
+            await self._hub.rs.clear_tg()
+            self._hub.username_cache = ""
+            return {}
 
-        # Null out before dispatch so concurrent slots don't try to use a
-        # half-stopped bot.
-        self._bot = None
-        self._bot_task = None
-        self._dispatch(self.system_telegram_logout_done, run())
+        return reply(self._hub.runner, run())
 
-    @Slot()
-    def cancel_telegram_login(self) -> None:
-        """Юзер закрыл модалку re-auth до завершения. Чистим временный
-        Pyrogram-клиент и обнуляем OTP-state, чтобы не оставлять открытый
-        сокет и не уйти в «уже отправили код» при следующей попытке.
+    def cancel_login(self) -> dict:
+        """Человек закрыл окно повторного входа, не доведя его.
+
+        Временный клиент Telegram закрывается, а шаг обнуляется: иначе остаётся
+        открытый сокет, а следующая попытка упирается в «код уже отправлен».
         """
-        self._dispatch_noop(self._login.forget())
+
+        async def run() -> dict:
+            await self._hub.login.forget()
+            return {}
+
+        return reply(self._hub.runner, run())
+
+    async def _username(self) -> str:
+        """Ник вошедшего: спросить Telegram, а не вышло — отдать запомненный.
+
+        Запомненный нужен потому, что бот поднимается медленно, а экран
+        настроек спрашивают сразу после входа: без него человек видел бы пустое
+        поле там, где только что вошёл под своим именем.
+        """
+        client = getattr(self._hub.bot, "_client", None)
+        await _wait_connected(client)
+        asked = None
+        if getattr(client, "is_connected", False):
+            asked = await username_of(client)
+            if asked is None:
+                logger.warning("ник для настроек спросить не вышло", exc_info=True)
+        if asked is None:
+            return self._hub.username_cache
+        # Пустая строка — это ответ «ника нет», и он перебивает запомненное:
+        # снятый ник иначе остался бы на экране прежним.
+        self._hub.username_cache = asked
+        return asked
+
+    async def _apply_providers(self, creds: dict[str, LlmProviderConfig]) -> list[str]:
+        """Записать присланных поставщиков и назвать записанных."""
+        setters = {"chat": self._hub.rs.set_chat, "embed": self._hub.rs.set_embed}
+        applied: list[str] = []
+        for kind, cfg in creds.items():
+            await setters[kind](
+                base_url=cfg.base_url, api_key=cfg.api_key, model=cfg.model
+            )
+            applied.append(kind)
+        return applied
+
+    async def _apply_app(self, app: dict) -> list[str]:
+        """Записать пороги отбора и назвать записанные."""
+        applied: list[str] = []
+        for key, value in app.items():
+            if key not in APP_KEYS:
+                logger.warning("настройки: незнакомый ключ %r пропущен", key)
+                continue
+            # Да/нет хранится словом: настройки держат строки, и `send_locked`
+            # разбирается сравнением с «true» в нижнем регистре — `str(True)`
+            # дал бы «True» и это сравнение не прошёл.
+            if isinstance(value, bool):
+                value = "true" if value else "false"
+            await self._hub.rs.set_app(str(key), str(value))
+            applied.append(f"app.{key}")
+        if "send_locked" in app:
+            # Запрет отправки сверяется на горячем пути своей копией; без этой
+            # строки новое значение начало бы действовать только после
+            # перезапуска бота.
+            from adapters import telegram as _tg
+            _tg.SEND_LOCKED = self._hub.rs.send_locked
+        return applied
+
+
+async def _wait_connected(client) -> None:
+    """Короткое ожидание соединения бота — до трёх секунд."""
+    if client is None:
+        return
+    for _ in range(_CONNECT_TRIES):
+        if getattr(client, "is_connected", False):
+            return
+        await asyncio.sleep(_CONNECT_STEP_S)
+
+
+def _read_providers(payload: dict) -> dict[str, LlmProviderConfig]:
+    """Учётные данные обоих поставщиков — до записи и тем же правилом, что проба.
+
+    Пустое поле почти всегда стёрлось последним переводом фокуса. Уйди оно в
+    запись, поставщик пропал бы с экрана целиком — из пустоты его собрать
+    нечем, — и человек считал бы, что починилось, пока не упал первый разбор
+    вакансии.
+
+    Отказ называет поставщика: экран правит обоих сразу, и без имени человек не
+    знает, в каком из двух полей стёрлось.
+    """
+    creds: dict[str, LlmProviderConfig] = {}
+    for kind in ("chat", "embed"):
+        draft = payload.get(kind)
+        if not isinstance(draft, dict):
+            continue
+        try:
+            creds[kind] = read_llm_creds(draft)
+        except (AttributeError, TypeError, ValueError) as e:
+            raise ValueError(f"{kind}: {e}") from e
+    return creds
