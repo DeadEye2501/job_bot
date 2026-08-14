@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { BLACKLIST_KINDS, blacklistShown, channelName, fresher } from '../state/contacts.js';
+import {
+  BLACKLIST_KINDS,
+  blacklistShown,
+  channelName,
+  fresher,
+  personName,
+} from '../state/contacts.js';
 
 describe('имя канала в списке', () => {
   it('название показывают, а ник — под ним', () => {
@@ -24,6 +30,24 @@ describe('имя канала в списке', () => {
     // остаться нажимаемой.
     expect(channelName({ id: 42, title: '', username: '' }))
       .toEqual({ name: 'Канал #42', handle: '' });
+  });
+});
+
+describe('имя человека в чужой карточке', () => {
+  it('человека называют его именем', () => {
+    expect(personName({ id: 3, name: 'Ирина', telegram_username: 'irina_hr' })).toBe('Ирина');
+  });
+
+  it('без имени человека называют ником', () => {
+    // Имя приходит из переписки и бывает пустым — ник же есть почти всегда, и
+    // по нему человека узнают в самом Telegram.
+    expect(personName({ id: 3, name: '', telegram_username: 'irina_hr' })).toBe('@irina_hr');
+  });
+
+  it('без имени и ника человек назван номером', () => {
+    // Такое приходит от учётных записей, скрывших ник: строка должна остаться
+    // читаемой, а не пустой.
+    expect(personName({ id: 12, name: '', telegram_username: '' })).toBe('Человек #12');
   });
 });
 

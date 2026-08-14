@@ -27,5 +27,6 @@ export const PROFILE_TABS = [
 /** Вкладки раздела «Контакты». Каналы первыми — с них начинается сбор. */
 export const CONTACTS_TABS = [
   { key: 'channels', label: 'Каналы' },
+  { key: 'companies', label: 'Компании' },
   { key: 'blacklist', label: 'Чёрный список' },
 ];

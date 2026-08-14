@@ -37,6 +37,7 @@ import './styles/lang-rows.css';
 import './styles/cv-file.css';
 import './styles/collapsible.css';
 import './styles/contacts.css';
+import './styles/company-card.css';
 import './styles/stats.css';
 import './styles/donut.css';
 import './styles/skills.css';

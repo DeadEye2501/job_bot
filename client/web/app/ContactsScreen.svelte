@@ -9,6 +9,7 @@
 
   import BlacklistList from './BlacklistList.svelte';
   import ChannelsList from './ChannelsList.svelte';
+  import CompaniesList from './CompaniesList.svelte';
 
   let { ask, say, events } = $props();
 
@@ -20,6 +21,8 @@
 <div class="screen-body">
   {#if tab === 'channels'}
     <ChannelsList {ask} {say} {events} />
+  {:else if tab === 'companies'}
+    <CompaniesList {ask} {say} {events} />
   {:else}
     <BlacklistList {ask} {say} {events} />
   {/if}
