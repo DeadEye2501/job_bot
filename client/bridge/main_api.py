@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from concurrent.futures import Future
-from typing import Any, Coroutine
 
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -16,22 +14,22 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from backend.telegram_login import TelegramLogin
 from backend.runtime_settings import RuntimeSettings
 from client.bridge.bot_stop import stop_bot
-from client.bridge.answer import _dispatch_json, _ok
-from client.bridge.desktop import DesktopSlots
+from client.bridge.answer import _ok
 from client.bridge.hub import Hub
-from client.bridge.journal import JournalSlots
 from client.bridge.runner import AsyncRunner
-from client.bridge.state import (
-    _HEALTHCHECK_INTERVAL_MS,
-    _UNREAD_INTERVAL_MS,
-    WindowStateSlots,
-)
-from client.bridge.wipe import WipeSlots
+from client.bridge.state import System
 
 
 logger = logging.getLogger(__name__)
 
 
+_HEALTHCHECK_INTERVAL_MS = 5_000
+_UNREAD_INTERVAL_MS = 15_000
+"""Часы окна: как часто оно само спрашивало здоровье и непрочитанное.
+
+Живут здесь, а не у домена, потому что уходят вместе с окном: страница
+спрашивает и то и другое своим чередом, а не ждёт толчка по чужим часам.
+"""
 
 _CLOSING_WAIT_S = 5.0
 """Сколько закрывающееся окно ждёт остановки бота.
@@ -46,19 +44,17 @@ _CLOSING_WAIT_S = 5.0
 """
 
 
-class MainApi(
-    DesktopSlots, JournalSlots,
-    WindowStateSlots, WipeSlots,
-    QObject,
-):
+class MainApi(QObject):
     """Один объект «api», который канал отдаёт основному окну.
 
-    Своих слотов не держит: предметы приходят примесями, а здесь — бот,
-    часы общего состояния, отправка работы на мотор и уборка. Пять сигналов
-    объявлены тут же, потому что испускает их бот, а не предмет: списки
-    контактов, список каналов и список вакансий меняются сами по себе, когда
-    сбор находит новое, а письмо от человека и его отметка о прочтении
-    приходят от собеседника — их дом, очередь событий, ждёт слайса А2.9.
+    Слотов у него больше нет вовсе: домены переехали на поверхность возврата
+    (`api.Api`), и здесь остались бот, часы окна, отправка работы на мотор и
+    уборка. Уходит это второй половиной слайса А2.9, вместе с самим каналом.
+
+    Пять сигналов объявлены тут же, потому что испускает их бот, а не предмет:
+    списки контактов, каналов и вакансий меняются сами по себе, когда сбор
+    находит новое, а письмо от человека и его отметка о прочтении приходят от
+    собеседника.
     """
 
     contacts_lists_changed = Signal()
@@ -80,16 +76,25 @@ class MainApi(
         self._session_factory = session_factory
         self._runner = runner
         self._parent_widget = parent_widget
-        self._engine = engine  # для dispose() в delete_all_data
         self._hub = Hub(runner, session_factory, rs)
+        # Доводом от оболочки; сносу без него не удалить базу.
+        self._hub.engine = engine
         self._bot_task = None
+        # Рука для часов и для обратных вызовов бота: считать здоровье и
+        # непрочитанное умеет домен, а окно только бьёт по нему своим ритмом.
+        # Уходит вместе с часами, второй половиной слайса.
+        self._system = System(self._hub)
 
         self._health_timer = QTimer(self)
-        self._health_timer.timeout.connect(self._kick_health)
+        self._health_timer.timeout.connect(
+            lambda: self._tick(self._system.push_health())
+        )
         self._health_timer.start(_HEALTHCHECK_INTERVAL_MS)
 
         self._unread_timer = QTimer(self)
-        self._unread_timer.timeout.connect(self._kick_unread)
+        self._unread_timer.timeout.connect(
+            lambda: self._tick(self._system.push_unread())
+        )
         self._unread_timer.start(_UNREAD_INTERVAL_MS)
 
         # Вход кладётся в хозяйство, как до него бот: заводит его окно, а
@@ -100,43 +105,6 @@ class MainApi(
         self._hub.login = TelegramLogin(
             "job_bot_relogin", rs, on_saved=self._after_login_saved
         )
-        # Лампочка спрашивает модели реже, чем базу и Telegram: вопрос к
-        # модели — настоящая генерация, см. `_MODEL_PROBE_INTERVAL_S`.
-        self._models_probed_at: float = float("-inf")
-        self._models_health_cache: tuple[bool, bool] = (False, False)
-        self._models_in_flight = False
-        self._logs_subscribed = False
-        # Когда журнал спрашивали в прошлый раз — заслон от частых обращений
-        # (`journal._LOGS_REQUEST_INTERVAL_S`).
-        self._logs_request_last_ts: float = float("-inf")
-        # Hook log-buffer → Qt signal: each new LogRecord pushed (debounce
-        # is on the JS side via existing patterns). Emit must be JSON-string
-        # for Signal(str), so serialize the entry inline. Push gated на
-        # `_logs_subscribed` flag — ставится из JS при заходе на logs-tab,
-        # снимается при уходе/выключении auto-refresh, чтобы не сжигать
-        # JSON-сериализацию + cross-thread dispatch на чужих экранах.
-        from backend.log_buffer import get_handler
-        # Recursion-guard: если внутри _on_record логнуть warning, тот warning
-        # снова попадёт в LogBufferHandler.emit → on_record → бесконечная
-        # рекурсия. Флаг блокирует повторный вход.
-        _on_record_in_flight = {"v": False}
-        def _on_record(entry: dict) -> None:
-            if not self._logs_subscribed:
-                return
-            try:
-                self.system_log_record_pushed.emit(json.dumps(entry))
-            except Exception:
-                if _on_record_in_flight["v"]:
-                    return
-                _on_record_in_flight["v"] = True
-                try:
-                    logger.warning(
-                        "LogBuffer on_record callback failed", exc_info=True,
-                    )
-                finally:
-                    _on_record_in_flight["v"] = False
-        get_handler().on_record = _on_record
-
         # Без session_string Pyrogram свалится в interactive-login на stdin
         # (запрашивает код подтверждения в терминале). Бот стартанём только
         # после того, как пользователь авторизуется через UI («Войти»).
@@ -187,22 +155,23 @@ class MainApi(
             logger.info("Constructing Bot and starting run loop")
             self._bot = Bot(self._rs, self._session_factory)
             def _on_cycle_start() -> None:
-                self.ingestion_started.emit()
+                self._hub.events.add("ingestion_started")
 
             def _on_cycle_end() -> None:
-                self.ingestion_finished.emit(_ok())
-                self._kick_unread()
+                self._hub.events.add("ingestion_finished")
+                self._tick(self._system.push_unread())
 
             self._bot.on_cycle_start = _on_cycle_start
             self._bot.on_cycle_end = _on_cycle_end
             self._bot.on_progress = lambda stage, label, cur, tot: (
-                self.progress_update.emit(json.dumps(
-                    {"stage": stage, "label": label, "current": cur, "total": tot}
-                ))
+                self._hub.events.add(
+                    "progress_update",
+                    {"stage": stage, "label": label, "current": cur, "total": tot},
+                )
             )
             def _on_new_msg(hr_id: int) -> None:
                 self.contacts_hr_messages_arrived.emit(_ok({"hr_id": hr_id}))
-                self._kick_unread()
+                self._tick(self._system.push_unread())
             self._bot.on_new_message = _on_new_msg
 
             def _on_hr_read(hr_id: int, max_tg_id: int) -> None:
@@ -237,8 +206,18 @@ class MainApi(
 
     # --- helpers ----------------------------------------------------------
 
-    def _dispatch(self, signal: Signal, coro: Coroutine[Any, Any, Any]) -> None:
-        _dispatch_json(self._runner, signal, coro)
+    def _tick(self, coro) -> None:
+        """Отправить на мотор работу, у которой нет ответа окну.
+
+        Своё она кладёт в очередь событий, а вот поломка без этой строки
+        осталась бы лежать в `Future`, которую никто не читает: часы били бы
+        впустую, и ни лампочка, ни счётчик об этом не сказали бы.
+        """
+        if self._hub.wiping:
+            # Снос идёт: базы, к которой они ходят, вот-вот не станет.
+            coro.close()
+            return
+        self._runner.submit(coro).add_done_callback(_log_if_broken)
 
     def cleanup(self) -> None:
         """Stop timers + the background bot. Runner shutdown is owned by shell.
@@ -279,3 +258,15 @@ class MainApi(
         if self._bot is None:
             self._start_bot()
 
+
+def _log_if_broken(future: Future) -> None:
+    """Сказать в журнал о работе часов, которая сорвалась.
+
+    Отмену пропускаем: её приносит остановка мотора при закрытии окна, и
+    жаловаться на неё значит писать беду о штатном выходе.
+    """
+    if future.cancelled():
+        return
+    error = future.exception()
+    if error is not None:
+        logger.error("часы окна: работа сорвалась", exc_info=error)

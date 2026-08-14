@@ -1,13 +1,11 @@
-"""Просьбы окна к рабочему столу: открыть ссылку, положить текст в буфер."""
+"""Просьбы окна к рабочему столу: открыть ссылку тем, чем её открывает система."""
 
 from __future__ import annotations
 
 import logging
 import os
 
-from PySide6.QtCore import QUrl, Slot
-from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QApplication
+from client.bridge.answer import denied
 
 
 logger = logging.getLogger(__name__)
@@ -32,25 +30,32 @@ def open_in_system(target: str) -> bool:
     return True
 
 
-class DesktopSlots:
-    """Два слота без ответа: всё, что они делают, происходит вне приложения."""
+class Desktop:
+    """Просьба к рабочему столу, какую страница делает чужими руками.
 
-    @Slot(str)
-    def open_external_url(self, url: str) -> None:
-        """Hand a URL off to the OS-default browser / Telegram client.
+    Примесь к `System`, и просьба в ней осталась одна. Вторая, буфер обмена,
+    не переехала и не переедет: написана она была на Qt, а страница в WebView2
+    кладёт текст в буфер сама (`navigator.clipboard`) — мост ей для этого не
+    нужен.
+    """
 
-        Used by the vacancies UI for "go to source post"
-        (vacancy.source_url) and "DM the HR" (https://t.me/{username})
-        actions — QWebEngineView swallows ``<a target="_blank">`` clicks
-        by default, so the JS side calls this slot instead.
+    def open_url(self, url: str) -> dict:
+        """Отдать ссылку тому, чем система её открывает.
+
+        Ведут они на объявление в канале и на переписку с человеком в
+        Telegram. Ответ пустой, но он есть: открывает ссылку не мост, а
+        система, и «открыли» от «не смогли» человек отличит только по нашему
+        слову.
+
+        Работы для мотора здесь нет вовсе — просьба уходит системе и
+        возвращается тут же, — поэтому ответ складывается на месте.
         """
-        if not url:
-            return
-        QDesktopServices.openUrl(QUrl(url))
-
-    @Slot(str)
-    def copy_to_clipboard(self, text: str) -> None:
-        """Копирование в системный буфер для WebEngine UI (Clipboard API там часто недоступен)."""
-        cb = QApplication.clipboard()
-        if cb:
-            cb.setText(text or "")
+        if not isinstance(url, str) or not url:
+            # Ссылка в карточке бывает пустой: источник её не прислал. Уйди
+            # пустое в оболочку, открылось бы окно браузера ни на чём, и
+            # человек решил бы, что приложение сломалось. Не-строка сюда же:
+            # прежде её приводил канал, а теперь нагрузка едет как есть.
+            return denied("Ссылка пуста.")
+        if not open_in_system(url):
+            return denied("Не удалось открыть ссылку.", url=url)
+        return {"ok": {"url": url}}

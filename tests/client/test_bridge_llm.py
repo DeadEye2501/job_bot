@@ -191,7 +191,7 @@ async def test_a_saved_model_reaches_the_settings(wizard_api, watch, api, ask):
 
 
 async def test_a_listed_but_silent_model_lights_the_lamp_red(
-    main_api, watch, provider_says, runtime_settings
+    api, ask, provider_says, runtime_settings
 ):
     """Лампочка в шапке гаснет от той же беды, что и кнопка проверки.
 
@@ -200,7 +200,6 @@ async def test_a_listed_but_silent_model_lights_the_lamp_red(
     зелёное в шапке и красное в настройках на одном и том же наборе, и не
     понял бы, чему верить.
     """
-    caught = watch(main_api.health_changed)
     provider_says({
         MODELS: models_response("qwen"),
         CHAT: httpx.Response(500, text="модель выгружена"),
@@ -209,9 +208,9 @@ async def test_a_listed_but_silent_model_lights_the_lamp_red(
         base_url="http://localhost:1234", api_key="", model="qwen"
     )
 
-    main_api.request_initial()
+    answer = await ask(api.system.health)
 
-    assert (await caught.next())["chat"] is False
+    assert answer["ok"]["chat"] is False
 
 
 async def test_saving_a_provider_without_a_model_is_refused(wizard_api, watch):
@@ -231,7 +230,7 @@ async def test_saving_a_provider_without_a_model_is_refused(wizard_api, watch):
 
 
 async def test_an_answering_model_lights_the_lamp_green(
-    main_api, watch, provider_says, runtime_settings
+    api, ask, provider_says, runtime_settings
 ):
     """Отвечающая модель зажигает лампочку зелёной.
 
@@ -239,7 +238,6 @@ async def test_an_answering_model_lights_the_lamp_green(
     лампочке, погасшей навсегда, — а погасшая насовсем отправляет человека
     чинить то, что работает.
     """
-    caught = watch(main_api.health_changed)
     provider_says({
         MODELS: models_response("qwen"),
         CHAT: httpx.Response(
@@ -251,30 +249,27 @@ async def test_an_answering_model_lights_the_lamp_green(
         base_url="http://localhost:1234", api_key="", model="qwen"
     )
 
-    main_api.request_initial()
+    answer = await ask(api.system.health)
 
-    assert (await caught.next())["chat"] is True
+    assert answer["ok"]["chat"] is True
 
 
 async def test_the_lamp_answers_about_the_base_and_telegram_too(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """Лампочка отвечает про базу и Telegram, а не только про модели.
 
     Три ответа окно рисует тремя разными огоньками. Пропади ключ или уедь
     он к соседу — человек чинил бы Telegram, глядя на погасшую базу.
     """
-    caught = watch(main_api.health_changed)
+    answer = await ask(api.system.health)
 
-    main_api.request_initial()
-
-    answer = await caught.next()
-    assert answer["db"] is True
-    assert answer["tg"] is False
+    assert answer["ok"]["db"] is True
+    assert answer["ok"]["tg"] is False
 
 
 async def test_the_model_is_not_asked_again_within_the_minute(
-    main_api, watch, provider_says, runtime_settings
+    api, ask, provider_says, runtime_settings
 ):
     """Второй удар часов не идёт к модели заново, а показывает прошлый ответ.
 
@@ -282,7 +277,6 @@ async def test_the_model_is_not_asked_again_within_the_minute(
     и модель не выгрузится из памяти никогда, а неподнятый поставщик завалит
     журнал трассировками ровно тогда, когда человек ещё заполняет мастер.
     """
-    caught = watch(main_api.health_changed)
     provider_says({
         MODELS: models_response("qwen"),
         CHAT: httpx.Response(
@@ -294,18 +288,18 @@ async def test_the_model_is_not_asked_again_within_the_minute(
         base_url="http://localhost:1234", api_key="", model="qwen"
     )
 
-    main_api.request_initial()
-    assert (await caught.next())["chat"] is True
+    first = await ask(api.system.health)
+    assert first["ok"]["chat"] is True
 
     # Поставщик замолчал — но минута не прошла, и лампочка держит прошлый ответ.
     provider_says({MODELS: httpx.Response(500, text="упал")})
-    main_api.request_initial()
+    again = await ask(api.system.health)
 
-    assert (await caught.next())["chat"] is True
+    assert again["ok"]["chat"] is True
 
 
 async def test_a_slow_provider_is_not_asked_twice_at_once(
-    main_api, watch, provider_says, runtime_settings
+    api, ask, provider_says, runtime_settings
 ):
     """Пока проба в полёте, вторая не заводится.
 
@@ -314,7 +308,6 @@ async def test_a_slow_provider_is_not_asked_twice_at_once(
     настоящих генераций поверх незакончившихся, и модель уже никогда не
     выгрузилась бы из памяти.
     """
-    caught = watch(main_api.health_changed)
     provider_says({
         MODELS: models_response("qwen"),
         CHAT: httpx.Response(
@@ -326,10 +319,10 @@ async def test_a_slow_provider_is_not_asked_twice_at_once(
         base_url="http://localhost:1234", api_key="", model="qwen"
     )
 
-    main_api._models_in_flight = True
-    main_api.request_initial()
+    api.system._models_in_flight = True
+    answer = await ask(api.system.health)
 
-    assert (await caught.next())["chat"] is False
+    assert answer["ok"]["chat"] is False
 
 
 async def test_a_bad_address_is_refused_with_its_kind(api, ask):

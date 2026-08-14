@@ -3,88 +3,97 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import CancelledError, Future
+import os
+import threading
 
-from PySide6.QtCore import Signal, Slot
-
-from client.bridge.answer import _err, _ok
 from backend.crypto import forget_master_key
 from backend.wipe import wipe_all
+from client.bridge.answer import Denied, reply
 from client.bridge.bot_stop import stop_bot
 
 
 logger = logging.getLogger(__name__)
 
+_LEAVE_AFTER_S = 1.0
+"""Сколько ждать до выхода, отдав ответ.
 
-class WipeSlots:
+Срок назначен, а не измерен: ответ едет странице уже после того, как метод
+вернул, и из питона этот миг не виден вовсе. Секунда заведомо больше дороги
+ответа внутри одного процесса и заведомо меньше того, за что человек успевает
+нажать на экране что-нибудь ещё.
+"""
+
+
+class Wipe:
     """Одна кнопка, после которой приложение начинает с чистого листа.
 
-    Подмешивающий обязан держать `_bot`, `_bot_task`, `_engine`, `_runner` и
-    оба таймера общего состояния — их приходится остановить до сноса. Ответ
-    идёт не через `_dispatch`: работа отправляется на мотор напрямую, потому
-    что после неё приложение себя убивает.
+    Примесь к `System`. Часы окна отсюда больше не гасятся: они были Qt'шные и
+    уходят вместе с ним, а свой опрос страница ведёт сама — остановить его мост
+    не может. Держатель базы, открытый её вопросом посреди сноса, — хвост
+    страницы: спрашивать что-либо после нажатия «Удалить всё» ей нечего.
     """
 
-    delete_all_data_done = Signal(str)
-
-    @Slot()
-    def request_delete_all_data(self) -> None:
+    def wipe(self) -> dict:
         """Опасная зона → «Удалить всё».
 
-        Слот только просит: останавливает бота, зовёт снос
-        (`backend.wipe.wipe_all`), забывает ключ и убивает процесс. Из чего
+        Мост только просит: останавливает бота, зовёт снос
+        (`backend.wipe.wipe_all`), забывает ключ и уходит из процесса. Из чего
         состоит каталог данных, он не знает — это дело `config`.
 
         Следующий запуск уйдёт в мастер: настройки стёрты вместе с базой.
         """
-        bot = self._bot
-        bot_task = self._bot_task
-        # Захватываем сразу, потом null'им — чтобы health-timer не дёрнулся
-        # на полу-удалённой базе. И, главное, тут же тушим сами таймеры
-        # (здоровье и непрочитанное) — иначе после закрытия движка их
-        # следующий удар откроет новое соединение из пула, и Windows
-        # откажется удалять файл базы с открытым держателем.
-        self._bot = None
-        self._bot_task = None
-        self._health_timer.stop()
-        self._unread_timer.stop()
+        bot = self._hub.bot
+        bot_task = self._hub.bot_task
+        # Часы окна ходят в базу каждые пять секунд, и посреди сноса им там
+        # делать нечего. Гасить их отсюда домен не может — они чужие, — но
+        # сказать им замолчать может.
+        self._hub.wiping = True
+        # Обнуляем до отправки работы: соседний зов иначе взял бы
+        # полуостановленного бота, а лампочка — базу, которой уже нет.
+        self._hub.bot = None
+        self._hub.bot_task = None
 
-        async def run() -> str:
+        async def run() -> dict:
             # Беду остановки глотаем: снос обязан дойти до конца, даже если
             # бот уже не отвечает, — иначе останутся и данные, и полуудалённый
             # след.
             try:
                 await stop_bot(bot, bot_task)
             except Exception:
-                logger.exception("delete_all: bot stop failed")
+                logger.exception("снос: остановить бота не вышло")
 
-            errors = await wipe_all(self._engine)
+            errors = await wipe_all(self._hub.engine)
             forget_master_key()
             if errors:
-                return _err("Не все файлы удалось удалить: " + "; ".join(errors))
-            return _ok({})
+                raise Denied("Не все файлы удалось удалить: " + "; ".join(errors))
+            # Уходим отсюда, а не с возврата: возврат случается и по сроку, и по
+            # отмене — работа при этом доделывается, — и сторож, заведённый там,
+            # рубил бы процесс посреди наполовину снесённого каталога.
+            _leave_later()
+            return {}
 
-        # После завершения корутины (успех/ошибка) — эмитим результат и
-        # сразу убиваем процесс через os._exit(0). Штатный QApplication.quit()
-        # здесь приводит к зависанию: aboutToQuit → api.cleanup() →
-        # runner.stop() → gather отменяемых тасков, и какой-то из них
-        # натыкается на удалённую sessions/jobbot.db и блокирует unwind.
-        # Для «wipe everything» все нужные действия (бот остановлен,
-        # engine disposed, файлы удалены) уже сделаны выше — штатный
-        # cleanup нам не нужен.
-        future = self._runner.submit(run())
+        # Ответ отдаётся как есть: сторож выхода уже заведён внутри работы, и
+        # секунды ему хватит, чтобы этот возврат успел уехать странице.
+        return reply(self._hub.runner, run())
 
-        def _on_done(f: Future) -> None:
-            try:
-                payload = f.result()
-            except CancelledError:
-                # Отмена наследует BaseException и мимо перехвата ниже прошла
-                # бы молча: окно не узнало бы ничего, а приложение не вышло.
-                payload = _err("Снос отменён.")
-            except Exception as e:
-                payload = _err(f"{type(e).__name__}: {e}")
-            self.delete_all_data_done.emit(payload)
-            import os
-            os._exit(0)
 
-        future.add_done_callback(_on_done)
+def _leave_later() -> None:
+    """Уйти из процесса, дав ответу дойти до страницы.
+
+    Поток сторожевой: уйди приложение своим ходом раньше срока — этот не стал
+    бы его задерживать.
+    """
+    timer = threading.Timer(_LEAVE_AFTER_S, _leave)
+    timer.daemon = True
+    timer.start()
+
+
+def _leave() -> None:
+    """Убить процесс, не разбирая штатного закрытия.
+
+    Штатный выход зовёт уборку окна — остановку мотора и отмену его работ, — а
+    какая-нибудь из них упирается в удалённую базу и держит выход навсегда. Всё
+    нужное к этому мигу уже сделано: бот остановлен, движок закрыт, файлы
+    удалены.
+    """
+    os._exit(0)

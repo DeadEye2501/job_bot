@@ -1,23 +1,27 @@
-"""Общее состояние окна: режим бота, сбор, здоровье, непрочитанное."""
+"""Общее состояние окна: режим бота, сбор, здоровье, непрочитанное.
+
+Здесь же собран весь домен «система»: журнал, снос данных и просьба к рабочему
+столу приходят примесями из соседних файлов. Разрез по файлам — это раскладка
+одного домена, а не задел под вторую реализацию: страница видит один предмет,
+`api.system`.
+"""
 
 from __future__ import annotations
 
-import logging
+import asyncio
+
 import time
 
-from PySide6.QtCore import Signal, Slot
 from backend import health
 from backend.models import BotMode
 from backend.repository import hr_list, messages as messages_repo
-from client.bridge.answer import _err, _ok
-from client.bridge.refusals import BUSY_CYCLE
+from client.bridge.answer import Denied, denied, reply
+from client.bridge.desktop import Desktop
+from client.bridge.journal import Journal
+from client.bridge.payload import PAYLOAD_ERRORS
+from client.bridge.refusals import BUSY_CYCLE, NO_BOT
+from client.bridge.wipe import Wipe
 
-
-logger = logging.getLogger(__name__)
-
-
-_HEALTHCHECK_INTERVAL_MS = 5_000
-_UNREAD_INTERVAL_MS = 15_000
 
 _MODEL_PROBE_INTERVAL_S = 60.0
 """Как часто лампочка спрашивает саму модель, а не только базу и Telegram.
@@ -32,163 +36,226 @@ _MODEL_PROBE_INTERVAL_S = 60.0
 минутной давности, и это честнее, чем греть модель ради секундной точности.
 """
 
+_RUN_REFUSALS = {
+    "busy": BUSY_CYCLE,
+    "cancelled": "Поллинг отменён.",
+    "error": "Не удалось прогнать каналы — см. логи.",
+}
+"""Чем кончился ручной обход, если не удачей. Незнакомый исход тоже получает
+ответ: исходы заводит бэкенд, и новый появится там раньше перевода здесь, а
+промолчи мост — кнопка осталась бы нажатой навсегда.
+"""
 
-class WindowStateSlots:
-    """То, что окно показывает всегда, на каком бы экране ни стояло.
 
-    Подмешивающий обязан держать `_rs`, `_bot`, `_session_factory` и
-    `_dispatch`. Часы, по которым бьются `_kick_health` и `_kick_unread`,
-    заводит и останавливает он же: они живут ровно столько, сколько окно. Три
-    сигнала о сборе — `ingestion_started`, `ingestion_finished`,
-    `progress_update` — объявлены здесь, а испускает их бот, которого поднимает
-    подмешивающий: сбор идёт сам по себе, окно на него только смотрит.
+_MODEL_PROBE_TIMEOUT_S = 10.0
+"""Сколько лампочка ждёт поставщика.
 
-    Подмешивающий у примеси один, и второго не будет: канал регистрирует
-    ровно один объект «api», так что все предметы окна обязаны сойтись в нём.
-    Это разрезание класса на файлы, а не абстракция под будущую замену.
+Назначен, не измерен: у самого клиента срок втрое больше общего срока ответа
+моста, и молчащий поставщик унёс бы с собой не лампочку, а весь ответ — вместе
+с режимом и счётом непрочитанного. Десять секунд — заведомо больше, чем отвечает
+поднятая модель, и заведомо меньше срока ответа.
+"""
+
+class System(Journal, Wipe, Desktop):
+    """То, что страница показывает всегда, на каком бы экране ни стояла.
+
+    Режим бота, ручной сбор, здоровье связи и счёт непрочитанного — здесь;
+    журнал, снос всех данных и открытие ссылки — примесями рядом.
+
+    Своих часов у домена нет: здоровье и непрочитанное он считает по вопросу.
+    Спрашивают его двое — страница своим чередом и доживающие часы окна,
+    которым нужен тот же счёт толчком в очередь (`push_health`,
+    `push_unread`); уйдут часы вместе с окном, останется первый.
+
+    Всё, что случается само, — обход начался и кончился, прогресс подвинулся,
+    в журнал легла запись — толчком и приходит: дом у такого один, очередь.
     """
 
-    health_changed = Signal(str)
-    unread_changed = Signal(str)
-    mode_changed = Signal(str)
-    ingestion_started = Signal()
-    ingestion_finished = Signal(str)
-    ingestion_action_done = Signal(str)
-    progress_update = Signal(str)
-    unread_chats_loaded = Signal(str)
+    def __init__(self, hub) -> None:
+        self._hub = hub
+        # Отметка и прошлый ответ пробы моделей: спрашивают их чаще, чем стоит
+        # спрашивать саму модель, — см. `_MODEL_PROBE_INTERVAL_S`.
+        self._models_probed_at: float = float("-inf")
+        self._models_answer: tuple[bool, bool] = (False, False)
+        self._models_in_flight = False
+        self._open_journal()
 
-    @Slot()
-    def request_initial(self) -> None:
-        """Push every cached state to JS via signals — called once on UI boot."""
-        self._kick_health()
-        self._kick_unread()
-        self._kick_mode()
+    def initial(self) -> dict:
+        """Всё, что нижняя полоса показывает всегда, — одним ответом.
 
-    @Slot(str)
-    def set_mode(self, mode_str: str) -> None:
-        try:
-            mode = BotMode(mode_str)
-        except ValueError:
-            logger.warning("set_mode: unknown mode requested: %r", mode_str)
-            self.mode_changed.emit(_err(f"Неизвестный режим: {mode_str!r}"))
-            return
-
-        logger.info("Mode change requested: %s", mode.value)
-        async def run() -> str:
-            await self._rs.set_mode(mode)
-            # Wake the bot so it picks up the new mode without waiting for
-            # the next poll tick.
-            if self._bot is not None:
-                self._bot.kick()
-            return _ok({"mode": mode.value})
-
-        self._dispatch(self.mode_changed, run())
-
-    @Slot()
-    def trigger_ingestion(self) -> None:
-        """Refresh button — force a one-shot poll regardless of bot mode.
-
-        Если уже идёт другой цикл — показываем toast «уже идёт цикл,
-        пропустил», иначе пользователь жмёт кнопку и не понимает почему
-        ничего не происходит.
+        Одним, а не тремя: полосу страница рисует целиком, и приди одно без
+        другого — она стояла бы наполовину пустой до первого своего опроса,
+        то есть секунды после открытия.
         """
-        if self._bot is None:
-            return
-        logger.info("Manual ingestion triggered")
 
-        async def run() -> str:
-            status = await self._bot.force_poll_once()
-            if status == "busy":
-                return _err(BUSY_CYCLE, action="trigger_ingestion", status=status)
-            if status == "ok":
-                return _ok({"action": "trigger_ingestion", "status": status})
-            messages = {
-                "cancelled": "Поллинг отменён.",
-                "error": "Не удалось прогнать каналы — см. логи.",
+        async def run() -> dict:
+            return {
+                "health": await self._health(),
+                "unread": await self._unread(),
+                "mode": (await self._hub.rs.get_mode()).value,
             }
-            return _err(messages.get(status, "Не удалось прогнать."), action="trigger_ingestion", status=status)
 
-        self._dispatch(self.ingestion_action_done, run())
+        return reply(self._hub.runner, run())
 
-    @Slot()
-    def stop_ingestion(self) -> None:
-        """Stop button — cancel the in-flight poll cycle (if any)."""
-        if self._bot is None:
-            return
-        logger.info("Ingestion cancel requested")
-        self._bot.cancel_current_poll()
+    def set_mode(self, mode: str) -> dict:
+        """Переключить режим бота: выключен, только переписка, полный вперёд.
 
-    def _kick_mode(self) -> None:
-        async def run() -> str:
-            mode = await self._rs.get_mode()
-            return _ok({"mode": mode.value})
+        Незнакомое имя отбивается, назвав присланное: прими мост что попало —
+        бот остался бы в прежнем режиме, а переключатель на экране показывал
+        бы новый, и человек считал бы отправку включённой.
 
-        self._dispatch(self.mode_changed, run())
-
-    def _kick_unread(self) -> None:
-        async def run() -> str:
-            async with self._session_factory() as session:
-                count = await messages_repo.count_unread_incoming(session)
-            return _ok({"count": count})
-
-        self._dispatch(self.unread_changed, run())
-
-    @Slot()
-    def request_unread_chats(self) -> None:
-        """List of HRs with at least one unread incoming message — feeds the
-        footer pop-up (TODO #4). Ordered by most recent unread first.
+        Бота будим сразу: иначе новый режим начал бы действовать с ближайшим
+        ударом его собственных часов, а человек уже переключил тумблер.
         """
-        async def run() -> str:
-            async with self._session_factory() as session:
+        try:
+            chosen = BotMode(mode)
+        except PAYLOAD_ERRORS:
+            return denied(f"Неизвестный режим: {mode!r}")
+
+        async def run() -> dict:
+            await self._hub.rs.set_mode(chosen)
+            if self._hub.bot is not None:
+                self._hub.bot.kick()
+            return {"mode": chosen.value}
+
+        return reply(self._hub.runner, run())
+
+    def run_now(self) -> dict:
+        """Кнопка обновления: один обход каналов помимо режима.
+
+        Занятый цикл объясняют словами: иначе человек жмёт кнопку, ничего не
+        происходит, и он жмёт её снова — так и не узнав, что обход уже идёт.
+        """
+
+        async def run() -> dict:
+            bot = self._hub.bot
+            if bot is None:
+                raise Denied(NO_BOT, action="run_now")
+            status = await bot.force_poll_once()
+            if status == "ok":
+                return {"action": "run_now", "status": status}
+            raise Denied(
+                _RUN_REFUSALS.get(status, "Не удалось прогнать."),
+                action="run_now",
+                status=status,
+            )
+
+        return reply(self._hub.runner, run())
+
+    def stop_run(self) -> dict:
+        """Кнопка остановки: отменить идущий обход.
+
+        Отмена уезжает на мотор, а не зовётся прямо отсюда: обход живёт
+        задачей в его цикле, и трогать её из чужого потока нельзя.
+        """
+
+        async def run() -> dict:
+            bot = self._hub.bot
+            if bot is None:
+                raise Denied(NO_BOT, action="stop_run")
+            bot.cancel_current_poll()
+            return {"action": "stop_run"}
+
+        return reply(self._hub.runner, run())
+
+    def unread_chats(self) -> dict:
+        """Люди, от которых есть непрочитанное, — для списка над полосой.
+
+        Свежее непрочитанное первым: список открывают, чтобы ответить, а
+        отвечают на последнее пришедшее.
+        """
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
                 rows = await hr_list.list_hrs_with_unread(session)
-            return _ok({"chats": rows})
+            return {"chats": rows}
 
-        self._dispatch(self.unread_chats_loaded, run())
+        return reply(self._hub.runner, run())
 
-    async def _models_health(self) -> tuple[bool, bool]:
+    def health(self) -> dict:
+        """Живо ли то, на чём держится работа: база, Telegram, обе модели."""
+        return reply(self._hub.runner, self._health())
+
+    def unread(self) -> dict:
+        """Сколько писем ждут ответа — счёт над списком переписок."""
+        return reply(self._hub.runner, self._unread())
+
+    async def push_health(self) -> None:
+        """То же здоровье, но в очередь: так его спрашивают часы окна.
+
+        Часы Qt'шные и уходят вместе с окном — страница спрашивает сама
+        (`health`). Пока они бьют, ответ им класть некуда, кроме очереди.
+        """
+        self._hub.events.add("health_changed", await self._health())
+
+    async def push_unread(self) -> None:
+        """Пересчитать непрочитанное и положить счёт в очередь.
+
+        Зовут это часы окна и обратные вызовы бота: пришло письмо или кончился
+        обход — счёт над списком обязан сойтись, а сам по себе он не сойдётся
+        до ближайшего вопроса страницы.
+        """
+        self._hub.events.add("unread_changed", await self._unread())
+
+    async def _health(self) -> dict:
+        """Спросить всё, из чего собрана лампочка.
+
+        Сами вопросы задаёт `backend.health`; здесь только ритм: базу и
+        Telegram спрашиваем каждый раз, модели — раз в минуту.
+
+        Порядок значим: база спрашивается первой, пока вопрос молодой. Вопрос
+        к моделям ждёт ответа поставщика до нескольких минут, и соединение с
+        базой, открытое после него, пришлось бы на движок, который за это
+        время могли и закрыть.
+        """
+        alive = {
+            "db": await health.database_alive(self._hub.session_factory),
+            "tg": health.telegram_alive(self._hub.bot),
+        }
+        chat, embed = await self._models_alive()
+        return {**alive, "chat": chat, "embed": embed}
+
+    async def _unread(self) -> dict:
+        """Сколько входящих писем не прочитаны."""
+        async with self._hub.session_factory() as session:
+            return {"count": await messages_repo.count_unread_incoming(session)}
+
+    async def _models_alive(self) -> tuple[bool, bool]:
         """Отвечают ли обе модели — с прошлым ответом между опросами.
 
         Свой срок у этого вопроса потому, что он дорог: см.
-        `_MODEL_PROBE_INTERVAL_S`. База и Telegram спрашиваются каждый удар
-        часов, модели — раз в минуту.
+        `_MODEL_PROBE_INTERVAL_S`. База и Telegram спрашиваются каждый раз,
+        модели — раз в минуту.
 
         Отметка ставится **до** опроса, а не после, и пока опрос в полёте,
         второго не заводится. Иначе срок держался бы только на быстром
-        поставщике: медленный отвечает дольше, чем бьют часы, — LM Studio
-        подгружает модель до трёх минут, — и каждый удар заводил бы новую
-        пару настоящих генераций поверх незакончившихся.
+        поставщике: медленный отвечает дольше, чем его успевают спросить
+        заново, — LM Studio подгружает модель до трёх минут, — и каждый вопрос
+        заводил бы новую пару настоящих генераций поверх незакончившихся.
         """
         now = time.monotonic()
         stale = now - self._models_probed_at >= _MODEL_PROBE_INTERVAL_S
         if self._models_in_flight or not stale:
-            return self._models_health_cache
+            return self._models_answer
         self._models_probed_at = now
         self._models_in_flight = True
         try:
-            self._models_health_cache = (
-                await health.model_alive(self._rs.chat, "chat"),
-                await health.model_alive(self._rs.embed, "embed"),
+            self._models_answer = await asyncio.wait_for(
+                self._ask_models(), _MODEL_PROBE_TIMEOUT_S
             )
+        except TimeoutError:
+            # Не дождались — лампочка гаснет, и это честный ответ: поставщик,
+            # думающий дольше отведённого, для человека и есть недоступный.
+            # Ждать дольше нельзя ни в коем случае: тот же ответ несёт режим и
+            # счёт непрочитанного, а срок у него общий — молчащий поставщик
+            # унёс бы с собой всю нижнюю полосу.
+            self._models_answer = (False, False)
         finally:
             self._models_in_flight = False
-        return self._models_health_cache
+        return self._models_answer
 
-    def _kick_health(self) -> None:
-        """Спросить, живо ли то, на чём держится работа, и отдать окну.
-
-        Сами вопросы задаёт `backend.health`; здесь только ритм: базу и
-        Telegram спрашиваем каждый удар часов, модели — раз в минуту.
-        """
-        async def run() -> str:
-            # Порядок значим: база спрашивается первой, пока тик молодой.
-            # Вопрос к моделям ждёт ответа поставщика до нескольких минут, и
-            # соединение с базой, открытое после него, пришлось бы на уже
-            # закрытый движок — снос данных гасит таймеры именно поэтому.
-            alive = {
-                "db": await health.database_alive(self._session_factory),
-                "tg": health.telegram_alive(self._bot),
-            }
-            chat, embed = await self._models_health()
-            return _ok({**alive, "chat": chat, "embed": embed})
-
-        self._dispatch(self.health_changed, run())
+    async def _ask_models(self) -> tuple[bool, bool]:
+        return (
+            await health.model_alive(self._hub.rs.chat, "chat"),
+            await health.model_alive(self._hub.rs.embed, "embed"),
+        )

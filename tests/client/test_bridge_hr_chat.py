@@ -51,7 +51,7 @@ async def test_an_attachment_arrives_as_an_address_the_window_can_open(
 
 
 async def test_only_chats_with_unread_incoming_are_listed(
-    main_api, watch, session_factory
+    api, ask, session_factory
 ):
     """В непрочитанное попадает только то, что и правда ждёт ответа.
 
@@ -59,14 +59,13 @@ async def test_only_chats_with_unread_incoming_are_listed(
     единственное, что зовёт человека открыть переписку, и завышенный он
     отправляет его искать несуществующее письмо.
     """
-    caught = watch(main_api.unread_chats_loaded)
     hr = hr_row(name="Мария")
     await put(session_factory, hr)
     await put(session_factory, *unread_probe(hr.id))
 
-    main_api.request_unread_chats()
+    answer = await ask(api.system.unread_chats)
 
-    chats = (await caught.next())["chats"]
+    chats = answer["ok"]["chats"]
     assert [row["name"] for row in chats] == ["Мария"]
     assert chats[0]["unread_count"] == 1
 

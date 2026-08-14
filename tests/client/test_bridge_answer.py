@@ -3,9 +3,9 @@
 Предмет здесь один — дорога ответа, а не то, что по ней едет. Поведение на
 отказе, на поломке и на отмене одинаково для всех, кто по ней ходит.
 
-**Дорог сейчас две, и это переходное состояние.** Переехавшие домены отвечают
-возвратом (`reply`), непереехавшие — сигналом (`_dispatch_json`). Вторая уходит
-слайсом А2.9, и сторожа уйдут вместе с ней; расходятся дороги в одном —
+**Дорог сейчас две, и это переходное состояние.** Домены отвечают возвратом
+(`reply`), окно первого запуска — сигналом (`_dispatch_json`). Вторая уходит
+вместе с мастером, и сторожа уйдут с ней; расходятся дороги в одном —
 поведении при отмене, и довод записан у `reply`.
 """
 
@@ -16,24 +16,24 @@ import logging
 from client.bridge.answer import reply
 
 
-async def test_the_answer_reaches_the_window_as_a_signal(main_api, watch):
+async def test_the_answer_reaches_the_window_as_a_signal(wizard_api, watch):
     """Ответ доходит до окна отправкой, а не возвратом слота.
 
     Слот возвращает `None` сразу же — окно узнаёт исход только сигналом, и
     порвись эта дорога, интерфейс молчал бы, не показывая никакой ошибки.
     """
-    caught = watch(main_api.mode_changed)
+    caught = watch(wizard_api.finish_done)
 
     async def answered() -> str:
         return json.dumps({"ok": True, "notes": "готово"})
 
-    main_api._dispatch(main_api.mode_changed, answered())
+    wizard_api._dispatch(wizard_api.finish_done, answered())
 
     assert await caught.next() == {"ok": True, "notes": "готово"}
 
 
 async def test_a_broken_coroutine_becomes_a_refusal_not_a_silence(
-    main_api, watch, caplog
+    wizard_api, watch, caplog
 ):
     """Поломка внутри работы превращается в отказ, а не теряется.
 
@@ -42,27 +42,27 @@ async def test_a_broken_coroutine_becomes_a_refusal_not_a_silence(
     человеку было что показать, а трассировка — в журнал, чтобы было что
     читать потом.
     """
-    caught = watch(main_api.mode_changed)
+    caught = watch(wizard_api.finish_done)
 
     async def broken() -> str:
         raise RuntimeError("база не отвечает")
 
     with caplog.at_level(logging.ERROR, logger="client.bridge.answer"):
-        main_api._dispatch(main_api.mode_changed, broken())
+        wizard_api._dispatch(wizard_api.finish_done, broken())
         answer = await caught.next()
 
     assert answer == {"ok": False, "error": "RuntimeError: база не отвечает"}
     assert any(record.exc_info for record in caplog.records)
 
 
-async def test_a_cancelled_request_says_nothing_at_all(main_api, watch):
+async def test_a_cancelled_request_says_nothing_at_all(wizard_api, watch):
     """Отменённая работа не отвечает вовсе.
 
     Отменяют при остановке приложения: обработчик в окне к этому мигу уже
     отвалился, и «работа отменена» уехало бы в умирающую страницу — человек
     увидел бы ошибку там, где просто закрыл окно.
     """
-    caught = watch(main_api.mode_changed)
+    caught = watch(wizard_api.finish_done)
     started = asyncio.Event()
 
     async def endless() -> str:
@@ -71,7 +71,7 @@ async def test_a_cancelled_request_says_nothing_at_all(main_api, watch):
         return ""
 
     coro = endless()
-    main_api._dispatch(main_api.mode_changed, coro)
+    wizard_api._dispatch(wizard_api.finish_done, coro)
     await started.wait()
     for task in asyncio.all_tasks():
         if task.get_coro() is coro:
