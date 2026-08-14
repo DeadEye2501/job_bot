@@ -12,7 +12,7 @@
   import PipelineSection from '$components/PipelineSection.svelte';
   import SettingsSection from '$components/SettingsSection.svelte';
   import TelegramSection from '$components/TelegramSection.svelte';
-  import { credsChanged, mirrored, probePill, sameCreds } from '$state/settings.js';
+  import { credsChanged, idleProbe, loginTrouble, mirrored, probePill, sameCreds } from '$state/settings.js';
 
   import TelegramLogin from './TelegramLogin.svelte';
 
@@ -31,7 +31,7 @@
   let embed = $state({ base_url: '', api_key: '', model: '' });
   let pipeline = $state({});
   let models = $state({ chat: [], embed: [] });
-  let probes = $state({ chat: idle(), embed: idle() });
+  let probes = $state({ chat: idleProbe(), embed: idleProbe() });
   let same = $state(false);
   let logging = $state(false);
   let wiping = $state(false);
@@ -40,10 +40,6 @@
   const pills = $derived({ chat: probePill(probes.chat), embed: probePill(probes.embed) });
 
   let alive = true;
-
-  function idle() {
-    return { status: 'idle', model: '', latencyMs: 0, error: '' };
-  }
 
   /** Перечитать настройки с моста целиком.
    *
@@ -56,8 +52,8 @@
     if (now === null || !alive) return;
     // Плашка проверки говорит про те данные, которые проверяли: приехали
     // другие — ей верить больше нельзя.
-    if (credsChanged(chat, now.chat)) probes = { ...probes, chat: idle() };
-    if (credsChanged(embed, now.embed)) probes = { ...probes, embed: idle() };
+    if (credsChanged(chat, now.chat)) probes = { ...probes, chat: idleProbe() };
+    if (credsChanged(embed, now.embed)) probes = { ...probes, embed: idleProbe() };
     tg = now.tg;
     chat = now.chat;
     embed = now.embed;
@@ -112,7 +108,7 @@
     same = on;
     if (!on) return;
     embed = mirrored(chat, embed);
-    probes = { ...probes, embed: idle() };
+    probes = { ...probes, embed: idleProbe() };
     listModels('embed');
     return save({ embed });
   }
@@ -125,7 +121,7 @@
    */
   async function probe(kind) {
     const creds = kind === 'chat' ? chat : embed;
-    probes = { ...probes, [kind]: { ...idle(), status: 'busy' } };
+    probes = { ...probes, [kind]: { ...idleProbe(), status: 'busy' } };
     let answer = null;
     let trouble = '';
     try {
@@ -141,7 +137,7 @@
     // данные врала бы о нынешних.
     if (probes[kind].status !== 'busy') return;
     if (answer === null) {
-      probes = { ...probes, [kind]: { ...idle(), status: 'err', error: trouble } };
+      probes = { ...probes, [kind]: { ...idleProbe(), status: 'err', error: trouble } };
       return;
     }
     probes = {
@@ -162,11 +158,8 @@
   }
 
   function startLogin() {
-    // Проверяем здесь, а не отказом моста: пустое поле — это забывчивость, и
-    // сказать про неё надо словом, которое называет забытое.
-    if (!draft.api_id || !draft.api_hash || !draft.phone) {
-      return say('Заполните api_id, api_hash и телефон', true);
-    }
+    const trouble = loginTrouble(draft);
+    if (trouble) return say(trouble, true);
     logging = true;
   }
 

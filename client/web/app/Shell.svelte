@@ -17,6 +17,7 @@
   import SettingsScreen from './SettingsScreen.svelte';
   import StatsScreen from './StatsScreen.svelte';
   import VacanciesScreen from './VacanciesScreen.svelte';
+  import WizardScreen from './WizardScreen.svelte';
   import HealthLamp from '$components/HealthLamp.svelte';
   import ModeToggle from '$components/ModeToggle.svelte';
   import NavGroup from '$components/NavGroup.svelte';
@@ -51,6 +52,10 @@
   // этом заводит всё равно эффект — до него слушатель молчит.
   const heard = listener((after) => call('system.events', after));
 
+  // Пока неизвестно, доведена ли настройка до конца, окно не показывает
+  // ничего: мелькнувшее на миг приложение с пустыми списками человек прочтёт
+  // как поломку, а не как «мастер сейчас откроется».
+  let setup = $state(null);
   let section = $state(SECTIONS[0].key);
   let systemTab = $state(SYSTEM_TABS[0].key);
   let expanded = $state(false);
@@ -119,7 +124,21 @@
     await applyHealth(now.health);
   }
 
+  /** Спросить, пройдена ли первая настройка.
+   *
+   * Спрашивается один раз при подъёме окна: отметку ставит сам мастер, и
+   * второй раз она за жизнь окна не меняется.
+   */
+  async function askSetup() {
+    const now = await ask('wizard.state');
+    // Отказ не считается ответом: сочти мы его за «настройка пройдена», мастер
+    // спрятался бы навсегда, а приложение открылось бы пустым. Спросим снова с
+    // ближайшим ударом часов здоровья.
+    if (now !== null) setup = now;
+  }
+
   async function askHealth() {
+    if (setup === null) askSetup();
     const fresh = await ask('system.health');
     if (fresh !== null) await applyHealth(fresh);
   }
@@ -183,6 +202,7 @@
     watch();
     const health_clock = setInterval(askHealth, HEALTH_EVERY_MS);
     const unread_clock = setInterval(askUnread, UNREAD_EVERY_MS);
+    askSetup();
     refresh();
     return () => {
       alive = false;
@@ -194,6 +214,11 @@
   });
 </script>
 
+{#if setup === null}
+  <div class="placeholder-content">Загрузка…</div>
+{:else if !setup.wizard_completed}
+  <WizardScreen {ask} {say} ondone={() => (setup = { ...setup, wizard_completed: true })} />
+{:else}
 <div class="app-frame" class:sidebar-expanded={expanded}>
   <aside class="sidebar">
     {#each SECTIONS as one (one.key)}
@@ -278,5 +303,6 @@
     </div>
   </div>
 </div>
+{/if}
 
 <Plaque message={plaque.message} danger={plaque.danger} />
