@@ -133,3 +133,18 @@ def with_bot(hub):
         return bot
 
     return _put
+
+
+class WindowThatPicks:
+    """Окно, которое отвечает на диалог выбора файла заранее назначенным.
+
+    Спрашивают его двое — анкета (`cv.pick`) и переписка
+    (`hr.pick_media`), — и правило у обеих одно: путь называет человек
+    диалогом самого окна, страница до него не дотягивается.
+    """
+
+    def __init__(self, chosen) -> None:
+        self.chosen = chosen
+
+    def create_file_dialog(self, *args, **kwargs):
+        return self.chosen

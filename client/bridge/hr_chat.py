@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import webview
+
 from backend.payloads import int_or_none, moment_or_none
 from backend.repository import messages as messages_repo
 from client.bridge.answer import Denied, bad_fields, denied, reply
@@ -108,8 +110,29 @@ class HrChat:
 
         return reply(self._hub.runner, run())
 
-    def send_media(self, payload: dict) -> dict:
-        """Отправить человеку файл, выбранный в окне.
+    def pick_media(self, hr_id: int) -> dict:
+        """Спросить у человека файл и отправить его этому собеседнику.
+
+        Диалог у окна, а не у страницы, и дотянуться до него со страницы
+        нельзя: браузер отдаёт выбранный файл содержимым, а не путём, —
+        нарочно, — а боту нужен именно путь, чтобы приложить файл с диска.
+
+        Этим же диалогом стоит и заслон: путь снова называет человек, а не
+        страница, и до бота не доедет то, чего в диалоге не выбирали. Затем
+        отправка и закрыта именем — поверхность моста собирается обходом полей,
+        и открытый метод страница позвала бы с любым путём.
+
+        Закрытый диалог отказом не считается: ничего не сломалось, человек
+        передумал. Отзовись мост отказом, окно показало бы красную плашку на
+        обычное «нет, не сейчас».
+        """
+        chosen = self._hub.window.create_file_dialog(webview.OPEN_DIALOG)
+        if not chosen:
+            return {"ok": {"cancelled": True}}
+        return self._send_media({"hr_id": hr_id, "path": chosen[0]})
+
+    def _send_media(self, payload: dict) -> dict:
+        """Отправить человеку файл, названный диалогом окна.
 
         Путь приходит нагрузкой: диалог выбора держит окно, а мост шлёт уже
         названное. Снимком уйдёт файл или вложением, решает бот по расширению

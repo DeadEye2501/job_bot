@@ -5,6 +5,7 @@
 окно узнаёт про отправку, оно узнаёт из его ответа.
 """
 
+from tests.client.conftest import WindowThatPicks
 from tests.dbio import put
 from tests.factories import hr_row, message_row, unread_probe
 
@@ -153,32 +154,37 @@ async def test_a_refusal_from_the_bot_is_repeated_word_for_word(
     assert answer["action"] == "send_message"
 
 
-async def test_a_file_without_a_path_never_reaches_the_bot(
-    api, ask, with_bot, session_factory
-):
-    """Без пути к файлу до бота не доходит ничего.
+async def test_a_closed_dialog_sends_nothing(api, ask, with_bot, hub, session_factory):
+    """Закрытый диалог отказом не считается и до бота не доходит.
 
-    Путь выбирает окно, и до моста он может не доехать вовсе. Отправь мост
-    отсутствие дальше — Telegram отказал бы уже своими словами, из которых
-    не видно, что файла никто не называл.
+    Человек передумал — ничего не сломалось. Отзовись мост отказом, окно
+    показало бы красную плашку на обычное «нет, не сейчас».
     """
     bot = with_bot()
     hr = hr_row()
     await put(session_factory, hr)
+    hub.window = WindowThatPicks(None)
 
-    answer = await ask(api.hr.send_media, {"hr_id": hr.id})
+    answer = await ask(api.hr.pick_media, hr.id)
 
-    assert answer["fail"] == "fields"
+    assert answer["ok"]["cancelled"] is True
     assert bot.calls == []
 
 
-async def test_a_chosen_file_travels_to_the_bot(api, ask, with_bot, session_factory):
-    """Выбранный файл доходит до бота тем самым путём, что назвал человек."""
-    bot = with_bot(sent=99)
+async def test_the_file_named_in_the_dialog_travels_to_the_bot(
+    api, ask, with_bot, hub, session_factory
+):
+    """Выбранный в диалоге файл уходит боту тем самым путём.
+
+    Путь называет диалог окна, а не страница: этим он и заслонён — до бота не
+    доедет то, чего человек не выбирал.
+    """
+    bot = with_bot(sent=77)
     hr = hr_row()
     await put(session_factory, hr)
+    hub.window = WindowThatPicks(["C:/договор.pdf"])
 
-    answer = await ask(api.hr.send_media, {"hr_id": hr.id, "path": "C:/резюме.pdf"})
+    answer = await ask(api.hr.pick_media, hr.id)
 
-    assert answer["ok"]["message_id"] == 99
-    assert ("send_to_hr_media", hr.id, "C:/резюме.pdf") in bot.calls
+    assert answer["ok"]["message_id"] == 77
+    assert ("send_to_hr_media", hr.id, "C:/договор.pdf") in bot.calls
