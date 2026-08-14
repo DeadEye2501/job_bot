@@ -16,6 +16,7 @@
   import ProfileScreen from './ProfileScreen.svelte';
   import SettingsScreen from './SettingsScreen.svelte';
   import StatsScreen from './StatsScreen.svelte';
+  import VacanciesScreen from './VacanciesScreen.svelte';
   import HealthLamp from '$components/HealthLamp.svelte';
   import ModeToggle from '$components/ModeToggle.svelte';
   import NavGroup from '$components/NavGroup.svelte';
@@ -223,6 +224,8 @@
       <ContactsScreen {ask} {say} events={heard} />
     {:else if section === 'stats'}
       <StatsScreen {ask} />
+    {:else if section === 'vacancies'}
+      <VacanciesScreen {ask} events={heard} />
     {:else if section === 'system'}
       <TopTabs tabs={SYSTEM_TABS} active={systemTab} onpick={(key) => (systemTab = key)} />
       {#if systemTab === 'logs'}
