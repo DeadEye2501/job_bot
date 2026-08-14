@@ -5,16 +5,20 @@
 окна — значит показать надо то, которое уже открыто, а не сообщение о том,
 почему нового не будет.
 
-Разговаривают копии по локальному сокету: он же и опознаёт живую копию —
-подключиться удаётся только к слушающей.
+Разговаривают копии по петлевому сокету: он же и опознаёт живую копию —
+дозвониться удаётся только до слушающей, а признаёт она себя тем, что отвечает
+на своё имя.
 """
 
+import socket
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QCoreApplication
 
+import client.raise_window as raise_window
 from client.raise_window import ask_to_raise, listen
+
+LOOPBACK = "127.0.0.1"
 
 
 class WindowDouble:
@@ -23,35 +27,33 @@ class WindowDouble:
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def isMinimized(self) -> bool:
-        return False
-
-    def showNormal(self) -> None:
+    def restore(self) -> None:
         self.calls.append("развернуть")
 
-    def raise_(self) -> None:
-        self.calls.append("поднять")
-
-    def activateWindow(self) -> None:
-        self.calls.append("в фокус")
+    def show(self) -> None:
+        self.calls.append("показать")
 
 
 @pytest.fixture
-def qt_alive():
-    """Приложение Qt: без него слушателю нечем разбирать подключения.
+def copies():
+    """Заводит слушателей и гасит их в конце.
 
-    Просящей стороне оно не нужно — `waitForConnected` крутит свой цикл, и
-    боевой зов из `main()` идёт как раз без приложения. А вот сигнал о новом
-    подключении доставляет цикл событий, и без приложения крутить его нечем.
-
-    Заводится одно на прогон и не гасится: второго `QCoreApplication` в том же
-    процессе Qt не позволяет, а гашение первого унесло бы с собой всё, что
-    успели создать.
+    Брошенный слушатель пережил бы тест: его держит свой поток, а порт он
+    отпускает только закрытым, и следующий тест на то же имя не занял бы его.
     """
-    return QCoreApplication.instance() or QCoreApplication([])
+    started = []
+
+    def start(window, name):
+        server = listen(window, name)
+        started.append(server)
+        return server
+
+    yield start
+    for server in started:
+        server.close()
 
 
-def test_nobody_listening_means_nobody_to_ask(qt_alive):
+def test_nobody_listening_means_nobody_to_ask():
     """Некому передать просьбу — так и говорится.
 
     По этому ответу зовущий понимает, что живой копии за замком нет. Соври
@@ -60,66 +62,80 @@ def test_nobody_listening_means_nobody_to_ask(qt_alive):
     assert ask_to_raise("job-bot-проверка-никто-не-слушает") is False
 
 
-def test_a_listening_copy_brings_its_window_forward(qt_alive):
+def test_a_listening_copy_brings_its_window_forward(copies):
     """Слушающая копия по просьбе выводит своё окно вперёд.
 
-    Окно поднимается над чужими и получает фокус: без фокуса оно всплывёт, но
-    ввод останется у той программы, поверх которой человек нажал ярлык.
+    Сперва разворачивается свёрнутое: поднимать свёрнутое бесполезно, оно
+    останется в панели задач, и человек решит, что второй запуск не сделал
+    ничего. Порядок здесь и есть следствие — показ после разворота.
+
+    Ответ приходит уже после того, как окно тронуто, поэтому проверять его
+    можно сразу: «передал» значит «показал».
     """
     window = WindowDouble()
-    server = listen(window, "job-bot-проверка-слушающей-копии")
+    copies(window, "job-bot-проверка-слушающей-копии")
 
     assert ask_to_raise("job-bot-проверка-слушающей-копии") is True
-
-    # Подключение доезжает до слушающего оборотом цикла событий, а не вызовом:
-    # сразу после просьбы окно ещё не тронуто, и утверждение соврало бы.
-    qt_alive.processEvents()
-    assert window.calls == ["поднять", "в фокус"]
-
-    server.close()
+    assert window.calls == ["развернуть", "показать"]
 
 
-def test_a_minimized_window_is_unminimized_first(qt_alive):
-    """Свёрнутое окно сперва разворачивают.
+def test_a_port_left_by_a_dead_copy_does_not_block_listening(copies):
+    """Порт, оставленный умершей копией, слушать не мешает.
 
-    Поднимать свёрнутое бесполезно: оно останется в панели задач, и человек
-    решит, что второй запуск не сделал ничего.
+    Копия уходит, не дождавшись, пока система отпустит порт до конца. Не займи
+    его следующий запуск — просьбы уходили бы в никуда, пока система не остынет
+    сама.
+
+    Брошенную копию доводим до настоящего разговора, а не открываем и закрываем
+    пустой: порт остывает только после соединения, и без него сторож проверял
+    бы, что свободный порт можно занять дважды.
     """
-    window = WindowDouble()
-    window.isMinimized = lambda: True
-    server = listen(window, "job-bot-проверка-свёрнутого-окна")
-
-    ask_to_raise("job-bot-проверка-свёрнутого-окна")
-
-    qt_alive.processEvents()
-    assert window.calls == ["развернуть", "поднять", "в фокус"]
-
-    server.close()
-
-
-def test_a_name_left_by_a_dead_copy_does_not_block_listening(qt_alive):
-    """Имя, брошенное умершей копией, слушать не мешает.
-
-    Вне Windows сокет остаётся файлом и переживает падение процесса. Не сними
-    его — и следующий запуск не занял бы имя, а просьбы второй копии уходили бы
-    в никуда до тех пор, пока файл не удалят руками.
-
-    Брошенное имя изображается закрытым сервером: `close()` на unix оставляет
-    файл сокета, как его оставила бы умершая копия.
-    """
-    name = "job-bot-проверка-брошенного-имени"
-    abandoned = listen(WindowDouble(), name)
+    name = "job-bot-проверка-брошенного-порта"
+    abandoned_window = WindowDouble()
+    abandoned = copies(abandoned_window, name)
+    assert ask_to_raise(name) is True
+    assert abandoned_window.calls == ["развернуть", "показать"]
     abandoned.close()
 
     window = WindowDouble()
-    second = listen(window, name)
+    copies(window, name)
 
-    assert second.isListening()
     assert ask_to_raise(name) is True
-    qt_alive.processEvents()
-    assert window.calls == ["поднять", "в фокус"]
+    assert window.calls == ["развернуть", "показать"]
 
-    second.close()
+
+def test_a_stranger_on_the_port_is_not_a_copy_of_ours():
+    """Чужой на нашем порту за открытую копию не считается.
+
+    Порт выведен из имени, и занять его до нас может кто угодно. Прими его за
+    свою копию — и зовущий сказал бы «передал», хотя окна не покажет никто.
+    """
+    name = "job-bot-проверка-чужого-на-порту"
+    stranger = socket.socket()
+    stranger.bind((LOOPBACK, raise_window.port_of(name)))
+    stranger.listen(1)
+    try:
+        assert ask_to_raise(name) is False
+    finally:
+        stranger.close()
+
+
+def test_a_greeting_from_a_stranger_leaves_the_window_alone(copies):
+    """Подключение не своим именем окна не поднимает.
+
+    На петлевой порт стучится не только наша копия: любой обход портов открыл
+    бы человеку окно посреди чужой работы.
+    """
+    name = "job-bot-проверка-чужого-приветствия"
+    window = WindowDouble()
+    copies(window, name)
+
+    with socket.create_connection((LOOPBACK, raise_window.port_of(name)), 1.0) as sock:
+        sock.sendall(b"x" * len(name.encode("utf-8")))
+        answer = sock.recv(16)
+
+    assert answer == b""
+    assert window.calls == []
 
 
 def test_the_socket_name_follows_the_data_directory(monkeypatch):
@@ -129,10 +145,17 @@ def test_the_socket_name_follows_the_data_directory(monkeypatch):
     нарочно. Общее имя на машину развело бы их с замком: договариваться они
     стали бы через одно имя, и одна из двух не смогла бы слушать вовсе.
     """
-    import client.raise_window as module
+    monkeypatch.setattr(raise_window, "get_data_dir", lambda: Path("/один"))
+    first = raise_window.socket_name()
+    monkeypatch.setattr(raise_window, "get_data_dir", lambda: Path("/другой"))
 
-    monkeypatch.setattr(module, "get_data_dir", lambda: Path("/один"))
-    first = module.socket_name()
-    monkeypatch.setattr(module, "get_data_dir", lambda: Path("/другой"))
+    assert raise_window.socket_name() != first
 
-    assert module.socket_name() != first
+
+def test_a_port_follows_the_socket_name():
+    """Разным именам — разные порты.
+
+    Общий порт на все имена свёл бы две копии над разными каталогами данных в
+    один разговор: просьба к одной поднимала бы окно другой.
+    """
+    assert raise_window.port_of("job-bot-один") != raise_window.port_of("job-bot-другой")
