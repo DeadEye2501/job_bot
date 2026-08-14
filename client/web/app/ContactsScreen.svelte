@@ -12,7 +12,7 @@
   import CompaniesList from './CompaniesList.svelte';
   import PeopleList from './PeopleList.svelte';
 
-  let { ask, say, events } = $props();
+  let { ask, say, lockedTip, events } = $props();
 
   let tab = $state(CONTACTS_TABS[0].key);
 </script>
@@ -21,7 +21,7 @@
 
 <div class="screen-body">
   {#if tab === 'channels'}
-    <ChannelsList {ask} {say} {events} />
+    <ChannelsList {ask} {say} {lockedTip} {events} />
   {:else if tab === 'companies'}
     <CompaniesList {ask} {say} {events} />
   {:else if tab === 'people'}

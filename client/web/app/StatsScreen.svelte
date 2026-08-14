@@ -11,7 +11,7 @@
   import DonutChart from '$components/DonutChart.svelte';
   import StatsCard from '$components/StatsCard.svelte';
   import TopTabs from '$components/TopTabs.svelte';
-  import { KPI, PERIODS, deltaNote, donut, duration, weekBars } from '$state/stats.js';
+  import { PERIODS, donut, duration, kpiRow, weekBars } from '$state/stats.js';
 
   let { ask } = $props();
 
@@ -76,13 +76,12 @@
   <div class="stats-grid">
     <StatsCard title="Показатели" ready={!!kpi} wide>
       <div class="kpi-row">
-        {#each KPI as one (one.key)}
-          {@const delta = deltaNote(kpi[one.delta], period)}
+        {#each kpiRow(kpi, period) as one (one.key)}
           <div class="kpi">
-            <span class="kpi-num" data-tone={one.tone}>{kpi[one.total] ?? 0}</span>
+            <span class="kpi-num" data-tone={one.tone}>{one.total}</span>
             <span class="kpi-label">{one.label}</span>
-            {#if delta}
-              <span class="kpi-delta" data-tone={delta.tone}>{delta.text}</span>
+            {#if one.delta}
+              <span class="kpi-delta" data-tone={one.delta.tone}>{one.delta.text}</span>
             {/if}
           </div>
         {/each}

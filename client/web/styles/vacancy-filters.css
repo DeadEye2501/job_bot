@@ -1,9 +1,5 @@
-/* Панель отбора вакансий: окно поверх списка, а в нём девять групп условий.
-   Что стоит внутри групп — чипы и перечни для выбора — своими файлами. */
-
-.filter-wrap {
-  position: relative;
-}
+/* Панель отбора вакансий: что стоит внутри окошка поверх списка. Оправа
+   окошка — общая, в popover.css; группы условий — в filter-group.css. */
 
 /* Воронка светится, пока условия стоят: панель закрыта, и по кнопке видно, что
    список показан не весь. */
@@ -13,19 +9,12 @@
 }
 
 .filter-panel {
-  position: absolute;
-  top: calc(100% + 4px);
   right: 0;
-  z-index: 3;
   display: flex;
   flex-direction: column;
   width: 340px;
   max-height: 520px;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-secondary);
-  box-shadow: 0 8px 22px var(--shadow-popup);
 }
 
 .filter-head {

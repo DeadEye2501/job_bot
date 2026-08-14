@@ -9,7 +9,7 @@
   import SearchList from '$components/SearchList.svelte';
   import { fresher } from '$state/contacts.js';
 
-  let { ask, say, events } = $props();
+  let { ask, say, lockedTip, events } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -140,6 +140,7 @@
   <ChannelCard
     {ask}
     {say}
+    {lockedTip}
     channelId={opened}
     onclose={() => (opened = null)}
     onchanged={refresh}

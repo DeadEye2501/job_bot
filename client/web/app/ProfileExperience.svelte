@@ -108,6 +108,7 @@
   {#each rows as exp (exp.key)}
     <ExperienceCard
       {exp}
+      {known}
       open={open.has(exp.key)}
       ontoggle={() => (open = toggled(open, exp.key))}
       onedit={(part) => edit(exp.key, part)}

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { KPI, PERIODS, deltaNote, donut, duration, weekBars } from '../state/stats.js';
+import { PERIODS, deltaNote, donut, duration, kpiRow, weekBars } from '../state/stats.js';
 
 describe('срок ответа', () => {
   it('секунды, минуты, часы и дни — каждый своей мерой', () => {
@@ -75,12 +75,19 @@ describe('показатели верхнего ряда', () => {
     // У первого показателя имя без приставки, у остальных с ней. Припиши ей
     // общее правило — счётчик вакансий показывал бы ноль при живой дельте
     // рядом, и человек читал бы «ноль вакансий, но +5 за неделю».
-    expect(KPI.map((one) => answer[one.total])).toEqual([40, 12, 3, 1, 7]);
+    expect(kpiRow(answer, 'week').map((one) => one.total)).toEqual([40, 12, 3, 1, 7]);
   });
 
-  it('прирост читается своим полем', () => {
-    expect(answer[KPI[0].delta]).toBe(5);
-    expect(answer[KPI[1].delta]).toBe(2);
+  it('прирост читается своим полем и переводится в слова', () => {
+    const shown = kpiRow(answer, 'week');
+    expect(shown[0].delta.text).toBe(deltaNote(5, 'week').text);
+    expect(shown[1].delta.text).toBe(deltaNote(2, 'week').text);
+  });
+
+  it('несчитанное число показывается нулём, а не пустотой', () => {
+    // Мост не присылает поля, которого не считал; пустое место в ряду
+    // читается как недогрузившийся экран.
+    expect(kpiRow({}, 'week').map((one) => one.total)).toEqual([0, 0, 0, 0, 0]);
   });
 });
 
