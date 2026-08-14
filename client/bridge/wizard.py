@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from client.bridge.answer import reply
+from client.bridge.hub import Hub
 from client.bridge.lifespan import start_bot
 from client.bridge.wire import _llm_provider_to_dict, _tg_creds_to_dict
 
@@ -26,7 +27,7 @@ class Wizard:
     возвращается на прерванный шаг и должен увидеть введённое.
     """
 
-    def __init__(self, hub) -> None:
+    def __init__(self, hub: Hub) -> None:
         self._hub = hub
 
     def state(self) -> dict:
@@ -102,7 +103,7 @@ def _steps_behind(rs) -> list[int]:
     недошедшего можно только отметкой.
     """
     completed: list[int] = []
-    if rs.tg is not None and getattr(rs.tg, "session_string", None):
+    if rs.has_tg_session:
         completed.append(1)
     if rs.chat is not None:
         completed.append(2)

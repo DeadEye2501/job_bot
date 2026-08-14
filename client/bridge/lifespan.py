@@ -8,10 +8,19 @@ from concurrent.futures import Future
 from backend.telegram_login import TelegramLogin
 from client.bridge.bot_stop import stop_bot
 from client.bridge.hub import Hub
+from client.bridge.journal import close_journal
 
 
 logger = logging.getLogger(__name__)
 
+
+_LOGIN_CLOSING_WAIT_S = 3.0
+"""Сколько закрывающееся окно ждёт, пока вход отпустит сокет.
+
+Короче, чем ждут бота: там останавливается целый обход, а здесь закрывается
+одно соединение, которое к тому же чаще всего уже мертво. Ждать дольше значит
+держать закрытие ради того, чего не будет.
+"""
 
 _CLOSING_WAIT_S = 5.0
 """Сколько закрывающееся окно ждёт остановки бота.
@@ -48,12 +57,15 @@ def start(runner, session_factory, rs, engine=None) -> Hub:
 
 
 def stop(hub: Hub) -> None:
-    """Отпустить всё, что держит закрывающееся окно: ждущих, вход и бота.
+    """Отпустить всё, что держит закрывающееся окно: журнал, ждущих, вход и бота.
 
-    Ждущие запросы отпускаются первыми: без этого последний из них догорал бы
-    свой срок, держа на себе закрытие приложения.
+    Порядок в теле — от того, что перестаёт слушать, к тому, что перестаёт
+    работать. Приёмник журнала снимается первым: кольцо записей одно на процесс
+    и переживает окно, а оставленный приёмник держал бы через себя всё
+    хозяйство. Ждущие запросы отпускаются вторыми — иначе последний из них
+    догорал бы свой срок, держа на себе закрытие приложения.
 
-    Недоведённый вход закрывается вторым. Посреди трёх шагов окно закрывают
+    Недоведённый вход закрывается третьим. Посреди трёх шагов окно закрывают
     чаще, чем доводят их до конца: незакрытый клиент Pyrogram пережил бы и сам
     мотор, а несброшенный отпечаток кода увёл бы следующую попытку в «код уже
     отправлен».
@@ -64,6 +76,7 @@ def stop(hub: Hub) -> None:
     Звать это из потока мотора нельзя: работа, которой мы здесь ждём, идёт в
     нём же.
     """
+    close_journal()
     hub.events.close()
     _forget_login(hub)
     bot = hub.bot
@@ -107,12 +120,7 @@ def _ready_for_bot(rs) -> bool:
     сеанса довод свой: без неё Pyrogram уходит спрашивать код через стандартный
     ввод, которого у оконной сборки нет, и приложение замирает молча.
     """
-    return (
-        rs.tg is not None
-        and bool(rs.tg.session_string)
-        and rs.chat is not None
-        and rs.embed is not None
-    )
+    return rs.has_tg_session and rs.chat is not None and rs.embed is not None
 
 
 def _forget_login(hub: Hub) -> None:
@@ -126,7 +134,7 @@ def _forget_login(hub: Hub) -> None:
     if not getattr(login, "active", False):
         return
     try:
-        hub.runner.submit(login.forget()).result(timeout=3)
+        hub.runner.submit(login.forget()).result(timeout=_LOGIN_CLOSING_WAIT_S)
     except Exception:
         logger.exception("закрытие: вход в Telegram не закрылся")
 

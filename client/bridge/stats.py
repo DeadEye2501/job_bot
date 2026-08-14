@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from backend.repository import stats_pipeline, stats_summary
 from client.bridge.answer import reply
+from client.bridge.hub import Hub
 
 
 class Stats:
     """Пять чтений одной формы: спросили за срок — ответили числами."""
 
-    def __init__(self, hub) -> None:
+    def __init__(self, hub: Hub) -> None:
         self._hub = hub
 
     def _read(self, period: str, reading) -> dict:

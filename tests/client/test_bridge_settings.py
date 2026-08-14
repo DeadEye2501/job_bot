@@ -5,6 +5,8 @@
 здесь смотрят на дорогу от формы до записи и обратно.
 """
 
+from backend.models import AppSetting
+
 
 async def test_an_empty_model_name_is_refused_before_saving(api, ask):
     """Пустое имя модели отбивают до записи в настройки.
@@ -50,16 +52,23 @@ async def test_saved_settings_come_back_on_the_next_request(api, ask):
     assert answer["ok"]["pipeline"]["scoring_threshold"] == 7
 
 
-async def test_an_unknown_setting_is_ignored_not_written(api, ask):
-    """Незнакомая настройка не применяется и не попадает в список применённых.
+async def test_an_unknown_setting_is_ignored_not_written(api, ask, session_factory):
+    """Незнакомая настройка не доезжает до базы и не числится применённой.
 
-    Список применённого окно показывает человеку. Попади туда имя, которого
-    приложение не знает, человек считал бы настройку рабочей и ждал бы от неё
-    поведения, которого нет.
+    Перечень позволенного стоит затем, чтобы опечатка в имени не легла в
+    настройки своим ключом и не осталась там навсегда, никем не читаемая.
+    Список применённого — вторая половина того же: попади туда незнакомое имя,
+    человек считал бы настройку рабочей и ждал бы от неё поведения, которого
+    нет.
+
+    Записанное спрашиваем у базы, а не у ответа моста: ответ про запись только
+    рассказывает, а сторожим мы саму запись.
     """
     answer = await ask(api.settings.save, {"app": {"придуманное": 1}})
 
     assert answer["ok"]["applied"] == []
+    async with session_factory() as session:
+        assert await session.get(AppSetting, "придуманное") is None
 
 
 async def test_saving_a_provider_without_an_address_is_refused(api, ask):

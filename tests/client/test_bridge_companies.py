@@ -70,6 +70,9 @@ async def test_a_taken_name_is_named_as_taken(api, ask, session_factory):
 
     assert answer["fail"] == "denied"
     assert "Контур" in answer["detail"]
+    # Имя действия едет обратно в отказе: карточку заводят из формы, и по нему
+    # окно понимает, какую именно форму оставить открытой.
+    assert answer["action"] == "create_company"
 
 
 async def test_spellings_of_a_wrong_shape_are_refused_before_the_base(

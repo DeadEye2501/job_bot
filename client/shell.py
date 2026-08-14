@@ -96,7 +96,7 @@ def run_ui() -> int:
     # (Bot работает в in-memory mode), локальные sessions/*.session
     # файлы уже не используются и хранят cleartext auth_key. Сносим
     # их — security review L3.
-    if rs.tg is not None and rs.tg.session_string:
+    if rs.has_tg_session:
         try:
             from adapters.telegram import SESSIONS_DIR as sessions_dir
             if sessions_dir.exists():

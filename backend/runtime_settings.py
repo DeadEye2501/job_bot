@@ -179,6 +179,18 @@ class RuntimeSettings:
         return self._tg
 
     @property
+    def has_tg_session(self) -> bool:
+        """Есть ли сохранённая строка сеанса Telegram.
+
+        Спрашивают об этом четверо и по разным поводам — можно ли поднимать
+        бота, засчитан ли первый шаг мастера, что показать на экране настроек,
+        сносить ли устаревшие файлы сеанса при запуске, — а условие у всех одно,
+        и написанное порознь оно разъезжается: учётные данные без сеанса
+        выглядят как готовый вход, но подключиться с ними нельзя.
+        """
+        return self._tg is not None and bool(self._tg.session_string)
+
+    @property
     def chat(self) -> LlmProviderConfig | None:
         return self._chat
 

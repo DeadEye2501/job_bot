@@ -124,6 +124,39 @@ async def test_an_update_without_fields_says_there_is_nothing_to_do(
     assert answer["detail"] == "Нечего обновлять."
 
 
+async def test_a_created_person_shows_up_in_the_list(api, ask):
+    """Заведённый из контактов человек попадает в перечень, а не только в ответ.
+
+    Заводят его, чтобы потом найти. Не доедь запись до базы, ответ был бы
+    успешным, а карточки в перечне не оказалось бы — и человек завёл бы вторую
+    такую же.
+
+    Красной фазы у этого сторожа не было: заведение из контактов не сторожил
+    никто вовсе, и дописан он по находке ревью слайса А2.9в.
+    """
+    answer = await ask(api.hr.create, {"name": "Пётр", "telegram_username": "petr"})
+
+    assert "ok" in answer
+    listed = await ask(api.hr.list, {})
+    assert "Пётр" in [row["name"] for row in listed["ok"]["hrs"]]
+
+
+async def test_a_person_without_a_name_and_without_a_nick_is_refused(api, ask):
+    """Карточку без имени и без ника не заводят и из контактов тоже.
+
+    Такая карточка не отличима от любой другой: следующий раз человек завёл бы
+    вторую такую же вместо того, чтобы найти эту. Заслон один на оба окна — и
+    на контакты, и на подборщик при вакансии, — и разойдись они, одно и то же
+    отбивалось бы в одном месте и проходило в другом.
+
+    Красной фазы не было — дописан по той же находке.
+    """
+    answer = await ask(api.hr.create, {"name": "  ", "notes": "без имени"})
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Укажите хотя бы имя или @username."
+
+
 async def test_a_nick_that_is_not_a_telegram_one_is_refused(api, ask, session_factory):
     """Ник, не похожий на телеграмовский, до карточки не доходит.
 

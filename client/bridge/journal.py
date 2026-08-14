@@ -7,19 +7,26 @@ import time
 from backend.log_buffer import get_handler
 from backend.payloads import int_or_none
 from client.bridge.answer import denied, reply
+from client.bridge.refusals import LOGS_TOO_OFTEN
 
 
 _LOGS_PAGE = 1000
 """Сколько записей уезжает странице, если она не просила иного."""
 
 _LOGS_INTERVAL_S = 1.0
-"""Чаще раза в секунду журнал не спрашивают.
+"""Чаще раза в секунду журнал не спрашивают. Довод — у слова отказа,
+`refusals.LOGS_TOO_OFTEN`."""
 
-Страница опрашивает его по своим часам, а новые записи и так приходят
-подпиской: второе обращение за ту же секунду отдало бы тот же снимок.
-"""
 
-TOO_OFTEN = "Журнал спрашивают не чаще раза в секунду."
+def close_journal() -> None:
+    """Снять приёмник с кольца записей: окно закрывается.
+
+    Пара к `Journal._open_journal` и живёт рядом с ним нарочно: кольцо одно на
+    процесс и переживает окно, а оставленный приёмник держал бы через себя всё
+    хозяйство — и очередь, и движок закрытой базы. Зовёт это гашение моста
+    (`lifespan.stop`): домен к тому мигу уже никому не принадлежит.
+    """
+    get_handler().on_record = None
 
 
 class Journal:
@@ -60,7 +67,7 @@ class Journal:
         # прошлому ответу, а собирать снимок кольца по нескольку раз в секунду
         # не приходится.
         if now - self._logs_asked_at < _LOGS_INTERVAL_S:
-            return denied(TOO_OFTEN)
+            return denied(LOGS_TOO_OFTEN)
         self._logs_asked_at = now
         limit = int_or_none(payload.get("limit")) or _LOGS_PAGE
 
@@ -69,7 +76,7 @@ class Journal:
 
         return reply(self._hub.runner, run())
 
-    def watch_logs(self, subscribed: bool = False) -> dict:
+    def watch_logs(self, subscribed: bool) -> dict:
         """Открыт ли экран журнала: пока да — новые записи едут в очередь.
 
         Гасится в источнике, а не на странице: каждая запись иначе
@@ -102,9 +109,10 @@ class Journal:
         замком и будит ждущих через их собственный цикл.
 
         Защиты от повторного входа, стоявшей тут прежде, больше нет, и она не
-        нужна: сам приёмник в журнал не пишет, а очередь жалуется только на
-        закрытый цикл ждущего — список ждущих она к тому мигу уже забрала, и
-        второго круга не выйдет.
+        нужна — хотя записи в журнал по дороге и случаются: разбудить ждущего с
+        закрытым циклом очередь не может и жалуется об этом (`events._wake`).
+        Второго круга это не даёт: жалоба идёт уже после того, как список
+        ждущих забран, и приёмник, позванный ею, застаёт очередь пустой.
         """
         if not self._hub.watching_logs:
             return

@@ -5,6 +5,7 @@ from __future__ import annotations
 from backend.models import BLACKLIST_KINDS
 from backend.repository import blacklist as blacklist_repo, blacklist_candidates
 from client.bridge.answer import Denied, bad_fields, denied, reply
+from client.bridge.hub import Hub
 from client.bridge.refusals import NO_ENTRY
 from client.bridge.wire import _blacklist_row_to_dict
 from client.form_payloads import read_toggle
@@ -13,7 +14,7 @@ from client.form_payloads import read_toggle
 class Blacklist:
     """Запись отсева: показать, завести, поправить, погасить, убрать."""
 
-    def __init__(self, hub) -> None:
+    def __init__(self, hub: Hub) -> None:
         self._hub = hub
 
     def list(self) -> dict:
@@ -95,7 +96,7 @@ class Blacklist:
             if not fields:
                 raise KeyError("value / reason")
         except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("update", e, action="update", id=blacklist_id)
+            return bad_fields("blacklist.update", e, action="update", id=blacklist_id)
 
         async def run() -> dict:
             try:

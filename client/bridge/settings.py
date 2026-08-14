@@ -9,6 +9,7 @@ from adapters.lm_studio import LlmProviderConfig
 from backend.telegram_login import username_of
 from client.bridge.answer import denied, reply
 from client.bridge.bot_stop import stop_bot
+from client.bridge.hub import Hub
 from client.bridge.llm import Llm, read_llm_creds
 from client.bridge.login import Login
 from client.bridge.wire import _llm_provider_to_dict, _tg_creds_to_dict
@@ -53,7 +54,7 @@ class Settings(Login, Llm):
     окном и в сеть не выходит.
     """
 
-    def __init__(self, hub) -> None:
+    def __init__(self, hub: Hub) -> None:
         self._hub = hub
 
     def get(self) -> dict:
@@ -70,7 +71,7 @@ class Settings(Login, Llm):
                 "tg": {
                     **_tg_creds_to_dict(tg),
                     "has_password": bool(tg and tg.password),
-                    "has_session": bool(tg and tg.session_string),
+                    "has_session": rs.has_tg_session,
                     "username": await self._username(),
                 },
                 "chat": _llm_provider_to_dict(rs.chat),
@@ -109,7 +110,14 @@ class Settings(Login, Llm):
         async def run() -> dict:
             applied = await self._apply_providers(creds)
             if app is not None:
-                applied += await self._apply_app(app)
+                try:
+                    await self._apply_app(app, applied)
+                except Exception:
+                    # Окну в этот миг едет «сорвалось» без подробностей, и без
+                    # этой строки разобрать, что успело лечь в настройки, было
+                    # бы нечем вовсе.
+                    logger.exception("настройки: записано %s, дальше сорвалось", applied)
+                    raise
             return {"applied": applied}
 
         return reply(self._hub.runner, run())
@@ -147,7 +155,15 @@ class Settings(Login, Llm):
 
         Временный клиент Telegram закрывается, а шаг обнуляется: иначе остаётся
         открытый сокет, а следующая попытка упирается в «код уже отправлен».
+
+        Незаведённую попытку на мотор не отправляем: окно закрывают и не начав
+        входить, а зов туда стоит целого круга по мотору и ждёт ответа своим
+        сроком — ради работы, которой нет.
         """
+        # Через `getattr`, как у соседа в `lifespan`: хозяйство заводит вход
+        # само, но спрашивают его и до подъёма — из стенда, где вход подменён.
+        if not getattr(self._hub.login, "active", False):
+            return {"ok": {}}
 
         async def run() -> dict:
             await self._hub.login.forget()
@@ -187,9 +203,14 @@ class Settings(Login, Llm):
             applied.append(kind)
         return applied
 
-    async def _apply_app(self, app: dict) -> list[str]:
-        """Записать пороги отбора и назвать записанные."""
-        applied: list[str] = []
+    async def _apply_app(self, app: dict, applied: list[str]) -> list[str]:
+        """Записать пороги отбора, дописывая записанные в общий перечень.
+
+        Перечень приходит доводом, а не заводится здесь: записи идут по одной, и
+        поломка посреди застаёт часть уже записанной. Свой список умер бы вместе
+        с броском, и жалоба зовущего назвала бы только поставщиков — то есть
+        ровно не то, на чём сорвалось.
+        """
         for key, value in app.items():
             if key not in APP_KEYS:
                 logger.warning("настройки: незнакомый ключ %r пропущен", key)
@@ -208,6 +229,8 @@ class Settings(Login, Llm):
             from adapters import telegram as _tg
             _tg.SEND_LOCKED = self._hub.rs.send_locked
         return applied
+
+
 
 
 async def _wait_connected(client) -> None:

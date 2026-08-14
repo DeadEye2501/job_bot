@@ -2,24 +2,27 @@
 
 from __future__ import annotations
 
-from sqlalchemy.exc import IntegrityError
-
 from backend.models import Vacancy
 from backend.payloads import text_or_none
-from backend.repository import companies_card, hr_identify, vacancies_card
-from client.bridge.answer import Denied, bad_fields, denied, reply
-from client.bridge.refusals import (
-    COMPANY_EXISTS,
-    IDENTITY_REQUIRED,
-    NAME_REQUIRED,
-    NO_VACANCY,
-)
+from backend.repository import vacancies_card
+from client.bridge.answer import Denied, bad_fields, reply
+from client.bridge.companies import create_company_row
+from client.bridge.hr import create_hr_row
+from client.bridge.refusals import NO_VACANCY
 from client.bridge.pickers import COMPANY_PICKER, HR_PICKER, link_picker
-from client.form_payloads import (
-    hr_is_identified,
-    read_new_company_fields,
-    read_new_hr_fields,
-)
+from client.form_payloads import read_new_company_fields, read_new_hr_fields
+
+
+_CREATING = {
+    "create_hr": (HR_PICKER, read_new_hr_fields, create_hr_row),
+    "create_company": (COMPANY_PICKER, read_new_company_fields, create_company_row),
+}
+"""Чем заведение человека отличается от заведения компании.
+
+Тремя вещами и больше ничем: чтением формы, объявлением, которое пишет запись, и
+подборщиком, чей список надо перечитать. Ключ — имя метода поверхности: он же
+едет в жалобу журнала, и второе имя для того же места разошлось бы с первым.
+"""
 
 
 class VacancyLinks:
@@ -104,51 +107,35 @@ class VacancyLinks:
         Номер заведённого едет ответом, чтобы окно подсветило строку; сама
         привязка по-прежнему за кнопкой «Связать».
         """
-        try:
-            vacancy_id = int(payload["vacancy_id"])
-            fields = read_new_hr_fields(payload)
-            search = text_or_none(payload.get("search"))
-        except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("create_hr", e)
-
-        if not hr_is_identified(fields):
-            return denied(IDENTITY_REQUIRED, vacancy_id=vacancy_id)
-
-        async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                async with session.begin():
-                    created_id = (await hr_identify.create_hr(session, **fields)).id
-                listed = await self._listing(session, HR_PICKER, vacancy_id, search)
-            return {**listed, "created_id": created_id}
-
-        return reply(self._hub.runner, run())
+        return self._created("create_hr", payload)
 
     def create_company(self, payload: dict) -> dict:
         """Завести компанию прямо из подборщика и вернуть обновлённый список."""
+        return self._created("create_company", payload)
+
+    def _created(self, slot: str, payload: dict) -> dict:
+        """Завести запись из подборщика и отдать список, в котором она уже есть.
+
+        Список и номер едут одним ответом нарочно: приди номер без списка,
+        окно подсветило бы строку, которой в нём ещё нет.
+
+        Человек и компания заводятся одинаково — разнятся у них чтение формы,
+        объявление, которое пишет запись, и подборщик, чей список надо
+        перечитать. Всё три названы в `_CREATING`, а не доводами: доводами это
+        четыре параметра на метод из шести строк.
+        """
+        subject, read_fields, create_row = _CREATING[slot]
         try:
             vacancy_id = int(payload["vacancy_id"])
-            fields = read_new_company_fields(payload)
-            name = fields["name"]
+            fields = read_fields(payload)
             search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("create_company", e)
-
-        if not name:
-            return denied(NAME_REQUIRED, vacancy_id=vacancy_id)
+            return bad_fields(slot, e)
 
         async def run() -> dict:
-            try:
-                async with self._hub.session_factory() as session:
-                    async with session.begin():
-                        created = await companies_card.create_company(session, **fields)
-                        created_id = created.id
-                    listed = await self._listing(
-                        session, COMPANY_PICKER, vacancy_id, search
-                    )
-            except IntegrityError:
-                raise Denied(COMPANY_EXISTS.format(name=name), vacancy_id=vacancy_id)
-            except ValueError as e:
-                raise Denied(str(e), vacancy_id=vacancy_id)
+            async with self._hub.session_factory() as session:
+                created_id = await create_row(session, fields, vacancy_id=vacancy_id)
+                listed = await self._listing(session, subject, vacancy_id, search)
             return {**listed, "created_id": created_id}
 
         return reply(self._hub.runner, run())

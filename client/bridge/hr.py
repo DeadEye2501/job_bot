@@ -11,6 +11,7 @@ from backend.repository import (
 )
 from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.hr_chat import HrChat
+from client.bridge.hub import Hub
 from client.bridge.mark import HR_MARK, mark, unmark
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
@@ -18,6 +19,23 @@ from client.bridge.pickers import HR_PICKER, merge_picker
 from client.bridge.refusals import IDENTITY_REQUIRED, NOTHING_TO_UPDATE, NO_HR
 from client.bridge.wire import _hr_picker_row_to_dict, _vacancy_mini_row_to_dict
 from client.form_payloads import hr_is_identified, read_new_hr_fields
+
+
+async def create_hr_row(session, fields: dict, **echo) -> int:
+    """Завести человека по прочитанной форме окна и назвать его номер.
+
+    Форма одна, а окон два: «Добавить HR» в контактах и заведение на ходу из
+    подборщика при вакансии. Заслон у них общий: карточка без имени, без ника и
+    без номера учётной записи не отличима от любой другой — в следующий раз
+    человек завёл бы вторую такую же вместо того, чтобы найти эту.
+
+    Поля отказа отдаёт зовущий: подборщику нужен номер вакансии, из которой
+    заводят, окну контактов — ничего.
+    """
+    if not hr_is_identified(fields):
+        raise Denied(IDENTITY_REQUIRED, **echo)
+    async with session.begin():
+        return (await hr_identify.create_hr(session, **fields)).id
 
 
 class Hr(HrChat):
@@ -35,7 +53,7 @@ class Hr(HrChat):
     сказав, окно осталось бы со вчерашними числами.
     """
 
-    def __init__(self, hub) -> None:
+    def __init__(self, hub: Hub) -> None:
         self._hub = hub
 
     def list(self, payload: dict | None = None) -> dict:
@@ -112,7 +130,7 @@ class Hr(HrChat):
             hr_id = int(payload["hr_id"])
             epoch = int_or_none(payload.get("epoch"))
         except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("vacancies", e)
+            return bad_fields("hr.vacancies", e)
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
@@ -135,7 +153,7 @@ class Hr(HrChat):
             absorbed_id = int(payload["absorbed_id"])
             search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("merge_picker", e)
+            return bad_fields("hr.merge_picker", e)
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
@@ -153,7 +171,7 @@ class Hr(HrChat):
             absorbed_id = int(payload["absorbed_id"])
             survivor_id = int(payload["survivor_id"])
         except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("merge", e)
+            return bad_fields("hr.merge", e)
 
         async def run() -> dict:
             try:
@@ -195,9 +213,11 @@ class Hr(HrChat):
 
         Написание — `@{username}`, если ник есть, иначе `user_id:{id}`.
         Повторное нажатие второй записи не заводит: погашенная оживает, живая
-        остаётся как есть, и ответ говорит об этом полем `existed`. Причина
-        остаётся пустой — её дописывают на экране самого списка. Карточку это
-        не сносит: снос — отдельная кнопка.
+        остаётся как есть, — и различают эти два исхода два поля ответа.
+        `existed` говорит только, что запись уже была; какой из двух случаев
+        это был, говорит `was_inactive`, и карточка рисует их по-разному.
+        Причина остаётся пустой — её дописывают на экране самого списка.
+        Карточку это не сносит: снос — отдельная кнопка.
         """
 
         async def run() -> dict:
@@ -237,7 +257,7 @@ class Hr(HrChat):
         try:
             hr_id = int(payload["hr_id"])
         except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("update", e)
+            return bad_fields("hr.update", e)
 
         # Только присланные поля: отсутствие ключа значит «не трогать».
         kwargs = {
@@ -269,22 +289,19 @@ class Hr(HrChat):
         """Завести человека из окна «Добавить HR».
 
         Номер заведённого едет ответом, чтобы окно подсветило новую строку;
-        перечень оно перечитывает следом само.
+        перечень оно перечитывает следом само. Само заведение — общее с
+        подборщиком при вакансии.
         """
         try:
             fields = read_new_hr_fields(payload)
         # `AttributeError` — про не-объект в нагрузке: помощник читает её
         # ключами, и спотыкается он до мотора, мимо конверта.
         except (AttributeError, ValueError, TypeError, KeyError) as e:
-            return bad_fields("create", e)
-
-        if not hr_is_identified(fields):
-            return denied(IDENTITY_REQUIRED)
+            return bad_fields("hr.create", e)
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
-                async with session.begin():
-                    created_id = (await hr_identify.create_hr(session, **fields)).id
+                created_id = await create_hr_row(session, fields)
             return {"action": "create_hr", "created_id": created_id}
 
         return reply(self._hub.runner, run())

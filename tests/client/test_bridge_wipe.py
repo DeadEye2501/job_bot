@@ -12,6 +12,8 @@
 
 import pytest
 
+from tests.fakes.ui_bot import UiBot
+
 
 @pytest.fixture
 def wipe_steps(monkeypatch, hub):
@@ -52,3 +54,39 @@ async def test_the_answer_is_ready_before_the_bot_and_the_data_are_gone(
 
     assert "ok" in answer
     assert wipe_steps == [("снос", None), ("выход", None)]
+
+
+async def test_the_bot_is_let_go_before_the_work_is_sent_off(
+    api, ask, hub, wipe_steps, monkeypatch
+):
+    """Бота отвязывают до того, как работа уходит на мотор.
+
+    Между отправкой работы и её началом окно живёт своей жизнью: соседний зов
+    в этот миг взял бы полуостановленного бота и пошёл бы с ним в базу, которой
+    вот-вот не станет.
+
+    Сторож смотрит на миг отправки, а не внутрь работы. Изнутри бот обнулён в
+    любом случае — потому соседний сторож выше и остаётся зелёным, если
+    обнуление перенести внутрь; отсюда же такой перенос виден.
+
+    Красной фазы не было: дописан по находке ревью, доверие заслужит итоговым
+    проходом.
+    """
+    # Бот и его работа ставятся руками, а не фикстурой: без них сторож зелен
+    # впустую — обнулять было бы нечего.
+    hub.bot = UiBot()
+    hub.bot_task = object()
+    at_submit: list = []
+    sending = hub.runner.submit
+
+    def watched(coro):
+        # Пара, а не один бот: обнуляются они вместе и по одной причине, и
+        # забытая половина оставила бы соседу работу уже остановленного.
+        at_submit.append((hub.bot, hub.bot_task))
+        return sending(coro)
+
+    monkeypatch.setattr(hub.runner, "submit", watched)
+
+    await ask(api.system.wipe)
+
+    assert at_submit == [(None, None)]

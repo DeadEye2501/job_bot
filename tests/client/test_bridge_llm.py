@@ -141,6 +141,25 @@ async def test_a_broken_listing_answers_instead_of_raising(api, ask, provider_sa
     assert answer["kind"] == "chat"
 
 
+async def test_a_listing_from_a_bad_address_is_refused_with_its_kind(api, ask):
+    """Негодный адрес в запросе списка возвращается отказом со своим родом.
+
+    Адрес набирают руками, и порт из букв — обычная опечатка, а не поломка
+    приложения. Улети она мимо конверта, окно получило бы отказ без рода и
+    погасило бы ожидание не у той из двух проверок.
+
+    Стоит рядом с такой же проверкой у пробы связи нарочно: там это место было
+    закрыто слайсом А2.8, а здесь осталась вторая половина.
+    """
+    answer = await ask(
+        api.settings.list_models,
+        {"kind": "chat", "base_url": "http://localhost:12ab"},
+    )
+
+    assert answer["fail"] == "denied"
+    assert answer["kind"] == "chat"
+
+
 async def test_a_listing_without_an_address_answers_with_nothing(api, ask):
     """Запрос списка без адреса отвечает пустым перечнем, а не отказом.
 

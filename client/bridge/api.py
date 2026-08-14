@@ -17,7 +17,7 @@ from client.bridge.hr import Hr
 from client.bridge.hub import Hub
 from client.bridge.profile import Profile
 from client.bridge.settings import Settings
-from client.bridge.state import System
+from client.bridge.system import System
 from client.bridge.stats import Stats
 from client.bridge.vacancies import Vacancies
 from client.bridge.wizard import Wizard

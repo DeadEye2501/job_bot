@@ -18,6 +18,24 @@ from client.bridge.refusals import LLM_FIELDS_REQUIRED
 logger = logging.getLogger(__name__)
 
 
+def _client_or_reason(cfg: LlmProviderConfig) -> tuple[httpx.AsyncClient | None, str]:
+    """Клиент поставщика либо причина, по которой он не собрался.
+
+    Сборка спотыкается о негодный адрес — `http://localhost:12ab` человек
+    набирает легко. Отвечаем исходом, а не броском: поломка, вылетевшая мимо
+    конверта, приезжает окну без рода, а без рода оно не знает, у которой из
+    двух проверок гасить ожидание.
+
+    Спрашивают это оба разговора с поставщиком — проба связи и опрос имён, — и
+    спотыкаются они об один и тот же адрес из одной и той же формы.
+    """
+    try:
+        return lm_studio.make_client(cfg), ""
+    except Exception as e:
+        logger.exception("не собрался клиент поставщика: %s", cfg.base_url)
+        return None, f"Неверный адрес поставщика: {e}"
+
+
 async def _do_list_models_for_creds(
     base_url: str, api_key: str, *, kind: str | None = None
 ) -> dict:
@@ -27,7 +45,9 @@ async def _do_list_models_for_creds(
     API v0 различает llm / embeddings).
     """
     cfg = LlmProviderConfig(base_url=base_url, api_key=api_key, model="x")
-    client = lm_studio.make_client(cfg)
+    client, reason = _client_or_reason(cfg)
+    if client is None:
+        return {"ok": False, "error": reason}
     try:
         models = await lm_studio.list_models(client, kind=kind)
         return {"ok": True, "models": models}
@@ -51,15 +71,9 @@ async def _do_llm_probe(
     `client.aclose()` гарантирован через finally — иначе при cancellation
     httpx-сокет утекает.
     """
-    try:
-        client = lm_studio.make_client(cfg)
-    except Exception as e:
-        # Сборка клиента спотыкается о негодный адрес — `http://localhost:12ab`
-        # человек набирает легко. Отвечаем исходом, а не броском: у поломки в
-        # конверте нет рода, а без рода окно не знает, у которой из двух
-        # проверок гасить ожидание.
-        logger.exception("не собрался клиент поставщика: %s", cfg.base_url)
-        return False, f"Неверный адрес поставщика: {e}", [], 0
+    client, reason = _client_or_reason(cfg)
+    if client is None:
+        return False, reason, [], 0
     t0 = time.monotonic()
     try:
         ok, detail = await check_fn(client, cfg.model)

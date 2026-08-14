@@ -152,6 +152,20 @@ def _stack_items(stack, matched_set: set[str]) -> list[dict]:
     return out
 
 
+def _company_name(v) -> str | None:
+    """Имя компании вакансии: связанная карточка перебивает написание объявления.
+
+    Ради этого связывание и делают: одна компания под пятью написаниями
+    перестаёт выглядеть пятью разными. Пока связи нет, окно показывает то, что
+    написано в самом объявлении, — иначе строка осталась бы вовсе без компании.
+
+    Читают это карточка и строка списка, и читать они обязаны одно: разойдись
+    правило, одна и та же вакансия называла бы компанию по-разному на двух
+    экранах.
+    """
+    return v.company.name if v.company is not None else v.company_name
+
+
 def _vacancy_detail_to_dict(
     detail, matched_set: set[str], score_threshold: int,
 ) -> dict:
@@ -159,7 +173,7 @@ def _vacancy_detail_to_dict(
     to the raw parsed strings on the vacancy when the FK isn't set, so the
     UI can always render *something* without lazy-loading."""
     v = detail.vacancy
-    company_name = v.company.name if v.company is not None else v.company_name
+    company_name = _company_name(v)
     company_website = v.company.website if v.company is not None else None
     channel_username = v.channel.username if v.channel is not None else None
     hr_block = None
@@ -237,6 +251,23 @@ def _hr_picker_row_to_dict(item) -> dict:
     }
 
 
+def _hr_mini_row_to_dict(hr, vacancy_count: int) -> dict:
+    """Строка человека в боковом списке карточки компании.
+
+    Не строка подборщика: счёт там свой, по всем вакансиям человека, и лежит
+    он полем прочитанного, а сюда приходит отдельным доводом. Непрочитанные,
+    последняя компания и отметка заслона сюда не едут вовсе: карточка
+    рассказывает про компанию, а не про человека целиком.
+    """
+    return {
+        "id": hr.id,
+        "name": hr.name,
+        "telegram_username": hr.telegram_username,
+        "vacancy_count": vacancy_count,
+        "avatar": _avatar_data_url(hr.avatar),
+    }
+
+
 def _message_row_to_dict(m) -> dict:
     """Письмо переписки — тем, из чего окно рисует пузырь.
 
@@ -310,14 +341,11 @@ def _company_picker_row_to_dict(item) -> dict:
 def _vacancy_list_row_to_dict(
     v, matched_set: set[str], activity_by_id: dict[int, Any] | None = None
 ) -> dict:
-    """Строка вакансии в списке. Linked Company.name wins over the
-    raw vacancy.company_name; falls back to raw if no FK is set. Each stack
-    item is paired with a ``matched`` flag against the casefolded profile
-    skills + aliases set so the UI can highlight relevant chips."""
-    if v.company is not None:
-        company = v.company.name
-    else:
-        company = v.company_name
+    """Строка вакансии в списке. Имя компании выбирает `_company_name` — то же,
+    что и в карточке. Each stack item is paired with a ``matched`` flag against
+    the casefolded profile skills + aliases set so the UI can highlight relevant
+    chips."""
+    company = _company_name(v)
     channel_username = v.channel.username if v.channel is not None else None
     last_activity = None
     if activity_by_id:

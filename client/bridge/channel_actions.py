@@ -6,7 +6,7 @@ from backend.domain.telegram_identity import normalize_username
 from backend.repository import channels as channels_repo
 from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.mark import CHANNEL_MARK, mark, unmark
-from client.bridge.refusals import BUSY_CYCLE, NO_BOT, NO_CHANNEL
+from client.bridge.refusals import NO_BOT, NO_CHANNEL, POLL_REFUSALS
 from client.form_payloads import read_toggle
 
 
@@ -73,14 +73,8 @@ class ChannelActions:
                     "action": "poll_now",
                     "status": status,
                 }
-            messages = {
-                "busy": BUSY_CYCLE,
-                "missing": "Канал не найден или без @username.",
-                "cancelled": "Поллинг канала отменён.",
-                "error": "Не удалось прогнать канал — см. логи.",
-            }
             raise Denied(
-                messages.get(status, "Не удалось прогнать канал."),
+                POLL_REFUSALS.get(status, "Не удалось прогнать канал."),
                 channel_id=channel_id,
                 action="poll_now",
                 status=status,
