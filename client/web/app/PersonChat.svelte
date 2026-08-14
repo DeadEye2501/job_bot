@@ -18,6 +18,7 @@
   let digging = $state(false);
   let draft = $state('');
   let sending = $state(false);
+  let attaching = $state(false);
   let feed = $state(null);
 
   const tries = attempts();
@@ -97,6 +98,25 @@
     return refresh();
   }
 
+  /** Приложить файл к переписке.
+   *
+   * Файл называет диалог самого окна, а не страница: браузер отдаёт выбранное
+   * содержимым, а боту нужен путь. Закрытый диалог ничего не отправляет и
+   * отказом не считается — про него мост говорит отдельным словом.
+   */
+  async function attach() {
+    if (attaching) return;
+    // Признак свой, не отправки письма: диалог выбора висит, пока человек ищет
+    // файл, — минуты, — и общий признак всё это время говорил бы, что письмо
+    // летит, и запирал бы кнопку отправки.
+    attaching = true;
+    const done = await ask('hr.pick_media', card.hr_id);
+    attaching = false;
+    if (done === null || !alive || done.cancelled) return;
+    say('Файл отправлен');
+    return refresh();
+  }
+
   /** Открыть вложение тем, чем его открывает система.
    *
    * Открывает не страница: путь приезжает адресом `file://`, а раздача окна
@@ -160,6 +180,16 @@
   <div class="empty-note">{blocked}</div>
 {:else}
   <div class="chat-send">
+    <button
+      class="btn"
+      type="button"
+      title="Приложить файл"
+      disabled={attaching}
+      onclick={attach}
+    >
+      <span class="material-symbols-outlined">attach_file</span>
+    </button>
+
     <!-- Поле не запирается на время отправки: человек набирает следующее письмо,
          пока летит прошлое, и запертое поле выбросило бы каретку. Заперта одна
          кнопка — второе нажатие отправило бы то же письмо дважды. -->

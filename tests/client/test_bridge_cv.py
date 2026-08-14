@@ -5,6 +5,8 @@
 называет страница, а спрашивает его у человека диалог самого окна.
 """
 
+from tests.client.conftest import WindowThatPicks
+
 
 async def test_an_empty_path_is_refused(api, ask):
     """Пустой путь не сохраняют: подставлять в отклик будет нечего."""
@@ -109,7 +111,7 @@ async def test_the_window_asks_the_person_for_a_file(api, ask, hub, tmp_path):
     """
     resume = tmp_path / "выбранное.pdf"
     resume.write_bytes(b"%PDF-1.4 ")
-    hub.window = _WindowThatPicks([str(resume)])
+    hub.window = WindowThatPicks([str(resume)])
 
     answer = await ask(api.profile.pick)
 
@@ -124,20 +126,8 @@ async def test_a_closed_dialog_changes_nothing(api, ask, hub):
     Отказ здесь был бы неправдой — ничего не сломалось, человек передумал, — а
     пустой путь стёр бы прежний, и отклик ушёл бы без вложения.
     """
-    hub.window = _WindowThatPicks(None)
+    hub.window = WindowThatPicks(None)
 
     answer = await ask(api.profile.pick)
 
     assert answer["ok"]["cancelled"] is True
-
-
-class _WindowThatPicks:
-    """Окно, которое отвечает на диалог заранее назначенным выбором."""
-
-    def __init__(self, chosen) -> None:
-        self.chosen = chosen
-        self.asked = []
-
-    def create_file_dialog(self, *args, **kwargs):
-        self.asked.append(kwargs)
-        return self.chosen
