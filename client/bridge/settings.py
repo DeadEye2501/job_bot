@@ -11,7 +11,7 @@ from client.bridge.answer import denied, reply
 from client.bridge.bot_stop import stop_bot
 from client.bridge.llm import Llm, read_llm_creds
 from client.bridge.login import Login
-from client.bridge.wire import _llm_provider_to_dict
+from client.bridge.wire import _llm_provider_to_dict, _tg_creds_to_dict
 
 
 logger = logging.getLogger(__name__)
@@ -68,9 +68,7 @@ class Settings(Login, Llm):
             tg = rs.tg
             return {
                 "tg": {
-                    "api_id": str(tg.api_id) if tg else "",
-                    "api_hash": tg.api_hash if tg else "",
-                    "phone": tg.phone if tg else "",
+                    **_tg_creds_to_dict(tg),
                     "has_password": bool(tg and tg.password),
                     "has_session": bool(tg and tg.session_string),
                     "username": await self._username(),

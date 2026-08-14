@@ -115,14 +115,14 @@ def _declare_ui_hooks(bot) -> None:
     два своих бот толкает сам.
     """
     # Optional UI hooks fired around each Full-mode poll cycle.
-    bot.on_cycle_start = None  # filled in by client.bridge.MainApi if running under the UI
-    bot.on_cycle_end = None    # filled in by client.bridge.MainApi if running under the UI
-    # Forwarded from IngestionPipeline; Bridge wires this to a Qt signal.
+    bot.on_cycle_start = None  # filled in by client.bridge.lifespan under the UI
+    bot.on_cycle_end = None     # filled in by client.bridge.lifespan under the UI
+    # Forwarded from IngestionPipeline; the bridge puts this in its event queue.
     # Signature: on_progress(stage, label, current, total)
-    bot.on_progress = None     # filled in by client.bridge.MainApi if running under the UI
+    bot.on_progress = None      # filled in by client.bridge.lifespan under the UI
     # Real-time chat push — fires after a new incoming HR DM is saved.
-    # Signature: on_new_message(hr_id: int). Bridge wires to a Qt signal
-    # the Contacts/HR pane listens for.
+    # Signature: on_new_message(hr_id: int). The bridge puts it in the queue
+    # the Contacts/HR pane reads.
     bot.on_new_message = None
     # Real-time HR-read-receipt push. Signature:
     # on_hr_read(hr_id: int, max_tg_id: int). Cheaper than on_new_message

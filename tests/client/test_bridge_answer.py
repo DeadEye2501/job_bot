@@ -3,81 +3,14 @@
 Предмет здесь один — дорога ответа, а не то, что по ней едет. Поведение на
 отказе, на поломке и на отмене одинаково для всех, кто по ней ходит.
 
-**Дорог сейчас две, и это переходное состояние.** Домены отвечают возвратом
-(`reply`), окно первого запуска — сигналом (`_dispatch_json`). Вторая уходит
-вместе с мастером, и сторожа уйдут с ней; расходятся дороги в одном —
-поведении при отмене, и довод записан у `reply`.
+Дорога одна: домен отвечает возвратом (`reply`). Вторая, сигнальная, ушла
+вместе с каналом Qt и мастером, который ею отвечал, — и сторожа ушли с ней.
 """
 
 import asyncio
-import json
 import logging
 
 from client.bridge.answer import reply
-
-
-async def test_the_answer_reaches_the_window_as_a_signal(wizard_api, watch):
-    """Ответ доходит до окна отправкой, а не возвратом слота.
-
-    Слот возвращает `None` сразу же — окно узнаёт исход только сигналом, и
-    порвись эта дорога, интерфейс молчал бы, не показывая никакой ошибки.
-    """
-    caught = watch(wizard_api.finish_done)
-
-    async def answered() -> str:
-        return json.dumps({"ok": True, "notes": "готово"})
-
-    wizard_api._dispatch(wizard_api.finish_done, answered())
-
-    assert await caught.next() == {"ok": True, "notes": "готово"}
-
-
-async def test_a_broken_coroutine_becomes_a_refusal_not_a_silence(
-    wizard_api, watch, caplog
-):
-    """Поломка внутри работы превращается в отказ, а не теряется.
-
-    Окно ждёт ответа на каждый запрос: пропади он — экран остался бы с
-    крутящимся ожиданием навсегда. Имя породы и текст едут в окно, чтобы
-    человеку было что показать, а трассировка — в журнал, чтобы было что
-    читать потом.
-    """
-    caught = watch(wizard_api.finish_done)
-
-    async def broken() -> str:
-        raise RuntimeError("база не отвечает")
-
-    with caplog.at_level(logging.ERROR, logger="client.bridge.answer"):
-        wizard_api._dispatch(wizard_api.finish_done, broken())
-        answer = await caught.next()
-
-    assert answer == {"ok": False, "error": "RuntimeError: база не отвечает"}
-    assert any(record.exc_info for record in caplog.records)
-
-
-async def test_a_cancelled_request_says_nothing_at_all(wizard_api, watch):
-    """Отменённая работа не отвечает вовсе.
-
-    Отменяют при остановке приложения: обработчик в окне к этому мигу уже
-    отвалился, и «работа отменена» уехало бы в умирающую страницу — человек
-    увидел бы ошибку там, где просто закрыл окно.
-    """
-    caught = watch(wizard_api.finish_done)
-    started = asyncio.Event()
-
-    async def endless() -> str:
-        started.set()
-        await asyncio.sleep(3600)
-        return ""
-
-    coro = endless()
-    wizard_api._dispatch(wizard_api.finish_done, coro)
-    await started.wait()
-    for task in asyncio.all_tasks():
-        if task.get_coro() is coro:
-            task.cancel()
-
-    assert await caught.silent()
 
 
 async def test_a_rejected_payload_never_lands_in_the_journal(api, ask, caplog):
@@ -137,9 +70,8 @@ async def test_a_broken_job_comes_back_named_on_the_new_road(runner, ask, caplog
 async def test_a_cancelled_job_comes_back_named_instead_of_silent(runner, ask):
     """Отменённая работа возвращается отказом, а не тишиной.
 
-    Соседняя дорога на отмене молчит нарочно — там ответ уезжал в умирающую
-    страницу. Здесь ответа ждёт зов, и молчание держало бы его до полного срока
-    впустую.
+    Ответа ждёт зов, и молчание держало бы его до полного срока впустую — а
+    страница всё это время стояла бы с крутящимся ожиданием.
     """
     started = asyncio.Event()
 

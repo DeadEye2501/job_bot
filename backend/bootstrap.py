@@ -1,7 +1,7 @@
 """First-run bootstrap: ensure DB schema exists.
 
-Schema создаётся / обновляется через Alembic на каждом старте. Сам wizard
-сейчас живёт в ``client/web/wizard.html`` + ``client/bridge.WizardApi``;
+Schema создаётся / обновляется через Alembic на каждом старте. Сам мастер
+первого запуска живёт на странице и в домене ``client/bridge/wizard.py``;
 терминальный CLI-wizard был удалён в Phase 11 как мёртвый код.
 """
 

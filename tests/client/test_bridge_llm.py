@@ -5,8 +5,6 @@
 из этого доезжает до окна и что оно показывает человеку до сохранения.
 """
 
-import json
-
 import httpx
 import pytest
 
@@ -31,54 +29,39 @@ def provider_says(monkeypatch):
     return _answer
 
 
-async def test_a_check_without_an_address_is_refused(wizard_api, watch):
+async def test_a_check_without_an_address_is_refused(api, ask):
     """Проверку без адреса и модели отбивают до похода в сеть.
 
     Форму проверяют на ходу, ещё не дописав адрес. Уйди запрос как есть, он
     ушёл бы в никуда и вернулся отказом соединения — из такого ответа не
     видно, что человек просто не дозаполнил поле.
     """
-    caught = watch(wizard_api.chat_check_done)
+    answer = await ask(
+        api.settings.probe_model, {"kind": "chat", "base_url": "", "model": ""}
+    )
 
-    wizard_api.chat_check(json.dumps({"base_url": "", "model": ""}))
-
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert answer["error"] == "Заполните base_url и модель."
+    assert answer["fail"] == "fields"
+    assert "Заполните base_url и модель." in answer["detail"]
 
 
-async def test_a_working_model_answers_with_what_it_can_do(
-    wizard_api, watch, provider_says
-):
-    """Удавшаяся проверка приносит и объяснение, и список моделей.
+async def test_a_working_provider_names_the_models_it_has(api, ask, provider_says):
+    """Опрошенный провайдер отдаёт свои имена моделей, а не пустоту.
 
-    Список нужен тут же: имя модели человек вписывает руками, и опечатку в
-    нём видно только рядом с тем, что провайдер на самом деле умеет.
+    Имя модели человек вписывает руками, и подсказка — единственное, чем он
+    сверяет написанное с тем, что у провайдера на самом деле поднято.
     """
-    caught = watch(wizard_api.chat_check_done)
-    provider_says(
-        {
-            MODELS: models_response("qwen", "llama"),
-            CHAT: httpx.Response(
-                200,
-                json={
-                    "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}]
-                },
-            ),
-        }
+    provider_says({MODELS: models_response("qwen", "llama")})
+
+    answer = await ask(
+        api.settings.list_models,
+        {"kind": "chat", "base_url": "http://provider.test"},
     )
 
-    wizard_api.chat_check(
-        json.dumps({"base_url": "http://provider.test", "model": "qwen"})
-    )
-
-    answer = await caught.next()
-    assert answer["ok"] is True
-    assert "qwen" in answer["models"]
+    assert "qwen" in answer["ok"]["models"]
 
 
 async def test_a_silent_provider_is_told_apart_from_a_working_one(
-    wizard_api, watch, provider_says
+    api, ask, provider_says
 ):
     """Молчащий провайдер отвечает отказом, а не пустым успехом.
 
@@ -86,14 +69,14 @@ async def test_a_silent_provider_is_told_apart_from_a_working_one(
     мост успехом — разбор объявлений молча не работал бы, а причина всплыла
     бы только в журнале.
     """
-    caught = watch(wizard_api.chat_check_done)
     provider_says({MODELS: httpx.ConnectError("соединение отклонено")})
 
-    wizard_api.chat_check(
-        json.dumps({"base_url": "http://provider.test", "model": "qwen"})
+    answer = await ask(
+        api.settings.probe_model,
+        {"kind": "chat", "base_url": "http://provider.test", "model": "qwen"},
     )
 
-    assert (await caught.next())["ok"] is False
+    assert answer["fail"] == "denied"
 
 
 async def test_a_probe_answers_about_the_model_it_was_asked_about(
@@ -170,26 +153,6 @@ async def test_a_listing_without_an_address_answers_with_nothing(api, ask):
     assert answer["ok"]["models"] == []
 
 
-async def test_a_saved_model_reaches_the_settings(wizard_api, watch, api, ask):
-    """Сохранённое мастером видно на экране настроек.
-
-    Мастер и основное окно — разные объекты моста, и общее у них только
-    записанное. Не доедь настройка, человек прошёл бы мастер и увидел пустые
-    поля модели в настройках.
-    """
-    saved = watch(wizard_api.chat_save_done)
-
-    wizard_api.chat_save(
-        json.dumps(
-            {"base_url": "http://provider.test/", "api_key": "", "model": "qwen"}
-        )
-    )
-    assert (await saved.next())["ok"] is True
-
-    answer = await ask(api.settings.get)
-    assert answer["ok"]["chat"]["model"] == "qwen"
-
-
 async def test_a_listed_but_silent_model_lights_the_lamp_red(
     api, ask, provider_says, runtime_settings
 ):
@@ -211,22 +174,6 @@ async def test_a_listed_but_silent_model_lights_the_lamp_red(
     answer = await ask(api.system.health)
 
     assert answer["ok"]["chat"] is False
-
-
-async def test_saving_a_provider_without_a_model_is_refused(wizard_api, watch):
-    """Пустую модель не сохраняют молча.
-
-    Сохранённая пустота выглядит как настроенный поставщик: экран показывает
-    заполненный адрес, а первый же разбор вакансии падает на пустом имени
-    модели — и ищут беду где угодно, только не в мастере.
-    """
-    caught = watch(wizard_api.chat_save_done)
-
-    wizard_api.chat_save(json.dumps({"base_url": "http://localhost:1234", "model": ""}))
-
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert answer["error"] == "Заполните base_url и модель."
 
 
 async def test_an_answering_model_lights_the_lamp_green(

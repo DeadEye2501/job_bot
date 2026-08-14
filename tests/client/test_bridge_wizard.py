@@ -1,62 +1,33 @@
-"""Следствия мастера первого запуска: с какого шага он продолжает и чем кончается.
+"""Следствия первого запуска: с какого шага он продолжается и чем кончается.
 
-Предмет — сам порядок первого запуска. Шаги, которые мастер делает вместе с
-основным окном — вход в Telegram, проверка модели, выбор резюме, — лежат со
-своими предметами: тела у них общие, и проверять их дважды незачем.
+Предмет — сам порядок первого запуска. Шаги, которые мастер делает теми же
+доменами, что и основное окно — вход в Telegram, проверка модели, её запись,
+выбор резюме, — сторожатся со своими предметами: тела у них общие, и проверять
+их дважды незачем.
 """
-
-import json
-
-import pytest
 
 from backend.crypto import encrypt_str
 from backend.models import LlmConfigKind
 from backend.runtime_settings import RuntimeSettings
-from client.bridge import WizardApi
 from tests.dbio import put
 from tests.factories import llm_config_row, tg_account_row
 
 
-class Handoff:
-    """Переход в основное окно: то, что мастер зовёт напоследок."""
-
-    def __init__(self) -> None:
-        self.entered = 0
-
-    def __call__(self) -> None:
-        self.entered += 1
-
-
-@pytest.fixture
-def handoff() -> Handoff:
-    return Handoff()
-
-
-@pytest.fixture
-async def wizard_with_handoff(runtime_settings, session_factory, runner, handoff):
-    """Мастер, которому есть куда передать управление."""
-    api = WizardApi(
-        runtime_settings, session_factory, runner, on_enter_main=handoff
-    )
-    yield api
-    await runner.drain()
-
-
-async def test_an_empty_setup_has_no_steps_behind_it(wizard_api):
+async def test_an_empty_setup_has_no_steps_behind_it(api, ask):
     """На пустой установке пройденных шагов нет ни одного.
 
     По этому списку мастер решает, с какого шага открыться. Соври он про
     пройденное — человек попал бы сразу на последний шаг, не введя ни
     учётной записи, ни модели.
     """
-    answer = json.loads(wizard_api.initial_state())
+    answer = await ask(api.wizard.state)
 
-    assert answer["completed"] == []
-    assert answer["wizard_completed"] is False
+    assert answer["ok"]["completed"] == []
+    assert answer["ok"]["wizard_completed"] is False
 
 
 async def test_credentials_without_a_session_do_not_count_as_a_step(
-    wizard_api, session_factory
+    api, ask, runtime_settings, session_factory
 ):
     """Введённые учётные данные без сохранённой сессии шагом не считаются.
 
@@ -74,58 +45,118 @@ async def test_credentials_without_a_session_do_not_count_as_a_step(
             api_hash_encrypted=encrypt_str("ш"), session_blob_encrypted=None
         ),
     )
-    await wizard_api._rs.reload()
+    await runtime_settings.reload()
 
-    answer = json.loads(wizard_api.initial_state())
+    answer = await ask(api.wizard.state)
 
-    assert answer["completed"] == []
-    assert answer["tg"]["api_hash"] == "ш"
+    assert answer["ok"]["completed"] == []
+    assert answer["ok"]["tg"]["api_hash"] == "ш"
 
 
-async def test_a_saved_model_counts_as_a_step(wizard_api, session_factory):
-    """Сохранённая чат-модель засчитывается пройденным шагом.
+async def test_a_saved_model_counts_as_a_step(
+    api, ask, runtime_settings, session_factory
+):
+    """Сохранённая чат-модель засчитывается пройденным шагом и приезжает назад.
 
     Мастер продолжают в другой день и с другого запуска; шаги, сделанные
-    вчера, переспрашивать незачем.
+    вчера, переспрашивать незачем. Само записанное едет вместе со счётом:
+    придя пустым, оно заставило бы человека перепечатать поверх того, что уже
+    лежит в базе, — а шаг при этом числился бы пройденным.
     """
     await put(session_factory, llm_config_row(LlmConfigKind.CHAT))
-    await wizard_api._rs.reload()
+    await runtime_settings.reload()
 
-    answer = json.loads(wizard_api.initial_state())
+    answer = await ask(api.wizard.state)
 
-    assert 2 in answer["completed"]
-
-
-async def test_finishing_does_not_yet_mark_the_setup_as_done(wizard_api, watch):
-    """Нажатие «готово» само по себе установку завершённой не помечает.
-
-    Отметку ставят только при настоящем переходе в основное окно: упади
-    приложение между этими двумя мигами, следующий запуск пропустил бы
-    последний экран мастера, так и не показав его.
-    """
-    caught = watch(wizard_api.finish_done)
-
-    wizard_api.finish()
-    assert (await caught.next())["ok"] is True
-
-    assert json.loads(wizard_api.initial_state())["wizard_completed"] is False
+    assert 2 in answer["ok"]["completed"]
+    assert answer["ok"]["chat"]["model"] == runtime_settings.chat.model
 
 
-async def test_entering_the_main_window_marks_the_setup_as_done(
-    wizard_with_handoff, handoff, session_factory
+async def test_a_saved_embedding_model_counts_as_its_own_step(
+    api, ask, runtime_settings, session_factory
 ):
-    """Переход в основное окно и отмечает установку, и передаёт управление.
+    """Модель векторов засчитывается своим шагом, а не шагом чат-модели.
 
-    Отметка решает, что покажет следующий запуск, а передача — что человек
-    увидит сейчас. Пропади первая, мастер открывался бы каждый раз заново;
-    пропади вторая — человек остался бы на последнем экране мастера навсегда.
+    Шага два, и записываются они порознь. Спутай мастер их номера — человек,
+    вернувшийся к прерванной установке, переспрашивал бы уже введённое и
+    проскакивал невведённое.
+
+    Красной фазы у этого сторожа не было: дописан по находке ревью — шаги 3 и 4
+    можно было снести, и прогон остался бы зелёным.
     """
-    wizard = wizard_with_handoff
+    await put(session_factory, llm_config_row(LlmConfigKind.EMBED))
+    await runtime_settings.reload()
 
-    wizard.enter_main_app()
-    await wizard._runner.drain()
+    answer = await ask(api.wizard.state)
 
-    assert handoff.entered == 1
+    assert answer["ok"]["completed"] == [3]
+
+
+async def test_a_chosen_resume_counts_as_the_last_step(api, ask, tmp_path):
+    """Выбранное резюме засчитывается последним шагом мастера.
+
+    Шаг резюме — единственный, который засчитывается по записи вне мастера:
+    путь кладёт домен анкеты. Не смотри мастер туда, человек, выбравший файл,
+    возвращался бы на тот же шаг после каждого перезапуска.
+
+    Красной фазы не было — дописан по той же находке.
+    """
+    resume = tmp_path / "уже выбрано.pdf"
+    resume.write_bytes(b"%PDF-1.4 ")
+    await ask(api.profile.replace, {"path": str(resume)})
+
+    answer = await ask(api.wizard.state)
+
+    assert 4 in answer["ok"]["completed"]
+
+
+async def test_skipping_the_resume_forgets_the_chosen_file(api, ask, tmp_path):
+    """Пропуск резюме стирает выбранный до него файл, а не оставляет его.
+
+    Человек выбирает файл, передумывает и жмёт «пропустить». Останься путь
+    записанным — отклики уходили бы с вложением, от которого человек только
+    что отказался, и увидел бы он это лишь в отправленном письме.
+    """
+    resume = tmp_path / "передумал.pdf"
+    resume.write_bytes(b"%PDF-1.4 ")
+    await ask(api.profile.replace, {"path": str(resume)})
+
+    answer = await ask(api.wizard.skip_cv)
+
+    assert "ok" in answer
+    assert (await ask(api.profile.get))["ok"]["cv_path"] == ""
+    assert (await ask(api.wizard.state))["ok"]["cv_path"] == ""
+
+
+async def test_the_setup_is_marked_done_only_when_it_is_completed(
+    api, ask, session_factory
+):
+    """Установка помечается завершённой ровно тогда, когда её завершают.
+
+    Отметка решает, что покажет следующий запуск. Поставь её мастер раньше —
+    брошенная посреди установка открылась бы в ненастроенном приложении; не
+    поставь вовсе — мастер открывался бы каждый раз заново поверх настроенного.
+    """
+    assert (await ask(api.wizard.state))["ok"]["wizard_completed"] is False
+
+    answer = await ask(api.wizard.complete)
+
+    assert "ok" in answer
     assert (await RuntimeSettings.load(session_factory)).wizard_completed is True
 
 
+async def test_a_finished_setup_does_not_wake_a_bot_it_cannot_build(api, ask, hub):
+    """Конец мастера на недонастроенном приложении бота не поднимает.
+
+    Мастер доходит до конца и с пропущенными шагами — их пропускают, чтобы
+    посмотреть приложение. Собери мост бота на пустых моделях, тот отказал бы
+    броском, и человек прочитал бы в журнале «бот упал» ровно там, где всё
+    идёт по плану.
+
+    Красной фазы не было: сторож дописан вместе с заслоном, найденным ревью, и
+    доверие заслужит итоговым проходом.
+    """
+    await ask(api.wizard.complete)
+
+    assert hub.bot is None
+    assert hub.bot_task is None
