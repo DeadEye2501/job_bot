@@ -28,5 +28,6 @@ export const PROFILE_TABS = [
 export const CONTACTS_TABS = [
   { key: 'channels', label: 'Каналы' },
   { key: 'companies', label: 'Компании' },
+  { key: 'people', label: 'HR' },
   { key: 'blacklist', label: 'Чёрный список' },
 ];
