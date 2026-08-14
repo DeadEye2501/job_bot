@@ -36,3 +36,105 @@
   flex-direction: column;
   gap: 2px;
 }
+
+/* Переписка в карточке человека: лента писем и строка отправки. */
+
+.chat {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 2px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.chat-day {
+  align-self: center;
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  padding: 2px 8px;
+}
+
+/* Своё письмо справа, чужое слева: по стороне их различают, не читая. */
+.bubble {
+  max-width: 78%;
+  align-self: flex-start;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.bubble.mine {
+  align-self: flex-end;
+  background: var(--selected-bg);
+}
+
+.bubble.dropped {
+  opacity: 0.6;
+}
+
+.bubble-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bubble-text {
+  font-size: 0.83rem;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bubble-mark {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+}
+
+.bubble-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+
+.bubble-file .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.bubble-file {
+  color: var(--text-secondary);
+}
+
+.bubble-time {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Прочитанное собеседником помечено цветом, а не только второй галочкой: две
+   галочки от одной на глаз не отличить. */
+.bubble-tick[data-tick='✓✓'] {
+  color: var(--accent);
+}
+
+.chat-send {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.chat-send .textarea {
+  min-height: 32px;
+}
