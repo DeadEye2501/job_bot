@@ -1,0 +1,28 @@
+/* Верхние вкладки раздела: одна строка над содержимым экрана. */
+
+.top-tabs {
+  height: 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  padding: 0 12px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.top-tabs .tab {
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.top-tabs .tab:hover { color: var(--text-primary); }
+
+.top-tabs .tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}

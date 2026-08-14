@@ -9,3 +9,10 @@ export const SECTIONS = [
   { key: 'stats', label: 'Статистика', icon: 'bar_chart' },
   { key: 'system', label: 'Система', icon: 'settings' },
 ];
+
+/** Вкладки раздела «Система» в том порядке, в каком они стояли в прежнем окне.
+ *  Настройки идут первыми и открыты по умолчанию — так было и там. */
+export const SYSTEM_TABS = [
+  { key: 'settings', label: 'Настройки' },
+  { key: 'logs', label: 'Логи' },
+];
