@@ -1,16 +1,15 @@
 <script>
-  // Раздел «Вакансии»: список с поиском, порядком и страницами.
-  //
-  // Отбор панелью и календарь приедут вторым заходом слайса; порядок и поиск
-  // стоят здесь потому, что без них список из тысячи строк не читается вовсе.
+  // Раздел «Вакансии»: список с поиском, порядком, отбором и страницами.
 
   import { untrack } from 'svelte';
 
   import Dropdown from '$components/Dropdown.svelte';
   import SearchList from '$components/SearchList.svelte';
+  import VacancyFilters from '$components/VacancyFilters.svelte';
   import VacancyRow from '$components/VacancyRow.svelte';
   import { attempts } from '$state/attempts.js';
   import { PAGE, appended, refreshLimit } from '$state/paging.js';
+  import { blankFilter, filterPayload } from '$state/vacancy_filter.js';
   import { SORTS, sortKey } from '$state/vacancies.js';
 
   let { ask, events } = $props();
@@ -21,6 +20,15 @@
   let search = $state('');
   let sort = $state(SORTS[0].label);
   let threshold = $state(null);
+  let applied = $state(blankFilter());
+  // Границы срока замораживаются в миг применения: пересчитай их к следующей
+  // странице, скользящее окно «за неделю» уехало бы вперёд, а `offset`
+  // считался бы по уже другой выдаче — строки на стыке страниц пропали бы.
+  let asked = $state({});
+  // Каналы и компании для панели собраны мимо действующего отбора: считай их
+  // мост по выдаче, меню сжималось бы до того, что уже отобрано, и вернуть
+  // отброшенное было бы нечем.
+  let options = $state({ channels: [], companies: [] });
 
   const tries = attempts();
   let alive = true;
@@ -41,10 +49,12 @@
       sort: sortKey(sort),
       limit,
       offset: 0,
+      ...asked,
     });
     if (now === null || !alive || tries.stale(mine)) return;
     rows = now.vacancies;
     hasMore = now.has_more;
+    options = now.filter_options;
     // Порог отбора приезжает вместе со списком: по нему красится оценка, и
     // спрашивать его отдельно значило бы ждать второго ответа ради цвета.
     threshold = now.score_threshold;
@@ -58,6 +68,7 @@
       sort: sortKey(sort),
       limit: PAGE,
       offset: rows.length,
+      ...asked,
     });
     if (page === null || !alive || tries.stale(mine)) return;
     rows = appended(rows, page.vacancies);
@@ -71,6 +82,12 @@
 
   function order(label) {
     sort = label;
+    return refresh();
+  }
+
+  function apply(next) {
+    applied = next;
+    asked = filterPayload(next, new Date());
     return refresh();
   }
 
@@ -100,12 +117,13 @@
     {loaded}
     count={rows.length}
     words={['вакансия', 'вакансии', 'вакансий']}
-    filtered={!!search}
+    filtered={!!search || Object.keys(asked).length > 0}
     nothing="Ничего не найдено"
     empty="Вакансий пока нет — они появятся после первого обхода каналов"
   >
     {#snippet actions()}
       <Dropdown options={SORTS.map((one) => one.label)} value={sort} onpick={order} />
+      <VacancyFilters {applied} {options} onapply={apply} />
     {/snippet}
 
     {#each rows as vacancy (vacancy.id)}
