@@ -9,8 +9,8 @@
   import ChipList from '$components/ChipList.svelte';
   import CompanyRow from '$components/CompanyRow.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
-  import MergePicker from '$components/MergePicker.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
+  import PickerDialog from '$components/PickerDialog.svelte';
   import { companyLine } from '$state/companies.js';
   import { personName } from '$state/contacts.js';
   import { plural } from '$state/words.js';
@@ -223,7 +223,8 @@
 {/if}
 
 {#if asking === 'merge'}
-  <MergePicker
+  <PickerDialog
+    icon="merge"
     title={`Слить «${shown.name}» с другой`}
     placeholder="Поиск по названию, написанию, домену"
     words={['компания', 'компании', 'компаний']}
@@ -236,7 +237,7 @@
         <CompanyRow {company} onpick={() => (chosen = company)} />
       {/each}
     {/snippet}
-  </MergePicker>
+  </PickerDialog>
 {/if}
 
 {#if chosen}

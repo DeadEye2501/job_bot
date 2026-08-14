@@ -1,0 +1,19 @@
+/* Окошко под кнопкой: общая оправа всплывающих панелей.
+
+   Своё у каждой — сторона, к которой она прижата, ширина и то, что внутри;
+   общее — то, чем она отделена от страницы под собой. */
+
+.pop-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  z-index: 3;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  box-shadow: 0 6px 20px var(--shadow-popup);
+}

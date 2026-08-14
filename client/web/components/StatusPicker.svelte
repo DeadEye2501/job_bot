@@ -13,7 +13,7 @@
   let note = $state('');
 </script>
 
-<div class="status-picker">
+<div class="pop status-picker">
   <ChoiceRow
     options={STATUS_CHOICES}
     chosen={new Set([chosen])}

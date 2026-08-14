@@ -1,24 +1,10 @@
-/* Выбор статуса: окошко под значком статуса в шапке карточки. Ряд вариантов
-   внутри — общий, в choice-row.css. */
-
-/* Окошко цепляется за значок статуса: без этой оправы оно уехало бы к краю
-   карточки. */
-.status-wrap {
-  position: relative;
-  flex-shrink: 0;
-}
+/* Выбор статуса: что стоит внутри окошка под значком статуса. Оправа окошка —
+   общая, в popover.css; ряд вариантов — в choice-row.css. */
 
 .status-picker {
-  position: absolute;
-  top: calc(100% + 4px);
   left: 0;
-  z-index: 3;
   width: 260px;
   padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-secondary);
-  box-shadow: 0 6px 20px var(--shadow-popup);
 }
 
 .status-picker .input {

@@ -6,25 +6,36 @@
   // рядом с ними и решают, стоит ли она отклика.
 
   import CardDialog from '$components/CardDialog.svelte';
+  import ConfirmDialog from '$components/ConfirmDialog.svelte';
+  import RawTextDialog from '$components/RawTextDialog.svelte';
   import StatusPicker from '$components/StatusPicker.svelte';
+  import VacancyActions from '$components/VacancyActions.svelte';
   import VacancyTimeline from '$components/VacancyTimeline.svelte';
   import { attempts } from '$state/attempts.js';
+  import { actionBlocks, rawNote } from '$state/vacancy_actions.js';
   import { gradeLabel, scoreTone } from '$state/vacancies.js';
   import { timelineRows } from '$state/vacancy_card.js';
 
-  let { ask, say, vacancyId, onclose, onchanged } = $props();
+  import VacancyLinks from './VacancyLinks.svelte';
+
+  let { ask, say, events, lockedTip, vacancyId, onclose, onchanged } = $props();
 
   let card = $state(null);
   let notes = $state('');
   let trouble = $state('');
   let picking = $state(false);
   let saving = $state(false);
+  let asking = $state(null);
+  let linking = $state(null);
+  let raw = $state(false);
+  let sending = $state(false);
 
   const tries = attempts();
   let alive = true;
 
   const rows = $derived(card ? timelineRows(card.history, card.events) : []);
   const tone = $derived(card ? scoreTone(card.score, card.score_threshold) : '');
+  const blocks = $derived(card ? actionBlocks(card, lockedTip) : { send: '', rerun: '' });
 
   /** Перечитать карточку целиком.
    *
@@ -91,18 +102,90 @@
     onchanged();
   }
 
+  /** Разобрать объявление заново.
+   *
+   * Ответ приходит сразу, а работа идёт дальше в боте: он занимает общий слот
+   * обхода, и о ходе рассказывает нижняя полоса окна. Готовое приезжает вестью
+   * о смене списка — по ней карточка и перечитывается.
+   */
+  async function rerun() {
+    const done = await ask('vacancies.rerun', { vacancy_id: vacancyId });
+    if (done === null) return;
+    say('Разбор запущен');
+  }
+
+  /** Отправить отклик.
+   *
+   * Заперто на время полёта: заслон «уже откликались» стоит на мосту и читает
+   * статус до отправки, а зов идёт своим чередом — два нажатия послали бы
+   * человеку два письма. Перечитываем и после отказа: половина отказов
+   * приходит оттого, что статус успел уехать, и на экране он уже другой.
+   */
+  async function send() {
+    if (sending) return;
+    asking = null;
+    sending = true;
+    const done = await ask('vacancies.send_application', { vacancy_id: vacancyId });
+    if (!alive) return;
+    sending = false;
+    if (done !== null) say('Отклик отправлен');
+    await refresh();
+    onchanged();
+  }
+
+  async function drop() {
+    asking = null;
+    const done = await ask('vacancies.delete', { vacancy_id: vacancyId });
+    if (done === null) return;
+    say('Вакансия удалена');
+    onchanged();
+    onclose();
+  }
+
+  /** Открыть объявление в Telegram.
+   *
+   * Открывает его система, а не страница: адрес ведёт наружу, и окно раздаёт
+   * свою папку, а не интернет. Ссылки может не быть вовсе — источник её не
+   * прислал, — и тогда открывать нечего, о чём и говорим.
+   */
+  function source() {
+    if (!card.source_url) return say('Ссылки на объявление нет');
+    return ask('system.open_url', card.source_url);
+  }
+
+  /** Положить исходный текст в буфер обмена.
+   *
+   * Кладёт страница сама: мосту для этого делать нечего, а в окне буфер обмена
+   * есть. Отказать он может — окно без разрешения на буфер такое бывает, — и
+   * молчать об этом нельзя: человек уйдёт вставлять пустоту.
+   */
+  async function copyRaw() {
+    if (!card.raw_text) return say('Копировать нечего');
+    try {
+      await navigator.clipboard.writeText(card.raw_text);
+    } catch (trouble) {
+      return say(`Не удалось скопировать: ${trouble}`);
+    }
+    say('Текст скопирован');
+  }
+
   $effect(() => {
     alive = true;
+    // Вакансию двигает не только это окно: бот разбирает её заново по нашей же
+    // просьбе и правит статус по переписке. Весть о смене списка — то же
+    // событие, по которому обновляется список под карточкой.
+    const deaf = events.on('vacancies_list_changed', refresh);
     refresh();
     return () => {
       alive = false;
+      deaf();
     };
   });
 </script>
 
 <CardDialog {trouble} ready={!!card} {onclose}>
   <div class="modal-title vac-card-head">
-    <div class="status-wrap">
+    <div class="pop-wrap">
       <button class="status-badge" type="button" onclick={() => (picking = !picking)}>
         <span class="status-dot" data-status={card.status}></span>
         <span class="status-label">{card.status}</span>
@@ -118,6 +201,18 @@
       {/if}
     </div>
     <span class="card-name">{card.title || 'Без названия'}</span>
+
+    <VacancyActions
+      {blocks}
+      {say}
+      onsend={() => (asking = 'send')}
+      onrerun={rerun}
+      onlinkhr={() => (linking = 'hr')}
+      onlinkcompany={() => (linking = 'company')}
+      onraw={() => (raw = true)}
+      onsource={source}
+      ondelete={() => (asking = 'delete')}
+    />
   </div>
 
   <div class="vac-chips">
@@ -183,3 +278,44 @@
     <button class="btn" type="button" onclick={() => onclose()}>Закрыть</button>
   </div>
 </CardDialog>
+
+{#if asking === 'send'}
+  <ConfirmDialog
+    message={`Сочинить сопроводительное письмо и отправить его${card.hr?.name ? ` ${card.hr.name}` : ''} вместе с резюме?`}
+    confirmLabel="Отправить"
+    onconfirm={send}
+    oncancel={() => (asking = null)}
+  />
+{/if}
+
+{#if asking === 'delete'}
+  <ConfirmDialog
+    message={'Удалить эту вакансию?\n\nИстория статусов и события разбора уйдут вместе с ней. Переписка с HR останется. Откатить нельзя.'}
+    confirmLabel="Удалить"
+    onconfirm={drop}
+    oncancel={() => (asking = null)}
+  />
+{/if}
+
+{#if raw}
+  <RawTextDialog
+    note={rawNote(card)}
+    text={card.raw_text ?? 'Исходный текст не сохранён'}
+    oncopy={copyRaw}
+    onclose={() => (raw = false)}
+  />
+{/if}
+
+{#if linking !== null}
+  <VacancyLinks
+    {ask}
+    {say}
+    {vacancyId}
+    kind={linking}
+    onclose={() => (linking = null)}
+    onlinked={() => {
+      refresh();
+      onchanged();
+    }}
+  />
+{/if}

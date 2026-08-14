@@ -4,6 +4,7 @@
   import { untrack } from 'svelte';
 
   import AskDialog from '$components/AskDialog.svelte';
+  import NewPersonFields from '$components/NewPersonFields.svelte';
   import PersonRow from '$components/PersonRow.svelte';
   import SearchList from '$components/SearchList.svelte';
   import { attempts } from '$state/attempts.js';
@@ -124,17 +125,7 @@
     onconfirm={create}
     oncancel={() => (adding = false)}
   >
-    <!-- svelte-ignore a11y_autofocus -->
-    <input
-      class="input"
-      autofocus
-      placeholder="Имя"
-      bind:value={draft.name}
-      onkeydown={(event) => event.key === 'Enter' && create()}
-    />
-    <input class="input" placeholder="Ник в Telegram" bind:value={draft.telegram_username} />
-    <input class="input" placeholder="Номер учётной записи Telegram" bind:value={draft.telegram_user_id} />
-    <textarea class="textarea" placeholder="Заметки" bind:value={draft.notes}></textarea>
+    <NewPersonFields {draft} onenter={create} />
   </AskDialog>
 {/if}
 
