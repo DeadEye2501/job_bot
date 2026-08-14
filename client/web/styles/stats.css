@@ -1,0 +1,190 @@
+/* Статистика: карточки сеткой, показатели в ряд, воронка по каналам.
+   Сама коробка карточки — общая, в settings-section.css. */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Показатели и каналы идут во всю ширину: в половине пять чисел встают в два
+   ряда, а таблица каналов режется по названию. */
+.stats-grid .wide {
+  grid-column: span 2;
+}
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.kpi-num {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.kpi-num[data-tone='info'] { color: var(--info); }
+.kpi-num[data-tone='ok'] { color: var(--ok); }
+.kpi-num[data-tone='accent'] { color: var(--accent); }
+.kpi-num[data-tone='err'] { color: var(--danger); }
+
+.kpi-label {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.kpi-delta {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+}
+
+/* Рост подсвечен, убыль — нет: убыль отказов это хорошо, а убыль офферов
+   плохо, и красить её одним цветом значило бы врать в половине случаев. */
+.kpi-delta[data-tone='up'] {
+  color: var(--accent);
+}
+
+.status-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.status-item {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+
+.status-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.stat-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stat-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.stat-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* Навык, который есть у человека, выделен: по этому списку он решает, чему
+   учиться, и своё нужно отличать с одного взгляда. */
+.stat-name.mine {
+  color: var(--accent);
+}
+
+/* Цвета показателей — те же, что были в прежнем окне: отклик синий, работа
+   зелёная, оффер сиреневый, отказ красный. */
+.kpi-num[data-tone='applied'] { color: var(--status-applied); }
+.kpi-num[data-tone='progress'] { color: var(--accent); }
+.kpi-num[data-tone='offer'] { color: var(--status-offer); }
+.kpi-num[data-tone='decline'] { color: var(--err); }
+
+/* Ответы по дням недели: столбцы снизу вверх. */
+.week-bars {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  align-items: end;
+  height: 70px;
+  margin-top: 10px;
+}
+
+.week-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  height: 100%;
+  gap: 3px;
+}
+
+.week-fill {
+  width: 100%;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+  min-height: 1px;
+}
+
+.week-label {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+}
+
+/* Воронка по каналам: одиннадцать колонок, числа выровнены по правому краю. */
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-table th {
+  text-align: right;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  padding: 0 6px 4px;
+  white-space: nowrap;
+}
+
+.stats-table td {
+  text-align: right;
+  padding: 3px 6px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.stats-table th:first-child,
+.stats-table td:first-child {
+  text-align: left;
+}
+
+.stats-table-name {
+  color: var(--text-primary);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
