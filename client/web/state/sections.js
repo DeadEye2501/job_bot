@@ -16,3 +16,10 @@ export const SYSTEM_TABS = [
   { key: 'settings', label: 'Настройки' },
   { key: 'logs', label: 'Логи' },
 ];
+
+/** Вкладки раздела «Профиль». Подписи английские — так они и стояли. */
+export const PROFILE_TABS = [
+  { key: 'cv', label: 'CV' },
+  { key: 'skills', label: 'Skills' },
+  { key: 'experience', label: 'Experience' },
+];

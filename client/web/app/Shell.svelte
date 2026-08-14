@@ -12,6 +12,7 @@
   import { call } from '$api/bridge.js';
   import { listener } from '$api/events.js';
   import LogsScreen from './LogsScreen.svelte';
+  import ProfileScreen from './ProfileScreen.svelte';
   import SettingsScreen from './SettingsScreen.svelte';
   import HealthLamp from '$components/HealthLamp.svelte';
   import ModeToggle from '$components/ModeToggle.svelte';
@@ -214,7 +215,9 @@
   </aside>
 
   <main class="main">
-    {#if section === 'system'}
+    {#if section === 'profile'}
+      <ProfileScreen {ask} />
+    {:else if section === 'system'}
       <TopTabs tabs={SYSTEM_TABS} active={systemTab} onpick={(key) => (systemTab = key)} />
       {#if systemTab === 'logs'}
         <LogsScreen {ask} {say} events={heard} />

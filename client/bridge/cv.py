@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import webview
+
 from client.bridge.answer import denied, reply
 from client.bridge.cv_file import _stat_cv
 from client.bridge.desktop import open_in_system
@@ -23,6 +25,25 @@ class Cv:
     Путь называет страница, а спрашивает его у человека диалог самого окна
     (`Window.create_file_dialog` у pywebview) — зовёт его экран анкеты, слайс Б3.
     """
+
+    def pick(self) -> dict:
+        """Спросить у человека файл резюме диалогом самого окна.
+
+        Диалог у окна, а не у моста, и со страницы до него не дотянуться:
+        браузер отдаёт выбранный файл содержимым, а не путём, — нарочно, — а
+        отклику нужен именно путь, чтобы приложить файл с диска.
+
+        Закрытый диалог отказом не считается: ничего не сломалось, человек
+        передумал. Отзовись мост отказом, окно показало бы плашку беды на
+        обычном «нет, не сейчас», а пустой путь стёр бы прежнее резюме, и
+        следующий отклик ушёл бы без вложения.
+        """
+        chosen = self._hub.window.create_file_dialog(
+            webview.OPEN_DIALOG, file_types=("Резюме (*.pdf;*.doc;*.docx)",)
+        )
+        if not chosen:
+            return {"ok": {"cancelled": True}}
+        return self.replace({"path": chosen[0]})
 
     def replace(self, payload: dict) -> dict:
         """Запомнить новый путь к резюме и рассказать, что по нему лежит."""

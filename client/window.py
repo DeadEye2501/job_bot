@@ -86,6 +86,9 @@ def run_ui() -> int:
             min_size=WINDOW_MIN,
             background_color=WINDOW_BACKGROUND,
         )
+        # Окно — хозяйству: до диалога выбора файла добраться больше неоткуда,
+        # а мост собран раньше окна и сам его не видит.
+        hub.window = window
         listening = raise_window.listen(window)
         webview.start(icon=_icon())
     finally:

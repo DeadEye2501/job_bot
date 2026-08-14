@@ -3,6 +3,8 @@
 // Чистые функции: ввод и ответы моста приходят доводами, наружу уходят числа,
 // строки и признаки. Ни моста, ни разметки этот файл не знает.
 
+import { fillPercent } from './chosen.js';
+
 /** Предел порога отбора. Дорожка ползунка размечена по нему, и он же
  *  зажимает значение, приехавшее с моста. */
 export const SCORE_MAX = 20;
@@ -37,7 +39,7 @@ export function clampField(raw, { min, max, fallback }) {
 
 /** Какую долю дорожки залить под этот порог. */
 export function scorePercent(value) {
-  return (Math.max(0, Math.min(SCORE_MAX, value)) / SCORE_MAX) * 100;
+  return fillPercent(value, SCORE_MAX);
 }
 
 /** Сменились ли учётные данные поставщика.

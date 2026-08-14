@@ -1,0 +1,52 @@
+/* Общее у экранов раздела: шапка с заголовком и поле под вкладками. */
+
+.screen-body {
+  flex: 1;
+  overflow: auto;
+  padding: 18px 24px;
+  min-height: 0;
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 14px;
+}
+
+.page-title {
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.page-title-meta {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.updated-ts {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+}
+
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+
+/* Отказ записи стоит под формой, а не плашкой поверх экрана: анкету
+   заполняют сверху вниз, и до последнего обязательного поля каждая запись
+   законно отказана — плашка била бы на каждом поле. */
+.save-trouble {
+  margin-top: 10px;
+  color: var(--danger);
+  font-size: 0.78rem;
+}

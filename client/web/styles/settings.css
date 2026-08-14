@@ -15,6 +15,15 @@
   margin: 0 auto;
 }
 
+/* Поля здесь плотнее общих: их на экране вдвое больше, и в общем размере
+   секции не помещаются на один взгляд. */
+.settings-page .input {
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  padding: 5px 9px;
+  font-size: 0.83rem;
+}
+
 .settings-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

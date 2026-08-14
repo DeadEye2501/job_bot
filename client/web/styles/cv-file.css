@@ -1,0 +1,53 @@
+/* Файл резюме: пунктирная рамка — то же, чем обычно показывают «сюда кладут». */
+
+.pdf-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  margin-top: 14px;
+}
+
+.pdf-row > .material-symbols-outlined {
+  color: var(--danger);
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.pdf-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pdf-name {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-meta {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  margin-top: 1px;
+}
+
+.pdf-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Пропавший файл обведён красным: строка «файл не найден» сама по себе теряется
+   между размером и именем, а бот прикладывает резюме к каждому отклику. */
+.pdf-row.missing {
+  border-color: var(--err-zone-border);
+}
+
+.pdf-row.missing .pdf-meta {
+  color: var(--danger);
+}

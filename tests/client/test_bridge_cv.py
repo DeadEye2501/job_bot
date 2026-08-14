@@ -99,3 +99,45 @@ async def test_a_resume_the_system_would_not_open_is_not_called_opened(
 
     assert answer["fail"] == "denied"
     assert answer["path"] == "C:/нет/такого.pdf"
+
+
+async def test_the_window_asks_the_person_for_a_file(api, ask, hub, tmp_path):
+    """Файл выбирают диалогом самого окна, а не набором пути руками.
+
+    Со страницы этот диалог не позвать: он у окна, а не у моста, — и мост
+    здесь единственный, кто до него дотягивается.
+    """
+    resume = tmp_path / "выбранное.pdf"
+    resume.write_bytes(b"%PDF-1.4 ")
+    hub.window = _WindowThatPicks([str(resume)])
+
+    answer = await ask(api.profile.pick)
+
+    assert answer["ok"]["exists"] is True
+    shown = await ask(api.profile.get)
+    assert shown["ok"]["cv_path"] == str(resume)
+
+
+async def test_a_closed_dialog_changes_nothing(api, ask, hub):
+    """Человек закрыл диалог, ничего не выбрав: прежнее резюме остаётся.
+
+    Отказ здесь был бы неправдой — ничего не сломалось, человек передумал, — а
+    пустой путь стёр бы прежний, и отклик ушёл бы без вложения.
+    """
+    hub.window = _WindowThatPicks(None)
+
+    answer = await ask(api.profile.pick)
+
+    assert answer["ok"]["cancelled"] is True
+
+
+class _WindowThatPicks:
+    """Окно, которое отвечает на диалог заранее назначенным выбором."""
+
+    def __init__(self, chosen) -> None:
+        self.chosen = chosen
+        self.asked = []
+
+    def create_file_dialog(self, *args, **kwargs):
+        self.asked.append(kwargs)
+        return self.chosen

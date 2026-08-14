@@ -1,0 +1,62 @@
+/* Выпадающий список со своим видом: системный в тёмном окне светлая заплата. */
+
+.cdd {
+  position: relative;
+  width: 100%;
+}
+
+.cdd-btn {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.cdd-btn:hover,
+.cdd.open .cdd-btn {
+  border-color: var(--accent);
+}
+
+.cdd-btn .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--text-tertiary);
+}
+
+.cdd-panel {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  min-width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 6px 14px var(--shadow-dropdown);
+  /* Выше соседних строк списка, но ниже окон поверх экрана. */
+  z-index: 30;
+  overflow: hidden;
+}
+
+.cdd-option {
+  width: 100%;
+  text-align: left;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.cdd-option:hover {
+  background: var(--selected-bg);
+  color: var(--text-primary);
+}
+
+.cdd-option.active {
+  color: var(--accent);
+}
