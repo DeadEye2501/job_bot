@@ -2,96 +2,110 @@
 
 from __future__ import annotations
 
-import json
-import logging
 import time
-
-from PySide6.QtCore import Signal, Slot
 
 from backend.log_buffer import get_handler
 from backend.payloads import int_or_none
-from client.bridge.answer import _err, _ok
-from client.bridge.payload import _log_invalid_payload
+from client.bridge.answer import denied, reply
 
-
-logger = logging.getLogger(__name__)
 
 _LOGS_PAGE = 1000
-"""Сколько записей уезжает в окно, если оно не просило иного."""
+"""Сколько записей уезжает странице, если она не просила иного."""
 
-_LOGS_REQUEST_INTERVAL_S = 1.0
+_LOGS_INTERVAL_S = 1.0
 """Чаще раза в секунду журнал не спрашивают.
 
-Окно опрашивает его по своим часам, а новые записи и так приходят подпиской:
-второе обращение за ту же секунду отдало бы тот же снимок.
+Страница опрашивает его по своим часам, а новые записи и так приходят
+подпиской: второе обращение за ту же секунду отдало бы тот же снимок.
 """
 
+TOO_OFTEN = "Журнал спрашивают не чаще раза в секунду."
 
-class JournalSlots:
-    """Буфер журнала, каким его видит окно.
 
-    Подмешивающий обязан держать `_dispatch` и признак `_logs_subscribed`:
-    подписку ставит окно, а строки в неё толкает обработчик, заведённый
-    подмешивающим при сборке, — поэтому `system_log_record_pushed` объявлен
-    здесь, а испускается не отсюда.
+class Journal:
+    """Кольцо записей журнала, каким его видит страница.
+
+    Примесь к `System`: это разрезание домена по файлам, а не задел под вторую
+    реализацию — поверхность у страницы одна, `api.system`.
+
+    Своего конструктора у примеси нет: собранный класс один, и два
+    конструктора в нём разошлись бы порядком. Подписку заводит `_open_journal`,
+    которую зовёт `System.__init__`.
     """
 
-    system_logs_loaded = Signal(str)
-    system_log_record_pushed = Signal(str)
-    system_logs_cleared = Signal(str)
+    def _open_journal(self) -> None:
+        """Завести признак подписки и повесить приёмник на кольцо журнала."""
+        self._logs_asked_at = float("-inf")
+        get_handler().on_record = self._push_record
 
-    @Slot(str)
-    def request_system_logs(self, payload_json: str) -> None:
+    def logs(self, payload: dict | None = None) -> dict:
         """Страница журнала для экрана «Логи».
 
-        Нагрузка — `{limit?}`. Отбора здесь нет нарочно: окно берёт весь
-        буфер и отбирает у себя, потому что счётчики в пилюлях считают полный
-        буфер независимо от выбранного уровня. Три ветки отбора, стоявшие
-        тут прежде, окно не просило ни разу — и одна из них разошлась с
-        общим правилом поиска.
+        Нагрузка — `{limit?}`; негодный потолок читается как «не задавали»
+        (`int_or_none`), и человек получает страницу по умолчанию вместо
+        отказа на опечатке.
 
-        Заслон от частых обращений: окно опрашивает журнал по своим часам, и
-        второе обращение за секунду ничего не добавит — записи оно и так
-        получит подпиской.
+        Отбора здесь нет нарочно: страница берёт весь буфер и отбирает у себя,
+        потому что счётчики в пилюлях считают полный буфер независимо от
+        выбранного уровня.
 
         Потолок не зажимается: больше кольца (`log_buffer.MAX_RECORDS`) в
         ответе и не бывает, а зажим на границе выглядел бы правилом, которого
         нет.
         """
+        payload = payload if isinstance(payload, dict) else {}
         now = time.monotonic()
-        if now - self._logs_request_last_ts < _LOGS_REQUEST_INTERVAL_S:
-            logger.debug("request_system_logs: too often, skipped")
-            return
-        self._logs_request_last_ts = now
-        try:
-            payload = json.loads(payload_json) if payload_json else {}
-            limit = int_or_none(payload.get("limit")) or _LOGS_PAGE
-        except (AttributeError, ValueError, TypeError) as e:
-            _log_invalid_payload("request_system_logs", e)
-            self.system_logs_loaded.emit(_err(f"Неверные поля: {e}"))
-            return
+        # Прежде на частый вопрос не отвечали вовсе. На дороге возврата
+        # молчания нет, и отказ значит ровно то же самое: страница рисует по
+        # прошлому ответу, а собирать снимок кольца по нескольку раз в секунду
+        # не приходится.
+        if now - self._logs_asked_at < _LOGS_INTERVAL_S:
+            return denied(TOO_OFTEN)
+        self._logs_asked_at = now
+        limit = int_or_none(payload.get("limit")) or _LOGS_PAGE
 
-        async def run() -> str:
-            return _ok(get_handler().page(limit))
+        async def run() -> dict:
+            return get_handler().page(limit)
 
-        self._dispatch(self.system_logs_loaded, run())
+        return reply(self._hub.runner, run())
 
-    @Slot(bool)
-    def set_logs_subscribed(self, subscribed: bool) -> None:
-        """JS toggle'ит при заходе/уходе с logs-таба и при включении/
-        выключении auto-refresh. Когда False, push-сигнал гасится в
-        источнике: обработчик буфера журнала, который заводит подмешивающий
-        при сборке, читает этот признак перед каждой отправкой.
+    def watch_logs(self, subscribed: bool = False) -> dict:
+        """Открыт ли экран журнала: пока да — новые записи едут в очередь.
+
+        Гасится в источнике, а не на странице: каждая запись иначе
+        превращалась бы в событие, а сборщик пишет их сотнями за обход — на
+        чужих экранах эта работа не нужна никому.
+
+        Ответ пустой, но он есть: без него страница не отличит поставленную
+        подписку от зова, не дошедшего до моста.
         """
-        self._logs_subscribed = bool(subscribed)
+        self._hub.watching_logs = bool(subscribed)
+        return {"ok": {"watching": self._hub.watching_logs}}
 
-    @Slot()
-    def request_system_logs_clear(self) -> None:
-        """Очищает in-memory ring-buffer. Не трогает файлы/stdout — это
-        чисто UI-action для сброса видимого списка.
+    def clear_logs(self) -> dict:
+        """Очистить кольцо записей. Файла журнала и потока это не трогает.
+
+        Чистят его, чтобы поймать поломку с чистого листа: прогнать заново и
+        увидеть только новые записи.
         """
-        async def run() -> str:
-            cleared = get_handler().clear()
-            return _ok({"cleared": cleared})
 
-        self._dispatch(self.system_logs_cleared, run())
+        async def run() -> dict:
+            return {"cleared": get_handler().clear()}
+
+        return reply(self._hub.runner, run())
+
+    def _push_record(self, entry: dict) -> None:
+        """Новая запись журнала — в очередь событий.
+
+        Зовётся из любого потока, который пишет в журнал: кольцо дёргает
+        приёмник прямо из своего `emit`. Очередь для того и сделана — она под
+        замком и будит ждущих через их собственный цикл.
+
+        Защиты от повторного входа, стоявшей тут прежде, больше нет, и она не
+        нужна: сам приёмник в журнал не пишет, а очередь жалуется только на
+        закрытый цикл ждущего — список ждущих она к тому мигу уже забрала, и
+        второго круга не выйдет.
+        """
+        if not self._hub.watching_logs:
+            return
+        self._hub.events.add("system_log_record_pushed", entry)

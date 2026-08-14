@@ -1,52 +1,41 @@
-"""Следствия слотов состояния: чем занят бот и что показывает нижняя полоса.
+"""Следствия домена «система»: чем занят бот и что показывает нижняя полоса.
 
 Предмет — то, что видно всегда, на любом экране: режим работы, здоровье связи
-и счёт непрочитанного. Журнал и настройки лежат своими файлами — их открывают
-нарочно, а это видно постоянно.
+и счёт непрочитанного. Журнал, снос данных и обращение к рабочему столу лежат
+своими файлами — их открывают нарочно, а это видно постоянно.
 """
 
 
-async def test_an_unknown_mode_is_refused_by_name(main_api, watch):
+async def test_an_unknown_mode_is_refused_by_name(api, ask):
     """Незнакомый режим отбивают, назвав присланное.
 
-    Режимов три, и приходят они строкой из окна. Прими мост что попало —
+    Режимов три, и приходят они строкой со страницы. Прими мост что попало —
     бот остался бы в прежнем режиме, а переключатель на экране показывал бы
     новый, и человек считал бы, что отправка включена.
     """
-    caught = watch(main_api.mode_changed)
+    answer = await ask(api.system.set_mode, "Полный вперёд")
 
-    main_api.set_mode("Полный вперёд")
-
-    answer = await caught.next()
-    assert answer["ok"] is False
-    assert "Полный вперёд" in answer["error"]
+    assert answer["fail"] == "denied"
+    assert "Полный вперёд" in answer["detail"]
 
 
-async def test_a_chosen_mode_comes_back_as_the_current_one(main_api, watch):
+async def test_a_chosen_mode_comes_back_as_the_current_one(api, ask):
     """Выбранный режим возвращается тем же ответом, что рисует переключатель."""
-    caught = watch(main_api.mode_changed)
+    answer = await ask(api.system.set_mode, "DM Only")
 
-    main_api.set_mode("DM Only")
-
-    answer = await caught.next()
-    assert answer["ok"] is True
-    assert answer["mode"] == "DM Only"
+    assert answer["ok"]["mode"] == "DM Only"
 
 
-async def test_the_first_request_brings_the_whole_snapshot(main_api, watch):
-    """Первый запрос приносит все три состояния сразу, и все — удавшимися.
+async def test_the_first_request_brings_the_whole_snapshot(api, ask):
+    """Первый запрос приносит все три состояния сразу, одним ответом.
 
-    Окно рисует нижнюю полосу целиком: здоровье, непрочитанное и режим.
+    Страница рисует нижнюю полосу целиком: здоровье, непрочитанное и режим.
     Приди одно без другого — полоса осталась бы наполовину пустой до первого
-    срабатывания таймеров, то есть на секунды после открытия. Отказ тут
-    равносилен пропаже: полоса нарисуется, но покажет неправду.
+    своего опроса, то есть на секунды после открытия.
     """
-    health = watch(main_api.health_changed)
-    unread = watch(main_api.unread_changed)
-    mode = watch(main_api.mode_changed)
+    answer = await ask(api.system.initial)
 
-    main_api.request_initial()
-
-    assert (await health.next())["ok"] is True
-    assert (await unread.next())["ok"] is True
-    assert (await mode.next())["ok"] is True
+    snapshot = answer["ok"]
+    assert snapshot["health"]["db"] is True
+    assert snapshot["unread"]["count"] == 0
+    assert snapshot["mode"] == "Off"

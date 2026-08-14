@@ -10,45 +10,44 @@ from tests.dbio import put
 from tests.factories import vacancy_row
 
 
-async def test_a_manual_run_before_the_bot_is_up_says_nothing(main_api, watch):
-    """До входа в Telegram ручной прогон молчит, а не отвечает отказом.
+async def test_a_manual_run_before_the_bot_is_up_is_refused_by_name(api, ask):
+    """До входа в Telegram ручной прогон отбивают словами про бота.
 
-    Кнопку рисуют всегда, а бота поднимают после входа. Ответь мост отказом —
-    человек, ещё не вошедший, получал бы на неё сообщение о поломке.
+    Кнопку рисуют всегда, а бота поднимают после входа. Прежде на эту кнопку
+    мост молчал; молчания на дороге возврата нет — оно оставило бы кнопку
+    нажатой навсегда, — и вместо него человеку говорят, чего не хватает.
     """
-    caught = watch(main_api.ingestion_action_done)
+    answer = await ask(api.system.run_now)
 
-    main_api.trigger_ingestion()
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Бот ещё не готов."
 
-    assert await caught.silent()
 
-
-async def test_a_busy_run_is_explained_not_swallowed(main_api, watch, with_bot):
+async def test_a_busy_run_is_explained_not_swallowed(api, ask, with_bot):
     """Занятый прогон объясняют словами.
 
     Иначе человек жмёт кнопку, ничего не происходит, и он жмёт её снова —
     так и не узнав, что цикл уже идёт.
     """
-    caught = watch(main_api.ingestion_action_done)
     with_bot(poll="busy")
 
-    main_api.trigger_ingestion()
+    answer = await ask(api.system.run_now)
 
-    answer = await caught.next()
-    assert answer["ok"] is False
+    assert answer["fail"] == "denied"
     assert answer["status"] == "busy"
 
 
-async def test_a_stop_reaches_the_bot(main_api, with_bot):
+async def test_a_stop_reaches_the_bot(api, ask, with_bot):
     """Остановка доходит до бота, а не гаснет в мосте.
 
-    Ответа у этой кнопки нет вовсе — окно узнаёт об остановке по тому, что
-    прогон кончился. Пропади вызов, кнопка стала бы украшением.
+    Показать её человеку нечем — об остановке он узнаёт по тому, что прогон
+    кончился. Пропади вызов, кнопка стала бы украшением.
     """
     bot = with_bot()
 
-    main_api.stop_ingestion()
+    answer = await ask(api.system.stop_run)
 
+    assert "ok" in answer
     assert ("cancel_current_poll",) in bot.calls
 
 

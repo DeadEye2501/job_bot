@@ -1,53 +1,54 @@
-"""Следствие удаления всех данных: что успевает случиться до самого удаления.
+"""Следствие удаления всех данных: в каком порядке это происходит.
 
-**Дальше первого шага этот слот в тестах не пускают, и это не осторожность, а
+**Дальше первого шага домен в тестах не пускают, и это не осторожность, а
 необходимость.** Он удаляет файл базы из каталога данных — а в прогоне каталог
 подменён на временный, и там лежит та самая база, которую стенд поднял на всю
 сессию. Дай ему доработать — следующие тесты остались бы без базы. Кончается он
-к тому же выходом из процесса (`os._exit`), то есть убил бы и сам прогон.
+к тому же выходом из процесса, то есть убил бы и сам прогон.
 
-Наблюдаемое здесь — порядок: до того как что-то удалять, слот отвязывает бота
-и гасит таймеры. Это и есть его первый шаг, и он синхронный.
+Наблюдаемое здесь — порядок: бота отвязывают до того, как что-то удалять, а из
+процесса уходят после того, как снос кончился.
 """
-
-from concurrent.futures import Future
 
 import pytest
 
 
 @pytest.fixture
-def held_back(main_api, monkeypatch):
-    """Ловит работу, не давая ей начаться.
+def wipe_steps(monkeypatch, hub):
+    """Записывает шаги сноса вместо того, чтобы их делать.
 
-    Корутину закрываем сразу: незапущенная она подняла бы предупреждение, а
-    предупреждения в этом прогоне равны ошибкам.
+    Снос и выход подменены оба: первый снёс бы базу, на которой стоит весь
+    прогон, второй убил бы сам прогон. Каждый шаг называет себя и говорит,
+    отвязан ли к этому мигу бот.
     """
-    caught = []
+    steps: list[tuple] = []
 
-    def _hold(coro):
-        coro.close()
-        caught.append(coro)
-        return Future()
+    async def _wipe_all(engine) -> list[str]:
+        steps.append(("снос", hub.bot))
+        return []
 
-    monkeypatch.setattr(main_api._runner, "submit", _hold)
-    return caught
+    monkeypatch.setattr("client.bridge.wipe.wipe_all", _wipe_all)
+    monkeypatch.setattr("client.bridge.wipe.forget_master_key", lambda: None)
+    monkeypatch.setattr(
+        "client.bridge.wipe._leave_later", lambda: steps.append(("выход", hub.bot))
+    )
+    return steps
 
 
-async def test_the_bot_is_let_go_before_anything_is_deleted(
-    main_api, with_bot, held_back
+async def test_the_answer_is_ready_before_the_bot_and_the_data_are_gone(
+    api, ask, with_bot, wipe_steps
 ):
-    """Бот отвязывается и таймеры гаснут до того, как начнётся удаление.
+    """Бота отвязывают до удаления, а сторож выхода заводят после него.
 
-    Таймеры ходят в базу каждые несколько секунд, а бот держит её открытой.
-    Сработай любой из них посреди удаления — файл базы оказался бы занят, а
-    в журнал полетели бы поломки на пустом месте, и человек решил бы, что
-    удаление не удалось.
+    Бот держит базу открытой: сработай его обход посреди удаления — файл
+    оказался бы занят, и Windows не дала бы его снести. А сторож выхода
+    заводится последним шагом самой работы: заведи его раньше, у возврата, — и
+    он срубил бы процесс посреди наполовину снесённого каталога, потому что
+    возврат случается и по сроку, и по отмене.
     """
     with_bot()
 
-    main_api.request_delete_all_data()
+    answer = await ask(api.system.wipe)
 
-    assert main_api._bot is None
-    assert main_api._health_timer.isActive() is False
-    assert main_api._unread_timer.isActive() is False
-    assert len(held_back) == 1
+    assert "ok" in answer
+    assert wipe_steps == [("снос", None), ("выход", None)]

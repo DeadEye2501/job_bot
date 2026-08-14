@@ -4,8 +4,8 @@
 сам, обходом полей. Отсюда и раскладка: домен — поле корня, а не примесь в один
 плоский класс, как того требовал канал Qt с его единственным именем.
 
-Доменов здесь сейчас восемь. Последний переезжает слайсом А2.9, и пока переехали
-не все, рядом живёт `main_api.MainApi` со старой поверхностью.
+Домены переехали все девять. Рядом ещё живёт `main_api.MainApi` — от него
+остались бот, часы окна и уборка, и уходит он второй половиной слайса А2.9.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from client.bridge.hr import Hr
 from client.bridge.hub import Hub
 from client.bridge.profile import Profile
 from client.bridge.settings import Settings
+from client.bridge.state import System
 from client.bridge.stats import Stats
 from client.bridge.vacancies import Vacancies
 
@@ -32,4 +33,5 @@ class Api:
         self.profile = Profile(hub)
         self.settings = Settings(hub)
         self.stats = Stats(hub)
+        self.system = System(hub)
         self.vacancies = Vacancies(hub)
