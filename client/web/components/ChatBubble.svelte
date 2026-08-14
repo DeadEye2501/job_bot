@@ -4,22 +4,27 @@
   // Своё письмо стоит справа, чужое слева — по стороне их и различают, не читая.
   import { chatTime, tick } from '$state/chat.js';
 
-  let { message } = $props();
+  let { message, onopen } = $props();
 
   const mark = $derived(tick(message));
 </script>
 
 <div class="bubble" class:mine={!message.is_incoming} class:dropped={message.is_deleted}>
   <div class="bubble-body">
-    <!-- Вложение названо словом, а не показано: мост отдаёт путь к нему
+    <!-- Вложение открывает система, а не страница: мост отдаёт путь к нему
          адресом `file://`, а страницу раздаёт сервер окна из своей папки —
-         такая ссылка не откроется. Открывать вложения будет заход, который
-         заведёт для этого зов моста; промолчать нельзя уже сейчас, иначе
-         письмо с одним файлом выглядело бы пустым пузырём. -->
-    {#if message.media_kind}
-      <span class="bubble-file">
+         ссылкой такой путь не открылся бы. Файла может и не быть вовсе: бот
+         скачивает не всё, — и тогда остаётся имя без нажатия, потому что
+         открывать нечего. -->
+    {#if message.media_kind && message.media_path}
+      <button class="bubble-file" type="button" onclick={() => onopen(message)}>
         <span class="material-symbols-outlined">attach_file</span>
         <span>{message.media_name || 'вложение'}</span>
+      </button>
+    {:else if message.media_kind}
+      <span class="bubble-file missing">
+        <span class="material-symbols-outlined">attach_file</span>
+        <span>{message.media_name || 'вложение'} — файла нет на диске</span>
       </span>
     {/if}
 

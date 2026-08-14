@@ -111,7 +111,14 @@
 }
 
 .bubble-file {
-  color: var(--text-secondary);
+  color: var(--accent);
+}
+
+/* Вложение, которого нет на диске, не нажимается — и видно это должно быть до
+   нажатия. */
+.bubble-file.missing {
+  color: var(--text-tertiary);
+  font-style: italic;
 }
 
 .bubble-time {
