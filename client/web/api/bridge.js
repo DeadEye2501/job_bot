@@ -1,0 +1,91 @@
+// Единственное место, знающее про `window.pywebview`.
+//
+// Всё остальное на странице зовёт мост отсюда и про библиотеку окна не знает
+// ничего: заменить её — значит переписать этот файл, а не искать зовы по всей
+// разметке.
+
+const READY_EVENT = 'pywebviewready';
+
+// Сколько ждём мост, прежде чем сказать, что его нет. Секунды хватает с
+// запасом: мост объявляется библиотекой окна до того, как страница дочитана, и
+// ждать его дольше значит ждать того, чего не будет вовсе.
+const READY_WAIT_MS = 1000;
+
+/** Отказ моста — один на все его роды.
+ *
+ * Род один нарочно: экран показывает отказы единой плашкой и по роду не
+ * ветвится. Различает их фраза, а поля рядом говорят, к какой строке отказ
+ * относится, — по ним экран откатывает отметку, поставленную заранее.
+ */
+export class Refused extends Error {
+  constructor(kind, message, fields) {
+    super(message);
+    this.name = 'Refused';
+    this.kind = kind;
+    this.fields = fields;
+  }
+}
+
+/** Дождаться, пока мост появится в странице.
+ *
+ * Ждём событие, но сперва смотрим, не случилось ли оно раньше нас: страница
+ * грузится дольше моста, и подписка на уже прошедшее событие висела бы вечно.
+ *
+ * У ожидания есть срок, и это не запас прочности. Страницу открывают и без
+ * окна — сервером разработки, — и там моста не будет никогда: без срока каждый
+ * зов висел бы молча, и разбираться пришлось бы с пустым экраном вместо
+ * внятного отказа.
+ */
+export function ready() {
+  if (surface()) return Promise.resolve();
+  return new Promise((done, fail) => {
+    const late = setTimeout(
+      () => fail(new Refused('broken', 'Моста в этой странице нет.', {})),
+      READY_WAIT_MS,
+    );
+    globalThis.window.addEventListener(
+      READY_EVENT,
+      () => {
+        clearTimeout(late);
+        done();
+      },
+      { once: true },
+    );
+  });
+}
+
+/** Позвать метод моста по имени вида `домен.метод` и вернуть его нагрузку.
+ *
+ * Конверт разворачивается здесь, а не на экранах: `{ok}` и `{fail}` — договор
+ * двоих, и разворачивай его каждый экран сам, первый же забытый разбор показал
+ * бы человеку пустой список вместо объяснения.
+ *
+ * Молчание — тоже отказ. Метод, вернувший ничего, означает поломку канала, а
+ * не пустой ответ, и принять её за успех значит нарисовать пустой экран вместо
+ * плашки беды.
+ */
+export async function call(path, ...args) {
+  await ready();
+  const answer = await reach(path)(...args);
+  // Проверяем предметность, а не истинность: `in` на строке или числе бросает
+  // `TypeError` мимо конверта, и вместо отказа экран получил бы поломку.
+  const envelope = answer !== null && typeof answer === 'object' ? answer : {};
+  if ('ok' in envelope) return envelope.ok;
+  if ('fail' in envelope) {
+    const { fail, detail, ...fields } = envelope;
+    throw new Refused(fail, detail ?? 'Не получилось.', fields);
+  }
+  throw new Refused('broken', 'Мост ответил непонятным.', { answer });
+}
+
+function surface() {
+  return globalThis.window?.pywebview?.api;
+}
+
+function reach(path) {
+  const method = path.split('.').reduce((where, step) => where?.[step], surface());
+  if (typeof method !== 'function') {
+    throw new Refused('broken', `Мост не знает метода ${path}.`, { path });
+  }
+  return method;
+}
