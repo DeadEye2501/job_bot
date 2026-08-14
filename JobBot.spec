@@ -5,20 +5,26 @@
 # Notes:
 #   - onefile + windowed: MSVC-style console спрятан, app выглядит как
 #     обычное Win-приложение.
-#   - datas: подтягиваем client/web (HTML/CSS/JS/шрифты), alembic-окружение
+#   - datas: подтягиваем собранный фронт (client/web/dist), alembic-окружение
 #     (alembic.ini + alembic/{env.py,script.py.mako,versions/*}) и иконку.
+#     Собранный, а не исходный: окно раздаёт себе `dist`, а исходники рядом с
+#     ним — это ещё и node_modules на сотни мегабайт.
 #   - hiddenimports: alembic versions модули, async SQLite-драйвер и
 #     keyring-бэкенд для Windows — все три загружаются динамически и не
 #     попадают в граф импортов PyInstaller'а сами.
-#   - pyz onefile-builds для Qt + WebEngine получаются ~250-350 МБ и
-#     стартуют 5-15 сек (распаковка во временный _MEIPASS-каталог).
+#   - Qt в сборке больше нет: окно рисует pywebview поверх системного
+#     WebView2, и от прежних 250-350 МБ с QtWebEngine осталась малая доля.
+#
+# Перед сборкой фронт собирается своим сборщиком:
+#     cd client/web && npm run build
+# Без этого в exe уедет старый `dist`, а при его отсутствии — ничего.
 
 import os
 
 block_cipher = None
 
 datas = [
-    ('client/web', 'client/web'),
+    ('client/web/dist', 'client/web/dist'),
     ('client/icon.ico', 'client'),
     ('alembic.ini', '.'),
     ('alembic/env.py', 'alembic'),
@@ -86,7 +92,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,           # UPX часто ломает Qt-DLL'ки и antivirus орёт
+    upx=False,           # UPX ломает подписи DLL и antivirus орёт
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,       # GUI-приложение, без консоли

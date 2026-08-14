@@ -29,7 +29,7 @@ from backend.payloads import Classification
 logger = logging.getLogger(__name__)
 
 
-# Зеркало JS-`_ensureTrailingPeriod` (client/web/main.html). Применяется
+# Зеркало JS-`ended` (client/web/state/vacancy_card.js). Применяется
 # ко всем записям `vacancy_status_history.explanation`, чтобы заметки в
 # таймлайне рендерились единообразно как "Status: reason." — независимо
 # от того, ЛЛМ ли это, ручной ввод или подпись авто-отправки.
