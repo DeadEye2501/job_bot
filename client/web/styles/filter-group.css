@@ -1,0 +1,18 @@
+/* Группа отбора: подпись над своими полями и черта под ними. */
+
+.filter-group {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.filter-group:last-child {
+  border-bottom: none;
+}
+
+.filter-label {
+  margin-bottom: 5px;
+  color: var(--text-tertiary);
+  font-size: 0.66rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}

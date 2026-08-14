@@ -8,7 +8,7 @@
   import { call } from '$api/bridge.js';
   import CvFileRow from '$components/CvFileRow.svelte';
   import LangRows from '$components/LangRows.svelte';
-  import SegRow from '$components/SegRow.svelte';
+  import ChoiceRow from '$components/ChoiceRow.svelte';
   import { toggled } from '$state/chosen.js';
   import { GRADES, WORK_FORMATS, blankProfile, langRow, updatedNote } from '$state/profile.js';
 
@@ -151,8 +151,8 @@
       onblur={(event) => edit('education', event.currentTarget.value.trim())}
     ></textarea>
 
-    <SegRow options={GRADES} chosen={grades} onpick={pickGrade} />
-    <SegRow options={WORK_FORMATS} chosen={formats} onpick={pickFormat} />
+    <ChoiceRow options={GRADES} chosen={grades} look="seg" onpick={pickGrade} />
+    <ChoiceRow options={WORK_FORMATS} chosen={formats} look="seg" onpick={pickFormat} />
 
     <LangRows rows={form.languages} onedit={editLang} onadd={addLang} onremove={dropLang} />
 

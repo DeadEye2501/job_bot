@@ -1,0 +1,87 @@
+/* Панель отбора вакансий: окно поверх списка, а в нём девять групп условий.
+   Что стоит внутри групп — чипы и перечни для выбора — своими файлами. */
+
+.filter-wrap {
+  position: relative;
+}
+
+/* Воронка светится, пока условия стоят: панель закрыта, и по кнопке видно, что
+   список показан не весь. */
+.filter-btn.active {
+  background: var(--selected-bg);
+  color: var(--accent);
+}
+
+.filter-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  max-height: 520px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  box-shadow: 0 8px 22px var(--shadow-popup);
+}
+
+.filter-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  font-size: 0.8rem;
+}
+
+.filter-head .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.filter-title {
+  flex: 1;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.filter-meta {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+}
+
+/* Прокручивается тело, а не панель целиком: шапка со счётом условий и подвал с
+   «Применить» нужны на любой глубине списка групп. */
+.filter-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.filter-pair {
+  display: flex;
+  gap: 6px;
+}
+
+.filter-dates {
+  margin-top: 6px;
+}
+
+.filter-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+
+.filter-foot-right {
+  display: inline-flex;
+  gap: 6px;
+}
