@@ -104,6 +104,7 @@ async def test_an_hr_without_a_name_and_without_a_nick_is_refused(
 
     assert answer["fail"] == "denied"
     assert answer["detail"] == "Укажите хотя бы имя или @username."
+    assert answer["vacancy_id"] == vacancy.id
 
 
 async def test_a_created_hr_comes_back_named_and_listed(api, ask, session_factory):
@@ -136,6 +137,34 @@ async def test_a_company_without_a_name_is_refused(api, ask, session_factory):
 
     assert answer["fail"] == "denied"
     assert answer["detail"] == "Название обязательно."
+    # Номер вакансии едет обратно в отказе: подборщик открыт из неё, и по
+    # номеру окно понимает, чью модалку красить.
+    assert answer["vacancy_id"] == vacancy.id
+
+
+async def test_a_created_company_comes_back_named_and_listed(
+    api, ask, session_factory
+):
+    """Заведённая компания приходит и номером, и строкой в списке.
+
+    Номер окно ставит выбранным сразу, не переспрашивая; список тем же ответом
+    обновляется. Приди одно без другого — выбор указывал бы на карточку,
+    которой в списке нет.
+
+    Красной фазы не было: у близнеца — заведения человека — такой сторож есть,
+    а здесь его не было; дописан по находке ревью слайса А2.9в.
+    """
+    vacancy = vacancy_row()
+    await put(session_factory, vacancy)
+
+    answer = await ask(
+        api.vacancies.create_company, {"vacancy_id": vacancy.id, "name": "Контур"}
+    )
+
+    assert answer["ok"]["created_id"] is not None
+    assert answer["ok"]["created_id"] in [
+        row["id"] for row in answer["ok"]["companies"]
+    ]
 
 
 async def test_a_second_company_with_the_same_name_is_named_as_existing(

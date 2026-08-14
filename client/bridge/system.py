@@ -1,9 +1,13 @@
-"""Общее состояние окна: режим бота, сбор, здоровье, непрочитанное.
+"""Домен «система»: то, чем страница живёт на любом экране.
 
-Здесь же собран весь домен «система»: журнал, снос данных и просьба к рабочему
-столу приходят примесями из соседних файлов. Разрез по файлам — это раскладка
-одного домена, а не задел под вторую реализацию: страница видит один предмет,
-`api.system`.
+Режим бота и ручной сбор она отсюда правит, здоровье связи и счёт
+непрочитанного — читает; журнал,
+снос данных и просьба к рабочему столу приходят примесями из соседних файлов.
+Разрез по файлам — это раскладка одного домена, а не задел под вторую
+реализацию: страница видит один предмет, `api.system`.
+
+Имя файла — по домену, а не по слову «состояние»: под тем именем сюда тянуло
+складывать всё, что где-то хранится, а хранится оно в хозяйстве (`hub`).
 """
 
 from __future__ import annotations
@@ -17,9 +21,9 @@ from backend.models import BotMode
 from backend.repository import hr_list, messages as messages_repo
 from client.bridge.answer import Denied, denied, reply
 from client.bridge.desktop import Desktop
+from client.bridge.hub import Hub
 from client.bridge.journal import Journal
-from client.bridge.payload import PAYLOAD_ERRORS
-from client.bridge.refusals import BUSY_CYCLE, NO_BOT
+from client.bridge.refusals import NO_BOT, RUN_REFUSALS
 from client.bridge.wipe import Wipe
 
 
@@ -35,17 +39,6 @@ _MODEL_PROBE_INTERVAL_S = 60.0
 Ответ между опросами берётся прошлый: лампочка показывает положение дел
 минутной давности, и это честнее, чем греть модель ради секундной точности.
 """
-
-_RUN_REFUSALS = {
-    "busy": BUSY_CYCLE,
-    "cancelled": "Поллинг отменён.",
-    "error": "Не удалось прогнать каналы — см. логи.",
-}
-"""Чем кончился ручной обход, если не удачей. Незнакомый исход тоже получает
-ответ: исходы заводит бэкенд, и новый появится там раньше перевода здесь, а
-промолчи мост — кнопка осталась бы нажатой навсегда.
-"""
-
 
 _MODEL_PROBE_TIMEOUT_S = 10.0
 """Сколько лампочка ждёт поставщика.
@@ -71,7 +64,7 @@ class System(Journal, Wipe, Desktop):
     такого один.
     """
 
-    def __init__(self, hub) -> None:
+    def __init__(self, hub: Hub) -> None:
         self._hub = hub
         # Отметка и прошлый ответ пробы моделей: спрашивают их чаще, чем стоит
         # спрашивать саму модель, — см. `_MODEL_PROBE_INTERVAL_S`.
@@ -109,7 +102,9 @@ class System(Journal, Wipe, Desktop):
         """
         try:
             chosen = BotMode(mode)
-        except PAYLOAD_ERRORS:
+        # Только `ValueError`: перечень отвечает им и на незнакомое слово, и на
+        # не-строку. Широкий набор соседей ловил бы здесь то, чего не бывает.
+        except ValueError:
             return denied(f"Неизвестный режим: {mode!r}")
 
         async def run() -> dict:
@@ -135,7 +130,7 @@ class System(Journal, Wipe, Desktop):
             if status == "ok":
                 return {"action": "run_now", "status": status}
             raise Denied(
-                _RUN_REFUSALS.get(status, "Не удалось прогнать."),
+                RUN_REFUSALS.get(status, "Не удалось прогнать."),
                 action="run_now",
                 status=status,
             )

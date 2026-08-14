@@ -12,8 +12,8 @@ from backend.repository import (
     vacancies_mini,
 )
 from client.bridge.answer import Denied, bad_fields, denied, reply
+from client.bridge.hub import Hub
 from client.bridge.mark import COMPANY_MARK, mark, unmark
-from client.bridge.media import _avatar_data_url
 from client.bridge.page import read_page
 from client.bridge.pickers import COMPANY_PICKER, merge_picker
 from client.bridge.refusals import (
@@ -22,8 +22,39 @@ from client.bridge.refusals import (
     NOTHING_TO_UPDATE,
     NO_COMPANY,
 )
-from client.bridge.wire import _company_picker_row_to_dict, _vacancy_mini_row_to_dict
+from client.bridge.wire import (
+    _company_picker_row_to_dict,
+    _hr_mini_row_to_dict,
+    _vacancy_mini_row_to_dict,
+)
 from client.form_payloads import read_company_spellings, read_new_company_fields
+
+
+async def create_company_row(session, fields: dict, **echo) -> int:
+    """Завести компанию по прочитанной форме окна и назвать её номер.
+
+    Форма одна, а окон два: «Добавить компанию» в контактах и заведение на ходу
+    из подборщика при вакансии. Правила у них общие — без названия карточку не
+    найти потом ничем, а занятое имя объясняется словами, а не отказом базы:
+    компании с одинаковым именем считаются одной, и заводящий вторую должен
+    узнать про первую.
+
+    Перехват здесь один, и это перехват из окна контактов. `ValueError` пустого
+    названия, который ловил подборщик, недостижим: пустое отбивает заслон
+    строкой выше, а другого повода бросить его у `create_company` нет.
+
+    Поля отказа отдаёт зовущий: карточке нужно имя действия, подборщику — номер
+    вакансии, из которой заводят.
+    """
+    name = fields["name"]
+    if not name:
+        raise Denied(NAME_REQUIRED, **echo)
+    try:
+        async with session.begin():
+            created_id = (await companies_card.create_company(session, **fields)).id
+    except IntegrityError:
+        raise Denied(COMPANY_EXISTS.format(name=name), **echo)
+    return created_id
 
 
 class Companies:
@@ -34,7 +65,7 @@ class Companies:
     без вести соседние экраны показывали бы компанию незаслонённой.
     """
 
-    def __init__(self, hub) -> None:
+    def __init__(self, hub: Hub) -> None:
         self._hub = hub
 
     def list(self, payload: dict | None = None) -> dict:
@@ -102,7 +133,7 @@ class Companies:
             company_id = int(payload["company_id"])
             epoch = int_or_none(payload.get("epoch"))
         except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("vacancies", e)
+            return bad_fields("companies.vacancies", e)
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
@@ -129,16 +160,7 @@ class Companies:
                 rows = await hr_list.list_hrs_for_company(session, company_id)
             return {
                 "company_id": company_id,
-                "hrs": [
-                    {
-                        "id": hr.id,
-                        "name": hr.name,
-                        "telegram_username": hr.telegram_username,
-                        "vacancy_count": count,
-                        "avatar": _avatar_data_url(hr.avatar),
-                    }
-                    for hr, count in rows
-                ],
+                "hrs": [_hr_mini_row_to_dict(hr, count) for hr, count in rows],
             }
 
         return reply(self._hub.runner, run())
@@ -153,7 +175,7 @@ class Companies:
             absorbed_id = int(payload["absorbed_id"])
             search = text_or_none(payload.get("search"))
         except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("merge_picker", e)
+            return bad_fields("companies.merge_picker", e)
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
@@ -172,7 +194,7 @@ class Companies:
             absorbed_id = int(payload["absorbed_id"])
             survivor_id = int(payload["survivor_id"])
         except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("merge", e)
+            return bad_fields("companies.merge", e)
 
         async def run() -> dict:
             try:
@@ -197,29 +219,21 @@ class Companies:
         """Завести компанию из окна «Добавить компанию».
 
         Номер заведённой едет ответом, чтобы окно подсветило новую строку.
-        Занятое имя объясняется словами, а не отказом базы: компании с
-        одинаковым именем считаются одной, и заводящий вторую должен узнать
-        про первую.
+        Само заведение — общее с подборщиком при вакансии.
         """
         try:
             fields = read_new_company_fields(payload)
         # `AttributeError` — про не-объект в нагрузке: помощник читает её
         # ключами, и спотыкается он до мотора, мимо конверта.
         except (AttributeError, ValueError, TypeError) as e:
-            return bad_fields("create", e)
-
-        name = fields["name"]
-        if not name:
-            return denied(NAME_REQUIRED, action="create_company")
+            return bad_fields("companies.create", e)
 
         async def run() -> dict:
-            try:
-                async with self._hub.session_factory() as session:
-                    company = await companies_card.create_company(session, **fields)
-                    await session.commit()
-            except IntegrityError:
-                raise Denied(COMPANY_EXISTS.format(name=name), action="create_company")
-            return {"action": "create_company", "created_id": company.id}
+            async with self._hub.session_factory() as session:
+                created_id = await create_company_row(
+                    session, fields, action="create_company"
+                )
+            return {"action": "create_company", "created_id": created_id}
 
         return reply(self._hub.runner, run())
 
@@ -233,7 +247,7 @@ class Companies:
         try:
             company_id = int(payload["company_id"])
         except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("update", e)
+            return bad_fields("companies.update", e)
 
         kwargs = {
             key: payload[key]
@@ -287,8 +301,10 @@ class Companies:
 
         Написание — имя компании: другого значения у неё нет, и именно его
         сверяет заслон отправки. Повторное нажатие второй записи не заводит:
-        погашенная оживает, живая остаётся как есть, и ответ говорит об этом
-        полем `existed`. Карточку это не сносит: снос — отдельная кнопка.
+        погашенная оживает, живая остаётся как есть. Про это говорят два поля:
+        `existed` — «запись уже была», `was_inactive` — «была погашена и
+        ожила»; по второму окно и различает эти два случая. Карточку это не
+        сносит: снос — отдельная кнопка.
         """
 
         async def run() -> dict:

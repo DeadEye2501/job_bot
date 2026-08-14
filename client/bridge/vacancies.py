@@ -13,6 +13,7 @@ from backend.repository import (
     vacancies_list,
 )
 from client.bridge.answer import Denied, bad_fields, denied, reply
+from client.bridge.hub import Hub
 from client.bridge.refusals import NO_VACANCY
 from client.bridge.page import read_page
 from client.bridge.vacancy_actions import VacancyActions
@@ -27,11 +28,17 @@ logger = logging.getLogger(__name__)
 class Vacancies(VacancyActions, VacancyLinks):
     """Вакансия на своём экране: как её показывают, как правят и что с ней делают.
 
-    Разрезано на три файла по объёму, а не по ответственности: показ и правка
-    здесь, действия над вакансией и привязка людей — у примесей рядом.
+    Разрезано на три файла по объёму: экран один, и в одном файле он не
+    помещается. Разрез при этом не по ответственности — `change_status` отсюда
+    и `delete` из примеси зовут один и тот же модуль репозитория, — а по тому,
+    что человек делает на экране: смотрит и правит поля здесь, жмёт кнопки
+    действий и связывает карточки в примесях рядом.
+
+    Поверхность у страницы одна, `api.vacancies`: примесь здесь раскладывает
+    один экран по файлам, а не готовит вторую реализацию.
     """
 
-    def __init__(self, hub) -> None:
+    def __init__(self, hub: Hub) -> None:
         self._hub = hub
 
     def list(self, payload: dict | None = None) -> dict:

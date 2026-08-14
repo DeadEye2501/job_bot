@@ -11,6 +11,7 @@ from backend.payloads import int_or_none, text_or_none
 from backend.repository import channels as channels_repo, vacancies_mini
 from client.bridge.answer import Denied, bad_fields, reply
 from client.bridge.channel_actions import ChannelActions
+from client.bridge.hub import Hub
 from client.bridge.media import _avatar_data_url
 from client.bridge.page import Page, read_page
 from client.bridge.refusals import NO_CHANNEL
@@ -30,7 +31,7 @@ class Channels(ChannelActions):
     реализацию.
     """
 
-    def __init__(self, hub) -> None:
+    def __init__(self, hub: Hub) -> None:
         self._hub = hub
 
     def list(self, payload: dict | None = None) -> dict:
@@ -110,7 +111,7 @@ class Channels(ChannelActions):
             channel_id = int(payload["channel_id"])
             page = read_page(payload, default_limit=50, modes=("replace", "append"))
         except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("vacancies", e)
+            return bad_fields("channels.vacancies", e)
 
         return reply(self._hub.runner, self._paged(channel_id, page))
 

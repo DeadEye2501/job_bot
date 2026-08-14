@@ -9,6 +9,7 @@ from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.choices import _filter_languages, _filter_set
 from client.bridge.cv import Cv
 from client.bridge.cv_file import _stat_cv
+from client.bridge.hub import Hub
 from client.bridge.refusals import PROFILE_FIRST
 from client.bridge.wire import _exp_to_dict, _profile_to_dict, _skill_to_dict
 
@@ -28,7 +29,7 @@ class Profile(Cv):
     приложение однопользовательское, а страница живёт в своём окне, не в сети.
     """
 
-    def __init__(self, hub) -> None:
+    def __init__(self, hub: Hub) -> None:
         self._hub = hub
 
     def get(self) -> dict:
