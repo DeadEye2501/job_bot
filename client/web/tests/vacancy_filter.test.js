@@ -2,12 +2,12 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { STATUS_CHOICES } from '../state/statuses.js';
 import {
   DATE_PRESETS,
   GRADE_CHOICES,
   HR_CHOICES,
   REMOTE_CHOICES,
-  STATUS_CHOICES,
   activeCount,
   blankFilter,
   filterPayload,

@@ -1,0 +1,82 @@
+/* Лента жизни вакансии: точка, текст и время в три колонки. */
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tl-item {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  align-items: baseline;
+  column-gap: 8px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.tl-item .status-dot {
+  justify-self: center;
+}
+
+/* Свечение у самой свежей строки: на ней вакансия стоит сейчас, и глазу нужно
+   за что-то зацепиться в ленте из двух десятков одинаковых точек. */
+.tl-item.current .status-dot {
+  box-shadow: 0 0 0 2px var(--selected-bg);
+}
+
+.tl-text {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.tl-label {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.tl-event {
+  color: var(--text-secondary);
+}
+
+/* Поле правки без рамки: строка ленты остаётся строкой, пока в неё не метят
+   мышью. Тянется вниз руками: пояснение бывает и в два слова, и в абзац, а
+   растить его по содержимому пришлось бы из разметки. */
+.tl-note {
+  flex: 1;
+  min-width: 120px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.tl-note:hover {
+  border-color: var(--border);
+}
+
+.tl-note:focus {
+  border-color: var(--accent);
+  background: var(--bg-tertiary);
+  outline: none;
+}
+
+.tl-note::placeholder {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.tl-when {
+  color: var(--text-tertiary);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
