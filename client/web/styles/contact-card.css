@@ -1,162 +1,145 @@
-/* Карточка контакта: числа под именем и списки под полями.
+/* Карточка контакта в правой панели: шапка, поля и коробки под ними.
 
-   Одевает три карточки — компании, человека и канала: числа у них разные, а
-   места этих чисел одни. */
+   Одевает три карточки — человека, компании и канала: содержимое у них разное,
+   а места этих мест одни. Переписка — в chat.css, мини-списки — в
+   mini-list.css, числа канала — в channel-stats.css. */
 
-.card-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  font-size: 0.72rem;
+.cnt-det-head {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
-.card-meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  padding: 1px 7px;
-  border-radius: 9px;
-  font-variant-numeric: tabular-nums;
-}
-
-.card-meta-item .material-symbols-outlined {
-  font-size: 12px;
-}
-
-/* Людей у компании бывают десятки — список прокручивается сам, чтобы окно
-   осталось в размерах экрана. Перечень вакансий рядом со своим потолком в
-   contacts.css: он длиннее, и потолки у них разные не по недосмотру. */
-.card-people {
-  max-height: 120px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-/* Переписка в карточке человека: лента писем и строка отправки. */
-
-.chat {
-  max-height: 260px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 4px 2px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-
-.chat-day {
+/* Кружок в карточке крупнее, чем в строке списка: здесь на него смотрят, а не
+   пробегают глазами. */
+.cnt-det-head .hr-avatar {
   align-self: center;
-  font-size: 0.68rem;
-  color: var(--text-tertiary);
-  padding: 2px 8px;
+  width: 56px;
+  height: 56px;
+  font-size: 1.1rem;
 }
 
-/* Своё письмо справа, чужое слева: по стороне их различают, не читая. */
-.bubble {
-  max-width: 78%;
-  align-self: flex-start;
-  background: var(--bg-tertiary);
-  border-radius: 8px;
-  padding: 4px 8px;
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-.bubble.mine {
-  align-self: flex-end;
-  background: var(--selected-bg);
-}
-
-.bubble.dropped {
-  opacity: 0.6;
-}
-
-.bubble-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.bubble-text {
-  font-size: 0.83rem;
+.cnt-det-name {
   color: var(--text-primary);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  font-size: 1.05rem;
+  font-weight: 500;
 }
 
-.bubble-mark {
-  font-size: 0.68rem;
+/* Безымянного зовут словами, и слова эти набраны курсивом: так видно, что это
+   не имя, а его отсутствие. */
+.cnt-det-name.muted {
   color: var(--text-tertiary);
-}
-
-/* Снимок во всю ширину пузыря, но не выше своей меры: длинное фото иначе
-   вытесняет из ленты всё остальное. */
-.bubble-photo {
-  display: block;
-  max-width: 100%;
-}
-
-.bubble-photo img {
-  display: block;
-  max-width: 100%;
-  max-height: 240px;
-  border-radius: 6px;
-  object-fit: cover;
-}
-
-.bubble-file {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.78rem;
-  color: var(--accent);
-}
-
-.bubble-file .material-symbols-outlined {
-  font-size: 14px;
-}
-
-.bubble-file {
-  color: var(--accent);
-}
-
-/* Вложение, которого нет на диске, не нажимается — и видно это должно быть до
-   нажатия. */
-.bubble-file.missing {
-  color: var(--text-tertiary);
+  font-weight: 400;
   font-style: italic;
 }
 
-.bubble-time {
-  font-size: 0.65rem;
-  color: var(--text-tertiary);
-  white-space: nowrap;
+.cnt-det-sub {
   display: flex;
   align-items: center;
-  gap: 2px;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
 }
 
-/* Прочитанное собеседником помечено цветом, а не только второй галочкой: две
-   галочки от одной на глаз не отличить. */
-.bubble-tick[data-tick='✓✓'] {
+/* Без этого длинная ссылка считает свою ширину по всему тексту и уносит
+   переносом всю строку целиком. */
+.cnt-det-sub > * {
+  min-width: 0;
+}
+
+.cnt-det-link {
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.cnt-det-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.cnt-det-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 0.72rem;
+}
+
+.cnt-det-meta-row > * {
+  min-width: 0;
+}
+
+.cnt-det-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Непрочитанное — единственное число карточки, ради которого её открывают: оно
+   и покрашено акцентом. */
+.cnt-det-meta-chip.unread {
+  background: var(--accent-chip-bg);
   color: var(--accent);
 }
 
-.chat-send {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
+.cnt-det-meta-chip.blacklist {
+  background: var(--danger-tint-strong);
+  color: var(--danger);
 }
 
-.chat-send .textarea {
-  min-height: 32px;
+.cnt-det-meta-chip .material-symbols-outlined {
+  font-size: 12px;
+}
+
+.cnt-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+  margin-bottom: 12px;
+}
+
+.cnt-input {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.82rem;
+}
+
+.cnt-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.cnt-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Коробка под блоком карточки: заметки, мини-список, числа канала. Ею они и
+   отделены друг от друга — на панели нет заголовков, и без рамки блоки слились
+   бы в одну простыню. */
+.cnt-det-section {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-secondary);
+}
+
+.cnt-vacs-empty {
+  padding: 4px 2px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
 }

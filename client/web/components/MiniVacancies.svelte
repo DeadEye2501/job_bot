@@ -1,30 +1,40 @@
 <script>
-  // Вакансии в чужой карточке: название, положение дел и оценка.
+  // Вакансии в чужой карточке: положение дел, оценка, название и давность.
   //
   // Один кусок на три карточки — канала, компании и человека. Так же на него
   // смотрит и мост: строку этих списков он собирает одним объявлением
   // (`_vacancy_mini_row_to_dict`), и разойдись они, на одном экране пропала бы
   // оценка, на другом — положение дел.
   //
-  // Страницами дочитывается только список канала: там вакансий бывают тысячи.
-  let { vacancies, empty, hasMore = false, onmore = null } = $props();
+  // Строка нажимается и уводит к самой вакансии: из карточки канала смотрят,
+  // что он приносит, и тут же открывают принесённое.
+  import { shortAgo } from '$state/vacancies.js';
+
+  let { vacancies, empty, loading = false, onpick } = $props();
 </script>
 
-<div class="card-vacancies">
+<div class="cnt-det-section">
   {#if !vacancies.length}
-    <div class="empty-note">{empty}</div>
+    <div class="cnt-vacs-empty">{empty}</div>
   {:else}
-    {#each vacancies as one (one.id)}
-      <div class="stat-line">
-        <span class="stat-name">{one.title || 'Без названия'}</span>
-        <span class="stat-value">
+    <div class="vacs-mini">
+      {#each vacancies as one (one.id)}
+        <div
+          class="vac-mini-row"
+          role="button"
+          tabindex="0"
+          onclick={() => onpick(one.id)}
+          onkeydown={(event) => event.key === 'Enter' && onpick(one.id)}
+        >
           <span class="status-dot" data-status={one.status}></span>
-          {one.score ?? '—'}
-        </span>
-      </div>
-    {/each}
-    {#if hasMore}
-      <button class="add-more" type="button" onclick={() => onmore()}>Показать ещё</button>
+          {#if one.score !== null}<span class="vac-mini-score">{one.score}</span>{:else}<span></span>{/if}
+          <span class="vac-mini-title">{one.title || '— без названия —'}</span>
+          <span class="vac-mini-when">{shortAgo(one.created_at, new Date())}</span>
+        </div>
+      {/each}
+    </div>
+    {#if loading}
+      <div class="ch-vacs-loading-more">Загрузка…</div>
     {/if}
   {/if}
 </div>

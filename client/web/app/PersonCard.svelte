@@ -1,20 +1,26 @@
 <script>
-  // Карточка человека: его числа, поля и действия над ним.
+  // Карточка человека: его числа, поля, переписка и действия над ним.
   //
   // Стоит правой панелью рядом со списком: человека правят и пишут ему, не
   // теряя из виду соседей, — рядом с ними и решают, кому писать следующему.
 
+  import ActionsMenu from '$components/ActionsMenu.svelte';
+  import Avatar from '$components/Avatar.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
+  import NotesField from '$components/NotesField.svelte';
   import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
   import { attempts } from '$state/attempts.js';
-  import { personCandidate, personName } from '$state/contacts.js';
+  import { personCandidate, personName, telegramHref } from '$state/contacts.js';
   import { plural } from '$state/words.js';
 
   import PersonChat from './PersonChat.svelte';
 
-  let { ask, say, events, personId, onclose, onchanged } = $props();
+  // Пауза перед записью заметки — та же, что ждало прежнее окно.
+  const NOTES_DELAY = 600;
+
+  let { ask, say, events, personId, oncompany, onvacancy, onclose, onchanged } = $props();
 
   let card = $state(null);
   let vacancies = $state([]);
@@ -56,6 +62,20 @@
     const done = await ask('hr.update', { hr_id: personId, ...part });
     await refresh(personId);
     if (done !== null) onchanged();
+  }
+
+  /** Записать заметку и вернуть то, что легло в базу.
+   *
+   * Карточку не перечитываем: человек мог набрать ещё, пока летел вопрос, и
+   * пришедшее из базы стёрло бы это. Записанным считаем набранное: этот зов
+   * называет только поправленные поля, самой заметки в ответе нет, — а пустая
+   * от пробельной здесь не отличается, обе сводятся к пустоте по дороге.
+   */
+  async function saveNotes(id, text) {
+    const done = await ask('hr.update', { hr_id: id, notes: text });
+    if (!alive || done === null) return null;
+    onchanged();
+    return text;
   }
 
   async function block() {
@@ -122,62 +142,134 @@
 {:else if !card}
   <div class="cnt-detail-empty">Загрузка…</div>
 {:else}
-  <div class="modal-title card-head">
-    {#if card.avatar}
-      <img class="avatar" src={card.avatar} alt="" />
-    {:else}
-      <span class="avatar avatar-empty material-symbols-outlined">person</span>
-    {/if}
-    <span class="card-name">{shown}</span>
-    {#if card.blacklist_value}
-      <span class="kind-tag" data-kind="hr" title="В чёрном списке: {card.blacklist_value}">
-        в отсеве: {card.blacklist_value}
-      </span>
-    {/if}
+  <div class="cnt-det-head">
+    <Avatar avatar={card.avatar} name={card.name} icon="person" />
+
+    <div>
+      <div class="cnt-det-name" class:muted={!card.name}>{card.name || '— без имени —'}</div>
+
+      <div class="cnt-det-sub">
+        {#if card.telegram_username}
+          <button
+            class="cnt-det-link"
+            type="button"
+            title="Открыть в Telegram"
+            onclick={() => ask('system.open_url', telegramHref(card.telegram_username))}
+          >
+            @{card.telegram_username}
+          </button>
+        {:else}
+          <span>@—</span>
+        {/if}
+        {#if card.last_company_name}
+          <span>·</span>
+          {#if card.last_company_id === null}
+            <span>{card.last_company_name}</span>
+          {:else}
+            <button
+              class="cnt-det-link"
+              type="button"
+              onclick={() => oncompany(card.last_company_id)}
+            >
+              {card.last_company_name}
+            </button>
+          {/if}
+        {/if}
+      </div>
+
+      <div class="cnt-det-meta-row">
+        <span class="cnt-det-meta-chip">
+          <span class="material-symbols-outlined">work</span>
+          {card.vacancy_count} {plural(card.vacancy_count, 'вакансия', 'вакансии', 'вакансий')}
+        </span>
+        {#if card.unread_count}
+          <span class="cnt-det-meta-chip unread">
+            <span class="material-symbols-outlined">mail</span>
+            {card.unread_count}
+            {plural(card.unread_count, 'непрочитанное', 'непрочитанных', 'непрочитанных')}
+          </span>
+        {/if}
+        {#if card.blacklist_value}
+          <span class="cnt-det-meta-chip blacklist" title="В blacklist: {card.blacklist_value}">
+            <span class="material-symbols-outlined">block</span>
+            В blacklist
+          </span>
+        {/if}
+      </div>
+    </div>
+
+    <ActionsMenu>
+      {#snippet children(close)}
+        <button
+          class="menu-item"
+          type="button"
+          onclick={() => {
+            close();
+            asking = 'merge';
+          }}
+        >
+          <span class="material-symbols-outlined">merge</span>
+          Слить с другим HR
+        </button>
+        {#if card.blacklist_value}
+          <button
+            class="menu-item"
+            type="button"
+            onclick={() => {
+              close();
+              unblock();
+            }}
+          >
+            <span class="material-symbols-outlined">restart_alt</span>
+            Убрать из blacklist
+          </button>
+        {:else}
+          <button
+            class="menu-item"
+            type="button"
+            onclick={() => {
+              close();
+              block();
+            }}
+          >
+            <span class="material-symbols-outlined">block</span>
+            Добавить в blacklist
+          </button>
+        {/if}
+
+        <div class="menu-line"></div>
+
+        <button
+          class="menu-item danger"
+          type="button"
+          onclick={() => {
+            close();
+            asking = 'delete';
+          }}
+        >
+          <span class="material-symbols-outlined">delete</span>
+          Удалить
+        </button>
+      {/snippet}
+    </ActionsMenu>
   </div>
 
-  <div class="card-meta">
-    <span class="card-meta-item">
-      <span class="material-symbols-outlined">work</span>
-      {card.vacancy_count} {plural(card.vacancy_count, 'вакансия', 'вакансии', 'вакансий')}
-    </span>
-    {#if card.last_company_name}
-      <span class="card-meta-item">
-        <span class="material-symbols-outlined">domain</span>
-        {card.last_company_name}
-      </span>
-    {/if}
-    {#if card.unread_count}
-      <span class="card-meta-item">
-        <span class="material-symbols-outlined">mail</span>
-        {card.unread_count} {plural(card.unread_count, 'непрочитанное', 'непрочитанных', 'непрочитанных')}
-      </span>
-    {/if}
-  </div>
-
-  <div class="form-grid">
+  <div class="cnt-form-grid">
     <input
-      class="input"
+      class="cnt-input"
+      maxlength="120"
       value={card.name ?? ''}
       placeholder="Имя"
       onchange={(event) => save({ name: event.currentTarget.value.trim() })}
     />
     <input
-      class="input"
-      value={card.telegram_username ?? ''}
-      placeholder="Ник в Telegram"
+      class="cnt-input"
+      maxlength="64"
+      value={card.telegram_username ? `@${card.telegram_username}` : ''}
+      placeholder="Telegram @username"
       onchange={(event) => save({ telegram_username: event.currentTarget.value.trim() })}
     />
   </div>
-
-  <textarea
-    class="textarea"
-    placeholder="Заметки о человеке"
-    value={card.notes ?? ''}
-    onchange={(event) => save({ notes: event.currentTarget.value })}
-  ></textarea>
-
-  <MiniVacancies {vacancies} empty="Вакансий от этого человека ещё нет" />
 
   <PersonChat
     {ask}
@@ -190,32 +282,27 @@
     }}
   />
 
-  <div class="modal-actions card-actions">
-    <button class="btn" type="button" onclick={() => (asking = 'merge')}>
-      <span class="material-symbols-outlined">merge</span>
-      Слить с другим
-    </button>
-    {#if card.blacklist_value}
-      <button class="btn" type="button" onclick={unblock}>
-        <span class="material-symbols-outlined">restart_alt</span>
-        Убрать из отсева
-      </button>
-    {:else}
-      <button class="btn danger" type="button" onclick={block}>
-        <span class="material-symbols-outlined">block</span>
-        В чёрный список
-      </button>
-    {/if}
-    <button class="btn danger" type="button" onclick={() => (asking = 'delete')}>
-      <span class="material-symbols-outlined">delete</span>
-      Удалить
-    </button>
+  <div class="cnt-det-section">
+    <!-- Своя запись на каждого человека: отсчёт отложенной записи живёт в поле,
+         и номер карточки запечатан в нём — набранное уедет туда, где
+         набиралось, даже если человека уже сменили. -->
+    {#key personId}
+      <NotesField
+        value={card.notes}
+        placeholder="Личные заметки по этому HR…"
+        delay={NOTES_DELAY}
+        limit={2000}
+        save={(text) => saveNotes(personId, text)}
+      />
+    {/key}
   </div>
+
+  <MiniVacancies {vacancies} empty="Связанных вакансий нет." onpick={onvacancy} />
 {/if}
 
 {#if asking === 'delete'}
   <ConfirmDialog
-    message={`Удалить карточку «${shown}»?\n\nПереписка с ним удалится вместе с ней. Собранные вакансии останутся, но без человека. Откатить нельзя.`}
+    message={`Удалить HR «${shown}»?\n\nВся переписка удалится. Связанные вакансии останутся, но без HR.`}
     confirmLabel="Удалить"
     onconfirm={drop}
     oncancel={() => (asking = null)}

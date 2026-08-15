@@ -1,35 +1,47 @@
 <script>
-  // Карточка канала: числа по нему и действия над ним.
+  // Карточка канала: его числа, воронка и вакансии, которые он принёс.
   //
-  // Открывается поверх списка: канал правят, глядя на его же числа, и уводить
-  // ради этого с экрана значило бы терять из виду соседей по списку.
+  // Стоит правой панелью рядом со списком: канал правят, глядя на его же числа,
+  // и уводить ради этого с экрана значило бы терять из виду соседей по списку.
 
-  import CardDialog from '$components/CardDialog.svelte';
+  import ActionsMenu from '$components/ActionsMenu.svelte';
+  import Avatar from '$components/Avatar.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
-  import DonutChart from '$components/DonutChart.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
-  import { channelName } from '$state/contacts.js';
+  import { attempts } from '$state/attempts.js';
+  import { channelName, channelStats, telegramHref } from '$state/contacts.js';
   import { PAGE, appended } from '$state/paging.js';
   import { donut } from '$state/stats.js';
 
-  let { ask, say, lockedTip, channelId, onclose, onchanged } = $props();
+  let { ask, say, lockedTip, channelId, onvacancy, onclose, onchanged } = $props();
 
   let card = $state(null);
   let vacancies = $state([]);
   let hasMore = $state(false);
-  let asking = $state(null);
+  let digging = $state(false);
+  let asking = $state(false);
   let trouble = $state('');
 
+  // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
+  // канал в ней переключают нажатием по соседней строке — ответ про прежний,
+  // лёгший поверх свежего, показал бы его числа под новым именем.
+  const cardTries = attempts();
+  const vacancyTries = attempts();
   let alive = true;
 
-  const statuses = $derived(donut(card?.stats.status_counts || {}));
   const shown = $derived(card ? channelName({ ...card, id: card.channel_id }) : null);
+  const numbers = $derived(card ? channelStats(card.stats) : null);
+  const funnel = $derived(card ? donut(card.stats.status_counts) : []);
+  // Неразобранные вакансии в перечень не идут: у них нет ни названия, ни
+  // оценки, и строка вышла бы пустой.
+  const parsed = $derived(vacancies.filter((one) => one.title.trim()));
 
-  async function refresh() {
-    const now = await ask('channels.detail', channelId);
-    if (!alive) return;
-    // Отказ не должен запирать окно на «Загрузка…»: человеку нужно хотя бы
-    // выйти из него, а плашку он уже увидел.
+  async function refresh(id) {
+    const mine = cardTries.next();
+    const now = await ask('channels.detail', id);
+    if (!alive || cardTries.stale(mine)) return;
+    // Отказ не должен запирать панель на «Загрузка…»: человеку нужно хотя бы
+    // перейти к соседнему каналу, а плашку он уже увидел.
     if (now === null) return (trouble = 'Не удалось прочитать канал');
     card = now;
   }
@@ -39,33 +51,44 @@
    * Страницами: каналов с тысячей вакансий хватает, и разом такой список не
    * рисуется. `append` — добор к показанному, `replace` — первая страница.
    */
-  async function loadVacancies(mode = 'replace') {
+  async function loadVacancies(id, mode = 'replace') {
+    const mine = vacancyTries.next();
     const page = await ask('channels.vacancies', {
-      channel_id: channelId,
+      channel_id: id,
       limit: PAGE,
       offset: mode === 'append' ? vacancies.length : 0,
       mode,
     });
-    if (page === null || !alive) return;
+    if (page === null || !alive || vacancyTries.stale(mine)) return;
     vacancies = mode === 'append' ? appended(vacancies, page.vacancies) : page.vacancies;
     hasMore = page.has_more;
   }
 
+  /** Дочитать следующую страницу вакансий: панель подошла к концу.
+   *
+   * Зовёт список — прокручивается панель целиком, вместе с шапкой и числами, и
+   * знает об этой прокрутке она.
+   */
+  export function more() {
+    if (!hasMore || digging) return;
+    digging = true;
+    loadVacancies(channelId, 'append').finally(() => {
+      digging = false;
+    });
+  }
+
   /** Опросить канал сейчас.
    *
-   * Просьба уходит боту, а он при погасших лампах не поднят вовсе: отвечать
-   * человеку «канал опрашивается» значило бы врать. Заслон назван теми же
-   * словами, что и на кнопке обхода внизу окна.
+   * Просьба уходит боту, а он при погасших лампах не поднят вовсе: пункт заперт
+   * и объяснён теми же словами, что и кнопка обхода внизу окна.
    */
   async function pollNow() {
-    if (lockedTip) return say(lockedTip, true);
     const done = await ask('channels.poll_now', channelId);
     if (done === null) return;
     say('Канал опрашивается');
   }
 
   async function resetCursor() {
-    asking = null;
     const done = await ask('channels.reset_cursor', channelId);
     if (done === null) return;
     say('Отметка прочитанного сброшена — следующий обход прочитает канал заново');
@@ -81,93 +104,200 @@
       ? await ask('channels.unblock', channelId)
       : await ask('channels.block', channelId);
     if (done === null) return;
-    await refresh();
+    await refresh(channelId);
     onchanged();
+  }
+
+  async function drop() {
+    asking = false;
+    const done = await ask('channels.delete', channelId);
+    if (done === null) return;
+    onchanged();
+    onclose();
   }
 
   $effect(() => {
     alive = true;
-    refresh();
-    loadVacancies();
+    const id = channelId;
+    // Показанное прежним каналом уходит сразу: панель одна, и его числа под
+    // новым именем читались бы как числа нового.
+    card = null;
+    trouble = '';
+    vacancies = [];
+    hasMore = false;
+    refresh(id);
+    loadVacancies(id);
     return () => {
       alive = false;
     };
   });
 </script>
 
-<CardDialog {trouble} ready={!!card} {onclose}>
-  <div class="modal-title card-head">
-    {#if card.avatar}
-      <img class="avatar" src={card.avatar} alt="" />
-    {:else}
-      <span class="avatar avatar-empty material-symbols-outlined">campaign</span>
-    {/if}
-    <span class="card-name">{shown.name}</span>
-    {#if shown.handle}<span class="card-handle">{shown.handle}</span>{/if}
-    {#if card.blacklist_value}<span class="kind-tag" data-kind="channel">в отсеве</span>{/if}
-  </div>
+{#if trouble}
+  <div class="cnt-detail-empty">{trouble}</div>
+{:else if !card}
+  <div class="cnt-detail-empty">Загрузка…</div>
+{:else}
+  <div class="cnt-det-head">
+    <Avatar avatar={card.avatar} icon="tag" />
 
-  <div class="status-card">
-    <div class="stat-lines">
-      <div class="stat-line">
-        <span class="stat-name">Вакансий собрано</span>
-        <span class="stat-value">{card.stats.total}</span>
+    <div>
+      <div class="cnt-det-name">{shown.name}</div>
+
+      <div class="cnt-det-sub">
+        {#if card.username}
+          <button
+            class="cnt-det-link"
+            type="button"
+            title="Открыть в Telegram"
+            onclick={() => ask('system.open_url', telegramHref(card.username))}
+          >
+            @{card.username}
+          </button>
+        {:else}
+          <span>@—</span>
+        {/if}
       </div>
-      <div class="stat-line">
-        <span class="stat-name">В день</span>
-        <span class="stat-value">{card.stats.vacancies_per_day ?? '—'}</span>
-      </div>
-      <div class="stat-line">
-        <span class="stat-name">Годных</span>
-        <span class="stat-value">{card.stats.fit_percent ?? '—'}%</span>
-      </div>
-      <div class="stat-line">
-        <span class="stat-name">Откликов</span>
-        <span class="stat-value">{card.stats.apply_percent ?? '—'}%</span>
-      </div>
-      <div class="stat-line">
-        <span class="stat-name">Ответили</span>
-        <span class="stat-value">{card.stats.response_percent ?? '—'}%</span>
-      </div>
-    </div>
-    <!-- Легенда рядом с кольцом: одиннадцать цветов без подписей не
-         читаются, а подписать сегменты внутри кольца негде. -->
-    <div class="status-list">
-      {#each statuses as one (one.name)}
-        <div class="status-item">
-          <span class="status-dot" data-status={one.name}></span>
-          <span class="status-name">{one.name}</span>
-          <span class="status-count">{one.count}</span>
+
+      {#if card.blacklist_value}
+        <div class="cnt-det-meta-row">
+          <span class="cnt-det-meta-chip blacklist" title="В blacklist: {card.blacklist_value}">
+            <span class="material-symbols-outlined">block</span>
+            В blacklist
+          </span>
         </div>
-      {/each}
+      {/if}
     </div>
-    <DonutChart parts={statuses} total={card.stats.total} label="Всего" />
+
+    <ActionsMenu>
+      {#snippet children(close)}
+        <button
+          class="menu-item"
+          type="button"
+          disabled={!!lockedTip}
+          title={lockedTip || 'Запустить поллинг этого канала'}
+          onclick={() => {
+            close();
+            pollNow();
+          }}
+        >
+          <span class="material-symbols-outlined">refresh</span>
+          Прогнать сейчас
+        </button>
+        <button
+          class="menu-item"
+          type="button"
+          title="Сбросить last_processed_msg_id"
+          onclick={() => {
+            close();
+            resetCursor();
+          }}
+        >
+          <span class="material-symbols-outlined">restart_alt</span>
+          Сбросить курсор
+        </button>
+        {#if card.blacklist_value}
+          <button
+            class="menu-item"
+            type="button"
+            onclick={() => {
+              close();
+              switchBlock();
+            }}
+          >
+            <span class="material-symbols-outlined">restart_alt</span>
+            Убрать из blacklist
+          </button>
+        {:else}
+          <button
+            class="menu-item"
+            type="button"
+            onclick={() => {
+              close();
+              switchBlock();
+            }}
+          >
+            <span class="material-symbols-outlined">block</span>
+            Добавить в blacklist
+          </button>
+        {/if}
+
+        <div class="menu-line"></div>
+
+        <button
+          class="menu-item danger"
+          type="button"
+          onclick={() => {
+            close();
+            asking = true;
+          }}
+        >
+          <span class="material-symbols-outlined">delete</span>
+          Удалить канал
+        </button>
+      {/snippet}
+    </ActionsMenu>
   </div>
 
-  <MiniVacancies {vacancies} empty="С этого канала вакансий ещё нет" hasMore={hasMore} onmore={() => loadVacancies('append')} />
+  <div class="cnt-det-section">
+    <div class="ch-stats-grid">
+      <div class="ch-stat">
+        <span class="ch-stat-num">{card.stats.vacancies_per_day}</span>
+        <span class="ch-stat-label">Вакансий в день</span>
+      </div>
+      <div class="ch-stat">
+        <span class="ch-stat-num fit">{numbers.fit}</span>
+        <span class="ch-stat-label">Подходящих вакансий</span>
+      </div>
+      <div class="ch-stat">
+        <span class="ch-stat-num apply">{numbers.apply}</span>
+        <span class="ch-stat-label">Откликов из подходящих</span>
+      </div>
+      <div class="ch-stat">
+        <span class="ch-stat-num response">{numbers.response}</span>
+        <span class="ch-stat-label">Ответов на отклики</span>
+      </div>
+    </div>
 
-  <div class="modal-actions card-actions">
-    <button class="btn" type="button" onclick={pollNow}>
-      <span class="material-symbols-outlined">refresh</span>
-      Опросить сейчас
-    </button>
-    <button class="btn" type="button" onclick={() => (asking = 'reset')}>
-      <span class="material-symbols-outlined">restart_alt</span>
-      Сбросить отметку
-    </button>
-    <button class="btn danger" type="button" onclick={switchBlock}>
-      <span class="material-symbols-outlined">block</span>
-      {card.blacklist_value ? 'Убрать из отсева' : 'В чёрный список'}
-    </button>
-    <button class="btn" type="button" onclick={() => onclose()}>Закрыть</button>
+    {#if numbers.empty}
+      <div class="ch-stats-empty">Из этого канала ещё не пришло вакансий</div>
+    {:else}
+      <div class="ch-bar">
+        {#each funnel as part (part.name)}
+          <div
+            class="ch-bar-seg"
+            data-status={part.name}
+            style="width: {part.percent}%"
+            title="{part.name} {part.count}"
+          ></div>
+        {/each}
+      </div>
+      <!-- Легенда под полосой: одиннадцать цветов без подписей не читаются, а
+           подписать отрезки внутри полосы негде. -->
+      <div class="ch-bar-legend">
+        {#each funnel as part (part.name)}
+          <span class="legend-item">
+            <span class="status-dot" data-status={part.name}></span>
+            {part.name} {part.count}
+          </span>
+        {/each}
+      </div>
+    {/if}
   </div>
-</CardDialog>
 
-{#if asking === 'reset'}
+  <MiniVacancies
+    vacancies={parsed}
+    empty="Из этого канала ещё нет вакансий."
+    loading={digging}
+    onpick={onvacancy}
+  />
+{/if}
+
+{#if asking}
   <ConfirmDialog
-    message={'Сбросить отметку прочитанного?\n\nСледующий обход прочитает канал с начала и заново разберёт всё, что там есть. Это долго и стоит вызовов модели.'}
-    confirmLabel="Сбросить"
-    onconfirm={resetCursor}
-    oncancel={() => (asking = null)}
+    message={`Удалить «${shown.name}»?\n\nСвязанные вакансии останутся, но без привязки к каналу. Действие необратимо.`}
+    confirmLabel="Удалить"
+    onconfirm={drop}
+    oncancel={() => (asking = false)}
   />
 {/if}

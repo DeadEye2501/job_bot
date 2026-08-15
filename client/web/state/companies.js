@@ -13,7 +13,7 @@ const SCHEME = /^([a-z][a-z0-9+.-]*):\/*/i;
 
 /** Чем подписать компанию в списке.
  *
- * Имя — сверху, сайт и написания — под ним: по имени компанию узнают, по
+ * Имя — сверху, сайт и алиасы — под ним: по имени компанию узнают, по
  * домену различают. Две «Ромашки» с разными сайтами — разные компании, и без
  * второй строки они неотличимы.
  *
@@ -23,7 +23,7 @@ const SCHEME = /^([a-z][a-z0-9+.-]*):\/*/i;
 export function companyLine(company) {
   const parts = [];
   if (company.website) parts.push(company.website);
-  if (company.aliases.length) parts.push(`написания: ${company.aliases.join(', ')}`);
+  if (company.aliases.length) parts.push(`алиасы: ${company.aliases.join(', ')}`);
   return {
     name: company.name || `Компания #${company.id}`,
     sub: parts.length ? parts.join(' · ') : 'без сайта',

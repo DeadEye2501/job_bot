@@ -1,21 +1,27 @@
 <script>
-  // Карточка компании: её числа, поля и действия над ней.
+  // Карточка компании: её числа, поля, люди и вакансии.
   //
-  // Открывается поверх списка: компанию правят, глядя на её же вакансии и
-  // людей, и уводить ради этого с экрана значило бы терять из виду соседей по
-  // списку.
+  // Стоит правой панелью рядом со списком: компанию правят, глядя на её же
+  // людей и вакансии, и уводить ради этого с экрана значило бы терять из виду
+  // соседей по списку.
 
-  import CardDialog from '$components/CardDialog.svelte';
+  import ActionsMenu from '$components/ActionsMenu.svelte';
+  import Avatar from '$components/Avatar.svelte';
   import ChipList from '$components/ChipList.svelte';
-  import PickerRow from '$components/PickerRow.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
+  import MiniPeople from '$components/MiniPeople.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
+  import NotesField from '$components/NotesField.svelte';
+  import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
-  import { companyCandidate, companyLine } from '$state/companies.js';
-  import { personName } from '$state/contacts.js';
+  import { attempts } from '$state/attempts.js';
+  import { companyCandidate, companyLine, siteHref } from '$state/companies.js';
   import { plural } from '$state/words.js';
 
-  let { ask, say, companyId, onclose, onchanged } = $props();
+  // Пауза перед записью заметки — та же, что ждало прежнее окно.
+  const NOTES_DELAY = 600;
+
+  let { ask, say, companyId, onperson, onvacancy, onclose, onchanged } = $props();
 
   let card = $state(null);
   let people = $state([]);
@@ -24,29 +30,37 @@
   let asking = $state(null);
   let chosen = $state(null);
 
+  // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
+  // компанию в ней переключают нажатием по соседней строке — ответ про
+  // прежнюю, лёгший поверх свежего, показал бы её числа под новым именем.
+  const cardTries = attempts();
+  const peopleTries = attempts();
+  const vacancyTries = attempts();
   let alive = true;
 
   const shown = $derived(card ? companyLine({ ...card, id: card.company_id }) : null);
   const chosenName = $derived(chosen ? companyLine(chosen).name : '');
+  const site = $derived(card ? siteHref(card.website) : null);
 
-  async function refresh() {
-    const now = await ask('companies.detail', companyId);
-    if (!alive) return;
-    // Отказ не должен запирать окно на «Загрузка…»: человеку нужно хотя бы
-    // выйти из него, а плашку он уже увидел.
+  async function refresh(id) {
+    const mine = cardTries.next();
+    const now = await ask('companies.detail', id);
+    if (!alive || cardTries.stale(mine)) return;
     if (now === null) return (trouble = 'Не удалось прочитать компанию');
     card = now;
   }
 
-  async function loadPeople() {
-    const now = await ask('companies.people', companyId);
-    if (now === null || !alive) return;
+  async function loadPeople(id) {
+    const mine = peopleTries.next();
+    const now = await ask('companies.people', id);
+    if (now === null || !alive || peopleTries.stale(mine)) return;
     people = now.hrs;
   }
 
-  async function loadVacancies() {
-    const now = await ask('companies.vacancies', { company_id: companyId });
-    if (now === null || !alive) return;
+  async function loadVacancies(id) {
+    const mine = vacancyTries.next();
+    const now = await ask('companies.vacancies', { company_id: id });
+    if (now === null || !alive || vacancyTries.stale(mine)) return;
     vacancies = now.vacancies;
   }
 
@@ -58,8 +72,22 @@
    */
   async function save(part) {
     const done = await ask('companies.update', { company_id: companyId, ...part });
-    await refresh();
+    await refresh(companyId);
     if (done !== null) onchanged();
+  }
+
+  /** Записать заметку и вернуть то, что легло в базу.
+   *
+   * Карточку не перечитываем: человек мог набрать ещё, пока летел вопрос, и
+   * пришедшее из базы стёрло бы это. Записанным считаем набранное: этот зов
+   * называет только поправленные поля, самой заметки в ответе нет, — а пустая
+   * от пробельной здесь не отличается, обе сводятся к пустоте по дороге.
+   */
+  async function saveNotes(id, text) {
+    const done = await ask('companies.update', { company_id: id, notes: text });
+    if (!alive || done === null) return null;
+    onchanged();
+    return text;
   }
 
   /** Поправить название. Пустое не отправляется вовсе: без названия компанию
@@ -79,7 +107,7 @@
     if (done.was_inactive) say(`Возвращена в отсев: ${done.value}`);
     else if (done.existed) say(`Уже в отсеве: ${done.value}`);
     else say(`Занесена в отсев: ${done.value}`);
-    await refresh();
+    await refresh(companyId);
     onchanged();
   }
 
@@ -87,7 +115,7 @@
     const done = await ask('companies.unblock', companyId);
     if (done === null) return;
     say(done.updated ? 'Убрана из отсева' : 'В отсеве её не было');
-    await refresh();
+    await refresh(companyId);
     onchanged();
   }
 
@@ -121,97 +149,159 @@
 
   $effect(() => {
     alive = true;
-    refresh();
-    loadPeople();
-    loadVacancies();
+    const id = companyId;
+    // Показанное прежней компанией уходит сразу: панель одна, и её числа под
+    // новым именем читались бы как числа новой.
+    card = null;
+    trouble = '';
+    people = [];
+    vacancies = [];
+    refresh(id);
+    loadPeople(id);
+    loadVacancies(id);
     return () => {
       alive = false;
     };
   });
 </script>
 
-<CardDialog {trouble} ready={!!card} {onclose}>
-  <div class="modal-title card-head">
-    <span class="avatar avatar-empty material-symbols-outlined">domain</span>
-    <span class="card-name">{shown.name}</span>
-    {#if card.blacklist_value}<span class="kind-tag" data-kind="company">в отсеве</span>{/if}
+{#if trouble}
+  <div class="cnt-detail-empty">{trouble}</div>
+{:else if !card}
+  <div class="cnt-detail-empty">Загрузка…</div>
+{:else}
+  <div class="cnt-det-head">
+    <Avatar icon="domain" />
+
+    <div>
+      <div class="cnt-det-name" class:muted={!card.name}>{card.name || '— без названия —'}</div>
+
+      <div class="cnt-det-sub">
+        {#if site === null}
+          <span>сайт не указан</span>
+        {:else}
+          <button
+            class="cnt-det-link"
+            type="button"
+            title="Открыть сайт"
+            onclick={() => ask('system.open_url', site)}
+          >
+            {card.website}
+          </button>
+        {/if}
+      </div>
+
+      <div class="cnt-det-meta-row">
+        <span class="cnt-det-meta-chip">
+          <span class="material-symbols-outlined">work</span>
+          {card.vacancy_count} {plural(card.vacancy_count, 'вакансия', 'вакансии', 'вакансий')}
+        </span>
+        <span class="cnt-det-meta-chip">
+          <span class="material-symbols-outlined">people</span>
+          {card.hr_count} HR
+        </span>
+        {#if card.blacklist_value}
+          <span class="cnt-det-meta-chip blacklist" title="В blacklist: {card.blacklist_value}">
+            <span class="material-symbols-outlined">block</span>
+            В blacklist
+          </span>
+        {/if}
+      </div>
+    </div>
+
+    <ActionsMenu>
+      {#snippet children(close)}
+        <button
+          class="menu-item"
+          type="button"
+          onclick={() => {
+            close();
+            asking = 'merge';
+          }}
+        >
+          <span class="material-symbols-outlined">merge</span>
+          Слить с другой компанией
+        </button>
+        {#if card.blacklist_value}
+          <button
+            class="menu-item"
+            type="button"
+            onclick={() => {
+              close();
+              unblock();
+            }}
+          >
+            <span class="material-symbols-outlined">restart_alt</span>
+            Убрать из blacklist
+          </button>
+        {:else}
+          <button
+            class="menu-item"
+            type="button"
+            onclick={() => {
+              close();
+              block();
+            }}
+          >
+            <span class="material-symbols-outlined">block</span>
+            Добавить в blacklist
+          </button>
+        {/if}
+
+        <div class="menu-line"></div>
+
+        <button
+          class="menu-item danger"
+          type="button"
+          onclick={() => {
+            close();
+            asking = 'delete';
+          }}
+        >
+          <span class="material-symbols-outlined">delete</span>
+          Удалить
+        </button>
+      {/snippet}
+    </ActionsMenu>
   </div>
 
-  <div class="card-meta">
-    <span class="card-meta-item">
-      <span class="material-symbols-outlined">work</span>
-      {card.vacancy_count} {plural(card.vacancy_count, 'вакансия', 'вакансии', 'вакансий')}
-    </span>
-    <span class="card-meta-item">
-      <span class="material-symbols-outlined">person</span>
-      {card.hr_count} {plural(card.hr_count, 'человек', 'человека', 'человек')}
-    </span>
-  </div>
-
-  <div class="form-grid">
-    <input class="input" value={card.name} placeholder="Название" onchange={rename} />
+  <div class="cnt-form-grid">
+    <input class="cnt-input" maxlength="120" value={card.name} placeholder="Название" onchange={rename} />
     <input
-      class="input"
+      class="cnt-input"
+      maxlength="200"
       value={card.website ?? ''}
-      placeholder="Сайт или домен"
+      placeholder="Сайт / домен"
       onchange={(event) => save({ website: event.currentTarget.value.trim() })}
     />
   </div>
 
   <!-- Написания: под ними компания приходит в объявлениях. Потеряй карточка
        одно из них — следующая вакансия завела бы компанию заново. -->
-  <ChipList
-    items={card.aliases}
-    onadd={(one) => save({ aliases: [...card.aliases, one] })}
-    onremove={(index) => save({ aliases: card.aliases.filter((_, at) => at !== index) })}
-  />
-
-  <textarea
-    class="textarea"
-    placeholder="Заметки о компании"
-    value={card.notes ?? ''}
-    onchange={(event) => save({ notes: event.currentTarget.value })}
-  ></textarea>
-
-  <div class="card-people">
-    {#if !people.length}
-      <div class="empty-note">Людей из этой компании ещё нет</div>
-    {:else}
-      {#each people as one (one.id)}
-        <div class="stat-line">
-          <span class="stat-name">{personName(one)}</span>
-          <span class="stat-value">{one.vacancy_count}</span>
-        </div>
-      {/each}
-    {/if}
+  <div class="cnt-det-section">
+    <ChipList
+      items={card.aliases}
+      onadd={(one) => save({ aliases: [...card.aliases, one] })}
+      onremove={(index) => save({ aliases: card.aliases.filter((_, at) => at !== index) })}
+    />
   </div>
 
-  <MiniVacancies {vacancies} empty="Вакансий этой компании ещё нет" />
-
-  <div class="modal-actions card-actions">
-    <button class="btn" type="button" onclick={() => (asking = 'merge')}>
-      <span class="material-symbols-outlined">merge</span>
-      Слить с другой
-    </button>
-    {#if card.blacklist_value}
-      <button class="btn" type="button" onclick={unblock}>
-        <span class="material-symbols-outlined">restart_alt</span>
-        Убрать из отсева
-      </button>
-    {:else}
-      <button class="btn danger" type="button" onclick={block}>
-        <span class="material-symbols-outlined">block</span>
-        В чёрный список
-      </button>
-    {/if}
-    <button class="btn danger" type="button" onclick={() => (asking = 'delete')}>
-      <span class="material-symbols-outlined">delete</span>
-      Удалить
-    </button>
-    <button class="btn" type="button" onclick={() => onclose()}>Закрыть</button>
+  <div class="cnt-det-section">
+    {#key companyId}
+      <NotesField
+        value={card.notes}
+        placeholder="Заметки о компании…"
+        delay={NOTES_DELAY}
+        limit={2000}
+        save={(text) => saveNotes(companyId, text)}
+      />
+    {/key}
   </div>
-</CardDialog>
 
+  <MiniPeople {people} empty="HR-контактов нет." onpick={onperson} />
+
+  <MiniVacancies {vacancies} empty="Связанных вакансий нет." onpick={onvacancy} />
+{/if}
 
 {#if asking === 'delete'}
   <ConfirmDialog

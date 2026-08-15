@@ -1,0 +1,29 @@
+/* Окно заведения канала: узкая коробка с шапкой, полем и подвалом.
+   Сами шапка, тело и подвал — общие, в modal.css. */
+
+/* Высота по содержимому: в окне одно поле, и запертая высота оставила бы под
+   ним пустую половину. */
+.add-channel {
+  width: min(380px, 92vw);
+  max-width: min(380px, 92vw);
+  max-height: 88vh;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.add-channel .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+}
+
+/* Пояснение стоит под полем, а не над ним: сначала человек видит, что набирать,
+   и только потом — что случится дальше. */
+.cnt-add-hint {
+  margin-top: 4px;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}

@@ -32,11 +32,18 @@
   height: 32px;
 }
 
+/* В строке канала это кнопка, а не просто место под имя: сама строка кнопкой
+   быть не может — в ней стоит переключатель опроса. */
 .cnt-hr-info {
   min-width: 0;
+  text-align: left;
 }
 
+/* Имя и подпись — двумя этажами: строка списка узка, и в один ряд подпись
+   съела бы имя. Блоками, потому что внутри кнопки строки стоят не div'ы, а
+   span'ы: кнопка не принимает блочную разметку. */
 .cnt-hr-name {
+  display: block;
   overflow: hidden;
   color: var(--text-primary);
   font-size: 0.83rem;
@@ -53,6 +60,7 @@
 }
 
 .cnt-hr-sub {
+  display: block;
   overflow: hidden;
   color: var(--text-tertiary);
   font-size: 0.72rem;
@@ -118,6 +126,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Счёт вакансий — приглушённая пилюля в хвосте строки: число говорит, стоит ли
+   открывать, но спорить за внимание с именем не должно. Нулей в ней не бывает:
+   пустая пилюля читалась бы как «ноль чего-то важного». */
+.cnt-co-count {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .list-head {
   display: flex;
   align-items: center;
@@ -135,82 +156,6 @@
   font-size: 0.72rem;
   color: var(--text-tertiary);
   margin-bottom: 6px;
-}
-
-.contact-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.contact-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-.contact-row:hover {
-  background: var(--accent-row-hover);
-}
-
-/* Строка канала из отсева приглушена: он остаётся в списке, но обход его не
-   читает, и выглядеть как рабочий он не должен. */
-.contact-row.blocked {
-  opacity: 0.55;
-}
-
-.contact-main {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
-.avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  object-fit: cover;
-}
-
-.avatar-empty {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-tertiary);
-  color: var(--text-tertiary);
-  font-size: 16px;
-}
-
-.contact-names {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-
-.contact-name {
-  font-size: 0.85rem;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.contact-handle {
-  font-size: 0.7rem;
-  color: var(--text-tertiary);
-}
-
-.contact-count {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
 }
 
 .kind-pills {
@@ -320,43 +265,4 @@
   background: var(--kind-keyword-bg);
   color: var(--kind-keyword-fg);
   border-color: transparent;
-}
-
-/* Карточка канала: шире обычного окна — в ней числа и кольцо рядом. */
-.card-dialog {
-  min-width: 520px;
-  max-width: 560px;
-}
-
-.card-handle {
-  color: var(--text-tertiary);
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
-.card-actions {
-  flex-wrap: wrap;
-  justify-content: flex-start;
-}
-
-/* Шапка карточки: значок, имя, ник и отметка отсева в одну строку. */
-.card-head {
-  gap: 8px;
-}
-
-.card-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Перечень вакансий канала прокручивается сам: их бывают сотни, а окно должно
-   остаться в размерах экрана. */
-.card-vacancies {
-  max-height: 220px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }

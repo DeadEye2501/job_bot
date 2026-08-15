@@ -1,18 +1,18 @@
 <script>
-  // Вкладка «Компании»: список с поиском, страницами и заведением.
+  // Вкладка «Компании»: список слева, карточка выбранной справа.
 
   import { untrack } from 'svelte';
 
   import AskDialog from '$components/AskDialog.svelte';
   import NewCompanyFields from '$components/NewCompanyFields.svelte';
   import CompanyRow from '$components/CompanyRow.svelte';
-  import SearchList from '$components/SearchList.svelte';
+  import SearchBox from '$components/SearchBox.svelte';
   import { attempts } from '$state/attempts.js';
-  import { PAGE, appended, refreshLimit } from '$state/paging.js';
+  import { PAGE, appended, nearBottom, refreshLimit } from '$state/paging.js';
 
   import CompanyCard from './CompanyCard.svelte';
 
-  let { ask, say, events, open, onopened } = $props();
+  let { ask, say, events, open, onopened, onperson, onvacancy } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -21,6 +21,7 @@
   let adding = $state(false);
   let draft = $state({ name: '', website: '', aliases: '', notes: '' });
   let opened = $state(null);
+  let loadingMore = $state(false);
 
   const tries = attempts();
   let alive = true;
@@ -70,6 +71,19 @@
     return refresh();
   }
 
+  /** Дочитать следующую страницу, когда список подошёл к концу.
+   *
+   * Прокруткой, а не кнопкой: список читают сверху вниз и глазами, а кнопка
+   * посреди чтения заставляет целиться в неё мышью.
+   */
+  function scrolled(event) {
+    if (!hasMore || loadingMore || !nearBottom(event.currentTarget)) return;
+    loadingMore = true;
+    more().finally(() => {
+      loadingMore = false;
+    });
+  }
+
   async function create() {
     const name = draft.name.trim();
     if (!name) return;
@@ -104,30 +118,63 @@
   });
 </script>
 
-<SearchList
-  {search}
-  placeholder="Поиск по названию, написанию, домену"
-  onsearch={find}
-  {loaded}
-  count={rows.length}
-  words={['компания', 'компании', 'компаний']}
-  empty={search ? 'Ничего не найдено' : 'Компаний пока нет'}
->
-  {#snippet actions()}
-    <button class="btn primary" type="button" onclick={() => (adding = true)}>
-      <span class="material-symbols-outlined">add</span>
-      Компания
-    </button>
-  {/snippet}
+<div class="cnt-layout">
+  <section class="cnt-list-pane">
+    <div class="cnt-list-toolbar">
+      <SearchBox
+        value={search}
+        placeholder="Поиск по названию, алиасу, домену..."
+        onsearch={find}
+      />
+      <button
+        class="cnt-add-btn"
+        type="button"
+        title="Добавить компанию"
+        onclick={() => (adding = true)}
+      >
+        <span class="material-symbols-outlined">add_business</span>
+      </button>
+    </div>
 
-  {#each rows as company (company.id)}
-    <CompanyRow {company} onpick={() => (opened = company.id)} />
-  {/each}
+    <div class="cnt-list" onscroll={scrolled}>
+      {#if !loaded}
+        <div class="cnt-list-empty">Загрузка…</div>
+      {:else if rows.length === 0}
+        <div class="cnt-list-empty">
+          {#if search}
+            Ничего не найдено по запросу «{search}»
+          {:else}
+            Компаний пока нет
+          {/if}
+        </div>
+      {:else}
+        {#each rows as company (company.id)}
+          <CompanyRow
+            {company}
+            selected={opened === company.id}
+            onpick={() => (opened = company.id)}
+          />
+        {/each}
+      {/if}
+    </div>
+  </section>
 
-  {#if hasMore}
-    <button class="add-more" type="button" onclick={more}>Показать ещё</button>
-  {/if}
-</SearchList>
+  <section class="cnt-detail-pane">
+    {#if opened === null}
+      <div class="cnt-detail-empty">Выберите компанию в списке слева</div>
+    {:else}
+      <CompanyCard
+        {ask}
+        {say}
+        {onperson}
+        {onvacancy}
+        companyId={opened}
+        onclose={() => (opened = null)}
+        onchanged={() => refresh(refreshLimit(rows.length))}
+      />
+    {/if}
+  </section>
+</div>
 
 {#if adding}
   <AskDialog
@@ -140,14 +187,4 @@
   >
     <NewCompanyFields {draft} />
   </AskDialog>
-{/if}
-
-{#if opened}
-  <CompanyCard
-    {ask}
-    {say}
-    companyId={opened}
-    onclose={() => (opened = null)}
-    onchanged={() => refresh(refreshLimit(rows.length))}
-  />
 {/if}

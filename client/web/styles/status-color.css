@@ -1,0 +1,50 @@
+/* Цвет статуса вакансии — один набор на всё окно.
+
+   Красит три места: сегмент кольца, точку в списке рядом с ним и отрезок полосы
+   воронки в карточке канала. Разойдись они, одна и та же ступень воронки была бы
+   разного цвета на соседних экранах. Обводка и заливка названы вместе: у кольца
+   цвет несёт stroke, у точки и отрезка — background. */
+
+.donut-part[data-status='New'],
+.status-dot[data-status='New'],
+.ch-bar-seg[data-status='New'] { stroke: var(--fg-max); background: var(--fg-max); }
+
+.donut-part[data-status='Applied'],
+.status-dot[data-status='Applied'],
+.ch-bar-seg[data-status='Applied'] { stroke: var(--status-applied); background: var(--status-applied); }
+
+.donut-part[data-status='Answered'],
+.status-dot[data-status='Answered'],
+.ch-bar-seg[data-status='Answered'] { stroke: var(--info); background: var(--info); }
+
+.donut-part[data-status='Test'],
+.status-dot[data-status='Test'],
+.ch-bar-seg[data-status='Test'] { stroke: var(--status-test); background: var(--status-test); }
+
+.donut-part[data-status='Invitation'],
+.status-dot[data-status='Invitation'],
+.ch-bar-seg[data-status='Invitation'] { stroke: var(--ok); background: var(--ok); }
+
+.donut-part[data-status='In Progress'],
+.status-dot[data-status='In Progress'],
+.ch-bar-seg[data-status='In Progress'] { stroke: var(--accent); background: var(--accent); }
+
+.donut-part[data-status='Offer'],
+.status-dot[data-status='Offer'],
+.ch-bar-seg[data-status='Offer'] { stroke: var(--status-offer); background: var(--status-offer); }
+
+.donut-part[data-status='Decline'],
+.status-dot[data-status='Decline'],
+.ch-bar-seg[data-status='Decline'] { stroke: var(--err); background: var(--err); }
+
+.donut-part[data-status='Ghosting'],
+.status-dot[data-status='Ghosting'],
+.ch-bar-seg[data-status='Ghosting'] { stroke: var(--warn); background: var(--warn); }
+
+.donut-part[data-status='Scam'],
+.status-dot[data-status='Scam'],
+.ch-bar-seg[data-status='Scam'] { stroke: var(--alert); background: var(--alert); }
+
+.donut-part[data-status='Not Fit'],
+.status-dot[data-status='Not Fit'],
+.ch-bar-seg[data-status='Not Fit'] { stroke: var(--status-not-fit); background: var(--status-not-fit); }

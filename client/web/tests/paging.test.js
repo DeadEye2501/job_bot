@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { appended, nearBottom, refreshLimit } from '../state/paging.js';
+import { appended, nearBottom, nearTop, refreshLimit } from '../state/paging.js';
 
 describe('догрузка по прокрутке', () => {
   it('следующая страница просится, не доехав до самого низа', () => {
@@ -16,6 +16,15 @@ describe('догрузка по прокрутке', () => {
     expect(nearBottom({ scrollTop: 100, clientHeight: 300, scrollHeight: 1100 })).toBe(false);
   });
 
+  it('лента писем просит старое, не доехав до самого верха', () => {
+    // Переписку листают вверх, к началу разговора: доехавший до края упёрся бы
+    // в пустоту вместо продолжения.
+    expect(nearTop({ scrollTop: 40 })).toBe(true);
+  });
+
+  it('в середине ленты старого не просят', () => {
+    expect(nearTop({ scrollTop: 900 })).toBe(false);
+  });
 });
 
 describe('догрузка следующей страницы', () => {
