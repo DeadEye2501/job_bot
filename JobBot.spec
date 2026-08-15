@@ -1,6 +1,6 @@
 # PyInstaller spec — single-file Windows .exe for Job Bot.
 #
-# Запуск:  pipenv run pyinstaller JobBot.spec
+# Запуск:  pipenv run python -m PyInstaller JobBot.spec --clean --noconfirm
 #
 # Notes:
 #   - onefile + windowed: MSVC-style console спрятан, app выглядит как
@@ -9,9 +9,9 @@
 #     (alembic.ini + alembic/{env.py,script.py.mako,versions/*}) и иконку.
 #     Собранный, а не исходный: окно раздаёт себе `dist`, а исходники рядом с
 #     ним — это ещё и node_modules на сотни мегабайт.
-#   - hiddenimports: alembic versions модули, async SQLite-драйвер и
-#     keyring-бэкенд для Windows — все три загружаются динамически и не
-#     попадают в граф импортов PyInstaller'а сами.
+#   - hiddenimports: async SQLite-драйвер, keyring-бэкенд для Windows и пара
+#     submodule'ов logging — все подгружаются динамически и в граф импортов
+#     PyInstaller'а сами не попадают.
 #   - Qt в сборке больше нет: окно рисует pywebview поверх системного
 #     WebView2, и от прежних 250-350 МБ с QtWebEngine осталась малая доля.
 #
@@ -20,8 +20,6 @@
 # Без этого в exe уедет старый `dist`, а при его отсутствии — ничего.
 
 import os
-
-block_cipher = None
 
 datas = [
     ('client/web/dist', 'client/web/dist'),
@@ -73,19 +71,16 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
+    optimize=0,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
-    a.zipfiles,
     a.datas,
     [],
     name='JobBot',

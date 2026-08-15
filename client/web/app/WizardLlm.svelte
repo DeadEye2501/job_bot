@@ -11,12 +11,16 @@
   // недописанный адрес значил бы работающего бота без модели.
   import { call } from '$api/bridge.js';
   import { mirrored, sameCreds } from '$state/settings.js';
+  import Dropdown from '$components/Dropdown.svelte';
   import SuggestInput from '$components/SuggestInput.svelte';
   import WizardFoot from '$components/WizardFoot.svelte';
   import { PRESETS, llmTrouble, presetFor } from '$state/wizard.js';
 
   // Значок строки состояния: чем шаг занят и чем кончилось.
   const TONE_ICONS = { busy: 'progress_activity', ok: 'check_circle', err: 'error' };
+
+  // Список выбирают по имени поставщика, адрес за именем ищет `presetFor`.
+  const PRESET_NAMES = PRESETS.map((one) => one.label);
 
   let { ask, kind, onback, onnext } = $props();
 
@@ -237,15 +241,7 @@
 
   <div class="wiz-fields">
     {#if chatStep}
-      <select
-        class="preset-select"
-        value={chosenPreset}
-        onchange={(event) => pickPreset(event.currentTarget.value)}
-      >
-        {#each PRESETS as one (one.label)}
-          <option value={one.label}>{one.label}</option>
-        {/each}
-      </select>
+      <Dropdown options={PRESET_NAMES} value={chosenPreset} onpick={pickPreset} />
     {:else}
       <label class="checkbox-row">
         <input
