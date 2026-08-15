@@ -476,27 +476,12 @@
   margin-top: 12px;
 }
 
-/* Выбор поставщика: свой список вместо системного — тот в тёмном окне светлая
-   заплата. Шеврон нарисован фоном: системный на своём списке не показывается. */
-.preset-select {
-  width: 100%;
-  appearance: none;
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  border-radius: 4px;
-  padding: 7px 28px 7px 10px;
+/* Выбор поставщика стоит в ряду полей и берёт их плотность: список общий со
+   всем окном, а поля мастера крупнее прочих — как и его кнопки. */
+.wiz-window .cdd-btn {
+  background: var(--bg-tertiary);
+  padding: 7px 10px;
   font-size: 0.86rem;
-  font-family: inherit;
-  cursor: pointer;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><polyline points='2,4 5,7 8,4' fill='none' stroke='%2386868b' stroke-width='1.5'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-}
-
-.preset-select:focus {
-  outline: none;
-  border-color: var(--accent);
 }
 
 /* Подсказка под самим полем идёт вплотную: снизу её отделяет уже зазор полей. */

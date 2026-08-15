@@ -8,8 +8,7 @@ alembic/versions/aa4e0de05368_seed_initial_data.py
 
 # Черновики под документацией и карты кода: карты собираются из самого кода
 # одной командой, хранить их под версией незачем.
-docs/temp/
-docs/maps/
+backup/
 
 .superpowers/
 
