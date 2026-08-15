@@ -7,7 +7,10 @@ import {
   blacklistShown,
   channelName,
   fresher,
+  initials,
+  linkReady,
   named,
+  personCandidate,
   personLine,
   personName,
   unreadLine,
@@ -170,5 +173,84 @@ describe('ответы, устаревшие в пути', () => {
     // ляг первый поверх третьего — в списке оказались бы чужие строки.
     expect(fresher(3, 3)).toBe(true);
     expect(fresher(2, 3)).toBe(false);
+  });
+});
+
+describe('запор кнопки «Связать»', () => {
+  it('пока никого не выбрали, связывать нечем', () => {
+    expect(linkReady({ current: 4, chosen: null })).toBe(false);
+  });
+
+  it('выбор того же, кто уже привязан, кнопку не отпирает', () => {
+    // Иначе нажатие переписывает привязку тем же значением и пишет в журнал
+    // перемену, которой не было.
+    expect(linkReady({ current: 4, chosen: 4 })).toBe(false);
+  });
+
+  it('выбор другого отпирает кнопку', () => {
+    expect(linkReady({ current: 4, chosen: 9 })).toBe(true);
+  });
+
+  it('выбор при пустой привязке отпирает кнопку', () => {
+    expect(linkReady({ current: null, chosen: 9 })).toBe(true);
+  });
+});
+
+describe('буквы вместо снимка', () => {
+  it('имя и фамилия дают две буквы', () => {
+    // Снимок есть не у всех: у заведённых руками его нет вовсе, а пустой
+    // кружок в списке читается как недогрузившаяся картинка.
+    expect(initials('Иван Петров')).toBe('ИП');
+  });
+
+  it('одно слово даёт одну букву', () => {
+    expect(initials('иван')).toBe('И');
+  });
+
+  it('из трёх слов берут первое и последнее', () => {
+    expect(initials('Иван Иванович Петров')).toBe('ИП');
+  });
+
+  it('безымянному букв не достаётся', () => {
+    // Тогда на его месте встаёт значок, а не пустой кружок.
+    expect(initials('')).toBe('');
+    expect(initials(null)).toBe('');
+  });
+});
+
+describe('строка кандидата в окне выбора', () => {
+  const PERSON = {
+    id: 4,
+    name: 'Ирина',
+    telegram_username: 'irina_hr',
+    last_company_name: 'Ромашка',
+    vacancy_count: 3,
+    avatar: 'data:image/png;base64,x',
+    is_blacklisted: false,
+  };
+
+  it('называет человека тем же, чем и список контактов', () => {
+    // Один и тот же человек, названный в списке и в подборщике по-разному,
+    // читается как двое разных.
+    expect(personCandidate(PERSON)).toEqual({
+      id: 4,
+      icon: 'person',
+      avatar: 'data:image/png;base64,x',
+      name: 'Ирина',
+      sub: '@irina_hr · Ромашка',
+      count: 3,
+      blocked: false,
+    });
+  });
+
+  it('отсеянный помечен отдельно', () => {
+    // Приглушённая строка говорит, что связывать с ним бот всё равно не будет.
+    expect(personCandidate({ ...PERSON, is_blacklisted: true }).blocked).toBe(true);
+  });
+
+  it('без снимка кружок остаётся пустым, а не ломается', () => {
+    // Снимок приходит не от всякой учётной записи: на его месте встают буквы
+    // имени, и решает это сам кружок.
+    expect(personCandidate({ ...PERSON, avatar: undefined }).avatar).toBe(null);
   });
 });

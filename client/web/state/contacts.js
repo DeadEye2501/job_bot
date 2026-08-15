@@ -37,6 +37,20 @@ export function personName(person) {
   return `Человек #${person.id}`;
 }
 
+/** Буквы имени на месте снимка.
+ *
+ * Снимок есть не у всех: у заведённых руками его нет вовсе, а пустой кружок
+ * читается как недогрузившаяся картинка. Берутся первое слово и последнее —
+ * имя и фамилия; отчество между ними ничего не различает.
+ */
+export function initials(name) {
+  const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+  const first = words[0][0];
+  const last = words.length === 1 ? '' : words[words.length - 1][0];
+  return `${first}${last}`.toUpperCase();
+}
+
 /** Чем подписана строка списка непрочитанных переписок.
  *
  * Ник под именем стоит только тогда, когда есть и то и другое: сам по себе он
@@ -85,6 +99,23 @@ export function personLine(person) {
   };
 }
 
+/** Человек в том виде, в каком его показывает окно выбора.
+ *
+ * Подпись берётся тем же правилом, что и в списке: один и тот же человек,
+ * названный в двух местах по-разному, читается как двое разных. Снимка может
+ * не быть вовсе — тогда кружок сам поставит на его место буквы имени.
+ */
+export function personCandidate(person) {
+  return {
+    id: person.id,
+    icon: 'person',
+    avatar: person.avatar ?? null,
+    ...personLine(person),
+    count: person.vacancy_count,
+    blocked: person.is_blacklisted,
+  };
+}
+
 /** Строки отсева, прошедшие род и поиск.
  *
  * Поиск идёт и по значению, и по причине: причину пишут словами, и по ней
@@ -98,6 +129,17 @@ export function blacklistShown(rows, { kind, search }) {
     if (!needle) return true;
     return `${one.value} ${one.reason || ''}`.toLowerCase().includes(needle);
   });
+}
+
+/** Отперта ли кнопка «Связать».
+ *
+ * Промах мышью по строке списка не должен менять привязку: выбор строки только
+ * помечает её, а связывает отдельная кнопка. Выбор уже привязанного кнопку не
+ * отпирает — нажатие переписало бы связь тем же значением и записало в ленту
+ * перемену, которой не было.
+ */
+export function linkReady({ current, chosen }) {
+  return chosen !== null && chosen !== undefined && chosen !== current;
 }
 
 /** Годится ли пришедший ответ: он должен отвечать на последний вопрос.

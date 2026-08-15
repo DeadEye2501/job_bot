@@ -2,18 +2,21 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { actionBlocks, rawNote } from '../state/vacancy_actions.js';
+import { actionBlocks, rawChips } from '../state/vacancy_actions.js';
 
 const CARD = {
   hr: { id: 1, name: 'Иван', telegram_username: 'ivan' },
   raw_text: 'Ищем питониста',
   channel_username: 'jobs',
   source_msg_id: 42,
+  source_url: 'https://t.me/jobs/42',
+  posted_at: '2026-08-14T09:05:00',
+  created_at: '2026-08-15T20:00:00',
 };
 
 describe('запреты действий', () => {
   it('всё живо и HR привязан — не заперто ничего', () => {
-    expect(actionBlocks(CARD, '')).toEqual({ send: '', rerun: '' });
+    expect(actionBlocks(CARD, '')).toEqual({ send: '', rerun: '', source: '' });
   });
 
   it('без HR отправка заперта, а переразбор нет', () => {
@@ -22,6 +25,7 @@ describe('запреты действий', () => {
     expect(actionBlocks({ ...CARD, hr: null }, '')).toEqual({
       send: 'Сначала привяжите HR',
       rerun: '',
+      source: '',
     });
   });
 
@@ -37,50 +41,77 @@ describe('запреты действий', () => {
     // разбирает. Своя фраза здесь спорила бы с той, что уже висит на кнопке
     // обхода внизу окна.
     const blocks = actionBlocks(CARD, 'Модель не отвечает');
-    expect(blocks).toEqual({ send: 'Модель не отвечает', rerun: 'Модель не отвечает' });
+    expect(blocks).toMatchObject({ send: 'Модель не отвечает', rerun: 'Модель не отвечает' });
   });
 
-  it('без исходного текста заперт только переразбор: разбирать нечего', () => {
-    // Мост на такое отвечает одной фразой про «нет вакансии или пустой
-    // raw_text», по которой не понять, что именно случилось. Отклик при этом
-    // уходит: письмо сочиняется по разобранным полям, а не по сырому тексту.
-    expect(actionBlocks({ ...CARD, raw_text: null }, '')).toEqual({
-      send: '',
-      rerun: 'Исходный текст объявления не сохранён',
-    });
+  it('без ссылки на источник переход к посту заперт', () => {
+    // Ссылку кладёт сбор, и приходит она не от всякого источника. Живой пункт
+    // меню обещает переход, которого не будет: человек нажимает и ничего не
+    // происходит.
+    expect(actionBlocks({ ...CARD, source_url: null }, '').source)
+      .toBe('Нет ссылки на источник');
   });
 
-  it('неживое окружение важнее пустого текста', () => {
-    // Чинить надо сперва то, что чинится: пустой текст не поправить вовсе, а
-    // связь с моделью — да.
-    expect(actionBlocks({ ...CARD, raw_text: null }, 'Модель не отвечает')).toEqual({
-      send: 'Модель не отвечает',
-      rerun: 'Модель не отвечает',
-    });
+  it('со ссылкой переход не заперт', () => {
+    expect(actionBlocks(CARD, '').source).toBe('');
+  });
+
+  it('пустой исходный текст переразбора не запирает', () => {
+    // Запирает его только неживое окружение: разбор зовут как раз тогда, когда
+    // карточка вышла кривой, и заслон здесь отнимал бы единственный способ
+    // это поправить. Отказ мост скажет сам, если разбирать и правда нечего.
+    expect(actionBlocks({ ...CARD, raw_text: null }, '')).toEqual({ send: '', rerun: '', source: '' });
   });
 });
 
-describe('подпись исходного текста', () => {
-  it('называет канал, номер сообщения и длину', () => {
+describe('чипы исходного текста', () => {
+  it('называют канал, номер сообщения, время поста и длину', () => {
     // По ним объявление находят в самом Telegram, когда разбор вышел кривым.
-    expect(rawNote(CARD)).toBe('@jobs · сообщение #42 · 14 знаков');
+    expect(rawChips(CARD)).toEqual([
+      { icon: 'tag', text: '@jobs' },
+      { icon: 'numbers', text: 'msg #42' },
+      { icon: 'schedule', text: '2026-08-14 09:05' },
+      { icon: 'straighten', text: '14 символов' },
+    ]);
   });
 
-  it('число знаков согласовано со словом', () => {
-    expect(rawNote({ ...CARD, raw_text: 'а' })).toBe('@jobs · сообщение #42 · 1 знак');
-    expect(rawNote({ ...CARD, raw_text: 'абв' })).toBe('@jobs · сообщение #42 · 3 знака');
+  it('у поста без своей метки времени берут время записи', () => {
+    // Метку ставит канал, и приходит она не от всякого источника; время
+    // заведения записи хотя бы обозначает, когда объявление к нам попало.
+    const chips = rawChips({ ...CARD, posted_at: null });
+    expect(chips).toContainEqual({ icon: 'schedule', text: '2026-08-15 20:00' });
   });
 
-  it('несохранённый исходный текст считается пустым, а не роняет подпись', () => {
+  it('число символов согласовано со словом', () => {
+    expect(rawChips({ ...CARD, raw_text: 'а' })).toContainEqual({
+      icon: 'straighten',
+      text: '1 символ',
+    });
+    expect(rawChips({ ...CARD, raw_text: 'абв' })).toContainEqual({
+      icon: 'straighten',
+      text: '3 символа',
+    });
+  });
+
+  it('несохранённый исходный текст считается пустым, а не роняет полосу', () => {
     // Окно исходного текста открывают и у такой вакансии — сказать, что
     // показывать нечего; обращение к длине пустоты уронило бы само окно.
-    expect(rawNote({ ...CARD, raw_text: null })).toBe('@jobs · сообщение #42 · 0 знаков');
+    expect(rawChips({ ...CARD, raw_text: null })).toContainEqual({
+      icon: 'straighten',
+      text: '0 символов',
+    });
   });
 
-  it('без канала и номера остаётся одна длина', () => {
-    // Канал могли снести, а номер приходит не от всякого источника: пустые
-    // разделители читались бы как потерянные поля.
-    const note = rawNote({ ...CARD, channel_username: null, source_msg_id: null });
-    expect(note).toBe('14 знаков');
+  it('без канала, номера и времени остаётся одна длина', () => {
+    // Канал могли снести, а номер и метка приходят не от всякого источника:
+    // пустые чипы читались бы как потерянные поля.
+    const chips = rawChips({
+      ...CARD,
+      channel_username: null,
+      source_msg_id: null,
+      posted_at: null,
+      created_at: null,
+    });
+    expect(chips).toEqual([{ icon: 'straighten', text: '14 символов' }]);
   });
 });

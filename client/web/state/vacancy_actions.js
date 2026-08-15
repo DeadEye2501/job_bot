@@ -3,6 +3,7 @@
 // Чистые функции: карточка приходит доводом, наружу уходят фразы. Ни моста, ни
 // разметки этот файл не знает.
 
+import { showStamp } from './dates.js';
 import { plural } from './words.js';
 
 /** Почему отправка и переразбор сейчас недоступны.
@@ -17,25 +18,34 @@ import { plural } from './words.js';
 export function actionBlocks(card, lockedTip) {
   return {
     send: lockedTip || (card.hr ? '' : 'Сначала привяжите HR'),
-    // Чинить надо сперва то, что чинится: пустой текст не поправить вовсе, а
-    // связь с моделью — да.
-    rerun: lockedTip || (card.raw_text ? '' : 'Исходный текст объявления не сохранён'),
+    // Пустой текст разбор не запирает: его зовут как раз тогда, когда карточка
+    // вышла кривой, и заслон отнял бы единственный способ это поправить.
+    rerun: lockedTip,
+    // Переход к посту наружу ходит мимо бота, поэтому неживое окружение его не
+    // касается: заперт он только тем, что ссылки может не быть вовсе.
+    source: card.source_url ? '' : 'Нет ссылки на источник',
   };
 }
 
-/** Чем подписан исходный текст объявления.
+/** Чем подписан исходный текст объявления — чипами над самим текстом.
  *
- * По каналу и номеру сообщения объявление находят в самом Telegram, когда
- * разбор вышел кривым; длина говорит, весь ли пост дошёл. Пропавшие половины
- * не оставляют пустых разделителей: канал могли снести, а номер приходит не от
- * всякого источника.
+ * По каналу, номеру сообщения и времени поста объявление находят в самом
+ * Telegram, когда разбор вышел кривым; длина говорит, весь ли пост дошёл.
+ * Пропавшие чипы не оставляют пустых мест: канал могли снести, а номер и метка
+ * времени приходят не от всякого источника.
  */
-export function rawNote(card) {
+export function rawChips(card) {
   const length = (card.raw_text || '').length;
-  const parts = [
-    card.channel_username ? `@${card.channel_username}` : '',
-    card.source_msg_id === null ? '' : `сообщение #${card.source_msg_id}`,
-    `${length} ${plural(length, 'знак', 'знака', 'знаков')}`,
+  // Когда объявление вышло: у поста своя метка, у записи — только время
+  // заведения, и второе на день-другой позже первого.
+  const stamp = showStamp(card.posted_at || card.created_at);
+  const chips = [
+    card.channel_username ? { icon: 'tag', text: `@${card.channel_username}` } : null,
+    card.source_msg_id === null || card.source_msg_id === undefined
+      ? null
+      : { icon: 'numbers', text: `msg #${card.source_msg_id}` },
+    stamp ? { icon: 'schedule', text: stamp } : null,
+    { icon: 'straighten', text: `${length} ${plural(length, 'символ', 'символа', 'символов')}` },
   ];
-  return parts.filter(Boolean).join(' · ');
+  return chips.filter(Boolean);
 }

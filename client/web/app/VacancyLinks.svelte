@@ -6,17 +6,17 @@
   // строкой списка. Зовы моста написаны литералами в обеих ветках: имя метода
   // должно быть видно на шве, а собранное из кусков там не видно вовсе.
   //
-  // Заведённого привязываем сразу: человек пришёл сюда за привязкой, и второе
-  // нажатие после заполненной формы ничего не решает.
+  // Заведённый возвращается в список отмеченным, но не привязанным: заведение и
+  // привязка — разные решения, и второе человек принимает сам.
   import AskDialog from '$components/AskDialog.svelte';
-  import CompanyRow from '$components/CompanyRow.svelte';
   import NewCompanyFields from '$components/NewCompanyFields.svelte';
   import NewPersonFields from '$components/NewPersonFields.svelte';
-  import PersonRow from '$components/PersonRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
-  import { named } from '$state/contacts.js';
+  import PickerRow from '$components/PickerRow.svelte';
+  import { companyCandidate } from '$state/companies.js';
+  import { named, personCandidate } from '$state/contacts.js';
 
-  let { ask, say, vacancyId, kind, onclose, onlinked } = $props();
+  let { ask, say, vacancyId, kind, prefill = '', current = null, onclose, onlinked } = $props();
 
   // Поля заведения у человека и у компании разные, и лишних не заводится: мост
   // читает ровно эти.
@@ -27,6 +27,7 @@
 
   let creating = $state(false);
   let saving = $state(false);
+  let picked = $state(null);
   let draft = $state({ ...BLANK[kind] });
 
   async function candidates(search) {
@@ -38,18 +39,20 @@
     return kind === 'hr' ? now.hrs : now.companies;
   }
 
-  async function link(id) {
+  async function link(row) {
+    saving = true;
     const done =
       kind === 'hr'
-        ? await ask('vacancies.link_hr', { vacancy_id: vacancyId, hr_id: id })
-        : await ask('vacancies.link_company', { vacancy_id: vacancyId, company_id: id });
+        ? await ask('vacancies.link_hr', { vacancy_id: vacancyId, hr_id: row.id })
+        : await ask('vacancies.link_company', { vacancy_id: vacancyId, company_id: row.id });
+    saving = false;
     if (done === null) return;
     say(kind === 'hr' ? 'HR привязан' : 'Компания привязана');
     onlinked();
     onclose();
   }
 
-  /** Завести нового и тут же привязать.
+  /** Завести нового и вернуться к списку с отметкой на нём.
    *
    * Пустое не отправляется вовсе — теми же заслонами, что и в списках
    * контактов: без имени карточку потом не найти ничем, и мост такую всё равно
@@ -67,59 +70,57 @@
     // Отказ форму не закрывает: набранное осталось бы набирать заново, а мост
     // уже сказал плашкой, чего ему не хватило.
     if (done === null) return;
-    // Заведённый уже есть, и форму надо закрыть до привязки: сорвись она —
-    // повторное нажатие по той же форме завело бы второго.
     creating = false;
-    return link(done.created_id);
+    draft = { ...BLANK[kind] };
+    say(kind === 'hr' ? 'Человек заведён' : 'Компания заведена');
+    picked = done.created_id;
   }
 </script>
 
 {#if creating}
   <AskDialog
-    icon={kind === 'hr' ? 'person_add' : 'domain_add'}
-    title={kind === 'hr' ? 'Новый человек' : 'Новая компания'}
-    subtitle={kind === 'hr'
-      ? 'Хотя бы имя, ник или номер учётной записи — иначе карточку потом не найти.'
-      : 'Название обязательно, остальное можно дописать потом.'}
-    confirmLabel="Завести и привязать"
+    icon={kind === 'hr' ? 'person_add' : 'add_business'}
+    title={kind === 'hr' ? 'Новый HR' : 'Новая компания'}
+    confirmLabel="Создать"
     onconfirm={create}
     oncancel={() => (creating = false)}
   >
     {#if kind === 'hr'}
-      <NewPersonFields {draft} onenter={create} />
+      <NewPersonFields {draft} />
     {:else}
-      <NewCompanyFields {draft} onenter={create} />
+      <NewCompanyFields {draft} />
     {/if}
   </AskDialog>
 {:else}
   <PickerDialog
-    icon="link"
+    icon={kind === 'hr' ? 'person_search' : 'domain'}
     title={kind === 'hr' ? 'Связать с HR' : 'Связать с компанией'}
     placeholder={kind === 'hr'
-      ? 'Поиск по имени и нику'
-      : 'Поиск по названию, написанию, домену'}
-    words={kind === 'hr'
-      ? ['человек', 'человека', 'человек']
-      : ['компания', 'компании', 'компаний']}
-    empty={kind === 'hr' ? 'Людей ещё нет' : 'Компаний ещё нет'}
+      ? 'Поиск по имени, @username...'
+      : 'Поиск по названию, сайту, алиасам...'}
+    empty={kind === 'hr' ? 'HR-контактов пока нет' : 'Компаний пока нет'}
+    {prefill}
+    {current}
+    preselect={picked}
     load={candidates}
+    applyLabel="Связать"
+    onapply={link}
+    {saving}
+    createIcon={kind === 'hr' ? 'person_add' : 'add_business'}
+    createLabel={kind === 'hr' ? 'Создать нового HR' : 'Создать новую компанию'}
+    oncreate={() => (creating = true)}
     {onclose}
   >
-    {#snippet children(rows)}
+    {#snippet children(rows, chosen, pick)}
       {#each rows as row (row.id)}
-        {#if kind === 'hr'}
-          <PersonRow person={row} onpick={() => link(row.id)} />
-        {:else}
-          <CompanyRow company={row} onpick={() => link(row.id)} />
-        {/if}
+        <PickerRow
+          row={kind === 'hr' ? personCandidate(row) : companyCandidate(row)}
+          current={row.id === current}
+          chosen={row.id === chosen}
+          mark={kind === 'hr' ? 'текущий' : 'текущая'}
+          onpick={pick}
+        />
       {/each}
-    {/snippet}
-
-    {#snippet extra()}
-      <button class="btn" type="button" onclick={() => (creating = true)}>
-        <span class="material-symbols-outlined">{kind === 'hr' ? 'person_add' : 'domain_add'}</span>
-        {kind === 'hr' ? 'Новый человек' : 'Новая компания'}
-      </button>
     {/snippet}
   </PickerDialog>
 {/if}

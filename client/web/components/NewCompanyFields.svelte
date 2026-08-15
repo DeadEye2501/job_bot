@@ -5,19 +5,35 @@
   // вакансии, — а поля у неё одни: мост читает ровно эти. Разойдись их
   // подписи, одно и то же поле называлось бы в окне по-разному.
   //
+  // Потолки длины те же, что держит база: обрезанное на записи значение
+  // человек прочёл бы как потерянное.
+  //
   // Черновик правится на месте: он приходит своим объектом от того, кто его
   // потом и отправит.
-  let { draft, onenter } = $props();
+  let { draft } = $props();
 </script>
 
-<!-- svelte-ignore a11y_autofocus -->
 <input
   class="input"
-  autofocus
-  placeholder="Название"
+  maxlength="120"
+  placeholder="Название (обязательно)"
   bind:value={draft.name}
-  onkeydown={(event) => event.key === 'Enter' && onenter()}
 />
-<input class="input" placeholder="Сайт или домен" bind:value={draft.website} />
-<input class="input" placeholder="Другие написания через запятую" bind:value={draft.aliases} />
-<textarea class="textarea" placeholder="Заметки" bind:value={draft.notes}></textarea>
+<input
+  class="input"
+  maxlength="200"
+  placeholder="Сайт / домен (опционально)"
+  bind:value={draft.website}
+/>
+<input
+  class="input"
+  maxlength="300"
+  placeholder="Алиасы через запятую (опционально)"
+  bind:value={draft.aliases}
+/>
+<textarea
+  class="textarea"
+  maxlength="2000"
+  placeholder="Заметки"
+  bind:value={draft.notes}
+></textarea>

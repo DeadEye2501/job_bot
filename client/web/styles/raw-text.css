@@ -1,0 +1,86 @@
+/* Окно исходного текста: полоса сведений об объявлении и сам текст под ней.
+   Шапка, тело и крестик — общие, в modal.css. */
+
+.vac-raw-modal {
+  width: min(720px, 92vw);
+  max-width: min(720px, 92vw);
+  max-height: min(440px, 88vh);
+  padding: 0;
+  overflow: hidden;
+  gap: 0;
+}
+
+.raw-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  font-size: 0.7rem;
+}
+
+.raw-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.raw-meta-chip .material-symbols-outlined {
+  font-size: 12px;
+}
+
+/* Прижата к верхнему краю видимой части: длинный текст прокручивают, и уехавшая
+   вверх кнопка нашлась бы только возвратом в начало. */
+.raw-copy-btn {
+  position: sticky;
+  top: 8px;
+  float: right;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin: 8px 8px -28px 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-over-content);
+  color: var(--text-secondary);
+  opacity: 0.55;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.raw-copy-btn:hover {
+  border-color: var(--accent);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  opacity: 1;
+}
+
+.raw-copy-btn:active {
+  transform: scale(0.96);
+}
+
+.raw-copy-btn .material-symbols-outlined {
+  display: block;
+  font-size: 16px;
+}
+
+/* Исходный текст показывается как пришёл — с переносами и отступами
+   объявления: по ним и видно, чего разбор не разобрал. */
+.raw-text {
+  margin: 0;
+  padding: 12px;
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  user-select: text;
+}

@@ -1,0 +1,33 @@
+/* Заметка к вакансии и вспышка «записано».
+
+   Вспышка тут же, а не в оформлении заметки: ею отзывается и пояснение в ленте,
+   а правило у неё одно — зелёная рамка с ореолом на те же доли секунды. */
+
+.notes-area {
+  width: 100%;
+  min-height: 80px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  resize: vertical;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.notes-area:focus {
+  outline: none;
+  border-color: var(--accent-focus-ring);
+}
+
+/* Стоит после правил фокуса — и своих, и ленты: вес у них одинаковый, и
+   победителя решает порядок. Ореол нужен затем, что на уже зеленоватой рамке
+   набранного поля одна смена цвета почти не видна. */
+.saved-flash,
+.saved-flash:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-flash);
+}

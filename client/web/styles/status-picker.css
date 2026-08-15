@@ -1,14 +1,68 @@
 /* Выбор статуса: что стоит внутри окошка под значком статуса. Оправа окошка —
-   общая, в popover.css; ряд вариантов — в choice-row.css. */
+   общая, в popover.css. */
 
 .status-picker {
   left: 0;
-  width: 260px;
-  padding: 8px;
+  width: 240px;
+  padding: 8px 0 6px;
 }
 
-.status-picker .input {
-  min-height: 44px;
-  margin: 6px 0;
+.status-options {
+  display: flex;
+  flex-direction: column;
+  padding: 0 4px 4px;
+  overflow-y: auto;
+}
+
+/* Строго радиокнопка, точка, подпись: переставь их местами — точка выбора
+   съезжает с середины строки. */
+.status-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.status-option:hover {
+  background: var(--selected-bg);
+}
+
+.status-option input {
+  accent-color: var(--accent);
+}
+
+.popover-comment {
+  width: calc(100% - 16px);
+  min-height: 40px;
+  margin: 4px 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1.35;
   resize: none;
+}
+
+.popover-comment:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 6px 8px 4px;
+}
+
+.popover-actions .btn {
+  padding: 4px 10px;
+  font-size: 0.76rem;
 }

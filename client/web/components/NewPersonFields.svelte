@@ -5,23 +5,33 @@
   // вакансии, — а поля у него одни: мост читает ровно эти. Разойдись их
   // подписи, одно и то же поле называлось бы в окне по-разному.
   //
+  // Потолки длины те же, что держит база: обрезанное на записи значение
+  // человек прочёл бы как потерянное.
+  //
   // Черновик правится на месте: он приходит своим объектом от того, кто его
   // потом и отправит.
-  let { draft, onenter } = $props();
+  let { draft } = $props();
 </script>
 
-<!-- svelte-ignore a11y_autofocus -->
+<input class="input" maxlength="120" placeholder="Имя" bind:value={draft.name} />
 <input
   class="input"
-  autofocus
-  placeholder="Имя"
-  bind:value={draft.name}
-  onkeydown={(event) => event.key === 'Enter' && onenter()}
+  maxlength="64"
+  placeholder="Telegram @username (без @)"
+  bind:value={draft.telegram_username}
 />
-<input class="input" placeholder="Ник в Telegram" bind:value={draft.telegram_username} />
+<!-- Номер учётной записи — только цифры: на телефоне открывается цифровая
+     раскладка, а мост всё равно приводит его к числу. -->
 <input
   class="input"
-  placeholder="Номер учётной записи Telegram"
+  inputmode="numeric"
+  maxlength="20"
+  placeholder="telegram_user_id (опционально)"
   bind:value={draft.telegram_user_id}
 />
-<textarea class="textarea" placeholder="Заметки" bind:value={draft.notes}></textarea>
+<textarea
+  class="textarea"
+  maxlength="2000"
+  placeholder="Заметки"
+  bind:value={draft.notes}
+></textarea>

@@ -49,6 +49,21 @@ export function isoDay(year, month, day) {
   return `${year}-${padded(month)}-${padded(day)}`;
 }
 
+/** День и часы одной строкой, местными часами.
+ *
+ * Ею подписано объявление в окне исходного текста: по дню и времени пост
+ * находят в самом канале, а давность словом («3 д») для поиска не годится.
+ * Времени может не быть вовсе — полночь 1970 года человек прочтёт как сбой
+ * часов, поэтому вместо неё пустое место.
+ */
+export function showStamp(iso) {
+  if (!iso) return '';
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '';
+  const day = `${at.getFullYear()}-${padded(at.getMonth() + 1)}-${padded(at.getDate())}`;
+  return `${day} ${padded(at.getHours())}:${padded(at.getMinutes())}`;
+}
+
 /** Годна ли набранная дата: да, нет или «ещё набирают».
  *
  * Три ответа, а не два: пока в поле обрывок, оно не должно краснеть на каждом

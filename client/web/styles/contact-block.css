@@ -1,0 +1,68 @@
+/* Кружок и два имени рядом с ним: так подписаны HR и компания в карточке
+   вакансии и кандидаты в подборщике привязки. */
+
+.contact-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hr-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.hr-avatar .material-symbols-outlined {
+  font-size: 16px;
+}
+
+/* Снимок приходит квадратным и разного размера: без обрезки по месту он
+   растянулся бы в овал. */
+img.hr-avatar {
+  object-fit: cover;
+}
+
+.hr-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.hr-name {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.83rem;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hr-name.muted {
+  color: var(--text-tertiary);
+}
+
+.hr-username {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Нажимаемое имя отличается от подписи только на наведении: подчёркивание в
+   покое разлиновало бы блок, где нажимается почти всё. */
+.hr-name.is-link:hover,
+.hr-username.is-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}

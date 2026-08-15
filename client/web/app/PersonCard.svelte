@@ -8,9 +8,9 @@
   import CardDialog from '$components/CardDialog.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
-  import PersonRow from '$components/PersonRow.svelte';
+  import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
-  import { personName } from '$state/contacts.js';
+  import { personCandidate, personName } from '$state/contacts.js';
   import { plural } from '$state/words.js';
 
   import PersonChat from './PersonChat.svelte';
@@ -212,14 +212,15 @@
     icon="merge"
     title={`Слить «${shown}» с другим`}
     placeholder="Поиск по имени и нику"
-    words={['человек', 'человека', 'человек']}
     empty="Сливать не с кем — других карточек нет"
     load={candidates}
+    applyLabel="Слить"
+    onapply={(person) => (chosen = person)}
     onclose={() => (asking = null)}
   >
-    {#snippet children(rows)}
+    {#snippet children(rows, marked, pick)}
       {#each rows as person (person.id)}
-        <PersonRow {person} onpick={() => (chosen = person)} />
+        <PickerRow row={personCandidate(person)} chosen={person.id === marked} onpick={pick} />
       {/each}
     {/snippet}
   </PickerDialog>
