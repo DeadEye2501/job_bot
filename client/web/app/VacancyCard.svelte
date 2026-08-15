@@ -12,7 +12,7 @@
   import VacancyTimeline from '$components/VacancyTimeline.svelte';
   import { attempts } from '$state/attempts.js';
   import { actionBlocks, rawNote } from '$state/vacancy_actions.js';
-  import { gradeLabel, scoreTone } from '$state/vacancies.js';
+  import { ago, gradeLabel, remoteLabel, scoreTone } from '$state/vacancies.js';
   import { timelineRows } from '$state/vacancy_card.js';
 
   import VacancyLinks from './VacancyLinks.svelte';
@@ -21,7 +21,6 @@
 
   let card = $state(null);
   let notes = $state('');
-  let trouble = $state('');
   let picking = $state(false);
   let saving = $state(false);
   let asking = $state(null);
@@ -35,6 +34,9 @@
   const rows = $derived(card ? timelineRows(card.history, card.events) : []);
   const tone = $derived(card ? scoreTone(card.score, card.score_threshold) : '');
   const blocks = $derived(card ? actionBlocks(card, lockedTip) : { send: '', rerun: '' });
+  // Когда объявление вышло: у поста есть своя метка, а у записи — только время
+  // её заведения, и второе на день-другой позже первого.
+  const posted = $derived(card ? card.posted_at || card.created_at : null);
 
   /** Перечитать карточку целиком.
    *
@@ -45,11 +47,7 @@
   async function refresh() {
     const mine = tries.next();
     const now = await ask('vacancies.detail', vacancyId);
-    if (!alive || tries.stale(mine)) return;
-    // Отказ не должен запирать окно на «Загрузка…»: человеку нужно хотя бы
-    // выйти из него, а плашку он уже увидел.
-    if (now === null) return (trouble = 'Не удалось прочитать вакансию');
-    trouble = '';
+    if (!alive || tries.stale(mine) || now === null) return;
     card = now.vacancy;
     notes = card.notes ?? '';
   }
@@ -182,13 +180,11 @@
   });
 </script>
 
-{#if trouble}
-  <div class="vac-detail-empty">{trouble}</div>
-{:else if !card}
+{#if !card}
   <div class="vac-detail-empty">Загрузка…</div>
 {:else}
-  <div class="modal-title vac-card-head">
-    <div class="pop-wrap">
+  <div class="det-head">
+    <div class="status-wrap" class:popover-open={picking}>
       <button class="status-badge" type="button" onclick={() => (picking = !picking)}>
         <span class="status-dot" data-status={card.status}></span>
         <span class="status-label">{card.status}</span>
@@ -203,7 +199,7 @@
         />
       {/if}
     </div>
-    <span class="card-name">{card.title || 'Без названия'}</span>
+    <div class="det-title">{card.title || '—'}</div>
 
     <VacancyActions
       {blocks}
@@ -218,68 +214,88 @@
     />
   </div>
 
-  <div class="vac-chips">
+  <div class="det-info">
     {#if card.score !== null}
-      <span class="info-chip score" data-tone={tone}>{card.score}</span>
+      <span class="info-chip score" data-tone={tone}>Score: {card.score}</span>
     {/if}
-    <span class="info-chip">{gradeLabel(card.grade)}</span>
+    {#if card.grade}<span class="info-chip">{gradeLabel(card.grade)}</span>{/if}
     {#if card.salary}<span class="info-chip">{card.salary}</span>{/if}
-    {#if card.remote}<span class="info-chip">{card.remote}</span>{/if}
+    {#if card.remote}<span class="info-chip">{remoteLabel(card.remote)}</span>{/if}
     {#if card.location}<span class="info-chip">{card.location}</span>{/if}
     {#if card.channel_username}
-      <span class="info-chip">@{card.channel_username}</span>
+      <button
+        class="info-chip"
+        class:linkable={card.source_url}
+        type="button"
+        title="Перейти к посту в канале"
+        disabled={!card.source_url}
+        onclick={source}
+      >
+        <span class="material-symbols-outlined">tag</span>{card.channel_username}
+      </button>
+    {/if}
+    {#if posted}
+      <span class="info-chip" title={posted}>
+        <span class="material-symbols-outlined">schedule</span>{ago(posted, new Date())}
+      </span>
     {/if}
   </div>
 
   <!-- Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою
        оценку. -->
   {#if card.stack.length}
-    <div class="vac-card-stack">
-      <!-- Ключ по месту, а не по названию: разбор кладёт в стек то, что нашёл,
-           и одно и то же название приходит дважды. -->
-      {#each card.stack as one, at (at)}
-        <span class="mini-chip" class:matched={one.matched}>{one.name}</span>
-      {/each}
+    <div class="det-section">
+      <div class="det-stack">
+        <!-- Ключ по месту, а не по названию: разбор кладёт в стек то, что
+             нашёл, и одно и то же название приходит дважды. -->
+        {#each card.stack as one, at (at)}
+          <span class="stack-chip" class:matched={one.matched}>{one.name}</span>
+        {/each}
+      </div>
     </div>
   {/if}
 
   {#if card.description}
-    <p class="vac-text">{card.description}</p>
+    <div class="det-section"><p>{card.description}</p></div>
   {/if}
 
-  <div class="vac-contacts">
-    <span class="card-meta-item">
-      <span class="material-symbols-outlined">person</span>
-      {#if card.hr}
-        {card.hr.name || 'Без имени'}{#if card.hr.telegram_username}
-          <span class="vac-dim">@{card.hr.telegram_username}</span>
+  <div class="det-section">
+    <div class="vac-contacts">
+      <span class="card-meta-item">
+        <span class="material-symbols-outlined">person</span>
+        {#if card.hr}
+          {card.hr.name || 'Без имени'}{#if card.hr.telegram_username}
+            <span class="vac-dim">@{card.hr.telegram_username}</span>
+          {/if}
+        {:else}
+          <span class="vac-dim">HR не определён</span>
         {/if}
-      {:else}
-        <span class="vac-dim">HR не определён</span>
-      {/if}
-    </span>
-    <span class="card-meta-item">
-      <span class="material-symbols-outlined">domain</span>
-      {#if card.company_name}
-        {card.company_name}
-      {:else}
-        <span class="vac-dim">Компания не определена</span>
-      {/if}
-    </span>
+      </span>
+      <span class="card-meta-item">
+        <span class="material-symbols-outlined">domain</span>
+        {#if card.company_name}
+          {card.company_name}
+        {:else}
+          <span class="vac-dim">Компания не определена</span>
+        {/if}
+      </span>
+    </div>
   </div>
 
-  <textarea
-    class="textarea"
-    placeholder="Заметки по вакансии"
-    bind:value={notes}
-    onchange={saveNotes}
-  ></textarea>
-
-  <VacancyTimeline {rows} onsave={saveNote} />
-
-  <div class="modal-actions card-actions">
-    <button class="btn" type="button" onclick={() => onclose()}>Закрыть</button>
+  <div class="det-section">
+    <textarea
+      class="textarea"
+      placeholder="Заметки по вакансии"
+      bind:value={notes}
+      onchange={saveNotes}
+    ></textarea>
   </div>
+
+  {#if rows.length}
+    <div class="det-section">
+      <VacancyTimeline {rows} onsave={saveNote} />
+    </div>
+  {/if}
 {/if}
 
 {#if asking === 'send'}

@@ -15,27 +15,103 @@
   line-height: 1.4;
 }
 
+/* Точка садится на строку текста: строки выровнены по базовой линии, и без
+   поправки она висит над первой буквой. Обводка отделяет тёмные цвета
+   статусов от тёмной подложки карточки. */
 .tl-item .status-dot {
   justify-self: center;
+  box-sizing: border-box;
+  margin-top: 4px;
+  border: 1px solid var(--dot-outline);
+}
+
+/* У строки без статуса точка пустая: события статуса не меняют, и залитая
+   точка обещала бы переход, которого не было. */
+.tl-item .status-dot[data-status=''] {
+  background: transparent;
+}
+
+/* Серый ленты светлее серого списка: в списке точка стоит на тёмной строке, в
+   ленте — на светлой карточке, и один и тот же цвет читается по-разному. */
+.tl-item .status-dot[data-status='Not Fit'] {
+  background: var(--status-not-fit-timeline);
 }
 
 /* Свечение у самой свежей строки: на ней вакансия стоит сейчас, и глазу нужно
-   за что-то зацепиться в ленте из двух десятков одинаковых точек. */
+   за что-то зацепиться в ленте из двух десятков одинаковых точек. Цвет —
+   свой на каждый статус: общий лаймовый спорил бы с цветом самой точки. */
 .tl-item.current .status-dot {
-  box-shadow: 0 0 0 2px var(--selected-bg);
+  box-shadow: 0 0 0 2px var(--tl-halo-default);
 }
 
+.tl-item.current .status-dot[data-status='New'] {
+  box-shadow: 0 0 0 2px var(--tl-halo-new);
+}
+
+.tl-item.current .status-dot[data-status='Applied'] {
+  box-shadow: 0 0 0 2px var(--tl-halo-applied);
+}
+
+.tl-item.current .status-dot[data-status='Answered'] {
+  box-shadow: 0 0 0 2px var(--tl-halo-answered);
+}
+
+.tl-item.current .status-dot[data-status='Test'] {
+  box-shadow: 0 0 0 2px var(--tl-halo-test);
+}
+
+.tl-item.current .status-dot[data-status='Invitation'] {
+  box-shadow: 0 0 0 2px var(--tl-halo-invitation);
+}
+
+.tl-item.current .status-dot[data-status='In Progress'] {
+  box-shadow: 0 0 0 2px var(--tl-halo-in-progress);
+}
+
+.tl-item.current .status-dot[data-status='Offer'] {
+  box-shadow: 0 0 0 2px var(--tl-halo-offer);
+}
+
+.tl-item.current .status-dot[data-status='Decline'] {
+  box-shadow: 0 0 0 2px var(--tl-halo-decline);
+}
+
+.tl-item.current .status-dot[data-status='Ghosting'] {
+  box-shadow: 0 0 0 2px var(--tl-halo-ghosting);
+}
+
+.tl-item.current .status-dot[data-status='Scam'] {
+  box-shadow: 0 0 0 2px var(--tl-halo-scam);
+}
+
+.tl-item.current .status-dot[data-status='Not Fit'] {
+  box-shadow: 0 0 0 2px var(--tl-halo-not-fit);
+}
+
+/* Текст течёт строкой, а не гибким рядом: вторая строка длинной записи ложится
+   под подпись, а не висячим отступом под текстом. */
 .tl-text {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
 
 .tl-label {
-  flex: 0 0 auto;
+  margin-right: 2px;
   font-weight: 600;
+}
+
+/* Своё пояснение правится полем, и оно гибким рядом как раз живёт: без него
+   длинный текст сваливается под подпись целиком. */
+.tl-history-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+}
+
+.tl-history-row .tl-label {
+  flex: 0 0 auto;
 }
 
 .tl-event {

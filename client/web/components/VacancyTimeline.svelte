@@ -26,17 +26,20 @@
     <div class="tl-item" class:current={row.current}>
       <span class="status-dot" data-status={row.status}></span>
       <span class="tl-text">
-        {#if row.label}<span class="tl-label">{row.label}</span>{/if}
         {#if row.editable}
-          <textarea
-            class="tl-note"
-            rows="2"
-            maxlength="2000"
-            placeholder="без комментария"
-            value={typed[row.historyId] ?? row.text}
-            onchange={(event) => save(row, event.currentTarget.value)}
-          ></textarea>
+          <span class="tl-history-row">
+            {#if row.label}<span class="tl-label">{row.label}</span>{/if}
+            <textarea
+              class="tl-note"
+              rows="2"
+              maxlength="2000"
+              placeholder="без комментария."
+              value={typed[row.historyId] ?? row.text}
+              onchange={(event) => save(row, event.currentTarget.value)}
+            ></textarea>
+          </span>
         {:else}
+          {#if row.label}<span class="tl-label">{row.label}</span>{/if}
           <span class="tl-event">{row.text}</span>
         {/if}
       </span>
