@@ -2,7 +2,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { PERIODS, deltaNote, donut, duration, kpiRow, weekBars } from '../state/stats.js';
+import {
+  PERIODS, convNote, deltaNote, donut, duration, kpiRow, skillRows, sliceTarget,
+  statusColumns, weekBars,
+} from '../state/stats.js';
 
 describe('срок ответа', () => {
   it('секунды, минуты, часы и дни — каждый своей мерой', () => {
@@ -108,6 +111,72 @@ describe('ответы по дням недели', () => {
   it('пустая неделя рисуется без столбцов, а не делением на ноль', () => {
     expect(weekBars([0, 0, 0, 0, 0, 0, 0]).every((one) => one.percent === 0)).toBe(true);
   });
+
+  it('суббота и воскресенье помечены выходными', () => {
+    // По этому графику решают, когда людям писать: серые выходные говорят, что
+    // низкий столбец там — не тишина, а нерабочий день.
+    expect(weekBars([1, 1, 1, 1, 1, 1, 1]).map((one) => one.weekend))
+      .toEqual([false, false, false, false, false, true, true]);
+  });
+
+  it('без единого отклика над столбцами стоят прочерки, а не нули', () => {
+    // Ноль читается как «писали, но не ответили»; прочерк говорит правду —
+    // писать было не с чего.
+    expect(weekBars([0, 0, 0, 0, 0, 0, 0], 0).map((one) => one.note)).toEqual(Array(7).fill('—'));
+    expect(weekBars([2, 0, 0, 0, 0, 0, 0], 9).map((one) => one.note)[1]).toBe(0);
+  });
+});
+
+describe('счётчики статусов', () => {
+  it('показаны все одиннадцать статусов, включая нулевые', () => {
+    // Ноль у «Офферов» — это новость. Пропусти мы строку, человек прочёл бы
+    // список как «оффер ещё не заводили», а не «ни одного не случилось».
+    const [moving, over] = statusColumns({ New: 3 });
+
+    expect([...moving, ...over]).toHaveLength(11);
+    expect(over.find((one) => one.name === 'Offer').count).toBe(0);
+  });
+
+  it('слева те, что ещё двигаются, справа — исходы', () => {
+    // Читают их как воронку: пока слева, вакансия жива, справа — всё, отыграла.
+    const [moving, over] = statusColumns({});
+
+    expect(moving.map((one) => one.name))
+      .toEqual(['New', 'Applied', 'Answered', 'Test', 'Invitation', 'In Progress']);
+    expect(over.map((one) => one.name))
+      .toEqual(['Offer', 'Decline', 'Ghosting', 'Scam', 'Not Fit']);
+  });
+});
+
+describe('навыки в вакансиях', () => {
+  it('полоса частоты считается от самого частого навыка', () => {
+    // Полосы читают друг относительно друга: доля от суммы сделала бы разницу
+    // между вторым и третьим навыком неразличимой.
+    const rows = skillRows([{ label: 'python', count: 8 }, { label: 'go', count: 2 }]);
+
+    expect(rows.map((one) => one.percent)).toEqual([100, 25]);
+  });
+
+  it('первый в колонке идёт без верхней черты', () => {
+    // Черта разделяет строки внутри колонки; над первой она читалась бы как
+    // граница карточки.
+    const rows = skillRows(Array.from({ length: 6 }, (_, at) => ({ label: `s${at}`, count: 1 })));
+
+    expect(rows.map((one) => one.first)).toEqual([true, false, true, false, true, false]);
+  });
+});
+
+describe('конверсия канала', () => {
+  it('несчитанная конверсия названа словом, а не нулём', () => {
+    // «0 %» значит «отклики были, ответов нет»; не отправляли вовсе — другая
+    // новость, и путать их нельзя.
+    expect(convNote(null)).toEqual({ text: 'n/a', percent: 0 });
+  });
+
+  it('доля округлена до целых процентов', () => {
+    // Дробь в узкой колонке разъезжается, а решают по ней на глаз.
+    expect(convNote(39.6)).toEqual({ text: '40%', percent: 39.6 });
+  });
 });
 
 describe('кольцо статусов', () => {
@@ -136,5 +205,24 @@ describe('кольцо статусов', () => {
     // Иначе кольцо копит невидимые сегменты, и подписи под ним расходятся с
     // тем, что видно.
     expect(donut({ New: 2, Offer: 0 }).map((one) => one.name)).toEqual(['New']);
+  });
+});
+
+describe('переход из статистики в вакансии', () => {
+  it('нажатие на строку статуса ведёт в вакансии с этим статусом', () => {
+    // Статусы иначе только считают: чтобы посмотреть, что за девять штук, надо
+    // идти в вакансии и набирать отбор руками.
+    expect([...sliceTarget('In Progress').statuses]).toEqual(['In Progress']);
+  });
+
+  it('прежний отбор при переходе снимается целиком', () => {
+    // Человек просит «покажи вакансии этого статуса», а не «сузь этим статусом
+    // то, что я отбирал час назад»: уцелевший грейд отдал бы ему пустой список.
+    const target = sliceTarget('Offer');
+
+    expect([...target.channels]).toEqual([]);
+    expect(target.grade).toBe('');
+    expect(target.datePreset).toBe('');
+    expect(target.scoreMin).toBe('');
   });
 });

@@ -1,0 +1,55 @@
+/* Карточка «Статусы»: счётчики двумя колонками и кольцо между ними.
+   Само кольцо — в donut.css, цвет точки — в status-color.css. */
+
+/* Кольцо посередине, счётчики по краям: так оно читается как итог обеих
+   колонок, а не как довесок к правой. Ширина кольца резиновая — в узком окне
+   оно ужимается, освобождая место счётчикам. */
+.stats-status-card {
+  display: grid;
+  grid-template-columns: 1fr clamp(120px, 35%, 185px) 1fr;
+  align-items: center;
+  gap: 14px;
+}
+
+.stats-status-col {
+  display: grid;
+  grid-template-columns: 12px auto auto;
+  column-gap: 6px;
+  row-gap: 3px;
+  align-content: start;
+  justify-content: start;
+}
+
+.stats-status-col.right {
+  justify-content: end;
+}
+
+/* Строка вставлена в сетку колонки, а не размечена своей: числа во всех
+   строках одной стороны должны стоять в один столбец, как бы ни разошлись
+   длины имён. */
+.stats-sc-item {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: center;
+  column-gap: 6px;
+  padding: 2px 4px;
+  font-size: 0.78rem;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.stats-sc-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.stats-sc-name {
+  color: var(--text-secondary);
+}
+
+.stats-sc-num {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  justify-self: end;
+}

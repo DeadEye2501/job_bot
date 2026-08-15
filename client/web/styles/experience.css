@@ -1,48 +1,141 @@
-/* Место работы: что стоит внутри карточки.
-   Сама карточка — общая коробка, в collapsible.css. */
+/* Место работы: коробка карточки, шапка и всё, что внутри.
+
+   Коробка своя, не общая с категорией навыков: там шапку нажимает одна
+   стрелка, а здесь — вся строка целиком, и разложена она сеткой под стрелку,
+   подпись и корзину. */
+
+.exp-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.exp-header {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--bg-tertiary);
+  user-select: none;
+  cursor: pointer;
+}
+
+/* Стрелка ложится набок у свёрнутой — так же, как в дереве файлов. */
+.exp-header > .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--text-secondary);
+  transition: transform 0.12s;
+}
+
+.exp-card.collapsed .exp-header > .material-symbols-outlined {
+  transform: rotate(-90deg);
+}
 
 .exp-summary {
-  flex: 1;
-  min-width: 0;
-  font-size: 0.85rem;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 4px 8px;
   color: var(--text-primary);
+  font-size: 0.85rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Название компании главнее — по нему строку и узнают, — но шире половины
+   подписи не растёт, иначе должности не остаётся места. Обрезаются оба своим
+   многоточием; период стоит справа и не сжимается. */
+.exp-summary > strong {
+  flex: 0 1 auto;
+  max-width: 50%;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.exp-summary .role {
+.exp-summary > .role {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-secondary);
 }
 
-/* Период прижат вправо: по нему карточки сравнивают взглядом сверху вниз, и
-   вразнобой он теряется среди названий. */
 .exp-summary .period {
   color: var(--text-tertiary);
   font-size: 0.75rem;
-  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.exp-delete {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.exp-delete:hover {
+  color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.exp-delete .material-symbols-outlined {
+  font-size: 16px;
 }
 
 .exp-body {
-  padding: 10px 12px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.date-pair {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.field-row .span-2,
+.field-row .input.span-2,
+.field-row .date-pair.span-2 {
+  grid-column: span 2;
+}
+
+.field-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  letter-spacing: 0.4px;
+}
+
+/* Поля карточки мельче общих: их здесь восемь на две колонки, и общим ростом
+   карточка вытягивается на пол-экрана. */
+.field-row .input {
+  font-size: 0.83rem;
+  padding: 5px 8px;
+  border-radius: 3px;
 }
 
 .input-date {
-  width: 110px;
-  flex: 0 0 auto;
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
   color: var(--text-primary);
   border-radius: 3px;
   padding: 5px 8px;
   font-size: 0.83rem;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: inherit;
+  color-scheme: dark;
 }
 
 .input-date:focus {
@@ -50,35 +143,49 @@
   border-color: var(--accent);
 }
 
-.input-date:disabled {
-  opacity: 0.5;
+.date-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.date-pair .input-date {
+  flex: 1;
+  min-width: 110px;
+  width: auto;
 }
 
 .date-dash {
   color: var(--text-tertiary);
 }
 
-.list-block {
-  margin-top: 12px;
+.date-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
 }
 
-.field-label {
+.date-current input {
+  accent-color: var(--accent);
+}
+
+.list-block .field-label {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  color: var(--text-tertiary);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-bottom: 4px;
+  align-items: center;
 }
 
 .list-add {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  color: var(--text-secondary);
-  font-size: 0.72rem;
   text-transform: none;
   letter-spacing: 0;
 }
@@ -92,31 +199,36 @@
 }
 
 .list-item {
-  display: grid;
-  grid-template-columns: 12px 1fr auto;
-  align-items: start;
-  gap: 6px;
-  margin-bottom: 3px;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 3px;
 }
 
 .list-bullet {
   color: var(--text-tertiary);
-  line-height: 1.8;
+  font-size: 0.83rem;
+  line-height: 1.4;
+  padding-top: 4px;
+  user-select: none;
 }
 
-/* Строка растёт вместе с текстом: достижение пишут фразой, и в одну строку
-   видно только её начало. */
+/* Рамки у строки нет, пока на неё не навели: достижений бывает десяток, и
+   десять обведённых полос подряд читаются как таблица, а не как список.
+   Растёт строка сама — полосы прокрутки в ней не разглядеть. */
 .list-input {
-  background: var(--bg-primary);
+  flex: 1;
+  background: transparent;
   border: 1px solid transparent;
   color: var(--text-primary);
-  border-radius: 3px;
-  padding: 4px 8px;
   font-size: 0.83rem;
+  padding: 4px 6px;
+  border-radius: 3px;
   font-family: inherit;
-  width: 100%;
-  resize: vertical;
-  min-height: 30px;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.4;
+  min-height: 22px;
 }
 
 .list-input:hover {
@@ -125,5 +237,145 @@
 
 .list-input:focus {
   outline: none;
+  border-color: var(--accent);
+  background: var(--bg-secondary);
+}
+
+/* Крестик проступает по наведению на строку: постоянный столбик крестиков
+   спорит с текстом, а убирают строку редко. */
+.list-item .icon-btn {
+  opacity: 0;
+  transition: opacity 0.1s;
+  flex-shrink: 0;
+}
+
+.list-item .icon-btn .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.list-item:hover .icon-btn {
+  opacity: 1;
+}
+
+.list-item button.icon-btn:hover {
+  color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.skills-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+  margin-top: 3px;
+  position: relative;
+}
+
+/* Подборщик всплывает над строкой: стек стоит внизу карточки, и вниз ему
+   некуда — список ушёл бы за нижнюю кромку поля. */
+.skill-picker {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 280px;
+  box-shadow: 0 6px 20px var(--shadow-dropdown);
+  z-index: 10;
+}
+
+.skill-picker-search {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.skill-picker-search .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--text-tertiary);
+}
+
+.skill-picker-search input {
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  flex: 1;
+  font-family: inherit;
+}
+
+.skill-picker-list {
+  overflow-y: auto;
+  padding: 4px 0;
+  max-height: 240px;
+}
+
+.skill-picker-cat {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  letter-spacing: 0.4px;
+  padding: 4px 10px 2px;
+}
+
+.skill-picker-item {
+  width: 100%;
+  padding: 4px 10px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.skill-picker-item:hover {
+  background: var(--selected-bg);
+}
+
+/* Уже взятый навык не пропадает из списка, а гаснет: пропади он — человек
+   искал бы его вслепую и брал второй раз. */
+.skill-picker-item.disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+.skill-picker-item.disabled:hover {
+  background: transparent;
+}
+
+.skill-picker-item .lvl {
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.skill-picker-empty {
+  padding: 10px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  text-align: center;
+  font-style: italic;
+}
+
+.new-exp {
+  width: 100%;
+  text-align: center;
+  padding: 8px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  cursor: pointer;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  margin-top: 4px;
+}
+
+.new-exp:hover {
+  color: var(--accent);
   border-color: var(--accent);
 }

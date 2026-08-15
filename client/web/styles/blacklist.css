@@ -30,29 +30,12 @@
   gap: 3px;
 }
 
+/* Своё у этой пилюли — значок с числом внутри; общая скобка в pill.css. */
 .bl-filter-pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
   font-size: 0.72rem;
-}
-
-.bl-filter-pill:hover {
-  border-color: var(--accent);
-}
-
-/* Выбранный род залит акцентом целиком: пилюль пять, и приглушённой отметки
-   среди них глаз не находит. */
-.bl-filter-pill.active {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--bg-primary);
-  font-weight: 500;
 }
 
 .bl-filter-pill .count {

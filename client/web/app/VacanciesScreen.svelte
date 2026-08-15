@@ -16,7 +16,8 @@
   // `lockedTip` приходит сверху, а не спрашивается здесь: лампы состояния
   // опрашивает оболочка для нижней полосы, и второй опрос из карточки дал бы
   // две разные правды об одном.
-  let { ask, say, lockedTip, events, oncontacts, open, onopened } = $props();
+  let { ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered } =
+    $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -51,6 +52,21 @@
     if (!open) return;
     opened = open.id;
     onopened();
+  });
+
+  // С каким отбором открыть список, придя из статистики. Поиск и открытая
+  // карточка при этом снимаются: человек просил список этого статуса, а не
+  // пересечение его с тем, что искал час назад.
+  $effect(() => {
+    if (!openFilter) return;
+    const asked = openFilter.filter;
+    search = '';
+    opened = null;
+    // Вне слежения: `apply` перечитывает список, а тот читает поиск и порядок —
+    // следящий эффект заводился бы заново на каждом набранном знаке и навязывал
+    // бы отбор статистики поверх того, что человек уже успел выбрать.
+    untrack(() => apply(asked));
+    onfiltered();
   });
 
   /** Перечитать список с начала.

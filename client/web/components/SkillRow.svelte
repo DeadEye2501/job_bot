@@ -5,6 +5,13 @@
   import ChipList from './ChipList.svelte';
 
   let { skill, onedit, onremove } = $props();
+
+  // Число и заливка идут за пальцем, запись ждёт отпущенной кнопки: писать на
+  // каждом делении значило бы десяток записей за одну протяжку, а число,
+  // стоящее на месте, пока ползунок едет, читается как залипшая строка.
+  let dragged = $state(null);
+
+  const level = $derived(dragged ?? skill.level);
 </script>
 
 <div class="skill-row">
@@ -22,10 +29,14 @@
       min="1"
       max="10"
       value={skill.level}
-      style="--pct: {levelPercent(skill.level)}%"
-      onchange={(event) => onedit({ level: Number(event.currentTarget.value) })}
+      style="--pct: {levelPercent(level)}%"
+      oninput={(event) => (dragged = Number(event.currentTarget.value))}
+      onchange={(event) => {
+        dragged = null;
+        onedit({ level: Number(event.currentTarget.value) });
+      }}
     />
-    <span class="level-num">{skill.level}/10</span>
+    <span class="level-num">{level}/10</span>
   </div>
 
   <ChipList

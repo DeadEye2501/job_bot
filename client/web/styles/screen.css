@@ -28,10 +28,10 @@
 }
 
 .page-title-meta {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   color: var(--text-tertiary);
   font-weight: 400;
-  margin-left: 8px;
+  margin-left: 6px;
 }
 
 .updated-ts {
@@ -47,13 +47,4 @@
 
 .form-grid .span-2 {
   grid-column: span 2;
-}
-
-/* Отказ записи стоит под формой, а не плашкой поверх экрана: анкету
-   заполняют сверху вниз, и до последнего обязательного поля каждая запись
-   законно отказана — плашка била бы на каждом поле. */
-.save-trouble {
-  margin-top: 10px;
-  color: var(--danger);
-  font-size: 0.78rem;
 }

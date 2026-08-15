@@ -1,14 +1,30 @@
 <script>
   // Языки анкеты: строка на язык, уровень выбирается списком.
+  import { tick } from 'svelte';
+
   import { LANG_LEVELS } from '$state/profile.js';
 
   import Dropdown from './Dropdown.svelte';
 
   let { rows, onedit, onadd, onremove } = $props();
+
+  let list = $state(null);
+
+  /** Завести строку и встать в неё курсором.
+   *
+   * Язык добавляют, чтобы тут же набрать его название, — курсор ждать нечему.
+   * Ставится он после отрисовки: до неё новой строки в разметке ещё нет.
+   */
+  async function add() {
+    onadd();
+    await tick();
+    const fresh = list.lastElementChild;
+    if (fresh) fresh.querySelector('.lang-name').focus();
+  }
 </script>
 
 <div class="span-2">
-  <div class="lang-list">
+  <div class="lang-list" bind:this={list}>
     {#each rows as row, index (index)}
       <div class="lang-row">
         <input
@@ -29,5 +45,5 @@
       </div>
     {/each}
   </div>
-  <button class="lang-add" type="button" onclick={() => onadd()}>+ Добавить язык</button>
+  <button class="lang-add" type="button" onclick={add}>+ Добавить язык</button>
 </div>

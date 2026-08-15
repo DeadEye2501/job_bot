@@ -1,10 +1,13 @@
 /* Кольцо долей: обводка круга сегментами и число в середине. */
 
+/* Ширина резиновая: кольцо стоит между двумя колонками счётчиков, и в узком
+   окне ужимается само, освобождая им место. */
 .donut-wrap {
   position: relative;
-  width: 120px;
-  height: 120px;
-  flex-shrink: 0;
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 185px;
+  margin: 0 auto;
 }
 
 .donut {
@@ -17,7 +20,7 @@
 .donut-part {
   fill: none;
   stroke: var(--text-tertiary);
-  stroke-width: 12;
+  stroke-width: 14;
 }
 
 .donut-center {
@@ -30,16 +33,12 @@
   pointer-events: none;
 }
 
-.donut-total {
-  font-size: 1.3rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-  line-height: 1.1;
-}
-
 .donut-label {
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   color: var(--text-tertiary);
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
 /* Цвет сегмента — цвет статуса, и набор этот общий с точкой и полосой воронки:

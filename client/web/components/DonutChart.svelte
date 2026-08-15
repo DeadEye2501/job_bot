@@ -5,7 +5,7 @@
   // одной формулой, и стык сегментов не расходится на доли точки.
   let { parts, total, label } = $props();
 
-  const RADIUS = 40;
+  const RADIUS = 42;
   const LENGTH = 2 * Math.PI * RADIUS;
 
   const drawn = $derived(
@@ -36,7 +36,7 @@
     {/each}
   </svg>
   <div class="donut-center">
-    <div class="donut-total">{total}</div>
+    <div class="big-num donut-total">{total}</div>
     <div class="donut-label">{label}</div>
   </div>
 </div>

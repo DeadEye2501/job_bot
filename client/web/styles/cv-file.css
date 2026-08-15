@@ -41,13 +41,3 @@
   gap: 4px;
   flex-shrink: 0;
 }
-
-/* Пропавший файл обведён красным: строка «файл не найден» сама по себе теряется
-   между размером и именем, а бот прикладывает резюме к каждому отклику. */
-.pdf-row.missing {
-  border-color: var(--err-zone-border);
-}
-
-.pdf-row.missing .pdf-meta {
-  color: var(--danger);
-}

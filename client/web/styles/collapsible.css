@@ -18,12 +18,16 @@
   min-width: 0;
 }
 
-/* Стрелка ложится набок у свёрнутой — так же, как в дереве файлов. */
-.collapsible-head .material-symbols-outlined {
+/* Стрелка ложится набок у свёрнутой — так же, как в дереве файлов. Названа
+   местом, а не значком: значки в шапке есть и у других кнопок, и общий отбор
+   клал бы набок корзину вместе со стрелкой. Стрелка стоит в шапке первой. */
+.collapsible-head > :first-child {
+  color: var(--text-secondary);
+  font-size: 18px;
   transition: transform 0.12s;
 }
 
-.collapsible.collapsed .collapsible-head .material-symbols-outlined {
+.collapsible.collapsed .collapsible-head > :first-child {
   transform: rotate(-90deg);
 }
 
@@ -36,4 +40,24 @@
 
 .add-more:hover {
   color: var(--accent);
+}
+
+/* «Новая категория» — пустая коробка во всю ширину под уже заведёнными:
+   пунктиром, потому что содержимого у неё ещё нет, и сплошная рамка читалась
+   бы как ещё одна категория, в которой ничего не показали. */
+.new-cat {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 8px;
+  margin-top: 4px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+}
+
+.new-cat:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }

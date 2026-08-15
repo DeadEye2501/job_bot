@@ -39,10 +39,28 @@ export function levelPercent(level) {
   return fillPercent(level, TOP_LEVEL);
 }
 
-/** Счёт в заголовке вкладки: сколько всего навыков и категорий. */
+/** Счёт в заголовке вкладки: сколько всего навыков и категорий.
+ *
+ * Навыки не склоняются: их число меняется на каждой правке строки, и слово
+ * дёргалось бы под курсором. У категорий оно стоит месяцами.
+ */
 export function countNote(skills, categories) {
   return (
-    `${skills} ${plural(skills, 'навык', 'навыка', 'навыков')}, ` +
+    `${skills} навыков, ` +
     `${categories} ${plural(categories, 'категория', 'категории', 'категорий')}`
   );
+}
+
+/** Каким станет перечень синонимов, когда набор закончили.
+ *
+ * Отменённый набор перечня не трогает: запись отложенная, и опечатка иначе
+ * успевает уехать в базу. Повтор без учёта регистра тоже не встаёт — мост
+ * сверяет написания так же, и пара значила бы лишнюю строку, которая ничего
+ * не находит.
+ */
+export function aliasesAfter(aliases, typed, keep) {
+  const value = typed.trim();
+  if (!keep || !value) return aliases;
+  const same = aliases.some((one) => one.trim().toLowerCase() === value.toLowerCase());
+  return same ? aliases : [...aliases, value];
 }

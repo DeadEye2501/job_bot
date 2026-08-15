@@ -145,7 +145,7 @@
   <div class="bl-filter-pills">
     {#each BLACKLIST_KINDS as one (one.key)}
       <button
-        class="bl-filter-pill"
+        class="pill bl-filter-pill"
         class:active={kind === one.key}
         type="button"
         onclick={() => (kind = one.key)}

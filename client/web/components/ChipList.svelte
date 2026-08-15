@@ -4,16 +4,24 @@
   // Ими названо одно и то же под разными именами: у навыка это «js» против
   // «JavaScript», у компании — написания, под которыми она приходит в
   // объявлениях. Предмет приходит списком снаружи, здесь его нет.
+  import { aliasesAfter } from '$state/skills.js';
+
   let { items, onadd, onremove } = $props();
 
   let adding = $state(false);
   let draft = $state('');
 
-  function accept() {
-    const value = draft.trim();
+  /** Закончить набор: принятое уходит наружу, отменённое пропадает.
+   *
+   * Что считать принятым, решает не окошко: отменённый набор и повтор в другом
+   * регистре судятся одинаково у всех, кто держит такие подписи.
+   */
+  function finish(keep) {
+    if (!adding) return;
+    const after = aliasesAfter(items, draft, keep);
     adding = false;
     draft = '';
-    if (value) onadd(value);
+    if (after.length > items.length) onadd(after.at(-1));
   }
 </script>
 
@@ -31,8 +39,16 @@
       class="chip-input"
       autofocus
       bind:value={draft}
-      onblur={accept}
-      onkeydown={(event) => event.key === 'Enter' && accept()}
+      onblur={() => finish(true)}
+      onkeydown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          finish(true);
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          finish(false);
+        }
+      }}
     />
   {:else}
     <button class="chip-add" type="button" onclick={() => (adding = true)}>+</button>

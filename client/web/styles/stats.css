@@ -1,190 +1,157 @@
-/* Статистика: карточки сеткой, показатели в ряд, воронка по каналам.
-   Сама коробка карточки — общая, в settings-section.css. */
+/* Статистика: полоса срока, сетка карточек и сама коробка карточки.
+   Что стоит внутри карточек — своими файлами. */
 
+.stats-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+/* Срок выбирают пилюлями, а не вкладками: вкладками наверху выбран раздел, и
+   второй ряд того же вида читался бы как второй уровень разделов. Сама
+   скобка — общая, в pill.css. */
+.stats-period-pill {
+  font-size: 0.74rem;
+}
+
+.stats-refresh-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+}
+
+.stats-refresh-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.stats-refresh-btn .material-symbols-outlined {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.stats-refresh-btn.spinning .material-symbols-outlined {
+  animation: stats-refresh-spin 0.8s linear infinite;
+}
+
+@keyframes stats-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Двенадцать колонок, а не две: карточки делят ширину по-разному — показатели
+   и каналы во всю, статусы и ответы пополам. */
 .stats-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(12, 1fr);
   gap: 10px;
 }
 
-/* Показатели и каналы идут во всю ширину: в половине пять чисел встают в два
-   ряда, а таблица каналов режется по названию. */
-.stats-grid .wide {
-  grid-column: span 2;
+.stats-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
 }
 
-.kpi-row {
+.stats-card-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+}
+
+.stats-col-6 {
+  grid-column: span 6;
+}
+
+.stats-col-12 {
+  grid-column: span 12;
+}
+
+.stats-loading {
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* Пять показателей — пять отдельных карточек в ряд: у каждого своя рамка,
+   и заголовка над рядом нет. Числа читают по одному, а не как список. */
+.stats-kpi-row {
+  grid-column: span 12;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 10px;
 }
 
-.kpi {
+.stats-kpi-row .stats-card {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  min-width: 0;
 }
 
-.kpi-num {
-  font-size: 1.5rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+.stats-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+}
+
+.stats-kpi-num {
+  font-size: 1.7rem;
+  font-weight: 500;
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
-.kpi-num[data-tone='info'] { color: var(--info); }
-.kpi-num[data-tone='ok'] { color: var(--ok); }
-.kpi-num[data-tone='accent'] { color: var(--accent); }
-.kpi-num[data-tone='err'] { color: var(--danger); }
+/* Цвета показателей: отклик синий, работа зелёная, оффер сиреневый, отказ
+   красный. Счёт вакансий цвета не имеет — он не про исход. */
+.stats-kpi-num[data-tone='applied'] { color: var(--status-applied); }
+.stats-kpi-num[data-tone='progress'] { color: var(--accent); }
+.stats-kpi-num[data-tone='offer'] { color: var(--status-offer); }
+.stats-kpi-num[data-tone='decline'] { color: var(--err); }
 
-.kpi-label {
-  font-size: 0.72rem;
+.stats-kpi-label {
+  font-size: 0.74rem;
   color: var(--text-tertiary);
 }
 
-.kpi-delta {
-  font-size: 0.7rem;
+/* Прижат к низу карточки: у показателей с приростом и без него подписи иначе
+   стояли бы на разной высоте. */
+.stats-kpi-delta {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  margin-top: auto;
+  padding-top: 4px;
   color: var(--text-tertiary);
 }
 
 /* Рост подсвечен, убыль — нет: убыль отказов это хорошо, а убыль офферов
    плохо, и красить её одним цветом значило бы врать в половине случаев. */
-.kpi-delta[data-tone='up'] {
-  color: var(--accent);
+.stats-kpi-delta[data-tone='up'] {
+  color: var(--ok);
 }
 
-.status-card {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.status-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.status-item {
-  display: grid;
-  grid-template-columns: 8px 1fr auto;
-  gap: 6px;
-  align-items: center;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-}
-
+/* Точка статуса — общая на всё окно: её красит status-color.css, а размер и
+   круглость одни везде, где она встречается. */
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--text-tertiary);
-}
-
-.status-count {
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-}
-
-.stat-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.stat-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-}
-
-.stat-value {
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-/* Навык, который есть у человека, выделен: по этому списку он решает, чему
-   учиться, и своё нужно отличать с одного взгляда. */
-.stat-name.mine {
-  color: var(--accent);
-}
-
-/* Цвета показателей — те же, что были в прежнем окне: отклик синий, работа
-   зелёная, оффер сиреневый, отказ красный. */
-.kpi-num[data-tone='applied'] { color: var(--status-applied); }
-.kpi-num[data-tone='progress'] { color: var(--accent); }
-.kpi-num[data-tone='offer'] { color: var(--status-offer); }
-.kpi-num[data-tone='decline'] { color: var(--err); }
-
-/* Ответы по дням недели: столбцы снизу вверх. */
-.week-bars {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-  align-items: end;
-  height: 70px;
-  margin-top: 10px;
-}
-
-.week-bar {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
-  height: 100%;
-  gap: 3px;
-}
-
-.week-fill {
-  width: 100%;
-  background: var(--accent);
-  border-radius: 2px 2px 0 0;
-  min-height: 1px;
-}
-
-.week-label {
-  font-size: 0.65rem;
-  color: var(--text-tertiary);
-}
-
-/* Воронка по каналам: одиннадцать колонок, числа выровнены по правому краю. */
-.stats-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.stats-table th {
-  text-align: right;
-  font-weight: 400;
-  color: var(--text-tertiary);
-  font-size: 0.68rem;
-  padding: 0 6px 4px;
-  white-space: nowrap;
-}
-
-.stats-table td {
-  text-align: right;
-  padding: 3px 6px;
-  border-top: 1px solid var(--border);
-  color: var(--text-secondary);
-}
-
-.stats-table th:first-child,
-.stats-table td:first-child {
-  text-align: left;
-}
-
-.stats-table-name {
-  color: var(--text-primary);
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }

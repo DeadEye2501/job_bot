@@ -10,7 +10,6 @@
   import { toggled } from '$state/chosen.js';
   import { named } from '$state/profile.js';
   import { countNote, grouped } from '$state/skills.js';
-  import { plural } from '$state/words.js';
 
   let { ask } = $props();
 
@@ -51,8 +50,16 @@
     return save();
   }
 
+  /** Завести пустой навык сразу за последним навыком своей категории.
+   *
+   * В конец всего перечня он падать не должен: нажали в одной коробке, а
+   * строка появилась бы в последней, и человек ищет её глазами по экрану.
+   */
   function addSkill(category) {
-    skills = [...skills, { id: null, category, name: '', level: 5, aliases: [] }];
+    const fresh = { id: null, category, name: '', level: 5, aliases: [] };
+    const last = groups.find((one) => one.name === category)?.items.at(-1);
+    const at = last ? skills.indexOf(last) + 1 : skills.length;
+    skills = [...skills.slice(0, at), fresh, ...skills.slice(at)];
   }
 
   function addCategory() {
@@ -97,12 +104,7 @@
   {#each groups as group (group.name)}
     <div class="collapsible" class:collapsed={closed.has(group.name)}>
       <div class="collapsible-head">
-        <button
-          class="icon-btn"
-          type="button"
-          title={closed.has(group.name) ? 'Развернуть' : 'Свернуть'}
-          onclick={() => toggleCategory(group.name)}
-        >
+        <button type="button" onclick={() => toggleCategory(group.name)}>
           <span class="material-symbols-outlined">expand_more</span>
         </button>
         <input
@@ -112,12 +114,11 @@
           onblur={(event) => renameCategory(group.name, event.currentTarget.value.trim())}
         />
         <span class="cat-spacer"></span>
-        <button class="btn" type="button" onclick={() => addSkill(group.name)}>
-          <span class="material-symbols-outlined">add</span>
-          Навык
-        </button>
+        <button class="cat-add" type="button" onclick={() => addSkill(group.name)}
+          ><span class="material-symbols-outlined">add</span>Навык</button
+        >
         <button
-          class="icon-btn"
+          class="cat-delete"
           type="button"
           title="Удалить категорию"
           onclick={() => (leaving = group)}
@@ -134,12 +135,12 @@
     </div>
   {/each}
 
-  <button class="add-more" type="button" onclick={addCategory}>+ Новая категория</button>
+  <button class="new-cat" type="button" onclick={addCategory}>+ Новая категория</button>
 {/if}
 
 {#if leaving}
   <ConfirmDialog
-    message={`Удалить категорию «${leaving.name}»?\n\nВместе с ней уйдут ${leaving.items.length} ${plural(leaving.items.length, 'навык', 'навыка', 'навыков')}. Откатить нельзя.`}
+    message={`Удалить категорию «${leaving.name}» и все её навыки?`}
     confirmLabel="Удалить"
     onconfirm={() => dropCategory(leaving.name)}
     oncancel={() => (leaving = null)}
