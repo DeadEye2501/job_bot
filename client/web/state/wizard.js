@@ -12,7 +12,7 @@ const SCREENS = ['welcome', 'telegram', 'chat', 'embed', 'cv', 'done'];
  *  (`wizard.state` отдаёт пройденные номерами). */
 const STEPS = [
   { screen: 'telegram', at: 1, label: 'Telegram' },
-  { screen: 'chat', at: 2, label: 'Модель' },
+  { screen: 'chat', at: 2, label: 'LLM' },
   { screen: 'embed', at: 3, label: 'Сравнение' },
   { screen: 'cv', at: 4, label: 'Резюме' },
 ];
@@ -25,11 +25,23 @@ const STEPS = [
  * этих, мастер не боится: он и есть «своё».
  */
 export const PRESETS = [
+  { label: 'OpenAI', base_url: 'https://api.openai.com/v1' },
   { label: 'LM Studio', base_url: 'http://localhost:1234' },
   { label: 'Ollama', base_url: 'http://localhost:11434' },
-  { label: 'OpenAI', base_url: 'https://api.openai.com/v1' },
   { label: 'OpenRouter', base_url: 'https://openrouter.ai/api/v1' },
+  { label: 'Custom', base_url: '' },
 ];
+
+/** Каким поставщиком отмечен этот адрес.
+ *
+ * Незнакомый — «своё»: без такого пункта набранный руками адрес оставлял бы
+ * выбор пустым, и человек читал бы это как «поставщик не выбран», хотя адрес
+ * у него уже вписан.
+ */
+export function presetFor(url) {
+  const typed = url.trim();
+  return PRESETS.find((one) => one.base_url && one.base_url === typed)?.label ?? 'Custom';
+}
 
 const SCHEME = /^https?:\/\//;
 
@@ -58,8 +70,58 @@ export function backScreen(screen) {
 export function stepMarks(completed, screen) {
   return STEPS.map((one) => ({
     label: one.label,
-    mark: one.screen === screen ? 'active' : completed.includes(one.at) ? 'done' : '',
+    // На приветствии строка стоит вся погашенная, цифрами: приглушённые
+    // галочки вернувшегося читаются как шаги, куда его не пускают.
+    mark:
+      screen === 'welcome'
+        ? ''
+        : one.screen === screen
+          ? 'active'
+          : completed.includes(one.at)
+            ? 'done'
+            : '',
   }));
+}
+
+/** Что мастер предлагает сделать с файлом резюме.
+ *
+ * Первый заперт: разбора резюме моделью ещё нет, а выбранный он завёл бы шаг,
+ * который ничего не делает. Подписи копируются с образца дословно — по ним
+ * человек и решает, чем эти три случая различаются.
+ */
+export function cvModes() {
+  return [
+    {
+      id: 'parse',
+      title: 'Разобрать через LLM и заполнить профиль',
+      note: 'Функция находится в разработке.',
+      disabled: true,
+    },
+    {
+      id: 'attach',
+      title: 'Только прикрепить файл',
+      note:
+        'Файл сохранится в профиле. Навыки и опыт нужно будет заполнить вручную ' +
+        'в разделе Профиль.',
+      disabled: false,
+    },
+    {
+      id: 'skip',
+      title: 'Пропустить шаг',
+      note: 'Резюме можно добавить позже в разделе Профиль.',
+      disabled: false,
+    },
+  ];
+}
+
+/** Можно ли закончить шаг резюме.
+ *
+ * Без файла заканчивать нечем — мастер отправил бы пустой путь, и шаг завершился
+ * бы ничем. Отказ от резюме называется прямо, отдельным выбором: так видно, что
+ * шаг пропущен нарочно, а не забыт.
+ */
+export function cvReady({ mode, path }) {
+  return mode === 'skip' || !!path;
 }
 
 /** Что мешает уйти с шага поставщика дальше. Пустая фраза значит «ничего».

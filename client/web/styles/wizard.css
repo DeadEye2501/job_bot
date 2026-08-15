@@ -28,6 +28,30 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  position: relative;
+}
+
+/* Черта от кружка к кружку: без неё четыре отметки читаются как четыре
+   несвязанных значка, а не как путь, часть которого пройдена. */
+.wiz-step::before {
+  content: '';
+  position: absolute;
+  height: 3px;
+  border-radius: 1.5px;
+  background: var(--bg-tertiary);
+  top: 7px;
+  left: calc(-50% + 9px);
+  width: calc(100% - 18px);
+  z-index: 0;
+}
+
+.wiz-step:first-child::before {
+  display: none;
+}
+
+.wiz-step[data-mark='active']::before,
+.wiz-step[data-mark='done']::before {
+  background: var(--accent);
 }
 
 .wiz-step-mark {
@@ -42,6 +66,8 @@
   font-size: 0.66rem;
   font-weight: 500;
   line-height: 1;
+  position: relative;
+  z-index: 1;
 }
 
 .wiz-step[data-mark='active'] .wiz-step-mark {
@@ -52,6 +78,7 @@
 .wiz-step[data-mark='done'] .wiz-step-mark {
   background: var(--accent-chip-selected);
   color: var(--accent);
+  font-weight: 700;
 }
 
 .wiz-step-label {
@@ -70,12 +97,15 @@
 }
 
 .wiz-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   min-height: 0;
-  padding: 16px 28px;
+  padding: 14px 28px;
   overflow-y: auto;
+}
+
+/* Отступ снизу у последнего блока: без него прокрученное до конца тело
+   упирается в подвал вплотную. */
+.wiz-body > *:last-child {
+  padding-bottom: 14px;
 }
 
 .wiz-head {
@@ -137,9 +167,13 @@
 }
 
 .wiz-done {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
+  height: 100%;
+  gap: 10px;
 }
 
 .wiz-done .material-symbols-outlined {
@@ -156,4 +190,324 @@
 
 .wiz-done .wiz-text {
   max-width: 380px;
+}
+
+/* Подзаголовок шага: чем этот шаг занят и что от человека нужно. Мельче и
+   тусклее вводного текста обложки — там речь о приложении целиком. */
+.wiz-subtitle {
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.wiz-subtitle strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Обложка: значок, заголовок и два-три блока под ними. Свой зазор, а не общий
+   у тела: на рабочих шагах расстояния держат сами блоки. */
+.wiz-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 14px;
+}
+
+/* Две карточки-подсказки: предупреждение и пояснение. Различаются цветом и
+   значком — на них смотрят прежде текста, и цвет говорит, беда это или
+   объяснение. */
+.warning-card,
+.info-card {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 8px;
+  align-items: start;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.warning-card {
+  background: var(--alert-card-bg);
+  border: 1px solid var(--alert-card-border);
+}
+
+.warning-card .material-symbols-outlined {
+  color: var(--alert-text);
+  font-size: 18px;
+  margin-top: 1px;
+}
+
+.warning-card strong {
+  color: var(--alert-text);
+}
+
+.info-card {
+  background: var(--info-card-bg);
+  border: 1px solid var(--info-card-border);
+  font-size: 0.8rem;
+  padding: 9px 12px;
+}
+
+.info-card .material-symbols-outlined {
+  color: var(--info);
+  font-size: 16px;
+  margin-top: 1px;
+}
+
+.info-card strong {
+  color: var(--info);
+  font-weight: 500;
+}
+
+.wiz-body > .info-card,
+.wiz-body > .warning-card {
+  margin: 10px 0 12px;
+}
+
+/* Пошаговая инструкция «где это взять»: нумерованный список с адресами. */
+.help {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.help strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.help code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.78rem;
+  background: var(--bg-tertiary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--text-primary);
+}
+
+.help ol {
+  margin: 6px 0 0 22px;
+  padding: 0;
+}
+
+.help ol li {
+  margin-bottom: 3px;
+}
+
+/* Строка состояния под полями: чем мастер занят прямо сейчас и чем кончилось.
+   Стоит там же, где работали, — плашка поверх окна увела бы ответ туда, куда
+   человек в этот миг не смотрит. */
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 0.82rem;
+  margin-top: 8px;
+}
+
+.status-row .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.status-row[data-tone='ok'] {
+  color: var(--text-primary);
+}
+
+.status-row[data-tone='ok'] .material-symbols-outlined {
+  color: var(--ok);
+}
+
+.status-row[data-tone='err'] {
+  color: var(--text-primary);
+}
+
+.status-row[data-tone='err'] .material-symbols-outlined {
+  color: var(--err);
+}
+
+.status-row[data-tone='busy'] .material-symbols-outlined {
+  color: var(--accent);
+  animation: wiz-spin 1s linear infinite;
+}
+
+@keyframes wiz-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Карточка выбора: три способа обойтись с резюме. Карточками, а не строкой
+   переключателей: у каждого способа есть пояснение, и в строку оно не встаёт. */
+.radio-card {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 9px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.radio-card:hover {
+  border-color: var(--accent);
+}
+
+.radio-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-hover-soft);
+}
+
+.radio-card.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.radio-card.disabled:hover {
+  border-color: var(--border);
+}
+
+.radio-card input {
+  accent-color: var(--accent);
+  margin-top: 2px;
+}
+
+.radio-card.disabled input {
+  cursor: not-allowed;
+}
+
+.radio-card .rc-title {
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.radio-card .rc-sub {
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* Выбор файла резюме: одна строка со значком, подписью и кнопкой. Пунктир до
+   выбора и сплошная рамка после — тем же приёмом, каким показывают «сюда
+   кладут». */
+.file-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.file-pick.has-file {
+  border-style: solid;
+}
+
+.file-pick .material-symbols-outlined {
+  font-size: 22px;
+  color: var(--text-tertiary);
+}
+
+.file-pick .text {
+  flex: 1;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-pick .text .name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Поля мастера светлее тела: их здесь три-четыре на экран, и рамкой одной они
+   не отделяются от коробки, на которой стоят. */
+.wiz-window .input {
+  background: var(--bg-tertiary);
+  padding: 7px 10px;
+  font-size: 0.86rem;
+}
+
+/* Кнопки мастера крупнее прочих: их на экране две, и нажимают их подряд. */
+.wiz-window .btn {
+  padding: 6px 14px;
+  border-radius: 5px;
+  background: var(--bg-secondary);
+  font-size: 0.82rem;
+}
+
+.wiz-window .btn .material-symbols-outlined {
+  font-size: 14px;
+}
+
+/* Поля в столбик: адрес, ключ, имя модели. */
+.wiz-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* В мастере основная кнопка под курсором не светлеет: своего правила на
+   наведение у неё в образце не было, а общее по окну меняет заливку. Здесь
+   нажимают две кнопки подряд, и мигающая заливка читается как отклик на
+   попадание, а не на нажатие. */
+.wiz-window .btn.primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Карточки выбора отделены от коробки файла: без отступа они читаются как её
+   продолжение, а выбирают ими другое — что делать с файлом дальше. */
+.wiz-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+/* Выбор поставщика: свой список вместо системного — тот в тёмном окне светлая
+   заплата. Шеврон нарисован фоном: системный на своём списке не показывается. */
+.preset-select {
+  width: 100%;
+  appearance: none;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 7px 28px 7px 10px;
+  font-size: 0.86rem;
+  font-family: inherit;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><polyline points='2,4 5,7 8,4' fill='none' stroke='%2386868b' stroke-width='1.5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.preset-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Подсказка под самим полем идёт вплотную: снизу её отделяет уже зазор полей. */
+.wiz-fields .help {
+  margin: -2px 0 0;
 }

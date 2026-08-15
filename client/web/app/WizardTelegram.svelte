@@ -1,21 +1,24 @@
 <script>
   // Шаг мастера: учётная запись Telegram.
   //
-  // Тот же раздел, что и в настройках, и тот же вход в три шага: заводить для
+  // Поля здесь голые, без коробки раздела: их три, и рамка с шапкой обещала бы
+  // соседей, которых на шаге нет.
+  //
+  // Сам вход — код и облачный пароль — живёт в окне поверх шага: заводить для
   // мастера второй значило бы держать два входа в один Telegram.
-  import TelegramSection from '$components/TelegramSection.svelte';
   import WizardFoot from '$components/WizardFoot.svelte';
 
   import { loginTrouble } from '$state/settings.js';
 
   import TelegramLogin from './TelegramLogin.svelte';
 
-  let { ask, say, onback, onnext } = $props();
+  let { ask, onback, onnext } = $props();
 
-  const NEED_SESSION = 'Войдите в Telegram, чтобы идти дальше';
+  // Значок строки состояния: чем шаг занят и чем кончилось.
+  const TONE_ICONS = { busy: 'progress_activity', err: 'error' };
 
-  let tg = $state(null);
   let draft = $state({ api_id: '', api_hash: '', phone: '' });
+  let status = $state(null);
   let logging = $state(false);
 
   let alive = true;
@@ -23,38 +26,44 @@
   async function refresh() {
     const now = await ask('settings.get');
     if (now === null || !alive) return;
-    tg = now.tg;
-    if (!draft.api_id) draft = { api_id: tg.api_id, api_hash: tg.api_hash, phone: tg.phone };
+    if (!draft.api_id) {
+      draft = { api_id: now.tg.api_id, api_hash: now.tg.api_hash, phone: now.tg.phone };
+    }
   }
 
-  function startLogin() {
-    const trouble = loginTrouble(draft);
-    if (trouble) return say(trouble, true);
+  /** Запросить код в Telegram.
+   *
+   * Пробелы срезаются здесь, а не при наборе: ключ приезжает вставкой из чужого
+   * окна вместе с пробелом на конце, и уехать на мост должен уже обрезанным.
+   */
+  function sendCode() {
+    draft = {
+      api_id: draft.api_id.trim(),
+      api_hash: draft.api_hash.trim(),
+      phone: draft.phone.trim(),
+    };
+    if (loginTrouble(draft)) {
+      status = { tone: 'err', text: 'Заполните все поля.' };
+      return;
+    }
+    status = { tone: 'busy', text: 'Запрашиваем код в Telegram...' };
     logging = true;
   }
 
-  /** Выйти из сеанса.
+  /** Вход удался: шаг сделан, дальше ведёт он сам.
    *
-   * Кнопка та же, что и в настройках, и делает то же самое: человек, вошедший
-   * не тем номером, чинит это здесь, не доходя до конца мастера.
+   * Отдельной кнопки «Дальше» на шаге нет: после входа человеку здесь делать
+   * нечего, и ждать от него ещё одного нажатия не за чем.
    */
-  async function logout() {
-    const done = await ask('settings.logout');
-    if (done === null) return;
-    return refresh();
-  }
-
-  /** Уйти дальше. Заслон назван словом, а не запертой кнопкой: запертая
-   *  оставляет человека гадать, чего ей не хватило. */
-  function ahead() {
-    if (!tg?.has_session) return say(NEED_SESSION, true);
+  function loggedIn() {
+    logging = false;
+    status = null;
     return onnext();
   }
 
-  function loggedIn() {
+  function closeLogin() {
     logging = false;
-    say('Вход выполнен');
-    return refresh();
+    status = null;
   }
 
   $effect(() => {
@@ -67,36 +76,47 @@
 </script>
 
 <div class="wiz-body">
-  <div class="wiz-title">Учётная запись Telegram</div>
-  <p class="wiz-text">
-    Бот читает каналы и пишет людям от вашего имени. Заведите для него отдельную
-    учётную запись: за рассылку незнакомым людям Telegram блокирует номер, и
-    терять на этом основной не стоит.
-  </p>
-  <p class="wiz-text">
-    <strong>api_id</strong> и <strong>api_hash</strong> берутся на my.telegram.org — раздел
-    «API development tools». Ключи остаются на этом компьютере.
-  </p>
-
-  {#if tg}
-    <TelegramSection
-      {tg}
-      {draft}
-      onedit={(part) => (draft = { ...draft, ...part })}
-      onlogin={startLogin}
-      onlogout={logout}
+  <div class="wiz-title">Telegram-аккаунт</div>
+  <div class="wiz-subtitle">
+    Бот заходит в Telegram как обычный клиент. Для этого нужны <strong>api_id</strong> и
+    <strong>api_hash</strong> — пара идентификатор/ключ, которую Telegram выдаёт каждому
+    приложению.
+  </div>
+  <div class="help">
+    <strong>Где их взять:</strong>
+    <ol>
+      <li>Откройте <code>https://my.telegram.org/auth</code> и войдите по номеру.</li>
+      <li>Перейдите в <strong>API development tools</strong>.</li>
+      <li>Заполните <strong>App title</strong> и <strong>Short name</strong> — значения любые.</li>
+      <li>Скопируйте <strong>App api_id</strong> и <strong>App api_hash</strong> в поля ниже.</li>
+    </ol>
+  </div>
+  <div class="wiz-fields">
+    <input class="input mono" maxlength="16" placeholder="api_id" bind:value={draft.api_id} />
+    <input class="input mono" maxlength="64" placeholder="api_hash" bind:value={draft.api_hash} />
+    <input
+      class="input mono"
+      maxlength="32"
+      placeholder="Телефон в международном формате, например +71234567890"
+      bind:value={draft.phone}
     />
-  {/if}
+    {#if status}
+      <div class="status-row" data-tone={status.tone}>
+        <span class="material-symbols-outlined">{TONE_ICONS[status.tone]}</span>
+        <span>{status.text}</span>
+      </div>
+    {/if}
+  </div>
 </div>
 
 <WizardFoot
-  trouble={tg?.has_session ? '' : NEED_SESSION}
-  nextLabel="Дальше"
-  busy={!tg}
+  nextLabel="Отправить код"
+  nextIcon="send"
+  busy={logging}
   {onback}
-  onnext={ahead}
+  onnext={sendCode}
 />
 
 {#if logging}
-  <TelegramLogin creds={draft} ondone={loggedIn} onclose={() => (logging = false)} />
+  <TelegramLogin creds={draft} ondone={loggedIn} onclose={closeLogin} />
 {/if}

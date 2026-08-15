@@ -70,33 +70,52 @@
 </script>
 
 <div class="wiz-window">
-  <WizardSteps {marks} dimmed={screen === 'welcome' || screen === 'done'} />
+  <!-- Приглушена только обложка: на финале четыре галочки горят в полную силу —
+       это и есть то, ради чего мастер проходили. -->
+  <WizardSteps {marks} dimmed={screen === 'welcome'} />
 
   {#if screen === 'welcome'}
     <div class="wiz-body">
-      <div class="wiz-head">
-        <span class="material-symbols-outlined">smart_toy</span>
-        <h1>Job Bot</h1>
+      <div class="wiz-welcome">
+        <div class="wiz-head">
+          <span class="material-symbols-outlined">smart_toy</span>
+          <h1>Добро пожаловать в Job Bot</h1>
+        </div>
+        <div class="wiz-text">
+          Бот читает вакансии из Telegram-каналов, сравнивает их с вашим профилем, помогает
+          вести переписку с HR и отслеживает статусы откликов. Настройка займёт 4 шага:
+          <strong>Telegram</strong>, <strong>LLM</strong>, <strong>эмбеддинги</strong>,
+          <strong>резюме</strong>.
+        </div>
+        <div class="warning-card">
+          <span class="material-symbols-outlined">warning</span>
+          <div>
+            <strong>Заведите отдельный аккаунт для бота.</strong> Telegram считает массовую
+            автоматизацию нарушением правил и может заблокировать номер
+            <strong>без возможности восстановления</strong>. Основной аккаунт под это не подходит.
+          </div>
+        </div>
+        <div class="info-card">
+          <span class="material-symbols-outlined">lock</span>
+          <div>
+            <strong>Все ключи остаются на вашем компьютере.</strong> Telegram-сессия и API-ключи
+            LLM шифруются ключом из системного хранилища паролей и лежат только в локальной БД.
+            Наружу ничего не уходит.
+          </div>
+        </div>
       </div>
-      <p class="wiz-text">
-        Бот читает каналы с вакансиями, разбирает объявления моделью, сравнивает
-        их с вашей анкетой и пишет тем, чьи вакансии подошли. Настройка занимает
-        четыре шага и делается один раз.
-      </p>
-      <p class="wiz-text">
-        Всё, что вы здесь введёте, остаётся на этом компьютере: ключи лежат в
-        базе рядом с приложением, а к моделям оно ходит с вашей машины напрямую.
-      </p>
     </div>
-    <WizardFoot nextLabel="Начать" onnext={() => (screen = 'telegram')} />
+    <WizardFoot
+      nextLabel="Дальше"
+      nextIcon="arrow_forward"
+      onnext={() => (screen = 'telegram')}
+    />
   {:else if screen === 'telegram'}
     <WizardTelegram {ask} {say} onback={() => (screen = back)} onnext={ahead} />
   {:else if screen === 'chat'}
     <WizardLlm
       {ask}
       kind="chat"
-      icon="smart_toy"
-      title="Модель для разбора и писем"
       onback={() => (screen = back)}
       onnext={ahead}
     />
@@ -104,22 +123,28 @@
     <WizardLlm
       {ask}
       kind="embed"
-      icon="calculate"
-      title="Модель для сравнения с анкетой"
       onback={() => (screen = back)}
       onnext={ahead}
     />
   {:else if screen === 'cv'}
-    <WizardCv {ask} {say} busy={finishing} onback={() => (screen = back)} onnext={finish} />
+    <WizardCv {ask} busy={finishing} onback={() => (screen = back)} onnext={finish} />
   {:else}
     <div class="wiz-body wiz-done">
       <span class="material-symbols-outlined">check_circle</span>
       <h2>Готово</h2>
       <p class="wiz-text">
-        Бот поднят. Впишите навыки и опыт в анкете, добавьте каналы в разделе
-        «Контакты» — и включите обход в нижней полосе окна.
+        Что сделать дальше:
+        <br /><br />
+        1. Откройте <strong>Профиль → Skills</strong> и проверьте уровни навыков. Если резюме
+        разбирала LLM — пройдитесь по списку и поправьте оценки.
+        <br />
+        2. В <strong>Системе → Настройки</strong> задайте порог отсева вакансий.
+        <br />
+        3. Добавьте каналы с вакансиями в <strong>Чат → Каналы</strong> и
+        <strong>подпишитесь на них под Telegram-аккаунтом бота</strong> — иначе он не увидит
+        сообщения.
       </p>
     </div>
-    <WizardFoot nextLabel="Открыть приложение" onnext={ondone} />
+    <WizardFoot nextLabel="Открыть Job Bot" nextIcon="arrow_forward" onnext={ondone} />
   {/if}
 </div>

@@ -94,9 +94,4 @@
   border-color: var(--accent);
 }
 
-.date-day.selected {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--bg-primary);
-  font-weight: 500;
-}
+/* Заливка выбранного — общая, в accent-fill.css. */
