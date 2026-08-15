@@ -16,7 +16,6 @@
   import PickerDialog from '$components/PickerDialog.svelte';
   import { attempts } from '$state/attempts.js';
   import { companyCandidate, companyLine, siteHref } from '$state/companies.js';
-  import { plural } from '$state/words.js';
 
   // Пауза перед записью заметки — та же, что ждало прежнее окно.
   const NOTES_DELAY = 600;
@@ -192,14 +191,6 @@
       </div>
 
       <div class="cnt-det-meta-row">
-        <span class="cnt-det-meta-chip">
-          <span class="material-symbols-outlined">work</span>
-          {card.vacancy_count} {plural(card.vacancy_count, 'вакансия', 'вакансии', 'вакансий')}
-        </span>
-        <span class="cnt-det-meta-chip">
-          <span class="material-symbols-outlined">people</span>
-          {card.hr_count} HR
-        </span>
         {#if card.blacklist_value}
           <span class="cnt-det-meta-chip blacklist" title="В blacklist: {card.blacklist_value}">
             <span class="material-symbols-outlined">block</span>

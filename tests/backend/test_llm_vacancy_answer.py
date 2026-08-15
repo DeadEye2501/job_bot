@@ -92,6 +92,45 @@ def test_a_text_field_is_trimmed():
     assert parsed.salary == "$3000"
 
 
+@pytest.mark.parametrize(
+    "raw_contact",
+    [
+        pytest.param("Откликнуться", id="подпись ссылки"),
+        pytest.param("Подробнее", id="подпись ссылки словом"),
+        pytest.param("пишите в комментарии под постом", id="указание словами"),
+        pytest.param("Apply here", id="подпись по-английски"),
+    ],
+)
+def test_a_way_to_apply_without_an_address_is_dropped(raw_contact):
+    """Способ отклика без адреса не сохраняется.
+
+    Пост часто кончается ссылкой-словом, а до модели доезжает только её
+    подпись — сам адрес остаётся в разметке сообщения. Записанная как есть,
+    она даёт в заметке вакансии «Контакты: Откликнуться»: строка есть, а
+    откликаться по ней некуда.
+    """
+    parsed = _parse_vacancy_json(_answer(other_contact=raw_contact))
+
+    assert parsed.other_contact is None
+
+
+@pytest.mark.parametrize(
+    "raw_contact",
+    [
+        pytest.param("jobs@acme.com", id="почта"),
+        pytest.param("https://forms.gle/abc123", id="ссылка"),
+        pytest.param("hh.ru/vacancy/12345", id="домен"),
+        pytest.param("резюме на careers.acme.com/apply", id="адрес внутри фразы"),
+        pytest.param("звонить +7 999 123-45-67", id="телефон"),
+    ],
+)
+def test_a_way_to_apply_with_an_address_is_kept(raw_contact):
+    """Способ отклика с адресом сохраняется дословно."""
+    parsed = _parse_vacancy_json(_answer(other_contact=raw_contact))
+
+    assert parsed.other_contact == raw_contact
+
+
 def test_an_overlong_description_is_cut_with_an_ellipsis():
     """Слишком длинное описание обрезается и помечается многоточием.
 

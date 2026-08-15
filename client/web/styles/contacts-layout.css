@@ -70,6 +70,7 @@
 
 .cnt-list {
   flex: 1;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -84,6 +85,7 @@
 .cnt-detail-pane {
   min-height: 0;
   padding: 16px 20px;
+  overflow-x: hidden;
   overflow-y: auto;
   background: var(--bg-primary);
 }

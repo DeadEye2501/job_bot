@@ -61,6 +61,7 @@
   padding: 8px 10px;
   color: var(--text-secondary);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-size: 0.74rem;
   line-height: 1.5;
 }

@@ -99,6 +99,7 @@
 .wiz-body {
   min-height: 0;
   padding: 14px 28px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 

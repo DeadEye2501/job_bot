@@ -178,10 +178,6 @@
       </div>
 
       <div class="cnt-det-meta-row">
-        <span class="cnt-det-meta-chip">
-          <span class="material-symbols-outlined">work</span>
-          {card.vacancy_count} {plural(card.vacancy_count, 'вакансия', 'вакансии', 'вакансий')}
-        </span>
         {#if card.unread_count}
           <span class="cnt-det-meta-chip unread">
             <span class="material-symbols-outlined">mail</span>

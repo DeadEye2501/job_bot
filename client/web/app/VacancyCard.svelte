@@ -276,16 +276,6 @@
             >
               {card.hr.name || '—'}
             </button>
-            {#if links.hrChat}
-              <button
-                class="hr-username is-link"
-                type="button"
-                title="Написать в Telegram"
-                onclick={() => outside(links.hrChat)}
-              >
-                @{card.hr.telegram_username}
-              </button>
-            {/if}
           {/if}
         </div>
       </div>
@@ -314,16 +304,6 @@
               onclick={() => (linking = { kind: 'company', prefill: links.companyPick })}
             >
               {card.company_name}
-            </button>
-          {/if}
-          {#if links.site}
-            <button
-              class="hr-username is-link"
-              type="button"
-              title="Открыть сайт компании"
-              onclick={() => outside(links.site)}
-            >
-              {card.company_website}
             </button>
           {/if}
         </div>

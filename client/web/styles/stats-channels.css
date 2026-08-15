@@ -7,10 +7,13 @@
 
 .stats-ch-grid {
   display: grid;
+  /* Наименьшая ширина колонки конверсии — не на глаз, а по тому, что в ней
+     стоит: подпись 36, зазор 8, метр 60 и отступы по 10. Меньшее число трек не
+     ужимает — ужиматься нечему, — а выносит содержимое за край карточки. */
   grid-template-columns:
     minmax(140px, 1.4fr)
     repeat(8, minmax(44px, auto))
-    repeat(2, minmax(72px, 1fr));
+    repeat(2, minmax(124px, 1fr));
   font-size: 0.76rem;
 }
 

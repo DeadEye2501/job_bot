@@ -121,6 +121,7 @@
   border-radius: 4px;
   background: var(--bg-secondary);
   box-shadow: 0 6px 20px var(--shadow-dropdown);
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
