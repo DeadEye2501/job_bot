@@ -5,6 +5,7 @@
 // часы всей странице.
 
 import { GRADES as PROFILE_GRADES } from './profile.js';
+import { REMOTE_CHOICES } from './vacancy_filter.js';
 
 /** Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и
  *  совпадают с перечнем `backend/repository/vacancies_list.VACANCY_SORTS`;
@@ -27,6 +28,16 @@ const GRADES = Object.fromEntries(PROFILE_GRADES.map((one) => [one.value, one.la
  *  человек узнает, а прочерк скрыл бы, что в объявлении грейд был. */
 export function gradeLabel(grade) {
   return grade ? GRADES[grade] || grade : '—';
+}
+
+/** Формат работы словом.
+ *
+ * Подписи те же, что в отборе: один и тот же формат, названный в двух местах
+ * по-разному, человек читает как два разных.
+ */
+export function remoteLabel(remote) {
+  const known = REMOTE_CHOICES.find((one) => one.value === remote);
+  return known === undefined ? remote : known.label;
 }
 
 /** Чем объяснить пустой список: значком и словами.

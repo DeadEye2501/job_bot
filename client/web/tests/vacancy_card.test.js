@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { remoteLabel } from '../state/vacancies.js';
 import { timelineRows } from '../state/vacancy_card.js';
 
 // Причина пропуска видна человеку только строкой ленты, и проверяется она
@@ -84,7 +85,7 @@ describe('лента карточки', () => {
         created_at: '2026-08-14T12:30:00Z',
       },
     ];
-    expect(timelineRows([], events)[0].text).toBe('Авто-отправка: файл резюме не найден.');
+    expect(timelineRows([], events)[0].text).toBe('Авто-отправка: CV-файл не найден.');
   });
 
   it('текущей помечена первая видимая строка, а не первая пришедшая', () => {
@@ -123,7 +124,7 @@ describe('лента карточки', () => {
       { ...HISTORY[1], explanation: null },
     ];
     const rows = timelineRows(history, []);
-    expect(rows[0].text).toBe('Без комментария.');
+    expect(rows[0].text).toBe('');
     expect(rows[1].text).toBe('');
   });
 
@@ -152,7 +153,7 @@ describe('лента карточки', () => {
     // лента останется зелёной.
     const row = timelineRows([], [EVENTS[0]])[0];
     expect(row.status).toBe('New');
-    expect(row.label).toBe('Статус:');
+    expect(row.label).toBe('New:');
     expect(row.when).toBe('2026-08-14T11:00:00Z');
   });
 
@@ -174,7 +175,7 @@ describe('лента карточки', () => {
         created_at: '2026-08-14T13:00:00Z',
       },
     ];
-    expect(timelineRows([], events)[0].text).toBe('Компания: — → Ромашка.');
+    expect(timelineRows([], events)[0].text).toBe('Компания: не привязана → Ромашка.');
   });
 
   it('привязка HR называет обе стороны', () => {
@@ -191,11 +192,55 @@ describe('лента карточки', () => {
     expect(timelineRows([], events)[0].text).toBe('HR: Иван → Пётр.');
   });
 
+  it('строка истории подписана именем статуса, а не словом «Статус»', () => {
+    // Каким стал статус — это и есть содержание строки. Одинаковая подпись у
+    // всех оставляет эту сведению только в цвете точки, а цветов одиннадцать
+    // и на глаз они не различаются.
+    const rows = timelineRows(HISTORY, []);
+    expect(rows.map((one) => one.label)).toEqual(['Applied:', 'New:']);
+  });
+
+  it('поступление без канала называет его неизвестным', () => {
+    // Канал в событии может не сохраниться, и подстановка пустоты дала бы
+    // «Поступила из канала @.» — строку, которую читают как поломку.
+    const events = [{ id: 1, kind: 'ingested', payload: {}, created_at: '2026-08-14T09:00:00Z' }];
+    expect(timelineRows([], events)[0].text).toBe('Поступила из канала неизвестного канала.');
+  });
+
+  it('привязка без имени называет сторону номером, а не прочерком', () => {
+    // Имя запекается в событие, но у давних записей его нет: номер даёт
+    // человеку хоть что-то, по чему привязку можно найти.
+    const events = [
+      {
+        id: 4,
+        kind: 'linked_hr',
+        payload: { previous_id: 12, new_name: 'Пётр' },
+        created_at: '2026-08-14T13:00:00Z',
+      },
+    ];
+    expect(timelineRows([], events)[0].text).toBe('HR: #12 → Пётр.');
+  });
+
   it('незнакомый род события не молчит', () => {
     // Роды заводит бэкенд, и новый приедет раньше, чем окно про него узнает:
     // пустая строка в ленте выглядела бы поломкой.
     const events = [{ id: 2, kind: 'спам', payload: {}, created_at: '2026-08-14T13:00:00Z' }];
     expect(timelineRows([], events)[0].text).toContain('спам');
+  });
+});
+
+describe('формат работы в чипе', () => {
+  it('назван по-русски, а не кодом моста', () => {
+    // Код едет с моста и на мост; человеку он ничего не говорит, а чип с
+    // надписью `remote` читается как недоделанная страница.
+    expect(remoteLabel('remote')).toBe('Удалёнка');
+    expect(remoteLabel('office')).toBe('Офис');
+  });
+
+  it('незнакомый формат едет как есть, а не теряется', () => {
+    // Форматы заводит бэкенд, и новый приедет раньше, чем окно про него
+    // узнает: пустой чип человек читает как поломку.
+    expect(remoteLabel('remote_first')).toBe('remote_first');
   });
 });
 

@@ -13,14 +13,13 @@ const HIDDEN = new Set(['applied_sent']);
 // (`backend/flows/apply.py`), и это единственное место, где человек узнаёт,
 // почему отклик не ушёл сам.
 const SEND_FAILS = {
-  no_vacancy: 'вакансия уже удалена',
   profile_empty: 'профиль пуст',
   cover_letter_failed: 'письмо не прошло проверку',
-  cv_missing: 'файл резюме не найден',
+  cv_missing: 'CV-файл не найден',
   race: 'статус успел измениться',
   blocked: 'отправка заблокирована',
-  telegram_error: 'Telegram отказался принять сообщение',
-  flood_wait: 'Telegram попросил подождать',
+  telegram_error: 'Telegram отказался',
+  flood_wait: 'Telegram держит FloodWait',
 };
 
 // Приставки причин пропуска: чем начинается ответ бэкенда и каким словом это
@@ -60,22 +59,34 @@ function skipNote(raw) {
   return ended(known.word + text.slice(known.starts.length));
 }
 
-function linkNote(what, payload) {
-  return `${what}: ${payload.previous_name || '—'} → ${payload.new_name || '—'}.`;
+// Сторона привязки: имя, номер или слова о пустоте. Имена запекаются в
+// событие, но у давних записей их нет — по номеру привязку хотя бы найдут.
+function linkSide(name, id, blank) {
+  if (name) return name;
+  return id === null || id === undefined ? blank : `#${id}`;
+}
+
+function linkNote(what, payload, blank) {
+  const was = linkSide(payload.previous_name, payload.previous_id, blank);
+  const now = linkSide(payload.new_name, payload.new_id, blank);
+  return `${what}: ${was} → ${now}.`;
 }
 
 // Чем подписано событие. Незнакомый род называется сам собой: роды заводит
 // бэкенд, и новый приедет раньше, чем окно про него узнает, — пустая строка в
 // ленте выглядела бы поломкой.
 function eventText(kind, payload) {
-  if (kind === 'ingested') return `Поступила из канала @${payload.channel}.`;
+  if (kind === 'ingested') {
+    const channel = payload.channel ? `@${payload.channel}` : 'неизвестного канала';
+    return `Поступила из канала ${channel}.`;
+  }
   if (kind === 'parsed') return skipNote(payload.skip_reason) || 'Без замечаний.';
   if (kind === 'auto_send') {
     return `Авто-отправка: ${SEND_FAILS[payload.reason] || payload.reason}.`;
   }
-  if (kind === 'linked_hr') return linkNote('HR', payload);
-  if (kind === 'linked_company') return linkNote('Компания', payload);
-  return `Событие: ${kind}.`;
+  if (kind === 'linked_hr') return linkNote('HR', payload, 'не привязан');
+  if (kind === 'linked_company') return linkNote('Компания', payload, 'не привязана');
+  return kind;
 }
 
 function moment(iso) {
@@ -93,8 +104,11 @@ function historyRow(one) {
     // Цветная точка значит «статус стал таким»: у записи, где статус не
     // менялся, она соврала бы о переходе, которого не было.
     status: one.applied ? one.status : '',
-    label: 'Статус:',
-    text: editable ? one.explanation || '' : ended(one.explanation || 'Без комментария'),
+    // Подпись — имя статуса: каким он стал, и есть содержание строки. Общее
+    // слово оставило бы эту сведению только в цвете точки, а цветов
+    // одиннадцать и на глаз они не различаются.
+    label: `${one.status}:`,
+    text: editable ? one.explanation || '' : ended(one.explanation || ''),
     when: one.changed_at,
     at: moment(one.changed_at),
     historyId: one.id,
@@ -108,7 +122,7 @@ function eventRow(one) {
     key: `e${one.id}`,
     kind: one.kind,
     status: one.kind === 'parsed' ? payload.status || '' : '',
-    label: one.kind === 'parsed' ? 'Статус:' : '',
+    label: one.kind === 'parsed' && payload.status ? `${payload.status}:` : '',
     text: eventText(one.kind, payload),
     when: one.created_at,
     at: moment(one.created_at),
