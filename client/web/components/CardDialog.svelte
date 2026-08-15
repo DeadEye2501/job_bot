@@ -7,8 +7,12 @@
   //
   // Отказ не запирает окно: человеку нужно хотя бы выйти из него, а плашку
   // беды он уже увидел.
+  import ModalKeys from './ModalKeys.svelte';
+
   let { trouble, ready, onclose, children } = $props();
 </script>
+
+<ModalKeys close={onclose} />
 
 <div class="modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && onclose()}>
   <div class="modal-dialog card-dialog" role="dialog" aria-modal="true">

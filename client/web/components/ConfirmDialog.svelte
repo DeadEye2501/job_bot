@@ -1,7 +1,11 @@
 <script>
   // Спросить человека, прежде чем делать необратимое.
+  import ModalKeys from './ModalKeys.svelte';
+
   let { message, confirmLabel, onconfirm, oncancel } = $props();
 </script>
+
+<ModalKeys close={oncancel} confirm={onconfirm} />
 
 <div
   class="modal-backdrop"

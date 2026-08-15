@@ -24,6 +24,15 @@
   font-size: 0.83rem;
 }
 
+/* Значок в кнопке мельче подписи и приподнят — только здесь: кнопки настроек
+   единственные, у кого он есть рядом со словом. В остальном окне значок
+   наследует размер строки, в которой стоит. */
+.settings-page .btn .material-symbols-outlined {
+  font-size: 14px;
+  position: relative;
+  top: 1px;
+}
+
 .settings-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

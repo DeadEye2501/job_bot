@@ -4,6 +4,14 @@
 
 const NO_TOTAL = '…';
 const NO_MESSAGES = '—';
+const RERUN = 'Прогон вакансии…';
+
+/** Подпись начатого обхода, о котором ещё ничего не известно.
+ *
+ * Первая весть о ходе приходит не сразу: до неё полосы уже бегут, и подпись под
+ * ними обязана сказать, чем именно бот занят.
+ */
+export const STARTING = 'Запуск…';
 
 /** Подпись под полосами: где сейчас обход по каналам и по сообщениям.
  *
@@ -37,9 +45,20 @@ export function bar(current, total) {
   };
 }
 
+/** Чем подписан прогон одной вакансии.
+ *
+ * Счёта у него нет вовсе — полосы бегут пустыми, — и стадия своё имя говорит
+ * сама. Не назвала: подпись всё равно обязана сказать, что бот занят, иначе
+ * бегущие полосы объясняются одним лишь «что-то происходит».
+ */
+export function rerunNote(label) {
+  return label || RERUN;
+}
+
 function channelPart({ label, current, total }) {
+  if (label) return `${label} (${Math.max(0, current)}/${Math.max(0, total)})`;
   if (!total || total <= 0) return NO_TOTAL;
-  return `${label || 'Каналы'} (${Math.max(0, current)}/${total})`;
+  return `Каналы (${Math.max(0, current)}/${total})`;
 }
 
 function messagePart({ current, total }) {

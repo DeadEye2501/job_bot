@@ -10,7 +10,28 @@ import {
   named,
   personLine,
   personName,
+  unreadLine,
 } from '../state/contacts.js';
+
+describe('строка непрочитанной переписки', () => {
+  it('человека с именем и ником называют именем, а ник ставят под ним', () => {
+    // Список открывают, чтобы ответить, — и отвечают человеку, а не нику.
+    expect(unreadLine({ hr_id: 7, name: 'Анна', telegram_username: 'anna' }))
+      .toEqual({ name: 'Анна', sub: '@anna' });
+  });
+
+  it('без имени человека называют ником, и второй строки не заводят', () => {
+    // Ник, повторённый под самим собой, занимает место и ничего не добавляет.
+    expect(unreadLine({ hr_id: 7, name: '', telegram_username: 'anna' }))
+      .toEqual({ name: '@anna', sub: '' });
+  });
+
+  it('без имени и без ника остаётся номер', () => {
+    // Строка должна остаться нажимаемой: за ней переписка, которую ждут.
+    expect(unreadLine({ hr_id: 7, name: null, telegram_username: null }))
+      .toEqual({ name: 'HR #7', sub: '' });
+  });
+});
 
 describe('имя канала в списке', () => {
   it('название показывают, а ник — под ним', () => {

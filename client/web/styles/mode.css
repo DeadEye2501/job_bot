@@ -10,6 +10,7 @@
    каждой смене Off ↔ DM Only ↔ Full. */
 .mode-text {
   font-size: 0.72rem;
+  color: var(--text-secondary);
   min-width: 56px;
   text-align: right;
   transition: color 0.15s;

@@ -1,5 +1,7 @@
 <script>
   // Вход в Telegram: код из приложения, а следом облачный пароль, если он есть.
+  import ModalKeys from './ModalKeys.svelte';
+
   let { step, phone, busy, error, onsubmit, oncancel } = $props();
 
   let value = $state('');
@@ -21,6 +23,8 @@
   );
 </script>
 
+<ModalKeys close={oncancel} confirm={() => !busy && onsubmit(value)} />
+
 <div class="modal-backdrop" role="presentation">
   <div class="modal-dialog" role="dialog" aria-modal="true">
     <div class="modal-title">
@@ -35,7 +39,6 @@
       type={asking.secret ? 'password' : 'text'}
       placeholder={asking.placeholder}
       bind:value
-      onkeydown={(event) => event.key === 'Enter' && !busy && onsubmit(value)}
     />
 
     {#if error}

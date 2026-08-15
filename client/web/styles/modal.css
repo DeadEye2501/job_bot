@@ -30,29 +30,28 @@
   font-size: 0.88rem;
   line-height: 1.4;
   /* Переносы строк в вопросе значимы: ими отделяют само действие от того, чего
-     оно не трогает. */
+     оно не трогает. Десять окон набраны в два абзаца именно так. */
   white-space: pre-line;
 }
 
 .modal-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  gap: 8px;
+  font-size: 0.85rem;
   color: var(--text-primary);
   font-weight: 500;
 }
 
 .modal-title .material-symbols-outlined {
-  font-size: 16px;
+  font-size: 18px;
   color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 .modal-subtitle {
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   line-height: 1.4;
 }
 

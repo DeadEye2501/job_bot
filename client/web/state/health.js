@@ -46,7 +46,7 @@ export function blockedTip(health) {
   if (!health) return WAITING;
   const down = downNames(health);
   if (down.length === 0) return '';
-  return `Бот заблокирован: для запуска все системы должны быть доступны. Сейчас недоступно: ${down.join(', ')}`;
+  return `Бот заблокирован: для запуска все системы должны быть доступны. Сейчас недоступно: ${down.join(', ')}.`;
 }
 
 /** Пора ли гасить бота: что-то отвалилось, а он ещё работает.

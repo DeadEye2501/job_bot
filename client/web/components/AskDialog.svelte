@@ -3,8 +3,15 @@
   //
   // Общая рама для спрашивающих окон — заведение канала, заведение строки
   // отсева. Своё у каждого только то, что внутри.
+  import ModalKeys from './ModalKeys.svelte';
+
   let { icon, title, subtitle = '', confirmLabel, onconfirm, oncancel, children } = $props();
 </script>
+
+<!-- Окно берёт на себя Escape, но не Enter: заведение спрашивает поля, и Enter
+     в них уже нажимает «Создать» своим обработчиком. Возьми его ещё и окно —
+     на одно нажатие ушло бы два зова моста и завелись бы две записи. -->
+<ModalKeys close={oncancel} />
 
 <div
   class="modal-backdrop"

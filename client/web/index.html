@@ -4,6 +4,15 @@
     <meta charset="utf-8" />
     <!-- Ни `viewport`, ни `theme-color`: страница живёт в своём окне заданного
          размера, телефона у неё не бывает, а рамку рисует система. -->
+    <!-- Страницу раздаёт свой сервер окна, и наружу она не ходит вовсе.
+         Источники ограничены заранее: первая же попытка подтянуть аватар со
+         стороны иначе открыла бы дорогу и всему остальному. `data:` разрешён
+         картинкам — аватары приходят с моста именно так. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'"
+    />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <title>Job Bot</title>
   </head>
   <body>

@@ -13,7 +13,7 @@
 
   import PersonCard from './PersonCard.svelte';
 
-  let { ask, say, events } = $props();
+  let { ask, say, events, openPerson, onopened } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -25,6 +25,15 @@
 
   const tries = attempts();
   let alive = true;
+
+  // Кого открыть, придя со стороны — из списка непрочитанного над полосой.
+  // Отметка гасится сразу: вкладку открывают и просто так, и заново открытая
+  // карточка человека, которого уже закрыли, читалась бы как поломка.
+  $effect(() => {
+    if (!openPerson) return;
+    opened = openPerson.id;
+    onopened();
+  });
 
   /** Перечитать список с начала.
    *

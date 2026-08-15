@@ -12,7 +12,7 @@
   const filled = (one) => (one.unknown ? '' : `width: ${one.percent}%`);
 </script>
 
-<div class="progress-wrap">
+<div class="progress-wrap" title="Бот сейчас обрабатывает каналы">
   <div class="progress-bars">
     <div class="progress-bar" data-indeterminate={messages.unknown}>
       <div class="progress-fill" style={filled(messages)}></div>
