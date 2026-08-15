@@ -5,11 +5,12 @@
   // бот без учётной записи и без модели не сделает ничего, а разбираться,
   // почему он молчит, человеку пришлось бы по журналу.
   //
-  // Пройденное считает мост по самим настройкам, а не по тому, куда человек
-  // нажимал: закрытое посреди установки окно иначе теряло бы весь ход.
+  // Пройденное считается по этому проходу, а не по записанным настройкам: шаг,
+  // заполненный когда-то раньше — сидом или прошлым заходом, — человек в этот
+  // раз не проходил, и отметка о нём говорила бы про чужую работу.
   import WizardFoot from '$components/WizardFoot.svelte';
   import WizardSteps from '$components/WizardSteps.svelte';
-  import { backScreen, nextScreen, stepMarks } from '$state/wizard.js';
+  import { backScreen, nextScreen, stepAt, stepMarks } from '$state/wizard.js';
 
   import WizardCv from './WizardCv.svelte';
   import WizardLlm from './WizardLlm.svelte';
@@ -18,28 +19,18 @@
   let { ask, say, ondone } = $props();
 
   let screen = $state('welcome');
-  let completed = $state([]);
+  let passed = $state([]);
   let finishing = $state(false);
 
   let alive = true;
 
-  const marks = $derived(stepMarks(completed, screen));
+  const marks = $derived(stepMarks(passed, screen));
   const back = $derived(backScreen(screen));
 
-  async function refresh() {
-    const now = await ask('wizard.state');
-    if (now === null || !alive) return;
-    completed = now.completed;
-  }
-
-  /** Шаг сделан: перечитать пройденное и уйти дальше.
-   *
-   * Отметки перечитываются с моста, а не проставляются здесь: он смотрит в
-   * записанные настройки и потому не соврёт про шаг, где запись не удалась.
-   */
-  async function ahead() {
-    await refresh();
-    if (alive) screen = nextScreen(screen);
+  /** Шаг сделан: отметить его пройденным и уйти дальше. */
+  function ahead() {
+    passed = [...passed, stepAt(screen)];
+    screen = nextScreen(screen);
   }
 
   /** Последний шаг: отметить настройку законченной.
@@ -52,17 +43,26 @@
     // нажатие подняло бы второго на той же строке сеанса Telegram.
     if (finishing) return;
     finishing = true;
-    await refresh();
     const done = await ask('wizard.complete');
     if (!alive) return;
     finishing = false;
     if (done === null) return;
+    passed = [...passed, stepAt(screen)];
     screen = 'done';
+  }
+
+  /** Уйти в приложение с последнего экрана.
+   *
+   * Окно растёт первым и растит его мост: разметка приложения нарисована шире
+   * мастера, и смени оболочка экран раньше — человек увидел бы её сплющенной.
+   */
+  async function openApp() {
+    await ask('wizard.enter_main_app');
+    if (alive) ondone();
   }
 
   $effect(() => {
     alive = true;
-    refresh();
     return () => {
       alive = false;
     };
@@ -145,6 +145,6 @@
         сообщения.
       </p>
     </div>
-    <WizardFoot nextLabel="Открыть Job Bot" nextIcon="arrow_forward" onnext={ondone} />
+    <WizardFoot nextLabel="Открыть Job Bot" nextIcon="arrow_forward" onnext={openApp} />
   {/if}
 </div>

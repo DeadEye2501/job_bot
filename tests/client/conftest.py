@@ -16,6 +16,7 @@ import pytest
 
 from backend.log_buffer import get_handler
 from backend.runtime_settings import RuntimeSettings
+from client import window_size
 from client.bridge import Api, lifespan
 from tests.fakes.ui_bot import UiBot
 
@@ -133,6 +134,41 @@ def with_bot(hub):
         return bot
 
     return _put
+
+
+class WindowThatGrows:
+    """Окно, которое никуда не едет и всё запоминает.
+
+    Спрашивают его двое — сам рост (`window_size.grow_to_main`) и конец
+    мастера, который этот рост зовёт.
+    """
+
+    def __init__(self) -> None:
+        self.x = 400
+        self.y = 300
+        self.native = object()
+        self.done: list[tuple] = []
+
+    def move(self, x: int, y: int) -> None:
+        self.done.append(("переехало", x, y))
+
+    def resize(self, width: int, height: int) -> None:
+        self.done.append(("выросло", width, height))
+
+
+@pytest.fixture
+def growing_window(monkeypatch) -> WindowThatGrows:
+    """Окно с подменённой рамой: её отпускание только отмечается.
+
+    Настоящее отпускание лезет в форму WinForms, а той нужен рабочий стол.
+    """
+    fake = WindowThatGrows()
+    monkeypatch.setattr(
+        window_size,
+        "_unlock_frame",
+        lambda form: fake.done.append(("рама отпущена",)),
+    )
+    return fake
 
 
 class WindowThatPicks:

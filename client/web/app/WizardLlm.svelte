@@ -11,6 +11,7 @@
   // недописанный адрес значил бы работающего бота без модели.
   import { call } from '$api/bridge.js';
   import { mirrored, sameCreds } from '$state/settings.js';
+  import SuggestInput from '$components/SuggestInput.svelte';
   import WizardFoot from '$components/WizardFoot.svelte';
   import { PRESETS, llmTrouble, presetFor } from '$state/wizard.js';
 
@@ -57,15 +58,26 @@
     return listModels();
   }
 
-  /** Спросить у поставщика имена его моделей. Ничего — это отказ моста. */
+  /** Спросить у поставщика имена его моделей.
+   *
+   * Молча: перечень — подсказка к полю, а не действие человека. Спрашивается он
+   * на каждую правку адреса и ключа, и непóднятый поставщик отвечает отказом на
+   * каждый знак — плашка беды выскакивала бы поверх набора. Не ответил — список
+   * пуст, имя модели вписывают руками.
+   */
   async function listModels() {
-    const answer = await ask('settings.list_models', {
-      kind,
-      base_url: creds.base_url,
-      api_key: creds.api_key,
-    });
-    if (answer === null || !alive) return null;
-    models = answer.models || [];
+    let answer = null;
+    try {
+      answer = await call('settings.list_models', {
+        kind,
+        base_url: creds.base_url,
+        api_key: creds.api_key,
+      });
+    } catch {
+      answer = null;
+    }
+    if (!alive) return null;
+    models = answer?.models || [];
     return models;
   }
 
@@ -275,20 +287,14 @@
       </div>
     {/if}
 
-    <input
-      class="input mono"
-      list="{kind}-model-presets"
-      autocomplete="off"
-      maxlength="128"
-      placeholder={namePlaceholder}
+    <SuggestInput
       value={creds.model}
-      onblur={(event) => edit({ model: event.currentTarget.value.trim() })}
+      options={models}
+      placeholder={namePlaceholder}
+      mono
+      maxlength={128}
+      onsave={(model) => edit({ model })}
     />
-    <datalist id="{kind}-model-presets">
-      {#each models as one (one)}
-        <option value={one}></option>
-      {/each}
-    </datalist>
 
     <div class="help">
       После «Проверить» список заменится теми моделями, которые реально доступны у провайдера.

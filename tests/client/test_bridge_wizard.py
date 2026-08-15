@@ -129,7 +129,7 @@ async def test_skipping_the_resume_forgets_the_chosen_file(api, ask, tmp_path):
 
 
 async def test_the_setup_is_marked_done_only_when_it_is_completed(
-    api, ask, session_factory
+    api, ask, session_factory, hub, growing_window
 ):
     """Установка помечается завершённой ровно тогда, когда её завершают.
 
@@ -137,6 +137,7 @@ async def test_the_setup_is_marked_done_only_when_it_is_completed(
     брошенная посреди установка открылась бы в ненастроенном приложении; не
     поставь вовсе — мастер открывался бы каждый раз заново поверх настроенного.
     """
+    hub.window = growing_window
     assert (await ask(api.wizard.state))["ok"]["wizard_completed"] is False
 
     answer = await ask(api.wizard.complete)
@@ -145,7 +146,38 @@ async def test_the_setup_is_marked_done_only_when_it_is_completed(
     assert (await RuntimeSettings.load(session_factory)).wizard_completed is True
 
 
-async def test_a_finished_setup_does_not_wake_a_bot_it_cannot_build(api, ask, hub):
+async def test_the_end_of_the_setup_leaves_the_window_alone(api, ask, hub, growing_window):
+    """Конец установки окна не трогает.
+
+    После него человек читает последний экран мастера — что сделать дальше, —
+    и читает он его в окне мастера. Вырасти окно здесь, страница раздалась бы
+    под ним прямо на глазах, до того как он дочитал.
+    """
+    hub.window = growing_window
+
+    await ask(api.wizard.complete)
+
+    assert growing_window.done == []
+
+
+async def test_the_window_grows_when_the_app_is_opened(api, ask, hub, growing_window):
+    """Окно растёт по переходу в приложение, а не раньше.
+
+    Окно открывалось под мастера — меньшим и нерастягиваемым. Не вырасти оно
+    здесь, человек увидел бы приложение в окне мастера и не смог бы даже
+    потянуть за край: разметка сплющена, а растить нечем — до следующего
+    запуска.
+    """
+    hub.window = growing_window
+
+    await ask(api.wizard.enter_main_app)
+
+    assert ("выросло", 900, 660) in growing_window.done
+
+
+async def test_a_finished_setup_does_not_wake_a_bot_it_cannot_build(
+    api, ask, hub, growing_window
+):
     """Конец мастера на недонастроенном приложении бота не поднимает.
 
     Мастер доходит до конца и с пропущенными шагами — их пропускают, чтобы
@@ -156,6 +188,8 @@ async def test_a_finished_setup_does_not_wake_a_bot_it_cannot_build(api, ask, hu
     Красной фазы не было: сторож дописан вместе с заслоном, найденным ревью, и
     доверие заслужит итоговым проходом.
     """
+    hub.window = growing_window
+
     await ask(api.wizard.complete)
 
     assert hub.bot is None

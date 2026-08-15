@@ -1,9 +1,9 @@
 <script>
   // Место работы: свёрнутая шапка и всё остальное под ней.
-  import { asIso, showDate } from '$state/dates.js';
   import { cardTitle } from '$state/experience.js';
 
   import BulletList from './BulletList.svelte';
+  import DatePicker from './DatePicker.svelte';
   import SkillPicker from './SkillPicker.svelte';
 
   let { exp, known, open, ontoggle, onedit, onremove } = $props();
@@ -22,13 +22,13 @@
     if (on) onedit({ end_date: null });
   }
 
-  /** Принять набранную дату.
+  /** Принять выбранную дату.
    *
-   * Недобранное не отправляем и поле не трогаем: человек продолжает набирать.
+   * Стёртое поле уходит пустотой, а не пустой строкой: `null` мост понимает как
+   * «даты нет», и им же стирает дату окончания галочка «по настоящее время».
    */
-  function pickDate(key, text) {
-    const iso = asIso(text);
-    if (iso !== null || text.trim() === '') onedit({ [key]: iso });
+  function pickDate(key, iso) {
+    onedit({ [key]: iso || null });
   }
 
   function editItem(field, index, text) {
@@ -46,7 +46,7 @@
     onclick={() => ontoggle()}
     onkeydown={(event) => event.key === 'Enter' && ontoggle()}
   >
-    <span class="material-symbols-outlined">expand_more</span>
+    <span class="material-symbols-outlined collapse-arrow">expand_more</span>
     <div class="exp-summary">
       <strong>{title.company}</strong>
       {#if title.role}· <span class="role">{title.role}</span>{/if}
@@ -91,21 +91,12 @@
         />
 
         <div class="date-pair span-2">
-          <input
-            class="input-date"
-            maxlength="10"
-            placeholder="дд.мм.гггг"
-            value={showDate(exp.start_date)}
-            onblur={(event) => pickDate('start_date', event.currentTarget.value)}
-          />
+          <DatePicker value={exp.start_date} onpick={(iso) => pickDate('start_date', iso)} />
           <span class="date-dash">—</span>
-          <input
-            class="input-date"
-            maxlength="10"
-            placeholder="дд.мм.гггг"
-            value={showDate(exp.end_date)}
+          <DatePicker
+            value={exp.end_date}
             disabled={current}
-            onblur={(event) => pickDate('end_date', event.currentTarget.value)}
+            onpick={(iso) => pickDate('end_date', iso)}
           />
           <label class="date-current">
             <input

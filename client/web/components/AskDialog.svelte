@@ -5,7 +5,11 @@
   // отсева. Своё у каждого только то, что внутри.
   import ModalKeys from './ModalKeys.svelte';
 
-  let { icon, title, subtitle = '', confirmLabel, onconfirm, oncancel, children } = $props();
+  // `ready` — набрано ли то, без чего заводить нечего. Пока не набрано, кнопка
+  // заперта: нажавший её иначе получает плашку отказа вместо карточки, и чего
+  // не хватило — узнаёт уже из неё.
+  let { icon, title, subtitle = '', confirmLabel, ready, onconfirm, oncancel, children } =
+    $props();
 </script>
 
 <!-- Окно берёт на себя Escape, но не Enter: в нём набирают заметки в несколько
@@ -32,7 +36,9 @@
 
     <div class="modal-actions">
       <button class="btn" type="button" onclick={() => oncancel()}>Отмена</button>
-      <button class="btn primary" type="button" onclick={() => onconfirm()}>{confirmLabel}</button>
+      <button class="btn primary" type="button" disabled={!ready} onclick={() => onconfirm()}>
+        {confirmLabel}
+      </button>
     </div>
   </div>
 </div>

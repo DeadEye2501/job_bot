@@ -20,6 +20,10 @@
   let search = $state('');
   let adding = $state(false);
   let draft = $state({ name: '', website: '', aliases: '', notes: '' });
+
+  // Без названия заводить нечего: мост такую компанию всё равно отобьёт, а
+  // человек прочитает отказ вместо заведённой карточки.
+  const ready = $derived(Boolean(draft.name.trim()));
   let opened = $state(null);
   let loadingMore = $state(false);
 
@@ -86,7 +90,7 @@
 
   async function create() {
     const name = draft.name.trim();
-    if (!name) return;
+    if (!ready) return;
     const done = await ask('companies.create', { ...draft, name });
     // Окно закрываем только по удаче: чаще всего отказ — это занятое имя, и
     // набранное человеку ещё пригодится.
@@ -182,6 +186,7 @@
     title="Новая компания"
     subtitle="Название обязательно, остальное можно дописать потом."
     confirmLabel="Создать"
+    {ready}
     onconfirm={create}
     oncancel={() => (adding = false)}
   >

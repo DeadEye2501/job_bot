@@ -45,7 +45,6 @@
   // весть есть, и она приходит на каждое сохранённое письмо.
   const HEALTH_EVERY_MS = 5000;
 
-  const MODE_TITLE = 'Режим работы — клик переключает';
   const RUN_TITLE = 'Прогнать цикл прямо сейчас';
   const STOP_TITLE = 'Остановить цикл';
 
@@ -402,12 +401,9 @@
     </div>
 
     <div class="bb-right">
-      <ModeToggle
-        {mode}
-        disabled={locked}
-        title={locked ? lockedTip : MODE_TITLE}
-        onpick={pickMode}
-      />
+      <!-- Подсказка только у запертого переключателя: у отпертого рядом стоит
+           сам режим словом, и объяснять, что по нему нажимают, нечего. -->
+      <ModeToggle {mode} disabled={locked} title={locked ? lockedTip : null} onpick={pickMode} />
       <RunButton
         {running}
         disabled={locked}

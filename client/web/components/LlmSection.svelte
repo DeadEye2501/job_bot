@@ -6,6 +6,7 @@
   // же, куда чат», и при нём адрес с ключом не показываются вовсе.
   import SecretInput from './SecretInput.svelte';
   import SettingsSection from './SettingsSection.svelte';
+  import SuggestInput from './SuggestInput.svelte';
 
   let { title, icon, creds, models, pill, busy, sameAsChat, onsave, onprobe, onsame, onedit } =
     $props();
@@ -15,6 +16,18 @@
   const placeholder = $derived(
     models.length ? 'Модель (выберите из списка или введите свою)' : 'Название модели',
   );
+
+  /** Имя модели пришло из подсказки под полем.
+   *
+   * Плашка проверки гасится здесь своими руками: остальные поля гасят её
+   * событием ввода, всплывающим до `.llm-fields`, а выбор из панели такого
+   * события не рождает — и плашка осталась бы говорить «отвечает» про модель,
+   * которой в поле уже нет.
+   */
+  function keepModel(model) {
+    onedit();
+    return onsave({ model });
+  }
 </script>
 
 {#snippet urlField(hint)}
@@ -37,19 +50,14 @@
 {/snippet}
 
 {#snippet modelField()}
-  <input
-    class="input span-2"
-    list="{icon}-models"
-    autocomplete="off"
-    value={creds.model}
-    {placeholder}
-    onblur={(event) => onsave({ model: event.currentTarget.value.trim() })}
-  />
-  <datalist id="{icon}-models">
-    {#each models as one (one)}
-      <option value={one}></option>
-    {/each}
-  </datalist>
+  <div class="span-2">
+    <SuggestInput
+      value={creds.model}
+      options={models}
+      {placeholder}
+      onsave={keepModel}
+    />
+  </div>
 {/snippet}
 
 {#snippet probeButton()}

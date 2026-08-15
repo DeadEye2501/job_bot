@@ -9,6 +9,7 @@ import {
   BOUNDS,
   clampField,
   credsChanged,
+  matchingModels,
   mirrored,
   nextStep,
   probePill,
@@ -198,6 +199,29 @@ describe('шаги входа в Telegram', () => {
 
   it('вход завершён', () => {
     expect(nextStep({ done: true })).toBe('done');
+  });
+});
+
+describe('подсказка имён моделей', () => {
+  const found = ['qwen/qwen3-4b-2507', 'text-embedding-bge-m3', 'llama-3.3-70b'];
+
+  it('поле пусто — виден весь перечень поставщика', () => {
+    // Открывший подсказку ещё ничего не набрал, и сузить перечень не по чему:
+    // пустой отбор показал бы пустую панель на живом поставщике.
+    expect(matchingModels(found, '')).toEqual(found);
+  });
+
+  it('набранное сужает перечень и регистра не различает', () => {
+    // Имена моделей набирают с середины («bge», «llama»), а не с начала: у
+    // локальных они идут с приставкой поставщика через косую черту.
+    expect(matchingModels(found, 'QWEN')).toEqual(['qwen/qwen3-4b-2507']);
+    expect(matchingModels(found, 'bge')).toEqual(['text-embedding-bge-m3']);
+  });
+
+  it('совпавших нет — перечень пуст', () => {
+    // Пустая панель здесь и есть ответ: набранного имени у поставщика нет, и
+    // подсказывать нечего.
+    expect(matchingModels(found, 'gpt-4')).toEqual([]);
   });
 });
 

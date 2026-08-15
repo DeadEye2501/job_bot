@@ -9,7 +9,12 @@
   import { WEEKDAYS, monthGrid, monthTitle, shiftMonth } from '$state/calendar.js';
   import { asIso, dayOf, isoDay, showDate, validDate } from '$state/dates.js';
 
-  let { value, onpick } = $props();
+  // `disabled` — для даты окончания у места работы, где отмечено «по настоящее
+  // время»: набирать там нечего, и календарь не открывается вместе с полем.
+  //
+  // `up` — раскрыть сетку вверх. Просит тот, под чьим полем места нет; по
+  // умолчанию она раскрывается вниз, как её и ищут взглядом.
+  let { value, onpick, disabled, up } = $props();
 
   const now = new Date();
   const today = isoDay(now.getFullYear(), now.getMonth() + 1, now.getDate());
@@ -79,14 +84,13 @@
     placeholder="дд.мм.гггг"
     maxlength="10"
     value={text}
+    {disabled}
     oninput={(event) => typed(event.currentTarget.value)}
     onfocus={() => (open = true)}
   />
 
   {#if open}
-    <!-- Календарь раскрывается вверх: поля периода стоят последней группой
-         панели, и вниз он ушёл бы под её нижнюю кромку. -->
-    <div class="date-panel">
+    <div class="date-panel" class:up>
       <div class="date-head">
         <button class="icon-btn" type="button" title="Прошлый месяц" onclick={() => step(-1)}>
           <span class="material-symbols-outlined">chevron_left</span>

@@ -6,6 +6,7 @@ from client.bridge.answer import reply
 from client.bridge.hub import Hub
 from client.bridge.lifespan import start_bot
 from client.bridge.wire import _llm_provider_to_dict, _tg_creds_to_dict
+from client.window_size import grow_to_main
 
 
 class Wizard:
@@ -90,6 +91,19 @@ class Wizard:
         if "ok" in answer:
             start_bot(self._hub)
         return answer
+
+    def enter_main_app(self) -> dict:
+        """Уйти из мастера в приложение: окно вырастает под его разметку.
+
+        Зовётся с последнего экрана, по нажатию «Открыть Job Bot», а не концом
+        установки: экран «Готово» человек дочитывает в окне мастера, и вырасти
+        оно раньше — страница раздалась бы у него на глазах.
+
+        Работы для мотора здесь нет: растит окно система, и ответ складывается
+        на месте.
+        """
+        grow_to_main(self._hub.window)
+        return {"ok": {}}
 
 
 def _steps_behind(rs) -> list[int]:

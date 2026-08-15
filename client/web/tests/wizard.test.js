@@ -4,8 +4,26 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  PRESETS, backScreen, cvModes, cvReady, llmTrouble, nextScreen, presetFor, stepMarks,
+  PRESETS, backScreen, cvModes, cvReady, llmTrouble, nextScreen, presetFor, stepAt, stepMarks,
 } from '../state/wizard.js';
+
+describe('номер шага у экрана', () => {
+  it('у рабочих экранов свой номер по порядку', () => {
+    // По нему мастер отмечает пройденное: экран, с которого ушли вперёд,
+    // становится отметкой в строке шагов.
+    expect(stepAt('telegram')).toBe(1);
+    expect(stepAt('chat')).toBe(2);
+    expect(stepAt('embed')).toBe(3);
+    expect(stepAt('cv')).toBe(4);
+  });
+
+  it('у обложек номера нет', () => {
+    // Приветствие и финал шагами не считаются: уйдя с приветствия, человек не
+    // прошёл ничего, и отмечать в строке нечего.
+    expect(stepAt('welcome')).toBe(null);
+    expect(stepAt('done')).toBe(null);
+  });
+});
 
 describe('ход мастера', () => {
   it('ведёт от приветствия к шагам и к финалу', () => {

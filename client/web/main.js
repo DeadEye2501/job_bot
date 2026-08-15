@@ -40,6 +40,7 @@ import './styles/choice-row.css';
 import './styles/lang-rows.css';
 import './styles/cv-file.css';
 import './styles/collapsible.css';
+import './styles/collapse-arrow.css';
 import './styles/toggle.css';
 import './styles/contacts-layout.css';
 import './styles/contacts.css';

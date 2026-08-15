@@ -221,8 +221,8 @@
         />
         {#if draft.datePreset === 'range'}
           <div class="filter-pair filter-dates">
-            <DatePicker value={draft.dateFrom} onpick={(iso) => (draft.dateFrom = iso)} />
-            <DatePicker value={draft.dateTo} onpick={(iso) => (draft.dateTo = iso)} />
+            <DatePicker value={draft.dateFrom} up onpick={(iso) => (draft.dateFrom = iso)} />
+            <DatePicker value={draft.dateTo} up onpick={(iso) => (draft.dateTo = iso)} />
           </div>
         {/if}
       </FilterGroup>

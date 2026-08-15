@@ -18,19 +18,6 @@
   min-width: 0;
 }
 
-/* Стрелка ложится набок у свёрнутой — так же, как в дереве файлов. Названа
-   местом, а не значком: значки в шапке есть и у других кнопок, и общий отбор
-   клал бы набок корзину вместе со стрелкой. Стрелка стоит в шапке первой. */
-.collapsible-head > :first-child {
-  color: var(--text-secondary);
-  font-size: 18px;
-  transition: transform 0.12s;
-}
-
-.collapsible.collapsed .collapsible-head > :first-child {
-  transform: rotate(-90deg);
-}
-
 /* Кнопка «добавить ещё одну» под списком коробок. */
 .add-more {
   margin-top: 6px;
