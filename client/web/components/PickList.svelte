@@ -8,24 +8,38 @@
   //
   // Имена приходят уже просеянными: искать умеет тот, кто знает, что это за
   // имена, а список только показывает переданное.
-  let { placeholder, names, chosen, search, onsearch, prefix = '', onpick } = $props();
+  let { placeholder, hint, empty, names, chosen, search, onsearch, prefix = '', onpick } = $props();
 
   let open = $state(false);
+  let root = $state(null);
+
+  $effect(() => {
+    if (!open) return;
+    // Нажатие мимо закрывает панель: она накрывает поля под собой, и уход
+    // мыши здесь не годится — в поле поиска набирают, не двигая её вовсе.
+    //
+    // «Мимо» считается по своему узлу, а не по классу: перечней в панели
+    // отбора два, и нажатие на соседний по классу читалось бы как нажатие в
+    // себя — оба остались бы открытыми, накрыв друг друга.
+    const away = (event) => {
+      if (!root.contains(event.target)) open = false;
+    };
+    document.addEventListener('click', away);
+    return () => document.removeEventListener('click', away);
+  });
 </script>
 
-<div class="pick">
+<div class="pick" bind:this={root}>
   <button class="pick-btn" type="button" onclick={() => (open = !open)}>
     <span>{chosen.size ? `Выбрано: ${chosen.size}` : placeholder}</span>
     <span class="material-symbols-outlined">{open ? 'expand_less' : 'expand_more'}</span>
   </button>
   {#if open}
-    <!-- Закрывается по уходу мыши, как и выпадающий список: панель накрывает
-         поля под собой, и открытой она мешала бы читать остальную панель. -->
-    <div class="pick-panel" role="group" tabindex="-1" onmouseleave={() => (open = false)}>
+    <div class="pick-panel">
       <input
         class="input"
         type="text"
-        placeholder="Поиск"
+        placeholder={hint}
         value={search}
         oninput={(event) => onsearch(event.currentTarget.value)}
       />
@@ -36,7 +50,7 @@
             {prefix}{name}
           </label>
         {/each}
-        {#if !names.length}<div class="empty-note">Ничего не найдено</div>{/if}
+        {#if !names.length}<div class="empty-note">{empty}</div>{/if}
       </div>
     </div>
   {/if}

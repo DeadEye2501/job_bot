@@ -8,20 +8,25 @@
   color: var(--accent);
 }
 
+/* Прижата к левому краю полосы, а не к кнопке: панель вдвое шире полосы, и от
+   кнопки у правого края она ушла бы за кромку списка. Слой выше меню порядка —
+   открытыми они не бывают разом, но панель перекрывает и его тень. */
 .filter-panel {
-  right: 0;
+  left: 8px;
+  z-index: 25;
   display: flex;
   flex-direction: column;
   width: 340px;
   max-height: 520px;
   overflow: hidden;
+  box-shadow: 0 8px 22px var(--scrim);
 }
 
 .filter-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-tertiary);
   font-size: 0.8rem;
@@ -43,12 +48,56 @@
   font-size: 0.72rem;
 }
 
+/* Крестик мельче прочих кнопок-значков окна: он стоит в одной строке с
+   подписью 0.8rem, и коробка в 26 пикселей разгоняла бы шапку по высоте. */
+.filter-close {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--text-tertiary);
+}
+
+.filter-close:hover {
+  background: var(--surface-hover-firm);
+  color: var(--text-primary);
+}
+
+.filter-close .material-symbols-outlined {
+  font-size: 15px;
+}
+
 /* Прокручивается тело, а не панель целиком: шапка со счётом условий и подвал с
    «Применить» нужны на любой глубине списка групп. */
 .filter-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* Поля панели мельче общих: групп девять, и на полях обычного роста панель не
+   уложилась бы в свои 520 пикселей. Одно правило на вилки и на поиск внутри
+   перечней — поле там одно и то же. */
+.filter-panel .input {
+  padding: 4px 6px;
+  background: var(--bg-tertiary);
+  font-size: 0.76rem;
+}
+
+/* Точка статуса в чипе мельче, чем в списке и в кольце: чип ростом с подпись
+   0.72rem, и точка в восемь пикселей выпирает за его строку. */
+.filter-body .status-dot {
+  width: 7px;
+  height: 7px;
+}
+
+/* Наведения на чипе отбора нет: их одиннадцать в два этажа, и подсветка под
+   мышью читается как ещё один выбранный. */
+.filter-body .choice:hover {
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .filter-pair {
@@ -60,6 +109,13 @@
   margin-top: 6px;
 }
 
+/* Календарь второго поля прижат к правому краю: два календаря в ряд шире
+   панели, и открытый влево он ушёл бы под её кромку. */
+.filter-dates .date-picker:last-child .date-panel {
+  left: auto;
+  right: 0;
+}
+
 .filter-foot {
   display: flex;
   align-items: center;
@@ -68,6 +124,19 @@
   padding: 8px 10px;
   border-top: 1px solid var(--border);
   background: var(--bg-tertiary);
+}
+
+.filter-foot .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+}
+
+.filter-foot .btn .material-symbols-outlined {
+  font-size: 14px;
+  line-height: 1;
 }
 
 .filter-foot-right {

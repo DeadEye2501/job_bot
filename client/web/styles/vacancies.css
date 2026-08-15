@@ -29,6 +29,21 @@
   position: relative;
 }
 
+/* Кнопки полосы: значок мельче общего и без заливки под мышью. Полоса стоит на
+   том же `--bg-tertiary`, которым заливается наведение, — залитая кнопка на ней
+   не отличалась бы от незалитой, и цвет значка остаётся единственным откликом. */
+.vac-list-toolbar .icon-btn {
+  flex-shrink: 0;
+}
+
+.vac-list-toolbar .icon-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.vac-list-toolbar .icon-btn:hover {
+  background: transparent;
+}
+
 /* Меню порядка падает из полосы и прижато к её правому краю — под кнопку, из
    которой открылось. */
 .vac-sort-menu {

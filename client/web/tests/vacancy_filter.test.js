@@ -24,7 +24,7 @@ describe('пустой отбор', () => {
   });
 
   it('насчитывает ноль условий', () => {
-    expect(activeCount(blankFilter(), NOW)).toBe(0);
+    expect(activeCount(blankFilter())).toBe(0);
   });
 });
 
@@ -39,7 +39,7 @@ describe('статусы', () => {
 
   it('выбор нескольких — одно условие, а не по одному на статус', () => {
     const filter = { ...blankFilter(), statuses: new Set(['New', 'Applied', 'Offer']) };
-    expect(activeCount(filter, NOW)).toBe(1);
+    expect(activeCount(filter)).toBe(1);
   });
 
   it('каждый статус перечня уезжает кодом, годным для моста', () => {
@@ -63,7 +63,7 @@ describe('вариант «Все»', () => {
       hrContact: HR_CHOICES[0].value,
     };
     expect(filterPayload(filter, NOW)).toEqual({});
-    expect(activeCount(filter, NOW)).toBe(0);
+    expect(activeCount(filter)).toBe(0);
   });
 
   it('выбранный грейд, формат и HR-контакт уезжают своими значениями', () => {
@@ -73,7 +73,7 @@ describe('вариант «Все»', () => {
       remote: 'remote',
       hr_contact: 'with',
     });
-    expect(activeCount(filter, NOW)).toBe(3);
+    expect(activeCount(filter)).toBe(3);
   });
 
   it('оба варианта контакта HR названы теми словами, которые мост различает', () => {
@@ -117,7 +117,13 @@ describe('числовые вилки', () => {
     // Счётчик считает условия отбора, а не заполненные поля: «2 активных» на
     // одной вилке человек читает как два разных отбора.
     const filter = { ...blankFilter(), scoreMin: '60', scoreMax: '90' };
-    expect(activeCount(filter, NOW)).toBe(1);
+    expect(activeCount(filter)).toBe(1);
+  });
+
+  it('набранное в вилке считается условием, даже пока это не число', () => {
+    // Счётчик отзывается на набор, а не на то, что доехало до моста: молчи он
+    // до годного числа, человек читал бы «Без фильтров» над набранным полем.
+    expect(activeCount({ ...blankFilter(), scoreMin: '-' })).toBe(1);
   });
 });
 
@@ -143,47 +149,38 @@ describe('срок активности', () => {
     expect(payload.date_to).toBeUndefined();
   });
 
-  it('«Периода» берёт набранные даты целыми сутками', () => {
-    // Набирают дату, а отбирают по метке со временем: конец дня взят
+  it('«Периода» берёт выбранные даты целыми сутками', () => {
+    // В отборе лежит ISO-дата, а отбирают по метке со временем: конец дня взят
     // последней миллисекундой, иначе вакансии этого дня выпали бы.
     const payload = filterPayload(
-      { ...blankFilter(), datePreset: 'range', dateFrom: '01.08.2026', dateTo: '14.08.2026' },
+      { ...blankFilter(), datePreset: 'range', dateFrom: '2026-08-01', dateTo: '2026-08-14' },
       NOW,
     );
     expect(payload.date_from).toBe(new Date(2026, 7, 1, 0, 0, 0, 0).toISOString());
     expect(payload.date_to).toBe(new Date(2026, 7, 14, 23, 59, 59, 999).toISOString());
   });
 
-  it('недобранная дата периода не уезжает', () => {
-    // Человек набирает посимвольно, и `01.08.20` на полпути — не дата.
+  it('невыбранная граница периода не уезжает', () => {
+    // Границы две, и ставят их порознь: «с первого августа и дальше» — такой
+    // же период, как и обе даты разом.
     const payload = filterPayload(
-      { ...blankFilter(), datePreset: 'range', dateFrom: '01.08.20', dateTo: '' },
+      { ...blankFilter(), datePreset: 'range', dateFrom: '2026-08-01', dateTo: '' },
       NOW,
     );
-    expect(payload).toEqual({});
-  });
-
-  it('несуществующая дата не уезжает границей', () => {
-    // Часы перекатывают «31.02.2026» на третье марта: набранное выглядело бы
-    // принятым, а отбор шёл бы по другим суткам, и сказать об этом было бы
-    // нечему.
-    const payload = filterPayload(
-      { ...blankFilter(), datePreset: 'range', dateFrom: '31.02.2026' },
-      NOW,
-    );
-    expect(payload).toEqual({});
+    expect(payload.date_to).toBeUndefined();
   });
 
   it('срок и его даты — одно условие', () => {
-    const filter = { ...blankFilter(), datePreset: 'range', dateFrom: '01.08.2026' };
-    expect(activeCount(filter, NOW)).toBe(1);
+    const filter = { ...blankFilter(), datePreset: 'range', dateFrom: '2026-08-01' };
+    expect(activeCount(filter)).toBe(1);
   });
 
-  it('выбранный период без набранных дат условием не считается', () => {
-    // Воронка светится, пока список показан не весь; над полным списком она
-    // говорила бы неправду ровно о том, ради чего заведена.
+  it('выбранный период считается условием и без дат', () => {
+    // Условие — это то, что человек выбрал в панели, а не то, что доехало до
+    // моста: нажатый чип «Периода…» обязан отозваться в счётчике сразу, иначе
+    // нажатие выглядит непринятым.
     const filter = { ...blankFilter(), datePreset: 'range' };
-    expect(activeCount(filter, NOW)).toBe(0);
+    expect(activeCount(filter)).toBe(1);
   });
 
   it('«Все» дат не ставит', () => {
@@ -202,7 +199,7 @@ describe('каналы и компании', () => {
 
   it('считаются двумя разными условиями', () => {
     const filter = { ...blankFilter(), channels: new Set(['jobs']), companies: new Set(['Ромашка']) };
-    expect(activeCount(filter, NOW)).toBe(2);
+    expect(activeCount(filter)).toBe(2);
   });
 });
 
@@ -217,6 +214,20 @@ describe('перечень для выбора', () => {
     // Набранное приходит как есть: заглавная и случайный пробел в конце иначе
     // оставили бы список пустым, а человек видел бы своё слово в поле.
     expect(pickNames(['Ромашка', 'РомБ', 'Астра'], '  РОМ ')).toEqual(['Ромашка', 'РомБ']);
+  });
+
+  it('обрезается потолком, когда его назвали', () => {
+    // Компаний бывают тысячи, а панель под них — 140 пикселей: без потолка
+    // открытие перечня перерисовывало бы всю базу ради первых пяти строк.
+    const names = Array.from({ length: 200 }, (_, at) => `Компания ${at}`);
+    expect(pickNames(names, '', 80)).toHaveLength(80);
+  });
+
+  it('без потолка отдаёт всё, что нашлось', () => {
+    // Каналов десятки, и обрезать их незачем — потолок стоит там, где его
+    // назвали, а не везде.
+    const names = Array.from({ length: 200 }, (_, at) => `Канал ${at}`);
+    expect(pickNames(names, '')).toHaveLength(200);
   });
 
   it('не переставляет пришедший с моста перечень', () => {
