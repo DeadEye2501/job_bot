@@ -3,6 +3,8 @@
 // Чистые функции: ответы моста приходят доводами, наружу уходят строки и доли.
 // Ни моста, ни разметки этот файл не знает.
 
+import { blankFilter } from './vacancy_filter.js';
+
 /** Сроки, за которые считают, — от короткого к длинному.
  *
  * `delta` — как называется прирост за этот срок. У «всего времени» его нет:
@@ -25,9 +27,9 @@ export const PERIODS = [
  * `tone` — цвет числа, тот же, что был в прежнем окне.
  */
 export const KPI = [
-  { key: 'total', label: 'Всего', total: 'total', delta: 'total_period', tone: '' },
-  { key: 'applied', label: 'Откликов', total: 'applied_total', delta: 'applied_period', tone: 'applied' },
-  { key: 'in_progress', label: 'В работе', total: 'in_progress_total', delta: 'in_progress_period', tone: 'progress' },
+  { key: 'total', label: 'Всего вакансий', total: 'total', delta: 'total_period', tone: '' },
+  { key: 'applied', label: 'Откликов отправлено', total: 'applied_total', delta: 'applied_period', tone: 'applied' },
+  { key: 'in_progress', label: 'В процессе', total: 'in_progress_total', delta: 'in_progress_period', tone: 'progress' },
   { key: 'offer', label: 'Офферов', total: 'offer_total', delta: 'offer_period', tone: 'offer' },
   { key: 'decline', label: 'Отказов', total: 'decline_total', delta: 'decline_period', tone: 'decline' },
 ];
@@ -42,6 +44,19 @@ export const STATUS_ORDER = [
 ];
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+// Первый день выходных. Их два, и они последние: по ним низкий столбец читают
+// не как тишину, а как нерабочий день.
+const WEEKEND_FROM = 5;
+
+/** Статусы, из которых вакансия ещё может сдвинуться, — левая колонка. */
+const MOVING = ['New', 'Applied', 'Answered', 'Test', 'Invitation', 'In Progress'];
+
+/** Исходы: отсюда вакансия уже не двигается, — правая колонка. */
+const OVER = ['Offer', 'Decline', 'Ghosting', 'Scam', 'Not Fit'];
+
+// На сколько колонок разложены навыки в карточке.
+const SKILL_COLUMNS = 3;
 
 /** Верхний ряд показателей: число, подпись и прирост — по каждому.
  *
@@ -67,13 +82,62 @@ export function kpiRow(answer, period) {
  * относительно друга, и доля от суммы сделала бы разницу между понедельником
  * и пятницей неразличимой.
  */
-export function weekBars(counts) {
+export function weekBars(counts, applied = 0) {
   const top = Math.max(...counts, 0);
   return counts.map((count, at) => ({
     label: WEEKDAYS[at],
     count,
+    weekend: at >= WEEKEND_FROM,
+    // Ноль над столбцом читается как «писали, но не ответили». Пока не отправлен
+    // ни один отклик, правду говорит прочерк.
+    note: applied ? count : '—',
     percent: top ? (count / top) * 100 : 0,
   }));
+}
+
+/** Счётчики статусов двумя колонками: слева живые, справа отыгравшие.
+ *
+ * Показаны все одиннадцать, включая нулевые: ноль у «Офферов» — это новость.
+ * Пропусти мы строку, человек прочёл бы список как «оффер ещё не заводили», а
+ * не «ни одного не случилось».
+ */
+export function statusColumns(counts) {
+  const named = (names) => names.map((name) => ({ name, count: counts[name] || 0 }));
+  return [named(MOVING), named(OVER)];
+}
+
+/** Строки карточки навыков: доля от самого частого и место в колонке.
+ *
+ * Полосы читают друг относительно друга — доля от суммы сделала бы разницу
+ * между вторым и третьим навыком неразличимой. Колонки заполняются сверху
+ * вниз, и у первой строки каждой из них верхней черты нет: там она читалась
+ * бы как граница карточки.
+ */
+export function skillRows(skills) {
+  const top = Math.max(1, ...skills.map((one) => one.count));
+  const inColumn = Math.ceil(skills.length / SKILL_COLUMNS);
+  return skills.map((one, at) => ({
+    ...one,
+    percent: (one.count / top) * 100,
+    first: inColumn > 0 && at % inColumn === 0,
+  }));
+}
+
+/** Сколько строк встаёт в одну колонку карточки навыков. */
+export function skillRowsPerColumn(skills) {
+  return Math.ceil(skills.length / SKILL_COLUMNS);
+}
+
+/** Конверсия канала: подпись и доля для полоски-метра.
+ *
+ * Несчитанная названа словом, а не нулём: «0 %» значит «отклики были, ответов
+ * нет», а не отправляли вовсе — другая новость, и путать их нельзя. Доля
+ * округлена до целых: дробь в узкой колонке разъезжается, а решают по ней на
+ * глаз.
+ */
+export function convNote(value) {
+  if (value === null || value === undefined) return { text: 'n/a', percent: 0 };
+  return { text: `${value.toFixed(0)}%`, percent: value };
 }
 
 const MINUTE = 60;
@@ -115,6 +179,17 @@ export function deltaNote(value, period) {
   if (value === null || value === undefined || !about?.delta) return null;
   const sign = value > 0 ? '+' : value < 0 ? '−' : '±';
   return { text: `${sign}${Math.abs(value)} ${about.delta}`, tone: value > 0 ? 'up' : '' };
+}
+
+/** Отбор, с которым уходят в вакансии, нажав на строку статуса.
+ *
+ * Прежний отбор перетирается целиком, а не дополняется: человек просит
+ * «покажи вакансии этого статуса», и уцелевший грейд позавчерашнего поиска
+ * отдал бы ему пустой список вместо тех девяти штук, которые он только что
+ * видел числом.
+ */
+export function sliceTarget(status) {
+  return { ...blankFilter(), statuses: new Set([status]) };
 }
 
 /** Доли кольца статусов.

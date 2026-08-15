@@ -1,0 +1,111 @@
+/* Карточка «Скилы»: навыки вакансий тремя колонками с полосой частоты.
+
+   Полоса, а не одно число: по ней видно, во сколько раз первый навык
+   встречается чаще пятого, — а это и есть то, ради чего в карточку смотрят. */
+
+/* Заполняется по колонкам, сверху вниз: список читают столбцом, а не
+   змейкой. Число строк в колонке задаёт разметка. */
+.stats-skills-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-auto-flow: column;
+  gap: 4px 16px;
+}
+
+.stats-skill-row {
+  display: grid;
+  grid-template-columns: 14px 1fr 60px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.78rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Над первой строкой колонки черта читалась бы как граница карточки. */
+.stats-skill-row.first-in-col {
+  border-top: 0;
+}
+
+.stats-skill-check {
+  color: var(--accent);
+  font-size: 0.78rem;
+  text-align: center;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.stats-skill-name {
+  font-size: 0.76rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-skill-row:not(.mine) .stats-skill-name {
+  color: var(--text-secondary);
+}
+
+.stats-skill-bar {
+  height: 5px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.stats-skill-bar-fill {
+  height: 100%;
+  transition: width 0.2s;
+}
+
+.stats-skill-row.mine .stats-skill-bar-fill {
+  background: var(--accent);
+  opacity: 0.85;
+}
+
+.stats-skill-row:not(.mine) .stats-skill-bar-fill {
+  background: var(--text-tertiary);
+  opacity: 0.5;
+}
+
+.stats-skill-num {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+  text-align: right;
+  font-size: 0.74rem;
+}
+
+/* Без подписей две заливки — просто два оттенка: что зелёное значит «моё»,
+   само по себе не читается. */
+.stats-skills-legend {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  display: flex;
+  gap: 16px;
+}
+
+.stats-skills-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.stats-skills-legend .leg-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.stats-skills-legend .leg-mine {
+  background: var(--accent);
+}
+
+.stats-skills-legend .leg-other {
+  background: var(--text-tertiary);
+  opacity: 0.5;
+}

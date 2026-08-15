@@ -36,6 +36,44 @@
   flex: 1;
 }
 
+/* «Навык» — подпись, а не клавиша: в шапке она стоит рядом с именем категории,
+   и полноценная кнопка перетягивала бы взгляд на себя с самого имени. */
+.cat-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.cat-add:hover {
+  background: var(--border);
+  color: var(--accent);
+}
+
+.cat-add .material-symbols-outlined {
+  font-size: 14px;
+}
+
+/* Удаление уносит категорию вместе с навыками, поэтому под курсором краснеет:
+   серый ховер тут ничем не отличался бы от сворачивания рядом. */
+.cat-delete {
+  padding: 2px;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+}
+
+.cat-delete:hover {
+  color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.cat-delete .material-symbols-outlined {
+  font-size: 16px;
+}
+
 .skill-row {
   display: grid;
   grid-template-columns: 150px 130px 1fr auto;
@@ -48,6 +86,18 @@
 
 .skill-row:hover {
   background: var(--accent-row-hover);
+}
+
+/* Корзина в строке краснеет под курсором: серый ховер общей кнопки-значка не
+   отличал бы её от тех, что ничего не уносят. Значок мельче общего — строка
+   навыка ниже полосы, где кнопка-значок стоит обычно. */
+.skill-row .icon-btn:hover {
+  color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.skill-row .icon-btn .material-symbols-outlined {
+  font-size: 16px;
 }
 
 .skill-row:hover input[type='range'].slider::-webkit-slider-thumb,

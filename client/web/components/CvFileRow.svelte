@@ -7,7 +7,7 @@
   const note = $derived(cvNote(meta));
 </script>
 
-<div class="pdf-row" class:missing={note.missing}>
+<div class="pdf-row">
   <span class="material-symbols-outlined">description</span>
   <div class="pdf-info">
     <div class="pdf-name">{note.name}</div>

@@ -36,21 +36,30 @@
   }
 </script>
 
-<div class="collapsible" class:collapsed={!open}>
-  <div class="collapsible-head">
-    <button class="icon-btn" type="button" onclick={() => ontoggle()}>
-      <span class="material-symbols-outlined">expand_more</span>
-    </button>
+<div class="exp-card" class:collapsed={!open}>
+  <!-- Нажимается вся шапка, а не одна стрелка: свёрнутых карточек столбик, и
+       целиться в значок ради раскрытия человеку не за что. -->
+  <div
+    class="exp-header"
+    role="button"
+    tabindex="0"
+    onclick={() => ontoggle()}
+    onkeydown={(event) => event.key === 'Enter' && ontoggle()}
+  >
+    <span class="material-symbols-outlined">expand_more</span>
     <div class="exp-summary">
       <strong>{title.company}</strong>
-      {#if title.role}<span class="role">· {title.role}</span>{/if}
+      {#if title.role}· <span class="role">{title.role}</span>{/if}
       {#if title.period}<span class="period">{title.period}</span>{/if}
     </div>
     <button
-      class="icon-btn"
+      class="exp-delete"
       type="button"
       title="Удалить место работы"
-      onclick={() => onremove()}
+      onclick={(event) => {
+        event.stopPropagation();
+        onremove();
+      }}
     >
       <span class="material-symbols-outlined">delete</span>
     </button>
@@ -58,7 +67,7 @@
 
   {#if open}
     <div class="exp-body">
-      <div class="form-grid">
+      <div class="field-row">
         <input
           class="input"
           maxlength="255"
@@ -98,7 +107,7 @@
             disabled={current}
             onblur={(event) => pickDate('end_date', event.currentTarget.value)}
           />
-          <label class="checkbox-row">
+          <label class="date-current">
             <input
               type="checkbox"
               checked={current}

@@ -6,7 +6,6 @@
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import ExperienceCard from '$components/ExperienceCard.svelte';
   import { toggled } from '$state/chosen.js';
-  import { cardTitle } from '$state/experience.js';
   import { named } from '$state/profile.js';
   import { plural } from '$state/words.js';
 
@@ -17,7 +16,8 @@
   let loaded = $state(false);
   let rows = $state([]);
   // Навыки анкеты: мост шлёт их вместе с опытом именно для стека — связать
-  // место работы он умеет только с заведённым навыком.
+  // место работы он умеет только с заведённым навыком. Держим строки целиком:
+  // подборщик раскладывает их по категориям и показывает уровень.
   let known = $state([]);
   let open = $state(new Set());
 
@@ -32,7 +32,7 @@
     const now = await ask('profile.experience');
     if (now === null || !alive) return;
     rows = now.experience.map((one) => ({ ...one, key: `id-${one.id}` }));
-    known = now.skills_index.map((one) => one.name);
+    known = now.skills_index;
     loaded = true;
   }
 
@@ -77,7 +77,9 @@
       responsibilities: [],
       skill_names: [],
     };
-    rows = [...rows, fresh];
+    // Первой в списке: места работы идут от свежего к давнему, и добавляют
+    // почти всегда последнее — внизу человек искал бы его глазами.
+    rows = [fresh, ...rows];
     // Свежая карточка раскрыта сразу: свёрнутая пустая выглядит как пустая
     // строка списка, и человек жал бы «добавить» второй раз.
     open = toggled(open, fresh.key);
@@ -116,12 +118,12 @@
     />
   {/each}
 
-  <button class="add-more" type="button" onclick={add}>+ Добавить место работы</button>
+  <button class="new-exp" type="button" onclick={add}>+ Добавить место работы</button>
 {/if}
 
 {#if leaving}
   <ConfirmDialog
-    message={`Удалить место работы «${cardTitle(leaving).company}»?\n\nВместе с ним уйдут достижения, обязанности и стек. Откатить нельзя.`}
+    message={`Удалить место работы «${leaving.company || 'без названия'}»?`}
     confirmLabel="Удалить"
     onconfirm={() => remove(leaving.key)}
     oncancel={() => (leaving = null)}

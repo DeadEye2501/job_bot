@@ -77,6 +77,10 @@
   // Какую вакансию открыть, придя в раздел вакансий из мини-списка чужой
   // карточки. Отметка такая же разовая, как и та, что ведёт в контакты.
   let openVacancy = $state(null);
+  // С каким отбором открыть список вакансий, придя из статистики. Отметка
+  // разовая по той же причине: оставленная лежать, она навязывала бы
+  // позавчерашний статус каждому следующему заходу в раздел.
+  let openFilter = $state(null);
   let mode = $state(OFF);
   let running = $state(false);
   let crawling = $state(false);
@@ -223,6 +227,16 @@
     section = 'vacancies';
   }
 
+  /** Уйти в вакансии с готовым отбором — из строки статуса в статистике.
+   *
+   * Иначе число в карточке остаётся числом: чтобы посмотреть, что за девять
+   * штук, человеку пришлось бы идти в вакансии и набирать тот же отбор руками.
+   */
+  function goSlice(filter) {
+    openFilter = { filter };
+    section = 'vacancies';
+  }
+
   async function pickMode(chosen) {
     if (chosen === null) return say(lockedTip);
     const answer = await ask('system.set_mode', chosen);
@@ -339,7 +353,7 @@
         events={heard}
       />
     {:else if section === 'stats'}
-      <StatsScreen {ask} />
+      <StatsScreen {ask} onslice={goSlice} onchannel={(id) => goContacts({ tab: 'channels', id })} />
     {:else if section === 'vacancies'}
       <VacanciesScreen
         {ask}
@@ -349,6 +363,8 @@
         oncontacts={goContacts}
         open={openVacancy}
         onopened={() => (openVacancy = null)}
+        openFilter={openFilter}
+        onfiltered={() => (openFilter = null)}
       />
     {:else if section === 'system'}
       <TopTabs tabs={SYSTEM_TABS} active={systemTab} onpick={(key) => (systemTab = key)} />

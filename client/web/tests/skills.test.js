@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { countNote, grouped, levelPercent } from '../state/skills.js';
+import { aliasesAfter, countNote, grouped, levelPercent } from '../state/skills.js';
 import { plural } from '../state/words.js';
 
 describe('раскладка навыков по категориям', () => {
@@ -60,5 +60,33 @@ describe('счёт в заголовке', () => {
     // По ним видно, что вкладка вообще что-то показывает: пустая она выглядит
     // так же, как несохранённая.
     expect(countNote(7, 2)).toBe('7 навыков, 2 категории');
+  });
+
+  it('счёт навыков не склоняется', () => {
+    // Число навыков меняется на каждой правке строки, и склонённое слово
+    // дёргалось бы под курсором; у категорий оно стоит месяцами.
+    expect(countNote(1, 1)).toBe('1 навыков, 1 категория');
+  });
+});
+
+describe('набор синонима', () => {
+  it('отменённый набор в перечень не попадает', () => {
+    // Escape набранное отменяет: иначе опечатка уезжает в базу отложенной
+    // записью, и снимать её приходится крестиком.
+    expect(aliasesAfter(['js'], 'JavaScrip', false)).toEqual(['js']);
+  });
+
+  it('подтверждённый набор встаёт в конец', () => {
+    expect(aliasesAfter(['js'], 'JavaScript', true)).toEqual(['js', 'JavaScript']);
+  });
+
+  it('то же слово в другом регистре вторым не встаёт', () => {
+    // «NumPy» и «numpy» — одно написание: мост сверяет их без регистра, и пара
+    // в перечне значила бы лишнюю строку, которая ничего не находит.
+    expect(aliasesAfter(['NumPy'], 'numpy', true)).toEqual(['NumPy']);
+  });
+
+  it('пустой набор перечня не трогает', () => {
+    expect(aliasesAfter(['js'], '   ', true)).toEqual(['js']);
   });
 });

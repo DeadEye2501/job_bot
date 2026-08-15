@@ -242,19 +242,19 @@
   <div class="cnt-det-section">
     <div class="ch-stats-grid">
       <div class="ch-stat">
-        <span class="ch-stat-num">{card.stats.vacancies_per_day}</span>
+        <span class="big-num ch-stat-num">{card.stats.vacancies_per_day}</span>
         <span class="ch-stat-label">Вакансий в день</span>
       </div>
       <div class="ch-stat">
-        <span class="ch-stat-num fit">{numbers.fit}</span>
+        <span class="big-num ch-stat-num fit">{numbers.fit}</span>
         <span class="ch-stat-label">Подходящих вакансий</span>
       </div>
       <div class="ch-stat">
-        <span class="ch-stat-num apply">{numbers.apply}</span>
+        <span class="big-num ch-stat-num apply">{numbers.apply}</span>
         <span class="ch-stat-label">Откликов из подходящих</span>
       </div>
       <div class="ch-stat">
-        <span class="ch-stat-num response">{numbers.response}</span>
+        <span class="big-num ch-stat-num response">{numbers.response}</span>
         <span class="ch-stat-label">Ответов на отклики</span>
       </div>
     </div>

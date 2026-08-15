@@ -61,7 +61,7 @@ export function updatedNote(iso) {
   if (!iso) return '—';
   const at = new Date(iso);
   const two = (number) => String(number).padStart(2, '0');
-  const date = `${two(at.getDate())}.${two(at.getMonth() + 1)}.${at.getFullYear()}`;
+  const date = `${at.getFullYear()}-${two(at.getMonth() + 1)}-${two(at.getDate())}`;
   return `обновлено ${date} ${two(at.getHours())}:${two(at.getMinutes())}`;
 }
 

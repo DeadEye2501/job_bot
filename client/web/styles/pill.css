@@ -1,0 +1,25 @@
+/* Пилюля выбора: нажимаемая скобка, одна из ряда. Ею выбирают род строки в
+   чёрном списке и срок в статистике.
+
+   Выбранная залита акцентом целиком, а не подсвечена рамкой: пилюль в ряду
+   пять, и приглушённой отметки среди них глаз не находит. */
+
+.pill {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.pill:hover {
+  border-color: var(--accent);
+}
+
+.pill.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-weight: 500;
+}

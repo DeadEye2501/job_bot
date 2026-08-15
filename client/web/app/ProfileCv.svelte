@@ -1,16 +1,23 @@
 <script>
   // Вкладка «CV»: анкета и файл резюме.
   //
-  // Записывается по ходу, как и настройки: поле уезжает на мост, когда его
-  // покидают. Мост принимает анкету целиком, поэтому уезжает она вся — но
-  // собранная из свежего состояния, а не из снимка.
+  // Записывается по ходу, как и настройки: набранное уезжает, когда человек
+  // остановился, ушёл из поля или попросил записать с клавиатуры. Мост
+  // принимает анкету целиком, поэтому уезжает она вся — но собранная из
+  // свежего состояния, а не из снимка.
 
   import { call } from '$api/bridge.js';
   import CvFileRow from '$components/CvFileRow.svelte';
   import LangRows from '$components/LangRows.svelte';
   import ChoiceRow from '$components/ChoiceRow.svelte';
+  import { autosave } from '$state/autosave.js';
   import { toggled } from '$state/chosen.js';
+  import { saveKey } from '$state/keys.js';
   import { GRADES, WORK_FORMATS, blankProfile, langRow, updatedNote } from '$state/profile.js';
+
+  // Пауза перед записью набранного. Короче — и мост получает вопрос на каждое
+  // слово, длиннее — и человек успевает уйти с вкладки, не дождавшись записи.
+  const TYPING_DELAY = 800;
 
   let { ask } = $props();
 
@@ -33,17 +40,35 @@
   let meta = $state(null);
   let grades = $state(new Set());
   let formats = $state(new Set());
+  let fields = $state(null);
 
   let alive = true;
+
+  // Отложенная запись одна на всю анкету: мост принимает её целиком, и держать
+  // по отсчёту на поле значило бы слать одно и то же по разу на поле.
+  const saver = autosave({ delay: TYPING_DELAY, save: () => save() });
 
   async function refresh() {
     const now = await ask('profile.get');
     if (now === null || !alive) return;
-    form = now.profile || blankProfile();
     meta = now.cv_meta;
+    const fresh = now.profile || blankProfile();
+    // Пока курсор стоит в форме, с моста берётся одна отметка о правке:
+    // остальное человек сейчас и набирает, а анкету перечитывают в том числе
+    // на свою же запись — пришедшее посреди набора стёрло бы набранное.
+    if (loaded && fields && fields.contains(document.activeElement)) {
+      form = { ...form, updated_at: fresh.updated_at };
+      return;
+    }
+    form = fresh;
     grades = new Set(form.grades);
     formats = new Set(form.work_format);
     loaded = true;
+  }
+
+  /** Анкета целиком — тем видом, каким её принимает мост. */
+  function sheet() {
+    return { ...form, grades: [...grades], work_format: [...formats] };
   }
 
   /** Отправить анкету целиком.
@@ -55,12 +80,12 @@
    * каждом поле и закрывала бы собой соседние.
    */
   async function save() {
+    const sending = sheet();
+    // Уехавшее — оно же и «лежит в базе»: без этого уход из нетронутого поля
+    // отправил бы ту же анкету заново.
+    saver.known(JSON.stringify(sending));
     try {
-      await call('profile.save', {
-        ...form,
-        grades: [...grades],
-        work_format: [...formats],
-      });
+      await call('profile.save', sending);
       if (!alive) return;
       trouble = '';
       await refresh();
@@ -69,9 +94,17 @@
     }
   }
 
-  function edit(key, value) {
-    form = { ...form, [key]: value };
-    return save();
+  /** Набранное в поле: в анкету ложится сразу, на мост уедет по остановке.
+   *
+   * Отсчёт ведётся по всей анкете, а не по полю: то, чем поля отличаются друг
+   * от друга, мосту всё равно не видно — он получает их разом.
+   *
+   * Обрезка здесь, а не при отправке: в поле остаётся набранное как есть, а
+   * лишний пробел на его краю не считается правкой и записи не будит.
+   */
+  function typed(key, value) {
+    form = { ...form, [key]: value.trim() };
+    saver.typed(JSON.stringify(sheet()));
   }
 
   function editLang(index, part) {
@@ -124,14 +157,14 @@
 </script>
 
 {#if !loaded}
-  <div class="empty-note">Загрузка…</div>
+  <div class="placeholder-content">Загрузка…</div>
 {:else}
   <div class="page-head">
     <div class="page-title">Профиль / CV</div>
     <div class="updated-ts">{updatedNote(form.updated_at)}</div>
   </div>
 
-  <div class="form-grid">
+  <div class="form-grid" bind:this={fields}>
     {#each FIELDS as one (one.key)}
       <input
         class="input"
@@ -139,7 +172,9 @@
         maxlength={one.max}
         placeholder={one.placeholder}
         value={form[one.key]}
-        onblur={(event) => edit(one.key, event.currentTarget.value.trim())}
+        oninput={(event) => typed(one.key, event.currentTarget.value)}
+        onblur={() => saver.flush()}
+        onkeydown={(event) => saveKey(event) && saver.flush()}
       />
     {/each}
 
@@ -148,7 +183,9 @@
       maxlength="1000"
       placeholder="Образование"
       value={form.education}
-      onblur={(event) => edit('education', event.currentTarget.value.trim())}
+      oninput={(event) => typed('education', event.currentTarget.value)}
+      onblur={() => saver.flush()}
+      onkeydown={(event) => saveKey(event) && saver.flush()}
     ></textarea>
 
     <ChoiceRow options={GRADES} chosen={grades} look="seg" onpick={pickGrade} />
@@ -161,13 +198,15 @@
       maxlength="2000"
       placeholder="Личные предпочтения — что важно при выборе работы, что точно не подойдёт"
       value={form.free_preferences}
-      onblur={(event) => edit('free_preferences', event.currentTarget.value.trim())}
+      oninput={(event) => typed('free_preferences', event.currentTarget.value)}
+      onblur={() => saver.flush()}
+      onkeydown={(event) => saveKey(event) && saver.flush()}
     ></textarea>
   </div>
 
   <CvFileRow {meta} onreplace={replaceCv} onopen={openCv} />
 
   {#if trouble}
-    <div class="save-trouble">{trouble}</div>
+    <div class="autosave-error">{trouble}</div>
   {/if}
 {/if}

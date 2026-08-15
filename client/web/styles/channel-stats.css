@@ -18,14 +18,6 @@
   text-align: center;
 }
 
-.ch-stat-num {
-  color: var(--text-primary);
-  font-size: 1.4rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-
 /* Три доли покрашены по ступеням воронки: годное — акцентом, отклики и ответы —
    теми же цветами, какими эти ступени покрашены в полосе под плитками. */
 .ch-stat-num.fit {
