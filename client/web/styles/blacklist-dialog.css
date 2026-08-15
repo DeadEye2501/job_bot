@@ -1,0 +1,159 @@
+/* Окно заведения строки отсева: выбор рода, значение с подсказчиком и причина.
+   Шапка, тело и подвал — общие, в modal.css. */
+
+.bl-add-modal {
+  width: min(480px, 92vw);
+  max-width: min(480px, 92vw);
+  height: min(420px, 88vh);
+  padding: 0;
+  gap: 0;
+  /* Подсказчик выпадает из поля и должен лечь поверх подвала окна: обрежь его
+     окно своей рамкой — список был бы виден на треть. */
+  overflow: visible;
+}
+
+.bl-add-modal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  overflow: visible;
+}
+
+/* Род выбирают до значения: от него зависит и подсказка поля, и то, из чего
+   подсказчик берёт существующие. */
+.bl-kind-segmented {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  padding: 3px;
+  border-radius: 5px;
+  background: var(--bg-tertiary);
+}
+
+.bl-kind-seg {
+  padding: 5px 4px;
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  text-align: center;
+}
+
+.bl-kind-seg:hover {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+/* Выбранный род залит своим цветом — тем же, каким он покрашен чипом в таблице:
+   так видно, строка какого рода сейчас заводится. */
+.bl-kind-seg.active.keyword {
+  background: var(--kind-keyword-active-bg);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.bl-kind-seg.active.hr {
+  background: var(--kind-hr-active-bg);
+  color: var(--fg-max);
+  font-weight: 500;
+}
+
+.bl-kind-seg.active.company {
+  background: var(--kind-company-active-bg);
+  color: var(--fg-max);
+  font-weight: 500;
+}
+
+.bl-kind-seg.active.channel {
+  background: var(--kind-channel-active-bg);
+  color: var(--fg-max);
+  font-weight: 500;
+}
+
+/* Поля окна залиты, в отличие от прозрачных полей таблицы: здесь их два на
+   пустом месте, и без заливки не видно, куда набирать. */
+.bl-modal-input,
+.bl-modal-textarea {
+  width: 100%;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.83rem;
+}
+
+.bl-modal-input:focus,
+.bl-modal-textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.bl-modal-input::placeholder,
+.bl-modal-textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.bl-modal-textarea {
+  min-height: calc(0.83rem * 1.4 * 3 + 14px);
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.bl-combobox-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.bl-combobox-dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  left: 0;
+  z-index: 100;
+  max-height: 220px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  box-shadow: 0 6px 20px var(--shadow-dropdown);
+  overflow-y: auto;
+}
+
+.bl-combobox-option {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 9px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+  text-align: left;
+  width: 100%;
+}
+
+.bl-combobox-option:last-child {
+  border-bottom: 0;
+}
+
+.bl-combobox-option:hover {
+  background: var(--selected-bg);
+}
+
+.bl-combobox-option .opt-label {
+  color: var(--text-primary);
+}
+
+/* Значение под именем — то, что ляжет в строку отсева: по нему и видно, чем
+   запись будет ловить объявления. */
+.bl-combobox-option .opt-sub {
+  color: var(--text-tertiary);
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+
+.bl-combobox-empty {
+  padding: 8px 12px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  text-align: center;
+}

@@ -5,10 +5,18 @@
   // спрашивать его на каждый набранный знак значило бы ждать сеть ради того,
   // что уже лежит в памяти.
 
-  import AskDialog from '$components/AskDialog.svelte';
+  import AddBlacklistDialog from '$components/AddBlacklistDialog.svelte';
+  import BlacklistRow from '$components/BlacklistRow.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
-  import SearchList from '$components/SearchList.svelte';
-  import { BLACKLIST_KINDS, blacklistShown } from '$state/contacts.js';
+  import SearchBox from '$components/SearchBox.svelte';
+  import { attempts } from '$state/attempts.js';
+  import {
+    BLACKLIST_KINDS,
+    blacklistCounts,
+    blacklistHints,
+    blacklistShown,
+    valueField,
+  } from '$state/contacts.js';
 
   let { ask, say, events } = $props();
 
@@ -17,40 +25,88 @@
   let kind = $state('');
   let search = $state('');
   let adding = $state(false);
-  let draft = $state({ kind: 'hr', value: '', reason: '' });
+  let draft = $state({ kind: 'keyword', value: '', reason: '' });
+  let saving = $state(false);
+  // Существующие люди, компании и каналы для подсказчика — по роду и по разу:
+  // перечень не меняется, пока окно открыто.
+  let known = $state({});
   let leaving = $state(null);
 
-  const shown = $derived(blacklistShown(rows, { kind, search }));
-
+  const listTries = attempts();
+  const knownTries = attempts();
   let alive = true;
 
+  const shown = $derived(blacklistShown(rows, { kind, search }));
+  const counts = $derived(blacklistCounts(rows));
+  const field = $derived(valueField(draft.kind));
+  const hints = $derived(
+    field.hints
+      ? blacklistHints({
+        items: known[draft.kind] ?? null,
+        rows,
+        kind: draft.kind,
+        typed: draft.value,
+      })
+      : null,
+  );
+
+  /** Перечитать строки отсева.
+   *
+   * Свой счёт попыток: перечитывают этот список все — правка поля, гашение
+   * строки, удаление, заведение и весть от бота, — и ответы возвращаются
+   * вразнобой. Лёгший поверх свежего старый вернул бы на экран только что
+   * поправленное значение.
+   */
   async function refresh() {
+    const mine = listTries.next();
     const now = await ask('blacklist.list');
-    if (now === null || !alive) return;
+    if (now === null || !alive || listTries.stale(mine)) return;
     rows = now.items;
     loaded = true;
   }
 
+  /** Прочитать существующие записи этого рода — для подсказчика.
+   *
+   * Свой счёт попыток: род успевают сменить, пока летит ответ, и пришедший на
+   * прежний вопрос показал бы каналы там, где выбраны люди.
+   */
+  async function load(one) {
+    if (known[one] !== undefined) return;
+    const mine = knownTries.next();
+    const now = await ask('blacklist.candidates', one);
+    if (now === null || !alive || knownTries.stale(mine)) return;
+    known = { ...known, [now.kind]: now.items };
+  }
+
+  function chooseKind(one) {
+    draft = { ...draft, kind: one };
+    if (valueField(one).hints) load(one);
+  }
+
   async function create() {
     const value = draft.value.trim();
-    if (!value) return;
+    if (!value || saving) return;
+    saving = true;
     const done = await ask('blacklist.create', { ...draft, value });
+    saving = false;
     if (done === null) return;
     adding = false;
     say(done.created ? 'Строка заведена' : 'Такая строка уже была');
-    draft = { kind: 'hr', value: '', reason: '' };
+    draft = { kind: 'keyword', value: '', reason: '' };
     return refresh();
   }
 
-  /** Записать правку строки и показать то, что легло на самом деле.
+  /** Записать правку строки и вернуть ответ моста.
    *
    * Перечитываем всегда, даже после отказа: поле правится на месте, и
    * отклонённое мостом значение осталось бы на экране — человек читал бы своё,
-   * а отсев шёл бы по прежнему.
+   * а отсев шёл бы по прежнему. Ответ уходит обратно в строку: по нему она и
+   * решает, вспыхнуть ли зелёным.
    */
   async function edit(row, part) {
-    await ask('blacklist.update', { id: row.id, ...part });
-    return refresh();
+    const done = await ask('blacklist.update', { id: row.id, ...part });
+    await refresh();
+    return done;
   }
 
   async function toggle(row, on) {
@@ -79,104 +135,77 @@
   });
 </script>
 
-<SearchList
-  {search}
-  placeholder="Поиск по значению и причине"
-  onsearch={(text) => (search = text)}
-  {loaded}
-  count={shown.length}
-  words={['строка', 'строки', 'строк']}
-  filtered={rows.length > 0}
-  nothing="Ничего не найдено"
-  empty="Чёрный список пуст"
->
-  {#snippet actions()}
-    <button class="btn primary" type="button" onclick={() => (adding = true)}>
-      <span class="material-symbols-outlined">add</span>
-      Строка
-    </button>
-  {/snippet}
+<div class="bl-toolbar">
+  <SearchBox
+    value={search}
+    placeholder="Поиск по значению или причине..."
+    onsearch={(text) => (search = text)}
+  />
 
-  {#snippet filters()}
-    <div class="kind-pills">
-      {#each BLACKLIST_KINDS as one (one.key)}
-        <button
-          class="kind-pill"
-          class:active={kind === one.key}
-          type="button"
-          onclick={() => (kind = one.key)}
-        >
-          {one.label}
-        </button>
-      {/each}
-    </div>
-  {/snippet}
-
-  {#each shown as row (`${row.id}:${row.value}:${row.reason}`)}
-    <div class="blacklist-row" class:off={!row.active}>
-      <span class="kind-tag" data-kind={row.kind}>{row.kind}</span>
-      <input
-        class="blacklist-value"
-        value={row.value}
-        onblur={(event) => edit(row, { value: event.currentTarget.value.trim() })}
-      />
-      <input
-        class="blacklist-reason"
-        placeholder="Причина"
-        value={row.reason || ''}
-        onblur={(event) => edit(row, { reason: event.currentTarget.value.trim() })}
-      />
-      <input
-        type="checkbox"
-        class="toggle"
-        checked={row.active}
-        title="Строка действует"
-        onchange={(event) => toggle(row, event.currentTarget.checked)}
-      />
-      <button class="icon-btn" type="button" title="Удалить" onclick={() => (leaving = row)}>
-        <span class="material-symbols-outlined">delete</span>
+  <div class="bl-filter-pills">
+    {#each BLACKLIST_KINDS as one (one.key)}
+      <button
+        class="bl-filter-pill"
+        class:active={kind === one.key}
+        type="button"
+        onclick={() => (kind = one.key)}
+      >
+        {one.label}
+        <span class="count">{one.key ? counts[one.key] : counts.all}</span>
       </button>
+    {/each}
+  </div>
+
+  <button class="bl-add-btn" type="button" title="Добавить в blacklist" onclick={() => (adding = true)}>
+    <span class="material-symbols-outlined">add</span>
+    Добавить
+  </button>
+</div>
+
+{#if !loaded}
+  <div class="cnt-list-empty">Загрузка…</div>
+{:else if shown.length === 0}
+  <div class="cnt-list-empty">{rows.length === 0 ? 'Blacklist пуст' : 'Ничего не найдено'}</div>
+{:else}
+  <div class="bl-table">
+    <div class="bl-row head">
+      <span>Тип</span>
+      <span>Значение</span>
+      <span>Причина</span>
+      <span>Добавлено</span>
+      <span class="bl-active-head">Активно</span>
+      <span></span>
     </div>
-  {/each}
-</SearchList>
+
+    {#each shown as row (row.id)}
+      <BlacklistRow
+        {row}
+        onedit={(part) => edit(row, part)}
+        ontoggle={(on) => toggle(row, on)}
+        onremove={() => (leaving = row)}
+      />
+    {/each}
+  </div>
+{/if}
 
 {#if adding}
-  <AskDialog
-    icon="block"
-    title="Новая строка отсева"
-    confirmLabel="Добавить"
-    onconfirm={create}
-    oncancel={() => (adding = false)}
-  >
-    <div class="kind-pills">
-      {#each BLACKLIST_KINDS.filter((one) => one.key) as one (one.key)}
-        <button
-          class="kind-pill"
-          class:active={draft.kind === one.key}
-          type="button"
-          onclick={() => (draft = { ...draft, kind: one.key })}
-        >
-          {one.label}
-        </button>
-      {/each}
-    </div>
-
-    <!-- svelte-ignore a11y_autofocus -->
-    <input
-      class="input"
-      autofocus
-      placeholder="Значение: ник, название или слово"
-      bind:value={draft.value}
-      onkeydown={(event) => event.key === 'Enter' && create()}
-    />
-    <input class="input" placeholder="Причина (необязательно)" bind:value={draft.reason} />
-  </AskDialog>
+  <AddBlacklistDialog
+    draft={{ ...draft, placeholder: field.placeholder }}
+    {hints}
+    {saving}
+    kinds={BLACKLIST_KINDS.filter((one) => one.key).map((one) => one.key)}
+    onkind={chooseKind}
+    onvalue={(text) => (draft = { ...draft, value: text })}
+    onreason={(text) => (draft = { ...draft, reason: text })}
+    onadd={create}
+    onclose={() => (adding = false)}
+  />
 {/if}
 
 {#if leaving}
   <ConfirmDialog
-    message={`Убрать «${leaving.value}» из чёрного списка?\n\nОтсев по этой строке перестанет действовать сразу.`}
-    confirmLabel="Убрать"
+    message={`Удалить «${leaving.value}» (${leaving.kind}) из blacklist?\n\nДействие необратимо.`}
+    confirmLabel="Удалить"
     onconfirm={() => drop(leaving)}
     oncancel={() => (leaving = null)}
   />
