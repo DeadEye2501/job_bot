@@ -13,7 +13,7 @@
 
 <div class="stats-skills-grid" style="grid-template-rows: repeat({perColumn}, auto);">
   {#each rows as one (one.label)}
-    <div class="stats-skill-row" class:mine={one.mine} class:first-in-col={one.first}>
+    <div class="ruled-row stats-skill-row" class:mine={one.mine} class:first-in-col={one.first}>
       <span class="stats-skill-check">{one.mine ? '✓' : ''}</span>
       <span class="stats-skill-name">{one.label}</span>
       <div class="stats-skill-bar">

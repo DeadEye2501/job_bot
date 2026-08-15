@@ -12,14 +12,12 @@
   gap: 4px 16px;
 }
 
+/* Сетка, выравнивание и черта — общие, в ruled-row.css. */
 .stats-skill-row {
-  display: grid;
   grid-template-columns: 14px 1fr 60px auto;
-  align-items: center;
   gap: 8px;
   padding: 4px 0;
   font-size: 0.78rem;
-  border-top: 1px solid var(--border);
 }
 
 /* Над первой строкой колонки черта читалась бы как граница карточки. */

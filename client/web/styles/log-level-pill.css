@@ -33,29 +33,31 @@
   font-variant-numeric: tabular-nums;
 }
 
-.logs-level-pill.active {
-  font-weight: 500;
-}
-
 .logs-level-pill.active .material-symbols-outlined { opacity: 1; }
 .logs-level-pill.active .count { color: inherit; opacity: 0.7; }
 
+/* Жирнее набраны только три цветные: у отладки зажатой пилюле веса не
+   добавляют — она и без того темнее прочих, и лишний вес поднял бы её в
+   ряду выше беды. */
 .logs-level-pill.active[data-tone='error'] {
   background: var(--err-fill);
   border-color: var(--err-muted);
   color: var(--danger);
+  font-weight: 500;
 }
 
 .logs-level-pill.active[data-tone='warn'] {
   background: var(--alert-fill);
   border-color: var(--alert-muted);
   color: var(--alert-text);
+  font-weight: 500;
 }
 
 .logs-level-pill.active[data-tone='info'] {
   background: var(--info-fill);
   border-color: var(--info-muted);
   color: var(--info);
+  font-weight: 500;
 }
 
 .logs-level-pill.active[data-tone='debug'] {

@@ -14,7 +14,7 @@
   const level = $derived(dragged ?? skill.level);
 </script>
 
-<div class="skill-row">
+<div class="ruled-row skill-row">
   <input
     class="input skill-name"
     maxlength="64"

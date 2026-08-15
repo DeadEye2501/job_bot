@@ -1,6 +1,8 @@
 <script>
   // Пороги отбора и ритм обхода: пять величин в одну строку.
-  import { BOUNDS, SCORE_MAX, clampField, scorePercent } from '$state/settings.js';
+  import { untrack } from 'svelte';
+
+  import { BOUNDS, SCORE_MAX, clampField, scorePercent, thresholdState } from '$state/settings.js';
 
   import SettingsSection from './SettingsSection.svelte';
 
@@ -21,6 +23,24 @@
 
   const LOCK_TITLE =
     'Когда включено, исходящие сообщения не уходят в Telegram — это режим проверки обхода без настоящей отправки';
+
+  // Порог живёт своим состоянием: запись уходит по отпусканию, и до ответа
+  // моста число рядом с ползунком отставало бы — порог тянули бы вслепую.
+  let threshold = $state(thresholdState({ saved: values.scoring_threshold }));
+
+  // Приехавшее сверху перебивает набранное: перечитанные настройки значат, что
+  // порог сменили не здесь. Сверяем именно число, а не сам приход настроек:
+  // запись соседнего поля отдаёт новый объект целиком, и без сверки она сбивала
+  // бы порог, который в этот миг тянут.
+  $effect(() => {
+    const saved = values.scoring_threshold;
+    if (saved !== untrack(() => threshold.saved)) threshold = thresholdState({ saved });
+  });
+
+  function settle() {
+    threshold = threshold.commit();
+    onsave({ scoring_threshold: threshold.saved });
+  }
 
   /** Принять число из поля и показать в нём то, что уехало на мост.
    *
@@ -49,11 +69,12 @@
           class="slider"
           min="0"
           max={SCORE_MAX}
-          value={values.scoring_threshold}
-          style="--pct: {scorePercent(values.scoring_threshold)}%;"
-          onchange={(event) => onsave({ scoring_threshold: event.currentTarget.value })}
+          value={threshold.shown}
+          style="--pct: {scorePercent(threshold.shown)}%;"
+          oninput={(event) => (threshold = threshold.drag(Number(event.currentTarget.value)))}
+          onchange={settle}
         />
-        <span class="slider-num">{values.scoring_threshold}</span>
+        <span class="slider-num">{threshold.shown}</span>
       </div>
     </div>
 
@@ -76,11 +97,13 @@
 
     <div>
       <div class="pipeline-label" title={LOCK_TITLE}>Симуляция отправки</div>
+      <!-- Поля нет — значит включено: без него бот молча начал бы писать людям
+           по-настоящему, а это худшая из двух ошибок. -->
       <div class="with-toggle">
         <input
           type="checkbox"
           class="toggle"
-          checked={values.send_locked}
+          checked={values.send_locked !== false}
           onchange={(event) => onsave({ send_locked: event.currentTarget.checked })}
         />
       </div>
