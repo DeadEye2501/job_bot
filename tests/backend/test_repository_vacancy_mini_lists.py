@@ -115,14 +115,14 @@ async def test_the_company_list_is_newest_first_and_breaks_ties_by_id(
     ]
 
 
-async def test_the_channel_list_keeps_the_unparsed_ones_on_purpose(
+async def test_the_channel_list_holds_only_the_parsed_ones(
     session, session_factory
 ):
-    """В списке канала остаются и недоразобранные вакансии — в отличие от двух других.
+    """В списке канала только разобранные вакансии — как и в двух других.
 
-    Счётчик канала и его сводка считают все вакансии подряд. Отсей мини-список
-    недоразобранные, и вышло бы расхождение: счётчик показывает четырнадцать, а
-    список пуст. У пользователей со старыми данными это обычное состояние.
+    Заведение и разбор — два шага конвейера, и между ними строка живёт без
+    названия и без оценки. В выдачу она не попадает, поэтому её не показывает
+    и мини-список: счётчик канала и его сводка считают ровно то же множество.
     """
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
@@ -136,7 +136,7 @@ async def test_the_channel_list_keeps_the_unparsed_ones_on_purpose(
 
     got, _ = await list_vacancies_for_channel(session, channel.id)
 
-    assert sorted(v.title for v in got) == sorted(["разобранная", "недоразобранная"])
+    assert [v.title for v in got] == ["разобранная"]
 
 
 _HOTTEST_FIRST = [

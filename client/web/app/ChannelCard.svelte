@@ -32,9 +32,6 @@
   const shown = $derived(card ? channelName({ ...card, id: card.channel_id }) : null);
   const numbers = $derived(card ? channelStats(card.stats) : null);
   const funnel = $derived(card ? donut(card.stats.status_counts) : []);
-  // Неразобранные вакансии в перечень не идут: у них нет ни названия, ни
-  // оценки, и строка вышла бы пустой.
-  const parsed = $derived(vacancies.filter((one) => one.title.trim()));
 
   async function refresh(id) {
     const mine = cardTries.next();
@@ -286,7 +283,7 @@
   </div>
 
   <MiniVacancies
-    vacancies={parsed}
+    {vacancies}
     empty="Из этого канала ещё нет вакансий."
     loading={digging}
     onpick={onvacancy}

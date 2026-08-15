@@ -74,21 +74,15 @@ async def list_vacancies_for_channel(
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Vacancy], bool]:
-    """Страница вакансий канала и есть ли за ней ещё.
+    """Страница разобранных вакансий канала и есть ли за ней ещё.
 
     Порядок — по горячести статуса, потом по свежести. Страница нужна потому,
     что каналы накапливают тысячи вакансий, и мини-список карточки грузит их
     пачками; признак продолжения отдаёт запрос — см. `paging.trim_page`.
 
-    is_parsed-фильтр НЕ применяем: badge канала и stats-блок считают все
-    вакансии (без этого фильтра), и фильтрация мини-списка по is_parsed=True
-    создавала рассинхрон — count=14, stats=14, мини-список пустой. Это
-    случается в том числе у пользователей со старыми данными до миграции
-    df83674 (`is_parsed` появился позже, существующие parsed-ряды получили
-    дефолт False, и `recover_orphan_vacancies` не всегда успевает их
-    восстановить — например, без активного бота). Половинно-построенные
-    ряды (только raw_text) рендерятся как «— без названия —» через
-    существующий fallback в UI.
+    Недоразобранные не показываются — тем же отбором, что берут счётчик
+    канала и его числа: все трое обещают выдачу, и разойдись они, число в
+    пилюле перестало бы отвечать за список под ней.
     """
     status_rank = case(
         _CHANNEL_VAC_STATUS_RANK,
@@ -98,7 +92,7 @@ async def list_vacancies_for_channel(
     rows = (
         await session.scalars(
             select(Vacancy)
-            .where(Vacancy.source_channel_id == channel_id)
+            .where(Vacancy.source_channel_id == channel_id, PARSED_ONLY)
             .order_by(
                 status_rank.asc(),
                 VACANCY_APPEARED_AT.desc(),

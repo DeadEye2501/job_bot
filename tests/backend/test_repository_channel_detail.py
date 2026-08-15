@@ -203,6 +203,36 @@ async def test_the_daily_rate_counts_only_the_last_thirty_days(
     assert card.stats.vacancies_per_day == 0.5
 
 
+async def test_an_unparsed_vacancy_is_counted_nowhere_on_the_card(
+    session, session_factory
+):
+    """Недоразобранная вакансия не идёт ни в воронку, ни в темп.
+
+    Числа карточки обещают то же, что человек увидит в выдаче. Пока разбор
+    не прошёл, у строки нет ни названия, ни оценки, а статус стоит начальный
+    — посчитанная, она добавляла бы каналу и «New», и долю подошедшего, за
+    которыми ничего нет.
+    """
+    channel = channel_row()
+    await put(session_factory, channel)
+    await put(
+        session_factory,
+        vacancy_row(source_channel_id=channel.id, created_at=days_ago(1)),
+        vacancy_row(
+            source_channel_id=channel.id,
+            created_at=days_ago(1),
+            is_parsed=False,
+            title=None,
+        ),
+    )
+
+    card = await get_channel_detail(session, channel.id)
+
+    assert card.stats.total == 1
+    assert card.stats.status_counts["New"] == 1
+    assert card.stats.vacancies_per_day == 0.0
+
+
 async def test_the_card_shows_an_active_mark_of_its_own_kind(
     session, session_factory
 ):

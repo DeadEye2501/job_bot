@@ -51,6 +51,27 @@ async def test_the_row_carries_its_counts_and_last_company(session, session_fact
     assert row.is_blacklisted is False
 
 
+async def test_an_unparsed_vacancy_is_not_counted(session, session_factory):
+    """Недоразобранная вакансия в счётчик человека не идёт.
+
+    Мини-список его карточки показывает только разобранные, и посчитанная
+    она развела бы число в строке со списком под ним.
+    """
+    hr = hr_row(name="Мария")
+    await put(session_factory, hr)
+    await put(
+        session_factory,
+        vacancy_row(hr_id=hr.id),
+        vacancy_row(hr_id=hr.id, is_parsed=False, title=None),
+    )
+
+    by_count, _ = await list_hr_with_counts(session)
+    by_activity, _ = await list_hr_with_counts(session, sort_by="last_activity")
+
+    assert next(r for r in by_count if r.hr.id == hr.id).vacancy_count == 1
+    assert next(r for r in by_activity if r.hr.id == hr.id).vacancy_count == 1
+
+
 async def test_vacancies_of_the_same_moment_are_broken_by_id(
     session, session_factory
 ):
