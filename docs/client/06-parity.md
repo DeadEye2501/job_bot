@@ -151,7 +151,7 @@
 
 - [x] **1. Оболочка окна.** Шапка, боковик, подвал, тосты, общая оболочка
       модалок, Escape и Enter, поп-ап непрочитанных. 53 расхождения.
-- [ ] **2. Вакансии: список и отбор.** Раскладка двух панелей, рама списка,
+- [x] **2. Вакансии: список и отбор.** Раскладка двух панелей, рама списка,
       очистка поиска, поля зарплаты, взаимное исключение, пустые состояния,
       свой компонент выбора даты вместо снесённого `flatpickr`.
       56 расхождений; закрывает и пункт Б8 этапа 5.
@@ -451,7 +451,7 @@ git add . && git commit -m "слайс 1: оболочка окна сведен
 компаний, свой порядок имён, счёт строк над списком, наведение на строку и на
 чип.
 
-- [ ] **Шаг 1. Написать падающие тесты на отбор**
+- [x] **Шаг 1. Написать падающие тесты на отбор**
 
 Модуль уже вывозит `blankFilter()`, `filterPayload(filter, now)`,
 `activeCount(filter, now)`, `pickNames(names, search)`, `GRADE_CHOICES`,
@@ -533,7 +533,7 @@ describe('дата в поле и в отборе', () => {
 });
 ```
 
-- [ ] **Шаг 2. Прогнать и увидеть красными**
+- [x] **Шаг 2. Прогнать и увидеть красными**
 
 ```bash
 cd client/web && npx vitest run tests/vacancy_filter.test.js tests/dates.test.js
@@ -541,7 +541,7 @@ cd client/web && npx vitest run tests/vacancy_filter.test.js tests/dates.test.js
 Ждём: FAIL — `pickExclusive` и `emptyNote` не объявлены, у `filterPayload`
 зарплаты нет, `state/dates.js` не разрешается.
 
-- [ ] **Шаг 3. Завести `state/dates.js` и дописать `state/vacancy_filter.js`**
+- [x] **Шаг 3. Завести `state/dates.js` и дописать `state/vacancy_filter.js`**
 
 **`showDate(iso)` и `asIso(text)` уже написаны** — `state/experience.js:13` и
 `:24`. Отбору нужны те же две; копировать их запрещено правилом 3, а оставить в
@@ -555,14 +555,14 @@ cd client/web && npx vitest run tests/vacancy_filter.test.js tests/dates.test.js
 плюс границы зарплаты внутри `filterPayload`. Всё переносится из образца
 (5050 и 5171–5199), а не сочиняется заново.
 
-- [ ] **Шаг 4. Прогнать — зелено**
+- [x] **Шаг 4. Прогнать — зелено**
 
 ```bash
 cd client/web && npx vitest run tests/vacancy_filter.test.js tests/dates.test.js tests/experience.test.js
 ```
 Последний — потому что `experience.js` сменил источник двух вывозов.
 
-- [ ] **Шаг 4а. Написать `DatePicker.svelte`**
+- [x] **Шаг 4а. Написать `DatePicker.svelte`**
 
 Свой компонент вместо `flatpickr`: поле набора плюс выпадающая сетка месяца.
 Что он умеет, снято с образца 877–1002 (тема) и с настроек `flatpickr` в
@@ -572,18 +572,18 @@ cd client/web && npx vitest run tests/vacancy_filter.test.js tests/dates.test.js
 Логика в компоненте не живёт: разбор и годность даты он берёт из
 `state/dates.js`, а наружу отдаёт ISO-дату.
 
-- [ ] **Шаг 5. Вернуть раскладку двух панелей**
+- [x] **Шаг 5. Вернуть раскладку двух панелей**
 
 `styles/vacancies.css` по образцу 1267–1290: `.vacancies-layout` —
 `display: grid; grid-template-columns: 275px 1fr`. `VacanciesScreen.svelte`
 показывает карточку в правой панели; `CardDialog.svelte` для вакансии больше
 не зовётся. Это образец для слайсов 3 и 4.
 
-- [ ] **Шаг 6. Свести список и панель отбора построчно**
+- [x] **Шаг 6. Свести список и панель отбора построчно**
 
-- [ ] **Шаг 7. Пройти таблицу замера** — 56 строк.
+- [x] **Шаг 7. Пройти таблицу замера** — 56 строк.
 
-- [ ] **Шаг 8. Пересобрать карты, прогнать, ревью**
+- [x] **Шаг 8. Пересобрать карты, прогнать, ревью**
 
 ```bash
 python C:/Users/deade/.claude/skills/free-hands/skills/keeping-code-clean/tools/module_map.py
@@ -592,7 +592,7 @@ cd client/web && npm test
 python -m pytest tests/client -q
 ```
 
-- [ ] **Шаг 9. Коммит**
+- [x] **Шаг 9. Коммит**
 
 ```bash
 git add . && git commit -m "слайс 2: список вакансий и отбор сведены с образцом"
