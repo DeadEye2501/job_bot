@@ -2,11 +2,12 @@
   // Пузырь переписки: что написано, когда и дошло ли.
   //
   // Своё письмо стоит справа, чужое слева — по стороне их и различают, не читая.
-  import { chatTime, tick } from '$state/chat.js';
+  import { attachmentKind, chatTime, tick } from '$state/chat.js';
 
   let { message, onopen } = $props();
 
   const mark = $derived(tick(message));
+  const attached = $derived(attachmentKind(message));
 </script>
 
 <div class="bubble" class:mine={!message.is_incoming} class:dropped={message.is_deleted}>
@@ -16,12 +17,18 @@
          ссылкой такой путь не открылся бы. Файла может и не быть вовсе: бот
          скачивает не всё, — и тогда остаётся имя без нажатия, потому что
          открывать нечего. -->
-    {#if message.media_kind && message.media_path}
+    {#if attached === 'photo'}
+      <!-- Снимок виден прямо в ленте: по нему и понимают, что прислали, не
+           выходя из переписки. -->
+      <button class="bubble-photo" type="button" onclick={() => onopen(message)}>
+        <img src={message.media_path} alt={message.media_name || 'снимок'} />
+      </button>
+    {:else if attached === 'file'}
       <button class="bubble-file" type="button" onclick={() => onopen(message)}>
         <span class="material-symbols-outlined">attach_file</span>
         <span>{message.media_name || 'вложение'}</span>
       </button>
-    {:else if message.media_kind}
+    {:else if attached === 'gone'}
       <span class="bubble-file missing">
         <span class="material-symbols-outlined">attach_file</span>
         <span>{message.media_name || 'вложение'} — файла нет на диске</span>

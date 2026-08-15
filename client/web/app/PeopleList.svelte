@@ -6,10 +6,10 @@
   import AskDialog from '$components/AskDialog.svelte';
   import NewPersonFields from '$components/NewPersonFields.svelte';
   import PersonRow from '$components/PersonRow.svelte';
-  import SearchList from '$components/SearchList.svelte';
+  import SearchBox from '$components/SearchBox.svelte';
   import { attempts } from '$state/attempts.js';
   import { named } from '$state/contacts.js';
-  import { PAGE, appended, refreshLimit } from '$state/paging.js';
+  import { PAGE, appended, nearBottom, refreshLimit } from '$state/paging.js';
 
   import PersonCard from './PersonCard.svelte';
 
@@ -22,6 +22,7 @@
   let adding = $state(false);
   let draft = $state({ name: '', telegram_username: '', telegram_user_id: '', notes: '' });
   let opened = $state(null);
+  let loadingMore = $state(false);
 
   const tries = attempts();
   let alive = true;
@@ -64,6 +65,19 @@
     return refresh();
   }
 
+  /** Дочитать следующую страницу, когда список подошёл к концу.
+   *
+   * Прокруткой, а не кнопкой: список читают сверху вниз и глазами, а кнопка
+   * посреди чтения заставляет целиться в неё мышью.
+   */
+  function scrolled(event) {
+    if (!hasMore || loadingMore || !nearBottom(event.currentTarget)) return;
+    loadingMore = true;
+    more().finally(() => {
+      loadingMore = false;
+    });
+  }
+
   /** Завести человека.
    *
    * Заслон один — назвать хоть чем-нибудь: карточка без имени, ника и номера
@@ -99,32 +113,58 @@
   });
 </script>
 
-<SearchList
-  {search}
-  placeholder="Поиск по имени и нику"
-  onsearch={find}
-  {loaded}
-  count={rows.length}
-  words={['человек', 'человека', 'человек']}
-  filtered={!!search}
-  nothing="Никого не найдено"
-  empty="Людей пока нет — они заведутся сами, когда бот разберёт переписку"
->
-  {#snippet actions()}
-    <button class="btn primary" type="button" onclick={() => (adding = true)}>
-      <span class="material-symbols-outlined">add</span>
-      Человек
-    </button>
-  {/snippet}
+<div class="cnt-layout">
+  <section class="cnt-list-pane">
+    <div class="cnt-list-toolbar">
+      <SearchBox value={search} placeholder="Поиск по имени, @username..." onsearch={find} />
+      <button
+        class="cnt-add-btn"
+        type="button"
+        title="Добавить HR"
+        onclick={() => (adding = true)}
+      >
+        <span class="material-symbols-outlined">person_add</span>
+      </button>
+    </div>
 
-  {#each rows as person (person.id)}
-    <PersonRow {person} onpick={() => (opened = person.id)} />
-  {/each}
+    <div class="cnt-list" onscroll={scrolled}>
+      {#if !loaded}
+        <div class="cnt-list-empty">Загрузка…</div>
+      {:else if rows.length === 0}
+        <div class="cnt-list-empty">
+          {#if search}
+            Никого не найдено по запросу «{search}».
+          {:else}
+            HR'ов пока нет.<br />Нажмите кнопку добавления вверху, чтобы создать первого.
+          {/if}
+        </div>
+      {:else}
+        {#each rows as person (person.id)}
+          <PersonRow
+            {person}
+            selected={opened === person.id}
+            onpick={() => (opened = person.id)}
+          />
+        {/each}
+      {/if}
+    </div>
+  </section>
 
-  {#if hasMore}
-    <button class="add-more" type="button" onclick={more}>Показать ещё</button>
-  {/if}
-</SearchList>
+  <section class="cnt-detail-pane">
+    {#if opened === null}
+      <div class="cnt-detail-empty">Выберите HR в списке слева</div>
+    {:else}
+      <PersonCard
+        {ask}
+        {say}
+        {events}
+        personId={opened}
+        onclose={() => (opened = null)}
+        onchanged={() => refresh(refreshLimit(rows.length))}
+      />
+    {/if}
+  </section>
+</div>
 
 {#if adding}
   <AskDialog
@@ -137,15 +177,4 @@
   >
     <NewPersonFields {draft} />
   </AskDialog>
-{/if}
-
-{#if opened}
-  <PersonCard
-    {ask}
-    {say}
-    {events}
-    personId={opened}
-    onclose={() => (opened = null)}
-    onchanged={() => refresh(refreshLimit(rows.length))}
-  />
 {/if}

@@ -38,6 +38,7 @@ import './styles/choice-row.css';
 import './styles/lang-rows.css';
 import './styles/cv-file.css';
 import './styles/collapsible.css';
+import './styles/contacts-layout.css';
 import './styles/contacts.css';
 import './styles/contact-card.css';
 import './styles/vacancies.css';

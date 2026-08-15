@@ -30,6 +30,18 @@ export function byDays(messages, now) {
   return days;
 }
 
+/** Чем показать вложение письма: снимком, строкой файла или ничем.
+ *
+ * Снимок виден прямо в ленте — по нему и понимают, что прислали, не выходя из
+ * переписки. Скачивает бот не всё: у нескачанного остаётся только имя, и
+ * нажимать на него нечего, а промолчать нельзя — письмо выглядело бы пустым.
+ */
+export function attachmentKind(message) {
+  if (!message.media_kind) return '';
+  if (!message.media_path) return 'gone';
+  return message.media_kind === 'photo' ? 'photo' : 'file';
+}
+
 /** Часы и минуты письма. Ведущий ноль обязателен: «9:5» читается как сломанное. */
 export function chatTime(sentAt) {
   const at = new Date(sentAt);

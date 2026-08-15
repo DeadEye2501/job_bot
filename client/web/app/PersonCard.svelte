@@ -1,15 +1,14 @@
 <script>
   // Карточка человека: его числа, поля и действия над ним.
   //
-  // Открывается поверх списка: человека правят и пишут ему, глядя на его же
-  // переписку, — уводить ради этого с экрана значило бы терять из виду соседей
-  // по списку.
+  // Стоит правой панелью рядом со списком: человека правят и пишут ему, не
+  // теряя из виду соседей, — рядом с ними и решают, кому писать следующему.
 
-  import CardDialog from '$components/CardDialog.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
+  import { attempts } from '$state/attempts.js';
   import { personCandidate, personName } from '$state/contacts.js';
   import { plural } from '$state/words.js';
 
@@ -23,21 +22,28 @@
   let asking = $state(null);
   let chosen = $state(null);
 
+  // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
+  // человека в ней переключают нажатием по соседней строке — ответ про
+  // прежнего, лёгший поверх свежего, показал бы его числа под новым именем.
+  const cardTries = attempts();
+  const vacancyTries = attempts();
   let alive = true;
 
   const shown = $derived(card ? personName({ ...card, id: card.hr_id }) : '');
   const chosenName = $derived(chosen ? personName(chosen) : '');
 
-  async function refresh() {
-    const now = await ask('hr.detail', personId);
-    if (!alive) return;
+  async function refresh(id) {
+    const mine = cardTries.next();
+    const now = await ask('hr.detail', id);
+    if (!alive || cardTries.stale(mine)) return;
     if (now === null) return (trouble = 'Не удалось прочитать карточку');
     card = now;
   }
 
-  async function loadVacancies() {
-    const now = await ask('hr.vacancies', { hr_id: personId });
-    if (now === null || !alive) return;
+  async function loadVacancies(id) {
+    const mine = vacancyTries.next();
+    const now = await ask('hr.vacancies', { hr_id: id });
+    if (now === null || !alive || vacancyTries.stale(mine)) return;
     vacancies = now.vacancies;
   }
 
@@ -48,7 +54,7 @@
    */
   async function save(part) {
     const done = await ask('hr.update', { hr_id: personId, ...part });
-    await refresh();
+    await refresh(personId);
     if (done !== null) onchanged();
   }
 
@@ -58,7 +64,7 @@
     if (done.was_inactive) say(`Возвращён в отсев: ${done.value}`);
     else if (done.existed) say(`Уже в отсеве: ${done.value}`);
     else say(`Занесён в отсев: ${done.value}`);
-    await refresh();
+    await refresh(personId);
     onchanged();
   }
 
@@ -66,7 +72,7 @@
     const done = await ask('hr.unblock', personId);
     if (done === null) return;
     say(done.updated ? 'Убран из отсева' : 'В отсеве его не было');
-    await refresh();
+    await refresh(personId);
     onchanged();
   }
 
@@ -97,15 +103,25 @@
 
   $effect(() => {
     alive = true;
-    refresh();
-    loadVacancies();
+    const id = personId;
+    // Показанное прежним человеком уходит сразу: панель одна, и его числа под
+    // новым именем читались бы как числа нового.
+    card = null;
+    trouble = '';
+    vacancies = [];
+    refresh(id);
+    loadVacancies(id);
     return () => {
       alive = false;
     };
   });
 </script>
 
-<CardDialog {trouble} ready={!!card} {onclose}>
+{#if trouble}
+  <div class="cnt-detail-empty">{trouble}</div>
+{:else if !card}
+  <div class="cnt-detail-empty">Загрузка…</div>
+{:else}
   <div class="modal-title card-head">
     {#if card.avatar}
       <img class="avatar" src={card.avatar} alt="" />
@@ -169,7 +185,7 @@
     {events}
     {card}
     onread={async () => {
-      await refresh();
+      await refresh(personId);
       onchanged();
     }}
   />
@@ -194,9 +210,8 @@
       <span class="material-symbols-outlined">delete</span>
       Удалить
     </button>
-    <button class="btn" type="button" onclick={() => onclose()}>Закрыть</button>
   </div>
-</CardDialog>
+{/if}
 
 {#if asking === 'delete'}
   <ConfirmDialog

@@ -7,6 +7,13 @@
   min-height: 0;
 }
 
+/* Поле раздела без отступов: вкладка с двумя панелями занимает его целиком, а
+   отступы и прокрутка у неё свои — внутри панелей. */
+.screen-body.flush {
+  padding: 0;
+  overflow: hidden;
+}
+
 .page-head {
   display: flex;
   justify-content: space-between;
