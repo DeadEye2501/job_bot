@@ -98,6 +98,21 @@
   color: var(--text-tertiary);
 }
 
+/* Снимок во всю ширину пузыря, но не выше своей меры: длинное фото иначе
+   вытесняет из ленты всё остальное. */
+.bubble-photo {
+  display: block;
+  max-width: 100%;
+}
+
+.bubble-photo img {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
 .bubble-file {
   display: inline-flex;
   align-items: center;

@@ -1,4 +1,122 @@
-/* Списки контактов: шапка с поиском, строки и отметки родов. */
+/* Списки контактов: шапка с поиском, строки и отметки родов.
+   Сами панели раздела — в contacts-layout.css. */
+
+.cnt-hr-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.cnt-hr-row:hover {
+  background: var(--accent-row-hover);
+}
+
+/* Выбранная строка помечена и подложкой, и полосой у края: одной подложки в
+   длинном списке глаз не находит. Отступ слева срезан на толщину полосы —
+   иначе строка дёргается вправо при выборе. */
+.cnt-hr-row.selected {
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+  background: var(--selected-bg);
+}
+
+/* Кружок в строке списка крупнее, чем в карточке вакансии: здесь по нему
+   человека и узнают, не читая имени. */
+.cnt-hr-row .hr-avatar {
+  width: 32px;
+  height: 32px;
+}
+
+.cnt-hr-info {
+  min-width: 0;
+}
+
+.cnt-hr-name {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.83rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Безымянного зовут словами, и слова эти набраны курсивом: так видно, что это
+   не имя, а его отсутствие. */
+.cnt-hr-name.muted {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.cnt-hr-sub {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cnt-hr-sub .at {
+  color: var(--text-secondary);
+  font-family: ui-monospace, monospace;
+}
+
+.cnt-hr-sub .company {
+  color: var(--text-secondary);
+}
+
+.cnt-hr-sub .muted {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.cnt-hr-sub .sep {
+  margin: 0 3px;
+}
+
+.cnt-hr-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Отсев виден значком, а не приглушённой строкой: приглушённая читается как
+   «просто пустая», а красный значок говорит, что бот её пропускает. */
+.cnt-hr-bl {
+  display: inline-flex;
+  align-items: center;
+  color: var(--danger);
+}
+
+.cnt-hr-bl .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.cnt-hr-row.blacklisted .cnt-hr-name {
+  color: var(--text-tertiary);
+}
+
+/* Счёт непрочитанного — сплошная акцентная пилюля: это единственное место
+   списка, куда человек смотрит первым делом. */
+.cnt-hr-unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-size: 0.65rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 
 .list-head {
   display: flex;

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { byDays, chatTime, sendBlock, tick, unread } from '../state/chat.js';
+import { attachmentKind, byDays, chatTime, sendBlock, tick, unread } from '../state/chat.js';
 
 const NOW = new Date('2026-08-14T21:00:00');
 
@@ -121,5 +121,27 @@ describe('можно ли отправлять', () => {
 
   it('одного номера учётной записи довольно', () => {
     expect(sendBlock({ telegram_username: '', telegram_user_id: 4242, blacklist_value: null })).toBe('');
+  });
+});
+
+describe('вложение в письме', () => {
+  it('картинка показывается фотографией', () => {
+    // В образце фото видно прямо в переписке; строкой со скрепкой оно требует
+    // выйти из окна, чтобы понять, что прислали.
+    expect(attachmentKind({ media_kind: 'photo', media_path: '/media/1.jpg' })).toBe('photo');
+  });
+
+  it('прочее остаётся вложением-файлом', () => {
+    expect(attachmentKind({ media_kind: 'document', media_path: '/media/cv.pdf' })).toBe('file');
+  });
+
+  it('нескачанное вложение названо, но не открывается', () => {
+    // Бот скачивает не всё: открывать нечего, а сказать, что вложение было,
+    // надо — иначе письмо выглядит пустым.
+    expect(attachmentKind({ media_kind: 'photo', media_path: null })).toBe('gone');
+  });
+
+  it('письмо без вложения вложения не показывает', () => {
+    expect(attachmentKind({ media_kind: null, media_path: null })).toBe('');
   });
 });

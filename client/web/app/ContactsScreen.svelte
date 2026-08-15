@@ -29,7 +29,7 @@
 
 <TopTabs tabs={CONTACTS_TABS} active={tab} onpick={(key) => (tab = key)} />
 
-<div class="screen-body">
+<div class="screen-body" class:flush={tab === 'people'}>
   {#if tab === 'channels'}
     <ChannelsList {ask} {say} {lockedTip} {events} />
   {:else if tab === 'companies'}
