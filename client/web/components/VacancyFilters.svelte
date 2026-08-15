@@ -20,9 +20,9 @@
   import FilterGroup from './FilterGroup.svelte';
   import PickList from './PickList.svelte';
 
-  let { applied, options, onapply } = $props();
-
-  let shown = $state(false);
+  // Открыта ли панель — знает экран, а не она сама: меню порядка стоит рядом,
+  // и открытое разом с панелью оно накрывало бы её собой.
+  let { applied, options, onapply, shown, onshown } = $props();
   // Наборы черновика делятся с применённым отбором, пока их не тронули: правят
   // их только через `toggled`, а он возвращает новый набор. Правка на месте
   // (`draft.statuses.add`) поехала бы и в применённый — «Отмена» перестала бы
@@ -45,7 +45,7 @@
       channelSearch = '';
       companySearch = '';
     }
-    shown = !shown;
+    onshown(!shown);
   }
 
   $effect(() => {
@@ -53,7 +53,7 @@
     // Нажатие мимо панели закрывает её и бросает черновик. Ухода мыши здесь
     // мало: панель большая, и мышь уходит с неё, пока человек ещё набирает.
     const away = (event) => {
-      if (!event.target.closest('.filter-wrap')) shown = false;
+      if (!event.target.closest('.filter-wrap')) onshown(false);
     };
     document.addEventListener('click', away);
     return () => document.removeEventListener('click', away);
@@ -77,7 +77,7 @@
         <span class="material-symbols-outlined">filter_list</span>
         <span class="filter-title">Фильтры</span>
         <span class="filter-meta">{count ? `${count} активных` : 'Без фильтров'}</span>
-        <button class="icon-btn" type="button" title="Закрыть" onclick={() => (shown = false)}>
+        <button class="icon-btn" type="button" title="Закрыть" onclick={() => onshown(false)}>
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
@@ -222,19 +222,19 @@
           class="btn"
           type="button"
           onclick={() => {
-            shown = false;
+            onshown(false);
             onapply(blankFilter());
           }}
         >
           Сбросить
         </button>
         <div class="filter-foot-right">
-          <button class="btn" type="button" onclick={() => (shown = false)}>Отмена</button>
+          <button class="btn" type="button" onclick={() => onshown(false)}>Отмена</button>
           <button
             class="btn primary"
             type="button"
             onclick={() => {
-              shown = false;
+              onshown(false);
               onapply({ ...draft });
             }}
           >

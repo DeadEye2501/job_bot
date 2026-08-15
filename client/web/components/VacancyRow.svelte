@@ -2,14 +2,14 @@
   // Строка вакансии: положение дел, оценка, название, подпись и стек.
   import { scoreTone, shownStack, vacancyLine } from '$state/vacancies.js';
 
-  let { vacancy, threshold, onpick } = $props();
+  let { vacancy, threshold, selected, onpick } = $props();
 
   const shown = $derived(vacancyLine(vacancy, new Date()));
   const tone = $derived(scoreTone(vacancy.score, threshold));
   const stack = $derived(shownStack(vacancy.stack));
 </script>
 
-<button class="vac-row" type="button" onclick={onpick}>
+<button class="vac-row" class:selected type="button" onclick={onpick}>
   <span class="vac-row-head">
     <span class="status-dot" data-status={vacancy.status}></span>
     {#if vacancy.score !== null}<span class="vac-score" data-tone={tone}>{vacancy.score}</span>{/if}

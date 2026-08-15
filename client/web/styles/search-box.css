@@ -1,0 +1,56 @@
+/* Строка поиска над списком: лупа, поле и крестик очистки.
+
+   Своим файлом, а не в оформлении списка: коробка одна на все списки окна —
+   вакансии и четыре вкладки контактов, — и различает их только полоса, в
+   которой она стоит. */
+
+.search-box {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.search-box .material-symbols-outlined {
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.78rem;
+}
+
+.search-input:focus {
+  outline: none;
+}
+
+/* Крестик стоит только при набранном: пустое поле чистить нечем, а место он
+   занимал бы всегда. */
+.search-clear {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--text-tertiary);
+}
+
+.search-clear:hover {
+  color: var(--text-secondary);
+  background: var(--surface-hover-firm);
+}
+
+.search-clear .material-symbols-outlined {
+  font-size: 14px;
+}

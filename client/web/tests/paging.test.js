@@ -2,7 +2,21 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { appended, refreshLimit } from '../state/paging.js';
+import { appended, nearBottom, refreshLimit } from '../state/paging.js';
+
+describe('догрузка по прокрутке', () => {
+  it('следующая страница просится, не доехав до самого низа', () => {
+    // Доехавший до низа человек уже упёрся в пустоту и ждёт: страницу надо
+    // просить заранее, чтобы список догрузился под ним на ходу.
+    expect(nearBottom({ scrollTop: 700, clientHeight: 300, scrollHeight: 1100 })).toBe(true);
+  });
+
+  it('в середине списка страницу не просят', () => {
+    // Иначе первая же прокрутка на пару строк вытянула бы весь перечень.
+    expect(nearBottom({ scrollTop: 100, clientHeight: 300, scrollHeight: 1100 })).toBe(false);
+  });
+
+});
 
 describe('догрузка следующей страницы', () => {
   it('строка, приехавшая дважды, не удваивается', () => {

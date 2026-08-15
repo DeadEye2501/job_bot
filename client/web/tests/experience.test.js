@@ -2,7 +2,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { asIso, cardTitle, period, showDate } from '../state/experience.js';
+import { asIso, showDate } from '../state/dates.js';
+import { cardTitle, period } from '../state/experience.js';
 
 describe('дата места работы', () => {
   it('с моста приходит одним видом, а показывается другим', () => {

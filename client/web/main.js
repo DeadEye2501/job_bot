@@ -20,6 +20,7 @@ import './styles/icon-button.css';
 import './styles/modal.css';
 import './styles/footer.css';
 import './styles/input.css';
+import './styles/search-box.css';
 import './styles/checkbox.css';
 import './styles/empty-note.css';
 import './styles/status-pill.css';
