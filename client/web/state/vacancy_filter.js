@@ -4,8 +4,8 @@
 // «Сейчас» тоже довод — сроки считаются от него, и без довода их нельзя было бы
 // проверить, не подменяя часы всей странице.
 
-import { asIso, validDate } from './dates.js';
-import { GRADES, WORK_FORMATS } from './profile.js';
+import { dayOf } from './dates.js';
+import { GRADES } from './profile.js';
 
 // Вариант «не отбираем». Пустая строка, а не слово: слово уехало бы на мост и
 // искалось бы подстрокой внутри значения — грейд и формат он сверяет так.
@@ -13,11 +13,21 @@ const ANY = '';
 
 const ALL = { value: ANY, label: 'Все' };
 
-/** Грейды и форматы работы объявлены анкетой: значения те же — и туда, и сюда
- *  они ездят через мост, а второе их написание разошлось бы с первым молча. */
+/** Грейды объявлены анкетой: значения те же — и туда, и сюда они ездят через
+ *  мост, а второе их написание разошлось бы с первым молча. */
 export const GRADE_CHOICES = [ALL, ...GRADES];
 
-export const REMOTE_CHOICES = [ALL, ...WORK_FORMATS];
+/** Форматы работы, какими их выбирают в отборе.
+ *
+ * Значения общие с анкетой — их читает мост, — а подписи и порядок свои:
+ * здесь ищут прежде всего удалёнку, и стоит она первой.
+ */
+export const REMOTE_CHOICES = [
+  ALL,
+  { value: 'remote', label: 'Удалёнка' },
+  { value: 'hybrid', label: 'Гибрид' },
+  { value: 'office', label: 'Офис' },
+];
 
 export const HR_CHOICES = [
   ALL,
@@ -82,11 +92,11 @@ function dayEdge(date, [hours, minutes, seconds, ms]) {
   return edge.toISOString();
 }
 
-// Набранный день, доведённый до края суток. Границей уезжает только годная
-// дата: у недобранной и у несуществующей границы нет вовсе.
-function typedDay(text, edge) {
-  if (validDate(text) !== true) return null;
-  const [year, month, day] = asIso(text).split('-').map(Number);
+// Выбранный день, доведённый до края суток. Невыбранной границы нет вовсе:
+// период с одним краем — такой же период, как и с обоими.
+function pickedDay(iso, edge) {
+  if (!iso) return null;
+  const { year, month, day } = dayOf(iso);
   return dayEdge(new Date(year, month - 1, day), edge);
 }
 
@@ -103,7 +113,7 @@ function dates(filter, now) {
     return { from: new Date(now.getTime() - 30 * DAY).toISOString(), to: null };
   }
   if (filter.datePreset === 'range') {
-    return { from: typedDay(filter.dateFrom, DAY_START), to: typedDay(filter.dateTo, DAY_END) };
+    return { from: pickedDay(filter.dateFrom, DAY_START), to: pickedDay(filter.dateTo, DAY_END) };
   }
   return { from: null, to: null };
 }
@@ -137,40 +147,46 @@ export function filterPayload(filter, now) {
   return payload;
 }
 
-// Ключи, из которых собирается одно условие. Вилка о двух половинах — одно
-// условие, срок с обеими границами — тоже одно: иначе «2 активных» на одной
+const filled = (text) => text.trim() !== '';
+
+// Девять групп панели: каждая стоит или не стоит. Вилка о двух половинах —
+// одно условие, срок со своими датами — тоже одно: иначе «2 активных» на одной
 // вилке человек читает как два разных отбора.
 const CONDITIONS = [
-  ['statuses'],
-  ['channels'],
-  ['companies'],
-  ['score_min', 'score_max'],
-  ['salary_min', 'salary_max'],
-  ['grade'],
-  ['remote'],
-  ['hr_contact'],
-  ['date_from', 'date_to'],
+  (filter) => filter.statuses.size > 0,
+  (filter) => filter.channels.size > 0,
+  (filter) => filter.companies.size > 0,
+  (filter) => filled(filter.scoreMin) || filled(filter.scoreMax),
+  (filter) => filled(filter.salaryMin) || filled(filter.salaryMax),
+  (filter) => filter.grade !== ANY,
+  (filter) => filter.remote !== ANY,
+  (filter) => filter.hrContact !== ANY,
+  (filter) => filter.datePreset !== ANY || filled(filter.dateFrom) || filled(filter.dateTo),
 ];
 
 /** Сколько условий отбора сейчас стоит.
  *
- * Считается по тому же, что уезжает на мост, а не по заполненности полей:
- * выбранный срок без набранных дат ничего не сужает, и насчитанное над ним
- * условие зажигало бы воронку над полным списком — то есть врало бы ровно о
- * том, ради чего она заведена.
+ * Считается по выбранному в панели, а не по тому, что доехало до моста:
+ * нажатый чип «Периода…» и набранный обрывок числа обязаны отозваться в
+ * счётчике сразу, иначе нажатие выглядит непринятым.
  */
-export function activeCount(filter, now) {
-  const sent = filterPayload(filter, now);
-  return CONDITIONS.filter((keys) => keys.some((key) => key in sent)).length;
+export function activeCount(filter) {
+  return CONDITIONS.filter((stands) => stands(filter)).length;
 }
 
-/** Имена для выбора: просеянные поиском и выстроенные по-русски.
+/** Потолок перечня компаний. Их бывают тысячи, а панель под них — 140
+ *  пикселей: без потолка открытие перерисовывало бы всю базу ради первых
+ *  пяти строк. У каналов потолка нет — их десятки. */
+export const COMPANY_MAX = 80;
+
+/** Имена для выбора: просеянные поиском, выстроенные по-русски и обрезанные
+ *  потолком, если его назвали.
  *
  * Мост отдаёт их в порядке базы — по кодам букв «ё» и строчные уехали бы в
  * хвост, и человек искал бы компанию не там, где её ждёт.
  */
-export function pickNames(names, search) {
+export function pickNames(names, search, limit = names.length) {
   const needle = search.trim().toLowerCase();
   const found = needle ? names.filter((one) => one.toLowerCase().includes(needle)) : names;
-  return [...found].sort((one, other) => one.localeCompare(other, 'ru'));
+  return [...found].sort((one, other) => one.localeCompare(other, 'ru')).slice(0, limit);
 }

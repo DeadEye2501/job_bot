@@ -1,0 +1,102 @@
+/* Поле даты и сетка месяца под ним. */
+
+.date-picker {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Моноширинный: в `дд.мм.гггг` знаки стоят на своих местах, и по обычному
+   шрифту не видно, добран ли день. */
+.input-date-text {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.83rem;
+}
+
+.input-date-text:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.input-date-text.invalid {
+  border-color: var(--err);
+}
+
+.date-panel {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  width: 224px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  box-shadow: 0 8px 24px var(--scrim);
+}
+
+.date-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0 4px;
+}
+
+/* Стрелки светятся лаймом, а не заливаются: календарь стоит на своей подложке,
+   и квадрат заливки на ней читается как вторая коробка. */
+.date-head .icon-btn:hover {
+  background: transparent;
+  color: var(--accent);
+}
+
+.date-title {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.date-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.date-weekday {
+  padding: 3px 0;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.date-cell {
+  height: 28px;
+}
+
+.date-day {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+
+.date-day:hover {
+  background: var(--selected-bg);
+}
+
+.date-day.today {
+  border-color: var(--accent);
+}
+
+.date-day.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-weight: 500;
+}

@@ -49,6 +49,7 @@ import './styles/timeline.css';
 import './styles/vacancy-filters.css';
 import './styles/filter-group.css';
 import './styles/pick-list.css';
+import './styles/date-picker.css';
 import './styles/stats.css';
 import './styles/donut.css';
 import './styles/skills.css';

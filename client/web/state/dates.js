@@ -6,6 +6,11 @@
 
 const DMY = /^(\d{2})\.(\d{2})\.(\d{4})$/;
 
+// Ведущий ноль. Мост разбирает ISO по знакам, и `2026-8-4` он не прочтёт.
+function padded(number) {
+  return String(number).padStart(2, '0');
+}
+
 /** Дата в том виде, в каком её читают и набирают.
  *
  * Мост говорит `2020-03-01`, человек — `01.03.2020`. Покажи ему первое, он
@@ -27,6 +32,21 @@ export function asIso(text) {
   if (parts === null) return null;
   const [, day, month, year] = parts;
   return `${year}-${month}-${day}`;
+}
+
+/** ISO-дата, разобранная на числа.
+ *
+ * Числами, а не строками: календарь открывается на том месяце, что уже
+ * выбран, и сравнивать «08» с восьмёркой пришлось бы в каждой клетке сетки.
+ */
+export function dayOf(iso) {
+  const [year, month, day] = iso.split('-').map(Number);
+  return { year, month, day };
+}
+
+/** Выбранный в календаре день в том виде, в каком его принимает мост. */
+export function isoDay(year, month, day) {
+  return `${year}-${padded(month)}-${padded(day)}`;
 }
 
 /** Годна ли набранная дата: да, нет или «ещё набирают».

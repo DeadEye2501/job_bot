@@ -28,7 +28,7 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  z-index: 2;
+  z-index: 35;
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -43,4 +43,15 @@
   max-height: 140px;
   margin-top: 6px;
   overflow-y: auto;
+}
+
+.pick-list .checkbox-row {
+  font-size: 0.74rem;
+}
+
+/* Надпись о пустоте прижата к строкам, а не расставлена по центру пустого
+   экрана: под неё здесь 140 пикселей, и общие отступы съели бы их целиком. */
+.pick-list .empty-note {
+  padding: 6px 2px;
+  font-size: 0.72rem;
 }
