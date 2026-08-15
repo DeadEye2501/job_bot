@@ -13,14 +13,6 @@
 
 .btn:hover:not(:disabled) { border-color: var(--accent); }
 
-/* Значок внутри кнопки мельче текста и приподнят: иначе он перевешивает
-   подпись и съезжает вниз относительно её базовой линии. */
-.btn .material-symbols-outlined {
-  font-size: 14px;
-  position: relative;
-  top: 1px;
-}
-
 .btn.primary {
   background: var(--accent);
   color: var(--bg-primary);

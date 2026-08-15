@@ -11,6 +11,7 @@
 
   import { call } from '$api/bridge.js';
   import { listener } from '$api/events.js';
+  import { attempts } from '$state/attempts.js';
   import ContactsScreen from './ContactsScreen.svelte';
   import LogsScreen from './LogsScreen.svelte';
   import ProfileScreen from './ProfileScreen.svelte';
@@ -28,7 +29,7 @@
   import UnreadBadge from '$components/UnreadBadge.svelte';
   import { LAMPS, allAlive, blockedTip, shouldTurnOff } from '$state/health.js';
   import { OFF } from '$state/modes.js';
-  import { bar, caption } from '$state/progress.js';
+  import { STARTING, bar, caption, rerunNote } from '$state/progress.js';
   import { SECTIONS, SYSTEM_TABS } from '$state/sections.js';
 
   const PLAQUE_MS = 2800;
@@ -38,19 +39,21 @@
   // разъедься они — второй обход начался бы с хвостом первого.
   const NOTHING_YET = { channels: { label: '', current: 0, total: 0 }, messages: { current: 0, total: 0 } };
 
-  // Часы страницы. У домена своих нет вовсе — он отвечает по вопросу, — и
-  // спрашивать здоровье некому, кроме нас: вестью оно не приходит. Пять секунд
-  // и пятнадцать взяты у прежнего окна: столько же били его таймеры.
+  // Часы здоровья. Спрашивать его некому, кроме нас: вестью оно не приходит —
+  // мост объявляет только то, что случилось само (`client/bridge/lifespan.py`),
+  // а здоровье он меряет по вопросу. Непрочитанное часов не требует: о нём
+  // весть есть, и она приходит на каждое сохранённое письмо.
   const HEALTH_EVERY_MS = 5000;
-  const UNREAD_EVERY_MS = 15000;
 
-  const MODE_TITLE = 'Режим бота: выключен, только переписка, полный вперёд';
-  const RUN_TITLE = 'Обход каналов помимо расписания';
+  const MODE_TITLE = 'Режим работы — клик переключает';
+  const RUN_TITLE = 'Прогнать цикл прямо сейчас';
+  const STOP_TITLE = 'Остановить цикл';
 
   // Слушатель заведён здесь, а не в эффекте: экраны получают его параметром и
   // подписываются в своих эффектах, а те срабатывают раньше нашего. Цикл при
   // этом заводит всё равно эффект — до него слушатель молчит.
   const heard = listener((after) => call('system.events', after));
+  const chatTries = attempts();
 
   // Пока неизвестно, доведена ли настройка до конца, окно не показывает
   // ничего: мелькнувшее на миг приложение с пустыми списками человек прочтёт
@@ -61,6 +64,15 @@
   let expanded = $state(false);
   let health = $state(null);
   let unread = $state(0);
+  // Список непрочитанных переписок: открыт ли, ждём ли ответа и что в нём.
+  let chatsOpen = $state(false);
+  let chatsLoading = $state(false);
+  let chats = $state([]);
+  // Кого открыть, придя в контакты из списка непрочитанного. Отметка разовая:
+  // контакты сообщают, что приняли её, и она гаснет. Останься она лежать —
+  // каждый следующий заход в раздел заново открывал бы ту же карточку, и до
+  // остальных вкладок было бы не добраться.
+  let openPerson = $state(null);
   let mode = $state(OFF);
   let running = $state(false);
   let crawling = $state(false);
@@ -146,9 +158,51 @@
     if (fresh !== null) await applyHealth(fresh);
   }
 
+  /** Перечитать счёт непрочитанного, а с ним и открытый список.
+   *
+   * Список перечитывается на месте: он висит поверх окна, и пришедшее письмо
+   * иначе было бы видно счётчиком, но не строкой — до закрытия и повторного
+   * открытия. Опустевший счёт список закрывает: показывать в нём нечего.
+   */
   async function askUnread() {
     const answer = await ask('system.unread');
-    if (answer !== null) unread = answer.count;
+    if (answer === null) return;
+    unread = answer.count;
+    if (unread === 0) chatsOpen = false;
+    if (chatsOpen) await askChats();
+  }
+
+  /** Перечитать список.
+   *
+   * Свой счёт попыток: спрашивают его и нажатием, и вестью о письме, и эти два
+   * зова обгоняют друг друга — лёгший поверх свежего старый ответ показал бы
+   * список без только что пришедшего.
+   */
+  async function askChats() {
+    const mine = chatTries.next();
+    chatsLoading = true;
+    const answer = await ask('system.unread_chats');
+    if (chatTries.stale(mine)) return;
+    chatsLoading = false;
+    if (answer !== null) chats = answer.chats;
+  }
+
+  /** Открыть или закрыть список непрочитанных переписок.
+   *
+   * Пустой счётчик не открывается вовсе: список был бы пуст, а нажатие,
+   * которое ничего не показывает, читается как поломка.
+   */
+  async function toggleChats() {
+    if (unread === 0) return;
+    chatsOpen = !chatsOpen;
+    if (chatsOpen) await askChats();
+  }
+
+  /** Уйти из списка в переписку с выбранным. */
+  function openChat(id) {
+    chatsOpen = false;
+    openPerson = { id };
+    section = 'contacts';
   }
 
   async function pickMode(chosen) {
@@ -169,7 +223,9 @@
   function started() {
     crawling = true;
     running = true;
-    single = '';
+    // Первая весть о ходе приходит не сразу: до неё полосы уже бегут, и подпись
+    // под ними обязана сказать, чем бот занят.
+    single = STARTING;
     channels = NOTHING_YET.channels;
     messages = NOTHING_YET.messages;
   }
@@ -183,12 +239,19 @@
    *
    * У прогона одной вакансии счёта нет вовсе — бот шлёт нули, — и полосы по
    * нему не двигаются: двинь их, они показали бы пустоту вместо хода. Своё имя
-   * он говорит подписью, и она же гаснет с началом обхода.
+   * он говорит подписью, а первая весть о счёте её гасит: дальше подпись
+   * считают полосы.
    */
   function moved(step) {
-    if (step.stage === 'rerun') single = step.label;
-    if (step.stage === 'channel') channels = { ...step };
-    if (step.stage === 'message') messages = { current: step.current, total: step.total };
+    if (step.stage === 'rerun') single = rerunNote(step.label);
+    if (step.stage === 'channel') {
+      single = '';
+      channels = { ...step };
+    }
+    if (step.stage === 'message') {
+      single = '';
+      messages = { current: step.current, total: step.total };
+    }
   }
 
   function watch() {
@@ -205,14 +268,12 @@
   $effect(() => {
     watch();
     const health_clock = setInterval(askHealth, HEALTH_EVERY_MS);
-    const unread_clock = setInterval(askUnread, UNREAD_EVERY_MS);
     askSetup();
     refresh();
     return () => {
       alive = false;
       heard.stop();
       clearInterval(health_clock);
-      clearInterval(unread_clock);
       clearTimeout(plaqueTimer);
     };
   });
@@ -250,7 +311,14 @@
     {#if section === 'profile'}
       <ProfileScreen {ask} />
     {:else if section === 'contacts'}
-      <ContactsScreen {ask} {say} {lockedTip} events={heard} />
+      <ContactsScreen
+        {ask}
+        {say}
+        {lockedTip}
+        {openPerson}
+        onopened={() => (openPerson = null)}
+        events={heard}
+      />
     {:else if section === 'stats'}
       <StatsScreen {ask} />
     {:else if section === 'vacancies'}
@@ -264,7 +332,7 @@
       {/if}
     {:else}
       <div class="placeholder-content">
-        Раздел «{sectionLabel}» — экран ещё не переехал
+        Раздел «{sectionLabel}» — экран ещё не реализован
       </div>
     {/if}
   </main>
@@ -300,10 +368,17 @@
       <RunButton
         {running}
         disabled={locked}
-        title={locked ? lockedTip : RUN_TITLE}
+        title={locked ? lockedTip : (running ? STOP_TITLE : RUN_TITLE)}
         onpress={toggleRun}
       />
-      <UnreadBadge count={unread} />
+      <UnreadBadge
+        count={unread}
+        open={chatsOpen}
+        loading={chatsLoading}
+        rows={chats}
+        ontoggle={toggleChats}
+        onpick={openChat}
+      />
     </div>
   </div>
 </div>

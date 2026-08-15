@@ -9,6 +9,5 @@
   data-running={running}
   {title}
   aria-disabled={disabled}
-  aria-label={running ? 'Остановить обход' : 'Запустить обход'}
   onclick={() => onpress()}
 ></button>

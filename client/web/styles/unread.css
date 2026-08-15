@@ -1,5 +1,4 @@
-/* Счёт непрочитанного: пилюля со значком письма.
-   Ни курсора-руки, ни подсветки по наведению — почему, сказано в компоненте. */
+/* Счёт непрочитанного: пилюля со значком письма и список под ней. */
 
 .badge-unread {
   display: inline-flex;
@@ -20,4 +19,91 @@
 .badge-unread[data-has-unread='true'] {
   background: var(--selected-bg);
   color: var(--accent);
+}
+
+.badge-unread:hover {
+  background: var(--surface-raised-hover);
+}
+
+.badge-unread[data-has-unread='true']:hover {
+  background: var(--accent-badge-hover);
+}
+
+/* Список висит над счётчиком и накрывает окно ловушкой нажатий: попасть мимо
+   него мышью — то же самое, что закрыть. */
+.unread-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 900;
+}
+
+.unread-popup {
+  position: fixed;
+  right: 12px;
+  bottom: 38px;
+  width: 280px;
+  max-height: 320px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px var(--shadow-popup);
+  display: flex;
+  flex-direction: column;
+  z-index: 901;
+  overflow: hidden;
+}
+
+.unread-popup-empty {
+  padding: 12px 14px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.unread-popup-list {
+  overflow-y: auto;
+}
+
+.unread-popup-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  text-align: left;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--surface-raised);
+}
+
+.unread-popup-row:last-child {
+  border-bottom: 0;
+}
+
+.unread-popup-row:hover {
+  background: var(--surface-raised);
+}
+
+.unread-popup-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  font-size: 0.82rem;
+}
+
+.unread-popup-sub {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+}
+
+.unread-popup-count {
+  background: var(--selected-bg);
+  color: var(--accent);
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  min-width: 18px;
+  text-align: center;
 }
