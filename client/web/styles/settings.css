@@ -2,7 +2,8 @@
    Что внутри секций — сетка полей, пороги, опасная зона — своими файлами. */
 
 .settings-page {
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 14px 20px;
   min-height: 0;
   flex: 1;

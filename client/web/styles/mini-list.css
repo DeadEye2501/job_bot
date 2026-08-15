@@ -63,7 +63,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-.vac-mini-title {
+/* Имя вакансии и имя человека обрезаются многоточием одинаково: обе строки
+   стоят в среднем треке своей сетки, и длинное имя распирало бы панель. */
+.vac-mini-title,
+.hr-mini-name {
   overflow: hidden;
   color: var(--text-primary);
   text-overflow: ellipsis;
@@ -80,10 +83,6 @@
   width: 22px;
   height: 22px;
   font-size: 0.65rem;
-}
-
-.hr-mini-name {
-  color: var(--text-primary);
 }
 
 .hr-mini-meta {

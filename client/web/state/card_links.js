@@ -1,12 +1,9 @@
-// Куда ведут связи карточки вакансии: наружу — в Telegram и на сайт компании,
-// внутрь — в карточки контактов.
+// Куда ведут связи карточки вакансии: в карточки контактов и в подборщик.
 //
-// Чистые функции: карточка приходит доводом, наружу уходят адреса и отметки
-// «куда идти». Ни моста, ни разметки этот файл не знает.
+// Чистые функции: карточка приходит доводом, наружу уходят отметки «куда
+// идти». Ни моста, ни разметки этот файл не знает.
 
-import { siteHref } from './companies.js';
-
-/** Пять связей карточки: две наружу, две внутрь и одна в подборщик.
+/** Три связи карточки: две внутрь и одна в подборщик.
  *
  * Пустая связь названа пустотой, а не пропущена: карточка ставит на её место
  * неподвижную подпись, и разбирать, чего в ответе нет, ей было бы нечем.
@@ -19,12 +16,10 @@ export function cardLinks(card) {
   const hr = card.hr;
   const linked = card.company_id !== null && card.company_id !== undefined;
   return {
-    hrChat: hr?.telegram_username ? `https://t.me/${hr.telegram_username}` : null,
     // Ключи вкладок те же, какими их знает раздел контактов (`sections.js`):
     // по ним он и выбирает, какую открыть.
     hrCard: hr?.id === null || hr?.id === undefined ? null : { tab: 'people', id: hr.id },
     companyCard: linked ? { tab: 'companies', id: card.company_id } : null,
     companyPick: !linked && card.company_name ? card.company_name : null,
-    site: siteHref(card.company_website),
   };
 }

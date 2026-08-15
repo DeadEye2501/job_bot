@@ -116,13 +116,19 @@
 .bl-row:not(.head) > .bl-kind-chip,
 .bl-row:not(.head) > .bl-input.value,
 .bl-row:not(.head) > .bl-when,
-.bl-row:not(.head) > .toggle,
 .bl-row:not(.head) > .icon-btn {
   margin-top: 3px;
 }
 
 .bl-row > .toggle {
   justify-self: center;
+}
+
+/* Тумблер вдвое ниже поля значения, и общей поправки ряда ему мало: по верхнему
+   краю он встаёт выше текста соседей. Своя поправка опускает его на середину
+   первой строки — там, где ряд выравнен по началу, это и есть «вровень». */
+.bl-row:not(.head) > .toggle {
+  margin-top: 8px;
 }
 
 /* Удаление здесь красное: строку отсева убирают навсегда, и отличать эту
@@ -132,9 +138,12 @@
   color: var(--danger);
 }
 
+/* Пилюля растянута на всю колонку рода, и имя в ней стоит по центру: у четырёх
+   родов длина слова разная, и прижатые влево они читались бы лесенкой. */
 .bl-kind-chip {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 1px 8px;
   border-radius: 10px;
@@ -168,6 +177,9 @@
    таблица из полусотни строк выглядела бы анкетой. */
 .bl-input {
   width: 100%;
+  /* Поле ввода само по себе шире своей колонки: ширина у него считается по
+     умолчанию движка, а не по `width`, и без этого таблица распирает панель. */
+  min-width: 0;
   padding: 3px 6px;
   border: 1px solid transparent;
   border-radius: 3px;
