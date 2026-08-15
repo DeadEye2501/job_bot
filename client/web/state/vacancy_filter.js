@@ -4,7 +4,7 @@
 // «Сейчас» тоже довод — сроки считаются от него, и без довода их нельзя было бы
 // проверить, не подменяя часы всей странице.
 
-import { asIso } from './experience.js';
+import { asIso, validDate } from './dates.js';
 import { GRADES, WORK_FORMATS } from './profile.js';
 
 // Вариант «не отбираем». Пустая строка, а не слово: слово уехало бы на мост и
@@ -82,16 +82,12 @@ function dayEdge(date, [hours, minutes, seconds, ms]) {
   return edge.toISOString();
 }
 
-// Набранный день, доведённый до края суток. Границей уезжает только целая и
-// существующая дата: недобранное человек набирает посимвольно, а «31.02» часы
-// перекатывают на март — и отбор молча пошёл бы не по тем суткам.
+// Набранный день, доведённый до края суток. Границей уезжает только годная
+// дата: у недобранной и у несуществующей границы нет вовсе.
 function typedDay(text, edge) {
-  const iso = asIso(text);
-  if (iso === null) return null;
-  const [year, month, day] = iso.split('-').map(Number);
-  const at = new Date(year, month - 1, day);
-  if (at.getMonth() + 1 !== month || at.getDate() !== day) return null;
-  return dayEdge(at, edge);
+  if (validDate(text) !== true) return null;
+  const [year, month, day] = asIso(text).split('-').map(Number);
+  return dayEdge(new Date(year, month - 1, day), edge);
 }
 
 // Границы срока. У недели и месяца верхней нет: она отрезала бы то, что

@@ -1,4 +1,108 @@
-/* Список вакансий: строка в три этажа — заголовок, подпись, стек. */
+/* Экран вакансий: список слева, подробности справа, строка в три этажа. */
+
+/* Список и подробности стоят рядом, а не поверх друг друга: вакансии
+   перебирают подряд, и окно поверх списка пришлось бы закрывать на каждой. */
+.vacancies-layout {
+  display: grid;
+  grid-template-columns: 275px 1fr;
+  height: 100%;
+  min-height: 0;
+}
+
+.vac-list-pane {
+  border-right: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Шапка стоит на месте, а ездит только список: поиск и отбор нужны как раз
+   тогда, когда список пролистан. */
+.vac-list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  position: relative;
+}
+
+/* Меню порядка падает из полосы и прижато к её правому краю — под кнопку, из
+   которой открылось. */
+.vac-sort-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 8px;
+  width: 200px;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  box-shadow: 0 8px 22px var(--scrim);
+  z-index: 20;
+}
+
+.vac-sort-option {
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: 4px;
+  text-align: left;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+}
+
+.vac-sort-option:hover {
+  background: var(--accent-hover-soft);
+}
+
+.vac-sort-option.active {
+  background: var(--accent-option-active);
+  color: var(--accent);
+}
+
+.vac-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.vac-list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  padding: 24px;
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+  text-align: center;
+  /* Приглашение включить бота набрано в две строки. */
+  white-space: pre-line;
+}
+
+.vac-list-empty .material-symbols-outlined {
+  font-size: 32px;
+  opacity: 0.45;
+}
+
+.vac-detail-pane {
+  background: var(--bg-primary);
+  overflow-y: auto;
+  padding: 14px 18px;
+  min-height: 0;
+}
+
+.vac-detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  text-align: center;
+}
 
 .vac-row {
   display: flex;
@@ -13,6 +117,14 @@
 
 .vac-row:hover {
   background: var(--accent-row-hover);
+}
+
+/* Открытая вакансия отмечена в списке: соседние строки читают, не теряя из
+   виду ту, что стоит справа. */
+.vac-row.selected {
+  background: var(--selected-bg);
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
 }
 
 .vac-row-head {

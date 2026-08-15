@@ -1,6 +1,7 @@
 <script>
   // Место работы: свёрнутая шапка и всё остальное под ней.
-  import { asIso, cardTitle, showDate } from '$state/experience.js';
+  import { asIso, showDate } from '$state/dates.js';
+  import { cardTitle } from '$state/experience.js';
 
   import BulletList from './BulletList.svelte';
   import SkillPicker from './SkillPicker.svelte';

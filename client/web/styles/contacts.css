@@ -19,36 +19,6 @@
   margin-bottom: 6px;
 }
 
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 4px 8px;
-  flex: 1;
-  max-width: 320px;
-}
-
-.search-box .material-symbols-outlined {
-  font-size: 16px;
-  color: var(--text-tertiary);
-}
-
-.search-input {
-  background: transparent;
-  border: 0;
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: 0.83rem;
-  width: 100%;
-}
-
-.search-input:focus {
-  outline: none;
-}
-
 .contact-list {
   display: flex;
   flex-direction: column;

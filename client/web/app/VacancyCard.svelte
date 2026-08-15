@@ -5,7 +5,6 @@
   // Открывается поверх списка: вакансию читают, не теряя из виду соседние, —
   // рядом с ними и решают, стоит ли она отклика.
 
-  import CardDialog from '$components/CardDialog.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import RawTextDialog from '$components/RawTextDialog.svelte';
   import StatusPicker from '$components/StatusPicker.svelte';
@@ -183,7 +182,11 @@
   });
 </script>
 
-<CardDialog {trouble} ready={!!card} {onclose}>
+{#if trouble}
+  <div class="vac-detail-empty">{trouble}</div>
+{:else if !card}
+  <div class="vac-detail-empty">Загрузка…</div>
+{:else}
   <div class="modal-title vac-card-head">
     <div class="pop-wrap">
       <button class="status-badge" type="button" onclick={() => (picking = !picking)}>
@@ -277,7 +280,7 @@
   <div class="modal-actions card-actions">
     <button class="btn" type="button" onclick={() => onclose()}>Закрыть</button>
   </div>
-</CardDialog>
+{/if}
 
 {#if asking === 'send'}
   <ConfirmDialog

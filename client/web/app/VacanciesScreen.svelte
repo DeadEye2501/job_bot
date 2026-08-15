@@ -3,16 +3,15 @@
 
   import { untrack } from 'svelte';
 
-  import Dropdown from '$components/Dropdown.svelte';
-  import SearchList from '$components/SearchList.svelte';
+  import SearchBox from '$components/SearchBox.svelte';
   import VacancyFilters from '$components/VacancyFilters.svelte';
   import VacancyRow from '$components/VacancyRow.svelte';
 
   import VacancyCard from './VacancyCard.svelte';
   import { attempts } from '$state/attempts.js';
-  import { PAGE, appended, refreshLimit } from '$state/paging.js';
+  import { VACANCY_PAGE, appended, nearBottom, refreshLimit } from '$state/paging.js';
   import { blankFilter, filterPayload } from '$state/vacancy_filter.js';
-  import { SORTS, sortKey } from '$state/vacancies.js';
+  import { SORTS, emptyNote, sortKey } from '$state/vacancies.js';
 
   // `lockedTip` приходит сверху, а не спрашивается здесь: лампы состояния
   // опрашивает оболочка для нижней полосы, и второй опрос из карточки дал бы
@@ -22,10 +21,15 @@
   let loaded = $state(false);
   let rows = $state([]);
   let hasMore = $state(false);
+  let loadingMore = $state(false);
   let search = $state('');
   let sort = $state(SORTS[0].label);
   let threshold = $state(null);
   let opened = $state(null);
+  // Меню порядка и панель отбора взаимно гасят друг друга: обе падают из одной
+  // полосы, и открытые разом они накрывают одна другую.
+  let sortOpen = $state(false);
+  let filterOpen = $state(false);
   let applied = $state(blankFilter());
   // Границы срока замораживаются в миг применения: пересчитай их к следующей
   // странице, скользящее окно «за неделю» уехало бы вперёд, а `offset`
@@ -48,8 +52,11 @@
    * Потолок — довод: по вести о новых вакансиях список перечитывается тем
    * числом строк, которое уже показано.
    */
-  async function refresh(limit = PAGE) {
+  async function refresh(limit = VACANCY_PAGE) {
     const mine = tries.next();
+    // Идущая догрузка этим зовом обесценена: её ответ уже не ляжет, и держать
+    // по ней запор значит молча не догружать свежий список до самого ответа.
+    loadingMore = false;
     const now = await ask('vacancies.list', {
       search,
       sort: sortKey(sort),
@@ -72,13 +79,27 @@
     const page = await ask('vacancies.list', {
       search,
       sort: sortKey(sort),
-      limit: PAGE,
+      limit: VACANCY_PAGE,
       offset: rows.length,
       ...asked,
     });
     if (page === null || !alive || tries.stale(mine)) return;
     rows = appended(rows, page.vacancies);
     hasMore = page.has_more;
+  }
+
+  /** Догрузить, когда список подъехал к низу.
+   *
+   * Одна страница за раз: прокрутка сыплет событиями десятками в секунду, и
+   * без запора на уже идущий зов мост получил бы их все.
+   */
+  function scrolled(event) {
+    if (!hasMore || loadingMore) return;
+    if (!nearBottom(event.currentTarget)) return;
+    loadingMore = true;
+    more().finally(() => {
+      loadingMore = false;
+    });
   }
 
   function find(text) {
@@ -88,6 +109,7 @@
 
   function order(label) {
     sort = label;
+    sortOpen = false;
     return refresh();
   }
 
@@ -96,6 +118,17 @@
     asked = filterPayload(next, new Date());
     return refresh();
   }
+
+  $effect(() => {
+    if (!sortOpen) return;
+    // Нажатие мимо закрывает меню. Оно падает поверх списка, и оставленное
+    // открытым закрывает собой те самые строки, ради которых порядок меняли.
+    const away = (event) => {
+      if (!event.target.closest('.vac-list-toolbar')) sortOpen = false;
+    };
+    document.addEventListener('click', away);
+    return () => document.removeEventListener('click', away);
+  });
 
   $effect(() => {
     alive = true;
@@ -115,41 +148,85 @@
   });
 </script>
 
-<div class="screen-body">
-  <SearchList
-    {search}
-    placeholder="Поиск по названию, описанию, компании, стеку"
-    onsearch={find}
-    {loaded}
-    count={rows.length}
-    words={['вакансия', 'вакансии', 'вакансий']}
-    filtered={!!search || Object.keys(asked).length > 0}
-    nothing="Ничего не найдено"
-    empty="Вакансий пока нет — они появятся после первого обхода каналов"
-  >
-    {#snippet actions()}
-      <Dropdown options={SORTS.map((one) => one.label)} value={sort} onpick={order} />
-      <VacancyFilters {applied} {options} onapply={apply} />
-    {/snippet}
+<div class="vacancies-layout">
+  <section class="vac-list-pane">
+    <div class="vac-list-toolbar">
+      <SearchBox value={search} placeholder="Поиск" onsearch={find} />
 
-    {#each rows as vacancy (vacancy.id)}
-      <VacancyRow {vacancy} {threshold} onpick={() => (opened = vacancy.id)} />
-    {/each}
+      <button
+        class="icon-btn"
+        type="button"
+        title="Сортировка: {sort}"
+        onclick={() => {
+          sortOpen = !sortOpen;
+          filterOpen = false;
+        }}
+      >
+        <span class="material-symbols-outlined">swap_vert</span>
+      </button>
 
-    {#if hasMore}
-      <button class="add-more" type="button" onclick={more}>Показать ещё</button>
+      <VacancyFilters
+        {applied}
+        {options}
+        onapply={apply}
+        shown={filterOpen}
+        onshown={(next) => {
+          filterOpen = next;
+          if (next) sortOpen = false;
+        }}
+      />
+
+      {#if sortOpen}
+        <div class="vac-sort-menu">
+          {#each SORTS as one (one.key)}
+            <button
+              class="vac-sort-option"
+              class:active={sort === one.label}
+              type="button"
+              onclick={() => order(one.label)}
+            >
+              {one.label}
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+
+    <div class="vac-list" onscroll={scrolled}>
+      {#if !loaded}
+        <div class="vac-list-empty">Загрузка…</div>
+      {:else if rows.length === 0}
+        {@const note = emptyNote(search)}
+        <div class="vac-list-empty">
+          <span class="material-symbols-outlined">{note.icon}</span>
+          <span>{note.text}</span>
+        </div>
+      {:else}
+        {#each rows as vacancy (vacancy.id)}
+          <VacancyRow
+            {vacancy}
+            {threshold}
+            selected={opened === vacancy.id}
+            onpick={() => (opened = vacancy.id)}
+          />
+        {/each}
+      {/if}
+    </div>
+  </section>
+
+  <section class="vac-detail-pane">
+    {#if opened === null}
+      <div class="vac-detail-empty">Выберите вакансию слева</div>
+    {:else}
+      <VacancyCard
+        {ask}
+        {say}
+        {events}
+        {lockedTip}
+        vacancyId={opened}
+        onclose={() => (opened = null)}
+        onchanged={() => refresh(refreshLimit(rows.length))}
+      />
     {/if}
-  </SearchList>
+  </section>
 </div>
-
-{#if opened !== null}
-  <VacancyCard
-    {ask}
-    {say}
-    {events}
-    {lockedTip}
-    vacancyId={opened}
-    onclose={() => (opened = null)}
-    onchanged={() => refresh(refreshLimit(rows.length))}
-  />
-{/if}
