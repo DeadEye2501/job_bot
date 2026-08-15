@@ -24,6 +24,15 @@
   font-size: 0.83rem;
 }
 
+/* Кнопки здесь плотнее общих по той же причине, что и поля: их на экране
+   десяток, и в общем размере секции разъезжаются. */
+.settings-page .btn {
+  padding: 2px 10px 3px;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  font-weight: 400;
+}
+
 /* Значок в кнопке мельче подписи и приподнят — только здесь: кнопки настроек
    единственные, у кого он есть рядом со словом. В остальном окне значок
    наследует размер строки, в которой стоит. */
@@ -31,6 +40,27 @@
   font-size: 14px;
   position: relative;
   top: 1px;
+}
+
+/* Опасная кнопка здесь контурная, а не залитая: их в настройках две, и залитые
+   красным они читались бы как предупреждение всей секции, а не как то, что
+   делает нажатие. */
+.settings-page .btn.danger {
+  background: var(--bg-tertiary);
+  color: var(--danger);
+  border-color: var(--border);
+  font-weight: 400;
+}
+
+.settings-page .btn.danger:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--danger);
+}
+
+/* Зазор перед полями, которые стоят под выбором «ходить туда же»: без него
+   галочка липнет к адресу и читается как его подпись. */
+.settings-row.spaced {
+  margin-top: 6px;
 }
 
 .settings-row {
@@ -48,6 +78,13 @@
   justify-content: flex-end;
   gap: 6px;
   padding-top: 4px;
+}
+
+/* Кнопки сеанса стоят вровень со строкой слева: отступ сверху, нужный кнопке
+   под полями, здесь сдвинул бы их относительно подписи рядом. */
+.session-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .session-row {

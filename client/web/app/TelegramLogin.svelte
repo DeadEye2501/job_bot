@@ -14,7 +14,7 @@
   import TgLoginDialog from '$components/TgLoginDialog.svelte';
   import { nextStep } from '$state/settings.js';
 
-  let { creds, ondone, onclose } = $props();
+  let { creds, relogin, ondone, onclose } = $props();
 
   let step = $state('code');
   let busy = $state(true);
@@ -79,6 +79,7 @@
   <TgLoginDialog
     {step}
     phone={creds.phone}
+    {relogin}
     {busy}
     {error}
     onsubmit={submit}

@@ -36,6 +36,10 @@
   let logging = $state(false);
   let wiping = $state(false);
   let leaving = $state(false);
+  // Кнопки, отпустить которые до ответа нельзя: обе делают необратимое, и
+  // второе нажатие ушло бы в уже начатую работу.
+  let leavingBusy = $state(false);
+  let wipingBusy = $state(false);
 
   const pills = $derived({ chat: probePill(probes.chat), embed: probePill(probes.embed) });
 
@@ -77,6 +81,23 @@
    */
   async function save(patch) {
     await ask('settings.save', patch);
+  }
+
+  /** Записать поле пайплайна, оставив записанное у себя.
+   *
+   * Своё состояние правится сразу: по нему откатывается негодный ввод соседнего
+   * поля — а откат к тому, что приехало при открытии экрана, вернул бы число,
+   * которое человек уже сменил.
+   */
+  function savePipeline(part) {
+    pipeline = { ...pipeline, ...part };
+    return save({ app: part });
+  }
+
+  /** Человек правит поля поставщика — плашка проверки больше не про них. */
+  function forgetProbe(kind) {
+    if (probes[kind].status === 'idle') return;
+    probes = { ...probes, [kind]: idleProbe() };
   }
 
   function saveChat(part) {
@@ -121,6 +142,9 @@
    */
   async function probe(kind) {
     const creds = kind === 'chat' ? chat : embed;
+    // Пустую форму не отправляем: поставщик ответит отказом про разбор адреса,
+    // и человек будет искать беду в сети вместо незаполненного поля.
+    if (!creds.base_url || !creds.model) return say('Заполните base_url и модель', true);
     probes = { ...probes, [kind]: { ...idleProbe(), status: 'busy' } };
     let answer = null;
     let trouble = '';
@@ -169,17 +193,34 @@
     return refresh();
   }
 
+  /** Выйти из учётной записи Telegram.
+   *
+   * Кнопка заперта на время зова: сервер отзывает ключ не мгновенно, и второе
+   * нажатие ушло бы в уже отозванный сеанс — человек прочитал бы отказ как
+   * «выйти не удалось».
+   */
   async function logout() {
     leaving = false;
+    leavingBusy = true;
     const done = await ask('settings.logout');
+    leavingBusy = false;
     if (done === null) return;
+    say('Сессия Telegram завершена');
     await refresh();
   }
 
+  /** Стереть все данные приложения.
+   *
+   * Запор снимается и после отказа: удалить получается не всегда — на Windows
+   * файл базы держит сам процесс, — и запертая навсегда кнопка означала бы, что
+   * повторить попытку можно только перезапуском.
+   */
   async function wipe() {
     wiping = false;
+    wipingBusy = true;
     say('Удаляем данные…');
     await ask('system.wipe');
+    wipingBusy = false;
   }
 
   $effect(() => {
@@ -204,6 +245,7 @@
       <TelegramSection
         {tg}
         {draft}
+        busy={leavingBusy}
         onedit={(part) => (draft = { ...draft, ...part })}
         onlogin={startLogin}
         onlogout={() => (leaving = true)}
@@ -217,6 +259,7 @@
         pill={pills.chat}
         busy={probes.chat.status === 'busy'}
         onsave={saveChat}
+        onedit={() => forgetProbe('chat')}
         onprobe={() => probe('chat')}
       />
 
@@ -229,11 +272,12 @@
         busy={probes.embed.status === 'busy'}
         sameAsChat={same}
         onsave={saveEmbed}
+        onedit={() => forgetProbe('embed')}
         onprobe={() => probe('embed')}
         onsame={switchSame}
       />
 
-      <PipelineSection values={pipeline} onsave={(part) => save({ app: part })} />
+      <PipelineSection values={pipeline} onsave={savePipeline} />
 
       <SettingsSection icon="warning" title="Опасная зона" danger>
         <div class="danger-row">
@@ -245,7 +289,12 @@
               закроется, при следующем запуске откроется мастер.
             </div>
           </div>
-          <button class="btn danger" type="button" onclick={() => (wiping = true)}>
+          <button
+            class="btn danger"
+            type="button"
+            disabled={wipingBusy}
+            onclick={() => (wiping = true)}
+          >
             <span class="material-symbols-outlined">delete_forever</span>
             Удалить всё
           </button>
@@ -253,11 +302,19 @@
       </SettingsSection>
     {/if}
   </div>
-</div>
 
-{#if logging}
-  <TelegramLogin creds={draft} ondone={loggedIn} onclose={() => (logging = false)} />
-{/if}
+  <!-- Окно входа стоит внутри поля настроек, а не рядом с ним: кнопки в нём
+       той же плотности, что и остальные кнопки экрана, и берут они её отсюда.
+       На раскладку это не влияет — окно висит поверх страницы. -->
+  {#if logging}
+    <TelegramLogin
+      creds={draft}
+      relogin={tg.has_session}
+      ondone={loggedIn}
+      onclose={() => (logging = false)}
+    />
+  {/if}
+</div>
 
 {#if leaving}
   <ConfirmDialog

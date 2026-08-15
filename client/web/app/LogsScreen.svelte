@@ -153,7 +153,7 @@
 
   <div class="logs-toolbar-gap"></div>
 
-  <label class="checkbox-row">
+  <label class="checkbox-row logs-auto-refresh">
     <input
       type="checkbox"
       checked={following}

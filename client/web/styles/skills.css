@@ -74,13 +74,11 @@
   font-size: 16px;
 }
 
+/* Сетка, выравнивание и черта — общие, в ruled-row.css. */
 .skill-row {
-  display: grid;
   grid-template-columns: 150px 130px 1fr auto;
-  align-items: center;
   gap: 10px;
   padding: 4px 8px;
-  border-top: 1px solid var(--border);
   font-size: 0.83rem;
 }
 
@@ -100,7 +98,13 @@
   font-size: 16px;
 }
 
-.skill-row:hover input[type='range'].slider::-webkit-slider-thumb,
+/* Движки разведены по разным правилам: псевдоэлемент, которого движок не
+   знает, делает недействительным всё правило целиком, — склеенные в один
+   список, они отбрасываются оба, и шарик не проявляется нигде. */
+.skill-row:hover input[type='range'].slider::-webkit-slider-thumb {
+  opacity: 1;
+}
+
 .skill-row:hover input[type='range'].slider::-moz-range-thumb {
   opacity: 1;
 }

@@ -59,7 +59,13 @@ input[type='range'].slider::-moz-range-thumb {
   transition: opacity 0.12s;
 }
 
-input[type='range'].slider:active::-webkit-slider-thumb,
+/* Движки разведены по разным правилам нарочно: псевдоэлемент, которого движок
+   не знает, делает недействительным всё правило целиком, а не свою строку, —
+   склеенные в один список, они отбрасываются оба, и шарика нет ни там ни тут. */
+input[type='range'].slider:active::-webkit-slider-thumb {
+  opacity: 1;
+}
+
 input[type='range'].slider:active::-moz-range-thumb {
   opacity: 1;
 }

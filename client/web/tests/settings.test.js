@@ -16,6 +16,7 @@ import {
   scorePercent,
   sessionPill,
   sessionText,
+  thresholdState,
 } from '../state/settings.js';
 
 describe('числовое поле настроек', () => {
@@ -197,5 +198,21 @@ describe('шаги входа в Telegram', () => {
 
   it('вход завершён', () => {
     expect(nextStep({ done: true })).toBe('done');
+  });
+});
+
+describe('порог отбора', () => {
+  it('перетаскивание меняет показываемое число сразу', () => {
+    // Число берётся из того же состояния, что и ползунок: иначе оно отстаёт
+    // до перечитывания, и настройку выставляют вслепую.
+    expect(thresholdState({ saved: 60 }).drag(75).shown).toBe(75);
+  });
+
+  it('до записи сохранённое значение не меняется', () => {
+    expect(thresholdState({ saved: 60 }).drag(75).saved).toBe(60);
+  });
+
+  it('запись переносит перетащенное в сохранённое', () => {
+    expect(thresholdState({ saved: 60 }).drag(75).commit().saved).toBe(75);
   });
 });
