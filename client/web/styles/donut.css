@@ -42,38 +42,5 @@
   color: var(--text-tertiary);
 }
 
-/* Цвет сегмента — цвет статуса. Тот же набор красит точку в списке рядом,
-   точку в таймлайне вакансии и счётчики: разойдись они, одна и та же ступень
-   воронки была бы разного цвета на соседних экранах. */
-.donut-part[data-status='New'],
-.status-dot[data-status='New'] { stroke: var(--fg-max); background: var(--fg-max); }
-
-.donut-part[data-status='Applied'],
-.status-dot[data-status='Applied'] { stroke: var(--status-applied); background: var(--status-applied); }
-
-.donut-part[data-status='Answered'],
-.status-dot[data-status='Answered'] { stroke: var(--info); background: var(--info); }
-
-.donut-part[data-status='Test'],
-.status-dot[data-status='Test'] { stroke: var(--status-test); background: var(--status-test); }
-
-.donut-part[data-status='Invitation'],
-.status-dot[data-status='Invitation'] { stroke: var(--ok); background: var(--ok); }
-
-.donut-part[data-status='In Progress'],
-.status-dot[data-status='In Progress'] { stroke: var(--accent); background: var(--accent); }
-
-.donut-part[data-status='Offer'],
-.status-dot[data-status='Offer'] { stroke: var(--status-offer); background: var(--status-offer); }
-
-.donut-part[data-status='Decline'],
-.status-dot[data-status='Decline'] { stroke: var(--err); background: var(--err); }
-
-.donut-part[data-status='Ghosting'],
-.status-dot[data-status='Ghosting'] { stroke: var(--warn); background: var(--warn); }
-
-.donut-part[data-status='Scam'],
-.status-dot[data-status='Scam'] { stroke: var(--alert); background: var(--alert); }
-
-.donut-part[data-status='Not Fit'],
-.status-dot[data-status='Not Fit'] { stroke: var(--status-not-fit); background: var(--status-not-fit); }
+/* Цвет сегмента — цвет статуса, и набор этот общий с точкой и полосой воронки:
+   он лежит в status-color.css. */

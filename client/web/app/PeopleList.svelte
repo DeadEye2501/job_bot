@@ -13,7 +13,7 @@
 
   import PersonCard from './PersonCard.svelte';
 
-  let { ask, say, events, open, onopened } = $props();
+  let { ask, say, events, open, onopened, oncompany, onvacancy } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -158,6 +158,8 @@
         {ask}
         {say}
         {events}
+        {oncompany}
+        {onvacancy}
         personId={opened}
         onclose={() => (opened = null)}
         onchanged={() => refresh(refreshLimit(rows.length))}

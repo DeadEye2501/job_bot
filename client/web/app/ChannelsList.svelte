@@ -1,38 +1,45 @@
 <script>
-  // Вкладка «Каналы»: список с поиском, переключением опроса и заведением.
+  // Вкладка «Каналы»: список слева, карточка выбранного справа.
 
+  import { untrack } from 'svelte';
+
+  import AddChannelDialog from '$components/AddChannelDialog.svelte';
   import ChannelRow from '$components/ChannelRow.svelte';
+  import SearchBox from '$components/SearchBox.svelte';
+  import { attempts } from '$state/attempts.js';
+  import { channelsToggle } from '$state/contacts.js';
+  import { nearBottom } from '$state/paging.js';
 
   import ChannelCard from './ChannelCard.svelte';
-  import AskDialog from '$components/AskDialog.svelte';
-  import ConfirmDialog from '$components/ConfirmDialog.svelte';
-  import SearchList from '$components/SearchList.svelte';
-  import { fresher } from '$state/contacts.js';
 
-  let { ask, say, lockedTip, events } = $props();
+  let { ask, say, lockedTip, events, onvacancy } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
   let search = $state('');
   let adding = $state(false);
   let draft = $state('');
-  let leaving = $state(null);
+  let saving = $state(false);
+  let trouble = $state('');
   let opened = $state(null);
+  let card = $state(null);
 
-  let asked = 0;
+  const tries = attempts();
   let alive = true;
+
+  const master = $derived(channelsToggle(rows));
 
   /** Перечитать список.
    *
-   * Каждому вопросу свой порядковый знак, и мост возвращает его эхом: человек
-   * набирает поиск посимвольно, ответы приходят вразнобой, и лёгший поверх
-   * свежего старый показал бы строки, которых он уже не ищет.
+   * Каналы приходят разом, без страниц: их десятки, а не тысячи. Счёт попыток
+   * всё равно свой — человек набирает поиск посимвольно, ответы возвращаются
+   * вразнобой, и лёгший поверх свежего старый показал бы строки, которых он уже
+   * не ищет.
    */
   async function refresh() {
-    asked += 1;
-    const mine = asked;
-    const now = await ask('channels.list', { search, epoch: mine });
-    if (now === null || !alive || !fresher(now.epoch, asked)) return;
+    const mine = tries.next();
+    const now = await ask('channels.list', { search });
+    if (now === null || !alive || tries.stale(mine)) return;
     rows = now.channels;
     loaded = true;
   }
@@ -52,33 +59,40 @@
     return refresh();
   }
 
+  /** Завести канал по нику или ссылке.
+   *
+   * Отказ остаётся в окне, а не уезжает общей плашкой: чаще всего это опечатка
+   * в нике, и объясняют её там же, где его набирали.
+   */
   async function create() {
     const value = draft.trim();
-    if (!value) return;
+    if (!value || saving) return;
+    saving = true;
+    trouble = '';
     const done = await ask('channels.create', { input: value });
-    // Окно закрываем только по удаче: отказ — это чаще всего опечатка в нике,
-    // и набранное человеку ещё пригодится.
-    if (done === null) return;
+    saving = false;
+    if (done === null) return (trouble = 'Не удалось добавить канал');
     adding = false;
     draft = '';
     say(done.created ? `Канал добавлен: @${done.username}` : `Канал @${done.username} уже был заведён`);
     return refresh();
   }
 
-  async function drop(channel) {
-    leaving = null;
-    const done = await ask('channels.delete', channel.id);
-    if (done === null) return;
-    return refresh();
+  /** Дочитать вакансии открытого канала: прокручивается панель целиком, и знает
+   *  об этой прокрутке она, а не сама карточка. */
+  function paneScrolled(event) {
+    if (card !== null && nearBottom(event.currentTarget)) card.more();
   }
 
   $effect(() => {
     alive = true;
-    // Списки меняет не только этот экран: бот заносит людей и компании в отсев
-    // сам, разбирая переписку. Без этой подписки экран показывал бы снимок той
+    // Списки меняет не только этот экран: бот заносит каналы в отсев сам,
+    // разбирая объявления. Без этой подписки экран показывал бы снимок той
     // минуты, когда его открыли.
     const deaf = events.on('contacts_lists_changed', refresh);
-    refresh();
+    // Первое чтение — вне слежения: строку поиска `refresh` читает, и следящий
+    // эффект перезаводился бы на каждом набранном знаке.
+    untrack(() => refresh());
     return () => {
       alive = false;
       deaf();
@@ -86,72 +100,82 @@
   });
 </script>
 
-<SearchList
-  {search}
-  placeholder="Поиск по каналам"
-  onsearch={find}
-  {loaded}
-  count={rows.length}
-  words={['канал', 'канала', 'каналов']}
-  filtered={!!search}
-  nothing="Ничего не найдено"
-  empty="Каналов пока нет — добавьте первый"
->
-  {#snippet actions()}
-    <button class="btn" type="button" onclick={() => toggleAll(true)}>Включить все</button>
-    <button class="btn" type="button" onclick={() => toggleAll(false)}>Выключить все</button>
-    <button class="btn primary" type="button" onclick={() => (adding = true)}>
-      <span class="material-symbols-outlined">add</span>
-      Канал
-    </button>
-  {/snippet}
+<div class="cnt-layout">
+  <section class="cnt-list-pane">
+    <div class="cnt-list-toolbar">
+      <SearchBox value={search} placeholder="Поиск канала..." onsearch={find} />
+      <button
+        class="cnt-add-btn"
+        type="button"
+        title="Добавить канал"
+        onclick={() => (adding = true)}
+      >
+        <span class="material-symbols-outlined">add_circle</span>
+      </button>
+      <!-- Один переключатель на весь список: он же и показывает, все ли каналы
+           опрашиваются. -->
+      <input
+        type="checkbox"
+        class="toggle compact"
+        checked={master.checked}
+        disabled={master.disabled}
+        title={master.title}
+        onchange={(event) => toggleAll(event.currentTarget.checked)}
+      />
+    </div>
 
-  {#each rows as channel (channel.id)}
-    <ChannelRow
-      {channel}
-      onpick={() => (opened = channel.id)}
-      ontoggle={(on) => toggle(channel, on)}
-      onremove={() => (leaving = channel)}
-    />
-  {/each}
-</SearchList>
+    <div class="cnt-list">
+      {#if !loaded}
+        <div class="cnt-list-empty">Загрузка…</div>
+      {:else if rows.length === 0}
+        <div class="cnt-list-empty">
+          {#if search}
+            Ничего не найдено по запросу «{search}»
+          {:else}
+            Каналов пока нет
+          {/if}
+        </div>
+      {:else}
+        {#each rows as channel (channel.id)}
+          <ChannelRow
+            {channel}
+            selected={opened === channel.id}
+            onpick={() => (opened = channel.id)}
+            ontoggle={(on) => toggle(channel, on)}
+          />
+        {/each}
+      {/if}
+    </div>
+  </section>
+
+  <section class="cnt-detail-pane" onscroll={paneScrolled}>
+    {#if opened === null}
+      <div class="cnt-detail-empty">Выберите канал в списке</div>
+    {:else}
+      <ChannelCard
+        bind:this={card}
+        {ask}
+        {say}
+        {lockedTip}
+        {onvacancy}
+        channelId={opened}
+        onclose={() => (opened = null)}
+        onchanged={refresh}
+      />
+    {/if}
+  </section>
+</div>
 
 {#if adding}
-  <AskDialog
-    icon="add"
-    title="Новый канал"
-    subtitle="Ник канала или ссылка на него."
-    confirmLabel="Добавить"
-    onconfirm={create}
-    oncancel={() => (adding = false)}
-  >
-    <!-- svelte-ignore a11y_autofocus -->
-    <input
-      class="input"
-      autofocus
-      placeholder="@python_jobs"
-      bind:value={draft}
-      onkeydown={(event) => event.key === 'Enter' && create()}
-    />
-  </AskDialog>
-{/if}
-
-{#if opened}
-  <ChannelCard
-    {ask}
-    {say}
-    {lockedTip}
-    channelId={opened}
-    onclose={() => (opened = null)}
-    onchanged={refresh}
-  />
-{/if}
-
-{#if leaving}
-  <ConfirmDialog
-    message={`Удалить канал «${leaving.title || leaving.username}»?\n\nВакансии, уже собранные с него, останутся. Откатить удаление нельзя.`}
-    confirmLabel="Удалить"
-    onconfirm={() => drop(leaving)}
-    oncancel={() => (leaving = null)}
+  <AddChannelDialog
+    value={draft}
+    {trouble}
+    {saving}
+    oninput={(text) => (draft = text)}
+    onadd={create}
+    onclose={() => {
+      adding = false;
+      trouble = '';
+    }}
   />
 {/if}

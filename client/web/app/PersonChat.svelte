@@ -8,7 +8,7 @@
   import ChatBubble from '$components/ChatBubble.svelte';
   import { attempts } from '$state/attempts.js';
   import { byDays, sendBlock, unread } from '$state/chat.js';
-  import { appended } from '$state/paging.js';
+  import { appended, nearTop } from '$state/paging.js';
 
   let { ask, say, card, events, onread } = $props();
 
@@ -40,7 +40,7 @@
     messages = page.messages;
     hasMore = page.has_more;
     loaded = true;
-    await toBottom();
+    await toUnread();
     return markRead();
   }
 
@@ -52,6 +52,11 @@
    * Второе нажатие, пока летит первое, отбивается признаком: опора до ответа не
    * меняется, обе просьбы вернули бы одну страницу, и в ленте оказались бы два
    * письма с одним номером.
+   *
+   * Дочитанное встаёт над показанным и сдвигает ленту вниз на свою высоту.
+   * Прокрутку двигаем на столько же: без поправки человек, долиставший до
+   * начала разговора, оказывался бы посреди только что подгруженного — а теперь
+   * страницы тянет сама прокрутка, и было бы это на каждой.
    */
   async function older() {
     const oldest = messages[0];
@@ -65,8 +70,21 @@
     });
     digging = false;
     if (page === null || !alive) return;
+    const was = feed === null ? 0 : feed.scrollHeight;
     messages = appended(page.messages, messages);
     hasMore = page.has_more;
+    await painted();
+    if (feed !== null) feed.scrollTop += feed.scrollHeight - was;
+  }
+
+  /** Дочитать старое, когда лента подошла к началу разговора.
+   *
+   * Прокруткой, а не нажатием: переписку листают вверх глазами, и строка-ссылка
+   * посреди чтения заставляет целиться в неё мышью.
+   */
+  function scrolled(event) {
+    if (!hasMore || digging || !nearTop(event.currentTarget)) return;
+    older();
   }
 
   /** Сказать мосту, что письма прочитаны.
@@ -126,14 +144,18 @@
     return ask('system.open_url', message.media_path);
   }
 
-  /** Показать конец ленты: свежие письма внизу, и читают их оттуда.
+  /** Показать то, ради чего переписку открыли: первое непрочитанное письмо, а
+   *  если всё прочитано — конец ленты.
    *
    * Ждём отрисовки: до неё у ленты прежняя высота, и прокрутка встала бы на
    * предпоследнее письмо.
    */
-  async function toBottom() {
+  async function toUnread() {
     await painted();
-    if (feed) feed.scrollTop = feed.scrollHeight;
+    if (!feed) return;
+    const first = feed.querySelector('[data-unread="true"]');
+    if (first === null) feed.scrollTop = feed.scrollHeight;
+    else feed.scrollTop = first.offsetTop - feed.offsetTop;
   }
 
   $effect(() => {
@@ -156,47 +178,45 @@
   });
 </script>
 
-<div class="chat" bind:this={feed}>
-  {#if !loaded}
-    <div class="empty-note">Загрузка переписки…</div>
-  {:else if !messages.length}
-    <div class="empty-note">Переписки пока нет</div>
-  {:else}
-    {#if hasMore}
-      <button class="add-more" type="button" disabled={digging} onclick={older}>
-        {digging ? 'Читаю…' : 'Показать письма постарее'}
-      </button>
-    {/if}
-    {#each days as one (one.key)}
-      <div class="chat-day">{one.day}</div>
-      {#each one.messages as message (message.id)}
-        <ChatBubble {message} onopen={open} />
+<div class="cnt-chat-section">
+  <div class="cnt-chat-body" bind:this={feed} onscroll={scrolled}>
+    {#if !loaded}
+      <div class="cnt-chat-empty">Загрузка переписки…</div>
+    {:else if !messages.length}
+      <div class="cnt-chat-empty">Переписки пока нет.</div>
+    {:else}
+      {#if digging}
+        <div class="cnt-chat-older">Загрузка…</div>
+      {:else if hasMore}
+        <button class="cnt-chat-older" type="button" onclick={older}>Загрузить старее</button>
+      {/if}
+      {#each days as one (one.key)}
+        <div class="cnt-chat-day">{one.day}</div>
+        {#each one.messages as message (message.id)}
+          <ChatBubble {message} onopen={open} />
+        {/each}
       {/each}
-    {/each}
-  {/if}
-</div>
+    {/if}
+  </div>
 
-{#if blocked}
-  <div class="empty-note">{blocked}</div>
-{:else}
-  <div class="chat-send">
+  <!-- Строка отправки остаётся на месте и при заслоне, только запертой: пропав,
+       она не сказала бы, почему писать нельзя. -->
+  <div class="cnt-chat-input-area">
     <button
-      class="btn"
+      class="cnt-chat-attach"
       type="button"
-      title="Приложить файл"
-      disabled={attaching}
+      title="Прикрепить файл"
+      disabled={attaching || sending || !!blocked}
       onclick={attach}
     >
       <span class="material-symbols-outlined">attach_file</span>
     </button>
 
-    <!-- Поле не запирается на время отправки: человек набирает следующее письмо,
-         пока летит прошлое, и запертое поле выбросило бы каретку. Заперта одна
-         кнопка — второе нажатие отправило бы то же письмо дважды. -->
     <textarea
-      class="textarea"
+      class="cnt-chat-input"
       rows="1"
-      placeholder="Написать сообщение"
+      placeholder={sending ? 'Отправка…' : 'Сообщение…'}
+      disabled={sending || !!blocked}
       bind:value={draft}
       onkeydown={(event) => {
         // Enter отправляет, Shift+Enter переносит строку — так же, как в самом
@@ -208,8 +228,19 @@
         }
       }}
     ></textarea>
-    <button class="btn primary" type="button" disabled={sending || !draft.trim()} onclick={send}>
-      <span class="material-symbols-outlined">{sending ? 'hourglass_empty' : 'send'}</span>
+
+    <button
+      class="cnt-chat-send"
+      type="button"
+      title="Отправить (Enter)"
+      disabled={sending || !!blocked || !draft.trim()}
+      onclick={send}
+    >
+      <span class="material-symbols-outlined">send</span>
     </button>
   </div>
-{/if}
+
+  {#if blocked}
+    <div class="cnt-chat-disabled-hint">{blocked}</div>
+  {/if}
+</div>

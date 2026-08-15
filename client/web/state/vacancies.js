@@ -6,6 +6,7 @@
 
 import { GRADES as PROFILE_GRADES } from './profile.js';
 import { REMOTE_CHOICES } from './vacancy_filter.js';
+import { plural } from './words.js';
 
 /** Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и
  *  совпадают с перечнем `backend/repository/vacancies_list.VACANCY_SORTS`;
@@ -106,6 +107,34 @@ export function ago(iso, now) {
   const weeks = Math.floor(days / 7);
   if (weeks < 5) return `${weeks} нед`;
   return `${Math.floor(days / 30)} мес`;
+}
+
+/** Давность для мини-списка в чужой карточке.
+ *
+ * Своя лестница, а не общая: строка стоит в узкой панели рядом с названием
+ * вакансии, и каждый лишний знак давности откусан у названия. Отсюда «м»
+ * вместо «мин» и годы вместо трёхзначных месяцев; дни держатся до двух недель —
+ * список читают сверху вниз, и «13 д» рядом с «2 нед» говорит больше, чем одни
+ * недели.
+ *
+ * Без даты остаётся пусто: прочерк занял бы колонку, которая здесь нужна
+ * названию.
+ */
+export function shortAgo(iso, now) {
+  if (!iso) return '';
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return '';
+  const minutes = Math.floor(Math.max(0, now.getTime() - at) / 60000);
+  if (minutes < 1) return 'только что';
+  if (minutes < 60) return `${minutes} м`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ч`;
+  const days = Math.floor(hours / 24);
+  if (days < 14) return `${days} д`;
+  if (days < 60) return `${Math.floor(days / 7)} нед`;
+  if (days < 365) return `${Math.floor(days / 30)} мес`;
+  const years = Math.floor(days / 365);
+  return `${years} ${plural(years, 'год', 'года', 'лет')}`;
 }
 
 /** Каким цветом читается оценка рядом с порогом отбора.

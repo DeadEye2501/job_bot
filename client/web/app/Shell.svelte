@@ -74,6 +74,9 @@
   // в раздел заново открывал бы ту же карточку, и до остальных вкладок было бы
   // не добраться.
   let openCard = $state(null);
+  // Какую вакансию открыть, придя в раздел вакансий из мини-списка чужой
+  // карточки. Отметка такая же разовая, как и та, что ведёт в контакты.
+  let openVacancy = $state(null);
   let mode = $state(OFF);
   let running = $state(false);
   let crawling = $state(false);
@@ -211,6 +214,15 @@
     section = 'contacts';
   }
 
+  /** Уйти к вакансии — из мини-списка в карточке канала, компании или человека.
+   *
+   * Оттуда и смотрят, что канал принёс: увидел строку — открыл её саму.
+   */
+  function goVacancy(id) {
+    openVacancy = { id };
+    section = 'vacancies';
+  }
+
   async function pickMode(chosen) {
     if (chosen === null) return say(lockedTip);
     const answer = await ask('system.set_mode', chosen);
@@ -323,12 +335,21 @@
         {lockedTip}
         {openCard}
         onopened={() => (openCard = null)}
+        onvacancy={goVacancy}
         events={heard}
       />
     {:else if section === 'stats'}
       <StatsScreen {ask} />
     {:else if section === 'vacancies'}
-      <VacanciesScreen {ask} {say} {lockedTip} events={heard} oncontacts={goContacts} />
+      <VacanciesScreen
+        {ask}
+        {say}
+        {lockedTip}
+        events={heard}
+        oncontacts={goContacts}
+        open={openVacancy}
+        onopened={() => (openVacancy = null)}
+      />
     {:else if section === 'system'}
       <TopTabs tabs={SYSTEM_TABS} active={systemTab} onpick={(key) => (systemTab = key)} />
       {#if systemTab === 'logs'}

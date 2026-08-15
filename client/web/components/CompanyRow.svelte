@@ -1,24 +1,43 @@
 <script>
-  // Строка компании: значок, имя с подписью и счёт её вакансий.
+  // Строка компании в списке: значок, имя с подписью, отсев и счёт вакансий.
   import { companyLine } from '$state/companies.js';
 
-  let { company, onpick } = $props();
+  import Avatar from './Avatar.svelte';
+
+  let { company, selected = false, onpick } = $props();
 
   const shown = $derived(companyLine(company));
+  // Ни сайта, ни алиасов — про это сказано словами, и слова набраны курсивом:
+  // так видно, что это не подпись, а её отсутствие.
+  const bare = $derived(!company.website && !company.aliases.length);
 </script>
 
-<div class="contact-row" class:blocked={company.is_blacklisted}>
-  <button class="contact-main" type="button" onclick={() => onpick()}>
-    <span class="avatar avatar-empty material-symbols-outlined">domain</span>
-    <span class="contact-names">
-      <span class="contact-name">{shown.name}</span>
-      <span class="contact-handle">{shown.sub}</span>
+<button
+  class="cnt-hr-row"
+  class:selected
+  class:blacklisted={company.is_blacklisted}
+  type="button"
+  onclick={() => onpick()}
+>
+  <Avatar icon="domain" />
+
+  <span class="cnt-hr-info">
+    <span class="cnt-hr-name" class:muted={!company.name}>
+      {company.name || '— без названия —'}
     </span>
-    <!-- У компании нет переключателя, поэтому отсев назван словом: приглушённой
-         строкой одной он читался бы как «просто пустая». -->
+    <span class="cnt-hr-sub">
+      {#if bare}<span class="muted">{shown.sub}</span>{:else}{shown.sub}{/if}
+    </span>
+  </span>
+
+  <span class="cnt-hr-trailing">
     {#if company.is_blacklisted}
-      <span class="kind-tag" data-kind="company">в отсеве</span>
+      <span class="cnt-hr-bl" title="В blacklist">
+        <span class="material-symbols-outlined">block</span>
+      </span>
     {/if}
-    <span class="contact-count">{company.vacancy_count}</span>
-  </button>
-</div>
+    {#if company.vacancy_count > 0}
+      <span class="cnt-co-count">{company.vacancy_count}</span>
+    {/if}
+  </span>
+</button>

@@ -128,7 +128,7 @@
       />
       <input
         type="checkbox"
-        class="pipeline-toggle"
+        class="toggle"
         checked={row.active}
         title="Строка действует"
         onchange={(event) => toggle(row, event.currentTarget.checked)}

@@ -1,0 +1,96 @@
+/* Числа канала: четыре плитки и полоса воронки под ними.
+
+   Полосой, а не кольцом: доли здесь читают одну относительно другой — сколько
+   из собранного дошло до отклика, — и в ряд это видно, а по кругу нет. Цвет
+   отрезков — общий набор из status-color.css. */
+
+.ch-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.ch-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.ch-stat-num {
+  color: var(--text-primary);
+  font-size: 1.4rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Три доли покрашены по ступеням воронки: годное — акцентом, отклики и ответы —
+   теми же цветами, какими эти ступени покрашены в полосе под плитками. */
+.ch-stat-num.fit {
+  color: var(--accent);
+}
+
+.ch-stat-num.apply {
+  color: var(--status-applied);
+}
+
+.ch-stat-num.response {
+  color: var(--info);
+}
+
+.ch-stat-label {
+  color: var(--text-tertiary);
+  font-size: 0.65rem;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.ch-bar {
+  display: flex;
+  height: 8px;
+  margin-top: 12px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  overflow: hidden;
+}
+
+.ch-bar-seg {
+  height: 100%;
+}
+
+.ch-bar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.ch-bar-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ch-bar-legend .status-dot {
+  flex-shrink: 0;
+}
+
+/* Канал без собранного говорит об этом словами: нули в плитках читались бы как
+   «обошли и ничего не нашли». */
+.ch-stats-empty {
+  padding: 12px 0;
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.ch-vacs-loading-more {
+  padding: 6px 0;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  text-align: center;
+}

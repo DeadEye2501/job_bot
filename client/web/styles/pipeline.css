@@ -72,36 +72,5 @@
   height: 28px;
 }
 
-.pipeline-toggle {
-  appearance: none;
-  width: 42px;
-  height: 21px;
-  background: var(--bg-tertiary);
-  border-radius: 11px;
-  position: relative;
-  cursor: pointer;
-  transition: background 0.15s;
-  margin: 0;
-  flex-shrink: 0;
-}
-
-.pipeline-toggle::after {
-  content: '';
-  position: absolute;
-  left: 3px;
-  top: 3px;
-  width: 15px;
-  height: 15px;
-  background: var(--text-tertiary);
-  border-radius: 50%;
-  transition: all 0.15s;
-}
-
-.pipeline-toggle:checked {
-  background: var(--accent);
-}
-
-.pipeline-toggle:checked::after {
-  left: calc(100% - 18px);
-  background: var(--bg-primary);
-}
+/* Сам переключатель — в toggle.css: такой же стоит в строке списка каналов, и
+   второй его записью они разъехались бы. */

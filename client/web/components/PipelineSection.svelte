@@ -79,7 +79,7 @@
       <div class="with-toggle">
         <input
           type="checkbox"
-          class="pipeline-toggle"
+          class="toggle"
           checked={values.send_locked}
           onchange={(event) => onsave({ send_locked: event.currentTarget.checked })}
         />

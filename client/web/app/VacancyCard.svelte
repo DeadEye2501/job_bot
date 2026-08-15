@@ -7,14 +7,13 @@
 
   import Avatar from '$components/Avatar.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
+  import NotesField from '$components/NotesField.svelte';
   import RawTextDialog from '$components/RawTextDialog.svelte';
   import StatusPicker from '$components/StatusPicker.svelte';
   import VacancyActions from '$components/VacancyActions.svelte';
   import VacancyTimeline from '$components/VacancyTimeline.svelte';
   import { attempts } from '$state/attempts.js';
-  import { autosave } from '$state/autosave.js';
   import { cardLinks } from '$state/card_links.js';
-  import { saveKey } from '$state/keys.js';
   import { actionBlocks, rawChips } from '$state/vacancy_actions.js';
   import { ago, gradeLabel, remoteLabel, scoreTone } from '$state/vacancies.js';
   import { timelineRows } from '$state/vacancy_card.js';
@@ -26,15 +25,9 @@
   // не увидев подтверждения.
   const NOTES_DELAY = 800;
 
-  // Сколько горит зелёная рамка записанного. Ровно столько же длится её
-  // угасание в оформлении: погасшая раньше срока читалась бы как моргание.
-  const FLASH_MS = 400;
-
   let { ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged } = $props();
 
   let card = $state(null);
-  let notes = $state('');
-  let notesSaved = $state(false);
   let picking = $state(false);
   let saving = $state(false);
   let asking = $state(null);
@@ -43,11 +36,6 @@
 
   const tries = attempts();
   let alive = true;
-  // Отложенная запись заметки этой вакансии. Заводится вместе с карточкой:
-  // номер вакансии в ней запечатан, и отложенное уедет туда, где набиралось,
-  // даже если человек уже перешёл к соседней.
-  let saver = null;
-  let flashTimer = null;
 
   const rows = $derived(card ? timelineRows(card.history, card.events) : []);
   const tone = $derived(card ? scoreTone(card.score, card.score_threshold) : '');
@@ -63,46 +51,23 @@
    * и ответы возвращаются вразнобой — лёгший поверх свежего старый показал бы
    * ленту без только что сделанного перехода.
    *
-   * Заметку поле принимает только у новой карточки: перечитывают её и по вести
-   * о смене списка, и пришедшая посреди набора она стёрла бы набранное.
    */
   async function refresh() {
     const mine = tries.next();
     const now = await ask('vacancies.detail', vacancyId);
     if (!alive || tries.stale(mine) || now === null) return;
-    const other = card === null || card.id !== now.vacancy.id;
     card = now.vacancy;
-    saver.known(card.notes ?? '');
-    if (other) notes = card.notes ?? '';
   }
 
-  /** Показать, что записанное легло.
-   *
-   * Запись отложена и уходит молча: без этой вспышки человек не знает, дошла
-   * ли заметка, и уходит с экрана в сомнении.
-   */
-  function flash() {
-    notesSaved = true;
-    clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => {
-      notesSaved = false;
-    }, FLASH_MS);
-  }
-
-  /** Записать заметку.
-   *
-   * Ответом приезжает то, что легло в базу, — им и отмечаем записанное: мост
-   * сводит пробельную заметку к пустоте, и не прими мы его ответ, следующая же
-   * пауза послала бы тот же вопрос заново.
+  /** Записать заметку и вернуть то, что легло в базу.
    *
    * Карточку не перечитываем: человек мог набрать ещё, пока летел вопрос, и
    * пришедшее из базы стёрло бы это.
    */
   async function saveNotes(id, text) {
     const done = await ask('vacancies.save_notes', { vacancy_id: id, notes: text });
-    if (!alive || done === null) return;
-    saver.known(done.notes ?? '');
-    flash();
+    if (!alive || done === null) return null;
+    return done.notes ?? '';
   }
 
   /** Записать пояснение к переходу.
@@ -200,8 +165,6 @@
 
   $effect(() => {
     alive = true;
-    const id = vacancyId;
-    saver = autosave({ delay: NOTES_DELAY, save: (text) => saveNotes(id, text) });
     // Вакансию двигает не только это окно: бот разбирает её заново по нашей же
     // просьбе и правит статус по переписке. Весть о смене списка — то же
     // событие, по которому обновляется список под карточкой.
@@ -209,14 +172,6 @@
     refresh();
     return () => {
       alive = false;
-      // Набранное и не уехавшее отправляем на прощание: карточку закрыли или
-      // сменили, и ждать паузы больше нечему. Номер вакансии запечатан в
-      // записи, поэтому заметка уедет к своей.
-      saver.flush();
-      clearTimeout(flashTimer);
-      // Вспышку гасим вместе с карточкой: оставленная гореть, она встретила бы
-      // соседнюю вакансию зелёной рамкой на ненабранном поле.
-      notesSaved = false;
       deaf();
     };
   });
@@ -373,15 +328,17 @@
   </div>
 
   <div class="det-section">
-    <textarea
-      class="notes-area"
-      class:saved-flash={notesSaved}
-      placeholder="Заметки по вакансии…"
-      bind:value={notes}
-      oninput={() => saver.typed(notes)}
-      onblur={() => saver.flush()}
-      onkeydown={(event) => saveKey(event) && saver.flush()}
-    ></textarea>
+    <!-- Своя запись на каждую вакансию: отсчёт отложенной записи живёт в поле,
+         и номер вакансии запечатан в нём — набранное уедет туда, где
+         набиралось, даже если человек уже перешёл к соседней. -->
+    {#key vacancyId}
+      <NotesField
+        value={card.notes}
+        placeholder="Заметки по вакансии…"
+        delay={NOTES_DELAY}
+        save={(text) => saveNotes(vacancyId, text)}
+      />
+    {/key}
   </div>
 
   {#if rows.length}

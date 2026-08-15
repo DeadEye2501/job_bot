@@ -1,0 +1,64 @@
+/* Переключатель-пилюля: дорожка и шарик на ней.
+
+   Двух размеров, и размер несущий: в анкете порогов он стоит один в колонке и
+   взят в полный рост, а в строке списка контактов делит место с именем, счётом
+   и значком отсева — там он вдвое меньше. Числа лежат переменными, чтобы шарик
+   не пришлось пересчитывать на каждый размер руками. */
+
+.toggle {
+  --toggle-w: 42px;
+  --toggle-h: 21px;
+  --toggle-knob: 15px;
+  --toggle-gap: 3px;
+
+  appearance: none;
+  flex-shrink: 0;
+  width: var(--toggle-w);
+  height: var(--toggle-h);
+  margin: 0;
+  border-radius: calc(var(--toggle-h) / 2);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.toggle.compact {
+  --toggle-w: 28px;
+  --toggle-h: 14px;
+  --toggle-knob: 10px;
+  --toggle-gap: 2px;
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: var(--toggle-gap);
+  left: var(--toggle-gap);
+  width: var(--toggle-knob);
+  height: var(--toggle-knob);
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  transition: all 0.15s;
+}
+
+.toggle:checked {
+  background: var(--accent);
+}
+
+.toggle:checked::after {
+  left: calc(100% - var(--toggle-knob) - var(--toggle-gap));
+  background: var(--bg-primary);
+}
+
+/* Пока ответ в пути, переключатель заперт и курсор говорит «жди». */
+.toggle:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* Запертый отсевом — «нельзя», а не «жди»: ждать тут нечего, пока запись не
+   снимут. */
+.toggle.locked:disabled {
+  cursor: not-allowed;
+}

@@ -36,7 +36,7 @@
 .chip-add {
   color: var(--text-tertiary);
   font-size: 0.7rem;
-  padding: 1px 7px;
+  padding: 1px 8px;
   border: 1px dashed var(--border);
   border-radius: 10px;
 }
@@ -46,17 +46,17 @@
   border-color: var(--accent);
 }
 
-/* Поле набора той же ширины, что и подпись рядом: иначе строка дёргается,
-   стоит начать печатать. */
+/* Поле набора шире подписи рядом: в него пишут целое написание компании, а не
+   одно слово, и в ширину чипа оно не помещается. */
 .chip-input {
-  width: 90px;
-  background: var(--bg-tertiary);
+  width: 110px;
+  background: var(--bg-secondary);
   border: 1px solid var(--accent);
   border-radius: 10px;
   color: var(--text-primary);
   font-size: 0.7rem;
   font-family: inherit;
-  padding: 1px 7px;
+  padding: 1px 6px;
 }
 
 .chip-input:focus {

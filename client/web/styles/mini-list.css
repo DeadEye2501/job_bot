@@ -1,0 +1,97 @@
+/* Нажимаемая строка внутри карточки контакта: вакансия и человек компании.
+
+   Обе ведут отсюда наружу — к вакансии и к карточке человека, — и поэтому
+   одеты одинаково: подсветка при наведении и имя, загорающееся акцентом,
+   говорят, что по строке нажимают. Коробка вокруг них общая, в
+   contact-card.css. */
+
+.vacs-mini,
+.hrs-mini {
+  display: flex;
+  flex-direction: column;
+}
+
+.vac-mini-row {
+  display: grid;
+  grid-template-columns: 14px auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+  /* Отрицательный отступ выносит подсветку строки на всю ширину коробки: без
+     него она обрывается по краям её padding'а. */
+  margin: 0 -6px;
+  padding: 4px 6px;
+  border-top: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.hr-mini-row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -6px;
+  padding: 4px 6px;
+  border-top: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.vac-mini-row:first-child,
+.hr-mini-row:first-child {
+  border-top: 0;
+}
+
+.vac-mini-row:hover,
+.hr-mini-row:hover {
+  background: var(--selected-bg);
+}
+
+.vac-mini-row:hover .vac-mini-title,
+.hr-mini-row:hover .hr-mini-name {
+  color: var(--accent);
+}
+
+.vac-mini-score {
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.vac-mini-title {
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vac-mini-when {
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.hr-mini-row .hr-avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 0.65rem;
+}
+
+.hr-mini-name {
+  color: var(--text-primary);
+}
+
+.hr-mini-meta {
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+}
+
+.hr-mini-go {
+  color: var(--text-tertiary);
+  font-size: 14px;
+}

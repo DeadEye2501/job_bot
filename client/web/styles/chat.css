@@ -1,0 +1,287 @@
+/* Переписка в карточке человека: лента писем, пузыри и строка отправки.
+
+   Своим файлом, а не в оформлении карточки: карточку одевают три предмета, а
+   переписка есть только у человека. */
+
+.cnt-chat-section {
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.cnt-chat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-height: 320px;
+  padding: 8px 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.cnt-chat-empty {
+  padding: 16px 10px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+/* Подпись дня — пилюлей посреди ленты: она делит переписку поперёк, и без
+   подложки эта черта теряется среди пузырей. */
+.cnt-chat-day {
+  align-self: center;
+  margin: 6px 0 2px;
+  padding: 1px 9px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+}
+
+.cnt-chat-older {
+  align-self: center;
+  padding: 4px 10px;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.cnt-chat-older:hover {
+  color: var(--text-secondary);
+}
+
+/* Своё письмо справа, чужое слева: по стороне их различают, не читая. Срезанный
+   угол у нижнего края — тот, которым пузырь смотрит на своего хозяина. */
+.cnt-bubble {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+  max-width: 75%;
+  padding: 5px 9px 4px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.cnt-bubble.them {
+  align-self: flex-start;
+  border-bottom-left-radius: 3px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.cnt-bubble.me {
+  align-self: flex-end;
+  border-bottom-right-radius: 3px;
+  background: var(--accent-chip-bg);
+  color: var(--text-primary);
+}
+
+.cnt-bubble.deleted {
+  opacity: 0.85;
+}
+
+.cnt-bubble-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cnt-bubble-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.cnt-bubble-text.deleted {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Вложение, которого нет на диске, названо родом в скобках: показать нечего, но
+   письмо без него выглядело бы пустым. */
+.cnt-bubble-text.gone {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.cnt-bubble-edited {
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  font-style: italic;
+}
+
+/* Снимок во всю ширину пузыря, но не выше своей меры: длинное фото иначе
+   вытесняет из ленты всё остальное. */
+.cnt-bubble-photo {
+  display: block;
+  max-width: 100%;
+}
+
+.cnt-bubble-photo img {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.cnt-bubble-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface-raised);
+  color: var(--accent);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.cnt-bubble-doc:hover {
+  background: var(--surface-raised-hover);
+}
+
+.cnt-bubble-doc .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.cnt-bubble-time {
+  flex-shrink: 0;
+  padding-bottom: 1px;
+  color: var(--text-tertiary);
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* На своём пузыре время покрашено акцентом: на зелёной подложке серое читается
+   как погасшее. */
+.cnt-bubble.me .cnt-bubble-time {
+  color: var(--accent-muted);
+}
+
+.cnt-bubble-tick {
+  margin-left: 3px;
+  color: var(--text-tertiary);
+}
+
+/* Прочитанное собеседником помечено цветом, а не только второй галочкой: две
+   галочки от одной на глаз не отличить. */
+.cnt-bubble-tick.read {
+  color: var(--accent);
+}
+
+.cnt-bubble.me .cnt-bubble-tick {
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+.cnt-bubble.me .cnt-bubble-tick.read {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.cnt-chat-input-area {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+
+/* Поле без рамки и подложки: полоса отправки и есть его рамка. Растёт оно само
+   по набранному — до потолка в четыре строки. */
+.cnt-chat-input {
+  flex: 1;
+  min-height: 30px;
+  max-height: 120px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.82rem;
+  resize: none;
+  field-sizing: content;
+}
+
+.cnt-chat-input:focus {
+  outline: none;
+}
+
+.cnt-chat-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.cnt-chat-input:disabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+.cnt-chat-attach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.cnt-chat-attach:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.cnt-chat-attach:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cnt-chat-attach .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.cnt-chat-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.cnt-chat-send:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.cnt-chat-send:disabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+.cnt-chat-send .material-symbols-outlined {
+  font-size: 22px;
+}
+
+/* Заслон объясняется под строкой отправки, а сама строка остаётся на месте:
+   исчезнувшая строка не говорит, почему писать нельзя. */
+.cnt-chat-disabled-hint {
+  padding: 4px 8px 0;
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  text-align: center;
+}
