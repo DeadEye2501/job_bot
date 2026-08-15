@@ -144,3 +144,23 @@ async def test_the_row_carries_its_count_and_blacklist_mark(session, session_fac
     assert rows["Контур"].is_blacklisted is True
     assert rows["Ромашка"].is_blacklisted is False
     assert rows["Берёзка"].is_blacklisted is False
+
+
+async def test_an_unparsed_vacancy_is_not_counted(session, session_factory):
+    """Недоразобранная вакансия в счётчик компании не идёт.
+
+    Мини-список карточки показывает только разобранные, и посчитанная она
+    развела бы число в строке со списком под ним.
+    """
+    company = company_row(name="Контур")
+    await put(session_factory, company)
+    await put(
+        session_factory,
+        vacancy_row(company_id=company.id),
+        vacancy_row(company_id=company.id, is_parsed=False, title=None),
+    )
+
+    found, _ = await list_companies_with_counts(session)
+    rows = {r.company.name: r for r in found}
+
+    assert rows["Контур"].vacancy_count == 1

@@ -1,6 +1,6 @@
 """Перечни HR со счётчиками."""
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company, HR, Message, Vacancy
@@ -12,6 +12,7 @@ from backend.repository.hr_identify import HAS_TELEGRAM_IDENTITY
 from backend.repository.messages import UNREAD_INCOMING
 from backend.repository.paging import slice_page
 from backend.repository.search import matches_search
+from backend.repository.vacancies_common import PARSED_ONLY
 
 _HR_BY_VACANCY_COUNT = (func.count(Vacancy.id).desc(), HR.name.asc())
 """Порядок «кто принёс больше вакансий», а при равенстве — по имени.
@@ -84,7 +85,7 @@ def _hr_counts_query(sort_by: str):
     if sort_by != "last_activity":
         return (
             select(HR, func.count(Vacancy.id).label("cnt"))
-            .outerjoin(Vacancy, Vacancy.hr_id == HR.id)
+            .outerjoin(Vacancy, and_(Vacancy.hr_id == HR.id, PARSED_ONLY))
             .group_by(HR.id)
             .order_by(*_HR_BY_VACANCY_COUNT)
         )
@@ -104,7 +105,7 @@ def _hr_counts_query(sort_by: str):
     )
     return (
         select(HR, func.count(Vacancy.id).label("cnt"))
-        .outerjoin(Vacancy, Vacancy.hr_id == HR.id)
+        .outerjoin(Vacancy, and_(Vacancy.hr_id == HR.id, PARSED_ONLY))
         .outerjoin(last_act_subq, last_act_subq.c.hr_id == HR.id)
         .group_by(HR.id, last_act_subq.c.last_act)
         .order_by(

@@ -1,6 +1,6 @@
 """Перечень компаний со счётчиками."""
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company, Vacancy
@@ -10,17 +10,24 @@ from backend.repository.blacklist_marks import active_blacklist_values
 from backend.repository.companies_card import company_blacklist_candidates
 from backend.repository.paging import slice_page
 from backend.repository.search import matches_search
+from backend.repository.vacancies_common import PARSED_ONLY
 
 
 def _companies_with_counts_query():
-    """Компании со счётчиком вакансий, плодовитые сверху.
+    """Компании со счётчиком разобранных вакансий, плодовитые сверху.
 
     Разрешитель по имени не украшение: у компаний без вакансий счёт один и
     тот же, и без него порядок списка менялся бы от прогона к прогону.
+
+    Отбор стоит в условии присоединения, а не в ``where``: в ``where`` он
+    выбросил бы из списка компанию без единой разобранной вакансии, а та
+    обязана остаться в нём с нулём.
     """
     return (
         select(Company, func.count(Vacancy.id).label("cnt"))
-        .outerjoin(Vacancy, Vacancy.company_id == Company.id)
+        .outerjoin(
+            Vacancy, and_(Vacancy.company_id == Company.id, PARSED_ONLY)
+        )
         .group_by(Company.id)
         .order_by(func.count(Vacancy.id).desc(), Company.name.asc())
     )

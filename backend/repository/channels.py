@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.funnel import APPLIED, FIT_EXCLUDE, RESPONDED, percent_or_none
@@ -16,7 +16,7 @@ from backend.repository.blacklist_marks import (
     active_blacklist_values,
 )
 from backend.repository.search import matches_search
-from backend.repository.vacancies_common import count_by_status
+from backend.repository.vacancies_common import PARSED_ONLY, count_by_status
 from backend.repository.vacancies_life import repoint_vacancies
 
 logger = logging.getLogger(__name__)
@@ -89,18 +89,25 @@ async def _channel_blacklist_value(
 
 
 def _channels_with_counts_query():
-    """Каналы со счётчиком вакансий, плодовитые сверху.
+    """Каналы со счётчиком разобранных вакансий, плодовитые сверху.
 
     ``coalesce(title, username)`` для сортировки совпадает с тем, как UI
     выбирает заголовок ряда (title если есть, иначе @username) — иначе
     NULL-title каналы в SQLite ASC всплывают наверх и порядок ломается.
+
+    Отбор стоит в условии присоединения, а не в ``where``: в ``where`` он
+    отбросил бы канал без единой разобранной вакансии целиком, а тот обязан
+    остаться в списке с нулём.
     """
     title_or_username = func.coalesce(
         TelegramChannel.title, TelegramChannel.username
     )
     return (
         select(TelegramChannel, func.count(Vacancy.id).label("cnt"))
-        .outerjoin(Vacancy, Vacancy.source_channel_id == TelegramChannel.id)
+        .outerjoin(
+            Vacancy,
+            and_(Vacancy.source_channel_id == TelegramChannel.id, PARSED_ONLY),
+        )
         .group_by(TelegramChannel.id)
         .order_by(
             func.count(Vacancy.id).desc(),
@@ -147,7 +154,7 @@ _CHANNEL_RATE_WINDOW_DAYS = 30
 
 
 async def _vacancies_per_day(session: AsyncSession, channel_id: int) -> float:
-    """Сколько вакансий в день канал приносит в последнем окне.
+    """Сколько разобранных вакансий в день канал приносит в последнем окне.
 
     Окно своё, а не «за всё время»: канал, замолчавший полгода назад,
     иначе выглядел бы таким же живым, как вчерашний.
@@ -160,6 +167,7 @@ async def _vacancies_per_day(session: AsyncSession, channel_id: int) -> float:
                 .where(
                     Vacancy.source_channel_id == channel_id,
                     Vacancy.created_at >= since,
+                    PARSED_ONLY,
                 )
             )
         ).scalar_one()
@@ -214,7 +222,7 @@ async def get_channel_detail(
     if ch is None:
         return None
     counts_by_enum = await count_by_status(
-        session, Vacancy.source_channel_id == channel_id
+        session, Vacancy.source_channel_id == channel_id, PARSED_ONLY
     )
     stats = await _channel_stats(session, channel_id, counts_by_enum)
     return ChannelDetail(

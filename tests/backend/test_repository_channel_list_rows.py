@@ -27,3 +27,23 @@ async def test_the_row_carries_its_count_and_blacklist_mark(
     assert rows["В списке"].is_blacklisted is True
     assert rows["Отметка снята"].is_blacklisted is False
     assert rows["Чужой род"].is_blacklisted is False
+
+
+async def test_an_unparsed_vacancy_is_not_counted(session, session_factory):
+    """Недоразобранная вакансия в счётчик не идёт.
+
+    Счётчик обещает то же, что человек увидит, открыв канал. Строка,
+    заведённая, но ещё не прошедшая разбор, в выдачу не попадает, и
+    посчитанная она давала бы «единицу», за которой ничего нет.
+    """
+    listed, _, _ = marked_channels()
+    await put(session_factory, listed)
+    await put(
+        session_factory,
+        vacancy_row(source_channel_id=listed.id),
+        vacancy_row(source_channel_id=listed.id, is_parsed=False, title=None),
+    )
+
+    rows = {r.channel.title: r for r in await list_telegram_channels(session)}
+
+    assert rows["В списке"].vacancy_count == 1
