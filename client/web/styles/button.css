@@ -1,7 +1,13 @@
 /* Кнопка с подписью. Значковые — в icon-button.css: у тех нет ни рамки, ни
    подложки, и общего с этими только сброс из base.css. */
 
+/* Строчный флекс с зазором: у половины кнопок окна значок стоит рядом с
+   подписью, и без него глиф садится на строку по-своему, а зазор приходится
+   держать пробелом в разметке. */
 .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 5px 12px;
   border-radius: 4px;
   border: 1px solid var(--border);
@@ -12,13 +18,6 @@
 }
 
 .btn:hover:not(:disabled) { border-color: var(--accent); }
-
-.btn.primary {
-  background: var(--accent);
-  color: var(--bg-primary);
-  border-color: var(--accent);
-  font-weight: 500;
-}
 
 .btn.primary:hover:not(:disabled) {
   background: var(--accent-hover-fill);
@@ -42,4 +41,16 @@
 .btn.danger:hover:not(:disabled) {
   background: var(--err-btn-bg-hover);
   border-color: var(--danger-btn);
+}
+
+/* Кнопка без рамки и подложки: так подписана «Назад» в мастере — она уводит
+   назад, а не двигает вперёд, и весом спорить с основной не должна. */
+.btn.text {
+  background: transparent;
+  border: 0;
+  color: var(--text-secondary);
+}
+
+.btn.text:hover:not(:disabled) {
+  color: var(--text-primary);
 }

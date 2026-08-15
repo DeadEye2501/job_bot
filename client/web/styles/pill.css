@@ -17,9 +17,4 @@
   border-color: var(--accent);
 }
 
-.pill.active {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--bg-primary);
-  font-weight: 500;
-}
+/* Заливка зажатой — общая, в accent-fill.css. */

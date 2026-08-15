@@ -38,3 +38,10 @@
 .secret-input .input {
   flex: 1;
 }
+
+/* Моноширинное поле: им набирают ключи, адреса и коды — то, что сверяют знак в
+   знак, а в пропорциональном начертании единица и «l» неразличимы. */
+.input.mono {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.83rem;
+}
