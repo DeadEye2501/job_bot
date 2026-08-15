@@ -1,5 +1,6 @@
 /* Карточка вакансии: шапка со статусом, чипы разбора, стек, текст и связи.
-   Лента переходов — в timeline.css, выбор статуса — в status-picker.css. */
+   Лента переходов — в timeline.css, выбор статуса — в status-picker.css,
+   исходный текст — в raw-text.css, кружок с именами — в contact-block.css. */
 
 /* Три места в ряд: значок статуса, название и меню действий. Сеткой, а не
    гибким рядом, — название занимает весь остаток, а крайние не съезжают от
@@ -166,33 +167,4 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-}
-
-.vac-dim {
-  color: var(--text-tertiary);
-}
-
-.raw-note {
-  margin-left: auto;
-  color: var(--text-tertiary);
-  font-size: 0.72rem;
-  font-weight: 400;
-}
-
-/* Исходный текст показывается как пришёл — с переносами и отступами
-   объявления: по ним и видно, чего разбор не разобрал. */
-.raw-text {
-  max-height: 50vh;
-  margin: 0;
-  padding: 8px 10px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-primary);
-  color: var(--text-secondary);
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 0.78rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  user-select: text;
 }

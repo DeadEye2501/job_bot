@@ -13,7 +13,7 @@
 
   import PersonCard from './PersonCard.svelte';
 
-  let { ask, say, events, openPerson, onopened } = $props();
+  let { ask, say, events, open, onopened } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -26,12 +26,13 @@
   const tries = attempts();
   let alive = true;
 
-  // Кого открыть, придя со стороны — из списка непрочитанного над полосой.
-  // Отметка гасится сразу: вкладку открывают и просто так, и заново открытая
-  // карточка человека, которого уже закрыли, читалась бы как поломка.
+  // Кого открыть, придя со стороны — из списка непрочитанного над полосой или
+  // из карточки вакансии. Отметка гасится сразу: вкладку открывают и просто
+  // так, и заново открытая карточка человека, которого уже закрыли, читалась бы
+  // как поломка.
   $effect(() => {
-    if (!openPerson) return;
-    opened = openPerson.id;
+    if (!open) return;
+    opened = open.id;
     onopened();
   });
 
@@ -134,7 +135,7 @@
     onconfirm={create}
     oncancel={() => (adding = false)}
   >
-    <NewPersonFields {draft} onenter={create} />
+    <NewPersonFields {draft} />
   </AskDialog>
 {/if}
 

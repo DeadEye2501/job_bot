@@ -132,7 +132,11 @@
   font-family: inherit;
   font-size: 0.82rem;
   line-height: 1.4;
-  resize: vertical;
+  /* Высоту полю ставит разметка по содержимому: пояснения бывают и в слово, и в
+     абзац, а прокрутка внутри строки ленты не читается вовсе. */
+  min-height: calc(0.82rem * 1.4 + 6px);
+  overflow: hidden;
+  resize: none;
 }
 
 .tl-note:hover {

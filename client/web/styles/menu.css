@@ -4,7 +4,9 @@
 .menu {
   right: 0;
   width: 250px;
+  max-height: 70vh;
   padding: 4px 0;
+  overflow-y: auto;
 }
 
 .menu-item {
@@ -13,6 +15,7 @@
   gap: 8px;
   width: 100%;
   padding: 5px 12px;
+  border-radius: 3px;
   color: var(--text-primary);
   font-size: 0.78rem;
   text-align: left;
@@ -28,11 +31,21 @@
   color: var(--text-secondary);
 }
 
-/* Запертый пункт приглушён, но нажимаем: по нажатию он говорит, почему нельзя,
-   а неотзывчивая строка оставила бы человека гадать. */
+/* Запертый пункт приглушён и подсвечивается не на наведение, а подсказкой:
+   почему нельзя, видно до нажатия. Нажатие он всё же принимает — и повторяет
+   ту же причину плашкой, чтобы человек не гадал, попал ли он по пункту. */
 .menu-item.blocked,
 .menu-item.blocked .material-symbols-outlined {
   color: var(--text-tertiary);
+}
+
+.menu-item.blocked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.menu-item.blocked:hover {
+  background: transparent;
 }
 
 .menu-item.danger,
@@ -42,6 +55,13 @@
 
 .menu-item.danger:hover {
   background: var(--danger-tint);
+}
+
+/* На наведении опасный пункт светлеет весь — и подпись, и значок: приглушённый
+   значок над посветлевшей подписью читался бы как наполовину запертый. */
+.menu-item.danger:hover,
+.menu-item.danger:hover .material-symbols-outlined {
+  color: var(--danger-hover-fg);
 }
 
 .menu-line {

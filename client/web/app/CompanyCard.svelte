@@ -7,11 +7,11 @@
 
   import CardDialog from '$components/CardDialog.svelte';
   import ChipList from '$components/ChipList.svelte';
-  import CompanyRow from '$components/CompanyRow.svelte';
+  import PickerRow from '$components/PickerRow.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
-  import { companyLine } from '$state/companies.js';
+  import { companyCandidate, companyLine } from '$state/companies.js';
   import { personName } from '$state/contacts.js';
   import { plural } from '$state/words.js';
 
@@ -227,14 +227,15 @@
     icon="merge"
     title={`Слить «${shown.name}» с другой`}
     placeholder="Поиск по названию, написанию, домену"
-    words={['компания', 'компании', 'компаний']}
     empty="Сливать не с чем — других компаний нет"
     load={candidates}
+    applyLabel="Слить"
+    onapply={(company) => (chosen = company)}
     onclose={() => (asking = null)}
   >
-    {#snippet children(rows)}
+    {#snippet children(rows, marked, pick)}
       {#each rows as company (company.id)}
-        <CompanyRow {company} onpick={() => (chosen = company)} />
+        <PickerRow row={companyCandidate(company)} chosen={company.id === marked} onpick={pick} />
       {/each}
     {/snippet}
   </PickerDialog>

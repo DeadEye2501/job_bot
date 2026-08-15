@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { modalKey, modalPress, opened } from '../state/keys.js';
+import { modalKey, modalPress, opened, saveKey } from '../state/keys.js';
 
 const ESCAPE = { key: 'Escape', target: { tagName: 'BODY' } };
 
@@ -71,5 +71,27 @@ describe('стопка открытых окон', () => {
 
     expect(closed).toBe(false);
     leave();
+  });
+});
+
+describe('запись набранного клавишами', () => {
+  it('Ctrl+Enter отправляет набранное, не дожидаясь паузы', () => {
+    // Заметка пишется с задержкой; человеку, который хочет записать её сейчас,
+    // иначе остаётся только уйти из поля мышью.
+    expect(saveKey({ key: 'Enter', ctrlKey: true })).toBe(true);
+  });
+
+  it('то же делает Cmd+Enter', () => {
+    expect(saveKey({ key: 'Enter', metaKey: true })).toBe(true);
+  });
+
+  it('один Enter переносит строку, а не записывает', () => {
+    // Заметку набирают в несколько абзацев: запись по Enter обрывала бы её на
+    // первом же переводе строки.
+    expect(saveKey({ key: 'Enter' })).toBe(false);
+  });
+
+  it('прочие клавиши записи не просят', () => {
+    expect(saveKey({ key: 's', ctrlKey: true })).toBe(false);
   });
 });

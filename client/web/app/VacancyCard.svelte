@@ -2,38 +2,57 @@
   // Карточка вакансии: чем она оказалась, что с ней делали и на чём стоит
   // сейчас.
   //
-  // Открывается поверх списка: вакансию читают, не теряя из виду соседние, —
-  // рядом с ними и решают, стоит ли она отклика.
+  // Стоит правой панелью рядом со списком: вакансию читают, не теряя из виду
+  // соседние, — рядом с ними и решают, стоит ли она отклика.
 
+  import Avatar from '$components/Avatar.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import RawTextDialog from '$components/RawTextDialog.svelte';
   import StatusPicker from '$components/StatusPicker.svelte';
   import VacancyActions from '$components/VacancyActions.svelte';
   import VacancyTimeline from '$components/VacancyTimeline.svelte';
   import { attempts } from '$state/attempts.js';
-  import { actionBlocks, rawNote } from '$state/vacancy_actions.js';
+  import { autosave } from '$state/autosave.js';
+  import { cardLinks } from '$state/card_links.js';
+  import { saveKey } from '$state/keys.js';
+  import { actionBlocks, rawChips } from '$state/vacancy_actions.js';
   import { ago, gradeLabel, remoteLabel, scoreTone } from '$state/vacancies.js';
   import { timelineRows } from '$state/vacancy_card.js';
 
   import VacancyLinks from './VacancyLinks.svelte';
 
-  let { ask, say, events, lockedTip, vacancyId, onclose, onchanged } = $props();
+  // Пауза перед записью заметки. Столько же ждало прежнее окно: короче — и
+  // мост получает вопрос на каждое слово, длиннее — и человек успевает уйти,
+  // не увидев подтверждения.
+  const NOTES_DELAY = 800;
+
+  // Сколько горит зелёная рамка записанного. Ровно столько же длится её
+  // угасание в оформлении: погасшая раньше срока читалась бы как моргание.
+  const FLASH_MS = 400;
+
+  let { ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged } = $props();
 
   let card = $state(null);
   let notes = $state('');
+  let notesSaved = $state(false);
   let picking = $state(false);
   let saving = $state(false);
   let asking = $state(null);
   let linking = $state(null);
   let raw = $state(false);
-  let sending = $state(false);
 
   const tries = attempts();
   let alive = true;
+  // Отложенная запись заметки этой вакансии. Заводится вместе с карточкой:
+  // номер вакансии в ней запечатан, и отложенное уедет туда, где набиралось,
+  // даже если человек уже перешёл к соседней.
+  let saver = null;
+  let flashTimer = null;
 
   const rows = $derived(card ? timelineRows(card.history, card.events) : []);
   const tone = $derived(card ? scoreTone(card.score, card.score_threshold) : '');
-  const blocks = $derived(card ? actionBlocks(card, lockedTip) : { send: '', rerun: '' });
+  const blocks = $derived(card ? actionBlocks(card, lockedTip) : { send: '', rerun: '', source: '' });
+  const links = $derived(card ? cardLinks(card) : null);
   // Когда объявление вышло: у поста есть своя метка, а у записи — только время
   // её заведения, и второе на день-другой позже первого.
   const posted = $derived(card ? card.posted_at || card.created_at : null);
@@ -43,39 +62,63 @@
    * Свой счёт попыток: правка пояснения и смена статуса перечитывают её каждая,
    * и ответы возвращаются вразнобой — лёгший поверх свежего старый показал бы
    * ленту без только что сделанного перехода.
+   *
+   * Заметку поле принимает только у новой карточки: перечитывают её и по вести
+   * о смене списка, и пришедшая посреди набора она стёрла бы набранное.
    */
   async function refresh() {
     const mine = tries.next();
     const now = await ask('vacancies.detail', vacancyId);
     if (!alive || tries.stale(mine) || now === null) return;
+    const other = card === null || card.id !== now.vacancy.id;
     card = now.vacancy;
-    notes = card.notes ?? '';
+    saver.known(card.notes ?? '');
+    if (other) notes = card.notes ?? '';
   }
 
-  /** Записать заметку и показать то, что легло на самом деле.
+  /** Показать, что записанное легло.
    *
-   * Перечитываем и после отказа: мост сводит пробельную заметку к пустоте, а
-   * отклонённая правка осталась бы на экране — человек читал бы своё, а в базе
-   * лежало бы прежнее.
+   * Запись отложена и уходит молча: без этой вспышки человек не знает, дошла
+   * ли заметка, и уходит с экрана в сомнении.
    */
-  async function saveNotes() {
-    await ask('vacancies.save_notes', { vacancy_id: vacancyId, notes });
-    return refresh();
+  function flash() {
+    notesSaved = true;
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      notesSaved = false;
+    }, FLASH_MS);
+  }
+
+  /** Записать заметку.
+   *
+   * Ответом приезжает то, что легло в базу, — им и отмечаем записанное: мост
+   * сводит пробельную заметку к пустоте, и не прими мы его ответ, следующая же
+   * пауза послала бы тот же вопрос заново.
+   *
+   * Карточку не перечитываем: человек мог набрать ещё, пока летел вопрос, и
+   * пришедшее из базы стёрло бы это.
+   */
+  async function saveNotes(id, text) {
+    const done = await ask('vacancies.save_notes', { vacancy_id: id, notes: text });
+    if (!alive || done === null) return;
+    saver.known(done.notes ?? '');
+    flash();
   }
 
   /** Записать пояснение к переходу.
    *
-   * Перечитываем всегда по тому же доводу, что и заметку: мост дописывает
-   * точку, и записанное отличается от набранного, а отказ оставил бы
-   * отклонённое на экране.
+   * Перечитываем карточку: мост дописывает точку, и записанное отличается от
+   * набранного. Ответ говорит ленте, вспыхнуть ли зелёным.
    */
-  async function saveNote(historyId, text) {
-    await ask('vacancies.save_history_explanation', {
-      vacancy_id: vacancyId,
+  async function saveNote(id, historyId, text) {
+    const done = await ask('vacancies.save_history_explanation', {
+      vacancy_id: id,
       history_id: historyId,
       explanation: text,
     });
-    return refresh();
+    if (done === null) return false;
+    await refresh();
+    return true;
   }
 
   async function apply(status, explanation) {
@@ -111,20 +154,11 @@
     say('Разбор запущен');
   }
 
-  /** Отправить отклик.
-   *
-   * Заперто на время полёта: заслон «уже откликались» стоит на мосту и читает
-   * статус до отправки, а зов идёт своим чередом — два нажатия послали бы
-   * человеку два письма. Перечитываем и после отказа: половина отказов
-   * приходит оттого, что статус успел уехать, и на экране он уже другой.
-   */
+  /** Отправить отклик. */
   async function send() {
-    if (sending) return;
     asking = null;
-    sending = true;
     const done = await ask('vacancies.send_application', { vacancy_id: vacancyId });
     if (!alive) return;
-    sending = false;
     if (done !== null) say('Отклик отправлен');
     await refresh();
     onchanged();
@@ -139,15 +173,13 @@
     onclose();
   }
 
-  /** Открыть объявление в Telegram.
+  /** Открыть адрес наружу.
    *
-   * Открывает его система, а не страница: адрес ведёт наружу, и окно раздаёт
-   * свою папку, а не интернет. Ссылки может не быть вовсе — источник её не
-   * прислал, — и тогда открывать нечего, о чём и говорим.
+   * Открывает его система, а не страница: адреса ведут в Telegram и на сайт
+   * компании, а окно раздаёт свою папку, а не интернет.
    */
-  function source() {
-    if (!card.source_url) return say('Ссылки на объявление нет');
-    return ask('system.open_url', card.source_url);
+  function outside(url) {
+    return ask('system.open_url', url);
   }
 
   /** Положить исходный текст в буфер обмена.
@@ -168,6 +200,8 @@
 
   $effect(() => {
     alive = true;
+    const id = vacancyId;
+    saver = autosave({ delay: NOTES_DELAY, save: (text) => saveNotes(id, text) });
     // Вакансию двигает не только это окно: бот разбирает её заново по нашей же
     // просьбе и правит статус по переписке. Весть о смене списка — то же
     // событие, по которому обновляется список под карточкой.
@@ -175,6 +209,14 @@
     refresh();
     return () => {
       alive = false;
+      // Набранное и не уехавшее отправляем на прощание: карточку закрыли или
+      // сменили, и ждать паузы больше нечему. Номер вакансии запечатан в
+      // записи, поэтому заметка уедет к своей.
+      saver.flush();
+      clearTimeout(flashTimer);
+      // Вспышку гасим вместе с карточкой: оставленная гореть, она встретила бы
+      // соседнюю вакансию зелёной рамкой на ненабранном поле.
+      notesSaved = false;
       deaf();
     };
   });
@@ -206,10 +248,10 @@
       {say}
       onsend={() => (asking = 'send')}
       onrerun={rerun}
-      onlinkhr={() => (linking = 'hr')}
-      onlinkcompany={() => (linking = 'company')}
+      onlinkhr={() => (linking = { kind: 'hr', prefill: '' })}
+      onlinkcompany={() => (linking = { kind: 'company', prefill: '' })}
       onraw={() => (raw = true)}
-      onsource={source}
+      onsource={() => outside(card.source_url)}
       ondelete={() => (asking = 'delete')}
     />
   </div>
@@ -229,7 +271,7 @@
         type="button"
         title="Перейти к посту в канале"
         disabled={!card.source_url}
-        onclick={source}
+        onclick={() => outside(card.source_url)}
       >
         <span class="material-symbols-outlined">tag</span>{card.channel_username}
       </button>
@@ -261,46 +303,102 @@
 
   <div class="det-section">
     <div class="vac-contacts">
-      <span class="card-meta-item">
-        <span class="material-symbols-outlined">person</span>
-        {#if card.hr}
-          {card.hr.name || 'Без имени'}{#if card.hr.telegram_username}
-            <span class="vac-dim">@{card.hr.telegram_username}</span>
+      <div class="contact-block">
+        <Avatar avatar={card.hr?.avatar} name={card.hr?.name} icon="person" />
+        <div class="hr-info">
+          {#if !card.hr}
+            <div class="hr-name muted">HR не определён</div>
+          {:else}
+            <button
+              class="hr-name is-link"
+              type="button"
+              title="Открыть в Контактах"
+              onclick={() => oncontacts(links.hrCard)}
+            >
+              {card.hr.name || '—'}
+            </button>
+            {#if links.hrChat}
+              <button
+                class="hr-username is-link"
+                type="button"
+                title="Написать в Telegram"
+                onclick={() => outside(links.hrChat)}
+              >
+                @{card.hr.telegram_username}
+              </button>
+            {/if}
           {/if}
-        {:else}
-          <span class="vac-dim">HR не определён</span>
-        {/if}
-      </span>
-      <span class="card-meta-item">
-        <span class="material-symbols-outlined">domain</span>
-        {#if card.company_name}
-          {card.company_name}
-        {:else}
-          <span class="vac-dim">Компания не определена</span>
-        {/if}
-      </span>
+        </div>
+      </div>
+
+      <div class="contact-block">
+        <Avatar icon="domain" />
+        <div class="hr-info">
+          {#if !card.company_name}
+            <div class="hr-name muted">Компания не определена</div>
+          {:else if links.companyCard}
+            <button
+              class="hr-name is-link"
+              type="button"
+              title="Открыть в Контактах"
+              onclick={() => oncontacts(links.companyCard)}
+            >
+              {card.company_name}
+            </button>
+          {:else}
+            <!-- Имя разбор узнал, а связи нет: нажатие открывает подборщик с
+                 этим самым именем, вместо того чтобы набирать его руками. -->
+            <button
+              class="hr-name is-link"
+              type="button"
+              title="Связать с компанией"
+              onclick={() => (linking = { kind: 'company', prefill: links.companyPick })}
+            >
+              {card.company_name}
+            </button>
+          {/if}
+          {#if links.site}
+            <button
+              class="hr-username is-link"
+              type="button"
+              title="Открыть сайт компании"
+              onclick={() => outside(links.site)}
+            >
+              {card.company_website}
+            </button>
+          {/if}
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="det-section">
     <textarea
-      class="textarea"
-      placeholder="Заметки по вакансии"
+      class="notes-area"
+      class:saved-flash={notesSaved}
+      placeholder="Заметки по вакансии…"
       bind:value={notes}
-      onchange={saveNotes}
+      oninput={() => saver.typed(notes)}
+      onblur={() => saver.flush()}
+      onkeydown={(event) => saveKey(event) && saver.flush()}
     ></textarea>
   </div>
 
   {#if rows.length}
     <div class="det-section">
-      <VacancyTimeline {rows} onsave={saveNote} />
+      <!-- Своя лента на каждую вакансию: отсчёты отложенной записи живут в ней,
+           и на общей они копились бы от вакансии к вакансии, пока открыт
+           экран. -->
+      {#key vacancyId}
+        <VacancyTimeline {rows} {vacancyId} onsave={saveNote} />
+      {/key}
     </div>
   {/if}
 {/if}
 
 {#if asking === 'send'}
   <ConfirmDialog
-    message={`Сочинить сопроводительное письмо и отправить его${card.hr?.name ? ` ${card.hr.name}` : ''} вместе с резюме?`}
+    message="Сгенерировать сопроводительное письмо и отправить связанному HR с прикреплённым резюме?"
     confirmLabel="Отправить"
     onconfirm={send}
     oncancel={() => (asking = null)}
@@ -309,7 +407,7 @@
 
 {#if asking === 'delete'}
   <ConfirmDialog
-    message={'Удалить эту вакансию?\n\nИстория статусов и события разбора уйдут вместе с ней. Переписка с HR останется. Откатить нельзя.'}
+    message="Удалить эту вакансию? Связанная история статусов и события будут удалены."
     confirmLabel="Удалить"
     onconfirm={drop}
     oncancel={() => (asking = null)}
@@ -318,8 +416,9 @@
 
 {#if raw}
   <RawTextDialog
-    note={rawNote(card)}
-    text={card.raw_text ?? 'Исходный текст не сохранён'}
+    id={card.id}
+    chips={rawChips(card)}
+    text={card.raw_text ?? ''}
     oncopy={copyRaw}
     onclose={() => (raw = false)}
   />
@@ -330,7 +429,9 @@
     {ask}
     {say}
     {vacancyId}
-    kind={linking}
+    kind={linking.kind}
+    prefill={linking.prefill}
+    current={linking.kind === 'hr' ? (card.hr?.id ?? null) : card.company_id}
     onclose={() => (linking = null)}
     onlinked={() => {
       refresh();

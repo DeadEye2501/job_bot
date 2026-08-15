@@ -49,6 +49,85 @@
   flex-shrink: 0;
 }
 
+/* Своя полоса шапки — у окон, которые окном и живут: исходный текст,
+   подборщик. Коротким вопросам она не нужна, им хватает строки заголовка. */
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+
+.modal-head .modal-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-head > .material-symbols-outlined {
+  flex-shrink: 0;
+  font-size: 18px;
+  color: var(--text-secondary);
+}
+
+.modal-title-meta {
+  margin-left: 6px;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+
+.modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 3px;
+  color: var(--text-tertiary);
+}
+
+.modal-close:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+
+.modal-close .material-symbols-outlined {
+  font-size: 16px;
+}
+
+/* Прокручивается тело, а не окно целиком: шапка с крестиком и подвал с
+   кнопками обязаны остаться на виду. */
+.modal-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+
+.modal-footer .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+}
+
+.modal-footer .btn .material-symbols-outlined {
+  font-size: 14px;
+}
+
 .modal-subtitle {
   color: var(--text-secondary);
   font-size: 0.78rem;

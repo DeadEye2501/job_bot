@@ -16,7 +16,7 @@
   // `lockedTip` приходит сверху, а не спрашивается здесь: лампы состояния
   // опрашивает оболочка для нижней полосы, и второй опрос из карточки дал бы
   // две разные правды об одном.
-  let { ask, say, lockedTip, events } = $props();
+  let { ask, say, lockedTip, events, oncontacts } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -223,6 +223,7 @@
         {say}
         {events}
         {lockedTip}
+        {oncontacts}
         vacancyId={opened}
         onclose={() => (opened = null)}
         onchanged={() => refresh(refreshLimit(rows.length))}

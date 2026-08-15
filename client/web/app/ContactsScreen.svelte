@@ -12,15 +12,19 @@
   import CompaniesList from './CompaniesList.svelte';
   import PeopleList from './PeopleList.svelte';
 
-  let { ask, say, lockedTip, events, openPerson, onopened } = $props();
+  let { ask, say, lockedTip, events, openCard, onopened } = $props();
 
   let tab = $state(CONTACTS_TABS[0].key);
 
-  // Пришли из списка непрочитанного — открываем ту вкладку, где человек живёт:
-  // выбранного показывает она, а не та, на которой раздел закрыли в прошлый раз.
+  // Пришли со стороны — открываем ту вкладку, где названная карточка живёт:
+  // показывает её она, а не та, на которой раздел закрыли в прошлый раз.
   $effect(() => {
-    if (openPerson) tab = 'people';
+    if (openCard) tab = openCard.tab;
   });
+
+  // Отметка достаётся только своей вкладке: чужой номер соседний список принял
+  // бы за свой и открыл бы карточку с тем же номером.
+  const mine = (key) => (openCard?.tab === key ? openCard : null);
 </script>
 
 <TopTabs tabs={CONTACTS_TABS} active={tab} onpick={(key) => (tab = key)} />
@@ -29,9 +33,9 @@
   {#if tab === 'channels'}
     <ChannelsList {ask} {say} {lockedTip} {events} />
   {:else if tab === 'companies'}
-    <CompaniesList {ask} {say} {events} />
+    <CompaniesList {ask} {say} {events} open={mine('companies')} {onopened} />
   {:else if tab === 'people'}
-    <PeopleList {ask} {say} {events} {openPerson} {onopened} />
+    <PeopleList {ask} {say} {events} open={mine('people')} {onopened} />
   {:else}
     <BlacklistList {ask} {say} {events} />
   {/if}

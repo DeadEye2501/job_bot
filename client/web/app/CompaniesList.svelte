@@ -12,7 +12,7 @@
 
   import CompanyCard from './CompanyCard.svelte';
 
-  let { ask, say, events } = $props();
+  let { ask, say, events, open, onopened } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -24,6 +24,15 @@
 
   const tries = attempts();
   let alive = true;
+
+  // Какую компанию открыть, придя из карточки вакансии. Отметка гасится сразу:
+  // вкладку открывают и просто так, и заново открытая карточка компании,
+  // которую уже закрыли, читалась бы как поломка.
+  $effect(() => {
+    if (!open) return;
+    opened = open.id;
+    onopened();
+  });
 
   /** Перечитать список с начала.
    *
@@ -129,7 +138,7 @@
     onconfirm={create}
     oncancel={() => (adding = false)}
   >
-    <NewCompanyFields {draft} onenter={create} />
+    <NewCompanyFields {draft} />
   </AskDialog>
 {/if}
 

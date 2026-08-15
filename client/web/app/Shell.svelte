@@ -68,11 +68,12 @@
   let chatsOpen = $state(false);
   let chatsLoading = $state(false);
   let chats = $state([]);
-  // Кого открыть, придя в контакты из списка непрочитанного. Отметка разовая:
-  // контакты сообщают, что приняли её, и она гаснет. Останься она лежать —
-  // каждый следующий заход в раздел заново открывал бы ту же карточку, и до
-  // остальных вкладок было бы не добраться.
-  let openPerson = $state(null);
+  // Чью карточку открыть, придя в контакты со стороны: из списка непрочитанного
+  // над полосой или из карточки вакансии. Отметка разовая: контакты сообщают,
+  // что приняли её, и она гаснет. Останься она лежать — каждый следующий заход
+  // в раздел заново открывал бы ту же карточку, и до остальных вкладок было бы
+  // не добраться.
+  let openCard = $state(null);
   let mode = $state(OFF);
   let running = $state(false);
   let crawling = $state(false);
@@ -198,10 +199,15 @@
     if (chatsOpen) await askChats();
   }
 
-  /** Уйти из списка в переписку с выбранным. */
-  function openChat(id) {
+  /** Уйти в контакты — к названной карточке.
+   *
+   * Приходят сюда двое: список непрочитанного над полосой и связи карточки
+   * вакансии. Вкладку называет сам зовущий: человек он ищет или компанию,
+   * знает он, а не раздел.
+   */
+  function goContacts(mark) {
     chatsOpen = false;
-    openPerson = { id };
+    openCard = mark;
     section = 'contacts';
   }
 
@@ -315,14 +321,14 @@
         {ask}
         {say}
         {lockedTip}
-        {openPerson}
-        onopened={() => (openPerson = null)}
+        {openCard}
+        onopened={() => (openCard = null)}
         events={heard}
       />
     {:else if section === 'stats'}
       <StatsScreen {ask} />
     {:else if section === 'vacancies'}
-      <VacanciesScreen {ask} {say} {lockedTip} events={heard} />
+      <VacanciesScreen {ask} {say} {lockedTip} events={heard} oncontacts={goContacts} />
     {:else if section === 'system'}
       <TopTabs tabs={SYSTEM_TABS} active={systemTab} onpick={(key) => (systemTab = key)} />
       {#if systemTab === 'logs'}
@@ -377,7 +383,7 @@
         loading={chatsLoading}
         rows={chats}
         ontoggle={toggleChats}
-        onpick={openChat}
+        onpick={(id) => goContacts({ tab: 'people', id })}
       />
     </div>
   </div>
