@@ -92,6 +92,22 @@ export function mirrored(chat, embed) {
   return { base_url: chat.base_url, api_key: chat.api_key, model: embed.model };
 }
 
+/** Имена моделей, подходящие набранному в поле.
+ *
+ * Отбор здесь, а не в самой подсказке: показывать переданное — вся её работа, а
+ * знание о том, что это за имена и как их ищут, принадлежит тому, кто их
+ * получил у поставщика.
+ *
+ * Вхождением, а не началом строки: у локальных поставщиков имя идёт с
+ * приставкой через косую черту («qwen/qwen3-4b-2507»), и отбор по началу
+ * прятал бы модель от того, кто набирает её собственное имя.
+ */
+export function matchingModels(models, typed) {
+  const needle = typed.trim().toLowerCase();
+  if (!needle) return models;
+  return models.filter((one) => one.toLowerCase().includes(needle));
+}
+
 /** Плашка сеанса Telegram в шапке секции.
  *
  * Красная без сеанса: по ней человек понимает, что бот не поедет, не читая

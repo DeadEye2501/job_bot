@@ -18,6 +18,14 @@
   font-size: 0.82rem;
 }
 
+/* «native» показывается с прописной, рядом с C2 и B1 — оно тут такая же
+   ступень, как они, и строчным читается как обмолвка. Правится показом, а не
+   значением: значение уходит на мост, а тот знает уровни строчными. */
+.lang-row .cdd-label,
+.lang-row .cdd-option {
+  text-transform: capitalize;
+}
+
 .lang-remove {
   color: var(--text-tertiary);
   text-align: center;

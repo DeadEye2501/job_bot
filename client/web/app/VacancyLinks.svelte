@@ -30,6 +30,10 @@
   let picked = $state(null);
   let draft = $state({ ...BLANK[kind] });
 
+  // Заслон тот же, что в списках контактов: человеку — хоть что-нибудь из трёх,
+  // компании — название.
+  const ready = $derived(kind === 'hr' ? named(draft) : Boolean(draft.name.trim()));
+
   async function candidates(search) {
     const now =
       kind === 'hr'
@@ -60,7 +64,7 @@
    */
   async function create() {
     if (saving) return;
-    if (kind === 'hr' ? !named(draft) : !draft.name.trim()) return;
+    if (!ready) return;
     saving = true;
     const done =
       kind === 'hr'
@@ -82,6 +86,7 @@
     icon={kind === 'hr' ? 'person_add' : 'add_business'}
     title={kind === 'hr' ? 'Новый HR' : 'Новая компания'}
     confirmLabel="Создать"
+    {ready}
     onconfirm={create}
     oncancel={() => (creating = false)}
   >

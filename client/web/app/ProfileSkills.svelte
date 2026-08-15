@@ -105,7 +105,7 @@
     <div class="collapsible" class:collapsed={closed.has(group.name)}>
       <div class="collapsible-head">
         <button type="button" onclick={() => toggleCategory(group.name)}>
-          <span class="material-symbols-outlined">expand_more</span>
+          <span class="material-symbols-outlined collapse-arrow">expand_more</span>
         </button>
         <input
           class="cat-name"

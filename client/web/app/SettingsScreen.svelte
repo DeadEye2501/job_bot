@@ -170,15 +170,26 @@
     };
   }
 
+  /** Перечень имён моделей у поставщика — молча.
+   *
+   * Спрашивается он на каждую правку адреса и ключа, и непóднятый поставщик
+   * отвечает отказом на каждый знак: плашка беды выскакивала бы поверх набора.
+   * Не ответил — список пуст, имя вписывают руками.
+   */
   async function listModels(kind) {
     const creds = kind === 'chat' ? chat : embed;
-    const answer = await ask('settings.list_models', {
-      kind,
-      base_url: creds.base_url,
-      api_key: creds.api_key,
-    });
-    if (answer === null || !alive) return;
-    models = { ...models, [kind]: answer.models || [] };
+    let answer = null;
+    try {
+      answer = await call('settings.list_models', {
+        kind,
+        base_url: creds.base_url,
+        api_key: creds.api_key,
+      });
+    } catch {
+      answer = null;
+    }
+    if (!alive) return;
+    models = { ...models, [kind]: answer?.models || [] };
   }
 
   function startLogin() {

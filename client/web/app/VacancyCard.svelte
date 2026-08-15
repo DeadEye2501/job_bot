@@ -29,6 +29,9 @@
 
   let card = $state(null);
   let picking = $state(false);
+  // Обёртка пилюли и окошка статуса: по ней окошко считает «нажали мимо».
+  // Своим узлом ему годится только она — кнопка лежит рядом с ним, не внутри.
+  let statusWrap = $state(null);
   let saving = $state(false);
   let asking = $state(null);
   let linking = $state(null);
@@ -181,7 +184,7 @@
   <div class="vac-detail-empty">Загрузка…</div>
 {:else}
   <div class="det-head">
-    <div class="status-wrap" class:popover-open={picking}>
+    <div class="status-wrap" class:popover-open={picking} bind:this={statusWrap}>
       <button class="status-badge" type="button" onclick={() => (picking = !picking)}>
         <span class="status-dot" data-status={card.status}></span>
         <span class="status-label">{card.status}</span>
@@ -191,6 +194,7 @@
         <StatusPicker
           status={card.status}
           {saving}
+          wrap={statusWrap}
           onapply={apply}
           oncancel={() => (picking = false)}
         />

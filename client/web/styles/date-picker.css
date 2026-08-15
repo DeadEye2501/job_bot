@@ -19,6 +19,10 @@
   font-size: 0.83rem;
 }
 
+.input-date-text:hover:not(:disabled, :focus) {
+  border-color: var(--text-secondary);
+}
+
 .input-date-text:focus {
   outline: none;
   border-color: var(--accent);
@@ -30,7 +34,7 @@
 
 .date-panel {
   position: absolute;
-  bottom: calc(100% + 4px);
+  top: calc(100% + 4px);
   left: 0;
   z-index: 40;
   width: 224px;
@@ -39,6 +43,13 @@
   border-radius: 6px;
   background: var(--bg-secondary);
   box-shadow: 0 8px 24px var(--scrim);
+}
+
+/* Вверх — там, где под полем места нет: в панели отбора поля периода стоят
+   последней группой, и раскрытая вниз сетка ушла бы под её нижнюю кромку. */
+.date-panel.up {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 
 .date-head {

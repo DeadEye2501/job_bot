@@ -46,8 +46,13 @@ button {
 body {
   /* Шрифт системный, свой не привозится: приложение набрано тем же, чем набрана
      система вокруг него. Привезённый стоил бы мегабайта в сборке и мигания
-     текстом при загрузке — ради вида, которого никто не просил. */
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+     текстом при загрузке — ради вида, которого никто не просил.
+
+     Первым назван Segoe UI, а не `system-ui`, как было в прежней разметке:
+     `system-ui` — не имя шрифта, а просьба к движку взять системный, и
+     QtWebEngine с WebView2 берут по ней разные начертания. Названное прямо
+     имя убирает этот выбор: окно набрано тем же, чем набрано было. */
+  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg-secondary);
   color: var(--text-primary);
   line-height: 1.5;

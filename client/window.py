@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from adapters import db
 from backend.models import BotMode
 from backend.runtime_settings import RuntimeSettings
-from client import raise_window
+from client import raise_window, window_size
 from client.bridge import Api, AsyncRunner, lifespan
 from client.serving import built_front
 from config import get_database_url
@@ -50,12 +50,6 @@ WINDOW_BACKGROUND = "#2d2d2f"
 оболочки видна ярко-белая вспышка со шлейфом прежнего кадра.
 """
 
-WINDOW_MIN = (900, 660)
-"""Наименьший размер окна, он же начальный.
-
-Начальный равен наименьшему нарочно: разметка нарисована под эту ширину и ниже
-неё переносится и ломается. Расти окно может сколько угодно.
-"""
 
 
 def run_ui() -> int:
@@ -77,15 +71,7 @@ def run_ui() -> int:
     hub = lifespan.start(runner, session_factory, rs, engine=engine)
     listening = None
     try:
-        window = webview.create_window(
-            "Job Bot",
-            built_front(WEB_DIST),
-            js_api=Api(hub),
-            width=WINDOW_MIN[0],
-            height=WINDOW_MIN[1],
-            min_size=WINDOW_MIN,
-            background_color=WINDOW_BACKGROUND,
-        )
+        window = _open_window(hub, settled=rs.wizard_completed)
         # Окно — хозяйству: до диалога выбора файла добраться больше неоткуда,
         # а мост собран раньше окна и сам его не видит.
         hub.window = window
@@ -98,6 +84,27 @@ def run_ui() -> int:
         # проститься с Telegram и закрыть базу.
         _put_out(hub, runner, listening)
     return 0
+
+
+def _open_window(hub, *, settled: bool):
+    """Поднять окно под ту поверхность, которую человек сейчас увидит.
+
+    Настроенное приложение открывается своим размером и тянется; мастер —
+    своим, меньшим, и не тянется вовсе. Дойдя до конца, мастер растит окно сам
+    (`window_size.grow_to_main`): pywebview отдаёт размеры системе один раз, и
+    открытое по-мастерски окно иначе таким и осталось бы.
+    """
+    size = window_size.MAIN if settled else window_size.WIZARD
+    return webview.create_window(
+        "Job Bot",
+        built_front(WEB_DIST),
+        js_api=Api(hub),
+        width=size[0],
+        height=size[1],
+        min_size=size,
+        resizable=settled,
+        background_color=WINDOW_BACKGROUND,
+    )
 
 
 def _put_out(hub, runner, listening) -> None:

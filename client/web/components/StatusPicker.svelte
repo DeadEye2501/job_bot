@@ -10,11 +10,10 @@
   import { modalKey, saveKey } from '$state/keys.js';
   import { STATUS_CHOICES } from '$state/statuses.js';
 
-  let { status, saving, onapply, oncancel } = $props();
+  let { status, saving, wrap, onapply, oncancel } = $props();
 
   let chosen = $state(status);
   let note = $state('');
-  let root = $state(null);
 
   function key(event) {
     if (saveKey(event)) return onapply(chosen, note);
@@ -24,15 +23,21 @@
   $effect(() => {
     // Нажатие мимо закрывает окошко. Своим узлом, а не по имени класса: окошек
     // на карточке два, и «мимо» у каждого своё.
+    //
+    // Свой узел — обёртка, а не сама панель: кнопка, которой окошко открывают,
+    // панели не принадлежит, она её сосед. Считай панель своим узлом — и тот
+    // самый клик, что её открыл, дошёл бы всплытием до `document`, где этот
+    // сторож уже висит, был бы сочтён «мимо» и закрыл окошко обратно. Снаружи
+    // это выглядит как не нажимающаяся кнопка.
     const away = (event) => {
-      if (root !== null && !root.contains(event.target)) oncancel();
+      if (wrap !== null && !wrap.contains(event.target)) oncancel();
     };
     document.addEventListener('click', away);
     return () => document.removeEventListener('click', away);
   });
 </script>
 
-<div class="pop status-picker" bind:this={root}>
+<div class="pop status-picker">
   <div class="status-options">
     {#each STATUS_CHOICES as one (one.value)}
       <label class="status-option">

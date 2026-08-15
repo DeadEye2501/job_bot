@@ -5,10 +5,38 @@
 из этого доезжает до окна и что оно показывает человеку до сохранения.
 """
 
+import asyncio
+import time
+
 import httpx
 import pytest
 
 from tests.fakes.llm import CHAT, MODELS, models_response
+
+
+def _busy_provider(free: asyncio.Event):
+    """Поставщик, отвечающий только пока событие взведено.
+
+    Заготовки `tests.fakes.llm` тут не годятся: их обработчик отвечает сразу, а
+    нужен молчащий — тот, что держит обращение неотвеченным, как держит его
+    LM Studio, считающая чужой промпт.
+    """
+
+    def make(_cfg):
+        async def answer(request):
+            await free.wait()
+            if request.url.path.endswith("/models"):
+                return models_response("qwen")
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}]},
+            )
+
+        return httpx.AsyncClient(
+            base_url="http://provider.test", transport=httpx.MockTransport(answer)
+        )
+
+    return make
 
 
 @pytest.fixture
@@ -289,6 +317,38 @@ async def test_a_slow_provider_is_not_asked_twice_at_once(
     answer = await ask(api.system.health)
 
     assert answer["ok"]["chat"] is False
+
+
+async def test_a_busy_provider_does_not_put_out_the_lamp(
+    api, ask, runner, monkeypatch, runtime_settings
+):
+    """Занятый поставщик держит прошлый ответ, а не гасит лампочку.
+
+    LM Studio обслуживает одну модель по очереди: пока идёт разбор вакансии,
+    пробное обращение стоит в этой очереди и молчит десятками секунд. Сочти
+    окно такое молчание за «модель мертва» — и оно погасит бота посреди его
+    же обхода, а оборванный на полуслове разбор запишет вакансии Not Fit по
+    несостоявшемуся запросу, а не по её содержанию.
+    """
+    free = asyncio.Event()
+    free.set()
+    monkeypatch.setattr("adapters.lm_studio.make_client", _busy_provider(free))
+    await runtime_settings.set_chat(
+        base_url="http://localhost:1234", api_key="", model="qwen"
+    )
+    lit = await ask(api.system.health)
+    assert lit["ok"]["chat"] is True
+
+    free.clear()
+    # Минута прошла — пора спрашивать заново, и на этот раз поставщик занят.
+    # Час назад, а не «никогда»: «никогда» — это первая проба, и её ждут.
+    api.system._models_probed_at = time.monotonic() - 3600
+
+    answer = await ask(api.system.health)
+
+    assert answer["ok"]["chat"] is True
+    free.set()
+    await runner.drain()
 
 
 async def test_a_bad_address_is_refused_with_its_kind(api, ask):

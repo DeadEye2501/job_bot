@@ -139,12 +139,16 @@ def test_a_window_that_would_not_open_still_puts_the_bridge_out(opened, monkeypa
     assert order == ["слушатель", "мост", "мотор"]
 
 
-def test_the_window_opens_at_the_size_the_layout_needs(opened):
-    """Окно открывается не меньше того размера, под который нарисован экран.
+async def test_a_finished_setup_opens_the_window_the_layout_needs(
+    opened, runtime_settings
+):
+    """Настроенное приложение открывается не меньше того размера, под который
+    нарисован экран.
 
     Ниже него разметка переносится и ломается, а вернуть размер человек уже не
     может: он тянет за край и упирается в то, что мы разрешили.
     """
+    await runtime_settings.mark_wizard_completed()
     fake, _order = opened
 
     window_module.run_ui()
@@ -153,6 +157,23 @@ def test_the_window_opens_at_the_size_the_layout_needs(opened):
     # на размере в сто точек, где разметка нечитаема вовсе.
     assert fake.created["min_size"] == (900, 660)
     assert fake.created["width"] == 900
+
+
+def test_the_wizard_opens_in_a_smaller_window_it_cannot_stretch(opened):
+    """Неоконченный мастер открывается своим окном, и потянуть его нельзя.
+
+    Мастер нарисован под шестьсот сорок точек и на девятистах расплывается
+    полосой пустоты. Растягивать в нём нечего — на экране одна колонка полей,
+    — а свободный край дал бы человеку сплющить её до нечитаемого.
+    """
+    fake, _order = opened
+
+    window_module.run_ui()
+
+    assert fake.created["width"] == 640
+    assert fake.created["height"] == 620
+    assert fake.created["min_size"] == (640, 620)
+    assert fake.created["resizable"] is False
 
 
 def test_the_window_is_painted_before_the_page_opens(opened):

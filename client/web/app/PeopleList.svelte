@@ -21,6 +21,10 @@
   let search = $state('');
   let adding = $state(false);
   let draft = $state({ name: '', telegram_username: '', telegram_user_id: '', notes: '' });
+
+  // Хоть что-нибудь из трёх: имя, ник или номер учётной записи. Тем же
+  // правилом заслоняется и мост.
+  const ready = $derived(named(draft));
   let opened = $state(null);
   let loadingMore = $state(false);
 
@@ -85,7 +89,7 @@
    * отбивает мост, и его отказ приезжает плашкой.
    */
   async function create() {
-    if (!named(draft)) return;
+    if (!ready) return;
     const done = await ask('hr.create', { ...draft });
     // Окно закрываем только по удаче: отказ — это чаще всего опечатка в нике,
     // и набранное человеку ещё пригодится.
@@ -174,6 +178,7 @@
     title="Новый человек"
     subtitle="Хотя бы имя, ник или номер учётной записи — иначе карточку потом не найти."
     confirmLabel="Создать"
+    {ready}
     onconfirm={create}
     oncancel={() => (adding = false)}
   >
