@@ -2,7 +2,35 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { asIso, dayOf, isoDay, showDate, showStamp, validDate } from '../state/dates.js';
+import {
+  asIso,
+  dayOf,
+  isoDay,
+  shortDate,
+  showDate,
+  showStamp,
+  validDate,
+} from '../state/dates.js';
+
+const NOW = new Date('2026-08-14T21:00:00');
+
+describe('дата в тесной колонке', () => {
+  it('месяц назван сокращённо, а год этого года не пишется', () => {
+    // Колонка «Добавлено» стоит между причиной и переключателем: полная дата
+    // отняла бы место у причины, а год в ней и так известен.
+    expect(shortDate('2026-04-12T10:00:00', NOW)).toBe('12 апр');
+  });
+
+  it('дата прошлого года названа с годом', () => {
+    expect(shortDate('2024-09-12T10:00:00', NOW)).toBe('12 сен 2024');
+  });
+
+  it('без даты остаётся пусто', () => {
+    // Прочерк в узкой колонке читался бы как значение.
+    expect(shortDate(null, NOW)).toBe('');
+    expect(shortDate('не дата', NOW)).toBe('');
+  });
+});
 
 describe('дата в поле и в отборе', () => {
   it('набранное д.м.г уходит в отбор ISO-датой', () => {

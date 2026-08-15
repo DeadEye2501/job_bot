@@ -46,6 +46,8 @@ import './styles/mini-list.css';
 import './styles/chat.css';
 import './styles/channel-stats.css';
 import './styles/add-channel.css';
+import './styles/blacklist.css';
+import './styles/blacklist-dialog.css';
 import './styles/vacancies.css';
 import './styles/vacancy-card.css';
 import './styles/contact-block.css';

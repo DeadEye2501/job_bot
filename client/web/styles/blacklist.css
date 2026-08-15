@@ -1,0 +1,240 @@
+/* Чёрный список: полоса отбора и таблица строк под ней.
+   Окно заведения строки — в blacklist-dialog.css. */
+
+.bl-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* Поиск здесь шире, чем над списками контактов: ищут в нём не имя, а кусок
+   причины, набранный словами. */
+.bl-toolbar .search-box {
+  flex: 1;
+  max-width: 380px;
+  padding: 4px 8px;
+}
+
+.bl-toolbar .search-input {
+  font-size: 0.78rem;
+}
+
+.bl-toolbar .search-box > .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.bl-filter-pills {
+  display: flex;
+  gap: 3px;
+}
+
+.bl-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.bl-filter-pill:hover {
+  border-color: var(--accent);
+}
+
+/* Выбранный род залит акцентом целиком: пилюль пять, и приглушённой отметки
+   среди них глаз не находит. */
+.bl-filter-pill.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-weight: 500;
+}
+
+.bl-filter-pill .count {
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.bl-add-btn {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 5px;
+  margin-left: auto;
+  padding: 4px 11px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.bl-add-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.bl-add-btn .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.bl-table {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.bl-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 1.4fr 100px 36px 26px;
+  align-items: start;
+  gap: 10px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.bl-row:last-child {
+  border-bottom: 0;
+}
+
+/* Шапка таблицы: по ней читают, что в какой колонке, — без неё «Добавлено» и
+   «Активно» приходится угадывать по содержимому. */
+.bl-row.head {
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.bl-row.head .bl-active-head {
+  text-align: center;
+}
+
+.bl-row:hover:not(.head) {
+  background: var(--accent-row-hover);
+}
+
+/* Причина растёт вниз, а соседи по ряду остаются наверху: ряд выравнен по
+   началу, и без этой поправки они вставали бы выше первой строки причины. */
+.bl-row:not(.head) > .bl-kind-chip,
+.bl-row:not(.head) > .bl-input.value,
+.bl-row:not(.head) > .bl-when,
+.bl-row:not(.head) > .toggle,
+.bl-row:not(.head) > .icon-btn {
+  margin-top: 3px;
+}
+
+.bl-row > .toggle {
+  justify-self: center;
+}
+
+/* Удаление здесь красное: строку отсева убирают навсегда, и отличать эту
+   корзину от прочих значков стоит до нажатия. */
+.bl-row button.icon-btn:hover {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.bl-kind-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+/* Цвет рода — тот же, каким род красится везде: человек, компания, канал,
+   слово. Набор лежит в палитре под подписью «виды записей чёрного списка». */
+.bl-kind-chip.keyword {
+  background: var(--kind-keyword-bg);
+  color: var(--kind-keyword-fg);
+}
+
+.bl-kind-chip.hr {
+  background: var(--kind-hr-bg);
+  color: var(--info);
+}
+
+.bl-kind-chip.company {
+  background: var(--kind-company-bg);
+  color: var(--kind-company-fg);
+}
+
+.bl-kind-chip.channel {
+  background: var(--kind-channel-bg);
+  color: var(--kind-channel-fg);
+}
+
+/* Поля правятся на месте: рамки у них нет, пока на строку не навели. Иначе
+   таблица из полусотни строк выглядела бы анкетой. */
+.bl-input {
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.83rem;
+}
+
+.bl-input:hover {
+  border-color: var(--border);
+}
+
+.bl-input:focus {
+  border-color: var(--accent);
+  background: var(--bg-tertiary);
+  outline: none;
+}
+
+.bl-input::placeholder {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* Значение — моноширинным: в нём ники и куски текста объявления, и в них
+   различают похожие знаки. */
+.bl-input.value {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+}
+
+/* Причина растёт по набранному: она бывает в три строки, а полосы прокрутки в
+   строке таблицы не разглядеть. */
+textarea.bl-input.reason {
+  min-height: 22px;
+  line-height: 1.4;
+  overflow: hidden;
+  resize: none;
+}
+
+.bl-input.saved-flash {
+  border-color: var(--accent);
+  transition: border-color 0.4s ease;
+}
+
+.bl-when {
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Погашенная строка не отсеивает — и зачёркнута поэтому она сама, а не
+   приглушена целиком: приглушённая читается как «неважная». */
+.bl-row.disabled .bl-input {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-tertiary);
+}
