@@ -15,6 +15,8 @@ import io
 from pathlib import Path
 from types import SimpleNamespace
 
+from pyrogram.enums import MessageEntityType
+
 from tests.factories import EPOCH
 
 # Номер нашей собственной учётной записи. У своего сообщения Telegram ставит
@@ -24,8 +26,41 @@ OUR_USER_ID = 1
 
 
 def message(*, text=None, caption=None, **extra) -> SimpleNamespace:
-    """Сообщение. `text` и `caption` задаются всегда: код читает их напрямую."""
-    return SimpleNamespace(text=text, caption=caption, **extra)
+    """Сообщение. `text` и `caption` задаются всегда: код читает их напрямую.
+
+    Разметка задаётся вместе с ними по той же причине: у настоящего сообщения
+    поля разметки есть всегда, пустые они или нет, и код читает их без оглядки.
+    """
+    fields = {"entities": None, "caption_entities": None}
+    fields.update(extra)
+    return SimpleNamespace(text=text, caption=caption, **fields)
+
+
+def link_entity(*, offset: int, length: int, url: str) -> SimpleNamespace:
+    """Ссылка, спрятанная под словами: адрес лежит не в тексте, а в разметке.
+
+    Отсчёт у Telegram свой — в единицах UTF-16, — и подделка повторяет его, а
+    не удобный python'у отсчёт по знакам: на смайлах они расходятся, и
+    подделка с удобным отсчётом молча прощала бы промах по месту вставки.
+    """
+    return SimpleNamespace(
+        type=MessageEntityType.TEXT_LINK,
+        offset=offset,
+        length=length,
+        url=url,
+        user=None,
+    )
+
+
+def url_entity(*, offset: int, length: int) -> SimpleNamespace:
+    """Адрес, набранный в тексте словами. Своего поля с адресом у него нет."""
+    return SimpleNamespace(
+        type=MessageEntityType.URL,
+        offset=offset,
+        length=length,
+        url=None,
+        user=None,
+    )
 
 
 def incoming(*, user_id=777, username=None, text="здравствуйте", **extra):

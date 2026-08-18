@@ -16,7 +16,7 @@ from backend.flows import parse as parse_mod
 import pytest
 
 from backend.flows import ingest
-from tests.fakes.telegram import post
+from tests.fakes.telegram import link_entity, post
 
 
 @pytest.fixture
@@ -60,6 +60,29 @@ async def test_a_fresh_post_is_saved_and_parsed(intake):
 
     assert intake.saved == [(1, 10, "Ищем Python-разработчика")]
     assert intake.parsed == [(7, "Ищем Python-разработчика")]
+
+
+async def test_a_hidden_contact_address_reaches_the_row_and_the_parse(intake):
+    """Адрес, спрятанный под словом, доезжает и до строки, и до разбора.
+
+    Объявление показывает «контакты в описании», а сам адрес лежит в разметке
+    сообщения. Не подобрав его здесь, разбору нечего класть в способ отклика:
+    подпись ссылки адресом не является и отбрасывается.
+    """
+    await ingest.ingest_post(
+        intake,
+        1,
+        "jobs",
+        post(
+            10,
+            text="Ищем Python-разработчика, контакты в описании",
+            entities=[link_entity(offset=37, length=8, url="https://acme.test/jobs")],
+        ),
+    )
+
+    expected = "Ищем Python-разработчика, контакты в описании (https://acme.test/jobs)"
+    assert intake.saved == [(1, 10, expected)]
+    assert intake.parsed == [(7, expected)]
 
 
 @pytest.mark.parametrize(

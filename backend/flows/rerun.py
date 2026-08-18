@@ -7,7 +7,7 @@ from typing import Literal
 from sqlalchemy import select
 
 from backend.flows import embeddings, parse
-from backend.message_text import extract_text
+from backend.message_text import extract_post_text
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
 from backend.repository.channels import list_named_channels
@@ -82,7 +82,7 @@ async def _fetch_fresh_text(pipeline, origin: _Origin, vacancy_id: int):
                 vacancy_id, origin.channel_username, origin.msg_id,
             )
             return None
-        candidate = extract_text(msg)
+        candidate = extract_post_text(msg)
         if not candidate:
             logger.info(
                 "rerun: vacancy %d fetched msg @%s/%d but text is empty (media-only?), keeping cached raw_text",

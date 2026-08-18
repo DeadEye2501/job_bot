@@ -4,8 +4,8 @@
 он виден только подстановкой в цитату ответа.
 """
 
-from backend.message_text import extract_dm_text, extract_text
-from tests.fakes.telegram import message
+from backend.message_text import extract_dm_text, extract_post_text, extract_text
+from tests.fakes.telegram import link_entity, message, url_entity
 
 
 def test_text_comes_from_the_text_field_trimmed():
@@ -80,3 +80,72 @@ def test_a_reply_to_a_document_quotes_its_own_placeholder():
     parent = message(document=object())
     got = extract_dm_text(message(text="ответ", reply_to_message=parent))
     assert got == "↪ [Документ]\n\nответ"
+
+
+def test_hidden_link_address_is_written_next_to_its_words():
+    """Адрес, спрятанный под словом, дописывается прямо за этим словом.
+
+    Ради этого объявления и читают разметку: в тексте видно «контакты в
+    описании», а по чему откликаться — только в разметке.
+    """
+    msg = message(
+        text="контакты в описании",
+        entities=[link_entity(offset=11, length=8, url="https://example.com")],
+    )
+    assert extract_post_text(msg) == "контакты в описании (https://example.com)"
+
+
+def test_post_without_hidden_links_reads_as_before():
+    """Объявление без спрятанных ссылок читается ровно как прежде."""
+    assert extract_post_text(message(text="  просто пост  ")) == "просто пост"
+
+
+def test_address_typed_in_the_text_is_not_doubled():
+    """Адрес, набранный в тексте словами, вторым разом не дописывается."""
+    msg = message(
+        text="пишите на https://example.com",
+        entities=[url_entity(offset=10, length=19)],
+    )
+    assert extract_post_text(msg) == "пишите на https://example.com"
+
+
+def test_every_hidden_link_gets_its_own_address():
+    """Каждая спрятанная ссылка получает свой адрес, и обе встают на место."""
+    msg = message(
+        text="описание и отклик",
+        entities=[
+            link_entity(offset=0, length=8, url="https://a.example"),
+            link_entity(offset=11, length=6, url="https://b.example"),
+        ],
+    )
+    assert extract_post_text(msg) == (
+        "описание (https://a.example) и отклик (https://b.example)"
+    )
+
+
+def test_emoji_before_a_link_do_not_shift_its_address():
+    """Смайл перед ссылкой не сдвигает адрес: отсчёт у Telegram свой.
+
+    Смайл занимает у него две единицы вместо одной, и вставка по отсчёту
+    python'а уехала бы на знак влево, разрезав слово.
+    """
+    msg = message(
+        text="🔥 контакты в описании",
+        entities=[link_entity(offset=14, length=8, url="https://example.com")],
+    )
+    assert extract_post_text(msg) == "🔥 контакты в описании (https://example.com)"
+
+
+def test_caption_links_are_read_too():
+    """У объявления картинкой разметку читают у подписи."""
+    msg = message(
+        text=None,
+        caption="контакты в описании",
+        caption_entities=[link_entity(offset=11, length=8, url="https://example.com")],
+    )
+    assert extract_post_text(msg) == "контакты в описании (https://example.com)"
+
+
+def test_a_post_without_text_and_caption_gives_empty_string():
+    """Без текста и подписи выходит пустая строка, как и у чтения для окна."""
+    assert extract_post_text(message()) == ""

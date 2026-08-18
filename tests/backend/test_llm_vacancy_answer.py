@@ -131,6 +131,36 @@ def test_a_way_to_apply_with_an_address_is_kept(raw_contact):
     assert parsed.other_contact == raw_contact
 
 
+@pytest.mark.parametrize(
+    ("raw_contact", "expected"),
+    [
+        pytest.param(
+            "контакты в описании (https://acme.test/jobs)",
+            "https://acme.test/jobs",
+            id="подпись со своим адресом",
+        ),
+        pytest.param(
+            "Откликнуться (https://forms.gle/abc)",
+            "https://forms.gle/abc",
+            id="подпись кнопки со своим адресом",
+        ),
+    ],
+)
+def test_an_address_written_after_its_label_is_left_alone_of_the_label(
+    raw_contact, expected
+):
+    """От подписи с адресом в скобках остаётся один адрес.
+
+    Адрес спрятанной ссылки дописывается за её подписью при чтении поста
+    (`extract_post_text`), и модель приносит их вместе. В заметке вакансии
+    нужен способ отклика, а не пересказ поста: «Контакты: контакты в описании
+    (https://…)» читается как сбой, а не как адрес.
+    """
+    parsed = _parse_vacancy_json(_answer(other_contact=raw_contact))
+
+    assert parsed.other_contact == expected
+
+
 def test_an_overlong_description_is_cut_with_an_ellipsis():
     """Слишком длинное описание обрезается и помечается многоточием.
 
@@ -248,3 +278,32 @@ def test_a_name_that_is_only_a_link_is_left_alone():
 
     assert parsed.company_name == "https://kontur.ru"
     assert parsed.company_website is None
+
+
+def test_a_company_name_with_its_address_in_brackets_is_split_clean():
+    """Имя компании и адрес в скобках разнимаются без остатка скобок.
+
+    Такую пару собирает чтение поста, дописывая адрес спрятанной ссылки за
+    её подписью, а модель приносит её целиком в имя компании. Скобка,
+    оставшаяся в имени, ломает сведение компаний, а скобка в адресе — кнопку
+    «открыть сайт».
+    """
+    parsed = _parse_vacancy_json(
+        _answer(company_name="Acme (https://acme.com)", company_website=None)
+    )
+
+    assert parsed.company_name == "Acme"
+    assert parsed.company_website == "https://acme.com"
+
+
+def test_an_hr_contact_written_after_its_label_loses_the_label():
+    """От имени со ссылкой на человека в скобках остаётся один адрес.
+
+    «писать Анне (https://t.me/anna_hr)» приходит от модели целиком, а по
+    такой строке ни ник не разобрать, ни собеседника не завести.
+    """
+    parsed = _parse_vacancy_json(
+        _answer(hr_contact="Анне (https://t.me/anna_hr)")
+    )
+
+    assert parsed.hr_contact == "https://t.me/anna_hr"

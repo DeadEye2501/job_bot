@@ -28,7 +28,7 @@ from backend.repository.vacancy_status import (
 )
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row, vacancy_row
-from tests.fakes.telegram import FakeTelegramClient, post
+from tests.fakes.telegram import FakeTelegramClient, link_entity, post
 
 
 class _WithMessages(FakeTelegramClient):
@@ -104,6 +104,28 @@ async def test_the_fresh_post_is_parsed_and_stored(monkeypatch, rerunning, sessi
 
     assert (await only_row(session_factory, Vacancy)).raw_text == "свежий текст"
     assert pipeline.parsed[-1] == (vacancy.id, "свежий текст", "jobs", False)
+
+
+async def test_a_hidden_link_address_is_picked_up_on_a_rerun(monkeypatch, rerunning):
+    """Прогон заново подбирает адрес спрятанной ссылки, как и первое чтение.
+
+    Иначе объявление, разобранное до этой правки, так и осталось бы без
+    способа отклика: кнопка «Прогнать заново» — единственный способ перечитать
+    его целиком, и читать она обязана тем же чтением, что и приём поста.
+    """
+    session_factory, vacancy, make_pipeline = rerunning
+    fresh = post(
+        42,
+        text="контакты в описании",
+        entities=[link_entity(offset=11, length=8, url="https://acme.test/jobs")],
+    )
+    pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(post=fresh))
+
+    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) == "ok"
+
+    expected = "контакты в описании (https://acme.test/jobs)"
+    assert (await only_row(session_factory, Vacancy)).raw_text == expected
+    assert pipeline.parsed[-1] == (vacancy.id, expected, "jobs", False)
 
 
 async def test_the_settings_are_reloaded_before_the_parse(monkeypatch, rerunning):
