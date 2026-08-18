@@ -23,7 +23,9 @@ def _filter_languages(items) -> list[tuple[str, str]]:
     """
     if not isinstance(items, list):
         return []
-    seen: dict[str, str] = {}  # lower(name) -> name
+    # Место строки, а не только её имя: повтор языка правит уже лежащую
+    # строку, и без места её пришлось бы искать вторым обходом.
+    seen: dict[str, int] = {}  # lower(name) -> место в out
     out: list[tuple[str, str]] = []
     for item in items:
         if not isinstance(item, dict):
@@ -36,12 +38,9 @@ def _filter_languages(items) -> list[tuple[str, str]]:
             level = "B2"
         key = name.lower()
         if key in seen:
-            # Replace previous tuple for this name with the newer level.
-            for i, (existing, _) in enumerate(out):
-                if existing.lower() == key:
-                    out[i] = (existing, level)
-                    break
+            at = seen[key]
+            out[at] = (out[at][0], level)
             continue
-        seen[key] = name
+        seen[key] = len(out)
         out.append((name, level))
     return out

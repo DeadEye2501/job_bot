@@ -223,7 +223,7 @@ async def list_hrs_for_company(
         await session.execute(
             select(HR, func.count(Vacancy.id).label("cnt"))
             .join(Vacancy, Vacancy.hr_id == HR.id)
-            .where(Vacancy.company_id == company_id)
+            .where(Vacancy.company_id == company_id, PARSED_ONLY)
             .group_by(HR.id)
             .order_by(*_HR_BY_VACANCY_COUNT)
         )

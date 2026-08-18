@@ -83,7 +83,9 @@ async def _do_llm_probe(
             try:
                 models = await lm_studio.list_models(client)
             except Exception as e:
-                logger.debug("post-check list_models failed: %s", e)
+                logger.debug(
+                    "post-check list_models failed: %s", e, exc_info=True
+                )
         return ok, detail, models, latency_ms
     finally:
         await client.aclose()
