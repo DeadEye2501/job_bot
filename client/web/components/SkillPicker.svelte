@@ -6,6 +6,8 @@
   // резюме этого места стек оказался бы пуст.
   import { grouped } from '$state/skills.js';
 
+  import Chip from './Chip.svelte';
+
   let { chosen, known, onadd, onremove } = $props();
 
   let open = $state(false);
@@ -54,10 +56,7 @@
 
 <div class="skills-block">
   {#each chosen as one, index (one)}
-    <span class="chip">
-      {one}
-      <button class="chip-x" type="button" title="убрать" onclick={() => onremove(index)}>×</button>
-    </span>
+    <Chip text={one} onremove={() => onremove(index)} />
   {/each}
 
   <button class="chip-add" type="button" onclick={toggle}>+ навык</button>

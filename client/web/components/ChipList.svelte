@@ -6,6 +6,8 @@
   // объявлениях. Предмет приходит списком снаружи, здесь его нет.
   import { aliasesAfter } from '$state/skills.js';
 
+  import Chip from './Chip.svelte';
+
   let { items, onadd, onremove } = $props();
 
   let adding = $state(false);
@@ -27,10 +29,7 @@
 
 <div class="chips">
   {#each items as one, index (index)}
-    <span class="chip">
-      {one}
-      <button class="chip-x" type="button" title="убрать" onclick={() => onremove(index)}>×</button>
-    </span>
+    <Chip text={one} onremove={() => onremove(index)} />
   {/each}
 
   {#if adding}
