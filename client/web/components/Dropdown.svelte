@@ -3,6 +3,8 @@
   //
   // Не системный `<select>`: тот рисуется средствами системы и в тёмном окне
   // выглядит светлой заплатой, а его список нельзя ни оформить, ни сузить.
+  import { closeOnClickAway } from '$state/outside.js';
+
   let { options, value, onpick } = $props();
 
   let open = $state(false);
@@ -14,11 +16,7 @@
     // него человек может куда угодно — хоть в соседнюю строку, хоть в поле над
     // ней. «Мимо» считается по своему узлу: списков на вкладке столько же,
     // сколько строк языка, и по классу они друг от друга не отличаются.
-    const away = (event) => {
-      if (!root.contains(event.target)) open = false;
-    };
-    document.addEventListener('click', away);
-    return () => document.removeEventListener('click', away);
+    return closeOnClickAway(() => root, () => (open = false));
   });
 </script>
 

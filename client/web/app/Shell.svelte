@@ -93,8 +93,6 @@
   const locked = $derived(!allAlive(health));
   const lockedTip = $derived(blockedTip(health));
   const captionText = $derived(single || caption(channels, messages));
-  const sectionLabel = $derived(SECTIONS.find((one) => one.key === section).label);
-  const systemTabLabel = $derived(SYSTEM_TABS.find((one) => one.key === systemTab).label);
 
   let plaqueTimer = null;
   let alive = true;
@@ -377,10 +375,6 @@
       {:else}
         <SettingsScreen {ask} {say} />
       {/if}
-    {:else}
-      <div class="placeholder-content">
-        Раздел «{sectionLabel}» — экран ещё не реализован
-      </div>
     {/if}
   </main>
 

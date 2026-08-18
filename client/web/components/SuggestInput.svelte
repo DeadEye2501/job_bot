@@ -9,6 +9,7 @@
   // Набранное — состояние самого поля, а не того, кто его поставил: это буквы,
   // которые в нём стоят прямо сейчас, и наверху они никому не нужны. Наверх
   // уходит только выбранное имя.
+  import { closeOnClickAway } from '$state/outside.js';
   import { matchingModels } from '$state/settings.js';
 
   let { value, options, placeholder, mono = false, maxlength = null, onsave } = $props();
@@ -27,11 +28,7 @@
     // человек может куда угодно — хоть в соседнее поле, хоть в кнопку проверки.
     // «Мимо» считается по своему узлу: полей с подсказкой на экране настроек
     // два, и по классу они друг от друга не отличаются.
-    const away = (event) => {
-      if (!root.contains(event.target)) open = false;
-    };
-    document.addEventListener('click', away);
-    return () => document.removeEventListener('click', away);
+    return closeOnClickAway(() => root, () => (open = false));
   });
 
   function keep(name) {

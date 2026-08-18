@@ -6,6 +6,7 @@
   // средствами системы, палитры окна не знает и по-русски говорит не везде.
   //
   // Наружу уходит ISO-дата — та, что понимает мост; человеку видно `д.м.г`.
+  import { closeOnClickAway } from '$state/outside.js';
   import { WEEKDAYS, monthGrid, monthTitle, shiftMonth } from '$state/calendar.js';
   import { asIso, dayOf, isoDay, showDate, validDate } from '$state/dates.js';
 
@@ -68,11 +69,7 @@
     // «Мимо» считается по своему узлу, а не по классу: полей периода два, и
     // нажатие в соседнее по классу читалось бы как нажатие в себя — календарь
     // «от» остался бы висеть над полем «до».
-    const away = (event) => {
-      if (!root.contains(event.target)) open = false;
-    };
-    document.addEventListener('click', away);
-    return () => document.removeEventListener('click', away);
+    return closeOnClickAway(() => root, () => (open = false));
   });
 </script>
 

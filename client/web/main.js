@@ -42,6 +42,7 @@ import './styles/cv-file.css';
 import './styles/collapsible.css';
 import './styles/collapse-arrow.css';
 import './styles/toggle.css';
+import './styles/master-detail.css';
 import './styles/contacts-layout.css';
 import './styles/contacts.css';
 import './styles/contact-card.css';

@@ -3,21 +3,6 @@
    Панели прокручиваются раздельно и обе стоят на экране всегда: человека правят
    и пишут ему, не теряя из виду соседей по списку. */
 
-.cnt-layout {
-  display: grid;
-  grid-template-columns: 275px 1fr;
-  height: 100%;
-  min-height: 0;
-}
-
-.cnt-list-pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-right: 1px solid var(--border);
-  background: var(--bg-secondary);
-}
-
 .cnt-list-toolbar {
   display: flex;
   align-items: center;
@@ -66,12 +51,6 @@
 
 .cnt-add-btn .material-symbols-outlined {
   font-size: 16px;
-}
-
-.cnt-list {
-  flex: 1;
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
 .cnt-list-empty {

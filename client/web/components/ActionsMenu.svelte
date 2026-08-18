@@ -3,6 +3,8 @@
   //
   // О самих пунктах не знает ничего — их рисует тот, кто позвал, и получает
   // сюда же закрывающий зов: нажатый пункт обязан убрать за собой окошко.
+  import { closeOnClickAway } from '$state/outside.js';
+
   let { children } = $props();
 
   let open = $state(false);
@@ -12,11 +14,7 @@
     if (!open) return;
     // Нажатие мимо закрывает меню. Своим узлом, а не по имени класса:
     // всплывающих окошек на карточке несколько, и «мимо» у каждого своё.
-    const away = (event) => {
-      if (root !== null && !root.contains(event.target)) open = false;
-    };
-    document.addEventListener('click', away);
-    return () => document.removeEventListener('click', away);
+    return closeOnClickAway(() => root, () => (open = false));
   });
 </script>
 

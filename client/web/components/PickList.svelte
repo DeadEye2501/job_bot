@@ -8,6 +8,8 @@
   //
   // Имена приходят уже просеянными: искать умеет тот, кто знает, что это за
   // имена, а список только показывает переданное.
+  import { closeOnClickAway } from '$state/outside.js';
+
   let { placeholder, hint, empty, names, chosen, search, onsearch, prefix = '', onpick } = $props();
 
   let open = $state(false);
@@ -21,11 +23,7 @@
     // «Мимо» считается по своему узлу, а не по классу: перечней в панели
     // отбора два, и нажатие на соседний по классу читалось бы как нажатие в
     // себя — оба остались бы открытыми, накрыв друг друга.
-    const away = (event) => {
-      if (!root.contains(event.target)) open = false;
-    };
-    document.addEventListener('click', away);
-    return () => document.removeEventListener('click', away);
+    return closeOnClickAway(() => root, () => (open = false));
   });
 </script>
 
