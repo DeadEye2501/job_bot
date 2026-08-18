@@ -11,6 +11,7 @@
 `send_dm` — второй рубеж, на случай дороги, заслон не спросившей.
 """
 
+import logging
 from pathlib import Path
 
 from pyrogram import Client
@@ -60,8 +61,6 @@ def make_client(tg: TgAccountConfig) -> Client:
         sleep_threshold=60,
     )
 
-
-import logging
 
 _log = logging.getLogger(__name__)
 

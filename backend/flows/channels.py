@@ -131,7 +131,11 @@ async def _store_metadata(
 
 
 async def refresh_channel_metadata(pipeline, channels) -> None:
-    """Sweep metadata for every active channel before message polling.
+    """Обновить название и аватар у каждого канала с ником, до чтения постов.
+
+    У каждого, а не только у включённых: выключенные всё равно стоят в списке
+    окна, и человек ждёт у них свежих данных. Отбор по включённости решает
+    только чтение постов ниже.
 
     One `get_chat` call per channel (sequential — Pyrogram's session is
     not thread-safe and concurrent calls can trip FloodWait); the same

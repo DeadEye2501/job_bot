@@ -31,8 +31,7 @@ class AsyncRunner:
         # SQLite-storage / стопнутого loop'а / частично-разобранного
         # клиента. Делать тут нечего — apply'нуть уже не во что,
         # фильтруем шум, чтобы он не прыгал в stderr и не пугал юзера.
-        # Список расширен по review-concurrency.md M4: помимо
-        # ProgrammingError("closed database") теперь глушатся и
+        # Помимо ProgrammingError("closed database") глушатся и
         # RuntimeError("Event loop is closed"), и AttributeError на
         # частично-разобранных Pyrogram-объектах при teardown'е.
         def _quiet_pyrogram_shutdown(loop, context):

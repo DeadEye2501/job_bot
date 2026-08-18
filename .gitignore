@@ -3,7 +3,7 @@
 
 # Personal data seed migration (CV, skills, experience, subscribed channels,
 # hardcoded tunables). Ships only on dev's machine; other users get an empty
-# DB + RuntimeSettings._APP_DEFAULTS + the first-run wizard.
+# DB + значения по умолчанию из backend/runtime_settings.py + мастер настройки.
 alembic/versions/aa4e0de05368_seed_initial_data.py
 
 # Черновики под документацией и карты кода: карты собираются из самого кода

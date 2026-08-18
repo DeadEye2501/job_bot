@@ -231,22 +231,6 @@ async def check_model(
     return True, model
 
 
-async def check_chat(client: httpx.AsyncClient, model: str) -> tuple[bool, str]:
-    """Проверить чат-модель. Род назван именем, а не доводом.
-
-    Боевых зовущих у обёртки не осталось: мост спрашивает `check_model` с родом
-    доводом. Живут они своими сторожами до итогового прохода этапа, где решится
-    их судьба, — снятие тронуло бы шестнадцать тестов адаптера, а предмет у них
-    свой.
-    """
-    return await check_model(client, model, "chat")
-
-
-async def check_embed(client: httpx.AsyncClient, model: str) -> tuple[bool, str]:
-    """Проверить модель векторов. Довод тот же, что у `check_chat` выше."""
-    return await check_model(client, model, "embed")
-
-
 # Топовые семейства моделей встраиваний в Ollama / OpenAI: `bge-*` (BAAI),
 # `e5-*` (Microsoft), `nomic-embed-*` (Nomic), `text-embedding-*` (OpenAI).
 # Голое «ada» приметой не годится: поймало бы «yi-chat-ada» и «llama-canada»

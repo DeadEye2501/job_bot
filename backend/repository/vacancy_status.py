@@ -243,7 +243,7 @@ async def change_vacancy_status(
 
 async def update_status_history_explanation(
     session: AsyncSession, history_id: int, explanation: str | None
-) -> bool:
+) -> VacancyStatusHistory | None:
     """Replace ``vacancy_status_history.explanation`` для одной записи.
 
     Зеркалит поведение ``update_vacancy_notes``: empty / whitespace-only

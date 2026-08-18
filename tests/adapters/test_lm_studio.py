@@ -14,8 +14,7 @@ import pytest
 from adapters.lm_studio import (
     ChatRequest,
     chat,
-    check_chat,
-    check_embed,
+    check_model,
     embed,
     list_models,
     make_client,
@@ -60,13 +59,13 @@ async def test_a_loaded_chat_model_passes_the_check():
         MODELS: models_response("qwen", "llama"),
         CHAT: httpx.Response(200, json={"choices": []}),
     })
-    assert await check_chat(client, "qwen") == (True, "qwen")
+    assert await check_model(client, "qwen", "chat") == (True, "qwen")
 
 
 async def test_a_missing_chat_model_fails_the_check_and_lists_what_there_is():
     """Если модели нет, отказ называет, что у провайдера есть."""
     client = provider({MODELS: models_response("llama", "mistral")})
-    passed, message = await check_chat(client, "qwen")
+    passed, message = await check_model(client, "qwen", "chat")
     assert passed is False
     assert "llama" in message and "mistral" in message
 
@@ -74,7 +73,7 @@ async def test_a_missing_chat_model_fails_the_check_and_lists_what_there_is():
 async def test_a_provider_with_no_models_says_so_plainly():
     """Пустой список моделей называется словами, а не пустой строкой."""
     client = provider({MODELS: models_response()})
-    passed, message = await check_chat(client, "qwen")
+    passed, message = await check_model(client, "qwen", "chat")
     assert passed is False
     assert "no models loaded" in message
 
@@ -85,7 +84,7 @@ async def test_a_chat_model_that_fails_the_ping_does_not_pass():
         MODELS: models_response("qwen"),
         CHAT: httpx.Response(500, text="сломалось"),
     })
-    passed, message = await check_chat(client, "qwen")
+    passed, message = await check_model(client, "qwen", "chat")
     assert passed is False
     assert "500" in message
 
@@ -93,7 +92,7 @@ async def test_a_chat_model_that_fails_the_ping_does_not_pass():
 async def test_a_provider_error_response_names_its_kind_and_code():
     """Провайдер ответил ошибкой на список моделей — сообщение называет её род и код."""
     client = provider({})
-    passed, message = await check_chat(client, "qwen")
+    passed, message = await check_model(client, "qwen", "chat")
     assert passed is False
     assert "HTTPStatusError" in message
     assert "599" in message
@@ -105,7 +104,7 @@ async def test_a_loaded_embedding_model_passes_the_check():
         MODELS: models_response("bge-m3"),
         EMBEDDINGS: httpx.Response(200, json={"data": [{"embedding": [0.1]}]}),
     })
-    assert await check_embed(client, "bge-m3") == (True, "bge-m3")
+    assert await check_model(client, "bge-m3", "embed") == (True, "bge-m3")
 
 
 async def test_a_missing_embedding_model_is_told_what_there_is_too():
@@ -116,7 +115,7 @@ async def test_a_missing_embedding_model_is_told_what_there_is_too():
     сверяет по перечню. Без перечня у одного из двух сверять нечем.
     """
     client = provider({MODELS: models_response("qwen", "llama")})
-    passed, message = await check_embed(client, "bge-m3")
+    passed, message = await check_model(client, "bge-m3", "embed")
     assert passed is False
     assert "qwen" in message and "llama" in message
 
@@ -127,7 +126,7 @@ async def test_an_embedding_model_that_fails_the_ping_does_not_pass():
         MODELS: models_response("bge-m3"),
         EMBEDDINGS: httpx.Response(500, text="сломалось"),
     })
-    passed, message = await check_embed(client, "bge-m3")
+    passed, message = await check_model(client, "bge-m3", "embed")
     assert passed is False
     assert "500" in message
 
@@ -244,17 +243,19 @@ async def test_embed_raises_when_the_provider_answers_with_an_error():
 
 
 @pytest.mark.parametrize(
-    ("check", "routes"),
+    ("kind", "model", "routes"),
     [
-        pytest.param(check_chat, {}, id="чат, список моделей"),
+        pytest.param("chat", "qwen", {}, id="чат, список моделей"),
         pytest.param(
-            check_chat,
+            "chat",
+            "qwen",
             {MODELS: models_response("qwen"), CHAT: httpx.ConnectError("оборвалось")},
             id="чат, пробный запрос",
         ),
-        pytest.param(check_embed, {}, id="векторы, список моделей"),
+        pytest.param("embed", "bge-m3", {}, id="векторы, список моделей"),
         pytest.param(
-            check_embed,
+            "embed",
+            "bge-m3",
             {
                 MODELS: models_response("bge-m3"),
                 EMBEDDINGS: httpx.ConnectError("оборвалось"),
@@ -263,17 +264,15 @@ async def test_embed_raises_when_the_provider_answers_with_an_error():
         ),
     ],
 )
-async def test_a_failed_check_leaves_a_trace_in_the_log(check, routes, caplog):
+async def test_a_failed_check_leaves_a_trace_in_the_log(kind, model, routes, caplog):
     """Неудачная проверка оставляет трассировку в журнале.
 
     Наружу уходит короткое «род и текст» — этого хватает подсказке в окне,
     но не хватает, чтобы понять, где именно оборвалось. Трассировка нужна
     там, где её потом читают: в журнале.
     """
-    model = "qwen" if check is check_chat else "bge-m3"
-
     with caplog.at_level("ERROR", logger="adapters.lm_studio"):
-        passed, _ = await check(provider(routes), model)
+        passed, _ = await check_model(provider(routes), model, kind)
 
     assert passed is False
     # Смотрим записи именно адаптера: по всему журналу трассировку мог бы

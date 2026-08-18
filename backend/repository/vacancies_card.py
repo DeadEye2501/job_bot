@@ -95,8 +95,8 @@ async def get_vacancy_detail(
 
 async def update_vacancy_notes(
     session: AsyncSession, vacancy_id: int, notes: str | None
-) -> bool:
-    """Replace ``vacancy.notes``. Returns False if the vacancy is missing.
+) -> Vacancy | None:
+    """Replace ``vacancy.notes``. Пусто — такой вакансии нет.
 
     Empty / whitespace-only ``notes`` is normalized to ``NULL`` so a textarea
     with only spaces or newlines doesn't leave behind a "ghost" non-empty

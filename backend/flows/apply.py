@@ -356,8 +356,8 @@ async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool,
         # а письмо уходит до перевода статуса — HR получил бы второе, и то,
         # что граф переходов потом не пустит `APPLIED → APPLIED`, уже неважно.
         # Читается то же, что в `_send_refusal`, а слово окну другое, и это
-        # записанный вердикт (`docs/not-duplicates.md`): там гонка с моделью,
-        # здесь человек нажал сам и должен услышать, что отклик уже был.
+        # не повтор: там гонка с моделью, здесь человек нажал сам и должен
+        # услышать, что отклик уже был.
         if v.status == VacancyStatus.APPLIED:
             logger.info(
                 "send_application: vacancy %d already APPLIED, refusing re-send",

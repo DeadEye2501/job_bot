@@ -49,7 +49,7 @@ async def _connect(bot) -> None:
         )
     await bot._client.start()
     # ``bot._loop`` ставим ПОСЛЕ client.start() — это и метка
-    # «бот готов принимать kick/cancel из Qt-треда», и сам loop
+    # «бот готов принимать kick/cancel из потока окна», и сам loop
     # для thread-safe методов. До этого момента kick/cancel/
     # request_stop fallback'ятся на прямой .set() (безопасно: Event
     # ещё не имеет ожидателей; а poll-task ещё не создан, так что
