@@ -1,0 +1,122 @@
+"""Следствия, которые наблюдают тесты `adapters/teletype.py`.
+
+Страница собирается здесь короткой, но с той же разметкой, что у настоящей:
+teletype размечает заголовок и тело статьи по schema.org, и держится разбор
+именно за неё. Собери страницу без разметки — и проверки зеленели бы на
+поиске по именам стилей, которого в боевом коде нет.
+"""
+
+import httpx
+import pytest
+
+from adapters import teletype
+
+
+def _page(*, headline: str = "Senior Manual QA", body: str = "<p>Ищем QA</p>") -> str:
+    """Страница статьи в той разметке, в какой её отдаёт teletype."""
+    return (
+        "<html><body>"
+        f'<h1 itemprop="headline">{headline}</h1>'
+        f'<article itemprop="articleBody">{body}</article>'
+        "</body></html>"
+    )
+
+
+def _client(handler) -> httpx.AsyncClient:
+    """Клиент к поддельному teletype: обращения уходят в переданный обработчик."""
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+async def test_the_article_comes_back_with_its_headline():
+    """Из страницы достаются и заголовок, и тело статьи."""
+    async with _client(lambda _r: httpx.Response(200, text=_page())) as client:
+        got = await teletype.fetch_article(client, "https://teletype.in/@a/b")
+
+    assert got == "Senior Manual QA\n\nИщем QA"
+
+
+async def test_the_article_body_keeps_its_lines():
+    """Строки тела остаются строками, а не сливаются в одну.
+
+    Требования в статьях идут списком, и слитые в строку они читаются
+    разбором как одно предложение.
+    """
+    body = "<ul><li>Python</li><li>SQL</li></ul>"
+    async with _client(lambda _r: httpx.Response(200, text=_page(body=body))) as client:
+        got = await teletype.fetch_article(client, "https://teletype.in/@a/b")
+
+    assert got == "Senior Manual QA\n\nPython\nSQL"
+
+
+async def test_a_page_without_an_article_gives_nothing():
+    """Страница без размеченного тела статьи не даёт ничего.
+
+    По адресу статьи может лежать страница автора или весть о том, что
+    статью снесли: объявление от этого объявлением быть не перестаёт.
+    """
+    page = "<html><body><h1>Автор</h1></body></html>"
+    async with _client(lambda _r: httpx.Response(200, text=page)) as client:
+        assert await teletype.fetch_article(client, "https://teletype.in/@a") is None
+
+
+@pytest.mark.parametrize(
+    "trouble",
+    [
+        pytest.param(httpx.Response(404, text="нет такой"), id="страницы нет"),
+        pytest.param(httpx.Response(500, text="упал"), id="сайт упал"),
+        pytest.param(httpx.ConnectError("сеть отвалилась"), id="обрыв связи"),
+    ],
+)
+async def test_a_site_that_did_not_answer_says_so(trouble):
+    """Не отдали страницу — беда идёт наружу, а не притворяется пустотой.
+
+    Различать это обязан зовущий: «страницу не отдали» — беда на час, и
+    сохранённый текст вакансии переписывать нельзя; «статьи там нет» —
+    навсегда, и держаться за сохранённый текст незачем.
+    """
+
+    def handle(_request):
+        if isinstance(trouble, BaseException):
+            raise trouble
+        return trouble
+
+    async with _client(handle) as client:
+        with pytest.raises(httpx.HTTPError):
+            await teletype.fetch_article(client, "https://teletype.in/@a/b")
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        pytest.param(
+            "вся вакансия https://teletype.in/@courierus/OxPcuC1iLUU",
+            ["https://teletype.in/@courierus/OxPcuC1iLUU"],
+            id="адрес словами",
+        ),
+        pytest.param(
+            "ПОСМОТРЕТЬ (https://teletype.in/@courierus/OxPcuC1iLUU)",
+            ["https://teletype.in/@courierus/OxPcuC1iLUU"],
+            id="адрес за подписью ссылки",
+        ),
+        pytest.param(
+            "вся вакансия https://teletype.in/@courierus/OxPcuC1iLUU.",
+            ["https://teletype.in/@courierus/OxPcuC1iLUU"],
+            id="точка в конце предложения",
+        ),
+        pytest.param(
+            "тут https://teletype.in/@a/b, а ещё тут",
+            ["https://teletype.in/@a/b"],
+            id="запятая после адреса",
+        ),
+        pytest.param("наш канал https://teletype.in/@courierus", [], id="страница автора"),
+        pytest.param("пишите @courierus", [], id="ник без адреса"),
+        pytest.param("https://habr.com/@a/b", [], id="чужой сайт"),
+    ],
+)
+def test_which_addresses_count_as_an_article(text, expected):
+    """Адрес статьи узнаётся в тексте объявления и не прихватывает лишнего.
+
+    Скобка отдельно: адрес спрятанной ссылки дописывают в текст именно в
+    скобках, и утащенная в адрес закрывающая скобка вела бы в никуда.
+    """
+    assert teletype.ARTICLE_URL_RE.findall(text) == expected

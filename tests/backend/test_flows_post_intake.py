@@ -15,6 +15,7 @@
 from backend.flows import parse as parse_mod
 import pytest
 
+from adapters import teletype
 from backend.flows import ingest
 from tests.fakes.telegram import link_entity, post
 
@@ -83,6 +84,28 @@ async def test_a_hidden_contact_address_reaches_the_row_and_the_parse(intake):
     expected = "Ищем Python-разработчика, контакты в описании (https://acme.test/jobs)"
     assert intake.saved == [(1, 10, expected)]
     assert intake.parsed == [(7, expected)]
+
+
+async def test_a_linked_article_is_written_into_the_post(intake, monkeypatch):
+    """Статья по ссылке дописывается к объявлению до сохранения и до разбора.
+
+    В таких объявлениях пост — одна шапка, а требования, условия и способ
+    отклика вынесены в статью: без неё разбирать нечего, а сохранённый текст
+    не годится для прогона заново.
+    """
+    async def fetch_article(_client, url):
+        return "Требования: Python"
+
+    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+
+    await ingest.ingest_post(
+        intake, 1, "jobs", post(10, text="Senior QA https://teletype.in/@a/b")
+    )
+
+    expected = "Senior QA https://teletype.in/@a/b\n\nТребования: Python"
+    assert intake.saved == [(1, 10, expected)]
+    assert intake.parsed == [(7, expected)]
+    assert intake.embedded == expected
 
 
 @pytest.mark.parametrize(

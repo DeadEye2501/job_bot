@@ -5,7 +5,7 @@ import logging
 from sqlalchemy.exc import IntegrityError
 import numpy as np
 
-from backend.flows import parse
+from backend.flows import linked_article, parse
 from backend.domain.dedup import cosine_top_match
 from backend.message_text import extract_post_text
 from backend.models import Vacancy
@@ -60,6 +60,7 @@ async def ingest_post(
     text = extract_post_text(msg)
     if not text or msg.service is not None or msg.poll is not None:
         return
+    text, _whole = await linked_article.with_linked_articles(text)
     post = ChannelPost(channel_id, channel_username, msg, text)
     embedding = await _post_embedding(pipeline, post)
     if embedding is None:

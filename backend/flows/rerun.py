@@ -6,7 +6,7 @@ from typing import Literal
 
 from sqlalchemy import select
 
-from backend.flows import embeddings, parse
+from backend.flows import embeddings, linked_article, parse
 from backend.message_text import extract_post_text
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
@@ -61,6 +61,30 @@ async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None:
         )
 
 
+async def _post_text(msg, origin: _Origin, vacancy_id: int) -> str | None:
+    """Текст перечитанного поста со статьями; пусто — брать сохранённый.
+
+    Недобравший текст здесь хуже прежнего, а не лучше: сохранённый уже
+    содержит статью, которую в эту минуту не отдали, и переписать его постом
+    без неё — значит потерять требования, по которым вакансию и отбирали.
+    """
+    candidate = extract_post_text(msg)
+    if not candidate:
+        logger.info(
+            "rerun: vacancy %d fetched msg @%s/%d but text is empty (media-only?), keeping cached raw_text",
+            vacancy_id, origin.channel_username, origin.msg_id,
+        )
+        return None
+    candidate, whole = await linked_article.with_linked_articles(candidate)
+    if not whole:
+        logger.info(
+            "rerun: vacancy %d linked article not available, keeping cached raw_text",
+            vacancy_id,
+        )
+        return None
+    return candidate
+
+
 async def _fetch_fresh_text(pipeline, origin: _Origin, vacancy_id: int):
     """Перечитать исходный пост; пусто — берём сохранённый текст.
 
@@ -82,14 +106,7 @@ async def _fetch_fresh_text(pipeline, origin: _Origin, vacancy_id: int):
                 vacancy_id, origin.channel_username, origin.msg_id,
             )
             return None
-        candidate = extract_post_text(msg)
-        if not candidate:
-            logger.info(
-                "rerun: vacancy %d fetched msg @%s/%d but text is empty (media-only?), keeping cached raw_text",
-                vacancy_id, origin.channel_username, origin.msg_id,
-            )
-            return None
-        return candidate
+        return await _post_text(msg, origin, vacancy_id)
     except FloodWait as e:
         logger.warning(
             "rerun: vacancy %d FloodWait %ss while fetching @%s/%d, keeping cached raw_text",

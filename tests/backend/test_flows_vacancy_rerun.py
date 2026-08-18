@@ -11,7 +11,9 @@
 """
 
 from backend.flows import embeddings as embeddings_mod
+from adapters import teletype
 from backend.flows import parse as parse_mod
+import httpx
 import pytest
 from pyrogram.errors import FloodWait
 
@@ -126,6 +128,28 @@ async def test_a_hidden_link_address_is_picked_up_on_a_rerun(monkeypatch, rerunn
     expected = "контакты в описании (https://acme.test/jobs)"
     assert (await only_row(session_factory, Vacancy)).raw_text == expected
     assert pipeline.parsed[-1] == (vacancy.id, expected, "jobs", False)
+
+
+async def test_an_unreachable_article_keeps_the_saved_text(monkeypatch, rerunning):
+    """Не отдавшаяся статья оставляет сохранённый текст на месте.
+
+    В сохранённом статья уже есть, и переписать его перечитанным постом без
+    неё — потерять требования, по которым вакансию и отбирали. Прогон в этом
+    случае идёт по тому, что лежит в базе, как и при недоступном посте.
+    """
+    session_factory, vacancy, make_pipeline = rerunning
+
+    async def fetch_article(_client, _url):
+        raise httpx.ConnectError("сеть отвалилась")
+
+    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    fresh = post(42, text="Senior QA https://teletype.in/@a/b")
+    pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(post=fresh))
+
+    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) == "ok"
+
+    assert (await only_row(session_factory, Vacancy)).raw_text == "сохранённый текст"
+    assert pipeline.parsed[-1] == (vacancy.id, "сохранённый текст", "jobs", False)
 
 
 async def test_the_settings_are_reloaded_before_the_parse(monkeypatch, rerunning):
