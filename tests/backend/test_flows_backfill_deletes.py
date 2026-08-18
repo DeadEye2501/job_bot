@@ -104,12 +104,12 @@ class _WritesWhileReading(FakeTelegramClient):
     def __init__(self, *, arrival, session_factory, **kwargs) -> None:
         super().__init__(**kwargs)
         self._arrival = arrival
-        self._session_factory = session_factory
+        self.session_factory = session_factory
 
     async def get_chat_history(self, target, limit=100):
         async for msg in super().get_chat_history(target, limit):
             yield msg
-        await put(self._session_factory, self._arrival)
+        await put(self.session_factory, self._arrival)
 
 
 async def test_a_message_that_arrived_mid_walk_is_left_alone(

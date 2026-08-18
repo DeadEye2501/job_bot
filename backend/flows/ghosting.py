@@ -20,7 +20,7 @@ async def check_ghosting_timeouts(pipeline) -> int:
     """
 
     try:
-        async with pipeline._session_factory() as session:
+        async with pipeline.session_factory() as session:
             async with session.begin():
                 affected = await mark_ghosted_vacancies(
                     session, timeout_days=GHOSTING_TIMEOUT_DAYS,

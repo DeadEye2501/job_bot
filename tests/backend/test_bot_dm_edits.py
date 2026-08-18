@@ -35,7 +35,7 @@ def _edit(*, chat_id=777, username=None, msg_id=10, text="новая редак�
 async def test_an_edit_overwrites_the_saved_text(chatting, session_factory):
     """Правка переписывает сохранённый текст и метит строку как изменённую."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="старая"),
@@ -57,7 +57,7 @@ async def test_an_edit_of_our_own_message_finds_the_outgoing_row(
     вполне может лежать строка с тем же номером.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="входящее"),
@@ -74,7 +74,7 @@ async def test_an_edit_of_our_own_message_finds_the_outgoing_row(
 async def test_an_edit_from_a_stranger_changes_nothing(chatting, session_factory):
     """Правка из переписки с незнакомым собеседником ничего не меняет."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="старая"),
@@ -88,7 +88,7 @@ async def test_an_edit_from_a_stranger_changes_nothing(chatting, session_factory
 async def test_an_edit_without_a_chat_is_ignored(chatting, session_factory):
     """Правка без указания переписки пропускается: искать строку не по чему."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="старая"),
@@ -102,7 +102,7 @@ async def test_an_edit_without_a_chat_is_ignored(chatting, session_factory):
 async def test_a_switched_off_bot_ignores_edits(chatting, session_factory):
     """Выключенный бот правки не разбирает."""
     bot, client, hr = await chatting(mode=BotMode.OFF, telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="старая"),
@@ -124,7 +124,7 @@ async def test_an_edited_incoming_message_is_refreshed_in_the_buffer(
     """
     bot, client, hr = await chatting(telegram_user_id=777)
     ingestion = FakeIngestion()
-    bot._ingestion = ingestion
+    bot.ingestion = ingestion
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="старая"),
@@ -141,7 +141,7 @@ async def test_an_edit_of_our_own_message_does_not_touch_the_buffer(
     """Правка своего сообщения накопитель не трогает: разбирают чужие."""
     bot, client, hr = await chatting(telegram_user_id=777)
     ingestion = FakeIngestion()
-    bot._ingestion = ingestion
+    bot.ingestion = ingestion
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=False, tg_message_id=10, text="своё"),
@@ -158,7 +158,7 @@ async def test_an_edit_that_matched_nothing_leaves_the_buffer_alone(
     """Правка, не нашедшая строки, накопитель тоже не трогает."""
     bot, client, hr = await chatting(telegram_user_id=777)
     ingestion = FakeIngestion()
-    bot._ingestion = ingestion
+    bot.ingestion = ingestion
 
     await bot._on_dm_edit(client, _edit())
 
@@ -168,7 +168,7 @@ async def test_an_edit_that_matched_nothing_leaves_the_buffer_alone(
 async def test_the_window_hears_about_an_edit(chatting, session_factory):
     """Окно узнаёт о правке: открытая переписка перерисуется сразу."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="старая"),
@@ -186,7 +186,7 @@ async def test_the_window_is_not_told_about_an_edit_that_matched_nothing(
 ):
     """Правка, не нашедшая строки, окно не дёргает: перерисовывать нечего."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     heard: list[int] = []
     bot.on_new_message = heard.append
 
@@ -198,7 +198,7 @@ async def test_the_window_is_not_told_about_an_edit_that_matched_nothing(
 async def test_a_broken_window_hook_does_not_lose_the_edit(chatting, session_factory):
     """Сломанное оповещение окна саму правку не отменяет."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="старая"),
@@ -224,7 +224,7 @@ async def test_an_edit_of_a_message_without_a_sender_lands_on_the_outgoing_row(
     половине переписки.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="входящее"),
@@ -252,7 +252,7 @@ async def test_an_edit_finds_an_hr_known_only_by_name(chatting, session_factory)
     того опознать её можно лишь по имени из переписки.
     """
     bot, client, hr = await chatting(telegram_username="maria", telegram_user_id=None)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="старая"),

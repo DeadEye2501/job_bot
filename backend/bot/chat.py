@@ -30,10 +30,10 @@ async def mark_hr_chat_read(bot, hr_id: int) -> int:
     Pyrogram side — the Telegram-side read receipt will arrive later
     through ``UpdateReadHistoryInbox`` when the user opens it elsewhere.
     """
-    if (await bot._current_mode()) is BotMode.OFF:
+    if (await bot.current_mode()) is BotMode.OFF:
         return 0
     now = datetime.now(timezone.utc)
-    async with bot._session_factory() as session:
+    async with bot.session_factory() as session:
         hr = await session.get(HR, hr_id)
         if hr is None:
             return 0
@@ -43,7 +43,7 @@ async def mark_hr_chat_read(bot, hr_id: int) -> int:
 
     if updated > 0 and target is not None:
         try:
-            await bot._client.read_chat_history(target)
+            await bot.client.read_chat_history(target)
         except Exception:
             logger.exception(
                 "read_chat_history failed for hr %d", hr_id,
@@ -72,7 +72,7 @@ async def _target_or_refuse(bot, hr_id: int) -> int | str:
     слова: причина, годная для журнала, человеку ничего не говорит. Слово без
     перевода роняет отправку нарочно — молчаливый отказ окно показать не может.
     """
-    async with bot._session_factory() as session:
+    async with bot.session_factory() as session:
         hr = await session.get(HR, hr_id)
     if hr is None:
         raise RuntimeError(f"HR id={hr_id} не найден.")
@@ -91,7 +91,7 @@ async def _persist_outgoing(bot, outgoing: OutgoingMessage) -> Message:
     Обе отправки из окна — текстом и вложением — кладут строку одинаково
     устроенной; своё у каждой только то, чем заполнена сама `OutgoingMessage`.
     """
-    async with bot._session_factory() as session:
+    async with bot.session_factory() as session:
         row, _ = await save_outgoing_message(session, outgoing)
         await session.commit()
     return row
@@ -114,7 +114,7 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
     if not clean:
         raise RuntimeError("Пустое сообщение.")
 
-    pyro_msg = await bot._client.send_message(target, clean)
+    pyro_msg = await bot.client.send_message(target, clean)
     logger.info(
         "Chat DM sent to hr %d (tg_msg=%d, %d chars)",
         hr_id, pyro_msg.id, len(clean),
@@ -173,9 +173,9 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
     src = Path(file_path)
     as_photo = _checked_kind(src, file_path)
     if as_photo:
-        pyro_msg = await bot._client.send_photo(target, str(src))
+        pyro_msg = await bot.client.send_photo(target, str(src))
     else:
-        pyro_msg = await bot._client.send_document(target, str(src))
+        pyro_msg = await bot.client.send_document(target, str(src))
     logger.info(
         "Chat media sent to hr %d (tg_msg=%d, kind=%s, name=%s)",
         hr_id,

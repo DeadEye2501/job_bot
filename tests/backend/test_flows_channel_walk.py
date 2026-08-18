@@ -37,7 +37,7 @@ async def walking(monkeypatch, make_pipeline):
     async def poll(pipeline, channel_id, username, last_id):
         pipeline.walked.append(username)
 
-    pipeline._reload_resources = reload
+    pipeline.reload_resources = reload
     monkeypatch.setattr(channels, "poll_channel", poll)
     return pipeline
 
@@ -181,7 +181,7 @@ async def test_names_are_refreshed_even_for_switched_off_channels(
     async def nothing():
         pass
 
-    pipeline._reload_resources = nothing
+    pipeline.reload_resources = nothing
 
     await pipeline.poll_active_channels()
 

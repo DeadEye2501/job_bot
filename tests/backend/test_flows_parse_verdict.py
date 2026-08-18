@@ -107,7 +107,7 @@ async def test_an_empty_post_never_reaches_the_validator(parsing):
 async def test_a_blacklisted_post_is_marked_unfit(parsing, session_factory):
     """Объявление, попавшее под чёрный список, помечается непригодным."""
     pipeline, vacancy = parsing
-    pipeline._blacklist_patterns = ["казино"]
+    pipeline.blacklist_patterns = ["казино"]
 
     await parse.parse_and_update_vacancy(pipeline, 
         vacancy.id, "Ищем в казино", "jobs", allow_delete=False
@@ -125,7 +125,7 @@ async def test_the_blacklist_reads_the_whole_post(parsing, session_factory):
     иначе не сработал бы вовсе.
     """
     pipeline, vacancy = parsing
-    pipeline._blacklist_patterns = ["казино"]
+    pipeline.blacklist_patterns = ["казино"]
     long_tail = "а" * 7000 + " казино"
 
     await parse.parse_and_update_vacancy(pipeline, 
@@ -138,7 +138,7 @@ async def test_the_blacklist_reads_the_whole_post(parsing, session_factory):
 async def test_a_blacklisted_post_never_reaches_the_validator(parsing):
     """Отсеянное чёрным списком до проверки пригодности не доходит."""
     pipeline, vacancy = parsing
-    pipeline._blacklist_patterns = ["казино"]
+    pipeline.blacklist_patterns = ["казино"]
 
     await parse.parse_and_update_vacancy(pipeline, 
         vacancy.id, "Ищем в казино", "jobs", allow_delete=False
@@ -217,7 +217,7 @@ async def test_a_low_score_is_not_sent_to_the_validator(parsing, session_factory
     модели на заведомо чужую вакансию незачем.
     """
     pipeline, vacancy = parsing
-    await pipeline._rs.set_app("scoring_threshold", "100")
+    await pipeline.rs.set_app("scoring_threshold", "100")
 
     await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
 

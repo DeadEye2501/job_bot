@@ -29,9 +29,9 @@ async def test_the_skills_are_lifted_into_memory(make_pipeline, session_factory)
     )
     pipeline = await make_pipeline()
 
-    await pipeline._reload_resources()
+    await pipeline.reload_resources()
 
-    assert sorted(s.name for s in pipeline._skills_cache) == ["Docker", "Python"]
+    assert sorted(s.name for s in pipeline.skills_cache) == ["Docker", "Python"]
 
 
 async def test_the_blacklist_is_lifted_into_memory(make_pipeline, session_factory):
@@ -43,9 +43,9 @@ async def test_the_blacklist_is_lifted_into_memory(make_pipeline, session_factor
     )
     pipeline = await make_pipeline()
 
-    await pipeline._reload_resources()
+    await pipeline.reload_resources()
 
-    assert sorted(pipeline._blacklist_patterns) == ["казино", "ставки"]
+    assert sorted(pipeline.blacklist_patterns) == ["казино", "ставки"]
 
 
 async def test_a_switched_off_blacklist_entry_is_not_lifted(
@@ -63,9 +63,9 @@ async def test_a_switched_off_blacklist_entry_is_not_lifted(
     )
     pipeline = await make_pipeline()
 
-    await pipeline._reload_resources()
+    await pipeline.reload_resources()
 
-    assert pipeline._blacklist_patterns == ["ставки"]
+    assert pipeline.blacklist_patterns == ["ставки"]
 
 
 async def test_the_candidate_slice_is_rebuilt(make_pipeline, session_factory):
@@ -82,11 +82,11 @@ async def test_the_candidate_slice_is_rebuilt(make_pipeline, session_factory):
     )
     pipeline = await make_pipeline()
 
-    await pipeline._reload_resources()
+    await pipeline.reload_resources()
 
-    assert pipeline._profile_cache.title == "Python-разработчик"
-    assert pipeline._profile_cache.location == "Ереван"
-    assert [(x.name, x.level) for x in pipeline._profile_cache.languages] == [
+    assert pipeline.profile_cache.title == "Python-разработчик"
+    assert pipeline.profile_cache.location == "Ереван"
+    assert [(x.name, x.level) for x in pipeline.profile_cache.languages] == [
         ("Английский", "B1")
     ]
 
@@ -100,9 +100,9 @@ async def test_the_letter_block_is_rebuilt(make_pipeline, session_factory):
     await put(session_factory, profile_row(title="Python-разработчик"))
     pipeline = await make_pipeline()
 
-    await pipeline._reload_resources()
+    await pipeline.reload_resources()
 
-    assert "Python-разработчик" in pipeline._profile_block
+    assert "Python-разработчик" in pipeline.profile_block
 
 
 async def test_an_empty_base_leaves_empty_caches(make_pipeline):
@@ -112,11 +112,11 @@ async def test_an_empty_base_leaves_empty_caches(make_pipeline):
     """
     pipeline = await make_pipeline()
 
-    await pipeline._reload_resources()
+    await pipeline.reload_resources()
 
-    assert pipeline._skills_cache == []
-    assert pipeline._blacklist_patterns == []
-    assert pipeline._profile_cache.title is None
+    assert pipeline.skills_cache == []
+    assert pipeline.blacklist_patterns == []
+    assert pipeline.profile_cache.title is None
 
 
 async def test_the_second_reload_sees_the_edits(make_pipeline, session_factory):
@@ -126,12 +126,12 @@ async def test_the_second_reload_sees_the_edits(make_pipeline, session_factory):
     обхода, а не немедленно.
     """
     pipeline = await make_pipeline()
-    await pipeline._reload_resources()
+    await pipeline.reload_resources()
 
     await put(session_factory, blacklist_row("keyword", "казино"))
-    await pipeline._reload_resources()
+    await pipeline.reload_resources()
 
-    assert pipeline._blacklist_patterns == ["казино"]
+    assert pipeline.blacklist_patterns == ["казино"]
 
 
 async def test_an_unset_cv_path_yields_nothing(make_pipeline):
@@ -141,7 +141,7 @@ async def test_an_unset_cv_path_yields_nothing(make_pipeline):
     """
     pipeline = await make_pipeline()
 
-    assert pipeline._cv_path() is None
+    assert pipeline.cv_path() is None
 
 
 async def test_a_set_cv_path_is_handed_over_as_a_path(make_pipeline, tmp_path):
@@ -149,6 +149,6 @@ async def test_a_set_cv_path_is_handed_over_as_a_path(make_pipeline, tmp_path):
     resume = tmp_path / "Резюме.pdf"
     resume.write_bytes(b"%PDF")
     pipeline = await make_pipeline()
-    await pipeline._rs.set_app("cv_path", str(resume))
+    await pipeline.rs.set_app("cv_path", str(resume))
 
-    assert pipeline._cv_path() == resume
+    assert pipeline.cv_path() == resume

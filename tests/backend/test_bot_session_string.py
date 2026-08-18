@@ -22,7 +22,7 @@ async def test_a_changed_session_string_is_saved(make_bot):
 
     await loop.persist_session_if_changed(bot)
 
-    assert bot._rs.tg.session_string == "новая сессия"
+    assert bot.rs.tg.session_string == "новая сессия"
 
 
 async def test_an_unchanged_session_string_is_left_alone(make_bot):
@@ -34,7 +34,7 @@ async def test_an_unchanged_session_string_is_left_alone(make_bot):
     client = FakeTelegramClient()
     client.session_string = "прежняя"
     bot = await make_bot(client)
-    await bot._rs.set_tg(
+    await bot.rs.set_tg(
         api_id=1,
         api_hash="ш",
         phone="+70000000000",
@@ -46,7 +46,7 @@ async def test_an_unchanged_session_string_is_left_alone(make_bot):
     async def remember(**kwargs):
         written.append(kwargs["session_string"])
 
-    bot._rs.set_tg = remember
+    bot.rs.set_tg = remember
 
     await loop.persist_session_if_changed(bot)
 
@@ -61,11 +61,11 @@ async def test_a_failed_export_saves_nothing(make_bot):
     bot = await make_bot(
         FakeTelegramClient(fails={"export_session_string": OSError("сеть")})
     )
-    before = bot._rs.tg.session_string
+    before = bot.rs.tg.session_string
 
     await loop.persist_session_if_changed(bot)
 
-    assert bot._rs.tg.session_string == before
+    assert bot.rs.tg.session_string == before
 
 
 async def test_a_failed_save_does_not_stop_the_start(make_bot):
@@ -81,9 +81,9 @@ async def test_a_failed_save_does_not_stop_the_start(make_bot):
     async def broken(**kwargs):
         raise OSError("база")
 
-    bot._rs.set_tg = broken
-    before = bot._rs.tg.session_string
+    bot.rs.set_tg = broken
+    before = bot.rs.tg.session_string
 
     await loop.persist_session_if_changed(bot)
 
-    assert bot._rs.tg.session_string == before
+    assert bot.rs.tg.session_string == before

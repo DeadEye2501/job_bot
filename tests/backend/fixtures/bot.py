@@ -141,7 +141,7 @@ def chatting(session_factory, make_bot):
         telegram_client = client if client is not None else FakeTelegramClient()
         await put(session_factory, hr_row(**hr_fields))
         bot = await make_bot(telegram_client, dry_run=dry_run)
-        await bot._rs.set_mode(mode)
+        await bot.rs.set_mode(mode)
         return bot, telegram_client, await only_row(session_factory, HR)
 
     return build
@@ -159,7 +159,7 @@ async def busy_slot():
 
     def occupy(bot) -> None:
         task = asyncio.create_task(asyncio.sleep(30))
-        bot._current_poll_task = task
+        bot.current_poll_task = task
         occupied.append(task)
 
     yield occupy
@@ -216,7 +216,7 @@ def ready_to_send(session_factory, make_bot):
             vacancy_row(title="к отклику", status=status),
         )
         bot = await make_bot(dry_run=dry_run)
-        await bot._rs.set_mode(mode)
+        await bot.rs.set_mode(mode)
         saved_hr = await only_row(session_factory, HR)
         vacancy = await only_row(session_factory, Vacancy)
         return bot, saved_hr, vacancy

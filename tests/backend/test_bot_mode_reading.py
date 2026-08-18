@@ -15,9 +15,9 @@ from backend.models import BotMode
 async def test_the_mode_comes_from_the_settings(make_bot):
     """Режим берётся из настроек, а не из памяти бота."""
     bot = await make_bot()
-    await bot._rs.set_mode(BotMode.FULL)
+    await bot.rs.set_mode(BotMode.FULL)
 
-    assert await bot._current_mode() is BotMode.FULL
+    assert await bot.current_mode() is BotMode.FULL
 
 
 async def test_an_unreadable_mode_reads_as_off(make_bot):
@@ -31,6 +31,6 @@ async def test_an_unreadable_mode_reads_as_off(make_bot):
     async def broken():
         raise OSError("база недоступна")
 
-    bot._rs.get_mode = broken
+    bot.rs.get_mode = broken
 
-    assert await bot._current_mode() is BotMode.OFF
+    assert await bot.current_mode() is BotMode.OFF

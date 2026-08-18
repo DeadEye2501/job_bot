@@ -43,7 +43,7 @@ async def poll_channel_now(
     """
     outcome, walk = await slot.run_in_slot(
         bot,
-        lambda: bot._ingestion.poll_one_channel(channel_id),
+        lambda: bot.ingestion.poll_one_channel(channel_id),
         f"manual poll for channel {channel_id}",
     )
     return walk if outcome == "ok" else outcome
@@ -53,7 +53,7 @@ async def delete_channel(bot, channel_id: int) -> int | None:
     """UI «Удалить канал» — severs vacancy FKs and deletes the row.
     Returns count of detached vacancies, or None if channel missing.
     """
-    async with bot._session_factory() as session:
+    async with bot.session_factory() as session:
         async with session.begin():
             return await repo_delete_channel(session, channel_id)
 
@@ -73,22 +73,22 @@ async def add_channel(
     Метаданные тянем ДО инсёрта одним `get_chat`-вызовом — он же
     выступает валидатором существования.
     """
-    async with bot._session_factory() as session:
+    async with bot.session_factory() as session:
         existing = await find_channel_by_username(session, username)
         if existing is not None:
             return existing.id, "exists"
 
     try:
-        chat = await bot._client.get_chat(username)
+        chat = await bot.client.get_chat(username)
     except Exception:
         logger.exception("add_channel: get_chat(%s) failed", username)
         return None, "invalid"
     if chat is None:
         return None, "invalid"
 
-    title, avatar = await read_channel_metadata(bot._client, chat)
+    title, avatar = await read_channel_metadata(bot.client, chat)
 
-    async with bot._session_factory() as session:
+    async with bot.session_factory() as session:
         async with session.begin():
             # Race-guard: ещё одна вкладка/процесс могла успеть вставить
             # за время `get_chat` — повторно проверяем дубль.
@@ -107,6 +107,6 @@ async def force_poll_once(bot) -> Literal["ok", "busy", "cancelled", "error"]:
     подсказкой.
     """
     outcome, _ = await slot.run_in_slot(
-        bot, lambda: bot._ingestion.poll_active_channels(), "forced poll cycle"
+        bot, lambda: bot.ingestion.poll_active_channels(), "forced poll cycle"
     )
     return outcome

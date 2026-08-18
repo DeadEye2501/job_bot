@@ -39,21 +39,21 @@ logger = logging.getLogger(__name__)
 def _declare_caches(pipeline) -> None:
     """Слепки, которые конвейер держит при себе, — и у них два хозяина.
 
-    Анкету и чёрный список перестраивает `_reload_resources` разом; до
+    Анкету и чёрный список перестраивает `reload_resources` разом; до
     первой загрузки они пусты, и валидатор подставит «—» во все слоты, что
     равносильно «нет ограничений». Кэш векторов живёт своей жизнью в
-    `flows/embeddings.py`: `_reload_resources` его не трогает вовсе, он
+    `flows/embeddings.py`: `reload_resources` его не трогает вовсе, он
     наполняется по требованию и признаком помнит, наполнялся ли.
     """
     # Текстовый блок «Информация о кандидате» для cover-letter prompt'а.
-    pipeline._profile_block = ""
-    pipeline._embedding_ids = np.empty((0,), dtype=np.int64)
-    pipeline._embedding_matrix = np.empty((0, 0), dtype=np.float32)
-    pipeline._embedding_cache_loaded = False
-    pipeline._skills_cache = []
+    pipeline.profile_block = ""
+    pipeline.embedding_ids = np.empty((0,), dtype=np.int64)
+    pipeline.embedding_matrix = np.empty((0, 0), dtype=np.float32)
+    pipeline.embedding_cache_loaded = False
+    pipeline.skills_cache = []
     # Срез данных профиля для LLM-валидатора.
-    pipeline._profile_cache = CandidateProfile()
-    pipeline._blacklist_patterns = []
+    pipeline.profile_cache = CandidateProfile()
+    pipeline.blacklist_patterns = []
 
 
 def _declare_window_hooks(pipeline) -> None:
@@ -100,33 +100,45 @@ def _declare_dm_debounce(pipeline) -> None:
     от HR, потом одна классификация на склеенный текст, а вердикт по ней
     прикладывается к вакансии и письму **последнего** в пачке.
     """
-    pipeline._dm_classify_buffer = {}
-    pipeline._dm_classify_tasks = {}
+    pipeline.dm_classify_buffer = {}
+    pipeline.dm_classify_tasks = {}
     # Разборы, уже прошедшие таймер. Держатся отдельно, потому что из
     # словаря таймеров задача вычёркивает себя перед разбором — иначе
     # свежее сообщение отменило бы разбор посреди обращения к модели, и
     # пакет, уже вынутый из буфера, пропал бы. Остановке же дождаться их
     # нужно: отмена по ним не работает, а соединения она закрывает.
-    pipeline._dm_classify_running = set()
+    pipeline.dm_classify_running = set()
     # Семафор на одновременные LLM-классификации. Catch-up на OFF→active
     # transition'е может разом разбудить debounce'ры по всем HR'ам, что
     # на локальной LM Studio превращается в 30 параллельных httpx.post
     # к одному серверу — она ставит их в очередь, начинает таймаутить и
     # часть вердиктов теряется. 2 одновременных вызова — компромисс
     # между throughput'ом и не-OOM'нуть LM Studio.
-    pipeline._dm_classify_semaphore = asyncio.Semaphore(2)
+    pipeline.dm_classify_semaphore = asyncio.Semaphore(2)
 
 
 class IngestionPipeline:
+    """Конвейер: сотрудники, кэши и работа над вакансией от поста до отклика.
+
+    Поля открытые, и это не небрежность: ими пользуются одиннадцать соседних
+    модулей пакета — читают настройки, берут фабрику сессий, правят кэш
+    отпечатков и копилку отложенного разбора. Прежде они числились закрытыми,
+    и подчёркивание обещало то, чего не было.
+
+    Кэш отпечатков и копилка разбора живут здесь полями, а править их ходят
+    соседи, — это следующий заход: им место в своих объектах со своими
+    методами, а не в общем мешке.
+    """
+
     # Поля ставят объявления выше, а объявлены они здесь: присвоение по
-    # чужому полю (`pipeline._skills_cache = ...`) тип не записывает.
-    _profile_block: str
-    _skills_cache: list[ProfileSkill]
-    _profile_cache: CandidateProfile
-    _blacklist_patterns: list[str]
-    _dm_classify_buffer: dict[int, list[dict]]
-    _dm_classify_tasks: dict[int, asyncio.Task]
-    _dm_classify_running: set[asyncio.Task]
+    # чужому полю (`pipeline.skills_cache = ...`) тип не записывает.
+    profile_block: str
+    skills_cache: list[ProfileSkill]
+    profile_cache: CandidateProfile
+    blacklist_patterns: list[str]
+    dm_classify_buffer: dict[int, list[dict]]
+    dm_classify_tasks: dict[int, asyncio.Task]
+    dm_classify_running: set[asyncio.Task]
 
     def __init__(
         self,
@@ -139,14 +151,14 @@ class IngestionPipeline:
         send,
         runtime_settings,
     ) -> None:
-        self._client = client
-        self._session_factory = session_factory
-        self._lm_client = lm_client
-        self._lm_embed_client = lm_embed_client
-        self._lm_chat_model = lm_chat_model
-        self._lm_embed_model = lm_embed_model
-        self._send = send
-        self._rs = runtime_settings
+        self.client = client
+        self.session_factory = session_factory
+        self.lm_client = lm_client
+        self.lm_embed_client = lm_embed_client
+        self.lm_chat_model = lm_chat_model
+        self.lm_embed_model = lm_embed_model
+        self.send = send
+        self.rs = runtime_settings
         _declare_caches(self)
         _declare_window_hooks(self)
         _declare_dm_debounce(self)
@@ -156,19 +168,19 @@ class IngestionPipeline:
         # weak-ref'ы — без своего set'а Python может GC'нуть таск
         # посреди выполнения с warning'ом «Task was destroyed but it
         # is pending». На done-callback'е сам себя убираем из set'а.
-        self._backfill_tasks: set[asyncio.Task] = set()
+        self.backfill_tasks: set[asyncio.Task] = set()
 
         # Shutdown-флаг. Bot.run finally выставляет его в True ДО
         # client.stop() / lm_*.aclose() — после этого schedule_dm_class*
         # и process_dm молча no-op'ят, чтобы Pyrogram'овский handler,
         # успевший отстрелить уже после teardown'а, не насыпал в БД
         # запись и не попытался дёрнуть закрытый httpx-клиент.
-        self._shutting_down: bool = False
+        self.shutting_down: bool = False
 
     def mark_shutting_down(self) -> None:
         """Bot.run finally: с этого момента DM-handler ничего не делает."""
-        self._shutting_down = True
-        for task in self._backfill_tasks:
+        self.shutting_down = True
+        for task in self.backfill_tasks:
             task.cancel()
 
 
@@ -184,46 +196,46 @@ class IngestionPipeline:
     DM_CLASSIFY_STOP_TIMEOUT_SEC = 5.0
 
 
-    def _emit_progress(self, stage: str, label: str, current: int, total: int) -> None:
+    def emit_progress(self, stage: str, label: str, current: int, total: int) -> None:
         fire(self.on_progress, "on_progress", stage, label, current, total)
 
-    def _fire_contacts_changed(self) -> None:
+    def fire_contacts_changed(self) -> None:
         fire(self.on_contacts_changed, "on_contacts_changed")
 
-    def _fire_vacancies_changed(self) -> None:
+    def fire_vacancies_changed(self) -> None:
         fire(self.on_vacancies_changed, "on_vacancies_changed")
 
 
-    async def _reload_resources(self) -> None:
+    async def reload_resources(self) -> None:
         # Кэши skills/blacklist/profile/languages/profile_block обновляются
         # ровно один раз — в начале каждого poll-цикла. Если юзер редактирует
         # профиль через UI между циклами, изменения подхватятся ТОЛЬКО на
         # следующем `poll_active_changes`. Это намеренно: cache invalidation
         # из UI-bridge'а потребует cross-thread hook'а, и польза маргинальная
         # (юзер редко редактирует профиль во время активного полла).
-        async with self._session_factory() as session:
-            self._skills_cache = await list_skills(session)
-            self._blacklist_patterns = await load_active_blacklist_patterns(
+        async with self.session_factory() as session:
+            self.skills_cache = await list_skills(session)
+            self.blacklist_patterns = await load_active_blacklist_patterns(
                 session
             )
             profile = await get_profile(session)
             languages = await list_profile_languages(session)
-            self._profile_cache = candidate._build_candidate_profile(profile, languages)
-            self._profile_block = await build_profile_block(session)
+            self.profile_cache = candidate._build_candidate_profile(profile, languages)
+            self.profile_block = await build_profile_block(session)
         logger.info(
             "loaded resources: %d skills, %d blacklist patterns, "
             "profile_title=%r, %d languages, profile_block=%d chars",
-            len(self._skills_cache),
-            len(self._blacklist_patterns),
-            self._profile_cache.title,
-            len(self._profile_cache.languages),
-            len(self._profile_block),
+            len(self.skills_cache),
+            len(self.blacklist_patterns),
+            self.profile_cache.title,
+            len(self.profile_cache.languages),
+            len(self.profile_block),
         )
 
-    def _cv_path(self):
+    def cv_path(self):
         """Path к резюме (PDF), если задан в настройках. None если не задан
         или файл не существует — caller должен skip'нуть отправку."""
-        raw = self._rs.cv_path
+        raw = self.rs.cv_path
         if not raw:
             return None
         return Path(raw)

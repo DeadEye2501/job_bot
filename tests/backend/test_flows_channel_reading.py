@@ -95,7 +95,7 @@ async def test_the_mark_is_saved_in_batches(monkeypatch, reading, session_factor
     записей на диск за один обход.
     """
     pipeline, client, channel = reading
-    await pipeline._rs.set_app("backfill_limit", "25")
+    await pipeline.rs.set_app("backfill_limit", "25")
     client.history = [post(msg_id) for msg_id in range(25, 0, -1)]
     saves: list[int] = []
     real_advance = channels.advance_cursor
@@ -208,7 +208,7 @@ async def test_a_channel_that_outran_the_limit_says_so(reading, caplog):
     выглядит удавшимся.
     """
     pipeline, client, channel = reading
-    await pipeline._rs.set_app("backfill_limit", "3")
+    await pipeline.rs.set_app("backfill_limit", "3")
     client.history = [post(msg_id) for msg_id in range(20, 0, -1)]
 
     with caplog.at_level("WARNING"):
@@ -225,7 +225,7 @@ async def test_the_first_walk_of_a_channel_is_not_called_a_loss(reading, caplog)
     назначению — это глубина первого захода, а не обрыв.
     """
     pipeline, client, channel = reading
-    await pipeline._rs.set_app("backfill_limit", "3")
+    await pipeline.rs.set_app("backfill_limit", "3")
     client.history = [post(msg_id) for msg_id in range(20, 0, -1)]
 
     with caplog.at_level("WARNING"):

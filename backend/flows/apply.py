@@ -97,7 +97,7 @@ async def try_auto_send(
     # на FloodWait выписывает в app_settings момент когда можно
     # пробовать снова. Дёргать send_dm раньше — гарантированный
     # повторный FloodWait и накопление штрафа.
-    wait_until = pipeline._rs.flood_wait_until_ts
+    wait_until = pipeline.rs.flood_wait_until_ts
     if wait_until > 0:
         remaining = wait_until - time.time()
         if remaining > 0:
@@ -146,7 +146,7 @@ async def _send_plan(pipeline, hr, vacancy_id: int, force: bool) -> tuple:
     идёт полным, следующие короткими. Это заслон от спама, когда HR
     выкладывает несколько вакансий и обход видит их одним заходом.
     """
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         v = (
             await session.scalars(
                 select(Vacancy)
@@ -175,12 +175,12 @@ async def _full_letter(pipeline, parsed: ParsedVacancy, channel_ref: str, vacanc
     приставка «Откликаюсь на вакансию: …» выглядела штампом поверх живого
     письма и потому снята.
     """
-    if not pipeline._profile_block:
+    if not pipeline.profile_block:
         logger.warning("vacancy %d: profile_block empty, skipping send", vacancy_id)
         return None, "profile_empty"
     body = await generate_cover_letter(
-        pipeline._profile_block, parsed,
-        pipeline._lm_client, pipeline._lm_chat_model,
+        pipeline.profile_block, parsed,
+        pipeline.lm_client, pipeline.lm_chat_model,
         channel_ref=channel_ref,
     )
     if body is None:
@@ -188,7 +188,7 @@ async def _full_letter(pipeline, parsed: ParsedVacancy, channel_ref: str, vacanc
             "vacancy %d: cover letter generation failed, skipping send", vacancy_id
         )
         return None, "cover_letter_failed"
-    cv_path = pipeline._cv_path()
+    cv_path = pipeline.cv_path()
     if cv_path is None or not cv_path.is_file():
         logger.warning(
             "vacancy %d: CV file missing (%s), skipping send", vacancy_id, cv_path
@@ -207,7 +207,7 @@ async def _hand_letter_over(
     нет вовсе.
     """
     try:
-        sent = await pipeline._send(
+        sent = await pipeline.send(
             hr, letter.text, attachment=letter.attachment,
             vacancy_id=vacancy_id, force=force,
         )
@@ -237,7 +237,7 @@ async def _still_sendable(pipeline, vacancy_id: int, force: bool) -> str | None:
     """
     if force:
         return None
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         return _send_refusal(
             await session.get(Vacancy, vacancy_id),
             force=force,
@@ -336,7 +336,7 @@ async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool,
     same shape as the auto-send path. Returns (ok, reason). Reasons:
     'sent' / 'no_vacancy' / 'no_hr' / 'already_applied' / любой код
     из send_application."""
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         v = (
             await session.scalars(
                 select(Vacancy)
@@ -366,6 +366,6 @@ async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool,
             return False, "already_applied"
         hr = v.hr
         parsed = _parsed_from_row(v)
-    if not pipeline._profile_block:
-        await pipeline._reload_resources()
+    if not pipeline.profile_block:
+        await pipeline.reload_resources()
     return await send_application(pipeline, hr, parsed, vacancy_id, force=True)

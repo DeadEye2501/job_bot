@@ -31,7 +31,7 @@ async def test_a_bot_is_not_ready_until_it_captures_its_loop(make_bot):
 
     assert bot.is_ready is False
 
-    bot._loop = asyncio.get_running_loop()
+    bot.loop = asyncio.get_running_loop()
 
     assert bot.is_ready is True
 
@@ -39,13 +39,13 @@ async def test_a_bot_is_not_ready_until_it_captures_its_loop(make_bot):
 async def test_a_wake_signal_reaches_the_loop(make_bot):
     """Побудка доходит до цикла, а не выставляется мимо него."""
     bot = await make_bot()
-    bot._loop = asyncio.get_running_loop()
+    bot.loop = asyncio.get_running_loop()
 
     bot.kick()
-    assert not bot._wake_event.is_set()
+    assert not bot.wake_event.is_set()
 
     await asyncio.sleep(0)
-    assert bot._wake_event.is_set()
+    assert bot.wake_event.is_set()
 
 
 @pytest.mark.parametrize("captured", [False, True], ids=["цикла нет", "цикл закрыт"])
@@ -59,11 +59,11 @@ async def test_a_wake_signal_without_a_live_loop_fires_on_the_spot(
     на закрытый цикл упало бы.
     """
     bot = await make_bot()
-    bot._loop = closed_loop if captured else None
+    bot.loop = closed_loop if captured else None
 
     bot.kick()
 
-    assert bot._wake_event.is_set()
+    assert bot.wake_event.is_set()
 
 
 async def test_a_stop_signal_also_wakes_the_loop(make_bot):
@@ -73,13 +73,13 @@ async def test_a_stop_signal_also_wakes_the_loop(make_bot):
     остановиться дошла бы только к концу сна.
     """
     bot = await make_bot()
-    bot._loop = asyncio.get_running_loop()
+    bot.loop = asyncio.get_running_loop()
 
     bot.request_stop()
     await asyncio.sleep(0)
 
-    assert bot._stop_event.is_set()
-    assert bot._wake_event.is_set()
+    assert bot.stop_event.is_set()
+    assert bot.wake_event.is_set()
 
 
 @pytest.mark.parametrize("captured", [False, True], ids=["цикла нет", "цикл закрыт"])
@@ -88,20 +88,20 @@ async def test_a_stop_signal_without_a_live_loop_fires_on_the_spot(
 ):
     """Без живого цикла остановка срабатывает на месте."""
     bot = await make_bot()
-    bot._loop = closed_loop if captured else None
+    bot.loop = closed_loop if captured else None
 
     bot.request_stop()
 
-    assert bot._stop_event.is_set()
-    assert bot._wake_event.is_set()
+    assert bot.stop_event.is_set()
+    assert bot.wake_event.is_set()
 
 
 async def test_cancelling_a_poll_reaches_the_running_task(make_bot):
     """Отмена прогона доходит до запущенной задачи."""
     bot = await make_bot()
-    bot._loop = asyncio.get_running_loop()
+    bot.loop = asyncio.get_running_loop()
     task = asyncio.create_task(asyncio.sleep(30))
-    bot._current_poll_task = task
+    bot.current_poll_task = task
 
     bot.cancel_current_poll()
     assert not task.cancelled()
@@ -116,9 +116,9 @@ async def test_cancelling_without_a_live_loop_reaches_the_task_too(
 ):
     """Без живого цикла отмена доходит до задачи прямо здесь."""
     bot = await make_bot()
-    bot._loop = closed_loop
+    bot.loop = closed_loop
     task = asyncio.create_task(asyncio.sleep(30))
-    bot._current_poll_task = task
+    bot.current_poll_task = task
 
     bot.cancel_current_poll()
 
@@ -133,10 +133,10 @@ async def test_cancelling_a_finished_poll_does_nothing(make_bot):
     сам; повторная отмена не должна ни падать, ни трогать чужое.
     """
     bot = await make_bot()
-    bot._loop = asyncio.get_running_loop()
+    bot.loop = asyncio.get_running_loop()
     task = asyncio.create_task(asyncio.sleep(0))
     await task
-    bot._current_poll_task = task
+    bot.current_poll_task = task
 
     bot.cancel_current_poll()
 
@@ -146,8 +146,8 @@ async def test_cancelling_a_finished_poll_does_nothing(make_bot):
 async def test_cancelling_when_nothing_runs_does_nothing(make_bot):
     """Отмена при отсутствии прогона ничего не делает и не падает."""
     bot = await make_bot()
-    bot._loop = asyncio.get_running_loop()
+    bot.loop = asyncio.get_running_loop()
 
     bot.cancel_current_poll()
 
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None

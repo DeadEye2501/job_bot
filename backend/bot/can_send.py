@@ -45,15 +45,15 @@ async def can_send_to_hr(bot, hr) -> SendPermission:
     target = telegram_peer(hr)
     if target is None:
         return SendPermission(refusal=NO_TARGET)
-    if (await bot._current_mode()) is BotMode.OFF:
+    if (await bot.current_mode()) is BotMode.OFF:
         return SendPermission(target=target, refusal=BOT_OFF)
-    async with bot._session_factory() as session:
+    async with bot.session_factory() as session:
         blacklisted = await hr_blacklist_value(session, hr)
     if blacklisted:
         return SendPermission(
             target=target, refusal=BLACKLISTED, blacklist_value=blacklisted
         )
-    if bot._dry_run:
+    if bot.dry_run:
         return SendPermission(target=target, refusal=DRY_RUN)
     if telegram.SEND_LOCKED:
         return SendPermission(target=target, refusal=SENDING_LOCKED)

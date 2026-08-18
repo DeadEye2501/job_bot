@@ -44,7 +44,7 @@ async def _delete_and_forget(
     Удаление идёт через репозиторий, а не своим `session.delete`: проверка
     внешних ключей у движка выключена, и дети строки остались бы сиротами.
     """
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         v = await session.get(Vacancy, vacancy_id)
         channel_id = v.source_channel_id if v is not None else None
         if trash_reason is not _NO_TRASH_EVENT:
@@ -59,8 +59,8 @@ async def _delete_and_forget(
     if deleted:
         embeddings.drop_embedding(pipeline, vacancy_id)
         # Vacancy_count у HR/Company изменился — пушим refresh.
-        pipeline._fire_contacts_changed()
-        pipeline._fire_vacancies_changed()
+        pipeline.fire_contacts_changed()
+        pipeline.fire_vacancies_changed()
     return deleted, channel_id
 
 

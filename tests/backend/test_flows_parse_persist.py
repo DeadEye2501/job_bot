@@ -208,7 +208,7 @@ async def test_a_fitting_vacancy_gets_an_application_sent(parsing, session_facto
     pipeline.parsed = parsed_vacancy(
         title="Python-разработчик", stack_required=["Python"], hr_contact="@maria"
     )
-    await pipeline._rs.set_app("auto_apply", "true")
+    await pipeline.rs.set_app("auto_apply", "true")
 
     await parse.parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
@@ -223,7 +223,7 @@ async def test_auto_apply_switched_off_sends_nothing(parsing):
     pipeline.parsed = parsed_vacancy(
         title="Python-разработчик", stack_required=["Python"], hr_contact="@maria"
     )
-    await pipeline._rs.set_app("auto_apply", "false")
+    await pipeline.rs.set_app("auto_apply", "false")
 
     await parse.parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
@@ -239,7 +239,7 @@ async def test_an_unfit_vacancy_gets_no_application(parsing):
     pipeline.parsed = parsed_vacancy(
         title="Python-разработчик", stack_required=["Python"], hr_contact="@maria"
     )
-    await pipeline._rs.set_app("auto_apply", "true")
+    await pipeline.rs.set_app("auto_apply", "true")
 
     await parse.parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
@@ -251,7 +251,7 @@ async def test_an_unfit_vacancy_gets_no_application(parsing):
 async def test_a_vacancy_without_an_hr_gets_no_application(parsing):
     """Вакансии без разысканного HR отклик не уходит: писать некому."""
     pipeline, vacancy = parsing
-    await pipeline._rs.set_app("auto_apply", "true")
+    await pipeline.rs.set_app("auto_apply", "true")
 
     await parse.parse_and_update_vacancy(pipeline, 
         vacancy.id, "текст", "jobs", allow_delete=False
@@ -279,7 +279,7 @@ async def test_every_attempt_is_recorded_in_the_timeline(monkeypatch,
     pipeline.parsed = parsed_vacancy(
         title="Python-разработчик", stack_required=["Python"], hr_contact="@maria"
     )
-    await pipeline._rs.set_app("auto_apply", "true")
+    await pipeline.rs.set_app("auto_apply", "true")
 
     async def try_auto_send(pipeline, hr, parsed, vacancy_id):
         return outcome, reason

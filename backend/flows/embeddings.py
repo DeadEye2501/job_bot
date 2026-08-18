@@ -37,8 +37,8 @@ async def embed_text(pipeline, text: str, what: str) -> list[float] | None:
     """
     try:
         return await lm_studio.embed(
-            pipeline._lm_embed_client,
-            pipeline._lm_embed_model,
+            pipeline.lm_embed_client,
+            pipeline.lm_embed_model,
             text[:_EMBED_MAX_CHARS],
         )
     except Exception:
@@ -60,9 +60,9 @@ async def ensure_embedding_cache(pipeline, width: int) -> None:
     и сравнивать его с нынешними нечем. Вернуть их в дело может только
     пересчёт — прогон заново по каждой вакансии.
     """
-    if pipeline._embedding_cache_loaded:
+    if pipeline.embedding_cache_loaded:
         return
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         rows = (
             await session.execute(
                 select(Vacancy.id, Vacancy.embedding).where(
@@ -78,26 +78,26 @@ async def ensure_embedding_cache(pipeline, width: int) -> None:
             len(rows) - len(fit), width,
         )
     if fit:
-        pipeline._embedding_ids = np.array([r.id for r in fit], dtype=np.int64)
-        pipeline._embedding_matrix = np.array(
+        pipeline.embedding_ids = np.array([r.id for r in fit], dtype=np.int64)
+        pipeline.embedding_matrix = np.array(
             [r.embedding for r in fit], dtype=np.float32
         )
-    pipeline._embedding_cache_loaded = True
+    pipeline.embedding_cache_loaded = True
     logger.debug("Embedding cache loaded: %d vectors", len(fit))
 
 
 def append_embedding(pipeline, vacancy_id: int, embedding: list[float]) -> None:
     vec = np.asarray(embedding, dtype=np.float32)
-    pipeline._embedding_ids = np.append(pipeline._embedding_ids, vacancy_id)
-    if pipeline._embedding_matrix.size == 0:
-        pipeline._embedding_matrix = vec.reshape(1, -1)
+    pipeline.embedding_ids = np.append(pipeline.embedding_ids, vacancy_id)
+    if pipeline.embedding_matrix.size == 0:
+        pipeline.embedding_matrix = vec.reshape(1, -1)
     else:
-        pipeline._embedding_matrix = np.vstack([pipeline._embedding_matrix, vec])
+        pipeline.embedding_matrix = np.vstack([pipeline.embedding_matrix, vec])
 
 
 def drop_embedding(pipeline, vacancy_id: int) -> None:
-    idx = np.where(pipeline._embedding_ids == vacancy_id)[0]
+    idx = np.where(pipeline.embedding_ids == vacancy_id)[0]
     if idx.size == 0:
         return
-    pipeline._embedding_ids = np.delete(pipeline._embedding_ids, idx)
-    pipeline._embedding_matrix = np.delete(pipeline._embedding_matrix, idx, axis=0)
+    pipeline.embedding_ids = np.delete(pipeline.embedding_ids, idx)
+    pipeline.embedding_matrix = np.delete(pipeline.embedding_matrix, idx, axis=0)

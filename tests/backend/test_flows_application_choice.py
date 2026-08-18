@@ -49,8 +49,8 @@ async def applying(make_pipeline, session_factory, tmp_path, monkeypatch):
     vacancy = await only_row(session_factory, Vacancy)
 
     pipeline = await make_pipeline()
-    await pipeline._rs.set_app("cv_path", str(resume))
-    pipeline._profile_block = "Иван Петров, Python-разработчик"
+    await pipeline.rs.set_app("cv_path", str(resume))
+    pipeline.profile_block = "Иван Петров, Python-разработчик"
     pipeline.letter = "Здравствуйте! Откликаюсь на вакансию."
 
     async def generate_cover_letter(block, parsed, client, model, *, channel_ref=None):
@@ -175,7 +175,7 @@ async def test_an_empty_profile_stops_the_full_letter(applying):
     Писать HR от лица пустого профиля хуже, чем не писать вовсе.
     """
     pipeline, hr, vacancy, _ = applying
-    pipeline._profile_block = ""
+    pipeline.profile_block = ""
 
     assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
@@ -223,7 +223,7 @@ async def test_a_resume_that_vanished_at_the_last_moment_says_so(applying):
     async def send(hr_row, text, attachment=None, vacancy_id=None, *, force=False):
         raise FileNotFoundError(str(resume))
 
-    pipeline._send = send
+    pipeline.send = send
 
     assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
@@ -242,7 +242,7 @@ async def test_a_refused_send_is_named_blocked(applying):
     async def send(hr_row, text, attachment=None, vacancy_id=None, *, force=False):
         return False
 
-    pipeline._send = send
+    pipeline.send = send
 
     assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
@@ -261,7 +261,7 @@ async def test_a_broken_send_is_named_a_telegram_error(applying):
     async def send(hr_row, text, attachment=None, vacancy_id=None, *, force=False):
         raise OSError("сеть")
 
-    pipeline._send = send
+    pipeline.send = send
 
     assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
@@ -306,7 +306,7 @@ async def test_a_rate_limit_window_holds_the_auto_send(applying):
     import time
 
     pipeline, hr, vacancy, _ = applying
-    await pipeline._rs.set_app("flood_wait_until_ts", str(time.time() + 999))
+    await pipeline.rs.set_app("flood_wait_until_ts", str(time.time() + 999))
 
     assert await apply.try_auto_send(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
@@ -320,7 +320,7 @@ async def test_an_expired_rate_limit_window_lets_the_send_through(applying):
     import time
 
     pipeline, hr, vacancy, _ = applying
-    await pipeline._rs.set_app("flood_wait_until_ts", str(time.time() - 10))
+    await pipeline.rs.set_app("flood_wait_until_ts", str(time.time() - 10))
 
     ok, reason = await apply.try_auto_send(pipeline, hr, parsed_vacancy(), vacancy.id)
 
