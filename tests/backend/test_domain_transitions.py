@@ -134,9 +134,25 @@ def test_the_send_button_revives_a_rejected_vacancy():
         VacancyStatus.IN_PROGRESS,
     ],
 )
-def test_the_send_button_does_not_overwrite_an_outcome_already_reached(current):
-    """Случайный клик «Отправить» не затирает уже случившийся исход."""
-    assert not should_apply_status(current, VacancyStatus.APPLIED, force=True)
+def test_the_send_button_moves_an_outcome_already_reached(current):
+    """Ушедшее письмо переводит вакансию в «отклик отправлен» из любого статуса.
+
+    Прежде граф берёг здесь прежний исход, а письмо всё равно уходило: заслон
+    стоял на записи, а не на отправке, — и вакансия оставалась в «оффере» без
+    единой строки о том, что мы написали ещё раз.
+    """
+    assert should_apply_status(current, VacancyStatus.APPLIED, force=True)
+
+
+def test_a_second_send_adds_no_second_applied():
+    """Второе письмо по уже откликнутой вакансии записи не заводит.
+
+    Статус уже говорит то же самое, что сказала бы новая строка, а петель в
+    графе нет.
+    """
+    assert not should_apply_status(
+        VacancyStatus.APPLIED, VacancyStatus.APPLIED, force=True
+    )
 
 
 def test_the_send_button_opens_nothing_but_applied():

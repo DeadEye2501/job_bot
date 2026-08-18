@@ -11,7 +11,6 @@ from backend.repository.channels import (
     create_channel,
     delete_channel as repo_delete_channel,
     find_channel_by_username,
-    reset_channel_cursor as repo_reset_channel_cursor,
 )
 
 logger = logging.getLogger(__name__)
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 async def poll_channel_now(
     bot, channel_id: int
-) -> Literal["ok", "busy", "missing", "cancelled", "error"]:
+) -> Literal["ok", "busy", "missing", "blacklisted", "cancelled", "error"]:
     """UI «Прогнать сейчас» — single-channel manual poll.
 
     Идёт в общем месте прогона, как и полный обход: отсюда нижняя полоса
@@ -32,6 +31,7 @@ async def poll_channel_now(
     - "ok": cycle ran end-to-end.
     - "busy": another cycle was already in flight (skip).
     - "missing": channel row не существует / без @username.
+    - "blacklisted": канал в чёрном списке — руками его тоже не прогоняют.
     - "cancelled": user clicked stop mid-poll.
     - "error": обход сломался — закрытый канал, просьба подождать, молчание
       модели. Своё слово ему нужно: «не найден» послал бы человека искать
@@ -47,13 +47,6 @@ async def poll_channel_now(
         f"manual poll for channel {channel_id}",
     )
     return walk if outcome == "ok" else outcome
-
-
-async def reset_channel_cursor(bot, channel_id: int) -> bool:
-    """UI «Сбросить курсор» — clears last_processed_msg_id."""
-    async with bot._session_factory() as session:
-        async with session.begin():
-            return await repo_reset_channel_cursor(session, channel_id)
 
 
 async def delete_channel(bot, channel_id: int) -> int | None:

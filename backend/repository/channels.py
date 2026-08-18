@@ -327,8 +327,11 @@ async def is_channel_blacklisted(
     session: AsyncSession, channel_id: int
 ) -> bool:
     """True если в blacklist'е активна строка kind=channel, value которой
-    совпадает с одним из blacklist-кандидатов канала. Используется в
-    set_channel_active для отказа re-enable'а.
+    совпадает с одним из blacklist-кандидатов канала.
+
+    Зовут двое: мост — чтобы отказать во включении отсеянного канала, и ручной
+    прогон одного канала (`flows/channels.poll_one_channel`) — чтобы не тащить
+    из него вакансии в обход отметки.
     """
     ch = await session.get(TelegramChannel, channel_id)
     if ch is None:

@@ -14,6 +14,7 @@
 import pytest
 
 from backend.models import (
+    BotMode,
     Message,
     Vacancy,
     VacancyEvent,
@@ -175,13 +176,14 @@ async def test_a_manual_send_lifts_a_vacancy_out_of_not_fit(
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
 
 
-async def test_a_manual_send_still_does_not_undo_a_later_status(
+async def test_a_manual_send_moves_even_a_later_status(
     ready_to_send, session_factory, outbox
 ):
-    """Отправка из окна поздний статус всё равно не откатывает.
+    """Отправка из окна переводит в «отклик отправлен» и с позднего статуса.
 
-    Случайное нажатие «отправить» на карточке с приглашением затёрло бы
-    то, что пользователь уже знает от HR.
+    Письмо HR ушло, и статус обязан это показать. Прежде вакансия оставалась
+    в приглашении, а в истории не появлялось ни строки — нажимать можно было
+    сколько угодно раз, и каждое нажатие писало HR заново.
     """
     bot, hr, vacancy = await ready_to_send(
         status=VacancyStatus.INVITATION
@@ -189,9 +191,11 @@ async def test_a_manual_send_still_does_not_undo_a_later_status(
 
     await bot.send(hr, "письмо", vacancy_id=vacancy.id, force=True)
 
-    assert (
-        await only_row(session_factory, Vacancy)
-    ).status is VacancyStatus.INVITATION
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
+    written = await only_row(session_factory, VacancyStatusHistory)
+    assert written.previous_status is VacancyStatus.INVITATION
+    assert written.status is VacancyStatus.APPLIED
+    assert written.applied is True
 
 
 async def test_the_timeline_records_that_an_application_went_out(
@@ -232,3 +236,47 @@ async def test_a_suppressed_send_is_marked_as_such_in_the_timeline(
     event = await only_row(session_factory, VacancyEvent)
     assert event.payload["suppressed"] is True
     assert event.payload["tg_message_id"] is None
+
+
+async def test_a_send_tells_the_window_the_vacancy_changed(
+    ready_to_send, session_factory, outbox
+):
+    """Об ушедшем письме окно узнаёт вестью, и другого способа у него нет.
+
+    Зов, которым отправку завели, ответил «пущено» задолго до того, как модель
+    сочинила письмо: не пошли мы весть — карточка так и стояла бы с прежним
+    статусом, пока человек не переключится на соседнюю и обратно.
+    """
+    bot, hr, vacancy = await ready_to_send()
+    heard = []
+    bot.on_vacancies_changed = lambda: heard.append("вакансии")
+
+    await bot.send(hr, "письмо", vacancy_id=vacancy.id, force=True)
+
+    assert heard == ["вакансии"]
+
+
+async def test_a_simulated_send_tells_the_window_too(
+    ready_to_send, session_factory, outbox
+):
+    """Заглушённая отправка окну тоже рассказывает: статус-то она переставила."""
+    bot, hr, vacancy = await ready_to_send(dry_run=True)
+    heard = []
+    bot.on_vacancies_changed = lambda: heard.append("вакансии")
+
+    await bot.send(hr, "письмо", vacancy_id=vacancy.id, force=True)
+
+    assert heard == ["вакансии"]
+
+
+async def test_a_refused_send_tells_the_window_nothing(
+    ready_to_send, session_factory, outbox
+):
+    """Отказ заслона вестью не сопровождается: менять окну нечего."""
+    bot, hr, vacancy = await ready_to_send(mode=BotMode.OFF)
+    heard = []
+    bot.on_vacancies_changed = lambda: heard.append("вакансии")
+
+    assert await bot.send(hr, "письмо", vacancy_id=vacancy.id, force=True) is False
+
+    assert heard == []

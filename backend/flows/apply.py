@@ -22,6 +22,13 @@ logger = logging.getLogger(__name__)
 # cover letter + CV, как первый раз.
 _RECENT_SEND_WINDOW_DAYS = 14
 
+# Вакансии, отправка по которым идёт прямо сейчас. Живёт в модуле, а не в
+# конвейере: отправку заводят обе дороги — кнопка окна и авто-отправка
+# разбора, — а конвейер у них общий один, и держать список на нём значило бы
+# только дальше идти за тем же самым. Замка не нужно: обе дороги идут на одном
+# цикле asyncio, и между проверкой и записью сюда никто не вклинится.
+_SENDING: set[int] = set()
+
 
 def _format_channel_ref(channel_username: str | None) -> str | None:
     """Нормализуем @-handle для подстановки в шаблоны. None → None
@@ -250,7 +257,27 @@ async def send_application(
     Код исхода читает окно и пишет по нему подсказку — иначе человек не
     отличит отправку от молчаливого пропуска. Пустое название отправку не
     отменяет: в шаблоне оно вырождается в «вашу вакансию».
+
+    Вторую отправку по той же вакансии, пока идёт первая, отбиваем здесь.
+    Заслон «уже откликались» её не ловит: он смотрит на статус, а статус
+    меняется в самом конце — после того как модель сочинит письмо. Всё это
+    время нажатие в окне заводило бы вторую отправку, и HR получал бы два
+    письма подряд.
     """
+    if vacancy_id in _SENDING:
+        logger.info("vacancy %d: send already in flight, refusing second", vacancy_id)
+        return False, "in_flight"
+    _SENDING.add(vacancy_id)
+    try:
+        return await _send_the_letter(pipeline, hr, parsed, vacancy_id, force)
+    finally:
+        _SENDING.discard(vacancy_id)
+
+
+async def _send_the_letter(
+    pipeline, hr, parsed: ParsedVacancy, vacancy_id: int, force: bool
+) -> tuple[bool, str]:
+    """Собрать письмо и отдать его; сказать, ушло ли и почему нет."""
     refusal, plan = await _send_plan(pipeline, hr, vacancy_id, force)
     if refusal is not None:
         return False, refusal

@@ -125,6 +125,27 @@ def ask():
 
 
 @pytest.fixture
+def told(hub, runner):
+    """Что мост сказал окну об исходе пущенной работы.
+
+    Долгие кнопки — прогон канала, прогон вакансии, отправка отклика —
+    отвечают «пущено» и уходят работать. Чем кончилось, человек узнаёт вестью,
+    и другого места, где это видно, нет: дожидаемся работы и читаем очередь.
+    """
+
+    async def _told():
+        await runner.drain()
+        news = await hub.events.take(0, timeout=0.1)
+        said = [
+            one["payload"] for one in news["events"]
+            if one["kind"] == "action_finished"
+        ]
+        return said[-1] if said else None
+
+    return _told
+
+
+@pytest.fixture
 def with_bot(hub):
     """Ставит подделку бота на место настоящего и отдаёт её же."""
 

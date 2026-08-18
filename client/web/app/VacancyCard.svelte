@@ -122,14 +122,17 @@
     say('Разбор запущен');
   }
 
-  /** Отправить отклик. */
+  /** Отправить отклик.
+   *
+   * Ответа об отправке здесь не ждут: письмо сочиняет модель, и ждать её
+   * значило бы держать окно. Ушло письмо или нет, скажет оболочка — вестью об
+   * исходе, — а карточка перечитается по вести о смене списка.
+   */
   async function send() {
     asking = null;
     const done = await ask('vacancies.send_application', { vacancy_id: vacancyId });
-    if (!alive) return;
-    if (done !== null) say('Отклик отправлен');
-    await refresh();
-    onchanged();
+    if (done === null) return;
+    say('Отклик отправляется');
   }
 
   async function drop() {

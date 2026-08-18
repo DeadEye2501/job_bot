@@ -21,7 +21,7 @@ async def test_a_rerun_reaches_the_pipeline_and_frees_the_slot(make_bot):
     ingestion = FakeIngestion()
     bot = wire(await make_bot(), ingestion)
 
-    assert await bot.ui_rerun_vacancy_pipeline(5) is True
+    assert await bot.ui_rerun_vacancy_pipeline(5) == "ok"
     assert ingestion.rerun_calls == [5]
     assert bot._current_poll_task is None
 
@@ -51,11 +51,16 @@ async def test_a_delete_of_a_gone_vacancy_reports_failure(make_bot):
     assert await bot.ui_forget_vacancy(5) is False
 
 
-async def test_a_rerun_the_pipeline_refused_reports_failure(make_bot):
-    """Прогон, за который конвейер не взялся, сообщает о неудаче."""
-    bot = wire(await make_bot(), FakeIngestion(outcome=False))
+async def test_a_rerun_the_pipeline_refused_reports_its_own_word(make_bot):
+    """Слово конвейера доезжает до окна как есть.
 
-    assert await bot.ui_rerun_vacancy_pipeline(5) is False
+    Молчащая модель и снесённая вакансия — разные беды, и говорят о них
+    разное; свести их к одному «не вышло» значило бы послать человека искать
+    запись, которая на месте.
+    """
+    bot = wire(await make_bot(), FakeIngestion(word_outcome="llm"))
+
+    assert await bot.ui_rerun_vacancy_pipeline(5) == "llm"
 
 
 async def test_a_rerun_while_busy_is_refused(make_bot, busy_slot):
@@ -68,7 +73,7 @@ async def test_a_rerun_while_busy_is_refused(make_bot, busy_slot):
     bot = wire(await make_bot(), ingestion)
     busy_slot(bot)
 
-    assert await bot.ui_rerun_vacancy_pipeline(5) is False
+    assert await bot.ui_rerun_vacancy_pipeline(5) == "busy"
     assert ingestion.rerun_calls == []
 
 
@@ -80,7 +85,7 @@ async def test_a_cancelled_rerun_frees_the_slot(make_bot):
     await asyncio.sleep(0)
     bot.cancel_current_poll()
 
-    assert await running is False
+    assert await running == "cancelled"
     assert bot._current_poll_task is None
 
 
@@ -88,7 +93,7 @@ async def test_a_failed_rerun_frees_the_slot_too(make_bot):
     """Сбой повторного прогона тоже освобождает место."""
     bot = wire(await make_bot(), FakeIngestion(error=RuntimeError("сорвалось")))
 
-    assert await bot.ui_rerun_vacancy_pipeline(5) is False
+    assert await bot.ui_rerun_vacancy_pipeline(5) == "error"
     assert bot._current_poll_task is None
 
 
@@ -125,7 +130,7 @@ async def test_a_broken_window_hook_does_not_stop_a_rerun(make_bot, broken):
     hooks = WindowHooks(**{broken: RuntimeError("окно")})
     bot = wire(await make_bot(), ingestion, hooks)
 
-    assert await bot.ui_rerun_vacancy_pipeline(5) is True
+    assert await bot.ui_rerun_vacancy_pipeline(5) == "ok"
     assert ingestion.rerun_calls == [5]
 
 

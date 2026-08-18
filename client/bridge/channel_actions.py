@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from backend.domain.telegram_identity import normalize_username
 from backend.repository import channels as channels_repo
-from client.bridge.answer import Denied, bad_fields, denied, reply
+from client.bridge.answer import Denied, bad_fields, denied, launched, reply
 from client.bridge.mark import CHANNEL_MARK, mark, unmark
 from client.bridge.refusals import NO_BOT, NO_CHANNEL, POLL_REFUSALS
 from client.form_payloads import read_toggle
@@ -57,42 +57,41 @@ class ChannelActions:
     def poll_now(self, channel_id: int) -> dict:
         """Прогнать один канал вне очереди — кнопка «Прогнать сейчас».
 
-        Незнакомый исход тоже получает ответ: исходы заводит бэкенд, и новый
-        появится там раньше перевода здесь, а промолчи мост — кнопка осталась
-        бы нажатой навсегда.
+        Ответ говорит только «пущено»: на каждый новый пост канала уходит до
+        пяти обращений к модели, и ждать их значит держать зов вместе с окном.
+        Чем кончилось, человек узнаёт вестью.
         """
+        bot = self._hub.bot
+        if bot is None:
+            return denied(NO_BOT, channel_id=channel_id, action="poll_now")
 
-        async def run() -> dict:
-            bot = self._hub.bot
-            if bot is None:
-                raise Denied(NO_BOT, channel_id=channel_id, action="poll_now")
-            status = await bot.poll_channel_now(channel_id)
-            if status == "ok":
-                return {
-                    "channel_id": channel_id,
-                    "action": "poll_now",
-                    "status": status,
-                }
-            raise Denied(
-                POLL_REFUSALS.get(status, "Не удалось прогнать канал."),
-                channel_id=channel_id,
-                action="poll_now",
-                status=status,
-            )
-
-        return reply(self._hub.runner, run())
+        return launched(
+            self._hub,
+            lambda: bot.poll_channel_now(channel_id),
+            POLL_REFUSALS,
+            "Канал прогнан.",
+            channel_id=channel_id,
+            action="poll_now",
+        )
 
     def reset_cursor(self, channel_id: int) -> dict:
         """Отмотать отметку прочитанного: канал перечитают с начала.
 
-        Единственный способ вернуть пропущенные объявления.
+        Единственный способ вернуть пропущенные объявления — насколько хватает
+        глубины добора (`backfill_limit`): дальше неё не смотрит и обход.
+
+        Идёт мимо бота нарочно: это одна правка строки в базе, и запирать её на
+        поднятого бота значило бы отказывать до входа в Telegram там, где
+        Telegram не нужен вовсе.
         """
 
         async def run() -> dict:
-            bot = self._hub.bot
-            if bot is None:
-                raise Denied(NO_BOT, channel_id=channel_id, action="reset_cursor")
-            if not await bot.reset_channel_cursor(channel_id):
+            async with self._hub.session_factory() as session:
+                async with session.begin():
+                    reset = await channels_repo.reset_channel_cursor(
+                        session, channel_id
+                    )
+            if not reset:
                 raise Denied(NO_CHANNEL, channel_id=channel_id, action="reset_cursor")
             return {"channel_id": channel_id, "action": "reset_cursor"}
 

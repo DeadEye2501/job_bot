@@ -9,6 +9,7 @@ from backend.bot import can_send
 from backend.models import HR
 from backend.payloads import OutgoingMessage
 from backend.flows.events import record_vacancy_event
+from backend.notify import fire
 from backend.repository.messages import save_outgoing_message
 from backend.repository.vacancies_life import mark_vacancy_applied
 
@@ -294,4 +295,8 @@ async def send(
     await _record_send(
         bot, hr, text, _Outcome(vacancy_id, tg_msg_id, suppressed, force), permission
     )
+    # Окно узнаёт об отправке только этой вестью: зов, которым её завели,
+    # ответил «пущено» задолго до того, как модель сочинила письмо.
+    if vacancy_id is not None:
+        fire(bot.on_vacancies_changed, "on_vacancies_changed")
     return True

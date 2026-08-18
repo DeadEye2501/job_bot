@@ -18,14 +18,13 @@ class Sent:
 
 ANSWERS = {
     "poll": "ok",
-    "rerun": True,
+    "rerun": "ok",
     "application": (True, "sent"),
     "forgotten": True,
     "read": 1,
     "sent": 1,
     "refusal": None,
     "channel_poll": "ok",
-    "cursor_reset": True,
     "detached": 0,
     "added": (1, "created"),
 }
@@ -57,7 +56,7 @@ class UiBot:
     def cancel_current_poll(self) -> None:
         self.calls.append(("cancel_current_poll",))
 
-    async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> bool:
+    async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> str:
         self.calls.append(("ui_rerun_vacancy_pipeline", vacancy_id))
         return self.answers["rerun"]
 
@@ -89,10 +88,6 @@ class UiBot:
     async def poll_channel_now(self, channel_id: int) -> str:
         self.calls.append(("poll_channel_now", channel_id))
         return self.answers["channel_poll"]
-
-    async def reset_channel_cursor(self, channel_id: int) -> bool:
-        self.calls.append(("reset_channel_cursor", channel_id))
-        return self.answers["cursor_reset"]
 
     async def delete_channel(self, channel_id: int) -> int | None:
         self.calls.append(("delete_channel", channel_id))

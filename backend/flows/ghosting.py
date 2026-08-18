@@ -4,7 +4,7 @@ import logging
 
 from backend.domain.transitions import GHOSTING_TIMEOUT_DAYS
 from backend.notify import fire
-from backend.repository.vacancies_life import mark_ghosted_vacancies
+from backend.repository.vacancies_ghosting import mark_ghosted_vacancies
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ async def check_ghosting_timeouts(pipeline) -> int:
     Дёргается из Bot.run loop'а раз в poll-tick (DM_ONLY и FULL —
     в OFF не запускается, бот считается «на паузе»). Стоимость
     низкая: только Applied/In Progress попадают в шорт-лист, и берётся
-    он одним заходом в базу — см. `vacancies_life._silence_candidates`.
+    он одним заходом в базу — см. `vacancies_ghosting._silence_candidates`.
     """
 
     try:

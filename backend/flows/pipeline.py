@@ -232,7 +232,9 @@ class IngestionPipeline:
     async def check_ghosting_timeouts(self) -> int:
         return await ghosting.check_ghosting_timeouts(self)
 
-    async def rerun_pipeline_for_vacancy(self, vacancy_id) -> bool:
+    async def rerun_pipeline_for_vacancy(
+        self, vacancy_id
+    ) -> Literal["ok", "missing", "no_text", "llm"]:
         return await rerun.rerun_pipeline_for_vacancy(self, vacancy_id)
 
     async def recover_orphan_vacancies(self) -> int:
@@ -244,7 +246,9 @@ class IngestionPipeline:
     async def forget_vacancy(self, vacancy_id) -> bool:
         return await cleanup.forget_vacancy(self, vacancy_id)
 
-    async def poll_one_channel(self, channel_id) -> Literal["ok", "missing", "error"]:
+    async def poll_one_channel(
+        self, channel_id
+    ) -> Literal["ok", "missing", "blacklisted", "error"]:
         return await channels.poll_one_channel(self, channel_id)
 
     async def refresh_channel_metadata_for_ids(self, channel_ids) -> None:

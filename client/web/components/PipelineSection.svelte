@@ -97,13 +97,14 @@
 
     <div>
       <div class="pipeline-label" title={LOCK_TITLE}>Симуляция отправки</div>
-      <!-- Поля нет — значит включено: без него бот молча начал бы писать людям
-           по-настоящему, а это худшая из двух ошибок. -->
+      <!-- Поля нет — значит выключена, как и в настройках бота: включённая
+           молча, она показывала бы «отклик отправлен» над письмом, которого HR
+           не получал. Стенд включают нарочно. -->
       <div class="with-toggle">
         <input
           type="checkbox"
           class="toggle"
-          checked={values.send_locked !== false}
+          checked={values.send_locked === true}
           onchange={(event) => onsave({ send_locked: event.currentTarget.checked })}
         />
       </div>

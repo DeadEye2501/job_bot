@@ -5,7 +5,7 @@ from typing import Literal
 
 from backend.telegram_lookup import read_channel_metadata
 from backend.models import TelegramChannel
-from backend.repository.channels import list_named_channels
+from backend.repository.channels import is_channel_blacklisted, list_named_channels
 
 from backend.flows import ingest
 from backend.notify import fire
@@ -54,27 +54,36 @@ async def poll_active_channels(pipeline) -> None:
 
 async def poll_one_channel(
     pipeline, channel_id: int
-) -> Literal["ok", "missing", "error"]:
+) -> Literal["ok", "missing", "blacklisted", "error"]:
     """Run metadata refresh + message polling for a single channel.
 
     UI's «Прогнать сейчас» — taps this without touching the global poll loop,
     so it doesn't have to wait through 17 other channels in a 90-min cycle.
 
-    Исходов три, и «нет записи» отделено от «обход сломался» нарочно: окно
-    говорит о них разное, и одинаковый ответ посылал бы человека искать
-    запись, которая на месте, пока настоящая причина — закрытый канал,
-    просьба подождать, молчание модели — оставалась бы только в журнале.
+    Исходы разведены нарочно: окно говорит о них разное, и одинаковый ответ
+    посылал бы человека искать запись, которая на месте, пока настоящая
+    причина — закрытый канал, просьба подождать, молчание модели — оставалась
+    бы только в журнале.
 
-    Ловушка обнимает один обход постов, и после разведения исходов от неё
-    осталась одна польза — ник канала в записи журнала. Всё, что до неё, летит
-    наружу, и там его ловит место прогона: его ответ «сорвалось» приводит окно
-    к тому же слову, что и здешний `"error"`.
+    Выключенный канал прогнать руками можно — тем ручной прогон и отличается
+    от обхода. Канал в чёрном списке — нельзя: его заносили туда затем, чтобы
+    он больше не приносил вакансий, а отсев по тексту от этого не спасает —
+    он сверяет текст поста, а написание канала это `@ник`, которого в теле
+    поста обычно нет.
+
+    Ловушка обнимает один обход постов, и польза от неё одна — ник канала в
+    записи журнала. Всё, что до неё, ловит место прогона, и его «сорвалось»
+    приводит окно к тому же слову, что и здешний `"error"`.
     """
     await pipeline._reload_resources()
     async with pipeline._session_factory() as session:
         named = await list_named_channels(session, ids=[channel_id])
         if not named:
             return "missing"
+        if await is_channel_blacklisted(session, channel_id):
+            logger.info("[@%s] manual poll refused: channel is blacklisted",
+                        named[0].username)
+            return "blacklisted"
         username = named[0].username
         last_id = named[0].last_processed_msg_id
     await refresh_channel_metadata_for_ids(pipeline, [channel_id])

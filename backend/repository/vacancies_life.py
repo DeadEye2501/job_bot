@@ -4,14 +4,18 @@
 `Vacancy(...)` собирается там и только там. Обещай докстрока «от заведения»,
 читатель искал бы запись строки в этом модуле и не нашёл.
 
-Дальше вся её жизнь: переводы статуса с историей, отметки в ленте, перевод
-вакансий на другого владельца, удаление. Перечислять их фразой смысла нет —
-предмет один, вакансия, и меняется он по-разному.
+Дальше вся её жизнь: переводы статуса с историей, отметки в ленте, отметки о
+мусоре, перевод вакансий на другого владельца, удаление. Перечислять их фразой
+смысла нет — предмет один, вакансия, и меняется он по-разному.
+
+Соседом стоит `vacancies_ghosting`: там вакансию двигает не сделанное кем-то, а
+несделанное — молчание HR дольше срока, — и счёт этого молчания живёт своим
+модулем. Общий у них один переход, `move_status`.
 """
 
 import logging
 
-from sqlalchemy import and_, delete, func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.transitions import should_apply_status
@@ -44,7 +48,7 @@ def _ensure_trailing_period(s: str | None) -> str | None:
     return trimmed + "."
 
 
-def _move_status(
+def move_status(
     vacancy: Vacancy,
     new_status: VacancyStatus,
     explanation: str | None,
@@ -66,6 +70,9 @@ def _move_status(
 
     Строку зовущий кладёт в сессию сам: он же решает, нужен ли ему сразу
     её идентификатор.
+
+    Имя открытое: тем же переходом гасят замолчавшие вакансии, а живёт это
+    счётом молчания в `vacancies_ghosting` — предмет там свой.
     """
     previous = vacancy.status
     applied = previous != new_status
@@ -127,8 +134,63 @@ async def mark_vacancy_applied(
         vacancy.status, VacancyStatus.APPLIED, force=force
     ):
         return False
-    session.add(_move_status(vacancy, VacancyStatus.APPLIED, explanation))
+    session.add(move_status(vacancy, VacancyStatus.APPLIED, explanation))
     return True
+
+
+async def last_status_history_id(
+    session: AsyncSession, vacancy_id: int
+) -> int | None:
+    """Последняя строка истории вакансии; пусто — истории ещё нет.
+
+    Нужна снимком «до»: по нему потом видно, объяснил ли смену статуса
+    кто-то другой, пока шла долгая работа.
+    """
+    return await session.scalar(
+        select(func.max(VacancyStatusHistory.id)).where(
+            VacancyStatusHistory.vacancy_id == vacancy_id
+        )
+    )
+
+
+async def record_rerun(
+    session: AsyncSession,
+    vacancy_id: int,
+    previous: VacancyStatus,
+    last_history: int | None,
+) -> None:
+    """Отметить в истории вакансии, что её разобрали заново.
+
+    Строку пишет не `move_status`, хотя рядом, и собирает её своим телом: тот
+    двигает статус и заводит запись об этом, а здесь статус уже сдвинут —
+    разбор ставит его прямо, как у только что заведённой строки. Без этой
+    записи история обрывалась бы на прежнем статусе, а шапка карточки
+    показывала бы новый, и связать их было бы нечем. Общая сборка строки обоим
+    не годится: полей у неё семь, и довод на каждое — это уже не помощник, а
+    второй конструктор.
+
+    Записи не будет в двух случаях. Статус не менялся — рассказывать нечего.
+    Или переход уже объяснён строкой, легшей за время прогона: самоотклик
+    внутри разбора переводит вакансию в «отклик отправлен» и пишет об этом
+    сам, и вторая строка о том же переходе показала бы его в ленте дважды.
+
+    Транзакцию закрывает зовущий.
+    """
+    vacancy = await session.get(Vacancy, vacancy_id)
+    if vacancy is None or vacancy.status == previous:
+        return
+    if await last_status_history_id(session, vacancy_id) != last_history:
+        return
+    session.add(
+        VacancyStatusHistory(
+            vacancy_id=vacancy_id,
+            previous_status=previous,
+            status=vacancy.status,
+            explanation=_ensure_trailing_period("Прогон заново"),
+            applied=True,
+            source=StatusHistorySource.SYSTEM,
+        )
+    )
 
 
 def _log_status_change(vacancy_id: int, previous, new_status, detail: str) -> None:
@@ -195,7 +257,7 @@ async def change_vacancy_status(
     cleaned_explanation = _ensure_trailing_period(explanation)
     if previous == new_status and cleaned_explanation is None:
         return None
-    history = _move_status(
+    history = move_status(
         vacancy, new_status, cleaned_explanation, source=StatusHistorySource.USER
     )
     session.add(history)
@@ -235,12 +297,34 @@ async def record_trash_event(
     Используется ДО удаления Vacancy-ряда (в auto-ingest режиме), чтобы
     трекать «сколько мусора прислал канал» — иначе после delete этой
     информации в БД не остаётся. Caller оборачивает в session.begin().
+
+    Один пост — одна отметка. Тот же пост приходит на разбор второй раз после
+    сброса курсора канала, и без этой проверки числа «сколько мусора прислал
+    канал» росли бы от каждого сброса, ничего нового не узнав.
     """
+    if source_msg_id is not None and await _trash_noted(
+        session, source_channel_id, source_msg_id
+    ):
+        return
     session.add(TrashEvent(
         source_channel_id=source_channel_id,
         source_msg_id=source_msg_id,
         reason=reason,
     ))
+
+
+async def _trash_noted(
+    session: AsyncSession, source_channel_id: int | None, source_msg_id: int
+) -> bool:
+    """Отмечен ли этот пост мусором раньше."""
+    return (
+        await session.scalar(
+            select(TrashEvent.id).where(
+                TrashEvent.source_channel_id == source_channel_id,
+                TrashEvent.source_msg_id == source_msg_id,
+            ).limit(1)
+        )
+    ) is not None
 
 
 async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool:
@@ -337,129 +421,10 @@ async def apply_classification(
         vacancy_id, previous, classification.status, f"auto, msg={message_id}"
     )
     session.add(
-        _move_status(
+        move_status(
             vacancy,
             classification.status,
             classification.explanation,
             message_id=message_id,
         )
     )
-
-
-def _last_incoming_subq():
-    """Когда по каждой вакансии последний раз писал HR."""
-    return (
-        select(
-            Message.vacancy_id.label("vid"),
-            func.max(Message.sent_at).label("last_msg_at"),
-        )
-        .where(Message.is_incoming.is_(True))
-        .group_by(Message.vacancy_id)
-        .subquery()
-    )
-
-
-def _last_status_change_subq():
-    """Когда вакансия последний раз вставала в каждый из своих статусов."""
-    return (
-        select(
-            VacancyStatusHistory.vacancy_id.label("vid"),
-            VacancyStatusHistory.status.label("status"),
-            func.max(VacancyStatusHistory.changed_at).label("last_status_at"),
-        )
-        .group_by(
-            VacancyStatusHistory.vacancy_id, VacancyStatusHistory.status
-        )
-        .subquery()
-    )
-
-
-async def _silence_candidates(session: AsyncSession):
-    """Вакансии, которым срок молчания вообще считается, с их отметками.
-
-    Один заход в базу вместо 1+2N: последние отметки собраны заранее
-    подзапросами. Соединение внешнее потому, что у свежей вакансии может не
-    быть ни писем, ни истории.
-
-    Из истории берётся смена **в нынешний статус** — отсюда сверка
-    `status == Vacancy.status` в соединении: молчание отсчитывается с того
-    мига, как вакансия встала туда, где стоит сейчас, а не с любой давней
-    смены статуса.
-    """
-    from backend.domain.transitions import GHOSTING_ELIGIBLE_FROM
-
-    last_msg_subq = _last_incoming_subq()
-    last_status_subq = _last_status_change_subq()
-    return (
-        await session.execute(
-            select(
-                Vacancy,
-                last_msg_subq.c.last_msg_at,
-                last_status_subq.c.last_status_at,
-            )
-            .outerjoin(last_msg_subq, last_msg_subq.c.vid == Vacancy.id)
-            .outerjoin(
-                last_status_subq,
-                and_(
-                    last_status_subq.c.vid == Vacancy.id,
-                    last_status_subq.c.status == Vacancy.status,
-                ),
-            )
-            .where(Vacancy.status.in_([s for s in GHOSTING_ELIGIBLE_FROM]))
-        )
-    ).all()
-
-
-def _last_activity(vacancy: Vacancy, last_msg_at, last_status_at):
-    """Самая поздняя отметка жизни вакансии; от неё и считается молчание.
-
-    Заведение есть всегда, письмо и смена статуса могут не случаться вовсе.
-    """
-    timestamps = [vacancy.created_at]
-    if last_msg_at is not None:
-        timestamps.append(last_msg_at)
-    if last_status_at is not None:
-        timestamps.append(last_status_at)
-    return max(timestamps)
-
-
-async def mark_ghosted_vacancies(
-    session: AsyncSession,
-    *,
-    timeout_days: int,
-) -> list[int]:
-    """Сканирует Applied/In Progress вакансии и переводит в Ghosting те,
-    у которых HR молчит дольше ``timeout_days``.
-
-    «Молчит» означает: ни входящего письма, ни постановки в нынешний
-    статус, ни заведения самой вакансии в окне последних ``timeout_days``
-    дней — см. :func:`_last_activity` и :func:`_silence_candidates`.
-
-    Возвращает список vacancy_id, переведённых в Ghosting. Caller
-    оборачивает в session.begin() и выполняет commit.
-    """
-    from datetime import datetime, timedelta, timezone
-
-    # SQLite + aiosqlite возвращает наивные datetime'ы даже при
-    # DateTime(timezone=True), поэтому для Python-side сравнения с
-    # v.created_at / max(sent_at) / max(changed_at) cutoff тоже должен
-    # быть naive (UTC по конвенции — server_default=func.now()).
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
-        days=timeout_days
-    )
-    affected: list[int] = []
-    for v, last_msg_at, last_status_at in await _silence_candidates(session):
-        if _last_activity(v, last_msg_at, last_status_at) >= cutoff:
-            continue
-        # Перевод в Ghosting ни на какую реплику HR не ссылается: молчание
-        # и есть повод, а сообщения, которого не было, у события нет.
-        session.add(
-            _move_status(
-                v,
-                VacancyStatus.GHOSTING,
-                f"HR не отвечает более {timeout_days} дней — "
-                "автоматически помечено как ghosting.",
-            )
-        )
-        affected.append(v.id)
-    return affected

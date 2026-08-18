@@ -11,7 +11,7 @@
 
 from backend.models import VacancyStatus
 from backend.repository.vacancies_card import get_vacancy_detail
-from backend.repository.vacancies_life import mark_ghosted_vacancies
+from backend.repository.vacancies_ghosting import mark_ghosted_vacancies
 from tests.dbio import put
 from tests.factories import (
     days_ago,

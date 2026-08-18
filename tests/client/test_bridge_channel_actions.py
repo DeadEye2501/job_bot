@@ -5,7 +5,8 @@
 Telegram, поэтому бот подделан.
 """
 
-from tests.dbio import put
+from backend.models import TelegramChannel
+from tests.dbio import only_row, put
 from tests.factories import channel_row
 
 
@@ -97,7 +98,7 @@ async def test_a_manual_walk_before_the_bot_is_up_is_refused_by_name(
     assert answer["detail"] == "Бот ещё не готов."
 
 
-async def test_a_busy_walk_is_explained(api, ask, with_bot, session_factory):
+async def test_a_busy_walk_is_explained(api, ask, with_bot, told, session_factory):
     """Занятый обход объясняют, а не глотают.
 
     Место прогона одно на все каналы, и попасть на занятое — обычное дело.
@@ -107,36 +108,41 @@ async def test_a_busy_walk_is_explained(api, ask, with_bot, session_factory):
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
 
-    answer = await ask(api.channels.poll_now, channel.id)
+    await ask(api.channels.poll_now, channel.id)
 
-    assert answer["fail"] == "denied"
-    assert answer["status"] == "busy"
+    assert await told() == {
+        "message": "Уже идёт другой цикл, попробуйте позже.",
+        "danger": True,
+    }
 
 
 async def test_an_unknown_walk_outcome_still_answers(
-    api, ask, with_bot, session_factory
+    api, ask, with_bot, told, session_factory
 ):
     """Незнакомый исход обхода тоже получает ответ.
 
     Исходы заводит бэкенд, и новый появится там раньше перевода здесь.
-    Промолчи мост — кнопка осталась бы нажатой навсегда.
+    Промолчи мост — человек остался бы без ответа вовсе.
     """
     with_bot(channel_poll="перегрев")
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
 
-    answer = await ask(api.channels.poll_now, channel.id)
+    await ask(api.channels.poll_now, channel.id)
 
-    assert answer["fail"] == "denied"
-    assert answer["status"] == "перегрев"
+    said = await told()
+    assert said["danger"] is True
+    assert said["message"] == "Не удалось прогнать канал — см. логи."
 
 
-async def test_a_finished_walk_answers_plainly(api, ask, with_bot, session_factory):
-    """Удавшийся обход отвечает без оговорок, и по этому ответу гаснет ожидание.
+async def test_a_walk_answers_before_it_walks(
+    api, ask, with_bot, told, session_factory
+):
+    """Ответ приходит сразу, а исход — вестью, когда обход кончится.
 
-    Остальные исходы окно показывает сообщением, а этот — единственный, после
-    которого список просто перечитывают. Не приди он, кнопка осталась бы
-    нажатой до перезапуска.
+    Обход канала — это до пяти обращений к модели на каждый новый пост.
+    Дождись мост его конца, окно висело бы всё это время, а человек не знал бы,
+    нажалась ли кнопка вообще.
     """
     bot = with_bot()
     channel = channel_row(username="pyjobs")
@@ -144,33 +150,38 @@ async def test_a_finished_walk_answers_plainly(api, ask, with_bot, session_facto
 
     answer = await ask(api.channels.poll_now, channel.id)
 
-    assert answer["ok"]["status"] == "ok"
+    assert answer["ok"] == {
+        "started": True,
+        "channel_id": channel.id,
+        "action": "poll_now",
+    }
+    assert await told() == {"message": "Канал прогнан.", "danger": False}
     assert ("poll_channel_now", channel.id) in bot.calls
 
 
-async def test_a_reset_cursor_reaches_the_bot(api, ask, with_bot, session_factory):
-    """Отматывание отметки доходит до бота вместе с номером канала.
+async def test_a_reset_cursor_clears_the_mark_without_the_bot(
+    api, ask, session_factory
+):
+    """Отметка прочитанного сбрасывается и до входа в Telegram.
 
-    После него канал перечитывают с начала — это единственный способ вернуть
-    пропущенные объявления. Не дойди вызов, кнопка отвечала бы успехом, а
-    прежние сообщения так и остались бы непрочитанными.
+    Это одна правка строки в базе, и бот ей не нужен вовсе: запри её на
+    поднятого бота — кнопка отказывала бы там, где работа ей по силам.
     """
-    bot = with_bot()
-    channel = channel_row(username="pyjobs")
+    channel = channel_row(username="pyjobs", last_processed_msg_id=500)
     await put(session_factory, channel)
 
     assert "ok" in await ask(api.channels.reset_cursor, channel.id)
-    assert ("reset_channel_cursor", channel.id) in bot.calls
+
+    saved = await only_row(session_factory, TelegramChannel)
+    assert saved.last_processed_msg_id is None
 
 
-async def test_a_reset_cursor_for_a_missing_channel_is_refused(api, ask, with_bot):
+async def test_a_reset_cursor_for_a_missing_channel_is_refused(api, ask):
     """Отмотать отметку у несуществующего канала не выходит.
 
     Кнопку жмут из карточки, а карточка могла устареть. Ответь мост успехом —
     человек ждал бы повторного разбора старых сообщений, которого не будет.
     """
-    with_bot(cursor_reset=False)
-
     answer = await ask(api.channels.reset_cursor, 404)
 
     assert answer["detail"] == "Канал не найден."

@@ -74,11 +74,13 @@ _APP_DEFAULTS: dict[str, str] = {
     "dm_backfill_limit": "50",
     "cv_path": "",
     "wizard_completed": "false",
-    # send_locked: dev-safety, по дефолту блочит реальную отправку DM.
-    # Раньше был hardcoded const в adapters/telegram.py — теперь
-    # авторитет здесь, а telegram.SEND_LOCKED синкается из этой
+    # send_locked: симуляция отправки — всё, кроме самого вызова Telegram.
+    # По умолчанию выключена: включённая молча, она показывает «отклик
+    # отправлен» над письмом, которого HR не получал, и вакансия при этом
+    # закрывается от следующей попытки. Стенд включают нарочно, галкой в
+    # настройках. Авторитет здесь, а telegram.SEND_LOCKED синкается из этой
     # настройки на старте Bot.run.
-    "send_locked": "true",
+    "send_locked": "false",
     # auto_apply: kill-switch для автоматической отправки cover-letter'ов
     # из poll-цикла (auto-send branch в flows/parse.py, parse_and_update_vacancy).
     # При False parse-pipeline всё равно отрабатывает — статус NEW,
@@ -239,10 +241,10 @@ class RuntimeSettings:
 
     @property
     def send_locked(self) -> bool:
-        """Если True, реальная отправка Telegram-DM подавляется (для
-        dev-тестов). Авторитетный источник — здесь; ``telegram.SEND_LOCKED``
-        синкается с этой настройкой на старте Bot.run и при изменении
-        через UI."""
+        """Если True, реальная отправка Telegram-DM подавляется — стенд, на
+        котором конвейер обкатывают без живых HR. По умолчанию False.
+        Авторитетный источник — здесь; ``telegram.SEND_LOCKED`` синкается с
+        этой настройкой на старте Bot.run и при изменении через UI."""
         return self._app_bool("send_locked")
 
     @property

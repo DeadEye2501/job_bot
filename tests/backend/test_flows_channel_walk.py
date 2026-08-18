@@ -14,7 +14,7 @@ import pytest
 
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, put
-from tests.factories import channel_row
+from tests.factories import blacklist_row, channel_row
 from tests.fakes.telegram import FakeTelegramClient, chat
 
 
@@ -215,6 +215,23 @@ async def test_a_switched_off_channel_is_still_read_on_demand(
     rows = await all_rows(session_factory, TelegramChannel)
 
     assert await walking.poll_one_channel(rows[0].id) == "ok"
+
+
+async def test_a_blacklisted_channel_is_not_read_even_on_demand(
+    walking, session_factory
+):
+    """Канал в чёрном списке не читают и по кнопке.
+
+    Заносили его туда затем, чтобы он больше не приносил вакансий. Отсев по
+    тексту тут не спасает: он сверяет текст поста, а написание канала — это
+    `@ник`, которого в теле поста обычно нет.
+    """
+    await put(session_factory, channel_row(username="listed"))
+    await put(session_factory, blacklist_row("channel", "@listed"))
+    rows = await all_rows(session_factory, TelegramChannel)
+
+    assert await walking.poll_one_channel(rows[0].id) == "blacklisted"
+    assert [step for step in walking.walked if step != "настройки"] == []
 
 
 async def test_a_missing_channel_on_demand_reports_failure(walking):

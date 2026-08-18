@@ -81,6 +81,11 @@ def make_bot(session_factory, monkeypatch):
     получает обратно, а клиенты LLM — заглушками, которые помнят свой адрес
     и умеют закрываться. По адресу видно, какая досталась чату, а какая
     векторам; по закрытию — что остановка их не забыла.
+
+    Симуляция отправки включается прямо здесь, записью в настройки. Стенд
+    заперт двумя слоями (`tests/conftest.py`), и второй из них — `SEND_LOCKED` —
+    подъём бота переписывает из этой настройки: в боевом умолчании симуляция
+    снята, и без записи подъём снимал бы запор с каждого поднятого бота.
     """
 
     async def build(
@@ -93,6 +98,7 @@ def make_bot(session_factory, monkeypatch):
             llm_config_row(LlmConfigKind.EMBED, base_url=embed_url),
         )
         settings = await RuntimeSettings.load(session_factory)
+        await settings.set_app("send_locked", "true")
         telegram_client = client if client is not None else FakeTelegramClient()
         monkeypatch.setattr(
             "adapters.telegram.make_client", lambda tg: telegram_client

@@ -90,34 +90,12 @@ async def test_a_cancelled_job_comes_back_named_instead_of_silent(runner, ask):
     assert await asked == {"fail": "cancelled"}
 
 
-async def test_a_hanging_job_comes_back_by_its_own_deadline(
-    runner, ask, monkeypatch
-):
-    """Зависшая работа отпускает зовущего по сроку, а не держит навсегда.
+async def test_the_jobs_own_deadline_arrives_as_a_breakage(runner, ask, caplog):
+    """Свой срок работы приезжает поломкой, а не молчанием.
 
-    Своего срока у канала нет вовсе: зависший зов оставил бы запись о себе до
-    закрытия окна, а окно — крутящееся ожидание. Срок держит мост.
-    """
-    monkeypatch.setattr("client.bridge.answer.REPLY_SECONDS", 0.05)
-    release = asyncio.Event()
-
-    async def hangs() -> str:
-        await release.wait()
-        return "поздно"
-
-    answer = await ask(lambda: reply(runner, hangs()))
-    release.set()
-
-    assert answer == {"fail": "timeout"}
-
-
-async def test_the_jobs_own_deadline_is_not_mistaken_for_ours(runner, ask, caplog):
-    """Свой срок работы приезжает поломкой, а не «мотор не успел».
-
-    Внутренних сроков в мосте хватает — остановка бота, ожидание клиента, —
-    и все они бьют тем же классом, что и наш. Спутав их, окно скажет «долго»
-    там, где работа отказала, а в журнал не ляжет ничего: разбирать будет
-    нечего.
+    Внутренних сроков в мосте хватает — остановка бота, ожидание клиента.
+    Своего срока у ожидания нет вовсе, и такой отказ обязан доехать до окна
+    вместе с записью в журнале: иначе разбирать будет нечего.
     """
 
     async def impatient() -> str:

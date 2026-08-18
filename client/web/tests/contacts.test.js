@@ -18,6 +18,7 @@ import {
   personCandidate,
   personLine,
   personName,
+  pollBlock,
   unreadLine,
   valueField,
 } from '../state/contacts.js';
@@ -443,5 +444,28 @@ describe('общий переключатель над списком канал
     const shown = channelsToggle([BLOCKED]);
     expect(shown.disabled).toBe(true);
     expect(shown.title).toBe('Все каналы в blacklist');
+  });
+});
+
+describe('запор ручного прогона канала', () => {
+  it('канал в чёрном списке прогнать нельзя, даже когда лампы живы', () => {
+    expect(pollBlock({ blacklist_value: '@spam' }, '')).toBe(
+      'Канал в чёрном списке — прогнать его нельзя',
+    );
+  });
+
+  it('отсев старше неживых ламп: сказано про него, а не про них', () => {
+    expect(pollBlock({ blacklist_value: '@spam' }, 'Бот заблокирован')).toBe(
+      'Канал в чёрном списке — прогнать его нельзя',
+    );
+  });
+
+  it('чистый канал запирается только лампой', () => {
+    expect(pollBlock({ blacklist_value: null }, 'Бот заблокирован')).toBe('Бот заблокирован');
+    expect(pollBlock({ blacklist_value: null }, '')).toBe('');
+  });
+
+  it('непрочитанная карточка запирается только лампой', () => {
+    expect(pollBlock(null, 'Бот заблокирован')).toBe('Бот заблокирован');
   });
 });

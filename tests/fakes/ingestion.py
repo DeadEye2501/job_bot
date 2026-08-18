@@ -12,12 +12,13 @@ class FakeIngestion:
     """Сообщает, чем кончился прогон, и записывает, о чём его просили."""
 
     def __init__(
-        self, *, outcome=True, channel_outcome="ok", error=None, hangs=False
+        self, *, outcome=True, word_outcome="ok", error=None, hangs=False
     ) -> None:
         self._outcome = outcome
-        # У обхода одного канала исход свой: он говорит тремя словами, а не
-        # «да/нет», — «нет записи» и «обход сломался» окно называет разным.
-        self._channel_outcome = channel_outcome
+        # Прогон канала и прогон вакансии отвечают словом, а не «да/нет»:
+        # «нет записи», «канал в отсеве» и «сорвалось» окно называет разным.
+        # Поле у них общее — в одной проверке зовут что-то одно.
+        self._word_outcome = word_outcome
         self._error = error
         self._hangs = hangs
         self.channel_calls: list[int] = []
@@ -63,7 +64,7 @@ class FakeIngestion:
 
     async def poll_one_channel(self, channel_id: int):
         self.channel_calls.append(channel_id)
-        return await self._answer(outcome=self._channel_outcome)
+        return await self._answer(outcome=self._word_outcome)
 
     async def poll_active_channels(self):
         self.full_calls += 1
@@ -72,7 +73,7 @@ class FakeIngestion:
 
     async def rerun_pipeline_for_vacancy(self, vacancy_id: int):
         self.rerun_calls.append(vacancy_id)
-        return await self._answer()
+        return await self._answer(outcome=self._word_outcome)
 
     async def forget_vacancy(self, vacancy_id: int):
         self.forget_calls.append(vacancy_id)
@@ -85,7 +86,7 @@ class FakeIngestion:
     _OWN = object()
 
     async def _answer(self, *, outcome=_OWN):
-        """Ответ подделки: общий или свой у обхода одного канала.
+        """Ответ подделки: общий или тот, что отвечают словом.
 
         Часовой, а не `None`: у обхода `None` — такой же осмысленный ответ,
         как и прочие, и проверка «нечего не передали» съела бы его.

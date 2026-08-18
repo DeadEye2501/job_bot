@@ -5,7 +5,6 @@ import logging
 from sqlalchemy.exc import IntegrityError
 import numpy as np
 
-from adapters import lm_studio
 from backend.flows import parse
 from backend.domain.dedup import cosine_top_match
 from backend.message_text import extract_text
@@ -21,22 +20,12 @@ logger = logging.getLogger(__name__)
 async def _post_embedding(pipeline, post: ChannelPost):
     """Числовой отпечаток поста; пусто — модель отпечатков не дала.
 
-    Беда отпечатка не роняет обход канала: пост пропускается, курсор идёт
-    дальше, и следующий проход по каналу его не увидит — но это дешевле,
-    чем встать на одном посте.
+    Пост без отпечатка пропускается, курсор идёт дальше, и следующий проход по
+    каналу его не увидит — но это дешевле, чем встать на одном посте.
     """
-    try:
-        return await lm_studio.embed(
-            pipeline._lm_embed_client, pipeline._lm_embed_model, post.text
-        )
-    except RuntimeError as e:
-        logger.warning(
-            "[@%s] %d embed shape error: %s, skipping",
-            post.channel_username,
-            post.msg.id,
-            e,
-        )
-        return None
+    return await embeddings.embed_text(
+        pipeline, post.text, f"[@{post.channel_username}] {post.msg.id}"
+    )
 
 
 async def _resume_or_skip(pipeline, similar_id: int, post: ChannelPost) -> None:
