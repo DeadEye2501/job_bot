@@ -7,7 +7,7 @@ import numpy as np
 
 from backend.flows import parse
 from backend.domain.dedup import cosine_top_match
-from backend.message_text import extract_text
+from backend.message_text import extract_post_text
 from backend.models import Vacancy
 from backend.payloads import ChannelPost
 from backend.repository.vacancies_life import add_vacancy_event
@@ -57,7 +57,7 @@ async def ingest_post(
     pipeline, channel_id: int, channel_username: str, msg
 ) -> None:
     # Cursor advance'ится в `poll_channel` (батчами), не здесь.
-    text = extract_text(msg)
+    text = extract_post_text(msg)
     if not text or msg.service is not None or msg.poll is not None:
         return
     post = ChannelPost(channel_id, channel_username, msg, text)
