@@ -52,6 +52,35 @@ class _Walk:
     on_vacancies_changed: Any
 
 
+# Сколько ждём просьбы Telegram «слишком часто». Pyrogram сам пережидает
+# короткие (`sleep_threshold`), значит сюда доходят только долгие — минуты и
+# часы. Ждать их некому: догон идёт внутри тела цикла бота, до всякой проверки
+# остановки, и на это время приложение перестаёт закрываться, а кнопка
+# «остановить» — помогать. Пропущенное не теряется: догон повторится на
+# следующем переходе в рабочий режим.
+_WAIT_OUT_LIMIT_SEC = 60
+
+
+async def _after_flood_wait(hr, read, target, wait: int) -> list | None:
+    """Переждать просьбу «слишком часто» и прочитать ещё раз.
+
+    Второй отказ пережидать уже нечем: он значит штраф до включения, и
+    возвращаться сюда третий раз незачем.
+    """
+    if wait > _WAIT_OUT_LIMIT_SEC:
+        logger.warning(
+            "backfill: FloodWait %ds на hr %d — слишком долго, пропускаю", wait, hr.id
+        )
+        return None
+    logger.info("backfill: FloodWait %ds на hr %d — жду и ретраим", wait, hr.id)
+    await asyncio.sleep(wait + 1)
+    try:
+        return await read(target)
+    except Exception:
+        logger.exception("backfill: retry после FloodWait не помог hr %d", hr.id)
+        return None
+
+
 async def _fetch_history(client, hr, limit: int) -> list | None:
     """Хвост переписки, свежими вперёд; `None` — прочитать не удалось.
 
@@ -59,8 +88,7 @@ async def _fetch_history(client, hr, limit: int) -> list | None:
     дальше. Две беды чинятся здесь, обе одной попыткой. Неизвестный собеседник:
     номера нет в кэше, и `get_users` зовётся ради побочного действия — он
     кладёт собеседника туда, оттого второе чтение и проходит. Просьба
-    подождать: сюда доходят только долгие (короткие Pyrogram пережидает сам),
-    потому одной попытки и хватает, а второй отказ значит штраф до включения.
+    подождать разобрана рядом, в `_after_flood_wait`.
     """
     from pyrogram.errors import FloodWait, PeerIdInvalid
 
@@ -83,14 +111,9 @@ async def _fetch_history(client, hr, limit: int) -> list | None:
             logger.exception("backfill: resolve fallback failed для hr %d", hr.id)
             return None
     except FloodWait as e:
-        wait = int(getattr(e, "value", 30))
-        logger.info("backfill: FloodWait %ds на hr %d — жду и ретраим", wait, hr.id)
-        await asyncio.sleep(wait + 1)
-        try:
-            return await read(target)
-        except Exception:
-            logger.exception("backfill: retry после FloodWait не помог hr %d", hr.id)
-            return None
+        return await _after_flood_wait(
+            hr, read, target, int(getattr(e, "value", 30))
+        )
 
 
 async def _store_outgoing(walk: _Walk, msg) -> bool:

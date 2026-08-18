@@ -73,7 +73,7 @@ async def ingest_post(
     if embedding is None:
         return
 
-    await embeddings.ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline, len(embedding))
     similar_id = cosine_top_match(
         np.asarray(embedding, dtype=np.float32),
         pipeline._embedding_ids,

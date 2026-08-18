@@ -51,7 +51,7 @@ async def with_a_vacancy(make_pipeline, session_factory):
         vacancy_event_row(vacancy.id),
     )
     pipeline = await make_pipeline()
-    await embeddings.ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline, width=2)
     return pipeline, vacancy, channel
 
 

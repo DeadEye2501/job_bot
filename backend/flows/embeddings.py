@@ -46,7 +46,20 @@ async def embed_text(pipeline, text: str, what: str) -> list[float] | None:
         return None
 
 
-async def ensure_embedding_cache(pipeline) -> None:
+async def ensure_embedding_cache(pipeline, width: int) -> None:
+    """Поднять векторы вакансий в память один раз за жизнь конвейера.
+
+    Берутся только векторы длиной `width` — той, какую даёт нынешняя модель
+    отпечатков. Смени её в настройках, и в базе окажутся векторы двух длин:
+    собранные в одну матрицу, они роняют подъём кэша на каждом посте, а беда
+    уходит наверх, где обход двигает курсор канала дальше. Со стороны это
+    выглядит как удавшийся обход без единой вакансии, и второй раз эти посты
+    не прочтут.
+
+    Отброшенные не потеря: вектор прежней модели живёт в другом пространстве,
+    и сравнивать его с нынешними нечем. Вернуть их в дело может только
+    пересчёт — прогон заново по каждой вакансии.
+    """
     if pipeline._embedding_cache_loaded:
         return
     async with pipeline._session_factory() as session:
@@ -57,15 +70,20 @@ async def ensure_embedding_cache(pipeline) -> None:
                 )
             )
         ).all()
-    if rows:
-        pipeline._embedding_ids = np.array(
-            [r.id for r in rows], dtype=np.int64
+    fit = [r for r in rows if len(r.embedding) == width]
+    if len(fit) != len(rows):
+        logger.warning(
+            "Embedding cache: %d вектор(ов) чужой длины отброшено "
+            "(нынешняя %d) — вернёт их только прогон заново",
+            len(rows) - len(fit), width,
         )
+    if fit:
+        pipeline._embedding_ids = np.array([r.id for r in fit], dtype=np.int64)
         pipeline._embedding_matrix = np.array(
-            [r.embedding for r in rows], dtype=np.float32
+            [r.embedding for r in fit], dtype=np.float32
         )
     pipeline._embedding_cache_loaded = True
-    logger.debug("Embedding cache loaded: %d vectors", len(rows))
+    logger.debug("Embedding cache loaded: %d vectors", len(fit))
 
 
 def append_embedding(pipeline, vacancy_id: int, embedding: list[float]) -> None:

@@ -196,3 +196,39 @@ async def test_the_window_is_told_where_inside_the_channel_it_is(reading):
         ("message", "@jobs", 1, 2),
         ("message", "@jobs", 2, 2),
     ]
+
+
+async def test_a_channel_that_outran_the_limit_says_so(reading, caplog):
+    """Канал, выложивший больше предела за один срок, отмечается в журнале.
+
+    Читается только предел свежих, и на первом виденном чтение обрывается. Не
+    доберись оно до виденного — значит между отметкой и самым старым из
+    прочитанных остались посты, которых не увидит уже никто: отметка уедет на
+    самый свежий. Молча это худший из исходов, потому что снаружи обход
+    выглядит удавшимся.
+    """
+    pipeline, client, channel = reading
+    await pipeline._rs.set_app("backfill_limit", "3")
+    client.history = [post(msg_id) for msg_id in range(20, 0, -1)]
+
+    with caplog.at_level("WARNING"):
+        await channels.poll_channel(pipeline, channel.id, "jobs", 5)
+
+    assert "jobs" in caplog.text
+    assert "5" in caplog.text and "18" in caplog.text
+
+
+async def test_the_first_walk_of_a_channel_is_not_called_a_loss(reading, caplog):
+    """Первый обход канала потерей не считается, сколько бы он ни прочёл.
+
+    Отметки ещё нет, читать «до виденного» нечего, и предел здесь работает по
+    назначению — это глубина первого захода, а не обрыв.
+    """
+    pipeline, client, channel = reading
+    await pipeline._rs.set_app("backfill_limit", "3")
+    client.history = [post(msg_id) for msg_id in range(20, 0, -1)]
+
+    with caplog.at_level("WARNING"):
+        await channels.poll_channel(pipeline, channel.id, "jobs", None)
+
+    assert "WARNING" not in caplog.text
