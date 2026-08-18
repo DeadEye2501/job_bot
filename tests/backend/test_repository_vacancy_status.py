@@ -9,7 +9,7 @@
 from backend.models import StatusHistorySource, VacancyStatus
 from backend.payloads import Classification
 from backend.repository.vacancies_card import get_vacancy_detail
-from backend.repository.vacancies_life import apply_classification, change_vacancy_status, update_status_history_explanation
+from backend.repository.vacancy_status import apply_classification, change_vacancy_status, update_status_history_explanation
 from tests.dbio import put
 from tests.factories import message_row, vacancy_row
 
