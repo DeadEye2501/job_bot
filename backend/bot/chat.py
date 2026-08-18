@@ -10,6 +10,7 @@ from backend.models import HR
 from backend.models import Message
 from backend.domain.telegram_identity import telegram_peer
 from backend.payloads import OutgoingMessage
+from backend.telegram_time import tg_moment
 from backend.repository.messages import mark_incoming_read
 from backend.repository.messages import save_outgoing_message
 
@@ -125,7 +126,7 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
             hr_id=hr_id,
             text=clean,
             tg_message_id=pyro_msg.id,
-            sent_at=pyro_msg.date,
+            sent_at=tg_moment(pyro_msg.date),
         ),
     )
 
@@ -190,7 +191,7 @@ async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message:
             hr_id=hr_id,
             text="",
             tg_message_id=pyro_msg.id,
-            sent_at=pyro_msg.date,
+            sent_at=tg_moment(pyro_msg.date),
             media_kind="photo" if as_photo else "document",
             media_path=media_path,
             # У фото имени нет: Telegram его не хранит, и окно показывает

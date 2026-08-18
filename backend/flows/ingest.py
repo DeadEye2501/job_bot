@@ -11,6 +11,7 @@ from backend.message_text import extract_post_text, extract_text
 from backend.models import Vacancy
 from backend.payloads import ChannelPost
 from backend.repository.vacancies_life import add_vacancy_event
+from backend.telegram_time import tg_moment
 
 from backend.flows import embeddings
 
@@ -107,7 +108,7 @@ def _vacancy_row(post: ChannelPost, embedding: list[float]) -> Vacancy:
         raw_text=post.text,
         embedding=embedding,
         source_url=f"https://t.me/{post.channel_username}/{post.msg.id}",
-        posted_at=post.msg.date,
+        posted_at=tg_moment(post.msg.date),
     )
 
 

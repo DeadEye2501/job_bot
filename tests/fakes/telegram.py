@@ -12,12 +12,19 @@
 
 import asyncio
 import io
+from datetime import timezone
 from pathlib import Path
 from types import SimpleNamespace
 
 from pyrogram.enums import MessageEntityType
 
 from tests.factories import EPOCH
+
+# Тот же миг, что `EPOCH`, но записанный по местным часам: Pyrogram отдаёт время
+# сообщения наивным и местным (`datetime.fromtimestamp`), а `EPOCH` — это наша
+# шкала, наивный UTC. Отдавай подделка сразу `EPOCH`, приведение времени на
+# входе стало бы холостым, и проверки перестали бы его сторожить.
+TG_EPOCH = EPOCH.replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
 
 # Номер нашей собственной учётной записи. У своего сообщения Telegram ставит
 # отправителем нас, а не собеседника, и `FakeTelegramClient.me` отвечает тем же
@@ -78,7 +85,7 @@ def incoming(*, user_id=777, username=None, text="здравствуйте", **e
     fields = {
         "id": 10,
         "text": text,
-        "date": EPOCH,
+        "date": TG_EPOCH,
         "photo": None,
         "document": None,
         "reply_to_message_id": None,
@@ -125,7 +132,7 @@ def post(msg_id: int, *, text=_UNSET, **extra):
     return message(
         id=msg_id,
         text=f"объявление {msg_id}" if text is _UNSET else text,
-        date=EPOCH,
+        date=TG_EPOCH,
         **fields,
     )
 
@@ -274,7 +281,7 @@ class FakeTelegramClient:
         self.outgoing.append((kind, target, payload, caption))
         self._fail_if_asked(kind)
         self.last_message_id += 1
-        answer = SimpleNamespace(id=self.last_message_id, date=EPOCH)
+        answer = SimpleNamespace(id=self.last_message_id, date=TG_EPOCH)
         if self.on_send is not None:
             await self.on_send(answer)
         return answer
