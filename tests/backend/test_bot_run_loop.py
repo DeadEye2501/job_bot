@@ -14,6 +14,7 @@
 
 import pytest
 
+from backend.bot import loop as loop_mod
 from backend.models import BotMode
 from tests.fakes.ingestion import FakeIngestion, wire
 
@@ -340,3 +341,24 @@ async def test_a_stop_request_ends_the_loop_after_the_current_turn(
 
     assert pipeline.full_calls == 1
     assert client.lifecycle == ["запуск", "остановка"]
+
+
+async def test_a_kick_during_the_turn_is_not_lost(chatting, caught_up):
+    """Окрик из окна, пришедший во время оборота, не пропадает.
+
+    Тумблер режима будит цикл, чтобы тот сразу увидел смену: при уходе в OFF
+    — слил накопленную переписку в разбор, при возврате — догнал пропущенное.
+    Гасись событие перед ожиданием, окрик, поданный пока шёл обход каналов,
+    стирался бы, и цикл спал бы полный срок — по умолчанию полчаса, а на
+    настроенных полутора часах и дольше.
+    """
+    import asyncio
+
+    bot, _client, _hr = await chatting()
+    bot._wake_event.set()
+
+    # Срок ожидания здесь не при чём: с сохранённым окриком возврат мгновенный,
+    # а потерянный окрик усыпил бы цикл на весь настроенный интервал.
+    await asyncio.wait_for(loop_mod._sleep_until_wake(bot), timeout=1)
+
+    assert not bot._wake_event.is_set()

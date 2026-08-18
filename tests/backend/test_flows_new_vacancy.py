@@ -67,7 +67,7 @@ async def test_the_new_vector_joins_the_cache(make_pipeline):
     вакансии: второе сравнивалось бы с памятью, где первого ещё нет.
     """
     pipeline = await make_pipeline()
-    await embeddings.ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline, width=2)
 
     new_id = await ingest.save_new_vacancy(pipeline, ChannelPost(None, "jobs", post(42, text="Ищем Python-разработчика"), "текст"), [0.1, 0.2])
 
@@ -118,7 +118,7 @@ async def test_a_refused_row_leaves_no_vector_behind(make_pipeline, session_fact
     await put(session_factory, channel_row(username="jobs"))
     channel = await only_row(session_factory, TelegramChannel)
     pipeline = await make_pipeline()
-    await embeddings.ensure_embedding_cache(pipeline)
+    await embeddings.ensure_embedding_cache(pipeline, width=2)
     first = await ingest.save_new_vacancy(pipeline, ChannelPost(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст"), [0.1])
 
     await ingest.save_new_vacancy(pipeline, ChannelPost(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст"), [0.1])

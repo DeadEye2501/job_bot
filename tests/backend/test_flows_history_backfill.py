@@ -345,3 +345,35 @@ async def test_with_a_buffer_the_vacancy_list_is_left_to_the_reader(
     )
 
     assert heard == []
+
+
+async def test_a_long_rate_limit_is_not_waited_out(
+    known_hr, session_factory, monkeypatch, caplog
+):
+    """Долгий отказ «слишком часто» не пережидают вовсе.
+
+    Pyrogram сам переживает просьбы короче минуты, значит сюда доходят только
+    долгие — минуты и часы. А ждать их некому: догон идёт внутри тела цикла
+    бота, до всякой проверки остановки, и приложение на это время перестаёт
+    закрываться, а кнопка «остановить» перестаёт помогать.
+
+    Пропущенная переписка не теряется: догон повторится на следующем переходе
+    в рабочий режим.
+    """
+    import asyncio
+
+    slept: list[float] = []
+
+    async def note(seconds):
+        slept.append(seconds)
+
+    monkeypatch.setattr(asyncio, "sleep", note)
+    client = FakeTelegramClient(fails={"get_chat_history": [FloodWait(value=1800)]})
+    client.history = [_theirs(10, "не должно доехать")]
+
+    with caplog.at_level(logging.WARNING):
+        await _catch_up(client, known_hr, session_factory)
+
+    assert slept == []
+    assert await all_rows(session_factory, Message) == []
+    assert "1800" in caplog.text

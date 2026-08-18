@@ -175,13 +175,25 @@ async def _unseen_posts(pipeline, channel_username: str, last_id: int | None):
     переворачивается — разбирать посты надо в том порядке, в каком их
     писали.
     """
+    limit = pipeline._rs.backfill_limit
     new_msgs = []
+    reached_seen = False
     async for msg in pipeline._client.get_chat_history(
-        channel_username, limit=pipeline._rs.backfill_limit
+        channel_username, limit=limit
     ):
         if last_id is not None and msg.id <= last_id:
+            reached_seen = True
             break
         new_msgs.append(msg)
+    if last_id is not None and not reached_seen and len(new_msgs) >= limit:
+        # Дочитать нечем: отметка сейчас уедет на самый свежий, и пропущенное
+        # не увидит уже никто. Молча это худший из исходов — снаружи обход
+        # выглядит удавшимся, а половины объявлений в списке нет.
+        logger.warning(
+            "[@%s] предел догона %d исчерпан, а отметка %d не встретилась: "
+            "посты между ней и %d потеряны, подними backfill_limit",
+            channel_username, limit, last_id, new_msgs[-1].id,
+        )
     return list(reversed(new_msgs))
 
 
