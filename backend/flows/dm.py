@@ -11,6 +11,7 @@ from backend.flows.auto_gate import status_open_for_auto
 from backend.message_text import extract_dm_text
 from backend.message_text import extract_text
 from backend.telegram_lookup import fetch_telegram_avatar
+from backend.telegram_time import tg_moment
 from backend.flows.dm_classify import classify_and_apply
 from backend.payloads import IncomingMessage, OutgoingMessage, PendingReply
 from backend.repository.hr_identify import find_known_hr
@@ -77,7 +78,7 @@ async def _store_outgoing_row(
                 hr_id=hr_id,
                 text=extract_dm_text(msg),
                 tg_message_id=msg.id,
-                sent_at=msg.date,
+                sent_at=tg_moment(msg.date),
                 media_kind=media.kind,
                 media_path=media.path,
                 media_name=media.name,
@@ -182,7 +183,7 @@ def _incoming_row(
         vacancy_id=vacancy_id,
         text=extract_dm_text(msg),
         tg_message_id=msg.id,
-        received_at=msg.date,
+        received_at=tg_moment(msg.date),
         media_kind=attachment.kind,
         media_path=attachment.path,
         media_name=attachment.name,

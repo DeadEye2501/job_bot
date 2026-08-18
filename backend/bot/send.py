@@ -11,6 +11,7 @@ from backend.payloads import OutgoingMessage
 from backend.flows.events import record_vacancy_event
 from backend.notify import fire
 from backend.repository.messages import save_outgoing_message
+from backend.telegram_time import tg_moment
 from backend.repository.vacancy_status import mark_vacancy_applied
 
 logger = logging.getLogger(__name__)
@@ -142,7 +143,7 @@ async def _commit_send(bot, hr: HR, text: str, outcome: _Outcome) -> bool:
                     hr_id=hr.id,
                     text=text,
                     tg_message_id=outcome.tg_message_id,
-                    sent_at=datetime.now(timezone.utc),
+                    sent_at=tg_moment(datetime.now(timezone.utc)),
                     vacancy_id=outcome.vacancy_id,
                 ),
             )
