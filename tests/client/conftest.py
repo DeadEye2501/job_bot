@@ -203,5 +203,8 @@ class WindowThatPicks:
     def __init__(self, chosen) -> None:
         self.chosen = chosen
 
-    def create_file_dialog(self, *args, **kwargs):
+    def create_file_dialog(self, *_args, **_kwargs):
+        # Доводы настоящего диалога здесь не читают: подделка отвечает
+        # заготовленным выбором. Подпись при этом повторяет настоящую — иначе
+        # зов с чужими доводами прошёл бы у подделки и упал бы в бою.
         return self.chosen
