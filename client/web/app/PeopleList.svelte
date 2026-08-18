@@ -7,18 +7,15 @@
   import NewPersonFields from '$components/NewPersonFields.svelte';
   import PersonRow from '$components/PersonRow.svelte';
   import SearchBox from '$components/SearchBox.svelte';
-  import { attempts } from '$state/attempts.js';
   import { named } from '$state/contacts.js';
-  import { PAGE, appended, nearBottom, refreshLimit } from '$state/paging.js';
+  import { pagedList } from '$state/paged_list.svelte.js';
 
   import PersonCard from './PersonCard.svelte';
 
   let { ask, say, events, open, onopened, oncompany, onvacancy } = $props();
 
-  let loaded = $state(false);
-  let rows = $state([]);
-  let hasMore = $state(false);
-  let search = $state('');
+  const list = pagedList({ ask, method: 'hr.list', key: 'hrs' });
+
   let adding = $state(false);
   let draft = $state({ name: '', telegram_username: '', telegram_user_id: '', notes: '' });
 
@@ -26,10 +23,6 @@
   // правилом заслоняется и мост.
   const ready = $derived(named(draft));
   let opened = $state(null);
-  let loadingMore = $state(false);
-
-  const tries = attempts();
-  let alive = true;
 
   // Кого открыть, придя со стороны — из списка непрочитанного над полосой или
   // из карточки вакансии. Отметка гасится сразу: вкладку открывают и просто
@@ -40,47 +33,6 @@
     opened = open.id;
     onopened();
   });
-
-  /** Перечитать список с начала.
-   *
-   * Потолок шлём всегда: у этого перечня на мосту умолчания нет вовсе, и без
-   * потолка он отдал бы всех разом. Потолок при этом довод — перечитывают
-   * список и после правки в карточке, где показанного больше страницы.
-   */
-  async function refresh(limit = PAGE) {
-    const mine = tries.next();
-    const now = await ask('hr.list', { search, limit, offset: 0 });
-    if (now === null || !alive || tries.stale(mine)) return;
-    rows = now.hrs;
-    hasMore = now.has_more;
-    loaded = true;
-  }
-
-  async function more() {
-    const mine = tries.next();
-    const page = await ask('hr.list', { search, limit: PAGE, offset: rows.length });
-    if (page === null || !alive || tries.stale(mine)) return;
-    rows = appended(rows, page.hrs);
-    hasMore = page.has_more;
-  }
-
-  function find(text) {
-    search = text;
-    return refresh();
-  }
-
-  /** Дочитать следующую страницу, когда список подошёл к концу.
-   *
-   * Прокруткой, а не кнопкой: список читают сверху вниз и глазами, а кнопка
-   * посреди чтения заставляет целиться в неё мышью.
-   */
-  function scrolled(event) {
-    if (!hasMore || loadingMore || !nearBottom(event.currentTarget)) return;
-    loadingMore = true;
-    more().finally(() => {
-      loadingMore = false;
-    });
-  }
 
   /** Завести человека.
    *
@@ -97,21 +49,21 @@
     adding = false;
     draft = { name: '', telegram_username: '', telegram_user_id: '', notes: '' };
     say('Карточка заведена');
-    return refresh(refreshLimit(rows.length));
+    return list.again();
   }
 
   $effect(() => {
-    alive = true;
     // Списки меняет не только этот экран: бот заводит людей сам, разбирая
     // переписку, и он же считает непрочитанное.
     // Только про списки: весть о непрочитанном кладётся на каждое сохранённое
     // письмо, и обход в сотню сообщений перечитал бы список сотню раз подряд.
-    const deaf = events.on('contacts_lists_changed', () => refresh(refreshLimit(rows.length)));
-    // Первое чтение — вне слежения: строку поиска `refresh` читает, и следящий
+    const deaf = events.on('contacts_lists_changed', () => list.again());
+    const settled = list.mounted();
+    // Первое чтение — вне слежения: строку поиска читает `refresh`, и следящий
     // эффект перезаводился бы на каждом набранном знаке.
-    untrack(() => refresh());
+    untrack(() => list.refresh());
     return () => {
-      alive = false;
+      settled();
       deaf();
     };
   });
@@ -120,7 +72,7 @@
 <div class="cnt-layout">
   <section class="cnt-list-pane">
     <div class="cnt-list-toolbar">
-      <SearchBox value={search} placeholder="Поиск по имени, @username..." onsearch={find} />
+      <SearchBox value={list.search} placeholder="Поиск по имени, @username..." onsearch={list.find} />
       <button
         class="cnt-add-btn"
         type="button"
@@ -131,19 +83,19 @@
       </button>
     </div>
 
-    <div class="cnt-list" onscroll={scrolled}>
-      {#if !loaded}
+    <div class="cnt-list" onscroll={list.scrolled}>
+      {#if !list.loaded}
         <div class="cnt-list-empty">Загрузка…</div>
-      {:else if rows.length === 0}
+      {:else if list.rows.length === 0}
         <div class="cnt-list-empty">
-          {#if search}
-            Никого не найдено по запросу «{search}».
+          {#if list.search}
+            Никого не найдено по запросу «{list.search}».
           {:else}
             HR'ов пока нет.<br />Нажмите кнопку добавления вверху, чтобы создать первого.
           {/if}
         </div>
       {:else}
-        {#each rows as person (person.id)}
+        {#each list.rows as person (person.id)}
           <PersonRow
             {person}
             selected={opened === person.id}
@@ -166,7 +118,7 @@
         {onvacancy}
         personId={opened}
         onclose={() => (opened = null)}
-        onchanged={() => refresh(refreshLimit(rows.length))}
+        onchanged={() => list.again()}
       />
     {/if}
   </section>
