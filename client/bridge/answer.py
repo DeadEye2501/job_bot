@@ -1,7 +1,10 @@
 """Единый конверт ответа окну — от исхода работы до ответа зовущему.
 
-Отправка одна: `reply` отдаёт ответ значением, как его ждёт pywebview. Вторая,
-сигнальная, ушла вместе с каналом Qt и мастером, который ею отвечал.
+Отправок две, и разводит их длина работы. `reply` отдаёт исход значением, как
+его ждёт pywebview, — им отвечает всё, что кончается за один взгляд человека.
+`launched` отвечает «работа пущена» сразу, а исход её уезжает вестью в очередь:
+так отвечают обход каналов, прогон канала, прогон вакансии и отправка отклика,
+где работа идёт минутами, и держать ради неё зов значило бы держать и окно.
 
 **Пишет отсюда и в журнал.** Негодная нагрузка и сорвавшаяся работа уезжают
 окну коротким словом, а трассировка к ним остаётся здесь: показывать её
@@ -14,28 +17,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from concurrent.futures import CancelledError, Future
-from typing import Any, Coroutine
+from concurrent.futures import CancelledError
+from typing import Any, Callable, Coroutine
 
+from client.bridge.events import Events
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.runner import AsyncRunner
 
 
 logger = logging.getLogger(__name__)
-
-REPLY_SECONDS = 60.0
-"""Сколько зовущий ждёт ответа с мотора.
-
-Срок назначен, а не выведен: он заведомо больше самой долгой работы, какую
-сегодня делает один метод, и заведомо меньше того времени, за которое человек
-решает, что окно повисло, и убивает его.
-
-Своего срока на ждущий зов у pywebview нет — замерено слайсом А3: зов длиной
-28 секунд дошёл целым. Значит потолок здесь наш и другого нет.
-
-Имя открытое при закрытых соседях — нарочно: величину подменяет сторож, чтобы
-не ждать минуту на каждом прогоне.
-"""
 
 
 class Denied(Exception):
@@ -93,27 +83,23 @@ def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict:
     окно оставалось со спиннером навсегда.
 
     **Отмена тоже отвечает.** Ответа ждёт зов, и промолчать значит держать его
-    до срока впустую.
+    впустую.
 
-    Начатую работу срок не отменяет: `Future` от `run_coroutine_threadsafe`
-    отзывает только то, что ещё не пошло. Отвечаем зовущему и оставляем работу
-    доделываться — её исход просто некому будет прочесть.
+    Своего срока у ожидания нет. Назначенный однажды, он врал: работа длиннее
+    срока доходила до конца, а окно к тому времени уже объявляло её неудачей.
+    Долгую работу отвечают не сроком, а `launched` — она и не ждёт вовсе.
 
     Звать это из потока самого мотора нельзя: работа, которой мы ждём, идёт в
-    нём же, и ждать её значит запереть его на полный срок. Сегодня оттуда никто
-    и не зовёт — там обратные вызовы бота, они кладут событие в очередь.
+    нём же, и ждать её значит запереть его насовсем. Сегодня оттуда никто и не
+    зовёт — там обратные вызовы бота, они кладут событие в очередь.
     """
-    future = None
     try:
-        future = runner.submit(coro)
-        return {"ok": future.result(REPLY_SECONDS)}
+        return {"ok": runner.submit(coro).result()}
     except Denied as e:
         return denied(e.reason, **e.extra)
     except (CancelledError, asyncio.CancelledError):
         return {"fail": "cancelled"}
     except Exception as e:
-        if _our_deadline(e, future):
-            return {"fail": "timeout"}
         logger.exception(
             "bridge: unexpected error in coroutine %s",
             getattr(coro, "__qualname__", "?"),
@@ -121,11 +107,63 @@ def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict:
         return {"fail": "broken", "detail": f"{type(e).__name__}: {e}"}
 
 
-def _our_deadline(error: Exception, future: Future | None) -> bool:
-    """Это наш срок вышел, а не работа сама не дождалась своего.
+def launched(
+    hub, work: Callable[[], Coroutine[Any, Any, str]],
+    refusals: dict[str, str], done: str, **started: Any,
+) -> dict:
+    """Пустить долгую работу на мотор и ответить, не дожидаясь её конца.
 
-    Бьют они одним классом: внутренних сроков в мосте хватает — остановка бота,
-    ожидание клиента. Различает их то, кончилась ли работа: наш срок застаёт её
-    идущей, свой приходит вместе с её концом.
+    Так отвечают четыре кнопки — обход каналов, прогон одного канала, прогон
+    вакансии, отправка отклика: работа за ними идёт минутами, и ждать её
+    значит держать зов, а с ним и окно. Ответ говорит одно — работа пущена;
+    чем она кончилась, окно узнаёт вестью `action_finished`.
+
+    **Пущенное отвечает всегда.** Ответ вести складывается здесь, а не в самой
+    работе: сорвись работа броском, весть, написанная после её зова, ушла бы
+    вместе с ним, и человек остался бы с «отправляется» навсегда — ровно с той
+    бедой, ради которой вести и заведены.
+
+    Работа принимается вызываемым, а не готовой корутиной: на погашенном
+    моторе её никто не станет ждать, и она осталась бы висеть неисполненной.
+
+    Собирающий обязан держать `runner` и `events` — оба берутся из хозяйства
+    окна, и другого хозяйства у моста нет.
     """
-    return isinstance(error, TimeoutError) and future is not None and not future.done()
+    async def report() -> None:
+        try:
+            status = await work()
+        except (CancelledError, asyncio.CancelledError):
+            logger.info("bridge: launched job cancelled")
+            raise
+        except Exception:
+            logger.exception("bridge: launched job failed")
+            status = "error"
+        finished(hub.events, status, refusals, done)
+
+    try:
+        hub.runner.submit(report())
+    except Exception as e:
+        logger.exception("bridge: launched job could not start")
+        return {"fail": "broken", "detail": f"{type(e).__name__}: {e}"}
+    return {"ok": {"started": True, **started}}
+
+
+def finished(events: Events, status: str, refusals: dict[str, str], done: str) -> None:
+    """Сказать окну, чем кончилась пущенная работа.
+
+    Пара к `launched`: ответ на зов сказал только «пущено», и всё остальное
+    человек узнаёт отсюда — вестью, которую оболочка показывает плашкой.
+
+    Незнакомый исход берёт общую фразу набора — потому у каждого набора и
+    обязан быть ключ `error`: исходы заводит бэкенд, и новый появляется там
+    раньше, чем перевод к нему здесь, а промолчи мы, человек остался бы без
+    ответа вовсе.
+    """
+    ok = status == "ok"
+    events.add(
+        "action_finished",
+        {
+            "message": done if ok else refusals.get(status, refusals["error"]),
+            "danger": not ok,
+        },
+    )

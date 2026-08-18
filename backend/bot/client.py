@@ -249,11 +249,10 @@ class Bot:
         slot.on_runner_loop(self, self._wake_event.set)
 
 
-    async def poll_channel_now(self, channel_id) -> Literal["ok", "busy", "missing", "cancelled", "error"]:
+    async def poll_channel_now(
+        self, channel_id
+    ) -> Literal["ok", "busy", "missing", "blacklisted", "cancelled", "error"]:
         return await channels.poll_channel_now(self, channel_id)
-
-    async def reset_channel_cursor(self, channel_id) -> bool:
-        return await channels.reset_channel_cursor(self, channel_id)
 
     async def delete_channel(self, channel_id) -> int | None:
         return await channels.delete_channel(self, channel_id)
@@ -306,7 +305,9 @@ class Bot:
     async def run(self, *, once=False) -> None:
         return await loop.run(self, once=once)
 
-    async def ui_rerun_vacancy_pipeline(self, vacancy_id) -> bool:
+    async def ui_rerun_vacancy_pipeline(
+        self, vacancy_id
+    ) -> Literal["ok", "busy", "missing", "no_text", "llm", "cancelled", "error"]:
         return await rerun.ui_rerun_vacancy_pipeline(self, vacancy_id)
 
     async def ui_forget_vacancy(self, vacancy_id) -> bool:

@@ -1,36 +1,17 @@
-"""Следствия правки строки канала кнопками окна.
+"""Следствия удаления канала кнопкой окна.
 
-Обе кнопки — «сбросить курсор» и «удалить» — пишут в своей сделке и
-закрывают её сами. Читает результат окно уже другим обращением, поэтому
-незакрытая сделка выглядела бы как кнопка, которая ничего не сделала.
+Кнопка пишет в своей сделке и закрывает её сама. Читает результат окно уже
+другим обращением, поэтому незакрытая сделка выглядела бы как кнопка, которая
+ничего не сделала.
+
+Сброс курсора сюда не входит: он идёт мимо бота, прямо в репозиторий, и
+проверяется на мосту (`tests/client/test_bridge_channel_actions.py`) и в самом
+репозитории (`tests/backend/test_repository_channel_cursor.py`).
 """
 
 from backend.models import TelegramChannel, Vacancy
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row, vacancy_row
-
-
-async def test_resetting_a_cursor_survives_the_transaction(make_bot, session_factory):
-    """Сброс курсора виден следующему обращению, а не только своему.
-
-    Окно перечитывает список отдельным запросом: незакрытая сделка
-    показала бы кнопку, которая ничего не сделала.
-    """
-    await put(session_factory, channel_row(last_processed_msg_id=500))
-    bot = await make_bot()
-
-    saved = await only_row(session_factory, TelegramChannel)
-    assert await bot.reset_channel_cursor(saved.id) is True
-
-    again = await only_row(session_factory, TelegramChannel)
-    assert again.last_processed_msg_id is None
-
-
-async def test_resetting_a_missing_cursor_says_so(make_bot):
-    """Сброс курсора у несуществующего канала отвечает отказом, а не падает."""
-    bot = await make_bot()
-
-    assert await bot.reset_channel_cursor(404) is False
 
 
 async def test_deleting_a_channel_keeps_its_vacancies(make_bot, session_factory):

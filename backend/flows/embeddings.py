@@ -1,13 +1,36 @@
-"""Кэш векторов вакансий: держит их в памяти для отсева повторов."""
+"""Векторы вакансий: как их считают и как держат в памяти для отсева повторов."""
 
 import logging
 
 import numpy as np
 from sqlalchemy import select
 
+from adapters import lm_studio
 from backend.models import Vacancy
 
 logger = logging.getLogger(__name__)
+
+
+async def embed_text(pipeline, text: str, what: str) -> list[float] | None:
+    """Числовой отпечаток текста; пусто — модель отпечатков его не дала.
+
+    Беда отпечатка не роняет ни обход канала, ни прогон вакансии: зовущий
+    решает сам, что делать без него, — а вставать на одном посте дороже, чем
+    пропустить его. Чей это текст, говорит `what`: из записи журнала иначе не
+    видно, на чём споткнулись.
+
+    Ловится всё, а не только кривая форма ответа: поставщик отпечатков — не тот
+    же, что чат-модель, и лежать они могут порознь. Не отвечающий адрес и
+    незагруженная модель приезжают сюда бедами `httpx`, и пропусти мы их мимо —
+    прогон вакансии умирал бы целиком из-за второстепенного шага.
+    """
+    try:
+        return await lm_studio.embed(
+            pipeline._lm_embed_client, pipeline._lm_embed_model, text
+        )
+    except Exception:
+        logger.exception("%s: не вышло посчитать отпечаток, пропускаю", what)
+        return None
 
 
 async def ensure_embedding_cache(pipeline) -> None:

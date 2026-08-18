@@ -94,14 +94,19 @@ def test_a_written_whole_number_survives_stray_spaces(key):
     assert getattr(settings(**{key: "  7  "}), key) == 7
 
 
-def test_sending_is_locked_until_explicitly_allowed():
-    """Отправка заперта по умолчанию: пустая база не разрешает слать в Telegram."""
-    assert settings().send_locked is True
+def test_sending_is_open_until_explicitly_locked():
+    """Отправка по умолчанию настоящая: пустая база не включает симуляцию.
+
+    Симуляция — это отладочный стенд, а не состояние, в котором приложением
+    пользуются: включённая молча, она показывает «отклик отправлен» над
+    письмом, которого HR не получал.
+    """
+    assert settings().send_locked is False
 
 
-def test_sending_unlocks_once_explicitly_allowed():
-    """Записанное «false» действительно снимает запор — в этом смысл настройки."""
-    assert settings(send_locked="false").send_locked is False
+def test_sending_locks_once_explicitly_asked():
+    """Записанное «true» включает симуляцию — в этом смысл настройки."""
+    assert settings(send_locked="true").send_locked is True
 
 
 def test_automatic_apply_is_on_by_default():

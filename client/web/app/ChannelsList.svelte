@@ -157,6 +157,7 @@
         {ask}
         {say}
         {lockedTip}
+        {events}
         {onvacancy}
         channelId={opened}
         onclose={() => (opened = null)}

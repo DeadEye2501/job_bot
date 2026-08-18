@@ -18,7 +18,7 @@ from backend import health
 from backend.models import BotMode
 from backend.payloads import int_or_none
 from backend.repository import hr_list, messages as messages_repo
-from client.bridge.answer import Denied, denied, reply
+from client.bridge.answer import Denied, denied, launched, reply
 from client.bridge.desktop import Desktop
 from client.bridge.hub import Hub
 from client.bridge.journal import Journal
@@ -108,24 +108,22 @@ class System(Journal, Wipe, Desktop):
     def run_now(self) -> dict:
         """Кнопка обновления: один обход каналов помимо режима.
 
-        Занятый цикл объясняют словами: иначе человек жмёт кнопку, ничего не
-        происходит, и он жмёт её снова — так и не узнав, что обход уже идёт.
+        Ответ говорит только «пущено»: обход идёт по всем каналам и по всем их
+        новым постам — это самая долгая работа в приложении, и ждать её значит
+        держать зов вместе с окном. Чем кончилось, человек узнаёт вестью, а о
+        ходе рассказывает нижняя полоса.
         """
+        bot = self._hub.bot
+        if bot is None:
+            return denied(NO_BOT, action="run_now")
 
-        async def run() -> dict:
-            bot = self._hub.bot
-            if bot is None:
-                raise Denied(NO_BOT, action="run_now")
-            status = await bot.force_poll_once()
-            if status == "ok":
-                return {"action": "run_now", "status": status}
-            raise Denied(
-                RUN_REFUSALS.get(status, "Не удалось прогнать."),
-                action="run_now",
-                status=status,
-            )
-
-        return reply(self._hub.runner, run())
+        return launched(
+            self._hub,
+            bot.force_poll_once,
+            RUN_REFUSALS,
+            "Каналы прогнаны.",
+            action="run_now",
+        )
 
     def stop_run(self) -> dict:
         """Кнопка остановки: отменить идущий обход.

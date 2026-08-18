@@ -325,3 +325,71 @@ async def test_an_expired_rate_limit_window_lets_the_send_through(applying):
     ok, reason = await apply.try_auto_send(pipeline, hr, parsed_vacancy(), vacancy.id)
 
     assert (ok, reason) == (True, "sent")
+
+
+async def test_a_second_send_while_the_first_is_in_flight_is_refused(
+    applying, monkeypatch
+):
+    """Пока письмо сочиняется, вторая отправка по той же вакансии отбивается.
+
+    Заслон «уже откликались» её не ловит: он смотрит на статус, а статус
+    меняется в самом конце, когда письмо уже ушло. Всё это время нажатие в
+    окне заводило бы вторую отправку, и HR получал бы два письма подряд.
+    """
+    pipeline, hr, vacancy, _ = applying
+    second: list[tuple] = []
+
+    async def generate_cover_letter(block, parsed, client, model, *, channel_ref=None):
+        second.append(
+            await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id)
+        )
+        return pipeline.letter
+
+    monkeypatch.setattr(
+        "backend.flows.apply.generate_cover_letter", generate_cover_letter
+    )
+
+    ok, reason = await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id)
+
+    assert (ok, reason) == (True, "sent")
+    assert second == [(False, "in_flight")]
+    assert len(pipeline.sent) == 1
+
+
+async def test_a_send_that_finished_lets_the_next_one_through(applying):
+    """Кончившаяся отправка заслон снимает: следующая идёт своим ходом."""
+    pipeline, hr, vacancy, _ = applying
+
+    await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id)
+    ok, reason = await apply.send_application(
+        pipeline, hr, parsed_vacancy(), vacancy.id
+    )
+
+    assert (ok, reason) == (True, "sent")
+
+
+async def test_a_send_that_broke_lets_the_next_one_through_too(applying, monkeypatch):
+    """Сорвавшаяся отправка заслон снимает тоже.
+
+    Иначе одна беда посреди сочинения письма запирала бы вакансию от новых
+    попыток до перезапуска приложения.
+    """
+    pipeline, hr, vacancy, _ = applying
+
+    tries = []
+
+    async def breaks_once(block, parsed, client, model, *, channel_ref=None):
+        tries.append(1)
+        if len(tries) == 1:
+            raise RuntimeError("модель отвалилась")
+        return pipeline.letter
+
+    monkeypatch.setattr("backend.flows.apply.generate_cover_letter", breaks_once)
+    with pytest.raises(RuntimeError):
+        await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id)
+
+    ok, reason = await apply.send_application(
+        pipeline, hr, parsed_vacancy(), vacancy.id
+    )
+
+    assert (ok, reason) == (True, "sent")

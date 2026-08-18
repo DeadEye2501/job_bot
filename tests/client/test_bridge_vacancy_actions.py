@@ -6,8 +6,26 @@ Telegram и модели мост не заходит ни разу, он зов
 ответ.
 """
 
+import pytest
+
 from tests.dbio import put
 from tests.factories import vacancy_row
+
+
+@pytest.fixture
+def broken_vacancy(session_factory, with_bot):
+    """Вакансия, отправка по которой срывается броском изнутри бота."""
+
+    async def _put():
+        async def broken(vacancy_id):
+            raise RuntimeError("сорвалось на полпути")
+
+        with_bot().ui_send_vacancy_application = broken
+        vacancy = vacancy_row()
+        await put(session_factory, vacancy)
+        return vacancy
+
+    return _put
 
 
 async def test_a_manual_run_before_the_bot_is_up_is_refused_by_name(api, ask):
@@ -23,7 +41,7 @@ async def test_a_manual_run_before_the_bot_is_up_is_refused_by_name(api, ask):
     assert answer["detail"] == "Бот ещё не готов."
 
 
-async def test_a_busy_run_is_explained_not_swallowed(api, ask, with_bot):
+async def test_a_busy_run_is_explained_not_swallowed(api, ask, with_bot, told):
     """Занятый прогон объясняют словами.
 
     Иначе человек жмёт кнопку, ничего не происходит, и он жмёт её снова —
@@ -33,8 +51,25 @@ async def test_a_busy_run_is_explained_not_swallowed(api, ask, with_bot):
 
     answer = await ask(api.system.run_now)
 
-    assert answer["fail"] == "denied"
-    assert answer["status"] == "busy"
+    assert answer["ok"]["started"] is True
+    assert await told() == {
+        "message": "Уже идёт другой цикл, попробуйте позже.",
+        "danger": True,
+    }
+
+
+async def test_a_finished_run_says_so_when_it_is_finished(api, ask, with_bot, told):
+    """Обход каналов отвечает сразу, а исход говорит вестью.
+
+    Обход идёт по всем каналам и по всем их новым постам — самая долгая работа
+    в приложении. Дождись мост её конца, окно висело бы десятками минут.
+    """
+    with_bot()
+
+    answer = await ask(api.system.run_now)
+
+    assert answer["ok"] == {"started": True, "action": "run_now"}
+    assert await told() == {"message": "Каналы прогнаны.", "danger": False}
 
 
 async def test_a_stop_reaches_the_bot(api, ask, with_bot):
@@ -69,26 +104,65 @@ async def test_a_rerun_before_the_bot_is_up_is_refused_by_name(
 
 
 async def test_a_rerun_that_had_nothing_to_parse_says_so(
-    api, ask, with_bot, session_factory
+    api, ask, with_bot, told, session_factory
 ):
     """Неудавшийся разбор называет причину: разбирать было нечего.
 
     У вакансии, заведённой руками, исходного текста нет, и повторный разбор
-    для неё бессмыслен. Без внятного ответа кнопка выглядела бы сломанной.
+    для неё бессмыслен. Прежде тем же ответом объяснялись все шесть исходов —
+    и молчащая модель, и занятое место, — и человек шёл искать запись, которая
+    на месте.
     """
-    with_bot(rerun=False)
+    with_bot(rerun="no_text")
+    vacancy = vacancy_row()
+    await put(session_factory, vacancy)
+
+    await ask(api.vacancies.rerun, {"vacancy_id": vacancy.id})
+
+    assert await told() == {
+        "message": "У вакансии нет исходного текста — разбирать нечего.",
+        "danger": True,
+    }
+
+
+async def test_a_rerun_the_model_slept_through_says_that_instead(
+    api, ask, with_bot, told, session_factory
+):
+    """Молчание модели называют молчанием модели, а не пропажей вакансии."""
+    with_bot(rerun="llm")
+    vacancy = vacancy_row()
+    await put(session_factory, vacancy)
+
+    await ask(api.vacancies.rerun, {"vacancy_id": vacancy.id})
+
+    said = await told()
+    assert said["message"] == "Модель не ответила — разбор не состоялся, см. логи."
+
+
+async def test_a_rerun_answers_before_it_parses(
+    api, ask, with_bot, told, session_factory
+):
+    """Ответ приходит сразу, а исход — вестью, когда разбор кончится.
+
+    Разбор одной вакансии — это от двух до пяти обращений к модели. Дождись
+    мост его конца, окно висело бы всё это время.
+    """
+    with_bot()
     vacancy = vacancy_row()
     await put(session_factory, vacancy)
 
     answer = await ask(api.vacancies.rerun, {"vacancy_id": vacancy.id})
 
-    assert answer["fail"] == "denied"
-    assert answer["action"] == "rerun"
-    assert "raw_text" in answer["detail"]
+    assert answer["ok"] == {
+        "started": True,
+        "vacancy_id": vacancy.id,
+        "action": "rerun",
+    }
+    assert await told() == {"message": "Вакансия разобрана заново.", "danger": False}
 
 
 async def test_a_refused_application_is_told_in_human_words(
-    api, ask, with_bot, session_factory
+    api, ask, with_bot, told, session_factory
 ):
     """Отказ отправки переводят с кода на человеческий.
 
@@ -100,16 +174,18 @@ async def test_a_refused_application_is_told_in_human_words(
     vacancy = vacancy_row()
     await put(session_factory, vacancy)
 
-    answer = await ask(api.vacancies.send_application, {"vacancy_id": vacancy.id})
+    await ask(api.vacancies.send_application, {"vacancy_id": vacancy.id})
 
-    assert answer["fail"] == "denied"
-    assert answer["detail"] == "К вакансии не привязан HR."
+    assert await told() == {
+        "message": "К вакансии не привязан HR.",
+        "danger": True,
+    }
 
 
 async def test_an_unknown_refusal_code_still_reaches_the_window(
-    api, ask, with_bot, session_factory
+    api, ask, with_bot, told, session_factory
 ):
-    """Незнакомый код отказа не теряется, а доезжает как есть.
+    """Незнакомый код отказа не теряется: человек слышит общий отказ.
 
     Коды заводит бэкенд, и новый появится там раньше, чем перевод здесь.
     Промолчи мост о незнакомом — отправка выглядела бы удавшейся.
@@ -118,19 +194,21 @@ async def test_an_unknown_refusal_code_still_reaches_the_window(
     vacancy = vacancy_row()
     await put(session_factory, vacancy)
 
-    answer = await ask(api.vacancies.send_application, {"vacancy_id": vacancy.id})
+    await ask(api.vacancies.send_application, {"vacancy_id": vacancy.id})
 
-    assert answer["fail"] == "denied"
-    assert "квота_кончилась" in answer["detail"]
+    assert await told() == {
+        "message": "Не удалось отправить отклик — см. логи.",
+        "danger": True,
+    }
 
 
-async def test_a_sent_application_names_the_reason_of_success(
-    api, ask, with_bot, session_factory
+async def test_a_sent_application_answers_before_it_sends(
+    api, ask, with_bot, told, session_factory
 ):
-    """Удачная отправка тоже называет свой код.
+    """Ответ приходит сразу, а «отправлено» — вестью, когда письмо ушло.
 
-    По нему окно отличает обычную отправку от той, о которой надо сказать
-    отдельно, — на будущие коды это единственная зацепка.
+    Письмо сочиняет модель, и ждать её значило бы держать окно; отменить
+    начатую отправку это всё равно не отменило бы.
     """
     with_bot()
     vacancy = vacancy_row()
@@ -138,8 +216,12 @@ async def test_a_sent_application_names_the_reason_of_success(
 
     answer = await ask(api.vacancies.send_application, {"vacancy_id": vacancy.id})
 
-    assert "ok" in answer
-    assert answer["ok"]["reason"] == "sent"
+    assert answer["ok"] == {
+        "started": True,
+        "vacancy_id": vacancy.id,
+        "action": "send",
+    }
+    assert await told() == {"message": "Отклик отправлен.", "danger": False}
 
 
 async def test_deleting_with_the_bot_up_goes_through_the_bot(
@@ -158,3 +240,23 @@ async def test_deleting_with_the_bot_up_goes_through_the_bot(
 
     assert "ok" in answer
     assert ("ui_forget_vacancy", vacancy.id) in bot.calls
+
+
+async def test_a_launched_job_that_broke_still_answers_the_window(
+    api, ask, told, broken_vacancy, caplog
+):
+    """Сорвавшаяся пущенная работа всё равно говорит окну, и след ложится в журнал.
+
+    Ответ на зов сказал только «пущено»: промолчи мост об исходе — человек
+    остался бы с «отправляется» навсегда, ровно с той бедой, ради которой
+    вести и заведены.
+    """
+    vacancy = await broken_vacancy()
+
+    with caplog.at_level("ERROR"):
+        answer = await ask(api.vacancies.send_application, {"vacancy_id": vacancy.id})
+        said = await told()
+
+    assert answer["ok"]["started"] is True
+    assert said == {"message": "Не удалось отправить отклик — см. логи.", "danger": True}
+    assert "сорвалось на полпути" in caplog.text

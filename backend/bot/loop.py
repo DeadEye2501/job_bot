@@ -39,7 +39,7 @@ async def _connect(bot) -> None:
     """Поднять соединение и объявить бота готовым к обращениям из окна."""
     if bot._dry_run:
         logger.warning("DRY-RUN mode: outgoing TG messages will NOT be sent")
-    # Синкаем dev-safety lock из БД-настройки в module-level guard
+    # Синкаем галку «Симуляция отправки» из БД-настройки в module-level guard
     # adapters/telegram.send_dm. Авторитет — rs.send_locked; константа
     # — defence-in-depth на случай если Bot.send забудет проверить.
     telegram.SEND_LOCKED = bot._rs.send_locked

@@ -9,11 +9,11 @@
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import { attempts } from '$state/attempts.js';
-  import { channelName, channelStats, telegramHref } from '$state/contacts.js';
-  import { PAGE, appended } from '$state/paging.js';
+  import { channelName, channelStats, pollBlock, telegramHref } from '$state/contacts.js';
+  import { PAGE, appended, refreshLimit } from '$state/paging.js';
   import { donut } from '$state/stats.js';
 
-  let { ask, say, lockedTip, channelId, onvacancy, onclose, onchanged } = $props();
+  let { ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged } = $props();
 
   let card = $state(null);
   let vacancies = $state([]);
@@ -30,6 +30,7 @@
   let alive = true;
 
   const shown = $derived(card ? channelName({ ...card, id: card.channel_id }) : null);
+  const pollTip = $derived(pollBlock(card, lockedTip));
   const numbers = $derived(card ? channelStats(card.stats) : null);
   const funnel = $derived(card ? donut(card.stats.status_counts) : []);
 
@@ -47,12 +48,17 @@
    *
    * Страницами: каналов с тысячей вакансий хватает, и разом такой список не
    * рисуется. `append` — добор к показанному, `replace` — первая страница.
+   *
+   * Перечитывание берёт столько строк, сколько показано, а не страницу: весть
+   * приходит на каждое разобранное объявление, и страницей она схлопывала бы
+   * пролистанное снова и снова — ровно во время того прогона, который человек
+   * и запустил.
    */
   async function loadVacancies(id, mode = 'replace') {
     const mine = vacancyTries.next();
     const page = await ask('channels.vacancies', {
       channel_id: id,
-      limit: PAGE,
+      limit: mode === 'append' ? PAGE : refreshLimit(vacancies.length),
       offset: mode === 'append' ? vacancies.length : 0,
       mode,
     });
@@ -78,17 +84,24 @@
    *
    * Просьба уходит боту, а он при погасших лампах не поднят вовсе: пункт заперт
    * и объяснён теми же словами, что и кнопка обхода внизу окна.
+   *
+   * Ответа о прогоне здесь не ждут: на каждый новый пост уходит до пяти
+   * обращений к модели. Чем кончилось, скажет оболочка вестью об исходе, а
+   * числа карточки подтянутся вестью о смене списка вакансий.
    */
   async function pollNow() {
     const done = await ask('channels.poll_now', channelId);
     if (done === null) return;
-    say('Канал опрашивается');
+    say('Прогон канала запущен');
   }
 
   async function resetCursor() {
     const done = await ask('channels.reset_cursor', channelId);
     if (done === null) return;
-    say('Отметка прочитанного сброшена — следующий обход прочитает канал заново');
+    say(
+      'Отметка прочитанного сброшена — следующий обход перечитает последние посты канала ' +
+        '(сколько именно, задаёт глубина добора)',
+    );
   }
 
   /** Занести канал в отсев или убрать оттуда.
@@ -124,8 +137,16 @@
     hasMore = false;
     refresh(id);
     loadVacancies(id);
+    // Канал приносит вакансии и во время прогона, и сам по себе обходом: его
+    // числа и перечень стареют, пока карточка открыта, а прогнавший канал
+    // человек смотрит именно на них.
+    const deaf = events.on('vacancies_list_changed', () => {
+      refresh(id);
+      loadVacancies(id);
+    });
     return () => {
       alive = false;
+      deaf();
     };
   });
 </script>
@@ -171,8 +192,8 @@
         <button
           class="menu-item"
           type="button"
-          disabled={!!lockedTip}
-          title={lockedTip || 'Запустить поллинг этого канала'}
+          disabled={!!pollTip}
+          title={pollTip || 'Запустить поллинг этого канала'}
           onclick={() => {
             close();
             pollNow();

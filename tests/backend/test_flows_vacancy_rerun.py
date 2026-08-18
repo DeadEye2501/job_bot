@@ -10,12 +10,20 @@
 вакансию, а не выбросить её.
 """
 
+from backend.flows import embeddings as embeddings_mod
 from backend.flows import parse as parse_mod
 import pytest
 from pyrogram.errors import FloodWait
 
-from backend.models import TelegramChannel, Vacancy
-from tests.dbio import only_row, put
+from backend.models import (
+    StatusHistorySource,
+    TelegramChannel,
+    Vacancy,
+    VacancyStatus,
+    VacancyStatusHistory,
+)
+from backend.repository.vacancies_life import move_status
+from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row, vacancy_row
 from tests.fakes.telegram import FakeTelegramClient, post
 
@@ -67,6 +75,14 @@ async def _prepare(monkeypatch, make_pipeline, client):
     async def reload():
         pipeline.parsed.append("настройки")
 
+    async def embed(pipeline, text, what):
+        pipeline.embedded.append(text)
+        return pipeline.vector
+
+    pipeline.embedded = []
+    pipeline.vector = [0.5, 0.25]
+
+    monkeypatch.setattr(embeddings_mod, "embed_text", embed)
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
     pipeline._reload_resources = reload
     return pipeline
@@ -81,7 +97,7 @@ async def test_the_fresh_post_is_parsed_and_stored(monkeypatch, rerunning, sessi
     session_factory, vacancy, make_pipeline = rerunning
     pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(post=post(42, text="свежий текст")))
 
-    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) is True
+    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) == "ok"
 
     assert (await only_row(session_factory, Vacancy)).raw_text == "свежий текст"
     assert pipeline.parsed[-1] == (vacancy.id, "свежий текст", "jobs", False)
@@ -101,15 +117,14 @@ async def test_the_settings_are_reloaded_before_the_parse(monkeypatch, rerunning
     assert pipeline.parsed[0] == "настройки"
 
 
-async def test_a_rerun_that_could_not_ask_the_model_reports_failure(
+async def test_a_rerun_that_could_not_ask_the_model_says_so(
     monkeypatch, rerunning
 ):
-    """Прогон, не сумевший спросить модель, отвечает отказом.
+    """Прогон, не сумевший спросить модель, отвечает своим словом.
 
-    На отказ окно показывает «не удалось перезапустить», и человек жмёт
-    кнопку снова. Ответь прогон успехом — он показал бы «готово» там, где
-    карточка не менялась вовсе: приговора не было, а значит и переспрашивать
-    вроде бы незачем.
+    Окно показывает по нему «модель не ответила», и человек идёт поднимать
+    модель, а не искать пропавшую вакансию. Ответь прогон успехом — он показал
+    бы «готово» там, где карточка не менялась вовсе.
     """
     _, vacancy, make_pipeline = rerunning
     pipeline = await _prepare(
@@ -117,7 +132,7 @@ async def test_a_rerun_that_could_not_ask_the_model_reports_failure(
     )
     pipeline.parse_done = False
 
-    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) is False
+    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) == "llm"
 
 
 async def test_deletion_is_forbidden_on_a_rerun(monkeypatch, rerunning):
@@ -154,7 +169,7 @@ async def test_an_unavailable_post_falls_back_to_the_stored_text(monkeypatch, re
     _, vacancy, make_pipeline = rerunning
     pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(**answer))
 
-    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) is True
+    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) == "ok"
     assert pipeline.parsed[-1][1] == "сохранённый текст"
 
 
@@ -183,7 +198,7 @@ async def test_a_vacancy_without_a_source_is_parsed_from_the_cache(monkeypatch,
     client = _WithMessages(post=post(42, text="свежий текст"))
     pipeline = await _prepare(monkeypatch, make_pipeline, client)
 
-    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) is True
+    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) == "ok"
     assert client.asked == []
     assert pipeline.parsed[-1] == (vacancy.id, "сохранённый текст", "", False)
 
@@ -196,13 +211,142 @@ async def test_a_vacancy_with_no_text_at_all_cannot_be_rerun(monkeypatch,
     vacancy = await only_row(session_factory, Vacancy)
     pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(post=None))
 
-    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) is False
+    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) == "no_text"
     assert pipeline.parsed == []
 
 
 async def test_a_vanished_vacancy_cannot_be_rerun(monkeypatch, make_pipeline):
-    """Прогон исчезнувшей вакансии сообщает о неудаче."""
+    """Прогон исчезнувшей вакансии называет своё: записи нет."""
     pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(post=None))
 
-    assert await pipeline.rerun_pipeline_for_vacancy(404) is False
+    assert await pipeline.rerun_pipeline_for_vacancy(404) == "missing"
     assert pipeline.parsed == []
+
+
+async def test_the_fingerprint_is_recomputed_for_the_parsed_text(
+    monkeypatch, rerunning, session_factory
+):
+    """Отпечаток считается заново — по тому тексту, с которым идёт прогон.
+
+    Прогон заново — это весь путь заново. Отпечаток, оставшийся от прежнего
+    текста, отсеивал бы будущие похожие посты по тому, чего в объявлении уже
+    нет.
+    """
+    session_factory, vacancy, make_pipeline = rerunning
+    pipeline = await _prepare(
+        monkeypatch, make_pipeline, _WithMessages(post=post(42, text="свежий текст"))
+    )
+
+    await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
+
+    assert pipeline.embedded == ["свежий текст"]
+    assert (await only_row(session_factory, Vacancy)).embedding == [0.5, 0.25]
+
+
+async def test_a_rerun_writes_the_status_it_changed_into_the_history(
+    monkeypatch, rerunning, session_factory
+):
+    """Смена статуса прогоном не остаётся без объяснения.
+
+    Разбор ставит статус прямо, как у только что заведённой строки. Без этой
+    записи история обрывалась бы на прежнем статусе, а шапка карточки
+    показывала бы новый, и связать их было бы нечем.
+    """
+    session_factory, vacancy, make_pipeline = rerunning
+    pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(post=None))
+
+    async def parse(_pipeline, vacancy_id, text, username, allow_delete=False):
+        async with session_factory() as session:
+            row = await session.get(Vacancy, vacancy_id)
+            row.status = VacancyStatus.NOT_FIT
+            await session.commit()
+        return True
+
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
+
+    await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
+
+    written = await only_row(session_factory, VacancyStatusHistory)
+    assert written.previous_status is VacancyStatus.NEW
+    assert written.status is VacancyStatus.NOT_FIT
+    assert written.explanation == "Прогон заново."
+    assert written.applied is True
+    assert written.source is StatusHistorySource.SYSTEM
+
+
+async def test_a_rerun_that_changed_nothing_writes_no_history(
+    monkeypatch, rerunning, session_factory
+):
+    """Прогон, оставивший статус прежним, истории не трогает: сказать нечего."""
+    session_factory, vacancy, make_pipeline = rerunning
+    pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(post=None))
+
+    await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
+
+    assert await all_rows(session_factory, VacancyStatusHistory) == []
+
+
+async def test_a_silent_fingerprint_provider_does_not_cancel_the_rerun(
+    monkeypatch, rerunning
+):
+    """Молчащий поставщик отпечатков прогон не отменяет.
+
+    Он отдельный от чат-модели и лежать может порознь с ней, а разбор — то
+    главное, ради чего кнопку и жали.
+    """
+    _, vacancy, make_pipeline = rerunning
+    pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(post=None))
+    pipeline.vector = None
+
+    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) == "ok"
+    assert pipeline.parsed[-1][1] == "сохранённый текст"
+
+
+async def test_the_new_fingerprint_replaces_the_old_one_in_the_cache(
+    monkeypatch, rerunning
+):
+    """Кэш отсева перепостов получает новый отпечаток вместо прежнего.
+
+    Кэш живёт в памяти и сам из базы не перечитывается: оставь мы в нём старый
+    вектор — отсев сравнивал бы будущие посты с текстом, которого в вакансии
+    уже нет.
+    """
+    _, vacancy, make_pipeline = rerunning
+    pipeline = await _prepare(
+        monkeypatch, make_pipeline, _WithMessages(post=post(42, text="свежий текст"))
+    )
+    embeddings_mod.append_embedding(pipeline, vacancy.id, [0.9, 0.9])
+
+    await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
+
+    assert list(pipeline._embedding_ids) == [vacancy.id]
+    assert pipeline._embedding_matrix.tolist() == [[0.5, 0.25]]
+
+
+async def test_a_status_already_explained_gets_no_second_row(
+    monkeypatch, rerunning, session_factory
+):
+    """Переход, уже объяснённый чужой строкой, второй не получает.
+
+    Самоотклик внутри разбора сам переводит вакансию в «отклик отправлен» и
+    пишет об этом в историю; вторая строка о том же переходе показала бы его
+    в ленте дважды.
+    """
+    session_factory, vacancy, make_pipeline = rerunning
+    pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(post=None))
+
+    async def parse(_pipeline, vacancy_id, text, username, allow_delete=False):
+        async with session_factory() as session:
+            row = await session.get(Vacancy, vacancy_id)
+            session.add(
+                move_status(row, VacancyStatus.APPLIED, "Авто-отправка отклика.")
+            )
+            await session.commit()
+        return True
+
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
+
+    await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
+
+    written = await only_row(session_factory, VacancyStatusHistory)
+    assert written.explanation == "Авто-отправка отклика."
