@@ -75,9 +75,13 @@
   font-size: 16px;
 }
 
-/* Сетка, выравнивание и черта — общие, в ruled-row.css. */
+/* Сетка, выравнивание и черта — общие, в ruled-row.css.
+
+   Колонка синонимов ужимается ниже своего содержимого: голый `1fr` держит
+   ширину по самой длинной пилюле, и в узком окне строка вылезала за поле, а
+   срезанной оказывалась её корзина. */
 .skill-row {
-  grid-template-columns: 150px 130px 1fr auto;
+  grid-template-columns: 150px 130px minmax(0, 1fr) auto;
   gap: 10px;
   padding: 4px 8px;
   font-size: 0.83rem;
