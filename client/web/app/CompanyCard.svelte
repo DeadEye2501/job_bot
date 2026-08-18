@@ -284,7 +284,8 @@
         placeholder="Заметки о компании…"
         delay={NOTES_DELAY}
         limit={2000}
-        save={(text) => saveNotes(companyId, text)}
+        owner={companyId}
+        save={saveNotes}
       />
     {/key}
   </div>

@@ -320,12 +320,18 @@
   </div>
 
   <div class="det-section">
-    <NotesField
-      value={card.notes}
-      placeholder="Заметки по вакансии…"
-      delay={NOTES_DELAY}
-      save={(text) => saveNotes(vacancyId, text)}
-    />
+    <!-- Своя запись на каждую вакансию: поле запечатывает номер при заведении,
+         и заводиться заново на каждую его заставляет именно `{#key}` — без
+         него запечатанный номер протухнет. -->
+    {#key vacancyId}
+      <NotesField
+        value={card.notes}
+        placeholder="Заметки по вакансии…"
+        delay={NOTES_DELAY}
+        owner={vacancyId}
+        save={saveNotes}
+      />
+    {/key}
   </div>
 
   {#if rows.length}
