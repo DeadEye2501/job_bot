@@ -7,7 +7,7 @@ import numpy as np
 
 from backend.flows import linked_article, parse
 from backend.domain.dedup import cosine_top_match
-from backend.message_text import extract_post_text
+from backend.message_text import extract_post_text, extract_text
 from backend.models import Vacancy
 from backend.payloads import ChannelPost
 from backend.repository.vacancies_life import add_vacancy_event
@@ -22,9 +22,15 @@ async def _post_embedding(pipeline, post: ChannelPost):
 
     Пост без отпечатка пропускается, курсор идёт дальше, и следующий проход по
     каналу его не увидит — но это дешевле, чем встать на одном посте.
+
+    Считается по голому тексту поста, а не по тому, что уходит в разбор и
+    ложится в строку: там к посту подставлены адреса ссылок и дописаны статьи,
+    а сравнивать отпечаток приходится с посчитанными год назад, когда ни того,
+    ни другого в тексте не было. Посчитай его по склейке — и перепост давно
+    заведённой вакансии перестал бы с ней сходиться, заведясь второй строкой.
     """
     return await embeddings.embed_text(
-        pipeline, post.text, f"[@{post.channel_username}] {post.msg.id}"
+        pipeline, extract_text(post.msg), f"[@{post.channel_username}] {post.msg.id}"
     )
 
 
