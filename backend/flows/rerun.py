@@ -7,7 +7,7 @@ from typing import Literal
 from sqlalchemy import select
 
 from backend.flows import embeddings, linked_article, parse
-from backend.message_text import extract_post_text
+from backend.message_text import extract_post_text, extract_text
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
 from backend.repository.channels import list_named_channels
@@ -61,8 +61,12 @@ async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None:
         )
 
 
-async def _post_text(msg, origin: _Origin, vacancy_id: int) -> str | None:
-    """Текст перечитанного поста со статьями; пусто — брать сохранённый.
+async def _post_text(msg, origin: _Origin, vacancy_id: int) -> tuple[str, str] | None:
+    """Перечитанный пост двумя текстами; пусто — брать сохранённый.
+
+    Первый — со статьями и адресами ссылок, он идёт в разбор и в строку.
+    Второй — голый текст поста, он идёт в отпечаток: отпечатки сравнивают с
+    посчитанными год назад, когда ни адресов, ни статей в тексте не было.
 
     Недобравший текст здесь хуже прежнего, а не лучше: сохранённый уже
     содержит статью, которую в эту минуту не отдали, и переписать его постом
@@ -82,7 +86,7 @@ async def _post_text(msg, origin: _Origin, vacancy_id: int) -> str | None:
             vacancy_id,
         )
         return None
-    return candidate
+    return candidate, extract_text(msg)
 
 
 async def _fetch_fresh_text(pipeline, origin: _Origin, vacancy_id: int):
@@ -141,8 +145,10 @@ async def _refresh_embedding(pipeline, vacancy_id: int, text: str) -> None:
 
     Прогон заново — это весь путь заново, и отпечаток тоже: оставшийся от
     прежнего текста, он отсеивал бы будущие похожие посты по тому, чего в
-    объявлении уже нет. Кэш отсева правится следом за строкой — он живёт
-    в памяти и сам из базы не перечитывается.
+    объявлении уже нет. Приходит сюда голый текст поста, тот же, по какому
+    отпечаток считают на приёме, — иначе прогон уводил бы вакансию из общего
+    счёта, и перепост переставал бы с ней сходиться. Кэш отсева правится
+    следом за строкой — он живёт в памяти и сам из базы не перечитывается.
 
     Молчание поставщика отпечатков прогон не отменяет: он отдельный от
     чат-модели и лежит порознь с ней, а разбор — главное, ради чего кнопку и
@@ -168,10 +174,10 @@ async def rerun_pipeline_for_vacancy(
 ) -> Literal["ok", "missing", "no_text", "llm"]:
     """Разобрать заведённую вакансию заново — кнопка окна «Прогнать заново».
 
-    Прогон идёт как над только что заведённой строкой, и всё, что даёт эту
-    одинаковость, делается здесь: исходный пост перечитывается из Telegram (при
-    неудаче остаётся сохранённый текст — см. `_fetch_fresh_text`), навыки,
-    отсев и анкета перечитываются, отпечаток текста считается заново.
+    Прогон идёт как над только что заведённой строкой: пост перечитывается из
+    Telegram (при неудаче остаётся сохранённый текст — см. `_fetch_fresh_text`),
+    навыки, отсев и анкета перечитываются, отпечаток считается заново — по
+    голому тексту перечитанного поста, а не по сохранённому со статьями.
 
     Исходов четыре, а не «да/нет»: окно говорит о них разное, и «нет вакансии
     или пустой текст» на месте молчащей модели посылало бы человека искать
@@ -180,12 +186,13 @@ async def rerun_pipeline_for_vacancy(
     origin = await _vacancy_origin(pipeline, vacancy_id)
     if origin is None:
         return "missing"
-    fresh_text = await _fetch_fresh_text(pipeline, origin, vacancy_id)
-    if fresh_text is not None and fresh_text != origin.raw_text:
-        await _store(pipeline, vacancy_id, raw_text=fresh_text)
-        text = fresh_text
+    fresh = await _fetch_fresh_text(pipeline, origin, vacancy_id)
+    if fresh is None:
+        text, plain = origin.raw_text, None
     else:
-        text = origin.raw_text
+        text, plain = fresh
+        if text != origin.raw_text:
+            await _store(pipeline, vacancy_id, raw_text=text)
 
     if not text:
         logger.warning("rerun: vacancy %d has empty raw_text", vacancy_id)
@@ -195,7 +202,8 @@ async def rerun_pipeline_for_vacancy(
         pipeline, vacancy_id, text, origin.channel_username, allow_delete=False
     ):
         return "llm"
-    await _refresh_embedding(pipeline, vacancy_id, text)
+    if plain is not None:
+        await _refresh_embedding(pipeline, vacancy_id, plain)
     await _note_rerun(pipeline, vacancy_id, origin)
     # Вторая весть за прогон: первую шлёт сам разбор, но строка истории и
     # отпечаток ложатся уже после неё, и карточка перечитала бы себя без них.

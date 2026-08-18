@@ -292,6 +292,46 @@ async def test_the_fingerprint_is_recomputed_for_the_parsed_text(
     assert (await only_row(session_factory, Vacancy)).embedding == [0.5, 0.25]
 
 
+async def test_the_fingerprint_is_taken_from_the_post_alone(monkeypatch, rerunning):
+    """Отпечаток считается по голому посту, без адресов и без статьи.
+
+    Тем же, чем он считается на приёме: иначе прогон заново уводил бы вакансию
+    из общего счёта, и перепост переставал бы с ней сходиться.
+    """
+    _, vacancy, make_pipeline = rerunning
+
+    async def fetch_article(_client, _url):
+        return "Требования: Python"
+
+    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    text = "Senior QA, контакты в описании https://teletype.in/@a/b"
+    fresh = post(
+        42,
+        text=text,
+        entities=[link_entity(offset=10, length=8, url="https://acme.test/jobs")],
+    )
+    pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(post=fresh))
+
+    await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
+
+    assert pipeline.embedded == [text]
+
+
+async def test_an_unread_post_leaves_the_fingerprint_alone(monkeypatch, rerunning):
+    """Не перечитанный пост отпечаток не трогает.
+
+    Считать его тогда не от чего: голого текста поста на руках нет, а
+    сохранённый для этого не годится — в нём адреса и статьи. Прежний
+    отпечаток и так отвечает тому же посту.
+    """
+    _, vacancy, make_pipeline = rerunning
+    pipeline = await _prepare(monkeypatch, make_pipeline, _WithMessages(post=None))
+
+    await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
+
+    assert pipeline.embedded == []
+
+
 async def test_a_rerun_writes_the_status_it_changed_into_the_history(
     monkeypatch, rerunning, session_factory
 ):
