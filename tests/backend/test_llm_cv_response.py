@@ -127,3 +127,19 @@ async def test_a_well_formed_answer_becomes_a_parsed_resume():
     assert parsed.languages == []
     assert parsed.skills == []
     assert parsed.experience == []
+
+
+async def test_reasoning_with_braces_before_the_answer_does_not_hide_it():
+    """Скобки в рассуждении до ответа сам ответ не заслоняют.
+
+    Рассуждающая модель проговаривает шаги и сыплет скобками; берись объект от
+    первой открывающей до последней закрывающей, разбор упирался бы в первую
+    же такую скобку и отдавал пустоту — то есть резюме не разобралось бы вовсе.
+    """
+    answer = f"Смотрю разделы {{опыт, навыки}} и собираю:\n{MINIMAL_CV}"
+    client = provider({CHAT: chat_response(answer)})
+
+    parsed = await parse_cv("резюме", client, "qwen")
+
+    assert parsed is not None
+    assert parsed.profile.first_name == "Алексей"

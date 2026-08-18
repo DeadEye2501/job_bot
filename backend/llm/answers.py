@@ -3,10 +3,6 @@
 
 import json
 import logging
-import re
-
-_JSON_OBJECT_RE = re.compile(r"\{[^{}]*\}", re.DOTALL)
-
 
 QUOTE_TRANSLATION = str.maketrans({
     "“": '"',
@@ -16,28 +12,64 @@ QUOTE_TRANSLATION = str.maketrans({
 })
 
 
+def _last_object_in(text: str) -> tuple[int, str] | None:
+    """Последний разбираемый объект верхнего уровня и место, где он начался.
+
+    Разбирает сам `json`, а не выражение по скобкам: скобка внутри значения —
+    обычный знак строки, и ответ с шаблонизатором в перечне навыков выражение
+    рвало бы пополам. Вложенный объект по той же причине отдельно не
+    выхватывается: разобрав внешний, идём дальше от его конца.
+
+    Неудача на открывающей скобке — обычный исход, а не беда: рассуждение
+    модели полно скобок, за которыми объекта нет.
+    """
+    decoder = json.JSONDecoder()
+    last: tuple[int, str] | None = None
+    at = 0
+    while (start := text.find("{", at)) != -1:
+        try:
+            value, end = decoder.raw_decode(text, start)
+        except ValueError:
+            at = start + 1
+            continue
+        if isinstance(value, dict):
+            last = (start, text[start:end])
+        at = end
+    return last
+
+
 def extract_last_json(answer: str) -> str | None:
     """Последний объект JSON из ответа модели.
 
-    Сначала ищется разбираемый объект в тексте как есть, и только потом — в
-    тексте с выпрямленными кавычками. Порядок важен: выпрямление заведено
-    ради моделей, ставящих ёлочки вместо кавычек JSON, но те же ёлочки
-    встречаются и внутри значений по-русски — выпрямив их там, мы ломаем
-    годный ответ.
+    Объект ищется дважды: в тексте как есть и в нём же с выпрямленными
+    кавычками. Выпрямление заведено ради моделей, ставящих ёлочки вместо
+    кавычек JSON, но те же ёлочки встречаются и внутри значений по-русски, где
+    выпрямление ломает годный ответ, — поэтому один из двух надо выбрать.
 
-    Если не разбирается ничто, отдаётся последний найденный огрызок: зовущий
-    сообщит о неразбираемом ответе так же, как и прежде.
+    Выбирается тот, чей объект **начался раньше**: начавшийся раньше — более
+    внешний. Ёлочка на месте кавычки JSON рвёт объект снаружи, и в исходном
+    тексте от него остаётся внутренний кусок; выпрямление открывает его
+    целиком, и начало уезжает влево. А когда ёлочки стоят внутри значения,
+    выпрямление, наоборот, ломает объект, и раньше начинается исходный.
+    При равенстве побеждает текст как есть.
+
+    Сравнивать места можно потому, что выпрямление меняет знаки один к одному
+    и длин не двигает.
+
+    Если не разбирается ничто, отдаётся огрызок от последней открывающей
+    скобки до последней закрывающей: зовущий сообщит о неразбираемом ответе
+    так же, как и прежде, и в записи будет видно, обо что споткнулись.
     """
     straightened = answer.translate(QUOTE_TRANSLATION)
+    best: tuple[int, str] | None = None
     for text in (answer, straightened):
-        for candidate in reversed(_JSON_OBJECT_RE.findall(text)):
-            try:
-                json.loads(candidate)
-            except ValueError:
-                continue
-            return candidate
-    matches = _JSON_OBJECT_RE.findall(straightened)
-    return matches[-1] if matches else None
+        found = _last_object_in(text)
+        if found is not None and (best is None or found[0] < best[0]):
+            best = found
+    if best is not None:
+        return best[1]
+    start, end = straightened.rfind("{"), straightened.rfind("}")
+    return straightened[start : end + 1] if -1 < start < end else None
 
 
 def json_object(answer: str, log: logging.Logger, purpose: str) -> dict | None:

@@ -20,7 +20,7 @@ from backend.domain.skill_names import skill_key
 from backend.domain.spellings import dedupe_first_wins
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
 from backend.llm.answers import (
-    QUOTE_TRANSLATION,
+    extract_last_json,
     log_unparseable,
     normalize_enum,
     str_or_none,
@@ -169,8 +169,6 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 - languages, skills и experience могут быть пустыми массивами, если в CV их нет.
 - Никакого текста вне JSON. Никакого markdown-обрамления. Никаких code-fence заборчиков. Никаких комментариев."""
 
-
-_JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]:
     if not isinstance(raw, list):
@@ -325,12 +323,18 @@ def _parse_experience(item) -> ParsedCvExperience | None:
 
 
 def _parse_cv_json(answer: str) -> ParsedCv | None:
-    cleaned = answer.translate(QUOTE_TRANSLATION)
-    match = _JSON_OBJECT_RE.search(cleaned)
-    if match is None:
+    """Разобранное резюме из ответа модели; пусто — разбирать нечего.
+
+    Объект вырезает общее объявление, а не своё: разбор резюме отличался от
+    соседей только тем, что брал от первой открывающей скобки до последней
+    закрывающей — ради вложенности, — и упирался в любую скобку рассуждения
+    до самого ответа. Общее объявление вложенность держит само.
+    """
+    raw = extract_last_json(answer)
+    if raw is None:
         return None
     try:
-        data = json.loads(match.group(0))
+        data = json.loads(raw)
     except json.JSONDecodeError:
         return None
 
