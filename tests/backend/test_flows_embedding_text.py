@@ -25,8 +25,8 @@ class _Pipeline:
     """Столько конвейера, сколько нужно счёту отпечатка."""
 
     def __init__(self, client) -> None:
-        self._lm_embed_client = client
-        self._lm_embed_model = "bge"
+        self.lm_embed_client = client
+        self.lm_embed_model = "bge"
 
 
 @pytest.mark.parametrize(

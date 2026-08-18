@@ -38,7 +38,7 @@ class _Origin:
 
 async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None:
     """Что известно о происхождении вакансии; пусто — вакансии нет."""
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         v = await session.get(Vacancy, vacancy_id)
         if v is None:
             logger.warning("rerun: vacancy %d missing", vacancy_id)
@@ -101,7 +101,7 @@ async def _fetch_fresh_text(pipeline, origin: _Origin, vacancy_id: int):
     if not origin.channel_username or origin.msg_id is None:
         return None
     try:
-        msg = await pipeline._client.get_messages(
+        msg = await pipeline.client.get_messages(
             origin.channel_username, message_ids=origin.msg_id
         )
         if msg is None or getattr(msg, "empty", False):
@@ -131,7 +131,7 @@ async def _store(pipeline, vacancy_id: int, **fields) -> None:
     оборвись разбор посреди, записанное всё равно останется. Исчезнувшая
     строка — обычный исход: её могли снести из окна, пока шёл прогон.
     """
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         v = await session.get(Vacancy, vacancy_id)
         if v is None:
             return
@@ -164,7 +164,7 @@ async def _refresh_embedding(pipeline, vacancy_id: int, text: str) -> None:
 
 async def _note_rerun(pipeline, vacancy_id: int, origin: "_Origin") -> None:
     """Отметить в истории вакансии, что её прогнали заново."""
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         async with session.begin():
             await record_rerun(session, vacancy_id, origin.status, origin.history_id)
 
@@ -197,7 +197,7 @@ async def rerun_pipeline_for_vacancy(
     if not text:
         logger.warning("rerun: vacancy %d has empty raw_text", vacancy_id)
         return "no_text"
-    await pipeline._reload_resources()
+    await pipeline.reload_resources()
     if not await parse.parse_and_update_vacancy(
         pipeline, vacancy_id, text, origin.channel_username, allow_delete=False
     ):
@@ -207,7 +207,7 @@ async def rerun_pipeline_for_vacancy(
     await _note_rerun(pipeline, vacancy_id, origin)
     # Вторая весть за прогон: первую шлёт сам разбор, но строка истории и
     # отпечаток ложатся уже после неё, и карточка перечитала бы себя без них.
-    pipeline._fire_vacancies_changed()
+    pipeline.fire_vacancies_changed()
     return "ok"
 
 
@@ -217,7 +217,7 @@ async def _orphan_rows(pipeline) -> list:
     Ник канала берётся внешним соединением: канал могли снести, а вакансия
     от этого недоразобранной быть не перестаёт.
     """
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         return (
             await session.execute(
                 select(
@@ -250,14 +250,14 @@ async def recover_orphan_vacancies(pipeline) -> int:
     Trash / empty verdicts therefore delete the row, same as a fresh
     ingest. Returns the number of orphans processed.
     """
-    await pipeline._reload_resources()
+    await pipeline.reload_resources()
     rows = await _orphan_rows(pipeline)
     if not rows:
         return 0
     logger.info("recovering %d orphan vacancy/vacancies", len(rows))
     processed = 0
     for idx, r in enumerate(rows, start=1):
-        pipeline._emit_progress(
+        pipeline.emit_progress(
             "recover", r.username or "", idx - 1, len(rows)
         )
         text = r.raw_text or ""
@@ -274,6 +274,6 @@ async def recover_orphan_vacancies(pipeline) -> int:
             )
     # Clear the recovery bar once done so the next stage's progress
     # doesn't inherit the leftover count (mirrors poll_active_channels).
-    pipeline._emit_progress("recover", "", 0, 0)
+    pipeline.emit_progress("recover", "", 0, 0)
     logger.info("recovered %d/%d orphan vacancy/vacancies", processed, len(rows))
     return processed

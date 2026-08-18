@@ -17,8 +17,8 @@ import pytest
 @pytest.mark.parametrize(
     ("fire", "hook"),
     [
-        pytest.param("_fire_contacts_changed", "on_contacts_changed", id="контакты"),
-        pytest.param("_fire_vacancies_changed", "on_vacancies_changed", id="вакансии"),
+        pytest.param("fire_contacts_changed", "on_contacts_changed", id="контакты"),
+        pytest.param("fire_vacancies_changed", "on_vacancies_changed", id="вакансии"),
     ],
 )
 async def test_the_window_is_told_what_changed(make_pipeline, fire, hook):
@@ -38,6 +38,6 @@ async def test_the_window_hears_how_much_is_done(make_pipeline):
     heard: list[tuple] = []
     pipeline.on_progress = lambda *args: heard.append(args)
 
-    pipeline._emit_progress("channel", "@pyjobs", 3, 18)
+    pipeline.emit_progress("channel", "@pyjobs", 3, 18)
 
     assert heard == [("channel", "@pyjobs", 3, 18)]

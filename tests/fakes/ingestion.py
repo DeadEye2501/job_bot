@@ -126,7 +126,7 @@ class WindowHooks:
 
 def wire(bot, ingestion, hooks=None):
     """Ставит боту подставной конвейер и подключает оповещения окна."""
-    bot._ingestion = ingestion
+    bot.ingestion = ingestion
     if hooks is not None:
         bot.on_cycle_start = hooks.start
         bot.on_cycle_end = hooks.end

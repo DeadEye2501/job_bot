@@ -340,9 +340,9 @@ def spawn_hr_backfill(pipeline, hr) -> None:
     async def _run() -> None:
         try:
             await backfill_hr_dm_history(
-                pipeline._client, hr, pipeline._lm_client, pipeline._lm_chat_model,
-                pipeline._session_factory,
-                backfill_limit=pipeline._rs.dm_backfill_limit,
+                pipeline.client, hr, pipeline.lm_client, pipeline.lm_chat_model,
+                pipeline.session_factory,
+                backfill_limit=pipeline.rs.dm_backfill_limit,
                 on_message_persisted=pipeline.on_new_message,
                 on_vacancies_changed=pipeline.on_vacancies_changed,
                 schedule_classification=pipeline.schedule_dm_classification,
@@ -355,5 +355,5 @@ def spawn_hr_backfill(pipeline, hr) -> None:
                 hr.id, extra={"hr_id": hr.id},
             )
     task = asyncio.create_task(_run())
-    pipeline._backfill_tasks.add(task)
-    task.add_done_callback(pipeline._backfill_tasks.discard)
+    pipeline.backfill_tasks.add(task)
+    task.add_done_callback(pipeline.backfill_tasks.discard)

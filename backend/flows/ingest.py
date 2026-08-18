@@ -76,9 +76,9 @@ async def ingest_post(
     await embeddings.ensure_embedding_cache(pipeline, len(embedding))
     similar_id = cosine_top_match(
         np.asarray(embedding, dtype=np.float32),
-        pipeline._embedding_ids,
-        pipeline._embedding_matrix,
-        threshold=pipeline._rs.dedup_cosine_threshold,
+        pipeline.embedding_ids,
+        pipeline.embedding_matrix,
+        threshold=pipeline.rs.dedup_cosine_threshold,
     )
     if similar_id is not None:
         await _resume_or_skip(pipeline, similar_id, post)
@@ -117,7 +117,7 @@ async def save_new_vacancy(
     post: ChannelPost,
     embedding: list[float],
 ) -> int | None:
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         try:
             new_vacancy = _vacancy_row(post, embedding)
             session.add(new_vacancy)

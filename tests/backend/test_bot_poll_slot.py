@@ -24,7 +24,7 @@ async def test_a_manual_channel_poll_reports_success(make_bot):
 
     assert await bot.poll_channel_now(7) == "ok"
     assert ingestion.channel_calls == [7]
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None
 
 
 async def test_a_channel_the_pipeline_could_not_take_reports_missing(make_bot):
@@ -64,7 +64,7 @@ async def test_a_cancelled_channel_poll_frees_the_slot(make_bot):
     bot.cancel_current_poll()
 
     assert await running == "cancelled"
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None
 
 
 async def test_a_failed_channel_poll_frees_the_slot_too(make_bot):
@@ -72,7 +72,7 @@ async def test_a_failed_channel_poll_frees_the_slot_too(make_bot):
     bot = wire(await make_bot(), FakeIngestion(error=RuntimeError("сорвалось")))
 
     assert await bot.poll_channel_now(7) == "error"
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None
 
 
 @pytest.mark.parametrize(
@@ -113,7 +113,7 @@ async def test_a_broken_end_hook_does_not_change_the_outcome(make_bot):
     bot = wire(await make_bot(), FakeIngestion(), WindowHooks(end_error=RuntimeError("окно")))
 
     assert await bot.poll_channel_now(7) == "ok"
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None
 
 
 async def test_a_forced_full_poll_reports_success(make_bot):
@@ -123,7 +123,7 @@ async def test_a_forced_full_poll_reports_success(make_bot):
 
     assert await bot.force_poll_once() == "ok"
     assert ingestion.full_calls == 1
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None
 
 
 async def test_a_forced_full_poll_while_busy_is_refused(make_bot, busy_slot):
@@ -145,7 +145,7 @@ async def test_a_cancelled_full_poll_frees_the_slot(make_bot):
     bot.cancel_current_poll()
 
     assert await running == "cancelled"
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None
 
 
 async def test_a_failed_full_poll_frees_the_slot_too(make_bot):
@@ -153,7 +153,7 @@ async def test_a_failed_full_poll_frees_the_slot_too(make_bot):
     bot = wire(await make_bot(), FakeIngestion(error=RuntimeError("сорвалось")))
 
     assert await bot.force_poll_once() == "error"
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None
 
 
 async def test_the_window_hears_both_ends_of_a_full_poll(make_bot):

@@ -29,7 +29,7 @@ async def ui_rerun_vacancy_pipeline(
     logger.info("UI rerun pipeline for vacancy %d", vacancy_id)
     outcome, walk = await slot.run_in_slot(
         bot,
-        lambda: bot._ingestion.rerun_pipeline_for_vacancy(vacancy_id),
+        lambda: bot.ingestion.rerun_pipeline_for_vacancy(vacancy_id),
         f"rerun pipeline for vacancy {vacancy_id}",
         progress=("rerun", f"Прогон вакансии #{vacancy_id}…", 0, 0),
     )

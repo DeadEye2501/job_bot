@@ -24,7 +24,7 @@ def on_runner_loop(bot, action: Callable[[], Any]) -> None:
     делаем прямо: ожидающих у события в этот миг нет, а задачи прогона нет и
     подавно.
     """
-    loop = bot._loop
+    loop = bot.loop
     if loop is not None and not loop.is_closed():
         loop.call_soon_threadsafe(action)
     else:
@@ -33,7 +33,7 @@ def on_runner_loop(bot, action: Callable[[], Any]) -> None:
 
 def cancel_current_poll(bot) -> None:
     """Cancel an in-flight poll cycle without stopping the whole bot."""
-    task = bot._current_poll_task
+    task = bot.current_poll_task
     if task is None or task.done():
         return
     logger.info("Cancel current poll requested")
@@ -49,9 +49,9 @@ async def _run_task(bot, work: Callable[[], Any], label: str):
     зовущий говорит о них разными словами.
     """
     try:
-        bot._current_poll_task = asyncio.create_task(work())
+        bot.current_poll_task = asyncio.create_task(work())
         try:
-            return "ok", await bot._current_poll_task
+            return "ok", await bot.current_poll_task
         except asyncio.CancelledError:
             logger.info("%s cancelled by user", label)
             return "cancelled", None
@@ -80,7 +80,7 @@ async def run_in_slot(
     месте её никто не станет ждать, и она осталась бы висеть
     неисполненной.
     """
-    if bot._current_poll_task is not None:
+    if bot.current_poll_task is not None:
         logger.info("%s: another cycle is already running, skipping", label)
         return "busy", None
     fire(bot.on_cycle_start, "on_cycle_start")
@@ -89,6 +89,6 @@ async def run_in_slot(
     try:
         outcome, result = await _run_task(bot, work, label)
     finally:
-        bot._current_poll_task = None
+        bot.current_poll_task = None
         fire(bot.on_cycle_end, "on_cycle_end")
     return outcome, result

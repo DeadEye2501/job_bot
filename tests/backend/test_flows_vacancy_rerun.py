@@ -89,7 +89,7 @@ async def _prepare(monkeypatch, make_pipeline, client):
 
     monkeypatch.setattr(embeddings_mod, "embed_text", embed)
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
-    pipeline._reload_resources = reload
+    pipeline.reload_resources = reload
     return pipeline
 
 
@@ -408,8 +408,8 @@ async def test_the_new_fingerprint_replaces_the_old_one_in_the_cache(
 
     await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
 
-    assert list(pipeline._embedding_ids) == [vacancy.id]
-    assert pipeline._embedding_matrix.tolist() == [[0.5, 0.25]]
+    assert list(pipeline.embedding_ids) == [vacancy.id]
+    assert pipeline.embedding_matrix.tolist() == [[0.5, 0.25]]
 
 
 async def test_a_status_already_explained_gets_no_second_row(

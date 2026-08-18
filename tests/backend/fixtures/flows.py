@@ -71,7 +71,7 @@ async def _put_out_backfills(pipelines) -> None:
     посреди чужого прогона.
     """
     for pipeline in pipelines:
-        for task in list(pipeline._backfill_tasks):
+        for task in list(pipeline.backfill_tasks):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
@@ -192,8 +192,8 @@ async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)
     await put(session_factory, profile_row())
     profile = await only_row(session_factory, Profile)
     await put(session_factory, profile_skill_row(profile.id, "Python"))
-    await pipeline._reload_resources()
-    await pipeline._rs.set_app("scoring_threshold", "1")
+    await pipeline.reload_resources()
+    await pipeline.rs.set_app("scoring_threshold", "1")
     return pipeline, unparsed_vacancy
 
 
@@ -212,9 +212,9 @@ async def dm_pipeline(monkeypatch, make_pipeline):
 
     async def classify(pipeline, hr_id):
         built.classified.append(
-            (hr_id, list(built._dm_classify_buffer.get(hr_id, [])))
+            (hr_id, list(built.dm_classify_buffer.get(hr_id, [])))
         )
-        built._dm_classify_buffer.pop(hr_id, None)
+        built.dm_classify_buffer.pop(hr_id, None)
 
     monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", classify)
     yield built

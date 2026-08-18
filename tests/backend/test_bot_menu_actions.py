@@ -23,7 +23,7 @@ async def test_a_rerun_reaches_the_pipeline_and_frees_the_slot(make_bot):
 
     assert await bot.ui_rerun_vacancy_pipeline(5) == "ok"
     assert ingestion.rerun_calls == [5]
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None
 
 
 async def test_a_delete_from_the_window_reaches_the_pipeline(make_bot):
@@ -86,7 +86,7 @@ async def test_a_cancelled_rerun_frees_the_slot(make_bot):
     bot.cancel_current_poll()
 
     assert await running == "cancelled"
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None
 
 
 async def test_a_failed_rerun_frees_the_slot_too(make_bot):
@@ -94,7 +94,7 @@ async def test_a_failed_rerun_frees_the_slot_too(make_bot):
     bot = wire(await make_bot(), FakeIngestion(error=RuntimeError("сорвалось")))
 
     assert await bot.ui_rerun_vacancy_pipeline(5) == "error"
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None
 
 
 async def test_a_rerun_tells_the_window_which_vacancy_it_took(make_bot):

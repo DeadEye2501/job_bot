@@ -40,7 +40,7 @@ async def test_a_message_typed_elsewhere_shows_up_in_the_chat(
     отвечает второй раз на то, что уже ответил.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
 
     await bot._on_dm_outgoing(client, _echo())
 
@@ -61,7 +61,7 @@ async def test_an_echo_of_our_own_send_is_not_written_twice(
     одинаковых пузыря.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(
@@ -83,7 +83,7 @@ async def test_an_echo_of_our_own_send_downloads_nothing(chatting, session_facto
     """
     client = FakeTelegramClient()
     bot, _, hr = await chatting(client=client, telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=False, tg_message_id=10),
@@ -103,7 +103,7 @@ async def test_the_window_hears_about_an_echo_of_our_own_send(
     сообщение действительно ушло, — это и есть эхо.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=False, tg_message_id=10),
@@ -123,7 +123,7 @@ async def test_a_message_to_a_stranger_is_not_saved(chatting, session_factory):
     значило бы завалить вкладку посторонним.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
 
     await bot._on_dm_outgoing(client, _echo(chat_id=999))
 
@@ -133,7 +133,7 @@ async def test_a_message_to_a_stranger_is_not_saved(chatting, session_factory):
 async def test_a_message_without_a_chat_is_ignored(chatting, session_factory):
     """Сообщение без указания переписки пропускается: адресата не опознать."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
 
     await bot._on_dm_outgoing(client, message(id=10, text="куда-то", chat=None))
 
@@ -145,7 +145,7 @@ async def test_a_switched_off_bot_ignores_what_was_typed_elsewhere(
 ):
     """Выключенный бот написанное с телефона не подхватывает."""
     bot, client, hr = await chatting(mode=BotMode.OFF, telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
 
     await bot._on_dm_outgoing(client, _echo())
 
@@ -162,7 +162,7 @@ async def test_an_attachment_typed_elsewhere_is_downloaded(
     """
     client = FakeTelegramClient()
     bot, _, hr = await chatting(client=client, telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
 
     downloaded: list[str] = []
 
@@ -192,8 +192,8 @@ async def test_an_attachment_without_a_client_is_not_chased(
     виден пузырь.
     """
     bot, _, _ = await chatting(client=FakeTelegramClient(), telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
-    bot._client = None
+    bot.ingestion = FakeIngestion()
+    bot.client = None
 
     with caplog.at_level(logging.ERROR):
         await bot._on_dm_outgoing(None, _echo(photo=object()))
@@ -216,7 +216,7 @@ async def test_a_duplicate_that_slipped_in_meanwhile_is_passed_over(
     """
     client = FakeTelegramClient()
     bot, _, hr = await chatting(client=client, telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
 
     async def download_media(msg, file_name):
         await put(
@@ -260,7 +260,7 @@ async def test_a_write_that_fell_through_stays_quiet(
     перерисовываться не за чем — она покажет ровно то же, что и была.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     monkeypatch.setattr("backend.flows.dm.extract_dm_text", lambda msg: object())
     heard: list[int] = []
     bot.on_new_message = heard.append
@@ -276,7 +276,7 @@ async def test_the_window_hears_about_a_message_typed_elsewhere(
 ):
     """Окно узнаёт о написанном с телефона: переписка обновится сразу."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     heard: list[int] = []
     bot.on_new_message = heard.append
 
@@ -290,7 +290,7 @@ async def test_a_broken_window_hook_does_not_lose_the_message(
 ):
     """Сломанное оповещение окна само сообщение не теряет."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
 
     def broken(hr_id):
         raise RuntimeError("окно")
@@ -309,7 +309,7 @@ async def test_an_echo_finds_an_hr_known_only_by_name(chatting, session_factory)
     единственное, чем строку можно опознать.
     """
     bot, client, hr = await chatting(telegram_username="maria", telegram_user_id=None)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
 
     await bot._on_dm_outgoing(client, _echo(chat_id=999, username="maria"))
 

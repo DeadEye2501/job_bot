@@ -14,13 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 async def poll_active_channels(pipeline) -> None:
-    await pipeline._reload_resources()
+    await pipeline.reload_resources()
     # Берём ВСЕ каналы с @username (не только active=true): metadata-
     # sweep должен подтягивать title и аватарки и для выключенных
     # каналов тоже — они всё равно показываются в UI и пользователь
     # ожидает свежие данные. Активность гейтит только обработку
     # сообщений ниже.
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         all_named = await list_named_channels(session)
 
     # Быстрый sweep метаданных по всему списку до тяжёлой обработки
@@ -38,17 +38,17 @@ async def poll_active_channels(pipeline) -> None:
         total,
     )
     for idx, ch in enumerate(active_named):
-        pipeline._emit_progress("channel", f"@{ch.username}", idx, total)
+        pipeline.emit_progress("channel", f"@{ch.username}", idx, total)
         try:
             await poll_channel(pipeline, 
                 ch.id, ch.username, ch.last_processed_msg_id
             )
         except Exception:
             logger.exception("[@%s] poll failed", ch.username)
-    pipeline._emit_progress("channel", "", total, total)
+    pipeline.emit_progress("channel", "", total, total)
     # 0/0 on the message track signals the UI to clear that bar between
     # cycles; otherwise it would freeze on the last channel's count.
-    pipeline._emit_progress("message", "", 0, 0)
+    pipeline.emit_progress("message", "", 0, 0)
     logger.info("Poll cycle done")
 
 
@@ -75,8 +75,8 @@ async def poll_one_channel(
     записи журнала. Всё, что до неё, ловит место прогона, и его «сорвалось»
     приводит окно к тому же слову, что и здешний `"error"`.
     """
-    await pipeline._reload_resources()
-    async with pipeline._session_factory() as session:
+    await pipeline.reload_resources()
+    async with pipeline.session_factory() as session:
         named = await list_named_channels(session, ids=[channel_id])
         if not named:
             return "missing"
@@ -104,7 +104,7 @@ async def refresh_channel_metadata_for_ids(pipeline, channel_ids: list[int]) -> 
     if not channel_ids:
         return
     logger.debug("refresh metadata for %d channel(s)", len(channel_ids))
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         rows = await list_named_channels(session, ids=channel_ids)
     await refresh_channel_metadata(pipeline, rows)
 
@@ -113,7 +113,7 @@ async def _store_metadata(
     pipeline, title_updates: dict[int, str], avatar_updates: dict[int, bytes]
 ) -> None:
     """Записать собранное за обход — всё одной транзакцией."""
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         for channel_id in set(title_updates) | set(avatar_updates):
             db_ch = await session.get(TelegramChannel, channel_id)
             if db_ch is None:
@@ -148,14 +148,14 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
     avatar_updates: dict[int, bytes] = {}
     for ch in channels:
         try:
-            chat = await pipeline._client.get_chat(ch.username)
+            chat = await pipeline.client.get_chat(ch.username)
         except Exception:
             logger.exception("[@%s] get_chat failed", ch.username)
             continue
         if chat is None:
             continue
         new_title, blob = await read_channel_metadata(
-            pipeline._client, chat, current_avatar=ch.avatar
+            pipeline.client, chat, current_avatar=ch.avatar
         )
         if new_title and new_title != ch.title:
             title_updates[ch.id] = new_title
@@ -179,10 +179,10 @@ async def _unseen_posts(pipeline, channel_username: str, last_id: int | None):
     переворачивается — разбирать посты надо в том порядке, в каком их
     писали.
     """
-    limit = pipeline._rs.backfill_limit
+    limit = pipeline.rs.backfill_limit
     new_msgs = []
     reached_seen = False
-    async for msg in pipeline._client.get_chat_history(
+    async for msg in pipeline.client.get_chat_history(
         channel_username, limit=limit
     ):
         if last_id is not None and msg.id <= last_id:
@@ -218,7 +218,7 @@ async def poll_channel(
     cursor: int | None = None
     try:
         for i, msg in enumerate(ordered):
-            pipeline._emit_progress("message", f"@{channel_username}", i, total)
+            pipeline.emit_progress("message", f"@{channel_username}", i, total)
             try:
                 await ingest.ingest_post(pipeline, channel_id, channel_username, msg)
             except Exception:
@@ -232,14 +232,14 @@ async def poll_channel(
             cursor = msg.id
             if (i + 1) % BATCH_FLUSH_EVERY == 0:
                 await advance_cursor(pipeline, channel_id, cursor)
-        pipeline._emit_progress("message", f"@{channel_username}", total, total)
+        pipeline.emit_progress("message", f"@{channel_username}", total, total)
     finally:
         if cursor is not None:
             await advance_cursor(pipeline, channel_id, cursor)
 
 
 async def advance_cursor(pipeline, channel_id: int, msg_id: int) -> None:
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         ch = await session.get(TelegramChannel, channel_id)
         if ch is None:
             return

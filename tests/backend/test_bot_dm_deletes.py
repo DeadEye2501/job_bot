@@ -38,7 +38,7 @@ async def test_a_deleted_message_is_marked_not_dropped(chatting, session_factory
     значило бы терять то, ради чего она велась.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, text="было"),
@@ -57,7 +57,7 @@ async def test_an_unread_tombstone_stops_counting(chatting, session_factory):
     Открыть его уже нельзя, и счётчик завис бы на нём навсегда.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, read_at=None),
@@ -74,7 +74,7 @@ async def test_an_already_read_tombstone_keeps_its_read_time(
     """У прочитанного удалённого время прочтения остаётся прежним."""
     first_read = datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc)
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10, read_at=first_read),
@@ -91,7 +91,7 @@ async def test_a_deleted_outgoing_message_is_not_marked_read(
 ):
     """Своё удалённое прочитанным не метится: его читает HR, а не мы."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=False, tg_message_id=10, read_at=None),
@@ -107,7 +107,7 @@ async def test_a_deleted_outgoing_message_is_not_marked_read(
 async def test_several_deletions_in_one_chat_go_together(chatting, session_factory):
     """Несколько удалений в одной переписке разбираются разом."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
@@ -124,7 +124,7 @@ async def test_several_deletions_in_one_chat_go_together(chatting, session_facto
 async def test_a_deletion_from_a_stranger_marks_nothing(chatting, session_factory):
     """Удаление в переписке с незнакомым собеседником ничего не метит."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
@@ -138,7 +138,7 @@ async def test_a_deletion_from_a_stranger_marks_nothing(chatting, session_factor
 async def test_a_switched_off_bot_ignores_deletions(chatting, session_factory):
     """Выключенный бот удаления не разбирает."""
     bot, client, hr = await chatting(mode=BotMode.OFF, telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
@@ -152,7 +152,7 @@ async def test_a_switched_off_bot_ignores_deletions(chatting, session_factory):
 async def test_an_empty_batch_changes_nothing(chatting, session_factory):
     """Пустая пачка удалений ничего не меняет и не падает."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
@@ -172,7 +172,7 @@ async def test_a_chatless_deletion_reaches_incoming_messages(
     единственное, за что можно зацепиться.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
@@ -193,7 +193,7 @@ async def test_a_chatless_deletion_spares_outgoing_messages(
     сужение окна и держится.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=False, tg_message_id=10),
@@ -212,7 +212,7 @@ async def test_a_deleted_message_leaves_the_pending_buffer(chatting, session_fac
     """
     bot, client, hr = await chatting(telegram_user_id=777)
     ingestion = FakeIngestion()
-    bot._ingestion = ingestion
+    bot.ingestion = ingestion
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
@@ -229,7 +229,7 @@ async def test_a_deletion_that_matched_nothing_leaves_the_buffer_alone(
     """Удаление, не нашедшее строки, накопитель не трогает."""
     bot, client, hr = await chatting(telegram_user_id=777)
     ingestion = FakeIngestion()
-    bot._ingestion = ingestion
+    bot.ingestion = ingestion
 
     await bot._on_dm_delete(client, [_tombstone(10)])
 
@@ -245,7 +245,7 @@ async def test_the_window_hears_about_each_touched_chat_once(
     перерисовывать переписку столько раз, сколько строк убрали.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
@@ -269,7 +269,7 @@ async def test_a_repeated_deletion_does_not_wake_the_window_again(
     в ней нечего — а окно перерисовывало бы переписку заново.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
@@ -288,7 +288,7 @@ async def test_the_window_hears_about_a_chatless_deletion_too(
 ):
     """О безымянном удалении окно тоже узнаёт — и знает, чью переписку чинить."""
     bot, client, hr = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
@@ -304,7 +304,7 @@ async def test_the_window_hears_about_a_chatless_deletion_too(
 async def test_deletions_in_two_chats_are_both_handled(chatting, session_factory):
     """Удаления в двух переписках разбираются обе, а не первая попавшаяся."""
     bot, client, first = await chatting(telegram_user_id=777)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(session_factory, hr_row(name="Пётр", telegram_user_id=888))
     second = [
         h for h in await all_rows(session_factory, HR) if h.id != first.id
@@ -329,7 +329,7 @@ async def test_a_deletion_finds_an_hr_known_only_by_name(chatting, session_facto
     лишь по имени, которое Pyrogram кладёт в тот же объект чата.
     """
     bot, client, hr = await chatting(telegram_username="maria", telegram_user_id=None)
-    bot._ingestion = FakeIngestion()
+    bot.ingestion = FakeIngestion()
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),

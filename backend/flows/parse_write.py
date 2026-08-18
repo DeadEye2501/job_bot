@@ -49,10 +49,10 @@ async def _resolve_hr(pipeline, parsed: ParsedVacancy | None):
     """
     if parsed is None or not parsed.hr_contact:
         return None, None
-    user = await resolve_hr_telegram(pipeline._client, parsed.hr_contact)
+    user = await resolve_hr_telegram(pipeline.client, parsed.hr_contact)
     if user is None:
         return None, None
-    return user, await fetch_telegram_avatar(pipeline._client, user)
+    return user, await fetch_telegram_avatar(pipeline.client, user)
 
 
 def _clear_parsed_fields(v: Vacancy, score: int) -> None:
@@ -155,8 +155,8 @@ async def _link_company(session, v: Vacancy, parsed, pipeline) -> dict | None:
         session,
         parsed.company_name,
         website=parsed.company_website,
-        lm_client=pipeline._lm_client,
-        lm_model=pipeline._lm_chat_model,
+        lm_client=pipeline.lm_client,
+        lm_model=pipeline.lm_chat_model,
     )
     if company is not None:
         v.company_id = company.id
@@ -212,7 +212,7 @@ async def persist_parse_outcome(
     """
     resolved = await _resolve_hr(pipeline, parsed)
     hr, hr_created = None, False
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         try:
             v = await _write_parsed_row(session, vacancy_id, parsed, outcome)
             if v is None:
@@ -231,6 +231,6 @@ async def persist_parse_outcome(
             )
             return None, False
 
-    pipeline._fire_contacts_changed()
-    pipeline._fire_vacancies_changed()
+    pipeline.fire_contacts_changed()
+    pipeline.fire_vacancies_changed()
     return hr, hr_created

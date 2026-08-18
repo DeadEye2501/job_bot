@@ -157,14 +157,14 @@ async def test_an_empty_profile_is_reloaded_before_the_send(carded):
     «анкета пуста», хотя анкета заполнена.
     """
     pipeline, hr, vacancy = carded
-    pipeline._profile_block = ""
+    pipeline.profile_block = ""
     reloaded: list[int] = []
 
     async def reload():
         reloaded.append(1)
-        pipeline._profile_block = "Иван Петров"
+        pipeline.profile_block = "Иван Петров"
 
-    pipeline._reload_resources = reload
+    pipeline.reload_resources = reload
 
     await pipeline.send_application_for_vacancy(vacancy.id)
 
@@ -178,13 +178,13 @@ async def test_a_filled_profile_is_not_reloaded(carded):
     незачем.
     """
     pipeline, hr, vacancy = carded
-    pipeline._profile_block = "Иван Петров"
+    pipeline.profile_block = "Иван Петров"
     reloaded: list[int] = []
 
     async def reload():
         reloaded.append(1)
 
-    pipeline._reload_resources = reload
+    pipeline.reload_resources = reload
 
     await pipeline.send_application_for_vacancy(vacancy.id)
 

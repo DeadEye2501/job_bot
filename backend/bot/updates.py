@@ -31,7 +31,7 @@ async def _muted(bot) -> bool:
     отметок о прочтении. Спрашивают его первой строкой все пятеро, и разойдись
     они, одна дорога продолжала бы писать в базу у выключенного бота.
     """
-    return (await bot._current_mode()) is BotMode.OFF
+    return (await bot.current_mode()) is BotMode.OFF
 
 
 async def on_raw_update(bot, _client, update, _users, _chats) -> None:
@@ -48,7 +48,7 @@ async def on_raw_update(bot, _client, update, _users, _chats) -> None:
     if await _muted(bot):
         return
     hr_id = await dm_sync.mark_read(
-        bot._session_factory, peer.user_id, update.max_id
+        bot.session_factory, peer.user_id, update.max_id
     )
     if hr_id is not None:
         fire(bot.on_hr_read, "on_hr_read", hr_id, update.max_id)
@@ -60,14 +60,14 @@ async def on_dm_edit(bot, _client, msg) -> None:
         return
     if not msg.chat:
         return
-    synced = await dm_sync.sync_edit(bot._session_factory, msg)
+    synced = await dm_sync.sync_edit(bot.session_factory, msg)
     if synced is None:
         return
     hr_id, is_incoming = synced
     # Правленое чужое письмо может ещё сидеть в копилке отложенного разбора —
     # HR успевает поправить его в первую минуту, — и разбирать надо свежее.
     if is_incoming:
-        bot._ingestion.update_dm_buffer_text(hr_id, msg.id, extract_text(msg))
+        bot.ingestion.update_dm_buffer_text(hr_id, msg.id, extract_text(msg))
     logger.debug(
         "DM edit synced: hr=%d tg_msg=%d incoming=%s", hr_id, msg.id, is_incoming
     )
@@ -79,7 +79,7 @@ async def on_dm_delete(bot, _client, messages) -> None:
     if await _muted(bot):
         return
     touched = await dm_sync.tombstone_deleted(
-        bot._session_factory, messages, bot._ingestion.remove_dm_buffer_msg
+        bot.session_factory, messages, bot.ingestion.remove_dm_buffer_msg
     )
     for hr_id in touched:
         fire(bot.on_new_message, "on_new_message", hr_id)
@@ -95,7 +95,7 @@ async def on_dm_outgoing(bot, _client, msg) -> None:
         return
     if not msg.chat:
         return
-    hr_id = await dm_sync.store_outgoing(bot._session_factory, bot._client, msg)
+    hr_id = await dm_sync.store_outgoing(bot.session_factory, bot.client, msg)
     if hr_id is not None:
         fire(bot.on_new_message, "on_new_message", hr_id)
 
@@ -106,11 +106,11 @@ async def on_dm(bot, _client, msg) -> None:
         return
     await process_dm(
         msg,
-        bot._lm_client,
-        bot._lm_chat_model,
-        bot._session_factory,
-        client=bot._client,
-        schedule_classification=bot._ingestion.schedule_dm_classification,
+        bot.lm_client,
+        bot.lm_chat_model,
+        bot.session_factory,
+        client=bot.client,
+        schedule_classification=bot.ingestion.schedule_dm_classification,
     )
     # `on_vacancies_changed` НЕ пушим здесь — статус вакансии флипнется
     # debounce-таском через ~60с после burst'а (см. flows/dm_classify.py,
@@ -124,7 +124,7 @@ async def on_dm(bot, _client, msg) -> None:
     if not msg.from_user:
         return
     try:
-        async with bot._session_factory() as session:
+        async with bot.session_factory() as session:
             hr = await find_known_hr(
                 session,
                 msg.from_user.id,

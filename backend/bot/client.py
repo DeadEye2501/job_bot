@@ -42,30 +42,30 @@ def _open_connections(bot, runtime_settings: RuntimeSettings) -> None:
     # try to clean them up here because httpx has no sync close() and
     # we can't await from sync __init__ — and init failure means the
     # process is about to exit anyway.
-    bot._client = telegram.make_client(runtime_settings.tg)
-    bot._lm_client = lm_studio.make_client(runtime_settings.chat)
-    bot._lm_chat_model = runtime_settings.chat.model
+    bot.client = telegram.make_client(runtime_settings.tg)
+    bot.lm_client = lm_studio.make_client(runtime_settings.chat)
+    bot.lm_chat_model = runtime_settings.chat.model
     # Reuse the chat httpx client for embeddings if both providers point
     # at the same endpoint with the same auth.
-    bot._lm_embed_client = (
-        bot._lm_client
+    bot.lm_embed_client = (
+        bot.lm_client
         if send._shares_provider(runtime_settings.chat, runtime_settings.embed)
         else lm_studio.make_client(runtime_settings.embed)
     )
-    bot._lm_embed_model = runtime_settings.embed.model
+    bot.lm_embed_model = runtime_settings.embed.model
 
 
 def _subscribe_to_updates(bot) -> None:
     """Подписки на события Telegram: личные сообщения и сырые обновления."""
-    bot._client.add_handler(
+    bot.client.add_handler(
         MessageHandler(bot._on_dm, filters.private & filters.incoming)
     )
-    bot._client.add_handler(
+    bot.client.add_handler(
         MessageHandler(
             bot._on_dm_outgoing, filters.private & filters.outgoing
         )
     )
-    bot._client.add_handler(
+    bot.client.add_handler(
         EditedMessageHandler(bot._on_dm_edit, filters.private)
     )
     # NOTE: `filters.private` НЕ годится для DeletedMessagesHandler.
@@ -76,7 +76,7 @@ def _subscribe_to_updates(bot) -> None:
     # вообще. Поэтому пропускаем chatless-stub'ы и явные private-чаты,
     # отсекая каналы (UpdateDeleteChannelMessages приходит уже с
     # chat=Channel).
-    bot._client.add_handler(
+    bot.client.add_handler(
         DeletedMessagesHandler(
             bot._on_dm_delete,
             filters.private | filters.create(
@@ -87,7 +87,7 @@ def _subscribe_to_updates(bot) -> None:
     # UpdateReadHistoryOutbox carries the «HR has read up to msg N» signal
     # for our outgoing DMs. Filter out everything else inside the handler;
     # raw updates fire for every server event.
-    bot._client.add_handler(RawUpdateHandler(bot._on_raw_update))
+    bot.client.add_handler(RawUpdateHandler(bot._on_raw_update))
 
 
 def _declare_loop_controls(bot) -> None:
@@ -95,16 +95,16 @@ def _declare_loop_controls(bot) -> None:
     # Wake event = "skip the rest of the current sleep, poll now". Set
     # by kick(). Stop event = "shutdown after current iteration". Set
     # by stop().
-    bot._wake_event = asyncio.Event()
-    bot._stop_event = asyncio.Event()
+    bot.wake_event = asyncio.Event()
+    bot.stop_event = asyncio.Event()
     # Capture loop в run() — нужен для thread-safe kick / cancel /
     # request_stop из потока окна. Эти Event-ы и Task-и живут на
     # runner-loop'е; .set() / .cancel() из чужого треда — undefined
     # behavior (CPython его прощает, но контракт asyncio нарушается).
-    bot._loop = None
+    bot.loop = None
     # Reference to the currently-running poll task so the UI's stop
     # button can cancel it without killing the whole bot loop.
-    bot._current_poll_task = None
+    bot.current_poll_task = None
 
 
 def _declare_ui_hooks(bot) -> None:
@@ -148,29 +148,38 @@ def _declare_ui_hooks(bot) -> None:
 
 def _forward_pipeline_hooks(bot) -> None:
     """Отклики конвейера пересылаются наружу — тому, кто вписан в бота."""
-    bot._ingestion.on_progress = lambda stage, label, cur, tot: (
+    bot.ingestion.on_progress = lambda stage, label, cur, tot: (
         bot.on_progress and bot.on_progress(stage, label, cur, tot)
     )
-    bot._ingestion.on_channels_changed = lambda: (
+    bot.ingestion.on_channels_changed = lambda: (
         bot.on_channels_changed and bot.on_channels_changed()
     )
-    bot._ingestion.on_contacts_changed = lambda: (
+    bot.ingestion.on_contacts_changed = lambda: (
         bot.on_contacts_changed and bot.on_contacts_changed()
     )
-    bot._ingestion.on_vacancies_changed = lambda: (
+    bot.ingestion.on_vacancies_changed = lambda: (
         bot.on_vacancies_changed and bot.on_vacancies_changed()
     )
-    bot._ingestion.on_new_message = lambda hr_id: (
+    bot.ingestion.on_new_message = lambda hr_id: (
         bot.on_new_message and bot.on_new_message(hr_id)
     )
 
 
 class Bot:
+    """Бот целиком: соединение, режим, цикл и его сотрудники.
+
+    Поля, которыми пользуются соседи по пакету — клиент Telegram, фабрика
+    сессий, настройки, конвейер, — открытые. Подчёркивание оставлено ровно
+    тем, что дальше этого файла не ходит: ссылкам на обработчики, которые
+    здесь же и вешаются на клиента. Прежде закрытыми числились и общие, и
+    обещание «дальше модуля не идёт» было неправдой почти двести раз.
+    """
+
     # Оба поля ставит `_declare_loop_controls`, а объявлены они здесь:
-    # присвоение по чужому полю (`bot._loop = ...`) тип не записывает,
+    # присвоение по чужому полю (`bot.loop = ...`) тип не записывает,
     # и без этих двух строк класс не объявляет ни одного своего поля.
-    _loop: asyncio.AbstractEventLoop | None
-    _current_poll_task: asyncio.Task | None
+    loop: asyncio.AbstractEventLoop | None
+    current_poll_task: asyncio.Task | None
 
     def __init__(
         self,
@@ -179,7 +188,7 @@ class Bot:
         *,
         dry_run: bool = False,
     ) -> None:
-        self._dry_run = dry_run
+        self.dry_run = dry_run
         if runtime_settings.tg is None:
             raise RuntimeError("Bot: TG account not configured")
         if runtime_settings.chat is None:
@@ -187,18 +196,18 @@ class Bot:
         if runtime_settings.embed is None:
             raise RuntimeError("Bot: embedding LLM not configured")
 
-        self._rs = runtime_settings
-        self._session_factory = session_factory
+        self.rs = runtime_settings
+        self.session_factory = session_factory
         _open_connections(self, runtime_settings)
-        self._ingestion = IngestionPipeline(
-            client=self._client,
-            session_factory=self._session_factory,
-            lm_client=self._lm_client,
-            lm_embed_client=self._lm_embed_client,
-            lm_chat_model=self._lm_chat_model,
-            lm_embed_model=self._lm_embed_model,
+        self.ingestion = IngestionPipeline(
+            client=self.client,
+            session_factory=self.session_factory,
+            lm_client=self.lm_client,
+            lm_embed_client=self.lm_embed_client,
+            lm_chat_model=self.lm_chat_model,
+            lm_embed_model=self.lm_embed_model,
             send=self.send,
-            runtime_settings=self._rs,
+            runtime_settings=self.rs,
         )
         _subscribe_to_updates(self)
         _declare_loop_controls(self)
@@ -212,7 +221,7 @@ class Bot:
         До этой точки Pyrogram-клиент ещё не подключён. Спрашивает его лампочка
         связи — через `is_connected` рядом, — и больше никто: у остальных дорог
         свой заслон, отвечающий окну словом, а не молчанием."""
-        return self._loop is not None
+        return self.loop is not None
 
     @property
     def is_connected(self) -> bool:
@@ -226,7 +235,7 @@ class Bot:
         закрытый `_client` снаружи ей нечем — и прежде она делала именно это.
         """
         return bool(
-            self.is_ready and getattr(self._client, "is_connected", False)
+            self.is_ready and getattr(self.client, "is_connected", False)
         )
 
     def kick(self) -> None:
@@ -236,7 +245,7 @@ class Bot:
         там же.
         """
         logger.debug("Poll wake requested")
-        slot.on_runner_loop(self, self._wake_event.set)
+        slot.on_runner_loop(self, self.wake_event.set)
 
 
     def request_stop(self) -> None:
@@ -245,8 +254,8 @@ class Bot:
         Thread-safe: см. ``kick``.
         """
         logger.info("Stop requested")
-        slot.on_runner_loop(self, self._stop_event.set)
-        slot.on_runner_loop(self, self._wake_event.set)
+        slot.on_runner_loop(self, self.stop_event.set)
+        slot.on_runner_loop(self, self.wake_event.set)
 
 
     async def poll_channel_now(
@@ -299,7 +308,7 @@ class Bot:
     async def log_out_session(self) -> None:
         return await loop.log_out_session(self)
 
-    async def _current_mode(self) -> BotMode:
+    async def current_mode(self) -> BotMode:
         return await loop.current_mode(self)
 
     async def run(self, *, once=False) -> None:
@@ -311,4 +320,4 @@ class Bot:
         return await rerun.ui_rerun_vacancy_pipeline(self, vacancy_id)
 
     async def ui_forget_vacancy(self, vacancy_id) -> bool:
-        return await self._ingestion.forget_vacancy(vacancy_id)
+        return await self.ingestion.forget_vacancy(vacancy_id)

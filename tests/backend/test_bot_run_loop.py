@@ -207,7 +207,7 @@ async def test_a_failed_poll_does_not_stop_the_turn(chatting, caught_up):
 
     bot, client, _ = await _one_turn(chatting, BotMode.FULL, pipeline)
 
-    assert bot._current_poll_task is None
+    assert bot.current_poll_task is None
     assert client.lifecycle == ["запуск", "остановка"]
 
 
@@ -231,12 +231,12 @@ async def test_leaving_the_loop_closes_both_model_connections(make_bot, caught_u
     открытым переживает бота и держит гнездо до конца работы приложения.
     """
     bot = wire(await make_bot(embed_url="http://векторы.test"), FakeIngestion())
-    assert bot._lm_embed_client is not bot._lm_client
+    assert bot.lm_embed_client is not bot.lm_client
 
     await bot.run(once=True)
 
-    assert bot._lm_client.closed == 1
-    assert bot._lm_embed_client.closed == 1
+    assert bot.lm_client.closed == 1
+    assert bot.lm_embed_client.closed == 1
 
 
 async def test_a_shared_model_connection_is_closed_once(chatting, caught_up):
@@ -247,11 +247,11 @@ async def test_a_shared_model_connection_is_closed_once(chatting, caught_up):
     """
     bot, client, _ = await chatting()
     wire(bot, FakeIngestion())
-    assert bot._lm_client is bot._lm_embed_client
+    assert bot.lm_client is bot.lm_embed_client
 
     await bot.run(once=True)
 
-    assert bot._lm_client.closed == 1
+    assert bot.lm_client.closed == 1
 
 
 async def test_an_already_disconnected_client_is_not_a_failure(chatting, caught_up):
@@ -269,7 +269,7 @@ async def test_an_already_disconnected_client_is_not_a_failure(chatting, caught_
 
     await bot.run(once=True)
 
-    assert bot._lm_client.closed == 1
+    assert bot.lm_client.closed == 1
 
 
 async def test_a_broken_disconnect_does_not_leave_connections_open(
@@ -285,7 +285,7 @@ async def test_a_broken_disconnect_does_not_leave_connections_open(
 
     await bot.run(once=True)
 
-    assert bot._lm_client.closed == 1
+    assert bot.lm_client.closed == 1
 
 
 async def test_switching_off_drains_the_text_waiting_to_be_read(
@@ -303,7 +303,7 @@ async def test_switching_off_drains_the_text_waiting_to_be_read(
     wire(bot, pipeline)
     # Секунда, а не ноль: нулевой интервал больше не берётся — он крутил бы
     # цикл опроса встык, и настройки такое теперь откатывают к умолчанию.
-    await bot._rs.set_app("poll_interval_sec", "1")
+    await bot.rs.set_app("poll_interval_sec", "1")
 
     # Останов повешен на чтение режима, а не на сам слив: слив здесь —
     # предмет проверки, и если бы цикл кончался им, снятая строка вешала бы
@@ -318,7 +318,7 @@ async def test_switching_off_drains_the_text_waiting_to_be_read(
         bot.request_stop()
         return BotMode.OFF
 
-    bot._rs.get_mode = next_mode
+    bot.rs.get_mode = next_mode
 
     await bot.run()
 
@@ -355,10 +355,10 @@ async def test_a_kick_during_the_turn_is_not_lost(chatting, caught_up):
     import asyncio
 
     bot, _client, _hr = await chatting()
-    bot._wake_event.set()
+    bot.wake_event.set()
 
     # Срок ожидания здесь не при чём: с сохранённым окриком возврат мгновенный,
     # а потерянный окрик усыпил бы цикл на весь настроенный интервал.
     await asyncio.wait_for(loop_mod._sleep_until_wake(bot), timeout=1)
 
-    assert not bot._wake_event.is_set()
+    assert not bot.wake_event.is_set()

@@ -101,7 +101,7 @@ async def test_a_rate_limit_is_remembered_until_it_expires(
 
     await bot.send(hr, "письмо", vacancy_id=vacancy.id)
 
-    assert before + 42 <= bot._rs.flood_wait_until_ts <= time.time() + 42
+    assert before + 42 <= bot.rs.flood_wait_until_ts <= time.time() + 42
 
 
 async def test_a_successful_send_lifts_an_expired_rate_limit(
@@ -113,11 +113,11 @@ async def test_a_successful_send_lifts_an_expired_rate_limit(
     своего конца без всякой причины.
     """
     bot, hr, vacancy = await ready_to_send()
-    await bot._rs.set_app("flood_wait_until_ts", str(time.time() + 999))
+    await bot.rs.set_app("flood_wait_until_ts", str(time.time() + 999))
 
     await bot.send(hr, "письмо", vacancy_id=vacancy.id)
 
-    assert bot._rs.flood_wait_until_ts == 0
+    assert bot.rs.flood_wait_until_ts == 0
 
 
 async def test_a_suppressed_send_leaves_a_rate_limit_alone(ready_to_send, session_factory):
@@ -126,11 +126,11 @@ async def test_a_suppressed_send_leaves_a_rate_limit_alone(ready_to_send, sessio
     Она до Telegram не доходила и о том, отпустил ли он, ничего не знает.
     """
     bot, hr, vacancy = await ready_to_send()
-    await bot._rs.set_app("flood_wait_until_ts", "555")
+    await bot.rs.set_app("flood_wait_until_ts", "555")
 
     await bot.send(hr, "письмо", vacancy_id=vacancy.id)
 
-    assert bot._rs.flood_wait_until_ts == 555
+    assert bot.rs.flood_wait_until_ts == 555
 
 
 async def test_a_letter_already_written_by_the_echo_is_not_a_mishap(
@@ -179,7 +179,7 @@ async def test_a_sent_letter_counts_even_when_the_record_failed(
     значило бы позвать вторую отправку тому же человеку.
     """
     bot, hr, vacancy = await ready_to_send()
-    bot._session_factory = _BrokenCommits(session_factory, failures=1)
+    bot.session_factory = _BrokenCommits(session_factory, failures=1)
 
     assert await bot.send(hr, "письмо", vacancy_id=vacancy.id) is True
 
@@ -193,7 +193,7 @@ async def test_a_failed_record_still_moves_the_vacancy(
     «уже откликались» смотрит на него.
     """
     bot, hr, vacancy = await ready_to_send()
-    bot._session_factory = _BrokenCommits(session_factory, failures=1)
+    bot.session_factory = _BrokenCommits(session_factory, failures=1)
 
     await bot.send(hr, "письмо", vacancy_id=vacancy.id)
 
@@ -213,7 +213,7 @@ async def test_a_fallback_move_is_written_into_the_history(
     «отклик отправлен» — их и потеряла сорвавшаяся запись.
     """
     bot, hr, vacancy = await ready_to_send()
-    bot._session_factory = _BrokenCommits(session_factory, failures=1)
+    bot.session_factory = _BrokenCommits(session_factory, failures=1)
 
     await bot.send(hr, "письмо", vacancy_id=vacancy.id)
 
@@ -235,7 +235,7 @@ async def test_a_send_survives_a_failure_of_the_fallback_too(
     сказать «не отправлено» было бы прямой неправдой.
     """
     bot, hr, vacancy = await ready_to_send()
-    bot._session_factory = _BrokenCommits(session_factory, failures=2)
+    bot.session_factory = _BrokenCommits(session_factory, failures=2)
 
     assert await bot.send(hr, "письмо", vacancy_id=vacancy.id) is True
 

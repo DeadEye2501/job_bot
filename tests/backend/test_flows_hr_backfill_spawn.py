@@ -83,7 +83,7 @@ async def test_a_running_catch_up_is_remembered(spawning):
     dm_backfill.spawn_hr_backfill(pipeline, hr)
     await asyncio.sleep(0)
 
-    assert len(pipeline._backfill_tasks) == 1
+    assert len(pipeline.backfill_tasks) == 1
 
     pipeline.hold.set()
     await asyncio.sleep(0)
@@ -101,7 +101,7 @@ async def test_a_finished_catch_up_is_forgotten(spawning):
     await asyncio.sleep(0)
     await asyncio.sleep(0)
 
-    assert pipeline._backfill_tasks == set()
+    assert pipeline.backfill_tasks == set()
 
 
 async def test_a_broken_catch_up_does_not_surface(spawning):
@@ -117,7 +117,7 @@ async def test_a_broken_catch_up_does_not_surface(spawning):
     await asyncio.sleep(0)
     await asyncio.sleep(0)
 
-    assert pipeline._backfill_tasks == set()
+    assert pipeline.backfill_tasks == set()
 
 
 async def test_stopping_the_bot_puts_out_the_catch_up(spawning):
@@ -130,7 +130,7 @@ async def test_stopping_the_bot_puts_out_the_catch_up(spawning):
     pipeline.hold = asyncio.Event()
     dm_backfill.spawn_hr_backfill(pipeline, hr)
     await asyncio.sleep(0)
-    running = next(iter(pipeline._backfill_tasks))
+    running = next(iter(pipeline.backfill_tasks))
 
     pipeline.mark_shutting_down()
     await asyncio.sleep(0)

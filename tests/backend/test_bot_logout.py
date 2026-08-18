@@ -17,8 +17,8 @@ async def test_logging_out_stops_the_bot(make_bot):
     await bot.log_out_session()
 
     assert client.logged_out is True
-    assert bot._stop_event.is_set()
-    assert bot._wake_event.is_set()
+    assert bot.stop_event.is_set()
+    assert bot.wake_event.is_set()
 
 
 async def test_a_failed_log_out_stops_the_bot_anyway(make_bot):
@@ -31,5 +31,5 @@ async def test_a_failed_log_out_stops_the_bot_anyway(make_bot):
 
     await bot.log_out_session()
 
-    assert bot._stop_event.is_set()
-    assert bot._wake_event.is_set()
+    assert bot.stop_event.is_set()
+    assert bot.wake_event.is_set()

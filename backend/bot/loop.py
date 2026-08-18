@@ -20,16 +20,16 @@ async def log_out_session(bot) -> None:
     """
     logger.info("TG log_out requested")
     try:
-        await bot._client.log_out()
+        await bot.client.log_out()
     except Exception:
         logger.exception("log_out RPC failed; proceeding to stop bot")
-    bot._stop_event.set()
-    bot._wake_event.set()
+    bot.stop_event.set()
+    bot.wake_event.set()
 
 
 async def current_mode(bot) -> BotMode:
     try:
-        return await bot._rs.get_mode()
+        return await bot.rs.get_mode()
     except Exception:
         logger.exception("get_mode failed; falling back to Off")
         return BotMode.OFF
@@ -37,28 +37,28 @@ async def current_mode(bot) -> BotMode:
 
 async def _connect(bot) -> None:
     """Поднять соединение и объявить бота готовым к обращениям из окна."""
-    if bot._dry_run:
+    if bot.dry_run:
         logger.warning("DRY-RUN mode: outgoing TG messages will NOT be sent")
     # Синкаем галку «Симуляция отправки» из БД-настройки в module-level guard
     # adapters/telegram.send_dm. Авторитет — rs.send_locked; константа
     # — defence-in-depth на случай если Bot.send забудет проверить.
-    telegram.SEND_LOCKED = bot._rs.send_locked
+    telegram.SEND_LOCKED = bot.rs.send_locked
     if telegram.SEND_LOCKED:
         logger.warning(
             "SEND_LOCKED=True: outgoing DM will be simulated, not sent"
         )
-    await bot._client.start()
-    # ``bot._loop`` ставим ПОСЛЕ client.start() — это и метка
+    await bot.client.start()
+    # ``bot.loop`` ставим ПОСЛЕ client.start() — это и метка
     # «бот готов принимать kick/cancel из потока окна», и сам loop
     # для thread-safe методов. До этого момента kick/cancel/
     # request_stop fallback'ятся на прямой .set() (безопасно: Event
     # ещё не имеет ожидателей; а poll-task ещё не создан, так что
     # и cancel'ить нечего).
-    bot._loop = asyncio.get_running_loop()
+    bot.loop = asyncio.get_running_loop()
     from backend.runtime_settings import mask_phone
     logger.info(
         "Telegram client connected (phone=%s)",
-        mask_phone(bot._rs.tg.phone if bot._rs.tg else None),
+        mask_phone(bot.rs.tg.phone if bot.rs.tg else None),
     )
     await persist_session_if_changed(bot)
 
@@ -71,7 +71,7 @@ async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None:
     # вручную через UI если нужно.
     if mode is BotMode.OFF and prev_mode is not BotMode.OFF:
         logger.info("Transition into OFF; draining DM debouncers")
-        await bot._ingestion.cancel_pending_dm_classifications(drain=True)
+        await bot.ingestion.cancel_pending_dm_classifications(drain=True)
     if mode is not BotMode.OFF and prev_mode is BotMode.OFF:
         logger.info(
             "Transition into active mode (%s); running DM catch-up",
@@ -79,14 +79,14 @@ async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None:
         )
         try:
             await catch_up_missed_dms(
-                bot._client,
-                bot._lm_client,
-                bot._lm_chat_model,
-                bot._session_factory,
-                backfill_limit=bot._rs.dm_backfill_limit,
+                bot.client,
+                bot.lm_client,
+                bot.lm_chat_model,
+                bot.session_factory,
+                backfill_limit=bot.rs.dm_backfill_limit,
                 on_message_persisted=bot.on_new_message,
                 on_vacancies_changed=bot.on_vacancies_changed,
-                schedule_classification=bot._ingestion.schedule_dm_classification,
+                schedule_classification=bot.ingestion.schedule_dm_classification,
             )
         except Exception:
             logger.exception("dm catch-up failed")
@@ -101,7 +101,7 @@ async def _tick(bot, mode: BotMode) -> None:
     # лист, и при пустом списке ранний return.
     if mode is not BotMode.OFF:
         try:
-            await bot._ingestion.check_ghosting_timeouts()
+            await bot.ingestion.check_ghosting_timeouts()
         except Exception:
             logger.exception("ghosting timer tick failed")
     # Channel polling and outbound applications are Full-only.
@@ -111,7 +111,7 @@ async def _tick(bot, mode: BotMode) -> None:
         # Оборот может тихо не сделать ничего: место прогона мог
         # занять ручной прогон из окна.
         await slot.run_in_slot(
-            bot, lambda: bot._ingestion.poll_active_channels(), "poll cycle"
+            bot, lambda: bot.ingestion.poll_active_channels(), "poll cycle"
         )
 
 
@@ -126,12 +126,12 @@ async def _sleep_until_wake(bot) -> None:
     """
     try:
         await asyncio.wait_for(
-            bot._wake_event.wait(),
-            timeout=bot._rs.poll_interval_sec,
+            bot.wake_event.wait(),
+            timeout=bot.rs.poll_interval_sec,
         )
     except asyncio.TimeoutError:
         pass
-    bot._wake_event.clear()
+    bot.wake_event.clear()
 
 
 async def _disconnect(bot) -> None:
@@ -142,26 +142,26 @@ async def _disconnect(bot) -> None:
     # no-op'нет вместо того, чтобы пытаться писать в закрытый
     # session_factory или дёргать httpx-клиенты, которые мы
     # сейчас будем aclose'ить.
-    bot._ingestion.mark_shutting_down()
+    bot.ingestion.mark_shutting_down()
     # Висящие debounce-таски DM-классификации не должны жить дольше
     # бота — иначе при reload'е RuntimeSettings (новый Bot) старые
     # таски попытаются использовать закрытый httpx-клиент.
     try:
-        await bot._ingestion.cancel_pending_dm_classifications()
+        await bot.ingestion.cancel_pending_dm_classifications()
     except Exception:
         logger.exception("cancel_pending_dm_classifications failed")
     # log_out_session() уже отключил клиент; повторный stop()
     # упадёт ConnectionError("Client is already terminated").
     # Глушим — логируем как debug.
     try:
-        await bot._client.stop()
+        await bot.client.stop()
     except ConnectionError:
         logger.debug("Pyrogram client already terminated; skip stop()")
     except Exception:
         logger.exception("Pyrogram client.stop() failed")
-    if bot._lm_embed_client is not bot._lm_client:
-        await bot._lm_embed_client.aclose()
-    await bot._lm_client.aclose()
+    if bot.lm_embed_client is not bot.lm_client:
+        await bot.lm_embed_client.aclose()
+    await bot.lm_client.aclose()
 
 
 async def run(bot, *, once: bool = False) -> None:
@@ -174,7 +174,7 @@ async def run(bot, *, once: bool = False) -> None:
         # gets unstuck even if its source channel never re-posts the
         # same message.
         try:
-            await bot._ingestion.recover_orphan_vacancies()
+            await bot.ingestion.recover_orphan_vacancies()
         except Exception:
             logger.exception("orphan recovery failed")
         # OFF is a full stop — no DM catch-up, no LLM classification,
@@ -188,18 +188,18 @@ async def run(bot, *, once: bool = False) -> None:
             await _on_mode_switch(bot, prev_mode, mode)
             await _tick(bot, mode)
             prev_mode = mode
-            if once or bot._stop_event.is_set():
+            if once or bot.stop_event.is_set():
                 # `_disconnect` логирует «Bot run-loop exiting» —
                 # детали (once / stop_event) пишем DEBUG, чтобы не
                 # дублировать INFO-строку.
                 logger.debug(
                     "Run-loop terminating: once=%s stop_event=%s",
                     once,
-                    bot._stop_event.is_set(),
+                    bot.stop_event.is_set(),
                 )
                 return
             await _sleep_until_wake(bot)
-            if bot._stop_event.is_set():
+            if bot.stop_event.is_set():
                 logger.debug("Run-loop exiting after stop request")
                 return
     finally:
@@ -217,17 +217,17 @@ async def persist_session_if_changed(bot) -> None:
       copy in sync.
     """
     try:
-        new_str = await bot._client.export_session_string()
+        new_str = await bot.client.export_session_string()
     except Exception:
         logger.exception("export_session_string failed; not persisting")
         return
-    tg = bot._rs.tg
+    tg = bot.rs.tg
     if tg is None:
         return
     if new_str == (tg.session_string or ""):
         return
     try:
-        await bot._rs.set_tg(
+        await bot.rs.set_tg(
             api_id=tg.api_id,
             api_hash=tg.api_hash,
             phone=tg.phone,

@@ -67,10 +67,10 @@ async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> str | No
     validation = await validate_vacancy_fit(
         parsed,
         text,
-        pipeline._lm_client,
-        pipeline._lm_chat_model,
-        profile=pipeline._profile_cache,
-        known_skills=pipeline._skills_cache,
+        pipeline.lm_client,
+        pipeline.lm_chat_model,
+        profile=pipeline.profile_cache,
+        known_skills=pipeline.skills_cache,
     )
     logger.debug(
         "vacancy %s: fit verdict=%s reason=%r",
@@ -99,11 +99,11 @@ async def _auto_send_if_allowed(
     с опознанным HR и пройденным порогом и не понимает, почему отклик так
     и не ушёл. Без строки в ленте ответа на это нет нигде.
     """
-    if status != VacancyStatus.NEW or hr is None or not pipeline._rs.auto_apply:
+    if status != VacancyStatus.NEW or hr is None or not pipeline.rs.auto_apply:
         return
     ok, reason = await apply.try_auto_send(pipeline, hr, parsed, vacancy_id)
     await record_vacancy_event(
-        pipeline._session_factory,
+        pipeline.session_factory,
         vacancy_id,
         "auto_send",
         {"ok": ok, "reason": reason},
@@ -127,10 +127,10 @@ async def _parsed_or_dropped(
     """
     parsed, refusal = await parse_vacancy(
         text,
-        pipeline._lm_client,
-        pipeline._lm_chat_model,
+        pipeline.lm_client,
+        pipeline.lm_chat_model,
         channel_username=channel_username,
-        known_skills=pipeline._skills_cache,
+        known_skills=pipeline.skills_cache,
     )
     if refusal is not None:
         logger.warning("vacancy %s: разбор не состоялся (%s)", vacancy_id, refusal)
@@ -152,14 +152,14 @@ async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple:
     спрашивают только у тех, кого не отсеяли раньше, — второе обращение к
     модели стоит денег.
     """
-    blacklist_match = check_blacklist(text, pipeline._blacklist_patterns)
-    score = score_parsed(parsed, pipeline._skills_cache)
+    blacklist_match = check_blacklist(text, pipeline.blacklist_patterns)
+    score = score_parsed(parsed, pipeline.skills_cache)
     logger.debug(
         "vacancy %s: score=%d threshold=%d blacklist=%s",
-        vacancy_id, score, pipeline._rs.scoring_threshold, blacklist_match,
+        vacancy_id, score, pipeline.rs.scoring_threshold, blacklist_match,
     )
     status, skip_reason = decide_vacancy_status(
-        parsed, score, blacklist_match, threshold=pipeline._rs.scoring_threshold,
+        parsed, score, blacklist_match, threshold=pipeline.rs.scoring_threshold,
     )
     if status == VacancyStatus.NEW:
         refusal = await _fit_refusal(pipeline, parsed, text, vacancy_id)
@@ -250,7 +250,7 @@ async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
     because rerun-path empty/trash rows legitimately have no title
     but ARE parsed (status=NotFit, skip_reason='empty:...').
     """
-    async with pipeline._session_factory() as session:
+    async with pipeline.session_factory() as session:
         v = await session.get(Vacancy, vacancy_id)
     return v is not None and not v.is_parsed
 

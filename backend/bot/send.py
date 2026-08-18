@@ -41,7 +41,7 @@ async def ui_send_vacancy_application(bot, vacancy_id: int) -> tuple[bool, str]:
     «Отправить отклик». Возвращает (ok, reason) — UI использует reason
     для понятного toast'а (что именно не сработало)."""
     logger.info("UI send application for vacancy %d", vacancy_id)
-    return await bot._ingestion.send_application_for_vacancy(vacancy_id)
+    return await bot.ingestion.send_application_for_vacancy(vacancy_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,7 +74,7 @@ async def _note_flood_wait(bot, error) -> None:
     secs = int(getattr(error, "value", 0) or 0)
     logger.warning("Bot.send: FloodWait %d сек, persist'у flood_wait_until_ts", secs)
     try:
-        await bot._rs.set_app("flood_wait_until_ts", str(_time.time() + secs))
+        await bot.rs.set_app("flood_wait_until_ts", str(_time.time() + secs))
     except Exception:
         logger.exception("Bot.send: failed to persist flood_wait_until_ts")
 
@@ -85,10 +85,10 @@ async def _clear_flood_wait(bot) -> None:
     Не сняв его, автоотправка после восстановления сверялась бы с
     просроченным окном и молчала бы дольше, чем просили.
     """
-    if bot._rs.flood_wait_until_ts <= 0:
+    if bot.rs.flood_wait_until_ts <= 0:
         return
     try:
-        await bot._rs.set_app("flood_wait_until_ts", "0")
+        await bot.rs.set_app("flood_wait_until_ts", "0")
     except Exception:
         logger.exception("Bot.send: failed to clear flood_wait_until_ts")
 
@@ -109,7 +109,7 @@ async def _deliver_dm(
         "Sending DM to hr %s (vacancy=%s, %d chars)", target, vacancy_id, len(text)
     )
     try:
-        tg_msg_id = await telegram.send_dm(bot._client, target, text, attachment)
+        tg_msg_id = await telegram.send_dm(bot.client, target, text, attachment)
     except FloodWait as e:
         await _note_flood_wait(bot, e)
         return None, False
@@ -135,7 +135,7 @@ async def _commit_send(bot, hr: HR, text: str, outcome: _Outcome) -> bool:
     обращение к тому же HR уйдёт полным письмом с резюме вместо короткого
     догона, а ответ HR отнесётся не к той вакансии.
     """
-    async with bot._session_factory() as session:
+    async with bot.session_factory() as session:
         if not outcome.suppressed:
             stored, _ = await save_outgoing_message(
                 session,
@@ -179,7 +179,7 @@ async def _flip_applied_alone(bot, outcome: _Outcome) -> None:
     if outcome.vacancy_id is None:
         return
     try:
-        async with bot._session_factory() as session:
+        async with bot.session_factory() as session:
             if await mark_vacancy_applied(
                 session,
                 outcome.vacancy_id,
@@ -231,7 +231,7 @@ async def _audit_sent(bot, hr_id: int, chars: int, outcome: _Outcome) -> None:
     if outcome.vacancy_id is None:
         return
     await record_vacancy_event(
-        bot._session_factory,
+        bot.session_factory,
         outcome.vacancy_id,
         "applied_sent",
         {
