@@ -292,8 +292,8 @@ def _message_row_to_dict(m) -> dict:
 def _blacklist_row_to_dict(row: Blacklist) -> dict:
     """Строка чёрного списка.
 
-    `kind` — свободная строка (исторически использовались "hr", "company";
-    добавляем "keyword", "channel"). Frontend различает кинды и красит чипы.
+    Роды объявлены один раз — в `backend/models/settings.py`, — и мост чужой
+    род отбивает до записи. Окно различает их и красит чипы.
     """
     return {
         "id": row.id,

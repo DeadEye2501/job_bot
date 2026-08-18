@@ -17,7 +17,7 @@ from backend.repository.vacancies_common import PARSED_ONLY, VACANCY_APPEARED_AT
 # Ключи — .value-строки, а не enum-члены: при `case(dict, value=col)` SA
 # биндит ключи как литералы БЕЗ прогона через Enum-type processor колонки,
 # и aiosqlite падает с `type 'VacancyStatus' is not supported`. Падение
-# проглатывалось в `_dispatch` как _err, и мини-список рендерил «нет
+# проглатывалось диспетчером прежнего окна, и мини-список рендерил «нет
 # вакансий», хотя badge/funnel показывали реальный count.
 _CHANNEL_VAC_STATUS_RANK: dict[str, int] = {
     VacancyStatus.OFFER.value: 1,

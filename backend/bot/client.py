@@ -98,7 +98,7 @@ def _declare_loop_controls(bot) -> None:
     bot._wake_event = asyncio.Event()
     bot._stop_event = asyncio.Event()
     # Capture loop в run() — нужен для thread-safe kick / cancel /
-    # request_stop из Qt-треда. Эти Event-ы и Task-и живут на
+    # request_stop из потока окна. Эти Event-ы и Task-и живут на
     # runner-loop'е; .set() / .cancel() из чужого треда — undefined
     # behavior (CPython его прощает, но контракт asyncio нарушается).
     bot._loop = None
@@ -110,9 +110,9 @@ def _declare_loop_controls(bot) -> None:
 def _declare_ui_hooks(bot) -> None:
     """Места, куда окно вписывает свои отклики на события бота.
 
-    Без окна все остаются пустыми, и бот работает молча. Пять из семи
-    приходят от конвейера — их пересылает `_forward_pipeline_hooks`, — а
-    два своих бот толкает сам.
+    Без окна все остаются пустыми, и бот работает молча. Их восемь: пять
+    приходят от конвейера — их пересылает `_forward_pipeline_hooks`, — а три
+    бот толкает сам: начало и конец оборота и отметку о прочтении.
     """
     # Optional UI hooks fired around each Full-mode poll cycle.
     bot.on_cycle_start = None  # filled in by client.bridge.lifespan under the UI
@@ -208,10 +208,10 @@ class Bot:
     @property
     def is_ready(self) -> bool:
         """True after Bot.run() прошёл await client.start() и захватил loop.
-        До этой точки Pyrogram-клиент ещё не подключён, и любой
-        ``self._bot.<method>()`` из Qt-треда может попасть в полу-
-        инициализированное состояние. Используйте этот флаг для
-        gate-проверок (`if bot is not None and bot.is_ready: ...`)."""
+
+        До этой точки Pyrogram-клиент ещё не подключён. Спрашивает его лампочка
+        связи — через `is_connected` рядом, — и больше никто: у остальных дорог
+        свой заслон, отвечающий окну словом, а не молчанием."""
         return self._loop is not None
 
     @property
