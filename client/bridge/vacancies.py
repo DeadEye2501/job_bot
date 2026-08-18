@@ -9,8 +9,8 @@ from backend.models import Vacancy, VacancyStatus
 from backend.repository import (
     profile as profile_repo,
     vacancies_card,
-    vacancies_life,
     vacancies_list,
+    vacancy_status,
 )
 from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.hub import Hub
@@ -153,7 +153,7 @@ class Vacancies(VacancyActions, VacancyLinks):
         async def run() -> dict:
             async with self._hub.session_factory() as session:
                 async with session.begin():
-                    row = await vacancies_life.update_status_history_explanation(
+                    row = await vacancy_status.update_status_history_explanation(
                         session, history_id, explanation,
                     )
                     saved = row.explanation if row is not None else None
@@ -195,7 +195,7 @@ class Vacancies(VacancyActions, VacancyLinks):
         async def run() -> dict:
             async with self._hub.session_factory() as session:
                 async with session.begin():
-                    row = await vacancies_life.change_vacancy_status(
+                    row = await vacancy_status.change_vacancy_status(
                         session,
                         vacancy_id=vacancy_id,
                         new_status=new_status,

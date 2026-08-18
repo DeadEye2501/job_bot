@@ -1,7 +1,7 @@
 """Вакансии, о которых замолчали: срок тишины и гашение по нему.
 
-Живёт своим модулем, потому что предмет свой: остальная жизнь вакансии
-(`vacancies_life`) меняется от того, что кто-то сделал, а здесь — от того, что
+Живёт своим модулем, потому что предмет свой: статус вакансии
+(`vacancy_status`) меняется от того, что кто-то сделал, а здесь — от того, что
 не сделал никто. Отсюда и весь счёт отметок жизни: последнее письмо HR,
 последняя постановка в нынешний статус, заведение самой строки.
 """
@@ -17,10 +17,9 @@ from backend.domain.transitions import GHOSTING_ELIGIBLE_FROM
 from backend.models import (
     Message,
     Vacancy,
-    VacancyStatus,
     VacancyStatusHistory,
 )
-from backend.repository.vacancies_life import move_status
+from backend.repository.vacancy_status import apply_silence
 
 logger = logging.getLogger(__name__)
 
@@ -126,15 +125,6 @@ async def mark_ghosted_vacancies(
     for v, last_msg_at, last_status_at in await _silence_candidates(session):
         if _last_activity(v, last_msg_at, last_status_at) >= cutoff:
             continue
-        # Перевод в Ghosting ни на какую реплику HR не ссылается: молчание
-        # и есть повод, а сообщения, которого не было, у события нет.
-        session.add(
-            move_status(
-                v,
-                VacancyStatus.GHOSTING,
-                f"HR не отвечает более {timeout_days} дней — "
-                "автоматически помечено как ghosting.",
-            )
-        )
+        apply_silence(session, v, timeout_days)
         affected.append(v.id)
     return affected

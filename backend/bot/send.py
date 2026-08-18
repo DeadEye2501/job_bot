@@ -11,7 +11,7 @@ from backend.payloads import OutgoingMessage
 from backend.flows.events import record_vacancy_event
 from backend.notify import fire
 from backend.repository.messages import save_outgoing_message
-from backend.repository.vacancies_life import mark_vacancy_applied
+from backend.repository.vacancy_status import mark_vacancy_applied
 
 logger = logging.getLogger(__name__)
 

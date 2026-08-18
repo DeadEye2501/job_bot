@@ -11,7 +11,7 @@ from backend.message_text import extract_text
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
 from backend.repository.channels import list_named_channels
-from backend.repository.vacancies_life import (
+from backend.repository.vacancy_status import (
     last_status_history_id,
     record_rerun,
 )

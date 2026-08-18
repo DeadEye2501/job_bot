@@ -7,7 +7,7 @@ from backend.flows.auto_gate import status_open_for_auto
 from backend.llm.hr_reply import classify_hr_reply
 from backend.models import VacancyStatus
 from backend.payloads import PendingReply
-from backend.repository.vacancies_life import apply_classification
+from backend.repository.vacancy_status import apply_classification
 from backend.notify import fire
 
 logger = logging.getLogger(__name__)

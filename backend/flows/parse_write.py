@@ -17,6 +17,7 @@ from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
 from backend.repository.companies_matching import find_or_create_company
 from backend.repository.hr_identify import find_or_create_hr
 from backend.repository.vacancies_life import add_vacancy_event
+from backend.repository.vacancy_status import apply_parse_outcome
 from backend.telegram_lookup import fetch_telegram_avatar
 from backend.telegram_lookup import resolve_hr_telegram
 
@@ -129,7 +130,7 @@ async def _write_parsed_row(
     v = await session.get(Vacancy, vacancy_id)
     if v is None:
         return None
-    v.status = outcome.status
+    apply_parse_outcome(v, outcome.status)
     v.skip_reason = outcome.skip_reason
     v.is_parsed = True
     _apply_parsed_fields(v, parsed, outcome)

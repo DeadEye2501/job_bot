@@ -22,7 +22,10 @@ from backend.models import (
     VacancyStatus,
     VacancyStatusHistory,
 )
-from backend.repository.vacancies_life import move_status
+from backend.repository.vacancy_status import (
+    apply_parse_outcome,
+    mark_vacancy_applied,
+)
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row, vacancy_row
 from tests.fakes.telegram import FakeTelegramClient, post
@@ -258,7 +261,7 @@ async def test_a_rerun_writes_the_status_it_changed_into_the_history(
     async def parse(_pipeline, vacancy_id, text, username, allow_delete=False):
         async with session_factory() as session:
             row = await session.get(Vacancy, vacancy_id)
-            row.status = VacancyStatus.NOT_FIT
+            apply_parse_outcome(row, VacancyStatus.NOT_FIT)
             await session.commit()
         return True
 
@@ -337,9 +340,8 @@ async def test_a_status_already_explained_gets_no_second_row(
 
     async def parse(_pipeline, vacancy_id, text, username, allow_delete=False):
         async with session_factory() as session:
-            row = await session.get(Vacancy, vacancy_id)
-            session.add(
-                move_status(row, VacancyStatus.APPLIED, "Авто-отправка отклика.")
+            await mark_vacancy_applied(
+                session, vacancy_id, "Авто-отправка отклика.", force=False
             )
             await session.commit()
         return True
