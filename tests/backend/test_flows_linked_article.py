@@ -123,11 +123,14 @@ async def test_a_site_that_did_not_answer_makes_the_text_short(fetched, monkeypa
 
 
 async def test_no_more_than_three_articles_are_fetched(fetched):
-    """Больше трёх статей с одного объявления не тянут.
+    """Больше трёх статей с одного объявления не тянут, и это не недобор.
 
     Пост-дайджест «десять вакансий недели» ссылается на статью у каждой, и
     десять походов в сеть подряд держат обход канала на себе. Разбирать такой
     пост как одну вакансию всё равно нечего.
+
+    Недобором срез не считается: четвёртая ссылка никуда не денется и завтра,
+    а прогон заново у такого объявления перестал бы обновлять текст навсегда.
     """
     asked, articles = fetched
     text = " ".join(f"https://teletype.in/@a/{n}" for n in range(6))
@@ -135,4 +138,4 @@ async def test_no_more_than_three_articles_are_fetched(fetched):
     _got, whole = await linked_article.with_linked_articles(text)
 
     assert len(asked) == 3
-    assert whole is False
+    assert whole is True

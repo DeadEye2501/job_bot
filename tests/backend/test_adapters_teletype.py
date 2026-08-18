@@ -48,6 +48,29 @@ async def test_the_article_body_keeps_its_lines():
     assert got == "Senior Manual QA\n\nPython\nSQL"
 
 
+async def test_an_article_without_a_headline_comes_back_without_it():
+    """Статья без размеченного заголовка отдаётся одним телом.
+
+    Пустой строки перед текстом при этом не появляется: в разборе она читалась
+    бы как оборванный заголовок.
+    """
+    page = '<html><body><article itemprop="articleBody">Ищем QA</article></body></html>'
+    async with _client(lambda _r: httpx.Response(200, text=page)) as client:
+        got = await teletype.fetch_article(client, "https://teletype.in/@a/b")
+
+    assert got == "Ищем QA"
+
+
+async def test_an_empty_article_gives_nothing():
+    """Размеченное, но пустое тело — та же пустота, что и его отсутствие.
+
+    Дописывать к объявлению один заголовок статьи незачем: он и так стоит в
+    посте, а разбор примет повтор за второе название.
+    """
+    async with _client(lambda _r: httpx.Response(200, text=_page(body=""))) as client:
+        assert await teletype.fetch_article(client, "https://teletype.in/@a/b") is None
+
+
 async def test_a_page_without_an_article_gives_nothing():
     """Страница без размеченного тела статьи не даёт ничего.
 
