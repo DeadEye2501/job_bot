@@ -60,7 +60,7 @@ async def ingest_post(
     text = extract_post_text(msg)
     if not text or msg.service is not None or msg.poll is not None:
         return
-    text, _whole = await linked_article.with_linked_articles(text)
+    text, whole = await linked_article.with_linked_articles(text)
     post = ChannelPost(channel_id, channel_username, msg, text)
     embedding = await _post_embedding(pipeline, post)
     if embedding is None:
@@ -79,8 +79,13 @@ async def ingest_post(
 
     new_vacancy_id = await save_new_vacancy(pipeline, post, embedding)
     if new_vacancy_id is not None:
+        # Недобравшее объявление выбрасывать нельзя: в таком посте одна шапка
+        # со ссылкой, и без статьи разбору видно пустышку. Выброси её — и
+        # вакансия пропадёт навсегда, потому что курсор канала уже уехал и
+        # второй раз этот пост не прочтут. Пометка «не подходит» дождётся
+        # прогона заново, а тот статью и подберёт.
         await parse.parse_and_update_vacancy(pipeline,
-            new_vacancy_id, text, channel_username
+            new_vacancy_id, text, channel_username, allow_delete=whole
         )
 
 

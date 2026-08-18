@@ -26,6 +26,7 @@ async def intake(make_pipeline, monkeypatch):
     pipeline = await make_pipeline()
     pipeline.saved = []
     pipeline.parsed = []
+    pipeline.allowed_delete = []
     pipeline.new_id = 7
     pipeline.similar_id = None
     pipeline.unparsed = False
@@ -38,8 +39,9 @@ async def intake(make_pipeline, monkeypatch):
         pipeline.saved.append((post.channel_id, post.msg.id, post.text))
         return pipeline.new_id
 
-    async def parse(pipeline, vacancy_id, text, username):
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=True):
         pipeline.parsed.append((vacancy_id, text))
+        pipeline.allowed_delete.append(allow_delete)
 
     async def unparsed(pipeline, vacancy_id):
         return pipeline.unparsed
@@ -192,3 +194,34 @@ async def test_a_vacancy_that_could_not_be_saved_is_not_parsed(intake):
     await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.parsed == []
+
+
+async def test_an_article_that_did_not_load_saves_the_vacancy_from_the_bin(
+    intake, monkeypatch
+):
+    """Не отдавшаяся статья запрещает выбросить объявление как мусор.
+
+    В таком объявлении пост — одна шапка со ссылкой, и без статьи разбору
+    видно пустышку. Выброси её — и вакансия пропадёт навсегда: курсор канала
+    уже уехал, и второй раз этот пост не прочтут. Оставленная пометкой «не
+    подходит», она дождётся прогона заново.
+    """
+    import httpx
+
+    async def fetch_article(_client, _url):
+        raise httpx.ConnectError("сеть отвалилась")
+
+    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+
+    await ingest.ingest_post(
+        intake, 1, "jobs", post(10, text="Senior QA https://teletype.in/@a/b")
+    )
+
+    assert intake.allowed_delete == [False]
+
+
+async def test_a_post_without_articles_may_still_be_binned(intake):
+    """Объявление без ссылок на статьи выбрасывается как и прежде."""
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
+
+    assert intake.allowed_delete == [True]

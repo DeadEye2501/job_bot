@@ -52,21 +52,21 @@ def _article_text(html: str) -> str | None:
 
     Пусто бывает не только от перевёрстки: по адресу статьи может лежать
     страница автора или весть о том, что статью снесли, и тела у неё нет.
+
+    Пустое тело — та же пустота: дописывать к объявлению один заголовок
+    статьи незачем, он и так стоит в посте, а разбор примет повтор за второе
+    название.
     """
     soup = BeautifulSoup(html, "html.parser")
     body = soup.find(attrs={"itemprop": "articleBody"})
     if body is None:
         return None
+    body_text = body.get_text("\n", strip=True)
+    if not body_text:
+        return None
     headline = soup.find(attrs={"itemprop": "headline"})
-    parts = [
-        part
-        for part in (
-            headline.get_text(" ", strip=True) if headline else "",
-            body.get_text("\n", strip=True),
-        )
-        if part
-    ]
-    return "\n\n".join(parts) or None
+    head_text = headline.get_text(" ", strip=True) if headline else ""
+    return f"{head_text}\n\n{body_text}" if head_text else body_text
 
 
 async def fetch_article(client: httpx.AsyncClient, url: str) -> str | None:
