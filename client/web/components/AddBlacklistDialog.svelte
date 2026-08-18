@@ -4,6 +4,7 @@
   // Подсказчик — подсказка, а не закрытый набор: рядом с ним значение набирают
   // руками, чтобы завести ник, которого в базе ещё нет. Появится такой человек
   // или канал — попадёт под уже заведённую строку сразу.
+  import { closeOnClickAway } from '$state/outside.js';
   import ModalKeys from './ModalKeys.svelte';
 
   let { draft, hints, kinds, saving, onkind, onvalue, onreason, onadd, onclose } = $props();
@@ -20,11 +21,7 @@
     if (!open) return;
     // Нажатие мимо закрывает подсказчик, а не окно: окно закрывают крестиком и
     // Escape, и падать оно от промаха по списку не должно.
-    const away = (event) => {
-      if (root !== null && !root.contains(event.target)) open = false;
-    };
-    document.addEventListener('click', away);
-    return () => document.removeEventListener('click', away);
+    return closeOnClickAway(() => root, () => (open = false));
   });
 </script>
 

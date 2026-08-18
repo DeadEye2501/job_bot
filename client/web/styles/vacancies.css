@@ -1,22 +1,5 @@
 /* Экран вакансий: список слева, подробности справа, строка в три этажа. */
 
-/* Список и подробности стоят рядом, а не поверх друг друга: вакансии
-   перебирают подряд, и окно поверх списка пришлось бы закрывать на каждой. */
-.vacancies-layout {
-  display: grid;
-  grid-template-columns: 275px 1fr;
-  height: 100%;
-  min-height: 0;
-}
-
-.vac-list-pane {
-  border-right: 1px solid var(--border);
-  background: var(--bg-secondary);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
 /* Шапка стоит на месте, а ездит только список: поиск и отбор нужны как раз
    тогда, когда список пролистан. */
 .vac-list-toolbar {
@@ -77,12 +60,6 @@
   color: var(--accent);
 }
 
-.vac-list {
-  flex: 1;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
 .vac-list-empty {
   display: flex;
   flex-direction: column;
@@ -134,14 +111,6 @@
 
 .vac-row:hover {
   background: var(--accent-row-hover);
-}
-
-/* Открытая вакансия отмечена в списке: соседние строки читают, не теряя из
-   виду ту, что стоит справа. */
-.vac-row.selected {
-  background: var(--selected-bg);
-  border-left: 2px solid var(--accent);
-  padding-left: 8px;
 }
 
 .vac-row-head {

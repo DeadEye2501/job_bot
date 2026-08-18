@@ -50,19 +50,9 @@ img.hr-avatar {
   color: var(--text-tertiary);
 }
 
-.hr-username {
-  overflow: hidden;
-  color: var(--text-tertiary);
-  font-size: 0.72rem;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Нажимаемое имя отличается от подписи только на наведении: подчёркивание в
    покое разлиновало бы блок, где нажимается почти всё. */
-.hr-name.is-link:hover,
-.hr-username.is-link:hover {
+.hr-name.is-link:hover {
   color: var(--accent);
   text-decoration: underline;
 }
