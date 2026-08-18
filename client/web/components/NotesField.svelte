@@ -13,7 +13,14 @@
   // угасание в оформлении: погасшая раньше срока читалась бы как моргание.
   const FLASH_MS = 400;
 
-  let { value, placeholder, delay, limit = null, save } = $props();
+  let { value, placeholder, delay, limit = null, owner, save } = $props();
+
+  // Номер записи запечатан при заведении поля, а не читается на отправке.
+  // Отправок две, и вторая — прощальная: она случается уже после того, как
+  // карточка сменила запись. Читай мы номер тогда, набранное для прежней
+  // записи уехало бы к соседней и затёрло её заметку, а сама прежняя осталась
+  // бы ни с чем. Поле заводится заново на каждую запись — тем и держится.
+  const owned = owner;
 
   let text = $state(value ?? '');
   let flashed = $state(false);
@@ -22,7 +29,7 @@
   const saver = autosave({ delay, save: (typed) => write(typed) });
 
   async function write(typed) {
-    const stored = await save(typed);
+    const stored = await save(owned, typed);
     if (stored === null) return;
     saver.known(stored);
     flashed = true;
