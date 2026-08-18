@@ -43,10 +43,19 @@ def first_transition_subq(statuses):
 
 
 def stats_period_since(period: str) -> datetime | None:
-    """Convert UI period code to a since-timestamp, or None for 'all'."""
+    """Начало выбранного срока, а для «за всё время» — пустота.
+
+    «Сегодня» считается от начала **местных** суток: полночь человек мерит по
+    своим часам. На поясе UTC+4 отсчёт от полуночи UTC начинал бы «сегодня» в
+    четыре утра — заведённое ночью в него не попадало бы, зато попадало бы
+    вчерашнее с восьми вечера. Остальные сроки скользящие, и им пояс безразличен.
+    """
     now = datetime.now(timezone.utc)
     if period == "today":
-        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+        here = now.astimezone()
+        return here.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(
+            timezone.utc
+        )
     if period == "week":
         return now - timedelta(days=7)
     if period == "month":

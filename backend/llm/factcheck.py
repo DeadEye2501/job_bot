@@ -9,6 +9,7 @@ import httpx
 from adapters.lm_studio import ChatRequest, chat
 from backend.llm.answers import json_object, log_unparseable, normalize_enum
 from backend.llm.external import wrap_external
+from backend.payloads import str_list
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +100,10 @@ def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]:
     """
     raw = obj.get("verdict")
     verdict = normalize_enum(raw, ("ok", "reject"))
-    issues = [x for x in (obj.get("issues") or []) if isinstance(x, str)][:3]
+    # Общим приведением, а не обходом: ответь модель одной строкой вместо
+    # списка, обход рассыпал бы её по буквам и показал человеку три знака
+    # вместо трёх замечаний.
+    issues = str_list(obj.get("issues"))[:3]
     if verdict == "reject":
         logger.debug("factcheck_cover_letter: reject in %.2fs", elapsed)
         return False, issues

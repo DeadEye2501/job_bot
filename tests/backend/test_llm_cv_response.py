@@ -10,7 +10,7 @@ import httpx
 
 from backend.llm.cv import parse_cv
 from tests.factories import CV_REQUIRED_PROFILE
-from tests.fakes.llm import CHAT, chat_response, provider
+from tests.fakes.llm import CHAT, chat_response, data_block, provider
 
 
 MINIMAL_CV = json.dumps({"profile": CV_REQUIRED_PROFILE}, ensure_ascii=False)
@@ -38,10 +38,10 @@ async def test_a_long_resume_is_cut_before_sending():
 
     await parse_cv("я" * 30000, client, "qwen")
 
-    # Считаем в самом резюме, а не во всём теле: указание модели тоже
-    # по-русски и своих «я» содержит достаточно, чтобы счёт стал бессмысленным.
-    payload = json.loads(client.sent[0].read())
-    assert len(payload["messages"][1]["content"]) == 20000
+    # Считаем в самом резюме, а не во всём теле: и указание модели, и рамка
+    # данных тоже по-русски, и своих «я» содержат достаточно, чтобы счёт стал
+    # бессмысленным.
+    assert len(data_block(client.sent[0])) == 20000
 
 
 async def test_the_prompt_and_the_resume_go_as_separate_messages():
@@ -53,7 +53,9 @@ async def test_the_prompt_and_the_resume_go_as_separate_messages():
     payload = json.loads(client.sent[0].read())
     roles = [m["role"] for m in payload["messages"]]
     assert roles == ["system", "user"]
-    assert payload["messages"][1]["content"] == "моё резюме"
+    # Резюме уезжает блоком данных, а не голым текстом: шов у всех шести
+    # обращений к модели один.
+    assert data_block(client.sent[0]) == "моё резюме"
     assert payload["model"] == "qwen"
 
 

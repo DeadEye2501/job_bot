@@ -10,6 +10,7 @@ from backend.domain.telegram_identity import typed_username
 from backend.models import Company, HR, Message, Vacancy
 from backend.payloads import HrDetail, text_or_none
 
+from backend.repository.vacancies_common import PARSED_ONLY
 from backend.repository.blacklist_marks import (
     active_blacklist_value,
     preferred_blacklist_value,
@@ -85,7 +86,7 @@ async def _vacancy_count_of(session: AsyncSession, hr_id: int) -> int:
     """Сколько вакансий человек принёс за всё время."""
     return int(
         await session.scalar(
-            select(func.count(Vacancy.id)).where(Vacancy.hr_id == hr_id)
+            select(func.count(Vacancy.id)).where(Vacancy.hr_id == hr_id, PARSED_ONLY)
         )
         or 0
     )

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
-from backend.payloads import text_or_none as _none_if_empty
+from backend.payloads import text_or_none
 from backend.repository import profile as profile_repo
 from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.choices import _filter_languages, _filter_set
@@ -149,12 +149,12 @@ def _read_profile_fields(payload: dict) -> dict:
         "last_name": str(payload.get("last_name") or "").strip(),
         "title": str(payload.get("title") or "").strip(),
         "email": str(payload.get("email") or "").strip(),
-        "phone": _none_if_empty(payload.get("phone")),
-        "location": _none_if_empty(payload.get("location")),
-        "telegram_username": _none_if_empty(payload.get("telegram_username")),
-        "github_url": _none_if_empty(payload.get("github_url")),
-        "education": _none_if_empty(payload.get("education")),
-        "free_preferences": _none_if_empty(payload.get("free_preferences")),
+        "phone": text_or_none(payload.get("phone")),
+        "location": text_or_none(payload.get("location")),
+        "telegram_username": text_or_none(payload.get("telegram_username")),
+        "github_url": text_or_none(payload.get("github_url")),
+        "education": text_or_none(payload.get("education")),
+        "free_preferences": text_or_none(payload.get("free_preferences")),
         "grades": _filter_set(payload.get("grades"), GRADES),
         "work_format": _filter_set(payload.get("work_format"), WORK_FORMATS),
     }

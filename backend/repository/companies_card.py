@@ -10,6 +10,7 @@ from backend.domain.spellings import dedupe_first_wins
 from backend.models import Company, Vacancy
 from backend.payloads import CompanyDetail, str_list, text_or_none
 
+from backend.repository.vacancies_common import PARSED_ONLY
 from backend.repository.blacklist_marks import (
     active_blacklist_value,
     preferred_blacklist_value,
@@ -95,7 +96,9 @@ async def get_company_detail(
         return None
     vacancy_count = int(
         await session.scalar(
-            select(func.count(Vacancy.id)).where(Vacancy.company_id == company_id)
+            select(func.count(Vacancy.id)).where(
+                Vacancy.company_id == company_id, PARSED_ONLY
+            )
         )
         or 0
     )

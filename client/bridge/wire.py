@@ -246,7 +246,7 @@ def _hr_picker_row_to_dict(item) -> dict:
         "vacancy_count": item.vacancy_count,
         "last_company_name": item.last_company_name,
         "unread_count": item.unread_count,
-        "is_blacklisted": getattr(item, "is_blacklisted", False),
+        "is_blacklisted": item.is_blacklisted,
         "avatar": _avatar_data_url(hr.avatar),
     }
 
@@ -318,7 +318,7 @@ def _channel_row_to_dict(item) -> dict:
         "is_active": bool(ch.is_active),
         "vacancy_count": item.vacancy_count,
         "avatar": _avatar_data_url(ch.avatar),
-        "is_blacklisted": getattr(item, "is_blacklisted", False),
+        "is_blacklisted": item.is_blacklisted,
     }
 
 
@@ -334,7 +334,7 @@ def _company_picker_row_to_dict(item) -> dict:
         "website": co.website,
         "aliases": list(co.aliases or []),
         "vacancy_count": item.vacancy_count,
-        "is_blacklisted": getattr(item, "is_blacklisted", False),
+        "is_blacklisted": item.is_blacklisted,
     }
 
 

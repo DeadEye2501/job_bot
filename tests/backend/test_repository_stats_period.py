@@ -35,17 +35,22 @@ def test_a_rolling_period_counts_back_from_now(period, days):
     assert before - timedelta(minutes=1) <= since <= after + timedelta(minutes=1)
 
 
-def test_today_counts_from_the_start_of_the_day():
-    """«Сегодня» отсчитывается от начала суток, а не от часа назад.
+def test_today_counts_from_the_local_start_of_the_day():
+    """«Сегодня» отсчитывается от начала местных суток, а не от полуночи UTC.
 
-    Разница видна: скользящий период в один день дал бы момент вчерашний,
-    а начало суток — сегодняшний, с нулями во всех долях.
+    Полночь считает человек по своим часам, а не по всемирным. На поясе UTC+4
+    отсчёт от полуночи UTC начинал бы «сегодня» в четыре утра: заведённое
+    ночью в него не попадало бы, зато попадало бы вчерашнее с восьми вечера, и
+    в два часа ночи экран показывал бы вчерашний день.
+
+    Скользящий период в один день здесь тоже не годится: он дал бы момент
+    вчерашний, а начало суток — сегодняшний.
     """
     since = stats_period_since("today")
 
-    now = datetime.now(timezone.utc)
-    assert since.date() == now.date()
-    assert (since.hour, since.minute, since.second, since.microsecond) == (0, 0, 0, 0)
+    local = since.astimezone()
+    assert local.date() == datetime.now().astimezone().date()
+    assert (local.hour, local.minute, local.second, local.microsecond) == (0, 0, 0, 0)
 
 
 @pytest.mark.parametrize(

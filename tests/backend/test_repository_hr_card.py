@@ -37,14 +37,15 @@ async def test_a_fresh_hr_has_zeroes_rather_than_emptiness(session, session_fact
     assert card.blacklist_value is None
 
 
-async def test_the_vacancy_count_covers_the_unparsed_ones_too(
+async def test_the_vacancy_count_matches_the_list_under_it(
     session, session_factory
 ):
-    """Счётчик вакансий считает и недоразобранные, в отличие от мини-списка.
+    """Счётчик вакансий считает то же, что показывает мини-список под ним.
 
-    Мини-список под счётчиком их отсеивает, и расхождение здесь настоящее:
-    счётчик покажет больше, чем видно строк. Тест закрепляет сегодняшнее
-    поведение обеих сторон.
+    Недоразобранные отсеивают оба: счётчик, разошедшийся со списком, читается
+    как пропавшие строки. Сегодня такая вакансия и владельца не имеет —
+    разбор ставит признак и хозяина одной сделкой, — но держаться этому на
+    удаче устройства конвейера незачем.
     """
     hr = hr_row()
     other = hr_row(name="соседний")
@@ -59,7 +60,7 @@ async def test_the_vacancy_count_covers_the_unparsed_ones_too(
 
     card = await get_hr_detail(session, hr.id)
 
-    assert card.vacancy_count == 2
+    assert card.vacancy_count == 1
 
 
 async def test_the_last_company_comes_from_the_freshest_vacancy(
