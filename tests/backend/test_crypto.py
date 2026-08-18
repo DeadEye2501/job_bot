@@ -10,6 +10,7 @@ import pytest
 from backend.crypto import (
     _check_keyring_backend,
     decrypt_bytes,
+    forget_master_key,
     decrypt_str,
     encrypt_bytes,
     encrypt_str,
@@ -91,3 +92,26 @@ def test_a_key_store_that_cannot_be_probed_does_not_stop_startup(monkeypatch):
     monkeypatch.setattr(keyring, "get_keyring", explode)
 
     _check_keyring_backend()
+
+
+def test_the_master_key_is_forgotten_with_the_data(memory_keyring):
+    """Главный ключ уходит вместе с данными, а не остаётся в хранилище ОС.
+
+    Им зашифрована строка сеанса Telegram. Переживи он «удалить всё», в
+    хранилище ключей остался бы секрет от данных, которых уже нет, — а человек
+    считает, что стёр всё.
+    """
+    encrypt_str("строка сеанса")
+    assert memory_keyring.store != {}
+
+    forget_master_key()
+
+    assert memory_keyring.store == {}
+
+
+def test_forgetting_a_key_that_is_not_there_is_not_a_trouble():
+    """Забыть несуществующий ключ — не беда, а то же самое состояние.
+
+    Снос данных зовут и на чистой установке, и второй раз подряд.
+    """
+    forget_master_key()

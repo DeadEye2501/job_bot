@@ -5,6 +5,7 @@
 """
 
 import keyring.backend
+import keyring.errors
 
 
 class MemoryKeyring(keyring.backend.KeyringBackend):
@@ -23,4 +24,9 @@ class MemoryKeyring(keyring.backend.KeyringBackend):
         self.store[(service, username)] = password
 
     def delete_password(self, service: str, username: str) -> None:
-        self.store.pop((service, username), None)
+        # Отсутствующую запись настоящее хранилище встречает броском, и
+        # боевой код на это ветвится. Прости подделка молчанием — ветка
+        # осталась бы непроверенной, а «забыли то, чего нет» выглядело бы
+        # как удавшееся забывание.
+        if self.store.pop((service, username), None) is None:
+            raise keyring.errors.PasswordDeleteError(username)

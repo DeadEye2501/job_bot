@@ -103,3 +103,24 @@ async def test_the_journal_is_let_go_before_the_files_are_removed(data_dir):
 
     assert handler.file_was_there is True, "журнал закрыли уже после удаления"
     assert not log.exists()
+
+
+async def test_the_database_is_let_go_before_it_is_deleted(data_dir):
+    """Движок отпускает базу до сноса, а не после.
+
+    Windows не отдаёт файл, пока за него держится хоть один открытый движок,
+    и снос без этого не удаляет ровно то, ради чего его и зовут. Беда при этом
+    не молчит — она доедет до человека отдельной строкой, — но «удалить всё»
+    не сработает, а человек будет считать иначе.
+    """
+    import config
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    db = config.data_files()[0]
+    engine = create_async_engine(f"sqlite+aiosqlite:///{db.as_posix()}")
+    async with engine.connect() as connection:
+        await connection.execute(text("select 1"))
+
+    assert await wipe_all(engine) == []
+    assert not db.exists()
