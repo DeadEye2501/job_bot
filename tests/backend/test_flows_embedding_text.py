@@ -64,3 +64,30 @@ async def test_the_fingerprint_comes_back_when_the_provider_answers():
     pipeline = _Pipeline(_Answering())
 
     assert await embeddings.embed_text(pipeline, "текст", "vacancy 7") == [0.5, 0.25]
+
+
+async def test_a_very_long_text_is_cut_before_it_goes_to_the_provider():
+    """Длинный текст режется до отправки, а не отвергается поставщиком.
+
+    К посту дописывается статья по ссылке, и вместе они перерастают окно
+    модели отпечатков. Отказ поставщика приходит наверх пустым отпечатком, а
+    пустой отпечаток на приёме означает, что объявление не завели вовсе —
+    и второй раз его не увидят, курсор канала уже уехал.
+    """
+    sent = []
+
+    class _Watching:
+        async def post(self, _path, json=None, **_kwargs):
+            sent.append(json["input"])
+            return httpx.Response(
+                200,
+                json={"data": [{"embedding": [0.5]}]},
+                request=httpx.Request("POST", "http://provider.test/v1/embeddings"),
+            )
+
+    pipeline = _Pipeline(_Watching())
+
+    await embeddings.embed_text(pipeline, "я" * 20_000, "vacancy 7")
+
+    assert len(sent[0]) == 6000
+    assert sent[0] == "я" * 6000
