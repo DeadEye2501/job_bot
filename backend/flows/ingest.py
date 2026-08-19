@@ -135,11 +135,16 @@ async def save_new_vacancy(
                 new_vacancy.id,
             )
             return new_vacancy.id
-        except IntegrityError:
+        except IntegrityError as trouble:
+            # Целостность нарушается тут по-разному, и какое правило сработало
+            # — говорит сама беда: обычное дело это тот же пост, заведённый
+            # встречным обходом (`uq_vacancy_source`), но сюда же приходит и
+            # ссылка на канал, которого уже нет.
             await session.rollback()
             logger.info(
-                "[@%s] %d uq_vacancy_source race, skipping",
+                "[@%s] %d строка не завелась, целостность нарушена: %s",
                 post.channel_username,
                 post.msg.id,
+                trouble.orig,
             )
             return None

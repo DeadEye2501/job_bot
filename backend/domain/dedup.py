@@ -12,8 +12,14 @@ def cosine_top_match(
     query: np.ndarray,
     ids: np.ndarray,
     matrix: np.ndarray,
-    threshold: float = 0.92,
+    threshold: float,
 ) -> int | None:
+    """Номер самой похожей вакансии; пусто — похожих нет.
+
+    Порог приходит доводом и умолчания не имеет: живёт он в настройках
+    (`dedup_cosine_threshold`), и второе его написание здесь разошлось бы с
+    первым молча — в бою сюда всегда приходит настроенное.
+    """
     # Runtime-check вместо `assert` — assert'ы выпиливаются `python -O`
     # и invariant проверки не работают в production. Длина mismatch'а —
     # bug в caller'е (плохая консистентность embedding-cache'а), лучше
@@ -92,13 +98,18 @@ class EmbeddingCache:
         Дописывается сразу, а не ждёт следующего подъёма: иначе два одинаковых
         поста в одном обходе разошлись бы в две вакансии — второй сравнивали бы
         с памятью, где первого ещё нет.
+
+        Матрица собирается первой, номер дописывается после: вектор чужой
+        длины отсюда не принимается вовсе, и допиши мы номер раньше — номера с
+        матрицей разъехались бы, а разъехавшись, роняют сравнение с любым
+        следующим постом до самого перезапуска.
         """
         vec = np.asarray(vector, dtype=np.float32)
-        self.ids = np.append(self.ids, vacancy_id)
         if self.matrix.size == 0:
             self.matrix = vec.reshape(1, -1)
         else:
             self.matrix = np.vstack([self.matrix, vec])
+        self.ids = np.append(self.ids, vacancy_id)
 
     def drop(self, vacancy_id: int) -> None:
         """Снять вектор вакансии; незнакомый номер кэш не трогает."""

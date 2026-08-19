@@ -40,14 +40,17 @@ def is_empty_vacancy(parsed: ParsedVacancy | None) -> bool:
 
 
 def decide_vacancy_status(
-    parsed: ParsedVacancy | None,
+    parsed: ParsedVacancy,
     score: int,
     blacklist_match: str | None,
     *,
     threshold: int,
 ) -> tuple[VacancyStatus, str | None]:
-    if parsed is None:
-        return VacancyStatus.NOT_FIT, "unparseable"
+    """Приговор разобранному объявлению: статус и причина отказа.
+
+    Разбора без объявления сюда не приходит: пустой разбор — это пустышка, и
+    её приговор выносит `is_empty_vacancy` куда раньше.
+    """
     if blacklist_match:
         return VacancyStatus.NOT_FIT, f"blacklist: {blacklist_match}"
     if score < threshold:

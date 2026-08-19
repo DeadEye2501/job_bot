@@ -7,7 +7,7 @@ import pytest
 
 from backend.flows import apply, dm_classify
 from backend.flows.dm import process_dm
-from backend.flows.pipeline import IngestionPipeline
+from backend.flows.pipeline import IngestionPipeline, LmProviders
 from backend.models import (
     Profile,
     Vacancy,
@@ -52,10 +52,12 @@ def _pipeline_on_fakes(session_factory, client, settings) -> IngestionPipeline:
     pipeline = IngestionPipeline(
         client=client,
         session_factory=session_factory,
-        lm_client=LmClient("http://provider.test"),
-        lm_embed_client=LmClient("http://provider.test"),
-        lm_chat_model="qwen",
-        lm_embed_model="bge",
+        models=LmProviders(
+            chat_client=LmClient("http://provider.test"),
+            chat_model="qwen",
+            embed_client=LmClient("http://provider.test"),
+            embed_model="bge",
+        ),
         send=send,
         runtime_settings=settings,
     )

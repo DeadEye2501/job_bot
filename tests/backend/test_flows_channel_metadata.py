@@ -154,6 +154,33 @@ async def test_a_failed_request_leaves_its_trace_in_the_log(
     assert "OSError: канал закрыт" in caplog.text
 
 
+async def test_a_write_that_broke_does_not_break_the_sweep(
+    make_pipeline, session_factory, monkeypatch, caplog
+):
+    """Сорвавшаяся запись сводки броском наружу не выходит.
+
+    Сводка — дело второстепенное: названия и картинки. Уронив зовущего, она
+    уносит с собой весь обход каналов, то есть все сегодняшние объявления, —
+    а занятая база это обычное дело, соседняя сделка идёт своим чередом.
+    """
+    saved = await _channels(session_factory, channel_row(username="jobs", title="Было"))
+    client = FakeTelegramClient(chats={"jobs": chat(title="Стало")})
+    pipeline = await make_pipeline(client)
+    heard: list[int] = []
+    pipeline.on_channels_changed = lambda: heard.append(1)
+
+    async def busy(pipeline, title_updates, avatar_updates):
+        raise OSError("database is locked")
+
+    monkeypatch.setattr(channels, "_store_metadata", busy)
+
+    with caplog.at_level(logging.ERROR):
+        await channels.refresh_channel_metadata(pipeline, saved)
+
+    assert heard == []
+    assert "OSError: database is locked" in caplog.text
+
+
 async def test_a_channel_deleted_mid_sweep_is_skipped(
     make_pipeline, session_factory
 ):

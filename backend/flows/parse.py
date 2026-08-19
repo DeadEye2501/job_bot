@@ -38,15 +38,16 @@ async def _dropped_as_trash(
     """Убрать непригодную вакансию, если убирать разрешено; сказать, убрали ли.
 
     Приговор «непригодна» выносят дважды — пустышке и вердикту «мусор», — и
-    развилка у него одна. При обычном разборе строку удаляют: пост оказался
-    не вакансией, и держать его незачем. При повторном разборе не удаляют
-    вовсе — строку человек открыл руками, и исчезнуть у него из-под курсора
-    она не должна; непригодность остаётся пометкой в причине отказа. Разойдись
-    развилка, одна из двух дорог удаляла бы там, где человек этого не просил.
+    развилка у него одна. Разрешение приходит доводом от зовущего: приём поста
+    даёт его целому тексту (пост оказался не вакансией, и держать его незачем)
+    и не даёт недобравшему — в таком одна шапка со ссылкой, и разбору видна
+    пустышка. Прогон заново не разрешает никогда: строку человек открыл
+    руками, и исчезнуть у него из-под курсора она не должна; непригодность
+    остаётся пометкой в причине отказа.
     """
     if not allow_delete:
         logger.info(
-            "vacancy %s: %s, marking Not Fit (rerun, no auto-delete)",
+            "vacancy %s: %s, marking Not Fit (deleting not allowed here)",
             vacancy_id, reason,
         )
         return False
@@ -168,17 +169,24 @@ async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple:
     return status, skip_reason, score
 
 
-async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> None:
+async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> bool:
     """Записать исход, отправить отклик, если можно, и догнать переписку.
 
     Догон идёт последним нарочно: пойди он раньше, вытащил бы наше же
     письмо прежде, чем отправка закоммитит свою строку, — и в переписке
     появился бы дубль без вакансии.
+
+    Отвечает, дошла ли запись: не дошла — отклик не отправляют и человеку
+    говорят «не удалось», а не «готово» над карточкой, которая не менялась.
     """
-    hr, created = await persist_parse_outcome(pipeline, vacancy_id, parsed, outcome)
+    written = await persist_parse_outcome(pipeline, vacancy_id, parsed, outcome)
+    if written is None:
+        return False
+    hr, created = written
     await _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id, outcome.status)
     if created:
         dm_backfill.spawn_hr_backfill(pipeline, hr)
+    return True
 
 
 async def _thrown_out_by_the_verdict(
@@ -205,14 +213,15 @@ async def parse_and_update_vacancy(
 ) -> bool:
     """Разобрать объявление, вынести приговор и записать исход; сказать, вышло ли.
 
-    ``allow_delete`` разводит две дороги: при обычном обходе непригодную
-    строку удаляют, при повторном разборе — никогда, потому что её открыл
-    человек. Умолчание истинно только ради обхода.
+    ``allow_delete`` разводит две дороги: непригодную строку удаляют только
+    там, где зовущий за неё ручается, — приём поста разрешает это целому
+    тексту и запрещает недобравшему, — а прогон заново не разрешает никогда,
+    потому что строку открыл человек. Умолчание истинно только ради приёма.
 
-    «Не вышло» значит одно: спросить модель не удалось. Пустой разбор — это
-    состоявшийся приговор, и он истина. Различие нужно окну: на отказе оно
-    говорит «не удалось перезапустить» вместо «готово» над карточкой,
-    которая не менялась.
+    «Не вышло» значит одно из двух: спросить модель не удалось или исход не
+    записался. Пустой разбор — это состоявшийся приговор, и он истина.
+    Различие нужно окну: на отказе оно говорит «не удалось перезапустить»
+    вместо «готово» над карточкой, которая не менялась.
     """
     parsed, refusal = await _parsed_or_dropped(
         pipeline, vacancy_id, text, channel_username, allow_delete
@@ -228,7 +237,7 @@ async def parse_and_update_vacancy(
         pipeline, vacancy_id, skip_reason, allow_delete
     ):
         return True
-    await _finish_parse(
+    return await _finish_parse(
         pipeline,
         vacancy_id,
         parsed,
@@ -239,7 +248,6 @@ async def parse_and_update_vacancy(
             keep_previous_stack=True,
         ),
     )
-    return True
 
 
 async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
@@ -271,7 +279,7 @@ async def save_empty_vacancy(
     show the previous parse output alongside skip_reason="empty",
     which is misleading.
     """
-    hr, hr_created = await persist_parse_outcome(
+    written = await persist_parse_outcome(
         pipeline,
         vacancy_id,
         parsed,
@@ -282,5 +290,8 @@ async def save_empty_vacancy(
             keep_previous_stack=False,
         ),
     )
+    if written is None:
+        return
+    hr, hr_created = written
     if hr_created:
         dm_backfill.spawn_hr_backfill(pipeline, hr)

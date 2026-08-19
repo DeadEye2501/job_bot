@@ -26,7 +26,7 @@ from backend.bot import send
 from backend.bot import chat
 from backend.bot import channels
 from backend.bot import slot
-from backend.flows.pipeline import IngestionPipeline
+from backend.flows.pipeline import IngestionPipeline, LmProviders
 from backend.models import BotMode
 from backend.models import Message
 from backend.runtime_settings import RuntimeSettings
@@ -202,10 +202,12 @@ class Bot:
         self.ingestion = IngestionPipeline(
             client=self.client,
             session_factory=self.session_factory,
-            lm_client=self.lm_client,
-            lm_embed_client=self.lm_embed_client,
-            lm_chat_model=self.lm_chat_model,
-            lm_embed_model=self.lm_embed_model,
+            models=LmProviders(
+                chat_client=self.lm_client,
+                chat_model=self.lm_chat_model,
+                embed_client=self.lm_embed_client,
+                embed_model=self.lm_embed_model,
+            ),
             send=self.send,
             runtime_settings=self.rs,
         )

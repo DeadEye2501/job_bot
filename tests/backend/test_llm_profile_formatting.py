@@ -10,11 +10,11 @@ import pytest
 
 from backend.llm.candidate import (
     CandidateLanguage,
-    _format_text,
-    _format_grades,
-    _format_known_skills,
-    _format_languages,
-    _format_work_formats,
+    format_text,
+    format_grades,
+    format_known_skills,
+    format_languages,
+    format_work_formats,
 )
 
 
@@ -35,7 +35,7 @@ from backend.llm.candidate import (
 )
 def test_grades_are_named_by_their_known_labels(grades, expected):
     """Уровни называются известными обозначениями, незнакомые отсеиваются."""
-    assert _format_grades(grades) == expected
+    assert format_grades(grades) == expected
 
 
 @pytest.mark.parametrize(
@@ -52,12 +52,12 @@ def test_grades_are_named_by_their_known_labels(grades, expected):
 )
 def test_work_formats_are_named_in_russian(formats, expected):
     """Форматы работы называются по-русски: промпт на русском."""
-    assert _format_work_formats(formats) == expected
+    assert format_work_formats(formats) == expected
 
 
 def test_languages_are_listed_with_their_levels():
     """Языки перечисляются с уровнями через тире."""
-    got = _format_languages(
+    got = format_languages(
         [
             CandidateLanguage(name="Русский", level="native"),
             CandidateLanguage(name="Английский", level="B2"),
@@ -84,12 +84,12 @@ def test_a_language_without_both_halves_is_skipped(languages):
     Строка «Английский — » с пустым уровнем читалась бы моделью как
     настоящий уровень, а не как его отсутствие.
     """
-    assert _format_languages(languages) == "—"
+    assert format_languages(languages) == "—"
 
 
 def test_a_language_without_a_level_does_not_spoil_the_rest():
     """Пропуск одного языка остальных не задевает."""
-    got = _format_languages(
+    got = format_languages(
         [
             CandidateLanguage(name="Русский", level="native"),
             CandidateLanguage(name="Армянский", level=""),
@@ -113,7 +113,7 @@ def test_a_free_text_slot_is_passed_as_written(text, expected):
     Слотов на этом объявлении три — роль, локация и пожелания, — и прочерк
     у них общий: пустой слот оставил бы в промпте оборванную строку.
     """
-    assert _format_text(text) == expected
+    assert format_text(text) == expected
 
 
 class _Skill:
@@ -130,7 +130,7 @@ def test_known_skills_are_listed_with_their_spellings():
     Список нужен модели, чтобы она называла технологии так же, как они
     записаны у кандидата, а не своими словами.
     """
-    got = _format_known_skills(
+    got = format_known_skills(
         [_Skill("PostgreSQL", ["Postgres", "PG"]), _Skill("Python")]
     )
 
@@ -150,11 +150,11 @@ def test_an_empty_skill_list_becomes_a_dash(skills):
 
     Пустое место в этом углу промпта оставило бы предложение оборванным.
     """
-    assert _format_known_skills(skills) == "—"
+    assert format_known_skills(skills) == "—"
 
 
 def test_junk_among_the_spellings_is_skipped():
     """Мусор среди написаний пропускается, а не роняет подготовку."""
-    got = _format_known_skills([_Skill("Python", ["py", 42, None, "   "])])
+    got = format_known_skills([_Skill("Python", ["py", 42, None, "   "])])
 
     assert got == "- Python — py"

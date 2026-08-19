@@ -16,6 +16,7 @@
 from backend.flows import channels
 import pytest
 
+from backend.flows import embeddings
 from backend.flows import ingest as ingest_mod
 from backend.models import TelegramChannel
 from tests.dbio import only_row, put
@@ -86,6 +87,53 @@ async def test_the_mark_ends_up_on_the_lastpost(reading, session_factory):
 
     saved = await only_row(session_factory, TelegramChannel)
     assert saved.last_processed_msg_id == 12
+
+
+async def test_a_silent_prints_provider_leaves_the_mark_alone(
+    monkeypatch, reading, session_factory
+):
+    """Пост, не принятый из-за молчащего поставщика отпечатков, отметку не двигает.
+
+    Двинутая отметка теряет объявления навсегда: следующий обход берёт то,
+    что новее её, а эти посты никто не считал. Сорвавшийся разбор — другое
+    дело: там строка вакансии уже заведена, и перечитывать пост незачем.
+    """
+    pipeline, client, channel = reading
+    client.history = [post(12), post(11), post(10)]
+
+    async def no_provider(pipeline, channel_id, username, msg):
+        raise embeddings.ProviderIsSilent(f"[@{username}] {msg.id}")
+
+    monkeypatch.setattr(ingest_mod, "ingest_post", no_provider)
+
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
+
+    saved = await only_row(session_factory, TelegramChannel)
+    assert saved.last_processed_msg_id is None
+
+
+async def test_the_channel_is_dropped_after_the_provider_keeps_silent(
+    monkeypatch, reading
+):
+    """Молчание поставщика подряд бросает обход канала, а не перебирает хвост.
+
+    Молчит он сразу для всех, и перебор оставшихся постов — это десятки
+    напрасных обращений и минуты на канал, за которыми всё равно ничего не
+    заводится.
+    """
+    pipeline, client, channel = reading
+    client.history = [post(msg_id) for msg_id in range(20, 10, -1)]
+    tried: list[int] = []
+
+    async def no_provider(pipeline, channel_id, username, msg):
+        tried.append(msg.id)
+        raise embeddings.ProviderIsSilent(f"[@{username}] {msg.id}")
+
+    monkeypatch.setattr(ingest_mod, "ingest_post", no_provider)
+
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
+
+    assert tried == [11, 12, 13]
 
 
 async def test_the_mark_is_saved_in_batches(monkeypatch, reading, session_factory):

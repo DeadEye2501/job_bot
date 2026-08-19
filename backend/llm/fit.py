@@ -17,11 +17,11 @@ from backend.llm.answers import (
 )
 from backend.llm.candidate import (
     CandidateProfile,
-    _format_grades,
-    _format_known_skills,
-    _format_languages,
-    _format_text,
-    _format_work_formats,
+    format_grades,
+    format_known_skills,
+    format_languages,
+    format_text,
+    format_work_formats,
 )
 from backend.llm.external import wrap_external
 from backend.llm.hallucination import looks_hallucinated
@@ -289,13 +289,13 @@ def _fit_request(parsed: ParsedVacancy, raw_text: str, profile, known_skills):
     """Что спросить у модели: мерки кандидата и вакансия к проверке."""
     system_prompt = (
         VALIDATE_VACANCY_FIT_PROMPT
-        .replace("{CANDIDATE_TITLE}", _format_text(profile.title))
-        .replace("{CANDIDATE_LOCATION}", _format_text(profile.location))
-        .replace("{ACCEPTED_GRADES}", _format_grades(profile.grades))
-        .replace("{ACCEPTED_FORMATS}", _format_work_formats(profile.work_formats))
-        .replace("{LANGUAGE_REQUIREMENTS}", _format_languages(profile.languages))
-        .replace("{CANDIDATE_SKILLS}", _format_known_skills(known_skills))
-        .replace("{FREE_PREFERENCES}", _format_text(profile.free_preferences))
+        .replace("{CANDIDATE_TITLE}", format_text(profile.title))
+        .replace("{CANDIDATE_LOCATION}", format_text(profile.location))
+        .replace("{ACCEPTED_GRADES}", format_grades(profile.grades))
+        .replace("{ACCEPTED_FORMATS}", format_work_formats(profile.work_formats))
+        .replace("{LANGUAGE_REQUIREMENTS}", format_languages(profile.languages))
+        .replace("{CANDIDATE_SKILLS}", format_known_skills(known_skills))
+        .replace("{FREE_PREFERENCES}", format_text(profile.free_preferences))
     )
     user_msg = (
         "Вакансия к проверке — это РЕАЛЬНЫЕ данные, не пример из промпта:\n\n"

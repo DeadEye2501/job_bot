@@ -137,30 +137,38 @@ async def _write_parsed_row(
     return v
 
 
-async def _link_company(session, v: Vacancy, parsed, pipeline) -> dict | None:
-    """Привязать компанию по имени из разбора; отдать решение о сведении.
+async def _resolve_company(pipeline, parsed) -> tuple[int | None, dict | None]:
+    """Свести компанию из разбора со своей строкой; отдать номер и решение.
 
-    Решение отдаётся наружу затем, что уходит в ленту: сведение компаний
-    спрашивает языковую модель, и по чему именно она решила, разбирают
-    потом по строке ленты, а не по журналу.
+    Идёт своей короткой сделкой до открытия сессии записи — как и розыск HR, и
+    по той же причине: сведение спрашивает языковую модель, а ответа её ждут
+    до трёх минут. Внутри начатой сделки база всё это время не приняла бы ни
+    одной записи, и входящее письмо HR, пришедшее в тот же миг, потерялось бы
+    вовсе.
+
+    Решение отдаётся наружу затем, что уходит в ленту: по чему именно модель
+    свела компании, разбирают потом по строке ленты, а не по журналу.
+
+    Заведённая компания переживает пропавшую вакансию, и это верно: заводят её
+    по имени из объявления, а не по самой строке.
 
     Компания привязывается и у непригодной вакансии — как и собеседник:
-    ссылки из карточки в «Компании» и «HR» должны работать одинаково у
-    любой строки, иначе имя компании в карточке есть, а перехода на неё
-    нет.
+    ссылки из карточки в «Компании» и «HR» должны работать одинаково у любой
+    строки, иначе имя компании в карточке есть, а перехода на неё нет.
     """
     if parsed is None or not parsed.company_name:
-        return None
-    company, decision = await find_or_create_company(
-        session,
-        parsed.company_name,
-        website=parsed.company_website,
-        lm_client=pipeline.lm_client,
-        lm_model=pipeline.lm_chat_model,
-    )
-    if company is not None:
-        v.company_id = company.id
-    return decision
+        return None, None
+    async with pipeline.session_factory() as session:
+        company, decision = await find_or_create_company(
+            session,
+            parsed.company_name,
+            website=parsed.company_website,
+            lm_client=pipeline.lm_client,
+            lm_model=pipeline.lm_chat_model,
+        )
+        company_id = company.id if company is not None else None
+        await session.commit()
+    return company_id, decision
 
 
 async def _link_resolved_hr(session, v: Vacancy, resolved) -> tuple[HR | None, bool]:
@@ -196,28 +204,29 @@ def _parsed_event_payload(v: Vacancy, outcome: Outcome, decision) -> dict:
 
 async def persist_parse_outcome(
     pipeline, vacancy_id: int, parsed: ParsedVacancy | None, outcome: Outcome
-) -> tuple[HR | None, bool]:
+) -> tuple[HR | None, bool] | None:
     """Провести исход разбора через сессию: розыск, запись, оповещение окна.
 
-    Сама запись разложена по трём объявлениям выше — строка, компания,
-    собеседник; здесь остаётся чужое им: сессия, поломка посреди записи и
-    оповещение окна после. Розыск идёт первым и стоит двух сетевых
-    обращений — это самая медленная и ломкая часть работы, и в сессии ей
-    не место (см. `_resolve_hr`).
+    Сама запись разложена по объявлениям выше; здесь остаётся чужое им:
+    сессия, поломка посреди записи и оповещение окна после. Розыск
+    собеседника и сведение компании идут первыми, каждый своей дорогой: это
+    самые медленные и ломкие части работы, и в сессии записи им не место.
 
-    Отдаёт HR и признак «только что заведён»: отклик пустышке не положен,
-    а догон переписки обязан идти и после закрытия сессии, и после
-    отправки отклика — иначе он вытащит наше же письмо раньше, чем оно
-    запишется. Вне сессии HR пригоден: ``expire_on_commit=False``.
+    Отдаёт HR и признак «только что заведён»: отклик пустышке не положен, а
+    догон переписки обязан идти и после закрытия сессии, и после отправки
+    отклика — иначе он вытащит наше же письмо раньше, чем оно запишется. Вне
+    сессии HR пригоден: ``expire_on_commit=False``. Пустота вместо пары
+    означает, что записи не было вовсе: строка пропала или запись сорвалась.
     """
     resolved = await _resolve_hr(pipeline, parsed)
-    hr, hr_created = None, False
+    company_id, decision = await _resolve_company(pipeline, parsed)
     async with pipeline.session_factory() as session:
         try:
             v = await _write_parsed_row(session, vacancy_id, parsed, outcome)
             if v is None:
-                return None, False
-            decision = await _link_company(session, v, parsed, pipeline)
+                return None
+            if company_id is not None:
+                v.company_id = company_id
             hr, hr_created = await _link_resolved_hr(session, v, resolved)
             await add_vacancy_event(
                 session, vacancy_id, "parsed",
@@ -229,7 +238,7 @@ async def persist_parse_outcome(
                 "vacancy %s: parse persist failed", vacancy_id,
                 extra={"vacancy_id": vacancy_id},
             )
-            return None, False
+            return None
 
     pipeline.fire_contacts_changed()
     pipeline.fire_vacancies_changed()

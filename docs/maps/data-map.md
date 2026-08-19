@@ -242,6 +242,8 @@
 ### `backend/flows/channels.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `BATCH_FLUSH_EVERY` = `10`
+- `_SILENCE_BEFORE_DROPPING_THE_CHANNEL` = `3`
 
 ### `backend/flows/cleanup.py`
 
@@ -318,6 +320,11 @@
 ### `backend/flows/pipeline.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `class LmProviders`
+  - `chat_client: object`
+  - `chat_model: str`
+  - `embed_client: object`
+  - `embed_model: str`
 - `class IngestionPipeline`
   - `profile_block: str`
   - `skills_cache: list[ProfileSkill]`

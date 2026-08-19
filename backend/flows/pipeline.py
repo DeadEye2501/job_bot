@@ -7,6 +7,7 @@
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from typing import Literal
 from pathlib import Path
 
@@ -66,10 +67,10 @@ def _declare_window_hooks(pipeline) -> None:
     #        "message" — across messages inside the current channel.
     # Semantics: current = "how many already done", so it ranges 0..total.
     pipeline.on_progress = None
-    # Optional UI hook: called with no args after the title sweep at the
-    # start of a poll cycle has written one or more title changes. Lets
-    # the Contacts/Channels pane auto-refresh in real time without the
-    # user having to switch tabs or restart the app.
+    # Толкается без доводов после каждой удавшейся записи сводки каналов —
+    # названий, картинок или того и другого сразу. Зовут сводку двое: обход
+    # перед чтением постов и заведение канала из окна, — и обоим нужно одно:
+    # список каналов в окне обновляется сам, без перехода по вкладкам.
     pipeline.on_channels_changed = None
     # Optional UI hook: called with no args after a vacancy parse commit
     # that may have created/updated HR or Company rows (via
@@ -109,6 +110,23 @@ def _declare_dm_debounce(pipeline) -> None:
     pipeline.dm_debounce = DmDebounce(cap=50, slots=2)
 
 
+@dataclass(frozen=True, slots=True)
+class LmProviders:
+    """Оба соединения с моделями и оба имени моделей — одной группой.
+
+    Ходят они только вместе: чат-модель разбирает объявление и выносит
+    вердикт, модель отпечатков считает векторы, и лежать эти двое могут на
+    разных серверах. Порознь доводами они дают восемь доводов у сборки
+    конвейера — и путаются местами при сборке, потому что тип у обоих
+    соединений один.
+    """
+
+    chat_client: object
+    chat_model: str
+    embed_client: object
+    embed_model: str
+
+
 class IngestionPipeline:
     """Конвейер: сотрудники, кэши и работа над вакансией от поста до отклика.
 
@@ -135,19 +153,16 @@ class IngestionPipeline:
         self,
         client,
         session_factory,
-        lm_client,
-        lm_embed_client,
-        lm_chat_model: str,
-        lm_embed_model: str,
+        models: LmProviders,
         send,
         runtime_settings,
     ) -> None:
         self.client = client
         self.session_factory = session_factory
-        self.lm_client = lm_client
-        self.lm_embed_client = lm_embed_client
-        self.lm_chat_model = lm_chat_model
-        self.lm_embed_model = lm_embed_model
+        self.lm_client = models.chat_client
+        self.lm_embed_client = models.embed_client
+        self.lm_chat_model = models.chat_model
+        self.lm_embed_model = models.embed_model
         self.send = send
         self.rs = runtime_settings
         _declare_caches(self)
@@ -161,11 +176,12 @@ class IngestionPipeline:
         # is pending». На done-callback'е сам себя убираем из set'а.
         self.backfill_tasks: set[asyncio.Task] = set()
 
-        # Shutdown-флаг. Bot.run finally выставляет его в True ДО
-        # client.stop() / lm_*.aclose() — после этого schedule_dm_class*
-        # и process_dm молча no-op'ят, чтобы Pyrogram'овский handler,
-        # успевший отстрелить уже после teardown'а, не насыпал в БД
-        # запись и не попытался дёрнуть закрытый httpx-клиент.
+        # Отметка «гасимся». Ставится в `Bot.run` до `client.stop()` и
+        # закрытия соединений с моделями; читает её отложенный разбор писем
+        # (`dm_classify`) и молча ничего не делает — чтобы обработчик
+        # Pyrogram, отстреливший уже после гашения, не полез в закрытое
+        # соединение. Сама запись входящего письма отметки не читает: письмо,
+        # дошедшее до нас, ложится в базу при любом исходе.
         self.shutting_down: bool = False
 
     def mark_shutting_down(self) -> None:
@@ -206,7 +222,7 @@ class IngestionPipeline:
             )
             profile = await get_profile(session)
             languages = await list_profile_languages(session)
-            self.profile_cache = candidate._build_candidate_profile(profile, languages)
+            self.profile_cache = candidate.build_candidate_profile(profile, languages)
             self.profile_block = await build_profile_block(session)
         logger.info(
             "loaded resources: %d skills, %d blacklist patterns, "
@@ -219,8 +235,12 @@ class IngestionPipeline:
         )
 
     def cv_path(self):
-        """Path к резюме (PDF), если задан в настройках. None если не задан
-        или файл не существует — caller должен skip'нуть отправку."""
+        """Путь к резюме из настроек; пусто — путь не задан.
+
+        Лежит ли по нему файл, здесь не спрашивают: настройку правит человек,
+        а между вопросом и отправкой файл всё равно успевает исчезнуть. Пустое
+        место разбирает тот, кто прикладывает резюме к письму.
+        """
         raw = self.rs.cv_path
         if not raw:
             return None

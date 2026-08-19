@@ -25,6 +25,7 @@ from tests.backend.fixtures.flows import (
 )
 from tests.backend.fixtures.listing import channel_titles, hr_names, titles
 from tests.backend.fixtures.logs import clean_root_logger
+from tests.backend.fixtures.rerun import rerunning
 from tests.backend.fixtures.stats import applied
 
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     "outbox",
     "parsing",
     "ready_to_send",
+    "rerunning",
     "sending_unlocked",
     "titles",
     "unparsed_vacancy",

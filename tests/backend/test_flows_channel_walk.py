@@ -42,6 +42,27 @@ async def walking(monkeypatch, make_pipeline):
     return pipeline
 
 
+async def test_a_broken_metadata_sweep_does_not_cancel_the_walk(
+    walking, session_factory, monkeypatch
+):
+    """Сорвавшаяся сводка названий обход не отменяет.
+
+    Она идёт до чтения сообщений и нужна только окну — свежие названия и
+    картинки. Уронив обход броском, она стоит человеку всех объявлений этого
+    цикла, а следующий цикл идёт через полтора часа.
+    """
+    await put(session_factory, channel_row(username="on", is_active=True))
+
+    async def broken(pipeline, rows):
+        raise OSError("канал закрыт")
+
+    monkeypatch.setattr(channels, "refresh_channel_metadata", broken)
+
+    await walking.poll_active_channels()
+
+    assert "on" in walking.walked
+
+
 async def test_only_the_switched_on_channels_are_read(
     walking, session_factory
 ):
