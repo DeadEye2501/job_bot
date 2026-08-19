@@ -1186,14 +1186,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def _carry_company_to_survivor(survivor: Company, taken: _AbsorbedCompany) -> None` (19)
 - `async def merge_company(session: AsyncSession, *, absorbed_id: int, survivor_id: int) -> None` (37)
 
-### `backend/repository/companies_keys.py` — 195 строк
+### `backend/repository/companies_keys.py` — 206 строк
 
 Приведение компании к ключам, по которым её сравнивают.
 
 Зависит от: `backend.incoming`
 
 - `def _translit_cyr_to_latin(s: str) -> str` (2)
-- `def _without_edge_legal_forms(words: list[str]) -> list[str]` (14)
+- `def _without_edge_legal_forms(words: list[str]) -> list[str]` (16)
 - `def normalize_company_name(s: str | None) -> str` (9)
 - `def normalize_host(url: str | None) -> str` (23)
 - `def _is_aggregator_host(host: str) -> bool` (10)
@@ -3569,13 +3569,13 @@ Runtime settings layer.
 Тестов: 6
 
 
-### `tests/backend/test_repository_company_keys.py` — 194 строк
+### `tests/backend/test_repository_company_keys.py` — 209 строк
 
 Следствия приведения имени и сайта компании к сравнимому виду.
 
 Зависит от: `backend.repository.companies_keys`
 
-Тестов: 10
+Тестов: 11
 
 
 ### `tests/backend/test_repository_company_list.py` — 166 строк

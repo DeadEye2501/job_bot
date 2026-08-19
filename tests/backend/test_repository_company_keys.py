@@ -50,6 +50,9 @@ def test_cyrillic_is_transliterated_letter_by_letter(raw, expected):
         pytest.param("«Сбер»банк", "sberbank", id="ёлочки внутри слова"),
         pytest.param("Acme   Corp   Inc", "acme", id="лишние пробелы"),
         pytest.param("Sber AG Tech", "sber ag tech", id="форма посреди имени цела"),
+        pytest.param("АО Сбер", "sber", id="русская двухбуквенная форма впереди"),
+        pytest.param("Philips NV", "philips", id="чужая двухбуквенная форма сзади"),
+        pytest.param("НВ Групп", "nv grupp", id="чужая двухбуквенная форма впереди"),
         pytest.param("Acme & Co!", "acme co", id="знаки заменяются пробелом"),
         pytest.param("Sberbank", "sberbank", id="уже нормальное"),
     ],
@@ -74,6 +77,18 @@ def test_two_spellings_of_one_company_reduce_to_the_same_form():
     assert normalize_company_name("ПАО Сбербанк") == normalize_company_name(
         'ООО "Sberbank"'
     )
+
+
+def test_a_two_letter_form_is_cut_only_on_the_side_where_it_lives():
+    """Форма на своей стороне сводит компании, на чужой — оставляет разными.
+
+    Режь двухбуквенные с обеих сторон — и «НВ Групп» сойдётся с «Групп»
+    правилом имени, без арбитра, а склейка компаний необратима.
+    """
+    assert normalize_company_name("АО Сбер") == normalize_company_name("Сбер")
+    assert normalize_company_name("Philips NV") == normalize_company_name("Philips")
+    assert normalize_company_name("НВ Групп") != normalize_company_name("Групп")
+    assert normalize_company_name("Сбер АО") != normalize_company_name("Сбер")
 
 
 def test_a_legal_form_inside_a_word_is_not_cut():
