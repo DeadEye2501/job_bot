@@ -62,6 +62,38 @@ async def test_the_key_stays_when_something_survived_the_wipe(api, ask, monkeypa
     assert forgotten == []
 
 
+async def test_the_refusal_says_one_phrase_instead_of_the_system_troubles(
+    api, ask, monkeypatch
+):
+    """Не удавшийся снос отвечают одной фразой, а не бедами от системы.
+
+    Беды приходят строками от Windows: код `WinError`, полный путь к файлу и
+    одна и та же причина по разу на каждый занятый файл — база и оба её
+    спутника. Человеку это три экрана текста об одном: файлы кто-то держит, и
+    закрыть надо чужую программу, а не разбирать их по именам.
+
+    Сами беды не пропадают: каждую пишет `backend.wipe`, и до перезапуска их
+    видно на экране «Логи».
+    """
+
+    async def _wipe_all(engine) -> list[str]:
+        busy = "[WinError 32] Процесс не может получить доступ к файлу"
+        return [
+            f"jobbot.db: {busy}: 'C:\\Users\\deade\\JobBot\\jobbot.db'",
+            f"jobbot.db-wal: {busy}: 'C:\\Users\\deade\\JobBot\\jobbot.db-wal'",
+        ]
+
+    monkeypatch.setattr("client.bridge.wipe.wipe_all", _wipe_all)
+    monkeypatch.setattr("client.bridge.wipe.forget_master_key", lambda: None)
+    monkeypatch.setattr("client.bridge.wipe._leave_later", lambda: None)
+
+    answer = await ask(api.system.wipe)
+
+    assert answer["detail"] == (
+        "Файлы открыты в другом процессе и не могут быть удалены."
+    )
+
+
 async def test_the_answer_is_ready_before_the_bot_and_the_data_are_gone(
     api, ask, with_bot, wipe_steps
 ):
