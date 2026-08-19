@@ -50,6 +50,8 @@ AGGREGATOR_HOSTS = frozenset({
     "career.ru",
     "greenhouse.io",
     "lever.co",
+    "indeed.com",
+    "stepstone.de",
     # Общие хостинги ссылок, анкет и заметок: на таком хосте сидит кто угодно,
     # и одна ссылка на форму отклика склеила бы две разные компании.
     "docs.google.com",

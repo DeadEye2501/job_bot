@@ -147,6 +147,8 @@ def test_a_query_is_cut_even_without_a_path():
         pytest.param("acme.com", False, id="обычный сайт"),
         pytest.param("t.me", True, id="мессенджер"),
         pytest.param("hh.ru", True, id="площадка вакансий"),
+        pytest.param("indeed.com", True, id="зарубежная площадка вакансий"),
+        pytest.param("stepstone.de", True, id="ещё одна зарубежная площадка"),
         pytest.param("careers.hh.ru", True, id="поддомен площадки"),
         pytest.param("m.linkedin.com", True, id="мобильный поддомен соцсети"),
         pytest.param("nothh.ru", False, id="хост, лишь оканчивающийся так же"),
