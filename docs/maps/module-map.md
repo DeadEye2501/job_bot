@@ -143,7 +143,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## backend — 109 модулей
+## backend — 113 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -683,11 +683,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parsed_event_payload(v: Vacancy, outcome: Outcome, decision) -> dict` (15)
 - `async def persist_parse_outcome(pipeline, vacancy_id: int, parsed: ParsedVacancy | None, outcome: Outcome) -> tuple[HR | None, bool] | None` (41)
 
-### `backend/flows/pipeline.py` — 317 строк ⚠ подошёл к 300
+### `backend/flows/pipeline.py` — 319 строк ⚠ подошёл к 300
 
 Сборка конвейера: его состояние, общие ресурсы и поверхность для зовущих.
 
-Зависит от: `backend.domain.dedup`, `backend.flows`, `backend.flows.dm`, `backend.flows.dm_backfill`, `backend.flows.dm_debounce`, `backend.llm`, `backend.llm.candidate`, `backend.models`, `backend.notify`, `backend.repository.blacklist_marks`, `backend.repository.profile`, `backend.repository.profile_block`
+Зависит от: `backend.domain.dedup`, `backend.flows`, `backend.flows.dm`, `backend.flows.dm_backfill`, `backend.flows.dm_debounce`, `backend.llm`, `backend.llm.candidate`, `backend.models`, `backend.notify`, `backend.repository.blacklist_marks`, `backend.repository.profile`, `backend.repository.profile_block`, `backend.repository.profile_languages`, `backend.repository.profile_skills`
 
 - `def _declare_caches(pipeline) -> None` (16)
 - `def _declare_window_hooks(pipeline) -> None` (32)
@@ -1324,47 +1324,75 @@ First-run bootstrap: ensure DB schema exists.
 - `def searched_page(rows: list[T], matches, limit: int | None, offset: int) -> tuple[list[T], bool]` (11)
 - `def slice_page(rows: list[T], limit: int | None, offset: int) -> tuple[list[T], bool]` (13)
 
-### `backend/repository/profile.py` — 493 строк ⚠ подошёл к 300
+### `backend/repository/profile.py` — 33 строк
 
-Хранение анкеты кандидата.
+Поля анкеты кандидата.
 
-Зависит от: `backend.domain.skill_names`, `backend.domain.spellings`, `backend.incoming`, `backend.models`, `backend.payloads`
+Зависит от: `backend.models`
 
-- `async def _wipe_experience(session: AsyncSession) -> None` (10)
-- `def _index_skill_keys(lookup: dict[str, ProfileSkill], names: tuple[str, ...], row: ProfileSkill, where: str) -> None` (19)
-- `def _skills_by_key(rows: list[ProfileSkill]) -> dict[str, ProfileSkill]` (11)
-- `async def _wipe_profile(session: AsyncSession) -> None` (11)
-- `async def _add_parsed_skills(session: AsyncSession, profile_id: int, skills) -> dict[str, ProfileSkill]` (21)
-- `async def _add_parsed_experience(session: AsyncSession, profile_id: int, experience, skill_lookup: dict[str, ProfileSkill]) -> None` (32)
-- `async def _upsert_cv_path(session: AsyncSession, cv_path: str) -> None` (8)
-- `def _new_profile(p) -> Profile` (20)
-- `async def save_parsed_cv(session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None=None) -> None` (40)
-- `async def list_skills(session: AsyncSession) -> list[ProfileSkill]` (10)
-- `async def list_experience(session: AsyncSession) -> list[ProfileExperience]` (13)
-- `def _skill_columns(row: dict) -> dict | None` (19)
-- `def _upsert_skills(session: AsyncSession, rows: list[dict], existing: dict, profile_id: int) -> set[int]` (26)
-- `async def _drop_skills(session: AsyncSession, existing: dict, drop_ids: set[int]) -> None` (15)
-- `async def save_skills(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (23)
-- `class SaveExperienceError(ValueError)` (11)
-- `def _checked_experience_rows(rows: list[dict]) -> list[tuple[dict, date, date | None]]` (33)
-- `def _add_experience_rows(session: AsyncSession, checked: list, profile_id: int, skills_by_name: dict) -> None` (29)
-- `async def save_experience(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (22)
 - `async def get_profile(session: AsyncSession) -> Profile | None` (3)
 - `async def upsert_profile(session: AsyncSession, **fields) -> Profile` (16)
-- `async def list_profile_languages(session: AsyncSession) -> list[ProfileLanguage]` (8)
-- `async def replace_profile_languages(session: AsyncSession, profile_id: int, items: list[tuple[str, str]]) -> None` (25)
 
-### `backend/repository/profile_block.py` — 111 строк
+### `backend/repository/profile_block.py` — 109 строк
 
 Сборка текстового блока анкеты для наставления модели.
 
-Зависит от: `backend.repository.profile`
+Зависит от: `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_skills`
 
 - `def _skills_lines(skills: list) -> list[str]` (12)
 - `def _years_in_it(experiences: list) -> int` (14)
 - `def _header_lines(profile, experiences: list) -> list[str]` (19)
 - `def _experience_lines(experiences: list) -> list[str]` (13)
 - `async def build_profile_block(session: AsyncSession) -> str` (28)
+
+### `backend/repository/profile_cv.py` — 165 строк
+
+Запись анкеты, разобранной моделью из резюме.
+
+Зависит от: `backend.domain.skill_names`, `backend.models`, `backend.payloads`, `backend.repository.profile_experience`, `backend.repository.profile_languages`, `backend.repository.profile_skills`
+
+- `async def _wipe_profile(session: AsyncSession) -> None` (11)
+- `async def _add_parsed_skills(session: AsyncSession, profile_id: int, skills) -> dict[str, ProfileSkill]` (21)
+- `async def _add_parsed_experience(session: AsyncSession, profile_id: int, experience, skill_lookup: dict[str, ProfileSkill]) -> None` (32)
+- `async def _upsert_cv_path(session: AsyncSession, cv_path: str) -> None` (8)
+- `def _new_profile(p) -> Profile` (20)
+- `async def save_parsed_cv(session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None=None) -> None` (40)
+
+### `backend/repository/profile_experience.py` — 162 строк
+
+Места работы, названные в анкете кандидата.
+
+Зависит от: `backend.domain.skill_names`, `backend.domain.spellings`, `backend.incoming`, `backend.models`, `backend.repository.profile_skills`
+
+- `async def wipe_experience(session: AsyncSession) -> None` (10)
+- `def _skills_by_key(rows: list[ProfileSkill]) -> dict[str, ProfileSkill]` (11)
+- `async def list_experience(session: AsyncSession) -> list[ProfileExperience]` (13)
+- `class SaveExperienceError(ValueError)` (11)
+- `def _checked_experience_rows(rows: list[dict]) -> list[tuple[dict, date, date | None]]` (33)
+- `def _add_experience_rows(session: AsyncSession, checked: list, profile_id: int, skills_by_name: dict) -> None` (29)
+- `async def save_experience(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (22)
+
+### `backend/repository/profile_languages.py` — 47 строк
+
+Языки, названные в анкете кандидата.
+
+Зависит от: `backend.models`
+
+- `async def list_profile_languages(session: AsyncSession) -> list[ProfileLanguage]` (8)
+- `async def replace_profile_languages(session: AsyncSession, profile_id: int, items: list[tuple[str, str]]) -> None` (25)
+
+### `backend/repository/profile_skills.py` — 136 строк
+
+Навыки, названные в анкете кандидата.
+
+Зависит от: `backend.domain.skill_names`, `backend.incoming`, `backend.models`
+
+- `def index_skill_keys(lookup: dict[str, ProfileSkill], names: tuple[str, ...], row: ProfileSkill, where: str) -> None` (19)
+- `async def list_skills(session: AsyncSession) -> list[ProfileSkill]` (10)
+- `def _skill_columns(row: dict) -> dict | None` (19)
+- `def _upsert_skills(session: AsyncSession, rows: list[dict], existing: dict, profile_id: int) -> set[int]` (26)
+- `async def _drop_skills(session: AsyncSession, existing: dict, drop_ids: set[int]) -> None` (15)
+- `async def save_skills(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (23)
 
 ### `backend/repository/search.py` — 26 строк
 
@@ -1431,7 +1459,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Частота технологий в объявлениях за выбранный срок.
 
-Зависит от: `backend.domain.scoring`, `backend.domain.skill_names`, `backend.models`, `backend.repository.profile`, `backend.repository.stats_common`
+Зависит от: `backend.domain.scoring`, `backend.domain.skill_names`, `backend.models`, `backend.repository.profile_skills`, `backend.repository.stats_common`
 
 - `def _count_stack_tags(stacks) -> tuple[dict[str, int], dict[str, str]]` (30)
 - `def _skill_items(counts: dict[str, int], canon_by_key: dict[str, str], profile_set, min_count: int) -> list[dict]` (18)
@@ -2021,7 +2049,7 @@ Runtime settings layer.
 - `async def merge_picker(session, subject: PickerSubject, absorbed_id: int, search: str | None) -> dict` (21)
 - `async def link_picker(session, subject: PickerSubject, vacancy, search: str | None) -> dict` (18)
 
-### `client/bridge/profile.py` — 160 строк
+### `client/bridge/profile.py` — 163 строк
 
 Анкета соискателя: сведения о себе, навыки и места работы.
 
@@ -3779,11 +3807,11 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/backend/test_repository_profile_cv_saving.py` — 290 строк
+### `tests/backend/test_repository_profile_cv_saving.py` — 293 строк
 
 Следствия записи разобранного резюме в профиль.
 
-Зависит от: `backend.models`, `backend.payloads`, `backend.repository.profile`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.payloads`, `backend.repository.profile`, `backend.repository.profile_cv`, `backend.repository.profile_experience`, `backend.repository.profile_skills`, `tests.dbio`, `tests.factories`
 
 Тестов: 10
 
@@ -3792,30 +3820,30 @@ Runtime settings layer.
 - `def _place(**overrides) -> ParsedCvExperience` (9)
 - `def _cv(**overrides) -> ParsedCv` (10)
 
-### `tests/backend/test_repository_profile_experience.py` — 256 строк
+### `tests/backend/test_repository_profile_experience.py` — 260 строк
 
 Следствия сохранения мест работы профиля.
 
-Зависит от: `backend.models`, `backend.repository.profile`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.profile_experience`, `tests.dbio`, `tests.factories`
 
 Тестов: 12
 
 - `def _row(**overrides) -> dict` (5)
 
-### `tests/backend/test_repository_profile_fields.py` — 61 строк
+### `tests/backend/test_repository_profile_fields.py` — 62 строк
 
 Следствия чтения и записи основных полей профиля.
 
-Зависит от: `backend.repository.profile`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.repository.profile`, `backend.repository.profile_skills`, `tests.dbio`, `tests.factories`
 
 Тестов: 5
 
 
-### `tests/backend/test_repository_profile_languages.py` — 64 строк
+### `tests/backend/test_repository_profile_languages.py` — 67 строк
 
 Следствия замены списка языков профиля.
 
-Зависит от: `backend.repository.profile`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.repository.profile_languages`, `tests.dbio`, `tests.factories`
 
 Тестов: 4
 
@@ -3824,7 +3852,7 @@ Runtime settings layer.
 
 Следствия сохранения списка навыков профиля.
 
-Зависит от: `backend.models`, `backend.repository.profile`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.profile_skills`, `tests.dbio`, `tests.factories`
 
 Тестов: 12
 

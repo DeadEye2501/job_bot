@@ -4,7 +4,8 @@
 навыков и мест работы не касаясь: у тех свои пути записи.
 """
 
-from backend.repository.profile import get_profile, list_skills, upsert_profile
+from backend.repository.profile import get_profile, upsert_profile
+from backend.repository.profile_skills import list_skills
 from tests.dbio import put
 from tests.factories import person_fields, profile_row, profile_skill_row
 

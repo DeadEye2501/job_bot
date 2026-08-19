@@ -5,6 +5,9 @@ from __future__ import annotations
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.incoming import text_or_none
 from backend.repository import profile as profile_repo
+from backend.repository import profile_experience as experience_repo
+from backend.repository import profile_languages as languages_repo
+from backend.repository import profile_skills as skills_repo
 from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.choices import _filter_languages, _filter_set
 from client.bridge.cv import Cv
@@ -39,7 +42,7 @@ class Profile(Cv):
             async with self._hub.session_factory() as session:
                 profile = await profile_repo.get_profile(session)
                 languages = (
-                    await profile_repo.list_profile_languages(session)
+                    await languages_repo.list_profile_languages(session)
                     if profile is not None
                     else []
                 )
@@ -68,7 +71,7 @@ class Profile(Cv):
             async with self._hub.session_factory() as session:
                 async with session.begin():
                     profile = await profile_repo.upsert_profile(session, **fields)
-                    await profile_repo.replace_profile_languages(
+                    await languages_repo.replace_profile_languages(
                         session, profile.id, languages
                     )
             return {}
@@ -80,14 +83,14 @@ class Profile(Cv):
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
-                rows = await profile_repo.list_skills(session)
+                rows = await skills_repo.list_skills(session)
             return {"skills": [_skill_to_dict(s) for s in rows]}
 
         return reply(self._hub.runner, run())
 
     def save_skills(self, payload: dict) -> dict:
         """Заменить перечень навыков присланным."""
-        return self._save_rows(payload, "skills", profile_repo.save_skills)
+        return self._save_rows(payload, "skills", skills_repo.save_skills)
 
     def experience(self) -> dict:
         """Места работы вместе с указателем навыков.
@@ -98,8 +101,8 @@ class Profile(Cv):
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
-                exps = await profile_repo.list_experience(session)
-                skills = await profile_repo.list_skills(session)
+                exps = await experience_repo.list_experience(session)
+                skills = await skills_repo.list_skills(session)
             return {
                 "experience": [_exp_to_dict(e) for e in exps],
                 "skills_index": [_skill_to_dict(s) for s in skills],
@@ -109,7 +112,7 @@ class Profile(Cv):
 
     def save_experience(self, payload: dict) -> dict:
         """Заменить перечень мест работы присланным."""
-        return self._save_rows(payload, "experience", profile_repo.save_experience)
+        return self._save_rows(payload, "experience", experience_repo.save_experience)
 
     def _save_rows(self, payload: dict, key: str, saving) -> dict:
         """Прочитать перечень строк анкеты и отдать его сохранению.
@@ -135,7 +138,7 @@ class Profile(Cv):
                         if profile is None:
                             raise Denied(PROFILE_FIRST)
                         await saving(session, rows, profile.id)
-            except profile_repo.SaveExperienceError as e:
+            except experience_repo.SaveExperienceError as e:
                 raise Denied(str(e))
             return {}
 
