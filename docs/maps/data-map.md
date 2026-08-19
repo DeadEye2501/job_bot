@@ -248,6 +248,10 @@
   - `title: str`
   - `channel_ref: str | None`
 
+### `backend/flows/batches.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
 ### `backend/flows/channels.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -263,6 +267,12 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `OutgoingDmOutcome` = `Literal['stored', 'already_stored', 'not_stored'…`
+- `class DmHelpers`
+  - `session_factory: Any`
+  - `lm_client: Any` = `None`
+  - `lm_chat_model: str | None` = `None`
+  - `client: Any` = `None`
+  - `schedule_classification: Any` = `None`
 - `class _Attachment`
   - `kind: str | None` = `None`
   - `path: str | None` = `None`
@@ -273,15 +283,9 @@
 - `logger` = `logging.getLogger(__name__)`
 - `_DM_CATCHUP_BATCH_SIZE` = `20`
 - `_DM_CATCHUP_BATCH_DELAY_SEC` = `1.0`
-- `class _Walk`
-  - `hr_id: int`
-  - `client: Any`
-  - `lm_client: Any`
-  - `lm_chat_model: str | None`
-  - `session_factory: Any`
-  - `schedule_classification: Any`
-  - `on_vacancies_changed: Any`
-- `_WAIT_OUT_LIMIT_SEC` = `60`
+- `class DmHooks`
+  - `on_message_persisted: Any` = `None`
+  - `on_vacancies_changed: Any` = `None`
 
 ### `backend/flows/dm_classify.py`
 

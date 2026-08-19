@@ -79,14 +79,9 @@ async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None:
         )
         try:
             await catch_up_missed_dms(
-                bot.client,
-                bot.lm_client,
-                bot.lm_chat_model,
-                bot.session_factory,
+                bot.ingestion.dm_helpers(),
+                bot.ingestion.dm_hooks(),
                 backfill_limit=bot.rs.dm_backfill_limit,
-                on_message_persisted=bot.on_new_message,
-                on_vacancies_changed=bot.on_vacancies_changed,
-                schedule_classification=bot.ingestion.schedule_dm_classification,
             )
         except Exception:
             logger.exception("dm catch-up failed")

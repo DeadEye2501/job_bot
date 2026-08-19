@@ -148,6 +148,20 @@ async def test_the_timer_only_status_is_never_offered():
     assert "Ghosting" not in _allowed_line(client)
 
 
+async def test_a_status_never_offered_is_not_a_verdict():
+    """Статус, которого модели не предлагали, вердиктом не считается.
+
+    «Пропала без вести» вычеркнута из списка нарочно: её ставит только таймер
+    молчания. Прими мы её обратно из ответа — модель назначала бы её сама, и
+    вакансия уходила бы в тишину по одному письму HR.
+    """
+    client = provider({CHAT: _verdict("Ghosting", "молчит")})
+
+    got = await classify_hr_reply("текст", VacancyStatus.APPLIED, client, "qwen")
+
+    assert got is None
+
+
 async def test_a_status_without_moves_still_offers_itself():
     """У статуса без разрешённых переходов остаётся он сам.
 

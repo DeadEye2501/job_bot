@@ -12,14 +12,15 @@
 """
 
 import logging
+from datetime import timedelta, timezone
 
 from backend.models import HR, Message, Vacancy, VacancyStatus
 from backend.payloads import Classification, PendingReply
 from backend.repository.messages import save_incoming_message
 from backend.repository.vacancies_life import delete_vacancy
 from tests.dbio import all_rows, only_row, put
-from tests.factories import EPOCH, at, hr_row, message_row, vacancy_row
-from tests.fakes.telegram import incoming, message, user
+from tests.factories import at, hr_row, message_row, vacancy_row
+from tests.fakes.telegram import TG_EPOCH, incoming, message, user
 
 
 async def _two_vacancies(session_factory):
@@ -96,6 +97,43 @@ async def test_a_letter_without_a_reply_lands_on_the_freshest(session_factory, d
     assert (await only_row(session_factory, Message)).vacancy_id == by_title["свежая"].id
 
 
+async def test_the_letter_time_is_read_in_our_scale(session_factory, deliver):
+    """Свежесть вакансии считается по времени письма, приведённому к нашей шкале.
+
+    Отбор сравнивает его с колонками базы, а те наивные и по UTC. Метка от
+    Telegram живёт по другим часам, и без приведения граница «на момент
+    письма» уезжает на смещение пояса: письмо относят к вакансии, которой в
+    ту минуту ещё не было.
+
+    Метка взята с поясом нарочно: на машине, живущей по UTC, приведённая и
+    сырая совпали бы, и проверка молчала бы вместе с бедой. Письмо помечено
+    между двумя вакансиями, так что промах виден по тому, к какой из них его
+    отнесли.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777))
+    hr = await only_row(session_factory, HR)
+    await put(
+        session_factory,
+        vacancy_row(
+            title="свежая", hr_id=hr.id,
+            status=VacancyStatus.APPLIED, created_at=at(-60),
+        ),
+        vacancy_row(
+            title="старая", hr_id=hr.id,
+            status=VacancyStatus.APPLIED, created_at=at(-120),
+        ),
+    )
+    by_title = {v.title: v for v in await all_rows(session_factory, Vacancy)}
+    stamped = at(-90).replace(tzinfo=timezone.utc).astimezone(
+        timezone(timedelta(hours=5))
+    )
+
+    await deliver(incoming(text="да, давайте", date=stamped), schedule=_ignore)
+
+    saved = [m for m in await all_rows(session_factory, Message) if m.is_incoming]
+    assert [m.vacancy_id for m in saved] == [by_title["старая"].id]
+
+
 async def test_a_reply_to_something_unknown_falls_back_to_the_freshest(session_factory, deliver):
     """Ответ на неизвестное сообщение относят к самой свежей вакансии.
 
@@ -161,6 +199,38 @@ async def test_a_letter_is_handed_to_the_buffer_when_there_is_one(session_factor
             ),
         )
     ]
+
+
+async def test_a_letter_about_a_new_vacancy_reaches_no_reader(
+    session_factory, deliver
+):
+    """Письмо по вакансии, на которую мы ещё не откликались, не разбирают.
+
+    Из «новой» автоматика ведёт ровно в «отклик отправлен», а отправляем его
+    мы, не собеседник. Дай мы разбору выбирать из этих двух — письмо HR само
+    объявляло бы отклик ушедшим, и кнопка отправки запиралась бы на вакансии,
+    по которой мы не написали ни строки.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777))
+    hr = await only_row(session_factory, HR)
+    await put(
+        session_factory,
+        vacancy_row(
+            title="ещё не откликались",
+            hr_id=hr.id,
+            status=VacancyStatus.NEW,
+            created_at=at(-60),
+        ),
+    )
+    scheduled: list[tuple] = []
+
+    await deliver(
+        incoming(text="здравствуйте, вы откликались?"),
+        schedule=lambda *args: scheduled.append(args),
+    )
+
+    assert scheduled == []
+    assert (await only_row(session_factory, Message)).text == "здравствуйте, вы откликались?"
 
 
 async def test_a_vacancy_beyond_automation_reaches_no_reader(session_factory, deliver):
@@ -312,7 +382,7 @@ async def test_the_quote_of_our_own_letter_does_not_go_to_the_reader(session_fac
     quoted = message(
         id=10,
         text="да, давайте",
-        date=EPOCH,
+        date=TG_EPOCH,
         from_user=user(id=777, username=None),
         photo=None,
         document=None,

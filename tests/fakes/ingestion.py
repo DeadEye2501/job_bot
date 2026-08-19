@@ -7,6 +7,9 @@
 
 import asyncio
 
+from backend.flows.dm import DmHelpers
+from backend.flows.dm_backfill import DmHooks
+
 
 class FakeIngestion:
     """Сообщает, чем кончился прогон, и записывает, о чём его просили."""
@@ -55,6 +58,18 @@ class FakeIngestion:
     def schedule_dm_classification(self, hr_id, *rest):
         self.log.append(f"разбор запланирован: {hr_id}")
         self.scheduled.append((hr_id, *rest))
+
+    def dm_helpers(self) -> DmHelpers:
+        """Сотрудники для проводки письма: у подделки все пустые.
+
+        Подделку зовут там, где предмет проверки — сам оборот цикла, а не
+        письмо; догон при этом всё равно подменён своим.
+        """
+        return DmHelpers(session_factory=None)
+
+    def dm_hooks(self) -> DmHooks:
+        """Крючки окна: у подделки их нет."""
+        return DmHooks()
 
     def update_dm_buffer_text(self, hr_id: int, tg_message_id: int, text: str) -> None:
         self.buffer_edits.append((hr_id, tg_message_id, text))

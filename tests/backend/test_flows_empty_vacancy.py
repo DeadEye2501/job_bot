@@ -172,7 +172,7 @@ def caught_backfills(monkeypatch):
     """Кто из HR ушёл в фоновый догон переписки."""
     caught: list[int] = []
 
-    async def backfill(client, hr_row_, *args, **kwargs):
+    async def backfill(hr_row_, *args, **kwargs):
         caught.append(hr_row_.id)
 
     monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)

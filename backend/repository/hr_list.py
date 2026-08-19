@@ -41,18 +41,20 @@ async def _with_last_incoming_id(
     return result
 
 
-async def list_hrs_for_backfill(
-    session: AsyncSession,
-) -> list[tuple[HR, int]]:
-    """Every HR with a Telegram identifier + the highest incoming
-    ``tg_message_id`` we already have (0 if none). Used by Bot startup to
-    pull whatever we missed while the bot was off — broader than
-    ``list_open_hr_chats``, which only covers HRs we ever messaged first.
+async def list_hrs_for_backfill(session: AsyncSession) -> list[HR]:
+    """Все, до кого можно дотянуться в Telegram, — с них бот и догоняет.
+
+    Шире `list_open_hr_chats`: тот берёт только тех, кому мы писали первыми.
+
+    Одних людей, без отметки «докуда уже прочитано»: догон читает хвост
+    переписки целиком и отбивает повторы номером сообщения, а границу сверки
+    удалённого снимает своим запросом — по обеим сторонам, не по входящим.
+    Отметка здесь была лишним обращением к базе на каждого человека, и на
+    трёх сотнях собеседников это три сотни запросов в никуда.
     """
-    hrs = list(
+    return list(
         (await session.scalars(select(HR).where(HAS_TELEGRAM_IDENTITY))).all()
     )
-    return await _with_last_incoming_id(session, hrs)
 
 
 async def list_open_hr_chats(

@@ -103,14 +103,7 @@ async def on_dm(bot, _client, msg) -> None:
     # Off mode silences everything, including reading HR replies.
     if await _muted(bot):
         return
-    hr_id = await process_dm(
-        msg,
-        bot.lm_client,
-        bot.lm_chat_model,
-        bot.session_factory,
-        client=bot.client,
-        schedule_classification=bot.ingestion.schedule_dm_classification,
-    )
+    hr_id = await process_dm(msg, bot.ingestion.dm_helpers())
     # `on_vacancies_changed` НЕ пушим здесь — статус вакансии флипнется
     # debounce-таском через ~60с после burst'а (см. flows/dm_classify.py,
     # _run_debounced_classify), он же сам пушнёт сигнал. До того статус

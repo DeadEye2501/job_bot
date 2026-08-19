@@ -6,7 +6,7 @@ from contextlib import suppress
 import pytest
 
 from backend.flows import apply, dm_classify
-from backend.flows.dm import process_dm
+from backend.flows.dm import DmHelpers, process_dm
 from backend.flows.pipeline import IngestionPipeline, LmProviders
 from backend.models import (
     Profile,
@@ -137,11 +137,12 @@ def deliver(session_factory):
     async def run(msg, *, client=None, schedule=None):
         return await process_dm(
             msg,
-            None,
-            "qwen",
-            session_factory,
-            client=client,
-            schedule_classification=schedule,
+            DmHelpers(
+                session_factory=session_factory,
+                lm_chat_model="qwen",
+                client=client,
+                schedule_classification=schedule,
+            ),
         )
 
     return run

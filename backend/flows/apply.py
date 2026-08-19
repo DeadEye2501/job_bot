@@ -168,7 +168,9 @@ async def _send_plan(pipeline, hr, vacancy_id: int, force: bool) -> tuple:
         )
 
 
-async def _full_letter(pipeline, parsed: ParsedVacancy, channel_ref: str, vacancy_id: int):
+async def _full_letter(
+    pipeline, parsed: ParsedVacancy, channel_ref: str | None, vacancy_id: int
+):
     """Полное письмо с резюме; при беде — пара «пусто и код отказа».
 
     Название и канал вплетает в текст сама модель: детерминированная
@@ -223,8 +225,9 @@ async def _hand_letter_over(
             extra={"vacancy_id": vacancy_id, "hr_id": hr.id},
         )
         return False, "telegram_error"
-    # Ложь от отправки значит заслон: выключенный бот, чёрный список или
-    # некуда писать. Какой именно — сказано в её собственной записи.
+    # Ложь от отправки значит одно из двух: заслон — выключенный бот, чёрный
+    # список, некуда писать — или отказ Telegram по частоте, после которого
+    # письма нет. Что именно, сказано в её собственной записи.
     return (True, "sent") if sent else (False, "blocked")
 
 

@@ -125,12 +125,11 @@ async def _tombstone_in_chat(
 async def _tombstone_chatless(session_factory, chatless_ids: list[int]) -> set[int]:
     """Похоронить безадресные надгробия; отдать задетых людей.
 
-    Номер письма свой у каждой переписки, а не общий на всю учётную запись,
-    поэтому такой проход в принципе может задеть чужую строку. Сужаем до
-    входящих: без переписки удаления приходят практически только из секретных
-    чатов и каналов, которых мы не храним, а входящие сужают окно ошибки ещё
-    сильнее. Пропущенные здесь исходящие сверятся при следующей загрузке
-    переписки из Telegram.
+    Номера писем у пользовательской учётной записи общие на все личные
+    переписки, а не свои у каждой, — попадание по одному номеру поэтому
+    точное, чужую строку такой проход не заденет. Сужены мы всё же до
+    входящих; исходящие, которые проход пропускает, сверятся при следующей
+    загрузке переписки из Telegram.
 
     Спрашиваем до похорон и тем же отбором: иначе в смешанной пачке уже
     похороненная строка чужого человека разбудила бы окно за переписку, в
@@ -145,6 +144,12 @@ async def _tombstone_chatless(session_factory, chatless_ids: list[int]) -> set[i
         rowcount = await tombstone_messages(session, *chatless)
         await session.commit()
     return hr_ids if rowcount else set()
+
+
+def _forget_all(forget_pending, hr_id: int, msg_ids) -> None:
+    """Выбросить названные письма из копилки отложенного разбора у человека."""
+    for tg_msg_id in msg_ids:
+        forget_pending(hr_id, tg_msg_id)
 
 
 async def tombstone_deleted(session_factory, messages, forget_pending) -> set[int]:
@@ -166,10 +171,12 @@ async def tombstone_deleted(session_factory, messages, forget_pending) -> set[in
         if hr_id is None:
             continue
         touched.add(hr_id)
-        for tg_msg_id in msg_ids:
-            forget_pending(hr_id, tg_msg_id)
+        _forget_all(forget_pending, hr_id, msg_ids)
     if chatless_ids:
-        touched |= await _tombstone_chatless(session_factory, chatless_ids)
+        chatless_hrs = await _tombstone_chatless(session_factory, chatless_ids)
+        touched |= chatless_hrs
+        for hr_id in chatless_hrs:
+            _forget_all(forget_pending, hr_id, chatless_ids)
     if touched:
         logger.info("DM tombstoned across %d hr(s)", len(touched))
     return touched

@@ -29,9 +29,20 @@ async def status_open_for_auto(
     шло, и разбирать ответ по тому, чего нет, не о чем. Разбирать пропажу
     самим зовущим было бы дороже: их двое, и оба ушли бы отсюда той же
     дорогой, что и от терминального статуса, — записью в журнал и выходом.
+
+    «Новая» закрыта наравне с ними, хоть граф из неё выход и знает: ведёт он
+    ровно в «отклик отправлен», а отправляем его мы, не собеседник. Открой мы
+    её разбору — письмо HR само объявляло бы отклик ушедшим, и кнопка
+    отправки запиралась бы на вакансии, по которой мы не написали ни строки.
+    Отправке этот заслон не помеха: она ходит своей дорогой, через граф.
     """
     async with session_factory() as session:
         status = await session.scalar(
             select(Vacancy.status).where(Vacancy.id == vacancy_id)
         )
-    return (status is not None and not is_terminal_for_auto(status)), status
+    is_open = (
+        status is not None
+        and status is not VacancyStatus.NEW
+        and not is_terminal_for_auto(status)
+    )
+    return is_open, status

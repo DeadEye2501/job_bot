@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy.exc import IntegrityError
 
@@ -25,6 +25,28 @@ from backend.repository.messages import save_outgoing_message
 logger = logging.getLogger(__name__)
 
 OutgoingDmOutcome = Literal["stored", "already_stored", "not_stored"]
+
+
+@dataclass(frozen=True, slots=True)
+class DmHelpers:
+    """Кто ведёт входящее письмо: база, модель, Telegram и накопитель разбора.
+
+    Держит их вместе одна дорога — проводка письма, — и порознь ни один здесь
+    не значит ничего. Дорог этих две, живая и догон, и обе несут один и тот
+    же набор от начала до конца; собирают его в одном месте, у конвейера
+    (`pipeline.dm_helpers`).
+
+    Своё умолчание у каждого поля, кроме базы, и умолчания эти для стенда:
+    в бою заполнены все пятеро. Разбор на месте — та ветка, что зовёт модель
+    без накопителя, — тоже живёт одним стендом: боевые места сборки кладут
+    туда связанный метод конвейера, и пустым он не бывает.
+    """
+
+    session_factory: Any
+    lm_client: Any = None
+    lm_chat_model: str | None = None
+    client: Any = None
+    schedule_classification: Any = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,7 +189,9 @@ async def _attributed_vacancy(session, hr_id: int, msg) -> int | None:
         by_reply = await resolve_reply_target_vacancy(session, hr_id, reply_to_id)
         if by_reply is not None:
             return by_reply
-    return await find_latest_vacancy_id_for_hr(session, hr_id, as_of=msg.date)
+    return await find_latest_vacancy_id_for_hr(
+        session, hr_id, as_of=tg_moment(msg.date)
+    )
 
 
 def _incoming_row(
@@ -190,7 +214,7 @@ def _incoming_row(
     )
 
 
-async def _save_incoming(session_factory, msg, attachment: _Attachment, avatar):
+async def _save_incoming(session_factory, msg, attachment: _Attachment):
     """Записать входящее письмо; отдать номер вакансии и номер строки.
 
     Пустая пара значит «дальше не идём»: HR исчез, письмо уже лежит (гонка
@@ -204,7 +228,7 @@ async def _save_incoming(session_factory, msg, attachment: _Attachment, avatar):
             )
             if hr is None:
                 return None, None
-            refresh_hr_from_telegram(hr, msg.from_user, avatar=avatar)
+            refresh_hr_from_telegram(hr, msg.from_user, avatar=None)
             vacancy_id = await _attributed_vacancy(session, hr.id, msg)
             new_msg = await save_incoming_message(
                 session, _incoming_row(msg, hr.id, vacancy_id, attachment)
@@ -244,10 +268,66 @@ async def _status_open_for_reply(session_factory, vacancy_id: int):
     return None
 
 
-async def process_dm(
-    msg, lm_client, lm_chat_model, session_factory,
-    *, client=None, schedule_classification=None,
-) -> int | None:
+async def _catch_up_avatar(session_factory, client, msg) -> None:
+    """Спросить картинку собеседника и вписать её своей сделкой.
+
+    Спрашивают её только после того, как строка письма легла. Прежде она
+    качалась до записи, и догон платил за неё на каждом уже лежащем письме:
+    повторная запись откатывалась, унося и картинку.
+
+    «Картинки ещё нет» проверяется дважды — здесь и внутри `refresh_hr_...`:
+    за время загрузки карточку мог заполнить сосед, и его снимок точнее.
+
+    Беда наружу не выходит: картинка — украшение карточки, а письмо к этому
+    мигу уже записано. Пусти мы отсюда исключение, и запертая база — а догон
+    гоняет два десятка переписок разом — отменяла бы разбор письма, которое
+    лежит.
+    """
+    try:
+        avatar = await fetch_telegram_avatar(client, msg.from_user)
+        if avatar is None:
+            return
+        async with session_factory() as session:
+            hr = await find_known_hr(
+                session, msg.from_user.id, msg.from_user.username
+            )
+            if hr is None or hr.avatar is not None:
+                return
+            refresh_hr_from_telegram(hr, msg.from_user, avatar=avatar)
+            await session.commit()
+    except Exception:
+        logger.exception(
+            "DM avatar catch-up failed",
+            extra={"sender_id": msg.from_user.id, "tg_message_id": msg.id},
+        )
+
+
+async def _receive(dm, msg, hr_lookup) -> tuple[int | None, int | None]:
+    """Записать письмо, а легло — подтянуть картинку собеседника."""
+    attachment = await _attachment_of(dm.client, msg, hr_lookup.id)
+    vacancy_id, new_msg_id = await _save_incoming(
+        dm.session_factory, msg, attachment
+    )
+    if new_msg_id is not None and dm.client is not None and hr_lookup.avatar is None:
+        await _catch_up_avatar(dm.session_factory, dm.client, msg)
+    return vacancy_id, new_msg_id
+
+
+async def _hand_to_classification(dm, msg, hr_id: int, subject) -> None:
+    """Отдать письмо разбору: в накопитель, если он есть, иначе на месте."""
+    text = extract_text(msg)
+    if dm.schedule_classification is not None:
+        vacancy_id, new_msg_id, _status = subject
+        dm.schedule_classification(
+            hr_id, PendingReply(vacancy_id, new_msg_id, msg.id, text)
+        )
+        return
+    await classify_and_apply(
+        dm.session_factory, dm.lm_client, dm.lm_chat_model, text, subject
+    )
+
+
+async def process_dm(msg, dm: DmHelpers) -> int | None:
     """Провести входящее письмо: записать, отнести к вакансии, разобрать.
 
     В базу текст идёт с цитатой ответа, в разбор — без неё: иначе разборщик
@@ -260,34 +340,16 @@ async def process_dm(
     """
     if not msg.from_user or msg.from_user.is_bot:
         return None
-    hr_lookup = await _sender_to_listen_to(session_factory, msg)
+    hr_lookup = await _sender_to_listen_to(dm.session_factory, msg)
     if hr_lookup is None:
         return None
-    attachment = await _attachment_of(client, msg, hr_lookup.id)
-    avatar = None
-    if client is not None and hr_lookup.avatar is None:
-        avatar = await fetch_telegram_avatar(client, msg.from_user)
-    vacancy_id, new_msg_id = await _save_incoming(
-        session_factory, msg, attachment, avatar
-    )
+    vacancy_id, new_msg_id = await _receive(dm, msg, hr_lookup)
     if vacancy_id is None:
         return hr_lookup.id
-    v_status = await _status_open_for_reply(session_factory, vacancy_id)
+    v_status = await _status_open_for_reply(dm.session_factory, vacancy_id)
     if v_status is None:
         return hr_lookup.id
-    # С планировщиком письмо ложится в накопитель и разбирается отложенно;
-    # без него — на месте.
-    classify_text = extract_text(msg)
-    if schedule_classification is not None:
-        reply = PendingReply(vacancy_id, new_msg_id, msg.id, classify_text)
-        schedule_classification(hr_lookup.id, reply)
-        return hr_lookup.id
-
-    await classify_and_apply(
-        session_factory,
-        lm_client,
-        lm_chat_model,
-        classify_text,
-        (vacancy_id, new_msg_id, v_status),
+    await _hand_to_classification(
+        dm, msg, hr_lookup.id, (vacancy_id, new_msg_id, v_status)
     )
     return hr_lookup.id

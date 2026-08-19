@@ -10,8 +10,10 @@ from backend.models import VacancyStatus
 # юзер вправе выставить любой статус из любого.
 #
 # Терминалы (пустое множество) — auto-классификация для них вообще не
-# вызывается: `process_dm` гейтит до похода в LLM, экономя токены и не
-# засоряя timeline призрачными `applied=False` строками.
+# вызывается: заслон `flows/auto_gate` отбивает их до похода в LLM, экономя
+# токены и не засоряя timeline призрачными `applied=False` строками. Он же
+# закрывает и `New`: выход оттуда один, в `Applied`, и делает его отправка,
+# а не письмо собеседника.
 #
 # Test/Invitation — короткие транзитные статусы: «мяч у меня». Как
 # только этап завершён, вакансия идёт в In Progress (ожидание фидбека
@@ -84,10 +86,10 @@ ALLOWED_AUTO_TRANSITIONS: dict[VacancyStatus, frozenset[VacancyStatus]] = {
 def is_terminal_for_auto(status: VacancyStatus) -> bool:
     """True если из ``status`` нет ни одного разрешённого авто-перехода.
 
-    Используется в `process_dm` для отсечения вызова LLM-классификатора
-    на терминальных вакансиях (Offer/Decline/Scam/Not Fit) — экономит
-    LLM-токены и предотвращает запись призрачных строк в
-    vacancy_status_history.
+    Спрашивает об этом заслон `flows/auto_gate`, а через него — приём письма
+    и отложенный разбор: обращение к модели на терминальной вакансии
+    (Offer/Decline/Scam/Not Fit) стоило бы денег и оставляло бы призрачные
+    строки в vacancy_status_history.
     """
     return not ALLOWED_AUTO_TRANSITIONS[status]
 
