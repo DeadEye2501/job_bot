@@ -183,6 +183,23 @@ async def test_an_answer_that_is_not_an_object_becomes_a_refusal():
     assert reasoning == "unparseable_json: [7]"
 
 
+async def test_the_answer_shape_travels_as_json_and_not_as_a_template():
+    """Образец ответа уезжает модели настоящим JSON'ом.
+
+    Наставление ни через какое подставление не проходит, а удвоенные скобки
+    достались ему от соседа, который проходит (`llm/hr_reply.py`). Разбор
+    такой ответ переживает — `json_object` отступает на знак и берёт
+    внутренний объект, — но модели показывают форму, которой в JSON не бывает,
+    и просят повторить именно её.
+    """
+    client = provider({CHAT: _answer(matched_id=7)})
+
+    await _ask(client, [_Candidate(7, "Другая компания")])
+
+    system = messages_of(client.sent[0])["system"]
+    assert '\n{"matched_id"' in system
+
+
 async def test_the_parsed_name_goes_as_data_and_not_as_the_rules():
     """Разобранное имя уезжает данными, а не частью наставления.
 

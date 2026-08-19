@@ -43,7 +43,7 @@ DEDUPE_COMPANY_PROMPT = """Ты определяешь, является ли р
 6. В случае любых сомнений выбирай null. Лучше создать дубликат (поправимо вручную), чем неверно склеить две разные компании (необратимо).
 
 Верни JSON-объект такого вида:
-{{"matched_id": <id одного из кандидатов или null>, "reasoning": "<краткое пояснение НА ТОМ ЖЕ ЯЗЫКЕ, что и parsed_name (русское имя → русский reasoning; English/Latin name → English reasoning), 1-2 предложения>"}}
+{"matched_id": <id одного из кандидатов или null>, "reasoning": "<краткое пояснение НА ТОМ ЖЕ ЯЗЫКЕ, что и parsed_name (русское имя → русский reasoning; English/Latin name → English reasoning), 1-2 предложения>"}
 """ + ONLY_JSON
 
 
