@@ -3164,13 +3164,13 @@ Runtime settings layer.
 - `def _allowed_line(client) -> str` (9)
 - `def _verdict(status: str, explanation: str | None=None) -> httpx.Response` (3)
 
-### `tests/backend/test_llm_company_arbiter.py` — 267 строк
+### `tests/backend/test_llm_company_arbiter.py` — 284 строк
 
 Следствия обращения к модели как к арбитру при сведении компаний.
 
 Зависит от: `backend.llm.company`, `tests.fakes.llm`
 
-Тестов: 15
+Тестов: 16
 
 - `class _Candidate` (8)
 - `def _answer(matched_id=None, reasoning=None) -> httpx.Response` (3)
