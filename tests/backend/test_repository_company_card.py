@@ -74,6 +74,30 @@ async def test_one_hr_with_many_vacancies_counts_once(session, session_factory):
     assert card.hr_count == 2
 
 
+async def test_an_unparsed_vacancy_is_counted_by_neither_counter(
+    session, session_factory
+):
+    """Неразобранная вакансия не идёт ни в один счётчик карточки.
+
+    Оба отвечают на один вопрос — что мы про эту компанию знаем, — а у
+    неразобранной строки и сама принадлежность компании ещё не установлена:
+    её проставит разбор, который не дошёл.
+    """
+    company = company_row()
+    await put(session_factory, company)
+    hr = hr_row(name="Анна")
+    await put(session_factory, hr)
+    await put(
+        session_factory,
+        vacancy_row(company_id=company.id, hr_id=hr.id, is_parsed=False),
+    )
+
+    card = await get_company_detail(session, company.id)
+
+    assert card.vacancy_count == 0
+    assert card.hr_count == 0
+
+
 def test_a_company_is_listed_by_its_name_alone():
     """В чёрном списке компанию записывают именем — другого признака у неё нет."""
     assert company_blacklist_candidates(company_row(name="Контур")) == ["Контур"]

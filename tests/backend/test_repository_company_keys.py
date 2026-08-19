@@ -49,6 +49,7 @@ def test_cyrillic_is_transliterated_letter_by_letter(raw, expected):
         pytest.param('Сбер"банк', "sberbank", id="кавычка внутри слова"),
         pytest.param("«Сбер»банк", "sberbank", id="ёлочки внутри слова"),
         pytest.param("Acme   Corp   Inc", "acme", id="лишние пробелы"),
+        pytest.param("Sber AG Tech", "sber ag tech", id="форма посреди имени цела"),
         pytest.param("Acme & Co!", "acme co", id="знаки заменяются пробелом"),
         pytest.param("Sberbank", "sberbank", id="уже нормальное"),
     ],
@@ -130,6 +131,12 @@ def test_a_query_is_cut_even_without_a_path():
         pytest.param("m.linkedin.com", True, id="мобильный поддомен соцсети"),
         pytest.param("nothh.ru", False, id="хост, лишь оканчивающийся так же"),
         pytest.param("hh.ru.acme.com", False, id="имя площадки внутри чужого хоста"),
+        pytest.param("docs.google.com", True, id="общий хостинг документов"),
+        pytest.param("forms.gle", True, id="общий хостинг анкет"),
+        pytest.param("telegra.ph", True, id="общий хостинг заметок"),
+        pytest.param("notion.so", True, id="общее рабочее пространство"),
+        pytest.param("taplink.cc", True, id="общий сборник ссылок"),
+        pytest.param("bit.ly", True, id="сокращатель ссылок"),
     ],
 )
 def test_an_aggregator_host_is_recognised_including_its_subdomains(host, expected):

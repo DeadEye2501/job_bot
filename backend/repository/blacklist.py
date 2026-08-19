@@ -90,6 +90,49 @@ async def deactivate_blacklist_values(
     return done.rowcount or 0
 
 
+async def rename_blacklist_marks(
+    session: AsyncSession, kind: str, *, old_value: str, new_value: str
+) -> None:
+    """Перевести действующие отметки предмета на его новое написание.
+
+    Предмет опознают написанием, а оно сменяемое: компанию переименовывают в
+    карточке, и её имя перестаёт быть именем при слиянии. Останься строка на
+    прежнем написании — она продолжила бы отсеивать посты, а с карточки
+    пропала бы: та ищет отметку по нынешнему написанию.
+
+    Строка под новым написанием уже бывает заведена — так сливают две
+    отмеченные записи. Тогда действующей становится она, а переезжающие
+    гаснут: второй строки с тем же написанием не допускает и заведение, а
+    погашенная остаётся видимой на экране списка. Транзакцию закрывает
+    зовущий.
+    """
+    if old_value == new_value:
+        return
+    moving = (
+        await session.scalars(
+            select(Blacklist).where(active_mark_of(kind, [old_value]))
+        )
+    ).all()
+    if not moving:
+        return
+    standing = await _same_entry(session, kind, new_value)
+    for row in moving:
+        if standing is None:
+            row.value = new_value
+            standing = row
+        else:
+            row.active = False
+    standing.active = True
+    await _hold_the_channel_rule(session, kind)
+    logger.info(
+        "Blacklist marks of kind=%s moved %r -> %r (rows=%d)",
+        kind,
+        old_value,
+        new_value,
+        len(moving),
+    )
+
+
 _BLACKLIST_FIELD_UNSET = object()
 
 
