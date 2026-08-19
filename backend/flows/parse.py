@@ -56,8 +56,15 @@ async def _dropped_as_trash(
     return True
 
 
-async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> str | None:
-    """Причина, по которой модель отвергла вакансию; пустота — годится.
+async def _fit_refusal(
+    pipeline, parsed, text: str, vacancy_id: int
+) -> tuple[str | None, bool]:
+    """Причина, по которой модель отвергла вакансию, и «спросить не вышло».
+
+    Пустая причина значит «годится». Второе значение отделяет от неё беду
+    провайдера: по ней приговора нет вовсе, и строку нельзя помечать
+    разобранной — лежащий полчаса провайдер иначе уводит в «не подходит» всё,
+    что пришло за это время, а вернуть их можно только кнопкой по каждой.
 
     Неразобранный ответ считается отказом нарочно: закрытая дверь тут
     дешевле открытой — человек пересмотрит вакансию руками, а вот отклик,
@@ -65,13 +72,12 @@ async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> str | No
     отличается от прочих тем, что по ней строку можно убрать вовсе; решает
     это зовущий.
     """
-    validation = await validate_vacancy_fit(
+    validation, trouble = await validate_vacancy_fit(
         parsed,
         text,
         pipeline.lm_client,
         pipeline.lm_chat_model,
         profile=pipeline.profile_cache,
-        known_skills=pipeline.skills_cache,
     )
     logger.debug(
         "vacancy %s: fit verdict=%s reason=%r",
@@ -79,16 +85,22 @@ async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> str | No
         validation.verdict if validation else None,
         validation.reason if validation else None,
     )
+    if trouble is not None:
+        logger.warning(
+            "vacancy %s: вердикт не спросился (%s), оставляю неразобранной",
+            vacancy_id, trouble,
+        )
+        return None, True
     if validation is None:
         logger.warning(
             "validate_vacancy_fit unavailable for vacancy parse, marking Not Fit"
         )
-        return f"{LLM_SKIP_PREFIX}validation unavailable"
+        return f"{LLM_SKIP_PREFIX}validation unavailable", False
     if validation.verdict == "trash":
-        return f"{TRASH_SKIP_PREFIX}{validation.reason or 'no reason'}"
+        return f"{TRASH_SKIP_PREFIX}{validation.reason or 'no reason'}", False
     if validation.verdict == "reject":
-        return f"{LLM_SKIP_PREFIX}{validation.reason or 'rejected'}"
-    return None
+        return f"{LLM_SKIP_PREFIX}{validation.reason or 'rejected'}", False
+    return None, False
 
 
 async def _auto_send_if_allowed(
@@ -145,8 +157,10 @@ async def _parsed_or_dropped(
     return None, None
 
 
-async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple:
-    """Приговор объявлению: статус, причина отказа и баллы.
+async def _verdict_for(
+    pipeline, parsed, text: str, vacancy_id: int
+) -> tuple | None:
+    """Приговор объявлению: статус, причина отказа и баллы; пусто — не спросили.
 
     Чёрный список читает весь исходный текст: разбору он достаётся урезанным
     по бюджету модели, и образец за обрезом всё равно ловится. Оценщика
@@ -163,7 +177,9 @@ async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple:
         parsed, score, blacklist_match, threshold=pipeline.rs.scoring_threshold,
     )
     if status == VacancyStatus.NEW:
-        refusal = await _fit_refusal(pipeline, parsed, text, vacancy_id)
+        refusal, unasked = await _fit_refusal(pipeline, parsed, text, vacancy_id)
+        if unasked:
+            return None
         if refusal is not None:
             status, skip_reason = VacancyStatus.NOT_FIT, refusal
     return status, skip_reason, score
@@ -230,9 +246,10 @@ async def parse_and_update_vacancy(
         return False
     if parsed is None:
         return True
-    status, skip_reason, score = await _verdict_for(
-        pipeline, parsed, text, vacancy_id
-    )
+    verdict = await _verdict_for(pipeline, parsed, text, vacancy_id)
+    if verdict is None:
+        return False
+    status, skip_reason, score = verdict
     if await _thrown_out_by_the_verdict(
         pipeline, vacancy_id, skip_reason, allow_delete
     ):

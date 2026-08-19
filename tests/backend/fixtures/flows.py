@@ -87,7 +87,7 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
 
     async def validate_vacancy_fit(parsed, text, client_, model, **kwargs):
         pipeline.validated = True
-        return pipeline.verdict
+        return pipeline.verdict, pipeline.fit_trouble
 
     async def try_auto_send(pipeline, hr, parsed, vacancy_id):
         pipeline.asked_to_send.append(vacancy_id)
@@ -187,6 +187,8 @@ async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)
     )
     pipeline.parse_refusal = None
     pipeline.verdict = FitValidation(verdict="fit", reason=None)
+    # Причина, по которой вердикт не спросился: пусто — спросили и получили.
+    pipeline.fit_trouble = None
     pipeline.validated = False
     pipeline.asked_to_send = []
     _answer_instead_of_the_model(pipeline, monkeypatch)

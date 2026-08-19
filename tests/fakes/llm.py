@@ -190,6 +190,17 @@ def data_block(request: httpx.Request) -> str:
     return user.split("<<<\n", 1)[1].rsplit("\n>>>", 1)[0]
 
 
+def warning_before_the_block(request: httpx.Request) -> str:
+    """Что сказано модели до блока данных.
+
+    Рамка обязана стоять **до** чужого текста: сказанное после него модель
+    читает уже как продолжение данных, а не как наше указание.
+    """
+    user = messages_of(request)["user"]
+    assert "<<<\n" in user, "в запросе нет блока данных"
+    return user.split("<<<\n", 1)[0]
+
+
 def chat_response(content: str | None, *, finish_reason: str = "stop") -> httpx.Response:
     """Ответ чата в форме, которую разбирает боевой код.
 

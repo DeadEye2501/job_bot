@@ -1,10 +1,23 @@
-"""Поиск выдуманных фактов в объяснении, которое дала модель."""
+"""Чем негодно обоснование, которое дала модель.
+
+Негодность бывает двух родов, и следствия у них разные: выдуманный факт
+переворачивает вердикт — отказ вынесен по тому, чего в объявлении нет;
+сказанное не в той форме гасит одно обоснование, а отказ остаётся. Обе
+приметы только называют беду; что с ней делать, решает зовущий.
+"""
 
 
 import re
 
-from backend.domain.taxonomy import CEFR_LEVELS
+from backend.domain.taxonomy import CEFR_LEVELS, GRADES
 from backend.llm.candidate import CandidateProfile
+
+# Уровни языка и грейды приметам нужны перечислением через «или». Собираются
+# из общего справочника, а не выписываются руками: вписанные в четырёх местах,
+# они разъезжались бы с ним по одному — и примета молча переставала бы ловить
+# то, ради чего заведена.
+_CEFR_ALT = "|".join(CEFR_LEVELS)
+_GRADE_ALT = "|".join(GRADES)
 
 # Универсальные (профиль-независимые) маркеры галлюцинаций. Если LLM в reason
 # использовал один из этих маркеров, а в тексте поста его нет — reason не
@@ -56,7 +69,7 @@ _REASON_STYLE_VIOLATIONS: tuple[re.Pattern[str], ...] = (
     # перетягивание данных кандидата в reason
     re.compile(
         r"\bу\s+кандидат\w*\s+(только|лишь|всего|нет)\s+"
-        r"(A1|A2|B1|B2|C1|C2|junior|middle|senior|lead|"
+        rf"({_CEFR_ALT}|{_GRADE_ALT}|"
         r"office|remote|hybrid|удал[её]нк\w*|оф[ф]?ис\w*|гибрид\w*)",
         re.IGNORECASE,
     ),
@@ -72,14 +85,16 @@ _REASON_STYLE_VIOLATIONS: tuple[re.Pattern[str], ...] = (
     # предложениях с двумя клозами — «у кандидата опыт достаточный, но
     # B1 недостаточно для C1» через всю фразу.
     re.compile(
-        r"\b(только|лишь|всего)\s+(A1|A2|B1|B2|C1|C2)\b[^.]{0,30}\b(недостаточно|мало|слаб)",
+        rf"\b(только|лишь|всего)\s+({_CEFR_ALT})\b"
+        r"[^.]{0,30}\b(недостаточно|мало|слаб)",
         re.IGNORECASE,
     ),
     # Bare «B1 недостаточно» без квантификатора — агрессивно: вакансия
     # сама может цитировать «B1 недостаточно для C1-роли». Триггерим
     # ТОЛЬКО когда рядом «у кандидата»/«его»/«мой», и тоже с bounded gap.
     re.compile(
-        r"\b(у\s+кандидат\w*|его|мой)\b[^.]{0,40}\b(A1|A2|B1|B2|C1|C2)\s+недостаточно\b",
+        r"\b(у\s+кандидат\w*|его|мой)\b[^.]{0,40}"
+        rf"\b({_CEFR_ALT})\s+недостаточно\b",
         re.IGNORECASE,
     ),
 
@@ -89,8 +104,7 @@ _REASON_STYLE_VIOLATIONS: tuple[re.Pattern[str], ...] = (
     re.compile(
         r"\bcandidate\s+(only\s+has|has\s+only|has\s+just|only\s+speaks|"
         r"speaks\s+only)\s+"
-        r"(A1|A2|B1|B2|C1|C2|junior|middle|senior|lead|"
-        r"office|remote|hybrid)",
+        rf"({_CEFR_ALT}|{_GRADE_ALT}|office|remote|hybrid)",
         re.IGNORECASE,
     ),
     # «candidate doesn't have / does not have / has no / lacks <X>»
@@ -209,11 +223,10 @@ def _build_profile_hallucination_markers(
     inference_verbs = (
         r"(подразумева|необходим|требу|предполага|нужен|нужна|требуется)"
     )
-    # CEFR + локализованные эквиваленты («свободный», «разговорный»). Корень
-    # CEFR берём из общей константы _CEFR_LEVEL_RE, чтобы списки не разъезжались.
-    cefr_text = (
-        r"(" + _CEFR_LEVEL_RE.pattern + r"|свободн\w*|разговорн\w*)"
-    )
+    # Уровень CEFR подтверждает требование к языку сам по себе: в посте он
+    # стоит только про язык. Корень берём из общей константы, чтобы списки
+    # не разъезжались.
+    cefr_text = _CEFR_LEVEL_RE.pattern
     for lang in profile.languages:
         name = (lang.name or "").strip()
         root = _language_root(name)
@@ -230,12 +243,14 @@ def looks_hallucinated(
     raw_text: str,
     profile: CandidateProfile,
 ) -> str | None:
-    """Detect when LLM verdict reason copies a phrase from prompt's few-shot
-    examples without grounding in the actual vacancy post, OR breaks the
-    "reason as vacancy requirement" style by referencing candidate data.
+    """Обоснование ссылается на то, чего в объявлении нет; отдаёт примету.
 
-    Returns the matched marker pattern (for logging) when a hallucination is
-    suspected, None otherwise. Conservative by design.
+    Приметы двух родов: общие, не зависящие от кандидата, и построенные по
+    языкам его анкеты. Обе спрашивают одно: сказанное в обосновании есть в
+    самом посте или выдумано.
+
+    Осторожна нарочно: пустая примета значит «не поймали», и вердикт модели
+    остаётся как есть.
     """
     if not reason:
         return None
@@ -245,6 +260,20 @@ def looks_hallucinated(
     for reason_re, text_re in _build_profile_hallucination_markers(profile):
         if reason_re.search(reason) and not text_re.search(raw_text):
             return reason_re.pattern
+    return None
+
+
+def breaks_reason_style(reason: str) -> str | None:
+    """Обоснование говорит о кандидате, а не о требовании вакансии.
+
+    Отдельно от выдумки, потому что следствие другое: выдуманное обоснование
+    отказа переворачивает вердикт — вакансию отвергли по тому, чего в ней
+    нет; сказанное не в той форме гасит одно обоснование, а сам отказ
+    остаётся. Переверни мы и его, при включённой автоотправке письмо ушло бы
+    живому HR по вакансии, которую модель отвергла по делу.
+    """
+    if not reason:
+        return None
     for style_re in _REASON_STYLE_VIOLATIONS:
         if style_re.search(reason):
             return style_re.pattern

@@ -179,6 +179,30 @@ async def test_a_validator_without_an_answer_means_unfit(parsing, session_factor
     assert saved.skip_reason == "llm: validation unavailable"
 
 
+async def test_a_verdict_nobody_answered_leaves_the_vacancy_unparsed(
+    parsing, session_factory
+):
+    """Вердикт, которого не у кого спросить, оставляет вакансию неразобранной.
+
+    Провайдер лежит целыми пачками — двадцать вакансий подряд уходили при этом
+    в «не подходит» с пометкой «вердикт недоступен», и вернуть их могла только
+    кнопка по каждой. Неразобранную строку подберёт следующий заход сам.
+    """
+    pipeline, vacancy = parsing
+    pipeline.verdict = None
+    pipeline.fit_trouble = "llm_request_error"
+
+    done = await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs"
+    )
+
+    saved = await only_row(session_factory, Vacancy)
+    assert saved.is_parsed is False
+    # Чужой приговор из обстановки — на месте: своего разбор не выносил.
+    assert saved.skip_reason == "прошлый отказ"
+    assert done is False
+
+
 async def test_trash_from_the_validator_is_thrown_out_on_ingest(
     parsing, session_factory
 ):

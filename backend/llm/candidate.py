@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from backend.models import Profile
 from backend.models import ProfileLanguage
+from backend.models import ProfileSkill
 from backend.payloads import str_list
 
 _GRADE_LABELS_RU = {
@@ -32,9 +33,12 @@ class CandidateLanguage:
 
 @dataclass(frozen=True)
 class CandidateProfile:
-    """Срез данных профиля, нужный LLM-валидатору вакансии. Передаётся как
-    единый объект, чтобы в сигнатуре validate_vacancy_fit не висело пять
-    позиционных аргументов."""
+    """Всё, что модель знает о кандидате: анкета и его навыки.
+
+    Единым объектом, а не доводами: порознь у вердикта пригодности их
+    набиралось шесть, и линт краснел. Навыки лежат здесь же, потому что
+    уходят в то же наставление и берутся из того же слепка настроек.
+    """
 
     title: str | None = None
     location: str | None = None
@@ -42,6 +46,7 @@ class CandidateProfile:
     work_formats: list[str] = field(default_factory=list)
     languages: list[CandidateLanguage] = field(default_factory=list)
     free_preferences: str | None = None
+    known_skills: list[ProfileSkill] = field(default_factory=list)
 
 
 def _format_labels(values: list[str] | None, labels: dict[str, str]) -> str:
