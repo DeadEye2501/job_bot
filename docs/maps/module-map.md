@@ -98,7 +98,7 @@ Job Bot — single CLI entry point.
 - `def make_client(tg: TgAccountConfig) -> Client` (30)
 - `async def send_dm(client: Client, user: str | int, text: str, attachment: str | Path | None=None) -> int | None` (24)
 
-### `adapters/teletype.py` — 86 строк
+### `adapters/teletype.py` — 108 строк
 
 Статья teletype: сходить по адресу и достать из страницы её текст.
 
@@ -106,7 +106,7 @@ Job Bot — single CLI entry point.
 
 - `def make_client() -> httpx.AsyncClient` (7)
 - `def _article_text(html: str) -> str | None` (20)
-- `async def fetch_article(client: httpx.AsyncClient, url: str) -> str | None` (15)
+- `async def fetch_article(client: httpx.AsyncClient, url: str) -> str | None` (24)
 
 ## alembic — 3 модулей
 
@@ -2459,13 +2459,13 @@ Runtime settings layer.
 - `def applied(session_factory)` (42)
   - `async def build(applied_at, *, hr=None, answered_after=None, **overrides)` (19)
 
-### `tests/backend/test_adapters_teletype.py` — 145 строк
+### `tests/backend/test_adapters_teletype.py` — 173 строк
 
 Следствия, которые наблюдают тесты `adapters/teletype.py`.
 
 Зависит от: `adapters`
 
-Тестов: 7
+Тестов: 8
 
 - `def _page(*, headline: str='Senior Manual QA', body: str='<p>Ищем QA</p>') -> str` (8)
 - `def _client(handler) -> httpx.AsyncClient` (3)
