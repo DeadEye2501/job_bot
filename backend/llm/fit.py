@@ -10,10 +10,12 @@ from adapters.lm_chat import ChatRequest, chat
 from backend.payloads import FIT_VERDICTS, FitValidation, ParsedVacancy
 
 from backend.llm.answers import (
+    ONLY_JSON,
     json_object,
     log_unparseable,
     normalize_enum,
     str_or_none,
+    truncation_trouble,
 )
 from backend.llm.candidate import (
     CandidateProfile,
@@ -23,8 +25,14 @@ from backend.llm.candidate import (
     format_text,
     format_work_formats,
 )
-from backend.llm.external import wrap_external
-from backend.llm.hallucination import looks_hallucinated
+from backend.llm.external import external_block
+from backend.llm.hallucination import breaks_reason_style, looks_hallucinated
+from backend.llm.rules import (
+    APPLY_CONTACTS,
+    FORMAT_MARKERS,
+    GEO_LIMIT_MARKERS,
+    GRADE_MARKERS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +46,9 @@ HARD RULES — проверяй В ПЕРВУЮ ОЧЕРЕДЬ, до любог�
    → verdict ВСЕГДА «trash», вне зависимости от того, насколько содержательно описан стек, роль и контакт. Это резюме соискателя, а не вакансия. Не пытайся «спасти» такой пост через fit/reject — структурное сходство с вакансией ничего не меняет, направление обратное (автор предлагает СЕБЯ на работу).
    reason: 1 предложение с цитатой найденного хэштега, например: «Это пост соискателя — в тексте «#cv», «#резюме»».
 
-2. ПРЯМЫЕ Я-ФОРМА ТРИГГЕРЫ. Если в тексте есть фраза от первого лица про автора: «ищу работу», «ищу вакансию», «ищу проекты», «ищу подработку», «возьму проект», «возьму подработку», «в активном поиске работы», «рассматриваю офферы», «looking for a job/work», «open to work/opportunities/new roles», «available for hire/projects», «accepting projects» (про себя)
+2. ПРЯМЫЕ Я-ФОРМА ТРИГГЕРЫ. Если в тексте есть фраза от первого лица про автора — вот полный список, других мест с ним в промпте нет:
+   РУССКИЙ: «ищу работу», «ищу вакансию», «ищу проекты», «ищу подработку»; «возьму проект», «возьму подработку»; «я открыт(а) к предложениям», «открыт(а) к новым проектам/ролям» (когда автор пишет про себя; «компания открыта к предложениям» — это НЕ триггер); «в активном поиске работы», «рассматриваю офферы», «готов рассмотреть позиции».
+   АНГЛИЙСКИЙ: «looking for a job», «looking for work», «I'm looking for …»; «open to work», «open to opportunities», «open to new roles»; «available for hire», «available for projects»; «accepting projects» (когда автор пишет про себя).
    → verdict ВСЕГДА «trash». То же исключение из общего анализа.
    reason: цитата триггерной фразы.
 
@@ -75,7 +85,7 @@ HARD RULES — проверяй В ПЕРВУЮ ОЧЕРЕДЬ, до любог�
 - Перед тем как поставить reject, мысленно убедись: «вижу ли я в присланном тексте слова, которые означают этот блокер?». Если нет — fit.
 
 КОНТАКТ ДЛЯ ОТКЛИКА (важно — не путай с Telegram):
-- «Контакт для отклика» — это ЛЮБОЙ указанный в посте способ связаться по вакансии. Telegram (@username, t.me/...) — лишь один из вариантов. Также считаются контактом: email, ссылка на форму отклика, ссылка на вакансию на job-площадке (hh.ru, habr.com/career, getmatch, linkedin.com/jobs, lever.co, greenhouse.io, jobs.lever.co, careers.<домен>, stepstone, xing, indeed и т.п.), фраза вида «резюме на почту …», «отклик через сайт компании», ссылка на корпоративную карьерную страницу.
+- «Контакт для отклика» — это ЛЮБОЙ указанный в посте способ связаться по вакансии; список тот же, что у разбора: """ + APPLY_CONTACTS + """. Сюда же фразы «резюме на почту …», «отклик через сайт компании».
 - Отсутствие именно Telegram-контакта при наличии email/формы/ссылки на job-площадку — это НЕ trash и НЕ reject. Способ связи указан, просто не через Telegram.
 - Признак «нет контакта» работает ТОЛЬКО если в посте не указан НИКАКОЙ способ отклика.
 
@@ -87,16 +97,7 @@ HARD RULES — проверяй В ПЕРВУЮ ОЧЕРЕДЬ, до любог�
 ОТДЕЛЬНО ПРО ПОСТЫ СОИСКАТЕЛЕЙ (это ВСЕГДА trash, не fit и не reject):
 Хиринг-каналы регулярно публикуют посты от соискателей, которые рекламируют сами себя на роль. Структурно такой пост ОЧЕНЬ похож на вакансию: указана роль, перечислен стек/скилы, есть контакт, иногда формат и локация. ОТЛИЧИЕ — направление: автор поста ОТДАЁТ свой труд, а не нанимает.
 
-Прямые триггеры (Я-форма про себя; автор предлагает СЕБЯ на работу). РУССКИЙ:
-- «ищу работу», «ищу вакансию», «ищу проекты», «ищу подработку»;
-- «возьму проект», «возьму подработку»;
-- «я открыт(а) к предложениям», «открыт(а) к новым проектам/ролям» (когда автор пишет про себя; «компания открыта к предложениям» — это НЕ триггер);
-- «в активном поиске работы», «рассматриваю офферы», «готов рассмотреть позиции».
-АНГЛИЙСКИЙ:
-- «looking for a job», «looking for work», «I'm looking for …»;
-- «open to work», «open to opportunities», «open to new roles»;
-- «available for hire», «available for projects»;
-- «accepting projects» (когда автор пишет про себя).
+Прямые триггеры перечислены в HARD RULE №2 наверху промпта — здесь их повторять не нужно, список там один и полный.
 
 Косвенные признаки (засчитываются ТОЛЬКО вместе с одним из прямых триггеров выше ИЛИ когда в посте нет описания обязанностей/задач от лица работодателя — то есть пост целиком про автора, а не про роль). Каждый признак должен быть в Я-форме (от первого лица про автора), безличные «5 лет опыта» / «знание Python» НЕ считаются:
 - автор перечисляет СВОЙ опыт глаголом первого лица: «у меня 5 лет опыта», «работал в …», «делал …», «I have 5 years», «I worked at …»;
@@ -125,9 +126,9 @@ reason для такого trash — 1-2 предложения с цитато�
    - Вакансия упоминает основной стек кандидата на равных с другими языками/инструментами («Python + Go микросервисы», «Vue/React фронт», «Figma + Sketch»).
    - Вариативная роль (Full-stack, generalist), где зона ответственности кандидата покрыта.
 
-2. ГРЕЙД. Вакансия требует грейд, которого нет в списке {ACCEPTED_GRADES}. Грейд должен быть ЯВНО назван в тексте («junior», «стажёр», «intern», «senior», «lead», «тимлид»). Стаж в годах сам по себе — НЕ грейд, не делай по нему вывод. Если в {ACCEPTED_GRADES} стоит «—» (кандидат не указал ограничений) — этот блокер не применяется вообще.
+2. ГРЕЙД. Вакансия требует грейд, которого нет в списке {ACCEPTED_GRADES}. Грейд должен быть ЯВНО назван в тексте — теми же маркерами, что и у разбора: """ + GRADE_MARKERS + """. Если в {ACCEPTED_GRADES} стоит «—» (кандидат не указал ограничений) — этот блокер не применяется вообще.
 
-3. ФОРМАТ РАБОТЫ. Вакансия требует формат, которого нет в списке {ACCEPTED_FORMATS}. Триггер должен быть в тексте: «office/офис/из офиса/onsite», «hybrid/гибрид/X дней в офисе обязательно», «remote/удалёнка». Если {ACCEPTED_FORMATS} содержит несколько вариантов — допустим любой из них. Если {ACCEPTED_FORMATS} = «—» (кандидат не указал ограничений по формату) — этот блокер не применяется вообще.
+3. ФОРМАТ РАБОТЫ. Вакансия требует формат, которого нет в списке {ACCEPTED_FORMATS}. Триггер должен быть в тексте — те же слова, что и у разбора: """ + FORMAT_MARKERS + """. Если {ACCEPTED_FORMATS} содержит несколько вариантов — допустим любой из них. Если {ACCEPTED_FORMATS} = «—» (кандидат не указал ограничений по формату) — этот блокер не применяется вообще.
 
 4. ЛОКАЦИЯ. Вакансия требует физического присутствия кандидата в стране/городе, который не совместим с его локацией {CANDIDATE_LOCATION} И не входит в его {FREE_PREFERENCES}.
    Если {CANDIDATE_LOCATION} = «—» И {FREE_PREFERENCES} = «—» (кандидат не указал ни локации, ни географических предпочтений) — этот блокер не применяется вообще.
@@ -161,7 +162,7 @@ reason для такого trash — 1-2 предложения с цитато�
 {"verdict": "fit" | "reject" | "trash", "reason": "..." | null}
 
 reason: для fit можно null или короткая фраза; для reject и trash — 1-2 предложения НА ТОМ ЖЕ ЯЗЫКЕ, что и исходный пост вакансии (русский пост → русский reason; English post → English reason; Deutsch → Deutsch), в форме «требование вакансии», без пересказа данных кандидата (см. критическое правило выше).
-Никакого текста вне JSON. Никакого markdown. Никаких code-fence заборчиков.
+""" + ONLY_JSON + """
 
 --- ПРИМЕРЫ ФОРМАТА (НЕ КОПИРУЙ reason ДОСЛОВНО — ссылайся на слова из РЕАЛЬНОГО входного текста; примеры намеренно из РАЗНЫХ профессий, чтобы показать, что логика не зависит от домена) ---
 
@@ -221,7 +222,7 @@ LANGUAGE_REQUIREMENTS: Русский — native, Английский — B2.
 CANDIDATE_LOCATION: Армения/Ереван. ACCEPTED_FORMATS: удалёнка.
 Поля: title='Python разработчик', stack=['Python','FastAPI'], remote='remote', location=null. Текст: "Python разработчик в продуктовую команду. Удалёнка, гибкий график. Стек: Python, FastAPI, PostgreSQL. От 3 лет опыта."
 Ответ: {"verdict": "fit", "reason": null}
-Пояснение (для тебя): «удалёнка» без «удалёнка из РФ» / «только из России» / «remote in Russia» / «time zone MSK» / «российский ИП» — это remote без гео-ограничения, reject по локации НЕЛЬЗЯ.
+Пояснение (для тебя): «удалёнка» без одной из тех же триггерных формулировок, по которым гео-ограничение узнаёт разбор (""" + GEO_LIMIT_MARKERS + """) — это remote без гео-ограничения, reject по локации НЕЛЬЗЯ.
 
 Пример G (trash — реклама курса):
 Поля: title=null, stack=[], remote=null, location=null. Текст: "🔥 Курс по дизайну с трудоустройством за 4 месяца, скидка 50%, регистрация по ссылке..."
@@ -285,7 +286,7 @@ def _vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str:
     )
 
 
-def _fit_request(parsed: ParsedVacancy, raw_text: str, profile, known_skills):
+def _fit_request(parsed: ParsedVacancy, raw_text: str, profile):
     """Что спросить у модели: мерки кандидата и вакансия к проверке."""
     system_prompt = (
         VALIDATE_VACANCY_FIT_PROMPT
@@ -294,13 +295,14 @@ def _fit_request(parsed: ParsedVacancy, raw_text: str, profile, known_skills):
         .replace("{ACCEPTED_GRADES}", format_grades(profile.grades))
         .replace("{ACCEPTED_FORMATS}", format_work_formats(profile.work_formats))
         .replace("{LANGUAGE_REQUIREMENTS}", format_languages(profile.languages))
-        .replace("{CANDIDATE_SKILLS}", format_known_skills(known_skills))
+        .replace("{CANDIDATE_SKILLS}", format_known_skills(profile.known_skills))
         .replace("{FREE_PREFERENCES}", format_text(profile.free_preferences))
     )
-    user_msg = (
-        "Вакансия к проверке — это РЕАЛЬНЫЕ данные, не пример из промпта:\n\n"
-        + wrap_external(_vacancy_block(parsed, raw_text))
-        + "\n\nВерни JSON {\"verdict\": ..., \"reason\": ...}. reason ОБЯЗАН ссылаться на конкретные слова/факты из текста выше, а не из примеров промпта."
+    user_msg = external_block(
+        _vacancy_block(parsed, raw_text),
+        "вакансия к проверке (настоящая, не пример из промпта)",
+        'Верни JSON {"verdict": ..., "reason": ...}. reason ОБЯЗАН ссылаться '
+        "на конкретные слова/факты из текста выше, а не из примеров промпта.",
     )
     return ChatRequest(
         purpose="validate_vacancy_fit",
@@ -315,15 +317,29 @@ def _fit_request(parsed: ParsedVacancy, raw_text: str, profile, known_skills):
 def _without_invented_reason(validation: FitValidation, raw_text: str, profile):
     """Обезвредить отказ, обоснованный тем, чего в вакансии нет.
 
-    Две дороги, и они не симметричны нарочно. Выдуманное обоснование
-    отказа переводит вердикт в «годится»: пропустить вакансию к ручному
-    просмотру дешевле, чем потерять подходящую. Выдуманное обоснование
-    «мусора» вердикт сохраняет и гасит только само обоснование — сама
-    вакансия скорее всего и правда реклама или дайджест, а пускать
-    рекламу в отклик по такому перевороту нельзя.
+    Дороги три, и они не симметричны нарочно.
+
+    Выдуманное обоснование отказа переводит вердикт в «годится»: пропустить
+    вакансию к ручному просмотру дешевле, чем потерять подходящую. Выдуманное
+    обоснование «мусора» вердикт сохраняет и гасит только само обоснование —
+    вакансия скорее всего и правда реклама, а пускать рекламу в отклик по
+    такому перевороту нельзя.
+
+    Обоснование не в той форме — про кандидата вместо требования вакансии —
+    гасится, а вердикт остаётся любой: модель написала не о том, но отвергла
+    по делу. Переверни мы и его, при включённой автоотправке письмо ушло бы
+    живому HR.
     """
     if validation.verdict not in ("reject", "trash") or validation.reason is None:
         return validation
+    style = breaks_reason_style(validation.reason)
+    if style is not None:
+        logger.warning(
+            "validate_vacancy_fit: обоснование говорит о кандидате, а не о "
+            "вакансии (примета %s), гашу обоснование. reason=%r",
+            style, validation.reason,
+        )
+        return FitValidation(verdict=validation.verdict, reason=None)
     marker = looks_hallucinated(validation.reason, raw_text, profile)
     if marker is None:
         return validation
@@ -339,19 +355,25 @@ def _without_invented_reason(validation: FitValidation, raw_text: str, profile):
 
 async def validate_vacancy_fit(
     parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str,
-    *, profile: CandidateProfile, known_skills=None,
-) -> FitValidation | None:
-    """Годится ли вакансия кандидату; пустота — модель не ответила.
+    *, profile: CandidateProfile,
+) -> tuple[FitValidation | None, str | None]:
+    """Годится ли вакансия кандидату и, если не спросилось, почему.
 
-    Неразобранный ответ тоже пустота: зовущий считает её отказом и
-    отправляет вакансию на ручной просмотр.
+    Причина отделена от пустого вердикта нарочно, как и у разбора: «модель не
+    ответила» — не приговор вакансии, и помечать по нему строку разобранной
+    нельзя, иначе лежащий полчаса провайдер уводит в «не подходит» всё, что
+    пришло за это время.
+
+    Неразобранный ответ причиной не считается: модель ответила, а сказала
+    несуразицу — зовущий считает это отказом и шлёт вакансию на ручной
+    просмотр.
     """
     logger.debug("validate_vacancy_fit: title=%r", parsed.title)
     reply = await chat(
-        client, model, _fit_request(parsed, raw_text, profile, known_skills), logger
+        client, model, _fit_request(parsed, raw_text, profile), logger
     )
     if reply.text is None:
-        return None
+        return None, reply.error
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "validate_vacancy_fit: title=%r raw_text[:200]=%r answer=%r",
@@ -360,5 +382,5 @@ async def validate_vacancy_fit(
     validation = _parse_fit_validation(reply.text)
     if validation is None:
         log_unparseable(reply.text, logger, "validate_vacancy_fit")
-        return None
-    return _without_invented_reason(validation, raw_text, profile)
+        return None, truncation_trouble(reply.finish_reason)
+    return _without_invented_reason(validation, raw_text, profile), None

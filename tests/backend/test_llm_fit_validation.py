@@ -39,7 +39,20 @@ def _answer(verdict, reason=None) -> httpx.Response:
 
 
 async def _check(client, *, raw_text="обычный текст вакансии", profile=None, parsed=None):
-    """Спросить модель о пригодности вакансии."""
+    """Спросить модель о пригодности вакансии; отдать один вердикт.
+
+    Причину, по которой спросить не вышло, смотрит отдельная проверка: у
+    остальных провайдер отвечает, и разбирать пару в каждой значило бы писать
+    `[0]` тридцать раз.
+    """
+    validation, _trouble = await _asked(
+        client, raw_text=raw_text, profile=profile, parsed=parsed
+    )
+    return validation
+
+
+async def _asked(client, *, raw_text="обычный текст вакансии", profile=None, parsed=None):
+    """Спросить модель о пригодности и отдать ответ целиком: вердикт и причину."""
     return await validate_vacancy_fit(
         parsed or parsed_vacancy(),
         raw_text,
@@ -283,16 +296,42 @@ async def test_a_verdict_without_a_reason_is_not_second_guessed():
     assert got.reason is None
 
 
-async def test_a_reason_speaking_about_the_candidate_is_treated_as_made_up():
-    """Обоснование, говорящее о кандидате, а не о вакансии, считается выдуманным.
+async def test_a_reason_speaking_about_the_candidate_loses_only_its_words():
+    """Обоснование о кандидате гасится, а сам отказ остаётся отказом.
 
-    Обоснование должно называть требование вакансии. Пересказ данных
-    кандидата означает, что модель ушла в рассуждение вместо цитаты — и
-    такой отказ переворачивается независимо от текста объявления.
+    Обоснование должно называть требование вакансии; пересказ данных
+    кандидата означает, что модель написала не в той форме, — но не то, что
+    вакансия подходит. Переверни мы вердикт, при включённой автоотправке
+    письмо ушло бы живому HR по вакансии, которую модель отвергла.
     """
     client = provider({CHAT: _answer("reject", "у кандидата только B1")})
 
     got = await _check(client, raw_text="Ищем питониста, английский B1 и выше.")
+
+    assert got.verdict == "reject"
+    assert got.reason is None
+
+
+async def test_fluency_without_a_language_does_not_confirm_a_language_demand():
+    """«Свободный график» подтверждением требования к языку не считается.
+
+    Слова «свободный» и «разговорный» подтверждают вывод модели о языке
+    только рядом с самим языком. Считай мы их подтверждением всегда — заслон
+    молча выключался бы на каждой вакансии со свободным графиком, а выдуманное
+    требование языка уводило бы годную вакансию в отказ.
+    """
+    client = provider(
+        {CHAT: _answer("reject", "вакансия подразумевает английский язык")}
+    )
+    profile = CandidateProfile(
+        languages=[CandidateLanguage(name="Английский", level="A2")]
+    )
+
+    got = await _check(
+        client,
+        raw_text="Ищем питониста, свободный график, оформление по договору",
+        profile=profile,
+    )
 
     assert got.verdict == "fit"
     assert got.reason is None

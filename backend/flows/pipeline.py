@@ -7,7 +7,7 @@
 
 import asyncio
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 from pathlib import Path
 
@@ -222,7 +222,10 @@ class IngestionPipeline:
             )
             profile = await get_profile(session)
             languages = await list_profile_languages(session)
-            self.profile_cache = candidate.build_candidate_profile(profile, languages)
+            self.profile_cache = replace(
+                candidate.build_candidate_profile(profile, languages),
+                known_skills=self.skills_cache,
+            )
             self.profile_block = await build_profile_block(session)
         logger.info(
             "loaded resources: %d skills, %d blacklist patterns, "

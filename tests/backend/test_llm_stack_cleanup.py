@@ -61,6 +61,9 @@ def test_a_version_tail_is_cut_unless_it_is_part_of_the_name(raw, expected):
         pytest.param("Base64", id="кодирование"),
         pytest.param("UTF-8", id="кодировка через дефис"),
         pytest.param("x86_64", id="разрядность через подчёркивание"),
+        pytest.param("Bitrix24", id="платформа с цифрой в имени"),
+        pytest.param("Битрикс24", id="она же по-русски"),
+        pytest.param("SHA-256", id="хеш через дефис"),
     ],
 )
 def test_a_name_that_ends_in_a_digit_keeps_it(raw):
