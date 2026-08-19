@@ -11,6 +11,7 @@
 import httpx
 import pytest
 
+from backend.llm.rules import AGGREGATOR_HOSTS_LINE
 from backend.llm.vacancy import parse_vacancy
 from tests.fakes.llm import (
     CHAT,
@@ -33,6 +34,21 @@ async def test_an_empty_post_is_not_sent_anywhere():
 
     assert await parse_vacancy("", client, "qwen") == (None, None)
     assert client.sent == []
+
+
+async def test_the_parser_hears_every_host_the_code_calls_an_aggregator():
+    """Разбору перечисляют те же неподходящие хосты, что знает отбор.
+
+    Их модель не должна класть в поле сайта компании: сведение по домену на
+    общем хосте склеило бы разные компании в одну. Перечень поэтому один на
+    код и оба наставления.
+    """
+    client = provider({CHAT: _parsed()})
+
+    await parse_vacancy("Ищем питониста", client, "qwen")
+
+    system = messages_of(client.sent[0])["system"]
+    assert AGGREGATOR_HOSTS_LINE in system
 
 
 async def test_a_parsed_vacancy_comes_back():

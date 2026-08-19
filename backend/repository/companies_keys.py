@@ -8,6 +8,7 @@
 
 import re
 
+from backend.domain.company_hosts import is_aggregator_host
 from backend.incoming import text_or_none
 
 
@@ -35,13 +36,14 @@ _LEGAL_FORMS = frozenset({
     "gmbh", "plc", "sas",
 })
 
-# Двухбуквенные формы снимаются только с той стороны, на которой их пишут:
-# русское «АО» — впереди имени, европейские `SA`, `AG`, `NV`, `BV` — позади.
-# Двух букв слишком мало, чтобы принимать их за форму где попало: «НВ Групп»
-# со снятым `nv` даёт `grupp` и сходится с компанией «Групп» правилом имени,
-# без арбитра, — а склейка компаний необратима.
+# Двухбуквенные формы снимаются только с той стороны, на которой их пишут.
+# Русское «АО» стоит с обеих: «АО Сбер» и «МТС, АО» — обычные написания.
+# Европейские `SA`, `AG`, `NV`, `BV` пишут только позади имени, и спереди
+# двух букв слишком мало, чтобы принимать их за форму: «НВ Групп» со снятым
+# `nv` даёт `grupp` и сходится с компанией «Групп» правилом имени, без
+# арбитра, — а склейка компаний необратима.
 _HEAD_LEGAL_FORMS = _LEGAL_FORMS | {"ao"}
-_TAIL_LEGAL_FORMS = _LEGAL_FORMS | {"sa", "ag", "nv", "bv"}
+_TAIL_LEGAL_FORMS = _LEGAL_FORMS | {"ao", "sa", "ag", "nv", "bv"}
 
 
 _QUOTE_CHARS = set("«»\"'`“”„‚‘’")
@@ -54,8 +56,9 @@ def _without_edge_legal_forms(words: list[str]) -> list[str]:
     компании в одну. «Sber AG Tech» и «Sber Tech» дали бы один ключ, и
     `rule_name` свёл бы их без арбитра.
 
-    Края при этом разные: двухбуквенные формы снимаются лишь с той стороны,
-    где их пишут (см. `_HEAD_LEGAL_FORMS` и `_TAIL_LEGAL_FORMS`).
+    Края при этом неодинаковые: у хвоста перечень шире на четыре европейские
+    формы, которые впереди имени формой не бывают (см. `_HEAD_LEGAL_FORMS` и
+    `_TAIL_LEGAL_FORMS`).
     """
     start, end = 0, len(words)
     while start < end and words[start] in _HEAD_LEGAL_FORMS:
@@ -101,73 +104,6 @@ def normalize_host(url: str | None) -> str:
     return s
 
 
-# Хосты, которые НЕ являются «домашним сайтом компании»: агрегаторы
-# вакансий, соцсети, мессенджеры, блог-платформы. Если parser ошибся и
-# сунул в `company_website` ссылку на канал/профиль/пост, Stage 1c (host-
-# match) мог бы склеить две разные компании по этому общему host'у. Для
-# таких host'ов host-match пропускается; останутся только name/alias-match
-# и Stage 2 LLM.
-_AGGREGATOR_HOSTS = frozenset({
-    "t.me",
-    "telegram.me",
-    "telegram.org",
-    "linkedin.com",
-    "hh.ru",
-    "habr.com",
-    "vc.ru",
-    "github.com",
-    "gitlab.com",
-    "avito.ru",
-    "superjob.ru",
-    "facebook.com",
-    "instagram.com",
-    "twitter.com",
-    "x.com",
-    "vk.com",
-    "ok.ru",
-    "youtube.com",
-    "behance.net",
-    "dribbble.com",
-    "medium.com",
-    # Шеринговые хостинги job-страниц / резидент-каталоги: на одном
-    # хосте сидит много разных компаний → Stage 1c (website-match) на
-    # таком общем домене склеит их в одну. Любой *.potok.io,
-    # *.huntflow.io и т.п. — это резюме-/job-board, а не сайт компании.
-    "potok.io",
-    "huntflow.io",
-    "huntflow.ru",
-    "amazingjobs.ru",
-    "getmatch.ru",
-    "jobs.ru",
-    "talantix.ru",
-    "rabota.ru",
-    "trudvsem.ru",
-    "career.ru",
-    # Общие хостинги ссылок, анкет и заметок: на таком хосте сидит кто
-    # угодно, и `rule_website` склеил бы две разные компании по одной лишь
-    # ссылке на форму отклика — без арбитра и без записи, которую можно
-    # откатить.
-    "docs.google.com",
-    "forms.gle",
-    "telegra.ph",
-    "notion.so",
-    "taplink.cc",
-    "bit.ly",
-})
-
-
-def _is_aggregator_host(host: str) -> bool:
-    """True если host — агрегатор/соцсеть/мессенджер, а не корпоративный
-    сайт. Suffix-match: ловит и `linkedin.com`, и `m.linkedin.com`,
-    `careers.hh.ru` и т.п."""
-    if not host:
-        return False
-    for h in _AGGREGATOR_HOSTS:
-        if host == h or host.endswith("." + h):
-            return True
-    return False
-
-
 def signal_host(host: str) -> str:
     """Хост, очищенный от «нет сигнала о компании». Для всего, что
     является агрегатором/соцсетью/мессенджером, возвращает пустую
@@ -176,7 +112,7 @@ def signal_host(host: str) -> str:
     очевидные кейсы вроде `(Acme, acme.com)` vs `(Acme, t.me/Acme)`,
     где парсер сунул в company_website ссылку на канал — на самом деле
     это та же компания, и решение должно приниматься по name-match."""
-    if not host or _is_aggregator_host(host):
+    if not host or is_aggregator_host(host):
         return ""
     return host
 

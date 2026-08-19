@@ -12,6 +12,7 @@
 import httpx
 import pytest
 
+from backend.llm.rules import AGGREGATOR_HOSTS_LINE
 from backend.llm.company import dedupe_company_with_llm
 from tests.fakes.llm import (
     CHAT,
@@ -198,6 +199,21 @@ async def test_the_answer_shape_travels_as_json_and_not_as_a_template():
 
     system = messages_of(client.sent[0])["system"]
     assert '\n{"matched_id"' in system
+
+
+async def test_the_arbiter_hears_every_host_the_code_calls_an_aggregator():
+    """Арбитру перечисляют те же неподходящие хосты, что знает отбор.
+
+    По ним он решает, считать ли два разных сайта доводом «это разные
+    компании». Разойдись перечни — на одних и тех же данных ответ зависел бы
+    от того, дошло дело до модели или решилось правилом.
+    """
+    client = provider({CHAT: _answer()})
+
+    await _ask(client, [_Candidate(7, "Другая компания")])
+
+    system = messages_of(client.sent[0])["system"]
+    assert AGGREGATOR_HOSTS_LINE in system
 
 
 async def test_the_parsed_name_goes_as_data_and_not_as_the_rules():
