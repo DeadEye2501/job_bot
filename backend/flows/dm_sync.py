@@ -127,19 +127,16 @@ async def _tombstone_chatless(session_factory, chatless_ids: list[int]) -> set[i
 
     Номера писем у пользовательской учётной записи общие на все личные
     переписки, а не свои у каждой, — попадание по одному номеру поэтому
-    точное, чужую строку такой проход не заденет. Сужены мы всё же до
-    входящих; исходящие, которые проход пропускает, сверятся при следующей
-    загрузке переписки из Telegram.
+    точное, чужую строку такой проход не заденет. Направление письма в отбор
+    не входит: наше стёртое надо хоронить тем же оповещением, а жди оно
+    догона переписки — глубже его предела не похоронилось бы никогда.
 
     Спрашиваем до похорон и тем же отбором: иначе в смешанной пачке уже
     похороненная строка чужого человека разбудила бы окно за переписку, в
     которой ничего не изменилось.
     """
     async with session_factory() as session:
-        chatless = (
-            Message.tg_message_id.in_(chatless_ids),
-            Message.is_incoming,
-        )
+        chatless = (Message.tg_message_id.in_(chatless_ids),)
         hr_ids = await hr_ids_of_live_messages(session, *chatless)
         rowcount = await tombstone_messages(session, *chatless)
         await session.commit()

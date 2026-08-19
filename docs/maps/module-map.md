@@ -584,7 +584,7 @@ First-run bootstrap: ensure DB schema exists.
   - `def forget_timers(self) -> None` (3)
   - `def forget_bursts(self) -> None` (3)
 
-### `backend/flows/dm_sync.py` — 201 строк
+### `backend/flows/dm_sync.py` — 198 строк
 
 Сверка переписки с тем, что случилось с ней на стороне Telegram.
 
@@ -595,7 +595,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _split_by_chat(messages) -> tuple[dict[int, list[int]], list[int]]` (17)
 - `def _chat_username(messages, chat_id: int) -> str | None` (11)
 - `async def _tombstone_in_chat(session_factory, chat_id: int, msg_ids: list[int], messages)` (15)
-- `async def _tombstone_chatless(session_factory, chatless_ids: list[int]) -> set[int]` (22)
+- `async def _tombstone_chatless(session_factory, chatless_ids: list[int]) -> set[int]` (19)
 - `def _forget_all(forget_pending, hr_id: int, msg_ids) -> None` (4)
 - `async def tombstone_deleted(session_factory, messages, forget_pending) -> set[int]` (28)
 - `async def store_outgoing(session_factory, client, msg) -> int | None` (17)
@@ -1294,7 +1294,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def load_merge_pair(session: AsyncSession, model, *, absorbed_id: int, survivor_id: int, subject: str)` (24)
 - `def concat_notes(survivor: str | None, absorbed: str | None) -> str | None` (12)
 
-### `backend/repository/messages.py` — 344 строк ⚠ подошёл к 300
+### `backend/repository/messages.py` — 346 строк ⚠ подошёл к 300
 
 Хранение переписки с HR.
 
@@ -1303,7 +1303,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def save_incoming_message(session: AsyncSession, incoming: IncomingMessage) -> Message` (24)
 - `async def mark_incoming_read(session: AsyncSession, hr_id: int, now: datetime) -> int` (23)
 - `async def mark_outgoing_read(session: AsyncSession, hr_id: int, up_to_tg_id: int, now: datetime) -> int` (27)
-- `async def overwrite_message_text(session: AsyncSession, hr_id: int, tg_message_id: int, *, is_incoming: bool, text: str) -> int` (36)
+- `async def overwrite_message_text(session: AsyncSession, hr_id: int, tg_message_id: int, *, is_incoming: bool, text: str) -> int` (38)
 - `async def hr_ids_of_live_messages(session: AsyncSession, *where) -> set[int]` (20)
 - `async def newest_tg_message_id(session: AsyncSession, hr_id: int) -> int` (18)
 - `async def tombstone_messages(session: AsyncSession, *where) -> int` (31)
@@ -2519,7 +2519,7 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/backend/test_bot_dm_deletes.py` — 409 строк ⚠ подошёл к 300
+### `tests/backend/test_bot_dm_deletes.py` — 414 строк ⚠ подошёл к 300
 
 Следствия удаления сообщения на стороне Telegram.
 
