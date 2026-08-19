@@ -14,6 +14,7 @@ from tests.factories import (
     at,
     channel_row,
     company_row,
+    message_row,
     status_history_row,
     vacancy_event_row,
     vacancy_row,
@@ -198,6 +199,48 @@ async def test_activity_is_the_latest_of_the_four_sources(session, session_facto
         by_posted.id: at(20),
         by_event.id: at(30),
         by_status.id: at(40),
+    }
+
+
+async def test_a_letter_from_the_hr_counts_as_activity_too(
+    session, session_factory
+):
+    """Письмо собеседника — тоже жизнь вакансии, и метка его учитывает.
+
+    По другую сторону экрана срок молчания считает от него же
+    (`vacancies_ghosting`), и без него получалось два ответа на один вопрос:
+    вакансия, по которой HR написал вчера, показывалась в списке
+    двухнедельной давности и уезжала в хвост.
+    """
+    vacancy = vacancy_row(created_at=at(0))
+    await put(session_factory, vacancy)
+    await put(
+        session_factory,
+        message_row(vacancy_id=vacancy.id, is_incoming=True, sent_at=at(50)),
+    )
+
+    assert await list_vacancy_last_activity(session, [vacancy.id]) == {
+        vacancy.id: at(50)
+    }
+
+
+async def test_our_own_letter_is_not_activity_of_the_vacancy(
+    session, session_factory
+):
+    """Своё письмо меткой не считается: ждём мы ответа, а не себя.
+
+    Тем же правилом живёт и срок молчания: отсчёт ведут по тому, когда
+    отозвался собеседник.
+    """
+    vacancy = vacancy_row(created_at=at(0))
+    await put(session_factory, vacancy)
+    await put(
+        session_factory,
+        message_row(vacancy_id=vacancy.id, is_incoming=False, sent_at=at(50)),
+    )
+
+    assert await list_vacancy_last_activity(session, [vacancy.id]) == {
+        vacancy.id: at(0)
     }
 
 

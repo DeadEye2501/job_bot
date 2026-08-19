@@ -14,27 +14,11 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.transitions import GHOSTING_ELIGIBLE_FROM
-from backend.models import (
-    Message,
-    Vacancy,
-    VacancyStatusHistory,
-)
+from backend.models import Vacancy, VacancyStatusHistory
+from backend.repository.vacancies_activity import last_incoming_subq
 from backend.repository.vacancy_status import apply_silence
 
 logger = logging.getLogger(__name__)
-
-
-def _last_incoming_subq():
-    """Когда по каждой вакансии последний раз писал HR."""
-    return (
-        select(
-            Message.vacancy_id.label("vid"),
-            func.max(Message.sent_at).label("last_msg_at"),
-        )
-        .where(Message.is_incoming.is_(True))
-        .group_by(Message.vacancy_id)
-        .subquery()
-    )
 
 
 def _last_status_change_subq():
@@ -64,13 +48,13 @@ async def _silence_candidates(session: AsyncSession):
     мига, как вакансия встала туда, где стоит сейчас, а не с любой давней
     смены статуса.
     """
-    last_msg_subq = _last_incoming_subq()
+    last_msg_subq = last_incoming_subq()
     last_status_subq = _last_status_change_subq()
     return (
         await session.execute(
             select(
                 Vacancy,
-                last_msg_subq.c.last_msg_at,
+                last_msg_subq.c.max_at,
                 last_status_subq.c.last_status_at,
             )
             .outerjoin(last_msg_subq, last_msg_subq.c.vid == Vacancy.id)

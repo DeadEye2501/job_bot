@@ -933,9 +933,10 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `_STATUS_BY_CODE` = `{status_code(s): s for s in VacancyStatus}`
-- `VACANCY_SORTS` = `набор из 6`
 - `_STATUS_PRIORITY_ACTIVE_FIRST` = `словарь из 11`
 - `_STATUS_PRIORITY_NEW_FIRST` = `словарь из 11`
+- `_LIKE_ESCAPE` = `'\\'`
+- `_LIKE_SPECIALS` = `набор из 3`
 
 ### `backend/repository/vacancies_mini.py`
 
@@ -944,6 +945,10 @@
 ### `backend/repository/vacancy_status.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `class _Signature`
+  - `explanation: str | None` = `None`
+  - `message_id: int | None` = `None`
+  - `source: StatusHistorySource` = `StatusHistorySource.SYSTEM`
 
 ### `backend/runtime_settings.py`
 

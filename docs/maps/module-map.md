@@ -35,16 +35,17 @@ Job Bot — single CLI entry point.
 
 ## adapters — 7 модулей
 
-### `adapters/db.py` — 88 строк
+### `adapters/db.py` — 105 строк
 
 Соединение с базой: как его завести и как спросить, живо ли оно.
 
 Зависит от: —
 
 - `def _dump_json(value: object) -> str` (9)
-- `def make_engine(database_url: str) -> AsyncEngine` (27)
-  - `def _prepare_connection(dbapi_conn, _record)` (9)
+- `def make_engine(database_url: str) -> AsyncEngine` (28)
+  - `def _prepare_connection(dbapi_conn, _record)` (10)
 - `def _lower(value: object) -> object` (14)
+- `def _trim(value: object) -> object` (14)
 - `async def ping(session) -> bool` (16)
 
 ### `adapters/lm_chat.py` — 153 строк
@@ -142,7 +143,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## backend — 103 модулей
+## backend — 104 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -1395,15 +1396,27 @@ First-run bootstrap: ensure DB schema exists.
 - `def _median(values: list[float]) -> float | None` (9)
 - `async def get_stats_hr_responses(session: AsyncSession, *, period: str) -> dict` (39)
 
-### `backend/repository/vacancies_card.py` — 233 строк
+### `backend/repository/vacancies_activity.py` — 94 строк
+
+Отметка последней жизни вакансии — из чего складывается и как её спросить.
+
+Зависит от: `backend.models`
+
+- `def _greatest_pair(a, b)` (4)
+- `def _greatest(*cols)` (5)
+- `def last_incoming_subq(ids: list[int] | None=None)` (18)
+- `def activity_aggs(ids: list[int] | None=None) -> tuple` (24)
+- `def activity_ts(aggs: tuple)` (7)
+- `def join_activity(stmt, aggs: tuple)` (9)
+
+### `backend/repository/vacancies_card.py` — 223 строк
 
 Поля одной вакансии.
 
 Зависит от: `backend.models`, `backend.payloads`, `backend.repository.vacancies_life`
 
-- `async def _status_history_of(session: AsyncSession, vacancy_id: int) -> list` (18)
-- `async def _events_of(session: AsyncSession, vacancy_id: int) -> list` (14)
-- `async def get_vacancy_detail(session: AsyncSession, vacancy_id: int) -> VacancyDetail | None` (25)
+- `async def _newest_first(session: AsyncSession, rows, stamp, vacancy_id: int) -> list` (20)
+- `async def get_vacancy_detail(session: AsyncSession, vacancy_id: int) -> VacancyDetail | None` (29)
 - `async def update_vacancy_notes(session: AsyncSession, vacancy_id: int, notes: str | None) -> Vacancy | None` (30)
 - `class _Link` (16)
 - `async def _link_name(session: AsyncSession, link: _Link, row_id: int | None) -> str | None` (13)
@@ -1419,13 +1432,12 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def count_by_status(session: AsyncSession, *conditions) -> dict[VacancyStatus, int]` (21)
 
-### `backend/repository/vacancies_ghosting.py` — 130 строк
+### `backend/repository/vacancies_ghosting.py` — 114 строк
 
 Вакансии, о которых замолчали: срок тишины и гашение по нему.
 
-Зависит от: `backend.domain.transitions`, `backend.models`, `backend.repository.vacancy_status`
+Зависит от: `backend.domain.transitions`, `backend.models`, `backend.repository.vacancies_activity`, `backend.repository.vacancy_status`
 
-- `def _last_incoming_subq()` (11)
 - `def _last_status_change_subq()` (13)
 - `async def _silence_candidates(session: AsyncSession)` (32)
 - `def _last_activity(vacancy: Vacancy, last_msg_at, last_status_at)` (11)
@@ -1443,28 +1455,25 @@ First-run bootstrap: ensure DB schema exists.
 - `async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool` (32)
 - `async def add_vacancy_event(session: AsyncSession, vacancy_id: int, kind: str, payload: dict | None=None) -> VacancyEvent` (19)
 
-### `backend/repository/vacancies_list.py` — 439 строк ⚠ подошёл к 300
+### `backend/repository/vacancies_list.py` — 409 строк ⚠ подошёл к 300
 
 Отбор вакансий для списка на экране.
 
-Зависит от: `backend.domain.spellings`, `backend.models`, `backend.payloads`, `backend.repository.paging`, `backend.repository.vacancies_card`, `backend.repository.vacancies_common`
+Зависит от: `backend.domain.spellings`, `backend.models`, `backend.payloads`, `backend.repository.paging`, `backend.repository.vacancies_activity`, `backend.repository.vacancies_card`, `backend.repository.vacancies_common`
 
-- `def _greatest_pair(a, b)` (4)
-- `def _greatest(*cols)` (5)
-- `def _activity_aggs(ids: list[int] | None=None)` (23)
-- `def _activity_ts(event_agg, status_agg)` (14)
-- `def _order_for(sort: str, activity_ts)` (37)
+- `def _order_for(sort: str, freshness)` (34)
+- `def _like_anywhere(text: str) -> str` (18)
 - `def _search_clauses(search: str | None) -> tuple[list, set[str]]` (24)
-- `def _choice_clauses(f: VacancyFilter) -> tuple[list, set[str]]` (37)
-- `def _range_clauses(f: VacancyFilter, activity_ts) -> list` (21)
-- `def _column_clauses(f: VacancyFilter) -> list` (12)
-- `def _where_and_joins(f: VacancyFilter, activity_ts) -> tuple[list, set[str]]` (15)
+- `def _choice_clauses(f: VacancyFilter) -> tuple[list, set[str]]` (41)
+- `def _range_clauses(f: VacancyFilter, freshness) -> list` (21)
+- `def _column_clauses(f: VacancyFilter) -> list` (20)
+- `def _where_and_joins(f: VacancyFilter, freshness) -> tuple[list, set[str]]` (15)
 - `async def list_vacancies(session: AsyncSession, filters: VacancyFilter) -> tuple[list[Vacancy], bool]` (21)
-- `def _listing_stmt(f: VacancyFilter)` (30)
+- `def _listing_stmt(f: VacancyFilter)` (26)
 - `async def _channel_options(session: AsyncSession) -> list[str]` (12)
 - `async def _company_options(session: AsyncSession) -> list[str]` (34)
 - `async def list_vacancy_filter_options(session: AsyncSession) -> dict[str, list[str]]` (16)
-- `async def list_vacancy_last_activity(session: AsyncSession, vacancy_ids: list[int]) -> dict[int, datetime]` (26)
+- `async def list_vacancy_last_activity(session: AsyncSession, vacancy_ids: list[int]) -> dict[int, datetime]` (25)
 
 ### `backend/repository/vacancies_mini.py` — 105 строк
 
@@ -1477,24 +1486,25 @@ First-run bootstrap: ensure DB schema exists.
 - `async def list_vacancies_for_company(session: AsyncSession, company_id: int) -> list[Vacancy]` (5)
 - `async def list_vacancies_for_channel(session: AsyncSession, channel_id: int, *, limit: int=50, offset: int=0) -> tuple[list[Vacancy], bool]` (36)
 
-### `backend/repository/vacancy_status.py` — 352 строк ⚠ подошёл к 300
+### `backend/repository/vacancy_status.py` — 371 строк ⚠ подошёл к 300
 
 Смена статуса вакансии: решение, запись, история.
 
 Зависит от: `backend.domain.transitions`, `backend.models`, `backend.payloads`
 
 - `def _ensure_trailing_period(s: str | None) -> str | None` (9)
-- `def _move_status(vacancy: Vacancy, new_status: VacancyStatus, explanation: str | None, *, message_id: int | None=None, source: StatusHistorySource=StatusHistorySource.SYSTEM) -> VacancyStatusHistory` (37)
-- `async def mark_vacancy_applied(session: AsyncSession, vacancy_id: int, explanation: str | None, *, force: bool) -> bool` (22)
+- `class _Signature` (13)
+- `def _move_status(vacancy: Vacancy, new_status: VacancyStatus, sign: _Signature) -> VacancyStatusHistory` (34)
+- `async def mark_vacancy_applied(session: AsyncSession, vacancy_id: int, explanation: str | None, *, force: bool) -> bool` (24)
 - `async def last_status_history_id(session: AsyncSession, vacancy_id: int) -> int | None` (13)
 - `async def record_rerun(session: AsyncSession, vacancy_id: int, previous: VacancyStatus, last_history: int | None) -> None` (38)
 - `def _log_status_change(vacancy_id: int, previous, new_status, detail: str) -> None` (14)
 - `def _log_manual_change(history: VacancyStatusHistory, vacancy_id: int, previous, new_status) -> None` (19)
-- `async def change_vacancy_status(session: AsyncSession, vacancy_id: int, new_status: VacancyStatus, explanation: str | None) -> VacancyStatusHistory | None` (34)
+- `async def change_vacancy_status(session: AsyncSession, vacancy_id: int, new_status: VacancyStatus, explanation: str | None) -> VacancyStatusHistory | None` (36)
 - `async def update_status_history_explanation(session: AsyncSession, history_id: int, explanation: str | None) -> VacancyStatusHistory | None` (18)
 - `def _log_blocked_verdict(vacancy_id: int, previous, classification: Classification, message_id: int) -> None` (19)
-- `async def apply_classification(session: AsyncSession, vacancy_id: int, message_id: int, classification: Classification) -> None` (25)
-- `def apply_silence(session: AsyncSession, vacancy: Vacancy, timeout_days: int) -> None` (21)
+- `async def apply_classification(session: AsyncSession, vacancy_id: int, message_id: int, classification: Classification) -> None` (24)
+- `def apply_silence(session: AsyncSession, vacancy: Vacancy, timeout_days: int) -> None` (23)
 - `def apply_parse_outcome(vacancy: Vacancy, new_status: VacancyStatus) -> None` (18)
 
 ### `backend/runtime_settings.py` — 499 строк ⚠ подошёл к 300
@@ -3852,13 +3862,13 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_repository_vacancy_joins.py` — 271 строк
+### `tests/backend/test_repository_vacancy_joins.py` — 347 строк ⚠ подошёл к 300
 
 Следствия отбора в `list_vacancies` по тому, что лежит в соседних таблицах.
 
 Зависит от: `backend.repository.vacancies_list`, `tests.dbio`, `tests.factories`
 
-Тестов: 13
+Тестов: 17
 
 
 ### `tests/backend/test_repository_vacancy_links.py` — 237 строк
@@ -3888,13 +3898,13 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `tests/backend/test_repository_vacancy_options.py` — 250 строк
+### `tests/backend/test_repository_vacancy_options.py` — 293 строк
 
 Следствия двух справочных запросов по вакансиям.
 
 Зависит от: `backend.repository.vacancies_list`, `tests.dbio`, `tests.factories`
 
-Тестов: 12
+Тестов: 14
 
 
 ### `tests/backend/test_repository_vacancy_salary.py` — 114 строк
@@ -3906,13 +3916,13 @@ Runtime settings layer.
 Тестов: 6
 
 
-### `tests/backend/test_repository_vacancy_sort.py` — 278 строк
+### `tests/backend/test_repository_vacancy_sort.py` — 299 строк
 
 Следствия порядка выдачи в `list_vacancies`.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 14
+Тестов: 15
 
 
 ### `tests/backend/test_repository_vacancy_status.py` — 267 строк
