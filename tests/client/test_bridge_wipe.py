@@ -37,6 +37,31 @@ def wipe_steps(monkeypatch, hub):
     return steps
 
 
+async def test_the_key_stays_when_something_survived_the_wipe(api, ask, monkeypatch):
+    """Ключ забывают только после удавшегося сноса.
+
+    Главный ключ открывает всё, что зашифровано в базе. Забытый при живой базе,
+    он оставляет человека с целыми данными, которых уже никто не прочтёт: ни
+    строки сессии Telegram, ни ключей провайдера — а снос при этом не удался, и
+    приложение продолжает работать.
+    """
+    forgotten: list[str] = []
+
+    async def _wipe_all(engine) -> list[str]:
+        return ["jobbot.db: занят другим процессом"]
+
+    monkeypatch.setattr("client.bridge.wipe.wipe_all", _wipe_all)
+    monkeypatch.setattr(
+        "client.bridge.wipe.forget_master_key", lambda: forgotten.append("забыт")
+    )
+    monkeypatch.setattr("client.bridge.wipe._leave_later", lambda: None)
+
+    answer = await ask(api.system.wipe)
+
+    assert answer["fail"] == "denied"
+    assert forgotten == []
+
+
 async def test_the_answer_is_ready_before_the_bot_and_the_data_are_gone(
     api, ask, with_bot, wipe_steps
 ):
