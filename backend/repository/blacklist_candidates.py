@@ -5,13 +5,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company, HR
 
+from backend.repository.blacklist_marks import preferred_blacklist_value
 from backend.repository.channels import (
-    channel_blacklist_preferred_value,
+    channel_blacklist_candidates,
     list_named_channels,
 )
-from backend.repository.companies_card import company_blacklist_preferred_value
-from backend.repository.hr_card import hr_blacklist_preferred_value
+from backend.repository.companies_card import company_blacklist_candidates
+from backend.repository.hr_card import hr_blacklist_candidates
 from backend.repository.hr_identify import HAS_TELEGRAM_IDENTITY
+
+
+def _by_label(rows: list[dict]) -> list[dict]:
+    """Подсказки по подписи, без учёта регистра.
+
+    Порядок общий у трёх вкладок одного окна: человек ходит между ними, а
+    сравнение базы идёт по кодам символов — заглавные встали бы впереди
+    строчных на одной вкладке из трёх.
+    """
+    rows.sort(key=lambda row: (row["label"] or "").casefold())
+    return rows
 
 
 def _named_candidates(named: list[tuple[str | None, str | None]]) -> list[dict]:
@@ -27,8 +39,22 @@ def _named_candidates(named: list[tuple[str | None, str | None]]) -> list[dict]:
         if value is None:
             continue
         out.append({"value": value, "label": title or value, "sub": value if title else None})
-    out.sort(key=lambda x: (x["label"] or "").casefold())
-    return out
+    return _by_label(out)
+
+
+async def _company_candidates(session: AsyncSession) -> list[dict]:
+    """Строки подсказки по компаниям: значение и подпись — имя, ниже сайт.
+
+    Своей формой, а не общей `_named_candidates`: у компании названия отдельно
+    от значения нет — уточнением служит сайт. Порядок при этом общий, `_by_label`.
+    """
+    out: list[dict] = []
+    for co in (await session.scalars(select(Company))).all():
+        value = preferred_blacklist_value(company_blacklist_candidates(co))
+        if value is None:
+            continue
+        out.append({"value": value, "label": co.name, "sub": co.website or None})
+    return _by_label(out)
 
 
 async def list_blacklist_candidates(
@@ -50,36 +76,28 @@ async def list_blacklist_candidates(
     независимо от рода (`load_active_blacklist_patterns` берёт все подряд), и
     там тот же `ник` сработает по границам слова — не там, где имелось в виду.
 
-    Returns: [{value, label, sub?}], отсортировано по label.
-
-    - kind="hr": HRs с @username или telegram_user_id (что-то для
-      сохранения как blacklist value).
-    - kind="company": все компании by name.
-    - kind="channel": каналы с @username.
-    - kind="keyword": [] (свободный ввод).
+    Каждая строка — `{value, label, sub?}`, порядок по подписи. Незнакомый
+    род и ключевое слово подсказок не имеют: последнее набирают свободно.
     """
     if kind == "hr":
         rows = (
             await session.scalars(select(HR).where(HAS_TELEGRAM_IDENTITY))
         ).all()
         return _named_candidates(
-            [(hr_blacklist_preferred_value(hr), hr.name) for hr in rows]
+            [
+                (preferred_blacklist_value(hr_blacklist_candidates(hr)), hr.name)
+                for hr in rows
+            ]
         )
     if kind == "company":
-        rows = (
-            await session.scalars(select(Company).order_by(Company.name.asc()))
-        ).all()
-        out: list[dict] = []
-        for co in rows:
-            value = company_blacklist_preferred_value(co)
-            if value is None:
-                continue
-            out.append({"value": value, "label": co.name, "sub": co.website or None})
-        return out
+        return await _company_candidates(session)
     if kind == "channel":
         return _named_candidates(
             [
-                (channel_blacklist_preferred_value(ch), ch.title)
+                (
+                    preferred_blacklist_value(channel_blacklist_candidates(ch)),
+                    ch.title,
+                )
                 for ch in await list_named_channels(session)
             ]
         )

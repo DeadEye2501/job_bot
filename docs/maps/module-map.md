@@ -1077,7 +1077,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def moment_or_none(value) -> datetime | None` (16)
 - `def str_list(value) -> list[str]` (11)
 
-### `backend/repository/blacklist.py` — 310 строк ⚠ подошёл к 300
+### `backend/repository/blacklist.py` — 322 строк ⚠ подошёл к 300
 
 Ведение чёрного списка.
 
@@ -1089,6 +1089,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def rename_blacklist_marks(session: AsyncSession, kind: str, *, old_value: str, new_value: str) -> None` (41)
 - `class BlacklistUpdateError(ValueError)` (2)
 - `def _required_value(value) -> str` (11)
+- `async def _free_value(session: AsyncSession, row: Blacklist, value: str) -> str` (10)
 - `async def update_blacklist(session: AsyncSession, blacklist_id: int, *, value=_BLACKLIST_FIELD_UNSET, reason=_BLACKLIST_FIELD_UNSET) -> bool` (32)
 - `async def _same_entry(session: AsyncSession, kind: str, value: str) -> Blacklist | None` (11)
 - `def _reuse_existing(existing: Blacklist, reason: str | None) -> BlacklistOutcome` (20)
@@ -1097,16 +1098,18 @@ First-run bootstrap: ensure DB schema exists.
 - `async def delete_blacklist(session: AsyncSession, blacklist_id: int) -> bool` (18)
 - `async def list_blacklist(session: AsyncSession) -> list[Blacklist]` (15)
 
-### `backend/repository/blacklist_candidates.py` — 86 строк
+### `backend/repository/blacklist_candidates.py` — 104 строк
 
 Подсказки «кого предложить в чёрный список» для окна заведения.
 
-Зависит от: `backend.models`, `backend.repository.channels`, `backend.repository.companies_card`, `backend.repository.hr_card`, `backend.repository.hr_identify`
+Зависит от: `backend.models`, `backend.repository.blacklist_marks`, `backend.repository.channels`, `backend.repository.companies_card`, `backend.repository.hr_card`, `backend.repository.hr_identify`
 
-- `def _named_candidates(named: list[tuple[str | None, str | None]]) -> list[dict]` (15)
-- `async def list_blacklist_candidates(session: AsyncSession, kind: str) -> list[dict]` (53)
+- `def _by_label(rows: list[dict]) -> list[dict]` (9)
+- `def _named_candidates(named: list[tuple[str | None, str | None]]) -> list[dict]` (14)
+- `async def _company_candidates(session: AsyncSession) -> list[dict]` (13)
+- `async def list_blacklist_candidates(session: AsyncSession, kind: str) -> list[dict]` (45)
 
-### `backend/repository/blacklist_marks.py` — 88 строк
+### `backend/repository/blacklist_marks.py` — 101 строк
 
 Активные строки чёрного списка, по которым предметы получают отметку.
 
@@ -1116,9 +1119,10 @@ First-run bootstrap: ensure DB schema exists.
 - `async def active_blacklist_value(session: AsyncSession, kind: str, candidates: list[str]) -> str | None` (21)
 - `async def active_blacklist_values(session: AsyncSession, kind: str) -> set[str]` (14)
 - `async def load_active_blacklist_patterns(session: AsyncSession) -> list[str]` (15)
-- `def preferred_blacklist_value(candidates: list[str]) -> str | None` (8)
+- `def marked_by(candidates: list[str], values: set[str]) -> bool` (9)
+- `def preferred_blacklist_value(candidates: list[str]) -> str | None` (10)
 
-### `backend/repository/channels.py` — 421 строк ⚠ подошёл к 300
+### `backend/repository/channels.py` — 412 строк ⚠ подошёл к 300
 
 Ведение записей о телеграм-каналах.
 
@@ -1126,10 +1130,9 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def list_named_channels(session: AsyncSession, *, ids: list[int] | None=None) -> list[TelegramChannel]` (23)
 - `def channel_blacklist_candidates(ch: TelegramChannel) -> list[str]` (14)
-- `def channel_blacklist_preferred_value(ch: TelegramChannel) -> str | None` (2)
 - `def _is_blacklisted(ch: TelegramChannel, bl_values: set[str]) -> bool` (8)
 - `async def _channel_blacklist_value(session: AsyncSession, ch: TelegramChannel) -> str | None` (9)
-- `def _channels_with_counts_query()` (26)
+- `def _channels_with_counts_query()` (17)
 - `async def list_telegram_channels(session: AsyncSession, search: str | None=None) -> list[ChannelWithCount]` (32)
 - `async def _vacancies_per_day(session: AsyncSession, channel_id: int) -> float` (20)
 - `async def _channel_stats(session: AsyncSession, channel_id: int, counts_by_enum: dict) -> ChannelStats` (32)
@@ -1143,7 +1146,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def reset_channel_cursor(session: AsyncSession, channel_id: int) -> bool` (9)
 - `async def delete_channel(session: AsyncSession, channel_id: int) -> int | None` (39)
 
-### `backend/repository/companies_card.py` — 301 строк ⚠ подошёл к 300
+### `backend/repository/companies_card.py` — 297 строк
 
 Ведение записей о компаниях.
 
@@ -1151,12 +1154,11 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def create_company(session: AsyncSession, *, name: str, website: str | None=None, aliases: list[str] | None=None, notes: str | None=None) -> Company` (37)
 - `def company_blacklist_candidates(co: Company) -> list[str]` (11)
-- `def company_blacklist_preferred_value(co: Company) -> str | None` (2)
 - `async def _company_blacklist_value(session: AsyncSession, co: Company) -> str | None` (6)
 - `async def get_company_detail(session: AsyncSession, company_id: int) -> 'CompanyDetail | None'` (34)
 - `def add_company_spellings(co: Company, incoming: list) -> None` (25)
 - `def typed_spellings(aliases) -> list[str]` (14)
-- `async def update_company_fields(session: AsyncSession, company_id: int, **fields) -> bool` (40)
+- `async def update_company_fields(session: AsyncSession, company_id: int, **fields) -> bool` (43)
 - `async def delete_company(session: AsyncSession, company_id: int) -> bool` (22)
 - `class _AbsorbedCompany` (7)
 - `def _carry_company_to_survivor(survivor: Company, taken: _AbsorbedCompany) -> None` (19)
@@ -1177,14 +1179,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def real_corporate_website(url: str | None) -> str | None` (15)
 - `def hosts_compatible(a: str, b: str) -> bool` (6)
 
-### `backend/repository/companies_list.py` — 68 строк
+### `backend/repository/companies_list.py` — 50 строк
 
 Перечень компаний со счётчиками.
 
 Зависит от: `backend.models`, `backend.payloads`, `backend.repository.blacklist_marks`, `backend.repository.companies_card`, `backend.repository.paging`, `backend.repository.search`, `backend.repository.vacancies_common`
 
-- `def _companies_with_counts_query()` (18)
-- `async def list_companies_with_counts(session: AsyncSession, search: str | None=None, *, limit: int | None=None, offset: int=0) -> tuple[list[CompanyWithCount], bool]` (33)
+- `async def list_companies_with_counts(session: AsyncSession, search: str | None=None, *, limit: int | None=None, offset: int=0) -> tuple[list[CompanyWithCount], bool]` (36)
 
 ### `backend/repository/companies_matching.py` — 479 строк ⚠ подошёл к 300
 
@@ -1213,27 +1214,27 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _llm_arbitrate(lm_client: Any, lm_model: str, parsed: _Parsed, shortlist) -> tuple[Company | None, dict]` (39)
 - `async def find_or_create_company(session: AsyncSession, name: str, *, website: str | None=None, lm_client: Any=None, lm_model: str | None=None) -> tuple[Company | None, dict]` (40)
 
-### `backend/repository/hr_card.py` — 316 строк ⚠ подошёл к 300
+### `backend/repository/hr_card.py` — 336 строк ⚠ подошёл к 300
 
 Одна запись HR: чтение, правка, слияние, удаление.
 
 Зависит от: `backend.domain.telegram_identity`, `backend.models`, `backend.payloads`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.messages`, `backend.repository.vacancies_common`, `backend.repository.vacancies_life`
 
-- `async def update_hr_fields(session: AsyncSession, hr_id: int, *, name=_HR_FIELD_UNSET, telegram_username=_HR_FIELD_UNSET, notes=_HR_FIELD_UNSET) -> bool` (39)
+- `async def update_hr_fields(session: AsyncSession, hr_id: int, **fields) -> bool` (32)
 - `async def _vacancy_count_of(session: AsyncSession, hr_id: int) -> int` (8)
 - `async def _last_company_of(session: AsyncSession, hr_id: int) -> tuple[int | None, str | None]` (21)
 - `async def _unread_count_of(session: AsyncSession, hr_id: int) -> int` (11)
 - `async def get_hr_detail(session: AsyncSession, hr_id: int) -> HrDetail | None` (23)
-- `def hr_blacklist_candidates(hr: HR) -> list[str]` (15)
+- `def hr_blacklist_candidates(hr: HR) -> list[str]` (20)
 - `async def hr_blacklist_value(session: AsyncSession, hr: HR) -> str | None` (2)
 - `async def delete_hr(session: AsyncSession, hr_id: int) -> bool` (27)
-- `def hr_blacklist_preferred_value(hr: HR) -> str | None` (9)
 - `class _AbsorbedHr` (11)
-- `async def _move_or_drop_chat(session: AsyncSession, absorbed_id: int, survivor_id: int, survivor_has_tg: bool) -> tuple[int, int]` (25)
+- `async def _drop_letters_the_survivor_already_has(session: AsyncSession, absorbed_id: int, survivor_id: int) -> int` (31)
+- `async def _move_or_drop_chat(session: AsyncSession, absorbed_id: int, survivor_id: int, survivor_has_tg: bool) -> tuple[int, int]` (28)
 - `def _carry_to_survivor(survivor: HR, taken: _AbsorbedHr, survivor_has_tg: bool) -> None` (19)
 - `async def merge_hr(session: AsyncSession, *, absorbed_id: int, survivor_id: int) -> None` (38)
 
-### `backend/repository/hr_identify.py` — 261 строк
+### `backend/repository/hr_identify.py` — 266 строк
 
 Соответствие записи HR данным Telegram.
 
@@ -1245,36 +1246,33 @@ First-run bootstrap: ensure DB schema exists.
 - `async def resolve_reply_target_vacancy(session: AsyncSession, hr_id: int, reply_to_tg_msg_id: int) -> int | None` (24)
 - `def telegram_full_name(user) -> str | None` (3)
 - `def refresh_hr_from_telegram(hr: HR, user, *, avatar: bytes | None) -> None` (30)
-- `async def create_hr(session: AsyncSession, *, name: str | None, telegram_username: str | None, telegram_user_id: int | None=None, notes: str | None=None) -> HR` (36)
+- `async def create_hr(session: AsyncSession, *, name: str | None, telegram_username: str | None, telegram_user_id: int | None=None, notes: str | None=None) -> HR` (42)
 - `async def find_or_create_hr(session: AsyncSession, user, *, avatar: bytes | None=None) -> tuple[HR, bool]` (23)
 
-### `backend/repository/hr_list.py` — 265 строк
+### `backend/repository/hr_list.py` — 217 строк
 
 Перечни HR со счётчиками.
 
 Зависит от: `backend.models`, `backend.payloads`, `backend.repository.blacklist_marks`, `backend.repository.hr_card`, `backend.repository.hr_identify`, `backend.repository.messages`, `backend.repository.paging`, `backend.repository.search`, `backend.repository.vacancies_common`
 
-- `async def _with_last_incoming_id(session: AsyncSession, hrs: list[HR]) -> list[tuple[HR, int]]` (17)
-- `async def list_hrs_for_backfill(session: AsyncSession) -> list[HR]` (14)
-- `async def list_open_hr_chats(session: AsyncSession) -> list[tuple[HR, int]]` (17)
-- `def _hr_counts_query(sort_by: str)` (39)
+- `async def list_hrs_for_backfill(session: AsyncSession) -> list[HR]` (12)
+- `def _hr_counts_query(sort_by: str)` (38)
 - `async def _last_company_by_hr(session: AsyncSession) -> dict[int, str]` (26)
 - `async def _unread_by_hr(session: AsyncSession) -> dict[int, int]` (17)
-- `def _found_page(rows, search: str | None, limit: int | None, offset: int)` (13)
-- `async def list_hr_with_counts(session: AsyncSession, search: str | None=None, *, limit: int | None=None, offset: int=0, sort_by: str='vacancy_count') -> tuple[list[HrWithCount], bool]` (34)
+- `async def list_hr_with_counts(session: AsyncSession, search: str | None=None, *, limit: int | None=None, offset: int=0, sort_by: str='vacancy_count') -> tuple[list[HrWithCount], bool]` (45)
 - `async def list_hrs_for_company(session: AsyncSession, company_id: int) -> list[tuple[HR, int]]` (16)
 - `async def list_hrs_with_unread(session: AsyncSession) -> list[dict]` (30)
 
-### `backend/repository/merging.py` — 48 строк
+### `backend/repository/merging.py` — 54 строк
 
 Общее у слияния двух записей об одном предмете.
 
 Зависит от: —
 
-- `async def load_merge_pair(session: AsyncSession, model, *, absorbed_id: int, survivor_id: int, subject: str)` (18)
+- `async def load_merge_pair(session: AsyncSession, model, *, absorbed_id: int, survivor_id: int, subject: str)` (24)
 - `def concat_notes(survivor: str | None, absorbed: str | None) -> str | None` (12)
 
-### `backend/repository/messages.py` — 339 строк ⚠ подошёл к 300
+### `backend/repository/messages.py` — 344 строк ⚠ подошёл к 300
 
 Хранение переписки с HR.
 
@@ -1285,21 +1283,22 @@ First-run bootstrap: ensure DB schema exists.
 - `async def mark_outgoing_read(session: AsyncSession, hr_id: int, up_to_tg_id: int, now: datetime) -> int` (27)
 - `async def overwrite_message_text(session: AsyncSession, hr_id: int, tg_message_id: int, *, is_incoming: bool, text: str) -> int` (36)
 - `async def hr_ids_of_live_messages(session: AsyncSession, *where) -> set[int]` (20)
-- `async def newest_tg_message_id(session: AsyncSession, hr_id: int) -> int` (15)
+- `async def newest_tg_message_id(session: AsyncSession, hr_id: int) -> int` (18)
 - `async def tombstone_messages(session: AsyncSession, *where) -> int` (31)
 - `async def find_outgoing_message(session: AsyncSession, hr_id: int, tg_message_id: int) -> Message | None` (17)
 - `async def save_outgoing_message(session: AsyncSession, out: OutgoingMessage) -> tuple[Message, bool]` (36)
-- `def _older_than(q, before_id: int | None, before_sent_at: datetime | None)` (26)
-- `async def list_messages_for_hr(session: AsyncSession, hr_id: int, *, limit: int=50, before_id: int | None=None, before_sent_at: datetime | None=None) -> tuple[list[Message], bool]` (29)
+- `def _older_than(q, before_id: int | None, before_sent_at: datetime | None)` (25)
+- `async def list_messages_for_hr(session: AsyncSession, hr_id: int, *, limit: int=50, before_id: int | None=None, before_sent_at: datetime | None=None) -> tuple[list[Message], bool]` (32)
 - `async def count_unread_incoming(session: AsyncSession) -> int` (11)
 
-### `backend/repository/paging.py` — 46 строк
+### `backend/repository/paging.py` — 61 строк
 
 Страница ответа репозитория и признак продолжения, который знает режущий.
 
 Зависит от: —
 
 - `def trim_page(rows: list[T], limit: int | None) -> tuple[list[T], bool]` (12)
+- `def searched_page(rows: list[T], matches, limit: int | None, offset: int) -> tuple[list[T], bool]` (11)
 - `def slice_page(rows: list[T], limit: int | None, offset: int) -> tuple[list[T], bool]` (13)
 
 ### `backend/repository/profile.py` — 486 строк ⚠ подошёл к 300
@@ -1452,12 +1451,14 @@ First-run bootstrap: ensure DB schema exists.
 - `async def set_vacancy_hr(session: AsyncSession, vacancy_id: int, hr_id: int | None) -> bool` (5)
 - `async def set_vacancy_company(session: AsyncSession, vacancy_id: int, company_id: int | None) -> bool` (5)
 
-### `backend/repository/vacancies_common.py` — 56 строк
+### `backend/repository/vacancies_common.py` — 91 строк
 
 Чтение вакансий, общее для всех экранов.
 
 Зависит от: `backend.models`
 
+- `def by_vacancy_count(label)` (13)
+- `def with_vacancy_counts(subject, link, label)` (17)
 - `async def count_by_status(session: AsyncSession, *conditions) -> dict[VacancyStatus, int]` (21)
 
 ### `backend/repository/vacancies_ghosting.py` — 93 строк
@@ -1676,18 +1677,18 @@ Runtime settings layer.
 
 - `class Api` (14)
 
-### `client/bridge/blacklist.py` — 168 строк
+### `client/bridge/blacklist.py` — 171 строк
 
 Экран «Контакты / Чёрный список»: чем окно правит отсев.
 
 Зависит от: `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.hub`, `client.bridge.refusals`, `client.bridge.wire`, `client.form_payloads`
 
-- `class Blacklist` (155)
+- `class Blacklist` (158)
   - `def list(self) -> dict` (12)
     - `async def run() -> dict` (4)
   - `def candidates(self, kind: str) -> dict` (15)
     - `async def run() -> dict` (6)
-  - `def create(self, payload: dict | None=None) -> dict` (33)
+  - `def create(self, payload: dict | None=None) -> dict` (36)
     - `async def run() -> dict` (14)
   - `def update(self, payload: dict) -> dict` (36)
     - `async def run() -> dict` (16)
@@ -1825,14 +1826,14 @@ Runtime settings layer.
 - `def _wake(waiters: list[tuple[asyncio.AbstractEventLoop, asyncio.Future]]) -> None` (6)
 - `def _finish(waiter: asyncio.Future) -> None` (3)
 
-### `client/bridge/hr.py` — 307 строк ⚠ подошёл к 300
+### `client/bridge/hr.py` — 309 строк ⚠ подошёл к 300
 
 Экран «Контакты / HR»: список людей, их карточка и правки в ней.
 
 Зависит от: `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.hr_chat`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.media`, `client.bridge.page`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`, `client.form_payloads`
 
 - `async def create_hr_row(session, fields: dict, **echo) -> int` (15)
-- `class Hr(HrChat)` (267)
+- `class Hr(HrChat)` (269)
   - `def list(self, payload: dict | None=None) -> dict` (33)
     - `async def run() -> dict` (17)
   - `def detail(self, hr_id: int) -> dict` (27)
@@ -1845,7 +1846,7 @@ Runtime settings layer.
     - `async def run() -> dict` (18)
   - `def delete(self, hr_id: int) -> dict` (13)
     - `async def run() -> dict` (8)
-  - `def block(self, hr_id: int) -> dict` (19)
+  - `def block(self, hr_id: int) -> dict` (21)
     - `async def run() -> dict` (5)
   - `def unblock(self, hr_id: int) -> dict` (15)
     - `async def run() -> dict` (5)
@@ -3330,22 +3331,22 @@ Runtime settings layer.
 Тестов: 9
 
 
-### `tests/backend/test_repository_blacklist_candidates.py` — 179 строк
+### `tests/backend/test_repository_blacklist_candidates.py` — 209 строк
 
 Следствия сбора подсказок для окна добавления в чёрный список.
 
 Зависит от: `backend.repository.blacklist_candidates`, `tests.dbio`, `tests.factories`
 
-Тестов: 9
+Тестов: 10
 
 
-### `tests/backend/test_repository_blacklist_editing.py` — 80 строк
+### `tests/backend/test_repository_blacklist_editing.py` — 104 строк
 
 Следствия правки значения и причины у строки чёрного списка.
 
 Зависит от: `backend.models`, `backend.repository.blacklist`, `tests.dbio`, `tests.factories`
 
-Тестов: 5
+Тестов: 6
 
 
 ### `tests/backend/test_repository_blacklist_listing.py` — 31 строк
@@ -3438,11 +3439,11 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/backend/test_repository_channel_marks.py` — 20 строк
+### `tests/backend/test_repository_channel_marks.py` — 25 строк
 
 Следствия записи канала в чёрный список.
 
-Зависит от: `backend.repository.channels`, `tests.factories`
+Зависит от: `backend.repository.blacklist_marks`, `backend.repository.channels`, `tests.factories`
 
 Тестов: 2
 
@@ -3498,11 +3499,11 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `tests/backend/test_repository_company_card.py` — 193 строк
+### `tests/backend/test_repository_company_card.py` — 196 строк
 
 Следствия сборки карточки компании для боковой панели контактов.
 
-Зависит от: `backend.repository.companies_card`, `backend.repository.hr_list`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.repository.blacklist_marks`, `backend.repository.companies_card`, `backend.repository.hr_list`, `tests.dbio`, `tests.factories`
 
 Тестов: 10
 
@@ -3571,13 +3572,13 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/backend/test_repository_hr_blacklist_marks.py` — 115 строк
+### `tests/backend/test_repository_hr_blacklist_marks.py` — 139 строк
 
 Следствия сопоставления HR со строками чёрного списка.
 
-Зависит от: `backend.repository.hr_card`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.blacklist_marks`, `backend.repository.hr_card`, `tests.dbio`, `tests.factories`
 
-Тестов: 7
+Тестов: 8
 
 
 ### `tests/backend/test_repository_hr_card.py` — 140 строк
@@ -3625,13 +3626,13 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_repository_hr_list_catchup.py` — 73 строк
+### `tests/backend/test_repository_hr_list_catchup.py` — 25 строк
 
 Следствия перечней, с которых бот догоняет пропущенное после простоя.
 
 Зависит от: `backend.repository.hr_list`, `tests.dbio`, `tests.factories`
 
-Тестов: 3
+Тестов: 1
 
 
 ### `tests/backend/test_repository_hr_list_filter.py` — 64 строк
@@ -3661,13 +3662,13 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `tests/backend/test_repository_hr_merge.py` — 167 строк
+### `tests/backend/test_repository_hr_merge.py` — 208 строк
 
 Следствия слияния двух записей об одном человеке.
 
 Зависит от: `backend.models`, `backend.repository.hr_card`, `tests.dbio`, `tests.factories`
 
-Тестов: 10
+Тестов: 11
 
 
 ### `tests/backend/test_repository_hr_removal.py` — 96 строк
@@ -3697,13 +3698,13 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `tests/backend/test_repository_message_paging.py` — 221 строк
+### `tests/backend/test_repository_message_paging.py` — 201 строк
 
 Следствия чтения переписки страницами.
 
 Зависит от: `backend.repository.messages`, `tests.dbio`, `tests.factories`
 
-Тестов: 10
+Тестов: 9
 
 - `async def texts(session, hr_id, **kwargs) -> tuple[list[str], bool]` (4)
 

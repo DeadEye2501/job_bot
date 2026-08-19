@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, func, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.funnel import APPLIED, FIT_EXCLUDE, RESPONDED, percent_or_none
@@ -11,12 +11,16 @@ from backend.models import TelegramChannel, TrashEvent, Vacancy
 from backend.payloads import ChannelDetail, ChannelStats, ChannelWithCount
 
 from backend.repository.blacklist_marks import (
+    marked_by,
     active_blacklist_value,
-    preferred_blacklist_value,
     active_blacklist_values,
 )
 from backend.repository.search import matches_search
-from backend.repository.vacancies_common import PARSED_ONLY, count_by_status
+from backend.repository.vacancies_common import (
+    PARSED_ONLY,
+    count_by_status,
+    with_vacancy_counts,
+)
 from backend.repository.vacancies_life import repoint_vacancies
 
 logger = logging.getLogger(__name__)
@@ -63,18 +67,14 @@ def channel_blacklist_candidates(ch: TelegramChannel) -> list[str]:
     return [f"@{ch.username}"]
 
 
-def channel_blacklist_preferred_value(ch: TelegramChannel) -> str | None:
-    return preferred_blacklist_value(channel_blacklist_candidates(ch))
-
-
 def _is_blacklisted(ch: TelegramChannel, bl_values: set[str]) -> bool:
     """Отмечен ли канал одной из активных строк, прочитанных заранее.
 
     Отдельное объявление, потому что зовущих трое — перечень, разовый проход
-    и сплошное включение, — и разойдись они, канал считался бы отмеченным на
-    одном экране и чистым на другом.
+    и сплошное включение, — и вписанный трижды перечень написаний канала
+    разошёлся бы с ними молча. Само сравнение общее у трёх предметов.
     """
-    return any(c in bl_values for c in channel_blacklist_candidates(ch))
+    return marked_by(channel_blacklist_candidates(ch), bl_values)
 
 
 async def _channel_blacklist_value(
@@ -102,17 +102,8 @@ def _channels_with_counts_query():
     title_or_username = func.coalesce(
         TelegramChannel.title, TelegramChannel.username
     )
-    return (
-        select(TelegramChannel, func.count(Vacancy.id).label("cnt"))
-        .outerjoin(
-            Vacancy,
-            and_(Vacancy.source_channel_id == TelegramChannel.id, PARSED_ONLY),
-        )
-        .group_by(TelegramChannel.id)
-        .order_by(
-            func.count(Vacancy.id).desc(),
-            title_or_username.asc(),
-        )
+    return with_vacancy_counts(
+        TelegramChannel, Vacancy.source_channel_id, title_or_username
     )
 
 

@@ -2,19 +2,22 @@
 
 Одного человека в списке можно записать двумя способами — ником или
 идентификатором Telegram, — и написание выбирают в момент добавления, когда
-известно не всё. Поэтому поиск проверяет оба, а кнопка «добавить» пишет одно.
+известно не всё. Поэтому поиск проверяет оба, а кнопка «добавить» пишет одно —
+несменяемое.
 """
 
-from backend.repository.hr_card import get_hr_detail, hr_blacklist_candidates, hr_blacklist_preferred_value
+from backend.models import HR
+from backend.repository.blacklist_marks import preferred_blacklist_value
+from backend.repository.hr_card import get_hr_detail, hr_blacklist_candidates
 from tests.dbio import put
 from tests.factories import blacklist_row, hr_row
 
 
 def test_both_spellings_are_offered_for_lookup():
-    """Для поиска предлагаются оба написания сразу."""
+    """Для поиска предлагаются оба написания сразу, несменяемое первым."""
     hr = hr_row(telegram_username="maria", telegram_user_id=111)
 
-    assert hr_blacklist_candidates(hr) == ["@maria", "user_id:111"]
+    assert hr_blacklist_candidates(hr) == ["user_id:111", "@maria"]
 
 
 def test_a_missing_identifier_drops_its_spelling():
@@ -30,20 +33,41 @@ def test_a_missing_identifier_drops_its_spelling():
     ) == []
 
 
-def test_the_button_writes_the_readable_spelling_when_there_is_one():
-    """Кнопка добавления пишет ник, а к идентификатору отступает только без него.
+def test_the_button_writes_the_spelling_that_cannot_change():
+    """Кнопка добавления пишет номер учётной записи, а к нику отступает без него.
 
-    На экране чёрного списка ник читается, а голое число — нет.
+    Ник у собеседника сменяемый, и Telegram переписывает его в карточке при
+    каждом входящем письме; номер не меняется никогда. Читается на экране
+    хуже, но отметка, слетающая от смены ника, не отсеивает никого.
     """
-    assert hr_blacklist_preferred_value(
-        hr_row(telegram_username="maria", telegram_user_id=111)
-    ) == "@maria"
-    assert hr_blacklist_preferred_value(
-        hr_row(telegram_username=None, telegram_user_id=111)
-    ) == "user_id:111"
-    assert hr_blacklist_preferred_value(
-        hr_row(telegram_username=None, telegram_user_id=None)
-    ) is None
+    def written(**identity) -> str | None:
+        return preferred_blacklist_value(hr_blacklist_candidates(hr_row(**identity)))
+
+    assert written(telegram_username="maria", telegram_user_id=111) == "user_id:111"
+    assert written(telegram_username="maria", telegram_user_id=None) == "@maria"
+    assert written(telegram_username=None, telegram_user_id=None) is None
+
+
+async def test_a_mark_survives_a_renamed_account(session, session_factory):
+    """Отметка держится, когда собеседник сменил ник.
+
+    Ровно за этим кнопка и пишет номер: Telegram отдаёт новый ник с первым же
+    письмом, карточка его перезаписывает — и отметка, заведённая на прежний,
+    перестала бы совпадать. Отсев тогда молча снимается, а строка в списке
+    продолжает гореть: на экране всё выглядит так, будто он работает.
+    """
+    hr = hr_row(name="Анна", telegram_username="Recruiter_Anna", telegram_user_id=777)
+    await put(session_factory, hr)
+    await put(session_factory, blacklist_row("hr", "user_id:777"))
+
+    async with session_factory() as telegram_said:
+        row = await telegram_said.get(HR, hr.id)
+        row.telegram_username = "recruiter_anna"
+        await telegram_said.commit()
+
+    assert (
+        await get_hr_detail(session, hr.id)
+    ).blacklist_value == "user_id:777"
 
 
 async def test_the_card_shows_the_mark_written_under_either_spelling(

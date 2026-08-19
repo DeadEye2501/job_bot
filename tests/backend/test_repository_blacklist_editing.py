@@ -18,6 +18,30 @@ async def test_editing_a_missing_row_reports_failure(session):
     assert await update_blacklist(session, 10_000, value="@x") is False
 
 
+async def test_a_value_taken_by_a_row_of_the_same_kind_is_refused(
+    session, session_factory
+):
+    """Занятое значение отменяет правку, но занятое другим родом — нет.
+
+    Заведение двойника не допускает: повторное «в отсев» поднимает найденную
+    строку вместо второй. Дай правке обойти это — и в списке окажутся два
+    ряда с одним написанием, а гасить их человеку придётся по одному, не
+    понимая, почему отметка не снимается. Род при этом входит в сравнение:
+    компанию и человека зовут одинаково чаще, чем кажется, а отметку каждый
+    экран ищет своим родом.
+    """
+    taken = blacklist_row("hr", "@maria")
+    other_kind = blacklist_row("company", "Ромашка")
+    edited = blacklist_row("hr", "@olga")
+    await put(session_factory, taken, other_kind, edited)
+
+    with pytest.raises(BlacklistUpdateError):
+        await update_blacklist(session, edited.id, value="@maria")
+    assert (await session.get(Blacklist, edited.id)).value == "@olga"
+
+    assert await update_blacklist(session, edited.id, value="Ромашка") is True
+
+
 async def test_an_unnamed_field_is_left_untouched(session, session_factory):
     """Не названное в вызове поле остаётся прежним — и это верно для обоих.
 

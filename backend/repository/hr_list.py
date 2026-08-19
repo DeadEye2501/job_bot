@@ -1,50 +1,26 @@
 """Перечни HR со счётчиками."""
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company, HR, Message, Vacancy
 from backend.payloads import HrWithCount
 
-from backend.repository.blacklist_marks import active_blacklist_values
+from backend.repository.blacklist_marks import active_blacklist_values, marked_by
 from backend.repository.hr_card import LAST_VACANCY_ORDER, hr_blacklist_candidates
 from backend.repository.hr_identify import HAS_TELEGRAM_IDENTITY
 from backend.repository.messages import UNREAD_INCOMING
-from backend.repository.paging import slice_page
+from backend.repository.paging import searched_page
 from backend.repository.search import matches_search
-from backend.repository.vacancies_common import PARSED_ONLY
-
-_HR_BY_VACANCY_COUNT = (func.count(Vacancy.id).desc(), HR.name.asc())
-"""Порядок «кто принёс больше вакансий», а при равенстве — по имени.
-
-Одно объявление на два перечня — общий и по компании: разойдись они, один и
-тот же человек стоял бы в двух списках по-разному без всякой причины.
-"""
-
-
-async def _with_last_incoming_id(
-    session: AsyncSession, hrs: list[HR]
-) -> list[tuple[HR, int]]:
-    """Каждому человеку — наибольший `tg_message_id` входящего, что у нас
-    уже есть, или ноль. С этой границы догон и продолжает читать.
-    """
-    result: list[tuple[HR, int]] = []
-    for hr in hrs:
-        last_seen = (
-            await session.scalars(
-                select(func.max(Message.tg_message_id)).where(
-                    Message.hr_id == hr.id, Message.is_incoming
-                )
-            )
-        ).first()
-        result.append((hr, last_seen or 0))
-    return result
+from backend.repository.vacancies_common import (
+    PARSED_ONLY,
+    by_vacancy_count,
+    with_vacancy_counts,
+)
 
 
 async def list_hrs_for_backfill(session: AsyncSession) -> list[HR]:
     """Все, до кого можно дотянуться в Telegram, — с них бот и догоняет.
-
-    Шире `list_open_hr_chats`: тот берёт только тех, кому мы писали первыми.
 
     Одних людей, без отметки «докуда уже прочитано»: догон читает хвост
     переписки целиком и отбивает повторы номером сообщения, а границу сверки
@@ -57,25 +33,6 @@ async def list_hrs_for_backfill(session: AsyncSession) -> list[HR]:
     )
 
 
-async def list_open_hr_chats(
-    session: AsyncSession,
-) -> list[tuple[HR, int]]:
-    hrs = list(
-        (
-            await session.scalars(
-                select(HR)
-                .where(HR.telegram_user_id.is_not(None))
-                .where(
-                    select(Message.id)
-                    .where(Message.hr_id == HR.id, ~Message.is_incoming)
-                    .exists()
-                )
-            )
-        ).all()
-    )
-    return await _with_last_incoming_id(session, hrs)
-
-
 def _hr_counts_query(sort_by: str):
     """Люди со счётчиком вакансий, в порядке, которого просит зовущий.
 
@@ -85,12 +42,7 @@ def _hr_counts_query(sort_by: str):
     по убыванию, пустые в конец, дальше по имени.
     """
     if sort_by != "last_activity":
-        return (
-            select(HR, func.count(Vacancy.id).label("cnt"))
-            .outerjoin(Vacancy, and_(Vacancy.hr_id == HR.id, PARSED_ONLY))
-            .group_by(HR.id)
-            .order_by(*_HR_BY_VACANCY_COUNT)
-        )
+        return with_vacancy_counts(HR, Vacancy.hr_id, HR.name)
     # Пре-агрегируем последнюю переписку отдельным GROUP BY hr_id вместо
     # коррелированного scalar-subquery в ORDER BY: иначе SQLite заново
     # сканировал бы message-таблицу по разу на каждого HR при сортировке.
@@ -105,11 +57,15 @@ def _hr_counts_query(sort_by: str):
         .group_by(Message.hr_id)
         .subquery()
     )
+    # Поверх общего запроса, а не вторым его написанием: счёт вакансий у
+    # обеих веток один и тот же, и разойдись они, вкладка контактов показывала
+    # бы не то число, что подборщик. Прежний порядок при этом снимается —
+    # здесь наверху не плодовитые, а те, с кем говорили последними.
     return (
-        select(HR, func.count(Vacancy.id).label("cnt"))
-        .outerjoin(Vacancy, and_(Vacancy.hr_id == HR.id, PARSED_ONLY))
+        with_vacancy_counts(HR, Vacancy.hr_id, HR.name)
         .outerjoin(last_act_subq, last_act_subq.c.hr_id == HR.id)
-        .group_by(HR.id, last_act_subq.c.last_act)
+        .group_by(last_act_subq.c.last_act)
+        .order_by(None)
         .order_by(
             last_act_subq.c.last_act.desc().nullslast(),
             HR.name.asc(),
@@ -164,21 +120,6 @@ async def _unread_by_hr(session: AsyncSession) -> dict[int, int]:
     return {hr_id: int(n) for hr_id, n in rows}
 
 
-def _found_page(rows, search: str | None, limit: int | None, offset: int):
-    """Строки, подходящие под искомое, из них страница и есть ли за ней ещё.
-
-    Отбор идёт в Python (см. :func:`backend.repository.search.matches_search`),
-    и страница отрезается после него — почему, сказано у `paging.slice_page`.
-    Без предела возвращается всё: так это окно связывания и звало всегда.
-    """
-    found = [
-        (hr, cnt)
-        for hr, cnt in rows
-        if matches_search(search, hr.name, hr.telegram_username)
-    ]
-    return slice_page(found, limit, offset)
-
-
 async def list_hr_with_counts(
     session: AsyncSession,
     search: str | None = None,
@@ -189,15 +130,28 @@ async def list_hr_with_counts(
 ) -> tuple[list[HrWithCount], bool]:
     """Страница людей со счётом вакансий и последней компанией, и есть ли за ней ещё.
 
-    Used by the "Связать с HR" picker AND the Contacts/HR pane (05).
+    Зовут двое — подборщик «Связать с HR» и вкладка контактов.
+
+    **Доводов пять, и свёртке они не подлежат.** Три из них — страница и
+    отбор, и группа тут настоящая, но объявление под неё уже есть в мосте
+    (`client/bridge/page.py`), вместе с режимом показа и порядковым знаком —
+    тем, чего репозиторию знать нельзя. Второе такое же объявление в
+    репозитории разошлось бы с первым молча: соседний перечень компаний
+    просит страницу теми же словами и уже сегодня без порядка.
 
     Договор с зовущим разошёлся по помощникам: порядок — ``sort_by``,
     :func:`_hr_counts_query`; отбор по ``search`` и страница ``limit``/
-    ``offset`` — :func:`_found_page`; ``last_company_name`` —
-    :func:`_last_company_by_hr`.
+    ``offset`` — `paging.searched_page`; ``last_company_name`` —
+    :func:`_last_company_by_hr`. Без предела возвращается всё: так это окно
+    связывания и звало всегда.
     """
     rows = (await session.execute(_hr_counts_query(sort_by))).all()
-    counts, has_more = _found_page(rows, search, limit, offset)
+    counts, has_more = searched_page(
+        rows,
+        lambda row: matches_search(search, row[0].name, row[0].telegram_username),
+        limit,
+        offset,
+    )
     last_co = await _last_company_by_hr(session)
     unread_by_hr = await _unread_by_hr(session)
     bl_values = await active_blacklist_values(session, "hr")
@@ -207,9 +161,7 @@ async def list_hr_with_counts(
             vacancy_count=int(cnt or 0),
             last_company_name=last_co.get(hr.id),
             unread_count=unread_by_hr.get(hr.id, 0),
-            is_blacklisted=any(
-                c in bl_values for c in hr_blacklist_candidates(hr)
-            ),
+            is_blacklisted=marked_by(hr_blacklist_candidates(hr), bl_values),
         )
         for hr, cnt in counts
     ], has_more
@@ -227,7 +179,7 @@ async def list_hrs_for_company(
             .join(Vacancy, Vacancy.hr_id == HR.id)
             .where(Vacancy.company_id == company_id, PARSED_ONLY)
             .group_by(HR.id)
-            .order_by(*_HR_BY_VACANCY_COUNT)
+            .order_by(*by_vacancy_count(HR.name))
         )
     ).all()
     return [(hr, int(cnt or 0)) for hr, cnt in rows]

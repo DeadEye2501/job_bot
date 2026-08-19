@@ -12,10 +12,7 @@ from backend.payloads import CompanyDetail, str_list, text_or_none
 
 from backend.repository.vacancies_common import PARSED_ONLY
 from backend.repository.blacklist import rename_blacklist_marks
-from backend.repository.blacklist_marks import (
-    active_blacklist_value,
-    preferred_blacklist_value,
-)
+from backend.repository.blacklist_marks import active_blacklist_value
 from backend.repository.merging import concat_notes, load_merge_pair
 from backend.repository.vacancies_life import repoint_vacancies
 
@@ -72,10 +69,6 @@ def company_blacklist_candidates(co: Company) -> list[str]:
     (см. `preferred_blacklist_value`).
     """
     return [co.name] if co.name else []
-
-
-def company_blacklist_preferred_value(co: Company) -> str | None:
-    return preferred_blacklist_value(company_blacklist_candidates(co))
 
 
 async def _company_blacklist_value(
@@ -174,6 +167,9 @@ async def update_company_fields(
     `aliases`, `notes`, — и отдельными доводами вызов перевалил бы за предел
     правила 5. Отсутствие ключа и значит «не трогать», поэтому и метка
     «не задано» здесь не нужна: `None` в наборе — это «стереть».
+
+    Имена полей набора никто здесь не сверяет: набирает его мост, отбирая
+    известные ключи из нагрузки окна, и незнакомому взяться неоткуда.
 
     Ложь возвращается в двух случаях: компании с таким номером нет и имя
     задано пустым. Второй случай отменяет весь вызов, а не одно поле: имя

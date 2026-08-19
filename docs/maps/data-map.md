@@ -876,7 +876,6 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `LAST_VACANCY_ORDER` = `набор из 2`
-- `_HR_FIELD_UNSET` = `object()`
 - `class _AbsorbedHr`
   - `telegram_user_id: int | None`
   - `telegram_username: str | None`
@@ -887,10 +886,6 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `HAS_TELEGRAM_IDENTITY` = `or_(HR.telegram_user_id.is_not(None), HR.telegra…`
-
-### `backend/repository/hr_list.py`
-
-- `_HR_BY_VACANCY_COUNT` = `набор из 2`
 
 ### `backend/repository/messages.py`
 

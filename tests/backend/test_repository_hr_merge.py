@@ -108,6 +108,47 @@ async def test_a_survivor_without_an_account_adopts_the_other_one_with_its_chat(
     assert kept.telegram_username == "dubl"
 
 
+async def test_a_letter_both_records_already_have_is_kept_once(
+    session, session_factory
+):
+    """Письмо, попавшее в обе переписки, слияние переживает в одном числе.
+
+    Две карточки одного человека — это одна переписка Telegram, и номера
+    писем у них общие: наша отправка легла под ту карточку, из чата которой
+    её послали, а её эхо — под ту, которую нашло опознание. Переезд без
+    сверки упирается в уникальность `(hr_id, tg_message_id, is_incoming)`,
+    сделка откатывается целиком, и дубль карточек становится неустранимым.
+
+    Направление входит в сверку: под тем же номером у поглощаемой лежит и
+    письмо другой стороны, и его переезд ничему не мешает — выбрось из
+    сверки признак «входящее», и слияние съело бы настоящую строку.
+    """
+    absorbed = hr_row(name="из телеграма", telegram_user_id=222)
+    survivor = hr_row(name="заведён руками", telegram_user_id=None)
+    await put(session_factory, absorbed, survivor)
+    await put(
+        session_factory,
+        message_row(text="эхо", hr_id=absorbed.id, tg_message_id=500),
+        message_row(text="наше", hr_id=survivor.id, tg_message_id=500),
+        message_row(
+            text="ответ на тот же номер",
+            hr_id=absorbed.id,
+            tg_message_id=500,
+            is_incoming=False,
+        ),
+        message_row(text="только у поглощённой", hr_id=absorbed.id, tg_message_id=501),
+    )
+
+    await merge_hr(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
+
+    rows = (await session.scalars(select(Message))).all()
+    assert sorted((m.text, m.hr_id) for m in rows) == [
+        ("наше", survivor.id),
+        ("ответ на тот же номер", survivor.id),
+        ("только у поглощённой", survivor.id),
+    ]
+
+
 async def test_a_name_is_taken_only_when_the_survivor_has_none(
     session, session_factory
 ):

@@ -164,35 +164,13 @@ async def test_an_older_message_with_a_higher_row_number_is_not_skipped(
     assert got == ["долито разбором"]
 
 
-async def test_a_cursor_without_a_time_falls_back_to_the_row_number(
-    session, session_factory
-):
-    """Указатель без времени работает по одному номеру строки.
+async def test_half_a_cursor_moves_nothing(session, session_factory):
+    """Половина указателя указателем не считается — отдаётся вся переписка.
 
-    Так ведут себя старые сборки экрана, не присылающие время. Поведение
-    оставлено ради них, и именно на нём видна беда, ради которой указатель
-    стал составным: долитое разбором старое сообщение с большим номером в
-    выдачу не попадает.
-    """
-    hr = hr_row()
-    await put(session_factory, hr)
-    shown = message_row(hr_id=hr.id, text="уже показано", sent_at=at(30))
-    await put(session_factory, shown)
-    backfilled = message_row(hr_id=hr.id, text="долито разбором", sent_at=at(10))
-    await put(session_factory, backfilled)
-
-    got, _ = await texts(session, hr.id, before_id=shown.id)
-
-    assert got == []
-
-
-async def test_a_time_without_a_row_number_moves_nothing(session, session_factory):
-    """Время без номера строки указателем не считается — отдаётся вся переписка.
-
-    Половинчатый указатель отсекать нечем: сравнение по паре требует обеих
-    её частей, а запасной путь по одному номеру без номера не работает.
-    Экран такого не шлёт, и ветка существует лишь как следствие устройства
-    охраны. Тест закрепляет сегодняшнее поведение.
+    Отсекать половиной нечем: сравнение идёт по паре, а отсечка по одному
+    номеру — это ровно та беда, ради которой указатель и стал составным:
+    долитое разбором старое письмо с большим номером выпадало из выдачи.
+    Экран шлёт обе половины или ни одной; проверяются обе половины порознь.
     """
     hr = hr_row()
     await put(session_factory, hr)
@@ -200,9 +178,11 @@ async def test_a_time_without_a_row_number_moves_nothing(session, session_factor
     edge = message_row(hr_id=hr.id, text="край", sent_at=at(20))
     await put(session_factory, older, edge)
 
-    got, _ = await texts(session, hr.id, before_sent_at=edge.sent_at)
+    by_time, _ = await texts(session, hr.id, before_sent_at=edge.sent_at)
+    by_number, _ = await texts(session, hr.id, before_id=edge.id)
 
-    assert got == ["старое", "край"]
+    assert by_time == ["старое", "край"]
+    assert by_number == ["старое", "край"]
 
 
 async def test_a_neighbouring_chat_stays_out(session, session_factory):

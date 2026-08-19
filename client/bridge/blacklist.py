@@ -52,6 +52,11 @@ class Blacklist:
         Строку с тем же родом и значением база не задваивает: погашенную
         зажигает заново, живую отдаёт как есть. Отличить это окну даёт поле
         `created`.
+
+        Пустое значение отбивает сам репозиторий, и слова у отказа его: своя
+        проверка здесь была третьей копией одного текста, а срабатывала бы
+        первой — разойдись они, человек читал бы на одном экране два разных
+        отказа об одном.
         """
         payload = payload if isinstance(payload, dict) else {}
         kind = (payload.get("kind") or "").strip()
@@ -60,8 +65,6 @@ class Blacklist:
 
         if kind not in BLACKLIST_KINDS:
             return denied("Неверный тип записи.", action="create")
-        if not value:
-            return denied("Значение не может быть пустым.", action="create")
 
         async def run() -> dict:
             try:
