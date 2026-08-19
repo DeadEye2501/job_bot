@@ -150,6 +150,12 @@ class ChannelActions:
                     f"Telegram не нашёл канал @{username}. Проверьте имя.",
                     action="create", status=status,
                 )
+            if status == "error":
+                raise Denied(
+                    f"Не вышло спросить Telegram о канале @{username}. "
+                    "Попробуйте ещё раз, причина в журнале.",
+                    action="create", status=status,
+                )
             return {
                 "channel_id": channel_id,
                 "username": username,

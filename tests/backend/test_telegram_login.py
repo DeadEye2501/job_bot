@@ -13,6 +13,7 @@ import pytest
 from pyrogram.errors import (
     BadRequest,
     FloodWait,
+    PasswordHashInvalid,
     PhoneCodeExpired,
     PhoneCodeInvalid,
     PhoneNumberInvalid,
@@ -176,13 +177,83 @@ async def test_a_second_factor_is_asked_for_when_telegram_wants_it(login, client
 async def test_a_cloud_password_that_did_not_fit_is_answered_with_a_refusal(
     login, clients
 ):
-    """Неверный облачный пароль отвечает отказом."""
-    clients.fails["check_password"] = BadRequest()
+    """Неверный облачный пароль отвечает отказом.
+
+    Именно своим родом отказа: четырёхсотым Telegram отвечает и на другое.
+    """
+    clients.fails["check_password"] = PasswordHashInvalid()
     await sent(login)
 
     step = await login.confirm_password("не тот")
 
     assert step.error == "Неверный облачный пароль."
+
+
+async def test_a_refusal_that_is_not_about_the_password_says_so(
+    login, clients, caplog
+):
+    """Отказ Telegram, не про пароль, паролем не объясняют.
+
+    Четырёхсотым Telegram отвечает и на устаревший отпечаток кода, и на
+    отозванный ключ приложения. Назови мы это неверным паролем — человек до
+    ночи перебирал бы верный, а причина лежала бы в другом месте.
+    """
+    clients.fails["check_password"] = BadRequest("SESSION_EXPIRED")
+    await sent(login)
+
+    with caplog.at_level("WARNING", logger="backend.telegram_login"):
+        step = await login.confirm_password("облачный")
+
+    assert step.error != "Неверный облачный пароль."
+    assert [rec for rec in caplog.records if rec.name == "backend.telegram_login"]
+
+
+async def test_a_rate_limit_on_the_code_is_told_in_human_words(login, clients):
+    """Запрет на шаге кода называется словами, а не именем исключения.
+
+    Тот же запрет на первом шаге давно объяснён человеку; на втором и третьем
+    он приходил как `FloodWait: 12418` — незнакомое слово и число секунд.
+    """
+    clients.fails["sign_in"] = FloodWait(value=12418)
+    await sent(login)
+
+    step = await login.confirm_code("11111")
+
+    assert "3 ч 26 мин" in step.error
+
+
+async def test_a_rate_limit_on_the_password_is_told_in_human_words(login, clients):
+    """Запрет на шаге пароля называется теми же словами, что и на первом."""
+    clients.fails["check_password"] = FloodWait(value=12418)
+    await sent(login)
+
+    step = await login.confirm_password("облачный")
+
+    assert "3 ч 26 мин" in step.error
+
+
+async def test_a_session_that_could_not_be_written_is_not_silent(
+    login, clients, monkeypatch, caplog
+):
+    """Не записавшаяся сессия отвечает отказом, а не броском наружу.
+
+    Вывезенная строка сеанса живёт один раз: клиент к этому мигу отключён, и
+    второй раз её взять неоткуда. Улети беда броском — окно показало бы
+    «сломалось», а человек не понял бы, что вход надо повторить.
+    """
+    from backend.runtime_settings import RuntimeSettings
+
+    async def no_room(self, **fields):
+        raise OSError("на диске нет места")
+
+    monkeypatch.setattr(RuntimeSettings, "set_tg", no_room)
+    await sent(login)
+
+    with caplog.at_level("ERROR", logger="backend.telegram_login"):
+        step = await login.confirm_code("11111")
+
+    assert step.error is not None
+    assert step.payload is None
 
 
 async def test_a_confirmed_code_saves_the_session_and_closes_the_client(

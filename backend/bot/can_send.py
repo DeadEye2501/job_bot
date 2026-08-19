@@ -19,7 +19,6 @@ from backend.repository.hr_card import hr_blacklist_value
 NO_TARGET = "нет адресата"
 BOT_OFF = "бот выключен"
 BLACKLISTED = "чёрный список"
-DRY_RUN = "тестовый режим"
 SENDING_LOCKED = "отправка заглушена"
 
 
@@ -39,8 +38,9 @@ async def can_send_to_hr(bot, hr) -> SendPermission:
 
     Порядок стоит по цене: адресат и режим читаются из того, что уже под
     рукой, чёрный список — единственный, кто идёт в базу, и потому стоит за
-    ними. Замки последние: они снимаются одним переключателем, а всё, что
-    выше, пользователь чинит по-настоящему — и узнать об этом ему полезнее.
+    ними. Замок отправки последний: он снимается одним переключателем, а всё,
+    что выше, пользователь чинит по-настоящему — и узнать об этом ему
+    полезнее.
     """
     target = telegram_peer(hr)
     if target is None:
@@ -53,8 +53,6 @@ async def can_send_to_hr(bot, hr) -> SendPermission:
         return SendPermission(
             target=target, refusal=BLACKLISTED, blacklist_value=blacklisted
         )
-    if bot.dry_run:
-        return SendPermission(target=target, refusal=DRY_RUN)
     if telegram.SEND_LOCKED:
         return SendPermission(target=target, refusal=SENDING_LOCKED)
     return SendPermission(target=target)

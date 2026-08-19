@@ -24,6 +24,7 @@ ANSWERS = {
     "read": 1,
     "sent": 1,
     "refusal": None,
+    "log_out_refusal": None,
     "channel_poll": "ok",
     "detached": 0,
     "added": (1, "created"),
@@ -84,6 +85,8 @@ class UiBot:
 
     async def log_out_session(self) -> None:
         self.calls.append(("log_out_session",))
+        if self.answers["log_out_refusal"] is not None:
+            raise RuntimeError(self.answers["log_out_refusal"])
 
     async def poll_channel_now(self, channel_id: int) -> str:
         self.calls.append(("poll_channel_now", channel_id))

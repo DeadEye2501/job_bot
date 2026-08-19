@@ -4,6 +4,8 @@ import logging
 
 from typing import Literal
 
+from pyrogram.errors import UsernameInvalid, UsernameNotOccupied
+
 from backend.bot import slot
 from backend.telegram_lookup import read_channel_metadata
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
@@ -60,15 +62,18 @@ async def delete_channel(bot, channel_id: int) -> int | None:
 
 async def add_channel(
     bot, username: str
-) -> tuple[int | None, Literal["created", "exists", "invalid"]]:
+) -> tuple[int | None, Literal["created", "exists", "invalid", "error"]]:
     """Validate against Telegram and insert a TelegramChannel.
 
     Returns a status tuple:
     - ``(id, "exists")`` — row уже была; UI выбирает её и тостит «уже добавлен».
     - ``(id, "created")`` — новая строка с подгруженными title/avatar.
-    - ``(None, "invalid")`` — Telegram не знает такой канал; ничего
+    - ``(None, "invalid")`` — Telegram не знает такого имени; ничего
       не пишем в БД, чтобы пользователь не накапливал зомби-ряды без
       title/avatar после опечаток.
+    - ``(None, "error")`` — спросить Telegram не вышло вовсе: сеть, запрет
+      частоты, закрытый канал. Имя при этом может быть верным, и говорить
+      человеку «проверьте имя» здесь нельзя.
 
     Метаданные тянем ДО инсёрта одним `get_chat`-вызовом — он же
     выступает валидатором существования.
@@ -80,9 +85,12 @@ async def add_channel(
 
     try:
         chat = await bot.client.get_chat(username)
+    except (UsernameNotOccupied, UsernameInvalid):
+        logger.info("add_channel: Telegram не знает канала @%s", username)
+        return None, "invalid"
     except Exception:
         logger.exception("add_channel: get_chat(%s) failed", username)
-        return None, "invalid"
+        return None, "error"
     if chat is None:
         return None, "invalid"
 

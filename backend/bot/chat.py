@@ -8,7 +8,6 @@ from pathlib import Path
 from backend.models import BotMode
 from backend.models import HR
 from backend.models import Message
-from backend.domain.telegram_identity import telegram_peer
 from backend.payloads import OutgoingMessage
 from backend.telegram_time import tg_moment
 from backend.repository.messages import mark_incoming_read
@@ -19,16 +18,24 @@ from backend.bot import media
 
 logger = logging.getLogger(__name__)
 
+EMPTY_MESSAGE = "Пустое сообщение."
+"""Отказ на пустой текст письма.
+
+Объявлен здесь, а спрашивают его двое: сам заслон отправки и мост, который
+отбивает пустое поле ещё до бота. Порознь эти два написания разъехались бы, а
+человек видит их на одном экране."""
+
 
 async def mark_hr_chat_read(bot, hr_id: int) -> int:
-    """Mark all incoming HR messages as read in the DB AND in Telegram.
+    """Погасить непрочитанное этого HR в базе и в Telegram; сказать, сколько.
 
-    OFF mode short-circuits: nothing is written, nothing is pinged.
-    Returns the number of DB rows updated. The Pyrogram call propagates
-    the read receipt to the user's other clients (phone, desktop). When
-    the HR has no telegram_user_id we still update the DB but skip the
-    Pyrogram side — the Telegram-side read receipt will arrive later
-    through ``UpdateReadHistoryInbox`` when the user opens it elsewhere.
+    Выключенный бот не делает ни того ни другого: «выключен» значит, что он не
+    трогает ни базу, ни Telegram.
+
+    Отметку в Telegram видит живой человек на том конце, поэтому она проходит
+    через общий заслон отправки, а не через один режим: при «симуляции
+    отправки» и у отсеянного собеседника наружу не уходит ничего. Счётчик в
+    окне при этом гасится — прочитанное всё равно прочитано.
     """
     if (await bot.current_mode()) is BotMode.OFF:
         return 0
@@ -37,21 +44,35 @@ async def mark_hr_chat_read(bot, hr_id: int) -> int:
         hr = await session.get(HR, hr_id)
         if hr is None:
             return 0
-        target = telegram_peer(hr)
         updated = await mark_incoming_read(session, hr_id, now)
         await session.commit()
 
-    if updated > 0 and target is not None:
-        try:
-            await bot.client.read_chat_history(target)
-        except Exception:
-            logger.exception(
-                "read_chat_history failed for hr %d", hr_id,
-                extra={"hr_id": hr_id},
-            )
     if updated > 0:
+        await _tell_telegram_it_is_read(bot, hr, hr_id)
         logger.debug("Marked %d msgs read for hr %d", updated, hr_id)
     return updated
+
+
+async def _tell_telegram_it_is_read(bot, hr: HR, hr_id: int) -> None:
+    """Погасить подсветку у собеседника и на своих остальных клиентах.
+
+    Сорвавшаяся отметка местную не отменяет: счётчик непрочитанного в окне
+    важнее подсветки на телефоне, и откатывать первое из-за второго было бы
+    обменом не в ту сторону.
+    """
+    permission = await can_send.can_send_to_hr(bot, hr)
+    if permission.refusal is not None:
+        logger.debug(
+            "read receipt for hr %d held back: %s", hr_id, permission.refusal
+        )
+        return
+    try:
+        await bot.client.read_chat_history(permission.target)
+    except Exception:
+        logger.exception(
+            "read_chat_history failed for hr %d", hr_id,
+            extra={"hr_id": hr_id},
+        )
 
 
 _REFUSAL_TEXTS = {
@@ -60,7 +81,6 @@ _REFUSAL_TEXTS = {
     ),
     can_send.BOT_OFF: "Бот выключен. Включите DM Only или Full.",
     can_send.BLACKLISTED: "HR в blacklist ({value}). Сначала уберите из blacklist.",
-    can_send.DRY_RUN: "Отправка отключена: тестовый режим.",
     can_send.SENDING_LOCKED: "Отправка отключена: защита от случайной отправки.",
 }
 
@@ -112,7 +132,7 @@ async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message:
 
     clean = (text or "").strip()
     if not clean:
-        raise RuntimeError("Пустое сообщение.")
+        raise RuntimeError(EMPTY_MESSAGE)
 
     pyro_msg = await bot.client.send_message(target, clean)
     logger.info(

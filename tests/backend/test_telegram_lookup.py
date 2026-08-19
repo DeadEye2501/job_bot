@@ -43,6 +43,25 @@ async def test_a_flood_wait_yields_no_avatar_and_does_not_raise():
     assert await fetch_telegram_avatar(client, entity) is None
 
 
+async def test_a_flood_wait_without_a_number_still_reaches_the_log(caplog):
+    """Запрет без названного срока запись в журнале не съедает.
+
+    Срок Telegram называет не всегда. Собери запись числом — на месте срока
+    оказалась бы строка, сборка сообщения упала бы, и в журнале не осталось
+    бы ничего: ни срока, ни самого запрета.
+    """
+    client = FakeTelegramClient(fails={"download_media": FloodWait()})
+    entity = user(photo=photo(small_file_id="small-1"))
+
+    with caplog.at_level(logging.WARNING, logger="backend.telegram_lookup"):
+        assert await fetch_telegram_avatar(client, entity) is None
+
+    assert [
+        rec for rec in caplog.records
+        if rec.name == "backend.telegram_lookup" and "FloodWait" in rec.getMessage()
+    ]
+
+
 async def test_a_failed_download_leaves_its_trace_in_the_log(caplog):
     """Сорванное скачивание аватара оставляет в журнале трассировку.
 

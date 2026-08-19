@@ -62,6 +62,26 @@ async def test_a_letter_nobody_could_have_written_is_ignored(session_factory, de
     assert await all_rows(session_factory, Message) == []
 
 
+async def test_the_taken_letter_names_its_correspondent(session_factory, deliver):
+    """Принятое письмо называет собеседника, чьё оно.
+
+    По этому номеру окно узнаёт, какую переписку перерисовать. Спрашивать его
+    второй раз, уже в слое оповещений, значило бы завести там свою сессию —
+    а обработчик оповещений отстреливает на каждое событие сервера.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777))
+    hr = await only_row(session_factory, HR)
+
+    assert await deliver(incoming()) == hr.id
+
+
+async def test_a_letter_nobody_writes_back_to_names_nobody(session_factory, deliver):
+    """Письмо незнакомца собеседника не называет: окну говорить не о чем."""
+    await put(session_factory, hr_row(telegram_user_id=777))
+
+    assert await deliver(incoming(user_id=999)) is None
+
+
 async def test_a_letter_from_a_stranger_is_not_saved(session_factory, deliver):
     """Письмо от незаведённого собеседника не сохраняется.
 

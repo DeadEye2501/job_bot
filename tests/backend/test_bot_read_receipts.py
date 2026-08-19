@@ -133,7 +133,9 @@ async def test_an_already_read_message_is_not_touched_again(
     assert saved.read_at.replace(tzinfo=timezone.utc) == first_read
 
 
-async def test_the_read_mark_goes_to_telegram_too(chatting, session_factory):
+async def test_the_read_mark_goes_to_telegram_too(
+    chatting, session_factory, sending_unlocked
+):
     """Отметка уходит и в Telegram: телефон тоже гасит подсветку."""
     bot, client, hr = await chatting(telegram_user_id=777)
     await put(session_factory, message_row(hr_id=hr.id, is_incoming=True, read_at=None))
@@ -144,7 +146,7 @@ async def test_the_read_mark_goes_to_telegram_too(chatting, session_factory):
 
 
 async def test_an_hr_known_only_by_name_is_marked_read_by_name(
-    chatting, session_factory
+    chatting, session_factory, sending_unlocked
 ):
     """У HR без номера отметка уходит по имени.
 
@@ -169,6 +171,24 @@ async def test_an_hr_without_an_address_is_still_marked_read_locally(
     прочитанное всё равно прочитано.
     """
     bot, client, hr = await chatting(telegram_username=None, telegram_user_id=None)
+    await put(session_factory, message_row(hr_id=hr.id, is_incoming=True, read_at=None))
+
+    assert await bot.mark_hr_chat_read(hr.id) == 1
+
+    assert (await only_row(session_factory, Message)).read_at is not None
+    assert client.read_calls == []
+
+
+async def test_a_simulated_sending_holds_the_read_mark_back(
+    chatting, session_factory
+):
+    """При «симуляции отправки» отметка в Telegram не уходит.
+
+    Её видит живой человек на том конце: собеседник, которому мы ничего не
+    отправляли, узнаёт, что его письмо прочитали. Замок ставят как раз затем,
+    чтобы наружу не ушло ничего, — а непрочитанное в окне гасится по-прежнему.
+    """
+    bot, client, hr = await chatting(telegram_user_id=777)
     await put(session_factory, message_row(hr_id=hr.id, is_incoming=True, read_at=None))
 
     assert await bot.mark_hr_chat_read(hr.id) == 1

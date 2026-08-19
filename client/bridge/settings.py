@@ -7,7 +7,7 @@ import logging
 
 from adapters.lm_studio import LlmProviderConfig
 from backend.telegram_login import username_of
-from client.bridge.answer import denied, reply
+from client.bridge.answer import Denied, denied, reply
 from client.bridge.bot_stop import stop_bot
 from client.bridge.hub import Hub
 from client.bridge.llm import Llm, read_llm_creds
@@ -131,6 +131,11 @@ class Settings(Login, Llm):
         останься он работать, следующий его запрос ушёл бы с учётными данными,
         которых в настройках уже нет. И только после этого стирается сеанс,
         отчего экран и лампочка показывают «нет сессии».
+
+        Не отозвавшийся ключ учётную запись не стирает. Сеанс на серверах
+        Telegram живёт дальше и продолжает читать переписку; стерев настройки,
+        мы оставили бы человека уверенным в обратном — и отозвать ключ было бы
+        уже нечем, строки сеанса в настройках не осталось бы.
         """
         bot = self._hub.bot
         bot_task = self._hub.bot_task
@@ -141,9 +146,21 @@ class Settings(Login, Llm):
 
         async def run() -> dict:
             await self._hub.login.forget()
-            await stop_bot(
-                bot, bot_task, bot.log_out_session if bot is not None else None
-            )
+            try:
+                await stop_bot(
+                    bot, bot_task, bot.log_out_session if bot is not None else None
+                )
+            except Exception as e:
+                logger.exception("выход: ключ на сервере не отозван")
+                raise Denied(
+                    "Telegram не отозвал ключ, учётная запись осталась на месте. "
+                    f"Попробуйте ещё раз: {type(e).__name__}: {e}"
+                ) from e
+            if bot is None:
+                # Отзывать было нечем: бот не поднят. Настройки стираются —
+                # иначе выйти было бы нельзя вовсе, — но след остаётся: ключ
+                # на серверах Telegram отзовёт только сам человек.
+                logger.warning("выход без поднятого бота: ключ на сервере не отозван")
             await self._hub.rs.clear_tg()
             self._hub.username_cache = ""
             return {}
@@ -160,9 +177,7 @@ class Settings(Login, Llm):
         входить, а зов туда стоит целого круга по мотору и ждёт ответа своим
         сроком — ради работы, которой нет.
         """
-        # Через `getattr`, как у соседа в `lifespan`: хозяйство заводит вход
-        # само, но спрашивают его и до подъёма — из стенда, где вход подменён.
-        if not getattr(self._hub.login, "active", False):
+        if not self._hub.login.active:
             return {"ok": {}}
 
         async def run() -> dict:
@@ -184,7 +199,9 @@ class Settings(Login, Llm):
         if getattr(client, "is_connected", False):
             asked = await username_of(client)
             if asked is None:
-                logger.warning("ник для настроек спросить не вышло", exc_info=True)
+                # Без трассировки: беду поймал и записал сам `username_of`,
+                # а здесь живого исключения нет — вышло бы «NoneType: None».
+                logger.warning("ник для настроек спросить не вышло")
         if asked is None:
             return self._hub.username_cache
         # Пустая строка — это ответ «ника нет», и он перебивает запомненное:

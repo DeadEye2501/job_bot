@@ -135,7 +135,7 @@ def deliver(session_factory):
     """
 
     async def run(msg, *, client=None, schedule=None):
-        await process_dm(
+        return await process_dm(
             msg,
             None,
             "qwen",

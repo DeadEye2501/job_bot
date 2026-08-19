@@ -55,21 +55,42 @@ async def test_the_bot_becomes_ready_only_after_the_client_starts(
     """Готовность объявляется после подключения клиента, а не до.
 
     До этого мига обращение из окна попало бы в полусобранное состояние.
+    Смотрим оба края подъёма: сам `client.start` и первую работу цикла сразу
+    за ним.
     """
     bot, client, _ = await chatting(mode=BotMode.OFF)
-    wire(bot, FakeIngestion())
+    pipeline = FakeIngestion()
+    wire(bot, pipeline)
     seen: list[bool] = []
 
     async def start():
         seen.append(bot.is_ready)
         client.lifecycle.append("запуск")
 
+    recover = pipeline.recover_orphan_vacancies
+
+    async def recover_and_look():
+        seen.append(bot.is_ready)
+        return await recover()
+
     client.start = start
+    pipeline.recover_orphan_vacancies = recover_and_look
 
     await bot.run(once=True)
 
-    assert seen == [False]
-    assert bot.is_ready is True
+    assert seen == [False, True]
+
+
+async def test_a_bot_that_left_the_loop_is_not_ready_any_more(chatting, caught_up):
+    """Вышедший из цикла бот готовым больше не считается.
+
+    Готовность спрашивает лампочка связи в окне. Останься она истиной после
+    выхода, человек видел бы зелёный огонёк у бота, который уже отключил
+    клиента и закрыл соединения с моделью.
+    """
+    bot, _, _ = await _one_turn(chatting, BotMode.OFF)
+
+    assert bot.is_ready is False
 
 
 async def test_a_turn_picks_up_vacancies_left_half_parsed(chatting, caught_up):
@@ -284,6 +305,29 @@ async def test_a_broken_disconnect_does_not_leave_connections_open(
     wire(bot, FakeIngestion())
 
     await bot.run(once=True)
+
+    assert bot.lm_client.closed == 1
+
+
+async def test_a_connection_that_never_came_up_still_closes_the_rest(
+    chatting, caught_up
+):
+    """Сорвавшийся подъём соединения оставляет соединения с моделью закрытыми.
+
+    Клиент Telegram не поднялся — сеть, отозванный ключ, занятый порт, — а два
+    клиента модели уже открыты: собирают их до подъёма. Пройди подъём мимо
+    разборки, они пережили бы бота и держали бы гнёзда до конца работы
+    приложения.
+    """
+    from tests.fakes.telegram import FakeTelegramClient
+
+    bot, client, _ = await chatting(
+        client=FakeTelegramClient(fails={"start": OSError("сеть")})
+    )
+    wire(bot, FakeIngestion())
+
+    with pytest.raises(OSError):
+        await bot.run(once=True)
 
     assert bot.lm_client.closed == 1
 

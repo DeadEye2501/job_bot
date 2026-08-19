@@ -67,6 +67,26 @@ async def test_a_cancelled_channel_poll_frees_the_slot(make_bot):
     assert bot.current_poll_task is None
 
 
+async def test_cancelling_the_whole_loop_is_not_taken_for_a_cancelled_poll(
+    make_bot,
+):
+    """Отмена самого цикла отменой прогона не считается и уходит наружу.
+
+    Окно, закрываясь, отменяет работу целиком. Прими место прогона эту отмену
+    за свою — цикл спокойно пошёл бы дальше и погасил соединения под живой
+    задачей обхода: та осталась бы читать канал и писать в закрытую базу.
+    """
+    bot = wire(await make_bot(), FakeIngestion(hangs=True))
+    running = asyncio.create_task(bot.poll_channel_now(7))
+    await asyncio.sleep(0)
+
+    running.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await running
+    assert bot.current_poll_task is None
+
+
 async def test_a_failed_channel_poll_frees_the_slot_too(make_bot):
     """Сбой прогона тоже освобождает место и сообщает об ошибке."""
     bot = wire(await make_bot(), FakeIngestion(error=RuntimeError("сорвалось")))

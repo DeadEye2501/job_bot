@@ -88,7 +88,7 @@ Job Bot — single CLI entry point.
 
 - `def make_client(config: LlmProviderConfig) -> httpx.AsyncClient` (9)
 
-### `adapters/telegram.py` — 102 строк
+### `adapters/telegram.py` — 101 строк
 
 Сборка клиента Telegram и отправка письма его руками.
 
@@ -149,16 +149,16 @@ First-run bootstrap: ensure DB schema exists.
 - `def alembic_config() -> Config` (10)
 - `def ensure_schema() -> None` (9)
 
-### `backend/bot/can_send.py` — 60 строк
+### `backend/bot/can_send.py` — 58 строк
 
 Один ответ на вопрос «можно ли писать этому HR» — окну и конвейеру.
 
 Зависит от: `adapters`, `backend.domain.telegram_identity`, `backend.models`, `backend.repository.hr_card`
 
 - `class SendPermission` (8)
-- `async def can_send_to_hr(bot, hr) -> SendPermission` (24)
+- `async def can_send_to_hr(bot, hr) -> SendPermission` (23)
 
-### `backend/bot/channels.py` — 112 строк
+### `backend/bot/channels.py` — 120 строк
 
 Правка каналов из окна: заведение, удаление, чтение по требованию.
 
@@ -166,23 +166,24 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def poll_channel_now(bot, channel_id: int) -> Literal['ok', 'busy', 'missing', 'blacklisted', 'cancelled', 'error']` (31)
 - `async def delete_channel(bot, channel_id: int) -> int | None` (7)
-- `async def add_channel(bot, username: str) -> tuple[int | None, Literal['created', 'exists', 'invalid']]` (39)
+- `async def add_channel(bot, username: str) -> tuple[int | None, Literal['created', 'exists', 'invalid', 'error']]` (45)
 - `async def force_poll_once(bot) -> Literal['ok', 'busy', 'cancelled', 'error']` (11)
 
-### `backend/bot/chat.py` — 201 строк
+### `backend/bot/chat.py` — 221 строк
 
 Переписка с HR из окна: отправка текста, файла и отметка о прочтении.
 
-Зависит от: `backend.bot`, `backend.domain.telegram_identity`, `backend.models`, `backend.payloads`, `backend.repository.messages`, `backend.telegram_time`
+Зависит от: `backend.bot`, `backend.models`, `backend.payloads`, `backend.repository.messages`, `backend.telegram_time`
 
-- `async def mark_hr_chat_read(bot, hr_id: int) -> int` (32)
+- `async def mark_hr_chat_read(bot, hr_id: int) -> int` (25)
+- `async def _tell_telegram_it_is_read(bot, hr: HR, hr_id: int) -> None` (20)
 - `async def _target_or_refuse(bot, hr_id: int) -> int | str` (18)
 - `async def _persist_outgoing(bot, outgoing: OutgoingMessage) -> Message` (10)
 - `async def send_to_hr_chat(bot, hr_id: int, text: str) -> Message` (32)
 - `def _checked_kind(src: Path, file_path: str) -> bool` (28)
 - `async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message` (38)
 
-### `backend/bot/client.py` — 325 строк ⚠ подошёл к 300
+### `backend/bot/client.py` — 328 строк ⚠ подошёл к 300
 
 Сборка бота: его состояние, соединения и поверхность, которой пользуется окно.
 
@@ -193,21 +194,21 @@ First-run bootstrap: ensure DB schema exists.
 - `def _declare_loop_controls(bot) -> None` (15)
 - `def _declare_ui_hooks(bot) -> None` (37)
 - `def _forward_pipeline_hooks(bot) -> None` (17)
-- `class Bot` (158)
+- `class Bot` (161)
   - `def is_ready(self) -> bool` (7)
   - `def is_connected(self) -> bool` (13)
   - `def kick(self) -> None` (8)
   - `def request_stop(self) -> None` (8)
   - `async def poll_channel_now(self, channel_id) -> Literal['ok', 'busy', 'missing', 'blacklisted', 'cancelled', 'error']` (4)
   - `async def delete_channel(self, channel_id) -> int | None` (2)
-  - `async def add_channel(self, username) -> tuple[int | None, Literal['created', 'exists', 'invalid']]` (2)
+  - `async def add_channel(self, username) -> tuple[int | None, Literal['created', 'exists', 'invalid', 'error']]` (4)
   - `def cancel_current_poll(self) -> None` (2)
   - `async def force_poll_once(self) -> Literal['ok', 'busy', 'cancelled', 'error']` (2)
   - `async def mark_hr_chat_read(self, hr_id) -> int` (2)
   - `async def send_to_hr_chat(self, hr_id, text) -> Message` (2)
   - `async def send_to_hr_media(self, hr_id, file_path) -> Message` (2)
   - `async def ui_send_vacancy_application(self, vacancy_id) -> tuple[bool, str]` (2)
-  - `async def send(self, hr, text, attachment=None, vacancy_id=None, *, force=False) -> bool` (2)
+  - `async def send(self, hr, text, attachment=None, vacancy_id=None, *, force=False) -> bool` (6)
   - `async def _on_raw_update(self, _client, update, _users, _chats) -> None` (2)
   - `async def _on_dm_edit(self, _client, msg) -> None` (2)
   - `async def _on_dm_delete(self, _client, messages) -> None` (2)
@@ -219,20 +220,20 @@ First-run bootstrap: ensure DB schema exists.
   - `async def ui_rerun_vacancy_pipeline(self, vacancy_id) -> Literal['ok', 'busy', 'missing', 'no_text', 'llm', 'cancelled', 'error']` (4)
   - `async def ui_forget_vacancy(self, vacancy_id) -> bool` (2)
 
-### `backend/bot/loop.py` — 239 строк
+### `backend/bot/loop.py` — 244 строк
 
 Жизненный цикл соединения: режим работы, главный цикл, выход из сеанса.
 
 Зависит от: `adapters`, `backend.bot`, `backend.flows.dm_backfill`, `backend.models`, `backend.runtime_settings`
 
-- `async def log_out_session(bot) -> None` (14)
+- `async def log_out_session(bot) -> None` (17)
 - `async def current_mode(bot) -> BotMode` (6)
-- `async def _connect(bot) -> None` (26)
-- `async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None` (27)
+- `async def _connect(bot) -> None` (24)
+- `async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None` (26)
 - `async def _tick(bot, mode: BotMode) -> None` (21)
 - `async def _sleep_until_wake(bot) -> None` (17)
-- `async def _disconnect(bot) -> None` (28)
-- `async def run(bot, *, once: bool=False) -> None` (40)
+- `async def _disconnect(bot) -> None` (32)
+- `async def run(bot, *, once: bool=False) -> None` (41)
 - `async def persist_session_if_changed(bot) -> None` (31)
 
 ### `backend/bot/media.py` — 167 строк
@@ -258,7 +259,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def ui_rerun_vacancy_pipeline(bot, vacancy_id: int) -> Literal['ok', 'busy', 'missing', 'no_text', 'llm', 'cancelled', 'error']` (25)
 
-### `backend/bot/send.py` — 303 строк ⚠ подошёл к 300
+### `backend/bot/send.py` — 321 строк ⚠ подошёл к 300
 
 Доставка отклика в Telegram: вложение, ограничения сервиса, след в базе.
 
@@ -267,6 +268,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _applied_label(force: bool) -> str` (3)
 - `def _shares_provider(a, b) -> bool` (12)
 - `async def ui_send_vacancy_application(bot, vacancy_id: int) -> tuple[bool, str]` (6)
+- `class Errand` (12)
 - `class _Outcome` (15)
 - `async def _note_flood_wait(bot, error) -> None` (15)
 - `async def _clear_flood_wait(bot) -> None` (12)
@@ -277,9 +279,9 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _hand_over(bot, permission, text: str, attachment, vacancy_id) -> tuple[int | None, bool]` (19)
 - `async def _audit_sent(bot, hr_id: int, chars: int, outcome: _Outcome) -> None` (21)
 - `async def _record_send(bot, hr: HR, text: str, outcome: _Outcome, permission) -> None` (22)
-- `async def send(bot, hr: HR, text: str, attachment=None, vacancy_id: int | None=None, *, force: bool=False) -> bool` (33)
+- `async def send(bot, hr: HR, text: str, attachment=None, errand: Errand=Errand()) -> bool` (36)
 
-### `backend/bot/slot.py` — 94 строк
+### `backend/bot/slot.py` — 107 строк
 
 Единственное место прогона: пока оно занято, второй цикл получает отказ.
 
@@ -287,21 +289,21 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def on_runner_loop(bot, action: Callable[[], Any]) -> None` (14)
 - `def cancel_current_poll(bot) -> None` (7)
-- `async def _run_task(bot, work: Callable[[], Any], label: str)` (18)
+- `async def _run_task(bot, work: Callable[[], Any], label: str)` (31)
 - `async def run_in_slot(bot, work: Callable[[], Any], label: str, progress: tuple[str, str, int, int] | None=None) -> tuple[CycleOutcome, Any]` (32)
 
-### `backend/bot/updates.py` — 138 строк
+### `backend/bot/updates.py` — 120 строк
 
 Обработчики оповещений Telegram: входящее, эхо, правка, удаление, отметка о прочтении.
 
-Зависит от: `backend.flows`, `backend.flows.dm`, `backend.message_text`, `backend.models`, `backend.notify`, `backend.repository.hr_identify`
+Зависит от: `backend.flows`, `backend.flows.dm`, `backend.message_text`, `backend.models`, `backend.notify`
 
 - `async def _muted(bot) -> bool` (8)
 - `async def on_raw_update(bot, _client, update, _users, _chats) -> None` (18)
 - `async def on_dm_edit(bot, _client, msg) -> None` (18)
 - `async def on_dm_delete(bot, _client, messages) -> None` (9)
 - `async def on_dm_outgoing(bot, _client, msg) -> None` (13)
-- `async def on_dm(bot, _client, msg) -> None` (36)
+- `async def on_dm(bot, _client, msg) -> None` (19)
 
 ### `backend/crypto.py` — 107 строк
 
@@ -486,7 +488,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def forget_vacancy(pipeline, vacancy_id: int) -> bool` (15)
 - `async def delete_vacancy_as_trash(pipeline, vacancy_id: int, reason: str | None) -> None` (11)
 
-### `backend/flows/dm.py` — 287 строк
+### `backend/flows/dm.py` — 293 строк
 
 Личная переписка с HR: запись сообщения в обе стороны, привязка, разбор.
 
@@ -501,7 +503,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _incoming_row(msg, hr_id: int, vacancy_id: int | None, attachment: _Attachment) -> IncomingMessage` (18)
 - `async def _save_incoming(session_factory, msg, attachment: _Attachment, avatar)` (36)
 - `async def _status_open_for_reply(session_factory, vacancy_id: int)` (14)
-- `async def process_dm(msg, lm_client, lm_chat_model, session_factory, *, client=None, schedule_classification=None) -> None` (41)
+- `async def process_dm(msg, lm_client, lm_chat_model, session_factory, *, client=None, schedule_classification=None) -> int | None` (47)
 
 ### `backend/flows/dm_backfill.py` — 359 строк ⚠ подошёл к 300
 
@@ -892,7 +894,7 @@ First-run bootstrap: ensure DB schema exists.
   - `def doRollover(self) -> None` (16)
   - `def handleError(self, record: logging.LogRecord) -> None` (2)
 
-### `backend/log_secrets.py` — 150 строк
+### `backend/log_secrets.py` — 152 строк
 
 Вымарывание секретов из журнала — включая тот случай, когда запись сломалась.
 
@@ -1522,7 +1524,7 @@ Runtime settings layer.
 - `def _take_the_lock(fd: int) -> bool` (23)
 - `def hold_the_only_copy(lock_path: Path | str)` (38)
 
-### `backend/telegram_login.py` — 296 строк
+### `backend/telegram_login.py` — 322 строк ⚠ подошёл к 300
 
 Вход в Telegram по коду: четыре шага и состояние между ними.
 
@@ -1533,28 +1535,29 @@ Runtime settings layer.
 - `async def username_of(client) -> str | None` (14)
 - `def _flood_wait_refusal(e) -> str` (12)
 - `def _humanize_duration(seconds: int) -> str` (9)
-- `class TelegramLogin` (200)
+- `class TelegramLogin` (225)
   - `def awaiting_code(self) -> bool` (7)
   - `def awaiting_password(self) -> bool` (8)
   - `def active(self) -> bool` (3)
   - `async def forget(self) -> None` (10)
   - `def _new_client(self, api_id: int, api_hash: str, phone: str) -> PyrogramClient` (14)
   - `async def send_code(self, api_id: int, api_hash: str, phone: str) -> LoginStep` (33)
-  - `async def confirm_code(self, code: str) -> LoginStep` (20)
-  - `async def confirm_password(self, password: str) -> LoginStep` (13)
+  - `async def confirm_code(self, code: str) -> LoginStep` (22)
+  - `async def confirm_password(self, password: str) -> LoginStep` (23)
   - `def _drop(self) -> None` (10)
   - `async def _failed(self, client, message: str) -> LoginStep` (5)
-  - `async def _save(self) -> LoginStep` (37)
+  - `async def _save(self) -> LoginStep` (46)
 
-### `backend/telegram_lookup.py` — 93 строк
+### `backend/telegram_lookup.py` — 101 строк
 
 Что берётся у Telegram по дороге, а не ради самого похода.
 
 Зависит от: `backend.domain.telegram_identity`
 
 - `async def read_channel_metadata(client, chat, *, current_avatar: bytes | None=None) -> tuple[str | None, bytes | None]` (20)
-- `async def fetch_telegram_avatar(client, entity) -> bytes | None` (27)
-- `async def resolve_hr_telegram(client, hr_contact: str)` (20)
+- `async def _quietly(what: str, asking)` (21)
+- `async def fetch_telegram_avatar(client, entity) -> bytes | None` (20)
+- `async def resolve_hr_telegram(client, hr_contact: str)` (12)
 
 ### `backend/telegram_time.py` — 31 строк
 
@@ -1627,7 +1630,7 @@ Runtime settings layer.
   - `def set_active(self, payload: dict) -> dict` (33)
     - `async def run() -> dict` (12)
 
-### `client/bridge/bot_stop.py` — 72 строк
+### `client/bridge/bot_stop.py` — 73 строк
 
 Остановка бота: попросить и дождаться.
 
@@ -1635,13 +1638,13 @@ Runtime settings layer.
 
 - `async def stop_bot(bot, bot_task: Future | None, asking: Callable[[], Awaitable[None]] | None=None, timeout: float=STOP_TIMEOUT_S) -> None` (36)
 
-### `client/bridge/channel_actions.py` — 245 строк
+### `client/bridge/channel_actions.py` — 251 строк
 
 Что окно делает с каналом: опрос, курсор, чёрный список, состав.
 
 Зависит от: `backend.domain.telegram_identity`, `backend.repository`, `client.bridge.answer`, `client.bridge.mark`, `client.bridge.refusals`, `client.form_payloads`
 
-- `class ChannelActions` (233)
+- `class ChannelActions` (239)
   - `def block(self, channel_id: int) -> dict` (16)
     - `async def run() -> dict` (5)
   - `def unblock(self, channel_id: int) -> dict` (14)
@@ -1651,8 +1654,8 @@ Runtime settings layer.
     - `async def run() -> dict` (9)
   - `def delete(self, channel_id: int) -> dict` (21)
     - `async def run() -> dict` (12)
-  - `def create(self, payload: dict | None=None) -> dict` (40)
-    - `async def run() -> dict` (17)
+  - `def create(self, payload: dict | None=None) -> dict` (46)
+    - `async def run() -> dict` (23)
   - `def set_active(self, payload: dict) -> dict` (24)
   - `async def _switched(self, channel_id: int, is_active: bool) -> dict` (31)
   - `def set_all_active(self, payload: dict) -> dict` (26)
@@ -1785,11 +1788,11 @@ Runtime settings layer.
   - `def create(self, payload: dict) -> dict` (20)
     - `async def run() -> dict` (4)
 
-### `client/bridge/hr_chat.py` — 157 строк
+### `client/bridge/hr_chat.py` — 158 строк
 
 Переписка с человеком: страница сообщений, отправка, прочтение.
 
-Зависит от: `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.bot.chat`, `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.wire`
 
 - `class HrChat` (143)
   - `def messages(self, payload: dict) -> dict` (20)
@@ -1826,23 +1829,25 @@ Runtime settings layer.
     - `async def run() -> dict` (2)
   - `def _push_record(self, entry: dict) -> None` (16)
 
-### `client/bridge/lifespan.py` — 223 строк
+### `client/bridge/lifespan.py` — 270 строк
 
 Жизнь моста при окне: от подъёма хозяйства до его гашения.
 
 Зависит от: `backend.bot.client`, `backend.telegram_login`, `client.bridge.bot_stop`, `client.bridge.hub`, `client.bridge.journal`
 
-- `def start(runner, session_factory, rs, engine=None) -> Hub` (19)
+- `def start(runner, session_factory, rs, engine=None) -> Hub` (20)
 - `def stop(hub: Hub) -> None` (35)
-- `def start_bot(hub: Hub) -> None` (18)
+- `def start_bot(hub: Hub) -> None` (23)
 - `def _ready_for_bot(rs) -> bool` (9)
 - `def _forget_login(hub: Hub) -> None` (14)
 - `def _start_bot(hub: Hub) -> None` (21)
   - `async def _build_and_run() -> None` (8)
 - `def _tell_the_window(bot, hub: Hub) -> None` (33)
   - `def arrived(hr_id: int) -> None` (3)
-- `def _remember_login(hub: Hub, username: str | None) -> None` (10)
-- `def _log_if_crashed(future: Future) -> None` (11)
+- `def _restart_bot(hub: Hub) -> None` (23)
+  - `async def _swap() -> None` (7)
+- `def _remember_login(hub: Hub, username: str | None) -> None` (17)
+- `def _log_if_crashed(hub: Hub, future: Future) -> None` (20)
 
 ### `client/bridge/llm.py` — 190 строк
 
@@ -1966,22 +1971,22 @@ Runtime settings layer.
   - `def stop(self) -> None` (24)
     - `async def _cancel_pending() -> None` (5)
 
-### `client/bridge/settings.py` — 266 строк
+### `client/bridge/settings.py` — 283 строк
 
 Экран «Настройки»: всё, что окно спрашивает и правит на нём.
 
 Зависит от: `adapters`, `adapters.lm_studio`, `backend.telegram_login`, `client.bridge.answer`, `client.bridge.bot_stop`, `client.bridge.hub`, `client.bridge.llm`, `client.bridge.login`, `client.bridge.wire`
 
-- `class Settings(Login, Llm)` (189)
+- `class Settings(Login, Llm)` (206)
   - `def get(self) -> dict` (29)
     - `async def run() -> dict` (20)
   - `def save(self, payload: dict | None=None) -> dict` (34)
     - `async def run() -> dict` (12)
-  - `def logout(self) -> dict` (27)
-    - `async def run() -> dict` (8)
-  - `def cancel_login(self) -> dict` (20)
+  - `def logout(self) -> dict` (44)
+    - `async def run() -> dict` (20)
+  - `def cancel_login(self) -> dict` (18)
     - `async def run() -> dict` (3)
-  - `async def _username(self) -> str` (20)
+  - `async def _username(self) -> str` (22)
   - `async def _apply_providers(self, creds: dict[str, LlmProviderConfig]) -> list[str]` (10)
   - `async def _apply_app(self, app: dict, applied: list[str]) -> list[str]` (26)
 - `async def _wait_connected(client) -> None` (8)
@@ -2207,7 +2212,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 232 модулей
+## tests — 231 модулей
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -2273,7 +2278,7 @@ Runtime settings layer.
 - `async def catch_up_everyone(client, session_factory)` (15)
 - `async def known_hr(session_factory)` (4)
 
-### `tests/backend/fixtures/bot.py` — 224 строк
+### `tests/backend/fixtures/bot.py` — 222 строк
 
 Обстановка для проверок бота: всё собрано на подделках, до сети не доходит.
 
@@ -2283,17 +2288,17 @@ Runtime settings layer.
   - `async def send_dm(self, _client, target, text, attachment=None)` (5)
 - `def row_saved_mid_send(session_factory, hr_id)` (20)
   - `async def save(answer) -> None` (10)
-- `def make_bot(session_factory, monkeypatch)` (37)
-  - `async def build(client=None, *, embed_url='http://provider.test', dry_run=False) -> Bot` (19)
+- `def make_bot(session_factory, monkeypatch)` (35)
+  - `async def build(client=None, *, embed_url='http://provider.test') -> Bot` (17)
 - `def empty_media_dir()` (13)
 - `def chatting(session_factory, make_bot)` (17)
-  - `async def build(*, mode=BotMode.FULL, client=None, dry_run=False, **hr_fields)` (6)
+  - `async def build(*, mode=BotMode.FULL, client=None, **hr_fields)` (6)
 - `async def busy_slot()` (20)
   - `def occupy(bot) -> None` (4)
 - `def sending_unlocked(monkeypatch)` (10)
 - `def outbox(monkeypatch, sending_unlocked)` (11)
 - `def ready_to_send(session_factory, make_bot)` (24)
-  - `async def build(*, status=VacancyStatus.NEW, mode=BotMode.FULL, hr=None, dry_run=False)` (13)
+  - `async def build(*, status=VacancyStatus.NEW, mode=BotMode.FULL, hr=None)` (13)
 
 ### `tests/backend/fixtures/flows.py` — 220 строк
 
@@ -2394,13 +2399,13 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/backend/test_bot_channels.py` — 164 строк
+### `tests/backend/test_bot_channels.py` — 183 строк
 
 Следствия добавления канала из окна настроек.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
-Тестов: 9
+Тестов: 10
 
 
 ### `tests/backend/test_bot_chat_media.py` — 272 строк
@@ -2443,16 +2448,17 @@ Runtime settings layer.
 
 - `def _edit(*, chat_id=777, username=None, msg_id=10, text='новая редакция', mine=False)` (14)
 
-### `tests/backend/test_bot_dm_incoming.py` — 123 строк
+### `tests/backend/test_bot_dm_incoming.py` — 120 строк
 
 Следствия входящего сообщения от HR.
 
 Зависит от: `backend.models`, `tests.fakes.telegram`
 
-Тестов: 7
+Тестов: 6
 
-- `def dm_reader(monkeypatch)` (9)
-  - `async def process_dm(msg, *args, **kwargs)` (2)
+- `def dm_reader(monkeypatch)` (18)
+  - `class Reader(list)` (6)
+    - `async def __call__(self, msg, *_args, **_kwargs)` (3)
 
 ### `tests/backend/test_bot_dm_outgoing.py` — 318 строк ⚠ подошёл к 300
 
@@ -2464,16 +2470,7 @@ Runtime settings layer.
 
 - `def _echo(*, chat_id=777, username=None, msg_id=10, text='ответ с телефона', photo=None)` (9)
 
-### `tests/backend/test_bot_dry_run.py` — 86 строк
-
-Следствия запуска в тестовом режиме.
-
-Зависит от: `backend.models`, `tests.dbio`
-
-Тестов: 5
-
-
-### `tests/backend/test_bot_logout.py` — 35 строк
+### `tests/backend/test_bot_logout.py` — 39 строк
 
 Следствия выхода из учётной записи Telegram.
 
@@ -2518,44 +2515,44 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/backend/test_bot_poll_slot.py` — 166 строк
+### `tests/backend/test_bot_poll_slot.py` — 186 строк
 
 Следствия ручного прогона, запущенного кнопкой окна.
 
 Зависит от: `tests.fakes.ingestion`
 
-Тестов: 13
+Тестов: 14
 
 
-### `tests/backend/test_bot_read_receipts.py` — 371 строк ⚠ подошёл к 300
+### `tests/backend/test_bot_read_receipts.py` — 391 строк ⚠ подошёл к 300
 
 Следствия отметок о прочтении — своих и чужих.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
-Тестов: 21
+Тестов: 22
 
 - `def _outbox_read(user_id: int, max_id: int)` (5)
 
-### `tests/backend/test_bot_run_loop.py` — 364 строк ⚠ подошёл к 300
+### `tests/backend/test_bot_run_loop.py` — 408 строк ⚠ подошёл к 300
 
 Следствия одного оборота главного цикла бота.
 
 Зависит от: `backend.bot`, `backend.models`, `tests.fakes.ingestion`, `tests.fakes.telegram`
 
-Тестов: 22
+Тестов: 24
 
 - `def caught_up(monkeypatch)` (9)
   - `async def catch_up_missed_dms(client, *args, **kwargs)` (2)
 - `async def _one_turn(chatting, mode, ingestion=None)` (9)
 
-### `tests/backend/test_bot_send_effects.py` — 282 строк
+### `tests/backend/test_bot_send_effects.py` — 308 строк ⚠ подошёл к 300
 
 Следы, которые оставляет ушедший отклик.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 16
+Тестов: 17
 
 
 ### `tests/backend/test_bot_send_mishaps.py` — 242 строк
@@ -2911,13 +2908,13 @@ Runtime settings layer.
 - `async def _two_vacancies(session_factory)` (26)
 - `def _ignore(*args)` (6)
 
-### `tests/backend/test_flows_incoming_gate.py` — 268 строк
+### `tests/backend/test_flows_incoming_gate.py` — 288 строк
 
 Кого бот слушает во входящих личных сообщениях, а кого нет.
 
 Зависит от: `backend.bot.media`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
-Тестов: 14
+Тестов: 16
 
 
 ### `tests/backend/test_flows_linked_article.py` — 141 строк
@@ -3205,7 +3202,7 @@ Runtime settings layer.
 
 - `def _parsed(**fields) -> httpx.Response` (3)
 
-### `tests/backend/test_log_buffer.py` — 495 строк ⚠ подошёл к 300
+### `tests/backend/test_log_buffer.py` — 498 строк ⚠ подошёл к 300
 
 Следствия, которые наблюдают тесты журналирования.
 
@@ -3962,26 +3959,26 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_telegram_login.py` — 286 строк
+### `tests/backend/test_telegram_login.py` — 357 строк ⚠ подошёл к 300
 
 Следствия входа в Telegram по коду.
 
 Зависит от: `backend.runtime_settings`, `backend.telegram_login`, `tests.fakes.telegram`
 
-Тестов: 18
+Тестов: 22
 
 - `def clients(monkeypatch)` (16)
   - `def build(**kwargs)` (5)
 - `async def login(session_factory, clients)` (4)
 - `async def sent(login, *, phone='+79991234567')` (3)
 
-### `tests/backend/test_telegram_lookup.py` — 127 строк
+### `tests/backend/test_telegram_lookup.py` — 146 строк
 
 Следствия, которые наблюдают тесты `backend/telegram_lookup.py`.
 
 Зависит от: `backend.telegram_lookup`, `tests.fakes.telegram`
 
-Тестов: 13
+Тестов: 14
 
 
 ### `tests/backend/test_telegram_time.py` — 47 строк
@@ -4163,15 +4160,18 @@ Runtime settings layer.
 
 - `def journal()` (20)
 
-### `tests/client/test_bridge_lifespan.py` — 105 строк
+### `tests/client/test_bridge_lifespan.py` — 197 строк
 
 Следствия подъёма и гашения моста: что окно заводит, открываясь и закрываясь.
 
 Зависит от: `backend.telegram_login`, `client.bridge`, `tests.fakes.ui_login`
 
-Тестов: 4
+Тестов: 8
 
 - `class Silent` (2)
+- `class Stoppable(Silent)` (11)
+  - `def cancel_current_poll(self) -> None` (2)
+  - `def request_stop(self) -> None` (2)
 
 ### `tests/client/test_bridge_list_payload.py` — 103 строк
 
@@ -4196,13 +4196,13 @@ Runtime settings layer.
 - `def provider_says(monkeypatch)` (15)
   - `def _answer(routes) -> None` (6)
 
-### `tests/client/test_bridge_login.py` — 139 строк
+### `tests/client/test_bridge_login.py` — 168 строк
 
 Следствия входа в Telegram: три шага, о которых окно спрашивает по одному.
 
-Зависит от: `backend.telegram_login`, `tests.fakes.ui_login`
+Зависит от: `backend.crypto`, `backend.telegram_login`, `tests.dbio`, `tests.factories`, `tests.fakes.ui_login`
 
-Тестов: 8
+Тестов: 9
 
 
 ### `tests/client/test_bridge_paging.py` — 74 строк
@@ -4589,14 +4589,14 @@ Runtime settings layer.
   - `async def log_out(self)` (3)
   - `async def export_session_string(self)` (3)
 
-### `tests/fakes/ui_bot.py` — 98 строк
+### `tests/fakes/ui_bot.py` — 101 строк
 
 Бот, каким его видит окно: обращения, которые делает мост.
 
 Зависит от: —
 
 - `class Sent` (4)
-- `class UiBot` (66)
+- `class UiBot` (68)
   - `def _refuse_if_asked(self) -> None` (3)
   - `async def force_poll_once(self) -> str` (3)
   - `def cancel_current_poll(self) -> None` (2)
@@ -4606,7 +4606,7 @@ Runtime settings layer.
   - `async def mark_hr_chat_read(self, hr_id: int) -> int` (3)
   - `async def send_to_hr_chat(self, hr_id: int, text: str) -> Sent` (4)
   - `async def send_to_hr_media(self, hr_id: int, file_path: str) -> Sent` (4)
-  - `async def log_out_session(self) -> None` (2)
+  - `async def log_out_session(self) -> None` (4)
   - `async def poll_channel_now(self, channel_id: int) -> str` (3)
   - `async def delete_channel(self, channel_id: int) -> int | None` (3)
   - `async def add_channel(self, username: str) -> tuple[int | None, str]` (3)
@@ -4845,6 +4845,7 @@ Runtime settings layer.
 - `Journal` — наследник один: `System`
 - `Llm` — наследник один: `Settings`
 - `Login` — наследник один: `Settings`
+- `Silent` — наследник один: `Stoppable`
 - `VacancyActions` — наследник один: `Vacancies`
 - `VacancyLinks` — наследник один: `Vacancies`
 - `Wipe` — наследник один: `System`

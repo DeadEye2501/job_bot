@@ -45,6 +45,21 @@ async def ui_send_vacancy_application(bot, vacancy_id: int) -> tuple[bool, str]:
 
 
 @dataclass(frozen=True, slots=True)
+class Errand:
+    """По какому поводу шлём письмо: вакансия и настойчивость.
+
+    Пара, а не два довода: оба говорят об одном — откуда взялась отправка.
+    Ручная (`force`) отличается от самоотклика только тем, что переход статуса
+    ей разрешён поверх графа, и без номера вакансии это ничего не значит.
+    Разложенные доводами, они дают у отправки шесть штук — линт краснеет, а
+    зовущий путает местами два необязательных.
+    """
+
+    vacancy_id: int | None = None
+    force: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class _Outcome:
     """Чем кончилась отправка — то, что после неё надо записать.
 
@@ -269,8 +284,7 @@ async def _record_send(bot, hr: HR, text: str, outcome: _Outcome, permission) ->
 
 
 async def send(
-    bot, hr: HR, text: str, attachment=None, vacancy_id: int | None = None,
-    *, force: bool = False,
+    bot, hr: HR, text: str, attachment=None, errand: Errand = Errand(),
 ) -> bool:
     """Отправить отклик HR; сказать, считать ли отклик сделанным.
 
@@ -278,26 +292,30 @@ async def send(
     адреса, бот выключен, чёрный список, Telegram попросил подождать.
     Заглушка отказом не считается — при ней состоялось всё, кроме вызова."""
     # Заслоны те же, что у переписки из окна: одно объявление на двоих.
-    # Заглушают отправку ровно два замка, и оба названы поимённо: незнакомая
+    # Заглушает отправку ровно один замок, и назван он поимённо: незнакомая
     # причина — заведённая позже, и зачесть по ней отклик значило бы закрыть
     # вакансию от следующей попытки навсегда. Умолчание тут — отказ.
     permission = await can_send.can_send_to_hr(bot, hr)
-    suppressed = permission.refusal in (can_send.DRY_RUN, can_send.SENDING_LOCKED)
+    suppressed = permission.refusal == can_send.SENDING_LOCKED
     if permission.refusal is not None and not suppressed:
-        _log_refusal(permission, hr, vacancy_id)
+        _log_refusal(permission, hr, errand.vacancy_id)
         return False
     tg_msg_id, delivered = await _hand_over(
-        bot, permission, text, attachment, vacancy_id
+        bot, permission, text, attachment, errand.vacancy_id
     )
     if not delivered:
         return False
     # С этого момента письмо у HR (или сымитировано), и отсюда «сделано» уже
     # не зависит от того, чем кончилась запись: повторять отправку нельзя.
     await _record_send(
-        bot, hr, text, _Outcome(vacancy_id, tg_msg_id, suppressed, force), permission
+        bot,
+        hr,
+        text,
+        _Outcome(errand.vacancy_id, tg_msg_id, suppressed, errand.force),
+        permission,
     )
     # Окно узнаёт об отправке только этой вестью: зов, которым её завели,
     # ответил «пущено» задолго до того, как модель сочинила письмо.
-    if vacancy_id is not None:
+    if errand.vacancy_id is not None:
         fire(bot.on_vacancies_changed, "on_vacancies_changed")
     return True

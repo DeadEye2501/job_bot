@@ -221,6 +221,28 @@ async def test_the_timeline_records_that_an_application_went_out(
     }
 
 
+async def test_a_suppressed_application_still_counts(
+    ready_to_send, session_factory
+):
+    """Заглушенный замком отклик всё равно засчитывается вакансии.
+
+    Иначе обход с включённой «симуляцией отправки» слал бы отклик по одной и
+    той же вакансии на каждом обороте цикла — а прогонять сбор, не беспокоя
+    живых HR, надо уметь. Строки переписки при этом нет: письма никто не
+    получал.
+
+    Красной фазы не было: проверка вернулась взамен снесённой вместе с
+    «тестовым режимом» и сторожит то же следствие с другого замка. Доверие
+    заслужит итоговым проходом.
+    """
+    bot, hr, vacancy = await ready_to_send()
+
+    assert await bot.send(hr, "письмо", vacancy_id=vacancy.id) is True
+
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
+    assert await all_rows(session_factory, Message) == []
+
+
 async def test_a_suppressed_send_is_marked_as_such_in_the_timeline(
     ready_to_send, session_factory
 ):
@@ -257,10 +279,14 @@ async def test_a_send_tells_the_window_the_vacancy_changed(
 
 
 async def test_a_simulated_send_tells_the_window_too(
-    ready_to_send, session_factory, outbox
+    ready_to_send, session_factory
 ):
-    """Заглушённая отправка окну тоже рассказывает: статус-то она переставила."""
-    bot, hr, vacancy = await ready_to_send(dry_run=True)
+    """Заглушённая отправка окну тоже рассказывает: статус-то она переставила.
+
+    Замок отправки стенд держит взведённым, и снимать его здесь нечем: предмет
+    как раз в том, что весть уходит и без настоящего письма.
+    """
+    bot, hr, vacancy = await ready_to_send()
     heard = []
     bot.on_vacancies_changed = lambda: heard.append("вакансии")
 

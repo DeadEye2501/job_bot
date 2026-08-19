@@ -88,9 +88,7 @@ def make_bot(session_factory, monkeypatch):
     снята, и без записи подъём снимал бы запор с каждого поднятого бота.
     """
 
-    async def build(
-        client=None, *, embed_url="http://provider.test", dry_run=False
-    ) -> Bot:
+    async def build(client=None, *, embed_url="http://provider.test") -> Bot:
         await put(
             session_factory,
             tg_account_row(api_hash_encrypted=encrypt_str("шифр")),
@@ -106,7 +104,7 @@ def make_bot(session_factory, monkeypatch):
         monkeypatch.setattr(
             "adapters.lm_studio.make_client", lambda cfg: LmClient(cfg.base_url)
         )
-        return Bot(settings, session_factory, dry_run=dry_run)
+        return Bot(settings, session_factory)
 
     return build
 
@@ -137,10 +135,10 @@ def chatting(session_factory, make_bot):
     адресом.
     """
 
-    async def build(*, mode=BotMode.FULL, client=None, dry_run=False, **hr_fields):
+    async def build(*, mode=BotMode.FULL, client=None, **hr_fields):
         telegram_client = client if client is not None else FakeTelegramClient()
         await put(session_factory, hr_row(**hr_fields))
-        bot = await make_bot(telegram_client, dry_run=dry_run)
+        bot = await make_bot(telegram_client)
         await bot.rs.set_mode(mode)
         return bot, telegram_client, await only_row(session_factory, HR)
 
@@ -208,14 +206,14 @@ def ready_to_send(session_factory, make_bot):
     """
 
     async def build(
-        *, status=VacancyStatus.NEW, mode=BotMode.FULL, hr=None, dry_run=False
+        *, status=VacancyStatus.NEW, mode=BotMode.FULL, hr=None
     ):
         await put(
             session_factory,
             hr if hr is not None else hr_row(),
             vacancy_row(title="к отклику", status=status),
         )
-        bot = await make_bot(dry_run=dry_run)
+        bot = await make_bot()
         await bot.rs.set_mode(mode)
         saved_hr = await only_row(session_factory, HR)
         vacancy = await only_row(session_factory, Vacancy)

@@ -47,9 +47,9 @@
 
 ### `adapters/telegram.py`
 
+- `_log` = `logging.getLogger(__name__)`
 - `SESSIONS_DIR` = `get_data_dir() / 'sessions'`
 - `SESSION_NAME` = `'job_bot'`
-- `_log` = `logging.getLogger(__name__)`
 - `SEND_LOCKED` = `False`
 
 ### `adapters/teletype.py`
@@ -103,7 +103,6 @@
 - `NO_TARGET` = `'нет адресата'`
 - `BOT_OFF` = `'бот выключен'`
 - `BLACKLISTED` = `'чёрный список'`
-- `DRY_RUN` = `'тестовый режим'`
 - `SENDING_LOCKED` = `'отправка заглушена'`
 - `class SendPermission`
   - `target: int | str | None` = `None`
@@ -117,7 +116,8 @@
 ### `backend/bot/chat.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_REFUSAL_TEXTS` = `словарь из 5`
+- `EMPTY_MESSAGE` = `'Пустое сообщение.'`
+- `_REFUSAL_TEXTS` = `словарь из 4`
 
 ### `backend/bot/client.py`
 
@@ -146,6 +146,9 @@
 ### `backend/bot/send.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `class Errand`
+  - `vacancy_id: int | None` = `None`
+  - `force: bool` = `False`
 - `class _Outcome`
   - `vacancy_id: int | None`
   - `tg_message_id: int | None`
@@ -1257,7 +1260,7 @@
 
 - `class Sent`
   - `id: int`
-- `ANSWERS` = `словарь из 10`
+- `ANSWERS` = `словарь из 11`
 
 ## tools
 
