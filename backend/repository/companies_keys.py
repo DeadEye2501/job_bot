@@ -27,12 +27,21 @@ def _translit_cyr_to_latin(s: str) -> str:
     return "".join(_CYR_TO_LAT.get(ch, ch) for ch in s.lower())
 
 
-# Юр.формы, снимаемые с краёв имени до сравнения: «ПАО Сбербанк» → «sberbank».
+# Юр.формы, снимаемые с обоих краёв имени до сравнения: «ПАО Сбербанк» →
+# «sberbank». Сами по себе они не режут ничего — их берут оба перечня ниже.
 # Слова уже в латинице и нижнем регистре: транслитерация идёт раньше.
 _LEGAL_FORMS = frozenset({
-    "pao", "oao", "ao", "zao", "ooo", "jsc", "llc", "ltd", "inc", "corp",
-    "gmbh", "sa", "ag", "nv", "bv", "plc", "sas",
+    "pao", "oao", "zao", "ooo", "jsc", "llc", "ltd", "inc", "corp",
+    "gmbh", "plc", "sas",
 })
+
+# Двухбуквенные формы снимаются только с той стороны, на которой их пишут:
+# русское «АО» — впереди имени, европейские `SA`, `AG`, `NV`, `BV` — позади.
+# Двух букв слишком мало, чтобы принимать их за форму где попало: «НВ Групп»
+# со снятым `nv` даёт `grupp` и сходится с компанией «Групп» правилом имени,
+# без арбитра, — а склейка компаний необратима.
+_HEAD_LEGAL_FORMS = _LEGAL_FORMS | {"ao"}
+_TAIL_LEGAL_FORMS = _LEGAL_FORMS | {"sa", "ag", "nv", "bv"}
 
 
 _QUOTE_CHARS = set("«»\"'`“”„‚‘’")
@@ -41,15 +50,17 @@ _QUOTE_CHARS = set("«»\"'`“”„‚‘’")
 def _without_edge_legal_forms(words: list[str]) -> list[str]:
     """Слова имени без юр.форм по краям.
 
-    Только по краям: в перечне лежат и двухбуквенные — `ao`, `sa`, `ag`,
-    `nv`, `bv`, — а вырезанные посреди имени они превращают разные компании в
-    одну. «Sber AG Tech» и «Sber Tech» дали бы один ключ, и `rule_name` свёл
-    бы их без арбитра.
+    Только по краям: вырезанная посреди имени форма превращает разные
+    компании в одну. «Sber AG Tech» и «Sber Tech» дали бы один ключ, и
+    `rule_name` свёл бы их без арбитра.
+
+    Края при этом разные: двухбуквенные формы снимаются лишь с той стороны,
+    где их пишут (см. `_HEAD_LEGAL_FORMS` и `_TAIL_LEGAL_FORMS`).
     """
     start, end = 0, len(words)
-    while start < end and words[start] in _LEGAL_FORMS:
+    while start < end and words[start] in _HEAD_LEGAL_FORMS:
         start += 1
-    while end > start and words[end - 1] in _LEGAL_FORMS:
+    while end > start and words[end - 1] in _TAIL_LEGAL_FORMS:
         end -= 1
     return words[start:end]
 

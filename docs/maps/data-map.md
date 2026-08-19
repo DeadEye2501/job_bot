@@ -869,7 +869,9 @@
 ### `backend/repository/companies_keys.py`
 
 - `_CYR_TO_LAT` = `словарь из 33`
-- `_LEGAL_FORMS` = `frozenset({'pao', 'oao', 'ao', 'zao', 'ooo', 'js…`
+- `_LEGAL_FORMS` = `frozenset({'pao', 'oao', 'zao', 'ooo', 'jsc', 'l…`
+- `_HEAD_LEGAL_FORMS` = `_LEGAL_FORMS | {'ao'}`
+- `_TAIL_LEGAL_FORMS` = `_LEGAL_FORMS | {'sa', 'ag', 'nv', 'bv'}`
 - `_QUOTE_CHARS` = `set('«»"\'`“”„‚‘’')`
 - `_AGGREGATOR_HOSTS` = `frozenset({'t.me', 'telegram.me', 'telegram.org'…`
 
