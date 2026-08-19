@@ -2040,7 +2040,7 @@ Runtime settings layer.
     - `async def run() -> dict` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (16)
 
-### `client/bridge/refusals.py` — 132 строк
+### `client/bridge/refusals.py` — 143 строк
 
 Слова, которыми мост отказывает окну.
 
@@ -2187,11 +2187,11 @@ Runtime settings layer.
 
 Снос всех данных приложения по просьбе из окна.
 
-Зависит от: `backend.crypto`, `backend.wipe`, `client.bridge.answer`, `client.bridge.bot_stop`
+Зависит от: `backend.crypto`, `backend.wipe`, `client.bridge.answer`, `client.bridge.bot_stop`, `client.bridge.refusals`
 
-- `class Wipe` (53)
-  - `def wipe(self) -> dict` (41)
-    - `async def run() -> dict` (21)
+- `class Wipe` (52)
+  - `def wipe(self) -> dict` (40)
+    - `async def run() -> dict` (20)
 - `def _leave_later() -> None` (9)
 - `def _leave() -> None` (9)
 
@@ -4430,13 +4430,13 @@ Runtime settings layer.
 Тестов: 9
 
 
-### `tests/client/test_bridge_wipe.py` — 117 строк
+### `tests/client/test_bridge_wipe.py` — 149 строк
 
 Следствие удаления всех данных: в каком порядке это происходит.
 
 Зависит от: `tests.fakes.ui_bot`
 
-Тестов: 3
+Тестов: 4
 
 - `def wipe_steps(monkeypatch, hub)` (19)
   - `async def _wipe_all(engine) -> list[str]` (3)

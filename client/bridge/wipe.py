@@ -10,6 +10,7 @@ from backend.crypto import forget_master_key
 from backend.wipe import wipe_all
 from client.bridge.answer import Denied, reply
 from client.bridge.bot_stop import stop_bot
+from client.bridge.refusals import WIPE_FILES_BUSY
 
 
 logger = logging.getLogger(__name__)
@@ -61,9 +62,8 @@ class Wipe:
             except Exception:
                 logger.exception("снос: остановить бота не вышло")
 
-            errors = await wipe_all(self._hub.engine)
-            if errors:
-                raise Denied("Не все файлы удалось удалить: " + "; ".join(errors))
+            if await wipe_all(self._hub.engine):
+                raise Denied(WIPE_FILES_BUSY)
             # Ключ забываем последним: он открывает всё, что зашифровано в
             # базе, и забытый при уцелевшей базе оставляет человека с целыми
             # данными, которых уже не прочтёт никто.
