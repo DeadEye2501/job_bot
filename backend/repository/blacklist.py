@@ -153,6 +153,18 @@ def _required_value(value) -> str:
     return normalized
 
 
+async def _free_value(session: AsyncSession, row: Blacklist, value: str) -> str:
+    """Значение, если им не занята другая строка того же рода; иначе отказ.
+
+    Род входит в сравнение: компанию и человека зовут одинаково чаще, чем
+    кажется, а отметку каждый экран ищет своим родом.
+    """
+    twin = await _same_entry(session, row.kind, value)
+    if twin is not None and twin.id != row.id:
+        raise BlacklistUpdateError(f"Запись «{value}» уже есть в списке.")
+    return value
+
+
 async def update_blacklist(
     session: AsyncSession,
     blacklist_id: int,
@@ -167,20 +179,20 @@ async def update_blacklist(
     Raises ``BlacklistUpdateError`` на пустом значении — почему, сказано
     у `_required_value`.
 
+    Raises ``BlacklistUpdateError`` и на значении, занятом другой строкой
+    того же рода: заведение двойника не допускает — повторное «в отсев»
+    поднимает найденную строку вместо второй, — и правка не может быть
+    дорогой в обход. Два ряда с одним написанием человек гасил бы по одному,
+    не понимая, почему отметка не снимается.
+
     Returns False if the row is missing. Caller wraps in
     ``session.begin()``.
-
-    TODO: дедуп с другими активными рядами того же `kind` — сейчас можно
-    инлайн-эдитом сделать (kind=hr, value=@x) дублем, хотя заведение
-    (`create_blacklist`) этого не даёт. Добавить
-    проверку `select(...).where(kind == row.kind, value == new_value,
-    id != row.id)` и кидать ``BlacklistUpdateError("Уже существует")``.
     """
     row = await session.get(Blacklist, blacklist_id)
     if row is None:
         return False
     if value is not _BLACKLIST_FIELD_UNSET:
-        row.value = _required_value(value)
+        row.value = await _free_value(session, row, _required_value(value))
         await _hold_the_channel_rule(session, row.kind)
     if reason is not _BLACKLIST_FIELD_UNSET:
         row.reason = text_or_none(reason)

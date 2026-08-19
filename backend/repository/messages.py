@@ -163,9 +163,12 @@ async def hr_ids_of_live_messages(session: AsyncSession, *where) -> set[int]:
 async def newest_tg_message_id(session: AsyncSession, hr_id: int) -> int:
     """Наибольший номер Telegram, что у нас есть по этому человеку, или ноль.
 
-    Отметка снимается перед догоном и служит верхней границей сверки
-    удалённого: всё, что появилось выше неё, пришло уже во время прохода, а
-    значит отсутствует в ответе Telegram не потому, что стёрто.
+    Отметка снимается перед догоном и участвует в потолке сверки удалённого:
+    хоронится то, что не выше наибольшего из этой отметки и номеров, пришедших
+    в ответе Telegram. Всё, что появилось выше потолка, пришло уже во время
+    прохода, а значит отсутствует в ответе не потому, что стёрто. Своя роль у
+    отметки одна: не дать похоронам обойти стёртое последнее письмо, которого
+    в ответе уже нет.
 
     Обе стороны переписки, а не одни входящие: удаляют и своё.
     """
@@ -201,7 +204,7 @@ async def tombstone_messages(session: AsyncSession, *where) -> int:
     alive = (*where, Message.is_deleted.is_(False))
     await session.execute(
         update(Message)
-        .where(*alive, Message.is_incoming, Message.read_at.is_(None))
+        .where(*where, *UNREAD_INCOMING)
         .values(read_at=datetime.now(timezone.utc))
     )
     buried = await session.execute(
@@ -277,22 +280,21 @@ def _older_than(q, before_id: int | None, before_sent_at: datetime | None):
     либо возвращает их дважды.
 
     Пара сравнивается развёрнутым `ИЛИ`, а не построчным сравнением: SQLite
-    его понимает с 3.15, но привязываться к этому незачем. Клиент, не
-    приславший времени, получает прежнюю отсечку по номеру.
+    его понимает с 3.15, но привязываться к этому незачем. Половина метки
+    отсечкой не считается: окно шлёт обе или ни одной, а одинокий номер и
+    есть та самая отсечка, что пропускает письма.
     """
-    if before_sent_at is not None and before_id is not None:
-        return q.where(
-            or_(
-                Message.sent_at < before_sent_at,
-                and_(
-                    Message.sent_at == before_sent_at,
-                    Message.id < before_id,
-                ),
-            )
+    if before_sent_at is None or before_id is None:
+        return q
+    return q.where(
+        or_(
+            Message.sent_at < before_sent_at,
+            and_(
+                Message.sent_at == before_sent_at,
+                Message.id < before_id,
+            ),
         )
-    if before_id is not None:
-        return q.where(Message.id < before_id)
-    return q
+    )
 
 
 async def list_messages_for_hr(
@@ -311,7 +313,10 @@ async def list_messages_for_hr(
     Returns ``(messages, has_more)`` so the UI knows whether to keep
     offering "load older".
 
-    Отсечка страницы — :func:`_older_than`.
+    **Доводов пять, и свёртке они не подлежат.** Указатель из времени и
+    номера — настоящая пара, но потребитель у неё один: объявление под
+    указатель завелось бы раньше второго. Отсечка страницы —
+    :func:`_older_than`, и обе половины указателя нужны ей вместе.
     """
     q = _older_than(
         select(Message).where(Message.hr_id == hr_id), before_id, before_sent_at

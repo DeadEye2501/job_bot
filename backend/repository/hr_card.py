@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from backend.domain.telegram_identity import typed_username
 from backend.models import Company, HR, Message, Vacancy
@@ -13,7 +14,6 @@ from backend.payloads import HrDetail, text_or_none
 from backend.repository.vacancies_common import PARSED_ONLY
 from backend.repository.blacklist_marks import (
     active_blacklist_value,
-    preferred_blacklist_value,
 )
 from backend.repository.merging import concat_notes, load_merge_pair
 from backend.repository.vacancies_life import repoint_vacancies
@@ -38,47 +38,37 @@ LAST_VACANCY_ORDER = (Vacancy.created_at.desc(), Vacancy.id.desc())
 """
 
 
-_HR_FIELD_UNSET = object()
+async def update_hr_fields(session: AsyncSession, hr_id: int, **fields) -> bool:
+    """Записать названные поля человека; неназванные остаются как были.
 
+    Поля приходят набором, а не доводами — тем же образом, что у компании:
+    отсутствие ключа и значит «не трогать», а `None` в наборе — «стереть».
+    Пустая строка сводится к пустоте: схема не различает «нет» и «пусто».
 
-async def update_hr_fields(
-    session: AsyncSession,
-    hr_id: int,
-    *,
-    name=_HR_FIELD_UNSET,
-    telegram_username=_HR_FIELD_UNSET,
-    notes=_HR_FIELD_UNSET,
-) -> bool:
-    """Update one or more HR columns. Caller wraps in ``session.begin()``.
-
-    Sentinel ``_HR_FIELD_UNSET`` distinguishes "don't touch" from "set to
-    NULL", so a single call can patch any subset of columns. Empty strings
-    collapse to NULL — the schema treats absence and empty equivalently.
+    Имена полей набора никто здесь не сверяет: набирает его мост, отбирая
+    известные ключи из нагрузки окна, и незнакомому взяться неоткуда.
 
     Ник разбирается тем же объявлением, что и при заведении: правка того же
     поля не может принимать то, что форма заведения отвергает. Не
     телеграмовское роняет ``ValueError`` — прежний ник при этом остаётся
     цел, а молча записанное имя человека обнаружилось бы только тогда,
     когда отправка перестала находить собеседника.
+
+    Ложь возвращается, только если человека с таким номером нет. Транзакцию
+    закрывает зовущий.
     """
     hr = await session.get(HR, hr_id)
     if hr is None:
         return False
-    changed = []
-    if name is not _HR_FIELD_UNSET:
-        hr.name = text_or_none(name)
-        changed.append("name")
-    if telegram_username is not _HR_FIELD_UNSET:
-        hr.telegram_username = (
-            None if telegram_username is None else typed_username(telegram_username)
-        )
-        changed.append("telegram_username")
-    if notes is not _HR_FIELD_UNSET:
-        hr.notes = text_or_none(notes)
-        changed.append("notes")
+    if "name" in fields:
+        hr.name = text_or_none(fields["name"])
+    if "telegram_username" in fields:
+        typed = fields["telegram_username"]
+        hr.telegram_username = None if typed is None else typed_username(typed)
+    if "notes" in fields:
+        hr.notes = text_or_none(fields["notes"])
     await session.flush()
-    if changed:
-        logger.debug("Updated HR %d fields=%s", hr_id, changed)
+    logger.debug("Updated HR %d fields=%s", hr_id, sorted(fields))
     return True
 
 
@@ -154,19 +144,24 @@ async def get_hr_detail(
 
 
 def hr_blacklist_candidates(hr: HR) -> list[str]:
-    """Possible blacklist `value` strings for this HR — same format the
-    `contacts_add_hr_to_blacklist` slot writes. Both forms are checked so
-    a row added under one identifier (username) still surfaces if the HR
-    later only has the other (user_id), or vice versa.
+    """Написания, под которыми человек может числиться в чёрном списке.
 
-    Порядок значим: первое написание — то, что запишет кнопка
-    «в чёрный список» (см. `preferred_blacklist_value`).
+    Проверяются оба: строку заводили и тогда, когда у карточки был один ник,
+    и тогда, когда один номер. Совпадение ищется точное, по нынешним
+    написаниям карточки, — то есть отметка, заведённая под ником, потеряется,
+    если ник у карточки сменится и старого написания в перечне не станет.
+
+    Порядок значим: первое написание — то, что запишет кнопка «в чёрный
+    список» (см. `preferred_blacklist_value`), и первым стоит несменяемый
+    номер учётной записи. Ник Telegram отдаёт заново с каждым входящим, и
+    карточка его перезаписывает: отметка на нём слетает молча, а строка в
+    списке продолжает гореть.
     """
     out: list[str] = []
-    if hr.telegram_username:
-        out.append(f"@{hr.telegram_username}")
     if hr.telegram_user_id is not None:
         out.append(f"user_id:{hr.telegram_user_id}")
+    if hr.telegram_username:
+        out.append(f"@{hr.telegram_username}")
     return out
 
 
@@ -203,17 +198,6 @@ async def delete_hr(session: AsyncSession, hr_id: int) -> bool:
     return True
 
 
-def hr_blacklist_preferred_value(hr: HR) -> str | None:
-    """Написание, под которым человек попадёт в подсказки экрана отсева.
-
-    Первое из перечня — ник, если он есть: на экране списка его читают
-    глазами, а номер учётной записи не говорит ничего. Кнопка карточки
-    берёт то же написание, но не отсюда: она зовёт общее объявление
-    `preferred_blacklist_value` над тем же перечнем.
-    """
-    return preferred_blacklist_value(hr_blacklist_candidates(hr))
-
-
 @dataclass(frozen=True, slots=True)
 class _AbsorbedHr:
     """Что уносится с поглощаемым человеком.
@@ -226,6 +210,39 @@ class _AbsorbedHr:
     telegram_username: str | None
     name: str | None
     notes: str | None
+
+
+async def _drop_letters_the_survivor_already_has(
+    session: AsyncSession, absorbed_id: int, survivor_id: int
+) -> int:
+    """Убрать у поглощаемого письма, что уже есть у выжившего; сколько убрали.
+
+    Две карточки одного человека — это одна переписка Telegram, и номера
+    писем у них общие: наша отправка легла под ту карточку, из чата которой
+    её послали, а её эхо — под ту, которую нашло опознание. Переезд такого
+    письма упирается в `uq_message_hr_tgid_dir`, и сделка слияния
+    откатывается целиком — вместе с переездом вакансий.
+
+    Своя строка выжившего при этом выигрывает: она уже связана с его
+    вакансией, а вакансия — то, ради чего переписку и читают. Цена известна:
+    отметка о прочтении держится на сносимой строке — её ставят по номеру
+    учётной записи, то есть поглощаемому, — и вторая галочка у письма гаснет
+    до ближайшего оповещения из Telegram.
+    """
+    kept = aliased(Message)
+    twin = (
+        select(kept.id)
+        .where(
+            kept.hr_id == survivor_id,
+            kept.tg_message_id == Message.tg_message_id,
+            kept.is_incoming == Message.is_incoming,
+        )
+        .exists()
+    )
+    dropped = await session.execute(
+        delete(Message).where(Message.hr_id == absorbed_id, twin)
+    )
+    return dropped.rowcount or 0
 
 
 async def _move_or_drop_chat(
@@ -245,6 +262,9 @@ async def _move_or_drop_chat(
             )
         ).rowcount or 0
         return 0, dropped
+    dropped = await _drop_letters_the_survivor_already_has(
+        session, absorbed_id, survivor_id
+    )
     moved = (
         await session.execute(
             update(Message)
@@ -252,7 +272,7 @@ async def _move_or_drop_chat(
             .values(hr_id=survivor_id)
         )
     ).rowcount or 0
-    return moved, 0
+    return moved, dropped
 
 
 def _carry_to_survivor(

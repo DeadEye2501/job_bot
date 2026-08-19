@@ -6,7 +6,8 @@
 её записывают именем — единственным написанием.
 """
 
-from backend.repository.companies_card import company_blacklist_candidates, company_blacklist_preferred_value, get_company_detail
+from backend.repository.blacklist_marks import preferred_blacklist_value
+from backend.repository.companies_card import company_blacklist_candidates, get_company_detail
 from backend.repository.hr_list import list_hrs_for_company
 from tests.dbio import put
 from tests.factories import blacklist_row, company_row, hr_row, vacancy_row
@@ -101,7 +102,9 @@ async def test_an_unparsed_vacancy_is_counted_by_neither_counter(
 def test_a_company_is_listed_by_its_name_alone():
     """В чёрном списке компанию записывают именем — другого признака у неё нет."""
     assert company_blacklist_candidates(company_row(name="Контур")) == ["Контур"]
-    assert company_blacklist_preferred_value(company_row(name="Контур")) == "Контур"
+    assert preferred_blacklist_value(
+        company_blacklist_candidates(company_row(name="Контур"))
+    ) == "Контур"
 
 
 async def test_the_card_shows_an_active_mark_of_its_own_kind(

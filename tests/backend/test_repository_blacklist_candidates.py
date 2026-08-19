@@ -53,7 +53,11 @@ async def test_an_hr_without_any_identifier_is_not_suggested(
 async def test_an_hr_suggestion_shows_the_name_and_hides_the_value_below(
     session, session_factory
 ):
-    """У HR с именем подписью идёт значение, а безымянный назван самим значением."""
+    """У HR с именем подписью идёт значение, а безымянный назван самим значением.
+
+    Значением идёт несменяемый номер учётной записи: на него отметку и
+    заводят, а читаемым остаётся имя в подписи.
+    """
     await put(
         session_factory,
         hr_row(name="Мария", telegram_username="maria", telegram_user_id=111),
@@ -62,8 +66,12 @@ async def test_an_hr_suggestion_shows_the_name_and_hides_the_value_below(
 
     got = {c["label"]: c for c in await list_blacklist_candidates(session, "hr")}
 
-    assert got["Мария"] == {"value": "@maria", "label": "Мария", "sub": "@maria"}
-    assert got["@olga"] == {"value": "@olga", "label": "@olga", "sub": None}
+    assert got["Мария"] == {
+        "value": "user_id:111", "label": "Мария", "sub": "user_id:111",
+    }
+    assert got["user_id:222"] == {
+        "value": "user_id:222", "label": "user_id:222", "sub": None,
+    }
 
 
 async def test_hr_suggestions_are_sorted_by_label_ignoring_case(
@@ -106,6 +114,28 @@ async def test_channel_suggestions_are_sorted_by_label_ignoring_case(
     got = await list_blacklist_candidates(session, "channel")
 
     assert [c["label"] for c in got] == ["аналитика", "Бэкенд", "яндекс"]
+
+
+async def test_company_suggestions_are_sorted_by_label_ignoring_case(
+    session, session_factory
+):
+    """Подсказки по компаниям упорядочены по имени, без учёта регистра.
+
+    Тем же правилом, что у людей и каналов: человек ходит между тремя
+    вкладками одного окна, и порядок в них обязан читаться одинаково.
+    Сравнение, которое даёт база, идёт по кодам символов — заглавные там
+    впереди строчных.
+    """
+    await put(
+        session_factory,
+        company_row(name="яблоко"),
+        company_row(name="Ящик"),
+        company_row(name="Ананас"),
+    )
+
+    got = await list_blacklist_candidates(session, "company")
+
+    assert [c["label"] for c in got] == ["Ананас", "яблоко", "Ящик"]
 
 
 async def test_every_company_is_suggested_by_its_name(session, session_factory):
