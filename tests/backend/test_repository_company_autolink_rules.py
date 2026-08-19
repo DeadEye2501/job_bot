@@ -154,6 +154,26 @@ async def test_a_link_to_a_channel_does_not_join_anything(session, session_facto
     assert decision["stage"] == "create"
 
 
+async def test_a_shared_form_hosting_does_not_join_anything(
+    session, session_factory
+):
+    """Ссылка на общий хостинг анкет и заметок записи по себе не сводит.
+
+    На `forms.gle`, `docs.google.com`, `telegra.ph` сидит кто угодно: сойдись
+    две компании по такому хосту — вакансия уехала бы в чужую карточку, а имя
+    попало бы в её написания, и следующая сошлась бы уже по написанию.
+    """
+    existing = company_row(name="Ромашка", website="https://forms.gle/aaa")
+    await put(session_factory, existing)
+
+    company, decision = await find_or_create_company(
+        session, "Берёзка", website="https://forms.gle/bbb"
+    )
+
+    assert company.id != existing.id
+    assert decision["stage"] == "create"
+
+
 async def test_a_name_reduced_to_a_bare_legal_form_never_matches_by_name(
     session, session_factory
 ):

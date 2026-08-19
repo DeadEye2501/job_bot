@@ -850,7 +850,6 @@
 ### `backend/repository/companies_card.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_COMPANY_FIELD_UNSET` = `object()`
 - `class _AbsorbedCompany`
   - `name: str`
   - `aliases: list`
@@ -860,7 +859,7 @@
 ### `backend/repository/companies_keys.py`
 
 - `_CYR_TO_LAT` = `словарь из 33`
-- `_LEGAL_SUFFIX_RE` = `re.compile('\\b(pao|oao|ao|zao|ooo|jsc|llc|ltd|i…`
+- `_LEGAL_FORMS` = `frozenset({'pao', 'oao', 'ao', 'zao', 'ooo', 'js…`
 - `_QUOTE_CHARS` = `set('«»"\'`“”„‚‘’')`
 - `_AGGREGATOR_HOSTS` = `frozenset({'t.me', 'telegram.me', 'telegram.org'…`
 

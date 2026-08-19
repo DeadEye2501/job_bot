@@ -1077,7 +1077,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def moment_or_none(value) -> datetime | None` (16)
 - `def str_list(value) -> list[str]` (11)
 
-### `backend/repository/blacklist.py` — 267 строк
+### `backend/repository/blacklist.py` — 310 строк ⚠ подошёл к 300
 
 Ведение чёрного списка.
 
@@ -1086,6 +1086,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _hold_the_channel_rule(session: AsyncSession, kind: str) -> None` (13)
 - `async def set_blacklist_active(session: AsyncSession, blacklist_id: int, active: bool) -> bool` (23)
 - `async def deactivate_blacklist_values(session: AsyncSession, kind: str, candidates: list[str]) -> int` (23)
+- `async def rename_blacklist_marks(session: AsyncSession, kind: str, *, old_value: str, new_value: str) -> None` (41)
 - `class BlacklistUpdateError(ValueError)` (2)
 - `def _required_value(value) -> str` (11)
 - `async def update_blacklist(session: AsyncSession, blacklist_id: int, *, value=_BLACKLIST_FIELD_UNSET, reason=_BLACKLIST_FIELD_UNSET) -> bool` (32)
@@ -1142,32 +1143,34 @@ First-run bootstrap: ensure DB schema exists.
 - `async def reset_channel_cursor(session: AsyncSession, channel_id: int) -> bool` (9)
 - `async def delete_channel(session: AsyncSession, channel_id: int) -> int | None` (39)
 
-### `backend/repository/companies_card.py` — 267 строк
+### `backend/repository/companies_card.py` — 301 строк ⚠ подошёл к 300
 
 Ведение записей о компаниях.
 
-Зависит от: `backend.domain.spellings`, `backend.models`, `backend.payloads`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.vacancies_common`, `backend.repository.vacancies_life`
+Зависит от: `backend.domain.spellings`, `backend.models`, `backend.payloads`, `backend.repository.blacklist`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.vacancies_common`, `backend.repository.vacancies_life`
 
 - `async def create_company(session: AsyncSession, *, name: str, website: str | None=None, aliases: list[str] | None=None, notes: str | None=None) -> Company` (37)
 - `def company_blacklist_candidates(co: Company) -> list[str]` (11)
 - `def company_blacklist_preferred_value(co: Company) -> str | None` (2)
 - `async def _company_blacklist_value(session: AsyncSession, co: Company) -> str | None` (6)
-- `async def get_company_detail(session: AsyncSession, company_id: int) -> 'CompanyDetail | None'` (33)
-- `def _set_aliases(co: Company, aliases) -> None` (9)
-- `async def update_company_fields(session: AsyncSession, company_id: int, *, name=_COMPANY_FIELD_UNSET, website=_COMPANY_FIELD_UNSET, aliases=_COMPANY_FIELD_UNSET, notes=_COMPANY_FIELD_UNSET) -> bool` (35)
+- `async def get_company_detail(session: AsyncSession, company_id: int) -> 'CompanyDetail | None'` (34)
+- `def add_company_spellings(co: Company, incoming: list) -> None` (25)
+- `def typed_spellings(aliases) -> list[str]` (14)
+- `async def update_company_fields(session: AsyncSession, company_id: int, **fields) -> bool` (40)
 - `async def delete_company(session: AsyncSession, company_id: int) -> bool` (22)
 - `class _AbsorbedCompany` (7)
-- `def _carry_company_to_survivor(survivor: Company, taken: _AbsorbedCompany) -> None` (24)
-- `async def merge_company(session: AsyncSession, *, absorbed_id: int, survivor_id: int) -> None` (34)
+- `def _carry_company_to_survivor(survivor: Company, taken: _AbsorbedCompany) -> None` (19)
+- `async def merge_company(session: AsyncSession, *, absorbed_id: int, survivor_id: int) -> None` (37)
 
-### `backend/repository/companies_keys.py` — 169 строк
+### `backend/repository/companies_keys.py` — 195 строк
 
 Приведение компании к ключам, по которым её сравнивают.
 
 Зависит от: `backend.payloads`
 
 - `def _translit_cyr_to_latin(s: str) -> str` (2)
-- `def normalize_company_name(s: str | None) -> str` (10)
+- `def _without_edge_legal_forms(words: list[str]) -> list[str]` (14)
+- `def normalize_company_name(s: str | None) -> str` (9)
 - `def normalize_host(url: str | None) -> str` (23)
 - `def _is_aggregator_host(host: str) -> bool` (10)
 - `def signal_host(host: str) -> str` (11)
@@ -1183,14 +1186,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def _companies_with_counts_query()` (18)
 - `async def list_companies_with_counts(session: AsyncSession, search: str | None=None, *, limit: int | None=None, offset: int=0) -> tuple[list[CompanyWithCount], bool]` (33)
 
-### `backend/repository/companies_matching.py` — 473 строк ⚠ подошёл к 300
+### `backend/repository/companies_matching.py` — 479 строк ⚠ подошёл к 300
 
 Сведение разобранной из вакансии компании с уже заведённой.
 
-Зависит от: `backend.domain.spellings`, `backend.llm.company`, `backend.models`, `backend.payloads`, `backend.repository.companies_card`, `backend.repository.companies_keys`
+Зависит от: `backend.llm.company`, `backend.models`, `backend.payloads`, `backend.repository.companies_card`, `backend.repository.companies_keys`
 
 - `def _known_spellings(company: Company) -> tuple[str, list[str]]` (13)
-- `def _enrich_company_with_parsed(company: Company, parsed_name: str, parsed_website: str | None) -> None` (41)
+- `def _enrich_company_with_parsed(company: Company, parsed_name: str, parsed_website: str | None) -> None` (23)
 - `def _accept_company_match(company: Company, parsed_name: str, parsed_website: str | None, decision: dict, stage: str) -> tuple[Company, dict]` (24)
 - `def _keep_pre_create_stage(decision: dict) -> None` (10)
 - `async def _insert_company(session: AsyncSession, name: str, website: str | None, decision: dict) -> Company | None` (25)
@@ -1198,7 +1201,8 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _create_company_row(session: AsyncSession, name: str, website: str | None, decision: dict, seen_ids: set[int]) -> tuple[Company | None, dict]` (40)
 - `class _Parsed` (26)
   - `def of(cls, raw_name: str, website: str | None) -> '_Parsed'` (8)
-- `def _new_decision() -> dict` (25)
+- `def _new_decision() -> dict` (36)
+- `async def _companies_in_order(session: AsyncSession) -> list[Company]` (12)
 - `def _company_norms(rows) -> list[tuple[Company, str, list[str], str]]` (12)
 - `def _same_name(norms, parsed: _Parsed) -> Company | None` (16)
 - `def _same_alias(norms, parsed: _Parsed) -> Company | None` (8)
@@ -1746,14 +1750,14 @@ Runtime settings layer.
 - `def _filter_set(values, allowed: tuple[str, ...]) -> list[str]` (6)
 - `def _filter_languages(items) -> list[tuple[str, str]]` (31)
 
-### `client/bridge/companies.py` — 332 строк ⚠ подошёл к 300
+### `client/bridge/companies.py` — 344 строк ⚠ подошёл к 300
 
 Компания как запись в контактах: найти, показать, поправить, убрать.
 
 Зависит от: `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.page`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`, `client.form_payloads`
 
 - `async def create_company_row(session, fields: dict, **echo) -> int` (25)
-- `class Companies` (273)
+- `class Companies` (285)
   - `def list(self, payload: dict | None=None) -> dict` (28)
     - `async def run() -> dict` (13)
   - `def detail(self, company_id: int) -> dict` (24)
@@ -1769,7 +1773,7 @@ Runtime settings layer.
   - `def create(self, payload: dict) -> dict` (21)
     - `async def run() -> dict` (6)
   - `def update(self, payload: dict) -> dict` (26)
-  - `async def _updated(self, company_id: int, kwargs: dict) -> dict` (17)
+  - `async def _updated(self, company_id: int, kwargs: dict) -> dict` (29)
   - `def delete(self, company_id: int) -> dict` (13)
     - `async def run() -> dict` (8)
   - `def block(self, company_id: int) -> dict` (18)
@@ -2274,7 +2278,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 232 модулей
+## tests — 233 модулей
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -3476,22 +3480,31 @@ Runtime settings layer.
   - `def install(**kwargs) -> Arbiter` (4)
 - `async def resolve(session, name, arbiter_fake=None, **kwargs)` (9)
 
-### `tests/backend/test_repository_company_autolink_rules.py` — 386 строк ⚠ подошёл к 300
+### `tests/backend/test_repository_company_autolink_rules.py` — 406 строк ⚠ подошёл к 300
 
 Следствия автоматического сведения разобранной компании к существующей.
 
 Зависит от: `backend.models`, `backend.repository.companies_matching`, `tests.dbio`, `tests.factories`
 
-Тестов: 19
+Тестов: 20
 
 
-### `tests/backend/test_repository_company_card.py` — 169 строк
+### `tests/backend/test_repository_company_blacklist_marks.py` — 132 строк
+
+Следствия переезда отметки чёрного списка вслед за именем компании.
+
+Зависит от: `backend.models`, `backend.repository.companies_card`, `tests.dbio`, `tests.factories`
+
+Тестов: 5
+
+
+### `tests/backend/test_repository_company_card.py` — 193 строк
 
 Следствия сборки карточки компании для боковой панели контактов.
 
 Зависит от: `backend.repository.companies_card`, `backend.repository.hr_list`, `tests.dbio`, `tests.factories`
 
-Тестов: 9
+Тестов: 10
 
 
 ### `tests/backend/test_repository_company_creation.py` — 58 строк
@@ -3512,7 +3525,7 @@ Runtime settings layer.
 Тестов: 6
 
 
-### `tests/backend/test_repository_company_keys.py` — 187 строк
+### `tests/backend/test_repository_company_keys.py` — 194 строк
 
 Следствия приведения имени и сайта компании к сравнимому виду.
 
@@ -3531,13 +3544,13 @@ Runtime settings layer.
 
 - `async def names(session, **kwargs) -> list[str]` (4)
 
-### `tests/backend/test_repository_company_merge.py` — 165 строк
+### `tests/backend/test_repository_company_merge.py` — 202 строк
 
 Следствия слияния двух записей об одной компании.
 
 Зависит от: `backend.models`, `backend.repository.companies_card`, `tests.dbio`, `tests.factories`
 
-Тестов: 10
+Тестов: 12
 
 
 ### `tests/backend/test_repository_company_removal.py` — 44 строк
@@ -4179,13 +4192,13 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/client/test_bridge_companies.py` — 257 строк
+### `tests/client/test_bridge_companies.py` — 278 строк
 
 Следствия домена компании: перечень, карточка, написания, слияние, заслон.
 
 Зависит от: `tests.dbio`, `tests.factories`
 
-Тестов: 14
+Тестов: 15
 
 
 ### `tests/client/test_bridge_cv.py` — 133 строк

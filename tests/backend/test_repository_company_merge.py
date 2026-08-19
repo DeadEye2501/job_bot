@@ -128,6 +128,43 @@ async def test_a_spelling_repeated_inside_the_absorbed_lands_once(
     assert kept.aliases == ["SKB", "Kontur"]
 
 
+async def test_a_spelling_arrives_trimmed_like_everywhere_else(
+    session, session_factory
+):
+    """Написание с пробелами по краям кладётся обрезанным.
+
+    Те же пробелы срезает и разбор вакансии, дописывая новое написание, — а
+    список у компании один, и два правила чистки развели бы «Контур» с
+    «Контур » в две разные строки.
+    """
+    absorbed = company_row(name="  Контур  ", aliases=["  Kontur  "])
+    survivor = company_row(name="СКБ Контур", aliases=[])
+    await put(session_factory, absorbed, survivor)
+
+    await merge_company(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
+
+    kept = await session.get(Company, survivor.id)
+    assert kept.aliases == ["Kontur", "Контур"]
+
+
+async def test_a_junk_spelling_does_not_break_the_merge(session, session_factory):
+    """Число посреди списка написаний слияние не роняет, и в списке не остаётся.
+
+    Строки заводились и сырым SQL мимо окна, и число в списке роняло слияние
+    целиком: откатывался и переезд вакансий, а человек видел текст исключения.
+    Чистятся при этом обе стороны — списку оставшейся достаётся то же
+    правило, что и приходящему.
+    """
+    absorbed = company_row(name="Контур", aliases=[42, "Kontur"])
+    survivor = company_row(name="СКБ Контур", aliases=[17, "SKB"])
+    await put(session_factory, absorbed, survivor)
+
+    await merge_company(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
+
+    kept = await session.get(Company, survivor.id)
+    assert kept.aliases == ["SKB", "Kontur", "Контур"]
+
+
 async def test_a_website_is_taken_only_when_the_survivor_has_none(
     session, session_factory
 ):

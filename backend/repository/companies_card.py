@@ -11,6 +11,7 @@ from backend.models import Company, Vacancy
 from backend.payloads import CompanyDetail, str_list, text_or_none
 
 from backend.repository.vacancies_common import PARSED_ONLY
+from backend.repository.blacklist import rename_blacklist_marks
 from backend.repository.blacklist_marks import (
     active_blacklist_value,
     preferred_blacklist_value,
@@ -45,7 +46,7 @@ async def create_company(
         raise ValueError("create_company: name is required")
     company = Company(
         name=normalized,
-        aliases=dedupe_first_wins(str_list(aliases), str.casefold),
+        aliases=typed_spellings(aliases),
         website=(website or None),
         notes=(notes or None),
     )
@@ -107,6 +108,7 @@ async def get_company_detail(
             select(func.count(func.distinct(Vacancy.hr_id))).where(
                 Vacancy.company_id == company_id,
                 Vacancy.hr_id.is_not(None),
+                PARSED_ONLY,
             )
         )
         or 0
@@ -120,54 +122,88 @@ async def get_company_detail(
     )
 
 
-_COMPANY_FIELD_UNSET = object()
+def add_company_spellings(co: Company, incoming: list) -> None:
+    """Дописать компании написания, которых она ещё не знает.
 
+    Занятыми считаются имя и нынешние написания, сравнение — без учёта
+    регистра и без схлопывания разделителей: «Сбер-Тех» и «Сбер Тех» —
+    разные написания, а схлопывающий ключ отвечает на другой вопрос, «та же
+    ли это компания», и списку написаний он не судья. Сличи им — и второе
+    написание не запомнилось бы, а список для того и копится.
 
-def _set_aliases(co: Company, aliases) -> None:
-    """Записать написания компании, не сверяя их с её именем.
+    Обе стороны просеиваются `str_list`: колонка написаний — JSON, и что в
+    ней лежит, код не обещает. Потерять негодное содержимое дешевле, чем
+    уронить разбор вакансии или слияние, — строками оно всё равно не было.
+    Отсеивается при этом только негодное: написание, равное имени компании,
+    у лежащих остаётся — правка карточки не выбрасывает его нарочно, и
+    вычищать набранное человеком тут незачем.
 
-    Accept list-of-str only; normalize: strip + dedup + drop empty. А вот с
-    именем компании набранное здесь не сверяется намеренно: список человек
-    пишет руками, и выбросить написанное им значило бы стереть введённое
-    молча. Слияние сверяется — там список копится сам.
+    Порознь эти два списка чистились по разным правилам, и одно и то же
+    написание попадало в базу то обрезанным, то с пробелами.
     """
-    co.aliases = dedupe_first_wins(str_list(aliases), str.casefold)
+    known = {(co.name or "").casefold()}
+    aliases = str_list(co.aliases)
+    known.update(a.casefold() for a in aliases)
+    co.aliases = aliases + dedupe_first_wins(
+        str_list(incoming), str.casefold, known
+    )
+
+
+def typed_spellings(aliases) -> list[str]:
+    """Набранные человеком написания, готовые лечь в колонку.
+
+    Годные строки, обрезанные по краям, без повторов без учёта регистра. С
+    именем компании набранное не сверяется намеренно: список человек пишет
+    руками, и выбросить написанное им значило бы стереть введённое молча.
+    Слияние и разбор вакансии сверяются — там список копится сам
+    (`add_company_spellings`).
+
+    Дороги сюда две, заведение и правка, и обе кладут в ту же колонку: пиши
+    они чистку порознь, одно и то же написание попадало бы в базу по-разному
+    в зависимости от того, каким окном его завели.
+    """
+    return dedupe_first_wins(str_list(aliases), str.casefold)
 
 
 async def update_company_fields(
-    session: AsyncSession,
-    company_id: int,
-    *,
-    name=_COMPANY_FIELD_UNSET,
-    website=_COMPANY_FIELD_UNSET,
-    aliases=_COMPANY_FIELD_UNSET,
-    notes=_COMPANY_FIELD_UNSET,
+    session: AsyncSession, company_id: int, **fields
 ) -> bool:
-    """Patch one or more Company columns. Sentinel-default unset = leave
-    unchanged. Returns False if the company id isn't found.
+    """Записать названные поля компании; неназванные остаются как были.
+
+    Поля приходят набором, а не доводами: их четыре — `name`, `website`,
+    `aliases`, `notes`, — и отдельными доводами вызов перевалил бы за предел
+    правила 5. Отсутствие ключа и значит «не трогать», поэтому и метка
+    «не задано» здесь не нужна: `None` в наборе — это «стереть».
+
+    Ложь возвращается в двух случаях: компании с таким номером нет и имя
+    задано пустым. Второй случай отменяет весь вызов, а не одно поле: имя
+    обязательно и уникально, а соседние поля из того же вызова человек правил
+    в одной форме — записать половину значило бы соврать окну об исходе.
+
+    Отметка чёрного списка едет за именем (`rename_blacklist_marks`): она
+    заведена на прежнее написание, и без переезда продолжила бы отсеивать
+    посты, пропав из карточки.
     """
     co = await session.get(Company, company_id)
     if co is None:
         return False
-    changed = []
-    if name is not _COMPANY_FIELD_UNSET:
-        cleaned = (str(name).strip() if name is not None else "")
+    if "name" in fields:
+        cleaned = str(fields["name"] or "").strip()
         if not cleaned:
-            return False  # company name is required (UNIQUE NOT NULL)
+            return False
+        previous = co.name
         co.name = cleaned
-        changed.append("name")
-    if website is not _COMPANY_FIELD_UNSET:
-        co.website = text_or_none(website)
-        changed.append("website")
-    if aliases is not _COMPANY_FIELD_UNSET:
-        _set_aliases(co, aliases)
-        changed.append("aliases")
-    if notes is not _COMPANY_FIELD_UNSET:
-        co.notes = text_or_none(notes)
-        changed.append("notes")
+        await rename_blacklist_marks(
+            session, "company", old_value=previous, new_value=cleaned
+        )
+    if "website" in fields:
+        co.website = text_or_none(fields["website"])
+    if "aliases" in fields:
+        co.aliases = typed_spellings(fields["aliases"])
+    if "notes" in fields:
+        co.notes = text_or_none(fields["notes"])
     await session.flush()
-    if changed:
-        logger.debug("Updated company %d fields=%s", company_id, changed)
+    logger.debug("Updated company %d fields=%s", company_id, sorted(fields))
     return True
 
 
@@ -220,12 +256,7 @@ def _carry_company_to_survivor(
     Сайт берётся, только если своего нет, а заметки склеиваются — иначе
     написанное человеком пропадало бы молча.
     """
-    aliases = list(survivor.aliases or [])
-    known = {(survivor.name or "").casefold()}
-    known.update(a.casefold() for a in aliases)
-    survivor.aliases = aliases + dedupe_first_wins(
-        taken.aliases + [taken.name], str.casefold, known
-    )
+    add_company_spellings(survivor, taken.aliases + [taken.name])
     if not survivor.website and taken.website:
         survivor.website = taken.website
     survivor.notes = concat_notes(survivor.notes, taken.notes)
@@ -260,6 +291,9 @@ async def merge_company(
     await session.delete(absorbed)
     await session.flush()
     _carry_company_to_survivor(survivor, taken)
+    await rename_blacklist_marks(
+        session, "company", old_value=taken.name, new_value=survivor.name
+    )
 
     logger.info(
         "merged company #%d -> #%d (vacancies=%d)",

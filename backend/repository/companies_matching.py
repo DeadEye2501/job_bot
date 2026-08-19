@@ -10,9 +10,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company
-from backend.domain.spellings import dedupe_first_wins
 from backend.payloads import str_list
-from backend.repository.companies_card import create_company
+from backend.repository.companies_card import add_company_spellings, create_company
 from backend.repository.companies_keys import (
     hosts_compatible,
     normalize_company_name,
@@ -61,25 +60,7 @@ def _enrich_company_with_parsed(
 
     if not normalize_company_name(parsed_name):
         return
-    # Отсев тем же правилом и той же формой, что у слияния: разделители у
-    # компании не схлопываются, «Сбер-Тех» и «Сбер Тех» — разные написания.
-    # Схлопывающий ключ выше отвечает на другой вопрос, «та же ли это
-    # компания», и списку написаний он не судья: сличи им — и второе написание
-    # не запомнилось бы, а список для того и копится.
-    #
-    # Отсев идёт по приходящему, а лежащее не трогается вовсе: там бывает и
-    # строка, равная имени компании, — правка карточки её не выбрасывает
-    # нарочно, и фоновому разбору вычищать набранное человеком незачем.
-    #
-    # Через `str_list`, а не `or []`: колонка JSON, и негодное её содержимое
-    # здесь не сохраняется. Потерять его дешевле, чем уронить разбор вакансии,
-    # — строками оно всё равно не было.
-    known = {(company.name or "").casefold()}
-    aliases = str_list(company.aliases)
-    known.update(a.casefold() for a in aliases)
-    company.aliases = aliases + dedupe_first_wins(
-        [parsed_name.strip()], str.casefold, known
-    )
+    add_company_spellings(company, [parsed_name])
 
 
 def _accept_company_match(
@@ -116,7 +97,7 @@ def _keep_pre_create_stage(decision: dict) -> None:
     базе перестанет отличать «модель пробовали» от «модель не звали».
     """
     prior_stage = decision.get("stage")
-    if prior_stage and prior_stage not in ("skip", None):
+    if prior_stage and prior_stage != "skip":
         decision["pre_create_stage"] = prior_stage
 
 
@@ -250,6 +231,17 @@ def _new_decision() -> dict:
         candidates:    [{id, name, website}, ...] | None — shortlist для
                        LLM (заполняется только когда LLM вызывался)
         llm_reasoning: str | None — короткий ответ LLM
+
+    Ещё два поля кладутся не всегда, и потому их нет в пустом протоколе:
+
+        pre_create_stage:   str — стадия, с которой пришли к заведению строки.
+                            Без неё исход «create» стёр бы след от `llm_no_match`,
+                            и разбор по одной базе перестал бы отличать
+                            «модель звали» от «модель не звали».
+        llm_hallucinated_id: int — номер, который арбитр назвал в ответе, но
+                            которого не было в показанном ему списке. Иначе
+                            след от него остался бы только в свободном тексте
+                            рассуждения.
     """
     return {
         "stage": "skip",
@@ -257,6 +249,20 @@ def _new_decision() -> dict:
         "candidates": None,
         "llm_reasoning": None,
     }
+
+
+async def _companies_in_order(session: AsyncSession) -> list[Company]:
+    """Все компании в порядке заведения — по возрастанию номера.
+
+    Порядок здесь и есть правило: отбор берёт первое сработавшее, а
+    столкновение по имени выигрывает первый. Кто первый, без `order_by`
+    решала бы выдача базы, которой никто не назначил порядка: две строки с
+    одним ключом («Acme» и «acme») меняли бы победителя от `VACUUM` к
+    `VACUUM`, а с ним — и карточку, в которую уедет вакансия.
+    """
+    return list(
+        (await session.scalars(select(Company).order_by(Company.id.asc()))).all()
+    )
 
 
 def _company_norms(rows) -> list[tuple[Company, str, list[str], str]]:
@@ -450,7 +456,7 @@ async def find_or_create_company(
     if not raw_name:
         return None, decision
     parsed = _Parsed.of(raw_name, website)
-    rows = list((await session.scalars(select(Company))).all())
+    rows = await _companies_in_order(session)
     norms = _company_norms(rows)
     ruled = _rule_match(norms, parsed)
     if ruled is not None:

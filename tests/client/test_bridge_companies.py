@@ -75,6 +75,27 @@ async def test_a_taken_name_is_named_as_taken(api, ask, session_factory):
     assert answer["action"] == "create_company"
 
 
+async def test_renaming_into_a_taken_name_is_named_as_taken(
+    api, ask, session_factory
+):
+    """Правку имени на занятое объясняют теми же словами, что и заведение.
+
+    Руками сводя дубли, человек как раз и переименовывает одну в другую.
+    Отказ базы доехал бы до окна текстом исключения SQLite.
+    """
+    taken = company_row(name="Контур")
+    renamed = company_row(name="Ромашка")
+    await put(session_factory, taken, renamed)
+
+    answer = await ask(
+        api.companies.update, {"company_id": renamed.id, "name": "Контур"}
+    )
+
+    assert answer["fail"] == "denied"
+    assert "Контур" in answer["detail"]
+    assert answer["action"] == "update_company"
+
+
 async def test_spellings_of_a_wrong_shape_are_refused_before_the_base(
     api, ask, session_factory
 ):

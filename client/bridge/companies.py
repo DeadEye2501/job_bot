@@ -265,11 +265,23 @@ class Companies:
         return reply(self._hub.runner, self._updated(company_id, kwargs))
 
     async def _updated(self, company_id: int, kwargs: dict) -> dict:
-        """Записать прочитанные поля и назвать окну, какие из них поправлены."""
+        """Записать прочитанные поля и назвать окну, какие из них поправлены.
+
+        Занятое имя объясняется теми же словами, что и при заведении: руками
+        сводя дубли, человек как раз и переименовывает одну компанию в другую.
+        Уникальна у компании только колонка имени, поэтому иного повода для
+        отказа базы здесь нет, и написанное в форме имя у отказа всегда есть.
+        """
         async with self._hub.session_factory() as session:
-            async with session.begin():
-                saved = await companies_card.update_company_fields(
-                    session, company_id, **kwargs,
+            try:
+                async with session.begin():
+                    saved = await companies_card.update_company_fields(
+                        session, company_id, **kwargs,
+                    )
+            except IntegrityError:
+                raise Denied(
+                    COMPANY_EXISTS.format(name=kwargs["name"]),
+                    company_id=company_id, action="update_company",
                 )
         if not saved:
             raise Denied(

@@ -27,26 +27,42 @@ def _translit_cyr_to_latin(s: str) -> str:
     return "".join(_CYR_TO_LAT.get(ch, ch) for ch in s.lower())
 
 
-# Юр.формы вырезаются из имени до сравнения: «ПАО Сбербанк» → «sberbank».
-# Регистр и кириллица — после lower() и transliterate.
-_LEGAL_SUFFIX_RE = re.compile(
-    r"\b(pao|oao|ao|zao|ooo|jsc|llc|ltd|inc|corp|gmbh|sa|ag|nv|bv|plc|sas)\b\.?"
-)
+# Юр.формы, снимаемые с краёв имени до сравнения: «ПАО Сбербанк» → «sberbank».
+# Слова уже в латинице и нижнем регистре: транслитерация идёт раньше.
+_LEGAL_FORMS = frozenset({
+    "pao", "oao", "ao", "zao", "ooo", "jsc", "llc", "ltd", "inc", "corp",
+    "gmbh", "sa", "ag", "nv", "bv", "plc", "sas",
+})
 
 
 _QUOTE_CHARS = set("«»\"'`“”„‚‘’")
 
 
+def _without_edge_legal_forms(words: list[str]) -> list[str]:
+    """Слова имени без юр.форм по краям.
+
+    Только по краям: в перечне лежат и двухбуквенные — `ao`, `sa`, `ag`,
+    `nv`, `bv`, — а вырезанные посреди имени они превращают разные компании в
+    одну. «Sber AG Tech» и «Sber Tech» дали бы один ключ, и `rule_name` свёл
+    бы их без арбитра.
+    """
+    start, end = 0, len(words)
+    while start < end and words[start] in _LEGAL_FORMS:
+        start += 1
+    while end > start and words[end - 1] in _LEGAL_FORMS:
+        end -= 1
+    return words[start:end]
+
+
 def normalize_company_name(s: str | None) -> str:
     """Нормализованная форма имени для deterministic match: lowercase +
-    транслитерация + срезанные юр.суффиксы + сглаженные пробелы."""
+    транслитерация + срезанные по краям юр.формы + сглаженные пробелы."""
     if not s:
         return ""
     s = "".join(ch for ch in s.strip() if ch not in _QUOTE_CHARS)
     s = _translit_cyr_to_latin(s)
-    s = _LEGAL_SUFFIX_RE.sub(" ", s)
     s = re.sub(r"[^a-z0-9]+", " ", s)
-    return " ".join(s.split())
+    return " ".join(_without_edge_legal_forms(s.split()))
 
 
 def normalize_host(url: str | None) -> str:
@@ -116,6 +132,16 @@ _AGGREGATOR_HOSTS = frozenset({
     "rabota.ru",
     "trudvsem.ru",
     "career.ru",
+    # Общие хостинги ссылок, анкет и заметок: на таком хосте сидит кто
+    # угодно, и `rule_website` склеил бы две разные компании по одной лишь
+    # ссылке на форму отклика — без арбитра и без записи, которую можно
+    # откатить.
+    "docs.google.com",
+    "forms.gle",
+    "telegra.ph",
+    "notion.so",
+    "taplink.cc",
+    "bit.ly",
 })
 
 
