@@ -337,7 +337,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _word_match(text_lower: str, variant: str) -> bool` (4)
 - `def check_blacklist(raw_text: str, patterns: list[str]) -> str | None` (18)
 
-### `backend/domain/company_hosts.py` — 75 строк
+### `backend/domain/company_hosts.py` — 77 строк
 
 Хосты, которые не бывают домашним сайтом компании.
 
@@ -3606,7 +3606,7 @@ Runtime settings layer.
 Тестов: 6
 
 
-### `tests/backend/test_repository_company_keys.py` — 214 строк
+### `tests/backend/test_repository_company_keys.py` — 216 строк
 
 Следствия приведения имени и сайта компании к сравнимому виду.
 
