@@ -912,6 +912,22 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `backend/repository/profile_cv.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
+### `backend/repository/profile_experience.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
+### `backend/repository/profile_languages.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
+### `backend/repository/profile_skills.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
 ### `backend/repository/stats_kpi.py`
 
 - `_IN_PROGRESS` = `frozenset({VacancyStatus.INVITATION, VacancyStat…`

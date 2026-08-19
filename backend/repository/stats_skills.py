@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.domain.scoring import build_skill_lookup
 from backend.domain.skill_names import skill_key
 from backend.models import Vacancy
-from backend.repository.profile import list_skills
+from backend.repository.profile_skills import list_skills
 from backend.repository.stats_common import parsed_in_window, stats_period_since
 
 

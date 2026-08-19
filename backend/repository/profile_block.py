@@ -8,11 +8,9 @@ from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.repository.profile import (
-    get_profile,
-    list_experience,
-    list_skills,
-)
+from backend.repository.profile import get_profile
+from backend.repository.profile_experience import list_experience
+from backend.repository.profile_skills import list_skills
 
 
 def _skills_lines(skills: list) -> list[str]:
