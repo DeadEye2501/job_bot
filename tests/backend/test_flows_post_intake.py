@@ -15,8 +15,10 @@
 from backend.flows import parse as parse_mod
 import pytest
 
+import httpx
+
 from adapters import teletype
-from backend.flows import ingest
+from backend.flows import embeddings, ingest
 from tests.fakes.telegram import link_entity, post
 
 
@@ -56,6 +58,75 @@ async def intake(make_pipeline, monkeypatch):
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
     monkeypatch.setattr(parse_mod, "is_unparsed_vacancy", unparsed)
     return pipeline
+
+
+async def test_a_provider_that_does_not_answer_at_all_stops_the_post(
+    intake, monkeypatch
+):
+    """Молчащий поставщик отпечатков поста не пропускает, а обрывает приём.
+
+    Пропуск здесь — это потеря: отметка канала уедет дальше, и второй раз
+    этот пост не прочтут. Отличить «этот текст не посчитался» от «поставщика
+    нет вовсе» можно только здесь, у самого обращения: выше видно один и тот
+    же пустой отпечаток.
+    """
+
+    async def no_answer(client, model, text):
+        raise httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr("adapters.lm_studio.embed", no_answer)
+
+    with pytest.raises(embeddings.ProviderIsSilent):
+        await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python"))
+
+    assert intake.saved == []
+
+
+async def test_a_model_the_provider_does_not_have_stops_the_post_too(
+    intake, monkeypatch
+):
+    """Ненайденная модель отпечатков — тоже беда не про этот текст.
+
+    Поставщик отвечает, но модели у него нет: имя сменили в настройках,
+    модель не загрузили. Отказ этот придёт на каждый пост подряд, и пропусти
+    его приём — канал уехал бы отметкой до самого свежего поста.
+    """
+
+    async def not_found(client, model, text):
+        raise httpx.HTTPStatusError(
+            "model not found",
+            request=httpx.Request("POST", "http://provider.test/v1/embeddings"),
+            response=httpx.Response(404),
+        )
+
+    monkeypatch.setattr("adapters.lm_studio.embed", not_found)
+
+    with pytest.raises(embeddings.ProviderIsSilent):
+        await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python"))
+
+    assert intake.saved == []
+
+
+async def test_a_text_the_provider_refuses_is_skipped(intake, monkeypatch):
+    """Отказ по самому тексту пост пропускает, а приём не обрывает.
+
+    Такой отказ говорит об этом посте, а не о поставщике: следующий
+    посчитается. Встать на нём значило бы остановить канал из-за одного
+    объявления.
+    """
+
+    async def refuse(client, model, text):
+        raise httpx.HTTPStatusError(
+            "context length exceeded",
+            request=httpx.Request("POST", "http://provider.test/v1/embeddings"),
+            response=httpx.Response(400),
+        )
+
+    monkeypatch.setattr("adapters.lm_studio.embed", refuse)
+
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python"))
+
+    assert intake.saved == []
 
 
 async def test_a_fresh_post_is_saved_and_parsed(intake):

@@ -24,8 +24,8 @@ import pytest
 
 from backend.models import HR, Company, Currency, Vacancy, VacancyEvent, VacancyStatus
 from backend.payloads import FitValidation
-from tests.dbio import all_rows, only_row
-from tests.factories import parsed_vacancy
+from tests.dbio import all_rows, only_row, put
+from tests.factories import app_setting_row, company_row, parsed_vacancy
 
 
 async def test_the_parsed_fields_land_in_the_row(parsing, session_factory):
@@ -315,6 +315,60 @@ async def test_a_vanished_vacancy_is_left_alone(parsing, session_factory, caplog
 
     assert await all_rows(session_factory, VacancyEvent) == []
     assert [r for r in caplog.records if r.name == "backend.flows.parse_write"] == []
+
+
+async def test_the_company_arbiter_is_asked_with_the_base_left_free(
+    parsing, session_factory, monkeypatch
+):
+    """Пока арбитр компаний думает, база остаётся открытой для записи.
+
+    Ответа модели ждут до трёх минут. Спроси её посреди начатой сделки — и всё
+    это время в базу не пишет больше никто: входящее письмо HR, пришедшее в
+    этот миг, не запишется вовсе, а человек увидит переписку без него.
+    """
+    pipeline, vacancy = parsing
+    await put(session_factory, company_row(name="Акме Софт"))
+    pipeline.parsed = replace(pipeline.parsed, company_name="Акме Софтвер")
+    written: list[str] = []
+
+    async def arbiter(client, model, *, parsed_name, parsed_website, candidates):
+        async with session_factory() as another:
+            another.add(app_setting_row("чужая запись", "пока думает арбитр"))
+            await another.commit()
+        written.append(parsed_name)
+        return None, "не та компания"
+
+    monkeypatch.setattr("backend.llm.company.dedupe_company_with_llm", arbiter)
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=False
+    )
+
+    assert written == ["Акме Софтвер"]
+
+
+async def test_a_write_that_failed_is_not_reported_as_a_finished_parse(
+    parsing, monkeypatch, caplog
+):
+    """Провал записи не выдаётся за удавшийся разбор.
+
+    Окно говорит на это «Вакансия разобрана заново», человек закрывает
+    карточку — а в базе не изменилось ничего. Тем же ответом отвечает и
+    удавшаяся запись вакансии без собеседника, и различить их снаружи нечем.
+    """
+    pipeline, vacancy = parsing
+
+    async def no_room(*args, **kwargs):
+        raise RuntimeError("на диске нет места")
+
+    monkeypatch.setattr("backend.flows.parse_write.add_vacancy_event", no_room)
+
+    with caplog.at_level(logging.ERROR, logger="backend.flows.parse_write"):
+        done = await parse.parse_and_update_vacancy(
+            pipeline, vacancy.id, "текст", "jobs", allow_delete=False
+        )
+
+    assert done is False
 
 
 async def test_the_window_hears_about_both_lists(parsing):

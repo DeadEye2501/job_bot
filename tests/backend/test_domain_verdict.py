@@ -34,14 +34,6 @@ def test_a_preferred_only_stack_still_counts_as_a_signal():
     )
 
 
-def test_an_unparseable_post_is_rejected_with_a_named_reason():
-    """Пост, из которого ничего не извлеклось, уходит в Not Fit с причиной."""
-    assert decide_vacancy_status(None, 10, None, threshold=0) == (
-        VacancyStatus.NOT_FIT,
-        "unparseable",
-    )
-
-
 def test_a_blacklisted_vacancy_is_rejected_and_names_the_pattern():
     """Отказ по чёрному списку называет сработавший образец."""
     assert decide_vacancy_status(parsed_vacancy(), 10, "казино", threshold=0) == (

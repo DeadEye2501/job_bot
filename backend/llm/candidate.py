@@ -58,17 +58,17 @@ def _format_labels(values: list[str] | None, labels: dict[str, str]) -> str:
     return ", ".join(parts) if parts else "—"
 
 
-def _format_grades(grades: list[str] | None) -> str:
+def format_grades(grades: list[str] | None) -> str:
     """'middle, senior, lead/team-lead' либо '—' если пусто."""
     return _format_labels(grades, _GRADE_LABELS_RU)
 
 
-def _format_work_formats(formats: list[str] | None) -> str:
+def format_work_formats(formats: list[str] | None) -> str:
     """'удалёнка, гибрид' либо '—' если пусто."""
     return _format_labels(formats, _FORMAT_LABELS_RU)
 
 
-def _format_languages(languages: list[CandidateLanguage] | None) -> str:
+def format_languages(languages: list[CandidateLanguage] | None) -> str:
     """'Русский — native, Английский — A2' либо '—' если пусто."""
     if not languages:
         return "—"
@@ -86,7 +86,7 @@ def _format_languages(languages: list[CandidateLanguage] | None) -> str:
     return ", ".join(parts) if parts else "—"
 
 
-def _format_text(text: str | None) -> str:
+def format_text(text: str | None) -> str:
     """Свободный текст в слот промпта, либо «—», если пусто.
 
     Прочерк, а не пустота: незаполненный слот оставил бы в промпте
@@ -96,7 +96,7 @@ def _format_text(text: str | None) -> str:
     return s if s else "—"
 
 
-def _format_known_skills(skills) -> str:
+def format_known_skills(skills) -> str:
     """Render the user's profile_skills + aliases as a parseable bullet list
     for the parse_vacancy prompt's stack-normalization section. Empty list
     becomes "—" so the prompt slot stays grammatically valid."""
@@ -115,7 +115,7 @@ def _format_known_skills(skills) -> str:
     return "\n".join(lines) if lines else "—"
 
 
-def _build_candidate_profile(
+def build_candidate_profile(
     profile: Profile | None,
     languages: list[ProfileLanguage],
 ) -> CandidateProfile:

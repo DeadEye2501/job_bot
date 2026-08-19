@@ -9,6 +9,8 @@
 сменить её в настройках, как в базе оказываются две.
 """
 
+import pytest
+
 from backend.domain.dedup import EmbeddingCache
 
 
@@ -90,6 +92,23 @@ def test_a_filled_cache_says_it_is_filled():
     cache.fill([], width=2)
 
     assert cache.loaded is True
+
+
+def test_a_vector_of_another_width_leaves_the_cache_whole():
+    """Не принятый вектор чужой длины кэш не разъезжает.
+
+    Длина задана моделью отпечатков, и сменить её можно посреди работы.
+    Дописка такого вектора не удаётся — но номера и матрица обязаны остаться
+    парой: разъехавшись, они роняют сравнение с любым следующим постом, и
+    отсев повторов не работает до перезапуска, а посты канала уходят мимо.
+    """
+    cache = EmbeddingCache()
+    cache.append(1, [1.0, 0.0])
+
+    with pytest.raises(ValueError):
+        cache.append(2, [1.0, 0.0, 0.0])
+
+    assert cache.match([1.0, 0.0], threshold=0.9) == 1
 
 
 def test_an_emptied_cache_takes_new_vectors():

@@ -51,7 +51,6 @@ function skipNote(raw) {
   const text = String(raw);
   const score = SCORE_SKIP.exec(text);
   if (score !== null) return `Оценка ${score[1]} ниже порога ${score[2]}.`;
-  if (text === 'unparseable') return 'Не удалось разобрать.';
   const lower = text.toLowerCase();
   if (lower.startsWith('empty: ')) return 'Пустая вакансия.';
   const known = SKIP_PREFIXES.find((one) => lower.startsWith(one.starts));

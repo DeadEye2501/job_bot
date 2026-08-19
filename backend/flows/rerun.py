@@ -124,20 +124,23 @@ async def _fetch_fresh_text(pipeline, origin: _Origin, vacancy_id: int):
     return None
 
 
-async def _store(pipeline, vacancy_id: int, **fields) -> None:
-    """Записать поля вакансии своей короткой сделкой.
+async def _store(pipeline, vacancy_id: int, **fields) -> bool:
+    """Записать поля вакансии своей короткой сделкой; `False` — строки нет.
 
     Своей, а не общей с разбором: и текст, и отпечаток пишутся до него, и
     оборвись разбор посреди, записанное всё равно останется. Исчезнувшая
-    строка — обычный исход: её могли снести из окна, пока шёл прогон.
+    строка — обычный исход: её могли снести из окна, пока шёл прогон, — и
+    зовущему это говорится ответом: у кэша отсева своя память, и та переживает
+    снос строки.
     """
     async with pipeline.session_factory() as session:
         v = await session.get(Vacancy, vacancy_id)
         if v is None:
-            return
+            return False
         for name, value in fields.items():
             setattr(v, name, value)
         await session.commit()
+    return True
 
 
 async def _refresh_embedding(pipeline, vacancy_id: int, text: str) -> None:
@@ -153,11 +156,23 @@ async def _refresh_embedding(pipeline, vacancy_id: int, text: str) -> None:
     Молчание поставщика отпечатков прогон не отменяет: он отдельный от
     чат-модели и лежит порознь с ней, а разбор — главное, ради чего кнопку и
     жали. Вектор в этом случае остаётся прежним до следующего прогона.
+
+    Кэш правится только вслед за удавшейся записью: вакансию могли выбросить
+    из окна, пока отвечала модель, и вернувшийся в кэш вектор отсеивал бы
+    будущие посты как повторы строки, которой уже нет.
     """
-    vector = await embeddings.embed_text(pipeline, text, f"vacancy {vacancy_id}")
+    try:
+        vector = await embeddings.embed_text(pipeline, text, f"vacancy {vacancy_id}")
+    except embeddings.ProviderIsSilent:
+        logger.warning(
+            "rerun: vacancy %d поставщик отпечатков молчит, вектор остаётся прежним",
+            vacancy_id,
+        )
+        return
     if vector is None:
         return
-    await _store(pipeline, vacancy_id, embedding=vector)
+    if not await _store(pipeline, vacancy_id, embedding=vector):
+        return
     pipeline.embeddings.drop(vacancy_id)
     pipeline.embeddings.append(vacancy_id, vector)
 
@@ -167,6 +182,23 @@ async def _note_rerun(pipeline, vacancy_id: int, origin: "_Origin") -> None:
     async with pipeline.session_factory() as session:
         async with session.begin():
             await record_rerun(session, vacancy_id, origin.status, origin.history_id)
+
+
+async def _text_to_parse(pipeline, origin: "_Origin", vacancy_id: int):
+    """Текст для разбора заново и голый текст поста, если пост перечитан.
+
+    Перечитанный текст тут же и записывается, пока он на руках: разбор идёт
+    минутами, и оборвись он посреди, сохранённый текст остался бы от прошлого
+    раза. Голый текст поста нужен только отпечатку, и без перечитывания его
+    нет вовсе — сохранённый для этого не годится, в нём адреса и статьи.
+    """
+    fresh = await _fetch_fresh_text(pipeline, origin, vacancy_id)
+    if fresh is None:
+        return origin.raw_text, None
+    text, plain = fresh
+    if text != origin.raw_text:
+        await _store(pipeline, vacancy_id, raw_text=text)
+    return text, plain
 
 
 async def rerun_pipeline_for_vacancy(
@@ -186,14 +218,7 @@ async def rerun_pipeline_for_vacancy(
     origin = await _vacancy_origin(pipeline, vacancy_id)
     if origin is None:
         return "missing"
-    fresh = await _fetch_fresh_text(pipeline, origin, vacancy_id)
-    if fresh is None:
-        text, plain = origin.raw_text, None
-    else:
-        text, plain = fresh
-        if text != origin.raw_text:
-            await _store(pipeline, vacancy_id, raw_text=text)
-
+    text, plain = await _text_to_parse(pipeline, origin, vacancy_id)
     if not text:
         logger.warning("rerun: vacancy %d has empty raw_text", vacancy_id)
         return "no_text"
@@ -201,6 +226,12 @@ async def rerun_pipeline_for_vacancy(
     if not await parse.parse_and_update_vacancy(
         pipeline, vacancy_id, text, origin.channel_username, allow_delete=False
     ):
+        # Разбор не дошёл до конца по одной из двух причин, и человеку они
+        # говорят разное: модель не ответила — поднимать модель, строки не
+        # стало — искать нечего. Разбор идёт минутами, и выбросить вакансию
+        # из окна за это время успевают.
+        if await _vacancy_origin(pipeline, vacancy_id) is None:
+            return "missing"
         return "llm"
     if plain is not None:
         await _refresh_embedding(pipeline, vacancy_id, plain)

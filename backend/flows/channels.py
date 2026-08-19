@@ -7,28 +7,43 @@ from backend.telegram_lookup import read_channel_metadata
 from backend.models import TelegramChannel
 from backend.repository.channels import is_channel_blacklisted, list_named_channels
 
-from backend.flows import ingest
+from backend.flows import embeddings, ingest
 from backend.notify import fire
 
 logger = logging.getLogger(__name__)
 
 
+# Отметка сохраняется пачками, а не после каждого сообщения: пятнадцать постов
+# на полсотни каналов дали бы под тысячу записей на диск за цикл. Оборвись
+# работа посреди пачки — до девяти уже разобранных постов примутся заново, а
+# заведённое повторно срежет отсев по отпечатку.
+BATCH_FLUSH_EVERY = 10
+
+# Сколько подряд молчащих ответов поставщика отпечатков терпит один канал.
+# Молчит он сразу для всех постов, и перебирать из-за него весь хвост — это
+# десятки напрасных обращений, за которыми всё равно ничего не заводится.
+_SILENCE_BEFORE_DROPPING_THE_CHANNEL = 3
+
+
 async def poll_active_channels(pipeline) -> None:
+    """Обойти каналы за свежими постами, обновив по дороге названия.
+
+    Сводка названий идёт по всем каналам с ником, включая выключенные: они
+    видны в окне, и человек ждёт у них свежих данных. Отбор по включённости
+    решает только чтение сообщений — оно и стоит минуты против её секунд.
+
+    Сорвавшаяся сводка обход не отменяет: она второстепенна — названия и
+    картинки, — а следующий цикл идёт через полтора часа, и объявления этого
+    человек не увидел бы вовсе.
+    """
     await pipeline.reload_resources()
-    # Берём ВСЕ каналы с @username (не только active=true): metadata-
-    # sweep должен подтягивать title и аватарки и для выключенных
-    # каналов тоже — они всё равно показываются в UI и пользователь
-    # ожидает свежие данные. Активность гейтит только обработку
-    # сообщений ниже.
     async with pipeline.session_factory() as session:
         all_named = await list_named_channels(session)
 
-    # Быстрый sweep метаданных по всему списку до тяжёлой обработки
-    # сообщений: один `get_chat` на канал, плюс backfill аватара через
-    # `download_media`, всё пишется одной транзакцией. UI получает
-    # свежие названия и аватары за десятки секунд, а не за десятки
-    # минут (по ~5 мин на канал на парсинг сообщений).
-    await refresh_channel_metadata(pipeline, all_named)
+    try:
+        await refresh_channel_metadata(pipeline, all_named)
+    except Exception:
+        logger.exception("Сводка названий сорвалась, иду читать сообщения")
 
     active_named = [c for c in all_named if c.is_active]
     total = len(active_named)
@@ -130,19 +145,17 @@ async def _store_metadata(
         await session.commit()
 
 
-async def refresh_channel_metadata(pipeline, channels) -> None:
-    """Обновить название и аватар у каждого канала с ником, до чтения постов.
+async def _collect_metadata(pipeline, channels) -> tuple[dict, dict]:
+    """Спросить у Telegram названия и картинки; отдать то, что стоит записать.
 
-    У каждого, а не только у включённых: выключенные всё равно стоят в списке
-    окна, и человек ждёт у них свежих данных. Отбор по включённости решает
-    только чтение постов ниже.
+    Обращение на канал одно и идёт по очереди: соединение Pyrogram одно на
+    всех, а частые обращения упираются в предел. Ответ несёт и название, и
+    картинку сразу. Что берётся у ответа и по какому правилу — в
+    `telegram_lookup.read_channel_metadata`; здесь остаётся своё: название
+    попадает в сбор только изменившееся.
 
-    One `get_chat` call per channel (sequential — Pyrogram's session is
-    not thread-safe and concurrent calls can trip FloodWait); the same
-    response carries both ``title`` and ``photo``. Что берётся у ответа и по
-    какому правилу — в `telegram_lookup.read_channel_metadata`; здесь остаётся своё:
-    название обновляется только изменившееся, а всё собранное ложится одной
-    транзакцией. Failures are logged and skipped.
+    Канал, до которого не достучались, пропускается с записью в журнал: из-за
+    одного закрытого остальные обновиться должны.
     """
     title_updates: dict[int, str] = {}
     avatar_updates: dict[int, bytes] = {}
@@ -161,9 +174,31 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
             title_updates[ch.id] = new_title
         if blob:
             avatar_updates[ch.id] = blob
+    return title_updates, avatar_updates
+
+
+async def refresh_channel_metadata(pipeline, channels) -> None:
+    """Обновить название и аватар у каждого канала с ником, до чтения постов.
+
+    У каждого, а не только у включённых: выключенные всё равно стоят в списке
+    окна, и человек ждёт у них свежих данных. Отбор по включённости решает
+    только чтение постов ниже.
+
+    Спрашивает сосед (`_collect_metadata`), здесь остаётся запись: всё
+    собранное ложится одной сделкой, и окно узнаёт о свежих названиях только
+    после неё — не записанному радоваться нечему.
+    """
+    title_updates, avatar_updates = await _collect_metadata(pipeline, channels)
     if not title_updates and not avatar_updates:
         return
-    await _store_metadata(pipeline, title_updates, avatar_updates)
+    try:
+        await _store_metadata(pipeline, title_updates, avatar_updates)
+    except Exception:
+        # Занятая база — обычное дело: рядом идёт запись входящего письма.
+        # Названия подождут следующего обхода, а вот бросок отсюда уносит и
+        # ручной прогон канала, и весь цикл сразу за сводкой.
+        logger.exception("Не записал названия и картинки каналов")
+        return
     logger.info(
         "refresh_channel_metadata: %d title(s), %d avatar(s) updated",
         len(title_updates), len(avatar_updates),
@@ -201,6 +236,25 @@ async def _unseen_posts(pipeline, channel_username: str, last_id: int | None):
     return list(reversed(new_msgs))
 
 
+async def _take_post(pipeline, channel_id: int, channel_username: str, msg) -> bool:
+    """Принять один пост; `False` — поставщик отпечатков молчит.
+
+    Сорвавшийся приём здесь беды не делает и отметку не держит: сломанное
+    сообщение иначе перечитывалось бы вечно, а что успело завестись — срежет
+    отсев повторов. Молчание поставщика решается зовущим: пост не считали
+    вовсе, и двигать отметку значит потерять его.
+    """
+    try:
+        await ingest.ingest_post(pipeline, channel_id, channel_username, msg)
+    except embeddings.ProviderIsSilent:
+        return False
+    except Exception:
+        logger.exception(
+            "[@%s] %d ingest failed, advancing cursor", channel_username, msg.id,
+        )
+    return True
+
+
 async def poll_channel(
     pipeline,
     channel_id: int,
@@ -209,30 +263,33 @@ async def poll_channel(
 ) -> None:
     ordered = await _unseen_posts(pipeline, channel_username, last_id)
     total = len(ordered)
-    # Cursor flush'ится батчами вместо коммита на каждое сообщение —
-    # backfill_limit=15 × 50 каналов = ~750 fsync'ов на цикл иначе.
-    # При crash mid-batch потеряем до BATCH_FLUSH_EVERY-1 уже-обработанных
-    # сообщений (они реингестятся, дедуп по embedding'у не пропустит).
-    # finally-flush гарантирует, что курсор не отстаёт между poll-циклами.
-    BATCH_FLUSH_EVERY = 10
     cursor: int | None = None
+    silence = 0
     try:
         for i, msg in enumerate(ordered):
             pipeline.emit_progress("message", f"@{channel_username}", i, total)
-            try:
-                await ingest.ingest_post(pipeline, channel_id, channel_username, msg)
-            except Exception:
-                # Advance cursor anyway — иначе сломанное сообщение
-                # реингестится бесконечно. Дубликаты (если ingest
-                # частично прошёл) всё равно срежет дедуп.
-                logger.exception(
-                    "[@%s] %d ingest failed, advancing cursor",
-                    channel_username, msg.id,
+            if not await _take_post(pipeline, channel_id, channel_username, msg):
+                # Отметку не двигаем: пост не считали вовсе, и двинутая
+                # отметка потеряла бы его навсегда — следующий обход берёт
+                # только то, что новее её.
+                silence += 1
+                logger.warning(
+                    "[@%s] %d поставщик отпечатков молчит (%d подряд)",
+                    channel_username, msg.id, silence,
                 )
+                if silence < _SILENCE_BEFORE_DROPPING_THE_CHANNEL:
+                    continue
+                logger.error(
+                    "[@%s] бросаю обход: поставщик отпечатков молчит %d раза подряд",
+                    channel_username, silence,
+                )
+                break
+            silence = 0
             cursor = msg.id
             if (i + 1) % BATCH_FLUSH_EVERY == 0:
                 await advance_cursor(pipeline, channel_id, cursor)
-        pipeline.emit_progress("message", f"@{channel_username}", total, total)
+        else:
+            pipeline.emit_progress("message", f"@{channel_username}", total, total)
     finally:
         if cursor is not None:
             await advance_cursor(pipeline, channel_id, cursor)

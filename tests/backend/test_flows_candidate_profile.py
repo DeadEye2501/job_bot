@@ -11,7 +11,7 @@
 отвязана от сессии.
 """
 
-from backend.llm.candidate import _build_candidate_profile
+from backend.llm.candidate import build_candidate_profile
 from backend.llm.candidate import CandidateProfile
 from backend.models import ProfileLanguage
 from tests.factories import profile_row
@@ -23,7 +23,7 @@ def test_a_missing_profile_yields_an_empty_slice():
     Проверяльщик читает пустоту как «ограничений нет»; иначе приложение
     отбрасывало бы все вакансии до того, как пользователь заполнит анкету.
     """
-    assert _build_candidate_profile(None, []) == CandidateProfile()
+    assert build_candidate_profile(None, []) == CandidateProfile()
 
 
 def test_the_slice_carries_what_the_validator_reads():
@@ -36,7 +36,7 @@ def test_the_slice_carries_what_the_validator_reads():
         free_preferences="без релокации",
     )
 
-    got = _build_candidate_profile(profile, [])
+    got = build_candidate_profile(profile, [])
 
     assert got.title == "Python-разработчик"
     assert got.location == "Ереван"
@@ -56,7 +56,7 @@ def test_languages_come_with_their_levels():
         ProfileLanguage(profile_id=1, language="Английский", level="B1"),
     ]
 
-    got = _build_candidate_profile(profile_row(), languages)
+    got = build_candidate_profile(profile_row(), languages)
 
     assert [(item.name, item.level) for item in got.languages] == [
         ("Русский", "native"),
@@ -72,7 +72,7 @@ def test_empty_lists_stay_empty_rather_than_absent():
     """
     profile = profile_row(grades=None, work_format=None)
 
-    got = _build_candidate_profile(profile, [])
+    got = build_candidate_profile(profile, [])
 
     assert got.grades == []
     assert got.work_formats == []
@@ -87,7 +87,7 @@ def test_the_slice_does_not_share_its_lists_with_the_profile():
     """
     profile = profile_row(grades=["middle"], work_format=["remote"])
 
-    got = _build_candidate_profile(profile, [])
+    got = build_candidate_profile(profile, [])
     profile.grades.append("senior")
     profile.work_format.append("office")
 
