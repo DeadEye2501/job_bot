@@ -36,9 +36,23 @@ _STATUS_BY_CODE = {status_code(s): s for s in VacancyStatus}
 """
 
 
-# Порядок «горячее сверху» и «новое сверху»: чем ближе к оферу (или чем
-# свежее), тем выше. Зеркала в разметке у них нет — сортировка целиком на
-# стороне запроса. Положения дел вне перечня уходят в хвост (999).
+# Обещание этого порядка — воронка с конца: чем ближе к оферу, тем выше. Тест
+# и приглашение подняты над «в процессе» нарочно: там ход за человеком, а «в
+# процессе» — ожидание ответа HR (`domain/transitions.py`). Сквозным правилом
+# «ход за человеком» не служит: «новая» лежит ниже «отклика», хотя отправлять
+# отклик тоже человеку. Второй перечень обещает обратное, «сначала новые», и
+# идёт по воронке с её начала.
+#
+# У мини-списка канала (`vacancies_mini.py`) обещание другое — «по ходу
+# воронки»: там «в процессе» стоит выше теста с приглашением, а «не подходит»
+# уходит в самый низ. Расходятся обе половины перечня — и активная середина, и
+# холодный хвост, у которого принципа нет ни здесь, ни там. Расхождение
+# подтверждено человеком 19.08 и намеренно: сводить таблицы в одну не надо.
+#
+# Зеркала у самой сортировки в разметке нет — порядок выдачи целиком на
+# стороне запроса. Свои перечни статусов у окна есть (`state/stats.js`), но они
+# о другом: там кольцо воронки, а не порядок списка.
+# Положения дел вне перечня уходят в хвост (999).
 _STATUS_PRIORITY_ACTIVE_FIRST = {
     VacancyStatus.OFFER: 0,
     VacancyStatus.TEST: 1,
@@ -201,12 +215,12 @@ def _choice_clauses(f: VacancyFilter) -> tuple[list, set[str]]:
     return clauses, joins
 
 
-def _range_clauses(f: VacancyFilter, freshness) -> list:
-    """Условия по числовым и временным границам.
+def _salary_clauses(f: VacancyFilter) -> list:
+    """Условия по окну зарплаты.
 
-    Окно зарплаты и вилка вакансии сравниваются на пересечение, поэтому
-    границы сходятся крест-накрест. У вакансии без чисел обе колонки пусты,
-    и сравнение с пустотой отсеивает её само.
+    Окно и вилка вакансии сравниваются на пересечение, поэтому границы
+    сходятся крест-накрест. У вакансии без чисел обе колонки пусты, и
+    сравнение с пустотой отсеивает её само.
 
     Одна названная граница — не то же самое, что ни одной: «от 300 000»
     потолка не имеет вовсе, и ставить ему те же триста тысяч значит прятать
@@ -214,10 +228,6 @@ def _range_clauses(f: VacancyFilter, freshness) -> list:
     отбору не противоречит и потому его проходит.
     """
     clauses: list = []
-    if f.score_min is not None:
-        clauses.append(Vacancy.score >= f.score_min)
-    if f.score_max is not None:
-        clauses.append(Vacancy.score <= f.score_max)
     if f.salary_min is not None:
         clauses.append(
             or_(
@@ -238,6 +248,17 @@ def _range_clauses(f: VacancyFilter, freshness) -> list:
                 ),
             )
         )
+    return clauses
+
+
+def _range_clauses(f: VacancyFilter, freshness) -> list:
+    """Условия по числовым и временным границам."""
+    clauses: list = []
+    if f.score_min is not None:
+        clauses.append(Vacancy.score >= f.score_min)
+    if f.score_max is not None:
+        clauses.append(Vacancy.score <= f.score_max)
+    clauses.extend(_salary_clauses(f))
     if f.date_from is not None:
         clauses.append(freshness >= f.date_from)
     if f.date_to is not None:

@@ -8,10 +8,19 @@ from backend.repository.hr_card import LAST_VACANCY_ORDER
 from backend.repository.paging import trim_page
 from backend.repository.vacancies_common import PARSED_ONLY, VACANCY_APPEARED_AT
 
-# Channel mini-list sort order — UI requirement: hottest funnel statuses
-# first (Offer / In Progress / Invitation / Test / Answered / Applied / New),
-# then unresolved cold (Scam / Ghosting / Decline), then NotFit at the
-# bottom. Secondary sort внутри одного статуса — по дате появления вакансии
+# Обещание этого порядка — «по ходу воронки»: наверху офер, под ним «в
+# процессе», и только потом приглашение с тестом. Так потому, что по графу
+# авто-переходов в «в процессе» приходят только из них (`domain/transitions.py`;
+# рукой человек ставит любой статус из любого, граф ему не указ) — значит,
+# зашло дальше. Внизу холодное, и «не подходит» последним: это наш собственный
+# отсев, а не чужой ответ.
+#
+# У большого списка (`vacancies_list.py`) обещание другое — воронка с конца с
+# поднятыми тестом и приглашением, — и холодный хвост там свой, «не подходит»
+# идёт первым. Расхождение подтверждено человеком 19.08 и намеренно: сводить
+# таблицы в одну не надо.
+#
+# Secondary sort внутри одного статуса — по дате появления вакансии
 # (posted_at если есть, иначе created_at), новые сверху.
 #
 # Ключи — .value-строки, а не enum-члены: при `case(dict, value=col)` SA

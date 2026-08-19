@@ -1505,7 +1505,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool` (32)
 - `async def add_vacancy_event(session: AsyncSession, vacancy_id: int, kind: str, payload: dict | None=None) -> VacancyEvent` (19)
 
-### `backend/repository/vacancies_list.py` — 430 строк ⚠ подошёл к 300
+### `backend/repository/vacancies_list.py` — 451 строк ⚠ подошёл к 300
 
 Отбор вакансий для списка на экране.
 
@@ -1515,7 +1515,8 @@ First-run bootstrap: ensure DB schema exists.
 - `def _like_anywhere(text: str) -> str` (18)
 - `def _search_clauses(search: str | None) -> tuple[list, set[str]]` (24)
 - `def _choice_clauses(f: VacancyFilter) -> tuple[list, set[str]]` (41)
-- `def _range_clauses(f: VacancyFilter, freshness) -> list` (42)
+- `def _salary_clauses(f: VacancyFilter) -> list` (34)
+- `def _range_clauses(f: VacancyFilter, freshness) -> list` (13)
 - `def _column_clauses(f: VacancyFilter) -> list` (20)
 - `def _where_and_joins(f: VacancyFilter, freshness) -> tuple[list, set[str]]` (15)
 - `async def list_vacancies(session: AsyncSession, filters: VacancyFilter) -> tuple[list[Vacancy], bool]` (21)
@@ -1525,7 +1526,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def list_vacancy_filter_options(session: AsyncSession) -> dict[str, list[str]]` (16)
 - `async def list_vacancy_last_activity(session: AsyncSession, vacancy_ids: list[int]) -> dict[int, datetime]` (25)
 
-### `backend/repository/vacancies_mini.py` — 105 строк
+### `backend/repository/vacancies_mini.py` — 114 строк
 
 Короткие списки вакансий для карточек других предметов.
 
