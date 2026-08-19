@@ -2,7 +2,14 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, UniqueConstraint, func
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Index,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import expression
 
@@ -11,8 +18,9 @@ from backend.models.base import Base, IdMixin
 
 class Message(IdMixin, Base):
     __tablename__ = "message"
-    # FK-индексы на hr_id / vacancy_id горячие: chat-list, HR-detail,
-    # vacancy-delete-cascade ходят по ним в каждом UI-action'е.
+    # Поиск по вакансии горячий: список переписки, карточка HR и снос вакансии
+    # ходят по нему на каждое действие в окне, а своих индексов на внешние
+    # ключи SQLite не заводит.
     __table_args__ = (
         UniqueConstraint(
             "hr_id",
@@ -20,7 +28,8 @@ class Message(IdMixin, Base):
             "is_incoming",
             name="uq_message_hr_tgid_dir",
         ),
-        Index("ix_message_hr_id", "hr_id"),
+        # По `hr_id` поиск идёт левым началом уникальности выше; свой индекс
+        # на ту же колонку нового пути не давал.
         Index("ix_message_vacancy_id", "vacancy_id"),
     )
 
@@ -28,7 +37,9 @@ class Message(IdMixin, Base):
     hr_id: Mapped[int | None] = mapped_column(ForeignKey("hr.id"))
     vacancy_id: Mapped[int | None] = mapped_column(ForeignKey("vacancy.id"))
     text: Mapped[str]
-    tg_message_id: Mapped[int | None]
+    # BigInteger — см. TelegramChannel.last_processed_msg_id: номер письма в
+    # Telegram выходит за 2^31 у долгоживущих учётных записей.
+    tg_message_id: Mapped[int | None] = mapped_column(BigInteger)
     sent_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

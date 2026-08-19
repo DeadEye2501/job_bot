@@ -24,18 +24,16 @@ from backend.models.enums import Currency, StatusHistorySource, VacancyStatus
 class Vacancy(IdMixin, CreatedAtMixin, Base):
     __tablename__ = "vacancy"
     # SQLite сам индексов на FK не создаёт — каждая отрисовка HR-карточки,
-    # карточки компании, статистики канала иначе делает full-scan. Compound
-    # (hr_id, is_parsed) и (company_id, is_parsed) покрывают самые горячие
-    # фильтры UI-списка вакансий.
+    # карточки компании, статистики канала иначе делала бы полный обход.
+    # Составных хватает: поиск по одному только `hr_id` идёт левым началом
+    # (hr_id, is_parsed), а по каналу — левым началом уникальности источника.
+    # Отдельные индексы на те же колонки нового пути не давали.
     __table_args__ = (
         UniqueConstraint(
             "source_channel_id",
             "source_msg_id",
             name="uq_vacancy_source",
         ),
-        Index("ix_vacancy_hr_id", "hr_id"),
-        Index("ix_vacancy_company_id", "company_id"),
-        Index("ix_vacancy_source_channel_id", "source_channel_id"),
         Index("ix_vacancy_hr_id_is_parsed", "hr_id", "is_parsed"),
         Index("ix_vacancy_company_id_is_parsed", "company_id", "is_parsed"),
     )
@@ -150,18 +148,24 @@ class VacancyStatusHistory(IdMixin, Base):
     )
 
     vacancy_id: Mapped[int] = mapped_column(ForeignKey("vacancy.id"))
-    message_id: Mapped[int | None] = mapped_column(ForeignKey("message.id"))
+    # Гаснет вместе с письмом, а строку истории не уносит: переписка уходит с
+    # удалённым HR, а история принадлежит вакансии, и та остаётся. Держи
+    # ссылка письмо намертво — удалить ответившего HR было бы нельзя вовсе.
+    message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("message.id", ondelete="SET NULL")
+    )
     previous_status: Mapped[VacancyStatus | None] = mapped_column(
-        enum_column(VacancyStatus, "vacancy_status", create_type=False),
+        enum_column(VacancyStatus, "vacancy_status"),
     )
     status: Mapped[VacancyStatus] = mapped_column(
-        enum_column(VacancyStatus, "vacancy_status", create_type=False),
+        enum_column(VacancyStatus, "vacancy_status"),
     )
-    # Без explicit length — все остальные строковые поля в схеме объявлены
-    # как `String` (SQLite всё равно хранит TEXT без cap'а на длину).
-    # 2000-cap раньше отличал эту колонку без причины. Ограничение длины
-    # на стороне приложения — `_ensure_trailing_period` в repository/vacancy_status.py
-    # сам обрабатывает None/empty; UI textarea имеет maxlength=2000.
+    # Без предела длины: остальные строковые поля объявлены так же, а SQLite
+    # хранит TEXT без ограничения — прежний предел в 2000 знаков отличал эту
+    # колонку без причины. Длину не ограничивает и приложение: окно держит
+    # `maxlength` на своём поле пояснения, а приходящее от модели не мерит
+    # никто (`_ensure_trailing_period` в `repository/vacancy_status.py` только
+    # дописывает точку).
     explanation: Mapped[str | None] = mapped_column(String)
     applied: Mapped[bool] = mapped_column(server_default=expression.true())
     source: Mapped[StatusHistorySource] = mapped_column(

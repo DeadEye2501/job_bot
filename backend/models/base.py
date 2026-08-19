@@ -11,23 +11,17 @@ class Base(DeclarativeBase):
     pass
 
 
-def enum_column(
-    values: type[enum.Enum], name: str, *, create_type: bool = True
-) -> SQLEnum:
+def enum_column(values: type[enum.Enum], name: str) -> SQLEnum:
     """Тип колонки под перечисление: в базу идёт `value`, а не имя члена.
 
     Без `values_callable` SQLAlchemy пишет имена (`NOT_FIT`), и колонка
     расходится с тем, что показывает экран и что лежит в старых строках.
     Объявление одно на все колонки: семь написаний расходились бы по одному.
-
-    `create_type=False` ставится там, где тип с этим именем уже объявлен
-    другой колонкой, — иначе миграция пыталась бы завести его дважды.
     """
     return SQLEnum(
         values,
         values_callable=lambda x: [e.value for e in x],
         name=name,
-        create_type=create_type,
     )
 
 
@@ -56,7 +50,12 @@ class CreatedAtMixin:
 
 
 class UpdatedAtMixin:
-    """Время последней правки строки, обновляемое базой на каждый UPDATE."""
+    """Время последней правки строки, проставляемое на каждый UPDATE.
+
+    Проставляет его SQLAlchemy (`onupdate`), а не база: у SQLite триггера на
+    обновление нет, и строка, правленная мимо сессии — прямым SQL из DBeaver
+    или миграцией, — отметку не двигает.
+    """
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

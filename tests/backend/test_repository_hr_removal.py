@@ -7,10 +7,15 @@
 
 from sqlalchemy import select
 
-from backend.models import HR, Message, Vacancy
+from backend.models import HR, Message, Vacancy, VacancyStatusHistory
 from backend.repository.hr_card import delete_hr
 from tests.dbio import put
-from tests.factories import hr_row, message_row, vacancy_row
+from tests.factories import (
+    hr_row,
+    message_row,
+    status_history_row,
+    vacancy_row,
+)
 
 
 async def test_deleting_a_missing_hr_reports_failure(session):
@@ -41,6 +46,34 @@ async def test_the_conversation_goes_with_the_person(session, session_factory):
     assert [h.name for h in (await session.scalars(select(HR))).all()] == [
         "рядом стоял"
     ]
+
+
+async def test_the_history_outlives_the_letter_it_pointed_at(
+    session, session_factory
+):
+    """Строка истории переживает удаление письма, на которое ссылалась.
+
+    Переписка уходит вместе с человеком, а история статусов принадлежит
+    вакансии — та остаётся. Держи ссылка письмо намертво, удалить ответившего
+    HR было бы нельзя вовсе: база отбила бы снос ссылкой из истории, и
+    карточка человека, однажды ответившего на отклик, стала бы вечной.
+    """
+    doomed = hr_row(name="под нож")
+    await put(session_factory, doomed)
+    vacancy = vacancy_row(hr_id=doomed.id)
+    await put(session_factory, vacancy)
+    letter = message_row(text="его разговор", hr_id=doomed.id, vacancy_id=vacancy.id)
+    await put(session_factory, letter)
+    await put(
+        session_factory,
+        status_history_row(vacancy_id=vacancy.id, message_id=letter.id),
+    )
+
+    assert await delete_hr(session, doomed.id) is True
+    await session.commit()
+
+    kept = (await session.scalars(select(VacancyStatusHistory))).all()
+    assert [row.message_id for row in kept] == [None]
 
 
 async def test_the_vacancies_survive_without_their_hr(session, session_factory):
