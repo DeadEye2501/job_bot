@@ -163,16 +163,17 @@ First-run bootstrap: ensure DB schema exists.
 - `class SendPermission` (8)
 - `async def can_send_to_hr(bot, hr) -> SendPermission` (23)
 
-### `backend/bot/channels.py` — 120 строк
+### `backend/bot/channels.py` — 142 строк
 
 Правка каналов из окна: заведение, удаление, чтение по требованию.
 
-Зависит от: `backend.bot`, `backend.repository.channels`, `backend.telegram_lookup`
+Зависит от: `backend.bot`, `backend.flows`, `backend.repository.channels`, `backend.telegram_lookup`
 
-- `async def poll_channel_now(bot, channel_id: int) -> Literal['ok', 'busy', 'missing', 'blacklisted', 'cancelled', 'error']` (31)
+- `async def poll_channel_now(bot, channel_id: int) -> ChannelPollOutcome` (29)
 - `async def delete_channel(bot, channel_id: int) -> int | None` (7)
-- `async def add_channel(bot, username: str) -> tuple[int | None, Literal['created', 'exists', 'invalid', 'error']]` (45)
-- `async def force_poll_once(bot) -> Literal['ok', 'busy', 'cancelled', 'error']` (11)
+- `async def _ask_telegram_about(bot, username: str)` (18)
+- `async def add_channel(bot, username: str) -> tuple[int | None, ChannelAddOutcome]` (38)
+- `async def force_poll_once(bot) -> slot.CycleOutcome` (11)
 
 ### `backend/bot/chat.py` — 221 строк
 
@@ -188,7 +189,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _checked_kind(src: Path, file_path: str) -> bool` (28)
 - `async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message` (38)
 
-### `backend/bot/client.py` — 328 строк ⚠ подошёл к 300
+### `backend/bot/client.py` — 327 строк ⚠ подошёл к 300
 
 Сборка бота: его состояние, соединения и поверхность, которой пользуется окно.
 
@@ -204,11 +205,11 @@ First-run bootstrap: ensure DB schema exists.
   - `def is_connected(self) -> bool` (13)
   - `def kick(self) -> None` (8)
   - `def request_stop(self) -> None` (8)
-  - `async def poll_channel_now(self, channel_id) -> Literal['ok', 'busy', 'missing', 'blacklisted', 'cancelled', 'error']` (4)
+  - `async def poll_channel_now(self, channel_id) -> channels.ChannelPollOutcome` (4)
   - `async def delete_channel(self, channel_id) -> int | None` (2)
-  - `async def add_channel(self, username) -> tuple[int | None, Literal['created', 'exists', 'invalid', 'error']]` (4)
+  - `async def add_channel(self, username) -> tuple[int | None, channels.ChannelAddOutcome]` (4)
   - `def cancel_current_poll(self) -> None` (2)
-  - `async def force_poll_once(self) -> Literal['ok', 'busy', 'cancelled', 'error']` (2)
+  - `async def force_poll_once(self) -> slot.CycleOutcome` (2)
   - `async def mark_hr_chat_read(self, hr_id) -> int` (2)
   - `async def send_to_hr_chat(self, hr_id, text) -> Message` (2)
   - `async def send_to_hr_media(self, hr_id, file_path) -> Message` (2)
@@ -222,7 +223,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def log_out_session(self) -> None` (2)
   - `async def current_mode(self) -> BotMode` (2)
   - `async def run(self, *, once=False) -> None` (2)
-  - `async def ui_rerun_vacancy_pipeline(self, vacancy_id) -> Literal['ok', 'busy', 'missing', 'no_text', 'llm', 'cancelled', 'error']` (4)
+  - `async def ui_rerun_vacancy_pipeline(self, vacancy_id) -> rerun.RerunOutcome` (4)
   - `async def ui_forget_vacancy(self, vacancy_id) -> bool` (2)
 
 ### `backend/bot/loop.py` — 236 строк
@@ -256,13 +257,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def media_path_for_db(path) -> str` (11)
 - `async def download_media(client, msg, hr_id: int) -> str | None` (25)
 
-### `backend/bot/rerun.py` — 36 строк
+### `backend/bot/rerun.py` — 41 строк
 
 Ручной перезапуск разбора вакансии из окна.
 
-Зависит от: `backend.bot`
+Зависит от: `backend.bot`, `backend.flows`
 
-- `async def ui_rerun_vacancy_pipeline(bot, vacancy_id: int) -> Literal['ok', 'busy', 'missing', 'no_text', 'llm', 'cancelled', 'error']` (25)
+- `async def ui_rerun_vacancy_pipeline(bot, vacancy_id: int) -> RerunOutcome` (23)
 
 ### `backend/bot/send.py` — 321 строк ⚠ подошёл к 300
 
@@ -286,7 +287,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _record_send(bot, hr: HR, text: str, outcome: _Outcome, permission) -> None` (22)
 - `async def send(bot, hr: HR, text: str, attachment=None, errand: Errand=Errand()) -> bool` (36)
 
-### `backend/bot/slot.py` — 107 строк
+### `backend/bot/slot.py` — 115 строк
 
 Единственное место прогона: пока оно занято, второй цикл получает отказ.
 
@@ -478,14 +479,14 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def report_failures(hr_ids: list[int], results: list, what: str) -> None` (19)
 
-### `backend/flows/channels.py` — 307 строк ⚠ подошёл к 300
+### `backend/flows/channels.py` — 313 строк ⚠ подошёл к 300
 
 Обход телеграм-каналов за свежими постами.
 
 Зависит от: `backend.flows`, `backend.models`, `backend.notify`, `backend.repository.channels`, `backend.telegram_lookup`
 
 - `async def poll_active_channels(pipeline) -> None` (40)
-- `async def poll_one_channel(pipeline, channel_id: int) -> Literal['ok', 'missing', 'blacklisted', 'error']` (41)
+- `async def poll_one_channel(pipeline, channel_id: int) -> PollOutcome` (39)
 - `async def refresh_channel_metadata_for_ids(pipeline, channel_ids: list[int]) -> None` (12)
 - `async def _store_metadata(pipeline, title_updates: dict[int, str], avatar_updates: dict[int, bytes]) -> None` (19)
 - `async def _collect_metadata(pipeline, channels) -> tuple[dict, dict]` (30)
@@ -682,7 +683,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parsed_event_payload(v: Vacancy, outcome: Outcome, decision) -> dict` (15)
 - `async def persist_parse_outcome(pipeline, vacancy_id: int, parsed: ParsedVacancy | None, outcome: Outcome) -> tuple[HR | None, bool] | None` (41)
 
-### `backend/flows/pipeline.py` — 318 строк ⚠ подошёл к 300
+### `backend/flows/pipeline.py` — 317 строк ⚠ подошёл к 300
 
 Сборка конвейера: его состояние, общие ресурсы и поверхность для зовущих.
 
@@ -700,11 +701,11 @@ First-run bootstrap: ensure DB schema exists.
   - `async def reload_resources(self) -> None` (28)
   - `def cv_path(self)` (11)
   - `async def check_ghosting_timeouts(self) -> int` (2)
-  - `async def rerun_pipeline_for_vacancy(self, vacancy_id) -> Literal['ok', 'missing', 'no_text', 'llm']` (4)
+  - `async def rerun_pipeline_for_vacancy(self, vacancy_id) -> rerun.RerunPipelineOutcome` (4)
   - `async def recover_orphan_vacancies(self) -> int` (2)
   - `async def poll_active_channels(self) -> None` (2)
   - `async def forget_vacancy(self, vacancy_id) -> bool` (2)
-  - `async def poll_one_channel(self, channel_id) -> Literal['ok', 'missing', 'blacklisted', 'error']` (4)
+  - `async def poll_one_channel(self, channel_id) -> channels.PollOutcome` (4)
   - `async def refresh_channel_metadata_for_ids(self, channel_ids) -> None` (2)
   - `def update_dm_buffer_text(self, hr_id, tg_msg_id, new_text) -> None` (3)
   - `def remove_dm_buffer_msg(self, hr_id, tg_msg_id) -> None` (3)
@@ -714,7 +715,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def cancel_pending_dm_classifications(self, *, drain=False) -> None` (2)
   - `async def send_application_for_vacancy(self, vacancy_id) -> tuple[bool, str]` (2)
 
-### `backend/flows/rerun.py` — 310 строк ⚠ подошёл к 300
+### `backend/flows/rerun.py` — 317 строк ⚠ подошёл к 300
 
 Повторный разбор уже заведённой вакансии.
 
@@ -728,7 +729,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _refresh_embedding(pipeline, vacancy_id: int, text: str) -> None` (32)
 - `async def _note_rerun(pipeline, vacancy_id: int, origin: '_Origin') -> None` (5)
 - `async def _text_to_parse(pipeline, origin: '_Origin', vacancy_id: int)` (15)
-- `async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> Literal['ok', 'missing', 'no_text', 'llm']` (39)
+- `async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> RerunPipelineOutcome` (39)
 - `async def _orphan_rows(pipeline) -> list` (25)
 - `async def recover_orphan_vacancies(pipeline) -> int` (39)
 

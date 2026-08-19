@@ -7,6 +7,7 @@ from typing import Literal
 from pyrogram.errors import UsernameInvalid, UsernameNotOccupied
 
 from backend.bot import slot
+from backend.flows import channels as flow_channels
 from backend.telegram_lookup import read_channel_metadata
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
 from backend.repository.channels import (
@@ -17,10 +18,18 @@ from backend.repository.channels import (
 
 logger = logging.getLogger(__name__)
 
+ChannelPollOutcome = Literal[slot.CycleOutcome, flow_channels.PollOutcome]
+"""Чем кончился прогон одного канала, как это видит окно.
 
-async def poll_channel_now(
-    bot, channel_id: int
-) -> Literal["ok", "busy", "missing", "blacklisted", "cancelled", "error"]:
+Складывается, а не выписывается: исходы места прогона и исходы самого обхода
+объявлены каждый у себя, и переписанные здесь значения разошлись бы с ними.
+"""
+
+ChannelAddOutcome = Literal["created", "exists", "invalid", "error"]
+"""Чем кончилось заведение канала."""
+
+
+async def poll_channel_now(bot, channel_id: int) -> ChannelPollOutcome:
     """UI «Прогнать сейчас» — single-channel manual poll.
 
     Идёт в общем месте прогона, как и полный обход: отсюда нижняя полоса
@@ -60,10 +69,30 @@ async def delete_channel(bot, channel_id: int) -> int | None:
             return await repo_delete_channel(session, channel_id)
 
 
+async def _ask_telegram_about(bot, username: str):
+    """Канал по имени и чем кончился вопрос; исход непустой — дальше не идём.
+
+    Спрашивается один `get_chat`, и он же и есть проверка существования.
+    «Не знает такого имени» и «спросить не вышло» разведены нарочно, а чем
+    эта разница оборачивается для человека — сказано у зовущего.
+    """
+    try:
+        chat = await bot.client.get_chat(username)
+    except (UsernameNotOccupied, UsernameInvalid):
+        logger.info("add_channel: Telegram не знает канала @%s", username)
+        return None, "invalid"
+    except Exception:
+        logger.exception("add_channel: get_chat(%s) failed", username)
+        return None, "error"
+    if chat is None:
+        return None, "invalid"
+    return chat, None
+
+
 async def add_channel(
     bot, username: str
-) -> tuple[int | None, Literal["created", "exists", "invalid", "error"]]:
-    """Validate against Telegram and insert a TelegramChannel.
+) -> tuple[int | None, ChannelAddOutcome]:
+    """Спросить Telegram об имени и завести канал; номер строки и исход.
 
     Returns a status tuple:
     - ``(id, "exists")`` — row уже была; UI выбирает её и тостит «уже добавлен».
@@ -83,16 +112,9 @@ async def add_channel(
         if existing is not None:
             return existing.id, "exists"
 
-    try:
-        chat = await bot.client.get_chat(username)
-    except (UsernameNotOccupied, UsernameInvalid):
-        logger.info("add_channel: Telegram не знает канала @%s", username)
-        return None, "invalid"
-    except Exception:
-        logger.exception("add_channel: get_chat(%s) failed", username)
-        return None, "error"
-    if chat is None:
-        return None, "invalid"
+    chat, refused = await _ask_telegram_about(bot, username)
+    if refused is not None:
+        return None, refused
 
     title, avatar = await read_channel_metadata(bot.client, chat)
 
@@ -107,7 +129,7 @@ async def add_channel(
     return channel_id, "created"
 
 
-async def force_poll_once(bot) -> Literal["ok", "busy", "cancelled", "error"]:
+async def force_poll_once(bot) -> slot.CycleOutcome:
     """Manual one-shot poll, fired regardless of bot_state.mode. Used by
     the refresh button so the user always sees something happen.
 

@@ -7,7 +7,6 @@
 
 import asyncio
 import logging
-from typing import Literal
 
 from pyrogram import filters
 from pyrogram.handlers import (
@@ -259,7 +258,7 @@ class Bot:
 
     async def poll_channel_now(
         self, channel_id
-    ) -> Literal["ok", "busy", "missing", "blacklisted", "cancelled", "error"]:
+    ) -> channels.ChannelPollOutcome:
         return await channels.poll_channel_now(self, channel_id)
 
     async def delete_channel(self, channel_id) -> int | None:
@@ -267,13 +266,13 @@ class Bot:
 
     async def add_channel(
         self, username
-    ) -> tuple[int | None, Literal["created", "exists", "invalid", "error"]]:
+    ) -> tuple[int | None, channels.ChannelAddOutcome]:
         return await channels.add_channel(self, username)
 
     def cancel_current_poll(self) -> None:
         return slot.cancel_current_poll(self)
 
-    async def force_poll_once(self) -> Literal["ok", "busy", "cancelled", "error"]:
+    async def force_poll_once(self) -> slot.CycleOutcome:
         return await channels.force_poll_once(self)
 
     async def mark_hr_chat_read(self, hr_id) -> int:
@@ -321,7 +320,7 @@ class Bot:
 
     async def ui_rerun_vacancy_pipeline(
         self, vacancy_id
-    ) -> Literal["ok", "busy", "missing", "no_text", "llm", "cancelled", "error"]:
+    ) -> rerun.RerunOutcome:
         return await rerun.ui_rerun_vacancy_pipeline(self, vacancy_id)
 
     async def ui_forget_vacancy(self, vacancy_id) -> bool:
