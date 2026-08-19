@@ -211,10 +211,7 @@ async def dm_pipeline(monkeypatch, make_pipeline):
     built.classified = []
 
     async def classify(pipeline, hr_id):
-        built.classified.append(
-            (hr_id, list(built.dm_classify_buffer.get(hr_id, [])))
-        )
-        built.dm_classify_buffer.pop(hr_id, None)
+        built.classified.append((hr_id, built.dm_debounce.take(hr_id)))
 
     monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", classify)
     yield built

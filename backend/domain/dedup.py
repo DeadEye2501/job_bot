@@ -1,6 +1,7 @@
-"""Поиск ближайшей вакансии по косинусной близости эмбеддингов."""
+"""Отсев повторов: векторы заведённых вакансий и поиск ближайшего к новому."""
 
 import logging
+from collections.abc import Iterable
 
 import numpy as np
 
@@ -44,3 +45,71 @@ def cosine_top_match(
     if sims[best] >= threshold:
         return int(ids[best])
     return None
+
+
+class EmbeddingCache:
+    """Векторы заведённых вакансий в памяти — то, с чем сравнивают новый пост.
+
+    Своей вещью, а не полями конвейера: номера и матрица связаны договором —
+    строка матрицы и номер под тем же местом описывают одну вакансию, — а
+    держали его четыре функции в двух чужих модулях, по договорённости.
+    Здесь договор внутри одной вещи, и снаружи его не разорвать.
+
+    Читать из базы кэш не умеет: это работа конвейера, он и приносит строки
+    в `fill`. Здесь только память и сравнение.
+    """
+
+    def __init__(self) -> None:
+        self.ids = np.empty((0,), dtype=np.int64)
+        self.matrix = np.empty((0, 0), dtype=np.float32)
+        # Поднимали ли уже. Подъём идёт один раз за жизнь конвейера, и без
+        # этой отметки его повторяли бы на каждый пост.
+        self.loaded = False
+
+    def fill(
+        self, pairs: Iterable[tuple[int, list[float]]], width: int
+    ) -> int:
+        """Поднять векторы из базы; сказать, сколько отброшено чужой длины.
+
+        Длину задаёт модель отпечатков. Смени её в настройках, и в базе
+        окажутся векторы двух длин; собранные в одну матрицу, они роняют
+        подъём целиком — то есть отсев повторов перестаёт работать вовсе.
+        Отброшенные не потеря: вектор прежней модели живёт в другом
+        пространстве, и сравнивать его с нынешними нечем.
+        """
+        rows = list(pairs)
+        fit = [(vacancy_id, vector) for vacancy_id, vector in rows
+               if len(vector) == width]
+        if fit:
+            self.ids = np.array([i for i, _ in fit], dtype=np.int64)
+            self.matrix = np.array([v for _, v in fit], dtype=np.float32)
+        self.loaded = True
+        return len(rows) - len(fit)
+
+    def append(self, vacancy_id: int, vector: list[float]) -> None:
+        """Дописать вектор только что заведённой вакансии.
+
+        Дописывается сразу, а не ждёт следующего подъёма: иначе два одинаковых
+        поста в одном обходе разошлись бы в две вакансии — второй сравнивали бы
+        с памятью, где первого ещё нет.
+        """
+        vec = np.asarray(vector, dtype=np.float32)
+        self.ids = np.append(self.ids, vacancy_id)
+        if self.matrix.size == 0:
+            self.matrix = vec.reshape(1, -1)
+        else:
+            self.matrix = np.vstack([self.matrix, vec])
+
+    def drop(self, vacancy_id: int) -> None:
+        """Снять вектор вакансии; незнакомый номер кэш не трогает."""
+        at = np.where(self.ids == vacancy_id)[0]
+        if at.size == 0:
+            return
+        self.ids = np.delete(self.ids, at)
+        self.matrix = np.delete(self.matrix, at, axis=0)
+
+    def match(self, vector: list[float], threshold: float) -> int | None:
+        """Номер похожей вакансии; пусто — похожих нет."""
+        return cosine_top_match(
+            np.asarray(vector, dtype=np.float32), self.ids, self.matrix, threshold
+        )

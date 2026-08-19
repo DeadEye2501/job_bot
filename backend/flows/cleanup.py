@@ -14,7 +14,6 @@ from backend.models import Vacancy
 from backend.repository.vacancies_life import delete_vacancy as repo_delete_vacancy
 from backend.repository.vacancies_life import record_trash_event
 
-from backend.flows import embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ async def _delete_and_forget(
         deleted = await repo_delete_vacancy(session, vacancy_id)
         await session.commit()
     if deleted:
-        embeddings.drop_embedding(pipeline, vacancy_id)
+        pipeline.embeddings.drop(vacancy_id)
         # Vacancy_count у HR/Company изменился — пушим refresh.
         pipeline.fire_contacts_changed()
         pipeline.fire_vacancies_changed()

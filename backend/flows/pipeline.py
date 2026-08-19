@@ -10,8 +10,8 @@ import logging
 from typing import Literal
 from pathlib import Path
 
-import numpy as np
-
+from backend.domain.dedup import EmbeddingCache
+from backend.flows.dm_debounce import DmDebounce
 from backend.notify import fire
 
 from backend.flows import apply
@@ -41,15 +41,13 @@ def _declare_caches(pipeline) -> None:
 
     Анкету и чёрный список перестраивает `reload_resources` разом; до
     первой загрузки они пусты, и валидатор подставит «—» во все слоты, что
-    равносильно «нет ограничений». Кэш векторов живёт своей жизнью в
-    `flows/embeddings.py`: `reload_resources` его не трогает вовсе, он
-    наполняется по требованию и признаком помнит, наполнялся ли.
+    равносильно «нет ограничений». Кэш векторов живёт своей жизнью
+    (`domain/dedup.EmbeddingCache`): `reload_resources` его не трогает вовсе,
+    он наполняется по требованию и сам помнит, наполнялся ли.
     """
     # Текстовый блок «Информация о кандидате» для cover-letter prompt'а.
     pipeline.profile_block = ""
-    pipeline.embedding_ids = np.empty((0,), dtype=np.int64)
-    pipeline.embedding_matrix = np.empty((0, 0), dtype=np.float32)
-    pipeline.embedding_cache_loaded = False
+    pipeline.embeddings = EmbeddingCache()
     pipeline.skills_cache = []
     # Срез данных профиля для LLM-валидатора.
     pipeline.profile_cache = CandidateProfile()
@@ -100,21 +98,15 @@ def _declare_dm_debounce(pipeline) -> None:
     от HR, потом одна классификация на склеенный текст, а вердикт по ней
     прикладывается к вакансии и письму **последнего** в пачке.
     """
-    pipeline.dm_classify_buffer = {}
-    pipeline.dm_classify_tasks = {}
-    # Разборы, уже прошедшие таймер. Держатся отдельно, потому что из
-    # словаря таймеров задача вычёркивает себя перед разбором — иначе
-    # свежее сообщение отменило бы разбор посреди обращения к модели, и
-    # пакет, уже вынутый из буфера, пропал бы. Остановке же дождаться их
-    # нужно: отмена по ним не работает, а соединения она закрывает.
-    pipeline.dm_classify_running = set()
-    # Семафор на одновременные LLM-классификации. Catch-up на OFF→active
-    # transition'е может разом разбудить debounce'ры по всем HR'ам, что
-    # на локальной LM Studio превращается в 30 параллельных httpx.post
-    # к одному серверу — она ставит их в очередь, начинает таймаутить и
-    # часть вердиктов теряется. 2 одновременных вызова — компромисс
-    # между throughput'ом и не-OOM'нуть LM Studio.
-    pipeline.dm_classify_semaphore = asyncio.Semaphore(2)
+    # Предел пачки на одного человека — защита от спама: пятьдесят сообщений в
+    # одном окне ожидания уже точно ненормально, а тысячи строк раздувают
+    # память и не дают ничего — модель всё равно отрежет хвост.
+    #
+    # Разрешений обратиться к модели два. Переход из OFF в рабочий режим может
+    # разом разбудить таймеры по всем людям, что на локальной LM Studio
+    # превращается в тридцать одновременных обращений к одному серверу — она
+    # ставит их в очередь, начинает таймаутить, и часть вердиктов теряется.
+    pipeline.dm_debounce = DmDebounce(cap=50, slots=2)
 
 
 class IngestionPipeline:
@@ -125,9 +117,10 @@ class IngestionPipeline:
     отпечатков и копилку отложенного разбора. Прежде они числились закрытыми,
     и подчёркивание обещало то, чего не было.
 
-    Кэш отпечатков и копилка разбора живут здесь полями, а править их ходят
-    соседи, — это следующий заход: им место в своих объектах со своими
-    методами, а не в общем мешке.
+    Кэш отпечатков и копилка отложенного разбора полями здесь больше не
+    лежат: у обоих свои объекты со своими правилами
+    (`domain/dedup.EmbeddingCache`, `flows/dm_debounce.DmDebounce`), и
+    договор внутри каждого снаружи уже не разорвать.
     """
 
     # Поля ставят объявления выше, а объявлены они здесь: присвоение по
@@ -136,9 +129,7 @@ class IngestionPipeline:
     skills_cache: list[ProfileSkill]
     profile_cache: CandidateProfile
     blacklist_patterns: list[str]
-    dm_classify_buffer: dict[int, list[dict]]
-    dm_classify_tasks: dict[int, asyncio.Task]
-    dm_classify_running: set[asyncio.Task]
+    dm_debounce: DmDebounce
 
     def __init__(
         self,
@@ -185,11 +176,6 @@ class IngestionPipeline:
 
 
     DM_CLASSIFY_DEBOUNCE_SEC = 60.0
-    # Cap buffer'а на одного HR — защита от спама. 50 сообщений в одном
-    # debounce-окне (60с) уже точно ненормально; накопление тысяч строк
-    # раздувает память и rам прибавляет ничего полезного — LLM всё равно
-    # отрежет хвост в classify_hr_reply.
-    DM_CLASSIFY_BUFFER_CAP = 50
     # Сколько остановка ждёт начавшийся разбор. Названа отдельно, потому что
     # на выключении по её истечении разбор всё-таки гасят, и проверить это,
     # не просидев пять секунд, иначе нечем.
@@ -267,10 +253,12 @@ class IngestionPipeline:
         return await channels.refresh_channel_metadata_for_ids(self, channel_ids)
 
     def update_dm_buffer_text(self, hr_id, tg_msg_id, new_text) -> None:
-        return dm_classify.update_dm_buffer_text(self, hr_id, tg_msg_id, new_text)
+        """HR поправил письмо, ещё ждущее разбора, — разбор увидит свежее."""
+        return self.dm_debounce.retext(hr_id, tg_msg_id, new_text or "")
 
     def remove_dm_buffer_msg(self, hr_id, tg_msg_id) -> None:
-        return dm_classify.remove_dm_buffer_msg(self, hr_id, tg_msg_id)
+        """HR удалил письмо, ещё ждущее разбора, — в пачку оно не пойдёт."""
+        return self.dm_debounce.forget(hr_id, tg_msg_id)
 
     def schedule_dm_classification(self, hr_id, reply) -> None:
         return dm_classify.schedule_dm_classification(self, hr_id, reply)
