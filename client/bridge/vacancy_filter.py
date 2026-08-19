@@ -14,14 +14,8 @@
 
 from __future__ import annotations
 
-from backend.payloads import (
-    VacancyFilter,
-    float_or_none,
-    int_or_none,
-    moment_or_none,
-    str_list,
-    text_or_none,
-)
+from backend.payloads import VacancyFilter
+from backend.incoming import float_or_none, int_or_none, moment_or_none, str_list, text_or_none
 from client.bridge.page import Page
 
 

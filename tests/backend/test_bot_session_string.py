@@ -12,6 +12,7 @@ Telegram переселяет учётную запись между узлам�
 
 from backend.bot import loop
 from tests.fakes.telegram import FakeTelegramClient
+from tests.factories import tg_creds
 
 
 async def test_a_changed_session_string_is_saved(make_bot):
@@ -34,17 +35,11 @@ async def test_an_unchanged_session_string_is_left_alone(make_bot):
     client = FakeTelegramClient()
     client.session_string = "прежняя"
     bot = await make_bot(client)
-    await bot.rs.set_tg(
-        api_id=1,
-        api_hash="ш",
-        phone="+70000000000",
-        password="",
-        session_string="прежняя",
-    )
+    await bot.rs.set_tg(tg_creds(session_string="прежняя"))
     written: list[str] = []
 
-    async def remember(**kwargs):
-        written.append(kwargs["session_string"])
+    async def remember(creds):
+        written.append(creds.session_string)
 
     bot.rs.set_tg = remember
 
@@ -78,7 +73,7 @@ async def test_a_failed_save_does_not_stop_the_start(make_bot):
     client.session_string = "новая сессия"
     bot = await make_bot(client)
 
-    async def broken(**kwargs):
+    async def broken(creds):
         raise OSError("база")
 
     bot.rs.set_tg = broken

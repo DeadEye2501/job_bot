@@ -9,18 +9,22 @@
 постоять.
 """
 
+from backend.bot import loop
 from backend.models import BotMode
+from backend.repository.bot_mode import write_mode
 
 
-async def test_the_mode_comes_from_the_settings(make_bot):
-    """Режим берётся из настроек, а не из памяти бота."""
+async def test_the_mode_comes_from_the_base(make_bot, session_factory):
+    """Режим берётся из базы, а не из памяти бота."""
     bot = await make_bot()
-    await bot.rs.set_mode(BotMode.FULL)
+    async with session_factory() as session:
+        async with session.begin():
+            await write_mode(session, BotMode.FULL)
 
     assert await bot.current_mode() is BotMode.FULL
 
 
-async def test_an_unreadable_mode_reads_as_off(make_bot):
+async def test_an_unreadable_mode_reads_as_off(make_bot, monkeypatch):
     """Нечитаемый режим понимается как «выключен».
 
     Продолжить рассылку, не зная, разрешена ли она, хуже, чем зря
@@ -28,9 +32,9 @@ async def test_an_unreadable_mode_reads_as_off(make_bot):
     """
     bot = await make_bot()
 
-    async def broken():
+    async def broken(session):
         raise OSError("база недоступна")
 
-    bot.rs.get_mode = broken
+    monkeypatch.setattr(loop, "read_mode", broken)
 
     assert await bot.current_mode() is BotMode.OFF

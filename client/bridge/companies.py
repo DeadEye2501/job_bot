@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy.exc import IntegrityError
 
-from backend.payloads import int_or_none, text_or_none
+from backend.incoming import int_or_none, text_or_none
 from backend.repository import (
     companies_card,
     companies_list,

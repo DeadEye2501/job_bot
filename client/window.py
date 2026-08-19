@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from adapters import db
 from backend.models import BotMode
+from backend.repository.bot_mode import write_mode
 from backend.runtime_settings import RuntimeSettings
 from client import raise_window, window_size
 from client.bridge import Api, AsyncRunner, lifespan
@@ -137,7 +138,9 @@ async def prepare(session_factory) -> RuntimeSettings:
     работающим ещё до того, как открылось окно.
     """
     rs = await RuntimeSettings.load(session_factory)
-    await rs.set_mode(BotMode.OFF)
+    async with session_factory() as session:
+        async with session.begin():
+            await write_mode(session, BotMode.OFF)
     return rs
 
 

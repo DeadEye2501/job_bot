@@ -25,7 +25,7 @@ from pyrogram.errors import (
     SessionPasswordNeeded,
 )
 
-from backend.runtime_settings import mask_phone
+from backend.runtime_settings import TgAccountConfig, mask_phone
 
 logger = logging.getLogger(__name__)
 
@@ -296,11 +296,13 @@ class TelegramLogin:
 
         try:
             await self._settings.set_tg(
-                api_id=creds["api_id"],
-                api_hash=creds["api_hash"],
-                phone=creds["phone"],
-                password=creds.get("password") or "",
-                session_string=session_string,
+                TgAccountConfig(
+                    api_id=creds["api_id"],
+                    api_hash=creds["api_hash"],
+                    phone=creds["phone"],
+                    password=creds.get("password") or "",
+                    session_string=session_string,
+                )
             )
         except Exception as e:
             # Вывезенная строка сеанса живёт один раз: клиент к этому мигу

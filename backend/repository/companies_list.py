@@ -3,7 +3,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company, Vacancy
-from backend.payloads import CompanyWithCount, str_list
+from backend.payloads import CompanyWithCount
+from backend.incoming import str_list
 
 from backend.repository.blacklist_marks import active_blacklist_values, marked_by
 from backend.repository.companies_card import company_blacklist_candidates

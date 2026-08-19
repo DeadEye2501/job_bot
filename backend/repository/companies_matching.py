@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company
-from backend.payloads import str_list
+from backend.incoming import str_list
 from backend.repository.companies_card import add_company_spellings, create_company
 from backend.repository.companies_keys import (
     hosts_compatible,

@@ -9,7 +9,8 @@ from sqlalchemy.orm import aliased
 
 from backend.domain.telegram_identity import typed_username
 from backend.models import Company, HR, Message, Vacancy
-from backend.payloads import HrDetail, text_or_none
+from backend.payloads import HrDetail
+from backend.incoming import text_or_none
 
 from backend.repository.vacancies_common import PARSED_ONLY
 from backend.repository.blacklist_marks import (

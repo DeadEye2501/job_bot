@@ -7,6 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.skill_names import index_by_key, skill_key
+from backend.domain.spellings import dedupe_first_wins
 from backend.models import (
     AppSetting,
     Profile,
@@ -15,7 +16,8 @@ from backend.models import (
     ProfileSkill,
     profile_experience_skills,
 )
-from backend.payloads import ParsedCv, str_list, text_or_none
+from backend.payloads import ParsedCv
+from backend.incoming import str_list, text_or_none
 
 logger = logging.getLogger(__name__)
 
@@ -395,8 +397,13 @@ def _add_experience_rows(
             achievements=str_list(row.get("achievements")),
             responsibilities=str_list(row.get("responsibilities")),
         )
-        for sname in (row.get("skill_names") or []):
-            s = skills_by_name.get(skill_key(str(sname)))
+        # Повторы отсеиваются тем же ключом, каким навык и ищется: два его
+        # написания («Node.js» и «Node JS») ведут к одной строке, и вторая
+        # связь падает на первичном ключе, унося всю правку вкладки.
+        for sname in dedupe_first_wins(
+            [str(name) for name in row.get("skill_names") or []], skill_key
+        ):
+            s = skills_by_name.get(skill_key(sname))
             if s is not None:
                 exp.skills.append(s)
         session.add(exp)

@@ -143,7 +143,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## backend — 107 модулей
+## backend — 109 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -225,21 +225,21 @@ First-run bootstrap: ensure DB schema exists.
   - `async def ui_rerun_vacancy_pipeline(self, vacancy_id) -> Literal['ok', 'busy', 'missing', 'no_text', 'llm', 'cancelled', 'error']` (4)
   - `async def ui_forget_vacancy(self, vacancy_id) -> bool` (2)
 
-### `backend/bot/loop.py` — 239 строк
+### `backend/bot/loop.py` — 236 строк
 
 Жизненный цикл соединения: режим работы, главный цикл, выход из сеанса.
 
-Зависит от: `adapters`, `backend.bot`, `backend.flows.dm_backfill`, `backend.models`, `backend.runtime_settings`
+Зависит от: `adapters`, `backend.bot`, `backend.flows.dm_backfill`, `backend.models`, `backend.repository.bot_mode`, `backend.runtime_settings`
 
 - `async def log_out_session(bot) -> None` (17)
-- `async def current_mode(bot) -> BotMode` (6)
+- `async def current_mode(bot) -> BotMode` (7)
 - `async def _connect(bot) -> None` (24)
 - `async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None` (21)
 - `async def _tick(bot, mode: BotMode) -> None` (21)
 - `async def _sleep_until_wake(bot) -> None` (17)
 - `async def _disconnect(bot) -> None` (32)
 - `async def run(bot, *, once: bool=False) -> None` (41)
-- `async def persist_session_if_changed(bot) -> None` (31)
+- `async def persist_session_if_changed(bot) -> None` (25)
 
 ### `backend/bot/media.py` — 167 строк
 
@@ -742,6 +742,19 @@ First-run bootstrap: ensure DB schema exists.
 - `def telegram_alive(bot) -> bool` (7)
 - `async def model_alive(cfg, kind: str) -> bool` (22)
 
+### `backend/incoming.py` — 94 строк
+
+Приведение внешнего ввода к значениям, годным для записи.
+
+Зависит от: —
+
+- `def text_or_none(value) -> str | None` (16)
+- `def int_or_none(value) -> int | None` (3)
+- `def float_or_none(value) -> float | None` (3)
+- `def _number_or_none(value, kind)` (19)
+- `def moment_or_none(value) -> datetime | None` (16)
+- `def str_list(value) -> list[str]` (11)
+
 ### `backend/llm/answers.py` — 177 строк
 
 Разбор того, что ответила модель, и жалоба, когда разбор не удался.
@@ -760,7 +773,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Сведения о кандидате в том виде, в каком они уходят в промпт.
 
-Зависит от: `backend.models`, `backend.payloads`
+Зависит от: `backend.incoming`, `backend.models`
 
 - `class CandidateLanguage` (5)
 - `class CandidateProfile` (15)
@@ -776,7 +789,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Арбитр: та же это компания, что уже заведена, или новая.
 
-Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.external`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.incoming`, `backend.llm.answers`, `backend.llm.external`
 
 - `def _dedupe_request(parsed_name: str, parsed_website: str | None, candidates: list) -> ChatRequest` (42)
 - `def _matched_id(answer: str) -> tuple[int | None, str | None]` (22)
@@ -794,11 +807,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (24)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> str | None` (41)
 
-### `backend/llm/cv.py` — 393 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 387 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.llm.answers`, `backend.llm.external`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.incoming`, `backend.llm.answers`, `backend.llm.external`, `backend.payloads`
 
 - `def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]` (9)
 - `def _normalize_lang_level(value: object) -> str | None` (11)
@@ -824,7 +837,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Сверка письма-отклика с тем, что о кандидате известно.
 
-Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.external`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.incoming`, `backend.llm.answers`, `backend.llm.external`
 
 - `def _factcheck_request(profile_block: str, letter: str, about: str) -> ChatRequest` (23)
 - `def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]` (29)
@@ -1016,13 +1029,13 @@ First-run bootstrap: ensure DB schema exists.
 - `class ProfileSkill(IdMixin, Base)` (10)
 - `class ProfileExperience(IdMixin, Base)` (18)
 
-### `backend/models/settings.py` — 98 строк
+### `backend/models/settings.py` — 99 строк
 
 Таблицы, которыми настраивают работу бота.
 
 Зависит от: `backend.models.base`, `backend.models.enums`
 
-- `class BotState(IdMixin, Base)` (15)
+- `class BotState(IdMixin, Base)` (16)
 - `class Blacklist(IdMixin, CreatedAtMixin, Base)` (7)
 - `class TgAccount(IdMixin, UpdatedAtMixin, Base)` (18)
 - `class LlmConfig(IdMixin, UpdatedAtMixin, Base)` (14)
@@ -1047,7 +1060,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 476 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 398 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -1075,17 +1088,12 @@ First-run bootstrap: ensure DB schema exists.
 - `class ChannelStats` (20)
 - `class ChannelDetail` (4)
 - `class VacancyFilter` (53)
-- `def text_or_none(value) -> str | None` (16)
-- `def int_or_none(value) -> int | None` (17)
-- `def float_or_none(value) -> float | None` (12)
-- `def moment_or_none(value) -> datetime | None` (16)
-- `def str_list(value) -> list[str]` (11)
 
 ### `backend/repository/blacklist.py` — 322 строк ⚠ подошёл к 300
 
 Ведение чёрного списка.
 
-Зависит от: `backend.models`, `backend.payloads`, `backend.repository`, `backend.repository.blacklist_marks`
+Зависит от: `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.blacklist_marks`
 
 - `async def _hold_the_channel_rule(session: AsyncSession, kind: str) -> None` (13)
 - `async def set_blacklist_active(session: AsyncSession, blacklist_id: int, active: bool) -> bool` (23)
@@ -1126,6 +1134,16 @@ First-run bootstrap: ensure DB schema exists.
 - `def marked_by(candidates: list[str], values: set[str]) -> bool` (9)
 - `def preferred_blacklist_value(candidates: list[str]) -> str | None` (10)
 
+### `backend/repository/bot_mode.py` — 50 строк
+
+Режим бота, записанный в единственной строке состояния.
+
+Зависит от: `backend.models`
+
+- `async def _state_row(session: AsyncSession) -> BotState | None` (3)
+- `async def read_mode(session: AsyncSession) -> BotMode` (8)
+- `async def write_mode(session: AsyncSession, mode: BotMode) -> None` (17)
+
 ### `backend/repository/channels.py` — 412 строк ⚠ подошёл к 300
 
 Ведение записей о телеграм-каналах.
@@ -1150,11 +1168,11 @@ First-run bootstrap: ensure DB schema exists.
 - `async def reset_channel_cursor(session: AsyncSession, channel_id: int) -> bool` (9)
 - `async def delete_channel(session: AsyncSession, channel_id: int) -> int | None` (39)
 
-### `backend/repository/companies_card.py` — 297 строк
+### `backend/repository/companies_card.py` — 298 строк
 
 Ведение записей о компаниях.
 
-Зависит от: `backend.domain.spellings`, `backend.models`, `backend.payloads`, `backend.repository.blacklist`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.vacancies_common`, `backend.repository.vacancies_life`
+Зависит от: `backend.domain.spellings`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository.blacklist`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.vacancies_common`, `backend.repository.vacancies_life`
 
 - `async def create_company(session: AsyncSession, *, name: str, website: str | None=None, aliases: list[str] | None=None, notes: str | None=None) -> Company` (37)
 - `def company_blacklist_candidates(co: Company) -> list[str]` (11)
@@ -1172,7 +1190,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Приведение компании к ключам, по которым её сравнивают.
 
-Зависит от: `backend.payloads`
+Зависит от: `backend.incoming`
 
 - `def _translit_cyr_to_latin(s: str) -> str` (2)
 - `def _without_edge_legal_forms(words: list[str]) -> list[str]` (14)
@@ -1183,11 +1201,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def real_corporate_website(url: str | None) -> str | None` (15)
 - `def hosts_compatible(a: str, b: str) -> bool` (6)
 
-### `backend/repository/companies_list.py` — 50 строк
+### `backend/repository/companies_list.py` — 51 строк
 
 Перечень компаний со счётчиками.
 
-Зависит от: `backend.models`, `backend.payloads`, `backend.repository.blacklist_marks`, `backend.repository.companies_card`, `backend.repository.paging`, `backend.repository.search`, `backend.repository.vacancies_common`
+Зависит от: `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository.blacklist_marks`, `backend.repository.companies_card`, `backend.repository.paging`, `backend.repository.search`, `backend.repository.vacancies_common`
 
 - `async def list_companies_with_counts(session: AsyncSession, search: str | None=None, *, limit: int | None=None, offset: int=0) -> tuple[list[CompanyWithCount], bool]` (36)
 
@@ -1195,7 +1213,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Сведение разобранной из вакансии компании с уже заведённой.
 
-Зависит от: `backend.llm.company`, `backend.models`, `backend.payloads`, `backend.repository.companies_card`, `backend.repository.companies_keys`
+Зависит от: `backend.incoming`, `backend.llm.company`, `backend.models`, `backend.repository.companies_card`, `backend.repository.companies_keys`
 
 - `def _known_spellings(company: Company) -> tuple[str, list[str]]` (13)
 - `def _enrich_company_with_parsed(company: Company, parsed_name: str, parsed_website: str | None) -> None` (23)
@@ -1218,11 +1236,11 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _llm_arbitrate(lm_client: Any, lm_model: str, parsed: _Parsed, shortlist) -> tuple[Company | None, dict]` (39)
 - `async def find_or_create_company(session: AsyncSession, name: str, *, website: str | None=None, lm_client: Any=None, lm_model: str | None=None) -> tuple[Company | None, dict]` (40)
 
-### `backend/repository/hr_card.py` — 336 строк ⚠ подошёл к 300
+### `backend/repository/hr_card.py` — 337 строк ⚠ подошёл к 300
 
 Одна запись HR: чтение, правка, слияние, удаление.
 
-Зависит от: `backend.domain.telegram_identity`, `backend.models`, `backend.payloads`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.messages`, `backend.repository.vacancies_common`, `backend.repository.vacancies_life`
+Зависит от: `backend.domain.telegram_identity`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.messages`, `backend.repository.vacancies_common`, `backend.repository.vacancies_life`
 
 - `async def update_hr_fields(session: AsyncSession, hr_id: int, **fields) -> bool` (32)
 - `async def _vacancy_count_of(session: AsyncSession, hr_id: int) -> int` (8)
@@ -1305,11 +1323,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def searched_page(rows: list[T], matches, limit: int | None, offset: int) -> tuple[list[T], bool]` (11)
 - `def slice_page(rows: list[T], limit: int | None, offset: int) -> tuple[list[T], bool]` (13)
 
-### `backend/repository/profile.py` — 486 строк ⚠ подошёл к 300
+### `backend/repository/profile.py` — 493 строк ⚠ подошёл к 300
 
 Хранение анкеты кандидата.
 
-Зависит от: `backend.domain.skill_names`, `backend.models`, `backend.payloads`
+Зависит от: `backend.domain.skill_names`, `backend.domain.spellings`, `backend.incoming`, `backend.models`, `backend.payloads`
 
 - `async def _wipe_experience(session: AsyncSession) -> None` (10)
 - `def _index_skill_keys(lookup: dict[str, ProfileSkill], names: tuple[str, ...], row: ProfileSkill, where: str) -> None` (19)
@@ -1328,7 +1346,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def save_skills(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (23)
 - `class SaveExperienceError(ValueError)` (11)
 - `def _checked_experience_rows(rows: list[dict]) -> list[tuple[dict, date, date | None]]` (33)
-- `def _add_experience_rows(session: AsyncSession, checked: list, profile_id: int, skills_by_name: dict) -> None` (24)
+- `def _add_experience_rows(session: AsyncSession, checked: list, profile_id: int, skills_by_name: dict) -> None` (29)
 - `async def save_experience(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (22)
 - `async def get_profile(session: AsyncSession) -> Profile | None` (3)
 - `async def upsert_profile(session: AsyncSession, **fields) -> Profile` (16)
@@ -1539,7 +1557,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def apply_silence(session: AsyncSession, vacancy: Vacancy, timeout_days: int) -> None` (23)
 - `def apply_parse_outcome(vacancy: Vacancy, new_status: VacancyStatus) -> None` (18)
 
-### `backend/runtime_settings.py` — 499 строк ⚠ подошёл к 300
+### `backend/runtime_settings.py` — 477 строк ⚠ подошёл к 300
 
 Runtime settings layer.
 
@@ -1550,9 +1568,8 @@ Runtime settings layer.
 - `class LlmProviderConfig` (5)
 - `def _log_tg_updated(api_id: int, phone: str, password: str, session_string: str | None) -> None` (16)
 - `async def _tg_row(session: AsyncSession) -> TgAccount | None` (3)
-- `async def _state_row(session: AsyncSession) -> BotState | None` (3)
 - `async def _llm_row(session: AsyncSession, kind: LlmConfigKind) -> LlmConfig | None` (5)
-- `class RuntimeSettings` (315)
+- `class RuntimeSettings` (300)
   - `async def load(cls, session_factory: async_sessionmaker[AsyncSession]) -> 'RuntimeSettings'` (6)
   - `async def reload(self) -> None` (22)
   - `def tg(self) -> TgAccountConfig | None` (2)
@@ -1570,18 +1587,19 @@ Runtime settings layer.
   - `def auto_apply(self) -> bool` (5)
   - `def flood_wait_until_ts(self) -> float` (2)
   - `def _app_bool(self, key: str) -> bool` (9)
-  - `def _app_float(self, key: str) -> float` (22)
-  - `def _app_int(self, key: str, *, minimum: int | None=None) -> int` (21)
+  - `def _app_float(self, key: str) -> float` (17)
+    - `def read(raw: str) -> float | None` (6)
+  - `def _app_int(self, key: str, *, minimum: int | None=None) -> int` (15)
+    - `def read(raw: str) -> int | None` (6)
+  - `def _app_number(self, key: str, read, kind)` (17)
   - `def _app_value(self, key: str) -> str` (8)
-  - `async def set_tg(self, *, api_id: int, api_hash: str, phone: str, password: str='', session_string: str | None=None) -> None` (34)
+  - `async def set_tg(self, creds: TgAccountConfig) -> None` (30)
   - `async def clear_tg(self) -> None` (12)
   - `async def set_chat(self, *, base_url: str, api_key: str, model: str) -> None` (4)
   - `async def set_embed(self, *, base_url: str, api_key: str, model: str) -> None` (4)
   - `async def _set_llm(self, kind: LlmConfigKind, base_url: str, api_key: str, model: str) -> None` (32)
   - `async def set_app(self, key: str, value: str) -> None` (13)
   - `async def mark_wizard_completed(self) -> None` (3)
-  - `async def get_mode(self) -> BotMode` (4)
-  - `async def set_mode(self, mode: BotMode) -> None` (12)
 - `def _from_tg_row(row: TgAccount) -> TgAccountConfig | None` (26)
 - `def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None` (18)
 
@@ -1595,7 +1613,7 @@ Runtime settings layer.
 - `def _take_the_lock(fd: int) -> bool` (23)
 - `def hold_the_only_copy(lock_path: Path | str)` (38)
 
-### `backend/telegram_login.py` — 322 строк ⚠ подошёл к 300
+### `backend/telegram_login.py` — 324 строк ⚠ подошёл к 300
 
 Вход в Telegram по коду: четыре шага и состояние между ними.
 
@@ -1606,7 +1624,7 @@ Runtime settings layer.
 - `async def username_of(client) -> str | None` (14)
 - `def _flood_wait_refusal(e) -> str` (12)
 - `def _humanize_duration(seconds: int) -> str` (9)
-- `class TelegramLogin` (225)
+- `class TelegramLogin` (227)
   - `def awaiting_code(self) -> bool` (7)
   - `def awaiting_password(self) -> bool` (8)
   - `def active(self) -> bool` (3)
@@ -1617,7 +1635,7 @@ Runtime settings layer.
   - `async def confirm_password(self, password: str) -> LoginStep` (23)
   - `def _drop(self) -> None` (10)
   - `async def _failed(self, client, message: str) -> LoginStep` (5)
-  - `async def _save(self) -> LoginStep` (46)
+  - `async def _save(self) -> LoginStep` (48)
 
 ### `backend/telegram_lookup.py` — 101 строк
 
@@ -1736,7 +1754,7 @@ Runtime settings layer.
 
 Экран «Контакты / Каналы»: список каналов и их карточка.
 
-Зависит от: `backend.models`, `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.channel_actions`, `client.bridge.hub`, `client.bridge.media`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.channel_actions`, `client.bridge.hub`, `client.bridge.media`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.wire`
 
 - `class Channels(ChannelActions)` (123)
   - `def list(self, payload: dict | None=None) -> dict` (30)
@@ -1759,7 +1777,7 @@ Runtime settings layer.
 
 Компания как запись в контактах: найти, показать, поправить, убрать.
 
-Зависит от: `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.page`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`, `client.form_payloads`
+Зависит от: `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.page`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`, `client.form_payloads`
 
 - `async def create_company_row(session, fields: dict, **echo) -> int` (25)
 - `class Companies` (285)
@@ -1834,7 +1852,7 @@ Runtime settings layer.
 
 Экран «Контакты / HR»: список людей, их карточка и правки в ней.
 
-Зависит от: `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.hr_chat`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.media`, `client.bridge.page`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`, `client.form_payloads`
+Зависит от: `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.hr_chat`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.media`, `client.bridge.page`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`, `client.form_payloads`
 
 - `async def create_hr_row(session, fields: dict, **echo) -> int` (15)
 - `class Hr(HrChat)` (269)
@@ -1863,7 +1881,7 @@ Runtime settings layer.
 
 Переписка с человеком: страница сообщений, отправка, прочтение.
 
-Зависит от: `backend.bot.chat`, `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.bot.chat`, `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.wire`
 
 - `class HrChat` (143)
   - `def messages(self, payload: dict) -> dict` (20)
@@ -1888,7 +1906,7 @@ Runtime settings layer.
 
 Системный журнал в окне: страница записей, подписка, очистка.
 
-Зависит от: `backend.log_buffer`, `backend.payloads`, `client.bridge.answer`, `client.bridge.refusals`
+Зависит от: `backend.incoming`, `backend.log_buffer`, `client.bridge.answer`, `client.bridge.refusals`
 
 - `def close_journal() -> None` (9)
 - `class Journal` (88)
@@ -1977,7 +1995,7 @@ Runtime settings layer.
 
 Страница списка, прочитанная из нагрузки окна.
 
-Зависит от: `backend.payloads`
+Зависит от: `backend.incoming`
 
 - `class Page` (7)
 - `def read_mode(payload: dict, modes: tuple[str, ...]) -> str` (15)
@@ -2005,7 +2023,7 @@ Runtime settings layer.
 
 Анкета соискателя: сведения о себе, навыки и места работы.
 
-Зависит от: `backend.domain.taxonomy`, `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.domain.taxonomy`, `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.refusals`, `client.bridge.wire`
 
 - `class Profile(Cv)` (123)
   - `def get(self) -> dict` (19)
@@ -2078,17 +2096,18 @@ Runtime settings layer.
   - `def skills(self, period: str) -> dict` (3)
   - `def channels_pipeline(self, period: str) -> dict` (3)
 
-### `client/bridge/system.py` — 267 строк
+### `client/bridge/system.py` — 276 строк
 
 Домен «система»: то, чем страница живёт на любом экране.
 
-Зависит от: `backend`, `backend.models`, `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.refusals`, `client.bridge.wipe`
+Зависит от: `backend`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.refusals`, `client.bridge.wipe`
 
-- `class System(Journal, Wipe, Desktop)` (210)
+- `class System(Journal, Wipe, Desktop)` (218)
   - `def initial(self) -> dict` (16)
     - `async def run() -> dict` (6)
-  - `def set_mode(self, mode: str) -> dict` (24)
-    - `async def run() -> dict` (5)
+  - `async def _mode(self) -> BotMode` (5)
+  - `def set_mode(self, mode: str) -> dict` (26)
+    - `async def run() -> dict` (7)
   - `def run_now(self) -> dict` (19)
   - `def stop_run(self) -> dict` (15)
     - `async def run() -> dict` (6)
@@ -2135,11 +2154,11 @@ Runtime settings layer.
   - `def delete(self, payload: dict) -> dict` (23)
     - `async def run() -> dict` (14)
 
-### `client/bridge/vacancy_filter.py` — 61 строк
+### `client/bridge/vacancy_filter.py` — 55 строк
 
 Отбор списка вакансий, прочитанный из нагрузки окна.
 
-Зависит от: `backend.payloads`, `client.bridge.page`
+Зависит от: `backend.incoming`, `backend.payloads`, `client.bridge.page`
 
 - `def read_vacancy_filter(payload: dict, page: Page) -> VacancyFilter` (34)
 
@@ -2147,7 +2166,7 @@ Runtime settings layer.
 
 Привязка вакансии к человеку и к компании: подборщики и их правки.
 
-Зависит от: `backend.models`, `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.companies`, `client.bridge.hr`, `client.bridge.pickers`, `client.bridge.refusals`, `client.form_payloads`
+Зависит от: `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.companies`, `client.bridge.hr`, `client.bridge.pickers`, `client.bridge.refusals`, `client.form_payloads`
 
 - `class VacancyLinks` (145)
   - `def hr_picker(self, payload: dict) -> dict` (14)
@@ -2220,7 +2239,7 @@ Runtime settings layer.
 
 Поля записи, прочитанные из нагрузки форм окна.
 
-Зависит от: `backend.domain.telegram_identity`, `backend.payloads`
+Зависит от: `backend.domain.telegram_identity`, `backend.incoming`
 
 - `def read_toggle(payload: dict, id_key: str, flag_key: str) -> tuple[int | None, bool | None]` (18)
 - `def read_company_spellings(raw) -> list[str]` (16)
@@ -2256,16 +2275,16 @@ Runtime settings layer.
 - `def _inside(root: Path, path: str) -> Path | None` (17)
 - `def _content_type(target: Path) -> str` (17)
 
-### `client/window.py` — 218 строк
+### `client/window.py` — 221 строк
 
 Окно приложения: как оно открывается и чем гасится.
 
-Зависит от: `adapters`, `adapters.telegram`, `backend.models`, `backend.runtime_settings`, `client`, `client.bridge`, `client.serving`, `config`
+Зависит от: `adapters`, `adapters.telegram`, `backend.models`, `backend.repository.bot_mode`, `backend.runtime_settings`, `client`, `client.bridge`, `client.serving`, `config`
 
 - `def run_ui() -> int` (32)
 - `def _open_window(hub, *, settled: bool)` (19)
 - `def _put_out(hub, runner, listening) -> None` (20)
-- `async def prepare(session_factory) -> RuntimeSettings` (10)
+- `async def prepare(session_factory) -> RuntimeSettings` (12)
 - `def _open_runner() -> AsyncRunner` (4)
 - `def _open_database() -> tuple[Any, async_sessionmaker]` (9)
 - `def _await(future: Future) -> Any` (3)
@@ -2283,7 +2302,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 234 модулей
+## tests — 235 модулей
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -2350,16 +2369,17 @@ Runtime settings layer.
 - `async def catch_up_everyone(client, session_factory, *, hooks=None, **kwargs)` (12)
 - `async def known_hr(session_factory)` (4)
 
-### `tests/backend/fixtures/bot.py` — 222 строк
+### `tests/backend/fixtures/bot.py` — 231 строк
 
 Обстановка для проверок бота: всё собрано на подделках, до сети не доходит.
 
-Зависит от: `adapters.telegram`, `backend.bot.client`, `backend.bot.media`, `backend.crypto`, `backend.models`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`, `tests.fakes.lm_studio`, `tests.fakes.telegram`
+Зависит от: `adapters.telegram`, `backend.bot.client`, `backend.bot.media`, `backend.crypto`, `backend.models`, `backend.repository.bot_mode`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`, `tests.fakes.lm_studio`, `tests.fakes.telegram`
 
 - `class Outbox` (18)
   - `async def send_dm(self, _client, target, text, attachment=None)` (5)
 - `def row_saved_mid_send(session_factory, hr_id)` (20)
   - `async def save(answer) -> None` (10)
+- `async def _switch_to(session_factory, mode: BotMode) -> None` (5)
 - `def make_bot(session_factory, monkeypatch)` (35)
   - `async def build(client=None, *, embed_url='http://provider.test') -> Bot` (17)
 - `def empty_media_dir()` (13)
@@ -2578,11 +2598,11 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/backend/test_bot_mode_reading.py` — 36 строк
+### `tests/backend/test_bot_mode_reading.py` — 40 строк
 
 Откуда бот берёт свой режим.
 
-Зависит от: `backend.models`
+Зависит от: `backend.bot`, `backend.models`, `backend.repository.bot_mode`
 
 Тестов: 2
 
@@ -2653,11 +2673,11 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `tests/backend/test_bot_session_string.py` — 89 строк
+### `tests/backend/test_bot_session_string.py` — 84 строк
 
 Следствия сверки строки сессии при запуске.
 
-Зависит от: `backend.bot`, `tests.fakes.telegram`
+Зависит от: `backend.bot`, `tests.factories`, `tests.fakes.telegram`
 
 Тестов: 4
 
@@ -3398,6 +3418,15 @@ Runtime settings layer.
 Тестов: 5
 
 
+### `tests/backend/test_repository_bot_mode.py` — 55 строк
+
+Следствия чтения и записи режима бота.
+
+Зависит от: `backend.models`, `backend.repository.bot_mode`, `tests.dbio`, `tests.factories`
+
+Тестов: 4
+
+
 ### `tests/backend/test_repository_channel_cursor.py` — 27 строк
 
 Следствия сброса отметки разобранного у канала.
@@ -3761,13 +3790,13 @@ Runtime settings layer.
 - `def _place(**overrides) -> ParsedCvExperience` (9)
 - `def _cv(**overrides) -> ParsedCv` (10)
 
-### `tests/backend/test_repository_profile_experience.py` — 237 строк
+### `tests/backend/test_repository_profile_experience.py` — 256 строк
 
 Следствия сохранения мест работы профиля.
 
 Зависит от: `backend.models`, `backend.repository.profile`, `tests.dbio`, `tests.factories`
 
-Тестов: 11
+Тестов: 12
 
 - `def _row(**overrides) -> dict` (5)
 
@@ -3985,20 +4014,20 @@ Runtime settings layer.
 Тестов: 14
 
 
-### `tests/backend/test_runtime_settings_load.py` — 201 строк
+### `tests/backend/test_runtime_settings_load.py` — 185 строк
 
 Следствия чтения настроек из базы в память.
 
 Зависит от: `backend.crypto`, `backend.models`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`
 
-Тестов: 19
+Тестов: 17
 
 
-### `tests/backend/test_runtime_settings_masking.py` — 77 строк
+### `tests/backend/test_runtime_settings_masking.py` — 78 строк
 
 Следствия сокрытия секретов от журнала в `backend/runtime_settings.py`.
 
-Зависит от: `backend.runtime_settings`
+Зависит от: `backend.runtime_settings`, `tests.factories`
 
 Тестов: 4
 
@@ -4013,13 +4042,13 @@ Runtime settings layer.
 
 - `def settings(**app) -> RuntimeSettings` (16)
 
-### `tests/backend/test_runtime_settings_writes.py` — 212 строк
+### `tests/backend/test_runtime_settings_writes.py` — 189 строк
 
 Следствия записи настроек: у одних методов их два, у других — одно.
 
 Зависит от: `backend.crypto`, `backend.models`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`
 
-Тестов: 17
+Тестов: 15
 
 
 ### `tests/backend/test_schema_and_models.py` — 37 строк
@@ -4041,15 +4070,14 @@ Runtime settings layer.
 
 - `def _lock_once_it_is_free(lock_path: Path, seconds: float=5.0)` (14)
 
-### `tests/backend/test_telegram_adapter.py` — 153 строк
+### `tests/backend/test_telegram_adapter.py` — 140 строк
 
 Следствия сборки клиента Telegram и отправки личного сообщения.
 
-Зависит от: `adapters.telegram`, `backend.runtime_settings`, `config`, `tests.fakes.telegram`
+Зависит от: `adapters.telegram`, `config`, `tests.factories`, `tests.fakes.telegram`
 
 Тестов: 9
 
-- `def _account(**overrides)` (11)
 
 ### `tests/backend/test_telegram_identity.py` — 77 строк
 
@@ -4488,11 +4516,11 @@ Runtime settings layer.
 - `def _get(app, path: str) -> tuple[str, dict, bytes]` (10)
   - `def start_response(status: str, headers: list[tuple[str, str]]) -> None` (3)
 
-### `tests/client/test_window.py` — 206 строк
+### `tests/client/test_window.py` — 210 строк
 
 Следствия открытия и закрытия окна: что приложение делает вокруг него.
 
-Зависит от: `backend.models`, `client`
+Зависит от: `backend.models`, `backend.repository.bot_mode`, `client`
 
 Тестов: 7
 
@@ -4549,11 +4577,11 @@ Runtime settings layer.
 - `async def only_row(session_factory, model)` (4)
 - `async def all_rows(session_factory, model) -> list` (8)
 
-### `tests/factories.py` — 379 строк ⚠ подошёл к 300
+### `tests/factories.py` — 399 строк ⚠ подошёл к 300
 
 Построение объектов, которые тесты подают на вход коду.
 
-Зависит от: `backend.models`, `backend.payloads`
+Зависит от: `backend.models`, `backend.payloads`, `backend.runtime_settings`
 
 - `def at(minutes: int) -> datetime` (3)
 - `def days_ago(days: float) -> datetime` (8)
@@ -4583,6 +4611,7 @@ Runtime settings layer.
 - `def marked_channels() -> list[TelegramChannel]` (15)
 - `def vacancy_event_row(vacancy_id: int, **overrides) -> VacancyEvent` (5)
 - `def status_history_row(vacancy_id: int, **overrides) -> VacancyStatusHistory` (10)
+- `def tg_creds(**overrides) -> TgAccountConfig` (16)
 
 ### `tests/fakes/ingestion.py` — 149 строк
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
-from backend.payloads import text_or_none
+from backend.incoming import text_or_none
 from backend.repository import profile as profile_repo
 from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.choices import _filter_languages, _filter_set

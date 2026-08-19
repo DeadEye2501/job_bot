@@ -203,6 +203,25 @@ async def test_two_skills_sharing_one_key_do_not_swallow_each_other(
     assert [s.name for s in got[0].skills] == ["Node.js"]
 
 
+async def test_two_names_of_one_skill_link_it_once(session, session_factory):
+    """Два названия одного навыка связываются с местом работы один раз.
+
+    «Node.js» и «Node JS» сводятся к одному ключу, а значит и к одной строке
+    навыка. Свяжи её дважды — и запись места работы падает на первичном ключе
+    связи, унося с собой всю правку вкладки.
+    """
+    profile = profile_row()
+    await put(session_factory, profile)
+    await put(session_factory, profile_skill_row(profile.id, "Node.js"))
+
+    await save_experience(
+        session, [_row(skill_names=["Node.js", "Node JS"])], profile.id
+    )
+
+    got = await list_experience(session)
+    assert [s.name for s in got[0].skills] == ["Node.js"]
+
+
 async def test_an_unknown_skill_name_is_dropped_silently(session, session_factory):
     """Неизвестное имя навыка молча выбрасывается.
 

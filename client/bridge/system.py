@@ -16,7 +16,8 @@ import time
 
 from backend import health
 from backend.models import BotMode
-from backend.payloads import int_or_none
+from backend.repository.bot_mode import read_mode, write_mode
+from backend.incoming import int_or_none
 from backend.repository import hr_list, messages as messages_repo
 from client.bridge.answer import Denied, denied, launched, reply
 from client.bridge.desktop import Desktop
@@ -75,10 +76,16 @@ class System(Journal, Wipe, Desktop):
             return {
                 "health": await self._health(),
                 "unread": await self._unread(),
-                "mode": (await self._hub.rs.get_mode()).value,
+                "mode": (await self._mode()).value,
             }
 
         return reply(self._hub.runner, run())
+
+    async def _mode(self) -> BotMode:
+        """Режим, записанный в базе. Читается на каждый показ, а не из кэша:
+        переключить его могло и окно, и очередной удар часов бота."""
+        async with self._hub.session_factory() as session:
+            return await read_mode(session)
 
     def set_mode(self, mode: str) -> dict:
         """Переключить режим бота: выключен, только переписка, полный вперёд.
@@ -98,7 +105,9 @@ class System(Journal, Wipe, Desktop):
             return denied(f"Неизвестный режим: {mode!r}")
 
         async def run() -> dict:
-            await self._hub.rs.set_mode(chosen)
+            async with self._hub.session_factory() as session:
+                async with session.begin():
+                    await write_mode(session, chosen)
             if self._hub.bot is not None:
                 self._hub.bot.kick()
             return {"mode": chosen.value}

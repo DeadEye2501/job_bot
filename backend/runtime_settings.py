@@ -22,8 +22,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from backend.crypto import decrypt_bytes, decrypt_str, encrypt_bytes, encrypt_str
 from backend.models import (
     AppSetting,
-    BotMode,
-    BotState,
     LlmConfig,
     LlmConfigKind,
     TgAccount,
@@ -120,11 +118,6 @@ def _log_tg_updated(
 async def _tg_row(session: AsyncSession) -> TgAccount | None:
     """Единственная строка учётной записи Telegram, если она заведена."""
     return (await session.scalars(select(TgAccount))).first()
-
-
-async def _state_row(session: AsyncSession) -> BotState | None:
-    """Единственная строка состояния бота, если она заведена."""
-    return (await session.scalars(select(BotState))).first()
 
 
 async def _llm_row(session: AsyncSession, kind: LlmConfigKind) -> LlmConfig | None:
@@ -272,46 +265,53 @@ class RuntimeSettings:
     def _app_float(self, key: str) -> float:
         """Дробная настройка; негодное значение откатывается к умолчанию.
 
-        Умолчание берётся из общего перечня, как у целых: два места, знающих
-        одно и то же число, разошлись бы молча. Бесконечность и `NaN` тут же
-        и отбиваются — они «числа», но ни один зовущий их не переживёт:
-        порог дедупа с ними отсеял бы всё или ничего, а метка времени
-        ожидания заперла бы отправку навсегда.
+        Бесконечность и `NaN` негодны наравне с буквами: они «числа», но ни
+        один зовущий их не переживёт — порог дедупа с ними отсеял бы всё или
+        ничего, а метка времени ожидания заперла бы отправку навсегда.
 
         Дальнейшие оговорки — зажим у порога — остаются зовущему.
         """
-        raw = self._app_value(key)
-        try:
-            value = float(raw)
-        except ValueError:
-            value = math.nan
-        if not math.isfinite(value):
-            logger.warning(
-                "настройка %s негодна (%r) — беру умолчание", key, raw
-            )
-            return float(_APP_DEFAULTS[key])
-        return value
+        def read(raw: str) -> float | None:
+            try:
+                value = float(raw)
+            except ValueError:
+                return None
+            return value if math.isfinite(value) else None
+
+        return self._app_number(key, read, float)
 
     def _app_int(self, key: str, *, minimum: int | None = None) -> int:
         """Целая настройка; негодное значение откатывается к умолчанию.
-
-        Значения правят руками через DBeaver, и опечатка вроде «1 800» не
-        должна ронять запуск — соседние числовые настройки её переживают.
 
         Нижняя граница задаётся не всем: у порога оценки годится любое целое,
         потому что и сам счёт бывает отрицательным, и «пропускать всё»
         выражается именно отрицательным порогом.
         """
+        def read(raw: str) -> int | None:
+            try:
+                value = int(raw)
+            except ValueError:
+                return None
+            return None if minimum is not None and value < minimum else value
+
+        return self._app_number(key, read, int)
+
+    def _app_number(self, key: str, read, kind):
+        """Числовая настройка: прочитанное или умолчание, с жалобой в журнал.
+
+        Что считать годным, решает `read` — у целых и дробных это разные
+        вопросы. Общее у них — что делать с негодным: значения правят руками
+        через DBeaver, и опечатка вроде «1 800» не должна ронять запуск.
+        Умолчание берётся из общего перечня: два места, знающих одно и то же
+        число, разошлись бы молча.
+        """
         raw = self._app_value(key)
-        try:
-            value = int(raw)
-        except ValueError:
-            value = None
-        if value is None or (minimum is not None and value < minimum):
+        value = read(raw)
+        if value is None:
             logger.warning(
                 "настройка %s негодна (%r) — беру умолчание", key, raw
             )
-            return int(_APP_DEFAULTS[key])
+            return kind(_APP_DEFAULTS[key])
         return value
 
     def _app_value(self, key: str) -> str:
@@ -323,40 +323,36 @@ class RuntimeSettings:
         v = raw.strip() if raw else ""
         return v if v else _APP_DEFAULTS.get(key, "")
 
-    async def set_tg(
-        self,
-        *,
-        api_id: int,
-        api_hash: str,
-        phone: str,
-        password: str = "",
-        session_string: str | None = None,
-    ) -> None:
+    async def set_tg(self, creds: TgAccountConfig) -> None:
+        """Записать учётные данные Telegram и запомнить их в кэше.
+
+        Приходят они свёрткой, а не россыпью доводов: пять значений здесь —
+        одна учётная запись, и порознь ни одно из них строку не составляет.
+        Умолчаний у полей нет нарочно: пустой пароль и пустая строка сеанса
+        стирают записанный секрет, и пропустить их молча значит разлогинить
+        человека мимо его воли.
+        """
         async with self._session_factory() as session:
             async with session.begin():
                 row = await _tg_row(session)
                 if row is None:
                     row = TgAccount(id=1)
                     session.add(row)
-                row.api_id = api_id
-                row.api_hash_encrypted = encrypt_str(api_hash)
-                row.phone = phone
+                row.api_id = creds.api_id
+                row.api_hash_encrypted = encrypt_str(creds.api_hash)
+                row.phone = creds.phone
                 row.password_encrypted = (
-                    encrypt_str(password) if password else None
+                    encrypt_str(creds.password) if creds.password else None
                 )
                 row.session_blob_encrypted = (
-                    encrypt_bytes(session_string.encode("utf-8"))
-                    if session_string is not None
+                    encrypt_bytes(creds.session_string.encode("utf-8"))
+                    if creds.session_string is not None
                     else None
                 )
-        self._tg = TgAccountConfig(
-            api_id=api_id,
-            api_hash=api_hash,
-            phone=phone,
-            password=password,
-            session_string=session_string,
+        self._tg = creds
+        _log_tg_updated(
+            creds.api_id, creds.phone, creds.password, creds.session_string
         )
-        _log_tg_updated(api_id, phone, password, session_string)
 
     async def clear_tg(self) -> None:
         """Полное удаление TG-креденшалов: row в БД сносится, in-memory
@@ -431,24 +427,6 @@ class RuntimeSettings:
     async def mark_wizard_completed(self) -> None:
         await self.set_app("wizard_completed", "true")
         logger.info("First-run wizard completed")
-
-    async def get_mode(self) -> BotMode:
-        async with self._session_factory() as session:
-            row = await _state_row(session)
-            return row.mode if row is not None else BotMode.OFF
-
-    async def set_mode(self, mode: BotMode) -> None:
-        async with self._session_factory() as session:
-            async with session.begin():
-                row = await _state_row(session)
-                prev = row.mode.value if row is not None else None
-                if row is None:
-                    row = BotState(id=1, mode=mode)
-                    session.add(row)
-                else:
-                    row.mode = mode
-        if prev != mode.value:
-            logger.info("Bot mode changed: %s -> %s", prev, mode.value)
 
 
 def _from_tg_row(row: TgAccount) -> TgAccountConfig | None:

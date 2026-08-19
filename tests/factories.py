@@ -7,6 +7,8 @@
 
 from datetime import date, datetime, timedelta, timezone
 
+from backend.runtime_settings import TgAccountConfig
+
 from backend.models import (
     AppSetting,
     Blacklist,
@@ -377,3 +379,21 @@ def status_history_row(vacancy_id: int, **overrides) -> VacancyStatusHistory:
     }
     fields.update(overrides)
     return VacancyStatusHistory(vacancy_id=vacancy_id, **fields)
+
+
+def tg_creds(**overrides) -> TgAccountConfig:
+    """Учётные данные Telegram — свёртка, которую принимает запись настроек.
+
+    Пароль и строка сеанса заданы пустыми: у самой свёртки умолчаний нет
+    нарочно — пропущенное поле стирает записанный секрет, — а проверкам,
+    которые об этих полях не говорят, называть их каждый раз незачем.
+    """
+    fields = {
+        "api_id": 1,
+        "api_hash": "шифр",
+        "phone": "+79991234567",
+        "password": "",
+        "session_string": None,
+    }
+    fields.update(overrides)
+    return TgAccountConfig(**fields)

@@ -7,7 +7,7 @@ import logging
 from sqlalchemy import func, select
 
 from backend.models import Vacancy
-from backend.payloads import int_or_none, text_or_none
+from backend.incoming import int_or_none, text_or_none
 from backend.repository import channels as channels_repo, vacancies_mini
 from client.bridge.answer import Denied, bad_fields, reply
 from client.bridge.channel_actions import ChannelActions
