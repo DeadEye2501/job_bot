@@ -175,6 +175,10 @@
 - `_KEYRING_KEY` = `'master_key'`
 - `_REJECTED_KEYRING_BACKENDS` = `набор из 5`
 
+### `backend/domain/company_hosts.py`
+
+- `AGGREGATOR_HOSTS` = `frozenset({'t.me', 'telegram.me', 'telegram.org'…`
+
 ### `backend/domain/dedup.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -400,6 +404,7 @@
 - `logger` = `logging.getLogger(__name__)`
 - `MAX_DEDUPE_TOKENS` = `1200`
 - `DEDUPE_COMPANY_PROMPT` = `'Ты определяешь, является ли распарсенная из вак…`
+- `DEDUPE_COMPANY_PROMPT` = `DEDUPE_COMPANY_PROMPT.replace('{AGGREGATOR_HOSTS…`
 
 ### `backend/llm/cover_letter.py`
 
@@ -449,6 +454,7 @@
 
 ### `backend/llm/rules.py`
 
+- `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS))`
 - `GRADE_MARKERS` = `'«junior/стажёр/intern», «middle/мидл», «senior/…`
 - `FORMAT_MARKERS` = `'«remote/удалёнка/удалённо/distributed», «hybrid…`
 - `APPLY_CONTACTS` = `'Telegram (@username, t.me/...), email (jobs@acm…`
@@ -876,9 +882,8 @@
 - `_CYR_TO_LAT` = `словарь из 33`
 - `_LEGAL_FORMS` = `frozenset({'pao', 'oao', 'zao', 'ooo', 'jsc', 'l…`
 - `_HEAD_LEGAL_FORMS` = `_LEGAL_FORMS | {'ao'}`
-- `_TAIL_LEGAL_FORMS` = `_LEGAL_FORMS | {'sa', 'ag', 'nv', 'bv'}`
+- `_TAIL_LEGAL_FORMS` = `_LEGAL_FORMS | {'ao', 'sa', 'ag', 'nv', 'bv'}`
 - `_QUOTE_CHARS` = `set('«»"\'`“”„‚‘’')`
-- `_AGGREGATOR_HOSTS` = `frozenset({'t.me', 'telegram.me', 'telegram.org'…`
 
 ### `backend/repository/companies_matching.py`
 

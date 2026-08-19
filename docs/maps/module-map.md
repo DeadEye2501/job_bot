@@ -143,7 +143,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## backend — 113 модулей
+## backend — 114 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -336,6 +336,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def _compile_word_pattern(variant: str) -> re.Pattern[str]` (13)
 - `def _word_match(text_lower: str, variant: str) -> bool` (4)
 - `def check_blacklist(raw_text: str, patterns: list[str]) -> str | None` (18)
+
+### `backend/domain/company_hosts.py` — 75 строк
+
+Хосты, которые не бывают домашним сайтом компании.
+
+Зависит от: —
+
+- `def is_aggregator_host(host: str) -> bool` (12)
 
 ### `backend/domain/dedup.py` — 126 строк
 
@@ -786,13 +794,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def format_known_skills(skills) -> str` (17)
 - `def build_candidate_profile(profile: Profile | None, languages: list[ProfileLanguage]) -> CandidateProfile` (19)
 
-### `backend/llm/company.py` — 158 строк
+### `backend/llm/company.py` — 174 строк
 
 Арбитр: та же это компания, что уже заведена, или новая.
 
-Зависит от: `adapters.lm_chat`, `backend.incoming`, `backend.llm.answers`, `backend.llm.external`
+Зависит от: `adapters.lm_chat`, `backend.incoming`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.rules`
 
-- `def _dedupe_request(parsed_name: str, parsed_website: str | None, candidates: list) -> ChatRequest` (42)
+- `def _shown_candidates(parsed_name: str, parsed_website: str | None, candidates: list) -> str` (20)
+- `def _dedupe_request(parsed_name: str, parsed_website: str | None, candidates: list) -> ChatRequest` (28)
 - `def _matched_id(answer: str) -> tuple[int | None, str | None]` (22)
 - `async def dedupe_company_with_llm(client: httpx.AsyncClient, model: str, *, parsed_name: str, parsed_website: str | None, candidates: list) -> tuple[int | None, str | None]` (41)
 
@@ -880,11 +889,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
 - `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> Classification | None` (47)
 
-### `backend/llm/rules.py` — 52 строк
+### `backend/llm/rules.py` — 63 строк
 
 Приметы предметной области, общие для наставлений модели.
 
-Зависит от: —
+Зависит от: `backend.domain.company_hosts`
 
 
 ### `backend/llm/skills.py` — 135 строк
@@ -898,7 +907,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (30)
 
-### `backend/llm/vacancy.py` — 428 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 429 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
@@ -1187,17 +1196,16 @@ First-run bootstrap: ensure DB schema exists.
 - `def _carry_company_to_survivor(survivor: Company, taken: _AbsorbedCompany) -> None` (19)
 - `async def merge_company(session: AsyncSession, *, absorbed_id: int, survivor_id: int) -> None` (37)
 
-### `backend/repository/companies_keys.py` — 206 строк
+### `backend/repository/companies_keys.py` — 142 строк
 
 Приведение компании к ключам, по которым её сравнивают.
 
-Зависит от: `backend.incoming`
+Зависит от: `backend.domain.company_hosts`, `backend.incoming`
 
 - `def _translit_cyr_to_latin(s: str) -> str` (2)
-- `def _without_edge_legal_forms(words: list[str]) -> list[str]` (16)
+- `def _without_edge_legal_forms(words: list[str]) -> list[str]` (17)
 - `def normalize_company_name(s: str | None) -> str` (9)
 - `def normalize_host(url: str | None) -> str` (23)
-- `def _is_aggregator_host(host: str) -> bool` (10)
 - `def signal_host(host: str) -> str` (11)
 - `def real_corporate_website(url: str | None) -> str | None` (15)
 - `def hosts_compatible(a: str, b: str) -> bool` (6)
@@ -3192,13 +3200,13 @@ Runtime settings layer.
 - `def _allowed_line(client) -> str` (9)
 - `def _verdict(status: str, explanation: str | None=None) -> httpx.Response` (3)
 
-### `tests/backend/test_llm_company_arbiter.py` — 284 строк
+### `tests/backend/test_llm_company_arbiter.py` — 300 строк
 
 Следствия обращения к модели как к арбитру при сведении компаний.
 
-Зависит от: `backend.llm.company`, `tests.fakes.llm`
+Зависит от: `backend.llm.company`, `backend.llm.rules`, `tests.fakes.llm`
 
-Тестов: 16
+Тестов: 17
 
 - `class _Candidate` (8)
 - `def _answer(matched_id=None, reasoning=None) -> httpx.Response` (3)
@@ -3324,13 +3332,13 @@ Runtime settings layer.
 
 - `def _answer(**fields) -> str` (3)
 
-### `tests/backend/test_llm_vacancy_request.py` — 226 строк
+### `tests/backend/test_llm_vacancy_request.py` — 242 строк
 
 Следствия обращения к модели за разбором поста с вакансией.
 
-Зависит от: `backend.llm.vacancy`, `tests.fakes.llm`
+Зависит от: `backend.llm.rules`, `backend.llm.vacancy`, `tests.fakes.llm`
 
-Тестов: 13
+Тестов: 14
 
 - `def _parsed(**fields) -> httpx.Response` (3)
 
@@ -3598,11 +3606,11 @@ Runtime settings layer.
 Тестов: 6
 
 
-### `tests/backend/test_repository_company_keys.py` — 209 строк
+### `tests/backend/test_repository_company_keys.py` — 214 строк
 
 Следствия приведения имени и сайта компании к сравнимому виду.
 
-Зависит от: `backend.repository.companies_keys`
+Зависит от: `backend.domain.company_hosts`, `backend.repository.companies_keys`
 
 Тестов: 11
 

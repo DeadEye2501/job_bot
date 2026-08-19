@@ -9,8 +9,8 @@
 
 import pytest
 
+from backend.domain.company_hosts import is_aggregator_host
 from backend.repository.companies_keys import (
-    _is_aggregator_host,
     _translit_cyr_to_latin,
     hosts_compatible,
     normalize_company_name,
@@ -51,6 +51,7 @@ def test_cyrillic_is_transliterated_letter_by_letter(raw, expected):
         pytest.param("Acme   Corp   Inc", "acme", id="лишние пробелы"),
         pytest.param("Sber AG Tech", "sber ag tech", id="форма посреди имени цела"),
         pytest.param("АО Сбер", "sber", id="русская двухбуквенная форма впереди"),
+        pytest.param("МТС, АО", "mts", id="русская двухбуквенная форма сзади"),
         pytest.param("Philips NV", "philips", id="чужая двухбуквенная форма сзади"),
         pytest.param("НВ Групп", "nv grupp", id="чужая двухбуквенная форма впереди"),
         pytest.param("Acme & Co!", "acme co", id="знаки заменяются пробелом"),
@@ -79,16 +80,20 @@ def test_two_spellings_of_one_company_reduce_to_the_same_form():
     )
 
 
-def test_a_two_letter_form_is_cut_only_on_the_side_where_it_lives():
-    """Форма на своей стороне сводит компании, на чужой — оставляет разными.
+def test_a_two_letter_form_is_cut_only_where_it_can_be_a_form():
+    """Форма на своём месте сводит компании, на чужом — оставляет разными.
 
-    Режь двухбуквенные с обеих сторон — и «НВ Групп» сойдётся с «Групп»
-    правилом имени, без арбитра, а склейка компаний необратима.
+    Русское «АО» пишут с обоих краёв («АО Сбер», «МТС, АО»), европейские — за
+    именем. Режь `nv` и спереди — и «НВ Групп» сойдётся с «Групп» правилом
+    имени, без арбитра, а склейка компаний необратима.
     """
     assert normalize_company_name("АО Сбер") == normalize_company_name("Сбер")
     assert normalize_company_name("Philips NV") == normalize_company_name("Philips")
     assert normalize_company_name("НВ Групп") != normalize_company_name("Групп")
-    assert normalize_company_name("Сбер АО") != normalize_company_name("Сбер")
+    assert normalize_company_name("Сбер АО") == normalize_company_name("Сбер")
+    for form in ("SA", "AG", "BV"):
+        assert normalize_company_name(f"Bosch {form}") == "bosch"
+        assert normalize_company_name(f"{form} Bosch") == f"{form.lower()} bosch"
 
 
 def test_a_legal_form_inside_a_word_is_not_cut():
@@ -156,7 +161,7 @@ def test_a_query_is_cut_even_without_a_path():
 )
 def test_an_aggregator_host_is_recognised_including_its_subdomains(host, expected):
     """Агрегатор опознаётся вместе с поддоменами, но не по случайному сходству."""
-    assert _is_aggregator_host(host) is expected
+    assert is_aggregator_host(host) is expected
 
 
 def test_an_aggregator_host_carries_no_signal_about_a_company():

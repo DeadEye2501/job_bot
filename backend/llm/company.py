@@ -8,6 +8,7 @@ import httpx
 from adapters.lm_chat import ChatRequest, chat
 from backend.llm.answers import ONLY_JSON, json_object, log_unparseable
 from backend.llm.external import external_block
+from backend.llm.rules import AGGREGATOR_HOSTS_LINE
 from backend.incoming import str_list
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ DEDUPE_COMPANY_PROMPT = """Ты определяешь, является ли р
 
 Жёсткие правила (применяй строго):
 1. Если у компаний указаны ОБА websites и хосты разные (без учёта www.) — это РАЗНЫЕ компании, выбери для них null.
-   ВАЖНО: ссылки на агрегаторы вакансий, мессенджеры и соцсети (t.me/..., telegram.me/..., linkedin.com/..., x.com/..., twitter.com/..., instagram.com/..., facebook.com/..., vk.com/..., github.com/..., medium.com/..., behance.net/..., dribbble.com/..., xing.com/..., hh.ru/..., habr.com/..., getmatch.ru/... и т.п.) — это НЕ корпоративный сайт, а ссылка на канал/профиль. Обращайся с такими URL'ами как с «website не указан» при применении правила 1.
+   ВАЖНО: ссылки на агрегаторы вакансий, мессенджеры и соцсети ({AGGREGATOR_HOSTS} и т.п.) — это НЕ корпоративный сайт, а ссылка на канал/профиль. Обращайся с такими URL'ами как с «website не указан» при применении правила 1.
 2. Subsidiary'и и дочерние юрлица (отдельные юридические лица под общим брендом или материнской компанией) — это РАЗНЫЕ компании. Примеры:
    - Alphabet (материнская) и Google LLC (дочка); Alphabet и Waymo LLC; Alphabet и Verily;
    - Microsoft и LinkedIn Corp.; Microsoft и GitHub, Inc.; Microsoft и ZeniMax Media;
@@ -44,7 +45,36 @@ DEDUPE_COMPANY_PROMPT = """Ты определяешь, является ли р
 
 Верни JSON-объект такого вида:
 {"matched_id": <id одного из кандидатов или null>, "reasoning": "<краткое пояснение НА ТОМ ЖЕ ЯЗЫКЕ, что и parsed_name (русское имя → русский reasoning; English/Latin name → English reasoning), 1-2 предложения>"}
-""" + ONLY_JSON
+"""
+# Местодержателем, как у соседнего наставления разбора: `format` здесь не
+# годится вовсе — образец ответа выше написан фигурными скобками, и они
+# читались бы как поля подстановки.
+DEDUPE_COMPANY_PROMPT = (
+    DEDUPE_COMPANY_PROMPT.replace("{AGGREGATOR_HOSTS}", AGGREGATOR_HOSTS_LINE)
+    + ONLY_JSON
+)
+
+
+def _shown_candidates(
+    parsed_name: str, parsed_website: str | None, candidates: list
+) -> str:
+    """Разобранное и кандидаты одним куском данных — тем, что увидит арбитр.
+
+    Порядковых номеров у списка нет нарочно: при пяти кандидатах модель путала
+    «третий» с `id=3` и приклеивала вакансию к чужой компании.
+    """
+    cand_lines = []
+    for c in candidates:
+        aliases = ", ".join(str_list(c.aliases)) or "—"
+        cand_lines.append(
+            f'id={c.id}, name="{c.name}", aliases=[{aliases}], '
+            f'website="{c.website or "—"}"'
+        )
+    return (
+        f'Распарсено из вакансии:\n- name: "{parsed_name}"\n'
+        f'- website: "{parsed_website or "—"}"\n\n'
+        "Кандидаты в БД:\n" + "\n".join(cand_lines)
+    )
 
 
 def _dedupe_request(
@@ -62,22 +92,8 @@ def _dedupe_request(
     склеивание необратимо. Заслон «номер должен быть из списка» не спасает:
     подсказывают как раз номер из списка.
     """
-    # Порядковых номеров у списка нет нарочно: при пяти кандидатах модель
-    # путала «третий» с `id=3` и приклеивала вакансию к чужой компании.
-    cand_lines = []
-    for c in candidates:
-        aliases = ", ".join(str_list(c.aliases)) or "—"
-        cand_lines.append(
-            f'id={c.id}, name="{c.name}", aliases=[{aliases}], '
-            f'website="{c.website or "—"}"'
-        )
-    data = (
-        f'Распарсено из вакансии:\n- name: "{parsed_name}"\n'
-        f'- website: "{parsed_website or "—"}"\n\n'
-        "Кандидаты в БД:\n" + "\n".join(cand_lines)
-    )
     user_content = external_block(
-        data,
+        _shown_candidates(parsed_name, parsed_website, candidates),
         "разобранное имя компании и кандидаты из базы",
         "Реши по правилам system prompt'а.",
     )
