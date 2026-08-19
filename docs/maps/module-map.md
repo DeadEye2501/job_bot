@@ -357,16 +357,20 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def percent_or_none(numerator: int, denominator: int) -> int | None` (14)
 
-### `backend/domain/salary.py` — 182 строк
+### `backend/domain/salary.py` — 293 строк
 
 Разбор свободной строки зарплаты: число, как записано, и валюта.
 
 Зависит от: `backend.models`
 
-- `def parse_salary(salary: str | None) -> tuple[int | None, int | None, Currency | None]` (22)
-- `def _first_money_range(s: str) -> list[int]` (15)
-- `def _about_money(s: str, run: list[re.Match]) -> bool` (8)
-- `def _values(run: list[re.Match]) -> list[int]` (13)
+- `def parse_salary(salary: str | None) -> tuple[int | None, int | None, Currency | None]` (19)
+- `def _named_outright(s: str, part: list[re.Match]) -> bool` (26)
+- `def _money_bounds(s: str) -> tuple[int | None, int | None]` (20)
+- `def _one_bound(s: str, part: list[re.Match], kept: tuple[re.Match, int]) -> tuple[int | None, int | None]` (14)
+- `def _money_part(s: str, run: list[re.Match]) -> list[re.Match]` (21)
+- `def _spaced(s: str, pair: list[re.Match]) -> bool` (8)
+- `def _one_sided(s: str, hit: re.Match, value: int) -> tuple[int | None, int | None]` (18)
+- `def _values(run: list[re.Match]) -> list[tuple[re.Match, int]]` (17)
 - `def _runs(s: str) -> list[list[re.Match]]` (15)
 - `def _amount(num: str, scale: str | None) -> int` (13)
 - `def _scale(marker: str | None) -> int` (5)
@@ -1043,7 +1047,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 474 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 476 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -1070,7 +1074,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class ChannelWithCount` (4)
 - `class ChannelStats` (20)
 - `class ChannelDetail` (4)
-- `class VacancyFilter` (51)
+- `class VacancyFilter` (53)
 - `def text_or_none(value) -> str | None` (16)
 - `def int_or_none(value) -> int | None` (17)
 - `def float_or_none(value) -> float | None` (12)
@@ -1483,7 +1487,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool` (32)
 - `async def add_vacancy_event(session: AsyncSession, vacancy_id: int, kind: str, payload: dict | None=None) -> VacancyEvent` (19)
 
-### `backend/repository/vacancies_list.py` — 409 строк ⚠ подошёл к 300
+### `backend/repository/vacancies_list.py` — 430 строк ⚠ подошёл к 300
 
 Отбор вакансий для списка на экране.
 
@@ -1493,7 +1497,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _like_anywhere(text: str) -> str` (18)
 - `def _search_clauses(search: str | None) -> tuple[list, set[str]]` (24)
 - `def _choice_clauses(f: VacancyFilter) -> tuple[list, set[str]]` (41)
-- `def _range_clauses(f: VacancyFilter, freshness) -> list` (21)
+- `def _range_clauses(f: VacancyFilter, freshness) -> list` (42)
 - `def _column_clauses(f: VacancyFilter) -> list` (20)
 - `def _where_and_joins(f: VacancyFilter, freshness) -> tuple[list, set[str]]` (15)
 - `async def list_vacancies(session: AsyncSession, filters: VacancyFilter) -> tuple[list[Vacancy], bool]` (21)
@@ -2279,7 +2283,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 233 модулей
+## tests — 234 модулей
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -2725,13 +2729,22 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_domain_salary.py` — 446 строк ⚠ подошёл к 300
+### `tests/backend/test_domain_salary.py` — 385 строк ⚠ подошёл к 300
 
 Следствия, которые наблюдают тесты `backend/domain/salary.py`.
 
 Зависит от: `backend.domain.salary`, `backend.models`
 
-Тестов: 41
+Тестов: 30
+
+
+### `tests/backend/test_domain_salary_numbers.py` — 177 строк
+
+Следствия чтения самого числа в строке зарплаты.
+
+Зависит от: `backend.domain.salary`, `backend.models`
+
+Тестов: 16
 
 
 ### `tests/backend/test_domain_scoring.py` — 166 строк
@@ -3945,13 +3958,13 @@ Runtime settings layer.
 Тестов: 14
 
 
-### `tests/backend/test_repository_vacancy_salary.py` — 114 строк
+### `tests/backend/test_repository_vacancy_salary.py` — 137 строк
 
 Следствия отбора вакансий по зарплате.
 
 Зависит от: `tests.dbio`, `tests.factories`
 
-Тестов: 6
+Тестов: 7
 
 
 ### `tests/backend/test_repository_vacancy_sort.py` — 299 строк

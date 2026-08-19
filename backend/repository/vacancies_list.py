@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 
-from sqlalchemy import String, case, cast, func, or_, select
+from sqlalchemy import String, and_, case, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.spellings import dedupe_first_wins
@@ -207,6 +207,11 @@ def _range_clauses(f: VacancyFilter, freshness) -> list:
     Окно зарплаты и вилка вакансии сравниваются на пересечение, поэтому
     границы сходятся крест-накрест. У вакансии без чисел обе колонки пусты,
     и сравнение с пустотой отсеивает её само.
+
+    Одна названная граница — не то же самое, что ни одной: «от 300 000»
+    потолка не имеет вовсе, и ставить ему те же триста тысяч значит прятать
+    вакансию от отбора «от 400 000». Пустая сторона при названной второй
+    отбору не противоречит и потому его проходит.
     """
     clauses: list = []
     if f.score_min is not None:
@@ -214,9 +219,25 @@ def _range_clauses(f: VacancyFilter, freshness) -> list:
     if f.score_max is not None:
         clauses.append(Vacancy.score <= f.score_max)
     if f.salary_min is not None:
-        clauses.append(Vacancy.salary_max >= f.salary_min)
+        clauses.append(
+            or_(
+                Vacancy.salary_max >= f.salary_min,
+                and_(
+                    Vacancy.salary_max.is_(None),
+                    Vacancy.salary_min.is_not(None),
+                ),
+            )
+        )
     if f.salary_max is not None:
-        clauses.append(Vacancy.salary_min <= f.salary_max)
+        clauses.append(
+            or_(
+                Vacancy.salary_min <= f.salary_max,
+                and_(
+                    Vacancy.salary_min.is_(None),
+                    Vacancy.salary_max.is_not(None),
+                ),
+            )
+        )
     if f.date_from is not None:
         clauses.append(freshness >= f.date_from)
     if f.date_to is not None:
