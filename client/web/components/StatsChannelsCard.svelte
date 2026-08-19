@@ -52,8 +52,8 @@
   <div class="stats-ch-th">Answ</div>
   <div class="stats-ch-th">Invite+</div>
   <div class="stats-ch-th">Decline</div>
-  <div class="stats-ch-th stats-ch-sep-l">Answ / Sent</div>
-  <div class="stats-ch-th">Invite / Sent</div>
+  <div class="stats-ch-th stats-ch-sep-l">Sent → Answ</div>
+  <div class="stats-ch-th">Sent → Invite+</div>
 
   {#each rows as row (row.id)}
     {#each row.cells as cell, at (at)}

@@ -143,7 +143,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## backend — 104 модулей
+## backend — 107 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -428,7 +428,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def is_terminal_for_auto(status: VacancyStatus) -> bool` (9)
 - `def should_apply_status(current: VacancyStatus, new: VacancyStatus, *, force: bool=False) -> bool` (28)
 
-### `backend/domain/verdict.py` — 58 строк
+### `backend/domain/verdict.py` — 68 строк
 
 Приговор разобранному объявлению до того, как оно войдёт в граф статусов.
 
@@ -1348,55 +1348,78 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def matches_search(search: str | None, *values: object) -> bool` (12)
 
-### `backend/repository/stats_common.py` — 65 строк
+### `backend/repository/stats_common.py` — 83 строк
 
 Кирпичи, из которых обе половины экрана статистики собирают свои числа.
 
-Зависит от: `backend.models`
+Зависит от: `backend.models`, `backend.repository.vacancies_common`
 
 - `def status_cond(statuses)` (9)
 - `def first_transition_subq(statuses)` (13)
-- `def stats_period_since(period: str) -> datetime | None` (21)
+- `def parsed_in_window(since) -> list` (11)
+- `def stats_period_since(period: str) -> datetime | None` (25)
 
-### `backend/repository/stats_pipeline.py` — 245 строк
+### `backend/repository/stats_kpi.py` — 124 строк
+
+Верхняя строка экрана статистики: пять счётчиков и дельта у каждого.
+
+Зависит от: `backend.models`, `backend.repository.stats_common`, `backend.repository.vacancies_common`
+
+- `async def _ever_in(session: AsyncSession, statuses) -> int` (12)
+- `async def _first_in_period(session: AsyncSession, statuses, since: datetime) -> int` (10)
+- `async def _kpi_totals(session: AsyncSession) -> dict` (16)
+- `async def _kpi_deltas(session: AsyncSession, since: datetime | None) -> dict` (31)
+- `async def get_stats_kpi(session: AsyncSession, *, period: str) -> dict` (22)
+
+### `backend/repository/stats_pipeline.py` — 259 строк
 
 Воронка по каналам для экрана статистики.
 
 Зависит от: `backend.domain.funnel`, `backend.domain.verdict`, `backend.models`, `backend.repository.stats_common`, `backend.repository.vacancies_common`
 
 - `def _channel_item(ch_id: int, title: str | None, username: str | None, counts: tuple[int, int, int]=(0, 0, 0)) -> dict` (25)
-- `def _trash_predicates()` (19)
-- `async def _ingest_by_channel(session: AsyncSession, since) -> list` (21)
+- `def _trash_predicates()` (26)
+- `async def _ingest_by_channel(session: AsyncSession, since) -> list` (18)
 - `async def _trash_events_by_channel(session: AsyncSession, since) -> dict[int, int]` (15)
 - `async def _first_in_period_by_channel(session: AsyncSession, statuses, since) -> dict[int, set[int]]` (22)
 - `async def _funnel_by_channel(session: AsyncSession, since) -> dict[str, dict[int, set[int]]]` (19)
 - `async def _channels_without_ingest(session: AsyncSession, missing_ids: set[int]) -> dict[int, dict]` (21)
-- `def _pipeline_row(ch_id: int, item: dict, trash_events: int, funnel) -> dict` (30)
-  - `def share(reached: int) -> float | None` (2)
+- `def _pipeline_row(ch_id: int, item: dict, trash_events: int, funnel) -> dict` (39)
+  - `def share(stage: str) -> float | None` (4)
 - `async def get_stats_channels_pipeline(session: AsyncSession, *, period: str) -> dict` (37)
 
-### `backend/repository/stats_summary.py` — 356 строк ⚠ подошёл к 300
+### `backend/repository/stats_responses.py` — 147 строк
 
-Сводные числа для экрана статистики.
+Скорость ответа HR: сколько ждали, кто не ответил и в какие дни пишут.
 
-Зависит от: `backend.domain.funnel`, `backend.domain.scoring`, `backend.domain.skill_names`, `backend.models`, `backend.repository.profile`, `backend.repository.stats_common`, `backend.repository.vacancies_common`
+Зависит от: `backend.domain.funnel`, `backend.models`, `backend.repository.stats_common`, `backend.repository.vacancies_common`
 
-- `async def _ever_in(session: AsyncSession, statuses) -> int` (12)
-- `async def _first_in_period(session: AsyncSession, statuses, since: datetime) -> int` (10)
-- `async def _kpi_totals(session: AsyncSession) -> dict` (16)
-- `async def _kpi_deltas(session: AsyncSession, since: datetime | None) -> dict` (32)
-- `async def get_stats_kpi(session: AsyncSession, *, period: str) -> dict` (22)
-- `async def get_stats_status_breakdown(session: AsyncSession, *, period: str) -> dict` (15)
+- `async def _applied_in_period(session: AsyncSession, since: datetime | None) -> dict[int, datetime]` (23)
+- `async def _first_response_at(session: AsyncSession, applied_map: dict[int, datetime]) -> dict[int, datetime]` (31)
+- `def _local_weekday(stamp: datetime) -> int` (8)
+- `def _weekdays_and_waits(applied_map: dict[int, datetime], first_resp_by_vid: dict[int, datetime]) -> tuple[list[int], list[float]]` (17)
+- `def _median(values: list[float]) -> float | None` (9)
+- `async def get_stats_hr_responses(session: AsyncSession, *, period: str) -> dict` (33)
+
+### `backend/repository/stats_skills.py` — 94 строк
+
+Частота технологий в объявлениях за выбранный срок.
+
+Зависит от: `backend.domain.scoring`, `backend.domain.skill_names`, `backend.models`, `backend.repository.profile`, `backend.repository.stats_common`
+
 - `def _count_stack_tags(stacks) -> tuple[dict[str, int], dict[str, str]]` (30)
 - `def _skill_items(counts: dict[str, int], canon_by_key: dict[str, str], profile_set, min_count: int) -> list[dict]` (18)
 - `async def get_stats_skills(session: AsyncSession, *, period: str, limit: int=27, min_count: int=2) -> dict` (30)
-- `async def _applied_in_period(session: AsyncSession, since: datetime | None) -> dict[int, datetime]` (23)
-- `async def _first_response_at(session: AsyncSession, applied_map: dict[int, datetime]) -> dict[int, datetime]` (31)
-- `def _weekdays_and_waits(applied_map: dict[int, datetime], first_resp_by_vid: dict[int, datetime]) -> tuple[list[int], list[float]]` (15)
-- `def _median(values: list[float]) -> float | None` (9)
-- `async def get_stats_hr_responses(session: AsyncSession, *, period: str) -> dict` (39)
 
-### `backend/repository/vacancies_activity.py` — 94 строк
+### `backend/repository/stats_statuses.py` — 29 строк
+
+Разбивка вакансий по нынешним статусам за выбранный срок.
+
+Зависит от: `backend.repository.stats_common`, `backend.repository.vacancies_activity`, `backend.repository.vacancies_common`
+
+- `async def get_stats_status_breakdown(session: AsyncSession, *, period: str) -> dict` (20)
+
+### `backend/repository/vacancies_activity.py` — 130 строк
 
 Отметка последней жизни вакансии — из чего складывается и как её спросить.
 
@@ -1405,6 +1428,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _greatest_pair(a, b)` (4)
 - `def _greatest(*cols)` (5)
 - `def last_incoming_subq(ids: list[int] | None=None)` (18)
+- `def entered_current_status_at()` (34)
 - `def activity_aggs(ids: list[int] | None=None) -> tuple` (24)
 - `def activity_ts(aggs: tuple)` (7)
 - `def join_activity(stmt, aggs: tuple)` (9)
@@ -1432,15 +1456,14 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def count_by_status(session: AsyncSession, *conditions) -> dict[VacancyStatus, int]` (21)
 
-### `backend/repository/vacancies_ghosting.py` — 114 строк
+### `backend/repository/vacancies_ghosting.py` — 93 строк
 
 Вакансии, о которых замолчали: срок тишины и гашение по нему.
 
 Зависит от: `backend.domain.transitions`, `backend.models`, `backend.repository.vacancies_activity`, `backend.repository.vacancy_status`
 
-- `def _last_status_change_subq()` (13)
-- `async def _silence_candidates(session: AsyncSession)` (32)
-- `def _last_activity(vacancy: Vacancy, last_msg_at, last_status_at)` (11)
+- `async def _silence_candidates(session: AsyncSession)` (24)
+- `def _last_activity(vacancy: Vacancy, last_msg_at, entered_at)` (10)
 - `async def mark_ghosted_vacancies(session: AsyncSession, *, timeout_days: int) -> list[int]` (29)
 
 ### `backend/repository/vacancies_life.py` — 150 строк
@@ -2031,7 +2054,7 @@ Runtime settings layer.
 - `async def _wait_connected(client) -> None` (8)
 - `def _read_providers(payload: dict) -> dict[str, LlmProviderConfig]` (21)
 
-### `client/bridge/stats.py` — 52 строк
+### `client/bridge/stats.py` — 58 строк
 
 Экран «Статистика»: показатели за выбранный срок.
 
@@ -3749,20 +3772,20 @@ Runtime settings layer.
 
 - `async def names_and_levels(session) -> list[tuple[str, int]]` (3)
 
-### `tests/backend/test_repository_stats_breakdown.py` — 90 строк
+### `tests/backend/test_repository_stats_breakdown.py` — 196 строк
 
 Следствия разбивки вакансий по статусам за период.
 
-Зависит от: `backend.models`, `backend.repository.stats_summary`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.stats_statuses`, `tests.dbio`, `tests.factories`
 
-Тестов: 5
+Тестов: 9
 
 
 ### `tests/backend/test_repository_stats_kpi.py` — 254 строк
 
 Следствия сводных счётчиков в шапке экрана статистики.
 
-Зависит от: `backend.models`, `backend.repository.stats_summary`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.stats_kpi`, `tests.dbio`, `tests.factories`
 
 Тестов: 11
 
@@ -3777,13 +3800,13 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/backend/test_repository_stats_pipeline.py` — 445 строк ⚠ подошёл к 300
+### `tests/backend/test_repository_stats_pipeline.py` — 511 строк ⚠ за пределом 500
 
 Следствия таблицы «каналы» на экране статистики.
 
-Зависит от: `backend.models`, `backend.repository.stats_pipeline`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.domain.verdict`, `backend.models`, `backend.repository.stats_pipeline`, `tests.dbio`, `tests.factories`
 
-Тестов: 17
+Тестов: 19
 
 - `async def rows_by_label(session, **kwargs) -> dict[str, dict]` (4)
 
@@ -3791,26 +3814,27 @@ Runtime settings layer.
 
 Следствия подсчёта срока ответа на отклик.
 
-Зависит от: `backend.models`, `backend.repository.stats_summary`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.stats_responses`, `tests.dbio`, `tests.factories`
 
 Тестов: 12
 
 
-### `tests/backend/test_repository_stats_response_weekday.py` — 33 строк
+### `tests/backend/test_repository_stats_response_weekday.py` — 69 строк
 
 Следствия распределения ответов HR по дням недели.
 
-Зависит от: `backend.repository.stats_summary`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.repository.stats_responses`, `tests.dbio`, `tests.factories`
 
-Тестов: 1
+Тестов: 2
 
 - `def _monday(hour: int=12) -> datetime` (7)
+- `def _local_monday_after_midnight() -> datetime` (12)
 
 ### `tests/backend/test_repository_stats_skills.py` — 184 строк
 
 Следствия подсчёта технологий, встречающихся в вакансиях.
 
-Зависит от: `backend.repository.stats_summary`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.repository.stats_skills`, `tests.dbio`, `tests.factories`
 
 Тестов: 11
 

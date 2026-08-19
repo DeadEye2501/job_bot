@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from backend.repository import stats_pipeline, stats_summary
+from backend.repository import (
+    stats_kpi,
+    stats_pipeline,
+    stats_responses,
+    stats_skills,
+    stats_statuses,
+)
 from client.bridge.answer import reply
 from client.bridge.hub import Hub
 
@@ -33,19 +39,19 @@ class Stats:
         """Верхний ряд показателей экрана. Срок ∈ {today, week, month,
         quarter, all}.
         """
-        return self._read(period, stats_summary.get_stats_kpi)
+        return self._read(period, stats_kpi.get_stats_kpi)
 
     def status_breakdown(self, period: str) -> dict:
         """Счёт по одиннадцати положениям дел — воронка и общие счётчики."""
-        return self._read(period, stats_summary.get_stats_status_breakdown)
+        return self._read(period, stats_statuses.get_stats_status_breakdown)
 
     def hr_responses(self, period: str) -> dict:
         """Скорость ответа людей и раскладка по дням недели."""
-        return self._read(period, stats_summary.get_stats_hr_responses)
+        return self._read(period, stats_responses.get_stats_hr_responses)
 
     def skills(self, period: str) -> dict:
         """Самые частые навыки за срок и отметка «есть у меня»."""
-        return self._read(period, stats_summary.get_stats_skills)
+        return self._read(period, stats_skills.get_stats_skills)
 
     def channels_pipeline(self, period: str) -> dict:
         """Воронка по каналам: сбор, отклики, конверсия."""

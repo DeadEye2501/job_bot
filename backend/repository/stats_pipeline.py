@@ -4,7 +4,7 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.funnel import INVITED, RESPONDED
-from backend.domain.verdict import TRASH_SKIP_PREFIX
+from backend.domain.verdict import JUNK_SKIP_PREFIXES
 from backend.models import (
     TelegramChannel,
     TrashEvent,
@@ -14,6 +14,7 @@ from backend.models import (
 
 from backend.repository.stats_common import (
     first_transition_subq,
+    parsed_in_window,
     stats_period_since,
 )
 from backend.repository.vacancies_common import PARSED_ONLY
@@ -48,16 +49,23 @@ def _channel_item(
 def _trash_predicates():
     """Два условия «мусор» и «просто не подошло», набранные одним образцом.
 
-    Мусор — посты, отсеянные валидатором. При обычном разборе строку
-    удаляют, и счёт хранится в `trash_event`; при повторном строка остаётся
-    со статусом «не подходит» и меткой в причине отказа. Чистое «не
-    подошло» — тот же статус **без** метки: отсев по языку, месту, уровню.
+    Мусор — посты, не бывшие вакансией: отвергнутые вердиктом и пустые. При
+    обычном разборе строку удаляют, и счёт хранится в `trash_event`; при
+    повторном строка остаётся со статусом «не подходит» и меткой в причине
+    отказа. Метки две (`JUNK_SKIP_PREFIXES`), и обе значат здесь одно.
+    Чистое «не подошло» — тот же статус **без** меток: отсев по языку,
+    месту, уровню.
 
     Образец один на оба условия нарочно: они обязаны быть отрицанием друг
     друга, а набранные порознь разъехались бы молча. Пробел у метки в
     образец не идёт — за ним следует сама причина.
     """
-    marked_trash = Vacancy.skip_reason.like(f"{TRASH_SKIP_PREFIX.rstrip()}%")
+    marked_trash = or_(
+        *[
+            Vacancy.skip_reason.like(f"{prefix.rstrip()}%")
+            for prefix in JUNK_SKIP_PREFIXES
+        ]
+    )
     is_rerun_trash = and_(Vacancy.status == VacancyStatus.NOT_FIT, marked_trash)
     is_not_fit_clean = and_(
         Vacancy.status == VacancyStatus.NOT_FIT,
@@ -69,9 +77,6 @@ def _trash_predicates():
 async def _ingest_by_channel(session: AsyncSession, since) -> list:
     """Сколько каждый канал прислал за окно: всего, мусора, «не подошло»."""
     is_rerun_trash, is_not_fit_clean = _trash_predicates()
-    base_filter = [PARSED_ONLY]
-    if since is not None:
-        base_filter.append(Vacancy.created_at >= since)
     return (
         await session.execute(
             select(
@@ -83,7 +88,7 @@ async def _ingest_by_channel(session: AsyncSession, since) -> list:
                 func.sum(case((is_not_fit_clean, 1), else_=0)).label("not_fit"),
             )
             .join(Vacancy, Vacancy.source_channel_id == TelegramChannel.id)
-            .where(*base_filter)
+            .where(*parsed_in_window(since))
             .group_by(TelegramChannel.id)
         )
     ).all()
@@ -178,20 +183,29 @@ def _pipeline_row(ch_id: int, item: dict, trash_events: int, funnel) -> dict:
     """Строка таблицы по одному каналу: ингест, воронка и две доли.
 
     Всего — это и строки вакансий, и удалённый мусор: последнего в
-    `vacancy` уже нет, а прислан каналом он был. Доли считаются от
-    отправленного, и при нуле отправленных их нет вовсе — ноль там означал
-    бы «отвечают нулю процентов», а не «спрашивать не с чего».
+    `vacancy` уже нет, а прислан каналом он был.
+
+    Доли считаются по одной когорте: и в числителе, и в знаменателе только
+    те вакансии, отклик на которые ушёл внутри окна. Считай мы числитель по
+    своему множеству — вакансия, откликнутая до окна и ответившая внутри,
+    попадала бы в числитель, минуя знаменатель, и доля переваливала бы за
+    сотню. Столбцы воронки рядом остаются как есть: они отвечают на другой
+    вопрос — сколько вообще прошло ступень за период.
+
+    При нуле отправленных долей нет вовсе — ноль там означал бы «отвечают
+    нулю процентов», а не «спрашивать не с чего».
     """
     total = item["_total_vac"] + trash_events
     trash = trash_events + item["_rerun_trash"]
     not_fit = item["not_fit"]
-    counts = {
-        name: len(by_ch.get(ch_id, set())) for name, by_ch in funnel.items()
-    }
-    sent = counts["sent"]
+    reached = {name: by_ch.get(ch_id, set()) for name, by_ch in funnel.items()}
+    counts = {name: len(ids) for name, ids in reached.items()}
+    sent_ids = reached["sent"]
 
-    def share(reached: int) -> float | None:
-        return round(reached / sent * 100, 1) if sent > 0 else None
+    def share(stage: str) -> float | None:
+        if not sent_ids:
+            return None
+        return round(len(reached[stage] & sent_ids) / len(sent_ids) * 100, 1)
 
     return {
         "id": ch_id,
@@ -201,8 +215,8 @@ def _pipeline_row(ch_id: int, item: dict, trash_events: int, funnel) -> dict:
         "not_fit": not_fit,
         "fit": max(0, total - trash - not_fit),
         **counts,
-        "conv_answ_sent": share(counts["answered"]),
-        "conv_invite_sent": share(counts["invite_plus"]),
+        "conv_answ_sent": share("answered"),
+        "conv_invite_sent": share("invite_plus"),
     }
 
 

@@ -9,7 +9,7 @@
 """
 
 from backend.models import VacancyStatus
-from backend.repository.stats_summary import get_stats_status_breakdown
+from backend.repository.stats_statuses import get_stats_status_breakdown
 from tests.dbio import put
 from tests.factories import days_ago, status_history_row, vacancy_row
 
@@ -57,8 +57,14 @@ async def test_the_current_status_is_counted_not_the_history(
     assert counts["Applied"] == 0
 
 
-async def test_the_window_cuts_by_the_creation_date(session, session_factory):
-    """Окно отсекает по дате появления вакансии."""
+async def test_a_vacancy_without_history_is_cut_by_its_creation_date(
+    session, session_factory
+):
+    """У вакансии без истории окно отсекает по дате её появления.
+
+    В «новую» вакансия попадает самим заведением, и перехода туда никто не
+    пишет: считать по переходу тут нечего.
+    """
     await put(
         session_factory,
         vacancy_row(status=VacancyStatus.NEW, created_at=days_ago(1)),
@@ -70,6 +76,106 @@ async def test_the_window_cuts_by_the_creation_date(session, session_factory):
 
     assert within["New"] == 1
     assert lifetime["New"] == 2
+
+
+async def test_the_window_counts_when_the_vacancy_entered_its_status(
+    session, session_factory
+):
+    """Окно считает по тому, когда вакансия встала туда, где стоит сейчас.
+
+    Соседняя карточка того же экрана — дельты в шапке — считает окно так же,
+    по времени перехода. Считай разбивка по дате появления, и вакансия,
+    заведённая в позапрошлом месяце и откликнутая вчера, попадала бы в
+    «+1 за неделю» наверху и не попадала бы в столбик «Applied» под ним.
+    """
+    vacancy = vacancy_row(status=VacancyStatus.APPLIED, created_at=days_ago(40))
+    await put(session_factory, vacancy)
+    await put(
+        session_factory,
+        status_history_row(
+            vacancy.id, status=VacancyStatus.APPLIED, changed_at=days_ago(1)
+        ),
+    )
+
+    counts = (await get_stats_status_breakdown(session, period="week"))["counts"]
+
+    assert counts["Applied"] == 1
+
+
+async def test_a_status_entered_before_the_window_stays_out(
+    session, session_factory
+):
+    """Вакансия, вставшая в свой статус до окна, в него не попадает.
+
+    Иначе счёт «за неделю» отличался бы от лайфтайма только заведёнными
+    заново, и любая давняя вакансия числилась бы свежей.
+    """
+    vacancy = vacancy_row(status=VacancyStatus.APPLIED, created_at=days_ago(1))
+    await put(session_factory, vacancy)
+    await put(
+        session_factory,
+        status_history_row(
+            vacancy.id, status=VacancyStatus.APPLIED, changed_at=days_ago(40)
+        ),
+    )
+
+    counts = (await get_stats_status_breakdown(session, period="week"))["counts"]
+
+    assert counts["Applied"] == 0
+
+
+async def test_the_latest_entry_into_the_status_decides(session, session_factory):
+    """Считается последний вход в нынешний статус, а не первый.
+
+    Вакансия могла побывать в «отправлено» в мае, откатиться и уйти туда же
+    вчера. Возьми мы первый вход — она числилась бы майской и в свежий счёт
+    не попадала бы, хотя откликнулись по ней позавчера.
+    """
+    vacancy = vacancy_row(status=VacancyStatus.APPLIED, created_at=days_ago(60))
+    await put(session_factory, vacancy)
+    await put(
+        session_factory,
+        status_history_row(
+            vacancy.id, status=VacancyStatus.APPLIED, changed_at=days_ago(50)
+        ),
+        status_history_row(
+            vacancy.id, status=VacancyStatus.APPLIED, changed_at=days_ago(2)
+        ),
+    )
+
+    counts = (await get_stats_status_breakdown(session, period="week"))["counts"]
+
+    assert counts["Applied"] == 1
+
+
+async def test_a_comment_to_the_current_status_does_not_refresh_it(
+    session, session_factory
+):
+    """Комментарий к нынешнему статусу свежести вакансии не прибавляет.
+
+    Строку истории заводит и он, но вакансия никуда не двигалась: у такой
+    строки снят признак «применено». Считай мы её переходом — дописанная
+    вчера заметка к майскому оферу показывала бы офер сегодняшним, а верхний
+    ряд того же экрана честно давал бы ноль.
+    """
+    vacancy = vacancy_row(status=VacancyStatus.OFFER, created_at=days_ago(60))
+    await put(session_factory, vacancy)
+    await put(
+        session_factory,
+        status_history_row(
+            vacancy.id, status=VacancyStatus.OFFER, changed_at=days_ago(50)
+        ),
+        status_history_row(
+            vacancy.id,
+            status=VacancyStatus.OFFER,
+            changed_at=days_ago(1),
+            applied=False,
+        ),
+    )
+
+    counts = (await get_stats_status_breakdown(session, period="week"))["counts"]
+
+    assert counts["Offer"] == 0
 
 
 async def test_each_status_gets_its_own_tally(session, session_factory):

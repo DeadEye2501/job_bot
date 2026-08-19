@@ -8,7 +8,7 @@
 from datetime import timedelta
 
 from backend.models import VacancyStatus
-from backend.repository.stats_summary import get_stats_hr_responses
+from backend.repository.stats_responses import get_stats_hr_responses
 from tests.dbio import put
 from tests.factories import (
     days_ago,

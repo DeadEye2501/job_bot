@@ -9,6 +9,7 @@
 при повторном разборе строка сохраняется с пометкой в причине отказа.
 """
 
+from backend.domain.verdict import EMPTY_SKIP_REASON
 from backend.models import TrashEvent, VacancyStatus
 from backend.repository.stats_pipeline import get_stats_channels_pipeline
 from tests.dbio import put
@@ -140,6 +141,37 @@ async def test_junk_marked_at_a_second_pass_counts_too(session, session_factory)
     assert row["trash"] == 1
     assert row["not_fit"] == 2
     assert row["fit"] == 1
+
+
+async def test_an_empty_post_marked_at_a_second_pass_is_junk_too(
+    session, session_factory
+):
+    """Пустышка с повторного разбора идёт в мусор, а не в «не подошло».
+
+    При обычном разборе такой пост удаляют вместе со строкой, и он ложится в
+    отметки мусора. При повторном строка остаётся с другой меткой в причине
+    отказа — и уходила в соседнюю колонку, хотя пост тот же самый.
+    """
+    channel = channel_row(username="noisy", title="Шумный")
+    await put(session_factory, channel)
+    await put(
+        session_factory,
+        vacancy_row(
+            source_channel_id=channel.id,
+            status=VacancyStatus.NOT_FIT,
+            skip_reason=EMPTY_SKIP_REASON,
+        ),
+        vacancy_row(
+            source_channel_id=channel.id,
+            status=VacancyStatus.NOT_FIT,
+            skip_reason="язык не тот",
+        ),
+    )
+
+    row = (await rows_by_label(session, period="all"))["Шумный"]
+
+    assert row["trash"] == 1
+    assert row["not_fit"] == 1
 
 
 async def test_the_leftover_is_zero_when_everything_was_junk(
@@ -323,6 +355,40 @@ async def test_the_conversions_are_shares_of_what_was_sent(
     assert row["sent"] == 2
     assert row["conv_answ_sent"] == 50.0
     assert row["conv_invite_sent"] == 50.0
+
+
+async def test_a_share_counts_only_those_who_were_sent_in_the_window(
+    session, session_factory
+):
+    """Доля считается по одной когорте — по тем, кого отправили в окне.
+
+    Вакансия, отклик на которую ушёл до окна, а ответ пришёл внутри, в
+    знаменатель не попадает. Считай мы её в числителе — доля перевалила бы
+    за сотню, и полоска на экране вылезла бы из ячейки.
+    """
+    channel = channel_row(username="ch", title="Канал")
+    await put(session_factory, channel)
+    old = vacancy_row(title="откликнулись давно", source_channel_id=channel.id)
+    fresh = vacancy_row(title="откликнулись в окне", source_channel_id=channel.id)
+    await put(session_factory, old, fresh)
+    await put(
+        session_factory,
+        status_history_row(
+            old.id, status=VacancyStatus.APPLIED, changed_at=days_ago(40)
+        ),
+        status_history_row(
+            old.id, status=VacancyStatus.ANSWERED, changed_at=days_ago(1)
+        ),
+        status_history_row(
+            fresh.id, status=VacancyStatus.APPLIED, changed_at=days_ago(2)
+        ),
+    )
+
+    row = (await rows_by_label(session, period="month"))["Канал"]
+
+    assert row["sent"] == 1
+    assert row["answered"] == 1
+    assert row["conv_answ_sent"] == 0.0
 
 
 async def test_without_a_single_application_there_are_no_shares(
