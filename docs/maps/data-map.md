@@ -185,7 +185,8 @@
 ### `backend/domain/salary.py`
 
 - `_AMOUNT_RE` = `re.compile('(?P<num>\\d+(?:[ \xa0\u202f\u2009,.]…`
-- `_CURRENCY_WORD` = `'₽|\\$|€|руб[а-яё.]*|долл[а-яё.]*|евро|usd|eur|r…`
+- `_CURRENCY_WORDS: tuple[tuple[Currency, str], ...]` = `набор из 3`
+- `_CURRENCY_WORD` = `'|'.join((word for _, word in _CURRENCY_WORDS))`
 - `_RANGE_GLUE_RE` = `re.compile(f'\\s*(?:(?:{_CURRENCY_WORD})\\s*)?(?…`
 - `_THOUSAND` = `набор из 3`
 - `_FRACTION_RE` = `re.compile('[.,]\\d{1,2}$')`
@@ -193,9 +194,13 @@
 - `_NEGOTIABLE_RE` = `re.compile('собесед|договорённ|договоренн|догово…`
 - `_LEADING_NOT_MONEY_RE` = `re.compile('опыт\\w*|стаж\\w*|бонус\\w*|преми\\w…`
 - `_TRAILING_NOT_MONEY_RE` = `re.compile('лет|года|раза?|дней|дня|день|месяца|…`
-- `_WORD_BEFORE_RE` = `re.compile('([a-zа-яё]+)(?:\\s+(?:от|до|с))?\\s*…`
+- `_PREPOSITIONS` = `'от|до|с'`
+- `_WORD_BEFORE_RE` = `re.compile(f'([a-zа-яё]+)(?:\\s+(?:{_PREPOSITION…`
+- `_PREPOSITION_RE` = `re.compile(f'(?<![а-яё])({_PREPOSITIONS})\\s*$')`
+- `_CURRENCY_BEFORE_RE` = `re.compile(f'(?:{_CURRENCY_WORD})\\s*$')`
+- `_CURRENCY_AFTER_RE` = `re.compile(f'^\\s*(?:{_CURRENCY_WORD})')`
 - `_WORD_AFTER_RE` = `re.compile('^(?:-[а-яё]{1,2})?\\s*([a-zа-яё]+)')`
-- `_CURRENCIES: tuple[tuple[Currency, re.Pattern[str]], ...]` = `набор из 3`
+- `_CURRENCIES: tuple[tuple[Currency, re.Pattern[str]], ...]` = `tuple(((currency, re.compile(word)) for currency…`
 
 ### `backend/domain/scoring.py`
 

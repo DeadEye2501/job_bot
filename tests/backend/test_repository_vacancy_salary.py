@@ -112,3 +112,26 @@ async def test_a_salary_filter_no_longer_cancels_pagination(titles, session_fact
 
     assert len(await titles(limit=2)) == 2
     assert len(await titles(limit=2, salary_min=1000)) == 2
+
+
+async def test_an_open_ended_vacancy_is_not_hidden_by_the_window(
+    titles, session_factory
+):
+    """Вакансия с одной названной границей из окна не выпадает.
+
+    «от 300 000» верхней границы не имеет вовсе: платить там могут и
+    полмиллиона. Ставь ей потолком те же триста тысяч — и она пряталась бы от
+    отбора «от 400 000», хотя подходит под него. Зеркально «до 120 000» без
+    нижней границы обязана находиться отбором «до 100 000»: восемьдесят тысяч
+    она платить готова.
+    """
+    await put(
+        session_factory,
+        vacancy_row(title="от трёхсот", salary_min=300000, salary_max=None),
+        vacancy_row(title="до ста двадцати", salary_min=None, salary_max=120000),
+    )
+
+    assert await titles(salary_min=400000) == ["от трёхсот"]
+    assert await titles(salary_max=100000) == ["до ста двадцати"]
+    assert await titles(salary_min=200000, salary_max=500000) == ["от трёхсот"]
+
