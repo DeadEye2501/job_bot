@@ -8,7 +8,7 @@
 Telegram присылает такие оповещения скупо: переписка в них часто не названа
 вовсе, гарантирован только номер сообщения. Номера у пользовательской учётной
 записи общие на все личные переписки, так что попадание по одному номеру
-точное; безымянная уборка при этом всё равно сужена до входящих.
+точное в обе стороны — безымянная уборка хоронит и наши письма тоже.
 """
 
 from datetime import datetime, timezone
@@ -183,13 +183,15 @@ async def test_a_chatless_deletion_reaches_incoming_messages(
     assert (await only_row(session_factory, Message)).is_deleted is True
 
 
-async def test_a_chatless_deletion_spares_outgoing_messages(
+async def test_a_chatless_deletion_reaches_outgoing_messages_too(
     chatting, session_factory
 ):
-    """Безымянное удаление своих сообщений не трогает.
+    """Безымянное удаление хоронит и наше письмо, и окно о нём слышит.
 
-    Стёртое исходящее сверится при следующей загрузке переписки из Telegram,
-    и безымянный проход до него не дотягивается.
+    Жди исходящее догона переписки — до следующей загрузки оно висело бы
+    живым, а глубже его предела не похоронилось бы никогда. Окно спрашивается
+    тем же отбором, и сузься он обратно у одного из двух запросов, надгробие
+    встало бы, а переписка на экране осталась бы прежней.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
     bot.ingestion = FakeIngestion()
@@ -197,10 +199,13 @@ async def test_a_chatless_deletion_spares_outgoing_messages(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=False, tg_message_id=10),
     )
+    heard: list[int] = []
+    bot.on_new_message = heard.append
 
     await bot._on_dm_delete(client, [_tombstone(10, chat_id=None)])
 
-    assert (await only_row(session_factory, Message)).is_deleted is False
+    assert (await only_row(session_factory, Message)).is_deleted is True
+    assert heard == [hr.id]
 
 
 async def test_a_deleted_message_leaves_the_pending_buffer(chatting, session_factory):
