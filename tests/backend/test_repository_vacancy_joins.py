@@ -127,6 +127,23 @@ async def test_a_percent_in_the_search_is_a_letter_not_a_wildcard(
     assert await titles(search="%") == ["с процентом"]
 
 
+async def test_the_escape_sign_itself_is_a_letter_too(titles, session_factory):
+    """Сам знак экранирования ищется как знак.
+
+    Раньше его не проверял никто: соседние проверки берут «%» и «_». Порядок
+    перечня спецсимволов стерегут они же — здесь обе раскладки дают один и тот
+    же образец, и от перестановки этот тест не покраснеет.
+    """
+    await put(
+        session_factory,
+        vacancy_row(title="с путём", description=r"логи в C:\Users\dev"),
+        vacancy_row(title="без пути", description="логи в домашнем каталоге"),
+    )
+
+    assert await titles(search=r"C:\Users") == ["с путём"]
+    assert await titles(search="\\") == ["с путём"]
+
+
 async def test_an_underscore_in_the_search_is_a_letter_too(titles, session_factory):
     """Подчёркивание в строке поиска ищется как знак, а не как «любая буква».
 

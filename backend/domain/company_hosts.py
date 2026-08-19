@@ -50,17 +50,43 @@ AGGREGATOR_HOSTS = frozenset({
     "career.ru",
     "greenhouse.io",
     "lever.co",
-    "indeed.com",
-    "stepstone.de",
     # Общие хостинги ссылок, анкет и заметок: на таком хосте сидит кто угодно,
     # и одна ссылка на форму отклика склеила бы две разные компании.
     "docs.google.com",
     "forms.gle",
+    "typeform.com",
     "telegra.ph",
     "notion.so",
     "taplink.cc",
     "bit.ly",
 })
+
+
+AGGREGATOR_BRANDS = frozenset({"indeed", "stepstone"})
+"""Площадки вакансий, живущие выводком доменов: по домену на страну.
+
+Перечислить их поимённо нельзя: у одной такой площадки доменов под шестьдесят,
+и заводится новый без нашего ведома. Опознаются они не именем домена, а именем
+площадки перед окончанием: `indeed.de`, `indeed.co.uk`, `de.indeed.com` — одна
+и та же, а `indeed.acme.com` — чужой хост, который лишь начинается так же.
+"""
+
+
+def _is_brand_domain(host: str) -> bool:
+    """Стоит ли за хостом площадка из `AGGREGATOR_BRANDS`.
+
+    Имя площадки засчитывается, только если за ним не осталось ничего, кроме
+    окончания домена. Окончание отличается длиной: `de`, `ru`, `com`, `co.uk`
+    — не длиннее трёх букв каждое, а `acme` — длиннее. Правило грубое, но
+    ошибается в безопасную сторону: незнакомое длинное окончание оставит хост
+    обычным сайтом, то есть решать будет арбитр, а не склейка по домену.
+    """
+    labels = host.split(".")
+    for i, label in enumerate(labels[:-1]):
+        if label in AGGREGATOR_BRANDS:
+            if all(len(rest) <= 3 for rest in labels[i + 1:]):
+                return True
+    return False
 
 
 def is_aggregator_host(host: str) -> bool:
@@ -74,4 +100,4 @@ def is_aggregator_host(host: str) -> bool:
     for known in AGGREGATOR_HOSTS:
         if host == known or host.endswith("." + known):
             return True
-    return False
+    return _is_brand_domain(host)

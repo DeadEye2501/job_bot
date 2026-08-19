@@ -34,6 +34,14 @@ from backend.llm.rules import (
     GRADE_MARKERS,
 )
 
+# Бюджет токенов на вердикт пригодности — тот же, что у соседей по причине,
+# описанной в `hr_reply.MAX_CLASSIFY_TOKENS`: рассуждающая модель тратит их на
+# размышление до ответа. Четырёхсот не хватало, и с тех пор как обрыв здесь
+# перестал считаться отказом, упёршаяся в предел вакансия не уходит в «не
+# подходит», а остаётся неразобранной — то есть разбирается заново при каждом
+# запуске и не разберётся уже никогда.
+MAX_FIT_TOKENS = 1200
+
 logger = logging.getLogger(__name__)
 
 
@@ -310,7 +318,7 @@ def _fit_request(parsed: ParsedVacancy, raw_text: str, profile):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_msg},
         ],
-        max_tokens=400,
+        max_tokens=MAX_FIT_TOKENS,
     )
 
 

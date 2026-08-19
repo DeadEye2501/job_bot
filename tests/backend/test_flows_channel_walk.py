@@ -36,6 +36,7 @@ async def walking(monkeypatch, make_pipeline):
 
     async def poll(pipeline, channel_id, username, last_id):
         pipeline.walked.append(username)
+        return True
 
     pipeline.reload_resources = reload
     monkeypatch.setattr(channels, "poll_channel", poll)

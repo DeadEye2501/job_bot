@@ -140,6 +140,35 @@ async def test_nothing_but_duplicates_means_the_window_is_not_told(
 
 
 
+async def test_an_incoming_duplicate_does_not_wake_the_window_either(
+    known_hr, session_factory
+):
+    """Повтор чужого письма окно не дёргает, как и повтор нашего.
+
+    Догон видит уже записанное почти всегда, и переписок он обходит по два
+    десятка разом: считай мы повтор новостью, каждое включение бота
+    перерисовывало бы все открытые переписки на пустом месте.
+    """
+    await put(
+        session_factory,
+        message_row(
+            hr_id=known_hr.id, is_incoming=True, tg_message_id=12, text="уже было"
+        ),
+    )
+    client = FakeTelegramClient()
+    client.history = [_theirs(12, "уже было")]
+    heard: list[int] = []
+
+    await _catch_up(
+        client,
+        known_hr,
+        session_factory,
+        hooks=DmHooks(on_message_persisted=heard.append),
+    )
+
+    assert heard == []
+
+
 async def test_an_unknown_peer_is_resolved_by_name(session_factory):
     """Неизвестного Telegram собеседника ищут по имени и пробуют снова.
 
@@ -264,7 +293,7 @@ async def test_without_a_buffer_the_vacancy_list_is_refreshed(
     """
 
     async def process_dm(msg, *args, **kwargs):
-        pass
+        return known_hr.id
 
     monkeypatch.setattr("backend.flows.dm_backfill.process_dm", process_dm)
     client = FakeTelegramClient()
@@ -293,7 +322,7 @@ async def test_with_a_buffer_the_vacancy_list_is_left_to_the_reader(
     """
 
     async def process_dm(msg, *args, **kwargs):
-        pass
+        return known_hr.id
 
     monkeypatch.setattr("backend.flows.dm_backfill.process_dm", process_dm)
     client = FakeTelegramClient()

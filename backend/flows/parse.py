@@ -128,6 +128,10 @@ async def _parsed_or_dropped(
 ):
     """Разобрать объявление; пустота в ответ — с ним уже покончено.
 
+    Три значения: разбор, отказ модели и «дошла ли запись». Третье нужно
+    только пустой дороге: там строку записывают, и сорвавшаяся запись не
+    должна доехать до окна словом «разобрана».
+
     Пустышку отсеиваем до модели-оценщика: разбор не вытащил ни одного поля
     сверх названия, то есть это мем, обрывок или рекламная строчка, и второе
     обращение к модели ей не положено. Дальше две дороги — удалить или
@@ -147,14 +151,14 @@ async def _parsed_or_dropped(
     )
     if refusal is not None:
         logger.warning("vacancy %s: разбор не состоялся (%s)", vacancy_id, refusal)
-        return None, refusal
+        return None, refusal, False
     if not is_empty_vacancy(parsed):
-        return parsed, None
-    if not await _dropped_as_trash(
+        return parsed, None, True
+    if await _dropped_as_trash(
         pipeline, vacancy_id, EMPTY_SKIP_REASON, allow_delete=allow_delete
     ):
-        await save_empty_vacancy(pipeline, vacancy_id, parsed)
-    return None, None
+        return None, None, True
+    return None, None, await save_empty_vacancy(pipeline, vacancy_id, parsed)
 
 
 async def _verdict_for(
@@ -239,13 +243,13 @@ async def parse_and_update_vacancy(
     Различие нужно окну: на отказе оно говорит «не удалось перезапустить»
     вместо «готово» над карточкой, которая не менялась.
     """
-    parsed, refusal = await _parsed_or_dropped(
+    parsed, refusal, stored = await _parsed_or_dropped(
         pipeline, vacancy_id, text, channel_username, allow_delete
     )
     if refusal is not None:
         return False
     if parsed is None:
-        return True
+        return stored
     verdict = await _verdict_for(pipeline, parsed, text, vacancy_id)
     if verdict is None:
         return False
@@ -282,7 +286,7 @@ async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
 
 async def save_empty_vacancy(
     pipeline, vacancy_id: int, parsed: ParsedVacancy | None
-) -> None:
+) -> bool:
     """Persist an empty/trash vacancy as Not Fit when auto-delete is off
     (rerun path). Fills whatever fields LLM did extract — заголовок и, как
     правило, ещё один сигнал из пяти, по которым выносится приговор
@@ -308,7 +312,8 @@ async def save_empty_vacancy(
         ),
     )
     if written is None:
-        return
+        return False
     hr, hr_created = written
     if hr_created:
         dm_backfill.spawn_hr_backfill(pipeline, hr)
+    return True

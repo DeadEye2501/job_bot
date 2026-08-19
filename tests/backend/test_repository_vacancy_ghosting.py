@@ -150,6 +150,61 @@ async def test_a_recent_move_into_the_current_status_restarts_the_countdown(
     assert await mark_ghosted_vacancies(session, timeout_days=TIMEOUT) == []
 
 
+async def test_a_note_written_by_a_person_restarts_the_countdown(
+    session, session_factory
+):
+    """Заметка человека к нынешнему статусу отодвигает срок.
+
+    Статус она не меняет — строка истории остаётся «не применённой», — но
+    человек, дописавший вчера «созвонились, ждут ответа заказчика», проявил
+    ту же активность, что и автоматический перевод. Уводить такую вакансию в
+    тишину нельзя: она жива, и это видно.
+    """
+    noted = vacancy_row(status=VacancyStatus.APPLIED, created_at=days_ago(30))
+    silent = vacancy_row(status=VacancyStatus.APPLIED, created_at=days_ago(30))
+    await put(session_factory, noted, silent)
+    await put(
+        session_factory,
+        status_history_row(
+            noted.id,
+            status=VacancyStatus.APPLIED,
+            previous_status=VacancyStatus.APPLIED,
+            applied=False,
+            changed_at=days_ago(1),
+        ),
+    )
+
+    assert await mark_ghosted_vacancies(session, timeout_days=TIMEOUT) == [silent.id]
+
+
+async def test_a_deleted_letter_does_not_restart_the_countdown(
+    session, session_factory
+):
+    """Похороненное письмо срок не отодвигает.
+
+    HR написал и отозвал письмо: строка осталась с надгробием, но ответа мы
+    так и не получили. Считай мы её, вакансия ждала бы ещё две недели ответа,
+    которого не было, и в списке числилась бы свежей.
+    """
+    hr = hr_row()
+    await put(session_factory, hr)
+    vacancy = vacancy_row(status=VacancyStatus.APPLIED, created_at=days_ago(30))
+    await put(session_factory, vacancy)
+    await put(
+        session_factory,
+        message_row(
+            text="написал и передумал",
+            hr_id=hr.id,
+            vacancy_id=vacancy.id,
+            is_incoming=True,
+            is_deleted=True,
+            sent_at=days_ago(1),
+        ),
+    )
+
+    assert await mark_ghosted_vacancies(session, timeout_days=TIMEOUT) == [vacancy.id]
+
+
 async def test_a_recent_move_into_some_other_status_does_not_count(
     session, session_factory
 ):

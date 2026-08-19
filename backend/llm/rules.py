@@ -12,15 +12,18 @@
 увидеть блокер.
 """
 
-from backend.domain.company_hosts import AGGREGATOR_HOSTS
+from backend.domain.company_hosts import AGGREGATOR_BRANDS, AGGREGATOR_HOSTS
 
-AGGREGATOR_HOSTS_LINE = ", ".join(sorted(AGGREGATOR_HOSTS))
+AGGREGATOR_HOSTS_LINE = ", ".join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_BRANDS))
 """Хосты, за которыми не стоит одна компания, — строкой для наставления.
 
 Собирается из перечня, а не выписывается: разбор кладёт такие ссылки мимо поля
 сайта, арбитр не считает их доводом «сайты разные», а отбор гасит их до
 пустоты — и все трое обязаны знать один и тот же список. Порядок ровный, по
 алфавиту: наставление не должно меняться от перебора множества.
+
+Площадки с выводком доменов названы здесь одним именем, без окончания: модели
+и надо узнать площадку, а не проверить домен, — доменов у неё шесть десятков.
 """
 
 GRADE_MARKERS = (

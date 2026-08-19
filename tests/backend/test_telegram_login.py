@@ -223,13 +223,19 @@ async def test_a_rate_limit_on_the_code_is_told_in_human_words(login, clients):
 
 
 async def test_a_rate_limit_on_the_password_is_told_in_human_words(login, clients):
-    """Запрет на шаге пароля называется теми же словами, что и на первом."""
+    """Запрет на шаге пароля называется срок в срок, но про свой шаг.
+
+    Фраза общая на все три шага, а хвост у неё свой: «перед следующей попыткой
+    отправить код» на шаге облачного пароля уводит человека обратно к номеру
+    телефона, откуда он уже ушёл.
+    """
     clients.fails["check_password"] = FloodWait(value=12418)
     await sent(login)
 
     step = await login.confirm_password("облачный")
 
     assert "3 ч 26 мин" in step.error
+    assert step.error.endswith("перед следующей попыткой ввести пароль.")
 
 
 async def test_a_session_that_could_not_be_written_is_not_silent(
@@ -243,7 +249,7 @@ async def test_a_session_that_could_not_be_written_is_not_silent(
     """
     from backend.runtime_settings import RuntimeSettings
 
-    async def no_room(self, **fields):
+    async def no_room(self, creds):
         raise OSError("на диске нет места")
 
     monkeypatch.setattr(RuntimeSettings, "set_tg", no_room)

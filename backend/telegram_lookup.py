@@ -45,6 +45,11 @@ async def read_channel_metadata(
 async def _quietly(what: str, asking):
     """Спросить Telegram и промолчать, если не ответил; беду записать.
 
+    ``asking`` — не корутина, а то, чем её заводят: рождённая доводом, она
+    рождалась бы снаружи перехвата, и бросок на самом зове ушёл бы мимо. Тот
+    же приём у места прогона (`bot/slot.run_in_slot`), но там он по своей
+    причине — незапущенная корутина осталась бы висеть.
+
     Оба зова отсюда второстепенны — картинка собеседника и его розыск, — и
     ронять из-за них разбор нельзя: у зовущих на пустоту есть свои дороги.
 
@@ -54,7 +59,7 @@ async def _quietly(what: str, asking):
     собой саму запись.
     """
     try:
-        return await asking
+        return await asking()
     except FloodWait as e:
         logger.warning(
             "%s: FloodWait %s, пропускаю", what, getattr(e, "value", "?")
@@ -80,7 +85,8 @@ async def fetch_telegram_avatar(client, entity) -> bytes | None:
     if not file_id:
         return None
     buf = await _quietly(
-        "fetch_telegram_avatar", client.download_media(file_id, in_memory=True)
+        "fetch_telegram_avatar",
+        lambda: client.download_media(file_id, in_memory=True),
     )
     if buf is None:
         return None
@@ -92,7 +98,7 @@ async def resolve_hr_telegram(client, hr_contact: str):
     if not username:
         return None
     user = await _quietly(
-        f"resolve_hr_telegram {hr_contact!r}", client.get_users(username)
+        f"resolve_hr_telegram {hr_contact!r}", lambda: client.get_users(username)
     )
     if user is None:
         return None

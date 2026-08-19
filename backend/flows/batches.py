@@ -2,10 +2,10 @@
 
 import logging
 
-logger = logging.getLogger(__name__)
 
-
-def report_failures(hr_ids: list[int], results: list, what: str) -> None:
+def report_failures(
+    hr_ids: list[int], results: list, what: str, log: logging.Logger
+) -> None:
     """Пожаловаться на тех, чья работа в пачке сорвалась.
 
     Пачка собирается с `return_exceptions=True` нарочно: сорвавшийся человек
@@ -20,7 +20,11 @@ def report_failures(hr_ids: list[int], results: list, what: str) -> None:
     отменой пачка сюда не доходит вовсе (`gather` бросает её сам, минуя
     разбор), а отменённый изнутри один человек не повод гасить бота — а
     именно этим проброс и кончился бы: у обоих зовущих отмены никто не ждёт.
+
+    Журнал берётся зовущего, а не свой: в записи окна источником стоит имя
+    модуля, и беду догона человек ищет под именем догона. Своим именем разбор
+    увёл бы такие записи в общий модуль, о котором человек не знает вовсе.
     """
     for hr_id, result in zip(hr_ids, results):
         if isinstance(result, BaseException):
-            logger.exception("%s failed for hr %d", what, hr_id, exc_info=result)
+            log.exception("%s failed for hr %d", what, hr_id, exc_info=result)

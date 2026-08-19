@@ -162,10 +162,10 @@ class VacancyStatusHistory(IdMixin, Base):
     )
     # Без предела длины: остальные строковые поля объявлены так же, а SQLite
     # хранит TEXT без ограничения — прежний предел в 2000 знаков отличал эту
-    # колонку без причины. Длину не ограничивает и приложение: окно держит
-    # `maxlength` на своём поле пояснения, а приходящее от модели не мерит
-    # никто (`_ensure_trailing_period` в `repository/vacancy_status.py` только
-    # дописывает точку).
+    # колонку без причины. Длину не ограничивает и приложение: в эту колонку
+    # пишут два окошка, и предел стоит только у одного (`VacancyTimeline`),
+    # а приходящее от модели не мерит никто (`_ensure_trailing_period` в
+    # `repository/vacancy_status.py` только дописывает точку).
     explanation: Mapped[str | None] = mapped_column(String)
     applied: Mapped[bool] = mapped_column(server_default=expression.true())
     source: Mapped[StatusHistorySource] = mapped_column(

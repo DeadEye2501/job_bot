@@ -46,8 +46,9 @@ def _hr_counts_query(sort_by: str):
     # Пре-агрегируем последнюю переписку отдельным GROUP BY hr_id вместо
     # коррелированного scalar-subquery в ORDER BY: иначе SQLite заново
     # сканировал бы message-таблицу по разу на каждого HR при сортировке.
-    # Здесь — один проход по message с использованием ix_message_hr_id,
-    # дальше LEFT JOIN на HR.
+    # Здесь — один проход по message (его закрывает уникальный ключ
+    # `uq_message_hr_tgid_dir`, у которого `hr_id` идёт первым), дальше
+    # LEFT JOIN на HR.
     last_act_subq = (
         select(
             Message.hr_id.label("hr_id"),

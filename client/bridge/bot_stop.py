@@ -40,8 +40,8 @@ async def stop_bot(
     bot_task: Future | None,
     asking: Callable[[], Awaitable[None]] | None = None,
     timeout: float = STOP_TIMEOUT_S,
-) -> None:
-    """Попросить бота остановиться и дождаться его работы.
+) -> bool:
+    """Попросить бота остановиться и дождаться его работы; сказать, дождались ли.
 
     `asking` — чем именно просят: у выхода из учётной записи это
     `log_out_session`, который сперва отзывает ключ на сервере; у остальных
@@ -55,7 +55,10 @@ async def stop_bot(
 
     Ожидание, наоборот, беду глотает и пишет в журнал: зависший обход не
     отменяет ни выхода, ни сноса, ни закрытия окна, а след его нужен —
-    другого не останется.
+    другого не останется. Но проглоченная беда отвечает ложью: пересборка под
+    новый сеанс по этому ответу и решает, поднимать ли следующего, — подними
+    она его поверх недождавшегося, и Telegram увидел бы две копии на одной
+    строке сеанса.
     """
     if bot is not None:
         bot.cancel_current_poll()
@@ -64,10 +67,12 @@ async def stop_bot(
         else:
             bot.request_stop()
     if bot_task is None:
-        return
+        return True
     try:
         await asyncio.wait_for(asyncio.wrap_future(bot_task), timeout)
     except asyncio.TimeoutError:
         logger.warning("stop_bot: bot did not stop within %ss", timeout)
+        return False
     except Exception:
         logger.exception("stop_bot: bot task raised")
+    return True

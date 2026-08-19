@@ -193,6 +193,9 @@ async def test_a_cancelled_chat_leaves_a_trace_and_spares_the_others(
 
     assert done == [hrs[1].id]
     assert "CancelledError" in caplog.text
+    # Источником записи стоит догон, а не общий разбор пачек: беду догона
+    # человек ищет в журнале под именем догона.
+    assert [r.name for r in caplog.records] == ["backend.flows.dm_backfill"]
 
 
 async def test_the_window_hooks_reach_every_chat(session_factory, monkeypatch):

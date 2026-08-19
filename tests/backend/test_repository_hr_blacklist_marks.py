@@ -8,7 +8,11 @@
 
 from backend.models import HR
 from backend.repository.blacklist_marks import preferred_blacklist_value
-from backend.repository.hr_card import get_hr_detail, hr_blacklist_candidates
+from backend.repository.hr_card import (
+    get_hr_detail,
+    hr_blacklist_candidates,
+    merge_hr,
+)
 from tests.dbio import put
 from tests.factories import blacklist_row, hr_row
 
@@ -137,3 +141,81 @@ async def test_when_both_spellings_are_listed_the_older_row_wins(
     )
 
     assert (await get_hr_detail(session, hr.id)).blacklist_value == "user_id:111"
+
+
+async def test_a_mark_moves_onto_the_survivor_of_a_merge(session, session_factory):
+    """Отметка поглощённой карточки достаётся выжившей.
+
+    Отсеянного человека легко завести дважды и потом слить: его учётная
+    запись при слиянии пропадает, а с ней пропала бы и отметка — заслон
+    отправки перестал бы его видеть, и бот написал бы заблокированному.
+    """
+    absorbed = hr_row(name="дубль", telegram_username="olga", telegram_user_id=222)
+    survivor = hr_row(name="основной", telegram_username="maria", telegram_user_id=111)
+    await put(session_factory, absorbed, survivor)
+    await put(session_factory, blacklist_row("hr", "user_id:222"))
+
+    await merge_hr(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
+
+    assert (await get_hr_detail(session, survivor.id)).blacklist_value == "user_id:111"
+
+
+async def test_a_mark_keeps_working_when_the_account_moves_to_the_survivor(
+    session, session_factory
+):
+    """Отметка остаётся действующей и когда переезжает сама учётная запись.
+
+    У выжившего своей записи не было — он получает чужую целиком, и написание
+    отметки остаётся тем же. Переписывать тут нечего, но и потеряться она не
+    должна.
+    """
+    absorbed = hr_row(name="дубль", telegram_username="olga", telegram_user_id=222)
+    survivor = hr_row(name="основной", telegram_username=None, telegram_user_id=None)
+    await put(session_factory, absorbed, survivor)
+    await put(session_factory, blacklist_row("hr", "user_id:222"))
+
+    await merge_hr(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
+
+    assert (await get_hr_detail(session, survivor.id)).blacklist_value == "user_id:222"
+
+
+async def test_the_survivors_own_mark_follows_a_replaced_nickname(
+    session, session_factory
+):
+    """Отметка выжившего переезжает, когда его ник заместил чужой.
+
+    У выжившего был один ник и отметка на нём; поглощённый принёс учётную
+    запись, и ник карточки переписался. Отметка на прежнем нике не совпадает
+    больше ни с кем: заслон отправки человека не видит, а строка списка
+    продолжает отсеивать посты по нику, который теперь чужой.
+    """
+    absorbed = hr_row(name="дубль", telegram_username="olga", telegram_user_id=222)
+    survivor = hr_row(name="основной", telegram_username="anna", telegram_user_id=None)
+    await put(session_factory, absorbed, survivor)
+    await put(session_factory, blacklist_row("hr", "@anna"))
+
+    await merge_hr(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
+
+    assert (await get_hr_detail(session, survivor.id)).blacklist_value == "user_id:222"
+
+
+async def test_two_marked_records_leave_one_standing_mark(session, session_factory):
+    """Слияние двух отмеченных оставляет одну действующую отметку.
+
+    Второй строки с тем же написанием не допускает заведение, поэтому
+    переезжающая гаснет, а действующей остаётся та, что уже стоит на
+    написании выжившего. Погашенная видна на экране списка — решение не
+    пропадает.
+    """
+    absorbed = hr_row(name="дубль", telegram_username="olga", telegram_user_id=222)
+    survivor = hr_row(name="основной", telegram_username="maria", telegram_user_id=111)
+    await put(session_factory, absorbed, survivor)
+    await put(
+        session_factory,
+        blacklist_row("hr", "user_id:222"),
+        blacklist_row("hr", "user_id:111"),
+    )
+
+    await merge_hr(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
+
+    assert (await get_hr_detail(session, survivor.id)).blacklist_value == "user_id:111"

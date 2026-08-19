@@ -103,6 +103,25 @@ async def test_a_secret_no_key_can_open_is_not_credentials(session_factory):
     assert (await RuntimeSettings.load(session_factory)).tg is None
 
 
+async def test_a_broken_key_in_the_os_keyring_is_not_credentials(
+    session_factory, monkeypatch
+):
+    """Испорченный ключ в связке тоже читается как «не настроено».
+
+    Разъехаться связка и база могут не только чистой заменой ключа: запись в
+    связке бывает обрезанной или испорченной, и тогда `Fernet` роняет не отказ
+    расшифровки, а `ValueError` — совсем другую беду с тем же следствием.
+    Ловить надо обе, иначе приложение падает до появления окна, и войти заново
+    человек не может.
+    """
+    await put(session_factory, tg_account_row(api_hash_encrypted=encrypt_str("ш")))
+    monkeypatch.setattr(
+        "backend.crypto._get_or_create_master_key", lambda: b"cut-short-key"
+    )
+
+    assert (await RuntimeSettings.load(session_factory)).tg is None
+
+
 async def test_the_two_provider_kinds_are_read_separately(session_factory):
     """Настройки чата и встраиваний не путаются между собой."""
     await put(

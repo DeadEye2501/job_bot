@@ -274,6 +274,34 @@ async def test_the_timeline_says_nothing_was_filled(emptied, session_factory):
     assert saved.payload["fields_filled"] == []
 
 
+async def test_a_failed_write_of_an_empty_vacancy_is_not_called_a_parse(
+    emptied, monkeypatch
+):
+    """Провал записи пустышки не выдаётся окну за разбор.
+
+    На прогоне заново это обычная дорога: пустышку там не удаляют, а именно
+    записывают. Сорвись запись — окно скажет «Вакансия разобрана заново» над
+    карточкой, в которой не изменилось ничего.
+    """
+    pipeline, vacancy = emptied
+
+    async def no_room(*args, **kwargs):
+        raise RuntimeError("на диске нет места")
+
+    monkeypatch.setattr("backend.flows.parse_write.add_vacancy_event", no_room)
+
+    async def nothing_to_take(*args, **kwargs):
+        return parsed_vacancy(title="Хоть что-то"), None
+
+    monkeypatch.setattr(parse, "parse_vacancy", nothing_to_take)
+
+    done = await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=False
+    )
+
+    assert done is False
+
+
 async def test_the_window_hears_about_both_lists(emptied):
     """Окно узнаёт и о вакансиях, и о контактах.
 

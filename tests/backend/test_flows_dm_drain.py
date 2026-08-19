@@ -121,6 +121,9 @@ async def test_a_cancelled_reading_leaves_a_trace(monkeypatch, dm_pipeline, capl
         await dm_pipeline.cancel_pending_dm_classifications(drain=True)
 
     assert "CancelledError" in caplog.text
+    # Имя источника — разбора писем, а не общего разбора пачек: под ним беду
+    # и ищут в журнале окна.
+    assert [r.name for r in caplog.records] == ["backend.flows.dm_classify"]
 
 
 async def test_an_empty_buffer_is_not_read(dm_pipeline):

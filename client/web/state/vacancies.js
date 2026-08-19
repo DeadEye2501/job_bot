@@ -9,8 +9,9 @@ import { REMOTE_CHOICES } from './vacancy_filter.js';
 import { plural } from './words.js';
 
 /** Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и
- *  совпадают с перечнем `backend/repository/vacancies_list.VACANCY_SORTS`;
- *  первый — тот, в котором список открывается. */
+ *  разбираются там `backend/repository/vacancies_list._order_for`; незнакомый
+ *  ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список
+ *  открывается. */
 export const SORTS = [
   { key: 'newest', label: 'Сначала новые' },
   { key: 'oldest', label: 'Сначала старые' },
