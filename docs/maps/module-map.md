@@ -33,7 +33,7 @@ Job Bot — single CLI entry point.
 - `def _log_uncaught_in_thread(args) -> None` (10)
 - `def main() -> int` (40)
 
-## adapters — 4 модулей
+## adapters — 7 модулей
 
 ### `adapters/db.py` — 88 строк
 
@@ -47,11 +47,11 @@ Job Bot — single CLI entry point.
 - `def _lower(value: object) -> object` (14)
 - `async def ping(session) -> bool` (16)
 
-### `adapters/lm_studio.py` — 330 строк ⚠ подошёл к 300
+### `adapters/lm_chat.py` — 153 строк
 
-OpenAI-compatible LLM provider client.
+Обращение к чат-модели провайдера и разбор её ответа.
 
-Зависит от: `backend.runtime_settings`
+Зависит от: —
 
 - `class ChatRequest` (16)
 - `class ChatAnswer` (10)
@@ -59,13 +59,34 @@ OpenAI-compatible LLM provider client.
 - `def _warn_if_truncated(finish_reason, purpose: str, log: logging.Logger) -> None` (17)
 - `def _answer_or_empty(content, finish_reason, purpose: str, log: logging.Logger) -> ChatAnswer` (21)
 - `async def chat(client: httpx.AsyncClient, model: str, request: ChatRequest, log: logging.Logger) -> ChatAnswer` (30)
-- `def make_client(config: LlmProviderConfig) -> httpx.AsyncClient` (9)
+
+### `adapters/lm_embed.py` — 25 строк
+
+Числовой отпечаток текста у модели встраиваний.
+
+Зависит от: —
+
+- `async def embed(client: httpx.AsyncClient, model: str, text: str) -> list[float]` (16)
+
+### `adapters/lm_models.py` — 148 строк
+
+Перечень моделей у провайдера и проверка, что нужная отвечает.
+
+Зависит от: —
+
 - `def _ping_request(model: str, kind: str) -> tuple[str, dict]` (14)
 - `async def check_model(client: httpx.AsyncClient, model: str, kind: str) -> tuple[bool, str]` (35)
 - `def _looks_like_embed(name: str) -> bool` (9)
 - `async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | None` (37)
 - `async def list_models(client: httpx.AsyncClient, *, kind: str | None=None) -> list[str]` (22)
-- `async def embed(client: httpx.AsyncClient, model: str, text: str) -> list[float]` (16)
+
+### `adapters/lm_studio.py` — 32 строк
+
+Соединение с OpenAI-совместимым провайдером моделей.
+
+Зависит от: `backend.runtime_settings`
+
+- `def make_client(config: LlmProviderConfig) -> httpx.AsyncClient` (9)
 
 ### `adapters/telegram.py` — 102 строк
 
@@ -697,14 +718,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def telegram_alive(bot) -> bool` (7)
 - `async def model_alive(cfg, kind: str) -> bool` (22)
 
-### `backend/llm/answers.py` — 146 строк
+### `backend/llm/answers.py` — 154 строк
 
 Разбор того, что ответила модель, и жалоба, когда разбор не удался.
 
 Зависит от: —
 
-- `def _last_object_in(text: str) -> tuple[int, str] | None` (24)
-- `def extract_last_json(answer: str) -> str | None` (32)
+- `def _last_object_in(text: str) -> tuple[int, int, str] | None` (27)
+- `def extract_last_json(answer: str) -> str | None` (37)
 - `def json_object(answer: str, log: logging.Logger, purpose: str) -> dict | None` (23)
 - `def log_unparseable(answer: str, log: logging.Logger, purpose: str) -> None` (18)
 - `def str_or_none(value) -> str | None` (10)
@@ -726,32 +747,32 @@ First-run bootstrap: ensure DB schema exists.
 - `def format_known_skills(skills) -> str` (17)
 - `def build_candidate_profile(profile: Profile | None, languages: list[ProfileLanguage]) -> CandidateProfile` (19)
 
-### `backend/llm/company.py` — 143 строк
+### `backend/llm/company.py` — 154 строк
 
 Арбитр: та же это компания, что уже заведена, или новая.
 
-Зависит от: `adapters.lm_studio`, `backend.llm.answers`, `backend.llm.external`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.external`, `backend.payloads`
 
 - `def _dedupe_request(parsed_name: str, parsed_website: str | None, candidates: list) -> ChatRequest` (41)
 - `def _matched_id(answer: str) -> tuple[int | None, str | None]` (22)
-- `async def dedupe_company_with_llm(client: httpx.AsyncClient, model: str, *, parsed_name: str, parsed_website: str | None, candidates: list) -> tuple[int | None, str | None]` (33)
+- `async def dedupe_company_with_llm(client: httpx.AsyncClient, model: str, *, parsed_name: str, parsed_website: str | None, candidates: list) -> tuple[int | None, str | None]` (38)
 
 ### `backend/llm/cover_letter.py` — 267 строк
 
 Сочинение письма-отклика.
 
-Зависит от: `adapters.lm_studio`, `backend.llm.external`, `backend.llm.factcheck`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.llm.external`, `backend.llm.factcheck`, `backend.payloads`
 
 - `def _letter_request(profile_block: str, parsed: ParsedVacancy, channel_ref: str | None) -> ChatRequest` (40)
 - `def _with_vacancy_filled(raw_text: str, parsed: ParsedVacancy, channel_ref) -> str` (19)
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (24)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> str | None` (39)
 
-### `backend/llm/cv.py` — 405 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 399 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
-Зависит от: `adapters.lm_studio`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.llm.answers`, `backend.llm.external`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.llm.answers`, `backend.llm.external`, `backend.payloads`
 
 - `def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]` (9)
 - `def _normalize_lang_level(value: object) -> str | None` (11)
@@ -761,7 +782,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parse_profile(data: dict) -> ParsedCvProfile | None` (23)
 - `def _parse_skill(item) -> ParsedCvSkill | None` (32)
 - `def _parse_experience(item) -> ParsedCvExperience | None` (18)
-- `def _parse_cv_json(answer: str) -> ParsedCv | None` (36)
+- `def _parse_cv_json(answer: str) -> ParsedCv | None` (31)
 - `async def parse_cv(text: str, client: httpx.AsyncClient, model: str) -> ParsedCv | None` (42)
 
 ### `backend/llm/external.py` — 18 строк
@@ -772,21 +793,21 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def wrap_external(text: str) -> str` (15)
 
-### `backend/llm/factcheck.py` — 146 строк
+### `backend/llm/factcheck.py` — 158 строк
 
 Сверка письма-отклика с тем, что о кандидате известно.
 
-Зависит от: `adapters.lm_studio`, `backend.llm.answers`, `backend.llm.external`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.external`, `backend.payloads`
 
 - `def _factcheck_request(profile_block: str, letter: str) -> ChatRequest` (19)
 - `def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]` (29)
-- `async def factcheck_cover_letter(profile_block: str, letter: str, client: httpx.AsyncClient, model: str) -> tuple[bool, list[str]]` (23)
+- `async def factcheck_cover_letter(profile_block: str, letter: str, client: httpx.AsyncClient, model: str) -> tuple[bool, list[str]]` (29)
 
 ### `backend/llm/fit.py` — 364 строк ⚠ подошёл к 300
 
 Приговор о пригодности вакансии кандидату.
 
-Зависит от: `adapters.lm_studio`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.hallucination`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.hallucination`, `backend.payloads`
 
 - `def _parse_fit_validation(answer: str) -> FitValidation | None` (10)
 - `def _vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str` (20)
@@ -805,16 +826,16 @@ First-run bootstrap: ensure DB schema exists.
 - `def _build_profile_hallucination_markers(profile: CandidateProfile) -> tuple[tuple[re.Pattern[str], re.Pattern[str]], ...]` (31)
 - `def looks_hallucinated(reason: str, raw_text: str, profile: CandidateProfile) -> str | None` (24)
 
-### `backend/llm/hr_reply.py` — 226 строк
+### `backend/llm/hr_reply.py` — 234 строк
 
 Разбор ответа HR: на каком этапе теперь отклик.
 
-Зависит от: `adapters.lm_studio`, `backend.domain.transitions`, `backend.llm.answers`, `backend.llm.external`, `backend.models`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.transitions`, `backend.llm.answers`, `backend.llm.external`, `backend.models`, `backend.payloads`
 
 - `def _parse_classification(answer: str) -> Classification | None` (19)
 - `def _allowed_next(current_status: VacancyStatus) -> str` (14)
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (22)
-- `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> Classification | None` (38)
+- `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> Classification | None` (39)
 
 ### `backend/llm/skills.py` — 129 строк
 
@@ -827,11 +848,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (30)
 
-### `backend/llm/vacancy.py` — 424 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 427 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
-Зависит от: `adapters.lm_studio`, `backend.domain.taxonomy`, `backend.domain.telegram_identity`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.skills`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.taxonomy`, `backend.domain.telegram_identity`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.skills`, `backend.payloads`
 
 - `def _split_stack(data: dict) -> tuple[list, list]` (19)
 - `def _company_name_and_site(company_name: str | None, company_website: str | None) -> tuple[str | None, str | None]` (28)
@@ -843,7 +864,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parse_request(text: str, known_skills) -> ChatRequest` (20)
 - `def _without_channel_as_hr(parsed: ParsedVacancy, channel_username: str | None) -> ParsedVacancy` (16)
 - `def _log_parsed(parsed: ParsedVacancy) -> None` (10)
-- `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, known_skills=None) -> tuple[ParsedVacancy | None, str | None]` (38)
+- `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, known_skills=None) -> tuple[ParsedVacancy | None, str | None]` (41)
 
 ### `backend/log_buffer.py` — 156 строк
 
@@ -2186,15 +2207,42 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 229 модулей
+## tests — 232 модулей
 
-### `tests/adapters/test_lm_studio.py` — 431 строк ⚠ подошёл к 300
+### `tests/adapters/test_lm_chat.py` — 164 строк
 
-Следствия, которые наблюдают тесты `adapters/lm_studio.py`.
+Следствия разговора с чат-моделью: что уходит и что получается.
 
-Зависит от: `adapters.lm_studio`, `backend.runtime_settings`, `tests.fakes.llm`
+Зависит от: `adapters.lm_chat`, `tests.fakes.llm`
 
-Тестов: 27
+Тестов: 5
+
+
+### `tests/adapters/test_lm_embed.py` — 38 строк
+
+Следствия обращения к модели встраиваний.
+
+Зависит от: `adapters.lm_embed`, `tests.fakes.llm`
+
+Тестов: 4
+
+
+### `tests/adapters/test_lm_models.py` — 215 строк
+
+Следствия перечня моделей у провайдера и проверки, что модель отвечает.
+
+Зависит от: `adapters.lm_models`, `tests.fakes.llm`
+
+Тестов: 15
+
+
+### `tests/adapters/test_lm_studio.py` — 26 строк
+
+Следствия соединения с провайдером моделей.
+
+Зависит от: `adapters.lm_studio`, `backend.runtime_settings`
+
+Тестов: 3
 
 
 ### `tests/backend/conftest.py` — 51 строк
@@ -3005,24 +3053,24 @@ Runtime settings layer.
   - `def __call__(self)` (2)
 - `class Bot` (3)
 
-### `tests/backend/test_llm_classify_reply.py` — 191 строк
+### `tests/backend/test_llm_classify_reply.py` — 209 строк
 
 Следствия разбора ответа HR в новый статус вакансии.
 
 Зависит от: `backend.llm.hr_reply`, `backend.models`, `tests.fakes.llm`
 
-Тестов: 12
+Тестов: 13
 
 - `def _allowed_line(client) -> str` (9)
 - `def _verdict(status: str, explanation: str | None=None) -> httpx.Response` (3)
 
-### `tests/backend/test_llm_company_arbiter.py` — 236 строк
+### `tests/backend/test_llm_company_arbiter.py` — 253 строк
 
 Следствия обращения к модели как к арбитру при сведении компаний.
 
 Зависит от: `backend.llm.company`, `tests.fakes.llm`
 
-Тестов: 13
+Тестов: 14
 
 - `class _Candidate` (8)
 - `def _answer(matched_id=None, reasoning=None) -> httpx.Response` (3)
@@ -3088,13 +3136,13 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/backend/test_llm_factcheck.py` — 157 строк
+### `tests/backend/test_llm_factcheck.py` — 175 строк
 
 Следствия второй проверки письма — сверки фактов с профилем.
 
 Зависит от: `backend.llm.factcheck`, `tests.fakes.llm`
 
-Тестов: 9
+Тестов: 10
 
 - `def _verdict(verdict, issues=None) -> httpx.Response` (3)
 
@@ -3109,13 +3157,13 @@ Runtime settings layer.
 - `def _answer(verdict, reason=None) -> httpx.Response` (3)
 - `async def _check(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (9)
 
-### `tests/backend/test_llm_json_extraction.py` — 191 строк
+### `tests/backend/test_llm_json_extraction.py` — 209 строк
 
 Следствия вырезания ответа-объекта из того, что вернула модель.
 
 Зависит от: `backend.llm.answers`
 
-Тестов: 12
+Тестов: 13
 
 
 ### `tests/backend/test_llm_profile_formatting.py` — 160 строк
@@ -3147,13 +3195,13 @@ Runtime settings layer.
 
 - `def _answer(**fields) -> str` (3)
 
-### `tests/backend/test_llm_vacancy_request.py` — 211 строк
+### `tests/backend/test_llm_vacancy_request.py` — 226 строк
 
 Следствия обращения к модели за разбором поста с вакансией.
 
 Зависит от: `backend.llm.vacancy`, `tests.fakes.llm`
 
-Тестов: 12
+Тестов: 13
 
 - `def _parsed(**fields) -> httpx.Response` (3)
 

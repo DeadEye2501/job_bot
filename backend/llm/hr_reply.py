@@ -5,7 +5,7 @@ import logging
 
 import httpx
 
-from adapters.lm_studio import ChatRequest, chat
+from adapters.lm_chat import ChatRequest, chat
 
 from backend.domain.transitions import ALLOWED_AUTO_TRANSITIONS
 from backend.models import VacancyStatus
@@ -15,6 +15,13 @@ from backend.llm.answers import json_object, log_unparseable, str_or_none
 from backend.llm.external import wrap_external
 
 logger = logging.getLogger(__name__)
+
+
+# Бюджет токенов на вердикт о письме HR. Двухсот не хватало вовсе:
+# рассуждающая модель тратит их на размышление до ответа, упирается в предел,
+# и вердикта не остаётся — а обрыв здесь означает, что письмо не разобрано
+# (см. `MAX_COVER_LETTER_TOKENS`, где счёт тот же).
+MAX_CLASSIFY_TOKENS = 1200
 
 
 CLASSIFY_HR_REPLY_PROMPT_TEMPLATE = """Ты классифицируешь ответ HR-а кандидату по тому, на каком этапе сейчас находится отклик.
@@ -182,7 +189,7 @@ def _classify_request(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
-        max_tokens=200,
+        max_tokens=MAX_CLASSIFY_TOKENS,
     )
 
 
@@ -194,29 +201,30 @@ async def classify_hr_reply(
 ) -> Classification | None:
     """Классифицирует burst HR-сообщений с учётом текущего статуса вакансии.
 
-    `current_status` пробрасывается в промпт вместе со списком статусов, из
-    которых модели разрешено выбирать (:func:`_allowed_next`): выбирая
-    только из них, она не порождает вердиктов, которые `apply_classification`
-    всё равно отобьёт.
+    Модели дают только те статусы, куда переход разрешён из нынешнего
+    (`_allowed_next`): выбирая из них, она не порождает вердиктов, которые
+    `apply_classification` всё равно отобьёт.
+
+    Оборванный на пределе токенов ответ вердиктом не считается: статусы
+    терминальны, и приглашение, записанное отказом из недоговорённого ответа,
+    человек уже не увидит.
     """
     if not text:
         return None
     allowed_str = _allowed_next(current_status)
-    # Truncate с конца, не с начала: «most recent signal wins». В burst'е
-    # из 1000 коротких сообщений первые 4000 chars содержат старые ack'и,
-    # а реальный вердикт («давайте на интервью» / «не подходите») в конце.
+    # Обрезается начало, а не конец: решает последняя реплика, а первые в
+    # пачке — «здравствуйте» и «спасибо».
     text = text[-4000:]
     logger.debug(
         "classify_hr_reply: %d chars, current=%s, allowed=%s",
         len(text), current_status.value, allowed_str,
     )
-    reply = await chat(
-        client,
-        model,
-        _classify_request(text, current_status, allowed_str),
-        logger,
-    )
+    request = _classify_request(text, current_status, allowed_str)
+    reply = await chat(client, model, request, logger)
     if reply.text is None:
+        return None
+    if reply.finish_reason == "length":
+        logger.warning("classify_hr_reply: ответ оборван, вердикта нет")
         return None
     parsed = _parse_classification(reply.text)
     if parsed is None:

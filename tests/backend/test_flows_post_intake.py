@@ -48,7 +48,7 @@ async def intake(make_pipeline, monkeypatch):
     async def unparsed(pipeline, vacancy_id):
         return pipeline.unparsed
 
-    monkeypatch.setattr("adapters.lm_studio.embed", embed)
+    monkeypatch.setattr("adapters.lm_embed.embed", embed)
     monkeypatch.setattr(
         pipeline.embeddings,
         "match",
@@ -74,7 +74,7 @@ async def test_a_provider_that_does_not_answer_at_all_stops_the_post(
     async def no_answer(client, model, text):
         raise httpx.ConnectError("connection refused")
 
-    monkeypatch.setattr("adapters.lm_studio.embed", no_answer)
+    monkeypatch.setattr("adapters.lm_embed.embed", no_answer)
 
     with pytest.raises(embeddings.ProviderIsSilent):
         await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python"))
@@ -99,7 +99,7 @@ async def test_a_model_the_provider_does_not_have_stops_the_post_too(
             response=httpx.Response(404),
         )
 
-    monkeypatch.setattr("adapters.lm_studio.embed", not_found)
+    monkeypatch.setattr("adapters.lm_embed.embed", not_found)
 
     with pytest.raises(embeddings.ProviderIsSilent):
         await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python"))
@@ -122,7 +122,7 @@ async def test_a_text_the_provider_refuses_is_skipped(intake, monkeypatch):
             response=httpx.Response(400),
         )
 
-    monkeypatch.setattr("adapters.lm_studio.embed", refuse)
+    monkeypatch.setattr("adapters.lm_embed.embed", refuse)
 
     await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python"))
 
@@ -276,7 +276,7 @@ async def test_a_post_the_model_could_not_embed_is_skipped(intake, monkeypatch):
     async def broken(client, model, text):
         raise RuntimeError("модель вернула не тот размер")
 
-    monkeypatch.setattr("adapters.lm_studio.embed", broken)
+    monkeypatch.setattr("adapters.lm_embed.embed", broken)
 
     await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 

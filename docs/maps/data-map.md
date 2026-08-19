@@ -23,10 +23,8 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
-### `adapters/lm_studio.py`
+### `adapters/lm_chat.py`
 
-- `_log` = `logging.getLogger(__name__)`
-- `LLM_REQUEST_TIMEOUT_SEC` = `180.0`
 - `class ChatRequest`
   - `purpose: str`
   - `messages: list[dict[str, str]]`
@@ -37,7 +35,15 @@
   - `text: str | None` = `None`
   - `finish_reason: str | None` = `None`
   - `error: str | None` = `None`
-- `_EMBED_MARKERS` = `набор из 5`
+
+### `adapters/lm_models.py`
+
+- `_log` = `logging.getLogger(__name__)`
+- `_EMBED_MARKERS` = `набор из 4`
+
+### `adapters/lm_studio.py`
+
+- `LLM_REQUEST_TIMEOUT_SEC` = `180.0`
 
 ### `adapters/telegram.py`
 
@@ -370,6 +376,7 @@
 ### `backend/llm/company.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `MAX_DEDUPE_TOKENS` = `1200`
 - `DEDUPE_COMPANY_PROMPT` = `'Ты определяешь, является ли распарсенная из вак…`
 
 ### `backend/llm/cover_letter.py`
@@ -390,6 +397,7 @@
 ### `backend/llm/factcheck.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `MAX_FACTCHECK_TOKENS` = `1500`
 - `FACT_CHECK_COVER_LETTER_PROMPT` = `'Ты — фактчекер сопроводительных писем. Тебе даю…`
 
 ### `backend/llm/fit.py`
@@ -408,6 +416,7 @@
 ### `backend/llm/hr_reply.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `MAX_CLASSIFY_TOKENS` = `1200`
 - `CLASSIFY_HR_REPLY_PROMPT_TEMPLATE` = `'Ты классифицируешь ответ HR-а кандидату по тому…`
 
 ### `backend/llm/skills.py`
@@ -1118,7 +1127,7 @@
 
 ## tests
 
-### `tests/adapters/test_lm_studio.py`
+### `tests/adapters/test_lm_models.py`
 
 - `NATIVE_MODELS` = `набор из 2`
 

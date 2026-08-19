@@ -234,3 +234,20 @@ async def test_a_candidate_name_travels_as_data_too():
     sent = messages_of(client.sent[0])
     assert "Подставная контора" not in sent["system"]
     assert "Подставная контора" in data_block(client.sent[0])
+
+
+async def test_a_merge_decided_by_a_cut_answer_is_refused():
+    """Решение о склейке из оборванного ответа не принимается.
+
+    Склейка необратима на уровне вакансий: сведённые компании обратно не
+    разводятся. Заведённая лишняя запись поправима, поэтому обрыв вырождается
+    в отказ, а причина называет его словом.
+    """
+    client = provider(
+        {CHAT: chat_json({"matched_id": 7, "reasoning": "та же"}, finish_reason="length")}
+    )
+
+    matched_id, reasoning = await _ask(client, [_Candidate(7, "Сбербанк")])
+
+    assert matched_id is None
+    assert "truncated" in reasoning

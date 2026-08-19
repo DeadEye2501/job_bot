@@ -8,20 +8,19 @@
 разбор, а читают анкета и окно.
 """
 
-import json
 import logging
 import re
 from datetime import date
 
 import httpx
 
-from adapters.lm_studio import ChatRequest, chat
+from adapters.lm_chat import ChatRequest, chat
 from backend.domain.skill_names import skill_key
 from backend.domain.spellings import dedupe_first_wins
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
 from backend.llm.external import wrap_external
 from backend.llm.answers import (
-    extract_last_json,
+    json_object,
     log_unparseable,
     normalize_enum,
     str_or_none,
@@ -326,17 +325,12 @@ def _parse_experience(item) -> ParsedCvExperience | None:
 def _parse_cv_json(answer: str) -> ParsedCv | None:
     """Разобранное резюме из ответа модели; пусто — разбирать нечего.
 
-    Объект вырезает общее объявление, а не своё: разбор резюме отличался от
-    соседей только тем, что брал от первой открывающей скобки до последней
-    закрывающей — ради вложенности, — и упирался в любую скобку рассуждения
-    до самого ответа. Общее объявление вложенность держит само.
+    Объект собирает общее объявление (`json_object`), а не своё тело: прежде
+    здесь стояла его копия без записи в журнал, и неразобравшийся ответ
+    резюме пропадал молча.
     """
-    raw = extract_last_json(answer)
-    if raw is None:
-        return None
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
+    data = json_object(answer, logger, "parse_cv")
+    if data is None:
         return None
 
     profile = _parse_profile(data.get("profile"))

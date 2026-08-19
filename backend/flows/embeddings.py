@@ -5,7 +5,7 @@ import logging
 import httpx
 from sqlalchemy import select
 
-from adapters import lm_studio
+from adapters import lm_embed
 from backend.models import Vacancy
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ async def embed_text(pipeline, text: str, what: str) -> list[float] | None:
     кончился обход.
     """
     try:
-        return await lm_studio.embed(
+        return await lm_embed.embed(
             pipeline.lm_embed_client,
             pipeline.lm_embed_model,
             text[:_EMBED_MAX_CHARS],
