@@ -97,7 +97,7 @@
     <StatsKpiRow answer={kpi} {period} />
 
     <StatsCard title="Статусы" ready={!!breakdown} span="6">
-      <StatsStatusCard counts={breakdown.counts} onpick={(name) => onslice(sliceTarget(name))} />
+      <StatsStatusCard counts={breakdown.counts} onpick={(name) => onslice(sliceTarget(name, period, new Date()))} />
     </StatsCard>
 
     <StatsCard title="Ответы HR" ready={!!responses} span="6">

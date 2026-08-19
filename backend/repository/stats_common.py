@@ -1,19 +1,20 @@
 """Кирпичи, из которых обе половины экрана статистики собирают свои числа.
 
-Своим модулем, а не половиной `stats_summary`, потому что зовущих у них двое
-и они равноправны: сводка и воронка по каналам. Пока кирпичи лежали у сводки,
-воронка ввозила их через границу модуля — то есть знала про соседний экран,
-чтобы посчитать свой.
+Своим модулем, потому что зовущих у каждого несколько и они равноправны:
+четыре половины сводки и воронка по каналам. Пока кирпичи лежали у одной из них,
+остальные ввозили их через границу модуля — то есть знали про соседа, чтобы
+посчитать своё.
 
 Подчёркивания у имён здесь нет нарочно: у объявления, общего для двоих, оно
 означало бы «не ввозить», а ввозят его как раз оба.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 
 from sqlalchemy import func, select
 
-from backend.models import VacancyStatusHistory
+from backend.models import Vacancy, VacancyStatusHistory
+from backend.repository.vacancies_common import PARSED_ONLY
 
 
 def status_cond(statuses):
@@ -42,6 +43,19 @@ def first_transition_subq(statuses):
     )
 
 
+def parsed_in_window(since) -> list:
+    """Условия «разобранная вакансия, заведённая в окне»; без окна — только разбор.
+
+    Кирпич этот берут трое: дельта числа вакансий, частота технологий и
+    ингест по каналам. Набранный порознь, он разъезжался бы молча — три
+    числа одного экрана считались бы по трём разным множествам строк.
+    """
+    conditions = [PARSED_ONLY]
+    if since is not None:
+        conditions.append(Vacancy.created_at >= since)
+    return conditions
+
+
 def stats_period_since(period: str) -> datetime | None:
     """Начало выбранного срока, а для «за всё время» — пустота.
 
@@ -49,13 +63,17 @@ def stats_period_since(period: str) -> datetime | None:
     своим часам. На поясе UTC+4 отсчёт от полуночи UTC начинал бы «сегодня» в
     четыре утра — заведённое ночью в него не попадало бы, зато попадало бы
     вчерашнее с восьми вечера. Остальные сроки скользящие, и им пояс безразличен.
+
+    Полночь собирается заново из даты, а не получается обнулением часов у
+    нынешнего мига: обнуление сохраняет смещение, верное на **сейчас**, а в
+    сутки перевода часов оно у полуночи другое, и начало суток съезжало бы
+    на час.
     """
     now = datetime.now(timezone.utc)
     if period == "today":
         here = now.astimezone()
-        return here.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(
-            timezone.utc
-        )
+        midnight = datetime.combine(here.date(), time.min).astimezone()
+        return midnight.astimezone(timezone.utc)
     if period == "week":
         return now - timedelta(days=7)
     if period == "month":

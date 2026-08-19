@@ -212,13 +212,36 @@ describe('переход из статистики в вакансии', () => {
   it('нажатие на строку статуса ведёт в вакансии с этим статусом', () => {
     // Статусы иначе только считают: чтобы посмотреть, что за девять штук, надо
     // идти в вакансии и набирать отбор руками.
-    expect([...sliceTarget('In Progress').statuses]).toEqual(['In Progress']);
+    expect([...sliceTarget('In Progress', 'all', new Date()).statuses]).toEqual(['In Progress']);
+  });
+
+  it('срок статистики уезжает в отбор вместе со статусом', () => {
+    // Число под столбиком посчитано за выбранный срок. Уйди мы без него — на
+    // «New 9 за сегодня» открылись бы все New за всё время, и человек решил
+    // бы, что счёт врёт.
+    expect(sliceTarget('New', 'today', new Date()).datePreset).toBe('today');
+    expect(sliceTarget('New', 'week', new Date()).datePreset).toBe('week');
+    expect(sliceTarget('New', 'month', new Date()).datePreset).toBe('month');
+  });
+
+  it('за квартал срок уезжает своими датами: готового у отбора нет', () => {
+    // Часы приходят доводом, поэтому граница проверяется числом, а не видом
+    // строки: 90 суток назад от заданного дня — 2 января.
+    const target = sliceTarget('New', 'quarter', new Date(2026, 3, 2, 15, 0));
+
+    expect(target.datePreset).toBe('range');
+    expect(target.dateFrom).toBe('2026-01-02');
+    expect(target.dateTo).toBe('');
+  });
+
+  it('за всё время срока в отборе нет вовсе', () => {
+    expect(sliceTarget('New', 'all', new Date()).datePreset).toBe('');
   });
 
   it('прежний отбор при переходе снимается целиком', () => {
     // Человек просит «покажи вакансии этого статуса», а не «сузь этим статусом
     // то, что я отбирал час назад»: уцелевший грейд отдал бы ему пустой список.
-    const target = sliceTarget('Offer');
+    const target = sliceTarget('Offer', 'all', new Date());
 
     expect([...target.channels]).toEqual([]);
     expect(target.grade).toBe('');

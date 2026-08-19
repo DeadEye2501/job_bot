@@ -10,30 +10,18 @@ import logging
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.transitions import GHOSTING_ELIGIBLE_FROM
-from backend.models import Vacancy, VacancyStatusHistory
-from backend.repository.vacancies_activity import last_incoming_subq
+from backend.models import Vacancy
+from backend.repository.vacancies_activity import (
+    entered_current_status_at,
+    last_incoming_subq,
+)
 from backend.repository.vacancy_status import apply_silence
 
 logger = logging.getLogger(__name__)
-
-
-def _last_status_change_subq():
-    """Когда вакансия последний раз вставала в каждый из своих статусов."""
-    return (
-        select(
-            VacancyStatusHistory.vacancy_id.label("vid"),
-            VacancyStatusHistory.status.label("status"),
-            func.max(VacancyStatusHistory.changed_at).label("last_status_at"),
-        )
-        .group_by(
-            VacancyStatusHistory.vacancy_id, VacancyStatusHistory.status
-        )
-        .subquery()
-    )
 
 
 async def _silence_candidates(session: AsyncSession):
@@ -49,37 +37,28 @@ async def _silence_candidates(session: AsyncSession):
     смены статуса.
     """
     last_msg_subq = last_incoming_subq()
-    last_status_subq = _last_status_change_subq()
     return (
         await session.execute(
             select(
                 Vacancy,
                 last_msg_subq.c.max_at,
-                last_status_subq.c.last_status_at,
+                entered_current_status_at(),
             )
             .outerjoin(last_msg_subq, last_msg_subq.c.vid == Vacancy.id)
-            .outerjoin(
-                last_status_subq,
-                and_(
-                    last_status_subq.c.vid == Vacancy.id,
-                    last_status_subq.c.status == Vacancy.status,
-                ),
-            )
             .where(Vacancy.status.in_([s for s in GHOSTING_ELIGIBLE_FROM]))
         )
     ).all()
 
 
-def _last_activity(vacancy: Vacancy, last_msg_at, last_status_at):
+def _last_activity(vacancy: Vacancy, last_msg_at, entered_at):
     """Самая поздняя отметка жизни вакансии; от неё и считается молчание.
 
-    Заведение есть всегда, письмо и смена статуса могут не случаться вовсе.
+    Заведение и вход в нынешний статус есть всегда — второе при отсутствии
+    истории и есть заведение, — а письмо может не случиться вовсе.
     """
-    timestamps = [vacancy.created_at]
+    timestamps = [vacancy.created_at, entered_at]
     if last_msg_at is not None:
         timestamps.append(last_msg_at)
-    if last_status_at is not None:
-        timestamps.append(last_status_at)
     return max(timestamps)
 
 
@@ -106,8 +85,8 @@ async def mark_ghosted_vacancies(
         days=timeout_days
     )
     affected: list[int] = []
-    for v, last_msg_at, last_status_at in await _silence_candidates(session):
-        if _last_activity(v, last_msg_at, last_status_at) >= cutoff:
+    for v, last_msg_at, entered_at in await _silence_candidates(session):
+        if _last_activity(v, last_msg_at, entered_at) >= cutoff:
             continue
         apply_silence(session, v, timeout_days)
         affected.append(v.id)

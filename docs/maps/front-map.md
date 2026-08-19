@@ -513,7 +513,7 @@
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
 - отдаёт: aliasesAfter, countNote, grouped, levelPercent
 
-### state/stats.js (209)
+### state/stats.js (243)
 - * Сроки, за которые считают, — от короткого к длинному. * * `delta` — как называется прирост за этот срок. У «всего времени» его нет: * сравнивать не с чем, это и есть всё время.
 - отдаёт: KPI, PERIODS, STATUS_ORDER, convNote, deltaNote, donut, duration, kpiRow, skillRows, skillRowsPerColumn, sliceTarget, statusColumns, weekBars
 
@@ -1058,7 +1058,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/skills.test.js (92)
 - —
 
-### tests/stats.test.js (228)
+### tests/stats.test.js (251)
 - —
 
 ### tests/vacancies.test.js (202)

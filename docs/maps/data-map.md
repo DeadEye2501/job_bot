@@ -231,8 +231,10 @@
 
 ### `backend/domain/verdict.py`
 
-- `EMPTY_SKIP_REASON` = `'empty: no meaningful fields'`
+- `EMPTY_SKIP_PREFIX` = `'empty: '`
+- `EMPTY_SKIP_REASON` = `f'{EMPTY_SKIP_PREFIX}no meaningful fields'`
 - `TRASH_SKIP_PREFIX` = `'trash: '`
+- `JUNK_SKIP_PREFIXES` = `набор из 2`
 - `LLM_SKIP_PREFIX` = `'llm: '`
 
 ### `backend/flows/apply.py`
@@ -899,7 +901,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
-### `backend/repository/stats_summary.py`
+### `backend/repository/stats_kpi.py`
 
 - `_IN_PROGRESS` = `frozenset({VacancyStatus.INVITATION, VacancyStat…`
 
