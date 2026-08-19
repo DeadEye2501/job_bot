@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Blacklist
-from backend.payloads import text_or_none
+from backend.incoming import text_or_none
 
 from backend.repository import channels
 from backend.repository.blacklist_marks import active_mark_of

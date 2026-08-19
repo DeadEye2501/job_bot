@@ -26,14 +26,8 @@ from backend.llm.answers import (
     normalize_enum,
     str_or_none,
 )
-from backend.payloads import (
-    ParsedCv,
-    ParsedCvExperience,
-    ParsedCvLanguage,
-    ParsedCvProfile,
-    ParsedCvSkill,
-    str_list,
-)
+from backend.payloads import ParsedCv, ParsedCvExperience, ParsedCvLanguage, ParsedCvProfile, ParsedCvSkill
+from backend.incoming import str_list
 
 
 logger = logging.getLogger(__name__)

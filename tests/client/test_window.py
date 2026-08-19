@@ -13,6 +13,7 @@ from concurrent.futures import Future
 
 import pytest
 
+from backend.repository.bot_mode import read_mode, write_mode
 from backend.models import BotMode
 from client import window as window_module
 
@@ -94,11 +95,14 @@ async def test_the_bot_starts_switched_off_however_it_was_left(
     принялся бы за работу сам, ещё до того как человек увидел окно, — а
     выключал он его вчера именно затем, чтобы этого не было.
     """
-    await runtime_settings.set_mode(BotMode.FULL)
+    async with session_factory() as session:
+        async with session.begin():
+            await write_mode(session, BotMode.FULL)
 
     await window_module.prepare(session_factory)
 
-    assert await runtime_settings.get_mode() is BotMode.OFF
+    async with session_factory() as session:
+        assert await read_mode(session) is BotMode.OFF
 
 
 def test_everything_is_put_out_from_the_top_down(opened):

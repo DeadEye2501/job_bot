@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from backend.models import Vacancy
-from backend.payloads import text_or_none
+from backend.incoming import text_or_none
 from backend.repository import vacancies_card
 from client.bridge.answer import Denied, bad_fields, reply
 from client.bridge.companies import create_company_row

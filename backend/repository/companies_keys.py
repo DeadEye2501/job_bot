@@ -8,7 +8,7 @@
 
 import re
 
-from backend.payloads import text_or_none
+from backend.incoming import text_or_none
 
 
 # Минимальная транслитерация русского кириллического алфавита в латиницу

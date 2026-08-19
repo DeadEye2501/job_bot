@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 
 from backend.log_buffer import get_handler
-from backend.payloads import int_or_none
+from backend.incoming import int_or_none
 from client.bridge.answer import denied, reply
 from client.bridge.refusals import LOGS_TOO_OFTEN
 

@@ -847,6 +847,10 @@
 - `BlacklistOutcome` = `Literal['created', 'reactivated', 'already_activ…`
 - `_BLACKLIST_FIELD_UNSET` = `object()`
 
+### `backend/repository/bot_mode.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
 ### `backend/repository/channels.py`
 
 - `logger` = `logging.getLogger(__name__)`

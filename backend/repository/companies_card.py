@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.spellings import dedupe_first_wins
 from backend.models import Company, Vacancy
-from backend.payloads import CompanyDetail, str_list, text_or_none
+from backend.payloads import CompanyDetail
+from backend.incoming import str_list, text_or_none
 
 from backend.repository.vacancies_common import PARSED_ONLY
 from backend.repository.blacklist import rename_blacklist_marks

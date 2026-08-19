@@ -1,11 +1,13 @@
 """Жизненный цикл соединения: режим работы, главный цикл, выход из сеанса."""
 
 import logging
+from dataclasses import replace
 import asyncio
 
 from adapters import telegram
 from backend.bot import slot
 from backend.flows.dm_backfill import catch_up_missed_dms
+from backend.repository.bot_mode import read_mode
 from backend.models import BotMode
 
 logger = logging.getLogger(__name__)
@@ -32,9 +34,10 @@ async def log_out_session(bot) -> None:
 
 async def current_mode(bot) -> BotMode:
     try:
-        return await bot.rs.get_mode()
+        async with bot.session_factory() as session:
+            return await read_mode(session)
     except Exception:
-        logger.exception("get_mode failed; falling back to Off")
+        logger.exception("read_mode failed; falling back to Off")
         return BotMode.OFF
 
 
@@ -227,13 +230,7 @@ async def persist_session_if_changed(bot) -> None:
     if new_str == (tg.session_string or ""):
         return
     try:
-        await bot.rs.set_tg(
-            api_id=tg.api_id,
-            api_hash=tg.api_hash,
-            phone=tg.phone,
-            password=tg.password,
-            session_string=new_str,
-        )
+        await bot.rs.set_tg(replace(tg, session_string=new_str))
         logger.info("persisted refreshed Telegram session_string")
     except Exception:
         logger.exception("persist session_string failed")

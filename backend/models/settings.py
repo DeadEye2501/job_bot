@@ -20,10 +20,11 @@ from backend.models.enums import BotMode, LlmConfigKind
 
 
 class BotState(IdMixin, Base):
-    """Single-row table — id всегда 1. CHECK-constraint защищает от
-    случайной вставки второй строки через raw SQL: ``runtime_settings``
-    хардкодит id=1 в setter'ах, но без БД-уровневой защиты ``get_mode``
-    при наличии лишних строк возвращал бы недетерминированную."""
+    """Единственная строка состояния — id всегда 1.
+
+    CHECK-constraint защищает от случайной вставки второй строки сырым SQL:
+    запись режима (`repository/bot_mode`) хардкодит id=1, но чтение берёт
+    первую попавшуюся, и при лишних строках отвечало бы наугад."""
 
     __tablename__ = "bot_state"
     __table_args__ = (

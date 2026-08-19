@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from backend.models import Profile
 from backend.models import ProfileLanguage
 from backend.models import ProfileSkill
-from backend.payloads import str_list
+from backend.incoming import str_list
 
 _GRADE_LABELS_RU = {
     "junior": "junior",

@@ -333,7 +333,7 @@ async def test_a_connection_that_never_came_up_still_closes_the_rest(
 
 
 async def test_switching_off_drains_the_text_waiting_to_be_read(
-    chatting, caught_up
+    chatting, caught_up, monkeypatch
 ):
     """Выключение сливает текст, ждавший разбора.
 
@@ -354,7 +354,7 @@ async def test_switching_off_drains_the_text_waiting_to_be_read(
     # прогон вместо того, чтобы покрасить тест.
     modes = [BotMode.FULL]
 
-    async def next_mode():
+    async def next_mode(session):
         if modes:
             return modes.pop(0)
         # Просьба об остановке идёт тем же вызовом, что отдаёт «выключено»:
@@ -362,7 +362,7 @@ async def test_switching_off_drains_the_text_waiting_to_be_read(
         bot.request_stop()
         return BotMode.OFF
 
-    bot.rs.get_mode = next_mode
+    monkeypatch.setattr(loop_mod, "read_mode", next_mode)
 
     await bot.run()
 

@@ -10,6 +10,7 @@ from backend.runtime_settings import (
     TgAccountConfig,
     mask_phone,
 )
+from tests.factories import tg_creds
 
 
 @pytest.mark.parametrize(
@@ -38,7 +39,7 @@ async def test_the_saved_phone_reaches_the_log_masked(session_factory, caplog):
     settings = await RuntimeSettings.load(session_factory)
 
     with caplog.at_level(logging.INFO, logger="backend.runtime_settings"):
-        await settings.set_tg(api_id=1, api_hash="шифр", phone="+79991234567")
+        await settings.set_tg(tg_creds())
 
     written = [
         record.getMessage()

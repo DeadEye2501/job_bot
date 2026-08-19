@@ -21,22 +21,9 @@ import pytest
 
 import adapters.telegram
 from adapters.telegram import make_client, send_dm
-from backend.runtime_settings import TgAccountConfig
+from tests.factories import tg_creds
 from tests.fakes.telegram import FakeTelegramClient
 from config import get_data_dir
-
-
-def _account(**overrides):
-    """Учётные данные Telegram в том виде, в каком их читают из настроек."""
-    fields = {
-        "api_id": 26276902,
-        "api_hash": "шифр",
-        "phone": "+70000000000",
-        "password": "",
-        "session_string": None,
-    }
-    fields.update(overrides)
-    return TgAccountConfig(**fields)
 
 
 def test_a_saved_session_keeps_the_client_in_memory():
@@ -45,7 +32,7 @@ def test_a_saved_session_keeps_the_client_in_memory():
     Строка лежит в настройках зашифрованной и переживает переезд папки с
     данными; файл сессии — нет.
     """
-    client = make_client(_account(session_string="сессия"))
+    client = make_client(tg_creds(session_string="сессия"))
 
     assert client.in_memory is True
 
@@ -56,7 +43,7 @@ def test_a_first_login_keeps_the_session_in_a_file():
     Строки ещё нет — её выдаёт сам Telegram по итогам входа, и до тех пор
     держать состояние негде.
     """
-    client = make_client(_account())
+    client = make_client(tg_creds())
 
     assert not client.in_memory
     # Сверяется сам путь файла, а не имя из настроек: имя — довод, который мы
@@ -71,7 +58,7 @@ def test_a_first_login_keeps_the_session_in_a_file():
 
 def test_the_login_carries_the_phone_and_the_password():
     """Вход несёт телефон и пароль второго шага."""
-    client = make_client(_account(password="пароль"))
+    client = make_client(tg_creds(phone="+70000000000", password="пароль"))
 
     assert client.phone_number == "+70000000000"
     assert client.password == "пароль"
@@ -83,7 +70,7 @@ def test_an_account_without_a_second_step_carries_no_password():
     Пустая строка Pyrogram'ом читается как «пароль есть», и он спросил бы
     его у пользователя на ровном месте.
     """
-    client = make_client(_account(password=""))
+    client = make_client(tg_creds(password=""))
 
     assert client.password is None
 
@@ -91,8 +78,8 @@ def test_an_account_without_a_second_step_carries_no_password():
 @pytest.mark.parametrize(
     "account",
     [
-        pytest.param(_account(session_string="сессия"), id="в памяти"),
-        pytest.param(_account(), id="файлом"),
+        pytest.param(tg_creds(session_string="сессия"), id="в памяти"),
+        pytest.param(tg_creds(), id="файлом"),
     ],
 )
 def test_the_client_waits_out_short_rate_limits_itself(account):

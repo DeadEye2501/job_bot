@@ -8,7 +8,7 @@ import httpx
 from adapters.lm_chat import ChatRequest, chat
 from backend.llm.answers import ONLY_JSON, json_object, log_unparseable
 from backend.llm.external import external_block
-from backend.payloads import str_list
+from backend.incoming import str_list
 
 logger = logging.getLogger(__name__)
 

@@ -7,12 +7,11 @@
 from cryptography.fernet import Fernet
 
 from backend.crypto import encrypt_bytes, encrypt_str
-from backend.models import BotMode, LlmConfigKind
+from backend.models import LlmConfigKind
 from backend.runtime_settings import RuntimeSettings
 from tests.dbio import put
 from tests.factories import (
     app_setting_row,
-    bot_state_row,
     llm_config_row,
     tg_account_row,
 )
@@ -184,18 +183,3 @@ async def test_a_reload_picks_up_a_change_made_afterwards(session_factory):
     assert settings.scoring_threshold == 5
     await settings.reload()
     assert settings.scoring_threshold == 42
-
-
-async def test_the_mode_defaults_to_off_when_the_row_is_missing(session_factory):
-    """Без строки состояния бот считается выключенным."""
-    settings = await RuntimeSettings.load(session_factory)
-
-    assert await settings.get_mode() is BotMode.OFF
-
-
-async def test_the_stored_mode_is_read_back(session_factory):
-    """Записанный режим читается обратно."""
-    await put(session_factory, bot_state_row(BotMode.FULL))
-    settings = await RuntimeSettings.load(session_factory)
-
-    assert await settings.get_mode() is BotMode.FULL
