@@ -519,12 +519,12 @@
 
 - `class Message(IdMixin, Base)`
   - `__tablename__` = `'message'`
-  - `__table_args__` = `набор из 3`
+  - `__table_args__` = `набор из 2`
   - `is_incoming: Mapped[bool]` = `mapped_column(server_default=expression.false())`
   - `hr_id: Mapped[int | None]` = `mapped_column(ForeignKey('hr.id'))`
   - `vacancy_id: Mapped[int | None]` = `mapped_column(ForeignKey('vacancy.id'))`
   - `text: Mapped[str]`
-  - `tg_message_id: Mapped[int | None]`
+  - `tg_message_id: Mapped[int | None]` = `mapped_column(BigInteger)`
   - `sent_at: Mapped[datetime]` = `mapped_column(DateTime(timezone=True), server_de…`
   - `read_at: Mapped[datetime | None]` = `mapped_column(DateTime(timezone=True))`
   - `is_edited: Mapped[bool]` = `mapped_column(server_default=expression.false())`
@@ -612,7 +612,7 @@
 
 - `class Vacancy(IdMixin, CreatedAtMixin, Base)`
   - `__tablename__` = `'vacancy'`
-  - `__table_args__` = `набор из 6`
+  - `__table_args__` = `набор из 3`
   - `hr_id: Mapped[int | None]` = `mapped_column(ForeignKey('hr.id'))`
   - `company_id: Mapped[int | None]` = `mapped_column(ForeignKey('company.id'))`
   - `source_channel_id: Mapped[int | None]` = `mapped_column(ForeignKey('telegram_channel.id'))`
@@ -657,7 +657,7 @@
   - `__tablename__` = `'vacancy_status_history'`
   - `__table_args__` = `набор из 2`
   - `vacancy_id: Mapped[int]` = `mapped_column(ForeignKey('vacancy.id'))`
-  - `message_id: Mapped[int | None]` = `mapped_column(ForeignKey('message.id'))`
+  - `message_id: Mapped[int | None]` = `mapped_column(ForeignKey('message.id', ondelete=…`
   - `previous_status: Mapped[VacancyStatus | None]` = `mapped_column(enum_column(VacancyStatus, 'vacanc…`
   - `status: Mapped[VacancyStatus]` = `mapped_column(enum_column(VacancyStatus, 'vacanc…`
   - `explanation: Mapped[str | None]` = `mapped_column(String)`

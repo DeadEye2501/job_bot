@@ -183,18 +183,15 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('source_channel_id', 'source_msg_id', name='uq_vacancy_source')
     )
-    op.create_index('ix_vacancy_company_id', 'vacancy', ['company_id'], unique=False)
     op.create_index('ix_vacancy_company_id_is_parsed', 'vacancy', ['company_id', 'is_parsed'], unique=False)
-    op.create_index('ix_vacancy_hr_id', 'vacancy', ['hr_id'], unique=False)
     op.create_index('ix_vacancy_hr_id_is_parsed', 'vacancy', ['hr_id', 'is_parsed'], unique=False)
-    op.create_index('ix_vacancy_source_channel_id', 'vacancy', ['source_channel_id'], unique=False)
     op.create_table('message',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('is_incoming', sa.Boolean(), server_default=sa.text('0'), nullable=False),
     sa.Column('hr_id', sa.Integer(), nullable=True),
     sa.Column('vacancy_id', sa.Integer(), nullable=True),
     sa.Column('text', sa.String(), nullable=False),
-    sa.Column('tg_message_id', sa.Integer(), nullable=True),
+    sa.Column('tg_message_id', sa.BigInteger(), nullable=True),
     sa.Column('sent_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('read_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('is_edited', sa.Boolean(), server_default=sa.text('0'), nullable=False),
@@ -207,7 +204,6 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('hr_id', 'tg_message_id', 'is_incoming', name='uq_message_hr_tgid_dir')
     )
-    op.create_index('ix_message_hr_id', 'message', ['hr_id'], unique=False)
     op.create_index('ix_message_vacancy_id', 'message', ['vacancy_id'], unique=False)
     op.create_table('profile_experience_skills',
     sa.Column('experience_id', sa.Integer(), nullable=False),
@@ -236,7 +232,7 @@ def upgrade() -> None:
     sa.Column('applied', sa.Boolean(), server_default=sa.text('1'), nullable=False),
     sa.Column('source', sa.Enum('system', 'user', name='status_history_source'), server_default=sa.text("'system'"), nullable=False),
     sa.Column('changed_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.ForeignKeyConstraint(['message_id'], ['message.id'], ),
+    sa.ForeignKeyConstraint(['message_id'], ['message.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['vacancy_id'], ['vacancy.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -254,13 +250,9 @@ def downgrade() -> None:
     op.drop_table('vacancy_event')
     op.drop_table('profile_experience_skills')
     op.drop_index('ix_message_vacancy_id', table_name='message')
-    op.drop_index('ix_message_hr_id', table_name='message')
     op.drop_table('message')
-    op.drop_index('ix_vacancy_source_channel_id', table_name='vacancy')
     op.drop_index('ix_vacancy_hr_id_is_parsed', table_name='vacancy')
-    op.drop_index('ix_vacancy_hr_id', table_name='vacancy')
     op.drop_index('ix_vacancy_company_id_is_parsed', table_name='vacancy')
-    op.drop_index('ix_vacancy_company_id', table_name='vacancy')
     op.drop_table('vacancy')
     op.drop_index('ix_trash_event_channel_created', table_name='trash_event')
     op.drop_table('trash_event')

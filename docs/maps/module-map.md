@@ -120,22 +120,26 @@ Job Bot — single CLI entry point.
 - `async def run_async_migrations() -> None` (14)
 - `def run_migrations_online() -> None` (2)
 
-### `alembic/versions/8ba64b863cb1_init.py` — 280 строк
+### `alembic/versions/8ba64b863cb1_init.py` — 272 строк
 
 init
 
 Зависит от: `alembic`
 
-- `def upgrade() -> None` (225)
-- `def downgrade() -> None` (32)
+- `def upgrade() -> None` (221)
+- `def downgrade() -> None` (28)
 
-### `alembic/versions/aa4e0de05368_seed_initial_data.py` — 474 строк ⚠ подошёл к 300
+### `alembic/versions/aa4e0de05368_seed_initial_data.py` — 496 строк ⚠ подошёл к 300
 
 seed initial data
 
 Зависит от: `alembic`, `backend.crypto`
 
-- `def upgrade() -> None` (155)
+- `def _seed_profile() -> None` (60)
+- `def _seed_channels() -> None` (11)
+- `def _seed_secrets() -> None` (61)
+- `def _seed_settings() -> None` (27)
+- `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
 ## backend — 101 модулей
@@ -928,17 +932,17 @@ First-run bootstrap: ensure DB schema exists.
 Отдаёт наружу: `HR`, `AppSetting`, `Base`, `BLACKLIST_KINDS`, `Blacklist`, `BotMode`, `BotState`, `Company`, `Currency`, `LlmConfig`, `LlmConfigKind`, `Message`, `Profile`, `ProfileExperience`, `ProfileLanguage`, `ProfileSkill`, `StatusHistorySource`, `status_code`, `TelegramChannel`, `TgAccount`, `TrashEvent`, `Vacancy`, `VacancyEvent`, `VacancyStatus`, `VacancyStatusHistory`, `profile_experience_skills`
 
 
-### `backend/models/base.py` — 66 строк
+### `backend/models/base.py` — 65 строк
 
 Основание, от которого объявляются таблицы.
 
 Зависит от: —
 
 - `class Base(DeclarativeBase)` (2)
-- `def enum_column(values: type[enum.Enum], name: str, *, create_type: bool=True) -> SQLEnum` (18)
+- `def enum_column(values: type[enum.Enum], name: str) -> SQLEnum` (12)
 - `class IdMixin` (4)
 - `class CreatedAtMixin` (8)
-- `class UpdatedAtMixin` (9)
+- `class UpdatedAtMixin` (14)
 
 ### `backend/models/contacts.py` — 51 строк
 
@@ -950,7 +954,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class HR(IdMixin, Base)` (17)
 - `class Company(IdMixin, Base)` (10)
 
-### `backend/models/enums.py` — 69 строк
+### `backend/models/enums.py` — 70 строк
 
 Перечисления, которыми колонки ограничивают набор значений.
 
@@ -959,17 +963,17 @@ First-run bootstrap: ensure DB schema exists.
 - `class BotMode(enum.Enum)` (4)
 - `class Currency(enum.Enum)` (10)
 - `class VacancyStatus(enum.Enum)` (12)
-- `def status_code(status: VacancyStatus) -> str` (14)
+- `def status_code(status: VacancyStatus) -> str` (15)
 - `class StatusHistorySource(enum.Enum)` (11)
 - `class LlmConfigKind(enum.Enum)` (3)
 
-### `backend/models/message.py` — 52 строк
+### `backend/models/message.py` — 63 строк
 
 Таблица переписки с HR.
 
 Зависит от: `backend.models.base`
 
-- `class Message(IdMixin, Base)` (41)
+- `class Message(IdMixin, Base)` (45)
 
 ### `backend/models/profile.py` — 98 строк
 
@@ -982,7 +986,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class ProfileSkill(IdMixin, Base)` (10)
 - `class ProfileExperience(IdMixin, Base)` (18)
 
-### `backend/models/settings.py` — 95 строк
+### `backend/models/settings.py` — 98 строк
 
 Таблицы, которыми настраивают работу бота.
 
@@ -994,16 +998,16 @@ First-run bootstrap: ensure DB schema exists.
 - `class LlmConfig(IdMixin, UpdatedAtMixin, Base)` (14)
 - `class AppSetting(UpdatedAtMixin, Base)` (7)
 
-### `backend/models/vacancy.py` — 174 строк
+### `backend/models/vacancy.py` — 178 строк
 
 Таблицы, в которых конвейер записывает судьбу разобранного поста.
 
 Зависит от: `backend.models.base`, `backend.models.contacts`, `backend.models.enums`
 
-- `class Vacancy(IdMixin, CreatedAtMixin, Base)` (63)
+- `class Vacancy(IdMixin, CreatedAtMixin, Base)` (61)
 - `class VacancyEvent(IdMixin, CreatedAtMixin, Base)` (16)
 - `class TrashEvent(IdMixin, CreatedAtMixin, Base)` (34)
-- `class VacancyStatusHistory(IdMixin, Base)` (32)
+- `class VacancyStatusHistory(IdMixin, Base)` (38)
 
 ### `backend/notify.py` — 20 строк
 
@@ -2212,7 +2216,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 231 модулей
+## tests — 232 модулей
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -3593,13 +3597,13 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_repository_hr_removal.py` — 63 строк
+### `tests/backend/test_repository_hr_removal.py` — 96 строк
 
 Следствия удаления записи об HR.
 
 Зависит от: `backend.models`, `backend.repository.hr_card`, `tests.dbio`, `tests.factories`
 
-Тестов: 3
+Тестов: 4
 
 
 ### `tests/backend/test_repository_hr_upsert.py` — 154 строк
@@ -3928,6 +3932,15 @@ Runtime settings layer.
 Зависит от: `backend.crypto`, `backend.models`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`
 
 Тестов: 17
+
+
+### `tests/backend/test_schema_and_models.py` — 37 строк
+
+Схема базы и объявления моделей не разошлись.
+
+Зависит от: `backend.models`
+
+Тестов: 1
 
 
 ### `tests/backend/test_single_instance.py` — 124 строк
