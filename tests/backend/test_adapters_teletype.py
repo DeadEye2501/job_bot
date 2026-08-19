@@ -85,8 +85,10 @@ async def test_a_page_without_an_article_gives_nothing():
 @pytest.mark.parametrize(
     "trouble",
     [
-        pytest.param(httpx.Response(404, text="нет такой"), id="страницы нет"),
         pytest.param(httpx.Response(500, text="упал"), id="сайт упал"),
+        pytest.param(httpx.Response(429, text="частишь"), id="просят подождать"),
+        pytest.param(httpx.Response(403, text="не пущу"), id="не пустили"),
+        pytest.param(httpx.Response(408, text="долго"), id="истекло ожидание"),
         pytest.param(httpx.ConnectError("сеть отвалилась"), id="обрыв связи"),
     ],
 )
@@ -143,3 +145,29 @@ def test_which_addresses_count_as_an_article(text, expected):
     скобках, и утащенная в адрес закрывающая скобка вела бы в никуда.
     """
     assert teletype.ARTICLE_URL_RE.findall(text) == expected
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        pytest.param(404, id="страницу снесли"),
+        pytest.param(410, id="страница ушла навсегда"),
+        pytest.param(451, id="страницу закрыли по закону"),
+    ],
+)
+async def test_a_page_that_will_never_come_back_gives_nothing(code):
+    """Отказ, который завтра не пройдёт, читается как «статьи там нет».
+
+    Снесённая статья не вернётся ни к утру, ни к концу недели. Считай её
+    бедой на час — и прогон заново перестал бы обновлять текст такой вакансии
+    до конца её дней, сколько бы раз человек ни нажимал кнопку; на приёме
+    поста тот же отказ запрещал бы удалять настоящий мусор.
+
+    Соседние отказы того же семейства — «не пустили» и «истекло ожидание» —
+    вечными не считаются: они про нас, а не про страницу, и завтра проходят.
+
+    Страница при этом отдаётся годной, с разметкой: пустота от неразобранной
+    страницы выглядела бы так же, и тест зеленел бы, не читая кода ответа.
+    """
+    async with _client(lambda _r: httpx.Response(code, text=_page())) as client:
+        assert await teletype.fetch_article(client, "https://teletype.in/@a/x") is None

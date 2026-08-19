@@ -58,6 +58,7 @@
 - `ARTICLE_URL_RE` = `re.compile('https?://teletype\\.in/@[^\\s)\\]/]+…`
 - `FETCH_TIMEOUT_SEC` = `20.0`
 - `_USER_AGENT` = `'Mozilla/5.0 (compatible; JobBot/1.0)'`
+- `_GONE_FOR_GOOD` = `frozenset({404, 410, 451})`
 
 ## alembic
 
