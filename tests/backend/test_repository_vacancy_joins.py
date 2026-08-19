@@ -109,6 +109,56 @@ async def test_search_reaches_a_cyrillic_word_inside_the_stack(
     assert await titles(search="testing") == ["латинский стек"]
 
 
+async def test_a_percent_in_the_search_is_a_letter_not_a_wildcard(
+    titles, session_factory
+):
+    """Процент в строке поиска ищется как знак, а не как «что угодно».
+
+    Незакрытым он превращает любой запрос в «выдать всё»: человек набирает
+    «50%», а получает всю базу и решает, что поиск сломан.
+    """
+    await put(
+        session_factory,
+        vacancy_row(title="с процентом", salary="бонус 50% от оклада"),
+        vacancy_row(title="без процента", salary="200000"),
+    )
+
+    assert await titles(search="50%") == ["с процентом"]
+    assert await titles(search="%") == ["с процентом"]
+
+
+async def test_an_underscore_in_the_search_is_a_letter_too(titles, session_factory):
+    """Подчёркивание в строке поиска ищется как знак, а не как «любая буква».
+
+    В никах Telegram оно попадается через раз, и без обезвреживания «job_bot»
+    находит ещё и «jobXbot».
+    """
+    await put(
+        session_factory,
+        vacancy_row(title="с подчёркиванием", notes="канал job_bot"),
+        vacancy_row(title="без подчёркивания", notes="канал jobXbot"),
+    )
+
+    assert await titles(search="job_bot") == ["с подчёркиванием"]
+
+
+async def test_a_percent_in_the_grade_filter_is_a_letter_too(
+    titles, session_factory
+):
+    """Отбор по грейду и формату держится того же правила, что и поиск.
+
+    Строку туда кладёт то же окно, и знак образца в ней значит ровно то же
+    самое: ничего.
+    """
+    await put(
+        session_factory,
+        vacancy_row(title="со знаком", grade="senior%"),
+        vacancy_row(title="без знака", grade="senior"),
+    )
+
+    assert await titles(grade="senior%") == ["со знаком"]
+
+
 async def test_a_blank_search_is_switched_off_rather_than_matched_as_empty(
     titles, session_factory
 ):
@@ -214,6 +264,32 @@ async def test_a_company_option_finds_every_spelling_it_was_folded_from(
     # обе стороны сравнения. Какое из двух написаний попадёт в список,
     # решает порядок выдачи базы, и опираться на него нельзя.
     assert sorted(await titles(companies=["КОНТУР"])) == both
+
+
+async def test_a_company_option_finds_the_name_with_edges_it_was_trimmed_of(
+    titles, session, session_factory
+):
+    """Вариант из списка находит название и с пробелами по краям.
+
+    Список обрезает края, а отбор сравнивал как есть: название, приехавшее
+    из поста с висячим пробелом, показывалось в списке подстриженным и не
+    находило собственную вакансию. Своего написания список не предлагает, и
+    добраться до неё через фильтр было нельзя вовсе.
+    """
+    await put(
+        session_factory,
+        vacancy_row(title="с пробелом", company_name="Контур "),
+        vacancy_row(title="с переносом", company_name="\nКонтур"),
+        vacancy_row(title="с неразрывным", company_name="Контур\u00a0"),
+        vacancy_row(title="мимо", company_name="Ромашка"),
+    )
+
+    options = await list_vacancy_filter_options(session)
+    assert sorted(options["companies"]) == ["Контур", "Ромашка"]
+
+    assert sorted(await titles(companies=["Контур"])) == sorted(
+        ["с пробелом", "с переносом", "с неразрывным"]
+    )
 
 
 async def test_a_channel_option_finds_every_spelling_it_was_folded_from(

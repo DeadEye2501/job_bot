@@ -12,13 +12,16 @@ from backend.models import (
     HR,
     TelegramChannel,
     Vacancy,
-    VacancyEvent,
     VacancyStatus,
-    VacancyStatusHistory,
     status_code,
 )
 from backend.payloads import VacancyFilter
 from backend.repository.paging import trim_page
+from backend.repository.vacancies_activity import (
+    activity_aggs,
+    activity_ts,
+    join_activity,
+)
 from backend.repository.vacancies_card import VACANCY_NEIGHBOURS
 from backend.repository.vacancies_common import PARSED_ONLY
 
@@ -31,16 +34,6 @@ _STATUS_BY_CODE = {status_code(s): s for s in VacancyStatus}
 руками разошлась бы с перечислением на первом же новом положении дел, и отбор
 по нему перестал бы работать молча.
 """
-
-
-VACANCY_SORTS = {
-    "newest",
-    "oldest",
-    "score_desc",
-    "score_asc",
-    "status_active_first",
-    "status_new_first",
-}
 
 
 # Порядок «горячее сверху» и «новое сверху»: чем ближе к оферу (или чем
@@ -76,84 +69,27 @@ _STATUS_PRIORITY_NEW_FIRST = {
 }
 
 
-def _greatest_pair(a, b):
-    # NULL-safe row-wise greatest: SQLite has no GREATEST(), and
-    # NULL > anything is NULL, so we have to spell it out.
-    return case((a.is_(None), b), (b.is_(None), a), (a > b, a), else_=b)
-
-
-def _greatest(*cols):
-    out = cols[0]
-    for c in cols[1:]:
-        out = _greatest_pair(out, c)
-    return out
-
-
-def _activity_aggs(ids: list[int] | None = None):
-    """Свежайшее событие и свежайшая смена статуса — по одной строке на вакансию.
-
-    Названные номера сужают обе группировки: спрашивая метку для полусотни
-    показанных строк, незачем группировать всю ленту событий. Список так
-    сузить нельзя — он отбирает уже после соединения, — поэтому довод
-    необязательный.
-    """
-    event_q = select(
-        VacancyEvent.vacancy_id.label("vid"),
-        func.max(VacancyEvent.created_at).label("max_at"),
-    )
-    status_q = select(
-        VacancyStatusHistory.vacancy_id.label("vid"),
-        func.max(VacancyStatusHistory.changed_at).label("max_at"),
-    )
-    if ids is not None:
-        event_q = event_q.where(VacancyEvent.vacancy_id.in_(ids))
-        status_q = status_q.where(VacancyStatusHistory.vacancy_id.in_(ids))
-    return (
-        event_q.group_by(VacancyEvent.vacancy_id).subquery("event_agg"),
-        status_q.group_by(VacancyStatusHistory.vacancy_id).subquery("status_agg"),
-    )
-
-
-def _activity_ts(event_agg, status_agg):
-    """Метка активности вакансии — позднейшее из четырёх времён.
-
-    Перечень источников один на обе дороги: по нему список сортирует прямо в
-    запросе, по нему же окно спрашивает метку для показанных строк. Написанный
-    порознь, он разошёлся бы молча — вакансия стояла бы первой, показывая дату
-    второй.
-    """
-    return _greatest(
-        Vacancy.created_at,
-        Vacancy.posted_at,
-        event_agg.c.max_at,
-        status_agg.c.max_at,
-    )
-
-
-def _order_for(sort: str, activity_ts):
+def _order_for(sort: str, freshness):
     """Порядок выдачи по ключу сортировки; незнакомый ключ — «сначала свежие».
 
     Номер строки идёт последним у каждого ключа: у меток активности бывают
     совпадения, и без него порядок двух таких строк решался бы случаем — от
     страницы к странице они менялись бы местами.
 
-    Незнакомый ключ отсекается здесь, а не у зовущего: перечень известных
-    и разбор по ним — одно знание, и порознь они разъехались бы.
+    Незнакомый ключ доходит до последней строки и получает «сначала свежие».
     """
-    if sort not in VACANCY_SORTS:
-        return (activity_ts.desc().nulls_last(), Vacancy.id.desc())
     if sort == "oldest":
-        return (activity_ts.asc().nulls_last(), Vacancy.id.asc())
+        return (freshness.asc().nulls_last(), Vacancy.id.asc())
     if sort == "score_desc":
         return (
             Vacancy.score.desc().nulls_last(),
-            activity_ts.desc(),
+            freshness.desc(),
             Vacancy.id.desc(),
         )
     if sort == "score_asc":
         return (
             Vacancy.score.asc().nulls_last(),
-            activity_ts.desc(),
+            freshness.desc(),
             Vacancy.id.desc(),
         )
     if sort in ("status_active_first", "status_new_first"):
@@ -165,8 +101,35 @@ def _order_for(sort: str, activity_ts):
         priority = case(
             *[(Vacancy.status == s, p) for s, p in ranks.items()], else_=999
         )
-        return (priority.asc(), activity_ts.desc(), Vacancy.id.desc())
-    return (activity_ts.desc().nulls_last(), Vacancy.id.desc())
+        return (priority.asc(), freshness.desc(), Vacancy.id.desc())
+    return (freshness.desc().nulls_last(), Vacancy.id.desc())
+
+
+_LIKE_ESCAPE = "\\"
+
+_LIKE_SPECIALS = (_LIKE_ESCAPE, "%", "_")
+"""Знаки, которые `LIKE` читает как образец. Знак экранирования назван первым:
+обезвредь его вторым, и он удвоил бы уже проставленные слэши."""
+
+
+def _like_anywhere(text: str) -> str:
+    """Образец «где-то внутри» из того, что набрал человек.
+
+    Знаки образца обезвреживаются: для человека `%` и `_` — обычные символы
+    из зарплаты и из ника, а не язык запроса. Незакрытый `%` превращает любой
+    поиск в «выдать всё», и вместо находки человек видит всю базу.
+
+    Регистр сводится здесь же и только здесь: обе стороны сравнения обязаны
+    складываться одинаково, а на стороне базы стоит `lower` из
+    `adapters/db.py` — он и кириллицу понимает.
+
+    Зовущему остаётся передать `escape=_LIKE_ESCAPE`: без этого довода база не
+    узнает, чем именно мы обезвредили.
+    """
+    escaped = text.strip().lower()
+    for ch in _LIKE_SPECIALS:
+        escaped = escaped.replace(ch, _LIKE_ESCAPE + ch)
+    return f"%{escaped}%"
 
 
 def _search_clauses(search: str | None) -> tuple[list, set[str]]:
@@ -179,18 +142,18 @@ def _search_clauses(search: str | None) -> tuple[list, set[str]]:
     """
     if not search or not search.strip():
         return [], set()
-    q = f"%{search.strip().lower()}%"
+    q = _like_anywhere(search)
     matched = or_(
-        func.lower(Vacancy.title).like(q),
-        func.lower(Vacancy.description).like(q),
-        func.lower(Vacancy.company_name).like(q),
-        func.lower(Vacancy.notes).like(q),
-        func.lower(Vacancy.salary).like(q),
-        func.lower(Vacancy.grade).like(q),
-        func.lower(HR.name).like(q),
-        func.lower(HR.telegram_username).like(q),
-        func.lower(Company.name).like(q),
-        func.lower(cast(Vacancy.stack, String)).like(q),
+        func.lower(Vacancy.title).like(q, escape=_LIKE_ESCAPE),
+        func.lower(Vacancy.description).like(q, escape=_LIKE_ESCAPE),
+        func.lower(Vacancy.company_name).like(q, escape=_LIKE_ESCAPE),
+        func.lower(Vacancy.notes).like(q, escape=_LIKE_ESCAPE),
+        func.lower(Vacancy.salary).like(q, escape=_LIKE_ESCAPE),
+        func.lower(Vacancy.grade).like(q, escape=_LIKE_ESCAPE),
+        func.lower(HR.name).like(q, escape=_LIKE_ESCAPE),
+        func.lower(HR.telegram_username).like(q, escape=_LIKE_ESCAPE),
+        func.lower(Company.name).like(q, escape=_LIKE_ESCAPE),
+        func.lower(cast(Vacancy.stack, String)).like(q, escape=_LIKE_ESCAPE),
     )
     return [matched], {"hr", "company"}
 
@@ -222,19 +185,23 @@ def _choice_clauses(f: VacancyFilter) -> tuple[list, set[str]]:
             clauses.append(func.lower(TelegramChannel.username).in_(cleaned))
             joins.add("channel")
     if f.companies:
-        cleaned = [c.lower() for c in f.companies if c]
+        cleaned = [c.strip().lower() for c in f.companies if c and c.strip()]
         if cleaned:
+            # Края обрезаются с обеих сторон сравнения: выпадающий список их
+            # обрезает (см. :func:`_company_options`), и название, приехавшее
+            # из поста с висячим пробелом, иначе не находило бы собственную
+            # вакансию — а своего написания список не предлагает вовсе.
             clauses.append(
                 or_(
-                    func.lower(Company.name).in_(cleaned),
-                    func.lower(Vacancy.company_name).in_(cleaned),
+                    func.trim(func.lower(Company.name)).in_(cleaned),
+                    func.trim(func.lower(Vacancy.company_name)).in_(cleaned),
                 )
             )
             joins.add("company")
     return clauses, joins
 
 
-def _range_clauses(f: VacancyFilter, activity_ts) -> list:
+def _range_clauses(f: VacancyFilter, freshness) -> list:
     """Условия по числовым и временным границам.
 
     Окно зарплаты и вилка вакансии сравниваются на пересечение, поэтому
@@ -251,9 +218,9 @@ def _range_clauses(f: VacancyFilter, activity_ts) -> list:
     if f.salary_max is not None:
         clauses.append(Vacancy.salary_min <= f.salary_max)
     if f.date_from is not None:
-        clauses.append(activity_ts >= f.date_from)
+        clauses.append(freshness >= f.date_from)
     if f.date_to is not None:
-        clauses.append(activity_ts <= f.date_to)
+        clauses.append(freshness <= f.date_to)
     return clauses
 
 
@@ -261,9 +228,17 @@ def _column_clauses(f: VacancyFilter) -> list:
     """Условия по одиночным колонкам вакансии."""
     clauses: list = []
     if f.grade:
-        clauses.append(func.lower(Vacancy.grade).like(f"%{f.grade.lower()}%"))
+        clauses.append(
+            func.lower(Vacancy.grade).like(
+                _like_anywhere(f.grade), escape=_LIKE_ESCAPE
+            )
+        )
     if f.remote:
-        clauses.append(func.lower(Vacancy.remote).like(f"%{f.remote.lower()}%"))
+        clauses.append(
+            func.lower(Vacancy.remote).like(
+                _like_anywhere(f.remote), escape=_LIKE_ESCAPE
+            )
+        )
     if f.hr_contact == "with":
         clauses.append(Vacancy.hr_id.is_not(None))
     elif f.hr_contact == "without":
@@ -271,7 +246,7 @@ def _column_clauses(f: VacancyFilter) -> list:
     return clauses
 
 
-def _where_and_joins(f: VacancyFilter, activity_ts) -> tuple[list, set[str]]:
+def _where_and_joins(f: VacancyFilter, freshness) -> tuple[list, set[str]]:
     """Все условия отбора разом и имена соседей, без которых они не читаются.
 
     Соседи подтягиваются по требованию, а не всегда: список открывают без
@@ -283,7 +258,7 @@ def _where_and_joins(f: VacancyFilter, activity_ts) -> tuple[list, set[str]]:
     for found, needed in (_search_clauses(f.search), _choice_clauses(f)):
         clauses.extend(found)
         joins.update(needed)
-    clauses.extend(_range_clauses(f, activity_ts))
+    clauses.extend(_range_clauses(f, freshness))
     clauses.extend(_column_clauses(f))
     return clauses, joins
 
@@ -319,14 +294,10 @@ def _listing_stmt(f: VacancyFilter):
     соседи вакансии (`VACANCY_NEIGHBOURS`) подтягиваются всегда — их рисует
     каждая строка.
     """
-    event_agg, status_agg = _activity_aggs()
-    activity_ts = _activity_ts(event_agg, status_agg)
-    where_clauses, joins = _where_and_joins(f, activity_ts)
-    stmt = (
-        select(Vacancy)
-        .outerjoin(event_agg, event_agg.c.vid == Vacancy.id)
-        .outerjoin(status_agg, status_agg.c.vid == Vacancy.id)
-    )
+    aggs = activity_aggs()
+    freshness = activity_ts(aggs)
+    where_clauses, joins = _where_and_joins(f, freshness)
+    stmt = join_activity(select(Vacancy), aggs)
     if "hr" in joins:
         stmt = stmt.outerjoin(HR, HR.id == Vacancy.hr_id)
     if "company" in joins:
@@ -339,7 +310,7 @@ def _listing_stmt(f: VacancyFilter):
         stmt
         .where(*where_clauses)
         .options(*VACANCY_NEIGHBOURS)
-        .order_by(*_order_for(f.sort, activity_ts))
+        .order_by(*_order_for(f.sort, freshness))
     )
 
 
@@ -417,19 +388,18 @@ async def list_vacancy_last_activity(
     """Метка последней активности для каждой из названных вакансий.
 
     Источники те же и в том же порядке, что у сортировки списка: их перечень
-    объявлен один раз в :func:`_activity_ts`.
+    объявлен один раз, в `vacancies_activity`.
     """
     ids = [int(x) for x in vacancy_ids if x is not None]
     if not ids:
         return {}
 
-    event_agg, status_agg = _activity_aggs(ids)
+    aggs = activity_aggs(ids)
     rows = (
         await session.execute(
-            select(Vacancy.id, _activity_ts(event_agg, status_agg))
-            .outerjoin(event_agg, event_agg.c.vid == Vacancy.id)
-            .outerjoin(status_agg, status_agg.c.vid == Vacancy.id)
-            .where(Vacancy.id.in_(ids))
+            join_activity(
+                select(Vacancy.id, activity_ts(aggs)), aggs
+            ).where(Vacancy.id.in_(ids))
         )
     ).all()
     return {

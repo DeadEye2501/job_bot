@@ -19,6 +19,7 @@
 """
 
 import logging
+from dataclasses import dataclass
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,13 +51,26 @@ def _ensure_trailing_period(s: str | None) -> str | None:
     return trimmed + "."
 
 
+@dataclass(frozen=True, slots=True)
+class _Signature:
+    """Подпись перехода: чем объяснён, по чьей воле и на какое письмо ссылается.
+
+    Три значения об одном — о том, как переход выглядит в истории, — и в одну
+    её строку они и ложатся, все три сразу.
+
+    Умолчания названы по самому частому случаю: переход от автоматики, ни на
+    какое письмо не ссылающийся. Двум путям из четырёх хватает их целиком.
+    """
+
+    explanation: str | None = None
+    message_id: int | None = None
+    source: StatusHistorySource = StatusHistorySource.SYSTEM
+
+
 def _move_status(
     vacancy: Vacancy,
     new_status: VacancyStatus,
-    explanation: str | None,
-    *,
-    message_id: int | None = None,
-    source: StatusHistorySource = StatusHistorySource.SYSTEM,
+    sign: _Signature,
 ) -> VacancyStatusHistory:
     """Оформить переход вакансии в ``new_status``.
 
@@ -80,12 +94,12 @@ def _move_status(
         vacancy.status = new_status
     return VacancyStatusHistory(
         vacancy_id=vacancy.id,
-        message_id=message_id,
+        message_id=sign.message_id,
         previous_status=previous,
         status=new_status,
-        explanation=_ensure_trailing_period(explanation),
+        explanation=_ensure_trailing_period(sign.explanation),
         applied=applied,
-        source=source,
+        source=sign.source,
     )
 
 
@@ -109,7 +123,9 @@ async def mark_vacancy_applied(
         vacancy.status, VacancyStatus.APPLIED, force=force
     ):
         return False
-    session.add(_move_status(vacancy, VacancyStatus.APPLIED, explanation))
+    session.add(
+        _move_status(vacancy, VacancyStatus.APPLIED, _Signature(explanation))
+    )
     return True
 
 
@@ -233,7 +249,9 @@ async def change_vacancy_status(
     if previous == new_status and cleaned_explanation is None:
         return None
     history = _move_status(
-        vacancy, new_status, cleaned_explanation, source=StatusHistorySource.USER
+        vacancy,
+        new_status,
+        _Signature(cleaned_explanation, source=StatusHistorySource.USER),
     )
     session.add(history)
     await session.flush()
@@ -303,8 +321,7 @@ async def apply_classification(
         _move_status(
             vacancy,
             classification.status,
-            classification.explanation,
-            message_id=message_id,
+            _Signature(classification.explanation, message_id=message_id),
         )
     )
 
@@ -326,8 +343,10 @@ def apply_silence(
         _move_status(
             vacancy,
             VacancyStatus.GHOSTING,
-            f"HR не отвечает более {timeout_days} дней — "
-            "автоматически помечено как ghosting.",
+            _Signature(
+                f"HR не отвечает более {timeout_days} дней — "
+                "автоматически помечено как ghosting."
+            ),
         )
     )
 

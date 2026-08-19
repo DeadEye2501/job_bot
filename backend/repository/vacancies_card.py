@@ -30,37 +30,23 @@ VACANCY_NEIGHBOURS = (
 """
 
 
-async def _status_history_of(session: AsyncSession, vacancy_id: int) -> list:
-    """Переходы статусов вакансии, свежие сверху.
+async def _newest_first(
+    session: AsyncSession, rows, stamp, vacancy_id: int
+) -> list:
+    """Записи одной ленты вакансии, свежие сверху.
 
-    Разрешитель по идентификатору не украшение: время перехода проставляет
-    база, и два перехода подряд легко получают одну метку.
+    Лент у карточки две — переходы статусов и события конвейера, — и разное у
+    них только имя колонки со временем.
+
+    Разрешитель по идентификатору не украшение: время проставляет база, и две
+    записи подряд легко получают одну метку.
     """
     return list(
         (
             await session.scalars(
-                select(VacancyStatusHistory)
-                .where(VacancyStatusHistory.vacancy_id == vacancy_id)
-                .order_by(
-                    VacancyStatusHistory.changed_at.desc(),
-                    VacancyStatusHistory.id.desc(),
-                )
-            )
-        ).all()
-    )
-
-
-async def _events_of(session: AsyncSession, vacancy_id: int) -> list:
-    """События конвейера по вакансии, свежие сверху."""
-    return list(
-        (
-            await session.scalars(
-                select(VacancyEvent)
-                .where(VacancyEvent.vacancy_id == vacancy_id)
-                .order_by(
-                    VacancyEvent.created_at.desc(),
-                    VacancyEvent.id.desc(),
-                )
+                select(rows)
+                .where(rows.vacancy_id == vacancy_id)
+                .order_by(stamp.desc(), rows.id.desc())
             )
         ).all()
     )
@@ -88,8 +74,12 @@ async def get_vacancy_detail(
 
     return VacancyDetail(
         vacancy=vacancy,
-        history=await _status_history_of(session, vacancy_id),
-        events=await _events_of(session, vacancy_id),
+        history=await _newest_first(
+            session, VacancyStatusHistory, VacancyStatusHistory.changed_at, vacancy_id
+        ),
+        events=await _newest_first(
+            session, VacancyEvent, VacancyEvent.created_at, vacancy_id
+        ),
     )
 
 

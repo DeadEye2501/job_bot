@@ -10,10 +10,31 @@ from backend.models import VacancyStatus
 from tests.dbio import put
 from tests.factories import (
     at,
+    message_row,
     status_history_row,
     vacancy_event_row,
     vacancy_row,
 )
+
+
+async def test_a_letter_from_the_hr_lifts_the_vacancy_in_the_list(
+    titles, session_factory
+):
+    """Письмо собеседника поднимает вакансию в списке, как и всякая жизнь.
+
+    Метку считают двое — список прямо в запросе и окно для показанных строк, —
+    и ради общности их счёт объявлен одним местом. Проверка второй дороги
+    нужна затем, что общность эта только на бумаге, пока обе не спрошены.
+    """
+    quiet = vacancy_row(title="тихая", created_at=at(20))
+    written_to = vacancy_row(title="написал HR", created_at=at(10))
+    await put(session_factory, quiet, written_to)
+    await put(
+        session_factory,
+        message_row(vacancy_id=written_to.id, is_incoming=True, sent_at=at(30)),
+    )
+
+    assert await titles(sort="newest") == ["написал HR", "тихая"]
 
 
 async def test_newest_puts_the_latest_activity_first(titles, session_factory):

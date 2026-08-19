@@ -35,8 +35,8 @@ def make_engine(database_url: str) -> AsyncEngine:
     декларирует ``ondelete=SET NULL``, но без FK enforcement остаётся
     висячий integer). Listener выпускает три PRAGMA при каждом новом
     соединении (включая connections из pool'а) — это стандартный
-    SQLAlchemy+SQLite-паттерн. Там же подменяется ``lower()``: встроенный
-    складывает регистр только у латиницы.
+    SQLAlchemy+SQLite-паттерн. Там же подменяются ``lower()`` и ``trim()``:
+    встроенные складывают регистр у одной латиницы и обрезают один пробел.
     """
     engine = create_async_engine(database_url, json_serializer=_dump_json)
 
@@ -50,6 +50,7 @@ def make_engine(database_url: str) -> AsyncEngine:
         finally:
             cursor.close()
         dbapi_conn.create_function("lower", 1, _lower, deterministic=True)
+        dbapi_conn.create_function("trim", 1, _trim, deterministic=True)
 
     return engine
 
@@ -68,6 +69,22 @@ def _lower(value: object) -> object:
     колонки, — а ходят сегодня только они.
     """
     return value.lower() if isinstance(value, str) else value
+
+
+def _trim(value: object) -> object:
+    """TRIM() для SQLite, обрезающий не один пробел.
+
+    Встроенный однодоводный снимает только `U+0020`: перенос строки,
+    табуляция и неразрывный пробел остаются. Списки же вариантов фильтра
+    режут края питоновским `strip`, и сравнение двух правил расходилось ровно
+    там, где название приехало из поста с неразрывным пробелом на конце: в
+    списке оно показано подстриженным, а своей вакансии не находит.
+
+    Со встроенным сходится на строках и на пустоте, расходится на числах и
+    двоичных данных — как и подменённый `lower` рядом, и по той же причине:
+    под `func.trim` ходят одни текстовые колонки.
+    """
+    return value.strip() if isinstance(value, str) else value
 
 
 async def ping(session) -> bool:
