@@ -10,9 +10,11 @@
 нетронутом статусе вакансии.
 """
 
+import asyncio
+import logging
+
 from backend.flows import dm_classify
 from backend.payloads import PendingReply
-import asyncio
 
 
 def _outlasts_the_wait(started: asyncio.Event):
@@ -99,6 +101,26 @@ async def test_one_broken_reading_does_not_stop_the_others(monkeypatch, dm_pipel
     await dm_pipeline.cancel_pending_dm_classifications(drain=True)
 
     assert good == [8]
+
+
+async def test_a_cancelled_reading_leaves_a_trace(monkeypatch, dm_pipeline, caplog):
+    """Отменённый разбор попадает в журнал, а не исчезает молча.
+
+    Отмена приходит из пачки значением наравне с бедой, но `Exception` её не
+    ловит. Промолчи мы — выключение с потерянной пачкой выглядело бы точно
+    как выключение с разобранной.
+    """
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "от первого"))
+
+    async def classify(pipeline, hr_id):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", classify)
+
+    with caplog.at_level(logging.WARNING):
+        await dm_pipeline.cancel_pending_dm_classifications(drain=True)
+
+    assert "CancelledError" in caplog.text
 
 
 async def test_an_empty_buffer_is_not_read(dm_pipeline):

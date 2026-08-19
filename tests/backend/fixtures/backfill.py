@@ -2,7 +2,12 @@
 
 import pytest
 
-from backend.flows.dm_backfill import backfill_hr_dm_history, catch_up_missed_dms
+from backend.flows.dm import DmHelpers
+from backend.flows.dm_backfill import (
+    DmHooks,
+    backfill_hr_dm_history,
+    catch_up_missed_dms,
+)
 from backend.models import HR
 from tests.dbio import only_row, put
 from tests.factories import hr_row
@@ -19,21 +24,34 @@ def ours(msg_id, text, *, photo=None):
     return outgoing(id=msg_id, text=text, photo=photo)
 
 
-async def catch_up(client, hr, session_factory, **kwargs):
+def _helpers(client, session_factory, **extra) -> DmHelpers:
+    """Сотрудники догона на стенде: модель молчит, разбор откладывается.
+
+    Названное поимённо перебивает умолчание: проверке накопителя нужен свой
+    планировщик, остальным — любой непустой, лишь бы разбор не пошёл в модель.
+    """
+    fields = {
+        "session_factory": session_factory,
+        "lm_chat_model": "qwen",
+        "client": client,
+        "schedule_classification": lambda *args: None,
+    }
+    fields.update(extra)
+    return DmHelpers(**fields)
+
+
+async def catch_up(client, hr, session_factory, *, hooks=None, **kwargs):
     """Догоняет переписку с одним HR."""
     await backfill_hr_dm_history(
-        client,
         hr,
-        None,
-        "qwen",
-        session_factory,
+        _helpers(client, session_factory),
+        hooks or DmHooks(),
         backfill_limit=50,
-        schedule_classification=lambda *args: None,
         **kwargs,
     )
 
 
-async def catch_up_everyone(client, session_factory):
+async def catch_up_everyone(client, session_factory, *, hooks=None, **kwargs):
     """Догоняет переписку по всем известным собеседникам.
 
     Отличается от `catch_up` тем, что идёт настоящей дорогой обхода: отметку
@@ -41,12 +59,9 @@ async def catch_up_everyone(client, session_factory):
     неё работает вслепую.
     """
     await catch_up_missed_dms(
-        client,
-        None,
-        "qwen",
-        session_factory,
-        50,
-        schedule_classification=lambda *args: None,
+        _helpers(client, session_factory, **kwargs),
+        hooks or DmHooks(),
+        backfill_limit=50,
     )
 
 

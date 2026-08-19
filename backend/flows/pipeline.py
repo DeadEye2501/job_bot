@@ -12,6 +12,8 @@ from typing import Literal
 from pathlib import Path
 
 from backend.domain.dedup import EmbeddingCache
+from backend.flows.dm import DmHelpers
+from backend.flows.dm_backfill import DmHooks
 from backend.flows.dm_debounce import DmDebounce
 from backend.notify import fire
 
@@ -285,6 +287,29 @@ class IngestionPipeline:
 
     def schedule_dm_classification(self, hr_id, reply) -> None:
         return dm_classify.schedule_dm_classification(self, hr_id, reply)
+
+    def dm_helpers(self) -> DmHelpers:
+        """Сотрудники для проводки письма — одним местом сборки.
+
+        Собирают их трое: приём живого письма, догон при переходе в рабочий
+        режим и догон свежего собеседника. Набор один и тот же, и знание, из
+        чего он складывается, разъезжалось по трём слоям — добавленное поле
+        приходилось вписывать в каждый.
+        """
+        return DmHelpers(
+            session_factory=self.session_factory,
+            lm_client=self.lm_client,
+            lm_chat_model=self.lm_chat_model,
+            client=self.client,
+            schedule_classification=self.schedule_dm_classification,
+        )
+
+    def dm_hooks(self) -> DmHooks:
+        """Чем догон будит окно — оттуда же, откуда и сотрудники."""
+        return DmHooks(
+            on_message_persisted=self.on_new_message,
+            on_vacancies_changed=self.on_vacancies_changed,
+        )
 
     async def cancel_pending_dm_classifications(self, *, drain=False) -> None:
         return await dm_classify.cancel_pending_dm_classifications(self, drain=drain)

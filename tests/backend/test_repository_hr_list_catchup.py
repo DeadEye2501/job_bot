@@ -1,8 +1,8 @@
 """Следствия перечней, с которых бот догоняет пропущенное после простоя.
 
 Перечня два, и они разной ширины. Первый берёт всех, до кого вообще можно
-дотянуться в Telegram; второй — только тех, кому мы писали первыми. С каждым
-отдаётся наибольший номер уже полученного сообщения: с него бот и продолжит.
+дотянуться в Telegram; второй — только тех, кому мы писали первыми, и с
+каждым отдаёт наибольший номер уже полученного сообщения.
 """
 
 from backend.repository.hr_list import list_hrs_for_backfill, list_open_hr_chats
@@ -23,34 +23,7 @@ async def test_backfill_covers_everyone_reachable_in_telegram(
 
     got = await list_hrs_for_backfill(session)
 
-    assert sorted(hr.name for hr, _ in got) == sorted(["по идентификатору", "по нику"])
-
-
-async def test_backfill_reports_the_highest_incoming_message_number(
-    session, session_factory
-):
-    """С каждым HR отдаётся наибольший номер уже полученного сообщения.
-
-    С него бот продолжит: всё, что выше, пришло, пока он молчал. Исходящие в
-    счёт не идут — их нумерация та же, и наше письмо сдвинуло бы отметку
-    вперёд, спрятав ответ HR.
-
-    Больший номер вставлен раньше меньшего нарочно: вставь по возрастанию —
-    и «наибольший» стал бы неотличим от «последнего вставленного».
-    """
-    hr = hr_row(telegram_user_id=111)
-    silent = hr_row(telegram_user_id=222, name="без переписки")
-    await put(session_factory, hr, silent)
-    await put(
-        session_factory,
-        message_row(hr_id=hr.id, tg_message_id=30, is_incoming=True),
-        message_row(hr_id=hr.id, tg_message_id=10, is_incoming=True),
-        message_row(hr_id=hr.id, tg_message_id=99, is_incoming=False),
-    )
-
-    got = dict((h.telegram_user_id, seen) for h, seen in await list_hrs_for_backfill(session))
-
-    assert got == {111: 30, 222: 0}
+    assert sorted(hr.name for hr in got) == sorted(["по идентификатору", "по нику"])
 
 
 async def test_open_chats_need_both_an_id_and_a_letter_from_us(
@@ -71,3 +44,30 @@ async def test_open_chats_need_both_an_id_and_a_letter_from_us(
     got = await list_open_hr_chats(session)
 
     assert [hr.name for hr, _ in got] == ["и то и другое"]
+
+
+async def test_open_chats_report_the_highest_incoming_message_number(
+    session, session_factory
+):
+    """С открытым чатом отдаётся наибольший номер уже полученного сообщения.
+
+    Исходящие в счёт не идут — нумерация у них та же, и наше письмо сдвинуло
+    бы отметку вперёд, спрятав ответ HR.
+
+    Больший номер вставлен раньше меньшего нарочно: вставь по возрастанию —
+    и «наибольший» стал бы неотличим от «последнего вставленного».
+    """
+    hr = hr_row(telegram_user_id=111)
+    silent = hr_row(telegram_user_id=222, name="без входящих")
+    await put(session_factory, hr, silent)
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, tg_message_id=30, is_incoming=True),
+        message_row(hr_id=hr.id, tg_message_id=10, is_incoming=True),
+        message_row(hr_id=hr.id, tg_message_id=99, is_incoming=False),
+        message_row(hr_id=silent.id, tg_message_id=5, is_incoming=False),
+    )
+
+    got = dict((h.telegram_user_id, seen) for h, seen in await list_open_hr_chats(session))
+
+    assert got == {111: 30, 222: 0}

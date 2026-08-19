@@ -184,6 +184,58 @@ async def test_a_card_without_a_picture_gets_one(session_factory, deliver):
     assert (await only_row(session_factory, HR)).avatar == b"\x89PNG"
 
 
+async def test_a_picture_that_would_not_come_does_not_cost_the_letter(
+    session_factory, deliver, monkeypatch
+):
+    """Сорвавшаяся картинка письма не уносит.
+
+    Картинка — украшение карточки, а письмо — то, ради чего всё. Своей
+    сделкой она идёт уже после того, как строка легла, и её беда не должна
+    ни отменять записанное, ни мешать разбору: догон гоняет два десятка
+    переписок разом, и запертая на запись база там обычное дело.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777, avatar=None))
+    client = FakeTelegramClient(avatar=b"PNG")
+
+    async def refuses(*_args):
+        raise RuntimeError("база занята")
+
+    monkeypatch.setattr("backend.flows.dm.fetch_telegram_avatar", refuses)
+
+    got = await deliver(
+        incoming(from_user=user(id=777, photo=photo(small_file_id="кар"))),
+        client=client,
+    )
+
+    assert got is not None
+    assert (await only_row(session_factory, Message)).tg_message_id == 10
+
+
+async def test_a_letter_already_in_the_chat_costs_no_picture(
+    session_factory, deliver
+):
+    """За уже лежащее письмо картинкой собеседника не платят.
+
+    Догон приносит переписку целиком, и почти вся она уже лежит. Пока
+    картинку спрашивали до записи, за неё платили на каждом старом письме и
+    тут же выбрасывали откатом: строка не легла — не легла и картинка.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777, avatar=None))
+    hr = await only_row(session_factory, HR)
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
+    )
+    client = FakeTelegramClient(avatar=b"\x89PNG")
+
+    await deliver(
+        incoming(id=10, from_user=user(id=777, photo=photo(small_file_id="кар"))),
+        client=client,
+    )
+
+    assert client.download_calls == []
+
+
 async def test_a_picture_that_arrived_while_downloading_is_not_overwritten(
     session_factory, deliver
 ):

@@ -153,20 +153,26 @@ def _parse_classification(answer: str) -> Classification | None:
     )
 
 
-def _allowed_next(current_status: VacancyStatus) -> str:
-    """Статусы, из которых модели разрешено выбирать, одной строкой.
+def _allowed_next(current_status: VacancyStatus) -> set[VacancyStatus]:
+    """Статусы, из которых модели разрешено выбирать.
 
     Разрешённые переходы плюс сам нынешний статус как «ничего не
     изменилось», минус «пропал без вести» — его ставит только таймер
-    молчания, и модели предлагать его нельзя. Порядок ровный ради
-    воспроизводимости наставления.
+    молчания, и модели предлагать его нельзя.
+
+    Набором, а не строкой: тем же набором ответ модели и сверяется. Сверяй
+    его со всем перечнем статусов — и вычеркнутый отсюда проходил бы
+    насквозь, а вычёркивали его не для красоты наставления.
     """
-    allowed_set = set(ALLOWED_AUTO_TRANSITIONS[current_status])
-    allowed_set.discard(VacancyStatus.GHOSTING)
-    allowed_set.add(current_status)
-    return ", ".join(
-        s.value for s in sorted(allowed_set, key=lambda s: s.value)
-    )
+    allowed = set(ALLOWED_AUTO_TRANSITIONS[current_status])
+    allowed.discard(VacancyStatus.GHOSTING)
+    allowed.add(current_status)
+    return allowed
+
+
+def _as_line(allowed: set[VacancyStatus]) -> str:
+    """Разрешённые статусы одной строкой; порядок ровный ради наставления."""
+    return ", ".join(s.value for s in sorted(allowed, key=lambda s: s.value))
 
 
 def _classify_request(
@@ -202,7 +208,8 @@ async def classify_hr_reply(
 
     Модели дают только те статусы, куда переход разрешён из нынешнего
     (`_allowed_next`): выбирая из них, она не порождает вердиктов, которые
-    `apply_classification` всё равно отобьёт.
+    `apply_classification` всё равно отобьёт. Тем же набором ответ и
+    сверяется — наставление держит модель, но не связывает.
 
     Оборванный на пределе токенов ответ вердиктом не считается: статусы
     терминальны, и приглашение, записанное отказом из недоговорённого ответа,
@@ -210,7 +217,8 @@ async def classify_hr_reply(
     """
     if not text:
         return None
-    allowed_str = _allowed_next(current_status)
+    allowed = _allowed_next(current_status)
+    allowed_str = _as_line(allowed)
     # Обрезается начало, а не конец: решает последняя реплика, а первые в
     # пачке — «здравствуйте» и «спасибо».
     text = text[-4000:]
@@ -228,6 +236,12 @@ async def classify_hr_reply(
     parsed = _parse_classification(reply.text)
     if parsed is None:
         log_unparseable(reply.text, logger, "classify_hr_reply")
-    else:
-        logger.debug("classify_hr_reply: status=%s", parsed.status.value)
+        return None
+    if parsed.status not in allowed:
+        logger.warning(
+            "classify_hr_reply: статус %s модели не предлагали, вердикта нет",
+            parsed.status.value,
+        )
+        return None
+    logger.debug("classify_hr_reply: status=%s", parsed.status.value)
     return parsed

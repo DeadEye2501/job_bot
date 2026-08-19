@@ -30,11 +30,11 @@ async def spawning(make_pipeline, session_factory, monkeypatch):
     pipeline.hold = asyncio.Event()
     pipeline.hold.set()
 
-    async def backfill(client, hr_row_, *args, **kwargs):
+    async def backfill(hr_row_, dm, hooks, **kwargs):
         await pipeline.hold.wait()
         if isinstance(pipeline.caught, Exception):
             raise pipeline.caught
-        pipeline.caught.append((hr_row_.id, kwargs))
+        pipeline.caught.append((hr_row_.id, dm, hooks))
 
     monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)
     return pipeline, hr
@@ -52,7 +52,7 @@ async def test_the_history_is_caught_up_in_the_background(spawning):
     assert pipeline.caught == []
 
     await asyncio.sleep(0)
-    assert [hr_id for hr_id, _ in pipeline.caught] == [hr.id]
+    assert [hr_id for hr_id, _dm, _hooks in pipeline.caught] == [hr.id]
 
 
 async def test_the_window_is_wired_to_the_background_catch_up(spawning):
@@ -66,9 +66,9 @@ async def test_the_window_is_wired_to_the_background_catch_up(spawning):
     dm_backfill.spawn_hr_backfill(pipeline, hr)
     await asyncio.sleep(0)
 
-    _, kwargs = pipeline.caught[0]
-    assert kwargs["on_message_persisted"] is pipeline.on_new_message
-    assert kwargs["schedule_classification"] == pipeline.schedule_dm_classification
+    _, dm, hooks = pipeline.caught[0]
+    assert hooks.on_message_persisted is pipeline.on_new_message
+    assert dm.schedule_classification == pipeline.schedule_dm_classification
 
 
 async def test_a_running_catch_up_is_remembered(spawning):

@@ -4,6 +4,7 @@ import logging
 import asyncio
 
 from backend.flows.auto_gate import status_open_for_auto
+from backend.flows.batches import report_failures
 from backend.llm.hr_reply import classify_hr_reply
 from backend.models import VacancyStatus
 from backend.payloads import PendingReply
@@ -251,11 +252,7 @@ async def _drain_buffers(pipeline) -> None:
         *(classify_and_apply_for_hr(pipeline, hr_id) for hr_id in hr_ids),
         return_exceptions=True,
     )
-    for hr_id, res in zip(hr_ids, results):
-        if isinstance(res, Exception):
-            logger.exception(
-                "drain classify on OFF failed for hr %d", hr_id, exc_info=res,
-            )
+    report_failures(hr_ids, results, "drain classify on OFF")
 
 
 async def cancel_pending_dm_classifications(
@@ -270,12 +267,10 @@ async def cancel_pending_dm_classifications(
     ждём с таймаутом, чтобы все живые task'и доработали или
     завершились по cancel'у.
 
-    Edge race во время normal completion: tardy task мог проскочить
-    cancel (был в commit'е) и сделать `apply_classification` уже
-    ПОСЛЕ того, как таймеры забыты. Корректность не нарушается —
-    commit прошёл, статус-history-row записан; просто таймер
-    завершившегося разбора некоторое время числится за человеком,
-    пока следующее письмо его не перезапишет.
+    Не уложившийся в срок разбор досиживает своё уже после того, как таймеры
+    забыты, и это не беда: пачку он вынул из копилки сам, а таймер снял с
+    человека ещё когда начинался. Записанный им вердикт — настоящий, и
+    порядок ничем не нарушен.
 
     ``drain=True`` (OFF transition) — накопленное разбирается напоследок,
     см. :func:`_drain_buffers`. Shutdown путь использует drain=False —

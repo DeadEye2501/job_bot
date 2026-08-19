@@ -6,7 +6,8 @@ from itertools import batched
 from dataclasses import dataclass
 from typing import Any
 
-from backend.flows.dm import persist_outgoing_dm, process_dm
+from backend.flows.batches import report_failures
+from backend.flows.dm import DmHelpers, persist_outgoing_dm, process_dm
 from backend.domain.telegram_identity import telegram_peer
 from backend.models import Message
 from backend.repository.hr_list import list_hrs_for_backfill
@@ -28,67 +29,31 @@ _DM_CATCHUP_BATCH_DELAY_SEC = 1.0
 
 
 @dataclass(frozen=True, slots=True)
-class _Walk:
-    """Один проход по переписке: чей он и с чьей помощью идёт.
+class DmHooks:
+    """Чем догон будит окно: пришло письмо и сменился статус вакансии.
 
-    **Это не свёртка группы значений, а носильщик сотрудников** — и разница
-    названа нарочно. Соглашение плана сворачивает только настоящие группы, а
-    здесь собраны Telegram, модель, база, планировщик и окно, то есть ровно
-    тот мешок, который план отверг для `Bot.send`. Заведён он по другой
-    причине: без него разнимание тела упирается в предел доводов у каждого
-    куска. Публичная подпись догона при этом не тронута — её девять доводов
-    остались доводами, и это записано в плане.
-
-    Держит поля вместе один предмет — номер HR, чью переписку разбирают: все
-    они живут ровно от первого сообщения прохода до последнего.
+    Ходят вдвоём везде, где ходят вообще: обоих зовущий берёт у одного и того
+    же конвейера и передаёт насквозь до самого прохода по переписке.
     """
 
-    hr_id: int
-    client: Any
-    lm_client: Any
-    lm_chat_model: str | None
-    session_factory: Any
-    schedule_classification: Any
-    on_vacancies_changed: Any
-
-
-# Сколько ждём просьбы Telegram «слишком часто». Pyrogram сам пережидает
-# короткие (`sleep_threshold`), значит сюда доходят только долгие — минуты и
-# часы. Ждать их некому: догон идёт внутри тела цикла бота, до всякой проверки
-# остановки, и на это время приложение перестаёт закрываться, а кнопка
-# «остановить» — помогать. Пропущенное не теряется: догон повторится на
-# следующем переходе в рабочий режим.
-_WAIT_OUT_LIMIT_SEC = 60
-
-
-async def _after_flood_wait(hr, read, target, wait: int) -> list | None:
-    """Переждать просьбу «слишком часто» и прочитать ещё раз.
-
-    Второй отказ пережидать уже нечем: он значит штраф до включения, и
-    возвращаться сюда третий раз незачем.
-    """
-    if wait > _WAIT_OUT_LIMIT_SEC:
-        logger.warning(
-            "backfill: FloodWait %ds на hr %d — слишком долго, пропускаю", wait, hr.id
-        )
-        return None
-    logger.info("backfill: FloodWait %ds на hr %d — жду и ретраим", wait, hr.id)
-    await asyncio.sleep(wait + 1)
-    try:
-        return await read(target)
-    except Exception:
-        logger.exception("backfill: retry после FloodWait не помог hr %d", hr.id)
-        return None
+    on_message_persisted: Any = None
+    on_vacancies_changed: Any = None
 
 
 async def _fetch_history(client, hr, limit: int) -> list | None:
     """Хвост переписки, свежими вперёд; `None` — прочитать не удалось.
 
     Пустой список этим не считается: он значит «переписки нет», и зовущий идёт
-    дальше. Две беды чинятся здесь, обе одной попыткой. Неизвестный собеседник:
-    номера нет в кэше, и `get_users` зовётся ради побочного действия — он
-    кладёт собеседника туда, оттого второе чтение и проходит. Просьба
-    подождать разобрана рядом, в `_after_flood_wait`.
+    дальше. Неизвестный собеседник чинится здесь же, одной попыткой: номера
+    нет в кэше, и `get_users` зовётся ради побочного действия — он кладёт
+    собеседника туда, оттого второе чтение и проходит.
+
+    Просьбу «слишком часто» не пережидают вовсе. Короткие Pyrogram переживает
+    сам (`sleep_threshold`), значит сюда доходят только долгие — минуты и
+    часы. А ждать их некому: догон идёт внутри тела цикла бота, до всякой
+    проверки остановки, и на это время приложение перестаёт закрываться, а
+    кнопка «остановить» — помогать. Пропущенное не теряется: догон повторится
+    на следующем переходе в рабочий режим.
     """
     from pyrogram.errors import FloodWait, PeerIdInvalid
 
@@ -111,12 +76,14 @@ async def _fetch_history(client, hr, limit: int) -> list | None:
             logger.exception("backfill: resolve fallback failed для hr %d", hr.id)
             return None
     except FloodWait as e:
-        return await _after_flood_wait(
-            hr, read, target, int(getattr(e, "value", 30))
+        logger.warning(
+            "backfill: FloodWait %ss на hr %d — пропускаю до следующего раза",
+            getattr(e, "value", "?"), hr.id,
         )
+        return None
 
 
-async def _store_outgoing(walk: _Walk, msg) -> bool:
+async def _store_outgoing(hr_id: int, dm: DmHelpers, msg) -> bool:
     """Записать своё сообщение из хвоста; сказать, легло ли новое.
 
     Разбора моделью оно не требует — пишется как есть, тем же объявлением,
@@ -130,18 +97,18 @@ async def _store_outgoing(walk: _Walk, msg) -> bool:
     """
     try:
         outcome = await persist_outgoing_dm(
-            walk.session_factory, walk.client, msg, walk.hr_id
+            dm.session_factory, dm.client, msg, hr_id
         )
     except Exception:
         logger.exception(
             "backfill outgoing insert failed",
-            extra={"hr_id": walk.hr_id, "tg_message_id": msg.id},
+            extra={"hr_id": hr_id, "tg_message_id": msg.id},
         )
         return False
     return outcome == "stored"
 
 
-async def _store_incoming(walk: _Walk, msg) -> bool:
+async def _store_incoming(hr_id: int, dm: DmHelpers, hooks: DmHooks, msg) -> bool:
     """Провести чужое сообщение той же дорогой, что и живое.
 
     Разбор и привязка к вакансии обязаны совпадать с живым путём, а повтор
@@ -154,23 +121,21 @@ async def _store_incoming(walk: _Walk, msg) -> bool:
     отличить от трёх других мест с тем же крючком.
     """
     try:
-        await process_dm(
-            msg, walk.lm_client, walk.lm_chat_model, walk.session_factory,
-            client=walk.client,
-            schedule_classification=walk.schedule_classification,
-        )
+        await process_dm(msg, dm)
     except Exception:
         logger.exception(
             "backfill incoming process failed",
-            extra={"hr_id": walk.hr_id, "tg_message_id": msg.id},
+            extra={"hr_id": hr_id, "tg_message_id": msg.id},
         )
         return False
-    if walk.schedule_classification is None:
-        fire(walk.on_vacancies_changed, "backfill: on_vacancies_changed")
+    if dm.schedule_classification is None:
+        fire(hooks.on_vacancies_changed, "backfill: on_vacancies_changed")
     return True
 
 
-async def _walk_messages(messages: list, walk: _Walk) -> bool:
+async def _walk_messages(
+    messages: list, hr_id: int, dm: DmHelpers, hooks: DmHooks
+) -> bool:
     """Записать вытянутую переписку; сказать, появилось ли новое.
 
     Старое первым: Telegram отдаёт свежее вперёд, а в переписке окна порядок
@@ -182,9 +147,9 @@ async def _walk_messages(messages: list, walk: _Walk) -> bool:
     had_new = False
     for msg in reversed(messages):
         if msg.outgoing:
-            had_new = await _store_outgoing(walk, msg) or had_new
+            had_new = await _store_outgoing(hr_id, dm, msg) or had_new
         else:
-            had_new = await _store_incoming(walk, msg) or had_new
+            had_new = await _store_incoming(hr_id, dm, hooks, msg) or had_new
     return had_new
 
 
@@ -228,11 +193,10 @@ async def _reconcile_deletes(
 
 
 async def backfill_hr_dm_history(
-    client, hr, lm_client, lm_chat_model, session_factory,
+    hr, dm: DmHelpers, hooks: DmHooks,
     *,
     backfill_limit: int,
-    on_message_persisted=None, on_vacancies_changed=None,
-    schedule_classification=None, newest_before: int = 0,
+    newest_before: int = 0,
 ) -> None:
     """Pull the DM history of one HR and persist it.
 
@@ -245,47 +209,19 @@ async def backfill_hr_dm_history(
     Снимает его зовущий: здесь это была бы работа с базой внутри задачи,
     которую гасят при остановке. Ноль значит «у нас ничего не было».
     """
-    messages = await _fetch_history(client, hr, backfill_limit)
+    messages = await _fetch_history(dm.client, hr, backfill_limit)
     if messages is None:
         return
-    had_new = await _walk_messages(
-        messages,
-        _Walk(
-            hr_id=hr.id,
-            client=client,
-            lm_client=lm_client,
-            lm_chat_model=lm_chat_model,
-            session_factory=session_factory,
-            schedule_classification=schedule_classification,
-            on_vacancies_changed=on_vacancies_changed,
-        ),
-    )
+    had_new = await _walk_messages(messages, hr.id, dm, hooks)
     tombstoned = await _reconcile_deletes(
-        session_factory, hr.id, messages, newest_before
+        dm.session_factory, hr.id, messages, newest_before
     )
     if had_new or tombstoned:
-        fire(on_message_persisted, "on_message_persisted", hr.id)
-
-
-def _report_failed(batch: list, results: list) -> None:
-    """Пожаловаться на людей, чей проход сорвался.
-
-    Сорвавшийся проход одного человека остальных не роняет: пачка собрана
-    с `return_exceptions=True`, то есть беда приходит сюда значением, а не
-    исключением, и разбирается после того, как пачка дошла целиком.
-    """
-    for (hr, _), result in zip(batch, results):
-        if isinstance(result, Exception):
-            logger.exception(
-                "catch_up failed for hr %d", hr.id, exc_info=result,
-            )
+        fire(hooks.on_message_persisted, "on_message_persisted", hr.id)
 
 
 async def catch_up_missed_dms(
-    client, lm_client, lm_chat_model, session_factory, backfill_limit: int,
-    *,
-    on_message_persisted=None, on_vacancies_changed=None,
-    schedule_classification=None,
+    dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int
 ) -> None:
     """Pull recent DM history per known HR, both directions.
 
@@ -294,9 +230,9 @@ async def catch_up_missed_dms(
     # Отметки снимаются здесь и разом: до прохода, одной сессией и вне задач,
     # которые гасят при остановке. Ими сверка удалённого отличает стёртое от
     # пришедшего, пока шёл проход.
-    async with session_factory() as session:
+    async with dm.session_factory() as session:
         chats = await list_hrs_for_backfill(session)
-        newest = {hr.id: await newest_tg_message_id(session, hr.id) for hr, _ in chats}
+        newest = {hr.id: await newest_tg_message_id(session, hr.id) for hr in chats}
     logger.info(
         "DM catch-up: %d HR(s), batch=%d delay=%ss",
         len(chats), _DM_CATCHUP_BATCH_SIZE, _DM_CATCHUP_BATCH_DELAY_SEC,
@@ -308,18 +244,15 @@ async def catch_up_missed_dms(
         results = await asyncio.gather(
             *[
                 backfill_hr_dm_history(
-                    client, hr, lm_client, lm_chat_model, session_factory,
+                    hr, dm, hooks,
                     backfill_limit=backfill_limit,
-                    on_message_persisted=on_message_persisted,
-                    on_vacancies_changed=on_vacancies_changed,
-                    schedule_classification=schedule_classification,
                     newest_before=newest[hr.id],
                 )
-                for hr, _last_seen in batch
+                for hr in batch
             ],
             return_exceptions=True,
         )
-        _report_failed(batch, results)
+        report_failures([hr.id for hr in batch], results, "catch_up")
         if index + 1 < len(batches):
             await asyncio.sleep(_DM_CATCHUP_BATCH_DELAY_SEC)
 
@@ -340,12 +273,10 @@ def spawn_hr_backfill(pipeline, hr) -> None:
     async def _run() -> None:
         try:
             await backfill_hr_dm_history(
-                pipeline.client, hr, pipeline.lm_client, pipeline.lm_chat_model,
-                pipeline.session_factory,
+                hr,
+                pipeline.dm_helpers(),
+                pipeline.dm_hooks(),
                 backfill_limit=pipeline.rs.dm_backfill_limit,
-                on_message_persisted=pipeline.on_new_message,
-                on_vacancies_changed=pipeline.on_vacancies_changed,
-                schedule_classification=pipeline.schedule_dm_classification,
             )
         except asyncio.CancelledError:
             raise

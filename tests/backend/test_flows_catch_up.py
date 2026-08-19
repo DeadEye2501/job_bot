@@ -11,8 +11,10 @@
 """
 
 import asyncio
+import logging
 
-from backend.flows.dm_backfill import _DM_CATCHUP_BATCH_SIZE, catch_up_missed_dms
+from backend.flows.dm_backfill import _DM_CATCHUP_BATCH_SIZE, DmHooks
+from tests.backend.fixtures.backfill import catch_up_everyone
 from backend.models import HR
 from tests.dbio import all_rows, put
 from tests.factories import hr_row
@@ -21,9 +23,7 @@ from tests.fakes.telegram import FakeTelegramClient
 
 async def _catch_up(session_factory, **kwargs):
     """Догоняет переписки по всем известным HR."""
-    await catch_up_missed_dms(
-        FakeTelegramClient(), None, "qwen", session_factory, 50, **kwargs
-    )
+    await catch_up_everyone(FakeTelegramClient(), session_factory, **kwargs)
 
 
 async def _hrs(session_factory, count):
@@ -47,7 +47,7 @@ async def test_every_known_hr_is_caught_up(session_factory, monkeypatch):
     hrs = await _hrs(session_factory, 3)
     visited: list[int] = []
 
-    async def backfill(client, hr, *args, **kwargs):
+    async def backfill(hr, *args, **kwargs):
         visited.append(hr.id)
 
     monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)
@@ -61,7 +61,7 @@ async def test_an_empty_address_book_is_no_work(session_factory, monkeypatch):
     """Когда HR ещё нет, догон ничего не делает и не падает."""
     visited: list[int] = []
 
-    async def backfill(client, hr, *args, **kwargs):
+    async def backfill(hr, *args, **kwargs):
         visited.append(hr.id)
 
     monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)
@@ -81,7 +81,7 @@ async def test_a_batch_runs_its_chats_side_by_side(session_factory, monkeypatch)
     started = 0
     peak = 0
 
-    async def backfill(client, hr, *args, **kwargs):
+    async def backfill(hr, *args, **kwargs):
         nonlocal started, peak
         started += 1
         peak = max(peak, started)
@@ -103,7 +103,7 @@ async def test_batches_are_spaced_out(session_factory, monkeypatch):
     """
     await _hrs(session_factory, _DM_CATCHUP_BATCH_SIZE + 1)
 
-    async def backfill(client, hr, *args, **kwargs):
+    async def backfill(hr, *args, **kwargs):
         pass
 
     monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)
@@ -127,7 +127,7 @@ async def test_the_last_batch_is_not_followed_by_a_pause(
     """После последней пачки бот не ждёт: ждать больше нечего."""
     await _hrs(session_factory, 2)
 
-    async def backfill(client, hr, *args, **kwargs):
+    async def backfill(hr, *args, **kwargs):
         pass
 
     monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)
@@ -157,7 +157,7 @@ async def test_one_broken_chat_does_not_stop_the_others(
     hrs = await _hrs(session_factory, 3)
     done: list[int] = []
 
-    async def backfill(client, hr, *args, **kwargs):
+    async def backfill(hr, *args, **kwargs):
         if hr.id == hrs[0].id:
             raise OSError("сеть")
         done.append(hr.id)
@@ -169,6 +169,32 @@ async def test_one_broken_chat_does_not_stop_the_others(
     assert sorted(done) == sorted(h.id for h in hrs[1:])
 
 
+async def test_a_cancelled_chat_leaves_a_trace_and_spares_the_others(
+    session_factory, monkeypatch, caplog
+):
+    """Отменённая переписка попадает в журнал, а соседние догоняются.
+
+    Молчи мы о ней — брошенный проход выглядел бы как удачно законченный, и
+    понять по журналу, почему у собеседника пусто, было бы нечем. А гасить
+    из-за неё весь догон нельзя: остальные переписки ни при чём.
+    """
+    hrs = await _hrs(session_factory, 2)
+    done: list[int] = []
+
+    async def backfill(hr, *args, **kwargs):
+        if hr.id == hrs[0].id:
+            raise asyncio.CancelledError
+        done.append(hr.id)
+
+    monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)
+
+    with caplog.at_level(logging.WARNING):
+        await _catch_up(session_factory)
+
+    assert done == [hrs[1].id]
+    assert "CancelledError" in caplog.text
+
+
 async def test_the_window_hooks_reach_every_chat(session_factory, monkeypatch):
     """Оповещения окна доходят до догона каждой переписки.
 
@@ -176,26 +202,28 @@ async def test_the_window_hooks_reach_every_chat(session_factory, monkeypatch):
     открытой вкладке по мере того, как её строки ложатся в базу.
     """
     await _hrs(session_factory, 2)
-    got: list[dict] = []
+    got: list[tuple] = []
 
-    async def backfill(client, hr, *args, **kwargs):
-        got.append(kwargs)
+    async def backfill(hr, dm, hooks, **kwargs):
+        got.append((dm, hooks))
 
     monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)
     heard: list[str] = []
 
     await _catch_up(
         session_factory,
-        on_message_persisted=lambda hr_id: heard.append("переписка"),
-        on_vacancies_changed=lambda: heard.append("вакансии"),
+        hooks=DmHooks(
+            on_message_persisted=lambda hr_id: heard.append("переписка"),
+            on_vacancies_changed=lambda: heard.append("вакансии"),
+        ),
         schedule_classification=lambda *args: heard.append("разбор"),
     )
 
     assert len(got) == 2
-    for kwargs in got:
-        kwargs["on_message_persisted"](1)
-        kwargs["on_vacancies_changed"]()
-        kwargs["schedule_classification"]()
+    for dm, hooks in got:
+        hooks.on_message_persisted(1)
+        hooks.on_vacancies_changed()
+        dm.schedule_classification()
     assert heard.count("переписка") == 2
     assert heard.count("вакансии") == 2
     assert heard.count("разбор") == 2

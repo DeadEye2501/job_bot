@@ -6,9 +6,9 @@
 завис бы на надгробии, которое некому открыть.
 
 Telegram присылает такие оповещения скупо: переписка в них часто не названа
-вовсе, гарантирован только номер сообщения. А номера свои у каждой переписки —
-двойки и тройки есть у всех. Поэтому безымянная уборка сужена до входящих:
-задеть чужую строку она всё ещё может, но окно для этого куда уже.
+вовсе, гарантирован только номер сообщения. Номера у пользовательской учётной
+записи общие на все личные переписки, так что попадание по одному номеру
+точное; безымянная уборка при этом всё равно сужена до входящих.
 """
 
 from datetime import datetime, timezone
@@ -188,9 +188,8 @@ async def test_a_chatless_deletion_spares_outgoing_messages(
 ):
     """Безымянное удаление своих сообщений не трогает.
 
-    Номера в Telegram свои у каждой переписки, и без названной переписки
-    отличить своё сообщение с тем же номером не по чему. Входящими
-    сужение окна и держится.
+    Стёртое исходящее сверится при следующей загрузке переписки из Telegram,
+    и безымянный проход до него не дотягивается.
     """
     bot, client, hr = await chatting(telegram_user_id=777)
     bot.ingestion = FakeIngestion()
@@ -219,6 +218,28 @@ async def test_a_deleted_message_leaves_the_pending_buffer(chatting, session_fac
     )
 
     await bot._on_dm_delete(client, [_tombstone(10)])
+
+    assert ingestion.buffer_removals == [(hr.id, 10)]
+
+
+async def test_a_chatless_deletion_leaves_the_pending_buffer_too(
+    chatting, session_factory
+):
+    """Безымянное удаление тоже выбрасывает письмо из копилки разбора.
+
+    Боевое удаление личного письма приходит без переписки почти всегда, и
+    без этой уборки отозванный отказ доживал бы до разбора и двигал статус
+    вакансии по тому, чего собеседник уже не говорил.
+    """
+    bot, client, hr = await chatting(telegram_user_id=777)
+    ingestion = FakeIngestion()
+    bot.ingestion = ingestion
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, is_incoming=True, tg_message_id=10),
+    )
+
+    await bot._on_dm_delete(client, [_tombstone(10, chat_id=None)])
 
     assert ingestion.buffer_removals == [(hr.id, 10)]
 
