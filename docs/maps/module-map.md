@@ -1237,7 +1237,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _llm_arbitrate(lm_client: Any, lm_model: str, parsed: _Parsed, shortlist) -> tuple[Company | None, dict]` (39)
 - `async def find_or_create_company(session: AsyncSession, name: str, *, website: str | None=None, lm_client: Any=None, lm_model: str | None=None) -> tuple[Company | None, dict]` (40)
 
-### `backend/repository/hr_card.py` — 337 строк ⚠ подошёл к 300
+### `backend/repository/hr_card.py` — 345 строк ⚠ подошёл к 300
 
 Одна запись HR: чтение, правка, слияние, удаление.
 
@@ -1474,7 +1474,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def set_vacancy_hr(session: AsyncSession, vacancy_id: int, hr_id: int | None) -> bool` (5)
 - `async def set_vacancy_company(session: AsyncSession, vacancy_id: int, company_id: int | None) -> bool` (5)
 
-### `backend/repository/vacancies_common.py` — 91 строк
+### `backend/repository/vacancies_common.py` — 97 строк
 
 Чтение вакансий, общее для всех экранов.
 
@@ -1527,13 +1527,13 @@ First-run bootstrap: ensure DB schema exists.
 - `async def list_vacancy_filter_options(session: AsyncSession) -> dict[str, list[str]]` (16)
 - `async def list_vacancy_last_activity(session: AsyncSession, vacancy_ids: list[int]) -> dict[int, datetime]` (25)
 
-### `backend/repository/vacancies_mini.py` — 114 строк
+### `backend/repository/vacancies_mini.py` — 121 строк
 
 Короткие списки вакансий для карточек других предметов.
 
 Зависит от: `backend.models`, `backend.repository.hr_card`, `backend.repository.paging`, `backend.repository.vacancies_common`
 
-- `async def _list_linked(session: AsyncSession, linked_to) -> list[Vacancy]` (14)
+- `async def _list_linked(session: AsyncSession, linked_to) -> list[Vacancy]` (21)
 - `async def list_vacancies_for_hr(session: AsyncSession, hr_id: int) -> list[Vacancy]` (8)
 - `async def list_vacancies_for_company(session: AsyncSession, company_id: int) -> list[Vacancy]` (5)
 - `async def list_vacancies_for_channel(session: AsyncSession, channel_id: int, *, limit: int=50, offset: int=0) -> tuple[list[Vacancy], bool]` (36)
