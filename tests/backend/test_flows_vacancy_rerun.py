@@ -404,12 +404,12 @@ async def test_the_new_fingerprint_replaces_the_old_one_in_the_cache(
     pipeline = await _prepare(
         monkeypatch, make_pipeline, _WithMessages(post=post(42, text="свежий текст"))
     )
-    embeddings_mod.append_embedding(pipeline, vacancy.id, [0.9, 0.9])
+    pipeline.embeddings.append(vacancy.id, [0.9, 0.9])
 
     await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
 
-    assert list(pipeline.embedding_ids) == [vacancy.id]
-    assert pipeline.embedding_matrix.tolist() == [[0.5, 0.25]]
+    assert list(pipeline.embeddings.ids) == [vacancy.id]
+    assert pipeline.embeddings.matrix.tolist() == [[0.5, 0.25]]
 
 
 async def test_a_status_already_explained_gets_no_second_row(

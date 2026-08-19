@@ -48,8 +48,9 @@ async def intake(make_pipeline, monkeypatch):
 
     monkeypatch.setattr("adapters.lm_studio.embed", embed)
     monkeypatch.setattr(
-        "backend.flows.ingest.cosine_top_match",
-        lambda vec, ids, matrix, threshold: pipeline.similar_id,
+        pipeline.embeddings,
+        "match",
+        lambda vector, threshold: pipeline.similar_id,
     )
     monkeypatch.setattr(ingest, "save_new_vacancy", save)
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)

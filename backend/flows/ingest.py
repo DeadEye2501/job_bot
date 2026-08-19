@@ -3,10 +3,8 @@
 import logging
 
 from sqlalchemy.exc import IntegrityError
-import numpy as np
 
 from backend.flows import linked_article, parse
-from backend.domain.dedup import cosine_top_match
 from backend.message_text import extract_post_text, extract_text
 from backend.models import Vacancy
 from backend.payloads import ChannelPost
@@ -74,11 +72,8 @@ async def ingest_post(
         return
 
     await embeddings.ensure_embedding_cache(pipeline, len(embedding))
-    similar_id = cosine_top_match(
-        np.asarray(embedding, dtype=np.float32),
-        pipeline.embedding_ids,
-        pipeline.embedding_matrix,
-        threshold=pipeline.rs.dedup_cosine_threshold,
+    similar_id = pipeline.embeddings.match(
+        embedding, pipeline.rs.dedup_cosine_threshold
     )
     if similar_id is not None:
         await _resume_or_skip(pipeline, similar_id, post)
@@ -132,7 +127,7 @@ async def save_new_vacancy(
                 },
             )
             await session.commit()
-            embeddings.append_embedding(pipeline, new_vacancy.id, embedding)
+            pipeline.embeddings.append(new_vacancy.id, embedding)
             logger.info(
                 "[@%s] %d -> vacancy %d",
                 post.channel_username,

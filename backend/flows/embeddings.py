@@ -1,8 +1,7 @@
-"""Векторы вакансий: как их считают и как держат в памяти для отсева повторов."""
+"""Отпечаток текста: как его считают у поставщика и как поднимают кэш."""
 
 import logging
 
-import numpy as np
 from sqlalchemy import select
 
 from adapters import lm_studio
@@ -49,18 +48,12 @@ async def embed_text(pipeline, text: str, what: str) -> list[float] | None:
 async def ensure_embedding_cache(pipeline, width: int) -> None:
     """Поднять векторы вакансий в память один раз за жизнь конвейера.
 
-    Берутся только векторы длиной `width` — той, какую даёт нынешняя модель
-    отпечатков. Смени её в настройках, и в базе окажутся векторы двух длин:
-    собранные в одну матрицу, они роняют подъём кэша на каждом посте, а беда
-    уходит наверх, где обход двигает курсор канала дальше. Со стороны это
-    выглядит как удавшийся обход без единой вакансии, и второй раз эти посты
-    не прочтут.
-
-    Отброшенные не потеря: вектор прежней модели живёт в другом пространстве,
-    и сравнивать его с нынешними нечем. Вернуть их в дело может только
-    пересчёт — прогон заново по каждой вакансии.
+    Здесь только поход в базу: что делать с векторами чужой длины, решает сам
+    кэш (`domain/dedup.EmbeddingCache`). Отброшенные он же и считает — число
+    уходит в журнал, потому что вернуть их в дело может только пересчёт,
+    прогон заново по каждой вакансии.
     """
-    if pipeline.embedding_cache_loaded:
+    if pipeline.embeddings.loaded:
         return
     async with pipeline.session_factory() as session:
         rows = (
@@ -70,34 +63,13 @@ async def ensure_embedding_cache(pipeline, width: int) -> None:
                 )
             )
         ).all()
-    fit = [r for r in rows if len(r.embedding) == width]
-    if len(fit) != len(rows):
+    dropped = pipeline.embeddings.fill(
+        ((r.id, r.embedding) for r in rows), width
+    )
+    if dropped:
         logger.warning(
             "Embedding cache: %d вектор(ов) чужой длины отброшено "
             "(нынешняя %d) — вернёт их только прогон заново",
-            len(rows) - len(fit), width,
+            dropped, width,
         )
-    if fit:
-        pipeline.embedding_ids = np.array([r.id for r in fit], dtype=np.int64)
-        pipeline.embedding_matrix = np.array(
-            [r.embedding for r in fit], dtype=np.float32
-        )
-    pipeline.embedding_cache_loaded = True
-    logger.debug("Embedding cache loaded: %d vectors", len(fit))
-
-
-def append_embedding(pipeline, vacancy_id: int, embedding: list[float]) -> None:
-    vec = np.asarray(embedding, dtype=np.float32)
-    pipeline.embedding_ids = np.append(pipeline.embedding_ids, vacancy_id)
-    if pipeline.embedding_matrix.size == 0:
-        pipeline.embedding_matrix = vec.reshape(1, -1)
-    else:
-        pipeline.embedding_matrix = np.vstack([pipeline.embedding_matrix, vec])
-
-
-def drop_embedding(pipeline, vacancy_id: int) -> None:
-    idx = np.where(pipeline.embedding_ids == vacancy_id)[0]
-    if idx.size == 0:
-        return
-    pipeline.embedding_ids = np.delete(pipeline.embedding_ids, idx)
-    pipeline.embedding_matrix = np.delete(pipeline.embedding_matrix, idx, axis=0)
+    logger.debug("Embedding cache loaded: %d vectors", len(rows) - dropped)

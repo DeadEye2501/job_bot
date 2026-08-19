@@ -19,7 +19,7 @@ from backend.payloads import PendingReply
 
 def _texts(pipeline, hr_id):
     """Тексты, накопленные для собеседника."""
-    return [item["text"] for item in pipeline.dm_classify_buffer.get(hr_id, [])]
+    return [item["text"] for item in pipeline.dm_debounce.bursts.get(hr_id, [])]
 
 
 async def test_a_message_waits_in_the_buffer_before_being_read(dm_pipeline):
@@ -110,8 +110,8 @@ async def test_a_message_without_text_is_not_buffered(dm_pipeline):
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
     dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, ""))
 
-    assert 7 not in dm_pipeline.dm_classify_buffer
-    assert 7 not in dm_pipeline.dm_classify_tasks
+    assert 7 not in dm_pipeline.dm_debounce.bursts
+    assert 7 not in dm_pipeline.dm_debounce.timers
 
 
 async def test_a_stopping_bot_buffers_nothing(dm_pipeline):
@@ -124,7 +124,7 @@ async def test_a_stopping_bot_buffers_nothing(dm_pipeline):
     dm_pipeline.mark_shutting_down()
     dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
 
-    assert 7 not in dm_pipeline.dm_classify_buffer
+    assert 7 not in dm_pipeline.dm_debounce.bursts
 
 
 async def test_an_overlong_burst_keeps_only_its_tail(dm_pipeline):
@@ -134,7 +134,7 @@ async def test_an_overlong_burst_keeps_only_its_tail(dm_pipeline):
     зациклившийся собеседник иначе раздувал бы память без предела.
     """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    cap = dm_pipeline.DM_CLASSIFY_BUFFER_CAP
+    cap = dm_pipeline.dm_debounce.cap
     for number in range(cap + 3):
         dm_pipeline.schedule_dm_classification(
             7, PendingReply(1, number, number, f"строка {number}")
@@ -227,7 +227,7 @@ async def test_removing_the_last_message_drops_the_buffer_itself(dm_pipeline):
 
     dm_pipeline.remove_dm_buffer_msg(7, 10)
 
-    assert 7 not in dm_pipeline.dm_classify_buffer
+    assert 7 not in dm_pipeline.dm_debounce.bursts
 
 
 @pytest.mark.parametrize(

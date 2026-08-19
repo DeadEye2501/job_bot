@@ -82,7 +82,7 @@ async def test_a_deleted_vacancy_leaves_the_embedding_cache(with_a_vacancy):
 
     await cleanup.forget_vacancy(pipeline, vacancy.id)
 
-    assert pipeline.embedding_ids.tolist() == []
+    assert pipeline.embeddings.ids.tolist() == []
 
 
 async def test_the_facade_says_the_vacancy_was_forgotten(with_a_vacancy):
@@ -147,7 +147,7 @@ async def test_trash_also_leaves_the_embedding_cache(with_a_vacancy):
 
     await cleanup.delete_vacancy_as_trash(pipeline, vacancy.id, "не про работу")
 
-    assert pipeline.embedding_ids.tolist() == []
+    assert pipeline.embeddings.ids.tolist() == []
 
 
 async def test_a_mark_for_a_vanished_vacancy_names_no_channel(

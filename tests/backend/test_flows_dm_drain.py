@@ -23,7 +23,7 @@ def _outlasts_the_wait(started: asyncio.Event):
     """
 
     async def reading(pipeline, hr_id):
-        pipeline.dm_classify_buffer.pop(hr_id, None)
+        pipeline.dm_debounce.drop(hr_id)
         started.set()
         await asyncio.Event().wait()
 
@@ -37,12 +37,12 @@ async def test_stopping_puts_out_the_pending_timers(dm_pipeline):
     этому времени соединения уже закрыты.
     """
     dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
-    timer = dm_pipeline.dm_classify_tasks[7]
+    timer = dm_pipeline.dm_debounce.timers[7]
 
     await dm_pipeline.cancel_pending_dm_classifications()
 
     assert timer.done()
-    assert dm_pipeline.dm_classify_tasks == {}
+    assert dm_pipeline.dm_debounce.timers == {}
 
 
 async def test_stopping_reads_nothing(dm_pipeline):
@@ -52,7 +52,7 @@ async def test_stopping_reads_nothing(dm_pipeline):
     await dm_pipeline.cancel_pending_dm_classifications()
 
     assert dm_pipeline.classified == []
-    assert dm_pipeline.dm_classify_buffer == {}
+    assert dm_pipeline.dm_debounce.waiting() == []
 
 
 async def test_switching_off_reads_what_was_collected(dm_pipeline):
@@ -66,7 +66,7 @@ async def test_switching_off_reads_what_was_collected(dm_pipeline):
     await dm_pipeline.cancel_pending_dm_classifications(drain=True)
 
     assert [hr_id for hr_id, _ in dm_pipeline.classified] == [7]
-    assert dm_pipeline.dm_classify_buffer == {}
+    assert dm_pipeline.dm_debounce.waiting() == []
 
 
 async def test_switching_off_reads_every_correspondent(dm_pipeline):
@@ -127,7 +127,7 @@ async def test_a_stopping_bot_ignores_the_request_to_read(dm_pipeline):
     await dm_pipeline.cancel_pending_dm_classifications(drain=True)
 
     assert dm_pipeline.classified == []
-    assert dm_pipeline.dm_classify_buffer == {}
+    assert dm_pipeline.dm_debounce.waiting() == []
 
 
 async def test_a_reading_already_under_way_is_waited_out(monkeypatch, dm_pipeline):
@@ -159,7 +159,7 @@ async def test_a_reading_already_under_way_is_waited_out(monkeypatch, dm_pipelin
     assert finished
     # Доработавший разбор из списка ждущих уходит: иначе он копится всю
     # сессию, и каждая следующая остановка ждёт давно завершённых.
-    assert dm_pipeline.dm_classify_running == set()
+    assert dm_pipeline.dm_debounce.running == set()
 
 
 async def test_switching_off_lets_a_slow_reading_finish(monkeypatch, dm_pipeline):
@@ -178,7 +178,7 @@ async def test_switching_off_lets_a_slow_reading_finish(monkeypatch, dm_pipeline
     )
     dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     await started.wait()
-    running = next(iter(dm_pipeline.dm_classify_running))
+    running = dm_pipeline.dm_debounce.busy()[0]
 
     await dm_pipeline.cancel_pending_dm_classifications(drain=True)
 
@@ -208,7 +208,7 @@ async def test_shutting_down_cuts_off_a_reading_that_outstayed(
     )
     dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "привет"))
     await started.wait()
-    running = next(iter(dm_pipeline.dm_classify_running))
+    running = dm_pipeline.dm_debounce.busy()[0]
 
     await dm_pipeline.cancel_pending_dm_classifications()
 
@@ -222,4 +222,4 @@ async def test_nothing_pending_means_nothing_to_wait_for(dm_pipeline):
     """Когда гасить нечего, остановка ничего не ждёт и не падает."""
     await dm_pipeline.cancel_pending_dm_classifications()
 
-    assert dm_pipeline.dm_classify_tasks == {}
+    assert dm_pipeline.dm_debounce.timers == {}

@@ -13,39 +13,6 @@ from backend.notify import fire
 logger = logging.getLogger(__name__)
 
 
-def update_dm_buffer_text(pipeline, hr_id: int, tg_msg_id: int, new_text: str) -> None:
-    """HR отредактировал сообщение пока оно сидит в debounce-буфере —
-    обновим текст, чтобы LLM-классификатор видел свежее содержимое.
-
-    Ищется письмо по номеру Telegram: оповещение о правке приходит оттуда и
-    другого номера не знает. Номер строки базы лежит в копилке рядом и
-    служит другому — записи вердикта.
-    """
-    buf = pipeline.dm_classify_buffer.get(hr_id)
-    if not buf:
-        return
-    for item in buf:
-        if item["tg_msg_id"] == tg_msg_id:
-            item["text"] = new_text or ""
-            break
-
-
-def remove_dm_buffer_msg(pipeline, hr_id: int, tg_msg_id: int) -> None:
-    """HR удалил сообщение пока оно сидит в debounce-буфере — выкинем
-    его из burst'а, чтобы не учитывать в классификации.
-
-    По номеру Telegram, по той же причине, что и правка.
-    """
-    buf = pipeline.dm_classify_buffer.get(hr_id)
-    if not buf:
-        return
-    pipeline.dm_classify_buffer[hr_id] = [
-        item for item in buf if item["tg_msg_id"] != tg_msg_id
-    ]
-    if not pipeline.dm_classify_buffer[hr_id]:
-        pipeline.dm_classify_buffer.pop(hr_id, None)
-
-
 def schedule_dm_classification(pipeline, hr_id: int, reply: PendingReply) -> None:
     """Append text to per-HR burst buffer и (пере-)взводит таймер на
     DM_CLASSIFY_DEBOUNCE_SEC. Когда таймер дотикает (новых сообщений
@@ -58,30 +25,20 @@ def schedule_dm_classification(pipeline, hr_id: int, reply: PendingReply) -> Non
         # Медиа-only без подписи нечем классифицировать. Пропускаем
         # тихо — само сообщение уже в БД.
         return
-    buf = pipeline.dm_classify_buffer.setdefault(hr_id, [])
-    buf.append({
+    dropped = pipeline.dm_debounce.remember(hr_id, {
         "vacancy_id": reply.vacancy_id,
         "msg_id": reply.message_id,
         "tg_msg_id": reply.tg_message_id,
         "text": reply.text,
     })
-    # Cap: спам / зацикленный HR не должен раздувать память.
-    # Drop oldest, оставляя последние DM_CLASSIFY_BUFFER_CAP штук —
-    # «свежий сигнал» важнее «полной истории», тем более что
-    # classify_hr_reply всё равно режет последние 4000 chars.
-    if len(buf) > pipeline.DM_CLASSIFY_BUFFER_CAP:
-        dropped = len(buf) - pipeline.DM_CLASSIFY_BUFFER_CAP
-        del buf[: dropped]
+    if dropped:
         logger.warning(
             "schedule_dm_classification: hr %d burst > %d msgs, "
             "dropping oldest %d",
-            hr_id, pipeline.DM_CLASSIFY_BUFFER_CAP, dropped,
+            hr_id, pipeline.dm_debounce.cap, dropped,
         )
-    prev = pipeline.dm_classify_tasks.get(hr_id)
-    if prev is not None and not prev.done():
-        prev.cancel()
-    pipeline.dm_classify_tasks[hr_id] = asyncio.create_task(
-        _run_debounced_classify(pipeline, hr_id)
+    pipeline.dm_debounce.arm(
+        hr_id, asyncio.create_task(_run_debounced_classify(pipeline, hr_id))
     )
 
 
@@ -131,25 +88,23 @@ async def _run_debounced_classify(pipeline, hr_id: int) -> None:
         await asyncio.sleep(pipeline.DM_CLASSIFY_DEBOUNCE_SEC)
     except asyncio.CancelledError:
         return  # перепланировано более свежим сообщением — выходим тихо
-    # Identity-check ДО pop'а буфера: если за время sleep'а прилетело
-    # новое schedule_dm_classification, оно cancel'нуло нас и положило
-    # в _dm_classify_tasks свой task. Если мы pop'нем буфер, новый
-    # task получит пусто и тоже выйдет тихо — burst пропадёт. Сначала
-    # удостоверимся, что мы всё ещё «owner» этого hr_id.
+    # Добро спрашивается ДО того, как забрать пачку: за срок ожидания могло
+    # прилететь свежее письмо, оно погасило нас и поставило над человеком свой
+    # таймер. Забери мы пачку — тот разобрал бы пустоту, и накопленное пропало
+    # бы молча.
     current = asyncio.current_task()
-    if pipeline.dm_classify_tasks.get(hr_id) is not current:
-        return  # superseded — буфер не трогаем, пусть новый task его драйнит
-    pipeline.dm_classify_tasks.pop(hr_id, None)
+    if not pipeline.dm_debounce.claim(hr_id, current):
+        return  # над человеком стоит уже другой таймер — он и разберёт
     # Защита от race shutdown'а: между sleep'ом и сюда могли вызвать
     # mark_shutting_down + cancel_pending. Если флаг — выходим без
     # LLM-вызова и БД-записи (sessions/clients уже закрываются).
     if pipeline.shutting_down:
         return
-    pipeline.dm_classify_running.add(current)
+    pipeline.dm_debounce.begin(current)
     try:
         await classify_and_apply_for_hr(pipeline, hr_id)
     finally:
-        pipeline.dm_classify_running.discard(current)
+        pipeline.dm_debounce.end(current)
 
 
 async def _blacklisted_now(pipeline, hr_id: int) -> str | None:
@@ -177,7 +132,7 @@ async def _ask_and_apply(pipeline, hr_id: int, burst: list, target) -> None:
     из копилки и потеряна, и число — единственное, что о ней скажет.
     """
     try:
-        async with pipeline.dm_classify_semaphore:
+        async with pipeline.dm_debounce.slots:
             applied = await classify_and_apply(
                 pipeline.session_factory,
                 pipeline.lm_client,
@@ -215,9 +170,9 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
             "debounced classify: hr %d in blacklist (%s) — drop burst",
             hr_id, bl_value,
         )
-        pipeline.dm_classify_buffer.pop(hr_id, None)
+        pipeline.dm_debounce.drop(hr_id)
         return
-    buf = pipeline.dm_classify_buffer.pop(hr_id, [])
+    buf = pipeline.dm_debounce.take(hr_id)
     if not buf:
         return
     last = buf[-1]
@@ -268,15 +223,13 @@ async def _wait_out(pipeline, tasks: list, *, drain: bool) -> None:
 async def _cancel_and_wait(pipeline, *, drain: bool) -> None:
     """Отменить спящие разборы и дождаться уже начавшихся.
 
-    Отмена достаётся только спящим на таймере: они и числятся в
-    `_dm_classify_tasks`. Начавшийся разбор вычёркивает себя оттуда сам и
-    переходит в `_dm_classify_running` — его дожидаются, но не отменяют:
-    пакет он из буфера уже вынул, и отмена потеряла бы его насовсем.
+    Отмена достаётся только спящим на таймере. Начавшийся разбор снимает
+    таймер с человека сам и переходит в начавшие — его дожидаются, но не
+    отменяют: пачку он из копилки уже вынул, и отмена потеряла бы её
+    насовсем.
     """
-    tasks = [t for t in pipeline.dm_classify_tasks.values() if not t.done()]
-    for t in tasks:
-        t.cancel()
-    waited = tasks + [t for t in pipeline.dm_classify_running if not t.done()]
+    tasks = pipeline.dm_debounce.cancel_timers()
+    waited = tasks + pipeline.dm_debounce.busy()
     if waited:
         await _wait_out(pipeline, waited, drain=drain)
 
@@ -290,8 +243,8 @@ async def _drain_buffers(pipeline) -> None:
     ни на остановку, ни на побудку. Сломавшийся разбор одного человека
     остальных не роняет.
     """
-    # Ключи снимаются заранее: `classify_and_apply_for_hr` вынимает копилку.
-    hr_ids = [hr_id for hr_id, buf in pipeline.dm_classify_buffer.items() if buf]
+    # Ключи снимаются заранее: `classify_and_apply_for_hr` вынимает пачку.
+    hr_ids = pipeline.dm_debounce.waiting()
     if not hr_ids:
         return
     results = await asyncio.gather(
@@ -319,17 +272,17 @@ async def cancel_pending_dm_classifications(
 
     Edge race во время normal completion: tardy task мог проскочить
     cancel (был в commit'е) и сделать `apply_classification` уже
-    ПОСЛЕ pipeline.dm_classify_tasks.clear(). Корректность не нарушается —
-    commit прошёл, статус-history-row записан; просто tasks-dict
-    некоторое время будет содержать ссылку на завершившийся task,
-    пока следующий schedule_dm_classification его не перезапишет.
+    ПОСЛЕ того, как таймеры забыты. Корректность не нарушается —
+    commit прошёл, статус-history-row записан; просто таймер
+    завершившегося разбора некоторое время числится за человеком,
+    пока следующее письмо его не перезапишет.
 
     ``drain=True`` (OFF transition) — накопленное разбирается напоследок,
     см. :func:`_drain_buffers`. Shutdown путь использует drain=False —
     клиенты/сессии уже закрываются.
     """
     await _cancel_and_wait(pipeline, drain=drain)
-    pipeline.dm_classify_tasks.clear()
+    pipeline.dm_debounce.forget_timers()
     if drain and pipeline.shutting_down:
         logger.debug(
             "cancel_pending_dm_classifications: drain=True ignored "
@@ -337,4 +290,4 @@ async def cancel_pending_dm_classifications(
         )
     if drain and not pipeline.shutting_down:
         await _drain_buffers(pipeline)
-    pipeline.dm_classify_buffer.clear()
+    pipeline.dm_debounce.forget_bursts()

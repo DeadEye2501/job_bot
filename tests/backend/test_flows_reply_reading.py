@@ -62,7 +62,7 @@ async def reading(make_pipeline, session_factory, monkeypatch):
 
 def _buffer(pipeline, hr, vacancy, message, *texts):
     """Кладёт в накопитель пакет от собеседника."""
-    pipeline.dm_classify_buffer[hr.id] = [
+    pipeline.dm_debounce.bursts[hr.id] = [
         {
             "vacancy_id": vacancy.id,
             "msg_id": message.id,
@@ -113,7 +113,7 @@ async def test_the_buffer_is_emptied_by_the_reading(reading):
 
     await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
-    assert hr.id not in pipeline.dm_classify_buffer
+    assert hr.id not in pipeline.dm_debounce.bursts
 
 
 async def test_an_empty_buffer_asks_the_model_nothing(reading):
@@ -138,7 +138,7 @@ async def test_a_blacklisted_hr_is_not_read_at_all(reading, session_factory):
     await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
 
     assert pipeline.asked == []
-    assert hr.id not in pipeline.dm_classify_buffer
+    assert hr.id not in pipeline.dm_debounce.bursts
     assert (
         await only_row(session_factory, Vacancy)
     ).status is VacancyStatus.APPLIED
@@ -280,7 +280,7 @@ async def test_the_verdict_lands_on_the_vacancy_of_the_last_message(
     second = next(
         v for v in await all_rows(session_factory, Vacancy) if v.title == "вторая"
     )
-    pipeline.dm_classify_buffer[hr.id] = [
+    pipeline.dm_debounce.bursts[hr.id] = [
         {
             "vacancy_id": vacancy.id,
             "msg_id": message_row_.id,

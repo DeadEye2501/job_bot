@@ -158,8 +158,8 @@ async def _refresh_embedding(pipeline, vacancy_id: int, text: str) -> None:
     if vector is None:
         return
     await _store(pipeline, vacancy_id, embedding=vector)
-    embeddings.drop_embedding(pipeline, vacancy_id)
-    embeddings.append_embedding(pipeline, vacancy_id, vector)
+    pipeline.embeddings.drop(vacancy_id)
+    pipeline.embeddings.append(vacancy_id, vector)
 
 
 async def _note_rerun(pipeline, vacancy_id: int, origin: "_Origin") -> None:

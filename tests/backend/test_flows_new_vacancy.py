@@ -71,7 +71,7 @@ async def test_the_new_vector_joins_the_cache(make_pipeline):
 
     new_id = await ingest.save_new_vacancy(pipeline, ChannelPost(None, "jobs", post(42, text="Ищем Python-разработчика"), "текст"), [0.1, 0.2])
 
-    assert pipeline.embedding_ids.tolist() == [new_id]
+    assert pipeline.embeddings.ids.tolist() == [new_id]
 
 
 async def test_the_timeline_records_where_it_was_ingested_from(
@@ -123,7 +123,7 @@ async def test_a_refused_row_leaves_no_vector_behind(make_pipeline, session_fact
 
     await ingest.save_new_vacancy(pipeline, ChannelPost(channel.id, "jobs", post(42, text="Ищем Python-разработчика"), "текст"), [0.1])
 
-    assert pipeline.embedding_ids.tolist() == [first]
+    assert pipeline.embeddings.ids.tolist() == [first]
 
 
 async def test_an_unfinished_vacancy_is_picked_up_later(monkeypatch, 
