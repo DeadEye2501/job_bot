@@ -5,12 +5,18 @@ import logging
 
 import httpx
 
-from adapters.lm_studio import ChatRequest, chat
+from adapters.lm_chat import ChatRequest, chat
 from backend.llm.answers import json_object, log_unparseable
 from backend.llm.external import wrap_external
 from backend.payloads import str_list
 
 logger = logging.getLogger(__name__)
+
+
+# Бюджет токенов на решение о склейке компаний. Прежних двухсот пятидесяти
+# рассуждающей модели хватало только на размышление, и до номера со ссылкой на
+# кандидата дело не доходило — обрыв же здесь вырождается в «завести новую».
+MAX_DEDUPE_TOKENS = 1200
 
 
 DEDUPE_COMPANY_PROMPT = """Ты определяешь, является ли распарсенная из вакансии компания одной из существующих в БД, или это новая компания.
@@ -80,7 +86,7 @@ def _dedupe_request(
             {"role": "system", "content": DEDUPE_COMPANY_PROMPT},
             {"role": "user", "content": user_content},
         ],
-        max_tokens=250,
+        max_tokens=MAX_DEDUPE_TOKENS,
     )
 
 
@@ -140,4 +146,9 @@ async def dedupe_company_with_llm(
         # разборе сведения компаний, поэтому она остаётся строкой провайдера,
         # а не сводится к общему «не получилось».
         return None, reply.error
+    if reply.finish_reason == "length":
+        # Обрыв решением о склейке быть не может: сведённые компании обратно
+        # не разводятся, а лишняя заведённая запись поправима.
+        logger.warning("dedupe_company: ответ оборван, свожу как «не та»")
+        return None, "truncated"
     return _matched_id(reply.text)

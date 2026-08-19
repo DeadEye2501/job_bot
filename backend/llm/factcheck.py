@@ -6,12 +6,18 @@ import time
 
 import httpx
 
-from adapters.lm_studio import ChatRequest, chat
+from adapters.lm_chat import ChatRequest, chat
 from backend.llm.answers import json_object, log_unparseable, normalize_enum
 from backend.llm.external import wrap_external
 from backend.payloads import str_list
 
 logger = logging.getLogger(__name__)
+
+
+# Бюджет токенов на сверку письма. Четырёхсот мало по той же причине, по какой
+# их мало самому письму (`MAX_COVER_LETTER_TOKENS`): размышление съедает их
+# целиком, а после него нужны ещё вердикт и до трёх замечаний словами.
+MAX_FACTCHECK_TOKENS = 1500
 
 
 FACT_CHECK_COVER_LETTER_PROMPT = """Ты — фактчекер сопроводительных писем. Тебе дают (1) блок «Информация о кандидате» (это единственный источник правды) и (2) текст письма. Ты должен проверить, что КАЖДЫЙ фактический claim в письме подтверждён блоком кандидата.
@@ -86,7 +92,7 @@ def _factcheck_request(profile_block: str, letter: str) -> ChatRequest:
             {"role": "system", "content": FACT_CHECK_COVER_LETTER_PROMPT},
             {"role": "user", "content": user_msg},
         ],
-        max_tokens=400,
+        max_tokens=MAX_FACTCHECK_TOKENS,
     )
 
 
@@ -138,6 +144,12 @@ async def factcheck_cover_letter(
     t0 = time.monotonic()
     reply = await chat(client, model, request, logger)
     if reply.text is None:
+        return True, []
+    if reply.finish_reason == "length":
+        # Обрыв — та же беда, что и молчание провайдера: модель не
+        # договорила, и её незаконченный отказ остановил бы отклик, который
+        # первый слой наставления счёл годным.
+        logger.warning("factcheck_cover_letter: ответ оборван, письмо пропускаю")
         return True, []
     obj = json_object(reply.text, logger, "factcheck_cover_letter")
     if obj is None:

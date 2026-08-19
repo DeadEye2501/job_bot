@@ -155,3 +155,21 @@ async def test_any_trouble_lets_the_letter_through(prepared):
 
     assert ok is True
     assert issues == []
+
+
+async def test_a_reject_from_a_cut_answer_does_not_hold_the_letter():
+    """Отказ из оборванного ответа письмо не задерживает.
+
+    Сверка — второй слой поверх уже усиленного наставления, и открывается она
+    наружу при любой беде. Обрыв — та же беда: модель не договорила, и её
+    незаконченный отказ остановил бы отклик, который первый слой счёл годным.
+    """
+    client = provider(
+        {CHAT: chat_json({"verdict": "reject", "issues": ["выдумано"]},
+                         finish_reason="length")}
+    )
+
+    ok, issues = await factcheck_cover_letter("профиль", "письмо", client, "qwen")
+
+    assert ok is True
+    assert issues == []

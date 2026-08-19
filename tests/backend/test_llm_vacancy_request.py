@@ -27,8 +27,6 @@ from tests.fakes.llm import (
 def _parsed(**fields) -> httpx.Response:
     """Тот же ответ, но доставленный провайдером."""
     return chat_json(parsed_vacancy_answer(**fields))
-
-
 async def test_an_empty_post_is_not_sent_anywhere():
     """Пустой пост к модели не отправляется вовсе."""
     client = provider({})
@@ -209,3 +207,20 @@ async def test_an_answer_cut_by_the_token_limit_is_still_parsed_if_it_can_be():
     got, _ = await parse_vacancy("текст", client, "qwen")
 
     assert got.title == "Python-разработчик"
+
+
+async def test_an_answer_cut_before_the_object_names_the_break():
+    """Оборванный ответ, из которого объект не собрался, называет обрыв.
+
+    Пустой разбор — это приговор «в посте нет вакансии», и по нему строку
+    удаляют навсегда. Обрыв приговором не является: модель не договорила, и
+    объявление обязано дождаться следующего захода.
+    """
+    client = provider(
+        {CHAT: chat_response('{"title": "Python-разр', finish_reason="length")}
+    )
+
+    parsed, refusal = await parse_vacancy("текст", client, "qwen")
+
+    assert parsed is None
+    assert refusal == "truncated"

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from adapters import db, lm_studio
+from adapters import db, lm_models, lm_studio
 
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ async def model_alive(cfg, kind: str) -> bool:
         return False
     client = lm_studio.make_client(cfg)
     try:
-        ok, _detail = await lm_studio.check_model(client, cfg.model, kind)
+        ok, _detail = await lm_models.check_model(client, cfg.model, kind)
         return ok
     except Exception:
         logger.debug("healthcheck: %s probe failed", kind, exc_info=True)

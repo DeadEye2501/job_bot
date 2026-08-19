@@ -6,7 +6,7 @@ import re
 
 import httpx
 
-from adapters.lm_studio import ChatRequest, chat
+from adapters.lm_chat import ChatRequest, chat
 
 from backend.payloads import ParsedVacancy
 

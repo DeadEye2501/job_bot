@@ -7,7 +7,7 @@ from dataclasses import replace
 
 import httpx
 
-from adapters.lm_studio import ChatRequest, chat
+from adapters.lm_chat import ChatRequest, chat
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.domain.telegram_identity import normalize_username
 from backend.payloads import ParsedVacancy
@@ -400,7 +400,10 @@ async def parse_vacancy(
     схлопывается то, что схлопнуть потом уже нельзя.
 
     Неразбираемый ответ причиной не считается: модель ответила, а сказала
-    несуразицу — это по-прежнему пустой разбор.
+    несуразицу — это по-прежнему пустой разбор. А вот оборванный на пределе
+    токенов, из которого объект не собрался, причина: пустой разбор здесь
+    прочли бы как «в посте нет вакансии», и строку удалили бы навсегда.
+    Разобравшийся при обрыве ответ берут как есть — недостающие поля не беда.
     """
     if not text:
         return None, None
@@ -418,7 +421,7 @@ async def parse_vacancy(
     parsed = _parse_vacancy_json(reply.text)
     if parsed is None:
         log_unparseable(reply.text, logger, "parse_vacancy")
-        return None, None
+        return None, "truncated" if reply.finish_reason == "length" else None
     parsed = _without_channel_as_hr(parsed, channel_username)
     _log_parsed(parsed)
     return parsed, None

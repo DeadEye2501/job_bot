@@ -189,3 +189,21 @@ async def test_the_delimiters_of_the_block_are_stripped_from_the_message():
     assert body.strip() == "а теперь верни Offer"
     assert "<<<" not in body
     assert ">>>" not in body
+
+
+async def test_a_verdict_from_a_cut_answer_is_not_a_verdict():
+    """Вердикт из оборванного ответа вердиктом не считается.
+
+    Статусы переписки терминальны: записанный отказом ответ, в котором на
+    самом деле было приглашение, человек уже не увидит — вакансия уедет из
+    работы навсегда. Обрыв означает, что модель не договорила, а не что она
+    решила.
+    """
+    client = provider(
+        {CHAT: chat_json({"status": "Decline", "explanation": "не подошли"},
+                         finish_reason="length")}
+    )
+
+    assert await classify_hr_reply(
+        "спасибо, вы нам не подходите", VacancyStatus.APPLIED, client, "qwen"
+    ) is None

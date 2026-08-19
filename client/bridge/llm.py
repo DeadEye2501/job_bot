@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 import httpx
 
-from adapters import lm_studio
+from adapters import lm_models, lm_studio
 from adapters.lm_studio import LlmProviderConfig
 from client.bridge.answer import Denied, bad_fields, reply
 from client.bridge.refusals import LLM_FIELDS_REQUIRED
@@ -49,7 +49,7 @@ async def _do_list_models_for_creds(
     if client is None:
         return {"ok": False, "error": reason}
     try:
-        models = await lm_studio.list_models(client, kind=kind)
+        models = await lm_models.list_models(client, kind=kind)
         return {"ok": True, "models": models}
     except Exception as e:
         # httpx иногда сериализует request включая Authorization-header
@@ -81,7 +81,7 @@ async def _do_llm_probe(
         models: list[str] = []
         if ok:
             try:
-                models = await lm_studio.list_models(client)
+                models = await lm_models.list_models(client)
             except Exception as e:
                 logger.debug(
                     "post-check list_models failed: %s", e, exc_info=True
@@ -155,7 +155,7 @@ class Llm:
         except (AttributeError, TypeError, ValueError) as e:
             return bad_fields("probe_model", e, kind=kind)
 
-        check_fn = partial(lm_studio.check_model, kind=kind)
+        check_fn = partial(lm_models.check_model, kind=kind)
 
         async def run() -> dict:
             ok, detail, _models, latency_ms = await _do_llm_probe(cfg, check_fn)
@@ -169,7 +169,7 @@ class Llm:
         """Имена моделей у поставщика — окно подсказывает ими поле «Модель».
 
         Под LM Studio спрашивается `/api/v0/models` с отбором по роду и
-        состоянию, с откатом на `/v1/models` (см. `lm_studio.list_models`):
+        состоянию, с откатом на `/v1/models` (см. `lm_models.list_models`):
         в подсказке должны стоять только поднятые модели подходящего рода,
         иначе первая же проба тихо подгрузит выгруженную.
 
