@@ -7,10 +7,9 @@
 
 from datetime import datetime, timedelta, timezone
 
-from backend.models import VacancyStatus
 from backend.repository.stats_summary import get_stats_hr_responses
 from tests.dbio import put
-from tests.factories import hr_row, message_row, status_history_row, vacancy_row
+from tests.factories import hr_row
 
 
 def _monday(hour: int = 12) -> datetime:
@@ -22,28 +21,12 @@ def _monday(hour: int = 12) -> datetime:
     return start_of_week - timedelta(days=7)
 
 
-async def test_the_weekday_comes_from_the_answer(session, session_factory):
+async def test_the_weekday_comes_from_the_answer(session, session_factory, applied):
     """День недели берётся у ответа, а не у отправки отклика."""
     hr = hr_row()
     await put(session_factory, hr)
-    vacancy = vacancy_row(hr_id=hr.id)
-    await put(session_factory, vacancy)
-    monday = _monday()
-    await put(
-        session_factory,
-        status_history_row(
-            vacancy.id, status=VacancyStatus.APPLIED, changed_at=monday
-        ),
-    )
-    await put(
-        session_factory,
-        message_row(
-            hr_id=hr.id,
-            vacancy_id=vacancy.id,
-            is_incoming=True,
-            sent_at=monday + timedelta(days=2),
-        ),
-    )
+
+    await applied(_monday(), hr=hr, answered_after=timedelta(days=2))
 
     got = await get_stats_hr_responses(session, period="all")
 

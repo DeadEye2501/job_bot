@@ -25,8 +25,10 @@ from tests.backend.fixtures.flows import (
 )
 from tests.backend.fixtures.listing import channel_titles, hr_names, titles
 from tests.backend.fixtures.logs import clean_root_logger
+from tests.backend.fixtures.stats import applied
 
 __all__ = [
+    "applied",
     "busy_slot",
     "channel_titles",
     "chatting",

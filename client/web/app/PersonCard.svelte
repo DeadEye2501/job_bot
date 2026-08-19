@@ -6,6 +6,7 @@
 
   import ActionsMenu from '$components/ActionsMenu.svelte';
   import Avatar from '$components/Avatar.svelte';
+  import BlacklistMenuItem from '$components/BlacklistMenuItem.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import NotesField from '$components/NotesField.svelte';
@@ -207,31 +208,12 @@
           <span class="material-symbols-outlined">merge</span>
           Слить с другим HR
         </button>
-        {#if card.blacklist_value}
-          <button
-            class="menu-item"
-            type="button"
-            onclick={() => {
-              close();
-              unblock();
-            }}
-          >
-            <span class="material-symbols-outlined">restart_alt</span>
-            Убрать из blacklist
-          </button>
-        {:else}
-          <button
-            class="menu-item"
-            type="button"
-            onclick={() => {
-              close();
-              block();
-            }}
-          >
-            <span class="material-symbols-outlined">block</span>
-            Добавить в blacklist
-          </button>
-        {/if}
+        <BlacklistMenuItem
+          blocked={!!card.blacklist_value}
+          {close}
+          onblock={block}
+          onunblock={unblock}
+        />
 
         <div class="menu-line"></div>
 
