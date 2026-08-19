@@ -8,7 +8,6 @@
 import asyncio
 import logging
 from dataclasses import dataclass, replace
-from typing import Literal
 from pathlib import Path
 
 from backend.domain.dedup import EmbeddingCache
@@ -257,7 +256,7 @@ class IngestionPipeline:
 
     async def rerun_pipeline_for_vacancy(
         self, vacancy_id
-    ) -> Literal["ok", "missing", "no_text", "llm"]:
+    ) -> rerun.RerunPipelineOutcome:
         return await rerun.rerun_pipeline_for_vacancy(self, vacancy_id)
 
     async def recover_orphan_vacancies(self) -> int:
@@ -271,7 +270,7 @@ class IngestionPipeline:
 
     async def poll_one_channel(
         self, channel_id
-    ) -> Literal["ok", "missing", "blacklisted", "error"]:
+    ) -> channels.PollOutcome:
         return await channels.poll_one_channel(self, channel_id)
 
     async def refresh_channel_metadata_for_ids(self, channel_ids) -> None:

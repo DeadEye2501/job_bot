@@ -13,6 +13,14 @@ from backend.notify import fire
 logger = logging.getLogger(__name__)
 
 CycleOutcome = Literal["ok", "busy", "cancelled", "error"]
+"""Чем кончилось действие, занимавшее место прогона.
+
+Имя одно на всех, кто это место занимает, и на фасад бота, который их
+пересказывает окну: переписанный значениями перечень разошёлся бы с этим
+молча — новый исход добавили бы сюда, а фасад продолжал бы обещать старое.
+Действия с исходами богаче добавляют к нему свои имена (`ChannelPollOutcome`,
+`RerunOutcome`), а не выписывают перечень заново.
+"""
 
 
 def on_runner_loop(bot, action: Callable[[], Any]) -> None:

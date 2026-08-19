@@ -201,9 +201,16 @@ async def _text_to_parse(pipeline, origin: "_Origin", vacancy_id: int):
     return text, plain
 
 
+RerunPipelineOutcome = Literal["ok", "missing", "no_text", "llm"]
+"""Чем кончился повторный разбор вакансии на конвейере.
+
+Исходы места прогона сюда не входят — см. `flows/channels.py:PollOutcome`.
+"""
+
+
 async def rerun_pipeline_for_vacancy(
     pipeline, vacancy_id: int
-) -> Literal["ok", "missing", "no_text", "llm"]:
+) -> RerunPipelineOutcome:
     """Разобрать заведённую вакансию заново — кнопка окна «Прогнать заново».
 
     Прогон идёт как над только что заведённой строкой: пост перечитывается из

@@ -67,9 +67,15 @@ async def poll_active_channels(pipeline) -> None:
     logger.info("Poll cycle done")
 
 
-async def poll_one_channel(
-    pipeline, channel_id: int
-) -> Literal["ok", "missing", "blacklisted", "error"]:
+PollOutcome = Literal["ok", "missing", "blacklisted", "error"]
+"""Чем кончился прогон одного канала на конвейере.
+
+Место прогона и его исходы («занято», «остановили») сюда не входят: этим
+распоряжается слой выше, и там имя складывается с `slot.CycleOutcome`.
+"""
+
+
+async def poll_one_channel(pipeline, channel_id: int) -> PollOutcome:
     """Run metadata refresh + message polling for a single channel.
 
     UI's «Прогнать сейчас» — taps this without touching the global poll loop,

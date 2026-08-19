@@ -113,6 +113,8 @@
 ### `backend/bot/channels.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `ChannelPollOutcome` = `Literal[slot.CycleOutcome, flow_channels.PollOut…`
+- `ChannelAddOutcome` = `Literal['created', 'exists', 'invalid', 'error']`
 
 ### `backend/bot/chat.py`
 
@@ -143,6 +145,7 @@
 ### `backend/bot/rerun.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `RerunOutcome` = `Literal[slot.CycleOutcome, flow_rerun.RerunPipel…`
 
 ### `backend/bot/send.py`
 
@@ -265,6 +268,7 @@
 - `logger` = `logging.getLogger(__name__)`
 - `BATCH_FLUSH_EVERY` = `10`
 - `_SILENCE_BEFORE_DROPPING_THE_CHANNEL` = `3`
+- `PollOutcome` = `Literal['ok', 'missing', 'blacklisted', 'error']`
 
 ### `backend/flows/cleanup.py`
 
@@ -364,6 +368,7 @@
   - `msg_id: int | None`
   - `status: VacancyStatus`
   - `history_id: int | None`
+- `RerunPipelineOutcome` = `Literal['ok', 'missing', 'no_text', 'llm']`
 
 ### `backend/health.py`
 
