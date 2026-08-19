@@ -10,6 +10,8 @@
 проходом этапа.
 """
 
+from concurrent.futures import Future
+
 from backend.telegram_login import LoginStep
 from client.bridge import lifespan
 from tests.fakes.ui_login import UiLogin
@@ -50,6 +52,24 @@ async def test_a_second_call_does_not_raise_a_second_bot(hub, monkeypatch):
     assert built == []
 
 
+async def test_a_bot_still_being_built_does_not_get_a_second_one(hub, monkeypatch):
+    """Собираемый бот второго тоже не пускает.
+
+    Признака «бот есть» два: работа кладётся на мотор в потоке зовущего, а
+    само поле `bot` выставляется уже внутри неё. Между этими мигами первое поле
+    пусто, и заслон, смотрящий только на него, пропустил бы вторую сборку — то
+    есть ровно две копии на одной строке сеанса.
+    """
+    built: list[str] = []
+    monkeypatch.setattr(lifespan, "_ready_for_bot", lambda rs: True)
+    monkeypatch.setattr(lifespan, "_start_bot", lambda one: built.append("собран"))
+    hub.bot_task = Future()
+
+    lifespan.start_bot(hub)
+
+    assert built == []
+
+
 async def test_a_fresh_login_rebuilds_the_bot(hub, monkeypatch, runner):
     """Повторный вход пересобирает бота, а не оставляет прежнего.
 
@@ -70,6 +90,35 @@ async def test_a_fresh_login_rebuilds_the_bot(hub, monkeypatch, runner):
     # до остановки прежнего дал бы Telegram две копии на одной строке сеанса.
     assert steps == ["отмени обход", "остановись", "собран"]
     assert hub.username_cache == "маша"
+
+
+async def test_a_bot_that_did_not_stop_keeps_the_new_one_from_rising(
+    hub, monkeypatch, runner
+):
+    """Не отпустившийся прежний бот второго поднять не даёт.
+
+    Это и есть весь смысл пересборки одной работой: две копии на одной строке
+    сеанса Telegram считает разными, и обход канала идёт в два голоса. Прежний
+    при этом возвращается в хозяйство — иначе заслон подъёма увидел бы пустоту
+    и пропустил следующий вход, а снос и выход остались бы без бота.
+    """
+    steps: list[str] = []
+    monkeypatch.setattr(lifespan, "_ready_for_bot", lambda rs: True)
+    monkeypatch.setattr(lifespan, "_start_bot", lambda one: steps.append("собран"))
+
+    async def never_stops(bot, task, *args, **kwargs):
+        steps.append("просили остановиться")
+        return False
+
+    monkeypatch.setattr(lifespan, "stop_bot", never_stops)
+    old = Stoppable(steps)
+    hub.bot = old
+
+    lifespan._remember_login(hub, "маша")
+    await runner.drain()
+
+    assert steps == ["просили остановиться"]
+    assert hub.bot is old
 
 
 async def test_a_login_on_a_bare_app_does_not_build_a_bot(hub, monkeypatch):

@@ -157,13 +157,14 @@ async def _disconnect(bot) -> None:
         logger.debug("Pyrogram client already terminated; skip stop()")
     except Exception:
         logger.exception("Pyrogram client.stop() failed")
+    # Метка готовности снимается до закрытия клиентов модели, а не после: по
+    # ней окно рисует лампочку связи, и сорвись закрытие — взведённая метка
+    # осталась бы навсегда, показывая зелёный огонёк у бота, который уже
+    # отключил Telegram.
+    bot.loop = None
     if bot.lm_embed_client is not bot.lm_client:
         await bot.lm_embed_client.aclose()
     await bot.lm_client.aclose()
-    # Метка готовности снимается последней: по ней окно рисует лампочку
-    # связи, и оставленная она показывала бы зелёный огонёк у бота, который
-    # уже отключил клиента и закрыл соединения с моделью.
-    bot.loop = None
 
 
 async def run(bot, *, once: bool = False) -> None:

@@ -13,8 +13,12 @@ from backend.payloads import HrDetail
 from backend.incoming import text_or_none
 
 from backend.repository.vacancies_common import PARSED_ONLY
+from backend.repository.blacklist import rename_blacklist_marks
 from backend.repository.blacklist_marks import (
+    account_mark,
     active_blacklist_value,
+    nickname_mark,
+    preferred_blacklist_value,
 )
 from backend.repository.merging import concat_notes, load_merge_pair
 from backend.repository.vacancies_life import repoint_vacancies
@@ -152,6 +156,21 @@ async def get_hr_detail(
     )
 
 
+def _marks_of(user_id: int | None, username: str | None) -> list[str]:
+    """Написания отметки по паре опознаний — живой карточки или её снимка.
+
+    Снимок нужен слиянию: там написания читают до удаления строки, а карточки
+    уже нет. Написание отметки не зависит больше ни от чего, поэтому оба зовут
+    одно.
+    """
+    out: list[str] = []
+    if user_id is not None:
+        out.append(account_mark(user_id))
+    if username:
+        out.append(nickname_mark(username))
+    return out
+
+
 def hr_blacklist_candidates(hr: HR) -> list[str]:
     """Написания, под которыми человек может числиться в чёрном списке.
 
@@ -166,12 +185,7 @@ def hr_blacklist_candidates(hr: HR) -> list[str]:
     карточка его перезаписывает: отметка на нём слетает молча, а строка в
     списке продолжает гореть.
     """
-    out: list[str] = []
-    if hr.telegram_user_id is not None:
-        out.append(f"user_id:{hr.telegram_user_id}")
-    if hr.telegram_username:
-        out.append(f"@{hr.telegram_username}")
-    return out
+    return _marks_of(hr.telegram_user_id, hr.telegram_username)
 
 
 async def hr_blacklist_value(session: AsyncSession, hr: HR) -> str | None:
@@ -213,6 +227,9 @@ class _AbsorbedHr:
 
     Снимок читается **до** удаления строки: после него обращение к полям
     удалённой записи — уже не чтение, а поведение сессии.
+
+    Два написания учётной записи здесь те же, что у карточки, и `_marks_of`
+    читает их снимком наравне с ней: написание отметки зависит только от них.
     """
 
     telegram_user_id: int | None
@@ -305,14 +322,45 @@ def _carry_to_survivor(
     survivor.notes = concat_notes(survivor.notes, taken.notes)
 
 
+async def _carry_marks_to_survivor(
+    session: AsyncSession, written_before: list[str], survivor: HR
+) -> None:
+    """Перевести отметки на нынешнее написание выжившего.
+
+    Написания меняются с обеих сторон: у поглощённого учётная запись
+    пропадает, а у выжившего её, наоборот, может заместить чужая — тогда
+    осиротеет уже его собственная отметка. Поэтому переводится всё, что
+    перестало быть написанием выжившего, а не только написания поглощённого.
+
+    Останься отметка на пропавшем написании — заслон отправки перестал бы
+    видеть отсеянного человека, бот написал бы заблокированному, а строка
+    списка продолжила бы отсеивать посты по чужому теперь нику. Так же это
+    устроено у компании, где отметка едет за именем.
+
+    Написание выжившего берётся то же, что пишет кнопка: у него их бывает
+    два, и разойдись выбор — отметка встала бы на второе, а карточка искала
+    бы по первому.
+    """
+    now = hr_blacklist_candidates(survivor)
+    survivor_value = preferred_blacklist_value(now)
+    if survivor_value is None:
+        return
+    for old_value in written_before:
+        if old_value not in now:
+            await rename_blacklist_marks(
+                session, "hr", old_value=old_value, new_value=survivor_value
+            )
+
+
 async def merge_hr(
     session: AsyncSession, *, absorbed_id: int, survivor_id: int
 ) -> None:
     """Merge ``absorbed`` HR into ``survivor``. Irreversible.
 
     Caller must wrap in ``session.begin()``. Вакансии объединяются, а что
-    делается с учётной записью, перепиской, именем и заметками — см.
-    :func:`_move_or_drop_chat` и :func:`_carry_to_survivor`.
+    делается с учётной записью, перепиской, именем, заметками и отметкой
+    чёрного списка — см. :func:`_move_or_drop_chat`, :func:`_carry_to_survivor`
+    и :func:`_carry_marks_to_survivor`.
     """
     absorbed, survivor = await load_merge_pair(
         session,
@@ -328,6 +376,11 @@ async def merge_hr(
         notes=absorbed.notes,
     )
     survivor_has_tg = survivor.telegram_user_id is not None
+    # Написания обеих карточек читаются до переноса полей: после него часть
+    # из них уже не написания выжившего, и отличить пропавшие будет нечем.
+    written_before = hr_blacklist_candidates(survivor) + _marks_of(
+        taken.telegram_user_id, taken.telegram_username
+    )
 
     moved_vacancies = await repoint_vacancies(
         session, Vacancy.hr_id, absorbed_id=absorbed_id, survivor_id=survivor_id
@@ -338,6 +391,7 @@ async def merge_hr(
     await session.delete(absorbed)
     await session.flush()
     _carry_to_survivor(survivor, taken, survivor_has_tg)
+    await _carry_marks_to_survivor(session, written_before, survivor)
 
     logger.info(
         "merged HR #%d -> #%d (vacancies=%d, messages moved=%d, dropped=%d)",

@@ -20,8 +20,7 @@ logger = logging.getLogger(__name__)
 BATCH_FLUSH_EVERY = 10
 
 # Сколько подряд молчащих ответов поставщика отпечатков терпит один канал.
-# Молчит он сразу для всех постов, и перебирать из-за него весь хвост — это
-# десятки напрасных обращений, за которыми всё равно ничего не заводится.
+# Почему порог вообще есть — сказано у `_silence_broke_the_walk`.
 _SILENCE_BEFORE_DROPPING_THE_CHANNEL = 3
 
 
@@ -109,11 +108,11 @@ async def poll_one_channel(pipeline, channel_id: int) -> PollOutcome:
         last_id = named[0].last_processed_msg_id
     await refresh_channel_metadata_for_ids(pipeline, [channel_id])
     try:
-        await poll_channel(pipeline, channel_id, username, last_id)
+        walked_whole = await poll_channel(pipeline, channel_id, username, last_id)
     except Exception:
         logger.exception("[@%s] manual poll failed", username)
         return "error"
-    return "ok"
+    return "ok" if walked_whole else "error"
 
 
 async def refresh_channel_metadata_for_ids(pipeline, channel_ids: list[int]) -> None:
@@ -261,44 +260,69 @@ async def _take_post(pipeline, channel_id: int, channel_username: str, msg) -> b
     return True
 
 
+def _silence_broke_the_walk(channel_username: str, msg_id: int, silence: int) -> bool:
+    """Записать осечку поставщика; `True` — обход пора бросать.
+
+    Молчит поставщик сразу для всех, и перебор оставшихся постов — десятки
+    напрасных обращений и минуты на канал, за которыми всё равно ничего не
+    заводится. Порог считает осечки подряд: одиночная бывает и от медленной
+    выдачи сразу после загрузки модели.
+    """
+    logger.warning(
+        "[@%s] %d поставщик отпечатков молчит (%d подряд)",
+        channel_username, msg_id, silence,
+    )
+    if silence < _SILENCE_BEFORE_DROPPING_THE_CHANNEL:
+        return False
+    logger.error(
+        "[@%s] бросаю обход: поставщик отпечатков молчит %d подряд",
+        channel_username, silence,
+    )
+    return True
+
+
 async def poll_channel(
     pipeline,
     channel_id: int,
     channel_username: str,
     last_id: int | None,
-) -> None:
+) -> bool:
+    """Вычитать новые посты канала; `False` — обход брошен, а не пройден.
+
+    Отметку держит первая же осечка, а не третья: см. `_take_post`. Посты
+    после неё заводятся и на следующем обходе срезаются отсевом повторов.
+    """
     ordered = await _unseen_posts(pipeline, channel_username, last_id)
     total = len(ordered)
     cursor: int | None = None
+    held = False
     silence = 0
+    walked_whole = False
     try:
         for i, msg in enumerate(ordered):
             pipeline.emit_progress("message", f"@{channel_username}", i, total)
             if not await _take_post(pipeline, channel_id, channel_username, msg):
-                # Отметку не двигаем: пост не считали вовсе, и двинутая
-                # отметка потеряла бы его навсегда — следующий обход берёт
-                # только то, что новее её.
+                held = True
                 silence += 1
-                logger.warning(
-                    "[@%s] %d поставщик отпечатков молчит (%d подряд)",
-                    channel_username, msg.id, silence,
-                )
-                if silence < _SILENCE_BEFORE_DROPPING_THE_CHANNEL:
-                    continue
-                logger.error(
-                    "[@%s] бросаю обход: поставщик отпечатков молчит %d раза подряд",
-                    channel_username, silence,
-                )
-                break
+                if _silence_broke_the_walk(channel_username, msg.id, silence):
+                    break
+                continue
             silence = 0
+            if held:
+                continue
             cursor = msg.id
             if (i + 1) % BATCH_FLUSH_EVERY == 0:
                 await advance_cursor(pipeline, channel_id, cursor)
         else:
-            pipeline.emit_progress("message", f"@{channel_username}", total, total)
+            walked_whole = True
     finally:
+        # Полосу дозаполняем и на брошенном обходе: пока цикл идёт к
+        # следующему каналу, она иначе стоит на счёте брошенного. С экрана её
+        # снимает не это, а конец прогона — по нему окно убирает обе полосы.
+        pipeline.emit_progress("message", f"@{channel_username}", total, total)
         if cursor is not None:
             await advance_cursor(pipeline, channel_id, cursor)
+    return walked_whole
 
 
 async def advance_cursor(pipeline, channel_id: int, msg_id: int) -> None:

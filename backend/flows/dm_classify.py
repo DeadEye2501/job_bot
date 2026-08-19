@@ -252,7 +252,7 @@ async def _drain_buffers(pipeline) -> None:
         *(classify_and_apply_for_hr(pipeline, hr_id) for hr_id in hr_ids),
         return_exceptions=True,
     )
-    report_failures(hr_ids, results, "drain classify on OFF")
+    report_failures(hr_ids, results, "drain classify on OFF", logger)
 
 
 async def cancel_pending_dm_classifications(

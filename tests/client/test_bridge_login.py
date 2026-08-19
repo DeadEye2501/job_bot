@@ -151,6 +151,34 @@ async def test_a_key_the_server_did_not_revoke_is_not_called_revoked(
     assert hub.rs.has_tg_session is True
 
 
+async def test_a_second_attempt_to_log_out_does_not_wipe_the_account_either(
+    api, ask, hub, with_bot, session_factory
+):
+    """Второе нажатие «выйти» учётную запись тоже не стирает.
+
+    Первый заход бота уже отвязал и обнулил, так что второй видит пустоту —
+    и, приняв её за «отзывать было нечем», стёр бы настройки. Отзыва при этом
+    не было ни разу: заслон, заведённый ради первого нажатия, обходился бы
+    вторым.
+    """
+    await put(
+        session_factory,
+        tg_account_row(
+            api_hash_encrypted=encrypt_str("шифр"),
+            session_blob_encrypted=encrypt_bytes("сессия".encode("utf-8")),
+        ),
+    )
+    await hub.rs.reload()
+    hub.login = UiLogin(LoginStep(payload={}, error=None))
+    with_bot(log_out_refusal="сеть отвалилась")
+    await ask(api.settings.logout)
+
+    answer = await ask(api.settings.logout)
+
+    assert "ok" not in answer
+    assert hub.rs.has_tg_session is True
+
+
 async def test_logging_out_lets_the_bot_go(api, ask, hub, with_bot):
     """Выход из Telegram отвязывает бота прежде, чем стереть учётную запись.
 

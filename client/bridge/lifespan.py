@@ -82,7 +82,7 @@ def stop(hub: Hub) -> None:
     _forget_login(hub)
     bot = hub.bot
     bot_task = hub.bot_task
-    if bot is None or bot_task is None:
+    if bot is None and bot_task is None:
         return
     try:
         hub.runner.submit(
@@ -110,8 +110,13 @@ def start_bot(hub: Hub) -> None:
     Поднятого бота второй зов не трогает: собранный поверх него второй сел бы
     на ту же строку сеанса, а Telegram считает такие соединения разными
     копиями — обход канала пошёл бы в два голоса.
+
+    Признака «бот есть» два, и спрашиваются оба. Работа кладётся на мотор
+    отсюда, а само поле `bot` выставляется уже там, внутри неё: между этими
+    мигами первый признак пуст, и заслон, смотрящий только на него, пропустил
+    бы вторую сборку.
     """
-    if hub.bot is not None:
+    if hub.bot is not None or hub.bot_task is not None:
         return
     if not _ready_for_bot(hub.rs):
         logger.info("бот ждёт настройки: нет учётной записи Telegram или модели")
@@ -165,8 +170,12 @@ def _start_bot(hub: Hub) -> None:
         await bot.run()
 
     future = hub.runner.submit(_build_and_run())
-    future.add_done_callback(lambda done: _log_if_crashed(hub, done))
+    # Отметка кладётся до подписки: у завершённого будущего `add_done_callback`
+    # зовёт обработчик тут же, в этом потоке, и тот сверяется с отметкой —
+    # пустую он не признаёт своей, и мёртвое будущее осталось бы в хозяйстве
+    # навсегда, заперев подъём до перезапуска.
     hub.bot_task = future
+    future.add_done_callback(lambda done: _log_if_crashed(hub, done))
 
 
 def _tell_the_window(bot, hub: Hub) -> None:
@@ -213,6 +222,13 @@ def _restart_bot(hub: Hub) -> None:
     останавливающегося, а ожидание уезжает внутрь отправленной работы: зовут
     это из самого мотора — вход сохраняет сеанс его же корутиной, — и ждать
     здесь значило бы запереть мотор на себе.
+
+    Не отпустившийся прежний возвращается в хозяйство как есть. Оставь мы там
+    пустоту, заслон подъёма не увидел бы ничего, и следующий вход поднял бы
+    нового поверх живого — ровно то, ради чего вся эта работа и делается.
+    Возвращённый, он к тому же даёт дорогу назад: повторный вход попробует
+    остановить его ещё раз, а снос, выход и закрытие окна увидят настоящего
+    бота, а не пустоту.
     """
     bot, task = hub.bot, hub.bot_task
     hub.bot = None
@@ -221,9 +237,17 @@ def _restart_bot(hub: Hub) -> None:
     async def _swap() -> None:
         if bot is not None:
             try:
-                await stop_bot(bot, task)
+                stopped = await stop_bot(bot, task)
             except Exception:
                 logger.exception("вход: прежний бот не остановился")
+                hub.bot, hub.bot_task = bot, task
+                return
+            if not stopped:
+                logger.error(
+                    "вход: прежний бот не дождался остановки, нового не поднимаю"
+                )
+                hub.bot, hub.bot_task = bot, task
+                return
         start_bot(hub)
 
     hub.runner.submit(_swap())

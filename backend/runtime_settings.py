@@ -13,6 +13,7 @@ and the cache).
 
 import logging
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from cryptography.fernet import InvalidToken
@@ -296,7 +297,7 @@ class RuntimeSettings:
 
         return self._app_number(key, read, int)
 
-    def _app_number(self, key: str, read, kind):
+    def _app_number(self, key: str, read: Callable, kind: type):
         """Числовая настройка: прочитанное или умолчание, с жалобой в журнал.
 
         Что считать годным, решает `read` — у целых и дробных это разные
@@ -435,6 +436,10 @@ def _from_tg_row(row: TgAccount) -> TgAccountConfig | None:
     Нечитаемый шифротекст — тоже «нет»: связка ключей ОС и база разъезжаются
     при чистке связки, переносе профиля и восстановлении из копии, а брошенный
     отсюда отказ не ловит никто — приложение падает раньше окна.
+
+    Бед у этого две, и обе ловятся здесь: чужой ключ даёт отказ расшифровки, а
+    испорченная или обрезанная запись в связке — `ValueError` от самого
+    шифровальщика. Следствие у них одно, и различать их окну незачем.
     """
     if row.api_id is None or not row.api_hash_encrypted or not row.phone:
         return None
@@ -452,7 +457,7 @@ def _from_tg_row(row: TgAccount) -> TgAccountConfig | None:
                 else None
             ),
         )
-    except InvalidToken:
+    except (InvalidToken, ValueError):
         logger.exception("Telegram credentials are unreadable, treating as unset")
         return None
 
@@ -472,6 +477,6 @@ def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None:
             ),
             model=row.model,
         )
-    except InvalidToken:
+    except (InvalidToken, ValueError):
         logger.exception("LLM provider key is unreadable, treating as unset")
         return None

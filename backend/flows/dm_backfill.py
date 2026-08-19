@@ -119,18 +119,22 @@ async def _store_incoming(hr_id: int, dm: DmHelpers, hooks: DmHooks, msg) -> boo
     HR — полторы тысячи оповещений за миг. Без планировщика разбор идёт на
     месте, и сигнал нужен. Имя с приставкой: без неё запись о поломке не
     отличить от трёх других мест с тем же крючком.
+
+    «Легло» берётся из ответа `process_dm`, а не из отсутствия поломки: догон
+    видит уже записанное почти всегда, и повтор, засчитанный за новость, будил
+    бы окно по каждой переписке при каждом включении.
     """
     try:
-        await process_dm(msg, dm)
+        landed = await process_dm(msg, dm) is not None
     except Exception:
         logger.exception(
             "backfill incoming process failed",
             extra={"hr_id": hr_id, "tg_message_id": msg.id},
         )
         return False
-    if dm.schedule_classification is None:
+    if landed and dm.schedule_classification is None:
         fire(hooks.on_vacancies_changed, "backfill: on_vacancies_changed")
-    return True
+    return landed
 
 
 async def _walk_messages(
@@ -252,7 +256,7 @@ async def catch_up_missed_dms(
             ],
             return_exceptions=True,
         )
-        report_failures([hr.id for hr in batch], results, "catch_up")
+        report_failures([hr.id for hr in batch], results, "catch_up", logger)
         if index + 1 < len(batches):
             await asyncio.sleep(_DM_CATCHUP_BATCH_DELAY_SEC)
 

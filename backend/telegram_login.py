@@ -70,18 +70,19 @@ async def username_of(client) -> str | None:
         return None
 
 
-def _flood_wait_refusal(e) -> str:
+def _flood_wait_refusal(e, before: str) -> str:
     """Отказ «Telegram попросил подождать» словами человека.
 
     Срок Telegram называет не всегда, и «подождите 0 сек» на экране —
     приглашение повторить прямо сейчас и получить тот же запрет.
+
+    Чего именно ждать, называет зовущий: запрет частоты прилетает на всех трёх
+    шагах входа, а фраза про «следующую попытку отправить код» на шаге
+    облачного пароля уводит человека не туда.
     """
     secs = int(getattr(e, "value", 0) or 0)
     waiting = _humanize_duration(secs) if secs else "некоторое время"
-    return (
-        f"Telegram попросил подождать {waiting} "
-        "перед следующей попыткой отправить код."
-    )
+    return f"Telegram попросил подождать {waiting} перед {before}."
 
 
 def _humanize_duration(seconds: int) -> str:
@@ -203,7 +204,10 @@ class TelegramLogin:
         except PhoneNumberInvalid:
             return await self._failed(new_client, "Неверный номер телефона.")
         except FloodWait as e:
-            return await self._failed(new_client, _flood_wait_refusal(e))
+            return await self._failed(
+                new_client,
+                _flood_wait_refusal(e, "следующей попыткой отправить код"),
+            )
         except BadRequest as e:
             return await self._failed(new_client, f"Telegram отклонил запрос: {e}")
         except Exception as e:
@@ -227,7 +231,9 @@ class TelegramLogin:
         except PhoneCodeExpired:
             return LoginStep(error="Код устарел — запросите новый.")
         except FloodWait as e:
-            return LoginStep(error=_flood_wait_refusal(e))
+            return LoginStep(
+                error=_flood_wait_refusal(e, "следующей попыткой ввести код")
+            )
         except Exception as e:
             logger.exception("telegram_confirm_code failed")
             return LoginStep(error=f"{type(e).__name__}: {e}")
@@ -242,7 +248,9 @@ class TelegramLogin:
         except PasswordHashInvalid:
             return LoginStep(error="Неверный облачный пароль.")
         except FloodWait as e:
-            return LoginStep(error=_flood_wait_refusal(e))
+            return LoginStep(
+                error=_flood_wait_refusal(e, "следующей попыткой ввести пароль")
+            )
         except BadRequest as e:
             # Четырёхсотым Telegram отвечает и на устаревший отпечаток кода, и
             # на отозванный ключ приложения. Назови мы это неверным паролем —

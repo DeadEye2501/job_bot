@@ -112,6 +112,53 @@ async def test_a_silent_prints_provider_leaves_the_mark_alone(
     assert saved.last_processed_msg_id is None
 
 
+async def test_one_silent_post_holds_the_mark_below_itself(
+    monkeypatch, reading, session_factory
+):
+    """Одна осечка держит отметку под собой, сколько бы постов ни легло следом.
+
+    Молчание поставщика бывает и одиночным — медленная выдача сразу после
+    загрузки модели. Двинь отметку по следующим удачным постам, и пропущенный
+    останется ниже неё: следующий обход берёт только то, что новее, и
+    объявление не увидит уже никто.
+
+    Посты после осечки при этом заводятся, а на следующем обходе
+    перечитываются и срезаются отсевом повторов — это дешевле потери.
+    """
+    pipeline, client, channel = reading
+    client.history = [post(13), post(12), post(11)]
+
+    async def silent_on_the_first(pipeline, channel_id, username, msg):
+        if msg.id == 11:
+            raise embeddings.ProviderIsSilent(f"[@{username}] {msg.id}")
+
+    monkeypatch.setattr(ingest_mod, "ingest_post", silent_on_the_first)
+
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
+
+    saved = await only_row(session_factory, TelegramChannel)
+    assert saved.last_processed_msg_id is None
+
+
+async def test_a_dropped_walk_is_not_reported_as_done(monkeypatch, reading):
+    """Брошенный обход отвечает бедой, а не «прогнан».
+
+    Человек нажал «Прогнать сейчас», поставщик отпечатков молчит, обход
+    бросили на третьем посте — окно обязано сказать о беде. Слово «прогнан»
+    здесь означало бы, что канал вычитан, и человек не стал бы разбираться,
+    почему не появилось ни одной вакансии.
+    """
+    pipeline, client, channel = reading
+    client.history = [post(msg_id) for msg_id in range(20, 10, -1)]
+
+    async def no_provider(pipeline, channel_id, username, msg):
+        raise embeddings.ProviderIsSilent(f"[@{username}] {msg.id}")
+
+    monkeypatch.setattr(ingest_mod, "ingest_post", no_provider)
+
+    assert await channels.poll_one_channel(pipeline, channel.id) == "error"
+
+
 async def test_the_channel_is_dropped_after_the_provider_keeps_silent(
     monkeypatch, reading
 ):

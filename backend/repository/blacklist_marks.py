@@ -3,7 +3,36 @@
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import Blacklist
+from backend.models import Blacklist, HR
+
+_ACCOUNT_MARK_PREFIX = "user_id:"
+
+
+def account_mark(telegram_user_id: int) -> str:
+    """Написание отметки, привязанной к учётной записи Telegram.
+
+    Живёт здесь, а не у карточки человека: тем же написанием отметку и пишут,
+    и разбирают обратно (`_nicknames_of_marked_people`). Разойдись эти двое —
+    отсев постов по нику отвалился бы молча, а на экранах всё выглядело бы
+    работающим.
+    """
+    return f"{_ACCOUNT_MARK_PREFIX}{telegram_user_id}"
+
+
+def nickname_mark(telegram_username: str) -> str:
+    """Написание отметки, привязанной к нику Telegram."""
+    return f"@{telegram_username}"
+
+
+def _account_id_of(value: str) -> int | None:
+    """Номер учётной записи из написания отметки; None — написание другое."""
+    if not value.startswith(_ACCOUNT_MARK_PREFIX):
+        return None
+    tail = value[len(_ACCOUNT_MARK_PREFIX):]
+    # `isascii` не украшение: значения этого рода набирают и руками, а
+    # `"²".isdigit()` истина, тогда как `int("²")` роняет `ValueError` —
+    # и уронил бы весь обход, читающий образцы перед циклом.
+    return int(tail) if tail.isascii() and tail.isdigit() else None
 
 
 def active_mark_of(kind: str, candidates: list[str]):
@@ -61,6 +90,38 @@ async def active_blacklist_values(session: AsyncSession, kind: str) -> set[str]:
     )
 
 
+async def _nicknames_of_marked_people(session: AsyncSession) -> list[str]:
+    """Ники отмеченных людей — их написание для сверки с текстом объявления.
+
+    Отметку человека кнопка держит на несменяемом номере учётной записи, а
+    номер в тексте объявления не встречается никогда: по нему отсеиваются
+    письма, но не посты. Ник встречается — и объявление, под которым назван
+    отсеянный рекрутёр, отсеивается по нему.
+
+    Ник берётся нынешний, из карточки, а не написание строки списка: сменился
+    ник — отсев поедет за ним сам, чего написание в списке не умеет.
+    """
+    marked = (
+        await session.scalars(
+            select(Blacklist.value).where(
+                Blacklist.kind == "hr", Blacklist.active.is_(True)
+            )
+        )
+    ).all()
+    numbers = [n for n in (_account_id_of(v) for v in marked) if n is not None]
+    if not numbers:
+        return []
+    nicknames = (
+        await session.scalars(
+            select(HR.telegram_username).where(HR.telegram_user_id.in_(numbers))
+        )
+    ).all()
+    # Пустой ник отсеивается правдивостью, а не сверкой с `None`: заведение
+    # сводит пустую строку к отсутствию, но пробейся она в колонку — образец
+    # `"@"` ловил бы любую собачку в любом тексте, включая чужую почту.
+    return [nickname_mark(nick) for nick in nicknames if nick]
+
+
 async def load_active_blacklist_patterns(session: AsyncSession) -> list[str]:
     """Все активные значения списка, любого рода, — образцы для сверки с
     текстом объявления.
@@ -68,14 +129,19 @@ async def load_active_blacklist_patterns(session: AsyncSession) -> list[str]:
     Род здесь не спрашивается нарочно: по тексту поста отсеивают и по
     названию компании, и по ключевому слову, и знать заранее, чем именно
     совпадёт, конвейеру незачем.
+
+    Одно исключение — люди: их написание в списке несменяемое и потому в
+    тексте не встречается. К значениям добавляются ники отмеченных, иначе
+    отметка на человеке гасила бы только письма (`_nicknames_of_marked_people`).
     """
-    return list(
+    values = list(
         (
             await session.scalars(
                 select(Blacklist.value).where(Blacklist.active)
             )
         ).all()
     )
+    return values + await _nicknames_of_marked_people(session)
 
 
 def marked_by(candidates: list[str], values: set[str]) -> bool:

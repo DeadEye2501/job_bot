@@ -95,9 +95,8 @@ def _channels_with_counts_query():
     выбирает заголовок ряда (title если есть, иначе @username) — иначе
     NULL-title каналы в SQLite ASC всплывают наверх и порядок ломается.
 
-    Отбор стоит в условии присоединения, а не в ``where``: в ``where`` он
-    отбросил бы канал без единой разобранной вакансии целиком, а тот обязан
-    остаться в списке с нулём.
+    Как устроен сам счёт и почему отбор стоит в условии присоединения —
+    сказано там, где живёт запрос (`vacancies_common.with_vacancy_counts`).
     """
     title_or_username = func.coalesce(
         TelegramChannel.title, TelegramChannel.username

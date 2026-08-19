@@ -31,7 +31,7 @@ VACANCY_NEIGHBOURS = (
 
 
 async def _newest_first(
-    session: AsyncSession, rows, stamp, vacancy_id: int
+    session: AsyncSession, model, stamp, vacancy_id: int
 ) -> list:
     """Записи одной ленты вакансии, свежие сверху.
 
@@ -44,9 +44,9 @@ async def _newest_first(
     return list(
         (
             await session.scalars(
-                select(rows)
-                .where(rows.vacancy_id == vacancy_id)
-                .order_by(stamp.desc(), rows.id.desc())
+                select(model)
+                .where(model.vacancy_id == vacancy_id)
+                .order_by(stamp.desc(), model.id.desc())
             )
         ).all()
     )

@@ -57,6 +57,9 @@ class UiBot:
     def cancel_current_poll(self) -> None:
         self.calls.append(("cancel_current_poll",))
 
+    def request_stop(self) -> None:
+        self.calls.append(("request_stop",))
+
     async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> str:
         self.calls.append(("ui_rerun_vacancy_pipeline", vacancy_id))
         return self.answers["rerun"]

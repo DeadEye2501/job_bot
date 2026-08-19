@@ -130,8 +130,11 @@ async def test_the_candidates_are_shown_with_all_they_have():
     )
 
     shown = data_block(client.sent[0])
-    assert 'id=7, name="Сбербанк", aliases=[Sber], website="https://sber.ru"' in shown
-    assert 'id=8, name="Ромашка", aliases=[—], website="—"' in shown
+    lines = [line for line in shown.splitlines() if line.startswith("id=")]
+    assert lines == [
+        'id=7, name="Сбербанк", aliases=[Sber], website="https://sber.ru"',
+        'id=8, name="Ромашка", aliases=[—], website="—"',
+    ]
 
 
 async def test_a_junk_spelling_does_not_stop_the_question():

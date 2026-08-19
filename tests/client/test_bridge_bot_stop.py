@@ -36,9 +36,13 @@ async def test_a_bot_that_never_stops_does_not_hold_the_caller():
     bot = HangingBot()
     never = Future()
 
-    await asyncio.wait_for(stop_bot(bot, never, timeout=0.01), timeout=1)
+    waited = await asyncio.wait_for(stop_bot(bot, never, timeout=0.01), timeout=1)
 
     assert bot.asked == ["cancel", "stop"]
+    # И отвечает «не дождались»: по этому ответу пересборка под новый сеанс
+    # решает, поднимать ли следующего бота, — подними она его поверх
+    # недождавшегося, Telegram увидел бы две копии на одной строке сеанса.
+    assert waited is False
 
 
 async def test_a_failed_request_reaches_the_caller():

@@ -53,6 +53,8 @@ def test_cyrillic_is_transliterated_letter_by_letter(raw, expected):
         pytest.param("АО Сбер", "sber", id="русская двухбуквенная форма впереди"),
         pytest.param("МТС, АО", "mts", id="русская двухбуквенная форма сзади"),
         pytest.param("Philips NV", "philips", id="чужая двухбуквенная форма сзади"),
+        pytest.param("Philips N.V.", "philips n v", id="она же написанная точками"),
+        pytest.param("Иванов А.О.", "ivanov a o", id="инициалы, похожие на форму"),
         pytest.param("НВ Групп", "nv grupp", id="чужая двухбуквенная форма впереди"),
         pytest.param("Acme & Co!", "acme co", id="знаки заменяются пробелом"),
         pytest.param("Sberbank", "sberbank", id="уже нормальное"),
@@ -90,6 +92,7 @@ def test_a_two_letter_form_is_cut_only_where_it_can_be_a_form():
     assert normalize_company_name("АО Сбер") == normalize_company_name("Сбер")
     assert normalize_company_name("Philips NV") == normalize_company_name("Philips")
     assert normalize_company_name("НВ Групп") != normalize_company_name("Групп")
+    assert normalize_company_name("Петров С.А.") != normalize_company_name("Петров")
     assert normalize_company_name("Сбер АО") == normalize_company_name("Сбер")
     for form in ("SA", "AG", "BV"):
         assert normalize_company_name(f"Bosch {form}") == "bosch"
@@ -149,6 +152,12 @@ def test_a_query_is_cut_even_without_a_path():
         pytest.param("hh.ru", True, id="площадка вакансий"),
         pytest.param("indeed.com", True, id="зарубежная площадка вакансий"),
         pytest.param("stepstone.de", True, id="ещё одна зарубежная площадка"),
+        pytest.param("indeed.de", True, id="та же площадка в домене другой страны"),
+        pytest.param("indeed.co.uk", True, id="она же на составном домене"),
+        pytest.param("stepstone.at", True, id="и вторая площадка в чужой стране"),
+        pytest.param("indeed.acme.com", False, id="имя площадки поддоменом чужого"),
+        pytest.param("myindeed.com", False, id="имя площадки внутри чужого слова"),
+        pytest.param("form.typeform.com", True, id="общий хостинг анкет отклика"),
         pytest.param("careers.hh.ru", True, id="поддомен площадки"),
         pytest.param("m.linkedin.com", True, id="мобильный поддомен соцсети"),
         pytest.param("nothh.ru", False, id="хост, лишь оканчивающийся так же"),
