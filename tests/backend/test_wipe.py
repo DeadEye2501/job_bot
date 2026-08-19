@@ -11,7 +11,20 @@ import logging
 
 import pytest
 
+from backend.single_instance import hold_the_only_copy, release_the_lock
 from backend.wipe import wipe_all
+
+
+@pytest.fixture(autouse=True)
+def lock_let_go():
+    """Отпускает замок после проверки.
+
+    Не удавшийся снос оставляет замок взятым нарочно — приложение после него
+    продолжает работать, — и без этого файл замка пережил бы свой временный
+    каталог: открытый дескриптор достался бы следующим проверкам.
+    """
+    yield
+    release_the_lock()
 
 
 @pytest.fixture
@@ -124,3 +137,83 @@ async def test_the_database_is_let_go_before_it_is_deleted(data_dir):
 
     assert await wipe_all(engine) == []
     assert not db.exists()
+
+
+async def test_the_lock_comes_back_when_something_survives(data_dir, monkeypatch):
+    """Не удавшийся снос возвращает замок единственной копии на место.
+
+    Замок отпускают ради удаления его же файла, но приложение после неудачи
+    остаётся жить: человек читает беду и продолжает работать. Оставь замок
+    отпущенным — рядом запустилась бы вторая копия, а её и сторожат: две копии
+    делят один журнал и одну базу.
+    """
+    import config
+
+    lock = config.get_lock_path()
+    (data_dir / "jobbot.db").write_text("данные", encoding="utf-8")
+    assert hold_the_only_copy(lock) is not None
+
+    def _refuse(self, *args, **kwargs):
+        raise PermissionError(32, "used by another process")
+
+    monkeypatch.setattr("pathlib.Path.unlink", _refuse)
+
+    troubles = await wipe_all(None)
+
+    assert troubles
+    assert hold_the_only_copy(lock) is None, "замок остался отпущенным"
+
+
+async def test_a_lock_that_will_not_come_back_is_not_passed_over(
+    data_dir, monkeypatch, caplog
+):
+    """Замок, который не удалось взять обратно, молча не проходит.
+
+    Вернуться ему мешает либо чужая копия, занявшая его в этот самый миг, либо
+    недоступный каталог. Приложение после неудавшегося сноса продолжает
+    работать — уже без сторожа, — и увидеть это человек может только в
+    журнале: файлы журнала к этому мигу закрыты, а экран журнала кормит буфер.
+    """
+    (data_dir / "jobbot.db").write_text("данные", encoding="utf-8")
+
+    def _refuse(self, *args, **kwargs):
+        raise PermissionError(32, "used by another process")
+
+    monkeypatch.setattr("pathlib.Path.unlink", _refuse)
+    monkeypatch.setattr("backend.wipe.hold_the_only_copy", lambda lock_path: None)
+
+    await wipe_all(None)
+
+    assert [one for one in caplog.records if "unguarded" in one.getMessage()], (
+        "приложение осталось без сторожа единственной копии молча"
+    )
+
+
+async def test_a_journal_that_will_not_close_leaves_a_trace(data_dir, caplog):
+    """Не закрывшийся файл журнала оставляет после себя трассировку.
+
+    Одной строкой в ответе окну беда не разбирается: там имя файла и текст
+    ошибки, а почему дескриптор не отдался — видно только по трассировке, и
+    записать её больше некому.
+    """
+    log = data_dir / "jobbot.log"
+    root = logging.getLogger()
+
+    class Stubborn(logging.FileHandler):
+        """Обработчик, который отдаёт файл с руганью."""
+
+        def close(self) -> None:
+            super().close()
+            raise OSError("файл журнала не отпустил дескриптор")
+
+    handler = Stubborn(log, encoding="utf-8")
+    root.addHandler(handler)
+    try:
+        troubles = await wipe_all(None)
+    finally:
+        root.removeHandler(handler)
+
+    assert any("журнал" in trouble for trouble in troubles)
+    assert [record for record in caplog.records if record.exc_info], (
+        "беда журнала ушла без трассировки"
+    )

@@ -15,8 +15,8 @@ from __future__ import annotations
 import logging
 import shutil
 
-from backend.single_instance import release_the_lock
-from config import data_dirs, data_files
+from backend.single_instance import hold_the_only_copy, release_the_lock
+from config import data_dirs, data_files, get_lock_path
 
 
 logger = logging.getLogger(__name__)
@@ -40,39 +40,25 @@ def _close_log_files() -> list[str]:
             handler.close()
         except Exception as e:
             troubles.append(f"журнал: {e}")
+            logger.exception("wipe: failed to close %s", handler.baseFilename)
     return troubles
 
 
-async def wipe_all(engine) -> list[str]:
-    """Закрыть базу и снести каталог данных; вернуть беды, какие случились.
+def _remove_the_data() -> list[str]:
+    """Удалить перечисленное в каталоге данных; вернуть беды.
 
-    Движок закрывается первым: Windows не отдаст файл базы, пока у неё открыт
-    хоть один держатель, и снос без этого молча оставил бы базу на месте.
-
-    Свои держатели отпускаются до удаления: журнал держит обработчик записи,
-    файл замка — открытый дескриптор единственной копии, и Windows занятый
-    файл удалить не даст. Прощать этот отказ молча нельзя — прощённым он
-    оставлял бы на диске ровно то, ради чего снос и зовут: записи журнала с
-    перепиской.
-
-    Что удалять, перечислено `config.data_files` и `config.data_dirs`.
+    Держатели к этому мигу отпущены зовущим: Windows занятый файл удалить не
+    даст, а прощённый молча отказ оставил бы на диске ровно то, ради чего снос
+    и зовут, — записи журнала с перепиской.
     """
-    release_the_lock()
-    errors: list[str] = _close_log_files()
-    if engine is not None:
-        try:
-            await engine.dispose()
-        except Exception as e:
-            errors.append(f"engine.dispose: {e}")
-            logger.exception("wipe: engine.dispose failed")
-
+    troubles: list[str] = []
     for path in data_files():
         if not path.exists():
             continue
         try:
             path.unlink()
         except Exception as e:
-            errors.append(f"{path.name}: {e}")
+            troubles.append(f"{path.name}: {e}")
             logger.exception("wipe: failed to remove %s", path)
 
     for path in data_dirs():
@@ -81,7 +67,37 @@ async def wipe_all(engine) -> list[str]:
         try:
             shutil.rmtree(path)
         except Exception as e:
-            errors.append(f"{path.name}/: {e}")
+            troubles.append(f"{path.name}/: {e}")
             logger.exception("wipe: failed to remove %s", path)
 
+    return troubles
+
+
+async def wipe_all(engine) -> list[str]:
+    """Закрыть базу и снести каталог данных; вернуть беды, какие случились.
+
+    Свои держатели отпускаются до удаления: журнал держит обработчик записи,
+    движок — файл базы, файл замка — открытый дескриптор единственной копии.
+
+    Замок отпускается последним и только ради своего же файла, а при бедах
+    берётся обратно: не удавшийся снос оставляет приложение жить, и без
+    сторожа рядом запустилась бы вторая копия над теми же данными.
+
+    Что удалять, перечислено `config.data_files` и `config.data_dirs`.
+    """
+    errors: list[str] = _close_log_files()
+    if engine is not None:
+        try:
+            await engine.dispose()
+        except Exception as e:
+            errors.append(f"engine.dispose: {e}")
+            logger.exception("wipe: engine.dispose failed")
+
+    release_the_lock()
+    errors += _remove_the_data()
+    if errors and hold_the_only_copy(get_lock_path()) is None:
+        # Занять его в этот миг успевает вторая копия — запущенная ровно между
+        # отпусканием и обратным взятием. Сказать это человеку можно только
+        # журналом: файлы его закрыты, но экран журнала кормит буфер.
+        logger.error("wipe: lock taken by someone else, running unguarded")
     return errors

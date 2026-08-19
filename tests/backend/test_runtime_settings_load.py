@@ -4,6 +4,8 @@
 `_from_tg_row` и `_from_llm_row` видны только тем, что оказалось в кэше.
 """
 
+from cryptography.fernet import Fernet
+
 from backend.crypto import encrypt_bytes, encrypt_str
 from backend.models import BotMode, LlmConfigKind
 from backend.runtime_settings import RuntimeSettings
@@ -85,6 +87,23 @@ async def test_an_account_without_a_phone_is_not_credentials(session_factory):
     assert (await RuntimeSettings.load(session_factory)).tg is None
 
 
+async def test_a_secret_no_key_can_open_is_not_credentials(session_factory):
+    """Нечитаемый секрет читается как «не настроено», а не роняет чтение.
+
+    Мастер-ключ живёт в связке ключей ОС, а шифротекст — в базе, и разъехаться
+    они могут: связку чистят, профиль переносят на другую машину, базу
+    восстанавливают из копии. Брошенный отсюда отказ расшифровки не ловит никто
+    во всём дереве — приложение падает раньше, чем появится окно, и человек не
+    может даже войти заново.
+    """
+    from_another_keyring = Fernet(Fernet.generate_key()).encrypt(b"hash").decode("ascii")
+    await put(session_factory, tg_account_row(
+        api_hash_encrypted=from_another_keyring
+    ))
+
+    assert (await RuntimeSettings.load(session_factory)).tg is None
+
+
 async def test_the_two_provider_kinds_are_read_separately(session_factory):
     """Настройки чата и встраиваний не путаются между собой."""
     await put(
@@ -125,6 +144,20 @@ async def test_a_provider_without_an_address_is_not_a_provider(session_factory):
 async def test_a_provider_without_a_model_is_not_a_provider(session_factory):
     """Настройка без модели провайдером не считается."""
     await put(session_factory, llm_config_row(LlmConfigKind.CHAT, model=None))
+
+    assert (await RuntimeSettings.load(session_factory)).chat is None
+
+
+async def test_a_provider_key_no_master_key_can_open_is_not_a_provider(session_factory):
+    """Нечитаемый ключ провайдера тоже читается как «не настроено».
+
+    Беда общая с учётной записью Telegram: связка ключей ОС и база разъехались.
+    Падение здесь так же не даёт человеку дойти до окна и вписать ключ заново.
+    """
+    from_another_keyring = Fernet(Fernet.generate_key()).encrypt(b"sk-1").decode("ascii")
+    await put(session_factory, llm_config_row(
+        LlmConfigKind.CHAT, api_key_encrypted=from_another_keyring
+    ))
 
     assert (await RuntimeSettings.load(session_factory)).chat is None
 

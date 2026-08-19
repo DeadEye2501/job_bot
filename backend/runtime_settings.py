@@ -15,6 +15,7 @@ import logging
 import math
 from dataclasses import dataclass, field
 
+from cryptography.fernet import InvalidToken
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -451,30 +452,48 @@ class RuntimeSettings:
 
 
 def _from_tg_row(row: TgAccount) -> TgAccountConfig | None:
+    """Учётные данные Telegram из строки базы; `None`, если их нет.
+
+    Нечитаемый шифротекст — тоже «нет»: связка ключей ОС и база разъезжаются
+    при чистке связки, переносе профиля и восстановлении из копии, а брошенный
+    отсюда отказ не ловит никто — приложение падает раньше окна.
+    """
     if row.api_id is None or not row.api_hash_encrypted or not row.phone:
         return None
-    return TgAccountConfig(
-        api_id=row.api_id,
-        api_hash=decrypt_str(row.api_hash_encrypted),
-        phone=row.phone,
-        password=(
-            decrypt_str(row.password_encrypted) if row.password_encrypted else ""
-        ),
-        session_string=(
-            decrypt_bytes(row.session_blob_encrypted).decode("utf-8")
-            if row.session_blob_encrypted
-            else None
-        ),
-    )
+    try:
+        return TgAccountConfig(
+            api_id=row.api_id,
+            api_hash=decrypt_str(row.api_hash_encrypted),
+            phone=row.phone,
+            password=(
+                decrypt_str(row.password_encrypted) if row.password_encrypted else ""
+            ),
+            session_string=(
+                decrypt_bytes(row.session_blob_encrypted).decode("utf-8")
+                if row.session_blob_encrypted
+                else None
+            ),
+        )
+    except InvalidToken:
+        logger.exception("Telegram credentials are unreadable, treating as unset")
+        return None
 
 
 def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None:
+    """Настройки провайдера из строки базы; `None`, если их нет.
+
+    Нечитаемый ключ — тоже «нет», по причине из `_from_tg_row`.
+    """
     if not row.base_url or not row.model:
         return None
-    return LlmProviderConfig(
-        base_url=row.base_url,
-        api_key=(
-            decrypt_str(row.api_key_encrypted) if row.api_key_encrypted else ""
-        ),
-        model=row.model,
-    )
+    try:
+        return LlmProviderConfig(
+            base_url=row.base_url,
+            api_key=(
+                decrypt_str(row.api_key_encrypted) if row.api_key_encrypted else ""
+            ),
+            model=row.model,
+        )
+    except InvalidToken:
+        logger.exception("LLM provider key is unreadable, treating as unset")
+        return None
