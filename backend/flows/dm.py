@@ -247,17 +247,22 @@ async def _status_open_for_reply(session_factory, vacancy_id: int):
 async def process_dm(
     msg, lm_client, lm_chat_model, session_factory,
     *, client=None, schedule_classification=None,
-) -> None:
+) -> int | None:
     """Провести входящее письмо: записать, отнести к вакансии, разобрать.
 
     В базу текст идёт с цитатой ответа, в разбор — без неё: иначе разборщик
     оценил бы как слова HR то, что мы сами же процитировали.
+
+    Отдаёт номер собеседника, чьё письмо приняли: по нему окно узнаёт о
+    пришедшем. Пусто значит, что письмо не наше — писал бот, незнакомец или
+    тот, кого слушать не велено, — и окну говорить не о чем. Спрашивать это у
+    базы второй раз, уже в слое оповещений, значило бы завести там сессию.
     """
     if not msg.from_user or msg.from_user.is_bot:
-        return
+        return None
     hr_lookup = await _sender_to_listen_to(session_factory, msg)
     if hr_lookup is None:
-        return
+        return None
     attachment = await _attachment_of(client, msg, hr_lookup.id)
     avatar = None
     if client is not None and hr_lookup.avatar is None:
@@ -266,17 +271,17 @@ async def process_dm(
         session_factory, msg, attachment, avatar
     )
     if vacancy_id is None:
-        return
+        return hr_lookup.id
     v_status = await _status_open_for_reply(session_factory, vacancy_id)
     if v_status is None:
-        return
+        return hr_lookup.id
     # С планировщиком письмо ложится в накопитель и разбирается отложенно;
     # без него — на месте.
     classify_text = extract_text(msg)
     if schedule_classification is not None:
         reply = PendingReply(vacancy_id, new_msg_id, msg.id, classify_text)
         schedule_classification(hr_lookup.id, reply)
-        return
+        return hr_lookup.id
 
     await classify_and_apply(
         session_factory,
@@ -285,3 +290,4 @@ async def process_dm(
         classify_text,
         (vacancy_id, new_msg_id, v_status),
     )
+    return hr_lookup.id

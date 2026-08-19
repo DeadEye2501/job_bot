@@ -12,19 +12,22 @@ logger = logging.getLogger(__name__)
 
 
 async def log_out_session(bot) -> None:
-    """Revoke server-side TG session via DROP_AUTH and exit the run loop.
+    """Отозвать ключ на серверах Telegram и вывести цикл из работы.
 
-    Pyrogram's log_out() also disconnects the client and removes the
-    local session file. Errors are logged but don't propagate — the
-    caller still wants the bot to stop and the local creds cleared.
+    Беда отзыва уходит наружу: не отозванный ключ, выданный за отозванный,
+    оставляет человека с живым сеансом, о котором он думает, что вышел.
+    Решает, что с этим сказать окну, зовущий.
+
+    Остановка идёт в любом случае — нажали «выйти», и работать боту больше
+    нечем: своё соединение Pyrogram при удавшемся отзыве закрывает сам, а при
+    сорвавшемся оно ведёт в учётную запись, из которой человек уходит.
     """
     logger.info("TG log_out requested")
     try:
         await bot.client.log_out()
-    except Exception:
-        logger.exception("log_out RPC failed; proceeding to stop bot")
-    bot.stop_event.set()
-    bot.wake_event.set()
+    finally:
+        bot.stop_event.set()
+        bot.wake_event.set()
 
 
 async def current_mode(bot) -> BotMode:
@@ -37,8 +40,6 @@ async def current_mode(bot) -> BotMode:
 
 async def _connect(bot) -> None:
     """Поднять соединение и объявить бота готовым к обращениям из окна."""
-    if bot.dry_run:
-        logger.warning("DRY-RUN mode: outgoing TG messages will NOT be sent")
     # Синкаем галку «Симуляция отправки» из БД-настройки в module-level guard
     # adapters/telegram.send_dm. Авторитет — rs.send_locked; константа
     # — defence-in-depth на случай если Bot.send забудет проверить.
@@ -65,10 +66,9 @@ async def _connect(bot) -> None:
 
 async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None:
     """Что делается один раз на переходе между режимами, а не каждый оборот."""
-    # Transition в OFF: гасим debounce-таймеры pending'овых
-    # классификаций. Накопленные тексты пропадают, но сами
-    # сообщения уже в БД — юзеру нужно будет переклассифицировать
-    # вручную через UI если нужно.
+    # Уход в OFF гасит таймеры отложенного разбора, но накопленное не
+    # выбрасывает: `drain=True` разбирает его напоследок — иначе пачка писем,
+    # застигнутая выключением, осталась бы без вердикта до ручного прогона.
     if mode is BotMode.OFF and prev_mode is not BotMode.OFF:
         logger.info("Transition into OFF; draining DM debouncers")
         await bot.ingestion.cancel_pending_dm_classifications(drain=True)
@@ -162,26 +162,31 @@ async def _disconnect(bot) -> None:
     if bot.lm_embed_client is not bot.lm_client:
         await bot.lm_embed_client.aclose()
     await bot.lm_client.aclose()
+    # Метка готовности снимается последней: по ней окно рисует лампочку
+    # связи, и оставленная она показывала бы зелёный огонёк у бота, который
+    # уже отключил клиента и закрыл соединения с моделью.
+    bot.loop = None
 
 
 async def run(bot, *, once: bool = False) -> None:
-    await _connect(bot)
+    """Главный цикл бота: подъём, обороты по режиму, разборка за собой.
+
+    Подъём стоит внутри разборки нарочно: два клиента модели собраны ещё до
+    него, и сорвись `client.start()` — они пережили бы бота и держали бы
+    гнёзда до конца работы приложения.
+
+    Первым делом подбираются вакансии, недоразобранные прошлым запуском: иначе
+    застрявшая ждала бы, пока канал не выложит то же объявление заново.
+
+    Режим OFF — полная остановка: ни догона переписки, ни разбора, ни обхода.
+    Догон идёт на каждом переходе в рабочий режим, включая самый первый.
+    """
     try:
-        # Re-parse any vacancies that were ingested but never finished
-        # the LLM pipeline (previous process crashed mid-parse). Runs
-        # before polling so the UI doesn't briefly show empty rows
-        # alongside fresh ones, and so a long-stuck orphan eventually
-        # gets unstuck even if its source channel never re-posts the
-        # same message.
+        await _connect(bot)
         try:
             await bot.ingestion.recover_orphan_vacancies()
         except Exception:
             logger.exception("orphan recovery failed")
-        # OFF is a full stop — no DM catch-up, no LLM classification,
-        # no polling. Catch-up runs once on every transition into an
-        # active mode (including the initial transition from the seeded
-        # OFF state at process start), so a fresh start in DM Only / Full
-        # back-fills immediately and so does toggling out of OFF later.
         prev_mode = BotMode.OFF
         while True:
             mode = await current_mode(bot)

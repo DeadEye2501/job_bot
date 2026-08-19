@@ -47,12 +47,25 @@ async def _run_task(bot, work: Callable[[], Any], label: str):
     получает именно она, и по ней же читается занятость места. Отмена и
     сбой разводятся здесь: первое — решение человека, второе — беда, и
     зовущий говорит о них разными словами.
+
+    Отмен две, и путать их нельзя. Отменили саму задачу — это отмена прогона,
+    и она исход. Отменили нас — закрывается окно, и отмена идёт дальше
+    наружу: приняв её за свою, цикл пошёл бы гасить соединения под живой
+    задачей обхода, а та осталась бы читать канал и писать в закрытую базу.
+
+    Различает их счётчик отмен нашей же задачи: отменённая задача прогона
+    роняет `CancelledError` и в нас, но просьб отмениться у нас при этом нет
+    ни одной.
     """
     try:
-        bot.current_poll_task = asyncio.create_task(work())
+        task = asyncio.create_task(work())
+        bot.current_poll_task = task
         try:
-            return "ok", await bot.current_poll_task
+            return "ok", await task
         except asyncio.CancelledError:
+            ours = asyncio.current_task()
+            if ours is not None and ours.cancelling() > 0:
+                raise
             logger.info("%s cancelled by user", label)
             return "cancelled", None
     except Exception:

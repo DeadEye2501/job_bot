@@ -19,6 +19,8 @@ from pyrogram import Client
 from backend.runtime_settings import TgAccountConfig
 from config import get_data_dir
 
+_log = logging.getLogger(__name__)
+
 
 SESSIONS_DIR = get_data_dir() / "sessions"
 """Папка, в которой Pyrogram держит файл сеанса.
@@ -60,9 +62,6 @@ def make_client(tg: TgAccountConfig) -> Client:
         workdir=str(sessions_dir),
         sleep_threshold=60,
     )
-
-
-_log = logging.getLogger(__name__)
 
 
 # Запор боевой отправки: `True` — письмо не уходит. Хозяин запора не здесь, а в

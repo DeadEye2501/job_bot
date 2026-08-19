@@ -18,6 +18,7 @@ from pyrogram.client import Client as PyrogramClient
 from pyrogram.errors import (
     BadRequest,
     FloodWait,
+    PasswordHashInvalid,
     PhoneCodeExpired,
     PhoneCodeInvalid,
     PhoneNumberInvalid,
@@ -108,7 +109,11 @@ class TelegramLogin:
         settings,
         on_saved: Callable[[str | None], None] | None = None,
     ) -> None:
-        """``session_name`` разводит входы по своим файлам сессии.
+        """``session_name`` — имя клиента Pyrogram, оно же метка в журнале.
+
+        Файлов сессии за ним нет: клиент поднимается `in_memory=True`, а
+        вывезенная строка ложится в настройки. Разные имена нужны затем, чтобы
+        по записи было видно, чей это вход — мастера или повторного.
 
         ``on_saved`` зовут после сохранения и передают ник вошедшего: пустую
         строку, если ника нет, и `None`, если спросить не удалось. Без
@@ -221,6 +226,8 @@ class TelegramLogin:
             return LoginStep(error="Неверный код.")
         except PhoneCodeExpired:
             return LoginStep(error="Код устарел — запросите новый.")
+        except FloodWait as e:
+            return LoginStep(error=_flood_wait_refusal(e))
         except Exception as e:
             logger.exception("telegram_confirm_code failed")
             return LoginStep(error=f"{type(e).__name__}: {e}")
@@ -230,14 +237,24 @@ class TelegramLogin:
         """Третий шаг, если Telegram спросил: облачный пароль."""
         assert self._client is not None
         assert self._creds is not None
-        self._creds["password"] = password
         try:
             await self._client.check_password(password)
-        except BadRequest:
+        except PasswordHashInvalid:
             return LoginStep(error="Неверный облачный пароль.")
+        except FloodWait as e:
+            return LoginStep(error=_flood_wait_refusal(e))
+        except BadRequest as e:
+            # Четырёхсотым Telegram отвечает и на устаревший отпечаток кода, и
+            # на отозванный ключ приложения. Назови мы это неверным паролем —
+            # человек перебирал бы верный, а причина лежала бы в другом месте.
+            logger.warning("telegram_confirm_password refused: %s", e)
+            return LoginStep(error=f"Telegram отклонил запрос: {e}")
         except Exception as e:
             logger.exception("telegram_confirm_password failed")
             return LoginStep(error=f"{type(e).__name__}: {e}")
+        # Пароль ложится в держатель только пройденным: непринятому не место
+        # ни в снимке состояния, ни в настройках, куда его запишет сохранение.
+        self._creds["password"] = password
         return await self._save()
 
     def _drop(self) -> None:
@@ -277,13 +294,22 @@ class TelegramLogin:
             # сокет переживает попытку.
             await _safe_disconnect(client)
 
-        await self._settings.set_tg(
-            api_id=creds["api_id"],
-            api_hash=creds["api_hash"],
-            phone=creds["phone"],
-            password=creds.get("password") or "",
-            session_string=session_string,
-        )
+        try:
+            await self._settings.set_tg(
+                api_id=creds["api_id"],
+                api_hash=creds["api_hash"],
+                phone=creds["phone"],
+                password=creds.get("password") or "",
+                session_string=session_string,
+            )
+        except Exception as e:
+            # Вывезенная строка сеанса живёт один раз: клиент к этому мигу
+            # отключён, и второй раз её взять неоткуда. Улети беда броском —
+            # окно сказало бы «сломалось», а повторить вход человек не
+            # догадался бы.
+            logger.exception("telegram session not written to settings")
+            self._drop()
+            return LoginStep(error=f"Сессия не записалась: {type(e).__name__}: {e}")
         self._drop()
         logger.info(
             "Telegram session saved (session=%s, api_id=%s, phone=%s)",

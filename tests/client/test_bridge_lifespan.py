@@ -19,6 +19,98 @@ class Silent:
     """Бот, у которого нет ничего, кроме мест под обратные вызовы."""
 
 
+class Stoppable(Silent):
+    """Бот, который вписывает в общий список, как его просили остановиться."""
+
+    def __init__(self, steps: list[str]) -> None:
+        self.steps = steps
+
+    def cancel_current_poll(self) -> None:
+        self.steps.append("отмени обход")
+
+    def request_stop(self) -> None:
+        self.steps.append("остановись")
+
+
+async def test_a_second_call_does_not_raise_a_second_bot(hub, monkeypatch):
+    """Второй зов подъёма поднятого бота не трогает.
+
+    Зовут подъём и открытие окна, и конец мастера, и удавшийся вход — а
+    настройки к этому мигу уже полны. Собери он второго бота, тот сел бы на ту
+    же строку сеанса: Telegram считает такие соединения разными копиями, и
+    обход канала пошёл бы в два голоса.
+    """
+    built: list[str] = []
+    monkeypatch.setattr(lifespan, "_ready_for_bot", lambda rs: True)
+    monkeypatch.setattr(lifespan, "_start_bot", lambda one: built.append("собран"))
+    hub.bot = Silent()
+
+    lifespan.start_bot(hub)
+
+    assert built == []
+
+
+async def test_a_fresh_login_rebuilds_the_bot(hub, monkeypatch, runner):
+    """Повторный вход пересобирает бота, а не оставляет прежнего.
+
+    Вход выдаёт новую строку сеанса, а прежнюю Telegram отзывает: бот,
+    оставленный на ней, молчит до перезапуска приложения — окно при этом
+    показывает связь живой.
+    """
+    steps: list[str] = []
+    monkeypatch.setattr(lifespan, "_ready_for_bot", lambda rs: True)
+    monkeypatch.setattr(lifespan, "_start_bot", lambda one: steps.append("собран"))
+    old = Stoppable(steps)
+    hub.bot = old
+
+    lifespan._remember_login(hub, "маша")
+    await runner.drain()
+
+    # Порядок несущий: новый бот садится на ту же учётную запись, и собранный
+    # до остановки прежнего дал бы Telegram две копии на одной строке сеанса.
+    assert steps == ["отмени обход", "остановись", "собран"]
+    assert hub.username_cache == "маша"
+
+
+async def test_a_login_on_a_bare_app_does_not_build_a_bot(hub, monkeypatch):
+    """Вход на ненастроенном приложении бота не поднимает.
+
+    Первым шагом мастера идёт вход, а модели вписывают вторым и третьим:
+    собранный в этот миг бот отказывает броском, и человек читает в журнале
+    «бот упал» посреди того, что идёт по плану.
+    """
+    built: list[str] = []
+    monkeypatch.setattr(lifespan, "_ready_for_bot", lambda rs: False)
+    monkeypatch.setattr(lifespan, "_start_bot", lambda one: built.append("собран"))
+
+    lifespan._remember_login(hub, None)
+
+    assert built == []
+
+
+async def test_a_bot_that_fell_does_not_stay_in_the_hub(hub, monkeypatch, runner):
+    """Упавший бот в хозяйстве не остаётся.
+
+    Оставшись, он выглядит поднятым: лампочка связи зелена, а следующий зов
+    подъёма молчит, считая, что бот уже есть, — и окно живёт ширмой до
+    перезапуска.
+    """
+
+    class Falling:
+        def __init__(self, rs, session_factory) -> None:
+            pass
+
+        async def run(self) -> None:
+            raise RuntimeError("подъём не удался")
+
+    monkeypatch.setattr("backend.bot.client.Bot", Falling)
+
+    lifespan._start_bot(hub)
+    await runner.drain()
+
+    assert hub.bot is None
+
+
 async def test_what_the_bot_does_by_itself_reaches_the_queue(hub):
     """Всё, что бот делает сам, доезжает до страницы вестью в очереди.
 

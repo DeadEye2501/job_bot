@@ -49,7 +49,10 @@ def record(msg: str, *, name: str = "проверка", level: int = logging.INF
         "Authorization: Bearer abcdefgh12345678",
         "ключ sk-abcdefghijklmnop0123",
         "api_hash='9cc8ccb459f977b52c89b3199fa8e591'",
-        "сессия " + "A" * 60,
+        # Настоящая строка сеанса Pyrogram: base64 в безопасном для адреса
+        # написании, с `-` и `_` внутри. Из одних больших букв её не собрать,
+        # и образец, зелёный на «A» × 60, настоящую пропускал бы целиком.
+        "сессия 4yNjo-QkZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr_",
     ],
 )
 def test_a_secret_never_reaches_the_record(raw):

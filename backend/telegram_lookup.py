@@ -42,6 +42,29 @@ async def read_channel_metadata(
     return title, await fetch_telegram_avatar(client, chat)
 
 
+async def _quietly(what: str, asking):
+    """Спросить Telegram и промолчать, если не ответил; беду записать.
+
+    Оба зова отсюда второстепенны — картинка собеседника и его розыск, — и
+    ронять из-за них разбор нельзя: у зовущих на пустоту есть свои дороги.
+
+    Запрет частоты пишется словом, а не трассировкой: это не поломка, а
+    просьба подождать. Срок при этом Telegram называет не всегда, и в запись
+    он идёт строкой — собранная числом, она упала бы на «?» и унесла бы с
+    собой саму запись.
+    """
+    try:
+        return await asking
+    except FloodWait as e:
+        logger.warning(
+            "%s: FloodWait %s, пропускаю", what, getattr(e, "value", "?")
+        )
+        return None
+    except Exception:
+        logger.exception("%s: не вышло", what)
+        return None
+
+
 async def fetch_telegram_avatar(client, entity) -> bytes | None:
     """Download the small profile photo from a Pyrogram User or Chat.
 
@@ -56,16 +79,9 @@ async def fetch_telegram_avatar(client, entity) -> bytes | None:
     file_id = getattr(photo, "small_file_id", None) or getattr(photo, "big_file_id", None)
     if not file_id:
         return None
-    try:
-        buf = await client.download_media(file_id, in_memory=True)
-    except FloodWait as e:
-        logger.warning(
-            "fetch_telegram_avatar: FloodWait %ds, skipping", getattr(e, "value", "?")
-        )
-        return None
-    except Exception:
-        logger.exception("fetch_telegram_avatar: failed")
-        return None
+    buf = await _quietly(
+        "fetch_telegram_avatar", client.download_media(file_id, in_memory=True)
+    )
     if buf is None:
         return None
     return buf.getvalue()
@@ -75,17 +91,9 @@ async def resolve_hr_telegram(client, hr_contact: str):
     username = normalize_username(hr_contact)
     if not username:
         return None
-    try:
-        user = await client.get_users(username)
-    except FloodWait as e:
-        logger.warning(
-            "resolve_hr_telegram: FloodWait %ds, skipping", getattr(e, "value", "?")
-        )
-        return None
-    except Exception:
-        logger.exception("resolve_hr_telegram: failed for %r", hr_contact)
-        return None
-
+    user = await _quietly(
+        f"resolve_hr_telegram {hr_contact!r}", client.get_users(username)
+    )
     if user is None:
         return None
     if getattr(user, "is_bot", False) or getattr(user, "is_deleted", False):

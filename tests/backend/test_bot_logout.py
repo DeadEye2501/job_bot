@@ -6,6 +6,8 @@
 получасового сна, и всё это время он сидел бы с отозванной сессией.
 """
 
+import pytest
+
 from tests.fakes.telegram import FakeTelegramClient
 
 
@@ -21,15 +23,17 @@ async def test_logging_out_stops_the_bot(make_bot):
     assert bot.wake_event.is_set()
 
 
-async def test_a_failed_log_out_stops_the_bot_anyway(make_bot):
-    """Сорвавшийся выход всё равно останавливает бота.
+async def test_a_failed_log_out_is_not_passed_off_as_a_done_one(make_bot):
+    """Сорвавшийся выход не выдаётся за удавшийся, а бот всё равно встаёт.
 
-    Пользователь нажал «выйти»: оставить его с работающим ботом из-за
-    неудачного запроса значило бы не сделать ровно то, о чём просили.
+    Ключ на серверах Telegram остался живым: промолчи мы — человек считал бы
+    себя вышедшим, а его сеанс продолжал бы читать переписку. Остановка при
+    этом идёт в любом случае: нажали «выйти», и работать боту больше нечем.
     """
     bot = await make_bot(FakeTelegramClient(fails={"log_out": OSError("сеть")}))
 
-    await bot.log_out_session()
+    with pytest.raises(OSError):
+        await bot.log_out_session()
 
     assert bot.stop_event.is_set()
     assert bot.wake_event.is_set()

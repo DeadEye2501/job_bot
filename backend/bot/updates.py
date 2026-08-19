@@ -17,7 +17,6 @@ from backend.flows import dm_sync
 from backend.flows.dm import process_dm
 from backend.message_text import extract_text
 from backend.models import BotMode
-from backend.repository.hr_identify import find_known_hr
 
 from backend.notify import fire
 
@@ -104,7 +103,7 @@ async def on_dm(bot, _client, msg) -> None:
     # Off mode silences everything, including reading HR replies.
     if await _muted(bot):
         return
-    await process_dm(
+    hr_id = await process_dm(
         msg,
         bot.lm_client,
         bot.lm_chat_model,
@@ -117,22 +116,5 @@ async def on_dm(bot, _client, msg) -> None:
     # _run_debounced_classify), он же сам пушнёт сигнал. До того статус
     # не менялся, любой ранний refetch вкладки «Вакансии» отдал бы
     # тот же набор статусов и зря грузил бы БД/UI.
-    # Пустой обработчик отсеивается и здесь, хотя `fire` умеет это сам:
-    # без окна не нужен и поиск HR в базе, который идёт следом.
-    if bot.on_new_message is None:
-        return
-    if not msg.from_user:
-        return
-    try:
-        async with bot.session_factory() as session:
-            hr = await find_known_hr(
-                session,
-                msg.from_user.id,
-                msg.from_user.username,
-            )
-        if hr is not None:
-            fire(bot.on_new_message, "on_new_message", hr.id)
-    except Exception:
-        # Поломку самого оповещения глотает `fire`; сюда долетает только
-        # сбой поиска HR, то есть обращение к базе.
-        logger.exception("echo lookup for the window failed")
+    if hr_id is not None:
+        fire(bot.on_new_message, "on_new_message", hr_id)

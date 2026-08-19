@@ -48,7 +48,8 @@ def start(runner, session_factory, rs, engine=None) -> Hub:
     hub = Hub(runner, session_factory, rs)
     hub.engine = engine
     # Клиент входа свой, временный — отдельный от того, что поднимает бот
-    # позже. Имя сеанса тоже своё: под общим они делили бы один файл.
+    # позже. Имя своё же: файлов сессии ни у одного из них нет (оба поднимают
+    # клиента `in_memory=True`), зато по записи в журнале видно, чей это вход.
     hub.login = TelegramLogin(
         "job_bot_relogin", rs, on_saved=lambda username: _remember_login(hub, username)
     )
@@ -96,17 +97,22 @@ def stop(hub: Hub) -> None:
 def start_bot(hub: Hub) -> None:
     """Поднять бота, если приложение уже настроено, и промолчать, если нет.
 
-    Зовут это дважды: при открытии окна и последним шагом первого запуска. Оба
-    — мгновения, когда записанного могло стать достаточно. Третье такое
-    мгновение, удавшийся вход в Telegram, идёт мимо: `_remember_login` поднимает
-    бота своим зовом, потому что к тому времени заслон уже пройден.
+    Зовут это трижды: при открытии окна, последним шагом первого запуска и
+    после удавшегося входа в Telegram. Все три — мгновения, когда записанного
+    могло стать достаточно, и заслон у них общий.
 
     Заслон обязателен. Собранный не вовремя бот отказывает броском
     (`Bot.__init__`), и отказ приезжает в журнал как «бот упал» — а случается
     он ровно посреди первого запуска, где вход идёт первым шагом, а модели
     вводят вторым и третьим. Человек читал бы о поломке приложения там, где всё
     идёт по плану.
+
+    Поднятого бота второй зов не трогает: собранный поверх него второй сел бы
+    на ту же строку сеанса, а Telegram считает такие соединения разными
+    копиями — обход канала пошёл бы в два голоса.
     """
+    if hub.bot is not None:
+        return
     if not _ready_for_bot(hub.rs):
         logger.info("бот ждёт настройки: нет учётной записи Telegram или модели")
         return
@@ -132,7 +138,7 @@ def _forget_login(hub: Hub) -> None:
     нет вовсе.
     """
     login = hub.login
-    if not getattr(login, "active", False):
+    if not login.active:
         return
     try:
         hub.runner.submit(login.forget()).result(timeout=_LOGIN_CLOSING_WAIT_S)
@@ -159,7 +165,7 @@ def _start_bot(hub: Hub) -> None:
         await bot.run()
 
     future = hub.runner.submit(_build_and_run())
-    future.add_done_callback(_log_if_crashed)
+    future.add_done_callback(lambda done: _log_if_crashed(hub, done))
     hub.bot_task = future
 
 
@@ -198,26 +204,67 @@ def _tell_the_window(bot, hub: Hub) -> None:
     bot.on_vacancies_changed = lambda: events.add("vacancies_list_changed")
 
 
+def _restart_bot(hub: Hub) -> None:
+    """Пересобрать бота под новый сеанс: прежнего погасить, нового поднять.
+
+    Одной работой, а не двумя: новый садится на ту же учётную запись, и
+    подними мы его до остановки прежнего — Telegram увидел бы две копии на
+    одной строке сеанса. Отвязываем прежнего сразу, чтобы соседний зов не взял
+    останавливающегося, а ожидание уезжает внутрь отправленной работы: зовут
+    это из самого мотора — вход сохраняет сеанс его же корутиной, — и ждать
+    здесь значило бы запереть мотор на себе.
+    """
+    bot, task = hub.bot, hub.bot_task
+    hub.bot = None
+    hub.bot_task = None
+
+    async def _swap() -> None:
+        if bot is not None:
+            try:
+                await stop_bot(bot, task)
+            except Exception:
+                logger.exception("вход: прежний бот не остановился")
+        start_bot(hub)
+
+    hub.runner.submit(_swap())
+
+
 def _remember_login(hub: Hub, username: str | None) -> None:
-    """Новый сеанс сохранён: запомнить ник и поднять бота, если он лежит.
+    """Новый сеанс сохранён: запомнить ник и пересобрать под него бота.
 
     Не спросившийся ник (`None`) прежний в кэше не трогает: показать старый
     вернее, чем стереть его до первого удачного `get_me` у бота.
+
+    Прежний бот гасится, а не остаётся: вход выдал новую строку сеанса, а
+    прежнюю Telegram отозвал — оставленный на ней бот молчит до перезапуска
+    приложения, показывая окну живую связь.
+
+    Подъём идёт через общий заслон, а не мимо него: первым шагом мастера стоит
+    как раз вход, а модели вписывают вторым и третьим — собранный в этот миг
+    бот отказал бы броском.
     """
     if username is not None:
         hub.username_cache = username
-    if hub.bot is None:
-        _start_bot(hub)
+    _restart_bot(hub)
 
 
-def _log_if_crashed(future: Future) -> None:
-    """Сказать в журнал, что бот упал: без этого окно осталось бы живой ширмой.
+def _log_if_crashed(hub: Hub, future: Future) -> None:
+    """Убрать упавшего бота из хозяйства и сказать о падении в журнал.
 
     Отмену пропускаем: её приносит остановка мотора при закрытии окна, и
     жаловаться на неё значит писать беду о штатном выходе.
+
+    Оставленный в хозяйстве упавший бот выглядит поднятым: лампочка связи
+    зелена, а следующий зов подъёма молчит, считая, что бот уже есть.
+    Убирается только свой — за время падения место могло достаться
+    пересобранному, и его сносить нельзя.
     """
     if future.cancelled():
         return
     error = future.exception()
-    if error is not None:
-        logger.critical("бот упал — окно осталось без него", exc_info=error)
+    if error is None:
+        return
+    if hub.bot_task is future:
+        hub.bot = None
+        hub.bot_task = None
+    logger.critical("бот упал — окно осталось без него", exc_info=error)

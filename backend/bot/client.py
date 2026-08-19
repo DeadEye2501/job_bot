@@ -185,10 +185,7 @@ class Bot:
         self,
         runtime_settings: RuntimeSettings,
         session_factory: async_sessionmaker[AsyncSession],
-        *,
-        dry_run: bool = False,
     ) -> None:
-        self.dry_run = dry_run
         if runtime_settings.tg is None:
             raise RuntimeError("Bot: TG account not configured")
         if runtime_settings.chat is None:
@@ -268,7 +265,9 @@ class Bot:
     async def delete_channel(self, channel_id) -> int | None:
         return await channels.delete_channel(self, channel_id)
 
-    async def add_channel(self, username) -> tuple[int | None, Literal["created", "exists", "invalid"]]:
+    async def add_channel(
+        self, username
+    ) -> tuple[int | None, Literal["created", "exists", "invalid", "error"]]:
         return await channels.add_channel(self, username)
 
     def cancel_current_poll(self) -> None:
@@ -289,8 +288,12 @@ class Bot:
     async def ui_send_vacancy_application(self, vacancy_id) -> tuple[bool, str]:
         return await send.ui_send_vacancy_application(self, vacancy_id)
 
-    async def send(self, hr, text, attachment=None, vacancy_id=None, *, force=False) -> bool:
-        return await send.send(self, hr, text, attachment, vacancy_id, force=force)
+    async def send(
+        self, hr, text, attachment=None, vacancy_id=None, *, force=False
+    ) -> bool:
+        return await send.send(
+            self, hr, text, attachment, send.Errand(vacancy_id, force)
+        )
 
     async def _on_raw_update(self, _client, update, _users, _chats) -> None:
         return await updates.on_raw_update(self, _client, update, _users, _chats)

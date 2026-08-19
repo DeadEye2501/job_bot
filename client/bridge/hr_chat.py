@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import webview
 
+from backend.bot.chat import EMPTY_MESSAGE
 from backend.payloads import int_or_none, moment_or_none
 from backend.repository import messages as messages_repo
 from client.bridge.answer import Denied, bad_fields, denied, reply
@@ -96,7 +97,7 @@ class HrChat:
             return bad_fields("send_message", e)
 
         if not text:
-            return denied("Пустое сообщение.", hr_id=hr_id)
+            return denied(EMPTY_MESSAGE, hr_id=hr_id)
 
         async def run() -> dict:
             bot = self._hub.bot

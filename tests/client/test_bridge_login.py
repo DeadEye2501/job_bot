@@ -7,6 +7,9 @@
 """
 
 from backend.telegram_login import LoginStep
+from backend.crypto import encrypt_bytes, encrypt_str
+from tests.dbio import put
+from tests.factories import tg_account_row
 from tests.fakes.ui_login import UiLogin
 
 
@@ -120,6 +123,32 @@ async def test_the_password_reaches_the_login_as_typed(api, ask, hub):
 
     assert "ok" in answer
     assert ("confirm_password", " Тайна 1 ") in login.calls
+
+
+async def test_a_key_the_server_did_not_revoke_is_not_called_revoked(
+    api, ask, hub, with_bot, session_factory
+):
+    """Неотозванный ключ выходом не считается, и учётная запись остаётся.
+
+    Сеанс на серверах Telegram живёт дальше и продолжает читать переписку.
+    Сотри мы учётные данные — человек считал бы себя вышедшим, а отозвать
+    ключ было бы уже нечем: строки сеанса в настройках нет.
+    """
+    await put(
+        session_factory,
+        tg_account_row(
+            api_hash_encrypted=encrypt_str("шифр"),
+            session_blob_encrypted=encrypt_bytes("сессия".encode("utf-8")),
+        ),
+    )
+    await hub.rs.reload()
+    hub.login = UiLogin(LoginStep(payload={}, error=None))
+    with_bot(log_out_refusal="сеть отвалилась")
+
+    answer = await ask(api.settings.logout)
+
+    assert "ok" not in answer
+    assert hub.rs.has_tg_session is True
 
 
 async def test_logging_out_lets_the_bot_go(api, ask, hub, with_bot):
