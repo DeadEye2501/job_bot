@@ -196,7 +196,7 @@
 </script>
 
 {#if !card}
-  <div class="vac-detail-empty">Загрузка…</div>
+  <div class="empty-note vac-detail-empty">Загрузка…</div>
 {:else}
   <div class="det-head">
     <div class="status-wrap" class:popover-open={picking} bind:this={statusWrap}>

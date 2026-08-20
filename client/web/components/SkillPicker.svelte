@@ -47,11 +47,11 @@
   <button class="chip-add" type="button" onclick={toggle}>+ навык</button>
 
   {#if open}
-    <div class="skill-picker">
+    <div class="pop-frame skill-picker">
       {#if known.length === 0}
-        <div class="skill-picker-empty">Нет навыков. Добавьте в Skills.</div>
+        <div class="empty-note skill-picker-empty">Нет навыков. Добавьте в Skills.</div>
       {:else}
-        <div class="skill-picker-search">
+        <div class="search-bar skill-picker-search">
           <SearchBox
             value={query}
             placeholder="Поиск навыка..."

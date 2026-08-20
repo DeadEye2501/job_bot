@@ -139,11 +139,6 @@
   font-size: 0.72rem;
 }
 
-.stack-chip.matched {
-  background: var(--accent-chip-bg);
-  color: var(--accent);
-}
-
 /* Переносится и посреди слова: в описании из объявления попадаются ссылки и
    цепочки ников без пробелов, а вширь панели ехать некуда. */
 .det-section p {

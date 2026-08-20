@@ -57,7 +57,7 @@
 </script>
 
 <textarea
-  class="notes-area"
+  class="textarea notes-area"
   class:saved-flash={flashed}
   maxlength={LIMIT}
   {placeholder}

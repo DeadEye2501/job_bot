@@ -44,9 +44,7 @@
   bottom: 38px;
   width: 280px;
   max-height: 320px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  /* Тень гуще общей: список висит над всем окном, а не под своей кнопкой. */
   box-shadow: 0 8px 24px var(--shadow-popup);
   display: flex;
   flex-direction: column;
@@ -56,9 +54,7 @@
 
 .unread-popup-empty {
   padding: 12px 14px;
-  color: var(--text-tertiary);
   font-size: 0.78rem;
-  text-align: center;
 }
 
 .unread-popup-list {

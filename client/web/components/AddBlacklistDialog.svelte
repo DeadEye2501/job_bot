@@ -71,7 +71,7 @@
           onkeydown={(event) => event.key === 'Enter' && onadd()}
         />
         {#if hints !== null && open}
-          <div class="drop-panel bl-combobox-dropdown">
+          <div class="pop-frame drop-panel bl-combobox-dropdown">
             {#if hints.empty}
               <div class="bl-combobox-empty">{hints.empty}</div>
             {:else}

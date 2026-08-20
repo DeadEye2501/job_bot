@@ -12,7 +12,7 @@
 <button class="vac-row" class:selected type="button" onclick={onpick}>
   <span class="vac-row-head">
     <span class="status-dot" data-status={vacancy.status}></span>
-    {#if vacancy.score !== null}<span class="vac-score" data-tone={tone}>{vacancy.score}</span>{/if}
+    {#if vacancy.score !== null}<span class="num-pill vac-score" data-tone={tone}>{vacancy.score}</span>{/if}
     <span class="vac-title">{shown.title}</span>
   </span>
 

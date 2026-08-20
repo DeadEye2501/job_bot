@@ -164,9 +164,9 @@
 </script>
 
 {#if trouble}
-  <div class="cnt-detail-empty">{trouble}</div>
+  <div class="empty-note cnt-detail-empty">{trouble}</div>
 {:else if !card}
-  <div class="cnt-detail-empty">Загрузка…</div>
+  <div class="empty-note cnt-detail-empty">Загрузка…</div>
 {:else}
   <div class="cnt-det-head">
     <Avatar avatar={card.avatar} icon="tag" />

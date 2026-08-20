@@ -41,12 +41,16 @@
   right: 0;
   min-width: 100%;
   max-height: 220px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  box-shadow: 0 6px 14px var(--shadow-dropdown);
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+/* Своё против общей оправы, и это отклонение, а не украшение: панель падает
+   вплотную к полю, откуда её открыли, — при общем скруглении её угол спорил бы
+   с углом поля, а мягкая тень окошка отрывала бы её от него. */
+.pop-frame.drop-panel {
+  border-radius: 4px;
+  box-shadow: 0 6px 14px var(--shadow-dropdown);
 }
 
 /* Выше соседних строк списка, но ниже окон поверх экрана. */

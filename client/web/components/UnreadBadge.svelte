@@ -24,11 +24,11 @@
        окна, и оставленный открытым перекрывал бы правый край полосы. -->
   <div class="unread-popup-backdrop" role="presentation" onclick={() => ontoggle()}></div>
 
-  <div class="unread-popup" role="dialog" aria-label="Непрочитанные чаты">
+  <div class="pop-frame unread-popup" role="dialog" aria-label="Непрочитанные чаты">
     {#if loading && rows.length === 0}
-      <div class="unread-popup-empty">Загрузка…</div>
+      <div class="empty-note unread-popup-empty">Загрузка…</div>
     {:else if rows.length === 0}
-      <div class="unread-popup-empty">Непрочитанных чатов нет.</div>
+      <div class="empty-note unread-popup-empty">Непрочитанных чатов нет.</div>
     {:else}
       <div class="unread-popup-list">
         {#each rows as row (row.hr_id)}

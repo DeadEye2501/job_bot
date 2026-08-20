@@ -107,7 +107,7 @@
   />
 
   {#if open}
-    <div class="date-panel" class:up>
+    <div class="pop-frame date-panel" class:up>
       <div class="date-head">
         <button class="icon-btn" type="button" title="Прошлый месяц" onclick={() => step(-1)}>
           <span class="material-symbols-outlined">chevron_left</span>

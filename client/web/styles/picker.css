@@ -20,14 +20,8 @@
   padding: 6px 10px;
 }
 
-/* Сама строка поиска — общая, в search-box.css. Своего отступа она здесь не
-   держит: его даёт полоса, а два вложенных отступа подряд разносят строку вдвое
-   против прежней. Кегль свой: окно выбора шире полосы списка, и мелкий шрифт
-   полосы в нём теряется. */
-.picker-search-bar .search-box {
-  padding: 0;
-}
-
+/* Кегль свой: окно выбора шире полосы списка, и мелкий шрифт полосы в нём
+   теряется. Отступ самой строки снимает общее правило полосы с поиском. */
 .picker-search-bar .search-input {
   font-size: 0.82rem;
 }
@@ -42,10 +36,8 @@
 
 .picker-empty {
   padding: 16px 12px;
-  color: var(--text-tertiary);
   font-size: 0.78rem;
   font-style: italic;
-  text-align: center;
 }
 
 .picker-row {
@@ -115,13 +107,10 @@
   flex-shrink: 0;
 }
 
+/* Просторнее прочих: строка подборщика стоит в окне вдвое шире списка. */
 .vac-count {
   padding: 1px 8px;
   border-radius: 10px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
 }
 
 /* Заведение нового — своей полосой над подвалом, а не кнопкой среди прочих:

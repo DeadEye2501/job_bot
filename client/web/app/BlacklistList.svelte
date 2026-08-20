@@ -169,9 +169,9 @@
 </div>
 
 {#if !loaded}
-  <div class="cnt-list-empty">Загрузка…</div>
+  <div class="empty-note cnt-list-empty">Загрузка…</div>
 {:else if shown.length === 0}
-  <div class="cnt-list-empty">{rows.length === 0 ? 'Blacklist пуст' : 'Ничего не найдено'}</div>
+  <div class="empty-note cnt-list-empty">{rows.length === 0 ? 'Blacklist пуст' : 'Ничего не найдено'}</div>
 {:else}
   <div class="bl-table">
     <div class="bl-row head">

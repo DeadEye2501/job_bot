@@ -58,16 +58,6 @@
   text-align: right;
 }
 
-/* Шарик ползунка проявляется, когда курсор над его строкой. Движки разведены
-   по разным правилам: склеенные в один список, они отбрасываются оба. */
-.slider-row:hover input[type='range'].slider::-webkit-slider-thumb {
-  opacity: 1;
-}
-
-.slider-row:hover input[type='range'].slider::-moz-range-thumb {
-  opacity: 1;
-}
-
 .with-toggle {
   display: flex;
   align-items: center;

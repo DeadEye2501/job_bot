@@ -59,13 +59,22 @@ input[type='range'].slider::-moz-range-thumb {
   transition: opacity 0.12s;
 }
 
-/* Движки разведены по разным правилам нарочно: псевдоэлемент, которого движок
+/* Шарик проявляется в двух случаях: пока его тянут и пока курсор над строкой,
+   в которой он стоит. Строк таких две — ползунок конвейера и ползунок уровня
+   навыка, — и названы они здесь, а не у себя: правило одно, а написанное у
+   каждой оно разошлось бы молча, и шарик перестал бы проявляться в одной.
+
+   Движки разведены по разным правилам нарочно: псевдоэлемент, которого движок
    не знает, делает недействительным всё правило целиком, а не свою строку, —
    склеенные в один список, они отбрасываются оба, и шарика нет ни там ни тут. */
-input[type='range'].slider:active::-webkit-slider-thumb {
+input[type='range'].slider:active::-webkit-slider-thumb,
+.slider-row:hover input[type='range'].slider::-webkit-slider-thumb,
+.skill-row:hover input[type='range'].slider::-webkit-slider-thumb {
   opacity: 1;
 }
 
-input[type='range'].slider:active::-moz-range-thumb {
+input[type='range'].slider:active::-moz-range-thumb,
+.slider-row:hover input[type='range'].slider::-moz-range-thumb,
+.skill-row:hover input[type='range'].slider::-moz-range-thumb {
   opacity: 1;
 }

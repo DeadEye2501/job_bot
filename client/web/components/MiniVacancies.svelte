@@ -27,7 +27,7 @@
           onkeydown={(event) => event.key === 'Enter' && onpick(one.id)}
         >
           <span class="status-dot" data-status={one.status}></span>
-          {#if one.score !== null}<span class="vac-mini-score">{one.score}</span>{:else}<span></span>{/if}
+          {#if one.score !== null}<span class="num-pill vac-mini-score">{one.score}</span>{:else}<span></span>{/if}
           <span class="vac-mini-title">{one.title || '— без названия —'}</span>
           <span class="vac-mini-when">{shortAgo(one.created_at, new Date())}</span>
         </div>

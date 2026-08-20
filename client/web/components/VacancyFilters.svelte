@@ -96,11 +96,11 @@
 
   {#if shown}
     <div class="pop filter-panel">
-      <div class="filter-head">
+      <div class="bar filter-head">
         <span class="material-symbols-outlined">filter_list</span>
         <span class="filter-title">Фильтры</span>
         <span class="filter-meta">{count ? `${count} активных` : 'Без фильтров'}</span>
-        <button class="filter-close" type="button" title="Закрыть" onclick={() => onshown(false)}>
+        <button class="modal-close filter-close" type="button" title="Закрыть" onclick={() => onshown(false)}>
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
@@ -230,7 +230,7 @@
         </FilterGroup>
       </div>
 
-      <div class="filter-foot">
+      <div class="modal-footer filter-foot">
         <!-- «Сбросить» — это «показать всё», а не «очистить поля»: список
              перечитывается сразу, панель закрывается. -->
         <button

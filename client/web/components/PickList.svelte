@@ -32,7 +32,7 @@
     <span class="material-symbols-outlined">{open ? 'expand_less' : 'expand_more'}</span>
   </button>
   {#if open}
-    <div class="pick-panel">
+    <div class="pop-frame pick-panel">
       <input
         class="input"
         type="text"

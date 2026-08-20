@@ -35,7 +35,7 @@
   <span class="cnt-hr-trailing">
     <BlacklistMark blocked={company.is_blacklisted} />
     {#if company.vacancy_count > 0}
-      <span class="cnt-co-count">{company.vacancy_count}</span>
+      <span class="num-pill cnt-co-count">{company.vacancy_count}</span>
     {/if}
   </span>
 </button>

@@ -62,9 +62,7 @@
   gap: 8px;
   height: 100%;
   padding: 24px;
-  color: var(--text-tertiary);
   font-size: 0.82rem;
-  text-align: center;
   /* Приглашение включить бота набрано в две строки. */
   white-space: pre-line;
 }
@@ -82,14 +80,14 @@
   min-height: 0;
 }
 
+/* По самой середине панели, без отступов: панель занимает её целиком, и
+   надпись стоит в её середине, а не под верхней кромкой. */
 .vac-detail-empty {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--text-tertiary);
-  font-size: 0.85rem;
-  text-align: center;
+  padding: 0;
 }
 
 .vac-row {
@@ -147,15 +145,10 @@
 }
 
 /* Оценка говорит не сама о себе, а о своём отношении к порогу отбора: под
-   порогом — отвергнутая, сразу над ним — взятая с натяжкой. */
+   порогом — отвергнутая, сразу над ним — взятая с натяжкой. Цветом и сказано;
+   сама пилюля — общая, в count-pill.css. */
 .vac-score {
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
   color: var(--accent);
-  background: var(--bg-tertiary);
-  padding: 0 5px;
-  border-radius: 8px;
-  flex-shrink: 0;
 }
 
 .vac-score[data-tone='warn'] {
@@ -184,10 +177,4 @@
 
 .mini-chip.more {
   color: var(--text-tertiary);
-}
-
-/* Совпавшее с анкетой подсвечено: по нему решают, стоит ли открывать. */
-.mini-chip.matched {
-  background: var(--accent-chip-bg);
-  color: var(--accent);
 }

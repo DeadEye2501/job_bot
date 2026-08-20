@@ -146,7 +146,7 @@
           ><span class="material-symbols-outlined">add</span>Навык</button
         >
         <button
-          class="cat-delete"
+          class="cat-delete trash"
           type="button"
           title="Удалить категорию"
           onclick={() => (leaving = group)}

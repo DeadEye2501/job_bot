@@ -44,13 +44,6 @@
   white-space: nowrap;
 }
 
-/* Безымянного зовут словами, и слова эти набраны курсивом: так видно, что это
-   не имя, а его отсутствие. */
-.cnt-hr-name.muted {
-  color: var(--text-tertiary);
-  font-style: italic;
-}
-
 .cnt-hr-sub {
   display: block;
   overflow: hidden;
@@ -118,15 +111,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Счёт вакансий — приглушённая пилюля в хвосте строки: число говорит, стоит ли
-   открывать, но спорить за внимание с именем не должно. Нулей в ней не бывает:
-   пустая пилюля читалась бы как «ноль чего-то важного». */
+/* Тихая пилюля — общая, в count-pill.css; здесь только её отбивка по высоте.
+   Нулей в ней не бывает: пустая пилюля читалась бы как «ноль чего-то важного». */
 .cnt-co-count {
-  flex-shrink: 0;
   padding: 1px 6px;
-  border-radius: 8px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
 }
