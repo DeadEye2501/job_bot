@@ -28,7 +28,7 @@
   <span class="cnt-hr-trailing">
     <BlacklistMark blocked={channel.is_blacklisted} />
     {#if channel.vacancy_count > 0}
-      <span class="cnt-co-count">{channel.vacancy_count}</span>
+      <span class="num-pill cnt-co-count">{channel.vacancy_count}</span>
     {/if}
     <!-- Канал из отсева включить нельзя: обход всё равно его пропустит, и
          включённый переключатель обещал бы работу, которой не будет. -->

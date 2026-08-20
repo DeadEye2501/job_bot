@@ -8,12 +8,21 @@
   flex-shrink: 0;
 }
 
-.pop {
-  position: absolute;
-  top: calc(100% + 4px);
-  z-index: 3;
+/* Сама оправа. Носят её восемь панелей, и половина из них прижата не под
+   кнопкой, а к своему месту на экране: перечень выбора, подборщик навыков,
+   календарь, список непрочитанного. Им достаётся только оправа, а куда встать —
+   они говорят сами. */
+.pop,
+.pop-frame {
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg-secondary);
   box-shadow: 0 6px 20px var(--shadow-popup);
+}
+
+/* Место под кнопкой, из-под которой окошко и выпадает. */
+.pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  z-index: 3;
 }

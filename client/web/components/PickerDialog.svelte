@@ -112,18 +112,18 @@
   {#snippet children()}
     <ModalHead {icon} {title} {onclose} />
 
-    <div class="bar picker-search-bar">
+    <div class="bar search-bar picker-search-bar">
       <SearchBox value={search} {placeholder} onsearch={find} />
     </div>
 
     <div class="picker-list">
       {#if !loaded}
-        <div class="picker-empty">Загрузка…</div>
+        <div class="empty-note picker-empty">Загрузка…</div>
       {:else if rows.length === 0}
         <!-- Пустых слов два, и разница несущая: «ничего не найдено» говорит, что
              список есть, а показать из него нечего, — и человек ищет причину в
              поле поиска, а не в том, что заводить он ещё ничего не начинал. -->
-        <div class="picker-empty">
+        <div class="empty-note picker-empty">
           {search ? `Ничего не найдено по запросу «${search}»` : empty}
         </div>
       {:else}

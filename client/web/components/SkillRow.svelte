@@ -45,7 +45,7 @@
     onremove={(index) => onedit({ aliases: skill.aliases.filter((_, at) => at !== index) })}
   />
 
-  <button class="icon-btn" type="button" title="Удалить навык" onclick={() => onremove()}>
+  <button class="icon-btn trash" type="button" title="Удалить навык" onclick={() => onremove()}>
     <span class="material-symbols-outlined">delete</span>
   </button>
 </div>

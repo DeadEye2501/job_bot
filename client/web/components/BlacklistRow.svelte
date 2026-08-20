@@ -114,7 +114,7 @@
 
   <RowToggle checked={row.active} {ontoggle} />
 
-  <button class="icon-btn" type="button" title="Удалить запись" onclick={() => onremove()}>
+  <button class="icon-btn trash" type="button" title="Удалить запись" onclick={() => onremove()}>
     <span class="material-symbols-outlined">delete</span>
   </button>
 </div>

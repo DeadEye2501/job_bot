@@ -29,13 +29,11 @@
   box-shadow: 0 8px 22px var(--scrim);
 }
 
+/* Полоса — общая, в bar.css; здесь только её просвет, отступы и кегль: в шапке
+   панели стоят значок, подпись и счёт условий, а не поле поиска. */
 .filter-head {
-  display: flex;
-  align-items: center;
   gap: 6px;
   padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-tertiary);
   font-size: 0.8rem;
 }
 
@@ -55,21 +53,17 @@
   font-size: 0.72rem;
 }
 
-/* Крестик мельче прочих кнопок-значков окна: он стоит в одной строке с
-   подписью 0.8rem, и коробка в 26 пикселей разгоняла бы шапку по высоте. */
+/* Крестик — общий с окном, в modal.css; мельче он потому, что стоит в одной
+   строке с подписью 0.8rem, и коробка в 26 пикселей разгоняла бы шапку по
+   высоте. Подсветка под курсором тоже своя: панель лежит на подложке, где общая
+   почти не видна. */
 .filter-close {
   width: 20px;
   height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 3px;
-  color: var(--text-tertiary);
 }
 
 .filter-close:hover {
   background: var(--surface-hover-firm);
-  color: var(--text-primary);
 }
 
 .filter-close .material-symbols-outlined {
@@ -124,26 +118,21 @@
   right: 0;
 }
 
+/* Подвал — общий с окном, в modal.css; здесь кнопки разведены по краям: слева
+   сброс, справа отмена и применение, — а не прижаты вправо, как в окне. */
 .filter-foot {
-  display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
   padding: 8px 10px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-tertiary);
 }
 
+/* Кнопки поджаты: панель уже окна, а кнопок в подвале три. */
 .filter-foot .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   padding: 4px 10px;
   font-size: 0.76rem;
 }
 
 .filter-foot .btn .material-symbols-outlined {
-  font-size: 14px;
   line-height: 1;
 }
 

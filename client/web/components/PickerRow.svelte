@@ -30,5 +30,5 @@
     </span>
     <span class="picker-sub">{row.sub}</span>
   </span>
-  <span class="picker-meta"><span class="vac-count" title={about}>{row.count}</span></span>
+  <span class="picker-meta"><span class="num-pill vac-count" title={about}>{row.count}</span></span>
 </button>

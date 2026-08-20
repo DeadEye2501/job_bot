@@ -3,18 +3,16 @@
    Вспышка тут же, а не в оформлении заметки: ею отзывается и пояснение в ленте,
    а правило у неё одно — зелёная рамка с ореолом на те же доли секунды. */
 
+/* Само поле — общее многострочное, в input.css; здесь только то, чем заметка
+   от него отличается: она ростом выше, набрана мельче и лежит на подложке
+   глубже — карточка под ней светлая, и поле на общем фоне сливалось бы с ней.
+   Медленный переход — для вспышки «записано» ниже. */
 .notes-area {
-  width: 100%;
   min-height: 80px;
   padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
   background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-family: inherit;
   font-size: 0.82rem;
   line-height: 1.4;
-  resize: vertical;
   transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 

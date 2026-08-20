@@ -46,10 +46,6 @@ img.hr-avatar {
   white-space: nowrap;
 }
 
-.hr-name.muted {
-  color: var(--text-tertiary);
-}
-
 /* Нажимаемое имя отличается от подписи только на наведении: подчёркивание в
    покое разлиновало бы блок, где нажимается почти всё. */
 .hr-name.is-link:hover {

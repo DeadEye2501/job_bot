@@ -56,11 +56,6 @@
   color: var(--text-tertiary);
 }
 
-.cat-delete:hover {
-  color: var(--danger);
-  background: var(--danger-tint);
-}
-
 .cat-delete .material-symbols-outlined {
   font-size: 16px;
 }
@@ -81,27 +76,10 @@
   background: var(--accent-row-hover);
 }
 
-/* Корзина в строке краснеет под курсором: серый ховер общей кнопки-значка не
-   отличал бы её от тех, что ничего не уносят. Значок мельче общего — строка
-   навыка ниже полосы, где кнопка-значок стоит обычно. */
-.skill-row .icon-btn:hover {
-  color: var(--danger);
-  background: var(--danger-tint);
-}
-
+/* Значок мельче общего: строка навыка ниже полосы, где кнопка-значок стоит
+   обычно. Само покраснение корзины — общее, в trash.css. */
 .skill-row .icon-btn .material-symbols-outlined {
   font-size: 16px;
-}
-
-/* Движки разведены по разным правилам: псевдоэлемент, которого движок не
-   знает, делает недействительным всё правило целиком, — склеенные в один
-   список, они отбрасываются оба, и шарик не проявляется нигде. */
-.skill-row:hover input[type='range'].slider::-webkit-slider-thumb {
-  opacity: 1;
-}
-
-.skill-row:hover input[type='range'].slider::-moz-range-thumb {
-  opacity: 1;
 }
 
 /* Имя навыка правится на месте — тем же общим правилом. Ширина по колонке:

@@ -257,10 +257,10 @@
 
     <div class="vac-list" onscroll={scrolled}>
       {#if !loaded}
-        <div class="vac-list-empty">Загрузка…</div>
+        <div class="empty-note vac-list-empty">Загрузка…</div>
       {:else if rows.length === 0}
         {@const note = emptyNote(search)}
-        <div class="vac-list-empty">
+        <div class="empty-note vac-list-empty">
           <span class="material-symbols-outlined">{note.icon}</span>
           <span>{note.text}</span>
         </div>
@@ -279,7 +279,7 @@
 
   <section class="vac-detail-pane">
     {#if opened === null}
-      <div class="vac-detail-empty">Выберите вакансию слева</div>
+      <div class="empty-note vac-detail-empty">Выберите вакансию слева</div>
     {:else}
       <VacancyCard
         {ask}

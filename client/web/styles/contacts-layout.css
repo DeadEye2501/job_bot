@@ -23,12 +23,12 @@
   font-size: 16px;
 }
 
+/* Приглушённая надпись по центру — общая, в empty-note.css; здесь мельче
+   кегль и просторнее строки: список узкий, и в нём это не заголовок, а
+   объяснение. */
 .cnt-list-empty {
-  padding: 40px 16px;
-  color: var(--text-tertiary);
   font-size: 0.78rem;
   line-height: 1.4;
-  text-align: center;
 }
 
 .cnt-detail-pane {
@@ -39,9 +39,8 @@
   background: var(--bg-primary);
 }
 
+/* Отбита сверху сильнее списочной: правая панель выше, и надпись по её
+   середине читается как потерянная. */
 .cnt-detail-empty {
   padding: 60px 20px;
-  color: var(--text-tertiary);
-  font-size: 0.85rem;
-  text-align: center;
 }

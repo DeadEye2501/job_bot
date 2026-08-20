@@ -10,7 +10,7 @@
   let { options, value, onpick, keepFocus = false } = $props();
 </script>
 
-<div class="drop-panel cdd-panel" role="listbox" tabindex="-1">
+<div class="pop-frame drop-panel cdd-panel" role="listbox" tabindex="-1">
   {#each options as one (one)}
     <button
       class="cdd-option"

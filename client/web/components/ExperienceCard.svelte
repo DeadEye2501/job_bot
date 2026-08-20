@@ -56,7 +56,7 @@
       {#if title.period}<span class="period">{title.period}</span>{/if}
     </div>
     <button
-      class="exp-delete"
+      class="exp-delete trash"
       type="button"
       title="Удалить место работы"
       onclick={(event) => {

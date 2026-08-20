@@ -15,7 +15,7 @@
   } = $props();
 </script>
 
-<div class="wiz-foot">
+<div class="modal-footer wiz-foot">
   {#if onback}
     <!-- Заперта вместе с основной: уход назад посреди зова оставил бы ответ
          прилетать в экран, которого уже нет. -->

@@ -148,13 +148,13 @@
   font-weight: 500;
 }
 
+/* Подвал — общий с окном, в modal.css; здесь кнопки разведены по краям: слева
+   «Назад», справа «Дальше», — а не прижаты вправо, как в окне. Отступы шире:
+   шаг мастера занимает окно целиком. */
 .wiz-foot {
-  display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 18px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-tertiary);
 }
 
 .wiz-foot-right {

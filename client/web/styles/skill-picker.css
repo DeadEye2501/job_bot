@@ -18,10 +18,9 @@
   position: absolute;
   bottom: calc(100% + 4px);
   left: 0;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
   width: 280px;
+  /* Тень своя: подборщик всплывает над строкой, и общая тень окошка легла бы
+     не под ним, а на него. */
   box-shadow: 0 6px 20px var(--shadow-dropdown);
   z-index: 10;
 }
@@ -34,13 +33,9 @@
   gap: 6px;
 }
 
-/* Сама строка поиска — общая, в search-box.css. Своего отступа она здесь не
-   держит: его даёт полоса подборщика. Крупнее общей и лупа, и набранное:
-   подборщик всплывает над строкой, и мелкий шрифт списка в нём не читается. */
-.skill-picker-search .search-box {
-  padding: 0;
-}
-
+/* Крупнее общей и лупа, и набранное: подборщик всплывает над строкой, и мелкий
+   шрифт списка в нём не читается. Отступ самой строки снимает общее правило
+   полосы с поиском. */
 .skill-picker-search .search-input {
   font-size: 0.8rem;
 }
@@ -101,8 +96,6 @@
 
 .skill-picker-empty {
   padding: 10px;
-  color: var(--text-tertiary);
   font-size: 0.78rem;
-  text-align: center;
   font-style: italic;
 }

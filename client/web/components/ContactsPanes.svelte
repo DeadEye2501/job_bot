@@ -39,9 +39,9 @@
 
     <div class="cnt-list" onscroll={onlistscroll}>
       {#if !loaded}
-        <div class="cnt-list-empty">Загрузка…</div>
+        <div class="empty-note cnt-list-empty">Загрузка…</div>
       {:else if empty}
-        <div class="cnt-list-empty">{@render emptyNote()}</div>
+        <div class="empty-note cnt-list-empty">{@render emptyNote()}</div>
       {:else}
         {@render items()}
       {/if}
@@ -50,7 +50,7 @@
 
   <section class="cnt-detail-pane" onscroll={ondetailscroll}>
     {#if !chosen}
-      <div class="cnt-detail-empty">{detailEmpty}</div>
+      <div class="empty-note cnt-detail-empty">{detailEmpty}</div>
     {:else}
       {@render detail()}
     {/if}
