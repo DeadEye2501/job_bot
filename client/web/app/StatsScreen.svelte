@@ -14,6 +14,7 @@
   import StatsResponsesCard from '$components/StatsResponsesCard.svelte';
   import StatsSkillsCard from '$components/StatsSkillsCard.svelte';
   import StatsStatusCard from '$components/StatsStatusCard.svelte';
+  import { living } from '$state/alive.js';
   import { PERIODS, sliceTarget } from '$state/stats.js';
 
   let { ask, onslice, onchannel } = $props();
@@ -25,7 +26,7 @@
   let skills = $state(null);
   let channels = $state(null);
 
-  let alive = true;
+  const alive = living();
 
   const loading = $derived(!kpi || !breakdown || !responses || !skills || !channels);
 
@@ -35,7 +36,7 @@
    * читались бы как настоящие.
    */
   async function taken(asked, answer) {
-    return answer !== null && alive && asked === period ? answer : null;
+    return answer !== null && alive.now && asked === period ? answer : null;
   }
 
   async function load() {
@@ -55,14 +56,14 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     // Читает `period` нарочно: сменился срок — эффект заводится заново и
     // перечитывает всё сам. Второй зов из обработчика вкладки удвоил бы
     // работу моста на каждое нажатие.
     period;
     load();
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>

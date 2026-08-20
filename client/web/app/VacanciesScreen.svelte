@@ -8,6 +8,7 @@
   import VacancyRow from '$components/VacancyRow.svelte';
 
   import VacancyCard from './VacancyCard.svelte';
+  import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
   import { closeOnClickAway } from '$state/outside.js';
   import { VACANCY_PAGE, appended, nearBottom, refreshLimit } from '$state/paging.js';
@@ -56,7 +57,7 @@
   // списка, а ответы возвращаются вразнобой — лёгший поверх свежего старый убрал
   // бы из меню только что заведённую компанию.
   const optionTries = attempts();
-  let alive = true;
+  const alive = living();
 
   // Какую вакансию открыть, придя со стороны — из мини-списка в карточке
   // канала, компании или человека. Отметка гасится сразу: раздел открывают и
@@ -101,7 +102,7 @@
       offset: 0,
       ...asked,
     });
-    if (now === null || !alive || tries.stale(mine)) return;
+    if (now === null || !alive.now || tries.stale(mine)) return;
     rows = now.vacancies;
     hasMore = now.has_more;
     // Порог отбора приезжает вместе со списком: по нему красится оценка, и
@@ -123,7 +124,7 @@
   async function askOptions() {
     const mine = optionTries.next();
     const now = await ask('vacancies.filter_options');
-    if (now === null || !alive || optionTries.stale(mine)) return;
+    if (now === null || !alive.now || optionTries.stale(mine)) return;
     options = now.filter_options;
     optionsLoaded = true;
   }
@@ -145,7 +146,7 @@
       offset: was.rows.length,
       ...was.filter,
     });
-    if (page === null || !alive) return;
+    if (page === null || !alive.now) return;
     if (rows !== was.rows || search !== was.search) return;
     if (sortKey(sort) !== was.sort || asked !== was.filter) return;
     rows = appended(rows, page.vacancies);
@@ -191,7 +192,7 @@
   });
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     // Список меняет не только этот экран: бот собирает вакансии сам, и статусы
     // им же двигаются по ходу переписки.
     // Перечитываем показанным числом строк, а не страницей: весть приходит на
@@ -210,7 +211,7 @@
       refresh();
     });
     return () => {
-      alive = false;
+      settled();
       deaf();
     };
   });

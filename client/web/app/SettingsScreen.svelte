@@ -12,6 +12,8 @@
   import PipelineSection from '$components/PipelineSection.svelte';
   import SettingsSection from '$components/SettingsSection.svelte';
   import TelegramSection from '$components/TelegramSection.svelte';
+  import { living } from '$state/alive.js';
+  import { askModels, probeModel } from '$state/provider.js';
   import { credsChanged, idleProbe, loginTrouble, mirrored, probePill, sameCreds } from '$state/settings.js';
 
   import TelegramLogin from './TelegramLogin.svelte';
@@ -24,9 +26,13 @@
   const LOGOUT_ASK =
     'Выйти из сессии Telegram?\n\nКлюч будет отозван на сервере, бот остановится, а api_id, api_hash и телефон сотрутся из настроек. Войти заново придётся с нуля.';
 
+  // Пустой черновик входа: им экран открывается и к нему же возвращается после
+  // выхода из сессии.
+  const BLANK_TG = { api_id: '', api_hash: '', phone: '' };
+
   let loaded = $state(false);
   let tg = $state(null);
-  let draft = $state({ api_id: '', api_hash: '', phone: '' });
+  let draft = $state({ ...BLANK_TG });
   let chat = $state({ base_url: '', api_key: '', model: '' });
   let embed = $state({ base_url: '', api_key: '', model: '' });
   let pipeline = $state({});
@@ -43,7 +49,7 @@
 
   const pills = $derived({ chat: probePill(probes.chat), embed: probePill(probes.embed) });
 
-  let alive = true;
+  const alive = living();
 
   /** Перечитать настройки с моста целиком.
    *
@@ -53,7 +59,7 @@
    */
   async function refresh() {
     const now = await ask('settings.get');
-    if (now === null || !alive) return;
+    if (now === null || !alive.now) return;
     // Плашка проверки говорит про те данные, которые проверяли: приехали
     // другие — ей верить больше нельзя.
     if (credsChanged(chat, now.chat)) probes = { ...probes, chat: idleProbe() };
@@ -146,27 +152,18 @@
     // и человек будет искать беду в сети вместо незаполненного поля.
     if (!creds.base_url || !creds.model) return say('Заполните base_url и модель', true);
     probes = { ...probes, [kind]: { ...idleProbe(), status: 'busy' } };
-    let answer = null;
-    let trouble = '';
-    try {
-      // Зовём мост напрямую: отказ поставщика — это и есть исход проверки, и
-      // человек читает его в плашке рядом с полем. Общая плашка окна показала
-      // бы то же самое и погасла, а искать причину он будет здесь.
-      answer = await call('settings.probe_model', { kind, ...creds });
-    } catch (refusal) {
-      trouble = refusal.message;
-    }
-    if (!alive) return;
+    const done = await probeModel(call, { kind, ...creds });
+    if (!alive.now) return;
     // Ответ, пришедший после правки полей, отбрасывается: плашка про прежние
     // данные врала бы о нынешних.
     if (probes[kind].status !== 'busy') return;
-    if (answer === null) {
-      probes = { ...probes, [kind]: { ...idleProbe(), status: 'err', error: trouble } };
+    if (!done.ok) {
+      probes = { ...probes, [kind]: { ...idleProbe(), status: 'err', error: done.trouble } };
       return;
     }
     probes = {
       ...probes,
-      [kind]: { status: 'ok', model: answer.model || '', latencyMs: answer.latency_ms || 0, error: '' },
+      [kind]: { status: 'ok', model: done.model, latencyMs: done.latencyMs, error: '' },
     };
   }
 
@@ -178,18 +175,9 @@
    */
   async function listModels(kind) {
     const creds = kind === 'chat' ? chat : embed;
-    let answer = null;
-    try {
-      answer = await call('settings.list_models', {
-        kind,
-        base_url: creds.base_url,
-        api_key: creds.api_key,
-      });
-    } catch {
-      answer = null;
-    }
-    if (!alive) return;
-    models = { ...models, [kind]: answer?.models || [] };
+    const found = await askModels(call, { kind, ...creds });
+    if (!alive.now) return;
+    models = { ...models, [kind]: found.models };
   }
 
   function startLogin() {
@@ -217,6 +205,11 @@
     leavingBusy = false;
     if (done === null) return;
     say('Сессия Telegram завершена');
+    // Черновик стирается здесь, а не перечитыванием: `refresh` переписывает его
+    // только при первом чтении, и api_id с телефоном остались бы на экране —
+    // вопреки тому, что человек прочитал в подтверждении и что уже случилось в
+    // базе.
+    draft = { ...BLANK_TG };
     await refresh();
   }
 
@@ -235,15 +228,15 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     refresh().then(() => {
-      if (alive) {
+      if (alive.now) {
         listModels('chat');
         listModels('embed');
       }
     });
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>
@@ -319,6 +312,7 @@
        На раскладку это не влияет — окно висит поверх страницы. -->
   {#if logging}
     <TelegramLogin
+      {say}
       creds={draft}
       relogin={tg.has_session}
       ondone={loggedIn}

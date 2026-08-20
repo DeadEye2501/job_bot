@@ -12,26 +12,27 @@
 
   import { call } from '$api/bridge.js';
   import TgLoginDialog from '$components/TgLoginDialog.svelte';
+  import { living } from '$state/alive.js';
   import { nextStep } from '$state/settings.js';
 
-  let { creds, relogin, ondone, onclose } = $props();
+  let { say, creds, relogin, ondone, onclose } = $props();
 
   let step = $state('code');
   let busy = $state(true);
   let error = $state('');
 
-  let alive = true;
+  const alive = living();
 
   async function stepped(run) {
     busy = true;
     error = '';
     try {
       const answer = await run();
-      if (!alive) return null;
+      if (!alive.now) return null;
       busy = false;
       return answer;
     } catch (refusal) {
-      if (!alive) return null;
+      if (!alive.now) return null;
       busy = false;
       error = refusal.message;
       return null;
@@ -61,14 +62,21 @@
     onclose();
     // Временный клиент Telegram закрывается на той стороне: иначе остаётся
     // открытый сокет, а следующая попытка упирается в «код уже отправлен».
-    await call('settings.cancel_login').catch(() => {});
+    try {
+      await call('settings.cancel_login');
+    } catch (refusal) {
+      // Окно уже закрыто, и показать отказ в нём негде — он уходит общей
+      // плашкой. Промолчать нельзя: незакрытый вход виден только на следующей
+      // попытке, и объяснить её тогда будет нечем.
+      say(`Вход не закрылся: ${refusal.message}`, true);
+    }
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     start();
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>

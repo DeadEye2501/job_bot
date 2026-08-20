@@ -12,6 +12,7 @@
   // нечем.
   import { untrack } from 'svelte';
 
+  import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
   import { linkReady } from '$state/picker.js';
 
@@ -44,7 +45,7 @@
   const ready = $derived(linkReady({ current, chosen }));
 
   const tries = attempts();
-  let alive = true;
+  const alive = living();
 
   /** Перечитать кандидатов.
    *
@@ -58,7 +59,7 @@
   async function refresh() {
     const mine = tries.next();
     const now = await load(search);
-    if (now === null || !alive || tries.stale(mine)) return;
+    if (now === null || !alive.now || tries.stale(mine)) return;
     rows = now;
     loaded = true;
     if (chosen !== null && !rows.some((one) => one.id === chosen)) chosen = null;
@@ -81,12 +82,12 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     // Вне слежения: строку поиска читает `refresh`, и следящий эффект
     // перезаводился бы на каждом набранном знаке.
     untrack(() => refresh());
     return () => {
-      alive = false;
+      settled();
     };
   });
 

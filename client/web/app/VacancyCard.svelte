@@ -12,6 +12,7 @@
   import StatusPicker from '$components/StatusPicker.svelte';
   import VacancyActions from '$components/VacancyActions.svelte';
   import VacancyTimeline from '$components/VacancyTimeline.svelte';
+  import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
   import { cardLinks } from '$state/card_links.js';
   import { actionBlocks, rawChips } from '$state/vacancy_actions.js';
@@ -38,7 +39,7 @@
   let raw = $state(false);
 
   const tries = attempts();
-  let alive = true;
+  const alive = living();
 
   const rows = $derived(card ? timelineRows(card.history, card.events) : []);
   const tone = $derived(card ? scoreTone(card.score, card.score_threshold) : '');
@@ -58,7 +59,7 @@
   async function refresh() {
     const mine = tries.next();
     const now = await ask('vacancies.detail', vacancyId);
-    if (!alive || tries.stale(mine) || now === null) return;
+    if (!alive.now || tries.stale(mine) || now === null) return;
     card = now.vacancy;
   }
 
@@ -69,7 +70,7 @@
    */
   async function saveNotes(id, text) {
     const done = await ask('vacancies.save_notes', { vacancy_id: id, notes: text });
-    if (!alive || done === null) return null;
+    if (!alive.now || done === null) return null;
     return done.notes ?? '';
   }
 
@@ -97,7 +98,7 @@
       status,
       explanation,
     });
-    if (!alive) return;
+    if (!alive.now) return;
     saving = false;
     // Отказ окно выбора не закрывает: статус выбран, причина набрана, и
     // закрытие заставило бы набирать всё заново.
@@ -170,7 +171,7 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     // Перешли к другой вакансии — прежнюю с глаз долой, не дожидаясь ответа:
     // поле заметки берёт значение один раз, при заведении, и заведённое над
     // прежней карточкой держало бы чужую заметку до самого закрытия. Вести о
@@ -182,7 +183,7 @@
     const deaf = events.on('vacancies_list_changed', refresh);
     refresh();
     return () => {
-      alive = false;
+      settled();
       deaf();
     };
   });

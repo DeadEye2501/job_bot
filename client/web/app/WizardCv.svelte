@@ -6,15 +6,13 @@
   // потом, в анкете. Пропуск при этом называется вслух, отдельным выбором:
   // молчаливо пройденный шаг человек считал бы приложенным резюме.
   import { call } from '$api/bridge.js';
+  import { living } from '$state/alive.js';
   import { fileSize } from '$state/profile.js';
   import WizardFoot from '$components/WizardFoot.svelte';
+  import WizardStatus from '$components/WizardStatus.svelte';
   import { cvModes, cvReady } from '$state/wizard.js';
 
   let { ask, busy, onback, onnext } = $props();
-
-  /** Значок строки состояния по её тону. Двух хватает: шаг либо занят, либо
-   *  отказал, — «сделано» здесь не показывают, следом уходит весь мастер. */
-  const ICONS = { busy: 'progress_activity', err: 'error' };
 
   const MODES = cvModes();
 
@@ -25,11 +23,11 @@
   let saving = $state(false);
   let status = $state(null);
 
-  let alive = true;
+  const alive = living();
 
   async function refresh() {
     const now = await ask('profile.get');
-    if (now === null || !alive) return;
+    if (now === null || !alive.now) return;
     cv = now.cv_meta;
     path = now.cv_path;
     loaded = true;
@@ -39,7 +37,7 @@
    *  что было выбрано до диалога. */
   async function pick() {
     const now = await ask('profile.pick');
-    if (now === null || !alive) return;
+    if (now === null || !alive.now) return;
     status = null;
     return refresh();
   }
@@ -58,12 +56,12 @@
     saving = true;
     status = { tone: 'busy', text: 'Сохраняем...' };
     if (mode === 'skip' && !(await forget())) return;
-    if (!alive) return;
+    if (!alive.now) return;
     await onnext();
     // Досюда доходят, только если закончить не удалось: удавшееся уводит на
     // финал вместе с этим экраном. Кнопки отпираются обратно — иначе человек
     // остался бы на шаге, с которого больше некуда нажать.
-    if (!alive) return;
+    if (!alive.now) return;
     saving = false;
     status = null;
   }
@@ -78,7 +76,7 @@
     try {
       await call('wizard.skip_cv');
     } catch (refusal) {
-      if (!alive) return false;
+      if (!alive.now) return false;
       saving = false;
       status = { tone: 'err', text: refusal.message };
       return false;
@@ -87,10 +85,10 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     refresh();
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>
@@ -134,12 +132,7 @@
     {/each}
   </div>
 
-  {#if status}
-    <div class="status-row" data-tone={status.tone}>
-      <span class="material-symbols-outlined">{ICONS[status.tone]}</span>
-      <span>{status.text}</span>
-    </div>
-  {/if}
+  <WizardStatus {status} />
 </div>
 
 <WizardFoot

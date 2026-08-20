@@ -14,15 +14,15 @@
 
 ## app — 25 файлов
 
-### app/BlacklistList.svelte (212)
+### app/BlacklistList.svelte (213)
 - —
 - принимает: ask, say, events
 
-### app/ChannelCard.svelte (309)
+### app/ChannelCard.svelte (310)
 - Легенда под полосой: одиннадцать цветов без подписей не читаются, а подписать отрезки внутри полосы негде.
 - принимает: ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged
 
-### app/ChannelsList.svelte (188)
+### app/ChannelsList.svelte (189)
 - Один переключатель на весь список: он же и показывает, все ли каналы опрашиваются.
 - принимает: ask, say, lockedTip, events, open, onopened, onvacancy
 - берёт: ./ChannelCard.svelte
@@ -32,7 +32,7 @@
 - принимает: ask, say, events, open, onopened, onperson, onvacancy
 - берёт: ./CompanyCard.svelte
 
-### app/CompanyCard.svelte (321)
+### app/CompanyCard.svelte (322)
 - Написания: под ними компания приходит в объявлениях. Потеряй карточка одно из них — следующая вакансия завела бы компанию заново.
 - принимает: ask, say, companyId, onperson, onvacancy, onclose, onchanged
 
@@ -41,7 +41,7 @@
 - принимает: ask, say, lockedTip, events, openCard, onopened, onvacancy
 - берёт: ./BlacklistList.svelte, ./ChannelsList.svelte, ./CompaniesList.svelte, ./PeopleList.svelte
 
-### app/LogsScreen.svelte (196)
+### app/LogsScreen.svelte (197)
 - —
 - принимает: ask, events, say
 
@@ -50,20 +50,20 @@
 - принимает: ask, say, events, open, onopened, oncompany, onvacancy
 - берёт: ./PersonCard.svelte
 
-### app/PersonCard.svelte (329)
+### app/PersonCard.svelte (330)
 - Своя запись на каждого человека: поле запечатывает номер при заведении, и заводиться заново на каждого его заставляет именно `{#key}` — без него запечатанный номер протухнет.
 - принимает: ask, say, events, personId, oncompany, onvacancy, onclose, onchanged
 - берёт: ./PersonChat.svelte
 
-### app/PersonChat.svelte (264)
+### app/PersonChat.svelte (265)
 - Строка отправки остаётся на месте и при заслоне, только запертой: пропав, она не сказала бы, почему писать нельзя.
 - принимает: ask, say, hrId, blocked, events, onread
 
-### app/ProfileCv.svelte (215)
+### app/ProfileCv.svelte (227)
 - —
 - принимает: ask
 
-### app/ProfileExperience.svelte (135)
+### app/ProfileExperience.svelte (153)
 - —
 - принимает: ask
 
@@ -72,33 +72,33 @@
 - принимает: ask
 - берёт: ./ProfileCv.svelte, ./ProfileExperience.svelte, ./ProfileSkills.svelte
 
-### app/ProfileSkills.svelte (148)
+### app/ProfileSkills.svelte (177)
 - —
 - принимает: ask
 
-### app/SettingsScreen.svelte (346)
+### app/SettingsScreen.svelte (340)
 - Окно входа стоит внутри поля настроек, а не рядом с ним: кнопки в нём той же плотности, что и остальные кнопки экрана, и берут они её отсюда. На раскладку это не влияет — окно висит поверх страницы.
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
 
-### app/Shell.svelte (430)
+### app/Shell.svelte (432)
 - Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
 - берёт: ./ContactsScreen.svelte, ./LogsScreen.svelte, ./ProfileScreen.svelte, ./SettingsScreen.svelte, ./StatsScreen.svelte, ./VacanciesScreen.svelte, ./WizardScreen.svelte
 
-### app/StatsScreen.svelte (123)
+### app/StatsScreen.svelte (124)
 - Числа считает бот, а не окно: пересчитать за тот же срок иначе нечем — пришлось бы уходить в другой раздел и возвращаться.
 - принимает: ask, onslice, onchannel
 
-### app/TelegramLogin.svelte (88)
+### app/TelegramLogin.svelte (96)
 - Окно пересоздаётся на смене шага: код и облачный пароль — разные секреты, и набранный код не должен доехать до поля пароля.
-- принимает: creds, relogin, ondone, onclose
+- принимает: say, creds, relogin, ondone, onclose
 
-### app/VacanciesScreen.svelte (301)
+### app/VacanciesScreen.svelte (302)
 - —
 - принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte
 
-### app/VacancyCard.svelte (386)
+### app/VacancyCard.svelte (387)
 - Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою оценку.
 - принимает: ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged
 - берёт: ./VacancyLinks.svelte
@@ -107,25 +107,25 @@
 - —
 - принимает: ask, say, vacancyId, kind, prefill, current, onclose, onlinked
 
-### app/WizardCv.svelte (151)
+### app/WizardCv.svelte (144)
 - —
 - принимает: ask, busy, onback, onnext
 
-### app/WizardLlm.svelte (325)
+### app/WizardLlm.svelte (301)
 - —
 - принимает: ask, kind, onback, onnext
 
-### app/WizardScreen.svelte (155)
+### app/WizardScreen.svelte (156)
 - Приглушена только обложка: на финале четыре галочки горят в полную силу — это и есть то, ради чего мастер проходили.
 - принимает: ask, say, ondone, completed
 - берёт: ./WizardCv.svelte, ./WizardLlm.svelte, ./WizardTelegram.svelte
 
-### app/WizardTelegram.svelte (122)
+### app/WizardTelegram.svelte (116)
 - —
-- принимает: ask, onback, onnext
+- принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 68 файлов
+## components — 69 файлов
 
 ### components/ActionsMenu.svelte (31)
 - —
@@ -287,7 +287,7 @@
 - —
 - принимает: placeholder, hint, empty, names, chosen, search, onsearch, prefix, onpick
 
-### components/PickerDialog.svelte (159)
+### components/PickerDialog.svelte (160)
 - Пустых слов два, и разница несущая: «ничего не найдено» говорит, что список есть, а показать из него нечего, — и человек ищет причину в поле поиска, а не в том, что заводить он ещё ничего не начинал.
 - принимает: title, icon, placeholder, empty, prefill, current, preselect, load, applyLabel, onapply, saving, onclose, children, createLabel, createIcon, oncreate
 - берёт: ./ModalKeys.svelte
@@ -323,9 +323,9 @@
 - —
 - принимает: value, placeholder, onsearch
 
-### components/SecretInput.svelte (27)
+### components/SecretInput.svelte (32)
 - —
-- принимает: value, placeholder, onsave
+- принимает: value, placeholder, mono, maxlength, onsave
 
 ### components/SettingsSection.svelte (17)
 - —
@@ -415,15 +415,23 @@
 - —
 - принимает: rows, vacancyId, onsave
 
-### components/WizardFoot.svelte (39)
+### components/WizardFoot.svelte (34)
 - Заперта вместе с основной: уход назад посреди зова оставил бы ответ прилетать в экран, которого уже нет.
-- принимает: trouble, nextLabel, nextIcon, busy, onback, onnext, children
+- принимает: nextLabel, nextIcon, busy, onback, onnext, children
+
+### components/WizardStatus.svelte (20)
+- —
+- принимает: status
 
 ### components/WizardSteps.svelte (16)
 - —
 - принимает: marks, dimmed
 
-## state — 37 файлов
+## state — 40 файлов
+
+### state/alive.js (32)
+- * Заводит признак жизни экрана.
+- отдаёт: living
 
 ### state/attempts.js (34)
 - * Завести свой счёт попыток. * * Заводится он на каждое место, где запросы обгоняют друг друга, — поиск, * прокрутка, переключение вкладок. Общий счётчик на страницу отбрасывал бы * ответы соседнего экрана. * * Начатую работу счёт не останавливает — остановить её со страницы нечем, — а * обесценивает её ответ: пришедший последним не считается свежим, если после * него успели спросить заново. * * **Это не про закрытие окна.** Свежим тут считается ровно один запрос, а окно * спрашивает мост вперемешку — здоровье, непрочитанное, режим, — и соседний * ответ такой счёт объявил бы устаревшим. Уход со страницы оболочка сторожит * своим признаком: там гасится всё разом, а не последнее.
@@ -461,9 +469,9 @@
 - * Разложить письма по дням, сохранив их порядок. * * Подпись дня стоит над первым письмом этого дня, а не над каждым: иначе лента * превращается в чересполосицу дат. * * Письмо без времени выпадает вовсе — поставить его некуда, а под чужой * подписью дня оно соврало бы.
 - отдаёт: attachmentKind, byDays, chatTime, sendBlock, tick, unread
 
-### state/chosen.js (27)
+### state/chosen.js (39)
 - * Какую долю дорожки залить под это значение. * * Зажато с обеих сторон: значение приезжает с моста и могло быть выставлено * до того, как предел назначили, — заливка шире дорожки выглядит поломкой, а * отрицательная не рисуется вовсе.
-- отдаёт: fillPercent, toggled
+- отдаёт: fillPercent, toggled, without
 
 ### state/companies.js (79)
 - /i; /** Чем подписать компанию в списке. * * Имя — сверху, сайт и алиасы — под ним: по имени компанию узнают, по * домену различают. Две «Ромашки» с разными сайтами — разные компании, и без * второй строки они неотличимы. * * Имени может не быть — оно приходит из объявления, — и тогда компания названа * номером: показать нечего, но строка должна остаться нажимаемой.
@@ -473,9 +481,9 @@
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
 - отдаёт: asIso, dayOf, isoDay, padded, shortDate, showDate, showStamp, validDate
 
-### state/experience.js (32)
+### state/experience.js (47)
 - * Период работы для шапки карточки. * * Месяц и год без дня: места работы различают по месяцам, а день удлиняет * строку вдвое. Открытый конец назван словами — по нему и читают, работает * человек здесь сейчас или нет.
-- отдаёт: cardTitle, period
+- отдаёт: cardTitle, experienceReady, period
 
 ### state/flash.js (24)
 - * Заводит отметку, которая гаснет сама. * * Второе зажигание подряд отсчёт продлевает, а не гасит: быстрая правка двух * полей иначе тушила бы рамку по времени первого, и вторая запись выглядела бы * незаписанной.
@@ -497,11 +505,15 @@
 - * Три положения слева направо. Порядок несущий: по нему считается, в какую * треть дорожки попало нажатие.
 - отдаёт: OFF, modeAt
 
+### state/one_write.js (49)
+- * Заводит запись, у которой в полёте не бывает двух снимков. * * `write` отвечает, а не бросает: отказ моста — обычное дело для анкеты, и все * трое зовущих ловят его у себя, каждый своими словами человеку. * * Отдаёт обещание, которое кончается вместе с отправкой снимка: на нём держится * и уход с вкладки — набранное должно успеть уехать. * * Кончается оно исходом последней уехавшей записи, а не своей: сведённый снимок * включает в себя все, что были до него, и «легло ли» — это про него.
+- отдаёт: oneWrite
+
 ### state/outside.js (31)
 - * Ставит сторожа «нажали мимо» и отдаёт его снятие. * * Отдаётся снятие затем, что зовут это из эффекта: он и вернёт его окну. * * Узла может ещё не быть — разметка привязывает его после первого показа, — и * до тех пор мимо не нажимают ни разу: окошка на экране нет.
 - отдаёт: closeOnClickAway
 
-### state/paged_list.svelte.js (125)
+### state/paged_list.svelte.js (115)
 - * Заводит список, читающий себя страницами. * * `ask` — обращение к мосту, `method` — имя метода, `key` — под каким именем * строки лежат в ответе. Обращение принимается обёрткой, а не самим доводом: * довод читается один раз, при заведении списка, и подмена его сверху сюда бы * не доехала.
 - отдаёт: pagedList
 
@@ -525,13 +537,17 @@
 - * Подпись начатого обхода, о котором ещё ничего не известно. * * Первая весть о ходе приходит не сразу: до неё полосы уже бегут, и подпись под * ними обязана сказать, чем именно бот занят.
 - отдаёт: STARTING, bar, caption, rerunNote
 
+### state/provider.js (48)
+- * Спросить у поставщика имена его моделей. * * Отказ и пустой перечень — разные ответы, и путать их нельзя: первое значит * «сервер не отозвался», второе — «сервер поднят, но модели в нём нет», и * чинятся они по-разному. Отказ приходит фразой, а не пустотой. * * Имя модели в вопрос не идёт: перечень читается с адреса и ключа, а имя — как * раз то, что в нём ищут.
+- отдаёт: askModels, probeModel
+
 ### state/sections.js (33)
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
-### state/settings.js (179)
-- * Предел порога отбора. Дорожка ползунка размечена по нему, и он же * зажимает значение, приехавшее с моста.
-- отдаёт: BOUNDS, SCORE_MAX, clampField, credsChanged, idleProbe, loginTrouble, matchingModels, mirrored, nextStep, probePill, sameCreds, scorePercent, sessionPill, sessionText, thresholdState
+### state/settings.js (190)
+- * Чем подписано пустое поле имени модели. * * Пока имён нет, подсказка не обещает списка: перечень читается с адреса и * ключа, и у непóднятого поставщика его не будет вовсе — имя тогда вписывают * руками. Слова общие на настройки и на шаг мастера: одно и то же поле, * подписанное по-разному, читается как два разных.
+- отдаёт: BOUNDS, SCORE_MAX, clampField, credsChanged, idleProbe, loginTrouble, matchingModels, mirrored, modelPlaceholder, nextStep, probePill, sameCreds, scorePercent, sessionPill, sessionText, thresholdState
 
 ### state/skills.js (66)
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
@@ -734,14 +750,14 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (5): .icon-btn, .icon-btn .material-symbols-outlined, .icon-btn:hover, .icon-btn.is-disabled, .icon-btn.is-disabled:hover
 - берёт: --bg-tertiary, --text-primary, --text-secondary
 
-### styles/input.css (57)
+### styles/input.css (72)
 - Поле ввода, многострочное поле и поле для секрета рядом с глазом. Экран настроек уменьшает их своим правилом — там полей вдвое больше.
-- селекторы (8): .input,
+- селекторы (9): .input,
 .textarea, .input:hover:not(:disabled, :focus),
 .textarea:hover:not(:disabled, :focus), .input:focus,
 .textarea:focus, .input::placeholder,
-.textarea::placeholder, .textarea, .secret-input, .secret-input .input, .input.mono
-- берёт: --accent, --bg-secondary, --border, --text-primary, --text-secondary, --text-tertiary
+.textarea::placeholder, .textarea, .secret-input, .secret-input .input, .input.missing:not(:focus), .input.mono
+- берёт: --accent, --bg-secondary, --border, --danger-border, --danger-wash, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/lang-rows.css (49)
 - Языки анкеты: строка на язык и кнопка добавления под списком.
@@ -1007,15 +1023,18 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (20): .filter-btn.active, .filter-panel, .filter-head, .filter-head .material-symbols-outlined, .filter-title, .filter-meta, .filter-close, .filter-close:hover, .filter-close .material-symbols-outlined, .filter-body, .filter-panel .input, .filter-body .status-dot, .filter-body .choice:hover, .filter-pair, .filter-dates, .filter-dates .date-picker:last-child .date-panel, .filter-foot, .filter-foot .btn, .filter-foot .btn .material-symbols-outlined, .filter-foot-right
 - берёт: --accent, --bg-tertiary, --border, --scrim, --selected-bg, --surface-hover-firm, --text-primary, --text-secondary, --text-tertiary
 
-### styles/wizard.css (490)
+### styles/wizard.css (483)
 - Мастер первого запуска: окно из трёх полос — шаги, тело, подвал. Полосы те же, что у самого приложения, и это нарочно: мастер — не отдельная программа, а первый разговор с этой.
-- селекторы (73): .wiz-window, .wiz-steps, .wiz-steps.dimmed, .wiz-step, .wiz-step::before, .wiz-step:first-child::before, .wiz-step[data-mark='active']::before,
-.wiz-step[data-mark='done']::before, .wiz-step-mark, .wiz-step[data-mark='active'] .wiz-step-mark, .wiz-step[data-mark='done'] .wiz-step-mark, .wiz-step-label, .wiz-step[data-mark='active'] .wiz-step-label, .wiz-step[data-mark='done'] .wiz-step-label, .wiz-body, .wiz-body > *:last-child, .wiz-head, .wiz-head .material-symbols-outlined, .wiz-head h1, .wiz-title, .wiz-text, .wiz-text strong, .wiz-foot, .wiz-foot-right, .wiz-trouble, .wiz-done, .wiz-done .material-symbols-outlined, .wiz-done h2, .wiz-done .wiz-text, .wiz-subtitle, .wiz-subtitle strong, .wiz-welcome, .warning-card,
+- селекторы (72): .wiz-window, .wiz-steps, .wiz-steps.dimmed, .wiz-step, .wiz-step::before, .wiz-step:first-child::before, .wiz-step[data-mark='active']::before,
+.wiz-step[data-mark='done']::before, .wiz-step-mark, .wiz-step[data-mark='active'] .wiz-step-mark, .wiz-step[data-mark='done'] .wiz-step-mark, .wiz-step-label, .wiz-step[data-mark='active'] .wiz-step-label, .wiz-step[data-mark='done'] .wiz-step-label, .wiz-body, .wiz-body > *:last-child, .wiz-head, .wiz-head .material-symbols-outlined, .wiz-head h1, .wiz-title, .wiz-text, .wiz-text strong, .wiz-foot, .wiz-foot-right, .wiz-done, .wiz-done .material-symbols-outlined, .wiz-done h2, .wiz-done .wiz-text, .wiz-subtitle, .wiz-subtitle strong, .wiz-welcome, .warning-card,
 .info-card, .warning-card, .warning-card .material-symbols-outlined, .warning-card strong, .info-card, .info-card .material-symbols-outlined, .info-card strong, .wiz-body > .info-card,
 .wiz-body > .warning-card, .help, .help strong, .help code, .help ol, .help ol li, .status-row, .status-row .material-symbols-outlined, .status-row[data-tone='ok'], .status-row[data-tone='ok'] .material-symbols-outlined, .status-row[data-tone='err'], .status-row[data-tone='err'] .material-symbols-outlined, .status-row[data-tone='busy'] .material-symbols-outlined, @keyframes wiz-spin, .radio-card, .radio-card:hover, .radio-card.selected, .radio-card.disabled, .radio-card.disabled:hover, .radio-card input, .radio-card.disabled input, .radio-card .rc-title, .radio-card .rc-sub, .file-pick, .file-pick.has-file, .file-pick .material-symbols-outlined, .file-pick .text, .file-pick .text .name, .wiz-window .input, .wiz-window .btn, .wiz-window .btn .material-symbols-outlined, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --accent-hover-soft, --alert-card-bg, --alert-card-border, --alert-text, --bg-primary, --bg-secondary, --bg-tertiary, --border, --err, --info, --info-card-bg, --info-card-border, --ok, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 34 файлов
+## tests — 38 файлов
+
+### tests/alive.test.js (46)
+- —
 
 ### tests/attempts.test.js (32)
 - —
@@ -1050,6 +1069,9 @@ body, html, button, body, .material-symbols-outlined
 ### tests/chat.test.js (157)
 - —
 
+### tests/chosen.test.js (28)
+- —
+
 ### tests/companies.test.js (109)
 - —
 
@@ -1059,7 +1081,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/events.test.js (205)
 - * Мост, отвечающий заготовленным, а на исходе — закрытой очередью.
 
-### tests/experience.test.js (60)
+### tests/experience.test.js (93)
 - —
 
 ### tests/flash.test.js (34)
@@ -1076,6 +1098,9 @@ body, html, button, body, .material-symbols-outlined
 
 ### tests/notes_field.test.js (64)
 - * Файлы разметки, ставящие поле заметки, вместе с их содержимым.
+
+### tests/one_write.test.js (139)
+- * Запись, которая отвечает не сразу: ответ отдаёт вызывающий.
 
 ### tests/outside.test.js (90)
 - * Узел, считающий своими только перечисленные цели.
@@ -1094,6 +1119,9 @@ body, html, button, body, .material-symbols-outlined
 
 ### tests/profile.test.js (103)
 - —
+
+### tests/provider.test.js (107)
+- * Отказ моста в том виде, в каком его поднимает обёртка зова.
 
 ### tests/settings.test.js (242)
 - —

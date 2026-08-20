@@ -160,13 +160,6 @@
   gap: 10px;
 }
 
-/* Причина стоит рядом с кнопкой, которую она держит: плашкой поверх окна она
-   ушла бы туда, куда человек в этот миг не смотрит. */
-.wiz-trouble {
-  color: var(--text-tertiary);
-  font-size: 0.78rem;
-}
-
 .wiz-done {
   display: flex;
   flex-direction: column;

@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { asIso, showDate } from '../state/dates.js';
-import { cardTitle, period } from '../state/experience.js';
+import { cardTitle, experienceReady, period } from '../state/experience.js';
 
 describe('дата места работы', () => {
   it('с моста приходит одним видом, а показывается другим', () => {
@@ -56,5 +56,38 @@ describe('подпись свёрнутой карточки', () => {
     // Свежую карточку иначе не отличить от пустого места в списке.
     expect(cardTitle({ company: '', role: '', start_date: null, end_date: null }))
       .toEqual({ company: 'Без названия', role: '', period: '' });
+  });
+});
+
+describe('какие места работы уезжают на мост', () => {
+  const FILLED = {
+    company: 'Контур',
+    role: 'Python-разработчик',
+    start_date: '2020-03-01',
+    end_date: null,
+  };
+
+  it('заполненное место уезжает', () => {
+    expect(experienceReady(FILLED)).toBe(true);
+  });
+
+  it('без должности не уезжает', () => {
+    // Мост требует три поля и отбивает **весь** перечень разом: одна
+    // недозаполненная карточка отменяла бы правки соседних заполненных.
+    expect(experienceReady({ ...FILLED, role: '   ' })).toBe(false);
+  });
+
+  it('без даты начала не уезжает', () => {
+    expect(experienceReady({ ...FILLED, start_date: null })).toBe(false);
+  });
+
+  it('без названия компании не уезжает', () => {
+    // Свежая карточка рождается пустой, и человек в этот миг ещё набирает её.
+    expect(experienceReady({ ...FILLED, company: '' })).toBe(false);
+  });
+
+  it('незаконченное место работы уезжает без даты конца', () => {
+    // «По настоящее время» — обычный случай, и мост даты конца не требует.
+    expect(experienceReady({ ...FILLED, end_date: '' })).toBe(true);
   });
 });

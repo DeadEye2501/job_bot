@@ -11,6 +11,7 @@
 
   import { call } from '$api/bridge.js';
   import { listener } from '$api/events.js';
+  import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
   import ContactsScreen from './ContactsScreen.svelte';
   import LogsScreen from './LogsScreen.svelte';
@@ -95,7 +96,7 @@
   const captionText = $derived(single || caption(channels, messages));
 
   let plaqueTimer = null;
-  let alive = true;
+  const alive = living();
 
   /** Сказать человеку о беде. Плашка одна: вторая беда сменяет первую, а не
    *  встаёт под ней — стопка плашек закрыла бы собой экран. */
@@ -119,9 +120,9 @@
   async function ask(path, ...args) {
     try {
       const answer = await call(path, ...args);
-      return alive ? answer : null;
+      return alive.now ? answer : null;
     } catch (refusal) {
-      if (alive) say(refusal.message, true);
+      if (alive.now) say(refusal.message, true);
       return null;
     }
   }
@@ -300,12 +301,13 @@
   }
 
   $effect(() => {
+    const settled = alive.mounted();
     watch();
     const health_clock = setInterval(askHealth, HEALTH_EVERY_MS);
     askSetup();
     refresh();
     return () => {
-      alive = false;
+      settled();
       heard.stop();
       clearInterval(health_clock);
       clearTimeout(plaqueTimer);

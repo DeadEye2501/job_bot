@@ -9,6 +9,7 @@
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import LogLevelPill from '$components/LogLevelPill.svelte';
   import LogRow from '$components/LogRow.svelte';
+  import { living } from '$state/alive.js';
   import { toggled } from '$state/chosen.js';
   import {
     AT_FIRST,
@@ -39,7 +40,7 @@
 
   let askedAt = 0;
   let timer = null;
-  let alive = true;
+  const alive = living();
 
   /** Перечитать страницу журнала целиком.
    *
@@ -59,7 +60,7 @@
     try {
       show(await call('system.logs'));
     } catch (refusal) {
-      if (!alive) return;
+      if (!alive.now) return;
       if (again) return say(refusal.message, true);
       clearTimeout(timer);
       timer = setTimeout(() => refresh(true), askDelay(0));
@@ -67,7 +68,7 @@
   }
 
   function show(page) {
-    if (!alive) return;
+    if (!alive.now) return;
     records = page.records;
     counts = page.level_counts;
     total = page.total;
@@ -115,7 +116,7 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     // Подписка гасится в источнике: без неё каждая запись журнала
     // превращалась бы в весть, а на чужих экранах эта работа не нужна никому.
     ask('system.watch_logs', true);
@@ -129,7 +130,7 @@
     ];
     refresh();
     return () => {
-      alive = false;
+      settled();
       clearTimeout(timer);
       for (const off of deaf) off();
       ask('system.watch_logs', false);

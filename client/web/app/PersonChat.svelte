@@ -10,6 +10,7 @@
   import { tick as painted, untrack } from 'svelte';
 
   import ChatBubble from '$components/ChatBubble.svelte';
+  import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
   import { byDays, unread } from '$state/chat.js';
   import { appended, nearTop } from '$state/paging.js';
@@ -26,7 +27,7 @@
   let feed = $state(null);
 
   const tries = attempts();
-  let alive = true;
+  const alive = living();
 
   const days = $derived(byDays(messages, new Date()));
 
@@ -39,7 +40,7 @@
   async function refresh() {
     const mine = tries.next();
     const page = await ask('hr.messages', { hr_id: hrId });
-    if (page === null || !alive || tries.stale(mine)) return;
+    if (page === null || !alive.now || tries.stale(mine)) return;
     messages = page.messages;
     hasMore = page.has_more;
     loaded = true;
@@ -71,7 +72,7 @@
       before_sent_at: oldest.sent_at,
     });
     digging = false;
-    if (page === null || !alive) return;
+    if (page === null || !alive.now) return;
     const was = feed === null ? 0 : feed.scrollHeight;
     messages = appended(page.messages, messages);
     hasMore = page.has_more;
@@ -98,7 +99,7 @@
   async function markRead() {
     if (!unread(messages)) return;
     const done = await ask('hr.mark_read', hrId);
-    if (done === null || !alive) return;
+    if (done === null || !alive.now) return;
     // Молчим, когда отмечать было нечего: бот в положении «Off» до Telegram не
     // дотягивается и отмечает ноль писем. Скажи мы и об этом, карточка
     // перечиталась бы, лента следом, письма остались бы непрочитанными — и
@@ -137,7 +138,7 @@
     attaching = true;
     const done = await ask('hr.pick_media', hrId);
     attaching = false;
-    if (done === null || !alive || done.cancelled) return;
+    if (done === null || !alive.now || done.cancelled) return;
     say('Файл отправлен');
     return refresh();
   }
@@ -168,7 +169,7 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     // Письма приходят и уходят, пока карточка открыта: без подписок человек
     // читал бы снимок той минуты, когда её открыл. Вторая весть — про чужую
     // отметку прочтения, от неё зависит вторая галочка на своих письмах.
@@ -189,7 +190,7 @@
     // заводится заново вместе с ней.
     untrack(() => refresh());
     return () => {
-      alive = false;
+      settled();
       deafNew();
       deafRead();
     };

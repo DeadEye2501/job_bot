@@ -15,6 +15,7 @@
   import NotesField from '$components/NotesField.svelte';
   import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
+  import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
   import { blockNote, unblockNote } from '$state/blacklist.js';
   import { cardRead } from '$state/card_read.js';
@@ -37,13 +38,13 @@
   // прежнюю, лёгший поверх свежего, показал бы её числа под новым именем.
   const peopleTries = attempts();
   const vacancyTries = attempts();
-  let alive = true;
+  const alive = living();
 
   const readCard = cardRead({
     ask: (...args) => ask(...args),
     method: 'companies.detail',
     trouble: 'Не удалось прочитать компанию',
-    alive: () => alive,
+    alive: () => alive.now,
   });
 
   const shown = $derived(card ? companyLine({ ...card, id: card.company_id }) : null);
@@ -59,14 +60,14 @@
   async function loadPeople(id) {
     const mine = peopleTries.next();
     const now = await ask('companies.people', id);
-    if (now === null || !alive || peopleTries.stale(mine)) return;
+    if (now === null || !alive.now || peopleTries.stale(mine)) return;
     people = now.hrs;
   }
 
   async function loadVacancies(id) {
     const mine = vacancyTries.next();
     const now = await ask('companies.vacancies', { company_id: id });
-    if (now === null || !alive || vacancyTries.stale(mine)) return;
+    if (now === null || !alive.now || vacancyTries.stale(mine)) return;
     vacancies = now.vacancies;
   }
 
@@ -91,7 +92,7 @@
    */
   async function saveNotes(id, text) {
     const done = await ask('companies.update', { company_id: id, notes: text });
-    if (!alive || done === null) return null;
+    if (!alive.now || done === null) return null;
     onchanged();
     return text;
   }
@@ -152,7 +153,7 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     const id = companyId;
     // Показанное прежней компанией уходит сразу: панель одна, и её числа под
     // новым именем читались бы как числа новой.
@@ -164,7 +165,7 @@
     loadPeople(id);
     loadVacancies(id);
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>

@@ -12,6 +12,7 @@
 
   import WizardFoot from '$components/WizardFoot.svelte';
   import WizardSteps from '$components/WizardSteps.svelte';
+  import { living } from '$state/alive.js';
   import { backScreen, nextScreen, resumeScreen, stepAt, stepMarks } from '$state/wizard.js';
 
   import WizardCv from './WizardCv.svelte';
@@ -27,7 +28,7 @@
   let passed = $state(untrack(() => [...completed]));
   let finishing = $state(false);
 
-  let alive = true;
+  const alive = living();
 
   const marks = $derived(stepMarks(passed, screen));
   const back = $derived(backScreen(screen));
@@ -49,7 +50,7 @@
     if (finishing) return;
     finishing = true;
     const done = await ask('wizard.complete');
-    if (!alive) return;
+    if (!alive.now) return;
     finishing = false;
     if (done === null) return;
     passed = [...passed, stepAt(screen)];
@@ -63,13 +64,13 @@
    */
   async function openApp() {
     await ask('wizard.enter_main_app');
-    if (alive) ondone();
+    if (alive.now) ondone();
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>

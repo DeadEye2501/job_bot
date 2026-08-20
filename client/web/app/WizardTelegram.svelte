@@ -7,25 +7,24 @@
   // Сам вход — код и облачный пароль — живёт в окне поверх шага: заводить для
   // мастера второй значило бы держать два входа в один Telegram.
   import WizardFoot from '$components/WizardFoot.svelte';
+  import WizardStatus from '$components/WizardStatus.svelte';
 
+  import { living } from '$state/alive.js';
   import { loginTrouble } from '$state/settings.js';
 
   import TelegramLogin from './TelegramLogin.svelte';
 
-  let { ask, onback, onnext } = $props();
-
-  // Значок строки состояния: чем шаг занят и чем кончилось.
-  const TONE_ICONS = { busy: 'progress_activity', err: 'error' };
+  let { ask, say, onback, onnext } = $props();
 
   let draft = $state({ api_id: '', api_hash: '', phone: '' });
   let status = $state(null);
   let logging = $state(false);
 
-  let alive = true;
+  const alive = living();
 
   async function refresh() {
     const now = await ask('settings.get');
-    if (now === null || !alive) return;
+    if (now === null || !alive.now) return;
     if (!draft.api_id) {
       draft = { api_id: now.tg.api_id, api_hash: now.tg.api_hash, phone: now.tg.phone };
     }
@@ -67,10 +66,10 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     refresh();
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>
@@ -100,12 +99,7 @@
       placeholder="Телефон в международном формате, например +71234567890"
       bind:value={draft.phone}
     />
-    {#if status}
-      <div class="status-row" data-tone={status.tone}>
-        <span class="material-symbols-outlined">{TONE_ICONS[status.tone]}</span>
-        <span>{status.text}</span>
-      </div>
-    {/if}
+    <WizardStatus {status} />
   </div>
 </div>
 
@@ -118,5 +112,5 @@
 />
 
 {#if logging}
-  <TelegramLogin creds={draft} ondone={loggedIn} onclose={closeLogin} />
+  <TelegramLogin {say} creds={draft} ondone={loggedIn} onclose={closeLogin} />
 {/if}
