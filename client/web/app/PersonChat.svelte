@@ -11,8 +11,8 @@
 
   import ChatBubble from '$components/ChatBubble.svelte';
   import { living } from '$state/alive.js';
-  import { attempts } from '$state/attempts.js';
   import { byDays, unread } from '$state/chat.js';
+  import { freshAnswer } from '$state/fresh.js';
   import { appended, nearTop } from '$state/paging.js';
 
   let { ask, say, hrId, blocked, events, onread } = $props();
@@ -26,8 +26,8 @@
   let attaching = $state(false);
   let feed = $state(null);
 
-  const tries = attempts();
   const alive = living();
+  const fresh = freshAnswer(() => alive.now);
 
   const days = $derived(byDays(messages, new Date()));
 
@@ -38,9 +38,8 @@
    * показал бы ленту без только что отправленного.
    */
   async function refresh() {
-    const mine = tries.next();
-    const page = await ask('hr.messages', { hr_id: hrId });
-    if (page === null || !alive.now || tries.stale(mine)) return;
+    const page = await fresh(() => ask('hr.messages', { hr_id: hrId }));
+    if (page === null) return;
     messages = page.messages;
     hasMore = page.has_more;
     loaded = true;

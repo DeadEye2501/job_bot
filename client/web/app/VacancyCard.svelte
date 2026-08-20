@@ -13,8 +13,9 @@
   import VacancyActions from '$components/VacancyActions.svelte';
   import VacancyTimeline from '$components/VacancyTimeline.svelte';
   import { living } from '$state/alive.js';
-  import { attempts } from '$state/attempts.js';
+  import { cardDrop } from '$state/card_drop.js';
   import { cardLinks } from '$state/card_links.js';
+  import { freshAnswer } from '$state/fresh.js';
   import { actionBlocks, rawChips } from '$state/vacancy_actions.js';
   import { ago, gradeLabel, remoteLabel, scoreTone } from '$state/vacancies.js';
   import { timelineRows } from '$state/vacancy_card.js';
@@ -38,8 +39,17 @@
   let linking = $state(null);
   let raw = $state(false);
 
-  const tries = attempts();
   const alive = living();
+  const fresh = freshAnswer(() => alive.now);
+
+  const dropCard = cardDrop({
+    ask: (...args) => ask(...args),
+    method: 'vacancies.delete',
+    note: 'Вакансия удалена',
+    say: (text) => say(text),
+    onchanged: () => onchanged(),
+    onclose: () => onclose(),
+  });
 
   const rows = $derived(card ? timelineRows(card.history, card.events) : []);
   const tone = $derived(card ? scoreTone(card.score, card.score_threshold) : '');
@@ -57,9 +67,8 @@
    *
    */
   async function refresh() {
-    const mine = tries.next();
-    const now = await ask('vacancies.detail', vacancyId);
-    if (!alive.now || tries.stale(mine) || now === null) return;
+    const now = await fresh(() => ask('vacancies.detail', vacancyId));
+    if (now === null) return;
     card = now.vacancy;
   }
 
@@ -138,11 +147,7 @@
 
   async function drop() {
     asking = null;
-    const done = await ask('vacancies.delete', { vacancy_id: vacancyId });
-    if (done === null) return;
-    say('Вакансия удалена');
-    onchanged();
-    onclose();
+    await dropCard({ vacancy_id: vacancyId });
   }
 
   /** Открыть адрес наружу.

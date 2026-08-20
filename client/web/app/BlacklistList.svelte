@@ -10,7 +10,6 @@
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import SearchBox from '$components/SearchBox.svelte';
   import { living } from '$state/alive.js';
-  import { attempts } from '$state/attempts.js';
   import {
     BLACKLIST_KINDS,
     blacklistCounts,
@@ -18,6 +17,7 @@
     blacklistShown,
     valueField,
   } from '$state/blacklist.js';
+  import { freshAnswer } from '$state/fresh.js';
 
   let { ask, say, events } = $props();
 
@@ -33,9 +33,9 @@
   let known = $state({});
   let leaving = $state(null);
 
-  const listTries = attempts();
-  const knownTries = attempts();
   const alive = living();
+  const freshList = freshAnswer(() => alive.now);
+  const freshKnown = freshAnswer(() => alive.now);
 
   const shown = $derived(blacklistShown(rows, { kind, search }));
   const counts = $derived(blacklistCounts(rows));
@@ -59,9 +59,8 @@
    * поправленное значение.
    */
   async function refresh() {
-    const mine = listTries.next();
-    const now = await ask('blacklist.list');
-    if (now === null || !alive.now || listTries.stale(mine)) return;
+    const now = await freshList(() => ask('blacklist.list'));
+    if (now === null) return;
     rows = now.items;
     loaded = true;
   }
@@ -73,9 +72,8 @@
    */
   async function load(one) {
     if (known[one] !== undefined) return;
-    const mine = knownTries.next();
-    const now = await ask('blacklist.candidates', one);
-    if (now === null || !alive.now || knownTries.stale(mine)) return;
+    const now = await freshKnown(() => ask('blacklist.candidates', one));
+    if (now === null) return;
     known = { ...known, [now.kind]: now.items };
   }
 

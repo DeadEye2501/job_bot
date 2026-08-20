@@ -8,6 +8,7 @@
   import NewPersonFields from '$components/NewPersonFields.svelte';
   import PersonRow from '$components/PersonRow.svelte';
   import SearchBox from '$components/SearchBox.svelte';
+  import { takeOpened } from '$state/open_mark.js';
   import { pagedList } from '$state/paged_list.svelte.js';
   import { named } from '$state/people.js';
 
@@ -26,14 +27,8 @@
   let opened = $state(null);
 
   // Кого открыть, придя со стороны — из списка непрочитанного над полосой или
-  // из карточки вакансии. Отметка гасится сразу: вкладку открывают и просто
-  // так, и заново открытая карточка человека, которого уже закрыли, читалась бы
-  // как поломка.
-  $effect(() => {
-    if (!open) return;
-    opened = open.id;
-    onopened();
-  });
+  // из карточки вакансии.
+  $effect(() => takeOpened(open, (id) => (opened = id), onopened));
 
   /** Завести человека.
    *

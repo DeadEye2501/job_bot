@@ -16,10 +16,11 @@
   import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
   import { living } from '$state/alive.js';
-  import { attempts } from '$state/attempts.js';
   import { blockNote, unblockNote } from '$state/blacklist.js';
+  import { cardDrop } from '$state/card_drop.js';
   import { cardRead } from '$state/card_read.js';
   import { companyCandidate, companyLine, siteHref } from '$state/companies.js';
+  import { freshAnswer } from '$state/fresh.js';
 
   // Пауза перед записью заметки — та же, что ждало прежнее окно.
   const NOTES_DELAY = 600;
@@ -36,15 +37,24 @@
   // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
   // компанию в ней переключают нажатием по соседней строке — ответ про
   // прежнюю, лёгший поверх свежего, показал бы её числа под новым именем.
-  const peopleTries = attempts();
-  const vacancyTries = attempts();
   const alive = living();
+  const freshPeople = freshAnswer(() => alive.now);
+  const freshVacancies = freshAnswer(() => alive.now);
 
   const readCard = cardRead({
     ask: (...args) => ask(...args),
     method: 'companies.detail',
     trouble: 'Не удалось прочитать компанию',
     alive: () => alive.now,
+  });
+
+  const dropCard = cardDrop({
+    ask: (...args) => ask(...args),
+    method: 'companies.delete',
+    note: 'Компания удалена',
+    say: (text) => say(text),
+    onchanged: () => onchanged(),
+    onclose: () => onclose(),
   });
 
   const shown = $derived(card ? companyLine({ ...card, id: card.company_id }) : null);
@@ -58,16 +68,14 @@
   }
 
   async function loadPeople(id) {
-    const mine = peopleTries.next();
-    const now = await ask('companies.people', id);
-    if (now === null || !alive.now || peopleTries.stale(mine)) return;
+    const now = await freshPeople(() => ask('companies.people', id));
+    if (now === null) return;
     people = now.hrs;
   }
 
   async function loadVacancies(id) {
-    const mine = vacancyTries.next();
-    const now = await ask('companies.vacancies', { company_id: id });
-    if (now === null || !alive.now || vacancyTries.stale(mine)) return;
+    const now = await freshVacancies(() => ask('companies.vacancies', { company_id: id }));
+    if (now === null) return;
     vacancies = now.vacancies;
   }
 
@@ -126,11 +134,7 @@
 
   async function drop() {
     asking = null;
-    const done = await ask('companies.delete', companyId);
-    if (done === null) return;
-    say('Компания удалена');
-    onchanged();
-    onclose();
+    await dropCard(companyId);
   }
 
   async function candidates(search) {

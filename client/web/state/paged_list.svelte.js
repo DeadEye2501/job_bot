@@ -12,7 +12,7 @@
 // оценки), и завёрнутый в общее, он потребовал бы ветвлений внутри.
 
 import { living } from '$state/alive.js';
-import { attempts } from '$state/attempts.js';
+import { freshAnswer } from '$state/fresh.js';
 import { appended, nearBottom, PAGE, refreshLimit } from '$state/paging.js';
 
 /** Заводит список, читающий себя страницами.
@@ -29,8 +29,8 @@ export function pagedList({ ask, method, key }) {
   let search = $state('');
   let loadingMore = $state(false);
 
-  const tries = attempts();
   const alive = living();
+  const fresh = freshAnswer(() => alive.now);
 
   /** Перечитать список с начала.
    *
@@ -39,9 +39,8 @@ export function pagedList({ ask, method, key }) {
    * список и после правки в карточке, где показанного больше страницы.
    */
   async function refresh(limit = PAGE) {
-    const mine = tries.next();
-    const now = await ask(method, { search, limit, offset: 0 });
-    if (now === null || !alive.now || tries.stale(mine)) return;
+    const now = await fresh(() => ask(method, { search, limit, offset: 0 }));
+    if (now === null) return;
     rows = now[key];
     hasMore = now.has_more;
     loaded = true;

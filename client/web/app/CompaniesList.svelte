@@ -9,6 +9,7 @@
   import CompanyRow from '$components/CompanyRow.svelte';
   import SearchBox from '$components/SearchBox.svelte';
   import { companyNamed } from '$state/companies.js';
+  import { takeOpened } from '$state/open_mark.js';
   import { pagedList } from '$state/paged_list.svelte.js';
 
   import CompanyCard from './CompanyCard.svelte';
@@ -27,14 +28,8 @@
   const ready = $derived(companyNamed(draft));
   let opened = $state(null);
 
-  // Какую компанию открыть, придя из карточки вакансии. Отметка гасится сразу:
-  // вкладку открывают и просто так, и заново открытая карточка компании,
-  // которую уже закрыли, читалась бы как поломка.
-  $effect(() => {
-    if (!open) return;
-    opened = open.id;
-    onopened();
-  });
+  // Какую компанию открыть, придя из карточки вакансии.
+  $effect(() => takeOpened(open, (id) => (opened = id), onopened));
 
   async function create() {
     const name = draft.name.trim();

@@ -13,10 +13,11 @@
   import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
   import { living } from '$state/alive.js';
-  import { attempts } from '$state/attempts.js';
   import { blockNote, unblockNote } from '$state/blacklist.js';
+  import { cardDrop } from '$state/card_drop.js';
   import { cardRead } from '$state/card_read.js';
   import { sendBlock } from '$state/chat.js';
+  import { freshAnswer } from '$state/fresh.js';
   import { personCandidate, personName } from '$state/people.js';
   import { telegramHref } from '$state/telegram.js';
   import { plural } from '$state/words.js';
@@ -37,14 +38,23 @@
   // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
   // человека в ней переключают нажатием по соседней строке — ответ про
   // прежнего, лёгший поверх свежего, показал бы его числа под новым именем.
-  const vacancyTries = attempts();
   const alive = living();
+  const freshVacancies = freshAnswer(() => alive.now);
 
   const readCard = cardRead({
     ask: (...args) => ask(...args),
     method: 'hr.detail',
     trouble: 'Не удалось прочитать карточку',
     alive: () => alive.now,
+  });
+
+  const dropCard = cardDrop({
+    ask: (...args) => ask(...args),
+    method: 'hr.delete',
+    note: 'Карточка удалена',
+    say: (text) => say(text),
+    onchanged: () => onchanged(),
+    onclose: () => onclose(),
   });
 
   const shown = $derived(card ? personName({ ...card, id: card.hr_id }) : '');
@@ -57,9 +67,8 @@
   }
 
   async function loadVacancies(id) {
-    const mine = vacancyTries.next();
-    const now = await ask('hr.vacancies', { hr_id: id });
-    if (now === null || !alive.now || vacancyTries.stale(mine)) return;
+    const now = await freshVacancies(() => ask('hr.vacancies', { hr_id: id }));
+    if (now === null) return;
     vacancies = now.vacancies;
   }
 
@@ -106,11 +115,7 @@
 
   async function drop() {
     asking = null;
-    const done = await ask('hr.delete', personId);
-    if (done === null) return;
-    say('Карточка удалена');
-    onchanged();
-    onclose();
+    await dropCard(personId);
   }
 
   async function candidates(search) {

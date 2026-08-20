@@ -13,7 +13,7 @@
   import { untrack } from 'svelte';
 
   import { living } from '$state/alive.js';
-  import { attempts } from '$state/attempts.js';
+  import { freshAnswer } from '$state/fresh.js';
   import { linkReady } from '$state/picker.js';
 
   import ModalFoot from './ModalFoot.svelte';
@@ -49,8 +49,8 @@
 
   const ready = $derived(linkReady({ current, chosen }));
 
-  const tries = attempts();
   const alive = living();
+  const fresh = freshAnswer(() => alive.now);
 
   /** Перечитать кандидатов.
    *
@@ -62,9 +62,8 @@
    * человек не просил, а кнопка внизу осталась бы отпертой.
    */
   async function refresh() {
-    const mine = tries.next();
-    const now = await load(search);
-    if (now === null || !alive.now || tries.stale(mine)) return;
+    const now = await fresh(() => load(search));
+    if (now === null) return;
     rows = now;
     loaded = true;
     if (chosen !== null && !rows.some((one) => one.id === chosen)) chosen = null;
