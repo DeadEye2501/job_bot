@@ -4,7 +4,12 @@
   // Секция одна на двоих — чат и эмбеддинги, — но раскладка у них разная: у
   // чата всё идёт одной сеткой, у эмбеддингов сверху стоит выбор «ходить туда
   // же, куда чат», и при нём адрес с ключом не показываются вовсе.
-  import { modelPlaceholder } from '$state/settings.js';
+  import {
+    CREDS_LIMITS,
+    KEY_PLACEHOLDER,
+    SAME_CREDS_LABEL,
+    modelPlaceholder,
+  } from '$state/settings.js';
 
   import SecretInput from './SecretInput.svelte';
   import SettingsSection from './SettingsSection.svelte';
@@ -33,6 +38,7 @@
 {#snippet urlField(hint)}
   <input
     class="input span-2"
+    maxlength={CREDS_LIMITS.base_url}
     value={creds.base_url}
     placeholder={hint}
     onblur={(event) => onsave({ base_url: event.currentTarget.value.trim() })}
@@ -43,7 +49,8 @@
   <div class="span-2">
     <SecretInput
       value={creds.api_key || ''}
-      placeholder="api_key (оставьте пустым, если не нужен)"
+      placeholder={KEY_PLACEHOLDER}
+      maxlength={CREDS_LIMITS.api_key}
       onsave={(api_key) => onsave({ api_key })}
     />
   </div>
@@ -55,6 +62,7 @@
       value={creds.model}
       options={models}
       {placeholder}
+      maxlength={CREDS_LIMITS.model}
       onsave={keepModel}
     />
   </div>
@@ -82,7 +90,7 @@
           checked={sameAsChat}
           onchange={(event) => onsame(event.currentTarget.checked)}
         />
-        Использовать те же base_url и api_key, что и для чата
+        {SAME_CREDS_LABEL}
       </label>
 
       {#if ownCreds}

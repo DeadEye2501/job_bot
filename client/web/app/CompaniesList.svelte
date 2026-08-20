@@ -6,7 +6,7 @@
   import NewCompanyFields from '$components/NewCompanyFields.svelte';
   import CompanyRow from '$components/CompanyRow.svelte';
   import SearchBox from '$components/SearchBox.svelte';
-  import { companyNamed } from '$state/companies.js';
+  import { blankCompany, companyNamed } from '$state/companies.js';
   import { takeOpened } from '$state/open_mark.js';
   import { pagedList } from '$state/paged_list.svelte.js';
 
@@ -21,7 +21,7 @@
   });
 
   let adding = $state(false);
-  let draft = $state({ name: '', website: '', aliases: '', notes: '' });
+  let draft = $state(blankCompany());
 
   const ready = $derived(companyNamed(draft));
   let opened = $state(null);
@@ -37,7 +37,7 @@
     // набранное человеку ещё пригодится.
     if (done === null) return;
     adding = false;
-    draft = { name: '', website: '', aliases: '', notes: '' };
+    draft = blankCompany();
     say('Компания заведена');
     // Тем же потолком, что и по вести: заведение не повод схлопывать
     // пролистанное.

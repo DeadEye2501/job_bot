@@ -14,7 +14,17 @@
   import TelegramSection from '$components/TelegramSection.svelte';
   import { living } from '$state/alive.js';
   import { askModels, probeModel } from '$state/provider.js';
-  import { credsChanged, idleProbe, loginTrouble, mirrored, probePill, sameCreds } from '$state/settings.js';
+  import {
+    blankCreds,
+    blankTelegram,
+    credsChanged,
+    idleProbe,
+    loginTrouble,
+    mirrored,
+    probePill,
+    sameCreds,
+    telegramCreds,
+  } from '$state/settings.js';
 
   import TelegramLogin from './TelegramLogin.svelte';
 
@@ -26,15 +36,11 @@
   const LOGOUT_ASK =
     'Выйти из сессии Telegram?\n\nКлюч будет отозван на сервере, бот остановится, а api_id, api_hash и телефон сотрутся из настроек. Войти заново придётся с нуля.';
 
-  // Пустой черновик входа: им экран открывается и к нему же возвращается после
-  // выхода из сессии.
-  const BLANK_TG = { api_id: '', api_hash: '', phone: '' };
-
   let loaded = $state(false);
   let tg = $state(null);
-  let draft = $state({ ...BLANK_TG });
-  let chat = $state({ base_url: '', api_key: '', model: '' });
-  let embed = $state({ base_url: '', api_key: '', model: '' });
+  let draft = $state(blankTelegram());
+  let chat = $state(blankCreds());
+  let embed = $state(blankCreds());
   let pipeline = $state({});
   let models = $state({ chat: [], embed: [] });
   let probes = $state({ chat: idleProbe(), embed: idleProbe() });
@@ -69,7 +75,7 @@
     embed = now.embed;
     pipeline = now.pipeline;
     if (!loaded) {
-      draft = { api_id: now.tg.api_id, api_hash: now.tg.api_hash, phone: now.tg.phone };
+      draft = telegramCreds(now.tg);
       // Признак выводится из настроек только здесь, при первом чтении: своего
       // поля в базе у него нет. Дальше им распоряжается человек — пересчитывай
       // мы его при каждой записи, снятая галочка возвращалась бы сама, и
@@ -209,7 +215,7 @@
     // только при первом чтении, и api_id с телефоном остались бы на экране —
     // вопреки тому, что человек прочитал в подтверждении и что уже случилось в
     // базе.
-    draft = { ...BLANK_TG };
+    draft = blankTelegram();
     await refresh();
   }
 

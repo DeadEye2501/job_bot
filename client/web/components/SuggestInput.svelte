@@ -9,8 +9,10 @@
   // Набранное — состояние самого поля, а не того, кто его поставил: это буквы,
   // которые в нём стоят прямо сейчас, и наверху они никому не нужны. Наверх
   // уходит только выбранное имя.
-  import { closeOnClickAway } from '$state/outside.js';
+  import { whileOpen } from '$state/outside.js';
   import { matchingModels } from '$state/settings.js';
+
+  import DropPanel from './DropPanel.svelte';
 
   let { value, options, placeholder, mono = false, maxlength = null, onsave } = $props();
 
@@ -23,12 +25,11 @@
   const shown = $derived(matchingModels(options, typed ?? value ?? ''));
 
   $effect(() => {
-    if (!open) return;
     // Закрывается нажатием мимо: панель накрывает поля под собой, и уйти от неё
     // человек может куда угодно — хоть в соседнее поле, хоть в кнопку проверки.
     // «Мимо» считается по своему узлу: полей с подсказкой на экране настроек
     // два, и по классу они друг от друга не отличаются.
-    return closeOnClickAway(() => root, () => (open = false));
+    return whileOpen(open, () => root, () => (open = false));
   });
 
   function keep(name) {
@@ -51,21 +52,6 @@
     onblur={(event) => keep(event.currentTarget.value.trim())}
   />
   {#if open && shown.length}
-    <div class="drop-panel cdd-panel" role="listbox" tabindex="-1">
-      {#each shown as one (one)}
-        <!-- Нажатие не уводит из поля: уйди оно — сработал бы уход, поле
-             записало бы набранное, и выбранное имя уехало бы наверх вторым
-             зовом поверх первого. -->
-        <button
-          class="cdd-option"
-          class:active={one === value}
-          type="button"
-          onmousedown={(event) => event.preventDefault()}
-          onclick={() => keep(one)}
-        >
-          {one}
-        </button>
-      {/each}
-    </div>
+    <DropPanel options={shown} {value} keepFocus onpick={keep} />
   {/if}
 </div>

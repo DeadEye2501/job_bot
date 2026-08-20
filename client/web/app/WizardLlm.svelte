@@ -12,7 +12,15 @@
   import { call } from '$api/bridge.js';
   import { living } from '$state/alive.js';
   import { askModels, probeModel } from '$state/provider.js';
-  import { mirrored, modelPlaceholder, sameCreds } from '$state/settings.js';
+  import {
+    CREDS_LIMITS,
+    blankCreds,
+    KEY_PLACEHOLDER,
+    SAME_CREDS_LABEL,
+    mirrored,
+    modelPlaceholder,
+    sameCreds,
+  } from '$state/settings.js';
   import Dropdown from '$components/Dropdown.svelte';
   import SecretInput from '$components/SecretInput.svelte';
   import SuggestInput from '$components/SuggestInput.svelte';
@@ -25,8 +33,8 @@
 
   let { ask, kind, onback, onnext } = $props();
 
-  let creds = $state({ base_url: '', api_key: '', model: '' });
-  let chat = $state({ base_url: '', api_key: '', model: '' });
+  let creds = $state(blankCreds());
+  let chat = $state(blankCreds());
   let sameAsChat = $state(true);
   let models = $state([]);
   let status = $state(null);
@@ -239,23 +247,23 @@
           checked={sameAsChat}
           onchange={(event) => useChatCreds(event.currentTarget.checked)}
         />
-        Те же base_url и api_key, что и для чата
+        {SAME_CREDS_LABEL}
       </label>
     {/if}
 
     {#if ownCreds}
       <input
         class="input mono"
-        maxlength="255"
+        maxlength={CREDS_LIMITS.base_url}
         placeholder="base_url"
         value={creds.base_url}
         onblur={(event) => edit({ base_url: event.currentTarget.value.trim() })}
       />
       <SecretInput
         value={creds.api_key}
-        placeholder="api_key (если требуется)"
+        placeholder={KEY_PLACEHOLDER}
         mono
-        maxlength={512}
+        maxlength={CREDS_LIMITS.api_key}
         onsave={(api_key) => edit({ api_key })}
       />
     {/if}
@@ -265,7 +273,7 @@
       options={models}
       placeholder={namePlaceholder}
       mono
-      maxlength={128}
+      maxlength={CREDS_LIMITS.model}
       onsave={(model) => edit({ model })}
     />
 

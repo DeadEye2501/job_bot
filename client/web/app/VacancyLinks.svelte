@@ -13,24 +13,21 @@
   import NewPersonFields from '$components/NewPersonFields.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
   import PickerRow from '$components/PickerRow.svelte';
-  import { companyCandidate, companyNamed } from '$state/companies.js';
-  import { named, personCandidate } from '$state/people.js';
+  import { blankCompany, companyCandidate, companyNamed } from '$state/companies.js';
+  import { blankPerson, named, personCandidate } from '$state/people.js';
 
   let { ask, say, vacancyId, kind, prefill = '', current = null, onclose, onlinked } = $props();
 
-  // Поля заведения у человека и у компании разные, и лишних не заводится: мост
-  // читает ровно эти.
-  const BLANK = {
-    hr: { name: '', telegram_username: '', telegram_user_id: '', notes: '' },
-    company: { name: '', website: '', aliases: '', notes: '' },
-  };
+  // Поля заведения у человека и у компании разные, и берутся они там же, где их
+  // берут вкладки контактов: мост читает ровно эти.
+  const BLANK = { hr: blankPerson, company: blankCompany };
 
   let creating = $state(false);
   let saving = $state(false);
   let picked = $state(null);
   // Свой набор полей на каждый род: окно открывают то для человека, то для
   // компании, и один набор на двоих уехал бы на мост с чужими ключами.
-  let drafts = $state({ hr: { ...BLANK.hr }, company: { ...BLANK.company } });
+  let drafts = $state({ hr: blankPerson(), company: blankCompany() });
   const draft = $derived(drafts[kind]);
 
   // Заслон тот же, что в списках контактов: человеку — хоть что-нибудь из трёх,
@@ -78,7 +75,7 @@
     // уже сказал плашкой, чего ему не хватило.
     if (done === null) return;
     creating = false;
-    drafts[kind] = { ...BLANK[kind] };
+    drafts[kind] = BLANK[kind]();
     say(kind === 'hr' ? 'Человек заведён' : 'Компания заведена');
     picked = done.created_id;
   }

@@ -10,16 +10,15 @@
   z-index: 60;
 }
 
-.tg-login-box {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+/* Коробка та же, что у общих окон, — своё в ней только ширина, отбивка строк и
+   отсутствие тени: окно спрашивает одно короткое поле, и тень под ним читалась
+   бы как вес, которого у вопроса нет. */
+.modal-dialog.tg-login-box {
   width: 380px;
+  min-width: 0;
   max-width: 90vw;
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
   gap: 10px;
+  box-shadow: none;
 }
 
 /* Заголовок крупнее, чем у окон, спрашивающих одной строкой: здесь он назван

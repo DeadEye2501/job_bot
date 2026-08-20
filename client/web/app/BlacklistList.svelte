@@ -15,6 +15,7 @@
     blacklistCounts,
     blacklistHints,
     blacklistShown,
+    blankRow,
     valueField,
   } from '$state/blacklist.js';
   import { freshAnswer } from '$state/fresh.js';
@@ -26,7 +27,7 @@
   let kind = $state('');
   let search = $state('');
   let adding = $state(false);
-  let draft = $state({ kind: 'keyword', value: '', reason: '' });
+  let draft = $state(blankRow());
   let saving = $state(false);
   // Существующие люди, компании и каналы для подсказчика — по роду и по разу:
   // перечень не меняется, пока окно открыто.
@@ -91,7 +92,7 @@
     if (done === null) return;
     adding = false;
     say(done.created ? 'Строка заведена' : 'Такая строка уже была');
-    draft = { kind: 'keyword', value: '', reason: '' };
+    draft = blankRow();
     return refresh();
   }
 

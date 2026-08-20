@@ -3,7 +3,7 @@
   //
   // О самих пунктах не знает ничего — их рисует тот, кто позвал, и получает
   // сюда же закрывающий зов: нажатый пункт обязан убрать за собой окошко.
-  import { closeOnClickAway } from '$state/outside.js';
+  import { whileOpen } from '$state/outside.js';
 
   let { children } = $props();
 
@@ -11,10 +11,9 @@
   let root = $state(null);
 
   $effect(() => {
-    if (!open) return;
     // Нажатие мимо закрывает меню. Своим узлом, а не по имени класса:
     // всплывающих окошек на карточке несколько, и «мимо» у каждого своё.
-    return closeOnClickAway(() => root, () => (open = false));
+    return whileOpen(open, () => root, () => (open = false));
   });
 </script>
 

@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BOUNDS,
+  blankCreds,
+  blankTelegram,
   clampField,
   credsChanged,
   matchingModels,
@@ -17,6 +19,7 @@ import {
   scorePercent,
   sessionPill,
   sessionText,
+  telegramCreds,
   thresholdState,
 } from '../state/settings.js';
 
@@ -238,5 +241,34 @@ describe('порог отбора', () => {
 
   it('запись переносит перетащенное в сохранённое', () => {
     expect(thresholdState({ saved: 60 }).drag(75).commit().saved).toBe(75);
+  });
+});
+
+describe('пустые черновики настроек', () => {
+  it('пустой вход в Telegram ничем не заполнен', () => {
+    // Им экран открывается и к нему же возвращается после выхода из сеанса:
+    // останься в полях прежнее, человек отправил бы код на чужой номер.
+    expect(blankTelegram()).toEqual({ api_id: '', api_hash: '', phone: '' });
+  });
+
+  it('пустые данные поставщика ничем не заполнены', () => {
+    expect(blankCreds()).toEqual({ base_url: '', api_key: '', model: '' });
+  });
+
+  it('каждый черновик новый', () => {
+    // Черновики правят на месте: один на всех протёк бы из настроек в мастер и
+    // обратно.
+    const one = blankCreds();
+    one.model = 'qwen';
+
+    expect(blankCreds().model).toBe('');
+  });
+
+  it('из ответа моста берутся ровно поля входа', () => {
+    // Ответ настроек шире: в нём и признак сеанса, и имя учётной записи, — а в
+    // поля идут только те три, которые человек правит.
+    expect(
+      telegramCreds({ api_id: '12', api_hash: 'ff', phone: '+7', has_session: true, username: 'x' }),
+    ).toEqual({ api_id: '12', api_hash: 'ff', phone: '+7' });
   });
 });

@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BLACKLIST_KINDS,
   blacklistCounts,
+  blankRow,
   blacklistHints,
   blacklistShown,
   blockNote,
@@ -175,5 +176,26 @@ describe('что говорят человеку о занесении в отс
     expect(unblockNote({ updated: 1 })).toBe('Убран из отсева');
     expect(unblockNote({ updated: 0 })).toBe('В отсеве его не было');
     expect(unblockNote({ updated: 0 }, true)).toBe('В отсеве её не было');
+  });
+});
+
+describe('пустой черновик строки отсева', () => {
+  it('открывается на роде, которым отсеивают чаще всего', () => {
+    // Слово отсеивает больше объявлений, чем все каналы вместе, и набирают его
+    // руками — остальные роды подсказываются из уже заведённого.
+    expect(blankRow().kind).toBe('keyword');
+  });
+
+  it('ни значения, ни причины в нём нет', () => {
+    expect(blankRow()).toEqual({ kind: 'keyword', value: '', reason: '' });
+  });
+
+  it('каждый раз новый', () => {
+    // Черновик правят на месте: один и тот же принёс бы в следующее окно
+    // набранное в прошлом.
+    const one = blankRow();
+    one.value = '@spam';
+
+    expect(blankRow().value).toBe('');
   });
 });

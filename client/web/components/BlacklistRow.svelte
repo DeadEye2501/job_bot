@@ -7,6 +7,7 @@
   import { untrack } from 'svelte';
 
   import { autosave } from '$state/autosave.js';
+  import { fitHeight } from '$state/autosize.js';
   import { shortDate } from '$state/dates.js';
   import { flashing } from '$state/flash.js';
 
@@ -62,8 +63,7 @@
    *  прокрутки в строке таблицы не разглядеть. */
   function grow() {
     if (field === null) return;
-    field.style.height = 'auto';
-    field.style.height = `${field.scrollHeight}px`;
+    fitHeight(field);
   }
 
   $effect(() => {

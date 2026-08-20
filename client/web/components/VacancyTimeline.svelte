@@ -9,6 +9,7 @@
   // зовущего: записи, вспышки и набранное помнятся по номеру строки истории, и
   // без пересоздания в них копились бы строки всех вакансий сеанса.
   import { autosave } from '$state/autosave.js';
+  import { fitHeight } from '$state/autosize.js';
   import { flashing } from '$state/flash.js';
   import { saveKey } from '$state/keys.js';
   import { ago } from '$state/vacancies.js';
@@ -62,15 +63,8 @@
 
   function type(row, field) {
     typed[row.historyId] = field.value;
-    grow(field);
+    fitHeight(field);
     saverFor(row).typed(field.value);
-  }
-
-  /** Поле высотой в свой текст: пояснения бывают и в слово, и в абзац, а
-   *  прокрутка внутри строки ленты не читается вовсе. */
-  function grow(field) {
-    field.style.height = 'auto';
-    field.style.height = `${field.scrollHeight}px`;
   }
 
   $effect(() => {

@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  blankCompany,
   companyCandidate,
   companyLine,
   companyNamed,
@@ -122,5 +123,19 @@ describe('чем подписана компания там, где имени �
   it('безымянную зовут прочерком — и в списке, и в шапке карточки', () => {
     // Номер годится строке подборщика, а здесь читался бы как название.
     expect(companyTitle({ id: 7, name: '' })).toEqual({ name: '— без названия —', named: false });
+  });
+});
+
+describe('пустой черновик компании', () => {
+  it('пустым он назван быть не может', () => {
+    expect(companyNamed(blankCompany())).toBe(false);
+  });
+
+  it('каждый раз новый', () => {
+    // Черновик правят на месте: один и тот же протёк бы из окна в окно.
+    const one = blankCompany();
+    one.name = 'Ромашка';
+
+    expect(blankCompany().name).toBe('');
   });
 });

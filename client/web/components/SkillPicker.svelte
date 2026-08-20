@@ -4,7 +4,7 @@
   // Набирать нельзя: мост связывает место работы с заведённым навыком по
   // имени и незнакомое отбрасывает молча — человек написал бы «js», а в
   // резюме этого места стек оказался бы пуст.
-  import { closeOnClickAway } from '$state/outside.js';
+  import { whileOpen } from '$state/outside.js';
   import { groupsMatching } from '$state/skills.js';
 
   import Chip from './Chip.svelte';
@@ -36,10 +36,7 @@
     onadd(name);
   }
 
-  $effect(() => {
-    if (!open) return;
-    return closeOnClickAway(() => root, () => (open = false));
-  });
+  $effect(() => whileOpen(open, () => root, () => (open = false)));
 </script>
 
 <div class="skills-block" bind:this={root}>
