@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  blankPerson,
   named,
   personCandidate,
   personHead,
@@ -186,5 +187,22 @@ describe('половины подписи человека', () => {
 
     expect(personSub(one)).toEqual({ handle: 'без ника', company: 'без компании' });
     expect(personLine({ ...one, id: 1, name: 'Ирина' }).sub).toBe('без ника · без компании');
+  });
+});
+
+describe('пустой черновик человека', () => {
+  it('пустым он назван быть не может', () => {
+    // Форма открывается с ним, и кнопка «Создать» при нём заперта: карточку
+    // без имени, ника и номера потом не найти ничем.
+    expect(named(blankPerson())).toBe(false);
+  });
+
+  it('каждый раз новый', () => {
+    // Черновик правят на месте: отдай мы один и тот же, набранное в окне
+    // контактов всплыло бы в окне заведения из карточки вакансии.
+    const one = blankPerson();
+    one.name = 'Ирина';
+
+    expect(blankPerson().name).toBe('');
   });
 });

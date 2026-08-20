@@ -7,7 +7,7 @@
   import { tick } from 'svelte';
 
   import { toggled } from '$state/chosen.js';
-  import { closeOnClickAway } from '$state/outside.js';
+  import { whileOpen } from '$state/outside.js';
   import { STATUS_CHOICES } from '$state/statuses.js';
   import {
     COMPANY_MAX,
@@ -71,10 +71,9 @@
   }
 
   $effect(() => {
-    if (!shown) return;
     // Нажатие мимо панели закрывает её и бросает черновик. Ухода мыши здесь
     // мало: панель большая, и мышь уходит с неё, пока человек ещё набирает.
-    return closeOnClickAway(() => root, () => onshown(false));
+    return whileOpen(shown, () => root, () => onshown(false));
   });
 </script>
 

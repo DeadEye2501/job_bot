@@ -10,13 +10,13 @@
   import WizardStatus from '$components/WizardStatus.svelte';
 
   import { living } from '$state/alive.js';
-  import { loginTrouble } from '$state/settings.js';
+  import { blankTelegram, loginTrouble, telegramCreds } from '$state/settings.js';
 
   import TelegramLogin from './TelegramLogin.svelte';
 
   let { ask, say, onback, onnext } = $props();
 
-  let draft = $state({ api_id: '', api_hash: '', phone: '' });
+  let draft = $state(blankTelegram());
   let status = $state(null);
   let logging = $state(false);
 
@@ -26,7 +26,7 @@
     const now = await ask('settings.get');
     if (now === null || !alive.now) return;
     if (!draft.api_id) {
-      draft = { api_id: now.tg.api_id, api_hash: now.tg.api_hash, phone: now.tg.phone };
+      draft = telegramCreds(now.tg);
     }
   }
 

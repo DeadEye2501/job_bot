@@ -3,7 +3,9 @@
   //
   // Не системный `<select>`: тот рисуется средствами системы и в тёмном окне
   // выглядит светлой заплатой, а его список нельзя ни оформить, ни сузить.
-  import { closeOnClickAway } from '$state/outside.js';
+  import { whileOpen } from '$state/outside.js';
+
+  import DropPanel from './DropPanel.svelte';
 
   let { options, value, onpick } = $props();
 
@@ -11,12 +13,11 @@
   let root = $state(null);
 
   $effect(() => {
-    if (!open) return;
     // Закрывается нажатием мимо: список накрывает строки под собой, и уйти от
     // него человек может куда угодно — хоть в соседнюю строку, хоть в поле над
     // ней. «Мимо» считается по своему узлу: списков на вкладке столько же,
     // сколько строк языка, и по классу они друг от друга не отличаются.
-    return closeOnClickAway(() => root, () => (open = false));
+    return whileOpen(open, () => root, () => (open = false));
   });
 </script>
 
@@ -26,20 +27,13 @@
     <span class="material-symbols-outlined">expand_more</span>
   </button>
   {#if open}
-    <div class="drop-panel cdd-panel" role="listbox" tabindex="-1">
-      {#each options as one (one)}
-        <button
-          class="cdd-option"
-          class:active={one === value}
-          type="button"
-          onclick={() => {
-            open = false;
-            onpick(one);
-          }}
-        >
-          {one}
-        </button>
-      {/each}
-    </div>
+    <DropPanel
+      {options}
+      {value}
+      onpick={(one) => {
+        open = false;
+        onpick(one);
+      }}
+    />
   {/if}
 </div>

@@ -14,7 +14,7 @@
 
 ## app — 25 файлов
 
-### app/BlacklistList.svelte (217)
+### app/BlacklistList.svelte (218)
 - —
 - принимает: ask, say, events
 
@@ -76,7 +76,7 @@
 - —
 - принимает: ask
 
-### app/SettingsScreen.svelte (340)
+### app/SettingsScreen.svelte (346)
 - Окно входа стоит внутри поля настроек, а не рядом с ним: кнопки в нём той же плотности, что и остальные кнопки экрана, и берут они её отсюда. На раскладку это не влияет — окно висит поверх страницы.
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
@@ -93,7 +93,7 @@
 - Окно пересоздаётся на смене шага: код и облачный пароль — разные секреты, и набранный код не должен доехать до поля пароля.
 - принимает: say, creds, relogin, ondone, onclose
 
-### app/VacanciesScreen.svelte (297)
+### app/VacanciesScreen.svelte (296)
 - —
 - принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte
@@ -103,7 +103,7 @@
 - принимает: ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged
 - берёт: ./VacancyLinks.svelte
 
-### app/VacancyLinks.svelte (134)
+### app/VacancyLinks.svelte (131)
 - —
 - принимает: ask, say, vacancyId, kind, prefill, current, onclose, onlinked
 
@@ -111,7 +111,7 @@
 - —
 - принимает: ask, busy, onback, onnext
 
-### app/WizardLlm.svelte (297)
+### app/WizardLlm.svelte (305)
 - —
 - принимает: ask, kind, onback, onnext
 
@@ -125,13 +125,13 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 79 файлов
+## components — 80 файлов
 
-### components/ActionsMenu.svelte (31)
+### components/ActionsMenu.svelte (30)
 - —
 - принимает: children
 
-### components/AddBlacklistDialog.svelte (109)
+### components/AddBlacklistDialog.svelte (108)
 - Поле одно на оба рода: у слова подсказчика нет вовсе, и второе написание того же поля разошлось бы с первым первой же правкой длины. Обёртка стоит всегда — она держит выпадающий список у поля.
 - принимает: draft, hints, kinds, saving, onkind, onvalue, onreason, onadd, onclose
 - берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte
@@ -168,7 +168,7 @@
 - принимает: row, onedit, ontoggle, onremove
 - берёт: ./RowToggle.svelte
 
-### components/BulletList.svelte (60)
+### components/BulletList.svelte (59)
 - —
 - принимает: label, addLabel, items, onedit, onadd, onremove
 
@@ -221,7 +221,7 @@
 - Открывать нечего, когда файла нет на диске: система показала бы свою ошибку вместо нашей строки «файл не найден».
 - принимает: meta, onreplace, onopen
 
-### components/DatePicker.svelte (150)
+### components/DatePicker.svelte (149)
 - —
 - принимает: value, onpick, disabled, up
 
@@ -229,9 +229,14 @@
 - —
 - принимает: parts, total, label
 
-### components/Dropdown.svelte (45)
+### components/DropPanel.svelte (25)
+- —
+- принимает: options, value, onpick, keepFocus
+
+### components/Dropdown.svelte (39)
 - —
 - принимает: options, value, onpick
+- берёт: ./DropPanel.svelte
 
 ### components/ExperienceCard.svelte (147)
 - Нажимается вся шапка, а не одна стрелка: свёрнутых карточек столбик, и целиться в значок ради раскрытия человеку не за что.
@@ -255,7 +260,7 @@
 - принимает: rows, onedit, onadd, onremove
 - берёт: ./Dropdown.svelte
 
-### components/LlmSection.svelte (108)
+### components/LlmSection.svelte (116)
 - Ввод в любое из полей гасит плашку проверки: она говорит «модель отвечает» про тот адрес, который проверяли, и на изменённых полях лгала бы. Ловится здесь, а не на каждом поле: событие всплывает, и второй обработчик у поля секрета пришлось бы заводить внутри чужого компонента.
 - принимает: title, icon, creds, models, pill, busy, sameAsChat, onsave, onprobe, onsame, onedit
 - берёт: ./SecretInput.svelte, ./SettingsSection.svelte, ./SuggestInput.svelte
@@ -293,9 +298,9 @@
 - —
 - принимает: close, confirm
 
-### components/ModalShell.svelte (28)
+### components/ModalShell.svelte (34)
 - Нажатие по затемнению закрывает окно, нажатие внутри коробки — нет: сверяем, что нажали ровно в затемнение, а не всплыло из содержимого.
-- принимает: extra, confirm, onclose, children
+- принимает: extra, over, confirm, awayCloses, onclose, children
 - берёт: ./ModalKeys.svelte
 
 ### components/ModeToggle.svelte (29)
@@ -323,7 +328,7 @@
 - принимает: person, selected, onpick
 - берёт: ./Avatar.svelte, ./BlacklistMark.svelte, ./Handle.svelte
 
-### components/PickList.svelte (55)
+### components/PickList.svelte (54)
 - —
 - принимает: placeholder, hint, empty, names, chosen, search, onsearch, prefix, onpick
 
@@ -376,7 +381,7 @@
 - принимает: icon, title, pill, danger, children
 - берёт: ./StatusPill.svelte
 
-### components/SkillPicker.svelte (85)
+### components/SkillPicker.svelte (82)
 - —
 - принимает: chosen, known, onadd, onremove
 - берёт: ./Chip.svelte, ./SearchBox.svelte
@@ -420,9 +425,10 @@
 - —
 - принимает: text, tone, title
 
-### components/SuggestInput.svelte (71)
-- Нажатие не уводит из поля: уйди оно — сработал бы уход, поле записало бы набранное, и выбранное имя уехало бы наверх вторым зовом поверх первого.
+### components/SuggestInput.svelte (57)
+- —
 - принимает: value, options, placeholder, mono, maxlength, onsave
+- берёт: ./DropPanel.svelte
 
 ### components/TelegramSection.svelte (51)
 - —
@@ -432,7 +438,7 @@
 ### components/TgLoginDialog.svelte (61)
 - Escape закрывает, Enter — нет: шаг уходит только кнопкой.
 - принимает: step, phone, relogin, busy, error, onsubmit, oncancel
-- берёт: ./ModalKeys.svelte
+- берёт: ./ModalShell.svelte
 
 ### components/TopTabs.svelte (12)
 - —
@@ -447,7 +453,7 @@
 - принимает: blocks, say, onsend, onrerun, onlinkhr, onlinkcompany, onraw, onsource, ondelete
 - берёт: ./ActionsMenu.svelte, ./MenuItem.svelte
 
-### components/VacancyFilters.svelte (264)
+### components/VacancyFilters.svelte (263)
 - Панель падает из полосы, а не из-под кнопки: она вдвое шире полосы, и прижатая к кнопке у правого края она уходила бы за кромку списка. Обёртка вокруг них своей раскладки не имеет и стоит только затем, чтобы кнопка и панель считались одним местом: «мимо» сторож считает по узлу, а не по имени класса, и кнопка панели не принадлежит — она её сосед.
 - принимает: applied, options, onapply, shown, onshown
 - берёт: ./ChoiceRow.svelte, ./DatePicker.svelte, ./FilterGroup.svelte, ./PickList.svelte
@@ -456,7 +462,7 @@
 - Половины подписи покрашены по-разному: компанию читают первой, а давность — последней, и одинаковый цвет заставлял бы разбирать строку целиком.
 - принимает: vacancy, threshold, selected, onpick
 
-### components/VacancyTimeline.svelte (114)
+### components/VacancyTimeline.svelte (108)
 - —
 - принимает: rows, vacancyId, onsave
 
@@ -472,7 +478,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 47 файлов
+## state — 48 файлов
 
 ### state/alive.js (51)
 - * Заводит признак жизни экрана.
@@ -486,13 +492,17 @@
 - * Заводит отложенную запись поля. * * Пауза считается от последнего знака: запись на каждый знак послала бы мосту * по вопросу на букву, а отсчёт от первого отправлял бы недописанное. * * `save` отвечает, легло ли: ложь означает отказ, и тогда набранное считается * незаписанным — следующая попытка уедет тем же текстом.
 - отдаёт: autosave
 
+### state/autosize.js (24)
+- * Подогнать высоту поля под его текст. * * Сжатие до `auto` перед замером несущее: растянутое поле показывает прежнюю * высоту и после того, как текст из него убрали, — стёртый абзац оставил бы * после себя дыру во весь свой рост.
+- отдаёт: fitHeight
+
 ### state/avatar.js (19)
 - * Буквы имени на месте снимка. * * Снимок есть не у всех: у заведённых руками его нет вовсе, а пустой кружок * читается как недогрузившаяся картинка. Берутся первое слово и последнее — * имя и фамилия; отчество между ними ничего не различает.
 - отдаёт: initials
 
-### state/blacklist.js (126)
+### state/blacklist.js (137)
 - * Роды строк отсева. Первый — общий: в нём экран открывается. * * Порядок несущий: слова стоят перед предметами, потому что ими отсев и * пользуются чаще всего — по одному слову отсеивается больше объявлений, чем по * всем каналам вместе.
-- отдаёт: BLACKLIST_KINDS, blacklistCounts, blacklistHints, blacklistShown, blockNote, unblockNote, valueField
+- отдаёт: BLACKLIST_KINDS, blacklistCounts, blacklistHints, blacklistShown, blankRow, blockNote, unblockNote, valueField
 
 ### state/calendar.js (62)
 - * Дни недели с понедельника. Порядок несущий: по нему считается, в какую * колонку встаёт первое число месяца.
@@ -534,9 +544,9 @@
 - * Какую долю дорожки залить под это значение. * * Зажато с обеих сторон: значение приезжает с моста и могло быть выставлено * до того, как предел назначили, — заливка шире дорожки выглядит поломкой, а * отрицательная не рисуется вовсе.
 - отдаёт: fillPercent, toggled, without
 
-### state/companies.js (95)
+### state/companies.js (105)
 - /i; // Чем названа компания, которую назвать нечем. const UNNAMED = '— без названия —'; /** Чем подписать компанию в списке. * * Имя — сверху, сайт и алиасы — под ним: по имени компанию узнают, по * домену различают. Две «Ромашки» с разными сайтами — разные компании, и без * второй строки они неотличимы. * * Имени может не быть — оно приходит из объявления, — и тогда компания названа * номером: показать нечего, но строка должна остаться нажимаемой.
-- отдаёт: companyCandidate, companyLine, companyNamed, companyTitle, siteHref
+- отдаёт: blankCompany, companyCandidate, companyLine, companyNamed, companyTitle, siteHref
 
 ### state/dates.js (111)
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
@@ -578,9 +588,9 @@
 - * Принять отметку и погасить её. * * Отметку ставят соседние экраны: воронка каналов в статистике, карточка * вакансии, вкладка компании. Без отметки не трогают ничего — вкладку * открывают и просто так. * * Гасится она сразу, а не по закрытии карточки: непогашенная открыла бы её * заново, и человек, закрывший карточку, читал бы это как поломку.
 - отдаёт: takeOpened
 
-### state/outside.js (31)
+### state/outside.js (43)
 - * Ставит сторожа «нажали мимо» и отдаёт его снятие. * * Отдаётся снятие затем, что зовут это из эффекта: он и вернёт его окну. * * Узла может ещё не быть — разметка привязывает его после первого показа, — и * до тех пор мимо не нажимают ни разу: окошка на экране нет.
-- отдаёт: closeOnClickAway
+- отдаёт: closeOnClickAway, whileOpen
 
 ### state/paged_list.svelte.js (127)
 - * Заводит список, читающий себя страницами. * * `ask` — обращение к мосту, `method` — имя метода, `key` — под каким именем * строки лежат в ответе. Обращение принимается обёрткой, а не самим доводом: * довод читается один раз, при заведении списка, и подмена его сверху сюда бы * не доехала.
@@ -590,9 +600,9 @@
 - * Сколько строк в странице. Столько же по умолчанию отдаёт мост.
 - отдаёт: PAGE, VACANCY_PAGE, appended, nearBottom, nearTop, refreshLimit
 
-### state/people.js (129)
+### state/people.js (140)
 - * Как назвать человека в чужой карточке. * * Безымянный назван номером: строка должна читаться, а не пустовать.
-- отдаёт: named, personCandidate, personHead, personLine, personName, personSub, personTitle, unreadLine
+- отдаёт: blankPerson, named, personCandidate, personHead, personLine, personName, personSub, personTitle, unreadLine
 
 ### state/picker.js (29)
 - * Отперта ли кнопка «Связать». * * Промах мышью по строке списка не должен менять привязку: выбор строки только * помечает её, а связывает отдельная кнопка. Выбор уже привязанного кнопку не * отпирает — нажатие переписало бы связь тем же значением и записало в ленту * перемену, которой не было.
@@ -618,9 +628,9 @@
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
-### state/settings.js (185)
+### state/settings.js (232)
 - * Чем подписано пустое поле имени модели. * * Пока имён нет, подсказка не обещает списка: перечень читается с адреса и * ключа, и у непóднятого поставщика его не будет вовсе — имя тогда вписывают * руками. Слова общие на настройки и на шаг мастера: одно и то же поле, * подписанное по-разному, читается как два разных.
-- отдаёт: BOUNDS, SCORE_MAX, clampField, credsChanged, idleProbe, loginTrouble, matchingModels, mirrored, modelPlaceholder, nextStep, probePill, sameCreds, scorePercent, sessionPill, sessionText, thresholdState
+- отдаёт: BOUNDS, CREDS_LIMITS, KEY_PLACEHOLDER, SAME_CREDS_LABEL, SCORE_MAX, blankCreds, blankTelegram, clampField, credsChanged, idleProbe, loginTrouble, matchingModels, mirrored, modelPlaceholder, nextStep, probePill, sameCreds, scorePercent, sessionPill, sessionText, telegramCreds, thresholdState
 
 ### state/skills.js (84)
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
@@ -1131,10 +1141,10 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (4): .top-tabs, .top-tabs .tab, .top-tabs .tab:hover, .top-tabs .tab.active
 - берёт: --accent, --bg-secondary, --border, --text-primary, --text-secondary
 
-### styles/tg-login.css (42)
+### styles/tg-login.css (41)
 - Окно входа в Telegram — своё, а не общее окно-вопрос. Отличия не в украшении: коробка у́же и без тени, потому что спрашивает одно короткое поле, а поле в ней темнее подложки — на общем цвете оно совпадает с коробкой, и человеку не видно, куда набирать код.
-- селекторы (5): .tg-login, .tg-login-box, .tg-login .modal-title, .tg-login .input, .tg-login .modal-actions
-- берёт: --bg-secondary, --bg-tertiary, --border
+- селекторы (5): .tg-login, .modal-dialog.tg-login-box, .tg-login .modal-title, .tg-login .input, .tg-login .modal-actions
+- берёт: --bg-tertiary
 
 ### styles/timeline.css (151)
 - Лента жизни вакансии: точка, текст и время в три колонки.
@@ -1174,7 +1184,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 45 файлов
+## tests — 46 файлов
 
 ### tests/alive.test.js (79)
 - —
@@ -1185,10 +1195,13 @@ body, html, button, body, .material-symbols-outlined
 ### tests/autosave.test.js (139)
 - —
 
+### tests/autosize.test.js (49)
+- * Поле, помнящее всё, что ему ставили в высоту. * * Измеренная высота отвечает по последнему поставленному: настоящее поле * меряет содержимое ровно так — сжатое до `auto` показывает свой текст, а * растянутое прежним значением показывает это самое прежнее.
+
 ### tests/avatar.test.js (27)
 - —
 
-### tests/blacklist.test.js (179)
+### tests/blacklist.test.js (201)
 - —
 
 ### tests/blacklist_menu_item.test.js (108)
@@ -1227,7 +1240,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/chosen.test.js (28)
 - —
 
-### tests/companies.test.js (126)
+### tests/companies.test.js (141)
 - —
 
 ### tests/dates.test.js (100)
@@ -1263,7 +1276,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/open_mark.test.js (36)
 - —
 
-### tests/outside.test.js (90)
+### tests/outside.test.js (122)
 - * Узел, считающий своими только перечисленные цели.
 
 ### tests/paged_list.test.js (173)
@@ -1272,7 +1285,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/paging.test.js (61)
 - —
 
-### tests/people.test.js (190)
+### tests/people.test.js (208)
 - —
 
 ### tests/picker.test.js (64)
@@ -1287,7 +1300,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/search.test.js (49)
 - —
 
-### tests/settings.test.js (242)
+### tests/settings.test.js (274)
 - —
 
 ### tests/skills.test.js (130)

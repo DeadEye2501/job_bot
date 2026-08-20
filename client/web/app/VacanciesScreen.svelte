@@ -11,7 +11,7 @@
   import { living } from '$state/alive.js';
   import { freshAnswer } from '$state/fresh.js';
   import { takeOpened } from '$state/open_mark.js';
-  import { closeOnClickAway } from '$state/outside.js';
+  import { whileOpen } from '$state/outside.js';
   import { VACANCY_PAGE, appended, nearBottom, refreshLimit } from '$state/paging.js';
   import { blankFilter, filterPayload } from '$state/vacancy_filter.js';
   import { SORTS, emptyNote, sortKey } from '$state/vacancies.js';
@@ -180,10 +180,9 @@
   }
 
   $effect(() => {
-    if (!sortOpen) return;
     // Нажатие мимо закрывает меню. Оно падает поверх списка, и оставленное
     // открытым закрывает собой те самые строки, ради которых порядок меняли.
-    return closeOnClickAway(() => bar, () => (sortOpen = false));
+    return whileOpen(sortOpen, () => bar, () => (sortOpen = false));
   });
 
   $effect(() => {

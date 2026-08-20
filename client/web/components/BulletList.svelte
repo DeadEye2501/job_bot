@@ -5,6 +5,8 @@
   // в узкой строке видно только её начало.
   import { tick as painted } from 'svelte';
 
+  import { fitHeight } from '$state/autosize.js';
+
   let { label, addLabel, items, onedit, onadd, onremove } = $props();
 
   /** Растянуть строку по набранному.
@@ -13,10 +15,7 @@
    * строка прятала бы вторую половину достижения.
    */
   function grow(field) {
-    const fit = () => {
-      field.style.height = 'auto';
-      field.style.height = `${field.scrollHeight}px`;
-    };
+    const fit = () => fitHeight(field);
     fit();
     field.addEventListener('input', fit);
     return {

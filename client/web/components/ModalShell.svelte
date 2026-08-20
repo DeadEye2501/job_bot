@@ -6,11 +6,17 @@
   // окно у четверых из шести, а у двоих нет: поправка до копий не доехала.
   //
   // `extra` — имя своего вида коробки: ширина у окон разная, и задаёт её каждое
-  // само. `confirm` просит только подтверждение необратимого: там Enter значит
-  // «да», а в окнах с заметкой в несколько строк он обрывал бы набор.
+  // само. `over` — имя своего затемнения: место в стопке у окон разное, и вход
+  // в Telegram стоит ниже общих окон, но выше экрана настроек. `confirm` просит
+  // только подтверждение необратимого: там Enter значит «да», а в окнах с
+  // заметкой в несколько строк он обрывал бы набор.
+  //
+  // `awayCloses` — закрывать ли нажатием по затемнению. Вход в Telegram так не
+  // закрывается нарочно: окно спрашивает код, набранный в чужом приложении, и
+  // промах мимо коробки стоил бы нового кода.
   import ModalKeys from './ModalKeys.svelte';
 
-  let { extra = '', confirm = null, onclose, children } = $props();
+  let { extra = '', over = '', confirm = null, awayCloses = true, onclose, children } = $props();
 </script>
 
 <ModalKeys close={onclose} {confirm} />
@@ -18,9 +24,9 @@
 <!-- Нажатие по затемнению закрывает окно, нажатие внутри коробки — нет:
      сверяем, что нажали ровно в затемнение, а не всплыло из содержимого. -->
 <div
-  class="modal-backdrop"
+  class="modal-backdrop {over}"
   role="presentation"
-  onclick={(event) => event.target === event.currentTarget && onclose()}
+  onclick={(event) => awayCloses && event.target === event.currentTarget && onclose()}
 >
   <div class="modal-dialog {extra}" role="dialog" aria-modal="true">
     {@render children()}

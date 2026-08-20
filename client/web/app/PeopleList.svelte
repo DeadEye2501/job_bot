@@ -8,7 +8,7 @@
   import SearchBox from '$components/SearchBox.svelte';
   import { takeOpened } from '$state/open_mark.js';
   import { pagedList } from '$state/paged_list.svelte.js';
-  import { named } from '$state/people.js';
+  import { blankPerson, named } from '$state/people.js';
 
   import PersonCard from './PersonCard.svelte';
 
@@ -17,7 +17,7 @@
   const list = pagedList({ ask: (...args) => ask(...args), method: 'hr.list', key: 'hrs' });
 
   let adding = $state(false);
-  let draft = $state({ name: '', telegram_username: '', telegram_user_id: '', notes: '' });
+  let draft = $state(blankPerson());
 
   // Хоть что-нибудь из трёх: имя, ник или номер учётной записи. Тем же
   // правилом заслоняется и мост.
@@ -41,7 +41,7 @@
     // и набранное человеку ещё пригодится.
     if (done === null) return;
     adding = false;
-    draft = { name: '', telegram_username: '', telegram_user_id: '', notes: '' };
+    draft = blankPerson();
     say('Карточка заведена');
     return list.again();
   }

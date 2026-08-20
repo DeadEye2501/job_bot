@@ -4,7 +4,7 @@
   // Подсказчик — подсказка, а не закрытый набор: рядом с ним значение набирают
   // руками, чтобы завести ник, которого в базе ещё нет. Появится такой человек
   // или канал — попадёт под уже заведённую строку сразу.
-  import { closeOnClickAway } from '$state/outside.js';
+  import { whileOpen } from '$state/outside.js';
 
   import ModalFoot from './ModalFoot.svelte';
   import ModalHead from './ModalHead.svelte';
@@ -21,10 +21,9 @@
   }
 
   $effect(() => {
-    if (!open) return;
     // Нажатие мимо закрывает подсказчик, а не окно: окно закрывают крестиком и
     // Escape, и падать оно от промаха по списку не должно.
-    return closeOnClickAway(() => root, () => (open = false));
+    return whileOpen(open, () => root, () => (open = false));
   });
 </script>
 

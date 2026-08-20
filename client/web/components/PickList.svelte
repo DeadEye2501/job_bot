@@ -8,7 +8,7 @@
   //
   // Имена приходят уже просеянными: искать умеет тот, кто знает, что это за
   // имена, а список только показывает переданное.
-  import { closeOnClickAway } from '$state/outside.js';
+  import { whileOpen } from '$state/outside.js';
 
   let { placeholder, hint, empty, names, chosen, search, onsearch, prefix = '', onpick } = $props();
 
@@ -16,14 +16,13 @@
   let root = $state(null);
 
   $effect(() => {
-    if (!open) return;
     // Нажатие мимо закрывает панель: она накрывает поля под собой, и уход
     // мыши здесь не годится — в поле поиска набирают, не двигая её вовсе.
     //
     // «Мимо» считается по своему узлу, а не по классу: перечней в панели
     // отбора два, и нажатие на соседний по классу читалось бы как нажатие в
     // себя — оба остались бы открытыми, накрыв друг друга.
-    return closeOnClickAway(() => root, () => (open = false));
+    return whileOpen(open, () => root, () => (open = false));
   });
 </script>
 

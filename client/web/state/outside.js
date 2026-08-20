@@ -29,3 +29,15 @@ export function closeOnClickAway(node, close) {
   document.addEventListener('click', away);
   return () => document.removeEventListener('click', away);
 }
+
+/** Тот же сторож, но живущий, только пока окошко открыто.
+ *
+ * Обвязка вокруг сторожа была написана девятью одинаковыми эффектами: тот же
+ * заслон по признаку показа, тот же зов, тот же возврат снятия. Закрытому
+ * окошку сторож не нужен — висел бы на документе всё время жизни экрана и
+ * отзывался бы на каждое нажатие мимо.
+ */
+export function whileOpen(open, node, close) {
+  if (!open) return undefined;
+  return closeOnClickAway(node, close);
+}

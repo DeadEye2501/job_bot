@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { closeOnClickAway } from '$state/outside.js';
+import { closeOnClickAway, whileOpen } from '$state/outside.js';
 
 let listeners;
 
@@ -86,5 +86,37 @@ describe('нажатие мимо', () => {
 
     expect(listeners).toEqual([]);
     expect(closed).toBe(false);
+  });
+});
+
+describe('сторож, живущий только при открытом окошке', () => {
+  it('открытое окошко сторожа ставит', () => {
+    let closed = false;
+    whileOpen(true, () => node('своё'), () => (closed = true));
+
+    press('чужое');
+
+    expect(closed).toBe(true);
+  });
+
+  it('закрытое окошко сторожа не ставит', () => {
+    // Иначе сторож висел бы на документе всё время жизни экрана и отзывался
+    // бы на каждое нажатие мимо закрытого окошка.
+    whileOpen(false, () => node('своё'), () => {});
+
+    expect(listeners).toEqual([]);
+  });
+
+  it('закрытое окошко нечего и снимать', () => {
+    // Эффект возвращает это наружу: вернись оттуда не-функция, руны уронили бы
+    // экран на первой же уборке.
+    expect(whileOpen(false, () => node('своё'), () => {})).toBe(undefined);
+  });
+
+  it('открытое отдаёт снятие сторожа', () => {
+    const off = whileOpen(true, () => node('своё'), () => {});
+    off();
+
+    expect(listeners).toEqual([]);
   });
 });

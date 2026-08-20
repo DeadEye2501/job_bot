@@ -1,9 +1,11 @@
 <script>
   // Вход в Telegram: код из приложения, а следом облачный пароль, если он есть.
   //
-  // Окно своё, а не общая рама вопроса: у него свой заголовок, объяснение на
-  // три строки и поле ввода — оформление лежит в styles/tg-login.css.
-  import ModalKeys from './ModalKeys.svelte';
+  // Рама общая, а вид свой: у окна свой заголовок, объяснение на три строки и
+  // поле ввода — оформление лежит в styles/tg-login.css. Нажатием по затемнению
+  // оно не закрывается: код набирают в чужом приложении, и промах мимо коробки
+  // стоил бы нового кода.
+  import ModalShell from './ModalShell.svelte';
 
   let { step, phone, relogin, busy, error, onsubmit, oncancel } = $props();
 
@@ -17,10 +19,8 @@
 </script>
 
 <!-- Escape закрывает, Enter — нет: шаг уходит только кнопкой. -->
-<ModalKeys close={oncancel} />
-
-<div class="modal-backdrop tg-login" role="presentation">
-  <div class="tg-login-box" role="dialog" aria-modal="true">
+<ModalShell extra="tg-login-box" over="tg-login" awayCloses={false} onclose={oncancel}>
+  {#snippet children()}
     <div class="modal-title">
       <span class="material-symbols-outlined">login</span>
       {relogin ? 'Перелогиниться' : 'Войти в Telegram'}
@@ -57,5 +57,5 @@
         {busy ? 'Проверка…' : asking.confirm}
       </button>
     </div>
-  </div>
-</div>
+  {/snippet}
+</ModalShell>
