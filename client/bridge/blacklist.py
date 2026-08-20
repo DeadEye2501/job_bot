@@ -8,7 +8,7 @@ from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.hub import Hub
 from client.bridge.refusals import NO_ENTRY
 from client.bridge.wire import _blacklist_row_to_dict
-from client.form_payloads import read_toggle
+from client.bridge.form_payloads import read_toggle
 
 
 class Blacklist:

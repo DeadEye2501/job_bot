@@ -6,7 +6,7 @@ import logging
 from concurrent.futures import Future
 
 from backend.telegram_login import TelegramLogin
-from client.bridge.bot_stop import stop_bot
+from client.bridge.bot_stop import detach_bot, stop_bot
 from client.bridge.hub import Hub
 from client.bridge.journal import close_journal
 
@@ -230,9 +230,7 @@ def _restart_bot(hub: Hub) -> None:
     остановить его ещё раз, а снос, выход и закрытие окна увидят настоящего
     бота, а не пустоту.
     """
-    bot, task = hub.bot, hub.bot_task
-    hub.bot = None
-    hub.bot_task = None
+    bot, task = detach_bot(hub)
 
     async def _swap() -> None:
         if bot is not None:

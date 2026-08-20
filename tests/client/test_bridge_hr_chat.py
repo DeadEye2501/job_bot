@@ -33,10 +33,12 @@ async def test_the_chat_tells_ours_from_theirs(api, ask, session_factory):
 async def test_an_attachment_arrives_as_an_address_the_window_can_open(
     api, ask, session_factory
 ):
-    """Вложение приезжает готовым адресом, а не путём в файловой системе.
+    """Вложение приезжает адресом той же раздачи, что отдала саму страницу.
 
     Хранится оно относительным путём внутри каталога медиа — окно про этот
     каталог не знает вовсе и показать по такому пути ничего не смогло бы.
+    Адрес именно http'шный: снимок, вставленный в страницу как `file://`,
+    Chromium не загружает — правила происхождения запрещают такой подресурс.
     """
     hr = hr_row()
     await put(session_factory, hr)
@@ -48,8 +50,7 @@ async def test_an_attachment_arrives_as_an_address_the_window_can_open(
     answer = await ask(api.hr.messages, {"hr_id": hr.id})
 
     row = answer["ok"]["messages"][0]
-    assert row["media_path"].startswith("file:///")
-    assert row["media_path"].endswith("/1/42.jpg")
+    assert row["media_path"] == "/media/1/42.jpg"
 
 
 async def test_only_chats_with_unread_incoming_are_listed(

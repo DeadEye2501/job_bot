@@ -35,6 +35,18 @@ STOP_TIMEOUT_S = 10.0
 """
 
 
+def detach_bot(hub) -> tuple[object | None, Future | None]:
+    """Отцепить бота от хозяйства и отдать его тому, кто будет останавливать.
+
+    Отцепляют до отправки работы на мотор, а не внутри неё: соседний зов иначе
+    взял бы полуостановленного бота, а лампочка — базу, которой уже нет.
+    """
+    bot, bot_task = hub.bot, hub.bot_task
+    hub.bot = None
+    hub.bot_task = None
+    return bot, bot_task
+
+
 async def stop_bot(
     bot,
     bot_task: Future | None,

@@ -5,21 +5,26 @@
   // бот без учётной записи и без модели не сделает ничего, а разбираться,
   // почему он молчит, человеку пришлось бы по журналу.
   //
-  // Пройденное считается по этому проходу, а не по записанным настройкам: шаг,
-  // заполненный когда-то раньше — сидом или прошлым заходом, — человек в этот
-  // раз не проходил, и отметка о нём говорила бы про чужую работу.
+  // Пройденное приходит с моста: мастер бросают на середине и открывают
+  // назавтра, и начнись он снова с первого шага — человек запрашивал бы код
+  // подтверждения второй раз, о чём мастер сам же и предупреждает на обложке.
+  import { untrack } from 'svelte';
+
   import WizardFoot from '$components/WizardFoot.svelte';
   import WizardSteps from '$components/WizardSteps.svelte';
-  import { backScreen, nextScreen, stepAt, stepMarks } from '$state/wizard.js';
+  import { backScreen, nextScreen, resumeScreen, stepAt, stepMarks } from '$state/wizard.js';
 
   import WizardCv from './WizardCv.svelte';
   import WizardLlm from './WizardLlm.svelte';
   import WizardTelegram from './WizardTelegram.svelte';
 
-  let { ask, say, ondone } = $props();
+  let { ask, say, ondone, completed } = $props();
 
-  let screen = $state('welcome');
-  let passed = $state([]);
+  // Начальное берётся один раз, нарочно: мастер стоит на своём экране, пока его
+  // проходят, — следи эти двое за доводом, уход вперёд сбрасывал бы человека
+  // обратно на первый непройденный шаг.
+  let screen = $state(untrack(() => resumeScreen(completed)));
+  let passed = $state(untrack(() => [...completed]));
   let finishing = $state(false);
 
   let alive = true;

@@ -9,7 +9,7 @@ import pytest
 
 from backend.repository.companies_card import create_company
 from backend.repository.hr_identify import create_hr
-from client.form_payloads import (
+from client.bridge.form_payloads import (
     hr_is_identified,
     read_new_company_fields,
     read_new_hr_fields,

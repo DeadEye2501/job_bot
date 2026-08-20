@@ -10,6 +10,7 @@
 (`repository/bot_mode.py`), и следствия его записи проверяет свой файл.
 """
 
+from adapters import telegram
 from backend.crypto import decrypt_bytes, decrypt_str
 from backend.models import AppSetting, LlmConfig, LlmConfigKind, TgAccount
 from backend.runtime_settings import RuntimeSettings
@@ -167,6 +168,25 @@ async def test_an_existing_setting_is_updated_in_place(session_factory):
 
     rows = await all_rows(session_factory, AppSetting)
     assert [(r.key, r.value) for r in rows] == [("scoring_threshold", "42")]
+
+
+async def test_locking_sends_reaches_the_transport_at_once(session_factory, monkeypatch):
+    """Запрет отправки, записанный настройкой, тут же виден транспорту.
+
+    Заслон на горячем пути сверяется своей копией — читать настройки на каждое
+    письмо незачем. Останься копия прежней, запрет начал бы действовать только
+    после перезапуска бота: человек ставит галку «не отправлять», а следующий
+    отклик всё равно уходит живому HR.
+
+    Зеркалит владелец настройки, а не тот, кто её правит: правят её и экран
+    настроек, и мастер, и будущие зовущие, а копия у транспорта одна.
+    """
+    monkeypatch.setattr(telegram, "SEND_LOCKED", False)
+    settings = await RuntimeSettings.load(session_factory)
+
+    await settings.set_app("send_locked", "true")
+
+    assert telegram.SEND_LOCKED is True
 
 
 async def test_completing_the_wizard_is_recorded(session_factory):

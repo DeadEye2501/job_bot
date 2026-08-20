@@ -9,7 +9,7 @@ import threading
 from backend.crypto import forget_master_key
 from backend.wipe import wipe_all
 from client.bridge.answer import Denied, reply
-from client.bridge.bot_stop import stop_bot
+from client.bridge.bot_stop import detach_bot, stop_bot
 from client.bridge.refusals import WIPE_FILES_BUSY
 
 
@@ -51,12 +51,7 @@ class Wipe:
         этой ветке не забывается, иначе уцелевшая база осталась бы нечитаемой
         навсегда.
         """
-        bot = self._hub.bot
-        bot_task = self._hub.bot_task
-        # Обнуляем до отправки работы: соседний зов иначе взял бы
-        # полуостановленного бота, а лампочка — базу, которой уже нет.
-        self._hub.bot = None
-        self._hub.bot_task = None
+        bot, bot_task = detach_bot(self._hub)
 
         async def run() -> dict:
             # Беду остановки глотаем: снос обязан дойти до конца, даже если

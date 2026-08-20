@@ -17,12 +17,13 @@ import webview
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from adapters import db
+from backend.bot.media import MEDIA_DIR
 from backend.models import BotMode
 from backend.repository.bot_mode import write_mode
 from backend.runtime_settings import RuntimeSettings
 from client import raise_window, window_size
 from client.bridge import Api, AsyncRunner, lifespan
-from client.serving import built_front
+from client.serving import served_files
 from config import get_database_url
 
 
@@ -98,7 +99,7 @@ def _open_window(hub, *, settled: bool):
     size = window_size.MAIN if settled else window_size.WIZARD
     return webview.create_window(
         "Job Bot",
-        built_front(WEB_DIST),
+        served_files(WEB_DIST, MEDIA_DIR),
         js_api=Api(hub),
         width=size[0],
         height=size[1],

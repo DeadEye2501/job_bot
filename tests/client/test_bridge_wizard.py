@@ -6,6 +6,8 @@
 их дважды незачем.
 """
 
+import json
+
 from backend.crypto import encrypt_str
 from backend.models import LlmConfigKind
 from backend.runtime_settings import RuntimeSettings
@@ -24,6 +26,34 @@ async def test_an_empty_setup_has_no_steps_behind_it(api, ask):
 
     assert answer["ok"]["completed"] == []
     assert answer["ok"]["wizard_completed"] is False
+
+
+async def test_the_cloud_password_never_leaves_the_bridge(
+    api, ask, runtime_settings, session_factory
+):
+    """Облачный пароль Telegram в снимок мастера не попадает.
+
+    Читать его на странице нечему: мастер спрашивает пароль формой и шлёт
+    введённое обратно, а не показывает сохранённое. Уехавший же он лежит в
+    памяти окна всю его жизнь — вместе со всем, что окно про себя помнит.
+    """
+    await put(
+        session_factory,
+        tg_account_row(
+            api_hash_encrypted=encrypt_str("ш"),
+            password_encrypted=encrypt_str("облачный"),
+        ),
+    )
+    await runtime_settings.reload()
+    # Пароль и правда лежит в настройках: без этой строки сторож был бы зелен
+    # оттого, что отдавать было нечего.
+    assert runtime_settings.tg.password == "облачный"
+
+    answer = await ask(api.wizard.state)
+
+    # Ищем сам секрет по всему ответу, а не имя ключа: уехавший под другим
+    # именем — та же утечка, а имён у него может быть сколько угодно.
+    assert "облачный" not in json.dumps(answer, ensure_ascii=False)
 
 
 async def test_credentials_without_a_session_do_not_count_as_a_step(
