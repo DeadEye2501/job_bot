@@ -4536,18 +4536,21 @@ Runtime settings layer.
 Тестов: 17
 
 
-### `tests/client/test_front_vocabulary.py` — 152 строк
+### `tests/client/test_front_vocabulary.py` — 216 строк
 
 Согласие перечней окна с перечнями бэкенда.
 
-Зависит от: `backend.domain.taxonomy`, `backend.domain.verdict`, `backend.models.enums`, `backend.models.settings`, `tests.factories`
+Зависит от: `backend.domain.taxonomy`, `backend.domain.verdict`, `backend.models.enums`, `backend.models.settings`, `client.bridge.refusals`, `tests.factories`
 
-Тестов: 8
+Тестов: 9
 
 - `def _array(module: str, name: str) -> str` (10)
+- `def _object(module: str, name: str) -> str` (10)
 - `def _strings(module: str, name: str) -> list[str]` (3)
 - `def _values(module: str, name: str) -> list[str]` (3)
 - `def _skip_reasons_the_backend_writes() -> set[str]` (21)
+- `def _reason_in(value: ast.expr) -> set[str]` (15)
+- `def _send_outcomes_the_backend_writes() -> set[str]` (12)
 
 ### `tests/client/test_page_contract.py` — 158 строк
 
