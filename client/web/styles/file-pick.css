@@ -1,0 +1,38 @@
+/* Выбор файла резюме: одна строка со значком, подписью и кнопкой.
+
+   Пунктир до выбора говорит «сюда кладут», сплошная рамка после — что файл
+   уже взят: пустая строка со сплошной рамкой читалась бы как поле, в которое
+   забыли что-то вписать. */
+
+.file-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.file-pick.has-file {
+  border-style: solid;
+}
+
+.file-pick .material-symbols-outlined {
+  font-size: 22px;
+  color: var(--text-tertiary);
+}
+
+.file-pick .text {
+  flex: 1;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-pick .text .name {
+  color: var(--text-primary);
+  font-weight: 500;
+}

@@ -51,7 +51,7 @@
     onblur={(event) => keep(event.currentTarget.value.trim())}
   />
   {#if open && shown.length}
-    <div class="cdd-panel" role="listbox" tabindex="-1">
+    <div class="drop-panel cdd-panel" role="listbox" tabindex="-1">
       {#each shown as one (one)}
         <!-- Нажатие не уводит из поля: уйди оно — сработал бы уход, поле
              записало бы набранное, и выбранное имя уехало бы наверх вторым

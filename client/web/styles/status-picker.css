@@ -36,24 +36,18 @@
   accent-color: var(--accent);
 }
 
+/* Общее поле, поджатое под окошко: оно узкое, и причину в нём набирают в две
+   строки. Тянуть его за угол незачем — окошко от этого не вырастет. */
 .popover-comment {
   width: calc(100% - 16px);
   min-height: 40px;
   margin: 4px 8px;
   padding: 4px 6px;
-  border: 1px solid var(--border);
   border-radius: 3px;
   background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-family: inherit;
   font-size: 0.78rem;
   line-height: 1.35;
   resize: none;
-}
-
-.popover-comment:focus {
-  outline: none;
-  border-color: var(--accent);
 }
 
 .popover-actions {

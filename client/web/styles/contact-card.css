@@ -108,40 +108,11 @@
   font-size: 12px;
 }
 
-.cnt-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 14px;
-  margin-bottom: 12px;
-}
-
+/* Поле карточки — общее поле, поджатое под тесную сетку: полей в ней по два в
+   ряд, и общий отступ с кеглем разносили бы их за края панели. Всё остальное —
+   рамка, подложка, отклик на курсор и на набор — приходит из input.css. */
 .cnt-input {
   padding: 5px 8px;
-  border: 1px solid var(--border);
   border-radius: 3px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-family: inherit;
   font-size: 0.82rem;
 }
-
-.cnt-input:focus {
-  border-color: var(--accent);
-  outline: none;
-}
-
-.cnt-input::placeholder {
-  color: var(--text-tertiary);
-}
-
-/* Коробка под блоком карточки: заметки, мини-список, числа канала. Ею они и
-   отделены друг от друга — на панели нет заголовков, и без рамки блоки слились
-   бы в одну простыню. */
-.cnt-det-section {
-  margin-bottom: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--bg-secondary);
-}
-

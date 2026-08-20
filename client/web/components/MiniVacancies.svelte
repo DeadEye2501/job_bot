@@ -13,7 +13,7 @@
   let { vacancies, empty, loading = false, onpick } = $props();
 </script>
 
-<div class="cnt-det-section">
+<div class="card-section">
   {#if !vacancies.length}
     <div class="mini-list-empty">{empty}</div>
   {:else}

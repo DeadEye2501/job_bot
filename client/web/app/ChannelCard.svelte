@@ -229,7 +229,7 @@
     </ActionsMenu>
   </div>
 
-  <div class="cnt-det-section">
+  <div class="card-section">
     <div class="ch-stats-grid">
       <div class="ch-stat">
         <span class="big-num ch-stat-num">{card.stats.vacancies_per_day}</span>

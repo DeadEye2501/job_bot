@@ -91,7 +91,7 @@
           <span class="tl-history-row">
             {#if row.label}<span class="tl-label">{row.label}</span>{/if}
             <textarea
-              class="tl-note"
+              class="inline-edit tl-note"
               class:saved-flash={flashed[row.historyId]}
               rows="1"
               maxlength="2000"

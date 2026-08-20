@@ -84,7 +84,7 @@
   <span class="bl-kind-chip {row.kind}">{row.kind}</span>
 
   <input
-    class="bl-input value"
+    class="inline-edit bl-input value"
     class:saved-flash={valueSaved}
     maxlength="500"
     placeholder="—"
@@ -94,7 +94,7 @@
   />
 
   <textarea
-    class="bl-input reason"
+    class="inline-edit bl-input reason"
     class:saved-flash={reasonSaved}
     bind:this={field}
     rows="1"

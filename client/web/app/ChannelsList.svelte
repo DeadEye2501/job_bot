@@ -135,7 +135,7 @@
   {#snippet toolbar()}
     <SearchBox value={search} placeholder="Поиск канала..." onsearch={find} />
     <button
-      class="cnt-add-btn"
+      class="icon-btn cnt-add-btn"
       type="button"
       title="Добавить канал"
       onclick={() => (adding = true)}

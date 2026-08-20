@@ -1,14 +1,8 @@
 /* Экран вакансий: список слева, подробности справа, строка в три этажа. */
 
-/* Шапка стоит на месте, а ездит только список: поиск и отбор нужны как раз
-   тогда, когда список пролистан. */
+/* Полоса — общая, в master-detail.css. Своё у неё здесь одно: она держит на
+   себе меню порядка и панель отбора, и те падают из неё. */
 .vac-list-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-tertiary);
   position: relative;
 }
 

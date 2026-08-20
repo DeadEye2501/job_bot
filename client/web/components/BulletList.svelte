@@ -45,7 +45,7 @@
     <div class="list-item">
       <span class="list-bullet">•</span>
       <textarea
-        class="list-input"
+        class="inline-edit list-input"
         rows="1"
         maxlength="250"
         value={text}

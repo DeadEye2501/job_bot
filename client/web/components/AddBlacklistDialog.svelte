@@ -28,7 +28,7 @@
   });
 </script>
 
-<ModalShell extra="bl-add-modal" {onclose}>
+<ModalShell extra="narrow bl-add-modal" {onclose}>
   {#snippet children()}
     <ModalHead icon="block" title="Добавить в blacklist" {onclose} />
 
@@ -58,7 +58,7 @@
              несколько и выбор первого за человеком. -->
         <!-- svelte-ignore a11y_autofocus -->
         <input
-          class="bl-modal-input"
+          class="input bl-modal-input"
           autofocus
           maxlength="500"
           autocomplete="off"
@@ -72,7 +72,7 @@
           onkeydown={(event) => event.key === 'Enter' && onadd()}
         />
         {#if hints !== null && open}
-          <div class="bl-combobox-dropdown">
+          <div class="drop-panel bl-combobox-dropdown">
             {#if hints.empty}
               <div class="bl-combobox-empty">{hints.empty}</div>
             {:else}
@@ -88,7 +88,7 @@
       </div>
 
       <textarea
-        class="bl-modal-textarea"
+        class="input bl-modal-textarea"
         rows="3"
         maxlength="500"
         placeholder="Причина (опционально)"

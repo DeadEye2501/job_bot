@@ -80,7 +80,7 @@
   {#snippet toolbar()}
     <SearchBox value={list.search} placeholder="Поиск по имени, @username..." onsearch={list.find} />
     <button
-      class="cnt-add-btn"
+      class="icon-btn cnt-add-btn"
       type="button"
       title="Добавить HR"
       onclick={() => (adding = true)}

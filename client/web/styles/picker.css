@@ -22,24 +22,16 @@
   background: var(--bg-tertiary);
 }
 
-.picker-search-bar .material-symbols-outlined {
-  font-size: 14px;
-  color: var(--text-tertiary);
+/* Сама строка поиска — общая, в search-box.css. Своего отступа она здесь не
+   держит: его даёт полоса, а два вложенных отступа подряд разносят строку вдвое
+   против прежней. Кегль свой: окно выбора шире полосы списка, и мелкий шрифт
+   полосы в нём теряется. */
+.picker-search-bar .search-box {
+  padding: 0;
 }
 
-.picker-search-bar input {
-  flex: 1;
-  min-width: 0;
-  padding: 2px 0;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-family: inherit;
+.picker-search-bar .search-input {
   font-size: 0.82rem;
-}
-
-.picker-search-bar input:focus {
-  outline: none;
 }
 
 .picker-list {

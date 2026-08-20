@@ -26,7 +26,7 @@
     <span class="material-symbols-outlined">expand_more</span>
   </button>
   {#if open}
-    <div class="cdd-panel" role="listbox" tabindex="-1">
+    <div class="drop-panel cdd-panel" role="listbox" tabindex="-1">
       {#each options as one (one)}
         <button
           class="cdd-option"

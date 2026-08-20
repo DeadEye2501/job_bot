@@ -3,7 +3,9 @@
   //
   // Крестик свой, а не системный: `type="search"` рисует его по-своему, без
   // подписи и мимо палитры, — и в тёмном окне он выглядит заплатой.
-  let { value, placeholder, onsearch } = $props();
+  // `maxlength` просит подборщик навыков: там ищут по имени навыка, а оно и в
+  // самой анкете не длиннее.
+  let { value, placeholder, maxlength = null, onsearch } = $props();
 
   let field;
 
@@ -21,6 +23,7 @@
     class="search-input"
     bind:this={field}
     type="text"
+    {maxlength}
     {value}
     {placeholder}
     oninput={(event) => onsearch(event.currentTarget.value)}

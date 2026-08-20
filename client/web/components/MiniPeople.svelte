@@ -10,7 +10,7 @@
   let { people, empty, onpick } = $props();
 </script>
 
-<div class="cnt-det-section">
+<div class="card-section">
   {#if !people.length}
     <div class="mini-list-empty">{empty}</div>
   {:else}

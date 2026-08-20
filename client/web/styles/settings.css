@@ -64,16 +64,6 @@
   margin-top: 6px;
 }
 
-.settings-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 10px;
-}
-
-.settings-row .span-2 {
-  grid-column: span 2;
-}
-
 .settings-actions {
   display: flex;
   justify-content: flex-end;
@@ -101,4 +91,3 @@
   color: var(--text-tertiary);
   font-size: 0.72rem;
 }
-

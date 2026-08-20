@@ -1,26 +1,11 @@
 /* Окно заведения строки отсева: выбор рода, значение с подсказчиком и причина.
    Шапка, тело и подвал — общие, в modal.css. */
 
-/* Высота по содержимому, а не своя: полей тут три, и заданная высота оставляла
-   под ними пустое место в треть окна. Предел нужен на случай, когда подсказчик
-   раскрыт под длинным списком, — тогда тело прокручивается само. */
-.bl-add-modal {
-  width: min(380px, 92vw);
-  max-width: min(380px, 92vw);
-  height: auto;
-  max-height: 88vh;
-  padding: 0;
-  gap: 0;
-  /* Подсказчик выпадает из поля и должен лечь поверх подвала окна: обрежь его
-     окно своей рамкой — список был бы виден на треть. */
-  overflow: visible;
-}
-
+/* Узкая коробка и её тело — общие, в modal.css. Своё здесь одно: подсказчик
+   выпадает из поля и должен лечь поверх подвала окна — обрежь его окно своей
+   рамкой, список был бы виден на треть. */
+.bl-add-modal,
 .bl-add-modal .modal-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px;
   overflow: visible;
 }
 
@@ -74,29 +59,14 @@
   font-weight: 500;
 }
 
-/* Поля окна залиты, в отличие от прозрачных полей таблицы: здесь их два на
-   пустом месте, и без заливки не видно, куда набирать. */
+/* Поля окна залиты глубже общих: окно само лежит на подложке, и поле цвета
+   этой подложки на ней не читается. Остальное — общее поле из input.css. */
 .bl-modal-input,
 .bl-modal-textarea {
-  width: 100%;
   padding: 6px 9px;
-  border: 1px solid var(--border);
   border-radius: 3px;
   background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-family: inherit;
   font-size: 0.83rem;
-}
-
-.bl-modal-input:focus,
-.bl-modal-textarea:focus {
-  border-color: var(--accent);
-  outline: none;
-}
-
-.bl-modal-input::placeholder,
-.bl-modal-textarea::placeholder {
-  color: var(--text-tertiary);
 }
 
 .bl-modal-textarea {
@@ -110,19 +80,10 @@
   width: 100%;
 }
 
+/* Панель — общая, в dropdown.css. Своё здесь одно: она выпадает внутри окна и
+   должна лечь поверх его подвала. */
 .bl-combobox-dropdown {
-  position: absolute;
-  top: calc(100% + 2px);
-  right: 0;
-  left: 0;
   z-index: 100;
-  max-height: 220px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  box-shadow: 0 6px 20px var(--shadow-dropdown);
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
 .bl-combobox-option {

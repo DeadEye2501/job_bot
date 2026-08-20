@@ -41,16 +41,9 @@
   top: 8px;
   float: right;
   z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
   margin: 8px 8px -28px 0;
   border: 1px solid var(--border);
-  border-radius: 4px;
   background: var(--bg-over-content);
-  color: var(--text-secondary);
   opacity: 0.55;
   transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease,
     border-color 0.15s ease;

@@ -212,9 +212,9 @@
   </div>
 
   <div class="cnt-form-grid">
-    <input class="cnt-input" maxlength="120" value={card.name} placeholder="Название" onchange={rename} />
+    <input class="input cnt-input" maxlength="120" value={card.name} placeholder="Название" onchange={rename} />
     <input
-      class="cnt-input"
+      class="input cnt-input"
       maxlength="200"
       value={card.website ?? ''}
       placeholder="Сайт / домен"
@@ -224,7 +224,7 @@
 
   <!-- Написания: под ними компания приходит в объявлениях. Потеряй карточка
        одно из них — следующая вакансия завела бы компанию заново. -->
-  <div class="cnt-det-section">
+  <div class="card-section">
     <ChipList
       items={card.aliases}
       onadd={(one) => save({ aliases: [...card.aliases, one] })}
@@ -232,7 +232,7 @@
     />
   </div>
 
-  <div class="cnt-det-section">
+  <div class="card-section">
     {#key companyId}
       <NotesField
         value={card.notes}

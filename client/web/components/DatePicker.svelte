@@ -91,7 +91,7 @@
 
 <div class="date-picker" bind:this={root}>
   <input
-    class="input-date-text"
+    class="input mono input-date-text"
     class:invalid={validDate(text) === false}
     type="text"
     placeholder="дд.мм.гггг"

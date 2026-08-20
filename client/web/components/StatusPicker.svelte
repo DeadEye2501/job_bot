@@ -55,7 +55,7 @@
   </div>
 
   <textarea
-    class="popover-comment"
+    class="input popover-comment"
     placeholder="Причина (опционально)..."
     bind:value={note}
     onkeydown={key}
