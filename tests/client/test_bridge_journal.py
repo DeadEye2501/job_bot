@@ -45,9 +45,29 @@ async def test_the_journal_shows_what_was_written(api, ask, journal):
     """
     logging.getLogger("проверка").warning("канал не отвечает")
 
-    answer = await ask(api.system.logs, {})
+    answer = await ask(api.system.logs)
 
     assert answer["ok"]["records"][0]["msg"] == "канал не отвечает"
+
+
+async def test_the_pills_promise_only_what_the_list_can_show(api, ask, journal):
+    """Пилюля считает ровно то, что человек может найти в списке.
+
+    Считай она больше — человек читал бы «предупреждений: 1200», нажимал на
+    пилюлю и не находил обещанного: список отдавал бы тысячу, а остальные
+    двести лежали бы в кольце без дороги на экран. Отбор страница делает у
+    себя, и достать их ей нечем.
+    """
+    for n in range(1200):
+        logging.getLogger("проверка").warning("запись %d", n)
+
+    answer = await ask(api.system.logs)
+
+    page = answer["ok"]
+    # Считаем свой уровень, а не все записи: кольцо общее на процесс, и чужая
+    # строка чужого уровня красила бы сторож впустую.
+    shown = [row for row in page["records"] if row["level"] == "WARNING"]
+    assert page["level_counts"]["WARNING"] == len(shown) == 1200
 
 
 async def test_a_request_too_soon_after_the_last_one_is_refused(api, ask, journal):
@@ -66,7 +86,7 @@ async def test_a_request_too_soon_after_the_last_one_is_refused(api, ask, journa
     logging.getLogger("проверка").info("раз")
     api.system._logs_asked_at = time.monotonic()
 
-    answer = await ask(api.system.logs, {})
+    answer = await ask(api.system.logs)
 
     assert answer["fail"] == "denied"
 
@@ -82,7 +102,7 @@ async def test_a_cleared_journal_comes_back_empty(api, ask, journal):
     cleared = await ask(api.system.clear_logs)
     assert cleared["ok"]["cleared"] >= 1
 
-    listed = await ask(api.system.logs, {})
+    listed = await ask(api.system.logs)
     assert listed["ok"]["records"] == []
 
 

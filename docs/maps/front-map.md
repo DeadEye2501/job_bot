@@ -93,7 +93,7 @@
 - Окно пересоздаётся на смене шага: код и облачный пароль — разные секреты, и набранный код не должен доехать до поля пароля.
 - принимает: creds, relogin, ondone, onclose
 
-### app/VacanciesScreen.svelte (259)
+### app/VacanciesScreen.svelte (293)
 - —
 - принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte

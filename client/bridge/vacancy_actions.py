@@ -1,4 +1,9 @@
-"""Действия над вакансией: перезапуск разбора, отклик, удаление."""
+"""Действия над вакансией: перезапуск разбора, отклик, удаление.
+
+Чтение номера вакансии из нагрузки живёт здесь же, а не в общем `page.py` или
+`form_payloads.py`: те про страницу списка и про поля новой записи, а здесь
+единственное поле, которое читают все три кнопки, и читают одинаково.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +15,20 @@ from client.bridge.refusals import (
     RERUN_REFUSALS,
     SEND_REFUSALS,
 )
+
+
+def _asked_vacancy(payload: dict, slot: str) -> tuple[int | None, dict | None]:
+    """Номер вакансии из нагрузки, а при негодной — готовый отказ окну.
+
+    Двумя значениями, а не броском: жалоба в журнал должна нести саму беду —
+    имя пропавшего поля из `KeyError` в неё попадает, а значение нет, — и
+    собрать её умеет только `bad_fields`. Тремя кнопками карточки это было
+    написано дословно одинаково.
+    """
+    try:
+        return int(payload["vacancy_id"]), None
+    except (ValueError, TypeError, KeyError) as e:
+        return None, bad_fields(slot, e)
 
 
 class VacancyActions:
@@ -26,10 +45,9 @@ class VacancyActions:
         человек узнаёт вестью, а карточка перечитывается сама по вести о смене
         списка.
         """
-        try:
-            vacancy_id = int(payload["vacancy_id"])
-        except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("rerun", e)
+        vacancy_id, refused = _asked_vacancy(payload, "rerun")
+        if refused is not None:
+            return refused
 
         bot = self._hub.bot
         if bot is None:
@@ -50,10 +68,9 @@ class VacancyActions:
         Ответ говорит только «пущено»: письмо сочиняет модель, и до её ответа
         зов держал бы окно, а начатую отправку это всё равно не отменило бы.
         """
-        try:
-            vacancy_id = int(payload["vacancy_id"])
-        except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("send_application", e)
+        vacancy_id, refused = _asked_vacancy(payload, "send_application")
+        if refused is not None:
+            return refused
 
         bot = self._hub.bot
         if bot is None:
@@ -74,10 +91,9 @@ class VacancyActions:
 
     def delete(self, payload: dict) -> dict:
         """Снести вакансию вместе с историей и событиями."""
-        try:
-            vacancy_id = int(payload["vacancy_id"])
-        except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("delete", e)
+        vacancy_id, refused = _asked_vacancy(payload, "delete")
+        if refused is not None:
+            return refused
 
         async def run() -> dict:
             # Через конвейер, а не прямо в репозиторий: вместе со строкой уходит

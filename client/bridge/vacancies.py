@@ -25,6 +25,16 @@ from client.bridge.wire import _vacancy_detail_to_dict, _vacancy_list_row_to_dic
 logger = logging.getLogger(__name__)
 
 
+def _typed_text(raw) -> str | None:
+    """Набранное человеком, каким оно пришло; пустота значит «поле не прислали».
+
+    От `text_or_none` отличается тем, что пустую строку не сводит к пустоте:
+    стёртая заметка — это правка, и записать её надо, а «не прислали» значит
+    «не трогать». Тремя слотами это было написано одинаково, дважды побайтно.
+    """
+    return None if raw is None else str(raw)
+
+
 class Vacancies(VacancyActions, VacancyLinks):
     """Вакансия на своём экране: как её показывают, как правят и что с ней делают.
 
@@ -49,15 +59,33 @@ class Vacancies(VacancyActions, VacancyLinks):
         окно подсвечивает нужные чипы, не спрашивая навыки отдельно.
 
         Нагрузка — объект с полями отбора; пустая или негодная сводится к
-        умолчаниям `VacancyFilter`. Списки для выпадающих меню фильтра берутся
-        мимо самого фильтра — иначе любой отбор сжимал бы их до того, что
-        уцелело в выдаче.
+        умолчаниям `VacancyFilter`.
         """
         # Не-объект сводится к пустоте, а не роняет разбор: отбор — дело окна, и
         # испорченная нагрузка не должна отнимать у человека весь список.
         payload = payload if isinstance(payload, dict) else {}
         page = read_page(payload)
         return reply(self._hub.runner, self._listed(read_vacancy_filter(payload, page)))
+
+    def filter_options(self) -> dict:
+        """Перечни для выпадающих меню фильтра: все каналы и все компании.
+
+        Своим зовом, а не полем списка. От отбора они не зависят — иначе любой
+        отбор сжимал бы меню до того, что уцелело в выдаче, — а список окно
+        перечитывает на каждое нажатие клавиши в поиске: приезжай перечни с
+        ним, каждый набранный знак стоил бы лишнего полного прохода по таблице
+        вакансий.
+
+        Спрашивают их при открытии экрана и на вести о правке списка: новая
+        вакансия приносит с собой и новую компанию, и новый канал.
+        """
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                options = await vacancies_list.list_vacancy_filter_options(session)
+            return {"filter_options": options}
+
+        return reply(self._hub.runner, run())
 
     async def _listed(self, filters) -> dict:
         async with self._hub.session_factory() as session:
@@ -66,24 +94,30 @@ class Vacancies(VacancyActions, VacancyLinks):
             activity_by_id = await vacancies_list.list_vacancy_last_activity(
                 session, [v.id for v in rows]
             )
-            filter_options = await vacancies_list.list_vacancy_filter_options(session)
         matched_set = build_skill_lookup(skills)
         return {
             "vacancies": [
                 _vacancy_list_row_to_dict(v, matched_set, activity_by_id) for v in rows
             ],
-            "filter_options": filter_options,
             "has_more": has_more,
             "score_threshold": self._hub.rs.scoring_threshold,
         }
 
-    def detail(self, vacancy_id: int) -> dict:
+    def detail(self, vacancy_id) -> dict:
         """Карточка одной вакансии целиком.
 
         Отдаётся вся — описание, стек, контакты, история статусов, события, — а
         окно рисует из неё то, что показывает сейчас. Так карточка растёт без
         правок моста.
+
+        Номер приводится, а не принимается на веру: приезжает он нагрузкой, как
+        и всё прочее, и негодный уехал бы в запрос к базе — а оттуда вернулся бы
+        «вакансии нет», то есть отказ не про то, что случилось.
         """
+        try:
+            vacancy_id = int(vacancy_id)
+        except (ValueError, TypeError) as e:
+            return bad_fields("detail", e)
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
@@ -110,9 +144,7 @@ class Vacancies(VacancyActions, VacancyLinks):
         """
         try:
             vacancy_id = int(payload["vacancy_id"])
-            notes = payload.get("notes")
-            if notes is not None:
-                notes = str(notes)
+            notes = _typed_text(payload.get("notes"))
         except (ValueError, TypeError, KeyError) as e:
             return bad_fields("save_notes", e)
 
@@ -132,15 +164,15 @@ class Vacancies(VacancyActions, VacancyLinks):
     def save_history_explanation(self, payload: dict) -> dict:
         """Правка пояснения к одной строке истории статусов.
 
-        Отвечает своим ответом, а не общим для карточки: окну не нужно
-        перечитывать её целиком, оно правит одну строку, не теряя набранного.
+        Отвечает своим ответом, а не карточкой целиком. Перечитывает её окно
+        всё равно — мост дописывает к пояснению точку, и записанное отличается
+        от набранного, — но по своему доводу и своим зовом: ответ здесь говорит
+        только «легло», и по нему строка истории вспыхивает зелёным.
         """
         try:
             history_id = int(payload["history_id"])
             vacancy_id = int(payload["vacancy_id"])
-            explanation = payload.get("explanation")
-            if explanation is not None:
-                explanation = str(explanation)
+            explanation = _typed_text(payload.get("explanation"))
         except (ValueError, TypeError, KeyError) as e:
             return bad_fields("save_history_explanation", e)
 
@@ -177,14 +209,13 @@ class Vacancies(VacancyActions, VacancyLinks):
         try:
             vacancy_id = int(payload["vacancy_id"])
             status_raw = str(payload["status"]).strip()
-            explanation = payload.get("explanation")
-            if explanation is not None:
-                explanation = str(explanation)
-            new_status = next(s for s in VacancyStatus if s.value == status_raw)
-        except StopIteration:
-            return denied("Неверный статус.", vacancy_id=payload.get("vacancy_id"))
+            explanation = _typed_text(payload.get("explanation"))
         except (ValueError, TypeError, KeyError) as e:
             return bad_fields("change_status", e)
+        try:
+            new_status = VacancyStatus(status_raw)
+        except ValueError:
+            return denied("Неверный статус.", vacancy_id=vacancy_id)
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:

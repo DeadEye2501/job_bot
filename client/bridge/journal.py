@@ -5,13 +5,9 @@ from __future__ import annotations
 import time
 
 from backend.log_buffer import get_handler
-from backend.incoming import int_or_none
 from client.bridge.answer import denied, reply
 from client.bridge.refusals import LOGS_TOO_OFTEN
 
-
-_LOGS_PAGE = 1000
-"""Сколько записей уезжает странице, если она не просила иного."""
 
 _LOGS_INTERVAL_S = 1.0
 """Чаще раза в секунду журнал не спрашивают. Довод — у слова отказа,
@@ -45,22 +41,14 @@ class Journal:
         self._logs_asked_at = float("-inf")
         get_handler().on_record = self._push_record
 
-    def logs(self, payload: dict | None = None) -> dict:
+    def logs(self) -> dict:
         """Страница журнала для экрана «Логи».
 
-        Нагрузка — `{limit?}`; негодный потолок читается как «не задавали»
-        (`int_or_none`), и человек получает страницу по умолчанию вместо
-        отказа на опечатке.
-
-        Отбора здесь нет нарочно: страница берёт весь буфер и отбирает у себя,
-        потому что счётчики в пилюлях считают полный буфер независимо от
-        выбранного уровня.
-
-        Потолок не зажимается: больше кольца (`log_buffer.MAX_RECORDS`) в
-        ответе и не бывает, а зажим на границе выглядел бы правилом, которого
-        нет.
+        Нагрузки нет вовсе: кольцо уезжает целиком. Отбор по уровню страница
+        делает у себя, а счётчики в пилюлях считают всё кольцо независимо от
+        выбранного — обрежь мост список, пилюля обещала бы записи, которых
+        человеку не достать ничем.
         """
-        payload = payload if isinstance(payload, dict) else {}
         now = time.monotonic()
         # Прежде на частый вопрос не отвечали вовсе. На дороге возврата
         # молчания нет, и отказ значит ровно то же самое: страница рисует по
@@ -69,10 +57,9 @@ class Journal:
         if now - self._logs_asked_at < _LOGS_INTERVAL_S:
             return denied(LOGS_TOO_OFTEN)
         self._logs_asked_at = now
-        limit = int_or_none(payload.get("limit")) or _LOGS_PAGE
 
         async def run() -> dict:
-            return get_handler().page(limit)
+            return get_handler().page()
 
         return reply(self._hub.runner, run())
 

@@ -39,6 +39,46 @@ async def test_a_picker_for_a_missing_vacancy_is_refused(api, ask):
     assert answer["vacancy_id"] == 404
 
 
+async def test_linking_a_person_who_is_gone_is_refused_in_human_words(
+    api, ask, session_factory
+):
+    """Привязка к пропавшему человеку отбивается словами человека, не базы.
+
+    Карточку могли снести в соседнем окне, пока здесь выбирали строку в
+    подборщике. Отказ читает человек — и читал он внутреннюю английскую фразу
+    с именем метода и номером строки, по которой ему нечего делать.
+    """
+    vacancy = vacancy_row()
+    await put(session_factory, vacancy)
+
+    answer = await ask(
+        api.vacancies.link_hr, {"vacancy_id": vacancy.id, "hr_id": 404}
+    )
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "HR не найден."
+
+
+async def test_linking_a_company_that_is_gone_is_refused_in_human_words(
+    api, ask, session_factory
+):
+    """То же у компании, и фраза у неё своя.
+
+    Стоит рядом с проверкой человека нарочно: одна была бы зелена и на мосте,
+    который отвечает про HR на оба случая, — а человек, связывавший компанию,
+    прочёл бы про кого-то другого.
+    """
+    vacancy = vacancy_row()
+    await put(session_factory, vacancy)
+
+    answer = await ask(
+        api.vacancies.link_company, {"vacancy_id": vacancy.id, "company_id": 404}
+    )
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Компания не найдена."
+
+
 async def test_a_linked_hr_shows_up_in_the_list_row(api, ask, session_factory):
     """Связанный HR виден в строке списка, а не только в ответе на связывание.
 

@@ -475,24 +475,27 @@ def test_a_critical_record_is_counted_as_an_error():
     handler.emit(record("обычная беда", level=logging.ERROR))
     handler.emit(record("беда пострашнее", level=logging.CRITICAL))
 
-    counts = handler.page(limit=10)["level_counts"]
+    counts = handler.page()["level_counts"]
 
     assert counts["ERROR"] == 2
     assert "CRITICAL" not in counts
 
 
-def test_the_page_shows_the_newest_first_and_counts_them_all():
-    """На странице свежие сверху, а счёт остаётся полным.
+def test_the_page_shows_the_newest_first_and_all_of_them():
+    """На странице свежие сверху, и на ней всё кольцо целиком.
 
-    Окно рисует список сверху вниз и показывает рядом «всего». Считай мы
-    страницу, а не кольцо, — человек, открывший журнал с потолком в одну
-    запись, прочёл бы «всего: 1» и решил, что остальное потерялось.
+    Окно рисует список сверху вниз и отбирает по уровню у себя: обрежь мы
+    страницу — пилюля обещала бы записи, которых человеку не достать ничем,
+    потому что счёт она ведёт по всему кольцу.
     """
     handler = LogBufferHandler()
-    for n in range(3):
+    # Больше прежнего потолка в тысячу: на трёх записях «отдаётся всё кольцо»
+    # не отличалось бы от любого потолка от трёх и выше.
+    for n in range(1200):
         handler.emit(record(f"запись {n}"))
 
-    page = handler.page(limit=2)
+    page = handler.page()
 
-    assert [row["msg"] for row in page["records"]] == ["запись 2", "запись 1"]
-    assert page["total"] == 3
+    assert len(page["records"]) == 1200
+    assert page["total"] == 1200
+    assert page["records"][0]["msg"] == "запись 1199"
