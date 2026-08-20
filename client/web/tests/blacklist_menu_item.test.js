@@ -8,39 +8,11 @@
 // Сторожатся обе половины цепочки: что копий пункта больше нет и что на каждом
 // её звене зовы передаются, а не додумываются.
 
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { describe, expect, it } from 'vitest';
 
-const ROOTS = ['app', 'components'];
+import { markup, placed } from './markup.js';
+
 const HOME = 'components/BlacklistMenuItem.svelte';
-
-/** Файлы разметки вместе с содержимым. */
-function markup() {
-  const found = [];
-  for (const root of ROOTS) {
-    for (const name of readdirSync(root)) {
-      if (!name.endsWith('.svelte')) continue;
-      found.push({ file: `${root}/${name}`, text: readFileSync(join(root, name), 'utf8') });
-    }
-  }
-  return found;
-}
-
-/** Постановки названного тега: файл и сам тег. */
-function placed(tag) {
-  const found = [];
-  for (const { file, text } of markup()) {
-    let at = text.indexOf(tag);
-    while (at !== -1) {
-      const end = text.indexOf('/>', at);
-      found.push({ file, tag: text.slice(at, end) });
-      at = text.indexOf(tag, end);
-    }
-  }
-  return found;
-}
 
 /** Постановки самого пункта. */
 function usages() {

@@ -202,7 +202,7 @@ async def test_the_timeline_records_what_was_filled(parsing, session_factory):
     }
 
 
-async def test_a_fitting_vacancy_gets_an_application_sent(parsing, session_factory):
+async def test_a_fitting_vacancy_gets_an_application_sent(parsing):
     """Прошедшей всё вакансии отклик уходит сам."""
     pipeline, vacancy = parsing
     pipeline.parsed = parsed_vacancy(

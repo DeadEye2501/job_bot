@@ -17,6 +17,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from pyrogram.enums import MessageEntityType
+from pyrogram.errors import PeerIdInvalid, UsernameNotOccupied
 
 from tests.factories import EPOCH
 
@@ -113,6 +114,27 @@ def outgoing(*, peer_id=777, peer_username=None, **extra):
         chat=chat(id=peer_id, username=peer_username),
         outgoing=True,
         **extra,
+    )
+
+
+def my_dm(*, chat_id=777, username=None, msg_id=10, text="ответ с телефона", photo=None):
+    """Своё письмо в личной переписке, названное со стороны собеседника.
+
+    Отличий от `outgoing` два. Имена доводов: проверки личной переписки
+    держат номер и имя собеседника под одними именами для обеих сторон
+    разговора, иначе один и тот же случай писался бы по-разному для своего
+    письма и для чужого, и пара «своё — чужое» перестала бы читаться рядом.
+
+    И картинка, гасящая текст: у сообщения с картинкой Telegram кладёт
+    подпись, а не текст, и своё письмо с обоими сразу в бою не приходит.
+    Проставленное руками, это правило разъезжалось по местам применения.
+    """
+    return outgoing(
+        id=msg_id,
+        peer_id=chat_id,
+        peer_username=username,
+        text=None if photo is not None else text,
+        photo=photo,
     )
 
 
@@ -233,9 +255,19 @@ class FakeTelegramClient:
             raise error
 
     async def get_chat(self, chat_id):
+        """Незнакомое имя — бросок, как у настоящего клиента, а не пустота.
+
+        Пустотой подделка водила бы за нос дважды: сторожила бы ветку
+        `chat is None`, в которую Telegram не заводит никогда, и оставляла бы
+        без сторожа перехват `UsernameNotOccupied`, через который в бою и
+        проходит каждая опечатка в имени.
+        """
         self.get_chat_calls.append(chat_id)
         self._fail_if_asked("get_chat")
-        return self._chats.get(chat_id)
+        chat = self._chats.get(chat_id)
+        if chat is None:
+            raise UsernameNotOccupied
+        return chat
 
     async def get_chat_history(self, target, limit=100):
         self.history_calls.append((target, limit))
@@ -244,9 +276,13 @@ class FakeTelegramClient:
             yield msg
 
     async def get_users(self, username):
+        """Незнакомое имя — бросок, по той же причине, что и у `get_chat`."""
         self.get_users_calls.append(username)
         self._fail_if_asked("get_users")
-        return self._users.get(username)
+        user = self._users.get(username)
+        if user is None:
+            raise PeerIdInvalid
+        return user
 
     async def download_media(self, target, file_name=None, in_memory=False):
         """Скачивание в память по идентификатору файла или на диск по сообщению.

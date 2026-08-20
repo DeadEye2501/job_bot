@@ -129,7 +129,7 @@ async def test_a_comment_already_closed_is_left_alone(session, session_factory):
 
 
 async def test_an_explanation_of_a_missing_history_row_is_not_written(
-    session, session_factory
+    session
 ):
     """Пояснение к несуществующей записи истории не пишется, и вызов об этом сообщает."""
     assert await update_status_history_explanation(session, 10_000, "текст") is None

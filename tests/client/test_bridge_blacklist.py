@@ -52,7 +52,7 @@ async def test_an_empty_value_is_refused(api, ask):
 
 
 async def test_the_same_entry_twice_does_not_make_a_second_one(
-    api, ask, session_factory
+    api, ask
 ):
     """Повторное заведение не плодит вторую запись, а признаётся в первой.
 

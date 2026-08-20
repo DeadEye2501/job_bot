@@ -10,6 +10,7 @@ from tests.backend.fixtures.backfill import known_hr
 from tests.backend.fixtures.bot import (
     busy_slot,
     chatting,
+    chatting_on_fakes,
     empty_media_dir,
     make_bot,
     outbox,
@@ -33,6 +34,7 @@ __all__ = [
     "busy_slot",
     "channel_titles",
     "chatting",
+    "chatting_on_fakes",
     "clean_root_logger",
     "deliver",
     "dm_pipeline",

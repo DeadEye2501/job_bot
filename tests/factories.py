@@ -362,6 +362,38 @@ def marked_channels() -> list[TelegramChannel]:
     ]
 
 
+# Имена трёх компаний, на которых проверяется отметка чёрного списка: в
+# списке, со снятой отметкой и чужого рода. Имя — единственное, чем компания
+# связана с отметкой, поэтому обе половины обстановки берут его отсюда:
+# записанные порознь, они разъехались бы молча, и проверка «отметки нет»
+# осталась бы зелёной по другой причине, чем задумана.
+_MARKED_COMPANIES = ("Контур", "Ромашка", "Берёзка")
+
+
+def company_marks() -> list[Blacklist]:
+    """Три отметки, которыми проверяется правило «компания в чёрном списке»:
+    включённая своего рода, снятая своего рода и включённая чужого.
+
+    То же, что `channel_marks()`, но по другому роду записи: правило читают
+    карточка компании и перечень компаний, и собранное порознь оно
+    разъезжалось бы молча — снятая отметка осталась бы проверенной на одном
+    экране и забытой на другом.
+    """
+    listed, switched_off, other_kind = _MARKED_COMPANIES
+    return [
+        blacklist_row("company", listed),
+        blacklist_row("company", switched_off, active=False),
+        blacklist_row("hr", other_kind),
+    ]
+
+
+def marked_companies() -> list[Company]:
+    """Три компании под отметки `company_marks()`: в списке, со снятой
+    отметкой и чужого рода.
+    """
+    return [company_row(name=name) for name in _MARKED_COMPANIES]
+
+
 def vacancy_event_row(vacancy_id: int, **overrides) -> VacancyEvent:
     """Событие обработки вакансии. Метка времени задаётся явно — по ней сортируют."""
     fields = {"kind": "parsed", "created_at": EPOCH}

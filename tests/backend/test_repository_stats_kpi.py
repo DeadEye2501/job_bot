@@ -67,6 +67,23 @@ async def test_an_unparsed_vacancy_stays_out_of_every_counter(
     assert kpi["applied_period"] == 1
 
 
+async def test_a_vacancy_from_the_applied_fixture_counts_in_the_period(
+    session, applied
+):
+    """Отклик, собранный общей фикстурой, виден и в прибавке за период.
+
+    Прибавка `total` идёт по `created_at` вакансии, а не по её истории.
+    Заводи фикстура вакансию задним числом, каждая проверка периода на ней
+    получала бы ноль и указывала бы на отбор, хотя виновата обстановка.
+    """
+    await applied(days_ago(2))
+
+    kpi = await get_stats_kpi(session, period="week")
+
+    assert kpi["applied_period"] == 1
+    assert kpi["total_period"] == 1
+
+
 async def test_a_reverted_status_does_not_shrink_the_counter(
     session, session_factory
 ):

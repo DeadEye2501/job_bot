@@ -11,7 +11,7 @@ from backend.flows.dm_backfill import (
 from backend.models import HR
 from tests.dbio import only_row, put
 from tests.factories import hr_row
-from tests.fakes.telegram import incoming, outgoing
+from tests.fakes.telegram import incoming, my_dm
 
 
 def theirs(msg_id, text):
@@ -21,7 +21,7 @@ def theirs(msg_id, text):
 
 def ours(msg_id, text, *, photo=None):
     """Своё сообщение, отправленное из другого клиента."""
-    return outgoing(id=msg_id, text=text, photo=photo)
+    return my_dm(msg_id=msg_id, text=text, photo=photo)
 
 
 def _helpers(client, session_factory, **extra) -> DmHelpers:

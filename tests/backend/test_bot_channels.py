@@ -37,10 +37,12 @@ async def test_a_known_channel_is_returned_instead_of_added_again(
 async def test_a_channel_unknown_to_telegram_is_not_written_down(
     make_bot, session_factory
 ):
-    """Неизвестный Telegram канал в базу не попадает.
+    """Неизвестный Telegram канал в базу не попадает, и это названо своим словом.
 
     Иначе опечатка заводила бы строку без названия и картинки — отличить
-    её от живого канала пользователь смог бы только глазами.
+    её от живого канала пользователь смог бы только глазами. Исход именно
+    «имя не занято», а не общая беда: так окно скажет «проверьте имя» ровно
+    там, где имя и виновато. Отличие от беды сторожит соседняя проверка.
     """
     bot = await make_bot(FakeTelegramClient(chats={}))
 
@@ -60,24 +62,6 @@ async def test_a_telegram_failure_is_not_written_down_either(
     bot = await make_bot(FakeTelegramClient(fails={"get_chat": OSError("сеть")}))
 
     assert await bot.add_channel("jobs") == (None, "error")
-    assert await all_rows(session_factory, TelegramChannel) == []
-
-
-async def test_a_name_telegram_does_not_know_is_called_by_its_own_word(
-    make_bot, session_factory
-):
-    """Незанятое имя называется своим отказом, а не общей бедой.
-
-    Так окно скажет «проверьте имя» ровно там, где имя и виновато: Telegram
-    отвечает на такое отдельным родом отказа.
-    """
-    from pyrogram.errors import UsernameNotOccupied
-
-    bot = await make_bot(
-        FakeTelegramClient(fails={"get_chat": UsernameNotOccupied()})
-    )
-
-    assert await bot.add_channel("опечатка") == (None, "invalid")
     assert await all_rows(session_factory, TelegramChannel) == []
 
 

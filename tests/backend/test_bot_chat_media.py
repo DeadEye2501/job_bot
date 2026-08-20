@@ -34,7 +34,7 @@ def _file(tmp_path, name: str, size: int = 4):
 
 
 async def test_a_picture_goes_as_a_photo(
-    chatting, session_factory, sending_unlocked, tmp_path
+    chatting, sending_unlocked, tmp_path
 ):
     """Картинка уходит картинкой, и имя файла у неё не запоминается.
 
@@ -53,7 +53,7 @@ async def test_a_picture_goes_as_a_photo(
 
 
 async def test_anything_else_goes_as_a_document_under_its_name(
-    chatting, session_factory, sending_unlocked, tmp_path
+    chatting, sending_unlocked, tmp_path
 ):
     """Прочее уходит документом, и его имя запоминается для переписки."""
     bot, client, hr = await chatting()
@@ -163,7 +163,7 @@ async def test_an_oversized_file_is_refused_before_sending(
 
 
 async def test_a_file_at_the_limit_still_goes(
-    chatting, session_factory, sending_unlocked, tmp_path
+    chatting, sending_unlocked, tmp_path
 ):
     """Файл ровно по пределу ещё уходит: предел включительный."""
     bot, client, hr = await chatting()
@@ -179,7 +179,7 @@ async def test_a_file_at_the_limit_still_goes(
     [pytest.param("нет.pdf", id="файла нет"), pytest.param("", id="это папка")],
 )
 async def test_a_path_that_is_not_a_file_is_refused(
-    chatting, session_factory, sending_unlocked, tmp_path, name
+    chatting, sending_unlocked, tmp_path, name
 ):
     """Путь, за которым нет файла, отклоняется с указанием пути."""
     bot, client, hr = await chatting()
@@ -192,7 +192,7 @@ async def test_a_path_that_is_not_a_file_is_refused(
 
 
 async def test_a_switched_off_bot_sends_no_files(
-    chatting, session_factory, tmp_path
+    chatting, tmp_path
 ):
     """Выключенный бот файлов не шлёт — так же, как и сообщений."""
     bot, client, hr = await chatting(mode=BotMode.OFF)
@@ -204,7 +204,7 @@ async def test_a_switched_off_bot_sends_no_files(
     assert client.outgoing == []
 
 
-async def test_the_send_guard_stops_files_too(chatting, session_factory, tmp_path):
+async def test_the_send_guard_stops_files_too(chatting, tmp_path):
     """Защита от случайной отправки останавливает и файлы."""
     bot, client, hr = await chatting()
     src = _file(tmp_path, "снимок.png")
@@ -230,7 +230,7 @@ async def test_a_blacklisted_hr_gets_no_files_either(
 
 
 async def test_an_hr_without_an_address_gets_no_files_either(
-    chatting, session_factory, sending_unlocked, tmp_path
+    chatting, sending_unlocked, tmp_path
 ):
     """HR без адреса файла не получает: отправлять некуда."""
     bot, client, hr = await chatting(
@@ -245,7 +245,7 @@ async def test_an_hr_without_an_address_gets_no_files_either(
 
 
 async def test_a_missing_hr_gets_no_files_either(
-    chatting, session_factory, sending_unlocked, tmp_path
+    chatting, sending_unlocked, tmp_path
 ):
     """Отказ по несуществующему HR называет, кого не нашли."""
     bot, client, _ = await chatting()

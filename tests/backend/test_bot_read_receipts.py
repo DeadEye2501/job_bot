@@ -197,7 +197,7 @@ async def test_a_simulated_sending_holds_the_read_mark_back(
     assert client.read_calls == []
 
 
-async def test_nothing_new_means_nothing_sent_to_telegram(chatting, session_factory):
+async def test_nothing_new_means_nothing_sent_to_telegram(chatting):
     """Когда гасить нечего, Telegram не беспокоят."""
     bot, client, hr = await chatting(telegram_user_id=777)
 
@@ -232,7 +232,7 @@ async def test_a_switched_off_bot_marks_nothing_read(chatting, session_factory):
     assert client.read_calls == []
 
 
-async def test_a_missing_hr_marks_nothing(chatting, session_factory):
+async def test_a_missing_hr_marks_nothing(chatting):
     """Отметка по несуществующему HR ничего не делает и не падает."""
     bot, client, _ = await chatting()
 
@@ -350,7 +350,7 @@ async def test_the_window_hears_about_a_receipt(chatting, session_factory):
     assert heard == [(hr.id, 10)]
 
 
-async def test_the_window_is_not_told_when_nothing_changed(chatting, session_factory):
+async def test_the_window_is_not_told_when_nothing_changed(chatting):
     """Когда менять нечего, окно не дёргают.
 
     Повторные отметки от Telegram приходят часто; каждая из них

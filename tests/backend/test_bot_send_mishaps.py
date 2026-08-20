@@ -88,7 +88,7 @@ async def test_a_rate_limited_send_is_not_counted(ready_to_send, session_factory
 
 
 async def test_a_rate_limit_is_remembered_until_it_expires(
-    ready_to_send, session_factory, outbox
+    ready_to_send, outbox
 ):
     """Запрет запоминается со сроком, а не просто как «было».
 
@@ -105,7 +105,7 @@ async def test_a_rate_limit_is_remembered_until_it_expires(
 
 
 async def test_a_successful_send_lifts_an_expired_rate_limit(
-    ready_to_send, session_factory, outbox
+    ready_to_send, outbox
 ):
     """Удачная отправка снимает запомненный запрет.
 
@@ -120,7 +120,7 @@ async def test_a_successful_send_lifts_an_expired_rate_limit(
     assert bot.rs.flood_wait_until_ts == 0
 
 
-async def test_a_suppressed_send_leaves_a_rate_limit_alone(ready_to_send, session_factory):
+async def test_a_suppressed_send_leaves_a_rate_limit_alone(ready_to_send):
     """Заглушенная отправка запомненный запрет не трогает.
 
     Она до Telegram не доходила и о том, отпустил ли он, ничего не знает.

@@ -9,29 +9,13 @@
 // половины договора: что номер и правда передан доводом, а не спрятан в
 // замыкании зовущего, и что поле заводится заново на каждую запись.
 
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { describe, expect, it } from 'vitest';
 
-const ROOTS = ['app', 'components'];
+import { placed } from './markup.js';
 
 /** Файлы разметки, ставящие поле заметки, вместе с их содержимым. */
 function usages() {
-  const found = [];
-  for (const root of ROOTS) {
-    for (const name of readdirSync(root)) {
-      if (!name.endsWith('.svelte')) continue;
-      const text = readFileSync(join(root, name), 'utf8');
-      let at = text.indexOf('<NotesField');
-      while (at !== -1) {
-        const end = text.indexOf('/>', at);
-        found.push({ file: `${root}/${name}`, tag: text.slice(at, end), before: text.slice(0, at) });
-        at = text.indexOf('<NotesField', end);
-      }
-    }
-  }
-  return found;
+  return placed('<NotesField');
 }
 
 describe('поле заметки', () => {

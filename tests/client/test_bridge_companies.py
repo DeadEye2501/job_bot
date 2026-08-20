@@ -40,7 +40,7 @@ async def test_a_card_of_a_missing_company_is_refused_with_the_number(api, ask):
 
 
 async def test_spellings_typed_in_one_line_arrive_as_a_list(
-    api, ask, session_factory
+    api, ask
 ):
     """Написания, набранные строкой через запятую, приезжают списком.
 

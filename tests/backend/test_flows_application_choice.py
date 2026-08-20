@@ -196,7 +196,7 @@ async def test_a_letter_the_model_did_not_write_stops_the_send(applying):
     assert pipeline.sent == []
 
 
-async def test_a_missing_resume_stops_the_full_letter(applying, session_factory):
+async def test_a_missing_resume_stops_the_full_letter(applying):
     """Без файла резюме полное письмо не уходит.
 
     Первый отклик без вложения выглядит как обрывок; лучше сказать

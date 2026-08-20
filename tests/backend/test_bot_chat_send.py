@@ -39,7 +39,7 @@ async def test_a_message_reaches_the_hr_and_the_chat(
 
 
 async def test_surrounding_whitespace_is_dropped(
-    chatting, session_factory, sending_unlocked
+    chatting, sending_unlocked
 ):
     """Пробелы по краям обрезаются: их пользователь набрал не нарочно."""
     bot, client, hr = await chatting()
@@ -54,7 +54,7 @@ async def test_surrounding_whitespace_is_dropped(
     "text", [pytest.param("", id="пусто"), pytest.param("   ", id="одни пробелы")]
 )
 async def test_an_empty_message_is_refused(
-    chatting, session_factory, sending_unlocked, text
+    chatting, sending_unlocked, text
 ):
     """Пустое сообщение не уходит: отправлять нечего."""
     bot, client, hr = await chatting()
@@ -65,7 +65,7 @@ async def test_an_empty_message_is_refused(
     assert client.outgoing == []
 
 
-async def test_a_switched_off_bot_refuses_to_chat(chatting, session_factory):
+async def test_a_switched_off_bot_refuses_to_chat(chatting):
     """Выключенный бот сообщений не шлёт и говорит, что включить."""
     bot, client, hr = await chatting(mode=BotMode.OFF)
 
@@ -75,7 +75,7 @@ async def test_a_switched_off_bot_refuses_to_chat(chatting, session_factory):
     assert client.outgoing == []
 
 
-async def test_the_send_guard_refuses_and_says_why(chatting, session_factory):
+async def test_the_send_guard_refuses_and_says_why(chatting):
     """При включённой защите отправка отказывается и называет причину.
 
     Иначе разработчик, забывший про защиту, счёл бы молчание Telegram
@@ -90,7 +90,7 @@ async def test_the_send_guard_refuses_and_says_why(chatting, session_factory):
 
 
 async def test_an_hr_without_an_address_is_refused_by_a_switched_off_bot_too(
-    chatting, session_factory, sending_unlocked
+    chatting, sending_unlocked
 ):
     """У HR без адреса причина отказа одна, включён бот или нет.
 
@@ -127,7 +127,7 @@ async def test_a_blacklisted_hr_is_named_ahead_of_the_send_lock(
 
 
 async def test_a_missing_hr_is_named_in_the_refusal(
-    chatting, session_factory, sending_unlocked
+    chatting, sending_unlocked
 ):
     """Отказ по несуществующему HR называет, кого не нашли."""
     bot, client, _ = await chatting()
@@ -139,7 +139,7 @@ async def test_a_missing_hr_is_named_in_the_refusal(
 
 
 async def test_an_hr_without_an_address_is_refused(
-    chatting, session_factory, sending_unlocked
+    chatting, sending_unlocked
 ):
     """HR без адреса получает отказ: отправлять некуда."""
     bot, client, hr = await chatting(

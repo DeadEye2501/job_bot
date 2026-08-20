@@ -276,7 +276,7 @@ async def test_the_path_to_the_file_is_recorded_alongside(session):
     assert saved.value == "cv/ivan.pdf"
 
 
-async def test_a_recorded_path_is_replaced_not_doubled(session, session_factory):
+async def test_a_recorded_path_is_replaced_not_doubled(session):
     """Повторная запись заменяет прежний путь, а не заводит вторую настройку."""
     await save_parsed_cv(session, _cv(), cv_path="cv/старое.pdf")
 

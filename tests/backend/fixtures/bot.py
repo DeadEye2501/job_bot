@@ -28,6 +28,7 @@ from tests.factories import (
     tg_account_row,
     vacancy_row,
 )
+from tests.fakes.ingestion import FakeIngestion, wire
 from tests.fakes.lm_studio import LmClient
 from tests.fakes.telegram import FakeTelegramClient
 
@@ -156,6 +157,27 @@ def chatting(session_factory, make_bot):
         bot = await make_bot(telegram_client)
         await _switch_to(session_factory, mode)
         return bot, telegram_client, await only_row(session_factory, HR)
+
+    return build
+
+
+@pytest.fixture
+def chatting_on_fakes(chatting):
+    """Та же переписка, но с подставным конвейером сбора.
+
+    Три слайса личной переписки — эхо, правки, удаления — самого конвейера не
+    проверяют вовсе, а настоящий тянул бы за собой разбор и модель. Ставился
+    он в этих файлах руками, по строке на проверку, четыре десятка раз.
+
+    Отдельной фикстурой, а не подделкой внутри `chatting`: ту же переписку
+    просят проверки входящих, отметок о прочтении и оборота цикла, и они
+    работают на настоящем конвейере. Подмени его всем разом — эти проверки
+    остались бы зелёными, не исполняя ни одной своей ветки.
+    """
+
+    async def build(**kwargs):
+        bot, client, hr = await chatting(**kwargs)
+        return wire(bot, FakeIngestion()), client, hr
 
     return build
 

@@ -280,7 +280,7 @@ async def test_refreshing_by_number_skips_a_channel_without_a_name(
 
 
 async def test_refreshing_nothing_asks_telegram_nothing(
-    make_pipeline, session_factory
+    make_pipeline
 ):
     """Обновление пустого списка Telegram не беспокоит."""
     client = FakeTelegramClient()

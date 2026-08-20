@@ -11,38 +11,24 @@
 """
 
 import logging
-from pathlib import Path
 
 from backend.models import BotMode, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import EPOCH, message_row
-from tests.fakes.ingestion import FakeIngestion
-from tests.fakes.telegram import FakeTelegramClient, message, outgoing
-
-
-def _echo(*, chat_id=777, username=None, msg_id=10, text="ответ с телефона", photo=None):
-    """Эхо своего сообщения, отправленного из другого клиента Telegram."""
-    return outgoing(
-        id=msg_id,
-        peer_id=chat_id,
-        peer_username=username,
-        text=None if photo is not None else text,
-        photo=photo,
-    )
+from tests.fakes.telegram import FakeTelegramClient, message, my_dm
 
 
 async def test_a_message_typed_elsewhere_shows_up_in_the_chat(
-    chatting, session_factory
+    chatting_on_fakes, session_factory
 ):
     """Написанное с телефона появляется в переписке окна.
 
     Иначе половина разговора видна только на телефоне, и пользователь
     отвечает второй раз на то, что уже ответил.
     """
-    bot, client, hr = await chatting(telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, client, hr = await chatting_on_fakes(telegram_user_id=777)
 
-    await bot._on_dm_outgoing(client, _echo())
+    await bot._on_dm_outgoing(client, my_dm())
 
     saved = await only_row(session_factory, Message)
     assert saved.is_incoming is False
@@ -53,15 +39,14 @@ async def test_a_message_typed_elsewhere_shows_up_in_the_chat(
 
 
 async def test_an_echo_of_our_own_send_is_not_written_twice(
-    chatting, session_factory
+    chatting_on_fakes, session_factory
 ):
     """Эхо отправленного отсюда второй строкой не пишется.
 
     Строку завела сама отправка; вторая дала бы в переписке два
     одинаковых пузыря.
     """
-    bot, client, hr = await chatting(telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, client, hr = await chatting_on_fakes(telegram_user_id=777)
     await put(
         session_factory,
         message_row(
@@ -69,41 +54,39 @@ async def test_an_echo_of_our_own_send_is_not_written_twice(
         ),
     )
 
-    await bot._on_dm_outgoing(client, _echo())
+    await bot._on_dm_outgoing(client, my_dm())
 
     saved = await only_row(session_factory, Message)
     assert saved.text == "отправлено отсюда"
 
 
-async def test_an_echo_of_our_own_send_downloads_nothing(chatting, session_factory):
+async def test_an_echo_of_our_own_send_downloads_nothing(chatting_on_fakes, session_factory):
     """Эхо своего вложения заново не качается.
 
     Копия уже лежит в папке, сделанная при отправке; загрузка гналась бы
     с ней за один и тот же файл и оставила бы рваный.
     """
     client = FakeTelegramClient()
-    bot, _, hr = await chatting(client=client, telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, _, hr = await chatting_on_fakes(client=client, telegram_user_id=777)
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=False, tg_message_id=10),
     )
 
-    await bot._on_dm_outgoing(client, _echo(photo=object()))
+    await bot._on_dm_outgoing(client, my_dm(photo=object()))
 
     assert client.download_calls == []
 
 
 async def test_the_window_hears_about_an_echo_of_our_own_send(
-    chatting, session_factory
+    chatting_on_fakes, session_factory
 ):
     """Об эхе своей отправки окно всё равно узнаёт.
 
     Строка уже была, но до эха она значилась только у нас; момент, когда
     сообщение действительно ушло, — это и есть эхо.
     """
-    bot, client, hr = await chatting(telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, client, hr = await chatting_on_fakes(telegram_user_id=777)
     await put(
         session_factory,
         message_row(hr_id=hr.id, is_incoming=False, tg_message_id=10),
@@ -111,29 +94,27 @@ async def test_the_window_hears_about_an_echo_of_our_own_send(
     heard: list[int] = []
     bot.on_new_message = heard.append
 
-    await bot._on_dm_outgoing(client, _echo())
+    await bot._on_dm_outgoing(client, my_dm())
 
     assert heard == [hr.id]
 
 
-async def test_a_message_to_a_stranger_is_not_saved(chatting, session_factory):
+async def test_a_message_to_a_stranger_is_not_saved(chatting_on_fakes, session_factory):
     """Написанное незнакомому собеседнику не сохраняется.
 
     Переписка ведётся с HR; складывать сюда разговор с кем угодно
     значило бы завалить вкладку посторонним.
     """
-    bot, client, hr = await chatting(telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, client, hr = await chatting_on_fakes(telegram_user_id=777)
 
-    await bot._on_dm_outgoing(client, _echo(chat_id=999))
+    await bot._on_dm_outgoing(client, my_dm(chat_id=999))
 
     assert await all_rows(session_factory, Message) == []
 
 
-async def test_a_message_without_a_chat_is_ignored(chatting, session_factory):
+async def test_a_message_without_a_chat_is_ignored(chatting_on_fakes, session_factory):
     """Сообщение без указания переписки пропускается: адресата не опознать."""
-    bot, client, hr = await chatting(telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, client, hr = await chatting_on_fakes(telegram_user_id=777)
 
     await bot._on_dm_outgoing(client, message(id=10, text="куда-то", chat=None))
 
@@ -141,19 +122,18 @@ async def test_a_message_without_a_chat_is_ignored(chatting, session_factory):
 
 
 async def test_a_switched_off_bot_ignores_what_was_typed_elsewhere(
-    chatting, session_factory
+    chatting_on_fakes, session_factory
 ):
     """Выключенный бот написанное с телефона не подхватывает."""
-    bot, client, hr = await chatting(mode=BotMode.OFF, telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, client, hr = await chatting_on_fakes(mode=BotMode.OFF, telegram_user_id=777)
 
-    await bot._on_dm_outgoing(client, _echo())
+    await bot._on_dm_outgoing(client, my_dm())
 
     assert await all_rows(session_factory, Message) == []
 
 
 async def test_an_attachment_typed_elsewhere_is_downloaded(
-    chatting, session_factory
+    chatting_on_fakes, session_factory
 ):
     """Вложение, отправленное с телефона, скачивается в свою папку.
 
@@ -161,28 +141,18 @@ async def test_an_attachment_typed_elsewhere_is_downloaded(
     показала бы пузырь без содержимого.
     """
     client = FakeTelegramClient()
-    bot, _, hr = await chatting(client=client, telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, _, hr = await chatting_on_fakes(client=client, telegram_user_id=777)
 
-    downloaded: list[str] = []
-
-    async def download_media(msg, file_name):
-        downloaded.append(file_name)
-        Path(file_name).write_bytes(b"file")
-        return file_name
-
-    client.download_media = download_media
-
-    await bot._on_dm_outgoing(client, _echo(photo=object()))
+    await bot._on_dm_outgoing(client, my_dm(photo=object()))
 
     saved = await only_row(session_factory, Message)
     assert saved.media_kind == "photo"
     assert saved.media_path == f"{hr.id}/10.jpg"
-    assert len(downloaded) == 1
+    assert len(client.download_paths) == 1
 
 
 async def test_an_attachment_without_a_client_is_not_chased(
-    chatting, session_factory, caplog
+    chatting_on_fakes, session_factory, caplog
 ):
     """Без клиента Telegram вложение даже не пробуют скачать.
 
@@ -191,12 +161,11 @@ async def test_an_attachment_without_a_client_is_not_chased(
     при этом ложится: род вложения известен и без файла, и в переписке по нему
     виден пузырь.
     """
-    bot, _, _ = await chatting(client=FakeTelegramClient(), telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, _, _ = await chatting_on_fakes(client=FakeTelegramClient(), telegram_user_id=777)
     bot.client = None
 
     with caplog.at_level(logging.ERROR):
-        await bot._on_dm_outgoing(None, _echo(photo=object()))
+        await bot._on_dm_outgoing(None, my_dm(photo=object()))
 
     saved = await only_row(session_factory, Message)
     assert saved.media_kind == "photo"
@@ -205,7 +174,7 @@ async def test_an_attachment_without_a_client_is_not_chased(
 
 
 async def test_a_duplicate_that_slipped_in_meanwhile_is_passed_over(
-    chatting, session_factory
+    chatting_on_fakes, session_factory
 ):
     """Строка, вставленная за время скачивания, обработчик не роняет.
 
@@ -215,24 +184,21 @@ async def test_a_duplicate_that_slipped_in_meanwhile_is_passed_over(
     окна успевает записать своё, пока грузится вложение эха.
     """
     client = FakeTelegramClient()
-    bot, _, hr = await chatting(client=client, telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, _, hr = await chatting_on_fakes(client=client, telegram_user_id=777)
 
-    async def download_media(msg, file_name):
+    async def send_slips_in(_file_name):
         await put(
             session_factory,
             message_row(
                 hr_id=hr.id, is_incoming=False, tg_message_id=10, text="успела отправка"
             ),
         )
-        Path(file_name).write_bytes(b"file")
-        return file_name
 
-    client.download_media = download_media
+    client.on_download = send_slips_in
     heard: list[int] = []
     bot.on_new_message = heard.append
 
-    await bot._on_dm_outgoing(client, _echo(photo=object()))
+    await bot._on_dm_outgoing(client, my_dm(photo=object()))
 
     saved = await all_rows(session_factory, Message)
     assert [row.text for row in saved] == ["успела отправка"]
@@ -243,7 +209,7 @@ async def test_a_duplicate_that_slipped_in_meanwhile_is_passed_over(
 
 
 async def test_a_write_that_fell_through_stays_quiet(
-    chatting, session_factory, monkeypatch
+    chatting_on_fakes, session_factory, monkeypatch
 ):
     """Сорвавшаяся запись эха обработчик не роняет.
 
@@ -259,59 +225,55 @@ async def test_a_write_that_fell_through_stays_quiet(
     Тишина здесь и про окно: строки не появилось, и звать переписку
     перерисовываться не за чем — она покажет ровно то же, что и была.
     """
-    bot, client, hr = await chatting(telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, client, hr = await chatting_on_fakes(telegram_user_id=777)
     monkeypatch.setattr("backend.flows.dm.extract_dm_text", lambda msg: object())
     heard: list[int] = []
     bot.on_new_message = heard.append
 
-    await bot._on_dm_outgoing(client, _echo())
+    await bot._on_dm_outgoing(client, my_dm())
 
     assert await all_rows(session_factory, Message) == []
     assert heard == []
 
 
 async def test_the_window_hears_about_a_message_typed_elsewhere(
-    chatting, session_factory
+    chatting_on_fakes
 ):
     """Окно узнаёт о написанном с телефона: переписка обновится сразу."""
-    bot, client, hr = await chatting(telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, client, hr = await chatting_on_fakes(telegram_user_id=777)
     heard: list[int] = []
     bot.on_new_message = heard.append
 
-    await bot._on_dm_outgoing(client, _echo())
+    await bot._on_dm_outgoing(client, my_dm())
 
     assert heard == [hr.id]
 
 
 async def test_a_broken_window_hook_does_not_lose_the_message(
-    chatting, session_factory
+    chatting_on_fakes, session_factory
 ):
     """Сломанное оповещение окна само сообщение не теряет."""
-    bot, client, hr = await chatting(telegram_user_id=777)
-    bot.ingestion = FakeIngestion()
+    bot, client, hr = await chatting_on_fakes(telegram_user_id=777)
 
     def broken(hr_id):
         raise RuntimeError("окно")
 
     bot.on_new_message = broken
 
-    await bot._on_dm_outgoing(client, _echo())
+    await bot._on_dm_outgoing(client, my_dm())
 
     assert (await only_row(session_factory, Message)).text == "ответ с телефона"
 
 
-async def test_an_echo_finds_an_hr_known_only_by_name(chatting, session_factory):
+async def test_an_echo_finds_an_hr_known_only_by_name(chatting_on_fakes, session_factory):
     """Эхо находит HR, известного только по имени.
 
     Номер собеседника заводится позже; до того имя из объекта чата —
     единственное, чем строку можно опознать.
     """
-    bot, client, hr = await chatting(telegram_username="maria", telegram_user_id=None)
-    bot.ingestion = FakeIngestion()
+    bot, client, hr = await chatting_on_fakes(telegram_username="maria", telegram_user_id=None)
 
-    await bot._on_dm_outgoing(client, _echo(chat_id=999, username="maria"))
+    await bot._on_dm_outgoing(client, my_dm(chat_id=999, username="maria"))
 
     saved = await only_row(session_factory, Message)
     assert saved.hr_id == hr.id

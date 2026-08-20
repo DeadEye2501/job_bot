@@ -118,7 +118,11 @@ async def test_a_deleted_account_is_not_accepted():
 
 
 async def test_an_unknown_username_resolves_to_nothing():
-    """Неизвестное Telegram имя даёт отсутствие."""
+    """Неизвестное Telegram имя даёт отсутствие, а не бросок наружу.
+
+    Telegram отвечает на такое отказом, а поиск собеседника идёт попутно: урони
+    он зовущего — разбор объявления вставал бы из-за ненайденного ника.
+    """
     client = FakeTelegramClient(users={})
 
     assert await resolve_hr_telegram(client, "@user_name") is None

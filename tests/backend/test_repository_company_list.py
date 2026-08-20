@@ -7,7 +7,7 @@
 
 from backend.repository.companies_list import list_companies_with_counts
 from tests.dbio import put
-from tests.factories import blacklist_row, company_row, vacancy_row
+from tests.factories import company_marks, company_row, marked_companies, vacancy_row
 
 
 async def names(session, **kwargs) -> list[str]:
@@ -125,17 +125,9 @@ async def test_the_page_is_cut_after_the_search(session, session_factory):
 
 async def test_the_row_carries_its_count_and_blacklist_mark(session, session_factory):
     """В строке списка едут счётчик вакансий и отметка чёрного списка."""
-    listed = company_row(name="Контур")
-    switched_off = company_row(name="Ромашка")
-    other_kind = company_row(name="Берёзка")
+    listed, switched_off, other_kind = marked_companies()
     await put(session_factory, listed, switched_off, other_kind)
-    await put(
-        session_factory,
-        vacancy_row(company_id=listed.id),
-        blacklist_row("company", "Контур"),
-        blacklist_row("company", "Ромашка", active=False),
-        blacklist_row("hr", "Берёзка"),
-    )
+    await put(session_factory, vacancy_row(company_id=listed.id), *company_marks())
 
     found, _ = await list_companies_with_counts(session)
     rows = {r.company.name: r for r in found}

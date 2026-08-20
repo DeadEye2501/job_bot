@@ -2374,7 +2374,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 234 модулей
+## tests — 235 модулей
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -2412,13 +2412,13 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/backend/conftest.py` — 51 строк
+### `tests/backend/conftest.py` — 53 строк
 
 Фикстуры слоя `backend`, собранные из модулей по предметам.
 
 Зависит от: `tests.backend.fixtures.backfill`, `tests.backend.fixtures.bot`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.listing`, `tests.backend.fixtures.logs`, `tests.backend.fixtures.rerun`, `tests.backend.fixtures.stats`
 
-Отдаёт наружу: `applied`, `busy_slot`, `channel_titles`, `chatting`, `clean_root_logger`, `deliver`, `dm_pipeline`, `empty_media_dir`, `hr_names`, `known_hr`, `make_bot`, `make_pipeline`, `outbox`, `parsing`, `ready_to_send`, `rerunning`, `sending_unlocked`, `titles`, `unparsed_vacancy`
+Отдаёт наружу: `applied`, `busy_slot`, `channel_titles`, `chatting`, `chatting_on_fakes`, `clean_root_logger`, `deliver`, `dm_pipeline`, `empty_media_dir`, `hr_names`, `known_hr`, `make_bot`, `make_pipeline`, `outbox`, `parsing`, `ready_to_send`, `rerunning`, `sending_unlocked`, `titles`, `unparsed_vacancy`
 
 
 ### `tests/backend/fixtures/__init__.py` — 1 строк
@@ -2441,11 +2441,11 @@ Runtime settings layer.
 - `async def catch_up_everyone(client, session_factory, *, hooks=None, **kwargs)` (12)
 - `async def known_hr(session_factory)` (4)
 
-### `tests/backend/fixtures/bot.py` — 237 строк
+### `tests/backend/fixtures/bot.py` — 259 строк
 
 Обстановка для проверок бота: всё собрано на подделках, до сети не доходит.
 
-Зависит от: `adapters.telegram`, `backend.bot.client`, `backend.bot.media`, `backend.crypto`, `backend.models`, `backend.repository.bot_mode`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`, `tests.fakes.lm_studio`, `tests.fakes.telegram`
+Зависит от: `adapters.telegram`, `backend.bot.client`, `backend.bot.media`, `backend.crypto`, `backend.models`, `backend.repository.bot_mode`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`, `tests.fakes.ingestion`, `tests.fakes.lm_studio`, `tests.fakes.telegram`
 
 - `class Outbox` (18)
   - `async def send_dm(self, _client, target, text, attachment=None)` (5)
@@ -2457,6 +2457,8 @@ Runtime settings layer.
 - `def empty_media_dir()` (13)
 - `def chatting(session_factory, make_bot)` (17)
   - `async def build(*, mode=BotMode.FULL, client=None, **hr_fields)` (6)
+- `def chatting_on_fakes(chatting)` (18)
+  - `async def build(**kwargs)` (3)
 - `async def busy_slot()` (20)
   - `def occupy(bot) -> None` (4)
 - `def sending_unlocked(monkeypatch)` (10)
@@ -2522,14 +2524,14 @@ Runtime settings layer.
   - `async def reload()` (2)
   - `async def embed(pipeline, text, what)` (3)
 
-### `tests/backend/fixtures/stats.py` — 52 строк
+### `tests/backend/fixtures/stats.py` — 62 строк
 
 Обстановка для проверок сводки: отклик и ответ на него.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
 
-- `def applied(session_factory)` (42)
-  - `async def build(applied_at, *, hr=None, answered_after=None, **overrides)` (19)
+- `def applied(session_factory)` (52)
+  - `async def build(applied_at, *, hr=None, answered_after=None, **overrides)` (24)
 
 ### `tests/backend/test_adapters_teletype.py` — 173 строк
 
@@ -2554,13 +2556,13 @@ Runtime settings layer.
 - `def _revision_reached(db_file) -> str` (6)
 - `def _project_of_two_revisions(root, db_file) -> None` (20)
 
-### `tests/backend/test_bot_channels.py` — 183 строк
+### `tests/backend/test_bot_channels.py` — 167 строк
 
 Следствия добавления канала из окна настроек.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
-Тестов: 10
+Тестов: 9
 
 
 ### `tests/backend/test_bot_chat_media.py` — 272 строк
@@ -2582,26 +2584,26 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/backend/test_bot_dm_deletes.py` — 414 строк ⚠ подошёл к 300
+### `tests/backend/test_bot_dm_deletes.py` — 395 строк ⚠ подошёл к 300
 
 Следствия удаления сообщения на стороне Telegram.
 
-Зависит от: `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.ingestion`, `tests.fakes.telegram`
+Зависит от: `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
 Тестов: 20
 
 - `def _tombstone(msg_id: int, *, chat_id=777, username=None)` (6)
 - `def _deletion_filter(client)` (7)
 
-### `tests/backend/test_bot_dm_edits.py` — 263 строк
+### `tests/backend/test_bot_dm_edits.py` — 247 строк
 
 Следствия правки сообщения, пришедшей из Telegram.
 
-Зависит от: `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.ingestion`, `tests.fakes.telegram`
+Зависит от: `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
 Тестов: 13
 
-- `def _edit(*, chat_id=777, username=None, msg_id=10, text='новая редакция', mine=False)` (14)
+- `def _edit(*, chat_id=777, username=None, msg_id=10, text='новая редакция', mine=False)` (12)
 
 ### `tests/backend/test_bot_dm_incoming.py` — 120 строк
 
@@ -2615,15 +2617,14 @@ Runtime settings layer.
   - `class Reader(list)` (6)
     - `async def __call__(self, msg, *_args, **_kwargs)` (3)
 
-### `tests/backend/test_bot_dm_outgoing.py` — 318 строк ⚠ подошёл к 300
+### `tests/backend/test_bot_dm_outgoing.py` — 280 строк
 
 Следствия сообщения, отправленного HR с телефона или другого клиента.
 
-Зависит от: `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.ingestion`, `tests.fakes.telegram`
+Зависит от: `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
 Тестов: 14
 
-- `def _echo(*, chat_id=777, username=None, msg_id=10, text='ответ с телефона', photo=None)` (9)
 
 ### `tests/backend/test_bot_logout.py` — 39 строк
 
@@ -3041,7 +3042,7 @@ Runtime settings layer.
 - `def _long_ago()` (3)
 - `def _recently()` (3)
 
-### `tests/backend/test_flows_history_backfill.py` — 371 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_history_backfill.py` — 375 строк ⚠ подошёл к 300
 
 Следствия догона переписки с одним HR.
 
@@ -3225,17 +3226,17 @@ Runtime settings layer.
 - `def _allowed_line(client) -> str` (9)
 - `def _verdict(status: str, explanation: str | None=None) -> httpx.Response` (3)
 
-### `tests/backend/test_llm_company_arbiter.py` — 303 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_company_arbiter.py` — 342 строк ⚠ подошёл к 300
 
 Следствия обращения к модели как к арбитру при сведении компаний.
 
 Зависит от: `backend.llm.company`, `backend.llm.rules`, `tests.fakes.llm`
 
-Тестов: 17
+Тестов: 19
 
 - `class _Candidate` (8)
 - `def _answer(matched_id=None, reasoning=None) -> httpx.Response` (3)
-- `async def _ask(client, candidates, name='Сбербанк Тех')` (9)
+- `async def _ask(client, candidates, name='Сбербанк Тех', website=None)` (9)
 
 ### `tests/backend/test_llm_cover_letter.py` — 361 строк ⚠ подошёл к 300
 
@@ -3604,7 +3605,7 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `tests/backend/test_repository_company_card.py` — 131 строк
+### `tests/backend/test_repository_company_card.py` — 130 строк
 
 Следствия сборки карточки компании для боковой панели контактов.
 
@@ -3640,7 +3641,7 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/backend/test_repository_company_list.py` — 166 строк
+### `tests/backend/test_repository_company_list.py` — 158 строк
 
 Следствия сборки списка компаний со счётчиками.
 
@@ -3853,13 +3854,13 @@ Runtime settings layer.
 - `def _place(**overrides) -> ParsedCvExperience` (9)
 - `def _cv(**overrides) -> ParsedCv` (10)
 
-### `tests/backend/test_repository_profile_experience.py` — 260 строк
+### `tests/backend/test_repository_profile_experience.py` — 286 строк
 
 Следствия сохранения мест работы профиля.
 
 Зависит от: `backend.models`, `backend.repository.profile_experience`, `tests.dbio`, `tests.factories`
 
-Тестов: 12
+Тестов: 14
 
 - `def _row(**overrides) -> dict` (5)
 
@@ -3881,13 +3882,13 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_repository_profile_skills.py` — 281 строк
+### `tests/backend/test_repository_profile_skills.py` — 286 строк
 
 Следствия сохранения списка навыков профиля.
 
 Зависит от: `backend.models`, `backend.repository.profile_skills`, `tests.dbio`, `tests.factories`
 
-Тестов: 12
+Тестов: 13
 
 - `async def names_and_levels(session) -> list[tuple[str, int]]` (3)
 
@@ -3900,13 +3901,13 @@ Runtime settings layer.
 Тестов: 9
 
 
-### `tests/backend/test_repository_stats_kpi.py` — 254 строк
+### `tests/backend/test_repository_stats_kpi.py` — 271 строк
 
 Следствия сводных счётчиков в шапке экрана статистики.
 
 Зависит от: `backend.models`, `backend.repository.stats_kpi`, `tests.dbio`, `tests.factories`
 
-Тестов: 11
+Тестов: 12
 
 - `def _four_steps(vacancy_id: int, when)` (11)
 
@@ -4164,7 +4165,7 @@ Runtime settings layer.
 - `async def login(session_factory, clients)` (4)
 - `async def sent(login, *, phone='+79991234567')` (3)
 
-### `tests/backend/test_telegram_lookup.py` — 146 строк
+### `tests/backend/test_telegram_lookup.py` — 150 строк
 
 Следствия, которые наблюдают тесты `backend/telegram_lookup.py`.
 
@@ -4416,7 +4417,7 @@ Runtime settings layer.
 
 - `async def _saved_person(api, ask, **extra) -> None` (4)
 
-### `tests/client/test_bridge_runner.py` — 105 строк
+### `tests/client/test_bridge_runner.py` — 110 строк
 
 Следствия мотора, в котором окно исполняет свою работу.
 
@@ -4424,7 +4425,7 @@ Runtime settings layer.
 
 Тестов: 5
 
-- `def runner()` (11)
+- `def real_runner()` (16)
 
 ### `tests/client/test_bridge_settings.py` — 87 строк
 
@@ -4609,7 +4610,7 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/conftest.py` — 343 строк ⚠ подошёл к 300
+### `tests/conftest.py` — 350 строк ⚠ подошёл к 300
 
 Стенд: подмена каталога данных, хранилища ключей и базы.
 
@@ -4623,8 +4624,8 @@ Runtime settings layer.
 - `def migrations_target(tmp_path, monkeypatch) -> Path` (13)
 - `def _schema(database_url)` (8)
 - `class TelegramReached(BaseException)` (10)
-- `def _telegram_is_unreachable(monkeypatch)` (32)
-  - `async def _refuse(*_args, **_kwargs)` (6)
+- `def _telegram_is_unreachable(monkeypatch)` (39)
+  - `async def _refuse(*_args, **_kwargs)` (7)
 - `def _sending_locked(monkeypatch)` (10)
 - `async def _clear_all_tables(engine: AsyncEngine) -> None` (37)
 - `async def _clean_database(_schema, database_url)` (25)
@@ -4642,7 +4643,7 @@ Runtime settings layer.
 - `async def only_row(session_factory, model)` (4)
 - `async def all_rows(session_factory, model) -> list` (8)
 
-### `tests/factories.py` — 399 строк ⚠ подошёл к 300
+### `tests/factories.py` — 431 строк ⚠ подошёл к 300
 
 Построение объектов, которые тесты подают на вход коду.
 
@@ -4674,6 +4675,8 @@ Runtime settings layer.
 - `def unread_probe_with_a_neighbour(hr_id: int, other_hr_id: int) -> list[Message]` (13)
 - `def channel_marks() -> list[Blacklist]` (13)
 - `def marked_channels() -> list[TelegramChannel]` (15)
+- `def company_marks() -> list[Blacklist]` (15)
+- `def marked_companies() -> list[Company]` (5)
 - `def vacancy_event_row(vacancy_id: int, **overrides) -> VacancyEvent` (5)
 - `def status_history_row(vacancy_id: int, **overrides) -> VacancyStatusHistory` (10)
 - `def tg_creds(**overrides) -> TgAccountConfig` (16)
@@ -4747,7 +4750,7 @@ Runtime settings layer.
 - `class LmClient` (9)
   - `async def aclose(self) -> None` (2)
 
-### `tests/fakes/telegram.py` — 346 строк ⚠ подошёл к 300
+### `tests/fakes/telegram.py` — 382 строк ⚠ подошёл к 300
 
 Подделка клиента Pyrogram и построители его объектов.
 
@@ -4758,18 +4761,19 @@ Runtime settings layer.
 - `def url_entity(*, offset: int, length: int) -> SimpleNamespace` (9)
 - `def incoming(*, user_id=777, username=None, text='здравствуйте', **extra)` (26)
 - `def outgoing(*, peer_id=777, peer_username=None, **extra)` (16)
+- `def my_dm(*, chat_id=777, username=None, msg_id=10, text='ответ с телефона', photo=None)` (19)
 - `def post(msg_id: int, *, text=_UNSET, **extra)` (14)
 - `def photo(*, small_file_id=None, big_file_id=None) -> SimpleNamespace` (3)
 - `def document(name: str | None) -> SimpleNamespace` (3)
 - `def chat(*, title=None, photo=None, **extra) -> SimpleNamespace` (3)
 - `def user(*, username=None, photo=None, **extra) -> SimpleNamespace` (15)
-- `class FakeTelegramClient` (175)
+- `class FakeTelegramClient` (189)
   - `def loop(self)` (4)
   - `def add_handler(self, handler) -> None` (2)
   - `def _fail_if_asked(self, method: str) -> None` (6)
-  - `async def get_chat(self, chat_id)` (4)
+  - `async def get_chat(self, chat_id)` (14)
   - `async def get_chat_history(self, target, limit=100)` (5)
-  - `async def get_users(self, username)` (4)
+  - `async def get_users(self, username)` (8)
   - `async def download_media(self, target, file_name=None, in_memory=False)` (21)
   - `async def _accept(self, kind: str, target, payload, caption=None)` (15)
   - `async def send_message(self, target, text)` (2)
@@ -4830,13 +4834,22 @@ Runtime settings layer.
 Тестов: 6
 
 
-### `tests/test_harness_safety.py` — 118 строк
+### `tests/test_fakes_telegram.py` — 32 строк
+
+Верность подделки Telegram настоящему клиенту.
+
+Зависит от: `tests.fakes.telegram`
+
+Тестов: 2
+
+
+### `tests/test_harness_safety.py` — 142 строк
 
 Сторож стенда: падает, если подмена не сработала.
 
 Зависит от: `adapters.telegram`, `backend.models`, `config`, `tests.conftest`
 
-Тестов: 9
+Тестов: 11
 
 
 ## tools — 26 модулей
