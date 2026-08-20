@@ -85,6 +85,9 @@
       field.value = was;
       return;
     }
+    // Обрезанное возвращаем в поле: на мост уходит имя без краевых пробелов, и
+    // оставленные в поле, они читались бы как принятые.
+    if (becomes !== field.value) field.value = becomes;
     if (becomes === was) return;
     skills = skills.map((one) => (one.category === was ? { ...one, category: becomes } : one));
     if (closed.has(was)) {

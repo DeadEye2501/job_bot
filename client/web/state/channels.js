@@ -11,7 +11,8 @@
  * нажимаемой.
  */
 export function channelName(channel) {
-  if (channel.title) return { name: channel.title, handle: `@${channel.username}` };
+  const handle = channel.username ? `@${channel.username}` : '';
+  if (channel.title) return { name: channel.title, handle };
   if (channel.username) return { name: `@${channel.username}`, handle: '' };
   return { name: `Канал #${channel.id}`, handle: '' };
 }
