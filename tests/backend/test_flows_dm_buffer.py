@@ -162,3 +162,29 @@ async def test_an_edit_emptied_to_nothing_leaves_an_empty_string(dm_pipeline):
     dm_pipeline.update_dm_buffer_text(7, 10, None)
 
     assert _texts(dm_pipeline, 7) == [""]
+
+
+async def test_a_telegram_number_does_not_hit_a_row_number(dm_pipeline):
+    """Совпадение номера Telegram с чужим номером строки чужого не трогает.
+
+    Номера у письма два, и живут они в разных счётах: номер строки базы растёт
+    сам по себе, номер Telegram — свой у каждой переписки. Совпасть они могут
+    когда угодно, и раньше копилка искала по номеру строки, а звали её с
+    номером Telegram: удаление одного письма выбрасывало соседнее, живое, а
+    правка переписывала чужой текст. Модель после этого разбирала то, чего HR
+    не писал, и двигала статус вакансии по чужому письму.
+
+    Здесь у второго письма номер строки — 10, ровно тот номер Telegram, по
+    которому уходит первое.
+    """
+    dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 500, 10, "первое"))
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 11, "второе"))
+
+    dm_pipeline.remove_dm_buffer_msg(7, 10)
+
+    assert _texts(dm_pipeline, 7) == ["второе"]
+
+    dm_pipeline.update_dm_buffer_text(7, 11, "второе, переписанное")
+
+    assert _texts(dm_pipeline, 7) == ["второе, переписанное"]

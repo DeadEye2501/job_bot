@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import { cardFinish } from '../state/card_finish.js';
 
+import { replying } from './bridge_stub.js';
+
 /** Панель, записывающая всё, что с ней сделали, — в том порядке, в каком делали. */
 function panel(answer) {
   const trail = [];
@@ -50,12 +52,9 @@ describe('действие, кончающее карточку', () => {
   });
 
   it('мосту уходит названная нагрузка', async () => {
-    const asked = [];
+    const { asked, ask } = replying([{ merged: true }]);
     const finish = cardFinish({
-      ask: (method, payload) => {
-        asked.push([method, payload]);
-        return Promise.resolve({ merged: true });
-      },
+      ask,
       method: 'hr.merge',
       note: 'Карточки слиты',
       say: () => {},
@@ -65,6 +64,8 @@ describe('действие, кончающее карточку', () => {
 
     await finish({ absorbed_id: 3, survivor_id: 9 });
 
-    expect(asked).toEqual([['hr.merge', { absorbed_id: 3, survivor_id: 9 }]]);
+    expect(asked).toEqual([
+      { method: 'hr.merge', payload: { absorbed_id: 3, survivor_id: 9 } },
+    ]);
   });
 });

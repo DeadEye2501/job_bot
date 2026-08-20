@@ -2958,17 +2958,17 @@ Runtime settings layer.
   - `async def reload()` (2)
   - `async def poll(pipeline, channel_id, username, last_id)` (3)
 
-### `tests/backend/test_flows_dm_buffer.py` — 164 строк
+### `tests/backend/test_flows_dm_buffer.py` — 190 строк
 
 Следствия накопления входящих перед разбором ответа HR.
 
 Зависит от: `backend.payloads`
 
-Тестов: 9
+Тестов: 10
 
 - `def _texts(pipeline, hr_id)` (3)
 
-### `tests/backend/test_flows_dm_debounce.py` — 217 строк
+### `tests/backend/test_flows_dm_debounce.py` — 229 строк
 
 Договор копилки отложенного разбора: пачки, таймеры и начавшие.
 
@@ -2976,7 +2976,7 @@ Runtime settings layer.
 
 Тестов: 16
 
-- `def _letter(tg_msg_id: int, text: str) -> dict` (3)
+- `def _letter(tg_msg_id: int, text: str) -> dict` (15)
 
 ### `tests/backend/test_flows_dm_drain.py` — 250 строк
 
@@ -4758,7 +4758,7 @@ Runtime settings layer.
 - `class LmClient` (9)
   - `async def aclose(self) -> None` (2)
 
-### `tests/fakes/telegram.py` — 382 строк ⚠ подошёл к 300
+### `tests/fakes/telegram.py` — 378 строк ⚠ подошёл к 300
 
 Подделка клиента Pyrogram и построители его объектов.
 
@@ -4768,20 +4768,19 @@ Runtime settings layer.
 - `def link_entity(*, offset: int, length: int, url: str) -> SimpleNamespace` (14)
 - `def url_entity(*, offset: int, length: int) -> SimpleNamespace` (9)
 - `def incoming(*, user_id=777, username=None, text='здравствуйте', **extra)` (26)
-- `def outgoing(*, peer_id=777, peer_username=None, **extra)` (16)
-- `def my_dm(*, chat_id=777, username=None, msg_id=10, text='ответ с телефона', photo=None)` (19)
+- `def my_dm(*, chat_id=777, username=None, msg_id=10, text='ответ с телефона', photo=None)` (27)
 - `def post(msg_id: int, *, text=_UNSET, **extra)` (14)
 - `def photo(*, small_file_id=None, big_file_id=None) -> SimpleNamespace` (3)
 - `def document(name: str | None) -> SimpleNamespace` (3)
 - `def chat(*, title=None, photo=None, **extra) -> SimpleNamespace` (3)
 - `def user(*, username=None, photo=None, **extra) -> SimpleNamespace` (15)
-- `class FakeTelegramClient` (189)
+- `class FakeTelegramClient` (195)
   - `def loop(self)` (4)
   - `def add_handler(self, handler) -> None` (2)
   - `def _fail_if_asked(self, method: str) -> None` (6)
   - `async def get_chat(self, chat_id)` (14)
   - `async def get_chat_history(self, target, limit=100)` (5)
-  - `async def get_users(self, username)` (8)
+  - `async def get_users(self, username)` (14)
   - `async def download_media(self, target, file_name=None, in_memory=False)` (21)
   - `async def _accept(self, kind: str, target, payload, caption=None)` (15)
   - `async def send_message(self, target, text)` (2)
@@ -4799,11 +4798,11 @@ Runtime settings layer.
   - `async def log_out(self)` (3)
   - `async def export_session_string(self)` (3)
 
-### `tests/fakes/ui_bot.py` — 110 строк
+### `tests/fakes/ui_bot.py` — 112 строк
 
 Бот, каким его видит окно: обращения, которые делает мост.
 
-Зависит от: —
+Зависит от: `backend.bot.rerun`
 
 - `class Sent` (4)
 - `class UiBot` (78)
@@ -4813,7 +4812,7 @@ Runtime settings layer.
   - `def request_stop(self) -> None` (2)
   - `def kick(self) -> None` (2)
   - `async def run(self, *, once: bool=False) -> None` (7)
-  - `async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> str` (3)
+  - `async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> RerunOutcome` (3)
   - `async def ui_send_vacancy_application(self, vacancy_id: int) -> tuple[bool, str]` (3)
   - `async def ui_forget_vacancy(self, vacancy_id: int) -> bool` (3)
   - `async def mark_hr_chat_read(self, hr_id: int) -> int` (3)
@@ -4853,7 +4852,7 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/test_harness_safety.py` — 142 строк
+### `tests/test_harness_safety.py` — 143 строк
 
 Сторож стенда: падает, если подмена не сработала.
 

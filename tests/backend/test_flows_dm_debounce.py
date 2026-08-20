@@ -13,8 +13,20 @@ from backend.flows.dm_debounce import DmDebounce
 
 
 def _letter(tg_msg_id: int, text: str) -> dict:
-    return {"vacancy_id": 1, "msg_id": tg_msg_id, "tg_msg_id": tg_msg_id,
-            "text": text}
+    """Письмо в пачке. Номер строки базы нарочно не равен номеру Telegram.
+
+    Номера у письма два, и живут они в разных счётах: номер строки растёт сам
+    по себе, номер Telegram свой у каждой переписки. Совпади они здесь —
+    копилка, ищущая по номеру строки вместо номера Telegram, прошла бы все
+    проверки зелёной, а в бою удаление одного письма выбрасывало бы соседнее,
+    живое, и правка переписывала бы чужой текст. Так уже было.
+    """
+    return {
+        "vacancy_id": 1,
+        "msg_id": 500 + tg_msg_id,
+        "tg_msg_id": tg_msg_id,
+        "text": text,
+    }
 
 
 def test_a_remembered_letter_waits_in_its_burst():

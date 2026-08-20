@@ -8,6 +8,8 @@
 
 from dataclasses import dataclass
 
+from backend.bot.rerun import RerunOutcome
+
 
 @dataclass(frozen=True)
 class Sent:
@@ -70,7 +72,7 @@ class UiBot:
         """
         self.calls.append(("run", once))
 
-    async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> str:
+    async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> RerunOutcome:
         self.calls.append(("ui_rerun_vacancy_pipeline", vacancy_id))
         return self.answers["rerun"]
 

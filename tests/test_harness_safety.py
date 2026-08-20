@@ -59,10 +59,11 @@ async def test_a_call_through_a_raw_session_blows_up_too():
 
 
 async def test_starting_a_raw_session_blows_up():
-    """Подключение сессии падает: её первый обмен идёт мимо `Session.invoke`.
+    """Подключение сессии падает до того, как откроет сокет.
 
-    `Session.start` шлёт первый пакет через `Session.send` напрямую, поэтому
-    запор, стоявший на `invoke`, до подключения не доходил вовсе.
+    `Session.start` соединяется сама и только потом шлёт первый пакет — и шлёт
+    его через `send`, мимо `invoke`. Запор на обмене опоздал бы вдвойне:
+    соединение к тому мигу уже установлено.
     """
     import pyrogram
 

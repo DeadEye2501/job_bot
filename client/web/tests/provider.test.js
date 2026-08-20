@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 
 import { askModels, probeModel } from '../state/provider.js';
 
+import { replying } from './bridge_stub.js';
+
 /** Отказ моста в том виде, в каком его поднимает обёртка зова. */
 function refusal(message) {
   const trouble = new Error(message);
@@ -49,17 +51,13 @@ describe('перечень моделей у поставщика', () => {
 
   it('спрашивают адрес и ключ, а имя модели не спрашивают', async () => {
     // Перечень читается с адреса и ключа; имя модели — как раз то, что ищут.
-    const asked = [];
-    const call = async (path, payload) => {
-      asked.push({ path, payload });
-      return { models: [] };
-    };
+    const { asked, ask: call } = replying([{ models: [] }]);
 
     await askModels(call, CREDS);
 
     expect(asked).toEqual([
       {
-        path: 'settings.list_models',
+        method: 'settings.list_models',
         payload: { kind: 'chat', base_url: 'http://localhost:1234/v1', api_key: 'k' },
       },
     ]);
@@ -94,14 +92,10 @@ describe('проверка связи с поставщиком', () => {
   });
 
   it('проверяют набранное целиком, вместе с именем модели', async () => {
-    const asked = [];
-    const call = async (path, payload) => {
-      asked.push({ path, payload });
-      return { model: 'qwen', latency_ms: 1 };
-    };
+    const { asked, ask: call } = replying([{ model: 'qwen', latency_ms: 1 }]);
 
     await probeModel(call, CREDS);
 
-    expect(asked).toEqual([{ path: 'settings.probe_model', payload: CREDS }]);
+    expect(asked).toEqual([{ method: 'settings.probe_model', payload: CREDS }]);
   });
 });

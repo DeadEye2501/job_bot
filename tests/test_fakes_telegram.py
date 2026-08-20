@@ -7,7 +7,7 @@
 """
 
 import pytest
-from pyrogram.errors import PeerIdInvalid, UsernameNotOccupied
+from pyrogram.errors import UsernameNotOccupied
 
 from tests.fakes.telegram import FakeTelegramClient
 
@@ -23,10 +23,10 @@ async def test_the_fake_refuses_a_channel_name_telegram_does_not_know():
 
 
 async def test_the_fake_refuses_a_username_telegram_does_not_know():
-    """Подделка бросает на незнакомом имени собеседника — по той же причине.
+    """Подделка бросает на незанятом имени собеседника — по той же причине.
 
     Настоящий `get_users` о неизвестном имени не отвечает пустотой, и разбор
     поиска, проверенный на пустоте, в бою проверен не был бы вовсе.
     """
-    with pytest.raises(PeerIdInvalid):
+    with pytest.raises(UsernameNotOccupied):
         await FakeTelegramClient(users={}).get_users("user_name")

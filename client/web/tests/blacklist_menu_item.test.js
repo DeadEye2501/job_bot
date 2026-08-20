@@ -95,12 +95,16 @@ describe('пункт «в отсев»', () => {
     // Смотрим оба места постановки: карточка канала ставит пункт напрямую, а
     // карточки человека и компании — через общее меню. Возьми мы только одно,
     // половина карточек осталась бы неприкрытой.
-    const given = usages().concat(menus()).filter((one) => /onblock=/.test(one.tag));
+    // Годных записей две. Своё тело — тогда смотрим, что внутри. Сквозной
+    // проброс `{onblock}` — тогда смотреть не на что и не нужно: перепутать
+    // его молча нельзя, для этого пришлось бы написать `onblock={onunblock}`,
+    // то есть вернуться к первой записи и попасться на ней же.
+    const given = usages().concat(menus());
     expect(given.length).toBeGreaterThan(0);
 
     for (const use of given) {
-      expect(use.tag, use.file).toMatch(/onblock=\{[^}]*\.block\(/);
-      expect(use.tag, use.file).toMatch(/onunblock=\{[^}]*\.unblock\(/);
+      expect(use.tag, use.file).toMatch(/onblock=\{[^}]*\.block\(|\{onblock\}/);
+      expect(use.tag, use.file).toMatch(/onunblock=\{[^}]*\.unblock\(|\{onunblock\}/);
     }
   });
 
