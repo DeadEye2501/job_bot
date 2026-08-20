@@ -7,7 +7,7 @@ from backend.repository import channels as channels_repo
 from client.bridge.answer import Denied, bad_fields, denied, launched, reply
 from client.bridge.mark import CHANNEL_MARK, mark, unmark
 from client.bridge.refusals import NO_BOT, NO_CHANNEL, POLL_REFUSALS
-from client.form_payloads import read_toggle
+from client.bridge.form_payloads import read_toggle
 
 
 class ChannelActions:

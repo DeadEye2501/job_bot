@@ -55,7 +55,7 @@
 - принимает: ask, say, events, personId, oncompany, onvacancy, onclose, onchanged
 - берёт: ./PersonChat.svelte
 
-### app/PersonChat.svelte (246)
+### app/PersonChat.svelte (248)
 - Строка отправки остаётся на месте и при заслоне, только запертой: пропав, она не сказала бы, почему писать нельзя.
 - принимает: ask, say, card, events, onread
 
@@ -81,7 +81,7 @@
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
 
-### app/Shell.svelte (425)
+### app/Shell.svelte (430)
 - Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
 - берёт: ./ContactsScreen.svelte, ./LogsScreen.svelte, ./ProfileScreen.svelte, ./SettingsScreen.svelte, ./StatsScreen.svelte, ./VacanciesScreen.svelte, ./WizardScreen.svelte
 
@@ -115,9 +115,9 @@
 - —
 - принимает: ask, kind, onback, onnext
 
-### app/WizardScreen.svelte (150)
+### app/WizardScreen.svelte (155)
 - Приглушена только обложка: на финале четыре галочки горят в полную силу — это и есть то, ради чего мастер проходили.
-- принимает: ask, say, ondone
+- принимает: ask, say, ondone, completed
 - берёт: ./WizardCv.svelte, ./WizardLlm.svelte, ./WizardTelegram.svelte
 
 ### app/WizardTelegram.svelte (122)
@@ -167,8 +167,8 @@
 - принимает: channel, selected, onpick, ontoggle
 - берёт: ./Avatar.svelte
 
-### components/ChatBubble.svelte (60)
-- Вложение открывает система, а не страница: мост отдаёт путь к нему адресом `file://`, а страницу раздаёт сервер окна из своей папки — ссылкой такой путь не открылся бы. Файла может и не быть вовсе: бот скачивает не всё, — и тогда остаётся род вложения в скобках, потому что открывать нечего.
+### components/ChatBubble.svelte (59)
+- Вложение открывает система, а не страница: показать документ она умеет только снимком, а читают его в своей программе. Файла может и не быть вовсе: бот скачивает не всё, — и тогда остаётся род вложения в скобках, потому что открывать нечего.
 - принимает: message, onopen
 
 ### components/Chip.svelte (14)
@@ -513,7 +513,7 @@
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
 - отдаёт: aliasesAfter, countNote, grouped, levelPercent
 
-### state/stats.js (243)
+### state/stats.js (250)
 - * Сроки, за которые считают, — от короткого к длинному. * * `delta` — как называется прирост за этот срок. У «всего времени» его нет: * сравнивать не с чем, это и есть всё время.
 - отдаёт: KPI, PERIODS, STATUS_ORDER, convNote, deltaNote, donut, duration, kpiRow, skillRows, skillRowsPerColumn, sliceTarget, statusColumns, weekBars
 
@@ -521,8 +521,8 @@
 - * Статусы в том порядке, в каком их читают в кольце статистики. * * Значение совпадает с тем, каким статус приходит в строке списка и каким его * принимает смена статуса на мосту; им же покрашена точка рядом.
 - отдаёт: STATUS_CHOICES
 
-### state/vacancies.js (171)
-- * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * совпадают с перечнем `backend/repository/vacancies_list.VACANCY_SORTS`; * первый — тот, в котором список открывается.
+### state/vacancies.js (172)
+- * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
 - отдаёт: SORTS, ago, emptyNote, gradeLabel, remoteLabel, scoreTone, shortAgo, shownStack, sortKey, vacancyLine
 
 ### state/vacancy_actions.js (51)
@@ -537,9 +537,9 @@
 - * Грейды объявлены анкетой: значения те же — и туда, и сюда они ездят через * мост, а второе их написание разошлось бы с первым молча.
 - отдаёт: COMPANY_MAX, DATE_PRESETS, GRADE_CHOICES, HR_CHOICES, REMOTE_CHOICES, activeCount, blankFilter, filterPayload, pickNames
 
-### state/wizard.js (147)
+### state/wizard.js (163)
 - * Экраны по порядку. Приветствие и финал — обложки: шага у них нет, и в * строке шагов они ничего не подсвечивают.
-- отдаёт: PRESETS, backScreen, cvModes, cvReady, llmTrouble, nextScreen, presetFor, stepAt, stepMarks
+- отдаёт: PRESETS, backScreen, cvModes, cvReady, llmTrouble, nextScreen, presetFor, resumeScreen, stepAt, stepMarks
 
 ### state/words.js (15)
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
@@ -1061,7 +1061,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/stats.test.js (251)
 - —
 
-### tests/vacancies.test.js (202)
+### tests/vacancies.test.js (203)
 - —
 
 ### tests/vacancy_actions.test.js (117)
@@ -1073,5 +1073,5 @@ body, html, button, body, .material-symbols-outlined
 ### tests/vacancy_filter.test.js (241)
 - —
 
-### tests/wizard.test.js (163)
+### tests/wizard.test.js (194)
 - —

@@ -27,7 +27,7 @@ from client.bridge.wire import (
     _hr_mini_row_to_dict,
     _vacancy_mini_row_to_dict,
 )
-from client.form_payloads import read_company_spellings, read_new_company_fields
+from client.bridge.form_payloads import read_company_spellings, read_new_company_fields
 
 
 async def create_company_row(session, fields: dict, **echo) -> int:

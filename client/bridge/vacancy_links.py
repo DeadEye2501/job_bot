@@ -10,7 +10,7 @@ from client.bridge.companies import create_company_row
 from client.bridge.hr import create_hr_row
 from client.bridge.refusals import NO_VACANCY
 from client.bridge.pickers import COMPANY_PICKER, HR_PICKER, link_picker
-from client.form_payloads import read_new_company_fields, read_new_hr_fields
+from client.bridge.form_payloads import read_new_company_fields, read_new_hr_fields
 
 
 _CREATING = {

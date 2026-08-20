@@ -8,7 +8,7 @@ import logging
 from adapters.lm_studio import LlmProviderConfig
 from backend.telegram_login import username_of
 from client.bridge.answer import Denied, denied, reply
-from client.bridge.bot_stop import stop_bot
+from client.bridge.bot_stop import detach_bot, stop_bot
 from client.bridge.hub import Hub
 from client.bridge.llm import Llm, read_llm_creds
 from client.bridge.login import Login
@@ -137,12 +137,7 @@ class Settings(Login, Llm):
         мы оставили бы человека уверенным в обратном — и отозвать ключ было бы
         уже нечем, строки сеанса в настройках не осталось бы.
         """
-        bot = self._hub.bot
-        bot_task = self._hub.bot_task
-        # Обнуляем до отправки работы: соседний зов иначе взял бы
-        # полуостановленного бота.
-        self._hub.bot = None
-        self._hub.bot_task = None
+        bot, bot_task = detach_bot(self._hub)
 
         async def run() -> dict:
             await self._hub.login.forget()
@@ -157,21 +152,7 @@ class Settings(Login, Llm):
                     f"Попробуйте ещё раз: {type(e).__name__}: {e}"
                 ) from e
             if bot is None:
-                if self._hub.rs.has_tg_session:
-                    # Сеанс есть, а бота нет: отзывать ключ нечем — для этого
-                    # нужен живой клиент. Стереть настройки сейчас значило бы
-                    # сказать «вышли» там, где сеанс на серверах Telegram жив и
-                    # продолжает читать переписку, а отзывать его стало бы
-                    # нечем: строки сеанса в настройках не осталось бы.
-                    logger.warning("выход без бота при живом сеансе: ключ не отозван")
-                    raise Denied(
-                        "Бот не поднят — отозвать ключ нечем, а без этого сеанс "
-                        "на серверах Telegram останется жив. Дождитесь связи "
-                        "или перезапустите приложение и попробуйте снова."
-                    )
-                # Отзывать было нечего: ни бота, ни сеанса. Настройки стираются —
-                # иначе выйти было бы нельзя вовсе.
-                logger.warning("выход без поднятого бота: отзывать было нечего")
+                _check_logout_without_bot(self._hub.rs.has_tg_session)
             await self._hub.rs.clear_tg()
             self._hub.username_cache = ""
             return {}
@@ -231,13 +212,14 @@ class Settings(Login, Llm):
             applied.append(kind)
         return applied
 
-    async def _apply_app(self, app: dict, applied: list[str]) -> list[str]:
+    async def _apply_app(self, app: dict, applied: list[str]) -> None:
         """Записать пороги отбора, дописывая записанные в общий перечень.
 
         Перечень приходит доводом, а не заводится здесь: записи идут по одной, и
         поломка посреди застаёт часть уже записанной. Свой список умер бы вместе
         с броском, и жалоба зовущего назвала бы только поставщиков — то есть
-        ровно не то, на чём сорвалось.
+        ровно не то, на чём сорвалось. По той же причине он и не возвращается:
+        читать возврат некому — зовущий держит тот же самый список.
         """
         for key, value in app.items():
             if key not in APP_KEYS:
@@ -250,15 +232,29 @@ class Settings(Login, Llm):
                 value = "true" if value else "false"
             await self._hub.rs.set_app(str(key), str(value))
             applied.append(f"app.{key}")
-        if "send_locked" in app:
-            # Запрет отправки сверяется на горячем пути своей копией; без этой
-            # строки новое значение начало бы действовать только после
-            # перезапуска бота.
-            from adapters import telegram as _tg
-            _tg.SEND_LOCKED = self._hub.rs.send_locked
-        return applied
 
 
+
+
+def _check_logout_without_bot(has_session: bool) -> None:
+    """Можно ли стирать учётную запись, когда бота нет вовсе.
+
+    Сеанс есть, а бота нет — отзывать ключ нечем: для этого нужен живой клиент.
+    Стереть настройки сейчас значило бы сказать «вышли» там, где сеанс на
+    серверах Telegram жив и продолжает читать переписку, а отзывать его стало
+    бы нечем: строки сеанса в настройках не осталось бы.
+
+    Нет ни бота, ни сеанса — отзывать было нечего, и настройки стираются:
+    иначе выйти было бы нельзя вовсе.
+    """
+    if has_session:
+        logger.warning("выход без бота при живом сеансе: ключ не отозван")
+        raise Denied(
+            "Бот не поднят — отозвать ключ нечем, а без этого сеанс "
+            "на серверах Telegram останется жив. Дождитесь связи "
+            "или перезапустите приложение и попробуйте снова."
+        )
+    logger.warning("выход без поднятого бота: отзывать было нечего")
 
 
 async def _wait_connected(client) -> None:

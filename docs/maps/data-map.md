@@ -178,6 +178,7 @@
 ### `backend/domain/company_hosts.py`
 
 - `AGGREGATOR_HOSTS` = `frozenset({'t.me', 'telegram.me', 'telegram.org'…`
+- `AGGREGATOR_BRANDS` = `frozenset({'indeed', 'stepstone'})`
 
 ### `backend/domain/dedup.py`
 
@@ -249,6 +250,7 @@
 - `TRASH_SKIP_PREFIX` = `'trash: '`
 - `JUNK_SKIP_PREFIXES` = `набор из 2`
 - `LLM_SKIP_PREFIX` = `'llm: '`
+- `TRUNCATED_SKIP_REASON` = `f'{LLM_SKIP_PREFIX}ответ модели не поместился'`
 
 ### `backend/flows/apply.py`
 
@@ -262,10 +264,6 @@
   - `prior_count: int`
   - `title: str`
   - `channel_ref: str | None`
-
-### `backend/flows/batches.py`
-
-- `logger` = `logging.getLogger(__name__)`
 
 ### `backend/flows/channels.py`
 
@@ -382,6 +380,7 @@
 
 - `ONLY_JSON` = `'Никакого текста вне JSON. Никакого markdown. Ни…`
 - `QUOTE_TRANSLATION` = `str.maketrans({'“': '"', '”': '"', '‘': "'", '’'…`
+- `TRUNCATED_TROUBLE` = `'truncated'`
 
 ### `backend/llm/candidate.py`
 
@@ -433,6 +432,8 @@
 
 ### `backend/llm/fit.py`
 
+- `MAX_FIT_TOKENS` = `1200`
+- `ROOMIER_FIT_TOKENS` = `2400`
 - `logger` = `logging.getLogger(__name__)`
 - `VALIDATE_VACANCY_FIT_PROMPT` = `'Ты валидируешь Telegram-пост о вакансии для кон…`
 
@@ -454,7 +455,7 @@
 
 ### `backend/llm/rules.py`
 
-- `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS))`
+- `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_B…`
 - `GRADE_MARKERS` = `'«junior/стажёр/intern», «middle/мидл», «senior/…`
 - `FORMAT_MARKERS` = `'«remote/удалёнка/удалённо/distributed», «hybrid…`
 - `APPLY_CONTACTS` = `'Telegram (@username, t.me/...), email (jobs@acm…`
@@ -469,6 +470,8 @@
 ### `backend/llm/vacancy.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `MAX_PARSE_TOKENS` = `1200`
+- `ROOMIER_PARSE_TOKENS` = `2400`
 - `PARSE_VACANCY_PROMPT` = `'Ты парсишь пост с вакансией из Telegram-канала …`
 - `_TRAILING_URL_RE` = `re.compile('\\s*(https?://[^\\s)]+|(?:www\\.)?[a…`
 - `_CONTACT_ADDRESS_RE` = `re.compile('\n      [^\\s@]+@[^\\s@]+\\.[a-zA-Z]…`
@@ -859,6 +862,10 @@
 - `BlacklistOutcome` = `Literal['created', 'reactivated', 'already_activ…`
 - `_BLACKLIST_FIELD_UNSET` = `object()`
 
+### `backend/repository/blacklist_marks.py`
+
+- `_ACCOUNT_MARK_PREFIX` = `'user_id:'`
+
 ### `backend/repository/bot_mode.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -1037,6 +1044,8 @@
 ### `client/bridge/desktop.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `_LINK_SCHEMES` = `frozenset({'http', 'https', 'tg'})`
+- `_OPENABLE_SUFFIXES` = `frozenset({'.bmp', '.gif', '.jpeg', '.jpg', '.pn…`
 
 ### `client/bridge/events.py`
 
@@ -1120,6 +1129,10 @@
 - `PROFILE_FIRST` = `'Сначала сохраните профайл (CV-таб).'`
 - `BUSY_CYCLE` = `'Уже идёт другой цикл, попробуйте позже.'`
 - `WIPE_FILES_BUSY` = `'Файлы открыты в другом процессе и не могут быть…`
+- `LINK_SCHEME_UNKNOWN` = `'Такие ссылки приложение не открывает.'`
+- `ATTACHMENT_MISSING` = `'Вложение не найдено.'`
+- `ATTACHMENT_NOT_OPENABLE` = `'Такие вложения приложение не открывает: файл мо…`
+- `ATTACHMENT_NOT_OPENED` = `'Не удалось открыть вложение.'`
 - `LOGS_TOO_OFTEN` = `'Журнал спрашивают не чаще раза в секунду.'`
 - `RUN_REFUSALS` = `словарь из 3`
 - `POLL_REFUSALS` = `словарь из 5`
@@ -1170,7 +1183,9 @@
 
 ### `client/serving.py`
 
+- `logger` = `logging.getLogger(__name__)`
 - `_NOT_FOUND` = `b'not found'`
+- `MEDIA_PREFIX` = `'/media/'`
 - `_OWN_TYPES` = `словарь из 7`
 
 ### `client/window.py`

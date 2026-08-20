@@ -6,6 +6,7 @@
 """
 
 import asyncio
+import logging
 import time
 
 import httpx
@@ -167,6 +168,25 @@ async def test_a_broken_listing_answers_instead_of_raising(api, ask, provider_sa
 
     assert answer["fail"] == "denied"
     assert answer["kind"] == "chat"
+
+
+async def test_a_broken_listing_leaves_its_trace_in_the_log(api, ask, provider_says, caplog):
+    """Сорвавшийся опрос имён оставляет в журнале трассировку, а не только текст.
+
+    Человеку в плашку едет короткая фраза, и по ней не отличить неподнятого
+    поставщика от оборванной сети или чужого ответа. Разбирать это можно
+    только по журналу — другого следа у этой беды не остаётся вовсе.
+    """
+    provider_says({MODELS: httpx.ConnectError("соединение отклонено")})
+
+    with caplog.at_level(logging.WARNING):
+        await ask(
+            api.settings.list_models,
+            {"kind": "chat", "base_url": "http://provider.test"},
+        )
+
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "соединение отклонено" in caplog.text
 
 
 async def test_a_listing_from_a_bad_address_is_refused_with_its_kind(api, ask):

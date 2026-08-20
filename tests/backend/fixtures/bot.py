@@ -21,6 +21,7 @@ from backend.models import (
 from backend.runtime_settings import RuntimeSettings
 from tests.dbio import only_row, put
 from tests.factories import (
+    app_setting_row,
     hr_row,
     llm_config_row,
     message_row,
@@ -91,10 +92,15 @@ def make_bot(session_factory, monkeypatch):
     и умеют закрываться. По адресу видно, какая досталась чату, а какая
     векторам; по закрытию — что остановка их не забыла.
 
-    Симуляция отправки включается прямо здесь, записью в настройки. Стенд
-    заперт двумя слоями (`tests/conftest.py`), и второй из них — `SEND_LOCKED` —
-    подъём бота переписывает из этой настройки: в боевом умолчании симуляция
-    снята, и без записи подъём снимал бы запор с каждого поднятого бота.
+    Симуляция отправки включается прямо здесь, строкой настройки. Стенд заперт
+    двумя слоями (`tests/conftest.py`), и второй из них — `SEND_LOCKED` — подъём
+    бота переписывает из этой настройки: в боевом умолчании симуляция снята, и
+    без записи подъём снимал бы запор с каждого поднятого бота.
+
+    Строка кладётся в базу до чтения настроек, а не пишется `set_app`: запись
+    зеркалит настройку в `telegram.SEND_LOCKED` тут же, и снятый признак
+    (`sending_unlocked`) она бы затёрла — тесты настоящей отправки не
+    исполняли бы ни одной своей ветки.
     """
 
     async def build(client=None, *, embed_url="http://provider.test") -> Bot:
@@ -103,9 +109,9 @@ def make_bot(session_factory, monkeypatch):
             tg_account_row(api_hash_encrypted=encrypt_str("шифр")),
             llm_config_row(LlmConfigKind.CHAT),
             llm_config_row(LlmConfigKind.EMBED, base_url=embed_url),
+            app_setting_row("send_locked", "true"),
         )
         settings = await RuntimeSettings.load(session_factory)
-        await settings.set_app("send_locked", "true")
         telegram_client = client if client is not None else FakeTelegramClient()
         monkeypatch.setattr(
             "adapters.telegram.make_client", lambda tg: telegram_client

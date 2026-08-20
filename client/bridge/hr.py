@@ -18,7 +18,7 @@ from client.bridge.page import read_page
 from client.bridge.pickers import HR_PICKER, merge_picker
 from client.bridge.refusals import IDENTITY_REQUIRED, NOTHING_TO_UPDATE, NO_HR
 from client.bridge.wire import _hr_picker_row_to_dict, _vacancy_mini_row_to_dict
-from client.form_payloads import hr_is_identified, read_new_hr_fields
+from client.bridge.form_payloads import hr_is_identified, read_new_hr_fields
 
 
 async def create_hr_row(session, fields: dict, **echo) -> int:

@@ -1,10 +1,12 @@
-"""Следствия обращения к оболочке: чем открывают ссылку из карточки.
+"""Следствия обращения к оболочке: что окно отдаёт системе, а что нет.
 
 Предмет один — дошло ли до оболочки то, что просили, и не ушло ли к ней
-лишнее. Копирование в буфер сюда больше не входит: оно было написано на Qt, а
-страница кладёт текст в буфер сама.
+лишнее. Дорог наружу две, и заслоны у них разные: у ссылки разбирается схема,
+у вложения — расширение и то, лежит ли оно в каталоге медиа. Копирование в
+буфер сюда больше не входит: оно было написано на Qt, а страница кладёт текст
+в буфер сама.
 
-Два нижних сторожа исполняют само тело `open_in_system`, а не подменяют его у
+Два сторожа в конце исполняют само тело `open_in_system`, а не подменяют его у
 зовущего. До них тело не исполнялось ни одним тестом — а это ровно та функция,
 которую ревью А2.4 нашло написанной неверно. Красной фазы у них не было:
 дописаны по находке, доверие заслужат итоговым проходом.
@@ -15,6 +17,7 @@ import logging
 import pytest
 
 from client.bridge.desktop import open_in_system
+from client.serving import MEDIA_PREFIX
 
 
 @pytest.fixture
@@ -26,6 +29,19 @@ def opened(monkeypatch) -> list:
         lambda target: addresses.append(target) or True,
     )
     return addresses
+
+
+@pytest.fixture
+def media(monkeypatch, tmp_path):
+    """Каталог медиа на время теста: вложения ищут файл именно в нём.
+
+    Своим подкаталогом, а не самим `tmp_path`: заслон проверяется тем, что
+    выше каталога есть куда уйти и там лежит настоящий файл.
+    """
+    inside_tmp = tmp_path / "медиа"
+    inside_tmp.mkdir()
+    monkeypatch.setattr("backend.bot.media.MEDIA_DIR", inside_tmp)
+    return inside_tmp
 
 
 async def test_an_address_reaches_the_shell_as_it_was_given(api, ask, opened):
@@ -48,6 +64,95 @@ async def test_an_empty_address_is_not_opened_at_all(api, ask, opened):
     решил бы, что приложение сломалось.
     """
     answer = await ask(api.system.open_url, "")
+
+    assert answer["fail"] == "denied"
+    assert opened == []
+
+
+async def test_a_link_of_a_stranger_scheme_is_not_handed_over(api, ask, opened):
+    """Ссылка чужой схемы системе не отдаётся вовсе.
+
+    Схема решает, чем система откроет ссылку, и `file:` открывает не браузер,
+    а то, на что путь указывает: строка из карточки, набранная кем угодно,
+    запустила бы программу с диска одним нажатием на «Открыть сайт».
+    """
+    answer = await ask(api.system.open_url, "file:///C:/Windows/system32/calc.exe")
+
+    assert answer["fail"] == "denied"
+    assert opened == []
+
+
+async def test_a_telegram_link_opens(api, ask, opened):
+    """Ссылка в само приложение Telegram открывается тоже.
+
+    Схема у неё не `http`, и заслон, знающий только про браузерные, отбил бы
+    её вместе с чужими.
+    """
+    answer = await ask(api.system.open_url, "tg://resolve?domain=ivanov")
+
+    assert "ok" in answer
+    assert opened == ["tg://resolve?domain=ivanov"]
+
+
+async def test_an_attachment_that_is_a_program_is_not_opened(api, ask, opened, media):
+    """Вложение, оказавшееся программой, не открывается.
+
+    Имя файла называет собеседник, и «Оферта.pdf.exe» в списке писем выглядит
+    документом: род вложения у него «документ», значок тот же. Отдай мы его
+    системе — по нажатию на обычную кнопку исполнилась бы присланная чужим
+    человеком программа.
+    """
+    (media / "1").mkdir()
+    (media / "1" / "42.exe").write_bytes(b"MZ")
+
+    answer = await ask(api.system.open_attachment, f"{MEDIA_PREFIX}1/42.exe")
+
+    assert answer["fail"] == "denied"
+    assert opened == []
+
+
+async def test_a_document_attachment_opens(api, ask, opened, media):
+    """Присланный документ открывается тем, чем его открывает система.
+
+    Ради этого кнопка и нарисована: резюме, оферту и описание вакансии человек
+    читает не в переписке, а в своей программе для документов.
+    """
+    (media / "1").mkdir()
+    (media / "1" / "42.pdf").write_bytes(b"%PDF-1.4")
+
+    answer = await ask(api.system.open_attachment, f"{MEDIA_PREFIX}1/42.pdf")
+
+    assert "ok" in answer
+    assert opened == [str(media / "1" / "42.pdf")]
+
+
+async def test_an_attachment_outside_the_media_folder_is_not_opened(
+    api, ask, opened, media, tmp_path
+):
+    """Путь, ведущий выше каталога медиа, наружу не выпускают.
+
+    Адрес вложения приезжает от окна обратно, и приведи его кто-нибудь к
+    «..» — открылся бы любой файл с диска.
+
+    Файл по этому пути настоящий, читаемый и с безобидным расширением: не будь
+    заслона, он бы и открылся. Лежит он вне каталога медиа нарочно — положенный
+    внутрь, он сделал бы тест зелёным по ветке «такого файла нет».
+    """
+    (tmp_path / "секрет.pdf").write_bytes(b"%PDF-1.4")
+
+    answer = await ask(api.system.open_attachment, f"{MEDIA_PREFIX}1/../../секрет.pdf")
+
+    assert answer["fail"] == "denied"
+    assert opened == []
+
+
+async def test_a_missing_attachment_is_named_missing(api, ask, opened, media):
+    """Вложения, которого нет на диске, не выдают за открытое.
+
+    Скачивает бот не всё, а строка о письме остаётся: ответь мост «открыли»,
+    человек ждал бы окна, которого не будет.
+    """
+    answer = await ask(api.system.open_attachment, f"{MEDIA_PREFIX}1/42.pdf")
 
     assert answer["fail"] == "denied"
     assert opened == []

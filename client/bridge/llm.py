@@ -52,6 +52,10 @@ async def _do_list_models_for_creds(
         models = await lm_models.list_models(client, kind=kind)
         return {"ok": True, "models": models}
     except Exception as e:
+        # Человеку в плашку едет короткая фраза, и по ней не отличить
+        # неподнятого поставщика от оборванной сети или чужого ответа. След
+        # остаётся только здесь: дальше беда уходит исходом, а не броском.
+        logger.exception("не вышло спросить имена моделей у %s", base_url)
         # httpx иногда сериализует request включая Authorization-header
         # в repr exception'а. Прогоняем через root-logger SecretRedaction-
         # Filter руками — он висит на root, но мы тут просто текст
@@ -100,17 +104,13 @@ def read_llm_creds(payload: dict) -> LlmProviderConfig:
     на модель, — и одна и та же форма принималась по-разному в зависимости от
     того, откуда её открыли.
 
-    Хвостовая косая у адреса срезается: человек копирует адрес из браузера
-    вместе с ней, а склейка пути дала бы двойную.
-
     Пустой адрес или пустое имя модели роняет `ValueError`: сохранённая
     пустота выглядит как настроенный поставщик, и беду ищут потом где угодно,
     только не здесь.
     """
     if not isinstance(payload, dict):
         raise ValueError(LLM_FIELDS_REQUIRED)
-    base_url = str(payload.get("base_url") or "").strip().rstrip("/")
-    api_key = str(payload.get("api_key") or "")
+    base_url, api_key = _provider_address(payload)
     model = str(payload.get("model") or "").strip()
     if not base_url or not model:
         raise ValueError(LLM_FIELDS_REQUIRED)
@@ -120,8 +120,20 @@ def read_llm_creds(payload: dict) -> LlmProviderConfig:
 def read_models_ask(payload) -> tuple[str, str, str]:
     """О чём спрашивают поставщика: род, адрес и ключ."""
     payload = payload if isinstance(payload, dict) else {}
+    return (str(payload.get("kind") or ""), *_provider_address(payload))
+
+
+def _provider_address(payload: dict) -> tuple[str, str]:
+    """Адрес поставщика и ключ доступа, приведённые к записи.
+
+    Хвостовая косая у адреса срезается: человек копирует адрес из браузера
+    вместе с ней, а склейка пути дала бы двойную.
+
+    Одним объявлением на обоих, кто это читает, — на запись поставщика и на
+    опрос имён. Разъедься приведение, один и тот же набранный адрес принимался
+    бы по-разному в зависимости от того, в каком поле его набрали.
+    """
     return (
-        str(payload.get("kind") or ""),
         str(payload.get("base_url") or "").strip().rstrip("/"),
         str(payload.get("api_key") or ""),
     )

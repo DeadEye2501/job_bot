@@ -1,34 +1,68 @@
-"""Картинка в виде адреса, который разметка вставит в `src`."""
+"""Вложение письма, каким его видит окно: адрес разметки и файл за адресом."""
 
 from __future__ import annotations
 
 import base64
 from pathlib import Path
 
+from client.serving import MEDIA_PREFIX, inside
+
 
 def _media_url(stored_path: str | None) -> str | None:
-    """Convert the ``message.media_path`` column into a ``file://`` URL the
-    SPA can render. New rows hold a posix path relative to ``MEDIA_DIR``
-    (e.g. ``"1/42.jpg"``); legacy rows from earlier sessions may hold an
-    absolute path or a project-relative one — `is_absolute` + the bot's
-    `MEDIA_DIR` cover both.
+    """Адрес, по которому окно получит вложение у своей же раздачи.
+
+    В колонке лежит путь внутри каталога медиа (`"1/42.jpg"`) — про сам каталог
+    окно не знает вовсе. Адрес нужен http'шный: страница отдана по http, и
+    подресурс с `file://` Chromium не загружает по правилам происхождения —
+    в ленте на месте снимка остаётся пустота, а отказ виден только в консоли.
+
+    Путь, ведущий вне каталога медиа, адреса не получает: раздать такой нечем,
+    заслон его не выпустит. Показать «нет адреса» окно уже умеет — так же, как
+    нескачанное вложение. Класть туда такие пути перестали: сегодня в колонку
+    идёт только путь внутри каталога.
     """
     if not stored_path:
         return None
+    relative = _under_media(stored_path)
+    if relative is None:
+        return None
+    return MEDIA_PREFIX + relative
+
+
+def media_file(url: str) -> Path | None:
+    """Файл на диске, стоящий за адресом вложения, или пусто.
+
+    Обратная дорога того же адреса: окно возвращает его, прося открыть
+    вложение системой, а системе нужен путь. Заслон здесь тот же, что у
+    раздачи, и нужен по той же причине — адрес приезжает снаружи.
+    """
+    if not isinstance(url, str) or not url.startswith(MEDIA_PREFIX):
+        return None
     from backend.bot.media import MEDIA_DIR
-    p = Path(stored_path)
-    if not p.is_absolute():
-        p = (MEDIA_DIR / p).resolve()
-    return p.as_uri()
+    return inside(MEDIA_DIR.resolve(), url[len(MEDIA_PREFIX):])
+
+
+def _under_media(stored_path: str) -> str | None:
+    """Путь из колонки, приведённый к пути внутри каталога медиа.
+
+    Приводит обе записи разом: относительную, какую пишут сегодня, и
+    оставшуюся от прежних заходов абсолютную. Дальше каталога она не пускает —
+    и заодно отвечает на «..», сложись он в колонке как угодно.
+    """
+    from backend.bot.media import MEDIA_DIR
+    root = MEDIA_DIR.resolve()
+    path = Path(stored_path)
+    full = path.resolve() if path.is_absolute() else (root / path).resolve()
+    if root not in full.parents:
+        return None
+    return full.relative_to(root).as_posix()
 
 
 def _avatar_data_url(blob: bytes | None) -> str | None:
-    """Encode raw avatar bytes (Telegram delivers JPEGs) as a data URL.
+    """Снимок учётной записи, вшитый в сам ответ.
 
-    The frontend embeds these directly in <img src=...> so we ship them
-    inline with the list/detail payload — Telegram small-file avatars are
-    a few KB each, so the JSON bloat is negligible vs a separate per-row
-    fetch round-trip.
+    Аватарки Telegram весят по нескольку килобайт, и вшитые в список они
+    обходятся дешевле, чем отдельный запрос на каждую строку.
     """
     if not blob:
         return None

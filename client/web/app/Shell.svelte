@@ -316,7 +316,12 @@
 {#if setup === null}
   <div class="placeholder-content">Загрузка…</div>
 {:else if !setup.wizard_completed}
-  <WizardScreen {ask} {say} ondone={() => (setup = { ...setup, wizard_completed: true })} />
+  <WizardScreen
+    {ask}
+    {say}
+    completed={setup.completed}
+    ondone={() => (setup = { ...setup, wizard_completed: true })}
+  />
 {:else}
 <div class="app-frame" class:sidebar-expanded={expanded}>
   <aside class="sidebar">
