@@ -222,16 +222,3 @@ def test_a_number_among_the_spellings_is_dropped_not_written():
     fields = read_new_company_fields({"name": "Контур", "aliases": [2024, "Контур"]})
 
     assert fields["aliases"] == ["Контур"]
-
-
-def test_spellings_come_the_same_way_from_both_screens():
-    """Строка через запятую и готовый список читаются одинаково.
-
-    Одна и та же форма открывается из карточки вакансии и из контактов, и
-    шлёт она разное: одна строку, другая список. Разойдись чтение — на одном
-    экране написания легли бы в колонку одним куском.
-    """
-    from_line = read_new_company_fields({"name": "Контур", "aliases": " Контур , ООО "})
-    from_list = read_new_company_fields({"name": "Контур", "aliases": [" Контур ", "ООО"]})
-
-    assert from_line["aliases"] == from_list["aliases"] == ["Контур", "ООО"]

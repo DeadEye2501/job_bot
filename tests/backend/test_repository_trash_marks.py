@@ -23,14 +23,40 @@ async def _noted(session, channel_id: int, msg_id: int, reason: str) -> None:
 
 
 async def test_the_same_post_is_not_noted_twice(session, session_factory):
-    """Второй разбор того же поста второй отметки не заводит."""
+    """Второй разбор того же поста второй отметки не заводит.
+
+    Считаются строки, а не читается первая: утверждение о первой истинно и
+    при двух, а вторая — это ровно та прибавка к «сколько мусора прислал
+    канал», ради которой сверка и стоит.
+    """
     await put(session_factory, channel_row(username="noisy"))
     channel = await only_row(session_factory, TelegramChannel)
 
     await _noted(session, channel.id, 7, "реклама")
     await _noted(session, channel.id, 7, "реклама")
 
-    assert (await only_row(session_factory, TrashEvent)).source_msg_id == 7
+    noted = await all_rows(session_factory, TrashEvent)
+    assert [row.source_msg_id for row in noted] == [7]
+
+
+async def test_the_same_post_number_in_another_channel_is_noted(
+    session, session_factory
+):
+    """Тот же номер поста в другом канале свою отметку получает.
+
+    Ключ отметки — пара «канал и номер»: номера Telegram раздаёт свои в
+    каждом канале, и сверка по одному номеру глушила бы мусор всех каналов,
+    кроме приславшего этот номер первым.
+    """
+    noisy = channel_row(username="noisy")
+    other = channel_row(username="other")
+    await put(session_factory, noisy, other)
+
+    await _noted(session, noisy.id, 7, "реклама")
+    await _noted(session, other.id, 7, "реклама")
+
+    noted = await all_rows(session_factory, TrashEvent)
+    assert {row.source_channel_id for row in noted} == {noisy.id, other.id}
 
 
 async def test_another_post_of_the_same_channel_is_noted(session, session_factory):

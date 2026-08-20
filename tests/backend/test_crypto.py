@@ -94,12 +94,13 @@ def test_a_key_store_that_cannot_be_probed_does_not_stop_startup(monkeypatch):
     _check_keyring_backend()
 
 
-def test_the_master_key_is_forgotten_with_the_data(memory_keyring):
-    """Главный ключ уходит вместе с данными, а не остаётся в хранилище ОС.
+def test_forgetting_the_key_empties_the_store(memory_keyring):
+    """Забытый главный ключ из хранилища ОС исчезает, а не перезаписывается.
 
-    Им зашифрована строка сеанса Telegram. Переживи он «удалить всё», в
-    хранилище ключей остался бы секрет от данных, которых уже нет, — а человек
-    считает, что стёр всё.
+    Им зашифрована строка сеанса Telegram, и оставшийся после сноса он
+    был бы секретом от данных, которых уже нет. Сама связка со сносом стережётся
+    не здесь, а там, где снос живёт (`tests/client/test_bridge_wipe.py`): здесь
+    зовут только само забывание.
     """
     encrypt_str("строка сеанса")
     assert memory_keyring.store != {}

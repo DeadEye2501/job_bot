@@ -73,6 +73,21 @@ def test_an_edit_of_something_not_remembered_changes_nothing():
     assert [i["text"] for i in bag.bursts.get(7, [])] == ["было"]
 
 
+def test_removing_a_letter_that_is_not_there_changes_nothing():
+    """Удаление того, чего в пачке нет, ничего не меняет и не падает.
+
+    Оповещение об удалении приходит на любое письмо переписки, а ждёт
+    разбора только свежее — чужой человек и чужой номер здесь обычное дело.
+    """
+    bag = DmDebounce(cap=50, slots=2)
+    bag.remember(7, _letter(1, "первое"))
+
+    bag.forget(8, 1)
+    bag.forget(7, 99)
+
+    assert [i["text"] for i in bag.bursts.get(7, [])] == ["первое"]
+
+
 def test_a_deleted_letter_leaves_the_burst():
     """Удалённое письмо выпадает из пачки и в разбор не идёт."""
     bag = DmDebounce(cap=50, slots=2)

@@ -2644,7 +2644,7 @@ Runtime settings layer.
 Тестов: 8
 
 
-### `tests/backend/test_bot_media_paths.py` — 147 строк
+### `tests/backend/test_bot_media_paths.py` — 145 строк
 
 Следствия выбора способа отправки файла и места для скачанного.
 
@@ -2756,7 +2756,7 @@ Runtime settings layer.
 
 - `def _provider(base_url='http://a', api_key='ключ', model='qwen')` (3)
 
-### `tests/backend/test_bot_signals.py` — 153 строк
+### `tests/backend/test_bot_signals.py` — 160 строк
 
 Следствия сигналов, приходящих боту из чужого потока.
 
@@ -2766,7 +2766,7 @@ Runtime settings layer.
 
 - `def closed_loop()` (5)
 
-### `tests/backend/test_crypto.py` — 117 строк
+### `tests/backend/test_crypto.py` — 118 строк
 
 Следствия шифрования секретов в `backend/crypto.py`.
 
@@ -2958,23 +2958,23 @@ Runtime settings layer.
   - `async def reload()` (2)
   - `async def poll(pipeline, channel_id, username, last_id)` (3)
 
-### `tests/backend/test_flows_dm_buffer.py` — 273 строк
+### `tests/backend/test_flows_dm_buffer.py` — 164 строк
 
 Следствия накопления входящих перед разбором ответа HR.
 
 Зависит от: `backend.payloads`
 
-Тестов: 15
+Тестов: 9
 
 - `def _texts(pipeline, hr_id)` (3)
 
-### `tests/backend/test_flows_dm_debounce.py` — 202 строк
+### `tests/backend/test_flows_dm_debounce.py` — 217 строк
 
 Договор копилки отложенного разбора: пачки, таймеры и начавшие.
 
 Зависит от: `backend.flows.dm_debounce`
 
-Тестов: 15
+Тестов: 16
 
 - `def _letter(tg_msg_id: int, text: str) -> dict` (3)
 
@@ -3051,7 +3051,7 @@ Runtime settings layer.
 Тестов: 16
 
 
-### `tests/backend/test_flows_hr_backfill_spawn.py` — 138 строк
+### `tests/backend/test_flows_hr_backfill_spawn.py` — 152 строк
 
 Следствия фонового догона переписки со свежезаведённым HR.
 
@@ -3059,7 +3059,7 @@ Runtime settings layer.
 
 Тестов: 6
 
-- `async def spawning(make_pipeline, session_factory, monkeypatch)` (17)
+- `async def spawning(make_pipeline, session_factory, monkeypatch)` (21)
   - `async def backfill(hr_row_, dm, hooks, **kwargs)` (5)
 
 ### `tests/backend/test_flows_incoming_attribution.py` — 397 строк ⚠ подошёл к 300
@@ -3823,7 +3823,7 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/backend/test_repository_message_unread.py` — 136 строк
+### `tests/backend/test_repository_message_unread.py` — 142 строк
 
 Следствия подсчёта непрочитанных входящих сообщений.
 
@@ -3960,13 +3960,13 @@ Runtime settings layer.
 
 - `async def labels(session, **kwargs) -> list[str]` (4)
 
-### `tests/backend/test_repository_trash_marks.py` — 44 строк
+### `tests/backend/test_repository_trash_marks.py` — 70 строк
 
 Отметки о мусоре: по одной на пост, сколько бы раз его ни разбирали.
 
 Зависит от: `backend.models`, `backend.repository.vacancies_life`, `tests.dbio`, `tests.factories`
 
-Тестов: 2
+Тестов: 3
 
 - `async def _noted(session, channel_id: int, msg_id: int, reason: str) -> None` (8)
 
@@ -4183,16 +4183,18 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/backend/test_wipe.py` — 220 строк
+### `tests/backend/test_wipe.py` — 258 строк
 
 Следствия сноса данных: что остаётся в каталоге после «удалить всё».
 
 Зависит от: `backend.single_instance`, `backend.wipe`, `config`
 
-Тестов: 8
+Тестов: 9
 
 - `def lock_let_go()` (9)
 - `def data_dir(tmp_path, monkeypatch)` (7)
+- `def held_by_someone_else(monkeypatch, what: str) -> None` (13)
+  - `def _refuse(*args, **kwargs)` (2)
 
 ### `tests/client/conftest.py` — 210 строк
 
@@ -4465,13 +4467,13 @@ Runtime settings layer.
 Тестов: 8
 
 
-### `tests/client/test_bridge_vacancies.py` — 316 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_vacancies.py` — 302 строк ⚠ подошёл к 300
 
 Следствия слотов вакансий, которым хватает одной базы.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 16
+Тестов: 15
 
 
 ### `tests/client/test_bridge_vacancy_actions.py` — 262 строк
@@ -4495,7 +4497,7 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/client/test_bridge_wipe.py` — 149 строк
+### `tests/client/test_bridge_wipe.py` — 173 строк
 
 Следствие удаления всех данных: в каком порядке это происходит.
 
@@ -4503,7 +4505,7 @@ Runtime settings layer.
 
 Тестов: 4
 
-- `def wipe_steps(monkeypatch, hub)` (19)
+- `def wipe_steps(monkeypatch, hub)` (26)
   - `async def _wipe_all(engine) -> list[str]` (3)
 
 ### `tests/client/test_bridge_wire.py` — 28 строк
@@ -4524,13 +4526,13 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/client/test_form_payloads.py` — 237 строк
+### `tests/client/test_form_payloads.py` — 224 строк
 
 Следствия чтения нагрузок форм «добавить HR» и «добавить компанию».
 
 Зависит от: `backend.repository.companies_card`, `backend.repository.hr_identify`, `client.bridge.form_payloads`
 
-Тестов: 18
+Тестов: 17
 
 
 ### `tests/client/test_front_vocabulary.py` — 87 строк
@@ -4643,7 +4645,7 @@ Runtime settings layer.
 - `async def only_row(session_factory, model)` (4)
 - `async def all_rows(session_factory, model) -> list` (8)
 
-### `tests/factories.py` — 431 строк ⚠ подошёл к 300
+### `tests/factories.py` — 425 строк ⚠ подошёл к 300
 
 Построение объектов, которые тесты подают на вход коду.
 
@@ -4671,7 +4673,7 @@ Runtime settings layer.
 - `def experience_row(profile_id: int, **overrides) -> ProfileExperience` (3)
 - `def blacklist_row(kind: str, value: str, **overrides) -> Blacklist` (5)
 - `def message_row(**overrides) -> Message` (11)
-- `def unread_probe(hr_id: int) -> list[Message]` (26)
+- `def unread_probe(hr_id: int) -> list[Message]` (20)
 - `def unread_probe_with_a_neighbour(hr_id: int, other_hr_id: int) -> list[Message]` (13)
 - `def channel_marks() -> list[Blacklist]` (13)
 - `def marked_channels() -> list[TelegramChannel]` (15)

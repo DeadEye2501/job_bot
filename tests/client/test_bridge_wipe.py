@@ -22,6 +22,11 @@ def wipe_steps(monkeypatch, hub):
     Снос и выход подменены оба: первый снёс бы базу, на которой стоит весь
     прогон, второй убил бы сам прогон. Каждый шаг называет себя и говорит,
     отвязан ли к этому мигу бот.
+
+    Забывание ключа тоже шаг, а не пустышка: подменённое пустышкой, оно
+    пропало бы из наблюдаемого целиком, и строку `forget_master_key()` можно
+    было бы снять при зелёном наборе — мастер-ключ Fernet пережил бы
+    «удалить всё» и остался в хранилище системы.
     """
     steps: list[tuple] = []
 
@@ -30,7 +35,9 @@ def wipe_steps(monkeypatch, hub):
         return []
 
     monkeypatch.setattr("client.bridge.wipe.wipe_all", _wipe_all)
-    monkeypatch.setattr("client.bridge.wipe.forget_master_key", lambda: None)
+    monkeypatch.setattr(
+        "client.bridge.wipe.forget_master_key", lambda: steps.append(("ключ", hub.bot))
+    )
     monkeypatch.setattr(
         "client.bridge.wipe._leave_later", lambda: steps.append(("выход", hub.bot))
     )
@@ -95,22 +102,39 @@ async def test_the_refusal_says_one_phrase_instead_of_the_system_troubles(
 
 
 async def test_the_answer_is_ready_before_the_bot_and_the_data_are_gone(
-    api, ask, with_bot, wipe_steps
+    api, ask, hub, wipe_steps, monkeypatch
 ):
-    """Бота отвязывают до удаления, а сторож выхода заводят после него.
+    """Бота останавливают до удаления, а сторож выхода заводят после него.
 
     Бот держит базу открытой: сработай его обход посреди удаления — файл
-    оказался бы занят, и Windows не дала бы его снести. А сторож выхода
-    заводится последним шагом самой работы: заведи его раньше, у возврата, — и
-    он срубил бы процесс посреди наполовину снесённого каталога, потому что
-    возврат случается и по сроку, и по отмене.
+    оказался бы занят, и Windows не дала бы его снести. Поэтому наблюдается
+    сама просьба остановиться, а не только опустевшее поле у хозяйства:
+    отвязать бота мало, отвязанный он продолжает обход.
+
+    Просьба ложится в тот же список, что и остальные шаги, а не в свой у
+    подделки: два списка порознь стерегут каждый своё содержимое и ни один —
+    порядок между ними, и остановка, переставленная за снос, прошла бы
+    зелёной ровно в том тесте, который назван это сторожить.
+
+    Сторож выхода заводится последним шагом самой работы: заведи его раньше,
+    у возврата, — и он срубил бы процесс посреди наполовину снесённого
+    каталога, потому что возврат случается и по сроку, и по отмене.
     """
-    with_bot()
+    bot = UiBot()
+    hub.bot = bot
+    monkeypatch.setattr(
+        bot, "request_stop", lambda: wipe_steps.append(("бот остановлен", hub.bot))
+    )
 
     answer = await ask(api.system.wipe)
 
     assert "ok" in answer
-    assert wipe_steps == [("снос", None), ("выход", None)]
+    assert wipe_steps == [
+        ("бот остановлен", None),
+        ("снос", None),
+        ("ключ", None),
+        ("выход", None),
+    ]
 
 
 async def test_the_bot_is_let_go_before_the_work_is_sent_off(

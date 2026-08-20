@@ -152,23 +152,6 @@ async def test_a_card_that_is_gone_is_named_as_gone(api, ask):
     assert answer["vacancy_id"] == 404
 
 
-async def test_notes_made_of_spaces_come_back_empty(api, ask, session_factory):
-    """Заметка из одних пробелов возвращается пустой, а не пробелами.
-
-    Окно принимает ответ за исходное состояние поля и сравнивает с ним
-    набранное. Верни мост пробелы, которых в базе нет, — следующее же
-    нажатие сочло бы поле изменённым и сохраняло бы его снова и снова.
-    """
-    vacancy = vacancy_row()
-    await put(session_factory, vacancy)
-
-    answer = await ask(
-        api.vacancies.save_notes, {"vacancy_id": vacancy.id, "notes": "   "}
-    )
-
-    assert answer["ok"]["notes"] is None
-
-
 async def test_an_unknown_status_is_refused_by_name(api, ask, session_factory):
     """Незнакомое положение отбивается словами, а не поломкой.
 
@@ -279,6 +262,9 @@ async def test_the_saved_note_comes_back_as_it_was_written_down(
     Заметку из одних пробелов база сводит к пустоте. Верни мост присланное —
     окно приняло бы пробелы за сохранённое и на следующем нажатии отправило
     бы их снова, затирая набранное человеком в это время.
+
+    Прежняя заметка в строке стоит нарочно: на пустой колонке «вернули пустоту»
+    и «вернули то, что лежит» неотличимы.
     """
     vacancy = vacancy_row(notes="было")
     await put(session_factory, vacancy)

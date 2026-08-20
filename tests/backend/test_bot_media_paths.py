@@ -116,13 +116,11 @@ def test_a_document_without_a_name_is_still_a_document():
 def test_the_cache_path_is_derived_from_the_message():
     """Место для скачанного выводится из собеседника и номера сообщения.
 
-    Обработчик входящего и ручная отправка могут скачивать одно и то же
-    одновременно: общий путь сводит их к одному файлу вместо двух осиротевших.
+    Собеседник и номер письма собираются в папку и имя: так двое скачивающих
+    одно и то же вложение — обработчик входящего и ручная отправка —
+    приходят к одному файлу, а не к двум осиротевшим.
     """
-    got = media_cache_path(7, 42, ".jpg")
-
-    assert got == MEDIA_DIR / "7" / "42.jpg"
-    assert media_cache_path(7, 42, ".jpg") == got
+    assert media_cache_path(7, 42, ".jpg") == MEDIA_DIR / "7" / "42.jpg"
 
 
 def test_a_cached_path_is_stored_relative_to_its_folder():
