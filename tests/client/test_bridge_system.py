@@ -5,6 +5,8 @@
 своими файлами — их открывают нарочно, а это видно постоянно.
 """
 
+import logging
+
 
 async def test_an_unknown_mode_is_refused_by_name(api, ask):
     """Незнакомый режим отбивают, назвав присланное.
@@ -83,3 +85,56 @@ async def test_a_broken_number_does_not_spin_the_page_against_the_bridge(api, as
 
     assert answer["ok"]["missed"] is False
     assert answer["ok"]["events"] == []
+
+
+async def test_a_fresh_page_is_not_told_what_happened_before_it(api, ask, hub):
+    """Страница, спросившая впервые, случившегося до себя не получает.
+
+    Номера у неё ещё нет: она только что открылась или перезагрузилась. Отдай
+    ей мост кольцо с начала — окно мигнуло бы плашками часовой давности как
+    свежими: «обход закончен», «письмо пришло», «отклик отправлен» — всё разом
+    и всё уже неправда.
+
+    Очередь закрыта нарочно: живая на пустой вопрос ждёт свои двадцать пять
+    секунд, и сторож жёг бы их на каждом прогоне.
+    """
+    hub.events.add("ingestion_finished")
+    hub.events.add("unread_changed")
+    hub.events.close()
+
+    answer = await ask(api.system.events, None)
+
+    assert answer["ok"]["events"] == []
+    assert answer["ok"]["missed"] is False
+
+
+async def test_a_deferred_model_probe_that_broke_leaves_its_trace(
+    api, ask, runner, monkeypatch, caplog
+):
+    """Сорвавшаяся отложенная проба моделей не пропадает молча.
+
+    Первую пробу лампочка ждёт, а все следующие уходят в сторону — ответа у
+    них не спрашивает никто. Брось такая проба поломку, лампочка показывала бы
+    прошлый ответ до самого закрытия окна, а следа не осталось бы нигде: ни в
+    ответе, ни в журнале.
+    """
+    monkeypatch.setattr("client.bridge.system._MODEL_PROBE_INTERVAL_S", 0.0)
+    await ask(api.system.health)
+
+    def fall(*_args, **_kwargs):
+        raise RuntimeError("поставщик отвалился")
+
+    monkeypatch.setattr("client.bridge.system.health.model_alive", fall)
+
+    with caplog.at_level(logging.ERROR, logger="client.bridge.system"):
+        await ask(api.system.health)
+        await runner.drain()
+
+    # След пришпилен к своему источнику: `any` по всем записям прошёл бы и от
+    # чужой трассировки, случившейся в том же тесте.
+    assert [
+        record.name for record in caplog.records if record.exc_info
+    ] == ["client.bridge.system"]
+    # И к самой беде: без этого сторож был бы зелен от любой трассировки, а
+    # разбирать её человеку придётся именно по тексту броска.
+    assert "поставщик отвалился" in caplog.text

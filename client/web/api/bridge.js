@@ -14,15 +14,13 @@ const READY_WAIT_MS = 1000;
 /** Отказ моста — один на все его роды.
  *
  * Род один нарочно: экран показывает отказы единой плашкой и по роду не
- * ветвится. Различает их фраза, а поля рядом говорят, к какой строке отказ
- * относится, — по ним экран откатывает отметку, поставленную заранее.
+ * ветвится. Различает их фраза — и ничего, кроме неё, отсюда не читают: род и
+ * поля из конверта тут лежали, но не спрашивал их ни один экран.
  */
 export class Refused extends Error {
-  constructor(kind, message, fields) {
+  constructor(message) {
     super(message);
     this.name = 'Refused';
-    this.kind = kind;
-    this.fields = fields;
   }
 }
 
@@ -40,7 +38,7 @@ export function ready() {
   if (surface()) return Promise.resolve();
   return new Promise((done, fail) => {
     const late = setTimeout(
-      () => fail(new Refused('broken', 'Моста в этой странице нет.', {})),
+      () => fail(new Refused('Моста в этой странице нет.')),
       READY_WAIT_MS,
     );
     globalThis.window.addEventListener(
@@ -71,11 +69,8 @@ export async function call(path, ...args) {
   // `TypeError` мимо конверта, и вместо отказа экран получил бы поломку.
   const envelope = answer !== null && typeof answer === 'object' ? answer : {};
   if ('ok' in envelope) return envelope.ok;
-  if ('fail' in envelope) {
-    const { fail, detail, ...fields } = envelope;
-    throw new Refused(fail, detail ?? 'Не получилось.', fields);
-  }
-  throw new Refused('broken', 'Мост ответил непонятным.', { answer });
+  if ('fail' in envelope) throw new Refused(envelope.detail ?? 'Не получилось.');
+  throw new Refused('Мост ответил непонятным.');
 }
 
 function surface() {
@@ -85,7 +80,7 @@ function surface() {
 function reach(path) {
   const method = path.split('.').reduce((where, step) => where?.[step], surface());
   if (typeof method !== 'function') {
-    throw new Refused('broken', `Мост не знает метода ${path}.`, { path });
+    throw new Refused(`Мост не знает метода ${path}.`);
   }
   return method;
 }

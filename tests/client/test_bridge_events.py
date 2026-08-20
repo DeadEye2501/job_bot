@@ -21,8 +21,8 @@ from client.bridge.events import Events
 async def test_what_happened_in_another_thread_reaches_the_waiting_window():
     """Событие, рождённое в чужом потоке, будит ждущего и доезжает целиком.
 
-    Девять сообщений из одиннадцати рождаются в потоке мотора, а спрашивает окно
-    из своего. Не доехав, полоса прогресса замерла бы на месте до конца обхода.
+    Восемь сообщений из десяти рождаются в потоке мотора, а спрашивает окно из
+    своего. Не доехав, полоса прогресса замерла бы на месте до конца обхода.
     """
     events = Events()
     threading.Timer(0.01, events.add, ("progress", {"done": 3})).start()
@@ -50,6 +50,47 @@ async def test_what_happened_before_the_question_is_not_lost():
     answer = await asyncio.wait_for(events.take(after=0, timeout=5), timeout=1)
 
     assert [one["kind"] for one in answer["events"]] == ["ingestion_started"]
+
+
+async def test_a_fresh_page_starts_from_now_and_hears_what_follows():
+    """Спросившая впервые не получает случившегося до себя, но слышит всё после.
+
+    Номера у такой страницы ещё нет: она только что открылась. Отдай ей кольцо
+    с начала — окно мигнуло бы плашками часовой давности как свежими. Но
+    промолчать в ответ на следующее случившееся нельзя тем более: это и есть
+    работа очереди.
+    """
+    events = Events()
+    events.add("ingestion_started")
+    waiting = asyncio.create_task(events.take(after=None, timeout=30))
+    # Даём ждущему дойти до очереди: событие, положенное до этого, попало бы
+    # в первый же снимок, и сторож не отличил бы ожидания от мгновенного ответа.
+    await asyncio.sleep(0.01)
+
+    events.add("unread_changed")
+    answer = await asyncio.wait_for(waiting, timeout=3)
+
+    assert [one["kind"] for one in answer["events"]] == ["unread_changed"]
+
+
+async def test_an_answer_without_news_still_says_where_the_count_stands():
+    """Даже пустой ответ называет нынешний номер очереди.
+
+    По нему страница двигает свою отметку. Не назови мы номер, дождавшаяся
+    тишины страница спросила бы снова «с этого мига» — и всё, что легло между
+    ответом и следующим вопросом, пропало бы молча. Хуже: `missed` при этом
+    сказал бы, что потерь не было, и перечитывать пропущенное было бы некому.
+
+    Пропасть так может `ingestion_started` — и тогда весь обход не будет ни
+    полосы прогресса, ни кнопки «Стоп», а нажатие заведёт второй обход.
+    """
+    events = Events()
+    events.add("ingestion_started")
+
+    answer = await asyncio.wait_for(events.take(after=None, timeout=0.01), timeout=1)
+
+    assert answer["events"] == []
+    assert answer["at"] == 1
 
 
 async def test_a_burst_is_taken_in_one_armful_and_in_order():

@@ -85,33 +85,6 @@ async def test_a_page_says_whether_there_is_more_to_ask_for(
     assert answer["ok"]["has_more"] is True
 
 
-async def test_an_unknown_mode_comes_back_as_replace(api, ask, session_factory):
-    """Незнакомый режим схлопывается в «заменить», а не едет обратно как есть.
-
-    По этому слову окно решает, дописать ли пришедшее к показанному или
-    заменить его. Верни ему опечатку — оно не поймёт, что делать со списком.
-    """
-    await put(session_factory, vacancy_row())
-
-    answer = await ask(api.vacancies.list, {"mode": "как-нибудь"})
-
-    assert answer["ok"]["mode"] == "replace"
-
-
-async def test_a_known_mode_comes_back_untouched(api, ask, session_factory):
-    """Знакомый режим доезжает как есть — иначе догрузка не работала бы вовсе.
-
-    Стоит рядом с проверкой опечатки нарочно: она одна была бы зелена и на
-    мосте, который отвечает «заменить» всегда, — а такой мост стирал бы
-    показанное на каждой подгрузке следующей страницы.
-    """
-    await put(session_factory, vacancy_row())
-
-    answer = await ask(api.vacancies.list, {"mode": "append"})
-
-    assert answer["ok"]["mode"] == "append"
-
-
 async def test_a_filter_that_cannot_be_read_is_dropped_not_refused(
     api, ask, session_factory
 ):

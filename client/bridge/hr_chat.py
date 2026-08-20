@@ -5,10 +5,9 @@ from __future__ import annotations
 import webview
 
 from backend.bot.chat import EMPTY_MESSAGE
-from backend.incoming import int_or_none, moment_or_none
+from backend.incoming import moment_or_none
 from backend.repository import messages as messages_repo
 from client.bridge.answer import Denied, bad_fields, denied, reply
-from client.bridge.page import read_mode
 from client.bridge.refusals import NO_BOT
 from client.bridge.wire import _message_row_to_dict
 
@@ -26,10 +25,9 @@ class HrChat:
     def messages(self, payload: dict) -> dict:
         """Страница переписки с одним человеком.
 
-        Нагрузка: `{"hr_id": int, "before_sent_at"?, "before_id"?: int,
-        "epoch"?: int, "mode"?: "tail"|"older"}`. Умолчание — «свежие»,
-        полсотни последних. «older» просит следующие полсотни от самого
-        старого показанного, чтобы окно дописало их сверху.
+        Нагрузка: `{"hr_id": int, "before_sent_at"?, "before_id"?: int}`.
+        Умолчание — «свежие», полсотни последних; отсечка просит следующие
+        полсотни от самого старого показанного, чтобы окно дописало их сверху.
 
         Отсечка — пара «время и номер», и слать надо обе половины: время у
         писем повторяется, а номера растут не в том же порядке (догон истории
@@ -39,22 +37,20 @@ class HrChat:
         try:
             hr_id = int(payload["hr_id"])
             before_id = payload.get("before_id")
-            mode = read_mode(payload, ("tail", "older"))
-            epoch = int_or_none(payload.get("epoch"))
             if before_id is not None:
                 before_id = int(before_id)
             before_sent_at = moment_or_none(payload.get("before_sent_at"))
         except (ValueError, TypeError, KeyError) as e:
             return bad_fields("messages", e)
 
-        asked = {"hr_id": hr_id, "mode": mode, "epoch": epoch, "before_id": before_id}
+        asked = {"hr_id": hr_id, "before_id": before_id}
         return reply(self._hub.runner, self._paged(asked, before_sent_at))
 
     async def _paged(self, asked: dict, before_sent_at) -> dict:
         """Полсотни писем и эхо того, о чём спрашивали.
 
-        Эхо едет одним словарём: окно сверяет по нему, свой ли ответ пришёл, и
-        разбирать его на четыре довода было бы только длиннее.
+        Эхо едет одним словарём, а не разобранным на доводы: разбирать его
+        было бы только длиннее.
         """
         async with self._hub.session_factory() as session:
             msgs, has_more = await messages_repo.list_messages_for_hr(

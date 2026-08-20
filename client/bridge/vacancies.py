@@ -57,12 +57,9 @@ class Vacancies(VacancyActions, VacancyLinks):
         # испорченная нагрузка не должна отнимать у человека весь список.
         payload = payload if isinstance(payload, dict) else {}
         page = read_page(payload)
-        return reply(
-            self._hub.runner,
-            self._listed(page, read_vacancy_filter(payload, page)),
-        )
+        return reply(self._hub.runner, self._listed(read_vacancy_filter(payload, page)))
 
-    async def _listed(self, page, filters) -> dict:
+    async def _listed(self, filters) -> dict:
         async with self._hub.session_factory() as session:
             rows, has_more = await vacancies_list.list_vacancies(session, filters)
             skills = await skills_repo.list_skills(session)
@@ -77,9 +74,6 @@ class Vacancies(VacancyActions, VacancyLinks):
             ],
             "filter_options": filter_options,
             "has_more": has_more,
-            "mode": page.mode,
-            "offset": page.offset,
-            "epoch": page.epoch,
             "score_threshold": self._hub.rs.scoring_threshold,
         }
 

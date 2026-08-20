@@ -61,18 +61,47 @@ describe('цикл событий', () => {
     expect(heard).toEqual([]);
   });
 
+  it('первый вопрос идёт не с начала кольца, а с пустого места', async () => {
+    // Номера у свежей страницы ещё нет: она только что открылась или
+    // перезагрузилась. Спроси она с нуля — мост отдал бы кольцо целиком, и окно
+    // мигнуло бы плашками часовой давности как свежими: «обход закончен»,
+    // «письмо пришло», «отклик отправлен» — всё разом и всё уже неправда.
+    const bridge = answers({ events: [], missed: false, closed: true });
+    const events = listener(bridge.ask);
+
+    await events.run();
+
+    expect(bridge.asked).toEqual([null]);
+  });
+
   it('второй вопрос идёт после последнего виденного номера', async () => {
     // Не продвинься номер, каждая пачка приезжала бы вечно, и экран
     // перерисовывался бы одним и тем же без остановки.
     const bridge = answers(
-      { events: [news(7, 'unread_changed')], missed: false, closed: false },
-      { events: [], missed: false, closed: true },
+      { at: 7, events: [news(7, 'unread_changed')], missed: false, closed: false },
+      { at: 7, events: [], missed: false, closed: true },
     );
     const events = listener(bridge.ask);
 
     await events.run();
 
-    expect(bridge.asked).toEqual([0, 7]);
+    expect(bridge.asked).toEqual([null, 7]);
+  });
+
+  it('пустой ответ тоже двигает отметку', async () => {
+    // Вопрос ждёт на той стороне до двадцати пяти секунд и возвращается пустым,
+    // если за это время ничего не случилось. Останься отметка пустой, следующий
+    // вопрос снова просил бы «с этого мига» — и всё, что легло между ответом и
+    // вопросом, пропало бы молча, а потери мост бы не объявил.
+    const bridge = answers(
+      { at: 12, events: [], missed: false, closed: false },
+      { at: 12, events: [], missed: false, closed: true },
+    );
+    const events = listener(bridge.ask);
+
+    await events.run();
+
+    expect(bridge.asked).toEqual([null, 12]);
   });
 
   it('закрытая очередь останавливает цикл, а не разгоняет его', async () => {
@@ -83,7 +112,7 @@ describe('цикл событий', () => {
 
     await events.run();
 
-    expect(bridge.asked).toEqual([0]);
+    expect(bridge.asked).toEqual([null]);
   });
 
   it('потеря объявляется отдельно от самих вестей', async () => {
@@ -153,7 +182,7 @@ describe('цикл событий', () => {
 
     await events.run();
 
-    expect(bridge.asked).toEqual([0]);
+    expect(bridge.asked).toEqual([null]);
   });
 
   it('отписавшийся больше не слышит', async () => {

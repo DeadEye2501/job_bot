@@ -1725,7 +1725,7 @@ Runtime settings layer.
 Отдаёт наружу: `Api`, `AsyncRunner`
 
 
-### `client/bridge/answer.py` — 169 строк
+### `client/bridge/answer.py` — 171 строк
 
 Единый конверт ответа окну — от исхода работы до ответа зовущему.
 
@@ -1733,7 +1733,7 @@ Runtime settings layer.
 
 - `class Denied(Exception)` (12)
 - `def denied(reason: str, **extra: Any) -> dict` (8)
-- `def bad_fields(where: str, error: Exception, **extra: Any) -> dict` (18)
+- `def bad_fields(where: str, error: Exception, **extra: Any) -> dict` (20)
 - `def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict` (33)
 - `def launched(hub, work: Callable[[], Coroutine[Any, Any, str]], refusals: dict[str, str], done: str, **started: Any) -> dict` (39)
   - `async def report() -> None` (10)
@@ -1799,19 +1799,19 @@ Runtime settings layer.
   - `def set_all_active(self, payload: dict) -> dict` (26)
     - `async def run() -> dict` (11)
 
-### `client/bridge/channels.py` — 146 строк
+### `client/bridge/channels.py` — 140 строк
 
 Экран «Контакты / Каналы»: список каналов и их карточка.
 
 Зависит от: `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.channel_actions`, `client.bridge.hub`, `client.bridge.media`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.wire`
 
-- `class Channels(ChannelActions)` (123)
-  - `def list(self, payload: dict | None=None) -> dict` (30)
-    - `async def run() -> dict` (16)
+- `class Channels(ChannelActions)` (117)
+  - `def list(self, payload: dict | None=None) -> dict` (28)
+    - `async def run() -> dict` (15)
   - `def detail(self, channel_id: int) -> dict` (33)
     - `async def run() -> dict` (23)
-  - `def vacancies(self, payload: dict) -> dict` (15)
-  - `async def _paged(self, channel_id: int, page: Page) -> dict` (29)
+  - `def vacancies(self, payload: dict) -> dict` (13)
+  - `async def _paged(self, channel_id: int, page: Page) -> dict` (27)
 
 ### `client/bridge/choices.py` — 46 строк
 
@@ -1822,20 +1822,20 @@ Runtime settings layer.
 - `def _filter_set(values, allowed: tuple[str, ...]) -> list[str]` (6)
 - `def _filter_languages(items) -> list[tuple[str, str]]` (31)
 
-### `client/bridge/companies.py` — 344 строк ⚠ подошёл к 300
+### `client/bridge/companies.py` — 335 строк ⚠ подошёл к 300
 
 Компания как запись в контактах: найти, показать, поправить, убрать.
 
 Зависит от: `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.page`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`
 
 - `async def create_company_row(session, fields: dict, **echo) -> int` (25)
-- `class Companies` (285)
-  - `def list(self, payload: dict | None=None) -> dict` (28)
-    - `async def run() -> dict` (13)
+- `class Companies` (276)
+  - `def list(self, payload: dict | None=None) -> dict` (23)
+    - `async def run() -> dict` (10)
   - `def detail(self, company_id: int) -> dict` (24)
     - `async def run() -> dict` (15)
-  - `def vacancies(self, payload: dict) -> dict` (25)
-    - `async def run() -> dict` (10)
+  - `def vacancies(self, payload: dict) -> dict` (21)
+    - `async def run() -> dict` (9)
   - `def people(self, company_id: int) -> dict` (16)
     - `async def run() -> dict` (7)
   - `def merge_picker(self, payload: dict) -> dict` (17)
@@ -1885,17 +1885,17 @@ Runtime settings layer.
   - `def open_url(self, url: str) -> dict` (28)
   - `def open_attachment(self, url: str) -> dict` (23)
 
-### `client/bridge/events.py` — 134 строк
+### `client/bridge/events.py` — 149 строк
 
 Живые события окна: копит случившееся с номерами и отдаёт всё новее названного.
 
 Зависит от: —
 
-- `class Events` (68)
+- `class Events` (83)
   - `def add(self, kind: str, payload: dict | None=None) -> None` (10)
-  - `async def take(self, after: int, timeout: float=WAIT_SECONDS) -> dict` (31)
+  - `async def take(self, after: int | None, timeout: float=WAIT_SECONDS) -> dict` (38)
   - `def close(self) -> None` (6)
-  - `def _since(self, after: int) -> dict` (7)
+  - `def _since(self, after: int) -> dict` (15)
 - `def _wake(waiters: list[tuple[asyncio.AbstractEventLoop, asyncio.Future]]) -> None` (6)
 - `def _finish(waiter: asyncio.Future) -> None` (3)
 
@@ -1911,20 +1911,20 @@ Runtime settings layer.
 - `def hr_is_identified(fields: dict) -> bool` (11)
 - `def read_new_hr_fields(payload: dict) -> dict` (31)
 
-### `client/bridge/hr.py` — 309 строк ⚠ подошёл к 300
+### `client/bridge/hr.py` — 299 строк
 
 Экран «Контакты / HR»: список людей, их карточка и правки в ней.
 
 Зависит от: `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.hr_chat`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.media`, `client.bridge.page`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`
 
 - `async def create_hr_row(session, fields: dict, **echo) -> int` (15)
-- `class Hr(HrChat)` (269)
-  - `def list(self, payload: dict | None=None) -> dict` (33)
-    - `async def run() -> dict` (17)
+- `class Hr(HrChat)` (259)
+  - `def list(self, payload: dict | None=None) -> dict` (28)
+    - `async def run() -> dict` (14)
   - `def detail(self, hr_id: int) -> dict` (27)
     - `async def run() -> dict` (18)
-  - `def vacancies(self, payload: dict) -> dict` (24)
-    - `async def run() -> dict` (8)
+  - `def vacancies(self, payload: dict) -> dict` (19)
+    - `async def run() -> dict` (7)
   - `def merge_picker(self, payload: dict) -> dict` (17)
     - `async def run() -> dict` (3)
   - `def merge(self, payload: dict) -> dict` (32)
@@ -1940,14 +1940,14 @@ Runtime settings layer.
   - `def create(self, payload: dict) -> dict` (20)
     - `async def run() -> dict` (4)
 
-### `client/bridge/hr_chat.py` — 164 строк
+### `client/bridge/hr_chat.py` — 160 строк
 
 Переписка с человеком: страница сообщений, отправка, прочтение.
 
-Зависит от: `backend.bot.chat`, `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.bot.chat`, `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.refusals`, `client.bridge.wire`
 
-- `class HrChat` (149)
-  - `def messages(self, payload: dict) -> dict` (26)
+- `class HrChat` (146)
+  - `def messages(self, payload: dict) -> dict` (23)
   - `async def _paged(self, asked: dict, before_sent_at) -> dict` (17)
   - `def mark_read(self, hr_id: int) -> dict` (19)
     - `async def run() -> dict` (10)
@@ -1981,7 +1981,7 @@ Runtime settings layer.
     - `async def run() -> dict` (2)
   - `def _push_record(self, entry: dict) -> None` (16)
 
-### `client/bridge/lifespan.py` — 292 строк
+### `client/bridge/lifespan.py` — 295 строк
 
 Жизнь моста при окне: от подъёма хозяйства до его гашения.
 
@@ -1994,7 +1994,7 @@ Runtime settings layer.
 - `def _forget_login(hub: Hub) -> None` (14)
 - `def _start_bot(hub: Hub) -> None` (25)
   - `async def _build_and_run() -> None` (8)
-- `def _tell_the_window(bot, hub: Hub) -> None` (33)
+- `def _tell_the_window(bot, hub: Hub) -> None` (36)
   - `def arrived(hr_id: int) -> None` (3)
 - `def _restart_bot(hub: Hub) -> None` (36)
   - `async def _swap() -> None` (15)
@@ -2057,15 +2057,14 @@ Runtime settings layer.
 - `def _under_media(stored_path: str) -> str | None` (14)
 - `def _avatar_data_url(blob: bytes | None) -> str | None` (9)
 
-### `client/bridge/page.py` — 85 строк
+### `client/bridge/page.py` — 77 строк
 
 Страница списка, прочитанная из нагрузки окна.
 
 Зависит от: `backend.incoming`
 
-- `class Page` (7)
-- `def read_mode(payload: dict, modes: tuple[str, ...]) -> str` (15)
-- `def read_page(payload: dict, *, default_limit: int | None=None, modes: tuple[str, ...]=LIST_MODES) -> Page` (34)
+- `class Page` (5)
+- `def read_page(payload: dict, *, default_limit: int | None=None) -> Page` (32)
 
 ### `client/bridge/payload.py` — 18 строк
 
@@ -2163,13 +2162,13 @@ Runtime settings layer.
   - `def skills(self, period: str) -> dict` (3)
   - `def channels_pipeline(self, period: str) -> dict` (3)
 
-### `client/bridge/system.py` — 276 строк
+### `client/bridge/system.py` — 307 строк ⚠ подошёл к 300
 
 Домен «система»: то, чем страница живёт на любом экране.
 
 Зависит от: `backend`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.refusals`, `client.bridge.wipe`
 
-- `class System(Journal, Wipe, Desktop)` (218)
+- `class System(Journal, Wipe, Desktop)` (219)
   - `def initial(self) -> dict` (16)
     - `async def run() -> dict` (6)
   - `async def _mode(self) -> BotMode` (5)
@@ -2180,7 +2179,7 @@ Runtime settings layer.
     - `async def run() -> dict` (6)
   - `def unread_chats(self) -> dict` (13)
     - `async def run() -> dict` (4)
-  - `def events(self, after) -> dict` (14)
+  - `def events(self, after) -> dict` (15)
   - `def health(self) -> dict` (3)
   - `def unread(self) -> dict` (3)
   - `async def _health(self) -> dict` (18)
@@ -2188,17 +2187,18 @@ Runtime settings layer.
   - `async def _models_alive(self) -> tuple[bool, bool]` (34)
   - `async def _probe_models(self) -> None` (6)
   - `async def _ask_models(self) -> tuple[bool, bool]` (5)
-- `def _after(asked) -> int` (14)
+- `def _probed(task: Future) -> None` (16)
+- `def _after(asked) -> int | None` (21)
 
-### `client/bridge/vacancies.py` — 212 строк
+### `client/bridge/vacancies.py` — 206 строк
 
 Экран «Вакансии»: список, карточка и правки в них.
 
 Зависит от: `backend.domain.scoring`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.hub`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.vacancy_actions`, `client.bridge.vacancy_filter`, `client.bridge.vacancy_links`, `client.bridge.wire`
 
-- `class Vacancies(VacancyActions, VacancyLinks)` (185)
-  - `def list(self, payload: dict | None=None) -> dict` (20)
-  - `async def _listed(self, page, filters) -> dict` (20)
+- `class Vacancies(VacancyActions, VacancyLinks)` (179)
+  - `def list(self, payload: dict | None=None) -> dict` (17)
+  - `async def _listed(self, filters) -> dict` (17)
   - `def detail(self, vacancy_id: int) -> dict` (23)
     - `async def run() -> dict` (13)
   - `def save_notes(self, payload: dict) -> dict` (27)
@@ -2262,11 +2262,11 @@ Runtime settings layer.
 - `def _leave_later() -> None` (9)
 - `def _leave() -> None` (9)
 
-### `client/bridge/wire.py` — 374 строк ⚠ подошёл к 300
+### `client/bridge/wire.py` — 388 строк ⚠ подошёл к 300
 
 Перевод внутренних значений в словари, которые читает окно.
 
-Зависит от: `backend.domain.scoring`, `backend.models`, `client.bridge.media`
+Зависит от: `backend.domain.skill_names`, `backend.models`, `client.bridge.media`
 
 - `def _iso(dt: datetime | None) -> str | None` (17)
 - `def _vacancy_mini_row_to_dict(v) -> dict` (20)
@@ -2277,9 +2277,12 @@ Runtime settings layer.
 - `def _exp_to_dict(e) -> dict` (12)
 - `def _stack_items(stack, matched_set: set[str]) -> list[dict]` (8)
 - `def _company_name(v) -> str | None` (12)
-- `def _vacancy_detail_to_dict(detail, matched_set: set[str], score_threshold: int) -> dict` (63)
+- `def _hr_face(hr) -> dict` (13)
+- `def _status_change(row) -> dict` (15)
+- `def _vacancy_event(row) -> dict` (8)
+- `def _vacancy_detail_to_dict(detail, matched_set: set[str], score_threshold: int) -> dict` (39)
 - `def _hr_picker_row_to_dict(item) -> dict` (18)
-- `def _hr_mini_row_to_dict(hr, vacancy_count: int) -> dict` (15)
+- `def _hr_mini_row_to_dict(hr, vacancy_count: int) -> dict` (11)
 - `def _message_row_to_dict(m) -> dict` (19)
 - `def _blacklist_row_to_dict(row: Blacklist) -> dict` (14)
 - `def _channel_row_to_dict(item) -> dict` (15)
@@ -4309,13 +4312,13 @@ Runtime settings layer.
 Тестов: 8
 
 
-### `tests/client/test_bridge_events.py` — 177 строк
+### `tests/client/test_bridge_events.py` — 218 строк
 
 Следствия очереди живых событий: что узнаёт окно, спросившее «что нового».
 
 Зависит от: `client.bridge.events`
 
-Тестов: 10
+Тестов: 12
 
 
 ### `tests/client/test_bridge_hr.py` — 268 строк
@@ -4346,7 +4349,7 @@ Runtime settings layer.
 
 - `def journal()` (20)
 
-### `tests/client/test_bridge_lifespan.py` — 246 строк
+### `tests/client/test_bridge_lifespan.py` — 249 строк
 
 Следствия подъёма и гашения моста: что окно заводит, открываясь и закрываясь.
 
@@ -4359,13 +4362,13 @@ Runtime settings layer.
   - `def cancel_current_poll(self) -> None` (2)
   - `def request_stop(self) -> None` (2)
 
-### `tests/client/test_bridge_list_payload.py` — 103 строк
+### `tests/client/test_bridge_list_payload.py` — 67 строк
 
 Следствия чтения нагрузки списка — той, что четыре экрана шлют одинаково.
 
 Зависит от: `tests.dbio`, `tests.factories`
 
-Тестов: 5
+Тестов: 3
 
 
 ### `tests/client/test_bridge_llm.py` — 390 строк ⚠ подошёл к 300
@@ -4449,22 +4452,22 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/client/test_bridge_system.py` — 85 строк
+### `tests/client/test_bridge_system.py` — 140 строк
 
 Следствия домена «система»: чем занят бот и что показывает нижняя полоса.
 
 Зависит от: —
 
-Тестов: 6
+Тестов: 8
 
 
-### `tests/client/test_bridge_vacancies.py` — 304 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_vacancies.py` — 277 строк
 
 Следствия слотов вакансий, которым хватает одной базы.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 16
+Тестов: 14
 
 
 ### `tests/client/test_bridge_vacancy_actions.py` — 262 строк
