@@ -4,6 +4,7 @@
 // слова. Ни моста, ни разметки этот файл не знает.
 
 import { fillPercent } from './chosen.js';
+import { matching } from './search.js';
 import { plural } from './words.js';
 
 const NO_CATEGORY = 'Общее';
@@ -32,6 +33,23 @@ export function grouped(skills) {
     groups[seen.get(name)].items.push(skill);
   }
   return groups;
+}
+
+/** Раскладка, в которой остались навыки, попавшие под набранное.
+ *
+ * Пустая категория уходит целиком: подпись без строк под ней читается как
+ * «навык потерян», а не как «здесь не нашлось».
+ *
+ * Просеивание живёт здесь, а не у подборщика: показывать переданное — вся его
+ * работа, а знание о том, чем навыки различают, принадлежит этому файлу.
+ */
+export function groupsMatching(skills, typed) {
+  return grouped(skills)
+    .map((group) => ({
+      name: group.name,
+      items: matching(group.items, typed, (one) => one.name),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 /** Какую долю дорожки залить под этот уровень. */

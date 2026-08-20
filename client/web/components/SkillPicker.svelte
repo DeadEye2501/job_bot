@@ -5,7 +5,7 @@
   // имени и незнакомое отбрасывает молча — человек написал бы «js», а в
   // резюме этого места стек оказался бы пуст.
   import { closeOnClickAway } from '$state/outside.js';
-  import { grouped } from '$state/skills.js';
+  import { groupsMatching } from '$state/skills.js';
 
   import Chip from './Chip.svelte';
   import SearchBox from './SearchBox.svelte';
@@ -23,16 +23,7 @@
   const taken = $derived(new Set(chosen.map((one) => one.toLowerCase())));
   // Навыков в анкете под сотню, и плоским списком имён в них не найтись:
   // категории и уровень — то же, чем человек различает их на своей вкладке.
-  const groups = $derived(
-    grouped(known)
-      .map((group) => ({
-        name: group.name,
-        items: group.items.filter((one) =>
-          one.name.toLowerCase().includes(query.trim().toLowerCase()),
-        ),
-      }))
-      .filter((group) => group.items.length > 0),
-  );
+  const groups = $derived(groupsMatching(known, query));
 
   function toggle() {
     open = !open;

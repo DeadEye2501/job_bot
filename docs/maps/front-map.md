@@ -372,7 +372,7 @@
 - принимает: icon, title, pill, danger, children
 - берёт: ./StatusPill.svelte
 
-### components/SkillPicker.svelte (94)
+### components/SkillPicker.svelte (85)
 - —
 - принимает: chosen, known, onadd, onremove
 - берёт: ./Chip.svelte, ./SearchBox.svelte
@@ -468,7 +468,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 40 файлов
+## state — 41 файлов
 
 ### state/alive.js (32)
 - * Заводит признак жизни экрана.
@@ -486,7 +486,7 @@
 - * Буквы имени на месте снимка. * * Снимок есть не у всех: у заведённых руками его нет вовсе, а пустой кружок * читается как недогрузившаяся картинка. Берутся первое слово и последнее — * имя и фамилия; отчество между ними ничего не различает.
 - отдаёт: initials
 
-### state/blacklist.js (132)
+### state/blacklist.js (126)
 - * Роды строк отсева. Первый — общий: в нём экран открывается. * * Порядок несущий: слова стоят перед предметами, потому что ими отсев и * пользуются чаще всего — по одному слову отсеивается больше объявлений, чем по * всем каналам вместе.
 - отдаёт: BLACKLIST_KINDS, blacklistCounts, blacklistHints, blacklistShown, blockNote, unblockNote, valueField
 
@@ -562,8 +562,8 @@
 - * Сколько строк в странице. Столько же по умолчанию отдаёт мост.
 - отдаёт: PAGE, VACANCY_PAGE, appended, nearBottom, nearTop, refreshLimit
 
-### state/people.js (81)
-- * Как назвать человека в чужой карточке. * * Имя приходит из переписки и бывает пустым, ник есть почти всегда — по нему * человека и узнают в самом Telegram. Нет ни того ни другого (учётная запись * скрыла ник) — остаётся номер: строка должна читаться, а не пустовать.
+### state/people.js (90)
+- * Как назвать человека в чужой карточке. * * Безымянный назван номером: строка должна читаться, а не пустовать.
 - отдаёт: named, personCandidate, personLine, personName, unreadLine
 
 ### state/picker.js (15)
@@ -574,7 +574,7 @@
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
 - отдаёт: GRADES, LANG_LEVELS, WORK_FORMATS, blankProfile, cvNote, fileSize, langRow, named, updatedNote
 
-### state/progress.js (67)
+### state/progress.js (66)
 - * Подпись начатого обхода, о котором ещё ничего не известно. * * Первая весть о ходе приходит не сразу: до неё полосы уже бегут, и подпись под * ними обязана сказать, чем именно бот занят.
 - отдаёт: STARTING, bar, caption, rerunNote
 
@@ -582,19 +582,23 @@
 - * Спросить у поставщика имена его моделей. * * Отказ и пустой перечень — разные ответы, и путать их нельзя: первое значит * «сервер не отозвался», второе — «сервер поднят, но модели в нём нет», и * чинятся они по-разному. Отказ приходит фразой, а не пустотой. * * Имя модели в вопрос не идёт: перечень читается с адреса и ключа, а имя — как * раз то, что в нём ищут.
 - отдаёт: askModels, probeModel
 
+### state/search.js (25)
+- * Что из списка остаётся видно под набранное. * * Пустое набранное оставляет список целым: поле поиска стоит над уже открытым * списком, и до первого знака резать нечего. Одни пробелы — то же самое: их * набирают между словами и стирают последними, и схлопнутый на них список * мигал бы под руками. * * Регистр не различается — человек набирает как придётся, а значения приходят * как записаны. Вхождением, а не началом строки: имена приходят с приставками * («qwen/qwen3-4b», «@ник · компания»), и отбор по началу прятал бы строку от * того, кто набирает её собственное имя. * * `text` называет, где искать: у строки списка полей несколько, и по какому из * них её вспоминают, знает не этот файл, а тот, кто её показывает.
+- отдаёт: matching
+
 ### state/sections.js (33)
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
-### state/settings.js (190)
+### state/settings.js (185)
 - * Чем подписано пустое поле имени модели. * * Пока имён нет, подсказка не обещает списка: перечень читается с адреса и * ключа, и у непóднятого поставщика его не будет вовсе — имя тогда вписывают * руками. Слова общие на настройки и на шаг мастера: одно и то же поле, * подписанное по-разному, читается как два разных.
 - отдаёт: BOUNDS, SCORE_MAX, clampField, credsChanged, idleProbe, loginTrouble, matchingModels, mirrored, modelPlaceholder, nextStep, probePill, sameCreds, scorePercent, sessionPill, sessionText, thresholdState
 
-### state/skills.js (66)
+### state/skills.js (84)
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
-- отдаёт: aliasesAfter, countNote, grouped, levelPercent
+- отдаёт: aliasesAfter, countNote, grouped, groupsMatching, levelPercent
 
-### state/stats.js (260)
+### state/stats.js (261)
 - * Сроки, за которые считают, — от короткого к длинному. * * `delta` — как называется прирост за этот срок. У «всего времени» его нет: * сравнивать не с чем, это и есть всё время.
 - отдаёт: KPI, PERIODS, STATUS_ORDER, convNote, deltaNote, donut, duration, kpiRow, skillRows, skillRowsPerColumn, sliceTarget, statusColumns, statusTotal, weekBars
 
@@ -606,7 +610,7 @@
 - * Адрес, по которому человека или канал открывают в самом Telegram. * * Ник, а не номер учётной записи: по номеру Telegram открывает разговор только * своим клиентом и не всегда, а ник работает и в окне браузера.
 - отдаёт: telegramHref
 
-### state/vacancies.js (172)
+### state/vacancies.js (181)
 - * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
 - отдаёт: SORTS, ago, emptyNote, gradeLabel, remoteLabel, scoreTone, shortAgo, shownStack, sortKey, vacancyLine
 
@@ -618,7 +622,7 @@
 - * Своя запись правится, чужая читается: пояснение бота — след его работы, а не * заметка, и правка стирала бы то, по чему потом разбираются.
 - отдаёт: timelineRows
 
-### state/vacancy_filter.js (192)
+### state/vacancy_filter.js (193)
 - * Грейды объявлены анкетой: значения те же — и туда, и сюда они ездят через * мост, а второе их написание разошлось бы с первым молча.
 - отдаёт: COMPANY_MAX, DATE_PRESETS, GRADE_CHOICES, HR_CHOICES, REMOTE_CHOICES, activeCount, blankFilter, filterPayload, pickNames
 
@@ -1142,7 +1146,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 38 файлов
+## tests — 39 файлов
 
 ### tests/alive.test.js (46)
 - —
@@ -1234,16 +1238,19 @@ body, html, button, body, .material-symbols-outlined
 ### tests/provider.test.js (107)
 - * Отказ моста в том виде, в каком его поднимает обёртка зова.
 
+### tests/search.test.js (49)
+- —
+
 ### tests/settings.test.js (242)
 - —
 
-### tests/skills.test.js (92)
+### tests/skills.test.js (130)
 - —
 
 ### tests/stats.test.js (273)
 - —
 
-### tests/vacancies.test.js (203)
+### tests/vacancies.test.js (215)
 - —
 
 ### tests/vacancy_actions.test.js (117)

@@ -4,6 +4,7 @@
 // Ни моста, ни разметки этот файл не знает.
 
 import { WEEKDAYS } from './calendar.js';
+import { fillPercent } from './chosen.js';
 import { isoDay } from './dates.js';
 import { blankFilter } from './vacancy_filter.js';
 
@@ -92,7 +93,7 @@ export function weekBars(counts, applied = 0) {
     // Ноль над столбцом читается как «писали, но не ответили». Пока не отправлен
     // ни один отклик, правду говорит прочерк.
     note: applied ? count : '—',
-    percent: top ? (count / top) * 100 : 0,
+    percent: top ? fillPercent(count, top) : 0,
   }));
 }
 
@@ -119,7 +120,7 @@ export function skillRows(skills) {
   const inColumn = skillRowsPerColumn(skills);
   return skills.map((one, at) => ({
     ...one,
-    percent: (one.count / top) * 100,
+    percent: fillPercent(one.count, top),
     first: inColumn > 0 && at % inColumn === 0,
   }));
 }
@@ -255,6 +256,6 @@ export function donut(counts) {
   return STATUS_ORDER.filter((name) => counts[name] > 0).map((name) => ({
     name,
     count: counts[name],
-    percent: (counts[name] / total) * 100,
+    percent: fillPercent(counts[name], total),
   }));
 }

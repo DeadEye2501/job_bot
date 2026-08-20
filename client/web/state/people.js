@@ -5,14 +5,10 @@
 
 /** Как назвать человека в чужой карточке.
  *
- * Имя приходит из переписки и бывает пустым, ник есть почти всегда — по нему
- * человека и узнают в самом Telegram. Нет ни того ни другого (учётная запись
- * скрыла ник) — остаётся номер: строка должна читаться, а не пустовать.
+ * Безымянный назван номером: строка должна читаться, а не пустовать.
  */
 export function personName(person) {
-  if (person.name) return person.name;
-  if (person.telegram_username) return `@${person.telegram_username}`;
-  return `Человек #${person.id}`;
+  return nameOrHandle(person.name, person.telegram_username, `Человек #${person.id}`);
 }
 
 /** Чем подписана строка списка непрочитанных переписок.
@@ -28,7 +24,7 @@ export function unreadLine(row) {
   const handle = row.telegram_username ? `@${row.telegram_username}` : '';
   const name = (row.name || '').trim();
   return {
-    name: name || handle || `HR #${row.hr_id}`,
+    name: nameOrHandle(name, row.telegram_username, `HR #${row.hr_id}`),
     sub: name && handle ? handle : '',
   };
 }
@@ -78,4 +74,17 @@ export function personCandidate(person) {
     count: person.vacancy_count,
     blocked: person.is_blacklisted,
   };
+}
+
+/** Цепочка запасных имён: имя, за ним ник, за ним переданное последнее слово.
+ *
+ * Имя приходит из переписки и бывает пустым, ник есть почти всегда — по нему
+ * человека и узнают в самом Telegram. Нет ни того ни другого (учётная запись
+ * скрыла ник) — остаётся то, чем зовёт безымянного место показа: карточка и
+ * список непрочитанных зовут его по-разному.
+ */
+function nameOrHandle(name, username, unnamed) {
+  if (name) return name;
+  if (username) return `@${username}`;
+  return unnamed;
 }

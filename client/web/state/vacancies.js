@@ -89,21 +89,37 @@ export function vacancyLine(vacancy, now) {
   };
 }
 
+/** Общая голова обеих лестниц давности: разбор даты, отбой негодной и ступени
+ *  до суток.
+ *
+ * До суток обе лестницы читаются одинаково — час есть час, — и расходятся они
+ * дальше, где точность начинает стоить знаков. Поэтому голова тут одна, а
+ * пороги и подписи хвоста остаются у той, что их выбирает.
+ *
+ * `missing` — чем назвать отсутствующую дату, `minute` — как подписаны минуты:
+ * в узкой панели то и другое короче. Названные сутки значат, что голова
+ * досчитала до хвоста и слова за него не сказала.
+ */
+function agoHead(iso, now, { missing, minute }) {
+  if (!iso) return { text: missing, days: null };
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return { text: missing, days: null };
+  const minutes = Math.floor(Math.max(0, now.getTime() - at) / 60000);
+  if (minutes < 1) return { text: 'только что', days: null };
+  if (minutes < 60) return { text: `${minutes} ${minute}`, days: null };
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return { text: `${hours} ч`, days: null };
+  return { text: null, days: Math.floor(hours / 24) };
+}
+
 /** Давность словом: от «только что» до месяцев.
  *
  * Точность падает вместе с давностью нарочно: «3 мин» человеку важно, «87 дней»
  * — нет, и месяц он читает быстрее.
  */
 export function ago(iso, now) {
-  if (!iso) return '—';
-  const at = Date.parse(iso);
-  if (Number.isNaN(at)) return '—';
-  const minutes = Math.floor(Math.max(0, now.getTime() - at) / 60000);
-  if (minutes < 1) return 'только что';
-  if (minutes < 60) return `${minutes} мин`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ч`;
-  const days = Math.floor(hours / 24);
+  const { text, days } = agoHead(iso, now, { missing: '—', minute: 'мин' });
+  if (days === null) return text;
   if (days < 7) return `${days} д`;
   const weeks = Math.floor(days / 7);
   if (weeks < 5) return `${weeks} нед`;
@@ -122,15 +138,8 @@ export function ago(iso, now) {
  * названию.
  */
 export function shortAgo(iso, now) {
-  if (!iso) return '';
-  const at = Date.parse(iso);
-  if (Number.isNaN(at)) return '';
-  const minutes = Math.floor(Math.max(0, now.getTime() - at) / 60000);
-  if (minutes < 1) return 'только что';
-  if (minutes < 60) return `${minutes} м`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ч`;
-  const days = Math.floor(hours / 24);
+  const { text, days } = agoHead(iso, now, { missing: '', minute: 'м' });
+  if (days === null) return text;
   if (days < 14) return `${days} д`;
   if (days < 60) return `${Math.floor(days / 7)} нед`;
   if (days < 365) return `${Math.floor(days / 30)} мес`;
