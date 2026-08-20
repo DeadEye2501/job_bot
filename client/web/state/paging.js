@@ -59,7 +59,10 @@ export function appended(shown, page) {
  * остался бы с началом списка. Потолок при этом сильнее: пролиставший тысячу
  * строк получит двести и догрузит остальное сам — ждать тысячу строк на каждую
  * правку поля дороже, чем нажать «показать ещё».
+ *
+ * Страница — довод: у вакансий она своя, и общим числом перечитанный список из
+ * двадцати строк вырос бы вдвое с половиной от одной смены статуса.
  */
-export function refreshLimit(shownCount) {
-  return Math.min(RELOAD_MAX, Math.max(PAGE, shownCount));
+export function refreshLimit(shownCount, page = PAGE) {
+  return Math.min(RELOAD_MAX, Math.max(page, shownCount));
 }

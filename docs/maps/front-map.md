@@ -18,7 +18,7 @@
 - —
 - принимает: ask, say, events
 
-### app/ChannelCard.svelte (302)
+### app/ChannelCard.svelte (303)
 - Легенда под полосой: одиннадцать цветов без подписей не читаются, а подписать отрезки внутри полосы негде.
 - принимает: ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged
 
@@ -50,7 +50,7 @@
 - принимает: ask, say, events, open, onopened, oncompany, onvacancy
 - берёт: ./PersonCard.svelte
 
-### app/PersonCard.svelte (322)
+### app/PersonCard.svelte (323)
 - Своя запись на каждого человека: поле запечатывает номер при заведении, и заводиться заново на каждого его заставляет именно `{#key}` — без него запечатанный номер протухнет.
 - принимает: ask, say, events, personId, oncompany, onvacancy, onclose, onchanged
 - берёт: ./PersonChat.svelte
@@ -59,7 +59,7 @@
 - Строка отправки остаётся на месте и при заслоне, только запертой: пропав, она не сказала бы, почему писать нельзя.
 - принимает: ask, say, card, events, onread
 
-### app/ProfileCv.svelte (212)
+### app/ProfileCv.svelte (215)
 - —
 - принимает: ask
 
@@ -154,7 +154,7 @@
 - —
 - принимает: blocked, close, onblock, onunblock
 
-### components/BlacklistRow.svelte (113)
+### components/BlacklistRow.svelte (121)
 - —
 - принимает: row, onedit, ontoggle, onremove
 
@@ -270,7 +270,7 @@
 - Номер учётной записи — только цифры: на телефоне открывается цифровая раскладка, а мост всё равно приводит его к числу.
 - принимает: draft
 
-### components/NotesField.svelte (64)
+### components/NotesField.svelte (65)
 - —
 - принимает: value, placeholder, delay, limit, owner, save
 
@@ -407,7 +407,7 @@
 - Половины подписи покрашены по-разному: компанию читают первой, а давность — последней, и одинаковый цвет заставлял бы разбирать строку целиком.
 - принимает: vacancy, threshold, selected, onpick
 
-### components/VacancyTimeline.svelte (112)
+### components/VacancyTimeline.svelte (113)
 - —
 - принимает: rows, vacancyId, onsave
 
@@ -419,15 +419,23 @@
 - —
 - принимает: marks, dimmed
 
-## state — 31 файлов
+## state — 36 файлов
 
-### state/attempts.js (38)
-- * Завести свой счёт попыток. * * Заводится он на каждое место, где запросы обгоняют друг друга, — поиск, * прокрутка, переключение вкладок. Общий счётчик на страницу отбрасывал бы * ответы соседнего экрана. * * Отмена не останавливает уже начатую работу — остановить её со страницы * нечем, — а обесценивает её ответ: пришедший последним не считается свежим, * если после него успели спросить заново. * * **Это не про закрытие окна.** Свежим тут считается ровно один запрос, а окно * спрашивает мост вперемешку — здоровье, непрочитанное, режим, — и соседний * ответ такой счёт объявил бы устаревшим. Уход со страницы оболочка сторожит * своим признаком: там гасится всё разом, а не последнее.
+### state/attempts.js (34)
+- * Завести свой счёт попыток. * * Заводится он на каждое место, где запросы обгоняют друг друга, — поиск, * прокрутка, переключение вкладок. Общий счётчик на страницу отбрасывал бы * ответы соседнего экрана. * * Начатую работу счёт не останавливает — остановить её со страницы нечем, — а * обесценивает её ответ: пришедший последним не считается свежим, если после * него успели спросить заново. * * **Это не про закрытие окна.** Свежим тут считается ровно один запрос, а окно * спрашивает мост вперемешку — здоровье, непрочитанное, режим, — и соседний * ответ такой счёт объявил бы устаревшим. Уход со страницы оболочка сторожит * своим признаком: там гасится всё разом, а не последнее.
 - отдаёт: attempts
 
-### state/autosave.js (58)
-- * Заводит отложенную запись поля. * * Пауза считается от последнего знака: запись на каждый знак послала бы мосту * по вопросу на букву, а отсчёт от первого отправлял бы недописанное.
+### state/autosave.js (70)
+- * Заводит отложенную запись поля. * * Пауза считается от последнего знака: запись на каждый знак послала бы мосту * по вопросу на букву, а отсчёт от первого отправлял бы недописанное. * * `save` отвечает, легло ли: ложь означает отказ, и тогда набранное считается * незаписанным — следующая попытка уедет тем же текстом.
 - отдаёт: autosave
+
+### state/avatar.js (19)
+- * Буквы имени на месте снимка. * * Снимок есть не у всех: у заведённых руками его нет вовсе, а пустой кружок * читается как недогрузившаяся картинка. Берутся первое слово и последнее — * имя и фамилия; отчество между ними ничего не различает.
+- отдаёт: initials
+
+### state/blacklist.js (102)
+- * Роды строк отсева. Первый — общий: в нём экран открывается. * * Порядок несущий: слова стоят перед предметами, потому что ими отсев и * пользуются чаще всего — по одному слову отсеивается больше объявлений, чем по * всем каналам вместе.
+- отдаёт: BLACKLIST_KINDS, blacklistCounts, blacklistHints, blacklistShown, valueField
 
 ### state/calendar.js (62)
 - * Дни недели с понедельника. Порядок несущий: по нему считается, в какую * колонку встаёт первое число месяца.
@@ -437,7 +445,11 @@
 - * Три связи карточки: две внутрь и одна в подборщик. * * Пустая связь названа пустотой, а не пропущена: карточка ставит на её место * неподвижную подпись, и разбирать, чего в ответе нет, ей было бы нечем. * * Имя компании без привязки ведёт не в контакты, а в подборщик с этим самым * именем: связи нет, но разбор её узнал — человек нажимает и сразу видит * совпадения, вместо того чтобы набирать то же слово руками.
 - отдаёт: cardLinks
 
-### state/chat.js (108)
+### state/channels.js (91)
+- * Чем подписать канал в списке. * * Название — сверху, ник — под ним: по названию канал узнают, по нику ищут. * Названия у канала может не быть — тогда его место занимает ник, а совсем * безымянный назван номером: показать нечего, но строка должна остаться * нажимаемой.
+- отдаёт: channelName, channelStats, channelToggle, channelsToggle, pollBlock
+
+### state/chat.js (104)
 - * Разложить письма по дням, сохранив их порядок. * * Подпись дня стоит над первым письмом этого дня, а не над каждым: иначе лента * превращается в чересполосицу дат. * * Письмо без времени выпадает вовсе — поставить его некуда, а под чужой * подписью дня оно соврало бы.
 - отдаёт: attachmentKind, byDays, chatTime, sendBlock, tick, unread
 
@@ -449,13 +461,9 @@
 - /i; /** Чем подписать компанию в списке. * * Имя — сверху, сайт и алиасы — под ним: по имени компанию узнают, по * домену различают. Две «Ромашки» с разными сайтами — разные компании, и без * второй строки они неотличимы. * * Имени может не быть — оно приходит из объявления, — и тогда компания названа * номером: показать нечего, но строка должна остаться нажимаемой.
 - отдаёт: companyCandidate, companyLine, siteHref
 
-### state/contacts.js (305)
-- * Роды строк отсева. Первый — общий: в нём экран открывается. * * Порядок несущий: слова стоят перед предметами, потому что ими отсев и * пользуются чаще всего — по одному слову отсеивается больше объявлений, чем по * всем каналам вместе.
-- отдаёт: BLACKLIST_KINDS, blacklistCounts, blacklistHints, blacklistShown, channelName, channelStats, channelToggle, channelsToggle, fresher, initials, linkReady, named, personCandidate, personLine, personName, pollBlock, telegramHref, unreadLine, valueField
-
-### state/dates.js (102)
+### state/dates.js (107)
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
-- отдаёт: asIso, dayOf, isoDay, shortDate, showDate, showStamp, validDate
+- отдаёт: asIso, dayOf, isoDay, padded, shortDate, showDate, showStamp, validDate
 
 ### state/experience.js (32)
 - * Период работы для шапки карточки. * * Месяц и год без дня: места работы различают по месяцам, а день удлиняет * строку вдвое. Открытый конец назван словами — по нему и читают, работает * человек здесь сейчас или нет.
@@ -473,7 +481,7 @@
 - * Чем нажатая клавиша отзовётся в окне: закрытием, подтверждением или ничем. * * Многострочное поле — исключение: в нём Enter переносит строку. Иначе заметку * в два абзаца не набрать, первый же перевод строки отправил бы окно.
 - отдаёт: modalKey, modalPress, opened, saveKey
 
-### state/logs.js (103)
+### state/logs.js (110)
 - * Уровни на пилюлях — от беды к мелочи. Порядок постоянный: по нему человек * метит в нужную пилюлю, не читая подписей. * * `id` — то, что приходит в записи с питона; `tone` — имя цвета; значок * лигатурой шрифта. `CRITICAL` своей пилюли не имеет: его накрывает `ERROR`.
 - отдаёт: AT_FIRST, LEVELS, askDelay, emptyText, levelTone, logTime, mayHide, shown
 
@@ -485,15 +493,23 @@
 - * Ставит сторожа «нажали мимо» и отдаёт его снятие. * * Отдаётся снятие затем, что зовут это из эффекта: он и вернёт его окну. * * Узла может ещё не быть — разметка привязывает его после первого показа, — и * до тех пор мимо не нажимают ни разу: окошка на экране нет.
 - отдаёт: closeOnClickAway
 
-### state/paged_list.svelte.js (119)
+### state/paged_list.svelte.js (123)
 - * Заводит список, читающий себя страницами. * * `ask` — обращение к мосту, `method` — имя метода, `key` — под каким именем * строки лежат в ответе.
 - отдаёт: pagedList
 
-### state/paging.js (65)
+### state/paging.js (68)
 - * Сколько строк в странице. Столько же по умолчанию отдаёт мост.
 - отдаёт: PAGE, VACANCY_PAGE, appended, nearBottom, nearTop, refreshLimit
 
-### state/profile.js (109)
+### state/people.js (81)
+- * Как назвать человека в чужой карточке. * * Имя приходит из переписки и бывает пустым, ник есть почти всегда — по нему * человека и узнают в самом Telegram. Нет ни того ни другого (учётная запись * скрыла ник) — остаётся номер: строка должна читаться, а не пустовать.
+- отдаёт: named, personCandidate, personLine, personName, unreadLine
+
+### state/picker.js (15)
+- * Отперта ли кнопка «Связать». * * Промах мышью по строке списка не должен менять привязку: выбор строки только * помечает её, а связывает отдельная кнопка. Выбор уже привязанного кнопку не * отпирает — нажатие переписало бы связь тем же значением и записало в ленту * перемену, которой не было.
+- отдаёт: linkReady
+
+### state/profile.js (108)
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
 - отдаёт: GRADES, LANG_LEVELS, WORK_FORMATS, blankProfile, cvNote, fileSize, langRow, named, updatedNote
 
@@ -520,6 +536,10 @@
 ### state/statuses.js (13)
 - * Статусы в том порядке, в каком их читают в кольце статистики. * * Значение совпадает с тем, каким статус приходит в строке списка и каким его * принимает смена статуса на мосту; им же покрашена точка рядом.
 - отдаёт: STATUS_CHOICES
+
+### state/telegram.js (14)
+- * Адрес, по которому человека или канал открывают в самом Telegram. * * Ник, а не номер учётной записи: по номеру Telegram открывает разговор только * своим клиентом и не всегда, а ник работает и в окне браузера.
+- отдаёт: telegramHref
 
 ### state/vacancies.js (172)
 - * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
@@ -987,18 +1007,24 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .help, .help strong, .help code, .help ol, .help ol li, .status-row, .status-row .material-symbols-outlined, .status-row[data-tone='ok'], .status-row[data-tone='ok'] .material-symbols-outlined, .status-row[data-tone='err'], .status-row[data-tone='err'] .material-symbols-outlined, .status-row[data-tone='busy'] .material-symbols-outlined, @keyframes wiz-spin, .radio-card, .radio-card:hover, .radio-card.selected, .radio-card.disabled, .radio-card.disabled:hover, .radio-card input, .radio-card.disabled input, .radio-card .rc-title, .radio-card .rc-sub, .file-pick, .file-pick.has-file, .file-pick .material-symbols-outlined, .file-pick .text, .file-pick .text .name, .wiz-window .input, .wiz-window .btn, .wiz-window .btn .material-symbols-outlined, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --accent-hover-soft, --alert-card-bg, --alert-card-border, --alert-text, --bg-primary, --bg-secondary, --bg-tertiary, --border, --err, --info, --info-card-bg, --info-card-border, --ok, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 29 файлов
+## tests — 33 файлов
 
-### tests/attempts.test.js (42)
+### tests/attempts.test.js (32)
 - —
 
-### tests/autosave.test.js (94)
+### tests/autosave.test.js (139)
+- —
+
+### tests/avatar.test.js (27)
+- —
+
+### tests/blacklist.test.js (144)
 - —
 
 ### tests/blacklist_menu_item.test.js (80)
 - * Файлы разметки вместе с содержимым.
 
-### tests/bridge.test.js (135)
+### tests/bridge.test.js (161)
 - —
 
 ### tests/calendar.test.js (50)
@@ -1007,13 +1033,13 @@ body, html, button, body, .material-symbols-outlined
 ### tests/card_links.test.js (37)
 - —
 
+### tests/channels.test.js (151)
+- —
+
 ### tests/chat.test.js (157)
 - —
 
 ### tests/companies.test.js (91)
-- —
-
-### tests/contacts.test.js (471)
 - —
 
 ### tests/dates.test.js (93)
@@ -1034,7 +1060,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/keys.test.js (97)
 - —
 
-### tests/logs.test.js (143)
+### tests/logs.test.js (152)
 - —
 
 ### tests/notes_field.test.js (64)
@@ -1043,13 +1069,19 @@ body, html, button, body, .material-symbols-outlined
 ### tests/outside.test.js (90)
 - * Узел, считающий своими только перечисленные цели.
 
-### tests/paged_list.test.js (108)
+### tests/paged_list.test.js (158)
 - * Подставной мост, отвечающий заготовленным и помнящий, о чём спрашивали.
 
-### tests/paging.test.js (55)
+### tests/paging.test.js (61)
 - —
 
-### tests/profile.test.js (96)
+### tests/people.test.js (141)
+- —
+
+### tests/picker.test.js (25)
+- —
+
+### tests/profile.test.js (103)
 - —
 
 ### tests/settings.test.js (242)

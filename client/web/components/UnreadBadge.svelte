@@ -3,7 +3,7 @@
   //
   // Список открывается над самим счётчиком: до переписки от него один нажим, а
   // не дорога через раздел контактов и поиск по имени.
-  import { unreadLine } from '$state/contacts.js';
+  import { unreadLine } from '$state/people.js';
 
   let { count, open, loading, rows, ontoggle, onpick } = $props();
 </script>

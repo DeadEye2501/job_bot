@@ -27,8 +27,13 @@ export function shortDate(value, now) {
   return at.getFullYear() === now.getFullYear() ? date : `${date} ${at.getFullYear()}`;
 }
 
-// Ведущий ноль. Мост разбирает ISO по знакам, и `2026-8-4` он не прочтёт.
-function padded(number) {
+/** Число двумя знаками, с ведущим нулём.
+ *
+ * Мост разбирает ISO по знакам, и `2026-8-4` он не прочтёт; часы и минуты в
+ * подписях набраны теми же двумя знаками, иначе время прыгало бы в ширину от
+ * записи к записи.
+ */
+export function padded(number) {
   return String(number).padStart(2, '0');
 }
 
@@ -81,7 +86,7 @@ export function showStamp(iso) {
   if (!iso) return '';
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return '';
-  const day = `${at.getFullYear()}-${padded(at.getMonth() + 1)}-${padded(at.getDate())}`;
+  const day = isoDay(at.getFullYear(), at.getMonth() + 1, at.getDate());
   return `${day} ${padded(at.getHours())}:${padded(at.getMinutes())}`;
 }
 
@@ -96,7 +101,7 @@ export function showStamp(iso) {
 export function validDate(text) {
   const iso = asIso(text);
   if (iso === null) return null;
-  const [year, month, day] = iso.split('-').map(Number);
+  const { year, month, day } = dayOf(iso);
   const at = new Date(year, month - 1, day);
   return at.getMonth() + 1 === month && at.getDate() === day;
 }

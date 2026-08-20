@@ -1,6 +1,6 @@
 <script>
   // Строка канала: значок, имя с ником, отсев, счёт вакансий и переключатель.
-  import { channelToggle } from '$state/contacts.js';
+  import { channelToggle } from '$state/channels.js';
 
   import Avatar from './Avatar.svelte';
 

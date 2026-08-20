@@ -3,6 +3,7 @@
 // Чистые функции: ответы моста приходят доводами, наружу уходят строки и доли.
 // Ни моста, ни разметки этот файл не знает.
 
+import { WEEKDAYS } from './calendar.js';
 import { isoDay } from './dates.js';
 import { blankFilter } from './vacancy_filter.js';
 
@@ -35,17 +36,6 @@ export const KPI = [
   { key: 'decline', label: 'Отказов', total: 'decline_total', delta: 'decline_period', tone: 'decline' },
 ];
 
-/** Порядок статусов в кольце — по воронке, а не по тому, как их прислал мост.
- *
- * Кольцо читают по часовой стрелке: «новая → отклик → ответ → …». Придёт
- * ответ в другом порядке — и воронка перестанет быть воронкой. */
-export const STATUS_ORDER = [
-  'New', 'Applied', 'Answered', 'Test', 'Invitation', 'In Progress',
-  'Offer', 'Decline', 'Ghosting', 'Scam', 'Not Fit',
-];
-
-const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-
 // Первый день выходных. Их два, и они последние: по ним низкий столбец читают
 // не как тишину, а как нерабочий день.
 const WEEKEND_FROM = 5;
@@ -55,6 +45,16 @@ const MOVING = ['New', 'Applied', 'Answered', 'Test', 'Invitation', 'In Progress
 
 /** Исходы: отсюда вакансия уже не двигается, — правая колонка. */
 const OVER = ['Offer', 'Decline', 'Ghosting', 'Scam', 'Not Fit'];
+
+/** Порядок статусов в кольце — по воронке, а не по тому, как их прислал мост.
+ *
+ * Кольцо читают по часовой стрелке: «новая → отклик → ответ → …». Придёт
+ * ответ в другом порядке — и воронка перестанет быть воронкой.
+ *
+ * Собран из тех же двух колонок, что показывает карточка: написанный отдельно,
+ * он разошёлся бы с ними молча — новый статус попал бы в кольцо и выпал из
+ * колонок. */
+export const STATUS_ORDER = [...MOVING, ...OVER];
 
 // На сколько колонок разложены навыки в карточке.
 const SKILL_COLUMNS = 3;
@@ -116,7 +116,7 @@ export function statusColumns(counts) {
  */
 export function skillRows(skills) {
   const top = Math.max(1, ...skills.map((one) => one.count));
-  const inColumn = Math.ceil(skills.length / SKILL_COLUMNS);
+  const inColumn = skillRowsPerColumn(skills);
   return skills.map((one, at) => ({
     ...one,
     percent: (one.count / top) * 100,

@@ -82,15 +82,18 @@
   async function save() {
     const sending = sheet();
     // Уехавшее — оно же и «лежит в базе»: без этого уход из нетронутого поля
-    // отправил бы ту же анкету заново.
+    // отправил бы ту же анкету заново. Ставится и здесь, потому что анкету шлёт
+    // не только отсчёт: выбор грейда, формата и языка зовёт запись напрямую.
     saver.known(JSON.stringify(sending));
     try {
       await call('profile.save', sending);
-      if (!alive) return;
+      if (!alive) return false;
       trouble = '';
       await refresh();
+      return true;
     } catch (refusal) {
       if (alive) trouble = refusal.message;
+      return false;
     }
   }
 

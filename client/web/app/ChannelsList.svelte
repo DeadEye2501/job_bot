@@ -7,7 +7,7 @@
   import ChannelRow from '$components/ChannelRow.svelte';
   import SearchBox from '$components/SearchBox.svelte';
   import { attempts } from '$state/attempts.js';
-  import { channelsToggle } from '$state/contacts.js';
+  import { channelsToggle } from '$state/channels.js';
   import { nearBottom } from '$state/paging.js';
 
   import ChannelCard from './ChannelCard.svelte';

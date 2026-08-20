@@ -80,6 +80,51 @@ describe('отложенная запись', () => {
     expect(sent).toEqual([]);
   });
 
+  it('отказ моста записью не считается: набранное уезжает снова', async () => {
+    // Иначе следующая попытка гасится проверкой «это уже лежит в базе», и
+    // заметка пропадает молча: человек уходит из поля, закрывает карточку, а в
+    // базе так ничего и не легло.
+    const sent = [];
+    const notes = autosave({
+      delay: 800,
+      save: (value) => {
+        sent.push(value);
+        return false;
+      },
+    });
+
+    notes.typed('Созвон в пятницу');
+    await vi.advanceTimersByTimeAsync(800);
+    notes.flush();
+
+    expect(sent).toEqual(['Созвон в пятницу', 'Созвон в пятницу']);
+  });
+
+  it('поздний отказ не сбивает пломбу того, что легло после него', async () => {
+    // Записи обгоняют друг друга: пауза отправила первую, уход из поля —
+    // вторую. Верни отказ первой пломбу к тому, что было до неё, — и уже
+    // записанное второй уехало бы на мост третьим разом.
+    const sent = [];
+    let answerFirst;
+    const notes = autosave({
+      delay: 800,
+      save: (value) => {
+        sent.push(value);
+        return sent.length === 1 ? new Promise((resolve) => (answerFirst = resolve)) : true;
+      },
+    });
+
+    notes.typed('Позвонить');
+    await vi.advanceTimersByTimeAsync(800);
+    notes.typed('Позвонить в среду');
+    await vi.advanceTimersByTimeAsync(800);
+    answerFirst(false);
+    await vi.advanceTimersByTimeAsync(0);
+    notes.flush();
+
+    expect(sent).toEqual(['Позвонить', 'Позвонить в среду']);
+  });
+
   it('записанное однажды уезжает снова, если его поправили', () => {
     const { sent, save } = writer();
     const notes = autosave({ delay: 800, save });

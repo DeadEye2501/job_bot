@@ -30,11 +30,12 @@
 
   async function write(typed) {
     const stored = await save(owned, typed);
-    if (stored === null) return;
+    if (stored === null) return false;
     saver.known(stored);
     flashed = true;
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => (flashed = false), FLASH_MS);
+    return true;
   }
 
   // Пришедшее с моста ложится в «что лежит в базе», но не в само поле: карточку

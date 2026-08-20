@@ -10,9 +10,10 @@
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import { attempts } from '$state/attempts.js';
-  import { channelName, channelStats, pollBlock, telegramHref } from '$state/contacts.js';
+  import { channelName, channelStats, pollBlock } from '$state/channels.js';
   import { PAGE, appended, refreshLimit } from '$state/paging.js';
   import { donut } from '$state/stats.js';
+  import { telegramHref } from '$state/telegram.js';
 
   let { ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged } = $props();
 

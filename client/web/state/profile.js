@@ -3,6 +3,8 @@
 // Чистые функции: ответ моста приходит доводом, наружу уходят строки и числа.
 // Ни моста, ни разметки этот файл не знает.
 
+import { showStamp } from './dates.js';
+
 /** Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с
  *  перечнем `backend/domain/taxonomy.py`. */
 export const GRADES = [
@@ -58,11 +60,8 @@ export function cvNote(meta) {
  * понимает, что запись дошла.
  */
 export function updatedNote(iso) {
-  if (!iso) return '—';
-  const at = new Date(iso);
-  const two = (number) => String(number).padStart(2, '0');
-  const date = `${at.getFullYear()}-${two(at.getMonth() + 1)}-${two(at.getDate())}`;
-  return `обновлено ${date} ${two(at.getHours())}:${two(at.getMinutes())}`;
+  const stamp = showStamp(iso);
+  return stamp ? `обновлено ${stamp}` : '—';
 }
 
 /** Строки, у которых есть имя.

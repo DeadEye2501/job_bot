@@ -122,7 +122,7 @@ describe('готовность', () => {
     // будет никогда. Человек должен прочитать, почему пусто, а не внутреннее
     // слово: плашка показывает сообщение и ничего больше.
     vi.useFakeTimers();
-    globalThis.window = { addEventListener: () => {} };
+    globalThis.window = { addEventListener: () => {}, removeEventListener: () => {} };
 
     const waiting = ready().catch((trouble) => trouble);
     await vi.advanceTimersByTimeAsync(2000);
@@ -131,5 +131,31 @@ describe('готовность', () => {
 
     expect(refusal).toBeInstanceOf(Refused);
     expect(refusal.message).toBe('Моста в этой странице нет.');
+  });
+
+  it('несостоявшееся ожидание не оставляет за собой слушателя', async () => {
+    // Снять его больше нечем: события, на котором подписка снимается сама, на
+    // такой странице не будет никогда. Страницу сервера разработки держат
+    // открытой часами, и зов в ней не один.
+    vi.useFakeTimers();
+    const listeners = new Set();
+    let added = 0;
+    globalThis.window = {
+      addEventListener: (name, listener) => {
+        added += 1;
+        listeners.add(listener);
+      },
+      removeEventListener: (name, listener) => listeners.delete(listener),
+    };
+
+    const waiting = ready().catch(() => {});
+    await vi.advanceTimersByTimeAsync(2000);
+    await waiting;
+    vi.useRealTimers();
+
+    // Подписка была: пустота без этой проверки означала бы и «сняли», и «не
+    // подписывались вовсе», а второе тоже сломало бы ожидание моста.
+    expect(added).toBe(1);
+    expect(listeners.size).toBe(0);
   });
 });

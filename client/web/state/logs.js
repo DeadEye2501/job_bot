@@ -3,6 +3,8 @@
 // Чистые функции: записи приходят доводами, наружу уходят строки и списки.
 // Ни моста, ни разметки этот файл не знает.
 
+import { padded } from './dates.js';
+
 /** Уровни на пилюлях — от беды к мелочи. Порядок постоянный: по нему человек
  *  метит в нужную пилюлю, не читая подписей.
  *
@@ -46,9 +48,8 @@ function pillOf(level) {
 export function logTime(epochSec) {
   if (epochSec === null || epochSec === undefined) return '';
   const at = new Date(epochSec * 1000);
-  const two = (number) => String(number).padStart(2, '0');
   const three = String(at.getMilliseconds()).padStart(3, '0');
-  return `${two(at.getHours())}:${two(at.getMinutes())}:${two(at.getSeconds())}.${three}`;
+  return `${padded(at.getHours())}:${padded(at.getMinutes())}:${padded(at.getSeconds())}.${three}`;
 }
 
 /** Каким цветом показать уровень записи.

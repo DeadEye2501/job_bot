@@ -4,7 +4,7 @@
 // списки. «Сегодня» тоже довод — без него эти функции нельзя было бы проверить,
 // не подменяя часы всей странице.
 
-import { shortDate } from './dates.js';
+import { padded, shortDate } from './dates.js';
 
 /** Разложить письма по дням, сохранив их порядок.
  *
@@ -42,7 +42,7 @@ export function attachmentKind(message) {
 /** Часы и минуты письма. Ведущий ноль обязателен: «9:5» читается как сломанное. */
 export function chatTime(sentAt) {
   const at = new Date(sentAt);
-  return `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  return `${padded(at.getHours())}:${padded(at.getMinutes())}`;
 }
 
 /** Дошло ли своё письмо до собеседника.
@@ -101,8 +101,4 @@ function sameDay(one, other) {
     && one.getMonth() === other.getMonth()
     && one.getDate() === other.getDate()
   );
-}
-
-function pad(number) {
-  return String(number).padStart(2, '0');
 }

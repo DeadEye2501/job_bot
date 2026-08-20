@@ -22,6 +22,11 @@ function page(rows, has_more = false) {
   return { hrs: rows, has_more };
 }
 
+/** Прокрутка, доехавшая до низа списка. */
+function atBottom() {
+  return { currentTarget: { scrollTop: 1000, clientHeight: 100, scrollHeight: 1100 } };
+}
+
 describe('список страницами', () => {
   it('первое чтение берёт страницу с начала', async () => {
     const { asked, answer } = bridge([page([{ id: 1 }])]);
@@ -88,6 +93,51 @@ describe('список страницами', () => {
     await list.refresh();
 
     expect(list.rows).toEqual([]);
+  });
+
+  it('догрузка не обесценивает идущий поиск и не дописывает чужих строк', async () => {
+    // Человек набрал поиск и продолжил прокручивать: страница просится от
+    // старого списка, а ответ на поиск уже в пути. Победи догрузка — под
+    // строкой «ivan» лежали бы полсотни посторонних людей, а найденное по
+    // самому поиску отбросилось бы как устаревшее.
+    const strangers = Array.from({ length: 50 }, (_, at) => ({ id: at }));
+    let answerSearch;
+    const { answer } = bridge([
+      page(strangers, true),
+      () => new Promise((resolve) => (answerSearch = resolve)),
+      page([{ id: 900 }], true),
+    ]);
+    const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
+
+    await list.refresh();
+    const searching = list.find('ivan');
+    await list.scrolled(atBottom());
+    answerSearch(page([{ id: 100 }], true));
+    await searching;
+
+    expect(list.rows).toEqual([{ id: 100 }]);
+  });
+
+  it('страница, доехавшая после перечитывания, к новому списку не дописывается', async () => {
+    // Перечитывание кладёт другой список — правленые строки, свежий порядок, —
+    // и дописывать к его хвосту страницу, отсчитанную от прежнего, значит
+    // показать половину списка дважды.
+    const strangers = Array.from({ length: 50 }, (_, at) => ({ id: at }));
+    let answerMore;
+    const { answer } = bridge([
+      page(strangers, true),
+      () => new Promise((resolve) => (answerMore = resolve)),
+      page(strangers.slice(), true),
+    ]);
+    const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
+
+    await list.refresh();
+    const loading = list.scrolled(atBottom());
+    await list.refresh();
+    answerMore(page([{ id: 900 }], true));
+    await loading;
+
+    expect(list.rows.map((one) => one.id)).not.toContain(900);
   });
 
   it('устаревший ответ уступает свежему', async () => {

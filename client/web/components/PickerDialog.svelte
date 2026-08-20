@@ -13,7 +13,7 @@
   import { untrack } from 'svelte';
 
   import { attempts } from '$state/attempts.js';
-  import { linkReady } from '$state/contacts.js';
+  import { linkReady } from '$state/picker.js';
 
   import ModalKeys from './ModalKeys.svelte';
 
