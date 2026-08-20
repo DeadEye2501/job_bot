@@ -2,6 +2,8 @@
 //
 // Чистые функции: вести приходят доводами, наружу уходят строка и число.
 
+import { fillPercent } from './chosen.js';
+
 const NO_TOTAL = '…';
 const NO_MESSAGES = '—';
 const RERUN = 'Прогон вакансии…';
@@ -39,10 +41,7 @@ export function caption(channels, messages) {
  */
 export function bar(current, total) {
   if (!total || total <= 0) return { percent: 0, unknown: true };
-  return {
-    percent: Math.min(100, Math.round((Math.max(0, current) / total) * 100)),
-    unknown: false,
-  };
+  return { percent: Math.round(fillPercent(current, total)), unknown: false };
 }
 
 /** Чем подписан прогон одной вакансии.

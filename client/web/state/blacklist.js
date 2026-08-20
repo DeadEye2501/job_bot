@@ -3,6 +3,8 @@
 // Чистые функции: строки моста приходят доводами, наружу уходят строки и
 // списки. Ни моста, ни разметки этот файл не знает.
 
+import { matching } from './search.js';
+
 /** Роды строк отсева. Первый — общий: в нём экран открывается.
  *
  * Порядок несущий: слова стоят перед предметами, потому что ими отсев и
@@ -74,10 +76,7 @@ export function blacklistHints({ items, rows, kind, typed }) {
     rows.filter((one) => one.kind === kind).map((one) => one.value.toLowerCase()),
   );
   const free = items.filter((one) => !taken.has(one.value.toLowerCase()));
-  const needle = typed.trim().toLowerCase();
-  const options = needle
-    ? free.filter((one) => `${one.label} ${one.value}`.toLowerCase().includes(needle))
-    : free;
+  const options = matching(free, typed, (one) => `${one.label} ${one.value}`);
   return { options, empty: options.length ? '' : emptyHint(kind, items, free) };
 }
 
@@ -119,14 +118,9 @@ export function unblockNote(done, female = false) {
 /** Строки отсева, прошедшие род и поиск.
  *
  * Поиск идёт и по значению, и по причине: причину пишут словами, и по ней
- * вспоминают, за что строка заведена. Регистр не различается — человек
- * набирает как придётся, а значения приходят как записаны.
+ * вспоминают, за что строка заведена.
  */
 export function blacklistShown(rows, { kind, search }) {
-  const needle = search.trim().toLowerCase();
-  return rows.filter((one) => {
-    if (kind && one.kind !== kind) return false;
-    if (!needle) return true;
-    return `${one.value} ${one.reason || ''}`.toLowerCase().includes(needle);
-  });
+  const ofKind = kind ? rows.filter((one) => one.kind === kind) : rows;
+  return matching(ofKind, search, (one) => `${one.value} ${one.reason || ''}`);
 }

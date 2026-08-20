@@ -6,6 +6,7 @@
 
 import { dayOf } from './dates.js';
 import { GRADES } from './profile.js';
+import { matching } from './search.js';
 
 // Вариант «не отбираем». Пустая строка, а не слово: слово уехало бы на мост и
 // искалось бы подстрокой внутри значения — грейд и формат он сверяет так.
@@ -186,7 +187,7 @@ export const COMPANY_MAX = 80;
  * хвост, и человек искал бы компанию не там, где её ждёт.
  */
 export function pickNames(names, search, limit = names.length) {
-  const needle = search.trim().toLowerCase();
-  const found = needle ? names.filter((one) => one.toLowerCase().includes(needle)) : names;
-  return [...found].sort((one, other) => one.localeCompare(other, 'ru')).slice(0, limit);
+  return [...matching(names, search)]
+    .sort((one, other) => one.localeCompare(other, 'ru'))
+    .slice(0, limit);
 }

@@ -4532,7 +4532,7 @@ Runtime settings layer.
 Тестов: 18
 
 
-### `tests/client/test_front_vocabulary.py` — 83 строк
+### `tests/client/test_front_vocabulary.py` — 87 строк
 
 Согласие перечней окна с перечнями бэкенда.
 

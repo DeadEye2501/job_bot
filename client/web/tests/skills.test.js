@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { aliasesAfter, countNote, grouped, levelPercent } from '../state/skills.js';
+import {
+  aliasesAfter,
+  countNote,
+  grouped,
+  groupsMatching,
+  levelPercent,
+} from '../state/skills.js';
 import { plural } from '../state/words.js';
 
 describe('раскладка навыков по категориям', () => {
@@ -29,6 +35,38 @@ describe('раскладка навыков по категориям', () => {
 
   it('пустой перечень даёт пустую раскладку', () => {
     expect(grouped([])).toEqual([]);
+  });
+});
+
+describe('раскладка, просеянная поиском', () => {
+  const known = [
+    { name: 'Python', category: 'Языки' },
+    { name: 'Go', category: 'Языки' },
+    { name: 'Docker', category: 'Инфра' },
+  ];
+
+  it('остаются навыки, попавшие под набранное', () => {
+    // Навыков в анкете под сотню, и без поиска нужный ищут прокруткой.
+    const groups = groupsMatching(known, 'py');
+
+    expect(groups.map((one) => one.name)).toEqual(['Языки']);
+    expect(groups[0].items.map((one) => one.name)).toEqual(['Python']);
+  });
+
+  it('категория без совпадений уходит целиком', () => {
+    // Пустая подпись категории читается как «здесь ничего нет», и человек
+    // решает, что навык потерян.
+    expect(groupsMatching(known, 'docker').map((one) => one.name)).toEqual(['Инфра']);
+  });
+
+  it('ненайденное опустошает раскладку целиком', () => {
+    // Подборщик по пустой раскладке говорит «ничего не нашлось», а по
+    // раскладке с пустыми категориями рисовал бы одни подписи.
+    expect(groupsMatching(known, 'rust')).toEqual([]);
+  });
+
+  it('пустой поиск оставляет раскладку целой', () => {
+    expect(groupsMatching(known, '  ').map((one) => one.name)).toEqual(['Языки', 'Инфра']);
   });
 });
 
