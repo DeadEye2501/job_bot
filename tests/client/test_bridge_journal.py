@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from backend.log_buffer import get_handler
+from backend.log_buffer import LEVEL_LIMITS, get_handler
 
 
 @pytest.fixture
@@ -53,21 +53,23 @@ async def test_the_journal_shows_what_was_written(api, ask, journal):
 async def test_the_pills_promise_only_what_the_list_can_show(api, ask, journal):
     """Пилюля считает ровно то, что человек может найти в списке.
 
-    Считай она больше — человек читал бы «предупреждений: 1200», нажимал на
-    пилюлю и не находил обещанного: список отдавал бы тысячу, а остальные
-    двести лежали бы в кольце без дороги на экран. Отбор страница делает у
-    себя, и достать их ей нечем.
+    Считай она больше, чем лежит в кольце уровня, — человек нажимал бы на
+    пилюлю и не находил обещанного: лишние лежали бы без дороги на экран.
+    Отбор страница делает у себя, и достать их ей нечем.
+
+    Записей кладём заведомо больше предела уровня: на числе меньше предела
+    сторож был бы зелен и у моста, который снова обрезает список.
     """
-    for n in range(1200):
+    for n in range(LEVEL_LIMITS["WARNING"] + 200):
         logging.getLogger("проверка").warning("запись %d", n)
 
     answer = await ask(api.system.logs)
 
     page = answer["ok"]
-    # Считаем свой уровень, а не все записи: кольцо общее на процесс, и чужая
+    # Считаем свой уровень, а не все записи: кольца общие на процесс, и чужая
     # строка чужого уровня красила бы сторож впустую.
     shown = [row for row in page["records"] if row["level"] == "WARNING"]
-    assert page["level_counts"]["WARNING"] == len(shown) == 1200
+    assert page["level_counts"]["WARNING"] == len(shown) == LEVEL_LIMITS["WARNING"]
 
 
 async def test_a_request_too_soon_after_the_last_one_is_refused(api, ask, journal):

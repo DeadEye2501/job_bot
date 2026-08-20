@@ -480,7 +480,7 @@
 
 ### `backend/log_buffer.py`
 
-- `MAX_RECORDS` = `5000`
+- `LEVEL_LIMITS` = `словарь из 4`
 - `_handler` = `LogBufferHandler()`
 
 ### `backend/log_file.py`
