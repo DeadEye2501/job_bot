@@ -50,8 +50,12 @@ def _values(module: str, name: str) -> list[str]:
 
 def test_statuses_match() -> None:
     """Порядок у окна свой — по воронке, от «новой» к исходам: в нём читают
-    кольцо статистики и чипы отбора. Сверяется состав, а не порядок."""
-    shown = _strings("stats.js", "STATUS_ORDER")
+    кольцо статистики и чипы отбора. Сверяется состав, а не порядок.
+
+    Читаются две колонки карточки статусов, а не собранный из них порядок
+    кольца: окно объявляет статусы именно ими, а кольцо сцепляет их ссылками.
+    """
+    shown = _strings("stats.js", "MOVING") + _strings("stats.js", "OVER")
     assert sorted(shown) == sorted(one.value for one in VacancyStatus)
 
 
@@ -78,6 +82,6 @@ def test_language_levels_match() -> None:
 def test_blacklist_kinds_match() -> None:
     """Первый род у окна свой и пустой — «все»: им открывается экран, и на
     мосту его нет."""
-    kinds = re.findall(r"key: '([^']*)'", _array("contacts.js", "BLACKLIST_KINDS"))
+    kinds = re.findall(r"key: '([^']*)'", _array("blacklist.js", "BLACKLIST_KINDS"))
     assert kinds[0] == ""
     assert sorted(kinds[1:]) == sorted(BLACKLIST_KINDS)

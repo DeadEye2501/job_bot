@@ -6,6 +6,8 @@
   // компании, — и правила у них одни. Записанное приходит ответом от того, кто
   // писал: мост сводит пробельную заметку к пустоте, и не прими мы его ответ,
   // следующая же пауза послала бы тот же вопрос заново.
+  import { untrack } from 'svelte';
+
   import { autosave } from '$state/autosave.js';
   import { flashing } from '$state/flash.js';
   import { saveKey } from '$state/keys.js';
@@ -24,13 +26,13 @@
   // карточка сменила запись. Читай мы номер тогда, набранное для прежней
   // записи уехало бы к соседней и затёрло её заметку, а сама прежняя осталась
   // бы ни с чем. Поле заводится заново на каждую запись — тем и держится.
-  const owned = owner;
+  const owned = untrack(() => owner);
 
-  let text = $state(value ?? '');
+  let text = $state(untrack(() => value ?? ''));
   let flashed = $state(false);
 
   const mark = flashing((on) => (flashed = on));
-  const saver = autosave({ delay, save: (typed) => write(typed) });
+  const saver = autosave({ delay: untrack(() => delay), save: (typed) => write(typed) });
 
   async function write(typed) {
     const stored = await save(owned, typed);
