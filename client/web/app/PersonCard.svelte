@@ -6,6 +6,7 @@
 
   import Avatar from '$components/Avatar.svelte';
   import BlacklistChip from '$components/BlacklistChip.svelte';
+  import CardHandle from '$components/CardHandle.svelte';
   import ContactActions from '$components/ContactActions.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
@@ -13,13 +14,14 @@
   import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
   import { living } from '$state/alive.js';
-  import { blockNote, unblockNote } from '$state/blacklist.js';
-  import { cardDrop } from '$state/card_drop.js';
+  import { cardBlocking } from '$state/card_block.js';
+  import { cardFinish } from '$state/card_finish.js';
+  import { cardNotes } from '$state/card_notes.js';
   import { cardRead } from '$state/card_read.js';
+  import { cardSave } from '$state/card_save.js';
   import { sendBlock } from '$state/chat.js';
   import { freshAnswer } from '$state/fresh.js';
-  import { personCandidate, personName } from '$state/people.js';
-  import { telegramHref } from '$state/telegram.js';
+  import { personCandidate, personHead, personName } from '$state/people.js';
   import { plural } from '$state/words.js';
 
   import PersonChat from './PersonChat.svelte';
@@ -48,7 +50,7 @@
     alive: () => alive.now,
   });
 
-  const dropCard = cardDrop({
+  const dropCard = cardFinish({
     ask: (...args) => ask(...args),
     method: 'hr.delete',
     note: 'Карточка удалена',
@@ -57,7 +59,41 @@
     onclose: () => onclose(),
   });
 
+  const mergeCard = cardFinish({
+    ask: (...args) => ask(...args),
+    method: 'hr.merge',
+    note: 'Карточки слиты',
+    say: (text) => say(text),
+    onchanged: () => onchanged(),
+    onclose: () => onclose(),
+  });
+
+  const saveField = cardSave({
+    ask: (...args) => ask(...args),
+    method: 'hr.update',
+    reread: () => refresh(personId),
+    onchanged: () => onchanged(),
+  });
+
+  const saveNotes = cardNotes({
+    ask: (...args) => ask(...args),
+    method: 'hr.update',
+    payload: (id, text) => ({ hr_id: id, notes: text }),
+    alive: () => alive.now,
+    onchanged: () => onchanged(),
+  });
+
+  const blocking = cardBlocking({
+    ask: (...args) => ask(...args),
+    block: 'hr.block',
+    unblock: 'hr.unblock',
+    say: (text) => say(text),
+    reread: () => refresh(personId),
+    onchanged: () => onchanged(),
+  });
+
   const shown = $derived(card ? personName({ ...card, id: card.hr_id }) : '');
+  const head = $derived(card ? personHead(card) : null);
   const chosenName = $derived(chosen ? personName(chosen) : '');
 
   async function refresh(id) {
@@ -72,45 +108,8 @@
     vacancies = now.vacancies;
   }
 
-  /** Записать правку поля и показать то, что легло на самом деле.
-   *
-   * Перечитываем и после отказа: поля правятся на месте, и отклонённое мостом
-   * значение — а негодный ник мост отклоняет — осталось бы на экране.
-   */
-  async function save(part) {
-    const done = await ask('hr.update', { hr_id: personId, ...part });
-    await refresh(personId);
-    if (done !== null) onchanged();
-  }
-
-  /** Записать заметку и вернуть то, что легло в базу.
-   *
-   * Карточку не перечитываем: человек мог набрать ещё, пока летел вопрос, и
-   * пришедшее из базы стёрло бы это. Записанным считаем набранное: этот зов
-   * называет только поправленные поля, самой заметки в ответе нет, — а пустая
-   * от пробельной здесь не отличается, обе сводятся к пустоте по дороге.
-   */
-  async function saveNotes(id, text) {
-    const done = await ask('hr.update', { hr_id: id, notes: text });
-    if (!alive.now || done === null) return null;
-    onchanged();
-    return text;
-  }
-
-  async function block() {
-    const done = await ask('hr.block', personId);
-    if (done === null) return;
-    say(blockNote(done));
-    await refresh(personId);
-    onchanged();
-  }
-
-  async function unblock() {
-    const done = await ask('hr.unblock', personId);
-    if (done === null) return;
-    say(unblockNote(done));
-    await refresh(personId);
-    onchanged();
+  function save(part) {
+    return saveField({ hr_id: personId, ...part });
   }
 
   async function drop() {
@@ -126,28 +125,23 @@
   async function merge() {
     const survivor = chosen;
     chosen = null;
-    const done = await ask('hr.merge', { absorbed_id: personId, survivor_id: survivor.id });
-    if (done === null) return;
-    asking = null;
-    say('Карточки слиты');
-    onchanged();
-    onclose();
+    // Окно выбора гасим только по удаче: отказ оставляет выбранного под рукой,
+    // а закрытое окно заставило бы искать его заново.
+    if (await mergeCard({ absorbed_id: personId, survivor_id: survivor.id })) asking = null;
   }
 
-  $effect(() => {
-    const settled = alive.mounted();
-    const id = personId;
-    // Показанное прежним человеком уходит сразу: панель одна, и его числа под
-    // новым именем читались бы как числа нового.
-    card = null;
-    trouble = '';
-    vacancies = [];
-    refresh(id);
-    loadVacancies(id);
-    return () => {
-      settled();
-    };
-  });
+  $effect(() =>
+    alive.entered(() => {
+      const id = personId;
+      // Показанное прежним человеком уходит сразу: панель одна, и его числа под
+      // новым именем читались бы как числа нового.
+      card = null;
+      trouble = '';
+      vacancies = [];
+      refresh(id);
+      loadVacancies(id);
+    }),
+  );
 </script>
 
 {#if trouble}
@@ -159,21 +153,13 @@
     <Avatar avatar={card.avatar} name={card.name} icon="person" />
 
     <div>
-      <div class="cnt-det-name" class:muted={!card.name}>{card.name || '— без имени —'}</div>
+      <div class="cnt-det-name" class:muted={!head.named}>{head.name}</div>
 
       <div class="cnt-det-sub">
-        {#if card.telegram_username}
-          <button
-            class="cnt-det-link"
-            type="button"
-            title="Открыть в Telegram"
-            onclick={() => ask('system.open_url', telegramHref(card.telegram_username))}
-          >
-            @{card.telegram_username}
-          </button>
-        {:else}
-          <span>@—</span>
-        {/if}
+        <CardHandle
+          username={card.telegram_username}
+          onopen={(url) => ask('system.open_url', url)}
+        />
         {#if card.last_company_name}
           <span>·</span>
           {#if card.last_company_id === null}
@@ -206,8 +192,8 @@
       mergeLabel="Слить с другим HR"
       blocked={!!card.blacklist_value}
       onmerge={() => (asking = 'merge')}
-      onblock={block}
-      onunblock={unblock}
+      onblock={() => blocking.block(personId)}
+      onunblock={() => blocking.unblock(personId)}
       ondelete={() => (asking = 'delete')}
     />
   </div>

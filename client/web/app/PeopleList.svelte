@@ -1,8 +1,6 @@
 <script>
   // Вкладка «HR»: список людей с поиском, страницами и заведением.
 
-  import { untrack } from 'svelte';
-
   import AskDialog from '$components/AskDialog.svelte';
   import ContactsPanes from '$components/ContactsPanes.svelte';
   import NewPersonFields from '$components/NewPersonFields.svelte';
@@ -54,10 +52,7 @@
     // Только про списки: весть о непрочитанном кладётся на каждое сохранённое
     // письмо, и обход в сотню сообщений перечитал бы список сотню раз подряд.
     const deaf = events.on('contacts_lists_changed', () => list.again());
-    const settled = list.mounted();
-    // Первое чтение — вне слежения: строку поиска читает `refresh`, и следящий
-    // эффект перезаводился бы на каждом набранном знаке.
-    untrack(() => list.refresh());
+    const settled = list.entered();
     return () => {
       settled();
       deaf();

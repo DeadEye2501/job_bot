@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   channelName,
   channelStats,
+  channelTitle,
   channelToggle,
   channelsToggle,
   pollBlock,
@@ -154,5 +155,23 @@ describe('запор ручного прогона канала', () => {
 
   it('непрочитанная карточка запирается только лампой', () => {
     expect(pollBlock(null, 'Бот заблокирован')).toBe('Бот заблокирован');
+  });
+});
+
+describe('чем подписан канал в строке списка', () => {
+  it('без названия имя берут из ника', () => {
+    expect(channelTitle({ id: 42, title: '', username: 'py_jobs' })).toEqual({
+      name: '@py_jobs',
+      named: true,
+    });
+  });
+
+  it('совсем безымянный назван прочерком, а не номером', () => {
+    // Номером его зовёт шапка карточки — там подпись обязана быть, — а в
+    // списке «Канал #42» встал бы в ряд названий и читался бы как название.
+    expect(channelTitle({ id: 42, title: '', username: '' })).toEqual({
+      name: '— без названия —',
+      named: false,
+    });
   });
 });

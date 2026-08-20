@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { companyCandidate, companyLine, companyNamed, siteHref } from '../state/companies.js';
+import {
+  companyCandidate,
+  companyLine,
+  companyNamed,
+  companyTitle,
+  siteHref,
+} from '../state/companies.js';
 
 describe('подпись компании в списке', () => {
   it('под именем стоят сайт и алиасы', () => {
@@ -105,5 +111,16 @@ describe('чем компания названа при заведении', () 
     // Домен приезжает из объявления и есть у многих: без имени компанию по нему
     // не узнать в списке, а строка выбора осталась бы безымянной.
     expect(companyNamed({ ...DRAFT, website: 'romashka.ru' })).toBe(false);
+  });
+});
+
+describe('чем подписана компания там, где имени может не быть', () => {
+  it('имя показывают как есть', () => {
+    expect(companyTitle({ id: 1, name: 'Ромашка' })).toEqual({ name: 'Ромашка', named: true });
+  });
+
+  it('безымянную зовут прочерком — и в списке, и в шапке карточки', () => {
+    // Номер годится строке подборщика, а здесь читался бы как название.
+    expect(companyTitle({ id: 7, name: '' })).toEqual({ name: '— без названия —', named: false });
   });
 });

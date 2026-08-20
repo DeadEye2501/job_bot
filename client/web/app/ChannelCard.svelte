@@ -8,18 +8,18 @@
   import Avatar from '$components/Avatar.svelte';
   import BlacklistChip from '$components/BlacklistChip.svelte';
   import BlacklistMenuItem from '$components/BlacklistMenuItem.svelte';
+  import CardHandle from '$components/CardHandle.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MenuItem from '$components/MenuItem.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import { living } from '$state/alive.js';
-  import { blockNote, unblockNote } from '$state/blacklist.js';
-  import { cardDrop } from '$state/card_drop.js';
+  import { cardBlocking } from '$state/card_block.js';
+  import { cardFinish } from '$state/card_finish.js';
   import { cardRead } from '$state/card_read.js';
   import { channelName, channelStats, pollBlock } from '$state/channels.js';
   import { freshAnswer } from '$state/fresh.js';
   import { PAGE, appended, refreshLimit } from '$state/paging.js';
   import { donut } from '$state/stats.js';
-  import { telegramHref } from '$state/telegram.js';
 
   let { ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged } = $props();
 
@@ -43,13 +43,22 @@
     alive: () => alive.now,
   });
 
-  const dropCard = cardDrop({
+  const dropCard = cardFinish({
     ask: (...args) => ask(...args),
     method: 'channels.delete',
     note: 'Канал удалён',
     say: (text) => say(text),
     onchanged: () => onchanged(),
     onclose: () => onclose(),
+  });
+
+  const blocking = cardBlocking({
+    ask: (...args) => ask(...args),
+    block: 'channels.block',
+    unblock: 'channels.unblock',
+    say: (text) => say(text),
+    reread: () => refresh(channelId),
+    onchanged: () => onchanged(),
   });
 
   const shown = $derived(card ? channelName({ ...card, id: card.channel_id }) : null);
@@ -123,38 +132,23 @@
     );
   }
 
-  async function block() {
-    const done = await ask('channels.block', channelId);
-    if (done === null) return;
-    say(blockNote(done));
-    await refresh(channelId);
-    onchanged();
-  }
-
-  async function unblock() {
-    const done = await ask('channels.unblock', channelId);
-    if (done === null) return;
-    say(unblockNote(done));
-    await refresh(channelId);
-    onchanged();
-  }
-
   async function drop() {
     asking = false;
     await dropCard(channelId);
   }
 
   $effect(() => {
-    const settled = alive.mounted();
     const id = channelId;
-    // Показанное прежним каналом уходит сразу: панель одна, и его числа под
-    // новым именем читались бы как числа нового.
-    card = null;
-    trouble = '';
-    vacancies = [];
-    hasMore = false;
-    refresh(id);
-    loadVacancies(id);
+    const settled = alive.entered(() => {
+      // Показанное прежним каналом уходит сразу: панель одна, и его числа под
+      // новым именем читались бы как числа нового.
+      card = null;
+      trouble = '';
+      vacancies = [];
+      hasMore = false;
+      refresh(id);
+      loadVacancies(id);
+    });
     // Канал приносит вакансии и во время прогона, и сам по себе обходом: его
     // числа и перечень стареют, пока карточка открыта, а прогнавший канал
     // человек смотрит именно на них.
@@ -181,18 +175,7 @@
       <div class="cnt-det-name">{shown.name}</div>
 
       <div class="cnt-det-sub">
-        {#if card.username}
-          <button
-            class="cnt-det-link"
-            type="button"
-            title="Открыть в Telegram"
-            onclick={() => ask('system.open_url', telegramHref(card.username))}
-          >
-            @{card.username}
-          </button>
-        {:else}
-          <span>@—</span>
-        {/if}
+        <CardHandle username={card.username} onopen={(url) => ask('system.open_url', url)} />
       </div>
 
       <div class="cnt-det-meta-row">
@@ -220,8 +203,8 @@
         <BlacklistMenuItem
           blocked={!!card.blacklist_value}
           {close}
-          onblock={block}
-          onunblock={unblock}
+          onblock={() => blocking.block(channelId)}
+          onunblock={() => blocking.unblock(channelId)}
         />
 
         <div class="menu-line"></div>

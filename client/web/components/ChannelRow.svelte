@@ -1,6 +1,6 @@
 <script>
   // Строка канала: значок, имя с ником, отсев, счёт вакансий и переключатель.
-  import { channelToggle } from '$state/channels.js';
+  import { channelTitle, channelToggle } from '$state/channels.js';
 
   import Avatar from './Avatar.svelte';
   import BlacklistMark from './BlacklistMark.svelte';
@@ -10,14 +10,15 @@
   let { channel, selected = false, onpick, ontoggle } = $props();
 
   const shown = $derived(channelToggle(channel));
+  const title = $derived(channelTitle(channel));
 </script>
 
 <div class="cnt-hr-row" class:selected class:blacklisted={shown.dim}>
   <Avatar avatar={channel.avatar} icon="tag" />
 
   <button class="cnt-hr-info" type="button" onclick={() => onpick()}>
-    <span class="cnt-hr-name" class:muted={!channel.title && !channel.username}>
-      {channel.title || (channel.username ? `@${channel.username}` : '— без названия —')}
+    <span class="cnt-hr-name" class:muted={!title.named}>
+      {title.name}
     </span>
     <span class="cnt-hr-sub">
       <Handle username={channel.username} />

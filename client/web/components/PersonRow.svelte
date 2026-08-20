@@ -1,6 +1,6 @@
 <script>
   // Строка человека в списке: снимок, имя с подписью, отсев и непрочитанное.
-  import { personName } from '$state/people.js';
+  import { personSub, personTitle } from '$state/people.js';
 
   import Avatar from './Avatar.svelte';
   import BlacklistMark from './BlacklistMark.svelte';
@@ -8,7 +8,8 @@
 
   let { person, selected = false, onpick } = $props();
 
-  const named = $derived(Boolean(person.name || person.telegram_username));
+  const shown = $derived(personTitle(person));
+  const sub = $derived(personSub(person));
 </script>
 
 <button
@@ -21,19 +22,18 @@
   <Avatar avatar={person.avatar} name={person.name} icon="person" />
 
   <span class="cnt-hr-info">
-    <span class="cnt-hr-name" class:muted={!named}>
-      {named ? personName(person) : '— без имени —'}
+    <span class="cnt-hr-name" class:muted={!shown.named}>
+      {shown.name}
     </span>
-    <!-- Ник и компания — то, чем различают тёзок: по нику находят в Telegram,
-         по компании вспоминают, откуда человек писал. Обе половины названы
-         всегда: пустое место читалось бы как недогрузившаяся строка. -->
+    <!-- Ник и компания красятся порознь: по нику находят в Telegram, по
+         компании вспоминают, откуда человек писал. -->
     <span class="cnt-hr-sub">
       <Handle username={person.telegram_username} />
       <span class="sep">·</span>
       {#if person.last_company_name}
-        <span class="company">{person.last_company_name}</span>
+        <span class="company">{sub.company}</span>
       {:else}
-        <span class="muted">без компании</span>
+        <span class="muted">{sub.company}</span>
       {/if}
     </span>
   </span>

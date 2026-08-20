@@ -1,8 +1,6 @@
 <script>
   // Вкладка «Компании»: список слева, карточка выбранной справа.
 
-  import { untrack } from 'svelte';
-
   import AskDialog from '$components/AskDialog.svelte';
   import ContactsPanes from '$components/ContactsPanes.svelte';
   import NewCompanyFields from '$components/NewCompanyFields.svelte';
@@ -53,10 +51,7 @@
     // Перечитываем по вести не страницей, а показанным: иначе занесение в
     // отсев из карточки схлопывало бы пролистанное до первой страницы.
     const deaf = events.on('contacts_lists_changed', () => list.again());
-    const settled = list.mounted();
-    // Первое чтение — вне слежения: строку поиска читает `refresh`, и следящий
-    // эффект перезаводился бы на каждом набранном знаке.
-    untrack(() => list.refresh());
+    const settled = list.entered();
     return () => {
       settled();
       deaf();

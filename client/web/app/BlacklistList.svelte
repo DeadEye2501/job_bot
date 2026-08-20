@@ -128,12 +128,11 @@
   }
 
   $effect(() => {
-    const settled = alive.mounted();
+    const settled = alive.entered(refresh);
     // Списки меняет не только этот экран: бот заносит людей и компании в отсев
     // сам, разбирая переписку. Без этой подписки экран показывал бы снимок той
     // минуты, когда его открыли.
     const deaf = events.on('contacts_lists_changed', refresh);
-    refresh();
     return () => {
       settled();
       deaf();
