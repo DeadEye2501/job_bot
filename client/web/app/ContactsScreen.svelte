@@ -44,7 +44,15 @@
 
 <div class="screen-body" class:flush={tab !== 'blacklist'}>
   {#if tab === 'channels'}
-    <ChannelsList {ask} {say} {lockedTip} {events} {onvacancy} />
+    <ChannelsList
+      {ask}
+      {say}
+      {lockedTip}
+      {events}
+      {onvacancy}
+      open={mine('channels')}
+      onopened={() => (mark = null)}
+    />
   {:else if tab === 'companies'}
     <CompaniesList
       {ask}

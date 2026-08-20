@@ -16,6 +16,8 @@
   import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
   import { attempts } from '$state/attempts.js';
+  import { blockNote, unblockNote } from '$state/blacklist.js';
+  import { cardRead } from '$state/card_read.js';
   import { companyCandidate, companyLine, siteHref } from '$state/companies.js';
 
   // Пауза перед записью заметки — та же, что ждало прежнее окно.
@@ -33,21 +35,25 @@
   // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
   // компанию в ней переключают нажатием по соседней строке — ответ про
   // прежнюю, лёгший поверх свежего, показал бы её числа под новым именем.
-  const cardTries = attempts();
   const peopleTries = attempts();
   const vacancyTries = attempts();
   let alive = true;
+
+  const readCard = cardRead({
+    ask: (...args) => ask(...args),
+    method: 'companies.detail',
+    trouble: 'Не удалось прочитать компанию',
+    alive: () => alive,
+  });
 
   const shown = $derived(card ? companyLine({ ...card, id: card.company_id }) : null);
   const chosenName = $derived(chosen ? companyLine(chosen).name : '');
   const site = $derived(card ? siteHref(card.website) : null);
 
   async function refresh(id) {
-    const mine = cardTries.next();
-    const now = await ask('companies.detail', id);
-    if (!alive || cardTries.stale(mine)) return;
-    if (now === null) return (trouble = 'Не удалось прочитать компанию');
-    card = now;
+    const now = await readCard(id);
+    if (now === null) return;
+    ({ card, trouble } = now);
   }
 
   async function loadPeople(id) {
@@ -104,9 +110,7 @@
   async function block() {
     const done = await ask('companies.block', companyId);
     if (done === null) return;
-    if (done.was_inactive) say(`Возвращена в отсев: ${done.value}`);
-    else if (done.existed) say(`Уже в отсеве: ${done.value}`);
-    else say(`Занесена в отсев: ${done.value}`);
+    say(blockNote(done, true));
     await refresh(companyId);
     onchanged();
   }
@@ -114,7 +118,7 @@
   async function unblock() {
     const done = await ask('companies.unblock', companyId);
     if (done === null) return;
-    say(done.updated ? 'Убрана из отсева' : 'В отсеве её не было');
+    say(unblockNote(done, true));
     await refresh(companyId);
     onchanged();
   }

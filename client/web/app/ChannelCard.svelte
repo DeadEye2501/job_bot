@@ -10,6 +10,8 @@
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import { attempts } from '$state/attempts.js';
+  import { blockNote, unblockNote } from '$state/blacklist.js';
+  import { cardRead } from '$state/card_read.js';
   import { channelName, channelStats, pollBlock } from '$state/channels.js';
   import { PAGE, appended, refreshLimit } from '$state/paging.js';
   import { donut } from '$state/stats.js';
@@ -27,9 +29,15 @@
   // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
   // канал в ней переключают нажатием по соседней строке — ответ про прежний,
   // лёгший поверх свежего, показал бы его числа под новым именем.
-  const cardTries = attempts();
   const vacancyTries = attempts();
   let alive = true;
+
+  const readCard = cardRead({
+    ask: (...args) => ask(...args),
+    method: 'channels.detail',
+    trouble: 'Не удалось прочитать канал',
+    alive: () => alive,
+  });
 
   const shown = $derived(card ? channelName({ ...card, id: card.channel_id }) : null);
   const pollTip = $derived(pollBlock(card, lockedTip));
@@ -37,13 +45,9 @@
   const funnel = $derived(card ? donut(card.stats.status_counts) : []);
 
   async function refresh(id) {
-    const mine = cardTries.next();
-    const now = await ask('channels.detail', id);
-    if (!alive || cardTries.stale(mine)) return;
-    // Отказ не должен запирать панель на «Загрузка…»: человеку нужно хотя бы
-    // перейти к соседнему каналу, а плашку он уже увидел.
-    if (now === null) return (trouble = 'Не удалось прочитать канал');
-    card = now;
+    const now = await readCard(id);
+    if (now === null) return;
+    ({ card, trouble } = now);
   }
 
   /** Дочитать вакансии канала.
@@ -105,16 +109,18 @@
     );
   }
 
-  /** Занести канал в отсев или убрать оттуда.
-   *
-   * Два зова, а не имя за условием: спрятанное в тернарий имя выпадает из шва
-   * с мостом.
-   */
-  async function switchBlock() {
-    const done = card.blacklist_value
-      ? await ask('channels.unblock', channelId)
-      : await ask('channels.block', channelId);
+  async function block() {
+    const done = await ask('channels.block', channelId);
     if (done === null) return;
+    say(blockNote(done));
+    await refresh(channelId);
+    onchanged();
+  }
+
+  async function unblock() {
+    const done = await ask('channels.unblock', channelId);
+    if (done === null) return;
+    say(unblockNote(done));
     await refresh(channelId);
     onchanged();
   }
@@ -218,8 +224,8 @@
         <BlacklistMenuItem
           blocked={!!card.blacklist_value}
           {close}
-          onblock={switchBlock}
-          onunblock={switchBlock}
+          onblock={block}
+          onunblock={unblock}
         />
 
         <div class="menu-line"></div>

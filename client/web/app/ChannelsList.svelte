@@ -5,6 +5,7 @@
 
   import AddChannelDialog from '$components/AddChannelDialog.svelte';
   import ChannelRow from '$components/ChannelRow.svelte';
+  import ContactsPanes from '$components/ContactsPanes.svelte';
   import SearchBox from '$components/SearchBox.svelte';
   import { attempts } from '$state/attempts.js';
   import { channelsToggle } from '$state/channels.js';
@@ -12,7 +13,7 @@
 
   import ChannelCard from './ChannelCard.svelte';
 
-  let { ask, say, lockedTip, events, onvacancy } = $props();
+  let { ask, say, lockedTip, events, open, onopened, onvacancy } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -28,6 +29,15 @@
   let alive = true;
 
   const master = $derived(channelsToggle(rows));
+
+  // Какой канал открыть, придя со стороны — из воронки каналов в статистике.
+  // Отметка гасится сразу: вкладку открывают и просто так, и заново открытая
+  // карточка канала, который уже закрыли, читалась бы как поломка.
+  $effect(() => {
+    if (!open) return;
+    opened = open.id;
+    onopened();
+  });
 
   /** Перечитать список.
    *
@@ -100,72 +110,68 @@
   });
 </script>
 
-<div class="cnt-layout">
-  <section class="cnt-list-pane">
-    <div class="cnt-list-toolbar">
-      <SearchBox value={search} placeholder="Поиск канала..." onsearch={find} />
-      <button
-        class="cnt-add-btn"
-        type="button"
-        title="Добавить канал"
-        onclick={() => (adding = true)}
-      >
-        <span class="material-symbols-outlined">add_circle</span>
-      </button>
-      <!-- Один переключатель на весь список: он же и показывает, все ли каналы
-           опрашиваются. -->
-      <input
-        type="checkbox"
-        class="toggle compact"
-        checked={master.checked}
-        disabled={master.disabled}
-        title={master.title}
-        onchange={(event) => toggleAll(event.currentTarget.checked)}
-      />
-    </div>
+<ContactsPanes
+  {loaded}
+  empty={rows.length === 0}
+  chosen={opened !== null}
+  detailEmpty="Выберите канал в списке"
+  ondetailscroll={paneScrolled}
+>
+  {#snippet toolbar()}
+    <SearchBox value={search} placeholder="Поиск канала..." onsearch={find} />
+    <button
+      class="cnt-add-btn"
+      type="button"
+      title="Добавить канал"
+      onclick={() => (adding = true)}
+    >
+      <span class="material-symbols-outlined">add_circle</span>
+    </button>
+    <!-- Один переключатель на весь список: он же и показывает, все ли каналы
+         опрашиваются. -->
+    <input
+      type="checkbox"
+      class="toggle compact"
+      checked={master.checked}
+      disabled={master.disabled}
+      title={master.title}
+      onchange={(event) => toggleAll(event.currentTarget.checked)}
+    />
+  {/snippet}
 
-    <div class="cnt-list">
-      {#if !loaded}
-        <div class="cnt-list-empty">Загрузка…</div>
-      {:else if rows.length === 0}
-        <div class="cnt-list-empty">
-          {#if search}
-            Ничего не найдено по запросу «{search}»
-          {:else}
-            Каналов пока нет
-          {/if}
-        </div>
-      {:else}
-        {#each rows as channel (channel.id)}
-          <ChannelRow
-            {channel}
-            selected={opened === channel.id}
-            onpick={() => (opened = channel.id)}
-            ontoggle={(on) => toggle(channel, on)}
-          />
-        {/each}
-      {/if}
-    </div>
-  </section>
-
-  <section class="cnt-detail-pane" onscroll={paneScrolled}>
-    {#if opened === null}
-      <div class="cnt-detail-empty">Выберите канал в списке</div>
+  {#snippet emptyNote()}
+    {#if search}
+      Ничего не найдено по запросу «{search}»
     {:else}
-      <ChannelCard
-        bind:this={card}
-        {ask}
-        {say}
-        {lockedTip}
-        {events}
-        {onvacancy}
-        channelId={opened}
-        onclose={() => (opened = null)}
-        onchanged={refresh}
-      />
+      Каналов пока нет
     {/if}
-  </section>
-</div>
+  {/snippet}
+
+  {#snippet items()}
+    {#each rows as channel (channel.id)}
+      <ChannelRow
+        {channel}
+        selected={opened === channel.id}
+        onpick={() => (opened = channel.id)}
+        ontoggle={(on) => toggle(channel, on)}
+      />
+    {/each}
+  {/snippet}
+
+  {#snippet detail()}
+    <ChannelCard
+      bind:this={card}
+      {ask}
+      {say}
+      {lockedTip}
+      {events}
+      {onvacancy}
+      channelId={opened}
+      onclose={() => (opened = null)}
+      onchanged={refresh}
+    />
+  {/snippet}
+</ContactsPanes>
 
 {#if adding}
   <AddChannelDialog

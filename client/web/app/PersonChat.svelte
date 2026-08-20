@@ -2,15 +2,19 @@
   // Переписка с человеком: лента писем и строка отправки.
   //
   // Живёт в его карточке: письма читают, глядя на того, кому пишут.
+  //
+  // Из карточки берутся поля, а не она сама: её перечитывают на каждую правку
+  // поля, и целиком она перезаводила бы подписки и ленту — с потерей
+  // дочитанного и прыжком в конец.
 
-  import { tick as painted } from 'svelte';
+  import { tick as painted, untrack } from 'svelte';
 
   import ChatBubble from '$components/ChatBubble.svelte';
   import { attempts } from '$state/attempts.js';
-  import { byDays, sendBlock, unread } from '$state/chat.js';
+  import { byDays, unread } from '$state/chat.js';
   import { appended, nearTop } from '$state/paging.js';
 
-  let { ask, say, card, events, onread } = $props();
+  let { ask, say, hrId, blocked, events, onread } = $props();
 
   let messages = $state([]);
   let hasMore = $state(false);
@@ -25,7 +29,6 @@
   let alive = true;
 
   const days = $derived(byDays(messages, new Date()));
-  const blocked = $derived(sendBlock(card));
 
   /** Прочитать хвост переписки — полсотни последних писем.
    *
@@ -35,7 +38,7 @@
    */
   async function refresh() {
     const mine = tries.next();
-    const page = await ask('hr.messages', { hr_id: card.hr_id });
+    const page = await ask('hr.messages', { hr_id: hrId });
     if (page === null || !alive || tries.stale(mine)) return;
     messages = page.messages;
     hasMore = page.has_more;
@@ -63,7 +66,7 @@
     if (!oldest || digging) return;
     digging = true;
     const page = await ask('hr.messages', {
-      hr_id: card.hr_id,
+      hr_id: hrId,
       before_id: oldest.id,
       before_sent_at: oldest.sent_at,
     });
@@ -94,8 +97,13 @@
    */
   async function markRead() {
     if (!unread(messages)) return;
-    const done = await ask('hr.mark_read', card.hr_id);
+    const done = await ask('hr.mark_read', hrId);
     if (done === null || !alive) return;
+    // Молчим, когда отмечать было нечего: бот в положении «Off» до Telegram не
+    // дотягивается и отмечает ноль писем. Скажи мы и об этом, карточка
+    // перечиталась бы, лента следом, письма остались бы непрочитанными — и
+    // круг пошёл бы заново, без конца.
+    if (!done.updated) return;
     // Числа непрочитанного стоят и в карточке, и в строке списка: пересчитать
     // их может только тот, кто их читал.
     onread();
@@ -105,7 +113,7 @@
     const text = draft.trim();
     if (!text || sending || blocked) return;
     sending = true;
-    const done = await ask('hr.send_message', { hr_id: card.hr_id, text });
+    const done = await ask('hr.send_message', { hr_id: hrId, text });
     sending = false;
     // Набранное остаётся при отказе: письмо не ушло, и переписывать его заново
     // человек не должен.
@@ -127,7 +135,7 @@
     // файл, — минуты, — и общий признак всё это время говорил бы, что письмо
     // летит, и запирал бы кнопку отправки.
     attaching = true;
-    const done = await ask('hr.pick_media', card.hr_id);
+    const done = await ask('hr.pick_media', hrId);
     attaching = false;
     if (done === null || !alive || done.cancelled) return;
     say('Файл отправлен');
@@ -165,12 +173,21 @@
     // читал бы снимок той минуты, когда её открыл. Вторая весть — про чужую
     // отметку прочтения, от неё зависит вторая галочка на своих письмах.
     const deafNew = events.on('contacts_hr_messages_arrived', (about) => {
-      if (Number(about.hr_id) === card.hr_id) refresh();
+      if (Number(about.hr_id) === hrId) refresh();
     });
     const deafRead = events.on('contacts_hr_read_receipt', (about) => {
-      if (Number(about.hr_id) === card.hr_id) refresh();
+      if (Number(about.hr_id) === hrId) refresh();
     });
-    refresh();
+    // Первое чтение — вне слежения. Довод сюда приходит полем чужой карточки
+    // (`hrId={card.hr_id}`), и читается это поле здесь: свёрткой в производное
+    // Svelte такое не заворачивает, зависимостью встаёт сама карточка. Читай мы
+    // его под слежением — эффект заводился бы заново на каждую её правку, лента
+    // схлопывалась бы до последних полусотни писем и прыгала в конец.
+    //
+    // Смена человека этим не теряется: пока карточка перечитывается с нуля, её
+    // разметка показывает «Загрузка…», переписки на экране нет вовсе, и эффект
+    // заводится заново вместе с ней.
+    untrack(() => refresh());
     return () => {
       alive = false;
       deafNew();

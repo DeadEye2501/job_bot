@@ -4,23 +4,27 @@
   import { untrack } from 'svelte';
 
   import AskDialog from '$components/AskDialog.svelte';
+  import ContactsPanes from '$components/ContactsPanes.svelte';
   import NewCompanyFields from '$components/NewCompanyFields.svelte';
   import CompanyRow from '$components/CompanyRow.svelte';
   import SearchBox from '$components/SearchBox.svelte';
+  import { companyNamed } from '$state/companies.js';
   import { pagedList } from '$state/paged_list.svelte.js';
 
   import CompanyCard from './CompanyCard.svelte';
 
   let { ask, say, events, open, onopened, onperson, onvacancy } = $props();
 
-  const list = pagedList({ ask, method: 'companies.list', key: 'companies' });
+  const list = pagedList({
+    ask: (...args) => ask(...args),
+    method: 'companies.list',
+    key: 'companies',
+  });
 
   let adding = $state(false);
   let draft = $state({ name: '', website: '', aliases: '', notes: '' });
 
-  // Без названия заводить нечего: мост такую компанию всё равно отобьёт, а
-  // человек прочитает отказ вместо заведённой карточки.
-  const ready = $derived(Boolean(draft.name.trim()));
+  const ready = $derived(companyNamed(draft));
   let opened = $state(null);
 
   // Какую компанию открыть, придя из карточки вакансии. Отметка гасится сразу:
@@ -54,9 +58,6 @@
     // Перечитываем по вести не страницей, а показанным: иначе занесение в
     // отсев из карточки схлопывало бы пролистанное до первой страницы.
     const deaf = events.on('contacts_lists_changed', () => list.again());
-    // Первое чтение — вне слежения: строку поиска `refresh` читает, и следящий
-    // эффект перезаводился бы на каждом набранном знаке — вместе с подпиской и
-    // вторым, никому не нужным вопросом мосту.
     const settled = list.mounted();
     // Первое чтение — вне слежения: строку поиска читает `refresh`, и следящий
     // эффект перезаводился бы на каждом набранном знаке.
@@ -68,63 +69,59 @@
   });
 </script>
 
-<div class="cnt-layout">
-  <section class="cnt-list-pane">
-    <div class="cnt-list-toolbar">
-      <SearchBox
-        value={list.search}
-        placeholder="Поиск по названию, алиасу, домену..."
-        onsearch={list.find}
-      />
-      <button
-        class="cnt-add-btn"
-        type="button"
-        title="Добавить компанию"
-        onclick={() => (adding = true)}
-      >
-        <span class="material-symbols-outlined">add_business</span>
-      </button>
-    </div>
+<ContactsPanes
+  loaded={list.loaded}
+  empty={list.rows.length === 0}
+  chosen={opened !== null}
+  detailEmpty="Выберите компанию в списке слева"
+  onlistscroll={list.scrolled}
+>
+  {#snippet toolbar()}
+    <SearchBox
+      value={list.search}
+      placeholder="Поиск по названию, алиасу, домену..."
+      onsearch={list.find}
+    />
+    <button
+      class="cnt-add-btn"
+      type="button"
+      title="Добавить компанию"
+      onclick={() => (adding = true)}
+    >
+      <span class="material-symbols-outlined">add_business</span>
+    </button>
+  {/snippet}
 
-    <div class="cnt-list" onscroll={list.scrolled}>
-      {#if !list.loaded}
-        <div class="cnt-list-empty">Загрузка…</div>
-      {:else if list.rows.length === 0}
-        <div class="cnt-list-empty">
-          {#if list.search}
-            Ничего не найдено по запросу «{list.search}»
-          {:else}
-            Компаний пока нет
-          {/if}
-        </div>
-      {:else}
-        {#each list.rows as company (company.id)}
-          <CompanyRow
-            {company}
-            selected={opened === company.id}
-            onpick={() => (opened = company.id)}
-          />
-        {/each}
-      {/if}
-    </div>
-  </section>
-
-  <section class="cnt-detail-pane">
-    {#if opened === null}
-      <div class="cnt-detail-empty">Выберите компанию в списке слева</div>
+  {#snippet emptyNote()}
+    {#if list.search}
+      Ничего не найдено по запросу «{list.search}»
     {:else}
-      <CompanyCard
-        {ask}
-        {say}
-        {onperson}
-        {onvacancy}
-        companyId={opened}
-        onclose={() => (opened = null)}
-        onchanged={() => list.again()}
-      />
+      Компаний пока нет
     {/if}
-  </section>
-</div>
+  {/snippet}
+
+  {#snippet items()}
+    {#each list.rows as company (company.id)}
+      <CompanyRow
+        {company}
+        selected={opened === company.id}
+        onpick={() => (opened = company.id)}
+      />
+    {/each}
+  {/snippet}
+
+  {#snippet detail()}
+    <CompanyCard
+      {ask}
+      {say}
+      {onperson}
+      {onvacancy}
+      companyId={opened}
+      onclose={() => (opened = null)}
+      onchanged={() => list.again()}
+    />
+  {/snippet}
+</ContactsPanes>
 
 {#if adding}
   <AskDialog

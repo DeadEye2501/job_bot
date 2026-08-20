@@ -7,6 +7,8 @@ import {
   blacklistCounts,
   blacklistHints,
   blacklistShown,
+  blockNote,
+  unblockNote,
   valueField,
 } from '../state/blacklist.js';
 
@@ -140,5 +142,38 @@ describe('подсказчик существующих записей', () => {
     // человек набирал бы руками то, что вот-вот подсказали бы.
     expect(blacklistHints({ items: null, rows: [], kind: 'hr', typed: '' }).empty)
       .toBe('Загрузка…');
+  });
+});
+
+describe('что говорят человеку о занесении в отсев', () => {
+  it('заведённая запись названа заведённой', () => {
+    expect(blockNote({ existed: false, was_inactive: false, value: '@spam' }))
+      .toBe('Занесён в отсев: @spam');
+  });
+
+  it('погашенная запись названа возвращённой, а не заведённой', () => {
+    // Это разные новости: одна говорит «отсев начался», другая — «он снова
+    // работает», и человек по ним решает, надо ли дописывать причину.
+    expect(blockNote({ existed: true, was_inactive: true, value: '@spam' }))
+      .toBe('Возвращён в отсев: @spam');
+  });
+
+  it('живая запись названа уже заведённой', () => {
+    expect(blockNote({ existed: true, was_inactive: false, value: '@spam' }))
+      .toBe('Уже в отсеве: @spam');
+  });
+
+  it('о компании говорят в женском роде', () => {
+    // Род предмета свой: «занесён» про компанию человек читает как опечатку и
+    // перестаёт верить остальному на экране.
+    expect(blockNote({ existed: false, was_inactive: false, value: 'Ромашка' }, true))
+      .toBe('Занесена в отсев: Ромашка');
+  });
+
+  it('снятие отсева и его отсутствие названы по-разному', () => {
+    // Иначе нажатие на записи, которой нет, выглядит сделавшим работу.
+    expect(unblockNote({ updated: 1 })).toBe('Убран из отсева');
+    expect(unblockNote({ updated: 0 })).toBe('В отсеве его не было');
+    expect(unblockNote({ updated: 0 }, true)).toBe('В отсеве её не было');
   });
 });
