@@ -16,7 +16,9 @@
   import { attempts } from '$state/attempts.js';
   import { linkReady } from '$state/picker.js';
 
-  import ModalKeys from './ModalKeys.svelte';
+  import ModalFoot from './ModalFoot.svelte';
+  import ModalHead from './ModalHead.svelte';
+  import ModalShell from './ModalShell.svelte';
 
   let {
     title,
@@ -31,7 +33,9 @@
     onapply,
     saving = false,
     onclose,
-    children,
+    // Переименовано при разборе доводов: внутри рамы своё место для разметки
+    // тоже зовётся `children`, и одно имя закрыло бы другое.
+    children: rowsMarkup,
     createLabel = null,
     createIcon = null,
     oncreate = null,
@@ -96,25 +100,17 @@
     // человек сам, отдельным нажатием: заведение и привязка — разные решения.
     if (preselect === null) return;
     chosen = preselect;
+    // Поиск сбрасываем: заводить новую запись шли как раз потому, что по
+    // набранному никого не нашлось, — по нему не найдётся и заведённая, а
+    // пропавшую из выдачи отметку `refresh` снимет, и кнопка останется запертой.
+    search = '';
     untrack(() => refresh());
   });
 </script>
 
-<ModalKeys close={onclose} />
-
-<div
-  class="modal-backdrop"
-  role="presentation"
-  onclick={(event) => event.target === event.currentTarget && onclose()}
->
-  <div class="modal-dialog vac-picker-modal" role="dialog" aria-modal="true">
-    <div class="modal-head">
-      <span class="material-symbols-outlined">{icon}</span>
-      <div class="modal-title">{title}</div>
-      <button class="modal-close" type="button" title="Закрыть" onclick={() => onclose()}>
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
+<ModalShell extra="vac-picker-modal" {onclose}>
+  {#snippet children()}
+    <ModalHead {icon} {title} {onclose} />
 
     <div class="picker-search-bar">
       <span class="material-symbols-outlined">search</span>
@@ -137,7 +133,7 @@
           {search ? `Ничего не найдено по запросу «${search}»` : empty}
         </div>
       {:else}
-        {@render children(rows, chosen, pick)}
+        {@render rowsMarkup(rows, chosen, pick)}
       {/if}
     </div>
 
@@ -150,11 +146,13 @@
       </div>
     {/if}
 
-    <div class="modal-footer">
-      <button class="btn" type="button" onclick={() => onclose()}>Отмена</button>
-      <button class="btn primary" type="button" disabled={saving || !ready} onclick={apply}>
-        {saving ? 'Сохраняю…' : applyLabel}
-      </button>
-    </div>
-  </div>
-</div>
+    <ModalFoot
+      label={applyLabel}
+      busyLabel="Сохраняю…"
+      busy={saving}
+      {ready}
+      oncancel={onclose}
+      onconfirm={apply}
+    />
+  {/snippet}
+</ModalShell>

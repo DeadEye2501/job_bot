@@ -337,7 +337,10 @@
 
   {#if rows.length}
     <div class="det-section">
-      <VacancyTimeline {rows} {vacancyId} onsave={saveNote} />
+      <!-- Своя лента на каждую вакансию: почему — сказано в её шапке. -->
+      {#key vacancyId}
+        <VacancyTimeline {rows} {vacancyId} onsave={saveNote} />
+      {/key}
     </div>
   {/if}
 {/if}

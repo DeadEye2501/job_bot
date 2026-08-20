@@ -6,12 +6,12 @@
   // доводом, стоит подсказкой при наведении — до нажатия — и повторяется
   // плашкой, если по пункту всё-таки нажали.
   import ActionsMenu from './ActionsMenu.svelte';
+  import MenuItem from './MenuItem.svelte';
 
   let { blocks, say, onsend, onrerun, onlinkhr, onlinkcompany, onraw, onsource, ondelete } =
     $props();
 
-  function pick(close, action, blocked) {
-    close();
+  function pick(action, blocked) {
     if (blocked) return say(blocked);
     return action();
   }
@@ -19,60 +19,42 @@
 
 <ActionsMenu>
   {#snippet children(close)}
-    <button
-      class="menu-item"
-      class:blocked={blocks.send}
-      type="button"
+    <MenuItem
+      icon="send"
+      label="Отправить отклик"
       title={blocks.send || null}
-      onclick={() => pick(close, onsend, blocks.send)}
-    >
-      <span class="material-symbols-outlined">send</span>
-      Отправить отклик
-    </button>
-    <button
-      class="menu-item"
-      class:blocked={blocks.rerun}
-      type="button"
+      blocked={Boolean(blocks.send)}
+      {close}
+      onpick={() => pick(onsend, blocks.send)}
+    />
+    <MenuItem
+      icon="refresh"
+      label="Прогнать пайплайн заново"
       title={blocks.rerun || null}
-      onclick={() => pick(close, onrerun, blocks.rerun)}
-    >
-      <span class="material-symbols-outlined">refresh</span>
-      Прогнать пайплайн заново
-    </button>
+      blocked={Boolean(blocks.rerun)}
+      {close}
+      onpick={() => pick(onrerun, blocks.rerun)}
+    />
 
     <div class="menu-line"></div>
 
-    <button class="menu-item" type="button" onclick={() => pick(close, onlinkhr, '')}>
-      <span class="material-symbols-outlined">link</span>
-      Связать с другим HR
-    </button>
-    <button class="menu-item" type="button" onclick={() => pick(close, onlinkcompany, '')}>
-      <span class="material-symbols-outlined">link</span>
-      Связать с другой компанией
-    </button>
+    <MenuItem icon="link" label="Связать с другим HR" {close} onpick={onlinkhr} />
+    <MenuItem icon="link" label="Связать с другой компанией" {close} onpick={onlinkcompany} />
 
     <div class="menu-line"></div>
 
-    <button class="menu-item" type="button" onclick={() => pick(close, onraw, '')}>
-      <span class="material-symbols-outlined">code</span>
-      Открыть raw_text
-    </button>
-    <button
-      class="menu-item"
-      class:blocked={blocks.source}
-      type="button"
+    <MenuItem icon="code" label="Открыть raw_text" {close} onpick={onraw} />
+    <MenuItem
+      icon="open_in_new"
+      label="Перейти к каналу-источнику"
       title={blocks.source || null}
-      onclick={() => pick(close, onsource, blocks.source)}
-    >
-      <span class="material-symbols-outlined">open_in_new</span>
-      Перейти к каналу-источнику
-    </button>
+      blocked={Boolean(blocks.source)}
+      {close}
+      onpick={() => pick(onsource, blocks.source)}
+    />
 
     <div class="menu-line"></div>
 
-    <button class="menu-item danger" type="button" onclick={() => pick(close, ondelete, '')}>
-      <span class="material-symbols-outlined">delete</span>
-      Удалить
-    </button>
+    <MenuItem icon="delete" label="Удалить" danger {close} onpick={ondelete} />
   {/snippet}
 </ActionsMenu>

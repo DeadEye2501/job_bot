@@ -3,6 +3,7 @@
   import { companyLine } from '$state/companies.js';
 
   import Avatar from './Avatar.svelte';
+  import BlacklistMark from './BlacklistMark.svelte';
 
   let { company, selected = false, onpick } = $props();
 
@@ -31,11 +32,7 @@
   </span>
 
   <span class="cnt-hr-trailing">
-    {#if company.is_blacklisted}
-      <span class="cnt-hr-bl" title="В blacklist">
-        <span class="material-symbols-outlined">block</span>
-      </span>
-    {/if}
+    <BlacklistMark blocked={company.is_blacklisted} />
     {#if company.vacancy_count > 0}
       <span class="cnt-co-count">{company.vacancy_count}</span>
     {/if}

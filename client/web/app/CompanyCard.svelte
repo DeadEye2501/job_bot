@@ -5,9 +5,9 @@
   // людей и вакансии, и уводить ради этого с экрана значило бы терять из виду
   // соседей по списку.
 
-  import ActionsMenu from '$components/ActionsMenu.svelte';
   import Avatar from '$components/Avatar.svelte';
-  import BlacklistMenuItem from '$components/BlacklistMenuItem.svelte';
+  import BlacklistChip from '$components/BlacklistChip.svelte';
+  import ContactActions from '$components/ContactActions.svelte';
   import ChipList from '$components/ChipList.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniPeople from '$components/MiniPeople.svelte';
@@ -197,50 +197,18 @@
       </div>
 
       <div class="cnt-det-meta-row">
-        {#if card.blacklist_value}
-          <span class="cnt-det-meta-chip blacklist" title="В blacklist: {card.blacklist_value}">
-            <span class="material-symbols-outlined">block</span>
-            В blacklist
-          </span>
-        {/if}
+        <BlacklistChip value={card.blacklist_value} />
       </div>
     </div>
 
-    <ActionsMenu>
-      {#snippet children(close)}
-        <button
-          class="menu-item"
-          type="button"
-          onclick={() => {
-            close();
-            asking = 'merge';
-          }}
-        >
-          <span class="material-symbols-outlined">merge</span>
-          Слить с другой компанией
-        </button>
-        <BlacklistMenuItem
-          blocked={!!card.blacklist_value}
-          {close}
-          onblock={block}
-          onunblock={unblock}
-        />
-
-        <div class="menu-line"></div>
-
-        <button
-          class="menu-item danger"
-          type="button"
-          onclick={() => {
-            close();
-            asking = 'delete';
-          }}
-        >
-          <span class="material-symbols-outlined">delete</span>
-          Удалить
-        </button>
-      {/snippet}
-    </ActionsMenu>
+    <ContactActions
+      mergeLabel="Слить с другой компанией"
+      blocked={!!card.blacklist_value}
+      onmerge={() => (asking = 'merge')}
+      onblock={block}
+      onunblock={unblock}
+      ondelete={() => (asking = 'delete')}
+    />
   </div>
 
   <div class="cnt-form-grid">
@@ -270,7 +238,6 @@
         value={card.notes}
         placeholder="Заметки о компании…"
         delay={NOTES_DELAY}
-        limit={2000}
         owner={companyId}
         save={saveNotes}
       />

@@ -110,9 +110,16 @@
     return done;
   }
 
+  /** Погасить строку отсева или зажечь её обратно.
+   *
+   * Отвечает, легло ли: строка держит положение переключателя у себя, и без
+   * ответа отказ остался бы невидимым — переключатель показывал бы одно, а
+   * отсев работал бы по-другому.
+   */
   async function toggle(row, on) {
-    await ask('blacklist.set_active', { id: row.id, active: on });
-    return refresh();
+    const done = await ask('blacklist.set_active', { id: row.id, active: on });
+    await refresh();
+    return done !== null;
   }
 
   async function drop(row) {

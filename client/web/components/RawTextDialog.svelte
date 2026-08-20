@@ -5,29 +5,15 @@
   //
   // Открывают его, когда разбор вышел кривым: по тексту видно, чего в
   // объявлении не было вовсе, а что модель прочла не так.
-  import ModalKeys from './ModalKeys.svelte';
+  import ModalHead from './ModalHead.svelte';
+  import ModalShell from './ModalShell.svelte';
 
   let { id, chips, text, oncopy, onclose } = $props();
 </script>
 
-<ModalKeys close={onclose} />
-
-<div
-  class="modal-backdrop"
-  role="presentation"
-  onclick={(event) => event.target === event.currentTarget && onclose()}
->
-  <div class="modal-dialog vac-raw-modal" role="dialog" aria-modal="true">
-    <div class="modal-head">
-      <span class="material-symbols-outlined">code</span>
-      <div class="modal-title">
-        Исходный текст вакансии
-        <span class="modal-title-meta">id #{id}</span>
-      </div>
-      <button class="modal-close" type="button" title="Закрыть" onclick={() => onclose()}>
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
+<ModalShell extra="vac-raw-modal" {onclose}>
+  {#snippet children()}
+    <ModalHead icon="code" title="Исходный текст вакансии" meta="id #{id}" {onclose} />
 
     <div class="raw-meta">
       {#each chips as chip (chip.icon)}
@@ -46,5 +32,5 @@
       </button>
       <pre class="raw-text">{text}</pre>
     </div>
-  </div>
-</div>
+  {/snippet}
+</ModalShell>

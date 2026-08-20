@@ -7,6 +7,7 @@
   import { tick } from 'svelte';
 
   import { toggled } from '$state/chosen.js';
+  import { closeOnClickAway } from '$state/outside.js';
   import { STATUS_CHOICES } from '$state/statuses.js';
   import {
     COMPANY_MAX,
@@ -35,6 +36,9 @@
   let channelSearch = $state('');
   let companySearch = $state('');
   let body = $state(null);
+  // Узел, по которому считается «нажали мимо»: кнопка и панель вместе. Своим
+  // узлом, а не по именам классов — в двух списках подряд они одинаковы.
+  let root = $state(null);
 
   const count = $derived(activeCount(draft));
   const channels = $derived(pickNames(options.channels, channelSearch));
@@ -70,191 +74,191 @@
     if (!shown) return;
     // Нажатие мимо панели закрывает её и бросает черновик. Ухода мыши здесь
     // мало: панель большая, и мышь уходит с неё, пока человек ещё набирает.
-    const away = (event) => {
-      if (!event.target.closest('.filter-panel') && !event.target.closest('.filter-btn')) {
-        onshown(false);
-      }
-    };
-    document.addEventListener('click', away);
-    return () => document.removeEventListener('click', away);
+    return closeOnClickAway(() => root, () => onshown(false));
   });
 </script>
 
-<button
-  class="icon-btn filter-btn"
-  class:active={activeCount(applied) > 0}
-  type="button"
-  title="Фильтры"
-  onclick={toggle}
->
-  <span class="material-symbols-outlined">filter_list</span>
-</button>
+<!-- Панель падает из полосы, а не из-под кнопки: она вдвое шире полосы, и
+     прижатая к кнопке у правого края она уходила бы за кромку списка.
 
-{#if shown}
-  <!-- Панель падает из полосы, а не из-под кнопки: она вдвое шире полосы, и
-       прижатая к кнопке у правого края она уходила бы за кромку списка. -->
-  <div class="pop filter-panel">
-    <div class="filter-head">
-      <span class="material-symbols-outlined">filter_list</span>
-      <span class="filter-title">Фильтры</span>
-      <span class="filter-meta">{count ? `${count} активных` : 'Без фильтров'}</span>
-      <button class="filter-close" type="button" title="Закрыть" onclick={() => onshown(false)}>
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
+     Обёртка вокруг них своей раскладки не имеет и стоит только затем, чтобы
+     кнопка и панель считались одним местом: «мимо» сторож считает по узлу, а не
+     по имени класса, и кнопка панели не принадлежит — она её сосед. -->
+<div class="filter-wrap" bind:this={root}>
+  <button
+    class="icon-btn filter-btn"
+    class:active={activeCount(applied) > 0}
+    type="button"
+    title="Фильтры"
+    onclick={toggle}
+  >
+    <span class="material-symbols-outlined">filter_list</span>
+  </button>
 
-    <div class="filter-body" bind:this={body}>
-      <FilterGroup label="Статус">
-        <ChoiceRow
-          options={STATUS_CHOICES}
-          chosen={draft.statuses}
-          look="chip"
-          dots
-          onpick={(value) => (draft.statuses = toggled(draft.statuses, value))}
-        />
-      </FilterGroup>
+  {#if shown}
+    <div class="pop filter-panel">
+      <div class="filter-head">
+        <span class="material-symbols-outlined">filter_list</span>
+        <span class="filter-title">Фильтры</span>
+        <span class="filter-meta">{count ? `${count} активных` : 'Без фильтров'}</span>
+        <button class="filter-close" type="button" title="Закрыть" onclick={() => onshown(false)}>
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
 
-      <FilterGroup label="Каналы">
-        <PickList
-          placeholder="Выбрать каналы"
-          hint="Поиск канала..."
-          empty="Нет каналов"
-          names={channels}
-          chosen={draft.channels}
-          search={channelSearch}
-          onsearch={(text) => (channelSearch = text)}
-          prefix="@"
-          onpick={(name) => (draft.channels = toggled(draft.channels, name))}
-        />
-      </FilterGroup>
-
-      <FilterGroup label="Компании">
-        <PickList
-          placeholder="Выбрать компании"
-          hint="Поиск компании..."
-          empty="Нет совпадений"
-          names={companies}
-          chosen={draft.companies}
-          search={companySearch}
-          onsearch={(text) => (companySearch = text)}
-          onpick={(name) => (draft.companies = toggled(draft.companies, name))}
-        />
-      </FilterGroup>
-
-      <FilterGroup label="Score">
-        <div class="filter-pair">
-          <input
-            class="input"
-            type="number"
-            placeholder="min"
-            value={draft.scoreMin}
-            oninput={(event) => (draft.scoreMin = event.currentTarget.value)}
+      <div class="filter-body" bind:this={body}>
+        <FilterGroup label="Статус">
+          <ChoiceRow
+            options={STATUS_CHOICES}
+            chosen={draft.statuses}
+            look="chip"
+            dots
+            onpick={(value) => (draft.statuses = toggled(draft.statuses, value))}
           />
-          <input
-            class="input"
-            type="number"
-            placeholder="max"
-            value={draft.scoreMax}
-            oninput={(event) => (draft.scoreMax = event.currentTarget.value)}
+        </FilterGroup>
+
+        <FilterGroup label="Каналы">
+          <PickList
+            placeholder="Выбрать каналы"
+            hint="Поиск канала..."
+            empty="Нет каналов"
+            names={channels}
+            chosen={draft.channels}
+            search={channelSearch}
+            onsearch={(text) => (channelSearch = text)}
+            prefix="@"
+            onpick={(name) => (draft.channels = toggled(draft.channels, name))}
           />
-        </div>
-      </FilterGroup>
+        </FilterGroup>
 
-      <FilterGroup label="Зарплата">
-        <div class="filter-pair">
-          <!-- Шаг в сотню: зарплату набирают тысячами, и стрелки поля с шагом
-               в единицу пришлось бы жать сотнями нажатий. -->
-          <input
-            class="input"
-            type="number"
-            min="0"
-            step="100"
-            placeholder="от"
-            value={draft.salaryMin}
-            oninput={(event) => (draft.salaryMin = event.currentTarget.value)}
+        <FilterGroup label="Компании">
+          <PickList
+            placeholder="Выбрать компании"
+            hint="Поиск компании..."
+            empty="Нет совпадений"
+            names={companies}
+            chosen={draft.companies}
+            search={companySearch}
+            onsearch={(text) => (companySearch = text)}
+            onpick={(name) => (draft.companies = toggled(draft.companies, name))}
           />
-          <input
-            class="input"
-            type="number"
-            min="0"
-            step="100"
-            placeholder="до"
-            value={draft.salaryMax}
-            oninput={(event) => (draft.salaryMax = event.currentTarget.value)}
-          />
-        </div>
-      </FilterGroup>
+        </FilterGroup>
 
-      <FilterGroup label="Грейд">
-        <ChoiceRow
-          options={GRADE_CHOICES}
-          chosen={alone(draft.grade)}
-          look="chip"
-          onpick={(value) => (draft.grade = value)}
-        />
-      </FilterGroup>
-
-      <FilterGroup label="Формат работы">
-        <ChoiceRow
-          options={REMOTE_CHOICES}
-          chosen={alone(draft.remote)}
-          look="chip"
-          onpick={(value) => (draft.remote = value)}
-        />
-      </FilterGroup>
-
-      <FilterGroup label="HR-контакт">
-        <ChoiceRow
-          options={HR_CHOICES}
-          chosen={alone(draft.hrContact)}
-          look="chip"
-          onpick={(value) => (draft.hrContact = value)}
-        />
-      </FilterGroup>
-
-      <FilterGroup label="Активность в течение">
-        <ChoiceRow
-          options={DATE_PRESETS}
-          chosen={alone(draft.datePreset)}
-          look="chip"
-          onpick={pickPreset}
-        />
-        {#if draft.datePreset === 'range'}
-          <div class="filter-pair filter-dates">
-            <DatePicker value={draft.dateFrom} up onpick={(iso) => (draft.dateFrom = iso)} />
-            <DatePicker value={draft.dateTo} up onpick={(iso) => (draft.dateTo = iso)} />
+        <FilterGroup label="Score">
+          <div class="filter-pair">
+            <input
+              class="input"
+              type="number"
+              placeholder="min"
+              value={draft.scoreMin}
+              oninput={(event) => (draft.scoreMin = event.currentTarget.value)}
+            />
+            <input
+              class="input"
+              type="number"
+              placeholder="max"
+              value={draft.scoreMax}
+              oninput={(event) => (draft.scoreMax = event.currentTarget.value)}
+            />
           </div>
-        {/if}
-      </FilterGroup>
-    </div>
+        </FilterGroup>
 
-    <div class="filter-foot">
-      <!-- «Сбросить» — это «показать всё», а не «очистить поля»: список
-           перечитывается сразу, панель закрывается. -->
-      <button
-        class="btn"
-        type="button"
-        onclick={() => {
-          onshown(false);
-          onapply(blankFilter());
-        }}
-      >
-        <span class="material-symbols-outlined">restart_alt</span>
-        Сбросить
-      </button>
-      <div class="filter-foot-right">
-        <button class="btn" type="button" onclick={() => onshown(false)}>Отмена</button>
+        <FilterGroup label="Зарплата">
+          <div class="filter-pair">
+            <!-- Шаг в сотню: зарплату набирают тысячами, и стрелки поля с шагом
+                 в единицу пришлось бы жать сотнями нажатий. -->
+            <input
+              class="input"
+              type="number"
+              min="0"
+              step="100"
+              placeholder="от"
+              value={draft.salaryMin}
+              oninput={(event) => (draft.salaryMin = event.currentTarget.value)}
+            />
+            <input
+              class="input"
+              type="number"
+              min="0"
+              step="100"
+              placeholder="до"
+              value={draft.salaryMax}
+              oninput={(event) => (draft.salaryMax = event.currentTarget.value)}
+            />
+          </div>
+        </FilterGroup>
+
+        <FilterGroup label="Грейд">
+          <ChoiceRow
+            options={GRADE_CHOICES}
+            chosen={alone(draft.grade)}
+            look="chip"
+            onpick={(value) => (draft.grade = value)}
+          />
+        </FilterGroup>
+
+        <FilterGroup label="Формат работы">
+          <ChoiceRow
+            options={REMOTE_CHOICES}
+            chosen={alone(draft.remote)}
+            look="chip"
+            onpick={(value) => (draft.remote = value)}
+          />
+        </FilterGroup>
+
+        <FilterGroup label="HR-контакт">
+          <ChoiceRow
+            options={HR_CHOICES}
+            chosen={alone(draft.hrContact)}
+            look="chip"
+            onpick={(value) => (draft.hrContact = value)}
+          />
+        </FilterGroup>
+
+        <FilterGroup label="Активность в течение">
+          <ChoiceRow
+            options={DATE_PRESETS}
+            chosen={alone(draft.datePreset)}
+            look="chip"
+            onpick={pickPreset}
+          />
+          {#if draft.datePreset === 'range'}
+            <div class="filter-pair filter-dates">
+              <DatePicker value={draft.dateFrom} up onpick={(iso) => (draft.dateFrom = iso)} />
+              <DatePicker value={draft.dateTo} up onpick={(iso) => (draft.dateTo = iso)} />
+            </div>
+          {/if}
+        </FilterGroup>
+      </div>
+
+      <div class="filter-foot">
+        <!-- «Сбросить» — это «показать всё», а не «очистить поля»: список
+             перечитывается сразу, панель закрывается. -->
         <button
-          class="btn primary"
+          class="btn"
           type="button"
           onclick={() => {
             onshown(false);
-            onapply({ ...draft });
+            onapply(blankFilter());
           }}
         >
-          Применить
+          <span class="material-symbols-outlined">restart_alt</span>
+          Сбросить
         </button>
+        <div class="filter-foot-right">
+          <button class="btn" type="button" onclick={() => onshown(false)}>Отмена</button>
+          <button
+            class="btn primary"
+            type="button"
+            onclick={() => {
+              onshown(false);
+              onapply({ ...draft });
+            }}
+          >
+            Применить
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-{/if}
+  {/if}
+</div>

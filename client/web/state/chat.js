@@ -62,7 +62,18 @@ export function tick(message) {
  * гонял бы базу на каждое открытие карточки.
  */
 export function unread(messages) {
-  return messages.some((one) => one.is_incoming && !one.read_at && !one.is_deleted);
+  return messages.some(isUnread);
+}
+
+/** Непрочитано ли это письмо.
+ *
+ * Правило одно на ленту и на пузырь: лента по нему решает, говорить ли мосту
+ * «прочитано», а пузырь — метить ли себя тем, к чему прокручиваются при
+ * открытии. Разъедься эти два счёта, прокрутка вела бы к письму, которое
+ * отметка уже не считает непрочитанным.
+ */
+export function isUnread(message) {
+  return message.is_incoming && !message.read_at && !message.is_deleted;
 }
 
 /** Почему этому человеку нельзя написать. Пусто — значит можно.

@@ -102,6 +102,10 @@ export function validDate(text) {
   const iso = asIso(text);
   if (iso === null) return null;
   const { year, month, day } = dayOf(iso);
+  // Нулевой год отбиваем отдельно: часы принимают его молча — годы до сотни они
+  // считают двадцатым веком, — а мост разбирает ISO питоном, и `0000-01-01` для
+  // того не дата вовсе.
+  if (year < 1) return false;
   const at = new Date(year, month - 1, day);
   return at.getMonth() + 1 === month && at.getDate() === day;
 }

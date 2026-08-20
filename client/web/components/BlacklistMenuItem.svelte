@@ -7,20 +7,15 @@
   // списком, и разъехаться им ничего не мешает.
   //
   // Чем зов кончится, пункт не знает: у карточек свои обращения к мосту и
-  // свои слова о сделанном. Меню за собой закрывает сам — оставшееся
-  // открытым окошко перекрывает ту самую строку, которую пункт и поменял.
+  // свои слова о сделанном.
+  import MenuItem from './MenuItem.svelte';
+
   let { blocked, close, onblock, onunblock } = $props();
 </script>
 
-<button
-  class="menu-item"
-  type="button"
-  onclick={() => {
-    close();
-    if (blocked) onunblock();
-    else onblock();
-  }}
->
-  <span class="material-symbols-outlined">{blocked ? 'restart_alt' : 'block'}</span>
-  {blocked ? 'Убрать из blacklist' : 'Добавить в blacklist'}
-</button>
+<MenuItem
+  icon={blocked ? 'restart_alt' : 'block'}
+  label={blocked ? 'Убрать из blacklist' : 'Добавить в blacklist'}
+  {close}
+  onpick={() => (blocked ? onunblock() : onblock())}
+/>

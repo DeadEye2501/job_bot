@@ -4,24 +4,21 @@
   // Своим окном, а не общим спрашивающим: у этого есть шапка с крестиком, свой
   // подвал и строка отказа внутри — канал заводят по нику, и ошибку в нике
   // объясняют там же, где его набирали, а не общей плашкой поверх окна.
-  import ModalKeys from './ModalKeys.svelte';
+  import ModalFoot from './ModalFoot.svelte';
+  import ModalHead from './ModalHead.svelte';
+  import ModalShell from './ModalShell.svelte';
 
   let { value, trouble, saving, oninput, onadd, onclose } = $props();
 </script>
 
-<ModalKeys close={onclose} />
-
-<div class="modal-backdrop" role="presentation">
-  <div class="modal-dialog add-channel" role="dialog" aria-modal="true">
-    <div class="modal-head">
-      <span class="material-symbols-outlined">add_circle</span>
-      <div class="modal-title">Добавить канал</div>
-      <button class="modal-close" type="button" title="Закрыть" onclick={() => onclose()}>
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
+<ModalShell extra="add-channel" {onclose}>
+  {#snippet children()}
+    <ModalHead icon="add_circle" title="Добавить канал" {onclose} />
 
     <div class="modal-body">
+      <!-- Курсор ставится в поле сразу: окно об одном поле и открывают затем,
+           чтобы в него набрать. Проверка a11y гасится нарочно — она о формах,
+           где полей несколько и выбор первого за человеком. -->
       <!-- svelte-ignore a11y_autofocus -->
       <input
         class="cnt-input"
@@ -38,11 +35,13 @@
       {/if}
     </div>
 
-    <div class="modal-footer">
-      <button class="btn" type="button" onclick={() => onclose()}>Отмена</button>
-      <button class="btn primary" type="button" disabled={saving || !value.trim()} onclick={() => onadd()}>
-        {saving ? 'Добавляю…' : 'Добавить'}
-      </button>
-    </div>
-  </div>
-</div>
+    <ModalFoot
+      label="Добавить"
+      busyLabel="Добавляю…"
+      busy={saving}
+      ready={Boolean(value.trim())}
+      oncancel={onclose}
+      onconfirm={onadd}
+    />
+  {/snippet}
+</ModalShell>

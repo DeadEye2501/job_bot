@@ -3,6 +3,8 @@
   import { personName } from '$state/people.js';
 
   import Avatar from './Avatar.svelte';
+  import BlacklistMark from './BlacklistMark.svelte';
+  import Handle from './Handle.svelte';
 
   let { person, selected = false, onpick } = $props();
 
@@ -26,11 +28,7 @@
          по компании вспоминают, откуда человек писал. Обе половины названы
          всегда: пустое место читалось бы как недогрузившаяся строка. -->
     <span class="cnt-hr-sub">
-      {#if person.telegram_username}
-        <span class="at">@{person.telegram_username}</span>
-      {:else}
-        <span class="muted">без @username</span>
-      {/if}
+      <Handle username={person.telegram_username} />
       <span class="sep">·</span>
       {#if person.last_company_name}
         <span class="company">{person.last_company_name}</span>
@@ -41,11 +39,7 @@
   </span>
 
   <span class="cnt-hr-trailing">
-    {#if person.is_blacklisted}
-      <span class="cnt-hr-bl" title="В blacklist">
-        <span class="material-symbols-outlined">block</span>
-      </span>
-    {/if}
+    <BlacklistMark blocked={person.is_blacklisted} />
     {#if person.unread_count}
       <span class="cnt-hr-unread">{person.unread_count}</span>
     {/if}

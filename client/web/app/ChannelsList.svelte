@@ -6,6 +6,7 @@
   import AddChannelDialog from '$components/AddChannelDialog.svelte';
   import ChannelRow from '$components/ChannelRow.svelte';
   import ContactsPanes from '$components/ContactsPanes.svelte';
+  import RowToggle from '$components/RowToggle.svelte';
   import SearchBox from '$components/SearchBox.svelte';
   import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
@@ -60,14 +61,27 @@
     return refresh();
   }
 
+  /** Включить опрос канала или снять его.
+   *
+   * Отвечает, легло ли: строка держит положение переключателя у себя, и без
+   * ответа отказ остался бы невидимым — человек считал бы канал выключенным,
+   * а обход читал бы его дальше.
+   */
   async function toggle(channel, on) {
-    await ask('channels.set_active', { channel_id: channel.id, is_active: on });
-    return refresh();
+    const done = await ask('channels.set_active', { channel_id: channel.id, is_active: on });
+    await refresh();
+    return done !== null;
   }
 
+  /** Включить опрос у всех каналов разом или снять его.
+   *
+   * Отвечает, легло ли: общий переключатель держит положение у себя, как и
+   * строчные, и без ответа отказ остался бы невидимым.
+   */
   async function toggleAll(on) {
-    await ask('channels.set_all_active', { is_active: on });
-    return refresh();
+    const done = await ask('channels.set_all_active', { is_active: on });
+    await refresh();
+    return done !== null;
   }
 
   /** Завести канал по нику или ссылке.
@@ -130,13 +144,11 @@
     </button>
     <!-- Один переключатель на весь список: он же и показывает, все ли каналы
          опрашиваются. -->
-    <input
-      type="checkbox"
-      class="toggle compact"
+    <RowToggle
       checked={master.checked}
       disabled={master.disabled}
       title={master.title}
-      onchange={(event) => toggleAll(event.currentTarget.checked)}
+      ontoggle={toggleAll}
     />
   {/snippet}
 

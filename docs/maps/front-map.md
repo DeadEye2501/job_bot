@@ -14,15 +14,15 @@
 
 ## app — 25 файлов
 
-### app/BlacklistList.svelte (213)
+### app/BlacklistList.svelte (220)
 - —
 - принимает: ask, say, events
 
-### app/ChannelCard.svelte (310)
+### app/ChannelCard.svelte (293)
 - Легенда под полосой: одиннадцать цветов без подписей не читаются, а подписать отрезки внутри полосы негде.
 - принимает: ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged
 
-### app/ChannelsList.svelte (189)
+### app/ChannelsList.svelte (201)
 - Один переключатель на весь список: он же и показывает, все ли каналы опрашиваются.
 - принимает: ask, say, lockedTip, events, open, onopened, onvacancy
 - берёт: ./ChannelCard.svelte
@@ -32,7 +32,7 @@
 - принимает: ask, say, events, open, onopened, onperson, onvacancy
 - берёт: ./CompanyCard.svelte
 
-### app/CompanyCard.svelte (322)
+### app/CompanyCard.svelte (289)
 - Написания: под ними компания приходит в объявлениях. Потеряй карточка одно из них — следующая вакансия завела бы компанию заново.
 - принимает: ask, say, companyId, onperson, onvacancy, onclose, onchanged
 
@@ -50,7 +50,7 @@
 - принимает: ask, say, events, open, onopened, oncompany, onvacancy
 - берёт: ./PersonCard.svelte
 
-### app/PersonCard.svelte (330)
+### app/PersonCard.svelte (297)
 - Своя запись на каждого человека: поле запечатывает номер при заведении, и заводиться заново на каждого его заставляет именно `{#key}` — без него запечатанный номер протухнет.
 - принимает: ask, say, events, personId, oncompany, onvacancy, onclose, onchanged
 - берёт: ./PersonChat.svelte
@@ -98,7 +98,7 @@
 - принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte
 
-### app/VacancyCard.svelte (387)
+### app/VacancyCard.svelte (390)
 - Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою оценку.
 - принимает: ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged
 - берёт: ./VacancyLinks.svelte
@@ -125,49 +125,59 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 69 файлов
+## components — 78 файлов
 
 ### components/ActionsMenu.svelte (31)
 - —
 - принимает: children
 
-### components/AddBlacklistDialog.svelte (125)
-- svelte-ignore a11y_autofocus
+### components/AddBlacklistDialog.svelte (109)
+- Поле одно на оба рода: у слова подсказчика нет вовсе, и второе написание того же поля разошлось бы с первым первой же правкой длины. Обёртка стоит всегда — она держит выпадающий список у поля.
 - принимает: draft, hints, kinds, saving, onkind, onvalue, onreason, onadd, onclose
-- берёт: ./ModalKeys.svelte
+- берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte
 
-### components/AddChannelDialog.svelte (48)
-- svelte-ignore a11y_autofocus
+### components/AddChannelDialog.svelte (47)
+- Курсор ставится в поле сразу: окно об одном поле и открывают затем, чтобы в него набрать. Проверка a11y гасится нарочно — она о формах, где полей несколько и выбор первого за человеком.
 - принимает: value, trouble, saving, oninput, onadd, onclose
-- берёт: ./ModalKeys.svelte
+- берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte
 
-### components/AskDialog.svelte (44)
+### components/AskDialog.svelte (42)
 - Окно берёт на себя Escape, но не Enter: в нём набирают заметки в несколько строк, и подтверждение по Enter обрывало бы заведение на первом же переводе строки.
 - принимает: icon, title, subtitle, confirmLabel, ready, onconfirm, oncancel, children
-- берёт: ./ModalKeys.svelte
+- берёт: ./ModalShell.svelte
 
 ### components/Avatar.svelte (20)
 - —
 - принимает: avatar, name, icon
 
-### components/BlacklistMenuItem.svelte (26)
+### components/BlacklistChip.svelte (15)
+- —
+- принимает: value
+
+### components/BlacklistMark.svelte (13)
+- —
+- принимает: blocked
+
+### components/BlacklistMenuItem.svelte (21)
 - —
 - принимает: blocked, close, onblock, onunblock
+- берёт: ./MenuItem.svelte
 
-### components/BlacklistRow.svelte (121)
+### components/BlacklistRow.svelte (118)
 - —
 - принимает: row, onedit, ontoggle, onremove
+- берёт: ./RowToggle.svelte
 
-### components/BulletList.svelte (51)
+### components/BulletList.svelte (60)
 - —
 - принимает: label, addLabel, items, onedit, onadd, onremove
 
-### components/ChannelRow.svelte (49)
+### components/ChannelRow.svelte (41)
 - Канал из отсева включить нельзя: обход всё равно его пропустит, и включённый переключатель обещал бы работу, которой не будет.
 - принимает: channel, selected, onpick, ontoggle
-- берёт: ./Avatar.svelte
+- берёт: ./Avatar.svelte, ./BlacklistMark.svelte, ./Handle.svelte, ./RowToggle.svelte
 
-### components/ChatBubble.svelte (59)
+### components/ChatBubble.svelte (62)
 - Вложение открывает система, а не страница: показать документ она умеет только снимком, а читают его в своей программе. Файла может и не быть вовсе: бот скачивает не всё, — и тогда остаётся род вложения в скобках, потому что открывать нечего.
 - принимает: message, onopen
 
@@ -175,8 +185,8 @@
 - —
 - принимает: text, onremove
 
-### components/ChipList.svelte (55)
-- svelte-ignore a11y_autofocus
+### components/ChipList.svelte (58)
+- Курсор ставится в поле сразу: его и завели по нажатию «добавить». Проверка a11y гасится нарочно — она о формах, где полей несколько и выбор первого за человеком.
 - принимает: items, onadd, onremove
 - берёт: ./Chip.svelte
 
@@ -184,15 +194,20 @@
 - —
 - принимает: options, chosen, look, dots, onpick
 
-### components/CompanyRow.svelte (43)
+### components/CompanyRow.svelte (40)
 - —
 - принимает: company, selected, onpick
-- берёт: ./Avatar.svelte
+- берёт: ./Avatar.svelte, ./BlacklistMark.svelte
 
-### components/ConfirmDialog.svelte (22)
+### components/ConfirmDialog.svelte (16)
 - —
 - принимает: message, confirmLabel, onconfirm, oncancel
-- берёт: ./ModalKeys.svelte
+- берёт: ./ModalShell.svelte
+
+### components/ContactActions.svelte (23)
+- —
+- принимает: mergeLabel, blocked, onmerge, onblock, onunblock, ondelete
+- берёт: ./ActionsMenu.svelte, ./BlacklistMenuItem.svelte, ./MenuItem.svelte
 
 ### components/ContactsPanes.svelte (58)
 - —
@@ -202,7 +217,7 @@
 - Открывать нечего, когда файла нет на диске: система показала бы свою ошибку вместо нашей строки «файл не найден».
 - принимает: meta, onreplace, onopen
 
-### components/DatePicker.svelte (129)
+### components/DatePicker.svelte (145)
 - —
 - принимает: value, onpick, disabled, up
 
@@ -214,7 +229,7 @@
 - —
 - принимает: options, value, onpick
 
-### components/ExperienceCard.svelte (144)
+### components/ExperienceCard.svelte (145)
 - Нажимается вся шапка, а не одна стрелка: свёрнутых карточек столбик, и целиться в значок ради раскрытия человеку не за что.
 - принимает: exp, known, open, ontoggle, onedit, onremove
 - берёт: ./BulletList.svelte, ./DatePicker.svelte, ./SkillPicker.svelte
@@ -222,6 +237,10 @@
 ### components/FilterGroup.svelte (12)
 - —
 - принимает: label, children
+
+### components/Handle.svelte (14)
+- —
+- принимает: username
 
 ### components/HealthLamp.svelte (9)
 - —
@@ -241,9 +260,13 @@
 - —
 - принимает: label, icon, tone, count, active, onpick
 
-### components/LogRow.svelte (17)
-- svelte-ignore a11y_click_events_have_key_events
+### components/LogRow.svelte (25)
+- Нажимается вся строка, а не значок в ней: строк сотни, и целиться в значок ради трассировки человеку не за что. Клавиатуре она отвечает тем же — иначе журнал не развернуть, не берясь за мышь.
 - принимает: time, level, tone, source, message, details, expanded, ontoggle
+
+### components/MenuItem.svelte (38)
+- —
+- принимает: icon, label, danger, title, blocked, disabled, close, onpick
 
 ### components/MiniPeople.svelte (39)
 - —
@@ -254,9 +277,22 @@
 - —
 - принимает: vacancies, empty, loading, onpick
 
+### components/ModalFoot.svelte (15)
+- —
+- принимает: label, busyLabel, busy, ready, oncancel, onconfirm
+
+### components/ModalHead.svelte (18)
+- —
+- принимает: icon, title, meta, onclose
+
 ### components/ModalKeys.svelte (17)
 - —
 - принимает: close, confirm
+
+### components/ModalShell.svelte (28)
+- Нажатие по затемнению закрывает окно, нажатие внутри коробки — нет: сверяем, что нажали ровно в затемнение, а не всплыло из содержимого.
+- принимает: extra, confirm, onclose, children
+- берёт: ./ModalKeys.svelte
 
 ### components/ModeToggle.svelte (29)
 - —
@@ -274,23 +310,23 @@
 - Номер учётной записи — только цифры: на телефоне открывается цифровая раскладка, а мост всё равно приводит его к числу.
 - принимает: draft
 
-### components/NotesField.svelte (65)
+### components/NotesField.svelte (66)
 - —
-- принимает: value, placeholder, delay, limit, owner, save
+- принимает: value, placeholder, delay, owner, save
 
-### components/PersonRow.svelte (53)
+### components/PersonRow.svelte (47)
 - Ник и компания — то, чем различают тёзок: по нику находят в Telegram, по компании вспоминают, откуда человек писал. Обе половины названы всегда: пустое место читалось бы как недогрузившаяся строка.
 - принимает: person, selected, onpick
-- берёт: ./Avatar.svelte
+- берёт: ./Avatar.svelte, ./BlacklistMark.svelte, ./Handle.svelte
 
 ### components/PickList.svelte (55)
 - —
 - принимает: placeholder, hint, empty, names, chosen, search, onsearch, prefix, onpick
 
-### components/PickerDialog.svelte (160)
+### components/PickerDialog.svelte (158)
 - Пустых слов два, и разница несущая: «ничего не найдено» говорит, что список есть, а показать из него нечего, — и человек ищет причину в поле поиска, а не в том, что заводить он ещё ничего не начинал.
 - принимает: title, icon, placeholder, empty, prefill, current, preselect, load, applyLabel, onapply, saving, onclose, children, createLabel, createIcon, oncreate
-- берёт: ./ModalKeys.svelte
+- берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte
 
 ### components/PickerRow.svelte (34)
 - —
@@ -310,10 +346,14 @@
 - —
 - принимает: channels, messages, text
 
-### components/RawTextDialog.svelte (50)
+### components/RawTextDialog.svelte (36)
 - Кнопка стоит поверх текста и полупрозрачна: окно узкое, и вынесенная в подвал она отняла бы у текста строку ради того, что нажимают раз в десять открытий.
 - принимает: id, chips, text, oncopy, onclose
-- берёт: ./ModalKeys.svelte
+- берёт: ./ModalHead.svelte, ./ModalShell.svelte
+
+### components/RowToggle.svelte (35)
+- —
+- принимает: checked, disabled, title, ontoggle
 
 ### components/RunButton.svelte (13)
 - —
@@ -332,7 +372,7 @@
 - принимает: icon, title, pill, danger, children
 - берёт: ./StatusPill.svelte
 
-### components/SkillPicker.svelte (93)
+### components/SkillPicker.svelte (89)
 - —
 - принимает: chosen, known, onadd, onremove
 - берёт: ./Chip.svelte
@@ -346,7 +386,7 @@
 - —
 - принимает: title, ready, span, children
 
-### components/StatsChannelsCard.svelte (83)
+### components/StatsChannelsCard.svelte (120)
 - —
 - принимает: channels, onpick
 
@@ -362,14 +402,15 @@
 - —
 - принимает: skills
 
-### components/StatsStatusCard.svelte (41)
+### components/StatsStatusCard.svelte (39)
 - —
 - принимает: counts, onpick
 - берёт: ./DonutChart.svelte
 
-### components/StatusPicker.svelte (69)
-- Заперты на время записи обе: пока ответ в пути, отмена оставила бы человека думать, что перехода не было, — а он уже уехал.
+### components/StatusPicker.svelte (75)
+- Заперты на время записи обе кнопки внизу: пока ответ в пути, отмена оставила бы человека думать, что перехода не было, — а он уже уехал. Escape при этом ловится на всё окно, а не в одном поле: окошко открывают нажатием по пилюле, и фокус в этот миг стоит на ней, а не в причине.
 - принимает: status, saving, wrap, onapply, oncancel
+- берёт: ./ModalKeys.svelte
 
 ### components/StatusPill.svelte (6)
 - —
@@ -397,13 +438,13 @@
 - Затемнения нет вовсе, но нажатие мимо список закрывает: он висит поверх окна, и оставленный открытым перекрывал бы правый край полосы.
 - принимает: count, open, loading, rows, ontoggle, onpick
 
-### components/VacancyActions.svelte (78)
+### components/VacancyActions.svelte (60)
 - —
 - принимает: blocks, say, onsend, onrerun, onlinkhr, onlinkcompany, onraw, onsource, ondelete
-- берёт: ./ActionsMenu.svelte
+- берёт: ./ActionsMenu.svelte, ./MenuItem.svelte
 
-### components/VacancyFilters.svelte (260)
-- Панель падает из полосы, а не из-под кнопки: она вдвое шире полосы, и прижатая к кнопке у правого края она уходила бы за кромку списка.
+### components/VacancyFilters.svelte (264)
+- Панель падает из полосы, а не из-под кнопки: она вдвое шире полосы, и прижатая к кнопке у правого края она уходила бы за кромку списка. Обёртка вокруг них своей раскладки не имеет и стоит только затем, чтобы кнопка и панель считались одним местом: «мимо» сторож считает по узлу, а не по имени класса, и кнопка панели не принадлежит — она её сосед.
 - принимает: applied, options, onapply, shown, onshown
 - берёт: ./ChoiceRow.svelte, ./DatePicker.svelte, ./FilterGroup.svelte, ./PickList.svelte
 
@@ -411,7 +452,7 @@
 - Половины подписи покрашены по-разному: компанию читают первой, а давность — последней, и одинаковый цвет заставлял бы разбирать строку целиком.
 - принимает: vacancy, threshold, selected, onpick
 
-### components/VacancyTimeline.svelte (113)
+### components/VacancyTimeline.svelte (114)
 - —
 - принимает: rows, vacancyId, onsave
 
@@ -465,9 +506,9 @@
 - * Чем подписать канал в списке. * * Название — сверху, ник — под ним: по названию канал узнают, по нику ищут. * Названия у канала может не быть — тогда его место занимает ник, а совсем * безымянный назван номером: показать нечего, но строка должна остаться * нажимаемой.
 - отдаёт: channelName, channelStats, channelToggle, channelsToggle, pollBlock
 
-### state/chat.js (104)
+### state/chat.js (115)
 - * Разложить письма по дням, сохранив их порядок. * * Подпись дня стоит над первым письмом этого дня, а не над каждым: иначе лента * превращается в чересполосицу дат. * * Письмо без времени выпадает вовсе — поставить его некуда, а под чужой * подписью дня оно соврало бы.
-- отдаёт: attachmentKind, byDays, chatTime, sendBlock, tick, unread
+- отдаёт: attachmentKind, byDays, chatTime, isUnread, sendBlock, tick, unread
 
 ### state/chosen.js (39)
 - * Какую долю дорожки залить под это значение. * * Зажато с обеих сторон: значение приезжает с моста и могло быть выставлено * до того, как предел назначили, — заливка шире дорожки выглядит поломкой, а * отрицательная не рисуется вовсе.
@@ -477,7 +518,7 @@
 - /i; /** Чем подписать компанию в списке. * * Имя — сверху, сайт и алиасы — под ним: по имени компанию узнают, по * домену различают. Две «Ромашки» с разными сайтами — разные компании, и без * второй строки они неотличимы. * * Имени может не быть — оно приходит из объявления, — и тогда компания названа * номером: показать нечего, но строка должна остаться нажимаемой.
 - отдаёт: companyCandidate, companyLine, companyNamed, siteHref
 
-### state/dates.js (107)
+### state/dates.js (111)
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
 - отдаёт: asIso, dayOf, isoDay, padded, shortDate, showDate, showStamp, validDate
 
@@ -553,9 +594,9 @@
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
 - отдаёт: aliasesAfter, countNote, grouped, levelPercent
 
-### state/stats.js (250)
+### state/stats.js (260)
 - * Сроки, за которые считают, — от короткого к длинному. * * `delta` — как называется прирост за этот срок. У «всего времени» его нет: * сравнивать не с чем, это и есть всё время.
-- отдаёт: KPI, PERIODS, STATUS_ORDER, convNote, deltaNote, donut, duration, kpiRow, skillRows, skillRowsPerColumn, sliceTarget, statusColumns, weekBars
+- отдаёт: KPI, PERIODS, STATUS_ORDER, convNote, deltaNote, donut, duration, kpiRow, skillRows, skillRowsPerColumn, sliceTarget, statusColumns, statusTotal, weekBars
 
 ### state/statuses.js (13)
 - * Статусы в том порядке, в каком их читают в кольце статистики. * * Значение совпадает с тем, каким статус приходит в строке списка и каким его * принимает смена статуса на мосту; им же покрашена точка рядом.
@@ -642,9 +683,9 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (8): .btn, .btn:hover:not(:disabled), .btn.primary:hover:not(:disabled), .btn:disabled, .btn.danger, .btn.danger:hover:not(:disabled), .btn.text, .btn.text:hover:not(:disabled)
 - берёт: --accent, --accent-hover-fill, --bg-tertiary, --border, --danger-btn, --err-btn-bg, --err-btn-bg-hover, --text-primary, --text-secondary
 
-### styles/channel-stats.css (88)
+### styles/channel-stats.css (82)
 - Числа канала: четыре плитки и полоса воронки под ними. Полосой, а не кольцом: доли здесь читают одну относительно другой — сколько из собранного дошло до отклика, — и в ряд это видно, а по кругу нет. Цвет отрезков — общий набор из status-color.css.
-- селекторы (13): .ch-stats-grid, .ch-stat, .ch-stat-num.fit, .ch-stat-num.apply, .ch-stat-num.response, .ch-stat-label, .ch-bar, .ch-bar-seg, .ch-bar-legend, .ch-bar-legend .legend-item, .ch-bar-legend .status-dot, .ch-stats-empty, .ch-vacs-loading-more
+- селекторы (12): .ch-stats-grid, .ch-stat, .ch-stat-num.fit, .ch-stat-num.apply, .ch-stat-num.response, .ch-stat-label, .ch-bar, .ch-bar-seg, .ch-bar-legend, .ch-bar-legend .legend-item, .ch-bar-legend .status-dot, .ch-stats-empty
 - берёт: --accent, --bg-tertiary, --info, --status-applied, --text-secondary, --text-tertiary
 
 ### styles/chat.css (295)
@@ -682,9 +723,9 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (8): .contact-block, .hr-avatar, .hr-avatar .material-symbols-outlined, img.hr-avatar, .hr-info, .hr-name, .hr-name.muted, .hr-name.is-link:hover
 - берёт: --accent, --bg-tertiary, --text-primary, --text-secondary, --text-tertiary
 
-### styles/contact-card.css (152)
+### styles/contact-card.css (147)
 - Карточка контакта в правой панели: шапка, поля и коробки под ними. Одевает три карточки — человека, компании и канала: содержимое у них разное, а места этих мест одни. Переписка — в chat.css, мини-списки — в mini-list.css, числа канала — в channel-stats.css.
-- селекторы (21): .cnt-det-head, .cnt-det-head > div, .cnt-det-head .hr-avatar, .cnt-det-name, .cnt-det-name.muted, .cnt-det-sub, .cnt-det-sub > *, .cnt-det-link, .cnt-det-link:hover, .cnt-det-meta-row, .cnt-det-meta-row > *, .cnt-det-meta-chip, .cnt-det-meta-chip.unread, .cnt-det-meta-chip.blacklist, .cnt-det-meta-chip .material-symbols-outlined, .cnt-form-grid, .cnt-input, .cnt-input:focus, .cnt-input::placeholder, .cnt-det-section, .cnt-vacs-empty
+- селекторы (20): .cnt-det-head, .cnt-det-head > div, .cnt-det-head .hr-avatar, .cnt-det-name, .cnt-det-name.muted, .cnt-det-sub, .cnt-det-sub > *, .cnt-det-link, .cnt-det-link:hover, .cnt-det-meta-row, .cnt-det-meta-row > *, .cnt-det-meta-chip, .cnt-det-meta-chip.unread, .cnt-det-meta-chip.blacklist, .cnt-det-meta-chip .material-symbols-outlined, .cnt-form-grid, .cnt-input, .cnt-input:focus, .cnt-input::placeholder, .cnt-det-section
 - берёт: --accent, --accent-chip-bg, --bg-secondary, --bg-tertiary, --border, --danger, --danger-tint-strong, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/contacts-layout.css (77)
@@ -796,14 +837,14 @@ body, html, button, body, .material-symbols-outlined
 .menu-item.danger:hover .material-symbols-outlined, .menu-line
 - берёт: --border, --danger, --danger-hover-fg, --danger-tint, --selected-bg, --text-primary, --text-secondary, --text-tertiary
 
-### styles/mini-list.css (96)
+### styles/mini-list.css (112)
 - Нажимаемая строка внутри карточки контакта: вакансия и человек компании. Обе ведут отсюда наружу — к вакансии и к карточке человека, — и поэтому одеты одинаково: подсветка при наведении и имя, загорающееся акцентом, говорят, что по строке нажимают. Коробка вокруг них общая, в contact-card.css.
-- селекторы (12): .vacs-mini,
+- селекторы (14): .vacs-mini,
 .hrs-mini, .vac-mini-row, .hr-mini-row, .vac-mini-row:first-child,
 .hr-mini-row:first-child, .vac-mini-row:hover,
 .hr-mini-row:hover, .vac-mini-row:hover .vac-mini-title,
 .hr-mini-row:hover .hr-mini-name, .vac-mini-score, .vac-mini-title,
-.hr-mini-name, .vac-mini-when, .hr-mini-row .hr-avatar, .hr-mini-meta, .hr-mini-go
+.hr-mini-name, .vac-mini-when, .hr-mini-row .hr-avatar, .hr-mini-meta, .hr-mini-go, .mini-list-empty, .mini-list-more
 - берёт: --accent, --bg-tertiary, --border, --selected-bg, --text-primary, --text-tertiary
 
 ### styles/modal.css (147)
@@ -920,10 +961,10 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (7): input[type='range'].slider, input[type='range'].slider::-webkit-slider-runnable-track, input[type='range'].slider::-moz-range-track, input[type='range'].slider::-webkit-slider-thumb, input[type='range'].slider::-moz-range-thumb, input[type='range'].slider:active::-webkit-slider-thumb, input[type='range'].slider:active::-moz-range-thumb
 - берёт: --accent, --bg-tertiary, --pct
 
-### styles/stats-channels.css (136)
+### styles/stats-channels.css (143)
 - Карточка «Каналы»: воронка канала одиннадцатью колонками. Сеткой, а не таблицей: имя канала и колонки конверсии резиновые, числовые — узкие по содержимому, и только так все одиннадцать влезают в карточку без поперечной прокрутки. Группы «Ингест», «Воронка отклика» и «Конверсия» отделены тонкой чертой — без неё одиннадцать чисел читаются как один ряд.
-- селекторы (23): .stats-ch-grid, .stats-ch-grid > *, .stats-ch-grid .stats-ch-group, .stats-ch-grid .stats-ch-group.ingest, .stats-ch-grid .stats-ch-group.funnel, .stats-ch-grid .stats-ch-group.outcome, .stats-ch-grid .stats-ch-th, .stats-ch-grid .stats-ch-name-cell, .stats-ch-grid .stats-ch-th-name, .stats-ch-grid .stats-ch-sep-l, .stats-ch-grid .stats-ch-conv, .stats-ch-grid .stats-ch-conv-label, .stats-ch-grid .stats-ch-conv-meter, .stats-ch-grid .stats-ch-conv-meter-fill, .stats-ch-grid .stats-ch-row, .stats-ch-grid .stats-ch-row.is-hover, .stats-ch-grid .v-dim, .stats-ch-grid .v-fit, .stats-ch-grid .v-sent, .stats-ch-grid .v-answ, .stats-ch-grid .v-invite, .stats-ch-grid .v-decline, .stats-ch-grid .stats-ch-last
-- берёт: --accent, --bg-tertiary, --border, --err, --info, --stats-group-funnel, --stats-group-ingest, --stats-group-outcome, --status-applied, --surface-raised, --text-primary, --text-secondary, --text-tertiary
+- селекторы (24): .stats-ch-grid, .stats-ch-grid > *, .stats-ch-grid .stats-ch-group, .stats-ch-grid .stats-ch-group, .stats-ch-grid .stats-ch-group.ingest, .stats-ch-grid .stats-ch-group.funnel, .stats-ch-grid .stats-ch-group.outcome, .stats-ch-grid .stats-ch-th, .stats-ch-grid .stats-ch-name-cell, .stats-ch-grid .stats-ch-th-name, .stats-ch-grid .stats-ch-sep-l, .stats-ch-grid .stats-ch-conv, .stats-ch-grid .stats-ch-conv-label, .stats-ch-grid .stats-ch-conv-meter, .stats-ch-grid .stats-ch-conv-meter-fill, .stats-ch-grid .stats-ch-row, .stats-ch-grid .stats-ch-row.is-hover, .stats-ch-grid .v-dim, .stats-ch-grid .v-fit, .stats-ch-grid .v-sent, .stats-ch-grid .v-answ, .stats-ch-grid .v-invite, .stats-ch-grid .v-decline, .stats-ch-grid .stats-ch-last
+- берёт: --accent, --bg-tertiary, --border, --cols, --err, --info, --stats-group-funnel, --stats-group-ingest, --stats-group-outcome, --status-applied, --surface-raised, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/stats-responses.css (84)
 - Карточка «Ответы HR»: столбцы по дням недели и две метрики под ними. Столбцы сверху, метрики снизу за чертой: график — то, ради чего в карточку смотрят, а метрики его подписывают.
@@ -1018,9 +1059,9 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (22): .det-head, .status-wrap, .det-title, .det-section, .status-badge, .status-badge:hover, .status-label, .status-badge .material-symbols-outlined, .status-wrap.popover-open .status-badge .material-symbols-outlined, .det-info, .info-chip, .info-chip .material-symbols-outlined, .info-chip.linkable, .info-chip.linkable:hover, .info-chip.score, .info-chip.score[data-tone='warn'], .info-chip.score[data-tone='bad'], .det-stack, .stack-chip, .stack-chip.matched, .det-section p, .vac-contacts
 - берёт: --accent, --accent-chip-bg, --bg-primary, --bg-secondary, --bg-tertiary, --border, --err, --score-warn, --text-primary, --text-secondary
 
-### styles/vacancy-filters.css (146)
+### styles/vacancy-filters.css (153)
 - Панель отбора вакансий: что стоит внутри окошка поверх списка. Оправа окошка — общая, в popover.css; группы условий — в filter-group.css.
-- селекторы (20): .filter-btn.active, .filter-panel, .filter-head, .filter-head .material-symbols-outlined, .filter-title, .filter-meta, .filter-close, .filter-close:hover, .filter-close .material-symbols-outlined, .filter-body, .filter-panel .input, .filter-body .status-dot, .filter-body .choice:hover, .filter-pair, .filter-dates, .filter-dates .date-picker:last-child .date-panel, .filter-foot, .filter-foot .btn, .filter-foot .btn .material-symbols-outlined, .filter-foot-right
+- селекторы (21): .filter-wrap, .filter-btn.active, .filter-panel, .filter-head, .filter-head .material-symbols-outlined, .filter-title, .filter-meta, .filter-close, .filter-close:hover, .filter-close .material-symbols-outlined, .filter-body, .filter-panel .input, .filter-body .status-dot, .filter-body .choice:hover, .filter-pair, .filter-dates, .filter-dates .date-picker:last-child .date-panel, .filter-foot, .filter-foot .btn, .filter-foot .btn .material-symbols-outlined, .filter-foot-right
 - берёт: --accent, --bg-tertiary, --border, --scrim, --selected-bg, --surface-hover-firm, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/wizard.css (483)
@@ -1048,7 +1089,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist.test.js (179)
 - —
 
-### tests/blacklist_menu_item.test.js (80)
+### tests/blacklist_menu_item.test.js (108)
 - * Файлы разметки вместе с содержимым.
 
 ### tests/bridge.test.js (161)
@@ -1075,7 +1116,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/companies.test.js (109)
 - —
 
-### tests/dates.test.js (93)
+### tests/dates.test.js (100)
 - —
 
 ### tests/events.test.js (205)
@@ -1129,7 +1170,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/skills.test.js (92)
 - —
 
-### tests/stats.test.js (251)
+### tests/stats.test.js (273)
 - —
 
 ### tests/vacancies.test.js (203)

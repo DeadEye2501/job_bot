@@ -5,7 +5,10 @@
   // руками, чтобы завести ник, которого в базе ещё нет. Появится такой человек
   // или канал — попадёт под уже заведённую строку сразу.
   import { closeOnClickAway } from '$state/outside.js';
-  import ModalKeys from './ModalKeys.svelte';
+
+  import ModalFoot from './ModalFoot.svelte';
+  import ModalHead from './ModalHead.svelte';
+  import ModalShell from './ModalShell.svelte';
 
   let { draft, hints, kinds, saving, onkind, onvalue, onreason, onadd, onclose } = $props();
 
@@ -25,17 +28,9 @@
   });
 </script>
 
-<ModalKeys close={onclose} />
-
-<div class="modal-backdrop" role="presentation">
-  <div class="modal-dialog bl-add-modal" role="dialog" aria-modal="true">
-    <div class="modal-head">
-      <span class="material-symbols-outlined">block</span>
-      <div class="modal-title">Добавить в blacklist</div>
-      <button class="modal-close" type="button" title="Закрыть" onclick={() => onclose()}>
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
+<ModalShell extra="bl-add-modal" {onclose}>
+  {#snippet children()}
+    <ModalHead icon="block" title="Добавить в blacklist" {onclose} />
 
     <div class="modal-body">
       <div class="bl-kind-segmented">
@@ -54,7 +49,13 @@
         {/each}
       </div>
 
-      {#if hints === null}
+      <!-- Поле одно на оба рода: у слова подсказчика нет вовсе, и второе
+           написание того же поля разошлось бы с первым первой же правкой длины.
+           Обёртка стоит всегда — она держит выпадающий список у поля. -->
+      <div class="bl-combobox-wrap" bind:this={root}>
+        <!-- Курсор ставится в поле сразу: окно открывают затем, чтобы в него
+             набрать. Проверка a11y гасится нарочно — она о формах, где полей
+             несколько и выбор первого за человеком. -->
         <!-- svelte-ignore a11y_autofocus -->
         <input
           class="bl-modal-input"
@@ -63,42 +64,28 @@
           autocomplete="off"
           placeholder={draft.placeholder}
           value={draft.value}
-          oninput={(event) => onvalue(event.currentTarget.value)}
+          onfocus={() => (open = hints !== null)}
+          oninput={(event) => {
+            open = hints !== null;
+            onvalue(event.currentTarget.value);
+          }}
           onkeydown={(event) => event.key === 'Enter' && onadd()}
         />
-      {:else}
-        <div class="bl-combobox-wrap" bind:this={root}>
-          <!-- svelte-ignore a11y_autofocus -->
-          <input
-            class="bl-modal-input"
-            autofocus
-            maxlength="500"
-            autocomplete="off"
-            placeholder={draft.placeholder}
-            value={draft.value}
-            onfocus={() => (open = true)}
-            oninput={(event) => {
-              open = true;
-              onvalue(event.currentTarget.value);
-            }}
-            onkeydown={(event) => event.key === 'Enter' && onadd()}
-          />
-          {#if open}
-            <div class="bl-combobox-dropdown">
-              {#if hints.empty}
-                <div class="bl-combobox-empty">{hints.empty}</div>
-              {:else}
-                {#each hints.options as one (one.value)}
-                  <button class="bl-combobox-option" type="button" onclick={() => pick(one.value)}>
-                    <span class="opt-label">{one.label}</span>
-                    {#if one.sub}<span class="opt-sub">{one.sub}</span>{/if}
-                  </button>
-                {/each}
-              {/if}
-            </div>
-          {/if}
-        </div>
-      {/if}
+        {#if hints !== null && open}
+          <div class="bl-combobox-dropdown">
+            {#if hints.empty}
+              <div class="bl-combobox-empty">{hints.empty}</div>
+            {:else}
+              {#each hints.options as one (one.value)}
+                <button class="bl-combobox-option" type="button" onclick={() => pick(one.value)}>
+                  <span class="opt-label">{one.label}</span>
+                  {#if one.sub}<span class="opt-sub">{one.sub}</span>{/if}
+                </button>
+              {/each}
+            {/if}
+          </div>
+        {/if}
+      </div>
 
       <textarea
         class="bl-modal-textarea"
@@ -110,16 +97,13 @@
       ></textarea>
     </div>
 
-    <div class="modal-footer">
-      <button class="btn" type="button" onclick={() => onclose()}>Отмена</button>
-      <button
-        class="btn primary"
-        type="button"
-        disabled={saving || !draft.value.trim()}
-        onclick={() => onadd()}
-      >
-        {saving ? 'Добавляю…' : 'Добавить'}
-      </button>
-    </div>
-  </div>
-</div>
+    <ModalFoot
+      label="Добавить"
+      busyLabel="Добавляю…"
+      busy={saving}
+      ready={Boolean(draft.value.trim())}
+      oncancel={onclose}
+      onconfirm={onadd}
+    />
+  {/snippet}
+</ModalShell>

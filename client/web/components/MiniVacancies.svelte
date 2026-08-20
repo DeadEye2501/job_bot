@@ -15,7 +15,7 @@
 
 <div class="cnt-det-section">
   {#if !vacancies.length}
-    <div class="cnt-vacs-empty">{empty}</div>
+    <div class="mini-list-empty">{empty}</div>
   {:else}
     <div class="vacs-mini">
       {#each vacancies as one (one.id)}
@@ -34,7 +34,7 @@
       {/each}
     </div>
     {#if loading}
-      <div class="ch-vacs-loading-more">Загрузка…</div>
+      <div class="mini-list-more">Загрузка…</div>
     {/if}
   {/if}
 </div>

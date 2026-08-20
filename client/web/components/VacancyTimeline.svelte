@@ -4,15 +4,18 @@
   // Своё пояснение правится прямо в строке: ради одной фразы открывать окно
   // дороже, чем сама правка. Записывается оно с задержкой, как и заметка
   // карточки, и о записи говорит зелёная вспышка рамки.
+  //
+  // Лента заводится заново на каждую вакансию — этого требует `{#key}` у
+  // зовущего: записи, вспышки и набранное помнятся по номеру строки истории, и
+  // без пересоздания в них копились бы строки всех вакансий сеанса.
   import { autosave } from '$state/autosave.js';
+  import { flashing } from '$state/flash.js';
   import { saveKey } from '$state/keys.js';
   import { ago } from '$state/vacancies.js';
 
   // Пауза короче, чем у заметки: пояснение — одна фраза, и человек уходит из
   // строки сразу, как её дописал.
   const NOTE_DELAY = 500;
-
-  const FLASH_MS = 400;
 
   let { rows, vacancyId, onsave } = $props();
 
@@ -22,9 +25,10 @@
   let flashed = $state({});
 
   // Своя отложенная запись на строку: пауза у каждой считается отдельно, иначе
-  // правка второй строки отправляла бы недописанную первую.
+  // правка второй строки отправляла бы недописанную первую. Своя вспышка — по
+  // той же причине: гаснут они порознь.
   const savers = new Map();
-  const timers = new Map();
+  const marks = new Map();
 
   function saverFor(row) {
     let one = savers.get(row.historyId);
@@ -40,17 +44,19 @@
     return one;
   }
 
+  function markFor(historyId) {
+    let one = marks.get(historyId);
+    if (one === undefined) {
+      one = flashing((on) => (flashed[historyId] = on));
+      marks.set(historyId, one);
+    }
+    return one;
+  }
+
   async function write(id, historyId, text) {
     const done = await onsave(id, historyId, text);
     if (!done) return false;
-    flashed[historyId] = true;
-    clearTimeout(timers.get(historyId));
-    timers.set(
-      historyId,
-      setTimeout(() => {
-        flashed[historyId] = false;
-      }, FLASH_MS),
-    );
+    markFor(historyId)();
     return true;
   }
 
@@ -67,16 +73,11 @@
     field.style.height = `${field.scrollHeight}px`;
   }
 
-  function grown(field) {
-    grow(field);
-  }
-
   $effect(() => {
     return () => {
       // Набранное и не уехавшее отправляем на прощание: ленту перерисовывают и
       // на смену статуса, и на весть о разборе.
       savers.forEach((one) => one.flush());
-      timers.forEach((one) => clearTimeout(one));
     };
   });
 </script>
@@ -96,7 +97,7 @@
               maxlength="2000"
               placeholder="без комментария."
               value={typed[row.historyId] ?? row.text}
-              use:grown
+              use:grow
               oninput={(event) => type(row, event.currentTarget)}
               onblur={() => saverFor(row).flush()}
               onkeydown={(event) => saveKey(event) && saverFor(row).flush()}

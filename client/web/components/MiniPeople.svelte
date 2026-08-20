@@ -12,7 +12,7 @@
 
 <div class="cnt-det-section">
   {#if !people.length}
-    <div class="cnt-vacs-empty">{empty}</div>
+    <div class="mini-list-empty">{empty}</div>
   {:else}
     <div class="hrs-mini">
       {#each people as one (one.id)}
