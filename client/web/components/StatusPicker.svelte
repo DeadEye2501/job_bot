@@ -7,6 +7,8 @@
   // Столбец радиокнопок, а не ряд чипов: статусов одиннадцать, читают их по
   // порядку — от «New» к «Not Fit», — и в переносящемся ряду этот порядок
   // теряется.
+  import { untrack } from 'svelte';
+
   import { closeOnClickAway } from '$state/outside.js';
   import { saveKey } from '$state/keys.js';
 
@@ -15,7 +17,7 @@
 
   let { status, saving, wrap, onapply, oncancel } = $props();
 
-  let chosen = $state(status);
+  let chosen = $state(untrack(() => status));
   let note = $state('');
 
   function key(event) {

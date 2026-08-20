@@ -1,5 +1,7 @@
 <script>
   // Место работы: свёрнутая шапка и всё остальное под ней.
+  import { untrack } from 'svelte';
+
   import { cardTitle } from '$state/experience.js';
 
   import BulletList from './BulletList.svelte';
@@ -13,7 +15,7 @@
   // «Работаю сейчас» — это признак самой карточки, а не пустая дата окончания.
   // Выводи мы его из даты, снятая галочка тут же возвращалась бы: даты-то ещё
   // нет, человек только собирается её набрать.
-  let current = $state(!exp.end_date);
+  let current = $state(untrack(() => !exp.end_date));
 
   function switchCurrent(on) {
     current = on;

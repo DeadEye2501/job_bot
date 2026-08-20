@@ -4,6 +4,8 @@
   // Оба поля правятся на месте и уезжают с задержкой: строку правят по одному
   // знаку — дописывают собачку, чинят опечатку в причине, — и запись на каждый
   // знак послала бы мосту по вопросу на букву.
+  import { untrack } from 'svelte';
+
   import { autosave } from '$state/autosave.js';
   import { shortDate } from '$state/dates.js';
   import { flashing } from '$state/flash.js';
@@ -16,8 +18,8 @@
 
   let { row, onedit, ontoggle, onremove } = $props();
 
-  let value = $state(row.value);
-  let reason = $state(row.reason || '');
+  let value = $state(untrack(() => row.value));
+  let reason = $state(untrack(() => row.reason || ''));
   let valueSaved = $state(false);
   let reasonSaved = $state(false);
   let field = $state(null);

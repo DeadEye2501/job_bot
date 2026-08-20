@@ -8,9 +8,11 @@
   //
   // Отказ возвращает положение обратно; удача ничего не двигает — довод к тому
   // времени уже приехал таким же.
+  import { untrack } from 'svelte';
+
   let { checked, disabled = false, title = null, ontoggle } = $props();
 
-  let on = $state(checked);
+  let on = $state(untrack(() => checked));
 
   // Довод сменили снаружи — идём за ним: список перечитывают и по вести от
   // бота, не только на своё нажатие.

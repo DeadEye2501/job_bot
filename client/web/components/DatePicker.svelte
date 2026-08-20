@@ -6,6 +6,8 @@
   // средствами системы, палитры окна не знает и по-русски говорит не везде.
   //
   // Наружу уходит ISO-дата — та, что понимает мост; человеку видно `д.м.г`.
+  import { untrack } from 'svelte';
+
   import { closeOnClickAway } from '$state/outside.js';
   import { WEEKDAYS, monthGrid, monthTitle, shiftMonth } from '$state/calendar.js';
   import { asIso, dayOf, isoDay, showDate, validDate } from '$state/dates.js';
@@ -20,14 +22,16 @@
   const now = new Date();
   const today = isoDay(now.getFullYear(), now.getMonth() + 1, now.getDate());
   // Календарь открывается на выбранном месяце, а без выбора — на нынешнем.
-  const start = value ? dayOf(value) : { year: now.getFullYear(), month: now.getMonth() + 1 };
+  const start = untrack(() =>
+    value ? dayOf(value) : { year: now.getFullYear(), month: now.getMonth() + 1 },
+  );
 
   // Набранное живёт в поле, а не в отборе: на полпути там обрывок, и уедь он
   // наружу — отбор пошёл бы по недобранной дате.
-  let text = $state(showDate(value));
+  let text = $state(untrack(() => showDate(value)));
   // Какое значение поле сейчас показывает. По нему и видно, что дату сменили
   // снаружи: сам набор довода не трогает, пока в поле обрывок.
-  let shown = value;
+  let shown = untrack(() => value);
   let year = $state(start.year);
   let month = $state(start.month);
   let open = $state(false);

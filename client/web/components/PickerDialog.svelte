@@ -44,7 +44,7 @@
 
   let loaded = $state(false);
   let rows = $state([]);
-  let search = $state(prefill);
+  let search = $state(untrack(() => prefill));
   let chosen = $state(null);
 
   const ready = $derived(linkReady({ current, chosen }));
