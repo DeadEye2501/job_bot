@@ -1233,35 +1233,35 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist.test.js (201)
 - —
 
-### tests/blacklist_menu_item.test.js (110)
+### tests/blacklist_menu_item.test.js (114)
 - * Кому эти слова положены: сам пункт, окошко ручного занесения и кнопка на * вкладке отсева. Всем прочим — нет: там это была бы четвёртая копия.
 
 ### tests/bridge.test.js (161)
 - —
 
-### tests/bridge_stub.js (16)
+### tests/bridge_stub.js (41)
 - * Мост, отвечающий заготовленным по очереди; зовы копятся в `asked`.
-- отдаёт: replying
+- отдаёт: replying, rereading, tracing
 
 ### tests/calendar.test.js (50)
 - —
 
-### tests/card_block.test.js (100)
+### tests/card_block.test.js (94)
 - * Карточка, записывающая всё, что с ней сделали.
 
-### tests/card_finish.test.js (70)
+### tests/card_finish.test.js (71)
 - * Панель, записывающая всё, что с ней сделали, — в том порядке, в каком делали.
 
 ### tests/card_links.test.js (37)
 - —
 
-### tests/card_notes.test.js (54)
+### tests/card_notes.test.js (53)
 - * Карточка с заметкой, записывающая всё, что с ней сделали.
 
 ### tests/card_read.test.js (69)
 - —
 
-### tests/card_save.test.js (57)
+### tests/card_save.test.js (50)
 - * Карточка, записывающая всё, что с ней сделали.
 
 ### tests/channels.test.js (186)
@@ -1300,11 +1300,11 @@ body, html, button, body, .material-symbols-outlined
 ### tests/logs.test.js (152)
 - —
 
-### tests/markup.js (79)
+### tests/markup.js (81)
 - * Файлы разметки вместе с содержимым.
 - отдаёт: markup, placed, placementsIn
 
-### tests/markup.test.js (60)
+### tests/markup.test.js (69)
 - —
 
 ### tests/notes_field.test.js (80)
@@ -1334,7 +1334,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/profile.test.js (115)
 - —
 
-### tests/provider.test.js (107)
+### tests/provider.test.js (101)
 - * Отказ моста в том виде, в каком его поднимает обёртка зова.
 
 ### tests/search.test.js (49)

@@ -17,7 +17,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from pyrogram.enums import MessageEntityType
-from pyrogram.errors import PeerIdInvalid, UsernameNotOccupied
+from pyrogram.errors import UsernameNotOccupied
 
 from tests.factories import EPOCH
 
@@ -99,8 +99,8 @@ def incoming(*, user_id=777, username=None, text="здравствуйте", **e
     return message(from_user=sender, **fields)
 
 
-def outgoing(*, peer_id=777, peer_username=None, **extra):
-    """Своё сообщение в личной переписке — написанное из другого клиента.
+def my_dm(*, chat_id=777, username=None, msg_id=10, text="ответ с телефона", photo=None):
+    """Своё письмо в личной переписке — написанное из другого клиента Telegram.
 
     Отправитель и собеседник здесь разные лица, и это не мелочь оформления:
     у настоящего своего сообщения `from_user` — мы сами, а `chat` — тот, кому
@@ -108,31 +108,21 @@ def outgoing(*, peer_id=777, peer_username=None, **extra):
     слитые в один номер лица сделали бы подмену `msg.chat` на `msg.from_user`
     незаметной: HR нашёлся бы тот же самый, а в бою написанное с телефона
     перестало бы попадать в переписку окна вовсе.
+
+    Номер и имя собеседника названы так же, как у входящего: проверки личной
+    переписки держат их под одними именами для обеих сторон разговора, иначе
+    один и тот же случай писался бы по-разному для своего письма и для чужого,
+    и пара «своё — чужое» перестала бы читаться рядом.
+
+    Картинка гасит текст: у сообщения с картинкой Telegram кладёт подпись, а
+    не текст, и своё письмо с обоими сразу в бою не приходит. Проставленное
+    руками, это правило разъезжалось по местам применения.
     """
     return incoming(
-        user_id=OUR_USER_ID,
-        chat=chat(id=peer_id, username=peer_username),
-        outgoing=True,
-        **extra,
-    )
-
-
-def my_dm(*, chat_id=777, username=None, msg_id=10, text="ответ с телефона", photo=None):
-    """Своё письмо в личной переписке, названное со стороны собеседника.
-
-    Отличий от `outgoing` два. Имена доводов: проверки личной переписки
-    держат номер и имя собеседника под одними именами для обеих сторон
-    разговора, иначе один и тот же случай писался бы по-разному для своего
-    письма и для чужого, и пара «своё — чужое» перестала бы читаться рядом.
-
-    И картинка, гасящая текст: у сообщения с картинкой Telegram кладёт
-    подпись, а не текст, и своё письмо с обоими сразу в бою не приходит.
-    Проставленное руками, это правило разъезжалось по местам применения.
-    """
-    return outgoing(
         id=msg_id,
-        peer_id=chat_id,
-        peer_username=username,
+        user_id=OUR_USER_ID,
+        chat=chat(id=chat_id, username=username),
+        outgoing=True,
         text=None if photo is not None else text,
         photo=photo,
     )
@@ -276,12 +266,18 @@ class FakeTelegramClient:
             yield msg
 
     async def get_users(self, username):
-        """Незнакомое имя — бросок, по той же причине, что и у `get_chat`."""
+        """Незанятое имя — бросок, по той же причине, что и у `get_chat`.
+
+        Именно `UsernameNotOccupied`: спрашивают здесь всегда ником, и на незанятый
+        ник Telegram отвечает именно этим отказом. `PeerIdInvalid` — его ответ на
+        незнакомый номер, и подделка, отвечающая им на ник, расходится с настоящим
+        клиентом ровно там, где обещала с ним совпадать.
+        """
         self.get_users_calls.append(username)
         self._fail_if_asked("get_users")
         user = self._users.get(username)
         if user is None:
-            raise PeerIdInvalid
+            raise UsernameNotOccupied
         return user
 
     async def download_media(self, target, file_name=None, in_memory=False):

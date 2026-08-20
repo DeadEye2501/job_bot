@@ -59,8 +59,10 @@ export function placementsIn(text, tag, where = 'разметка') {
     if (end === -1) throw new Error(`${where}: тег ${tag} не закрыт`);
     const written = text.slice(at, end);
     // Однофамилец: `<NotesFieldGroup` начинается с `<NotesField`, и без этой
-    // проверки договор поля сторожился бы на обёртке вокруг него.
-    if (/^[\s/]/.test(text[at + tag.length])) {
+    // проверки договор поля сторожился бы на обёртке вокруг него. Закрывающий
+    // знак входит в перечень наравне с пробелом: тег без доводов — это тот же
+    // тег, и молчать на нём значит пропускать самое простое применение с детьми.
+    if (/^[\s/>]/.test(text[at + tag.length])) {
       if (!written.trimEnd().endsWith('/')) {
         throw new Error(`${where}: тег ${tag} применён с детьми, ходок такого не разбирает`);
       }

@@ -5,24 +5,18 @@ import { describe, expect, it } from 'vitest';
 
 import { cardBlocking } from '../state/card_block.js';
 
+import { rereading, tracing } from './bridge_stub.js';
+
 /** Карточка, записывающая всё, что с ней сделали. */
 function card(answer, female = false) {
   const trail = [];
   const blocking = cardBlocking({
-    ask: (method, id) => {
-      trail.push(`спрошено: ${method} ${id}`);
-      return Promise.resolve(answer);
-    },
+    ask: tracing(trail, answer),
     block: 'companies.block',
     unblock: 'companies.unblock',
     female,
     say: (text) => trail.push(`сказано: ${text}`),
-    // Перечитывание отложено нарочно: сними кто-нибудь `await` перед ним, и
-    // список узнал бы об отсеве раньше самой карточки.
-    reread: async () => {
-      await Promise.resolve();
-      trail.push('карточка перечитана');
-    },
+    reread: rereading(trail),
     onchanged: () => trail.push('список перечитан'),
   });
   return { blocking, trail };

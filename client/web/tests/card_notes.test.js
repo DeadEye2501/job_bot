@@ -5,14 +5,13 @@ import { describe, expect, it } from 'vitest';
 
 import { cardNotes } from '../state/card_notes.js';
 
+import { tracing } from './bridge_stub.js';
+
 /** Карточка с заметкой, записывающая всё, что с ней сделали. */
 function card(answer, live = true) {
   const trail = [];
   const saveNotes = cardNotes({
-    ask: (method, payload) => {
-      trail.push(`спрошено: ${method} ${JSON.stringify(payload)}`);
-      return Promise.resolve(answer);
-    },
+    ask: tracing(trail, answer),
     method: 'hr.update',
     payload: (id, text) => ({ hr_id: id, notes: text }),
     alive: () => live,

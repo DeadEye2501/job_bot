@@ -5,21 +5,14 @@ import { describe, expect, it } from 'vitest';
 
 import { cardSave } from '../state/card_save.js';
 
+import { rereading, tracing } from './bridge_stub.js';
+
 /** Карточка, записывающая всё, что с ней сделали. */
 function card(answer) {
   const trail = [];
   const save = cardSave({
-    ask: (method, payload) => {
-      trail.push(`спрошено: ${method} ${JSON.stringify(payload)}`);
-      return Promise.resolve(answer);
-    },
-    // Перечитывание отложено нарочно: сними кто-нибудь `await` перед ним, и
-    // список узнал бы о правке раньше самой карточки — а он-то и решает, что
-    // показывать.
-    reread: async () => {
-      await Promise.resolve();
-      trail.push('карточка перечитана');
-    },
+    ask: tracing(trail, answer),
+    reread: rereading(trail),
     method: 'hr.update',
     onchanged: () => trail.push('список перечитан'),
   });
