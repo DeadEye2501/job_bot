@@ -1,11 +1,12 @@
-// Договор пункта «в отсев» с карточками, которые его ставят.
+// Договор пункта «в отсев» с теми, кто его ставит.
 //
 // Пункт стоял тремя дословными копиями — в карточках канала, компании и
-// человека, — и различались они только именем зова. Теперь он один, а
-// карточка передаёт ему своё: положение дел и что делать по нажатию.
+// человека, — и различались они только именем зова. Теперь он один, а между
+// ним и карточкой человека с компанией встало ещё и общее меню: карточка
+// отдаёт зовы меню, меню — пункту.
 //
-// Сторожатся обе половины: что копий больше нет и что каждая постановка
-// отдаёт пункту свой зов, а не полагается на его догадку.
+// Сторожатся обе половины цепочки: что копий пункта больше нет и что на каждом
+// её звене зовы передаются, а не додумываются.
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -27,24 +28,36 @@ function markup() {
   return found;
 }
 
-/** Постановки пункта: файл и сам тег. */
-function usages() {
+/** Постановки названного тега: файл и сам тег. */
+function placed(tag) {
   const found = [];
   for (const { file, text } of markup()) {
-    let at = text.indexOf('<BlacklistMenuItem');
+    let at = text.indexOf(tag);
     while (at !== -1) {
       const end = text.indexOf('/>', at);
       found.push({ file, tag: text.slice(at, end) });
-      at = text.indexOf('<BlacklistMenuItem', end);
+      at = text.indexOf(tag, end);
     }
   }
   return found;
 }
 
+/** Постановки самого пункта. */
+function usages() {
+  return placed('<BlacklistMenuItem');
+}
+
+/** Постановки меню карточки контакта: пункт стоит внутри него, и зовы идут
+ *  через него насквозь. */
+function menus() {
+  return placed('<ContactActions');
+}
+
 describe('пункт «в отсев»', () => {
-  it('стоит не в одной карточке — иначе выносить было незачем', () => {
-    const cards = new Set(usages().map((use) => use.file));
-    expect(cards.size).toBeGreaterThan(1);
+  it('где-то поставлен — иначе сторожить нечего', () => {
+    // Числом мест не меряем: пункт нарочно уходит вглубь, за общее меню, и
+    // верный следующий вынос уменьшил бы это число, а не увеличил.
+    expect(usages().length).toBeGreaterThan(0);
   });
 
   it('нигде не нарисован заново', () => {
@@ -62,7 +75,7 @@ describe('пункт «в отсев»', () => {
     // Иначе пункт полез бы за ним в карточку, а знание во фронте
     // одностороннее: вниз доводами, наверх никак.
     for (const use of usages()) {
-      expect(use.tag, use.file).toMatch(/\sblocked=\{/);
+      expect(use.tag, use.file).toMatch(/\s(blocked=\{|\{blocked\})/);
     }
   });
 
@@ -72,9 +85,24 @@ describe('пункт «в отсев»', () => {
     // Закрывающий зов затем, что оставшееся открытым окошко перекрывает ту
     // самую строку, которую пункт и поменял.
     for (const use of usages()) {
-      expect(use.tag, use.file).toMatch(/\sonblock=\{/);
-      expect(use.tag, use.file).toMatch(/\sonunblock=\{/);
+      expect(use.tag, use.file).toMatch(/\s(onblock=\{|\{onblock\})/);
+      expect(use.tag, use.file).toMatch(/\s(onunblock=\{|\{onunblock\})/);
       expect(use.tag, use.file).toMatch(/\s(close=\{|\{close\})/);
     }
+  });
+
+  it('меню карточки контакта тоже отдаёт пункту оба зова, а не догадку', () => {
+    // Меню встало между карточкой и пунктом, и цепочка длиннее на звено:
+    // пропади зов у карточки, пункт молча получил бы пустоту, а человек —
+    // нажатие, которое ничего не делает.
+    for (const use of menus()) {
+      expect(use.tag, use.file).toMatch(/\s(blocked=\{|\{blocked\})/);
+      expect(use.tag, use.file).toMatch(/\s(onblock=\{|\{onblock\})/);
+      expect(use.tag, use.file).toMatch(/\s(onunblock=\{|\{onunblock\})/);
+    }
+  });
+
+  it('меню карточки стоит не в одной карточке', () => {
+    expect(new Set(menus().map((use) => use.file)).size).toBeGreaterThan(1);
   });
 });

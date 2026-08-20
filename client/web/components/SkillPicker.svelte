@@ -4,6 +4,7 @@
   // Набирать нельзя: мост связывает место работы с заведённым навыком по
   // имени и незнакомое отбрасывает молча — человек написал бы «js», а в
   // резюме этого места стек оказался бы пуст.
+  import { closeOnClickAway } from '$state/outside.js';
   import { grouped } from '$state/skills.js';
 
   import Chip from './Chip.svelte';
@@ -12,6 +13,11 @@
 
   let open = $state(false);
   let query = $state('');
+  // Узел, по которому считается «нажали мимо». Своим, а не по имени класса:
+  // подборщиков на вкладке столько же, сколько мест работы, и нажатие в
+  // соседний по классу читалось бы как нажатие в себя — оба остались бы
+  // открытыми разом.
+  let root = $state(null);
 
   const taken = $derived(new Set(chosen.map((one) => one.toLowerCase())));
   // Навыков в анкете под сотню, и плоским списком имён в них не найтись:
@@ -38,23 +44,13 @@
     onadd(name);
   }
 
-  // Щелчок мимо закрывает подборщик. Слушателя вешаем следующим кадром: тот же
-  // щелчок, что открыл подборщик, дошёл бы до документа и закрыл его обратно.
   $effect(() => {
     if (!open) return;
-    const away = (event) => {
-      if (event.target.closest('.skill-picker') || event.target.closest('.chip-add')) return;
-      open = false;
-    };
-    const later = setTimeout(() => document.addEventListener('click', away), 0);
-    return () => {
-      clearTimeout(later);
-      document.removeEventListener('click', away);
-    };
+    return closeOnClickAway(() => root, () => (open = false));
   });
 </script>
 
-<div class="skills-block">
+<div class="skills-block" bind:this={root}>
   {#each chosen as one, index (one)}
     <Chip text={one} onremove={() => onremove(index)} />
   {/each}

@@ -8,6 +8,8 @@
   import { shortDate } from '$state/dates.js';
   import { flashing } from '$state/flash.js';
 
+  import RowToggle from './RowToggle.svelte';
+
   // Пауза перед записью правки. Короче — и мост получает вопрос на каждое
   // слово, длиннее — и человек успевает уйти со строки, не увидев вспышки.
   const EDIT_DELAY = 500;
@@ -108,12 +110,7 @@
 
   <span class="bl-when">{shortDate(row.created_at, new Date())}</span>
 
-  <input
-    type="checkbox"
-    class="toggle compact"
-    checked={row.active}
-    onchange={(event) => ontoggle(event.currentTarget.checked)}
-  />
+  <RowToggle checked={row.active} {ontoggle} />
 
   <button class="icon-btn" type="button" title="Удалить запись" onclick={() => onremove()}>
     <span class="material-symbols-outlined">delete</span>

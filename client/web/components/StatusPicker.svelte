@@ -8,7 +8,9 @@
   // порядку — от «New» к «Not Fit», — и в переносящемся ряду этот порядок
   // теряется.
   import { closeOnClickAway } from '$state/outside.js';
-  import { modalKey, saveKey } from '$state/keys.js';
+  import { saveKey } from '$state/keys.js';
+
+  import ModalKeys from './ModalKeys.svelte';
   import { STATUS_CHOICES } from '$state/statuses.js';
 
   let { status, saving, wrap, onapply, oncancel } = $props();
@@ -18,7 +20,6 @@
 
   function key(event) {
     if (saveKey(event)) return onapply(chosen, note);
-    if (modalKey(event) === 'close') oncancel();
   }
 
   $effect(() => {
@@ -28,6 +29,13 @@
     return closeOnClickAway(() => wrap, oncancel);
   });
 </script>
+
+<!-- Заперты на время записи обе кнопки внизу: пока ответ в пути, отмена
+     оставила бы человека думать, что перехода не было, — а он уже уехал.
+
+     Escape при этом ловится на всё окно, а не в одном поле: окошко открывают
+     нажатием по пилюле, и фокус в этот миг стоит на ней, а не в причине. -->
+<ModalKeys close={oncancel} />
 
 <div class="pop status-picker">
   <div class="status-options">
@@ -54,8 +62,6 @@
   ></textarea>
 
   <div class="popover-actions">
-    <!-- Заперты на время записи обе: пока ответ в пути, отмена оставила бы
-         человека думать, что перехода не было, — а он уже уехал. -->
     <button class="btn" type="button" disabled={saving} onclick={oncancel}>Отмена</button>
     <button
       class="btn primary"

@@ -2,7 +2,7 @@
   // Пузырь переписки: что написано, когда и дошло ли.
   //
   // Своё письмо стоит справа, чужое слева — по стороне их и различают, не читая.
-  import { attachmentKind, chatTime, tick } from '$state/chat.js';
+  import { attachmentKind, chatTime, isUnread, tick } from '$state/chat.js';
 
   let { message, onopen } = $props();
 
@@ -10,7 +10,10 @@
   const attached = $derived(attachmentKind(message));
   // Непрочитанное помечено в самой разметке: к первому такому письму лента
   // прокручивается при открытии, и найти его она может только по метке.
-  const unread = $derived(message.is_incoming && !message.read_at && !message.is_deleted);
+  //
+  // Правило берётся у переписки, а не считается здесь: по нему же лента решает,
+  // говорить ли мосту «прочитано».
+  const fresh = $derived(isUnread(message));
 </script>
 
 <div
@@ -18,7 +21,7 @@
   class:me={!message.is_incoming}
   class:them={message.is_incoming}
   class:deleted={message.is_deleted}
-  data-unread={unread ? 'true' : null}
+  data-unread={fresh ? 'true' : null}
 >
   <div class="cnt-bubble-content">
     <!-- Вложение открывает система, а не страница: показать документ она умеет

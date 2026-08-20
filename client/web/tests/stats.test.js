@@ -3,8 +3,17 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  PERIODS, convNote, deltaNote, donut, duration, kpiRow, skillRows, sliceTarget,
-  statusColumns, weekBars,
+  convNote,
+  deltaNote,
+  donut,
+  duration,
+  kpiRow,
+  PERIODS,
+  skillRows,
+  sliceTarget,
+  statusColumns,
+  statusTotal,
+  weekBars,
 } from '../state/stats.js';
 
 describe('срок ответа', () => {
@@ -247,5 +256,18 @@ describe('переход из статистики в вакансии', () => {
     expect(target.grade).toBe('');
     expect(target.datePreset).toBe('');
     expect(target.scoreMin).toBe('');
+  });
+});
+
+describe('итог кольца статусов', () => {
+  it('считает все статусы, а не нарисованные доли', () => {
+    // Число это стоит в середине кольца и обещает «всего вакансий». Кольцо
+    // рисует только знакомые ему статусы, и заведи бэкенд двенадцатый — он в
+    // доли не попадёт, а в счёт попасть обязан: иначе середина кольца врёт.
+    expect(statusTotal({ New: 2, Decline: 3, 'На паузе': 4 })).toBe(9);
+  });
+
+  it('пустая выборка даёт ноль, а не поломку', () => {
+    expect(statusTotal({})).toBe(0);
   });
 });

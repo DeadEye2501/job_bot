@@ -233,6 +233,16 @@ export function sliceTarget(status, period, now) {
   };
 }
 
+/** Сколько вакансий во всех статусах разом.
+ *
+ * Считается по всем, а не по нарисованным долям: нулевые статусы в кольцо не
+ * попадают, и сумма по нему совпала бы с настоящей лишь случайно. Число это
+ * стоит в середине самого кольца, и написанное дважды разошлось бы с ним.
+ */
+export function statusTotal(counts) {
+  return Object.values(counts).reduce((sum, one) => sum + (one || 0), 0);
+}
+
 /** Доли кольца статусов.
  *
  * Пустые статусы не попадают вовсе: кольцо копило бы невидимые сегменты, и
@@ -240,7 +250,7 @@ export function sliceTarget(status, period, now) {
  * рисует — нулевой круг вырождается в точку.
  */
 export function donut(counts) {
-  const total = Object.values(counts).reduce((sum, one) => sum + (one || 0), 0);
+  const total = statusTotal(counts);
   if (!total) return [];
   return STATUS_ORDER.filter((name) => counts[name] > 0).map((name) => ({
     name,

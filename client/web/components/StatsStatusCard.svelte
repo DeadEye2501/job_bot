@@ -4,15 +4,13 @@
   // Строка нажимается: иначе число остаётся числом — чтобы посмотреть, что за
   // девять штук, пришлось бы идти в вакансии и набирать тот же отбор руками.
   import DonutChart from './DonutChart.svelte';
-  import { donut, statusColumns } from '$state/stats.js';
+  import { donut, statusColumns, statusTotal } from '$state/stats.js';
 
   let { counts, onpick } = $props();
 
   const columns = $derived(statusColumns(counts));
   const parts = $derived(donut(counts));
-  // Итог считается по всем статусам, а не по нарисованным долям: нулевые в
-  // кольцо не попадают, и сумма по нему совпала бы с этой лишь случайно.
-  const total = $derived(Object.values(counts).reduce((sum, one) => sum + (one || 0), 0));
+  const total = $derived(statusTotal(counts));
 </script>
 
 {#snippet column(rows, side)}

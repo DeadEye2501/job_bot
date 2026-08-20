@@ -7,13 +7,17 @@
   // писал: мост сводит пробельную заметку к пустоте, и не прими мы его ответ,
   // следующая же пауза послала бы тот же вопрос заново.
   import { autosave } from '$state/autosave.js';
+  import { flashing } from '$state/flash.js';
   import { saveKey } from '$state/keys.js';
 
-  // Сколько горит зелёная рамка записанного. Ровно столько же длится её
-  // угасание в оформлении: погасшая раньше срока читалась бы как моргание.
-  const FLASH_MS = 400;
+  // Предел длины заметки — один на все три её места. В базе длина не
+  // ограничена вовсе, и разъедься числа по карточкам, человек набирал бы у
+  // компании столько, сколько у вакансии уже не помещается. Про соседние поля
+  // — пояснение в ленте, поля форм — предел этот ничего не говорит: у них свои
+  // предметы и свои числа.
+  const LIMIT = 2000;
 
-  let { value, placeholder, delay, limit = null, owner, save } = $props();
+  let { value, placeholder, delay, owner, save } = $props();
 
   // Номер записи запечатан при заведении поля, а не читается на отправке.
   // Отправок две, и вторая — прощальная: она случается уже после того, как
@@ -24,17 +28,15 @@
 
   let text = $state(value ?? '');
   let flashed = $state(false);
-  let flashTimer = null;
 
+  const mark = flashing((on) => (flashed = on));
   const saver = autosave({ delay, save: (typed) => write(typed) });
 
   async function write(typed) {
     const stored = await save(owned, typed);
     if (stored === null) return false;
     saver.known(stored);
-    flashed = true;
-    clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => (flashed = false), FLASH_MS);
+    mark();
     return true;
   }
 
@@ -49,14 +51,13 @@
     // Набранное и не уехавшее отправляем на прощание: поле закрывают вместе с
     // карточкой, и ждать паузы больше нечему.
     saver.flush();
-    clearTimeout(flashTimer);
   });
 </script>
 
 <textarea
   class="notes-area"
   class:saved-flash={flashed}
-  maxlength={limit}
+  maxlength={LIMIT}
   {placeholder}
   bind:value={text}
   oninput={() => saver.typed(text)}

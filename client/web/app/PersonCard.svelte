@@ -4,9 +4,9 @@
   // Стоит правой панелью рядом со списком: человека правят и пишут ему, не
   // теряя из виду соседей, — рядом с ними и решают, кому писать следующему.
 
-  import ActionsMenu from '$components/ActionsMenu.svelte';
   import Avatar from '$components/Avatar.svelte';
-  import BlacklistMenuItem from '$components/BlacklistMenuItem.svelte';
+  import BlacklistChip from '$components/BlacklistChip.svelte';
+  import ContactActions from '$components/ContactActions.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import NotesField from '$components/NotesField.svelte';
@@ -193,50 +193,18 @@
             {plural(card.unread_count, 'непрочитанное', 'непрочитанных', 'непрочитанных')}
           </span>
         {/if}
-        {#if card.blacklist_value}
-          <span class="cnt-det-meta-chip blacklist" title="В blacklist: {card.blacklist_value}">
-            <span class="material-symbols-outlined">block</span>
-            В blacklist
-          </span>
-        {/if}
+        <BlacklistChip value={card.blacklist_value} />
       </div>
     </div>
 
-    <ActionsMenu>
-      {#snippet children(close)}
-        <button
-          class="menu-item"
-          type="button"
-          onclick={() => {
-            close();
-            asking = 'merge';
-          }}
-        >
-          <span class="material-symbols-outlined">merge</span>
-          Слить с другим HR
-        </button>
-        <BlacklistMenuItem
-          blocked={!!card.blacklist_value}
-          {close}
-          onblock={block}
-          onunblock={unblock}
-        />
-
-        <div class="menu-line"></div>
-
-        <button
-          class="menu-item danger"
-          type="button"
-          onclick={() => {
-            close();
-            asking = 'delete';
-          }}
-        >
-          <span class="material-symbols-outlined">delete</span>
-          Удалить
-        </button>
-      {/snippet}
-    </ActionsMenu>
+    <ContactActions
+      mergeLabel="Слить с другим HR"
+      blocked={!!card.blacklist_value}
+      onmerge={() => (asking = 'merge')}
+      onblock={block}
+      onunblock={unblock}
+      ondelete={() => (asking = 'delete')}
+    />
   </div>
 
   <div class="cnt-form-grid">
@@ -277,7 +245,6 @@
         value={card.notes}
         placeholder="Личные заметки по этому HR…"
         delay={NOTES_DELAY}
-        limit={2000}
         owner={personId}
         save={saveNotes}
       />

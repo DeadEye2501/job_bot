@@ -3,6 +3,9 @@
   import { channelToggle } from '$state/channels.js';
 
   import Avatar from './Avatar.svelte';
+  import BlacklistMark from './BlacklistMark.svelte';
+  import Handle from './Handle.svelte';
+  import RowToggle from './RowToggle.svelte';
 
   let { channel, selected = false, onpick, ontoggle } = $props();
 
@@ -17,33 +20,22 @@
       {channel.title || (channel.username ? `@${channel.username}` : '— без названия —')}
     </span>
     <span class="cnt-hr-sub">
-      {#if channel.username}
-        <span class="at">@{channel.username}</span>
-      {:else}
-        <span class="muted">без @username</span>
-      {/if}
+      <Handle username={channel.username} />
     </span>
   </button>
 
   <span class="cnt-hr-trailing">
-    {#if channel.is_blacklisted}
-      <span class="cnt-hr-bl" title="В blacklist">
-        <span class="material-symbols-outlined">block</span>
-      </span>
-    {/if}
+    <BlacklistMark blocked={channel.is_blacklisted} />
     {#if channel.vacancy_count > 0}
       <span class="cnt-co-count">{channel.vacancy_count}</span>
     {/if}
     <!-- Канал из отсева включить нельзя: обход всё равно его пропустит, и
          включённый переключатель обещал бы работу, которой не будет. -->
-    <input
-      type="checkbox"
-      class="toggle compact"
-      class:locked={shown.disabled}
+    <RowToggle
       checked={shown.checked}
       disabled={shown.disabled}
       title={shown.title}
-      onchange={(event) => ontoggle(event.currentTarget.checked)}
+      {ontoggle}
     />
   </span>
 </div>

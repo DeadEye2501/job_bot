@@ -94,3 +94,19 @@
   color: var(--text-tertiary);
   font-size: 14px;
 }
+
+/* Пусто и «дочитываем» — слова самих мини-списков, а не экранов, на которых они
+   стоят: первое было подписано классом карточки контакта, второе классом чисел
+   канала, и правка вида задевала бы чужой блок. */
+.mini-list-empty {
+  padding: 4px 2px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+}
+
+.mini-list-more {
+  padding: 6px 0;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  text-align: center;
+}

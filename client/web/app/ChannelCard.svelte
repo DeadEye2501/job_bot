@@ -6,8 +6,10 @@
 
   import ActionsMenu from '$components/ActionsMenu.svelte';
   import Avatar from '$components/Avatar.svelte';
+  import BlacklistChip from '$components/BlacklistChip.svelte';
   import BlacklistMenuItem from '$components/BlacklistMenuItem.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
+  import MenuItem from '$components/MenuItem.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
@@ -185,43 +187,28 @@
         {/if}
       </div>
 
-      {#if card.blacklist_value}
-        <div class="cnt-det-meta-row">
-          <span class="cnt-det-meta-chip blacklist" title="В blacklist: {card.blacklist_value}">
-            <span class="material-symbols-outlined">block</span>
-            В blacklist
-          </span>
-        </div>
-      {/if}
+      <div class="cnt-det-meta-row">
+        <BlacklistChip value={card.blacklist_value} />
+      </div>
     </div>
 
     <ActionsMenu>
       {#snippet children(close)}
-        <button
-          class="menu-item"
-          type="button"
-          disabled={!!pollTip}
+        <MenuItem
+          icon="refresh"
+          label="Прогнать сейчас"
           title={pollTip || 'Запустить поллинг этого канала'}
-          onclick={() => {
-            close();
-            pollNow();
-          }}
-        >
-          <span class="material-symbols-outlined">refresh</span>
-          Прогнать сейчас
-        </button>
-        <button
-          class="menu-item"
-          type="button"
+          disabled={!!pollTip}
+          {close}
+          onpick={pollNow}
+        />
+        <MenuItem
+          icon="restart_alt"
+          label="Сбросить курсор"
           title="Сбросить last_processed_msg_id"
-          onclick={() => {
-            close();
-            resetCursor();
-          }}
-        >
-          <span class="material-symbols-outlined">restart_alt</span>
-          Сбросить курсор
-        </button>
+          {close}
+          onpick={resetCursor}
+        />
         <BlacklistMenuItem
           blocked={!!card.blacklist_value}
           {close}
@@ -231,17 +218,13 @@
 
         <div class="menu-line"></div>
 
-        <button
-          class="menu-item danger"
-          type="button"
-          onclick={() => {
-            close();
-            asking = true;
-          }}
-        >
-          <span class="material-symbols-outlined">delete</span>
-          Удалить канал
-        </button>
+        <MenuItem
+          icon="delete"
+          label="Удалить канал"
+          danger
+          {close}
+          onpick={() => (asking = true)}
+        />
       {/snippet}
     </ActionsMenu>
   </div>
