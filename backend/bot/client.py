@@ -261,9 +261,6 @@ class Bot:
     ) -> channels.ChannelPollOutcome:
         return await channels.poll_channel_now(self, channel_id)
 
-    async def delete_channel(self, channel_id) -> int | None:
-        return await channels.delete_channel(self, channel_id)
-
     async def add_channel(
         self, username
     ) -> tuple[int | None, channels.ChannelAddOutcome]:

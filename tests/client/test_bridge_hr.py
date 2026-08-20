@@ -94,6 +94,9 @@ async def test_merging_an_hr_into_himself_is_refused(api, ask, session_factory):
     answer = await ask(api.hr.merge, {"absorbed_id": hr.id, "survivor_id": hr.id})
 
     assert answer["fail"] == "denied"
+    # Словами человека: внутренний текст репозитория показывал ему латиницу с
+    # двумя номерами, по которой делать нечего.
+    assert answer["detail"] == "Слить карточку саму с собой нельзя."
 
 
 async def test_a_deleted_hr_leaves_the_list(api, ask, session_factory):
@@ -139,6 +142,26 @@ async def test_a_created_person_shows_up_in_the_list(api, ask):
     assert "ok" in answer
     listed = await ask(api.hr.list, {})
     assert "Пётр" in [row["name"] for row in listed["ok"]["hrs"]]
+
+
+async def test_a_second_person_with_the_same_telegram_is_named_as_taken(
+    api, ask, session_factory
+):
+    """Второй человек с той же учётной записью Telegram объясняется словами.
+
+    Номер учётной записи в базе уникален, и заводят второго не со зла: карточку
+    того же человека уже завёл бот, а человек ищет её по имени и не находит.
+    Сырой текст отказа базы про это не говорит ничего — соседний файл-близнец
+    такой же случай объясняет словами.
+    """
+    await put(session_factory, hr_row(name="Иван", telegram_user_id=777))
+
+    answer = await ask(
+        api.hr.create, {"name": "Другой Иван", "telegram_user_id": 777}
+    )
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Человек с такой учётной записью Telegram уже заведён."
 
 
 async def test_a_person_without_a_name_and_without_a_nick_is_refused(api, ask):
@@ -266,3 +289,26 @@ async def test_a_deleted_person_tells_the_counters_to_reread_themselves(
         "contacts_lists_changed",
         "unread_changed",
     ]
+
+
+async def test_the_absorbed_person_is_not_offered_as_his_own_survivor(
+    api, ask, session_factory
+):
+    """Поглощаемого не показывают среди тех, в кого его можно влить.
+
+    Оставшегося выбирают из общего перечня, и показанная строка выглядит как
+    разрешённый выбор: нажми человек её — карточка поглотила бы себя.
+
+    Сторож у стороны человека свой нарочно: тело подборщика общее с компанией,
+    и переведи кто-нибудь проводку `hr.merge_picker` на чужую таблицу предмета,
+    окно получало бы список компаний вместо людей, а сторож компании остался бы
+    зелёным.
+    """
+    absorbed = hr_row(name="Иван")
+    survivor = hr_row(name="Пётр", telegram_username="petr")
+    await put(session_factory, absorbed, survivor)
+
+    answer = await ask(api.hr.merge_picker, {"absorbed_id": absorbed.id})
+
+    names = [row["name"] for row in answer["ok"]["hrs"]]
+    assert names == ["Пётр"]

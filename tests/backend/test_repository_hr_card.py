@@ -24,43 +24,20 @@ async def test_a_missing_hr_has_no_card(session, session_factory):
 
 
 async def test_a_fresh_hr_has_zeroes_rather_than_emptiness(session, session_factory):
-    """У свежего HR счётчики нулевые, а компании и отметки списка нет."""
+    """У свежего HR счёт непрочитанного нулевой, компании и отметки списка нет.
+
+    Ноль здесь не то же самое, что пустота: по нему карточка решает не рисовать
+    чип «N непрочитанных», а пустота уехала бы в разметку словом «null».
+    """
     hr = hr_row()
     await put(session_factory, hr)
 
     card = await get_hr_detail(session, hr.id)
 
-    assert card.vacancy_count == 0
     assert card.unread_count == 0
     assert card.last_company_id is None
     assert card.last_company_name is None
     assert card.blacklist_value is None
-
-
-async def test_the_vacancy_count_matches_the_list_under_it(
-    session, session_factory
-):
-    """Счётчик вакансий считает то же, что показывает мини-список под ним.
-
-    Недоразобранные отсеивают оба: счётчик, разошедшийся со списком, читается
-    как пропавшие строки. Сегодня такая вакансия и владельца не имеет —
-    разбор ставит признак и хозяина одной сделкой, — но держаться этому на
-    удаче устройства конвейера незачем.
-    """
-    hr = hr_row()
-    other = hr_row(name="соседний")
-    await put(session_factory, hr, other)
-    await put(
-        session_factory,
-        vacancy_row(hr_id=hr.id, is_parsed=True),
-        vacancy_row(hr_id=hr.id, is_parsed=False),
-        vacancy_row(hr_id=other.id, is_parsed=True),
-        vacancy_row(hr_id=None, is_parsed=True),
-    )
-
-    card = await get_hr_detail(session, hr.id)
-
-    assert card.vacancy_count == 1
 
 
 async def test_the_last_company_comes_from_the_freshest_vacancy(

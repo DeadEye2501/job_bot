@@ -809,15 +809,12 @@
   - `is_blacklisted: bool` = `False`
 - `class HrDetail`
   - `hr: HR`
-  - `vacancy_count: int`
   - `last_company_id: int | None`
   - `last_company_name: str | None`
   - `unread_count: int`
   - `blacklist_value: str | None` = `None`
 - `class CompanyDetail`
   - `company: Company`
-  - `vacancy_count: int`
-  - `hr_count: int`
   - `blacklist_value: str | None` = `None`
 - `class CompanyWithCount`
   - `company: Company`
@@ -1037,9 +1034,34 @@
 - `logger` = `logging.getLogger(__name__)`
 - `STOP_TIMEOUT_S` = `10.0`
 
+### `client/bridge/cards.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `class CardSubject`
+  - `picker: PickerSubject`
+  - `id_key: str`
+  - `missing: str`
+  - `domain: str`
+  - `page_limit: int | None`
+  - `listing: dict`
+  - `read_fields: Callable`
+  - `update_fields: tuple[str, ...]`
+  - `mini_vacancies: Callable`
+  - `merge_row: Callable`
+  - `delete_row: Callable`
+  - `create_row: Callable`
+  - `merge_action: str`
+  - `delete_action: str`
+  - `create_action: str`
+  - `news: tuple[str, ...]`
+
 ### `client/bridge/channels.py`
 
 - `logger` = `logging.getLogger(__name__)`
+
+### `client/bridge/companies.py`
+
+- `COMPANY_CARD` = `CardSubject(picker=COMPANY_PICKER, id_key='compa…`
 
 ### `client/bridge/desktop.py`
 
@@ -1052,6 +1074,14 @@
 - `logger` = `logging.getLogger(__name__)`
 - `KEEP_EVENTS` = `500`
 - `WAIT_SECONDS` = `25.0`
+
+### `client/bridge/hr.py`
+
+- `HR_CARD` = `CardSubject(picker=HR_PICKER, id_key='hr_id', mi…`
+
+### `client/bridge/hr_chat.py`
+
+- `logger` = `logging.getLogger(__name__)`
 
 ### `client/bridge/journal.py`
 
@@ -1115,6 +1145,10 @@
 - `NO_COMPANY` = `'Компания не найдена.'`
 - `NO_CHANNEL` = `'Канал не найден.'`
 - `NO_ENTRY` = `'Запись не найдена.'`
+- `HR_TELEGRAM_TAKEN` = `'Человек с такой учётной записью Telegram уже за…`
+- `SEND_BROKE` = `'Telegram не принял письмо. Проверьте связь и за…`
+- `SPELLINGS_SHAPE` = `'Написания шлют списком или строкой через запяту…`
+- `MERGE_INTO_SELF` = `'Слить карточку саму с собой нельзя.'`
 - `NOTHING_TO_UPDATE` = `'Нечего обновлять.'`
 - `NAME_REQUIRED` = `'Название обязательно.'`
 - `IDENTITY_REQUIRED` = `'Укажите хотя бы имя или @username.'`
@@ -1334,7 +1368,7 @@
 
 - `class Sent`
   - `id: int`
-- `ANSWERS` = `словарь из 11`
+- `ANSWERS` = `словарь из 10`
 
 ## tools
 

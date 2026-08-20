@@ -272,9 +272,12 @@ class HrDetail:
     «N непрочитанных» chip in the head. ``blacklist_value`` is non-NULL
     when an active row exists in the blacklist table for this HR — UI
     paints a red chip + flips the menu item to «Убрать из blacklist».
+
+    Счёта вакансий здесь нет: карточка его не показывала никогда, а считался
+    он запросом на каждое её открытие. Число, которое человек видит, приезжает
+    строкой перечня.
     """
     hr: HR
-    vacancy_count: int
     last_company_id: int | None
     last_company_name: str | None
     unread_count: int
@@ -285,14 +288,15 @@ class HrDetail:
 class CompanyDetail:
     """Full payload for the Contacts/Companies detail pane (06).
 
-    ``hr_count`` = distinct HRs with at least one vacancy at this company,
-    powering the «N HR» chip in the head. ``blacklist_value`` is non-NULL
-    when an active row exists in the blacklist table for this company —
-    UI paints the red chip + flips the menu item to «Убрать из blacklist».
+    ``blacklist_value`` is non-NULL when an active row exists in the
+    blacklist table for this company — UI paints the red chip + flips the
+    menu item to «Убрать из blacklist».
+
+    Счёта вакансий и счёта людей здесь нет: карточка их не показывала никогда,
+    а считались они двумя запросами на каждое её открытие. Числа, которые
+    человек видит, приезжают строкой перечня.
     """
     company: Company
-    vacancy_count: int
-    hr_count: int
     blacklist_value: str | None = None
 
 

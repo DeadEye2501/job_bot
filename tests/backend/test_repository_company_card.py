@@ -20,83 +20,18 @@ async def test_a_missing_company_has_no_card(session, session_factory):
     assert await get_company_detail(session, 10_000) is None
 
 
-async def test_a_fresh_company_has_zeroes(session, session_factory):
-    """У свежей компании счётчики нулевые, отметки списка нет."""
+async def test_a_fresh_company_has_no_mark(session, session_factory):
+    """У свежей компании отметки чёрного списка нет.
+
+    Пустота здесь значит «в списке не числится», и по ней карточка решает, что
+    рисовать — красный чип или обычную шапку.
+    """
     company = company_row()
     await put(session_factory, company)
 
     card = await get_company_detail(session, company.id)
 
-    assert card.vacancy_count == 0
-    assert card.hr_count == 0
     assert card.blacklist_value is None
-
-
-async def test_the_counts_are_about_this_company_only(session, session_factory):
-    """Счётчики считают вакансии этой компании, а не все подряд."""
-    mine = company_row(name="Контур")
-    other = company_row(name="Ромашка")
-    await put(session_factory, mine, other)
-    await put(
-        session_factory,
-        vacancy_row(company_id=mine.id),
-        vacancy_row(company_id=mine.id),
-        vacancy_row(company_id=other.id),
-        vacancy_row(company_id=None),
-    )
-
-    card = await get_company_detail(session, mine.id)
-
-    assert card.vacancy_count == 2
-
-
-async def test_one_hr_with_many_vacancies_counts_once(session, session_factory):
-    """Один HR с несколькими вакансиями считается за одного.
-
-    Счётчик в шапке отвечает на вопрос «сколько людей о ней писали», а не
-    «сколько вакансий пришло».
-    """
-    company = company_row()
-    await put(session_factory, company)
-    busy = hr_row(name="Анна")
-    single = hr_row(name="Борис")
-    await put(session_factory, busy, single)
-    await put(
-        session_factory,
-        vacancy_row(company_id=company.id, hr_id=busy.id),
-        vacancy_row(company_id=company.id, hr_id=busy.id),
-        vacancy_row(company_id=company.id, hr_id=single.id),
-        vacancy_row(company_id=company.id, hr_id=None),
-    )
-
-    card = await get_company_detail(session, company.id)
-
-    assert card.vacancy_count == 4
-    assert card.hr_count == 2
-
-
-async def test_an_unparsed_vacancy_is_counted_by_neither_counter(
-    session, session_factory
-):
-    """Неразобранная вакансия не идёт ни в один счётчик карточки.
-
-    Оба отвечают на один вопрос — что мы про эту компанию знаем, — а у
-    неразобранной строки и сама принадлежность компании ещё не установлена:
-    её проставит разбор, который не дошёл.
-    """
-    company = company_row()
-    await put(session_factory, company)
-    hr = hr_row(name="Анна")
-    await put(session_factory, hr)
-    await put(
-        session_factory,
-        vacancy_row(company_id=company.id, hr_id=hr.id, is_parsed=False),
-    )
-
-    card = await get_company_detail(session, company.id)
-
-    assert card.vacancy_count == 0
-    assert card.hr_count == 0
 
 
 def test_a_company_is_listed_by_its_name_alone():

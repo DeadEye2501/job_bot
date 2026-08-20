@@ -13,6 +13,10 @@
 Предметы описаны таблицей: род, модель, имя ключа в ответе, слова отказов и
 объявление перечня написаний. Слова у каждого свои не по недосмотру — на трёх
 экранах человек читает про разные вещи.
+
+Обвязка кнопок живёт здесь же: сессия, зов и весть о том, что списки контактов
+устарели. Отметка отсева запечена в строках всех трёх предметов, и весть у них
+общая — а написанная в самих кнопках, она у одной из шести терялась.
 """
 
 from __future__ import annotations
@@ -70,6 +74,32 @@ CHANNEL_MARK = MarkSubject(
     unnamed="У канала нет @username.",
     candidates=channels_repo.channel_blacklist_candidates,
 )
+
+
+async def marked(hub, subject: MarkSubject, entity_id: int) -> dict:
+    """Отметить предмет и сказать окну, что списки контактов устарели.
+
+    Обвязка вокруг `mark` — сессия и весть — была написана трижды, по разу на
+    карточку, и различалась только предметом. Отметка отсева запечена в строках
+    людей, компаний и каналов, поэтому весть общая: без неё соседние экраны
+    показывали бы предмет незаслонённым.
+    """
+    async with hub.session_factory() as session:
+        done = await mark(session, subject, entity_id)
+    hub.events.add("contacts_lists_changed")
+    return done
+
+
+async def unmarked(hub, subject: MarkSubject, entity_id: int) -> dict:
+    """Снять отметку с предмета и сказать окну то же самое.
+
+    Пара к `marked` и по тому же доводу: три тела на три карточки различались
+    одним предметом.
+    """
+    async with hub.session_factory() as session:
+        done = await unmark(session, subject, entity_id)
+    hub.events.add("contacts_lists_changed")
+    return done
 
 
 async def mark(session, subject: MarkSubject, entity_id: int) -> dict:

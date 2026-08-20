@@ -26,7 +26,6 @@ ANSWERS = {
     "refusal": None,
     "log_out_refusal": None,
     "channel_poll": "ok",
-    "detached": 0,
     "added": (1, "created"),
 }
 
@@ -94,10 +93,6 @@ class UiBot:
     async def poll_channel_now(self, channel_id: int) -> str:
         self.calls.append(("poll_channel_now", channel_id))
         return self.answers["channel_poll"]
-
-    async def delete_channel(self, channel_id: int) -> int | None:
-        self.calls.append(("delete_channel", channel_id))
-        return self.answers["detached"]
 
     async def add_channel(self, username: str) -> tuple[int | None, str]:
         self.calls.append(("add_channel", username))

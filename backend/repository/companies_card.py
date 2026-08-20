@@ -3,7 +3,6 @@
 import logging
 from dataclasses import dataclass
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.spellings import dedupe_first_wins
@@ -11,7 +10,6 @@ from backend.models import Company, Vacancy
 from backend.payloads import CompanyDetail
 from backend.incoming import str_list, text_or_none
 
-from backend.repository.vacancies_common import PARSED_ONLY
 from backend.repository.blacklist import rename_blacklist_marks
 from backend.repository.blacklist_marks import active_blacklist_value
 from backend.repository.merging import concat_notes, load_merge_pair
@@ -83,36 +81,19 @@ async def _company_blacklist_value(
 async def get_company_detail(
     session: AsyncSession, company_id: int
 ) -> "CompanyDetail | None":
-    """Detail payload for the Contacts/Companies pane (06): company row +
-    vacancy count + distinct HR count + blacklist status.
+    """Карточка компании: сама строка и написание, под которым она в отсеве.
+
+    Чисел здесь нет: счёт вакансий и счёт людей карточка не показывала никогда,
+    а считались они двумя запросами на каждое её открытие. Числа, которые
+    человек видит, приезжают строкой перечня и считаются там одним запросом на
+    весь список.
     """
     co = await session.get(Company, company_id)
     if co is None:
         return None
-    vacancy_count = int(
-        await session.scalar(
-            select(func.count(Vacancy.id)).where(
-                Vacancy.company_id == company_id, PARSED_ONLY
-            )
-        )
-        or 0
-    )
-    hr_count = int(
-        await session.scalar(
-            select(func.count(func.distinct(Vacancy.hr_id))).where(
-                Vacancy.company_id == company_id,
-                Vacancy.hr_id.is_not(None),
-                PARSED_ONLY,
-            )
-        )
-        or 0
-    )
-    blacklist_value = await _company_blacklist_value(session, co)
     return CompanyDetail(
         company=co,
-        vacancy_count=vacancy_count,
-        hr_count=hr_count,
-        blacklist_value=blacklist_value,
+        blacklist_value=await _company_blacklist_value(session, co),
     )
 
 
@@ -172,8 +153,9 @@ async def update_company_fields(
     Имена полей набора никто здесь не сверяет: набирает его мост, отбирая
     известные ключи из нагрузки окна, и незнакомому взяться неоткуда.
 
-    Ложь возвращается в двух случаях: компании с таким номером нет и имя
-    задано пустым. Второй случай отменяет весь вызов, а не одно поле: имя
+    Ложь значит «компании с таким номером нет». Пустое имя — не то же самое, и
+    отвечает на него бросок: два разных положения дел, и человеку про них
+    говорят разными словами. Отменяет оно весь вызов, а не одно поле: имя
     обязательно и уникально, а соседние поля из того же вызова человек правил
     в одной форме — записать половину значило бы соврать окну об исходе.
 
@@ -187,7 +169,7 @@ async def update_company_fields(
     if "name" in fields:
         cleaned = str(fields["name"] or "").strip()
         if not cleaned:
-            return False
+            raise ValueError("company name is empty")
         previous = co.name
         co.name = cleaned
         await rename_blacklist_marks(

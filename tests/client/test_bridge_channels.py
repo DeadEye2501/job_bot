@@ -4,6 +4,8 @@
 канала и обход его сообщений лежат своим файлом: там без бота ничего не выйдет.
 """
 
+import logging
+
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, put
 from tests.factories import channel_row, vacancy_row
@@ -187,3 +189,51 @@ async def test_turning_all_on_leaves_the_blacklisted_ones_off(
         row["username"]: row["is_active"] for row in listed["ok"]["channels"]
     }
     assert state == {"pyjobs": True, "spam": False}
+
+
+async def test_an_unparsed_vacancy_does_not_raise_a_false_alarm(
+    api, ask, session_factory, caplog
+):
+    """Недоразобранная вакансия не поднимает в журнале ложной тревоги.
+
+    Сторож жалуется, когда перечень пуст, а строки с этим источником есть:
+    значит, число в карточке разошлось со списком под ним, и разбирать это
+    надо. Считай он не тем отбором, что список, — жаловался бы на всякий канал,
+    у которого есть хоть одна недоразобранная строка, то есть на любой
+    работающий, и настоящая беда утонула бы среди ложных.
+    """
+    channel = channel_row(username="pyjobs")
+    await put(session_factory, channel)
+    await put(
+        session_factory,
+        vacancy_row(source_channel_id=channel.id, is_parsed=False),
+    )
+
+    with caplog.at_level(logging.WARNING, logger="client.bridge.channels"):
+        answer = await ask(api.channels.vacancies, {"channel_id": channel.id})
+
+    assert answer["ok"]["vacancies"] == []
+    assert [record.message for record in caplog.records] == []
+
+
+async def test_an_empty_page_of_a_full_channel_is_complained_about(
+    api, ask, session_factory, caplog
+):
+    """Пустой перечень при непустом канале уходит жалобой в журнал.
+
+    Числа канала и его перечень обещают одно и то же, и разойтись им нельзя:
+    человек видит «12 вакансий» и пустой список под ним, а понять, где беда —
+    в запросе перечня или в дороге до окна, — по одному пустому списку нечем.
+    Жалоба называет оба числа и тем различает эти два места.
+    """
+    channel = channel_row(username="pyjobs")
+    await put(session_factory, channel)
+    await put(session_factory, vacancy_row(source_channel_id=channel.id))
+
+    with caplog.at_level(logging.WARNING, logger="client.bridge.channels"):
+        answer = await ask(
+            api.channels.vacancies, {"channel_id": channel.id, "offset": 50}
+        )
+
+    assert answer["ok"]["vacancies"] == []
+    assert "перечень вакансий пуст" in caplog.text

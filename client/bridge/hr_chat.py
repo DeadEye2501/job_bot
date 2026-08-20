@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import logging
+
 import webview
 
 from backend.bot.chat import EMPTY_MESSAGE
 from backend.incoming import moment_or_none
 from backend.repository import messages as messages_repo
 from client.bridge.answer import Denied, bad_fields, denied, reply
-from client.bridge.refusals import NO_BOT
+from client.bridge.refusals import NO_BOT, SEND_BROKE
 from client.bridge.wire import _message_row_to_dict
+
+
+logger = logging.getLogger(__name__)
 
 
 class HrChat:
@@ -64,6 +69,35 @@ class HrChat:
             "messages": [_message_row_to_dict(m) for m in msgs],
         }
 
+    async def _sent(self, sending, hr_id: int, action: str) -> dict:
+        """Отдать боту письмо или файл и назвать номер появившейся записи.
+
+        Тело одно на обе кнопки: различаются они зовом бота и именем действия,
+        а всё вокруг — заслон на неподнятого бота, разбор беды и форма ответа —
+        у них общее.
+
+        Бед две породы, и человеку они разные. `RuntimeError` — заслон самого
+        бота: выключен, собеседник в отсеве, ника нет; слова у него свои, и по
+        ним видно, где чинить. Всё прочее роняет зов Pyrogram — отказ Telegram
+        и оборванная сеть, — и мимо перехвата это уезжало окну поломкой без
+        единого внятного слова.
+        """
+        bot = self._hub.bot
+        if bot is None:
+            raise Denied(NO_BOT, hr_id=hr_id)
+        try:
+            msg = await sending(bot)
+        except RuntimeError as e:
+            # След остаётся и у отказа: внутренние `RuntimeError` из asyncio и
+            # Pyrogram неотличимы здесь от заслона самого бота, и без записи
+            # такая беда уехала бы человеку английской строкой без следа.
+            logger.info("%s: бот отказал, hr=%s: %s", action, hr_id, e)
+            raise Denied(str(e), hr_id=hr_id, action=action)
+        except Exception:
+            logger.exception("%s: отправка сорвалась, hr=%s", action, hr_id)
+            raise Denied(SEND_BROKE, hr_id=hr_id, action=action)
+        return {"action": action, "hr_id": hr_id, "message_id": msg.id}
+
     def mark_read(self, hr_id: int) -> dict:
         """Пометить прочитанными все входящие письма человека.
 
@@ -101,17 +135,10 @@ class HrChat:
         if not text:
             return denied(EMPTY_MESSAGE, hr_id=hr_id)
 
-        async def run() -> dict:
-            bot = self._hub.bot
-            if bot is None:
-                raise Denied(NO_BOT, hr_id=hr_id)
-            try:
-                msg = await bot.send_to_hr_chat(hr_id, text)
-            except RuntimeError as e:
-                raise Denied(str(e), hr_id=hr_id, action="send_message")
-            return {"action": "send_message", "hr_id": hr_id, "message_id": msg.id}
-
-        return reply(self._hub.runner, run())
+        return reply(
+            self._hub.runner,
+            self._sent(lambda bot: bot.send_to_hr_chat(hr_id, text), hr_id, "send_message"),
+        )
 
     def pick_media(self, hr_id: int) -> dict:
         """Спросить у человека файл и отправить его этому собеседнику.
@@ -147,14 +174,7 @@ class HrChat:
         except (ValueError, TypeError, KeyError) as e:
             return bad_fields("send_media", e)
 
-        async def run() -> dict:
-            bot = self._hub.bot
-            if bot is None:
-                raise Denied(NO_BOT, hr_id=hr_id)
-            try:
-                msg = await bot.send_to_hr_media(hr_id, path)
-            except RuntimeError as e:
-                raise Denied(str(e), hr_id=hr_id, action="send_media")
-            return {"action": "send_media", "hr_id": hr_id, "message_id": msg.id}
-
-        return reply(self._hub.runner, run())
+        return reply(
+            self._hub.runner,
+            self._sent(lambda bot: bot.send_to_hr_media(hr_id, path), hr_id, "send_media"),
+        )

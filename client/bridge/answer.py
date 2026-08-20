@@ -74,6 +74,23 @@ def bad_fields(where: str, error: Exception, **extra: Any) -> dict:
     return {"fail": "fields", "detail": f"Неверные поля: {error}", **extra}
 
 
+def asked_id(payload: dict, key: str, slot: str) -> tuple:
+    """Номер предмета из нагрузки, а при негодной — готовый отказ окну.
+
+    Двумя значениями, а не броском: жалоба в журнал должна нести саму беду —
+    имя пропавшего поля из `KeyError` в неё попадает, а значение нет, — и
+    собрать её умеет только `bad_fields`, который живёт здесь же.
+
+    Одно объявление на весь мост: то же чтение стояло своим телом у трёх кнопок
+    вакансии, у обеих карточек контакта и в правке полей, и написания у них
+    начали расходиться перехватываемыми породами.
+    """
+    try:
+        return int(payload[key]), None
+    except (ValueError, TypeError, KeyError) as e:
+        return None, bad_fields(slot, e)
+
+
 def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict:
     """Сделать работу на моторе и вернуть её исход зовущему одним конвертом.
 

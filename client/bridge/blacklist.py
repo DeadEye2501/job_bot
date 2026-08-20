@@ -152,7 +152,7 @@ class Blacklist:
         # синхронная, до мотора, и мимо конверта ушла бы прямо в канал.
         except (AttributeError, ValueError, TypeError, KeyError) as e:
             return bad_fields(
-                "set_active", e, action="set_active", id=blacklist_id, active=active
+                "blacklist.set_active", e, action="set_active", id=blacklist_id, active=active
             )
 
         async def run() -> dict:
