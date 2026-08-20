@@ -11,6 +11,7 @@
 // нарочно — он просит и получает сверх этого своё (порядок, отбор, границы
 // оценки), и завёрнутый в общее, он потребовал бы ветвлений внутри.
 
+import { living } from '$state/alive.js';
 import { attempts } from '$state/attempts.js';
 import { appended, nearBottom, PAGE, refreshLimit } from '$state/paging.js';
 
@@ -29,7 +30,7 @@ export function pagedList({ ask, method, key }) {
   let loadingMore = $state(false);
 
   const tries = attempts();
-  let alive = true;
+  const alive = living();
 
   /** Перечитать список с начала.
    *
@@ -40,7 +41,7 @@ export function pagedList({ ask, method, key }) {
   async function refresh(limit = PAGE) {
     const mine = tries.next();
     const now = await ask(method, { search, limit, offset: 0 });
-    if (now === null || !alive || tries.stale(mine)) return;
+    if (now === null || !alive.now || tries.stale(mine)) return;
     rows = now[key];
     hasMore = now.has_more;
     loaded = true;
@@ -58,7 +59,7 @@ export function pagedList({ ask, method, key }) {
     const asked = search;
     const base = rows;
     const page = await ask(method, { search: asked, limit: PAGE, offset: base.length });
-    if (page === null || !alive || search !== asked || rows !== base) return;
+    if (page === null || !alive.now || search !== asked || rows !== base) return;
     rows = appended(rows, page[key]);
     hasMore = page.has_more;
   }
@@ -109,17 +110,6 @@ export function pagedList({ ask, method, key }) {
       });
     },
 
-    /** Пометить список живым; отдаёт снятие пометки.
-     *
-     * Ответ, доехавший после ухода с вкладки, писать уже некуда: разметки нет,
-     * а строки, положенные в снесённое состояние, всплывут при следующем
-     * заходе вперемешку со свежими.
-     */
-    mounted() {
-      alive = true;
-      return () => {
-        alive = false;
-      };
-    },
+    mounted: alive.mounted,
   };
 }

@@ -5,13 +5,16 @@
 
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import ExperienceCard from '$components/ExperienceCard.svelte';
-  import { toggled } from '$state/chosen.js';
-  import { named } from '$state/profile.js';
+  import { living } from '$state/alive.js';
+  import { toggled, without } from '$state/chosen.js';
+  import { experienceReady } from '$state/experience.js';
+  import { oneWrite } from '$state/one_write.js';
   import { plural } from '$state/words.js';
 
   let { ask } = $props();
 
   let leaving = $state(null);
+  let trouble = $state('');
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -21,7 +24,7 @@
   let known = $state([]);
   let open = $state(new Set());
 
-  let alive = true;
+  const alive = living();
   // Свежим карточкам номера даёт мост, и до первой записи их нет. Свой ключ
   // нужен до тех пор: по нему список узнаёт строку, а раскрытость помнится
   // набором ключей — держи мы там сами записи, любая правка подменяла бы
@@ -30,20 +33,37 @@
 
   async function refresh() {
     const now = await ask('profile.experience');
-    if (now === null || !alive) return;
+    if (now === null || !alive.now) return;
     rows = now.experience.map((one) => ({ ...one, key: `id-${one.id}` }));
     known = now.skills_index;
     loaded = true;
   }
 
+  const write = oneWrite((going) => ask('profile.save_experience', { experience: going }));
+
   /** Отправить перечень целиком.
    *
-   * Безымянные места отсеиваются: свежая карточка рождается пустой, и человек
-   * в этот миг ещё набирает название.
+   * Отсеиваются только свежие недозаполненные карточки: они ещё не в базе, и
+   * пропустить их значит ничего не потерять — а без отсева одна пустая
+   * карточка отменяла бы правки всех соседних, заполненных.
+   *
+   * Уже записанная карточка не отсеивается никогда, чем бы её ни опустошили:
+   * мост заменяет перечень целиком, и вычеркнутая из посылки была бы стёрта из
+   * базы молча. Про такую говорим сами и не отправляем ничего — так номер в
+   * жалобе считается по тому списку, который человек видит, а не по укороченной
+   * посылке.
+   *
+   * Свой ключ на мост не уезжает: он про показ, не про запись.
    */
-  async function save() {
-    const going = named(rows, 'company').map(({ key, ...one }) => one);
-    await ask('profile.save_experience', { experience: going });
+  function save() {
+    const going = rows.filter((one) => one.id !== null || experienceReady(one));
+    const at = going.findIndex((one) => !experienceReady(one));
+    if (at !== -1) {
+      trouble = `Место работы #${rows.indexOf(going[at]) + 1}: заполните компанию, должность и дату начала — пока они пусты, перечень не записывается.`;
+      return Promise.resolve();
+    }
+    trouble = '';
+    return write(going.map(({ key, ...one }) => one));
   }
 
   function edit(key, part) {
@@ -57,14 +77,8 @@
     // спрашивая про место работы, которого в нём уже нет.
     leaving = null;
     rows = rows.filter((one) => one.key !== key);
-    open = withoutKey(open, key);
+    open = without(open, key);
     return save();
-  }
-
-  function withoutKey(set, key) {
-    const next = new Set(set);
-    next.delete(key);
-    return next;
   }
 
   function add() {
@@ -90,10 +104,10 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     refresh();
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>
@@ -123,6 +137,10 @@
   {/each}
 
   <button class="new-exp" type="button" onclick={add}>+ Добавить место работы</button>
+
+  {#if trouble}
+    <div class="autosave-error">{trouble}</div>
+  {/if}
 {/if}
 
 {#if leaving}

@@ -4,6 +4,8 @@
   // Секция одна на двоих — чат и эмбеддинги, — но раскладка у них разная: у
   // чата всё идёт одной сеткой, у эмбеддингов сверху стоит выбор «ходить туда
   // же, куда чат», и при нём адрес с ключом не показываются вовсе.
+  import { modelPlaceholder } from '$state/settings.js';
+
   import SecretInput from './SecretInput.svelte';
   import SettingsSection from './SettingsSection.svelte';
   import SuggestInput from './SuggestInput.svelte';
@@ -13,9 +15,7 @@
 
   const embeds = $derived(sameAsChat !== undefined);
   const ownCreds = $derived(sameAsChat !== true);
-  const placeholder = $derived(
-    models.length ? 'Модель (выберите из списка или введите свою)' : 'Название модели',
-  );
+  const placeholder = $derived(modelPlaceholder(models));
 
   /** Имя модели пришло из подсказки под полем.
    *

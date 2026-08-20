@@ -7,6 +7,7 @@
   import ChannelRow from '$components/ChannelRow.svelte';
   import ContactsPanes from '$components/ContactsPanes.svelte';
   import SearchBox from '$components/SearchBox.svelte';
+  import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
   import { channelsToggle } from '$state/channels.js';
   import { nearBottom } from '$state/paging.js';
@@ -26,7 +27,7 @@
   let card = $state(null);
 
   const tries = attempts();
-  let alive = true;
+  const alive = living();
 
   const master = $derived(channelsToggle(rows));
 
@@ -49,7 +50,7 @@
   async function refresh() {
     const mine = tries.next();
     const now = await ask('channels.list', { search });
-    if (now === null || !alive || tries.stale(mine)) return;
+    if (now === null || !alive.now || tries.stale(mine)) return;
     rows = now.channels;
     loaded = true;
   }
@@ -95,7 +96,7 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     // Списки меняет не только этот экран: бот заносит каналы в отсев сам,
     // разбирая объявления. Без этой подписки экран показывал бы снимок той
     // минуты, когда его открыли.
@@ -104,7 +105,7 @@
     // эффект перезаводился бы на каждом набранном знаке.
     untrack(() => refresh());
     return () => {
-      alive = false;
+      settled();
       deaf();
     };
   });

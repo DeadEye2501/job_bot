@@ -12,6 +12,7 @@
   import NotesField from '$components/NotesField.svelte';
   import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
+  import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
   import { blockNote, unblockNote } from '$state/blacklist.js';
   import { cardRead } from '$state/card_read.js';
@@ -37,13 +38,13 @@
   // человека в ней переключают нажатием по соседней строке — ответ про
   // прежнего, лёгший поверх свежего, показал бы его числа под новым именем.
   const vacancyTries = attempts();
-  let alive = true;
+  const alive = living();
 
   const readCard = cardRead({
     ask: (...args) => ask(...args),
     method: 'hr.detail',
     trouble: 'Не удалось прочитать карточку',
-    alive: () => alive,
+    alive: () => alive.now,
   });
 
   const shown = $derived(card ? personName({ ...card, id: card.hr_id }) : '');
@@ -58,7 +59,7 @@
   async function loadVacancies(id) {
     const mine = vacancyTries.next();
     const now = await ask('hr.vacancies', { hr_id: id });
-    if (now === null || !alive || vacancyTries.stale(mine)) return;
+    if (now === null || !alive.now || vacancyTries.stale(mine)) return;
     vacancies = now.vacancies;
   }
 
@@ -82,7 +83,7 @@
    */
   async function saveNotes(id, text) {
     const done = await ask('hr.update', { hr_id: id, notes: text });
-    if (!alive || done === null) return null;
+    if (!alive.now || done === null) return null;
     onchanged();
     return text;
   }
@@ -129,7 +130,7 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     const id = personId;
     // Показанное прежним человеком уходит сразу: панель одна, и его числа под
     // новым именем читались бы как числа нового.
@@ -139,7 +140,7 @@
     refresh(id);
     loadVacancies(id);
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>

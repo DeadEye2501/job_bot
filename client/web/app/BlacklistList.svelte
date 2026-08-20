@@ -9,6 +9,7 @@
   import BlacklistRow from '$components/BlacklistRow.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import SearchBox from '$components/SearchBox.svelte';
+  import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
   import {
     BLACKLIST_KINDS,
@@ -34,7 +35,7 @@
 
   const listTries = attempts();
   const knownTries = attempts();
-  let alive = true;
+  const alive = living();
 
   const shown = $derived(blacklistShown(rows, { kind, search }));
   const counts = $derived(blacklistCounts(rows));
@@ -60,7 +61,7 @@
   async function refresh() {
     const mine = listTries.next();
     const now = await ask('blacklist.list');
-    if (now === null || !alive || listTries.stale(mine)) return;
+    if (now === null || !alive.now || listTries.stale(mine)) return;
     rows = now.items;
     loaded = true;
   }
@@ -74,7 +75,7 @@
     if (known[one] !== undefined) return;
     const mine = knownTries.next();
     const now = await ask('blacklist.candidates', one);
-    if (now === null || !alive || knownTries.stale(mine)) return;
+    if (now === null || !alive.now || knownTries.stale(mine)) return;
     known = { ...known, [now.kind]: now.items };
   }
 
@@ -122,14 +123,14 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     // Списки меняет не только этот экран: бот заносит людей и компании в отсев
     // сам, разбирая переписку. Без этой подписки экран показывал бы снимок той
     // минуты, когда его открыли.
     const deaf = events.on('contacts_lists_changed', refresh);
     refresh();
     return () => {
-      alive = false;
+      settled();
       deaf();
     };
   });

@@ -7,7 +7,9 @@
 
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import SkillRow from '$components/SkillRow.svelte';
-  import { toggled } from '$state/chosen.js';
+  import { living } from '$state/alive.js';
+  import { toggled, without } from '$state/chosen.js';
+  import { oneWrite } from '$state/one_write.js';
   import { named } from '$state/profile.js';
   import { countNote, grouped } from '$state/skills.js';
 
@@ -22,22 +24,24 @@
 
   const groups = $derived(grouped(skills));
 
-  let alive = true;
+  const alive = living();
 
   async function refresh() {
     const now = await ask('profile.skills');
-    if (now === null || !alive) return;
+    if (now === null || !alive.now) return;
     skills = now.skills;
     loaded = true;
   }
+
+  const write = oneWrite((going) => ask('profile.save_skills', { skills: going }));
 
   /** Отправить перечень целиком.
    *
    * Безымянные строки отсеиваются: свежий навык рождается пустым, и мост
    * такой не примет — а человек в этот миг ещё набирает имя.
    */
-  async function save() {
-    await ask('profile.save_skills', { skills: named(skills, 'name') });
+  function save() {
+    return write(named(skills, 'name'));
   }
 
   function edit(skill, part) {
@@ -66,15 +70,40 @@
     addSkill(NEW_CATEGORY);
   }
 
-  function renameCategory(was, becomes) {
-    if (!becomes || becomes === was) return;
+  /** Переименовать категорию.
+   *
+   * Пустое имя не отправляется, и поле возвращается к прежнему: категория
+   * осталась той же, а пустое поле читалось бы как безымянная.
+   *
+   * Свёрнутость помнится по имени — другого ключа у категории нет, имя её и
+   * определяет, — поэтому отметку перевешиваем следом. Не перевесь её, свёрнутая
+   * категория раскрылась бы сама, а отметка досталась бы будущей тёзке.
+   */
+  function renameCategory(was, field) {
+    const becomes = field.value.trim();
+    if (!becomes) {
+      field.value = was;
+      return;
+    }
+    if (becomes === was) return;
     skills = skills.map((one) => (one.category === was ? { ...one, category: becomes } : one));
+    if (closed.has(was)) {
+      // Именно поставить, а не переключить: переименование в имя соседней
+      // категории сливает их, и переключение сняло бы отметку с той, что уже
+      // была свёрнута.
+      const next = without(closed, was);
+      next.add(becomes);
+      closed = next;
+    }
     return save();
   }
 
   function dropCategory(name) {
     leaving = null;
     skills = skills.filter((one) => one.category !== name);
+    // Отметка уходит вместе с категорией: оставшись, она досталась бы
+    // заведённой заново тёзке, и та открылась бы свёрнутой.
+    closed = without(closed, name);
     return save();
   }
 
@@ -83,10 +112,10 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     refresh();
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>
@@ -111,7 +140,7 @@
           class="cat-name"
           maxlength="64"
           value={group.name}
-          onblur={(event) => renameCategory(group.name, event.currentTarget.value.trim())}
+          onblur={(event) => renameCategory(group.name, event.currentTarget)}
         />
         <span class="cat-spacer"></span>
         <button class="cat-add" type="button" onclick={() => addSkill(group.name)}

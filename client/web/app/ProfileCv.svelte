@@ -10,9 +10,11 @@
   import CvFileRow from '$components/CvFileRow.svelte';
   import LangRows from '$components/LangRows.svelte';
   import ChoiceRow from '$components/ChoiceRow.svelte';
+  import { living } from '$state/alive.js';
   import { autosave } from '$state/autosave.js';
   import { toggled } from '$state/chosen.js';
   import { saveKey } from '$state/keys.js';
+  import { oneWrite } from '$state/one_write.js';
   import { GRADES, WORK_FORMATS, blankProfile, langRow, updatedNote } from '$state/profile.js';
 
   // Пауза перед записью набранного. Короче — и мост получает вопрос на каждое
@@ -23,11 +25,13 @@
 
   // Длины те же, что у полей базы: обрезать текст мост не станет, он ответит
   // отказом — а человек к тому мигу уже набрал лишнее и потерял бы набранное.
+  // `must` — поле, без которого мост анкету не примет вовсе. Звёздочка в
+  // подсказке говорит о том же, но только пока поле пустое и подсказка видна.
   const FIELDS = [
-    { key: 'first_name', placeholder: 'Имя *', max: 64 },
-    { key: 'last_name', placeholder: 'Фамилия *', max: 64 },
-    { key: 'title', placeholder: 'Должность *', max: 120, wide: true },
-    { key: 'email', placeholder: 'Email *', max: 254 },
+    { key: 'first_name', placeholder: 'Имя *', max: 64, must: true },
+    { key: 'last_name', placeholder: 'Фамилия *', max: 64, must: true },
+    { key: 'title', placeholder: 'Должность *', max: 120, wide: true, must: true },
+    { key: 'email', placeholder: 'Email *', max: 254, must: true },
     { key: 'phone', placeholder: 'Телефон', max: 32 },
     { key: 'telegram_username', placeholder: 'Telegram (@username)', max: 64 },
     { key: 'github_url', placeholder: 'GitHub (URL)', max: 255 },
@@ -42,7 +46,7 @@
   let formats = $state(new Set());
   let fields = $state(null);
 
-  let alive = true;
+  const alive = living();
 
   // Отложенная запись одна на всю анкету: мост принимает её целиком, и держать
   // по отсчёту на поле значило бы слать одно и то же по разу на поле.
@@ -50,7 +54,7 @@
 
   async function refresh() {
     const now = await ask('profile.get');
-    if (now === null || !alive) return;
+    if (now === null || !alive.now) return;
     meta = now.cv_meta;
     const fresh = now.profile || blankProfile();
     // Пока курсор стоит в форме, с моста берётся одна отметка о правке:
@@ -71,30 +75,37 @@
     return { ...form, grades: [...grades], work_format: [...formats] };
   }
 
-  /** Отправить анкету целиком.
+  /** Отдать анкету мосту и сказать, легла ли она.
    *
-   * Мост принимает её только так и отказывает, пока не заполнены четверо
-   * обязательных. Отказ этот — обычное дело: анкету заполняют сверху вниз, и
-   * до последнего обязательного поля каждая запись законно отказана. Поэтому
-   * он живёт строкой под формой, а не общей плашкой окна: плашка била бы на
-   * каждом поле и закрывала бы собой соседние.
+   * Мост принимает её только целиком и отказывает, пока не заполнены четверо
+   * обязательных. Отказ этот — обычное дело: анкету заполняют сверху вниз, и до
+   * последнего обязательного поля каждая запись законно отказана. Поэтому он
+   * живёт строкой под формой и отметкой на самих незаполненных полях, а не
+   * общей плашкой окна: плашка била бы на каждом поле и закрывала бы соседние.
    */
-  async function save() {
+  async function send(sending) {
+    try {
+      await call('profile.save', sending);
+      if (!alive.now) return false;
+      trouble = '';
+      await refresh();
+      return true;
+    } catch (refusal) {
+      if (alive.now) trouble = refusal.message;
+      return false;
+    }
+  }
+
+  const write = oneWrite(send);
+
+  /** Отправить анкету целиком. */
+  function save() {
     const sending = sheet();
     // Уехавшее — оно же и «лежит в базе»: без этого уход из нетронутого поля
     // отправил бы ту же анкету заново. Ставится и здесь, потому что анкету шлёт
     // не только отсчёт: выбор грейда, формата и языка зовёт запись напрямую.
     saver.known(JSON.stringify(sending));
-    try {
-      await call('profile.save', sending);
-      if (!alive) return false;
-      trouble = '';
-      await refresh();
-      return true;
-    } catch (refusal) {
-      if (alive) trouble = refusal.message;
-      return false;
-    }
+    return write(sending);
   }
 
   /** Набранное в поле: в анкету ложится сразу, на мост уедет по остановке.
@@ -142,7 +153,7 @@
    */
   async function replaceCv() {
     const answer = await ask('profile.pick');
-    if (answer === null || !alive || answer.cancelled) return;
+    if (answer === null || !alive.now || answer.cancelled) return;
     await refresh();
   }
 
@@ -151,10 +162,10 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     refresh();
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>
@@ -172,6 +183,7 @@
       <input
         class="input"
         class:span-2={one.wide}
+        class:missing={trouble && one.must && !form[one.key].trim()}
         maxlength={one.max}
         placeholder={one.placeholder}
         value={form[one.key]}

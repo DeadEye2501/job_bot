@@ -3,7 +3,10 @@
   //
   // Секреты живут в этом же окне и в сеть не уходят, поэтому показать их можно
   // — но не по умолчанию: экран настроек открывают и при свидетелях.
-  let { value, placeholder, onsave } = $props();
+  //
+  // `mono` просит шаг мастера: ключ там стоит под адресом, набранным
+  // моноширинным, и пропорциональный рядом читался бы как поле другого рода.
+  let { value, placeholder, mono = false, maxlength = null, onsave } = $props();
 
   let shown = $state(false);
 </script>
@@ -11,7 +14,9 @@
 <div class="secret-input">
   <input
     class="input"
+    class:mono
     type={shown ? 'text' : 'password'}
+    {maxlength}
     {value}
     {placeholder}
     onblur={(event) => onsave(event.currentTarget.value)}

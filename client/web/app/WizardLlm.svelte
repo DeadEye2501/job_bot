@@ -10,14 +10,15 @@
   // покидают, здесь — по «Дальше», и только пройдя заслон. В мастере
   // недописанный адрес значил бы работающего бота без модели.
   import { call } from '$api/bridge.js';
-  import { mirrored, sameCreds } from '$state/settings.js';
+  import { living } from '$state/alive.js';
+  import { askModels, probeModel } from '$state/provider.js';
+  import { mirrored, modelPlaceholder, sameCreds } from '$state/settings.js';
   import Dropdown from '$components/Dropdown.svelte';
+  import SecretInput from '$components/SecretInput.svelte';
   import SuggestInput from '$components/SuggestInput.svelte';
   import WizardFoot from '$components/WizardFoot.svelte';
+  import WizardStatus from '$components/WizardStatus.svelte';
   import { PRESETS, llmTrouble, presetFor } from '$state/wizard.js';
-
-  // Значок строки состояния: чем шаг занят и чем кончилось.
-  const TONE_ICONS = { busy: 'progress_activity', ok: 'check_circle', err: 'error' };
 
   // Список выбирают по имени поставщика, адрес за именем ищет `presetFor`.
   const PRESET_NAMES = PRESETS.map((one) => one.label);
@@ -29,26 +30,23 @@
   let sameAsChat = $state(true);
   let models = $state([]);
   let status = $state(null);
-  let shownKey = $state(false);
   let busy = $state(false);
 
-  let alive = true;
+  const alive = living();
 
   const chatStep = $derived(kind === 'chat');
   // Адрес и ключ стоят только там, где их набирают: при отмеченной галочке они
   // те же, что у чата, и показывать их значило бы предлагать править то, что
   // тут же перепишется чатовым.
   const ownCreds = $derived(chatStep || !sameAsChat);
-  const namePlaceholder = $derived(
-    models.length ? 'Модель (выберите из списка или введите свою)' : 'Название модели',
-  );
+  const namePlaceholder = $derived(modelPlaceholder(models));
   // Незнакомый адрес отмечен как «своё»: пустая отметка читалась бы как
   // «поставщик не выбран», хотя адрес уже вписан.
   const chosenPreset = $derived(presetFor(creds.base_url));
 
   async function refresh() {
     const now = await ask('settings.get');
-    if (now === null || !alive) return;
+    if (now === null || !alive.now) return;
     chat = now.chat;
     if (chatStep) {
       creds = now.chat;
@@ -68,21 +66,16 @@
    * на каждую правку адреса и ключа, и непóднятый поставщик отвечает отказом на
    * каждый знак — плашка беды выскакивала бы поверх набора. Не ответил — список
    * пуст, имя модели вписывают руками.
+   *
+   * Отказ при этом не теряется, а возвращается фразой: по нажатию «Проверить»
+   * его и показывают, и путать его с пустым перечнем нельзя — «сервер молчит» и
+   * «в сервере нет моделей» чинятся по-разному.
    */
   async function listModels() {
-    let answer = null;
-    try {
-      answer = await call('settings.list_models', {
-        kind,
-        base_url: creds.base_url,
-        api_key: creds.api_key,
-      });
-    } catch {
-      answer = null;
-    }
-    if (!alive) return null;
-    models = answer?.models || [];
-    return models;
+    const found = await askModels(call, { kind, ...creds });
+    if (!alive.now) return found;
+    models = found.models;
+    return found;
   }
 
   /** Поправить поле.
@@ -133,48 +126,49 @@
       return;
     }
     busy = true;
-    if (!creds.model.trim()) {
-      status = { tone: 'busy', text: 'Загружаем список моделей у провайдера...' };
-      const found = await listModels();
-      if (!alive) return;
-      busy = false;
-      if (found === null) {
-        status = { tone: 'err', text: 'Не удалось получить список моделей.' };
-      } else if (!found.length) {
-        status = {
-          tone: 'err',
-          text: 'Провайдер не вернул ни одной модели — проверьте, что в LM Studio загружена модель.',
-        };
-      } else {
-        status = {
-          tone: 'ok',
-          text: `Найдено моделей: ${found.length}. Выберите модель из списка и нажмите «Проверить».`,
-        };
-      }
+    if (creds.model.trim()) await probe();
+    else await askNames();
+    if (alive.now) busy = false;
+  }
+
+  /** Спросить у поставщика перечень его моделей.
+   *
+   * Три исхода, и они разные: сервер не отозвался, сервер поднят и пуст, сервер
+   * назвал имена. Первые два человек чинит по-разному — одно поднятием
+   * сервера, другое загрузкой модели в него.
+   */
+  async function askNames() {
+    status = { tone: 'busy', text: 'Загружаем список моделей у провайдера...' };
+    const found = await listModels();
+    if (!alive.now) return;
+    if (found.trouble) {
+      status = { tone: 'err', text: found.trouble };
       return;
     }
-    status = { tone: 'busy', text: 'Проверяем подключение...' };
-    let answer = null;
-    let refused = '';
-    try {
-      // Зовём мост напрямую: отказ поставщика — это и есть исход проверки, и
-      // человек читает его строкой под тем самым полем.
-      answer = await call('settings.probe_model', { kind, ...creds });
-    } catch (refusal) {
-      refused = refusal.message;
+    if (!found.models.length) {
+      status = {
+        tone: 'err',
+        text: 'Провайдер не вернул ни одной модели — проверьте, что в LM Studio загружена модель.',
+      };
+      return;
     }
-    if (!alive) return;
-    busy = false;
+    status = {
+      tone: 'ok',
+      text: `Найдено моделей: ${found.models.length}. Выберите модель из списка и нажмите «Проверить».`,
+    };
+  }
+
+  /** Проверить связь с поставщиком: имя модели набрано, и спрашивать есть что. */
+  async function probe() {
+    status = { tone: 'busy', text: 'Проверяем подключение...' };
+    const done = await probeModel(call, { kind, ...creds });
+    if (!alive.now) return;
     // Поля могли поправить, пока ответ шёл: исход говорил бы про данные,
     // которых в них уже нет.
     if (status?.tone !== 'busy') return;
-    status =
-      answer === null
-        ? { tone: 'err', text: refused }
-        : {
-            tone: 'ok',
-            text: `Подключение работает (${answer.model} · ${answer.latency_ms}ms)`,
-          };
+    status = done.ok
+      ? { tone: 'ok', text: `Подключение работает (${done.model} · ${done.latencyMs}ms)` }
+      : { tone: 'err', text: done.trouble };
   }
 
   async function save() {
@@ -191,24 +185,24 @@
     creds = ownCreds ? { ...creds, base_url: creds.base_url.trim() } : mirrored(chat, creds);
     try {
       // Зовём мост напрямую: отказ записи — исход шага, и читают его там же,
-      // где исход проверки.
+      // где исход проверки, — строкой под полями.
       await call('settings.save', chatStep ? { chat: creds } : { embed: creds });
     } catch (refusal) {
-      if (!alive) return;
+      if (!alive.now) return;
       busy = false;
       status = { tone: 'err', text: refusal.message };
       return;
     }
-    if (!alive) return;
+    if (!alive.now) return;
     busy = false;
     return onnext();
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     refresh();
     return () => {
-      alive = false;
+      settled();
     };
   });
 </script>
@@ -261,26 +255,13 @@
         value={creds.base_url}
         onblur={(event) => edit({ base_url: event.currentTarget.value.trim() })}
       />
-      <div class="secret-input">
-        <input
-          class="input mono"
-          type={shownKey ? 'text' : 'password'}
-          maxlength="512"
-          placeholder="api_key (если требуется)"
-          value={creds.api_key}
-          onblur={(event) => edit({ api_key: event.currentTarget.value })}
-        />
-        <button
-          class="icon-btn"
-          type="button"
-          title={shownKey ? 'Скрыть' : 'Показать'}
-          onclick={() => (shownKey = !shownKey)}
-        >
-          <span class="material-symbols-outlined">
-            {shownKey ? 'visibility_off' : 'visibility'}
-          </span>
-        </button>
-      </div>
+      <SecretInput
+        value={creds.api_key}
+        placeholder="api_key (если требуется)"
+        mono
+        maxlength={512}
+        onsave={(api_key) => edit({ api_key })}
+      />
     {/if}
 
     <SuggestInput
@@ -296,12 +277,7 @@
       После «Проверить» список заменится теми моделями, которые реально доступны у провайдера.
     </div>
 
-    {#if status}
-      <div class="status-row" data-tone={status.tone}>
-        <span class="material-symbols-outlined">{TONE_ICONS[status.tone]}</span>
-        <span>{status.text}</span>
-      </div>
-    {/if}
+    <WizardStatus {status} />
   </div>
 
   {#if chatStep}

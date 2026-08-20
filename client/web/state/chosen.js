@@ -25,3 +25,15 @@ export function toggled(set, value) {
   if (!next.delete(value)) next.add(value);
   return next;
 }
+
+/** Набор без этого значения.
+ *
+ * Нужен там, где уходит сам предмет, а не отметка на нём: переключением такое
+ * не снимешь — отсутствующее оно бы добавило. Отметка, пережившая свою запись,
+ * достаётся следующей с тем же именем.
+ */
+export function without(set, value) {
+  const next = new Set(set);
+  next.delete(value);
+  return next;
+}

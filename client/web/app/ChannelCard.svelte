@@ -9,6 +9,7 @@
   import BlacklistMenuItem from '$components/BlacklistMenuItem.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
+  import { living } from '$state/alive.js';
   import { attempts } from '$state/attempts.js';
   import { blockNote, unblockNote } from '$state/blacklist.js';
   import { cardRead } from '$state/card_read.js';
@@ -30,13 +31,13 @@
   // канал в ней переключают нажатием по соседней строке — ответ про прежний,
   // лёгший поверх свежего, показал бы его числа под новым именем.
   const vacancyTries = attempts();
-  let alive = true;
+  const alive = living();
 
   const readCard = cardRead({
     ask: (...args) => ask(...args),
     method: 'channels.detail',
     trouble: 'Не удалось прочитать канал',
-    alive: () => alive,
+    alive: () => alive.now,
   });
 
   const shown = $derived(card ? channelName({ ...card, id: card.channel_id }) : null);
@@ -67,7 +68,7 @@
       limit: mode === 'append' ? PAGE : refreshLimit(vacancies.length),
       offset: mode === 'append' ? vacancies.length : 0,
     });
-    if (page === null || !alive || vacancyTries.stale(mine)) return;
+    if (page === null || !alive.now || vacancyTries.stale(mine)) return;
     vacancies = mode === 'append' ? appended(vacancies, page.vacancies) : page.vacancies;
     hasMore = page.has_more;
   }
@@ -134,7 +135,7 @@
   }
 
   $effect(() => {
-    alive = true;
+    const settled = alive.mounted();
     const id = channelId;
     // Показанное прежним каналом уходит сразу: панель одна, и его числа под
     // новым именем читались бы как числа нового.
@@ -152,7 +153,7 @@
       loadVacancies(id);
     });
     return () => {
-      alive = false;
+      settled();
       deaf();
     };
   });
