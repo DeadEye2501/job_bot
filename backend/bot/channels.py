@@ -82,8 +82,6 @@ async def _ask_telegram_about(bot, username: str):
     except Exception:
         logger.exception("add_channel: get_chat(%s) failed", username)
         return None, "error"
-    if chat is None:
-        return None, "invalid"
     return chat, None
 
 

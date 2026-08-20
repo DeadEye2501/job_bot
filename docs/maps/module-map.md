@@ -163,14 +163,14 @@ First-run bootstrap: ensure DB schema exists.
 - `class SendPermission` (8)
 - `async def can_send_to_hr(bot, hr) -> SendPermission` (23)
 
-### `backend/bot/channels.py` — 140 строк
+### `backend/bot/channels.py` — 138 строк
 
 Правка каналов из окна: заведение, удаление, чтение по требованию.
 
 Зависит от: `backend.bot`, `backend.flows`, `backend.repository.channels`, `backend.telegram_lookup`
 
 - `async def poll_channel_now(bot, channel_id: int) -> ChannelPollOutcome` (29)
-- `async def _ask_telegram_about(bot, username: str)` (26)
+- `async def _ask_telegram_about(bot, username: str)` (24)
 - `async def add_channel(bot, username: str) -> tuple[int | None, ChannelAddOutcome]` (38)
 - `async def force_poll_once(bot) -> slot.CycleOutcome` (11)
 
@@ -486,7 +486,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def report_failures(hr_ids: list[int], results: list, what: str, log: logging.Logger) -> None` (25)
 
-### `backend/flows/channels.py` — 337 строк ⚠ подошёл к 300
+### `backend/flows/channels.py` — 335 строк ⚠ подошёл к 300
 
 Обход телеграм-каналов за свежими постами.
 
@@ -496,7 +496,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def poll_one_channel(pipeline, channel_id: int) -> PollOutcome` (39)
 - `async def refresh_channel_metadata_for_ids(pipeline, channel_ids: list[int]) -> None` (12)
 - `async def _store_metadata(pipeline, title_updates: dict[int, str], avatar_updates: dict[int, bytes]) -> None` (19)
-- `async def _collect_metadata(pipeline, channels) -> tuple[dict, dict]` (30)
+- `async def _collect_metadata(pipeline, channels) -> tuple[dict, dict]` (28)
 - `async def refresh_channel_metadata(pipeline, channels) -> None` (27)
 - `async def _unseen_posts(pipeline, channel_username: str, last_id: int | None)` (28)
 - `async def _take_post(pipeline, channel_id: int, channel_username: str, msg) -> bool` (17)

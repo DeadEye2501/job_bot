@@ -170,8 +170,6 @@ async def _collect_metadata(pipeline, channels) -> tuple[dict, dict]:
         except Exception:
             logger.exception("[@%s] get_chat failed", ch.username)
             continue
-        if chat is None:
-            continue
         new_title, blob = await read_channel_metadata(
             pipeline.client, chat, current_avatar=ch.avatar
         )
