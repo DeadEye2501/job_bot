@@ -16,6 +16,7 @@ from backend.llm.answers import (
     normalize_enum,
     str_or_none,
     truncation_trouble,
+    wants_more_room,
 )
 from backend.llm.candidate import (
     CandidateProfile,
@@ -39,8 +40,11 @@ from backend.llm.rules import (
 # размышление до ответа. Четырёхсот не хватало, и с тех пор как обрыв здесь
 # перестал считаться отказом, упёршаяся в предел вакансия не уходит в «не
 # подходит», а остаётся неразобранной — то есть разбирается заново при каждом
-# запуске и не разберётся уже никогда.
+# запуске и не разберётся уже никогда. Оборвавшийся ответ переспрашивается с
+# запасом (`ROOMIER_FIT_TOKENS`), и только если не хватило и его, вердикт
+# сдаётся, а зовущий записывает строку с названной причиной.
 MAX_FIT_TOKENS = 1200
+ROOMIER_FIT_TOKENS = 2400
 
 logger = logging.getLogger(__name__)
 
@@ -294,7 +298,7 @@ def _vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str:
     )
 
 
-def _fit_request(parsed: ParsedVacancy, raw_text: str, profile):
+def _fit_request(parsed: ParsedVacancy, raw_text: str, profile, max_tokens: int):
     """Что спросить у модели: мерки кандидата и вакансия к проверке."""
     system_prompt = (
         VALIDATE_VACANCY_FIT_PROMPT
@@ -318,7 +322,7 @@ def _fit_request(parsed: ParsedVacancy, raw_text: str, profile):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_msg},
         ],
-        max_tokens=MAX_FIT_TOKENS,
+        max_tokens=max_tokens,
     )
 
 
@@ -378,7 +382,7 @@ async def validate_vacancy_fit(
     """
     logger.debug("validate_vacancy_fit: title=%r", parsed.title)
     reply = await chat(
-        client, model, _fit_request(parsed, raw_text, profile), logger
+        client, model, _fit_request(parsed, raw_text, profile, MAX_FIT_TOKENS), logger
     )
     if reply.text is None:
         return None, reply.error
@@ -388,6 +392,15 @@ async def validate_vacancy_fit(
             parsed.title, raw_text[:200], reply.text,
         )
     validation = _parse_fit_validation(reply.text)
+    if wants_more_room(validation, reply.finish_reason):
+        logger.warning("validate_vacancy_fit: ответ оборван, переспрашиваю с запасом")
+        reply = await chat(
+            client, model,
+            _fit_request(parsed, raw_text, profile, ROOMIER_FIT_TOKENS), logger,
+        )
+        if reply.text is None:
+            return None, reply.error
+        validation = _parse_fit_validation(reply.text)
     if validation is None:
         log_unparseable(reply.text, logger, "validate_vacancy_fit")
         return None, truncation_trouble(reply.finish_reason)

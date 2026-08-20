@@ -19,6 +19,7 @@ import asyncio
 
 import pytest
 
+from backend.domain.verdict import TRUNCATED_SKIP_REASON
 from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
 from tests.backend.fixtures.flows import known_hr_client
 from tests.dbio import only_row, put
@@ -300,6 +301,60 @@ async def test_a_failed_write_of_an_empty_vacancy_is_not_called_a_parse(
     )
 
     assert done is False
+
+
+async def test_a_vacancy_the_model_never_fits_into_an_answer_stops_being_an_orphan(
+    emptied, monkeypatch, session_factory
+):
+    """Не поместившаяся в ответ вакансия записывается, а не ходит по кругу.
+
+    Обрыв ответа приговором не является, и строка ждёт следующего захода. Но
+    ждать вечно она не может: подбор недоразобранного берёт её при каждом
+    запуске и платит за неё полным разбором. Переспросить с запасом модель уже
+    пробовала — значит, дальше это дело человека: строка ложится в окно с
+    названной причиной и разбирается заново по кнопке.
+    """
+    pipeline, vacancy = emptied
+
+    async def never_fits(*args, **kwargs):
+        return None, "truncated"
+
+    monkeypatch.setattr(parse, "parse_vacancy", never_fits)
+
+    done = await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=True
+    )
+
+    saved = await only_row(session_factory, Vacancy)
+    assert done is True
+    assert saved.is_parsed is True
+    assert saved.status is VacancyStatus.NOT_FIT
+    assert saved.skip_reason == TRUNCATED_SKIP_REASON
+
+
+async def test_a_provider_that_fell_still_leaves_the_vacancy_for_the_next_run(
+    emptied, monkeypatch, session_factory
+):
+    """Упавший провайдер вакансию по-прежнему оставляет недоразобранной.
+
+    Беда провайдера временная: модель поднимут, и строка разберётся сама.
+    Запиши мы её отказом здесь — вернуть пришлось бы кнопкой по каждой из тех,
+    что пришли за полчаса лежащего провайдера.
+    """
+    pipeline, vacancy = emptied
+
+    async def provider_down(*args, **kwargs):
+        return None, "llm_http_error: 500"
+
+    monkeypatch.setattr(parse, "parse_vacancy", provider_down)
+
+    done = await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=True
+    )
+
+    saved = await only_row(session_factory, Vacancy)
+    assert done is False
+    assert saved.is_parsed is False
 
 
 async def test_the_window_hears_about_both_lists(emptied):

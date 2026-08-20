@@ -19,6 +19,7 @@ from backend.llm.answers import (
     normalize_enum,
     str_or_none,
     truncation_trouble,
+    wants_more_room,
 )
 from backend.llm.candidate import format_known_skills
 from backend.llm.rules import (
@@ -32,6 +33,14 @@ from backend.llm.external import external_block
 from backend.llm.skills import clean_stack_items
 
 logger = logging.getLogger(__name__)
+
+# Потолок токенов на разбор объявления и запас на второй заход. Первый заход
+# идёт обычным потолком: платить за запас на каждом посте незачем, длинных
+# среди них меньшинство. Оборвавшийся ответ переспрашивается с запасом — см.
+# `answers.wants_more_room`, — и если не хватило и его, разбор сдаётся, а
+# зовущий записывает строку с названной причиной вместо вечного перебора.
+MAX_PARSE_TOKENS = 1200
+ROOMIER_PARSE_TOKENS = 2400
 
 
 PARSE_VACANCY_PROMPT = """Ты парсишь пост с вакансией из Telegram-канала и извлекаешь структурированные поля в JSON.
@@ -336,7 +345,7 @@ def _parse_vacancy_json(answer: str) -> ParsedVacancy | None:
     )
 
 
-def _parse_request(text: str, known_skills) -> ChatRequest:
+def _parse_request(text: str, known_skills, max_tokens: int) -> ChatRequest:
     """Что спросить у модели: правила разбора и сам пост как данные."""
     system_prompt = PARSE_VACANCY_PROMPT.replace(
         "{KNOWN_SKILLS_BLOCK}", format_known_skills(known_skills)
@@ -352,7 +361,7 @@ def _parse_request(text: str, known_skills) -> ChatRequest:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
-        max_tokens=1200,
+        max_tokens=max_tokens,
     )
 
 
@@ -416,11 +425,20 @@ async def parse_vacancy(
         channel_username or "?",
     )
     reply = await chat(
-        client, model, _parse_request(text, known_skills), logger
+        client, model, _parse_request(text, known_skills, MAX_PARSE_TOKENS), logger
     )
     if reply.text is None:
         return None, reply.error
     parsed = _parse_vacancy_json(reply.text)
+    if wants_more_room(parsed, reply.finish_reason):
+        logger.warning("parse_vacancy: ответ оборван, переспрашиваю с запасом")
+        reply = await chat(
+            client, model, _parse_request(text, known_skills, ROOMIER_PARSE_TOKENS),
+            logger,
+        )
+        if reply.text is None:
+            return None, reply.error
+        parsed = _parse_vacancy_json(reply.text)
     if parsed is None:
         log_unparseable(reply.text, logger, "parse_vacancy")
         return None, truncation_trouble(reply.finish_reason)
