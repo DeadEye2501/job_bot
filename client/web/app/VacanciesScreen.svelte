@@ -193,7 +193,7 @@
     // собой и новую компанию, и новый канал.
     const deaf = events.on('vacancies_list_changed', () => {
       askOptions();
-      return refresh(refreshLimit(rows.length));
+      return refresh(refreshLimit(rows.length, VACANCY_PAGE));
     });
     // Первое чтение — вне слежения: поиск и порядок `refresh` читает, и следящий
     // эффект перезаводился бы на каждом набранном знаке.
@@ -286,7 +286,7 @@
         {oncontacts}
         vacancyId={opened}
         onclose={() => (opened = null)}
-        onchanged={() => refresh(refreshLimit(rows.length))}
+        onchanged={() => refresh(refreshLimit(rows.length, VACANCY_PAGE))}
       />
     {/if}
   </section>

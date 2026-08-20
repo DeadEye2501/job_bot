@@ -36,14 +36,22 @@
    */
   async function writeValue(text) {
     const done = await onedit({ value: text });
-    if (done === null) return (value = row.value);
+    if (done === null) {
+      value = row.value;
+      return false;
+    }
     markValue();
+    return true;
   }
 
   async function writeReason(text) {
     const done = await onedit({ reason: text });
-    if (done === null) return (reason = row.reason || '');
+    if (done === null) {
+      reason = row.reason || '';
+      return false;
+    }
     markReason();
+    return true;
   }
 
   /** Растянуть причину по набранному: она бывает в три строки, а полосы

@@ -46,13 +46,17 @@ export function pagedList({ ask, method, key }) {
 
   /** Дочитать следующую страницу.
    *
-   * Своей попыткой, а не под чужой: страница, доехавшая после смены поиска,
-   * дописала бы в список чужие строки.
+   * Своей попытки не берёт: она объявила бы устаревшим уже идущее перечитывание,
+   * а свежее как раз оно — в нём и поиск, и первая страница под него. Вместо
+   * счёта сверяется само основание: тот ли поиск и тот ли список, к концу
+   * которого страницу дописывают. Перечитывание кладёт другой список, и
+   * дописывать доехавшую страницу становится некуда.
    */
   async function more() {
-    const mine = tries.next();
-    const page = await ask(method, { search, limit: PAGE, offset: rows.length });
-    if (page === null || !alive || tries.stale(mine)) return;
+    const asked = search;
+    const base = rows;
+    const page = await ask(method, { search: asked, limit: PAGE, offset: base.length });
+    if (page === null || !alive || search !== asked || rows !== base) return;
     rows = appended(rows, page[key]);
     hasMore = page.has_more;
   }
@@ -98,7 +102,7 @@ export function pagedList({ ask, method, key }) {
     scrolled(event) {
       if (!hasMore || loadingMore || !nearBottom(event.currentTarget)) return;
       loadingMore = true;
-      more().finally(() => {
+      return more().finally(() => {
         loadingMore = false;
       });
     },

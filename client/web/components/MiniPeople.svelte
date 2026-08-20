@@ -4,7 +4,7 @@
   // Строка нажимается и уводит к самому человеку: из карточки компании смотрят,
   // кто из неё писал, и тут же открывают того, кому отвечать.
   import Avatar from './Avatar.svelte';
-  import { personName } from '$state/contacts.js';
+  import { personName } from '$state/people.js';
   import { plural } from '$state/words.js';
 
   let { people, empty, onpick } = $props();

@@ -14,7 +14,7 @@
   import PickerDialog from '$components/PickerDialog.svelte';
   import PickerRow from '$components/PickerRow.svelte';
   import { companyCandidate } from '$state/companies.js';
-  import { named, personCandidate } from '$state/contacts.js';
+  import { named, personCandidate } from '$state/people.js';
 
   let { ask, say, vacancyId, kind, prefill = '', current = null, onclose, onlinked } = $props();
 

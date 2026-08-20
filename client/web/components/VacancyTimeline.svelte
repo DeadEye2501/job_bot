@@ -42,7 +42,7 @@
 
   async function write(id, historyId, text) {
     const done = await onsave(id, historyId, text);
-    if (!done) return;
+    if (!done) return false;
     flashed[historyId] = true;
     clearTimeout(timers.get(historyId));
     timers.set(
@@ -51,6 +51,7 @@
         flashed[historyId] = false;
       }, FLASH_MS),
     );
+    return true;
   }
 
   function type(row, field) {

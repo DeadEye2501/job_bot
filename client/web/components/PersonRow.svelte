@@ -1,6 +1,6 @@
 <script>
   // Строка человека в списке: снимок, имя с подписью, отсев и непрочитанное.
-  import { personName } from '$state/contacts.js';
+  import { personName } from '$state/people.js';
 
   import Avatar from './Avatar.svelte';
 

@@ -13,7 +13,8 @@
   import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
   import { attempts } from '$state/attempts.js';
-  import { personCandidate, personName, telegramHref } from '$state/contacts.js';
+  import { personCandidate, personName } from '$state/people.js';
+  import { telegramHref } from '$state/telegram.js';
   import { plural } from '$state/words.js';
 
   import PersonChat from './PersonChat.svelte';

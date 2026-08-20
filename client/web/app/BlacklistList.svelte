@@ -16,7 +16,7 @@
     blacklistHints,
     blacklistShown,
     valueField,
-  } from '$state/contacts.js';
+  } from '$state/blacklist.js';
 
   let { ask, say, events } = $props();
 

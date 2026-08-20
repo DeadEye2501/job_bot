@@ -37,18 +37,18 @@ export class Refused extends Error {
 export function ready() {
   if (surface()) return Promise.resolve();
   return new Promise((done, fail) => {
-    const late = setTimeout(
-      () => fail(new Refused('Моста в этой странице нет.')),
-      READY_WAIT_MS,
-    );
-    globalThis.window.addEventListener(
-      READY_EVENT,
-      () => {
-        clearTimeout(late);
-        done();
-      },
-      { once: true },
-    );
+    // Подписку снимаем руками: `{ once: true }` снимает её на самом событии, а
+    // по сроку его как раз и не случилось. Не сними — страница без окна копила
+    // бы висящих слушателей, по одному на каждый зов.
+    const heard = () => {
+      clearTimeout(late);
+      done();
+    };
+    const late = setTimeout(() => {
+      globalThis.window.removeEventListener(READY_EVENT, heard);
+      fail(new Refused('Моста в этой странице нет.'));
+    }, READY_WAIT_MS);
+    globalThis.window.addEventListener(READY_EVENT, heard, { once: true });
   });
 }
 

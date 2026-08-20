@@ -7,8 +7,8 @@
   import NewPersonFields from '$components/NewPersonFields.svelte';
   import PersonRow from '$components/PersonRow.svelte';
   import SearchBox from '$components/SearchBox.svelte';
-  import { named } from '$state/contacts.js';
   import { pagedList } from '$state/paged_list.svelte.js';
+  import { named } from '$state/people.js';
 
   import PersonCard from './PersonCard.svelte';
 
