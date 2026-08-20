@@ -2,22 +2,31 @@
 
 from __future__ import annotations
 
-from backend.incoming import text_or_none
-from backend.repository import (
-    hr_card,
-    hr_identify,
-    hr_list,
-    vacancies_mini,
+from sqlalchemy.exc import IntegrityError
+
+from backend.repository import hr_card, hr_identify, vacancies_mini
+from client.bridge.answer import Denied, denied, reply
+from client.bridge.cards import (
+    CardSubject,
+    asked_update,
+    create_card,
+    delete_card,
+    listed,
+    merge_candidates,
+    merge_into,
+    vacancies_of,
 )
-from client.bridge.answer import Denied, bad_fields, denied, reply
 from client.bridge.hr_chat import HrChat
 from client.bridge.hub import Hub
-from client.bridge.mark import HR_MARK, mark, unmark
+from client.bridge.mark import HR_MARK, marked, unmarked
 from client.bridge.media import _avatar_data_url
-from client.bridge.page import read_page
-from client.bridge.pickers import HR_PICKER, merge_picker
-from client.bridge.refusals import IDENTITY_REQUIRED, NOTHING_TO_UPDATE, NO_HR
-from client.bridge.wire import _hr_picker_row_to_dict, _vacancy_mini_row_to_dict
+from client.bridge.pickers import HR_PICKER
+from client.bridge.refusals import (
+    HR_TELEGRAM_TAKEN,
+    IDENTITY_REQUIRED,
+    NOTHING_TO_UPDATE,
+    NO_HR,
+)
 from client.bridge.form_payloads import hr_is_identified, read_new_hr_fields
 
 
@@ -29,13 +38,46 @@ async def create_hr_row(session, fields: dict, **echo) -> int:
     без номера учётной записи не отличима от любой другой — в следующий раз
     человек завёл бы вторую такую же вместо того, чтобы найти эту.
 
+    Занятый номер учётной записи объясняется словами, а не отказом базы: тот
+    говорит про нарушенное ограничение таблицы, а человеку надо знать, что
+    карточка этого собеседника уже есть — её завёл бот, а ищут её по имени.
+    Соседний файл-близнец такой же случай объясняет так же.
+
     Поля отказа отдаёт зовущий: подборщику нужен номер вакансии, из которой
     заводят, окну контактов — ничего.
     """
     if not hr_is_identified(fields):
         raise Denied(IDENTITY_REQUIRED, **echo)
-    async with session.begin():
-        return (await hr_identify.create_hr(session, **fields)).id
+    try:
+        async with session.begin():
+            return (await hr_identify.create_hr(session, **fields)).id
+    except IntegrityError:
+        raise Denied(HR_TELEGRAM_TAKEN, **echo)
+
+
+HR_CARD = CardSubject(
+    picker=HR_PICKER,
+    id_key="hr_id",
+    missing=NO_HR,
+    domain="hr",
+    page_limit=None,
+    listing={"sort_by": "last_activity"},
+    read_fields=read_new_hr_fields,
+    update_fields=("name", "telegram_username", "notes"),
+    mini_vacancies=vacancies_mini.list_vacancies_for_hr,
+    merge_row=hr_card.merge_hr,
+    delete_row=hr_card.delete_hr,
+    create_row=create_hr_row,
+    merge_action="merge_hr",
+    delete_action="delete_hr",
+    create_action="create_hr",
+    news=("contacts_lists_changed", "unread_changed"),
+)
+"""Человек, каким его знает общая карточка контакта.
+
+Счёт непрочитанного среди вестей потому, что переписку сносят и переносят
+вместе с ним; у компании переписки нет вовсе.
+"""
 
 
 class Hr(HrChat):
@@ -62,28 +104,7 @@ class Hr(HrChat):
         Запрос под ним тот же, что у подборщика (`list_hr_with_counts`), но со
         страницами: потолок и сдвиг читаются как у списка вакансий.
         """
-        # Не-объект сводится к пустоте, а не роняет разбор: поиск — дело окна,
-        # и испорченная нагрузка не должна отнимать у человека весь перечень.
-        payload = payload if isinstance(payload, dict) else {}
-        search = text_or_none(payload.get("search"))
-        page = read_page(payload)
-
-        async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                rows, has_more = await hr_list.list_hr_with_counts(
-                    session,
-                    search=search,
-                    limit=page.limit,
-                    offset=page.offset,
-                    sort_by="last_activity",
-                )
-            return {
-                "search": search or "",
-                "hrs": [_hr_picker_row_to_dict(r) for r in rows],
-                "has_more": has_more,
-            }
-
-        return reply(self._hub.runner, run())
+        return listed(self._hub, HR_CARD, payload)
 
     def detail(self, hr_id: int) -> dict:
         """Карточка одного человека целиком.
@@ -103,7 +124,6 @@ class Hr(HrChat):
                 "telegram_username": detail.hr.telegram_username,
                 "telegram_user_id": detail.hr.telegram_user_id,
                 "notes": detail.hr.notes,
-                "vacancy_count": detail.vacancy_count,
                 "last_company_id": detail.last_company_id,
                 "last_company_name": detail.last_company_name,
                 "unread_count": detail.unread_count,
@@ -118,20 +138,7 @@ class Hr(HrChat):
 
         Нагрузка: `{hr_id}`.
         """
-        try:
-            hr_id = int(payload["hr_id"])
-        except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("hr.vacancies", e)
-
-        async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                rows = await vacancies_mini.list_vacancies_for_hr(session, hr_id)
-            return {
-                "hr_id": hr_id,
-                "vacancies": [_vacancy_mini_row_to_dict(v) for v in rows],
-            }
-
-        return reply(self._hub.runner, run())
+        return vacancies_of(self._hub, HR_CARD, payload)
 
     def merge_picker(self, payload: dict) -> dict:
         """Кандидаты, в которых можно влить эту карточку.
@@ -139,64 +146,24 @@ class Hr(HrChat):
         Строка та же, что у подборщика вакансий, за вычетом самой
         поглощаемой карточки.
         """
-        try:
-            absorbed_id = int(payload["absorbed_id"])
-            search = text_or_none(payload.get("search"))
-        except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("hr.merge_picker", e)
-
-        async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                return await merge_picker(session, HR_PICKER, absorbed_id, search)
-
-        return reply(self._hub.runner, run())
+        return merge_candidates(self._hub, HR_CARD, payload)
 
     def merge(self, payload: dict) -> dict:
         """Влить поглощаемую карточку в оставшуюся.
 
-        Вакансии и переписка переезжают на оставшегося, поглощённая строка
-        сносится; дело делает `hr_card.merge_hr`.
+        Вакансии переезжают на оставшегося, поглощённая строка сносится; дело
+        делает `hr_card.merge_hr`.
+
+        Переписка переезжает не всегда: она ходит вместе с учётной записью
+        Telegram, и если своя у выжившего уже есть — чужую переписку **стирают**
+        (`hr_card._move_or_drop_chat`). Окно про это говорит человеку прямо,
+        перед нажатием.
         """
-        try:
-            absorbed_id = int(payload["absorbed_id"])
-            survivor_id = int(payload["survivor_id"])
-        except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("hr.merge", e)
-
-        async def run() -> dict:
-            try:
-                async with self._hub.session_factory() as session:
-                    async with session.begin():
-                        await hr_card.merge_hr(
-                            session,
-                            absorbed_id=absorbed_id,
-                            survivor_id=survivor_id,
-                        )
-            except ValueError as e:
-                raise Denied(str(e), absorbed_id=absorbed_id, action="merge_hr")
-            self._hub.events.add("contacts_lists_changed")
-            self._hub.events.add("unread_changed")
-            return {
-                "action": "merge_hr",
-                "absorbed_id": absorbed_id,
-                "survivor_id": survivor_id,
-            }
-
-        return reply(self._hub.runner, run())
+        return merge_into(self._hub, HR_CARD, payload)
 
     def delete(self, hr_id: int) -> dict:
         """Снести карточку человека вместе с перепиской (`hr_card.delete_hr`)."""
-
-        async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                if not await hr_card.delete_hr(session, hr_id):
-                    raise Denied(NO_HR, hr_id=hr_id, action="delete_hr")
-                await session.commit()
-            self._hub.events.add("contacts_lists_changed")
-            self._hub.events.add("unread_changed")
-            return {"action": "delete_hr", "hr_id": hr_id}
-
-        return reply(self._hub.runner, run())
+        return delete_card(self._hub, HR_CARD, hr_id)
 
     def block(self, hr_id: int) -> dict:
         """Занести человека в чёрный список.
@@ -212,13 +179,7 @@ class Hr(HrChat):
         Карточку это не сносит: снос — отдельная кнопка.
         """
 
-        async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                marked = await mark(session, HR_MARK, hr_id)
-            self._hub.events.add("contacts_lists_changed")
-            return marked
-
-        return reply(self._hub.runner, run())
+        return reply(self._hub.runner, marked(self._hub, HR_MARK, hr_id))
 
     def unblock(self, hr_id: int) -> dict:
         """Убрать человека из чёрного списка.
@@ -228,13 +189,7 @@ class Hr(HrChat):
         ждут.
         """
 
-        async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                unmarked = await unmark(session, HR_MARK, hr_id)
-            self._hub.events.add("contacts_lists_changed")
-            return unmarked
-
-        return reply(self._hub.runner, run())
+        return reply(self._hub.runner, unmarked(self._hub, HR_MARK, hr_id))
 
     def update(self, payload: dict) -> dict:
         """Поправить одно или несколько полей карточки.
@@ -246,17 +201,9 @@ class Hr(HrChat):
         Ответ называет поправленные поля: окно перечитывает по нему карточку
         и берёт из неё приведённые написания — например, ник без «@».
         """
-        try:
-            hr_id = int(payload["hr_id"])
-        except (ValueError, TypeError, KeyError) as e:
-            return bad_fields("hr.update", e)
-
-        # Только присланные поля: отсутствие ключа значит «не трогать».
-        kwargs = {
-            key: payload[key]
-            for key in ("name", "telegram_username", "notes")
-            if key in payload
-        }
+        hr_id, kwargs, refused = asked_update(payload, HR_CARD)
+        if refused is not None:
+            return refused
         if not kwargs:
             return denied(NOTHING_TO_UPDATE, hr_id=hr_id)
 
@@ -284,16 +231,4 @@ class Hr(HrChat):
         перечень оно перечитывает следом само. Само заведение — общее с
         подборщиком при вакансии.
         """
-        try:
-            fields = read_new_hr_fields(payload)
-        # `AttributeError` — про не-объект в нагрузке: помощник читает её
-        # ключами, и спотыкается он до мотора, мимо конверта.
-        except (AttributeError, ValueError, TypeError, KeyError) as e:
-            return bad_fields("hr.create", e)
-
-        async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                created_id = await create_hr_row(session, fields)
-            return {"action": "create_hr", "created_id": created_id}
-
-        return reply(self._hub.runner, run())
+        return create_card(self._hub, HR_CARD, payload)

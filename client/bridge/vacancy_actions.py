@@ -1,34 +1,20 @@
 """Действия над вакансией: перезапуск разбора, отклик, удаление.
 
-Чтение номера вакансии из нагрузки живёт здесь же, а не в общем `page.py` или
-`form_payloads.py`: те про страницу списка и про поля новой записи, а здесь
-единственное поле, которое читают все три кнопки, и читают одинаково.
+Номер вакансии кнопки читают общим `answer.asked_id`: то же чтение стоит у
+карточек контакта, и написания у них начали расходиться перехватываемыми
+породами.
 """
 
 from __future__ import annotations
 
 from backend.repository import vacancies_life
-from client.bridge.answer import Denied, bad_fields, denied, launched, reply
+from client.bridge.answer import Denied, asked_id, denied, launched, reply
 from client.bridge.refusals import (
     NO_BOT,
     NO_VACANCY,
     RERUN_REFUSALS,
     SEND_REFUSALS,
 )
-
-
-def _asked_vacancy(payload: dict, slot: str) -> tuple[int | None, dict | None]:
-    """Номер вакансии из нагрузки, а при негодной — готовый отказ окну.
-
-    Двумя значениями, а не броском: жалоба в журнал должна нести саму беду —
-    имя пропавшего поля из `KeyError` в неё попадает, а значение нет, — и
-    собрать её умеет только `bad_fields`. Тремя кнопками карточки это было
-    написано дословно одинаково.
-    """
-    try:
-        return int(payload["vacancy_id"]), None
-    except (ValueError, TypeError, KeyError) as e:
-        return None, bad_fields(slot, e)
 
 
 class VacancyActions:
@@ -45,7 +31,7 @@ class VacancyActions:
         человек узнаёт вестью, а карточка перечитывается сама по вести о смене
         списка.
         """
-        vacancy_id, refused = _asked_vacancy(payload, "rerun")
+        vacancy_id, refused = asked_id(payload, "vacancy_id", "rerun")
         if refused is not None:
             return refused
 
@@ -68,7 +54,7 @@ class VacancyActions:
         Ответ говорит только «пущено»: письмо сочиняет модель, и до её ответа
         зов держал бы окно, а начатую отправку это всё равно не отменило бы.
         """
-        vacancy_id, refused = _asked_vacancy(payload, "send_application")
+        vacancy_id, refused = asked_id(payload, "vacancy_id", "send_application")
         if refused is not None:
             return refused
 
@@ -91,7 +77,7 @@ class VacancyActions:
 
     def delete(self, payload: dict) -> dict:
         """Снести вакансию вместе с историей и событиями."""
-        vacancy_id, refused = _asked_vacancy(payload, "delete")
+        vacancy_id, refused = asked_id(payload, "vacancy_id", "delete")
         if refused is not None:
             return refused
 

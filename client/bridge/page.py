@@ -1,4 +1,4 @@
-"""Страница списка, прочитанная из нагрузки окна.
+"""Запрос списка, прочитанный из нагрузки окна: сколько, откуда и что искать.
 
 Четыре экрана просят строки одинаково — сколько и с какого места, — и пока
 каждый слот читал эти поля сам, написания разъехались: умолчание потолка, чем
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from backend.incoming import int_or_none
+from backend.incoming import int_or_none, text_or_none
 
 
 _CEILING = 200
@@ -43,8 +43,18 @@ class Page:
     offset: int
 
 
+def read_search(payload) -> str | None:
+    """Строка поиска из нагрузки; негодная нагрузка значит «не искали».
+
+    Не-объект сводится к пустоте, а не роняет разбор: поиск — дело окна, и
+    испорченная нагрузка не должна отнимать у человека весь перечень.
+    """
+    payload = payload if isinstance(payload, dict) else {}
+    return text_or_none(payload.get("search"))
+
+
 def read_page(
-    payload: dict,
+    payload,
     *,
     default_limit: int | None = None,
 ) -> Page:
@@ -66,6 +76,7 @@ def read_page(
     `client/web/state/attempts.js`) — это и есть единственное место, где такое
     решается, и мост в нём не участвует.
     """
+    payload = payload if isinstance(payload, dict) else {}
     limit = int_or_none(payload.get("limit"))
     if limit is None:
         limit = default_limit

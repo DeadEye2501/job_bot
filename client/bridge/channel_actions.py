@@ -5,7 +5,7 @@ from __future__ import annotations
 from backend.domain.telegram_identity import normalize_username
 from backend.repository import channels as channels_repo
 from client.bridge.answer import Denied, bad_fields, denied, launched, reply
-from client.bridge.mark import CHANNEL_MARK, mark, unmark
+from client.bridge.mark import CHANNEL_MARK, marked, unmarked
 from client.bridge.refusals import NO_BOT, NO_CHANNEL, POLL_REFUSALS
 from client.bridge.form_payloads import read_toggle
 
@@ -31,13 +31,7 @@ class ChannelActions:
         ограждались.
         """
 
-        async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                marked = await mark(session, CHANNEL_MARK, channel_id)
-            self._hub.events.add("contacts_lists_changed")
-            return marked
-
-        return reply(self._hub.runner, run())
+        return reply(self._hub.runner, marked(self._hub, CHANNEL_MARK, channel_id))
 
     def unblock(self, channel_id: int) -> dict:
         """Убрать канал из чёрного списка.
@@ -46,13 +40,7 @@ class ChannelActions:
         видимыми, с выключенным тумблером.
         """
 
-        async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                unmarked = await unmark(session, CHANNEL_MARK, channel_id)
-            self._hub.events.add("contacts_lists_changed")
-            return unmarked
-
-        return reply(self._hub.runner, run())
+        return reply(self._hub.runner, unmarked(self._hub, CHANNEL_MARK, channel_id))
 
     def poll_now(self, channel_id: int) -> dict:
         """Прогнать один канал вне очереди — кнопка «Прогнать сейчас».
@@ -100,22 +88,26 @@ class ChannelActions:
     def delete(self, channel_id: int) -> dict:
         """Убрать канал.
 
-        Вакансии при этом остаются, но теряют ссылку на источник; сколько их
-        столько, едет ответом — по этому числу человек и решает, сносить ли.
+        Вакансии при этом остаются, но теряют ссылку на источник. Сколько их,
+        ответом не едет: окно этого числа не читает — оно видно строкой перечня
+        каналов, из которой карточку и открывают.
+
+        Идёт мимо бота нарочно, как и отмотка курсора выше: это одна правка
+        строки в базе — сам бот только открывал сессию и звал тот же
+        репозиторий, — и запирать её на поднятого бота значило бы отказывать до
+        входа в Telegram там, где Telegram не нужен вовсе. Список каналов как
+        раз и разбирают на ненастроенном приложении.
         """
 
         async def run() -> dict:
-            bot = self._hub.bot
-            if bot is None:
-                raise Denied(NO_BOT, channel_id=channel_id, action="delete")
-            detached = await bot.delete_channel(channel_id)
+            async with self._hub.session_factory() as session:
+                async with session.begin():
+                    detached = await channels_repo.delete_channel(
+                        session, channel_id
+                    )
             if detached is None:
                 raise Denied(NO_CHANNEL, channel_id=channel_id, action="delete")
-            return {
-                "channel_id": channel_id,
-                "detached_vacancies": detached,
-                "action": "delete",
-            }
+            return {"channel_id": channel_id, "action": "delete"}
 
         return reply(self._hub.runner, run())
 
@@ -185,7 +177,7 @@ class ChannelActions:
         # синхронная, до мотора, и мимо конверта ушла бы прямо в канал.
         except (AttributeError, ValueError, TypeError, KeyError) as e:
             return bad_fields(
-                "set_active", e,
+                "channels.set_active", e,
                 action="set_active", channel_id=channel_id, is_active=is_active,
             )
 

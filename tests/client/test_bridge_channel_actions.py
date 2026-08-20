@@ -5,9 +5,9 @@
 Telegram, поэтому бот подделан.
 """
 
-from backend.models import TelegramChannel
+from backend.models import TelegramChannel, Vacancy
 from tests.dbio import only_row, put
-from tests.factories import channel_row
+from tests.factories import channel_row, vacancy_row
 
 
 async def test_a_name_that_is_not_a_channel_never_reaches_telegram(
@@ -187,20 +187,41 @@ async def test_a_reset_cursor_for_a_missing_channel_is_refused(api, ask):
     assert answer["detail"] == "Канал не найден."
 
 
-async def test_deleting_a_channel_says_how_many_vacancies_lost_their_source(
-    api, ask, with_bot, session_factory
-):
-    """Удаление называет, сколько вакансий осталось без источника.
+async def test_a_channel_is_deleted_without_the_bot(api, ask, session_factory):
+    """Канал сносится и до входа в Telegram.
 
-    Вакансии при этом не удаляются — они просто перестают ссылаться на канал.
-    Человеку это число говорит, чего он лишится, ещё до того, как заметит
-    пустой столбец источника в списке.
+    Это одна правка строки в базе — ровно как отмотка отметки прочитанного,
+    которая рядом и которая бота не требует. Запертая на поднятого бота кнопка
+    отказывала бы человеку, разбирающему список каналов на ненастроенном
+    приложении, — а разбирают его как раз тогда.
     """
-    bot = with_bot(detached=4)
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
 
     answer = await ask(api.channels.delete, channel.id)
 
-    assert answer["ok"]["detached_vacancies"] == 4
-    assert ("delete_channel", channel.id) in bot.calls
+    assert "ok" in answer
+    assert await only_row(session_factory, TelegramChannel) is None
+
+
+async def test_the_vacancies_of_a_deleted_channel_survive_it(
+    api, ask, session_factory
+):
+    """Вакансии переживают свой канал, теряя только ссылку на источник.
+
+    Снеси их мост заодно — человек лишился бы всего, что канал успел принести,
+    и вернуть это было бы нечем: в Telegram посты доступны, но глубже
+    `backfill_limit` за ними никто не пойдёт.
+    """
+    channel = channel_row(username="pyjobs")
+    await put(session_factory, channel)
+    await put(
+        session_factory,
+        vacancy_row(title="Уцелеет", source_channel_id=channel.id),
+    )
+
+    assert "ok" in await ask(api.channels.delete, channel.id)
+
+    survivor = await only_row(session_factory, Vacancy)
+    assert survivor.title == "Уцелеет"
+    assert survivor.source_channel_id is None

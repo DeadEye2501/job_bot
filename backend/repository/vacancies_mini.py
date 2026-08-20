@@ -1,6 +1,6 @@
 """Короткие списки вакансий для карточек других предметов."""
 
-from sqlalchemy import case, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Vacancy, VacancyStatus
@@ -81,6 +81,22 @@ async def list_vacancies_for_company(
 ) -> list[Vacancy]:
     """All parsed vacancies linked to this company, newest-first."""
     return await _list_linked(session, Vacancy.company_id == company_id)
+
+
+async def count_vacancies_for_channel(session: AsyncSession, channel_id: int) -> int:
+    """Сколько разобранных вакансий числится за каналом.
+
+    Отбор тот же, что у списка рядом и у счётчика в карточке: мост сверяет с
+    этим числом пустую страницу и жалуется на расхождение. Считай оно иначе —
+    жалоба приходила бы на всякий канал, у которого есть хоть одна
+    недоразобранная строка, то есть на любой работающий.
+    """
+    counted = await session.execute(
+        select(func.count(Vacancy.id)).where(
+            Vacancy.source_channel_id == channel_id, PARSED_ONLY
+        )
+    )
+    return int(counted.scalar_one())
 
 
 async def list_vacancies_for_channel(

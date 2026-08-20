@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import func, select
-
-from backend.models import Vacancy
 from backend.incoming import text_or_none
 from backend.repository import channels as channels_repo, vacancies_mini
 from client.bridge.answer import Denied, bad_fields, reply
@@ -121,11 +118,9 @@ class Channels(ChannelActions):
             # По одному пустому списку не видно, где она — в запросе перечня
             # или в эхе моста; ноль против N различает эти два места.
             if not rows:
-                counted = await session.execute(
-                    select(func.count(Vacancy.id))
-                    .where(Vacancy.source_channel_id == channel_id)
+                total = await vacancies_mini.count_vacancies_for_channel(
+                    session, channel_id
                 )
-                total = int(counted.scalar_one())
                 if total > 0:
                     logger.warning(
                         "канал %d: перечень вакансий пуст, а строк с этим "

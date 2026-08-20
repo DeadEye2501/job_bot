@@ -163,14 +163,13 @@ First-run bootstrap: ensure DB schema exists.
 - `class SendPermission` (8)
 - `async def can_send_to_hr(bot, hr) -> SendPermission` (23)
 
-### `backend/bot/channels.py` — 150 строк
+### `backend/bot/channels.py` — 140 строк
 
 Правка каналов из окна: заведение, удаление, чтение по требованию.
 
 Зависит от: `backend.bot`, `backend.flows`, `backend.repository.channels`, `backend.telegram_lookup`
 
 - `async def poll_channel_now(bot, channel_id: int) -> ChannelPollOutcome` (29)
-- `async def delete_channel(bot, channel_id: int) -> int | None` (7)
 - `async def _ask_telegram_about(bot, username: str)` (26)
 - `async def add_channel(bot, username: str) -> tuple[int | None, ChannelAddOutcome]` (38)
 - `async def force_poll_once(bot) -> slot.CycleOutcome` (11)
@@ -189,7 +188,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _checked_kind(src: Path, file_path: str) -> bool` (28)
 - `async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message` (38)
 
-### `backend/bot/client.py` — 327 строк ⚠ подошёл к 300
+### `backend/bot/client.py` — 324 строк ⚠ подошёл к 300
 
 Сборка бота: его состояние, соединения и поверхность, которой пользуется окно.
 
@@ -200,13 +199,12 @@ First-run bootstrap: ensure DB schema exists.
 - `def _declare_loop_controls(bot) -> None` (15)
 - `def _declare_ui_hooks(bot) -> None` (37)
 - `def _forward_pipeline_hooks(bot) -> None` (17)
-- `class Bot` (161)
+- `class Bot` (158)
   - `def is_ready(self) -> bool` (7)
   - `def is_connected(self) -> bool` (13)
   - `def kick(self) -> None` (8)
   - `def request_stop(self) -> None` (8)
   - `async def poll_channel_now(self, channel_id) -> channels.ChannelPollOutcome` (4)
-  - `async def delete_channel(self, channel_id) -> int | None` (2)
   - `async def add_channel(self, username) -> tuple[int | None, channels.ChannelAddOutcome]` (4)
   - `def cancel_current_poll(self) -> None` (2)
   - `async def force_poll_once(self) -> slot.CycleOutcome` (2)
@@ -1073,7 +1071,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 398 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 402 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -1094,8 +1092,8 @@ First-run bootstrap: ensure DB schema exists.
 - `class FitValidation` (3)
 - `class VacancyDetail` (4)
 - `class HrWithCount` (6)
-- `class HrDetail` (15)
-- `class CompanyDetail` (12)
+- `class HrDetail` (18)
+- `class CompanyDetail` (13)
 - `class CompanyWithCount` (4)
 - `class ChannelWithCount` (4)
 - `class ChannelStats` (20)
@@ -1185,19 +1183,19 @@ First-run bootstrap: ensure DB schema exists.
 - `async def reset_channel_cursor(session: AsyncSession, channel_id: int) -> bool` (9)
 - `async def delete_channel(session: AsyncSession, channel_id: int) -> int | None` (39)
 
-### `backend/repository/companies_card.py` — 298 строк
+### `backend/repository/companies_card.py` — 280 строк
 
 Ведение записей о компаниях.
 
-Зависит от: `backend.domain.spellings`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository.blacklist`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.vacancies_common`, `backend.repository.vacancies_life`
+Зависит от: `backend.domain.spellings`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository.blacklist`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.vacancies_life`
 
 - `async def create_company(session: AsyncSession, *, name: str, website: str | None=None, aliases: list[str] | None=None, notes: str | None=None) -> Company` (37)
 - `def company_blacklist_candidates(co: Company) -> list[str]` (11)
 - `async def _company_blacklist_value(session: AsyncSession, co: Company) -> str | None` (6)
-- `async def get_company_detail(session: AsyncSession, company_id: int) -> 'CompanyDetail | None'` (34)
+- `async def get_company_detail(session: AsyncSession, company_id: int) -> 'CompanyDetail | None'` (17)
 - `def add_company_spellings(co: Company, incoming: list) -> None` (25)
 - `def typed_spellings(aliases) -> list[str]` (14)
-- `async def update_company_fields(session: AsyncSession, company_id: int, **fields) -> bool` (43)
+- `async def update_company_fields(session: AsyncSession, company_id: int, **fields) -> bool` (44)
 - `async def delete_company(session: AsyncSession, company_id: int) -> bool` (22)
 - `class _AbsorbedCompany` (7)
 - `def _carry_company_to_survivor(survivor: Company, taken: _AbsorbedCompany) -> None` (19)
@@ -1252,17 +1250,16 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _llm_arbitrate(lm_client: Any, lm_model: str, parsed: _Parsed, shortlist) -> tuple[Company | None, dict]` (39)
 - `async def find_or_create_company(session: AsyncSession, name: str, *, website: str | None=None, lm_client: Any=None, lm_model: str | None=None) -> tuple[Company | None, dict]` (40)
 
-### `backend/repository/hr_card.py` — 399 строк ⚠ подошёл к 300
+### `backend/repository/hr_card.py` — 390 строк ⚠ подошёл к 300
 
 Одна запись HR: чтение, правка, слияние, удаление.
 
-Зависит от: `backend.domain.telegram_identity`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository.blacklist`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.messages`, `backend.repository.vacancies_common`, `backend.repository.vacancies_life`
+Зависит от: `backend.domain.telegram_identity`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository.blacklist`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.messages`, `backend.repository.vacancies_life`
 
 - `async def update_hr_fields(session: AsyncSession, hr_id: int, **fields) -> bool` (32)
-- `async def _vacancy_count_of(session: AsyncSession, hr_id: int) -> int` (8)
 - `async def _last_company_of(session: AsyncSession, hr_id: int) -> tuple[int | None, str | None]` (21)
 - `async def _unread_count_of(session: AsyncSession, hr_id: int) -> int` (11)
-- `async def get_hr_detail(session: AsyncSession, hr_id: int) -> HrDetail | None` (23)
+- `async def get_hr_detail(session: AsyncSession, hr_id: int) -> HrDetail | None` (25)
 - `def _marks_of(user_id: int | None, username: str | None) -> list[str]` (13)
 - `def hr_blacklist_candidates(hr: HR) -> list[str]` (15)
 - `async def hr_blacklist_value(session: AsyncSession, hr: HR) -> str | None` (2)
@@ -1573,7 +1570,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def list_vacancy_filter_options(session: AsyncSession) -> dict[str, list[str]]` (16)
 - `async def list_vacancy_last_activity(session: AsyncSession, vacancy_ids: list[int]) -> dict[int, datetime]` (25)
 
-### `backend/repository/vacancies_mini.py` — 121 строк
+### `backend/repository/vacancies_mini.py` — 137 строк
 
 Короткие списки вакансий для карточек других предметов.
 
@@ -1582,6 +1579,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _list_linked(session: AsyncSession, linked_to) -> list[Vacancy]` (21)
 - `async def list_vacancies_for_hr(session: AsyncSession, hr_id: int) -> list[Vacancy]` (8)
 - `async def list_vacancies_for_company(session: AsyncSession, company_id: int) -> list[Vacancy]` (5)
+- `async def count_vacancies_for_channel(session: AsyncSession, channel_id: int) -> int` (14)
 - `async def list_vacancies_for_channel(session: AsyncSession, channel_id: int, *, limit: int=50, offset: int=0) -> tuple[list[Vacancy], bool]` (36)
 
 ### `backend/repository/vacancy_status.py` — 371 строк ⚠ подошёл к 300
@@ -1714,7 +1712,7 @@ Runtime settings layer.
 - `def _remove_the_data() -> list[str]` (27)
 - `async def wipe_all(engine) -> list[str]` (28)
 
-## client — 43 модулей
+## client — 44 модулей
 
 ### `client/bridge/__init__.py` — 23 строк
 
@@ -1725,7 +1723,7 @@ Runtime settings layer.
 Отдаёт наружу: `Api`, `AsyncRunner`
 
 
-### `client/bridge/answer.py` — 171 строк
+### `client/bridge/answer.py` — 188 строк
 
 Единый конверт ответа окну — от исхода работы до ответа зовущему.
 
@@ -1734,6 +1732,7 @@ Runtime settings layer.
 - `class Denied(Exception)` (12)
 - `def denied(reason: str, **extra: Any) -> dict` (8)
 - `def bad_fields(where: str, error: Exception, **extra: Any) -> dict` (20)
+- `def asked_id(payload: dict, key: str, slot: str) -> tuple` (15)
 - `def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict` (33)
 - `def launched(hub, work: Callable[[], Coroutine[Any, Any, str]], refusals: dict[str, str], done: str, **started: Any) -> dict` (39)
   - `async def report() -> None` (10)
@@ -1776,22 +1775,42 @@ Runtime settings layer.
 - `def detach_bot(hub) -> tuple[object | None, Future | None]` (10)
 - `async def stop_bot(bot, bot_task: Future | None, asking: Callable[[], Awaitable[None]] | None=None, timeout: float=STOP_TIMEOUT_S) -> bool` (41)
 
-### `client/bridge/channel_actions.py` — 251 строк
+### `client/bridge/cards.py` — 259 строк
+
+Карточка контакта: то, что человек и компания делают одним и тем же телом.
+
+Зависит от: `backend.incoming`, `client.bridge.answer`, `client.bridge.page`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`
+
+- `class CardSubject` (24)
+- `def listed(hub, subject: CardSubject, payload: dict | None) -> dict` (29)
+  - `async def run() -> dict` (14)
+- `def vacancies_of(hub, subject: CardSubject, payload: dict) -> dict` (17)
+  - `async def run() -> dict` (7)
+- `def merge_candidates(hub, subject: CardSubject, payload: dict) -> dict` (13)
+  - `async def run() -> dict` (3)
+- `def merge_into(hub, subject: CardSubject, payload: dict) -> dict` (45)
+  - `async def run() -> dict` (29)
+- `def delete_card(hub, subject: CardSubject, entity_id: int) -> dict` (6)
+- `def create_card(hub, subject: CardSubject, payload: dict) -> dict` (23)
+  - `async def run() -> dict` (6)
+- `async def _deleting(hub, subject: CardSubject, entity_id: int) -> dict` (12)
+- `def asked_update(payload: dict, subject: CardSubject) -> tuple` (17)
+- `def _tell(hub, subject: CardSubject) -> None` (9)
+
+### `client/bridge/channel_actions.py` — 243 строк
 
 Что окно делает с каналом: опрос, курсор, чёрный список, состав.
 
 Зависит от: `backend.domain.telegram_identity`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.mark`, `client.bridge.refusals`
 
-- `class ChannelActions` (239)
-  - `def block(self, channel_id: int) -> dict` (16)
-    - `async def run() -> dict` (5)
-  - `def unblock(self, channel_id: int) -> dict` (14)
-    - `async def run() -> dict` (5)
+- `class ChannelActions` (231)
+  - `def block(self, channel_id: int) -> dict` (10)
+  - `def unblock(self, channel_id: int) -> dict` (8)
   - `def poll_now(self, channel_id: int) -> dict` (19)
   - `def reset_cursor(self, channel_id: int) -> dict` (22)
     - `async def run() -> dict` (9)
-  - `def delete(self, channel_id: int) -> dict` (21)
-    - `async def run() -> dict` (12)
+  - `def delete(self, channel_id: int) -> dict` (25)
+    - `async def run() -> dict` (9)
   - `def create(self, payload: dict | None=None) -> dict` (46)
     - `async def run() -> dict` (23)
   - `def set_active(self, payload: dict) -> dict` (24)
@@ -1799,19 +1818,19 @@ Runtime settings layer.
   - `def set_all_active(self, payload: dict) -> dict` (26)
     - `async def run() -> dict` (11)
 
-### `client/bridge/channels.py` — 140 строк
+### `client/bridge/channels.py` — 135 строк
 
 Экран «Контакты / Каналы»: список каналов и их карточка.
 
-Зависит от: `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.channel_actions`, `client.bridge.hub`, `client.bridge.media`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.channel_actions`, `client.bridge.hub`, `client.bridge.media`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.wire`
 
-- `class Channels(ChannelActions)` (117)
+- `class Channels(ChannelActions)` (115)
   - `def list(self, payload: dict | None=None) -> dict` (28)
     - `async def run() -> dict` (15)
   - `def detail(self, channel_id: int) -> dict` (33)
     - `async def run() -> dict` (23)
   - `def vacancies(self, payload: dict) -> dict` (13)
-  - `async def _paged(self, channel_id: int, page: Page) -> dict` (27)
+  - `async def _paged(self, channel_id: int, page: Page) -> dict` (25)
 
 ### `client/bridge/choices.py` — 46 строк
 
@@ -1822,36 +1841,28 @@ Runtime settings layer.
 - `def _filter_set(values, allowed: tuple[str, ...]) -> list[str]` (6)
 - `def _filter_languages(items) -> list[tuple[str, str]]` (31)
 
-### `client/bridge/companies.py` — 335 строк ⚠ подошёл к 300
+### `client/bridge/companies.py` — 258 строк
 
 Компания как запись в контактах: найти, показать, поправить, убрать.
 
-Зависит от: `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.page`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.repository`, `client.bridge.answer`, `client.bridge.cards`, `client.bridge.form_payloads`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`
 
 - `async def create_company_row(session, fields: dict, **echo) -> int` (25)
-- `class Companies` (276)
-  - `def list(self, payload: dict | None=None) -> dict` (23)
-    - `async def run() -> dict` (10)
-  - `def detail(self, company_id: int) -> dict` (24)
-    - `async def run() -> dict` (15)
-  - `def vacancies(self, payload: dict) -> dict` (21)
-    - `async def run() -> dict` (9)
+- `class Companies` (173)
+  - `def list(self, payload: dict | None=None) -> dict` (6)
+  - `def detail(self, company_id: int) -> dict` (22)
+    - `async def run() -> dict` (13)
+  - `def vacancies(self, payload: dict) -> dict` (6)
   - `def people(self, company_id: int) -> dict` (16)
     - `async def run() -> dict` (7)
-  - `def merge_picker(self, payload: dict) -> dict` (17)
-    - `async def run() -> dict` (3)
-  - `def merge(self, payload: dict) -> dict` (31)
-    - `async def run() -> dict` (16)
-  - `def create(self, payload: dict) -> dict` (21)
-    - `async def run() -> dict` (6)
-  - `def update(self, payload: dict) -> dict` (26)
-  - `async def _updated(self, company_id: int, kwargs: dict) -> dict` (29)
-  - `def delete(self, company_id: int) -> dict` (13)
-    - `async def run() -> dict` (8)
-  - `def block(self, company_id: int) -> dict` (18)
-    - `async def run() -> dict` (5)
-  - `def unblock(self, company_id: int) -> dict` (15)
-    - `async def run() -> dict` (5)
+  - `def merge_picker(self, payload: dict) -> dict` (7)
+  - `def merge(self, payload: dict) -> dict` (8)
+  - `def create(self, payload: dict) -> dict` (7)
+  - `def update(self, payload: dict) -> dict` (19)
+  - `async def _updated(self, company_id: int, kwargs: dict) -> dict` (36)
+  - `def delete(self, company_id: int) -> dict` (3)
+  - `def block(self, company_id: int) -> dict` (12)
+  - `def unblock(self, company_id: int) -> dict` (9)
 
 ### `client/bridge/cv.py` — 75 строк
 
@@ -1911,51 +1922,42 @@ Runtime settings layer.
 - `def hr_is_identified(fields: dict) -> bool` (11)
 - `def read_new_hr_fields(payload: dict) -> dict` (31)
 
-### `client/bridge/hr.py` — 299 строк
+### `client/bridge/hr.py` — 234 строк
 
 Экран «Контакты / HR»: список людей, их карточка и правки в ней.
 
-Зависит от: `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.hr_chat`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.media`, `client.bridge.page`, `client.bridge.pickers`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.repository`, `client.bridge.answer`, `client.bridge.cards`, `client.bridge.form_payloads`, `client.bridge.hr_chat`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.media`, `client.bridge.pickers`, `client.bridge.refusals`
 
-- `async def create_hr_row(session, fields: dict, **echo) -> int` (15)
-- `class Hr(HrChat)` (259)
-  - `def list(self, payload: dict | None=None) -> dict` (28)
+- `async def create_hr_row(session, fields: dict, **echo) -> int` (23)
+- `class Hr(HrChat)` (152)
+  - `def list(self, payload: dict | None=None) -> dict` (7)
+  - `def detail(self, hr_id: int) -> dict` (26)
+    - `async def run() -> dict` (17)
+  - `def vacancies(self, payload: dict) -> dict` (6)
+  - `def merge_picker(self, payload: dict) -> dict` (7)
+  - `def merge(self, payload: dict) -> dict` (12)
+  - `def delete(self, hr_id: int) -> dict` (3)
+  - `def block(self, hr_id: int) -> dict` (15)
+  - `def unblock(self, hr_id: int) -> dict` (9)
+  - `def update(self, payload: dict) -> dict` (32)
     - `async def run() -> dict` (14)
-  - `def detail(self, hr_id: int) -> dict` (27)
-    - `async def run() -> dict` (18)
-  - `def vacancies(self, payload: dict) -> dict` (19)
-    - `async def run() -> dict` (7)
-  - `def merge_picker(self, payload: dict) -> dict` (17)
-    - `async def run() -> dict` (3)
-  - `def merge(self, payload: dict) -> dict` (32)
-    - `async def run() -> dict` (18)
-  - `def delete(self, hr_id: int) -> dict` (13)
-    - `async def run() -> dict` (8)
-  - `def block(self, hr_id: int) -> dict` (21)
-    - `async def run() -> dict` (5)
-  - `def unblock(self, hr_id: int) -> dict` (15)
-    - `async def run() -> dict` (5)
-  - `def update(self, payload: dict) -> dict` (40)
-    - `async def run() -> dict` (14)
-  - `def create(self, payload: dict) -> dict` (20)
-    - `async def run() -> dict` (4)
+  - `def create(self, payload: dict) -> dict` (8)
 
-### `client/bridge/hr_chat.py` — 160 строк
+### `client/bridge/hr_chat.py` — 180 строк
 
 Переписка с человеком: страница сообщений, отправка, прочтение.
 
 Зависит от: `backend.bot.chat`, `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.refusals`, `client.bridge.wire`
 
-- `class HrChat` (146)
+- `class HrChat` (161)
   - `def messages(self, payload: dict) -> dict` (23)
   - `async def _paged(self, asked: dict, before_sent_at) -> dict` (17)
+  - `async def _sent(self, sending, hr_id: int, action: str) -> dict` (28)
   - `def mark_read(self, hr_id: int) -> dict` (19)
     - `async def run() -> dict` (10)
-  - `def send_message(self, payload: dict) -> dict` (28)
-    - `async def run() -> dict` (9)
+  - `def send_message(self, payload: dict) -> dict` (21)
   - `def pick_media(self, hr_id: int) -> dict` (20)
-  - `def _send_media(self, payload: dict) -> dict` (24)
-    - `async def run() -> dict` (9)
+  - `def _send_media(self, payload: dict) -> dict` (17)
 
 ### `client/bridge/hub.py` — 55 строк
 
@@ -2036,13 +2038,15 @@ Runtime settings layer.
   - `def confirm_code(self, payload: dict) -> dict` (10)
   - `def confirm_password(self, payload: dict) -> dict` (10)
 
-### `client/bridge/mark.py` — 127 строк
+### `client/bridge/mark.py` — 157 строк
 
 Отметка предмета в чёрном списке, поставленная из его карточки.
 
 Зависит от: `backend.models`, `backend.repository`, `backend.repository.blacklist_marks`, `client.bridge.answer`, `client.bridge.refusals`
 
 - `class MarkSubject` (9)
+- `async def marked(hub, subject: MarkSubject, entity_id: int) -> dict` (12)
+- `async def unmarked(hub, subject: MarkSubject, entity_id: int) -> dict` (10)
 - `async def mark(session, subject: MarkSubject, entity_id: int) -> dict` (27)
 - `async def unmark(session, subject: MarkSubject, entity_id: int) -> dict` (24)
 
@@ -2057,14 +2061,15 @@ Runtime settings layer.
 - `def _under_media(stored_path: str) -> str | None` (14)
 - `def _avatar_data_url(blob: bytes | None) -> str | None` (9)
 
-### `client/bridge/page.py` — 77 строк
+### `client/bridge/page.py` — 88 строк
 
-Страница списка, прочитанная из нагрузки окна.
+Запрос списка, прочитанный из нагрузки окна: сколько, откуда и что искать.
 
 Зависит от: `backend.incoming`
 
 - `class Page` (5)
-- `def read_page(payload: dict, *, default_limit: int | None=None) -> Page` (32)
+- `def read_search(payload) -> str | None` (8)
+- `def read_page(payload, *, default_limit: int | None=None) -> Page` (33)
 
 ### `client/bridge/payload.py` — 18 строк
 
@@ -2105,7 +2110,7 @@ Runtime settings layer.
     - `async def run() -> dict` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (16)
 
-### `client/bridge/refusals.py` — 161 строк
+### `client/bridge/refusals.py` — 193 строк
 
 Слова, которыми мост отказывает окну.
 
@@ -2211,13 +2216,12 @@ Runtime settings layer.
   - `def change_status(self, payload: dict) -> dict` (35)
     - `async def run() -> dict` (16)
 
-### `client/bridge/vacancy_actions.py` — 113 строк
+### `client/bridge/vacancy_actions.py` — 99 строк
 
 Действия над вакансией: перезапуск разбора, отклик, удаление.
 
 Зависит от: `backend.repository`, `client.bridge.answer`, `client.bridge.refusals`
 
-- `def _asked_vacancy(payload: dict, slot: str) -> tuple[int | None, dict | None]` (12)
 - `class VacancyActions` (80)
   - `def rerun(self, payload: dict) -> dict` (24)
   - `def send_application(self, payload: dict) -> dict` (26)
@@ -2367,7 +2371,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 235 модулей
+## tests — 234 модулей
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -2546,15 +2550,6 @@ Runtime settings layer.
 - `def _tables(db_file) -> set[str]` (9)
 - `def _revision_reached(db_file) -> str` (6)
 - `def _project_of_two_revisions(root, db_file) -> None` (20)
-
-### `tests/backend/test_bot_channel_writes.py` — 48 строк
-
-Следствия удаления канала кнопкой окна.
-
-Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
-
-Тестов: 2
-
 
 ### `tests/backend/test_bot_channels.py` — 183 строк
 
@@ -3606,13 +3601,13 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `tests/backend/test_repository_company_card.py` — 196 строк
+### `tests/backend/test_repository_company_card.py` — 131 строк
 
 Следствия сборки карточки компании для боковой панели контактов.
 
 Зависит от: `backend.repository.blacklist_marks`, `backend.repository.companies_card`, `backend.repository.hr_list`, `tests.dbio`, `tests.factories`
 
-Тестов: 10
+Тестов: 7
 
 
 ### `tests/backend/test_repository_company_creation.py` — 58 строк
@@ -3624,7 +3619,7 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_repository_company_edits.py` — 94 строк
+### `tests/backend/test_repository_company_edits.py` — 101 строк
 
 Следствия правки полей компании.
 
@@ -3688,13 +3683,13 @@ Runtime settings layer.
 Тестов: 12
 
 
-### `tests/backend/test_repository_hr_card.py` — 140 строк
+### `tests/backend/test_repository_hr_card.py` — 117 строк
 
 Следствия сборки карточки HR для боковой панели контактов.
 
 Зависит от: `backend.repository.hr_card`, `tests.dbio`, `tests.factories`
 
-Тестов: 7
+Тестов: 6
 
 
 ### `tests/backend/test_repository_hr_creation.py` — 39 строк
@@ -4272,22 +4267,22 @@ Runtime settings layer.
   - `def cancel_current_poll(self) -> None` (2)
   - `def request_stop(self) -> None` (2)
 
-### `tests/client/test_bridge_channel_actions.py` — 206 строк
+### `tests/client/test_bridge_channel_actions.py` — 227 строк
 
 Следствия действий над каналом, которым нужен поднятый бот.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 12
+Тестов: 13
 
 
-### `tests/client/test_bridge_channels.py` — 189 строк
+### `tests/client/test_bridge_channels.py` — 239 строк
 
 Следствия домена канала, которым хватает одной базы.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 9
+Тестов: 11
 
 
 ### `tests/client/test_bridge_choice_sets.py` — 35 строк
@@ -4299,13 +4294,13 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/client/test_bridge_companies.py` — 278 строк
+### `tests/client/test_bridge_companies.py` — 324 строк ⚠ подошёл к 300
 
 Следствия домена компании: перечень, карточка, написания, слияние, заслон.
 
 Зависит от: `tests.dbio`, `tests.factories`
 
-Тестов: 15
+Тестов: 17
 
 
 ### `tests/client/test_bridge_cv.py` — 133 строк
@@ -4326,22 +4321,22 @@ Runtime settings layer.
 Тестов: 12
 
 
-### `tests/client/test_bridge_hr.py` — 268 строк
+### `tests/client/test_bridge_hr.py` — 314 строк ⚠ подошёл к 300
 
 Следствия карточки HR: перечень, правка, слияние, чёрный список.
 
 Зависит от: `tests.dbio`, `tests.factories`
 
-Тестов: 16
+Тестов: 18
 
 
-### `tests/client/test_bridge_hr_chat.py` — 191 строк
+### `tests/client/test_bridge_hr_chat.py` — 221 строк
 
 Следствия переписки: что окно показывает и чем отвечают на отправку.
 
 Зависит от: `tests.client.conftest`, `tests.dbio`, `tests.factories`
 
-Тестов: 10
+Тестов: 11
 
 
 ### `tests/client/test_bridge_journal.py` — 124 строк
@@ -4789,14 +4784,14 @@ Runtime settings layer.
   - `async def log_out(self)` (3)
   - `async def export_session_string(self)` (3)
 
-### `tests/fakes/ui_bot.py` — 104 строк
+### `tests/fakes/ui_bot.py` — 99 строк
 
 Бот, каким его видит окно: обращения, которые делает мост.
 
 Зависит от: —
 
 - `class Sent` (4)
-- `class UiBot` (71)
+- `class UiBot` (67)
   - `def _refuse_if_asked(self) -> None` (3)
   - `async def force_poll_once(self) -> str` (3)
   - `def cancel_current_poll(self) -> None` (2)
@@ -4809,7 +4804,6 @@ Runtime settings layer.
   - `async def send_to_hr_media(self, hr_id: int, file_path: str) -> Sent` (4)
   - `async def log_out_session(self) -> None` (4)
   - `async def poll_channel_now(self, channel_id: int) -> str` (3)
-  - `async def delete_channel(self, channel_id: int) -> int | None` (3)
   - `async def add_channel(self, username: str) -> tuple[int | None, str]` (3)
 
 ### `tests/fakes/ui_login.py` — 47 строк

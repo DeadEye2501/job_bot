@@ -110,7 +110,9 @@ async def test_spellings_of_a_wrong_shape_are_refused_before_the_base(
     answer = await ask(api.companies.update, {"company_id": company.id, "aliases": 42})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "aliases должен быть list или строка через запятую."
+    # Словами человека, а не именем колонки: «aliases» на экране не написано
+    # нигде, и починить по такой фразе нечего.
+    assert answer["detail"] == "Написания шлют списком или строкой через запятую."
 
 
 async def test_an_update_without_fields_says_there_is_nothing_to_do(
@@ -231,6 +233,7 @@ async def test_merging_a_company_into_itself_is_refused(api, ask, session_factor
     )
 
     assert answer["fail"] == "denied"
+    assert answer["detail"] == "Слить карточку саму с собой нельзя."
 
 
 async def test_a_deleted_company_leaves_the_list(api, ask, session_factory):
@@ -276,3 +279,46 @@ async def test_removing_a_company_blacklist_clears_the_card(
 
     shown = await ask(api.companies.detail, company.id)
     assert shown["ok"]["blacklist_value"] is None
+
+
+async def test_a_merged_company_tells_the_counters_to_reread_themselves(
+    api, ask, hub, session_factory
+):
+    """После слияния компаний окну говорят, что списки контактов устарели.
+
+    Счёт вакансий и строка компании собраны из того же, что и списки на
+    соседних экранах. Промолчи мост — вкладки «Компании» и «Вакансии»
+    показывали бы вчерашние числа до перезапуска приложения, и связать это с
+    только что нажатой кнопкой человек не смог бы ничем.
+    """
+    absorbed = company_row(name="Рога")
+    survivor = company_row(name="Контур")
+    await put(session_factory, absorbed, survivor)
+
+    await ask(
+        api.companies.merge,
+        {"absorbed_id": absorbed.id, "survivor_id": survivor.id},
+    )
+
+    news = await hub.events.take(after=0, timeout=0.01)
+    assert "contacts_lists_changed" in [one["kind"] for one in news["events"]]
+
+
+async def test_renaming_a_company_into_emptiness_asks_for_a_name(
+    api, ask, session_factory
+):
+    """Переименование в пустоту отбивают словами про имя, а не про пропажу.
+
+    Два разных положения дел: «компании нет» человек читает так, что строку
+    снесли, и идёт перечитывать список; «название обязательно» значит, что он
+    стёр поле и его надо заполнить. Одной фразой на оба они и были склеены.
+    """
+    company = company_row(name="Контур")
+    await put(session_factory, company)
+
+    answer = await ask(
+        api.companies.update, {"company_id": company.id, "name": "   "}
+    )
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Название обязательно."

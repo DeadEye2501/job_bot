@@ -12,7 +12,6 @@ from backend.models import Company, HR, Message, Vacancy
 from backend.payloads import HrDetail
 from backend.incoming import text_or_none
 
-from backend.repository.vacancies_common import PARSED_ONLY
 from backend.repository.blacklist import rename_blacklist_marks
 from backend.repository.blacklist_marks import (
     account_mark,
@@ -85,16 +84,6 @@ async def update_hr_fields(session: AsyncSession, hr_id: int, **fields) -> bool:
     return True
 
 
-async def _vacancy_count_of(session: AsyncSession, hr_id: int) -> int:
-    """Сколько вакансий человек принёс за всё время."""
-    return int(
-        await session.scalar(
-            select(func.count(Vacancy.id)).where(Vacancy.hr_id == hr_id, PARSED_ONLY)
-        )
-        or 0
-    )
-
-
 async def _last_company_of(
     session: AsyncSession, hr_id: int
 ) -> tuple[int | None, str | None]:
@@ -138,17 +127,19 @@ async def get_hr_detail(
 
     Returns the HR row + компания с самой свежей его вакансии (id + name,
     порядок — `LAST_VACANCY_ORDER`; пусто, если та вакансия ни к какой
-    компании не привязана) + total vacancy count + count of unread
-    incoming messages. Returns ``None`` if the HR row is gone.
+    компании не привязана) + count of unread incoming messages. Returns
+    ``None`` if the HR row is gone.
+
+    Счёта вакансий здесь нет: карточка его не показывала, а считался он
+    запросом на каждое её открытие. Число, которое человек видит, приезжает
+    строкой перечня.
     """
     hr = await session.get(HR, hr_id)
     if hr is None:
         return None
-    vacancy_count = await _vacancy_count_of(session, hr_id)
     last_company_id, last_company_name = await _last_company_of(session, hr_id)
     return HrDetail(
         hr=hr,
-        vacancy_count=vacancy_count,
         last_company_id=last_company_id,
         last_company_name=last_company_name,
         unread_count=await _unread_count_of(session, hr_id),

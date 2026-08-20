@@ -12,7 +12,6 @@ from backend.telegram_lookup import read_channel_metadata
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
 from backend.repository.channels import (
     create_channel,
-    delete_channel as repo_delete_channel,
     find_channel_by_username,
 )
 
@@ -58,15 +57,6 @@ async def poll_channel_now(bot, channel_id: int) -> ChannelPollOutcome:
         f"manual poll for channel {channel_id}",
     )
     return walk if outcome == "ok" else outcome
-
-
-async def delete_channel(bot, channel_id: int) -> int | None:
-    """UI «Удалить канал» — severs vacancy FKs and deletes the row.
-    Returns count of detached vacancies, or None if channel missing.
-    """
-    async with bot.session_factory() as session:
-        async with session.begin():
-            return await repo_delete_channel(session, channel_id)
 
 
 async def _ask_telegram_about(bot, username: str):

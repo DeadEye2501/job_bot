@@ -5,6 +5,8 @@
 вызов, а не одно поле.
 """
 
+import pytest
+
 from backend.repository.companies_card import get_company_detail, update_company_fields
 from tests.dbio import put
 from tests.factories import company_row
@@ -37,15 +39,20 @@ async def test_an_empty_name_is_refused_and_nothing_else_is_written(
     """Пустое имя правку отменяет целиком, а не стирает имя.
 
     Имя обязательно и уникально: без него строку не отличить от других.
-    Вызов возвращает отказ, и соседние поля из того же вызова тоже не
-    записываются.
+    Соседние поля из того же вызова тоже не записываются.
+
+    Отвечает на это бросок, а не ложь: ложью отвечает «компании с таким номером
+    нет», и человеку про эти два случая говорят разными словами — «название
+    обязательно» значит, что он стёр поле, а «компания не найдена» посылает его
+    перечитывать список.
     """
     company = company_row(name="Контур", notes="было")
     await put(session_factory, company)
 
-    assert await update_company_fields(
-        session, company.id, name="   ", notes="стало"
-    ) is False
+    with pytest.raises(ValueError):
+        await update_company_fields(
+            session, company.id, name="   ", notes="стало"
+        )
 
     card = await get_company_detail(session, company.id)
     assert card.company.name == "Контур"

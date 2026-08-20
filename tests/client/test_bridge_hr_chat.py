@@ -53,6 +53,36 @@ async def test_an_attachment_arrives_as_an_address_the_window_can_open(
     assert row["media_path"] == "/media/1/42.jpg"
 
 
+async def test_a_send_that_broke_is_explained_instead_of_crashing(
+    api, ask, with_bot, session_factory
+):
+    """Сорвавшаяся отправка возвращается словами, а не поломкой.
+
+    Зов Pyrogram роняет не только `RuntimeError`: отказ Telegram и оборванная
+    сеть приходят своими породами, и мимо перехвата они уезжали окну поломкой
+    без единого внятного слова.
+
+    Слова при этом обязаны предупредить о втором нажатии: по ответу не видно,
+    ушло письмо или нет, и человек, не увидев его в ленте, пишет работодателю
+    второй раз.
+    """
+    hr = hr_row()
+    await put(session_factory, hr)
+    bot = with_bot()
+
+    async def fall(hr_id: int, text: str):
+        raise OSError("сеть отвалилась")
+
+    bot.send_to_hr_chat = fall
+
+    answer = await ask(
+        api.hr.send_message, {"hr_id": hr.id, "text": "здравствуйте"}
+    )
+
+    assert answer["fail"] == "denied"
+    assert "переписк" in answer["detail"]
+
+
 async def test_only_chats_with_unread_incoming_are_listed(
     api, ask, session_factory
 ):
