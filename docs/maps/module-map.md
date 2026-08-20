@@ -1886,17 +1886,18 @@ Runtime settings layer.
 
 - `def _stat_cv(cv_path: str) -> dict | None` (9)
 
-### `client/bridge/desktop.py` — 159 строк
+### `client/bridge/desktop.py` — 184 строк
 
 Просьбы окна к рабочему столу: открыть названное тем, чем открывает система.
 
 Зависит от: `client.bridge.answer`, `client.bridge.media`, `client.bridge.refusals`
 
+- `def _show_in_folder(target) -> bool` (20)
 - `def _scheme_of(url: str) -> str` (7)
 - `def open_in_system(target: str) -> bool` (20)
-- `class Desktop` (65)
+- `class Desktop` (67)
   - `def open_url(self, url: str) -> dict` (28)
-  - `def open_attachment(self, url: str) -> dict` (23)
+  - `def open_attachment(self, url: str) -> dict` (25)
 
 ### `client/bridge/events.py` — 149 строк
 
@@ -4434,7 +4435,7 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/client/test_bridge_shell.py` — 197 строк
+### `tests/client/test_bridge_shell.py` — 208 строк
 
 Следствия обращения к оболочке: что окно отдаёт системе, а что нет.
 

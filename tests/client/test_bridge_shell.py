@@ -94,21 +94,32 @@ async def test_a_telegram_link_opens(api, ask, opened):
     assert opened == ["tg://resolve?domain=ivanov"]
 
 
-async def test_an_attachment_that_is_a_program_is_not_opened(api, ask, opened, media):
-    """Вложение, оказавшееся программой, не открывается.
+async def test_an_attachment_we_do_not_open_is_shown_in_the_folder(
+    api, ask, opened, media, monkeypatch
+):
+    """Вложение, которое приложение не открывает, оно показывает в папке.
 
-    Имя файла называет собеседник, и «Оферта.pdf.exe» в списке писем выглядит
-    документом: род вложения у него «документ», значок тот же. Отдай мы его
-    системе — по нажатию на обычную кнопку исполнилась бы присланная чужим
-    человеком программа.
+    Открывать самим нельзя: имя файла называет собеседник, и «Оферта.pdf.exe»
+    в ленте выглядит документом — род вложения у него «документ», значок тот
+    же, — а по нажатию исполнилась бы присланная чужим человеком программа.
+
+    Прятать тоже незачем: файл прислали человеку, и добраться до него он
+    вправе. Проводник показывает его выделенным и не запускает ничего — что
+    делать дальше, решает сам человек.
     """
     (media / "1").mkdir()
     (media / "1" / "42.exe").write_bytes(b"MZ")
+    shown: list = []
+    monkeypatch.setattr(
+        "client.bridge.desktop.subprocess.Popen", lambda args: shown.append(args)
+    )
 
     answer = await ask(api.system.open_attachment, f"{MEDIA_PREFIX}1/42.exe")
 
-    assert answer["fail"] == "denied"
+    assert "ok" in answer
+    # Показан, а не запущен: система получила проводник с отбором, а не сам файл.
     assert opened == []
+    assert shown == [["explorer", f"/select,{media / '1' / '42.exe'}"]]
 
 
 async def test_a_document_attachment_opens(api, ask, opened, media):
