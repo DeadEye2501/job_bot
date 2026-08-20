@@ -159,6 +159,15 @@ describe('запор ручного прогона канала', () => {
 });
 
 describe('чем подписан канал в строке списка', () => {
+  it('названный канал подписан своим названием', () => {
+    // По названию канал узнают: подставь тут ник, человек искал бы в списке не
+    // то, что видел в самом Telegram.
+    expect(channelTitle({ id: 42, title: 'Python Jobs', username: 'py_jobs' })).toEqual({
+      name: 'Python Jobs',
+      named: true,
+    });
+  });
+
   it('без названия имя берут из ника', () => {
     expect(channelTitle({ id: 42, title: '', username: 'py_jobs' })).toEqual({
       name: '@py_jobs',

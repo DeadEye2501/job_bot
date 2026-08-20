@@ -257,11 +257,14 @@ describe('пустые черновики настроек', () => {
 
   it('каждый черновик новый', () => {
     // Черновики правят на месте: один на всех протёк бы из настроек в мастер и
-    // обратно.
-    const one = blankCreds();
-    one.model = 'qwen';
+    // обратно — и набранный там ключ всплыл бы здесь.
+    const creds = blankCreds();
+    creds.model = 'qwen';
+    const tg = blankTelegram();
+    tg.phone = '+70000000000';
 
     expect(blankCreds().model).toBe('');
+    expect(blankTelegram().phone).toBe('');
   });
 
   it('из ответа моста берутся ровно поля входа', () => {
