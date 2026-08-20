@@ -4,7 +4,7 @@
 // настоящий живёт в окне, а окна у прогона нет, и подделка садится туда же,
 // куда сядет он, — в `window.pywebview.api`.
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Refused, call, ready } from '../api/bridge.js';
 
@@ -49,17 +49,16 @@ describe('ответ моста', () => {
     await expect(call('system.health')).rejects.toBeInstanceOf(Refused);
   });
 
-  it('поля отказа доезжают вместе с ним', async () => {
-    // По ним экран откатывает отметку у нужной строки: без номера вакансии он
-    // не знает, какую именно строку красить обратно.
+  it('человеку достаётся фраза отказа, а не общее «не получилось»', async () => {
+    // Плашка показывает эту фразу и ничего больше: она и есть всё, что человек
+    // узнает о том, почему действие не прошло. Подставь мост общее слово —
+    // «нельзя, потому что HR уже заведён» превратилось бы в «не получилось».
     bridgeAnswers([
       { fail: 'denied', detail: 'Нельзя', vacancy_id: 17, action: 'delete' },
     ]);
 
     const refusal = await call('system.health').catch((e) => e);
 
-    expect(refusal.fields).toEqual({ vacancy_id: 17, action: 'delete' });
-    expect(refusal.kind).toBe('denied');
     expect(refusal.message).toBe('Нельзя');
   });
 
@@ -78,7 +77,12 @@ describe('ответ моста', () => {
     // вместо плашки.
     bridgeAnswers(['я не конверт']);
 
-    await expect(call('system.health')).rejects.toBeInstanceOf(Refused);
+    const refusal = await call('system.health').catch((e) => e);
+
+    expect(refusal).toBeInstanceOf(Refused);
+    // Фраза, а не род: плашка показывает сообщение и ничего больше, и
+    // внутреннее слово вроде `broken`, попав в него, доехало бы до человека.
+    expect(refusal.message).toBe('Мост ответил непонятным.');
   });
 
   it('незнакомое имя метода — отказ, а не падение на месте зова', async () => {
@@ -90,7 +94,9 @@ describe('ответ моста', () => {
     const refusal = await call('vacancies.нетТакого').catch((e) => e);
 
     expect(refusal).toBeInstanceOf(Refused);
-    expect(refusal.fields.path).toBe('vacancies.нетТакого');
+    // Имя названо в самой фразе: другого места, где человек или журнал его
+    // увидят, нет — плашка показывает сообщение и ничего больше.
+    expect(refusal.message).toContain('vacancies.нетТакого');
   });
 
   it('молчание моста тоже отказ, а не успех с пустотой', async () => {
@@ -109,5 +115,21 @@ describe('готовность', () => {
     bridgeAnswers([]);
 
     await expect(ready()).resolves.toBeUndefined();
+  });
+
+  it('страницу без моста отказ объясняет словами', async () => {
+    // Страницу открывают и без окна — сервером разработки, — и моста там не
+    // будет никогда. Человек должен прочитать, почему пусто, а не внутреннее
+    // слово: плашка показывает сообщение и ничего больше.
+    vi.useFakeTimers();
+    globalThis.window = { addEventListener: () => {} };
+
+    const waiting = ready().catch((trouble) => trouble);
+    await vi.advanceTimersByTimeAsync(2000);
+    const refusal = await waiting;
+    vi.useRealTimers();
+
+    expect(refusal).toBeInstanceOf(Refused);
+    expect(refusal.message).toBe('Моста в этой странице нет.');
   });
 });

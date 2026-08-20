@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.incoming import int_or_none, text_or_none
+from backend.incoming import text_or_none
 from backend.repository import (
     hr_card,
     hr_identify,
@@ -60,9 +60,7 @@ class Hr(HrChat):
         """Перечень людей с поиском и бесконечной прокруткой.
 
         Запрос под ним тот же, что у подборщика (`list_hr_with_counts`), но со
-        страницами: потолок, сдвиг и режим читаются как у списка вакансий.
-        Порядковый знак уезжает эхом — по нему окно отбрасывает ответ,
-        устаревший, пока менялись поиск или порядок.
+        страницами: потолок и сдвиг читаются как у списка вакансий.
         """
         # Не-объект сводится к пустоте, а не роняет разбор: поиск — дело окна,
         # и испорченная нагрузка не должна отнимать у человека весь перечень.
@@ -83,9 +81,6 @@ class Hr(HrChat):
                 "search": search or "",
                 "hrs": [_hr_picker_row_to_dict(r) for r in rows],
                 "has_more": has_more,
-                "mode": page.mode,
-                "offset": page.offset,
-                "epoch": page.epoch,
             }
 
         return reply(self._hub.runner, run())
@@ -121,14 +116,10 @@ class Hr(HrChat):
     def vacancies(self, payload: dict) -> dict:
         """Короткий список вакансий этого человека — для его карточки.
 
-        Нагрузка: `{hr_id, epoch}`. Номер отсеивает ответ про другого
-        выбранного, порядковый знак — про того же самого, спрошенного дважды
-        подряд (например, быстрым переключением статуса вакансии). Оба уезжают
-        обратно эхом, устаревшее окно отбрасывает.
+        Нагрузка: `{hr_id}`.
         """
         try:
             hr_id = int(payload["hr_id"])
-            epoch = int_or_none(payload.get("epoch"))
         except (ValueError, TypeError, KeyError) as e:
             return bad_fields("hr.vacancies", e)
 
@@ -137,7 +128,6 @@ class Hr(HrChat):
                 rows = await vacancies_mini.list_vacancies_for_hr(session, hr_id)
             return {
                 "hr_id": hr_id,
-                "epoch": epoch,
                 "vacancies": [_vacancy_mini_row_to_dict(v) for v in rows],
             }
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy.exc import IntegrityError
 
-from backend.incoming import int_or_none, text_or_none
+from backend.incoming import text_or_none
 from backend.repository import (
     companies_card,
     companies_list,
@@ -71,9 +71,7 @@ class Companies:
     def list(self, payload: dict | None = None) -> dict:
         """Страница перечня компаний.
 
-        Нагрузка та же, что у перечня людей: поиск, потолок со сдвигом, режим
-        показа и порядковый знак. Знак уезжает эхом — по нему окно отбрасывает
-        ответ, устаревший, пока менялись поиск или прокрутка.
+        Нагрузка та же, что у перечня людей: поиск и потолок со сдвигом.
         """
         # Не-объект сводится к пустоте, а не роняет разбор: поиск — дело окна,
         # и испорченная нагрузка не должна отнимать у человека весь перечень.
@@ -90,9 +88,6 @@ class Companies:
                 "search": search or "",
                 "companies": [_company_picker_row_to_dict(r) for r in rows],
                 "has_more": has_more,
-                "mode": page.mode,
-                "offset": page.offset,
-                "epoch": page.epoch,
             }
 
         return reply(self._hub.runner, run())
@@ -125,13 +120,10 @@ class Companies:
     def vacancies(self, payload: dict) -> dict:
         """Короткий список вакансий этой компании — для её карточки.
 
-        Нагрузка: `{company_id, epoch}`. Номер отсеивает ответ про другую
-        выбранную, порядковый знак — про ту же самую, спрошенную дважды подряд.
-        Оба уезжают обратно эхом, устаревшее окно отбрасывает.
+        Нагрузка: `{company_id}`.
         """
         try:
             company_id = int(payload["company_id"])
-            epoch = int_or_none(payload.get("epoch"))
         except (ValueError, TypeError, KeyError) as e:
             return bad_fields("companies.vacancies", e)
 
@@ -142,7 +134,6 @@ class Companies:
                 )
             return {
                 "company_id": company_id,
-                "epoch": epoch,
                 "vacancies": [_vacancy_mini_row_to_dict(v) for v in rows],
             }
 

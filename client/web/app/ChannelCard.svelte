@@ -61,7 +61,6 @@
       channel_id: id,
       limit: mode === 'append' ? PAGE : refreshLimit(vacancies.length),
       offset: mode === 'append' ? vacancies.length : 0,
-      mode,
     });
     if (page === null || !alive || vacancyTries.stale(mine)) return;
     vacancies = mode === 'append' ? appended(vacancies, page.vacancies) : page.vacancies;

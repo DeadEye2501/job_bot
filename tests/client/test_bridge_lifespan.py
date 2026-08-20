@@ -184,7 +184,10 @@ async def test_what_the_bot_does_by_itself_reaches_the_queue(hub):
         "ingestion_started",
         "progress_update",
         "contacts_hr_read_receipt",
-        "contacts_channels_changed",
+        # Правка каналов едет тем же родом, что и правка прочих списков: свой
+        # род у неё был, а слушателя у того рода не было ни одного — свежее
+        # название канала не доезжало до окна до перехода на соседний экран.
+        "contacts_lists_changed",
         "contacts_lists_changed",
         "vacancies_list_changed",
         "ingestion_finished",

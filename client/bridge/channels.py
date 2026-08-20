@@ -7,7 +7,7 @@ import logging
 from sqlalchemy import func, select
 
 from backend.models import Vacancy
-from backend.incoming import int_or_none, text_or_none
+from backend.incoming import text_or_none
 from backend.repository import channels as channels_repo, vacancies_mini
 from client.bridge.answer import Denied, bad_fields, reply
 from client.bridge.channel_actions import ChannelActions
@@ -37,14 +37,13 @@ class Channels(ChannelActions):
     def list(self, payload: dict | None = None) -> dict:
         """Все каналы разом — без страниц: их мало.
 
-        Порядковый знак уезжает эхом: по нему окно отбрасывает ответ,
-        устаревший, пока менялась строка поиска.
+        Обратно едет и сама строка поиска: по ней окно рисует поле, когда
+        перечень открывают из другого места с уже набранным словом.
         """
         # Не-объект сводится к пустоте, а не роняет разбор: поиск — дело окна,
         # и испорченная нагрузка не должна отнимать у человека весь перечень.
         payload = payload if isinstance(payload, dict) else {}
         search = text_or_none(payload.get("search"))
-        epoch = int_or_none(payload.get("epoch"))
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
@@ -60,7 +59,6 @@ class Channels(ChannelActions):
             return {
                 "search": search or "",
                 "channels": [_channel_row_to_dict(r) for r in rows],
-                "epoch": epoch,
             }
 
         return reply(self._hub.runner, run())
@@ -102,14 +100,12 @@ class Channels(ChannelActions):
     def vacancies(self, payload: dict) -> dict:
         """Страница вакансий этого канала — для его карточки.
 
-        Нагрузка: `{channel_id, limit, offset, mode}`. Режима два: заменить
-        показанное или дописать к нему. Номер, сдвиг и признак продолжения
-        уезжают эхом — по ним окно отбрасывает ответ, устаревший на гонке
-        прокрутки и выбора соседней строки.
+        Нагрузка: `{channel_id, limit, offset}`. Дописать пришедшее или
+        заменить показанное, окно решает само.
         """
         try:
             channel_id = int(payload["channel_id"])
-            page = read_page(payload, default_limit=50, modes=("replace", "append"))
+            page = read_page(payload, default_limit=50)
         except (ValueError, TypeError, KeyError) as e:
             return bad_fields("channels.vacancies", e)
 
@@ -139,8 +135,6 @@ class Channels(ChannelActions):
                     )
         return {
             "channel_id": channel_id,
-            "offset": page.offset,
-            "mode": page.mode,
             "has_more": has_more,
             "vacancies": [_vacancy_mini_row_to_dict(v) for v in rows],
         }

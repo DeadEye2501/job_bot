@@ -1,13 +1,13 @@
 """Следствия чтения нагрузки списка — той, что четыре экрана шлют одинаково.
 
 Вакансии, люди, компании и каналы просят страницу одними и теми же полями:
-строка поиска, выбранное в фильтрах, потолок, сдвиг, режим и порядковый знак.
-Пока каждый слот читал их сам, написания разъехались — и разъехались молча:
-окно шлёт одно и то же, а получает разное.
+строка поиска, выбранное в фильтрах, потолок и сдвиг. Пока каждый слот читал
+их сам, написания разъехались — и разъехались молча: окно шлёт одно и то же, а
+получает разное.
 """
 
 from tests.dbio import put
-from tests.factories import company_row, hr_row, vacancy_row
+from tests.factories import company_row, vacancy_row
 
 
 async def test_a_filter_value_with_stray_spaces_still_finds_the_vacancy(
@@ -45,42 +45,6 @@ async def test_a_single_choice_filter_with_stray_spaces_still_matches(
 
     titles = [row["title"] for row in answer["ok"]["vacancies"]]
     assert titles == ["Питонист"]
-
-
-async def test_the_request_ordinal_comes_back_as_a_number(
-    api, ask, session_factory
-):
-    """Порядковый знак возвращается числом, каким бы ни пришёл.
-
-    Окно узнаёт свой ответ строгим сравнением знака. Вернись он строкой — ни
-    один ответ не совпал бы со своим запросом, и список вакансий компании
-    остался бы пустым навсегда.
-    """
-    company = company_row(name="Контур")
-    await put(session_factory, company)
-
-    answer = await ask(
-        api.companies.vacancies, {"company_id": company.id, "epoch": "7"}
-    )
-
-    assert answer["ok"]["epoch"] == 7
-
-
-async def test_an_unknown_chat_mode_comes_back_as_the_first_one(
-    api, ask, session_factory
-):
-    """Незнакомый режим переписки схлопывается в «свежие», а не едет эхом.
-
-    По этому слову окно решает, дописать пришедшее к показанному сверху или
-    заменить показанное целиком. Опечатка, вернувшаяся как есть, читается им
-    как замена — и уже догруженная история переписки пропадает с экрана.
-    """
-    hr = hr_row(name="Иван")
-    await put(session_factory, hr)
-
-    answer = await ask(api.hr.messages, {"hr_id": hr.id, "mode": "как-нибудь"})
-
-    assert answer["ok"]["mode"] == "tail"
 
 
 async def test_a_page_asked_beyond_the_ceiling_comes_back_cut(

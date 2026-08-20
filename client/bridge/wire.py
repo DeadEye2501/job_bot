@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from backend.domain.scoring import skill_key
+from backend.domain.skill_names import skill_key
 from backend.models import Blacklist
 from client.bridge.media import _avatar_data_url, _media_url
 
@@ -166,24 +166,61 @@ def _company_name(v) -> str | None:
     return v.company.name if v.company is not None else v.company_name
 
 
+def _hr_face(hr) -> dict:
+    """Человек строкой со снимком — чем его показывают чужие карточки.
+
+    Полей четыре из полутора десятков, что есть у записи: и карточка вакансии,
+    и боковой список карточки компании показывают человека одной строкой, а не
+    разворачивают его целиком — для этого у него своя карточка.
+    """
+    return {
+        "id": hr.id,
+        "name": hr.name,
+        "telegram_username": hr.telegram_username,
+        "avatar": _avatar_data_url(hr.avatar),
+    }
+
+
+def _status_change(row) -> dict:
+    """Одна смена статуса в истории вакансии.
+
+    Прежний статус бывает пустым — у самой первой записи: до неё вакансии не
+    было вовсе, и «из чего» здесь не из чего взять.
+    """
+    return {
+        "id": row.id,
+        "previous_status": row.previous_status.value if row.previous_status else None,
+        "status": row.status.value,
+        "explanation": row.explanation,
+        "applied": row.applied,
+        "source": row.source.value,
+        "changed_at": _iso(row.changed_at),
+    }
+
+
+def _vacancy_event(row) -> dict:
+    """Одна запись в ленте вакансии: что с ней случилось и когда."""
+    return {
+        "id": row.id,
+        "kind": row.kind,
+        "payload": row.payload,
+        "created_at": _iso(row.created_at),
+    }
+
+
 def _vacancy_detail_to_dict(
     detail, matched_set: set[str], score_threshold: int,
 ) -> dict:
-    """Detail-pane payload. Linked Company / HR / Channel fields fall back
-    to the raw parsed strings on the vacancy when the FK isn't set, so the
-    UI can always render *something* without lazy-loading."""
+    """Карточка вакансии — всё, что показывает её правая половина.
+
+    Откат к разобранным строкам вакансии есть **только у названия компании**
+    (`_company_name`): её человек видит и у непривязанной. У остальных троих
+    отката нет — не привязана, значит пусто: сайт и `@username` канала брать
+    неоткуда вовсе, а у человека разобранная строка есть (`hr_contact`), и
+    карточка её всё равно не показывает. Окно на это отвечает кнопкой
+    «привязать», а не пустой строкой без действия.
+    """
     v = detail.vacancy
-    company_name = _company_name(v)
-    company_website = v.company.website if v.company is not None else None
-    channel_username = v.channel.username if v.channel is not None else None
-    hr_block = None
-    if v.hr is not None:
-        hr_block = {
-            "id": v.hr.id,
-            "name": v.hr.name,
-            "telegram_username": v.hr.telegram_username,
-            "avatar": _avatar_data_url(v.hr.avatar),
-        }
     return {
         "id": v.id,
         "status": v.status.value,
@@ -193,41 +230,22 @@ def _vacancy_detail_to_dict(
         "description": v.description,
         "raw_text": v.raw_text,
         "company_id": v.company_id,
-        "company_name": company_name,
-        "company_website": company_website,
-        "hr": hr_block,
+        "company_name": _company_name(v),
+        "company_website": v.company.website if v.company is not None else None,
+        "hr": _hr_face(v.hr) if v.hr is not None else None,
         "grade": v.grade,
         "salary": v.salary,
         "remote": v.remote,
         "location": v.location,
-        "channel_username": channel_username,
+        "channel_username": v.channel.username if v.channel is not None else None,
         "source_msg_id": v.source_msg_id,
         "source_url": v.source_url,
         "stack": _stack_items(v.stack, matched_set),
         "notes": v.notes,
         "posted_at": _iso(v.posted_at),
         "created_at": _iso(v.created_at),
-        "history": [
-            {
-                "id": h.id,
-                "previous_status": h.previous_status.value if h.previous_status else None,
-                "status": h.status.value,
-                "explanation": h.explanation,
-                "applied": h.applied,
-                "source": h.source.value,
-                "changed_at": _iso(h.changed_at),
-            }
-            for h in detail.history
-        ],
-        "events": [
-            {
-                "id": e.id,
-                "kind": e.kind,
-                "payload": e.payload,
-                "created_at": _iso(e.created_at),
-            }
-            for e in detail.events
-        ],
+        "history": [_status_change(h) for h in detail.history],
+        "events": [_vacancy_event(e) for e in detail.events],
     }
 
 
@@ -254,18 +272,14 @@ def _hr_picker_row_to_dict(item) -> dict:
 def _hr_mini_row_to_dict(hr, vacancy_count: int) -> dict:
     """Строка человека в боковом списке карточки компании.
 
-    Не строка подборщика: счёт там свой, по всем вакансиям человека, и лежит
-    он полем прочитанного, а сюда приходит отдельным доводом. Непрочитанные,
-    последняя компания и отметка заслона сюда не едут вовсе: карточка
-    рассказывает про компанию, а не про человека целиком.
+    Сам человек — тем же `_hr_face`, что и в карточке вакансии: строка со
+    снимком у них одна. Своё здесь только счёт, и он не тот, что у подборщика:
+    там счёт по всем вакансиям человека и лежит полем прочитанного, а сюда
+    приходит отдельным доводом. Непрочитанные, последняя компания и отметка
+    заслона сюда не едут вовсе: карточка рассказывает про компанию, а не про
+    человека целиком.
     """
-    return {
-        "id": hr.id,
-        "name": hr.name,
-        "telegram_username": hr.telegram_username,
-        "vacancy_count": vacancy_count,
-        "avatar": _avatar_data_url(hr.avatar),
-    }
+    return {**_hr_face(hr), "vacancy_count": vacancy_count}
 
 
 def _message_row_to_dict(m) -> dict:

@@ -64,7 +64,6 @@
     digging = true;
     const page = await ask('hr.messages', {
       hr_id: card.hr_id,
-      mode: 'older',
       before_id: oldest.id,
       before_sent_at: oldest.sent_at,
     });

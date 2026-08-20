@@ -208,7 +208,10 @@ def _tell_the_window(bot, hub: Hub) -> None:
     bot.on_hr_read = lambda hr_id, max_tg_id: events.add(
         "contacts_hr_read_receipt", {"hr_id": hr_id, "max_tg_id": max_tg_id}
     )
-    bot.on_channels_changed = lambda: events.add("contacts_channels_changed")
+    # Правка каналов едет тем же родом, что и правка прочих списков: свой род у
+    # неё был, а слушателя у того рода не было ни одного — свежее название
+    # канала не доезжало до окна до перехода на соседний экран.
+    bot.on_channels_changed = lambda: events.add("contacts_lists_changed")
     bot.on_contacts_changed = lambda: events.add("contacts_lists_changed")
     bot.on_vacancies_changed = lambda: events.add("vacancies_list_changed")
 

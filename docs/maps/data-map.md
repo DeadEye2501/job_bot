@@ -1083,13 +1083,10 @@
 
 ### `client/bridge/page.py`
 
-- `LIST_MODES` = `набор из 3`
 - `_CEILING` = `200`
 - `class Page`
   - `limit: int | None`
   - `offset: int`
-  - `mode: str`
-  - `epoch: int | None`
 
 ### `client/bridge/payload.py`
 
@@ -1152,6 +1149,7 @@
 
 ### `client/bridge/system.py`
 
+- `logger` = `logging.getLogger(__name__)`
 - `_MODEL_PROBE_INTERVAL_S` = `60.0`
 
 ### `client/bridge/vacancies.py`
