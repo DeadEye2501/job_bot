@@ -59,6 +59,17 @@ class UiBot:
     def request_stop(self) -> None:
         self.calls.append(("request_stop",))
 
+    def kick(self) -> None:
+        self.calls.append(("kick",))
+
+    async def run(self, *, once: bool = False) -> None:
+        """Работа бота, которая сразу кончается.
+
+        Мост запускает её на моторе и держит только `Future`; что внутри, ему
+        безразлично — важно, что зов есть и что подпись совпадает с настоящей.
+        """
+        self.calls.append(("run", once))
+
     async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> str:
         self.calls.append(("ui_rerun_vacancy_pipeline", vacancy_id))
         return self.answers["rerun"]

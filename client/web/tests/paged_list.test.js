@@ -7,16 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { pagedList } from '$state/paged_list.svelte.js';
 
-/** Подставной мост, отвечающий заготовленным и помнящий, о чём спрашивали. */
-function bridge(pages) {
-  const asked = [];
-  const answer = async (method, payload) => {
-    asked.push({ method, ...payload });
-    const next = pages.shift();
-    return typeof next === 'function' ? next() : next;
-  };
-  return { asked, answer };
-}
+import { replying } from './bridge_stub.js';
 
 function page(rows, has_more = false) {
   return { hrs: rows, has_more };
@@ -29,12 +20,12 @@ function atBottom() {
 
 describe('список страницами', () => {
   it('первое чтение берёт страницу с начала', async () => {
-    const { asked, answer } = bridge([page([{ id: 1 }])]);
+    const { asked, ask: answer } = replying([page([{ id: 1 }])]);
     const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
 
     await list.refresh();
 
-    expect(asked).toEqual([{ method: 'hr.list', search: '', limit: 50, offset: 0 }]);
+    expect(asked).toEqual([{ method: 'hr.list', payload: { search: '', limit: 50, offset: 0 } }]);
     expect(list.rows).toEqual([{ id: 1 }]);
     expect(list.loaded).toBe(true);
   });
@@ -46,14 +37,30 @@ describe('список страницами', () => {
     expect(list.loaded).toBe(false);
   });
 
+  it('дочитывание берёт страницу с конца уже показанного', async () => {
+    // Отсчёт спрашивается у самого списка, а не у номера страницы, и это
+    // единственное, что двигает чтение вперёд. Уедь он на ноль — мост
+    // отдавал бы одну и ту же первую страницу без конца, а список дальше
+    // первых пятидесяти строк не показал бы никогда.
+    const first = Array.from({ length: 50 }, (_, at) => ({ id: at }));
+    const { asked, ask: answer } = replying([page(first, true), page([{ id: 900 }])]);
+    const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
+
+    await list.refresh();
+    await list.scrolled(atBottom());
+
+    expect(asked[1]).toEqual({ method: 'hr.list', payload: { search: '', limit: 50, offset: 50 } });
+    expect(list.rows.at(-1)).toEqual({ id: 900 });
+  });
+
   it('поиск начинает список заново и запоминается', async () => {
-    const { asked, answer } = bridge([page([{ id: 2 }])]);
+    const { asked, ask: answer } = replying([page([{ id: 2 }])]);
     const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
 
     await list.find('Мария');
 
-    expect(asked[0].search).toBe('Мария');
-    expect(asked[0].offset).toBe(0);
+    expect(asked[0].payload.search).toBe('Мария');
+    expect(asked[0].payload.offset).toBe(0);
     expect(list.search).toBe('Мария');
   });
 
@@ -61,19 +68,19 @@ describe('список страницами', () => {
     // Человек, стоящий на четвёртой сотне, иначе отбрасывался бы в начало
     // каждой правкой в карточке.
     const many = Array.from({ length: 120 }, (_, i) => ({ id: i }));
-    const { asked, answer } = bridge([page(many), page(many)]);
+    const { asked, ask: answer } = replying([page(many), page(many)]);
     const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
 
     await list.refresh(120);
     await list.again();
 
-    expect(asked[1].limit).toBe(120);
+    expect(asked[1].payload.limit).toBe(120);
   });
 
   it('отказ моста не стирает уже показанное', async () => {
     // Мост отвечает пустотой на любую беду, и стёртый на ней список читался бы
     // как «никого нет».
-    const { answer } = bridge([page([{ id: 1 }]), null]);
+    const { ask: answer } = replying([page([{ id: 1 }]), null]);
     const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
 
     await list.refresh();
@@ -85,7 +92,7 @@ describe('список страницами', () => {
   it('ответ, доехавший после ухода с вкладки, никуда не ложится', async () => {
     // Строки, положенные в снесённое состояние, всплыли бы при следующем заходе
     // вперемешку со свежими.
-    const { answer } = bridge([page([{ id: 1 }])]);
+    const { ask: answer } = replying([page([{ id: 1 }])]);
     const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
     const settled = list.entered();
 
@@ -102,7 +109,7 @@ describe('список страницами', () => {
     // самому поиску отбросилось бы как устаревшее.
     const strangers = Array.from({ length: 50 }, (_, at) => ({ id: at }));
     let answerSearch;
-    const { answer } = bridge([
+    const { ask: answer } = replying([
       page(strangers, true),
       () => new Promise((resolve) => (answerSearch = resolve)),
       page([{ id: 900 }], true),
@@ -124,7 +131,7 @@ describe('список страницами', () => {
     // показать половину списка дважды.
     const strangers = Array.from({ length: 50 }, (_, at) => ({ id: at }));
     let answerMore;
-    const { answer } = bridge([
+    const { ask: answer } = replying([
       page(strangers, true),
       () => new Promise((resolve) => (answerMore = resolve)),
       page(strangers.slice(), true),
@@ -145,7 +152,7 @@ describe('список страницами', () => {
     // вторым, старый ответ показал бы найденное по прежнему запросу.
     let releaseFirst;
     const first = new Promise((resolve) => (releaseFirst = resolve));
-    const { answer } = bridge([() => first, page([{ id: 2 }])]);
+    const { ask: answer } = replying([() => first, page([{ id: 2 }])]);
     const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
 
     const slow = list.find('М');
@@ -161,12 +168,12 @@ describe('заход на вкладку', () => {
   it('зашедшая вкладка читает первую страницу', async () => {
     // Без этого чтения вкладка открывалась бы пустой и ждала первой вести
     // моста, которой может не быть вовсе.
-    const { asked, answer } = bridge([page([{ id: 1 }])]);
+    const { asked, ask: answer } = replying([page([{ id: 1 }])]);
     const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
 
     list.entered();
     await Promise.resolve();
 
-    expect(asked).toEqual([{ method: 'hr.list', search: '', limit: 50, offset: 0 }]);
+    expect(asked).toEqual([{ method: 'hr.list', payload: { search: '', limit: 50, offset: 0 } }]);
   });
 });

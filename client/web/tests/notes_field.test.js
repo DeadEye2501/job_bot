@@ -9,6 +9,8 @@
 // половины договора: что номер и правда передан доводом, а не спрятан в
 // замыкании зовущего, и что поле заводится заново на каждую запись.
 
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { placed } from './markup.js';
@@ -44,5 +46,35 @@ describe('поле заметки', () => {
       expect(opened, use.file).toBeGreaterThan(-1);
       expect(use.before.slice(opened), use.file).not.toContain('{/key}');
     }
+  });
+
+  it('заводится заново по той же записи, номер которой запечатывает', () => {
+    // Открытый `{#key}` сам по себе ничего не обещает: заведи он поле заново
+    // по чужому счёту — по номеру вкладки, по шагу мастера, — и поле
+    // пережило бы смену записи ровно так же, как без него вовсе.
+    for (const use of usages()) {
+      const owner = /\sowner=\{([^}]+)\}/.exec(use.tag);
+      const opened = use.before.lastIndexOf('{#key');
+      const keyed = /\{#key\s+([^}]+)\}/.exec(use.before.slice(opened));
+
+      // Обе половины сперва должны найтись: не найдись ни одна, сравнение
+      // двух пустот прошло бы зелёным и сторожило бы ровно ничего.
+      expect(owner, use.file).not.toBeNull();
+      expect(keyed, use.file).not.toBeNull();
+      expect(keyed[1].trim(), use.file).toBe(owner[1].trim());
+    }
+  });
+});
+
+describe('само поле заметки', () => {
+  it('запечатывает номер записи, а не читает его на отправке', () => {
+    // Сторож здесь читает объявление, и это не от хорошей жизни: следствие
+    // видно только на живом компоненте — набрать, сменить запись, дождаться
+    // прощальной отправки, — а компонентных проверок во фронте нет ни одной.
+    // До них этот сторож ловит хотя бы снятое запечатывание.
+    const source = readFileSync('components/NotesField.svelte', 'utf8');
+
+    expect(source).toMatch(/const\s+owned\s*=\s*untrack\(\s*\(\)\s*=>\s*owner\s*\)/);
+    expect(source).toMatch(/save\(owned,/);
   });
 });

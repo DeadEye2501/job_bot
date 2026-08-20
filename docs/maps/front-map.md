@@ -1213,7 +1213,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 48 файлов
+## tests — 49 файлов
 
 ### tests/alive.test.js (79)
 - —
@@ -1233,11 +1233,15 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist.test.js (201)
 - —
 
-### tests/blacklist_menu_item.test.js (80)
-- * Постановки самого пункта.
+### tests/blacklist_menu_item.test.js (110)
+- * Кому эти слова положены: сам пункт, окошко ручного занесения и кнопка на * вкладке отсева. Всем прочим — нет: там это была бы четвёртая копия.
 
 ### tests/bridge.test.js (161)
 - —
+
+### tests/bridge_stub.js (16)
+- * Мост, отвечающий заготовленным по очереди; зовы копятся в `asked`.
+- отдаёт: replying
 
 ### tests/calendar.test.js (50)
 - —
@@ -1254,8 +1258,8 @@ body, html, button, body, .material-symbols-outlined
 ### tests/card_notes.test.js (54)
 - * Карточка с заметкой, записывающая всё, что с ней сделали.
 
-### tests/card_read.test.js (81)
-- * Подставной мост, отвечающий заготовленным и помнящий, о чём спрашивали.
+### tests/card_read.test.js (69)
+- —
 
 ### tests/card_save.test.js (57)
 - * Карточка, записывающая всё, что с ней сделали.
@@ -1272,13 +1276,13 @@ body, html, button, body, .material-symbols-outlined
 ### tests/companies.test.js (141)
 - —
 
-### tests/dates.test.js (100)
+### tests/dates.test.js (111)
 - —
 
 ### tests/events.test.js (205)
 - * Мост, отвечающий заготовленным, а на исходе — закрытой очередью.
 
-### tests/experience.test.js (130)
+### tests/experience.test.js (108)
 - —
 
 ### tests/flash.test.js (34)
@@ -1303,7 +1307,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/markup.test.js (60)
 - —
 
-### tests/notes_field.test.js (48)
+### tests/notes_field.test.js (80)
 - * Файлы разметки, ставящие поле заметки, вместе с их содержимым.
 
 ### tests/one_write.test.js (139)
@@ -1315,8 +1319,8 @@ body, html, button, body, .material-symbols-outlined
 ### tests/outside.test.js (122)
 - * Узел, считающий своими только перечисленные цели.
 
-### tests/paged_list.test.js (172)
-- * Подставной мост, отвечающий заготовленным и помнящий, о чём спрашивали.
+### tests/paged_list.test.js (179)
+- * Прокрутка, доехавшая до низа списка.
 
 ### tests/paging.test.js (61)
 - —
@@ -1327,7 +1331,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/picker.test.js (64)
 - —
 
-### tests/profile.test.js (103)
+### tests/profile.test.js (115)
 - —
 
 ### tests/provider.test.js (107)

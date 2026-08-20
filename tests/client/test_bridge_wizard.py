@@ -99,7 +99,10 @@ async def test_a_saved_model_counts_as_a_step(
     answer = await ask(api.wizard.state)
 
     assert 2 in answer["ok"]["completed"]
-    assert answer["ok"]["chat"]["model"] == runtime_settings.chat.model
+    # С литералом фабрики, а не с настройками: обе стороны читали бы
+    # один объект, и мост, отдающий вместо записанного что угодно из тех же
+    # настроек, прошёл бы зелёным.
+    assert answer["ok"]["chat"]["model"] == "qwen"
 
 
 async def test_a_saved_embedding_model_counts_as_its_own_step(

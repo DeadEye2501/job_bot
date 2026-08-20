@@ -19,8 +19,16 @@ import re
 from pathlib import Path
 
 from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
+from backend.domain.verdict import (
+    EMPTY_SKIP_REASON,
+    LLM_SKIP_PREFIX,
+    TRASH_SKIP_PREFIX,
+    TRUNCATED_SKIP_REASON,
+    decide_vacancy_status,
+)
 from backend.models.enums import BotMode, VacancyStatus
 from backend.models.settings import BLACKLIST_KINDS
+from tests.factories import parsed_vacancy
 
 
 STATE = Path(__file__).resolve().parents[2] / "client" / "web" / "state"
@@ -46,6 +54,63 @@ def _strings(module: str, name: str) -> list[str]:
 def _values(module: str, name: str) -> list[str]:
     """Значения перечня, объявленного парами «значение — подпись»."""
     return re.findall(r"value: '([^']*)'", _array(module, name))
+
+
+def _skip_reasons_the_backend_writes() -> set[str]:
+    """Причины пропуска, какими их пишет сам приговор, а не переписанный список.
+
+    Две из четырёх сочиняются на месте, литералами в теле, — их и берём у
+    приговора зовом: переписанные сюда руками, они разошлись бы с ним молча.
+    """
+    parsed = parsed_vacancy()
+    _, blocked = decide_vacancy_status(
+        parsed, score=100, blacklist_match="Контур", threshold=0
+    )
+    _, low = decide_vacancy_status(parsed, score=-5, blacklist_match=None, threshold=0)
+    return {
+        blocked,
+        low,
+        EMPTY_SKIP_REASON,
+        TRUNCATED_SKIP_REASON,
+        # Мусор и отказ модели собирает разбор (`flows/parse.py`) из приставки
+        # и слов модели; сами приставки объявлены рядом с приговором.
+        f"{TRASH_SKIP_PREFIX}реклама",
+        f"{LLM_SKIP_PREFIX}не вакансия",
+    }
+
+
+def test_the_window_understands_every_skip_reason_the_backend_writes() -> None:
+    """Каждую причину пропуска окно узнаёт и переводит человеку.
+
+    Приставку пишет бэкенд, а раскладывает её на слова окно — по своему
+    списку приставок и по образцу оценки. Не узнанную оно показывает как
+    есть: человек читает в ленте «blacklist: Контур» вместо «Отсев: Контур»,
+    а при новой приставке — сырой технический код целиком.
+    """
+    source = (STATE / "vacancy_card.js").read_text(encoding="utf-8")
+    known = set(re.findall(r"starts: '([^']*)'", source))
+    known |= set(re.findall(r"startsWith\('([^']*)'\)", source))
+    score = re.search(r"SCORE_SKIP = /(.+)/i;", source)
+    assert score is not None, "в vacancy_card.js не нашлось образца оценки"
+
+    for reason in _skip_reasons_the_backend_writes():
+        # Образец уезжает в питон как есть: классы знаков у обоих пишутся
+        # одинаково, и переводить тут нечего.
+        recognised = any(reason.startswith(one) for one in known) or re.match(
+            score.group(1), reason, re.IGNORECASE
+        )
+        assert recognised, f"окно не узнаёт причину пропуска {reason!r}"
+
+
+def test_work_formats_are_the_same_on_both_screens() -> None:
+    """Форматы работы у анкеты и у отбора вакансий — одни и те же значения.
+
+    Подписи и порядок у них свои: в анкете человек описывает себя, в отборе
+    ищет. Значения же уезжают на мост обоими экранами, и разойдись они —
+    отбор молча перестал бы находить то, что анкета записала.
+    """
+    chosen = _values("vacancy_filter.js", "REMOTE_CHOICES")
+    assert sorted(one for one in chosen if one) == sorted(_values("profile.js", "WORK_FORMATS"))
 
 
 def test_statuses_match() -> None:
