@@ -35,7 +35,7 @@
 
 <div class="cnt-layout">
   <section class="cnt-list-pane">
-    <div class="cnt-list-toolbar">{@render toolbar()}</div>
+    <div class="bar cnt-list-toolbar">{@render toolbar()}</div>
 
     <div class="cnt-list" onscroll={onlistscroll}>
       {#if !loaded}

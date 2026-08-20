@@ -63,7 +63,7 @@
 - —
 - принимает: ask
 
-### app/ProfileExperience.svelte (153)
+### app/ProfileExperience.svelte (140)
 - —
 - принимает: ask
 
@@ -163,7 +163,7 @@
 - принимает: blocked, close, onblock, onunblock
 - берёт: ./MenuItem.svelte
 
-### components/BlacklistRow.svelte (118)
+### components/BlacklistRow.svelte (120)
 - —
 - принимает: row, onedit, ontoggle, onremove
 - берёт: ./RowToggle.svelte
@@ -217,7 +217,7 @@
 - Открывать нечего, когда файла нет на диске: система показала бы свою ошибку вместо нашей строки «файл не найден».
 - принимает: meta, onreplace, onopen
 
-### components/DatePicker.svelte (145)
+### components/DatePicker.svelte (149)
 - —
 - принимает: value, onpick, disabled, up
 
@@ -229,7 +229,7 @@
 - —
 - принимает: options, value, onpick
 
-### components/ExperienceCard.svelte (145)
+### components/ExperienceCard.svelte (147)
 - Нажимается вся шапка, а не одна стрелка: свёрнутых карточек столбик, и целиться в значок ради раскрытия человеку не за что.
 - принимает: exp, known, open, ontoggle, onedit, onremove
 - берёт: ./BulletList.svelte, ./DatePicker.svelte, ./SkillPicker.svelte
@@ -310,7 +310,7 @@
 - Номер учётной записи — только цифры: на телефоне открывается цифровая раскладка, а мост всё равно приводит его к числу.
 - принимает: draft
 
-### components/NotesField.svelte (66)
+### components/NotesField.svelte (68)
 - —
 - принимает: value, placeholder, delay, owner, save
 
@@ -351,7 +351,7 @@
 - принимает: id, chips, text, oncopy, onclose
 - берёт: ./ModalHead.svelte, ./ModalShell.svelte
 
-### components/RowToggle.svelte (35)
+### components/RowToggle.svelte (37)
 - —
 - принимает: checked, disabled, title, ontoggle
 
@@ -407,7 +407,7 @@
 - принимает: counts, onpick
 - берёт: ./DonutChart.svelte
 
-### components/StatusPicker.svelte (75)
+### components/StatusPicker.svelte (77)
 - Заперты на время записи обе кнопки внизу: пока ответ в пути, отмена оставила бы человека думать, что перехода не было, — а он уже уехал. Escape при этом ловится на всё окно, а не в одном поле: окошко открывают нажатием по пилюле, и фокус в этот миг стоит на ней, а не в причине.
 - принимает: status, saving, wrap, onapply, oncancel
 - берёт: ./ModalKeys.svelte
@@ -522,9 +522,9 @@
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
 - отдаёт: asIso, dayOf, isoDay, padded, shortDate, showDate, showStamp, validDate
 
-### state/experience.js (47)
+### state/experience.js (71)
 - * Период работы для шапки карточки. * * Месяц и год без дня: места работы различают по месяцам, а день удлиняет * строку вдвое. Открытый конец назван словами — по нему и читают, работает * человек здесь сейчас или нет.
-- отдаёт: cardTitle, experienceReady, period
+- отдаёт: cardTitle, experienceGoing, experienceReady, period
 
 ### state/flash.js (24)
 - * Заводит отметку, которая гаснет сама. * * Второе зажигание подряд отсчёт продлевает, а не гасит: быстрая правка двух * полей иначе тушила бы рамку по времени первого, и вторая запись выглядела бы * незаписанной.
@@ -630,7 +630,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: plural
 
-## styles — 88 файлов
+## styles — 89 файлов
 
 ### styles/accent-fill.css (16)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре. Одним правилом на три места, а не тремя одинаковыми: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -648,6 +648,11 @@
 - Отказ отложенной записи: коробка под формой вкладки анкеты. Стоит под формой, а не плашкой поверх экрана: анкету заполняют сверху вниз, и до последнего обязательного поля каждая запись законно отказана — плашка била бы на каждом поле. Рамкой и подложкой, а не голой строкой: строка под длинной формой теряется среди подписей полей.
 - селекторы (1): .autosave-error
 - берёт: --danger-border, --danger-wash, --err
+
+### styles/bar.css (17)
+- Полоса: ряд, отбитый снизу чертой и подложкой. Так стоят шапка окна, полоса над списком контактов и над списком вакансий, строка поиска в окне выбора. Полоса не прокручивается вместе с тем, что под ней: к ней возвращаются, пролистав список или дочитав текст. Своим файлом, а не в оформлении каждого места: форма у них одна и та же — четыре объявления из четырёх, — а различаются они просветом и отступами, потому что и содержимое разное: у шапки окна значок с заголовком, у полосы списка поле поиска и кнопки. Своё каждый и дописывает.
+- селекторы (1): .bar
+- берёт: --bg-tertiary, --border
 
 ### styles/base.css (75)
 - Основание страницы: то, что верно на ней везде и не принадлежит ни одному блоку. Всё остальное оформление лежит файлом на блок рядом. Сюда попадает только то, у чего своего блока нет: сама страница, сброс чужих умолчаний и договор о шрифте — и текста, и значков.
@@ -853,7 +858,7 @@ body, html, button, body, .material-symbols-outlined
 - Экран журнала: панель сверху и список записей под ней. Что стоит внутри — пилюли и строки — своими файлами.
 - селекторы (5): .logs-toolbar, .logs-level-pills, .logs-toolbar-gap, .logs-auto-refresh, .logs-list
 
-### styles/master-detail.css (64)
+### styles/master-detail.css (62)
 - Каркас «список слева, подробности справа» — общий у контактов и вакансий. Своим файлом, потому что раскладка одна на два раздела, а написана была дважды: под приставкой `cnt-` и под `vac-`. Ширина панели стояла двумя числами в двух файлах, и разъехались бы они молча — а разделы эти стоят соседними вкладками одного окна, и разницу видно глазом. Селекторы сгруппированы, а не сведены к общему имени: имена классов несущие — по ним разметка и оформление раздела ищутся поиском, — и переименование стоило бы дороже, чем даёт. Что осталось у каждого раздела своим: подложка подробностей (у вакансий отступы плотнее — строка там гуще), пустые состояния (у вакансий это центрованный столбик со значком, у контактов простой абзац) и всё содержимое строки.
 - селекторы (5): .cnt-layout,
 .vacancies-layout, .cnt-list-pane,
@@ -861,7 +866,7 @@ body, html, button, body, .material-symbols-outlined
 .vac-list-toolbar, .cnt-list,
 .vac-list, .cnt-hr-row.selected,
 .vac-row.selected
-- берёт: --accent, --bg-secondary, --bg-tertiary, --border, --selected-bg
+- берёт: --accent, --bg-secondary, --border, --selected-bg
 
 ### styles/menu.css (72)
 - Меню действий: что стоит внутри списка под кнопкой-значком. Оправа окошка — общая, в popover.css.
@@ -882,9 +887,9 @@ body, html, button, body, .material-symbols-outlined
 .hr-mini-name, .vac-mini-when, .hr-mini-row .hr-avatar, .hr-mini-meta, .hr-mini-go, .mini-list-empty, .mini-list-more
 - берёт: --accent, --bg-tertiary, --border, --selected-bg, --text-primary, --text-tertiary
 
-### styles/modal.css (151)
+### styles/modal.css (172)
 - Окно поверх окна: затемнение на весь экран и коробка по центру.
-- селекторы (19): .modal-backdrop, .modal-dialog, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-actions,
+- селекторы (21): .modal-backdrop, .modal-dialog, .modal-dialog.narrow, .modal-dialog.narrow .modal-body, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-actions,
 .modal-footer, .modal-footer, .modal-footer .btn, .modal-footer .btn .material-symbols-outlined, .modal-subtitle, .modal-error
 - берёт: --bg-secondary, --bg-tertiary, --border, --danger, --scrim, --shadow-modal, --text-primary, --text-secondary, --text-tertiary
 
@@ -926,7 +931,7 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (7): .pick, .pick-btn, .pick-btn .material-symbols-outlined, .pick-panel, .pick-list, .pick-list .checkbox-row, .pick-list .empty-note
 - берёт: --bg-tertiary, --border, --shadow-dropdown, --text-primary, --text-tertiary
 
-### styles/picker.css (154)
+### styles/picker.css (152)
 - Окно выбора: полоса поиска, список кандидатов и строка заведения под ним. Шапка, тело и подвал — общие, в modal.css; кружок с именами — в contact-block.css.
 - селекторы (22): .vac-picker-modal, .picker-search-bar, .picker-search-bar .search-box, .picker-search-bar .search-input, .picker-list, .picker-empty, .picker-row, .picker-row:hover, .picker-row.selected, .picker-row.current, .picker-row.current .picker-name, .picker-row.blocked, .picker-info, .picker-name, .picker-current-mark, .picker-sub, .picker-meta, .vac-count, .picker-create, .picker-create-toggle, .picker-create-toggle:hover, .picker-create-toggle .material-symbols-outlined
 - берёт: --accent, --accent-hover-faint, --accent-row-current, --accent-row-hover, --bg-tertiary, --border, --selected-bg, --text-primary, --text-secondary, --text-tertiary
@@ -1187,7 +1192,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/events.test.js (205)
 - * Мост, отвечающий заготовленным, а на исходе — закрытой очередью.
 
-### tests/experience.test.js (93)
+### tests/experience.test.js (130)
 - —
 
 ### tests/flash.test.js (34)

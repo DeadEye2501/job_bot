@@ -6,7 +6,7 @@
   let { icon, title, meta = '', onclose } = $props();
 </script>
 
-<div class="modal-head">
+<div class="bar modal-head">
   <span class="material-symbols-outlined">{icon}</span>
   <div class="modal-title">
     {title}

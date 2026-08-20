@@ -219,7 +219,7 @@
 
 <div class="vacancies-layout">
   <section class="vac-list-pane">
-    <div class="vac-list-toolbar" bind:this={bar}>
+    <div class="bar vac-list-toolbar" bind:this={bar}>
       <SearchBox value={search} placeholder="Поиск" onsearch={find} />
 
       <button

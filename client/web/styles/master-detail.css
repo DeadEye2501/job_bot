@@ -33,15 +33,13 @@
   background: var(--bg-secondary);
 }
 
-/* Полоса над списком: поиск, заведение и отбор. */
+/* Полоса над списком: поиск, заведение и отбор. Сама полоса — общая, в
+   bar.css; здесь её просвет и отступы: панель списка узкая, и всё, что в ней
+   стоит, жмётся плотнее. */
 .cnt-list-toolbar,
 .vac-list-toolbar {
-  display: flex;
-  align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-tertiary);
 }
 
 /* Ездит только список: шапка с поиском и отбором нужна как раз тогда, когда
