@@ -169,5 +169,4 @@ describe('заход на вкладку', () => {
 
     expect(asked).toEqual([{ method: 'hr.list', search: '', limit: 50, offset: 0 }]);
   });
-
 });
