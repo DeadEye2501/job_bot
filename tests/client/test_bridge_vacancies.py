@@ -12,6 +12,45 @@ from tests.dbio import put
 from tests.factories import company_row, status_history_row, vacancy_row
 
 
+async def test_the_filter_menus_come_by_their_own_ask(api, ask, session_factory):
+    """Перечни для меню фильтра спрашивают своим зовом, а не вместе со списком.
+
+    От поиска и страницы они не зависят вовсе: меню показывает все компании и
+    все каналы, какие есть, иначе отбор сжимал бы их до того, что уцелело в
+    выдаче. А список окно перечитывает на каждое нажатие клавиши в поиске — и
+    приезжай перечни вместе с ним, каждый знак стоил бы лишнего полного прохода
+    по таблице вакансий.
+    """
+    contour = company_row(name="Контур")
+    await put(session_factory, contour)
+    await put(
+        session_factory,
+        vacancy_row(title="Питонист", company_id=contour.id),
+        vacancy_row(title="Не найдётся", company_name="Яндекс"),
+    )
+
+    answer = await ask(api.vacancies.filter_options)
+
+    assert answer["ok"]["filter_options"]["companies"] == ["Контур", "Яндекс"]
+    # И второе следствие: со списком они больше не едут. Верни их туда — и
+    # каждый набранный в поиске знак снова стоил бы полного прохода по таблице,
+    # а прогон остался бы зелёным.
+    listed = await ask(api.vacancies.list)
+    assert "filter_options" not in listed["ok"]
+
+
+async def test_a_card_asked_by_a_broken_number_says_the_fields_are_wrong(api, ask):
+    """Негодный номер карточки отбивают как негодное поле, а не как пропажу.
+
+    Отказы эти разные: «вакансии нет» человек читает так, что строку снесли, и
+    идёт перечитывать список; «неверные поля» значит, что сломалось окно. Уйди
+    номер в запрос к базе как есть — оттуда вернулось бы первое.
+    """
+    answer = await ask(api.vacancies.detail, "не число")
+
+    assert answer["fail"] == "fields"
+
+
 async def test_the_list_carries_the_fields_the_pane_draws(
     api, ask, session_factory
 ):

@@ -928,17 +928,17 @@ First-run bootstrap: ensure DB schema exists.
 - `def _log_parsed(parsed: ParsedVacancy) -> None` (10)
 - `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, known_skills=None) -> tuple[ParsedVacancy | None, str | None]` (50)
 
-### `backend/log_buffer.py` — 156 строк
+### `backend/log_buffer.py` — 168 строк
 
 Журнал в памяти для экрана «Логи»: кольцо записей и снимок для окна.
 
 Зависит от: `backend.log_secrets`
 
-- `class LogBufferHandler(logging.Handler)` (95)
+- `class LogBufferHandler(logging.Handler)` (107)
   - `def emit(self, record: logging.LogRecord) -> None` (33)
   - `def handleError(self, record: logging.LogRecord) -> None` (6)
   - `def snapshot(self) -> list[dict]` (3)
-  - `def page(self, limit: int) -> dict` (32)
+  - `def page(self) -> dict` (44)
   - `def clear(self) -> int` (5)
 - `def install() -> LogBufferHandler` (23)
 - `def get_handler() -> LogBufferHandler` (2)
@@ -1965,16 +1965,16 @@ Runtime settings layer.
 
 - `class Hub` (38)
 
-### `client/bridge/journal.py` — 119 строк
+### `client/bridge/journal.py` — 106 строк
 
 Системный журнал в окне: страница записей, подписка, очистка.
 
-Зависит от: `backend.incoming`, `backend.log_buffer`, `client.bridge.answer`, `client.bridge.refusals`
+Зависит от: `backend.log_buffer`, `client.bridge.answer`, `client.bridge.refusals`
 
 - `def close_journal() -> None` (9)
-- `class Journal` (88)
+- `class Journal` (79)
   - `def _open_journal(self) -> None` (4)
-  - `def logs(self, payload: dict | None=None) -> dict` (30)
+  - `def logs(self) -> dict` (21)
     - `async def run() -> dict` (2)
   - `def watch_logs(self, subscribed: bool) -> dict` (12)
   - `def clear_logs(self) -> dict` (11)
@@ -2190,35 +2190,39 @@ Runtime settings layer.
 - `def _probed(task: Future) -> None` (16)
 - `def _after(asked) -> int | None` (21)
 
-### `client/bridge/vacancies.py` — 206 строк
+### `client/bridge/vacancies.py` — 237 строк
 
 Экран «Вакансии»: список, карточка и правки в них.
 
 Зависит от: `backend.domain.scoring`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.hub`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.vacancy_actions`, `client.bridge.vacancy_filter`, `client.bridge.vacancy_links`, `client.bridge.wire`
 
-- `class Vacancies(VacancyActions, VacancyLinks)` (179)
-  - `def list(self, payload: dict | None=None) -> dict` (17)
-  - `async def _listed(self, filters) -> dict` (17)
-  - `def detail(self, vacancy_id: int) -> dict` (23)
+- `def _typed_text(raw) -> str | None` (8)
+- `class Vacancies(VacancyActions, VacancyLinks)` (200)
+  - `def list(self, payload: dict | None=None) -> dict` (15)
+  - `def filter_options(self) -> dict` (19)
+    - `async def run() -> dict` (4)
+  - `async def _listed(self, filters) -> dict` (15)
+  - `def detail(self, vacancy_id) -> dict` (31)
     - `async def run() -> dict` (13)
-  - `def save_notes(self, payload: dict) -> dict` (27)
+  - `def save_notes(self, payload: dict) -> dict` (25)
     - `async def run() -> dict` (10)
   - `def save_history_explanation(self, payload: dict) -> dict` (38)
     - `async def run() -> dict` (21)
-  - `def change_status(self, payload: dict) -> dict` (36)
+  - `def change_status(self, payload: dict) -> dict` (35)
     - `async def run() -> dict` (16)
 
-### `client/bridge/vacancy_actions.py` — 97 строк
+### `client/bridge/vacancy_actions.py` — 113 строк
 
 Действия над вакансией: перезапуск разбора, отклик, удаление.
 
 Зависит от: `backend.repository`, `client.bridge.answer`, `client.bridge.refusals`
 
-- `class VacancyActions` (83)
-  - `def rerun(self, payload: dict) -> dict` (25)
-  - `def send_application(self, payload: dict) -> dict` (27)
+- `def _asked_vacancy(payload: dict, slot: str) -> tuple[int | None, dict | None]` (12)
+- `class VacancyActions` (80)
+  - `def rerun(self, payload: dict) -> dict` (24)
+  - `def send_application(self, payload: dict) -> dict` (26)
     - `async def sending() -> str` (3)
-  - `def delete(self, payload: dict) -> dict` (23)
+  - `def delete(self, payload: dict) -> dict` (22)
     - `async def run() -> dict` (14)
 
 ### `client/bridge/vacancy_filter.py` — 55 строк
@@ -2229,26 +2233,27 @@ Runtime settings layer.
 
 - `def read_vacancy_filter(payload: dict, page: Page) -> VacancyFilter` (34)
 
-### `client/bridge/vacancy_links.py` — 172 строк
+### `client/bridge/vacancy_links.py` — 194 строк
 
 Привязка вакансии к человеку и к компании: подборщики и их правки.
 
 Зависит от: `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.companies`, `client.bridge.form_payloads`, `client.bridge.hr`, `client.bridge.pickers`, `client.bridge.refusals`
 
-- `class VacancyLinks` (145)
-  - `def hr_picker(self, payload: dict) -> dict` (14)
-  - `def company_picker(self, payload: dict) -> dict` (9)
-  - `def link_hr(self, payload: dict) -> dict` (20)
-    - `async def run() -> dict` (5)
-  - `def link_company(self, payload: dict) -> dict` (23)
-    - `async def run() -> dict` (12)
+- `class VacancyLinks` (140)
+  - `def hr_picker(self, payload: dict) -> dict` (8)
+  - `def company_picker(self, payload: dict) -> dict` (3)
+  - `def _open_picker(self, slot: str, payload: dict) -> dict` (11)
+  - `def link_hr(self, payload: dict) -> dict` (7)
+  - `def link_company(self, payload: dict) -> dict` (3)
+  - `def _link(self, slot: str, payload: dict) -> dict` (15)
+    - `async def run() -> dict` (3)
   - `def create_hr(self, payload: dict) -> dict` (7)
   - `def create_company(self, payload: dict) -> dict` (3)
   - `def _created(self, slot: str, payload: dict) -> dict` (26)
     - `async def run() -> dict` (5)
   - `async def _picker(self, kind, vacancy_id: int, search: str | None) -> dict` (6)
   - `async def _listing(self, session, kind, vacancy_id: int, search: str | None) -> dict` (12)
-  - `async def _linked(self, setting, vacancy_id: int, other_id: int | None, action: str)` (10)
+  - `async def _linked(self, setting, vacancy_id: int, other_id: int | None, action: str, missing: str)` (22)
 
 ### `client/bridge/wipe.py` — 101 строк
 
@@ -3364,7 +3369,7 @@ Runtime settings layer.
 
 - `def _parsed(**fields) -> httpx.Response` (3)
 
-### `tests/backend/test_log_buffer.py` — 498 строк ⚠ подошёл к 300
+### `tests/backend/test_log_buffer.py` — 501 строк ⚠ за пределом 500
 
 Следствия, которые наблюдают тесты журналирования.
 
@@ -4339,13 +4344,13 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/client/test_bridge_journal.py` — 104 строк
+### `tests/client/test_bridge_journal.py` — 124 строк
 
 Следствия домена журнала: что человек видит на экране записей.
 
 Зависит от: `backend.log_buffer`
 
-Тестов: 4
+Тестов: 5
 
 - `def journal()` (20)
 
@@ -4461,13 +4466,13 @@ Runtime settings layer.
 Тестов: 8
 
 
-### `tests/client/test_bridge_vacancies.py` — 277 строк
+### `tests/client/test_bridge_vacancies.py` — 316 строк ⚠ подошёл к 300
 
 Следствия слотов вакансий, которым хватает одной базы.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 14
+Тестов: 16
 
 
 ### `tests/client/test_bridge_vacancy_actions.py` — 262 строк
@@ -4482,13 +4487,13 @@ Runtime settings layer.
   - `async def _put()` (8)
     - `async def broken(vacancy_id)` (2)
 
-### `tests/client/test_bridge_vacancy_links.py` — 188 строк
+### `tests/client/test_bridge_vacancy_links.py` — 228 строк
 
 Следствия связывания вакансии с HR и компанией — вместе с подборщиками.
 
 Зависит от: `tests.dbio`, `tests.factories`
 
-Тестов: 9
+Тестов: 11
 
 
 ### `tests/client/test_bridge_wipe.py` — 149 строк

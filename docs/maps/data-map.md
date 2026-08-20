@@ -1055,7 +1055,6 @@
 
 ### `client/bridge/journal.py`
 
-- `_LOGS_PAGE` = `1000`
 - `_LOGS_INTERVAL_S` = `1.0`
 
 ### `client/bridge/lifespan.py`
@@ -1158,7 +1157,10 @@
 
 ### `client/bridge/vacancy_links.py`
 
+- `logger` = `logging.getLogger(__name__)`
 - `_CREATING` = `словарь из 2`
+- `_PICKING` = `словарь из 2`
+- `_LINKING` = `словарь из 2`
 
 ### `client/bridge/wipe.py`
 
