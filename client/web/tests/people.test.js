@@ -5,8 +5,11 @@ import { describe, expect, it } from 'vitest';
 import {
   named,
   personCandidate,
+  personHead,
   personLine,
   personName,
+  personSub,
+  personTitle,
   unreadLine,
 } from '../state/people.js';
 
@@ -137,5 +140,51 @@ describe('строка кандидата в окне выбора', () => {
     // Снимок приходит не от всякой учётной записи: на его месте встают буквы
     // имени, и решает это сам кружок.
     expect(personCandidate({ ...PERSON, avatar: undefined }).avatar).toBe(null);
+  });
+});
+
+describe('чем подписан человек там, где имени может не быть', () => {
+  it('в строке списка ник заменяет имя', () => {
+    // Строка списка одна, и ник в ней стоит на месте имени: под ним места нет.
+    expect(personTitle({ id: 1, name: '', telegram_username: 'irina_hr' })).toEqual({
+      name: '@irina_hr',
+      named: true,
+    });
+  });
+
+  it('в строке списка безымянного зовут прочерком, а не номером', () => {
+    // Номер тут не читается никак: строка стоит среди имён, и «Человек #7»
+    // человек принимает за имя.
+    expect(personTitle({ id: 7, name: '', telegram_username: '' })).toEqual({
+      name: '— без имени —',
+      named: false,
+    });
+  });
+
+  it('в шапке карточки ник именем не считается', () => {
+    // Ник стоит там своей строкой ниже: поставь его и сверху, человек читал бы
+    // одно и то же дважды.
+    expect(personHead({ id: 1, name: '', telegram_username: 'irina_hr' })).toEqual({
+      name: '— без имени —',
+      named: false,
+    });
+  });
+
+  it('в шапке карточки имя показывают как есть', () => {
+    expect(personHead({ id: 1, name: 'Ирина', telegram_username: '' })).toEqual({
+      name: 'Ирина',
+      named: true,
+    });
+  });
+});
+
+describe('половины подписи человека', () => {
+  it('ник и компания названы одними словами со строкой подборщика', () => {
+    // Строка списка собирает их сама — по частям, ради собственного вида, — и
+    // разойдись слова, один человек читался бы в двух местах как двое.
+    const one = { telegram_username: '', last_company_name: null };
+
+    expect(personSub(one)).toEqual({ handle: 'без ника', company: 'без компании' });
+    expect(personLine({ ...one, id: 1, name: 'Ирина' }).sub).toBe('без ника · без компании');
   });
 });

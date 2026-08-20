@@ -87,7 +87,7 @@ describe('список страницами', () => {
     // вперемешку со свежими.
     const { answer } = bridge([page([{ id: 1 }])]);
     const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
-    const settled = list.mounted();
+    const settled = list.entered();
 
     settled();
     await list.refresh();
@@ -155,4 +155,19 @@ describe('список страницами', () => {
 
     expect(list.rows).toEqual([{ id: 2 }]);
   });
+});
+
+describe('заход на вкладку', () => {
+  it('зашедшая вкладка читает первую страницу', async () => {
+    // Без этого чтения вкладка открывалась бы пустой и ждала первой вести
+    // моста, которой может не быть вовсе.
+    const { asked, answer } = bridge([page([{ id: 1 }])]);
+    const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
+
+    list.entered();
+    await Promise.resolve();
+
+    expect(asked).toEqual([{ method: 'hr.list', search: '', limit: 50, offset: 0 }]);
+  });
+
 });

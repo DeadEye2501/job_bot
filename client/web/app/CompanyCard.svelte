@@ -16,10 +16,12 @@
   import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
   import { living } from '$state/alive.js';
-  import { blockNote, unblockNote } from '$state/blacklist.js';
-  import { cardDrop } from '$state/card_drop.js';
+  import { cardBlocking } from '$state/card_block.js';
+  import { cardFinish } from '$state/card_finish.js';
+  import { cardNotes } from '$state/card_notes.js';
   import { cardRead } from '$state/card_read.js';
-  import { companyCandidate, companyLine, siteHref } from '$state/companies.js';
+  import { cardSave } from '$state/card_save.js';
+  import { companyCandidate, companyLine, companyTitle, siteHref } from '$state/companies.js';
   import { freshAnswer } from '$state/fresh.js';
 
   // Пауза перед записью заметки — та же, что ждало прежнее окно.
@@ -48,7 +50,7 @@
     alive: () => alive.now,
   });
 
-  const dropCard = cardDrop({
+  const dropCard = cardFinish({
     ask: (...args) => ask(...args),
     method: 'companies.delete',
     note: 'Компания удалена',
@@ -57,7 +59,42 @@
     onclose: () => onclose(),
   });
 
+  const mergeCard = cardFinish({
+    ask: (...args) => ask(...args),
+    method: 'companies.merge',
+    note: 'Компании слиты',
+    say: (text) => say(text),
+    onchanged: () => onchanged(),
+    onclose: () => onclose(),
+  });
+
+  const saveField = cardSave({
+    ask: (...args) => ask(...args),
+    method: 'companies.update',
+    reread: () => refresh(companyId),
+    onchanged: () => onchanged(),
+  });
+
+  const saveNotes = cardNotes({
+    ask: (...args) => ask(...args),
+    method: 'companies.update',
+    payload: (id, text) => ({ company_id: id, notes: text }),
+    alive: () => alive.now,
+    onchanged: () => onchanged(),
+  });
+
+  const blocking = cardBlocking({
+    ask: (...args) => ask(...args),
+    block: 'companies.block',
+    unblock: 'companies.unblock',
+    female: true,
+    say: (text) => say(text),
+    reread: () => refresh(companyId),
+    onchanged: () => onchanged(),
+  });
+
   const shown = $derived(card ? companyLine({ ...card, id: card.company_id }) : null);
+  const head = $derived(card ? companyTitle(card) : null);
   const chosenName = $derived(chosen ? companyLine(chosen).name : '');
   const site = $derived(card ? siteHref(card.website) : null);
 
@@ -79,30 +116,8 @@
     vacancies = now.vacancies;
   }
 
-  /** Записать правку поля и показать то, что легло на самом деле.
-   *
-   * Перечитываем и после отказа: поля правятся на месте, и отклонённое мостом
-   * значение осталось бы на экране — человек читал бы своё, а в базе лежало бы
-   * прежнее.
-   */
-  async function save(part) {
-    const done = await ask('companies.update', { company_id: companyId, ...part });
-    await refresh(companyId);
-    if (done !== null) onchanged();
-  }
-
-  /** Записать заметку и вернуть то, что легло в базу.
-   *
-   * Карточку не перечитываем: человек мог набрать ещё, пока летел вопрос, и
-   * пришедшее из базы стёрло бы это. Записанным считаем набранное: этот зов
-   * называет только поправленные поля, самой заметки в ответе нет, — а пустая
-   * от пробельной здесь не отличается, обе сводятся к пустоте по дороге.
-   */
-  async function saveNotes(id, text) {
-    const done = await ask('companies.update', { company_id: id, notes: text });
-    if (!alive.now || done === null) return null;
-    onchanged();
-    return text;
+  function save(part) {
+    return saveField({ company_id: companyId, ...part });
   }
 
   /** Поправить название. Пустое не отправляется вовсе: без названия компанию
@@ -114,22 +129,6 @@
       return;
     }
     return save({ name: value });
-  }
-
-  async function block() {
-    const done = await ask('companies.block', companyId);
-    if (done === null) return;
-    say(blockNote(done, true));
-    await refresh(companyId);
-    onchanged();
-  }
-
-  async function unblock() {
-    const done = await ask('companies.unblock', companyId);
-    if (done === null) return;
-    say(unblockNote(done, true));
-    await refresh(companyId);
-    onchanged();
   }
 
   async function drop() {
@@ -145,33 +144,25 @@
   async function merge() {
     const survivor = chosen;
     chosen = null;
-    const done = await ask('companies.merge', {
-      absorbed_id: companyId,
-      survivor_id: survivor.id,
-    });
-    if (done === null) return;
-    asking = null;
-    say('Компании слиты');
-    onchanged();
-    onclose();
+    // Окно выбора гасим только по удаче: отказ оставляет выбранную под рукой,
+    // а закрытое окно заставило бы искать её заново.
+    if (await mergeCard({ absorbed_id: companyId, survivor_id: survivor.id })) asking = null;
   }
 
-  $effect(() => {
-    const settled = alive.mounted();
-    const id = companyId;
-    // Показанное прежней компанией уходит сразу: панель одна, и её числа под
-    // новым именем читались бы как числа новой.
-    card = null;
-    trouble = '';
-    people = [];
-    vacancies = [];
-    refresh(id);
-    loadPeople(id);
-    loadVacancies(id);
-    return () => {
-      settled();
-    };
-  });
+  $effect(() =>
+    alive.entered(() => {
+      const id = companyId;
+      // Показанное прежней компанией уходит сразу: панель одна, и её числа под
+      // новым именем читались бы как числа новой.
+      card = null;
+      trouble = '';
+      people = [];
+      vacancies = [];
+      refresh(id);
+      loadPeople(id);
+      loadVacancies(id);
+    }),
+  );
 </script>
 
 {#if trouble}
@@ -183,7 +174,7 @@
     <Avatar icon="domain" />
 
     <div>
-      <div class="cnt-det-name" class:muted={!card.name}>{card.name || '— без названия —'}</div>
+      <div class="cnt-det-name" class:muted={!head.named}>{head.name}</div>
 
       <div class="cnt-det-sub">
         {#if site === null}
@@ -209,8 +200,8 @@
       mergeLabel="Слить с другой компанией"
       blocked={!!card.blacklist_value}
       onmerge={() => (asking = 'merge')}
-      onblock={block}
-      onunblock={unblock}
+      onblock={() => blocking.block(companyId)}
+      onunblock={() => blocking.unblock(companyId)}
       ondelete={() => (asking = 'delete')}
     />
   </div>

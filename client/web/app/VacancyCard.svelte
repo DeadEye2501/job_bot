@@ -13,7 +13,7 @@
   import VacancyActions from '$components/VacancyActions.svelte';
   import VacancyTimeline from '$components/VacancyTimeline.svelte';
   import { living } from '$state/alive.js';
-  import { cardDrop } from '$state/card_drop.js';
+  import { cardFinish } from '$state/card_finish.js';
   import { cardLinks } from '$state/card_links.js';
   import { freshAnswer } from '$state/fresh.js';
   import { actionBlocks, rawChips } from '$state/vacancy_actions.js';
@@ -42,7 +42,7 @@
   const alive = living();
   const fresh = freshAnswer(() => alive.now);
 
-  const dropCard = cardDrop({
+  const dropCard = cardFinish({
     ask: (...args) => ask(...args),
     method: 'vacancies.delete',
     note: 'Вакансия удалена',
@@ -176,17 +176,18 @@
   }
 
   $effect(() => {
-    const settled = alive.mounted();
-    // Перешли к другой вакансии — прежнюю с глаз долой, не дожидаясь ответа:
-    // поле заметки берёт значение один раз, при заведении, и заведённое над
-    // прежней карточкой держало бы чужую заметку до самого закрытия. Вести о
-    // смене списка сюда не заходят — там вакансия та же, и гасить её нечему.
-    card = null;
+    const settled = alive.entered(() => {
+      // Перешли к другой вакансии — прежнюю с глаз долой, не дожидаясь ответа:
+      // поле заметки берёт значение один раз, при заведении, и заведённое над
+      // прежней карточкой держало бы чужую заметку до самого закрытия. Вести о
+      // смене списка сюда не заходят — там вакансия та же, и гасить её нечему.
+      card = null;
+      refresh();
+    });
     // Вакансию двигает не только это окно: бот разбирает её заново по нашей же
     // просьбе и правит статус по переписке. Весть о смене списка — то же
     // событие, по которому обновляется список под карточкой.
     const deaf = events.on('vacancies_list_changed', refresh);
-    refresh();
     return () => {
       settled();
       deaf();

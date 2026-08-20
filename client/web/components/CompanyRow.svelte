@@ -1,6 +1,6 @@
 <script>
   // Строка компании в списке: значок, имя с подписью, отсев и счёт вакансий.
-  import { companyLine } from '$state/companies.js';
+  import { companyLine, companyTitle } from '$state/companies.js';
 
   import Avatar from './Avatar.svelte';
   import BlacklistMark from './BlacklistMark.svelte';
@@ -8,6 +8,7 @@
   let { company, selected = false, onpick } = $props();
 
   const shown = $derived(companyLine(company));
+  const title = $derived(companyTitle(company));
   // Ни сайта, ни алиасов — про это сказано словами, и слова набраны курсивом:
   // так видно, что это не подпись, а её отсутствие.
   const bare = $derived(!company.website && !company.aliases.length);
@@ -23,8 +24,8 @@
   <Avatar icon="domain" />
 
   <span class="cnt-hr-info">
-    <span class="cnt-hr-name" class:muted={!company.name}>
-      {company.name || '— без названия —'}
+    <span class="cnt-hr-name" class:muted={!title.named}>
+      {title.name}
     </span>
     <span class="cnt-hr-sub">
       {#if bare}<span class="muted">{shown.sub}</span>{:else}{shown.sub}{/if}
