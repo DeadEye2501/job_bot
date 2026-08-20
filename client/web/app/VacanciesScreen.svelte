@@ -9,7 +9,8 @@
 
   import VacancyCard from './VacancyCard.svelte';
   import { living } from '$state/alive.js';
-  import { attempts } from '$state/attempts.js';
+  import { freshAnswer } from '$state/fresh.js';
+  import { takeOpened } from '$state/open_mark.js';
   import { closeOnClickAway } from '$state/outside.js';
   import { VACANCY_PAGE, appended, nearBottom, refreshLimit } from '$state/paging.js';
   import { blankFilter, filterPayload } from '$state/vacancy_filter.js';
@@ -52,22 +53,16 @@
   // отбором.
   let optionsLoaded = $state(false);
 
-  const tries = attempts();
+  const alive = living();
+  const fresh = freshAnswer(() => alive.now);
   // Свой счёт попыток: перечни спрашивают и открытие экрана, и весть о правке
   // списка, а ответы возвращаются вразнобой — лёгший поверх свежего старый убрал
   // бы из меню только что заведённую компанию.
-  const optionTries = attempts();
-  const alive = living();
+  const freshOptions = freshAnswer(() => alive.now);
 
   // Какую вакансию открыть, придя со стороны — из мини-списка в карточке
-  // канала, компании или человека. Отметка гасится сразу: раздел открывают и
-  // просто так, и заново открытая карточка вакансии, которую уже закрыли,
-  // читалась бы как поломка.
-  $effect(() => {
-    if (!open) return;
-    opened = open.id;
-    onopened();
-  });
+  // канала, компании или человека.
+  $effect(() => takeOpened(open, (id) => (opened = id), onopened));
 
   // С каким отбором открыть список, придя из статистики. Поиск и открытая
   // карточка при этом снимаются: человек просил список этого статуса, а не
@@ -94,15 +89,16 @@
    * числом строк, которое уже показано.
    */
   async function refresh(limit = VACANCY_PAGE) {
-    const mine = tries.next();
-    const now = await ask('vacancies.list', {
-      search,
-      sort: sortKey(sort),
-      limit,
-      offset: 0,
-      ...asked,
-    });
-    if (now === null || !alive.now || tries.stale(mine)) return;
+    const now = await fresh(() =>
+      ask('vacancies.list', {
+        search,
+        sort: sortKey(sort),
+        limit,
+        offset: 0,
+        ...asked,
+      }),
+    );
+    if (now === null) return;
     rows = now.vacancies;
     hasMore = now.has_more;
     // Порог отбора приезжает вместе со списком: по нему красится оценка, и
@@ -122,9 +118,8 @@
    * каждый знак стоил бы лишнего полного прохода по таблице вакансий.
    */
   async function askOptions() {
-    const mine = optionTries.next();
-    const now = await ask('vacancies.filter_options');
-    if (now === null || !alive.now || optionTries.stale(mine)) return;
+    const now = await freshOptions(() => ask('vacancies.filter_options'));
+    if (now === null) return;
     options = now.filter_options;
     optionsLoaded = true;
   }

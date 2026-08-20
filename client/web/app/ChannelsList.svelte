@@ -9,8 +9,9 @@
   import RowToggle from '$components/RowToggle.svelte';
   import SearchBox from '$components/SearchBox.svelte';
   import { living } from '$state/alive.js';
-  import { attempts } from '$state/attempts.js';
   import { channelsToggle } from '$state/channels.js';
+  import { freshAnswer } from '$state/fresh.js';
+  import { takeOpened } from '$state/open_mark.js';
   import { nearBottom } from '$state/paging.js';
 
   import ChannelCard from './ChannelCard.svelte';
@@ -27,19 +28,13 @@
   let opened = $state(null);
   let card = $state(null);
 
-  const tries = attempts();
   const alive = living();
+  const fresh = freshAnswer(() => alive.now);
 
   const master = $derived(channelsToggle(rows));
 
   // Какой канал открыть, придя со стороны — из воронки каналов в статистике.
-  // Отметка гасится сразу: вкладку открывают и просто так, и заново открытая
-  // карточка канала, который уже закрыли, читалась бы как поломка.
-  $effect(() => {
-    if (!open) return;
-    opened = open.id;
-    onopened();
-  });
+  $effect(() => takeOpened(open, (id) => (opened = id), onopened));
 
   /** Перечитать список.
    *
@@ -49,9 +44,8 @@
    * не ищет.
    */
   async function refresh() {
-    const mine = tries.next();
-    const now = await ask('channels.list', { search });
-    if (now === null || !alive.now || tries.stale(mine)) return;
+    const now = await fresh(() => ask('channels.list', { search }));
+    if (now === null) return;
     rows = now.channels;
     loaded = true;
   }

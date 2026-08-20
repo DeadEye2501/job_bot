@@ -115,11 +115,7 @@
   }
 
   $effect(() => {
-    const settled = alive.mounted();
-    refresh();
-    return () => {
-      settled();
-    };
+    return alive.entered(refresh);
   });
 </script>
 

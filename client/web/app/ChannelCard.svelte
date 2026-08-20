@@ -12,10 +12,11 @@
   import MenuItem from '$components/MenuItem.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import { living } from '$state/alive.js';
-  import { attempts } from '$state/attempts.js';
   import { blockNote, unblockNote } from '$state/blacklist.js';
+  import { cardDrop } from '$state/card_drop.js';
   import { cardRead } from '$state/card_read.js';
   import { channelName, channelStats, pollBlock } from '$state/channels.js';
+  import { freshAnswer } from '$state/fresh.js';
   import { PAGE, appended, refreshLimit } from '$state/paging.js';
   import { donut } from '$state/stats.js';
   import { telegramHref } from '$state/telegram.js';
@@ -32,14 +33,23 @@
   // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
   // канал в ней переключают нажатием по соседней строке — ответ про прежний,
   // лёгший поверх свежего, показал бы его числа под новым именем.
-  const vacancyTries = attempts();
   const alive = living();
+  const freshVacancies = freshAnswer(() => alive.now);
 
   const readCard = cardRead({
     ask: (...args) => ask(...args),
     method: 'channels.detail',
     trouble: 'Не удалось прочитать канал',
     alive: () => alive.now,
+  });
+
+  const dropCard = cardDrop({
+    ask: (...args) => ask(...args),
+    method: 'channels.delete',
+    note: 'Канал удалён',
+    say: (text) => say(text),
+    onchanged: () => onchanged(),
+    onclose: () => onclose(),
   });
 
   const shown = $derived(card ? channelName({ ...card, id: card.channel_id }) : null);
@@ -64,13 +74,14 @@
    * и запустил.
    */
   async function loadVacancies(id, mode = 'replace') {
-    const mine = vacancyTries.next();
-    const page = await ask('channels.vacancies', {
-      channel_id: id,
-      limit: mode === 'append' ? PAGE : refreshLimit(vacancies.length),
-      offset: mode === 'append' ? vacancies.length : 0,
-    });
-    if (page === null || !alive.now || vacancyTries.stale(mine)) return;
+    const page = await freshVacancies(() =>
+      ask('channels.vacancies', {
+        channel_id: id,
+        limit: mode === 'append' ? PAGE : refreshLimit(vacancies.length),
+        offset: mode === 'append' ? vacancies.length : 0,
+      }),
+    );
+    if (page === null) return;
     vacancies = mode === 'append' ? appended(vacancies, page.vacancies) : page.vacancies;
     hasMore = page.has_more;
   }
@@ -130,10 +141,7 @@
 
   async function drop() {
     asking = false;
-    const done = await ask('channels.delete', channelId);
-    if (done === null) return;
-    onchanged();
-    onclose();
+    await dropCard(channelId);
   }
 
   $effect(() => {
