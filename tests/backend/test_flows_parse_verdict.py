@@ -14,7 +14,9 @@
 вакансию, а не выбросить её.
 """
 
+from backend.domain.verdict import TRUNCATED_SKIP_REASON
 from backend.flows import parse
+from backend.llm.answers import TRUNCATED_TROUBLE
 from backend.models import TrashEvent, Vacancy, VacancyStatus
 from backend.payloads import FitValidation
 from tests.dbio import all_rows, only_row
@@ -177,6 +179,32 @@ async def test_a_validator_without_an_answer_means_unfit(parsing, session_factor
     saved = await only_row(session_factory, Vacancy)
     assert saved.status is VacancyStatus.NOT_FIT
     assert saved.skip_reason == "llm: validation unavailable"
+
+
+async def test_a_verdict_that_never_fits_lands_the_vacancy_for_the_human(
+    parsing, session_factory
+):
+    """Не поместившийся вердикт кладёт строку человеку, а не в вечный круг.
+
+    Объявление к этому мигу разобрано — приговора нет только у пригодности, и
+    переспросить с поднятым потолком модель уже пробовала. Оставь мы строку
+    неразобранной, подбор брал бы её при каждом запуске и платил полным
+    разбором; оставь «новой» — отклик ушёл бы по вакансии, которую никто не
+    проверял.
+    """
+    pipeline, vacancy = parsing
+    pipeline.verdict = None
+    pipeline.fit_trouble = TRUNCATED_TROUBLE
+
+    done = await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs"
+    )
+
+    saved = await only_row(session_factory, Vacancy)
+    assert done is True
+    assert saved.is_parsed is True
+    assert saved.status is VacancyStatus.NOT_FIT
+    assert saved.skip_reason == TRUNCATED_SKIP_REASON
 
 
 async def test_a_verdict_nobody_answered_leaves_the_vacancy_unparsed(

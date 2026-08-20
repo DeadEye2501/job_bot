@@ -8,6 +8,8 @@
 стирается. Канал вакансию опубликовал, но связываться нужно не с ним.
 """
 
+import json
+
 import httpx
 import pytest
 
@@ -225,18 +227,64 @@ async def test_an_answer_cut_by_the_token_limit_is_still_parsed_if_it_can_be():
     assert got.title == "Python-разработчик"
 
 
-async def test_an_answer_cut_before_the_object_names_the_break():
-    """Оборванный ответ, из которого объект не собрался, называет обрыв.
+async def test_an_answer_cut_before_the_object_is_asked_again_with_more_room():
+    """Оборванный ответ переспрашивается с поднятым потолком.
+
+    Обрывается не пост, а ответ: рассуждающая модель тратит потолок на
+    размышление и не успевает выдать объект. Длинному объявлению — длинный
+    стек, длинное описание — обычного потолка не хватает, и второй заход с
+    поднятым даёт ему разобраться вместо вечного перебора.
+    """
+    client = provider(
+        {
+            CHAT: [
+                chat_response('{"title": "Python-разр', finish_reason="length"),
+                chat_json(parsed_vacancy_answer()),
+            ]
+        }
+    )
+
+    parsed, refusal = await parse_vacancy("текст", client, "qwen")
+
+    assert refusal is None
+    assert parsed.title == "Python-разработчик"
+    first, second = (json.loads(one.content)["max_tokens"] for one in client.sent)
+    assert second > first
+
+
+async def test_an_answer_cut_twice_names_the_break():
+    """Оборвавшийся и со второго захода ответ называет обрыв.
 
     Пустой разбор — это приговор «в посте нет вакансии», и по нему строку
     удаляют навсегда. Обрыв приговором не является: модель не договорила, и
-    объявление обязано дождаться следующего захода.
+    что делать дальше, решает зовущий.
     """
     client = provider(
-        {CHAT: chat_response('{"title": "Python-разр', finish_reason="length")}
+        {
+            CHAT: [
+                chat_response('{"title": "Python-разр', finish_reason="length"),
+                chat_response('{"title": "Python-разр', finish_reason="length"),
+            ]
+        }
     )
 
     parsed, refusal = await parse_vacancy("текст", client, "qwen")
 
     assert parsed is None
     assert refusal == "truncated"
+
+
+async def test_a_provider_that_fell_is_not_asked_again():
+    """Упавшего провайдера вторым заходом не добивают.
+
+    Второй заход заведён под обрыв — беду ответа, а не связи. Лежащий
+    провайдер от повтора не поднимется, а объявление и так дождётся следующего
+    захода: беда провайдера временная.
+    """
+    client = provider({CHAT: httpx.Response(500, text="упал")})
+
+    parsed, refusal = await parse_vacancy("текст", client, "qwen")
+
+    assert parsed is None
+    assert refusal.startswith("llm_http_error")
+    assert len(client.sent) == 1

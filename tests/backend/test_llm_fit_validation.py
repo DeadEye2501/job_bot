@@ -172,12 +172,37 @@ async def test_trouble_yields_no_verdict(prepared):
     assert await _check(client) is None
 
 
-async def test_a_cut_answer_is_named_a_trouble_and_not_a_refusal():
-    """Оборванный ответ называется бедой, а не отказом.
+async def test_a_cut_answer_is_asked_again_with_more_room():
+    """Оборванный ответ переспрашивается с поднятым потолком.
+
+    Рассуждающая модель тратит потолок на размышление и не успевает выдать
+    вердикт. Длинному объявлению обычного потолка не хватает, и второй заход с
+    поднятым даёт ему вердикт вместо вечного перебора.
+    """
+    client = provider(
+        {
+            CHAT: [
+                chat_response("{\"verdict\": ", finish_reason="length"),
+                _answer("reject", "требуется геймдев"),
+            ]
+        }
+    )
+
+    validation, trouble = await _asked(client)
+
+    assert trouble is None
+    assert validation.verdict == "reject"
+    first, second = (json.loads(one.content)["max_tokens"] for one in client.sent)
+    assert second > first
+
+
+async def test_an_answer_cut_twice_is_named_a_trouble_and_not_a_refusal():
+    """Оборвавшийся и со второго захода ответ называется бедой, а не отказом.
 
     Обрыв значит, что модель не договорила: вердикта не было вовсе. Прими мы
     его за «не подходит» — вакансия ушла бы в отказ по несостоявшемуся
-    приговору, а вернуть её можно только кнопкой по каждой.
+    приговору. Что делать дальше, решает зовущий: он и записывает строку
+    человеку с названной причиной.
     """
     client = provider({CHAT: chat_response("{\"verdict\": ", finish_reason="length")})
 
@@ -185,6 +210,7 @@ async def test_a_cut_answer_is_named_a_trouble_and_not_a_refusal():
 
     assert validation is None
     assert trouble == "truncated"
+    assert len(client.sent) == 2
 
 
 async def test_the_vacancy_reaches_the_model_behind_a_warning():

@@ -17,7 +17,9 @@ from backend.domain.verdict import (
     EMPTY_SKIP_REASON,
     LLM_SKIP_PREFIX,
     TRASH_SKIP_PREFIX,
+    TRUNCATED_SKIP_REASON,
 )
+from backend.llm.answers import TRUNCATED_TROUBLE
 from backend.llm.fit import validate_vacancy_fit
 from backend.llm.vacancy import parse_vacancy
 from backend.models import Vacancy
@@ -85,6 +87,12 @@ async def _fit_refusal(
         validation.verdict if validation else None,
         validation.reason if validation else None,
     )
+    if trouble == TRUNCATED_TROUBLE:
+        logger.warning(
+            "vacancy %s: вердикт не поместился даже с запасом, отдаю человеку",
+            vacancy_id,
+        )
+        return TRUNCATED_SKIP_REASON, False
     if trouble is not None:
         logger.warning(
             "vacancy %s: вердикт не спросился (%s), оставляю неразобранной",
@@ -149,6 +157,14 @@ async def _parsed_or_dropped(
         channel_username=channel_username,
         known_skills=pipeline.skills_cache,
     )
+    if refusal == TRUNCATED_TROUBLE:
+        logger.warning(
+            "vacancy %s: ответ не поместился даже с запасом, отдаю человеку",
+            vacancy_id,
+        )
+        return None, None, await save_empty_vacancy(
+            pipeline, vacancy_id, None, reason=TRUNCATED_SKIP_REASON
+        )
     if refusal is not None:
         logger.warning("vacancy %s: разбор не состоялся (%s)", vacancy_id, refusal)
         return None, refusal, False
@@ -285,7 +301,8 @@ async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
 
 
 async def save_empty_vacancy(
-    pipeline, vacancy_id: int, parsed: ParsedVacancy | None
+    pipeline, vacancy_id: int, parsed: ParsedVacancy | None,
+    *, reason: str = EMPTY_SKIP_REASON,
 ) -> bool:
     """Persist an empty/trash vacancy as Not Fit when auto-delete is off
     (rerun path). Fills whatever fields LLM did extract — заголовок и, как
@@ -306,7 +323,7 @@ async def save_empty_vacancy(
         parsed,
         Outcome(
             status=VacancyStatus.NOT_FIT,
-            skip_reason=EMPTY_SKIP_REASON,
+            skip_reason=reason,
             score=0,
             keep_previous_stack=False,
         ),
