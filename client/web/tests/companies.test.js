@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { companyCandidate, companyLine, siteHref } from '../state/companies.js';
+import { companyCandidate, companyLine, companyNamed, siteHref } from '../state/companies.js';
 
 describe('подпись компании в списке', () => {
   it('под именем стоят сайт и алиасы', () => {
@@ -87,5 +87,23 @@ describe('строка компании в окне выбора', () => {
 
   it('отсеянная помечена отдельно', () => {
     expect(companyCandidate({ ...COMPANY, is_blacklisted: true }).blocked).toBe(true);
+  });
+});
+
+describe('чем компания названа при заведении', () => {
+  const DRAFT = { name: '', website: '', aliases: '', notes: '' };
+
+  it('названия довольно', () => {
+    expect(companyNamed({ ...DRAFT, name: 'Ромашка' })).toBe(true);
+  });
+
+  it('без названия заводить нечего', () => {
+    expect(companyNamed({ ...DRAFT, name: '   ' })).toBe(false);
+  });
+
+  it('одного сайта названием не считают', () => {
+    // Домен приезжает из объявления и есть у многих: без имени компанию по нему
+    // не узнать в списке, а строка выбора осталась бы безымянной.
+    expect(companyNamed({ ...DRAFT, website: 'romashka.ru' })).toBe(false);
   });
 });

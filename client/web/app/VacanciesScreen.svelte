@@ -9,6 +9,7 @@
 
   import VacancyCard from './VacancyCard.svelte';
   import { attempts } from '$state/attempts.js';
+  import { closeOnClickAway } from '$state/outside.js';
   import { VACANCY_PAGE, appended, nearBottom, refreshLimit } from '$state/paging.js';
   import { blankFilter, filterPayload } from '$state/vacancy_filter.js';
   import { SORTS, emptyNote, sortKey } from '$state/vacancies.js';
@@ -31,6 +32,10 @@
   // полосы, и открытые разом они накрывают одна другую.
   let sortOpen = $state(false);
   let filterOpen = $state(false);
+  // Полоса над списком: по ней меню порядка считает «нажали мимо». Своим узлом
+  // ему годится только она — кнопка, которой его открывают, лежит рядом с
+  // меню, а не внутри него.
+  let bar = $state(null);
   let applied = $state(blankFilter());
   // Границы срока замораживаются в миг применения: пересчитай их к следующей
   // странице, скользящее окно «за неделю» уехало бы вперёд, а `offset`
@@ -68,13 +73,13 @@
   // пересечение его с тем, что искал час назад.
   $effect(() => {
     if (!openFilter) return;
-    const asked = openFilter.filter;
+    const wanted = openFilter.filter;
     search = '';
     opened = null;
     // Вне слежения: `apply` перечитывает список, а тот читает поиск и порядок —
     // следящий эффект заводился бы заново на каждом набранном знаке и навязывал
     // бы отбор статистики поверх того, что человек уже успел выбрать.
-    untrack(() => apply(asked));
+    untrack(() => apply(wanted));
     onfiltered();
   });
 
@@ -89,9 +94,6 @@
    */
   async function refresh(limit = VACANCY_PAGE) {
     const mine = tries.next();
-    // Идущая догрузка этим зовом обесценена: её ответ уже не ляжет, и держать
-    // по ней запор значит молча не догружать свежий список до самого ответа.
-    loadingMore = false;
     const now = await ask('vacancies.list', {
       search,
       sort: sortKey(sort),
@@ -126,16 +128,26 @@
     optionsLoaded = true;
   }
 
+  /** Дочитать следующую страницу.
+   *
+   * Своей попытки не берёт: она объявила бы устаревшим уже идущее
+   * перечитывание, а свежее как раз оно. Вместо счёта сверяется само основание
+   * — тот ли поиск, порядок и отбор и тот ли список, к концу которого страницу
+   * дописывают: перечитывание кладёт другой список, и дописывать доехавшую
+   * страницу становится некуда.
+   */
   async function more() {
-    const mine = tries.next();
+    const was = { search, sort: sortKey(sort), filter: asked, rows };
     const page = await ask('vacancies.list', {
-      search,
-      sort: sortKey(sort),
+      search: was.search,
+      sort: was.sort,
       limit: VACANCY_PAGE,
-      offset: rows.length,
-      ...asked,
+      offset: was.rows.length,
+      ...was.filter,
     });
-    if (page === null || !alive || tries.stale(mine)) return;
+    if (page === null || !alive) return;
+    if (rows !== was.rows || search !== was.search) return;
+    if (sortKey(sort) !== was.sort || asked !== was.filter) return;
     rows = appended(rows, page.vacancies);
     hasMore = page.has_more;
   }
@@ -175,11 +187,7 @@
     if (!sortOpen) return;
     // Нажатие мимо закрывает меню. Оно падает поверх списка, и оставленное
     // открытым закрывает собой те самые строки, ради которых порядок меняли.
-    const away = (event) => {
-      if (!event.target.closest('.vac-list-toolbar')) sortOpen = false;
-    };
-    document.addEventListener('click', away);
-    return () => document.removeEventListener('click', away);
+    return closeOnClickAway(() => bar, () => (sortOpen = false));
   });
 
   $effect(() => {
@@ -210,7 +218,7 @@
 
 <div class="vacancies-layout">
   <section class="vac-list-pane">
-    <div class="vac-list-toolbar">
+    <div class="vac-list-toolbar" bind:this={bar}>
       <SearchBox value={search} placeholder="Поиск" onsearch={find} />
 
       <button

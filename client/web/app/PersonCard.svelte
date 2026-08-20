@@ -13,6 +13,9 @@
   import PickerRow from '$components/PickerRow.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
   import { attempts } from '$state/attempts.js';
+  import { blockNote, unblockNote } from '$state/blacklist.js';
+  import { cardRead } from '$state/card_read.js';
+  import { sendBlock } from '$state/chat.js';
   import { personCandidate, personName } from '$state/people.js';
   import { telegramHref } from '$state/telegram.js';
   import { plural } from '$state/words.js';
@@ -33,19 +36,23 @@
   // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
   // человека в ней переключают нажатием по соседней строке — ответ про
   // прежнего, лёгший поверх свежего, показал бы его числа под новым именем.
-  const cardTries = attempts();
   const vacancyTries = attempts();
   let alive = true;
+
+  const readCard = cardRead({
+    ask: (...args) => ask(...args),
+    method: 'hr.detail',
+    trouble: 'Не удалось прочитать карточку',
+    alive: () => alive,
+  });
 
   const shown = $derived(card ? personName({ ...card, id: card.hr_id }) : '');
   const chosenName = $derived(chosen ? personName(chosen) : '');
 
   async function refresh(id) {
-    const mine = cardTries.next();
-    const now = await ask('hr.detail', id);
-    if (!alive || cardTries.stale(mine)) return;
-    if (now === null) return (trouble = 'Не удалось прочитать карточку');
-    card = now;
+    const now = await readCard(id);
+    if (now === null) return;
+    ({ card, trouble } = now);
   }
 
   async function loadVacancies(id) {
@@ -83,9 +90,7 @@
   async function block() {
     const done = await ask('hr.block', personId);
     if (done === null) return;
-    if (done.was_inactive) say(`Возвращён в отсев: ${done.value}`);
-    else if (done.existed) say(`Уже в отсеве: ${done.value}`);
-    else say(`Занесён в отсев: ${done.value}`);
+    say(blockNote(done));
     await refresh(personId);
     onchanged();
   }
@@ -93,7 +98,7 @@
   async function unblock() {
     const done = await ask('hr.unblock', personId);
     if (done === null) return;
-    say(done.updated ? 'Убран из отсева' : 'В отсеве его не было');
+    say(unblockNote(done));
     await refresh(personId);
     onchanged();
   }
@@ -254,7 +259,8 @@
     {ask}
     {say}
     {events}
-    {card}
+    hrId={card.hr_id}
+    blocked={sendBlock(card)}
     onread={async () => {
       await refresh(personId);
       onchanged();

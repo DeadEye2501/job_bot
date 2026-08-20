@@ -4,6 +4,7 @@
   import { untrack } from 'svelte';
 
   import AskDialog from '$components/AskDialog.svelte';
+  import ContactsPanes from '$components/ContactsPanes.svelte';
   import NewPersonFields from '$components/NewPersonFields.svelte';
   import PersonRow from '$components/PersonRow.svelte';
   import SearchBox from '$components/SearchBox.svelte';
@@ -14,7 +15,7 @@
 
   let { ask, say, events, open, onopened, oncompany, onvacancy } = $props();
 
-  const list = pagedList({ ask, method: 'hr.list', key: 'hrs' });
+  const list = pagedList({ ask: (...args) => ask(...args), method: 'hr.list', key: 'hrs' });
 
   let adding = $state(false);
   let draft = $state({ name: '', telegram_username: '', telegram_user_id: '', notes: '' });
@@ -69,60 +70,56 @@
   });
 </script>
 
-<div class="cnt-layout">
-  <section class="cnt-list-pane">
-    <div class="cnt-list-toolbar">
-      <SearchBox value={list.search} placeholder="Поиск по имени, @username..." onsearch={list.find} />
-      <button
-        class="cnt-add-btn"
-        type="button"
-        title="Добавить HR"
-        onclick={() => (adding = true)}
-      >
-        <span class="material-symbols-outlined">person_add</span>
-      </button>
-    </div>
+<ContactsPanes
+  loaded={list.loaded}
+  empty={list.rows.length === 0}
+  chosen={opened !== null}
+  detailEmpty="Выберите HR в списке слева"
+  onlistscroll={list.scrolled}
+>
+  {#snippet toolbar()}
+    <SearchBox value={list.search} placeholder="Поиск по имени, @username..." onsearch={list.find} />
+    <button
+      class="cnt-add-btn"
+      type="button"
+      title="Добавить HR"
+      onclick={() => (adding = true)}
+    >
+      <span class="material-symbols-outlined">person_add</span>
+    </button>
+  {/snippet}
 
-    <div class="cnt-list" onscroll={list.scrolled}>
-      {#if !list.loaded}
-        <div class="cnt-list-empty">Загрузка…</div>
-      {:else if list.rows.length === 0}
-        <div class="cnt-list-empty">
-          {#if list.search}
-            Никого не найдено по запросу «{list.search}».
-          {:else}
-            HR'ов пока нет.<br />Нажмите кнопку добавления вверху, чтобы создать первого.
-          {/if}
-        </div>
-      {:else}
-        {#each list.rows as person (person.id)}
-          <PersonRow
-            {person}
-            selected={opened === person.id}
-            onpick={() => (opened = person.id)}
-          />
-        {/each}
-      {/if}
-    </div>
-  </section>
-
-  <section class="cnt-detail-pane">
-    {#if opened === null}
-      <div class="cnt-detail-empty">Выберите HR в списке слева</div>
+  {#snippet emptyNote()}
+    {#if list.search}
+      Никого не найдено по запросу «{list.search}».
     {:else}
-      <PersonCard
-        {ask}
-        {say}
-        {events}
-        {oncompany}
-        {onvacancy}
-        personId={opened}
-        onclose={() => (opened = null)}
-        onchanged={() => list.again()}
-      />
+      HR'ов пока нет.<br />Нажмите кнопку добавления вверху, чтобы создать первого.
     {/if}
-  </section>
-</div>
+  {/snippet}
+
+  {#snippet items()}
+    {#each list.rows as person (person.id)}
+      <PersonRow
+        {person}
+        selected={opened === person.id}
+        onpick={() => (opened = person.id)}
+      />
+    {/each}
+  {/snippet}
+
+  {#snippet detail()}
+    <PersonCard
+      {ask}
+      {say}
+      {events}
+      {oncompany}
+      {onvacancy}
+      personId={opened}
+      onclose={() => (opened = null)}
+      onchanged={() => list.again()}
+    />
+  {/snippet}
+</ContactsPanes>
 
 {#if adding}
   <AskDialog
