@@ -34,6 +34,7 @@ async def test_an_empty_name_is_refused_before_the_bot(api, ask, with_bot):
 
     answer = await ask(api.channels.create, {"input": "   "})
 
+    assert answer["fail"] == "denied"
     assert answer["detail"] == "Укажите @username или ссылку на канал."
     assert bot.calls == []
 
@@ -95,6 +96,7 @@ async def test_a_manual_walk_before_the_bot_is_up_is_refused_by_name(
 
     answer = await ask(api.channels.poll_now, channel.id)
 
+    assert answer["fail"] == "denied"
     assert answer["detail"] == "Бот ещё не готов."
 
 
@@ -184,6 +186,7 @@ async def test_a_reset_cursor_for_a_missing_channel_is_refused(api, ask):
     """
     answer = await ask(api.channels.reset_cursor, 404)
 
+    assert answer["fail"] == "denied"
     assert answer["detail"] == "Канал не найден."
 
 

@@ -10,8 +10,8 @@ const CARD = {
   channel_username: 'jobs',
   source_msg_id: 42,
   source_url: 'https://t.me/jobs/42',
-  posted_at: '2026-08-14T09:05:00',
-  created_at: '2026-08-15T20:00:00',
+  posted_at: '2026-08-14T06:05:00+00:00',
+  created_at: '2026-08-15T17:00:00+00:00',
 };
 
 describe('запреты действий', () => {

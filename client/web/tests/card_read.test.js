@@ -6,22 +6,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { cardRead } from '../state/card_read.js';
-
-/** Подставной мост, отвечающий заготовленным и помнящий, о чём спрашивали. */
-function bridge(answers) {
-  const asked = [];
-  return {
-    asked,
-    ask: async (method, id) => {
-      asked.push({ method, id });
-      const next = answers.shift();
-      return typeof next === 'function' ? next() : next;
-    },
-  };
-}
+import { replying } from './bridge_stub.js';
 
 function reader(answers, { alive = () => true } = {}) {
-  const { asked, ask } = bridge(answers);
+  const { asked, ask } = replying(answers);
   return {
     asked,
     read: cardRead({ ask, method: 'hr.detail', trouble: 'Не удалось прочитать карточку', alive }),
@@ -33,7 +21,7 @@ describe('чтение карточки правой панели', () => {
     const { asked, read } = reader([{ hr_id: 7, name: 'Ирина' }]);
 
     expect(await read(7)).toEqual({ card: { hr_id: 7, name: 'Ирина' }, trouble: '' });
-    expect(asked).toEqual([{ method: 'hr.detail', id: 7 }]);
+    expect(asked).toEqual([{ method: 'hr.detail', payload: 7 }]);
   });
 
   it('отказ объясняют словами, а не пустой панелью', async () => {

@@ -4222,17 +4222,20 @@ Runtime settings layer.
 - `class WindowThatPicks` (16)
   - `def create_file_dialog(self, *_args, **_kwargs)` (5)
 
-### `tests/client/test_bot_contract.py` — 80 строк
+### `tests/client/test_bot_contract.py` — 152 строк
 
 Шов имён между мостом и ботом.
 
-Зависит от: `backend.bot`, `backend.bot.client`, `client.bridge`, `tests.fakes.ui_bot`
+Зависит от: `backend.bot`, `backend.bot.client`, `backend.bot.rerun`, `client.bridge`, `client.bridge.refusals`, `tests.fakes.ui_bot`
 
-Тестов: 3
+Тестов: 6
 
-- `def _asked_of_the_bot() -> list[str]` (7)
-- `def _hooks_the_window_fills() -> list[str]` (14)
-- `def _hooks_the_bot_declares() -> set[str]` (8)
+- `def _is_the_bot(node: ast.expr) -> bool` (9)
+- `def _touched_on_the_bot() -> set[str]` (14)
+- `def _asked_of_the_bot() -> list[str]` (11)
+- `def _hooks_set_in(what) -> set[str]` (13)
+- `def _hooks_the_bot_declares() -> set[str]` (3)
+- `def _rerun_outcomes() -> set[str]` (3)
 
 ### `tests/client/test_bridge_answer.py` — 132 строк
 
@@ -4261,19 +4264,16 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/client/test_bridge_bot_stop.py` — 59 строк
+### `tests/client/test_bridge_bot_stop.py` — 47 строк
 
 Следствия остановки бота: чем кончается ожидание, которого не дождались.
 
-Зависит от: `client.bridge.bot_stop`
+Зависит от: `client.bridge.bot_stop`, `tests.fakes.ui_bot`
 
 Тестов: 2
 
-- `class HangingBot` (11)
-  - `def cancel_current_poll(self) -> None` (2)
-  - `def request_stop(self) -> None` (2)
 
-### `tests/client/test_bridge_channel_actions.py` — 227 строк
+### `tests/client/test_bridge_channel_actions.py` — 230 строк
 
 Следствия действий над каналом, которым нужен поднятый бот.
 
@@ -4409,7 +4409,7 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/client/test_bridge_profile.py` — 212 строк
+### `tests/client/test_bridge_profile.py` — 230 строк
 
 Следствия слотов анкеты — того, что человек рассказывает о себе.
 
@@ -4438,15 +4438,16 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/client/test_bridge_shell.py` — 208 строк
+### `tests/client/test_bridge_shell.py` — 251 строк
 
 Следствия обращения к оболочке: что окно отдаёт системе, а что нет.
 
 Зависит от: `client.bridge.desktop`, `client.serving`
 
-Тестов: 10
+Тестов: 12
 
 - `def opened(monkeypatch) -> list` (8)
+- `def refused_by_the_system(monkeypatch) -> None` (9)
 - `def media(monkeypatch, tmp_path)` (10)
 
 ### `tests/client/test_bridge_stats.py` — 89 строк
@@ -4517,7 +4518,7 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/client/test_bridge_wizard.py` — 226 строк
+### `tests/client/test_bridge_wizard.py` — 229 строк
 
 Следствия первого запуска: с какого шага он продолжается и чем кончается.
 
@@ -4535,28 +4536,30 @@ Runtime settings layer.
 Тестов: 17
 
 
-### `tests/client/test_front_vocabulary.py` — 87 строк
+### `tests/client/test_front_vocabulary.py` — 152 строк
 
 Согласие перечней окна с перечнями бэкенда.
 
-Зависит от: `backend.domain.taxonomy`, `backend.models.enums`, `backend.models.settings`
+Зависит от: `backend.domain.taxonomy`, `backend.domain.verdict`, `backend.models.enums`, `backend.models.settings`, `tests.factories`
 
-Тестов: 6
+Тестов: 8
 
 - `def _array(module: str, name: str) -> str` (10)
 - `def _strings(module: str, name: str) -> list[str]` (3)
 - `def _values(module: str, name: str) -> list[str]` (3)
+- `def _skip_reasons_the_backend_writes() -> set[str]` (21)
 
-### `tests/client/test_page_contract.py` — 125 строк
+### `tests/client/test_page_contract.py` — 158 строк
 
 Шов имён: сходятся ли имена, которыми страница зовёт мост, с самим мостом.
 
 Зависит от: —
 
-Тестов: 5
+Тестов: 6
 
 - `def _sources() -> list[Path]` (7)
-- `def _called(text: str) -> set[tuple[str, str]]` (2)
+- `def _called(text: str) -> set[tuple[str, str]]` (3)
+- `def _pages_that_call() -> list[Path]` (9)
 
 ### `tests/client/test_raise_window.py` — 161 строк
 
@@ -4793,18 +4796,20 @@ Runtime settings layer.
   - `async def log_out(self)` (3)
   - `async def export_session_string(self)` (3)
 
-### `tests/fakes/ui_bot.py` — 99 строк
+### `tests/fakes/ui_bot.py` — 110 строк
 
 Бот, каким его видит окно: обращения, которые делает мост.
 
 Зависит от: —
 
 - `class Sent` (4)
-- `class UiBot` (67)
+- `class UiBot` (78)
   - `def _refuse_if_asked(self) -> None` (3)
   - `async def force_poll_once(self) -> str` (3)
   - `def cancel_current_poll(self) -> None` (2)
   - `def request_stop(self) -> None` (2)
+  - `def kick(self) -> None` (2)
+  - `async def run(self, *, once: bool=False) -> None` (7)
   - `async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> str` (3)
   - `async def ui_send_vacancy_application(self, vacancy_id: int) -> tuple[bool, str]` (3)
   - `async def ui_forget_vacancy(self, vacancy_id: int) -> bool` (3)

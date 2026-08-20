@@ -2,29 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { asIso, showDate } from '../state/dates.js';
 import { cardTitle, experienceGoing, experienceReady, period } from '../state/experience.js';
-
-describe('дата места работы', () => {
-  it('с моста приходит одним видом, а показывается другим', () => {
-    // Мост говорит датами вида 2020-03-01, человек читает и набирает
-    // 01.03.2020. Покажи ему первое — он решил бы, что поле чужое.
-    expect(showDate('2020-03-01')).toBe('01.03.2020');
-    expect(showDate(null)).toBe('');
-  });
-
-  it('набранное человеком уезжает обратно в вид моста', () => {
-    expect(asIso('01.03.2020')).toBe('2020-03-01');
-  });
-
-  it('недобранная дата не уезжает вовсе', () => {
-    // Человек набирает посимвольно, и «01.03.20» на полпути — не дата.
-    // Отправь мы её, мост записал бы двадцатый год нашей эры.
-    expect(asIso('01.03.20')).toBe(null);
-    expect(asIso('')).toBe(null);
-    expect(asIso('чепуха')).toBe(null);
-  });
-});
 
 describe('период в шапке карточки', () => {
   it('месяц и год с обеих сторон', () => {

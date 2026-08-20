@@ -12,19 +12,7 @@ from concurrent.futures import Future
 import pytest
 
 from client.bridge.bot_stop import stop_bot
-
-
-class HangingBot:
-    """Бот, который просьбу слышит, а работу не заканчивает."""
-
-    def __init__(self) -> None:
-        self.asked: list[str] = []
-
-    def cancel_current_poll(self) -> None:
-        self.asked.append("cancel")
-
-    def request_stop(self) -> None:
-        self.asked.append("stop")
+from tests.fakes.ui_bot import UiBot
 
 
 async def test_a_bot_that_never_stops_does_not_hold_the_caller():
@@ -33,12 +21,12 @@ async def test_a_bot_that_never_stops_does_not_hold_the_caller():
     Иначе закрытие окна висело бы до конца зависшего обхода — то есть, с точки
     зрения человека, не закрывалось бы вовсе.
     """
-    bot = HangingBot()
+    bot = UiBot()
     never = Future()
 
     waited = await asyncio.wait_for(stop_bot(bot, never, timeout=0.01), timeout=1)
 
-    assert bot.asked == ["cancel", "stop"]
+    assert bot.calls == [("cancel_current_poll",), ("request_stop",)]
     # И отвечает «не дождались»: по этому ответу пересборка под новый сеанс
     # решает, поднимать ли следующего бота, — подними она его поверх
     # недождавшегося, Telegram увидел бы две копии на одной строке сеанса.
@@ -56,4 +44,4 @@ async def test_a_failed_request_reaches_the_caller():
         raise RuntimeError("сервер не ответил")
 
     with pytest.raises(RuntimeError, match="сервер не ответил"):
-        await stop_bot(HangingBot(), None, refusing)
+        await stop_bot(UiBot(), None, refusing)

@@ -35,6 +35,13 @@ WEB = Path(__file__).resolve().parents[2] / "client" / "web"
 # молчание здесь читается как «всё сходится».
 CALLING = re.compile(r"""\b(?:call|ask)\(\s*['"]([a-z_]+)\.([a-z_]+)['"]""")
 
+# Второй способ назвать метод: отдать его строкой общему устройству, а не
+# позвать самому. Так делают перечни с подгрузкой по прокрутке — имя уезжает
+# полем нагрузки, и зова на странице нет вовсе.
+#
+# **Заведёшь третий способ — впиши и его.** Невписанный выпадает молча.
+HANDED_OVER = re.compile(r"""\bmethod:\s*['"]([a-z_]+)\.([a-z_]+)['"]""")
+
 SOURCES = ("*.js", "*.svelte")
 
 # Слои, где живёт страница. Перечислены поимённо, а не «всё, кроме сборки»:
@@ -54,7 +61,19 @@ def _sources() -> list[Path]:
 
 
 def _called(text: str) -> set[tuple[str, str]]:
-    return {(domain, method) for domain, method in CALLING.findall(text)}
+    found = CALLING.findall(text) + HANDED_OVER.findall(text)
+    return {(domain, method) for domain, method in found}
+
+
+def _pages_that_call() -> list[Path]:
+    """Исходники, где имена моста и правда названы.
+
+    Разложить сторожа по всем исходникам подряд — значит отчитаться о сотне
+    с лишним зелёных проверок, из которых сто с лишним не исполняют своего
+    тела вовсе: зовов моста у большинства файлов страницы нет. Зелёная сотня
+    читается как «проверено», а проверено там ничего.
+    """
+    return [one for one in _sources() if _called(one.read_text(encoding="utf-8"))]
 
 
 def test_there_are_sources_to_look_at_in_the_first_place():
@@ -66,6 +85,7 @@ def test_there_are_sources_to_look_at_in_the_first_place():
     остался бы прежним.
     """
     assert _sources(), f"в {WEB} не нашлось ни одного исходника страницы"
+    assert _pages_that_call(), "ни в одном исходнике не нашлось имён моста"
 
 
 def test_the_search_finds_a_call_it_is_shown():
@@ -92,6 +112,19 @@ def test_the_search_sees_the_calls_made_through_the_shell_wrapper():
     assert found == {("system", "set_mode")}
 
 
+def test_the_search_sees_a_name_handed_over_as_data():
+    """И находит имя, переданное не зовом, а полем нагрузки.
+
+    Списки с подгрузкой по мере прокрутки имени моста не зовут вовсе: они
+    отдают его строкой общему устройству (`pagedList({ method: … })`), и
+    обёртки в этой форме нет. Поиск, знающий только зовы, не видел так два
+    экрана целиком — перечни компаний и людей.
+    """
+    found = _called("const list = pagedList({ method: 'companies.list' });")
+
+    assert found == {("companies", "list")}
+
+
 def test_the_search_does_not_invent_calls_out_of_thin_air():
     """И не находит того, чего нет: слепой поиск ловится первым сторожем, а
     болтливый — этим. Найди он лишнее, шов краснел бы на ровном месте, и его
@@ -100,7 +133,7 @@ def test_the_search_does_not_invent_calls_out_of_thin_air():
     assert _called("api.system.health(); // так на странице не зовут") == set()
 
 
-@pytest.mark.parametrize("source", _sources(), ids=lambda p: p.name)
+@pytest.mark.parametrize("source", _pages_that_call(), ids=lambda p: p.name)
 def test_every_name_the_page_calls_exists_on_the_bridge(source, api):
     """Каждое имя, которым страница зовёт мост, у моста есть.
 

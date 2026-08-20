@@ -83,13 +83,25 @@ describe('что уезжает на мост', () => {
 
   it('пустая анкета — это все поля, а не половина', () => {
     // Мост принимает анкету целиком: пропущенное поле уедет как `undefined` и
-    // сотрёт то, что в базе уже лежало.
-    const blank = blankProfile();
-
-    expect(blank.first_name).toBe('');
-    expect(blank.grades).toEqual([]);
-    expect(blank.languages).toEqual([]);
-    expect(blank.updated_at).toBe(null);
+    // сотрёт то, что в базе уже лежало. Поэтому сверяется вся нагрузка разом,
+    // а не четыре поля вразбивку: выпади из неё образование — человек терял
+    // бы его на первом же сохранении, а четыре названных поля были бы целы.
+    expect(blankProfile()).toEqual({
+      first_name: '',
+      last_name: '',
+      title: '',
+      email: '',
+      phone: '',
+      telegram_username: '',
+      github_url: '',
+      location: '',
+      education: '',
+      free_preferences: '',
+      grades: [],
+      work_format: [],
+      languages: [],
+      updated_at: null,
+    });
   });
 });
 

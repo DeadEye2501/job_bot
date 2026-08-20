@@ -1296,6 +1296,10 @@
 
 - `_TS` = `1755500000.0`
 
+### `tests/client/test_bot_contract.py`
+
+- `BRIDGE` = `Path(__file__).resolve().parents[2] / 'client' /…`
+
 ### `tests/client/test_bridge_login.py`
 
 - `CREDENTIALS` = `словарь из 3`
@@ -1312,6 +1316,7 @@
 
 - `WEB` = `Path(__file__).resolve().parents[2] / 'client' /…`
 - `CALLING` = `re.compile('\\b(?:call|ask)\\(\\s*[\'"]([a-z_]+)…`
+- `HANDED_OVER` = `re.compile('\\bmethod:\\s*[\'"]([a-z_]+)\\.([a-z…`
 - `SOURCES` = `набор из 2`
 - `LAYERS` = `набор из 4`
 

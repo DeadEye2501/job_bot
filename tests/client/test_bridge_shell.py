@@ -32,6 +32,18 @@ def opened(monkeypatch) -> list:
 
 
 @pytest.fixture
+def refused_by_the_system(monkeypatch) -> None:
+    """Система берёт цель, но открыть не может.
+
+    Так она отвечает на снесённый ярлык, на файл без сопоставленной программы
+    и на занятую цель: зов проходит, а `False` возвращается. Перевод этого
+    `False` в отказ — своя ветка у ссылки и своя у вложения, и приманкой,
+    отвечающей «открыли», она не исполняется ни разу.
+    """
+    monkeypatch.setattr("client.bridge.desktop.open_in_system", lambda target: False)
+
+
+@pytest.fixture
 def media(monkeypatch, tmp_path):
     """Каталог медиа на время теста: вложения ищут файл именно в нём.
 
@@ -92,6 +104,37 @@ async def test_a_telegram_link_opens(api, ask, opened):
 
     assert "ok" in answer
     assert opened == ["tg://resolve?domain=ivanov"]
+
+
+async def test_a_link_the_system_would_not_open_is_named_a_refusal(
+    api, ask, refused_by_the_system
+):
+    """Ссылку, которую система не открыла, окно называет отказом.
+
+    Иначе окно отвечает «открыли» на ссылку, которую никто не открыл, и
+    человек ждёт чужого окна, которого не будет.
+    """
+    answer = await ask(api.system.open_url, "https://example.test/vacancy")
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Не удалось открыть ссылку."
+
+
+async def test_an_attachment_the_system_would_not_open_is_named_a_refusal(
+    api, ask, media, refused_by_the_system
+):
+    """И вложение, которое система не открыла, — по той же причине.
+
+    Своя ветка у своего слота: у ссылки и у файла общее только то, что оба
+    уходят системе, а отказы у них разные и по словам, и по месту.
+    """
+    (media / "1").mkdir()
+    (media / "1" / "42.pdf").write_bytes(b"%PDF-1.4")
+
+    answer = await ask(api.system.open_attachment, f"{MEDIA_PREFIX}1/42.pdf")
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Не удалось открыть вложение."
 
 
 async def test_an_attachment_we_do_not_open_is_shown_in_the_folder(

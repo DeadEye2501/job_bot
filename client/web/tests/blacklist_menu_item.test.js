@@ -12,7 +12,15 @@ import { describe, expect, it } from 'vitest';
 
 import { markup, placed } from './markup.js';
 
-const HOME = 'components/BlacklistMenuItem.svelte';
+const SAYS_IT = /Добавить в blacklist|Убрать из blacklist/;
+
+/** Кому эти слова положены: сам пункт, окошко ручного занесения и кнопка на
+ *  вкладке отсева. Всем прочим — нет: там это была бы четвёртая копия. */
+const ALLOWED_TO_SAY_IT = new Set([
+  'components/BlacklistMenuItem.svelte',
+  'components/AddBlacklistDialog.svelte',
+  'app/BlacklistList.svelte',
+]);
 
 /** Постановки самого пункта. */
 function usages() {
@@ -33,14 +41,19 @@ describe('пункт «в отсев»', () => {
   });
 
   it('нигде не нарисован заново', () => {
-    // Слова пункта ищутся строкой целиком: те же слова стоят подписью у
-    // кнопки на вкладке отсева, и она к меню карточек отношения не имеет.
-    // Сам пункт пропускается: у него эти слова стоять и должны.
-    for (const { file, text } of markup()) {
-      if (file === HOME) continue;
-      expect(text, file).not.toMatch(/^\s*Добавить в blacklist\s*$/m);
-      expect(text, file).not.toMatch(/^\s*Убрать из blacklist\s*$/m);
-    }
+    // Слова ищутся где угодно в строке, а не в одиночку на своей: в разметке
+    // они всегда стоят рядом с тегом, и якорь на всю строку не совпадал ни с
+    // одним местом — сторож молчал бы и на четвёртой копии пункта.
+    //
+    // Трое, кому эти слова положены, названы поимённо: сам пункт, заголовок
+    // окошка ручного занесения и кнопка на самой вкладке отсева. Список
+    // сверяется целиком, а не «эти пропускаем»: пропади слова у любого из
+    // троих — сторож тоже покраснеет, и это верно, кнопка исчезла бы.
+    const said = markup()
+      .filter(({ text }) => SAYS_IT.test(text))
+      .map(({ file }) => file);
+
+    expect(new Set(said)).toEqual(ALLOWED_TO_SAY_IT);
   });
 
   it('получает положение дел доводом', () => {
@@ -71,6 +84,23 @@ describe('пункт «в отсев»', () => {
       expect(use.tag, use.file).toMatch(/\s(blocked=\{|\{blocked\})/);
       expect(use.tag, use.file).toMatch(/\s(onblock=\{|\{onblock\})/);
       expect(use.tag, use.file).toMatch(/\s(onunblock=\{|\{onunblock\})/);
+    }
+  });
+
+  it('каждый зов ведёт к своему делу, а не просто написан', () => {
+    // Присутствие имён не говорит, куда они ведут: переставь тела местами —
+    // и «Убрать из blacklist» заносило бы компанию в отсев, а прогон
+    // остался бы зелёным целиком, на обоих языках сразу.
+    //
+    // Смотрим оба места постановки: карточка канала ставит пункт напрямую, а
+    // карточки человека и компании — через общее меню. Возьми мы только одно,
+    // половина карточек осталась бы неприкрытой.
+    const given = usages().concat(menus()).filter((one) => /onblock=/.test(one.tag));
+    expect(given.length).toBeGreaterThan(0);
+
+    for (const use of given) {
+      expect(use.tag, use.file).toMatch(/onblock=\{[^}]*\.block\(/);
+      expect(use.tag, use.file).toMatch(/onunblock=\{[^}]*\.unblock\(/);
     }
   });
 

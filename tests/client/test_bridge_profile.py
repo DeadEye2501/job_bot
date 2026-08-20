@@ -38,13 +38,31 @@ async def test_a_saved_person_comes_back_on_the_next_request(api, ask):
     только тем, что пришло. Не вернись анкета — человек увидел бы пустую
     форму и заполнил бы её второй раз поверх сохранённой.
     """
-    await _saved_person(api, ask)
+    await _saved_person(api, ask, education="МГУ", location="Москва")
 
     answer = await ask(api.profile.get)
 
     profile = answer["ok"]["profile"]
-    assert profile["first_name"] == "Иван"
-    assert profile["title"] == "Питон-разработчик"
+    # Целиком, а не выборочно: экран рисуется только тем, что пришло, и
+    # потерянное по дороге поле он показал бы пустым — а следующее нажатие
+    # сохранило бы эту пустоту поверх записанного. Метка правки идёт особняком:
+    # её ставит сама запись, и значение её тут не предмет.
+    assert profile.pop("updated_at") is not None
+    assert profile == {
+        "first_name": "Иван",
+        "last_name": "Петров",
+        "title": "Питон-разработчик",
+        "email": "ivan@example.com",
+        "phone": None,
+        "location": "Москва",
+        "telegram_username": None,
+        "github_url": None,
+        "education": "МГУ",
+        "free_preferences": None,
+        "grades": [],
+        "work_format": [],
+        "languages": [],
+    }
 
 
 async def test_grades_keep_the_declared_order_not_the_clicked_one(api, ask):
