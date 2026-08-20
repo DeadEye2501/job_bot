@@ -37,6 +37,21 @@ def data_dir(tmp_path, monkeypatch):
     return config.get_data_dir()
 
 
+def held_by_someone_else(monkeypatch, what: str) -> None:
+    """Пусть система откажет в удалении так, как отказывает Windows на занятом.
+
+    Занять файл может антивирус или открытый просмотрщик, и повторяется это
+    в четырёх проверках подряд. `what` — имя способа `pathlib.Path`, которым
+    сносят: файл убирается `unlink`, папка — `shutil.rmtree`, и отказы у них разные
+    дороги в боевом коде.
+    """
+
+    def _refuse(*args, **kwargs):
+        raise PermissionError(32, "used by another process")
+
+    monkeypatch.setattr(what, _refuse)
+
+
 async def test_the_journal_does_not_survive_the_wipe(data_dir):
     """Журнал и его повёрнутые копии уходят вместе со всем остальным.
 
@@ -69,22 +84,51 @@ async def test_the_lock_and_the_database_go_too(data_dir):
     assert list(data_dir.iterdir()) == []
 
 
-async def test_a_file_held_by_someone_else_is_reported(data_dir, monkeypatch):
-    """Файл, который не отдал кто-то чужой, попадает в беды, а не в тишину.
+async def test_a_file_held_by_someone_else_is_reported(
+    data_dir, monkeypatch, caplog
+):
+    """Файл, который не отдал кто-то чужой, попадает в беды и в журнал.
 
     Занять базу может антивирус или открытый просмотрщик. Промолчи снос —
     человек увидел бы «готово» и остался бы с данными на диске.
+
+    Трассировка нужна отдельно от строки беды: мост схлопывает подробности в
+    одну фразу «файлы открыты в другом процессе», и журнал — единственное
+    место, где видно, какая система и на чём именно отказала.
     """
     (data_dir / "jobbot.db").write_text("данные", encoding="utf-8")
 
-    def _refuse(self, *args, **kwargs):
-        raise PermissionError(32, "used by another process")
+    held_by_someone_else(monkeypatch, "pathlib.Path.unlink")
 
-    monkeypatch.setattr("pathlib.Path.unlink", _refuse)
-
-    troubles = await wipe_all(None)
+    with caplog.at_level(logging.ERROR):
+        troubles = await wipe_all(None)
 
     assert any("jobbot.db" in trouble for trouble in troubles)
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "PermissionError" in caplog.text
+
+
+async def test_a_folder_held_by_someone_else_is_reported_too(
+    data_dir, monkeypatch, caplog
+):
+    """Папка, которую не отдали, попадает в беды и в журнал наравне с файлом.
+
+    Вложения и сеансы сносятся другим способом, чем файлы, и отказ у них своя
+    дорога: перехват там свой, и написан он отдельной строкой. Сторож у файла
+    её не задевает вовсе — сними у папки запись, и набор остался бы зелёным,
+    а причина отказа не осела бы нигде.
+    """
+    (data_dir / "media").mkdir()
+    (data_dir / "media" / "1.jpg").write_bytes(b"\x00")
+
+    held_by_someone_else(monkeypatch, "shutil.rmtree")
+
+    with caplog.at_level(logging.ERROR):
+        troubles = await wipe_all(None)
+
+    assert any("media/" in trouble for trouble in troubles)
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "PermissionError" in caplog.text
 
 
 async def test_the_journal_is_let_go_before_the_files_are_removed(data_dir):
@@ -153,10 +197,7 @@ async def test_the_lock_comes_back_when_something_survives(data_dir, monkeypatch
     (data_dir / "jobbot.db").write_text("данные", encoding="utf-8")
     assert hold_the_only_copy(lock) is not None
 
-    def _refuse(self, *args, **kwargs):
-        raise PermissionError(32, "used by another process")
-
-    monkeypatch.setattr("pathlib.Path.unlink", _refuse)
+    held_by_someone_else(monkeypatch, "pathlib.Path.unlink")
 
     troubles = await wipe_all(None)
 
@@ -177,10 +218,7 @@ async def test_a_lock_that_will_not_come_back_is_not_passed_over(
     """
     (data_dir / "jobbot.db").write_text("данные", encoding="utf-8")
 
-    def _refuse(self, *args, **kwargs):
-        raise PermissionError(32, "used by another process")
-
-    monkeypatch.setattr("pathlib.Path.unlink", _refuse)
+    held_by_someone_else(monkeypatch, "pathlib.Path.unlink")
     monkeypatch.setattr("backend.wipe.hold_the_only_copy", lambda lock_path: None)
 
     await wipe_all(None)

@@ -143,11 +143,18 @@ async def test_cancelling_a_finished_poll_does_nothing(make_bot):
     assert not task.cancelled()
 
 
-async def test_cancelling_when_nothing_runs_does_nothing(make_bot):
-    """Отмена при отсутствии прогона ничего не делает и не падает."""
+async def test_cancelling_when_nothing_runs_does_not_blow_up(make_bot):
+    """Отмена при отсутствии прогона не падает.
+
+    Кнопку «стоп» нажимают и на стоящем боте. Держит это охрана `task is None`
+    в `backend/bot/slot.py`; сними её — и зов даст `AttributeError`, то есть
+    красную лампочку в окне на действии, задуманном безобидным.
+
+    Наблюдается поэтому сам зов: он обязан вернуться. Пустое поле, которое
+    можно было бы утверждать после него, таким и приехало из сборки — оно не
+    следствие отмены.
+    """
     bot = await make_bot()
     bot.loop = asyncio.get_running_loop()
 
     bot.cancel_current_poll()
-
-    assert bot.current_poll_task is None

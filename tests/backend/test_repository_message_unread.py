@@ -51,20 +51,26 @@ async def test_the_count_covers_every_hr_at_once(session, session_factory):
 async def test_the_popup_lists_only_hrs_with_something_unread(
     session, session_factory
 ):
-    """Во всплывающем списке только те, у кого есть непрочитанное."""
+    """Во всплывающем списке только те, у кого есть непрочитанное, и по счёту.
+
+    У шумного лежит общий набор: подходящее письмо и по нарушителю каждого
+    из трёх условий. Без нарушителей список сторожил бы только отбор по
+    хозяину — сужение общего `UNREAD_INCOMING` прошло бы молча, а счётчик у
+    имени вырос бы на прочитанное, на наше и на удалённое разом.
+    """
     noisy = hr_row(name="Анна")
     quiet = hr_row(name="Борис")
     silent = hr_row(name="Виктор")
     await put(session_factory, noisy, quiet, silent)
     await put(
         session_factory,
-        message_row(hr_id=noisy.id, is_incoming=True, read_at=None, sent_at=at(10)),
+        *unread_probe(noisy.id),
         message_row(hr_id=quiet.id, is_incoming=True, read_at=at(5), sent_at=at(20)),
     )
 
     got = await list_hrs_with_unread(session)
 
-    assert [row["name"] for row in got] == ["Анна"]
+    assert [(row["name"], row["unread_count"]) for row in got] == [("Анна", 1)]
 
 
 async def test_the_popup_leads_with_the_freshest_unread(session, session_factory):

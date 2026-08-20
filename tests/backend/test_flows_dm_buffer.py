@@ -8,11 +8,14 @@ HR пишет очередью: «привет», «посмотрел резю�
 Накопитель ограничен сверху. Зациклившийся или спамящий собеседник иначе
 раздул бы память, а пользы от тысячи строк нет: модель всё равно читает
 только хвост.
+Проверяется здесь верхний слой: когда копить, когда разбирать и что доезжает до
+копилки через переходники конвейера. Сама копилка — её пачки, предел и таймеры —
+проверяется у себя (`test_flows_dm_debounce.py`): тяни оба слоя к одному
+следствию, одна правка в копилке красила бы по два теста за раз.
 """
 
 import asyncio
-
-import pytest
+import logging
 
 from backend.payloads import PendingReply
 
@@ -127,41 +130,24 @@ async def test_a_stopping_bot_buffers_nothing(dm_pipeline):
     assert 7 not in dm_pipeline.dm_debounce.bursts
 
 
-async def test_an_overlong_burst_keeps_only_its_tail(dm_pipeline):
-    """Слишком длинная очередь обрезается с начала, а не с конца.
+async def test_an_overflowed_burst_is_said_out_loud(dm_pipeline, caplog):
+    """Обрезанная очередь не молчит: сколько выброшено, уходит в журнал.
 
-    Свежий сигнал важнее полной истории: модель читает хвост, а
-    зациклившийся собеседник иначе раздувал бы память без предела.
+    Сама обрезка — дело копилки, и там она и проверяется. Здесь другое
+    следствие: имени человека копилка не знает и сказать о потере не может —
+    говорит зовущий. Промолчи он, и модель разбирала бы хвост переписки
+    вместо целого, а по журналу этого было бы не видно.
     """
     dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
     cap = dm_pipeline.dm_debounce.cap
-    for number in range(cap + 3):
-        dm_pipeline.schedule_dm_classification(
-            7, PendingReply(1, number, number, f"строка {number}")
-        )
 
-    kept = _texts(dm_pipeline, 7)
-    assert len(kept) == cap
-    assert kept[0] == "строка 3"
-    assert kept[-1] == f"строка {cap + 2}"
+    with caplog.at_level(logging.WARNING):
+        for number in range(cap + 2):
+            dm_pipeline.schedule_dm_classification(
+                7, PendingReply(1, number, number, f"строка {number}")
+            )
 
-
-async def test_an_edited_message_is_updated_in_place(dm_pipeline):
-    """Правка меняет текст в накопителе, не трогая порядок и соседей.
-
-    Ищется письмо по номеру Telegram: оповещение о правке приходит оттуда и
-    другого номера не знает. Номера здесь потому и разведены — с одним и тем
-    же числом в обоих проверка прошла бы и при поиске по номеру строки базы,
-    то есть не стерегла бы ничего: правка уходила бы в пустоту, а модель
-    разбирала текст, которого HR уже не писал.
-    """
-    dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 500, 10, "первое"))
-    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 501, 11, "второе"))
-
-    dm_pipeline.update_dm_buffer_text(7, 10, "первое, исправленное")
-
-    assert _texts(dm_pipeline, 7) == ["первое, исправленное", "второе"]
+    assert "dropping oldest" in caplog.text
 
 
 async def test_an_edit_emptied_to_nothing_leaves_an_empty_string(dm_pipeline):
@@ -176,98 +162,3 @@ async def test_an_edit_emptied_to_nothing_leaves_an_empty_string(dm_pipeline):
     dm_pipeline.update_dm_buffer_text(7, 10, None)
 
     assert _texts(dm_pipeline, 7) == [""]
-
-
-@pytest.mark.parametrize(
-    ("hr_id", "msg_id"),
-    [
-        pytest.param(8, 10, id="чужой собеседник"),
-        pytest.param(7, 99, id="чужое сообщение"),
-    ],
-)
-async def test_an_edit_of_something_not_buffered_changes_nothing(
-    dm_pipeline, hr_id, msg_id
-):
-    """Правка того, чего в накопителе нет, ничего не меняет и не падает."""
-    dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "первое"))
-
-    dm_pipeline.update_dm_buffer_text(hr_id, msg_id, "мимо")
-
-    assert _texts(dm_pipeline, 7) == ["первое"]
-
-
-async def test_a_deleted_message_leaves_the_buffer(dm_pipeline):
-    """Удалённое сообщение выбывает из накопителя, соседи остаются.
-
-    Учитывать в решении то, что собеседник забрал назад, — прямой путь к
-    неверному статусу вакансии.
-
-    Номера разведены по той же причине, что и у правки: оповещение об
-    удалении знает только номер Telegram. Уцелевший сосед в проверке не для
-    красоты — он отличает «выбыло нужное» от «стёрлось всё разом».
-    """
-    dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 500, 10, "первое"))
-    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 501, 11, "второе"))
-
-    dm_pipeline.remove_dm_buffer_msg(7, 10)
-
-    assert _texts(dm_pipeline, 7) == ["второе"]
-
-
-async def test_removing_the_last_message_drops_the_buffer_itself(dm_pipeline):
-    """Удаление последнего сообщения убирает и сам накопитель.
-
-    Пустой накопитель дожил бы до слива и заставил бы обратиться к модели
-    с пустым пакетом.
-    """
-    dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "единственное"))
-
-    dm_pipeline.remove_dm_buffer_msg(7, 10)
-
-    assert 7 not in dm_pipeline.dm_debounce.bursts
-
-
-@pytest.mark.parametrize(
-    ("hr_id", "msg_id"),
-    [
-        pytest.param(8, 10, id="чужой собеседник"),
-        pytest.param(7, 99, id="чужое сообщение"),
-    ],
-)
-async def test_removing_something_not_buffered_changes_nothing(
-    dm_pipeline, hr_id, msg_id
-):
-    """Удаление того, чего в накопителе нет, ничего не меняет и не падает."""
-    dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "первое"))
-
-    dm_pipeline.remove_dm_buffer_msg(hr_id, msg_id)
-
-    assert _texts(dm_pipeline, 7) == ["первое"]
-async def test_a_telegram_number_does_not_hit_a_row_number(dm_pipeline):
-    """Совпадение номера Telegram с чужим номером строки чужого не трогает.
-
-    Номера у письма два, и живут они в разных счётах: номер строки базы растёт
-    сам по себе, номер Telegram — свой у каждой переписки. Совпасть они могут
-    когда угодно, и раньше копилка искала по номеру строки, а звали её с
-    номером Telegram: удаление одного письма выбрасывало соседнее, живое, а
-    правка переписывала чужой текст. Модель после этого разбирала то, чего HR
-    не писал, и двигала статус вакансии по чужому письму.
-
-    Здесь у второго письма номер строки — 10, ровно тот номер Telegram, по
-    которому уходит первое.
-    """
-    dm_pipeline.DM_CLASSIFY_DEBOUNCE_SEC = 30
-    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 500, 10, "первое"))
-    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 11, "второе"))
-
-    dm_pipeline.remove_dm_buffer_msg(7, 10)
-
-    assert _texts(dm_pipeline, 7) == ["второе"]
-
-    dm_pipeline.update_dm_buffer_text(7, 11, "второе, переписанное")
-
-    assert _texts(dm_pipeline, 7) == ["второе, переписанное"]

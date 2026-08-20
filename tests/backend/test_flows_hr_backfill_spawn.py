@@ -10,11 +10,12 @@
 гасит по этому списку всё, что ещё работает.
 """
 
-from backend.flows import dm_backfill
 import asyncio
+import logging
 
 import pytest
 
+from backend.flows import dm_backfill
 from backend.models import HR
 from tests.dbio import only_row, put
 from tests.factories import hr_row
@@ -26,6 +27,10 @@ async def spawning(make_pipeline, session_factory, monkeypatch):
     await put(session_factory, hr_row(telegram_user_id=777))
     hr = await only_row(session_factory, HR)
     pipeline = await make_pipeline()
+    # Крючок окна проставляется опознаваемым: в стенде он пуст, и сверка
+    # «доехал ли он до догона» вырождалась бы в `None is None` — заменить
+    # проводку пустышкой можно было бы незаметно.
+    pipeline.on_new_message = lambda hr_id: None
     pipeline.caught = []
     pipeline.hold = asyncio.Event()
     pipeline.hold.set()
@@ -104,20 +109,29 @@ async def test_a_finished_catch_up_is_forgotten(spawning):
     assert pipeline.backfill_tasks == set()
 
 
-async def test_a_broken_catch_up_does_not_surface(spawning):
-    """Сорвавшийся догон наружу не пробивается.
+async def test_a_broken_catch_up_does_not_surface(spawning, caplog):
+    """Сорвавшийся догон наружу не пробивается, а ложится в журнал.
 
     Он идёт фоном, и некому его поймать: неперехваченная ошибка задачи
     всплыла бы в чужом месте и в чужое время.
+
+    Пустой список задач сам по себе этого не сторожит — он пустеет и без
+    всякого перехвата, потому что задача снимается с учёта по завершении в
+    любом исходе. Наблюдается поэтому запись с трассировкой: сними перехват —
+    и беда осядет в «Task exception was never retrieved», где её не увидит
+    ни человек, ни счётчик ошибок в окне.
     """
     pipeline, hr = spawning
     pipeline.caught = RuntimeError("сеть")
 
-    dm_backfill.spawn_hr_backfill(pipeline, hr)
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
+    with caplog.at_level(logging.ERROR):
+        dm_backfill.spawn_hr_backfill(pipeline, hr)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
 
     assert pipeline.backfill_tasks == set()
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "RuntimeError: сеть" in caplog.text
 
 
 async def test_stopping_the_bot_puts_out_the_catch_up(spawning):
