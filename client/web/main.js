@@ -23,6 +23,7 @@ import './styles/nav.css';
 import './styles/tabs.css';
 import './styles/button.css';
 import './styles/icon-button.css';
+import './styles/bar.css';
 import './styles/modal.css';
 import './styles/tg-login.css';
 import './styles/footer.css';

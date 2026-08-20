@@ -113,7 +113,7 @@
   {#snippet children()}
     <ModalHead {icon} {title} {onclose} />
 
-    <div class="picker-search-bar">
+    <div class="bar picker-search-bar">
       <SearchBox value={search} {placeholder} onsearch={find} />
     </div>
 

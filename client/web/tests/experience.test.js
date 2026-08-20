@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { asIso, showDate } from '../state/dates.js';
-import { cardTitle, experienceReady, period } from '../state/experience.js';
+import { cardTitle, experienceGoing, experienceReady, period } from '../state/experience.js';
 
 describe('дата места работы', () => {
   it('с моста приходит одним видом, а показывается другим', () => {
@@ -89,5 +89,42 @@ describe('какие места работы уезжают на мост', () =
   it('незаконченное место работы уезжает без даты конца', () => {
     // «По настоящее время» — обычный случай, и мост даты конца не требует.
     expect(experienceReady({ ...FILLED, end_date: '' })).toBe(true);
+  });
+});
+
+describe('что из перечня мест работы уезжает на мост', () => {
+  const FILLED = {
+    id: 7,
+    company: 'Контур',
+    role: 'Python-разработчик',
+    start_date: '2020-03-01',
+    end_date: null,
+  };
+  const FRESH = { id: null, company: '', role: '', start_date: null, end_date: null };
+
+  it('заполненные уезжают', () => {
+    expect(experienceGoing([FILLED])).toEqual({ going: [FILLED], trouble: '' });
+  });
+
+  it('свежая пустая карточка не уезжает и записи не отменяет', () => {
+    // Её ещё нет в базе, пропустить её — значит ничего не потерять; а без
+    // отсева мост отбил бы весь перечень, вместе с правками соседей.
+    expect(experienceGoing([FRESH, FILLED])).toEqual({ going: [FILLED], trouble: '' });
+  });
+
+  it('уже записанная карточка не отсеивается, чем бы её ни опустошили', () => {
+    // Мост заменяет перечень целиком: вычеркнутая из посылки была бы стёрта из
+    // базы молча.
+    const emptied = { ...FILLED, role: '' };
+
+    expect(experienceGoing([emptied]).going).toEqual([]);
+  });
+
+  it('про недозаполненную говорят её номером в том списке, что видит человек', () => {
+    // Свежие пустые карточки в посылку не идут, и номер по ней уехал бы не на
+    // ту строку: свежую добавляют первой, и сдвигает она весь счёт.
+    const emptied = { ...FILLED, id: 9, start_date: '' };
+
+    expect(experienceGoing([FRESH, FILLED, emptied]).trouble).toContain('#3');
   });
 });

@@ -13,13 +13,11 @@
   gap: 0;
 }
 
+/* Полоса — общая, в bar.css; здесь её отступы: окно выбора шире панели
+   списка, и поиск в нём стоит просторнее. */
 .picker-search-bar {
-  display: flex;
-  align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-tertiary);
 }
 
 /* Сама строка поиска — общая, в search-box.css. Своего отступа она здесь не

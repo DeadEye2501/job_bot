@@ -7,7 +7,7 @@
   import ExperienceCard from '$components/ExperienceCard.svelte';
   import { living } from '$state/alive.js';
   import { toggled, without } from '$state/chosen.js';
-  import { experienceReady } from '$state/experience.js';
+  import { experienceGoing } from '$state/experience.js';
   import { oneWrite } from '$state/one_write.js';
   import { plural } from '$state/words.js';
 
@@ -43,27 +43,14 @@
 
   /** Отправить перечень целиком.
    *
-   * Отсеиваются только свежие недозаполненные карточки: они ещё не в базе, и
-   * пропустить их значит ничего не потерять — а без отсева одна пустая
-   * карточка отменяла бы правки всех соседних, заполненных.
-   *
-   * Уже записанная карточка не отсеивается никогда, чем бы её ни опустошили:
-   * мост заменяет перечень целиком, и вычеркнутая из посылки была бы стёрта из
-   * базы молча. Про такую говорим сами и не отправляем ничего — так номер в
-   * жалобе считается по тому списку, который человек видит, а не по укороченной
-   * посылке.
-   *
+   * Что уедет и что сказать, если не уедет ничего, решает `experienceGoing`.
    * Свой ключ на мост не уезжает: он про показ, не про запись.
    */
   function save() {
-    const going = rows.filter((one) => one.id !== null || experienceReady(one));
-    const at = going.findIndex((one) => !experienceReady(one));
-    if (at !== -1) {
-      trouble = `Место работы #${rows.indexOf(going[at]) + 1}: заполните компанию, должность и дату начала — пока они пусты, перечень не записывается.`;
-      return Promise.resolve();
-    }
-    trouble = '';
-    return write(going.map(({ key, ...one }) => one));
+    const now = experienceGoing(rows);
+    trouble = now.trouble;
+    if (now.trouble) return Promise.resolve();
+    return write(now.going.map(({ key, ...one }) => one));
   }
 
   function edit(key, part) {
