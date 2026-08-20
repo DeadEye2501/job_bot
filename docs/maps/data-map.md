@@ -1311,6 +1311,7 @@
 ### `tests/client/test_front_vocabulary.py`
 
 - `STATE` = `Path(__file__).resolve().parents[2] / 'client' /…`
+- `APPLY` = `Path(__file__).resolve().parents[2] / 'backend' …`
 
 ### `tests/client/test_page_contract.py`
 
