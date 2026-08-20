@@ -1213,7 +1213,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 49 файлов
+## tests — 51 файлов
 
 ### tests/alive.test.js (79)
 - —
@@ -1235,6 +1235,9 @@ body, html, button, body, .material-symbols-outlined
 
 ### tests/blacklist_menu_item.test.js (114)
 - * Кому эти слова положены: сам пункт, окошко ручного занесения и кнопка на * вкладке отсева. Всем прочим — нет: там это была бы четвёртая копия.
+
+### tests/blacklist_menu_item_live.test.js (62)
+- * Пункт с записанным за ним следом нажатий.
 
 ### tests/bridge.test.js (161)
 - —
@@ -1307,8 +1310,11 @@ body, html, button, body, .material-symbols-outlined
 ### tests/markup.test.js (69)
 - —
 
-### tests/notes_field.test.js (80)
+### tests/notes_field.test.js (66)
 - * Файлы разметки, ставящие поле заметки, вместе с их содержимым.
+
+### tests/notes_field_live.test.js (62)
+- * Поле заметки с записанными за ним отправками.
 
 ### tests/one_write.test.js (139)
 - * Запись, которая отвечает не сразу: ответ отдаёт вызывающий.
