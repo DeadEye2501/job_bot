@@ -926,18 +926,20 @@ First-run bootstrap: ensure DB schema exists.
 - `def _log_parsed(parsed: ParsedVacancy) -> None` (10)
 - `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, known_skills=None) -> tuple[ParsedVacancy | None, str | None]` (50)
 
-### `backend/log_buffer.py` — 168 строк
+### `backend/log_buffer.py` — 214 строк
 
-Журнал в памяти для экрана «Логи»: кольцо записей и снимок для окна.
+Журнал в памяти для экрана «Логи»: четыре кольца записей и снимок для окна.
 
 Зависит от: `backend.log_secrets`
 
-- `class LogBufferHandler(logging.Handler)` (107)
+- `def _bucket_of(levelname: str) -> str` (9)
+- `class LogBufferHandler(logging.Handler)` (121)
   - `def emit(self, record: logging.LogRecord) -> None` (33)
   - `def handleError(self, record: logging.LogRecord) -> None` (6)
   - `def snapshot(self) -> list[dict]` (3)
-  - `def page(self) -> dict` (44)
-  - `def clear(self) -> int` (5)
+  - `def _taken(self) -> tuple[list[dict], dict[str, int]]` (20)
+  - `def page(self) -> dict` (33)
+  - `def clear(self) -> int` (7)
 - `def install() -> LogBufferHandler` (23)
 - `def get_handler() -> LogBufferHandler` (2)
 
@@ -3364,13 +3366,13 @@ Runtime settings layer.
 
 - `def _parsed(**fields) -> httpx.Response` (3)
 
-### `tests/backend/test_log_buffer.py` — 501 строк ⚠ за пределом 500
+### `tests/backend/test_log_buffer.py` — 571 строк ⚠ за пределом 500
 
 Следствия, которые наблюдают тесты журналирования.
 
 Зависит от: `backend.log_buffer`, `backend.log_file`, `backend.log_secrets`, `config`
 
-Тестов: 29
+Тестов: 32
 
 - `def clean_log_file()` (11)
 - `def record(msg: str, *, name: str='проверка', level: int=logging.INFO)` (6)
@@ -4339,7 +4341,7 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/client/test_bridge_journal.py` — 124 строк
+### `tests/client/test_bridge_journal.py` — 126 строк
 
 Следствия домена журнала: что человек видит на экране записей.
 

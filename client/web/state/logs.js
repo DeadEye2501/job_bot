@@ -27,8 +27,14 @@ export const AT_FIRST = LEVELS.filter((one) => one.atFirst).map((one) => one.id)
  * человеку не показывают. Правило живёт здесь одно на всех — и цвет строки, и
  * отбор спрашивают его же.
  */
+const PILLS = ['ERROR', 'WARNING', 'INFO', 'DEBUG'];
+
 function pillOf(level) {
-  return level === 'CRITICAL' ? 'ERROR' : level;
+  if (level === 'CRITICAL') return 'ERROR';
+  // Чужой уровень — под отладочную пилюлю: журнал кладёт такую запись в
+  // отладочное кольцо и считает её там же, и разойдись эти два правила,
+  // пилюля обещала бы строки, которых под ней не покажется ни одной.
+  return PILLS.includes(level) ? level : 'DEBUG';
 }
 
 /** Время записи с долями секунды.

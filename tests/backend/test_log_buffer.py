@@ -16,7 +16,7 @@ import pytest
 
 from config import get_log_path
 
-from backend.log_buffer import MAX_RECORDS, LogBufferHandler, install
+from backend.log_buffer import LEVEL_LIMITS, LogBufferHandler, install
 from backend.log_file import LogFileHandler
 from backend.log_secrets import SecretRedactionFilter, install_secret_filter
 
@@ -213,25 +213,88 @@ def test_records_are_numbered_consecutively():
     assert [e["id"] for e in handler.snapshot()] == [1, 2]
 
 
-def test_the_ring_stays_bounded_and_drops_the_oldest():
-    """Кольцо не растёт за предел и теряет самые старые записи."""
+def test_a_level_stays_bounded_and_drops_its_own_oldest():
+    """Журнал уровня не растёт за свой предел и теряет свои самые старые.
+
+    Пределы у уровней разные, и отладочному отведено втрое больше: он идёт
+    потоком — сотни строк за обход, — а предупреждение случается по делу.
+    """
     handler = LogBufferHandler()
 
-    for i in range(MAX_RECORDS + 10):
-        handler.emit(record(f"запись {i}"))
+    for i in range(LEVEL_LIMITS["WARNING"] + 10):
+        handler.emit(record(f"запись {i}", level=logging.WARNING))
 
-    snapshot = handler.snapshot()
-    assert len(snapshot) == MAX_RECORDS
-    assert snapshot[0]["msg"] == "запись 10"
+    kept = handler.snapshot()
+    assert len(kept) == LEVEL_LIMITS["WARNING"]
+    assert kept[0]["msg"] == "запись 10"
 
 
-def test_clearing_returns_the_count_and_empties_the_buffer():
-    """Очистка возвращает число убранного и опустошает буфер."""
+def test_a_flood_of_debug_does_not_wash_out_an_error():
+    """Поток отладочных записей не смывает ошибку.
+
+    Ради этого журналы и разделены. Отладка идёт сотнями строк за обход, и в
+    общем кольце она вытесняла ровно то, ради чего журнал открывают: человек
+    видел поломку, шёл разбираться — а к его приходу строки о ней уже не было.
+    """
     handler = LogBufferHandler()
-    handler.emit(record("одна"))
-    handler.emit(record("вторая"))
+    handler.emit(record("сломалось", level=logging.ERROR))
 
-    assert handler.clear() == 2
+    for n in range(LEVEL_LIMITS["DEBUG"] * 2):
+        handler.emit(record(f"шум {n}", level=logging.DEBUG))
+
+    kept = handler.snapshot()
+    assert [row["msg"] for row in kept if row["level"] == "ERROR"] == ["сломалось"]
+    # И сама отладка свой предел держит: без этого «не смыло ошибку» прошло бы
+    # и у кольца, которое не выбрасывает ничего и растёт до конца работы.
+    assert len([row for row in kept if row["level"] == "DEBUG"]) == LEVEL_LIMITS["DEBUG"]
+
+
+def test_the_page_mixes_the_levels_in_the_order_they_happened():
+    """Без отбора записи идут вперемешку, в порядке случившегося.
+
+    Журналы у уровней свои, а лента у человека одна: разложи мы её по уровням,
+    из неё пропало бы главное — что за чем шло. Свежие сверху, как и прежде.
+    """
+    handler = LogBufferHandler()
+    handler.emit(record("первая", level=logging.INFO))
+    handler.emit(record("вторая", level=logging.ERROR))
+    handler.emit(record("третья", level=logging.DEBUG))
+
+    page = handler.page()
+
+    assert [row["msg"] for row in page["records"]] == ["третья", "вторая", "первая"]
+    assert page["total"] == 3
+
+
+def test_a_critical_record_shares_the_bounds_of_an_error():
+    """`CRITICAL` живёт в журнале ошибок, а не своим.
+
+    Окно рисует их одной пилюлей и одним цветом; заведи мы им отдельный
+    предел, число в пилюле перестало бы отвечать за строки под ней.
+    """
+    handler = LogBufferHandler()
+
+    for n in range(LEVEL_LIMITS["ERROR"] + 10):
+        handler.emit(record(f"беда {n}", level=logging.CRITICAL))
+
+    assert len(handler.snapshot()) == LEVEL_LIMITS["ERROR"]
+    assert handler.page()["level_counts"]["ERROR"] == LEVEL_LIMITS["ERROR"]
+
+
+def test_clearing_returns_the_count_and_empties_every_level():
+    """Очистка возвращает число убранного и опустошает все четыре кольца.
+
+    Записи разных уровней нарочно: чистка обходит кольца по одному, и забудь
+    она хоть одно — экран после «очистить» показывал бы прежние строки, ради
+    чего чистку и жмут.
+    """
+    handler = LogBufferHandler()
+    handler.emit(record("сведение"))
+    handler.emit(record("предупреждение", level=logging.WARNING))
+    handler.emit(record("беда", level=logging.ERROR))
+    handler.emit(record("отладка", level=logging.DEBUG))
+
+    assert handler.clear() == 4
     assert handler.snapshot() == []
 
 
@@ -481,21 +544,28 @@ def test_a_critical_record_is_counted_as_an_error():
     assert "CRITICAL" not in counts
 
 
-def test_the_page_shows_the_newest_first_and_all_of_them():
-    """На странице свежие сверху, и на ней всё кольцо целиком.
+def test_the_page_gives_all_the_rings_hold():
+    """Страница отдаёт всё, что лежит в кольцах, и ни строкой меньше.
 
-    Окно рисует список сверху вниз и отбирает по уровню у себя: обрежь мы
-    страницу — пилюля обещала бы записи, которых человеку не достать ничем,
-    потому что счёт она ведёт по всему кольцу.
+    Отбор по уровню окно делает у себя: обрежь мы страницу — пилюля обещала бы
+    записи, которых человеку не достать ничем. Потолок ответа держат сами
+    кольца, и другого потолка здесь нет.
+
+    Наполняем два кольца, а не одно: на одном «потолка нет» не отличалось бы от
+    потолка страницы в тот же предел кольца.
     """
     handler = LogBufferHandler()
-    # Больше прежнего потолка в тысячу: на трёх записях «отдаётся всё кольцо»
-    # не отличалось бы от любого потолка от трёх и выше.
-    for n in range(1200):
-        handler.emit(record(f"запись {n}"))
+    for n in range(LEVEL_LIMITS["INFO"] + 200):
+        handler.emit(record(f"сведение {n}"))
+    for n in range(LEVEL_LIMITS["ERROR"] + 200):
+        handler.emit(record(f"беда {n}", level=logging.ERROR))
 
     page = handler.page()
 
-    assert len(page["records"]) == 1200
-    assert page["total"] == 1200
-    assert page["records"][0]["msg"] == "запись 1199"
+    together = LEVEL_LIMITS["INFO"] + LEVEL_LIMITS["ERROR"]
+    assert len(page["records"]) == together
+    assert page["total"] == together
+    assert page["level_counts"] == {
+        "INFO": LEVEL_LIMITS["INFO"],
+        "ERROR": LEVEL_LIMITS["ERROR"],
+    }
