@@ -1213,7 +1213,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 46 файлов
+## tests — 48 файлов
 
 ### tests/alive.test.js (79)
 - —
@@ -1233,8 +1233,8 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist.test.js (201)
 - —
 
-### tests/blacklist_menu_item.test.js (108)
-- * Файлы разметки вместе с содержимым.
+### tests/blacklist_menu_item.test.js (80)
+- * Постановки самого пункта.
 
 ### tests/bridge.test.js (161)
 - —
@@ -1296,7 +1296,14 @@ body, html, button, body, .material-symbols-outlined
 ### tests/logs.test.js (152)
 - —
 
-### tests/notes_field.test.js (64)
+### tests/markup.js (79)
+- * Файлы разметки вместе с содержимым.
+- отдаёт: markup, placed, placementsIn
+
+### tests/markup.test.js (60)
+- —
+
+### tests/notes_field.test.js (48)
 - * Файлы разметки, ставящие поле заметки, вместе с их содержимым.
 
 ### tests/one_write.test.js (139)

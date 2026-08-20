@@ -269,7 +269,7 @@ async def test_an_answering_model_lights_the_lamp_green(
 
 
 async def test_the_lamp_answers_about_the_base_and_telegram_too(
-    api, ask, session_factory
+    api, ask
 ):
     """Лампочка отвечает про базу и Telegram, а не только про модели.
 

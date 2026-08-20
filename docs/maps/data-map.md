@@ -1338,6 +1338,7 @@
 - `EPOCH` = `datetime(2026, 1, 1, 12, 0)`
 - `_PHOTO_HEADS` = `словарь из 4`
 - `CV_REQUIRED_PROFILE` = `словарь из 4`
+- `_MARKED_COMPANIES` = `набор из 3`
 
 ### `tests/fakes/ingestion.py`
 

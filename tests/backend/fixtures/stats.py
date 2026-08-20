@@ -27,10 +27,20 @@ def applied(session_factory):
     Ответ без HR не ставится: письмо приходит от кого-то, и вакансия без
     человека отвечающего не имеет. Отклик без ответа — имеет: отправляют его
     мы, и в сводке он считается молчанием.
+
+    Сама вакансия заводится мигом отклика и в статусе отклика, а не остаётся
+    новой на начале времён: `Vacancy.created_at` — это отбор периода у трёх
+    запросов сводки, и вакансия из начала времён не попадала бы ни в одну
+    прибавку. Тест, которому нужно иное, называет поле именованным доводом.
     """
 
     async def build(applied_at, *, hr=None, answered_after=None, **overrides):
-        vacancy = vacancy_row(hr_id=hr.id if hr else None, **overrides)
+        assert answered_after is None or hr is not None, (
+            "ответ без HR не ставится: письмо приходит от кого-то"
+        )
+        fields = {"status": VacancyStatus.APPLIED, "created_at": applied_at}
+        fields.update(overrides)
+        vacancy = vacancy_row(hr_id=hr.id if hr else None, **fields)
         await put(session_factory, vacancy)
         rows = [
             status_history_row(

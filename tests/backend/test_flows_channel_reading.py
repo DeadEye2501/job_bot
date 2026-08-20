@@ -40,7 +40,7 @@ async def reading(monkeypatch, make_pipeline, session_factory):
     return pipeline, client, channel
 
 
-async def test_the_new_posts_are_taken_oldest_first(reading, session_factory):
+async def test_the_new_posts_are_taken_oldest_first(reading):
     """Новые объявления разбираются от старого к свежему.
 
     Telegram отдаёт наоборот, а отметка должна двигаться вперёд: разобрав
@@ -54,7 +54,7 @@ async def test_the_new_posts_are_taken_oldest_first(reading, session_factory):
     assert pipeline.taken == [10, 11, 12]
 
 
-async def test_reading_stops_at_the_mark(reading, session_factory):
+async def test_reading_stops_at_the_mark(reading):
     """Чтение обрывается на первом же сообщении не новее отметки.
 
     Дальше идёт то, что уже разобрано; читать его заново значило бы
@@ -183,7 +183,7 @@ async def test_the_channel_is_dropped_after_the_provider_keeps_silent(
     assert tried == [11, 12, 13]
 
 
-async def test_the_mark_is_saved_in_batches(monkeypatch, reading, session_factory):
+async def test_the_mark_is_saved_in_batches(monkeypatch, reading):
     """Отметка сохраняется пачками, а не после каждого сообщения.
 
     Полтора десятка каналов по полтора десятка сообщений дали бы сотни

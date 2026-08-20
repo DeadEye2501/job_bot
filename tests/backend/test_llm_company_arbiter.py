@@ -9,6 +9,8 @@
 без неё по записи не разобрать, чем всё кончилось.
 """
 
+import json
+
 import httpx
 import pytest
 
@@ -41,15 +43,52 @@ def _answer(matched_id=None, reasoning=None) -> httpx.Response:
     return chat_json({"matched_id": matched_id, "reasoning": reasoning})
 
 
-async def _ask(client, candidates, name="Сбербанк Тех"):
+async def _ask(client, candidates, name="Сбербанк Тех", website=None):
     """Спросить арбитра о названии при заданных кандидатах."""
     return await dedupe_company_with_llm(
         client,
         "qwen",
         parsed_name=name,
-        parsed_website=None,
+        parsed_website=website,
         candidates=candidates,
     )
+
+
+async def test_the_parsed_website_reaches_the_arbiter():
+    """Сайт разобранной компании доезжает до арбитра вместе с именем.
+
+    На нём держится половина правила 1 наставления: у обеих компаний сайт
+    назван и хосты разные — значит компании разные. Потеряйся он по дороге,
+    правило не сработало бы ни разу, а «Сбербанк» и «Сбербанк Тех» с разными
+    сайтами сводились бы по одному сходству имён.
+    """
+    client = provider({CHAT: _answer(None, "разные сайты")})
+
+    await _ask(
+        client,
+        [_Candidate(7, "Сбербанк", website="https://sber.ru")],
+        website="https://sbertech.ru",
+    )
+
+    assert "sbertech.ru" in data_block(client.sent[0])
+
+
+async def test_the_arbiter_is_given_room_to_reach_the_answer():
+    """Потолок ответа оставляет место после размышления, а не только на него.
+
+    Обрыв ответа здесь вырождается в «завести новую компанию», и молча:
+    прежних двухсот пятидесяти рассуждающей модели хватало ровно на
+    размышление, а до номера кандидата дело не доходило ни разу.
+
+    Смотрим на ушедший запрос, а не на константу: между объявлением и
+    проводом стоит сборка запроса, и сверка константы с самой собой прошла
+    бы зелёной и тогда, когда поле до провода не доехало.
+    """
+    client = provider({CHAT: _answer(7, "одна и та же")})
+
+    await _ask(client, [_Candidate(7, "Сбербанк")])
+
+    assert json.loads(client.sent[0].content)["max_tokens"] >= 1200
 
 
 async def test_without_candidates_nothing_is_asked():

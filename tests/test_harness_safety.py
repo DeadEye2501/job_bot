@@ -44,7 +44,7 @@ async def test_a_call_into_real_telegram_blows_up():
 
 
 async def test_a_call_through_a_raw_session_blows_up_too():
-    """Вызов `Session.invoke` падает так же, а не уходит на сервер.
+    """Отправка через отдельную сессию падает так же, а не уходит на сервер.
 
     Часть работы Pyrogram делает не через клиент, а поднимая отдельную
     сессию: так идут заливка файла, скачивание медиа и подключение. Через
@@ -55,7 +55,31 @@ async def test_a_call_through_a_raw_session_blows_up_too():
     import pyrogram
 
     with pytest.raises(TelegramReached, match="настоящего Telegram"):
-        await pyrogram.session.Session.invoke(None, None)
+        await pyrogram.session.Session.send(None, None)
+
+
+async def test_starting_a_raw_session_blows_up():
+    """Подключение сессии падает: её первый обмен идёт мимо `Session.invoke`.
+
+    `Session.start` шлёт первый пакет через `Session.send` напрямую, поэтому
+    запор, стоявший на `invoke`, до подключения не доходил вовсе.
+    """
+    import pyrogram
+
+    with pytest.raises(TelegramReached, match="настоящего Telegram"):
+        await pyrogram.session.Session.start(None)
+
+
+async def test_creating_an_auth_key_blows_up():
+    """Авторизация падает: у неё свой обмен, не через `Session`.
+
+    `Auth.create` открывает соединение сам и зовёт собственный `Auth.invoke`
+    другого класса — запоры на клиенте и на сессии её не задевают.
+    """
+    import pyrogram
+
+    with pytest.raises(TelegramReached, match="настоящего Telegram"):
+        await pyrogram.session.Auth.create(None)
 
 
 async def test_the_telegram_refusal_survives_an_except_exception_block():

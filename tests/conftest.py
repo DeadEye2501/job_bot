@@ -190,16 +190,20 @@ def _telegram_is_unreachable(monkeypatch):
     `adapters.telegram.SEND_LOCKED` для этого мало — `backend/bot/` зовёт
     методы клиента напрямую, минуя `send_dm`.
 
-    Единственной воронкой Pyrogram `Client.invoke` НЕ является. Под часть
-    работы библиотека поднимает отдельные `Session` и зовёт `Session.invoke`
-    напрямую: так идут заливка файла (`save_file`), скачивание медиа вместе с
-    обращением к раздающему узлу, подключение и авторизация. Через первый из
-    этих путей `send_photo`/`send_document` с путём к файлу сперва заливали
-    файл на сервера Telegram и упирались в запор только на последнем шаге —
-    файл к тому моменту уже был там.
+    Единственной воронкой Pyrogram `Client.invoke` НЕ является: под заливку
+    файла, скачивание медиа и подключение библиотека поднимает отдельные
+    `Session`. Через первый из этих путей `send_photo`/`send_document` с путём
+    к файлу сперва заливали файл на сервера Telegram и упирались в запор
+    только на последнем шаге — файл к тому моменту уже был там.
 
-    Поэтому запор двойной: подменяются обе воронки. Нижняя, `Session.invoke`,
-    ловит и то, что до верхней не доходит.
+    Запоров поэтому две пары. На обмене — `Client.invoke` и `Session.send`:
+    ловят того, кто уже держит живой клиент или сессию. Именно `send`, а не
+    `Session.invoke`: `invoke` сам сводится к `send`.
+
+    На сокете — `Session.start` и `Auth.create`: обе открывают соединение до
+    первого обмена, и запор на обмене пропускал бы их ровно до того мига,
+    когда подключение уже установлено. Авторизация вынесена отдельно от
+    сессии потому, что зовёт собственный `Auth.invoke` другого класса.
 
     Тестам, которым нужны эти пути, настоящий клиент передавать нельзя ни
     при каких условиях — только подделку из `tests/fakes/telegram.py`.
@@ -207,13 +211,16 @@ def _telegram_is_unreachable(monkeypatch):
 
     async def _refuse(*_args, **_kwargs):
         raise TelegramReached(
-            "тест дотянулся до настоящего Telegram: вызван invoke у клиента или "
-            "сессии Pyrogram. Передайте в проверяемый код подделку из "
+            "тест дотянулся до настоящего Telegram: вызван invoke у клиента, "
+            "обмен или подключение сессии Pyrogram, либо создание ключа "
+            "авторизации. Передайте в проверяемый код подделку из "
             "tests/fakes/telegram.py."
         )
 
     monkeypatch.setattr(pyrogram.Client, "invoke", _refuse)
-    monkeypatch.setattr(pyrogram.session.Session, "invoke", _refuse)
+    monkeypatch.setattr(pyrogram.session.Session, "send", _refuse)
+    monkeypatch.setattr(pyrogram.session.Session, "start", _refuse)
+    monkeypatch.setattr(pyrogram.session.Auth, "create", _refuse)
 
 
 @pytest.fixture(autouse=True)

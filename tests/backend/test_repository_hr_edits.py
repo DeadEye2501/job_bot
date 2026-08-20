@@ -13,7 +13,7 @@ from tests.dbio import put
 from tests.factories import hr_row
 
 
-async def test_fields_of_a_missing_hr_are_not_written(session, session_factory):
+async def test_fields_of_a_missing_hr_are_not_written(session):
     """Поля несуществующего HR не пишутся, и вызов об этом сообщает."""
     assert await update_hr_fields(session, 10_000, name="кто-то") is False
 

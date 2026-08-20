@@ -28,6 +28,11 @@ def _row(**overrides) -> dict:
     return fields
 
 
+async def test_an_empty_database_has_no_places(session):
+    """На пустой базе мест работы нет, и это не ошибка."""
+    assert await list_experience(session) == []
+
+
 async def test_places_are_listed_newest_first(session, session_factory):
     """Места работы отдаются от свежего к давнему."""
     profile = profile_row()
@@ -205,6 +210,27 @@ async def test_two_skills_sharing_one_key_do_not_swallow_each_other(
 
     got = await list_experience(session)
     assert [s.name for s in got[0].skills] == ["Node.js"]
+
+
+async def test_a_skill_nickname_does_not_link_the_place(session, session_factory):
+    """Прозвище навыка местом работы не опознаётся — только название.
+
+    Прозвища знает разбор резюме: стек оттуда приходит любым написанием.
+    Экран же присылает выбранное из списка, то есть само название, и лишний
+    ключ там множил бы столкновения — «Нода» у двух разных навыков увела бы
+    место работы к тому, кто попался первым.
+    """
+    profile = profile_row()
+    await put(session_factory, profile)
+    await put(
+        session_factory,
+        profile_skill_row(profile.id, "Node.js", aliases=["Нода"]),
+    )
+
+    await save_experience(session, [_row(skill_names=["Нода"])], profile.id)
+
+    got = await list_experience(session)
+    assert [s.name for s in got[0].skills] == []
 
 
 async def test_two_names_of_one_skill_link_it_once(session, session_factory):

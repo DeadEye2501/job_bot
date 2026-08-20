@@ -10,7 +10,13 @@ from backend.repository.blacklist_marks import preferred_blacklist_value
 from backend.repository.companies_card import company_blacklist_candidates, get_company_detail
 from backend.repository.hr_list import list_hrs_for_company
 from tests.dbio import put
-from tests.factories import blacklist_row, company_row, hr_row, vacancy_row
+from tests.factories import (
+    company_marks,
+    company_row,
+    hr_row,
+    marked_companies,
+    vacancy_row,
+)
 
 
 async def test_a_missing_company_has_no_card(session, session_factory):
@@ -46,16 +52,9 @@ async def test_the_card_shows_an_active_mark_of_its_own_kind(
     session, session_factory
 ):
     """Отметка показывается, только если она включена и заведена для компании."""
-    listed = company_row(name="Контур")
-    switched_off = company_row(name="Ромашка")
-    other_kind = company_row(name="Берёзка")
+    listed, switched_off, other_kind = marked_companies()
     await put(session_factory, listed, switched_off, other_kind)
-    await put(
-        session_factory,
-        blacklist_row("company", "Контур"),
-        blacklist_row("company", "Ромашка", active=False),
-        blacklist_row("hr", "Берёзка"),
-    )
+    await put(session_factory, *company_marks())
 
     assert (await get_company_detail(session, listed.id)).blacklist_value == "Контур"
     assert (await get_company_detail(session, switched_off.id)).blacklist_value is None

@@ -19,6 +19,11 @@ async def names_and_levels(session) -> list[tuple[str, int]]:
     return [(s.name, s.level) for s in await list_skills(session)]
 
 
+async def test_an_empty_database_has_no_skills(session):
+    """На пустой базе навыков нет, и это не ошибка."""
+    assert await list_skills(session) == []
+
+
 async def test_skills_are_listed_in_the_order_they_were_added(
     session, session_factory
 ):

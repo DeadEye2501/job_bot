@@ -90,7 +90,7 @@ async def test_only_a_waiting_vacancy_can_fall_silent(
     assert [row.status for row in rows] == [status]
 
 
-async def test_nothing_waiting_means_nothing_to_do(make_pipeline, session_factory):
+async def test_nothing_waiting_means_nothing_to_do(make_pipeline):
     """На пустой базе проверка ничего не делает и не падает."""
     pipeline = await make_pipeline()
 
@@ -115,7 +115,7 @@ async def test_the_window_hears_about_the_silenced_vacancies(
 
 
 async def test_the_window_is_not_told_when_nothing_moved(
-    make_pipeline, session_factory
+    make_pipeline
 ):
     """Когда двигать нечего, окно не дёргают.
 

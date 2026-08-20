@@ -26,7 +26,7 @@ from tests.factories import hr_row
 
 
 async def test_a_letter_reaches_the_address_the_hr_carries(
-    ready_to_send, session_factory, outbox
+    ready_to_send, outbox
 ):
     """Письмо уходит по адресу, записанному у HR."""
     bot, hr, vacancy = await ready_to_send()
@@ -261,7 +261,7 @@ async def test_a_suppressed_send_is_marked_as_such_in_the_timeline(
 
 
 async def test_a_send_tells_the_window_the_vacancy_changed(
-    ready_to_send, session_factory, outbox
+    ready_to_send, outbox
 ):
     """Об ушедшем письме окно узнаёт вестью, и другого способа у него нет.
 
@@ -279,7 +279,7 @@ async def test_a_send_tells_the_window_the_vacancy_changed(
 
 
 async def test_a_simulated_send_tells_the_window_too(
-    ready_to_send, session_factory
+    ready_to_send
 ):
     """Заглушённая отправка окну тоже рассказывает: статус-то она переставила.
 
@@ -296,7 +296,7 @@ async def test_a_simulated_send_tells_the_window_too(
 
 
 async def test_a_refused_send_tells_the_window_nothing(
-    ready_to_send, session_factory, outbox
+    ready_to_send, outbox
 ):
     """Отказ заслона вестью не сопровождается: менять окну нечего."""
     bot, hr, vacancy = await ready_to_send(mode=BotMode.OFF)

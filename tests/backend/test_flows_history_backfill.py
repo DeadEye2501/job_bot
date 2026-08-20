@@ -20,7 +20,7 @@ from backend.models import HR, Message
 from tests.backend.fixtures.backfill import catch_up as _catch_up, ours as _ours, theirs as _theirs
 from tests.dbio import all_rows, only_row, put
 from tests.factories import hr_row, message_row
-from tests.fakes.telegram import FakeTelegramClient, photo
+from tests.fakes.telegram import FakeTelegramClient, photo, user
 
 
 async def test_the_missed_conversation_lands_in_the_chat(
@@ -177,7 +177,10 @@ async def test_an_unknown_peer_is_resolved_by_name(session_factory):
     """
     await put(session_factory, hr_row(telegram_user_id=777, telegram_username="maria"))
     hr = await only_row(session_factory, HR)
-    client = FakeTelegramClient(fails={"get_chat_history": [PeerIdInvalid(), None]})
+    client = FakeTelegramClient(
+        fails={"get_chat_history": [PeerIdInvalid(), None]},
+        users={"maria": user(username="maria")},
+    )
     client.history = [_theirs(10, "нашлось")]
 
     await _catch_up(client, hr, session_factory)
@@ -211,7 +214,8 @@ async def test_a_failed_second_try_leaves_its_trace_in_the_log(
     await put(session_factory, hr_row(telegram_user_id=777, telegram_username="maria"))
     hr = await only_row(session_factory, HR)
     client = FakeTelegramClient(
-        fails={"get_chat_history": [PeerIdInvalid(), OSError("сеть")]}
+        fails={"get_chat_history": [PeerIdInvalid(), OSError("сеть")]},
+        users={"maria": user(username="maria")},
     )
 
     with caplog.at_level(logging.WARNING):
