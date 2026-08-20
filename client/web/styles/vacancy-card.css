@@ -32,17 +32,6 @@
   word-break: break-word;
 }
 
-/* Карточка с рамкой на каждый блок: стек, описание, контакты, заметки и
-   лента — разные разделы, и просветом между ними они читались бы одной
-   сплошной колонкой. */
-.det-section {
-  margin-bottom: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--bg-secondary);
-}
-
 .status-badge {
   display: inline-flex;
   align-items: center;

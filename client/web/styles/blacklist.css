@@ -22,14 +22,6 @@
   border: 1px solid var(--border);
 }
 
-.bl-toolbar .search-input {
-  font-size: 0.78rem;
-}
-
-.bl-toolbar .search-box > .material-symbols-outlined {
-  font-size: 14px;
-}
-
 .bl-filter-pills {
   display: flex;
   gap: 3px;
@@ -173,30 +165,19 @@
   color: var(--kind-channel-fg);
 }
 
-/* Поля правятся на месте: рамки у них нет, пока на строку не навели. Иначе
-   таблица из полусотни строк выглядела бы анкетой. */
+/* Правится на месте — общим правилом из inline-edit.css; здесь только размер
+   и то, чем поле залито в наборе. */
 .bl-input {
   width: 100%;
   /* Поле ввода само по себе шире своей колонки: ширина у него считается по
      умолчанию движка, а не по `width`, и без этого таблица распирает панель. */
   min-width: 0;
   padding: 3px 6px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--text-primary);
-  font-family: inherit;
   font-size: 0.83rem;
 }
 
-.bl-input:hover {
-  border-color: var(--border);
-}
-
 .bl-input:focus {
-  border-color: var(--accent);
   background: var(--bg-tertiary);
-  outline: none;
 }
 
 .bl-input::placeholder {
@@ -220,8 +201,14 @@ textarea.bl-input.reason {
   resize: none;
 }
 
+/* Ореола у вспышки здесь нет: он нужен там, где поле залито и уже обведено
+   рамкой набора, а в таблице поле прозрачное, и одной смены цвета рамки
+   довольно. Ореол вокруг строки таблицы вдобавок наезжает на соседние.
+
+   Гашение своё: у поля, которое правится на месте, перехода нет вовсе, и рамка
+   гасла бы рывком. */
 .bl-input.saved-flash {
-  border-color: var(--accent);
+  box-shadow: none;
   transition: border-color 0.4s ease;
 }
 

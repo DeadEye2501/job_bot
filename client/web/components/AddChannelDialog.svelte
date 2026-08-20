@@ -11,7 +11,7 @@
   let { value, trouble, saving, oninput, onadd, onclose } = $props();
 </script>
 
-<ModalShell extra="add-channel" {onclose}>
+<ModalShell extra="narrow add-channel" {onclose}>
   {#snippet children()}
     <ModalHead icon="add_circle" title="Добавить канал" {onclose} />
 
@@ -21,7 +21,7 @@
            где полей несколько и выбор первого за человеком. -->
       <!-- svelte-ignore a11y_autofocus -->
       <input
-        class="cnt-input"
+        class="input cnt-input"
         autofocus
         maxlength="200"
         placeholder="@username канала или t.me/..."

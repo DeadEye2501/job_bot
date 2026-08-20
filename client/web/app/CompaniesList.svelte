@@ -83,7 +83,7 @@
       onsearch={list.find}
     />
     <button
-      class="cnt-add-btn"
+      class="icon-btn cnt-add-btn"
       type="button"
       title="Добавить компанию"
       onclick={() => (adding = true)}

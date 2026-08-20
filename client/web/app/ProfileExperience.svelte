@@ -136,7 +136,7 @@
     />
   {/each}
 
-  <button class="new-exp" type="button" onclick={add}>+ Добавить место работы</button>
+  <button class="new-box" type="button" onclick={add}>+ Добавить место работы</button>
 
   {#if trouble}
     <div class="autosave-error">{trouble}</div>

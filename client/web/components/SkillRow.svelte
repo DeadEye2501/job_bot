@@ -16,7 +16,7 @@
 
 <div class="ruled-row skill-row">
   <input
-    class="input skill-name"
+    class="inline-edit skill-name"
     maxlength="64"
     value={skill.name}
     onblur={(event) => onedit({ name: event.currentTarget.value.trim() })}

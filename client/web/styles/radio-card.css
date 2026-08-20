@@ -1,0 +1,56 @@
+/* Карточка выбора: способ, его название и пояснение под ним.
+
+   Карточками, а не строкой переключателей: у каждого способа есть пояснение, и
+   в строку оно не встаёт. Так выбирают, что делать с резюме. */
+
+.radio-card {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 9px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.radio-card:hover {
+  border-color: var(--accent);
+}
+
+.radio-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-hover-soft);
+}
+
+.radio-card.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.radio-card.disabled:hover {
+  border-color: var(--border);
+}
+
+.radio-card input {
+  accent-color: var(--accent);
+  margin-top: 2px;
+}
+
+.radio-card.disabled input {
+  cursor: not-allowed;
+}
+
+.radio-card .rc-title {
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.radio-card .rc-sub {
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+  margin-top: 2px;
+  line-height: 1.4;
+}

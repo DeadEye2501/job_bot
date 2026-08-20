@@ -42,13 +42,7 @@
 }
 
 .stats-refresh-btn.spinning .material-symbols-outlined {
-  animation: stats-refresh-spin 0.8s linear infinite;
-}
-
-@keyframes stats-refresh-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  animation: spin 0.8s linear infinite;
 }
 
 /* Двенадцать колонок, а не две: карточки делят ширину по-разному — показатели
@@ -145,13 +139,4 @@
    плохо, и красить её одним цветом значило бы врать в половине случаев. */
 .stats-kpi-delta[data-tone='up'] {
   color: var(--ok);
-}
-
-/* Точка статуса — общая на всё окно: её красит status-color.css, а размер и
-   круглость одни везде, где она встречается. */
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
 }

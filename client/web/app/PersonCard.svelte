@@ -209,14 +209,14 @@
 
   <div class="cnt-form-grid">
     <input
-      class="cnt-input"
+      class="input cnt-input"
       maxlength="120"
       value={card.name ?? ''}
       placeholder="Имя"
       onchange={(event) => save({ name: event.currentTarget.value.trim() })}
     />
     <input
-      class="cnt-input"
+      class="input cnt-input"
       maxlength="64"
       value={card.telegram_username ? `@${card.telegram_username}` : ''}
       placeholder="Telegram @username"
@@ -236,7 +236,7 @@
     }}
   />
 
-  <div class="cnt-det-section">
+  <div class="card-section">
     <!-- Своя запись на каждого человека: поле запечатывает номер при
          заведении, и заводиться заново на каждого его заставляет именно
          `{#key}` — без него запечатанный номер протухнет. -->

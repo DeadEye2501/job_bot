@@ -1,46 +1,16 @@
-/* Раскладка вкладки контактов: список слева, карточка справа.
+/* Своё у вкладки контактов: кнопка заведения в полосе, два пустых состояния и
+   подложка панели подробностей.
 
-   Панели прокручиваются раздельно и обе стоят на экране всегда: человека правят
-   и пишут ему, не теряя из виду соседей по списку. */
+   Сама раскладка — общая с вакансиями, в master-detail.css: панели там
+   прокручиваются раздельно и обе стоят на экране всегда — человека правят и
+   пишут ему, не теряя из виду соседей по списку. */
 
-.cnt-list-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-tertiary);
-}
-
-/* Поиск в полосе списка стоит без рамки и подложки: полоса и есть его рамка, а
-   вторая коробка внутри неё читалась бы как поле в поле. */
-.cnt-list-toolbar .search-box {
-  flex: 1;
-  min-width: 0;
-  max-width: none;
-  padding: 4px 6px;
-  border: 0;
-  background: transparent;
-}
-
-.cnt-list-toolbar .search-input {
-  font-size: 0.78rem;
-}
-
-.cnt-list-toolbar .search-box > .material-symbols-outlined {
-  font-size: 14px;
-}
-
+/* Кнопка заведения — общая кнопка-значок в рамке: рядом с ней стоит поиск, и
+   без рамки она читалась бы как часть его строки. Под курсором светится
+   акцентом, а не серым: она единственная в полосе, что заводит запись. */
 .cnt-add-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  width: 26px;
-  height: 26px;
   border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-secondary);
 }
 
 .cnt-add-btn:hover {

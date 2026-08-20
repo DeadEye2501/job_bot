@@ -1,0 +1,108 @@
+/* Стек места работы: чипы взятых навыков и подборщик под ними.
+
+   Своим файлом, а не в оформлении карточки: подборщик — свой компонент, и
+   выбирают им из навыков анкеты, а не из чего-то, что знает карточка. */
+
+.skills-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+  margin-top: 3px;
+  position: relative;
+}
+
+/* Подборщик всплывает над строкой: стек стоит внизу карточки, и вниз ему
+   некуда — список ушёл бы за нижнюю кромку поля. */
+.skill-picker {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 280px;
+  box-shadow: 0 6px 20px var(--shadow-dropdown);
+  z-index: 10;
+}
+
+.skill-picker-search {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Сама строка поиска — общая, в search-box.css. Своего отступа она здесь не
+   держит: его даёт полоса подборщика. Крупнее общей и лупа, и набранное:
+   подборщик всплывает над строкой, и мелкий шрифт списка в нём не читается. */
+.skill-picker-search .search-box {
+  padding: 0;
+}
+
+.skill-picker-search .search-input {
+  font-size: 0.8rem;
+}
+
+/* Только лупа самой строки: крестик очистки живёт в своём кружке, и общий
+   размер значка распёр бы его до краёв. */
+.skill-picker-search > .search-box > .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.skill-picker-list {
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 4px 0;
+  max-height: 240px;
+}
+
+.skill-picker-cat {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  letter-spacing: 0.4px;
+  padding: 4px 10px 2px;
+}
+
+.skill-picker-item {
+  width: 100%;
+  padding: 4px 10px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.skill-picker-item:hover {
+  background: var(--selected-bg);
+}
+
+/* Уже взятый навык не пропадает из списка, а гаснет: пропади он — человек
+   искал бы его вслепую и брал второй раз. */
+.skill-picker-item.disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+.skill-picker-item.disabled:hover {
+  background: transparent;
+}
+
+.skill-picker-item .lvl {
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.skill-picker-empty {
+  padding: 10px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  text-align: center;
+  font-style: italic;
+}

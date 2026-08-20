@@ -254,7 +254,7 @@
   <!-- Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою
        оценку. -->
   {#if card.stack.length}
-    <div class="det-section">
+    <div class="card-section det-section">
       <div class="det-stack">
         <!-- Ключ по месту, а не по названию: разбор кладёт в стек то, что
              нашёл, и одно и то же название приходит дважды. -->
@@ -266,10 +266,10 @@
   {/if}
 
   {#if card.description}
-    <div class="det-section"><p>{card.description}</p></div>
+    <div class="card-section det-section"><p>{card.description}</p></div>
   {/if}
 
-  <div class="det-section">
+  <div class="card-section det-section">
     <div class="vac-contacts">
       <div class="contact-block">
         <Avatar avatar={card.hr?.avatar} name={card.hr?.name} icon="person" />
@@ -320,7 +320,7 @@
     </div>
   </div>
 
-  <div class="det-section">
+  <div class="card-section det-section">
     <!-- Своя запись на каждую вакансию: поле запечатывает номер при заведении,
          и заводиться заново на каждую его заставляет именно `{#key}` — без
          него запечатанный номер протухнет. -->
@@ -336,7 +336,7 @@
   </div>
 
   {#if rows.length}
-    <div class="det-section">
+    <div class="card-section det-section">
       <!-- Своя лента на каждую вакансию: почему — сказано в её шапке. -->
       {#key vacancyId}
         <VacancyTimeline {rows} {vacancyId} onsave={saveNote} />

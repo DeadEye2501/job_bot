@@ -137,7 +137,7 @@
           <span class="material-symbols-outlined collapse-arrow">expand_more</span>
         </button>
         <input
-          class="cat-name"
+          class="inline-edit cat-name"
           maxlength="64"
           value={group.name}
           onblur={(event) => renameCategory(group.name, event.currentTarget)}
@@ -164,7 +164,7 @@
     </div>
   {/each}
 
-  <button class="new-cat" type="button" onclick={addCategory}>+ Новая категория</button>
+  <button class="new-box" type="button" onclick={addCategory}>+ Новая категория</button>
 {/if}
 
 {#if leaving}

@@ -11,13 +11,13 @@
   flex-direction: column;
 }
 
-.vac-mini-row {
+/* Обе строки устроены одинаково и различаются только колонками: у вакансии их
+   четыре, у человека три. Отрицательный отступ выносит подсветку строки на всю
+   ширину коробки — без него она обрывается по краям её padding'а. */
+.vac-mini-row,
+.hr-mini-row {
   display: grid;
-  grid-template-columns: 14px auto 1fr auto;
   align-items: center;
-  gap: 6px;
-  /* Отрицательный отступ выносит подсветку строки на всю ширину коробки: без
-     него она обрывается по краям её padding'а. */
   margin: 0 -6px;
   padding: 4px 6px;
   border-top: 1px solid var(--border);
@@ -26,17 +26,14 @@
   cursor: pointer;
 }
 
+.vac-mini-row {
+  grid-template-columns: 14px auto 1fr auto;
+  gap: 6px;
+}
+
 .hr-mini-row {
-  display: grid;
   grid-template-columns: 22px 1fr auto;
-  align-items: center;
   gap: 8px;
-  margin: 0 -6px;
-  padding: 4px 6px;
-  border-top: 1px solid var(--border);
-  border-radius: 3px;
-  font-size: 0.78rem;
-  cursor: pointer;
 }
 
 .vac-mini-row:first-child,

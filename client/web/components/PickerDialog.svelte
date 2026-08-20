@@ -19,6 +19,7 @@
   import ModalFoot from './ModalFoot.svelte';
   import ModalHead from './ModalHead.svelte';
   import ModalShell from './ModalShell.svelte';
+  import SearchBox from './SearchBox.svelte';
 
   let {
     title,
@@ -113,13 +114,7 @@
     <ModalHead {icon} {title} {onclose} />
 
     <div class="picker-search-bar">
-      <span class="material-symbols-outlined">search</span>
-      <input
-        type="text"
-        {placeholder}
-        value={search}
-        oninput={(event) => find(event.currentTarget.value)}
-      />
+      <SearchBox value={search} {placeholder} onsearch={find} />
     </div>
 
     <div class="picker-list">

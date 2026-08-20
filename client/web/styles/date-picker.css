@@ -6,26 +6,12 @@
   min-width: 0;
 }
 
-/* Моноширинный: в `дд.мм.гггг` знаки стоят на своих местах, и по обычному
-   шрифту не видно, добран ли день. */
+/* Общее поле, поджатое под свою строку. Моноширинное начертание берётся у него
+   же — `.input.mono`: в `дд.мм.гггг` знаки стоят на своих местах, и по
+   пропорциональному шрифту не видно, добран ли день. */
 .input-date-text {
-  width: 100%;
   padding: 5px 8px;
-  border: 1px solid var(--border);
   border-radius: 3px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 0.83rem;
-}
-
-.input-date-text:hover:not(:disabled, :focus) {
-  border-color: var(--text-secondary);
-}
-
-.input-date-text:focus {
-  outline: none;
-  border-color: var(--accent);
 }
 
 .input-date-text.invalid {

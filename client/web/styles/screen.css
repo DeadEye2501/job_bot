@@ -39,13 +39,3 @@
   font-size: 0.72rem;
   color: var(--text-tertiary);
 }
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 14px;
-}
-
-.form-grid .span-2 {
-  grid-column: span 2;
-}

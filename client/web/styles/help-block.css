@@ -1,0 +1,34 @@
+/* Пошаговая инструкция «где это взять»: нумерованный список с адресами.
+
+   Стоит под полем, которое сама и объясняет: api_id в мастере Telegram, адрес
+   поставщика моделей. */
+
+.help {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.help strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.help code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.78rem;
+  background: var(--bg-tertiary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--text-primary);
+}
+
+.help ol {
+  margin: 6px 0 0 22px;
+  padding: 0;
+}
+
+.help ol li {
+  margin-bottom: 3px;
+}

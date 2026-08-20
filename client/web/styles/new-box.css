@@ -1,0 +1,27 @@
+/* Пунктирная кнопка «завести ещё»: пустая коробка во всю ширину под уже
+   заведёнными.
+
+   Пунктиром, потому что содержимого у неё ещё нет: сплошная рамка читалась бы
+   как очередная запись, в которой ничего не показали.
+
+   Своим файлом, а не в оформлении каждой вкладки: так заводят категорию навыков
+   и место работы, и написана она была дважды — уже разойдясь курсором и
+   способом показа. */
+
+.new-box {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+.new-box:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}

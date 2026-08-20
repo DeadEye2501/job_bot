@@ -1,0 +1,41 @@
+/* Строка состояния шага мастера: чем шаг занят и чем кончилось.
+
+   Своим файлом, а не в оформлении мастера: строка — свой компонент, и стоит она
+   на трёх шагах из четырёх. Стоит она там же, где работали: плашка поверх окна
+   увела бы ответ туда, куда человек в этот миг не смотрит. */
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 0.82rem;
+  margin-top: 8px;
+}
+
+.status-row .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.status-row[data-tone='ok'] {
+  color: var(--text-primary);
+}
+
+.status-row[data-tone='ok'] .material-symbols-outlined {
+  color: var(--ok);
+}
+
+.status-row[data-tone='err'] {
+  color: var(--text-primary);
+}
+
+.status-row[data-tone='err'] .material-symbols-outlined {
+  color: var(--err);
+}
+
+.status-row[data-tone='busy'] .material-symbols-outlined {
+  color: var(--accent);
+  animation: spin 1s linear infinite;
+}

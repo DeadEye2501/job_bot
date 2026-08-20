@@ -17,23 +17,3 @@
   background: var(--bg-tertiary);
   min-width: 0;
 }
-
-/* «Новая категория» — пустая коробка во всю ширину под уже заведёнными:
-   пунктиром, потому что содержимого у неё ещё нет, и сплошная рамка читалась
-   бы как ещё одна категория, в которой ничего не показали. */
-.new-cat {
-  display: block;
-  width: 100%;
-  text-align: center;
-  padding: 8px;
-  margin-top: 4px;
-  border: 1px dashed var(--border);
-  border-radius: 6px;
-  color: var(--text-tertiary);
-  font-size: 0.78rem;
-}
-
-.new-cat:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-}

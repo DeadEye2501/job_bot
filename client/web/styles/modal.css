@@ -107,11 +107,20 @@
   overflow-y: auto;
 }
 
+/* Ряд кнопок окна: «Отмена» и основная, прижатые вправо. Окно закрывают
+   отказом чаще, чем соглашаются, но основная стоит последней — по ней метят
+   рукой, и место у края предсказуемее. */
+.modal-actions,
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  flex-wrap: wrap;
   gap: 6px;
+}
+
+/* Подвал-полоса: тот же ряд, но отбитый от тела чертой и подложкой. Так стоят
+   окна с шапкой и подвалом — те, у которых тело прокручивается само. */
+.modal-footer {
+  flex-wrap: wrap;
   padding: 8px 12px;
   border-top: 1px solid var(--border);
   background: var(--bg-tertiary);
@@ -140,8 +149,3 @@
   font-size: 0.78rem;
 }
 
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}

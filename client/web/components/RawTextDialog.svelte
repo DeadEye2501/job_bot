@@ -27,7 +27,7 @@
       <!-- Кнопка стоит поверх текста и полупрозрачна: окно узкое, и вынесенная
            в подвал она отняла бы у текста строку ради того, что нажимают раз в
            десять открытий. -->
-      <button class="raw-copy-btn" type="button" title="Скопировать" onclick={oncopy}>
+      <button class="icon-btn raw-copy-btn" type="button" title="Скопировать" onclick={oncopy}>
         <span class="material-symbols-outlined">content_copy</span>
       </button>
       <pre class="raw-text">{text}</pre>

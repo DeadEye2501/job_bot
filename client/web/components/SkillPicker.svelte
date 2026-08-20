@@ -8,6 +8,7 @@
   import { grouped } from '$state/skills.js';
 
   import Chip from './Chip.svelte';
+  import SearchBox from './SearchBox.svelte';
 
   let { chosen, known, onadd, onremove } = $props();
 
@@ -63,8 +64,12 @@
         <div class="skill-picker-empty">Нет навыков. Добавьте в Skills.</div>
       {:else}
         <div class="skill-picker-search">
-          <span class="material-symbols-outlined">search</span>
-          <input placeholder="Поиск навыка..." maxlength="64" bind:value={query} />
+          <SearchBox
+            value={query}
+            placeholder="Поиск навыка..."
+            maxlength={64}
+            onsearch={(text) => (query = text)}
+          />
         </div>
         <div class="skill-picker-list">
           {#each groups as group (group.name)}

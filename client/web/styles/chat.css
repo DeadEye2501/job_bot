@@ -3,11 +3,11 @@
    Своим файлом, а не в оформлении карточки: карточку одевают три предмета, а
    переписка есть только у человека. */
 
+/* Коробка блока — общая, в card-section.css. Своё здесь: внутреннего отступа
+   нет — лента и строка отправки прижимаются к рамке, — и содержимое за рамку не
+   выходит. */
 .cnt-chat-section {
-  margin-bottom: 10px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--bg-secondary);
+  padding: 0;
   overflow: hidden;
 }
 

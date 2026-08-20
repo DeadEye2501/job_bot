@@ -1,34 +1,24 @@
 /* Навыки: строка навыка внутри категории.
    Сама коробка категории — общая, в collapsible.css. */
 
-/* Имя категории правится на месте: отдельного окошка переименования тут не
-   заводили, а рамка появляется под курсором — иначе поле не отличить от
-   заголовка и никто не догадается его тронуть. */
+/* Имя категории правится на месте — общим правилом из inline-edit.css:
+   отдельного окошка переименования тут не заводили, а рамка под курсором
+   говорит, что заголовок этот трогают. Здесь только начертание заголовка и то,
+   как имя ужимается в шапке. */
 .cat-name {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-primary);
   font-size: 0.85rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.4px;
   padding: 2px 6px;
-  border-radius: 3px;
   flex: 0 1 auto;
   min-width: 80px;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: inherit;
-}
-
-.cat-name:hover {
-  border-color: var(--border);
 }
 
 .cat-name:focus {
-  outline: none;
-  border-color: var(--accent);
   background: var(--bg-secondary);
 }
 
@@ -114,16 +104,12 @@
   opacity: 1;
 }
 
-/* Имя навыка правится на месте, как и имя категории. */
+/* Имя навыка правится на месте — тем же общим правилом. Ширина по колонке:
+   поле само по себе шире её, и без этого строка распирала бы сетку. */
 .skill-name {
-  background: transparent;
-  border: 1px solid transparent;
+  width: 100%;
   padding: 3px 6px;
-  border-radius: 3px;
-}
-
-.skill-name:hover {
-  border-color: var(--border);
+  font-size: 0.85rem;
 }
 
 .skill-name:focus {

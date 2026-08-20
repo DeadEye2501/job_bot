@@ -323,10 +323,10 @@
 - —
 - принимает: placeholder, hint, empty, names, chosen, search, onsearch, prefix, onpick
 
-### components/PickerDialog.svelte (158)
+### components/PickerDialog.svelte (153)
 - Пустых слов два, и разница несущая: «ничего не найдено» говорит, что список есть, а показать из него нечего, — и человек ищет причину в поле поиска, а не в том, что заводить он ещё ничего не начинал.
 - принимает: title, icon, placeholder, empty, prefill, current, preselect, load, applyLabel, onapply, saving, onclose, children, createLabel, createIcon, oncreate
-- берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte
+- берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte, ./SearchBox.svelte
 
 ### components/PickerRow.svelte (34)
 - —
@@ -359,9 +359,9 @@
 - —
 - принимает: running, disabled, title, onpress
 
-### components/SearchBox.svelte (33)
+### components/SearchBox.svelte (36)
 - —
-- принимает: value, placeholder, onsearch
+- принимает: value, placeholder, maxlength, onsearch
 
 ### components/SecretInput.svelte (32)
 - —
@@ -372,10 +372,10 @@
 - принимает: icon, title, pill, danger, children
 - берёт: ./StatusPill.svelte
 
-### components/SkillPicker.svelte (89)
+### components/SkillPicker.svelte (94)
 - —
 - принимает: chosen, known, onadd, onremove
-- берёт: ./Chip.svelte
+- берёт: ./Chip.svelte, ./SearchBox.svelte
 
 ### components/SkillRow.svelte (51)
 - —
@@ -630,7 +630,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: plural
 
-## styles — 76 файлов
+## styles — 88 файлов
 
 ### styles/accent-fill.css (16)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре. Одним правилом на три места, а не тремя одинаковыми: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -639,9 +639,9 @@
 .date-day.selected
 - берёт: --accent, --bg-primary
 
-### styles/add-channel.css (29)
+### styles/add-channel.css (17)
 - Окно заведения канала: узкая коробка с шапкой, полем и подвалом. Сами шапка, тело и подвал — общие, в modal.css.
-- селекторы (3): .add-channel, .add-channel .modal-body, .cnt-add-hint
+- селекторы (2): .add-channel, .cnt-add-hint
 - берёт: --text-tertiary
 
 ### styles/autosave-error.css (16)
@@ -662,26 +662,35 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (1): .big-num
 - берёт: --text-primary
 
-### styles/blacklist-dialog.css (164)
+### styles/blacklist-dialog.css (125)
 - Окно заведения строки отсева: выбор рода, значение с подсказчиком и причина. Шапка, тело и подвал — общие, в modal.css.
-- селекторы (21): .bl-add-modal, .bl-add-modal .modal-body, .bl-kind-segmented, .bl-kind-seg, .bl-kind-seg:hover, .bl-kind-seg.active.keyword, .bl-kind-seg.active.hr, .bl-kind-seg.active.company, .bl-kind-seg.active.channel, .bl-modal-input,
-.bl-modal-textarea, .bl-modal-input:focus,
-.bl-modal-textarea:focus, .bl-modal-input::placeholder,
-.bl-modal-textarea::placeholder, .bl-modal-textarea, .bl-combobox-wrap, .bl-combobox-dropdown, .bl-combobox-option, .bl-combobox-option:last-child, .bl-combobox-option:hover, .bl-combobox-option .opt-label, .bl-combobox-option .opt-sub, .bl-combobox-empty
-- берёт: --accent, --bg-secondary, --bg-tertiary, --border, --fg-max, --kind-channel-active-bg, --kind-company-active-bg, --kind-hr-active-bg, --kind-keyword-active-bg, --selected-bg, --shadow-dropdown, --surface-raised, --text-primary, --text-secondary, --text-tertiary
+- селекторы (18): .bl-add-modal,
+.bl-add-modal .modal-body, .bl-kind-segmented, .bl-kind-seg, .bl-kind-seg:hover, .bl-kind-seg.active.keyword, .bl-kind-seg.active.hr, .bl-kind-seg.active.company, .bl-kind-seg.active.channel, .bl-modal-input,
+.bl-modal-textarea, .bl-modal-textarea, .bl-combobox-wrap, .bl-combobox-dropdown, .bl-combobox-option, .bl-combobox-option:last-child, .bl-combobox-option:hover, .bl-combobox-option .opt-label, .bl-combobox-option .opt-sub, .bl-combobox-empty
+- берёт: --bg-tertiary, --border, --fg-max, --kind-channel-active-bg, --kind-company-active-bg, --kind-hr-active-bg, --kind-keyword-active-bg, --selected-bg, --surface-raised, --text-primary, --text-secondary, --text-tertiary
 
-### styles/blacklist.css (240)
+### styles/blacklist.css (227)
 - Чёрный список: полоса отбора и таблица строк под ней. Окно заведения строки — в blacklist-dialog.css.
-- селекторы (34): .bl-toolbar, .bl-toolbar .search-box, .bl-toolbar .search-input, .bl-toolbar .search-box > .material-symbols-outlined, .bl-filter-pills, .bl-filter-pill, .bl-filter-pill .count, .bl-add-btn, .bl-add-btn:hover, .bl-add-btn .material-symbols-outlined, .bl-table, .bl-row, .bl-row:last-child, .bl-row.head, .bl-row.head .bl-active-head, .bl-row:hover:not(.head), .bl-row:not(.head) > .bl-kind-chip,
+- селекторы (31): .bl-toolbar, .bl-toolbar .search-box, .bl-filter-pills, .bl-filter-pill, .bl-filter-pill .count, .bl-add-btn, .bl-add-btn:hover, .bl-add-btn .material-symbols-outlined, .bl-table, .bl-row, .bl-row:last-child, .bl-row.head, .bl-row.head .bl-active-head, .bl-row:hover:not(.head), .bl-row:not(.head) > .bl-kind-chip,
 .bl-row:not(.head) > .bl-input.value,
 .bl-row:not(.head) > .bl-when,
-.bl-row:not(.head) > .icon-btn, .bl-row > .toggle, .bl-row:not(.head) > .toggle, .bl-row button.icon-btn:hover, .bl-kind-chip, .bl-kind-chip.keyword, .bl-kind-chip.hr, .bl-kind-chip.company, .bl-kind-chip.channel, .bl-input, .bl-input:hover, .bl-input:focus, .bl-input::placeholder, .bl-input.value, textarea.bl-input.reason, .bl-input.saved-flash, .bl-when, .bl-row.disabled .bl-input
-- берёт: --accent, --accent-row-hover, --bg-secondary, --bg-tertiary, --border, --danger, --danger-tint, --info, --kind-channel-bg, --kind-channel-fg, --kind-company-bg, --kind-company-fg, --kind-hr-bg, --kind-keyword-bg, --kind-keyword-fg, --text-primary, --text-secondary, --text-tertiary
+.bl-row:not(.head) > .icon-btn, .bl-row > .toggle, .bl-row:not(.head) > .toggle, .bl-row button.icon-btn:hover, .bl-kind-chip, .bl-kind-chip.keyword, .bl-kind-chip.hr, .bl-kind-chip.company, .bl-kind-chip.channel, .bl-input, .bl-input:focus, .bl-input::placeholder, .bl-input.value, textarea.bl-input.reason, .bl-input.saved-flash, .bl-when, .bl-row.disabled .bl-input
+- берёт: --accent, --accent-row-hover, --bg-secondary, --bg-tertiary, --border, --danger, --danger-tint, --info, --kind-channel-bg, --kind-channel-fg, --kind-company-bg, --kind-company-fg, --kind-hr-bg, --kind-keyword-bg, --kind-keyword-fg, --text-secondary, --text-tertiary
+
+### styles/bullet-list.css (85)
+- Список строк под заголовком: достижения и обязанности места работы. Своим файлом, а не в оформлении карточки: список этот — свой компонент, и стоять он может под любой формой. Строка в нём — многострочное поле, которое правится на месте: рамка и её отклик приходят из inline-edit.css.
+- селекторы (12): .list-block .field-label, .list-add, .list-add:hover, .list-add .material-symbols-outlined, .list-item, .list-bullet, .list-input, .list-input:focus, .list-item .icon-btn, .list-item .icon-btn .material-symbols-outlined, .list-item:hover .icon-btn, .list-item button.icon-btn:hover
+- берёт: --accent, --bg-secondary, --danger, --text-secondary, --text-tertiary
 
 ### styles/button.css (56)
 - Кнопка с подписью. Значковые — в icon-button.css: у тех нет ни рамки, ни подложки, и общего с этими только сброс из base.css.
 - селекторы (8): .btn, .btn:hover:not(:disabled), .btn.primary:hover:not(:disabled), .btn:disabled, .btn.danger, .btn.danger:hover:not(:disabled), .btn.text, .btn.text:hover:not(:disabled)
 - берёт: --accent, --accent-hover-fill, --bg-tertiary, --border, --danger-btn, --err-btn-bg, --err-btn-bg-hover, --text-primary, --text-secondary
+
+### styles/card-section.css (18)
+- Коробка блока в карточке. Так отделены друг от друга разделы правой панели: заметки, мини-списки, числа канала, стек вакансии, её описание и лента, переписка с человеком. Заголовков на панели нет, и без рамки блоки слились бы в одну простыню. Своим файлом, а не в оформлении каждой карточки: коробка была написана трижды — у контакта, у вакансии и у переписки, — и первые две совпадали всеми пятью объявлениями. Своё каждый блок дописывает сам: у переписки нет внутреннего отступа, потому что лента прижимается к рамке.
+- селекторы (1): .card-section
+- берёт: --bg-secondary, --border
 
 ### styles/channel-stats.css (82)
 - Числа канала: четыре плитки и полоса воронки под ними. Полосой, а не кольцом: доли здесь читают одну относительно другой — сколько из собранного дошло до отклика, — и в ряд это видно, а по кругу нет. Цвет отрезков — общий набор из status-color.css.
@@ -691,7 +700,7 @@ body, html, button, body, .material-symbols-outlined
 ### styles/chat.css (295)
 - Переписка в карточке человека: лента писем, пузыри и строка отправки. Своим файлом, а не в оформлении карточки: карточку одевают три предмета, а переписка есть только у человека.
 - селекторы (40): .cnt-chat-section, .cnt-chat-body, .cnt-chat-empty, .cnt-chat-day, .cnt-chat-older, .cnt-chat-older:hover, .cnt-bubble, .cnt-bubble.them, .cnt-bubble.me, .cnt-bubble.deleted, .cnt-bubble-content, .cnt-bubble-text, .cnt-bubble-text.deleted, .cnt-bubble-text.gone, .cnt-bubble-edited, .cnt-bubble-photo, .cnt-bubble-photo img, .cnt-bubble-doc, .cnt-bubble-doc:hover, .cnt-bubble-doc .material-symbols-outlined, .cnt-bubble-time, .cnt-bubble.me .cnt-bubble-time, .cnt-bubble-tick, .cnt-bubble-tick.read, .cnt-bubble.me .cnt-bubble-tick, .cnt-bubble.me .cnt-bubble-tick.read, .cnt-chat-input-area, .cnt-chat-input, .cnt-chat-input:focus, .cnt-chat-input::placeholder, .cnt-chat-input:disabled, .cnt-chat-attach, .cnt-chat-attach:hover:not(:disabled), .cnt-chat-attach:disabled, .cnt-chat-attach .material-symbols-outlined, .cnt-chat-send, .cnt-chat-send:hover:not(:disabled), .cnt-chat-send:disabled, .cnt-chat-send .material-symbols-outlined, .cnt-chat-disabled-hint
-- берёт: --accent, --accent-chip-bg, --accent-muted, --bg-secondary, --bg-tertiary, --border, --surface-raised, --surface-raised-hover, --text-primary, --text-secondary, --text-tertiary
+- берёт: --accent, --accent-chip-bg, --accent-muted, --bg-tertiary, --border, --surface-raised, --surface-raised-hover, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/checkbox.css (15)
 - Галочка с подписью в одну строку: подпись нажимается вместе с квадратиком.
@@ -713,25 +722,25 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (2): .collapse-arrow, .collapsed .collapse-arrow
 - берёт: --text-secondary
 
-### styles/collapsible.css (39)
+### styles/collapsible.css (19)
 - Коробка со сворачиваемой шапкой: категория навыков, место работы. Что внутри — своими файлами.
-- селекторы (4): .collapsible, .collapsible-head, .new-cat, .new-cat:hover
-- берёт: --accent, --bg-secondary, --bg-tertiary, --border, --text-tertiary
+- селекторы (2): .collapsible, .collapsible-head
+- берёт: --bg-secondary, --bg-tertiary, --border
 
 ### styles/contact-block.css (58)
 - Кружок и два имени рядом с ним: так подписаны HR и компания в карточке вакансии и кандидаты в подборщике привязки.
 - селекторы (8): .contact-block, .hr-avatar, .hr-avatar .material-symbols-outlined, img.hr-avatar, .hr-info, .hr-name, .hr-name.muted, .hr-name.is-link:hover
 - берёт: --accent, --bg-tertiary, --text-primary, --text-secondary, --text-tertiary
 
-### styles/contact-card.css (147)
+### styles/contact-card.css (118)
 - Карточка контакта в правой панели: шапка, поля и коробки под ними. Одевает три карточки — человека, компании и канала: содержимое у них разное, а места этих мест одни. Переписка — в chat.css, мини-списки — в mini-list.css, числа канала — в channel-stats.css.
-- селекторы (20): .cnt-det-head, .cnt-det-head > div, .cnt-det-head .hr-avatar, .cnt-det-name, .cnt-det-name.muted, .cnt-det-sub, .cnt-det-sub > *, .cnt-det-link, .cnt-det-link:hover, .cnt-det-meta-row, .cnt-det-meta-row > *, .cnt-det-meta-chip, .cnt-det-meta-chip.unread, .cnt-det-meta-chip.blacklist, .cnt-det-meta-chip .material-symbols-outlined, .cnt-form-grid, .cnt-input, .cnt-input:focus, .cnt-input::placeholder, .cnt-det-section
-- берёт: --accent, --accent-chip-bg, --bg-secondary, --bg-tertiary, --border, --danger, --danger-tint-strong, --text-primary, --text-secondary, --text-tertiary
+- селекторы (16): .cnt-det-head, .cnt-det-head > div, .cnt-det-head .hr-avatar, .cnt-det-name, .cnt-det-name.muted, .cnt-det-sub, .cnt-det-sub > *, .cnt-det-link, .cnt-det-link:hover, .cnt-det-meta-row, .cnt-det-meta-row > *, .cnt-det-meta-chip, .cnt-det-meta-chip.unread, .cnt-det-meta-chip.blacklist, .cnt-det-meta-chip .material-symbols-outlined, .cnt-input
+- берёт: --accent, --accent-chip-bg, --bg-tertiary, --danger, --danger-tint-strong, --text-primary, --text-secondary, --text-tertiary
 
-### styles/contacts-layout.css (77)
-- Раскладка вкладки контактов: список слева, карточка справа. Панели прокручиваются раздельно и обе стоят на экране всегда: человека правят и пишут ему, не теряя из виду соседей по списку.
-- селекторы (10): .cnt-list-toolbar, .cnt-list-toolbar .search-box, .cnt-list-toolbar .search-input, .cnt-list-toolbar .search-box > .material-symbols-outlined, .cnt-add-btn, .cnt-add-btn:hover, .cnt-add-btn .material-symbols-outlined, .cnt-list-empty, .cnt-detail-pane, .cnt-detail-empty
-- берёт: --accent, --bg-primary, --bg-tertiary, --border, --selected-bg, --text-secondary, --text-tertiary
+### styles/contacts-layout.css (47)
+- Своё у вкладки контактов: кнопка заведения в полосе, два пустых состояния и подложка панели подробностей. Сама раскладка — общая с вакансиями, в master-detail.css: панели там прокручиваются раздельно и обе стоят на экране всегда — человека правят и пишут ему, не теряя из виду соседей по списку.
+- селекторы (6): .cnt-add-btn, .cnt-add-btn:hover, .cnt-add-btn .material-symbols-outlined, .cnt-list-empty, .cnt-detail-pane, .cnt-detail-empty
+- берёт: --accent, --bg-primary, --border, --selected-bg, --text-tertiary
 
 ### styles/contacts.css (132)
 - Строка списка контактов: кружок, имя с подписью и отметки в хвосте. Сами панели раздела — в contacts-layout.css, таблица отсева — в blacklist.css.
@@ -743,9 +752,9 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (6): .pdf-row, .pdf-row > .material-symbols-outlined, .pdf-info, .pdf-name, .pdf-meta, .pdf-actions
 - берёт: --bg-secondary, --border, --danger, --text-primary, --text-tertiary
 
-### styles/date-picker.css (108)
+### styles/date-picker.css (94)
 - Поле даты и сетка месяца под ним.
-- селекторы (16): .date-picker, .input-date-text, .input-date-text:hover:not(:disabled, :focus), .input-date-text:focus, .input-date-text.invalid, .date-panel, .date-panel.up, .date-head, .date-head .icon-btn:hover, .date-title, .date-week, .date-weekday, .date-cell, .date-day, .date-day:hover, .date-day.today
+- селекторы (14): .date-picker, .input-date-text, .input-date-text.invalid, .date-panel, .date-panel.up, .date-head, .date-head .icon-btn:hover, .date-title, .date-week, .date-weekday, .date-cell, .date-day, .date-day:hover, .date-day.today
 - берёт: --accent, --bg-secondary, --bg-tertiary, --border, --err, --scrim, --selected-bg, --text-primary, --text-secondary
 
 ### styles/donut.css (45)
@@ -753,10 +762,10 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (5): .donut-wrap, .donut, .donut-part, .donut-center, .donut-label
 - берёт: --text-tertiary
 
-### styles/dropdown.css (67)
+### styles/dropdown.css (72)
 - Выпадающий список со своим видом: системный в тёмном окне светлая заплата.
-- селекторы (8): .cdd, .cdd-btn, .cdd-btn:hover,
-.cdd.open .cdd-btn, .cdd-btn .material-symbols-outlined, .cdd-panel, .cdd-option, .cdd-option:hover, .cdd-option.active
+- селекторы (9): .cdd, .cdd-btn, .cdd-btn:hover,
+.cdd.open .cdd-btn, .cdd-btn .material-symbols-outlined, .drop-panel, .cdd-panel, .cdd-option, .cdd-option:hover, .cdd-option.active
 - берёт: --accent, --bg-secondary, --border, --selected-bg, --shadow-dropdown, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/empty-note.css (9)
@@ -764,12 +773,15 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (1): .empty-note
 - берёт: --text-tertiary
 
-### styles/experience.css (365)
+### styles/experience.css (136)
 - Место работы: коробка карточки, шапка и всё, что внутри. Коробка своя, не общая с категорией навыков: там шапку нажимает одна стрелка, а здесь — вся строка целиком, и разложена она сеткой под стрелку, подпись и корзину.
-- селекторы (48): .exp-card, .exp-header, .exp-card.collapsed .exp-header, .exp-summary, .exp-summary > strong, .exp-summary > .role, .exp-summary .period, .exp-delete, .exp-delete:hover, .exp-delete .material-symbols-outlined, .exp-body, .field-row, .field-row .span-2,
-.field-row .input.span-2,
-.field-row .date-pair.span-2, .field-label, .field-row .input, .date-pair, .date-pair .date-picker, .date-dash, .date-current, .date-current input, .list-block .field-label, .list-add, .list-add:hover, .list-add .material-symbols-outlined, .list-item, .list-bullet, .list-input, .list-input:hover, .list-input:focus, .list-item .icon-btn, .list-item .icon-btn .material-symbols-outlined, .list-item:hover .icon-btn, .list-item button.icon-btn:hover, .skills-block, .skill-picker, .skill-picker-search, .skill-picker-search .material-symbols-outlined, .skill-picker-search input, .skill-picker-list, .skill-picker-cat, .skill-picker-item, .skill-picker-item:hover, .skill-picker-item.disabled, .skill-picker-item.disabled:hover, .skill-picker-item .lvl, .skill-picker-empty, .new-exp, .new-exp:hover
-- берёт: --accent, --bg-secondary, --bg-tertiary, --border, --danger, --danger-tint, --selected-bg, --shadow-dropdown, --text-primary, --text-secondary, --text-tertiary
+- селекторы (17): .exp-card, .exp-header, .exp-card.collapsed .exp-header, .exp-summary, .exp-summary > strong, .exp-summary > .role, .exp-summary .period, .exp-delete, .exp-delete:hover, .exp-delete .material-symbols-outlined, .exp-body, .field-row .input, .date-pair, .date-pair .date-picker, .date-dash, .date-current, .date-current input
+- берёт: --accent, --bg-secondary, --bg-tertiary, --border, --danger, --danger-tint, --text-primary, --text-secondary, --text-tertiary
+
+### styles/file-pick.css (38)
+- Выбор файла резюме: одна строка со значком, подписью и кнопкой. Пунктир до выбора говорит «сюда кладут», сплошная рамка после — что файл уже взят: пустая строка со сплошной рамкой читалась бы как поле, в которое забыли что-то вписать.
+- селекторы (5): .file-pick, .file-pick.has-file, .file-pick .material-symbols-outlined, .file-pick .text, .file-pick .text .name
+- берёт: --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/filter-group.css (18)
 - Группа отбора: подпись над своими полями и черта под ними.
@@ -781,15 +793,36 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (4): .bottom-bar, .bb-left, .bb-right, .bb-center
 - берёт: --bg-secondary, --border
 
+### styles/form-grid.css (51)
+- Сетка формы: два поля в ряд, и место на всю ширину для тех, кому двух колонок мало. Так стоят четыре формы окна: анкета, поля карточки контакта, место работы и настройки. Написаны они были порознь, и правило «занять оба столбца» — под тремя из четырёх: у карточки контакта широких полей сегодня нет, и правила ей не заведено. Своё у каждой формы одно: просвет между полями. Он и правда разный — в тесной панели карточки поля стоят плотнее, чем на просторной вкладке.
+- селекторы (7): .form-grid,
+.cnt-form-grid,
+.field-row,
+.settings-row, .form-grid .span-2,
+.field-row .span-2,
+.settings-row .span-2, .field-label, .form-grid, .cnt-form-grid, .field-row, .settings-row
+- берёт: --text-tertiary
+
 ### styles/health-lamp.css (34)
 - Лампочка состояния: точка и короткое имя под ней.
 - селекторы (5): .health, .health .dot, .health[data-state='ok'] .dot, .health[data-state='err'] .dot, .health-label
 - берёт: --accent, --accent-glow-inner, --accent-glow-outer, --err, --err-glow-inner, --err-glow-outer, --text-secondary, --text-tertiary
 
+### styles/help-block.css (34)
+- Пошаговая инструкция «где это взять»: нумерованный список с адресами. Стоит под полем, которое сама и объясняет: api_id в мастере Telegram, адрес поставщика моделей.
+- селекторы (5): .help, .help strong, .help code, .help ol, .help ol li
+- берёт: --bg-tertiary, --text-primary, --text-secondary
+
 ### styles/icon-button.css (34)
 - Кнопка-значок: квадрат со значком внутри, без подписи. Вынесена на втором потребителе — кнопка обхода в полосе и очистка журнала.
 - селекторы (5): .icon-btn, .icon-btn .material-symbols-outlined, .icon-btn:hover, .icon-btn.is-disabled, .icon-btn.is-disabled:hover
 - берёт: --bg-tertiary, --text-primary, --text-secondary
+
+### styles/inline-edit.css (41)
+- Поле, которое правится на месте. Так набирают там, где поле стоит внутри чужого блока и формой быть не должно: значение и причина в таблице отсева, пояснение в ленте вакансии, строка достижения, имя категории и имя навыка. Рамки у такого поля в покое нет — иначе список из полусотни строк читался бы анкетой, — она проступает под курсором и светится акцентом в наборе. Своим файлом, а не пятью записями по блокам: правило наведения было переписано побайтно пять раз. Каждый блок оставляет себе только своё — размер, начертание, то, как поле тянется, и подложку набора: она у них разная, потому что разный фон под самим полем. Рамка набора не гаснет под курсором: наводят как раз на то поле, в котором набирают, и правило наведения без этой оговорки перебивало бы её — так уже случилось у имени навыка.
+- селекторы (4): .inline-edit, .inline-edit:hover:not(:focus), .inline-edit:focus, .inline-edit.saved-flash,
+.inline-edit.saved-flash:hover
+- берёт: --accent, --border, --text-primary
 
 ### styles/input.css (72)
 - Поле ввода, многострочное поле и поле для секрета рядом с глазом. Экран настроек уменьшает их своим правилом — там полей вдвое больше.
@@ -820,14 +853,15 @@ body, html, button, body, .material-symbols-outlined
 - Экран журнала: панель сверху и список записей под ней. Что стоит внутри — пилюли и строки — своими файлами.
 - селекторы (5): .logs-toolbar, .logs-level-pills, .logs-toolbar-gap, .logs-auto-refresh, .logs-list
 
-### styles/master-detail.css (53)
+### styles/master-detail.css (64)
 - Каркас «список слева, подробности справа» — общий у контактов и вакансий. Своим файлом, потому что раскладка одна на два раздела, а написана была дважды: под приставкой `cnt-` и под `vac-`. Ширина панели стояла двумя числами в двух файлах, и разъехались бы они молча — а разделы эти стоят соседними вкладками одного окна, и разницу видно глазом. Селекторы сгруппированы, а не сведены к общему имени: имена классов несущие — по ним разметка и оформление раздела ищутся поиском, — и переименование стоило бы дороже, чем даёт. Что осталось у каждого раздела своим: подложка подробностей (у вакансий отступы плотнее — строка там гуще), пустые состояния (у вакансий это центрованный столбик со значком, у контактов простой абзац) и всё содержимое строки.
-- селекторы (4): .cnt-layout,
+- селекторы (5): .cnt-layout,
 .vacancies-layout, .cnt-list-pane,
-.vac-list-pane, .cnt-list,
+.vac-list-pane, .cnt-list-toolbar,
+.vac-list-toolbar, .cnt-list,
 .vac-list, .cnt-hr-row.selected,
 .vac-row.selected
-- берёт: --accent, --bg-secondary, --border, --selected-bg
+- берёт: --accent, --bg-secondary, --bg-tertiary, --border, --selected-bg
 
 ### styles/menu.css (72)
 - Меню действий: что стоит внутри списка под кнопкой-значком. Оправа окошка — общая, в popover.css.
@@ -837,19 +871,21 @@ body, html, button, body, .material-symbols-outlined
 .menu-item.danger:hover .material-symbols-outlined, .menu-line
 - берёт: --border, --danger, --danger-hover-fg, --danger-tint, --selected-bg, --text-primary, --text-secondary, --text-tertiary
 
-### styles/mini-list.css (112)
+### styles/mini-list.css (109)
 - Нажимаемая строка внутри карточки контакта: вакансия и человек компании. Обе ведут отсюда наружу — к вакансии и к карточке человека, — и поэтому одеты одинаково: подсветка при наведении и имя, загорающееся акцентом, говорят, что по строке нажимают. Коробка вокруг них общая, в contact-card.css.
-- селекторы (14): .vacs-mini,
-.hrs-mini, .vac-mini-row, .hr-mini-row, .vac-mini-row:first-child,
+- селекторы (15): .vacs-mini,
+.hrs-mini, .vac-mini-row,
+.hr-mini-row, .vac-mini-row, .hr-mini-row, .vac-mini-row:first-child,
 .hr-mini-row:first-child, .vac-mini-row:hover,
 .hr-mini-row:hover, .vac-mini-row:hover .vac-mini-title,
 .hr-mini-row:hover .hr-mini-name, .vac-mini-score, .vac-mini-title,
 .hr-mini-name, .vac-mini-when, .hr-mini-row .hr-avatar, .hr-mini-meta, .hr-mini-go, .mini-list-empty, .mini-list-more
 - берёт: --accent, --bg-tertiary, --border, --selected-bg, --text-primary, --text-tertiary
 
-### styles/modal.css (147)
+### styles/modal.css (151)
 - Окно поверх окна: затемнение на весь экран и коробка по центру.
-- селекторы (19): .modal-backdrop, .modal-dialog, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-footer, .modal-footer .btn, .modal-footer .btn .material-symbols-outlined, .modal-subtitle, .modal-error, .modal-actions
+- селекторы (19): .modal-backdrop, .modal-dialog, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-actions,
+.modal-footer, .modal-footer, .modal-footer .btn, .modal-footer .btn .material-symbols-outlined, .modal-subtitle, .modal-error
 - берёт: --bg-secondary, --bg-tertiary, --border, --danger, --scrim, --shadow-modal, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/mode.css (54)
@@ -862,6 +898,17 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (14): .sidebar, .nav-group,
 .sidebar-toggle, .nav-group, .nav-icon-rail, .nav-icon-rail .material-symbols-outlined, .nav-label, .app-frame:not(.sidebar-expanded) .nav-label, .nav-group:hover, .nav-group.active, .nav-group.active .nav-icon-rail .material-symbols-outlined, .sidebar-spacer, .sidebar-toggle, .sidebar-toggle:hover, .sidebar-toggle .material-symbols-outlined
 - берёт: --accent, --bg-tertiary, --border, --rail-w, --selected-bg, --text-primary, --text-secondary, --text-tertiary
+
+### styles/new-box.css (27)
+- Пунктирная кнопка «завести ещё»: пустая коробка во всю ширину под уже заведёнными. Пунктиром, потому что содержимого у неё ещё нет: сплошная рамка читалась бы как очередная запись, в которой ничего не показали. Своим файлом, а не в оформлении каждой вкладки: так заводят категорию навыков и место работы, и написана она была дважды — уже разойдясь курсором и способом показа.
+- селекторы (2): .new-box, .new-box:hover
+- берёт: --accent, --border, --text-tertiary
+
+### styles/note-card.css (51)
+- Две карточки-подсказки: предупреждение и пояснение. Устроены одинаково, различаются цветом и значком: на них смотрят прежде текста, и цвет говорит, беда это или объяснение. Стоят они в мастере — там, где человеку надо сказать больше строки, но меньше, чем отдельным шагом.
+- селекторы (7): .warning-card,
+.info-card, .warning-card, .warning-card .material-symbols-outlined, .warning-card strong, .info-card, .info-card .material-symbols-outlined, .info-card strong
+- берёт: --alert-card-bg, --alert-card-border, --alert-text, --info, --info-card-bg, --info-card-border, --text-primary
 
 ### styles/notes-area.css (33)
 - Заметка к вакансии и вспышка «записано». Вспышка тут же, а не в оформлении заметки: ею отзывается и пояснение в ленте, а правило у неё одно — зелёная рамка с ореолом на те же доли секунды.
@@ -879,9 +926,9 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (7): .pick, .pick-btn, .pick-btn .material-symbols-outlined, .pick-panel, .pick-list, .pick-list .checkbox-row, .pick-list .empty-note
 - берёт: --bg-tertiary, --border, --shadow-dropdown, --text-primary, --text-tertiary
 
-### styles/picker.css (162)
+### styles/picker.css (154)
 - Окно выбора: полоса поиска, список кандидатов и строка заведения под ним. Шапка, тело и подвал — общие, в modal.css; кружок с именами — в contact-block.css.
-- селекторы (23): .vac-picker-modal, .picker-search-bar, .picker-search-bar .material-symbols-outlined, .picker-search-bar input, .picker-search-bar input:focus, .picker-list, .picker-empty, .picker-row, .picker-row:hover, .picker-row.selected, .picker-row.current, .picker-row.current .picker-name, .picker-row.blocked, .picker-info, .picker-name, .picker-current-mark, .picker-sub, .picker-meta, .vac-count, .picker-create, .picker-create-toggle, .picker-create-toggle:hover, .picker-create-toggle .material-symbols-outlined
+- селекторы (22): .vac-picker-modal, .picker-search-bar, .picker-search-bar .search-box, .picker-search-bar .search-input, .picker-list, .picker-empty, .picker-row, .picker-row:hover, .picker-row.selected, .picker-row.current, .picker-row.current .picker-name, .picker-row.blocked, .picker-info, .picker-name, .picker-current-mark, .picker-sub, .picker-meta, .vac-count, .picker-create, .picker-create-toggle, .picker-create-toggle:hover, .picker-create-toggle .material-symbols-outlined
 - берёт: --accent, --accent-hover-faint, --accent-row-current, --accent-row-hover, --bg-tertiary, --border, --selected-bg, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/pill.css (20)
@@ -909,7 +956,12 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (7): .bb-center .progress-wrap, .progress-bars, .progress-caption, .progress-bar, .progress-fill, .progress-bar[data-indeterminate='true'] .progress-fill, @keyframes slide
 - берёт: --accent, --bg-tertiary, --text-secondary
 
-### styles/raw-text.css (87)
+### styles/radio-card.css (56)
+- Карточка выбора: способ, его название и пояснение под ним. Карточками, а не строкой переключателей: у каждого способа есть пояснение, и в строку оно не встаёт. Так выбирают, что делать с резюме.
+- селекторы (9): .radio-card, .radio-card:hover, .radio-card.selected, .radio-card.disabled, .radio-card.disabled:hover, .radio-card input, .radio-card.disabled input, .radio-card .rc-title, .radio-card .rc-sub
+- берёт: --accent, --accent-hover-soft, --bg-tertiary, --border, --text-primary, --text-tertiary
+
+### styles/raw-text.css (80)
 - Окно исходного текста: полоса сведений об объявлении и сам текст под ней. Шапка, тело и крестик — общие, в modal.css.
 - селекторы (9): .vac-raw-modal, .raw-meta, .raw-meta-chip, .raw-meta-chip .material-symbols-outlined, .raw-copy-btn, .raw-copy-btn:hover, .raw-copy-btn:active, .raw-copy-btn .material-symbols-outlined, .raw-text
 - берёт: --accent, --bg-over-content, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary
@@ -924,13 +976,13 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (3): .run-btn::before, .run-btn[data-running='true']::before, .run-btn[data-running='true']:hover
 - берёт: --err, --err-stop-hover, --ok
 
-### styles/screen.css (51)
+### styles/screen.css (41)
 - Общее у экранов раздела: шапка с заголовком и поле под вкладками.
-- селекторы (8): .screen-body, .screen-body.flush, .page-head, .page-title, .page-title-meta, .updated-ts, .form-grid, .form-grid .span-2
+- селекторы (6): .screen-body, .screen-body.flush, .page-head, .page-title, .page-title-meta, .updated-ts
 - берёт: --text-primary, --text-tertiary
 
 ### styles/search-box.css (56)
-- Строка поиска над списком: лупа, поле и крестик очистки. Своим файлом, а не в оформлении списка: коробка одна на все списки окна — вакансии и четыре вкладки контактов, — и различает их только полоса, в которой она стоит.
+- Строка поиска над списком: лупа, поле и крестик очистки. Своим файлом, а не в оформлении списка: коробка одна на всё окно — вакансии, четыре вкладки контактов, окно выбора записи и подборщик навыков, — и различает их только место, в котором она стоит.
 - селекторы (7): .search-box, .search-box .material-symbols-outlined, .search-input, .search-input:focus, .search-clear, .search-clear:hover, .search-clear .material-symbols-outlined
 - берёт: --surface-hover-firm, --text-primary, --text-secondary, --text-tertiary
 
@@ -940,9 +992,9 @@ body, html, button, body, .material-symbols-outlined
 .settings-section.danger .settings-section-title .material-symbols-outlined, .danger-row, .danger-text, .danger-sub, .danger-row .btn
 - берёт: --bg-secondary, --border, --danger, --err-zone-bg, --err-zone-border, --text-primary, --text-secondary, --text-tertiary
 
-### styles/settings.css (104)
+### styles/settings.css (93)
 - Экран настроек: колонка секций посреди поля. Что внутри секций — сетка полей, пороги, опасная зона — своими файлами.
-- селекторы (14): .settings-page, .settings-inner, .settings-page .input, .settings-page .btn, .settings-page .btn .material-symbols-outlined, .settings-page .btn.danger, .settings-page .btn.danger:hover:not(:disabled), .settings-row.spaced, .settings-row, .settings-row .span-2, .settings-actions, .session-actions, .session-row, .session-info
+- селекторы (12): .settings-page, .settings-inner, .settings-page .input, .settings-page .btn, .settings-page .btn .material-symbols-outlined, .settings-page .btn.danger, .settings-page .btn.danger:hover:not(:disabled), .settings-row.spaced, .settings-actions, .session-actions, .session-row, .session-info
 - берёт: --bg-tertiary, --border, --danger, --text-tertiary
 
 ### styles/shell.css (42)
@@ -951,15 +1003,24 @@ body, html, button, body, .material-symbols-outlined
 - объявляет: --footer-h, --rail-w, --sidebar-w
 - берёт: --bg-primary, --bg-secondary, --footer-h, --rail-w, --sidebar-w, --text-tertiary
 
-### styles/skills.css (145)
+### styles/skill-picker.css (108)
+- Стек места работы: чипы взятых навыков и подборщик под ними. Своим файлом, а не в оформлении карточки: подборщик — свой компонент, и выбирают им из навыков анкеты, а не из чего-то, что знает карточка.
+- селекторы (14): .skills-block, .skill-picker, .skill-picker-search, .skill-picker-search .search-box, .skill-picker-search .search-input, .skill-picker-search > .search-box > .material-symbols-outlined, .skill-picker-list, .skill-picker-cat, .skill-picker-item, .skill-picker-item:hover, .skill-picker-item.disabled, .skill-picker-item.disabled:hover, .skill-picker-item .lvl, .skill-picker-empty
+- берёт: --bg-secondary, --border, --selected-bg, --shadow-dropdown, --text-primary, --text-tertiary
+
+### styles/skills.css (131)
 - Навыки: строка навыка внутри категории. Сама коробка категории — общая, в collapsible.css.
-- селекторы (21): .cat-name, .cat-name:hover, .cat-name:focus, .cat-spacer, .cat-add, .cat-add:hover, .cat-add .material-symbols-outlined, .cat-delete, .cat-delete:hover, .cat-delete .material-symbols-outlined, .skill-row, .skill-row:hover, .skill-row .icon-btn:hover, .skill-row .icon-btn .material-symbols-outlined, .skill-row:hover input[type='range'].slider::-webkit-slider-thumb, .skill-row:hover input[type='range'].slider::-moz-range-thumb, .skill-name, .skill-name:hover, .skill-name:focus, .level, .level-num
-- берёт: --accent, --accent-row-hover, --bg-secondary, --border, --danger, --danger-tint, --text-primary, --text-secondary, --text-tertiary
+- селекторы (19): .cat-name, .cat-name:focus, .cat-spacer, .cat-add, .cat-add:hover, .cat-add .material-symbols-outlined, .cat-delete, .cat-delete:hover, .cat-delete .material-symbols-outlined, .skill-row, .skill-row:hover, .skill-row .icon-btn:hover, .skill-row .icon-btn .material-symbols-outlined, .skill-row:hover input[type='range'].slider::-webkit-slider-thumb, .skill-row:hover input[type='range'].slider::-moz-range-thumb, .skill-name, .skill-name:focus, .level, .level-num
+- берёт: --accent, --accent-row-hover, --bg-secondary, --danger, --danger-tint, --text-secondary, --text-tertiary
 
 ### styles/slider.css (71)
 - Ползунок: порог отбора в настройках, уровень навыка в анкете. Заливка дорожки нарисована фоном самого поля: у ползунка нет своей «пройденной» части, а два элемента поверх друг друга разъезжались бы на краях. Долю кладёт разметка переменной `--pct`.
 - селекторы (7): input[type='range'].slider, input[type='range'].slider::-webkit-slider-runnable-track, input[type='range'].slider::-moz-range-track, input[type='range'].slider::-webkit-slider-thumb, input[type='range'].slider::-moz-range-thumb, input[type='range'].slider:active::-webkit-slider-thumb, input[type='range'].slider:active::-moz-range-thumb
 - берёт: --accent, --bg-tertiary, --pct
+
+### styles/spin.css (12)
+- Вращение значка: им показано, что дело идёт и ответа ещё нет. Своим файлом, а не в оформлении каждого экрана: крутится значок в двух местах — кнопка пересчёта статистики и строка состояния шага мастера, — и объявлено вращение было дважды, под двумя именами. Скорость у них при этом разная, и это своё: у кнопки оборот быстрее, потому что и ждать её недолго.
+- селекторы (1): @keyframes spin
 
 ### styles/stats-channels.css (143)
 - Карточка «Каналы»: воронка канала одиннадцатью колонками. Сеткой, а не таблицей: имя канала и колонки конверсии резиновые, числовые — узкие по содержимому, и только так все одиннадцать влезают в карточку без поперечной прокрутки. Группы «Ингест», «Воронка отклика» и «Конверсия» отделены тонкой чертой — без неё одиннадцать чисел читаются как один ряд.
@@ -981,14 +1042,14 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (7): .stats-status-card, .stats-status-col, .stats-status-col.right, .stats-sc-item, .stats-sc-item:hover, .stats-sc-name, .stats-sc-num
 - берёт: --bg-tertiary, --text-primary, --text-secondary
 
-### styles/stats.css (157)
+### styles/stats.css (142)
 - Статистика: полоса срока, сетка карточек и сама коробка карточки. Что стоит внутри карточек — своими файлами.
-- селекторы (25): .stats-toolbar, .stats-period-pill, .stats-refresh-btn, .stats-refresh-btn:hover, .stats-refresh-btn .material-symbols-outlined, .stats-refresh-btn.spinning .material-symbols-outlined, @keyframes stats-refresh-spin, .stats-grid, .stats-card, .stats-card-title, .stats-col-6, .stats-col-12, .stats-loading, .stats-kpi-row, .stats-kpi-row .stats-card, .stats-kpi, .stats-kpi-num, .stats-kpi-num[data-tone='applied'], .stats-kpi-num[data-tone='progress'], .stats-kpi-num[data-tone='offer'], .stats-kpi-num[data-tone='decline'], .stats-kpi-label, .stats-kpi-delta, .stats-kpi-delta[data-tone='up'], .status-dot
+- селекторы (23): .stats-toolbar, .stats-period-pill, .stats-refresh-btn, .stats-refresh-btn:hover, .stats-refresh-btn .material-symbols-outlined, .stats-refresh-btn.spinning .material-symbols-outlined, .stats-grid, .stats-card, .stats-card-title, .stats-col-6, .stats-col-12, .stats-loading, .stats-kpi-row, .stats-kpi-row .stats-card, .stats-kpi, .stats-kpi-num, .stats-kpi-num[data-tone='applied'], .stats-kpi-num[data-tone='progress'], .stats-kpi-num[data-tone='offer'], .stats-kpi-num[data-tone='decline'], .stats-kpi-label, .stats-kpi-delta, .stats-kpi-delta[data-tone='up']
 - берёт: --accent, --bg-secondary, --border, --err, --ok, --status-applied, --status-offer, --text-primary, --text-secondary, --text-tertiary
 
-### styles/status-color.css (50)
-- Цвет статуса вакансии — один набор на всё окно. Красит три места: сегмент кольца, точку в списке рядом с ним и отрезок полосы воронки в карточке канала. Разойдись они, одна и та же ступень воронки была бы разного цвета на соседних экранах. Обводка и заливка названы вместе: у кольца цвет несёт stroke, у точки и отрезка — background.
-- селекторы (11): .donut-part[data-status='New'],
+### styles/status-color.css (62)
+- Цвет статуса вакансии — один набор на всё окно. Красит три места: сегмент кольца, точку в списке рядом с ним и отрезок полосы воронки в карточке канала. Разойдись они, одна и та же ступень воронки была бы разного цвета на соседних экранах. Обводка и заливка названы вместе: у кольца цвет несёт stroke, у точки и отрезка — background. Сама точка объявлена здесь же: её ставят восемь компонентов на пяти экранах, а геометрия её лежала в файле экрана статистики — там её не нашёл бы никто, кроме автора. Незнакомый статус остаётся серым: цвет ему взять неоткуда, а пустое место читалось бы как пропущенная точка.
+- селекторы (12): .status-dot, .donut-part[data-status='New'],
 .status-dot[data-status='New'],
 .ch-bar-seg[data-status='New'], .donut-part[data-status='Applied'],
 .status-dot[data-status='Applied'],
@@ -1011,17 +1072,22 @@ body, html, button, body, .material-symbols-outlined
 .ch-bar-seg[data-status='Scam'], .donut-part[data-status='Not Fit'],
 .status-dot[data-status='Not Fit'],
 .ch-bar-seg[data-status='Not Fit']
-- берёт: --accent, --alert, --err, --fg-max, --info, --ok, --status-applied, --status-not-fit, --status-offer, --status-test, --warn
+- берёт: --accent, --alert, --err, --fg-max, --info, --ok, --status-applied, --status-not-fit, --status-offer, --status-test, --text-tertiary, --warn
 
-### styles/status-picker.css (69)
+### styles/status-picker.css (63)
 - Выбор статуса: что стоит внутри окошка под значком статуса. Оправа окошка — общая, в popover.css.
-- селекторы (9): .status-picker, .status-options, .status-option, .status-option:hover, .status-option input, .popover-comment, .popover-comment:focus, .popover-actions, .popover-actions .btn
-- берёт: --accent, --bg-tertiary, --border, --selected-bg, --text-primary
+- селекторы (8): .status-picker, .status-options, .status-option, .status-option:hover, .status-option input, .popover-comment, .popover-actions, .popover-actions .btn
+- берёт: --accent, --bg-tertiary, --selected-bg, --text-primary
 
 ### styles/status-pill.css (21)
 - Плашка состояния в шапке секции: прижата к правому краю.
 - селекторы (3): .status-pill, .status-pill[data-tone='ok'], .status-pill[data-tone='err']
 - берёт: --danger, --err-fill-strong, --ok-fill, --ok-text
+
+### styles/status-row.css (41)
+- Строка состояния шага мастера: чем шаг занят и чем кончилось. Своим файлом, а не в оформлении мастера: строка — свой компонент, и стоит она на трёх шагах из четырёх. Стоит она там же, где работали: плашка поверх окна увела бы ответ туда, куда человек в этот миг не смотрит.
+- селекторы (7): .status-row, .status-row .material-symbols-outlined, .status-row[data-tone='ok'], .status-row[data-tone='ok'] .material-symbols-outlined, .status-row[data-tone='err'], .status-row[data-tone='err'] .material-symbols-outlined, .status-row[data-tone='busy'] .material-symbols-outlined
+- берёт: --accent, --bg-tertiary, --err, --ok, --text-primary
 
 ### styles/tabs.css (28)
 - Верхние вкладки раздела: одна строка над содержимым экрана.
@@ -1033,10 +1099,10 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (5): .tg-login, .tg-login-box, .tg-login .modal-title, .tg-login .input, .tg-login .modal-actions
 - берёт: --bg-secondary, --bg-tertiary, --border
 
-### styles/timeline.css (162)
+### styles/timeline.css (151)
 - Лента жизни вакансии: точка, текст и время в три колонки.
-- селекторы (27): .timeline, .tl-item, .tl-item .status-dot, .tl-item .status-dot[data-status=''], .tl-item .status-dot[data-status='Not Fit'], .tl-item.current .status-dot, .tl-item.current .status-dot[data-status='New'], .tl-item.current .status-dot[data-status='Applied'], .tl-item.current .status-dot[data-status='Answered'], .tl-item.current .status-dot[data-status='Test'], .tl-item.current .status-dot[data-status='Invitation'], .tl-item.current .status-dot[data-status='In Progress'], .tl-item.current .status-dot[data-status='Offer'], .tl-item.current .status-dot[data-status='Decline'], .tl-item.current .status-dot[data-status='Ghosting'], .tl-item.current .status-dot[data-status='Scam'], .tl-item.current .status-dot[data-status='Not Fit'], .tl-text, .tl-label, .tl-history-row, .tl-history-row .tl-label, .tl-event, .tl-note, .tl-note:hover, .tl-note:focus, .tl-note::placeholder, .tl-when
-- берёт: --accent, --bg-tertiary, --border, --dot-outline, --status-not-fit-timeline, --text-primary, --text-secondary, --text-tertiary, --tl-halo-answered, --tl-halo-applied, --tl-halo-decline, --tl-halo-default, --tl-halo-ghosting, --tl-halo-in-progress, --tl-halo-invitation, --tl-halo-new, --tl-halo-not-fit, --tl-halo-offer, --tl-halo-scam, --tl-halo-test
+- селекторы (26): .timeline, .tl-item, .tl-item .status-dot, .tl-item .status-dot[data-status=''], .tl-item .status-dot[data-status='Not Fit'], .tl-item.current .status-dot, .tl-item.current .status-dot[data-status='New'], .tl-item.current .status-dot[data-status='Applied'], .tl-item.current .status-dot[data-status='Answered'], .tl-item.current .status-dot[data-status='Test'], .tl-item.current .status-dot[data-status='Invitation'], .tl-item.current .status-dot[data-status='In Progress'], .tl-item.current .status-dot[data-status='Offer'], .tl-item.current .status-dot[data-status='Decline'], .tl-item.current .status-dot[data-status='Ghosting'], .tl-item.current .status-dot[data-status='Scam'], .tl-item.current .status-dot[data-status='Not Fit'], .tl-text, .tl-label, .tl-history-row, .tl-history-row .tl-label, .tl-event, .tl-note, .tl-note:focus, .tl-note::placeholder, .tl-when
+- берёт: --bg-tertiary, --dot-outline, --status-not-fit-timeline, --text-primary, --text-secondary, --text-tertiary, --tl-halo-answered, --tl-halo-applied, --tl-halo-decline, --tl-halo-default, --tl-halo-ghosting, --tl-halo-in-progress, --tl-halo-invitation, --tl-halo-new, --tl-halo-not-fit, --tl-halo-offer, --tl-halo-scam, --tl-halo-test
 
 ### styles/toggle.css (64)
 - Переключатель-пилюля: дорожка и шарик на ней. Двух размеров, и размер несущий: в анкете порогов он стоит один в колонке и взят в полный рост, а в строке списка контактов делит место с именем, счётом и значком отсева — там он вдвое меньше. Числа лежат переменными, чтобы шарик не пришлось пересчитывать на каждый размер руками.
@@ -1049,14 +1115,14 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (15): .badge-unread, .badge-unread .material-symbols-outlined, .badge-unread[data-has-unread='true'], .badge-unread:hover, .badge-unread[data-has-unread='true']:hover, .unread-popup-backdrop, .unread-popup, .unread-popup-empty, .unread-popup-list, .unread-popup-row, .unread-popup-row:last-child, .unread-popup-row:hover, .unread-popup-name, .unread-popup-sub, .unread-popup-count
 - берёт: --accent, --accent-badge-hover, --bg-secondary, --border, --selected-bg, --shadow-popup, --surface-raised, --surface-raised-hover, --text-primary, --text-tertiary
 
-### styles/vacancies.css (199)
+### styles/vacancies.css (193)
 - Экран вакансий: список слева, подробности справа, строка в три этажа.
 - селекторы (27): .vac-list-toolbar, .vac-list-toolbar .icon-btn, .vac-list-toolbar .icon-btn .material-symbols-outlined, .vac-list-toolbar .icon-btn:hover, .vac-sort-menu, .vac-sort-option, .vac-sort-option:hover, .vac-sort-option.active, .vac-list-empty, .vac-list-empty .material-symbols-outlined, .vac-detail-pane, .vac-detail-empty, .vac-row, .vac-row:hover, .vac-row-head, .vac-title, .vac-meta, .vac-meta .v-co, .vac-meta .sep, .vac-meta .when, .vac-score, .vac-score[data-tone='warn'], .vac-score[data-tone='bad'], .vac-stack, .mini-chip, .mini-chip.more, .mini-chip.matched
 - берёт: --accent, --accent-chip-bg, --accent-hover-soft, --accent-option-active, --accent-row-hover, --bg-primary, --bg-secondary, --bg-tertiary, --border, --err, --score-warn, --scrim, --text-primary, --text-secondary, --text-tertiary
 
-### styles/vacancy-card.css (173)
+### styles/vacancy-card.css (162)
 - Карточка вакансии: шапка со статусом, чипы разбора, стек, текст и связи. Лента переходов — в timeline.css, выбор статуса — в status-picker.css, исходный текст — в raw-text.css, кружок с именами — в contact-block.css.
-- селекторы (22): .det-head, .status-wrap, .det-title, .det-section, .status-badge, .status-badge:hover, .status-label, .status-badge .material-symbols-outlined, .status-wrap.popover-open .status-badge .material-symbols-outlined, .det-info, .info-chip, .info-chip .material-symbols-outlined, .info-chip.linkable, .info-chip.linkable:hover, .info-chip.score, .info-chip.score[data-tone='warn'], .info-chip.score[data-tone='bad'], .det-stack, .stack-chip, .stack-chip.matched, .det-section p, .vac-contacts
+- селекторы (21): .det-head, .status-wrap, .det-title, .status-badge, .status-badge:hover, .status-label, .status-badge .material-symbols-outlined, .status-wrap.popover-open .status-badge .material-symbols-outlined, .det-info, .info-chip, .info-chip .material-symbols-outlined, .info-chip.linkable, .info-chip.linkable:hover, .info-chip.score, .info-chip.score[data-tone='warn'], .info-chip.score[data-tone='bad'], .det-stack, .stack-chip, .stack-chip.matched, .det-section p, .vac-contacts
 - берёт: --accent, --accent-chip-bg, --bg-primary, --bg-secondary, --bg-tertiary, --border, --err, --score-warn, --text-primary, --text-secondary
 
 ### styles/vacancy-filters.css (153)
@@ -1064,13 +1130,12 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (21): .filter-wrap, .filter-btn.active, .filter-panel, .filter-head, .filter-head .material-symbols-outlined, .filter-title, .filter-meta, .filter-close, .filter-close:hover, .filter-close .material-symbols-outlined, .filter-body, .filter-panel .input, .filter-body .status-dot, .filter-body .choice:hover, .filter-pair, .filter-dates, .filter-dates .date-picker:last-child .date-panel, .filter-foot, .filter-foot .btn, .filter-foot .btn .material-symbols-outlined, .filter-foot-right
 - берёт: --accent, --bg-tertiary, --border, --scrim, --selected-bg, --surface-hover-firm, --text-primary, --text-secondary, --text-tertiary
 
-### styles/wizard.css (483)
-- Мастер первого запуска: окно из трёх полос — шаги, тело, подвал. Полосы те же, что у самого приложения, и это нарочно: мастер — не отдельная программа, а первый разговор с этой.
-- селекторы (72): .wiz-window, .wiz-steps, .wiz-steps.dimmed, .wiz-step, .wiz-step::before, .wiz-step:first-child::before, .wiz-step[data-mark='active']::before,
-.wiz-step[data-mark='done']::before, .wiz-step-mark, .wiz-step[data-mark='active'] .wiz-step-mark, .wiz-step[data-mark='done'] .wiz-step-mark, .wiz-step-label, .wiz-step[data-mark='active'] .wiz-step-label, .wiz-step[data-mark='done'] .wiz-step-label, .wiz-body, .wiz-body > *:last-child, .wiz-head, .wiz-head .material-symbols-outlined, .wiz-head h1, .wiz-title, .wiz-text, .wiz-text strong, .wiz-foot, .wiz-foot-right, .wiz-done, .wiz-done .material-symbols-outlined, .wiz-done h2, .wiz-done .wiz-text, .wiz-subtitle, .wiz-subtitle strong, .wiz-welcome, .warning-card,
-.info-card, .warning-card, .warning-card .material-symbols-outlined, .warning-card strong, .info-card, .info-card .material-symbols-outlined, .info-card strong, .wiz-body > .info-card,
-.wiz-body > .warning-card, .help, .help strong, .help code, .help ol, .help ol li, .status-row, .status-row .material-symbols-outlined, .status-row[data-tone='ok'], .status-row[data-tone='ok'] .material-symbols-outlined, .status-row[data-tone='err'], .status-row[data-tone='err'] .material-symbols-outlined, .status-row[data-tone='busy'] .material-symbols-outlined, @keyframes wiz-spin, .radio-card, .radio-card:hover, .radio-card.selected, .radio-card.disabled, .radio-card.disabled:hover, .radio-card input, .radio-card.disabled input, .radio-card .rc-title, .radio-card .rc-sub, .file-pick, .file-pick.has-file, .file-pick .material-symbols-outlined, .file-pick .text, .file-pick .text .name, .wiz-window .input, .wiz-window .btn, .wiz-window .btn .material-symbols-outlined, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
-- берёт: --accent, --accent-chip-selected, --accent-hover-soft, --alert-card-bg, --alert-card-border, --alert-text, --bg-primary, --bg-secondary, --bg-tertiary, --border, --err, --info, --info-card-bg, --info-card-border, --ok, --text-primary, --text-secondary, --text-tertiary
+### styles/wizard.css (269)
+- Мастер первого запуска: полосы окна, обложка, финал и поджатия общих блоков под него. Полосы те же, что у самого приложения, и это нарочно: мастер — не отдельная программа, а первый разговор с этой. Что стоит внутри шага — карточки подсказок, инструкция, выбор файла, строка состояния — вынесено своими файлами: те же блоки встречаются и вне мастера.
+- селекторы (38): .wiz-window, .wiz-steps, .wiz-steps.dimmed, .wiz-step, .wiz-step::before, .wiz-step:first-child::before, .wiz-step[data-mark='active']::before,
+.wiz-step[data-mark='done']::before, .wiz-step-mark, .wiz-step[data-mark='active'] .wiz-step-mark, .wiz-step[data-mark='done'] .wiz-step-mark, .wiz-step-label, .wiz-step[data-mark='active'] .wiz-step-label, .wiz-step[data-mark='done'] .wiz-step-label, .wiz-body, .wiz-body > *:last-child, .wiz-head, .wiz-head .material-symbols-outlined, .wiz-head h1, .wiz-title, .wiz-text, .wiz-text strong, .wiz-foot, .wiz-foot-right, .wiz-done, .wiz-done .material-symbols-outlined, .wiz-done h2, .wiz-done .wiz-text, .wiz-subtitle, .wiz-subtitle strong, .wiz-welcome, .wiz-window .input, .wiz-window .btn, .wiz-window .btn .material-symbols-outlined, .wiz-body > .info-card,
+.wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
+- берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
 ## tests — 38 файлов
 

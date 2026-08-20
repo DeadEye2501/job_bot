@@ -197,7 +197,7 @@
   });
 </script>
 
-<div class="cnt-chat-section">
+<div class="card-section cnt-chat-section">
   <div class="cnt-chat-body" bind:this={feed} onscroll={scrolled}>
     {#if !loaded}
       <div class="cnt-chat-empty">Загрузка переписки…</div>
