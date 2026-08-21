@@ -42,6 +42,28 @@ export function remoteLabel(remote) {
   return known === undefined ? remote : known.label;
 }
 
+/** Зарплата пилюлей: только разобранные числа, единица знаком после них.
+ *
+ * Зарплата в объявлении бывает трёх родов: названа числами, названа словами
+ * («по результатам собеседования») либо не названа вовсе. Пилюля показывает
+ * только первый род, а двух остальных для неё не существует: разбор велит
+ * модели брать зарплату дословно, и в поле `salary` приезжает написанное
+ * автором поста — с эмодзи, служебным зачином и во всю ширину карточки.
+ *
+ * Незнакомая единица числа не прячет: показать сумму без значка лучше, чем
+ * скрыть разобранное из-за написания, которого нет в карте валют.
+ */
+export function salaryLabel(vacancy) {
+  const min = vacancy.salary_min ?? null;
+  const max = vacancy.salary_max ?? null;
+  const unit = vacancy.salary_currency ? ` ${vacancy.salary_currency}` : '';
+  if (min === null && max === null) return '';
+  if (min === max) return `${min}${unit}`;
+  if (max === null) return `от ${min}${unit}`;
+  if (min === null) return `до ${max}${unit}`;
+  return `от ${min} до ${max}${unit}`;
+}
+
 /** Чем объяснить пустой список: значком и словами.
  *
  * Положений два, и они разные: при наборе в поиске список пуст оттого, что
@@ -84,7 +106,7 @@ export function vacancyLine(vacancy, now) {
     title: vacancy.title || '—',
     company: vacancy.company || '—',
     grade: gradeLabel(vacancy.grade),
-    salary: vacancy.salary || '—',
+    salary: salaryLabel(vacancy) || '—',
     when: ago(vacancy.last_activity_at || vacancy.posted_at || vacancy.created_at, now),
   };
 }

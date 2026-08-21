@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 8ba64b863cb1
+Revision ID: e560edf8b958
 Revises: 
-Create Date: 2026-05-05 11:06:05.338783+00:00
+Create Date: 2026-08-21 14:43:52.045249+00:00
 
 """
 from typing import Sequence, Union
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = '8ba64b863cb1'
+revision: str = 'e560edf8b958'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -166,7 +166,7 @@ def upgrade() -> None:
     sa.Column('salary', sa.String(), nullable=True),
     sa.Column('salary_min', sa.Integer(), nullable=True),
     sa.Column('salary_max', sa.Integer(), nullable=True),
-    sa.Column('salary_currency', sa.Enum('RUB', 'USD', 'EUR', name='currency'), nullable=True),
+    sa.Column('salary_currency', sa.String(), nullable=True),
     sa.Column('remote', sa.String(), nullable=True),
     sa.Column('location', sa.String(), nullable=True),
     sa.Column('score', sa.Integer(), nullable=True),

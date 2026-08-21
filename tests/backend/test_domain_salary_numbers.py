@@ -10,7 +10,6 @@
 import pytest
 
 from backend.domain.salary import parse_salary
-from backend.models import Currency
 
 
 def test_a_space_inside_a_number_does_not_break_it():
@@ -19,7 +18,7 @@ def test_a_space_inside_a_number_does_not_break_it():
     Написание «$3 000» встречается в объявлениях наравне с «$3000», и разрыв
     на «3» и «000» превращал бы три тысячи долларов в диапазон от нуля до трёх.
     """
-    assert parse_salary("$3 000") == (3000, 3000, Currency.USD)
+    assert parse_salary("$3 000") == (3000, 3000, "$")
 
 
 @pytest.mark.parametrize("raw", ["300K", "300 тыс"])
@@ -30,12 +29,12 @@ def test_a_thousands_marker_is_expanded(raw):
 
 def test_a_cyrillic_thousands_marker_works_too():
     """Пометка тысяч кириллицей читается наравне с латинской."""
-    assert parse_salary("от 250к до 400к ₽") == (250000, 400000, Currency.RUB)
+    assert parse_salary("от 250к до 400к ₽") == (250000, 400000, "₽")
 
 
 def test_a_millions_marker_is_expanded_too():
     """«5 млн» — это пять миллионов, а не пять."""
-    assert parse_salary("5 млн ₽") == (5000000, 5000000, Currency.RUB)
+    assert parse_salary("5 млн ₽") == (5000000, 5000000, "₽")
 
 
 def test_bare_numbers_are_taken_at_face_value():
@@ -45,7 +44,7 @@ def test_bare_numbers_are_taken_at_face_value():
 
 def test_the_bounds_come_back_sorted():
     """Границы возвращаются по возрастанию независимо от порядка в строке."""
-    assert parse_salary("300 000 — 150 000 ₽") == (150000, 300000, Currency.RUB)
+    assert parse_salary("300 000 — 150 000 ₽") == (150000, 300000, "₽")
 
 
 @pytest.mark.parametrize(
@@ -93,7 +92,7 @@ def test_a_fraction_is_one_number_and_not_a_range(raw):
 
 def test_a_percentage_is_not_a_salary():
     """Процент премии в границы зарплаты не попадает."""
-    assert parse_salary("200 000 ₽ + KPI до 20%") == (200000, 200000, Currency.RUB)
+    assert parse_salary("200 000 ₽ + KPI до 20%") == (200000, 200000, "₽")
 
 
 def test_a_zero_bound_is_dropped():
@@ -104,7 +103,7 @@ def test_a_zero_bound_is_dropped():
     или повтори триста тысяч обеими — вакансия попадёт в отбор «от 300 000»,
     хотя платить столько никто не обещал.
     """
-    assert parse_salary("от 0 до 300 000 ₽") == (None, 300000, Currency.RUB)
+    assert parse_salary("от 0 до 300 000 ₽") == (None, 300000, "₽")
 
 
 @pytest.mark.parametrize(
@@ -133,7 +132,7 @@ def test_a_typographic_space_inside_a_number_does_not_break_it(space):
     Именно их ставит типографика, и именно они приезжают из объявлений
     Telegram. Обычный пробел в такой строке — скорее исключение.
     """
-    assert parse_salary(f"200{space}000 ₽") == (200000, 200000, Currency.RUB)
+    assert parse_salary(f"200{space}000 ₽") == (200000, 200000, "₽")
 
 
 @pytest.mark.parametrize(

@@ -208,6 +208,25 @@ def _vacancy_event(row) -> dict:
     }
 
 
+def _salary(v) -> dict:
+    """Зарплата на проводе: строка объявления и разобранные из неё числа.
+
+    Пилюлю окно собирает из чисел, а не из строки: разбор велит модели брать
+    зарплату дословно, и в строке приезжает написанное автором поста — со
+    служебным зачином и эмодзи. Строка при этом остаётся: её показывает
+    исходный текст объявления.
+
+    Общая на карточку и на строку списка: пилюля у них одна и та же, и
+    разойдись наборы полей, в одном из мест она замолчала бы.
+    """
+    return {
+        "salary": v.salary,
+        "salary_min": v.salary_min,
+        "salary_max": v.salary_max,
+        "salary_currency": v.salary_currency,
+    }
+
+
 def _vacancy_detail_to_dict(
     detail, matched_set: set[str], score_threshold: int,
 ) -> dict:
@@ -234,7 +253,7 @@ def _vacancy_detail_to_dict(
         "company_website": v.company.website if v.company is not None else None,
         "hr": _hr_face(v.hr) if v.hr is not None else None,
         "grade": v.grade,
-        "salary": v.salary,
+        **_salary(v),
         "remote": v.remote,
         "location": v.location,
         "channel_username": v.channel.username if v.channel is not None else None,
@@ -379,7 +398,7 @@ def _vacancy_list_row_to_dict(
         "hr_id": v.hr_id,
         "channel_username": channel_username,
         "grade": v.grade,
-        "salary": v.salary,
+        **_salary(v),
         "remote": v.remote,
         "stack": _stack_items(v.stack, matched_set),
         "posted_at": _iso(v.posted_at),

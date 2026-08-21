@@ -18,7 +18,7 @@ from sqlalchemy.sql import expression
 
 from backend.models.base import Base, CreatedAtMixin, IdMixin, enum_column
 from backend.models.contacts import HR, Company, TelegramChannel
-from backend.models.enums import Currency, StatusHistorySource, VacancyStatus
+from backend.models.enums import StatusHistorySource, VacancyStatus
 
 
 class Vacancy(IdMixin, CreatedAtMixin, Base):
@@ -56,9 +56,10 @@ class Vacancy(IdMixin, CreatedAtMixin, Base):
     salary: Mapped[str | None]
     salary_min: Mapped[int | None]
     salary_max: Mapped[int | None]
-    salary_currency: Mapped[Currency | None] = mapped_column(
-        enum_column(Currency, "currency")
-    )
+    # Знак валюты, как его печатает окно: карта написаний живёт в
+    # `domain/currency.py`, а перечисление здесь ограничивало набор тремя
+    # валютами — драм и тенге разбирались числом и оставались без валюты.
+    salary_currency: Mapped[str | None]
     remote: Mapped[str | None]
     location: Mapped[str | None]
     score: Mapped[int | None]

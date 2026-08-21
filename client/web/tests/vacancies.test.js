@@ -6,6 +6,7 @@ import {
   SORTS,
   ago,
   emptyNote,
+  salaryLabel,
   scoreTone,
   shortAgo,
   shownStack,
@@ -37,6 +38,44 @@ describe('пустой список', () => {
   });
 });
 
+describe('пилюля зарплаты', () => {
+  it('названы обе границы — «от» и «до», единица после числа', () => {
+    // Единственный род зарплаты, который пилюля показывает, — названный
+    // числами. Слова автора поста («по итогам собеседования») в неё не идут.
+    expect(salaryLabel({ salary_min: 1000, salary_max: 2000, salary_currency: '֏' }))
+      .toBe('от 1000 до 2000 ֏');
+  });
+
+  it('названа одна нижняя — «от»', () => {
+    expect(salaryLabel({ salary_min: 1000, salary_max: null, salary_currency: '֏' }))
+      .toBe('от 1000 ֏');
+  });
+
+  it('названа одна верхняя — «до»', () => {
+    expect(salaryLabel({ salary_min: null, salary_max: 2000, salary_currency: '֏' }))
+      .toBe('до 2000 ֏');
+  });
+
+  it('границы равны — это точная сумма, и предлог ей не нужен', () => {
+    expect(salaryLabel({ salary_min: 1500, salary_max: 1500, salary_currency: '֏' }))
+      .toBe('1500 ֏');
+  });
+
+  it('чисел нет — пилюли нет вовсе', () => {
+    // «Зарплата по результатам собеседования» — не число, и показывать в
+    // пилюле нечего.
+    expect(salaryLabel({ salary_min: null, salary_max: null, salary_currency: null }))
+      .toBe('');
+  });
+
+  it('единица не опознана — число печатают без значка', () => {
+    // Прятать разобранную сумму из-за неизвестного написания валюты хуже, чем
+    // показать её без значка.
+    expect(salaryLabel({ salary_min: 1500, salary_max: 1500, salary_currency: null }))
+      .toBe('1500');
+  });
+});
+
 describe('строка вакансии', () => {
   it('под названием стоят компания, грейд, зарплата и давность', () => {
     // По ним вакансию узнают в списке, не открывая: четыре слова говорят,
@@ -46,7 +85,9 @@ describe('строка вакансии', () => {
         title: 'Python-разработчик',
         company: 'Ромашка',
         grade: 'senior',
-        salary: '200 000 ₽',
+        salary_min: 200000,
+        salary_max: 200000,
+        salary_currency: '₽',
         last_activity_at: '2026-08-14T20:00:00',
       },
       NOW,
@@ -55,7 +96,7 @@ describe('строка вакансии', () => {
       title: 'Python-разработчик',
       company: 'Ромашка',
       grade: 'Senior',
-      salary: '200 000 ₽',
+      salary: '200000 ₽',
       when: '1 ч',
     });
   });
@@ -64,7 +105,15 @@ describe('строка вакансии', () => {
     // Пустое место читалось бы как недогрузившаяся строка, а прочерк говорит
     // «в объявлении этого не было».
     const line = vacancyLine(
-      { title: '', company: '', grade: '', salary: '', last_activity_at: null },
+      {
+        title: '',
+        company: '',
+        grade: '',
+        salary_min: null,
+        salary_max: null,
+        salary_currency: null,
+        last_activity_at: null,
+      },
       NOW,
     );
     expect(line).toEqual({
@@ -80,7 +129,6 @@ describe('строка вакансии', () => {
         title: 'x',
         company: 'x',
         grade: '',
-        salary: '',
         last_activity_at: '2026-08-14T18:00:00',
         created_at: '2026-05-01T10:00:00',
       },

@@ -17,7 +17,7 @@
   import { cardLinks } from '$state/card_links.js';
   import { miniRead } from '$state/mini_read.js';
   import { actionBlocks, rawChips } from '$state/vacancy_actions.js';
-  import { ago, gradeLabel, remoteLabel, scoreTone } from '$state/vacancies.js';
+  import { ago, gradeLabel, remoteLabel, salaryLabel, scoreTone } from '$state/vacancies.js';
   import { timelineRows } from '$state/vacancy_card.js';
 
   import VacancyLinks from './VacancyLinks.svelte';
@@ -47,6 +47,7 @@
 
   const rows = $derived(card ? timelineRows(card.history, card.events) : []);
   const tone = $derived(card ? scoreTone(card.score, card.score_threshold) : '');
+  const salary = $derived(card ? salaryLabel(card) : '');
   const blocks = $derived(card ? actionBlocks(card, lockedTip) : { send: '', rerun: '', source: '' });
   const links = $derived(card ? cardLinks(card) : null);
   // Когда объявление вышло: у поста есть своя метка, а у записи — только время
@@ -235,7 +236,7 @@
       <span class="info-chip score" data-tone={tone}>Score: {card.score}</span>
     {/if}
     {#if card.grade}<span class="info-chip">{gradeLabel(card.grade)}</span>{/if}
-    {#if card.salary}<span class="info-chip">{card.salary}</span>{/if}
+    {#if salary}<span class="info-chip">{salary}</span>{/if}
     {#if card.remote}<span class="info-chip">{remoteLabel(card.remote)}</span>{/if}
     {#if card.location}<span class="info-chip">{card.location}</span>{/if}
     {#if card.channel_username}

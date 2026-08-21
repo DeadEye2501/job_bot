@@ -71,6 +71,36 @@ async def test_the_list_carries_the_fields_the_pane_draws(
     assert row["status"] == "Applied"
 
 
+async def test_the_parsed_salary_reaches_both_the_row_and_the_card(
+    api, ask, session_factory
+):
+    """Разобранные числа зарплаты едут и в строку списка, и в карточку.
+
+    Пилюлю зарплаты окно собирает само — из границ и единицы, а не из
+    свободной строки объявления. Не доедь они, пилюля пропала бы у вакансии,
+    сумма в которой разобрана и лежит в полях.
+    """
+    await put(
+        session_factory,
+        vacancy_row(salary_min=500000, salary_max=700000, salary_currency="֏"),
+    )
+
+    listed = await ask(api.vacancies.list)
+    row = listed["ok"]["vacancies"][0]
+    card = (await ask(api.vacancies.detail, row["id"]))["ok"]["vacancy"]
+
+    assert (row["salary_min"], row["salary_max"], row["salary_currency"]) == (
+        500000,
+        700000,
+        "֏",
+    )
+    assert (card["salary_min"], card["salary_max"], card["salary_currency"]) == (
+        500000,
+        700000,
+        "֏",
+    )
+
+
 async def test_a_linked_company_name_beats_the_one_from_the_advert(
     api, ask, session_factory
 ):

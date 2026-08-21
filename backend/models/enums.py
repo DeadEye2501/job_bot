@@ -9,18 +9,6 @@ class BotMode(enum.Enum):
     FULL = "Full"
 
 
-class Currency(enum.Enum):
-    """Валюта зарплаты, как она названа в объявлении.
-
-    Приведения к одной валюте нет: курс в объявлении не указан, а отбор в
-    списке идёт по написанному числу. Не названная в строке валюта остаётся
-    неизвестной, и колонка хранит пустоту."""
-
-    RUB = "RUB"
-    USD = "USD"
-    EUR = "EUR"
-
-
 class VacancyStatus(enum.Enum):
     NEW = "New"
     APPLIED = "Applied"

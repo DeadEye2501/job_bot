@@ -2,7 +2,7 @@
 
 import re
 
-from backend.models import Currency
+from backend.domain.currency import CURRENCY_WRITINGS
 
 # Число вместе со своими разрядами, дробной частью и собственной пометкой
 # масштаба. Пометка ищется не по всей строке, а вплотную к числу и только
@@ -14,19 +14,10 @@ _AMOUNT_RE = re.compile(
     r"(?![a-zа-яё0-9])))?",
     re.IGNORECASE,
 )
-# Валюта, названная знаком, словом или кодом. Написания объявлены один раз:
-# по ним и склеиваются числа вилки, и опознаётся валюта строки, и разойдись
-# эти два перечня, «$3000-$5000» склеилось бы валютой, которой у строки нет.
-#
-# Название берётся целым словом: «евро» внутри «Европы» и «eur» внутри
-# «europe» превращали рублёвую вакансию в валютную, а «руб» внутри «рубрики»
-# — долларовую в вакансию с двумя валютами разом, то есть без валюты вовсе.
-_CURRENCY_WORDS: tuple[tuple[Currency, str], ...] = (
-    (Currency.USD, r"\$|(?<![a-z])usd(?![a-z])|долл[а-яё.]*"),
-    (Currency.EUR, r"€|(?<![a-z])eur(?![a-z])|евро(?![а-яё])"),
-    (Currency.RUB, r"₽|(?<![a-z])rub(?![a-z])|руб\.?(?![а-яё])|рубл[а-яё]*"),
-)
-_CURRENCY_WORD = "|".join(word for _, word in _CURRENCY_WORDS)
+# Написания валют приходят картой (`domain/currency.py`): по ним и
+# склеиваются числа вилки, и опознаётся валюта строки, и разойдись эти два
+# перечня, «$3000-$5000» склеилось бы валютой, которой у строки нет.
+_CURRENCY_WORD = "|".join(word for _, word in CURRENCY_WRITINGS)
 # Числа одной вилки склеены между собой только пробелами, тире, «до» — и
 # знаком валюты, но лишь вместе с тире или «до»: его пишут у каждой границы.
 # Стоять он может с любой стороны разделителя и с обеих сразу: у рубля пишут
@@ -80,14 +71,14 @@ _CURRENCY_BEFORE_RE = re.compile(rf"(?:{_CURRENCY_WORD})\s*$")
 _CURRENCY_AFTER_RE = re.compile(rf"^\s*(?:{_CURRENCY_WORD})")
 # Наращение при числе своё слово не заслоняет: «от 3-х лет» — тот же срок.
 _WORD_AFTER_RE = re.compile(r"^(?:-[а-яё]{1,2})?\s*([a-zа-яё]+)")
-_CURRENCIES: tuple[tuple[Currency, re.Pattern[str]], ...] = tuple(
-    (currency, re.compile(word)) for currency, word in _CURRENCY_WORDS
+_CURRENCIES: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
+    (sign, re.compile(word)) for sign, word in CURRENCY_WRITINGS
 )
 
 
 def parse_salary(
     salary: str | None,
-) -> tuple[int | None, int | None, Currency | None]:
+) -> tuple[int | None, int | None, str | None]:
     """Достать из строки диапазон и валюту, не пересчитывая их.
 
     Число остаётся тем, что записано в объявлении, — раскрывается только
@@ -289,11 +280,11 @@ def _scale(marker: str | None) -> int:
     return 1000 if marker.lower().startswith(_THOUSAND) else 10**6
 
 
-def _currency(s: str) -> Currency | None:
-    """Валюта строки — только если она в ней одна.
+def _currency(s: str) -> str | None:
+    """Знак валюты строки — только если валюта в ней одна.
 
     Названы две — диапазон не имеет смысла ни в одной из них, и выбор первой
     попавшейся спрятал бы вакансию от отбора по второй.
     """
-    named = [currency for currency, pattern in _CURRENCIES if pattern.search(s)]
+    named = [sign for sign, pattern in _CURRENCIES if pattern.search(s)]
     return named[0] if len(named) == 1 else None
