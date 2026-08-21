@@ -4,6 +4,8 @@
   // Стоит правой панелью рядом со списком: канал правят, глядя на его же числа,
   // и уводить ради этого с экрана значило бы терять из виду соседей по списку.
 
+  import { untrack } from 'svelte';
+
   import ActionsMenu from '$components/ActionsMenu.svelte';
   import Avatar from '$components/Avatar.svelte';
   import BlacklistChip from '$components/BlacklistChip.svelte';
@@ -137,6 +139,12 @@
     await dropCard(channelId);
   }
 
+  /** Перечитать карточку канала и показанные его вакансии. */
+  function reread(id) {
+    refresh(id);
+    loadVacancies(id);
+  }
+
   $effect(() => {
     const id = channelId;
     const settled = alive.entered(() => {
@@ -146,16 +154,17 @@
       trouble = '';
       vacancies = [];
       hasMore = false;
-      refresh(id);
-      loadVacancies(id);
+      // `loadVacancies` считает показанные строки, а эффект их же и обнулил
+      // строкой выше. Эффект, который пишет и тут же читает одно состояние,
+      // Svelte перезаводит по кругу, и каждый оборот шлёт мосту два зова —
+      // окно вставало намертво на обычном нажатии по каналу. Слежение за
+      // `channelId` при этом цело: он прочитан до обёртки.
+      untrack(() => reread(id));
     });
     // Канал приносит вакансии и во время прогона, и сам по себе обходом: его
     // числа и перечень стареют, пока карточка открыта, а прогнавший канал
     // человек смотрит именно на них.
-    const deaf = events.on('vacancies_list_changed', () => {
-      refresh(id);
-      loadVacancies(id);
-    });
+    const deaf = events.on('vacancies_list_changed', () => reread(id));
     return () => {
       settled();
       deaf();
