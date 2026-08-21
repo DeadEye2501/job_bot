@@ -1010,7 +1010,7 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: `backend.domain.company_hosts`, `backend.domain.resume_marks`
 
 
-### `backend/llm/skills.py` — 135 строк
+### `backend/llm/skills.py` — 195 строк
 
 Приведение названий технологий к виду, пригодному для стека вакансии.
 
@@ -1018,10 +1018,13 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def _strip_version(s: str) -> str` (12)
 - `def _capitalize_skill(s: str) -> str` (20)
+- `def _wrapped_tail(s: str) -> str | None` (4)
+- `def _named_tool(s: str) -> str | None` (12)
+- `def _is_wrapped_requirement(s: str) -> bool` (3)
 - `def _as_items(raw: object) -> list` (16)
-- `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (30)
+- `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (36)
 
-### `backend/llm/vacancy.py` — 447 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 452 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
@@ -3540,13 +3543,13 @@ Runtime settings layer.
 
 - `class _Skill` (6)
 
-### `tests/backend/test_llm_stack_cleanup.py` — 187 строк
+### `tests/backend/test_llm_stack_cleanup.py` — 271 строк
 
 Следствия приведения названий технологий к единому виду.
 
 Зависит от: `backend.llm.skills`
 
-Тестов: 11
+Тестов: 15
 
 
 ### `tests/backend/test_llm_vacancy_answer.py` — 309 строк ⚠ подошёл к 300

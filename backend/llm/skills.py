@@ -85,6 +85,60 @@ def _capitalize_skill(s: str) -> str:
     return " ".join(out)
 
 
+# Слово, которым начинают требование: «опыт работы с Docker», «знание
+# CI/CD», «работа с кассой». Обёртка — это то, чем требование введено, а не
+# то, что оно называет.
+_WRAPPER_HEAD = (
+    r"^\s*(?:опыт|опыта|знание|знания|умение|умения|навык|навыки|"
+    r"понимание|владение|работа|работы)\b"
+)
+# Хвост требования после обёртки. Между обёрткой и предлогом стоит что угодно
+# — «опыт успешной работы с Docker», — поэтому берётся всё после ПОСЛЕДНЕГО
+# предлога. Без предлога хвостом считается всё, что идёт за самой обёрткой:
+# «знание CI/CD».
+_WRAPPED_BY_PREPOSITION_RE = re.compile(
+    _WRAPPER_HEAD + r".*\s(?:с|со|в|во|на)\s+(?P<tail>\S.*)$", re.IGNORECASE
+)
+# Хвост после обёртки без предлога: «знание CI/CD», «владение Photoshop».
+_WRAPPED_BARE_RE = re.compile(
+    _WRAPPER_HEAD + r"\s+(?P<tail>\S.*)$", re.IGNORECASE
+)
+# Сколько слов бывает в требовании, которое стоит выбросить целиком. Порог
+# работает только вместе с обёрткой: строка, начатая обёрткой и вытянувшаяся
+# в пять слов, — это переписанная строка требований, с анкетой она не
+# сойдётся никогда. Названия без обёртки не отсеиваются по длине вовсе: у
+# строителя и маркетолога они бывают и в шесть слов — «Монтаж систем
+# вентиляции и кондиционирования».
+_MAX_WRAPPED_WORDS = 4
+_CYRILLIC_RE = re.compile(r"[а-яёА-ЯЁ]")
+_LATIN_RE = re.compile(r"[A-Za-z]")
+
+
+def _wrapped_tail(s: str) -> str | None:
+    """Что стоит за обёрткой требования; пусто — обёртки нет."""
+    said = _WRAPPED_BY_PREPOSITION_RE.match(s) or _WRAPPED_BARE_RE.match(s)
+    return said.group("tail").strip() if said else None
+
+
+def _named_tool(s: str) -> str | None:
+    """Имя собственное из требования; пусто — требование названо не именем.
+
+    Обёртка снимается только перед именем, написанным латиницей: «.NET»,
+    «H&M», «Premiere Pro». У русского хвоста остаётся падеж («ведения
+    соцсетей»), и срезкой слова его не починить — там нужна начальная форма,
+    которой у кода нет, и строка остаётся какой пришла.
+    """
+    tail = _wrapped_tail(s)
+    if tail is None or _CYRILLIC_RE.search(tail) or not _LATIN_RE.search(tail):
+        return None
+    return tail
+
+
+def _is_wrapped_requirement(s: str) -> bool:
+    """Требование ли это целиком — обёртка впереди и длина не как у названия."""
+    return _wrapped_tail(s) is not None and len(s.split()) > _MAX_WRAPPED_WORDS
+
+
 def _as_items(raw: object) -> list:
     """Список технологий из того, что прислала модель.
 
@@ -124,12 +178,18 @@ def clean_stack_items(
     # тот же навык в required и в preferred. Ключ тот же, что у анкеты: иначе
     # «CI/CD» и «ci cd» пережили бы дедупликацию и дали двойной балл за один
     # навык.
+    # Имя ищется раньше отсева по длине: «опыт успешной работы с Docker» — и
+    # требование, и название разом, и выбросить его целиком значило бы
+    # потерять названный в нём инструмент.
+    kept: list[str] = []
+    for one in (s.strip() for s in items if isinstance(s, str)):
+        named = _named_tool(one)
+        if named is not None:
+            kept.append(named)
+        elif not _is_wrapped_requirement(one):
+            kept.append(one)
     return dedupe_first_wins(
-        [
-            _capitalize_skill(_strip_version(s.strip()))
-            for s in items
-            if isinstance(s, str)
-        ],
+        [_capitalize_skill(_strip_version(one)) for one in kept],
         skill_key,
         seen,
     )
