@@ -154,7 +154,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## backend — 115 модулей
+## backend — 116 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -377,13 +377,13 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def percent_or_none(numerator: int, denominator: int) -> int | None` (14)
 
-### `backend/domain/resume_marks.py` — 68 строк
+### `backend/domain/resume_marks.py` — 60 строк
 
 Приметы поста соискателя: метки, по которым он опознаётся без модели.
 
 Зависит от: —
 
-- `def resume_mark(text: str) -> str | None` (15)
+- `def resume_mark(text: str) -> str | None` (13)
 
 ### `backend/domain/salary.py` — 299 строк
 
@@ -681,22 +681,25 @@ First-run bootstrap: ensure DB schema exists.
 - `def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None` (16)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 
-### `backend/flows/parse.py` — 372 строк ⚠ подошёл к 300
+### `backend/flows/parse.py` — 429 строк ⚠ подошёл к 300
 
 Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
-Зависит от: `backend.domain.blacklist`, `backend.domain.resume_marks`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`
+Зависит от: `backend.domain.blacklist`, `backend.domain.resume_marks`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit`, `backend.llm.genre`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`
 
 - `async def _dropped_as_trash(pipeline, vacancy_id: int, reason: str, *, allow_delete: bool) -> bool` (23)
 - `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (51)
+- `async def _thrown_out_as_a_resume(pipeline, vacancy_id: int, mark: str, allow_delete: bool) -> bool` (16)
+- `async def _genre_refusal(pipeline, text: str, vacancy_id: int) -> tuple[str | None, bool]` (29)
+- `async def _model_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (13)
 - `async def _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus) -> None` (36)
 - `async def _parsed_or_dropped(pipeline, vacancy_id: int, text: str, channel_username: str, allow_delete: bool)` (44)
-- `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (41)
+- `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (33)
 - `async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> bool` (18)
 - `async def _thrown_out_by_the_verdict(pipeline, vacancy_id: int, skip_reason: str | None, allow_delete: bool) -> bool` (16)
-- `async def parse_and_update_vacancy(pipeline, vacancy_id: int, text: str, channel_username: str, *, allow_delete: bool=True) -> bool` (42)
+- `async def parse_and_update_vacancy(pipeline, vacancy_id: int, text: str, channel_username: str, *, allow_delete: bool=True) -> bool` (43)
 - `async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool` (11)
-- `async def save_empty_vacancy(pipeline, vacancy_id: int, parsed: ParsedVacancy | None, *, reason: str=EMPTY_SKIP_REASON) -> bool` (34)
+- `async def save_empty_vacancy(pipeline, vacancy_id: int, parsed: ParsedVacancy | None, *, reason: str=EMPTY_SKIP_REASON) -> bool` (33)
 
 ### `backend/flows/parse_write.py` — 245 строк
 
@@ -894,6 +897,16 @@ First-run bootstrap: ensure DB schema exists.
 - `def _without_invented_reason(validation: FitValidation, raw_text: str, profile)` (37)
 - `async def validate_vacancy_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (36)
   - `def read(answer: str) -> FitValidation | None` (7)
+
+### `backend/llm/genre.py` — 131 строк
+
+Жанр поста: зовёт ли автор на работу или предлагает себя.
+
+Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.rules`, `backend.payloads`
+
+- `def _parse_genre(answer: str) -> PostGenre | None` (18)
+- `def _genre_request(text: str, max_tokens: int) -> ChatRequest` (17)
+- `async def classify_post_genre(text: str, client: httpx.AsyncClient, model: str) -> tuple[PostGenre | None, str | None]` (22)
 
 ### `backend/llm/hallucination.py` — 280 строк
 
@@ -1102,7 +1115,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 402 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 419 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -1120,6 +1133,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class Classification` (3)
 - `class ParsedVacancy` (38)
   - `def stack(self) -> list[str]` (8)
+- `class PostGenre` (14)
 - `class FitValidation` (3)
 - `class VacancyDetail` (4)
 - `class HrWithCount` (6)
@@ -2412,7 +2426,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 240 модулей
+## tests — 241 модулей
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -2516,7 +2530,7 @@ Runtime settings layer.
   - `def ensure_schema()` (2)
   - `def run_ui()` (3)
 
-### `tests/backend/fixtures/flows.py` — 223 строк
+### `tests/backend/fixtures/flows.py` — 235 строк
 
 Обстановка для проверок конвейера: он собран на подделках, модель молчит.
 
@@ -2526,8 +2540,9 @@ Runtime settings layer.
 - `def _pipeline_on_fakes(session_factory, client, settings) -> IngestionPipeline` (22)
   - `async def send(hr, text, attachment=None, vacancy_id=None, *, force=False)` (3)
 - `async def _put_out_backfills(pipelines) -> None` (12)
-- `def _answer_instead_of_the_model(pipeline, monkeypatch) -> None` (17)
-  - `async def parse_vacancy(text, client_, model, **kwargs)` (2)
+- `def _answer_instead_of_the_model(pipeline, monkeypatch) -> None` (23)
+  - `async def parse_vacancy(text, client_, model, **kwargs)` (3)
+  - `async def classify_post_genre(text, client_, model)` (3)
   - `async def validate_vacancy_fit(parsed, text, client_, model, **kwargs)` (3)
   - `async def try_auto_send(pipeline, hr, parsed, vacancy_id)` (3)
 - `async def make_pipeline(session_factory)` (24)
@@ -2535,7 +2550,7 @@ Runtime settings layer.
 - `def deliver(session_factory)` (20)
   - `async def run(msg, *, client=None, schedule=None)` (10)
 - `async def unparsed_vacancy(session_factory)` (17)
-- `async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)` (31)
+- `async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)` (37)
 - `async def dm_pipeline(monkeypatch, make_pipeline)` (18)
   - `async def classify(pipeline, hr_id)` (2)
 
@@ -3184,13 +3199,13 @@ Runtime settings layer.
 Тестов: 18
 
 
-### `tests/backend/test_flows_parse_verdict.py` — 383 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_parse_verdict.py` — 477 строк ⚠ подошёл к 300
 
 Какой приговор получает объявление после разбора.
 
 Зависит от: `backend.domain.verdict`, `backend.flows`, `backend.llm.answers`, `backend.models`, `backend.payloads`, `tests.dbio`
 
-Тестов: 19
+Тестов: 24
 
 
 ### `tests/backend/test_flows_post_intake.py` — 349 строк ⚠ подошёл к 300
@@ -3385,6 +3400,16 @@ Runtime settings layer.
 - `def _answer(verdict, reason=None) -> httpx.Response` (3)
 - `async def _check(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (11)
 - `async def _asked(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (9)
+
+### `tests/backend/test_llm_genre_answer.py` — 76 строк
+
+Следствия ответа модели о жанре поста.
+
+Зависит от: `backend.llm.genre`, `tests.fakes.llm`
+
+Тестов: 5
+
+- `async def _asked(answer: httpx.Response, text: str='Ищем в команду')` (3)
 
 ### `tests/backend/test_llm_json_extraction.py` — 210 строк
 

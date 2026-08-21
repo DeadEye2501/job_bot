@@ -20,7 +20,7 @@ from backend.domain.verdict import TRUNCATED_SKIP_REASON
 from backend.flows import parse
 from backend.llm.answers import TRUNCATED_TROUBLE
 from backend.models import TrashEvent, Vacancy, VacancyStatus
-from backend.payloads import FitValidation
+from backend.payloads import FitValidation, PostGenre
 from tests.dbio import all_rows, only_row
 
 
@@ -55,9 +55,9 @@ async def test_a_resume_mark_decides_before_the_fit_check(parsing, session_facto
     """Метка резюме выбрасывает пост сама, не спрашивая оценщика.
 
     Цена промаха тут не строка в списке, а письмо живому человеку от нашего
-    имени: 21.08.2026 отклик с приложенным CV ушёл соискателю, чей пост
-    начинался словом `#cv`. Оценщик такой пост пропустил — на настроение
-    модели тут полагаться нечем, а метка однозначна и стоит ноль.
+    имени: отклик с приложенным CV уходит соискателю. Оценщик такие посты
+    пропускает — на настроение модели тут полагаться нечем, а метка
+    однозначна и стоит ноль.
     """
     pipeline, vacancy = parsing
 
@@ -70,6 +70,8 @@ async def test_a_resume_mark_decides_before_the_fit_check(parsing, session_facto
     )
 
     assert await all_rows(session_factory, Vacancy) == []
+    assert pipeline.parse_asked is False
+    assert pipeline.genre_asked is False
     assert pipeline.validated is False
     mark = await only_row(session_factory, TrashEvent)
     assert mark.reason == "trash: пост соискателя, метка #cv"
@@ -99,9 +101,9 @@ async def test_a_hashtag_inside_a_link_is_not_a_mark(parsing, session_factory):
 async def test_a_hiring_post_that_says_it_is_looking_survives(parsing, session_factory):
     """Пост о найме с «#ищу» проходит отсев по меткам насквозь.
 
-    Метка `#ищу` в канале означает и «ищу работу», и «ищу сотрудника»: в
-    собранном за август она стоит в постах, где рядом `#вакансия`, `#hiring`
-    и `#требуется`. В набор решающих она поэтому не входит — реши она сама,
+    Метка `#ищу` в канале означает и «ищу работу», и «ищу сотрудника»: она
+    стоит и в постах о найме, где рядом `#вакансия`, `#hiring` и
+    `#требуется`. В набор решающих она поэтому не входит — реши она сама,
     настоящие вакансии уходили бы в мусор без возврата. Наблюдается это тем,
     что пост доживает до оценщика, а не приговаривается раньше.
     """
@@ -341,15 +343,107 @@ async def test_trash_from_the_validator_is_only_marked_on_a_rerun(
     assert saved.skip_reason == "trash: это реклама курсов"
 
 
+async def test_the_genre_is_asked_before_the_fit(parsing, session_factory):
+    """«Вакансия ли это» спрашивают отдельным зовом, до вопроса о пригодности.
+
+    Слитые в один вопрос, они спорят: на посте, похожем на анкету кандидата,
+    «подходит ли» перебивает «вакансия ли»: оценщик отвечает «годится» на
+    резюме, и письмо уходит живому человеку. Вопрос о жанре задаётся без анкеты вовсе, и похожести взяться
+    неоткуда, а пригодность у не-вакансии уже не спрашивают.
+    """
+    pipeline, vacancy = parsing
+    pipeline.genre = PostGenre(is_vacancy=False, reason="автор предлагает себя")
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=True)
+
+    assert pipeline.genre_asked is True
+    assert pipeline.validated is False
+    assert await all_rows(session_factory, Vacancy) == []
+    mark = await only_row(session_factory, TrashEvent)
+    assert mark.reason == "trash: автор предлагает себя"
+
+
+async def test_a_post_the_genre_call_could_not_judge_stays_unparsed(parsing, session_factory):
+    """Не спросившийся жанр приговора не выносит — строка ждёт следующего раза.
+
+    Лежащий провайдер иначе уводил бы в мусор всё, что пришло за это время, а
+    удаление необратимо.
+    """
+    pipeline, vacancy = parsing
+    pipeline.genre_trouble = "provider is down"
+
+    done = await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=True
+    )
+
+    assert done is False
+    assert pipeline.validated is False
+    saved = await only_row(session_factory, Vacancy)
+    assert saved.is_parsed is False
+    assert saved.skip_reason == "прошлый отказ"
+
+
+async def test_a_genre_answer_that_never_fits_is_handed_to_the_person(
+    parsing, session_factory
+):
+    """Не поместившийся ответ о жанре отдают человеку, а не оставляют навсегда.
+
+    Обрыв по пределу токенов повторится и на втором заходе с запасом: строка
+    иначе разбиралась бы заново каждый оборот и не разобралась бы никогда.
+    """
+    pipeline, vacancy = parsing
+    pipeline.genre_trouble = TRUNCATED_TROUBLE
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
+
+    saved = await only_row(session_factory, Vacancy)
+    assert pipeline.validated is False
+    assert saved.skip_reason == TRUNCATED_SKIP_REASON
+
+
+async def test_an_unreadable_genre_answer_lets_the_post_through(parsing, session_factory):
+    """Невнятный ответ о жанре приговора не выносит и пропускает пост дальше.
+
+    Удалять по неразобранному ответу нельзя, а следом стоит оценщик — он и
+    рассудит. Закрытая дверь тут стоила бы живых вакансий.
+    """
+    pipeline, vacancy = parsing
+    pipeline.genre = None
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=True)
+
+    assert pipeline.validated is True
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NEW
+
+
+async def test_a_resume_mark_on_a_rerun_marks_instead_of_deleting(parsing, session_factory):
+    """Метка резюме на прогоне заново помечает строку, а не сносит её.
+
+    Кнопку нажал человек, и вакансия не должна исчезнуть у него из-под рук.
+    Поля при этом чистятся: разбора не было, и разобранное прошлым заходом
+    рядом с приговором «мусор» выдавало бы старое за новое.
+    """
+    pipeline, vacancy = parsing
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "#cv Позиция: Python Developer", "jobs", allow_delete=False
+    )
+
+    saved = await only_row(session_factory, Vacancy)
+    assert saved.status is VacancyStatus.NOT_FIT
+    assert saved.skip_reason == "trash: пост соискателя, метка #cv"
+    assert saved.title is None
+    assert await all_rows(session_factory, TrashEvent) == []
+
+
 async def test_the_validator_is_asked_before_the_score(parsing, session_factory):
     """«Это вообще вакансия» спрашивают раньше баллов, а не после.
 
     Баллы отвечают на другой вопрос — подходит ли вакансия кандидату, — и к
     посту, который вакансией не является, неприменимы вовсе. Пока они стояли
     первыми, резюме получало «score -6 < 5» и до смыслового приговора не
-    доезжало: из 224 собранных постов 154 не спросили у оценщика ничего. Хуже
-    того, отсев по баллам выглядел работающим фильтром — а по двум резюме,
-    случайно набравшим баллы, ушли письма живым людям.
+    доезжало вовсе. Хуже того, отсев по баллам выглядит работающим
+    фильтром — а резюме, случайно набравшее баллы, получает письмо.
     """
     pipeline, vacancy = parsing
     pipeline.verdict = FitValidation(verdict="trash", reason="это пост соискателя")
