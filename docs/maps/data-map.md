@@ -452,6 +452,13 @@
 - `logger` = `logging.getLogger(__name__)`
 - `VALIDATE_VACANCY_FIT_PROMPT` = `'Ты валидируешь Telegram-пост о вакансии для кон…`
 
+### `backend/llm/genre.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `MAX_GENRE_TOKENS` = `1200`
+- `ROOMIER_GENRE_TOKENS` = `2400`
+- `CLASSIFY_POST_GENRE_PROMPT` = `'Ты определяешь ЖАНР телеграм-поста из канала с …`
+
 ### `backend/llm/hallucination.py`
 
 - `_CEFR_ALT` = `'|'.join(CEFR_LEVELS)`
@@ -811,6 +818,9 @@
   - `salary: str | None`
   - `remote: str | None`
   - `location: str | None`
+- `class PostGenre`
+  - `is_vacancy: bool`
+  - `reason: str`
 - `class FitValidation`
   - `verdict: FitVerdict`
   - `reason: str | None`

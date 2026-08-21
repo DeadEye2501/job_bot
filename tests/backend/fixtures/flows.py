@@ -13,7 +13,7 @@ from backend.models import (
     Vacancy,
     VacancyStatus,
 )
-from backend.payloads import FitValidation
+from backend.payloads import FitValidation, PostGenre
 from backend.runtime_settings import RuntimeSettings
 from tests.dbio import only_row, put
 from tests.factories import (
@@ -83,7 +83,12 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
     """Подменяет разбор, проверку пригодности и отправку заготовленным."""
 
     async def parse_vacancy(text, client_, model, **kwargs):
+        pipeline.parse_asked = True
         return pipeline.parsed, pipeline.parse_refusal
+
+    async def classify_post_genre(text, client_, model):
+        pipeline.genre_asked = True
+        return pipeline.genre, pipeline.genre_trouble
 
     async def validate_vacancy_fit(parsed, text, client_, model, **kwargs):
         pipeline.validated = True
@@ -95,6 +100,7 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
 
     monkeypatch.setattr(apply, "try_auto_send", try_auto_send)
     monkeypatch.setattr("backend.flows.parse.parse_vacancy", parse_vacancy)
+    monkeypatch.setattr("backend.flows.parse.classify_post_genre", classify_post_genre)
     monkeypatch.setattr("backend.flows.parse.validate_vacancy_fit", validate_vacancy_fit)
 
 
@@ -187,7 +193,13 @@ async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)
         location="Ереван",
     )
     pipeline.parse_refusal = None
-    pipeline.verdict = FitValidation(verdict="fit", reason=None)
+    pipeline.parse_asked = False
+    # Жанр по умолчанию — вакансия: приговор проверяют слайсы про пригодность
+    # и про порог, и заслон жанра не должен отвечать за них.
+    pipeline.genre = PostGenre(is_vacancy=True, reason="ищем в команду")
+    pipeline.genre_trouble = None
+    pipeline.genre_asked = False
+    pipeline.verdict = FitValidation(verdict="fit", reason="ищем в команду")
     # Причина, по которой вердикт не спросился: пусто — спросили и получили.
     pipeline.fit_trouble = None
     pipeline.validated = False

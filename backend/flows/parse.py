@@ -22,6 +22,7 @@ from backend.domain.verdict import (
 )
 from backend.llm.answers import TRUNCATED_TROUBLE
 from backend.llm.fit import validate_vacancy_fit
+from backend.llm.genre import classify_post_genre
 from backend.llm.vacancy import parse_vacancy
 from backend.models import Vacancy
 from backend.payloads import ParsedVacancy
@@ -112,6 +113,70 @@ async def _fit_refusal(
     if validation.verdict == "reject":
         return f"{LLM_SKIP_PREFIX}{validation.reason or 'rejected'}", False
     return None, False
+
+
+async def _thrown_out_as_a_resume(
+    pipeline, vacancy_id: int, mark: str, allow_delete: bool
+) -> bool:
+    """Убрать пост соискателя, не спрашивая модель вовсе; сказать, вышло ли.
+
+    Поля у такой строки не заполняются: разбора не было, а показывать в
+    карточке разобранное прошлым заходом рядом с приговором «мусор» — значит
+    выдавать старое за новое.
+    """
+    reason = f"{TRASH_SKIP_PREFIX}пост соискателя, метка {mark}"
+    logger.info("vacancy %s: пост соискателя, метка %s", vacancy_id, mark)
+    if await _dropped_as_trash(
+        pipeline, vacancy_id, reason, allow_delete=allow_delete
+    ):
+        return True
+    return await save_empty_vacancy(pipeline, vacancy_id, None, reason=reason)
+
+
+async def _genre_refusal(
+    pipeline, text: str, vacancy_id: int
+) -> tuple[str | None, bool]:
+    """Метка мусора, если пост не вакансия, и «спросить не вышло».
+
+    Спрашивают об одном — о жанре, — и без анкеты кандидата вовсе: похожесть
+    поста на анкету не должна влиять на ответ. Неразобранный ответ приговором
+    не считается и пропускает пост дальше: по нему нельзя удалять, а следом
+    стоит вердикт о пригодности.
+    """
+    genre, trouble = await classify_post_genre(
+        text, pipeline.lm_client, pipeline.lm_chat_model
+    )
+    if trouble == TRUNCATED_TROUBLE:
+        logger.warning(
+            "vacancy %s: жанр не поместился даже с запасом, отдаю человеку",
+            vacancy_id,
+        )
+        return TRUNCATED_SKIP_REASON, False
+    if trouble is not None:
+        logger.warning(
+            "vacancy %s: жанр не спросился (%s), оставляю неразобранной",
+            vacancy_id, trouble,
+        )
+        return None, True
+    if genre is None or genre.is_vacancy:
+        return None, False
+    logger.info("vacancy %s: не вакансия — %s", vacancy_id, genre.reason)
+    return f"{TRASH_SKIP_PREFIX}{genre.reason}", False
+
+
+async def _model_refusal(
+    pipeline, parsed, text: str, vacancy_id: int
+) -> tuple[str | None, bool]:
+    """Что скажет модель об объявлении: сперва жанр, потом пригодность.
+
+    Два вопроса разведены по двум зовам нарочно. Слитые в один, они спорят:
+    на посте, похожем на анкету кандидата, «подходит ли» перебивает «вакансия
+    ли это», и резюме получает «годится».
+    """
+    refusal, unasked = await _genre_refusal(pipeline, text, vacancy_id)
+    if unasked or refusal is not None:
+        return refusal, unasked
+    return await _fit_refusal(pipeline, parsed, text, vacancy_id)
 
 
 async def _auto_send_if_allowed(
@@ -207,22 +272,14 @@ async def _verdict_for(
     отвечают, подходит ли вакансия кандидату, и к посту, вакансией не
     являющемуся, неприменимы: чужое резюме они отсеивали случайно, навыками
     мимо анкеты. На случайность начинают рассчитывать — отсев выглядел
-    работающим фильтром, пока два резюме не набрали баллов и по ним не ушли
-    письма живым людям.
+    работающим фильтром, пока резюме не набирало баллов и по нему не уходило
+    письмо живому человеку.
 
     Чёрный список, наоборот, впереди: он не догадка о посте, а решение
     человека, и жанр поста его не меняет. Читает он весь исходный текст, а
     модели достаётся урезанный по её бюджету.
     """
-    mark = resume_mark(text)
     score = score_parsed(parsed, pipeline.skills_cache)
-    if mark is not None:
-        logger.info("vacancy %s: пост соискателя, метка %s", vacancy_id, mark)
-        return (
-            VacancyStatus.NOT_FIT,
-            f"{TRASH_SKIP_PREFIX}пост соискателя, метка {mark}",
-            score,
-        )
     blocked = blacklist_refusal(check_blacklist(text, pipeline.blacklist_patterns))
     logger.debug(
         "vacancy %s: score=%d threshold=%d blacklist=%s",
@@ -230,7 +287,7 @@ async def _verdict_for(
     )
     if blocked is not None:
         return VacancyStatus.NOT_FIT, blocked, score
-    refusal, unasked = await _fit_refusal(pipeline, parsed, text, vacancy_id)
+    refusal, unasked = await _model_refusal(pipeline, parsed, text, vacancy_id)
     if unasked:
         return None
     if refusal is not None:
@@ -266,9 +323,9 @@ async def _thrown_out_by_the_verdict(
 ) -> bool:
     """Убрать строку, если так решил приговор; сказать, убрали ли.
 
-    Метку мусора ставят двое — вердикт оценщика (`_fit_refusal`) и метка
-    соискательского поста, — и обе значат одно: это не вакансия. Отсюда и
-    одна дорога на двоих; кто заведёт метку третьим, тот и попадёт сюда же.
+    Метку мусора ставят двое — заслон жанра и вердикт оценщика, — и обе значат
+    одно: это не вакансия. Метка соискательского поста сюда не приходит, она
+    решает раньше и своей дорогой (`_thrown_out_as_a_resume`).
     """
     return bool(
         skip_reason
@@ -285,16 +342,17 @@ async def parse_and_update_vacancy(
 ) -> bool:
     """Разобрать объявление, вынести приговор и записать исход; сказать, вышло ли.
 
-    ``allow_delete`` разводит две дороги: непригодную строку удаляют только
-    там, где зовущий ручается за текст приговора, — а прогон заново не
-    разрешает этого никогда, потому что строку открыл человек. Умолчание
-    истинно только ради приёма: приговора без полного текста тот не выносит.
+    ``allow_delete`` разводит две дороги: непригодную строку удаляют там, где
+    зовущий ручается за текст приговора; прогон заново не разрешает никогда.
 
-    «Не вышло» значит одно из двух: спросить модель не удалось или исход не
-    записался. Пустой разбор — это состоявшийся приговор, и он истина.
-    Различие нужно окну: на отказе оно говорит «не удалось перезапустить»
-    вместо «готово» над карточкой, которая не менялась.
+    «Не вышло» — спросить модель не удалось либо исход не записался; пустой
+    разбор к ним не относится, это состоявшийся приговор. Различие нужно окну.
+
+    Метка соискательского поста стоит раньше разбора: она стоит ноль.
     """
+    mark = resume_mark(text)
+    if mark is not None:
+        return await _thrown_out_as_a_resume(pipeline, vacancy_id, mark, allow_delete)
     parsed, refusal, stored = await _parsed_or_dropped(
         pipeline, vacancy_id, text, channel_username, allow_delete
     )
@@ -347,9 +405,8 @@ async def save_empty_vacancy(
     to do manually. Что именно записалось, считается по строке после
     записи (`_fields_filled`), а не предполагается заранее.
 
-    When ``parsed is None`` (LLM failed to even extract a title — e.g.
-    rerun on a stale row that was previously parsed but now triggers an
-    LLM error) the stored fields are cleared. Otherwise the UI would
+    When ``parsed is None`` the stored fields are cleared: разбора либо не
+    было вовсе (пост опознан по метке), либо он не дал даже названия. Otherwise the UI would
     show the previous parse output alongside skip_reason="empty",
     which is misleading.
     """
