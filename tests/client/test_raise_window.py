@@ -16,9 +16,7 @@ from pathlib import Path
 import pytest
 
 import client.raise_window as raise_window
-from client.raise_window import ask_to_raise, listen
-
-LOOPBACK = "127.0.0.1"
+from client.raise_window import LOOPBACK, ask_to_raise, listen
 
 
 class WindowDouble:

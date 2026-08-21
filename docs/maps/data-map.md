@@ -202,7 +202,7 @@
 ### `backend/domain/resume_marks.py`
 
 - `RESUME_MARKS` = `frozenset({'#cv', '#resume', '#резюме', '#ищураб…`
-- `AMBIGUOUS_MARKS` = `frozenset({'#available'})`
+- `AMBIGUOUS_MARKS` = `frozenset({'#available', '#cv_'})`
 - `_MARK` = `re.compile('(?<!\\S)#\\w+')`
 
 ### `backend/domain/salary.py`
@@ -1358,10 +1358,6 @@
 - `HANDED_OVER` = `re.compile('\\bmethod:\\s*[\'"]([a-z_]+)\\.([a-z…`
 - `SOURCES` = `набор из 2`
 - `LAYERS` = `набор из 4`
-
-### `tests/client/test_raise_window.py`
-
-- `LOOPBACK` = `'127.0.0.1'`
 
 ### `tests/client/test_window.py`
 

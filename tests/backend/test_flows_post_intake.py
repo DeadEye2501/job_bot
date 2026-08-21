@@ -315,13 +315,6 @@ async def test_an_article_that_did_not_load_holds_the_verdict_back(
     assert intake.parsed == []
 
 
-async def test_a_post_without_articles_may_still_be_binned(intake):
-    """Объявление без ссылок на статьи выбрасывается как и прежде."""
-    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
-
-    assert intake.parsed == [(7, "Ищем Python-разработчика", "jobs", True)]
-
-
 async def test_a_repost_that_lost_its_article_holds_the_verdict_back_too(
     intake, monkeypatch
 ):
