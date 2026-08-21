@@ -177,13 +177,13 @@ async def test_a_linked_article_is_written_into_the_post(intake, monkeypatch):
     assert intake.parsed == [(7, expected, "jobs", True)]
 
 
-async def test_the_fingerprint_is_taken_from_the_post_alone(intake, monkeypatch):
-    """Отпечаток считается по одному тексту поста, без адресов и без статьи.
+async def test_the_fingerprint_is_taken_from_the_whole_text(intake, monkeypatch):
+    """Отпечаток считается по тому же тексту, что уходит в разбор и в строку.
 
-    Отпечатками отсеивают перепосты, а сравнивают их с теми, что посчитаны
-    год назад, — тогда ни адресов, ни статей в тексте не было. Посчитай
-    отпечаток по склейке, и перепост давно заведённой вакансии перестал бы с
-    ней сходиться, заведясь второй строкой.
+    Дописанное к посту — адреса ссылок и статьи — и есть содержание таких
+    объявлений: у поста-шапки со ссылкой своего текста нет вовсе, и по одной
+    шапке два разных объявления неотличимы. Отпечаток, посчитанный по шапке,
+    объявил бы второе повтором первого и потерял бы его молча.
     """
 
     async def fetch_article(_client, _url):
@@ -199,11 +199,14 @@ async def test_the_fingerprint_is_taken_from_the_post_alone(intake, monkeypatch)
         post(
             10,
             text=text,
-            entities=[link_entity(offset=10, length=8, url="https://acme.test/jobs")],
+            entities=[link_entity(offset=11, length=8, url="https://acme.test/jobs")],
         ),
     )
 
-    assert intake.embedded == text
+    assert intake.embedded == (
+        "Senior QA, контакты (https://acme.test/jobs) в описании"
+        " https://teletype.in/@a/b\n\nТребования: Python"
+    )
 
 
 @pytest.mark.parametrize(

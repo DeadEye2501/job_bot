@@ -658,13 +658,13 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def check_ghosting_timeouts(pipeline) -> int` (26)
 
-### `backend/flows/ingest.py` — 167 строк
+### `backend/flows/ingest.py` — 174 строк
 
 Приём объявления из канала с отсевом перепостов.
 
 Зависит от: `backend.flows`, `backend.message_text`, `backend.models`, `backend.payloads`, `backend.repository.vacancies_life`, `backend.telegram_time`
 
-- `async def _post_embedding(pipeline, post: ChannelPost)` (15)
+- `async def _post_embedding(pipeline, post: ChannelPost)` (22)
 - `def _waits_to_be_read_out(vacancy_id: int, post: ChannelPost) -> None` (6)
 - `async def _resume_or_skip(pipeline, similar_id: int, post: ChannelPost, whole: bool) -> None` (28)
 - `async def ingest_post(pipeline, channel_id: int, channel_username: str, msg) -> None` (35)
@@ -759,18 +759,18 @@ First-run bootstrap: ensure DB schema exists.
 
 - `class _Origin` (14)
 - `async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None` (23)
-- `async def _post_text(msg, where: str, vacancy_id: int) -> tuple[str, str, bool] | None` (20)
+- `async def _post_text(msg, where: str, vacancy_id: int) -> tuple[str, bool] | None` (17)
 - `async def _fetch_fresh_text(pipeline, channel_username: str, msg_id: int | None, vacancy_id: int)` (36)
 - `async def _store(pipeline, vacancy_id: int, **fields) -> bool` (17)
-- `async def _refresh_embedding(pipeline, vacancy_id: int, text: str) -> None` (32)
+- `async def _refresh_embedding(pipeline, vacancy_id: int, text: str) -> None` (36)
 - `async def _note_rerun(pipeline, vacancy_id: int, origin: '_Origin') -> None` (5)
 - `async def _reread_and_store(pipeline, vacancy_id: int, was: str, where: tuple[str, int | None])` (20)
-- `async def _text_to_parse(pipeline, origin: '_Origin', vacancy_id: int)` (24)
-- `async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> RerunPipelineOutcome` (39)
+- `async def _text_to_parse(pipeline, origin: '_Origin', vacancy_id: int) -> str` (21)
+- `async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> RerunPipelineOutcome` (38)
 - `async def _orphan_rows(pipeline) -> list` (28)
 - `def _wait_is_over(created_at) -> bool` (9)
 - `async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None` (27)
-- `async def _recover_one(pipeline, row) -> bool` (17)
+- `async def _recover_one(pipeline, row) -> bool` (20)
 - `async def recover_orphan_vacancies(pipeline) -> int` (45)
 
 ### `backend/health.py` — 90 строк
@@ -3189,15 +3189,17 @@ Runtime settings layer.
 - `async def carded(monkeypatch, make_pipeline, session_factory)` (25)
   - `async def send_application(pipeline, hr_row_, parsed, vacancy_id, *, force=False)` (3)
 
-### `tests/backend/test_flows_new_vacancy.py` — 362 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_new_vacancy.py` — 428 строк ⚠ подошёл к 300
 
 Следствия заведения строки под новое объявление.
 
 Зависит от: `adapters`, `backend.flows`, `backend.models`, `backend.payloads`, `tests.backend.fixtures.parse_stub`, `tests.backend.fixtures.rerun`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
-Тестов: 17
+Тестов: 19
 
 - `def parses(monkeypatch)` (11)
+- `def embeds(monkeypatch)` (16)
+  - `async def embed(pipeline, text, what)` (3)
 - `async def _orphan_waiting_for_an_article(session_factory, created_at=None)` (15)
 
 ### `tests/backend/test_flows_parse_persist.py` — 424 строк ⚠ подошёл к 300
@@ -3218,7 +3220,7 @@ Runtime settings layer.
 Тестов: 25
 
 
-### `tests/backend/test_flows_post_intake.py` — 338 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_post_intake.py` — 341 строк ⚠ подошёл к 300
 
 Что бот делает с очередным объявлением из канала.
 
@@ -3243,7 +3245,7 @@ Runtime settings layer.
   - `async def classify_hr_reply(text, status, client, model)` (5)
 - `def _buffer(pipeline, hr, vacancy, message, *texts)` (11)
 
-### `tests/backend/test_flows_rerun_fingerprint.py` — 168 строк
+### `tests/backend/test_flows_rerun_fingerprint.py` — 174 строк
 
 Отпечаток вакансии при повторном прогоне и кэш отсева повторов.
 

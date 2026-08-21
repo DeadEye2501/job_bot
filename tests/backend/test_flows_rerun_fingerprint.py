@@ -2,9 +2,9 @@
 
 Прогон заново — это весь путь заново, и отпечаток тоже: оставшийся от прежнего
 текста, он отсеивал бы будущие похожие посты по тому, чего в объявлении уже
-нет. Считается он по голому тексту поста — тем же, чем на приёме, — иначе
-прогон уводил бы вакансию из общего счёта, и перепост переставал бы с ней
-сходиться.
+нет. Считается он по тому же тексту, с каким идёт разбор, — тем же, чем на
+приёме, — иначе прогон уводил бы вакансию из общего счёта, и её же перепост
+перестал бы с ней сходиться.
 
 Кэш живёт в памяти и сам из базы не перечитывается, поэтому правится он вслед
 за строкой и только вместе с ней.
@@ -39,11 +39,12 @@ async def test_the_fingerprint_is_recomputed_for_the_parsed_text(
     assert (await only_row(session_factory, Vacancy)).embedding == [0.5, 0.25]
 
 
-async def test_the_fingerprint_is_taken_from_the_post_alone(monkeypatch, rerunning):
-    """Отпечаток считается по голому посту, без адресов и без статьи.
+async def test_the_fingerprint_is_taken_from_the_whole_text(monkeypatch, rerunning):
+    """Отпечаток считается по тому же тексту, с которым идёт разбор.
 
-    Тем же, чем он считается на приёме: иначе прогон заново уводил бы вакансию
-    из общего счёта, и перепост переставал бы с ней сходиться.
+    Тем же, чем он считается на приёме: разойдись эти два текста, прогон
+    уводил бы вакансию из общего счёта, и её же перепост перестал бы с ней
+    сходиться.
     """
     _, vacancy, make_pipeline = rerunning
 
@@ -55,13 +56,16 @@ async def test_the_fingerprint_is_taken_from_the_post_alone(monkeypatch, rerunni
     fresh = post(
         42,
         text=text,
-        entities=[link_entity(offset=10, length=8, url="https://acme.test/jobs")],
+        entities=[link_entity(offset=11, length=8, url="https://acme.test/jobs")],
     )
     pipeline = await prepare(monkeypatch, make_pipeline, WithMessages(post=fresh))
 
     await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
 
-    assert pipeline.embedded == [text]
+    assert pipeline.embedded == [
+        "Senior QA, контакты (https://acme.test/jobs) в описании"
+        " https://teletype.in/@a/b\n\nТребования: Python"
+    ]
 
 
 async def test_a_provider_that_answers_nobody_does_not_cancel_the_rerun(
@@ -116,19 +120,21 @@ async def test_a_vacancy_deleted_while_the_model_answered_stays_out_of_the_cache
     assert list(pipeline.embeddings.ids) == []
 
 
-async def test_an_unread_post_leaves_the_fingerprint_alone(monkeypatch, rerunning):
-    """Не перечитанный пост отпечаток не трогает.
+async def test_an_unread_post_is_fingerprinted_by_the_stored_text(
+    monkeypatch, rerunning
+):
+    """Не перечитанный пост считают по сохранённому тексту — тому же, что судят.
 
-    Считать его тогда не от чего: голого текста поста на руках нет, а
-    сохранённый для этого не годится — в нём адреса и статьи. Прежний
-    отпечаток и так отвечает тому же посту.
+    Сохранённый текст для этого и годится: в нём то самое, с чем идёт прогон.
+    Пропусти мы отпечаток — и прогон, объявленный «весь путь заново», обошёл бы
+    стороной ровно то, чем строку узнают в отсеве повторов.
     """
     _, vacancy, make_pipeline = rerunning
     pipeline = await prepare(monkeypatch, make_pipeline, WithMessages(post=None))
 
     await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
 
-    assert pipeline.embedded == []
+    assert pipeline.embedded == ["сохранённый текст"]
 
 
 async def test_a_silent_fingerprint_provider_does_not_cancel_the_rerun(
