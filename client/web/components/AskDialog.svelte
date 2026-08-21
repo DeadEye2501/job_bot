@@ -8,12 +8,27 @@
   // `ready` — набрано ли то, без чего заводить нечего. Пока не набрано, кнопка
   // заперта: нажавший её иначе получает плашку отказа вместо карточки, и чего
   // не хватило — узнаёт уже из неё.
+  //
+  // `busy` — летит ли уже ответ моста. Второе нажатие ушло бы в начатую работу
+  // и завело бы вторую карточку: сторожа на одинаковое имя нет ни в базе, ни на
+  // мосту, и различить их потом нечем. Подпись на это время говорит, что работа
+  // идёт, — запертая кнопка без объяснения читается как поломка.
   import ModalShell from './ModalShell.svelte';
 
   // Содержимое переименовано при разборе доводов: внутри рамы своё место для
   // разметки тоже зовётся `children`, и одно имя закрыло бы другое.
-  let { icon, title, subtitle = '', confirmLabel, ready, onconfirm, oncancel, children: inside } =
-    $props();
+  let {
+    icon,
+    title,
+    subtitle = '',
+    confirmLabel,
+    busyLabel,
+    busy,
+    ready,
+    onconfirm,
+    oncancel,
+    children: inside,
+  } = $props();
 </script>
 
 <!-- Окно берёт на себя Escape, но не Enter: в нём набирают заметки в несколько
@@ -34,8 +49,13 @@
 
     <div class="modal-actions">
       <button class="btn" type="button" onclick={() => oncancel()}>Отмена</button>
-      <button class="btn primary" type="button" disabled={!ready} onclick={() => onconfirm()}>
-        {confirmLabel}
+      <button
+        class="btn primary"
+        type="button"
+        disabled={busy || !ready}
+        onclick={() => onconfirm()}
+      >
+        {busy ? busyLabel : confirmLabel}
       </button>
     </div>
   {/snippet}

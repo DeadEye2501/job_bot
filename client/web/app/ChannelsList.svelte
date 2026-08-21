@@ -3,6 +3,7 @@
 
   import { untrack } from 'svelte';
 
+  import { call } from '$api/bridge.js';
   import AddChannelDialog from '$components/AddChannelDialog.svelte';
   import ChannelRow from '$components/ChannelRow.svelte';
   import ContactsPanes from '$components/ContactsPanes.svelte';
@@ -82,15 +83,27 @@
    *
    * Отказ остаётся в окне, а не уезжает общей плашкой: чаще всего это опечатка
    * в нике, и объясняют её там же, где его набирали.
+   *
+   * Зовём мост напрямую, как соседи с предметным отказом: общая обёртка
+   * показывает плашку и отдаёт пустоту, и слова моста — какое имя не нашлось и
+   * какие написания он понимает — гасли в углу, пока человек смотрел в поле.
    */
   async function create() {
     const value = draft.trim();
     if (!value || saving) return;
     saving = true;
     trouble = '';
-    const done = await ask('channels.create', { input: value });
+    let done;
+    try {
+      done = await call('channels.create', { input: value });
+    } catch (refusal) {
+      if (!alive.now) return;
+      saving = false;
+      trouble = refusal.message;
+      return;
+    }
+    if (!alive.now) return;
     saving = false;
-    if (done === null) return (trouble = 'Не удалось добавить канал');
     adding = false;
     draft = '';
     say(done.created ? `Канал добавлен: @${done.username}` : `Канал @${done.username} уже был заведён`);

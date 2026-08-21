@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { fitHeight } from '../state/autosize.js';
+import { fitHeight, growing } from '../state/autosize.js';
 
 /** Поле, помнящее всё, что ему ставили в высоту.
  *
@@ -15,8 +15,12 @@ import { fitHeight } from '../state/autosize.js';
  */
 function field(fits) {
   const trail = [];
+  const heard = new Map();
   return {
     trail,
+    heard,
+    addEventListener: (kind, fn) => heard.set(kind, fn),
+    removeEventListener: (kind, fn) => heard.get(kind) === fn && heard.delete(kind),
     style: {
       set height(value) {
         trail.push(value);
@@ -45,5 +49,37 @@ describe('высота поля по набранному', () => {
     fitHeight(one);
 
     expect(one.trail).toEqual(['auto', '64px']);
+  });
+});
+
+describe('поле, растущее пока живёт', () => {
+  it('подгоняет высоту сразу, не дожидаясь первого знака', () => {
+    // Иначе строка с длинным пояснением показывала бы первую свою строчку до
+    // тех пор, пока в неё не ткнут.
+    const one = field(64);
+
+    growing(one);
+
+    expect(one.trail).toEqual(['auto', '64px']);
+  });
+
+  it('подгоняет её на каждый набор', () => {
+    const one = field(64);
+    growing(one);
+    one.trail.length = 0;
+
+    one.heard.get('input')();
+
+    expect(one.trail).toEqual(['auto', '64px']);
+  });
+
+  it('уходя, снимает за собой слушателя', () => {
+    // Полей этих много и живут они недолго — строка списка, строка ленты, — и
+    // оставленный слушатель держал бы за собой всё поле целиком.
+    const one = field(64);
+
+    growing(one).destroy();
+
+    expect(one.heard.has('input')).toBe(false);
   });
 });

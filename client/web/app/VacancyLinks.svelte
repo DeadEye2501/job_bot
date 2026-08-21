@@ -13,26 +13,27 @@
   import NewPersonFields from '$components/NewPersonFields.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
   import PickerRow from '$components/PickerRow.svelte';
-  import { blankCompany, companyCandidate, companyNamed } from '$state/companies.js';
-  import { blankPerson, named, personCandidate } from '$state/people.js';
+  import { companyCandidate } from '$state/companies.js';
+  import { NEW_CARD } from '$state/new_card.js';
+  import { personCandidate } from '$state/people.js';
 
   let { ask, say, vacancyId, kind, prefill = '', current = null, onclose, onlinked } = $props();
 
-  // Поля заведения у человека и у компании разные, и берутся они там же, где их
-  // берут вкладки контактов: мост читает ровно эти.
-  const BLANK = { hr: blankPerson, company: blankCompany };
+  // Обвязка формы заведения — общая со вкладками контактов: форма одна, а окон
+  // два, и разъехавшиеся слова уже стоили этому окну своего заголовка.
+  const FORM = $derived(NEW_CARD[kind]);
 
   let creating = $state(false);
   let saving = $state(false);
   let picked = $state(null);
   // Свой набор полей на каждый род: окно открывают то для человека, то для
   // компании, и один набор на двоих уехал бы на мост с чужими ключами.
-  let drafts = $state({ hr: blankPerson(), company: blankCompany() });
+  let drafts = $state({ hr: NEW_CARD.hr.blank(), company: NEW_CARD.company.blank() });
   const draft = $derived(drafts[kind]);
 
   // Заслон тот же, что в списках контактов: человеку — хоть что-нибудь из трёх,
   // компании — название.
-  const ready = $derived(kind === 'hr' ? named(draft) : companyNamed(draft));
+  const ready = $derived(FORM.named(draft));
 
   async function candidates(search) {
     const now =
@@ -60,10 +61,10 @@
    *
    * Пустое не отправляется вовсе — теми же заслонами, что и в списках
    * контактов: без имени карточку потом не найти ничем, и мост такую всё равно
-   * отобьёт. Повторное нажатие, пока летит первое, завело бы двоих.
+   * отобьёт. От второго нажатия, пока летит первое, держит само окно: `busy`
+   * запирает кнопку, и свой заслон здесь был бы вторым по тому же поводу.
    */
   async function create() {
-    if (saving) return;
     if (!ready) return;
     saving = true;
     const done =
@@ -75,17 +76,20 @@
     // уже сказал плашкой, чего ему не хватило.
     if (done === null) return;
     creating = false;
-    drafts[kind] = BLANK[kind]();
-    say(kind === 'hr' ? 'Человек заведён' : 'Компания заведена');
+    drafts[kind] = FORM.blank();
+    say(FORM.done);
     picked = done.created_id;
   }
 </script>
 
 {#if creating}
   <AskDialog
-    icon={kind === 'hr' ? 'person_add' : 'add_business'}
-    title={kind === 'hr' ? 'Новый HR' : 'Новая компания'}
+    icon={FORM.icon}
+    title={FORM.title}
+    subtitle={FORM.subtitle}
     confirmLabel="Создать"
+    busyLabel={FORM.busyLabel}
+    busy={saving}
     {ready}
     onconfirm={create}
     oncancel={() => (creating = false)}
@@ -100,9 +104,7 @@
   <PickerDialog
     icon={kind === 'hr' ? 'person_search' : 'domain'}
     title={kind === 'hr' ? 'Связать с HR' : 'Связать с компанией'}
-    placeholder={kind === 'hr'
-      ? 'Поиск по имени, @username...'
-      : 'Поиск по названию, сайту, алиасам...'}
+    placeholder={FORM.searchHint}
     empty={kind === 'hr' ? 'HR-контактов пока нет' : 'Компаний пока нет'}
     {prefill}
     {current}
@@ -111,7 +113,7 @@
     applyLabel="Связать"
     onapply={link}
     {saving}
-    createIcon={kind === 'hr' ? 'person_add' : 'add_business'}
+    createIcon={FORM.icon}
     createLabel={kind === 'hr' ? 'Создать нового HR' : 'Создать новую компанию'}
     oncreate={() => (creating = true)}
     {onclose}

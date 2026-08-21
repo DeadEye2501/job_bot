@@ -22,11 +22,6 @@
 
   import VacancyLinks from './VacancyLinks.svelte';
 
-  // Пауза перед записью заметки. Столько же ждало прежнее окно: короче — и
-  // мост получает вопрос на каждое слово, длиннее — и человек успевает уйти,
-  // не увидев подтверждения.
-  const NOTES_DELAY = 800;
-
   let { ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged } = $props();
 
   let card = $state(null);
@@ -334,7 +329,6 @@
       <NotesField
         value={card.notes}
         placeholder="Заметки по вакансии…"
-        delay={NOTES_DELAY}
         owner={vacancyId}
         save={saveNotes}
       />

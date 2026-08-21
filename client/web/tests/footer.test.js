@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { allAlive, blockedTip, downNames, shouldTurnOff } from '../state/health.js';
-import { modeAt } from '../state/modes.js';
+import { modeAt, nextMode } from '../state/modes.js';
 import { bar, caption, rerunNote } from '../state/progress.js';
 
 describe('здоровье систем', () => {
@@ -79,10 +79,20 @@ describe('переключатель режима', () => {
     expect(modeAt(200, 300)).toBe('Full');
   });
 
-  it('промах мимо дорожки уходит к ближнему краю', () => {
-    // Промах в пару точек не должен менять режим внезапно.
-    expect(modeAt(-20, 300)).toBe('Off');
-    expect(modeAt(9999, 300)).toBe('Full');
+  it('нажатие мимо дорожки не выбирает ничего', () => {
+    // Слева от дорожки лежит слово режима — шире самой дорожки, — и «ближний
+    // край» там врал: метясь в слово «Full», человек гасил бота. Слово не
+    // орган управления, а подпись, и нажатие по нему не значит ничего.
+    expect(modeAt(-20, 300)).toBe('');
+    expect(modeAt(9999, 300)).toBe('');
+  });
+
+  it('перебор по кругу возвращается к началу', () => {
+    // Им ходят с клавиатуры: у нажатия по Enter места нет вовсе, и выбирать по
+    // месту там нечего. Без перебора с клавиатуры был бы доступен один «Off».
+    expect(nextMode('Off')).toBe('DM Only');
+    expect(nextMode('DM Only')).toBe('Full');
+    expect(nextMode('Full')).toBe('Off');
   });
 });
 

@@ -19,7 +19,13 @@
   // предметы и свои числа.
   const LIMIT = 2000;
 
-  let { value, placeholder, delay, owner, save } = $props();
+  // Пауза перед записью — по той же причине одна на все три места: поле одно и
+  // то же, а числа, разъехавшись по карточкам, дали разное поведение на
+  // соседних вкладках. Короче — и мост получает вопрос на каждое слово,
+  // длиннее — и человек успевает уйти, не увидев подтверждения.
+  const DELAY = 600;
+
+  let { value, placeholder, owner, save } = $props();
 
   // Номер записи запечатан при заведении поля, а не читается на отправке.
   // Отправок две, и вторая — прощальная: она случается уже после того, как
@@ -32,7 +38,7 @@
   let flashed = $state(false);
 
   const mark = flashing((on) => (flashed = on));
-  const saver = autosave({ delay: untrack(() => delay), save: (typed) => write(typed) });
+  const saver = autosave({ delay: DELAY, save: (typed) => write(typed) });
 
   async function write(typed) {
     const stored = await save(owned, typed);

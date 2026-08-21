@@ -9,7 +9,7 @@
   // зовущего: записи, вспышки и набранное помнятся по номеру строки истории, и
   // без пересоздания в них копились бы строки всех вакансий сеанса.
   import { autosave } from '$state/autosave.js';
-  import { fitHeight } from '$state/autosize.js';
+  import { growing } from '$state/autosize.js';
   import { flashing } from '$state/flash.js';
   import { saveKey } from '$state/keys.js';
   import { ago } from '$state/vacancies.js';
@@ -63,7 +63,6 @@
 
   function type(row, field) {
     typed[row.historyId] = field.value;
-    fitHeight(field);
     saverFor(row).typed(field.value);
   }
 
@@ -91,7 +90,7 @@
               maxlength="2000"
               placeholder="без комментария."
               value={typed[row.historyId] ?? row.text}
-              use:grow
+              use:growing={row.text}
               oninput={(event) => type(row, event.currentTarget)}
               onblur={() => saverFor(row).flush()}
               onkeydown={(event) => saveKey(event) && saverFor(row).flush()}

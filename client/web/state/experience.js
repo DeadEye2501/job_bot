@@ -18,6 +18,18 @@ export function period(startIso, endIso) {
   return `${short(startIso)} — ${endIso ? short(endIso) : 'настоящее время'}`;
 }
 
+/** Лежит ли карточка уже в базе.
+ *
+ * Номера мало: его даёт мост, а вкладка себя после записи не перечитывает —
+ * заведённая в этот заход карточка живёт с пустым номером до конца визита, уже
+ * будучи записанной. Отметку об уехавшей записи ставит сама вкладка, и без неё
+ * опустошённое обязательное поле вычёркивало такую строку из посылки, а мост
+ * стирал её молча вместе с достижениями и стеком.
+ */
+function stored(exp) {
+  return exp.id !== null || Boolean(exp.saved);
+}
+
 /** Готово ли место работы к записи.
  *
  * Три поля, ровно те же, что требует мост (`repository/profile_experience`):
@@ -45,7 +57,7 @@ export function experienceReady(exp) {
  * считается по тому списку, который человек видит, а не по укороченной посылке.
  */
 export function experienceGoing(rows) {
-  const going = rows.filter((one) => one.id !== null || experienceReady(one));
+  const going = rows.filter((one) => stored(one) || experienceReady(one));
   const at = going.findIndex((one) => !experienceReady(one));
   if (at === -1) return { going, trouble: '' };
   const shown = rows.indexOf(going[at]) + 1;

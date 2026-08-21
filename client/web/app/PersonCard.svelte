@@ -26,9 +26,6 @@
 
   import PersonChat from './PersonChat.svelte';
 
-  // Пауза перед записью заметки — та же, что ждало прежнее окно.
-  const NOTES_DELAY = 600;
-
   let { ask, say, events, personId, oncompany, onvacancy, onclose, onchanged } = $props();
 
   let card = $state(null);
@@ -235,7 +232,6 @@
       <NotesField
         value={card.notes}
         placeholder="Личные заметки по этому HR…"
-        delay={NOTES_DELAY}
         owner={personId}
         save={saveNotes}
       />

@@ -10,6 +10,7 @@ from backend.bot.chat import EMPTY_MESSAGE
 from backend.incoming import moment_or_none
 from backend.repository import messages as messages_repo
 from client.bridge.answer import Denied, bad_fields, denied, reply
+from client.bridge.page import read_page
 from client.bridge.refusals import NO_BOT, SEND_BROKE
 from client.bridge.wire import _message_row_to_dict
 
@@ -30,9 +31,15 @@ class HrChat:
     def messages(self, payload: dict) -> dict:
         """Страница переписки с одним человеком.
 
-        Нагрузка: `{"hr_id": int, "before_sent_at"?, "before_id"?: int}`.
+        Нагрузка: `{"hr_id": int, "limit"?: int, "before_sent_at"?, "before_id"?: int}`.
         Умолчание — «свежие», полсотни последних; отсечка просит следующие
         полсотни от самого старого показанного, чтобы окно дописало их сверху.
+
+        Потолок читается тем же `read_page`, что и у прочих перечней, вместе с
+        его границей: перечитывая хвост по вести о новом письме, окно просит не
+        меньше показанного. Без этого пролиставший переписку к началу разговора
+        терял дочитанное на каждом входящем — хвост приходил полусотней и
+        ложился заменой.
 
         Отсечка — пара «время и номер», и слать надо обе половины: время у
         писем повторяется, а номера растут не в том же порядке (догон истории
@@ -48,18 +55,19 @@ class HrChat:
         except (ValueError, TypeError, KeyError) as e:
             return bad_fields("messages", e)
 
+        limit = read_page(payload, default_limit=50).limit
         asked = {"hr_id": hr_id, "before_id": before_id}
-        return reply(self._hub.runner, self._paged(asked, before_sent_at))
+        return reply(self._hub.runner, self._paged(asked, before_sent_at, limit))
 
-    async def _paged(self, asked: dict, before_sent_at) -> dict:
-        """Полсотни писем и эхо того, о чём спрашивали.
+    async def _paged(self, asked: dict, before_sent_at, limit: int) -> dict:
+        """Страница писем и эхо того, о чём спрашивали.
 
         Эхо едет одним словарём, а не разобранным на доводы: разбирать его
         было бы только длиннее.
         """
         async with self._hub.session_factory() as session:
             msgs, has_more = await messages_repo.list_messages_for_hr(
-                session, asked["hr_id"], limit=50,
+                session, asked["hr_id"], limit=limit,
                 before_id=asked["before_id"],
                 before_sent_at=before_sent_at,
             )
