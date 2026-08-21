@@ -1,9 +1,11 @@
 """Какой приговор получает объявление после разбора.
 
-Порядок отсева выстроен от дешёвого к дорогому. Пустышка — мем, обрывок,
-рекламная строчка — отсеивается сразу, до всякой проверки на пригодность: за
-неё платить обращением к модели незачем. Дальше идут чёрный список и оценка по
-навыкам, и только уцелевшее уходит к проверяльщику.
+Порядок отсева выстроен от общего вопроса к частному: сперва «вакансия ли
+это», потом «подходит ли она кандидату». Пустышка — мем, обрывок, рекламная
+строчка — отсеивается прямо на разборе, обращением к модели за неё платить
+незачем; следом метка соискательского поста, она стоит ноль. Дальше идёт
+проверяльщик, и только признанное вакансией судят чёрный список и порог по
+навыкам: к посту, который вакансией не является, они неприменимы вовсе.
 
 Проверяльщик, не давший ответа, приравнивается к отказу. Сомнение здесь решается
 в пользу бездействия: откликнуться на вакансию, о которой ничего не известно,
@@ -206,16 +208,24 @@ async def test_the_blacklist_reads_the_whole_post(parsing, session_factory):
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NOT_FIT
 
 
-async def test_a_blacklisted_post_never_reaches_the_validator(parsing):
-    """Отсеянное чёрным списком до проверки пригодности не доходит."""
+async def test_a_blacklisted_post_never_reaches_the_validator(parsing, session_factory):
+    """Отсеянное чёрным списком до оценщика не доходит.
+
+    Список — не догадка о посте, а решение человека: с этими не работаем, и
+    жанр поста ответа не меняет. Спрашивать о таком посте модель незачем — её
+    вердикт ничего не решит, а обращение стоит денег. Этим он и отличается от
+    баллов, уехавших за оценщика: те отвечают на вопрос, осмысленный только
+    после «это вакансия».
+    """
     pipeline, vacancy = parsing
     pipeline.blacklist_patterns = ["казино"]
 
-    await parse.parse_and_update_vacancy(pipeline, 
+    await parse.parse_and_update_vacancy(pipeline,
         vacancy.id, "Ищем в казино", "jobs", allow_delete=False
     )
 
     assert pipeline.validated is False
+    assert (await only_row(session_factory, Vacancy)).skip_reason == "blacklist: казино"
 
 
 async def test_a_rejected_vacancy_carries_the_reason(parsing, session_factory):
@@ -331,16 +341,43 @@ async def test_trash_from_the_validator_is_only_marked_on_a_rerun(
     assert saved.skip_reason == "trash: это реклама курсов"
 
 
-async def test_a_low_score_is_not_sent_to_the_validator(parsing, session_factory):
-    """Вакансия, не набравшая порога, до проверяльщика не доходит.
+async def test_the_validator_is_asked_before_the_score(parsing, session_factory):
+    """«Это вообще вакансия» спрашивают раньше баллов, а не после.
 
-    Оценка по навыкам дешёвая и считается на месте; тратить обращение к
-    модели на заведомо чужую вакансию незачем.
+    Баллы отвечают на другой вопрос — подходит ли вакансия кандидату, — и к
+    посту, который вакансией не является, неприменимы вовсе. Пока они стояли
+    первыми, резюме получало «score -6 < 5» и до смыслового приговора не
+    доезжало: из 224 собранных постов 154 не спросили у оценщика ничего. Хуже
+    того, отсев по баллам выглядел работающим фильтром — а по двум резюме,
+    случайно набравшим баллы, ушли письма живым людям.
+    """
+    pipeline, vacancy = parsing
+    pipeline.verdict = FitValidation(verdict="trash", reason="это пост соискателя")
+    await pipeline.rs.set_app("scoring_threshold", "100")
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=True)
+
+    assert pipeline.validated is True
+    assert await all_rows(session_factory, Vacancy) == []
+    mark = await only_row(session_factory, TrashEvent)
+    assert mark.reason == "trash: это пост соискателя"
+
+
+async def test_the_score_judges_only_what_the_validator_called_a_vacancy(
+    parsing, session_factory
+):
+    """Порог остался, но судит только признанное вакансией.
+
+    Оценка по навыкам — про кандидата, а не про пост: она отвечает, стоит ли
+    откликаться на эту вакансию. Приговор «не набрала порога» осмыслен только
+    после того, как сказано, что перед нами вакансия.
     """
     pipeline, vacancy = parsing
     await pipeline.rs.set_app("scoring_threshold", "100")
 
     await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
 
-    assert pipeline.validated is False
-    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NOT_FIT
+    saved = await only_row(session_factory, Vacancy)
+    assert pipeline.validated is True
+    assert saved.status is VacancyStatus.NOT_FIT
+    assert saved.skip_reason.endswith("< 100")

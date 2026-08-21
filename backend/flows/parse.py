@@ -12,7 +12,7 @@ from backend.flows import dm_backfill
 from backend.domain.blacklist import check_blacklist
 from backend.domain.resume_marks import resume_mark
 from backend.domain.scoring import score_parsed
-from backend.domain.verdict import decide_vacancy_status
+from backend.domain.verdict import blacklist_refusal, decide_vacancy_status
 from backend.domain.verdict import is_empty_vacancy
 from backend.domain.verdict import (
     EMPTY_SKIP_REASON,
@@ -203,17 +203,16 @@ async def _verdict_for(
 ) -> tuple | None:
     """Приговор объявлению: статус, причина отказа и баллы; пусто — не спросили.
 
-    Чёрный список читает весь исходный текст: разбору он достаётся урезанным
-    по бюджету модели, и образец за обрезом всё равно ловится.
+    **Порог стоит за вопросом «вакансия ли это», а не перед ним.** Баллы
+    отвечают, подходит ли вакансия кандидату, и к посту, вакансией не
+    являющемуся, неприменимы: чужое резюме они отсеивали случайно, навыками
+    мимо анкеты. На случайность начинают рассчитывать — отсев выглядел
+    работающим фильтром, пока два резюме не набрали баллов и по ним не ушли
+    письма живым людям.
 
-    Метка резюме решает раньше всех — раньше чёрного списка, порога и
-    оценщика: 21.08.2026 оценщик пропустил пост, начинавшийся словом `#cv`, и
-    отклик с приложенным CV ушёл живому человеку.
-
-    Порог соискателю не судья: чужое резюме не проходит его случайно —
-    навыки не легли на анкету, — и перестаёт не проходить ровно тогда, когда
-    соискатель похож на кандидата. Смыслом такой пост отсеивает разбор, ещё
-    до баллов: полей он у него не заполняет, и строка выбывает пустышкой.
+    Чёрный список, наоборот, впереди: он не догадка о посте, а решение
+    человека, и жанр поста его не меняет. Читает он весь исходный текст, а
+    модели достаётся урезанный по её бюджету.
     """
     mark = resume_mark(text)
     score = score_parsed(parsed, pipeline.skills_cache)
@@ -224,20 +223,21 @@ async def _verdict_for(
             f"{TRASH_SKIP_PREFIX}пост соискателя, метка {mark}",
             score,
         )
-    blacklist_match = check_blacklist(text, pipeline.blacklist_patterns)
+    blocked = blacklist_refusal(check_blacklist(text, pipeline.blacklist_patterns))
     logger.debug(
         "vacancy %s: score=%d threshold=%d blacklist=%s",
-        vacancy_id, score, pipeline.rs.scoring_threshold, blacklist_match,
+        vacancy_id, score, pipeline.rs.scoring_threshold, blocked,
     )
+    if blocked is not None:
+        return VacancyStatus.NOT_FIT, blocked, score
+    refusal, unasked = await _fit_refusal(pipeline, parsed, text, vacancy_id)
+    if unasked:
+        return None
+    if refusal is not None:
+        return VacancyStatus.NOT_FIT, refusal, score
     status, skip_reason = decide_vacancy_status(
-        parsed, score, blacklist_match, threshold=pipeline.rs.scoring_threshold,
+        score, threshold=pipeline.rs.scoring_threshold
     )
-    if status == VacancyStatus.NEW:
-        refusal, unasked = await _fit_refusal(pipeline, parsed, text, vacancy_id)
-        if unasked:
-            return None
-        if refusal is not None:
-            status, skip_reason = VacancyStatus.NOT_FIT, refusal
     return status, skip_reason, score
 
 

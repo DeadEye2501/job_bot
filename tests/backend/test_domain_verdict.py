@@ -1,6 +1,10 @@
 """Следствия, которые наблюдают тесты `backend/domain/verdict.py`."""
 
-from backend.domain.verdict import decide_vacancy_status, is_empty_vacancy
+from backend.domain.verdict import (
+    blacklist_refusal,
+    decide_vacancy_status,
+    is_empty_vacancy,
+)
 from backend.models import VacancyStatus
 from tests.factories import parsed_vacancy
 
@@ -35,16 +39,22 @@ def test_a_preferred_only_stack_still_counts_as_a_signal():
 
 
 def test_a_blacklisted_vacancy_is_rejected_and_names_the_pattern():
-    """Отказ по чёрному списку называет сработавший образец."""
-    assert decide_vacancy_status(parsed_vacancy(), 10, "казино", threshold=0) == (
-        VacancyStatus.NOT_FIT,
-        "blacklist: казино",
-    )
+    """Отказ по чёрному списку называет сработавший образец.
+
+    Человек читает причину в карточке и по ней правит список: без образца
+    непонятно, какое из полусотни слов сработало.
+    """
+    assert blacklist_refusal("казино") == "blacklist: казино"
+
+
+def test_an_untouched_vacancy_has_nothing_to_refuse():
+    """Не задетое списком объявление отказа не получает."""
+    assert blacklist_refusal(None) is None
 
 
 def test_a_low_score_is_rejected_and_shows_both_numbers():
     """Отказ по баллам показывает и набранное, и порог."""
-    assert decide_vacancy_status(parsed_vacancy(), 2, None, threshold=5) == (
+    assert decide_vacancy_status(2, threshold=5) == (
         VacancyStatus.NOT_FIT,
         "score 2 < 5",
     )
@@ -52,15 +62,4 @@ def test_a_low_score_is_rejected_and_shows_both_numbers():
 
 def test_a_vacancy_exactly_at_the_threshold_passes():
     """Порог включающий: ровно threshold баллов проходит."""
-    assert decide_vacancy_status(parsed_vacancy(), 5, None, threshold=5) == (
-        VacancyStatus.NEW,
-        None,
-    )
-
-
-def test_the_blacklist_outranks_a_passing_score():
-    """Чёрный список сильнее набранных баллов, сколько бы их ни было."""
-    assert decide_vacancy_status(parsed_vacancy(), 100, "казино", threshold=5) == (
-        VacancyStatus.NOT_FIT,
-        "blacklist: казино",
-    )
+    assert decide_vacancy_status(5, threshold=5) == (VacancyStatus.NEW, None)
