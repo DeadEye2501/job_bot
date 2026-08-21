@@ -282,11 +282,16 @@ async def recover_orphan_vacancies(pipeline) -> int:
     ``parse_and_update_vacancy`` commits, or LLM call cancelled).
 
     Called once at startup before the polling loop kicks in, so the
-    UI never shows half-built rows for long. Each orphan goes through
-    the auto-ingest path (``allow_delete=True``) — that's what would
-    have happened on the original ingest if the process hadn't died.
-    Trash / empty verdicts therefore delete the row, same as a fresh
-    ingest. Returns the number of orphans processed.
+    UI never shows half-built rows for long.
+
+    Выбрасывать здесь нельзя ничего. Разбирают строку по сохранённому тексту, а
+    целым ли он записан, не знает никто: пост со ссылкой ложится в базу и
+    тогда, когда статья не доехала (`ingest._vacancy_row` пишет `post.text`
+    независимо от целости). Снеси такую — и объявление пропадёт навсегда: пост
+    второй раз не прочтут, отметка канала уехала. Пометка «не подходит»
+    дождётся прогона заново, а тот статью и подберёт.
+
+    Отвечает, сколько строк подобрано.
     """
     await pipeline.reload_resources()
     rows = await _orphan_rows(pipeline)
@@ -303,7 +308,7 @@ async def recover_orphan_vacancies(pipeline) -> int:
             continue
         try:
             await parse.parse_and_update_vacancy(pipeline, 
-                r.id, text, r.username or "", allow_delete=True
+                r.id, text, r.username or "", allow_delete=False
             )
             processed += 1
         except Exception:

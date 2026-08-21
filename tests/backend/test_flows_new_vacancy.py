@@ -129,7 +129,14 @@ async def test_a_refused_row_leaves_no_vector_behind(make_pipeline, session_fact
 async def test_an_unfinished_vacancy_is_picked_up_later(monkeypatch, 
     make_pipeline, session_factory
 ):
-    """Недоразобранная вакансия подбирается на следующем запуске."""
+    """Недоразобранная вакансия подбирается на следующем запуске — и не сносится.
+
+    Разбирают её по сохранённому тексту, а целым ли он записан, не знает никто:
+    строка кладётся в базу и тогда, когда статья по ссылке не доехала. Разреши
+    здесь снос — и объявление, от которого сохранилась одна шапка, пропало бы
+    навсегда: пост второй раз не прочтут, отметка канала уехала. Пометка «не
+    подходит» дождётся прогона заново, а тот статью и подберёт.
+    """
     await put(session_factory, vacancy_row(title=None, is_parsed=False, raw_text="текст"))
     pipeline = await make_pipeline()
     picked: list[tuple] = []
@@ -140,7 +147,7 @@ async def test_an_unfinished_vacancy_is_picked_up_later(monkeypatch,
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 
     assert await pipeline.recover_orphan_vacancies() == 1
-    assert picked == [(1, "текст", True)]
+    assert picked == [(1, "текст", False)]
 
 
 async def test_a_parsed_vacancy_is_not_picked_up(monkeypatch, make_pipeline, session_factory):

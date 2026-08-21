@@ -49,12 +49,15 @@ async def reading(make_pipeline, session_factory, monkeypatch):
     pipeline.verdict = Classification(
         status=VacancyStatus.INVITATION, explanation="зовут на созвон"
     )
+    # Причина, по которой спросить не вышло: пусто — спросили и получили. Тем
+    # же способом отвечает разбор вакансии, и по той же причине.
+    pipeline.trouble = None
 
     async def classify_hr_reply(text, status, client, model):
         pipeline.asked.append((text, status))
         if isinstance(pipeline.verdict, Exception):
             raise pipeline.verdict
-        return pipeline.verdict
+        return pipeline.verdict, pipeline.trouble
 
     monkeypatch.setattr("backend.flows.dm_classify.classify_hr_reply", classify_hr_reply)
     return pipeline, hr, vacancy, message
@@ -300,3 +303,25 @@ async def test_the_verdict_lands_on_the_vacancy_of_the_last_message(
     by_title = {v.title: v for v in await all_rows(session_factory, Vacancy)}
     assert by_title["вторая"].status is VacancyStatus.INVITATION
     assert by_title["к отклику"].status is VacancyStatus.APPLIED
+
+
+async def test_a_burst_the_provider_could_not_read_stays_in_the_buffer(reading):
+    """Пачка, на которой упал поставщик, из копилки не пропадает.
+
+    Беда поставщика — не вердикт: модель ничего не сказала, а пачка к этому
+    мигу уже вынута, и другой дороги к разбору у неё нет — ни повтора, ни
+    подбора неразобранных писем в дереве нет вовсе. Потерянное так приглашение
+    на созвон человек увидит, только если сам зайдёт в переписку.
+
+    Соседи по слою разводят этот случай нарочно: у разбора вакансии лежащий
+    полчаса провайдер не уводит в «не подходит» всё, что пришло за это время.
+    """
+    pipeline, hr, vacancy, message = reading
+    pipeline.verdict = None
+    pipeline.trouble = "llm_http_error: 500"
+    _buffer(pipeline, hr, vacancy, message, "приглашаем на созвон во вторник")
+
+    await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)
+
+    kept = pipeline.dm_debounce.bursts.get(hr.id, [])
+    assert [letter["text"] for letter in kept] == ["приглашаем на созвон во вторник"]

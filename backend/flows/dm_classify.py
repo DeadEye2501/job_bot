@@ -49,7 +49,7 @@ async def classify_and_apply(
     lm_chat_model,
     text: str,
     target: tuple[int, int, VacancyStatus],
-) -> bool:
+) -> tuple[bool, str | None]:
     """Спросить модель о письме и применить вердикт; отдать, применён ли он.
 
     Дорог две — отложенный разбор пачки и разбор одного письма на месте, — и
@@ -59,12 +59,25 @@ async def classify_and_apply(
     `target` — «вакансия, письмо, её нынешний статус»: три довода, которые
     все три описывают одно, к чему прикладывают вердикт, и порознь ни один
     из них здесь не нужен.
+
+    Отвечает парой: применён ли вердикт и не помешала ли беда поставщика.
+    Второе — не то же, что первое: «модель не ответила» пачку не приговаривает,
+    и зовущий возвращает её в копилку, а «вердикта нет» значит, что двигать
+    нечего.
     """
     vacancy_id, msg_id, status = target
-    verdict = await classify_hr_reply(text, status, lm_client, lm_chat_model)
+    verdict, trouble = await classify_hr_reply(
+        text, status, lm_client, lm_chat_model
+    )
+    if trouble is not None:
+        logger.warning(
+            "vacancy %s: спросить о письме не вышло (%s), пачку не теряем",
+            vacancy_id, trouble,
+        )
+        return False, trouble
     if verdict is None:
         logger.info("vacancy %s: classifier gave nothing", vacancy_id)
-        return False
+        return False, None
     logger.info(
         "vacancy %s: classifier verdict=%s -> applying",
         vacancy_id, verdict.status.value,
@@ -80,8 +93,8 @@ async def classify_and_apply(
                 "classification apply failed",
                 extra={"vacancy_id": vacancy_id, "message_id": msg_id},
             )
-            return False
-    return True
+            return False, None
+    return True, None
 
 
 async def _run_debounced_classify(pipeline, hr_id: int) -> None:
@@ -131,10 +144,15 @@ async def _ask_and_apply(pipeline, hr_id: int, burst: list, target) -> None:
 
     Размер пачки идёт в запись о поломке: сама пачка к этому мигу уже вынута
     из копилки и потеряна, и число — единственное, что о ней скажет.
+
+    Беда поставщика пачку не теряет: её кладут обратно в копилку, и разберёт
+    её следующее письмо этого человека — своим таймером — или слив при
+    следующем уходе в OFF. Взводить таймер заново отсюда нельзя: лежащий
+    поставщик крутил бы разбор по кругу, платя за каждый заход.
     """
     try:
         async with pipeline.dm_debounce.slots:
-            applied = await classify_and_apply(
+            applied, trouble = await classify_and_apply(
                 pipeline.session_factory,
                 pipeline.lm_client,
                 pipeline.lm_chat_model,
@@ -142,9 +160,21 @@ async def _ask_and_apply(pipeline, hr_id: int, burst: list, target) -> None:
                 target,
             )
     except Exception:
+        # Пачку здесь не возвращаем нарочно: беды поставщика сюда не доходят —
+        # их ловит `chat` и называет причиной, — а сюда попадает поломка нашего
+        # же кода. Вернув пачку, мы звали бы разбор по кругу об одну и ту же
+        # поломку на каждом следующем письме.
         logger.exception(
             "debounced classify failed for hr %d (%d msgs)", hr_id, len(burst)
         )
+        return
+    if trouble is not None:
+        dropped = pipeline.dm_debounce.restore(hr_id, burst)
+        if dropped:
+            logger.warning(
+                "hr %d: вернул пачку в копилку, %d старых писем не поместились",
+                hr_id, dropped,
+            )
         return
     if applied:
         fire(pipeline.on_vacancies_changed, "on_vacancies_changed")
@@ -284,5 +314,11 @@ async def cancel_pending_dm_classifications(
             "because shutdown in progress"
         )
     if drain and not pipeline.shutting_down:
+        # После слива копилки не чистим: всё, что в них осталось, — это пачки,
+        # которые разбор вернул назад, не сумев спросить модель, и письма,
+        # пришедшие пока слив шёл. И то и другое разберут, когда бота поднимут
+        # снова; забыв их здесь, мы потеряли бы ровно то, ради чего возврат и
+        # заведён.
         await _drain_buffers(pipeline)
+        return
     pipeline.dm_debounce.forget_bursts()

@@ -15,6 +15,7 @@ const HIDDEN = new Set(['applied_sent']);
 const SEND_FAILS = {
   profile_empty: 'профиль пуст',
   cover_letter_failed: 'письмо не прошло проверку',
+  cover_letter_unasked: 'модель не ответила',
   cv_missing: 'CV-файл не найден',
   race: 'статус успел измениться',
   blocked: 'отправка заблокирована',

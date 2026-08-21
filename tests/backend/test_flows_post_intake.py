@@ -325,3 +325,29 @@ async def test_a_post_without_articles_may_still_be_binned(intake):
     await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.allowed_delete == [True]
+
+
+async def test_a_repost_that_lost_its_article_may_not_be_binned_either(
+    intake, monkeypatch
+):
+    """Дозабор перепоста тоже не выбрасывает объявление без статьи.
+
+    Дорога другая — строка уже есть и её дописывают, — а причина та же: без
+    статьи разбору видна одна шапка со ссылкой. Признак целости считается тут
+    же, пятью строками выше, и раньше просто не доезжал до разбора: заслон
+    стоял на одной дороге из трёх.
+    """
+    import httpx
+
+    async def fetch_article(_client, _url):
+        raise httpx.ConnectError("сеть отвалилась")
+
+    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    intake.similar_id = 3
+    intake.unparsed = True
+
+    await ingest.ingest_post(
+        intake, 1, "jobs", post(10, text="Senior QA https://teletype.in/@a/b")
+    )
+
+    assert intake.allowed_delete == [False]

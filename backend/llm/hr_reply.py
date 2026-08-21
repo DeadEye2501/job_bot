@@ -209,8 +209,16 @@ async def classify_hr_reply(
     current_status: VacancyStatus,
     client: httpx.AsyncClient,
     model: str,
-) -> Classification | None:
+) -> tuple[Classification | None, str | None]:
     """Классифицирует burst HR-сообщений с учётом текущего статуса вакансии.
+
+    Отвечает парой: вердикт и причина, по которой спросить не вышло. Пустой
+    вердикт с пустой причиной значит «модель ответила, а вердикта в ответе
+    нет»; причина — что модель не отвечала вовсе. Разводить их обязательно:
+    пачка к мигу зова уже вынута из копилки, повторов у разбора нет, и
+    схлопнутые в одно, эти два случая теряли письма на всякой заминке
+    поставщика. Тем же способом отвечает разбор вакансии и вердикт о
+    пригодности.
 
     Модели дают только те статусы, куда переход разрешён из нынешнего
     (`_allowed_next`): выбирая из них, она не порождает вердиктов, которые
@@ -222,7 +230,7 @@ async def classify_hr_reply(
     человек уже не увидит.
     """
     if not text:
-        return None
+        return None, None
     allowed = _allowed_next(current_status)
     allowed_str = _as_line(allowed)
     # Обрезается начало, а не конец: решает последняя реплика, а первые в
@@ -235,19 +243,19 @@ async def classify_hr_reply(
     request = _classify_request(text, current_status, allowed_str)
     reply = await chat(client, model, request, logger)
     if reply.text is None:
-        return None
+        return None, reply.error
     if reply.finish_reason == "length":
         logger.warning("classify_hr_reply: ответ оборван, вердикта нет")
-        return None
+        return None, None
     parsed = _parse_classification(reply.text)
     if parsed is None:
         log_unparseable(reply.text, logger, "classify_hr_reply")
-        return None
+        return None, None
     if parsed.status not in allowed:
         logger.warning(
             "classify_hr_reply: статус %s модели не предлагали, вердикта нет",
             parsed.status.value,
         )
-        return None
+        return None, None
     logger.debug("classify_hr_reply: status=%s", parsed.status.value)
-    return parsed
+    return parsed, None

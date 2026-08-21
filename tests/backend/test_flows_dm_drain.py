@@ -71,6 +71,28 @@ async def test_switching_off_reads_what_was_collected(dm_pipeline):
     assert dm_pipeline.dm_debounce.waiting() == []
 
 
+async def test_a_burst_the_provider_could_not_read_survives_the_drain(
+    monkeypatch, dm_pipeline
+):
+    """Пачка, на которой упал поставщик, слив на выключении переживает.
+
+    Разбор кладёт её обратно в копилку — беда поставщика приговором не
+    является, — а слив следом забывал все пачки разом, и возвращённая гибла в
+    тот же миг. Приглашение на созвон, пришедшее при лежащем поставщике,
+    пропадало молча ровно там, где его обещали спасти.
+    """
+
+    async def falls(pipeline, hr_id):
+        pipeline.dm_debounce.restore(hr_id, pipeline.dm_debounce.take(hr_id))
+
+    monkeypatch.setattr(dm_classify, "classify_and_apply_for_hr", falls)
+    dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "созвон во вторник"))
+
+    await dm_pipeline.cancel_pending_dm_classifications(drain=True)
+
+    assert dm_pipeline.dm_debounce.waiting() == [7]
+
+
 async def test_switching_off_reads_every_correspondent(dm_pipeline):
     """Выключение разбирает всех накопленных, а не первого попавшегося."""
     dm_pipeline.schedule_dm_classification(7, PendingReply(1, 10, 10, "от первого"))

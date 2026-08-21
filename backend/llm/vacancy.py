@@ -15,14 +15,13 @@ from backend.payloads import ParsedVacancy
 from backend.llm.answers import (
     ONLY_JSON,
     json_object,
-    log_unparseable,
     normalize_enum,
+    read_with_a_second_try,
     str_or_none,
-    truncation_trouble,
-    wants_more_room,
 )
 from backend.llm.candidate import format_known_skills
 from backend.llm.rules import (
+    VACANCY_TEXT_CHARS,
     AGGREGATOR_HOSTS_LINE,
     APPLY_CONTACTS,
     FORMAT_MARKERS,
@@ -418,30 +417,22 @@ async def parse_vacancy(
     """
     if not text:
         return None, None
-    text = text[:6000]
+    text = text[:VACANCY_TEXT_CHARS]
     logger.debug(
         "parse_vacancy: %d chars channel=@%s",
         len(text),
         channel_username or "?",
     )
-    reply = await chat(
-        client, model, _parse_request(text, known_skills, MAX_PARSE_TOKENS), logger
+    parsed, trouble = await read_with_a_second_try(
+        lambda room: chat(
+            client, model, _parse_request(text, known_skills, room), logger
+        ),
+        _parse_vacancy_json,
+        (MAX_PARSE_TOKENS, ROOMIER_PARSE_TOKENS),
+        (logger, "parse_vacancy"),
     )
-    if reply.text is None:
-        return None, reply.error
-    parsed = _parse_vacancy_json(reply.text)
-    if wants_more_room(parsed, reply.finish_reason):
-        logger.warning("parse_vacancy: ответ оборван, переспрашиваю с запасом")
-        reply = await chat(
-            client, model, _parse_request(text, known_skills, ROOMIER_PARSE_TOKENS),
-            logger,
-        )
-        if reply.text is None:
-            return None, reply.error
-        parsed = _parse_vacancy_json(reply.text)
     if parsed is None:
-        log_unparseable(reply.text, logger, "parse_vacancy")
-        return None, truncation_trouble(reply.finish_reason)
+        return None, trouble
     parsed = _without_channel_as_hr(parsed, channel_username)
     _log_parsed(parsed)
     return parsed, None

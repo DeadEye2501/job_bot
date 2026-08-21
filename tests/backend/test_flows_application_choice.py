@@ -52,10 +52,12 @@ async def applying(make_pipeline, session_factory, tmp_path, monkeypatch):
     await pipeline.rs.set_app("cv_path", str(resume))
     pipeline.profile_block = "Иван Петров, Python-разработчик"
     pipeline.letter = "Здравствуйте! Откликаюсь на вакансию."
+    # Причина, по которой письмо не сочинилось: пусто — модель ответила.
+    pipeline.letter_trouble = None
 
     async def generate_cover_letter(block, parsed, client, model, *, channel_ref=None):
         pipeline.asked_for_letter = (block, parsed, channel_ref)
-        return pipeline.letter
+        return pipeline.letter, pipeline.letter_trouble
 
     monkeypatch.setattr("backend.flows.apply.generate_cover_letter", generate_cover_letter)
     return pipeline, hr, vacancy, resume
@@ -192,6 +194,23 @@ async def test_a_letter_the_model_did_not_write_stops_the_send(applying):
     assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
         False,
         "cover_letter_failed",
+    )
+    assert pipeline.sent == []
+
+
+async def test_a_silent_model_is_named_apart_from_a_rejected_letter(applying):
+    """Молчащую модель окну называют своим словом, а не «не прошло проверку».
+
+    Один код на оба случая посылал человека искать беду в длине письма, когда
+    на деле не поднят поставщик; второе нажатие давало то же самое.
+    """
+    pipeline, hr, vacancy, _ = applying
+    pipeline.letter = None
+    pipeline.letter_trouble = "llm_http_error: 500"
+
+    assert await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id) == (
+        False,
+        "cover_letter_unasked",
     )
     assert pipeline.sent == []
 
@@ -343,7 +362,7 @@ async def test_a_second_send_while_the_first_is_in_flight_is_refused(
         second.append(
             await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id)
         )
-        return pipeline.letter
+        return pipeline.letter, pipeline.letter_trouble
 
     monkeypatch.setattr(
         "backend.flows.apply.generate_cover_letter", generate_cover_letter
@@ -382,7 +401,7 @@ async def test_a_send_that_broke_lets_the_next_one_through_too(applying, monkeyp
         tries.append(1)
         if len(tries) == 1:
             raise RuntimeError("модель отвалилась")
-        return pipeline.letter
+        return pipeline.letter, pipeline.letter_trouble
 
     monkeypatch.setattr("backend.flows.apply.generate_cover_letter", breaks_once)
     with pytest.raises(RuntimeError):

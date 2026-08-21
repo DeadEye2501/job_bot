@@ -1,4 +1,4 @@
-"""Разбор того, что ответила модель, и жалоба, когда разбор не удался."""
+"""Разбор того, что ответила модель, порядок двух заходов и жалоба на неудачу."""
 
 
 import json
@@ -179,6 +179,45 @@ def wants_more_room(parsed, finish_reason: str | None) -> bool:
     один из них на всяком обрыве, и собравшийся объект стоил бы лишнего зова.
     """
     return parsed is None and finish_reason == "length"
+
+
+async def read_with_a_second_try(
+    ask, read, tokens: tuple[int, int], told: tuple[logging.Logger, str]
+):
+    """Спросить модель и, не разобрав оборванный ответ, переспросить с запасом.
+
+    Отвечает парой «разобранное и причина, по которой не вышло», — той же, что
+    отдают наружу оба зовущих.
+
+    Порядок шагов здесь, а не у каждого: спрашивают так двое — разбор
+    объявления и вердикт пригодности, — и написанные порознь тела совпадали
+    построчно. Решение переспросить (`wants_more_room`) и слово о беде
+    (`truncation_trouble`) были вынесены сюда же и раньше, а сам порядок вокруг
+    них — нет.
+
+    Обращение приходит доводом, а не собирается тут: этот модуль знает про
+    ответы модели, а не про то, как её зовут.
+
+    `ask` — обращение по потолку токенов, `read` — разбор ответа, `tokens` —
+    пара «обычный потолок и просторный», `told` — журнал и имя обращения для
+    записи в него.
+    """
+    log, purpose = told
+    usual, roomier = tokens
+    reply = await ask(usual)
+    if reply.text is None:
+        return None, reply.error
+    parsed = read(reply.text)
+    if wants_more_room(parsed, reply.finish_reason):
+        log.warning("%s: ответ оборван, переспрашиваю с запасом", purpose)
+        reply = await ask(roomier)
+        if reply.text is None:
+            return None, reply.error
+        parsed = read(reply.text)
+    if parsed is None:
+        log_unparseable(reply.text, log, purpose)
+        return None, truncation_trouble(reply.finish_reason)
+    return parsed, None
 
 
 def str_or_none(value) -> str | None:

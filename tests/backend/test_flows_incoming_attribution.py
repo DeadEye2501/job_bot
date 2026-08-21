@@ -329,8 +329,11 @@ async def test_without_a_buffer_the_letter_is_read_on_the_spot(session_factory, 
 
     async def classify_hr_reply(text, status, client, model):
         asked.append(text)
-        return Classification(
-            status=VacancyStatus.INVITATION, explanation="зовут на созвон"
+        return (
+            Classification(
+                status=VacancyStatus.INVITATION, explanation="зовут на созвон"
+            ),
+            None,
         )
 
     monkeypatch.setattr("backend.flows.dm_classify.classify_hr_reply", classify_hr_reply)
@@ -361,7 +364,7 @@ async def test_a_reader_without_a_verdict_leaves_the_vacancy_alone(session_facto
     )
 
     async def classify_hr_reply(text, status, client, model):
-        return None
+        return None, None
 
     monkeypatch.setattr("backend.flows.dm_classify.classify_hr_reply", classify_hr_reply)
 

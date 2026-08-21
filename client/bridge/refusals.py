@@ -179,6 +179,8 @@ SEND_REFUSALS = {
     "in_flight": "Отправка по этой вакансии уже идёт.",
     "profile_empty": "Профиль пуст — нечем заполнить cover letter.",
     "cover_letter_failed": "Cover letter не прошёл проверку (длина / формат — см. логи).",
+    "cover_letter_unasked": "Модель не дала ответа — письмо не сочинилось "
+                            "(см. журнал).",
     "cv_missing": "Файл резюме не найден — проверьте путь в настройках.",
     "blocked": "Отправка заблокирована (OFF mode / blacklist / у HR нет ни id, "
                "ни @username / Telegram просит подождать).",
