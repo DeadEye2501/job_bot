@@ -8,7 +8,7 @@ from backend.repository import profile as profile_repo
 from backend.repository import profile_experience as experience_repo
 from backend.repository import profile_languages as languages_repo
 from backend.repository import profile_skills as skills_repo
-from client.bridge.answer import Denied, bad_fields, denied, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
 from client.bridge.choices import _filter_languages, _filter_set
 from client.bridge.cv import Cv
 from client.bridge.cv_file import _stat_cv
@@ -60,7 +60,7 @@ class Profile(Cv):
         try:
             fields = _read_profile_fields(payload)
             languages = _filter_languages(payload.get("languages"))
-        except (AttributeError, ValueError, TypeError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("save", e)
 
         for required in REQUIRED_FIELDS:
@@ -127,7 +127,7 @@ class Profile(Cv):
             rows = (payload or {}).get(key) or []
             if not isinstance(rows, list):
                 raise ValueError(f"{key} must be a list")
-        except (AttributeError, ValueError, TypeError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields(f"save_{key}", e)
 
         async def run() -> dict:

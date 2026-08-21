@@ -190,6 +190,7 @@
 - `APPLIED: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.APPLIED, VacancyStatus.…`
 - `RESPONDED: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.ANSWERED, VacancyStatus…`
 - `INVITED: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.INVITATION, VacancyStat…`
+- `IN_PROGRESS_STEP: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.INVITATION, VacancyStat…`
 
 ### `backend/domain/salary.py`
 
@@ -460,6 +461,7 @@
 - `FORMAT_MARKERS` = `'«remote/удалёнка/удалённо/distributed», «hybrid…`
 - `APPLY_CONTACTS` = `'Telegram (@username, t.me/...), email (jobs@acm…`
 - `GEO_LIMIT_MARKERS` = `'«Удалённо в РФ», «удалёнка только из России», «…`
+- `VACANCY_TEXT_CHARS` = `6000`
 
 ### `backend/llm/skills.py`
 
@@ -937,10 +939,6 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
-### `backend/repository/stats_kpi.py`
-
-- `_IN_PROGRESS` = `frozenset({VacancyStatus.INVITATION, VacancyStat…`
-
 ### `backend/repository/vacancies_card.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -1028,6 +1026,7 @@
 ### `client/bridge/answer.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `BAD_PAYLOAD` = `набор из 4`
 
 ### `client/bridge/bot_stop.py`
 
@@ -1166,7 +1165,7 @@
 - `RUN_REFUSALS` = `словарь из 3`
 - `POLL_REFUSALS` = `словарь из 5`
 - `RERUN_REFUSALS` = `словарь из 6`
-- `SEND_REFUSALS` = `словарь из 11`
+- `SEND_REFUSALS` = `словарь из 12`
 
 ### `client/bridge/runner.py`
 

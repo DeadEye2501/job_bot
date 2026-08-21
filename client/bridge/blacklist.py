@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from backend.models import BLACKLIST_KINDS
 from backend.repository import blacklist as blacklist_repo, blacklist_candidates
-from client.bridge.answer import Denied, bad_fields, denied, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
 from client.bridge.hub import Hub
 from client.bridge.refusals import NO_ENTRY
 from client.bridge.wire import _blacklist_row_to_dict
@@ -98,7 +98,7 @@ class Blacklist:
             }
             if not fields:
                 raise KeyError("value / reason")
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("blacklist.update", e, action="update", id=blacklist_id)
 
         async def run() -> dict:
@@ -147,10 +147,7 @@ class Blacklist:
             blacklist_id, active = read_toggle(payload, "id", "active")
             if blacklist_id is None or active is None:
                 raise KeyError("id / active")
-        # `AttributeError` ловится вместе с остальными: чтение нагрузки идёт
-        # через помощника, и не-объект спотыкается уже внутри него — а беда
-        # синхронная, до мотора, и мимо конверта ушла бы прямо в канал.
-        except (AttributeError, ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields(
                 "blacklist.set_active", e, action="set_active", id=blacklist_id, active=active
             )

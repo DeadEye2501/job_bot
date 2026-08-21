@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from backend.telegram_login import LoginStep
-from client.bridge.answer import Denied, bad_fields, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, reply
 from client.bridge.refusals import CODE_FIRST, CODE_STEP_FIRST
 
 
@@ -98,9 +98,7 @@ class Login:
         """
         try:
             api_id, api_hash, phone = read_credentials(payload)
-        # `AttributeError` и `TypeError` — про не-объект в нагрузке: читают её
-        # ключами, и спотыкается разбор до мотора, мимо конверта.
-        except (AttributeError, KeyError, TypeError, ValueError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("send_code", e)
 
         return reply(
@@ -112,7 +110,7 @@ class Login:
         """Второй шаг: отдать Telegram код из сообщения."""
         try:
             code = read_code(payload)
-        except (AttributeError, KeyError, TypeError, ValueError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("confirm_code", e)
 
         return reply(
@@ -123,7 +121,7 @@ class Login:
         """Третий шаг, если Telegram спросил: облачный пароль."""
         try:
             password = read_password(payload)
-        except (AttributeError, KeyError, TypeError, ValueError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("confirm_password", e)
 
         return reply(

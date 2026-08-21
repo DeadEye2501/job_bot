@@ -8,9 +8,21 @@
 from tests.client.conftest import WindowThatPicks
 
 
+async def test_the_path_to_the_resume_cannot_be_set_from_the_page(api):
+    """Записать путь к резюме страница не может — только диалог самого окна.
+
+    Заслон тот же, что у отправки файла собеседнику (`hr_chat._send_media`):
+    поверхность моста pywebview собирает обходом полей и имена с подчёркиванием
+    пропускает. У резюме он был снят, хотя цена здесь выше — записанный путь
+    потом исполняется: «открыть резюме» отдаёт его `os.startfile` без всякого
+    перечня расширений, в отличие от соседней дороги к файлам.
+    """
+    assert not hasattr(api.profile, "replace")
+
+
 async def test_an_empty_path_is_refused(api, ask):
     """Пустой путь не сохраняют: подставлять в отклик будет нечего."""
-    answer = await ask(api.profile.replace, {"path": "   "})
+    answer = await ask(api.profile._replace, {"path": "   "})
 
     assert answer["fail"] == "denied"
     assert answer["detail"] == "Путь пустой."
@@ -25,7 +37,7 @@ async def test_a_replaced_resume_shows_up_in_the_profile(api, ask, tmp_path):
     resume = tmp_path / "новое.pdf"
     resume.write_bytes(b"%PDF-1.4 ")
 
-    answer = await ask(api.profile.replace, {"path": str(resume)})
+    answer = await ask(api.profile._replace, {"path": str(resume)})
     assert answer["ok"]["exists"] is True
 
     shown = await ask(api.profile.get)
@@ -41,7 +53,7 @@ async def test_a_resume_that_went_missing_is_reported_as_missing(api, ask, tmp_p
     """
     resume = tmp_path / "было.pdf"
     resume.write_bytes(b"%PDF-1.4 ")
-    await ask(api.profile.replace, {"path": str(resume)})
+    await ask(api.profile._replace, {"path": str(resume)})
 
     resume.unlink()
 

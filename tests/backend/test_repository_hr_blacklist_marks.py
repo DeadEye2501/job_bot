@@ -12,9 +12,12 @@ from backend.repository.hr_card import (
     get_hr_detail,
     hr_blacklist_candidates,
     merge_hr,
+    update_hr_fields,
 )
+from backend.repository.hr_identify import refresh_hr_from_telegram
 from tests.dbio import put
 from tests.factories import blacklist_row, hr_row
+from tests.fakes.telegram import user as tg_user
 
 
 def test_both_spellings_are_offered_for_lookup():
@@ -197,6 +200,44 @@ async def test_the_survivors_own_mark_follows_a_replaced_nickname(
     await merge_hr(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
 
     assert (await get_hr_detail(session, survivor.id)).blacklist_value == "user_id:222"
+
+
+async def test_a_mark_follows_a_nickname_changed_by_hand(session, session_factory):
+    """Отметка едет за ником, который человек поправил в карточке.
+
+    Написание у карточки без номера учётной записи одно — ник, — и отметку
+    кнопка пишет под ним. Смени его, и строка списка не совпадает больше ни с
+    кем: заслон отправки отсеянного не видит, бот пишет заблокированному, а на
+    экране чёрного списка строка при этом горит.
+    """
+    hr = hr_row(name="Мария", telegram_username="ivanov", telegram_user_id=None)
+    await put(session_factory, hr)
+    await put(session_factory, blacklist_row("hr", "@ivanov"))
+
+    await update_hr_fields(session, hr.id, telegram_username="@ivanov_hr")
+    await session.commit()
+
+    assert (await get_hr_detail(session, hr.id)).blacklist_value == "@ivanov_hr"
+
+
+async def test_a_mark_follows_a_nickname_telegram_replaced(session, session_factory):
+    """Отметка едет и за ником, который переписал сам Telegram.
+
+    Ник приходит заново с каждым входящим письмом, и карточка его
+    перезаписывает: дорога та же, что и правка руками, а последствие хуже —
+    человек её не совершал и о слетевшей отметке не узнает никак.
+    """
+    hr = hr_row(name="Мария", telegram_username="ivanov", telegram_user_id=None)
+    await put(session_factory, hr)
+    await put(session_factory, blacklist_row("hr", "@ivanov"))
+    stored = await session.get(HR, hr.id)
+
+    await refresh_hr_from_telegram(
+        session, stored, tg_user(id=12345, username="ivanov_hr"), avatar=None
+    )
+    await session.commit()
+
+    assert (await get_hr_detail(session, hr.id)).blacklist_value == "user_id:12345"
 
 
 async def test_two_marked_records_leave_one_standing_mark(session, session_factory):

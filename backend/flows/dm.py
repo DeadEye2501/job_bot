@@ -228,7 +228,7 @@ async def _save_incoming(session_factory, msg, attachment: _Attachment):
             )
             if hr is None:
                 return None, None
-            refresh_hr_from_telegram(hr, msg.from_user, avatar=None)
+            await refresh_hr_from_telegram(session, hr, msg.from_user, avatar=None)
             vacancy_id = await _attributed_vacancy(session, hr.id, msg)
             new_msg = await save_incoming_message(
                 session, _incoming_row(msg, hr.id, vacancy_id, attachment)
@@ -293,7 +293,7 @@ async def _catch_up_avatar(session_factory, client, msg) -> None:
             )
             if hr is None or hr.avatar is not None:
                 return
-            refresh_hr_from_telegram(hr, msg.from_user, avatar=avatar)
+            await refresh_hr_from_telegram(session, hr, msg.from_user, avatar=avatar)
             await session.commit()
     except Exception:
         logger.exception(

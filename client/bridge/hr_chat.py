@@ -9,7 +9,7 @@ import webview
 from backend.bot.chat import EMPTY_MESSAGE
 from backend.incoming import moment_or_none
 from backend.repository import messages as messages_repo
-from client.bridge.answer import Denied, bad_fields, denied, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
 from client.bridge.page import read_page
 from client.bridge.refusals import NO_BOT, SEND_BROKE
 from client.bridge.wire import _message_row_to_dict
@@ -52,7 +52,7 @@ class HrChat:
             if before_id is not None:
                 before_id = int(before_id)
             before_sent_at = moment_or_none(payload.get("before_sent_at"))
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("messages", e)
 
         limit = read_page(payload, default_limit=50).limit
@@ -137,7 +137,7 @@ class HrChat:
         try:
             hr_id = int(payload["hr_id"])
             text = str(payload.get("text") or "").strip()
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("send_message", e)
 
         if not text:
@@ -179,7 +179,7 @@ class HrChat:
         try:
             hr_id = int(payload["hr_id"])
             path = str(payload["path"])
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("send_media", e)
 
         return reply(

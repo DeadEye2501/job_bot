@@ -41,6 +41,20 @@ INVITED: frozenset[VacancyStatus] = frozenset({
     VacancyStatus.OFFER,
 })
 
+# `IN_PROGRESS_STEP`: ступень «В процессе» в шапке статистики — разговор идёт,
+#   но ничем ещё не кончился.
+#
+# С `INVITED` не сводится и лежит рядом нарочно: там отвечают на другой вопрос
+# — «позвали ли дальше разговора», — и потому туда входит оффер, а тестовое
+# задание не входит. Здесь наоборот: оффер это уже исход, а тестовое — та самая
+# середина. Наборы разъезжались молча, и `In Progress` не попадал ни в один: на
+# экране под шапкой он горел своей строкой, а счётчик над ним показывал ноль.
+IN_PROGRESS_STEP: frozenset[VacancyStatus] = frozenset({
+    VacancyStatus.INVITATION,
+    VacancyStatus.TEST,
+    VacancyStatus.IN_PROGRESS,
+})
+
 
 def percent_or_none(numerator: int, denominator: int) -> int | None:
     """Целая доля от целого, а при пустом целом — пусто, а не ноль.

@@ -7,7 +7,7 @@ import logging
 
 from adapters.lm_studio import LlmProviderConfig
 from backend.telegram_login import username_of
-from client.bridge.answer import Denied, denied, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, denied, reply
 from client.bridge.bot_stop import detach_bot, stop_bot
 from client.bridge.hub import Hub
 from client.bridge.llm import Llm, read_llm_creds
@@ -285,6 +285,6 @@ def _read_providers(payload: dict) -> dict[str, LlmProviderConfig]:
             continue
         try:
             creds[kind] = read_llm_creds(draft)
-        except (AttributeError, TypeError, ValueError) as e:
+        except BAD_PAYLOAD as e:
             raise ValueError(f"{kind}: {e}") from e
     return creds

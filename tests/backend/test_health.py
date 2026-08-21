@@ -5,7 +5,8 @@
 оставляет его в уверенности, что всё в порядке, пока бот молчит.
 """
 
-from backend.health import database_alive, telegram_alive
+from backend.health import database_alive, model_alive, telegram_alive
+from backend.runtime_settings import LlmProviderConfig
 
 
 class Stopped:
@@ -40,3 +41,17 @@ def test_a_bot_that_is_not_there_is_not_healthy():
     assert telegram_alive(None) is False
     assert telegram_alive(Bot(connected=False)) is False
     assert telegram_alive(Bot(connected=True)) is True
+
+
+async def test_a_provider_address_that_will_not_parse_darkens_the_lamp():
+    """Негодный адрес поставщика гасит лампочку, а не уносит весь ответ.
+
+    Клиент собирался до перехвата, и «http://localhost:12ab» — опечатка в
+    порте, которую человек делает легко, — ронял сборку броском. Тот проходил
+    насквозь до ответа окну: вместо погашенных лампочек человек видел красную
+    плашку с английской поломкой, а вместе с ответом терялись счёт
+    непрочитанного и режим — их спрашивают тем же зовом, и второй попытки нет.
+    """
+    broken = LlmProviderConfig(base_url="http://localhost:12ab", api_key="", model="qwen")
+
+    assert await model_alive(broken, "chat") is False

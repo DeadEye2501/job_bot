@@ -6,7 +6,7 @@ import logging
 
 from backend.incoming import text_or_none
 from backend.repository import channels as channels_repo, vacancies_mini
-from client.bridge.answer import Denied, bad_fields, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, reply
 from client.bridge.channel_actions import ChannelActions
 from client.bridge.hub import Hub
 from client.bridge.media import _avatar_data_url
@@ -103,7 +103,7 @@ class Channels(ChannelActions):
         try:
             channel_id = int(payload["channel_id"])
             page = read_page(payload, default_limit=50)
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("channels.vacancies", e)
 
         return reply(self._hub.runner, self._paged(channel_id, page))

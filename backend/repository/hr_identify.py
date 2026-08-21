@@ -7,6 +7,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import HR, Message, Vacancy
+from backend.repository.hr_card import carry_hr_marks, hr_blacklist_candidates
 from backend.repository.vacancies_common import PARSED_ONLY, VACANCY_APPEARED_AT
 
 logger = logging.getLogger(__name__)
@@ -165,7 +166,9 @@ def telegram_full_name(user) -> str | None:
     return " ".join(filter(None, [user.first_name, user.last_name])).strip() or None
 
 
-def refresh_hr_from_telegram(hr: HR, user, *, avatar: bytes | None) -> None:
+async def refresh_hr_from_telegram(
+    session: AsyncSession, hr: HR, user, *, avatar: bytes | None
+) -> None:
     """Дополнить найденную запись тем, что пришло от Telegram.
 
     Номер собеседника узнаётся только с первым его письмом: карточку
@@ -185,11 +188,18 @@ def refresh_hr_from_telegram(hr: HR, user, *, avatar: bytes | None) -> None:
     свежая заменялась бы устаревшей с любого запоздавшего пути. Цена
     известна: сменивший фотографию собеседник остаётся со старой, пока
     колонку не очистят руками.
+
+    Сессия нужна на одно: отметка чёрного списка обязана переехать за
+    сменившимися написаниями (:func:`carry_hr_marks`). Ник Telegram отдаёт
+    заново с каждым письмом, и оставленная на прежнем отметка не совпадает
+    больше ни с кем — бот пишет заблокированному, а строка списка горит.
     """
+    written_before = hr_blacklist_candidates(hr)
     if hr.telegram_user_id is None:
         hr.telegram_user_id = user.id
     if user.username and hr.telegram_username != user.username:
         hr.telegram_username = user.username
+    await carry_hr_marks(session, written_before, hr)
     full_name = telegram_full_name(user)
     if not hr.name and full_name:
         hr.name = full_name
@@ -262,5 +272,5 @@ async def find_or_create_hr(
         hr.avatar = avatar
         return hr, True
 
-    refresh_hr_from_telegram(hr, user, avatar=avatar)
+    await refresh_hr_from_telegram(session, hr, user, avatar=avatar)
     return hr, False

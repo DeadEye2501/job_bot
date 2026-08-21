@@ -43,10 +43,20 @@ class Cv:
         )
         if not chosen:
             return {"ok": {"cancelled": True}}
-        return self.replace({"path": chosen[0]})
+        return self._replace({"path": chosen[0]})
 
-    def replace(self, payload: dict) -> dict:
-        """Запомнить новый путь к резюме и рассказать, что по нему лежит."""
+    def _replace(self, payload: dict) -> dict:
+        """Запомнить новый путь к резюме и рассказать, что по нему лежит.
+
+        Закрыт от страницы тем же способом, что и отправка файла собеседнику
+        (`hr_chat._send_media`): поверхность моста pywebview собирает обходом
+        полей и имена с подчёркиванием пропускает. Открытым его звал бы кто
+        угодно с любым путём, а записанный путь потом исполняется — «открыть
+        резюме» отдаёт его системе без разбора расширения.
+
+        Единственный зовущий — `pick` рядом: путь сюда приходит из диалога
+        самого окна, то есть от человека.
+        """
         payload = payload if isinstance(payload, dict) else {}
         path = str(payload.get("path") or "").strip()
         if not path:
