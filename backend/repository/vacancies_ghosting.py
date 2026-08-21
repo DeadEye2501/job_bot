@@ -9,7 +9,7 @@
 
 import logging
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +22,7 @@ from backend.repository.vacancies_activity import (
     last_incoming_subq,
 )
 from backend.repository.vacancy_status import apply_silence
+from backend.telegram_time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -85,13 +86,10 @@ async def mark_ghosted_vacancies(
     Возвращает список vacancy_id, переведённых в Ghosting. Caller
     оборачивает в session.begin() и выполняет commit.
     """
-    # SQLite + aiosqlite возвращает наивные datetime'ы даже при
-    # DateTime(timezone=True), поэтому для Python-side сравнения с
-    # v.created_at / max(sent_at) / max(changed_at) cutoff тоже должен
-    # быть naive (UTC по конвенции — server_default=func.now()).
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
-        days=timeout_days
-    )
+    # Сравнение идёт на стороне питона с `created_at`, `max(sent_at)` и
+    # `max(changed_at)`, а те приходят из базы наивными — отсюда и наивная
+    # граница (`telegram_time.utc_now`).
+    cutoff = utc_now() - timedelta(days=timeout_days)
     affected: list[int] = []
     for v, last_msg_at, entered_at, touched_at in await _silence_candidates(session):
         if _last_activity(v, last_msg_at, entered_at, touched_at) >= cutoff:

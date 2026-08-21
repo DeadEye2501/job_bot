@@ -9,10 +9,10 @@
 // заслонены потолком по показанному (`refreshLimit`), у переписки его не было.
 
 import { cleanup, render } from '@testing-library/svelte';
-import { tick } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import PersonChat from '../app/PersonChat.svelte';
+import { settled } from './settled.js';
 
 afterEach(cleanup);
 
@@ -52,14 +52,6 @@ function chat(shownCount) {
     props: { ask, say: () => {}, hrId: 7, blocked: false, events, onread: () => {} },
   });
   return { asked, listeners };
-}
-
-/** Дождаться, пока осядут цепочка ответов моста и отрисовка. */
-async function settled() {
-  for (let i = 0; i < 6; i += 1) {
-    await tick();
-    await new Promise((done) => setTimeout(done, 0));
-  }
 }
 
 describe('живая переписка', () => {

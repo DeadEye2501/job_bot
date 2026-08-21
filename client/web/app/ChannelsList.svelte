@@ -1,8 +1,6 @@
 <script>
   // Вкладка «Каналы»: список слева, карточка выбранного справа.
 
-  import { untrack } from 'svelte';
-
   import { call } from '$api/bridge.js';
   import AddChannelDialog from '$components/AddChannelDialog.svelte';
   import ChannelRow from '$components/ChannelRow.svelte';
@@ -117,14 +115,11 @@
   }
 
   $effect(() => {
-    const settled = alive.mounted();
     // Списки меняет не только этот экран: бот заносит каналы в отсев сам,
     // разбирая объявления. Без этой подписки экран показывал бы снимок той
     // минуты, когда его открыли.
     const deaf = events.on('contacts_lists_changed', refresh);
-    // Первое чтение — вне слежения: строку поиска `refresh` читает, и следящий
-    // эффект перезаводился бы на каждом набранном знаке.
-    untrack(() => refresh());
+    const settled = alive.entered(refresh);
     return () => {
       settled();
       deaf();

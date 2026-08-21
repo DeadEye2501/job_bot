@@ -11,8 +11,6 @@
 // нарочно — он просит и получает сверх этого своё (порядок, отбор, границы
 // оценки), и завёрнутый в общее, он потребовал бы ветвлений внутри.
 
-import { untrack } from 'svelte';
-
 import { living } from '$state/alive.js';
 import { freshAnswer } from '$state/fresh.js';
 import { appended, nearBottom, PAGE, refreshLimit } from '$state/paging.js';
@@ -114,14 +112,11 @@ export function pagedList({ ask, method, key }) {
     /** Заход на вкладку: пометить живым, прочитать первую страницу и отдать
      *  снятие пометки — его и возвращают из эффекта.
      *
-     * Первое чтение — вне слежения: строку поиска читает `refresh`, и следящий
-     * эффект перезаводился бы на каждом набранном знаке. Написано это было
-     * дословно одинаково у обеих вкладок, вместе с пояснением.
+     * Сам заход общий (`alive.entered`); здесь только сказано, чем читается
+     * первая страница.
      */
     entered() {
-      const settled = alive.mounted();
-      untrack(() => refresh());
-      return settled;
+      return alive.entered(refresh);
     },
   };
 }

@@ -202,7 +202,7 @@
 ### `backend/domain/resume_marks.py`
 
 - `RESUME_MARKS` = `frozenset({'#cv', '#resume', '#резюме', '#ищураб…`
-- `AMBIGUOUS_MARKS` = `frozenset({'#available', '#cv_'})`
+- `AMBIGUOUS_MARKS` = `frozenset({'#available'})`
 - `_MARK` = `re.compile('(?<!\\S)#\\w+')`
 
 ### `backend/domain/salary.py`
@@ -444,7 +444,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `MAX_FACTCHECK_TOKENS` = `1500`
-- `FACT_CHECK_COVER_LETTER_PROMPT` = `'Ты — фактчекер сопроводительных писем. Тебе даю…`
+- `FACT_CHECK_COVER_LETTER_PROMPT` = `"Ты — фактчекер сопроводительных писем. Тебе даю…`
 
 ### `backend/llm/fit.py`
 
@@ -480,6 +480,8 @@
 
 - `RESUME_MARK_LINE` = `', '.join((f'«{mark}»' for mark in sorted(RESUME…`
 - `SELF_OFFER_MARKERS` = `'\n'.join(('РУССКИЙ: «ищу работу», «ищу вакансию…`
+- `FACT_KINDS` = `'\n'.join(('- Технологии, инструменты, языки, фр…`
+- `NOT_IN_THE_PROFILE` = `'нет в блоке кандидата ни дословно, ни по смыслу…`
 - `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_B…`
 - `GRADE_MARKERS` = `'«junior/стажёр/intern», «middle/мидл», «senior/…`
 - `FORMAT_MARKERS` = `'«remote/удалёнка/удалённо/distributed», «hybrid…`

@@ -46,16 +46,23 @@ def _under_media(stored_path: str) -> str | None:
     """Путь из колонки, приведённый к пути внутри каталога медиа.
 
     Приводит обе записи разом: относительную, какую пишут сегодня, и
-    оставшуюся от прежних заходов абсолютную. Дальше каталога она не пускает —
-    и заодно отвечает на «..», сложись он в колонке как угодно.
+    оставшуюся от прежних заходов абсолютную.
+
+    Сам заслон общий (`serving.inside`): дальше каталога он не пускает и
+    отвечает на «..», сложись он в колонке как угодно. Здесь только приведение
+    абсолютной записи к относительной — до заслона, потому что абсолютный путь
+    заменяет собой корень, и заслону досталось бы уже не то, что проверяют.
     """
     from backend.bot.media import MEDIA_DIR
     root = MEDIA_DIR.resolve()
     path = Path(stored_path)
-    full = path.resolve() if path.is_absolute() else (root / path).resolve()
-    if root not in full.parents:
-        return None
-    return full.relative_to(root).as_posix()
+    if path.is_absolute():
+        try:
+            path = path.resolve().relative_to(root)
+        except ValueError:
+            return None
+    target = inside(root, path.as_posix())
+    return None if target is None else target.relative_to(root).as_posix()
 
 
 def _avatar_data_url(blob: bytes | None) -> str | None:

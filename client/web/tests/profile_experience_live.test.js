@@ -12,20 +12,12 @@
 // предмет другой — что метку кто-то ставит, и ставит после удачи.
 
 import { cleanup, render, within } from '@testing-library/svelte';
-import { tick } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import ProfileExperience from '../app/ProfileExperience.svelte';
+import { settled } from './settled.js';
 
 afterEach(cleanup);
-
-/** Дождаться, пока осядут ответы моста и отрисовка. */
-async function settled() {
-  for (let i = 0; i < 8; i += 1) {
-    await tick();
-    await new Promise((done) => setTimeout(done, 0));
-  }
-}
 
 /** Вкладка с записанными за ней посылками на мост. */
 function tab() {

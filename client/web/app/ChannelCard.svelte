@@ -4,8 +4,6 @@
   // Стоит правой панелью рядом со списком: канал правят, глядя на его же числа,
   // и уводить ради этого с экрана значило бы терять из виду соседей по списку.
 
-  import { untrack } from 'svelte';
-
   import ActionsMenu from '$components/ActionsMenu.svelte';
   import Avatar from '$components/Avatar.svelte';
   import BlacklistChip from '$components/BlacklistChip.svelte';
@@ -43,6 +41,7 @@
     method: 'channels.detail',
     trouble: 'Не удалось прочитать канал',
     alive: () => alive.now,
+    show: (now) => ({ card, trouble } = now),
   });
 
   const dropCard = cardFinish({
@@ -59,7 +58,7 @@
     block: 'channels.block',
     unblock: 'channels.unblock',
     say: (text) => say(text),
-    reread: () => refresh(channelId),
+    reread: () => readCard(channelId),
     onchanged: () => onchanged(),
   });
 
@@ -67,12 +66,6 @@
   const pollTip = $derived(pollBlock(card, lockedTip));
   const numbers = $derived(card ? channelStats(card.stats) : null);
   const funnel = $derived(card ? donut(card.stats.status_counts) : []);
-
-  async function refresh(id) {
-    const now = await readCard(id);
-    if (now === null) return;
-    ({ card, trouble } = now);
-  }
 
   /** Дочитать вакансии канала.
    *
@@ -141,7 +134,7 @@
 
   /** Перечитать карточку канала и показанные его вакансии. */
   function reread(id) {
-    refresh(id);
+    readCard(id);
     loadVacancies(id);
   }
 
@@ -154,12 +147,7 @@
       trouble = '';
       vacancies = [];
       hasMore = false;
-      // `loadVacancies` считает показанные строки, а эффект их же и обнуляет
-      // строкой выше. Эффект, который пишет и тут же читает одно состояние,
-      // Svelte перезаводит по кругу: каждый оборот шлёт мосту два зова, и окно
-      // встаёт намертво. Слежение за `channelId` цело — он прочитан до
-      // обёртки.
-      untrack(() => reread(id));
+      reread(id);
     });
     // Канал приносит вакансии и во время прогона, и сам по себе обходом: его
     // числа и перечень стареют, пока карточка открыта, а прогнавший канал

@@ -63,6 +63,30 @@ async def _dropped_as_trash(
     return True
 
 
+def _unanswered(what: str, trouble: str | None, vacancy_id: int):
+    """Что делать с бедой при обращении к модели; пусто — беды не было.
+
+    Обрыв по пределу токенов и молчание провайдера решают разное, и оба зова к
+    модели — о жанре и о пригодности — разводят их одинаково. Обрыв повторится
+    и на втором заходе с запасом, значит дальше это дело человека: строка
+    ложится в окно с названной причиной. Молчание провайдера приговором не
+    является вовсе — строка остаётся неразобранной и ждёт следующего захода.
+    """
+    if trouble is None:
+        return None
+    if trouble == TRUNCATED_TROUBLE:
+        logger.warning(
+            "vacancy %s: %s не поместился даже с запасом, отдаю человеку",
+            vacancy_id, what,
+        )
+        return TRUNCATED_SKIP_REASON, False
+    logger.warning(
+        "vacancy %s: %s не спросился (%s), оставляю неразобранной",
+        vacancy_id, what, trouble,
+    )
+    return None, True
+
+
 async def _fit_refusal(
     pipeline, parsed, text: str, vacancy_id: int
 ) -> tuple[str | None, bool]:
@@ -92,18 +116,9 @@ async def _fit_refusal(
         validation.verdict if validation else None,
         validation.reason if validation else None,
     )
-    if trouble == TRUNCATED_TROUBLE:
-        logger.warning(
-            "vacancy %s: вердикт не поместился даже с запасом, отдаю человеку",
-            vacancy_id,
-        )
-        return TRUNCATED_SKIP_REASON, False
-    if trouble is not None:
-        logger.warning(
-            "vacancy %s: вердикт не спросился (%s), оставляю неразобранной",
-            vacancy_id, trouble,
-        )
-        return None, True
+    unanswered = _unanswered("вердикт", trouble, vacancy_id)
+    if unanswered is not None:
+        return unanswered
     if validation is None:
         logger.warning(
             "validate_vacancy_fit unavailable for vacancy parse, marking Not Fit"
@@ -147,18 +162,9 @@ async def _genre_refusal(
     genre, trouble = await classify_post_genre(
         text, pipeline.lm_client, pipeline.lm_chat_model
     )
-    if trouble == TRUNCATED_TROUBLE:
-        logger.warning(
-            "vacancy %s: жанр не поместился даже с запасом, отдаю человеку",
-            vacancy_id,
-        )
-        return TRUNCATED_SKIP_REASON, False
-    if trouble is not None:
-        logger.warning(
-            "vacancy %s: жанр не спросился (%s), оставляю неразобранной",
-            vacancy_id, trouble,
-        )
-        return None, True
+    unanswered = _unanswered("жанр", trouble, vacancy_id)
+    if unanswered is not None:
+        return unanswered
     if genre is None or genre.is_vacancy:
         return None, False
     logger.info("vacancy %s: не вакансия — %s", vacancy_id, genre.reason)
@@ -399,17 +405,17 @@ async def save_empty_vacancy(
     pipeline, vacancy_id: int, parsed: ParsedVacancy | None,
     *, reason: str = EMPTY_SKIP_REASON,
 ) -> bool:
-    """Persist an empty/trash vacancy as Not Fit when auto-delete is off
-    (rerun path). Fills whatever fields LLM did extract — заголовок и, как
-    правило, ещё один сигнал из пяти, по которым выносится приговор
-    «пусто», — so the user can see the vacancy in the UI and decide what
-    to do manually. Что именно записалось, считается по строке после
-    записи (`_fields_filled`), а не предполагается заранее.
+    """Записать непригодную строку пометкой, когда удалять её нельзя.
 
-    When ``parsed is None`` the stored fields are cleared: разбора либо не
-    было вовсе (пост опознан по метке), либо он не дал даже названия. Otherwise the UI would
-    show the previous parse output alongside skip_reason="empty",
-    which is misleading.
+    Пишется то, что разбор всё же вытащил, — обычно заголовок и ещё один
+    сигнал из пяти, по которым выносится приговор «пусто»: человек видит
+    вакансию в окне и решает руками. Что именно записалось, считается по
+    строке после записи (`_fields_filled`), а не предполагается заранее.
+
+    Пустой разбор чистит поля. Приходит он двумя дорогами: разбора не было
+    вовсе — пост опознан по метке — либо он не дал даже названия. Оставь мы
+    прежние поля, окно показало бы разобранное прошлым заходом рядом с
+    приговором «мусор», то есть выдало бы старое за новое.
     """
     written = await persist_parse_outcome(
         pipeline,

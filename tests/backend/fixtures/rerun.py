@@ -8,8 +8,8 @@
 import pytest
 
 from backend.flows import embeddings as embeddings_mod
-from backend.flows import parse as parse_mod
 from backend.models import TelegramChannel, Vacancy
+from tests.backend.fixtures.parse_stub import parse_into
 from tests.dbio import only_row, put
 from tests.factories import channel_row, vacancy_row
 from tests.fakes.telegram import FakeTelegramClient
@@ -55,10 +55,6 @@ async def prepare(monkeypatch, make_pipeline, client):
     pipeline.parsed = []
     pipeline.parse_done = True
 
-    async def parse(pipeline, vacancy_id, text, username, allow_delete=False):
-        pipeline.parsed.append((vacancy_id, text, username, allow_delete))
-        return pipeline.parse_done
-
     async def reload():
         pipeline.parsed.append("настройки")
 
@@ -70,6 +66,6 @@ async def prepare(monkeypatch, make_pipeline, client):
     pipeline.vector = [0.5, 0.25]
 
     monkeypatch.setattr(embeddings_mod, "embed_text", embed)
-    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
+    parse_into(monkeypatch, pipeline.parsed, done=lambda: pipeline.parse_done)
     pipeline.reload_resources = reload
     return pipeline

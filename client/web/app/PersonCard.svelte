@@ -20,7 +20,7 @@
   import { cardRead } from '$state/card_read.js';
   import { cardSave } from '$state/card_save.js';
   import { sendBlock } from '$state/chat.js';
-  import { freshAnswer } from '$state/fresh.js';
+  import { miniRead } from '$state/mini_read.js';
   import { personCandidate, personHead, personName } from '$state/people.js';
   import { plural } from '$state/words.js';
 
@@ -38,13 +38,21 @@
   // человека в ней переключают нажатием по соседней строке — ответ про
   // прежнего, лёгший поверх свежего, показал бы его числа под новым именем.
   const alive = living();
-  const freshVacancies = freshAnswer(() => alive.now);
+  const loadVacancies = miniRead({
+    ask: (...args) => ask(...args),
+    alive: () => alive.now,
+    method: 'hr.vacancies',
+    payload: (id) => ({ hr_id: id }),
+    key: 'vacancies',
+    show: (rows) => (vacancies = rows),
+  });
 
   const readCard = cardRead({
     ask: (...args) => ask(...args),
     method: 'hr.detail',
     trouble: 'Не удалось прочитать карточку',
     alive: () => alive.now,
+    show: (now) => ({ card, trouble } = now),
   });
 
   const dropCard = cardFinish({
@@ -68,7 +76,7 @@
   const saveField = cardSave({
     ask: (...args) => ask(...args),
     method: 'hr.update',
-    reread: () => refresh(personId),
+    reread: () => readCard(personId),
     onchanged: () => onchanged(),
   });
 
@@ -85,25 +93,13 @@
     block: 'hr.block',
     unblock: 'hr.unblock',
     say: (text) => say(text),
-    reread: () => refresh(personId),
+    reread: () => readCard(personId),
     onchanged: () => onchanged(),
   });
 
   const shown = $derived(card ? personName({ ...card, id: card.hr_id }) : '');
   const head = $derived(card ? personHead(card) : null);
   const chosenName = $derived(chosen ? personName(chosen) : '');
-
-  async function refresh(id) {
-    const now = await readCard(id);
-    if (now === null) return;
-    ({ card, trouble } = now);
-  }
-
-  async function loadVacancies(id) {
-    const now = await freshVacancies(() => ask('hr.vacancies', { hr_id: id }));
-    if (now === null) return;
-    vacancies = now.vacancies;
-  }
 
   function save(part) {
     return saveField({ hr_id: personId, ...part });
@@ -127,18 +123,18 @@
     if (await mergeCard({ absorbed_id: personId, survivor_id: survivor.id })) asking = null;
   }
 
-  $effect(() =>
-    alive.entered(() => {
-      const id = personId;
+  $effect(() => {
+    const id = personId;
+    return alive.entered(() => {
       // Показанное прежним человеком уходит сразу: панель одна, и его числа под
       // новым именем читались бы как числа нового.
       card = null;
       trouble = '';
       vacancies = [];
-      refresh(id);
+      readCard(id);
       loadVacancies(id);
-    }),
-  );
+    });
+  });
 </script>
 
 {#if trouble}
@@ -219,7 +215,7 @@
     hrId={card.hr_id}
     blocked={sendBlock(card)}
     onread={async () => {
-      await refresh(personId);
+      await readCard(personId);
       onchanged();
     }}
   />

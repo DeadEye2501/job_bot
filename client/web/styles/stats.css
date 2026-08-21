@@ -31,10 +31,7 @@
   margin-left: 4px;
 }
 
-.stats-refresh-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
+/* Обводка под курсором — общая, в accent-outline.css. */
 
 .stats-refresh-btn .material-symbols-outlined {
   font-size: 14px;

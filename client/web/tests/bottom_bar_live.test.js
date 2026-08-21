@@ -12,20 +12,12 @@
 // ждут наверху — её раздают экранам.
 
 import { cleanup, render } from '@testing-library/svelte';
-import { tick } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import BottomBar from '../app/BottomBar.svelte';
+import { settled } from './settled.js';
 
 afterEach(cleanup);
-
-/** Дождаться, пока осядут ответы моста и отрисовка. */
-async function settled() {
-  for (let i = 0; i < 6; i += 1) {
-    await tick();
-    await new Promise((done) => setTimeout(done, 0));
-  }
-}
 
 function bar(health) {
   const asked = [];

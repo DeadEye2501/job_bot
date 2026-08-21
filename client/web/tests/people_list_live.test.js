@@ -12,20 +12,12 @@
 // другой — проводка: признак взводится **до** зова моста и гасится после.
 
 import { cleanup, render, within } from '@testing-library/svelte';
-import { tick } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import PeopleList from '../app/PeopleList.svelte';
+import { settled } from './settled.js';
 
 afterEach(cleanup);
-
-/** Дождаться, пока осядут ответы моста и отрисовка. */
-async function settled() {
-  for (let i = 0; i < 6; i += 1) {
-    await tick();
-    await new Promise((done) => setTimeout(done, 0));
-  }
-}
 
 /** Вкладка «HR» с мостом, отвечающим не раньше, чем ему позволят. */
 function tab() {

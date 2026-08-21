@@ -54,10 +54,7 @@
   font-size: 0.78rem;
 }
 
-.bl-add-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
+/* Обводка под курсором — общая, в accent-outline.css. */
 
 .bl-add-btn .material-symbols-outlined {
   font-size: 14px;

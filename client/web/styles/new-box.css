@@ -21,7 +21,4 @@
   cursor: pointer;
 }
 
-.new-box:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-}
+/* Обводка под курсором — общая, в accent-outline.css. */
