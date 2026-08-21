@@ -460,14 +460,15 @@ First-run bootstrap: ensure DB schema exists.
 - `def is_terminal_for_auto(status: VacancyStatus) -> bool` (9)
 - `def should_apply_status(current: VacancyStatus, new: VacancyStatus, *, force: bool=False) -> bool` (28)
 
-### `backend/domain/verdict.py` — 82 строк
+### `backend/domain/verdict.py` — 90 строк
 
 Приговор разобранному объявлению до того, как оно войдёт в граф статусов.
 
 Зависит от: `backend.models`, `backend.payloads`
 
 - `def is_empty_vacancy(parsed: ParsedVacancy | None) -> bool` (24)
-- `def decide_vacancy_status(parsed: ParsedVacancy, score: int, blacklist_match: str | None, *, threshold: int) -> tuple[VacancyStatus, str | None]` (17)
+- `def blacklist_refusal(blacklist_match: str | None) -> str | None` (9)
+- `def decide_vacancy_status(score: int, *, threshold: int) -> tuple[VacancyStatus, str | None]` (14)
 
 ### `backend/flows/apply.py` — 380 строк ⚠ подошёл к 300
 
@@ -2903,7 +2904,7 @@ Runtime settings layer.
 
 - `def ways_out(status: VacancyStatus) -> list[VacancyStatus]` (3)
 
-### `tests/backend/test_domain_verdict.py` — 66 строк
+### `tests/backend/test_domain_verdict.py` — 65 строк
 
 Следствия, которые наблюдают тесты `backend/domain/verdict.py`.
 
@@ -3183,13 +3184,13 @@ Runtime settings layer.
 Тестов: 18
 
 
-### `tests/backend/test_flows_parse_verdict.py` — 346 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_parse_verdict.py` — 383 строк ⚠ подошёл к 300
 
 Какой приговор получает объявление после разбора.
 
 Зависит от: `backend.domain.verdict`, `backend.flows`, `backend.llm.answers`, `backend.models`, `backend.payloads`, `tests.dbio`
 
-Тестов: 18
+Тестов: 19
 
 
 ### `tests/backend/test_flows_post_intake.py` — 349 строк ⚠ подошёл к 300
@@ -4626,11 +4627,11 @@ Runtime settings layer.
 Тестов: 17
 
 
-### `tests/client/test_front_vocabulary.py` — 216 строк
+### `tests/client/test_front_vocabulary.py` — 212 строк
 
 Согласие перечней окна с перечнями бэкенда.
 
-Зависит от: `backend.domain.taxonomy`, `backend.domain.verdict`, `backend.models.enums`, `backend.models.settings`, `client.bridge.refusals`, `tests.factories`
+Зависит от: `backend.domain.taxonomy`, `backend.domain.verdict`, `backend.models.enums`, `backend.models.settings`, `client.bridge.refusals`
 
 Тестов: 9
 
@@ -4638,7 +4639,7 @@ Runtime settings layer.
 - `def _object(module: str, name: str) -> str` (10)
 - `def _strings(module: str, name: str) -> list[str]` (3)
 - `def _values(module: str, name: str) -> list[str]` (3)
-- `def _skip_reasons_the_backend_writes() -> set[str]` (21)
+- `def _skip_reasons_the_backend_writes() -> set[str]` (17)
 - `def _reason_in(value: ast.expr) -> set[str]` (15)
 - `def _send_outcomes_the_backend_writes() -> set[str]` (12)
 

@@ -25,12 +25,12 @@ from backend.domain.verdict import (
     LLM_SKIP_PREFIX,
     TRASH_SKIP_PREFIX,
     TRUNCATED_SKIP_REASON,
+    blacklist_refusal,
     decide_vacancy_status,
 )
 from backend.models.enums import BotMode, VacancyStatus
 from backend.models.settings import BLACKLIST_KINDS
 from client.bridge.refusals import SEND_REFUSALS
-from tests.factories import parsed_vacancy
 
 
 STATE = Path(__file__).resolve().parents[2] / "client" / "web" / "state"
@@ -77,13 +77,9 @@ def _skip_reasons_the_backend_writes() -> set[str]:
     Две из четырёх сочиняются на месте, литералами в теле, — их и берём у
     приговора зовом: переписанные сюда руками, они разошлись бы с ним молча.
     """
-    parsed = parsed_vacancy()
-    _, blocked = decide_vacancy_status(
-        parsed, score=100, blacklist_match="Контур", threshold=0
-    )
-    _, low = decide_vacancy_status(parsed, score=-5, blacklist_match=None, threshold=0)
+    _, low = decide_vacancy_status(score=-5, threshold=0)
     return {
-        blocked,
+        blacklist_refusal("Контур"),
         low,
         EMPTY_SKIP_REASON,
         TRUNCATED_SKIP_REASON,

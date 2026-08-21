@@ -63,20 +63,28 @@ def is_empty_vacancy(parsed: ParsedVacancy | None) -> bool:
     return sum(signals) < 2
 
 
-def decide_vacancy_status(
-    parsed: ParsedVacancy,
-    score: int,
-    blacklist_match: str | None,
-    *,
-    threshold: int,
-) -> tuple[VacancyStatus, str | None]:
-    """Приговор разобранному объявлению: статус и причина отказа.
+def blacklist_refusal(blacklist_match: str | None) -> str | None:
+    """Причина отказа по чёрному списку; пусто — списком объявление не задето.
 
-    Разбора без объявления сюда не приходит: пустой разбор — это пустышка, и
-    её приговор выносит `is_empty_vacancy` куда раньше.
+    Своим объявлением, а не вместе с порогом: между ними встал вопрос «это
+    вообще вакансия», и стоят они теперь по разные его стороны. Список — не
+    догадка о посте, а решение человека, и жанр поста этого решения не
+    меняет; спрашивать о таком посте модель незачем.
     """
-    if blacklist_match:
-        return VacancyStatus.NOT_FIT, f"blacklist: {blacklist_match}"
+    return f"blacklist: {blacklist_match}" if blacklist_match else None
+
+
+def decide_vacancy_status(
+    score: int, *, threshold: int
+) -> tuple[VacancyStatus, str | None]:
+    """Приговор по баллам: статус и причина отказа.
+
+    Сюда приходит только то, что уже признано вакансией: пустышку отсеял
+    `is_empty_vacancy`, пост соискателя — метка и оценщик пригодности. Вопрос
+    здесь один и он про кандидата: подходит ли ему эта вакансия по навыкам. К
+    посту, вакансией не являющемуся, он неприменим, и приговор «не набрал
+    порога» такому посту выглядел бы работающим отсевом, не будучи им.
+    """
     if score < threshold:
         return VacancyStatus.NOT_FIT, f"score {score} < {threshold}"
     return VacancyStatus.NEW, None
