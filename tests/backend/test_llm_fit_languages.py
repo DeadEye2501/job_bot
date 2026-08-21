@@ -13,17 +13,10 @@
 выдумки: снаружи она видна только перевёрнутым вердиктом.
 """
 
-import httpx
-
 from backend.llm.candidate import CandidateLanguage, CandidateProfile
 from backend.llm.fit_languages import validate_language_fit
 from tests.factories import parsed_vacancy
-from tests.fakes.llm import CHAT, chat_json, messages_of, provider
-
-
-def _answer(verdict, reason=None) -> httpx.Response:
-    """Ответ модели с вердиктом пригодности."""
-    return chat_json({"verdict": verdict, "reason": reason})
+from tests.fakes.llm import CHAT, fit_answer, messages_of, provider
 
 
 async def _asked(client, *, raw_text="обычный текст вакансии", profile=None, parsed=None):
@@ -52,7 +45,7 @@ async def test_the_question_about_languages_gets_no_parsed_fields():
     становятся поводом для отказа не по своему вопросу: прежде один зов видел
     всё сразу и путал критерии между собой.
     """
-    client = provider({CHAT: _answer("fit", "языковых требований нет")})
+    client = provider({CHAT: fit_answer("fit", "языковых требований нет")})
 
     await _check(
         client, parsed=parsed_vacancy(grade="junior", remote="office", stack_required=["Python"])
@@ -71,7 +64,7 @@ async def test_a_made_up_reason_for_rejection_flips_the_verdict():
     настоящую из-за фантазии модели.
     """
     client = provider(
-        {CHAT: _answer("reject", "вакансия подразумевает английский язык")}
+        {CHAT: fit_answer("reject", "вакансия подразумевает английский язык")}
     )
     profile = CandidateProfile(
         languages=[CandidateLanguage(name="Английский", level="A2")]
@@ -93,7 +86,7 @@ async def test_a_made_up_reason_is_caught_without_any_profile_data():
     вовсе, и сработать могут только первые — уровень языка, названный в
     обосновании, но отсутствующий в объявлении.
     """
-    client = provider({CHAT: _answer("reject", "требуется уровень B2")})
+    client = provider({CHAT: fit_answer("reject", "требуется уровень B2")})
 
     got = await _check(
         client,
@@ -107,7 +100,7 @@ async def test_a_made_up_reason_is_caught_without_any_profile_data():
 
 async def test_a_level_named_in_the_post_is_not_taken_for_a_made_up_one():
     """Уровень, названный в объявлении, выдумкой не считается."""
-    client = provider({CHAT: _answer("reject", "требуется уровень B2")})
+    client = provider({CHAT: fit_answer("reject", "требуется уровень B2")})
 
     got = await _check(
         client,
@@ -122,7 +115,7 @@ async def test_a_level_named_in_the_post_is_not_taken_for_a_made_up_one():
 async def test_a_reason_backed_by_the_post_survives():
     """Обоснование, подкреплённое текстом объявления, остаётся как есть."""
     client = provider(
-        {CHAT: _answer("reject", "вакансия подразумевает английский язык")}
+        {CHAT: fit_answer("reject", "вакансия подразумевает английский язык")}
     )
     profile = CandidateProfile(
         languages=[CandidateLanguage(name="Английский", level="A2")]
@@ -145,7 +138,7 @@ async def test_a_made_up_reason_for_junk_keeps_the_verdict_but_drops_the_reason(
     А само обоснование бессмысленно, и показывать его пользователю незачем.
     """
     client = provider(
-        {CHAT: _answer("trash", "вакансия подразумевает английский язык")}
+        {CHAT: fit_answer("trash", "вакансия подразумевает английский язык")}
     )
     profile = CandidateProfile(
         languages=[CandidateLanguage(name="Английский", level="A2")]
@@ -166,7 +159,7 @@ async def test_a_fitting_verdict_is_never_second_guessed():
     вакансия видна пользователю, а отброшенная — нет.
     """
     client = provider(
-        {CHAT: _answer("fit", "вакансия подразумевает английский язык")}
+        {CHAT: fit_answer("fit", "вакансия подразумевает английский язык")}
     )
     profile = CandidateProfile(
         languages=[CandidateLanguage(name="Английский", level="A2")]
@@ -187,7 +180,7 @@ async def test_fluency_without_a_language_does_not_confirm_a_language_demand():
     требование языка уводило бы годную вакансию в отказ.
     """
     client = provider(
-        {CHAT: _answer("reject", "вакансия подразумевает английский язык")}
+        {CHAT: fit_answer("reject", "вакансия подразумевает английский язык")}
     )
     profile = CandidateProfile(
         languages=[CandidateLanguage(name="Английский", level="A2")]

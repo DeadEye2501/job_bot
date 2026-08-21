@@ -79,6 +79,13 @@ LANGUAGE_REQUIREMENTS: Русский — native, Английский — B1. �
 Напоминание: нет в тексте явной языковой формулировки — fit. Заимствованные термины и язык самого поста требованием не считаются."""
 
 
+def _prompt_for(profile: CandidateProfile) -> str:
+    """Наставление с подставленными языками кандидата."""
+    return LANGUAGE_FIT_PROMPT.replace(
+        "{LANGUAGE_REQUIREMENTS}", format_languages(profile.languages)
+    )
+
+
 def _without_invented_language(
     validation: FitValidation, raw_text: str, profile: CandidateProfile
 ) -> FitValidation:
@@ -111,11 +118,8 @@ async def validate_language_fit(
 ) -> tuple[FitValidation | None, str | None]:
     """Требует ли вакансия чужого языка и, если не спросилось, почему."""
     logger.debug("%s: title=%r", PURPOSE, parsed.title)
-    prompt = LANGUAGE_FIT_PROMPT.replace(
-        "{LANGUAGE_REQUIREMENTS}", format_languages(profile.languages)
-    )
     validation, trouble = await ask_fit(
-        FitQuestion(purpose=PURPOSE, prompt=prompt),
+        FitQuestion(purpose=PURPOSE, prompt=_prompt_for(profile)),
         vacancy_text(raw_text),
         client,
         model,
