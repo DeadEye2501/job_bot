@@ -202,7 +202,7 @@
 ### `backend/domain/resume_marks.py`
 
 - `RESUME_MARKS` = `frozenset({'#cv', '#resume', '#резюме', '#ищураб…`
-- `AMBIGUOUS_MARKS` = `frozenset({'#ищу', '#available', '#cv_'})`
+- `AMBIGUOUS_MARKS` = `frozenset({'#available', '#cv_'})`
 - `_MARK` = `re.compile('(?<!\\S)#\\w+')`
 
 ### `backend/domain/salary.py`
@@ -385,6 +385,7 @@
   - `status: VacancyStatus`
   - `history_id: int | None`
 - `RerunPipelineOutcome` = `Literal['ok', 'missing', 'no_text', 'llm']`
+- `RECOVERED_PER_TURN` = `10`
 - `LONGEST_WAIT` = `timedelta(days=1)`
 
 ### `backend/health.py`
@@ -478,6 +479,7 @@
 ### `backend/llm/rules.py`
 
 - `RESUME_MARK_LINE` = `', '.join((f'«{mark}»' for mark in sorted(RESUME…`
+- `SELF_OFFER_MARKERS` = `'\n'.join(('РУССКИЙ: «ищу работу», «ищу вакансию…`
 - `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_B…`
 - `GRADE_MARKERS` = `'«junior/стажёр/intern», «middle/мидл», «senior/…`
 - `FORMAT_MARKERS` = `'«remote/удалёнка/удалённо/distributed», «hybrid…`
