@@ -784,7 +784,6 @@
 
 - `DIRECT_PARSED_FIELDS` = `набор из 8`
 - `FitVerdict` = `Literal['fit', 'reject', 'trash']`
-- `FIT_VERDICTS: tuple[str, ...]` = `get_args(FitVerdict)`
 - `class ChannelPost`
   - `channel_id: int | None`
   - `channel_username: str`
