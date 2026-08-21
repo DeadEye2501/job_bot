@@ -247,10 +247,19 @@ def _letter_refusal(text: str, finish_reason) -> str | None:
 async def generate_cover_letter(
     profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str,
     *, channel_ref: str | None = None,
-) -> str | None:
-    """Сочинить письмо-отклик; пустота — слать нечего."""
+) -> tuple[str | None, str | None]:
+    """Сочинить письмо-отклик и, если не сочинилось, почему.
+
+    Причина отделена от пустого письма нарочно, как у разбора и у вердикта о
+    пригодности: «модель не ответила» — не то же, что «письмо забраковано», и
+    схлопнутые в одно, они посылали человека искать беду в длине письма, когда
+    на деле не поднят поставщик.
+
+    Забракованное своими проверками письмо и отвергнутое сверкой фактов
+    причиной не считаются: модель ответила, и повторять зов нечем.
+    """
     if not profile_block:
-        return None
+        return None, None
     logger.debug(
         "generate_cover_letter: profile=%d chars vacancy=%r channel=%r",
         len(profile_block), parsed.title, channel_ref,
@@ -259,7 +268,7 @@ async def generate_cover_letter(
         client, model, _letter_request(profile_block, parsed, channel_ref), logger
     )
     if reply.text is None:
-        return None
+        return None, reply.error
     text = _with_vacancy_filled(reply.text, parsed, channel_ref)
     refusal = _letter_refusal(text, reply.finish_reason)
     if refusal is not None:
@@ -267,7 +276,7 @@ async def generate_cover_letter(
             "generate_cover_letter: rejected (%s, %d знаков): %r",
             refusal, len(text), text[:120],
         )
-        return None
+        return None, None
     # Второй слой — сверка фактов у модели: наставление усилено против
     # выдумок, но модели всё равно случается изобрести технологию или
     # приписать достижение не тому работодателю. При сетевой беде сверка
@@ -282,6 +291,6 @@ async def generate_cover_letter(
             "generate_cover_letter: factcheck rejected, issues=%r, text=%r",
             issues, text[:200],
         )
-        return None
+        return None, None
     logger.debug("generate_cover_letter: %d слов", len(text.split()))
-    return text
+    return text, None

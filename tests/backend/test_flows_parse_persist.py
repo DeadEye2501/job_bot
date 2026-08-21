@@ -24,6 +24,7 @@ import pytest
 
 from backend.models import HR, Company, Currency, Vacancy, VacancyEvent, VacancyStatus
 from backend.payloads import FitValidation
+from backend.repository.vacancy_status import mark_vacancy_applied
 from tests.dbio import all_rows, only_row, put
 from tests.factories import app_setting_row, company_row, parsed_vacancy
 
@@ -296,6 +297,44 @@ async def test_every_attempt_is_recorded_in_the_timeline(monkeypatch,
         if e.kind == "auto_send"
     )
     assert event.payload == {"ok": outcome, "reason": reason}
+
+
+async def test_a_vacancy_already_written_to_gets_no_second_letter(
+    monkeypatch, parsing, session_factory
+):
+    """Повторный разбор откликнутой вакансии второго письма не шлёт.
+
+    Прогон заново сбрасывает статус в «Новая» — так и задумано, — а заслон
+    отправки читает именно статус и к этому мигу видит уже сброшенный. Спросить
+    надо историю: в ней отклик остаётся навсегда. По статусу же второй прогон
+    подряд отправил бы письмо и на вакансии, которую первый уже отбил.
+    """
+    pipeline, vacancy = parsing
+    pipeline.parsed = parsed_vacancy(
+        title="Python-разработчик", stack_required=["Python"], hr_contact="@maria"
+    )
+    await pipeline.rs.set_app("auto_apply", "true")
+    async with session_factory() as session:
+        # `force=True` — так отклик и уходит из окна: перевод в «откликнулись»
+        # разрешён из любого статуса, потому что письмо уже у человека.
+        assert await mark_vacancy_applied(
+            session, vacancy.id, "отклик ушёл", force=True
+        )
+        await session.commit()
+
+    tried = []
+
+    async def try_auto_send(pipeline, hr, parsed, vacancy_id):
+        tried.append(vacancy_id)
+        return True, "sent"
+
+    monkeypatch.setattr(apply, "try_auto_send", try_auto_send)
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=False
+    )
+
+    assert tried == []
 
 
 async def test_a_vanished_vacancy_is_left_alone(parsing, session_factory, caplog):

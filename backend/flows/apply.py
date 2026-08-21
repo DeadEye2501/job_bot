@@ -180,11 +180,17 @@ async def _full_letter(
     if not pipeline.profile_block:
         logger.warning("vacancy %d: profile_block empty, skipping send", vacancy_id)
         return None, "profile_empty"
-    body = await generate_cover_letter(
+    body, trouble = await generate_cover_letter(
         pipeline.profile_block, parsed,
         pipeline.lm_client, pipeline.lm_chat_model,
         channel_ref=channel_ref,
     )
+    if trouble is not None:
+        logger.warning(
+            "vacancy %d: письмо не сочинилось — модель не ответила (%s)",
+            vacancy_id, trouble,
+        )
+        return None, "cover_letter_unasked"
     if body is None:
         logger.warning(
             "vacancy %d: cover letter generation failed, skipping send", vacancy_id

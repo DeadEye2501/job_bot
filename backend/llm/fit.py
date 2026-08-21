@@ -12,11 +12,9 @@ from backend.payloads import FIT_VERDICTS, FitValidation, ParsedVacancy
 from backend.llm.answers import (
     ONLY_JSON,
     json_object,
-    log_unparseable,
     normalize_enum,
+    read_with_a_second_try,
     str_or_none,
-    truncation_trouble,
-    wants_more_room,
 )
 from backend.llm.candidate import (
     CandidateProfile,
@@ -29,6 +27,7 @@ from backend.llm.candidate import (
 from backend.llm.external import external_block
 from backend.llm.hallucination import breaks_reason_style, looks_hallucinated
 from backend.llm.rules import (
+    VACANCY_TEXT_CHARS,
     APPLY_CONTACTS,
     FORMAT_MARKERS,
     GEO_LIMIT_MARKERS,
@@ -294,7 +293,7 @@ def _vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str:
         f"- remote: {parsed.remote!r}\n"
         f"- location: {parsed.location!r}\n\n"
         "Оригинальный текст вакансии:\n"
-        f"{raw_text[:3000]}"
+        f"{raw_text[:VACANCY_TEXT_CHARS]}"
     )
 
 
@@ -381,27 +380,23 @@ async def validate_vacancy_fit(
     просмотр.
     """
     logger.debug("validate_vacancy_fit: title=%r", parsed.title)
-    reply = await chat(
-        client, model, _fit_request(parsed, raw_text, profile, MAX_FIT_TOKENS), logger
+
+    def read(answer: str) -> FitValidation | None:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "validate_vacancy_fit: title=%r raw_text[:200]=%r answer=%r",
+                parsed.title, raw_text[:200], answer,
+            )
+        return _parse_fit_validation(answer)
+
+    validation, trouble = await read_with_a_second_try(
+        lambda room: chat(
+            client, model, _fit_request(parsed, raw_text, profile, room), logger
+        ),
+        read,
+        (MAX_FIT_TOKENS, ROOMIER_FIT_TOKENS),
+        (logger, "validate_vacancy_fit"),
     )
-    if reply.text is None:
-        return None, reply.error
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(
-            "validate_vacancy_fit: title=%r raw_text[:200]=%r answer=%r",
-            parsed.title, raw_text[:200], reply.text,
-        )
-    validation = _parse_fit_validation(reply.text)
-    if wants_more_room(validation, reply.finish_reason):
-        logger.warning("validate_vacancy_fit: ответ оборван, переспрашиваю с запасом")
-        reply = await chat(
-            client, model,
-            _fit_request(parsed, raw_text, profile, ROOMIER_FIT_TOKENS), logger,
-        )
-        if reply.text is None:
-            return None, reply.error
-        validation = _parse_fit_validation(reply.text)
     if validation is None:
-        log_unparseable(reply.text, logger, "validate_vacancy_fit")
-        return None, truncation_trouble(reply.finish_reason)
+        return None, trouble
     return _without_invented_reason(validation, raw_text, profile), None

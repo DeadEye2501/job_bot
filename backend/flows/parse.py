@@ -30,6 +30,7 @@ from backend.flows.events import record_vacancy_event
 from backend.flows import apply
 from backend.flows import cleanup
 from backend.flows.parse_write import Outcome, persist_parse_outcome
+from backend.repository.vacancy_status import was_ever_applied
 
 logger = logging.getLogger(__name__)
 
@@ -118,10 +119,23 @@ async def _auto_send_if_allowed(
 
     Запись нужна затем, что через месяцы человек смотрит на новую вакансию
     с опознанным HR и пройденным порогом и не понимает, почему отклик так
-    и не ушёл. Без строки в ленте ответа на это нет нигде.
+    и не ушёл. Без строки в ленте ответа на это нет нигде — речь про исход
+    самой отправки; те, до кого она не дошла вовсе, молчат, и ответ на них
+    виден по другим следам: статусу, привязке HR, настройке автоотправки.
+
+    «Уже откликались» спрашивается у истории, а не у статуса: разбор ставит
+    начальный статус поверх любого, и прогон заново приводит сюда вакансию,
+    у которой отклик давно ушёл, — со статусом «Новая», потому что его только
+    что и поставили. Заслоны в `apply` читают статус и такую не отбивают вовсе.
     """
     if status != VacancyStatus.NEW or hr is None or not pipeline.rs.auto_apply:
         return
+    async with pipeline.session_factory() as session:
+        if await was_ever_applied(session, vacancy_id):
+            logger.info(
+                "vacancy %d: отклик уже уходил, второго письма не шлю", vacancy_id
+            )
+            return
     ok, reason = await apply.try_auto_send(pipeline, hr, parsed, vacancy_id)
     await record_vacancy_event(
         pipeline.session_factory,

@@ -33,7 +33,9 @@ async def _post_embedding(pipeline, post: ChannelPost):
     )
 
 
-async def _resume_or_skip(pipeline, similar_id: int, post: ChannelPost) -> None:
+async def _resume_or_skip(
+    pipeline, similar_id: int, post: ChannelPost, whole: bool
+) -> None:
     """Что делать с постом, похожим на уже заведённую вакансию.
 
     Похожая строка бывает двух родов: настоящий перепост — такой
@@ -53,8 +55,12 @@ async def _resume_or_skip(pipeline, similar_id: int, post: ChannelPost) -> None:
     # Брошенная строка могла прийти из другого канала (перепост): разбираем
     # по тексту нынешнего поста и его каналу, а кладём в ту строку.
     # Совпадение отпечатков ручается, что тексты почти дословны.
+    #
+    # Целость доводом: без статьи по ссылке разбору видна одна шапка, и
+    # выброшенную вакансию не вернёт ничто — причина та же, что у свежего
+    # объявления ниже, и заслон обязан стоять на обеих дорогах.
     await parse.parse_and_update_vacancy(
-        pipeline, similar_id, post.text, post.channel_username
+        pipeline, similar_id, post.text, post.channel_username, allow_delete=whole
     )
 
 
@@ -76,7 +82,7 @@ async def ingest_post(
         embedding, pipeline.rs.dedup_cosine_threshold
     )
     if similar_id is not None:
-        await _resume_or_skip(pipeline, similar_id, post)
+        await _resume_or_skip(pipeline, similar_id, post, whole)
         return
 
     new_vacancy_id = await save_new_vacancy(pipeline, post, embedding)
