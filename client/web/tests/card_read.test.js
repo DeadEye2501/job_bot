@@ -10,60 +10,78 @@ import { replying } from './bridge_stub.js';
 
 function reader(answers, { alive = () => true } = {}) {
   const { asked, ask } = replying(answers);
+  const shown = [];
   return {
     asked,
-    read: cardRead({ ask, method: 'hr.detail', trouble: 'Не удалось прочитать карточку', alive }),
+    shown,
+    read: cardRead({
+      ask,
+      method: 'hr.detail',
+      trouble: 'Не удалось прочитать карточку',
+      alive,
+      show: (now) => shown.push(now),
+    }),
   };
 }
 
 describe('чтение карточки правой панели', () => {
   it('свежий ответ показывают как есть', async () => {
-    const { asked, read } = reader([{ hr_id: 7, name: 'Ирина' }]);
+    const { asked, shown, read } = reader([{ hr_id: 7, name: 'Ирина' }]);
 
-    expect(await read(7)).toEqual({ card: { hr_id: 7, name: 'Ирина' }, trouble: '' });
+    await read(7);
+
+    expect(shown).toEqual([{ card: { hr_id: 7, name: 'Ирина' }, trouble: '' }]);
     expect(asked).toEqual([{ method: 'hr.detail', payload: 7 }]);
   });
 
   it('отказ объясняют словами, а не пустой панелью', async () => {
     // Панель, застрявшая на «Загрузка…», не даёт даже перейти к соседней
     // записи: человек видит вечное ожидание вместо причины.
-    const { read } = reader([null]);
+    const { shown, read } = reader([null]);
 
-    expect(await read(7)).toEqual({ card: null, trouble: 'Не удалось прочитать карточку' });
+    await read(7);
+
+    expect(shown).toEqual([{ card: null, trouble: 'Не удалось прочитать карточку' }]);
   });
 
   it('удача снимает прежнюю беду', async () => {
     // Строка отказа, оставшаяся поверх живых данных, читается как беда,
     // которой уже нет.
-    const { read } = reader([null, { hr_id: 7 }]);
+    const { shown, read } = reader([null, { hr_id: 7 }]);
 
     await read(7);
+    await read(7);
 
-    expect((await read(7)).trouble).toBe('');
+    expect(shown.at(-1).trouble).toBe('');
   });
 
   it('устаревший ответ никуда не ложится', async () => {
     // Панель одна на всю вкладку, и записи в ней переключают нажатием по
     // соседней строке: ответ про прежнюю показал бы её числа под новым именем.
     let answerFirst;
-    const { read } = reader([() => new Promise((resolve) => (answerFirst = resolve)), { hr_id: 8 }]);
+    const { shown, read } = reader([
+      () => new Promise((resolve) => (answerFirst = resolve)),
+      { hr_id: 8 },
+    ]);
 
     const slow = read(7);
     await read(8);
     answerFirst({ hr_id: 7 });
+    await slow;
 
-    expect(await slow).toBe(null);
+    expect(shown).toEqual([{ card: { hr_id: 8 }, trouble: '' }]);
   });
 
   it('ответ, доехавший после ухода с панели, никуда не ложится', async () => {
     // Класть его уже некуда: разметки нет, а положенное в снесённое состояние
     // всплывёт при следующем заходе поверх свежего.
     let gone = false;
-    const { read } = reader([{ hr_id: 7 }], { alive: () => !gone });
+    const { shown, read } = reader([{ hr_id: 7 }], { alive: () => !gone });
 
     const going = read(7);
     gone = true;
+    await going;
 
-    expect(await going).toBe(null);
+    expect(shown).toEqual([]);
   });
 });

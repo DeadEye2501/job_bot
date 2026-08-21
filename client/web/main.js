@@ -85,6 +85,7 @@ import './styles/pill.css';
 import './styles/big-number.css';
 import './styles/ruled-row.css';
 import './styles/accent-fill.css';
+import './styles/accent-outline.css';
 import './styles/stats.css';
 import './styles/stats-status.css';
 import './styles/stats-skills.css';

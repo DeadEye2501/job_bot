@@ -9,7 +9,7 @@
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Literal
 
 from sqlalchemy import select
@@ -20,6 +20,7 @@ from backend.message_text import extract_post_text, extract_text
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
 from backend.repository.channels import list_named_channels
+from backend.telegram_time import utc_now
 from backend.repository.vacancy_status import (
     last_status_history_id,
     record_rerun,
@@ -192,6 +193,28 @@ async def _note_rerun(pipeline, vacancy_id: int, origin: "_Origin") -> None:
             await record_rerun(session, vacancy_id, origin.status, origin.history_id)
 
 
+async def _reread_and_store(pipeline, vacancy_id: int, was: str, where):
+    """Перечитанный пост тремя значениями; пусто — перечитать не вышло.
+
+    Целый текст тут же и записывается, пока он на руках: разбор идёт минутами,
+    и оборвись он посреди, сохранённый остался бы от прошлого раза. Недобравший
+    не записывается никогда — в сохранённом статья уже может быть, и переписать
+    его постом без неё значит потерять требования.
+
+    Толковать недобор отказываемся нарочно: прогону заново он повод оставить
+    сохранённое, а недоразобранной строке — повод подождать ещё, и выбирать
+    между этими двумя здесь нечем.
+    """
+    username, msg_id = where
+    fresh = await _fetch_fresh_text(pipeline, username, msg_id, vacancy_id)
+    if fresh is None:
+        return None
+    text, plain, whole = fresh
+    if whole and text != was:
+        await _store(pipeline, vacancy_id, raw_text=text)
+    return text, plain, whole
+
+
 async def _text_to_parse(pipeline, origin: "_Origin", vacancy_id: int):
     """Текст для разбора заново и голый текст поста, если пост перечитан.
 
@@ -204,8 +227,9 @@ async def _text_to_parse(pipeline, origin: "_Origin", vacancy_id: int):
     сохранённом статья уже есть, и переписать его постом без неё — значит
     потерять требования, по которым вакансию и отбирали.
     """
-    fresh = await _fetch_fresh_text(
-        pipeline, origin.channel_username, origin.msg_id, vacancy_id
+    fresh = await _reread_and_store(
+        pipeline, vacancy_id, origin.raw_text,
+        (origin.channel_username, origin.msg_id),
     )
     if fresh is None:
         return origin.raw_text, None
@@ -216,8 +240,6 @@ async def _text_to_parse(pipeline, origin: "_Origin", vacancy_id: int):
             vacancy_id,
         )
         return origin.raw_text, None
-    if text != origin.raw_text:
-        await _store(pipeline, vacancy_id, raw_text=text)
     return text, plain
 
 
@@ -323,17 +345,15 @@ LONGEST_WAIT = timedelta(days=1)
 """
 
 
-def _waited_out(created_at) -> bool:
+def _wait_is_over(created_at) -> bool:
     """Ждало ли объявление статьи дольше срока.
 
-    Сравнение наивное, по UTC: SQLite отдаёт метки без пояса даже у колонки с
-    поясом, а пишет их `CURRENT_TIMESTAMP` — тот же уговор, что у срока
-    молчания HR.
+    Сравнение наивное, по UTC — тот же уговор, что у срока молчания HR;
+    держит его `telegram_time.utc_now`.
     """
     if created_at is None:
         return True
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    return now - created_at >= LONGEST_WAIT
+    return utc_now() - created_at >= LONGEST_WAIT
 
 
 async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
@@ -355,16 +375,14 @@ async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
     """
     if not teletype.ARTICLE_URL_RE.search(row.raw_text):
         return row.raw_text, True
-    fresh = await _fetch_fresh_text(
-        pipeline, row.username or "", row.source_msg_id, row.id
+    fresh = await _reread_and_store(
+        pipeline, row.id, row.raw_text, (row.username or "", row.source_msg_id)
     )
     if fresh is not None:
         text, _plain, whole = fresh
         if whole:
-            if text != row.raw_text:
-                await _store(pipeline, row.id, raw_text=text)
             return text, True
-    return (row.raw_text, False) if _waited_out(row.created_at) else None
+    return (row.raw_text, False) if _wait_is_over(row.created_at) else None
 
 
 async def _recover_one(pipeline, row) -> bool:

@@ -8,8 +8,8 @@
 // следует ничего, а настоящие слова моста гасли в углу за 2,8 секунды.
 
 import { cleanup, render, within } from '@testing-library/svelte';
-import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { settled } from './settled.js';
 
 const refusals = [];
 
@@ -27,14 +27,6 @@ afterEach(() => {
   refusals.length = 0;
   cleanup();
 });
-
-/** Дождаться, пока осядут ответы моста и отрисовка. */
-async function settled() {
-  for (let i = 0; i < 6; i += 1) {
-    await tick();
-    await new Promise((done) => setTimeout(done, 0));
-  }
-}
 
 function screen() {
   const shown = render(ChannelsList, {

@@ -12,13 +12,14 @@
 Служебные записи и опросы до сравнения не доходят вовсе: вакансий в них нет.
 """
 
-from backend.flows import parse as parse_mod
 import pytest
 
 import httpx
 
 from adapters import teletype
 from backend.flows import embeddings, ingest
+from backend.flows import parse as parse_mod
+from tests.backend.fixtures.parse_stub import parse_into
 from tests.fakes.telegram import link_entity, post
 
 
@@ -28,7 +29,6 @@ async def intake(make_pipeline, monkeypatch):
     pipeline = await make_pipeline()
     pipeline.saved = []
     pipeline.parsed = []
-    pipeline.allowed_delete = []
     pipeline.new_id = 7
     pipeline.similar_id = None
     pipeline.unparsed = False
@@ -41,10 +41,6 @@ async def intake(make_pipeline, monkeypatch):
         pipeline.saved.append((post.channel_id, post.msg.id, post.text))
         return pipeline.new_id
 
-    async def parse(pipeline, vacancy_id, text, username, allow_delete=True):
-        pipeline.parsed.append((vacancy_id, text))
-        pipeline.allowed_delete.append(allow_delete)
-
     async def unparsed(pipeline, vacancy_id):
         return pipeline.unparsed
 
@@ -55,7 +51,7 @@ async def intake(make_pipeline, monkeypatch):
         lambda vector, threshold: pipeline.similar_id,
     )
     monkeypatch.setattr(ingest, "save_new_vacancy", save)
-    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
+    parse_into(monkeypatch, pipeline.parsed)
     monkeypatch.setattr(parse_mod, "is_unparsed_vacancy", unparsed)
     return pipeline
 
@@ -134,7 +130,7 @@ async def test_a_fresh_post_is_saved_and_parsed(intake):
     await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == [(1, 10, "Ищем Python-разработчика")]
-    assert intake.parsed == [(7, "Ищем Python-разработчика")]
+    assert intake.parsed == [(7, "Ищем Python-разработчика", "jobs", True)]
 
 
 async def test_a_hidden_contact_address_reaches_the_row_and_the_parse(intake):
@@ -157,7 +153,7 @@ async def test_a_hidden_contact_address_reaches_the_row_and_the_parse(intake):
 
     expected = "Ищем Python-разработчика, контакты в описании (https://acme.test/jobs)"
     assert intake.saved == [(1, 10, expected)]
-    assert intake.parsed == [(7, expected)]
+    assert intake.parsed == [(7, expected, "jobs", True)]
 
 
 async def test_a_linked_article_is_written_into_the_post(intake, monkeypatch):
@@ -178,7 +174,7 @@ async def test_a_linked_article_is_written_into_the_post(intake, monkeypatch):
 
     expected = "Senior QA https://teletype.in/@a/b\n\nТребования: Python"
     assert intake.saved == [(1, 10, expected)]
-    assert intake.parsed == [(7, expected)]
+    assert intake.parsed == [(7, expected, "jobs", True)]
 
 
 async def test_the_fingerprint_is_taken_from_the_post_alone(intake, monkeypatch):
@@ -263,7 +259,7 @@ async def test_a_repost_of_a_half_parsed_vacancy_finishes_it(intake):
     await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
     assert intake.saved == []
-    assert intake.parsed == [(3, "Ищем Python-разработчика")]
+    assert intake.parsed == [(3, "Ищем Python-разработчика", "jobs", True)]
 
 
 async def test_a_post_the_model_could_not_embed_is_skipped(intake, monkeypatch):
@@ -323,7 +319,7 @@ async def test_a_post_without_articles_may_still_be_binned(intake):
     """Объявление без ссылок на статьи выбрасывается как и прежде."""
     await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
 
-    assert intake.allowed_delete == [True]
+    assert intake.parsed == [(7, "Ищем Python-разработчика", "jobs", True)]
 
 
 async def test_a_repost_that_lost_its_article_holds_the_verdict_back_too(

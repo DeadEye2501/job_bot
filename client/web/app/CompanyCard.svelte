@@ -22,7 +22,7 @@
   import { cardRead } from '$state/card_read.js';
   import { cardSave } from '$state/card_save.js';
   import { companyCandidate, companyLine, companyTitle, siteHref } from '$state/companies.js';
-  import { freshAnswer } from '$state/fresh.js';
+  import { miniRead } from '$state/mini_read.js';
 
   let { ask, say, companyId, onperson, onvacancy, onclose, onchanged } = $props();
 
@@ -37,14 +37,29 @@
   // компанию в ней переключают нажатием по соседней строке — ответ про
   // прежнюю, лёгший поверх свежего, показал бы её числа под новым именем.
   const alive = living();
-  const freshPeople = freshAnswer(() => alive.now);
-  const freshVacancies = freshAnswer(() => alive.now);
+  const loadPeople = miniRead({
+    ask: (...args) => ask(...args),
+    alive: () => alive.now,
+    method: 'companies.people',
+    payload: (id) => id,
+    key: 'hrs',
+    show: (rows) => (people = rows),
+  });
+  const loadVacancies = miniRead({
+    ask: (...args) => ask(...args),
+    alive: () => alive.now,
+    method: 'companies.vacancies',
+    payload: (id) => ({ company_id: id }),
+    key: 'vacancies',
+    show: (rows) => (vacancies = rows),
+  });
 
   const readCard = cardRead({
     ask: (...args) => ask(...args),
     method: 'companies.detail',
     trouble: 'Не удалось прочитать компанию',
     alive: () => alive.now,
+    show: (now) => ({ card, trouble } = now),
   });
 
   const dropCard = cardFinish({
@@ -68,7 +83,7 @@
   const saveField = cardSave({
     ask: (...args) => ask(...args),
     method: 'companies.update',
-    reread: () => refresh(companyId),
+    reread: () => readCard(companyId),
     onchanged: () => onchanged(),
   });
 
@@ -86,7 +101,7 @@
     unblock: 'companies.unblock',
     female: true,
     say: (text) => say(text),
-    reread: () => refresh(companyId),
+    reread: () => readCard(companyId),
     onchanged: () => onchanged(),
   });
 
@@ -94,24 +109,6 @@
   const head = $derived(card ? companyTitle(card) : null);
   const chosenName = $derived(chosen ? companyLine(chosen).name : '');
   const site = $derived(card ? siteHref(card.website) : null);
-
-  async function refresh(id) {
-    const now = await readCard(id);
-    if (now === null) return;
-    ({ card, trouble } = now);
-  }
-
-  async function loadPeople(id) {
-    const now = await freshPeople(() => ask('companies.people', id));
-    if (now === null) return;
-    people = now.hrs;
-  }
-
-  async function loadVacancies(id) {
-    const now = await freshVacancies(() => ask('companies.vacancies', { company_id: id }));
-    if (now === null) return;
-    vacancies = now.vacancies;
-  }
 
   function save(part) {
     return saveField({ company_id: companyId, ...part });
@@ -146,20 +143,20 @@
     if (await mergeCard({ absorbed_id: companyId, survivor_id: survivor.id })) asking = null;
   }
 
-  $effect(() =>
-    alive.entered(() => {
-      const id = companyId;
+  $effect(() => {
+    const id = companyId;
+    return alive.entered(() => {
       // Показанное прежней компанией уходит сразу: панель одна, и её числа под
       // новым именем читались бы как числа новой.
       card = null;
       trouble = '';
       people = [];
       vacancies = [];
-      refresh(id);
+      readCard(id);
       loadPeople(id);
       loadVacancies(id);
-    }),
-  );
+    });
+  });
 </script>
 
 {#if trouble}

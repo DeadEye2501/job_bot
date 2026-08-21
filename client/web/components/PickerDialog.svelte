@@ -86,10 +86,7 @@
   }
 
   $effect(() => {
-    const settled = alive.mounted();
-    // Вне слежения: строку поиска читает `refresh`, и следящий эффект
-    // перезаводился бы на каждом набранном знаке.
-    untrack(() => refresh());
+    const settled = alive.entered(refresh);
     return () => {
       settled();
     };

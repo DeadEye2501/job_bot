@@ -21,6 +21,7 @@ from backend.flows import ingest, rerun
 from backend.flows import embeddings
 from backend.models import TelegramChannel, Vacancy, VacancyEvent
 from backend.payloads import ChannelPost
+from tests.backend.fixtures.parse_stub import parse_into
 from tests.backend.fixtures.rerun import WithMessages
 from tests.dbio import all_rows, only_row, put
 from tests.factories import EPOCH, channel_row, vacancy_row
@@ -40,12 +41,7 @@ def parses(monkeypatch):
     разбора.
     """
     calls: list[tuple] = []
-
-    async def parse(pipeline, vacancy_id, text, username, allow_delete=True):
-        calls.append((vacancy_id, text, username, allow_delete))
-        return True
-
-    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
+    parse_into(monkeypatch, calls)
     return calls
 
 

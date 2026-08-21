@@ -62,10 +62,7 @@
   color: var(--text-secondary);
 }
 
-.cnt-hr-sub .muted {
-  color: var(--text-tertiary);
-  font-style: italic;
-}
+/* Курсив у безымянной записи — общий, в unnamed.css. */
 
 .cnt-hr-sub .sep {
   margin: 0 3px;
