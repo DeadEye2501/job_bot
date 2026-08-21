@@ -1,5 +1,6 @@
 """Замок, которым запущенная копия приложения не пускает вторую."""
 
+import errno
 import logging
 import os
 from contextlib import nullcontext
@@ -34,8 +35,22 @@ def release_the_lock() -> None:
     _held = None
 
 
-def _take_the_lock(fd: int) -> bool:
-    """Занять открытый файл — или сказать, что он уже занят.
+_BUSY = frozenset({errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK, errno.EDEADLOCK})
+"""Номера бед, означающие «замок держит кто-то другой», а не осечку сторожа."""
+
+
+def _take_the_lock(fd: int) -> bool | None:
+    """Занять открытый файл; сказать, занят ли он или замков тут нет вовсе.
+
+    Три исхода, а не два: правда — взяли, ложь — держит другая копия, пустота —
+    замок не дался по постороннему поводу. Схлопнутые в два, последние
+    означали одно и то же: каталог данных на файловой системе без замков —
+    сетевой профиль, перенаправленный `%APPDATA%` — превращал приложение в
+    неоткрывающееся навсегда, и причина в коде числилась «не бедой».
+
+    «Занято» узнаётся по номеру беды: `msvcrt.locking` под `LK_NBLCK` отвечает
+    `EACCES`, а на длинном ожидании `EDEADLOCK`; `flock` под `LOCK_NB` —
+    `EAGAIN` (он же `EWOULDBLOCK`).
 
     Способа, общего для всех, нет, и берут они разное: на Windows замок
     ложится на диапазон байтов, и берётся самый короткий — один; на остальных
@@ -54,8 +69,11 @@ def _take_the_lock(fd: int) -> bool:
             import fcntl
 
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        return False
+    except OSError as e:
+        if e.errno in _BUSY:
+            return False
+        logger.exception("single instance: замок не дался, сторожить нечем")
+        return None
     return True
 
 
@@ -87,11 +105,17 @@ def hold_the_only_copy(lock_path: Path | str):
     except OSError:
         logger.exception("single instance: no lock at %s, starting unguarded", lock_path)
         return nullcontext()
-    if _take_the_lock(fd):
+    taken = _take_the_lock(fd)
+    if taken:
         global _held
         _held = os.fdopen(fd, "r+b")
         return _held
     os.close(fd)
+    if taken is None:
+        # Замков тут нет — не то же, что «уже запущено»: второй копии не
+        # существует, просить её показать окно бессмысленно. Работаем без
+        # сторожа, как и при неоткрывшемся файле.
+        return nullcontext()
     # Записи здесь нет нарочно: файл журнала — ровно то, что замок сторожит, и
     # у предела размера одна эта строка запустила бы поворот, то есть саму беду.
     # Что делать второй копии дальше — дело зовущего; сегодня он просит открытую

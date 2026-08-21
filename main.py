@@ -119,11 +119,46 @@ sys.excepthook = _log_uncaught
 threading.excepthook = _log_uncaught_in_thread
 
 
-def main() -> int:
+def _started_or_told_why() -> int:
+    """Пройти пролог и открыть окно; отказ показать человеку и уйти.
+
+    Отделено от `main`, потому что предмет другой: там замок и разговор двух
+    копий, здесь — сам запуск и его беда.
+
+    Ввозы отложены по той же причине, что и у зовущего: ввоз `client.window`
+    тянет за собой окно, а ввоз `main` правит корневой logger.
+    """
     from backend import bootstrap
     from backend.crypto import _check_keyring_backend
-    from backend.single_instance import hold_the_only_copy
+    from client.trouble_box import show_trouble
     from client.window import run_ui
+
+    # Весь пролог под одним перехватом. Работ до окна четыре — хранилище
+    # ключей, схема базы, подъём базы и чтение настроек внутри `run_ui`, — и
+    # отказ любой из них выглядел одинаково: человек жмёт ярлык, и не
+    # происходит ничего. Столько раз, сколько он нажмёт.
+    #
+    # Небезопасное или сломанное хранилище ключей отбивается первым: с ним
+    # секреты ушли бы на диск открытым текстом либо потерялись после первого
+    # же запуска.
+    #
+    # Схема доводится до порядка ДО того, как поднимется окно: alembic крутит
+    # внутри себя свой asyncio.run, и делать это под живым циклом окна нельзя.
+    try:
+        _check_keyring_backend()
+        bootstrap.ensure_schema()
+        return run_ui()
+    except Exception as e:
+        logger.critical("запуск не состоялся", exc_info=True)
+        show_trouble(
+            f"Не удалось запуститься: {e}\n\n"
+            f"Подробности — в журнале: {get_log_path()}"
+        )
+        return 2
+
+
+def main() -> int:
+    from backend.single_instance import hold_the_only_copy
 
     # Замок берётся первым и держится до самого конца: живёт он, пока жив
     # дескриптор. Две копии над одним каталогом данных делят файл журнала — а
@@ -143,22 +178,7 @@ def main() -> int:
         ask_to_raise()
         return 3
     with the_only_copy:
-        # Fail-fast если keyring-бэкенд небезопасный (PlaintextKeyring) или
-        # сломан (fail.Keyring) — иначе secrets улетят в открытом виде на
-        # диск или потеряются после первого старта. Друже сообщение в stderr
-        # вместо raw traceback'а — окно ещё не поднято, диалог показать
-        # негде, но юзер хотя бы поймёт причину выхода вместо «упало непонятно».
-        try:
-            _check_keyring_backend()
-        except RuntimeError as e:
-            logger.critical("keyring pre-flight failed: %s", e)
-            print(f"\n[Job Bot] Не удалось запуститься: {e}\n", file=sys.stderr)
-            return 2
-        # Схема доводится до порядка ДО того, как поднимется окно: alembic
-        # крутит внутри себя свой asyncio.run, и делать это под живым циклом
-        # окна нельзя.
-        bootstrap.ensure_schema()
-        return run_ui()
+        return _started_or_told_why()
 
 
 if __name__ == "__main__":

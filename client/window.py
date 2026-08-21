@@ -121,14 +121,26 @@ def _put_out(hub, runner, listening) -> None:
 
     Движок последним и через мотор: закрывать его — работа асинхронная, а
     делать её после остановки мотора уже негде.
+
+    Своя беда наружу не уходит. Гасить в этот миг уже нечего: человек закрыл
+    окно, приложение отработало, и процесс сейчас умрёт. А вылети она наружу,
+    точка входа приняла бы её за несостоявшийся запуск и показала бы модальное
+    окно поверх уже закрытого — да ещё и держала бы процесс, пока его не
+    нажмут. Стоя же в `finally`, она вдобавок унесла бы с собой ту беду, из-за
+    которой окно и закрылось.
+
+    Молчать при этом нельзя: движок, не отпустивший базу, виден только отсюда.
     """
     logger.info("окно закрыто, гасим мост")
-    if listening is not None:
-        listening.close()
-    lifespan.stop(hub)
-    if hub.engine is not None:
-        runner.submit(hub.engine.dispose()).result(timeout=_ENGINE_CLOSING_WAIT_S)
-    runner.stop()
+    try:
+        if listening is not None:
+            listening.close()
+        lifespan.stop(hub)
+        if hub.engine is not None:
+            runner.submit(hub.engine.dispose()).result(timeout=_ENGINE_CLOSING_WAIT_S)
+        runner.stop()
+    except Exception:
+        logger.exception("гашение сорвалось на середине")
 
 
 async def prepare(session_factory) -> RuntimeSettings:

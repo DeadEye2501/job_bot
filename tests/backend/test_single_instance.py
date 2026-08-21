@@ -10,6 +10,8 @@
 замок операционная система снимает сама, чем бы копия ни кончилась.
 """
 
+import errno
+import logging
 import subprocess
 import sys
 import time
@@ -84,6 +86,33 @@ def test_a_lock_that_cannot_be_taken_does_not_stop_the_launch(tmp_path: Path):
 
     with hold_the_only_copy(instead_of_a_file):
         pass
+
+
+def test_a_lock_the_system_will_not_give_does_not_stop_the_launch(
+    tmp_path: Path, monkeypatch, caplog
+):
+    """Осечка самого замка запуск не отменяет и не молчит.
+
+    «Занято» и «замков тут нет» приходят одной и той же породой беды, а
+    последствия у них противоположные: первое значит «вторая копия, уходи»,
+    второе — «сторожить нечем, работай без сторожа». Схлопнутые в одно, они
+    превращали каталог данных на файловой системе без замков — сетевой профиль,
+    перенаправленный `%APPDATA%` — в приложение, которое не запускается никогда:
+    ни окна, ни сообщения, ни строки в журнале.
+    """
+    def no_locks_here(*_args):
+        raise OSError(errno.ENOSYS, "замков на этой файловой системе нет")
+
+    # Подменяется сам системный зов, а не наш модуль: ввозится он внутри
+    # объявления — на чужой системе его не существует вовсе, — и подмена по
+    # имени модуля до него не дотянулась бы.
+    monkeypatch.setattr("msvcrt.locking", no_locks_here)
+
+    with caplog.at_level(logging.ERROR, logger="backend.single_instance"):
+        with hold_the_only_copy(tmp_path / "jobbot.lock"):
+            pass
+
+    assert "замков на этой файловой системе нет" in caplog.text
 
 
 def test_a_killed_copy_does_not_keep_the_lock(tmp_path: Path):

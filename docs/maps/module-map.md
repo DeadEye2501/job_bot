@@ -21,17 +21,18 @@ Bootstrap config.
 - `def data_dirs() -> list[Path]` (17)
 - `def get_log_path() -> Path` (7)
 
-### `main.py` — 165 строк
+### `main.py` — 185 строк
 
 Job Bot — single CLI entry point.
 
-Зависит от: `backend`, `backend.crypto`, `backend.log_file`, `backend.single_instance`, `client.raise_window`, `client.window`, `config`
+Зависит от: `backend`, `backend.crypto`, `backend.log_file`, `backend.single_instance`, `client.raise_window`, `client.trouble_box`, `client.window`, `config`
 
 - `def _use_utf8_stdout() -> None` (18)
 - `def _log_handlers() -> list[logging.Handler]` (27)
 - `def _log_uncaught(exc_type, exc, tb) -> None` (13)
 - `def _log_uncaught_in_thread(args) -> None` (10)
-- `def main() -> int` (40)
+- `def _started_or_told_why() -> int` (36)
+- `def main() -> int` (22)
 
 ## adapters — 7 модулей
 
@@ -108,7 +109,16 @@ Job Bot — single CLI entry point.
 - `def _article_text(html: str) -> str | None` (20)
 - `async def fetch_article(client: httpx.AsyncClient, url: str) -> str | None` (24)
 
-## alembic — 3 модулей
+## alembic — 4 модулей
+
+### `alembic/bundled/aa4e0de05368_seed_initial_data.py` — 46 строк
+
+seed initial data (заглушка для сборки)
+
+Зависит от: —
+
+- `def upgrade() -> None` (2)
+- `def downgrade() -> None` (2)
 
 ### `alembic/env.py` — 77 строк
 
@@ -957,7 +967,7 @@ First-run bootstrap: ensure DB schema exists.
   - `def doRollover(self) -> None` (16)
   - `def handleError(self, record: logging.LogRecord) -> None` (2)
 
-### `backend/log_secrets.py` — 152 строк
+### `backend/log_secrets.py` — 169 строк
 
 Вымарывание секретов из журнала — включая тот случай, когда запись сломалась.
 
@@ -1655,15 +1665,15 @@ Runtime settings layer.
 - `def _from_tg_row(row: TgAccount) -> TgAccountConfig | None` (30)
 - `def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None` (18)
 
-### `backend/single_instance.py` — 99 строк
+### `backend/single_instance.py` — 123 строк
 
 Замок, которым запущенная копия приложения не пускает вторую.
 
 Зависит от: —
 
 - `def release_the_lock() -> None` (15)
-- `def _take_the_lock(fd: int) -> bool` (23)
-- `def hold_the_only_copy(lock_path: Path | str)` (38)
+- `def _take_the_lock(fd: int) -> bool | None` (36)
+- `def hold_the_only_copy(lock_path: Path | str)` (44)
 
 ### `backend/telegram_login.py` — 332 строк ⚠ подошёл к 300
 
@@ -1718,7 +1728,7 @@ Runtime settings layer.
 - `def _remove_the_data() -> list[str]` (27)
 - `async def wipe_all(engine) -> list[str]` (28)
 
-## client — 44 модулей
+## client — 45 модулей
 
 ### `client/bridge/__init__.py` — 23 строк
 
@@ -2351,7 +2361,15 @@ Runtime settings layer.
 - `def _or_index(path: str) -> str` (10)
 - `def _content_type(target: Path) -> str` (17)
 
-### `client/window.py` — 222 строк
+### `client/trouble_box.py` — 37 строк
+
+Сказать человеку о беде, когда своего окна ещё нет.
+
+Зависит от: —
+
+- `def show_trouble(text: str) -> None` (11)
+
+### `client/window.py` — 234 строк
 
 Окно приложения: как оно открывается и чем гасится.
 
@@ -2359,7 +2377,7 @@ Runtime settings layer.
 
 - `def run_ui() -> int` (32)
 - `def _open_window(hub, *, settled: bool)` (19)
-- `def _put_out(hub, runner, listening) -> None` (20)
+- `def _put_out(hub, runner, listening) -> None` (32)
 - `async def prepare(session_factory) -> RuntimeSettings` (12)
 - `def _open_runner() -> AsyncRunner` (4)
 - `def _open_database() -> tuple[Any, async_sessionmaker]` (9)
@@ -2378,7 +2396,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 235 модулей
+## tests — 240 модулей
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -2416,13 +2434,13 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/backend/conftest.py` — 53 строк
+### `tests/backend/conftest.py` — 57 строк
 
 Фикстуры слоя `backend`, собранные из модулей по предметам.
 
-Зависит от: `tests.backend.fixtures.backfill`, `tests.backend.fixtures.bot`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.listing`, `tests.backend.fixtures.logs`, `tests.backend.fixtures.rerun`, `tests.backend.fixtures.stats`
+Зависит от: `tests.backend.fixtures.backfill`, `tests.backend.fixtures.bot`, `tests.backend.fixtures.entry`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.listing`, `tests.backend.fixtures.logs`, `tests.backend.fixtures.rerun`, `tests.backend.fixtures.stats`
 
-Отдаёт наружу: `applied`, `busy_slot`, `channel_titles`, `chatting`, `chatting_on_fakes`, `clean_root_logger`, `deliver`, `dm_pipeline`, `empty_media_dir`, `hr_names`, `known_hr`, `make_bot`, `make_pipeline`, `outbox`, `parsing`, `ready_to_send`, `rerunning`, `sending_unlocked`, `titles`, `unparsed_vacancy`
+Отдаёт наружу: `applied`, `busy_slot`, `channel_titles`, `chatting`, `chatting_on_fakes`, `clean_log_file`, `clean_root_logger`, `deliver`, `dm_pipeline`, `empty_media_dir`, `entry`, `hr_names`, `known_hr`, `lock_of_its_own`, `make_bot`, `make_pipeline`, `outbox`, `parsing`, `ready_to_send`, `rerunning`, `sending_unlocked`, `titles`, `unparsed_vacancy`
 
 
 ### `tests/backend/fixtures/__init__.py` — 1 строк
@@ -2470,6 +2488,18 @@ Runtime settings layer.
 - `def ready_to_send(session_factory, make_bot)` (24)
   - `async def build(*, status=VacancyStatus.NEW, mode=BotMode.FULL, hr=None)` (13)
 
+### `tests/backend/fixtures/entry.py` — 71 строк
+
+Точка входа с подменёнными шагами запуска — общая двум сторожам.
+
+Зависит от: `main`
+
+- `def lock_of_its_own(monkeypatch, tmp_path)` (12)
+- `def entry(clean_root_logger, lock_of_its_own, monkeypatch)` (41)
+  - `def check_keyring()` (2)
+  - `def ensure_schema()` (2)
+  - `def run_ui()` (3)
+
 ### `tests/backend/fixtures/flows.py` — 223 строк
 
 Обстановка для проверок конвейера: он собран на подделках, модель молчит.
@@ -2506,13 +2536,15 @@ Runtime settings layer.
 - `def channel_titles(session)` (10)
   - `async def read(**kwargs) -> list[str]` (5)
 
-### `tests/backend/fixtures/logs.py` — 28 строк
+### `tests/backend/fixtures/logs.py` — 57 строк
 
-Возврат корневого логгера в состояние, в котором его застали.
+Общая обстановка проверок журнала: корневой логгер, файл и готовая запись.
 
-Зависит от: —
+Зависит от: `config`
 
 - `def clean_root_logger()` (20)
+- `def clean_log_file()` (11)
+- `def record(msg: str, *, name: str='проверка', level: int=logging.INFO)` (6)
 
 ### `tests/backend/fixtures/rerun.py` — 75 строк
 
@@ -2528,14 +2560,15 @@ Runtime settings layer.
   - `async def reload()` (2)
   - `async def embed(pipeline, text, what)` (3)
 
-### `tests/backend/fixtures/stats.py` — 62 строк
+### `tests/backend/fixtures/stats.py` — 69 строк
 
 Обстановка для проверок сводки: отклик и ответ на него.
 
-Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.stats_pipeline`, `tests.dbio`, `tests.factories`
 
 - `def applied(session_factory)` (52)
   - `async def build(applied_at, *, hr=None, answered_after=None, **overrides)` (24)
+- `async def rows_by_label(session, **kwargs) -> dict[str, dict]` (4)
 
 ### `tests/backend/test_adapters_teletype.py` — 173 строк
 
@@ -2548,17 +2581,18 @@ Runtime settings layer.
 - `def _page(*, headline: str='Senior Manual QA', body: str='<p>Ищем QA</p>') -> str` (8)
 - `def _client(handler) -> httpx.AsyncClient` (3)
 
-### `tests/backend/test_bootstrap_schema.py` — 133 строк
+### `tests/backend/test_bootstrap_schema.py` — 176 строк
 
 Следствия подготовки схемы базы при запуске.
 
 Зависит от: `alembic`, `backend.bootstrap`, `tests.conftest`
 
-Тестов: 2
+Тестов: 3
 
 - `def _tables(db_file) -> set[str]` (9)
 - `def _revision_reached(db_file) -> str` (6)
 - `def _project_of_two_revisions(root, db_file) -> None` (20)
+- `def _revisions_in(paths) -> set[str]` (9)
 
 ### `tests/backend/test_bot_channels.py` — 167 строк
 
@@ -2863,19 +2897,24 @@ Runtime settings layer.
 Тестов: 9
 
 
-### `tests/backend/test_entry_point.py` — 488 строк ⚠ подошёл к 300
+### `tests/backend/test_entry_point.py` — 173 строк
 
 Следствия запуска приложения из единственной точки входа.
 
-Зависит от: `backend.single_instance`, `config`, `main`
+Зависит от: `backend.single_instance`
 
-Тестов: 18
+Тестов: 8
 
-- `def lock_of_its_own(monkeypatch, tmp_path)` (12)
-- `def entry(clean_root_logger, lock_of_its_own, monkeypatch)` (41)
-  - `def check_keyring()` (2)
-  - `def ensure_schema()` (2)
-  - `def run_ui()` (3)
+- `def shown(monkeypatch)` (7)
+
+### `tests/backend/test_entry_point_log.py` — 303 строк ⚠ подошёл к 300
+
+Следствия журнала приложения: файл, поворот, кодировка и падения.
+
+Зависит от: `config`
+
+Тестов: 11
+
 - `def _write_through(module, text: str) -> str` (22)
 
 ### `tests/backend/test_flows_application_choice.py` — 414 строк ⚠ подошёл к 300
@@ -3374,17 +3413,33 @@ Runtime settings layer.
 
 - `def _parsed(**fields) -> httpx.Response` (3)
 
-### `tests/backend/test_log_buffer.py` — 571 строк ⚠ за пределом 500
+### `tests/backend/test_log_buffer.py` — 257 строк
 
-Следствия, которые наблюдают тесты журналирования.
+Следствия кольца записей, которое показывает окну экран «Логи».
 
-Зависит от: `backend.log_buffer`, `backend.log_file`, `backend.log_secrets`, `config`
+Зависит от: `backend.log_buffer`, `tests.backend.fixtures.logs`
 
-Тестов: 32
+Тестов: 16
 
-- `def clean_log_file()` (11)
-- `def record(msg: str, *, name: str='проверка', level: int=logging.INFO)` (6)
+
+### `tests/backend/test_log_file.py` — 44 строк
+
+Следствия файла журнала: поворот по размеру и недоступный файл.
+
+Зависит от: `backend.log_file`, `tests.backend.fixtures.logs`
+
+Тестов: 1
+
 - `def _busy(source, dest)` (3)
+
+### `tests/backend/test_log_secrets.py` — 300 строк
+
+Следствия вымарывания секретов и жалобы журнала на собственную беду.
+
+Зависит от: `backend.log_buffer`, `backend.log_file`, `backend.log_secrets`, `tests.backend.fixtures.logs`
+
+Тестов: 16
+
 - `def _unbuildable()` (6)
 
 ### `tests/backend/test_message_text.py` — 151 строк
@@ -3907,6 +3962,15 @@ Runtime settings layer.
 Тестов: 9
 
 
+### `tests/backend/test_repository_stats_funnel.py` — 217 строк
+
+Следствия воронки канала на экране статистики: шаги и доли.
+
+Зависит от: `backend.models`, `tests.backend.fixtures.stats`, `tests.dbio`, `tests.factories`
+
+Тестов: 7
+
+
 ### `tests/backend/test_repository_stats_kpi.py` — 280 строк
 
 Следствия сводных счётчиков в шапке экрана статистики.
@@ -3926,15 +3990,14 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/backend/test_repository_stats_pipeline.py` — 511 строк ⚠ за пределом 500
+### `tests/backend/test_repository_stats_pipeline.py` — 302 строк ⚠ подошёл к 300
 
-Следствия таблицы «каналы» на экране статистики.
+Следствия таблицы «каналы»: что канал прислал и сколько из этого мусор.
 
-Зависит от: `backend.domain.verdict`, `backend.models`, `backend.repository.stats_pipeline`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.domain.verdict`, `backend.models`, `backend.repository.stats_pipeline`, `tests.backend.fixtures.stats`, `tests.dbio`, `tests.factories`
 
-Тестов: 19
+Тестов: 12
 
-- `async def rows_by_label(session, **kwargs) -> dict[str, dict]` (4)
 
 ### `tests/backend/test_repository_stats_response_time.py` — 260 строк
 
@@ -4130,13 +4193,13 @@ Runtime settings layer.
 Тестов: 1
 
 
-### `tests/backend/test_single_instance.py` — 124 строк
+### `tests/backend/test_single_instance.py` — 153 строк
 
 Следствия сторожа единственности приложения.
 
 Зависит от: `backend.single_instance`
 
-Тестов: 5
+Тестов: 6
 
 - `def _lock_once_it_is_free(lock_path: Path, seconds: float=5.0)` (14)
 
@@ -4425,15 +4488,16 @@ Runtime settings layer.
 
 - `async def _saved_person(api, ask, **extra) -> None` (4)
 
-### `tests/client/test_bridge_runner.py` — 110 строк
+### `tests/client/test_bridge_runner.py` — 170 строк
 
 Следствия мотора, в котором окно исполняет свою работу.
 
 Зависит от: `client.bridge.runner`
 
-Тестов: 5
+Тестов: 8
 
 - `def real_runner()` (16)
+- `def _troubled(real_runner, exc: BaseException) -> None` (11)
 
 ### `tests/client/test_bridge_settings.py` — 87 строк
 
@@ -4596,13 +4660,13 @@ Runtime settings layer.
 - `def _get(app, path: str) -> tuple[str, dict, bytes]` (10)
   - `def start_response(status: str, headers: list[tuple[str, str]]) -> None` (3)
 
-### `tests/client/test_window.py` — 210 строк
+### `tests/client/test_window.py` — 281 строк
 
 Следствия открытия и закрытия окна: что приложение делает вокруг него.
 
 Зависит от: `backend.models`, `backend.repository.bot_mode`, `client`
 
-Тестов: 7
+Тестов: 10
 
 - `class FakeWebview` (12)
   - `def create_window(self, title: str, url=None, **options)` (3)
@@ -4614,6 +4678,8 @@ Runtime settings layer.
 - `def opened(monkeypatch, runtime_settings, session_factory)` (24)
   - `class StubListener` (3)
     - `def close(self) -> None` (2)
+- `class _Settings` (5)
+- `def _sessions(tmp_path, monkeypatch)` (8)
 
 ### `tests/client/test_window_size.py` — 35 строк
 
