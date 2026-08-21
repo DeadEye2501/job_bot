@@ -9,6 +9,7 @@
 первым письмом, наблюдается по дороге переписки.
 """
 
+from backend.models import HR
 from backend.repository.hr_identify import find_known_hr, refresh_hr_from_telegram
 from tests.dbio import put
 from tests.factories import hr_row
@@ -119,15 +120,21 @@ async def test_an_unknown_sender_is_not_found(session, session_factory):
     assert await find_known_hr(session, 222, "olga") is None
 
 
-def test_an_absent_username_does_not_erase_the_stored_one():
+async def test_an_absent_username_does_not_erase_the_stored_one(session, session_factory):
     """Отсутствие ника в сообщении не стирает сохранённый.
 
     У пользователя Telegram ника может не быть вовсе, а у нас он записан с
     прошлого раза — терять его незачем.
     """
     hr = hr_row(telegram_username="maria")
+    await put(session_factory, hr)
+    stored = await session.get(HR, hr.id)
 
-    refresh_hr_from_telegram(hr, user(id=777, username=None), avatar=None)
-    refresh_hr_from_telegram(hr, user(id=777, username=""), avatar=None)
+    await refresh_hr_from_telegram(
+        session, stored, user(id=777, username=None), avatar=None
+    )
+    await refresh_hr_from_telegram(
+        session, stored, user(id=777, username=""), avatar=None
+    )
 
-    assert hr.telegram_username == "maria"
+    assert stored.telegram_username == "maria"

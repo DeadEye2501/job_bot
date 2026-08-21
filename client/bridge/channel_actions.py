@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from backend.domain.telegram_identity import normalize_username
 from backend.repository import channels as channels_repo
-from client.bridge.answer import Denied, bad_fields, denied, launched, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, launched, reply
 from client.bridge.mark import CHANNEL_MARK, marked, unmarked
 from client.bridge.refusals import NO_BOT, NO_CHANNEL, POLL_REFUSALS
 from client.bridge.form_payloads import read_toggle
@@ -172,10 +172,7 @@ class ChannelActions:
             channel_id, is_active = read_toggle(payload, "channel_id", "is_active")
             if channel_id is None or is_active is None:
                 raise KeyError("channel_id / is_active")
-        # `AttributeError` ловится вместе с остальными: чтение нагрузки идёт
-        # через помощника, и не-объект спотыкается уже внутри него — а беда
-        # синхронная, до мотора, и мимо конверта ушла бы прямо в канал.
-        except (AttributeError, ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields(
                 "channels.set_active", e,
                 action="set_active", channel_id=channel_id, is_active=is_active,
@@ -225,7 +222,7 @@ class ChannelActions:
         """
         try:
             is_active = bool(payload["is_active"])
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("set_all_active", e, action="set_all_active")
 
         async def run() -> dict:

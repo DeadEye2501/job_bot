@@ -74,6 +74,22 @@ def bad_fields(where: str, error: Exception, **extra: Any) -> dict:
     return {"fail": "fields", "detail": f"Неверные поля: {error}", **extra}
 
 
+BAD_PAYLOAD = (AttributeError, ValueError, TypeError, KeyError)
+"""Породы бед, означающие негодную нагрузку окна, а не сбой моста.
+
+Одним объявлением на весь мост: то же решение стояло своим кортежем в двух
+десятках слотов, и написания разошлись — три набора, пять написаний, две пары
+из которых различались только порядком членов. Разъезд молчаливый: на чём
+именно споткнётся чтение, зависит от того, каким движением слот берёт поле, и
+слот, поймавший не ту породу, отвечает окну поломкой вместо `bad_fields`.
+
+Почему четыре. `KeyError` — поля нет вовсе; `TypeError` — не-объект вместо
+нагрузки или не-число там, где ждали число; `ValueError` — число, которое не
+разбирается; `AttributeError` — не-объект, у которого спросили `get`. Все
+четыре означают одно: пришло не то, и говорить об этом надо окну, а не падать.
+"""
+
+
 def asked_id(payload: dict, key: str, slot: str) -> tuple:
     """Номер предмета из нагрузки, а при негодной — готовый отказ окну.
 
@@ -87,7 +103,7 @@ def asked_id(payload: dict, key: str, slot: str) -> tuple:
     """
     try:
         return int(payload[key]), None
-    except (ValueError, TypeError, KeyError) as e:
+    except BAD_PAYLOAD as e:
         return None, bad_fields(slot, e)
 
 

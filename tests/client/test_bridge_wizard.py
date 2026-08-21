@@ -136,7 +136,7 @@ async def test_a_chosen_resume_counts_as_the_last_step(api, ask, tmp_path):
     """
     resume = tmp_path / "уже выбрано.pdf"
     resume.write_bytes(b"%PDF-1.4 ")
-    await ask(api.profile.replace, {"path": str(resume)})
+    await ask(api.profile._replace, {"path": str(resume)})
 
     answer = await ask(api.wizard.state)
 
@@ -152,7 +152,7 @@ async def test_skipping_the_resume_forgets_the_chosen_file(api, ask, tmp_path):
     """
     resume = tmp_path / "передумал.pdf"
     resume.write_bytes(b"%PDF-1.4 ")
-    await ask(api.profile.replace, {"path": str(resume)})
+    await ask(api.profile._replace, {"path": str(resume)})
 
     answer = await ask(api.wizard.skip_cv)
 

@@ -126,26 +126,35 @@ async def test_a_vacancy_is_counted_once_however_often_it_moved(
     assert (await get_stats_kpi(session, period="all"))["applied_total"] == 1
 
 
-async def test_in_progress_covers_both_of_its_statuses(session, session_factory):
-    """«В работе» считает и приглашения, и тестовые задания.
+async def test_in_progress_covers_all_three_of_its_statuses(session, session_factory):
+    """«В работе» считает приглашения, тестовые задания и сам «In Progress».
+
+    Статуса, названного тем же словом, в наборе не было. Пока вакансию двигает
+    автоматика, разницы почти не видно: по графу в «In Progress» приходят из
+    приглашения и теста, то есть вакансия уже засчитана. Но прямое нажатие
+    человека графу не подчиняется — и поставленный рукой «In Progress» не
+    попадал в шапку вовсе: в кольце под ней строка горела, а счётчик над
+    кольцом показывал ноль.
 
     Рядом лежит вакансия в статусе, к «в работе» не относящемся: без неё
     счётчик мог бы считать всё подряд.
     """
     invited = vacancy_row()
     tested = vacancy_row()
+    working = vacancy_row()
     declined = vacancy_row()
-    await put(session_factory, invited, tested, declined)
+    await put(session_factory, invited, tested, working, declined)
     await put(
         session_factory,
         status_history_row(invited.id, status=VacancyStatus.INVITATION),
         status_history_row(tested.id, status=VacancyStatus.TEST),
+        status_history_row(working.id, status=VacancyStatus.IN_PROGRESS),
         status_history_row(declined.id, status=VacancyStatus.DECLINE),
     )
 
     kpi = await get_stats_kpi(session, period="all")
 
-    assert kpi["in_progress_total"] == 2
+    assert kpi["in_progress_total"] == 3
     assert kpi["decline_total"] == 1
 
 

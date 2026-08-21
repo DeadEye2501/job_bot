@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.funnel import IN_PROGRESS_STEP
 from backend.models import Vacancy, VacancyStatus, VacancyStatusHistory
 from backend.repository.stats_common import (
     first_transition_subq,
@@ -13,14 +14,6 @@ from backend.repository.stats_common import (
     status_cond,
 )
 from backend.repository.vacancies_common import PARSED_ONLY
-
-
-_IN_PROGRESS = frozenset({VacancyStatus.INVITATION, VacancyStatus.TEST})
-"""«В процессе» — это два статуса сразу, и на экране они одна ступень.
-
-Набор неизменяемый: он лежит на уровне модуля, и обычный сделал бы ступень
-воронки переписываемой любым зовущим.
-"""
 
 
 async def _ever_in(session: AsyncSession, statuses) -> int:
@@ -61,7 +54,7 @@ async def _kpi_totals(session: AsyncSession) -> dict:
             select(func.count(Vacancy.id)).where(PARSED_ONLY)
         )).scalar_one()),
         "applied_total": await _ever_in(session, VacancyStatus.APPLIED),
-        "in_progress_total": await _ever_in(session, _IN_PROGRESS),
+        "in_progress_total": await _ever_in(session, IN_PROGRESS_STEP),
         "offer_total": await _ever_in(session, VacancyStatus.OFFER),
         "decline_total": await _ever_in(session, VacancyStatus.DECLINE),
     }
@@ -89,7 +82,7 @@ async def _kpi_deltas(session: AsyncSession, since: datetime | None) -> dict:
             session, VacancyStatus.APPLIED, since
         ),
         "in_progress_period": await _first_in_period(
-            session, _IN_PROGRESS, since
+            session, IN_PROGRESS_STEP, since
         ),
         "offer_period": await _first_in_period(
             session, VacancyStatus.OFFER, since
@@ -107,7 +100,8 @@ async def get_stats_kpi(
 
     - total: лайфтайм count всех parsed-вакансий.
     - applied_total: когда-либо были в Applied.
-    - in_progress_total: когда-либо доходили до Invitation или Test.
+    - in_progress_total: когда-либо доходили до середины воронки —
+      Invitation, Test или In Progress (`domain/funnel.IN_PROGRESS_STEP`).
     - offer_total: когда-либо доходили до Offer.
     - decline_total: когда-либо были в Decline.
 

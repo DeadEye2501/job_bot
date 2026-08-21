@@ -7,7 +7,7 @@ import logging
 from backend.models import Vacancy
 from backend.incoming import text_or_none
 from backend.repository import vacancies_card
-from client.bridge.answer import Denied, bad_fields, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, reply
 from client.bridge.companies import create_company_row
 from client.bridge.hr import create_hr_row
 from client.bridge.refusals import NO_COMPANY, NO_HR, NO_VACANCY
@@ -76,7 +76,7 @@ class VacancyLinks:
         try:
             vacancy_id = int(payload["vacancy_id"])
             search = text_or_none(payload.get("search"))
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields(slot, e)
 
         return reply(
@@ -102,7 +102,7 @@ class VacancyLinks:
             vacancy_id = int(payload["vacancy_id"])
             raw = payload.get(key)
             other_id = int(raw) if raw is not None else None
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields(slot, e)
 
         async def run() -> dict:
@@ -139,7 +139,7 @@ class VacancyLinks:
             vacancy_id = int(payload["vacancy_id"])
             fields = read_fields(payload)
             search = text_or_none(payload.get("search"))
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields(slot, e)
 
         async def run() -> dict:

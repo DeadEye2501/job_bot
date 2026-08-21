@@ -357,7 +357,7 @@ First-run bootstrap: ensure DB schema exists.
   - `def drop(self, vacancy_id: int) -> None` (7)
   - `def match(self, vector: list[float], threshold: float) -> int | None` (5)
 
-### `backend/domain/funnel.py` — 58 строк
+### `backend/domain/funnel.py` — 72 строк
 
 Ступени воронки отбора, выраженные наборами статусов вакансии.
 
@@ -449,7 +449,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def is_empty_vacancy(parsed: ParsedVacancy | None) -> bool` (24)
 - `def decide_vacancy_status(parsed: ParsedVacancy, score: int, blacklist_match: str | None, *, threshold: int) -> tuple[VacancyStatus, str | None]` (17)
 
-### `backend/flows/apply.py` — 374 строк ⚠ подошёл к 300
+### `backend/flows/apply.py` — 380 строк ⚠ подошёл к 300
 
 Решение отправить отклик: письмо, охраны от повтора и запись исхода.
 
@@ -462,7 +462,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class _Letter` (9)
 - `class _Plan` (10)
 - `async def _send_plan(pipeline, hr, vacancy_id: int, force: bool) -> tuple` (31)
-- `async def _full_letter(pipeline, parsed: ParsedVacancy, channel_ref: str | None, vacancy_id: int)` (29)
+- `async def _full_letter(pipeline, parsed: ParsedVacancy, channel_ref: str | None, vacancy_id: int)` (35)
 - `async def _hand_letter_over(pipeline, hr, letter: _Letter, vacancy_id: int, force: bool) -> tuple` (30)
 - `async def _still_sendable(pipeline, vacancy_id: int, force: bool) -> str | None` (15)
 - `async def send_application(pipeline, hr, parsed: ParsedVacancy, vacancy_id: int, *, force: bool=False) -> tuple[bool, str]` (27)
@@ -553,35 +553,36 @@ First-run bootstrap: ensure DB schema exists.
 - `def spawn_hr_backfill(pipeline, hr) -> None` (31)
   - `async def _run() -> None` (15)
 
-### `backend/flows/dm_classify.py` — 288 строк
+### `backend/flows/dm_classify.py` — 324 строк ⚠ подошёл к 300
 
 Разбор переписки с HR языковой моделью.
 
 Зависит от: `backend.flows.auto_gate`, `backend.flows.batches`, `backend.llm.hr_reply`, `backend.models`, `backend.notify`, `backend.payloads`, `backend.repository.hr_card`, `backend.repository.vacancy_status`
 
 - `def schedule_dm_classification(pipeline, hr_id: int, reply: PendingReply) -> None` (27)
-- `async def classify_and_apply(session_factory, lm_client, lm_chat_model, text: str, target: tuple[int, int, VacancyStatus]) -> bool` (39)
+- `async def classify_and_apply(session_factory, lm_client, lm_chat_model, text: str, target: tuple[int, int, VacancyStatus]) -> tuple[bool, str | None]` (52)
 - `async def _run_debounced_classify(pipeline, hr_id: int) -> None` (22)
 - `async def _blacklisted_now(pipeline, hr_id: int) -> str | None` (13)
-- `async def _ask_and_apply(pipeline, hr_id: int, burst: list, target) -> None` (25)
+- `async def _ask_and_apply(pipeline, hr_id: int, burst: list, target) -> None` (42)
 - `def _burst_text(buf: list[dict]) -> str` (8)
 - `async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None` (37)
 - `async def _wait_out(pipeline, tasks: list, *, drain: bool) -> None` (20)
 - `async def _cancel_and_wait(pipeline, *, drain: bool) -> None` (12)
 - `async def _drain_buffers(pipeline) -> None` (18)
-- `async def cancel_pending_dm_classifications(pipeline, *, drain: bool=False) -> None` (31)
+- `async def cancel_pending_dm_classifications(pipeline, *, drain: bool=False) -> None` (37)
 
-### `backend/flows/dm_debounce.py` — 139 строк
+### `backend/flows/dm_debounce.py` — 167 строк
 
 Копилка отложенного разбора: пачки писем, таймеры над ними и начавшие.
 
 Зависит от: —
 
-- `class DmDebounce` (134)
+- `class DmDebounce` (162)
   - `def remember(self, hr_id: int, letter: dict) -> int` (15)
   - `def retext(self, hr_id: int, tg_msg_id: int, text: str) -> None` (11)
   - `def forget(self, hr_id: int, tg_msg_id: int) -> None` (14)
   - `def take(self, hr_id: int) -> list[dict]` (3)
+  - `def restore(self, hr_id: int, burst: list[dict]) -> int` (27)
   - `def drop(self, hr_id: int) -> None` (3)
   - `def waiting(self) -> list[int]` (3)
   - `def arm(self, hr_id: int, timer: asyncio.Task) -> None` (15)
@@ -636,14 +637,14 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def check_ghosting_timeouts(pipeline) -> int` (26)
 
-### `backend/flows/ingest.py` — 150 строк
+### `backend/flows/ingest.py` — 156 строк
 
 Приём объявления из канала с отсевом перепостов.
 
 Зависит от: `backend.flows`, `backend.message_text`, `backend.models`, `backend.payloads`, `backend.repository.vacancies_life`, `backend.telegram_time`
 
 - `async def _post_embedding(pipeline, post: ChannelPost)` (15)
-- `async def _resume_or_skip(pipeline, similar_id: int, post: ChannelPost) -> None` (23)
+- `async def _resume_or_skip(pipeline, similar_id: int, post: ChannelPost, whole: bool) -> None` (29)
 - `async def ingest_post(pipeline, channel_id: int, channel_username: str, msg) -> None` (31)
 - `def _vacancy_row(post: ChannelPost, embedding: list[float]) -> Vacancy` (14)
 - `async def save_new_vacancy(pipeline, post: ChannelPost, embedding: list[float]) -> int | None` (41)
@@ -657,15 +658,15 @@ First-run bootstrap: ensure DB schema exists.
 - `def _article_urls(text: str) -> list[str]` (11)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 
-### `backend/flows/parse.py` — 336 строк ⚠ подошёл к 300
+### `backend/flows/parse.py` — 350 строк ⚠ подошёл к 300
 
 Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
-Зависит от: `backend.domain.blacklist`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`
+Зависит от: `backend.domain.blacklist`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`
 
 - `async def _dropped_as_trash(pipeline, vacancy_id: int, reason: str, *, allow_delete: bool) -> bool` (22)
 - `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (51)
-- `async def _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus) -> None` (18)
+- `async def _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus) -> None` (31)
 - `async def _parsed_or_dropped(pipeline, vacancy_id: int, text: str, channel_username: str, allow_delete: bool)` (44)
 - `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (26)
 - `async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> bool` (18)
@@ -723,7 +724,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def cancel_pending_dm_classifications(self, *, drain=False) -> None` (2)
   - `async def send_application_for_vacancy(self, vacancy_id) -> tuple[bool, str]` (2)
 
-### `backend/flows/rerun.py` — 317 строк ⚠ подошёл к 300
+### `backend/flows/rerun.py` — 322 строк ⚠ подошёл к 300
 
 Повторный разбор уже заведённой вакансии.
 
@@ -739,9 +740,9 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _text_to_parse(pipeline, origin: '_Origin', vacancy_id: int)` (15)
 - `async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> RerunPipelineOutcome` (39)
 - `async def _orphan_rows(pipeline) -> list` (25)
-- `async def recover_orphan_vacancies(pipeline) -> int` (39)
+- `async def recover_orphan_vacancies(pipeline) -> int` (44)
 
-### `backend/health.py` — 68 строк
+### `backend/health.py` — 89 строк
 
 Живо ли то, на чём держится работа: база, Telegram и модели.
 
@@ -749,7 +750,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def database_alive(session_factory) -> bool` (14)
 - `def telegram_alive(bot) -> bool` (7)
-- `async def model_alive(cfg, kind: str) -> bool` (22)
+- `async def model_alive(cfg, kind: str) -> bool` (43)
 
 ### `backend/incoming.py` — 94 строк
 
@@ -764,9 +765,9 @@ First-run bootstrap: ensure DB schema exists.
 - `def moment_or_none(value) -> datetime | None` (16)
 - `def str_list(value) -> list[str]` (11)
 
-### `backend/llm/answers.py` — 210 строк
+### `backend/llm/answers.py` — 249 строк
 
-Разбор того, что ответила модель, и жалоба, когда разбор не удался.
+Разбор того, что ответила модель, порядок двух заходов и жалоба на неудачу.
 
 Зависит от: —
 
@@ -776,6 +777,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def log_unparseable(answer: str, log: logging.Logger, purpose: str) -> None` (18)
 - `def truncation_trouble(finish_reason: str | None) -> str | None` (9)
 - `def wants_more_room(parsed, finish_reason: str | None) -> bool` (18)
+- `async def read_with_a_second_try(ask, read, tokens: tuple[int, int], told: tuple[logging.Logger, str])` (37)
 - `def str_or_none(value) -> str | None` (10)
 - `def normalize_enum(value, allowed: tuple[str, ...]) -> str | None` (15)
 
@@ -806,7 +808,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _matched_id(answer: str) -> tuple[int | None, str | None]` (22)
 - `async def dedupe_company_with_llm(client: httpx.AsyncClient, model: str, *, parsed_name: str, parsed_website: str | None, candidates: list) -> tuple[int | None, str | None]` (41)
 
-### `backend/llm/cover_letter.py` — 287 строк
+### `backend/llm/cover_letter.py` — 296 строк
 
 Сочинение письма-отклика.
 
@@ -816,7 +818,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _vacancy_ref(parsed: ParsedVacancy, channel_ref) -> str` (9)
 - `def _with_vacancy_filled(raw_text: str, parsed: ParsedVacancy, channel_ref) -> str` (27)
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (24)
-- `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> str | None` (41)
+- `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
 ### `backend/llm/cv.py` — 387 строк ⚠ подошёл к 300
 
@@ -854,7 +856,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]` (29)
 - `async def factcheck_cover_letter(profile_block: str, letter: str, client: httpx.AsyncClient, model: str, *, about: str='') -> tuple[bool, list[str]]` (39)
 
-### `backend/llm/fit.py` — 407 строк ⚠ подошёл к 300
+### `backend/llm/fit.py` — 402 строк ⚠ подошёл к 300
 
 Приговор о пригодности вакансии кандидату.
 
@@ -864,7 +866,8 @@ First-run bootstrap: ensure DB schema exists.
 - `def _vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str` (20)
 - `def _fit_request(parsed: ParsedVacancy, raw_text: str, profile, max_tokens: int)` (26)
 - `def _without_invented_reason(validation: FitValidation, raw_text: str, profile)` (37)
-- `async def validate_vacancy_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (40)
+- `async def validate_vacancy_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (36)
+  - `def read(answer: str) -> FitValidation | None` (7)
 
 ### `backend/llm/hallucination.py` — 280 строк
 
@@ -878,7 +881,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def looks_hallucinated(reason: str, raw_text: str, profile: CandidateProfile) -> str | None` (23)
 - `def breaks_reason_style(reason: str) -> str | None` (15)
 
-### `backend/llm/hr_reply.py` — 253 строк
+### `backend/llm/hr_reply.py` — 261 строк
 
 Разбор ответа HR: на каком этапе теперь отклик.
 
@@ -888,9 +891,9 @@ First-run bootstrap: ensure DB schema exists.
 - `def _allowed_next(current_status: VacancyStatus) -> set[VacancyStatus]` (21)
 - `def _as_line(allowed: set[VacancyStatus]) -> str` (3)
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
-- `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> Classification | None` (47)
+- `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (55)
 
-### `backend/llm/rules.py` — 66 строк
+### `backend/llm/rules.py` — 82 строк
 
 Приметы предметной области, общие для наставлений модели.
 
@@ -908,7 +911,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (30)
 
-### `backend/llm/vacancy.py` — 447 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 438 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
@@ -924,7 +927,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parse_request(text: str, known_skills, max_tokens: int) -> ChatRequest` (18)
 - `def _without_channel_as_hr(parsed: ParsedVacancy, channel_username: str | None) -> ParsedVacancy` (16)
 - `def _log_parsed(parsed: ParsedVacancy) -> None` (10)
-- `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, known_skills=None) -> tuple[ParsedVacancy | None, str | None]` (50)
+- `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, known_skills=None) -> tuple[ParsedVacancy | None, str | None]` (42)
 
 ### `backend/log_buffer.py` — 214 строк
 
@@ -1252,13 +1255,13 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _llm_arbitrate(lm_client: Any, lm_model: str, parsed: _Parsed, shortlist) -> tuple[Company | None, dict]` (39)
 - `async def find_or_create_company(session: AsyncSession, name: str, *, website: str | None=None, lm_client: Any=None, lm_model: str | None=None) -> tuple[Company | None, dict]` (40)
 
-### `backend/repository/hr_card.py` — 390 строк ⚠ подошёл к 300
+### `backend/repository/hr_card.py` — 402 строк ⚠ подошёл к 300
 
 Одна запись HR: чтение, правка, слияние, удаление.
 
 Зависит от: `backend.domain.telegram_identity`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository.blacklist`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.messages`, `backend.repository.vacancies_life`
 
-- `async def update_hr_fields(session: AsyncSession, hr_id: int, **fields) -> bool` (32)
+- `async def update_hr_fields(session: AsyncSession, hr_id: int, **fields) -> bool` (38)
 - `async def _last_company_of(session: AsyncSession, hr_id: int) -> tuple[int | None, str | None]` (21)
 - `async def _unread_count_of(session: AsyncSession, hr_id: int) -> int` (11)
 - `async def get_hr_detail(session: AsyncSession, hr_id: int) -> HrDetail | None` (25)
@@ -1270,21 +1273,21 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _drop_letters_the_survivor_already_has(session: AsyncSession, absorbed_id: int, survivor_id: int) -> int` (31)
 - `async def _move_or_drop_chat(session: AsyncSession, absorbed_id: int, survivor_id: int, survivor_has_tg: bool) -> tuple[int, int]` (28)
 - `def _carry_to_survivor(survivor: HR, taken: _AbsorbedHr, survivor_has_tg: bool) -> None` (19)
-- `async def _carry_marks_to_survivor(session: AsyncSession, written_before: list[str], survivor: HR) -> None` (28)
+- `async def carry_hr_marks(session: AsyncSession, written_before: list[str], hr: HR) -> None` (34)
 - `async def merge_hr(session: AsyncSession, *, absorbed_id: int, survivor_id: int) -> None` (45)
 
-### `backend/repository/hr_identify.py` — 266 строк
+### `backend/repository/hr_identify.py` — 276 строк
 
 Соответствие записи HR данным Telegram.
 
-Зависит от: `backend.models`, `backend.repository.vacancies_common`
+Зависит от: `backend.models`, `backend.repository.hr_card`, `backend.repository.vacancies_common`
 
 - `async def find_known_hr(session: AsyncSession, telegram_user_id: int, telegram_username: str | None=None) -> HR | None` (40)
 - `async def find_latest_vacancy_id_for_hr(session: AsyncSession, hr_id: int, *, as_of: datetime | None=None) -> int | None` (38)
 - `async def count_recent_outgoing_with_vacancy_for_hr(session: AsyncSession, hr_id: int, *, window_days: int) -> int` (26)
 - `async def resolve_reply_target_vacancy(session: AsyncSession, hr_id: int, reply_to_tg_msg_id: int) -> int | None` (24)
 - `def telegram_full_name(user) -> str | None` (3)
-- `def refresh_hr_from_telegram(hr: HR, user, *, avatar: bytes | None) -> None` (30)
+- `async def refresh_hr_from_telegram(session: AsyncSession, hr: HR, user, *, avatar: bytes | None) -> None` (39)
 - `async def create_hr(session: AsyncSession, *, name: str | None, telegram_username: str | None, telegram_user_id: int | None=None, notes: str | None=None) -> HR` (42)
 - `async def find_or_create_hr(session: AsyncSession, user, *, avatar: bytes | None=None) -> tuple[HR, bool]` (23)
 
@@ -1429,17 +1432,17 @@ First-run bootstrap: ensure DB schema exists.
 - `def parsed_in_window(since) -> list` (11)
 - `def stats_period_since(period: str) -> datetime | None` (25)
 
-### `backend/repository/stats_kpi.py` — 124 строк
+### `backend/repository/stats_kpi.py` — 118 строк
 
 Верхняя строка экрана статистики: пять счётчиков и дельта у каждого.
 
-Зависит от: `backend.models`, `backend.repository.stats_common`, `backend.repository.vacancies_common`
+Зависит от: `backend.domain.funnel`, `backend.models`, `backend.repository.stats_common`, `backend.repository.vacancies_common`
 
 - `async def _ever_in(session: AsyncSession, statuses) -> int` (12)
 - `async def _first_in_period(session: AsyncSession, statuses, since: datetime) -> int` (10)
 - `async def _kpi_totals(session: AsyncSession) -> dict` (16)
 - `async def _kpi_deltas(session: AsyncSession, since: datetime | None) -> dict` (31)
-- `async def get_stats_kpi(session: AsyncSession, *, period: str) -> dict` (22)
+- `async def get_stats_kpi(session: AsyncSession, *, period: str) -> dict` (23)
 
 ### `backend/repository/stats_pipeline.py` — 259 строк
 
@@ -1584,7 +1587,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def count_vacancies_for_channel(session: AsyncSession, channel_id: int) -> int` (14)
 - `async def list_vacancies_for_channel(session: AsyncSession, channel_id: int, *, limit: int=50, offset: int=0) -> tuple[list[Vacancy], bool]` (36)
 
-### `backend/repository/vacancy_status.py` — 371 строк ⚠ подошёл к 300
+### `backend/repository/vacancy_status.py` — 397 строк ⚠ подошёл к 300
 
 Смена статуса вакансии: решение, запись, история.
 
@@ -1594,6 +1597,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class _Signature` (13)
 - `def _move_status(vacancy: Vacancy, new_status: VacancyStatus, sign: _Signature) -> VacancyStatusHistory` (34)
 - `async def mark_vacancy_applied(session: AsyncSession, vacancy_id: int, explanation: str | None, *, force: bool) -> bool` (24)
+- `async def was_ever_applied(session: AsyncSession, vacancy_id: int) -> bool` (24)
 - `async def last_status_history_id(session: AsyncSession, vacancy_id: int) -> int | None` (13)
 - `async def record_rerun(session: AsyncSession, vacancy_id: int, previous: VacancyStatus, last_history: int | None) -> None` (38)
 - `def _log_status_change(vacancy_id: int, previous, new_status, detail: str) -> None` (14)
@@ -1725,7 +1729,7 @@ Runtime settings layer.
 Отдаёт наружу: `Api`, `AsyncRunner`
 
 
-### `client/bridge/answer.py` — 188 строк
+### `client/bridge/answer.py` — 204 строк
 
 Единый конверт ответа окну — от исхода работы до ответа зовущему.
 
@@ -1748,13 +1752,13 @@ Runtime settings layer.
 
 - `class Api` (14)
 
-### `client/bridge/blacklist.py` — 171 строк
+### `client/bridge/blacklist.py` — 168 строк
 
 Экран «Контакты / Чёрный список»: чем окно правит отсев.
 
 Зависит от: `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.hub`, `client.bridge.refusals`, `client.bridge.wire`
 
-- `class Blacklist` (158)
+- `class Blacklist` (155)
   - `def list(self) -> dict` (12)
     - `async def run() -> dict` (4)
   - `def candidates(self, kind: str) -> dict` (15)
@@ -1765,7 +1769,7 @@ Runtime settings layer.
     - `async def run() -> dict` (16)
   - `def delete(self, blacklist_id: int) -> dict` (15)
     - `async def run() -> dict` (10)
-  - `def set_active(self, payload: dict) -> dict` (33)
+  - `def set_active(self, payload: dict) -> dict` (30)
     - `async def run() -> dict` (12)
 
 ### `client/bridge/bot_stop.py` — 90 строк
@@ -1777,7 +1781,7 @@ Runtime settings layer.
 - `def detach_bot(hub) -> tuple[object | None, Future | None]` (10)
 - `async def stop_bot(bot, bot_task: Future | None, asking: Callable[[], Awaitable[None]] | None=None, timeout: float=STOP_TIMEOUT_S) -> bool` (41)
 
-### `client/bridge/cards.py` — 259 строк
+### `client/bridge/cards.py` — 257 строк
 
 Карточка контакта: то, что человек и компания делают одним и тем же телом.
 
@@ -1793,19 +1797,19 @@ Runtime settings layer.
 - `def merge_into(hub, subject: CardSubject, payload: dict) -> dict` (45)
   - `async def run() -> dict` (29)
 - `def delete_card(hub, subject: CardSubject, entity_id: int) -> dict` (6)
-- `def create_card(hub, subject: CardSubject, payload: dict) -> dict` (23)
+- `def create_card(hub, subject: CardSubject, payload: dict) -> dict` (21)
   - `async def run() -> dict` (6)
 - `async def _deleting(hub, subject: CardSubject, entity_id: int) -> dict` (12)
 - `def asked_update(payload: dict, subject: CardSubject) -> tuple` (17)
 - `def _tell(hub, subject: CardSubject) -> None` (9)
 
-### `client/bridge/channel_actions.py` — 243 строк
+### `client/bridge/channel_actions.py` — 240 строк
 
 Что окно делает с каналом: опрос, курсор, чёрный список, состав.
 
 Зависит от: `backend.domain.telegram_identity`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.mark`, `client.bridge.refusals`
 
-- `class ChannelActions` (231)
+- `class ChannelActions` (228)
   - `def block(self, channel_id: int) -> dict` (10)
   - `def unblock(self, channel_id: int) -> dict` (8)
   - `def poll_now(self, channel_id: int) -> dict` (19)
@@ -1815,7 +1819,7 @@ Runtime settings layer.
     - `async def run() -> dict` (9)
   - `def create(self, payload: dict | None=None) -> dict` (46)
     - `async def run() -> dict` (23)
-  - `def set_active(self, payload: dict) -> dict` (24)
+  - `def set_active(self, payload: dict) -> dict` (21)
   - `async def _switched(self, channel_id: int, is_active: bool) -> dict` (31)
   - `def set_all_active(self, payload: dict) -> dict` (26)
     - `async def run() -> dict` (11)
@@ -1866,15 +1870,15 @@ Runtime settings layer.
   - `def block(self, company_id: int) -> dict` (12)
   - `def unblock(self, company_id: int) -> dict` (9)
 
-### `client/bridge/cv.py` — 75 строк
+### `client/bridge/cv.py` — 85 строк
 
 Файл резюме, на который смотрит окно: запомнить путь, открыть.
 
 Зависит от: `client.bridge.answer`, `client.bridge.cv_file`, `client.bridge.desktop`
 
-- `class Cv` (62)
+- `class Cv` (72)
   - `def pick(self) -> dict` (18)
-  - `def replace(self, payload: dict) -> dict` (12)
+  - `def _replace(self, payload: dict) -> dict` (22)
     - `async def run() -> dict` (3)
   - `def open(self) -> dict` (15)
 
@@ -1946,15 +1950,15 @@ Runtime settings layer.
     - `async def run() -> dict` (14)
   - `def create(self, payload: dict) -> dict` (8)
 
-### `client/bridge/hr_chat.py` — 180 строк
+### `client/bridge/hr_chat.py` — 188 строк
 
 Переписка с человеком: страница сообщений, отправка, прочтение.
 
-Зависит от: `backend.bot.chat`, `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.bot.chat`, `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.wire`
 
-- `class HrChat` (161)
-  - `def messages(self, payload: dict) -> dict` (23)
-  - `async def _paged(self, asked: dict, before_sent_at) -> dict` (17)
+- `class HrChat` (168)
+  - `def messages(self, payload: dict) -> dict` (30)
+  - `async def _paged(self, asked: dict, before_sent_at, limit: int) -> dict` (17)
   - `async def _sent(self, sending, hr_id: int, action: str) -> dict` (28)
   - `def mark_read(self, hr_id: int) -> dict` (19)
     - `async def run() -> dict` (10)
@@ -2024,7 +2028,7 @@ Runtime settings layer.
   - `def list_models(self, payload: dict) -> dict` (23)
     - `async def run() -> dict` (7)
 
-### `client/bridge/login.py` — 131 строк
+### `client/bridge/login.py` — 129 строк
 
 Вход в Telegram: три шага, общие основному окну и мастеру.
 
@@ -2036,8 +2040,8 @@ Runtime settings layer.
 - `async def code_step(login, code: str) -> LoginStep` (10)
 - `async def password_step(login, password: str) -> LoginStep` (10)
 - `async def step_payload(step_coro) -> dict` (11)
-- `class Login` (57)
-  - `def send_code(self, payload: dict) -> dict` (18)
+- `class Login` (55)
+  - `def send_code(self, payload: dict) -> dict` (16)
   - `def confirm_code(self, payload: dict) -> dict` (10)
   - `def confirm_password(self, payload: dict) -> dict` (10)
 
@@ -2064,7 +2068,7 @@ Runtime settings layer.
 - `def _under_media(stored_path: str) -> str | None` (14)
 - `def _avatar_data_url(blob: bytes | None) -> str | None` (9)
 
-### `client/bridge/page.py` — 88 строк
+### `client/bridge/page.py` — 89 строк
 
 Запрос списка, прочитанный из нагрузки окна: сколько, откуда и что искать.
 
@@ -2113,7 +2117,7 @@ Runtime settings layer.
     - `async def run() -> dict` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (16)
 
-### `client/bridge/refusals.py` — 193 строк
+### `client/bridge/refusals.py` — 195 строк
 
 Слова, которыми мост отказывает окну.
 
@@ -2874,15 +2878,15 @@ Runtime settings layer.
   - `def run_ui()` (3)
 - `def _write_through(module, text: str) -> str` (22)
 
-### `tests/backend/test_flows_application_choice.py` — 395 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_application_choice.py` — 414 строк ⚠ подошёл к 300
 
 Что именно уходит HR при отклике на вакансию.
 
 Зависит от: `backend.flows`, `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 18
+Тестов: 19
 
-- `async def applying(make_pipeline, session_factory, tmp_path, monkeypatch)` (33)
+- `async def applying(make_pipeline, session_factory, tmp_path, monkeypatch)` (35)
   - `async def generate_cover_letter(block, parsed, client, model, *, channel_ref=None)` (3)
 
 ### `tests/backend/test_flows_backfill_deletes.py` — 162 строк
@@ -2978,13 +2982,13 @@ Runtime settings layer.
 
 - `def _letter(tg_msg_id: int, text: str) -> dict` (15)
 
-### `tests/backend/test_flows_dm_drain.py` — 250 строк
+### `tests/backend/test_flows_dm_drain.py` — 272 строк
 
 Следствия гашения отложенных разборов при остановке и выключении.
 
 Зависит от: `backend.flows`, `backend.payloads`
 
-Тестов: 12
+Тестов: 13
 
 - `def _outlasts_the_wait(started: asyncio.Event)` (13)
   - `async def reading(pipeline, hr_id)` (4)
@@ -3062,7 +3066,7 @@ Runtime settings layer.
 - `async def spawning(make_pipeline, session_factory, monkeypatch)` (21)
   - `async def backfill(hr_row_, dm, hooks, **kwargs)` (5)
 
-### `tests/backend/test_flows_incoming_attribution.py` — 397 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_incoming_attribution.py` — 400 строк ⚠ подошёл к 300
 
 К какой вакансии бот относит письмо HR и что делает дальше.
 
@@ -3104,7 +3108,7 @@ Runtime settings layer.
 - `async def carded(monkeypatch, make_pipeline, session_factory)` (25)
   - `async def send_application(pipeline, hr_row_, parsed, vacancy_id, *, force=False)` (3)
 
-### `tests/backend/test_flows_new_vacancy.py` — 233 строк
+### `tests/backend/test_flows_new_vacancy.py` — 240 строк
 
 Следствия заведения строки под новое объявление.
 
@@ -3113,13 +3117,13 @@ Runtime settings layer.
 Тестов: 12
 
 
-### `tests/backend/test_flows_parse_persist.py` — 385 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_parse_persist.py` — 424 строк ⚠ подошёл к 300
 
 Что остаётся в базе после разбора объявления.
 
-Зависит от: `backend.flows`, `backend.models`, `backend.payloads`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.flows`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`, `tests.dbio`, `tests.factories`
 
-Тестов: 17
+Тестов: 18
 
 
 ### `tests/backend/test_flows_parse_verdict.py` — 277 строк
@@ -3131,13 +3135,13 @@ Runtime settings layer.
 Тестов: 15
 
 
-### `tests/backend/test_flows_post_intake.py` — 327 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_post_intake.py` — 353 строк ⚠ подошёл к 300
 
 Что бот делает с очередным объявлением из канала.
 
 Зависит от: `adapters`, `backend.flows`, `tests.fakes.telegram`
 
-Тестов: 14
+Тестов: 15
 
 - `async def intake(make_pipeline, monkeypatch)` (35)
   - `async def embed(client, model, text)` (3)
@@ -3145,15 +3149,15 @@ Runtime settings layer.
   - `async def parse(pipeline, vacancy_id, text, username, allow_delete=True)` (3)
   - `async def unparsed(pipeline, vacancy_id)` (2)
 
-### `tests/backend/test_flows_reply_reading.py` — 302 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_reply_reading.py` — 327 строк ⚠ подошёл к 300
 
 Следствия разбора накопленного ответа HR.
 
 Зависит от: `backend.flows`, `backend.models`, `backend.payloads`, `backend.repository.vacancies_life`, `tests.dbio`, `tests.factories`
 
-Тестов: 12
+Тестов: 13
 
-- `async def reading(make_pipeline, session_factory, monkeypatch)` (33)
+- `async def reading(make_pipeline, session_factory, monkeypatch)` (36)
   - `async def classify_hr_reply(text, status, client, model)` (5)
 - `def _buffer(pipeline, hr, vacancy, message, *texts)` (11)
 
@@ -3203,28 +3207,29 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/backend/test_health.py` — 42 строк
+### `tests/backend/test_health.py` — 57 строк
 
 Следствия вопроса «живо ли то, на чём держится работа».
 
-Зависит от: `backend.health`
+Зависит от: `backend.health`, `backend.runtime_settings`
 
-Тестов: 2
+Тестов: 3
 
 - `class Stopped` (5)
   - `def __call__(self)` (2)
 - `class Bot` (3)
 
-### `tests/backend/test_llm_classify_reply.py` — 239 строк
+### `tests/backend/test_llm_classify_reply.py` — 274 строк
 
 Следствия разбора ответа HR в новый статус вакансии.
 
 Зависит от: `backend.llm.hr_reply`, `backend.models`, `tests.fakes.llm`
 
-Тестов: 15
+Тестов: 16
 
 - `def _allowed_line(client) -> str` (9)
 - `def _verdict(status: str, explanation: str | None=None) -> httpx.Response` (3)
+- `async def _read(text, status, client, model='qwen')` (9)
 
 ### `tests/backend/test_llm_company_arbiter.py` — 342 строк ⚠ подошёл к 300
 
@@ -3238,15 +3243,16 @@ Runtime settings layer.
 - `def _answer(matched_id=None, reasoning=None) -> httpx.Response` (3)
 - `async def _ask(client, candidates, name='Сбербанк Тех', website=None)` (9)
 
-### `tests/backend/test_llm_cover_letter.py` — 361 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_cover_letter.py` — 404 строк ⚠ подошёл к 300
 
 Следствия составления письма-отклика.
 
 Зависит от: `backend.llm.cover_letter`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 22
+Тестов: 24
 
 - `def _client(letter: str, *, finish_reason: str='stop', factcheck: str=PASSES)` (10)
+- `async def _written(*args, **kwargs)` (10)
 
 ### `tests/backend/test_llm_cv_items.py` — 190 строк
 
@@ -3308,13 +3314,13 @@ Runtime settings layer.
 
 - `def _verdict(verdict, issues=None) -> httpx.Response` (3)
 
-### `tests/backend/test_llm_fit_validation.py` — 406 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_fit_validation.py` — 426 строк ⚠ подошёл к 300
 
 Следствия проверки вакансии на пригодность кандидату.
 
 Зависит от: `backend.llm.candidate`, `backend.llm.fit`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 21
+Тестов: 22
 
 - `def _answer(verdict, reason=None) -> httpx.Response` (3)
 - `async def _check(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (11)
@@ -3678,13 +3684,13 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/backend/test_repository_hr_blacklist_marks.py` — 221 строк
+### `tests/backend/test_repository_hr_blacklist_marks.py` — 262 строк
 
 Следствия сопоставления HR со строками чёрного списка.
 
-Зависит от: `backend.models`, `backend.repository.blacklist_marks`, `backend.repository.hr_card`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.blacklist_marks`, `backend.repository.hr_card`, `backend.repository.hr_identify`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
-Тестов: 12
+Тестов: 14
 
 
 ### `tests/backend/test_repository_hr_card.py` — 117 строк
@@ -3714,11 +3720,11 @@ Runtime settings layer.
 Тестов: 9
 
 
-### `tests/backend/test_repository_hr_identity.py` — 133 строк
+### `tests/backend/test_repository_hr_identity.py` — 140 строк
 
 Следствия опознания отправителя входящего сообщения.
 
-Зависит от: `backend.repository.hr_identify`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
+Зависит от: `backend.models`, `backend.repository.hr_identify`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
 Тестов: 7
 
@@ -3901,7 +3907,7 @@ Runtime settings layer.
 Тестов: 9
 
 
-### `tests/backend/test_repository_stats_kpi.py` — 271 строк
+### `tests/backend/test_repository_stats_kpi.py` — 280 строк
 
 Следствия сводных счётчиков в шапке экрана статистики.
 
@@ -4309,13 +4315,13 @@ Runtime settings layer.
 Тестов: 17
 
 
-### `tests/client/test_bridge_cv.py` — 133 строк
+### `tests/client/test_bridge_cv.py` — 145 строк
 
 Следствия резюме — файла, путь к которому помнит окно.
 
 Зависит от: `tests.client.conftest`
 
-Тестов: 8
+Тестов: 9
 
 
 ### `tests/client/test_bridge_events.py` — 218 строк
@@ -4336,13 +4342,13 @@ Runtime settings layer.
 Тестов: 18
 
 
-### `tests/client/test_bridge_hr_chat.py` — 221 строк
+### `tests/client/test_bridge_hr_chat.py` — 244 строк
 
 Следствия переписки: что окно показывает и чем отвечают на отправку.
 
 Зависит от: `tests.client.conftest`, `tests.dbio`, `tests.factories`
 
-Тестов: 11
+Тестов: 12
 
 
 ### `tests/client/test_bridge_journal.py` — 126 строк

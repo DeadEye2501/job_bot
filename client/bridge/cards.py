@@ -33,7 +33,7 @@ from dataclasses import dataclass
 import logging
 
 from backend.incoming import text_or_none
-from client.bridge.answer import Denied, asked_id, bad_fields, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, asked_id, bad_fields, reply
 from client.bridge.page import read_page, read_search
 from client.bridge.pickers import PickerSubject, merge_picker
 from client.bridge.refusals import MERGE_INTO_SELF
@@ -125,7 +125,7 @@ def merge_candidates(hub, subject: CardSubject, payload: dict) -> dict:
     try:
         absorbed_id = int(payload["absorbed_id"])
         search = text_or_none(payload.get("search"))
-    except (ValueError, TypeError, KeyError) as e:
+    except BAD_PAYLOAD as e:
         return bad_fields(f"{subject.domain}.merge_picker", e)
 
     async def run() -> dict:
@@ -146,7 +146,7 @@ def merge_into(hub, subject: CardSubject, payload: dict) -> dict:
     try:
         absorbed_id = int(payload["absorbed_id"])
         survivor_id = int(payload["survivor_id"])
-    except (ValueError, TypeError, KeyError) as e:
+    except BAD_PAYLOAD as e:
         return bad_fields(f"{subject.domain}.merge", e)
 
     async def run() -> dict:
@@ -200,9 +200,7 @@ def create_card(hub, subject: CardSubject, payload: dict) -> dict:
     """
     try:
         fields = subject.read_fields(payload)
-    # `AttributeError` — про не-объект в нагрузке: чтение идёт по ключам, и
-    # спотыкается оно до мотора, мимо конверта.
-    except (AttributeError, ValueError, TypeError) as e:
+    except BAD_PAYLOAD as e:
         return bad_fields(f"{subject.domain}.create", e)
 
     async def run() -> dict:

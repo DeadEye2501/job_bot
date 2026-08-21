@@ -11,7 +11,7 @@ import httpx
 
 from adapters import lm_models, lm_studio
 from adapters.lm_studio import LlmProviderConfig
-from client.bridge.answer import Denied, bad_fields, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, reply
 from client.bridge.refusals import LLM_FIELDS_REQUIRED
 
 
@@ -164,7 +164,7 @@ class Llm:
             if kind not in ("chat", "embed"):
                 raise ValueError(f"неизвестный род: {kind!r}")
             cfg = read_llm_creds(payload)
-        except (AttributeError, TypeError, ValueError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("probe_model", e, kind=kind)
 
         check_fn = partial(lm_models.check_model, kind=kind)

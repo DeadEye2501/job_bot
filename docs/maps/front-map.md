@@ -12,27 +12,31 @@
 - * Слушатель вестей поверх зова, который спрашивает мост «что нового после N». * * Зов приходит доводом, а не берётся отсюда: так цикл проверяется без окна и * без моста вовсе, а другого способа его проверить нет — он бесконечен по * устройству.
 - отдаёт: listener
 
-## app — 25 файлов
+## app — 26 файлов
 
 ### app/BlacklistList.svelte (218)
 - —
 - принимает: ask, say, events
 
+### app/BottomBar.svelte (251)
+- Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
+- принимает: ask, say, events, onlocked, oncontact
+
 ### app/ChannelCard.svelte (284)
 - Легенда под полосой: одиннадцать цветов без подписей не читаются, а подписать отрезки внутри полосы негде.
 - принимает: ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged
 
-### app/ChannelsList.svelte (195)
+### app/ChannelsList.svelte (208)
 - Один переключатель на весь список: он же и показывает, все ли каналы опрашиваются.
 - принимает: ask, say, lockedTip, events, open, onopened, onvacancy
 - берёт: ./ChannelCard.svelte
 
-### app/CompaniesList.svelte (128)
+### app/CompaniesList.svelte (135)
 - —
 - принимает: ask, say, events, open, onopened, onperson, onvacancy
 - берёт: ./CompanyCard.svelte
 
-### app/CompanyCard.svelte (284)
+### app/CompanyCard.svelte (280)
 - Написания: под ними компания приходит в объявлениях. Потеряй карточка одно из них — следующая вакансия завела бы компанию заново.
 - принимает: ask, say, companyId, onperson, onvacancy, onclose, onchanged
 
@@ -45,17 +49,17 @@
 - —
 - принимает: ask, events, say
 
-### app/PeopleList.svelte (126)
+### app/PeopleList.svelte (133)
 - —
 - принимает: ask, say, events, open, onopened, oncompany, onvacancy
 - берёт: ./PersonCard.svelte
 
-### app/PersonCard.svelte (288)
+### app/PersonCard.svelte (284)
 - Своя запись на каждого человека: поле запечатывает номер при заведении, и заводиться заново на каждого его заставляет именно `{#key}` — без него запечатанный номер протухнет.
 - принимает: ask, say, events, personId, oncompany, onvacancy, onclose, onchanged
 - берёт: ./PersonChat.svelte
 
-### app/PersonChat.svelte (264)
+### app/PersonChat.svelte (273)
 - Строка отправки остаётся на месте и при заслоне, только запертой: пропав, она не сказала бы, почему писать нельзя.
 - принимает: ask, say, hrId, blocked, events, onread
 
@@ -63,7 +67,7 @@
 - —
 - принимает: ask
 
-### app/ProfileExperience.svelte (136)
+### app/ProfileExperience.svelte (146)
 - —
 - принимает: ask
 
@@ -81,9 +85,9 @@
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
 
-### app/Shell.svelte (439)
-- Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
-- берёт: ./ContactsScreen.svelte, ./LogsScreen.svelte, ./ProfileScreen.svelte, ./SettingsScreen.svelte, ./StatsScreen.svelte, ./VacanciesScreen.svelte, ./WizardScreen.svelte
+### app/Shell.svelte (250)
+- —
+- берёт: ./BottomBar.svelte, ./ContactsScreen.svelte, ./LogsScreen.svelte, ./ProfileScreen.svelte, ./SettingsScreen.svelte, ./StatsScreen.svelte, ./VacanciesScreen.svelte, ./WizardScreen.svelte
 
 ### app/StatsScreen.svelte (124)
 - Числа считает бот, а не окно: пересчитать за тот же срок иначе нечем — пришлось бы уходить в другой раздел и возвращаться.
@@ -98,12 +102,12 @@
 - принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte
 
-### app/VacancyCard.svelte (396)
+### app/VacancyCard.svelte (390)
 - Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою оценку.
 - принимает: ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged
 - берёт: ./VacancyLinks.svelte
 
-### app/VacancyLinks.svelte (131)
+### app/VacancyLinks.svelte (133)
 - —
 - принимает: ask, say, vacancyId, kind, prefill, current, onclose, onlinked
 
@@ -141,9 +145,9 @@
 - принимает: value, trouble, saving, oninput, onadd, onclose
 - берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte
 
-### components/AskDialog.svelte (42)
+### components/AskDialog.svelte (62)
 - Окно берёт на себя Escape, но не Enter: в нём набирают заметки в несколько строк, и подтверждение по Enter обрывало бы заведение на первом же переводе строки.
-- принимает: icon, title, subtitle, confirmLabel, ready, onconfirm, oncancel, children
+- принимает: icon, title, subtitle, confirmLabel, busyLabel, busy, ready, onconfirm, oncancel, children
 - берёт: ./ModalShell.svelte
 
 ### components/Avatar.svelte (20)
@@ -168,7 +172,7 @@
 - принимает: row, onedit, ontoggle, onremove
 - берёт: ./RowToggle.svelte
 
-### components/BulletList.svelte (59)
+### components/BulletList.svelte (36)
 - —
 - принимает: label, addLabel, items, onedit, onadd, onremove
 
@@ -303,7 +307,7 @@
 - принимает: extra, over, confirm, awayCloses, onclose, children
 - берёт: ./ModalKeys.svelte
 
-### components/ModeToggle.svelte (29)
+### components/ModeToggle.svelte (34)
 - —
 - принимает: mode, disabled, title, onpick
 
@@ -319,9 +323,9 @@
 - Номер учётной записи — только цифры: на телефоне открывается цифровая раскладка, а мост всё равно приводит его к числу.
 - принимает: draft
 
-### components/NotesField.svelte (68)
+### components/NotesField.svelte (74)
 - —
-- принимает: value, placeholder, delay, owner, save
+- принимает: value, placeholder, owner, save
 
 ### components/PersonRow.svelte (47)
 - Ник и компания красятся порознь: по нику находят в Telegram, по компании вспоминают, откуда человек писал.
@@ -462,7 +466,7 @@
 - Половины подписи покрашены по-разному: компанию читают первой, а давность — последней, и одинаковый цвет заставлял бы разбирать строку целиком.
 - принимает: vacancy, threshold, selected, onpick
 
-### components/VacancyTimeline.svelte (108)
+### components/VacancyTimeline.svelte (107)
 - —
 - принимает: rows, vacancyId, onsave
 
@@ -478,7 +482,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 48 файлов
+## state — 49 файлов
 
 ### state/alive.js (51)
 - * Заводит признак жизни экрана.
@@ -492,9 +496,9 @@
 - * Заводит отложенную запись поля. * * Пауза считается от последнего знака: запись на каждый знак послала бы мосту * по вопросу на букву, а отсчёт от первого отправлял бы недописанное. * * `save` отвечает, легло ли: ложь означает отказ, и тогда набранное считается * незаписанным — следующая попытка уедет тем же текстом.
 - отдаёт: autosave
 
-### state/autosize.js (24)
+### state/autosize.js (51)
 - * Подогнать высоту поля под его текст. * * Сжатие до `auto` перед замером несущее: растянутое поле показывает прежнюю * высоту и после того, как текст из него убрали, — стёртый абзац оставил бы * после себя дыру во весь свой рост.
-- отдаёт: fitHeight
+- отдаёт: fitHeight, growing
 
 ### state/avatar.js (19)
 - * Буквы имени на месте снимка. * * Снимок есть не у всех: у заведённых руками его нет вовсе, а пустой кружок * читается как недогрузившаяся картинка. Берутся первое слово и последнее — * имя и фамилия; отчество между ними ничего не различает.
@@ -552,7 +556,7 @@
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
 - отдаёт: asIso, dayOf, isoDay, padded, shortDate, showDate, showStamp, validDate
 
-### state/experience.js (71)
+### state/experience.js (83)
 - * Период работы для шапки карточки. * * Месяц и год без дня: места работы различают по месяцам, а день удлиняет * строку вдвое. Открытый конец назван словами — по нему и читают, работает * человек здесь сейчас или нет.
 - отдаёт: cardTitle, experienceGoing, experienceReady, period
 
@@ -576,9 +580,13 @@
 - * Уровни на пилюлях — от беды к мелочи. Порядок постоянный: по нему человек * метит в нужную пилюлю, не читая подписей. * * `id` — то, что приходит в записи с питона; `tone` — имя цвета; значок * лигатурой шрифта. `CRITICAL` своей пилюли не имеет: его накрывает `ERROR`.
 - отдаёт: AT_FIRST, LEVELS, askDelay, emptyText, levelTone, logTime, mayHide, shown
 
-### state/modes.js (26)
+### state/modes.js (44)
 - * Три положения слева направо. Порядок несущий: по нему считается, в какую * треть дорожки попало нажатие.
-- отдаёт: OFF, modeAt
+- отдаёт: OFF, modeAt, nextMode
+
+### state/new_card.js (47)
+- * Обвязка формы заведения по роду карточки. * * `named` держится рядом с `blank` нарочно: пустой черновик и заслон, который * решает, что он уже не пустой, — две половины одного правила, и разъехавшись, * они дали бы кнопку, открытую над формой, которую мост отобьёт.
+- отдаёт: NEW_CARD
 
 ### state/one_write.js (49)
 - * Заводит запись, у которой в полёте не бывает двух снимков. * * `write` отвечает, а не бросает: отказ моста — обычное дело для анкеты, и все * трое зовущих ловят его у себя, каждый своими словами человеку. * * Отдаёт обещание, которое кончается вместе с отправкой снимка: на нём держится * и уход с вкладки — набранное должно успеть уехать. * * Кончается оно исходом последней уехавшей записи, а не своей: сведённый снимок * включает в себя все, что были до него, и «легло ли» — это про него.
@@ -656,7 +664,7 @@
 - * Почему отправка и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Отклик уходит человеку, и без привязанного HR слать его некому; разбору же * HR не нужен — он его как раз и находит.
 - отдаёт: actionBlocks, rawChips
 
-### state/vacancy_card.js (160)
+### state/vacancy_card.js (161)
 - * Своя запись правится, чужая читается: пояснение бота — след его работы, а не * заметка, и правка стирала бы то, по чему потом разбираются.
 - отдаёт: timelineRows
 
@@ -1213,10 +1221,13 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 51 файлов
+## tests — 58 файлов
 
 ### tests/alive.test.js (79)
 - —
+
+### tests/ask_dialog_live.test.js (55)
+- * Окно с записанным за ним следом нажатий.
 
 ### tests/attempts.test.js (32)
 - —
@@ -1224,7 +1235,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/autosave.test.js (139)
 - —
 
-### tests/autosize.test.js (49)
+### tests/autosize.test.js (85)
 - * Поле, помнящее всё, что ему ставили в высоту. * * Измеренная высота отвечает по последнему поставленному: настоящее поле * меряет содержимое ровно так — сжатое до `auto` показывает свой текст, а * растянутое прежним значением показывает это самое прежнее.
 
 ### tests/avatar.test.js (27)
@@ -1236,8 +1247,11 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item.test.js (114)
 - * Кому эти слова положены: сам пункт, окошко ручного занесения и кнопка на * вкладке отсева. Всем прочим — нет: там это была бы четвёртая копия.
 
-### tests/blacklist_menu_item_live.test.js (62)
+### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
+
+### tests/bottom_bar_live.test.js (71)
+- * Дождаться, пока осядут ответы моста и отрисовка.
 
 ### tests/bridge.test.js (161)
 - —
@@ -1270,6 +1284,9 @@ body, html, button, body, .material-symbols-outlined
 ### tests/channels.test.js (186)
 - —
 
+### tests/channels_list_live.test.js (75)
+- * Дождаться, пока осядут ответы моста и отрисовка.
+
 ### tests/chat.test.js (157)
 - —
 
@@ -1285,13 +1302,13 @@ body, html, button, body, .material-symbols-outlined
 ### tests/events.test.js (205)
 - * Мост, отвечающий заготовленным, а на исходе — закрытой очередью.
 
-### tests/experience.test.js (108)
+### tests/experience.test.js (118)
 - —
 
 ### tests/flash.test.js (34)
 - —
 
-### tests/footer.test.js (149)
+### tests/footer.test.js (159)
 - —
 
 ### tests/fresh.test.js (71)
@@ -1312,6 +1329,9 @@ body, html, button, body, .material-symbols-outlined
 
 ### tests/notes_field.test.js (66)
 - * Файлы разметки, ставящие поле заметки, вместе с их содержимым.
+
+### tests/notes_field_delay_live.test.js (51)
+- —
 
 ### tests/notes_field_live.test.js (62)
 - * Поле заметки с записанными за ним отправками.
@@ -1334,11 +1354,17 @@ body, html, button, body, .material-symbols-outlined
 ### tests/people.test.js (208)
 - —
 
+### tests/person_chat_live.test.js (78)
+- * Переписка с записанными за ней просьбами к мосту.
+
 ### tests/picker.test.js (64)
 - —
 
 ### tests/profile.test.js (115)
 - —
+
+### tests/profile_experience_live.test.js (80)
+- * Дождаться, пока осядут ответы моста и отрисовка.
 
 ### tests/provider.test.js (101)
 - * Отказ моста в том виде, в каком его поднимает обёртка зова.
@@ -1365,6 +1391,9 @@ body, html, button, body, .material-symbols-outlined
 - —
 
 ### tests/vacancy_filter.test.js (241)
+- —
+
+### tests/vacancy_timeline_live.test.js (43)
 - —
 
 ### tests/wizard.test.js (194)

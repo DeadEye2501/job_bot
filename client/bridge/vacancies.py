@@ -12,7 +12,7 @@ from backend.repository import (
     vacancies_list,
     vacancy_status,
 )
-from client.bridge.answer import Denied, bad_fields, denied, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
 from client.bridge.hub import Hub
 from client.bridge.refusals import NO_VACANCY
 from client.bridge.page import read_page
@@ -145,7 +145,7 @@ class Vacancies(VacancyActions, VacancyLinks):
         try:
             vacancy_id = int(payload["vacancy_id"])
             notes = _typed_text(payload.get("notes"))
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("save_notes", e)
 
         async def run() -> dict:
@@ -173,7 +173,7 @@ class Vacancies(VacancyActions, VacancyLinks):
             history_id = int(payload["history_id"])
             vacancy_id = int(payload["vacancy_id"])
             explanation = _typed_text(payload.get("explanation"))
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("save_history_explanation", e)
 
         async def run() -> dict:
@@ -210,7 +210,7 @@ class Vacancies(VacancyActions, VacancyLinks):
             vacancy_id = int(payload["vacancy_id"])
             status_raw = str(payload["status"]).strip()
             explanation = _typed_text(payload.get("explanation"))
-        except (ValueError, TypeError, KeyError) as e:
+        except BAD_PAYLOAD as e:
             return bad_fields("change_status", e)
         try:
             new_status = VacancyStatus(status_raw)
