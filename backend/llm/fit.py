@@ -17,7 +17,7 @@ import httpx
 
 from adapters.lm_chat import ChatRequest, chat
 
-from backend.payloads import FIT_VERDICTS, FitValidation, ParsedVacancy
+from backend.payloads import FitValidation, ParsedVacancy
 
 from backend.llm.answers import (
     ONLY_JSON,
@@ -40,6 +40,15 @@ from backend.llm.rules import VACANCY_TEXT_CHARS
 # сдаётся, а зовущий записывает строку с названной причиной.
 MAX_FIT_TOKENS = 1200
 ROOMIER_FIT_TOKENS = 2400
+
+ASKED_VERDICTS: tuple[str, ...] = ("fit", "reject")
+"""Что может ответить зов о пригодности.
+
+«Мусор» сюда не входит, хотя перечисление вердиктов его знает: вакансия ли
+это, решает зов о жанре, и решает раньше. Прими мы «мусор» от зова о роли или
+о языках — вакансию удалил бы тот, кого о жанре не спрашивали, а вернуть её
+нечем: курсор канала уже ушёл вперёд.
+"""
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +111,7 @@ def _parse_fit_validation(answer: str, purpose: str) -> FitValidation | None:
     if data is None:
         return None
 
-    verdict = normalize_enum(data.get("verdict"), FIT_VERDICTS)
+    verdict = normalize_enum(data.get("verdict"), ASKED_VERDICTS)
     if verdict is None:
         return None
 
@@ -136,7 +145,7 @@ def _without_candidate_data(
     но отвергла по делу. Переверни мы и его, при включённой автоотправке
     письмо ушло бы живому HR по вакансии, отвергнутой правильно.
     """
-    if validation.verdict not in ("reject", "trash") or validation.reason is None:
+    if validation.verdict != "reject" or validation.reason is None:
         return validation
     style = breaks_reason_style(validation.reason)
     if style is None:

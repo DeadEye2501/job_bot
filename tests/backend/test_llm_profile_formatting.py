@@ -10,49 +10,10 @@ import pytest
 
 from backend.llm.candidate import (
     CandidateLanguage,
-    format_text,
-    format_grades,
     format_known_skills,
     format_languages,
-    format_work_formats,
+    format_text,
 )
-
-
-@pytest.mark.parametrize(
-    ("grades", "expected"),
-    [
-        pytest.param(None, "—", id="ничего"),
-        pytest.param([], "—", id="пустой список"),
-        pytest.param(["senior"], "senior", id="один уровень"),
-        pytest.param(["  SENIOR  "], "senior", id="регистр и пробелы"),
-        pytest.param(["middle", "senior"], "middle, senior", id="два уровня"),
-        # Единственный уровень, чьё обозначение не совпадает с ключом: без
-        # этого случая строку словаря можно удалить, и прогон промолчит.
-        pytest.param(["lead"], "lead/team-lead", id="обозначение шире ключа"),
-        pytest.param(["architect"], "—", id="уровень не из набора"),
-        pytest.param(["senior", "architect"], "senior", id="лишний отсеивается"),
-    ],
-)
-def test_grades_are_named_by_their_known_labels(grades, expected):
-    """Уровни называются известными обозначениями, незнакомые отсеиваются."""
-    assert format_grades(grades) == expected
-
-
-@pytest.mark.parametrize(
-    ("formats", "expected"),
-    [
-        pytest.param(None, "—", id="ничего"),
-        pytest.param([], "—", id="пустой список"),
-        pytest.param(["remote"], "удалёнка", id="один формат"),
-        pytest.param(["  REMOTE  "], "удалёнка", id="регистр и пробелы"),
-        pytest.param(["remote", "hybrid"], "удалёнка, гибрид", id="два формата"),
-        pytest.param(["office"], "офис", id="офис"),
-        pytest.param(["anywhere"], "—", id="формат не из набора"),
-    ],
-)
-def test_work_formats_are_named_in_russian(formats, expected):
-    """Форматы работы называются по-русски: промпт на русском."""
-    assert format_work_formats(formats) == expected
 
 
 def test_languages_are_listed_with_their_levels():

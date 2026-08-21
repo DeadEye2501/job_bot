@@ -79,6 +79,30 @@ async def test_the_office_in_the_candidates_own_city_is_no_blocker(
     assert saved.skip_reason is None
 
 
+async def test_a_vacancy_is_not_deleted_by_a_verdict_nobody_asked_for(
+    parsing, session_factory
+):
+    """Ответ «мусор» от зова о пригодности вакансию не удаляет.
+
+    Жанр поста решён раньше и отдельным зовом: он сказал «вакансия». Ответь
+    после этого зов о роли «мусор» — прежде строка была бы удалена при
+    обычном сборе, то есть пост исчез бы по слову того, кого о жанре не
+    спрашивали, и вернуть его нечем: курсор канала ушёл вперёд.
+    """
+    pipeline, vacancy = parsing
+    pipeline.verdict_by["роль"] = FitValidation(
+        verdict="trash", reason="это реклама курсов"
+    )
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=True
+    )
+
+    saved = await only_row(session_factory, Vacancy)
+    assert saved.status is VacancyStatus.NOT_FIT
+    assert saved.skip_reason == "llm: это реклама курсов"
+
+
 async def test_all_three_questions_are_asked_when_nothing_blocks(parsing):
     """Прошедшую вакансию спрашивают по всем трём: роль, языки, предпочтения."""
     pipeline, vacancy = parsing
