@@ -460,7 +460,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def is_terminal_for_auto(status: VacancyStatus) -> bool` (9)
 - `def should_apply_status(current: VacancyStatus, new: VacancyStatus, *, force: bool=False) -> bool` (28)
 
-### `backend/domain/verdict.py` — 90 строк
+### `backend/domain/verdict.py` — 91 строк
 
 Приговор разобранному объявлению до того, как оно войдёт в граф статусов.
 
@@ -681,7 +681,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None` (16)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 
-### `backend/flows/parse.py` — 436 строк ⚠ подошёл к 300
+### `backend/flows/parse.py` — 438 строк ⚠ подошёл к 300
 
 Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
@@ -694,7 +694,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _genre_refusal(pipeline, text: str, vacancy_id: int) -> tuple[str | None, bool]` (20)
 - `async def _model_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (13)
 - `async def _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus) -> None` (36)
-- `async def _parsed_or_dropped(pipeline, vacancy_id: int, text: str, channel_username: str, allow_delete: bool)` (44)
+- `async def _parsed_or_dropped(pipeline, vacancy_id: int, text: str, channel_username: str, allow_delete: bool)` (46)
 - `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (33)
 - `async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> bool` (18)
 - `async def _thrown_out_by_the_verdict(pipeline, vacancy_id: int, skip_reason: str | None, allow_delete: bool) -> bool` (16)
@@ -751,7 +751,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def cancel_pending_dm_classifications(self, *, drain=False) -> None` (2)
   - `async def send_application_for_vacancy(self, vacancy_id) -> tuple[bool, str]` (2)
 
-### `backend/flows/rerun.py` — 451 строк ⚠ подошёл к 300
+### `backend/flows/rerun.py` — 456 строк ⚠ подошёл к 300
 
 Повторный разбор уже заведённой вакансии.
 
@@ -934,7 +934,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
 - `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (55)
 
-### `backend/llm/rules.py` — 131 строк
+### `backend/llm/rules.py` — 136 строк
 
 Приметы предметной области, общие для наставлений модели.
 
