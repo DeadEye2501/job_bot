@@ -6,7 +6,7 @@
   import NewCompanyFields from '$components/NewCompanyFields.svelte';
   import CompanyRow from '$components/CompanyRow.svelte';
   import SearchBox from '$components/SearchBox.svelte';
-  import { blankCompany, companyNamed } from '$state/companies.js';
+  import { NEW_CARD } from '$state/new_card.js';
   import { takeOpened } from '$state/open_mark.js';
   import { pagedList } from '$state/paged_list.svelte.js';
 
@@ -20,10 +20,13 @@
     key: 'companies',
   });
 
-  let adding = $state(false);
-  let draft = $state(blankCompany());
+  const FORM = NEW_CARD.company;
 
-  const ready = $derived(companyNamed(draft));
+  let adding = $state(false);
+  let saving = $state(false);
+  let draft = $state(FORM.blank());
+
+  const ready = $derived(FORM.named(draft));
   let opened = $state(null);
 
   // Какую компанию открыть, придя из карточки вакансии.
@@ -32,13 +35,15 @@
   async function create() {
     const name = draft.name.trim();
     if (!ready) return;
+    saving = true;
     const done = await ask('companies.create', { ...draft, name });
+    saving = false;
     // Окно закрываем только по удаче: чаще всего отказ — это занятое имя, и
     // набранное человеку ещё пригодится.
     if (done === null) return;
     adding = false;
-    draft = blankCompany();
-    say('Компания заведена');
+    draft = FORM.blank();
+    say(FORM.done);
     // Тем же потолком, что и по вести: заведение не повод схлопывать
     // пролистанное.
     return list.again();
@@ -69,7 +74,7 @@
   {#snippet toolbar()}
     <SearchBox
       value={list.search}
-      placeholder="Поиск по названию, алиасу, домену..."
+      placeholder={FORM.searchHint}
       onsearch={list.find}
     />
     <button
@@ -78,7 +83,7 @@
       title="Добавить компанию"
       onclick={() => (adding = true)}
     >
-      <span class="material-symbols-outlined">add_business</span>
+      <span class="material-symbols-outlined">{FORM.icon}</span>
     </button>
   {/snippet}
 
@@ -115,10 +120,12 @@
 
 {#if adding}
   <AskDialog
-    icon="domain_add"
-    title="Новая компания"
-    subtitle="Название обязательно, остальное можно дописать потом."
+    icon={FORM.icon}
+    title={FORM.title}
+    subtitle={FORM.subtitle}
     confirmLabel="Создать"
+    busyLabel={FORM.busyLabel}
+    busy={saving}
     {ready}
     onconfirm={create}
     oncancel={() => (adding = false)}

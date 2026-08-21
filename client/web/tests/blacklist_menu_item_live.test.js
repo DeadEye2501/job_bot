@@ -38,12 +38,17 @@ describe('живой пункт «в отсев»', () => {
     // отдельности каждая зелена и при перепутанном условии.
     const off = item(false);
     expect(off.button.textContent).toContain('Добавить в blacklist');
+    // Значок считается по тому же условию и был третьей его половиной, не
+    // сверявшейся нигде во всём дереве: перепутай её — и у отсеянной компании
+    // рядом со словами «Убрать из blacklist» стоял бы знак запрета.
+    expect(off.button.textContent).toContain('block');
     off.button.click();
     expect(off.trail).toContain('занесён в отсев');
     expect(off.trail).not.toContain('убран из отсева');
 
     const on = item(true);
     expect(on.button.textContent).toContain('Убрать из blacklist');
+    expect(on.button.textContent).toContain('restart_alt');
     on.button.click();
     expect(on.trail).toContain('убран из отсева');
     expect(on.trail).not.toContain('занесён в отсев');

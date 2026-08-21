@@ -13,7 +13,7 @@
   import { living } from '$state/alive.js';
   import { byDays, unread } from '$state/chat.js';
   import { freshAnswer } from '$state/fresh.js';
-  import { appended, nearTop } from '$state/paging.js';
+  import { appended, nearTop, refreshLimit } from '$state/paging.js';
 
   let { ask, say, hrId, blocked, events, onread } = $props();
 
@@ -31,19 +31,28 @@
 
   const days = $derived(byDays(messages, new Date()));
 
-  /** Прочитать хвост переписки — полсотни последних писем.
+  /** Перечитать хвост переписки — не меньше того, что уже показано.
+   *
+   * Потолок по показанному, как у соседних перечней: без него хвост приходил бы
+   * последними полусотней писем и ложился заменой, а долиставший переписку до
+   * начала разговора терял бы дочитанное на первом же входящем.
+   *
+   * Прокрутка двигается только там, где человек её ждёт, — при первом чтении и
+   * после своей отправки. По вести она стояла бы на месте чтения и прыгала в
+   * конец ленты посреди чужой истории.
    *
    * Свой счёт попыток: хвост перечитывается и по вести о новом письме, и после
    * отправки, и ответы возвращаются вразнобой — лёгший поверх свежего старый
    * показал бы ленту без только что отправленного.
    */
-  async function refresh() {
-    const page = await fresh(() => ask('hr.messages', { hr_id: hrId }));
+  async function refresh({ jump = false } = {}) {
+    const limit = refreshLimit(messages.length);
+    const page = await fresh(() => ask('hr.messages', { hr_id: hrId, limit }));
     if (page === null) return;
     messages = page.messages;
     hasMore = page.has_more;
     loaded = true;
-    await toUnread();
+    if (jump) await toUnread();
     return markRead();
   }
 
@@ -120,7 +129,7 @@
     if (done === null) return;
     draft = '';
     say('Отправлено');
-    return refresh();
+    return refresh({ jump: true });
   }
 
   /** Приложить файл к переписке.
@@ -139,7 +148,7 @@
     attaching = false;
     if (done === null || !alive.now || done.cancelled) return;
     say('Файл отправлен');
-    return refresh();
+    return refresh({ jump: true });
   }
 
   /** Открыть вложение тем, чем его открывает система.
@@ -187,7 +196,7 @@
     // Смена человека этим не теряется: пока карточка перечитывается с нуля, её
     // разметка показывает «Загрузка…», переписки на экране нет вовсе, и эффект
     // заводится заново вместе с ней.
-    untrack(() => refresh());
+    untrack(() => refresh({ jump: true }));
     return () => {
       settled();
       deafNew();

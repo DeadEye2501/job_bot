@@ -44,13 +44,23 @@
   /** Отправить перечень целиком.
    *
    * Что уедет и что сказать, если не уедет ничего, решает `experienceGoing`.
-   * Свой ключ на мост не уезжает: он про показ, не про запись.
+   * Свой ключ и отметка об уехавшей записи на мост не уезжают: они про показ,
+   * не про запись.
+   *
+   * Отметка ставится после удачи: номера свежим карточкам даёт мост, а вкладка
+   * себя не перечитывает — без отметки заведённая в этот заход строка до конца
+   * визита считалась бы «свежей», и опустошённое обязательное поле вычеркнуло
+   * бы её из следующей посылки. Мост заменяет перечень целиком, и стёрлась бы
+   * она молча.
    */
-  function save() {
+  async function save() {
     const now = experienceGoing(rows);
     trouble = now.trouble;
-    if (now.trouble) return Promise.resolve();
-    return write(now.going.map(({ key, ...one }) => one));
+    if (now.trouble) return;
+    const went = new Set(now.going.map((one) => one.key));
+    const done = await write(now.going.map(({ key, saved, ...one }) => one));
+    if (done === null || !alive.now) return;
+    rows = rows.map((one) => (went.has(one.key) ? { ...one, saved: true } : one));
   }
 
   function edit(key, part) {

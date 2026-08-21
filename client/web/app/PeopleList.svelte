@@ -6,9 +6,9 @@
   import NewPersonFields from '$components/NewPersonFields.svelte';
   import PersonRow from '$components/PersonRow.svelte';
   import SearchBox from '$components/SearchBox.svelte';
+  import { NEW_CARD } from '$state/new_card.js';
   import { takeOpened } from '$state/open_mark.js';
   import { pagedList } from '$state/paged_list.svelte.js';
-  import { blankPerson, named } from '$state/people.js';
 
   import PersonCard from './PersonCard.svelte';
 
@@ -16,12 +16,15 @@
 
   const list = pagedList({ ask: (...args) => ask(...args), method: 'hr.list', key: 'hrs' });
 
+  const FORM = NEW_CARD.hr;
+
   let adding = $state(false);
-  let draft = $state(blankPerson());
+  let saving = $state(false);
+  let draft = $state(FORM.blank());
 
   // Хоть что-нибудь из трёх: имя, ник или номер учётной записи. Тем же
   // правилом заслоняется и мост.
-  const ready = $derived(named(draft));
+  const ready = $derived(FORM.named(draft));
   let opened = $state(null);
 
   // Кого открыть, придя со стороны — из списка непрочитанного над полосой или
@@ -36,13 +39,15 @@
    */
   async function create() {
     if (!ready) return;
+    saving = true;
     const done = await ask('hr.create', { ...draft });
+    saving = false;
     // Окно закрываем только по удаче: отказ — это чаще всего опечатка в нике,
     // и набранное человеку ещё пригодится.
     if (done === null) return;
     adding = false;
-    draft = blankPerson();
-    say('Карточка заведена');
+    draft = FORM.blank();
+    say(FORM.done);
     return list.again();
   }
 
@@ -68,14 +73,14 @@
   onlistscroll={list.scrolled}
 >
   {#snippet toolbar()}
-    <SearchBox value={list.search} placeholder="Поиск по имени, @username..." onsearch={list.find} />
+    <SearchBox value={list.search} placeholder={FORM.searchHint} onsearch={list.find} />
     <button
       class="icon-btn cnt-add-btn"
       type="button"
       title="Добавить HR"
       onclick={() => (adding = true)}
     >
-      <span class="material-symbols-outlined">person_add</span>
+      <span class="material-symbols-outlined">{FORM.icon}</span>
     </button>
   {/snippet}
 
@@ -113,10 +118,12 @@
 
 {#if adding}
   <AskDialog
-    icon="person_add"
-    title="Новый человек"
-    subtitle="Хотя бы имя, ник или номер учётной записи — иначе карточку потом не найти."
+    icon={FORM.icon}
+    title={FORM.title}
+    subtitle={FORM.subtitle}
     confirmLabel="Создать"
+    busyLabel={FORM.busyLabel}
+    busy={saving}
     {ready}
     onconfirm={create}
     oncancel={() => (adding = false)}

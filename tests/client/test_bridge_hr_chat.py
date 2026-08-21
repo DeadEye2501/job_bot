@@ -30,6 +30,29 @@ async def test_the_chat_tells_ours_from_theirs(api, ask, session_factory):
     assert said == {"здравствуйте": True, "добрый день": False}
 
 
+async def test_the_window_can_ask_for_more_than_a_page_of_letters(
+    api, ask, session_factory
+):
+    """Окно просит столько писем, сколько уже показывает, — и получает столько.
+
+    Перечитывается хвост по вести о новом письме, а кладётся он в ленту заменой.
+    Отдай мост полсотни последних, и долиставший переписку до начала разговора
+    терял бы дочитанное на каждом входящем: читать историю во время живой
+    переписки было бы нельзя. Потолок тот же, что у прочих перечней, и читается
+    тем же `read_page`.
+    """
+    hr = hr_row()
+    await put(session_factory, hr)
+    await put(
+        session_factory,
+        *[message_row(hr_id=hr.id, text=f"письмо {n}") for n in range(60)],
+    )
+
+    answer = await ask(api.hr.messages, {"hr_id": hr.id, "limit": 60})
+
+    assert len(answer["ok"]["messages"]) == 60
+
+
 async def test_an_attachment_arrives_as_an_address_the_window_can_open(
     api, ask, session_factory
 ):

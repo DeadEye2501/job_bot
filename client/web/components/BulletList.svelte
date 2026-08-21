@@ -3,32 +3,9 @@
   //
   // Строка — многострочное поле, а не однострочное: достижение пишут фразой, и
   // в узкой строке видно только её начало.
-  import { tick as painted } from 'svelte';
-
-  import { fitHeight } from '$state/autosize.js';
+  import { growing } from '$state/autosize.js';
 
   let { label, addLabel, items, onedit, onadd, onremove } = $props();
-
-  /** Растянуть строку по набранному.
-   *
-   * Полосы прокрутки у неё нет — она бы спорила с текстом, — и не растянутая
-   * строка прятала бы вторую половину достижения.
-   */
-  function grow(field) {
-    const fit = () => fitHeight(field);
-    fit();
-    field.addEventListener('input', fit);
-    return {
-      // Пересчитываем и на смену текста: строки ключены по месту в списке, и
-      // после удаления соседней в то же поле переезжает чужой текст — длинный в
-      // строку, размеренную под короткую, и хвост его не виден вовсе.
-      //
-      // Ждём отрисовки: `update` срабатывает раньше, чем новое значение попадёт
-      // в поле, и померенное сразу было бы высотой прежнего жильца ячейки.
-      update: () => painted().then(fit),
-      destroy: () => field.removeEventListener('input', fit),
-    };
-  }
 </script>
 
 <div class="list-block">
@@ -48,7 +25,7 @@
         rows="1"
         maxlength="250"
         value={text}
-        use:grow={text}
+        use:growing={text}
         onblur={(event) => onedit(index, event.currentTarget.value.trim())}
       ></textarea>
       <button class="icon-btn" type="button" title="Удалить" onclick={() => onremove(index)}>

@@ -24,9 +24,6 @@
   import { companyCandidate, companyLine, companyTitle, siteHref } from '$state/companies.js';
   import { freshAnswer } from '$state/fresh.js';
 
-  // Пауза перед записью заметки — та же, что ждало прежнее окно.
-  const NOTES_DELAY = 600;
-
   let { ask, say, companyId, onperson, onvacancy, onclose, onchanged } = $props();
 
   let card = $state(null);
@@ -232,7 +229,6 @@
       <NotesField
         value={card.notes}
         placeholder="Заметки о компании…"
-        delay={NOTES_DELAY}
         owner={companyId}
         save={saveNotes}
       />
