@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import VacancyCard from '../app/VacancyCard.svelte';
 import { livingProps } from './live_props.svelte.js';
 import { settled } from './settled.js';
+import { vacancyDetail } from './vacancy_detail.js';
 
 let mounted = null;
 let host = null;
@@ -23,40 +24,12 @@ afterEach(() => {
   host = null;
 });
 
-/** Карточка, какой её отдаёт мост: заполнено только то, что видно на экране. */
-function detail(id) {
-  return {
-    id,
-    status: 'New',
-    title: `Вакансия ${id}`,
-    description: null,
-    score: null,
-    score_threshold: 5,
-    stack: [],
-    history: [],
-    events: [],
-    hr: null,
-    company_id: null,
-    company_name: null,
-    notes: '',
-    raw_text: '',
-    source_url: null,
-    channel_username: null,
-    posted_at: null,
-    created_at: null,
-    grade: null,
-    salary: null,
-    remote: null,
-    location: null,
-  };
-}
-
 function screen(vacancyId) {
   const asked = [];
   const [props, change] = livingProps({
     ask: async (method, payload) => {
       asked.push([method, payload]);
-      return { vacancy: detail(payload) };
+      return { vacancy: vacancyDetail(payload) };
     },
     say: () => {},
     events: { on: () => () => {} },

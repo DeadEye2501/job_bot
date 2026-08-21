@@ -354,6 +354,7 @@
   <ConfirmDialog
     message="Сгенерировать сопроводительное письмо и отправить связанному HR с прикреплённым резюме?"
     confirmLabel="Отправить"
+    tone="primary"
     onconfirm={send}
     oncancel={() => (asking = null)}
   />

@@ -102,7 +102,7 @@
 - принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte
 
-### app/VacancyCard.svelte (395)
+### app/VacancyCard.svelte (396)
 - Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою оценку.
 - принимает: ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged
 - берёт: ./VacancyLinks.svelte
@@ -211,9 +211,9 @@
 - принимает: company, selected, onpick
 - берёт: ./Avatar.svelte, ./BlacklistMark.svelte
 
-### components/ConfirmDialog.svelte (16)
+### components/ConfirmDialog.svelte (21)
 - —
-- принимает: message, confirmLabel, onconfirm, oncancel
+- принимает: message, confirmLabel, tone, onconfirm, oncancel
 - берёт: ./ModalShell.svelte
 
 ### components/ContactActions.svelte (23)
@@ -1346,7 +1346,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 63 файлов
+## tests — 65 файлов
 
 ### tests/alive.test.js (79)
 - —
@@ -1423,6 +1423,9 @@ body, html, button, body, .material-symbols-outlined
 
 ### tests/companies.test.js (141)
 - —
+
+### tests/confirm_tone_live.test.js (75)
+- * Карточка с привязанным HR: без него пункт отправки заперт.
 
 ### tests/dates.test.js (111)
 - —
@@ -1529,8 +1532,12 @@ body, html, button, body, .material-symbols-outlined
 ### tests/vacancy_card.test.js (278)
 - —
 
-### tests/vacancy_card_live.test.js (90)
-- * Карточка, какой её отдаёт мост: заполнено только то, что видно на экране.
+### tests/vacancy_card_live.test.js (63)
+- —
+
+### tests/vacancy_detail.js (34)
+- * Карточка вакансии от моста; названное в `extra` перебивает заготовку.
+- отдаёт: vacancyDetail
 
 ### tests/vacancy_filter.test.js (241)
 - —
