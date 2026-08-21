@@ -944,14 +944,15 @@ First-run bootstrap: ensure DB schema exists.
 - `async def ask_fit(question: FitQuestion, about: str, client: httpx.AsyncClient, model: str) -> tuple[FitValidation | None, str | None]` (29)
   - `def read(answer: str) -> FitValidation | None` (4)
 
-### `backend/llm/fit_languages.py` — 125 строк
+### `backend/llm/fit_languages.py` — 129 строк
 
 Один вопрос о вакансии: требует ли она языка, которого у кандидата нет.
 
 Зависит от: `backend.llm.candidate`, `backend.llm.fit`, `backend.llm.hallucination`, `backend.payloads`
 
+- `def _prompt_for(profile: CandidateProfile) -> str` (5)
 - `def _without_invented_language(validation: FitValidation, raw_text: str, profile: CandidateProfile) -> FitValidation` (24)
-- `async def validate_language_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (18)
+- `async def validate_language_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (15)
 
 ### `backend/llm/fit_preferences.py` — 93 строк
 
@@ -3491,7 +3492,7 @@ Runtime settings layer.
 
 - `def _verdict(verdict, issues=None) -> httpx.Response` (3)
 
-### `tests/backend/test_llm_fit_languages.py` — 203 строк
+### `tests/backend/test_llm_fit_languages.py` — 196 строк
 
 Следствия зова о языках вакансии.
 
@@ -3499,11 +3500,10 @@ Runtime settings layer.
 
 Тестов: 8
 
-- `def _answer(verdict, reason=None) -> httpx.Response` (3)
 - `async def _asked(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (9)
 - `async def _check(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (6)
 
-### `tests/backend/test_llm_fit_validation.py` — 282 строк
+### `tests/backend/test_llm_fit_validation.py` — 276 строк
 
 Следствия общего у трёх зовов о пригодности.
 
@@ -3511,7 +3511,6 @@ Runtime settings layer.
 
 Тестов: 15
 
-- `def _answer(verdict, reason=None) -> httpx.Response` (3)
 - `async def _check(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (11)
 - `async def _asked(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (9)
 
@@ -4960,7 +4959,7 @@ Runtime settings layer.
   - `def set_password(self, service: str, username: str, password: str) -> None` (2)
   - `def delete_password(self, service: str, username: str) -> None` (7)
 
-### `tests/fakes/llm.py` — 217 строк
+### `tests/fakes/llm.py` — 227 строк
 
 Подделка провайдера LLM: настоящий клиент поверх подставного транспорта.
 
@@ -4976,6 +4975,7 @@ Runtime settings layer.
 - `def models_response(*ids: str) -> httpx.Response` (3)
 - `def parsed_vacancy_answer(**fields) -> dict` (8)
 - `def chat_json(payload: dict, *, finish_reason: str='stop') -> httpx.Response` (9)
+- `def fit_answer(verdict: str, reason: str | None=None) -> httpx.Response` (8)
 - `def messages_of(request: httpx.Request) -> dict[str, str]` (9)
 - `def data_block(request: httpx.Request) -> str` (9)
 - `def warning_before_the_block(request: httpx.Request) -> str` (9)

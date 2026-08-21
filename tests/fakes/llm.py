@@ -168,6 +168,16 @@ def chat_json(payload: dict, *, finish_reason: str = "stop") -> httpx.Response:
     )
 
 
+def fit_answer(verdict: str, reason: str | None = None) -> httpx.Response:
+    """Ответ модели с вердиктом пригодности.
+
+    Общий на все зовы о пригодности: спрашивают порознь — о роли, о языках, о
+    предпочтениях, — а отвечают одним и тем же объектом, и вторая такая же
+    заготовка разошлась бы с первой на первом же новом поле ответа.
+    """
+    return chat_json({"verdict": verdict, "reason": reason})
+
+
 def messages_of(request: httpx.Request) -> dict[str, str]:
     """Отправленные роли и их содержимое, разложенные по ролям.
 
