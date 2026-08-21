@@ -1003,28 +1003,29 @@ First-run bootstrap: ensure DB schema exists.
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
 - `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (55)
 
-### `backend/llm/rules.py` — 135 строк
+### `backend/llm/rules.py` — 155 строк
 
 Приметы предметной области, общие для наставлений модели.
 
 Зависит от: `backend.domain.company_hosts`, `backend.domain.resume_marks`
 
 
-### `backend/llm/skills.py` — 195 строк
+### `backend/llm/skills.py` — 230 строк
 
 Приведение названий технологий к виду, пригодному для стека вакансии.
 
-Зависит от: `backend.domain.skill_names`, `backend.domain.spellings`
+Зависит от: `backend.domain.skill_names`, `backend.domain.spellings`, `backend.llm.rules`
 
 - `def _strip_version(s: str) -> str` (12)
 - `def _capitalize_skill(s: str) -> str` (20)
 - `def _wrapped_tail(s: str) -> str | None` (4)
-- `def _named_tool(s: str) -> str | None` (12)
-- `def _is_wrapped_requirement(s: str) -> bool` (3)
+- `def _is_name(one: str) -> bool` (8)
+- `def _named_tools(s: str) -> list[str]` (19)
+- `def _is_wrapped_requirement(s: str) -> bool` (9)
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (36)
 
-### `backend/llm/vacancy.py` — 452 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 453 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
@@ -3543,13 +3544,13 @@ Runtime settings layer.
 
 - `class _Skill` (6)
 
-### `tests/backend/test_llm_stack_cleanup.py` — 271 строк
+### `tests/backend/test_llm_stack_cleanup.py` — 326 строк ⚠ подошёл к 300
 
 Следствия приведения названий технологий к единому виду.
 
 Зависит от: `backend.llm.skills`
 
-Тестов: 15
+Тестов: 18
 
 
 ### `tests/backend/test_llm_vacancy_answer.py` — 309 строк ⚠ подошёл к 300

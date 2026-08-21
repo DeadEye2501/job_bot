@@ -6,6 +6,7 @@ import re
 
 from backend.domain.skill_names import skill_key
 from backend.domain.spellings import dedupe_first_wins
+from backend.llm.rules import REQUIREMENT_WRAPPERS
 
 logger = logging.getLogger(__name__)
 
@@ -85,33 +86,44 @@ def _capitalize_skill(s: str) -> str:
     return " ".join(out)
 
 
-# Слово, которым начинают требование: «опыт работы с Docker», «знание
-# CI/CD», «работа с кассой». Обёртка — это то, чем требование введено, а не
-# то, что оно называет.
+# Обёртка требования: слова, которыми требование введено, и предлог за ними
+# — «опыт работы с Docker», «знание CI/CD», «работа с кассой». Перечень слов
+# общий с наставлением (`llm/rules`): порознь они разъезжаются молча.
+#
+# Перед самой обёрткой допускаются два слова — «уверенный опыт работы с X»,
+# «глубокое понимание Y»: перечислить их нельзя, а без них обёртка не
+# опознаётся вовсе.
 _WRAPPER_HEAD = (
-    r"^\s*(?:опыт|опыта|знание|знания|умение|умения|навык|навыки|"
-    r"понимание|владение|работа|работы)\b"
+    r"^\s*(?:[а-яё]+\s+){0,2}(?:"
+    + "|".join(REQUIREMENT_WRAPPERS)
+    + r"|работа|работы)\b"
 )
 # Хвост требования после обёртки. Между обёрткой и предлогом стоит что угодно
 # — «опыт успешной работы с Docker», — поэтому берётся всё после ПОСЛЕДНЕГО
 # предлога. Без предлога хвостом считается всё, что идёт за самой обёрткой:
 # «знание CI/CD».
 _WRAPPED_BY_PREPOSITION_RE = re.compile(
-    _WRAPPER_HEAD + r".*\s(?:с|со|в|во|на)\s+(?P<tail>\S.*)$", re.IGNORECASE
+    _WRAPPER_HEAD + r".*?\s(?:с|со|в|во|на|по)\s+(?P<tail>\S.*)$", re.IGNORECASE
 )
 # Хвост после обёртки без предлога: «знание CI/CD», «владение Photoshop».
 _WRAPPED_BARE_RE = re.compile(
     _WRAPPER_HEAD + r"\s+(?P<tail>\S.*)$", re.IGNORECASE
 )
-# Сколько слов бывает в требовании, которое стоит выбросить целиком. Порог
-# работает только вместе с обёрткой: строка, начатая обёрткой и вытянувшаяся
-# в пять слов, — это переписанная строка требований, с анкетой она не
-# сойдётся никогда. Названия без обёртки не отсеиваются по длине вовсе: у
-# строителя и маркетолога они бывают и в шесть слов — «Монтаж систем
+# Сколько слов бывает у требования, которое стоит выбросить целиком. Считается
+# длина ХВОСТА, а не всей строки: у «опыта успешной работы с кассой» хвост в
+# одно слово, и выбрасывать её значило бы терять названный навык. Порог
+# работает только вместе с обёрткой — названия без неё по длине не отсеиваются
+# вовсе: у строителя и маркетолога они бывают и в шесть слов, «Монтаж систем
 # вентиляции и кондиционирования».
 _MAX_WRAPPED_WORDS = 4
 _CYRILLIC_RE = re.compile(r"[а-яёА-ЯЁ]")
 _LATIN_RE = re.compile(r"[A-Za-z]")
+# Русское слово внутри хвоста: по ним хвост и разбивается на имена. «Docker в
+# продакшене» называет Docker, а «продакшене» — уточнение, а не второе имя.
+_CYRILLIC_WORD_RE = re.compile(r"[а-яёА-ЯЁ]+")
+# Чем разделено перечисление внутри одного требования: запятая, союз «и»,
+# английское «and». Косая не разделитель: «CI/CD» — одно имя.
+_LISTED_RE = re.compile(r"\s*,\s*|\s+(?:и|and)\s+", re.IGNORECASE)
 
 
 def _wrapped_tail(s: str) -> str | None:
@@ -120,23 +132,46 @@ def _wrapped_tail(s: str) -> str | None:
     return said.group("tail").strip() if said else None
 
 
-def _named_tool(s: str) -> str | None:
-    """Имя собственное из требования; пусто — требование названо не именем.
+def _is_name(one: str) -> bool:
+    """Написано ли имя латиницей: «.NET», «H&M», «Premiere Pro», «Škoda».
 
-    Обёртка снимается только перед именем, написанным латиницей: «.NET»,
-    «H&M», «Premiere Pro». У русского хвоста остаётся падеж («ведения
-    соцсетей»), и срезкой слова его не починить — там нужна начальная форма,
-    которой у кода нет, и строка остаётся какой пришла.
+    Обёртка снимается только перед таким: у русского хвоста остаётся падеж
+    («ведения соцсетей»), и срезкой слова его не починить — там нужна
+    начальная форма, которой у кода нет.
+    """
+    return bool(_LATIN_RE.search(one)) and not _CYRILLIC_RE.search(one)
+
+
+def _named_tools(s: str) -> list[str]:
+    """Имена собственные, названные в требовании; пусто — таких в нём нет.
+
+    Имён бывает несколько: «опыт работы в Excel и Word» называет два, и
+    выбросить строку целиком значило бы потерять оба. Перечисление делится
+    по запятой и союзу, а косая внутри имени остаётся — «CI/CD» одно имя, а
+    не два.
     """
     tail = _wrapped_tail(s)
-    if tail is None or _CYRILLIC_RE.search(tail) or not _LATIN_RE.search(tail):
-        return None
-    return tail
+    if tail is None:
+        return []
+    found: list[str] = []
+    for listed in _LISTED_RE.split(tail):
+        for part in _CYRILLIC_WORD_RE.split(listed):
+            # Точка и амперсанд не срезаются: они часть имени — «.NET», «H&M».
+            one = part.strip(" \t,;:()«»\"'-–—")
+            if one and _is_name(one):
+                found.append(one)
+    return found
 
 
 def _is_wrapped_requirement(s: str) -> bool:
-    """Требование ли это целиком — обёртка впереди и длина не как у названия."""
-    return _wrapped_tail(s) is not None and len(s.split()) > _MAX_WRAPPED_WORDS
+    """Требование ли это целиком — обёртка впереди, а за ней не название.
+
+    Длина считается по тому, что стоит за словом-обёрткой, а не по всей
+    строке: у «опыта успешной работы с кассой» за обёрткой четыре слова, и
+    это ещё навык, названный длинно, а не переписанное требование.
+    """
+    said = _WRAPPED_BARE_RE.match(s)
+    return said is not None and len(said.group("tail").split()) > _MAX_WRAPPED_WORDS
 
 
 def _as_items(raw: object) -> list:
@@ -183,9 +218,9 @@ def clean_stack_items(
     # потерять названный в нём инструмент.
     kept: list[str] = []
     for one in (s.strip() for s in items if isinstance(s, str)):
-        named = _named_tool(one)
-        if named is not None:
-            kept.append(named)
+        named = _named_tools(one)
+        if named:
+            kept.extend(named)
         elif not _is_wrapped_requirement(one):
             kept.append(one)
     return dedupe_first_wins(
