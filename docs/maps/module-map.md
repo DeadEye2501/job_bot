@@ -668,7 +668,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _article_urls(text: str) -> list[str]` (11)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 
-### `backend/flows/parse.py` — 350 строк ⚠ подошёл к 300
+### `backend/flows/parse.py` — 355 строк ⚠ подошёл к 300
 
 Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
@@ -676,7 +676,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def _dropped_as_trash(pipeline, vacancy_id: int, reason: str, *, allow_delete: bool) -> bool` (22)
 - `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (51)
-- `async def _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus) -> None` (31)
+- `async def _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus) -> None` (36)
 - `async def _parsed_or_dropped(pipeline, vacancy_id: int, text: str, channel_username: str, allow_delete: bool)` (44)
 - `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (26)
 - `async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> bool` (18)
@@ -1665,7 +1665,7 @@ Runtime settings layer.
 - `def _from_tg_row(row: TgAccount) -> TgAccountConfig | None` (30)
 - `def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None` (18)
 
-### `backend/single_instance.py` — 123 строк
+### `backend/single_instance.py` — 127 строк
 
 Замок, которым запущенная копия приложения не пускает вторую.
 
@@ -1673,7 +1673,7 @@ Runtime settings layer.
 
 - `def release_the_lock() -> None` (15)
 - `def _take_the_lock(fd: int) -> bool | None` (36)
-- `def hold_the_only_copy(lock_path: Path | str)` (44)
+- `def hold_the_only_copy(lock_path: Path | str)` (48)
 
 ### `backend/telegram_login.py` — 332 строк ⚠ подошёл к 300
 

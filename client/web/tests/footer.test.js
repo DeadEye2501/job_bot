@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { allAlive, blockedTip, downNames, shouldTurnOff } from '../state/health.js';
-import { modeAt, nextMode } from '../state/modes.js';
+import { modeChosen } from '../state/modes.js';
 import { bar, caption, rerunNote } from '../state/progress.js';
 
 describe('здоровье систем', () => {
@@ -63,36 +63,46 @@ describe('здоровье систем', () => {
   });
 });
 
+/** Нажатие мышью: место на дорожке шириной 300 точек. */
+function byMouse(offsetX, current = 'Off') {
+  return modeChosen({ detail: 1, offsetX, width: 300 }, current);
+}
+
+/** Нажатие с клавиатуры: места у него нет вовсе, `detail` нулевой. */
+function byKey(current) {
+  return modeChosen({ detail: 0, offsetX: 0, width: 300 }, current);
+}
+
 describe('переключатель режима', () => {
   it('нажатие попадает в ту треть, куда метил человек', () => {
     // Положения три, и человек метит в то, которое видит. Съедь границы — он
     // начнёт промахиваться мимо режима, на который смотрит.
-    expect(modeAt(10, 300)).toBe('Off');
-    expect(modeAt(150, 300)).toBe('DM Only');
-    expect(modeAt(290, 300)).toBe('Full');
+    expect(byMouse(10)).toBe('Off');
+    expect(byMouse(150)).toBe('DM Only');
+    expect(byMouse(290)).toBe('Full');
   });
 
   it('границы третей принадлежат правой стороне', () => {
     // Ровно на границе выбор обязан быть определённым: иначе одно и то же
     // нажатие давало бы разный режим от округления ширины дорожки.
-    expect(modeAt(100, 300)).toBe('DM Only');
-    expect(modeAt(200, 300)).toBe('Full');
+    expect(byMouse(100)).toBe('DM Only');
+    expect(byMouse(200)).toBe('Full');
   });
 
   it('нажатие мимо дорожки не выбирает ничего', () => {
     // Слева от дорожки лежит слово режима — шире самой дорожки, — и «ближний
     // край» там врал: метясь в слово «Full», человек гасил бота. Слово не
     // орган управления, а подпись, и нажатие по нему не значит ничего.
-    expect(modeAt(-20, 300)).toBe('');
-    expect(modeAt(9999, 300)).toBe('');
+    expect(byMouse(-20)).toBe('');
+    expect(byMouse(9999)).toBe('');
   });
 
   it('перебор по кругу возвращается к началу', () => {
     // Им ходят с клавиатуры: у нажатия по Enter места нет вовсе, и выбирать по
     // месту там нечего. Без перебора с клавиатуры был бы доступен один «Off».
-    expect(nextMode('Off')).toBe('DM Only');
-    expect(nextMode('DM Only')).toBe('Full');
-    expect(nextMode('Full')).toBe('Off');
+    expect(byKey('Off')).toBe('DM Only');
+    expect(byKey('DM Only')).toBe('Full');
+    expect(byKey('Full')).toBe('Off');
   });
 });
 

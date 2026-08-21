@@ -12,6 +12,23 @@ const MODES = ['Off', 'DM Only', 'Full'];
  */
 export const OFF = 'Off';
 
+/** Какой режим выбрало нажатие: по месту на дорожке, а с клавиатуры — по кругу.
+ *
+ * Нажатие приходит разобранным — место относительно дорожки, её ширина и
+ * `detail` события, — а не самим событием: разметки этот файл не знает, а
+ * мерить дорожку умеет только она.
+ *
+ * Клавиатура узнаётся по `detail`: у нажатия по Enter он нулевой, места нет
+ * вовсе, и выбирать по месту там нечего. Не различи мы их, отступ выходил бы
+ * отрицательным, и с клавиатуры был бы доступен один «Off».
+ *
+ * Пустота значит «ничего не выбрано» — нажатие мимо дорожки; чем оно бывает,
+ * сказано у `_modeAt`.
+ */
+export function modeChosen({ detail, offsetX, width }, current) {
+  return detail === 0 ? _nextMode(current) : _modeAt(offsetX, width);
+}
+
 /** В какую треть дорожки попало нажатие — то и выбрано; мимо дорожки — ничто.
  *
  * Выбор по месту, а не перебором по кругу: положения три, и человек метит в то,
@@ -26,7 +43,7 @@ export const OFF = 'Off';
  * промах поднимал бы выключенного бота, а отправленного живому человеку письма
  * не вернуть.
  */
-export function modeAt(offsetX, width) {
+function _modeAt(offsetX, width) {
   if (offsetX < 0 || offsetX > width) return '';
   if (offsetX < width / 3) return MODES[0];
   if (offsetX < (width * 2) / 3) return MODES[1];
@@ -39,6 +56,6 @@ export function modeAt(offsetX, width) {
  * месту там нечего. Без него с клавиатуры был доступен один «Off» — отступ
  * выходил отрицательным, и до «DM Only» с «Full» было не добраться.
  */
-export function nextMode(current) {
+function _nextMode(current) {
   return MODES[(MODES.indexOf(current) + 1) % MODES.length];
 }
