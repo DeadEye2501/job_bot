@@ -531,6 +531,8 @@
 - `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_B…`
 - `GRADE_MARKERS` = `'«junior/стажёр/intern», «middle/мидл», «senior/…`
 - `FORMAT_MARKERS` = `'«remote/удалёнка/удалённо/distributed», «hybrid…`
+- `REQUIREMENT_WRAPPERS: tuple[str, ...]` = `набор из 10`
+- `WRAPPER_LINE` = `', '.join((f'«{one}»' for one in REQUIREMENT_WRA…`
 - `APPLY_CONTACTS` = `'Telegram (@username, t.me/...), email (jobs@acm…`
 - `GEO_LIMIT_MARKERS` = `'«Удалённо в РФ», «удалёнка только из России», «…`
 - `VACANCY_TEXT_CHARS` = `6000`
@@ -540,12 +542,14 @@
 - `logger` = `logging.getLogger(__name__)`
 - `_VERSION_SUFFIX_RE` = `re.compile('[\\s.\\-_]*[vV]?\\d+(?:[.\\-_]\\d+)*…`
 - `_DIGIT_BELONGS_TO_NAME` = `frozenset({'s3', 'c4', 'web3', 'html5', 'css3', …`
-- `_WRAPPER_HEAD` = `'^\\s*(?:опыт|опыта|знание|знания|умение|умения|…`
-- `_WRAPPED_BY_PREPOSITION_RE` = `re.compile(_WRAPPER_HEAD + '.*\\s(?:с|со|в|во|на…`
+- `_WRAPPER_HEAD` = `'^\\s*(?:[а-яё]+\\s+){0,2}(?:' + '|'.join(REQUIR…`
+- `_WRAPPED_BY_PREPOSITION_RE` = `re.compile(_WRAPPER_HEAD + '.*?\\s(?:с|со|в|во|н…`
 - `_WRAPPED_BARE_RE` = `re.compile(_WRAPPER_HEAD + '\\s+(?P<tail>\\S.*)$…`
 - `_MAX_WRAPPED_WORDS` = `4`
 - `_CYRILLIC_RE` = `re.compile('[а-яёА-ЯЁ]')`
 - `_LATIN_RE` = `re.compile('[A-Za-z]')`
+- `_CYRILLIC_WORD_RE` = `re.compile('[а-яёА-ЯЁ]+')`
+- `_LISTED_RE` = `re.compile('\\s*,\\s*|\\s+(?:и|and)\\s+', re.IGN…`
 
 ### `backend/llm/vacancy.py`
 
