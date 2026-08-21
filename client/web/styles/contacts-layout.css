@@ -32,11 +32,7 @@
 }
 
 .cnt-detail-pane {
-  min-height: 0;
   padding: 16px 20px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  background: var(--bg-primary);
 }
 
 /* Отбита сверху сильнее списочной: правая панель выше, и надпись по её

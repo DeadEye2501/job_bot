@@ -19,7 +19,7 @@
   {#each rows as one (one.key)}
     <div class="stats-card">
       <div class="stats-kpi">
-        <span class="stats-kpi-num" data-tone={one.tone}>{answer ? one.total : '—'}</span>
+        <span class="big-num stats-kpi-num" data-tone={one.tone}>{answer ? one.total : '—'}</span>
         <span class="stats-kpi-label">{answer ? one.label : '…'}</span>
         {#if answer && one.delta}
           <span class="stats-kpi-delta" data-tone={one.delta.tone}>{one.delta.text}</span>

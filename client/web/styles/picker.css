@@ -27,11 +27,7 @@
 }
 
 .picker-list {
-  flex: 1;
-  min-height: 0;
   padding: 4px;
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
 .picker-empty {
@@ -48,10 +44,6 @@
   padding: 6px 8px;
   border: 1px solid transparent;
   border-radius: 4px;
-}
-
-.picker-row:hover {
-  background: var(--accent-row-hover);
 }
 
 .picker-row.selected {
@@ -80,12 +72,9 @@
 }
 
 .picker-name {
-  overflow: hidden;
   color: var(--text-primary);
   font-size: 0.82rem;
   text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .picker-current-mark {
@@ -95,12 +84,9 @@
 }
 
 .picker-sub {
-  overflow: hidden;
   color: var(--text-tertiary);
   font-size: 0.72rem;
   text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .picker-meta {

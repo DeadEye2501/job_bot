@@ -48,8 +48,6 @@
 
 .nav-label {
   padding-right: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* Подпись именно убирается, а не гасится прозрачностью: гаснущая заняла бы

@@ -1,11 +1,12 @@
 <script>
   // Вкладка «HR»: список людей с поиском, страницами и заведением.
 
-  import AskDialog from '$components/AskDialog.svelte';
   import ContactsPanes from '$components/ContactsPanes.svelte';
-  import NewPersonFields from '$components/NewPersonFields.svelte';
+  import NewCardDialog from '$components/NewCardDialog.svelte';
   import PersonRow from '$components/PersonRow.svelte';
   import SearchBox from '$components/SearchBox.svelte';
+  import { contactAdding } from '$state/contact_adding.svelte.js';
+  import { watchContacts } from '$state/contacts_watch.js';
   import { NEW_CARD } from '$state/new_card.js';
   import { takeOpened } from '$state/open_mark.js';
   import { pagedList } from '$state/paged_list.svelte.js';
@@ -18,51 +19,25 @@
 
   const FORM = NEW_CARD.hr;
 
-  let adding = $state(false);
-  let saving = $state(false);
-  let draft = $state(FORM.blank());
+  // Негодный ник отбивает мост, и его отказ приезжает плашкой — потому здесь
+  // и не проверяется ничего сверх общего заслона.
+  const newCard = contactAdding({
+    list,
+    form: FORM,
+    save: (draft) => ask('hr.create', { ...draft }),
+    say: (text) => say(text),
+  });
 
-  // Хоть что-нибудь из трёх: имя, ник или номер учётной записи. Тем же
-  // правилом заслоняется и мост.
-  const ready = $derived(FORM.named(draft));
+  // Чья карточка показана справа.
   let opened = $state(null);
 
   // Кого открыть, придя со стороны — из списка непрочитанного над полосой или
   // из карточки вакансии.
   $effect(() => takeOpened(open, (id) => (opened = id), onopened));
 
-  /** Завести человека.
-   *
-   * Заслон один — назвать хоть чем-нибудь: карточка без имени, ника и номера
-   * учётной записи не находится потом ни поиском, ни отправкой. Негодный ник
-   * отбивает мост, и его отказ приезжает плашкой.
-   */
-  async function create() {
-    if (!ready) return;
-    saving = true;
-    const done = await ask('hr.create', { ...draft });
-    saving = false;
-    // Окно закрываем только по удаче: отказ — это чаще всего опечатка в нике,
-    // и набранное человеку ещё пригодится.
-    if (done === null) return;
-    adding = false;
-    draft = FORM.blank();
-    say(FORM.done);
-    return list.again();
-  }
-
-  $effect(() => {
-    // Списки меняет не только этот экран: бот заводит людей сам, разбирая
-    // переписку, и он же считает непрочитанное.
-    // Только про списки: весть о непрочитанном кладётся на каждое сохранённое
-    // письмо, и обход в сотню сообщений перечитал бы список сотню раз подряд.
-    const deaf = events.on('contacts_lists_changed', () => list.again());
-    const settled = list.entered();
-    return () => {
-      settled();
-      deaf();
-    };
-  });
+  // Только про списки: весть о непрочитанном кладётся на каждое сохранённое
+  // письмо, и обход в сотню сообщений перечитал бы список сотню раз подряд.
+  $effect(() => watchContacts(events, list));
 </script>
 
 <ContactsPanes
@@ -78,7 +53,7 @@
       class="icon-btn cnt-add-btn"
       type="button"
       title="Добавить HR"
-      onclick={() => (adding = true)}
+      onclick={() => (newCard.adding = true)}
     >
       <span class="material-symbols-outlined">{FORM.icon}</span>
     </button>
@@ -116,18 +91,13 @@
   {/snippet}
 </ContactsPanes>
 
-{#if adding}
-  <AskDialog
-    icon={FORM.icon}
-    title={FORM.title}
-    subtitle={FORM.subtitle}
-    confirmLabel="Создать"
-    busyLabel={FORM.busyLabel}
-    busy={saving}
-    {ready}
-    onconfirm={create}
-    oncancel={() => (adding = false)}
-  >
-    <NewPersonFields {draft} />
-  </AskDialog>
+{#if newCard.adding}
+  <NewCardDialog
+    kind="hr"
+    draft={newCard.draft}
+    busy={newCard.saving}
+    ready={newCard.ready}
+    onconfirm={() => newCard.create()}
+    oncancel={() => (newCard.adding = false)}
+  />
 {/if}

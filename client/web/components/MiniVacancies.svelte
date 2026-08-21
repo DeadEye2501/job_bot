@@ -8,6 +8,8 @@
   //
   // Строка нажимается и уводит к самой вакансии: из карточки канала смотрят,
   // что он приносит, и тут же открывают принесённое.
+  import { pressKey } from '$state/keys.js';
+  import { UNNAMED } from '$state/unnamed.js';
   import { shortAgo } from '$state/vacancies.js';
 
   let { vacancies, empty, loading = false, onpick } = $props();
@@ -24,11 +26,11 @@
           role="button"
           tabindex="0"
           onclick={() => onpick(one.id)}
-          onkeydown={(event) => event.key === 'Enter' && onpick(one.id)}
+          onkeydown={(event) => pressKey(event) && onpick(one.id)}
         >
           <span class="status-dot" data-status={one.status}></span>
           {#if one.score !== null}<span class="num-pill vac-mini-score">{one.score}</span>{:else}<span></span>{/if}
-          <span class="vac-mini-title">{one.title || '— без названия —'}</span>
+          <span class="vac-mini-title">{one.title || UNNAMED}</span>
           <span class="vac-mini-when">{shortAgo(one.created_at, new Date())}</span>
         </div>
       {/each}

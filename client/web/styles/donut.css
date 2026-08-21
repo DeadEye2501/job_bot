@@ -35,10 +35,7 @@
 
 .donut-label {
   font-size: 0.66rem;
-  color: var(--text-tertiary);
   margin-top: 3px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
 }
 
 /* Цвет сегмента — цвет статуса, и набор этот общий с точкой и полосой воронки:

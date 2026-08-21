@@ -13,10 +13,6 @@
   text-align: left;
 }
 
-.cnt-hr-row:hover {
-  background: var(--accent-row-hover);
-}
-
 /* Кружок в строке списка крупнее, чем в карточке вакансии: здесь по нему
    человека и узнают, не читая имени. */
 .cnt-hr-row .hr-avatar {
@@ -36,21 +32,15 @@
    span'ы: кнопка не принимает блочную разметку. */
 .cnt-hr-name {
   display: block;
-  overflow: hidden;
   color: var(--text-primary);
   font-size: 0.83rem;
   font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .cnt-hr-sub {
   display: block;
-  overflow: hidden;
   color: var(--text-tertiary);
   font-size: 0.72rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .cnt-hr-sub .at {

@@ -1,5 +1,6 @@
 <script>
   // Место работы: свёрнутая шапка и всё остальное под ней.
+  import { pressKey } from '$state/keys.js';
   import { untrack } from 'svelte';
 
   import { cardTitle } from '$state/experience.js';
@@ -47,7 +48,7 @@
     role="button"
     tabindex="0"
     onclick={() => ontoggle()}
-    onkeydown={(event) => event.key === 'Enter' && ontoggle()}
+    onkeydown={(event) => pressKey(event) && ontoggle()}
   >
     <span class="material-symbols-outlined collapse-arrow">expand_more</span>
     <div class="exp-summary">

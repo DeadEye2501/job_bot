@@ -33,10 +33,7 @@
 }
 
 .ch-stat-label {
-  color: var(--text-tertiary);
   font-size: 0.65rem;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
 }
 
 .ch-bar {

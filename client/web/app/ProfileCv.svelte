@@ -8,6 +8,7 @@
 
   import { call } from '$api/bridge.js';
   import CvFileRow from '$components/CvFileRow.svelte';
+  import DelayedTextarea from '$components/DelayedTextarea.svelte';
   import LangRows from '$components/LangRows.svelte';
   import ChoiceRow from '$components/ChoiceRow.svelte';
   import { living } from '$state/alive.js';
@@ -189,30 +190,26 @@
       />
     {/each}
 
-    <textarea
-      class="textarea span-2"
+    <DelayedTextarea
       maxlength="1000"
       placeholder="Образование"
       value={form.education}
-      oninput={(event) => typed('education', event.currentTarget.value)}
-      onblur={() => saver.flush()}
-      onkeydown={(event) => saveKey(event) && saver.flush()}
-    ></textarea>
+      ontyped={(text) => typed('education', text)}
+      onflush={() => saver.flush()}
+    />
 
     <ChoiceRow options={GRADES} chosen={grades} look="seg" onpick={pickGrade} />
     <ChoiceRow options={WORK_FORMATS} chosen={formats} look="seg" onpick={pickFormat} />
 
     <LangRows rows={form.languages} onedit={editLang} onadd={addLang} onremove={dropLang} />
 
-    <textarea
-      class="textarea span-2"
+    <DelayedTextarea
       maxlength="2000"
       placeholder="Личные предпочтения — что важно при выборе работы, что точно не подойдёт"
       value={form.free_preferences}
-      oninput={(event) => typed('free_preferences', event.currentTarget.value)}
-      onblur={() => saver.flush()}
-      onkeydown={(event) => saveKey(event) && saver.flush()}
-    ></textarea>
+      ontyped={(text) => typed('free_preferences', text)}
+      onflush={() => saver.flush()}
+    />
   </div>
 
   <CvFileRow {meta} onreplace={replaceCv} onopen={openCv} />

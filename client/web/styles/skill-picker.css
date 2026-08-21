@@ -55,9 +55,6 @@
 
 .skill-picker-cat {
   font-size: 0.65rem;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-  letter-spacing: 0.4px;
   padding: 4px 10px 2px;
 }
 
@@ -86,12 +83,6 @@
 
 .skill-picker-item.disabled:hover {
   background: transparent;
-}
-
-.skill-picker-item .lvl {
-  color: var(--text-tertiary);
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
 }
 
 .skill-picker-empty {

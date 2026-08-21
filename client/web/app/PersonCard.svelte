@@ -7,13 +7,14 @@
   import Avatar from '$components/Avatar.svelte';
   import BlacklistChip from '$components/BlacklistChip.svelte';
   import CardHandle from '$components/CardHandle.svelte';
+  import CardPane from '$components/CardPane.svelte';
   import ContactActions from '$components/ContactActions.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
+  import MergeDialog from '$components/MergeDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import NotesField from '$components/NotesField.svelte';
-  import PickerRow from '$components/PickerRow.svelte';
-  import PickerDialog from '$components/PickerDialog.svelte';
   import { living } from '$state/alive.js';
+  import { cardActions } from '$state/card_actions.svelte.js';
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
   import { cardNotes } from '$state/card_notes.js';
@@ -31,8 +32,6 @@
   let card = $state(null);
   let vacancies = $state([]);
   let trouble = $state('');
-  let asking = $state(null);
-  let chosen = $state(null);
 
   // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
   // человека в ней переключают нажатием по соседней строке — ответ про
@@ -97,30 +96,19 @@
     onchanged: () => onchanged(),
   });
 
+  const acts = cardActions({ id: () => personId, dropCard, mergeCard });
+
   const shown = $derived(card ? personName({ ...card, id: card.hr_id }) : '');
   const head = $derived(card ? personHead(card) : null);
-  const chosenName = $derived(chosen ? personName(chosen) : '');
+  const chosenName = $derived(acts.chosen ? personName(acts.chosen) : '');
 
   function save(part) {
     return saveField({ hr_id: personId, ...part });
   }
 
-  async function drop() {
-    asking = null;
-    await dropCard(personId);
-  }
-
   async function candidates(search) {
     const now = await ask('hr.merge_picker', { absorbed_id: personId, search });
     return now === null ? null : now.hrs;
-  }
-
-  async function merge() {
-    const survivor = chosen;
-    chosen = null;
-    // Окно выбора гасим только по удаче: отказ оставляет выбранного под рукой,
-    // а закрытое окно заставило бы искать его заново.
-    if (await mergeCard({ absorbed_id: personId, survivor_id: survivor.id })) asking = null;
   }
 
   $effect(() => {
@@ -137,11 +125,7 @@
   });
 </script>
 
-{#if trouble}
-  <div class="empty-note cnt-detail-empty">{trouble}</div>
-{:else if !card}
-  <div class="empty-note cnt-detail-empty">Загрузка…</div>
-{:else}
+<CardPane {trouble} ready={!!card}>
   <div class="cnt-det-head">
     <Avatar avatar={card.avatar} name={card.name} icon="person" />
 
@@ -184,10 +168,10 @@
     <ContactActions
       mergeLabel="Слить с другим HR"
       blocked={!!card.blacklist_value}
-      onmerge={() => (asking = 'merge')}
+      onmerge={() => (acts.asking = 'merge')}
       onblock={() => blocking.block(personId)}
       onunblock={() => blocking.unblock(personId)}
-      ondelete={() => (asking = 'delete')}
+      ondelete={() => (acts.asking = 'delete')}
     />
   </div>
 
@@ -235,46 +219,39 @@
   </div>
 
   <MiniVacancies {vacancies} empty="Связанных вакансий нет." onpick={onvacancy} />
-{/if}
+</CardPane>
 
-{#if asking === 'delete'}
+{#if acts.asking === 'delete'}
   <ConfirmDialog
     message={`Удалить HR «${shown}»?\n\nВся переписка удалится. Связанные вакансии останутся, но без HR.`}
     confirmLabel="Удалить"
-    onconfirm={drop}
-    oncancel={() => (asking = null)}
+    onconfirm={() => acts.drop()}
+    oncancel={() => (acts.asking = null)}
   />
 {/if}
 
-{#if asking === 'merge'}
-  <PickerDialog
-    icon="merge"
+{#if acts.asking === 'merge'}
+  <MergeDialog
     title={`Слить «${shown}» с другим`}
     placeholder="Поиск по имени и нику"
     empty="Сливать не с кем — других карточек нет"
     load={candidates}
-    applyLabel="Слить"
-    onapply={(person) => (chosen = person)}
-    onclose={() => (asking = null)}
-  >
-    {#snippet children(rows, marked, pick)}
-      {#each rows as person (person.id)}
-        <PickerRow row={personCandidate(person)} chosen={person.id === marked} onpick={pick} />
-      {/each}
-    {/snippet}
-  </PickerDialog>
+    asRow={personCandidate}
+    onapply={(person) => (acts.chosen = person)}
+    onclose={() => (acts.asking = null)}
+  />
 {/if}
 
-{#if chosen}
+{#if acts.chosen}
   <!-- Про переписку сказано по-разному не для красоты: у выжившего со своей
        учётной записью Telegram чужая переписка стирается, а не переезжает
        (`hr_card._move_or_drop_chat`), и это необратимо. -->
   <ConfirmDialog
-    message={chosen.telegram_user_id
+    message={acts.chosen.telegram_user_id
       ? `Слить «${shown}» в «${chosenName}»?\n\nВакансии перейдут к выбранному. Переписка этой карточки будет удалена: у выбранного своя учётная запись Telegram и своя переписка. Эта карточка будет удалена. Откатить нельзя.`
       : `Слить «${shown}» в «${chosenName}»?\n\nВакансии и переписка перейдут к выбранному. Эта карточка будет удалена. Откатить нельзя.`}
     confirmLabel="Слить"
-    onconfirm={merge}
-    oncancel={() => (chosen = null)}
+    onconfirm={() => acts.merge()}
+    oncancel={() => (acts.chosen = null)}
   />
 {/if}

@@ -3,6 +3,7 @@
   //
   // Строка нажимается: иначе число остаётся числом — чтобы посмотреть, что за
   // девять штук, пришлось бы идти в вакансии и набирать тот же отбор руками.
+  import { pressKey } from '$state/keys.js';
   import DonutChart from './DonutChart.svelte';
   import { donut, statusColumns, statusTotal } from '$state/stats.js';
 
@@ -22,7 +23,7 @@
         tabindex="0"
         title="Открыть вакансии со статусом «{one.name}»"
         onclick={() => onpick(one.name)}
-        onkeydown={(event) => event.key === 'Enter' && onpick(one.name)}
+        onkeydown={(event) => pressKey(event) && onpick(one.name)}
       >
         <span class="status-dot" data-status={one.name}></span>
         <span class="stats-sc-name">{one.name}</span>

@@ -4,6 +4,7 @@
   // Своим окном, а не общим спрашивающим: у этого есть шапка с крестиком, свой
   // подвал и строка отказа внутри — канал заводят по нику, и ошибку в нике
   // объясняют там же, где его набирали, а не общей плашкой поверх окна.
+  import { pressKey } from '$state/keys.js';
   import ModalFoot from './ModalFoot.svelte';
   import ModalHead from './ModalHead.svelte';
   import ModalShell from './ModalShell.svelte';
@@ -27,7 +28,7 @@
         placeholder="@username канала или t.me/..."
         {value}
         oninput={(event) => oninput(event.currentTarget.value)}
-        onkeydown={(event) => event.key === 'Enter' && onadd()}
+        onkeydown={(event) => pressKey(event) && onadd()}
       />
       <div class="cnt-add-hint">Название и аватар подгрузятся из Telegram автоматически.</div>
       {#if trouble}

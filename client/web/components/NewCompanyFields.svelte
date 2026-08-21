@@ -10,6 +10,8 @@
   //
   // Черновик правится на месте: он приходит своим объектом от того, кто его
   // потом и отправит.
+  import DraftNotes from './DraftNotes.svelte';
+
   let { draft } = $props();
 </script>
 
@@ -31,9 +33,4 @@
   placeholder="Алиасы через запятую (опционально)"
   bind:value={draft.aliases}
 />
-<textarea
-  class="textarea"
-  maxlength="2000"
-  placeholder="Заметки"
-  bind:value={draft.notes}
-></textarea>
+<DraftNotes {draft} />

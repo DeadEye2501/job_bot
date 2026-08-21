@@ -51,17 +51,11 @@
 }
 
 .stats-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
   padding: 12px 14px;
 }
 
 .stats-card-title {
   font-size: 0.7rem;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-  letter-spacing: 0.4px;
   margin-bottom: 8px;
 }
 
@@ -104,10 +98,6 @@
 
 .stats-kpi-num {
   font-size: 1.7rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
 }
 
 /* Цвета показателей: отклик синий, работа зелёная, оффер сиреневый, отказ

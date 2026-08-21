@@ -11,7 +11,6 @@
   cursor: pointer;
 }
 
-.logs-row:hover { background: var(--accent-row-hover); }
 .logs-row.expanded { background: var(--bg-secondary); }
 
 .logs-time {
@@ -34,18 +33,13 @@
 
 .logs-source {
   color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-/* Свёрнутая строка режется по ширине, развёрнутая переносится: иначе длинное
-   сообщение раздвигало бы колонки соседних строк. */
+/* Свёрнутая строка режется по ширине (`clipped-line.css`), развёрнутая
+   переносится: иначе длинное сообщение раздвигало бы колонки соседних
+   строк. */
 .logs-msg {
   color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .logs-row.expanded .logs-msg {

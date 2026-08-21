@@ -73,11 +73,7 @@
 }
 
 .vac-detail-pane {
-  background: var(--bg-primary);
-  overflow-x: hidden;
-  overflow-y: auto;
   padding: 14px 18px;
-  min-height: 0;
 }
 
 /* По самой середине панели, без отступов: панель занимает её целиком, и
@@ -101,10 +97,6 @@
   width: 100%;
 }
 
-.vac-row:hover {
-  background: var(--accent-row-hover);
-}
-
 .vac-row-head {
   display: flex;
   align-items: center;
@@ -116,9 +108,6 @@
   color: var(--text-primary);
   font-size: 0.83rem;
   font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   flex: 1;
   min-width: 0;
 }
@@ -126,9 +115,6 @@
 .vac-meta {
   color: var(--text-secondary);
   font-size: 0.72rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .vac-meta .v-co {
