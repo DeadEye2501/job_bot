@@ -12,5 +12,16 @@
 GRADES: tuple[str, ...] = ("junior", "middle", "senior", "lead")
 WORK_FORMATS: tuple[str, ...] = ("office", "remote", "hybrid")
 
+WORK_FORMAT_LABELS_RU: dict[str, str] = {
+    "remote": "удалёнка",
+    "hybrid": "гибрид",
+    "office": "офис",
+}
+"""Как формат работы называют по-русски.
+
+Рядом со значениями, а не у того, кто печатает: называют их двое — наставление
+модели и отказ по формату, — и второе написание разошлось бы с первым молча.
+"""
+
 CEFR_LEVELS: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
 LANGUAGE_LEVELS: tuple[str, ...] = CEFR_LEVELS + ("native",)

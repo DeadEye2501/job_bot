@@ -12,7 +12,7 @@ from backend.runtime_settings import LlmProviderConfig
 
 
 # Большие локальные модели (Qwen3 30B, Llama 70B и т.п.) на длинном
-# `validate_vacancy_fit` или `parse_vacancy` промпте уходят за 30 сек на
+# `validate_role_fit` или `parse_vacancy` промпте уходят за 30 сек на
 # обычном железе — особенно при первом запуске после загрузки модели,
 # когда часть слоёв ещё подкачивается. Жёсткий 30-сек лимит приводит к
 # массовому "validation unavailable" → вакансии пачкой попадают в Not Fit

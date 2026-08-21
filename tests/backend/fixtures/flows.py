@@ -90,9 +90,20 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
         pipeline.genre_asked = True
         return pipeline.genre, pipeline.genre_trouble
 
-    async def validate_vacancy_fit(parsed, text, client_, model, **kwargs):
-        pipeline.validated = True
-        return pipeline.verdict, pipeline.fit_trouble
+    def asking_fit(about: str):
+        """Один из трёх зовов о пригодности, называющий себя в общем следе.
+
+        Ответ по умолчанию у всех троих один и тот же: предмет большинства
+        проверок — порядок зовов, а не то, кто из троих вынес отказ. Тому,
+        кому нужен ответ именно от второго или третьего, служит `verdict_by`.
+        """
+
+        async def ask(parsed, text, client_, model, **kwargs):
+            pipeline.validated = True
+            pipeline.fit_asked.append(about)
+            return pipeline.verdict_by.get(about, pipeline.verdict), pipeline.fit_trouble
+
+        return ask
 
     async def try_auto_send(pipeline, hr, parsed, vacancy_id):
         pipeline.asked_to_send.append(vacancy_id)
@@ -101,7 +112,13 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
     monkeypatch.setattr(apply, "try_auto_send", try_auto_send)
     monkeypatch.setattr("backend.flows.parse.parse_vacancy", parse_vacancy)
     monkeypatch.setattr("backend.flows.parse.classify_post_genre", classify_post_genre)
-    monkeypatch.setattr("backend.flows.parse.validate_vacancy_fit", validate_vacancy_fit)
+    monkeypatch.setattr("backend.flows.parse.validate_role_fit", asking_fit("роль"))
+    monkeypatch.setattr(
+        "backend.flows.parse.validate_language_fit", asking_fit("языки")
+    )
+    monkeypatch.setattr(
+        "backend.flows.parse.validate_preferences_fit", asking_fit("предпочтения")
+    )
 
 
 @pytest.fixture
@@ -174,6 +191,25 @@ async def unparsed_vacancy(session_factory):
     return await only_row(session_factory, Vacancy)
 
 
+def _fit_answers_by_default(pipeline) -> None:
+    """Заготовленные ответы трёх зовов о пригодности и след того, кого спросили.
+
+    Своим объявлением, а не строками фикстуры: зовов три, у каждого свой
+    заготовленный ответ и общий на всех след, и вместе это половина настройки
+    конвейера.
+    """
+    pipeline.verdict = FitValidation(verdict="fit", reason="ищем в команду")
+    # Причина, по которой вердикт не спросился: пусто — спросили и получили.
+    pipeline.fit_trouble = None
+    pipeline.validated = False
+    # Кого из троих спросили и в каком порядке: отказ прекращает остальные, и
+    # увидеть это можно только следом зовов.
+    pipeline.fit_asked = []
+    # Ответ отдельного зова, если тесту нужен именно он; остальные отвечают
+    # общим `verdict`.
+    pipeline.verdict_by = {}
+
+
 @pytest.fixture
 async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory):
     """Конвейер с подставным разбором объявления.
@@ -199,10 +235,7 @@ async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)
     pipeline.genre = PostGenre(is_vacancy=True, reason="ищем в команду")
     pipeline.genre_trouble = None
     pipeline.genre_asked = False
-    pipeline.verdict = FitValidation(verdict="fit", reason="ищем в команду")
-    # Причина, по которой вердикт не спросился: пусто — спросили и получили.
-    pipeline.fit_trouble = None
-    pipeline.validated = False
+    _fit_answers_by_default(pipeline)
     pipeline.asked_to_send = []
     _answer_instead_of_the_model(pipeline, monkeypatch)
 

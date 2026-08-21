@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from backend.models import Profile
 from backend.models import ProfileLanguage
 from backend.models import ProfileSkill
+from backend.domain.taxonomy import WORK_FORMAT_LABELS_RU
 from backend.incoming import str_list
 
 _GRADE_LABELS_RU = {
@@ -13,13 +14,6 @@ _GRADE_LABELS_RU = {
     "middle": "middle",
     "senior": "senior",
     "lead": "lead/team-lead",
-}
-
-
-_FORMAT_LABELS_RU = {
-    "remote": "удалёнка",
-    "hybrid": "гибрид",
-    "office": "офис",
 }
 
 
@@ -75,7 +69,7 @@ def format_grades(grades: list[str] | None) -> str:
 
 def format_work_formats(formats: list[str] | None) -> str:
     """'удалёнка, гибрид' либо '—' если пусто."""
-    return _format_labels(formats, _FORMAT_LABELS_RU)
+    return _format_labels(formats, WORK_FORMAT_LABELS_RU)
 
 
 def format_languages(languages: list[CandidateLanguage] | None) -> str:

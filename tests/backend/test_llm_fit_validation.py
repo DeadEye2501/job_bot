@@ -1,17 +1,12 @@
-"""Следствия проверки вакансии на пригодность кандидату.
+"""Следствия общего у трёх зовов о пригодности.
 
-Вердиктов три: вакансия подходит, не подходит, или это вовсе не вакансия.
-Поверх вердикта стоит защита от выдуманного обоснования: модель охотно
-списывает причину отказа с примеров в промпте, и тогда в тексте объявления
-её не найти.
+Спрашивают порознь — о роли, о языках, о свободных предпочтениях, — а читают
+ответ одинаково: тот же разбор вердикта, тот же повтор с запасом токенов, тот
+же заслон на обоснование, пересказывающее данные кандидата. Проверяется это
+общее на зове о роли: он спрашивается первым и получает разобранные поля.
 
-Пойманное выдуманное обоснование разбирается по-разному. Отказ переворачивается
-в «подходит»: пропустить лишнюю вакансию на ручной просмотр дешевле, чем
-потерять настоящую. Мусор остаётся мусором, но без обоснования: сам пост
-скорее всего и правда реклама, а пускать её в рассылку по перевороту нельзя.
-
-Эти же тесты — единственный сторож `backend/llm/hallucination.py`: своего файла
-у него нет, потому что снаружи он виден только перевёрнутым вердиктом.
+Заслон на выдумку общим не является и живёт у зова о языках
+(`test_llm_fit_languages.py`) — приметы у него языковые.
 """
 
 import json
@@ -19,8 +14,9 @@ import json
 import httpx
 import pytest
 
-from backend.llm.candidate import CandidateLanguage, CandidateProfile
-from backend.llm.fit import _parse_fit_validation, validate_vacancy_fit
+from backend.llm.candidate import CandidateProfile
+from backend.llm.fit import _parse_fit_validation
+from backend.llm.fit_role import validate_role_fit
 from tests.factories import parsed_vacancy
 from tests.fakes.llm import (
     CHAT,
@@ -40,7 +36,7 @@ def _answer(verdict, reason=None) -> httpx.Response:
 
 
 async def _check(client, *, raw_text="обычный текст вакансии", profile=None, parsed=None):
-    """Спросить модель о пригодности вакансии; отдать один вердикт.
+    """Спросить зов о роли; отдать один вердикт.
 
     Причину, по которой спросить не вышло, смотрит отдельная проверка: у
     остальных провайдер отвечает, и разбирать пару в каждой значило бы писать
@@ -53,8 +49,8 @@ async def _check(client, *, raw_text="обычный текст вакансии
 
 
 async def _asked(client, *, raw_text="обычный текст вакансии", profile=None, parsed=None):
-    """Спросить модель о пригодности и отдать ответ целиком: вердикт и причину."""
-    return await validate_vacancy_fit(
+    """Спросить зов о роли и отдать ответ целиком: вердикт и причину."""
+    return await validate_role_fit(
         parsed or parsed_vacancy(),
         raw_text,
         client,
@@ -73,7 +69,7 @@ async def _asked(client, *, raw_text="обычный текст вакансии
 )
 def test_a_known_verdict_is_read(raw, expected):
     """Известный вердикт читается без учёта регистра и пробелов."""
-    got = _parse_fit_validation(json.dumps({"verdict": raw, "reason": "почему"}))
+    got = _parse_fit_validation(json.dumps({"verdict": raw, "reason": "почему"}), "проверка")
 
     assert got.verdict == expected
     assert got.reason == "почему"
@@ -90,12 +86,12 @@ def test_a_known_verdict_is_read(raw, expected):
 )
 def test_an_unusable_answer_yields_nothing(answer):
     """Неразбираемый ответ вердикта не даёт."""
-    assert _parse_fit_validation(answer) is None
+    assert _parse_fit_validation(answer, "проверка") is None
 
 
 def test_an_empty_reason_becomes_absence():
     """Пустое обоснование становится отсутствием, а не пустой строкой."""
-    got = _parse_fit_validation(json.dumps({"verdict": "fit", "reason": "   "}))
+    got = _parse_fit_validation(json.dumps({"verdict": "fit", "reason": "   "}), "проверка")
 
     assert got.reason is None
 
@@ -246,121 +242,6 @@ async def test_a_blocker_deep_in_a_long_post_still_reaches_the_model():
     assert buried in messages_of(client.sent[0])["user"]
 
 
-async def test_a_made_up_reason_for_rejection_flips_the_verdict():
-    """Выдуманное обоснование отказа переворачивает вердикт в «подходит».
-
-    Модель сослалась на требование к языку, которого в объявлении нет.
-    Пропустить такую вакансию на ручной просмотр дешевле, чем потерять
-    настоящую из-за фантазии модели.
-    """
-    client = provider(
-        {CHAT: _answer("reject", "вакансия подразумевает английский язык")}
-    )
-    profile = CandidateProfile(
-        languages=[CandidateLanguage(name="Английский", level="A2")]
-    )
-
-    got = await _check(
-        client, raw_text="Ищем питониста в Тбилиси, оформление по договору", profile=profile
-    )
-
-    assert got.verdict == "fit"
-    assert got.reason is None
-
-
-async def test_a_made_up_reason_is_caught_without_any_profile_data():
-    """Выдумка ловится и без сведений о кандидате — по общим приметам.
-
-    Приметы двух родов: общие, не зависящие от профиля, и построенные по
-    языкам кандидата. Профиль здесь пуст нарочно: вторые не построятся
-    вовсе, и сработать могут только первые — уровень языка, названный в
-    обосновании, но отсутствующий в объявлении.
-    """
-    client = provider({CHAT: _answer("reject", "требуется уровень B2")})
-
-    got = await _check(
-        client,
-        raw_text="Ищем питониста в бэкенд, оформление по договору",
-        profile=CandidateProfile(),
-    )
-
-    assert got.verdict == "fit"
-    assert got.reason is None
-
-
-async def test_a_level_named_in_the_post_is_not_taken_for_a_made_up_one():
-    """Уровень, названный в объявлении, выдумкой не считается."""
-    client = provider({CHAT: _answer("reject", "требуется уровень B2")})
-
-    got = await _check(
-        client,
-        raw_text="Ищем питониста, английский B2 обязателен",
-        profile=CandidateProfile(),
-    )
-
-    assert got.verdict == "reject"
-    assert got.reason == "требуется уровень B2"
-
-
-async def test_a_reason_backed_by_the_post_survives():
-    """Обоснование, подкреплённое текстом объявления, остаётся как есть."""
-    client = provider(
-        {CHAT: _answer("reject", "вакансия подразумевает английский язык")}
-    )
-    profile = CandidateProfile(
-        languages=[CandidateLanguage(name="Английский", level="A2")]
-    )
-
-    got = await _check(
-        client,
-        raw_text="Ищем питониста. Обязателен английский язык уровня C1.",
-        profile=profile,
-    )
-
-    assert got.verdict == "reject"
-    assert got.reason == "вакансия подразумевает английский язык"
-
-
-async def test_a_made_up_reason_for_junk_keeps_the_verdict_but_drops_the_reason():
-    """У мусора выдуманное обоснование стирается, а вердикт остаётся.
-
-    Переворачивать мусор в «подходит» нельзя: реклама ушла бы в рассылку.
-    А само обоснование бессмысленно, и показывать его пользователю незачем.
-    """
-    client = provider(
-        {CHAT: _answer("trash", "вакансия подразумевает английский язык")}
-    )
-    profile = CandidateProfile(
-        languages=[CandidateLanguage(name="Английский", level="A2")]
-    )
-
-    got = await _check(
-        client, raw_text="Подпишись на канал, скидки на курсы!", profile=profile
-    )
-
-    assert got.verdict == "trash"
-    assert got.reason is None
-
-
-async def test_a_fitting_verdict_is_never_second_guessed():
-    """Вердикт «подходит» на выдуманность не проверяют.
-
-    Проверка нужна там, где вакансия отбрасывается: пропущенная лишняя
-    вакансия видна пользователю, а отброшенная — нет.
-    """
-    client = provider(
-        {CHAT: _answer("fit", "вакансия подразумевает английский язык")}
-    )
-    profile = CandidateProfile(
-        languages=[CandidateLanguage(name="Английский", level="A2")]
-    )
-
-    got = await _check(client, raw_text="Ищем питониста.", profile=profile)
-
-    assert got.verdict == "fit"
-    assert got.reason == "вакансия подразумевает английский язык"
-
-
 async def test_a_verdict_without_a_reason_is_not_second_guessed():
     """Вердикт без обоснования на выдуманность не проверяют — проверять нечего."""
     client = provider({CHAT: _answer("reject", None)})
@@ -384,31 +265,6 @@ async def test_a_reason_speaking_about_the_candidate_loses_only_its_words():
     got = await _check(client, raw_text="Ищем питониста, английский B1 и выше.")
 
     assert got.verdict == "reject"
-    assert got.reason is None
-
-
-async def test_fluency_without_a_language_does_not_confirm_a_language_demand():
-    """«Свободный график» подтверждением требования к языку не считается.
-
-    Слова «свободный» и «разговорный» подтверждают вывод модели о языке
-    только рядом с самим языком. Считай мы их подтверждением всегда — заслон
-    молча выключался бы на каждой вакансии со свободным графиком, а выдуманное
-    требование языка уводило бы годную вакансию в отказ.
-    """
-    client = provider(
-        {CHAT: _answer("reject", "вакансия подразумевает английский язык")}
-    )
-    profile = CandidateProfile(
-        languages=[CandidateLanguage(name="Английский", level="A2")]
-    )
-
-    got = await _check(
-        client,
-        raw_text="Ищем питониста, свободный график, оформление по договору",
-        profile=profile,
-    )
-
-    assert got.verdict == "fit"
     assert got.reason is None
 
 

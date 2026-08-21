@@ -177,7 +177,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 117 модулей
+## backend — 121 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -399,6 +399,16 @@ First-run bootstrap: ensure DB schema exists.
   - `def drop(self, vacancy_id: int) -> None` (7)
   - `def match(self, vector: list[float], threshold: float) -> int | None` (5)
 
+### `backend/domain/fit_fields.py` — 58 строк
+
+Пригодность по полям-перечислениям: что решается о вакансии без модели.
+
+Зависит от: `backend.domain.taxonomy`
+
+- `def _blocked(value: str | None, accepted: list[str] | None, known: tuple[str, ...]) -> str | None` (21)
+- `def grade_refusal(grade: str | None, accepted: list[str] | None) -> str | None` (8)
+- `def work_format_refusal(remote: str | None, accepted: list[str] | None) -> str | None` (10)
+
 ### `backend/domain/funnel.py` — 72 строк
 
 Ступени воронки отбора, выраженные наборами статусов вакансии.
@@ -463,7 +473,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def dedupe_first_wins(items: Iterable[T], key: Callable[[T], str], seen: set[str] | None=None) -> list[T]` (38)
 
-### `backend/domain/taxonomy.py` — 16 строк
+### `backend/domain/taxonomy.py` — 27 строк
 
 Замкнутые перечни значений, которыми описывают вакансию и анкету.
 
@@ -711,18 +721,20 @@ First-run bootstrap: ensure DB schema exists.
 - `def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None` (16)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 
-### `backend/flows/parse.py` — 438 строк ⚠ подошёл к 300
+### `backend/flows/parse.py` — 477 строк ⚠ подошёл к 300
 
 Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
-Зависит от: `backend.domain.blacklist`, `backend.domain.resume_marks`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit`, `backend.llm.genre`, `backend.llm.rules`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`
+Зависит от: `backend.domain.blacklist`, `backend.domain.fit_fields`, `backend.domain.resume_marks`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit_languages`, `backend.llm.fit_preferences`, `backend.llm.fit_role`, `backend.llm.genre`, `backend.llm.rules`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`
 
 - `async def _dropped_as_trash(pipeline, vacancy_id: int, reason: str, *, allow_delete: bool) -> bool` (23)
 - `def _unanswered(what: str, trouble: str | None, vacancy_id: int) -> tuple[str | None, bool] | None` (24)
-- `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (42)
+- `def _fit_verdict_refusal(validation) -> str | None` (16)
+- `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (38)
 - `async def _thrown_out_as_a_resume(pipeline, vacancy_id: int, mark: str, allow_delete: bool) -> bool` (16)
 - `async def _genre_refusal(pipeline, text: str, vacancy_id: int) -> tuple[str | None, bool]` (20)
-- `async def _model_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (13)
+- `def _fields_refusal(parsed, profile) -> str | None` (12)
+- `async def _unfit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (21)
 - `async def _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus) -> None` (36)
 - `async def _parsed_or_dropped(pipeline, vacancy_id: int, text: str, channel_username: str, allow_delete: bool)` (44)
 - `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (33)
@@ -842,11 +854,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def str_or_none(value) -> str | None` (10)
 - `def normalize_enum(value, allowed: tuple[str, ...]) -> str | None` (15)
 
-### `backend/llm/candidate.py` — 149 строк
+### `backend/llm/candidate.py` — 143 строк
 
 Сведения о кандидате в том виде, в каком они уходят в промпт.
 
-Зависит от: `backend.incoming`, `backend.models`
+Зависит от: `backend.domain.taxonomy`, `backend.incoming`, `backend.models`
 
 - `class CandidateLanguage` (5)
 - `class CandidateProfile` (20)
@@ -917,18 +929,47 @@ First-run bootstrap: ensure DB schema exists.
 - `def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]` (29)
 - `async def factcheck_cover_letter(profile_block: str, letter: str, client: httpx.AsyncClient, model: str, *, about: str='') -> tuple[bool, list[str]]` (39)
 
-### `backend/llm/fit.py` — 403 строк ⚠ подошёл к 300
+### `backend/llm/fit.py` — 180 строк
 
-Приговор о пригодности вакансии кандидату.
+Общее у зовов о пригодности: чем спросить модель и как прочесть ответ.
 
-Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.hallucination`, `backend.llm.rules`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.hallucination`, `backend.llm.rules`, `backend.payloads`
 
-- `def _parse_fit_validation(answer: str) -> FitValidation | None` (10)
-- `def _vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str` (20)
-- `def _fit_request(parsed: ParsedVacancy, raw_text: str, profile, max_tokens: int)` (26)
-- `def _without_invented_reason(validation: FitValidation, raw_text: str, profile)` (37)
-- `async def validate_vacancy_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (36)
-  - `def read(answer: str) -> FitValidation | None` (7)
+- `class FitQuestion` (9)
+- `def vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str` (18)
+- `def vacancy_text(raw_text: str) -> str` (3)
+- `def _parse_fit_validation(answer: str, purpose: str) -> FitValidation | None` (10)
+- `def _request(question: FitQuestion, about: str, max_tokens: int) -> ChatRequest` (16)
+- `def _without_candidate_data(validation: FitValidation, purpose: str) -> FitValidation` (20)
+- `async def ask_fit(question: FitQuestion, about: str, client: httpx.AsyncClient, model: str) -> tuple[FitValidation | None, str | None]` (29)
+  - `def read(answer: str) -> FitValidation | None` (4)
+
+### `backend/llm/fit_languages.py` — 125 строк
+
+Один вопрос о вакансии: требует ли она языка, которого у кандидата нет.
+
+Зависит от: `backend.llm.candidate`, `backend.llm.fit`, `backend.llm.hallucination`, `backend.payloads`
+
+- `def _without_invented_language(validation: FitValidation, raw_text: str, profile: CandidateProfile) -> FitValidation` (24)
+- `async def validate_language_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (18)
+
+### `backend/llm/fit_preferences.py` — 93 строк
+
+Один вопрос о вакансии: нарушает ли она то, что кандидат написал словами.
+
+Зависит от: `backend.llm.candidate`, `backend.llm.fit`, `backend.payloads`
+
+- `def _prompt_for(profile: CandidateProfile) -> str` (7)
+- `async def validate_preferences_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (12)
+
+### `backend/llm/fit_role.py` — 95 строк
+
+Один вопрос о вакансии: та ли это профессия.
+
+Зависит от: `backend.llm.candidate`, `backend.llm.fit`, `backend.payloads`
+
+- `def _prompt_for(profile: CandidateProfile) -> str` (7)
+- `async def validate_role_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (12)
 
 ### `backend/llm/genre.py` — 137 строк
 
@@ -2459,7 +2500,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 242 модулей
+## tests — 245 модулей
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -2563,7 +2604,7 @@ Runtime settings layer.
   - `def ensure_schema()` (2)
   - `def run_ui()` (3)
 
-### `tests/backend/fixtures/flows.py` — 235 строк
+### `tests/backend/fixtures/flows.py` — 268 строк
 
 Обстановка для проверок конвейера: он собран на подделках, модель молчит.
 
@@ -2573,17 +2614,19 @@ Runtime settings layer.
 - `def _pipeline_on_fakes(session_factory, client, settings) -> IngestionPipeline` (22)
   - `async def send(hr, text, attachment=None, vacancy_id=None, *, force=False)` (3)
 - `async def _put_out_backfills(pipelines) -> None` (12)
-- `def _answer_instead_of_the_model(pipeline, monkeypatch) -> None` (23)
+- `def _answer_instead_of_the_model(pipeline, monkeypatch) -> None` (40)
   - `async def parse_vacancy(text, client_, model, **kwargs)` (3)
   - `async def classify_post_genre(text, client_, model)` (3)
-  - `async def validate_vacancy_fit(parsed, text, client_, model, **kwargs)` (3)
+  - `def asking_fit(about: str)` (14)
+    - `async def ask(parsed, text, client_, model, **kwargs)` (4)
   - `async def try_auto_send(pipeline, hr, parsed, vacancy_id)` (3)
 - `async def make_pipeline(session_factory)` (24)
   - `async def build(client=None)` (7)
 - `def deliver(session_factory)` (20)
   - `async def run(msg, *, client=None, schedule=None)` (10)
 - `async def unparsed_vacancy(session_factory)` (17)
-- `async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)` (37)
+- `def _fit_answers_by_default(pipeline) -> None` (17)
+- `async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)` (34)
 - `async def dm_pipeline(monkeypatch, make_pipeline)` (18)
   - `async def classify(pipeline, hr_id)` (2)
 
@@ -2923,6 +2966,15 @@ Runtime settings layer.
 Тестов: 10
 
 
+### `tests/backend/test_domain_fit_fields.py` — 68 строк
+
+Следствия заслонов по полям-перечислениям: грейд и формат работы.
+
+Зависит от: `backend.domain.fit_fields`
+
+Тестов: 9
+
+
 ### `tests/backend/test_domain_salary.py` — 435 строк ⚠ подошёл к 300
 
 Следствия, которые наблюдают тесты `backend/domain/salary.py`.
@@ -3232,6 +3284,15 @@ Runtime settings layer.
   - `async def embed(pipeline, text, what)` (3)
 - `async def _orphan_waiting_for_an_article(session_factory, created_at=None)` (15)
 
+### `tests/backend/test_flows_parse_blockers.py` — 125 строк
+
+Порядок заслонов пригодности: сперва бесплатные, потом платные.
+
+Зависит от: `backend.flows`, `backend.llm.candidate`, `backend.models`, `backend.payloads`, `tests.dbio`
+
+Тестов: 6
+
+
 ### `tests/backend/test_flows_parse_persist.py` — 424 строк ⚠ подошёл к 300
 
 Что остаётся в базе после разбора объявления.
@@ -3430,13 +3491,25 @@ Runtime settings layer.
 
 - `def _verdict(verdict, issues=None) -> httpx.Response` (3)
 
-### `tests/backend/test_llm_fit_validation.py` — 426 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_fit_languages.py` — 203 строк
 
-Следствия проверки вакансии на пригодность кандидату.
+Следствия зова о языках вакансии.
 
-Зависит от: `backend.llm.candidate`, `backend.llm.fit`, `tests.factories`, `tests.fakes.llm`
+Зависит от: `backend.llm.candidate`, `backend.llm.fit_languages`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 22
+Тестов: 8
+
+- `def _answer(verdict, reason=None) -> httpx.Response` (3)
+- `async def _asked(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (9)
+- `async def _check(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (6)
+
+### `tests/backend/test_llm_fit_validation.py` — 282 строк
+
+Следствия общего у трёх зовов о пригодности.
+
+Зависит от: `backend.llm.candidate`, `backend.llm.fit`, `backend.llm.fit_role`, `tests.factories`, `tests.fakes.llm`
+
+Тестов: 15
 
 - `def _answer(verdict, reason=None) -> httpx.Response` (3)
 - `async def _check(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (11)
