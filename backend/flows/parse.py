@@ -10,6 +10,7 @@ import logging
 
 from backend.flows import dm_backfill
 from backend.domain.blacklist import check_blacklist
+from backend.domain.fit_fields import grade_refusal, work_format_refusal
 from backend.domain.resume_marks import resume_mark
 from backend.domain.scoring import score_parsed
 from backend.domain.verdict import blacklist_refusal, decide_vacancy_status
@@ -21,7 +22,9 @@ from backend.domain.verdict import (
     TRUNCATED_SKIP_REASON,
 )
 from backend.llm.answers import TRUNCATED_TROUBLE
-from backend.llm.fit import validate_vacancy_fit
+from backend.llm.fit_languages import validate_language_fit
+from backend.llm.fit_preferences import validate_preferences_fit
+from backend.llm.fit_role import validate_role_fit
 from backend.llm.genre import classify_post_genre
 from backend.llm.rules import VACANCY_TEXT_CHARS
 from backend.llm.vacancy import parse_vacancy
@@ -89,47 +92,61 @@ def _unanswered(
     return None, True
 
 
+def _fit_verdict_refusal(validation) -> str | None:
+    """Причина отказа по вердикту одного зова; пусто — этот зов не возражает.
+
+    Неразобранный ответ считается отказом нарочно: закрытая дверь тут дешевле
+    открытой — человек пересмотрит вакансию руками, а вот отклик, ушедший по
+    невнятному вердикту, не отзовёшь. Причина с меткой мусора отличается от
+    прочих тем, что по ней строку можно убрать вовсе; решает это зовущий.
+    """
+    if validation is None:
+        logger.warning("вердикт о пригодности не прочитался, помечаю Not Fit")
+        return f"{LLM_SKIP_PREFIX}validation unavailable"
+    if validation.verdict == "trash":
+        return f"{TRASH_SKIP_PREFIX}{validation.reason or 'no reason'}"
+    if validation.verdict == "reject":
+        return f"{LLM_SKIP_PREFIX}{validation.reason or 'rejected'}"
+    return None
+
+
 async def _fit_refusal(
     pipeline, parsed, text: str, vacancy_id: int
 ) -> tuple[str | None, bool]:
-    """Причина, по которой модель отвергла вакансию, и «спросить не вышло».
+    """Причина, по которой вакансия отвергнута, и «спросить не вышло».
 
     Пустая причина значит «годится». Второе значение отделяет от неё беду
     провайдера: по ней приговора нет вовсе, и строку нельзя помечать
     разобранной — лежащий полчаса провайдер иначе уводит в «не подходит» всё,
     что пришло за это время, а вернуть их можно только кнопкой по каждой.
 
-    Неразобранный ответ считается отказом нарочно: закрытая дверь тут
-    дешевле открытой — человек пересмотрит вакансию руками, а вот отклик,
-    ушедший по невнятному вердикту, не отзовёшь. Причина с меткой мусора
-    отличается от прочих тем, что по ней строку можно убрать вовсе; решает
-    это зовущий.
+    Зовов три — роль, языки, свободные предпочтения, — и первый отказ
+    прекращает остальные: за них платят токенами и временем, а приговор уже
+    вынесен. Порознь они стоят потому, что зов не ошибётся о том, чего ему не
+    давали: слитые в один, шесть критериев путались между собой — запрет из
+    свободного текста применялся к месту, о котором в нём не было ни слова.
     """
-    validation, trouble = await validate_vacancy_fit(
-        parsed,
-        text,
-        pipeline.lm_client,
-        pipeline.lm_chat_model,
-        profile=pipeline.profile_cache,
-    )
-    logger.debug(
-        "vacancy %s: fit verdict=%s reason=%r",
-        vacancy_id,
-        validation.verdict if validation else None,
-        validation.reason if validation else None,
-    )
-    unanswered = _unanswered("вердикт", trouble, vacancy_id)
-    if unanswered is not None:
-        return unanswered
-    if validation is None:
-        logger.warning(
-            "validate_vacancy_fit unavailable for vacancy parse, marking Not Fit"
+    for ask in (validate_role_fit, validate_language_fit, validate_preferences_fit):
+        validation, trouble = await ask(
+            parsed,
+            text,
+            pipeline.lm_client,
+            pipeline.lm_chat_model,
+            profile=pipeline.profile_cache,
         )
-        return f"{LLM_SKIP_PREFIX}validation unavailable", False
-    if validation.verdict == "trash":
-        return f"{TRASH_SKIP_PREFIX}{validation.reason or 'no reason'}", False
-    if validation.verdict == "reject":
-        return f"{LLM_SKIP_PREFIX}{validation.reason or 'rejected'}", False
+        logger.debug(
+            "vacancy %s: %s verdict=%s reason=%r",
+            vacancy_id,
+            ask.__name__,
+            validation.verdict if validation else None,
+            validation.reason if validation else None,
+        )
+        unanswered = _unanswered("вердикт", trouble, vacancy_id)
+        if unanswered is not None:
+            return unanswered
+        refusal = _fit_verdict_refusal(validation)
+        if refusal is not None:
+            return refusal, False
     return None, False
 
 
@@ -173,18 +190,40 @@ async def _genre_refusal(
     return f"{TRASH_SKIP_PREFIX}{genre.reason}", False
 
 
-async def _model_refusal(
+def _fields_refusal(parsed, profile) -> str | None:
+    """Отказ по полям-перечислениям; пусто — эти поля не мешают.
+
+    Стоит перед зовами к модели, потому что не стоит ничего: обе стороны
+    здесь перечисления, и первый же отказ избавляет от трёх обращений к
+    провайдеру. Обоснование пишется той же формой, что требуется от модели, —
+    требованием вакансии, — и приставки не получает: окно показывает
+    незнакомую строку как есть.
+    """
+    return grade_refusal(parsed.grade, profile.grades) or work_format_refusal(
+        parsed.remote, profile.work_formats
+    )
+
+
+async def _unfit_refusal(
     pipeline, parsed, text: str, vacancy_id: int
 ) -> tuple[str | None, bool]:
-    """Что скажет модель об объявлении: сперва жанр, потом пригодность.
+    """Чем объявление отвергнуто: жанр, поля-перечисления, три зова о смысле.
 
-    Два вопроса разведены по двум зовам нарочно. Слитые в один, они спорят:
-    на посте, похожем на анкету кандидата, «подходит ли» перебивает «вакансия
-    ли это», и резюме получает «годится».
+    Вопросы разведены по зовам нарочно. Слитые в один, они спорят: на посте,
+    похожем на анкету кандидата, «подходит ли» перебивает «вакансия ли это»,
+    и резюме получает «годится». Тем же доводом расщеплена и сама
+    пригодность — на роль, языки и свободные предпочтения.
+
+    Порядок выбран по цене: бесплатные проверки идут раньше платных, и первый
+    отказ прекращает остальные.
     """
     refusal, unasked = await _genre_refusal(pipeline, text, vacancy_id)
     if unasked or refusal is not None:
         return refusal, unasked
+    by_fields = _fields_refusal(parsed, pipeline.profile_cache)
+    if by_fields is not None:
+        logger.info("vacancy %s: не подходит по полям — %s", vacancy_id, by_fields)
+        return by_fields, False
     return await _fit_refusal(pipeline, parsed, text, vacancy_id)
 
 
@@ -296,7 +335,7 @@ async def _verdict_for(
     )
     if blocked is not None:
         return VacancyStatus.NOT_FIT, blocked, score
-    refusal, unasked = await _model_refusal(pipeline, parsed, text, vacancy_id)
+    refusal, unasked = await _unfit_refusal(pipeline, parsed, text, vacancy_id)
     if unasked:
         return None
     if refusal is not None:

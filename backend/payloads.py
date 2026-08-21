@@ -220,7 +220,7 @@ class ParsedVacancy:
     # version-stripped, capitalized and unique across BOTH lists (the LLM is
     # explicitly instructed not to put the same skill into both groups). The
     # split is consumed by ``score_parsed`` for weighting and by
-    # ``validate_vacancy_fit`` (sees both lists separately); everywhere else
+    # ``validate_role_fit`` (sees both lists separately); everywhere else
     # (UI chips, DB ``Vacancy.stack`` column) reads ``stack`` — see the
     # property below — which simply joins both lists in declaration order.
     stack_required: list[str]

@@ -266,6 +266,7 @@
 
 - `GRADES: tuple[str, ...]` = `набор из 4`
 - `WORK_FORMATS: tuple[str, ...]` = `набор из 3`
+- `WORK_FORMAT_LABELS_RU: dict[str, str]` = `словарь из 3`
 - `CEFR_LEVELS: tuple[str, ...]` = `набор из 6`
 - `LANGUAGE_LEVELS: tuple[str, ...]` = `CEFR_LEVELS + ('native',)`
 
@@ -425,7 +426,6 @@
 ### `backend/llm/candidate.py`
 
 - `_GRADE_LABELS_RU` = `словарь из 4`
-- `_FORMAT_LABELS_RU` = `словарь из 3`
 - `class CandidateLanguage`
   - `name: str`
   - `level: str`
@@ -475,7 +475,29 @@
 - `MAX_FIT_TOKENS` = `1200`
 - `ROOMIER_FIT_TOKENS` = `2400`
 - `logger` = `logging.getLogger(__name__)`
-- `VALIDATE_VACANCY_FIT_PROMPT` = `'Ты валидируешь Telegram-пост о вакансии для кон…`
+- `ANSWER_RULES` = `'Формат ответа: ТОЛЬКО JSON-объект.\n{"verdict":…`
+- `VERDICT_SCOPE` = `'Ты отвечаешь ровно на один вопрос — тот, что оп…`
+- `class FitQuestion`
+  - `purpose: str`
+  - `prompt: str`
+
+### `backend/llm/fit_languages.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `PURPOSE` = `'validate_language_fit'`
+- `LANGUAGE_FIT_PROMPT` = `'Ты проверяешь Telegram-пост о вакансии по ОДНОМ…`
+
+### `backend/llm/fit_preferences.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `PURPOSE` = `'validate_preferences_fit'`
+- `PREFERENCES_FIT_PROMPT` = `'Ты проверяешь Telegram-пост о вакансии по ОДНОМ…`
+
+### `backend/llm/fit_role.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `PURPOSE` = `'validate_role_fit'`
+- `ROLE_FIT_PROMPT` = `'Ты проверяешь Telegram-пост о вакансии по ОДНОМ…`
 
 ### `backend/llm/genre.py`
 
