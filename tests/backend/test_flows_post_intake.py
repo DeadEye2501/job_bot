@@ -296,18 +296,16 @@ async def test_a_vacancy_that_could_not_be_saved_is_not_parsed(intake):
     assert intake.parsed == []
 
 
-async def test_an_article_that_did_not_load_saves_the_vacancy_from_the_bin(
+async def test_an_article_that_did_not_load_holds_the_verdict_back(
     intake, monkeypatch
 ):
-    """Не отдавшаяся статья запрещает выбросить объявление как мусор.
+    """Не отдавшаяся статья откладывает приговор: разбора у объявления нет.
 
-    В таком объявлении пост — одна шапка со ссылкой, и без статьи разбору
-    видно пустышку. Выброси её — и вакансия пропадёт навсегда: курсор канала
-    уже уехал, и второй раз этот пост не прочтут. Оставленная пометкой «не
-    подходит», она дождётся прогона заново.
+    Сперва полный текст, потом приговор. В таком посте — одна шапка со
+    ссылкой, и разбор по ней сочиняет описание на пустом месте, а оценщик
+    судит о том, чего не видел. Строка заводится, чтобы объявление не пропало
+    вместе с уехавшим курсором канала, и ждёт дочитывания.
     """
-    import httpx
-
     async def fetch_article(_client, _url):
         raise httpx.ConnectError("сеть отвалилась")
 
@@ -317,7 +315,8 @@ async def test_an_article_that_did_not_load_saves_the_vacancy_from_the_bin(
         intake, 1, "jobs", post(10, text="Senior QA https://teletype.in/@a/b")
     )
 
-    assert intake.allowed_delete == [False]
+    assert intake.saved == [(1, 10, "Senior QA https://teletype.in/@a/b")]
+    assert intake.parsed == []
 
 
 async def test_a_post_without_articles_may_still_be_binned(intake):
@@ -327,18 +326,15 @@ async def test_a_post_without_articles_may_still_be_binned(intake):
     assert intake.allowed_delete == [True]
 
 
-async def test_a_repost_that_lost_its_article_may_not_be_binned_either(
+async def test_a_repost_that_lost_its_article_holds_the_verdict_back_too(
     intake, monkeypatch
 ):
-    """Дозабор перепоста тоже не выбрасывает объявление без статьи.
+    """Дозабор перепоста без статьи тоже приговора не выносит.
 
     Дорога другая — строка уже есть и её дописывают, — а причина та же: без
-    статьи разбору видна одна шапка со ссылкой. Признак целости считается тут
-    же, пятью строками выше, и раньше просто не доезжал до разбора: заслон
-    стоял на одной дороге из трёх.
+    статьи разбору видна одна шапка со ссылкой. Строка так и остаётся
+    недоразобранной и ждёт дочитывания вместе с остальными.
     """
-    import httpx
-
     async def fetch_article(_client, _url):
         raise httpx.ConnectError("сеть отвалилась")
 
@@ -350,4 +346,4 @@ async def test_a_repost_that_lost_its_article_may_not_be_binned_either(
         intake, 1, "jobs", post(10, text="Senior QA https://teletype.in/@a/b")
     )
 
-    assert intake.allowed_delete == [False]
+    assert intake.parsed == []

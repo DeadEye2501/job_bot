@@ -33,6 +33,14 @@ async def _post_embedding(pipeline, post: ChannelPost):
     )
 
 
+def _waits_to_be_read_out(vacancy_id: int, post: ChannelPost) -> None:
+    """Отметить в журнале, что приговор объявлению отложен до полного текста."""
+    logger.info(
+        "[@%s] %d vacancy %d ждёт дочитывания статьи, приговора нет",
+        post.channel_username, post.msg.id, vacancy_id,
+    )
+
+
 async def _resume_or_skip(
     pipeline, similar_id: int, post: ChannelPost, whole: bool
 ) -> None:
@@ -48,6 +56,9 @@ async def _resume_or_skip(
             post.channel_username, post.msg.id, similar_id,
         )
         return
+    if not whole:
+        _waits_to_be_read_out(similar_id, post)
+        return
     logger.info(
         "[@%s] %d matched orphan vacancy %d, finishing parse",
         post.channel_username, post.msg.id, similar_id,
@@ -55,12 +66,8 @@ async def _resume_or_skip(
     # Брошенная строка могла прийти из другого канала (перепост): разбираем
     # по тексту нынешнего поста и его каналу, а кладём в ту строку.
     # Совпадение отпечатков ручается, что тексты почти дословны.
-    #
-    # Целость доводом: без статьи по ссылке разбору видна одна шапка, и
-    # выброшенную вакансию не вернёт ничто — причина та же, что у свежего
-    # объявления ниже, и заслон обязан стоять на обеих дорогах.
     await parse.parse_and_update_vacancy(
-        pipeline, similar_id, post.text, post.channel_username, allow_delete=whole
+        pipeline, similar_id, post.text, post.channel_username
     )
 
 
@@ -86,15 +93,19 @@ async def ingest_post(
         return
 
     new_vacancy_id = await save_new_vacancy(pipeline, post, embedding)
-    if new_vacancy_id is not None:
-        # Недобравшее объявление выбрасывать нельзя: в таком посте одна шапка
-        # со ссылкой, и без статьи разбору видно пустышку. Выброси её — и
-        # вакансия пропадёт навсегда, потому что курсор канала уже уехал и
-        # второй раз этот пост не прочтут. Пометка «не подходит» дождётся
-        # прогона заново, а тот статью и подберёт.
-        await parse.parse_and_update_vacancy(pipeline,
-            new_vacancy_id, text, channel_username, allow_delete=whole
-        )
+    if new_vacancy_id is None:
+        return
+    # Сперва полный текст, потом приговор. Пока статья не пришла по причине,
+    # которая пройдёт, разбору видна одна шапка со ссылкой: он сочиняет по ней
+    # описание, а оценщик судит о том, чего не видел. Строка всё равно
+    # заводится — курсор канала уже уехал, и второй раз этот пост не прочтут, —
+    # но остаётся недоразобранной, и подбор недоразобранного дочитает её.
+    if not whole:
+        _waits_to_be_read_out(new_vacancy_id, post)
+        return
+    await parse.parse_and_update_vacancy(
+        pipeline, new_vacancy_id, text, channel_username
+    )
 
 
 def _vacancy_row(post: ChannelPost, embedding: list[float]) -> Vacancy:

@@ -55,10 +55,10 @@ async def test_the_bot_becomes_ready_only_after_the_client_starts(
     """Готовность объявляется после подключения клиента, а не до.
 
     До этого мига обращение из окна попало бы в полусобранное состояние.
-    Смотрим оба края подъёма: сам `client.start` и первую работу цикла сразу
-    за ним.
+    Смотрим оба края подъёма: сам `client.start` и первую работу оборота сразу
+    за ним — подбор недоразобранного, которым начинается приём.
     """
-    bot, client, _ = await chatting(mode=BotMode.OFF)
+    bot, client, _ = await chatting(mode=BotMode.FULL)
     pipeline = FakeIngestion()
     wire(bot, pipeline)
     seen: list[bool] = []
@@ -94,14 +94,27 @@ async def test_a_bot_that_left_the_loop_is_not_ready_any_more(chatting, caught_u
 
 
 async def test_a_turn_picks_up_vacancies_left_half_parsed(chatting, caught_up):
-    """Оборот подбирает вакансии, недоразобранные прошлым запуском.
+    """Каждый полный оборот подбирает недоразобранное до того, как идти за новым.
 
-    Иначе застрявшая вакансия ждала бы, пока канал не выложит то же
-    объявление заново, — то есть, скорее всего, вечно.
+    Недоразобранной строка остаётся не только от обрыва: объявление, чья
+    статья по ссылке не пришла, ждёт приговора и в списке невидимо. Подбирай
+    его один раз при запуске — и оно ждало бы до следующего запуска
+    приложения, а работает оно сутками.
+    """
+    _, _, pipeline = await _one_turn(chatting, BotMode.FULL)
+
+    assert pipeline.log.index("недоразобранные") < pipeline.log.index("прогон каналов")
+
+
+async def test_a_switched_off_turn_picks_up_nothing(chatting, caught_up):
+    """Выключенный бот недоразобранное не подбирает.
+
+    Подбор кончается разбором и отправкой отклика, а в Off бот не делает
+    ни того, ни другого: он на паузе.
     """
     _, _, pipeline = await _one_turn(chatting, BotMode.OFF)
 
-    assert pipeline.log[0] == "недоразобранные"
+    assert "недоразобранные" not in pipeline.log
 
 
 async def test_a_failed_recovery_does_not_stop_the_turn(chatting, caught_up):

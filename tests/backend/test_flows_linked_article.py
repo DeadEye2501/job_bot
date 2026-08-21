@@ -5,6 +5,8 @@
 ходят вовсе.
 """
 
+import logging
+
 import httpx
 import pytest
 
@@ -120,6 +122,27 @@ async def test_a_site_that_did_not_answer_makes_the_text_short(fetched, monkeypa
 
     assert got == "Senior QA https://teletype.in/@a/b"
     assert whole is False
+
+
+async def test_the_log_names_what_the_site_answered_with(fetched, monkeypatch, caplog):
+    """Запись о несостоявшейся статье называет породу беды, а не пустые скобки.
+
+    От породы зависит судьба объявления: истёкший срок ожидания пройдёт, а
+    закрытая дверь сайта — нет. У истёкшего срока `str` пуст, и запись «не
+    отдал страницу ()» не отличает одно от другого ничем.
+    """
+    asked, _articles = fetched
+
+    async def fetch_article(_client, url):
+        asked.append(url)
+        raise httpx.ReadTimeout("")
+
+    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+
+    with caplog.at_level(logging.WARNING):
+        await linked_article.with_linked_articles("Senior QA https://teletype.in/@a/b")
+
+    assert "ReadTimeout" in caplog.text
 
 
 async def test_no_more_than_three_articles_are_fetched(fetched):

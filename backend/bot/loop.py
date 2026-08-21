@@ -108,9 +108,25 @@ async def _tick(bot, mode: BotMode) -> None:
     if mode is BotMode.FULL:
         # Оборот может тихо не сделать ничего: место прогона мог
         # занять ручной прогон из окна.
-        await slot.run_in_slot(
-            bot, lambda: bot.ingestion.poll_active_channels(), "poll cycle"
-        )
+        await slot.run_in_slot(bot, lambda: _ingest_round(bot), "poll cycle")
+
+
+async def _ingest_round(bot) -> None:
+    """Оборот приёма: сперва дочитать отложенное, потом идти за новым.
+
+    Недоразобранная строка ждёт статьи, которой не хватило на приёме, и в
+    окне её не видно вовсе — ни в списке, ни в отказах. Подбирай такие только
+    при подъёме, и объявление ждало бы до следующего запуска приложения, а
+    работает оно сутками.
+
+    Сорвавшийся подбор обход не отменяет: свежие объявления человек ждёт
+    больше, чем дочитанные.
+    """
+    try:
+        await bot.ingestion.recover_orphan_vacancies()
+    except Exception:
+        logger.exception("orphan recovery failed")
+    await bot.ingestion.poll_active_channels()
 
 
 async def _sleep_until_wake(bot) -> None:
@@ -174,18 +190,16 @@ async def run(bot, *, once: bool = False) -> None:
     него, и сорвись `client.start()` — они пережили бы бота и держали бы
     гнёзда до конца работы приложения.
 
-    Первым делом подбираются вакансии, недоразобранные прошлым запуском: иначе
-    застрявшая ждала бы, пока канал не выложит то же объявление заново.
+    Недоразобранные вакансии подбираются на каждом полном обороте, вместе с
+    обходом каналов (`_ingest_round`), а не единожды при подъёме: строка ждёт
+    там не только обрыва работы, но и статьи по ссылке, а та возвращается
+    посреди рабочего дня.
 
     Режим OFF — полная остановка: ни догона переписки, ни разбора, ни обхода.
     Догон идёт на каждом переходе в рабочий режим, включая самый первый.
     """
     try:
         await _connect(bot)
-        try:
-            await bot.ingestion.recover_orphan_vacancies()
-        except Exception:
-            logger.exception("orphan recovery failed")
         prev_mode = BotMode.OFF
         while True:
             mode = await current_mode(bot)

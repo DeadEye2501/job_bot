@@ -68,14 +68,14 @@ class Vacancy(IdMixin, CreatedAtMixin, Base):
         enum_column(VacancyStatus, "vacancy_status"),
         server_default=text("'New'"),
     )
-    # Flips to True only after the LLM parse + classify pipeline finishes
-    # and persists structured fields (title, stack, score, ...). False
-    # while the row holds just raw_text + embedding — i.e. it was created
-    # by ``ingest.save_new_vacancy`` but the follow-up ``parse.parse_and_update_vacancy``
-    # was killed (process crash, cancellation) before it could commit.
-    # The UI list filters on ``is_parsed = True`` so users never see a
-    # half-built row, and ``recover_orphan_vacancies`` re-parses the
-    # ``False`` ones on the next startup before polling resumes.
+    # Истиной становится только после того, как разбор закончился и записал
+    # поля (название, стек, баллы). Ложь у строки бывает по двум причинам, и
+    # обе штатные: разбор оборвали посреди — процесс убили, работу отменили, —
+    # либо приговора ещё не выносили вовсе, потому что статья по ссылке не
+    # пришла и объявление ждёт дочитывания (`flows/ingest`).
+    # Список в окне отбирает по `is_parsed = True`, так что полуготовой строки
+    # человек не видит, а `recover_orphan_vacancies` возвращается к ложным на
+    # каждом полном обороте цикла — перечитывает пост и решает их судьбу.
     is_parsed: Mapped[bool] = mapped_column(server_default=expression.false())
     notes: Mapped[str | None]
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
