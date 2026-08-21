@@ -1,11 +1,20 @@
-"""Повторный разбор уже заведённой вакансии."""
+"""Повторный разбор уже заведённой вакансии.
+
+Зовут его двое, и предмет у обоих один — строка, которая уже лежит в базе.
+Кнопка «Прогнать заново» разбирает её по просьбе человека; подбор
+недоразобранного — те, у которых приговора ещё нет вовсе. Разница между ними
+в одном: за какой текст зовущий ручается, и потому оба живут здесь, а не
+порознь.
+"""
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from sqlalchemy import select
 
+from adapters import teletype
 from backend.flows import embeddings, linked_article, parse
 from backend.message_text import extract_post_text, extract_text
 from backend.models import TelegramChannel
@@ -61,65 +70,64 @@ async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None:
         )
 
 
-async def _post_text(msg, origin: _Origin, vacancy_id: int) -> tuple[str, str] | None:
-    """Перечитанный пост двумя текстами; пусто — брать сохранённый.
+async def _post_text(msg, where: str, vacancy_id: int) -> tuple[str, str, bool] | None:
+    """Перечитанный пост тремя значениями; пусто — текста в посте нет.
 
     Первый — со статьями и адресами ссылок, он идёт в разбор и в строку.
     Второй — голый текст поста, он идёт в отпечаток: отпечатки сравнивают с
     посчитанными год назад, когда ни адресов, ни статей в тексте не было.
+    Третий — целиком ли собран текст, то есть не пропала ли статья по причине,
+    которая пройдёт.
 
-    Недобравший текст здесь хуже прежнего, а не лучше: сохранённый уже
-    содержит статью, которую в эту минуту не отдали, и переписать его постом
-    без неё — значит потерять требования, по которым вакансию и отбирали.
+    Что делать с недобравшим, здесь не решают: прогону заново он хуже
+    сохранённого, а недоразобранной строке — повод подождать ещё, и оба ответа
+    принадлежат зовущему.
     """
     candidate = extract_post_text(msg)
     if not candidate:
         logger.info(
-            "rerun: vacancy %d fetched msg @%s/%d but text is empty (media-only?), keeping cached raw_text",
-            vacancy_id, origin.channel_username, origin.msg_id,
+            "rerun: vacancy %d fetched msg %s but text is empty (media-only?), keeping cached raw_text",
+            vacancy_id, where,
         )
         return None
     candidate, whole = await linked_article.with_linked_articles(candidate)
-    if not whole:
-        logger.info(
-            "rerun: vacancy %d linked article not available, keeping cached raw_text",
-            vacancy_id,
-        )
-        return None
-    return candidate, extract_text(msg)
+    return candidate, extract_text(msg), whole
 
 
-async def _fetch_fresh_text(pipeline, origin: _Origin, vacancy_id: int):
-    """Перечитать исходный пост; пусто — берём сохранённый текст.
+async def _fetch_fresh_text(
+    pipeline, channel_username: str, msg_id: int | None, vacancy_id: int
+):
+    """Перечитать исходный пост; пусто — перечитать не вышло.
 
     Недоступность поста тут не беда, а обычный исход: канал мог закрыться,
     пост — быть удалённым, Telegram — попросить подождать. Во всех этих
-    случаях повторный прогон идёт по тому, что уже лежит в базе.
+    случаях зовущему остаётся то, что уже лежит в базе.
     """
     from pyrogram.errors import FloodWait
 
-    if not origin.channel_username or origin.msg_id is None:
+    if not channel_username or msg_id is None:
         return None
+    where = f"@{channel_username}/{msg_id}"
     try:
         msg = await pipeline.client.get_messages(
-            origin.channel_username, message_ids=origin.msg_id
+            channel_username, message_ids=msg_id
         )
         if msg is None or getattr(msg, "empty", False):
             logger.info(
-                "rerun: vacancy %d msg @%s/%d not available (deleted/empty), keeping cached raw_text",
-                vacancy_id, origin.channel_username, origin.msg_id,
+                "rerun: vacancy %d msg %s not available (deleted/empty), keeping cached raw_text",
+                vacancy_id, where,
             )
             return None
-        return await _post_text(msg, origin, vacancy_id)
+        return await _post_text(msg, where, vacancy_id)
     except FloodWait as e:
         logger.warning(
-            "rerun: vacancy %d FloodWait %ss while fetching @%s/%d, keeping cached raw_text",
-            vacancy_id, e.value, origin.channel_username, origin.msg_id,
+            "rerun: vacancy %d FloodWait %ss while fetching %s, keeping cached raw_text",
+            vacancy_id, e.value, where,
         )
     except Exception:
         logger.exception(
-            "rerun: vacancy %d failed to refetch @%s/%d, keeping cached raw_text",
-            vacancy_id, origin.channel_username, origin.msg_id,
+            "rerun: vacancy %d failed to refetch %s, keeping cached raw_text",
+            vacancy_id, where,
         )
     return None
 
@@ -191,11 +199,23 @@ async def _text_to_parse(pipeline, origin: "_Origin", vacancy_id: int):
     минутами, и оборвись он посреди, сохранённый текст остался бы от прошлого
     раза. Голый текст поста нужен только отпечатку, и без перечитывания его
     нет вовсе — сохранённый для этого не годится, в нём адреса и статьи.
+
+    Недобравший перечитанный текст здесь хуже сохранённого, а не лучше: в
+    сохранённом статья уже есть, и переписать его постом без неё — значит
+    потерять требования, по которым вакансию и отбирали.
     """
-    fresh = await _fetch_fresh_text(pipeline, origin, vacancy_id)
+    fresh = await _fetch_fresh_text(
+        pipeline, origin.channel_username, origin.msg_id, vacancy_id
+    )
     if fresh is None:
         return origin.raw_text, None
-    text, plain = fresh
+    text, plain, whole = fresh
+    if not whole:
+        logger.info(
+            "rerun: vacancy %d linked article not available, keeping cached raw_text",
+            vacancy_id,
+        )
+        return origin.raw_text, None
     if text != origin.raw_text:
         await _store(pipeline, vacancy_id, raw_text=text)
     return text, plain
@@ -252,8 +272,9 @@ async def rerun_pipeline_for_vacancy(
 async def _orphan_rows(pipeline) -> list:
     """Вакансии, заведённые, но так и не разобранные, старые первыми.
 
-    Ник канала берётся внешним соединением: канал могли снести, а вакансия
-    от этого недоразобранной быть не перестаёт.
+    Ник канала и номер поста берутся вместе с текстом: по ним объявление
+    перечитывают заново. Ник — внешним соединением: канал могли снести, а
+    вакансия от этого недоразобранной быть не перестаёт.
     """
     async with pipeline.session_factory() as session:
         return (
@@ -261,6 +282,8 @@ async def _orphan_rows(pipeline) -> list:
                 select(
                     Vacancy.id,
                     Vacancy.raw_text,
+                    Vacancy.source_msg_id,
+                    Vacancy.created_at,
                     TelegramChannel.username,
                 )
                 .outerjoin(
@@ -276,22 +299,98 @@ async def _orphan_rows(pipeline) -> list:
         ).all()
 
 
+LONGEST_WAIT = timedelta(days=1)
+"""Сколько объявление ждёт статью, прежде чем его осудят по тому, что есть.
+
+Срок нужен затем, чтобы ожидание вообще кончалось. Отличить «сайт лежит до
+утра» от «сайт закрылся от нас навсегда» по одному отказу нельзя: и защита от
+ботов, и умерший домен, и оборванная сеть приходят одинаковой бедой. Без срока
+такая строка осталась бы невидимой до конца своих дней — ни в списке, ни в
+отказах, нигде.
+
+Сутки, потому что перебои у teletype идут минутами, а починка домена — часами;
+объявление живёт дольше, и день ожидания ему не в убыток.
+"""
+
+
+def _waited_out(created_at) -> bool:
+    """Ждало ли объявление статьи дольше срока.
+
+    Сравнение наивное, по UTC: SQLite отдаёт метки без пояса даже у колонки с
+    поясом, а пишет их `CURRENT_TIMESTAMP` — тот же уговор, что у срока
+    молчания HR.
+    """
+    if created_at is None:
+        return True
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    return now - created_at >= LONGEST_WAIT
+
+
+async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
+    """Текст, по которому судить недоразобранную строку, и можно ли удалять.
+
+    Ссылок на статью в тексте нет — ждать нечего и перечитывать незачем:
+    объявление собрано целиком, и непригодное можно убирать.
+
+    Иначе пост перечитывается: только так видно, собралась ли наконец статья,
+    которой не хватило на приёме. Собралась — судим по свежему тексту, и
+    непригодную строку опять же можно убирать: полнее он уже не станет.
+
+    Не собралась — пусто в ответ, строка ждёт дальше. Сюда же приходит и
+    неперечитавшийся пост: просьба Telegram подождать проходит так же, как
+    лежащий сайт, а по одному отказу их всё равно не различить.
+
+    Ждать не бесконечно: прождавшую дольше `LONGEST_WAIT` судят по
+    сохранённому, но удалять по нему не дают — целым он так и не собрался.
+    """
+    if not teletype.ARTICLE_URL_RE.search(row.raw_text):
+        return row.raw_text, True
+    fresh = await _fetch_fresh_text(
+        pipeline, row.username or "", row.source_msg_id, row.id
+    )
+    if fresh is not None:
+        text, _plain, whole = fresh
+        if whole:
+            if text != row.raw_text:
+                await _store(pipeline, row.id, raw_text=text)
+            return text, True
+    return (row.raw_text, False) if _waited_out(row.created_at) else None
+
+
+async def _recover_one(pipeline, row) -> bool:
+    """Дочитать и разобрать одну недоразобранную строку; сказать, разобрали ли.
+
+    Отпечаток тут не пересчитывается, хотя пост и перечитан: у неразобранной
+    строки он посчитан на приёме и лежит в кэше отсева, а считается он по
+    голому тексту поста — тому же, что и сейчас. Прогон заново пересчитывает
+    его потому, что там объявление могли отредактировать за месяцы; здесь
+    между приёмом и подбором проходит оборот цикла.
+    """
+    judged = await _text_to_judge_by(pipeline, row)
+    if judged is None:
+        logger.info("recover: vacancy %d ждёт дочитывания статьи", row.id)
+        return False
+    text, allow_delete = judged
+    await parse.parse_and_update_vacancy(
+        pipeline, row.id, text, row.username or "", allow_delete=allow_delete
+    )
+    return True
+
+
 async def recover_orphan_vacancies(pipeline) -> int:
-    """Finish parsing rows that were ingested but never made it through
-    the LLM pipeline (process killed between ``save_new_vacancy`` and
-    ``parse_and_update_vacancy`` commits, or LLM call cancelled).
+    """Подобрать строки, заведённые, но так и не разобранные.
 
-    Called once at startup before the polling loop kicks in, so the
-    UI never shows half-built rows for long.
+    Недоразобранной строка остаётся по двум причинам: работу оборвали между
+    записью строки и записью разбора, или статья по ссылке не пришла и
+    приговор был отложен до полного текста. Обе лечатся одинаково — пост
+    перечитывается заново (`_text_to_judge_by`), и что из этого вышло, решает
+    судьбу строки: дочитанную судят с правом убрать непригодную, ждущую
+    оставляют ждать.
 
-    Выбрасывать здесь нельзя ничего. Разбирают строку по сохранённому тексту, а
-    целым ли он записан, не знает никто: пост со ссылкой ложится в базу и
-    тогда, когда статья не доехала (`ingest._vacancy_row` пишет `post.text`
-    независимо от целости). Снеси такую — и объявление пропадёт навсегда: пост
-    второй раз не прочтут, отметка канала уехала. Пометка «не подходит»
-    дождётся прогона заново, а тот статью и подберёт.
+    Идёт на каждом полном обороте, до обхода каналов: статья возвращается
+    посреди рабочего дня, а ждущей строки человек не видит вовсе.
 
-    Отвечает, сколько строк подобрано.
+    Отвечает, сколько строк разобрано; ждущие дальше в счёт не идут.
     """
     await pipeline.reload_resources()
     rows = await _orphan_rows(pipeline)
@@ -303,14 +402,11 @@ async def recover_orphan_vacancies(pipeline) -> int:
         pipeline.emit_progress(
             "recover", r.username or "", idx - 1, len(rows)
         )
-        text = r.raw_text or ""
-        if not text:
+        if not r.raw_text:
             continue
         try:
-            await parse.parse_and_update_vacancy(pipeline, 
-                r.id, text, r.username or "", allow_delete=False
-            )
-            processed += 1
+            if await _recover_one(pipeline, r):
+                processed += 1
         except Exception:
             logger.exception(
                 "recover: vacancy %d parse failed", r.id

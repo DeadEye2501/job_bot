@@ -379,6 +379,7 @@
   - `status: VacancyStatus`
   - `history_id: int | None`
 - `RerunPipelineOutcome` = `Literal['ok', 'missing', 'no_text', 'llm']`
+- `LONGEST_WAIT` = `timedelta(days=1)`
 
 ### `backend/health.py`
 
@@ -1276,6 +1277,10 @@
 
 - `_SILENT_DAYS` = `15`
 - `_STILL_WAITING_DAYS` = `13`
+
+### `tests/backend/test_flows_new_vacancy.py`
+
+- `WITH_ARTICLE` = `'Senior QA https://teletype.in/@a/b'`
 
 ### `tests/backend/test_llm_cover_letter.py`
 
