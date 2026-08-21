@@ -62,6 +62,13 @@
 
 ## alembic
 
+### `alembic/bundled/aa4e0de05368_seed_initial_data.py`
+
+- `revision: str` = `'aa4e0de05368'`
+- `down_revision: Union[str, Sequence[str], None]` = `'8ba64b863cb1'`
+- `branch_labels: Union[str, Sequence[str], None]` = `None`
+- `depends_on: Union[str, Sequence[str], None]` = `None`
+
 ### `alembic/env.py`
 
 - `config` = `context.config`
@@ -492,7 +499,7 @@
 
 ### `backend/log_secrets.py`
 
-- `_SECRET_PATTERNS: tuple[re.Pattern[str], ...]` = `набор из 4`
+- `_SECRET_PATTERNS: tuple[re.Pattern[str], ...]` = `набор из 6`
 - `_REDACTED` = `'***'`
 
 ### `backend/models/base.py`
@@ -1005,6 +1012,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `_held` = `None`
+- `_BUSY` = `frozenset({errno.EACCES, errno.EAGAIN, errno.EWO…`
 
 ### `backend/telegram_login.py`
 
@@ -1220,6 +1228,11 @@
 - `MEDIA_PREFIX` = `'/media/'`
 - `_OWN_TYPES` = `словарь из 7`
 
+### `client/trouble_box.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `_AS_TROUBLE` = `16`
+
 ### `client/window.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -1255,7 +1268,7 @@
 - `TERMINAL` = `набор из 4`
 - `LIVE` = `[status for status in VacancyStatus if status no…`
 
-### `tests/backend/test_entry_point.py`
+### `tests/backend/test_entry_point_log.py`
 
 - `ROOT` = `Path(__file__).resolve().parents[2]`
 

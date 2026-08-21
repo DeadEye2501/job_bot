@@ -9,6 +9,7 @@
 плане, слайс А3.
 """
 
+import logging
 from concurrent.futures import Future
 
 import pytest
@@ -123,6 +124,32 @@ def test_everything_is_put_out_from_the_top_down(opened):
     assert order == ["слушатель", "мост", "мотор"]
 
 
+def test_a_shutdown_that_broke_does_not_look_like_a_failed_launch(
+    opened, monkeypatch, caplog
+):
+    """Сорвавшееся гашение не выдаётся за несостоявшийся запуск.
+
+    Гасить нечего: человек закрыл окно, приложение отработало, и процесс сейчас
+    умрёт. А вот наружу такая беда уходила бы кодом отказа, и точка входа
+    показала бы модальное «Не удалось запуститься» поверх уже закрытого окна —
+    да ещё и держала бы процесс, пока его не нажмут.
+
+    Сорвавшееся гашение при этом молчать не должно: движок, не отпустивший
+    базу, виден только по журналу.
+    """
+    fake, _order = opened
+
+    def hangs(*_args, **_kwargs):
+        raise TimeoutError("движок не закрылся за отведённое время")
+
+    monkeypatch.setattr(window_module.lifespan, "stop", hangs)
+
+    with caplog.at_level(logging.ERROR, logger="client.window"):
+        assert window_module.run_ui() == 0
+
+    assert "движок не закрылся" in caplog.text
+
+
 def test_a_window_that_would_not_open_still_puts_the_bridge_out(opened, monkeypatch):
     """Окно, которое не поднялось, всё равно гасит за собой мост.
 
@@ -208,3 +235,47 @@ def test_the_page_is_served_and_not_opened_from_the_disk(opened):
     window_module.run_ui()
 
     assert callable(fake.created["url"])
+
+
+class _Settings:
+    """Настройки ровно в том объёме, который читает снос файлов сеанса."""
+
+    def __init__(self, *, has_tg_session: bool) -> None:
+        self.has_tg_session = has_tg_session
+
+
+def _sessions(tmp_path, monkeypatch):
+    """Каталог сеансов с тремя файлами: два своих и один чужой."""
+    where = tmp_path / "sessions"
+    where.mkdir()
+    for name in ("bot.session", "bot.session-journal", "заметка.txt"):
+        (where / name).write_text("что-то", encoding="utf-8")
+    monkeypatch.setattr("adapters.telegram.SESSIONS_DIR", where)
+    return where
+
+
+def test_a_live_session_makes_the_stale_files_go(tmp_path, monkeypatch):
+    """Файлы сеанса рядом с базой сносятся, когда сеанс есть в самой базе.
+
+    Ключ в них лежит открытым текстом, а в базе — зашифрованным; оставленные,
+    они переживают и смену устройства, и забытый главный ключ.
+    """
+    where = _sessions(tmp_path, monkeypatch)
+
+    window_module._drop_stale_session_files(_Settings(has_tg_session=True))
+
+    assert sorted(one.name for one in where.iterdir()) == ["заметка.txt"]
+
+
+def test_without_a_session_in_the_database_the_files_survive(tmp_path, monkeypatch):
+    """Без сеанса в базе файлы остаются: они могут быть всем, что осталось.
+
+    Мастер не дошёл до конца, базу пересоздали, ключ забыли — и снос оставил бы
+    человека входить заново по коду, которого Telegram после нескольких попыток
+    уже не пришлёт.
+    """
+    where = _sessions(tmp_path, monkeypatch)
+
+    window_module._drop_stale_session_files(_Settings(has_tg_session=False))
+
+    assert len(list(where.iterdir())) == 3

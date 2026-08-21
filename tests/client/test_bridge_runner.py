@@ -11,6 +11,8 @@
 """
 
 import asyncio
+import logging
+import sqlite3
 import threading
 
 import pytest
@@ -108,3 +110,61 @@ def test_stopping_twice_is_not_a_trouble(real_runner):
     real_runner.stop()
 
     real_runner.stop()
+
+
+def _troubled(real_runner, exc: BaseException) -> None:
+    """Отдать мотору беду, которую никто не перехватил.
+
+    Сперва дожидаемся самого цикла: ставит обработчик уже фоновый поток, а
+    `Thread.start` возвращает управление раньше, чем тот до этого доходит.
+    Без ожидания проверка изредка мигала бы на пустом месте — и искать причину
+    пришлось бы в поломке, которой нет.
+    """
+    real_runner.submit(asyncio.sleep(0)).result(timeout=5)
+    handler = real_runner.loop.get_exception_handler()
+    handler(real_runner.loop, {"exception": exc, "message": "беда в цикле"})
+
+
+def test_a_shutdown_race_of_pyrogram_is_swallowed_with_a_word(real_runner, caplog):
+    """Шум гашения Pyrogram глушится, но не молча.
+
+    Pyrogram догоняет обновлением уже закрытую базу и остановленный цикл, и
+    делать с этим нечего — применять некуда. Но всплыви та же беда не при
+    гашении, и это значит, что базу или цикл закрыли рано: тихая отладка
+    спрятала бы это, поэтому здесь предупреждение.
+    """
+    with caplog.at_level(logging.DEBUG, logger="client.bridge.runner"):
+        _troubled(real_runner, sqlite3.ProgrammingError("Cannot operate on a closed database."))
+        _troubled(real_runner, RuntimeError("Event loop is closed"))
+        _troubled(real_runner, AttributeError("'Client' object has no attribute 'storage'"))
+
+    assert caplog.text.count("swallowed") == 3
+    # И не пропущены дальше: пропусти обработчик контекст в штатный, журнал
+    # засыпало бы трассировками гонки Pyrogram на каждом закрытии окна.
+    assert [one for one in caplog.records if one.name == "asyncio"] == []
+
+
+def test_a_real_trouble_in_the_loop_reaches_the_log(real_runner, caplog):
+    """Беда, не похожая на шум гашения, доезжает до журнала целиком.
+
+    Экран «Логи» — единственная диагностика этого приложения. Сделай фильтр
+    шире, и всякая неперехваченная беда мотора пропадала бы молча; сделай уже —
+    и каждое закрытие окна засыпало бы журнал трассировками гонки Pyrogram, за
+    которыми настоящие записи утонут.
+    """
+    with caplog.at_level(logging.ERROR, logger="asyncio"):
+        _troubled(real_runner, ValueError("а вот это настоящая поломка"))
+
+    assert "а вот это настоящая поломка" in caplog.text
+
+
+def test_a_closed_database_outside_a_shutdown_is_not_swallowed(real_runner, caplog):
+    """Закрытая база, названная другими словами, за шум не принимается.
+
+    Глушится не порода беды, а именно гонка гашения: та же порода с другим
+    текстом — это наша поломка, и прятать её нельзя.
+    """
+    with caplog.at_level(logging.ERROR, logger="asyncio"):
+        _troubled(real_runner, sqlite3.ProgrammingError("no such column: hr.name"))
+
+    assert "no such column" in caplog.text

@@ -3,6 +3,7 @@
 import pytest
 
 from backend.models import VacancyStatus
+from backend.repository.stats_pipeline import get_stats_channels_pipeline
 from tests.dbio import put
 from tests.factories import message_row, status_history_row, vacancy_row
 
@@ -60,3 +61,9 @@ def applied(session_factory):
         return vacancy
 
     return build
+
+
+async def rows_by_label(session, **kwargs) -> dict[str, dict]:
+    """Строки таблицы, разложенные по подписи канала."""
+    got = await get_stats_channels_pipeline(session, **kwargs)
+    return {row["label"]: row for row in got["channels"]}

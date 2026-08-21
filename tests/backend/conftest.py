@@ -7,6 +7,7 @@
 """
 
 from tests.backend.fixtures.backfill import known_hr
+from tests.backend.fixtures.entry import entry, lock_of_its_own
 from tests.backend.fixtures.bot import (
     busy_slot,
     chatting,
@@ -25,7 +26,7 @@ from tests.backend.fixtures.flows import (
     unparsed_vacancy,
 )
 from tests.backend.fixtures.listing import channel_titles, hr_names, titles
-from tests.backend.fixtures.logs import clean_root_logger
+from tests.backend.fixtures.logs import clean_log_file, clean_root_logger
 from tests.backend.fixtures.rerun import rerunning
 from tests.backend.fixtures.stats import applied
 
@@ -35,12 +36,15 @@ __all__ = [
     "channel_titles",
     "chatting",
     "chatting_on_fakes",
+    "clean_log_file",
     "clean_root_logger",
     "deliver",
     "dm_pipeline",
     "empty_media_dir",
+    "entry",
     "hr_names",
     "known_hr",
+    "lock_of_its_own",
     "make_bot",
     "make_pipeline",
     "outbox",

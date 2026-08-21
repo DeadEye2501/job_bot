@@ -22,7 +22,9 @@
 проектного дойти до конца нельзя. Прогон в обоих случаях настоящий.
 """
 
+import re
 import sqlite3
+from pathlib import Path
 
 from alembic import command
 
@@ -131,3 +133,44 @@ def test_the_schema_is_brought_to_the_latest_revision(
 
     assert {"первая", "вторая"} <= _tables(migrations_target)
     assert _revision_reached(migrations_target) == "second"
+
+
+def _revisions_in(paths) -> set[str]:
+    """Ревизии, объявленные названными файлами миграций."""
+    found = set()
+    for path in paths:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("revision:") or line.startswith("revision ="):
+                found.add(line.split("=", 1)[1].strip().strip("'\""))
+                break
+    return found
+
+
+def test_the_build_carries_every_revision_the_sources_can_reach():
+    """История миграций в сборке покрывает ту же, до которой доходят исходники.
+
+    Каталог данных у сборки и у исходников один. Запуск из исходников доводит
+    базу до своей последней ревизии и пишет её в `alembic_version`; собранный
+    exe при старте зовёт `upgrade head`, ищет эту запись в своей истории и, не
+    найдя, бросает `CommandError`. Окна у него нет, консоли тоже — человек
+    жмёт ярлык, и не происходит ничего. Каждый раз.
+
+    Засевная миграция в сборку не едет нарочно — в ней личные данные, — но
+    исключать её надо из содержимого, а не из истории: заглушка с тем же
+    номером ревизии оставляет новую базу пустой и не роняет старую.
+
+    Сравнение вложением, а не равенством: сама засевная под версией не ходит, и
+    на свежем клоне её в `versions/` нет вовсе. Забытая в сборке новая ревизия
+    краснеет всё так же — она была бы слева и не нашлась бы справа.
+    """
+    root = Path(__file__).resolve().parents[2]
+    spec = (root / "JobBot.spec").read_text(encoding="utf-8")
+    bundled = [
+        root / name
+        for name in re.findall(r"'(alembic/[^']+[.]py)'", spec)
+        if "env.py" not in name
+    ]
+
+    assert _revisions_in((root / "alembic" / "versions").glob("*.py")) <= (
+        _revisions_in(bundled)
+    )
