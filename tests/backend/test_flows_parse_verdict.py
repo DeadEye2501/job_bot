@@ -19,6 +19,7 @@
 from backend.domain.verdict import TRUNCATED_SKIP_REASON
 from backend.flows import parse
 from backend.llm.answers import TRUNCATED_TROUBLE
+from backend.llm.rules import VACANCY_TEXT_CHARS
 from backend.models import TrashEvent, Vacancy, VacancyStatus
 from backend.payloads import FitValidation, PostGenre
 from tests.dbio import all_rows, only_row
@@ -75,6 +76,24 @@ async def test_a_resume_mark_decides_before_the_fit_check(parsing, session_facto
     assert pipeline.validated is False
     mark = await only_row(session_factory, TrashEvent)
     assert mark.reason == "trash: пост соискателя, метка #cv"
+
+
+async def test_a_mark_beyond_the_models_horizon_does_not_delete(parsing, session_factory):
+    """Метка за пределом того, что видит модель, строку не сносит.
+
+    Отсечка судит одна и удаляет без возврата, а модели достаётся урезанный
+    по её бюджету текст. Суди отсечка по большему — она сносила бы вакансию
+    по метке, которой ни один зов к модели даже не увидел; к тексту при этом
+    дописаны статьи по ссылкам, и хэштег в чужой статье не редкость.
+    """
+    pipeline, vacancy = parsing
+    far_away = "Ищем Python-разработчика. " + "а" * VACANCY_TEXT_CHARS + " #cv"
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, far_away, "jobs", allow_delete=True
+    )
+
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NEW
 
 
 async def test_a_hashtag_inside_a_link_is_not_a_mark(parsing, session_factory):
@@ -440,10 +459,10 @@ async def test_the_validator_is_asked_before_the_score(parsing, session_factory)
     """«Это вообще вакансия» спрашивают раньше баллов, а не после.
 
     Баллы отвечают на другой вопрос — подходит ли вакансия кандидату, — и к
-    посту, который вакансией не является, неприменимы вовсе. Пока они стояли
-    первыми, резюме получало «score -6 < 5» и до смыслового приговора не
-    доезжало вовсе. Хуже того, отсев по баллам выглядит работающим
-    фильтром — а резюме, случайно набравшее баллы, получает письмо.
+    посту, который вакансией не является, неприменимы вовсе. Стой они первыми,
+    резюме получало бы «не набрало порога» и до смыслового приговора не
+    доезжало бы. Хуже того, такой отсев выглядит работающим фильтром — а
+    резюме, случайно набравшее баллы, получает письмо.
     """
     pipeline, vacancy = parsing
     pipeline.verdict = FitValidation(verdict="trash", reason="это пост соискателя")

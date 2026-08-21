@@ -17,7 +17,7 @@ import pytest
 
 from adapters import teletype
 from backend.flows import parse as parse_mod
-from backend.flows import ingest
+from backend.flows import ingest, rerun
 from backend.flows import embeddings
 from backend.models import TelegramChannel, Vacancy, VacancyEvent
 from backend.payloads import ChannelPost
@@ -43,6 +43,7 @@ def parses(monkeypatch):
 
     async def parse(pipeline, vacancy_id, text, username, allow_delete=True):
         calls.append((vacancy_id, text, username, allow_delete))
+        return True
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
     return calls
@@ -294,6 +295,7 @@ async def test_one_broken_orphan_does_not_stop_the_rest(monkeypatch,
         if text == "первая":
             raise RuntimeError("не разобралось")
         done.append(text)
+        return True
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 
@@ -315,6 +317,46 @@ async def test_the_window_hears_about_the_recovery(parses, make_pipeline, sessio
     await pipeline.recover_orphan_vacancies()
 
     assert heard == [("recover", "", 0, 1), ("recover", "", 0, 0)]
+
+
+async def test_the_sweep_does_not_eat_the_whole_turn(parses, make_pipeline, session_factory):
+    """Подбор берёт за оборот не больше горсти строк, сколько бы их ни ждало.
+
+    Идёт он перед обходом каналов, и каждая ждущая строка стоит похода в
+    Telegram и до трёх обращений к чужому сайту по двадцать секунд. Не
+    ограничь его — накопившаяся сотня отложила бы свежие объявления на часы,
+    а канал бы за это время уехал.
+    """
+    await put(
+        session_factory,
+        *[
+            vacancy_row(title=None, is_parsed=False, raw_text=f"текст {n}")
+            for n in range(rerun.RECOVERED_PER_TURN + 3)
+        ],
+    )
+    pipeline = await make_pipeline()
+
+    assert await pipeline.recover_orphan_vacancies() == rerun.RECOVERED_PER_TURN
+    assert len(parses) == rerun.RECOVERED_PER_TURN
+
+
+async def test_a_row_the_parse_gave_up_on_is_not_counted(monkeypatch,
+    make_pipeline, session_factory
+):
+    """Строка, на которой разбор сдался, подобранной не считается.
+
+    Счёт этот человек читает в журнале, и завышенный он говорит «всё
+    разобрано» там, где строки остались ждать следующего оборота.
+    """
+    await put(session_factory, vacancy_row(title=None, is_parsed=False, raw_text="текст"))
+    pipeline = await make_pipeline()
+
+    async def parse(pipeline, vacancy_id, text, username, allow_delete=True):
+        return False
+
+    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
+
+    assert await pipeline.recover_orphan_vacancies() == 0
 
 
 async def test_nothing_to_recover_is_no_work(make_pipeline):

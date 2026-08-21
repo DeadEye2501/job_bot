@@ -377,7 +377,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def percent_or_none(numerator: int, denominator: int) -> int | None` (14)
 
-### `backend/domain/resume_marks.py` — 60 строк
+### `backend/domain/resume_marks.py` — 61 строк
 
 Приметы поста соискателя: метки, по которым он опознаётся без модели.
 
@@ -681,11 +681,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None` (16)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 
-### `backend/flows/parse.py` — 429 строк ⚠ подошёл к 300
+### `backend/flows/parse.py` — 430 строк ⚠ подошёл к 300
 
 Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
-Зависит от: `backend.domain.blacklist`, `backend.domain.resume_marks`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit`, `backend.llm.genre`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`
+Зависит от: `backend.domain.blacklist`, `backend.domain.resume_marks`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit`, `backend.llm.genre`, `backend.llm.rules`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`
 
 - `async def _dropped_as_trash(pipeline, vacancy_id: int, reason: str, *, allow_delete: bool) -> bool` (23)
 - `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (51)
@@ -750,7 +750,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def cancel_pending_dm_classifications(self, *, drain=False) -> None` (2)
   - `async def send_application_for_vacancy(self, vacancy_id) -> tuple[bool, str]` (2)
 
-### `backend/flows/rerun.py` — 418 строк ⚠ подошёл к 300
+### `backend/flows/rerun.py` — 433 строк ⚠ подошёл к 300
 
 Повторный разбор уже заведённой вакансии.
 
@@ -768,8 +768,8 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _orphan_rows(pipeline) -> list` (28)
 - `def _waited_out(created_at) -> bool` (11)
 - `async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None` (29)
-- `async def _recover_one(pipeline, row) -> bool` (18)
-- `async def recover_orphan_vacancies(pipeline) -> int` (39)
+- `async def _recover_one(pipeline, row) -> bool` (17)
+- `async def recover_orphan_vacancies(pipeline) -> int` (45)
 
 ### `backend/health.py` — 89 строк
 
@@ -898,7 +898,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def validate_vacancy_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (36)
   - `def read(answer: str) -> FitValidation | None` (7)
 
-### `backend/llm/genre.py` — 131 строк
+### `backend/llm/genre.py` — 137 строк
 
 Жанр поста: зовёт ли автор на работу или предлагает себя.
 
@@ -932,7 +932,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
 - `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (55)
 
-### `backend/llm/rules.py` — 95 строк
+### `backend/llm/rules.py` — 107 строк
 
 Приметы предметной области, общие для наставлений модели.
 
@@ -3178,16 +3178,16 @@ Runtime settings layer.
 - `async def carded(monkeypatch, make_pipeline, session_factory)` (25)
   - `async def send_application(pipeline, hr_row_, parsed, vacancy_id, *, force=False)` (3)
 
-### `tests/backend/test_flows_new_vacancy.py` — 327 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_new_vacancy.py` — 369 строк ⚠ подошёл к 300
 
 Следствия заведения строки под новое объявление.
 
 Зависит от: `adapters`, `backend.flows`, `backend.models`, `backend.payloads`, `tests.backend.fixtures.rerun`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
-Тестов: 15
+Тестов: 17
 
-- `def parses(monkeypatch)` (15)
-  - `async def parse(pipeline, vacancy_id, text, username, allow_delete=True)` (2)
+- `def parses(monkeypatch)` (16)
+  - `async def parse(pipeline, vacancy_id, text, username, allow_delete=True)` (3)
 - `async def _orphan_waiting_for_an_article(session_factory, created_at=None)` (15)
 
 ### `tests/backend/test_flows_parse_persist.py` — 424 строк ⚠ подошёл к 300
@@ -3199,13 +3199,13 @@ Runtime settings layer.
 Тестов: 18
 
 
-### `tests/backend/test_flows_parse_verdict.py` — 477 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_parse_verdict.py` — 496 строк ⚠ подошёл к 300
 
 Какой приговор получает объявление после разбора.
 
-Зависит от: `backend.domain.verdict`, `backend.flows`, `backend.llm.answers`, `backend.models`, `backend.payloads`, `tests.dbio`
+Зависит от: `backend.domain.verdict`, `backend.flows`, `backend.llm.answers`, `backend.llm.rules`, `backend.models`, `backend.payloads`, `tests.dbio`
 
-Тестов: 24
+Тестов: 25
 
 
 ### `tests/backend/test_flows_post_intake.py` — 349 строк ⚠ подошёл к 300

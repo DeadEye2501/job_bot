@@ -299,6 +299,16 @@ async def _orphan_rows(pipeline) -> list:
         ).all()
 
 
+RECOVERED_PER_TURN = 10
+"""Сколько недоразобранных строк подбирают за один оборот цикла.
+
+Подбор идёт перед обходом каналов, и каждая строка стоит похода в Telegram и
+до трёх обращений к чужому сайту со сроком ожидания в двадцать секунд.
+Накопившаяся сотня отложила бы свежие объявления на часы, а отметки каналов за
+это время уехали бы дальше. Остаток дождётся следующего оборота: строки идут
+старыми вперёд, и ни одна не пропускается насовсем.
+"""
+
 LONGEST_WAIT = timedelta(days=1)
 """Сколько объявление ждёт статью, прежде чем его осудят по тому, что есть.
 
@@ -371,10 +381,9 @@ async def _recover_one(pipeline, row) -> bool:
         logger.info("recover: vacancy %d ждёт дочитывания статьи", row.id)
         return False
     text, allow_delete = judged
-    await parse.parse_and_update_vacancy(
+    return await parse.parse_and_update_vacancy(
         pipeline, row.id, text, row.username or "", allow_delete=allow_delete
     )
-    return True
 
 
 async def recover_orphan_vacancies(pipeline) -> int:
@@ -388,19 +397,22 @@ async def recover_orphan_vacancies(pipeline) -> int:
     оставляют ждать.
 
     Идёт на каждом полном обороте, до обхода каналов: статья возвращается
-    посреди рабочего дня, а ждущей строки человек не видит вовсе.
+    посреди рабочего дня, а ждущей строки человек не видит вовсе. За оборот
+    берётся не больше `RECOVERED_PER_TURN`, старые первыми.
 
-    Отвечает, сколько строк разобрано; ждущие дальше в счёт не идут.
+    Отвечает, сколько строк разобрано: ждущие дальше и те, на которых разбор
+    сдался, в счёт не идут.
     """
     await pipeline.reload_resources()
     rows = await _orphan_rows(pipeline)
     if not rows:
         return 0
     logger.info("recovering %d orphan vacancy/vacancies", len(rows))
+    taken = rows[:RECOVERED_PER_TURN]
     processed = 0
-    for idx, r in enumerate(rows, start=1):
+    for idx, r in enumerate(taken, start=1):
         pipeline.emit_progress(
-            "recover", r.username or "", idx - 1, len(rows)
+            "recover", r.username or "", idx - 1, len(taken)
         )
         if not r.raw_text:
             continue
@@ -414,5 +426,8 @@ async def recover_orphan_vacancies(pipeline) -> int:
     # Clear the recovery bar once done so the next stage's progress
     # doesn't inherit the leftover count (mirrors poll_active_channels).
     pipeline.emit_progress("recover", "", 0, 0)
-    logger.info("recovered %d/%d orphan vacancy/vacancies", processed, len(rows))
+    logger.info(
+        "recovered %d/%d orphan vacancy/vacancies (waiting: %d)",
+        processed, len(taken), len(rows) - len(taken),
+    )
     return processed
