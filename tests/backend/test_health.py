@@ -5,6 +5,9 @@
 оставляет его в уверенности, что всё в порядке, пока бот молчит.
 """
 
+import httpx
+
+from adapters import lm_studio
 from backend.health import database_alive, model_alive, telegram_alive
 from backend.runtime_settings import LlmProviderConfig
 
@@ -55,3 +58,47 @@ async def test_a_provider_address_that_will_not_parse_darkens_the_lamp():
     broken = LlmProviderConfig(base_url="http://localhost:12ab", api_key="", model="qwen")
 
     assert await model_alive(broken, "chat") is False
+
+
+def _provider(monkeypatch, *, listed: list[str]) -> list[str]:
+    """Подставной поставщик: перечень отдаёт, на всё прочее жалуется.
+
+    Так выглядит модель, чем-то занятая: числится в перечне, а на обращение
+    отвечает отказом. Отдаёт список путей, которыми её потревожили сверх
+    перечня, — пустой он и есть главное следствие.
+    """
+    knocked: list[str] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": one} for one in listed]})
+        knocked.append(request.url.path)
+        return httpx.Response(400, json={"error": "the model is busy"})
+
+    monkeypatch.setattr(
+        lm_studio,
+        "make_client",
+        lambda _cfg: httpx.AsyncClient(
+            base_url="http://provider.test", transport=httpx.MockTransport(answer)
+        ),
+    )
+    return knocked
+
+
+async def test_the_lamp_answers_by_the_list_alone(monkeypatch):
+    """Лампочка отвечает вхождением имени в перечень — и ничем больше.
+
+    Обе половины здесь вместе нарочно. Молчащая модель лампочку не гасит:
+    настоящее обращение пошло бы к той же модели, которой в эту минуту
+    работает бот, а окно на погасшую лампочку переводит бота в Off посреди
+    обхода. Но и «всегда зелёная» не годится: имя модели правят руками, и
+    опечатка в нём означает, что не разберётся ни одна вакансия.
+    """
+    cfg = LlmProviderConfig(base_url="http://provider.test", api_key="", model="qwen")
+
+    knocked = _provider(monkeypatch, listed=["qwen"])
+    assert await model_alive(cfg, "chat") is True
+    assert knocked == []
+
+    _provider(monkeypatch, listed=["llama"])
+    assert await model_alive(cfg, "chat") is False

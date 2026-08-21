@@ -70,13 +70,14 @@ Job Bot — single CLI entry point.
 
 - `async def embed(client: httpx.AsyncClient, model: str, text: str) -> list[float]` (16)
 
-### `adapters/lm_models.py` — 148 строк
+### `adapters/lm_models.py` — 168 строк
 
 Перечень моделей у провайдера и проверка, что нужная отвечает.
 
 Зависит от: —
 
 - `def _ping_request(model: str, kind: str) -> tuple[str, dict]` (14)
+- `async def model_listed(client: httpx.AsyncClient, model: str) -> tuple[bool, list[str]]` (18)
 - `async def check_model(client: httpx.AsyncClient, model: str, kind: str) -> tuple[bool, str]` (35)
 - `def _looks_like_embed(name: str) -> bool` (9)
 - `async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | None` (37)
@@ -2190,13 +2191,13 @@ Runtime settings layer.
   - `def skills(self, period: str) -> dict` (3)
   - `def channels_pipeline(self, period: str) -> dict` (3)
 
-### `client/bridge/system.py` — 307 строк ⚠ подошёл к 300
+### `client/bridge/system.py` — 308 строк ⚠ подошёл к 300
 
 Домен «система»: то, чем страница живёт на любом экране.
 
 Зависит от: `backend`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.refusals`, `client.bridge.wipe`
 
-- `class System(Journal, Wipe, Desktop)` (219)
+- `class System(Journal, Wipe, Desktop)` (216)
   - `def initial(self) -> dict` (16)
     - `async def run() -> dict` (6)
   - `async def _mode(self) -> BotMode` (5)
@@ -2212,7 +2213,7 @@ Runtime settings layer.
   - `def unread(self) -> dict` (3)
   - `async def _health(self) -> dict` (18)
   - `async def _unread(self) -> dict` (4)
-  - `async def _models_alive(self) -> tuple[bool, bool]` (34)
+  - `async def _models_alive(self) -> tuple[bool, bool]` (31)
   - `async def _probe_models(self) -> None` (6)
   - `async def _ask_models(self) -> tuple[bool, bool]` (5)
 - `def _probed(task: Future) -> None` (16)
@@ -3255,17 +3256,19 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/backend/test_health.py` — 57 строк
+### `tests/backend/test_health.py` — 104 строк
 
 Следствия вопроса «живо ли то, на чём держится работа».
 
-Зависит от: `backend.health`, `backend.runtime_settings`
+Зависит от: `adapters`, `backend.health`, `backend.runtime_settings`
 
-Тестов: 3
+Тестов: 4
 
 - `class Stopped` (5)
   - `def __call__(self)` (2)
 - `class Bot` (3)
+- `def _provider(monkeypatch, *, listed: list[str]) -> list[str]` (23)
+  - `def answer(request: httpx.Request) -> httpx.Response` (5)
 
 ### `tests/backend/test_llm_classify_reply.py` — 274 строк
 
@@ -4455,13 +4458,13 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/client/test_bridge_llm.py` — 390 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_llm.py` — 369 строк ⚠ подошёл к 300
 
 Следствия проверки языковой модели: что окно узнаёт, нажав «проверить».
 
 Зависит от: `tests.fakes.llm`
 
-Тестов: 16
+Тестов: 15
 
 - `def _busy_provider(free: asyncio.Event)` (23)
   - `def make(_cfg)` (13)
