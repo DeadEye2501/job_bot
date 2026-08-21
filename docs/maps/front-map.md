@@ -22,7 +22,7 @@
 - Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
 - принимает: ask, say, events, onlocked, oncontact
 
-### app/ChannelCard.svelte (284)
+### app/ChannelCard.svelte (293)
 - Легенда под полосой: одиннадцать цветов без подписей не читаются, а подписать отрезки внутри полосы негде.
 - принимает: ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged
 
@@ -59,7 +59,7 @@
 - принимает: ask, say, events, personId, oncompany, onvacancy, onclose, onchanged
 - берёт: ./PersonChat.svelte
 
-### app/PersonChat.svelte (273)
+### app/PersonChat.svelte (280)
 - Строка отправки остаётся на месте и при заслоне, только запертой: пропав, она не сказала бы, почему писать нельзя.
 - принимает: ask, say, hrId, blocked, events, onread
 
@@ -580,9 +580,9 @@
 - * Уровни на пилюлях — от беды к мелочи. Порядок постоянный: по нему человек * метит в нужную пилюлю, не читая подписей. * * `id` — то, что приходит в записи с питона; `tone` — имя цвета; значок * лигатурой шрифта. `CRITICAL` своей пилюли не имеет: его накрывает `ERROR`.
 - отдаёт: AT_FIRST, LEVELS, askDelay, emptyText, levelTone, logTime, mayHide, shown
 
-### state/modes.js (44)
+### state/modes.js (61)
 - * Три положения слева направо. Порядок несущий: по нему считается, в какую * треть дорожки попало нажатие.
-- отдаёт: OFF, modeAt, nextMode
+- отдаёт: OFF, modeChosen
 
 ### state/new_card.js (47)
 - * Обвязка формы заведения по роду карточки. * * `named` держится рядом с `blank` нарочно: пустой черновик и заслон, который * решает, что он уже не пустой, — две половины одного правила, и разъехавшись, * они дали бы кнопку, открытую над формой, которую мост отобьёт.
@@ -1221,7 +1221,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 58 файлов
+## tests — 61 файлов
 
 ### tests/alive.test.js (79)
 - —
@@ -1281,6 +1281,9 @@ body, html, button, body, .material-symbols-outlined
 ### tests/card_save.test.js (50)
 - * Карточка, записывающая всё, что с ней сделали.
 
+### tests/channel_card_live.test.js (78)
+- * Сколько раз спросили названный слот.
+
 ### tests/channels.test.js (186)
 - —
 
@@ -1308,8 +1311,8 @@ body, html, button, body, .material-symbols-outlined
 ### tests/flash.test.js (34)
 - —
 
-### tests/footer.test.js (159)
-- —
+### tests/footer.test.js (169)
+- * Нажатие мышью: место на дорожке шириной 300 точек.
 
 ### tests/fresh.test.js (71)
 - * Ответ, который держат в руке: отдают его, когда скажут.
@@ -1354,6 +1357,9 @@ body, html, button, body, .material-symbols-outlined
 ### tests/people.test.js (208)
 - —
 
+### tests/people_list_live.test.js (82)
+- * Дождаться, пока осядут ответы моста и отрисовка.
+
 ### tests/person_chat_live.test.js (78)
 - * Переписка с записанными за ней просьбами к мосту.
 
@@ -1374,6 +1380,10 @@ body, html, button, body, .material-symbols-outlined
 
 ### tests/settings.test.js (277)
 - —
+
+### tests/settled.js (20)
+- * Дождаться, пока осядут ответы моста и отрисовка.
+- отдаёт: settled
 
 ### tests/skills.test.js (130)
 - —
