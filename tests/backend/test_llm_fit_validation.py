@@ -58,7 +58,6 @@ async def _asked(client, *, raw_text="обычный текст вакансии
     [
         pytest.param("fit", "fit", id="подходит"),
         pytest.param("  REJECT  ", "reject", id="регистр и пробелы"),
-        pytest.param("trash", "trash", id="не вакансия"),
     ],
 )
 def test_a_known_verdict_is_read(raw, expected):
@@ -80,6 +79,19 @@ def test_a_known_verdict_is_read(raw, expected):
 )
 def test_an_unusable_answer_yields_nothing(answer):
     """Неразбираемый ответ вердикта не даёт."""
+    assert _parse_fit_validation(answer, "проверка") is None
+
+
+def test_the_verdict_of_another_question_is_not_read_at_all():
+    """«Мусор» от зова о пригодности вердиктом не считается.
+
+    Вакансия ли это, решает зов о жанре, и решает раньше. По его «да» вакансия
+    остаётся, а «мусор» от зова о роли или о языках — ответ не на свой вопрос:
+    прочитай мы его, вакансию удалили бы по слову того, кого о жанре не
+    спрашивали.
+    """
+    answer = json.dumps({"verdict": "trash", "reason": "это реклама курсов"})
+
     assert _parse_fit_validation(answer, "проверка") is None
 
 

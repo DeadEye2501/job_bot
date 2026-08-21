@@ -331,29 +331,19 @@ async def test_a_verdict_nobody_answered_leaves_the_vacancy_unparsed(
     assert done is False
 
 
-async def test_trash_from_the_validator_is_thrown_out_on_ingest(
+async def test_a_post_the_genre_called_junk_is_only_marked_on_a_rerun(
     parsing, session_factory
 ):
-    """Признанное мусором при обычном сборе выбрасывается с отметкой."""
+    """Признанное мусором при повторном прогоне остаётся карточкой.
+
+    Мусором пост называет зов о жанре, и только он: по этой метке строку
+    удаляют насовсем, а человек, нажавший «прогнать заново», просил
+    перечитать вакансию, а не выбросить её.
+    """
     pipeline, vacancy = parsing
-    pipeline.verdict = FitValidation(verdict="trash", reason="это реклама курсов")
+    pipeline.genre = PostGenre(is_vacancy=False, reason="это реклама курсов")
 
-    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=True)
-
-    assert await all_rows(session_factory, Vacancy) == []
-    assert (await only_row(session_factory, TrashEvent)).reason == (
-        "trash: это реклама курсов"
-    )
-
-
-async def test_trash_from_the_validator_is_only_marked_on_a_rerun(
-    parsing, session_factory
-):
-    """Признанное мусором при повторном прогоне остаётся карточкой."""
-    pipeline, vacancy = parsing
-    pipeline.verdict = FitValidation(verdict="trash", reason="это реклама курсов")
-
-    await parse.parse_and_update_vacancy(pipeline, 
+    await parse.parse_and_update_vacancy(pipeline,
         vacancy.id, "текст", "jobs", allow_delete=False
     )
 
@@ -465,12 +455,12 @@ async def test_the_validator_is_asked_before_the_score(parsing, session_factory)
     резюме, случайно набравшее баллы, получает письмо.
     """
     pipeline, vacancy = parsing
-    pipeline.verdict = FitValidation(verdict="trash", reason="это пост соискателя")
+    pipeline.genre = PostGenre(is_vacancy=False, reason="это пост соискателя")
     await pipeline.rs.set_app("scoring_threshold", "100")
 
     await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=True)
 
-    assert pipeline.validated is True
+    assert pipeline.genre_asked is True
     assert await all_rows(session_factory, Vacancy) == []
     mark = await only_row(session_factory, TrashEvent)
     assert mark.reason == "trash: это пост соискателя"

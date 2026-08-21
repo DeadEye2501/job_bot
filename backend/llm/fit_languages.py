@@ -92,24 +92,19 @@ def _without_invented_language(
     """Обезвредить отказ, обоснованный языком, которого в объявлении нет.
 
     Выдуманное обоснование отказа переводит вердикт в «годится»: пропустить
-    вакансию к ручному просмотру дешевле, чем потерять подходящую. Вердикт
-    «мусор» при этом сохраняется и гасится только само обоснование — пост
-    скорее всего и правда не вакансия, а пускать такой в отклик по перевороту
-    нельзя.
+    вакансию к ручному просмотру дешевле, чем потерять подходящую.
     """
-    if validation.verdict not in ("reject", "trash") or validation.reason is None:
+    if validation.verdict != "reject" or validation.reason is None:
         return validation
     marker = looks_hallucinated(validation.reason, raw_text, profile)
     if marker is None:
         return validation
     logger.warning(
-        "%s: обоснование вердикта %s не найдено в тексте (маркер %s), гашу "
-        "обоснование. reason=%r",
-        PURPOSE, validation.verdict, marker, validation.reason,
+        "%s: обоснование отказа не найдено в тексте (маркер %s), считаю "
+        "вакансию годной. reason=%r",
+        PURPOSE, marker, validation.reason,
     )
-    if validation.verdict == "reject":
-        return FitValidation(verdict="fit", reason=None)
-    return FitValidation(verdict="trash", reason=None)
+    return FitValidation(verdict="fit", reason=None)
 
 
 async def validate_language_fit(

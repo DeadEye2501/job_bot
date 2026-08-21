@@ -425,7 +425,6 @@
 
 ### `backend/llm/candidate.py`
 
-- `_GRADE_LABELS_RU` = `словарь из 4`
 - `class CandidateLanguage`
   - `name: str`
   - `level: str`
@@ -474,6 +473,7 @@
 
 - `MAX_FIT_TOKENS` = `1200`
 - `ROOMIER_FIT_TOKENS` = `2400`
+- `ASKED_VERDICTS: tuple[str, ...]` = `набор из 2`
 - `logger` = `logging.getLogger(__name__)`
 - `ANSWER_RULES` = `'Формат ответа: ТОЛЬКО JSON-объект.\n{"verdict":…`
 - `VERDICT_SCOPE` = `'Ты отвечаешь ровно на один вопрос — тот, что оп…`

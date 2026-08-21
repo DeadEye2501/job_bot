@@ -6,15 +6,7 @@ from dataclasses import dataclass, field
 from backend.models import Profile
 from backend.models import ProfileLanguage
 from backend.models import ProfileSkill
-from backend.domain.taxonomy import WORK_FORMAT_LABELS_RU
 from backend.incoming import str_list
-
-_GRADE_LABELS_RU = {
-    "junior": "junior",
-    "middle": "middle",
-    "senior": "senior",
-    "lead": "lead/team-lead",
-}
 
 
 @dataclass(frozen=True)
@@ -46,30 +38,6 @@ class CandidateProfile:
     languages: list[CandidateLanguage] = field(default_factory=list)
     free_preferences: str | None = None
     known_skills: list[ProfileSkill] = field(default_factory=list)
-
-
-def _format_labels(values: list[str] | None, labels: dict[str, str]) -> str:
-    """Подписи выбранных значений через запятую либо «—», если выбирать
-    нечего или ни одно значение не нашлось в справочнике подписей.
-    """
-    if not values:
-        return "—"
-    parts: list[str] = []
-    for value in values:
-        key = (value or "").strip().lower()
-        if key in labels:
-            parts.append(labels[key])
-    return ", ".join(parts) if parts else "—"
-
-
-def format_grades(grades: list[str] | None) -> str:
-    """'middle, senior, lead/team-lead' либо '—' если пусто."""
-    return _format_labels(grades, _GRADE_LABELS_RU)
-
-
-def format_work_formats(formats: list[str] | None) -> str:
-    """'удалёнка, гибрид' либо '—' если пусто."""
-    return _format_labels(formats, WORK_FORMAT_LABELS_RU)
 
 
 def format_languages(languages: list[CandidateLanguage] | None) -> str:

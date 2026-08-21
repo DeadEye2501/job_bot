@@ -41,19 +41,22 @@ async def _check(client, *, raw_text="обычный текст вакансии
 async def test_the_question_about_languages_gets_no_parsed_fields():
     """Зову о языках разобранных полей не дают — только текст объявления.
 
-    Грейд, формат работы и стек — чужие критерии, и попав в наставление, они
-    становятся поводом для отказа не по своему вопросу: прежде один зов видел
-    всё сразу и путал критерии между собой.
+    Стек — чужой критерий, и попав в наставление, он становится поводом для
+    отказа не по своему вопросу: прежде один зов видел всё сразу и путал
+    критерии между собой.
     """
     client = provider({CHAT: fit_answer("fit", "языковых требований нет")})
 
     await _check(
-        client, parsed=parsed_vacancy(grade="junior", remote="office", stack_required=["Python"])
+        client,
+        raw_text="нужен английский",
+        parsed=parsed_vacancy(stack_required=["Python"]),
     )
 
     user = messages_of(client.sent[0])["user"]
+    assert "нужен английский" in user
     assert "stack_required" not in user
-    assert "junior" not in user
+    assert "Python" not in user
 
 
 async def test_a_made_up_reason_for_rejection_flips_the_verdict():
@@ -131,27 +134,6 @@ async def test_a_reason_backed_by_the_post_survives():
     assert got.reason == "вакансия подразумевает английский язык"
 
 
-async def test_a_made_up_reason_for_junk_keeps_the_verdict_but_drops_the_reason():
-    """У мусора выдуманное обоснование стирается, а вердикт остаётся.
-
-    Переворачивать мусор в «подходит» нельзя: реклама ушла бы в рассылку.
-    А само обоснование бессмысленно, и показывать его пользователю незачем.
-    """
-    client = provider(
-        {CHAT: fit_answer("trash", "вакансия подразумевает английский язык")}
-    )
-    profile = CandidateProfile(
-        languages=[CandidateLanguage(name="Английский", level="A2")]
-    )
-
-    got = await _check(
-        client, raw_text="Подпишись на канал, скидки на курсы!", profile=profile
-    )
-
-    assert got.verdict == "trash"
-    assert got.reason is None
-
-
 async def test_a_fitting_verdict_is_never_second_guessed():
     """Вердикт «подходит» на выдуманность не проверяют.
 
@@ -174,10 +156,10 @@ async def test_a_fitting_verdict_is_never_second_guessed():
 async def test_fluency_without_a_language_does_not_confirm_a_language_demand():
     """«Свободный график» подтверждением требования к языку не считается.
 
-    Слова «свободный» и «разговорный» подтверждают вывод модели о языке
-    только рядом с самим языком. Считай мы их подтверждением всегда — заслон
-    молча выключался бы на каждой вакансии со свободным графиком, а выдуманное
-    требование языка уводило бы годную вакансию в отказ.
+    Приметой служит сам язык или уровень CEFR, а не слово «свободный»:
+    вздумай мы считать подтверждением его, заслон молча выключался бы на
+    каждой вакансии со свободным графиком, и выдуманное требование языка
+    уводило бы годную вакансию в отказ.
     """
     client = provider(
         {CHAT: fit_answer("reject", "вакансия подразумевает английский язык")}
