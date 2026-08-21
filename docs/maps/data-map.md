@@ -540,6 +540,12 @@
 - `logger` = `logging.getLogger(__name__)`
 - `_VERSION_SUFFIX_RE` = `re.compile('[\\s.\\-_]*[vV]?\\d+(?:[.\\-_]\\d+)*…`
 - `_DIGIT_BELONGS_TO_NAME` = `frozenset({'s3', 'c4', 'web3', 'html5', 'css3', …`
+- `_WRAPPER_HEAD` = `'^\\s*(?:опыт|опыта|знание|знания|умение|умения|…`
+- `_WRAPPED_BY_PREPOSITION_RE` = `re.compile(_WRAPPER_HEAD + '.*\\s(?:с|со|в|во|на…`
+- `_WRAPPED_BARE_RE` = `re.compile(_WRAPPER_HEAD + '\\s+(?P<tail>\\S.*)$…`
+- `_MAX_WRAPPED_WORDS` = `4`
+- `_CYRILLIC_RE` = `re.compile('[а-яёА-ЯЁ]')`
+- `_LATIN_RE` = `re.compile('[A-Za-z]')`
 
 ### `backend/llm/vacancy.py`
 
