@@ -84,9 +84,6 @@
 .unread-popup-name {
   flex: 1;
   min-width: 0;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
   font-size: 0.82rem;
 }
 

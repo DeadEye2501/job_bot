@@ -229,11 +229,6 @@
   color: var(--text-tertiary);
 }
 
-.cnt-chat-input:disabled {
-  color: var(--text-tertiary);
-  cursor: not-allowed;
-}
-
 .cnt-chat-attach {
   display: inline-flex;
   align-items: center;
@@ -247,11 +242,6 @@
 
 .cnt-chat-attach:hover:not(:disabled) {
   color: var(--accent);
-}
-
-.cnt-chat-attach:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .cnt-chat-attach .material-symbols-outlined {
@@ -274,11 +264,6 @@
 
 .cnt-chat-send:hover:not(:disabled) {
   color: var(--accent);
-}
-
-.cnt-chat-send:disabled {
-  color: var(--text-tertiary);
-  cursor: not-allowed;
 }
 
 .cnt-chat-send .material-symbols-outlined {

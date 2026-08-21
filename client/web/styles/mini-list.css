@@ -57,20 +57,11 @@
   color: var(--text-tertiary);
 }
 
-/* Имя вакансии и имя человека обрезаются многоточием одинаково: обе строки
-   стоят в среднем треке своей сетки, и длинное имя распирало бы панель. */
+/* Имя вакансии и имя человека показаны одинаково: обе строки стоят в среднем
+   треке своей сетки. */
 .vac-mini-title,
 .hr-mini-name {
-  overflow: hidden;
   color: var(--text-primary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vac-mini-when {
-  color: var(--text-tertiary);
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
 }
 
 .hr-mini-row .hr-avatar {

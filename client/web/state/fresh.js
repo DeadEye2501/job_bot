@@ -26,12 +26,27 @@ import { attempts } from './attempts.js';
  * зовущему сама, тем же словом, что и два остальных исхода.
  */
 export function freshAnswer(alive) {
-  const tries = attempts();
+  const needed = stillNeeded(alive);
 
   return async function fresh(call) {
+    const got = await needed(call);
+    return got === null ? null : got.now;
+  };
+}
+
+/** Заводит тот же зов, но отдающий пришедшее коробкой.
+ *
+ * Коробка нужна тому, кто различает больше двух исходов: отказ моста — это
+ * тоже ответ, и рассказать о нём человеку надо, а вот ушедший экран и
+ * обогнанный ответ значат «класть некуда». Пустота здесь — только про эти
+ * два; отказ приезжает коробкой с пустотой внутри.
+ */
+export function stillNeeded(alive) {
+  const tries = attempts();
+
+  return async function once(call) {
     const mine = tries.next();
     const now = await call();
-    if (!alive() || tries.stale(mine)) return null;
-    return now;
+    return !alive() || tries.stale(mine) ? null : { now };
   };
 }

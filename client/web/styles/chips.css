@@ -19,14 +19,6 @@
   max-width: 180px;
 }
 
-/* Хвост режется у самой подписи, а не у пилюли: обрезанная пилюля уносила бы
-   вместе с хвостом и крестик, и длинную подпись стало бы нечем снять. */
-.chip-text {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 .chip-x {
   flex: none;
   color: var(--text-tertiary);

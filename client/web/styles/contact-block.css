@@ -38,12 +38,9 @@ img.hr-avatar {
 }
 
 .hr-name {
-  overflow: hidden;
   color: var(--text-primary);
   font-size: 0.83rem;
   text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Нажимаемое имя отличается от подписи только на наведении: подчёркивание в

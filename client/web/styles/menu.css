@@ -40,11 +40,6 @@
   color: var(--text-tertiary);
 }
 
-.menu-item.blocked {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
 .menu-item.blocked:hover {
   background: transparent;
 }

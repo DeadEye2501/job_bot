@@ -1,6 +1,8 @@
 <script>
   // Строка журнала: время, уровень, источник, сообщение. Развёрнутая
   // показывает трассировку и не режет сообщение по ширине.
+  import { pressKey } from '$state/keys.js';
+
   let { time, level, tone, source, message, details, expanded, ontoggle } = $props();
 </script>
 
@@ -13,7 +15,7 @@
   role="button"
   tabindex="0"
   onclick={() => ontoggle()}
-  onkeydown={(event) => event.key === 'Enter' && ontoggle()}
+  onkeydown={(event) => pressKey(event) && ontoggle()}
 >
   <span class="logs-time">{time}</span>
   <span class="logs-level" data-tone={tone}>{level}</span>

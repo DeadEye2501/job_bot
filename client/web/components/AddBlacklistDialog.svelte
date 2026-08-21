@@ -4,6 +4,7 @@
   // Подсказчик — подсказка, а не закрытый набор: рядом с ним значение набирают
   // руками, чтобы завести ник, которого в базе ещё нет. Появится такой человек
   // или канал — попадёт под уже заведённую строку сразу.
+  import { pressKey } from '$state/keys.js';
   import { whileOpen } from '$state/outside.js';
 
   import ModalFoot from './ModalFoot.svelte';
@@ -68,7 +69,7 @@
             open = hints !== null;
             onvalue(event.currentTarget.value);
           }}
-          onkeydown={(event) => event.key === 'Enter' && onadd()}
+          onkeydown={(event) => pressKey(event) && onadd()}
         />
         <!-- Оправа и падение панели — общие, а сами строки свои: у подсказки
              отсева в строке две половины — имя и приписка под ним, — а общая

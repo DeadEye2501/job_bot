@@ -8,9 +8,7 @@
   //
   // Заведённый возвращается в список отмеченным, но не привязанным: заведение и
   // привязка — разные решения, и второе человек принимает сам.
-  import AskDialog from '$components/AskDialog.svelte';
-  import NewCompanyFields from '$components/NewCompanyFields.svelte';
-  import NewPersonFields from '$components/NewPersonFields.svelte';
+  import NewCardDialog from '$components/NewCardDialog.svelte';
   import PickerDialog from '$components/PickerDialog.svelte';
   import PickerRow from '$components/PickerRow.svelte';
   import { companyCandidate } from '$state/companies.js';
@@ -83,23 +81,14 @@
 </script>
 
 {#if creating}
-  <AskDialog
-    icon={FORM.icon}
-    title={FORM.title}
-    subtitle={FORM.subtitle}
-    confirmLabel="Создать"
-    busyLabel={FORM.busyLabel}
+  <NewCardDialog
+    {kind}
+    {draft}
     busy={saving}
     {ready}
     onconfirm={create}
     oncancel={() => (creating = false)}
-  >
-    {#if kind === 'hr'}
-      <NewPersonFields {draft} />
-    {:else}
-      <NewCompanyFields {draft} />
-    {/if}
-  </AskDialog>
+  />
 {:else}
   <PickerDialog
     icon={kind === 'hr' ? 'person_search' : 'domain'}

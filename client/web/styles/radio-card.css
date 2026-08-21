@@ -24,11 +24,6 @@
   background: var(--accent-hover-soft);
 }
 
-.radio-card.disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
 .radio-card.disabled:hover {
   border-color: var(--border);
 }

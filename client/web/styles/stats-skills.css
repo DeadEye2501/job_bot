@@ -36,9 +36,6 @@
 .stats-skill-name {
   font-size: 0.76rem;
   color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .stats-skill-row:not(.mine) .stats-skill-name {
@@ -57,14 +54,24 @@
   transition: width 0.2s;
 }
 
-.stats-skill-row.mine .stats-skill-bar-fill {
+/* Полоса и точка легенды красятся одним правилом: легенда тем и объясняет
+   полосу, что покрашена так же, — а написанные порознь, они разъезжаются, и
+   легенда начинает врать. */
+.stats-skill-row.mine .stats-skill-bar-fill,
+.stats-skills-legend .leg-mine {
   background: var(--accent);
-  opacity: 0.85;
 }
 
-.stats-skill-row:not(.mine) .stats-skill-bar-fill {
+.stats-skill-row:not(.mine) .stats-skill-bar-fill,
+.stats-skills-legend .leg-other {
   background: var(--text-tertiary);
   opacity: 0.5;
+}
+
+/* Полоса «моего» приглушена, точка легенды нет: полоса тянется во всю ширину и
+   полным акцентом перекрикивает числа рядом, а точка мелкая. */
+.stats-skill-row.mine .stats-skill-bar-fill {
+  opacity: 0.85;
 }
 
 .stats-skill-num {
@@ -97,13 +104,4 @@
   width: 8px;
   height: 8px;
   border-radius: 2px;
-}
-
-.stats-skills-legend .leg-mine {
-  background: var(--accent);
-}
-
-.stats-skills-legend .leg-other {
-  background: var(--text-tertiary);
-  opacity: 0.5;
 }

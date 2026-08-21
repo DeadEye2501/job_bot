@@ -12,6 +12,7 @@
   //
   // Само правило ширины живёт в оформлении, сюда уезжает одно число: встроенный
   // стиль сильнее любого селектора, и раскладку им не пишут.
+  import { pressKey } from '$state/keys.js';
   import { convNote } from '$state/stats.js';
 
   let { channels, onpick } = $props();
@@ -104,7 +105,7 @@
         onmouseenter={() => (hovered = row.id)}
         onmouseleave={() => (hovered = null)}
         onclick={() => onpick(row.id)}
-        onkeydown={(event) => event.key === 'Enter' && onpick(row.id)}
+        onkeydown={(event) => pressKey(event) && onpick(row.id)}
       >
         {#if cell.conv}
           <span class="stats-ch-conv-label">{cell.conv.text}</span>

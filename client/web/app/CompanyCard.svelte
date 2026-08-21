@@ -7,15 +7,16 @@
 
   import Avatar from '$components/Avatar.svelte';
   import BlacklistChip from '$components/BlacklistChip.svelte';
+  import CardPane from '$components/CardPane.svelte';
   import ContactActions from '$components/ContactActions.svelte';
   import ChipList from '$components/ChipList.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
+  import MergeDialog from '$components/MergeDialog.svelte';
   import MiniPeople from '$components/MiniPeople.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import NotesField from '$components/NotesField.svelte';
-  import PickerRow from '$components/PickerRow.svelte';
-  import PickerDialog from '$components/PickerDialog.svelte';
   import { living } from '$state/alive.js';
+  import { cardActions } from '$state/card_actions.svelte.js';
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
   import { cardNotes } from '$state/card_notes.js';
@@ -30,8 +31,6 @@
   let people = $state([]);
   let vacancies = $state([]);
   let trouble = $state('');
-  let asking = $state(null);
-  let chosen = $state(null);
 
   // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
   // компанию в ней переключают нажатием по соседней строке — ответ про
@@ -105,9 +104,11 @@
     onchanged: () => onchanged(),
   });
 
+  const acts = cardActions({ id: () => companyId, dropCard, mergeCard });
+
   const shown = $derived(card ? companyLine({ ...card, id: card.company_id }) : null);
   const head = $derived(card ? companyTitle(card) : null);
-  const chosenName = $derived(chosen ? companyLine(chosen).name : '');
+  const chosenName = $derived(acts.chosen ? companyLine(acts.chosen).name : '');
   const site = $derived(card ? siteHref(card.website) : null);
 
   function save(part) {
@@ -125,22 +126,9 @@
     return save({ name: value });
   }
 
-  async function drop() {
-    asking = null;
-    await dropCard(companyId);
-  }
-
   async function candidates(search) {
     const now = await ask('companies.merge_picker', { absorbed_id: companyId, search });
     return now === null ? null : now.companies;
-  }
-
-  async function merge() {
-    const survivor = chosen;
-    chosen = null;
-    // Окно выбора гасим только по удаче: отказ оставляет выбранную под рукой,
-    // а закрытое окно заставило бы искать её заново.
-    if (await mergeCard({ absorbed_id: companyId, survivor_id: survivor.id })) asking = null;
   }
 
   $effect(() => {
@@ -159,11 +147,7 @@
   });
 </script>
 
-{#if trouble}
-  <div class="empty-note cnt-detail-empty">{trouble}</div>
-{:else if !card}
-  <div class="empty-note cnt-detail-empty">Загрузка…</div>
-{:else}
+<CardPane {trouble} ready={!!card}>
   <div class="cnt-det-head">
     <Avatar icon="domain" />
 
@@ -193,10 +177,10 @@
     <ContactActions
       mergeLabel="Слить с другой компанией"
       blocked={!!card.blacklist_value}
-      onmerge={() => (asking = 'merge')}
+      onmerge={() => (acts.asking = 'merge')}
       onblock={() => blocking.block(companyId)}
       onunblock={() => blocking.unblock(companyId)}
-      ondelete={() => (asking = 'delete')}
+      ondelete={() => (acts.asking = 'delete')}
     />
   </div>
 
@@ -235,43 +219,36 @@
   <MiniPeople {people} empty="HR-контактов нет." onpick={onperson} />
 
   <MiniVacancies {vacancies} empty="Связанных вакансий нет." onpick={onvacancy} />
-{/if}
+</CardPane>
 
-{#if asking === 'delete'}
+{#if acts.asking === 'delete'}
   <ConfirmDialog
     message={`Удалить компанию «${shown.name}»?\n\nСобранные вакансии останутся, но без компании. Откатить нельзя.`}
     confirmLabel="Удалить"
-    onconfirm={drop}
-    oncancel={() => (asking = null)}
+    onconfirm={() => acts.drop()}
+    oncancel={() => (acts.asking = null)}
   />
 {/if}
 
-{#if asking === 'merge'}
-  <PickerDialog
-    icon="merge"
+{#if acts.asking === 'merge'}
+  <MergeDialog
     title={`Слить «${shown.name}» с другой`}
     placeholder="Поиск по названию, написанию, домену"
     empty="Сливать не с чем — других компаний нет"
     load={candidates}
-    applyLabel="Слить"
-    onapply={(company) => (chosen = company)}
-    onclose={() => (asking = null)}
-  >
-    {#snippet children(rows, marked, pick)}
-      {#each rows as company (company.id)}
-        <PickerRow row={companyCandidate(company)} chosen={company.id === marked} onpick={pick} />
-      {/each}
-    {/snippet}
-  </PickerDialog>
+    asRow={companyCandidate}
+    onapply={(company) => (acts.chosen = company)}
+    onclose={() => (acts.asking = null)}
+  />
 {/if}
 
-{#if chosen}
+{#if acts.chosen}
   <ConfirmDialog
     message={`Слить «${shown.name}» в «${chosenName}»?
 
 Вакансии перейдут к выбранной. Написания объединятся — нынешнее имя станет одним из них. Заметки склеятся. Сайт возьмётся у выбранной, а если его там нет — у нынешней. Эта компания будет удалена. Откатить нельзя.`}
     confirmLabel="Слить"
-    onconfirm={merge}
-    oncancel={() => (chosen = null)}
+    onconfirm={() => acts.merge()}
+    oncancel={() => (acts.chosen = null)}
   />
 {/if}

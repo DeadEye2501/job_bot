@@ -34,23 +34,17 @@
 }
 
 /* Название компании главнее — по нему строку и узнают, — но шире половины
-   подписи не растёт, иначе должности не остаётся места. Обрезаются оба своим
-   многоточием; период стоит справа и не сжимается. */
+   подписи не растёт, иначе должности не остаётся места. Период стоит справа и
+   не сжимается. */
 .exp-summary > strong {
   flex: 0 1 auto;
   max-width: 50%;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .exp-summary > .role {
   flex: 0 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--text-secondary);
 }
 

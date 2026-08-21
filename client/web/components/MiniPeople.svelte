@@ -3,6 +3,7 @@
   //
   // Строка нажимается и уводит к самому человеку: из карточки компании смотрят,
   // кто из неё писал, и тут же открывают того, кому отвечать.
+  import { pressKey } from '$state/keys.js';
   import Avatar from './Avatar.svelte';
   import { personName } from '$state/people.js';
   import { plural } from '$state/words.js';
@@ -21,7 +22,7 @@
           role="button"
           tabindex="0"
           onclick={() => onpick(one.id)}
-          onkeydown={(event) => event.key === 'Enter' && onpick(one.id)}
+          onkeydown={(event) => pressKey(event) && onpick(one.id)}
         >
           <Avatar avatar={one.avatar} name={one.name} icon="person" />
           <div>

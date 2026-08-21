@@ -23,11 +23,6 @@
   background: var(--bg-tertiary);
 }
 
-.icon-btn.is-disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 .icon-btn.is-disabled:hover {
   color: var(--text-secondary);
   background: transparent;

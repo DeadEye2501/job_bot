@@ -63,9 +63,6 @@
 .stats-ch-grid .stats-ch-name-cell {
   justify-content: flex-start;
   color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   display: block;
   line-height: 1.4;
   padding-top: 6px;

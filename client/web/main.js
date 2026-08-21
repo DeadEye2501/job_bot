@@ -90,9 +90,6 @@ import './styles/stats-status.css';
 import './styles/stats-skills.css';
 import './styles/stats-responses.css';
 import './styles/stats-channels.css';
-// Ниже оформления самих блоков, и по тому же уговору, что у соседа-заливки:
-// у наведения та же весомость селектора, и выигрывает порядок.
-import './styles/accent-outline.css';
 import './styles/donut.css';
 import './styles/status-color.css';
 import './styles/skills.css';
@@ -105,6 +102,18 @@ import './styles/progress.css';
 import './styles/run.css';
 import './styles/unread.css';
 import './styles/plaque.css';
+
+// Общие приёмы — последними, ниже всех блоков, которые их носят. Своих
+// объявлений в тех блоках не осталось, так что порядок ни на что не влияет; он
+// нужен на будущее — написанное в блоке заново перебьёт общее правило, и
+// увидеть это надо сразу, а не через полгода.
+import './styles/accent-outline.css';
+import './styles/clipped-line.css';
+import './styles/disabled-look.css';
+import './styles/scroll-body.css';
+import './styles/caption.css';
+import './styles/quiet-number.css';
+import './styles/row-hover.css';
 
 import { mount } from 'svelte';
 

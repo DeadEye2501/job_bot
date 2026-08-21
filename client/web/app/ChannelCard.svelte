@@ -9,6 +9,7 @@
   import BlacklistChip from '$components/BlacklistChip.svelte';
   import BlacklistMenuItem from '$components/BlacklistMenuItem.svelte';
   import CardHandle from '$components/CardHandle.svelte';
+  import CardPane from '$components/CardPane.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MenuItem from '$components/MenuItem.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
@@ -160,11 +161,7 @@
   });
 </script>
 
-{#if trouble}
-  <div class="empty-note cnt-detail-empty">{trouble}</div>
-{:else if !card}
-  <div class="empty-note cnt-detail-empty">Загрузка…</div>
-{:else}
+<CardPane {trouble} ready={!!card}>
   <div class="cnt-det-head">
     <Avatar avatar={card.avatar} icon="tag" />
 
@@ -269,7 +266,7 @@
     loading={digging}
     onpick={onvacancy}
   />
-{/if}
+</CardPane>
 
 {#if asking}
   <ConfirmDialog
