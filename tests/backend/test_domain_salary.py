@@ -11,7 +11,6 @@
 import pytest
 
 from backend.domain.salary import parse_salary
-from backend.models import Currency
 
 
 @pytest.mark.parametrize("raw", [None, "", "   ", "—"])
@@ -22,33 +21,50 @@ def test_nothing_is_extracted_from_a_blank_salary(raw):
 
 def test_a_rouble_range_is_kept_as_written():
     """Рублёвый диапазон остаётся тем же числом, каким записан."""
-    assert parse_salary("150 000 — 300 000 ₽") == (150000, 300000, Currency.RUB)
+    assert parse_salary("150 000 — 300 000 ₽") == (150000, 300000, "₽")
+
+
+def test_a_range_glues_by_a_sign_the_map_knows():
+    """Вилку склеивает знак любой валюты из карты, а не только трёх прежних.
+
+    Опознание валюты и склейка вилки кормятся одним перечнем написаний.
+    Разойдись они — «500 000 ֏ до 700 000 ֏» распалось бы на две связки, и
+    зарплатой стала бы первая половина.
+    """
+    assert parse_salary("500 000 ֏ до 700 000 ֏") == (500000, 700000, "֏")
 
 
 def test_a_currency_amount_is_not_converted():
     """Валютное число не умножается ни на какой курс."""
-    assert parse_salary("$3000-5000") == (3000, 5000, Currency.USD)
+    assert parse_salary("$3000-5000") == (3000, 5000, "$")
 
 
 def test_a_single_number_gives_equal_bounds():
     """Одно число — диапазон из самого себя."""
-    assert parse_salary("200000 ₽") == (200000, 200000, Currency.RUB)
+    assert parse_salary("200000 ₽") == (200000, 200000, "₽")
 
 
 @pytest.mark.parametrize(
     "raw, currency",
     [
-        ("3000 долларов", Currency.USD),
-        ("3000 USD", Currency.USD),
-        ("2000 евро", Currency.EUR),
-        ("2000 EUR", Currency.EUR),
-        ("150000 руб.", Currency.RUB),
-        ("150000 RUB", Currency.RUB),
+        ("3000 долларов", "$"),
+        ("3000 USD", "$"),
+        ("2000 евро", "€"),
+        ("2000 EUR", "€"),
+        ("150000 руб.", "₽"),
+        ("150000 RUB", "₽"),
+        ("500000 драм", "֏"),
+        ("500000 AMD", "֏"),
+        ("500000 ֏", "֏"),
+        ("400000 тенге", "₸"),
+        ("400000 KZT", "₸"),
+        ("3000 лари", "₾"),
+        ("3000 GEL", "₾"),
     ],
 )
 def test_the_currency_is_recognised_by_word_as_well_as_by_sign(raw, currency):
     """Валюта опознаётся и знаком, и словом, и кодом."""
-    assert parse_salary(raw)[2] is currency
+    assert parse_salary(raw)[2] == currency
 
 
 def test_numbers_separated_by_a_line_break_stay_apart():
@@ -124,7 +140,7 @@ def test_a_currency_named_away_from_the_number_does_not_make_it_a_salary():
 
 def test_a_currency_name_inside_a_word_is_not_the_currency():
     """«Европе» — не евро, и рублёвую вакансию в евро не превращает."""
-    assert parse_salary("работа в Европе, 150000 руб")[2] is Currency.RUB
+    assert parse_salary("работа в Европе, 150000 руб")[2] == "₽"
 
 
 def test_two_currencies_at_once_leave_the_currency_unknown():
@@ -397,8 +413,8 @@ def test_a_word_starting_with_rub_is_not_the_rouble():
     Найденные разом рубль и доллар гасят валюту вовсе: разбор не выбирает
     первую попавшуюся. Так рублёвое слово в тексте стирало настоящую валюту.
     """
-    assert parse_salary("Рубрика: вакансии. Зарплата 3000$")[2] is Currency.USD
-    assert parse_salary("150 000 рублей")[2] is Currency.RUB
+    assert parse_salary("Рубрика: вакансии. Зарплата 3000$")[2] == "$"
+    assert parse_salary("150 000 рублей")[2] == "₽"
 
 
 @pytest.mark.parametrize(

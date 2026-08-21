@@ -65,7 +65,14 @@
 ### `alembic/bundled/aa4e0de05368_seed_initial_data.py`
 
 - `revision: str` = `'aa4e0de05368'`
-- `down_revision: Union[str, Sequence[str], None]` = `'8ba64b863cb1'`
+- `down_revision: Union[str, Sequence[str], None]` = `'e560edf8b958'`
+- `branch_labels: Union[str, Sequence[str], None]` = `None`
+- `depends_on: Union[str, Sequence[str], None]` = `None`
+
+### `alembic/bundled/c3f8a1d47b02_restore_answered_vacancy.py`
+
+- `revision: str` = `'c3f8a1d47b02'`
+- `down_revision: Union[str, Sequence[str], None]` = `'aa4e0de05368'`
 - `branch_labels: Union[str, Sequence[str], None]` = `None`
 - `depends_on: Union[str, Sequence[str], None]` = `None`
 
@@ -74,22 +81,15 @@
 - `config` = `context.config`
 - `target_metadata` = `Base.metadata`
 
-### `alembic/versions/8ba64b863cb1_init.py`
-
-- `revision: str` = `'8ba64b863cb1'`
-- `down_revision: Union[str, Sequence[str], None]` = `None`
-- `branch_labels: Union[str, Sequence[str], None]` = `None`
-- `depends_on: Union[str, Sequence[str], None]` = `None`
-
 ### `alembic/versions/aa4e0de05368_seed_initial_data.py`
 
 - `revision: str` = `'aa4e0de05368'`
-- `down_revision: Union[str, Sequence[str], None]` = `'8ba64b863cb1'`
+- `down_revision: Union[str, Sequence[str], None]` = `'e560edf8b958'`
 - `branch_labels: Union[str, Sequence[str], None]` = `None`
 - `depends_on: Union[str, Sequence[str], None]` = `None`
 - `PROFILE_ROWS` = `набор из 1`
 - `PROFILE_LANGUAGE_ROWS` = `набор из 2`
-- `PROFILE_SKILLS_ROWS` = `набор из 22`
+- `PROFILE_SKILLS_ROWS` = `набор из 25`
 - `PROFILE_EXPERIENCE_SKILLS_ROWS` = `набор из 45`
 - `PROFILE_EXPERIENCE_ROWS` = `набор из 6`
 - `APP_SETTINGS_ROWS` = `набор из 1`
@@ -97,7 +97,28 @@
 - `CHAT_LLM_SECRET` = `словарь из 3`
 - `EMBED_LLM_SECRET` = `словарь из 3`
 - `BOT_STATE_ROWS` = `набор из 1`
-- `TELEGRAM_CHANNEL_ROWS` = `набор из 19`
+- `TELEGRAM_CHANNEL_ROWS` = `набор из 16`
+
+### `alembic/versions/c3f8a1d47b02_restore_answered_vacancy.py`
+
+- `revision: str` = `'c3f8a1d47b02'`
+- `down_revision: Union[str, Sequence[str], None]` = `'aa4e0de05368'`
+- `branch_labels: Union[str, Sequence[str], None]` = `None`
+- `depends_on: Union[str, Sequence[str], None]` = `None`
+- `HR_ROWS` = `набор из 1`
+- `COMPANY_ROWS` = `набор из 1`
+- `VACANCY_ROWS` = `набор из 1`
+- `MESSAGE_ROWS` = `набор из 4`
+- `HISTORY_ROWS` = `набор из 2`
+- `EVENT_ROWS` = `набор из 4`
+- `CHANNEL_ROW` = `словарь из 6`
+
+### `alembic/versions/e560edf8b958_init.py`
+
+- `revision: str` = `'e560edf8b958'`
+- `down_revision: Union[str, Sequence[str], None]` = `None`
+- `branch_labels: Union[str, Sequence[str], None]` = `None`
+- `depends_on: Union[str, Sequence[str], None]` = `None`
 
 ## backend
 
@@ -187,6 +208,10 @@
 - `AGGREGATOR_HOSTS` = `frozenset({'t.me', 'telegram.me', 'telegram.org'…`
 - `AGGREGATOR_BRANDS` = `frozenset({'indeed', 'stepstone'})`
 
+### `backend/domain/currency.py`
+
+- `CURRENCY_WRITINGS: tuple[tuple[str, str], ...]` = `набор из 6`
+
 ### `backend/domain/dedup.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -208,8 +233,7 @@
 ### `backend/domain/salary.py`
 
 - `_AMOUNT_RE` = `re.compile('(?P<num>\\d+(?:[ \xa0\u202f\u2009,.]…`
-- `_CURRENCY_WORDS: tuple[tuple[Currency, str], ...]` = `набор из 3`
-- `_CURRENCY_WORD` = `'|'.join((word for _, word in _CURRENCY_WORDS))`
+- `_CURRENCY_WORD` = `'|'.join((word for _, word in CURRENCY_WRITINGS)…`
 - `_RANGE_GLUE_RE` = `re.compile(f'\\s*(?:(?:{_CURRENCY_WORD})\\s*)?(?…`
 - `_THOUSAND` = `набор из 3`
 - `_FRACTION_RE` = `re.compile('[.,]\\d{1,2}$')`
@@ -223,7 +247,7 @@
 - `_CURRENCY_BEFORE_RE` = `re.compile(f'(?:{_CURRENCY_WORD})\\s*$')`
 - `_CURRENCY_AFTER_RE` = `re.compile(f'^\\s*(?:{_CURRENCY_WORD})')`
 - `_WORD_AFTER_RE` = `re.compile('^(?:-[а-яё]{1,2})?\\s*([a-zа-яё]+)')`
-- `_CURRENCIES: tuple[tuple[Currency, re.Pattern[str]], ...]` = `tuple(((currency, re.compile(word)) for currency…`
+- `_CURRENCIES: tuple[tuple[str, re.Pattern[str]], ...]` = `tuple(((sign, re.compile(word)) for sign, word i…`
 
 ### `backend/domain/scoring.py`
 
@@ -561,10 +585,6 @@
   - `OFF` = `'Off'`
   - `DM_ONLY` = `'DM Only'`
   - `FULL` = `'Full'`
-- `class Currency(enum.Enum)`
-  - `RUB` = `'RUB'`
-  - `USD` = `'USD'`
-  - `EUR` = `'EUR'`
 - `class VacancyStatus(enum.Enum)`
   - `NEW` = `'New'`
   - `APPLIED` = `'Applied'`
@@ -697,7 +717,7 @@
   - `salary: Mapped[str | None]`
   - `salary_min: Mapped[int | None]`
   - `salary_max: Mapped[int | None]`
-  - `salary_currency: Mapped[Currency | None]` = `mapped_column(enum_column(Currency, 'currency'))`
+  - `salary_currency: Mapped[str | None]`
   - `remote: Mapped[str | None]`
   - `location: Mapped[str | None]`
   - `score: Mapped[int | None]`
@@ -1369,7 +1389,7 @@
 - `_REAL_APPDATA` = `os.environ.get('APPDATA')`
 - `TMP_ROOT` = `Path(tempfile.mkdtemp(prefix='jobbot-tests-'))`
 - `MEMORY_KEYRING` = `MemoryKeyring()`
-- `INIT_REVISION` = `'8ba64b863cb1'`
+- `INIT_REVISION` = `'e560edf8b958'`
 - `_REAL_DATA_DIR` = `Path(_REAL_APPDATA) / APP_NAME if _REAL_APPDATA …`
 - `_FALLBACK_DATA_DIR` = `_data_dir_without_appdata()`
 

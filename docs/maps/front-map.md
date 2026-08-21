@@ -102,7 +102,7 @@
 - принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte
 
-### app/VacancyCard.svelte (396)
+### app/VacancyCard.svelte (397)
 - Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою оценку.
 - принимает: ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged
 - берёт: ./VacancyLinks.svelte
@@ -700,9 +700,9 @@
 - * Чем подписана запись без названия. Показывают её приглушённой * (`styles/unnamed.css`) — так видно, что это не название, а его отсутствие.
 - отдаёт: UNNAMED
 
-### state/vacancies.js (181)
+### state/vacancies.js (203)
 - * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
-- отдаёт: SORTS, ago, emptyNote, gradeLabel, remoteLabel, scoreTone, shortAgo, shownStack, sortKey, vacancyLine
+- отдаёт: SORTS, ago, emptyNote, gradeLabel, remoteLabel, salaryLabel, scoreTone, shortAgo, shownStack, sortKey, vacancyLine
 
 ### state/vacancy_actions.js (51)
 - * Почему отправка и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Отклик уходит человеку, и без привязанного HR слать его некому; разбору же * HR не нужен — он его как раз и находит.
@@ -1523,7 +1523,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/stats.test.js (273)
 - —
 
-### tests/vacancies.test.js (215)
+### tests/vacancies.test.js (263)
 - —
 
 ### tests/vacancy_actions.test.js (117)
@@ -1532,10 +1532,10 @@ body, html, button, body, .material-symbols-outlined
 ### tests/vacancy_card.test.js (278)
 - —
 
-### tests/vacancy_card_live.test.js (63)
+### tests/vacancy_card_live.test.js (80)
 - —
 
-### tests/vacancy_detail.js (34)
+### tests/vacancy_detail.js (37)
 - * Карточка вакансии от моста; названное в `extra` перебивает заготовку.
 - отдаёт: vacancyDetail
 

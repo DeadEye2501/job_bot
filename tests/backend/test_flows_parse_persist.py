@@ -22,7 +22,7 @@ from backend.flows import parse
 from backend.flows import apply
 import pytest
 
-from backend.models import HR, Company, Currency, Vacancy, VacancyEvent, VacancyStatus
+from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
 from backend.payloads import FitValidation
 from backend.repository.vacancy_status import mark_vacancy_applied
 from tests.dbio import all_rows, only_row, put
@@ -64,7 +64,7 @@ async def test_the_currency_of_the_salary_lands_in_the_row(parsing, session_fact
 
     saved = await only_row(session_factory, Vacancy)
     assert (saved.salary_min, saved.salary_max) == (3000, 5000)
-    assert saved.salary_currency is Currency.USD
+    assert saved.salary_currency == "$"
 
 
 async def test_an_extra_way_to_apply_is_kept_in_the_notes(parsing, session_factory):

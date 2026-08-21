@@ -27,13 +27,13 @@
 это можно только переносом засева из миграции в код.
 
 Revision ID: aa4e0de05368
-Revises: 8ba64b863cb1
+Revises: e560edf8b958
 """
 from typing import Sequence, Union
 
 
 revision: str = 'aa4e0de05368'
-down_revision: Union[str, Sequence[str], None] = '8ba64b863cb1'
+down_revision: Union[str, Sequence[str], None] = 'e560edf8b958'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

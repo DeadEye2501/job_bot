@@ -110,11 +110,20 @@ Job Bot — single CLI entry point.
 - `def _article_text(html: str) -> str | None` (20)
 - `async def fetch_article(client: httpx.AsyncClient, url: str) -> str | None` (24)
 
-## alembic — 4 модулей
+## alembic — 6 модулей
 
 ### `alembic/bundled/aa4e0de05368_seed_initial_data.py` — 46 строк
 
 seed initial data (заглушка для сборки)
+
+Зависит от: —
+
+- `def upgrade() -> None` (2)
+- `def downgrade() -> None` (2)
+
+### `alembic/bundled/c3f8a1d47b02_restore_answered_vacancy.py` — 29 строк
+
+restore the answered vacancy (заглушка для сборки)
 
 Зависит от: —
 
@@ -132,7 +141,34 @@ seed initial data (заглушка для сборки)
 - `async def run_async_migrations() -> None` (14)
 - `def run_migrations_online() -> None` (2)
 
-### `alembic/versions/8ba64b863cb1_init.py` — 272 строк
+### `alembic/versions/aa4e0de05368_seed_initial_data.py` — 459 строк ⚠ подошёл к 300
+
+seed initial data
+
+Зависит от: `alembic`, `backend.crypto`
+
+- `def _insert(name: str, rows: list[dict], **typed) -> None` (10)
+- `def _seed_profile() -> None` (14)
+- `def _seed_channels() -> None` (3)
+- `def _seed_secrets() -> None` (61)
+- `def _seed_settings() -> None` (27)
+- `def upgrade() -> None` (11)
+- `def downgrade() -> None` (11)
+
+### `alembic/versions/c3f8a1d47b02_restore_answered_vacancy.py` — 119 строк
+
+restore the answered vacancy
+
+Зависит от: `alembic`
+
+- `def _blob(encoded: str) -> bytes` (3)
+- `def _table(rows_)` (7)
+- `def _insert(name, rows_)` (3)
+- `def upgrade() -> None` (8)
+- `def _restore_channel() -> None` (17)
+- `def downgrade() -> None` (12)
+
+### `alembic/versions/e560edf8b958_init.py` — 272 строк
 
 init
 
@@ -141,20 +177,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-### `alembic/versions/aa4e0de05368_seed_initial_data.py` — 496 строк ⚠ подошёл к 300
-
-seed initial data
-
-Зависит от: `alembic`, `backend.crypto`
-
-- `def _seed_profile() -> None` (60)
-- `def _seed_channels() -> None` (11)
-- `def _seed_secrets() -> None` (61)
-- `def _seed_settings() -> None` (27)
-- `def upgrade() -> None` (11)
-- `def downgrade() -> None` (11)
-
-## backend — 116 модулей
+## backend — 117 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -356,6 +379,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def _is_brand_domain(host: str) -> bool` (15)
 - `def is_aggregator_host(host: str) -> bool` (12)
 
+### `backend/domain/currency.py` — 24 строк
+
+Карта валют: чем их называют в объявлении и каким знаком печатают.
+
+Зависит от: —
+
+
 ### `backend/domain/dedup.py` — 126 строк
 
 Отсев повторов: векторы заведённых вакансий и поиск ближайшего к новому.
@@ -385,13 +415,13 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def resume_mark(text: str) -> str | None` (13)
 
-### `backend/domain/salary.py` — 299 строк
+### `backend/domain/salary.py` — 290 строк
 
 Разбор свободной строки зарплаты: число, как записано, и валюта.
 
-Зависит от: `backend.models`
+Зависит от: `backend.domain.currency`
 
-- `def parse_salary(salary: str | None) -> tuple[int | None, int | None, Currency | None]` (19)
+- `def parse_salary(salary: str | None) -> tuple[int | None, int | None, str | None]` (19)
 - `def _named_outright(s: str, part: list[re.Match]) -> bool` (32)
 - `def _money_bounds(s: str) -> tuple[int | None, int | None]` (20)
 - `def _one_bound(s: str, part: list[re.Match], kept: tuple[re.Match, int]) -> tuple[int | None, int | None]` (14)
@@ -402,7 +432,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _runs(s: str) -> list[list[re.Match]]` (15)
 - `def _amount(num: str, scale: str | None) -> int` (13)
 - `def _scale(marker: str | None) -> int` (5)
-- `def _currency(s: str) -> Currency | None` (8)
+- `def _currency(s: str) -> str | None` (8)
 
 ### `backend/domain/scoring.py` — 107 строк
 
@@ -1023,13 +1053,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def _media_placeholder(msg) -> str` (18)
 - `def extract_dm_text(msg) -> str` (23)
 
-### `backend/models/__init__.py` — 68 строк
+### `backend/models/__init__.py` — 66 строк
 
 Объявления таблиц базы, собранные из всех предметов.
 
 Зависит от: `backend.models.base`, `backend.models.contacts`, `backend.models.enums`, `backend.models.message`, `backend.models.profile`, `backend.models.settings`, `backend.models.vacancy`
 
-Отдаёт наружу: `HR`, `AppSetting`, `Base`, `BLACKLIST_KINDS`, `Blacklist`, `BotMode`, `BotState`, `Company`, `Currency`, `LlmConfig`, `LlmConfigKind`, `Message`, `Profile`, `ProfileExperience`, `ProfileLanguage`, `ProfileSkill`, `StatusHistorySource`, `status_code`, `TelegramChannel`, `TgAccount`, `TrashEvent`, `Vacancy`, `VacancyEvent`, `VacancyStatus`, `VacancyStatusHistory`, `profile_experience_skills`
+Отдаёт наружу: `HR`, `AppSetting`, `Base`, `BLACKLIST_KINDS`, `Blacklist`, `BotMode`, `BotState`, `Company`, `LlmConfig`, `LlmConfigKind`, `Message`, `Profile`, `ProfileExperience`, `ProfileLanguage`, `ProfileSkill`, `StatusHistorySource`, `status_code`, `TelegramChannel`, `TgAccount`, `TrashEvent`, `Vacancy`, `VacancyEvent`, `VacancyStatus`, `VacancyStatusHistory`, `profile_experience_skills`
 
 
 ### `backend/models/base.py` — 65 строк
@@ -1054,14 +1084,13 @@ First-run bootstrap: ensure DB schema exists.
 - `class HR(IdMixin, Base)` (17)
 - `class Company(IdMixin, Base)` (10)
 
-### `backend/models/enums.py` — 70 строк
+### `backend/models/enums.py` — 58 строк
 
 Перечисления, которыми колонки ограничивают набор значений.
 
 Зависит от: —
 
 - `class BotMode(enum.Enum)` (4)
-- `class Currency(enum.Enum)` (10)
 - `class VacancyStatus(enum.Enum)` (12)
 - `def status_code(status: VacancyStatus) -> str` (15)
 - `class StatusHistorySource(enum.Enum)` (11)
@@ -1098,13 +1127,13 @@ First-run bootstrap: ensure DB schema exists.
 - `class LlmConfig(IdMixin, UpdatedAtMixin, Base)` (14)
 - `class AppSetting(UpdatedAtMixin, Base)` (7)
 
-### `backend/models/vacancy.py` — 178 строк
+### `backend/models/vacancy.py` — 179 строк
 
 Таблицы, в которых конвейер записывает судьбу разобранного поста.
 
 Зависит от: `backend.models.base`, `backend.models.contacts`, `backend.models.enums`
 
-- `class Vacancy(IdMixin, CreatedAtMixin, Base)` (61)
+- `class Vacancy(IdMixin, CreatedAtMixin, Base)` (62)
 - `class VacancyEvent(IdMixin, CreatedAtMixin, Base)` (16)
 - `class TrashEvent(IdMixin, CreatedAtMixin, Base)` (34)
 - `class VacancyStatusHistory(IdMixin, Base)` (38)
@@ -2321,7 +2350,7 @@ Runtime settings layer.
 - `def _leave_later() -> None` (9)
 - `def _leave() -> None` (9)
 
-### `client/bridge/wire.py` — 388 строк ⚠ подошёл к 300
+### `client/bridge/wire.py` — 407 строк ⚠ подошёл к 300
 
 Перевод внутренних значений в словари, которые читает окно.
 
@@ -2339,6 +2368,7 @@ Runtime settings layer.
 - `def _hr_face(hr) -> dict` (13)
 - `def _status_change(row) -> dict` (15)
 - `def _vacancy_event(row) -> dict` (8)
+- `def _salary(v) -> dict` (17)
 - `def _vacancy_detail_to_dict(detail, matched_set: set[str], score_threshold: int) -> dict` (39)
 - `def _hr_picker_row_to_dict(item) -> dict` (18)
 - `def _hr_mini_row_to_dict(hr, vacancy_count: int) -> dict` (11)
@@ -2893,20 +2923,20 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_domain_salary.py` — 419 строк ⚠ подошёл к 300
+### `tests/backend/test_domain_salary.py` — 435 строк ⚠ подошёл к 300
 
 Следствия, которые наблюдают тесты `backend/domain/salary.py`.
 
-Зависит от: `backend.domain.salary`, `backend.models`
+Зависит от: `backend.domain.salary`
 
-Тестов: 32
+Тестов: 33
 
 
-### `tests/backend/test_domain_salary_numbers.py` — 177 строк
+### `tests/backend/test_domain_salary_numbers.py` — 176 строк
 
 Следствия чтения самого числа в строке зарплаты.
 
-Зависит от: `backend.domain.salary`, `backend.models`
+Зависит от: `backend.domain.salary`
 
 Тестов: 16
 
@@ -4595,13 +4625,13 @@ Runtime settings layer.
 Тестов: 8
 
 
-### `tests/client/test_bridge_vacancies.py` — 302 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_vacancies.py` — 332 строк ⚠ подошёл к 300
 
 Следствия слотов вакансий, которым хватает одной базы.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 15
+Тестов: 16
 
 
 ### `tests/client/test_bridge_vacancy_actions.py` — 262 строк

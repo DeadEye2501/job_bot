@@ -38,8 +38,11 @@ datas = [
     # этого номера в своей истории, падает молча — окна у него нет, консоли
     # тоже. С заглушкой новая база остаётся пустой, как и задумано в
     # README/config.py, а заведённая из исходников считается доведённой.
-    ('alembic/versions/8ba64b863cb1_init.py', 'alembic/versions'),
+    ('alembic/versions/e560edf8b958_init.py', 'alembic/versions'),
     ('alembic/bundled/aa4e0de05368_seed_initial_data.py', 'alembic/versions'),
+    # Восстановление единственной живой переписки — тоже личные данные, и в
+    # сборку от неё едет такая же заглушка с тем же номером ревизии.
+    ('alembic/bundled/c3f8a1d47b02_restore_answered_vacancy.py', 'alembic/versions'),
 ]
 
 hiddenimports = [
@@ -57,7 +60,7 @@ hiddenimports = [
     #
     # NB: саму init-миграцию через hiddenimports перечислять смысла
     # нет — alembic-хеши часто начинаются с цифры (например,
-    # 8ba64b863cb1_init), а Python identifier с цифры не начинается,
+    # e560edf8b958_init), а Python identifier с цифры не начинается,
     # PyInstaller просто молча скипает такие записи. Файл попадает в
     # бандл через datas (см. выше) и alembic находит его при сканировании
     # versions/-каталога по имени файла, не по импорту.

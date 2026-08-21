@@ -24,12 +24,12 @@ afterEach(() => {
   host = null;
 });
 
-function screen(vacancyId) {
+function screen(vacancyId, extra = {}) {
   const asked = [];
   const [props, change] = livingProps({
     ask: async (method, payload) => {
       asked.push([method, payload]);
-      return { vacancy: vacancyDetail(payload) };
+      return { vacancy: vacancyDetail(payload, extra) };
     },
     say: () => {},
     events: { on: () => () => {} },
@@ -59,5 +59,22 @@ describe('живая карточка вакансии', () => {
       ['vacancies.detail', 8],
     ]);
     expect(text()).toContain('Вакансия 8');
+  });
+
+  it('зарплату показывает пилюлей из разобранных чисел, а не строкой поста', async () => {
+    // Наставление разбора велит модели брать зарплату дословно, и в поле
+    // ложится написанное автором: «🎯 ЗП: действительно готовы обсудить ваши
+    // пожелания». В пилюле такому не место — она показывает только числа.
+    const { text } = screen(7, {
+      salary: '🎯 ЗП: действительно готовы обсудить ваши пожелания',
+      salary_min: 500000,
+      salary_max: 700000,
+      salary_currency: '֏',
+    });
+
+    await settled();
+
+    expect(text()).toContain('от 500000 до 700000 ֏');
+    expect(text()).not.toContain('готовы обсудить');
   });
 });
