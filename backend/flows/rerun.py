@@ -16,7 +16,7 @@ from sqlalchemy import select
 
 from adapters import teletype
 from backend.flows import embeddings, linked_article, parse
-from backend.message_text import extract_post_text, extract_text
+from backend.message_text import extract_post_text
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
 from backend.repository.channels import list_named_channels
@@ -71,14 +71,12 @@ async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None:
         )
 
 
-async def _post_text(msg, where: str, vacancy_id: int) -> tuple[str, str, bool] | None:
-    """Перечитанный пост тремя значениями; пусто — текста в посте нет.
+async def _post_text(msg, where: str, vacancy_id: int) -> tuple[str, bool] | None:
+    """Перечитанный пост двумя значениями; пусто — текста в посте нет.
 
-    Первый — со статьями и адресами ссылок, он идёт в разбор и в строку.
-    Второй — голый текст поста, он идёт в отпечаток: отпечатки сравнивают с
-    посчитанными год назад, когда ни адресов, ни статей в тексте не было.
-    Третий — целиком ли собран текст, то есть не пропала ли статья по причине,
-    которая пройдёт.
+    Первый — со статьями и адресами ссылок: он идёт и в разбор, и в строку, и
+    в отпечаток. Второй — целиком ли собран текст, то есть не пропала ли
+    статья по причине, которая пройдёт.
 
     Что делать с недобравшим, здесь не решают: оба ответа принадлежат зовущему.
     """
@@ -89,8 +87,7 @@ async def _post_text(msg, where: str, vacancy_id: int) -> tuple[str, str, bool] 
             vacancy_id, where,
         )
         return None
-    candidate, whole = await linked_article.with_linked_articles(candidate)
-    return candidate, extract_text(msg), whole
+    return await linked_article.with_linked_articles(candidate)
 
 
 async def _fetch_fresh_text(
@@ -151,18 +148,22 @@ async def _store(pipeline, vacancy_id: int, **fields) -> bool:
 
 
 async def _refresh_embedding(pipeline, vacancy_id: int, text: str) -> None:
-    """Пересчитать отпечаток вакансии под текст, с которым идёт прогон.
+    """Пересчитать отпечаток вакансии под текст, с которым идёт разбор.
 
-    Прогон заново — это весь путь заново, и отпечаток тоже: оставшийся от
-    прежнего текста, он отсеивал бы будущие похожие посты по тому, чего в
-    объявлении уже нет. Приходит сюда голый текст поста, тот же, по какому
-    отпечаток считают на приёме, — иначе прогон уводил бы вакансию из общего
-    счёта, и перепост переставал бы с ней сходиться. Кэш отсева правится
-    следом за строкой — он живёт в памяти и сам из базы не перечитывается.
+    Зовут отсюда двое, и обоим текст объявления меняется под руками: прогон
+    заново перечитывает пост, который могли отредактировать за месяцы, а
+    подбор недоразобранного дочитывает статью, которой на приёме не было.
+    Отпечаток, оставшийся от прежнего текста, отсеивал бы будущие похожие
+    посты по тому, чего в объявлении уже нет.
 
-    Молчание поставщика отпечатков прогон не отменяет: он отдельный от
-    чат-модели и лежит порознь с ней, а разбор — главное, ради чего кнопку и
-    жали. Вектор в этом случае остаётся прежним до следующего прогона.
+    Приходит сюда тот же текст, с каким идёт разбор, — тем же он считается и
+    на приёме, иначе строка уходила бы из общего счёта, и её же перепост
+    перестал бы с ней сходиться. Кэш отсева правится следом за строкой — он
+    живёт в памяти и сам из базы не перечитывается.
+
+    Молчание поставщика отпечатков работу зовущего не отменяет: он отдельный
+    от чат-модели и лежит порознь с ней, а разбор — главное, ради чего сюда и
+    шли. Вектор в этом случае остаётся прежним до следующего раза.
 
     Кэш правится только вслед за удавшейся записью: вакансию могли выбросить
     из окна, пока отвечала модель, и вернувшийся в кэш вектор отсеивал бы
@@ -194,7 +195,7 @@ async def _note_rerun(pipeline, vacancy_id: int, origin: "_Origin") -> None:
 async def _reread_and_store(
     pipeline, vacancy_id: int, was: str, where: tuple[str, int | None]
 ):
-    """Перечитанный пост тремя значениями; пусто — перечитать не вышло.
+    """Перечитанный пост двумя значениями; пусто — перечитать не вышло.
 
     Целый текст тут же и записывается, пока он на руках: разбор идёт минутами,
     и оборвись он посреди, сохранённый остался бы от прошлого раза. Недобравший
@@ -207,17 +208,14 @@ async def _reread_and_store(
     fresh = await _fetch_fresh_text(pipeline, username, msg_id, vacancy_id)
     if fresh is None:
         return None
-    text, plain, whole = fresh
+    text, whole = fresh
     if whole and text != was:
         await _store(pipeline, vacancy_id, raw_text=text)
-    return text, plain, whole
+    return text, whole
 
 
-async def _text_to_parse(pipeline, origin: "_Origin", vacancy_id: int):
-    """Текст для разбора заново и голый текст поста, если пост перечитан.
-
-    Голый текст поста нужен только отпечатку, и без перечитывания его нет
-    вовсе — сохранённый для этого не годится, в нём адреса и статьи.
+async def _text_to_parse(pipeline, origin: "_Origin", vacancy_id: int) -> str:
+    """Текст, с которым идёт прогон: перечитанный пост или сохранённый.
 
     Недобравший перечитанный текст здесь хуже сохранённого, а не лучше: в
     сохранённом статья уже есть, и переписать его постом без неё — значит
@@ -228,15 +226,15 @@ async def _text_to_parse(pipeline, origin: "_Origin", vacancy_id: int):
         (origin.channel_username, origin.msg_id),
     )
     if fresh is None:
-        return origin.raw_text, None
-    text, plain, whole = fresh
-    if not whole:
-        logger.info(
-            "rerun: vacancy %d linked article not available, keeping cached raw_text",
-            vacancy_id,
-        )
-        return origin.raw_text, None
-    return text, plain
+        return origin.raw_text
+    text, whole = fresh
+    if whole:
+        return text
+    logger.info(
+        "rerun: vacancy %d linked article not available, keeping cached raw_text",
+        vacancy_id,
+    )
+    return origin.raw_text
 
 
 RerunPipelineOutcome = Literal["ok", "missing", "no_text", "llm"]
@@ -254,7 +252,7 @@ async def rerun_pipeline_for_vacancy(
     Прогон идёт как над только что заведённой строкой: пост перечитывается из
     Telegram (при неудаче остаётся сохранённый текст — см. `_fetch_fresh_text`),
     навыки, отсев и анкета перечитываются, отпечаток считается заново — по
-    голому тексту перечитанного поста, а не по сохранённому со статьями.
+    тому же тексту, что уходит в разбор.
 
     Исходов четыре, а не «да/нет»: окно говорит о них разное, и «нет вакансии
     или пустой текст» на месте молчащей модели посылало бы человека искать
@@ -263,7 +261,7 @@ async def rerun_pipeline_for_vacancy(
     origin = await _vacancy_origin(pipeline, vacancy_id)
     if origin is None:
         return "missing"
-    text, plain = await _text_to_parse(pipeline, origin, vacancy_id)
+    text = await _text_to_parse(pipeline, origin, vacancy_id)
     if not text:
         logger.warning("rerun: vacancy %d has empty raw_text", vacancy_id)
         return "no_text"
@@ -278,8 +276,7 @@ async def rerun_pipeline_for_vacancy(
         if await _vacancy_origin(pipeline, vacancy_id) is None:
             return "missing"
         return "llm"
-    if plain is not None:
-        await _refresh_embedding(pipeline, vacancy_id, plain)
+    await _refresh_embedding(pipeline, vacancy_id, text)
     await _note_rerun(pipeline, vacancy_id, origin)
     # Вторая весть за прогон: первую шлёт сам разбор, но строка истории и
     # отпечаток ложатся уже после неё, и карточка перечитала бы себя без них.
@@ -380,7 +377,7 @@ async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
         pipeline, row.id, row.raw_text, (row.username or "", row.source_msg_id)
     )
     if fresh is not None:
-        text, _plain, whole = fresh
+        text, whole = fresh
         if whole:
             return text, True
     return (row.raw_text, False) if _wait_is_over(row.created_at) else None
@@ -389,20 +386,23 @@ async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
 async def _recover_one(pipeline, row) -> bool:
     """Дочитать и разобрать одну недоразобранную строку; сказать, разобрали ли.
 
-    Отпечаток тут не пересчитывается, хотя пост и перечитан: у неразобранной
-    строки он посчитан на приёме и лежит в кэше отсева, а считается он по
-    голому тексту поста — тому же, что и сейчас. Прогон заново пересчитывает
-    его потому, что там объявление могли отредактировать за месяцы; здесь
-    между приёмом и подбором проходит оборот цикла.
+    Отпечаток пересчитывается вместе с разбором: на приёме его посчитали по
+    одной шапке со ссылкой — статьи тогда не было, — а теперь она дочитана, и
+    в отсеве повторов строка так и осталась бы шапкой. Своё же объявление,
+    пришедшее из соседнего канала уже со статьёй, с ней бы не сошлось и
+    завелось второй строкой.
     """
     judged = await _text_to_judge_by(pipeline, row)
     if judged is None:
         logger.info("recover: vacancy %d ждёт дочитывания статьи", row.id)
         return False
     text, allow_delete = judged
-    return await parse.parse_and_update_vacancy(
+    if not await parse.parse_and_update_vacancy(
         pipeline, row.id, text, row.username or "", allow_delete=allow_delete
-    )
+    ):
+        return False
+    await _refresh_embedding(pipeline, row.id, text)
+    return True
 
 
 async def recover_orphan_vacancies(pipeline) -> int:

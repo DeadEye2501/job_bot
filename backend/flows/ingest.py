@@ -5,7 +5,7 @@ import logging
 from sqlalchemy.exc import IntegrityError
 
 from backend.flows import linked_article, parse
-from backend.message_text import extract_post_text, extract_text
+from backend.message_text import extract_post_text
 from backend.models import Vacancy
 from backend.payloads import ChannelPost
 from backend.repository.vacancies_life import add_vacancy_event
@@ -22,14 +22,21 @@ async def _post_embedding(pipeline, post: ChannelPost):
     Пост без отпечатка пропускается, курсор идёт дальше, и следующий проход по
     каналу его не увидит — но это дешевле, чем встать на одном посте.
 
-    Считается по голому тексту поста, а не по тому, что уходит в разбор и
-    ложится в строку: там к посту подставлены адреса ссылок и дописаны статьи,
-    а сравнивать отпечаток приходится с посчитанными год назад, когда ни того,
-    ни другого в тексте не было. Посчитай его по склейке — и перепост давно
-    заведённой вакансии перестал бы с ней сходиться, заведясь второй строкой.
+    Считается по тому же тексту, что уходит в разбор и ложится в строку: с
+    адресами ссылок и с дописанными статьями. В таких объявлениях статья и
+    есть содержание — у поста-шапки своего текста нет вовсе, — и по одной
+    шапке два разных объявления неразличимы: отпечаток объявил бы второе
+    повтором первого, и оно пропало бы молча.
+
+    Плата за это видна на посте, чья статья не собралась: отпечаток у него от
+    шапки, а у того же поста, перепощенного с собравшейся статьёй, — от
+    полного текста, и сойтись они могут не всегда. Тогда вместо дочитывания
+    заводится вторая строка. Подбор недоразобранного это окно закрывает —
+    дочитав статью, он пересчитывает отпечаток, — но пока строка ждёт, оно
+    открыто.
     """
     return await embeddings.embed_text(
-        pipeline, extract_text(post.msg), f"[@{post.channel_username}] {post.msg.id}"
+        pipeline, post.text, f"[@{post.channel_username}] {post.msg.id}"
     )
 
 
