@@ -83,8 +83,8 @@ async def mark_ghosted_vacancies(
     ``timeout_days`` дней — см. :func:`_last_activity` и
     :func:`_silence_candidates`.
 
-    Возвращает список vacancy_id, переведённых в Ghosting. Caller
-    оборачивает в session.begin() и выполняет commit.
+    Возвращает список номеров вакансий, переведённых в Ghosting. Сделку
+    заводит и закрывает зовущий.
     """
     # Сравнение идёт на стороне питона с `created_at`, `max(sent_at)` и
     # `max(changed_at)`, а те приходят из базы наивными — отсюда и наивная

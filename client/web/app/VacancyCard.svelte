@@ -15,7 +15,7 @@
   import { living } from '$state/alive.js';
   import { cardFinish } from '$state/card_finish.js';
   import { cardLinks } from '$state/card_links.js';
-  import { freshAnswer } from '$state/fresh.js';
+  import { miniRead } from '$state/mini_read.js';
   import { actionBlocks, rawChips } from '$state/vacancy_actions.js';
   import { ago, gradeLabel, remoteLabel, scoreTone } from '$state/vacancies.js';
   import { timelineRows } from '$state/vacancy_card.js';
@@ -35,7 +35,6 @@
   let raw = $state(false);
 
   const alive = living();
-  const fresh = freshAnswer(() => alive.now);
 
   const dropCard = cardFinish({
     ask: (...args) => ask(...args),
@@ -59,13 +58,15 @@
    * Свой счёт попыток: правка пояснения и смена статуса перечитывают её каждая,
    * и ответы возвращаются вразнобой — лёгший поверх свежего старый показал бы
    * ленту без только что сделанного перехода.
-   *
    */
-  async function refresh() {
-    const now = await fresh(() => ask('vacancies.detail', vacancyId));
-    if (now === null) return;
-    card = now.vacancy;
-  }
+  const refresh = miniRead({
+    ask: (method, payload) => ask(method, payload),
+    alive: () => alive.now,
+    method: 'vacancies.detail',
+    payload: (id) => id,
+    key: 'vacancy',
+    show: (one) => (card = one),
+  });
 
   /** Записать заметку и вернуть то, что легло в базу.
    *
@@ -90,7 +91,7 @@
       explanation: text,
     });
     if (done === null) return false;
-    await refresh();
+    await refresh(vacancyId);
     return true;
   }
 
@@ -111,7 +112,7 @@
     // Про переход говорим только когда он был: мост принимает и «тот же самый
     // статус с причиной», и объявлять это переходом значило бы врать.
     if (status !== was) say(`Статус: ${status}`);
-    await refresh();
+    await refresh(vacancyId);
     onchanged();
   }
 
@@ -171,18 +172,22 @@
   }
 
   $effect(() => {
+    // Номер читается до захода, и это здесь несущее: сам заход читает вне
+    // слежения, а панель одна на весь список — выбор другой строки меняет
+    // компоненту свойство, не заводя его заново.
+    const id = vacancyId;
     const settled = alive.entered(() => {
       // Перешли к другой вакансии — прежнюю с глаз долой, не дожидаясь ответа:
       // поле заметки берёт значение один раз, при заведении, и заведённое над
       // прежней карточкой держало бы чужую заметку до самого закрытия. Вести о
       // смене списка сюда не заходят — там вакансия та же, и гасить её нечему.
       card = null;
-      refresh();
+      refresh(id);
     });
     // Вакансию двигает не только это окно: бот разбирает её заново по нашей же
     // просьбе и правит статус по переписке. Весть о смене списка — то же
     // событие, по которому обновляется список под карточкой.
-    const deaf = events.on('vacancies_list_changed', refresh);
+    const deaf = events.on('vacancies_list_changed', () => refresh(id));
     return () => {
       settled();
       deaf();
@@ -383,7 +388,7 @@
     current={linking.kind === 'hr' ? (card.hr?.id ?? null) : card.company_id}
     onclose={() => (linking = null)}
     onlinked={() => {
-      refresh();
+      refresh(vacancyId);
       onchanged();
     }}
   />

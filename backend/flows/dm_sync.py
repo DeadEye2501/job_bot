@@ -14,7 +14,6 @@ Telegram присылает оповещение. Приход письма ра
 """
 
 import logging
-from datetime import datetime, timezone
 
 from backend.flows.dm import persist_outgoing_dm
 from backend.message_text import extract_dm_text
@@ -26,7 +25,7 @@ from backend.repository.messages import (
     overwrite_message_text,
     tombstone_messages,
 )
-from backend.telegram_time import tg_moment
+from backend.telegram_time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ async def mark_read(session_factory, user_id: int, max_id: int) -> int | None:
         if hr is None:
             return None
         updated = await mark_outgoing_read(
-            session, hr.id, max_id, tg_moment(datetime.now(timezone.utc))
+            session, hr.id, max_id, utc_now()
         )
         await session.commit()
         return hr.id if updated else None

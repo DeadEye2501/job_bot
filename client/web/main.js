@@ -85,12 +85,14 @@ import './styles/pill.css';
 import './styles/big-number.css';
 import './styles/ruled-row.css';
 import './styles/accent-fill.css';
-import './styles/accent-outline.css';
 import './styles/stats.css';
 import './styles/stats-status.css';
 import './styles/stats-skills.css';
 import './styles/stats-responses.css';
 import './styles/stats-channels.css';
+// Ниже оформления самих блоков, и по тому же уговору, что у соседа-заливки:
+// у наведения та же весомость селектора, и выигрывает порядок.
+import './styles/accent-outline.css';
 import './styles/donut.css';
 import './styles/status-color.css';
 import './styles/skills.css';

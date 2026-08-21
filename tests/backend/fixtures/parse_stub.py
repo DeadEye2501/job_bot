@@ -23,7 +23,7 @@ def parse_into(monkeypatch, calls: list, *, done=True) -> None:
     после того, как подделка поставлена.
     """
 
-    async def parse(pipeline, vacancy_id, text, username, allow_delete=True):
+    async def parse(pipeline, vacancy_id, text, username, *, allow_delete=True):
         calls.append((vacancy_id, text, username, allow_delete))
         return done() if callable(done) else done
 

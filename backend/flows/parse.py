@@ -63,11 +63,13 @@ async def _dropped_as_trash(
     return True
 
 
-def _unanswered(what: str, trouble: str | None, vacancy_id: int):
+def _unanswered(
+    what: str, trouble: str | None, vacancy_id: int
+) -> tuple[str | None, bool] | None:
     """Что делать с бедой при обращении к модели; пусто — беды не было.
 
-    Обрыв по пределу токенов и молчание провайдера решают разное, и оба зова к
-    модели — о жанре и о пригодности — разводят их одинаково. Обрыв повторится
+    Обрыв по пределу токенов и молчание провайдера решают разное, и все три
+    зова к модели — о разборе, о жанре и о пригодности — разводят их одинаково. Обрыв повторится
     и на втором заходе с запасом, значит дальше это дело человека: строка
     ложится в окно с названной причиной. Молчание провайдера приговором не
     является вовсе — строка остаётся неразобранной и ждёт следующего захода.
@@ -237,8 +239,9 @@ async def _parsed_or_dropped(
     сверх названия, и второе обращение к модели ей не положено. Дорога эта не
     только для мемов, обрывков и рекламных строчек — сюда же наставление
     разбора сводит пост соискателя, веля отдать по нему пустоту вместо полей.
-    Приговор «пусто» поэтому значит «вакансии тут нет», а не «мы не справились». Дальше две дороги — удалить или
-    пометить, — и выбор между ними держит `_dropped_as_trash`.
+    Приговор «пусто» поэтому значит «вакансии тут нет», а не «мы не
+    справились». Дальше две дороги — удалить или пометить, — и выбор между
+    ними держит `_dropped_as_trash`.
 
     Не состоявшееся обращение к модели на эти дороги не выходит вовсе и
     отдаётся отдельно: приговора не было, значит и выбрасывать нечего.
@@ -252,17 +255,14 @@ async def _parsed_or_dropped(
         channel_username=channel_username,
         known_skills=pipeline.skills_cache,
     )
-    if refusal == TRUNCATED_TROUBLE:
-        logger.warning(
-            "vacancy %s: ответ не поместился даже с запасом, отдаю человеку",
-            vacancy_id,
-        )
+    trouble = _unanswered("разбор", refusal, vacancy_id)
+    if trouble is not None:
+        reason, unasked = trouble
+        if unasked:
+            return None, refusal, False
         return None, None, await save_empty_vacancy(
-            pipeline, vacancy_id, None, reason=TRUNCATED_SKIP_REASON
+            pipeline, vacancy_id, None, reason=reason
         )
-    if refusal is not None:
-        logger.warning("vacancy %s: разбор не состоялся (%s)", vacancy_id, refusal)
-        return None, refusal, False
     if not is_empty_vacancy(parsed):
         return parsed, None, True
     if await _dropped_as_trash(

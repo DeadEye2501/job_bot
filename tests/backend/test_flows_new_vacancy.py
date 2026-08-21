@@ -35,10 +35,10 @@ WITH_ARTICLE = "Senior QA https://teletype.in/@a/b"
 def parses(monkeypatch):
     """Подставной разбор объявления: список того, о чём его просили.
 
-    Одна подделка на весь файл: подбор недоразобранного зовут семь проверок,
-    и разъедься у них умолчание `allow_delete`, проверка про запрет зеленела
-    бы на подделке, а не на коде. Умолчание тут такое же, как у настоящего
-    разбора.
+    Общим домом (`fixtures/parse_stub`), а не своим телом: разъедься у копий
+    умолчание `allow_delete`, проверка про запрет зеленела бы на подделке, а
+    не на коде. Своё тело осталось у одной проверки — той, где разбор обязан
+    сорваться на первой строке и уцелеть на второй.
     """
     calls: list[tuple] = []
     parse_into(monkeypatch, calls)
@@ -347,10 +347,7 @@ async def test_a_row_the_parse_gave_up_on_is_not_counted(monkeypatch,
     await put(session_factory, vacancy_row(title=None, is_parsed=False, raw_text="текст"))
     pipeline = await make_pipeline()
 
-    async def parse(pipeline, vacancy_id, text, username, allow_delete=True):
-        return False
-
-    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
+    parse_into(monkeypatch, [], done=False)
 
     assert await pipeline.recover_orphan_vacancies() == 0
 
