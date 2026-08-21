@@ -721,7 +721,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None` (16)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 
-### `backend/flows/parse.py` — 479 строк ⚠ подошёл к 300
+### `backend/flows/parse.py` — 481 строк ⚠ подошёл к 300
 
 Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
@@ -739,7 +739,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _parsed_or_dropped(pipeline, vacancy_id: int, text: str, channel_username: str, allow_delete: bool)` (44)
 - `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (33)
 - `async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> bool` (18)
-- `async def _thrown_out_by_the_verdict(pipeline, vacancy_id: int, skip_reason: str | None, allow_delete: bool) -> bool` (16)
+- `async def _thrown_out_by_the_verdict(pipeline, vacancy_id: int, skip_reason: str | None, allow_delete: bool) -> bool` (18)
 - `async def parse_and_update_vacancy(pipeline, vacancy_id: int, text: str, channel_username: str, *, allow_delete: bool=True) -> bool` (43)
 - `async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool` (11)
 - `async def save_empty_vacancy(pipeline, vacancy_id: int, parsed: ParsedVacancy | None, *, reason: str=EMPTY_SKIP_REASON) -> bool` (33)
@@ -1003,7 +1003,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
 - `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (55)
 
-### `backend/llm/rules.py` — 133 строк
+### `backend/llm/rules.py` — 135 строк
 
 Приметы предметной области, общие для наставлений модели.
 
@@ -3489,7 +3489,7 @@ Runtime settings layer.
 
 - `def _verdict(verdict, issues=None) -> httpx.Response` (3)
 
-### `tests/backend/test_llm_fit_languages.py` — 178 строк
+### `tests/backend/test_llm_fit_languages.py` — 176 строк
 
 Следствия зова о языках вакансии.
 

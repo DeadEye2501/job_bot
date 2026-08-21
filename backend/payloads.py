@@ -17,7 +17,7 @@
 
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any, Literal, get_args
+from typing import Any, Literal
 
 from backend.models import (
     HR,
@@ -55,10 +55,10 @@ DIRECT_PARSED_FIELDS = (
 """
 
 
+# Чем вердикт о вакансии бывает вообще. Что из этого вправе ответить зов о
+# пригодности — набор уже (`llm/fit.ASKED_VERDICTS`): «мусор» выносит только
+# зов о жанре, и по нему вакансию удаляют насовсем.
 FitVerdict = Literal["fit", "reject", "trash"]
-# Те же три значения, но набором — для разбора ответа модели. Берутся из
-# самого объявления, чтобы список и тип не разъехались.
-FIT_VERDICTS: tuple[str, ...] = get_args(FitVerdict)
 
 
 @dataclass(frozen=True)
