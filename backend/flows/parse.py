@@ -10,6 +10,7 @@ import logging
 
 from backend.flows import dm_backfill
 from backend.domain.blacklist import check_blacklist
+from backend.domain.resume_marks import resume_mark
 from backend.domain.scoring import score_parsed
 from backend.domain.verdict import decide_vacancy_status
 from backend.domain.verdict import is_empty_vacancy
@@ -203,12 +204,27 @@ async def _verdict_for(
     """Приговор объявлению: статус, причина отказа и баллы; пусто — не спросили.
 
     Чёрный список читает весь исходный текст: разбору он достаётся урезанным
-    по бюджету модели, и образец за обрезом всё равно ловится. Оценщика
-    спрашивают только у тех, кого не отсеяли раньше, — второе обращение к
-    модели стоит денег.
+    по бюджету модели, и образец за обрезом всё равно ловится.
+
+    Метка резюме решает раньше всех — раньше чёрного списка, порога и
+    оценщика: 21.08.2026 оценщик пропустил пост, начинавшийся словом `#cv`, и
+    отклик с приложенным CV ушёл живому человеку.
+
+    Порог соискателю не судья: чужое резюме не проходит его случайно —
+    навыки не легли на анкету, — и перестаёт не проходить ровно тогда, когда
+    соискатель похож на кандидата. Смыслом такой пост отсеивает разбор, ещё
+    до баллов: полей он у него не заполняет, и строка выбывает пустышкой.
     """
-    blacklist_match = check_blacklist(text, pipeline.blacklist_patterns)
+    mark = resume_mark(text)
     score = score_parsed(parsed, pipeline.skills_cache)
+    if mark is not None:
+        logger.info("vacancy %s: пост соискателя, метка %s", vacancy_id, mark)
+        return (
+            VacancyStatus.NOT_FIT,
+            f"{TRASH_SKIP_PREFIX}пост соискателя, метка {mark}",
+            score,
+        )
+    blacklist_match = check_blacklist(text, pipeline.blacklist_patterns)
     logger.debug(
         "vacancy %s: score=%d threshold=%d blacklist=%s",
         vacancy_id, score, pipeline.rs.scoring_threshold, blacklist_match,
@@ -248,11 +264,11 @@ async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> 
 async def _thrown_out_by_the_verdict(
     pipeline, vacancy_id: int, skip_reason: str | None, allow_delete: bool
 ) -> bool:
-    """Убрать строку, если так решил вердикт модели; сказать, убрали ли.
+    """Убрать строку, если так решил приговор; сказать, убрали ли.
 
-    Метку мусора ставит только вердикт (`_fit_refusal`), и она же —
-    единственный повод убрать строку. Кто заведёт её с другой стороны, тот и
-    отвечает за удаление.
+    Метку мусора ставят двое — вердикт оценщика (`_fit_refusal`) и метка
+    соискательского поста, — и обе значат одно: это не вакансия. Отсюда и
+    одна дорога на двоих; кто заведёт метку третьим, тот и попадёт сюда же.
     """
     return bool(
         skip_reason

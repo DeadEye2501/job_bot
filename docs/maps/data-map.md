@@ -199,6 +199,12 @@
 - `INVITED: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.INVITATION, VacancyStat…`
 - `IN_PROGRESS_STEP: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.INVITATION, VacancyStat…`
 
+### `backend/domain/resume_marks.py`
+
+- `RESUME_MARKS` = `frozenset({'#cv', '#resume', '#резюме', '#ищураб…`
+- `AMBIGUOUS_MARKS` = `frozenset({'#ищу', '#available', '#cv_'})`
+- `_MARK` = `re.compile('(?<!\\S)#\\w+')`
+
 ### `backend/domain/salary.py`
 
 - `_AMOUNT_RE` = `re.compile('(?P<num>\\d+(?:[ \xa0\u202f\u2009,.]…`
@@ -464,6 +470,7 @@
 
 ### `backend/llm/rules.py`
 
+- `RESUME_MARK_LINE` = `', '.join((f'«{mark}»' for mark in sorted(RESUME…`
 - `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_B…`
 - `GRADE_MARKERS` = `'«junior/стажёр/intern», «middle/мидл», «senior/…`
 - `FORMAT_MARKERS` = `'«remote/удалёнка/удалённо/distributed», «hybrid…`

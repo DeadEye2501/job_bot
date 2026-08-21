@@ -154,7 +154,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## backend — 114 модулей
+## backend — 115 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -376,6 +376,14 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: `backend.models`
 
 - `def percent_or_none(numerator: int, denominator: int) -> int | None` (14)
+
+### `backend/domain/resume_marks.py` — 68 строк
+
+Приметы поста соискателя: метки, по которым он опознаётся без модели.
+
+Зависит от: —
+
+- `def resume_mark(text: str) -> str | None` (15)
 
 ### `backend/domain/salary.py` — 299 строк
 
@@ -672,17 +680,17 @@ First-run bootstrap: ensure DB schema exists.
 - `def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None` (16)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 
-### `backend/flows/parse.py` — 356 строк ⚠ подошёл к 300
+### `backend/flows/parse.py` — 372 строк ⚠ подошёл к 300
 
 Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
-Зависит от: `backend.domain.blacklist`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`
+Зависит от: `backend.domain.blacklist`, `backend.domain.resume_marks`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`
 
 - `async def _dropped_as_trash(pipeline, vacancy_id: int, reason: str, *, allow_delete: bool) -> bool` (23)
 - `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (51)
 - `async def _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus) -> None` (36)
 - `async def _parsed_or_dropped(pipeline, vacancy_id: int, text: str, channel_username: str, allow_delete: bool)` (44)
-- `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (26)
+- `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (41)
 - `async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> bool` (18)
 - `async def _thrown_out_by_the_verdict(pipeline, vacancy_id: int, skip_reason: str | None, allow_delete: bool) -> bool` (16)
 - `async def parse_and_update_vacancy(pipeline, vacancy_id: int, text: str, channel_username: str, *, allow_delete: bool=True) -> bool` (42)
@@ -873,7 +881,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]` (29)
 - `async def factcheck_cover_letter(profile_block: str, letter: str, client: httpx.AsyncClient, model: str, *, about: str='') -> tuple[bool, list[str]]` (39)
 
-### `backend/llm/fit.py` — 402 строк ⚠ подошёл к 300
+### `backend/llm/fit.py` — 403 строк ⚠ подошёл к 300
 
 Приговор о пригодности вакансии кандидату.
 
@@ -910,11 +918,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
 - `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (55)
 
-### `backend/llm/rules.py` — 82 строк
+### `backend/llm/rules.py` — 95 строк
 
 Приметы предметной области, общие для наставлений модели.
 
-Зависит от: `backend.domain.company_hosts`
+Зависит от: `backend.domain.company_hosts`, `backend.domain.resume_marks`
 
 
 ### `backend/llm/skills.py` — 135 строк
@@ -928,7 +936,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (30)
 
-### `backend/llm/vacancy.py` — 438 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 447 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
@@ -3175,13 +3183,13 @@ Runtime settings layer.
 Тестов: 18
 
 
-### `tests/backend/test_flows_parse_verdict.py` — 277 строк
+### `tests/backend/test_flows_parse_verdict.py` — 346 строк ⚠ подошёл к 300
 
 Какой приговор получает объявление после разбора.
 
 Зависит от: `backend.domain.verdict`, `backend.flows`, `backend.llm.answers`, `backend.models`, `backend.payloads`, `tests.dbio`
 
-Тестов: 15
+Тестов: 18
 
 
 ### `tests/backend/test_flows_post_intake.py` — 349 строк ⚠ подошёл к 300

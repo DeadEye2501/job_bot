@@ -49,6 +49,75 @@ async def test_an_empty_post_is_thrown_out_on_ingest(parsing, session_factory):
     assert mark.reason == "empty: no meaningful fields"
 
 
+async def test_a_resume_mark_decides_before_the_fit_check(parsing, session_factory):
+    """Метка резюме выбрасывает пост сама, не спрашивая оценщика.
+
+    Цена промаха тут не строка в списке, а письмо живому человеку от нашего
+    имени: 21.08.2026 отклик с приложенным CV ушёл соискателю, чей пост
+    начинался словом `#cv`. Оценщик такой пост пропустил — на настроение
+    модели тут полагаться нечем, а метка однозначна и стоит ноль.
+    """
+    pipeline, vacancy = parsing
+
+    await parse.parse_and_update_vacancy(
+        pipeline,
+        vacancy.id,
+        "#cv #python #django\n\nПозиция: Python Developer\nКонтакты: @nnekojiru",
+        "jobs",
+        allow_delete=True,
+    )
+
+    assert await all_rows(session_factory, Vacancy) == []
+    assert pipeline.validated is False
+    mark = await only_row(session_factory, TrashEvent)
+    assert mark.reason == "trash: пост соискателя, метка #cv"
+
+
+async def test_a_hashtag_inside_a_link_is_not_a_mark(parsing, session_factory):
+    """Якорь внутри адреса меткой не считается.
+
+    В `https://acme.com/careers#resume` решётка стоит посреди слова. С пункта
+    1 к тексту объявления дописываются ещё и статьи по ссылкам, где таких
+    адресов вдоволь, а удаление вакансии необратимо.
+    """
+    pipeline, vacancy = parsing
+
+    await parse.parse_and_update_vacancy(
+        pipeline,
+        vacancy.id,
+        "Ищем Python-разработчика. Откликнуться: https://acme.com/careers#resume",
+        "jobs",
+        allow_delete=True,
+    )
+
+    saved = await only_row(session_factory, Vacancy)
+    assert saved.status is VacancyStatus.NEW
+
+
+async def test_a_hiring_post_that_says_it_is_looking_survives(parsing, session_factory):
+    """Пост о найме с «#ищу» проходит отсев по меткам насквозь.
+
+    Метка `#ищу` в канале означает и «ищу работу», и «ищу сотрудника»: в
+    собранном за август она стоит в постах, где рядом `#вакансия`, `#hiring`
+    и `#требуется`. В набор решающих она поэтому не входит — реши она сама,
+    настоящие вакансии уходили бы в мусор без возврата. Наблюдается это тем,
+    что пост доживает до оценщика, а не приговаривается раньше.
+    """
+    pipeline, vacancy = parsing
+
+    await parse.parse_and_update_vacancy(
+        pipeline,
+        vacancy.id,
+        "#vacancy #вакансия #job #работа #hiring #требуется #ищу\n\nProduct Manager",
+        "jobs",
+        allow_delete=True,
+    )
+
+    saved = await only_row(session_factory, Vacancy)
+    assert saved.status is VacancyStatus.NEW
+    assert pipeline.validated is True
+
+
 async def test_a_vacancy_survives_a_provider_that_did_not_answer(
     parsing, session_factory
 ):

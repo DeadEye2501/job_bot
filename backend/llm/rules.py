@@ -13,6 +13,19 @@
 """
 
 from backend.domain.company_hosts import AGGREGATOR_BRANDS, AGGREGATOR_HOSTS
+from backend.domain.resume_marks import AMBIGUOUS_MARKS, RESUME_MARKS
+
+RESUME_MARK_LINE = ", ".join(
+    f"«{mark}»" for mark in sorted(RESUME_MARKS | AMBIGUOUS_MARKS)
+)
+"""Метки соискательского поста — строкой для наставления.
+
+Собирается из перечня, а не выписывается, и по той же причине, что хосты выше:
+переписанный своими словами, он разошёлся с кодом в обе стороны. Двусмысленные
+метки сюда входят, а в жёсткую отсечку нет: модель читает их вместе со всем
+постом и умеет отличить «ищу работу» от «ищу сотрудника», а отсечка удаляет
+без возврата.
+"""
 
 AGGREGATOR_HOSTS_LINE = ", ".join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_BRANDS))
 """Хосты, за которыми не стоит одна компания, — строкой для наставления.
