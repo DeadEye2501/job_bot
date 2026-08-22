@@ -56,23 +56,23 @@ reject ставится ТОЛЬКО если в тексте ЯВНО найд�
 
 Пример 1 (reject — явный уровень и созвоны на языке):
 LANGUAGE_REQUIREMENTS: Русский — native, Английский — B1. Текст: "...daily standups in English with the US team, English Upper-Intermediate required..."
-Ответ: {"verdict": "reject", "reason": "Требуется английский на уровне Upper-Intermediate и ежедневные standup'ы на английском."}
+Ответ: {"reason": "Требуется английский на уровне Upper-Intermediate и ежедневные standup'ы на английском.", "verdict": "reject"}
 
 Пример 2 (reject — язык, которого у кандидата нет вовсе):
 LANGUAGE_REQUIREMENTS: Русский — native, Английский — B2. Текст: "Команда общается на немецком, встречи с клиентом на немецком языке."
-Ответ: {"verdict": "reject", "reason": "Работа ведётся на немецком: общение команды и встречи с клиентом на этом языке."}
+Ответ: {"reason": "Работа ведётся на немецком: общение команды и встречи с клиентом на этом языке.", "verdict": "reject"}
 
 Пример 3 (fit — англицизмы без языкового требования):
 LANGUAGE_REQUIREMENTS: Русский — native, Английский — B1. Текст: "Тимлиду нужно: руководить командой, проводить Code Review, фасилитировать Scrum meetings. Требования: 5 лет опыта."
-Ответ: {"verdict": "fit", "reason": "Языковых требований в тексте нет: названы только обязанности тимлида и опыт."}
+Ответ: {"reason": "Языковых требований в тексте нет: названы только обязанности тимлида и опыт.", "verdict": "fit"}
 
 Пример 4 (fit — англоязычный пост без требования уровня):
 LANGUAGE_REQUIREMENTS: Русский — native, Английский — B2. Текст: "Backend Engineer. We're a fully remote product team. You'll work on our payments service in Python."
-Ответ: {"verdict": "fit", "reason": "The post states no language requirement — only the role and the product stack."}
+Ответ: {"reason": "The post states no language requirement — only the role and the product stack.", "verdict": "fit"}
 
 Пример 5 (fit — язык только для чтения):
 LANGUAGE_REQUIREMENTS: Русский — native, Английский — B1. Текст: "...будет плюсом: знание немецкого для чтения исследований..."
-Ответ: {"verdict": "fit", "reason": "Немецкий назван как «будет плюсом» для чтения исследований, а не как требование."}
+Ответ: {"reason": "Немецкий назван как «будет плюсом» для чтения исследований, а не как требование.", "verdict": "fit"}
 
 --- КОНЕЦ ПРИМЕРОВ ---
 
