@@ -926,7 +926,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]` (29)
 - `async def factcheck_cover_letter(profile_block: str, letter: str, client: httpx.AsyncClient, model: str, *, about: str='') -> tuple[bool, list[str]]` (39)
 
-### `backend/llm/fit.py` — 189 строк
+### `backend/llm/fit.py` — 197 строк
 
 Общее у зовов о пригодности: чем спросить модель и как прочесть ответ.
 
@@ -951,7 +951,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _without_invented_language(validation: FitValidation, raw_text: str, profile: CandidateProfile) -> FitValidation` (19)
 - `async def validate_language_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (15)
 
-### `backend/llm/fit_preferences.py` — 93 строк
+### `backend/llm/fit_preferences.py` — 95 строк
 
 Один вопрос о вакансии: нарушает ли она то, что кандидат написал словами.
 

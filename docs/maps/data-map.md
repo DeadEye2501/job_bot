@@ -475,7 +475,7 @@
 - `ROOMIER_FIT_TOKENS` = `2400`
 - `ASKED_VERDICTS: tuple[str, ...]` = `набор из 2`
 - `logger` = `logging.getLogger(__name__)`
-- `ANSWER_RULES` = `'Формат ответа: ТОЛЬКО JSON-объект.\n{"verdict":…`
+- `ANSWER_RULES` = `'Формат ответа: ТОЛЬКО JSON-объект.\n{"reason": …`
 - `VERDICT_SCOPE` = `'Ты отвечаешь ровно на один вопрос — тот, что оп…`
 - `class FitQuestion`
   - `purpose: str`
