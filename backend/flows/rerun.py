@@ -14,7 +14,7 @@ from typing import Literal
 
 from sqlalchemy import select
 
-from adapters import teletype
+from adapters import telegraph
 from backend.flows import embeddings, linked_article, parse
 from backend.message_text import extract_post_text
 from backend.models import TelegramChannel
@@ -333,7 +333,7 @@ LONGEST_WAIT = timedelta(days=1)
 такая строка осталась бы невидимой до конца своих дней — ни в списке, ни в
 отказах, нигде.
 
-Сутки, потому что перебои у teletype идут минутами, а починка домена — часами;
+Сутки, потому что перебои у Telegraph идут минутами, а починка домена — часами;
 объявление живёт дольше, и день ожидания ему не в убыток.
 
 Считаются они по часам, а тикают по оборотам: подбор недоразобранного зовётся
@@ -371,7 +371,7 @@ async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
     Ждать не бесконечно: прождавшую дольше `LONGEST_WAIT` судят по
     сохранённому, но удалять по нему не дают — целым он так и не собрался.
     """
-    if not teletype.ARTICLE_URL_RE.search(row.raw_text):
+    if not telegraph.ARTICLE_URL_RE.search(row.raw_text):
         return row.raw_text, True
     fresh = await _reread_and_store(
         pipeline, row.id, row.raw_text, (row.username or "", row.source_msg_id)

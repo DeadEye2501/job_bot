@@ -1,6 +1,6 @@
 """Следствия, которые наблюдает тест `backend/flows/linked_article.py`.
 
-Само хождение в сеть проверено у переходника (`test_adapters_teletype`); здесь
+Само хождение в сеть проверено у переходника (`test_adapters_telegraph`); здесь
 смотрят только на склейку: что дописано, в каком порядке и когда в сеть не
 ходят вовсе.
 """
@@ -10,7 +10,7 @@ import logging
 import httpx
 import pytest
 
-from adapters import teletype
+from adapters import telegraph
 from backend.flows import linked_article
 
 
@@ -24,21 +24,21 @@ def fetched(monkeypatch):
         asked.append(url)
         return articles.get(url)
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
     return asked, articles
 
 
 async def test_the_article_is_written_after_the_post(fetched):
     """Статья дописывается за текстом поста, а не вместо него."""
     asked, articles = fetched
-    articles["https://teletype.in/@a/b"] = "Требования: Python"
+    articles["https://telegra.ph/QA-08-21"] = "Требования: Python"
 
     got, whole = await linked_article.with_linked_articles(
-        "Senior QA https://teletype.in/@a/b"
+        "Senior QA https://telegra.ph/QA-08-21"
     )
 
-    assert got == "Senior QA https://teletype.in/@a/b\n\nТребования: Python"
-    assert asked == ["https://teletype.in/@a/b"]
+    assert got == "Senior QA https://telegra.ph/QA-08-21\n\nТребования: Python"
+    assert asked == ["https://telegra.ph/QA-08-21"]
     assert whole is True
 
 
@@ -60,45 +60,45 @@ async def test_one_address_is_fetched_once(fetched):
     статья дописалась бы к объявлению вторым разом.
     """
     asked, articles = fetched
-    articles["https://teletype.in/@a/b"] = "Требования: Python"
+    articles["https://telegra.ph/QA-08-21"] = "Требования: Python"
 
     got, _whole = await linked_article.with_linked_articles(
-        "https://teletype.in/@a/b ПОСМОТРЕТЬ (https://teletype.in/@a/b)"
+        "https://telegra.ph/QA-08-21 ПОСМОТРЕТЬ (https://telegra.ph/QA-08-21)"
     )
 
-    assert asked == ["https://teletype.in/@a/b"]
+    assert asked == ["https://telegra.ph/QA-08-21"]
     assert got.count("Требования: Python") == 1
 
 
 async def test_articles_are_written_in_the_order_they_are_linked(fetched):
     """Несколько статей дописываются в том порядке, в каком на них сослались."""
     asked, articles = fetched
-    articles["https://teletype.in/@a/first"] = "первая"
-    articles["https://teletype.in/@a/second"] = "вторая"
+    articles["https://telegra.ph/first-08-21"] = "первая"
+    articles["https://telegra.ph/second-08-21"] = "вторая"
 
     got, _whole = await linked_article.with_linked_articles(
-        "тут https://teletype.in/@a/first и тут https://teletype.in/@a/second"
+        "тут https://telegra.ph/first-08-21 и тут https://telegra.ph/second-08-21"
     )
 
-    assert asked == ["https://teletype.in/@a/first", "https://teletype.in/@a/second"]
+    assert asked == ["https://telegra.ph/first-08-21", "https://telegra.ph/second-08-21"]
     assert got.endswith("\n\nпервая\n\nвторая")
 
 
 async def test_an_address_without_an_article_leaves_the_text_whole(fetched):
     """Адрес, за которым статьи нет, недобором не считается.
 
-    Её снесли или адрес ведёт на страницу автора — второй раз лучше не
+    Её снесли или за ключом ничего нет — второй раз лучше не
     станет. Считай это недобором, и прогон заново у такой вакансии перестал
     бы обновлять текст навсегда.
     """
     asked, _articles = fetched
 
     got, whole = await linked_article.with_linked_articles(
-        "Senior QA https://teletype.in/@a/b"
+        "Senior QA https://telegra.ph/QA-08-21"
     )
 
-    assert asked == ["https://teletype.in/@a/b"]
-    assert got == "Senior QA https://teletype.in/@a/b"
+    assert asked == ["https://telegra.ph/QA-08-21"]
+    assert got == "Senior QA https://telegra.ph/QA-08-21"
     assert whole is True
 
 
@@ -114,13 +114,13 @@ async def test_a_site_that_did_not_answer_makes_the_text_short(fetched, monkeypa
         asked.append(url)
         raise httpx.ConnectError("сеть отвалилась")
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
 
     got, whole = await linked_article.with_linked_articles(
-        "Senior QA https://teletype.in/@a/b"
+        "Senior QA https://telegra.ph/QA-08-21"
     )
 
-    assert got == "Senior QA https://teletype.in/@a/b"
+    assert got == "Senior QA https://telegra.ph/QA-08-21"
     assert whole is False
 
 
@@ -137,10 +137,10 @@ async def test_the_log_names_what_the_site_answered_with(fetched, monkeypatch, c
         asked.append(url)
         raise httpx.ReadTimeout("")
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
 
     with caplog.at_level(logging.WARNING):
-        await linked_article.with_linked_articles("Senior QA https://teletype.in/@a/b")
+        await linked_article.with_linked_articles("Senior QA https://telegra.ph/QA-08-21")
 
     assert "ReadTimeout" in caplog.text
 
@@ -156,7 +156,7 @@ async def test_no_more_than_three_articles_are_fetched(fetched):
     а прогон заново у такого объявления перестал бы обновлять текст навсегда.
     """
     asked, articles = fetched
-    text = " ".join(f"https://teletype.in/@a/{n}" for n in range(6))
+    text = " ".join(f"https://telegra.ph/QA-{n}-08-21" for n in range(6))
 
     _got, whole = await linked_article.with_linked_articles(text)
 

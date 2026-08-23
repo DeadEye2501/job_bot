@@ -13,7 +13,7 @@ import logging
 
 import httpx
 
-from adapters import teletype
+from adapters import telegraph
 from backend.domain.spellings import dedupe_first_wins
 
 logger = logging.getLogger(__name__)
@@ -31,11 +31,11 @@ def _article_urls(text: str) -> list[str]:
     Один и тот же адрес попадается в посте дважды: словами и подписью кнопки.
     Скачивать его дважды незачем, а дописывать дважды — тем более.
 
-    Сравниваются адреса как есть, без приведения: у teletype ключ статьи
+    Сравниваются адреса как есть, без приведения: у Telegraph ключ статьи
     чувствителен к регистру, и схлопни мы его — два разных адреса слились бы
     в один.
     """
-    return dedupe_first_wins(teletype.ARTICLE_URL_RE.findall(text), key=lambda url: url)
+    return dedupe_first_wins(telegraph.ARTICLE_URL_RE.findall(text), key=lambda url: url)
 
 
 def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None:
@@ -48,10 +48,10 @@ def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None:
     Читает эту разницу человек, а не код: приговор её не разбирает, и всякая
     беда откладывает объявление одинаково. Отличить по одному отказу «сайт
     лежит до утра» от «сайт закрылся навсегда» всё равно нельзя, а вот понять,
-    почему teletype перестал отдавать статьи, — можно только отсюда.
+    почему Telegraph перестал отдавать статьи, — можно только отсюда.
     """
     logger.warning(
-        "teletype: %s не отдал страницу (%s: %s)",
+        "telegraph: %s не отдал страницу (%s: %s)",
         url, type(trouble).__name__, trouble,
     )
 
@@ -70,7 +70,7 @@ async def with_linked_articles(text: str) -> tuple[str, bool]:
 
     Ни адрес, за которым статьи нет вовсе, ни срез по числу статей недобором
     не считаются, и по одной причине: завтра лучше не станет. Статью снесли,
-    адрес ведёт на страницу автора, четвёртая ссылка никуда не денется — всё
+    за ключом ничего нет, четвёртая ссылка никуда не денется — всё
     это навсегда, и прогон заново у такой вакансии перестал бы обновлять текст
     до конца её дней.
     """
@@ -79,10 +79,10 @@ async def with_linked_articles(text: str) -> tuple[str, bool]:
         return text, True
     parts = [text]
     whole = True
-    async with teletype.make_client() as client:
+    async with telegraph.make_client() as client:
         for url in urls[:_MAX_ARTICLES]:
             try:
-                article = await teletype.fetch_article(client, url)
+                article = await telegraph.fetch_article(client, url)
             except httpx.HTTPError as e:
                 _blame_the_site(url, e)
                 whole = False
@@ -90,6 +90,6 @@ async def with_linked_articles(text: str) -> tuple[str, bool]:
             if article:
                 parts.append(article)
     logger.info(
-        "teletype: статей у объявления %d, дописано %d", len(urls), len(parts) - 1
+        "telegraph: статей у объявления %d, дописано %d", len(urls), len(parts) - 1
     )
     return "\n\n".join(parts), whole
