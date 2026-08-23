@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-from adapters import teletype
+from adapters import telegraph
 from backend.flows import parse as parse_mod
 from backend.flows import ingest, rerun
 from backend.flows import embeddings
@@ -27,7 +27,7 @@ from tests.dbio import all_rows, only_row, put
 from tests.factories import EPOCH, channel_row, vacancy_row
 from tests.fakes.telegram import post
 
-WITH_ARTICLE = "Senior QA https://teletype.in/@a/b"
+WITH_ARTICLE = "Senior QA https://telegra.ph/QA-08-21"
 """Пост, всё содержание которого вынесено в статью по ссылке."""
 
 
@@ -218,7 +218,7 @@ async def test_an_orphan_whose_article_arrived_is_judged_in_full(monkeypatch,
     async def fetch_article(_client, _url):
         return "Требования: Python"
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
     pipeline = await make_pipeline(WithMessages(post=post(42, text=WITH_ARTICLE)))
 
     assert await pipeline.recover_orphan_vacancies() == 1
@@ -243,7 +243,7 @@ async def test_a_dug_out_article_moves_the_fingerprint_too(monkeypatch,
     async def fetch_article(_client, _url):
         return "Требования: Python"
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
     pipeline = await make_pipeline(WithMessages(post=post(42, text=WITH_ARTICLE)))
 
     assert await pipeline.recover_orphan_vacancies() == 1
@@ -269,7 +269,7 @@ async def test_an_orphan_still_without_its_article_waits_on(monkeypatch,
     async def fetch_article(_client, _url):
         raise httpx.ConnectError("сеть отвалилась")
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
     pipeline = await make_pipeline(WithMessages(post=post(42, text=WITH_ARTICLE)))
 
     assert await pipeline.recover_orphan_vacancies() == 0
@@ -291,7 +291,7 @@ async def test_an_orphan_that_waited_too_long_is_judged_as_it_is(monkeypatch,
     async def fetch_article(_client, _url):
         raise httpx.ConnectError("сеть отвалилась")
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
     pipeline = await make_pipeline(WithMessages(post=post(42, text=WITH_ARTICLE)))
 
     assert await pipeline.recover_orphan_vacancies() == 1

@@ -16,7 +16,7 @@ import pytest
 
 import httpx
 
-from adapters import teletype
+from adapters import telegraph
 from backend.flows import embeddings, ingest
 from backend.flows import parse as parse_mod
 from tests.backend.fixtures.parse_stub import parse_into
@@ -166,13 +166,13 @@ async def test_a_linked_article_is_written_into_the_post(intake, monkeypatch):
     async def fetch_article(_client, url):
         return "Требования: Python"
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
 
     await ingest.ingest_post(
-        intake, 1, "jobs", post(10, text="Senior QA https://teletype.in/@a/b")
+        intake, 1, "jobs", post(10, text="Senior QA https://telegra.ph/QA-08-21")
     )
 
-    expected = "Senior QA https://teletype.in/@a/b\n\nТребования: Python"
+    expected = "Senior QA https://telegra.ph/QA-08-21\n\nТребования: Python"
     assert intake.saved == [(1, 10, expected)]
     assert intake.parsed == [(7, expected, "jobs", True)]
 
@@ -189,8 +189,8 @@ async def test_the_fingerprint_is_taken_from_the_whole_text(intake, monkeypatch)
     async def fetch_article(_client, _url):
         return "Требования: Python"
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
-    text = "Senior QA, контакты в описании https://teletype.in/@a/b"
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
+    text = "Senior QA, контакты в описании https://telegra.ph/QA-08-21"
 
     await ingest.ingest_post(
         intake,
@@ -205,7 +205,7 @@ async def test_the_fingerprint_is_taken_from_the_whole_text(intake, monkeypatch)
 
     assert intake.embedded == (
         "Senior QA, контакты (https://acme.test/jobs) в описании"
-        " https://teletype.in/@a/b\n\nТребования: Python"
+        " https://telegra.ph/QA-08-21\n\nТребования: Python"
     )
 
 
@@ -308,13 +308,13 @@ async def test_an_article_that_did_not_load_holds_the_verdict_back(
     async def fetch_article(_client, _url):
         raise httpx.ConnectError("сеть отвалилась")
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
 
     await ingest.ingest_post(
-        intake, 1, "jobs", post(10, text="Senior QA https://teletype.in/@a/b")
+        intake, 1, "jobs", post(10, text="Senior QA https://telegra.ph/QA-08-21")
     )
 
-    assert intake.saved == [(1, 10, "Senior QA https://teletype.in/@a/b")]
+    assert intake.saved == [(1, 10, "Senior QA https://telegra.ph/QA-08-21")]
     assert intake.parsed == []
 
 
@@ -330,12 +330,12 @@ async def test_a_repost_that_lost_its_article_holds_the_verdict_back_too(
     async def fetch_article(_client, _url):
         raise httpx.ConnectError("сеть отвалилась")
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
     intake.similar_id = 3
     intake.unparsed = True
 
     await ingest.ingest_post(
-        intake, 1, "jobs", post(10, text="Senior QA https://teletype.in/@a/b")
+        intake, 1, "jobs", post(10, text="Senior QA https://telegra.ph/QA-08-21")
     )
 
     assert intake.parsed == []

@@ -1,36 +1,37 @@
-"""Следствия, которые наблюдают тесты `adapters/teletype.py`.
+"""Следствия, которые наблюдают тесты `adapters/telegraph.py`.
 
 Страница собирается здесь короткой, но с той же разметкой, что у настоящей:
-teletype размечает заголовок и тело статьи по schema.org, и держится разбор
-именно за неё. Собери страницу без разметки — и проверки зеленели бы на
-поиске по именам стилей, которого в боевом коде нет.
+Telegraph кладёт статью целиком — вместе с заголовком — в тег `article`, и
+держится разбор именно за него. Собери страницу без этого тега — и проверки
+зеленели бы на поиске по именам стилей, которого в боевом коде нет.
 """
 
 import httpx
 import pytest
 
-from adapters import teletype
+from adapters import telegraph
 
 
 def _page(*, headline: str = "Senior Manual QA", body: str = "<p>Ищем QA</p>") -> str:
-    """Страница статьи в той разметке, в какой её отдаёт teletype."""
+    """Страница статьи в той разметке, в какой её отдаёт Telegraph."""
     return (
         "<html><body>"
-        f'<h1 itemprop="headline">{headline}</h1>'
-        f'<article itemprop="articleBody">{body}</article>'
+        '<article id="_tl_editor" class="tl_article_content">'
+        f"<h1>{headline}</h1><address></address>{body}"
+        "</article>"
         "</body></html>"
     )
 
 
 def _client(handler) -> httpx.AsyncClient:
-    """Клиент к поддельному teletype: обращения уходят в переданный обработчик."""
+    """Клиент к поддельному Telegraph: обращения уходят в переданный обработчик."""
     return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
 
 async def test_the_article_comes_back_with_its_headline():
     """Из страницы достаются и заголовок, и тело статьи."""
     async with _client(lambda _r: httpx.Response(200, text=_page())) as client:
-        got = await teletype.fetch_article(client, "https://teletype.in/@a/b")
+        got = await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
 
     assert got == "Senior Manual QA\n\nИщем QA"
 
@@ -43,43 +44,67 @@ async def test_the_article_body_keeps_its_lines():
     """
     body = "<ul><li>Python</li><li>SQL</li></ul>"
     async with _client(lambda _r: httpx.Response(200, text=_page(body=body))) as client:
-        got = await teletype.fetch_article(client, "https://teletype.in/@a/b")
+        got = await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
 
     assert got == "Senior Manual QA\n\nPython\nSQL"
 
 
 async def test_an_article_without_a_headline_comes_back_without_it():
-    """Статья без размеченного заголовка отдаётся одним телом.
+    """Статья без заголовка отдаётся одним телом.
 
     Пустой строки перед текстом при этом не появляется: в разборе она читалась
     бы как оборванный заголовок.
     """
-    page = '<html><body><article itemprop="articleBody">Ищем QA</article></body></html>'
+    page = (
+        "<html><body>"
+        '<article id="_tl_editor" class="tl_article_content"><p>Ищем QA</p></article>'
+        "</body></html>"
+    )
     async with _client(lambda _r: httpx.Response(200, text=page)) as client:
-        got = await teletype.fetch_article(client, "https://teletype.in/@a/b")
+        got = await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
 
     assert got == "Ищем QA"
 
 
-async def test_an_empty_article_gives_nothing():
-    """Размеченное, но пустое тело — та же пустота, что и его отсутствие.
+async def test_only_the_first_headline_leaves_the_body():
+    """Заголовком считается первый `h1`, остальное остаётся телом статьи.
+
+    Своих подзаголовков Telegraph размечает `h3` и `h4`, но вставить второй
+    `h1` в статью автору никто не мешает, и такой заголовок — часть текста,
+    а не второе название вакансии.
+    """
+    body = "<h1>Про компанию</h1><p>Ищем QA</p>"
+    async with _client(lambda _r: httpx.Response(200, text=_page(body=body))) as client:
+        got = await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+
+    assert got == "Senior Manual QA\n\nПро компанию\nИщем QA"
+
+
+async def test_an_article_of_one_headline_gives_nothing():
+    """Статья из одного заголовка — та же пустота, что и её отсутствие.
 
     Дописывать к объявлению один заголовок статьи незачем: он и так стоит в
     посте, а разбор примет повтор за второе название.
     """
     async with _client(lambda _r: httpx.Response(200, text=_page(body=""))) as client:
-        assert await teletype.fetch_article(client, "https://teletype.in/@a/b") is None
+        assert (
+            await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+            is None
+        )
 
 
 async def test_a_page_without_an_article_gives_nothing():
-    """Страница без размеченного тела статьи не даёт ничего.
+    """Страница без тега статьи не даёт ничего.
 
-    По адресу статьи может лежать страница автора или весть о том, что
-    статью снесли: объявление от этого объявлением быть не перестаёт.
+    По адресу статьи может лежать весть о том, что её снесли: объявление от
+    этого объявлением быть не перестаёт.
     """
-    page = "<html><body><h1>Автор</h1></body></html>"
+    page = "<html><body><h1>Статья не найдена</h1></body></html>"
     async with _client(lambda _r: httpx.Response(200, text=page)) as client:
-        assert await teletype.fetch_article(client, "https://teletype.in/@a") is None
+        assert (
+            await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+            is None
+        )
 
 
 @pytest.mark.parametrize(
@@ -107,35 +132,39 @@ async def test_a_site_that_did_not_answer_says_so(trouble):
 
     async with _client(handle) as client:
         with pytest.raises(httpx.HTTPError):
-            await teletype.fetch_article(client, "https://teletype.in/@a/b")
+            await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
 
 
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
         pytest.param(
-            "вся вакансия https://teletype.in/@courierus/OxPcuC1iLUU",
-            ["https://teletype.in/@courierus/OxPcuC1iLUU"],
+            "вся вакансия https://telegra.ph/Senior-Manual-QA-08-21",
+            ["https://telegra.ph/Senior-Manual-QA-08-21"],
             id="адрес словами",
         ),
         pytest.param(
-            "ПОСМОТРЕТЬ (https://teletype.in/@courierus/OxPcuC1iLUU)",
-            ["https://teletype.in/@courierus/OxPcuC1iLUU"],
+            "ПОСМОТРЕТЬ (https://telegra.ph/Senior-Manual-QA-08-21)",
+            ["https://telegra.ph/Senior-Manual-QA-08-21"],
             id="адрес за подписью ссылки",
         ),
         pytest.param(
-            "вся вакансия https://teletype.in/@courierus/OxPcuC1iLUU.",
-            ["https://teletype.in/@courierus/OxPcuC1iLUU"],
+            "вся вакансия https://telegra.ph/Senior-Manual-QA-08-21.",
+            ["https://telegra.ph/Senior-Manual-QA-08-21"],
             id="точка в конце предложения",
         ),
         pytest.param(
-            "тут https://teletype.in/@a/b, а ещё тут",
-            ["https://teletype.in/@a/b"],
+            "тут https://telegra.ph/QA-08-21, а ещё тут",
+            ["https://telegra.ph/QA-08-21"],
             id="запятая после адреса",
         ),
-        pytest.param("наш канал https://teletype.in/@courierus", [], id="страница автора"),
-        pytest.param("пишите @courierus", [], id="ник без адреса"),
-        pytest.param("https://habr.com/@a/b", [], id="чужой сайт"),
+        pytest.param(
+            "вся вакансия https://telegra.ph/QA-08-21#trebovaniya",
+            ["https://telegra.ph/QA-08-21#trebovaniya"],
+            id="якорь остаётся в адресе",
+        ),
+        pytest.param("наш сайт https://telegra.ph/", [], id="корень без статьи"),
+        pytest.param("https://habr.com/QA-08-21", [], id="чужой сайт"),
     ],
 )
 def test_which_addresses_count_as_an_article(text, expected):
@@ -144,7 +173,7 @@ def test_which_addresses_count_as_an_article(text, expected):
     Скобка отдельно: адрес спрятанной ссылки дописывают в текст именно в
     скобках, и утащенная в адрес закрывающая скобка вела бы в никуда.
     """
-    assert teletype.ARTICLE_URL_RE.findall(text) == expected
+    assert telegraph.ARTICLE_URL_RE.findall(text) == expected
 
 
 @pytest.mark.parametrize(
@@ -170,4 +199,7 @@ async def test_a_page_that_will_never_come_back_gives_nothing(code):
     страницы выглядела бы так же, и тест зеленел бы, не читая кода ответа.
     """
     async with _client(lambda _r: httpx.Response(code, text=_page())) as client:
-        assert await teletype.fetch_article(client, "https://teletype.in/@a/x") is None
+        assert (
+            await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+            is None
+        )

@@ -52,10 +52,10 @@
 - `SESSION_NAME` = `'job_bot'`
 - `SEND_LOCKED` = `False`
 
-### `adapters/teletype.py`
+### `adapters/telegraph.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `ARTICLE_URL_RE` = `re.compile('https?://teletype\\.in/@[^\\s)\\]/]+…`
+- `ARTICLE_URL_RE` = `re.compile('https?://telegra\\.ph/[^\\s)\\]]*[^\…`
 - `FETCH_TIMEOUT_SEC` = `20.0`
 - `_USER_AGENT` = `'Mozilla/5.0 (compatible; JobBot/1.0)'`
 - `_GONE_FOR_GOOD` = `frozenset({404, 410, 451})`
@@ -1352,7 +1352,7 @@
 
 ### `tests/backend/test_flows_new_vacancy.py`
 
-- `WITH_ARTICLE` = `'Senior QA https://teletype.in/@a/b'`
+- `WITH_ARTICLE` = `'Senior QA https://telegra.ph/QA-08-21'`
 
 ### `tests/backend/test_llm_cover_letter.py`
 

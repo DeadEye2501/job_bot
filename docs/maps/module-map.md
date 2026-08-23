@@ -100,14 +100,14 @@ Job Bot — single CLI entry point.
 - `def make_client(tg: TgAccountConfig) -> Client` (30)
 - `async def send_dm(client: Client, user: str | int, text: str, attachment: str | Path | None=None) -> int | None` (24)
 
-### `adapters/teletype.py` — 108 строк
+### `adapters/telegraph.py` — 120 строк
 
-Статья teletype: сходить по адресу и достать из страницы её текст.
+Статья Telegraph: сходить по адресу и достать из страницы её текст.
 
 Зависит от: —
 
 - `def make_client() -> httpx.AsyncClient` (7)
-- `def _article_text(html: str) -> str | None` (20)
+- `def _article_text(html: str) -> str | None` (28)
 - `async def fetch_article(client: httpx.AsyncClient, url: str) -> str | None` (24)
 
 ## alembic — 6 модулей
@@ -141,7 +141,7 @@ restore the answered vacancy (заглушка для сборки)
 - `async def run_async_migrations() -> None` (14)
 - `def run_migrations_online() -> None` (2)
 
-### `alembic/versions/aa4e0de05368_seed_initial_data.py` — 459 строк ⚠ подошёл к 300
+### `alembic/versions/aa4e0de05368_seed_initial_data.py` — 460 строк ⚠ подошёл к 300
 
 seed initial data
 
@@ -991,7 +991,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def looks_hallucinated(reason: str, raw_text: str, profile: CandidateProfile) -> str | None` (23)
 - `def breaks_reason_style(reason: str) -> str | None` (15)
 
-### `backend/llm/hr_reply.py` — 261 строк
+### `backend/llm/hr_reply.py` — 270 строк
 
 Разбор ответа HR: на каком этапе теперь отклик.
 
@@ -2687,15 +2687,15 @@ Runtime settings layer.
   - `async def build(applied_at, *, hr=None, answered_after=None, **overrides)` (24)
 - `async def rows_by_label(session, **kwargs) -> dict[str, dict]` (4)
 
-### `tests/backend/test_adapters_teletype.py` — 173 строк
+### `tests/backend/test_adapters_telegraph.py` — 205 строк
 
-Следствия, которые наблюдают тесты `adapters/teletype.py`.
+Следствия, которые наблюдают тесты `adapters/telegraph.py`.
 
 Зависит от: `adapters`
 
-Тестов: 8
+Тестов: 9
 
-- `def _page(*, headline: str='Senior Manual QA', body: str='<p>Ищем QA</p>') -> str` (8)
+- `def _page(*, headline: str='Senior Manual QA', body: str='<p>Ищем QA</p>') -> str` (9)
 - `def _client(handler) -> httpx.AsyncClient` (3)
 
 ### `tests/backend/test_bootstrap_schema.py` — 176 строк

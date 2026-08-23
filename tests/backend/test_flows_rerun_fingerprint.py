@@ -10,7 +10,7 @@
 за строкой и только вместе с ней.
 """
 
-from adapters import teletype
+from adapters import telegraph
 from backend.flows import embeddings as embeddings_mod
 from backend.flows import parse as parse_mod
 from backend.models import Vacancy
@@ -51,8 +51,8 @@ async def test_the_fingerprint_is_taken_from_the_whole_text(monkeypatch, rerunni
     async def fetch_article(_client, _url):
         return "Требования: Python"
 
-    monkeypatch.setattr(teletype, "fetch_article", fetch_article)
-    text = "Senior QA, контакты в описании https://teletype.in/@a/b"
+    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
+    text = "Senior QA, контакты в описании https://telegra.ph/QA-08-21"
     fresh = post(
         42,
         text=text,
@@ -64,7 +64,7 @@ async def test_the_fingerprint_is_taken_from_the_whole_text(monkeypatch, rerunni
 
     assert pipeline.embedded == [
         "Senior QA, контакты (https://acme.test/jobs) в описании"
-        " https://teletype.in/@a/b\n\nТребования: Python"
+        " https://telegra.ph/QA-08-21\n\nТребования: Python"
     ]
 
 
