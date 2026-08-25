@@ -19,11 +19,11 @@ from backend.domain.skill_names import skill_key
 from backend.domain.spellings import dedupe_first_wins
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
 from backend.llm.external import external_block
+from backend.incoming import normalize_enum
 from backend.llm.answers import (
     ONLY_JSON,
     json_object,
     log_unparseable,
-    normalize_enum,
     str_or_none,
 )
 from backend.payloads import ParsedCv, ParsedCvExperience, ParsedCvLanguage, ParsedCvProfile, ParsedCvSkill

@@ -11,7 +11,10 @@
 </script>
 
 <div class="pop-frame drop-panel cdd-panel" role="listbox" tabindex="-1">
-  {#each options as one (one)}
+  <!-- Ключ по месту, а не по значению: имя человека уникальным не бывает, и у
+       одного собеседника их трое с одним и тем же. Ключ по значению роняет
+       отрисовку на первом же тёзке — панель не появляется вовсе и молча. -->
+  {#each options as one, at (at)}
     <button
       class="cdd-option"
       class:active={one === value}

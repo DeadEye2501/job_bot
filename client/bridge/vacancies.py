@@ -10,11 +10,13 @@ from backend.repository import (
     profile_skills as skills_repo,
     vacancies_card,
     vacancies_list,
+    vacancies_new,
     vacancy_status,
 )
 from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
+from client.bridge.form_payloads import read_new_vacancy_fields
 from client.bridge.hub import Hub
-from client.bridge.refusals import NO_VACANCY
+from client.bridge.refusals import NAME_REQUIRED, NO_VACANCY
 from client.bridge.page import read_page
 from client.bridge.vacancy_actions import VacancyActions
 from client.bridge.vacancy_filter import read_vacancy_filter
@@ -233,5 +235,33 @@ class Vacancies(VacancyActions, VacancyLinks):
                     if await session.get(Vacancy, vacancy_id) is None:
                         raise Denied(NO_VACANCY, vacancy_id=vacancy_id)
             return {"vacancy_id": vacancy_id}
+
+        return reply(self._hub.runner, run())
+
+    def create(self, payload: dict) -> dict:
+        """Завести вакансию руками — из окна «Добавить вакансию».
+
+        Для найденного не в Telegram, а глазами: на бирже, в почте, по
+        наводке. Конвейер такую не принесёт никогда, а вести её по воронке
+        человеку надо тем же экраном.
+
+        Номер заведённой едет ответом тем же полем, каким отвечает заведение
+        человека и компании; список окно перечитывает следом само.
+
+        Заслон здесь, а не в репозитории: пустое название — это про форму, а
+        не про строку, и отвечать на него надо словами человеку.
+        """
+        try:
+            fields = read_new_vacancy_fields(payload)
+        except BAD_PAYLOAD as e:
+            return bad_fields("vacancies.create", e)
+        if not fields["title"]:
+            return denied(NAME_REQUIRED, action="create_vacancy")
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                async with session.begin():
+                    created_id = await vacancies_new.create_vacancy(session, fields)
+            return {"action": "create_vacancy", "created_id": created_id}
 
         return reply(self._hub.runner, run())

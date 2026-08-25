@@ -11,7 +11,12 @@ from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, reply
 from client.bridge.companies import create_company_row
 from client.bridge.hr import create_hr_row
 from client.bridge.refusals import NO_COMPANY, NO_HR, NO_VACANCY
-from client.bridge.pickers import COMPANY_PICKER, HR_PICKER, link_picker
+from client.bridge.pickers import (
+    COMPANY_PICKER,
+    HR_PICKER,
+    all_candidates,
+    link_picker,
+)
 from client.bridge.form_payloads import read_new_company_fields, read_new_hr_fields
 
 
@@ -70,6 +75,25 @@ class VacancyLinks:
     def company_picker(self, payload: dict) -> dict:
         """Список компаний для окна «Связать с компанией»."""
         return self._open_picker("company_picker", payload)
+
+    def create_options(self) -> dict:
+        """Кого предложить компанией и HR-ом в форме заведения вакансии.
+
+        Своим зовом, а не подборщиком привязки: тот отвечает ещё и на «кто
+        привязан сейчас», а у заводимой вакансии нет ни номера, ни связей.
+
+        Оба перечня одним ответом: форма показывает их рядом, и приезжай они
+        порознь, выбирать пришлось бы в наполовину пустой форме.
+        """
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                return {
+                    HR_PICKER.key: await all_candidates(session, HR_PICKER),
+                    COMPANY_PICKER.key: await all_candidates(session, COMPANY_PICKER),
+                }
+
+        return reply(self._hub.runner, run())
 
     def _open_picker(self, slot: str, payload: dict) -> dict:
         """Открыть подборщик одного предмета; чем предметы разнятся — в `_PICKING`."""

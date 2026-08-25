@@ -80,6 +80,7 @@ function eventText(kind, payload) {
     const channel = payload.channel ? `@${payload.channel}` : 'неизвестного канала';
     return `Поступила из канала ${channel}.`;
   }
+  if (kind === 'created_by_hand') return 'Заведена руками.';
   if (kind === 'parsed') return skipNote(payload.skip_reason) || 'Без замечаний.';
   if (kind === 'auto_send') {
     return `Авто-отправка: ${SEND_FAILS[payload.reason] || payload.reason}.`;

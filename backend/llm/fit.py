@@ -19,10 +19,10 @@ from adapters.lm_chat import ChatRequest, chat
 
 from backend.payloads import FitValidation, ParsedVacancy
 
+from backend.incoming import normalize_enum
 from backend.llm.answers import (
     ONLY_JSON,
     json_object,
-    normalize_enum,
     read_with_a_second_try,
     str_or_none,
 )

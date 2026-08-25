@@ -37,6 +37,7 @@ class PickerSubject:
     rows: Callable
     row_to_dict: Callable
     id_of: Callable
+    short_row: Callable
     current: str
     linked_id: Callable
 
@@ -46,6 +47,11 @@ HR_PICKER = PickerSubject(
     rows=hr_list.list_hr_with_counts,
     row_to_dict=_hr_picker_row_to_dict,
     id_of=lambda row: row.hr.id,
+    short_row=lambda row: {
+        "id": row.hr.id,
+        "name": row.hr.name,
+        "telegram_username": row.hr.telegram_username,
+    },
     current="current_hr_id",
     linked_id=lambda vacancy: vacancy.hr_id,
 )
@@ -55,9 +61,30 @@ COMPANY_PICKER = PickerSubject(
     rows=companies_list.list_companies_with_counts,
     row_to_dict=_company_picker_row_to_dict,
     id_of=lambda row: row.company.id,
+    short_row=lambda row: {"id": row.company.id, "name": row.company.name},
     current="current_company_id",
     linked_id=lambda vacancy: vacancy.company_id,
 )
+
+
+async def all_candidates(session, subject: PickerSubject) -> list[dict]:
+    """Номер и имя каждой строки предмета — форме заведения вакансии.
+
+    Третья дорога к той же таблице, кроме двух подборщиков ниже: форма
+    выбирает из тех же перечней, но привязанного у неё нет и быть не может —
+    вакансии ещё нет вовсе. Спроси она подборщик привязки, ей пришлось бы
+    придумать номер несуществующей записи.
+
+    Строка здесь своя, а не общая с подборщиками: тем нужна вся карточка, и у
+    человека в ней едет картинка профиля строкой в кодировке base64. Форме
+    видны имя да ник, и полсотни картинок ради выпадающего списка она везла бы
+    мегабайтами — по дороге, которой их не свезти.
+
+    Ник у человека несущий: имя уникальным не бывает, и тёзок в подсказке
+    различают только по нему.
+    """
+    rows, _ = await subject.rows(session, search=None)
+    return [subject.short_row(row) for row in rows]
 
 
 async def merge_picker(

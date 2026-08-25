@@ -7,7 +7,7 @@
 
 import pytest
 
-from backend.llm.answers import normalize_enum
+from backend.incoming import normalize_enum
 
 
 @pytest.mark.parametrize(

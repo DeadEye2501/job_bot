@@ -201,3 +201,48 @@ export function sortKey(label) {
 export function shownStack(stack) {
   return { chips: stack.slice(0, CHIPS), more: Math.max(0, stack.length - CHIPS) };
 }
+
+/** Пустой черновик формы заведения вакансии руками.
+ *
+ * Ключи — те же, что читает мост (`bridge/form_payloads.read_new_vacancy_fields`):
+ * разъедься имена, набранное уехало бы в пустоту, и человек узнал бы об этом
+ * только по пустой карточке.
+ *
+ * Грейд и формат пусты, а не выставлены первым значением ряда: в объявлении
+ * их называют не всегда, а подставленный «junior» соврал бы про вакансию и
+ * увёл бы её из выдачи по грейду.
+ *
+ * У компании и человека полей по два: номер карточки уезжает на мост, имя
+ * стоит в поле с подсказкой. Одним не обойтись — мост связывает вакансию по
+ * номеру, а человек набирает слова, и незнакомое имя номера ещё не имеет.
+ */
+export function blankVacancy() {
+  return {
+    title: '',
+    company_id: null,
+    company_name: '',
+    hr_id: null,
+    hr_name: '',
+    source_url: '',
+    grade: '',
+    remote: '',
+    salary_min: '',
+    salary_max: '',
+    salary_currency: '',
+    country: '',
+    city: '',
+    stack: [],
+    description: '',
+    notes: '',
+  };
+}
+
+/** Названа ли вакансия, которую заводят руками.
+ *
+ * Одно название: им её называют в списке, по нему её ищут, и без него строка
+ * выглядит пустой. То же правило держит и мост (`bridge/vacancies.create`);
+ * здесь оно стоит затем, чтобы окно не отправляло заведомо отказной вопрос.
+ */
+export function vacancyNamed(draft) {
+  return Boolean(draft.title.trim());
+}

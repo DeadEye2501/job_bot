@@ -16,6 +16,7 @@
 
 import { blankCompany, companyNamed } from './companies.js';
 import { blankPerson, named } from './people.js';
+import { blankVacancy, vacancyNamed } from './vacancies.js';
 
 /** Обвязка формы заведения по роду карточки.
  *
@@ -27,7 +28,6 @@ export const NEW_CARD = {
   hr: {
     icon: 'person_add',
     title: 'Новый человек',
-    subtitle: 'Хотя бы имя, ник или номер учётной записи — иначе карточку потом не найти.',
     busyLabel: 'Завожу…',
     done: 'Человек заведён',
     searchHint: 'Поиск по имени, @username...',
@@ -37,11 +37,21 @@ export const NEW_CARD = {
   company: {
     icon: 'domain_add',
     title: 'Новая компания',
-    subtitle: 'Название обязательно, остальное можно дописать потом.',
     busyLabel: 'Завожу…',
     done: 'Компания заведена',
     searchHint: 'Поиск по названию, сайту, написаниям...',
     blank: blankCompany,
     named: companyNamed,
+  },
+  // Подсказки поиска у вакансии нет: поле над её списком подписано своим
+  // экраном, а не формой заведения. Пустая строка тут была бы полем без
+  // сегодняшнего потребителя.
+  vacancy: {
+    icon: 'post_add',
+    title: 'Новая вакансия',
+    busyLabel: 'Завожу…',
+    done: 'Вакансия заведена',
+    blank: blankVacancy,
+    named: vacancyNamed,
   },
 };

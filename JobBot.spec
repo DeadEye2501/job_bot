@@ -40,9 +40,6 @@ datas = [
     # README/config.py, а заведённая из исходников считается доведённой.
     ('alembic/versions/e560edf8b958_init.py', 'alembic/versions'),
     ('alembic/bundled/aa4e0de05368_seed_initial_data.py', 'alembic/versions'),
-    # Восстановление единственной живой переписки — тоже личные данные, и в
-    # сборку от неё едет такая же заглушка с тем же номером ревизии.
-    ('alembic/bundled/c3f8a1d47b02_restore_answered_vacancy.py', 'alembic/versions'),
 ]
 
 hiddenimports = [

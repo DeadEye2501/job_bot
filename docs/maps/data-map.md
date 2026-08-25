@@ -69,13 +69,6 @@
 - `branch_labels: Union[str, Sequence[str], None]` = `None`
 - `depends_on: Union[str, Sequence[str], None]` = `None`
 
-### `alembic/bundled/c3f8a1d47b02_restore_answered_vacancy.py`
-
-- `revision: str` = `'c3f8a1d47b02'`
-- `down_revision: Union[str, Sequence[str], None]` = `'aa4e0de05368'`
-- `branch_labels: Union[str, Sequence[str], None]` = `None`
-- `depends_on: Union[str, Sequence[str], None]` = `None`
-
 ### `alembic/env.py`
 
 - `config` = `context.config`
@@ -98,20 +91,6 @@
 - `EMBED_LLM_SECRET` = `словарь из 3`
 - `BOT_STATE_ROWS` = `набор из 1`
 - `TELEGRAM_CHANNEL_ROWS` = `набор из 16`
-
-### `alembic/versions/c3f8a1d47b02_restore_answered_vacancy.py`
-
-- `revision: str` = `'c3f8a1d47b02'`
-- `down_revision: Union[str, Sequence[str], None]` = `'aa4e0de05368'`
-- `branch_labels: Union[str, Sequence[str], None]` = `None`
-- `depends_on: Union[str, Sequence[str], None]` = `None`
-- `HR_ROWS` = `набор из 1`
-- `COMPANY_ROWS` = `набор из 1`
-- `VACANCY_ROWS` = `набор из 1`
-- `MESSAGE_ROWS` = `набор из 4`
-- `HISTORY_ROWS` = `набор из 2`
-- `EVENT_ROWS` = `набор из 4`
-- `CHANNEL_ROW` = `словарь из 6`
 
 ### `alembic/versions/e560edf8b958_init.py`
 
@@ -1058,6 +1037,11 @@
 
 - `_CHANNEL_VAC_STATUS_RANK: dict[str, int]` = `словарь из 11`
 
+### `backend/repository/vacancies_new.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `HAND_MADE` = `'created_by_hand'`
+
 ### `backend/repository/vacancy_status.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -1208,6 +1192,7 @@
   - `rows: Callable`
   - `row_to_dict: Callable`
   - `id_of: Callable`
+  - `short_row: Callable`
   - `current: str`
   - `linked_id: Callable`
 - `HR_PICKER` = `PickerSubject(key='hrs', rows=hr_list.list_hr_wi…`

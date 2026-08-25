@@ -4,7 +4,6 @@
 // строки и признаки. Ни моста, ни разметки этот файл не знает.
 
 import { fillPercent } from './chosen.js';
-import { matching } from './search.js';
 
 /** Чем подписано пустое поле имени модели.
  *
@@ -151,15 +150,6 @@ export function mirrored(chat, embed) {
   return { base_url: chat.base_url, api_key: chat.api_key, model: embed.model };
 }
 
-/** Имена моделей, подходящие набранному в поле.
- *
- * Отбор здесь, а не в самой подсказке: показывать переданное — вся её работа, а
- * знание о том, что это за имена и как их ищут, принадлежит тому, кто их
- * получил у поставщика.
- */
-export function matchingModels(models, typed) {
-  return matching(models, typed);
-}
 
 /** Плашка сеанса Telegram в шапке секции.
  *

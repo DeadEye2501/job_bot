@@ -7,7 +7,8 @@ import time
 import httpx
 
 from adapters.lm_chat import ChatRequest, chat
-from backend.llm.answers import ONLY_JSON, json_object, log_unparseable, normalize_enum
+from backend.incoming import normalize_enum
+from backend.llm.answers import ONLY_JSON, json_object, log_unparseable
 from backend.llm.external import external_block
 from backend.llm.rules import FACT_KINDS, NOT_IN_THE_PROFILE
 from backend.incoming import str_list

@@ -12,10 +12,10 @@ from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.domain.telegram_identity import normalize_username
 from backend.payloads import ParsedVacancy
 
+from backend.incoming import normalize_enum
 from backend.llm.answers import (
     ONLY_JSON,
     json_object,
-    normalize_enum,
     read_with_a_second_try,
     str_or_none,
 )

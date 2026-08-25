@@ -1,10 +1,11 @@
 <script>
-  // Окно заведения карточки контакта — человека или компании.
+  // Окно заведения карточки — человека, компании или вакансии.
   //
-  // Своим объявлением, потому что окон таких три: «Добавить» на вкладке людей,
-  // то же на вкладке компаний и заведение на ходу из подборщика связи вакансии.
-  // Слова у них давно общие (`state/new_card.js`), а обвязка была написана
-  // трижды — и разъезжаться теперь стала бы она.
+  // Своим объявлением, потому что окон таких четыре: «Добавить» на вкладке
+  // людей, то же на вкладке компаний, заведение на ходу из подборщика связи
+  // вакансии и «Добавить вакансию» над её списком. Слова у них общие
+  // (`state/new_card.js`), а обвязка была написана в каждом своя — и
+  // разъезжаться теперь стала бы она.
   //
   // Набор полей выбирается здесь по роду: снаружи он и так не нужен никому,
   // кроме этого окна, а выбор в трёх местах разошёлся бы так же, как слова.
@@ -16,8 +17,22 @@
   import AskDialog from './AskDialog.svelte';
   import NewCompanyFields from './NewCompanyFields.svelte';
   import NewPersonFields from './NewPersonFields.svelte';
+  import NewVacancyFields from './NewVacancyFields.svelte';
 
-  let { kind, draft, busy, ready, onconfirm, oncancel } = $props();
+  // Подсказки и приём набранного нужны одной форме из трёх — вакансии: она
+  // называет компанию и человека словами, а узнаёт их и заводит тот, кто
+  // держит мост. У человека и компании подсказывать нечему.
+  let {
+    kind,
+    draft,
+    busy,
+    ready,
+    options = null,
+    oncompany = null,
+    onhr = null,
+    onconfirm,
+    oncancel,
+  } = $props();
 
   const form = $derived(NEW_CARD[kind]);
 </script>
@@ -25,7 +40,6 @@
 <AskDialog
   icon={form.icon}
   title={form.title}
-  subtitle={form.subtitle}
   confirmLabel="Создать"
   busyLabel={form.busyLabel}
   {busy}
@@ -35,7 +49,9 @@
 >
   {#if kind === 'hr'}
     <NewPersonFields {draft} />
-  {:else}
+  {:else if kind === 'company'}
     <NewCompanyFields {draft} />
+  {:else}
+    <NewVacancyFields {draft} {options} {oncompany} {onhr} />
   {/if}
 </AskDialog>

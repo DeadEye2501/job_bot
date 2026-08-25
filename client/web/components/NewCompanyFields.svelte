@@ -10,6 +10,7 @@
   //
   // Черновик правится на месте: он приходит своим объектом от того, кто его
   // потом и отправит.
+  import DraftChips from './DraftChips.svelte';
   import DraftNotes from './DraftNotes.svelte';
 
   let { draft } = $props();
@@ -27,10 +28,8 @@
   placeholder="Сайт / домен (опционально)"
   bind:value={draft.website}
 />
-<input
-  class="input"
-  maxlength="300"
-  placeholder="Алиасы через запятую (опционально)"
-  bind:value={draft.aliases}
-/>
+<!-- Написания набирают по одному, как в карточке компании: их сверяют
+     поштучно, и набранные одной строкой они читались бы как одно длинное
+     написание, под которым компания не приходит никогда. -->
+<DraftChips {draft} field="aliases" caption="Алиасы:" />
 <DraftNotes {draft} />

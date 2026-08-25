@@ -9,8 +9,10 @@
 ответственности сосед у чтения один — `payload.py` с `choices.py`.
 """
 
+from backend.domain.salary import currency_sign
+from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.domain.telegram_identity import typed_username
-from backend.incoming import int_or_none, str_list, text_or_none
+from backend.incoming import int_or_none, normalize_enum, str_list, text_or_none
 
 
 def read_toggle(
@@ -33,22 +35,32 @@ def read_toggle(
     )
 
 
-def read_company_spellings(raw) -> list[str]:
-    """Написания компании из нагрузки формы.
+def _comma_list(raw) -> list[str]:
+    """Набор, набранный одной строкой через запятую либо пришедший списком.
 
-    Приходят с одного экрана строкой через запятую, с другого — готовым
-    списком, и читаются оба: список, прочитанный как строка, лёг бы в
-    колонку одним куском вида «['ООО Контур']», и ни одно написание не
-    нашлось бы при сведении компаний.
-
-    Своего здесь только разбор строки; дальше читает `str_list` — то же
-    объявление, которым читают этот список и обе стороны в репозитории.
-    Пустые, пробельные и не-строки выпадают там, и это разъезжалось: здесь
-    число приводилось к строке и становилось написанием компании.
+    Формы шлют такие наборы двумя видами: список, прочитанный как строка,
+    лёг бы в колонку одним куском вида «['ООО Контур']». Своего здесь только
+    разбор строки; дальше читает `str_list` — то же объявление, которым эти
+    списки читают обе стороны в репозитории. Пустые, пробельные и не-строки
+    выпадают там.
     """
     if isinstance(raw, str):
         raw = raw.split(",")
     return str_list(raw)
+
+
+def read_company_spellings(raw) -> list[str]:
+    """Написания компании из нагрузки формы.
+
+    Приходят с одного экрана строкой через запятую, с другого — готовым
+    списком, и читаются оба: не сойдись это, ни одно написание не нашлось бы
+    при сведении компаний.
+
+    Имя оставлено своё, хотя тело общее со стеком вакансии: читают его
+    подборщик связи и форма компании, и увидеть на шве им надо, что
+    просеиваются здесь именно написания.
+    """
+    return _comma_list(raw)
 
 
 def read_new_company_fields(payload: dict) -> dict:
@@ -111,5 +123,51 @@ def read_new_hr_fields(payload: dict) -> dict:
         "name": text_or_none(payload.get("name")),
         "telegram_username": username,
         "telegram_user_id": None if raw_user_id in (None, "") else int(raw_user_id),
+        "notes": text_or_none(payload.get("notes")),
+    }
+
+
+def _slashed(country: str | None, city: str | None) -> str | None:
+    """Страна и город одной строкой — так же, как их пишет разбор объявления.
+
+    Косая черта значит «страна и город»: висящая в конце, она читалась бы как
+    потерянный город, поэтому одна названная половина стоит сама по себе.
+    Разойдись это написание с тем, что кладёт разбор, отбор и статистика
+    считали бы одно место двумя разными.
+    """
+    named = [part for part in (country, city) if part]
+    return "/".join(named) if named else None
+
+
+def read_new_vacancy_fields(payload: dict) -> dict:
+    """Поля новой вакансии из нагрузки формы «добавить вакансию».
+
+    Ключи названы колонками `Vacancy` затем, что репозиторий кладёт
+    прочитанное в строку одним объектом: второе написание того же перечня
+    разъехалось бы с первым молча.
+
+    Название отдаётся строкой, а не пустотой, — как и у компании: слот
+    отвечает на пустое «Название обязательно». Компания и человек приезжают
+    номерами: их выбирают из заведённых карточек, и записанное строкой имя не
+    связало бы вакансию ни с чьей.
+
+    Чем просеяно и приведено остальное, сказано у тех, кто это делает:
+    `normalize_enum`, `currency_sign` и `_slashed`.
+    """
+    return {
+        "title": text_or_none(payload.get("title")) or "",
+        "company_id": int_or_none(payload.get("company_id")),
+        "hr_id": int_or_none(payload.get("hr_id")),
+        "source_url": text_or_none(payload.get("source_url")),
+        "location": _slashed(
+            text_or_none(payload.get("country")), text_or_none(payload.get("city"))
+        ),
+        "remote": normalize_enum(payload.get("remote"), WORK_FORMATS),
+        "grade": normalize_enum(payload.get("grade"), GRADES),
+        "salary_min": int_or_none(payload.get("salary_min")),
+        "salary_max": int_or_none(payload.get("salary_max")),
+        "salary_currency": currency_sign(text_or_none(payload.get("salary_currency"))),
+        "stack": _comma_list(payload.get("stack")),
+        "description": text_or_none(payload.get("description")),
         "notes": text_or_none(payload.get("notes")),
     }

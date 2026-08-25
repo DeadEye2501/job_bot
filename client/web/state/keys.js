@@ -60,6 +60,10 @@ export function opened(window_) {
  */
 export function modalPress(event, window_, { close, confirm = null }) {
   if (OPEN.at(-1) !== window_) return;
+  // Нажатие, уже разобранное тем, что стоит внутри окна, окну не достаётся:
+  // Escape в наборе пилюли отменяет пилюлю, и доехав до окна, он закрыл бы
+  // форму целиком — вместе со всем набранным.
+  if (event.defaultPrevented) return;
   const said = modalKey(event);
   if (said === 'close') close();
   else if (said === 'confirm' && confirm) confirm();

@@ -52,7 +52,7 @@ export function companyTitle(company) {
  * набор полей каждый раз: черновик правят на месте.
  */
 export function blankCompany() {
-  return { name: '', website: '', aliases: '', notes: '' };
+  return { name: '', website: '', aliases: [], notes: '' };
 }
 
 /** Есть ли чем назвать компанию, которую заводят руками.
