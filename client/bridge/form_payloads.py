@@ -167,7 +167,11 @@ def read_new_vacancy_fields(payload: dict) -> dict:
         "salary_min": int_or_none(payload.get("salary_min")),
         "salary_max": int_or_none(payload.get("salary_max")),
         "salary_currency": currency_sign(text_or_none(payload.get("salary_currency"))),
-        "stack": _comma_list(payload.get("stack")),
+        # Двумя половинами, как их набирают двумя рядами пилюль: по ним
+        # считается балл, и весят они по-разному. В колонку `stack` их
+        # складывает репозиторий — там же, где это делает разбор поста.
+        "stack_required": _comma_list(payload.get("stack_required")),
+        "stack_preferred": _comma_list(payload.get("stack_preferred")),
         "description": text_or_none(payload.get("description")),
         "notes": text_or_none(payload.get("notes")),
     }

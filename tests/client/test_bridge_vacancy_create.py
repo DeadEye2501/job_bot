@@ -6,7 +6,7 @@
 """
 
 from tests.dbio import put
-from tests.factories import company_row, hr_row
+from tests.factories import company_row, hr_row, profile_row, profile_skill_row
 
 
 async def created(ask, api, **fields) -> int:
@@ -18,6 +18,18 @@ async def created(ask, api, **fields) -> int:
     answer = await ask(api.vacancies.create, {"title": "Python-разработчик", **fields})
     assert "ok" in answer, answer
     return answer["ok"]["created_id"]
+
+
+async def profile_knowing(session_factory, name: str, level: int) -> None:
+    """Анкета, знающая один навык названного уровня.
+
+    Своим телом по тому же доводу, что и `created` выше: балл считают почти
+    все проверки ниже, и завод анкеты, переписанный в каждой, разъехался бы с
+    тем, что читает подсчёт.
+    """
+    profile = profile_row()
+    await put(session_factory, profile)
+    await put(session_factory, profile_skill_row(profile.id, name, level=level))
 
 
 async def test_a_hand_made_vacancy_shows_up_in_the_list(api, ask):
@@ -63,14 +75,82 @@ async def test_a_vacancy_without_a_title_is_refused(api, ask):
 async def test_a_stack_collected_by_chips_arrives_as_a_list(api, ask):
     """Стек, собранный пилюлями, доезжает до карточки списком.
 
-    Пустые пилюли выпадают по дороге: их набирают и бросают, а в карточке
-    пустой чип выглядел бы потерянным названием.
+    Рядов в форме два, а колонка одна: карточка, поиск и статистика читают
+    стек целиком, и делить его им незачем. Пустые пилюли выпадают по дороге:
+    их набирают и бросают, а в карточке пустой чип выглядел бы потерянным
+    названием. Пустым бывает не только пробел: у «///» и «-» пусто выходит
+    имя навыка, которым его сравнивают, и такая пилюля в карточке ничего не
+    говорит, а отбору по стеку врёт.
     """
-    vacancy_id = await created(ask, api, stack=["Python", "FastAPI", "  "])
+    vacancy_id = await created(
+        ask,
+        api,
+        stack_required=["Python", "  ", "///"],
+        stack_preferred=["FastAPI", " ", "-"],
+    )
 
     answer = await ask(api.vacancies.detail, vacancy_id)
 
     assert [one["name"] for one in answer["ok"]["vacancy"]["stack"]] == ["Python", "FastAPI"]
+
+
+async def test_a_hand_made_vacancy_is_scored_by_the_profile(api, ask, session_factory):
+    """Заведённой руками вакансии балл считают так же, как найденной ботом.
+
+    Список сортируют и отбирают по баллу, и строка без него оседает в хвосте
+    рядом с теми, у кого разбор не удался: человек завёл бы вакансию и не
+    нашёл её там, где ищет подходящие.
+    """
+    await profile_knowing(session_factory, "Python", 3)
+
+    vacancy_id = await created(ask, api, stack_required=["Python"])
+
+    answer = await ask(api.vacancies.detail, vacancy_id)
+    assert answer["ok"]["vacancy"]["score"] == 3
+
+
+async def test_the_second_row_of_chips_weighs_less_than_the_first(
+    api, ask, session_factory
+):
+    """Незнакомое в дополнительных не наказывает, а в основных — наказывает.
+
+    Ради этого различия рядов в форме и два: требование незнакомого опускает
+    вакансию ниже той, что не требует ничего, а названное плюсом о пригодности
+    не говорит вовсе.
+    """
+    await profile_knowing(session_factory, "Python", 3)
+
+    lenient = await created(ask, api, stack_preferred=["Rust"])
+    strict = await created(ask, api, stack_required=["Rust"])
+    known = await created(ask, api, stack_preferred=["Python"])
+
+    assert (await ask(api.vacancies.detail, lenient))["ok"]["vacancy"]["score"] == 0
+    assert (await ask(api.vacancies.detail, strict))["ok"]["vacancy"]["score"] == -1
+    # Знакомый навык в дополнительных стоит на балл меньше: не будь этой
+    # проверки, потерянная по дороге вторая половина осталась бы незамеченной —
+    # у незнакомого и у потерянного балл одинаковый.
+    assert (await ask(api.vacancies.detail, known))["ok"]["vacancy"]["score"] == 2
+
+
+async def test_a_skill_typed_into_both_rows_counts_once(api, ask, session_factory):
+    """Навык, набранный в оба ряда, считается один раз и чипом рисуется один.
+
+    Ряды стоят рядом, подписи у них короткие, и один и тот же навык попадает в
+    оба легко. Засчитайся он дважды — вакансия с одним знакомым инструментом
+    получила бы балл, будто их два, и перепрыгнула бы порог раньше тех, кто
+    его заслужил. У найденной ботом от этого стоит заслон в наставлении, и
+    правило здесь то же: повтор остаётся в обязательных. Одинаковыми при этом
+    считаются написания, а не буквы: «python» и «PYTHON» — тот же навык.
+    """
+    await profile_knowing(session_factory, "Python", 3)
+
+    vacancy_id = await created(
+        ask, api, stack_required=["Python", "python"], stack_preferred=["PYTHON"]
+    )
+
+    answer = await ask(api.vacancies.detail, vacancy_id)
+    assert [one["name"] for one in answer["ok"]["vacancy"]["stack"]] == ["Python"]
+    assert answer["ok"]["vacancy"]["score"] == 3
 
 
 async def test_an_unknown_grade_does_not_reach_the_card(api, ask):

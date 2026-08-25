@@ -71,6 +71,27 @@ function screen() {
   return host;
 }
 
+/** Ряд пилюль с названной подписью: рядов в форме несколько, и различает их
+ *  человек тоже подписью. */
+function chipRow(page, caption) {
+  return [...page.querySelectorAll('.captioned-field')].find(
+    (one) => one.querySelector('.field-caption')?.textContent.trim() === caption,
+  );
+}
+
+/** Набрать пилюлю в названном ряду так, как её набирают руками. */
+async function typeChip(row, text) {
+  row.querySelector('.chip-add').click();
+  await settled();
+  const input = row.querySelector('.chip-input');
+  input.value = text;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+  );
+  await settled();
+}
+
 describe('живой экран вакансий', () => {
   it('открытая форма подсказывает заведённых людей', async () => {
     const page = screen();
@@ -141,6 +162,29 @@ describe('живой экран вакансий', () => {
     expect(SENT[0].company_name).toBe('Acme');
   });
 
+  it('пилюли двух рядов уезжают на мост двумя списками', async () => {
+    // Ряды весят по-разному: незнакомое в основных отнимает балл, в
+    // дополнительных не стоит ничего. Слейся они в один список по дороге,
+    // вакансия получила бы чужой балл, и увидеть это в форме было бы нечем.
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+
+    const title = page.querySelector('input[placeholder="Название (обязательно)"]');
+    title.value = 'Python-разработчик';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+
+    await typeChip(chipRow(page, 'Must:'), 'Python');
+    await typeChip(chipRow(page, 'Nice:'), 'Docker');
+
+    [...page.querySelectorAll('button')].find((one) => one.textContent.trim() === 'Создать').click();
+    await settled();
+
+    expect(SENT[0].stack_required).toEqual(['Python']);
+    expect(SENT[0].stack_preferred).toEqual(['Docker']);
+  });
+
   it('Escape в наборе пилюли отменяет пилюлю, а не форму', async () => {
     // Окно слушает Escape окном, а пилюля — своим полем. Не разбери они, кому
     // нажатие досталось, человек терял бы всю набранную форму, передумав
@@ -150,7 +194,7 @@ describe('живой экран вакансий', () => {
     page.querySelector('button[title="Добавить вакансию"]').click();
     await settled();
 
-    [...page.querySelectorAll('button')].find((one) => one.textContent.trim() === '+').click();
+    chipRow(page, 'Must:').querySelector('.chip-add').click();
     await settled();
 
     const chip = page.querySelector('.chip-input');

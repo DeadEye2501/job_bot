@@ -70,8 +70,18 @@
      её одной строкой значило бы просить его склеить то, что мост разберёт
      обратно. -->
 <div class="field-line">
-  <input class="input" inputmode="numeric" placeholder="От" bind:value={draft.salary_min} />
-  <input class="input" inputmode="numeric" placeholder="До" bind:value={draft.salary_max} />
+  <input
+    class="input"
+    inputmode="numeric"
+    placeholder="Зарплата от"
+    bind:value={draft.salary_min}
+  />
+  <input
+    class="input"
+    inputmode="numeric"
+    placeholder="Зарплата до"
+    bind:value={draft.salary_max}
+  />
   <!-- Валюту набирают словом: «usd», «руб», «долларов» — приводит её мост тем
        же разбором, каким читает зарплату из объявления. -->
   <input class="input" placeholder="Валюта" bind:value={draft.salary_currency} />
@@ -85,7 +95,11 @@
   <input class="input" placeholder="Город" bind:value={draft.city} />
 </div>
 
-<DraftChips {draft} field="stack" caption="Скилы:" />
+<!-- Два ряда, а не один: делит их вес, а не вид — балл считают по требуемому
+     строже, чем по названному плюсом. Подписи взяты из языка найма: «must» и
+     «nice» короче любой русской пары и не сдвигают пилюли вправо. -->
+<DraftChips {draft} field="stack_required" caption="Must:" />
+<DraftChips {draft} field="stack_preferred" caption="Nice:" />
 
 <textarea class="textarea" placeholder="Описание" bind:value={draft.description}></textarea>
 <DraftNotes {draft} />

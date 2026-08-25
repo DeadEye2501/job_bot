@@ -155,7 +155,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 122 модулей
+## backend — 123 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -423,17 +423,17 @@ First-run bootstrap: ensure DB schema exists.
 - `def _scale(marker: str | None) -> int` (5)
 - `def currency_sign(s: str | None) -> str | None` (20)
 
-### `backend/domain/scoring.py` — 107 строк
+### `backend/domain/scoring.py` — 112 строк
 
 Оценка вакансии по навыкам анкеты.
 
-Зависит от: `backend.domain.skill_names`, `backend.models`, `backend.payloads`
+Зависит от: `backend.domain.skill_names`, `backend.models`
 
 - `def _build_skill_level_lookup(skills: list[ProfileSkill]) -> dict[str, int]` (27)
 - `def build_skill_lookup(skills: list[ProfileSkill]) -> set[str]` (10)
 - `def _required_points(level_lookup: dict[str, int], item: object) -> int` (10)
 - `def _preferred_points(level_lookup: dict[str, int], item: object) -> int` (10)
-- `def score_parsed(parsed: ParsedVacancy, skills: list[ProfileSkill]) -> int` (31)
+- `def score_stack(stack_required: list[str], stack_preferred: list[str], skills: list[ProfileSkill]) -> int` (37)
 
 ### `backend/domain/skill_names.py` — 57 строк
 
@@ -451,6 +451,15 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: —
 
 - `def dedupe_first_wins(items: Iterable[T], key: Callable[[T], str], seen: set[str] | None=None) -> list[T]` (38)
+
+### `backend/domain/stack.py` — 43 строк
+
+Стек вакансии: как две его половины становятся одной колонкой.
+
+Зависит от: `backend.domain.skill_names`, `backend.domain.spellings`
+
+- `def joined_stack(required: list[str], preferred: list[str]) -> list[str]` (8)
+- `def deduped_halves(required: list[str], preferred: list[str]) -> tuple[list[str], list[str]]` (19)
 
 ### `backend/domain/taxonomy.py` — 27 строк
 
@@ -700,7 +709,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None` (16)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 
-### `backend/flows/parse.py` — 481 строк ⚠ подошёл к 300
+### `backend/flows/parse.py` — 483 строк ⚠ подошёл к 300
 
 Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
@@ -716,7 +725,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _unfit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (21)
 - `async def _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus) -> None` (36)
 - `async def _parsed_or_dropped(pipeline, vacancy_id: int, text: str, channel_username: str, allow_delete: bool)` (44)
-- `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (33)
+- `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (35)
 - `async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> bool` (18)
 - `async def _thrown_out_by_the_verdict(pipeline, vacancy_id: int, skip_reason: str | None, allow_delete: bool) -> bool` (18)
 - `async def parse_and_update_vacancy(pipeline, vacancy_id: int, text: str, channel_username: str, *, allow_delete: bool=True) -> bool` (43)
@@ -1168,11 +1177,11 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 419 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 422 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
-Зависит от: `backend.models`
+Зависит от: `backend.domain.stack`, `backend.models`
 
 - `class ChannelPost` (12)
 - `class OutgoingMessage` (21)
@@ -1184,8 +1193,8 @@ First-run bootstrap: ensure DB schema exists.
 - `class ParsedCvExperience` (9)
 - `class ParsedCv` (5)
 - `class Classification` (3)
-- `class ParsedVacancy` (38)
-  - `def stack(self) -> list[str]` (8)
+- `class ParsedVacancy` (40)
+  - `def stack(self) -> list[str]` (11)
 - `class PostGenre` (14)
 - `class FitValidation` (3)
 - `class VacancyDetail` (4)
@@ -1680,13 +1689,13 @@ First-run bootstrap: ensure DB schema exists.
 - `async def count_vacancies_for_channel(session: AsyncSession, channel_id: int) -> int` (14)
 - `async def list_vacancies_for_channel(session: AsyncSession, channel_id: int, *, limit: int=50, offset: int=0) -> tuple[list[Vacancy], bool]` (36)
 
-### `backend/repository/vacancies_new.py` — 57 строк
+### `backend/repository/vacancies_new.py` — 72 строк
 
 Заведение вакансии руками — набранной в окне, а не найденной в канале.
 
-Зависит от: `backend.domain.salary`, `backend.models`, `backend.repository.vacancies_life`
+Зависит от: `backend.domain.salary`, `backend.domain.scoring`, `backend.domain.stack`, `backend.models`, `backend.repository.profile_skills`, `backend.repository.vacancies_life`
 
-- `async def create_vacancy(session: AsyncSession, fields: dict) -> int` (29)
+- `async def create_vacancy(session: AsyncSession, fields: dict) -> int` (41)
 
 ### `backend/repository/vacancy_status.py` — 397 строк ⚠ подошёл к 300
 
@@ -2019,7 +2028,7 @@ Runtime settings layer.
 - `def _wake(waiters: list[tuple[asyncio.AbstractEventLoop, asyncio.Future]]) -> None` (6)
 - `def _finish(waiter: asyncio.Future) -> None` (3)
 
-### `client/bridge/form_payloads.py` — 173 строк
+### `client/bridge/form_payloads.py` — 177 строк
 
 Поля записи, прочитанные из нагрузки форм окна.
 
@@ -2032,7 +2041,7 @@ Runtime settings layer.
 - `def hr_is_identified(fields: dict) -> bool` (11)
 - `def read_new_hr_fields(payload: dict) -> dict` (31)
 - `def _slashed(country: str | None, city: str | None) -> str | None` (10)
-- `def read_new_vacancy_fields(payload: dict) -> dict` (32)
+- `def read_new_vacancy_fields(payload: dict) -> dict` (36)
 
 ### `client/bridge/hr.py` — 234 строк
 
@@ -2990,7 +2999,7 @@ Runtime settings layer.
 Тестов: 16
 
 
-### `tests/backend/test_domain_scoring.py` — 166 строк
+### `tests/backend/test_domain_scoring.py` — 139 строк
 
 Следствия, которые наблюдают тесты `backend/domain/scoring.py`.
 
@@ -4714,13 +4723,13 @@ Runtime settings layer.
   - `async def _put()` (8)
     - `async def broken(vacancy_id)` (2)
 
-### `tests/client/test_bridge_vacancy_create.py` — 233 строк
+### `tests/client/test_bridge_vacancy_create.py` — 301 строк ⚠ подошёл к 300
 
 Следствия заведения вакансии руками: что после него видно в списке и в карточке.
 
 Зависит от: `tests.dbio`, `tests.factories`
 
-Тестов: 15
+Тестов: 18
 
 - `async def created(ask, api, **fields) -> int` (9)
 

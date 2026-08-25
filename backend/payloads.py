@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Literal
 
+from backend.domain.stack import joined_stack
 from backend.models import (
     HR,
     Company,
@@ -216,13 +217,12 @@ class ParsedVacancy:
     # посте никакого контакта кроме (или включая) TG-аккаунта.
     other_contact: str | None
     # Stack split into "обязательные" (required) and "будет плюсом" (preferred)
-    # at parse time by the LLM. Both lists are already canonicalized,
-    # version-stripped, capitalized and unique across BOTH lists (the LLM is
-    # explicitly instructed not to put the same skill into both groups). The
-    # split is consumed by ``score_parsed`` for weighting and by
-    # ``validate_role_fit`` (sees both lists separately); everywhere else
-    # (UI chips, DB ``Vacancy.stack`` column) reads ``stack`` — see the
-    # property below — which simply joins both lists in declaration order.
+    # at parse time by the LLM. Both lists are already version-stripped,
+    # capitalized and unique across BOTH lists (the LLM is explicitly
+    # instructed not to put the same skill into both groups). The split is
+    # consumed by ``score_stack`` for weighting and by ``validate_role_fit``
+    # (sees both lists separately); everywhere else (UI chips, DB
+    # ``Vacancy.stack`` column) reads ``stack`` — see the property below.
     stack_required: list[str]
     stack_preferred: list[str]
     grade: str | None
@@ -234,11 +234,14 @@ class ParsedVacancy:
     def stack(self) -> list[str]:
         """Объединённый стек (required + preferred) — потребители этого
         view не нуждаются в делении: запись в БД-колонку ``Vacancy.stack``,
-        ``is_empty_vacancy``-чек, отображение в UI. Возвращаем новый list,
-        не view — чтобы случайная мутация у потребителя не утекла в
-        required/preferred.
+        ``is_empty_vacancy``-чек, отображение в UI.
+
+        Складывает половины `domain/stack.joined_stack` — тот же, кем их
+        складывает заведение руками: правило порядка одно на оба пути, а
+        новый список вместо view он отдаёт затем, чтобы случайная мутация у
+        потребителя не утекла в required/preferred.
         """
-        return list(self.stack_required) + list(self.stack_preferred)
+        return joined_stack(self.stack_required, self.stack_preferred)
 
 
 @dataclass(frozen=True)

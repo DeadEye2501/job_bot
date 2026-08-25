@@ -12,7 +12,7 @@ from backend.flows import dm_backfill
 from backend.domain.blacklist import check_blacklist
 from backend.domain.fit_fields import grade_refusal, work_format_refusal
 from backend.domain.resume_marks import resume_mark
-from backend.domain.scoring import score_parsed
+from backend.domain.scoring import score_stack
 from backend.domain.verdict import blacklist_refusal, decide_vacancy_status
 from backend.domain.verdict import is_empty_vacancy
 from backend.domain.verdict import (
@@ -329,7 +329,9 @@ async def _verdict_for(
     человека, и жанр поста его не меняет. Читает он весь исходный текст, а
     модели достаётся урезанный по её бюджету.
     """
-    score = score_parsed(parsed, pipeline.skills_cache)
+    score = score_stack(
+        parsed.stack_required, parsed.stack_preferred, pipeline.skills_cache
+    )
     blocked = blacklist_refusal(check_blacklist(text, pipeline.blacklist_patterns))
     logger.debug(
         "vacancy %s: score=%d threshold=%d blacklist=%s",

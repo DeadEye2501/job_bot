@@ -117,6 +117,34 @@ async def test_a_reparse_without_skills_keeps_the_old_stack(
     assert saved.score == before.score
 
 
+async def test_the_halves_of_the_stack_reach_the_score_the_right_way_round(
+    parsing, session_factory
+):
+    """Обязательная половина считается строже желательной и после разбора.
+
+    Половины уезжают в подсчёт двумя соседними доводами одного вида, и
+    перепутать их местами — правка на два слова. Балл при этом останется
+    числом, порог — пройденным, и весь набор — зелёным; узнается подмена
+    только по чужим баллам на живых вакансиях. Здесь она видна сразу:
+    знакомый навык уровня 3 требованием стоит трёх баллов, пожеланием —
+    двух.
+    """
+    pipeline, vacancy = parsing
+    pipeline.parsed = parsed_vacancy(
+        title="Python-разработчик",
+        description="Ищем в команду",
+        stack_required=["Python"],
+        stack_preferred=["Rust"],
+    )
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=False
+    )
+
+    saved = await only_row(session_factory, Vacancy)
+    assert saved.score == 3
+
+
 async def test_the_company_is_created_and_linked(parsing, session_factory):
     """Компания заводится и привязывается к вакансии."""
     pipeline, vacancy = parsing
