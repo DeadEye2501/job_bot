@@ -16,7 +16,7 @@
 
 import { blankCompany, companyNamed } from './companies.js';
 import { blankPerson, named } from './people.js';
-import { blankVacancy, vacancyNamed } from './vacancies.js';
+import { blankVacancy, typed, vacancyNamed } from './vacancies.js';
 
 /** Обвязка формы заведения по роду карточки.
  *
@@ -29,7 +29,7 @@ export const NEW_CARD = {
     icon: 'person_add',
     title: 'Новый человек',
     busyLabel: 'Завожу…',
-    done: 'Человек заведён',
+    done: () => 'Человек заведён',
     searchHint: 'Поиск по имени, @username...',
     blank: blankPerson,
     named,
@@ -38,7 +38,7 @@ export const NEW_CARD = {
     icon: 'domain_add',
     title: 'Новая компания',
     busyLabel: 'Завожу…',
-    done: 'Компания заведена',
+    done: () => 'Компания заведена',
     searchHint: 'Поиск по названию, сайту, написаниям...',
     blank: blankCompany,
     named: companyNamed,
@@ -50,7 +50,11 @@ export const NEW_CARD = {
     icon: 'post_add',
     title: 'Новая вакансия',
     busyLabel: 'Завожу…',
-    done: 'Вакансия заведена',
+    // Слово по удаче зависит от способа: набранные поля ложатся в строку тут
+    // же, а вставленный текст только уходит на разбор — и чем тот кончился,
+    // скажет весть. Скажи окно «заведена» сразу, на повторе и на молчащей
+    // модели человек прочёл бы подтверждение раньше отказа.
+    done: (draft) => (typed(draft) ? '' : 'Вакансия заведена'),
     blank: blankVacancy,
     named: vacancyNamed,
   },

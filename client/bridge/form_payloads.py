@@ -12,7 +12,13 @@
 from backend.domain.salary import currency_sign
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.domain.telegram_identity import typed_username
-from backend.incoming import int_or_none, normalize_enum, str_list, text_or_none
+from backend.incoming import (
+    int_or_none,
+    moment_or_none,
+    normalize_enum,
+    str_list,
+    text_or_none,
+)
 
 
 def read_toggle(
@@ -174,4 +180,7 @@ def read_new_vacancy_fields(payload: dict) -> dict:
         "stack_preferred": _comma_list(payload.get("stack_preferred")),
         "description": text_or_none(payload.get("description")),
         "notes": text_or_none(payload.get("notes")),
+        # Дату публикации набирают: из набранного её не вывести, а по ней
+        # идут отбор «за последние дни» и давность в списке.
+        "posted_at": moment_or_none(payload.get("posted_at")),
     }

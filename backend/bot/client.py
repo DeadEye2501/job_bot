@@ -18,6 +18,7 @@ from pyrogram.handlers import (
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from adapters import lm_studio, telegram
+from backend.bot import pasted
 from backend.bot import rerun
 from backend.bot import loop
 from backend.bot import updates
@@ -319,6 +320,11 @@ class Bot:
         self, vacancy_id
     ) -> rerun.RerunOutcome:
         return await rerun.ui_rerun_vacancy_pipeline(self, vacancy_id)
+
+    async def ui_ingest_pasted_text(
+        self, text, posted_at
+    ) -> pasted.PastedOutcome:
+        return await pasted.ui_ingest_pasted_text(self, text, posted_at)
 
     async def ui_forget_vacancy(self, vacancy_id) -> bool:
         return await self.ingestion.forget_vacancy(vacancy_id)

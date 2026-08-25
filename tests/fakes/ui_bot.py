@@ -8,6 +8,7 @@
 
 from dataclasses import dataclass
 
+from backend.bot.pasted import PastedOutcome
 from backend.bot.rerun import RerunOutcome
 
 
@@ -21,6 +22,7 @@ class Sent:
 ANSWERS = {
     "poll": "ok",
     "rerun": "ok",
+    "pasted": "ok",
     "application": (True, "sent"),
     "forgotten": True,
     "read": 1,
@@ -75,6 +77,10 @@ class UiBot:
     async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> RerunOutcome:
         self.calls.append(("ui_rerun_vacancy_pipeline", vacancy_id))
         return self.answers["rerun"]
+
+    async def ui_ingest_pasted_text(self, text, posted_at) -> PastedOutcome:
+        self.calls.append(("ui_ingest_pasted_text", text, posted_at))
+        return self.answers["pasted"]
 
     async def ui_send_vacancy_application(self, vacancy_id: int) -> tuple[bool, str]:
         self.calls.append(("ui_send_vacancy_application", vacancy_id))

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { allAlive, blockedTip, downNames, shouldTurnOff } from '../state/health.js';
 import { modeChosen } from '../state/modes.js';
-import { bar, caption, rerunNote } from '../state/progress.js';
+import { bar, caption, countlessNote } from '../state/progress.js';
 
 describe('здоровье систем', () => {
   it('живо всё — значит живо каждое из четырёх', () => {
@@ -139,11 +139,11 @@ describe('полоса прогресса', () => {
   it('прогон одной вакансии без имени стадии называется прогоном', () => {
     // Полосам показать нечего — счёта у прогона нет, — и пустая подпись рядом с
     // бегущими полосами не говорит человеку даже того, что бот занят.
-    expect(rerunNote('')).toBe('Прогон вакансии…');
+    expect(countlessNote('')).toBe('Прогон вакансии…');
   });
 
   it('названная стадия прогона говорит за себя', () => {
-    expect(rerunNote('Разбор поста')).toBe('Разбор поста');
+    expect(countlessNote('Разбор поста')).toBe('Разбор поста');
   });
 
   it('заполнение не переваливает за край', () => {

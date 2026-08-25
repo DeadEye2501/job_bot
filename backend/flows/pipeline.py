@@ -17,6 +17,7 @@ from backend.flows.dm_debounce import DmDebounce
 from backend.notify import fire
 
 from backend.flows import apply
+from backend.flows import pasted
 from backend.flows import dm_classify
 from backend.flows import channels
 from backend.flows import rerun
@@ -263,6 +264,11 @@ class IngestionPipeline:
 
     async def recover_orphan_vacancies(self) -> int:
         return await rerun.recover_orphan_vacancies(self)
+
+    async def ingest_pasted_text(
+        self, text, posted_at
+    ) -> pasted.PastedIntakeOutcome:
+        return await pasted.ingest_pasted_text(self, text, posted_at)
 
     async def poll_active_channels(self) -> None:
         return await channels.poll_active_channels(self)

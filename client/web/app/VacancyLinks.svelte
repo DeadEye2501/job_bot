@@ -74,8 +74,12 @@
     // уже сказал плашкой, чего ему не хватило.
     if (done === null) return;
     creating = false;
+    // Слово спрашивается до чистки черновика — тем же уговором, что и у формы
+    // заведения (`state/contact_adding`): спрошенное после относилось бы к
+    // пустому, а пустое слово значит «сказать нечего».
+    const word = FORM.done(drafts[kind]);
     drafts[kind] = FORM.blank();
-    say(FORM.done);
+    if (word) say(word);
     picked = done.created_id;
   }
 </script>

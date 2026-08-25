@@ -26,6 +26,7 @@ class FakeIngestion:
         self._hangs = hangs
         self.channel_calls: list[int] = []
         self.rerun_calls: list[int] = []
+        self.pasted_calls: list[tuple] = []
         self.forget_calls: list[int] = []
         self.application_calls: list[int] = []
         self.full_calls = 0
@@ -88,6 +89,10 @@ class FakeIngestion:
 
     async def rerun_pipeline_for_vacancy(self, vacancy_id: int):
         self.rerun_calls.append(vacancy_id)
+        return await self._answer(outcome=self._word_outcome)
+
+    async def ingest_pasted_text(self, text: str, posted_at):
+        self.pasted_calls.append((text, posted_at))
         return await self._answer(outcome=self._word_outcome)
 
     async def forget_vacancy(self, vacancy_id: int):

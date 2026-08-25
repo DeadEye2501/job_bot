@@ -13,11 +13,14 @@
   // Черновик приходит своим объектом и правится на месте: отправляет его тот,
   // кто его завёл.
   import { NEW_CARD } from '$state/new_card.js';
+  import { VACANCY_MODES, typed } from '$state/vacancies.js';
 
   import AskDialog from './AskDialog.svelte';
+  import ChoiceRow from './ChoiceRow.svelte';
   import NewCompanyFields from './NewCompanyFields.svelte';
   import NewPersonFields from './NewPersonFields.svelte';
   import NewVacancyFields from './NewVacancyFields.svelte';
+  import PastedVacancyFields from './PastedVacancyFields.svelte';
 
   // Подсказки и приём набранного нужны одной форме из трёх — вакансии: она
   // называет компанию и человека словами, а узнаёт их и заводит тот, кто
@@ -39,6 +42,7 @@
 
 <AskDialog
   icon={form.icon}
+  extra={kind === 'vacancy' ? 'tall' : ''}
   title={form.title}
   confirmLabel="Создать"
   busyLabel={form.busyLabel}
@@ -52,6 +56,20 @@
   {:else if kind === 'company'}
     <NewCompanyFields {draft} />
   {:else}
-    <NewVacancyFields {draft} {options} {oncompany} {onhr} />
+    <!-- Ряд способов только у вакансии: её заводят двумя — набирают поля сами
+         или отдают боту текст объявления. У человека и компании второго нет
+         вовсе. Ряд тот же, что у грейда и формата: свой разошёлся бы с ними
+         видом. -->
+    <ChoiceRow
+      options={VACANCY_MODES}
+      chosen={new Set([draft.mode])}
+      look="seg"
+      onpick={(value) => (draft.mode = value)}
+    />
+    {#if typed(draft)}
+      <PastedVacancyFields {draft} />
+    {:else}
+      <NewVacancyFields {draft} {options} {oncompany} {onhr} />
+    {/if}
   {/if}
 </AskDialog>

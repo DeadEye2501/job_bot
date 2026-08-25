@@ -18,7 +18,7 @@
   import { attempts } from '$state/attempts.js';
   import { LAMPS, allAlive, blockedTip, shouldTurnOff } from '$state/health.js';
   import { OFF } from '$state/modes.js';
-  import { STARTING, bar, caption, rerunNote } from '$state/progress.js';
+  import { COUNTLESS_STAGES, STARTING, bar, caption, countlessNote } from '$state/progress.js';
 
   let { ask, say, events, onlocked, oncontact } = $props();
 
@@ -159,13 +159,13 @@
 
   /** Подвинуть полосу, которой касается весть.
    *
-   * У прогона одной вакансии счёта нет вовсе — бот шлёт нули, — и полосы по
-   * нему не двигаются: двинь их, они показали бы пустоту вместо хода. Своё имя
+   * У прогона одной вакансии и у разбора вставленного объявления счёта нет
+   * вовсе — бот шлёт нули, — и полосы по ним не двигаются: двинь их, они показали бы пустоту вместо хода. Своё имя
    * он говорит подписью, а первая весть о счёте её гасит: дальше подпись
    * считают полосы.
    */
   function moved(step) {
-    if (step.stage === 'rerun') single = rerunNote(step.label);
+    if (COUNTLESS_STAGES.has(step.stage)) single = countlessNote(step.label);
     if (step.stage === 'channel') {
       single = '';
       channels = { ...step };

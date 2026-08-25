@@ -21,7 +21,7 @@
   import { VACANCY_PAGE, appended, nearBottom, refreshLimit } from '$state/paging.js';
   import { filterPayload } from '$state/vacancy_filter.js';
   import { vacancyView } from '$state/vacancy_view.svelte.js';
-  import { SORTS, emptyNote, sortKey } from '$state/vacancies.js';
+  import { SORTS, emptyNote, sortKey, typed, vacancyFields } from '$state/vacancies.js';
 
   // `lockedTip` приходит сверху, а не спрашивается здесь: лампы состояния
   // опрашивает оболочка для нижней полосы, и второй опрос из карточки дал бы
@@ -75,7 +75,18 @@
   const newCard = contactAdding({
     list: { again: () => refresh(refreshLimit(rows.length, VACANCY_PAGE)) },
     form: NEW_CARD.vacancy,
-    save: (draft) => ask('vacancies.create', { ...draft }),
+    // Слот выбирается способом заведения: набранные поля ложатся в строку как
+    // есть, а вставленный текст уходит в конвейер на разбор — и оттуда
+    // возвращается баллом, приговором и заполненными полями. Имена слотов
+    // стоят литералами на самом шве: спрятанные в таблицу, они выпали бы
+    // из-под сторожа договора страницы.
+    save: (draft) =>
+      typed(draft)
+        ? ask('vacancies.create_from_text', {
+            raw_text: draft.raw_text,
+            posted_at: draft.posted_at,
+          })
+        : ask('vacancies.create', vacancyFields(draft)),
     say: (text) => say(text),
   });
 

@@ -4,11 +4,10 @@ import logging
 
 from sqlalchemy.exc import IntegrityError
 
-from backend.flows import linked_article, parse
+from backend.flows import intake, linked_article, parse
 from backend.message_text import extract_post_text
 from backend.models import Vacancy
 from backend.payloads import ChannelPost
-from backend.repository.vacancies_life import add_vacancy_event
 from backend.telegram_time import tg_moment
 
 from backend.flows import embeddings
@@ -91,10 +90,7 @@ async def ingest_post(
     if embedding is None:
         return
 
-    await embeddings.ensure_embedding_cache(pipeline, len(embedding))
-    similar_id = pipeline.embeddings.match(
-        embedding, pipeline.rs.dedup_cosine_threshold
-    )
+    similar_id = await embeddings.similar_vacancy_id(pipeline, embedding)
     if similar_id is not None:
         await _resume_or_skip(pipeline, similar_id, post, whole)
         return
@@ -136,39 +132,24 @@ async def save_new_vacancy(
     post: ChannelPost,
     embedding: list[float],
 ) -> int | None:
-    async with pipeline.session_factory() as session:
-        try:
-            new_vacancy = _vacancy_row(post, embedding)
-            session.add(new_vacancy)
-            await session.flush()
-            await add_vacancy_event(
-                session,
-                new_vacancy.id,
-                "ingested",
-                {
-                    "channel": post.channel_username,
-                    "msg_id": post.msg.id,
-                },
-            )
-            await session.commit()
-            pipeline.embeddings.append(new_vacancy.id, embedding)
-            logger.info(
-                "[@%s] %d -> vacancy %d",
-                post.channel_username,
-                post.msg.id,
-                new_vacancy.id,
-            )
-            return new_vacancy.id
-        except IntegrityError as trouble:
-            # Целостность нарушается тут по-разному, и какое правило сработало
-            # — говорит сама беда: обычное дело это тот же пост, заведённый
-            # встречным обходом (`uq_vacancy_source`), но сюда же приходит и
-            # ссылка на канал, которого уже нет.
-            await session.rollback()
-            logger.info(
-                "[@%s] %d строка не завелась, целостность нарушена: %s",
-                post.channel_username,
-                post.msg.id,
-                trouble.orig,
-            )
-            return None
+    try:
+        return await intake.save_new_vacancy(
+            pipeline,
+            _vacancy_row(post, embedding),
+            "ingested",
+            {"channel": post.channel_username, "msg_id": post.msg.id},
+        )
+    except IntegrityError as trouble:
+        # Целостность нарушается тут по-разному, и какое правило сработало —
+        # говорит сама беда: обычное дело это тот же пост, заведённый
+        # встречным обходом (`uq_vacancy_source`), но сюда же приходит и
+        # ссылка на канал, которого уже нет. Своя эта беда только посту:
+        # у вставленного текста нет ни канала, ни номера поста, и столкнуться
+        # с уникальностью источника ему нечем.
+        logger.info(
+            "[@%s] %d строка не завелась, целостность нарушена: %s",
+            post.channel_username,
+            post.msg.id,
+            trouble.orig,
+        )
+        return None

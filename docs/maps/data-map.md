@@ -149,6 +149,11 @@
 - `PHOTO_SIZE_LIMIT` = `10 * 1024 * 1024`
 - `DOCUMENT_SIZE_LIMIT` = `50 * 1024 * 1024`
 
+### `backend/bot/pasted.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `PastedOutcome` = `Literal[slot.CycleOutcome, flow_pasted.PastedInt…`
+
 ### `backend/bot/rerun.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -344,6 +349,10 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `backend/flows/intake.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
 ### `backend/flows/linked_article.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -361,6 +370,12 @@
   - `skip_reason: str | None`
   - `score: int`
   - `keep_previous_stack: bool`
+
+### `backend/flows/pasted.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `PastedIntakeOutcome` = `Literal['ok', 'duplicate', 'embed', 'llm', 'tras…`
+- `WHAT` = `'вставленный текст'`
 
 ### `backend/flows/pipeline.py`
 
@@ -1216,6 +1231,7 @@
 - `MERGE_INTO_SELF` = `'Слить карточку саму с собой нельзя.'`
 - `NOTHING_TO_UPDATE` = `'Нечего обновлять.'`
 - `NAME_REQUIRED` = `'Название обязательно.'`
+- `TEXT_REQUIRED` = `'Вставьте текст объявления.'`
 - `IDENTITY_REQUIRED` = `'Укажите хотя бы имя или @username.'`
 - `COMPANY_EXISTS` = `'Компания «{name}» уже существует.'`
 - `CODE_FIRST` = `'Сначала запросите код подтверждения.'`
@@ -1231,6 +1247,7 @@
 - `RUN_REFUSALS` = `словарь из 3`
 - `POLL_REFUSALS` = `словарь из 5`
 - `RERUN_REFUSALS` = `словарь из 6`
+- `PASTED_REFUSALS` = `словарь из 7`
 - `SEND_REFUSALS` = `словарь из 12`
 
 ### `client/bridge/runner.py`
@@ -1444,4 +1461,4 @@
 
 - `class Sent`
   - `id: int`
-- `ANSWERS` = `словарь из 10`
+- `ANSWERS` = `словарь из 11`

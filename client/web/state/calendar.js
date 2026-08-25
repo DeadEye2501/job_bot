@@ -32,10 +32,17 @@ function indent(year, month) {
   return (first + WEEK - 1) % WEEK;
 }
 
+// Сколько недель в сетке. Шесть — потолок: больше не занимает ни один месяц,
+// даже тридцать один день, начавшийся с воскресенья. Меньше сетка не бывает
+// нарочно — растущая по месяцу, она прыгала бы высотой на каждом
+// перелистывании, а вместе с ней и всё, что стоит под календарём.
+const WEEKS = 6;
+
 /** Дни месяца, разложенные по неделям. Пустая клетка — `null`.
  *
  * Недели ровно по семь клеток: числа стоят колонками под подписями дней, и
- * короткая неделя сдвинула бы всё, что под ней.
+ * короткая неделя сдвинула бы всё, что под ней. Недель всегда шесть — по той
+ * же причине, только сверху вниз.
  */
 export function monthGrid(year, month) {
   const length = new Date(year, month, 0).getDate();
@@ -43,7 +50,7 @@ export function monthGrid(year, month) {
     ...Array.from({ length: indent(year, month) }, () => null),
     ...Array.from({ length }, (_, at) => at + 1),
   ];
-  while (cells.length % WEEK !== 0) cells.push(null);
+  while (cells.length < WEEK * WEEKS) cells.push(null);
   const weeks = [];
   for (let at = 0; at < cells.length; at += WEEK) weeks.push(cells.slice(at, at + WEEK));
   return weeks;

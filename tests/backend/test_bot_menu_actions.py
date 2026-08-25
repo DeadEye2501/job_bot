@@ -26,6 +26,52 @@ async def test_a_rerun_reaches_the_pipeline_and_frees_the_slot(make_bot):
     assert bot.current_poll_task is None
 
 
+async def test_pasted_text_reaches_the_pipeline_and_frees_the_slot(make_bot):
+    """Вставленный текст доходит до конвейера, называет себя и освобождает место.
+
+    Место прогона одно на всех, и не освободи его приём — кнопка сбора и
+    прогон вакансии замерли бы навсегда: занятость читается по тому же полю.
+    Имя ступени окно ловит по строке: опечатайся она здесь, человек увидел бы
+    внизу две пустые полосы без единого слова о том, что идёт.
+    """
+    ingestion = FakeIngestion()
+    hooks = WindowHooks()
+    bot = wire(await make_bot(), ingestion, hooks)
+
+    assert await bot.ui_ingest_pasted_text("Ищем повара", None) == "ok"
+    assert ingestion.pasted_calls == [("Ищем повара", None)]
+    assert hooks.progress == [("pasted", "Разбор вставленного объявления…", 0, 0)]
+    assert bot.current_poll_task is None
+
+
+async def test_the_word_of_the_pasted_intake_reaches_the_window_as_it_is(make_bot):
+    """Слово приёма доезжает до окна как есть.
+
+    Повтор, молчащая модель отпечатков и не дошедший разбор — три разные
+    беды, и человеку про них говорят разное; сведи их к одному «не вышло», и
+    он не узнает, что вакансия давно в списке.
+    """
+    bot = wire(await make_bot(), FakeIngestion(word_outcome="duplicate"))
+
+    assert await bot.ui_ingest_pasted_text("Ищем повара", None) == "duplicate"
+
+
+async def test_a_paste_while_the_slot_is_busy_is_refused_without_calling_the_pipeline(
+    make_bot, busy_slot
+):
+    """Занятое место отбивает приём, не начиная работы.
+
+    Два прогона разом подрались бы за кэш отпечатков: первый пишет в него
+    заведённое, второй сверяется с ним же.
+    """
+    ingestion = FakeIngestion()
+    bot = wire(await make_bot(), ingestion)
+    busy_slot(bot)
+
+    assert await bot.ui_ingest_pasted_text("Ищем повара", None) == "busy"
+    assert ingestion.pasted_calls == []
+
+
 async def test_a_delete_from_the_window_reaches_the_pipeline(make_bot):
     """Удаление по кнопке из окна доходит до конвейера, а не до репозитория.
 

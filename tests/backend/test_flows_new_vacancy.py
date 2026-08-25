@@ -18,6 +18,7 @@ import pytest
 from adapters import telegraph
 from backend.flows import parse as parse_mod
 from backend.flows import ingest, rerun
+from backend.flows import intake as intake_flow
 from backend.flows import embeddings
 from backend.models import TelegramChannel, Vacancy, VacancyEvent
 from backend.payloads import ChannelPost
@@ -119,6 +120,27 @@ async def test_the_new_row_remembers_where_it_came_from(
     assert saved.source_msg_id == 42
     assert saved.source_url == "https://t.me/jobs/42"
     assert saved.posted_at == EPOCH
+
+
+async def test_a_row_without_a_vector_leaves_the_cache_alone(make_pipeline, session_factory):
+    """Строка без отпечатка кэш не трогает и следующей не мешает.
+
+    Отпечатка у строки не бывает у того, кто заводит её мимо бота, — модель
+    отпечатков поднимают не всегда. Положи такую пустоту в кэш, и он потеряет
+    ширину: следующий настоящий вектор в него уже не встанет, а строка к тому
+    мигу записана — она осталась бы навсегда неразобранной и невидимой.
+    """
+    pipeline = await make_pipeline()
+    await embeddings.ensure_embedding_cache(pipeline, width=2)
+
+    await intake_flow.save_new_vacancy(
+        pipeline, Vacancy(raw_text="Ищем повара"), "created_by_hand"
+    )
+    with_vector = await intake_flow.save_new_vacancy(
+        pipeline, Vacancy(raw_text="Ищем сварщика", embedding=[0.1, 0.2]), "ingested"
+    )
+
+    assert pipeline.embeddings.ids.tolist() == [with_vector]
 
 
 async def test_the_new_vector_joins_the_cache(make_pipeline):

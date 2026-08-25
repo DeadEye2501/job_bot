@@ -153,6 +153,120 @@ async def test_a_skill_typed_into_both_rows_counts_once(api, ask, session_factor
     assert answer["ok"]["vacancy"]["score"] == 3
 
 
+async def test_pasted_text_goes_to_the_bot_without_waiting_for_the_parser(
+    api, ask, with_bot, told
+):
+    """Вставленный текст уходит боту, а окно не ждёт разбора.
+
+    Разбор — это от двух до пяти обращений к модели: подержи мост ответ до
+    конца, и окно висело бы всё это время. Человеку отвечают «пущено», а
+    чем кончилось — говорят вестью.
+    """
+    bot = with_bot()
+
+    answer = await ask(api.vacancies.create_from_text, {"raw_text": "Ищем флориста"})
+
+    assert answer["ok"]["started"] is True
+    assert [call for call in bot.calls if call[0] == "ui_ingest_pasted_text"] == [
+        ("ui_ingest_pasted_text", "Ищем флориста", None)
+    ]
+    # Об удаче человеку говорят вестью, а не ответом на зов: к её приходу окно
+    # уже закрыто, и другого способа сказать «получилось» нет.
+    assert await told() == {"message": "Объявление заведено.", "danger": False}
+
+
+async def test_the_named_publication_date_reaches_the_bot(api, ask, with_bot):
+    """Названная дата публикации доезжает до конвейера.
+
+    Из самого текста её не достать — в посте канала бот берёт её у Telegram, а
+    у вставленного объявления взять неоткуда. Не доедь она, объявление
+    выпало бы из отбора «за последние дни».
+    """
+    bot = with_bot()
+
+    await ask(
+        api.vacancies.create_from_text,
+        {"raw_text": "Ищем сварщика", "posted_at": "2026-08-20"},
+    )
+
+    _, _, when = next(
+        call for call in bot.calls if call[0] == "ui_ingest_pasted_text"
+    )
+    assert when.date().isoformat() == "2026-08-20"
+
+
+async def test_an_empty_paste_is_refused_with_words(api, ask, with_bot):
+    """Пустую вставку отбивают словами, а не молчанием.
+
+    Разбирать нечего, и пущенная работа кончилась бы отказом изнутри — но
+    человек к этому времени уже закрыл бы окно, решив, что вакансия заводится.
+    """
+    with_bot()
+
+    answer = await ask(api.vacancies.create_from_text, {"raw_text": "   "})
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Вставьте текст объявления."
+
+
+async def test_pasting_before_the_bot_is_up_is_refused_by_name(api, ask):
+    """До входа в Telegram вставку отбивают словами про бота.
+
+    Разбор живёт на боте — там модели и место прогона. Кнопку рисуют всегда, и
+    молчание на неё оставило бы человека ждать вакансию, которая не заводится.
+    """
+    answer = await ask(api.vacancies.create_from_text, {"raw_text": "Ищем повара"})
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Бот ещё не готов."
+
+
+async def test_a_pasted_duplicate_is_explained_not_swallowed(
+    api, ask, with_bot, told
+):
+    """Про уже заведённое объявление человеку говорят словом.
+
+    Иначе он вставляет текст, ничего не появляется, и он вставляет снова —
+    так и не узнав, что эта вакансия давно в списке.
+    """
+    with_bot(pasted="duplicate")
+
+    answer = await ask(api.vacancies.create_from_text, {"raw_text": "Ищем повара"})
+
+    assert answer["ok"]["started"] is True
+    assert await told() == {
+        "message": "Такое объявление уже заведено.",
+        "danger": True,
+    }
+
+
+async def test_the_typed_description_is_not_passed_off_as_the_source_text(api, ask):
+    """Набранное описание исходным текстом объявления не становится.
+
+    Исходным текстом судит повторный разбор: он читает его и пишет поверх
+    полей. Ляг туда пересказ, сделанный человеком, — разбор пересказал бы
+    пересказ и затёр бы им набранное вручную. У вакансии, заведённой полями,
+    исходника нет, и это честнее подделки.
+    """
+    vacancy_id = await created(ask, api, description="Ищем флориста в студию")
+
+    answer = await ask(api.vacancies.detail, vacancy_id)
+    assert answer["ok"]["vacancy"]["raw_text"] is None
+
+
+async def test_the_typed_publication_date_lands_in_the_row(api, ask):
+    """Набранная дата публикации ложится в строку.
+
+    По ней идут отбор «за последние дни» и давность в списке: без даты
+    заведённая руками вакансия выглядит вчерашней ровно до тех пор, пока по
+    ней не пройдёт отбор, а там пропадает вовсе.
+    """
+    vacancy_id = await created(ask, api, posted_at="2026-08-20")
+
+    answer = await ask(api.vacancies.detail, vacancy_id)
+    assert answer["ok"]["vacancy"]["posted_at"].startswith("2026-08-20")
+
+
 async def test_an_unknown_grade_does_not_reach_the_card(api, ask):
     """Грейд не из перечня в карточку не попадает.
 

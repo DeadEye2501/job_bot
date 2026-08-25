@@ -74,6 +74,19 @@ async def embed_text(pipeline, text: str, what: str) -> list[float] | None:
         return None
 
 
+async def similar_vacancy_id(pipeline, embedding: list[float]) -> int | None:
+    """Номер уже заведённой вакансии с таким же отпечатком; пусто — такой нет.
+
+    Заводят вакансию из текста двое — обход канала и человек со вставленным
+    объявлением, — и отсев у них общий: перепост и повторная вставка одного и
+    того же объявления одинаково не должны давать второй строки. Порог
+    близости берётся из настроек, а не из довода: он один на оба входа, и
+    разъехавшись, они считали бы перепостом разное.
+    """
+    await ensure_embedding_cache(pipeline, len(embedding))
+    return pipeline.embeddings.match(embedding, pipeline.rs.dedup_cosine_threshold)
+
+
 async def ensure_embedding_cache(pipeline, width: int) -> None:
     """Поднять векторы вакансий в память один раз за жизнь конвейера.
 
