@@ -11,7 +11,6 @@ import {
   blankTelegram,
   clampField,
   credsChanged,
-  matchingModels,
   mirrored,
   nextStep,
   probePill,
@@ -22,6 +21,7 @@ import {
   telegramCreds,
   thresholdState,
 } from '../state/settings.js';
+import { matching } from '../state/search.js';
 
 describe('числовое поле настроек', () => {
   const bounds = { ...BOUNDS.poll_interval_sec, fallback: 60 };
@@ -211,20 +211,20 @@ describe('подсказка имён моделей', () => {
   it('поле пусто — виден весь перечень поставщика', () => {
     // Открывший подсказку ещё ничего не набрал, и сузить перечень не по чему:
     // пустой отбор показал бы пустую панель на живом поставщике.
-    expect(matchingModels(found, '')).toEqual(found);
+    expect(matching(found, '')).toEqual(found);
   });
 
   it('набранное сужает перечень и регистра не различает', () => {
     // Имена моделей набирают с середины («bge», «llama»), а не с начала: у
     // локальных они идут с приставкой поставщика через косую черту.
-    expect(matchingModels(found, 'QWEN')).toEqual(['qwen/qwen3-4b-2507']);
-    expect(matchingModels(found, 'bge')).toEqual(['text-embedding-bge-m3']);
+    expect(matching(found, 'QWEN')).toEqual(['qwen/qwen3-4b-2507']);
+    expect(matching(found, 'bge')).toEqual(['text-embedding-bge-m3']);
   });
 
   it('совпавших нет — перечень пуст', () => {
     // Пустая панель здесь и есть ответ: набранного имени у поставщика нет, и
     // подсказывать нечего.
-    expect(matchingModels(found, 'gpt-4')).toEqual([]);
+    expect(matching(found, 'gpt-4')).toEqual([]);
   });
 });
 

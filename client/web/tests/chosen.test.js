@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { without } from '../state/chosen.js';
+import { alone, without } from '../state/chosen.js';
 
 describe('снятое из набора', () => {
   it('снесённый предмет из набора уходит', () => {
@@ -24,5 +24,17 @@ describe('снятое из набора', () => {
     without(was, 'языки');
 
     expect([...was]).toEqual(['языки']);
+  });
+});
+
+describe('одно выбранное из ряда', () => {
+  it('нажатое повторно снимается', () => {
+    // Грейд в объявлении называют не всегда, и поставленный по ошибке нечем
+    // было бы убрать: соседнее значение соврало бы про вакансию не меньше.
+    expect(alone('senior', 'senior')).toBe('');
+  });
+
+  it('нажатое поверх другого замещает его', () => {
+    expect(alone('senior', 'lead')).toBe('lead');
   });
 });

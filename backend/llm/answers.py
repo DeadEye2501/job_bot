@@ -230,20 +230,3 @@ def str_or_none(value) -> str | None:
     if not isinstance(value, str):
         return None
     return value.strip() or None
-
-
-def normalize_enum(value, allowed: tuple[str, ...]) -> str | None:
-    """Значение из ответа модели, сведённое к справочнику, а чужое — как
-    отсутствие.
-
-    Модель отвечает свободным текстом: то с заглавной, то с пробелами по
-    краям, то словом, которого в справочнике нет вовсе. Приговор, уровень и
-    формат работы после этого либо ложатся в колонку из закрытого набора,
-    либо не ложатся никак — третьего колонки не принимают.
-    """
-    if not isinstance(value, str):
-        return None
-    v = value.strip().lower()
-    if v in allowed:
-        return v
-    return None

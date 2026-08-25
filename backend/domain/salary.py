@@ -94,7 +94,28 @@ def parse_salary(
     low, high = _money_bounds(s)
     if low is None and high is None:
         return (None, None, None)
-    return (low, high, _currency(s))
+    return (low, high, currency_sign(s))
+
+
+def salary_text(low: int | None, high: int | None, currency: str | None) -> str | None:
+    """Собрать строку зарплаты из чисел — обратная дорога `parse_salary`.
+
+    Нужна там, где вилку называет человек, а не объявление: колонка `salary`
+    хранит написанное автором поста, и у заведённой руками вакансии автор —
+    он сам. Пустая, когда чисел нет вовсе: строка из одного знака валюты
+    ничего не говорит.
+
+    Живёт рядом с разбором нарочно: написание вилки читают и пишут одно и то
+    же, и разъедься эти два объявления, разобранное перестало бы совпадать с
+    записанным.
+    """
+    if low is None and high is None:
+        return None
+    if low is not None and high is not None:
+        span = f"{low}" if low == high else f"{low}-{high}"
+    else:
+        span = f"от {low}" if low is not None else f"до {high}"
+    return f"{span} {currency}" if currency else span
 
 
 def _named_outright(s: str, part: list[re.Match]) -> bool:
@@ -280,11 +301,23 @@ def _scale(marker: str | None) -> int:
     return 1000 if marker.lower().startswith(_THOUSAND) else 10**6
 
 
-def _currency(s: str) -> str | None:
+def currency_sign(s: str | None) -> str | None:
     """Знак валюты строки — только если валюта в ней одна.
 
     Названы две — диапазон не имеет смысла ни в одной из них, и выбор первой
     попавшейся спрятал бы вакансию от отбора по второй.
+
+    Зовут двое: разбор зарплаты из объявления и форма заведения вакансии, где
+    валюту набирают словом — «usd», «руб», «долларов». Приведение у них одно
+    нарочно: разойдись оно, набранное руками не совпало бы с найденным ботом,
+    и одна валюта считалась бы двумя.
+
+    Регистр снимается здесь, а не у зовущего: написания в карте набраны
+    строчными и собраны без оглядки на регистр, и «USD» с «Руб» иначе не
+    находятся вовсе — валюта пропадает молча.
     """
+    if not s:
+        return None
+    s = s.lower()
     named = [sign for sign, pattern in _CURRENCIES if pattern.search(s)]
     return named[0] if len(named) == 1 else None

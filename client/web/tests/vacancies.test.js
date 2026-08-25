@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   SORTS,
   ago,
+  blankVacancy,
   emptyNote,
   salaryLabel,
   scoreTone,
@@ -12,6 +13,7 @@ import {
   shownStack,
   sortKey,
   vacancyLine,
+  vacancyNamed,
 } from '../state/vacancies.js';
 
 const NOW = new Date('2026-08-14T21:00:00');
@@ -259,5 +261,25 @@ describe('стек в строке', () => {
   it('короткий стек не приписывает себе лишнего', () => {
     // «+0» человек читает как поломку.
     expect(shownStack([{ name: 'a' }]).more).toBe(0);
+  });
+});
+
+describe('заслон формы заведения вакансии', () => {
+  it('над пустой формой кнопка заперта', () => {
+    // Мост такую всё равно отобьёт: строка без названия в списке выглядит
+    // пустой. Открытая кнопка меняла бы карточку на плашку отказа.
+    expect(vacancyNamed(blankVacancy())).toBe(false);
+  });
+
+  it('одного названия довольно', () => {
+    // Остальное дописывают в карточке: ссылку и стек человек копирует не
+    // всегда, а завести найденное надо в тот миг, когда увидел.
+    expect(vacancyNamed({ ...blankVacancy(), title: 'Senior Python Developer' })).toBe(true);
+  });
+
+  it('пробелы названием не считаются', () => {
+    // Пробельное название дошло бы до базы строкой, которую в списке не видно
+    // и не найти поиском.
+    expect(vacancyNamed({ ...blankVacancy(), title: '   ' })).toBe(false);
   });
 });

@@ -110,20 +110,11 @@ Job Bot — single CLI entry point.
 - `def _article_text(html: str) -> str | None` (28)
 - `async def fetch_article(client: httpx.AsyncClient, url: str) -> str | None` (24)
 
-## alembic — 6 модулей
+## alembic — 4 модулей
 
 ### `alembic/bundled/aa4e0de05368_seed_initial_data.py` — 46 строк
 
 seed initial data (заглушка для сборки)
-
-Зависит от: —
-
-- `def upgrade() -> None` (2)
-- `def downgrade() -> None` (2)
-
-### `alembic/bundled/c3f8a1d47b02_restore_answered_vacancy.py` — 29 строк
-
-restore the answered vacancy (заглушка для сборки)
 
 Зависит от: —
 
@@ -155,19 +146,6 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-### `alembic/versions/c3f8a1d47b02_restore_answered_vacancy.py` — 119 строк
-
-restore the answered vacancy
-
-Зависит от: `alembic`
-
-- `def _blob(encoded: str) -> bytes` (3)
-- `def _table(rows_)` (7)
-- `def _insert(name, rows_)` (3)
-- `def upgrade() -> None` (8)
-- `def _restore_channel() -> None` (17)
-- `def downgrade() -> None` (12)
-
 ### `alembic/versions/e560edf8b958_init.py` — 272 строк
 
 init
@@ -177,7 +155,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 121 модулей
+## backend — 122 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -425,13 +403,14 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def resume_mark(text: str) -> str | None` (13)
 
-### `backend/domain/salary.py` — 290 строк
+### `backend/domain/salary.py` — 323 строк ⚠ подошёл к 300
 
 Разбор свободной строки зарплаты: число, как записано, и валюта.
 
 Зависит от: `backend.domain.currency`
 
 - `def parse_salary(salary: str | None) -> tuple[int | None, int | None, str | None]` (19)
+- `def salary_text(low: int | None, high: int | None, currency: str | None) -> str | None` (19)
 - `def _named_outright(s: str, part: list[re.Match]) -> bool` (32)
 - `def _money_bounds(s: str) -> tuple[int | None, int | None]` (20)
 - `def _one_bound(s: str, part: list[re.Match], kept: tuple[re.Match, int]) -> tuple[int | None, int | None]` (14)
@@ -442,7 +421,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _runs(s: str) -> list[list[re.Match]]` (15)
 - `def _amount(num: str, scale: str | None) -> int` (13)
 - `def _scale(marker: str | None) -> int` (5)
-- `def _currency(s: str) -> str | None` (8)
+- `def currency_sign(s: str | None) -> str | None` (20)
 
 ### `backend/domain/scoring.py` — 107 строк
 
@@ -825,7 +804,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def telegram_alive(bot) -> bool` (7)
 - `async def model_alive(cfg, kind: str) -> bool` (44)
 
-### `backend/incoming.py` — 94 строк
+### `backend/incoming.py` — 118 строк
 
 Приведение внешнего ввода к значениям, годным для записи.
 
@@ -837,8 +816,9 @@ First-run bootstrap: ensure DB schema exists.
 - `def _number_or_none(value, kind)` (19)
 - `def moment_or_none(value) -> datetime | None` (16)
 - `def str_list(value) -> list[str]` (11)
+- `def normalize_enum(value, allowed: tuple[str, ...]) -> str | None` (22)
 
-### `backend/llm/answers.py` — 249 строк
+### `backend/llm/answers.py` — 232 строк
 
 Разбор того, что ответила модель, порядок двух заходов и жалоба на неудачу.
 
@@ -852,7 +832,6 @@ First-run bootstrap: ensure DB schema exists.
 - `def wants_more_room(parsed, finish_reason: str | None) -> bool` (18)
 - `async def read_with_a_second_try(ask, read, tokens: tuple[int, int], told: tuple[logging.Logger, str])` (37)
 - `def str_or_none(value) -> str | None` (10)
-- `def normalize_enum(value, allowed: tuple[str, ...]) -> str | None` (15)
 
 ### `backend/llm/candidate.py` — 111 строк
 
@@ -916,7 +895,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def external_block(text: str, what: str, then: str='') -> str` (14)
 - `def wrap_external(text: str) -> str` (15)
 
-### `backend/llm/factcheck.py` — 169 строк
+### `backend/llm/factcheck.py` — 170 строк
 
 Сверка письма-отклика с тем, что о кандидате известно.
 
@@ -930,7 +909,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Общее у зовов о пригодности: чем спросить модель и как прочесть ответ.
 
-Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.hallucination`, `backend.llm.rules`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.incoming`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.hallucination`, `backend.llm.rules`, `backend.payloads`
 
 - `class FitQuestion` (9)
 - `def vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str` (18)
@@ -1029,7 +1008,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Разбор объявления о вакансии в структурированные поля.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.taxonomy`, `backend.domain.telegram_identity`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.rules`, `backend.llm.skills`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.taxonomy`, `backend.domain.telegram_identity`, `backend.incoming`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.rules`, `backend.llm.skills`, `backend.payloads`
 
 - `def _split_stack(data: dict) -> tuple[list, list]` (19)
 - `def _company_name_and_site(company_name: str | None, company_website: str | None) -> tuple[str | None, str | None]` (28)
@@ -1701,6 +1680,14 @@ First-run bootstrap: ensure DB schema exists.
 - `async def count_vacancies_for_channel(session: AsyncSession, channel_id: int) -> int` (14)
 - `async def list_vacancies_for_channel(session: AsyncSession, channel_id: int, *, limit: int=50, offset: int=0) -> tuple[list[Vacancy], bool]` (36)
 
+### `backend/repository/vacancies_new.py` — 57 строк
+
+Заведение вакансии руками — набранной в окне, а не найденной в канале.
+
+Зависит от: `backend.domain.salary`, `backend.models`, `backend.repository.vacancies_life`
+
+- `async def create_vacancy(session: AsyncSession, fields: dict) -> int` (29)
+
 ### `backend/repository/vacancy_status.py` — 397 строк ⚠ подошёл к 300
 
 Смена статуса вакансии: решение, запись, история.
@@ -2032,17 +2019,20 @@ Runtime settings layer.
 - `def _wake(waiters: list[tuple[asyncio.AbstractEventLoop, asyncio.Future]]) -> None` (6)
 - `def _finish(waiter: asyncio.Future) -> None` (3)
 
-### `client/bridge/form_payloads.py` — 115 строк
+### `client/bridge/form_payloads.py` — 173 строк
 
 Поля записи, прочитанные из нагрузки форм окна.
 
-Зависит от: `backend.domain.telegram_identity`, `backend.incoming`
+Зависит от: `backend.domain.salary`, `backend.domain.taxonomy`, `backend.domain.telegram_identity`, `backend.incoming`
 
 - `def read_toggle(payload: dict, id_key: str, flag_key: str) -> tuple[int | None, bool | None]` (18)
-- `def read_company_spellings(raw) -> list[str]` (16)
+- `def _comma_list(raw) -> list[str]` (12)
+- `def read_company_spellings(raw) -> list[str]` (12)
 - `def read_new_company_fields(payload: dict) -> dict` (16)
 - `def hr_is_identified(fields: dict) -> bool` (11)
 - `def read_new_hr_fields(payload: dict) -> dict` (31)
+- `def _slashed(country: str | None, city: str | None) -> str | None` (10)
+- `def read_new_vacancy_fields(payload: dict) -> dict` (32)
 
 ### `client/bridge/hr.py` — 234 строк
 
@@ -2201,13 +2191,14 @@ Runtime settings layer.
 
 - `def _log_invalid_payload(slot: str, exc: Exception) -> None` (8)
 
-### `client/bridge/pickers.py` — 103 строк
+### `client/bridge/pickers.py` — 130 строк
 
 Списки кандидатов, которые окно показывает в модалке выбора.
 
 Зависит от: `backend.repository`, `client.bridge.wire`
 
-- `class PickerSubject` (15)
+- `class PickerSubject` (16)
+- `async def all_candidates(session, subject: PickerSubject) -> list[dict]` (18)
 - `async def merge_picker(session, subject: PickerSubject, absorbed_id: int, search: str | None) -> dict` (21)
 - `async def link_picker(session, subject: PickerSubject, vacancy, search: str | None) -> dict` (18)
 
@@ -2317,14 +2308,14 @@ Runtime settings layer.
 - `def _probed(task: Future) -> None` (16)
 - `def _after(asked) -> int | None` (21)
 
-### `client/bridge/vacancies.py` — 237 строк
+### `client/bridge/vacancies.py` — 267 строк
 
 Экран «Вакансии»: список, карточка и правки в них.
 
-Зависит от: `backend.domain.scoring`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.hub`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.vacancy_actions`, `client.bridge.vacancy_filter`, `client.bridge.vacancy_links`, `client.bridge.wire`
+Зависит от: `backend.domain.scoring`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.hub`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.vacancy_actions`, `client.bridge.vacancy_filter`, `client.bridge.vacancy_links`, `client.bridge.wire`
 
 - `def _typed_text(raw) -> str | None` (8)
-- `class Vacancies(VacancyActions, VacancyLinks)` (200)
+- `class Vacancies(VacancyActions, VacancyLinks)` (228)
   - `def list(self, payload: dict | None=None) -> dict` (15)
   - `def filter_options(self) -> dict` (19)
     - `async def run() -> dict` (4)
@@ -2337,6 +2328,8 @@ Runtime settings layer.
     - `async def run() -> dict` (21)
   - `def change_status(self, payload: dict) -> dict` (35)
     - `async def run() -> dict` (16)
+  - `def create(self, payload: dict) -> dict` (27)
+    - `async def run() -> dict` (5)
 
 ### `client/bridge/vacancy_actions.py` — 99 строк
 
@@ -2359,15 +2352,17 @@ Runtime settings layer.
 
 - `def read_vacancy_filter(payload: dict, page: Page) -> VacancyFilter` (34)
 
-### `client/bridge/vacancy_links.py` — 194 строк
+### `client/bridge/vacancy_links.py` — 218 строк
 
 Привязка вакансии к человеку и к компании: подборщики и их правки.
 
 Зависит от: `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.companies`, `client.bridge.form_payloads`, `client.bridge.hr`, `client.bridge.pickers`, `client.bridge.refusals`
 
-- `class VacancyLinks` (140)
+- `class VacancyLinks` (159)
   - `def hr_picker(self, payload: dict) -> dict` (8)
   - `def company_picker(self, payload: dict) -> dict` (3)
+  - `def create_options(self) -> dict` (18)
+    - `async def run() -> dict` (6)
   - `def _open_picker(self, slot: str, payload: dict) -> dict` (11)
   - `def link_hr(self, payload: dict) -> dict` (7)
   - `def link_company(self, payload: dict) -> dict` (3)
@@ -2502,7 +2497,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 245 модулей
+## tests — 246 модулей
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -3469,7 +3464,7 @@ Runtime settings layer.
 
 Следствия сверки значения со списком допустимых.
 
-Зависит от: `backend.llm.answers`
+Зависит от: `backend.incoming`
 
 Тестов: 1
 
@@ -4718,6 +4713,16 @@ Runtime settings layer.
 - `def broken_vacancy(session_factory, with_bot)` (13)
   - `async def _put()` (8)
     - `async def broken(vacancy_id)` (2)
+
+### `tests/client/test_bridge_vacancy_create.py` — 233 строк
+
+Следствия заведения вакансии руками: что после него видно в списке и в карточке.
+
+Зависит от: `tests.dbio`, `tests.factories`
+
+Тестов: 15
+
+- `async def created(ask, api, **fields) -> int` (9)
 
 ### `tests/client/test_bridge_vacancy_links.py` — 228 строк
 

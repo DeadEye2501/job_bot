@@ -22,7 +22,9 @@
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 5px;
-  background: var(--bg-primary);
+  /* Та же подложка, что у полей ввода (`input.css`): ряд стоит между ними в
+     столбик, и своя, более тёмная, читалась бы как другой род поля. */
+  background: var(--bg-secondary);
 }
 
 .choice-row[data-look='seg'] .choice {

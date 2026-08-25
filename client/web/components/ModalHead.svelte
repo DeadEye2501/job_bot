@@ -3,7 +3,10 @@
   //
   // `meta` — приписка бледнее заголовка: ею окно исходного текста называет
   // номер вакансии, по которому его и открыли.
-  let { icon, title, meta = '', onclose } = $props();
+  //
+  // `onclose` необязателен: у окна заведения второго выхода нет — закрывают
+  // его «Отменой», — и крестик там был бы кнопкой, которой не просили.
+  let { icon, title, meta = '', onclose = null } = $props();
 </script>
 
 <div class="bar modal-head">
@@ -12,7 +15,9 @@
     {title}
     {#if meta}<span class="modal-title-meta">{meta}</span>{/if}
   </div>
-  <button class="modal-close" type="button" title="Закрыть" onclick={() => onclose()}>
-    <span class="material-symbols-outlined">close</span>
-  </button>
+  {#if onclose}
+    <button class="modal-close" type="button" title="Закрыть" onclick={() => onclose()}>
+      <span class="material-symbols-outlined">close</span>
+    </button>
+  {/if}
 </div>
