@@ -1,11 +1,11 @@
 """Следствия, которые наблюдают тесты `backend/domain/scoring.py`.
 
 Закрытый `_build_skill_level_lookup` проверяется через публичный
-`score_parsed`: снаружи он виден только начисленными баллами.
+`score_stack`: снаружи он виден только начисленными баллами.
 """
 
-from backend.domain.scoring import build_skill_lookup, score_parsed
-from tests.factories import parsed_vacancy, profile_skill
+from backend.domain.scoring import build_skill_lookup, score_stack
+from tests.factories import profile_skill
 
 
 def test_a_skill_name_is_found_regardless_of_case():
@@ -21,10 +21,7 @@ def test_a_stray_space_around_the_name_does_not_cost_points():
     же навык считался своим в статистике и чужим в баллах: вакансия
     получала минус за незнакомое требование вместо плюса за уровень.
     """
-    score = score_parsed(
-        parsed_vacancy(stack_required=["Python"]),
-        [profile_skill("  Python  ", 3)],
-    )
+    score = score_stack(["Python"], [], [profile_skill("  Python  ", 3)])
 
     assert score == 3
 
@@ -36,9 +33,7 @@ def test_a_whitespace_only_skill_matches_nothing():
     пробельной строки в стеке вакансии: вместо штрафа за незнакомое
     требование вакансия получала бы плюс за уровень.
     """
-    score = score_parsed(
-        parsed_vacancy(stack_required=["   "]), [profile_skill("   ", 3)]
-    )
+    score = score_stack(["   "], [], [profile_skill("   ", 3)])
 
     assert score == -1
 
@@ -66,14 +61,12 @@ def test_a_non_string_alias_is_ignored():
 
 def test_an_empty_profile_scores_nothing():
     """Без навыков в профиле подсчёт не начисляет и не отнимает."""
-    assert score_parsed(parsed_vacancy(stack_required=["Python"]), []) == 0
+    assert score_stack(["Python"], [], []) == 0
 
 
 def test_a_required_skill_the_profile_has_adds_its_level():
     """Обязательный навык, который есть, добавляет свой уровень."""
-    got = score_parsed(
-        parsed_vacancy(stack_required=["Python"]), [profile_skill("Python", 3)]
-    )
+    got = score_stack(["Python"], [], [profile_skill("Python", 3)])
     assert got == 3
 
 
@@ -87,10 +80,7 @@ def test_of_two_names_sharing_a_key_the_first_one_scores():
     одно: иначе один и тот же навык весит на экране статистики иначе, чем в
     оценке вакансии.
     """
-    got = score_parsed(
-        parsed_vacancy(stack_required=["ci cd"]),
-        [profile_skill("CI/CD", 3), profile_skill("ci cd", 1)],
-    )
+    got = score_stack(["ci cd"], [], [profile_skill("CI/CD", 3), profile_skill("ci cd", 1)])
     assert got == 3
 
 
@@ -102,65 +92,84 @@ def test_a_separator_inside_a_name_does_not_cost_points():
     более строгому правилу, такой навык отнимал балл как незнакомый — и
     вакансия могла не пройти порог из-за написания через дефис.
     """
-    got = score_parsed(
-        parsed_vacancy(stack_required=["docker compose"]),
-        [profile_skill("Docker-Compose", 3)],
-    )
+    got = score_stack(["docker compose"], [], [profile_skill("Docker-Compose", 3)])
     assert got == 3
 
 
 def test_a_required_skill_the_profile_lacks_costs_a_point():
     """Обязательный навык, которого нет, отнимает балл."""
-    got = score_parsed(
-        parsed_vacancy(stack_required=["Rust"]), [profile_skill("Python", 3)]
-    )
+    got = score_stack(["Rust"], [], [profile_skill("Python", 3)])
     assert got == -1
 
 
 def test_a_preferred_skill_the_profile_has_adds_one_less():
     """Желательный навык стоит на балл меньше обязательного."""
-    got = score_parsed(
-        parsed_vacancy(stack_preferred=["Python"]), [profile_skill("Python", 3)]
-    )
+    got = score_stack([], ["Python"], [profile_skill("Python", 3)])
     assert got == 2
 
 
 def test_a_preferred_skill_at_the_lowest_level_adds_nothing():
     """Желательный навык первого уровня не поднимает вакансию над остальными."""
-    got = score_parsed(
-        parsed_vacancy(stack_preferred=["Bash"]), [profile_skill("Bash", 1)]
-    )
+    got = score_stack([], ["Bash"], [profile_skill("Bash", 1)])
     assert got == 0
 
 
 def test_a_preferred_skill_the_profile_lacks_costs_nothing():
     """Отсутствие желательного навыка ничем не наказывается."""
-    got = score_parsed(
-        parsed_vacancy(stack_preferred=["Rust"]), [profile_skill("Python", 3)]
-    )
+    got = score_stack([], ["Rust"], [profile_skill("Python", 3)])
     assert got == 0
 
 
 def test_an_alias_scores_exactly_like_the_name():
     """Псевдоним — другое написание того же навыка, и стоит столько же."""
     skills = [profile_skill("PostgreSQL", 4, aliases=["Postgres"])]
-    assert score_parsed(parsed_vacancy(stack_required=["postgres"]), skills) == 4
+    assert score_stack(["postgres"], [], skills) == 4
 
 
 def test_blank_and_non_string_stack_items_are_skipped():
     """Мусор в стеке не участвует в подсчёте и не роняет его."""
-    got = score_parsed(
-        parsed_vacancy(stack_required=["", None, "Python"]),
-        [profile_skill("Python", 2)],
-    )
+    got = score_stack(["", None, "Python"], [], [profile_skill("Python", 2)])
     assert got == 2
+
+
+def test_one_profile_skill_named_twice_is_paid_for_once():
+    """Два написания одного навыка анкеты дают его уровень один раз.
+
+    Объявление называет инструменты порознь — «Photoshop, Illustrator», — и
+    в стеке они остаются порознь: карточка обязана показать, что требуют
+    именно их. А в анкете это один навык одного уровня, и заплатить за него
+    дважды значило бы поднять вакансию с одним знакомым умением над той, где
+    их правда два.
+    """
+    skills = [profile_skill("Adobe Suite", 3, aliases=["Photoshop", "Illustrator"])]
+    assert score_stack(["Photoshop", "Illustrator"], [], skills) == 3
+
+
+def test_the_stronger_half_pays_for_a_skill_named_in_both():
+    """Навык, названный в обеих половинах, весит по обязательной.
+
+    Половина решает не порядок упоминания, а строгость: требование весит
+    полным уровнем, «будет плюсом» — на балл меньше. Возьми верх желательная,
+    и вакансия, где навык прямо требуют, оценивалась бы ниже той, где его
+    называют пожеланием.
+    """
+    skills = [profile_skill("Adobe Suite", 3, aliases=["Photoshop", "Illustrator"])]
+    assert score_stack(["Illustrator"], ["Photoshop"], skills) == 3
+
+
+def test_two_unknown_names_each_cost_their_own_point():
+    """Незнакомые анкете названия остаются каждый сам по себе.
+
+    Свести их не по чему: общего навыка, за который они оба сошли бы, в
+    анкете нет вовсе, и вакансия, требующая двух незнакомых технологий,
+    должна стоять ниже требующей одной.
+    """
+    got = score_stack(["Rust", "Go"], [], [profile_skill("Python", 3)])
+    assert got == -2
 
 
 def test_required_and_preferred_add_up_together():
     """Обе половины стека складываются в один итог."""
     skills = [profile_skill("Python", 3), profile_skill("Docker", 2)]
-    got = score_parsed(
-        parsed_vacancy(stack_required=["Python", "Rust"], stack_preferred=["Docker"]),
-        skills,
-    )
+    got = score_stack(["Python", "Rust"], ["Docker"], skills)
     assert got == 3

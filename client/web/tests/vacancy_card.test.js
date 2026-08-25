@@ -143,6 +143,15 @@ describe('лента карточки', () => {
     expect(timelineRows([], events)[0].text).toBe('Без замечаний.');
   });
 
+  it('заведение руками названо словами', () => {
+    // Незнакомый род лента печатает как есть, латиницей. Пропади перевод
+    // этого рода — в ленте встало бы «created_by_hand» вместо фразы.
+    const events = [
+      { id: 6, kind: 'created_by_hand', payload: null, created_at: '2026-08-25T11:00:00Z' },
+    ];
+    expect(timelineRows([], events)[0].text).toBe('Вакансия добавлена вручную.');
+  });
+
   it('поступление называет канал', () => {
     expect(timelineRows([], [EVENTS[1]])[0].text).toBe('Поступила из канала @jobs.');
   });

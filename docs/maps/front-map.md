@@ -352,7 +352,7 @@
 - принимает: draft
 - берёт: ./DraftNotes.svelte
 
-### components/NewVacancyFields.svelte (91)
+### components/NewVacancyFields.svelte (105)
 - Вилка тремя полями: человек читает её в объявлении разложенной, и набирать её одной строкой значило бы просить его склеить то, что мост разберёт обратно.
 - принимает: draft, options, oncompany, onhr
 - берёт: ./ChoiceRow.svelte, ./DraftChips.svelte, ./DraftNotes.svelte, ./SuggestInput.svelte
@@ -710,7 +710,7 @@
 - * Чем подписана запись без названия. Показывают её приглушённой * (`styles/unnamed.css`) — так видно, что это не название, а его отсутствие.
 - отдаёт: UNNAMED
 
-### state/vacancies.js (248)
+### state/vacancies.js (252)
 - * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
 - отдаёт: SORTS, ago, blankVacancy, emptyNote, gradeLabel, remoteLabel, salaryLabel, scoreTone, shortAgo, shownStack, sortKey, vacancyLine, vacancyNamed
 
@@ -1072,7 +1072,7 @@ body, html, button, body, .material-symbols-outlined
 .hr-mini-name, .hr-mini-row .hr-avatar, .hr-mini-meta, .hr-mini-go, .mini-list-empty, .mini-list-more
 - берёт: --accent, --border, --selected-bg, --text-primary, --text-tertiary
 
-### styles/modal.css (178)
+### styles/modal.css (179)
 - Окно поверх окна: затемнение на весь экран и коробка по центру.
 - селекторы (22): .modal-backdrop, .modal-dialog, .modal-dialog.narrow, .modal-dialog.narrow .modal-body, .modal-dialog.narrow .modal-body > *, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-actions,
 .modal-footer, .modal-footer, .modal-footer .btn, .modal-footer .btn .material-symbols-outlined, .modal-subtitle, .modal-error
@@ -1560,13 +1560,13 @@ body, html, button, body, .material-symbols-outlined
 ### tests/vacancies.test.js (285)
 - —
 
-### tests/vacancies_screen_new_live.test.js (166)
+### tests/vacancies_screen_new_live.test.js (210)
 - * Мост, отвечающий тем же, чем отвечает настоящий. * * Заведение чужой карточки отказывает: так ведёт себя настоящий, когда имя * занято или связь оборвалась, — и это единственный способ увидеть, что * остаётся в черновике после неудачи.
 
 ### tests/vacancy_actions.test.js (117)
 - —
 
-### tests/vacancy_card.test.js (278)
+### tests/vacancy_card.test.js (287)
 - —
 
 ### tests/vacancy_card_live.test.js (80)
