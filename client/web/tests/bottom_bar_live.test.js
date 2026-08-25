@@ -22,6 +22,9 @@ afterEach(cleanup);
 function bar(health) {
   const asked = [];
   const tips = [];
+  // Вести полосе приходят подпиской: сюда складываются обработчики, чтобы
+  // проверка могла позвать их так же, как их зовёт мост.
+  const handlers = {};
   const ask = async (method, ...args) => {
     asked.push({ method, args });
     if (method === 'system.initial') return { unread: { count: 0 }, mode: 'Full', health };
@@ -34,15 +37,43 @@ function bar(health) {
     props: {
       ask,
       say: () => {},
-      events: { on: () => () => {}, run: () => {}, stop: () => {} },
+      events: {
+        on: (name, handler) => {
+          handlers[name] = handler;
+          return () => {};
+        },
+        run: () => {},
+        stop: () => {},
+      },
       onlocked: (tip) => tips.push(tip),
       oncontact: () => {},
     },
   });
-  return { asked, tips };
+  return { asked, tips, handlers };
 }
 
 describe('живая нижняя полоса', () => {
+  it('разбор вставленного объявления называет себя под полосами', async () => {
+    // Ступень эта счёта не имеет — полосы бегут пустыми, — и своё имя говорит
+    // подписью. Не разбери полоса стадию, человек читал бы «Запуск…» всё
+    // время разбора и не отличил бы свою вставку от обхода каналов.
+    const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+
+    // Полоса показывает подпись только на идущей работе: до вести о начале
+    // её место занято переключателем режима.
+    handlers.ingestion_started();
+    handlers.progress_update({
+      stage: 'pasted',
+      label: 'Разбор вставленного объявления…',
+      current: 0,
+      total: 0,
+    });
+    await settled();
+
+    expect(document.body.textContent).toContain('Разбор вставленного объявления…');
+  });
+
   it('гасит бота, когда что-то отвалилось, и называет наверх причину', async () => {
     // Бот, работающий против мёртвого сеанса Telegram, крутит обходы впустую, а
     // переключатель в этот миг уже заперт, и человек выключить его не может.

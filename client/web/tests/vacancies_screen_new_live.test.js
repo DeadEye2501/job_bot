@@ -24,6 +24,8 @@ afterEach(() => {
 });
 
 const SENT = [];
+const PASTED = [];
+const SAID = [];
 
 /** Мост, отвечающий тем же, чем отвечает настоящий.
  *
@@ -35,6 +37,10 @@ async function bridge(method, payload) {
   if (method === 'vacancies.create') {
     SENT.push(payload);
     return { created_id: 77 };
+  }
+  if (method === 'vacancies.create_from_text') {
+    PASTED.push(payload);
+    return { started: true };
   }
   if (method === 'companies.create' || method === 'hr.create') return null;
   if (method === 'vacancies.list') {
@@ -54,9 +60,11 @@ async function bridge(method, payload) {
 
 function screen() {
   SENT.length = 0;
+  PASTED.length = 0;
+  SAID.length = 0;
   const [props] = livingProps({
     ask: bridge,
-    say: () => {},
+    say: (text) => SAID.push(text),
     lockedTip: '',
     events: { on: () => () => {} },
     oncontacts: () => {},
@@ -183,6 +191,89 @@ describe('живой экран вакансий', () => {
 
     expect(SENT[0].stack_required).toEqual(['Python']);
     expect(SENT[0].stack_preferred).toEqual(['Docker']);
+  });
+
+  it('вставленный текст уезжает своим слотом, а не полями формы', async () => {
+    // Вкладки две, а слот у каждой свой: поля идут прямо в строку, текст — в
+    // конвейер на разбор. Уедь текст слотом полей, вакансия завелась бы с
+    // пустым названием и без разбора вовсе.
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+
+    [...page.querySelectorAll('button')]
+      .find((one) => one.textContent.trim() === 'Текст')
+      .click();
+    await settled();
+
+    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
+    text.value = 'Ищем флориста в студию';
+    text.dispatchEvent(new Event('input', { bubbles: true }));
+
+    // Дату набирают тем же полем, что и на стороне полей; уедь она мимо
+    // нагрузки, объявление выпало бы из отбора «за последние дни».
+    const when = page.querySelector('.date-picker input');
+    when.value = '20.08.2026';
+    when.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+
+    [...page.querySelectorAll('button')].find((one) => one.textContent.trim() === 'Создать').click();
+    await settled();
+
+    expect(PASTED).toHaveLength(1);
+    expect(PASTED[0].raw_text).toBe('Ищем флориста в студию');
+    expect(PASTED[0].posted_at).toBe('2026-08-20');
+    expect(SENT).toHaveLength(0);
+    // Про исход говорит весть, когда разбор кончится. Скажи окно «Вакансия
+    // заведена» сразу — на повторе и на молчащей модели человек прочёл бы
+    // подтверждение раньше отказа, и первое было бы ложью.
+    expect(SAID).toEqual([]);
+  });
+
+  it('на стороне полей окно подтверждает заведение словом', async () => {
+    // Там работа кончается ответом моста, а не вестью: промолчи окно —
+    // человек не понял бы, завелась ли вакансия.
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+
+    const title = page.querySelector('input[placeholder="Название (обязательно)"]');
+    title.value = 'Python-разработчик';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+
+    [...page.querySelectorAll('button')].find((one) => one.textContent.trim() === 'Создать').click();
+    await settled();
+
+    expect(SAID).toEqual(['Вакансия заведена']);
+  });
+
+  it('кнопка «Создать» на вкладке текста ждёт текста, а не названия', async () => {
+    // Заслон у вкладок разный: полям нужно название, тексту — сам текст.
+    // Останься заслон общим, кнопка на вкладке текста молчала бы всегда.
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+
+    [...page.querySelectorAll('button')]
+      .find((one) => one.textContent.trim() === 'Текст')
+      .click();
+    await settled();
+
+    const create = [...page.querySelectorAll('button')].find(
+      (one) => one.textContent.trim() === 'Создать',
+    );
+    expect(create.disabled).toBe(true);
+
+    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
+    text.value = 'Ищем повара';
+    text.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+
+    expect(create.disabled).toBe(false);
   });
 
   it('Escape в наборе пилюли отменяет пилюлю, а не форму', async () => {

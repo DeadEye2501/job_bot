@@ -48,7 +48,9 @@
   const rows = $derived(card ? timelineRows(card.history, card.events) : []);
   const tone = $derived(card ? scoreTone(card.score, card.score_threshold) : '');
   const salary = $derived(card ? salaryLabel(card) : '');
-  const blocks = $derived(card ? actionBlocks(card, lockedTip) : { send: '', rerun: '', source: '' });
+  const blocks = $derived(
+    card ? actionBlocks(card, lockedTip) : { send: '', rerun: '', source: '', raw: '' },
+  );
   const links = $derived(card ? cardLinks(card) : null);
   // Когда объявление вышло: у поста есть своя метка, а у записи — только время
   // её заведения, и второе на день-другой позже первого.

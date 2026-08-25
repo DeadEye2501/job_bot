@@ -19,9 +19,10 @@ import pytest
 
 from backend.bot import client as client_mod
 from backend.bot.client import Bot
+from backend.bot.pasted import PastedOutcome
 from backend.bot.rerun import RerunOutcome
 from client.bridge import lifespan
-from client.bridge.refusals import RERUN_REFUSALS
+from client.bridge.refusals import PASTED_REFUSALS, RERUN_REFUSALS
 from tests.fakes.ui_bot import ANSWERS, UiBot
 
 
@@ -150,3 +151,24 @@ def test_the_fake_answers_the_rerun_with_an_outcome_the_bot_can_return():
     настоящий исход шёл бы мимо перевода — и оба конца были бы зелены.
     """
     assert ANSWERS["rerun"] in _rerun_outcomes()
+
+
+def _pasted_outcomes() -> set[str]:
+    """Чем приём вставленного объявления может кончиться по объявлению бота."""
+    return set(get_args(PastedOutcome))
+
+
+def test_every_pasted_outcome_has_a_phrase_for_the_human():
+    """У каждого исхода приёма вставленного есть своя фраза человеку.
+
+    Тот же шов, что и у повторного разбора, и та же беда без него: исход
+    заводит бэкенд, а переводит мост, и непереведённый доедет запасным «не
+    удалось завести» на том, что кончилось внятно — объявление уже заведено,
+    разбор не нашёл здесь вакансии, молчит модель отпечатков.
+    """
+    assert _pasted_outcomes() - {"ok"} == set(PASTED_REFUSALS)
+
+
+def test_the_fake_answers_the_pasted_intake_with_an_outcome_the_bot_can_return():
+    """Заготовленный ответ подделки — из тех же исходов, что и у бота."""
+    assert ANSWERS["pasted"] in _pasted_outcomes()

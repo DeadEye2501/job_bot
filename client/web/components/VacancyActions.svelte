@@ -43,7 +43,14 @@
 
     <div class="menu-line"></div>
 
-    <MenuItem icon="code" label="Открыть raw_text" {close} onpick={onraw} />
+    <MenuItem
+      icon="code"
+      label="Открыть raw_text"
+      title={blocks.raw || null}
+      blocked={Boolean(blocks.raw)}
+      {close}
+      onpick={() => pick(onraw, blocks.raw)}
+    />
     <MenuItem
       icon="open_in_new"
       label="Перейти к каналу-источнику"

@@ -391,7 +391,7 @@ async def _thrown_out_by_the_verdict(
 
 
 async def parse_and_update_vacancy(
-    pipeline, vacancy_id: int, text: str, channel_username: str,
+    pipeline, vacancy_id: int, text: str, channel_username: str | None,
     *, allow_delete: bool = True,
 ) -> bool:
     """Разобрать объявление, вынести приговор и записать исход; сказать, вышло ли.

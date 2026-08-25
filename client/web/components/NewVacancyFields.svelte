@@ -23,6 +23,7 @@
   import ChoiceRow from './ChoiceRow.svelte';
   import DraftChips from './DraftChips.svelte';
   import DraftNotes from './DraftNotes.svelte';
+  import PostedAtField from './PostedAtField.svelte';
   import SuggestInput from './SuggestInput.svelte';
 
   let { draft, options, oncompany, onhr } = $props();
@@ -34,6 +35,10 @@
 </script>
 
 <input class="input" placeholder="Название (обязательно)" bind:value={draft.title} />
+
+<!-- Дата сразу под названием: она про само объявление, а не про то, чего от
+     кандидата ждут, и место ей рядом с тем, чем объявление называется. -->
+<PostedAtField {draft} />
 
 <SuggestInput
   value={draft.company_name}

@@ -13,10 +13,24 @@ from backend.repository import (
     vacancies_new,
     vacancy_status,
 )
-from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
+from backend.incoming import moment_or_none, text_or_none
+from client.bridge.answer import (
+    BAD_PAYLOAD,
+    Denied,
+    bad_fields,
+    denied,
+    launched,
+    reply,
+)
 from client.bridge.form_payloads import read_new_vacancy_fields
 from client.bridge.hub import Hub
-from client.bridge.refusals import NAME_REQUIRED, NO_VACANCY
+from client.bridge.refusals import (
+    NAME_REQUIRED,
+    NO_BOT,
+    NO_VACANCY,
+    PASTED_REFUSALS,
+    TEXT_REQUIRED,
+)
 from client.bridge.page import read_page
 from client.bridge.vacancy_actions import VacancyActions
 from client.bridge.vacancy_filter import read_vacancy_filter
@@ -265,3 +279,32 @@ class Vacancies(VacancyActions, VacancyLinks):
             return {"action": "create_vacancy", "created_id": created_id}
 
         return reply(self._hub.runner, run())
+
+    def create_from_text(self, payload: dict) -> dict:
+        """Завести вакансию по вставленному тексту объявления.
+
+        Вторая вкладка того же окна: человек приносит текст, а поля из него
+        достаёт конвейер — тем же разбором, каким он читает пост канала, и с
+        тем же баллом, приговором и отпечатком. Набирать то же самое руками
+        значило бы делать работу, которую бот делает лучше.
+
+        Ответ говорит только «пущено»: разбор — это несколько обращений к
+        модели, и ждать их значит держать окно. Чем кончилось, человек узнаёт
+        вестью.
+        """
+        text = text_or_none(payload.get("raw_text"))
+        if not text:
+            return denied(TEXT_REQUIRED, action="create_from_text")
+
+        bot = self._hub.bot
+        if bot is None:
+            return denied(NO_BOT, action="create_from_text")
+
+        posted_at = moment_or_none(payload.get("posted_at"))
+        return launched(
+            self._hub,
+            lambda: bot.ui_ingest_pasted_text(text, posted_at),
+            PASTED_REFUSALS,
+            "Объявление заведено.",
+            action="create_from_text",
+        )
