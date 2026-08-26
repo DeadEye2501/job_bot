@@ -17,7 +17,13 @@ import httpx
 from adapters.lm_chat import ChatRequest, chat
 from backend.domain.skill_names import skill_key
 from backend.domain.spellings import dedupe_first_wins
-from backend.domain.taxonomy import CEFR_LEVELS, GRADES, NATIVE_LEVEL, WORK_FORMATS
+from backend.domain.taxonomy import (
+    CEFR_LEVELS,
+    GRADES,
+    LEVEL_SPELLINGS,
+    NATIVE_LEVEL,
+    WORK_FORMATS,
+)
 from backend.llm.cv_grounding import grounded_in_cv
 from backend.llm.cv_native import with_native_language
 from backend.llm.external import external_block
@@ -48,10 +54,11 @@ logger = logging.getLogger(__name__)
 #  - Мелкие поля-перечисления модель выдумывает: грейд выводит из стажа, язык —
 #    из страны проживания. Запретами в промпте это лечится наполовину, поэтому
 #    грейды и языки сверяются с текстом резюме в `cv_grounding.py`.
-#  - Уровень языка, названный не по шкале («письменный», «со словарём»),
-#    заменяется нижним (`_parse_languages`) — со всеми последствиями: отбор
-#    вакансий по языку он включает и вакансию, требующую свободного языка,
-#    такой анкете отрежет.
+#  - Уровень языка, названный словом, переводится в шкалу
+#    (`domain/taxonomy.LEVEL_SPELLINGS`); названный невнятно — «технический»,
+#    «письменный» — заменяется высшим. Уровня не называет тот, кто в языке
+#    уверен, и низший на его месте отрезал бы такому человеку все вакансии,
+#    где язык нужен.
 #  - Модель тянет в стек работы то, что названо в её обязанностях, и общий
 #    список навыков кандидата заодно. Сверка снимает это, спрашивая заголовок
 #    над стеком, а не сами названия — они-то настоящие. Остаётся щель: у
@@ -77,7 +84,7 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
     "free_preferences": "string | null"
   },
   "languages": [
-    {"language": "string", "level": "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "native"}
+    {"language": "string", "level": "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "native" | "слово из резюме" | null}
   ],
   "skills": [
     {"category": "string", "name": "string", "level": 1-5, "aliases": ["string", ...]}
@@ -110,10 +117,10 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 - free_preferences: краткое свободное текстовое поле с пожеланиями к вакансиям из блоков «О себе», «Цели», «Что ищу», «Обо мне», если там есть именно предпочтения по работе; иначе null. Не дублируй дословно весь раздел — сожми до сути.
 
 Семантика languages:
-- Уровень — строго CEFR (A1–C2) или native для родного языка. Название языка — в форме как в CV («Русский», «English», «Deutsch», «Français», «中文», «Português»).
+- Название языка — в форме как в CV («Русский», «English», «Deutsch», «Français», «中文», «Português»).
 - Язык, на котором написано САМО резюме, — родной: верни его с level "native" всегда, даже если раздела языков в резюме нет и слово «русский» («English», «Deutsch») в тексте не встречается ни разу.
 - Остальные языки берутся ТОЛЬКО из текста. Не добавляй язык по национальности имени или по стране проживания.
-- Уровень тоже берётся только из текста. Назван не по шкале — «письменный», «разговорный», «со словарём», «свободно», «базовый» — верни level: null. Свой уровень вместо названного не подставляй.
+- Уровень тоже берётся только из текста, и переписывается как есть. Назван по шкале — верни по шкале. Назван словом («свободно», «разговорный», «базовый», «fluent», «в совершенстве») — верни ЭТО СЛОВО, а не свою догадку о том, какой шкале оно отвечает. Не назван вовсе — верни level: null.
 
 Семантика skills:
 - Извлекай навыки ИЗ ВСЕГО ТЕКСТА РЕЗЮМЕ, а не только из явного раздела «Профессиональные навыки» / «Skills» / «Технологии». Сканируй также: описания опыта работы, буллеты обязанностей/достижений, строки «Стек:» / «Tech stack:» внутри каждой работы, заголовок резюме (title), раздел «О себе». Если в CV нет отдельного блока скилов — собери список из упоминаний по всему тексту. Если технология встречается ТОЛЬКО в одном месте работы и нигде больше — она всё равно должна попасть в skills.
@@ -166,16 +173,44 @@ def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]:
     )
 
 
+# Написания уровней разом, от длинного к короткому: «intermediate» сидит
+# внутри «upper intermediate», и короткое, спрошенное первым, отобрало бы у
+# длинного его собственный уровень.
+_LEVELS_BY_SPELLING: tuple[tuple[str, str], ...] = tuple(
+    sorted(
+        (
+            (spelling.replace("-", " "), level)
+            for level, spellings in LEVEL_SPELLINGS.items()
+            for spelling in spellings
+        ),
+        key=lambda pair: len(pair[0]),
+        reverse=True,
+    )
+)
+
+
 def _normalize_lang_level(value: object) -> str | None:
+    """Уровень по шкале; пусто — сказанного не понять.
+
+    Слово вместо шкалы переводится, а не приравнивается к нижнему уровню:
+    «свободно» — это названный уровень, просто не по шкале, и считать его
+    начальным значило бы отрезать человеку все вакансии, где язык нужен.
+    """
     v = str_or_none(value)
     if v is None:
         return None
-    vl = v.lower()
-    if vl in (NATIVE_LEVEL, "родной"):
+    # Промпт просит вернуть уровень как в резюме, а там его пишут по-всякому:
+    # «Свободно.», «C1 (advanced)», «Upper Intermediate». Дефис и пробел
+    # сводятся к одному, обрамление отбрасывается.
+    plain = re.sub(r"[\s\-]+", " ", v.strip().strip(".,;:()").lower())
+    if plain in (NATIVE_LEVEL, "родной"):
         return NATIVE_LEVEL
-    up = v.upper()
-    if up in CEFR_LEVELS:
-        return up
+    by_scale = re.search(r"\b([abc][12])\b", plain)
+    if by_scale is not None:
+        return by_scale.group(1).upper()
+    for spelling, level in _LEVELS_BY_SPELLING:
+        if re.search(rf"(?<![-\w]){re.escape(spelling)}(?![-\w])", plain):
+            return level
     return None
 
 
@@ -195,16 +230,17 @@ def _parse_language_item(item) -> tuple[str, str | None] | None:
 
 
 def _parse_languages(raw: object) -> list[ParsedCvLanguage]:
-    """Языки анкеты: по одному на язык, уровень неизвестен — самый низкий.
+    """Языки анкеты: по одному на язык, уровень неизвестен — высший.
 
     Отбор повторов свой, а не общий `dedupe_first_wins`: первым здесь
     побеждает не всякий, а тот, у кого уровень назван. Модель присылает один
     и тот же язык дважды — «Английский: технический» и «Английский: C1», — и
     первым в списке чаще стоит невнятный.
 
-    Уровень, оставшийся неизвестным, заменяется самым низким: колонка
-    обязательная, хранить «неизвестно» негде, а выбросить язык значило бы
-    потерять названное человеком.
+    Уровень, оставшийся неизвестным, заменяется высшим: колонка обязательная,
+    хранить «неизвестно» негде, а выбросить язык значило бы потерять названное
+    человеком. Высшим, а не низшим, потому что уровня не называет тот, кто в
+    языке уверен, — неуверенный как раз уточняет.
     """
     if not isinstance(raw, list):
         return []
@@ -218,7 +254,7 @@ def _parse_languages(raw: object) -> list[ParsedCvLanguage]:
             continue
         best[language.casefold()] = (known[0] if known else language, level)
     return [
-        ParsedCvLanguage(language=name, level=level or CEFR_LEVELS[0])
+        ParsedCvLanguage(language=name, level=level or CEFR_LEVELS[-1])
         for name, level in best.values()
     ]
 

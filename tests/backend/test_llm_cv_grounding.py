@@ -142,19 +142,20 @@ def test_an_invented_native_language_is_dropped_like_any_other():
     assert grounded.languages == []
 
 
-def test_a_language_level_the_text_never_names_drops_to_the_lowest():
+def test_a_language_level_the_text_never_names_falls_back_to_the_highest():
     """Уровень тоже сверяется с текстом, а не только сам язык.
 
-    «Английский (разговорный)» модель превращает в B1 или B2 — по настроению.
-    Ни того, ни другого в резюме нет, а по уровню языка отбирают вакансии:
-    выдуманный C1 приведёт к объявлениям, где человеку работать нечем.
+    «Английский (технический)» модель превращает в B1 или B2 — по настроению.
+    Ни того, ни другого в резюме нет. Взамен ставится высший: уровня человек
+    не назвал, а не называют его те, кто в языке уверен. Нижний на его месте
+    отрезал бы такому человеку все вакансии, где язык нужен.
     """
     parsed = parsed_cv(languages=[ParsedCvLanguage(language="Английский", level="B1")])
 
-    grounded = grounded_in_cv(parsed, "Иностранные языки: английский (разговорный)")
+    grounded = grounded_in_cv(parsed, "Иностранные языки: английский (технический)")
 
     assert [(x.language, x.level) for x in grounded.languages] == [
-        ("Английский", "A1")
+        ("Английский", "C2")
     ]
 
 
@@ -299,7 +300,7 @@ def test_a_level_hidden_inside_another_word_does_not_confirm_it():
     grounded = grounded_in_cv(parsed, "Английский. Опыт B2B-продаж и работы с CRM.")
 
     assert [(x.language, x.level) for x in grounded.languages] == [
-        ("Английский", "A1")
+        ("Английский", "C2")
     ]
 
 
@@ -349,3 +350,69 @@ def test_a_stack_heading_is_recognised_however_it_is_written():
         grounded = grounded_in_cv(parsed, text)
 
         assert grounded.experience[0].stack == ["Python"], heading
+
+
+def test_a_level_typed_in_cyrillic_letters_is_still_its_own():
+    """«А1» русской буквой — тот же A1, и повышать его до высшего нельзя.
+
+    Обозначения шкалы набирают в русской раскладке сплошь и рядом: А, В, С в
+    ней неотличимы на вид от латинских. Не узнай сверка своё же обозначение —
+    и честно названный начальный уровень стал бы высшим.
+    """
+    parsed = parsed_cv(languages=[ParsedCvLanguage(language="Английский", level="A1")])
+
+    grounded = grounded_in_cv(parsed, "Иностранные языки\nАнглийский - А1")
+
+    assert [(x.language, x.level) for x in grounded.languages] == [
+        ("Английский", "A1")
+    ]
+
+
+def test_a_level_word_from_another_sentence_does_not_confirm_it():
+    """«Свободный график» — не свободный английский.
+
+    Слова уровней живут в резюме своей жизнью: «свободный график»,
+    «продвинутый пользователь Excel», «базовое понимание процессов». Ищи их по
+    всему тексту — и любой выдуманный уровень найдёт себе подтверждение.
+    """
+    parsed = parsed_cv(languages=[ParsedCvLanguage(language="Английский", level="C1")])
+    text = (
+        "Ищу удалённую работу, свободный график.\n"
+        "Продвинутый пользователь Excel.\n\n"
+        "Иностранные языки\nАнглийский\n"
+    )
+
+    grounded = grounded_in_cv(parsed, text)
+
+    assert [(x.language, x.level) for x in grounded.languages] == [
+        ("Английский", "C2")
+    ]
+
+
+def test_a_level_word_belongs_to_the_language_it_stands_next_to():
+    """Два языка подряд: слово соседа своему уровню не засчитывается."""
+    parsed = parsed_cv(
+        languages=[
+            ParsedCvLanguage(language="Английский", level="C1"),
+            ParsedCvLanguage(language="Немецкий", level="A1"),
+        ]
+    )
+    text = "Иностранные языки\nАнглийский — свободно\nНемецкий — базовый\n"
+
+    grounded = grounded_in_cv(parsed, text)
+
+    assert [(x.language, x.level) for x in grounded.languages] == [
+        ("Английский", "C1"),
+        ("Немецкий", "A1"),
+    ]
+
+
+def test_a_longer_level_name_is_not_confirmed_by_its_own_tail():
+    """«Upper-Intermediate» — не «Intermediate», и B1 отсюда не следует."""
+    parsed = parsed_cv(languages=[ParsedCvLanguage(language="Английский", level="B1")])
+
+    grounded = grounded_in_cv(parsed, "Языки: Английский — Upper-Intermediate")
+
+    assert [(x.language, x.level) for x in grounded.languages] == [
+        ("Английский", "C2")
+    ]

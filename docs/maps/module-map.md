@@ -483,7 +483,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def joined_stack(required: list[str], preferred: list[str]) -> list[str]` (8)
 - `def deduped_halves(required: list[str], preferred: list[str]) -> tuple[list[str], list[str]]` (22)
 
-### `backend/domain/taxonomy.py` — 46 строк
+### `backend/domain/taxonomy.py` — 64 строк
 
 Замкнутые перечни значений, которыми описывают вакансию и анкету.
 
@@ -922,16 +922,16 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (24)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
-### `backend/llm/cv.py` — 417 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 453 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
 Зависит от: `adapters.lm_chat`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.incoming`, `backend.llm.answers`, `backend.llm.cv_grounding`, `backend.llm.cv_native`, `backend.llm.external`, `backend.payloads`
 
 - `def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]` (9)
-- `def _normalize_lang_level(value: object) -> str | None` (11)
+- `def _normalize_lang_level(value: object) -> str | None` (23)
 - `def _parse_language_item(item) -> tuple[str, str | None] | None` (13)
-- `def _parse_languages(raw: object) -> list[ParsedCvLanguage]` (27)
+- `def _parse_languages(raw: object) -> list[ParsedCvLanguage]` (28)
 - `def _parse_date(value) -> date | None` (21)
 - `def _parse_profile(data: dict) -> ParsedCvProfile | None` (23)
 - `def _parse_skill(item) -> ParsedCvSkill | None` (35)
@@ -939,7 +939,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parse_cv_json(answer: str) -> ParsedCv | None` (31)
 - `async def parse_cv(text: str, client: httpx.AsyncClient, model: str) -> ParsedCv | None` (36)
 
-### `backend/llm/cv_grounding.py` — 215 строк
+### `backend/llm/cv_grounding.py` — 280 строк
 
 Что в разобранном резюме не подтверждается его же текстом.
 
@@ -948,7 +948,8 @@ First-run bootstrap: ensure DB schema exists.
 - `def _spelled_in(text: str, word: str) -> bool` (10)
 - `def _grade_named_in(text: str, grade: str) -> bool` (8)
 - `def _language_named_in(text: str, name: str) -> bool` (18)
-- `def _grounded_level(text: str, level: str) -> str` (14)
+- `def _level_named_near(text: str, language: str, word: str) -> bool` (33)
+- `def _grounded_level(text: str, language: str, level: str) -> str` (24)
 - `def _company_at(lowered: str, company: str, cursor: int) -> int` (15)
 - `def _job_blocks(text: str, companies: list[str]) -> list[str | None]` (36)
 - `def _grounded_stack(place, block: str | None) -> list[str]` (11)
@@ -1035,7 +1036,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _genre_request(text: str, max_tokens: int) -> ChatRequest` (17)
 - `async def classify_post_genre(text: str, client: httpx.AsyncClient, model: str) -> tuple[PostGenre | None, str | None]` (22)
 
-### `backend/llm/hallucination.py` — 280 строк
+### `backend/llm/hallucination.py` — 286 строк
 
 Чем негодно обоснование, которое дала модель.
 
@@ -3532,13 +3533,13 @@ Runtime settings layer.
 - `def _client(letter: str, *, finish_reason: str='stop', factcheck: str=PASSES)` (10)
 - `async def _written(*args, **kwargs)` (10)
 
-### `tests/backend/test_llm_cv_grounding.py` — 351 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_cv_grounding.py` — 418 строк ⚠ подошёл к 300
 
 Следствия сверки разобранного резюме с его же текстом.
 
 Зависит от: `backend.llm.cv_grounding`, `backend.payloads`, `tests.factories`
 
-Тестов: 24
+Тестов: 28
 
 
 ### `tests/backend/test_llm_cv_items.py` — 221 строк
@@ -3562,13 +3563,13 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/backend/test_llm_cv_profile.py` — 242 строк
+### `tests/backend/test_llm_cv_profile.py` — 300 строк
 
 Следствия разбора профиля и языков в `backend/llm/cv.py`.
 
 Зависит от: `backend.llm.cv`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 22
+Тестов: 25
 
 - `async def parse_answer(answer: str, text: str='резюме')` (8)
 - `async def parse_profile(text: str='резюме', **fields)` (5)
