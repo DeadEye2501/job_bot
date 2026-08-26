@@ -30,7 +30,7 @@ def test_the_slice_carries_what_the_validator_reads():
     """В срез попадают поля, по которым проверяльщик выносит решение."""
     profile = profile_row(
         title="Python-разработчик",
-        location="Ереван",
+        location="Тверь",
         grades=["middle", "senior"],
         work_format=["remote"],
         free_preferences="без релокации",
@@ -39,7 +39,7 @@ def test_the_slice_carries_what_the_validator_reads():
     got = build_candidate_profile(profile, [])
 
     assert got.title == "Python-разработчик"
-    assert got.location == "Ереван"
+    assert got.location == "Тверь"
     assert got.grades == ["middle", "senior"]
     assert got.work_formats == ["remote"]
     assert got.free_preferences == "без релокации"

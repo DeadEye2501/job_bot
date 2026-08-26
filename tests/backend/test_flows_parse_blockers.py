@@ -66,10 +66,10 @@ async def test_the_office_in_the_candidates_own_city_is_no_blocker(
     """
     pipeline, vacancy = parsing
     pipeline.profile_cache = CandidateProfile(
-        location="Армения/Ереван", work_formats=["remote", "hybrid"]
+        location="Тверская область/Тверь", work_formats=["remote", "hybrid"]
     )
     pipeline.parsed = replace(
-        pipeline.parsed, remote="hybrid", location="Армения/Ереван"
+        pipeline.parsed, remote="hybrid", location="Тверская область/Тверь"
     )
 
     await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs")

@@ -264,6 +264,7 @@
 - `CEFR_LEVELS: tuple[str, ...]` = `набор из 6`
 - `NATIVE_LEVEL` = `'native'`
 - `LEVEL_SPELLINGS: dict[str, tuple[str, ...]]` = `словарь из 6`
+- `LEVELS_BY_SPELLING: tuple[tuple[str, str], ...]` = `tuple(sorted(((spelling.replace('-', ' '), level…`
 - `LANGUAGE_LEVELS: tuple[str, ...]` = `CEFR_LEVELS + (NATIVE_LEVEL,)`
 
 ### `backend/domain/telegram_identity.py`
@@ -423,6 +424,10 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `backend/incoming.py`
+
+- `_HOMOGLYPHS` = `str.maketrans('авсеАВСЕ', 'abceABCE')`
+
 ### `backend/llm/answers.py`
 
 - `ONLY_JSON` = `'Никакого текста вне JSON. Никакого markdown. Ни…`
@@ -462,7 +467,6 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `PARSE_CV_PROMPT` = `'Ты парсишь CV специалиста и извлекаешь структур…`
-- `_LEVELS_BY_SPELLING: tuple[tuple[str, str], ...]` = `tuple(sorted(((spelling.replace('-', ' '), level…`
 - `_YEAR_MONTH_RE` = `re.compile('^(\\d{4})-(\\d{1,2})$')`
 - `_YEAR_RE` = `re.compile('^(\\d{4})$')`
 - `_NOT_A_SKILL_SECTION_RE` = `re.compile('\\b(soft[\\s-]?skill|софт[\\s-]?скил…`
@@ -470,7 +474,6 @@
 ### `backend/llm/cv_grounding.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_HOMOGLYPHS` = `str.maketrans('авсе', 'abce')`
 - `_LEVEL_NEAR_CHARS` = `60`
 - `_STACK_WORDS` = `'(?:\\w+\\s+)?(?:стек|стэк)|(?:\\w+\\s+)?техноло…`
 - `_STACK_HEADING_RE` = `re.compile(f'(?:{_STACK_WORDS})\\s*:|^[\\s•*-]*(…`

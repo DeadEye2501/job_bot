@@ -90,12 +90,12 @@ async def test_whatever_was_extracted_is_kept(emptied, session_factory):
 
     await parse.save_empty_vacancy(pipeline, 
         vacancy.id,
-        parsed_vacancy(title="Python-разработчик", location="Ереван"),
+        parsed_vacancy(title="Python-разработчик", location="Тверь"),
     )
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.title == "Python-разработчик"
-    assert saved.location == "Ереван"
+    assert saved.location == "Тверь"
 
 
 async def test_nothing_extracted_wipes_the_previous_parse(emptied, session_factory):

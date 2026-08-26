@@ -5,6 +5,7 @@
 файл, который человек выбрал в окне.
 """
 
+import codecs
 import logging
 from pathlib import Path
 from zipfile import BadZipFile
@@ -74,6 +75,12 @@ def _plain_text(path: Path) -> str:
     целый, читаемый файл падал бы на первой же кириллической букве.
     """
     raw = path.read_bytes()
+    # Двухбайтовые метки порядка проверяются первыми и по самим байтам:
+    # однобайтовая кодировка разбирает такой файл без всякой ошибки — в
+    # бессмыслицу с нулями между буквами, и до неё дело доходить не должно.
+    for mark, encoding in ((codecs.BOM_UTF16_LE, "utf-16"), (codecs.BOM_UTF16_BE, "utf-16")):
+        if raw.startswith(mark):
+            return raw.decode(encoding)
     try:
         return raw.decode("utf-8-sig")
     except UnicodeDecodeError:

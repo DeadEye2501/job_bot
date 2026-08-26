@@ -42,8 +42,26 @@ def test_a_russian_resume_full_of_latin_terms_is_still_russian():
     assert [x.language for x in filled.languages] == ["Русский"]
 
 
-def test_a_native_language_already_named_is_not_doubled():
-    """Родной язык человек назвал сам — второго ему не приписывают."""
+def test_the_resume_language_already_native_is_not_doubled():
+    """Язык резюме уже назван родным — второй такой же строки не заводят."""
+    parsed = parsed_cv(
+        languages=[ParsedCvLanguage(language="Русский", level="native")]
+    )
+
+    filled = with_native_language(parsed, "Инженер. Родной язык — русский.")
+
+    assert [(x.language, x.level) for x in filled.languages] == [
+        ("Русский", "native")
+    ]
+
+
+def test_a_native_named_by_the_person_stays_the_only_one():
+    """Родной язык человек назвал сам — угадывать больше нечего.
+
+    Резюме при этом написано по-русски, и русский в анкету попадает, но уже
+    высшим уровнем, а не вторым родным: своё слово человека сильнее нашего
+    вывода из языка письма.
+    """
     parsed = parsed_cv(
         languages=[ParsedCvLanguage(language="Армянский", level="native")]
     )
@@ -51,7 +69,8 @@ def test_a_native_language_already_named_is_not_doubled():
     filled = with_native_language(parsed, "Инженер. Родной язык — армянский.")
 
     assert [(x.language, x.level) for x in filled.languages] == [
-        ("Армянский", "native")
+        ("Русский", "C2"),
+        ("Армянский", "native"),
     ]
 
 
@@ -83,3 +102,18 @@ def test_the_resume_language_listed_in_another_case_is_not_doubled():
     filled = with_native_language(parsed, "Инженер. Русский язык — C2.")
 
     assert [(x.language, x.level) for x in filled.languages] == [("русский", "native")]
+
+
+def test_the_resume_language_is_not_lost_beside_another_native():
+    """Родным назван чужой язык — язык резюме всё равно попадает в анкету.
+
+    Спроси мы только «есть ли хоть один родной» — русского в анкете не
+    оказалось бы вовсе, а родным числился бы английский.
+    """
+    parsed = parsed_cv(
+        languages=[ParsedCvLanguage(language="Английский", level="native")]
+    )
+
+    filled = with_native_language(parsed, "Инженер-конструктор. Английский — Advanced.")
+
+    assert ("Русский", "C2") in [(x.language, x.level) for x in filled.languages]
