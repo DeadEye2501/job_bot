@@ -2599,7 +2599,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 250 модулей
+## tests — 251 модулей
 
 ### `tests/adapters/test_cv_text.py` — 299 строк
 
@@ -5246,6 +5246,15 @@ Runtime settings layer.
 Зависит от: `adapters.telegram`, `backend.models`, `config`, `tests.conftest`
 
 Тестов: 11
+
+
+### `tests/test_package_shadowing.py` — 32 строк
+
+Сторож сборки: чужой каталог в `sys.path` не подменяет модули проекта.
+
+Зависит от: —
+
+Тестов: 1
 
 
 ## Абстракции с одной реализацией
