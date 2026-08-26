@@ -24,7 +24,11 @@ async def parse_answer(answer: str, text: str = "резюме"):
 
 
 async def parse_profile(text: str = "резюме", **fields):
-    """Прогнать профиль с заданными полями, остальное — обязательный минимум."""
+    """Прогнать профиль с заданными полями, остальное — обязательный минимум.
+
+    Текст резюме задают там, где ответ говорит о грейде, формате работы или
+    языке: разбор сверяет их с текстом и выбрасывает не названное в нём.
+    """
     return await parse_answer(
         json.dumps({"profile": {**CV_REQUIRED_PROFILE, **fields}}), text=text
     )
@@ -68,14 +72,19 @@ async def test_a_non_string_optional_field_becomes_absent():
 
 async def test_only_known_work_formats_survive():
     """Из формата работы остаётся только известное, в нижнем регистре."""
-    parsed = await parse_profile(work_format=["Remote", "office", "как получится"])
+    parsed = await parse_profile(
+        text="Рассматриваю remote или работу в офисе",
+        work_format=["Remote", "office", "как получится"],
+    )
 
     assert parsed.profile.work_format == ["remote", "office"]
 
 
 async def test_a_repeated_work_format_is_kept_once():
     """Повтор формата не удваивается."""
-    parsed = await parse_profile(work_format=["remote", "REMOTE"])
+    parsed = await parse_profile(
+        text="Формат: remote", work_format=["remote", "REMOTE"]
+    )
 
     assert parsed.profile.work_format == ["remote"]
 
@@ -87,7 +96,9 @@ async def test_a_non_string_inside_work_format_is_dropped():
     угодно — число, словарь, `null`. Без этой охраны одно такое значение
     отменяло бы разбор всего резюме.
     """
-    parsed = await parse_profile(work_format=["remote", 42, None, {"office": True}])
+    parsed = await parse_profile(
+        text="Формат: remote", work_format=["remote", 42, None, {"office": True}]
+    )
 
     assert parsed.profile.work_format == ["remote"]
 

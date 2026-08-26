@@ -259,6 +259,7 @@
 - `GRADES: tuple[str, ...]` = `набор из 4`
 - `WORK_FORMATS: tuple[str, ...]` = `набор из 3`
 - `GRADE_SPELLINGS: dict[str, tuple[str, ...]]` = `словарь из 4`
+- `WORK_FORMAT_SPELLINGS: dict[str, tuple[str, ...]]` = `словарь из 3`
 - `WORK_FORMAT_LABELS_RU: dict[str, str]` = `словарь из 3`
 - `CEFR_LEVELS: tuple[str, ...]` = `набор из 6`
 - `NATIVE_LEVEL` = `'native'`

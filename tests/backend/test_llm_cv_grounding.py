@@ -416,3 +416,64 @@ def test_a_longer_level_name_is_not_confirmed_by_its_own_tail():
     assert [(x.language, x.level) for x in grounded.languages] == [
         ("Английский", "C2")
     ]
+
+
+def test_a_work_format_the_resume_never_names_is_dropped():
+    """«Полный день, 5/2» — не про офис, удалёнку или гибрид.
+
+    Формат работы модель выводит из графика и из готовности к переезду, а по
+    нему отбирают вакансии наравне с грейдом: приписанный офис отрежет
+    человеку всю удалённую работу.
+    """
+    parsed = parsed_cv(profile=parsed_cv_profile(work_format=["office"]))
+    text = "График: полный день, 5/2\nГотовность к переезду: нет"
+
+    grounded = grounded_in_cv(parsed, text)
+
+    assert grounded.profile.work_format == []
+
+
+def test_a_work_format_the_resume_names_survives():
+    """Названный формат остаётся, в каком бы виде его ни написали."""
+    parsed = parsed_cv(
+        profile=parsed_cv_profile(work_format=["remote", "hybrid", "office"])
+    )
+    text = "Режим работы: гибрид или удалённо, готова выходить в офис раз в неделю"
+
+    grounded = grounded_in_cv(parsed, text)
+
+    assert grounded.profile.work_format == ["remote", "hybrid", "office"]
+
+
+def test_ms_office_in_the_skills_does_not_confirm_the_office_format():
+    """«MS Office» — программа, а не работа из офиса.
+
+    Английское «office» само по себе форматом не считается именно поэтому: оно
+    сидит в названии самой ходовой программы, какая только бывает в резюме.
+    """
+    parsed = parsed_cv(profile=parsed_cv_profile(work_format=["office"]))
+    text = "Профессиональные навыки\n- MS Office, 1С\nГрафик: полный день, 5/2"
+
+    grounded = grounded_in_cv(parsed, text)
+
+    assert grounded.profile.work_format == []
+
+
+def test_one_unnamed_format_takes_the_whole_list_with_it():
+    """Формат сверяется списком целиком, а не по одному значению.
+
+    Пустой список форматов выключает отбор вакансий по формату, непустой —
+    включает и отвергает всё, чего в нём нет. Значит вредна не потеря
+    значения, а неверный непустой список: оставь «гибрид» от пары
+    «гибрид, офис» — и человеку начнут отказывать по офисным вакансиям,
+    которых он не отвергал.
+
+    Грейд сверяется иначе, по одному значению, и это не разнобой: звания
+    («senior», «тимлид») в резюме ни с чем не путаются, а слова форматов —
+    «офис», «удалён» — сидят внутри «офисного пакета» и «удаления данных».
+    """
+    parsed = parsed_cv(profile=parsed_cv_profile(work_format=["hybrid", "office"]))
+
+    grounded = grounded_in_cv(parsed, "Режим работы: гибрид, два дня дома")
+
+    assert grounded.profile.work_format == []
