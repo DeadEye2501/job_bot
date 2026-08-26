@@ -145,9 +145,11 @@ async def test_a_well_formed_answer_becomes_a_parsed_resume():
 
     assert parsed is not None
     assert parsed.profile.email == "a@b.c"
-    assert parsed.languages == []
     assert parsed.skills == []
     assert parsed.experience == []
+    # Языков в ответе нет, а родной в анкете есть всегда: его дают тексту, а
+    # не берут из ответа модели.
+    assert [(x.language, x.level) for x in parsed.languages] == [("Русский", "native")]
 
 
 async def test_reasoning_with_braces_before_the_answer_does_not_hide_it():
@@ -180,3 +182,23 @@ async def test_a_grade_the_resume_never_names_does_not_come_back():
     parsed = await parse_cv("Электрик. Опыт работы 8 лет.", client, "qwen")
 
     assert parsed.profile.grades == []
+
+
+async def test_an_invented_native_language_gives_way_to_the_resume_language():
+    """Родной язык, выдуманный моделью, заменяется языком самого резюме.
+
+    Два шага разбора работают в паре: сверка снимает названное без опоры на
+    текст, а следом родным становится язык, на котором текст написан.
+    """
+    answer = json.dumps(
+        {
+            "profile": CV_REQUIRED_PROFILE,
+            "languages": [{"language": "Армянский", "level": "native"}],
+        },
+        ensure_ascii=False,
+    )
+    client = provider({CHAT: chat_response(answer)})
+
+    parsed = await parse_cv("Саркисян Ашот. Электрик. Опыт 8 лет.", client, "qwen")
+
+    assert [(x.language, x.level) for x in parsed.languages] == [("Русский", "native")]

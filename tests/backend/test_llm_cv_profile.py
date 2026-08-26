@@ -119,9 +119,9 @@ async def test_language_levels_come_back_uppercase():
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "English", "level": "b2"}],
-    }), text="Languages: English")
+    }), text="Иностранные языки: English, читаю документацию свободно")
 
-    assert [(x.language, x.level) for x in parsed.languages] == [("English", "B2")]
+    assert ("English", "B2") in [(x.language, x.level) for x in parsed.languages]
 
 
 @pytest.mark.parametrize("native", ["native", "родной"])
@@ -135,14 +135,24 @@ async def test_a_native_language_is_recognised_in_both_spellings(native):
     assert parsed.languages[0].level == "native"
 
 
-async def test_a_language_with_an_unknown_level_is_dropped():
-    """Язык с невнятным уровнем не попадает в разбор."""
+async def test_a_language_with_an_unknown_level_keeps_the_lowest_one():
+    """Уровень невнятен, но язык человек назвал — значит он у него есть."""
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
-        "languages": [{"language": "Deutsch", "level": "нулевой"}],
-    }))
+        "languages": [{"language": "Deutsch", "level": "письменный"}],
+    }), text="Иностранные языки: Deutsch — письменный")
 
-    assert parsed.languages == []
+    assert ("Deutsch", "A1") in [(x.language, x.level) for x in parsed.languages]
+
+
+async def test_a_language_named_without_any_level_keeps_the_lowest_one():
+    """Уровня нет вовсе — тот же случай, что и невнятный."""
+    parsed = await parse_answer(json.dumps({
+        "profile": CV_REQUIRED_PROFILE,
+        "languages": [{"language": "Deutsch"}],
+    }), text="Иностранные языки: Deutsch")
+
+    assert ("Deutsch", "A1") in [(x.language, x.level) for x in parsed.languages]
 
 
 async def test_a_language_without_a_name_is_dropped():
@@ -150,9 +160,9 @@ async def test_a_language_without_a_name_is_dropped():
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "", "level": "A1"}],
-    }), text="Языки: английский")
+    }), text="Иностранные языки: английский")
 
-    assert parsed.languages == []
+    assert [x.language for x in parsed.languages] == ["Русский"]
 
 
 async def test_a_repeated_language_keeps_the_first_spelling():
@@ -192,6 +202,41 @@ async def test_a_language_that_is_not_an_object_is_dropped():
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
         "languages": ["English", None, {"language": "Deutsch", "level": "B2"}],
-    }), text="Sprachen: Deutsch")
+    }), text="Владение иностранными языками: English, Deutsch")
 
-    assert [x.language for x in parsed.languages] == ["Deutsch"]
+    assert [x.language for x in parsed.languages] == ["Русский", "Deutsch"]
+
+
+async def test_a_named_level_beats_a_missing_one_for_the_same_language():
+    """Тот же язык приехал дважды: с невнятным уровнем и с внятным.
+
+    Побеждает внятный, в каком бы порядке они ни пришли. Подставь умолчание
+    до отсева повторов — и оно заняло бы место первым, затерев названное.
+    """
+    parsed = await parse_answer(json.dumps({
+        "profile": CV_REQUIRED_PROFILE,
+        "languages": [
+            {"language": "Английский", "level": "технический"},
+            {"language": "Английский", "level": "C1"},
+        ],
+    }), text="Иностранные языки: английский")
+
+    english = [x for x in parsed.languages if x.language == "Английский"]
+    assert [(x.language, x.level) for x in english] == [("Английский", "C1")]
+
+
+async def test_the_first_spelling_of_a_repeated_language_survives_the_winner():
+    """Победил уровень из второй записи, а написание осталось от первой.
+
+    Иначе анкета звалась бы языком в том написании, в каком он приехал
+    случайным вторым, — «английский» строчной буквой вместо «Английский».
+    """
+    parsed = await parse_answer(json.dumps({
+        "profile": CV_REQUIRED_PROFILE,
+        "languages": [
+            {"language": "Английский", "level": "технический"},
+            {"language": "английский", "level": "C1"},
+        ],
+    }), text="Иностранные языки: английский")
+
+    assert ("Английский", "C1") in [(x.language, x.level) for x in parsed.languages]
