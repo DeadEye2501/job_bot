@@ -19,6 +19,14 @@
 
 ## adapters
 
+### `adapters/cv_text.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `_PARAGRAPH` = `qn('w:p')`
+- `_WRAPPERS` = `frozenset({qn('w:tbl'), qn('w:tr'), qn('w:tc'), …`
+- `_READERS` = `словарь из 4`
+- `_LIES_ABOUT_FORMAT` = `набор из 4`
+
 ### `adapters/db.py`
 
 - `logger` = `logging.getLogger(__name__)`
