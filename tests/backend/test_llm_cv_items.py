@@ -188,3 +188,34 @@ async def test_the_order_of_jobs_is_preserved():
     ])
 
     assert [j.company for j in parsed.experience] == ["Вторая", "Первая"]
+
+
+async def test_a_soft_skills_section_never_becomes_skills():
+    """Раздел личных качеств не навык, как бы он ни назывался.
+
+    Модель кладёт в категорию то самое название, под которым качества стоят в
+    резюме, — по нему их и отличают. Запреты в промпте держатся по-русски и
+    рассыпаются на английском разделе «Soft Skills».
+    """
+    parsed = await parse_sections(skills=[
+        {"category": "Hard Skills", "name": "PHP"},
+        {"category": "Soft Skills", "name": "Team Player"},
+        {"category": "Личные качества", "name": "Ответственность"},
+        {"category": "Personal qualities", "name": "Communication"},
+    ])
+
+    assert [s.name for s in parsed.skills] == ["PHP"]
+
+
+async def test_a_category_that_merely_contains_a_soft_word_survives():
+    """«Microsoft Skills» — не «Soft Skills», хотя буквы те же.
+
+    Ищи раздел подстрокой — и у бухгалтера пропал бы весь блок с Excel, Word и
+    1С: слово «soft» прячется внутри «Microsoft».
+    """
+    parsed = await parse_sections(skills=[
+        {"category": "Microsoft Skills", "name": "MS Excel"},
+        {"category": "Soft Skills", "name": "Team Player"},
+    ])
+
+    assert [s.name for s in parsed.skills] == ["MS Excel"]

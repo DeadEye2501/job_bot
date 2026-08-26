@@ -6,11 +6,18 @@
 из имени кандидата. Слова в промпте это не лечит: пробовали, помогло только
 там, где выдумку было чем заменить.
 
-Сверяются два поля из всей анкеты, и оба — по цене ошибки. Грейд и язык
-участвуют в отборе вакансий: выдуманный `senior` уводит от подходящих
-объявлений, выдуманный язык — приводит к неподходящим. Остальное выдумкой
-портится куда меньше, а сверять его было бы нечем: достижение своими словами
-пересказано законно и дословно в тексте не ищется.
+Сверяются грейд, язык, уровень языка и стек места работы — по цене ошибки: по
+первым трём отбирают вакансии, а стек связывает работу с навыками анкеты.
+Выдуманный `senior` уводит от подходящих объявлений, выдуманный язык приводит
+к неподходящим.
+
+Спрашивают по-разному, потому что и врут по-разному. Грейд, язык и уровень
+модель придумывает целиком — их ищут в тексте дословно. В стек она кладёт
+названия настоящие, но не с той работы, и дословный поиск их находит; поэтому
+у стека спрашивают не название, а заголовок над ним.
+
+Остальное сверять нечем: достижение своими словами пересказано законно и в
+тексте дословно не ищется.
 
 Сосед по замыслу — `hallucination.py`: там тем же вопросом проверяют
 обоснование вердикта по вакансии. Отличает предмет: там объявление и приговор
@@ -22,7 +29,7 @@ import logging
 import re
 from dataclasses import replace
 
-from backend.domain.taxonomy import GRADE_SPELLINGS
+from backend.domain.taxonomy import CEFR_LEVELS, GRADE_SPELLINGS, NATIVE_LEVEL
 from backend.llm.hallucination import language_root
 from backend.payloads import ParsedCv
 
@@ -71,27 +78,138 @@ def _language_named_in(text: str, name: str) -> bool:
     return root is None or root.lower() in text
 
 
+def _grounded_level(text: str, level: str) -> str:
+    """Уровень языка, если он назван в тексте; иначе самый низкий.
+
+    Уровень, названный словом — «разговорный», «письменный», «со словарём», —
+    модель заменяет догадкой, и догадка у каждого прогона своя. Спрашивать её
+    с текста надо потому же, почему и сам язык: по уровню отбирают вакансии, и
+    выдуманный C1 приводит к объявлениям, где человеку работать нечем.
+
+    Родной уровень не спрашивается: его выводят из языка письма, и слова
+    «native» в резюме не бывает.
+    """
+    if level == NATIVE_LEVEL or _spelled_in(text, level.lower()):
+        return level
+    return CEFR_LEVELS[0]
+
+
+# Слова, которыми в резюме называют стек места работы. «Навыки», «Ключевые
+# навыки» и «Skills» сюда не входят нарочно: так зовут общий список кандидата,
+# и по названию отличают своё от чужого.
+_STACK_WORDS = (
+    r"(?:\w+\s+)?(?:стек|стэк)|(?:\w+\s+)?технологии|technologies"
+    r"|tech\s+stack|stack|инструменты|tools|environment"
+)
+
+# Заголовком слово делает двоеточие после него либо своя строка. Одного слова
+# мало: «ООО Инновационные технологии безопасности» — имя работодателя, и оно
+# разрешало бы работе стек, которого в резюме нет.
+_STACK_HEADING_RE = re.compile(
+    rf"(?:{_STACK_WORDS})\s*:|^[\s•*-]*(?:{_STACK_WORDS})\s*$",
+    re.MULTILINE,
+)
+
+
+def _company_at(lowered: str, company: str, cursor: int) -> int:
+    """Где начинается работа этой компании; -1 — названия дальше нет.
+
+    Шапка работы стоит с начала строки, а в «о себе» тот же работодатель
+    помянут посреди фразы: «восемь лет в Контуре и Сбере». Возьми первое
+    вхождение — и кусок работы съёжится до этого упоминания, отняв у неё
+    настоящий стек. Строчного вхождения нет вовсе — берётся любое: у
+    «Компания: ООО «Адвант»» название с начала строки не стоит.
+    """
+    name = re.escape(company.lower())
+    heading = re.compile(rf"^[ \t]*({name})", re.MULTILINE)
+    found = heading.search(lowered, cursor)
+    if found is not None:
+        return found.start(1)
+    return lowered.find(company.lower(), cursor)
+
+
+def _job_blocks(text: str, companies: list[str]) -> list[str | None]:
+    """Кусок текста на каждую работу: от её названия до названия следующей.
+
+    Пусто — названия в тексте не нашлось: модель его переиначила, и проверять
+    такую работу нечем.
+
+    Названия ищутся подряд, каждое следующее — за предыдущим. Первое вхождение
+    не годится: о работодателе поминают и в шапке «о себе», и кусок работы
+    съёжился бы до этого упоминания, отняв у неё настоящий стек. Тем же
+    порядком разводятся две работы в одной компании.
+
+    Кусок начинается сразу ЗА названием: оставь название внутри, и компания,
+    назвавшаяся «Технологии Доверия», сама себе разрешила бы стек.
+
+    Последнему куску достаётся весь хвост резюме с разделами, к работе не
+    относящимися. Раздел, названный «Технологии:», такая работа зачтёт себе —
+    щель известная и неприкрытая.
+    """
+    lowered = text.lower()
+    starts: list[int] = []
+    cursor = 0
+    for company in companies:
+        start = _company_at(lowered, company, cursor)
+        starts.append(start)
+        if start >= 0:
+            cursor = start + len(company)
+
+    blocks: list[str | None] = []
+    for number, start in enumerate(starts):
+        if start < 0:
+            blocks.append(None)
+            continue
+        opens = start + len(companies[number])
+        later = [spot for spot in starts[number + 1:] if spot > start]
+        blocks.append(lowered[opens: min(later) if later else len(lowered)])
+    return blocks
+
+
+def _grounded_stack(place, block: str | None) -> list[str]:
+    """Стек работы, если резюме объявляет его заголовком; иначе пусто.
+
+    Названия в стеке настоящие — выдумано их место: модель читает «Корректировки
+    в 1С» в обязанностях и кладёт 1С в стек, а то и переносит туда весь общий
+    список навыков кандидата. Присутствием в тексте такое не ловится, оттого
+    спрашивается не название, а заголовок над ним.
+    """
+    if block is None or _STACK_HEADING_RE.search(block):
+        return place.stack
+    return []
+
+
 def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv:
-    """Разобранное резюме без грейдов и языков, которых в тексте нет."""
+    """Разобранное резюме без того, чего его текст не подтверждает."""
     lowered = text.lower()
 
     grades = [
         grade for grade in parsed.profile.grades if _grade_named_in(lowered, grade)
     ]
     languages = [
-        lang for lang in parsed.languages if _language_named_in(lowered, lang.language)
+        replace(lang, level=_grounded_level(lowered, lang.level))
+        for lang in parsed.languages
+        if _language_named_in(lowered, lang.language)
     ]
 
     for grade in set(parsed.profile.grades) - set(grades):
         logger.info("разбор резюме: грейд %r в тексте не назван, выброшен", grade)
+    kept = {lang.language for lang in languages}
     for lang in parsed.languages:
-        if lang not in languages:
+        if lang.language not in kept:
             logger.info(
                 "разбор резюме: язык %r в тексте не назван, выброшен", lang.language
             )
+
+    blocks = _job_blocks(text, [place.company for place in parsed.experience])
+    experience = [
+        replace(place, stack=_grounded_stack(place, block))
+        for place, block in zip(parsed.experience, blocks)
+    ]
 
     return replace(
         parsed,
         profile=replace(parsed.profile, grades=grades),
         languages=languages,
+        experience=experience,
     )

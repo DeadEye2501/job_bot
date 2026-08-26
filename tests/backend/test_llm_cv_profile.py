@@ -119,7 +119,7 @@ async def test_language_levels_come_back_uppercase():
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "English", "level": "b2"}],
-    }), text="Иностранные языки: English, читаю документацию свободно")
+    }), text="Иностранные языки: English — b2, читаю документацию свободно")
 
     assert ("English", "B2") in [(x.language, x.level) for x in parsed.languages]
 
@@ -219,7 +219,7 @@ async def test_a_named_level_beats_a_missing_one_for_the_same_language():
             {"language": "Английский", "level": "технический"},
             {"language": "Английский", "level": "C1"},
         ],
-    }), text="Иностранные языки: английский")
+    }), text="Иностранные языки: английский — C1, технический")
 
     english = [x for x in parsed.languages if x.language == "Английский"]
     assert [(x.language, x.level) for x in english] == [("Английский", "C1")]
@@ -237,6 +237,6 @@ async def test_the_first_spelling_of_a_repeated_language_survives_the_winner():
             {"language": "Английский", "level": "технический"},
             {"language": "английский", "level": "C1"},
         ],
-    }), text="Иностранные языки: английский")
+    }), text="Иностранные языки: английский — C1, технический")
 
     assert ("Английский", "C1") in [(x.language, x.level) for x in parsed.languages]

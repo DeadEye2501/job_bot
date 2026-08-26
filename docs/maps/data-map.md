@@ -462,10 +462,13 @@
 - `PARSE_CV_PROMPT` = `'Ты парсишь CV специалиста и извлекаешь структур…`
 - `_YEAR_MONTH_RE` = `re.compile('^(\\d{4})-(\\d{1,2})$')`
 - `_YEAR_RE` = `re.compile('^(\\d{4})$')`
+- `_NOT_A_SKILL_SECTION_RE` = `re.compile('\\b(soft[\\s-]?skill|софт[\\s-]?скил…`
 
 ### `backend/llm/cv_grounding.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `_STACK_WORDS` = `'(?:\\w+\\s+)?(?:стек|стэк)|(?:\\w+\\s+)?техноло…`
+- `_STACK_HEADING_RE` = `re.compile(f'(?:{_STACK_WORDS})\\s*:|^[\\s•*-]*(…`
 
 ### `backend/llm/cv_native.py`
 

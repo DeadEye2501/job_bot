@@ -922,7 +922,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (24)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
-### `backend/llm/cv.py` — 397 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 417 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
@@ -934,12 +934,12 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parse_languages(raw: object) -> list[ParsedCvLanguage]` (27)
 - `def _parse_date(value) -> date | None` (21)
 - `def _parse_profile(data: dict) -> ParsedCvProfile | None` (23)
-- `def _parse_skill(item) -> ParsedCvSkill | None` (32)
+- `def _parse_skill(item) -> ParsedCvSkill | None` (35)
 - `def _parse_experience(item) -> ParsedCvExperience | None` (18)
 - `def _parse_cv_json(answer: str) -> ParsedCv | None` (31)
 - `async def parse_cv(text: str, client: httpx.AsyncClient, model: str) -> ParsedCv | None` (36)
 
-### `backend/llm/cv_grounding.py` — 97 строк
+### `backend/llm/cv_grounding.py` — 215 строк
 
 Что в разобранном резюме не подтверждается его же текстом.
 
@@ -948,7 +948,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _spelled_in(text: str, word: str) -> bool` (10)
 - `def _grade_named_in(text: str, grade: str) -> bool` (8)
 - `def _language_named_in(text: str, name: str) -> bool` (18)
-- `def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv` (24)
+- `def _grounded_level(text: str, level: str) -> str` (14)
+- `def _company_at(lowered: str, company: str, cursor: int) -> int` (15)
+- `def _job_blocks(text: str, companies: list[str]) -> list[str | None]` (36)
+- `def _grounded_stack(place, block: str | None) -> list[str]` (11)
+- `def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv` (34)
 
 ### `backend/llm/cv_native.py` — 57 строк
 
@@ -3528,22 +3532,22 @@ Runtime settings layer.
 - `def _client(letter: str, *, finish_reason: str='stop', factcheck: str=PASSES)` (10)
 - `async def _written(*args, **kwargs)` (10)
 
-### `tests/backend/test_llm_cv_grounding.py` — 142 строк
+### `tests/backend/test_llm_cv_grounding.py` — 351 строк ⚠ подошёл к 300
 
 Следствия сверки разобранного резюме с его же текстом.
 
 Зависит от: `backend.llm.cv_grounding`, `backend.payloads`, `tests.factories`
 
-Тестов: 12
+Тестов: 24
 
 
-### `tests/backend/test_llm_cv_items.py` — 190 строк
+### `tests/backend/test_llm_cv_items.py` — 221 строк
 
 Следствия разбора навыков и опыта работы в `backend/llm/cv.py`.
 
 Зависит от: `backend.llm.cv`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 20
+Тестов: 22
 
 - `async def parse_sections(**sections)` (4)
 - `async def one_skill(**fields)` (6)
