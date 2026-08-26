@@ -10,7 +10,6 @@ import logging
 import time
 
 import httpx
-import pytest
 
 from tests.fakes.llm import CHAT, MODELS, models_response
 
@@ -38,24 +37,6 @@ def _busy_provider(free: asyncio.Event):
         )
 
     return make
-
-
-@pytest.fixture
-def provider_says(monkeypatch):
-    """Ставит на место провайдера подставного и отдаёт заготовленные ответы.
-
-    Подменяется сборка соединения, а не сам мост: он зовёт её по имени модуля,
-    и подделка садится туда же, куда сел бы настоящий клиент.
-    """
-
-    def _answer(routes) -> None:
-        from tests.fakes.llm import provider
-
-        monkeypatch.setattr(
-            "adapters.lm_studio.make_client", lambda cfg: provider(routes)
-        )
-
-    return _answer
 
 
 async def test_a_check_without_an_address_is_refused(api, ask):

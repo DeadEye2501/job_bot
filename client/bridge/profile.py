@@ -3,22 +3,19 @@
 from __future__ import annotations
 
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
-from backend.incoming import text_or_none
+from backend.incoming import normalize_enum_list, text_or_none
+from backend.payloads import REQUIRED_PROFILE_FIELDS
 from backend.repository import profile as profile_repo
 from backend.repository import profile_experience as experience_repo
 from backend.repository import profile_languages as languages_repo
 from backend.repository import profile_skills as skills_repo
 from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
-from backend.incoming import normalize_enum_list
 from client.bridge.choices import _filter_languages
 from client.bridge.cv import Cv
 from client.bridge.cv_file import _stat_cv
 from client.bridge.hub import Hub
 from client.bridge.refusals import PROFILE_FIRST
-from backend.payloads import REQUIRED_PROFILE_FIELDS
 from client.bridge.wire import _exp_to_dict, _profile_to_dict, _skill_to_dict
-
-
 
 
 class Profile(Cv):

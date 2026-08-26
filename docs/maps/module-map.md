@@ -932,7 +932,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (24)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
-### `backend/llm/cv.py` — 442 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 439 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
@@ -945,10 +945,10 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parse_profile(data: dict) -> ParsedCvProfile | None` (17)
 - `def _parse_skill(item) -> ParsedCvSkill | None` (35)
 - `def _parse_experience(item) -> ParsedCvExperience | None` (18)
-- `def _parse_cv_json(answer: str) -> ParsedCv | None` (31)
+- `def _parse_cv_json(answer: str) -> ParsedCv | None` (30)
 - `async def parse_cv(text: str, client: httpx.AsyncClient, model: str) -> ParsedCv | None` (36)
 
-### `backend/llm/cv_grounding.py` — 356 строк ⚠ подошёл к 300
+### `backend/llm/cv_grounding.py` — 360 строк ⚠ подошёл к 300
 
 Что в разобранном резюме не подтверждается его же текстом.
 
@@ -963,7 +963,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _level_named_in(near: str, word: str) -> bool` (12)
 - `def _level_read_near(windows: list[str]) -> str | None` (16)
 - `def _grounded_level(windows: list[str], level: str) -> str` (24)
-- `def _company_at(lowered: str, company: str, cursor: int) -> int` (15)
+- `def _company_at(lowered: str, company: str, cursor: int) -> int` (19)
 - `def _job_blocks(text: str, companies: list[str]) -> list[str | None]` (36)
 - `def _grounded_stack(place, block: str | None) -> list[str]` (11)
 - `def _grounded_languages(text: str, languages: list) -> list` (13)
@@ -1293,7 +1293,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class ChannelDetail` (4)
 - `class VacancyFilter` (53)
 
-### `backend/repository/app_settings.py` — 31 строк
+### `backend/repository/app_settings.py` — 33 строк
 
 Строка общего словаря настроек: записать значение по ключу.
 
@@ -2073,17 +2073,19 @@ Runtime settings layer.
   - `def block(self, company_id: int) -> dict` (12)
   - `def unblock(self, company_id: int) -> dict` (9)
 
-### `client/bridge/cv.py` — 94 строк
+### `client/bridge/cv.py` — 155 строк
 
-Файл резюме, на который смотрит окно: запомнить путь, открыть.
+Файл резюме, на который смотрит окно: запомнить путь, открыть, разобрать.
 
-Зависит от: `adapters.cv_text`, `client.bridge.answer`, `client.bridge.cv_file`, `client.bridge.desktop`
+Зависит от: `adapters`, `adapters.cv_text`, `adapters.lm_studio`, `backend.llm`, `backend.repository.app_settings`, `backend.repository.profile_cv`, `client.bridge.answer`, `client.bridge.cv_file`, `client.bridge.desktop`, `client.bridge.refusals`
 
-- `class Cv` (72)
+- `class Cv` (97)
   - `def pick(self) -> dict` (18)
   - `def _replace(self, payload: dict) -> dict` (22)
     - `async def run() -> dict` (3)
+  - `def parse_cv(self) -> dict` (24)
   - `def open(self) -> dict` (15)
+- `async def _parse_into_profile(hub, path: Path, chat: LlmProviderConfig) -> str` (28)
 
 ### `client/bridge/cv_file.py` — 16 строк
 
@@ -2303,7 +2305,7 @@ Runtime settings layer.
 - `async def merge_picker(session, subject: PickerSubject, absorbed_id: int, search: str | None) -> dict` (21)
 - `async def link_picker(session, subject: PickerSubject, vacancy, search: str | None) -> dict` (18)
 
-### `client/bridge/profile.py` — 164 строк
+### `client/bridge/profile.py` — 161 строк
 
 Анкета соискателя: сведения о себе, навыки и места работы.
 
@@ -2324,7 +2326,7 @@ Runtime settings layer.
     - `async def run() -> dict` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (16)
 
-### `client/bridge/refusals.py` — 212 строк
+### `client/bridge/refusals.py` — 226 строк
 
 Слова, которыми мост отказывает окну.
 
@@ -2518,11 +2520,11 @@ Runtime settings layer.
 - `def _company_picker_row_to_dict(item) -> dict` (14)
 - `def _vacancy_list_row_to_dict(v, matched_set: set[str], activity_by_id: dict[int, Any] | None=None) -> dict` (34)
 
-### `client/bridge/wizard.py` — 124 строк
+### `client/bridge/wizard.py` — 126 строк
 
 Порядок первого запуска: чем он продолжается и когда он кончен.
 
-Зависит от: `client.bridge.answer`, `client.bridge.hub`, `client.bridge.lifespan`, `client.bridge.wire`, `client.window_size`
+Зависит от: `backend.repository.app_settings`, `client.bridge.answer`, `client.bridge.hub`, `client.bridge.lifespan`, `client.bridge.wire`, `client.window_size`
 
 - `class Wizard` (91)
   - `def state(self) -> dict` (21)
@@ -2599,7 +2601,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 251 модулей
+## tests — 252 модулей
 
 ### `tests/adapters/test_cv_text.py` — 299 строк
 
@@ -3555,13 +3557,22 @@ Runtime settings layer.
 - `def _client(letter: str, *, finish_reason: str='stop', factcheck: str=PASSES)` (10)
 - `async def _written(*args, **kwargs)` (10)
 
-### `tests/backend/test_llm_cv_grounding.py` — 542 строк ⚠ за пределом 500
+### `tests/backend/test_llm_cv_grounding.py` — 383 строк ⚠ подошёл к 300
 
 Следствия сверки разобранного резюме с его же текстом.
 
 Зависит от: `backend.llm.cv_grounding`, `backend.payloads`, `tests.factories`
 
-Тестов: 35
+Тестов: 27
+
+
+### `tests/backend/test_llm_cv_grounding_stack.py` — 196 строк
+
+Что в разобранном опыте работы не подтверждается текстом резюме.
+
+Зависит от: `backend.llm.cv_grounding`, `tests.factories`
+
+Тестов: 9
 
 
 ### `tests/backend/test_llm_cv_items.py` — 221 строк
@@ -4561,11 +4572,11 @@ Runtime settings layer.
 - `def held_by_someone_else(monkeypatch, what: str) -> None` (13)
   - `def _refuse(*args, **kwargs)` (2)
 
-### `tests/client/conftest.py` — 210 строк
+### `tests/client/conftest.py` — 232 строк
 
 Стенд моста: поверхность окна поверх настоящей базы, без окна и без канала.
 
-Зависит от: `backend.log_buffer`, `backend.runtime_settings`, `client`, `client.bridge`, `tests.fakes.ui_bot`
+Зависит от: `backend.log_buffer`, `backend.runtime_settings`, `client`, `client.bridge`, `tests.fakes.llm`, `tests.fakes.ui_bot`
 
 - `class LoopRunner` (37)
   - `def submit(self, coro) -> Future` (4)
@@ -4576,6 +4587,8 @@ Runtime settings layer.
 - `async def api(hub) -> Api` (3)
 - `def ask()` (12)
   - `async def _ask(method, *args)` (2)
+- `def provider_says(monkeypatch)` (19)
+  - `def _answer(routes) -> None` (6)
 - `def told(hub, runner)` (18)
   - `async def _told()` (8)
 - `def with_bot(hub)` (9)
@@ -4675,14 +4688,19 @@ Runtime settings layer.
 Тестов: 17
 
 
-### `tests/client/test_bridge_cv.py` — 145 строк
+### `tests/client/test_bridge_cv.py` — 244 строк
 
 Следствия резюме — файла, путь к которому помнит окно.
 
-Зависит от: `tests.client.conftest`
+Зависит от: `backend.models`, `tests.client.conftest`, `tests.dbio`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 9
+Тестов: 13
 
+- `def resume_on_disk(tmp_path, api, ask)` (10)
+  - `async def _put(body: str, name: str='резюме.txt') -> str` (5)
+- `async def chat_model(session_factory, runtime_settings)` (4)
+- `async def model_says(chat_model, provider_says)` (7)
+  - `def _answer(payload: dict) -> None` (2)
 
 ### `tests/client/test_bridge_events.py` — 218 строк
 
@@ -4743,7 +4761,7 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/client/test_bridge_llm.py` — 369 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_llm.py` — 350 строк ⚠ подошёл к 300
 
 Следствия проверки языковой модели: что окно узнаёт, нажав «проверить».
 
@@ -4754,8 +4772,6 @@ Runtime settings layer.
 - `def _busy_provider(free: asyncio.Event)` (23)
   - `def make(_cfg)` (13)
     - `async def answer(request)` (8)
-- `def provider_says(monkeypatch)` (15)
-  - `def _answer(routes) -> None` (6)
 
 ### `tests/client/test_bridge_login.py` — 196 строк
 

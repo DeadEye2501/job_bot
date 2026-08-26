@@ -173,6 +173,7 @@
   <WizardScreen
     {ask}
     {say}
+    events={heard}
     completed={setup.completed}
     ondone={() => (setup = { ...setup, wizard_completed: true })}
   />

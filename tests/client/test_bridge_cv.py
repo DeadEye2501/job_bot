@@ -5,7 +5,13 @@
 называет страница, а спрашивает его у человека диалог самого окна.
 """
 
+import pytest
+
+from backend.models import LlmConfigKind
 from tests.client.conftest import WindowThatPicks
+from tests.dbio import put
+from tests.factories import CV_REQUIRED_PROFILE, llm_config_row
+from tests.fakes.llm import CHAT, chat_json
 
 
 async def test_the_path_to_the_resume_cannot_be_set_from_the_page(api):
@@ -143,3 +149,96 @@ async def test_a_closed_dialog_changes_nothing(api, ask, hub):
     answer = await ask(api.profile.pick)
 
     assert answer["ok"]["cancelled"] is True
+
+
+@pytest.fixture
+def resume_on_disk(tmp_path, api, ask):
+    """Кладёт резюме на диск и запоминает путь — как это делает человек."""
+
+    async def _put(body: str, name: str = "резюме.txt") -> str:
+        path = tmp_path / name
+        path.write_text(body, encoding="utf-8")
+        await ask(api.profile._replace, {"path": str(path)})
+        return str(path)
+
+    return _put
+
+
+@pytest.fixture
+async def chat_model(session_factory, runtime_settings):
+    """Записывает выбранную чат-модель: разбор зовёт ту же, что и весь бот."""
+    await put(session_factory, llm_config_row(LlmConfigKind.CHAT))
+    await runtime_settings.reload()
+
+
+async def test_parsing_a_resume_nobody_chose_is_refused(api, ask):
+    """Пока файл не выбран, разбирать нечего, и работа не пускается."""
+    answer = await ask(api.profile.parse_cv)
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Резюме не выбрано."
+
+
+async def test_parsing_without_a_chosen_model_is_refused(api, ask, resume_on_disk):
+    """Без выбранной модели разбор не начинают: спрашивать некого.
+
+    Отказ приходит до всякой работы. Пущенная, она вернулась бы вестью через
+    минуту — и всю минуту человек ждал бы того, чего не будет.
+    """
+    await resume_on_disk("Иван Петров, разработчик.")
+
+    answer = await ask(api.profile.parse_cv)
+
+    assert answer["fail"] == "denied"
+    assert "модель" in answer["detail"].lower()
+
+
+async def test_a_file_that_cannot_be_read_is_explained_in_words(
+    api, ask, told, resume_on_disk, chat_model
+):
+    """Нечитаемый файл называет, что с ним делать, а не «не получилось».
+
+    Причины у отказа разные и чинятся по-разному: пропавший файл выбирают
+    заново, `.doc` и запароленный PDF пересохраняют, скан не спасёт ничто.
+    Скажи мост одно слово на все три — человек не узнал бы, что делать.
+    """
+    await resume_on_disk("не пдф вовсе", name="резюме.pdf")
+
+    answer = await ask(api.profile.parse_cv)
+    assert answer["ok"]["started"] is True
+
+    said = await told()
+    assert said["danger"] is True
+    assert "пересохран" in said["message"].lower()
+
+
+@pytest.fixture
+async def model_says(chat_model, provider_says):
+    """Записанная модель вместе с её ответом: разбору нужны обе половины."""
+
+    def _answer(payload: dict) -> None:
+        provider_says({CHAT: chat_json(payload)})
+
+    return _answer
+
+
+async def test_a_parsed_resume_fills_the_profile(
+    api, ask, told, resume_on_disk, model_says
+):
+    """Разобранное резюме доезжает до анкеты, а не остаётся в ответе моста.
+
+    В этом весь шаг: человек выбрал файл и получил заполненную анкету.
+    Проверяется она с экрана анкеты, а не по ответу разбора — иначе зелёным
+    прошёл бы мост, разобравший резюме и ничего не записавший.
+    """
+    await resume_on_disk("Иван Петров, разработчик. Python, SQL.")
+    model_says({"profile": CV_REQUIRED_PROFILE})
+
+    answer = await ask(api.profile.parse_cv)
+    assert answer["ok"]["started"] is True
+
+    said = await told()
+    assert said["danger"] is False
+
+    shown = await ask(api.profile.get)
+    assert shown["ok"]["profile"]["first_name"] == CV_REQUIRED_PROFILE["first_name"]

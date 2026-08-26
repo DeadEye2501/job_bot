@@ -17,25 +17,25 @@ import httpx
 from adapters.lm_chat import ChatRequest, chat
 from backend.domain.skill_names import skill_key
 from backend.domain.spellings import dedupe_first_wins
-from backend.domain.wording import spelled_alone
 from backend.domain.taxonomy import (
-    LEVEL_WHEN_UNTOLD,
     GRADES,
+    LEVEL_WHEN_UNTOLD,
     LEVELS_BY_SPELLING,
     NATIVE_LEVEL,
     WORK_FORMATS,
 )
-from backend.llm.cv_grounding import grounded_in_cv
-from backend.llm.cv_native import with_native_language
-from backend.llm.external import external_block
-from backend.llm.rules import NOT_A_SKILL_LINE, NOT_A_SKILL_SECTIONS
-from backend.incoming import fold_homoglyphs, normalize_enum_list
+from backend.domain.wording import spelled_alone
+from backend.incoming import fold_homoglyphs, normalize_enum_list, str_list
 from backend.llm.answers import (
     ONLY_JSON,
     json_object,
     log_unparseable,
     str_or_none,
 )
+from backend.llm.cv_grounding import grounded_in_cv
+from backend.llm.cv_native import with_native_language
+from backend.llm.external import external_block
+from backend.llm.rules import NOT_A_SKILL_LINE, NOT_A_SKILL_SECTIONS
 from backend.payloads import (
     REQUIRED_PROFILE_FIELDS,
     ParsedCv,
@@ -44,7 +44,6 @@ from backend.payloads import (
     ParsedCvProfile,
     ParsedCvSkill,
 )
-from backend.incoming import str_list
 
 
 logger = logging.getLogger(__name__)
@@ -55,9 +54,8 @@ logger = logging.getLogger(__name__)
 # Один заход держит и слабая местная модель: четыре страницы она разбирает
 # минутой с небольшим, не путая буллеты между работами, — при условии что
 # текст пришёл в порядке чтения, о чём заботится `adapters/cv_text.py`.
-# Многопроходный разбор пробовали (splitter, разбор буллетов по работам,
-# сличение навыков) — на той же модели выходило хуже: splitter копировал куски
-# неверно.
+# Многопроходный разбор — splitter, разбор буллетов по работам, сличение
+# навыков — на той же модели выходит хуже: splitter копирует куски неверно.
 #
 # Что остаётся кривым:
 #  - Мелкие поля-перечисления модель выдумывает: грейд выводит из стажа, формат
@@ -76,8 +74,8 @@ logger = logging.getLogger(__name__)
 #    в хвосте она примет за свой.
 #  - Язык, названный не в разделе языков, а строкой внутри профессиональных
 #    навыков («Английский язык — Advanced/C1»), слабая модель теряет вовсе.
-#    Подсказку в наставление добавляли — не помогло; сильная модель находит
-#    его и без неё.
+#    Подсказка в наставлении этого не лечит; сильная модель находит его и без
+#    подсказки.
 #  - Длинное резюме режется по `text[:20000]`, и остаток теряется молча.
 PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извлекаешь структурированные данные в JSON.
 
@@ -374,9 +372,8 @@ def _parse_experience(item) -> ParsedCvExperience | None:
 def _parse_cv_json(answer: str) -> ParsedCv | None:
     """Разобранное резюме из ответа модели; пусто — разбирать нечего.
 
-    Объект собирает общее объявление (`json_object`), а не своё тело: прежде
-    здесь стояла его копия без записи в журнал, и неразобравшийся ответ
-    резюме пропадал молча.
+    Объект собирает общее объявление (`json_object`), а не своё тело: своё
+    обошлось бы без записи в журнал, и неразобравшийся ответ пропадал бы молча.
     """
     data = json_object(answer, logger, "parse_cv")
     if data is None:
