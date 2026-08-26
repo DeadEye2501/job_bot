@@ -135,24 +135,28 @@ async def test_a_native_language_is_recognised_in_both_spellings(native):
     assert parsed.languages[0].level == "native"
 
 
-async def test_a_language_with_an_unknown_level_keeps_the_lowest_one():
-    """Уровень невнятен, но язык человек назвал — значит он у него есть."""
+async def test_a_language_with_an_unknown_level_keeps_the_highest_one():
+    """Уровень невнятен, но язык человек назвал — значит он у него есть.
+
+    Ставится высший: невнятность — не скромность. Уровень уточняет тот, кто в
+    языке не уверен.
+    """
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "Deutsch", "level": "письменный"}],
     }), text="Иностранные языки: Deutsch — письменный")
 
-    assert ("Deutsch", "A1") in [(x.language, x.level) for x in parsed.languages]
+    assert ("Deutsch", "C2") in [(x.language, x.level) for x in parsed.languages]
 
 
-async def test_a_language_named_without_any_level_keeps_the_lowest_one():
+async def test_a_language_named_without_any_level_keeps_the_highest_one():
     """Уровня нет вовсе — тот же случай, что и невнятный."""
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "Deutsch"}],
     }), text="Иностранные языки: Deutsch")
 
-    assert ("Deutsch", "A1") in [(x.language, x.level) for x in parsed.languages]
+    assert ("Deutsch", "C2") in [(x.language, x.level) for x in parsed.languages]
 
 
 async def test_a_language_without_a_name_is_dropped():
@@ -240,3 +244,57 @@ async def test_the_first_spelling_of_a_repeated_language_survives_the_winner():
     }), text="Иностранные языки: английский — C1, технический")
 
     assert ("Английский", "C1") in [(x.language, x.level) for x in parsed.languages]
+
+
+@pytest.mark.parametrize(
+    "named, level",
+    [
+        ("свободно", "C1"),
+        ("Fluent", "C1"),
+        ("разговорный", "B1"),
+        ("Intermediate", "B1"),
+        ("базовый", "A1"),
+        ("в совершенстве", "C2"),
+    ],
+)
+async def test_a_level_named_in_words_becomes_the_matching_one(named, level):
+    """Уровень, названный словом, переводится в шкалу, а не приравнивается к A1.
+
+    «Свободно» — это названный уровень, просто не по шкале. Считать его нижним
+    значило бы отрезать человеку все вакансии, где язык нужен.
+    """
+    parsed = await parse_answer(json.dumps({
+        "profile": CV_REQUIRED_PROFILE,
+        "languages": [{"language": "Английский", "level": named}],
+    }), text=f"Иностранные языки: английский — {named}")
+
+    assert ("Английский", level) in [(x.language, x.level) for x in parsed.languages]
+
+
+async def test_a_level_named_by_an_unknown_word_falls_back_to_the_highest():
+    """Незнакомое слово — не уровень, и высший тут именно запасной ответ."""
+    parsed = await parse_answer(json.dumps({
+        "profile": CV_REQUIRED_PROFILE,
+        "languages": [{"language": "Английский", "level": "технический"}],
+    }), text="Иностранные языки: английский — технический")
+
+    assert ("Английский", "C2") in [(x.language, x.level) for x in parsed.languages]
+
+
+@pytest.mark.parametrize(
+    "named, level",
+    [
+        ("Свободно.", "C1"),
+        ("C1 (advanced)", "C1"),
+        ("Upper Intermediate", "B2"),
+        ("  fluent  ", "C1"),
+    ],
+)
+async def test_a_level_named_loosely_is_still_understood(named, level):
+    """Модель возвращает уровень как в резюме, а там его пишут по-всякому."""
+    parsed = await parse_answer(json.dumps({
+        "profile": CV_REQUIRED_PROFILE,
+        "languages": [{"language": "Английский", "level": named}],
+    }), text=f"Иностранные языки: английский — {named}")
+
+    assert ("Английский", level) in [(x.language, x.level) for x in parsed.languages]

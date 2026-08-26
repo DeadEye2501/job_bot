@@ -29,7 +29,12 @@ import logging
 import re
 from dataclasses import replace
 
-from backend.domain.taxonomy import CEFR_LEVELS, GRADE_SPELLINGS, NATIVE_LEVEL
+from backend.domain.taxonomy import (
+    CEFR_LEVELS,
+    GRADE_SPELLINGS,
+    LEVEL_SPELLINGS,
+    NATIVE_LEVEL,
+)
 from backend.llm.hallucination import language_root
 from backend.payloads import ParsedCv
 
@@ -78,20 +83,80 @@ def _language_named_in(text: str, name: str) -> bool:
     return root is None or root.lower() in text
 
 
-def _grounded_level(text: str, level: str) -> str:
-    """Уровень языка, если он назван в тексте; иначе самый низкий.
+# Обозначения шкалы набирают в русской раскладке: «А1», «В2», «С1». В нижнем
+# регистре эти буквы от латинских не отличить на вид, и без сведения сверка не
+# узнала бы своего же обозначения.
+_HOMOGLYPHS = str.maketrans("авсе", "abce")
 
-    Уровень, названный словом — «разговорный», «письменный», «со словарём», —
-    модель заменяет догадкой, и догадка у каждого прогона своя. Спрашивать её
-    с текста надо потому же, почему и сам язык: по уровню отбирают вакансии, и
-    выдуманный C1 приводит к объявлениям, где человеку работать нечем.
+
+_LEVEL_NEAR_CHARS = 60
+"""Сколько знаков за названием языка считается его же строкой.
+
+Уровень стоит вплотную к языку: «Английский — B2», «Английский» и на
+следующей строке «свободно». Числом, а не концом строки, потому что перенос
+между ними — обычное дело.
+"""
+
+
+def _level_named_near(text: str, language: str, word: str) -> bool:
+    """Слово уровня стоит сразу за названием языка, а не где попало в резюме.
+
+    «Свободный график», «продвинутый пользователь Excel», «базовое понимание
+    процессов» — слова уровней живут в резюме своей жизнью. Ищи их по всему
+    тексту, и любой выдуманный уровень найдёт себе подтверждение.
+
+    Окно смотрит только вперёд: у двух языков подряд слово соседа стоит выше
+    своего, и назад заглядывать нельзя.
+
+    Дефис по краям запрещён наравне с буквой: «intermediate» сидит внутри
+    «upper-intermediate», и без запрета B1 подтверждался бы тем, что на самом
+    деле B2.
+
+    Окно смотрится дважды, как есть и со сведёнными омоглифами: обозначение
+    шкалы находится во втором виде, а русское слово — только в первом, потому
+    что сведение его же и портит.
+    """
+    root = language_root(language)
+    if root is None:
+        return False
+    at = text.find(root.lower())
+    if at < 0:
+        return False
+    near = text[at: at + _LEVEL_NEAR_CHARS]
+    # Дефис и пробел между словами уровня равнозначны: «Upper-Intermediate» и
+    # «Upper Intermediate» — одно и то же написание.
+    loose = r"[\s-]+".join(re.escape(part) for part in re.split(r"[\s-]+", word))
+    spelled = rf"(?<![-\w]){loose}(?![-\w])"
+    return any(
+        re.search(spelled, one) is not None
+        for one in (near, near.translate(_HOMOGLYPHS))
+    )
+
+
+def _grounded_level(text: str, language: str, level: str) -> str:
+    """Уровень языка, если он назван рядом с языком в тексте; иначе высший.
+
+    Уровень, названный невнятно — «технический», «письменный», — модель
+    заменяет догадкой, и догадка у каждого прогона своя. Спрашивать её с
+    текста надо потому же, почему и сам язык: по уровню отбирают вакансии.
+
+    Взамен неподтверждённого ставится высший, и это не поблажка: уровня не
+    называет тот, кто в языке уверен, — неуверенный как раз уточняет. Низший
+    на его месте отрезал бы человеку все вакансии, где язык нужен, а высший не
+    отрезает ничего: лишние объявления человек увидит и отсеет сам.
+
+    Названный словом ищется словом: в тексте стоит «свободно», а не «C1», и
+    спрашивать одну лишь шкалу значило бы объявить выдумкой честный перевод.
 
     Родной уровень не спрашивается: его выводят из языка письма, и слова
     «native» в резюме не бывает.
     """
-    if level == NATIVE_LEVEL or _spelled_in(text, level.lower()):
+    if level == NATIVE_LEVEL:
         return level
-    return CEFR_LEVELS[0]
+    named = (level.lower(), *LEVEL_SPELLINGS.get(level, ()))
+    if any(_level_named_near(text, language, word) for word in named):
+        return level
+    return CEFR_LEVELS[-1]
 
 
 # Слова, которыми в резюме называют стек места работы. «Навыки», «Ключевые
@@ -187,7 +252,7 @@ def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv:
         grade for grade in parsed.profile.grades if _grade_named_in(lowered, grade)
     ]
     languages = [
-        replace(lang, level=_grounded_level(lowered, lang.level))
+        replace(lang, level=_grounded_level(lowered, lang.language, lang.level))
         for lang in parsed.languages
         if _language_named_in(lowered, lang.language)
     ]
