@@ -13,15 +13,21 @@ from tests.factories import CV_REQUIRED_PROFILE
 from tests.fakes.llm import CHAT, chat_response, provider
 
 
-async def parse_answer(answer: str):
-    """Прогнать готовый ответ модели через настоящий разбор."""
+async def parse_answer(answer: str, text: str = "резюме"):
+    """Прогнать готовый ответ модели через настоящий разбор.
+
+    Текст резюме задаётся там, где ответ говорит о языке или грейде: разбор
+    сверяет их с текстом и выбрасывает не названное в нём.
+    """
     client = provider({CHAT: chat_response(answer)})
-    return await parse_cv("резюме", client, "qwen")
+    return await parse_cv(text, client, "qwen")
 
 
-async def parse_profile(**fields):
+async def parse_profile(text: str = "резюме", **fields):
     """Прогнать профиль с заданными полями, остальное — обязательный минимум."""
-    return await parse_answer(json.dumps({"profile": {**CV_REQUIRED_PROFILE, **fields}}))
+    return await parse_answer(
+        json.dumps({"profile": {**CV_REQUIRED_PROFILE, **fields}}), text=text
+    )
 
 
 async def test_a_minimal_profile_is_enough_for_a_parse():
@@ -88,7 +94,10 @@ async def test_a_non_string_inside_work_format_is_dropped():
 
 async def test_only_known_grades_survive():
     """Из уровней остаётся только известное."""
-    parsed = await parse_profile(grades=["Senior", "гуру", "lead"])
+    parsed = await parse_profile(
+        text="Senior Python Developer, гуру и тимлид",
+        grades=["Senior", "гуру", "lead"],
+    )
 
     assert parsed.profile.grades == ["senior", "lead"]
 
@@ -110,7 +119,7 @@ async def test_language_levels_come_back_uppercase():
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "English", "level": "b2"}],
-    }))
+    }), text="Languages: English")
 
     assert [(x.language, x.level) for x in parsed.languages] == [("English", "B2")]
 
@@ -121,7 +130,7 @@ async def test_a_native_language_is_recognised_in_both_spellings(native):
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "Русский", "level": native}],
-    }))
+    }), text="Языки: русский")
 
     assert parsed.languages[0].level == "native"
 
@@ -141,7 +150,7 @@ async def test_a_language_without_a_name_is_dropped():
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
         "languages": [{"language": "", "level": "A1"}],
-    }))
+    }), text="Языки: английский")
 
     assert parsed.languages == []
 
@@ -154,7 +163,7 @@ async def test_a_repeated_language_keeps_the_first_spelling():
             {"language": "Русский", "level": "native"},
             {"language": "русский", "level": "C1"},
         ],
-    }))
+    }), text="Языки: русский")
 
     assert [(x.language, x.level) for x in parsed.languages] == [("Русский", "native")]
 
@@ -183,6 +192,6 @@ async def test_a_language_that_is_not_an_object_is_dropped():
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
         "languages": ["English", None, {"language": "Deutsch", "level": "B2"}],
-    }))
+    }), text="Sprachen: Deutsch")
 
     assert [x.language for x in parsed.languages] == ["Deutsch"]

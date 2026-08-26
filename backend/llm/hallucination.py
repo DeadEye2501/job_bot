@@ -129,7 +129,7 @@ _REASON_STYLE_VIOLATIONS: tuple[re.Pattern[str], ...] = (
 # короткими словами вроде «Hi» (приветствие) или «Hin» (короткие префиксы).
 #
 # ВНИМАНИЕ: это закрытый набор (≈25 ходовых языков). Для языков ВНЕ списка
-# используется грубая эвристика name[:-2] (см. _language_root ниже). Эвристика срабатывает корректно для большинства склоняемых имён, но
+# используется грубая эвристика name[:-2] (см. language_root ниже). Эвристика срабатывает корректно для большинства склоняемых имён, но
 # для коротких/иноалфавитных имён (например, «中文», «हिन्दी», «한국어»)
 # safety-net по галлюцинациям этого языка работает грубее. Универсальные
 # детекторы (CEFR-маркеры в _GENERIC_HALLUCINATION_MARKERS) работают всегда.
@@ -163,7 +163,7 @@ _LANGUAGE_ROOT_OVERRIDES: dict[str, str] = {
 _MIN_LANG_ROOT_LEN = 4
 
 
-def _language_root(name: str) -> str | None:
+def language_root(name: str) -> str | None:
     """Корень названия языка для поиска по тексту; пусто — маркера не будет.
 
     Длинное имя теряет хвост склонения, короткое берётся как есть, а
@@ -217,7 +217,7 @@ def _build_profile_hallucination_markers(
 
     Возвращает кортеж пар (regex_in_reason, regex_in_text). Логика идентична
     _GENERIC_HALLUCINATION_MARKERS. Какие имена маркера не получают — см.
-    :func:`_language_root`.
+    :func:`language_root`.
     """
     markers: list[tuple[re.Pattern[str], re.Pattern[str]]] = []
     inference_verbs = (
@@ -229,7 +229,7 @@ def _build_profile_hallucination_markers(
     cefr_text = _CEFR_LEVEL_RE.pattern
     for lang in profile.languages:
         name = (lang.name or "").strip()
-        root = _language_root(name)
+        root = language_root(name)
         if root is None:
             continue
         markers.append(

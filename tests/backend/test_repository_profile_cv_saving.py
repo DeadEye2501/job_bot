@@ -11,13 +11,7 @@ from datetime import date
 import pytest
 from sqlalchemy import select
 
-from backend.payloads import (
-    ParsedCv,
-    ParsedCvExperience,
-    ParsedCvLanguage,
-    ParsedCvProfile,
-    ParsedCvSkill,
-)
+from backend.payloads import ParsedCvLanguage
 from backend.models import (
     AppSetting,
     Profile,
@@ -32,61 +26,14 @@ from backend.repository.profile_experience import list_experience
 from backend.repository.profile_skills import list_skills
 from tests.dbio import put
 from tests.factories import (
-    experience_fields,
     experience_row,
-    person_fields,
+    parsed_cv,
+    parsed_cv_place,
+    parsed_cv_profile,
+    parsed_cv_skill,
     profile_row,
     profile_skill_row,
-    skill_fields,
 )
-
-
-def _profile(**overrides) -> ParsedCvProfile:
-    """Разобранный профиль: обязательное заполнено, остальное пусто.
-
-    Тот же человек, что и в строке анкеты, — иначе проверка «разобранное легло
-    в анкету» сравнивала бы двух разных.
-    """
-    fields = person_fields(
-        phone=None,
-        location=None,
-        telegram_username=None,
-        github_url=None,
-        education=None,
-        work_format=[],
-        grades=[],
-        free_preferences=None,
-    )
-    fields.update(overrides)
-    return ParsedCvProfile(**fields)
-
-
-def _skill(name: str, **overrides) -> ParsedCvSkill:
-    """Разобранный навык — с теми же умолчаниями, что и строка в базе."""
-    return ParsedCvSkill(name=name, **skill_fields(**overrides))
-
-
-def _place(**overrides) -> ParsedCvExperience:
-    """Разобранное место работы — с теми же умолчаниями, что и строка в базе.
-
-    Своё поле здесь одно: стек места работы разбор из резюме приносит, а
-    колонки под него нет.
-    """
-    fields = experience_fields(stack=[])
-    fields.update(overrides)
-    return ParsedCvExperience(**fields)
-
-
-def _cv(**overrides) -> ParsedCv:
-    """Разобранное резюме целиком."""
-    fields = {
-        "profile": _profile(),
-        "languages": [],
-        "skills": [],
-        "experience": [],
-    }
-    fields.update(overrides)
-    return ParsedCv(**fields)
 
 
 async def test_the_previous_profile_is_wiped_not_merged(session, session_factory):
@@ -115,7 +62,7 @@ async def test_the_previous_profile_is_wiped_not_merged(session, session_factory
         )
     )
 
-    await save_parsed_cv(session, _cv())
+    await save_parsed_cv(session, parsed_cv())
 
     assert [p.first_name for p in (await session.scalars(select(Profile))).all()] == [
         "Иван"
@@ -132,8 +79,8 @@ async def test_every_profile_field_reaches_the_row(session):
     """Все поля разобранного профиля доходят до строки."""
     await save_parsed_cv(
         session,
-        _cv(
-            profile=_profile(
+        parsed_cv(
+            profile=parsed_cv_profile(
                 phone="+79991234567",
                 location="Тбилиси",
                 telegram_username="ivan",
@@ -161,12 +108,12 @@ async def test_languages_and_skills_are_written_with_the_profile(session):
     """Языки и навыки записываются вместе с профилем и привязаны к нему."""
     await save_parsed_cv(
         session,
-        _cv(
+        parsed_cv(
             languages=[
                 ParsedCvLanguage(language="Русский", level="native"),
                 ParsedCvLanguage(language="Английский", level="B2"),
             ],
-            skills=[_skill("Python", level=5, aliases=["py"])],
+            skills=[parsed_cv_skill("Python", level=5, aliases=["py"])],
         ),
     )
 
@@ -187,9 +134,9 @@ async def test_a_place_is_linked_to_the_skills_it_names(session):
     """Место работы связывается с навыками, названными в его стеке."""
     await save_parsed_cv(
         session,
-        _cv(
-            skills=[_skill("PostgreSQL", aliases=["Postgres"]), _skill("Python")],
-            experience=[_place(stack=["Python", "Postgres"])],
+        parsed_cv(
+            skills=[parsed_cv_skill("PostgreSQL", aliases=["Postgres"]), parsed_cv_skill("Python")],
+            experience=[parsed_cv_place(stack=["Python", "Postgres"])],
         ),
     )
 
@@ -210,9 +157,9 @@ async def test_a_stack_item_is_matched_loosely(session, written):
     """
     await save_parsed_cv(
         session,
-        _cv(
-            skills=[_skill("Docker Compose")],
-            experience=[_place(stack=[written])],
+        parsed_cv(
+            skills=[parsed_cv_skill("Docker Compose")],
+            experience=[parsed_cv_place(stack=[written])],
         ),
     )
 
@@ -231,9 +178,9 @@ async def test_an_unknown_stack_item_is_dropped(session):
     """
     await save_parsed_cv(
         session,
-        _cv(
-            skills=[_skill("Python"), _skill("Docker")],
-            experience=[_place(stack=["Python", "Кобол"])],
+        parsed_cv(
+            skills=[parsed_cv_skill("Python"), parsed_cv_skill("Docker")],
+            experience=[parsed_cv_place(stack=["Python", "Кобол"])],
         ),
     )
 
@@ -245,9 +192,9 @@ async def test_a_place_keeps_all_it_was_given(session):
     """Место работы сохраняется со всем, что при нём разобрано."""
     await save_parsed_cv(
         session,
-        _cv(
+        parsed_cv(
             experience=[
-                _place(
+                parsed_cv_place(
                     company="Контур",
                     company_url="https://kontur.ru",
                     role="Старший",
@@ -270,7 +217,7 @@ async def test_a_place_keeps_all_it_was_given(session):
 
 async def test_the_path_to_the_file_is_recorded_alongside(session):
     """Путь к файлу резюме записывается той же записью."""
-    await save_parsed_cv(session, _cv(), cv_path="cv/ivan.pdf")
+    await save_parsed_cv(session, parsed_cv(), cv_path="cv/ivan.pdf")
 
     saved = await session.get(AppSetting, "cv_path")
     assert saved.value == "cv/ivan.pdf"
@@ -278,9 +225,9 @@ async def test_the_path_to_the_file_is_recorded_alongside(session):
 
 async def test_a_recorded_path_is_replaced_not_doubled(session):
     """Повторная запись заменяет прежний путь, а не заводит вторую настройку."""
-    await save_parsed_cv(session, _cv(), cv_path="cv/старое.pdf")
+    await save_parsed_cv(session, parsed_cv(), cv_path="cv/старое.pdf")
 
-    await save_parsed_cv(session, _cv(), cv_path="cv/новое.pdf")
+    await save_parsed_cv(session, parsed_cv(), cv_path="cv/новое.pdf")
 
     rows = (await session.scalars(select(AppSetting))).all()
     assert [(r.key, r.value) for r in rows] == [("cv_path", "cv/новое.pdf")]
@@ -288,6 +235,6 @@ async def test_a_recorded_path_is_replaced_not_doubled(session):
 
 async def test_without_a_path_nothing_is_recorded(session):
     """Без пути к файлу настройка не заводится."""
-    await save_parsed_cv(session, _cv())
+    await save_parsed_cv(session, parsed_cv())
 
     assert (await session.scalars(select(AppSetting))).all() == []

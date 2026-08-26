@@ -164,3 +164,19 @@ async def test_reasoning_with_braces_before_the_answer_does_not_hide_it():
 
     assert parsed is not None
     assert parsed.profile.first_name == "Алексей"
+
+
+async def test_a_grade_the_resume_never_names_does_not_come_back():
+    """Выдуманное моделью до зовущего не доходит: разбор сверяет его с текстом.
+
+    Маленькая модель дописывает грейд к резюме, где о нём ни слова, — а по
+    грейду отбирают вакансии.
+    """
+    answer = json.dumps(
+        {"profile": {**CV_REQUIRED_PROFILE, "grades": ["senior"]}}, ensure_ascii=False
+    )
+    client = provider({CHAT: chat_response(answer)})
+
+    parsed = await parse_cv("Электрик. Опыт работы 8 лет.", client, "qwen")
+
+    assert parsed.profile.grades == []
