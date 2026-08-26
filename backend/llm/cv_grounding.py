@@ -6,15 +6,16 @@
 из имени кандидата. Слова в промпте это не лечит: пробовали, помогло только
 там, где выдумку было чем заменить.
 
-Сверяются грейд, язык, уровень языка и стек места работы — по цене ошибки: по
-первым трём отбирают вакансии, а стек связывает работу с навыками анкеты.
-Выдуманный `senior` уводит от подходящих объявлений, выдуманный язык приводит
-к неподходящим.
+Сверяются грейд, формат работы, язык, уровень языка и стек места работы — по
+цене ошибки: по первым четырём отбирают вакансии, а стек связывает работу с
+навыками анкеты. Выдуманный `senior` уводит от подходящих объявлений,
+выдуманный язык приводит к неподходящим.
 
 Спрашивают по-разному, потому что и врут по-разному. Грейд, язык и уровень
 модель придумывает целиком — их ищут в тексте дословно. В стек она кладёт
 названия настоящие, но не с той работы, и дословный поиск их находит; поэтому
-у стека спрашивают не название, а заголовок над ним.
+у стека спрашивают не название, а заголовок над ним. Формат спрашивают списком
+целиком: там опасна не потеря значения, а неверный остаток.
 
 Остальное сверять нечем: достижение своими словами пересказано законно и в
 тексте дословно не ищется.
@@ -34,6 +35,7 @@ from backend.domain.taxonomy import (
     GRADE_SPELLINGS,
     LEVEL_SPELLINGS,
     NATIVE_LEVEL,
+    WORK_FORMAT_SPELLINGS,
 )
 from backend.llm.hallucination import language_root
 from backend.payloads import ParsedCv
@@ -53,14 +55,34 @@ def _spelled_in(text: str, word: str) -> bool:
     return re.search(r"\b" + re.escape(word) + r"(?![a-z])", text) is not None
 
 
-def _grade_named_in(text: str, grade: str) -> bool:
-    # «Ё» в резюме пишут через раз, и «стажер» — то же слово, что «стажёр». Не
-    # своди их — и настоящее звание объявлялось бы выдуманным.
+def _any_named_in(text: str, words: tuple[str, ...]) -> bool:
+    """Хоть одно из написаний стоит в тексте.
+
+    «Ё» в резюме пишут через раз, и «стажер» — то же слово, что «стажёр». Не
+    своди их — и настоящее звание объявлялось бы выдуманным.
+    """
     plain = text.replace("ё", "е")
-    return any(
-        _spelled_in(plain, word.replace("ё", "е"))
-        for word in (grade, *GRADE_SPELLINGS.get(grade, ()))
+    return any(_spelled_in(plain, word.replace("ё", "е")) for word in words)
+
+
+def _grounded_formats(text: str, formats: list[str]) -> list[str]:
+    """Форматы работы, если КАЖДЫЙ назван в тексте; иначе ни одного.
+
+    Списком целиком, а не по одному значению, и вот почему. Пустой список
+    выключает отбор вакансий по формату, непустой — включает и отвергает всё,
+    чего в нём нет. Вредна поэтому не потеря значения, а неверный непустой
+    список: оставь «гибрид» от пары «гибрид, офис» — и человеку начнут
+    отказывать по офисным вакансиям, которых он не отвергал.
+
+    Грейд сверяется иначе, по одному значению, и это не разнобой: звания
+    («senior», «тимлид») в резюме ни с чем не путаются, а слова форматов
+    сидят внутри «офисного пакета» и «удаления данных», и доверия каждому
+    по отдельности меньше.
+    """
+    named = all(
+        _any_named_in(text, WORK_FORMAT_SPELLINGS.get(one, ())) for one in formats
     )
+    return list(formats) if named else []
 
 
 def _language_named_in(text: str, name: str) -> bool:
@@ -249,8 +271,11 @@ def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv:
     lowered = text.lower()
 
     grades = [
-        grade for grade in parsed.profile.grades if _grade_named_in(lowered, grade)
+        grade
+        for grade in parsed.profile.grades
+        if _any_named_in(lowered, (grade, *GRADE_SPELLINGS.get(grade, ())))
     ]
+    formats = _grounded_formats(lowered, parsed.profile.work_format)
     languages = [
         replace(lang, level=_grounded_level(lowered, lang.language, lang.level))
         for lang in parsed.languages
@@ -259,6 +284,8 @@ def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv:
 
     for grade in set(parsed.profile.grades) - set(grades):
         logger.info("разбор резюме: грейд %r в тексте не назван, выброшен", grade)
+    for one in set(parsed.profile.work_format) - set(formats):
+        logger.info("разбор резюме: формат %r в тексте не назван, выброшен", one)
     kept = {lang.language for lang in languages}
     for lang in parsed.languages:
         if lang.language not in kept:
@@ -274,7 +301,7 @@ def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv:
 
     return replace(
         parsed,
-        profile=replace(parsed.profile, grades=grades),
+        profile=replace(parsed.profile, grades=grades, work_format=formats),
         languages=languages,
         experience=experience,
     )

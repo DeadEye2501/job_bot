@@ -483,7 +483,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def joined_stack(required: list[str], preferred: list[str]) -> list[str]` (8)
 - `def deduped_halves(required: list[str], preferred: list[str]) -> tuple[list[str], list[str]]` (22)
 
-### `backend/domain/taxonomy.py` — 64 строк
+### `backend/domain/taxonomy.py` — 87 строк
 
 Замкнутые перечни значений, которыми описывают вакансию и анкету.
 
@@ -922,7 +922,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (24)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
-### `backend/llm/cv.py` — 453 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 458 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
@@ -939,21 +939,22 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parse_cv_json(answer: str) -> ParsedCv | None` (31)
 - `async def parse_cv(text: str, client: httpx.AsyncClient, model: str) -> ParsedCv | None` (36)
 
-### `backend/llm/cv_grounding.py` — 280 строк
+### `backend/llm/cv_grounding.py` — 307 строк ⚠ подошёл к 300
 
 Что в разобранном резюме не подтверждается его же текстом.
 
 Зависит от: `backend.domain.taxonomy`, `backend.llm.hallucination`, `backend.payloads`
 
 - `def _spelled_in(text: str, word: str) -> bool` (10)
-- `def _grade_named_in(text: str, grade: str) -> bool` (8)
+- `def _any_named_in(text: str, words: tuple[str, ...]) -> bool` (8)
+- `def _grounded_formats(text: str, formats: list[str]) -> list[str]` (18)
 - `def _language_named_in(text: str, name: str) -> bool` (18)
 - `def _level_named_near(text: str, language: str, word: str) -> bool` (33)
 - `def _grounded_level(text: str, language: str, level: str) -> str` (24)
 - `def _company_at(lowered: str, company: str, cursor: int) -> int` (15)
 - `def _job_blocks(text: str, companies: list[str]) -> list[str | None]` (36)
 - `def _grounded_stack(place, block: str | None) -> list[str]` (11)
-- `def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv` (34)
+- `def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv` (39)
 
 ### `backend/llm/cv_native.py` — 57 строк
 
@@ -3533,13 +3534,13 @@ Runtime settings layer.
 - `def _client(letter: str, *, finish_reason: str='stop', factcheck: str=PASSES)` (10)
 - `async def _written(*args, **kwargs)` (10)
 
-### `tests/backend/test_llm_cv_grounding.py` — 418 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_cv_grounding.py` — 479 строк ⚠ подошёл к 300
 
 Следствия сверки разобранного резюме с его же текстом.
 
 Зависит от: `backend.llm.cv_grounding`, `backend.payloads`, `tests.factories`
 
-Тестов: 28
+Тестов: 32
 
 
 ### `tests/backend/test_llm_cv_items.py` — 221 строк
@@ -3563,7 +3564,7 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/backend/test_llm_cv_profile.py` — 300 строк
+### `tests/backend/test_llm_cv_profile.py` — 311 строк ⚠ подошёл к 300
 
 Следствия разбора профиля и языков в `backend/llm/cv.py`.
 
@@ -3572,7 +3573,7 @@ Runtime settings layer.
 Тестов: 25
 
 - `async def parse_answer(answer: str, text: str='резюме')` (8)
-- `async def parse_profile(text: str='резюме', **fields)` (5)
+- `async def parse_profile(text: str='резюме', **fields)` (9)
 
 ### `tests/backend/test_llm_cv_response.py` — 204 строк
 
