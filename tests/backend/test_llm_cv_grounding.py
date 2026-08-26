@@ -66,7 +66,7 @@ def test_a_grade_named_in_russian_survives():
 def test_the_rest_of_the_resume_is_left_alone():
     """Сверка касается двух полей; навыки, опыт и прочий профиль не её дело."""
     parsed = parsed_cv(
-        profile=parsed_cv_profile(location="Ереван", education="МИРЭА"),
+        profile=parsed_cv_profile(location="Тверь", education="Политех"),
         skills=[parsed_cv_skill("Python")],
         experience=[parsed_cv_place(company="Контур")],
     )
@@ -75,8 +75,8 @@ def test_the_rest_of_the_resume_is_left_alone():
 
     assert [skill.name for skill in grounded.skills] == ["Python"]
     assert [place.company for place in grounded.experience] == ["Контур"]
-    assert grounded.profile.location == "Ереван"
-    assert grounded.profile.education == "МИРЭА"
+    assert grounded.profile.location == "Тверь"
+    assert grounded.profile.education == "Политех"
 
 
 def test_a_language_whose_name_is_too_short_to_check_survives():
@@ -210,9 +210,9 @@ def test_a_stack_is_dropped_when_the_job_has_no_stack_section():
 
 def test_a_stack_under_its_own_heading_survives():
     parsed = parsed_cv(
-        experience=[parsed_cv_place(company="Mindcheckapp", stack=["Python", "Django"])]
+        experience=[parsed_cv_place(company="Контур", stack=["Python", "Django"])]
     )
-    text = "Mindcheckapp\nBackend разработчик\n\nСтек:\n    Python | Django\n"
+    text = "Контур\nBackend разработчик\n\nСтек:\n    Python | Django\n"
 
     grounded = grounded_in_cv(parsed, text)
 
@@ -408,13 +408,17 @@ def test_a_level_word_belongs_to_the_language_it_stands_next_to():
 
 
 def test_a_longer_level_name_is_not_confirmed_by_its_own_tail():
-    """«Upper-Intermediate» — не «Intermediate», и B1 отсюда не следует."""
+    """«Upper-Intermediate» — не «Intermediate», и B1 отсюда не следует.
+
+    Взамен неподтверждённого читается написанное рядом с языком, а написано
+    там B2. Совпади короткое имя с длинным — и B1 остался бы как есть.
+    """
     parsed = parsed_cv(languages=[ParsedCvLanguage(language="Английский", level="B1")])
 
     grounded = grounded_in_cv(parsed, "Языки: Английский — Upper-Intermediate")
 
     assert [(x.language, x.level) for x in grounded.languages] == [
-        ("Английский", "C2")
+        ("Английский", "B2")
     ]
 
 
@@ -477,3 +481,62 @@ def test_one_unnamed_format_takes_the_whole_list_with_it():
     grounded = grounded_in_cv(parsed, "Режим работы: гибрид, два дня дома")
 
     assert grounded.profile.work_format == []
+
+
+def test_a_level_word_of_the_next_language_stays_with_it():
+    """Окно уровня кончается там, где начинается следующий язык.
+
+    Заявленный уровень английского в тексте не назван, и подтвердить его
+    нечем — но строкой ниже стоит «базовый» немецкого. Дотянись окно до него,
+    и английский получил бы A1 чужим словом.
+    """
+    parsed = parsed_cv(
+        languages=[
+            ParsedCvLanguage(language="Английский", level="A1"),
+            ParsedCvLanguage(language="Немецкий", level="A1"),
+        ]
+    )
+    text = "Иностранные языки\nАнглийский\nНемецкий — базовый\n"
+
+    grounded = grounded_in_cv(parsed, text)
+
+    assert [(x.language, x.level) for x in grounded.languages] == [
+        ("Английский", "C2"),
+        ("Немецкий", "A1"),
+    ]
+
+
+def test_a_language_mentioned_in_prose_does_not_steal_its_own_window():
+    """«Пять лет в англоязычной команде» — не то место, где назван уровень.
+
+    Корень языка ловится и в таком слове, а раздел с настоящим уровнем стоит
+    ниже. Возьми первое вхождение — и честный B1 подменится высшим: сверка
+    выбросит правду, чего ей делать нельзя.
+    """
+    parsed = parsed_cv(languages=[ParsedCvLanguage(language="Английский", level="B1")])
+    text = (
+        "О себе\nПять лет в англоязычной команде, ежедневные созвоны.\n\n"
+        "Иностранные языки\nАнглийский — B1\n"
+    )
+
+    grounded = grounded_in_cv(parsed, text)
+
+    assert [(x.language, x.level) for x in grounded.languages] == [
+        ("Английский", "B1")
+    ]
+
+
+def test_the_level_written_beside_the_language_wins_over_the_claimed_one():
+    """Модель перевела «начальный» в «Elementary» — уровень берут из резюме.
+
+    Заявленный A2 текстом не подтверждается: слова «elementary» в русском
+    резюме нет. Но рядом с языком написано «начальный», и это A1 — читать надо
+    его, а не уходить в запасной высший.
+    """
+    parsed = parsed_cv(languages=[ParsedCvLanguage(language="Английский", level="A2")])
+
+    grounded = grounded_in_cv(parsed, "Иностранные языки\nАнглийский язык — начальный")
+
+    assert [(x.language, x.level) for x in grounded.languages] == [
+        ("Английский", "A1")
+    ]

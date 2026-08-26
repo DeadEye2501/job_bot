@@ -20,14 +20,14 @@ from backend.domain.spellings import dedupe_first_wins
 from backend.domain.taxonomy import (
     CEFR_LEVELS,
     GRADES,
-    LEVEL_SPELLINGS,
+    LEVELS_BY_SPELLING,
     NATIVE_LEVEL,
     WORK_FORMATS,
 )
 from backend.llm.cv_grounding import grounded_in_cv
 from backend.llm.cv_native import with_native_language
 from backend.llm.external import external_block
-from backend.incoming import normalize_enum
+from backend.incoming import fold_homoglyphs, normalize_enum
 from backend.llm.answers import (
     ONLY_JSON,
     json_object,
@@ -113,7 +113,7 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 - first_name / last_name: имя и фамилия. Отчество в имя НЕ включай. Набранное в шапке резюме заглавными («ИВАН ПЕТРОВ») верни обычным письмом: «Иван», «Петров».
 - email: email одной строкой.
 - phone: телефон как написан, либо null.
-- location: город/страна как написано в CV («Берлин, Германия», «Lisbon, Portugal», «Buenos Aires, Argentina», «Ереван, Армения»), либо null.
+- location: город/страна как написано в CV («Берлин, Германия», «Lisbon, Portugal», «Buenos Aires, Argentina», «Тверь, Тверская область»), либо null.
 - telegram_username: только @username (без t.me/ и без https://). Если в тексте "https://t.me/foobar" — верни "@foobar".
 - github_url: полный https-URL на github-профиль. Хвостовые "?tab=..." можно срезать.
 - education: одна строка вида "ВУЗ, специальность, степень, год", если есть.
@@ -178,22 +178,6 @@ def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]:
     )
 
 
-# Написания уровней разом, от длинного к короткому: «intermediate» сидит
-# внутри «upper intermediate», и короткое, спрошенное первым, отобрало бы у
-# длинного его собственный уровень.
-_LEVELS_BY_SPELLING: tuple[tuple[str, str], ...] = tuple(
-    sorted(
-        (
-            (spelling.replace("-", " "), level)
-            for level, spellings in LEVEL_SPELLINGS.items()
-            for spelling in spellings
-        ),
-        key=lambda pair: len(pair[0]),
-        reverse=True,
-    )
-)
-
-
 def _normalize_lang_level(value: object) -> str | None:
     """Уровень по шкале; пусто — сказанного не понять.
 
@@ -210,10 +194,12 @@ def _normalize_lang_level(value: object) -> str | None:
     plain = re.sub(r"[\s\-]+", " ", v.strip().strip(".,;:()").lower())
     if plain in (NATIVE_LEVEL, "родной"):
         return NATIVE_LEVEL
-    by_scale = re.search(r"\b([abc][12])\b", plain)
+    # Обозначение шкалы ищется по сведённой строке, а слово — по исходной:
+    # сведение выручает «В2» русскими буквами и оно же портит «свободно».
+    by_scale = re.search(r"\b([abc][12])\b", fold_homoglyphs(plain))
     if by_scale is not None:
         return by_scale.group(1).upper()
-    for spelling, level in _LEVELS_BY_SPELLING:
+    for spelling, level in LEVELS_BY_SPELLING:
         if re.search(rf"(?<![-\w]){re.escape(spelling)}(?![-\w])", plain):
             return level
     return None

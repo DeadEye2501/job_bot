@@ -34,9 +34,11 @@ from backend.domain.taxonomy import (
     CEFR_LEVELS,
     GRADE_SPELLINGS,
     LEVEL_SPELLINGS,
+    LEVELS_BY_SPELLING,
     NATIVE_LEVEL,
     WORK_FORMAT_SPELLINGS,
 )
+from backend.incoming import fold_homoglyphs
 from backend.llm.hallucination import language_root
 from backend.payloads import ParsedCv
 
@@ -105,12 +107,6 @@ def _language_named_in(text: str, name: str) -> bool:
     return root is None or root.lower() in text
 
 
-# Обозначения шкалы набирают в русской раскладке: «А1», «В2», «С1». В нижнем
-# регистре эти буквы от латинских не отличить на вид, и без сведения сверка не
-# узнала бы своего же обозначения.
-_HOMOGLYPHS = str.maketrans("авсе", "abce")
-
-
 _LEVEL_NEAR_CHARS = 60
 """Сколько знаков за названием языка считается его же строкой.
 
@@ -120,43 +116,88 @@ _LEVEL_NEAR_CHARS = 60
 """
 
 
-def _level_named_near(text: str, language: str, word: str) -> bool:
-    """Слово уровня стоит сразу за названием языка, а не где попало в резюме.
+def _stops_after(text: str, at: int, others: tuple[str, ...]) -> int:
+    """Где кончается кусок, начатый на `at`: у соседнего языка или по мерке."""
+    ends = [at + _LEVEL_NEAR_CHARS]
+    for other in others:
+        root = language_root(other)
+        if root is None:
+            continue
+        spot = text.find(root.lower(), at + 1)
+        if spot >= 0:
+            ends.append(spot)
+    return min(ends)
 
-    «Свободный график», «продвинутый пользователь Excel», «базовое понимание
-    процессов» — слова уровней живут в резюме своей жизнью. Ищи их по всему
-    тексту, и любой выдуманный уровень найдёт себе подтверждение.
 
-    Окно смотрит только вперёд: у двух языков подряд слово соседа стоит выше
-    своего, и назад заглядывать нельзя.
+def _level_windows(text: str, language: str, others: tuple[str, ...]) -> list[str]:
+    """Куски текста, в которых может стоять уровень этого языка.
 
-    Дефис по краям запрещён наравне с буквой: «intermediate» сидит внутри
-    «upper-intermediate», и без запрета B1 подтверждался бы тем, что на самом
-    деле B2.
+    Каждый начинается с очередного упоминания языка и смотрит только вперёд:
+    у двух языков подряд слово соседа стоит выше своего, и назад заглядывать
+    нельзя. Кончается кусок раньше мерки, если ближе начинается другой язык:
+    «Английский» и строкой ниже «Немецкий — базовый» иначе отдали бы
+    английскому чужое слово.
 
-    Окно смотрится дважды, как есть и со сведёнными омоглифами: обозначение
-    шкалы находится во втором виде, а русское слово — только в первом, потому
-    что сведение его же и портит.
+    Упоминаний берутся все, а не первое: корень языка ловится и в
+    «англоязычной команде» из раздела «о себе», а настоящий уровень стоит
+    ниже. Возьми первое — и честный B1 подменился бы запасным высшим, то есть
+    сверка выбросила бы правду.
     """
     root = language_root(language)
     if root is None:
-        return False
+        return []
+    windows = []
     at = text.find(root.lower())
-    if at < 0:
-        return False
-    near = text[at: at + _LEVEL_NEAR_CHARS]
-    # Дефис и пробел между словами уровня равнозначны: «Upper-Intermediate» и
-    # «Upper Intermediate» — одно и то же написание.
+    while at >= 0:
+        windows.append(text[at: _stops_after(text, at, others)])
+        at = text.find(root.lower(), at + 1)
+    return windows
+
+
+def _level_named_in(near: str, word: str) -> bool:
+    """Слово уровня стоит в этом куске текста.
+
+    «Свободный график», «продвинутый пользователь Excel», «базовое понимание
+    процессов» — слова уровней живут в резюме своей жизнью, и потому кусок
+    берётся у самого языка, а не весь текст.
+
+    Дефис по краям запрещён наравне с буквой: «intermediate» сидит внутри
+    «upper-intermediate», и без запрета B1 подтверждался бы тем, что на самом
+    деле B2. Между словами дефис и пробел, наоборот, равнозначны:
+    «Upper-Intermediate» и «Upper Intermediate» — одно написание.
+
+    Кусок смотрится дважды, как есть и со сведёнными омоглифами: обозначение
+    шкалы находится во втором виде, а русское слово — только в первом, потому
+    что сведение его же и портит.
+    """
     loose = r"[\s-]+".join(re.escape(part) for part in re.split(r"[\s-]+", word))
     spelled = rf"(?<![-\w]){loose}(?![-\w])"
     return any(
         re.search(spelled, one) is not None
-        for one in (near, near.translate(_HOMOGLYPHS))
+        for one in (near, fold_homoglyphs(near))
     )
 
 
-def _grounded_level(text: str, language: str, level: str) -> str:
-    """Уровень языка, если он назван рядом с языком в тексте; иначе высший.
+def _level_read_near(windows: list[str]) -> str | None:
+    """Уровень, написанный рядом с языком; пусто — там его нет.
+
+    Читается, когда заявленный моделью текстом не подтвердился. Модель
+    переводит «начальный» в «Elementary» вопреки наставлению, и заявленного
+    слова в русском резюме, конечно, нет — а написанное человеком стоит на
+    месте. Читать его вернее, чем уходить в запасной высший.
+    """
+    for near in windows:
+        for spelling, level in LEVELS_BY_SPELLING:
+            if _level_named_in(near, spelling):
+                return level
+        for one in CEFR_LEVELS:
+            if _level_named_in(near, one.lower()):
+                return one
+    return None
+
+
+def _grounded_level(windows: list[str], level: str) -> str:
+    """Уровень языка, если он назван у любого упоминания языка; иначе высший.
 
     Уровень, названный невнятно — «технический», «письменный», — модель
     заменяет догадкой, и догадка у каждого прогона своя. Спрашивать её с
@@ -176,9 +217,9 @@ def _grounded_level(text: str, language: str, level: str) -> str:
     if level == NATIVE_LEVEL:
         return level
     named = (level.lower(), *LEVEL_SPELLINGS.get(level, ()))
-    if any(_level_named_near(text, language, word) for word in named):
+    if any(_level_named_in(near, word) for near in windows for word in named):
         return level
-    return CEFR_LEVELS[-1]
+    return _level_read_near(windows) or CEFR_LEVELS[-1]
 
 
 # Слова, которыми в резюме называют стек места работы. «Навыки», «Ключевые
@@ -266,6 +307,35 @@ def _grounded_stack(place, block: str | None) -> list[str]:
     return []
 
 
+def _grounded_languages(text: str, languages: list) -> list:
+    """Языки, названные в тексте, с уровнем, названным рядом с каждым."""
+    named = tuple(lang.language for lang in languages)
+    return [
+        replace(
+            lang,
+            level=_grounded_level(
+                _level_windows(text, lang.language, named), lang.level
+            ),
+        )
+        for lang in languages
+        if _language_named_in(text, lang.language)
+    ]
+
+
+def _grounded_experience(text: str, experience: list) -> list:
+    """Места работы со стеком, объявленным заголовком в их же куске текста."""
+    blocks = _job_blocks(text, [place.company for place in experience])
+    return [
+        replace(place, stack=_grounded_stack(place, block))
+        for place, block in zip(experience, blocks)
+    ]
+
+
+def _say_dropped(what: str, was, left) -> None:
+    for one in [value for value in was if value not in left]:
+        logger.info("разбор резюме: %s %r в тексте не назван, выброшен", what, one)
+
+
 def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv:
     """Разобранное резюме без того, чего его текст не подтверждает."""
     lowered = text.lower()
@@ -276,32 +346,19 @@ def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv:
         if _any_named_in(lowered, (grade, *GRADE_SPELLINGS.get(grade, ())))
     ]
     formats = _grounded_formats(lowered, parsed.profile.work_format)
-    languages = [
-        replace(lang, level=_grounded_level(lowered, lang.language, lang.level))
-        for lang in parsed.languages
-        if _language_named_in(lowered, lang.language)
-    ]
+    languages = _grounded_languages(lowered, parsed.languages)
 
-    for grade in set(parsed.profile.grades) - set(grades):
-        logger.info("разбор резюме: грейд %r в тексте не назван, выброшен", grade)
-    for one in set(parsed.profile.work_format) - set(formats):
-        logger.info("разбор резюме: формат %r в тексте не назван, выброшен", one)
-    kept = {lang.language for lang in languages}
-    for lang in parsed.languages:
-        if lang.language not in kept:
-            logger.info(
-                "разбор резюме: язык %r в тексте не назван, выброшен", lang.language
-            )
-
-    blocks = _job_blocks(text, [place.company for place in parsed.experience])
-    experience = [
-        replace(place, stack=_grounded_stack(place, block))
-        for place, block in zip(parsed.experience, blocks)
-    ]
+    _say_dropped("грейд", parsed.profile.grades, grades)
+    _say_dropped("формат", parsed.profile.work_format, formats)
+    _say_dropped(
+        "язык",
+        [lang.language for lang in parsed.languages],
+        [lang.language for lang in languages],
+    )
 
     return replace(
         parsed,
         profile=replace(parsed.profile, grades=grades, work_format=formats),
         languages=languages,
-        experience=experience,
+        experience=_grounded_experience(text, parsed.experience),
     )

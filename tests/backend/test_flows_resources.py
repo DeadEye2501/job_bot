@@ -74,7 +74,7 @@ async def test_the_candidate_slice_is_rebuilt(make_pipeline, session_factory):
     По нему модель решает, подходит ли вакансия; устаревший срез
     отбраковывал бы по вчерашним ограничениям.
     """
-    await put(session_factory, profile_row(title="Python-разработчик", location="Ереван"))
+    await put(session_factory, profile_row(title="Python-разработчик", location="Тверь"))
     profile = await only_row(session_factory, Profile)
     await put(
         session_factory,
@@ -85,7 +85,7 @@ async def test_the_candidate_slice_is_rebuilt(make_pipeline, session_factory):
     await pipeline.reload_resources()
 
     assert pipeline.profile_cache.title == "Python-разработчик"
-    assert pipeline.profile_cache.location == "Ереван"
+    assert pipeline.profile_cache.location == "Тверь"
     assert [(x.name, x.level) for x in pipeline.profile_cache.languages] == [
         ("Английский", "B1")
     ]

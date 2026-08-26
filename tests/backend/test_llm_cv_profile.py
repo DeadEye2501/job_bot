@@ -39,7 +39,7 @@ async def test_a_minimal_profile_is_enough_for_a_parse():
     parsed = await parse_profile()
 
     assert parsed is not None
-    assert parsed.profile.last_name == "Фролов"
+    assert parsed.profile.last_name == "Петров"
 
 
 @pytest.mark.parametrize("missing", ["first_name", "last_name", "title", "email"])
@@ -309,3 +309,17 @@ async def test_a_level_named_loosely_is_still_understood(named, level):
     }), text=f"Иностранные языки: английский — {named}")
 
     assert ("Английский", level) in [(x.language, x.level) for x in parsed.languages]
+
+
+async def test_a_level_typed_in_cyrillic_letters_is_understood_by_the_parse():
+    """«В2» русскими буквами — тот же B2, и разбору его тоже надо узнать.
+
+    Сверка омоглифы сводит, а разбор — нет, и уровень уезжал в запасной
+    высший ещё до неё.
+    """
+    parsed = await parse_answer(json.dumps({
+        "profile": CV_REQUIRED_PROFILE,
+        "languages": [{"language": "Английский", "level": "В2"}],
+    }), text="Иностранные языки: английский — В2")
+
+    assert ("Английский", "B2") in [(x.language, x.level) for x in parsed.languages]

@@ -105,8 +105,8 @@ def _empty_vacancy() -> dict:
 
 
 CV_REQUIRED_PROFILE = {
-    "first_name": "Алексей",
-    "last_name": "Фролов",
+    "first_name": "Иван",
+    "last_name": "Петров",
     "title": "Python-разработчик",
     "email": "a@b.c",
 }

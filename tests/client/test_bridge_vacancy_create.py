@@ -361,15 +361,15 @@ async def test_salary_typed_in_three_fields_arrives_as_a_range(api, ask):
 async def test_a_country_and_a_city_arrive_the_way_the_parser_writes_them(api, ask):
     """Страна и город складываются в то же написание, что кладёт разбор.
 
-    Разбор пишет «Армения/Ереван», и заведённая руками вакансия обязана
+    Разбор пишет «Тверская область/Тверь», и заведённая руками вакансия обязана
     писаться так же: иначе отбор и статистика считали бы одно и то же место
     двумя разными.
     """
-    vacancy_id = await created(ask, api, country="Армения", city="Ереван")
+    vacancy_id = await created(ask, api, country="Тверская область", city="Тверь")
 
     answer = await ask(api.vacancies.detail, vacancy_id)
 
-    assert answer["ok"]["vacancy"]["location"] == "Армения/Ереван"
+    assert answer["ok"]["vacancy"]["location"] == "Тверская область/Тверь"
 
 
 async def test_a_country_without_a_city_stands_alone(api, ask):
@@ -378,11 +378,11 @@ async def test_a_country_without_a_city_stands_alone(api, ask):
     Косая черта значит «страна и город»: висящая в конце, она читалась бы как
     потерянный город.
     """
-    vacancy_id = await created(ask, api, country="Армения")
+    vacancy_id = await created(ask, api, country="Тверская область")
 
     answer = await ask(api.vacancies.detail, vacancy_id)
 
-    assert answer["ok"]["vacancy"]["location"] == "Армения"
+    assert answer["ok"]["vacancy"]["location"] == "Тверская область"
 
 
 async def test_a_currency_named_in_words_becomes_its_sign(api, ask):

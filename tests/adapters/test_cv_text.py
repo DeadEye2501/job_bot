@@ -73,12 +73,12 @@ def _tiny_pdf(pages: list[list[tuple[int, str]]]) -> bytes:
 @pytest.mark.parametrize("suffix", [".txt", ".md"])
 def test_plain_file_gives_back_what_is_written_in_it(tmp_path, suffix):
     resume = tmp_path / f"Резюме{suffix}"
-    resume.write_text("Фролов Алексей\nPython Backend Developer", encoding="utf-8")
+    resume.write_text("Петров Иван\nPython Backend Developer", encoding="utf-8")
 
     text, trouble = read_cv_text(resume)
 
     assert trouble is None
-    assert "Фролов Алексей" in text
+    assert "Петров Иван" in text
     assert "Python Backend Developer" in text
 
 
@@ -115,14 +115,14 @@ def test_pdf_lines_come_in_the_order_they_stand_on_the_page(tmp_path):
 def test_docx_gives_the_text_of_its_paragraphs(tmp_path):
     resume = tmp_path / "Резюме.docx"
     document = Document()
-    document.add_paragraph("Фролов Алексей")
+    document.add_paragraph("Петров Иван")
     document.add_paragraph("Python Backend Developer")
     document.save(resume)
 
     text, trouble = read_cv_text(resume)
 
     assert trouble is None
-    assert "Фролов Алексей" in text
+    assert "Петров Иван" in text
     assert "Python Backend Developer" in text
 
 
@@ -176,13 +176,13 @@ def test_docx_gives_the_text_wrapped_in_a_content_control(tmp_path):
     inside = body.makeelement(qn("w:sdtContent"), {})
     control.append(inside)
     body.append(control)
-    inside.append(document.add_paragraph("Фролов Алексей")._p)
+    inside.append(document.add_paragraph("Петров Иван")._p)
     document.save(resume)
 
     text, trouble = read_cv_text(resume)
 
     assert trouble is None
-    assert "Фролов Алексей" in text
+    assert "Петров Иван" in text
 
 
 def test_a_cell_stretched_across_columns_is_read_once(tmp_path):
@@ -202,23 +202,23 @@ def test_a_cell_stretched_across_columns_is_read_once(tmp_path):
 def test_a_text_file_in_the_windows_encoding_is_read(tmp_path):
     """Русский `.txt` с русской Windows приходит не в UTF-8, и это не беда."""
     resume = tmp_path / "Резюме.txt"
-    resume.write_bytes("Фролов Алексей".encode("cp1251"))
+    resume.write_bytes("Петров Иван".encode("cp1251"))
 
     text, trouble = read_cv_text(resume)
 
     assert trouble is None
-    assert "Фролов Алексей" in text
+    assert "Петров Иван" in text
 
 
 def test_the_byte_order_mark_does_not_reach_the_text(tmp_path):
     """«Блокнот» ставит метку в начало файла, и пробелом она не считается."""
     resume = tmp_path / "Резюме.txt"
-    resume.write_bytes(b"\xef\xbb\xbf" + "Фролов Алексей".encode("utf-8"))
+    resume.write_bytes(b"\xef\xbb\xbf" + "Петров Иван".encode("utf-8"))
 
     text, trouble = read_cv_text(resume)
 
     assert trouble is None
-    assert text.startswith("Фролов")
+    assert text.startswith("Петров")
 
 
 @pytest.mark.parametrize("suffix", [".pdf", ".docx"])
@@ -281,3 +281,19 @@ def test_an_empty_text_file_is_told_apart(tmp_path):
 
     assert text is None
     assert trouble == "no_text"
+
+
+def test_a_text_file_in_utf16_is_read_as_written(tmp_path):
+    """«Блокнот» умеет сохранять и в UTF-16, и такой файл не мусор.
+
+    Однобайтовая кодировка разбирает его без ошибки — в бессмыслицу с нулями
+    между буквами. Молча принять её значило бы отдать модели мусор вместо
+    резюме.
+    """
+    resume = tmp_path / "Резюме.txt"
+    resume.write_bytes("Петров Иван\nPython".encode("utf-16"))
+
+    text, trouble = read_cv_text(resume)
+
+    assert trouble is None
+    assert "Петров Иван" in text

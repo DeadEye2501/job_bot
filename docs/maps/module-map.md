@@ -36,7 +36,7 @@ Job Bot — single CLI entry point.
 
 ## adapters — 8 модулей
 
-### `adapters/cv_text.py` — 124 строк
+### `adapters/cv_text.py` — 131 строк
 
 Текст резюме, вынутый из файла на диске.
 
@@ -45,7 +45,7 @@ Job Bot — single CLI entry point.
 - `def _pdf_text(path: Path) -> str` (13)
 - `def _docx_lines(parent, document: Document) -> list[str]` (13)
 - `def _docx_text(path: Path) -> str` (3)
-- `def _plain_text(path: Path) -> str` (13)
+- `def _plain_text(path: Path) -> str` (19)
 - `def read_cv_text(path: Path) -> tuple[str | None, str | None]` (27)
 
 ### `adapters/db.py` — 105 строк
@@ -483,7 +483,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def joined_stack(required: list[str], preferred: list[str]) -> list[str]` (8)
 - `def deduped_halves(required: list[str], preferred: list[str]) -> tuple[list[str], list[str]]` (22)
 
-### `backend/domain/taxonomy.py` — 87 строк
+### `backend/domain/taxonomy.py` — 105 строк
 
 Замкнутые перечни значений, которыми описывают вакансию и анкету.
 
@@ -857,12 +857,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def telegram_alive(bot) -> bool` (7)
 - `async def model_alive(cfg, kind: str) -> bool` (44)
 
-### `backend/incoming.py` — 118 строк
+### `backend/incoming.py` — 134 строк
 
 Приведение внешнего ввода к значениям, годным для записи.
 
 Зависит от: —
 
+- `def fold_homoglyphs(text: str) -> str` (12)
 - `def text_or_none(value) -> str | None` (16)
 - `def int_or_none(value) -> int | None` (3)
 - `def float_or_none(value) -> float | None` (3)
@@ -922,14 +923,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (24)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
-### `backend/llm/cv.py` — 458 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 444 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
 Зависит от: `adapters.lm_chat`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.incoming`, `backend.llm.answers`, `backend.llm.cv_grounding`, `backend.llm.cv_native`, `backend.llm.external`, `backend.payloads`
 
 - `def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]` (9)
-- `def _normalize_lang_level(value: object) -> str | None` (23)
+- `def _normalize_lang_level(value: object) -> str | None` (25)
 - `def _parse_language_item(item) -> tuple[str, str | None] | None` (13)
 - `def _parse_languages(raw: object) -> list[ParsedCvLanguage]` (28)
 - `def _parse_date(value) -> date | None` (21)
@@ -939,31 +940,37 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parse_cv_json(answer: str) -> ParsedCv | None` (31)
 - `async def parse_cv(text: str, client: httpx.AsyncClient, model: str) -> ParsedCv | None` (36)
 
-### `backend/llm/cv_grounding.py` — 307 строк ⚠ подошёл к 300
+### `backend/llm/cv_grounding.py` — 364 строк ⚠ подошёл к 300
 
 Что в разобранном резюме не подтверждается его же текстом.
 
-Зависит от: `backend.domain.taxonomy`, `backend.llm.hallucination`, `backend.payloads`
+Зависит от: `backend.domain.taxonomy`, `backend.incoming`, `backend.llm.hallucination`, `backend.payloads`
 
 - `def _spelled_in(text: str, word: str) -> bool` (10)
 - `def _any_named_in(text: str, words: tuple[str, ...]) -> bool` (8)
 - `def _grounded_formats(text: str, formats: list[str]) -> list[str]` (18)
 - `def _language_named_in(text: str, name: str) -> bool` (18)
-- `def _level_named_near(text: str, language: str, word: str) -> bool` (33)
-- `def _grounded_level(text: str, language: str, level: str) -> str` (24)
+- `def _stops_after(text: str, at: int, others: tuple[str, ...]) -> int` (11)
+- `def _level_windows(text: str, language: str, others: tuple[str, ...]) -> list[str]` (23)
+- `def _level_named_in(near: str, word: str) -> bool` (22)
+- `def _level_read_near(windows: list[str]) -> str | None` (16)
+- `def _grounded_level(windows: list[str], level: str) -> str` (24)
 - `def _company_at(lowered: str, company: str, cursor: int) -> int` (15)
 - `def _job_blocks(text: str, companies: list[str]) -> list[str | None]` (36)
 - `def _grounded_stack(place, block: str | None) -> list[str]` (11)
-- `def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv` (39)
+- `def _grounded_languages(text: str, languages: list) -> list` (13)
+- `def _grounded_experience(text: str, experience: list) -> list` (7)
+- `def _say_dropped(what: str, was, left) -> None` (3)
+- `def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv` (26)
 
-### `backend/llm/cv_native.py` — 57 строк
+### `backend/llm/cv_native.py` — 75 строк
 
 Родной язык кандидата — тот, на котором написано его резюме.
 
 Зависит от: `backend.domain.taxonomy`, `backend.payloads`
 
 - `def _resume_language(text: str) -> str` (10)
-- `def with_native_language(parsed: ParsedCv, text: str) -> ParsedCv` (22)
+- `def with_native_language(parsed: ParsedCv, text: str) -> ParsedCv` (40)
 
 ### `backend/llm/external.py` — 47 строк
 
@@ -2580,13 +2587,13 @@ Runtime settings layer.
 
 ## tests — 250 модулей
 
-### `tests/adapters/test_cv_text.py` — 283 строк
+### `tests/adapters/test_cv_text.py` — 299 строк
 
 Следствия чтения резюме с диска: что достаётся из файла и что мешает.
 
 Зависит от: `adapters.cv_text`
 
-Тестов: 16
+Тестов: 17
 
 - `def _tiny_pdf(pages: list[list[tuple[int, str]]]) -> bytes` (59)
 
@@ -3534,13 +3541,13 @@ Runtime settings layer.
 - `def _client(letter: str, *, finish_reason: str='stop', factcheck: str=PASSES)` (10)
 - `async def _written(*args, **kwargs)` (10)
 
-### `tests/backend/test_llm_cv_grounding.py` — 479 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_cv_grounding.py` — 542 строк ⚠ за пределом 500
 
 Следствия сверки разобранного резюме с его же текстом.
 
 Зависит от: `backend.llm.cv_grounding`, `backend.payloads`, `tests.factories`
 
-Тестов: 32
+Тестов: 35
 
 
 ### `tests/backend/test_llm_cv_items.py` — 221 строк
@@ -3555,22 +3562,22 @@ Runtime settings layer.
 - `async def one_skill(**fields)` (6)
 - `async def one_job(**fields)` (7)
 
-### `tests/backend/test_llm_cv_native.py` — 85 строк
+### `tests/backend/test_llm_cv_native.py` — 119 строк
 
 Следствия правила «родной язык у разобранной анкеты есть всегда».
 
 Зависит от: `backend.llm.cv_native`, `backend.payloads`, `tests.factories`
 
-Тестов: 7
+Тестов: 9
 
 
-### `tests/backend/test_llm_cv_profile.py` — 311 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_cv_profile.py` — 325 строк ⚠ подошёл к 300
 
 Следствия разбора профиля и языков в `backend/llm/cv.py`.
 
 Зависит от: `backend.llm.cv`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 25
+Тестов: 26
 
 - `async def parse_answer(answer: str, text: str='резюме')` (8)
 - `async def parse_profile(text: str='резюме', **fields)` (9)

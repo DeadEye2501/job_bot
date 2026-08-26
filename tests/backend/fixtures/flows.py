@@ -226,7 +226,7 @@ async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)
         grade="middle",
         salary="200000",
         remote="remote",
-        location="Ереван",
+        location="Тверь",
     )
     pipeline.parse_refusal = None
     pipeline.parse_asked = False

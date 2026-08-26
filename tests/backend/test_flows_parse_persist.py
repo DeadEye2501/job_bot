@@ -45,7 +45,7 @@ async def test_the_parsed_fields_land_in_the_row(parsing, session_factory):
     assert saved.salary_min == 200000
     assert saved.salary_max == 200000
     assert saved.remote == "remote"
-    assert saved.location == "Ереван"
+    assert saved.location == "Тверь"
     assert saved.is_parsed is True
 
 

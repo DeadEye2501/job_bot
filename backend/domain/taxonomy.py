@@ -84,4 +84,22 @@ LEVEL_SPELLINGS: dict[str, tuple[str, ...]] = {
 это не уровень, а свойство владения, и переводить его нечем.
 """
 
+LEVELS_BY_SPELLING: tuple[tuple[str, str], ...] = tuple(
+    sorted(
+        (
+            (spelling.replace("-", " "), level)
+            for level, spellings in LEVEL_SPELLINGS.items()
+            for spelling in spellings
+        ),
+        key=lambda pair: len(pair[0]),
+        reverse=True,
+    )
+)
+"""Те же написания разом, от длинного к короткому.
+
+Порядок несущий: «intermediate» сидит внутри «upper intermediate», и короткое,
+спрошенное первым, отобрало бы у длинного его собственный уровень. Дефис
+сведён к пробелу — «Upper-Intermediate» и «Upper Intermediate» одно и то же.
+"""
+
 LANGUAGE_LEVELS: tuple[str, ...] = CEFR_LEVELS + (NATIVE_LEVEL,)

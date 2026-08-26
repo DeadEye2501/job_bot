@@ -134,7 +134,7 @@ async def test_a_truncated_answer_still_parses_what_it_can():
     parsed = await parse_cv("резюме", client, "qwen")
 
     assert parsed is not None
-    assert parsed.profile.first_name == "Алексей"
+    assert parsed.profile.first_name == "Иван"
 
 
 async def test_a_well_formed_answer_becomes_a_parsed_resume():
@@ -165,7 +165,7 @@ async def test_reasoning_with_braces_before_the_answer_does_not_hide_it():
     parsed = await parse_cv("резюме", client, "qwen")
 
     assert parsed is not None
-    assert parsed.profile.first_name == "Алексей"
+    assert parsed.profile.first_name == "Иван"
 
 
 async def test_a_grade_the_resume_never_names_does_not_come_back():
