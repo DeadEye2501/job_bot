@@ -6,9 +6,18 @@ from pathlib import Path
 
 import webview
 
+from adapters.cv_text import READABLE_SUFFIXES
+
 from client.bridge.answer import denied, reply
 from client.bridge.cv_file import _stat_cv
 from client.bridge.desktop import open_in_system
+
+
+# Старый двоичный `.doc` дописан к читаемым: разбор его не читает, а приложить
+# к отклику можно и его — там нужен только путь.
+_RESUME_FILTER = "Резюме ({})".format(
+    ";".join(f"*{one}" for one in (*READABLE_SUFFIXES, ".doc"))
+)
 
 
 class Cv:
@@ -17,9 +26,9 @@ class Cv:
     Примесь к `Profile`; собирающий обязан держать `_hub` — оттуда берутся мотор
     и настройки, в которых лежит путь.
 
-    Внутрь файла не заглядывает никто: разбор резюме моделью отключён, и чтение
-    его текста снято вместе с последней дорогой к нему. `cv_file` знает о файле
-    ровно то, что говорит о нём файловая система.
+    Внутрь файла отсюда не заглядывают: `cv_file` знает о нём ровно то, что
+    говорит файловая система. Текст из него читает `adapters/cv_text`, и зовут
+    того из разбора резюме, а не из окна.
 
     Файл мосту не выбирает никто: диалог был Qt'шный и ушёл вместе с каналом.
     Путь называет страница, а спрашивает его у человека диалог самого окна
@@ -38,11 +47,8 @@ class Cv:
         обычном «нет, не сейчас», а пустой путь стёр бы прежнее резюме, и
         следующий отклик ушёл бы без вложения.
         """
-        # Старый двоичный `.doc` в перечне остаётся, хотя разбор его не читает:
-        # приложить к отклику можно и его, а путь — всё, что отклику нужно.
         chosen = self._hub.window.create_file_dialog(
-            webview.OPEN_DIALOG,
-            file_types=("Резюме (*.pdf;*.docx;*.doc;*.txt;*.md)",),
+            webview.OPEN_DIALOG, file_types=(_RESUME_FILTER,)
         )
         if not chosen:
             return {"ok": {"cancelled": True}}

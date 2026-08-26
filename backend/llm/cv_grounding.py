@@ -32,12 +32,14 @@ from dataclasses import replace
 
 from backend.domain.taxonomy import (
     CEFR_LEVELS,
+    LEVEL_WHEN_UNTOLD,
     GRADE_SPELLINGS,
     LEVEL_SPELLINGS,
     LEVELS_BY_SPELLING,
     NATIVE_LEVEL,
     WORK_FORMAT_SPELLINGS,
 )
+from backend.domain.wording import spelled_alone
 from backend.incoming import fold_homoglyphs
 from backend.llm.hallucination import language_root
 from backend.payloads import ParsedCv
@@ -161,21 +163,11 @@ def _level_named_in(near: str, word: str) -> bool:
     процессов» — слова уровней живут в резюме своей жизнью, и потому кусок
     берётся у самого языка, а не весь текст.
 
-    Дефис по краям запрещён наравне с буквой: «intermediate» сидит внутри
-    «upper-intermediate», и без запрета B1 подтверждался бы тем, что на самом
-    деле B2. Между словами дефис и пробел, наоборот, равнозначны:
-    «Upper-Intermediate» и «Upper Intermediate» — одно написание.
-
     Кусок смотрится дважды, как есть и со сведёнными омоглифами: обозначение
     шкалы находится во втором виде, а русское слово — только в первом, потому
     что сведение его же и портит.
     """
-    loose = r"[\s-]+".join(re.escape(part) for part in re.split(r"[\s-]+", word))
-    spelled = rf"(?<![-\w]){loose}(?![-\w])"
-    return any(
-        re.search(spelled, one) is not None
-        for one in (near, fold_homoglyphs(near))
-    )
+    return any(spelled_alone(one, word) for one in (near, fold_homoglyphs(near)))
 
 
 def _level_read_near(windows: list[str]) -> str | None:
@@ -219,7 +211,7 @@ def _grounded_level(windows: list[str], level: str) -> str:
     named = (level.lower(), *LEVEL_SPELLINGS.get(level, ()))
     if any(_level_named_in(near, word) for near in windows for word in named):
         return level
-    return _level_read_near(windows) or CEFR_LEVELS[-1]
+    return _level_read_near(windows) or LEVEL_WHEN_UNTOLD
 
 
 # Слова, которыми в резюме называют стек места работы. «Навыки», «Ключевые

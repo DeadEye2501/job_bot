@@ -17,8 +17,9 @@ import httpx
 from adapters.lm_chat import ChatRequest, chat
 from backend.domain.skill_names import skill_key
 from backend.domain.spellings import dedupe_first_wins
+from backend.domain.wording import spelled_alone
 from backend.domain.taxonomy import (
-    CEFR_LEVELS,
+    LEVEL_WHEN_UNTOLD,
     GRADES,
     LEVELS_BY_SPELLING,
     NATIVE_LEVEL,
@@ -27,14 +28,22 @@ from backend.domain.taxonomy import (
 from backend.llm.cv_grounding import grounded_in_cv
 from backend.llm.cv_native import with_native_language
 from backend.llm.external import external_block
-from backend.incoming import fold_homoglyphs, normalize_enum
+from backend.llm.rules import NOT_A_SKILL_LINE, NOT_A_SKILL_SECTIONS
+from backend.incoming import fold_homoglyphs, normalize_enum_list
 from backend.llm.answers import (
     ONLY_JSON,
     json_object,
     log_unparseable,
     str_or_none,
 )
-from backend.payloads import ParsedCv, ParsedCvExperience, ParsedCvLanguage, ParsedCvProfile, ParsedCvSkill
+from backend.payloads import (
+    REQUIRED_PROFILE_FIELDS,
+    ParsedCv,
+    ParsedCvExperience,
+    ParsedCvLanguage,
+    ParsedCvProfile,
+    ParsedCvSkill,
+)
 from backend.incoming import str_list
 
 
@@ -84,8 +93,8 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
     "telegram_username": "string | null",
     "github_url": "string | null",
     "education": "string | null",
-    "work_format": ["remote" | "hybrid" | "office", ...],
-    "grades": ["junior" | "middle" | "senior" | "lead", ...],
+    "work_format": [""" + " | ".join(f'"{one}"' for one in WORK_FORMATS) + """, ...],
+    "grades": [""" + " | ".join(f'"{one}"' for one in GRADES) + """, ...],
     "free_preferences": "string | null"
   },
   "languages": [
@@ -117,8 +126,8 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 - telegram_username: только @username (без t.me/ и без https://). Если в тексте "https://t.me/foobar" — верни "@foobar".
 - github_url: полный https-URL на github-профиль. Хвостовые "?tab=..." можно срезать.
 - education: одна строка вида "ВУЗ, специальность, степень, год", если есть.
-- work_format: подмножество из remote / hybrid / office — формат работы, который кандидат рассматривает или предпочитает, ЕСЛИ это явно сказано в CV («удалёнка», «гибрид», «офис», «remote», «хочу работать из дома»). Не угадывай из контекста. [] если не указано.
-- grades: подмножество из junior / middle / senior / lead — только если кандидат САМ называет свой уровень: «Senior Python Developer» в заголовке резюме, «middle+», «рассматриваю senior роли», «ищу позицию тимлида». Ничего не выводи ни из стажа, ни из числа мест работы, ни из объёма ответственности, ни из названия прошлой должности: «Team-lead» в шапке места работы — это кем человек РАБОТАЛ, а не то, кем он себя объявляет. Многие нетехнические CV вообще не используют эти маркеры (используют «опытный», «ведущий», «главный», «помощник» и т.п.) — в таком случае верни []. Сомневаешься — верни []: пустой список честнее выдуманного грейда, по грейду отбирают вакансии.
+- work_format: подмножество из """ + " / ".join(WORK_FORMATS) + """ — формат работы, который кандидат рассматривает или предпочитает, ЕСЛИ это явно сказано в CV («удалёнка», «гибрид», «офис», «remote», «хочу работать из дома»). Не угадывай из контекста. [] если не указано.
+- grades: подмножество из """ + " / ".join(GRADES) + """ — только если кандидат САМ называет свой уровень: «Senior Python Developer» в заголовке резюме, «middle+», «рассматриваю senior роли», «ищу позицию тимлида». Ничего не выводи ни из стажа, ни из числа мест работы, ни из объёма ответственности, ни из названия прошлой должности: «Team-lead» в шапке места работы — это кем человек РАБОТАЛ, а не то, кем он себя объявляет. Многие нетехнические CV вообще не используют эти маркеры (используют «опытный», «ведущий», «главный», «помощник» и т.п.) — в таком случае верни []. Сомневаешься — верни []: пустой список честнее выдуманного грейда, по грейду отбирают вакансии.
 - free_preferences: краткое свободное текстовое поле с пожеланиями к вакансиям из блоков «О себе», «Цели», «Что ищу», «Обо мне», если там есть именно предпочтения по работе; иначе null. Не дублируй дословно весь раздел — сожми до сути.
 
 Семантика languages:
@@ -134,7 +143,7 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 - category: бери из заголовка списка в резюме ("Python", "Базы данных", "DevOps", "Дизайн", "Маркетинг", "Финансы", "Кулинария" и т.п.). Если категории нет — "Общее". Заголовок пиши тот, что стоит в резюме, — по нему видно, откуда навык взят.
 - name: канонизированное название навыка / инструмента / технологии ("Django", "PostgreSQL", "Apache Kafka", "Docker", "Figma", "InDesign", "HubSpot", "AutoCAD", "Прототипирование"). Без описаний.
 - Навыком НЕ считаются и в skills не попадают: водительские права и категории; знание языков — для них есть свой массив languages; семейное положение, готовность к переезду и командировкам.
-- Личные качества — тоже не навык, НА ЛЮБОМ ЯЗЫКЕ. Это свойства характера и общие способности, а не инструменты и не предметные умения: «ответственность», «внимательность», «стрессоустойчивость», «коммуникабельность», «работа в команде», «обучаемость», «Creative Thinking», «Communication», «Time Management», «Team Player», «Problem Solving», «Leadership», «Research», «Attention to detail». Целый раздел, названный «Личные качества», «Soft Skills», «Soft-скилы», «Personal qualities» или «О себе», в skills не переносится ВООБЩЕ — ни одной записью, как бы он ни назывался.
+- Личные качества — тоже не навык, НА ЛЮБОМ ЯЗЫКЕ. Это свойства характера и общие способности, а не инструменты и не предметные умения: «ответственность», «внимательность», «стрессоустойчивость», «коммуникабельность», «работа в команде», «обучаемость», «Creative Thinking», «Communication», «Time Management», «Team Player», «Problem Solving», «Leadership», «Research», «Attention to detail». Целый раздел, названный так — """ + NOT_A_SKILL_LINE + """, — в skills не переносится ВООБЩЕ, ни одной записью, как бы он ни назывался.
 - Если в CV целый блок навыков назван в честь самого языка / платформы / линейки продуктов (например, заголовок «Python», «JavaScript» с подсписком фреймворков; или «Adobe Suite» с подсписком Photoshop / Illustrator / InDesign), то и эта платформа/линейка сама тоже должна быть отдельным skill'ом — НЕ теряй её только потому, что она вынесена в заголовок категории. Положи её либо в подходящую категорию («Языки программирования», «Дизайн-инструменты»), либо в ту же категорию, если другой подходящей нет.
 - level: целое 1-5, твоя оценка глубины владения по тексту CV. Опирайся на: упоминается ли в текущей работе, как часто встречается в опыте, как давно используется. Базовый ориентир: 5 — стержневой навык в текущей работе и большинстве опыта; 4 — регулярно используется; 3 — есть опыт, но не основной; 2 — был эпизодически; 1 — упоминание без явного опыта. НЕ ставь всем 3 — различай. Если по тексту невозможно сделать никакой обоснованной оценки (навык лишь в общем списке без контекста) — верни null, парсер подставит нейтральное значение.
 - aliases: распространённые альтернативные написания ("PostgreSQL" → ["Postgres"], "JavaScript" → ["JS"], "Docker-Compose" → ["docker compose"], "Photoshop" → ["Adobe Photoshop", "PS"], "Figma" → ["figma.com"]). НЕ включай в aliases само значение name (даже в другом регистре) — алиас по определению ОТЛИЧАЕТСЯ от name. Не дублируй один и тот же вариант. [] если других реальных написаний нет.
@@ -167,17 +176,6 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 - """ + ONLY_JSON
 
 
-def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]:
-    if not isinstance(raw, list):
-        return []
-    # Значение и есть свой ключ: оно уже сведено к справочнику, и сравнивать
-    # его больше нечем. Чужое `normalize_enum` отдаёт пустым, и обход его
-    # отсеивает вместе с прочей пустотой.
-    return dedupe_first_wins(
-        [normalize_enum(item, allowed) for item in raw], lambda value: value
-    )
-
-
 def _normalize_lang_level(value: object) -> str | None:
     """Уровень по шкале; пусто — сказанного не понять.
 
@@ -200,7 +198,7 @@ def _normalize_lang_level(value: object) -> str | None:
     if by_scale is not None:
         return by_scale.group(1).upper()
     for spelling, level in LEVELS_BY_SPELLING:
-        if re.search(rf"(?<![-\w]){re.escape(spelling)}(?![-\w])", plain):
+        if spelled_alone(plain, spelling):
             return level
     return None
 
@@ -245,7 +243,7 @@ def _parse_languages(raw: object) -> list[ParsedCvLanguage]:
             continue
         best[language.casefold()] = (known[0] if known else language, level)
     return [
-        ParsedCvLanguage(language=name, level=level or CEFR_LEVELS[-1])
+        ParsedCvLanguage(language=name, level=level or LEVEL_WHEN_UNTOLD)
         for name, level in best.values()
     ]
 
@@ -280,24 +278,18 @@ def _parse_date(value) -> date | None:
 def _parse_profile(data: dict) -> ParsedCvProfile | None:
     if not isinstance(data, dict):
         return None
-    first_name = str_or_none(data.get("first_name"))
-    last_name = str_or_none(data.get("last_name"))
-    title = str_or_none(data.get("title"))
-    email = str_or_none(data.get("email"))
-    if not (first_name and last_name and title and email):
+    required = {name: str_or_none(data.get(name)) for name in REQUIRED_PROFILE_FIELDS}
+    if not all(required.values()):
         return None
     return ParsedCvProfile(
-        first_name=first_name,
-        last_name=last_name,
-        title=title,
-        email=email,
+        **required,
         phone=str_or_none(data.get("phone")),
         location=str_or_none(data.get("location")),
         telegram_username=str_or_none(data.get("telegram_username")),
         github_url=str_or_none(data.get("github_url")),
         education=str_or_none(data.get("education")),
-        work_format=_normalize_enum_list(data.get("work_format"), WORK_FORMATS),
-        grades=_normalize_enum_list(data.get("grades"), GRADES),
+        work_format=normalize_enum_list(data.get("work_format"), WORK_FORMATS),
+        grades=normalize_enum_list(data.get("grades"), GRADES),
         free_preferences=str_or_none(data.get("free_preferences")),
     )
 
@@ -307,11 +299,17 @@ def _parse_profile(data: dict) -> ParsedCvProfile | None:
 # «качества — не навык» словами держится по-русски и рассыпается на английском
 # «Soft Skills». А качества в навыках дороги: навык сличают со стеком
 # вакансии, и «Communication» там не сличается ни с чем.
-# Слово ищется целым: «soft skill» подстрокой сидит внутри «Microsoft Skills»,
-# и бухгалтер лишился бы всего блока с Excel, Word и 1С.
+# Собирается из общего перечня: наставление и отсев обязаны знать одни и те же
+# названия. Слово при этом ищется целым — «soft skill» подстрокой сидит внутри
+# «Microsoft Skills», и бухгалтер лишился бы всего блока с Excel, Word и 1С.
+# Хвост слова свободен: «Soft-скилы» и «софт-скилам» — один раздел.
 _NOT_A_SKILL_SECTION_RE = re.compile(
-    r"\b(soft[\s-]?skill|софт[\s-]?скил|soft[\s-]?скил"
-    r"|лич(ные|ностные)\s+качества|personal\s+(qualit|skill))",
+    r"\b("
+    + "|".join(
+        r"[\s-]+".join(re.escape(part) for part in re.split(r"[\s-]+", one))
+        for one in NOT_A_SKILL_SECTIONS
+    )
+    + r")\w*",
     re.IGNORECASE,
 )
 

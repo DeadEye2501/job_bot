@@ -6,8 +6,8 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.skill_names import skill_key
+from backend.repository.app_settings import CV_PATH_KEY, put_app_setting
 from backend.models import (
-    AppSetting,
     Profile,
     ProfileExperience,
     ProfileLanguage,
@@ -91,16 +91,6 @@ async def _add_parsed_experience(
     await session.flush()
 
 
-async def _upsert_cv_path(session: AsyncSession, cv_path: str) -> None:
-    """Запомнить, из какого файла анкета разобрана."""
-    existing = await session.get(AppSetting, "cv_path")
-    if existing is None:
-        session.add(AppSetting(key="cv_path", value=cv_path))
-    else:
-        existing.value = cv_path
-    await session.flush()
-
-
 def _new_profile(p) -> Profile:
     """Строка анкеты из разобранного резюме.
 
@@ -154,7 +144,8 @@ async def save_parsed_cv(
         session, profile.id, parsed.experience, skill_lookup
     )
     if cv_path is not None:
-        await _upsert_cv_path(session, cv_path)
+        await put_app_setting(session, CV_PATH_KEY, cv_path)
+        await session.flush()
 
     logger.info(
         "Profile replaced: languages=%d skills=%d experiences=%d cv_path=%s",

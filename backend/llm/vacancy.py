@@ -44,6 +44,14 @@ MAX_PARSE_TOKENS = 1200
 ROOMIER_PARSE_TOKENS = 2400
 
 
+_GRADE_VALUES = '"' + " | ".join(GRADES) + ' | null"'
+_FORMAT_VALUES = '"' + " | ".join(WORK_FORMATS) + ' | null"'
+"""Значения полей-перечислений, как их видит модель.
+
+Собраны из справочника, а не выписаны: разъедься перечень с ним — и
+`normalize_enum` вернул бы пустоту на ответ, который сам же и заказан.
+"""
+
 PARSE_VACANCY_PROMPT = """Ты парсишь пост с вакансией из Telegram-канала и извлекаешь структурированные поля в JSON.
 
 ПЕРЕД ТЕМ КАК ОТВЕТИТЬ — мысленно ПРОЙДИСЬ ПО ЭТОМУ СПИСКУ ВОПРОСОВ. На каждый вопрос ищи ответ ИМЕННО В ПРИСЛАННОМ ТЕКСТЕ; если в тексте ответа нет — пиши null (или [] для stack_required / stack_preferred). Не выдумывай факты.
@@ -69,9 +77,9 @@ PARSE_VACANCY_PROMPT = """Ты парсишь пост с вакансией и�
   "other_contact": "string | null",
   "stack_required": ["string", ...],
   "stack_preferred": ["string", ...],
-  "grade": "junior | middle | senior | lead | null",
+  "grade": """ + _GRADE_VALUES + """,
   "salary": "string | null",
-  "remote": "remote | hybrid | office | null",
+  "remote": """ + _FORMAT_VALUES + """,
   "location": "string | null"
 }
 

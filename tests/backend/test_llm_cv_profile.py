@@ -71,13 +71,17 @@ async def test_a_non_string_optional_field_becomes_absent():
 
 
 async def test_only_known_work_formats_survive():
-    """Из формата работы остаётся только известное, в нижнем регистре."""
+    """Из формата работы остаётся только известное, в нижнем регистре.
+
+    И в порядке справочника, а не ответа модели: окно выкладывает отобранное
+    именно в нём.
+    """
     parsed = await parse_profile(
         text="Рассматриваю remote или работу в офисе",
         work_format=["Remote", "office", "как получится"],
     )
 
-    assert parsed.profile.work_format == ["remote", "office"]
+    assert parsed.profile.work_format == ["office", "remote"]
 
 
 async def test_a_repeated_work_format_is_kept_once():

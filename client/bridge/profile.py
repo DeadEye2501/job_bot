@@ -9,15 +9,16 @@ from backend.repository import profile_experience as experience_repo
 from backend.repository import profile_languages as languages_repo
 from backend.repository import profile_skills as skills_repo
 from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
-from client.bridge.choices import _filter_languages, _filter_set
+from backend.incoming import normalize_enum_list
+from client.bridge.choices import _filter_languages
 from client.bridge.cv import Cv
 from client.bridge.cv_file import _stat_cv
 from client.bridge.hub import Hub
 from client.bridge.refusals import PROFILE_FIRST
+from backend.payloads import REQUIRED_PROFILE_FIELDS
 from client.bridge.wire import _exp_to_dict, _profile_to_dict, _skill_to_dict
 
 
-REQUIRED_FIELDS = ("first_name", "last_name", "title", "email")
 
 
 class Profile(Cv):
@@ -63,7 +64,7 @@ class Profile(Cv):
         except BAD_PAYLOAD as e:
             return bad_fields("save", e)
 
-        for required in REQUIRED_FIELDS:
+        for required in REQUIRED_PROFILE_FIELDS:
             if not fields[required]:
                 return denied(f"Поле '{required}' обязательно.")
 
@@ -158,6 +159,6 @@ def _read_profile_fields(payload: dict) -> dict:
         "github_url": text_or_none(payload.get("github_url")),
         "education": text_or_none(payload.get("education")),
         "free_preferences": text_or_none(payload.get("free_preferences")),
-        "grades": _filter_set(payload.get("grades"), GRADES),
-        "work_format": _filter_set(payload.get("work_format"), WORK_FORMATS),
+        "grades": normalize_enum_list(payload.get("grades"), GRADES),
+        "work_format": normalize_enum_list(payload.get("work_format"), WORK_FORMATS),
     }

@@ -10,7 +10,7 @@
 """
 
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
-from client.bridge.choices import _filter_set
+from backend.incoming import normalize_enum_list
 
 
 def test_the_declared_order_wins_over_the_order_of_clicks():
@@ -20,8 +20,8 @@ def test_the_declared_order_wins_over_the_order_of_clicks():
     гибрид» и «гибрид, офис», — и ответы на неё расходились бы без единой
     правки самой анкеты.
     """
-    assert _filter_set(["hybrid", "office"], WORK_FORMATS) == ["office", "hybrid"]
-    assert _filter_set(["senior", "junior"], GRADES) == ["junior", "senior"]
+    assert normalize_enum_list(["hybrid", "office"], WORK_FORMATS) == ["office", "hybrid"]
+    assert normalize_enum_list(["senior", "junior"], GRADES) == ["junior", "senior"]
 
 
 def test_a_value_outside_the_set_does_not_reach_the_column():
@@ -31,5 +31,5 @@ def test_a_value_outside_the_set_does_not_reach_the_column():
     вовсе не список. Колонка же читается как закрытый набор — по ней анкета
     сравнивается с разобранной вакансией.
     """
-    assert _filter_set(["office", "космос", 42], WORK_FORMATS) == ["office"]
-    assert _filter_set("office", WORK_FORMATS) == []
+    assert normalize_enum_list(["office", "космос", 42], WORK_FORMATS) == ["office"]
+    assert normalize_enum_list("office", WORK_FORMATS) == []
