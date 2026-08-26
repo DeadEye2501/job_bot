@@ -17,8 +17,9 @@ import httpx
 from adapters.lm_chat import ChatRequest, chat
 from backend.domain.skill_names import skill_key
 from backend.domain.spellings import dedupe_first_wins
-from backend.domain.taxonomy import CEFR_LEVELS, GRADES, WORK_FORMATS
+from backend.domain.taxonomy import CEFR_LEVELS, GRADES, NATIVE_LEVEL, WORK_FORMATS
 from backend.llm.cv_grounding import grounded_in_cv
+from backend.llm.cv_native import with_native_language
 from backend.llm.external import external_block
 from backend.incoming import normalize_enum
 from backend.llm.answers import (
@@ -48,10 +49,9 @@ logger = logging.getLogger(__name__)
 #    из страны проживания. Запретами в промпте это лечится наполовину, поэтому
 #    грейды и языки сверяются с текстом резюме в `cv_grounding.py`.
 #  - Уровень языка, названный не по шкале («письменный», «со словарём»),
-#    ставит перед выбором из двух зол. Промпт просит вернуть пустой уровень —
-#    и тогда `_parse_language_item` выбрасывает язык целиком, потому что
-#    записать «уровень неизвестен» некуда: колонка обязательная. Не послушайся
-#    модель — язык останется с придуманным уровнем. Сверить его не с чем.
+#    заменяется нижним (`_parse_languages`) — со всеми последствиями: отбор
+#    вакансий по языку он включает и вакансию, требующую свободного языка,
+#    такой анкете отрежет.
 #  - Стек места работы на некоторых резюме собирается из общего списка навыков
 #    кандидата, хотя у самой работы раздела «Стек» нет. Сверкой не берётся:
 #    названия оттуда в тексте есть, просто в другом его месте.
@@ -109,7 +109,8 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 
 Семантика languages:
 - Уровень — строго CEFR (A1–C2) или native для родного языка. Название языка — в форме как в CV («Русский», «English», «Deutsch», «Français», «中文», «Português»).
-- Языки берутся ТОЛЬКО из текста. Нет в резюме раздела языков и нет упоминаний — верни []. Не добавляй родной язык по национальности имени, по языку самого резюме или по стране проживания.
+- Язык, на котором написано САМО резюме, — родной: верни его с level "native" всегда, даже если раздела языков в резюме нет и слово «русский» («English», «Deutsch») в тексте не встречается ни разу.
+- Остальные языки берутся ТОЛЬКО из текста. Не добавляй язык по национальности имени или по стране проживания.
 - Уровень тоже берётся только из текста. Назван не по шкале — «письменный», «разговорный», «со словарём», «свободно», «базовый» — верни level: null. Свой уровень вместо названного не подставляй.
 
 Семантика skills:
@@ -167,34 +168,56 @@ def _normalize_lang_level(value: object) -> str | None:
     if v is None:
         return None
     vl = v.lower()
-    if vl in ("native", "родной"):
-        return "native"
+    if vl in (NATIVE_LEVEL, "родной"):
+        return NATIVE_LEVEL
     up = v.upper()
     if up in CEFR_LEVELS:
         return up
     return None
 
 
-def _parse_language_item(item) -> ParsedCvLanguage | None:
+def _parse_language_item(item) -> tuple[str, str | None] | None:
+    """Название языка и его уровень; пусто — языка в записи нет.
+
+    Неразобранный уровень отдаётся пустотой, а не заменяется умолчанием:
+    подставленное неотличимо от названного, и при повторе языка оно затёрло бы
+    настоящий уровень.
+    """
     if not isinstance(item, dict):
         return None
     language = str_or_none(item.get("language"))
     if not language:
         return None
-    level = _normalize_lang_level(item.get("level"))
-    if level is None:
-        return None
-    return ParsedCvLanguage(language=language, level=level)
+    return language, _normalize_lang_level(item.get("level"))
 
 
 def _parse_languages(raw: object) -> list[ParsedCvLanguage]:
+    """Языки анкеты: по одному на язык, уровень неизвестен — самый низкий.
+
+    Отбор повторов свой, а не общий `dedupe_first_wins`: первым здесь
+    побеждает не всякий, а тот, у кого уровень назван. Модель присылает один
+    и тот же язык дважды — «Английский: технический» и «Английский: C1», — и
+    первым в списке чаще стоит невнятный.
+
+    Уровень, оставшийся неизвестным, заменяется самым низким: колонка
+    обязательная, хранить «неизвестно» негде, а выбросить язык значило бы
+    потерять названное человеком.
+    """
     if not isinstance(raw, list):
         return []
-    rows = [_parse_language_item(it) for it in raw]
-    return dedupe_first_wins(
-        [row for row in rows if row is not None],
-        lambda row: row.language.casefold(),
-    )
+    best: dict[str, tuple[str, str | None]] = {}
+    for row in (_parse_language_item(it) for it in raw):
+        if row is None:
+            continue
+        language, level = row
+        known = best.get(language.casefold())
+        if known is not None and known[1] is not None:
+            continue
+        best[language.casefold()] = (known[0] if known else language, level)
+    return [
+        ParsedCvLanguage(language=name, level=level or CEFR_LEVELS[0])
+        for name, level in best.values()
+    ]
 
 
 _YEAR_MONTH_RE = re.compile(r"^(\d{4})-(\d{1,2})$")
@@ -371,4 +394,4 @@ async def parse_cv(
     if parsed is None:
         log_unparseable(answer, logger, "parse_cv")
         return None
-    return grounded_in_cv(parsed, text)
+    return with_native_language(grounded_in_cv(parsed, text), text)

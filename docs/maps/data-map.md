@@ -261,7 +261,8 @@
 - `GRADE_SPELLINGS: dict[str, tuple[str, ...]]` = `словарь из 4`
 - `WORK_FORMAT_LABELS_RU: dict[str, str]` = `словарь из 3`
 - `CEFR_LEVELS: tuple[str, ...]` = `набор из 6`
-- `LANGUAGE_LEVELS: tuple[str, ...]` = `CEFR_LEVELS + ('native',)`
+- `NATIVE_LEVEL` = `'native'`
+- `LANGUAGE_LEVELS: tuple[str, ...]` = `CEFR_LEVELS + (NATIVE_LEVEL,)`
 
 ### `backend/domain/telegram_identity.py`
 
@@ -465,6 +466,12 @@
 ### `backend/llm/cv_grounding.py`
 
 - `logger` = `logging.getLogger(__name__)`
+
+### `backend/llm/cv_native.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `_CYRILLIC` = `re.compile('[а-яё]', re.IGNORECASE)`
+- `_LATIN` = `re.compile('[a-z]', re.IGNORECASE)`
 
 ### `backend/llm/external.py`
 

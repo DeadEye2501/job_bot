@@ -10,8 +10,10 @@ from tests.factories import parsed_cv, parsed_cv_place, parsed_cv_profile, parse
 
 
 def test_a_language_the_resume_never_names_is_dropped():
-    """Резюме маркетолога языков не называет, а модель дописала родной."""
-    parsed = parsed_cv(languages=[ParsedCvLanguage(language="Русский", level="native")])
+    """Резюме маркетолога языков не называет, а модель дописала французский."""
+    parsed = parsed_cv(
+        languages=[ParsedCvLanguage(language="Французский", level="B2")]
+    )
 
     grounded = grounded_in_cv(parsed, "Маркетолог. Яндекс.Директ, Google Ads, CRM.")
 
@@ -121,3 +123,20 @@ def test_a_grade_named_as_an_intern_survives():
     grounded = grounded_in_cv(parsed, "Стажёр отдела аналитики, ищу первую работу.")
 
     assert grounded.profile.grades == ["junior"]
+
+
+def test_an_invented_native_language_is_dropped_like_any_other():
+    """Родному языку поблажки нет, и это главное здесь.
+
+    Модель выводит родной язык из фамилии кандидата. Освободи его от сверки —
+    и выдуманный «Армянский» пройдёт в анкету, а настоящий язык резюме уже не
+    добавится: родной ведь формально есть. Дыра открывается ровно там, ради
+    чего сверка заведена.
+    """
+    parsed = parsed_cv(
+        languages=[ParsedCvLanguage(language="Армянский", level="native")]
+    )
+
+    grounded = grounded_in_cv(parsed, "Саркисян Ашот. Электрик. Опыт 8 лет.")
+
+    assert grounded.languages == []
