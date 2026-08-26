@@ -85,7 +85,7 @@
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
 
-### app/Shell.svelte (250)
+### app/Shell.svelte (251)
 - —
 - берёт: ./BottomBar.svelte, ./ContactsScreen.svelte, ./LogsScreen.svelte, ./ProfileScreen.svelte, ./SettingsScreen.svelte, ./StatsScreen.svelte, ./VacanciesScreen.svelte, ./WizardScreen.svelte
 
@@ -111,17 +111,17 @@
 - —
 - принимает: ask, say, vacancyId, kind, prefill, current, onclose, onlinked
 
-### app/WizardCv.svelte (140)
+### app/WizardCv.svelte (191)
 - —
-- принимает: ask, busy, onback, onnext
+- принимает: ask, busy, events, onback, onnext
 
 ### app/WizardLlm.svelte (305)
 - —
 - принимает: ask, kind, onback, onnext
 
-### app/WizardScreen.svelte (156)
+### app/WizardScreen.svelte (162)
 - Приглушена только обложка: на финале четыре галочки горят в полную силу — это и есть то, ради чего мастер проходили.
-- принимает: ask, say, ondone, completed
+- принимает: ask, say, events, ondone, completed
 - берёт: ./WizardCv.svelte, ./WizardLlm.svelte, ./WizardTelegram.svelte
 
 ### app/WizardTelegram.svelte (112)
@@ -740,7 +740,7 @@
 - * Отбор и порядок, какими их оставили в прошлый заход.
 - отдаёт: vacancyView
 
-### state/wizard.js (163)
+### state/wizard.js (165)
 - * Экраны по порядку. Приветствие и финал — обложки: шага у них нет, и в * строке шагов они ничего не подсвечивают.
 - отдаёт: PRESETS, backScreen, cvModes, cvReady, llmTrouble, nextScreen, presetFor, resumeScreen, stepAt, stepMarks
 
@@ -1082,12 +1082,11 @@ body, html, button, body, .material-symbols-outlined
 .hr-mini-name, .hr-mini-row .hr-avatar, .hr-mini-meta, .hr-mini-go, .mini-list-empty, .mini-list-more
 - берёт: --accent, --border, --selected-bg, --text-primary, --text-tertiary
 
-### styles/modal.css (200)
+### styles/modal.css (194)
 - Окно поверх окна: затемнение на весь экран и коробка по центру.
-- селекторы (24): :root, .modal-backdrop, .modal-dialog, .modal-dialog.narrow, .modal-dialog.narrow.tall, .modal-dialog.narrow .modal-body, .modal-dialog.narrow .modal-body > *, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-actions,
+- селекторы (23): .modal-backdrop, .modal-dialog, .modal-dialog.narrow, .modal-dialog.narrow.tall, .modal-dialog.narrow .modal-body, .modal-dialog.narrow .modal-body > *, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-actions,
 .modal-footer, .modal-footer, .modal-footer .btn, .modal-footer .btn .material-symbols-outlined, .modal-subtitle, .modal-error
-- объявляет: --modal-tallest
-- берёт: --bg-secondary, --bg-tertiary, --border, --danger, --modal-tallest, --scrim, --shadow-modal, --text-primary, --text-secondary, --text-tertiary
+- берёт: --bg-secondary, --bg-tertiary, --border, --danger, --scrim, --shadow-modal, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/mode.css (54)
 - Переключатель режима бота: слово, дорожка и бегунок на ней.
@@ -1385,7 +1384,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 68 файлов
+## tests — 69 файлов
 
 ### tests/alive.test.js (79)
 - —
@@ -1595,3 +1594,6 @@ body, html, button, body, .material-symbols-outlined
 
 ### tests/wizard.test.js (194)
 - —
+
+### tests/wizard_cv_live.test.js (108)
+- * Шаг с подставным мостом: след зовов и способ доставить весть об исходе. * * `during` доставляет весть посреди самого зова разбора — так приходят * мгновенные отказы: файл пропал, формат не читается, текста в файле нет.

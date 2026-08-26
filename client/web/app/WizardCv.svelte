@@ -12,7 +12,7 @@
   import WizardStatus from '$components/WizardStatus.svelte';
   import { cvModes, cvReady } from '$state/wizard.js';
 
-  let { ask, busy, onback, onnext } = $props();
+  let { ask, busy, events, onback, onnext } = $props();
 
   const MODES = cvModes();
 
@@ -21,6 +21,7 @@
   let mode = $state('attach');
   let loaded = $state(false);
   let saving = $state(false);
+  let parsing = $state(false);
   let status = $state(null);
 
   const alive = living();
@@ -57,6 +58,7 @@
     status = { tone: 'busy', text: 'Сохраняем...' };
     if (mode === 'skip' && !(await forget())) return;
     if (!alive.now) return;
+    if (mode === 'parse') return parse();
     await onnext();
     // Досюда доходят, только если закончить не удалось: удавшееся уводит на
     // финал вместе с этим экраном. Кнопки отпираются обратно — иначе человек
@@ -84,15 +86,58 @@
     return true;
   }
 
+  /** Пустить разбор и остаться ждать его вести.
+   *
+   * Шаг ждёт, а не уходит вперёд: разбор заменяет анкету целиком, и уйди
+   * человек с шага раньше исхода — мастер закончился бы, подняв бота посреди
+   * работы, а анкета доехала бы уже после.
+   */
+  async function parse() {
+    parsing = true;
+    status = { tone: 'busy', text: 'Разбираем резюме — это займёт около минуты.' };
+    const started = await ask('profile.parse_cv');
+    // Исход успевает прийти раньше ответа на сам зов: пропавший файл и
+    // нечитаемый формат отвечают вестью сразу. Сказанное им — последнее слово
+    // о шаге, и дописывать после него нечего.
+    if (!alive.now || started !== null) return;
+    parsing = false;
+    saving = false;
+    status = null;
+  }
+
+  /** Разбор кончился: удавшийся уводит дальше, сорвавшийся отдаёт шаг обратно.
+   *
+   * Слушаем только пока сами разбираем: весть эта общая на все долгие работы,
+   * и чужая увела бы человека с шага, которого он не заканчивал.
+   */
+  async function parsed(done) {
+    if (!parsing) return;
+    parsing = false;
+    if (done.danger) {
+      saving = false;
+      status = { tone: 'err', text: done.message };
+      return;
+    }
+    await onnext();
+    if (!alive.now) return;
+    saving = false;
+    status = null;
+  }
+
   $effect(() => {
     return alive.entered(refresh);
+  });
+
+  $effect(() => {
+    return events.on('action_finished', parsed);
   });
 </script>
 
 <div class="wiz-body">
   <div class="wiz-title">Резюме</div>
   <div class="wiz-subtitle">
-    Файл резюме в <strong>PDF</strong>, <strong>Markdown</strong> или <strong>txt</strong>.
+    Файл резюме в <strong>PDF</strong>, <strong>DOCX</strong>, <strong>Markdown</strong>
+    или <strong>txt</strong>.
     Используется для автозаполнения профиля и хранится локально.
   </div>
 
@@ -106,18 +151,24 @@
           Файл ещё не выбран
         {/if}
       </span>
-      <button class="btn" type="button" onclick={pick}>{cv ? 'Заменить' : 'Выбрать'}</button>
+      <button class="btn" type="button" disabled={saving} onclick={pick}>
+        {cv ? 'Заменить' : 'Выбрать'}
+      </button>
     </div>
   {/if}
 
   <div class="wiz-modes">
     {#each MODES as one (one.id)}
-      <label class="radio-card" class:selected={mode === one.id} class:disabled={one.disabled}>
+      <label
+        class="radio-card"
+        class:selected={mode === one.id}
+        class:disabled={one.disabled || saving}
+      >
         <input
           type="radio"
           name="cvmode"
           value={one.id}
-          disabled={one.disabled}
+          disabled={one.disabled || saving}
           bind:group={mode}
         />
         <div>

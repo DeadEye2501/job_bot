@@ -125,6 +125,28 @@ def ask():
 
 
 @pytest.fixture
+def provider_says(monkeypatch):
+    """Ставит на место провайдера подставного и отдаёт заготовленные ответы.
+
+    Подменяется сборка соединения, а не сам мост: он зовёт её по имени модуля,
+    и подделка садится туда же, куда сел бы настоящий клиент.
+
+    Общая двоим: спрашивают модель и проба связи с экрана настроек, и разбор
+    резюме. Написанные порознь, эти две подмены разъехались бы вместе с
+    именем, по которому мост зовёт сборку.
+    """
+
+    def _answer(routes) -> None:
+        from tests.fakes.llm import provider
+
+        monkeypatch.setattr(
+            "adapters.lm_studio.make_client", lambda cfg: provider(routes)
+        )
+
+    return _answer
+
+
+@pytest.fixture
 def told(hub, runner):
     """Что мост сказал окну об исходе пущенной работы.
 

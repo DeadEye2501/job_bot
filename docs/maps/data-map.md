@@ -1290,6 +1290,7 @@
 - `POLL_REFUSALS` = `словарь из 5`
 - `RERUN_REFUSALS` = `словарь из 6`
 - `PASTED_REFUSALS` = `словарь из 7`
+- `PARSE_CV_REFUSALS` = `словарь из 5`
 - `SEND_REFUSALS` = `словарь из 12`
 
 ### `client/bridge/runner.py`

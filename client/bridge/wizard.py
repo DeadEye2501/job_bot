@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.repository.app_settings import CV_PATH_KEY
+
 from client.bridge.answer import reply
 from client.bridge.hub import Hub
 from client.bridge.lifespan import start_bot
@@ -61,7 +63,7 @@ class Wizard:
         """
 
         async def run() -> dict:
-            await self._hub.rs.set_app("cv_path", "")
+            await self._hub.rs.set_app(CV_PATH_KEY, "")
             return {"cv_path": ""}
 
         return reply(self._hub.runner, run())
