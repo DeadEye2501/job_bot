@@ -14,6 +14,7 @@
 
 from backend.domain.company_hosts import AGGREGATOR_BRANDS, AGGREGATOR_HOSTS
 from backend.domain.resume_marks import AMBIGUOUS_MARKS, RESUME_MARKS
+from backend.domain.taxonomy import GRADE_SPELLINGS
 
 RESUME_MARK_LINE = ", ".join(
     f"«{mark}»" for mark in sorted(RESUME_MARKS | AMBIGUOUS_MARKS)
@@ -76,9 +77,11 @@ AGGREGATOR_HOSTS_LINE = ", ".join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_BRANDS))
 """
 
 GRADE_MARKERS = (
-    "«junior/стажёр/intern», «middle/мидл», «senior/сеньор», "
-    "«lead/тимлид/team lead». Стаж в годах («5 лет опыта») грейдом не "
-    "является"
+    ", ".join(
+        f"«{grade}/{'/'.join(spellings)}»"
+        for grade, spellings in GRADE_SPELLINGS.items()
+    )
+    + ". Стаж в годах («5 лет опыта») грейдом не является"
 )
 """Какими словами в посте назван грейд.
 

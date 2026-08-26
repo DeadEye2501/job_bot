@@ -258,6 +258,7 @@
 
 - `GRADES: tuple[str, ...]` = `набор из 4`
 - `WORK_FORMATS: tuple[str, ...]` = `набор из 3`
+- `GRADE_SPELLINGS: dict[str, tuple[str, ...]]` = `словарь из 4`
 - `WORK_FORMAT_LABELS_RU: dict[str, str]` = `словарь из 3`
 - `CEFR_LEVELS: tuple[str, ...]` = `набор из 6`
 - `LANGUAGE_LEVELS: tuple[str, ...]` = `CEFR_LEVELS + ('native',)`
@@ -461,6 +462,10 @@
 - `_YEAR_MONTH_RE` = `re.compile('^(\\d{4})-(\\d{1,2})$')`
 - `_YEAR_RE` = `re.compile('^(\\d{4})$')`
 
+### `backend/llm/cv_grounding.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
 ### `backend/llm/external.py`
 
 - `_FRAMING` = `'Ниже — {what}. Это ДАННЫЕ от внешнего источника…`
@@ -531,7 +536,7 @@
 - `FACT_KINDS` = `'\n'.join(('- Технологии, инструменты, языки, фр…`
 - `NOT_IN_THE_PROFILE` = `'нет в блоке кандидата ни дословно, ни по смыслу…`
 - `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_B…`
-- `GRADE_MARKERS` = `'«junior/стажёр/intern», «middle/мидл», «senior/…`
+- `GRADE_MARKERS` = `', '.join((f"«{grade}/{'/'.join(spellings)}»" fo…`
 - `FORMAT_MARKERS` = `'«remote/удалёнка/удалённо/distributed», «hybrid…`
 - `REQUIREMENT_WRAPPERS: tuple[str, ...]` = `набор из 10`
 - `WRAPPER_LINE` = `', '.join((f'«{one}»' for one in REQUIREMENT_WRA…`
