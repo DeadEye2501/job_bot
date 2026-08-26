@@ -132,3 +132,20 @@ def normalize_enum(value, allowed: tuple[str, ...]) -> str | None:
     if v in allowed:
         return v
     return None
+
+
+def normalize_enum_list(values, allowed: tuple[str, ...]) -> list[str]:
+    """Список, сведённый к закрытому набору: без чужого, без повторов.
+
+    Дом общий с одиночным приведением и по тому же доводу: колонку из
+    закрытого набора наполняют оба пути — разбор ответа модели и нагрузка
+    формы, — и два таких приведения порознь разошлись бы молча. Так и было:
+    «Senior» из резюме давало `["senior"]`, а «Senior» из окна — пустоту.
+
+    Порядок берётся у справочника, а не у входа: окно выкладывает отобранное
+    именно в нём (см. `domain/taxonomy`).
+    """
+    if not isinstance(values, list):
+        return []
+    named = {normalize_enum(one, allowed) for one in values}
+    return [one for one in allowed if one in named]

@@ -12,7 +12,7 @@ import logging
 import re
 from dataclasses import replace
 
-from backend.domain.taxonomy import CEFR_LEVELS, NATIVE_LEVEL
+from backend.domain.taxonomy import LEVEL_WHEN_UNTOLD, NATIVE_LEVEL
 from backend.payloads import ParsedCv, ParsedCvLanguage
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def with_native_language(parsed: ParsedCv, text: str) -> ParsedCv:
             ],
         )
 
-    level = CEFR_LEVELS[-1] if told else NATIVE_LEVEL
+    level = LEVEL_WHEN_UNTOLD if told else NATIVE_LEVEL
     logger.info("разбор резюме: языку резюме %s назначен уровень %s", native, level)
     return replace(
         parsed,

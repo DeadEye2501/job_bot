@@ -144,7 +144,7 @@ async def test_a_well_formed_answer_becomes_a_parsed_resume():
     parsed = await parse_cv("резюме", client, "qwen")
 
     assert parsed is not None
-    assert parsed.profile.email == "a@b.c"
+    assert parsed.profile.email == CV_REQUIRED_PROFILE["email"]
     assert parsed.skills == []
     assert parsed.experience == []
     # Языков в ответе нет, а родной в анкете есть всегда: его дают тексту, а

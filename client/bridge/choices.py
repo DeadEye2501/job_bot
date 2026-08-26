@@ -5,16 +5,12 @@ from __future__ import annotations
 from backend.domain.taxonomy import LANGUAGE_LEVELS
 
 
-def _filter_set(values, allowed: tuple[str, ...]) -> list[str]:
-    """Keep only known values, in `allowed` order, no duplicates."""
-    if not isinstance(values, list):
-        return []
-    seen = {str(v) for v in values if isinstance(v, str)}
-    return [v for v in allowed if v in seen]
-
-
 def _filter_languages(items) -> list[tuple[str, str]]:
     """Validate language entries from the UI.
+
+    Умолчание своё, не то, что у разбора резюме (`taxonomy.LEVEL_WHEN_UNTOLD`),
+    и различие нарочное: там уровня не назвал человек, а здесь он выбирает его
+    списком, и негодное значение означает битую нагрузку, а не умолчание.
 
     Drops rows with empty language name. Falls back to ``B2`` if the level
     is unknown (UI-typed garbage shouldn't break save). De-dups by language

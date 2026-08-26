@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backend.crypto import decrypt_bytes, decrypt_str, encrypt_bytes, encrypt_str
+from backend.repository.app_settings import put_app_setting
 from backend.models import (
     AppSetting,
     LlmConfig,
@@ -415,11 +416,7 @@ class RuntimeSettings:
     async def set_app(self, key: str, value: str) -> None:
         async with self._session_factory() as session:
             async with session.begin():
-                row = await session.get(AppSetting, key)
-                if row is None:
-                    session.add(AppSetting(key=key, value=value))
-                else:
-                    row.value = value
+                await put_app_setting(session, key, value)
         self._app[key] = value
         if key == "send_locked":
             # Заслон на горячем пути сверяется своей копией — читать настройки

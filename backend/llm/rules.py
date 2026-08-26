@@ -14,7 +14,7 @@
 
 from backend.domain.company_hosts import AGGREGATOR_BRANDS, AGGREGATOR_HOSTS
 from backend.domain.resume_marks import AMBIGUOUS_MARKS, RESUME_MARKS
-from backend.domain.taxonomy import GRADE_SPELLINGS
+from backend.domain.taxonomy import GRADE_SPELLINGS, WORK_FORMAT_SPELLINGS
 
 RESUME_MARK_LINE = ", ".join(
     f"«{mark}»" for mark in sorted(RESUME_MARKS | AMBIGUOUS_MARKS)
@@ -91,10 +91,41 @@ GRADE_MARKERS = (
 """
 
 FORMAT_MARKERS = (
-    "«remote/удалёнка/удалённо/distributed», «hybrid/гибрид/X дней в офисе», "
-    "«office/офис/из офиса/onsite»"
+    ", ".join(
+        f"«{'/'.join((one, *(w for w in spellings if w != one)))}»"
+        for one, spellings in WORK_FORMAT_SPELLINGS.items()
+    )
+    + ", «X дней в офисе»"
 )
-"""Какими словами назван формат работы."""
+"""Какими словами назван формат работы.
+
+Собирается из общего справочника по тому же доводу, что и приметы грейда:
+выписанный руками, он с ним уже расходился — сверка резюме считала «work from
+home» названным форматом, а наставление о таком написании не знало вовсе.
+
+Прибавка в хвосте не написание, а оборот, по которому формат узнают в
+объявлении: искать «X дней в офисе» подстрокой нечем, а модели он говорит о
+гибриде больше, чем слово «гибрид».
+"""
+
+NOT_A_SKILL_SECTIONS: tuple[str, ...] = (
+    "Личные качества",
+    "Личностные качества",
+    "Soft Skills",
+    "Soft-скилы",
+    "Софт-скилы",
+    "Personal qualities",
+    "Personal skills",
+)
+"""Как называют раздел резюме, из которого навыков не берут.
+
+Читают перечень двое, и порознь они уже расходились: наставление запрещало
+раздел «О себе», а отсев его пропускал, и «Коммуникабельность» оттуда доезжала
+до анкеты, где сличалась со стеком вакансии.
+"""
+
+NOT_A_SKILL_LINE = ", ".join(f"«{one}»" for one in NOT_A_SKILL_SECTIONS)
+"""Те же названия строкой для наставления."""
 
 REQUIREMENT_WRAPPERS: tuple[str, ...] = (
     "опыт", "опыта", "знание", "знания", "умение", "умения",

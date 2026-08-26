@@ -36,7 +36,7 @@ Job Bot — single CLI entry point.
 
 ## adapters — 8 модулей
 
-### `adapters/cv_text.py` — 131 строк
+### `adapters/cv_text.py` — 137 строк
 
 Текст резюме, вынутый из файла на диске.
 
@@ -167,7 +167,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 128 модулей
+## backend — 130 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -483,7 +483,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def joined_stack(required: list[str], preferred: list[str]) -> list[str]` (8)
 - `def deduped_halves(required: list[str], preferred: list[str]) -> tuple[list[str], list[str]]` (22)
 
-### `backend/domain/taxonomy.py` — 105 строк
+### `backend/domain/taxonomy.py` — 116 строк
 
 Замкнутые перечни значений, которыми описывают вакансию и анкету.
 
@@ -519,6 +519,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def is_empty_vacancy(parsed: ParsedVacancy | None) -> bool` (24)
 - `def blacklist_refusal(blacklist_match: str | None) -> str | None` (9)
 - `def decide_vacancy_status(score: int, *, threshold: int) -> tuple[VacancyStatus, str | None]` (14)
+
+### `backend/domain/wording.py` — 21 строк
+
+Как узнать написание в тексте: словом, а не куском чужого слова.
+
+Зависит от: —
+
+- `def spelled_alone(text: str, word: str) -> bool` (9)
 
 ### `backend/flows/apply.py` — 380 строк ⚠ подошёл к 300
 
@@ -857,7 +865,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def telegram_alive(bot) -> bool` (7)
 - `async def model_alive(cfg, kind: str) -> bool` (44)
 
-### `backend/incoming.py` — 134 строк
+### `backend/incoming.py` — 151 строк
 
 Приведение внешнего ввода к значениям, годным для записи.
 
@@ -871,6 +879,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def moment_or_none(value) -> datetime | None` (16)
 - `def str_list(value) -> list[str]` (11)
 - `def normalize_enum(value, allowed: tuple[str, ...]) -> str | None` (22)
+- `def normalize_enum_list(values, allowed: tuple[str, ...]) -> list[str]` (15)
 
 ### `backend/llm/answers.py` — 232 строк
 
@@ -923,28 +932,27 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (24)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
-### `backend/llm/cv.py` — 444 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 442 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.incoming`, `backend.llm.answers`, `backend.llm.cv_grounding`, `backend.llm.cv_native`, `backend.llm.external`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.domain.wording`, `backend.incoming`, `backend.llm.answers`, `backend.llm.cv_grounding`, `backend.llm.cv_native`, `backend.llm.external`, `backend.llm.rules`, `backend.payloads`
 
-- `def _normalize_enum_list(raw: object, allowed: tuple[str, ...]) -> list[str]` (9)
 - `def _normalize_lang_level(value: object) -> str | None` (25)
 - `def _parse_language_item(item) -> tuple[str, str | None] | None` (13)
 - `def _parse_languages(raw: object) -> list[ParsedCvLanguage]` (28)
 - `def _parse_date(value) -> date | None` (21)
-- `def _parse_profile(data: dict) -> ParsedCvProfile | None` (23)
+- `def _parse_profile(data: dict) -> ParsedCvProfile | None` (17)
 - `def _parse_skill(item) -> ParsedCvSkill | None` (35)
 - `def _parse_experience(item) -> ParsedCvExperience | None` (18)
 - `def _parse_cv_json(answer: str) -> ParsedCv | None` (31)
 - `async def parse_cv(text: str, client: httpx.AsyncClient, model: str) -> ParsedCv | None` (36)
 
-### `backend/llm/cv_grounding.py` — 364 строк ⚠ подошёл к 300
+### `backend/llm/cv_grounding.py` — 356 строк ⚠ подошёл к 300
 
 Что в разобранном резюме не подтверждается его же текстом.
 
-Зависит от: `backend.domain.taxonomy`, `backend.incoming`, `backend.llm.hallucination`, `backend.payloads`
+Зависит от: `backend.domain.taxonomy`, `backend.domain.wording`, `backend.incoming`, `backend.llm.hallucination`, `backend.payloads`
 
 - `def _spelled_in(text: str, word: str) -> bool` (10)
 - `def _any_named_in(text: str, words: tuple[str, ...]) -> bool` (8)
@@ -952,7 +960,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _language_named_in(text: str, name: str) -> bool` (18)
 - `def _stops_after(text: str, at: int, others: tuple[str, ...]) -> int` (11)
 - `def _level_windows(text: str, language: str, others: tuple[str, ...]) -> list[str]` (23)
-- `def _level_named_in(near: str, word: str) -> bool` (22)
+- `def _level_named_in(near: str, word: str) -> bool` (12)
 - `def _level_read_near(windows: list[str]) -> str | None` (16)
 - `def _grounded_level(windows: list[str], level: str) -> str` (24)
 - `def _company_at(lowered: str, company: str, cursor: int) -> int` (15)
@@ -1068,7 +1076,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
 - `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (55)
 
-### `backend/llm/rules.py` — 158 строк
+### `backend/llm/rules.py` — 189 строк
 
 Приметы предметной области, общие для наставлений модели.
 
@@ -1090,7 +1098,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (36)
 
-### `backend/llm/vacancy.py` — 463 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 471 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
@@ -1255,7 +1263,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 422 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 437 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -1284,6 +1292,14 @@ First-run bootstrap: ensure DB schema exists.
 - `class ChannelStats` (20)
 - `class ChannelDetail` (4)
 - `class VacancyFilter` (53)
+
+### `backend/repository/app_settings.py` — 31 строк
+
+Строка общего словаря настроек: записать значение по ключу.
+
+Зависит от: `backend.models`
+
+- `async def put_app_setting(session: AsyncSession, key: str, value: str) -> None` (7)
 
 ### `backend/repository/blacklist.py` — 322 строк ⚠ подошёл к 300
 
@@ -1544,18 +1560,17 @@ First-run bootstrap: ensure DB schema exists.
 - `def _experience_lines(experiences: list) -> list[str]` (13)
 - `async def build_profile_block(session: AsyncSession) -> str` (28)
 
-### `backend/repository/profile_cv.py` — 165 строк
+### `backend/repository/profile_cv.py` — 156 строк
 
 Запись анкеты, разобранной моделью из резюме.
 
-Зависит от: `backend.domain.skill_names`, `backend.models`, `backend.payloads`, `backend.repository.profile_experience`, `backend.repository.profile_languages`, `backend.repository.profile_skills`
+Зависит от: `backend.domain.skill_names`, `backend.models`, `backend.payloads`, `backend.repository.app_settings`, `backend.repository.profile_experience`, `backend.repository.profile_languages`, `backend.repository.profile_skills`
 
 - `async def _wipe_profile(session: AsyncSession) -> None` (11)
 - `async def _add_parsed_skills(session: AsyncSession, profile_id: int, skills) -> dict[str, ProfileSkill]` (21)
 - `async def _add_parsed_experience(session: AsyncSession, profile_id: int, experience, skill_lookup: dict[str, ProfileSkill]) -> None` (32)
-- `async def _upsert_cv_path(session: AsyncSession, cv_path: str) -> None` (8)
 - `def _new_profile(p) -> Profile` (20)
-- `async def save_parsed_cv(session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None=None) -> None` (40)
+- `async def save_parsed_cv(session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None=None) -> None` (41)
 
 ### `backend/repository/profile_experience.py` — 162 строк
 
@@ -1797,11 +1812,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def apply_silence(session: AsyncSession, vacancy: Vacancy, timeout_days: int) -> None` (23)
 - `def apply_parse_outcome(vacancy: Vacancy, new_status: VacancyStatus) -> None` (18)
 
-### `backend/runtime_settings.py` — 492 строк ⚠ подошёл к 300
+### `backend/runtime_settings.py` — 489 строк ⚠ подошёл к 300
 
 Runtime settings layer.
 
-Зависит от: `adapters`, `backend.crypto`, `backend.models`
+Зависит от: `adapters`, `backend.crypto`, `backend.models`, `backend.repository.app_settings`
 
 - `def mask_phone(phone: str | None) -> str` (10)
 - `class TgAccountConfig` (7)
@@ -1809,7 +1824,7 @@ Runtime settings layer.
 - `def _log_tg_updated(api_id: int, phone: str, password: str, session_string: str | None) -> None` (16)
 - `async def _tg_row(session: AsyncSession) -> TgAccount | None` (3)
 - `async def _llm_row(session: AsyncSession, kind: LlmConfigKind) -> LlmConfig | None` (5)
-- `class RuntimeSettings` (310)
+- `class RuntimeSettings` (306)
   - `async def load(cls, session_factory: async_sessionmaker[AsyncSession]) -> 'RuntimeSettings'` (6)
   - `async def reload(self) -> None` (22)
   - `def tg(self) -> TgAccountConfig | None` (2)
@@ -1838,7 +1853,7 @@ Runtime settings layer.
   - `async def set_chat(self, *, base_url: str, api_key: str, model: str) -> None` (4)
   - `async def set_embed(self, *, base_url: str, api_key: str, model: str) -> None` (4)
   - `async def _set_llm(self, kind: LlmConfigKind, base_url: str, api_key: str, model: str) -> None` (32)
-  - `async def set_app(self, key: str, value: str) -> None` (22)
+  - `async def set_app(self, key: str, value: str) -> None` (18)
   - `async def mark_wizard_completed(self) -> None` (3)
 - `def _from_tg_row(row: TgAccount) -> TgAccountConfig | None` (30)
 - `def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None` (18)
@@ -2027,14 +2042,13 @@ Runtime settings layer.
   - `def vacancies(self, payload: dict) -> dict` (13)
   - `async def _paged(self, channel_id: int, page: Page) -> dict` (25)
 
-### `client/bridge/choices.py` — 46 строк
+### `client/bridge/choices.py` — 42 строк
 
 Просеивание значений, пришедших из окна, по известному набору.
 
 Зависит от: `backend.domain.taxonomy`
 
-- `def _filter_set(values, allowed: tuple[str, ...]) -> list[str]` (6)
-- `def _filter_languages(items) -> list[tuple[str, str]]` (31)
+- `def _filter_languages(items) -> list[tuple[str, str]]` (35)
 
 ### `client/bridge/companies.py` — 258 строк
 
@@ -2059,14 +2073,14 @@ Runtime settings layer.
   - `def block(self, company_id: int) -> dict` (12)
   - `def unblock(self, company_id: int) -> dict` (9)
 
-### `client/bridge/cv.py` — 88 строк
+### `client/bridge/cv.py` — 94 строк
 
 Файл резюме, на который смотрит окно: запомнить путь, открыть.
 
-Зависит от: `client.bridge.answer`, `client.bridge.cv_file`, `client.bridge.desktop`
+Зависит от: `adapters.cv_text`, `client.bridge.answer`, `client.bridge.cv_file`, `client.bridge.desktop`
 
-- `class Cv` (75)
-  - `def pick(self) -> dict` (21)
+- `class Cv` (72)
+  - `def pick(self) -> dict` (18)
   - `def _replace(self, payload: dict) -> dict` (22)
     - `async def run() -> dict` (3)
   - `def open(self) -> dict` (15)
@@ -2289,11 +2303,11 @@ Runtime settings layer.
 - `async def merge_picker(session, subject: PickerSubject, absorbed_id: int, search: str | None) -> dict` (21)
 - `async def link_picker(session, subject: PickerSubject, vacancy, search: str | None) -> dict` (18)
 
-### `client/bridge/profile.py` — 163 строк
+### `client/bridge/profile.py` — 164 строк
 
 Анкета соискателя: сведения о себе, навыки и места работы.
 
-Зависит от: `backend.domain.taxonomy`, `backend.incoming`, `backend.repository`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.domain.taxonomy`, `backend.incoming`, `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.refusals`, `client.bridge.wire`
 
 - `class Profile(Cv)` (123)
   - `def get(self) -> dict` (19)
@@ -3571,7 +3585,7 @@ Runtime settings layer.
 Тестов: 9
 
 
-### `tests/backend/test_llm_cv_profile.py` — 325 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_cv_profile.py` — 329 строк ⚠ подошёл к 300
 
 Следствия разбора профиля и языков в `backend/llm/cv.py`.
 
@@ -4647,7 +4661,7 @@ Runtime settings layer.
 
 Следствия отбора значений из закрытых наборов при чтении форм окна.
 
-Зависит от: `backend.domain.taxonomy`, `client.bridge.choices`
+Зависит от: `backend.domain.taxonomy`, `backend.incoming`
 
 Тестов: 2
 
@@ -5017,7 +5031,7 @@ Runtime settings layer.
 - `async def only_row(session_factory, model)` (4)
 - `async def all_rows(session_factory, model) -> list` (8)
 
-### `tests/factories.py` — 479 строк ⚠ подошёл к 300
+### `tests/factories.py` — 478 строк ⚠ подошёл к 300
 
 Построение объектов, которые тесты подают на вход коду.
 

@@ -104,15 +104,6 @@ def _empty_vacancy() -> dict:
     }
 
 
-CV_REQUIRED_PROFILE = {
-    "first_name": "Иван",
-    "last_name": "Петров",
-    "title": "Python-разработчик",
-    "email": "a@b.c",
-}
-"""Минимум полей анкеты, без которого разбор резюме отдаёт пустоту."""
-
-
 def parsed_vacancy(**overrides) -> ParsedVacancy:
     """Разобранная вакансия: заголовок есть, остальное пусто.
 
@@ -288,6 +279,14 @@ def person_fields(**overrides) -> dict:
         "email": "ivan@example.com",
         **overrides,
     }
+
+
+CV_REQUIRED_PROFILE = person_fields()
+"""Минимум полей анкеты, без которого разбор резюме отдаёт пустоту.
+
+Тот же человек, что и везде: разойдись они, проверка «разобранное легло в
+анкету» сравнивала бы двух разных.
+"""
 
 
 def profile_row(**overrides) -> Profile:

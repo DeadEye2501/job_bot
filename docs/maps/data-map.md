@@ -25,6 +25,7 @@
 - `_PARAGRAPH` = `qn('w:p')`
 - `_WRAPPERS` = `frozenset({qn('w:tbl'), qn('w:tr'), qn('w:tc'), …`
 - `_READERS` = `словарь из 4`
+- `READABLE_SUFFIXES: tuple[str, ...]` = `tuple(_READERS)`
 - `_LIES_ABOUT_FORMAT` = `набор из 4`
 
 ### `adapters/db.py`
@@ -265,6 +266,7 @@
 - `NATIVE_LEVEL` = `'native'`
 - `LEVEL_SPELLINGS: dict[str, tuple[str, ...]]` = `словарь из 6`
 - `LEVELS_BY_SPELLING: tuple[tuple[str, str], ...]` = `tuple(sorted(((spelling.replace('-', ' '), level…`
+- `LEVEL_WHEN_UNTOLD: str` = `CEFR_LEVELS[-1]`
 - `LANGUAGE_LEVELS: tuple[str, ...]` = `CEFR_LEVELS + (NATIVE_LEVEL,)`
 
 ### `backend/domain/telegram_identity.py`
@@ -469,7 +471,7 @@
 - `PARSE_CV_PROMPT` = `'Ты парсишь CV специалиста и извлекаешь структур…`
 - `_YEAR_MONTH_RE` = `re.compile('^(\\d{4})-(\\d{1,2})$')`
 - `_YEAR_RE` = `re.compile('^(\\d{4})$')`
-- `_NOT_A_SKILL_SECTION_RE` = `re.compile('\\b(soft[\\s-]?skill|софт[\\s-]?скил…`
+- `_NOT_A_SKILL_SECTION_RE` = `re.compile('\\b(' + '|'.join(('[\\s-]+'.join((re…`
 
 ### `backend/llm/cv_grounding.py`
 
@@ -555,7 +557,9 @@
 - `NOT_IN_THE_PROFILE` = `'нет в блоке кандидата ни дословно, ни по смыслу…`
 - `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_B…`
 - `GRADE_MARKERS` = `', '.join((f"«{grade}/{'/'.join(spellings)}»" fo…`
-- `FORMAT_MARKERS` = `'«remote/удалёнка/удалённо/distributed», «hybrid…`
+- `FORMAT_MARKERS` = `', '.join((f"«{'/'.join((one, *(w for w in spell…`
+- `NOT_A_SKILL_SECTIONS: tuple[str, ...]` = `набор из 7`
+- `NOT_A_SKILL_LINE` = `', '.join((f'«{one}»' for one in NOT_A_SKILL_SEC…`
 - `REQUIREMENT_WRAPPERS: tuple[str, ...]` = `набор из 10`
 - `WRAPPER_LINE` = `', '.join((f'«{one}»' for one in REQUIREMENT_WRA…`
 - `APPLY_CONTACTS` = `'Telegram (@username, t.me/...), email (jobs@acm…`
@@ -581,6 +585,8 @@
 - `logger` = `logging.getLogger(__name__)`
 - `MAX_PARSE_TOKENS` = `1200`
 - `ROOMIER_PARSE_TOKENS` = `2400`
+- `_GRADE_VALUES` = `'"' + ' | '.join(GRADES) + ' | null"'`
+- `_FORMAT_VALUES` = `'"' + ' | '.join(WORK_FORMATS) + ' | null"'`
 - `PARSE_VACANCY_PROMPT` = `'Ты парсишь пост с вакансией из Telegram-канала …`
 - `_TRAILING_URL_RE` = `re.compile('\\s*(https?://[^\\s)]+|(?:www\\.)?[a…`
 - `_CONTACT_ADDRESS_RE` = `re.compile('\n      [^\\s@]+@[^\\s@]+\\.[a-zA-Z]…`
@@ -847,6 +853,7 @@
   - `message_id: int`
   - `tg_message_id: int`
   - `text: str`
+- `REQUIRED_PROFILE_FIELDS: tuple[str, ...]` = `набор из 4`
 - `class ParsedCvProfile`
   - `first_name: str`
   - `last_name: str`
@@ -959,6 +966,10 @@
   - `date_to: datetime | None` = `None`
   - `limit: int | None` = `None`
   - `offset: int` = `0`
+
+### `backend/repository/app_settings.py`
+
+- `CV_PATH_KEY` = `'cv_path'`
 
 ### `backend/repository/blacklist.py`
 
@@ -1173,6 +1184,10 @@
 
 - `COMPANY_CARD` = `CardSubject(picker=COMPANY_PICKER, id_key='compa…`
 
+### `client/bridge/cv.py`
+
+- `_RESUME_FILTER` = `'Резюме ({})'.format(';'.join((f'*{one}' for one…`
+
 ### `client/bridge/desktop.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -1243,10 +1258,6 @@
   - `linked_id: Callable`
 - `HR_PICKER` = `PickerSubject(key='hrs', rows=hr_list.list_hr_wi…`
 - `COMPANY_PICKER` = `PickerSubject(key='companies', rows=companies_li…`
-
-### `client/bridge/profile.py`
-
-- `REQUIRED_FIELDS` = `набор из 4`
 
 ### `client/bridge/refusals.py`
 
@@ -1461,7 +1472,7 @@
 
 - `EPOCH` = `datetime(2026, 1, 1, 12, 0)`
 - `_PHOTO_HEADS` = `словарь из 4`
-- `CV_REQUIRED_PROFILE` = `словарь из 4`
+- `CV_REQUIRED_PROFILE` = `person_fields()`
 - `_MARKED_COMPANIES` = `набор из 3`
 
 ### `tests/fakes/ingestion.py`
