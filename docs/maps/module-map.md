@@ -34,7 +34,19 @@ Job Bot — single CLI entry point.
 - `def _started_or_told_why() -> int` (36)
 - `def main() -> int` (22)
 
-## adapters — 7 модулей
+## adapters — 8 модулей
+
+### `adapters/cv_text.py` — 124 строк
+
+Текст резюме, вынутый из файла на диске.
+
+Зависит от: —
+
+- `def _pdf_text(path: Path) -> str` (13)
+- `def _docx_lines(parent, document: Document) -> list[str]` (13)
+- `def _docx_text(path: Path) -> str` (3)
+- `def _plain_text(path: Path) -> str` (13)
+- `def read_cv_text(path: Path) -> tuple[str | None, str | None]` (27)
 
 ### `adapters/db.py` — 105 строк
 
@@ -1045,7 +1057,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (36)
 
-### `backend/llm/vacancy.py` — 460 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 463 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
@@ -1056,12 +1068,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def _address_after_label(value: str) -> str` (15)
 - `def _hr_contact(hr_contact: str | None) -> str | None` (7)
 - `def _way_to_apply(other_contact: str | None) -> str | None` (22)
-- `def parsed_vacancy_from_json(answer: str) -> ParsedVacancy | None` (43)
+- `def parsed_vacancy_from_json(answer: str) -> ParsedVacancy | None` (16)
+- `def _vacancy_of(data: dict, title: str) -> ParsedVacancy` (31)
   - `def _text_field(field: str) -> str | None` (2)
 - `def _parse_request(text: str, known_skills, max_tokens: int) -> ChatRequest` (18)
 - `def _without_channel_as_hr(parsed: ParsedVacancy, channel_username: str | None) -> ParsedVacancy` (16)
 - `def _log_parsed(parsed: ParsedVacancy) -> None` (10)
-- `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, known_skills=None) -> tuple[ParsedVacancy | None, str | None]` (42)
+- `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, known_skills=None) -> tuple[ParsedVacancy | None, str | None]` (38)
 
 ### `backend/log_buffer.py` — 214 строк
 
@@ -2013,14 +2026,14 @@ Runtime settings layer.
   - `def block(self, company_id: int) -> dict` (12)
   - `def unblock(self, company_id: int) -> dict` (9)
 
-### `client/bridge/cv.py` — 85 строк
+### `client/bridge/cv.py` — 88 строк
 
 Файл резюме, на который смотрит окно: запомнить путь, открыть.
 
 Зависит от: `client.bridge.answer`, `client.bridge.cv_file`, `client.bridge.desktop`
 
-- `class Cv` (72)
-  - `def pick(self) -> dict` (18)
+- `class Cv` (75)
+  - `def pick(self) -> dict` (21)
   - `def _replace(self, payload: dict) -> dict` (22)
     - `async def run() -> dict` (3)
   - `def open(self) -> dict` (15)
@@ -2539,7 +2552,17 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 247 модулей
+## tests — 248 модулей
+
+### `tests/adapters/test_cv_text.py` — 283 строк
+
+Следствия чтения резюме с диска: что достаётся из файла и что мешает.
+
+Зависит от: `adapters.cv_text`
+
+Тестов: 16
+
+- `def _tiny_pdf(pages: list[list[tuple[int, str]]]) -> bytes` (59)
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 

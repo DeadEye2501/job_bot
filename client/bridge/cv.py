@@ -38,8 +38,11 @@ class Cv:
         обычном «нет, не сейчас», а пустой путь стёр бы прежнее резюме, и
         следующий отклик ушёл бы без вложения.
         """
+        # Старый двоичный `.doc` в перечне остаётся, хотя разбор его не читает:
+        # приложить к отклику можно и его, а путь — всё, что отклику нужно.
         chosen = self._hub.window.create_file_dialog(
-            webview.OPEN_DIALOG, file_types=("Резюме (*.pdf;*.doc;*.docx)",)
+            webview.OPEN_DIALOG,
+            file_types=("Резюме (*.pdf;*.docx;*.doc;*.txt;*.md)",),
         )
         if not chosen:
             return {"ok": {"cancelled": True}}
