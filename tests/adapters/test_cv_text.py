@@ -84,12 +84,12 @@ def test_plain_file_gives_back_what_is_written_in_it(tmp_path, suffix):
 
 def test_pdf_gives_the_text_of_every_page(tmp_path):
     resume = tmp_path / "Резюме.pdf"
-    resume.write_bytes(_tiny_pdf([[(700, "Frolov Alexey")], [(700, "Opyt raboty")]]))
+    resume.write_bytes(_tiny_pdf([[(700, "Petrov Ivan")], [(700, "Opyt raboty")]]))
 
     text, trouble = read_cv_text(resume)
 
     assert trouble is None
-    assert "Frolov Alexey" in text
+    assert "Petrov Ivan" in text
     assert "Opyt raboty" in text
 
 
@@ -236,12 +236,12 @@ def test_a_file_lying_about_its_format_is_told_apart(tmp_path, suffix):
 
 def test_the_suffix_is_read_whatever_its_case(tmp_path):
     resume = tmp_path / "Резюме.PDF"
-    resume.write_bytes(_tiny_pdf([[(700, "Frolov Alexey")]]))
+    resume.write_bytes(_tiny_pdf([[(700, "Petrov Ivan")]]))
 
     text, trouble = read_cv_text(resume)
 
     assert trouble is None
-    assert "Frolov Alexey" in text
+    assert "Petrov Ivan" in text
 
 
 def test_a_file_that_is_not_there_is_told_apart(tmp_path):
