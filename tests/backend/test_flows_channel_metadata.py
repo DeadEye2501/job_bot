@@ -17,7 +17,8 @@ from backend.flows import channels
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row
-from tests.fakes.telegram import FakeTelegramClient, chat, photo
+from tests.fakes.telegram import FakeTelegramClient
+from tests.fakes.telegram_objects import chat, photo
 
 
 async def _channels(session_factory, *rows):

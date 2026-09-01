@@ -20,7 +20,7 @@ from adapters import telegraph
 from backend.flows import embeddings, ingest
 from backend.flows import parse as parse_mod
 from tests.backend.fixtures.parse_stub import parse_into
-from tests.fakes.telegram import link_entity, post
+from tests.fakes.telegram_objects import link_entity, post
 
 
 @pytest.fixture

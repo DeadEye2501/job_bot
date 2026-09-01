@@ -5,7 +5,8 @@ import logging
 from pyrogram.errors import FloodWait
 
 from backend.telegram_lookup import fetch_telegram_avatar, resolve_hr_telegram
-from tests.fakes.telegram import FakeTelegramClient, photo, user
+from tests.fakes.telegram import FakeTelegramClient
+from tests.fakes.telegram_objects import photo, user
 
 
 async def test_the_avatar_is_downloaded_by_the_small_file_id():

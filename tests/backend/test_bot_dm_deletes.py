@@ -19,7 +19,7 @@ from pyrogram.enums import ChatType
 from backend.models import HR, BotMode, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import hr_row, message_row
-from tests.fakes.telegram import chat, message
+from tests.fakes.telegram_objects import chat, message
 
 
 def _tombstone(msg_id: int, *, chat_id=777, username=None):

@@ -298,3 +298,19 @@ def turn_and_settle(monkeypatch):
 
     return run
 
+
+@pytest.fixture
+def caught_up(monkeypatch):
+    """Подменяет догон пропущенных писем: он живёт в конвейере.
+
+    Записывает, с чем его позвали: по доводам видно и то, что догон вообще
+    пущен, и чем правилась его очередь.
+    """
+    calls: list[dict] = []
+
+    async def catch_up_missed_dms(client, *args, **kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr("backend.bot.loop.catch_up_missed_dms", catch_up_missed_dms)
+    return calls
+

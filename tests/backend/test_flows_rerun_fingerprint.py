@@ -16,7 +16,7 @@ from backend.flows import parse as parse_mod
 from backend.models import Vacancy
 from tests.backend.fixtures.rerun import WithMessages, prepare
 from tests.dbio import only_row
-from tests.fakes.telegram import link_entity, post
+from tests.fakes.telegram_objects import link_entity, post
 
 
 async def test_the_fingerprint_is_recomputed_for_the_parsed_text(

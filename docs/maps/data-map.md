@@ -145,6 +145,7 @@
 - `class Bot`
   - `loop: asyncio.AbstractEventLoop | None`
   - `current_poll_task: asyncio.Task | None`
+  - `dialogs: list[DialogPeer]`
 
 ### `backend/bot/loop.py`
 
@@ -1506,11 +1507,14 @@
 
 ### `tests/fakes/telegram.py`
 
+- `class FakeTelegramClient`
+  - `executor` = `None`
+
+### `tests/fakes/telegram_objects.py`
+
 - `TG_EPOCH` = `EPOCH.replace(tzinfo=timezone.utc).astimezone().…`
 - `OUR_USER_ID` = `1`
 - `_UNSET` = `object()`
-- `class FakeTelegramClient`
-  - `executor` = `None`
 
 ### `tests/fakes/ui_bot.py`
 

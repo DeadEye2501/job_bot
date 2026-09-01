@@ -21,7 +21,8 @@ from backend.flows import ingest as ingest_mod
 from backend.models import TelegramChannel
 from tests.dbio import only_row, put
 from tests.factories import channel_row
-from tests.fakes.telegram import FakeTelegramClient, post
+from tests.fakes.telegram import FakeTelegramClient
+from tests.fakes.telegram_objects import post
 
 
 @pytest.fixture

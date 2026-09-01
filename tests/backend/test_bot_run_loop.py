@@ -21,18 +21,6 @@ from backend.models import BotMode
 from tests.fakes.ingestion import FakeIngestion, wire
 
 
-@pytest.fixture
-def caught_up(monkeypatch):
-    """Подменяет догон пропущенных писем: он живёт в конвейере."""
-    calls: list[dict] = []
-
-    async def catch_up_missed_dms(client, *args, **kwargs):
-        calls.append(kwargs)
-
-    monkeypatch.setattr("backend.bot.loop.catch_up_missed_dms", catch_up_missed_dms)
-    return calls
-
-
 async def _one_turn(chatting, mode, ingestion=None):
     """Бот в заданном режиме, сделавший ровно один оборот цикла."""
     bot, client, _ = await chatting(mode=mode)

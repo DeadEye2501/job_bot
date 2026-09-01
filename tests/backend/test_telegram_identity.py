@@ -129,11 +129,13 @@ def test_a_contact_known_only_by_a_handle_is_matched_by_it():
     учётной записи там нет вовсе. Не сведи мы его по нику — именно у такого
     переписка и не догонялась бы, а он-то как раз и пишет первым.
     """
-    contacts = [Contact(78, username="Mastakova_TeamLead")]
+    # Второй нужен, чтобы проверка вообще могла упасть: с одним собеседником
+    # он попал бы в ответ и головой, и хвостом, и ответ был бы тем же.
+    contacts = [Contact(1, user_id=11), Contact(78, username="Mastakova_TeamLead")]
 
     matched = hrs_in_dialog_order(contacts, [DialogPeer(8435291761, "mastakova_teamlead")])
 
-    assert [hr.id for hr in matched] == [78]
+    assert [hr.id for hr in matched] == [78, 1]
 
 
 def test_one_dialog_takes_one_contact():

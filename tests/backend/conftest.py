@@ -10,6 +10,7 @@ from tests.backend.fixtures.backfill import known_hr
 from tests.backend.fixtures.entry import entry, lock_of_its_own
 from tests.backend.fixtures.bot import (
     busy_slot,
+    caught_up,
     chatting,
     chatting_on_fakes,
     empty_media_dir,
@@ -34,6 +35,7 @@ from tests.backend.fixtures.stats import applied
 __all__ = [
     "applied",
     "busy_slot",
+    "caught_up",
     "channel_titles",
     "chatting",
     "chatting_on_fakes",

@@ -12,7 +12,7 @@
 from backend.models import BotMode, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import message_row
-from tests.fakes.telegram import chat, incoming, message, my_dm
+from tests.fakes.telegram_objects import chat, incoming, message, my_dm
 
 
 def _edit(*, chat_id=777, username=None, msg_id=10, text="новая редакция", mine=False):

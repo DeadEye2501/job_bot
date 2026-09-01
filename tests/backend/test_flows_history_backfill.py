@@ -20,7 +20,8 @@ from backend.models import HR, Message
 from tests.backend.fixtures.backfill import catch_up as _catch_up, ours as _ours, theirs as _theirs
 from tests.dbio import all_rows, only_row, put
 from tests.factories import hr_row, message_row
-from tests.fakes.telegram import FakeTelegramClient, photo, user
+from tests.fakes.telegram import FakeTelegramClient
+from tests.fakes.telegram_objects import photo, user
 
 
 async def test_the_missed_conversation_lands_in_the_chat(

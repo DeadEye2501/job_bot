@@ -228,7 +228,7 @@ async def backfill_hr_dm_history(
 async def catch_up_missed_dms(
     dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, dialogs=()
 ) -> None:
-    """Догнать переписку с собеседниками, у которых она есть, свежими вперёд.
+    """Догнать переписку по всем известным собеседникам, свежими вперёд.
 
     Обе стороны — :func:`_store_outgoing`, удаления — :func:`_reconcile_deletes`.
 

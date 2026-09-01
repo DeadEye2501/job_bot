@@ -31,7 +31,7 @@ from backend.repository.vacancy_status import (
 from tests.backend.fixtures.rerun import WithMessages, prepare
 from tests.dbio import all_rows, only_row, put
 from tests.factories import vacancy_row
-from tests.fakes.telegram import link_entity, post
+from tests.fakes.telegram_objects import link_entity, post
 
 
 async def test_the_fresh_post_is_parsed_and_stored(monkeypatch, rerunning, session_factory):
