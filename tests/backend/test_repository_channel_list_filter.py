@@ -30,3 +30,19 @@ async def test_a_blank_search_selects_everything(channel_titles, session_factory
     )
 
     assert await channel_titles(search="   ") == ["Акация", "Берёза"]
+
+
+async def test_search_finds_a_channel_by_the_handle_as_it_is_shown(
+    channel_titles, session_factory
+):
+    """Ник, набранный с собачкой, находит канал.
+
+    Список рисует ник как `@ник`, и образец человек списывает оттуда же.
+    """
+    await put(
+        session_factory,
+        channel_row(username="jobs_it", title="Айти-вакансии"),
+        channel_row(username="jsjobs", title="Фронтенд"),
+    )
+
+    assert await channel_titles(search="@jobs_it") == ["Айти-вакансии"]
