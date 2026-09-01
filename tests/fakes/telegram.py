@@ -182,6 +182,25 @@ def user(*, username=None, photo=None, **extra) -> SimpleNamespace:
     return SimpleNamespace(username=username, photo=photo, **fields)
 
 
+def _dialog(peer_id: int):
+    """Переписка в том виде, в каком её отдаёт сырой `messages.GetDialogs`.
+
+    Верхнего письма к ней подделка не прикладывает — и это настоящий случай,
+    а не упрощение: у стёртого письма Telegram кладёт `messageEmpty`, у пустой
+    переписки номер верхнего письма нулевой. Прогрев обязан кончаться и тогда.
+    """
+    return raw.types.Dialog(
+        peer=raw.types.PeerUser(user_id=peer_id),
+        top_message=peer_id,
+        read_inbox_max_id=0,
+        read_outbox_max_id=0,
+        unread_count=0,
+        unread_mentions_count=0,
+        unread_reactions_count=0,
+        notify_settings=raw.types.PeerNotifySettings(),
+    )
+
+
 class FakeTelegramClient:
     """Отдаёт заранее положенное и записывает, о чём его спрашивали."""
 
@@ -214,6 +233,7 @@ class FakeTelegramClient:
         # сборки: пятый именованный довод конструктора упирается в предел.
         self.history: list = []
         self.cold_peers: set = set()
+        self.dialog_page: list[int] = []
         self.logged_out = False
         # Вход по коду: чем отвечает Telegram и о чём его спрашивали.
         self.phone_code_hash = "отпечаток"
@@ -291,17 +311,40 @@ class FakeTelegramClient:
         Незнакомое обращение — отказ, а не пустой ответ: пустотой подделка
         сказала бы «Telegram ничего не отдал» о том, чего у неё попросту нет.
 
-        Ответ пуст, и одной страницы довольно: у настоящего клиента участники
-        ложатся в кэш до всякого разбора ответа, и здесь то же выражено тем,
-        что холодные номера перестают быть холодными. Пустой список переписок
-        останавливает и постраничную подкачку — вторая страница у подделки не
-        проверяется.
+        Участники ложатся в кэш до всякого разбора ответа — у настоящего
+        клиента это делает `invoke`, здесь то же выражено тем, что холодные
+        номера перестают быть холодными.
+
+        `dialog_page`, если задана, отдаётся на **каждое** обращение одна и та
+        же. Так ведёт себя Telegram, когда закладка следующей страницы не
+        сдвинулась — а не сдвинуться ей есть от чего, — и прогрев обязан на
+        этом кончаться. Не задана — переписками считаются все холодные номера,
+        и второго обращения не будет: набор опустеет.
         """
+        # Уступка управления, которой у настоящего обращения не бывает иначе:
+        # без неё зациклившийся прогрев не прервать даже отменой, и проверка
+        # такой поломки не покраснела бы, а повисла бы вместе со всем набором.
+        await asyncio.sleep(0)
         self._fail_if_asked("invoke")
         if not isinstance(query, raw.functions.messages.GetDialogs):
             raise AttributeError(f"подделка не знает обращения {query!r}")
-        self.cold_peers.clear()
-        return SimpleNamespace(dialogs=[], messages=[], users=[], chats=[])
+        page = self.dialog_page or sorted(self.cold_peers)
+        # Греются ровно те, кто пришёл в ответе, а не все холодные разом: у
+        # настоящего клиента кэш наполняют участники ответа, и подделка,
+        # чистящая набор вслепую, прощала бы разбор ответа любой.
+        self.cold_peers.difference_update(page)
+        return SimpleNamespace(
+            dialogs=[_dialog(peer) for peer in page],
+            messages=[],
+            users=[],
+            chats=[],
+        )
+
+    async def resolve_peer(self, peer_id):
+        """Адрес пира по номеру. У прогретого кэша это чтение без сети."""
+        self._fail_if_asked("resolve_peer")
+        self._refuse_cold(peer_id)
+        return raw.types.InputPeerUser(user_id=peer_id, access_hash=0)
 
     async def get_users(self, username):
         """Незанятое имя — бросок, по той же причине, что и у `get_chat`.

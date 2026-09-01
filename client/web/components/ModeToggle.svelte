@@ -1,12 +1,9 @@
 <script>
   import { modeChosen } from '$state/modes.js';
 
-  let { mode, disabled, title, onpick } = $props();
+  let { mode, onpick } = $props();
 
   function pick(event) {
-    // Отказ объясняется словами, а не молчанием: запертую кнопку человек жмёт
-    // именно затем, чтобы узнать, почему она заперта.
-    if (disabled) return onpick(null);
     // Мерить дорожку умеет только разметка, а решать по померенному — правило
     // в состоянии: сюда уезжают место, ширина и `detail`, обратно — режим.
     const box = event.currentTarget.querySelector('.mode-track').getBoundingClientRect();
@@ -21,14 +18,7 @@
   }
 </script>
 
-<button
-  class="mode-control"
-  class:is-disabled={disabled}
-  data-mode={mode}
-  {title}
-  aria-disabled={disabled}
-  onclick={pick}
->
+<button class="mode-control" data-mode={mode} onclick={pick}>
   <span class="mode-text">{mode}</span>
   <span class="mode-track"><span class="mode-knob"></span></span>
 </button>

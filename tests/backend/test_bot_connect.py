@@ -11,6 +11,8 @@
 что бот делает в каждом режиме, здесь — с чем он выходит из подъёма.
 """
 
+import asyncio
+
 import pytest
 
 from backend.models import BotMode, Message
@@ -98,3 +100,25 @@ async def test_the_bot_is_declared_ready_only_after_the_cache_is_warm(
     await bot.run(once=True)
 
     assert seen == [False]
+
+
+async def test_a_dialog_page_that_never_moves_ends_the_warm_up(chatting):
+    """Прогрев кончается, даже когда список переписок не двигается.
+
+    Закладку следующей страницы прогрев считает по верхнему письму, а того в
+    ответе может не оказаться вовсе: у стёртого письма Telegram кладёт
+    `messageEmpty`, у пустой переписки номер нулевой. Нулевая закладка значит
+    «с самого верха» — и без сторожа продвижения прогрев ходил бы по кругу.
+
+    Ходил бы он в подъёме, до объявления готовности: окно ждало бы готового
+    бота вечно, и ни строки в журнале об этом не было бы.
+    """
+    client = FakeTelegramClient()
+    client.dialog_page = list(range(1, 101))
+    bot, _, _ = await chatting(mode=BotMode.OFF, client=client)
+    wire(bot, FakeIngestion())
+
+    await asyncio.wait_for(bot.run(once=True), timeout=5)
+
+    assert client.lifecycle == ["запуск", "остановка"]
+

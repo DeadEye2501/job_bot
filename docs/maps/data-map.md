@@ -1483,6 +1483,7 @@
 
 ### `tests/fakes/ingestion.py`
 
+- `logger` = `logging.getLogger(__name__)`
 - `class FakeIngestion`
   - `_OWN` = `object()`
 

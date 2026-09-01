@@ -140,7 +140,10 @@ async def test_a_switched_off_bot_does_nothing_but_start_and_stop(
     """
     _, _, pipeline = await _one_turn(chatting, BotMode.OFF)
 
-    assert caught_up == []
+    # Сверяется заведение задачи, а не её исход: в выключенном обороте нет ни
+    # одной точки уступки управления, и заведённый по ошибке догон был бы
+    # отменён, так и не начавшись, — а проверка исхода осталась бы зелёной.
+    assert "пущено задачей: dm catch-up" not in pipeline.log
     assert "молчание" not in pipeline.log
     assert "прогон каналов" not in pipeline.log
 
@@ -162,20 +165,6 @@ async def test_entering_an_active_mode_catches_up_missed_letters(
     await turn_and_settle(bot, BotMode.DM_ONLY)
 
     assert len(caught_up) == 1
-
-
-async def test_a_failed_catch_up_does_not_stop_the_turn(chatting, monkeypatch):
-    """Сбой догона пропущенного оборот не отменяет."""
-
-    async def catch_up_missed_dms(client, *args, **kwargs):
-        raise OSError("сеть")
-
-    monkeypatch.setattr("backend.bot.loop.catch_up_missed_dms", catch_up_missed_dms)
-
-    _, client, pipeline = await _one_turn(chatting, BotMode.FULL)
-
-    assert "прогон каналов" in pipeline.log
-    assert client.lifecycle == ["запуск", "остановка"]
 
 
 async def test_an_active_turn_checks_for_silent_hrs(chatting, caught_up):
@@ -447,4 +436,3 @@ async def test_a_hanging_catch_up_does_not_hold_the_turn(chatting, monkeypatch):
     await asyncio.wait_for(bot.run(once=True), timeout=5)
 
     assert "молчание" in pipeline.log
-

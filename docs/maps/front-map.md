@@ -18,8 +18,8 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (245)
-- Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
+### app/BottomBar.svelte (242)
+- Тумблер режима не запирается ничем: режим — выбор человека, и погасшая лампочка не повод не дать его сменить. Двум лампочкам из четырёх переписка вовсе не нужна, а запертый тумблер при мёртвом Telegram оставлял бы человека с ботом, которого нечем выключить.
 - принимает: ask, say, events, onlocked, oncontact
 
 ### app/ChannelCard.svelte (278)
@@ -329,9 +329,9 @@
 - принимает: extra, over, confirm, awayCloses, onclose, children
 - берёт: ./ModalKeys.svelte
 
-### components/ModeToggle.svelte (34)
+### components/ModeToggle.svelte (24)
 - —
-- принимает: mode, disabled, title, onpick
+- принимает: mode, onpick
 
 ### components/NavGroup.svelte (9)
 - —
@@ -1088,9 +1088,9 @@ body, html, button, body, .material-symbols-outlined
 .modal-footer, .modal-footer, .modal-footer .btn, .modal-footer .btn .material-symbols-outlined, .modal-subtitle, .modal-error
 - берёт: --bg-secondary, --bg-tertiary, --border, --danger, --scrim, --shadow-modal, --text-primary, --text-secondary, --text-tertiary
 
-### styles/mode.css (54)
+### styles/mode.css (50)
 - Переключатель режима бота: слово, дорожка и бегунок на ней.
-- селекторы (14): .mode-control, .mode-text, .mode-track, .mode-knob, .mode-control[data-mode='Off'] .mode-knob, .mode-control[data-mode='Off'] .mode-text, .mode-control[data-mode='Off'] .mode-track, .mode-control[data-mode='DM Only'] .mode-knob, .mode-control[data-mode='DM Only'] .mode-text, .mode-control[data-mode='DM Only'] .mode-track, .mode-control[data-mode='Full'] .mode-knob, .mode-control[data-mode='Full'] .mode-text, .mode-control[data-mode='Full'] .mode-track, .mode-control.is-disabled
+- селекторы (13): .mode-control, .mode-text, .mode-track, .mode-knob, .mode-control[data-mode='Off'] .mode-knob, .mode-control[data-mode='Off'] .mode-text, .mode-control[data-mode='Off'] .mode-track, .mode-control[data-mode='DM Only'] .mode-knob, .mode-control[data-mode='DM Only'] .mode-text, .mode-control[data-mode='DM Only'] .mode-track, .mode-control[data-mode='Full'] .mode-knob, .mode-control[data-mode='Full'] .mode-text, .mode-control[data-mode='Full'] .mode-track
 - берёт: --accent, --accent-muted, --bg-tertiary, --border, --err, --err-muted, --text-secondary, --text-tertiary, --warn, --warn-muted
 
 ### styles/nav.css (92)
@@ -1413,7 +1413,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (95)
+### tests/bottom_bar_live.test.js (109)
 - —
 
 ### tests/bridge.test.js (161)

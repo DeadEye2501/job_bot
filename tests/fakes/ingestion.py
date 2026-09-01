@@ -6,9 +6,12 @@
 """
 
 import asyncio
+import logging
 
 from backend.flows.dm import DmHelpers
 from backend.flows.dm_backfill import DmHooks
+
+logger = logging.getLogger(__name__)
 
 
 class FakeIngestion:
@@ -65,9 +68,23 @@ class FakeIngestion:
         Не зовёт её на месте: тем, что догон **не** дожидается оборота, и
         отличается нынешний цикл от прежнего. Подделка, зовущая работу сразу,
         красила бы эту разницу зелёным при любом исходе.
+
+        Беду задачи перехватывает так же, как настоящий. Без перехвата она
+        всплывала бы в «Task exception was never retrieved» посреди чужой
+        проверки — то есть подделка ломала бы соседей там, где боевой код
+        отрабатывает штатно.
         """
         self.log.append(f"пущено задачей: {what}")
-        task = asyncio.create_task(work())
+
+        async def _run() -> None:
+            try:
+                await work()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("%s failed", what)
+
+        task = asyncio.create_task(_run())
         self.backfill_tasks.add(task)
         task.add_done_callback(self.backfill_tasks.discard)
 

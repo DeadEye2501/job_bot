@@ -85,6 +85,20 @@ describe('живая нижняя полоса', () => {
     expect(tips.at(-1)).toContain('TG');
   });
 
+  it('погасшая лампочка тумблер режима не запирает', async () => {
+    // Запертый тумблер при мёртвой лампе — ловушка: пока полоса гасила бота
+    // сама, она её закрывала, а без гашения человек остаётся с работающим
+    // ботом, которого нечем выключить. Режим — его выбор, и запирать выбор
+    // нельзя ни в какую сторону.
+    const { asked } = bar({ db: true, tg: false, chat: true, embed: true });
+    await settled();
+
+    document.querySelector('.mode-control').click();
+    await settled();
+
+    expect(asked.some((one) => one.method === 'system.set_mode')).toBe(true);
+  });
+
   it('при живых системах бота не трогает и подсказку отдаёт пустой', async () => {
     const { asked, tips } = bar({ db: true, tg: true, chat: true, embed: true });
     await settled();
