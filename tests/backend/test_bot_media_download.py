@@ -11,7 +11,8 @@
 import pytest
 
 from backend.bot.media import MEDIA_DIR, download_media
-from tests.fakes.telegram import FakeTelegramClient, document, message
+from tests.fakes.telegram import FakeTelegramClient
+from tests.fakes.telegram_objects import document, message
 
 
 async def test_a_message_without_media_downloads_nothing():

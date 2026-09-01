@@ -23,7 +23,8 @@ from tests.factories import (
     vacancy_row,
 )
 from tests.fakes.lm_studio import LmClient
-from tests.fakes.telegram import FakeTelegramClient, photo, user
+from tests.fakes.telegram import FakeTelegramClient
+from tests.fakes.telegram_objects import photo, user
 
 
 def known_hr_client() -> FakeTelegramClient:

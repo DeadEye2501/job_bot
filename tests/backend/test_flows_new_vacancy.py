@@ -26,7 +26,7 @@ from tests.backend.fixtures.parse_stub import parse_into
 from tests.backend.fixtures.rerun import WithMessages
 from tests.dbio import all_rows, only_row, put
 from tests.factories import EPOCH, channel_row, vacancy_row
-from tests.fakes.telegram import post
+from tests.fakes.telegram_objects import post
 
 WITH_ARTICLE = "Senior QA https://telegra.ph/QA-08-21"
 """Пост, всё содержание которого вынесено в статью по ссылке."""

@@ -13,7 +13,7 @@ from backend.models import HR
 from backend.repository.hr_identify import find_known_hr, refresh_hr_from_telegram
 from tests.dbio import put
 from tests.factories import hr_row
-from tests.fakes.telegram import user
+from tests.fakes.telegram_objects import user
 
 
 async def test_an_hr_is_found_by_telegram_id(session, session_factory):

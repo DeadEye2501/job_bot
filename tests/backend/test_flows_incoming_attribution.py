@@ -20,7 +20,7 @@ from backend.repository.messages import save_incoming_message
 from backend.repository.vacancies_life import delete_vacancy
 from tests.dbio import all_rows, only_row, put
 from tests.factories import at, hr_row, message_row, vacancy_row
-from tests.fakes.telegram import TG_EPOCH, incoming, message, user
+from tests.fakes.telegram_objects import TG_EPOCH, incoming, message, user
 
 
 async def _two_vacancies(session_factory):

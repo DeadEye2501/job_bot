@@ -8,7 +8,7 @@
 from backend.repository.hr_identify import find_or_create_hr
 from tests.dbio import put
 from tests.factories import hr_row
-from tests.fakes.telegram import user
+from tests.fakes.telegram_objects import user
 
 
 async def test_an_unknown_sender_becomes_a_new_record(session):

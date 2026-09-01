@@ -9,7 +9,7 @@
 import pytest
 
 from backend.models import BotMode
-from tests.fakes.telegram import chat, incoming, message
+from tests.fakes.telegram_objects import chat, incoming, message
 
 
 @pytest.fixture

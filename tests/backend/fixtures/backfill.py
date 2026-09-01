@@ -11,7 +11,7 @@ from backend.flows.dm_backfill import (
 from backend.models import HR
 from tests.dbio import only_row, put
 from tests.factories import hr_row
-from tests.fakes.telegram import incoming, my_dm
+from tests.fakes.telegram_objects import incoming, my_dm
 
 
 def theirs(msg_id, text):

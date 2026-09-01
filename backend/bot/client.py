@@ -25,6 +25,7 @@ from backend.bot import updates
 from backend.bot import send
 from backend.bot import chat
 from backend.bot import channels
+from backend.domain.telegram_identity import DialogPeer
 from backend.bot import slot
 from backend.flows.pipeline import IngestionPipeline, LmProviders
 from backend.models import BotMode
@@ -105,6 +106,10 @@ def _declare_loop_controls(bot) -> None:
     # Reference to the currently-running poll task so the UI's stop
     # button can cancel it without killing the whole bot loop.
     bot.current_poll_task = None
+    # Переписки, прочитанные при подъёме соединения: ими догон правит очередь.
+    # Пустой список значит «не знаем» — тогда очередь остаётся прежней, и
+    # догон идёт по всем известным собеседникам.
+    bot.dialogs = []
 
 
 def _declare_ui_hooks(bot) -> None:
@@ -175,11 +180,12 @@ class Bot:
     обещание «дальше модуля не идёт» было неправдой почти двести раз.
     """
 
-    # Оба поля ставит `_declare_loop_controls`, а объявлены они здесь:
+    # Поля ставит `_declare_loop_controls`, а объявлены они здесь:
     # присвоение по чужому полю (`bot.loop = ...`) тип не записывает,
-    # и без этих двух строк класс не объявляет ни одного своего поля.
+    # и без этих строк класс не объявляет ни одного своего поля.
     loop: asyncio.AbstractEventLoop | None
     current_poll_task: asyncio.Task | None
+    dialogs: list[DialogPeer]
 
     def __init__(
         self,

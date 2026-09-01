@@ -15,7 +15,8 @@ import logging
 from backend.models import BotMode, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import EPOCH, message_row
-from tests.fakes.telegram import FakeTelegramClient, message, my_dm
+from tests.fakes.telegram import FakeTelegramClient
+from tests.fakes.telegram_objects import message, my_dm
 
 
 async def test_a_message_typed_elsewhere_shows_up_in_the_chat(

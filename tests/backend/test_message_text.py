@@ -5,7 +5,7 @@
 """
 
 from backend.message_text import extract_dm_text, extract_post_text, extract_text
-from tests.fakes.telegram import link_entity, message, url_entity
+from tests.fakes.telegram_objects import link_entity, message, url_entity
 
 
 def test_text_comes_from_the_text_field_trimmed():

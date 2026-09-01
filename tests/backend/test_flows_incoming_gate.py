@@ -16,13 +16,8 @@ from backend.bot.media import MEDIA_DIR
 from backend.models import HR, Message
 from tests.dbio import all_rows, only_row, put
 from tests.factories import EPOCH, blacklist_row, hr_row, message_row
-from tests.fakes.telegram import (
-    FakeTelegramClient,
-    incoming,
-    message,
-    photo,
-    user,
-)
+from tests.fakes.telegram import FakeTelegramClient
+from tests.fakes.telegram_objects import incoming, message, photo, user
 
 
 async def test_a_letter_from_a_known_hr_is_saved(session_factory, deliver):

@@ -15,7 +15,7 @@ import pytest
 
 from backend.bot.media import MEDIA_DIR, classify_media, looks_like_photo, media_cache_path, media_path_for_db
 from tests.factories import photo_head
-from tests.fakes.telegram import document, message
+from tests.fakes.telegram_objects import document, message
 
 
 @pytest.mark.parametrize(

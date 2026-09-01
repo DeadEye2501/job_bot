@@ -15,7 +15,8 @@ import pytest
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, put
 from tests.factories import blacklist_row, channel_row
-from tests.fakes.telegram import FakeTelegramClient, chat
+from tests.fakes.telegram import FakeTelegramClient
+from tests.fakes.telegram_objects import chat
 
 
 @pytest.fixture
