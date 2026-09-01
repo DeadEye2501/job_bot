@@ -173,11 +173,11 @@ class IngestionPipeline:
         _declare_window_hooks(self)
         _declare_dm_debounce(self)
 
-        # Strong-references на in-flight per-HR backfill таски (kicked
-        # из flows/dm.py, spawn_hr_backfill). Event loop держит на тасках только
-        # weak-ref'ы — без своего set'а Python может GC'нуть таск
-        # посреди выполнения с warning'ом «Task was destroyed but it
-        # is pending». На done-callback'е сам себя убираем из set'а.
+        # Ссылки на идущие чтения переписки — и догон по одному собеседнику
+        # (`spawn_hr_backfill` из разбора объявления), и общий догон при
+        # подъёме соединения. Цикл событий держит на задачах только слабые
+        # ссылки: без своего набора Python вправе прибрать задачу посреди
+        # работы. Снимается с учёта она сама, по завершении.
         self.backfill_tasks: set[asyncio.Task] = set()
 
         # Отметка «гасимся». Ставится в `Bot.run` до `client.stop()` и

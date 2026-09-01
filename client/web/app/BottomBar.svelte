@@ -57,21 +57,17 @@
   const lockedTip = $derived(blockedTip(health));
   const captionText = $derived(single || caption(channels, messages));
 
-  function applyHealth(fresh) {
-    health = fresh;
-  }
-
   async function refresh() {
     const now = await ask('system.initial');
     if (now === null) return;
     unread = now.unread.count;
     mode = now.mode;
-    await applyHealth(now.health);
+    health = now.health;
   }
 
   async function askHealth() {
     const fresh = await ask('system.health');
-    if (fresh !== null) await applyHealth(fresh);
+    if (fresh !== null) health = fresh;
   }
 
   /** Перечитать счёт непрочитанного, а с ним и открытый список.
@@ -122,7 +118,6 @@
   }
 
   async function pickMode(chosen) {
-    if (chosen === null) return say(lockedTip);
     const answer = await ask('system.set_mode', chosen);
     if (answer !== null) mode = answer.mode;
   }
@@ -218,9 +213,11 @@
   </div>
 
   <div class="bb-right">
-    <!-- Подсказка только у запертого переключателя: у отпертого рядом стоит
-         сам режим словом, и объяснять, что по нему нажимают, нечего. -->
-    <ModeToggle {mode} disabled={locked} title={locked ? lockedTip : null} onpick={pickMode} />
+    <!-- Тумблер режима не запирается ничем: режим — выбор человека, и
+         погасшая лампочка не повод не дать его сменить. Двум лампочкам из
+         четырёх переписка вовсе не нужна, а запертый тумблер при мёртвом
+         Telegram оставлял бы человека с ботом, которого нечем выключить. -->
+    <ModeToggle {mode} onpick={pickMode} />
     <RunButton
       {running}
       disabled={locked}

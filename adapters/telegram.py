@@ -105,17 +105,43 @@ _DIALOG_PAGE = 100
 """Сколько переписок просить за раз. Предел Telegram для этого обращения."""
 
 
-def _message_date(messages, message_id: int) -> int:
-    """Время письма по его номеру; ноль, если такого в ответе нет.
+def _message_date(messages, bookmark: tuple[int, int]) -> int:
+    """Время верхнего письма переписки; ноль, если такого в ответе нет.
 
     Оно нужно закладке следующей страницы: Telegram отсчитывает её от пары
     «номер и время верхнего письма», и без времени вторая страница пришла бы
     той же первой.
+
+    Ищется письмо по паре «переписка и номер», а не по одному номеру: в ответе
+    лежат верхние письма всей сотни переписок, а счётчик номеров у каждой свой
+    — по одному номеру находится первое попавшееся чужое письмо.
     """
+    peer_id, message_id = bookmark
     for msg in messages:
-        if getattr(msg, "id", None) == message_id:
+        if getattr(msg, "id", None) != message_id:
+            continue
+        own = getattr(msg, "peer_id", None)
+        if own is not None and utils.get_peer_id(own) == peer_id:
             return getattr(msg, "date", 0) or 0
     return 0
+
+
+async def _dialog_page(client, offset_date: int, offset_id: int, offset_peer):
+    """Страница списка переписок, взятая сырым обращением.
+
+    `sleep_threshold` тот же, что у `get_dialogs`: короткое «слишком часто»
+    Pyrogram пережидает сам, а до нас доходит только долгое.
+    """
+    return await client.invoke(
+        raw.functions.messages.GetDialogs(
+            offset_date=offset_date,
+            offset_id=offset_id,
+            offset_peer=offset_peer,
+            limit=_DIALOG_PAGE,
+            hash=0,
+        ),
+        sleep_threshold=60,
+    )
 
 
 async def warm_peer_cache(client) -> None:
@@ -133,22 +159,23 @@ async def warm_peer_cache(client) -> None:
     """
     offset_date, offset_id = 0, 0
     offset_peer = raw.types.InputPeerEmpty()
+    # Закладки, на которых страница уже кончалась. По ним и кончается проход:
+    # верхнего письма в ответе может не оказаться вовсе — у стёртого письма
+    # Telegram кладёт `messageEmpty`, у пустой переписки номер нулевой, — а
+    # нулевая закладка значит «с самого верха», и без этого набора проход
+    # ходил бы по кругу. Ходил бы он в подъёме, до объявления готовности.
+    seen: set[tuple[int, int]] = set()
     while True:
-        answer = await client.invoke(
-            raw.functions.messages.GetDialogs(
-                offset_date=offset_date,
-                offset_id=offset_id,
-                offset_peer=offset_peer,
-                limit=_DIALOG_PAGE,
-                hash=0,
-            ),
-            sleep_threshold=60,
-        )
+        answer = await _dialog_page(client, offset_date, offset_id, offset_peer)
         dialogs = [d for d in answer.dialogs if isinstance(d, raw.types.Dialog)]
-        if len(dialogs) < _DIALOG_PAGE:
+        if not dialogs:
             return
         last = dialogs[-1]
+        bookmark = (utils.get_peer_id(last.peer), last.top_message)
+        if bookmark in seen:
+            return
+        seen.add(bookmark)
         offset_id = last.top_message
-        offset_date = _message_date(answer.messages, offset_id)
-        offset_peer = await client.resolve_peer(utils.get_peer_id(last.peer))
+        offset_date = _message_date(answer.messages, bookmark)
+        offset_peer = await client.resolve_peer(bookmark[0])
 

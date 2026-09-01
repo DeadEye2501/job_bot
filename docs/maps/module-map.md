@@ -103,7 +103,7 @@ Job Bot — single CLI entry point.
 
 - `def make_client(config: LlmProviderConfig) -> httpx.AsyncClient` (9)
 
-### `adapters/telegram.py` — 154 строк
+### `adapters/telegram.py` — 181 строк
 
 Сборка клиента Telegram и отправка письма его руками.
 
@@ -111,8 +111,9 @@ Job Bot — single CLI entry point.
 
 - `def make_client(tg: TgAccountConfig) -> Client` (30)
 - `async def send_dm(client: Client, user: str | int, text: str, attachment: str | Path | None=None) -> int | None` (24)
-- `def _message_date(messages, message_id: int) -> int` (11)
-- `async def warm_peer_cache(client) -> None` (33)
+- `def _message_date(messages, bookmark: tuple[int, int]) -> int` (19)
+- `async def _dialog_page(client, offset_date: int, offset_id: int, offset_peer)` (16)
+- `async def warm_peer_cache(client) -> None` (34)
 
 ### `adapters/telegraph.py` — 120 строк
 
@@ -627,21 +628,21 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _hand_to_classification(dm, msg, hr_id: int, subject) -> None` (12)
 - `async def process_dm(msg, dm: DmHelpers) -> int | None` (33)
 
-### `backend/flows/dm_backfill.py` — 287 строк
+### `backend/flows/dm_backfill.py` — 286 строк
 
 Догон пропущенной переписки с HR.
 
 Зависит от: `backend.domain.telegram_identity`, `backend.flows.batches`, `backend.flows.dm`, `backend.models`, `backend.notify`, `backend.repository.hr_list`, `backend.repository.messages`
 
 - `class DmHooks` (9)
-- `async def _fetch_history(client, hr, limit: int) -> list | None` (41)
+- `async def _fetch_history(client, hr, limit: int) -> list | None` (40)
   - `async def read(peer) -> list` (2)
 - `async def _store_outgoing(hr_id: int, dm: DmHelpers, msg) -> bool` (23)
 - `async def _store_incoming(hr_id: int, dm: DmHelpers, hooks: DmHooks, msg) -> bool` (27)
 - `async def _walk_messages(messages: list, hr_id: int, dm: DmHelpers, hooks: DmHooks) -> bool` (18)
 - `async def _reconcile_deletes(session_factory, hr_id: int, messages: list, newest_before: int) -> bool` (37)
-- `async def backfill_hr_dm_history(hr, dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, newest_before: int=0) -> None` (26)
-- `async def catch_up_missed_dms(dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int) -> None` (35)
+- `async def backfill_hr_dm_history(hr, dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, newest_before: int=0) -> None` (27)
+- `async def catch_up_missed_dms(dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int) -> None` (34)
 - `def spawn_hr_backfill(pipeline, hr) -> None` (24)
   - `async def work() -> None` (7)
 
@@ -2866,13 +2867,13 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/backend/test_bot_connect.py` — 100 строк
+### `tests/backend/test_bot_connect.py` — 124 строк
 
 Следствия подъёма соединения с Telegram.
 
 Зависит от: `backend.models`, `tests.backend.fixtures.backfill`, `tests.dbio`, `tests.fakes.ingestion`, `tests.fakes.telegram`
 
-Тестов: 3
+Тестов: 4
 
 - `def caught_up(monkeypatch)` (9)
   - `async def catch_up_missed_dms(client, *args, **kwargs)` (2)
@@ -2983,13 +2984,13 @@ Runtime settings layer.
 
 - `def _outbox_read(user_id: int, max_id: int)` (5)
 
-### `tests/backend/test_bot_run_loop.py` — 450 строк ⚠ подошёл к 300
+### `tests/backend/test_bot_run_loop.py` — 438 строк ⚠ подошёл к 300
 
 Следствия одного оборота главного цикла бота.
 
 Зависит от: `backend.bot`, `backend.models`, `tests.fakes.ingestion`, `tests.fakes.telegram`
 
-Тестов: 26
+Тестов: 25
 
 - `def caught_up(monkeypatch)` (9)
   - `async def catch_up_missed_dms(client, *args, **kwargs)` (2)
@@ -5127,18 +5128,19 @@ Runtime settings layer.
 - `def status_history_row(vacancy_id: int, **overrides) -> VacancyStatusHistory` (10)
 - `def tg_creds(**overrides) -> TgAccountConfig` (16)
 
-### `tests/fakes/ingestion.py` — 169 строк
+### `tests/fakes/ingestion.py` — 186 строк
 
 Подделка конвейера сбора и оповещений окна о ходе цикла.
 
 Зависит от: `backend.flows.dm`, `backend.flows.dm_backfill`
 
-- `class FakeIngestion` (120)
+- `class FakeIngestion` (134)
   - `async def recover_orphan_vacancies(self)` (4)
   - `async def check_ghosting_timeouts(self)` (4)
   - `async def cancel_pending_dm_classifications(self, drain: bool=False)` (4)
   - `def mark_shutting_down(self)` (4)
-  - `def spawn_backfill(self, work, what: str, **_options) -> None` (11)
+  - `def spawn_backfill(self, work, what: str, **_options) -> None` (25)
+    - `async def _run() -> None` (7)
   - `def schedule_dm_classification(self, hr_id, *rest)` (3)
   - `def dm_helpers(self) -> DmHelpers` (7)
   - `def dm_hooks(self) -> DmHooks` (3)
@@ -5199,7 +5201,7 @@ Runtime settings layer.
 - `class LmClient` (9)
   - `async def aclose(self) -> None` (2)
 
-### `tests/fakes/telegram.py` — 422 строк ⚠ подошёл к 300
+### `tests/fakes/telegram.py` — 465 строк ⚠ подошёл к 300
 
 Подделка клиента Pyrogram и построители его объектов.
 
@@ -5215,14 +5217,16 @@ Runtime settings layer.
 - `def document(name: str | None) -> SimpleNamespace` (3)
 - `def chat(*, title=None, photo=None, **extra) -> SimpleNamespace` (3)
 - `def user(*, username=None, photo=None, **extra) -> SimpleNamespace` (15)
-- `class FakeTelegramClient` (238)
+- `def _dialog(peer_id: int)` (17)
+- `class FakeTelegramClient` (262)
   - `def loop(self)` (4)
   - `def add_handler(self, handler) -> None` (2)
   - `def _refuse_cold(self, target) -> None` (10)
   - `def _fail_if_asked(self, method: str) -> None` (6)
   - `async def get_chat(self, chat_id)` (14)
   - `async def get_chat_history(self, target, limit=100)` (12)
-  - `async def invoke(self, query, **_options)` (17)
+  - `async def invoke(self, query, **_options)` (34)
+  - `async def resolve_peer(self, peer_id)` (5)
   - `async def get_users(self, username)` (18)
   - `async def download_media(self, target, file_name=None, in_memory=False)` (21)
   - `async def _accept(self, kind: str, target, payload, caption=None)` (16)
