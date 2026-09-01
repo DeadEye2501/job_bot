@@ -280,6 +280,10 @@ def turn_and_settle(monkeypatch):
         async def next_mode(session):
             if turns:
                 return turns.pop(0)
+            # Дожидаемся пущенного, а не отмеряем ему время: сон между
+            # оборотами даёт задаче ход, но не обещает, что она успеет, — и на
+            # занятой машине проверка мигала бы без всякой поломки.
+            await asyncio.gather(*bot.ingestion.backfill_tasks, return_exceptions=True)
             bot.request_stop()
             return mode
 
