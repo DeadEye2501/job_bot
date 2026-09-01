@@ -41,8 +41,8 @@ async def test_search_finds_a_channel_by_the_handle_as_it_is_shown(
     """
     await put(
         session_factory,
-        channel_row(username="jobs_it", title="Айти-вакансии"),
+        channel_row(username="pyjobs", title="Питон-вакансии"),
         channel_row(username="jsjobs", title="Фронтенд"),
     )
 
-    assert await channel_titles(search="@jobs_it") == ["Айти-вакансии"]
+    assert await channel_titles(search="@pyjobs") == ["Питон-вакансии"]
