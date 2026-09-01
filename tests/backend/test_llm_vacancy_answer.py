@@ -330,3 +330,42 @@ def test_a_name_cleaned_of_its_link_gets_a_capital_letter():
 
     assert parsed.company_name == "Ромашка"
     assert parsed.company_website == "https://acme.io"
+
+
+def test_a_non_telegram_hr_contact_moves_to_the_way_to_apply():
+    """Почта, положенная моделью в поле собеседника, уезжает в способ отклика.
+
+    Поле собеседника читает `normalize_username`, и почтой оно неразрешимо:
+    записанная туда, она пропадает с глаз совсем — карточка поля собеседника
+    не показывает. А способ отклика она настоящий.
+    """
+    parsed = parsed_vacancy_from_json(
+        _answer(hr_contact="connect@hireway.agency", other_contact=None)
+    )
+
+    assert parsed.hr_contact is None
+    assert parsed.other_contact == "connect@hireway.agency"
+
+
+def test_a_non_telegram_hr_contact_yields_to_an_occupied_way_to_apply():
+    """Занятый способ отклика чужой записью не перебивается.
+
+    Модель уже назвала, куда откликаться; запись из чужого поля тут не
+    надёжнее, а перебей она — человек ушёл бы не туда, куда сказано в посте.
+    """
+    parsed = parsed_vacancy_from_json(
+        _answer(hr_contact="connect@hireway.agency", other_contact="jobs@acme.com")
+    )
+
+    assert parsed.hr_contact is None
+    assert parsed.other_contact == "jobs@acme.com"
+
+
+def test_a_telegram_hr_contact_stays_where_it_is():
+    """Ник в своём поле остаётся и способа отклика не занимает."""
+    parsed = parsed_vacancy_from_json(
+        _answer(hr_contact="@anna_hr", other_contact=None)
+    )
+
+    assert parsed.hr_contact == "@anna_hr"
+    assert parsed.other_contact is None

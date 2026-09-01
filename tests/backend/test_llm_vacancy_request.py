@@ -288,3 +288,26 @@ async def test_a_provider_that_fell_is_not_asked_again():
     assert parsed is None
     assert refusal.startswith("llm_http_error")
     assert len(client.sent) == 1
+
+
+async def test_the_source_channel_is_not_taken_for_a_way_to_apply():
+    """Ссылка на сам канал способом отклика не считается.
+
+    Чтение поста дописывает за подписью ссылки её адрес, и подвал канала
+    приезжает моделью как «первый встретившийся» способ отклика. В заметке
+    вакансии он читается контактом, а ведёт в тот же канал, откуда пост.
+    """
+    client = provider({CHAT: _parsed(other_contact="https://t.me/pyjobs")})
+
+    got, _ = await parse_vacancy("текст", client, "qwen", channel_username="PyJobs")
+
+    assert got.other_contact is None
+
+
+async def test_a_real_way_to_apply_survives():
+    """Чужой адрес способом отклика остаётся."""
+    client = provider({CHAT: _parsed(other_contact="jobs@acme.com")})
+
+    got, _ = await parse_vacancy("текст", client, "qwen", channel_username="PyJobs")
+
+    assert got.other_contact == "jobs@acme.com"
