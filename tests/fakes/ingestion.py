@@ -37,6 +37,7 @@ class FakeIngestion:
         self.drains = 0
         self.recovery_error: BaseException | None = None
         self.ghosting_error: BaseException | None = None
+        self.backfill_tasks: set[asyncio.Task] = set()
 
     async def recover_orphan_vacancies(self):
         self.log.append("недоразобранные")
@@ -55,6 +56,20 @@ class FakeIngestion:
 
     def mark_shutting_down(self):
         self.log.append("гасим")
+        for task in self.backfill_tasks:
+            task.cancel()
+
+    def spawn_backfill(self, work, what: str, **_options) -> None:
+        """Пускает работу задачей и держит на неё ссылку — как настоящий.
+
+        Не зовёт её на месте: тем, что догон **не** дожидается оборота, и
+        отличается нынешний цикл от прежнего. Подделка, зовущая работу сразу,
+        красила бы эту разницу зелёным при любом исходе.
+        """
+        self.log.append(f"пущено задачей: {what}")
+        task = asyncio.create_task(work())
+        self.backfill_tasks.add(task)
+        task.add_done_callback(self.backfill_tasks.discard)
 
     def schedule_dm_classification(self, hr_id, *rest):
         self.log.append(f"разбор запланирован: {hr_id}")

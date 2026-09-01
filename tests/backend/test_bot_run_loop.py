@@ -12,6 +12,8 @@
 бота и полезет в закрытые соединения.
 """
 
+import asyncio
+
 import pytest
 
 from backend.bot import loop as loop_mod
@@ -144,14 +146,20 @@ async def test_a_switched_off_bot_does_nothing_but_start_and_stop(
 
 
 async def test_entering_an_active_mode_catches_up_missed_letters(
-    chatting, caught_up
+    chatting, caught_up, turn_and_settle
 ):
     """Вход в рабочий режим догоняет пропущенные письма.
 
     Бот стартует из выключенного состояния, и всё, что HR писал, пока
     приложение было закрыто, иначе осталось бы непрочитанным.
+
+    Догон идёт задачей, поэтому оборота мало: ждать надо того мига, когда
+    цикл дал ей ход.
     """
-    await _one_turn(chatting, BotMode.DM_ONLY)
+    bot, _, _ = await chatting(mode=BotMode.DM_ONLY)
+    wire(bot, FakeIngestion())
+
+    await turn_and_settle(bot, BotMode.DM_ONLY)
 
     assert len(caught_up) == 1
 
@@ -419,3 +427,24 @@ async def test_a_kick_during_the_turn_is_not_lost(chatting, caught_up):
     await asyncio.wait_for(loop_mod._sleep_until_wake(bot), timeout=1)
 
     assert not bot.wake_event.is_set()
+
+
+async def test_a_hanging_catch_up_does_not_hold_the_turn(chatting, monkeypatch):
+    """Догон переписки оборот не держит.
+
+    Стоял он в теле цикла с `await`, до срока молчания, до обхода каналов и до
+    проверки остановки: пока он шёл — а на холодном кэше это были минуты, —
+    приложение не закрывалось и кнопка «остановить» не помогала.
+    """
+    async def catch_up_missed_dms(client, *args, **kwargs):
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr("backend.bot.loop.catch_up_missed_dms", catch_up_missed_dms)
+    bot, _, _ = await chatting(mode=BotMode.DM_ONLY)
+    pipeline = FakeIngestion()
+    wire(bot, pipeline)
+
+    await asyncio.wait_for(bot.run(once=True), timeout=5)
+
+    assert "молчание" in pipeline.log
+

@@ -99,14 +99,28 @@ async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None:
             "Transition into active mode (%s); running DM catch-up",
             mode.value,
         )
-        try:
-            await catch_up_missed_dms(
-                bot.ingestion.dm_helpers(),
-                bot.ingestion.dm_hooks(),
-                backfill_limit=bot.rs.dm_backfill_limit,
-            )
-        except Exception:
-            logger.exception("dm catch-up failed")
+        _spawn_catch_up(bot)
+
+
+def _spawn_catch_up(bot) -> None:
+    """Пустить догон переписки задачей.
+
+    Задачей, а не зовом: догон идёт по всем известным собеседникам и длится, а
+    стоит он в теле оборота — до срока молчания, до обхода каналов и до
+    проверки остановки. Дождись его оборот, и всё это время приложение не
+    закрывалось бы, а кнопка «остановить» не помогала.
+
+    Гасится он вместе с прочими чтениями переписки, в `mark_shutting_down`.
+    """
+
+    async def work() -> None:
+        await catch_up_missed_dms(
+            bot.ingestion.dm_helpers(),
+            bot.ingestion.dm_hooks(),
+            backfill_limit=bot.rs.dm_backfill_limit,
+        )
+
+    bot.ingestion.spawn_backfill(work, "dm catch-up")
 
 
 async def _tick(bot, mode: BotMode) -> None:

@@ -6,6 +6,7 @@ from contextlib import suppress
 
 import pytest
 
+from backend.bot import loop as loop_mod
 from backend.bot.client import Bot
 from backend.bot.media import MEDIA_DIR
 from backend.crypto import encrypt_str
@@ -257,3 +258,33 @@ def ready_to_send(session_factory, make_bot):
         return bot, saved_hr, vacancy
 
     return build
+
+
+@pytest.fixture
+def turn_and_settle(monkeypatch):
+    """Оборот цикла, за которым бот успевает доделать пущенное задачей.
+
+    `run(once=True)` для этого не годится: догон переписки уходит задачей, а
+    единственный оборот кончается разборкой — и задача гасится, не начавшись.
+    В бою между оборотами лежит сон, и задача успевает; сон и воспроизводится,
+    укороченный до секунды.
+
+    Остановка вешается на чтение режима, а не на саму задачу: чем кончится
+    догон, знает проверка, а не эта обстановка.
+    """
+
+    async def run(bot, mode):
+        await bot.rs.set_app("poll_interval_sec", "1")
+        turns = [mode]
+
+        async def next_mode(session):
+            if turns:
+                return turns.pop(0)
+            bot.request_stop()
+            return mode
+
+        monkeypatch.setattr(loop_mod, "read_mode", next_mode)
+        await bot.run()
+
+    return run
+

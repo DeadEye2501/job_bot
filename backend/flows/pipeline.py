@@ -194,6 +194,33 @@ class IngestionPipeline:
         for task in self.backfill_tasks:
             task.cancel()
 
+    def spawn_backfill(self, work, what: str, *, extra: dict | None = None) -> None:
+        """Пустить чтение переписки задачей и удержать на неё ссылку.
+
+        Задачей, а не зовом: чтение идёт по сети и длится, а звать его в теле
+        цикла бота значит держать вместе с ним и остановку, и всю остальную
+        работу оборота.
+
+        Ссылку держит `backfill_tasks` — без неё цикл событий хранит на задачу
+        одну слабую, и Python вправе прибрать её посреди работы. Гасит их всех
+        `mark_shutting_down`.
+
+        Беда задачи наверх не уходит — некому её там ловить, — поэтому пишется
+        с трассировкой здесь. Отмена бедой не считается: ею и гасят.
+        """
+
+        async def _run() -> None:
+            try:
+                await work()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("%s failed", what, extra=extra or {})
+
+        task = asyncio.create_task(_run())
+        self.backfill_tasks.add(task)
+        task.add_done_callback(self.backfill_tasks.discard)
+
 
     DM_CLASSIFY_DEBOUNCE_SEC = 60.0
     # Сколько остановка ждёт начавшийся разбор. Названа отдельно, потому что
