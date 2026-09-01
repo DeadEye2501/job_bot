@@ -103,7 +103,7 @@ Job Bot — single CLI entry point.
 
 - `def make_client(config: LlmProviderConfig) -> httpx.AsyncClient` (9)
 
-### `adapters/telegram.py` — 101 строк
+### `adapters/telegram.py` — 154 строк
 
 Сборка клиента Telegram и отправка письма его руками.
 
@@ -111,6 +111,8 @@ Job Bot — single CLI entry point.
 
 - `def make_client(tg: TgAccountConfig) -> Client` (30)
 - `async def send_dm(client: Client, user: str | int, text: str, attachment: str | Path | None=None) -> int | None` (24)
+- `def _message_date(messages, message_id: int) -> int` (11)
+- `async def warm_peer_cache(client) -> None` (33)
 
 ### `adapters/telegraph.py` — 120 строк
 
@@ -249,7 +251,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def ui_ingest_pasted_text(self, text, posted_at) -> pasted.PastedOutcome` (4)
   - `async def ui_forget_vacancy(self, vacancy_id) -> bool` (2)
 
-### `backend/bot/loop.py` — 251 строк
+### `backend/bot/loop.py` — 270 строк
 
 Жизненный цикл соединения: режим работы, главный цикл, выход из сеанса.
 
@@ -257,7 +259,8 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def log_out_session(bot) -> None` (17)
 - `async def current_mode(bot) -> BotMode` (7)
-- `async def _connect(bot) -> None` (24)
+- `async def _warm_peer_cache(bot) -> None` (11)
+- `async def _connect(bot) -> None` (30)
 - `async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None` (21)
 - `async def _tick(bot, mode: BotMode) -> None` (19)
 - `async def _ingest_round(bot) -> None` (16)
@@ -2609,7 +2612,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 253 модулей
+## tests — 254 модулей
 
 ### `tests/adapters/test_cv_text.py` — 299 строк
 
@@ -2855,6 +2858,17 @@ Runtime settings layer.
 
 Тестов: 11
 
+
+### `tests/backend/test_bot_connect.py` — 100 строк
+
+Следствия подъёма соединения с Telegram.
+
+Зависит от: `backend.models`, `tests.backend.fixtures.backfill`, `tests.dbio`, `tests.fakes.ingestion`, `tests.fakes.telegram`
+
+Тестов: 3
+
+- `def caught_up(monkeypatch)` (9)
+  - `async def catch_up_missed_dms(client, *args, **kwargs)` (2)
 
 ### `tests/backend/test_bot_dm_deletes.py` — 395 строк ⚠ подошёл к 300
 
@@ -5177,7 +5191,7 @@ Runtime settings layer.
 - `class LmClient` (9)
   - `async def aclose(self) -> None` (2)
 
-### `tests/fakes/telegram.py` — 378 строк ⚠ подошёл к 300
+### `tests/fakes/telegram.py` — 422 строк ⚠ подошёл к 300
 
 Подделка клиента Pyrogram и построители его объектов.
 
@@ -5193,19 +5207,21 @@ Runtime settings layer.
 - `def document(name: str | None) -> SimpleNamespace` (3)
 - `def chat(*, title=None, photo=None, **extra) -> SimpleNamespace` (3)
 - `def user(*, username=None, photo=None, **extra) -> SimpleNamespace` (15)
-- `class FakeTelegramClient` (195)
+- `class FakeTelegramClient` (238)
   - `def loop(self)` (4)
   - `def add_handler(self, handler) -> None` (2)
+  - `def _refuse_cold(self, target) -> None` (10)
   - `def _fail_if_asked(self, method: str) -> None` (6)
   - `async def get_chat(self, chat_id)` (14)
-  - `async def get_chat_history(self, target, limit=100)` (5)
-  - `async def get_users(self, username)` (14)
+  - `async def get_chat_history(self, target, limit=100)` (12)
+  - `async def invoke(self, query, **_options)` (17)
+  - `async def get_users(self, username)` (18)
   - `async def download_media(self, target, file_name=None, in_memory=False)` (21)
-  - `async def _accept(self, kind: str, target, payload, caption=None)` (15)
+  - `async def _accept(self, kind: str, target, payload, caption=None)` (16)
   - `async def send_message(self, target, text)` (2)
   - `async def send_photo(self, target, path)` (2)
   - `async def send_document(self, target, path, caption=None)` (4)
-  - `async def read_chat_history(self, target)` (3)
+  - `async def read_chat_history(self, target)` (4)
   - `async def connect(self)` (3)
   - `async def disconnect(self)` (3)
   - `async def send_code(self, phone)` (4)

@@ -16,8 +16,9 @@ from datetime import timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+from pyrogram import raw
 from pyrogram.enums import MessageEntityType
-from pyrogram.errors import UsernameNotOccupied
+from pyrogram.errors import PeerIdInvalid, UsernameNotOccupied
 
 from tests.factories import EPOCH
 
@@ -212,6 +213,7 @@ class FakeTelegramClient:
         # Переписка, которую отдаёт `get_chat_history`. Ставится после
         # сборки: пятый именованный довод конструктора упирается в предел.
         self.history: list = []
+        self.cold_peers: set = set()
         self.logged_out = False
         # Вход по коду: чем отвечает Telegram и о чём его спрашивали.
         self.phone_code_hash = "отпечаток"
@@ -237,6 +239,17 @@ class FakeTelegramClient:
     def add_handler(self, handler) -> None:
         self.handlers.append(handler)
 
+    def _refuse_cold(self, target) -> None:
+        """Отказать, если пира нет в кэше.
+
+        Настоящий клиент разрешает адрес перед каждым обращением, и холодный
+        номер роняет их все одинаково — и чтение переписки, и отправку письма,
+        и отметку о прочтении. Знай подделка об этом одно чтение, две другие
+        дороги оставались бы зелёными на кэше, которого нет.
+        """
+        if target in self.cold_peers:
+            raise PeerIdInvalid
+
     def _fail_if_asked(self, method: str) -> None:
         error = self._fails.get(method)
         if isinstance(error, list):
@@ -260,10 +273,35 @@ class FakeTelegramClient:
         return chat
 
     async def get_chat_history(self, target, limit=100):
+        """Холодный номер — `PeerIdInvalid`, как у настоящего клиента.
+
+        Пустотой подделка водила бы за нос: код отличает «переписки нет» от
+        «прочитать не удалось», и на первом он идёт дальше, а на втором
+        разыскивает пира заново.
+        """
         self.history_calls.append((target, limit))
         self._fail_if_asked("get_chat_history")
+        self._refuse_cold(target)
         for msg in self.history[:limit]:
             yield msg
+
+    async def invoke(self, query, **_options):
+        """Сырое обращение. Знает одно — список переписок для прогрева кэша.
+
+        Незнакомое обращение — отказ, а не пустой ответ: пустотой подделка
+        сказала бы «Telegram ничего не отдал» о том, чего у неё попросту нет.
+
+        Ответ пуст, и одной страницы довольно: у настоящего клиента участники
+        ложатся в кэш до всякого разбора ответа, и здесь то же выражено тем,
+        что холодные номера перестают быть холодными. Пустой список переписок
+        останавливает и постраничную подкачку — вторая страница у подделки не
+        проверяется.
+        """
+        self._fail_if_asked("invoke")
+        if not isinstance(query, raw.functions.messages.GetDialogs):
+            raise AttributeError(f"подделка не знает обращения {query!r}")
+        self.cold_peers.clear()
+        return SimpleNamespace(dialogs=[], messages=[], users=[], chats=[])
 
     async def get_users(self, username):
         """Незанятое имя — бросок, по той же причине, что и у `get_chat`.
@@ -278,6 +316,10 @@ class FakeTelegramClient:
         user = self._users.get(username)
         if user is None:
             raise UsernameNotOccupied
+        # Розыск по нику кладёт пира в кэш и под номером — на этом побочном
+        # действии держится запасной путь догона. Номера у ответа может и не
+        # быть: проверки розыска контакта кладут сюда объекты без него.
+        self.cold_peers.discard(getattr(user, "id", None))
         return user
 
     async def download_media(self, target, file_name=None, in_memory=False):
@@ -312,6 +354,7 @@ class FakeTelegramClient:
         """
         self.outgoing.append((kind, target, payload, caption))
         self._fail_if_asked(kind)
+        self._refuse_cold(target)
         self.last_message_id += 1
         answer = SimpleNamespace(id=self.last_message_id, date=TG_EPOCH)
         if self.on_send is not None:
@@ -332,6 +375,7 @@ class FakeTelegramClient:
     async def read_chat_history(self, target):
         self.read_calls.append(target)
         self._fail_if_asked("read_chat_history")
+        self._refuse_cold(target)
 
     async def connect(self):
         self.lifecycle.append("подключение")

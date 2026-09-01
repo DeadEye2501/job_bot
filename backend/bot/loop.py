@@ -41,6 +41,19 @@ async def current_mode(bot) -> BotMode:
         return BotMode.OFF
 
 
+async def _warm_peer_cache(bot) -> None:
+    """Прогреть кэш пиров; сорвавшийся прогрев подъёма не отменяет.
+
+    Чем греют, знает адаптер Pyrogram. Здесь решается только судьба неудачи:
+    без прогрева приложение работает так же, как работало до него, и ронять
+    из-за этого подъём нечем — а без соединения не работает вовсе ничего.
+    """
+    try:
+        await telegram.warm_peer_cache(bot.client)
+    except Exception:
+        logger.exception("peer cache warm-up failed")
+
+
 async def _connect(bot) -> None:
     """Поднять соединение и объявить бота готовым к обращениям из окна."""
     # Синкаем галку «Симуляция отправки» из БД-настройки в module-level guard
@@ -52,6 +65,13 @@ async def _connect(bot) -> None:
             "SEND_LOCKED=True: outgoing DM will be simulated, not sent"
         )
     await bot.client.start()
+    # Строка сеанса записывается до прогрева: прогрев идёт по сети и длится, а
+    # свежая строка после первого входа дорога — оборвись приложение в эти
+    # секунды, человек входил бы по коду заново.
+    await persist_session_if_changed(bot)
+    # Прогрев — до объявления готовности: окно, узнавшее о готовом боте, шлёт
+    # письма сразу, а по холодному кэшу они падают.
+    await _warm_peer_cache(bot)
     # ``bot.loop`` ставим ПОСЛЕ client.start() — это и метка
     # «бот готов принимать kick/cancel из потока окна», и сам loop
     # для thread-safe методов. До этого момента kick/cancel/
@@ -64,7 +84,6 @@ async def _connect(bot) -> None:
         "Telegram client connected (phone=%s)",
         mask_phone(bot.rs.tg.phone if bot.rs.tg else None),
     )
-    await persist_session_if_changed(bot)
 
 
 async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None:
