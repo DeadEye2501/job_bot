@@ -17,6 +17,7 @@ from tests.backend.fixtures.bot import (
     outbox,
     ready_to_send,
     sending_unlocked,
+    turn_and_settle,
 )
 from tests.backend.fixtures.flows import (
     deliver,
@@ -53,5 +54,6 @@ __all__ = [
     "rerunning",
     "sending_unlocked",
     "titles",
+    "turn_and_settle",
     "unparsed_vacancy",
 ]

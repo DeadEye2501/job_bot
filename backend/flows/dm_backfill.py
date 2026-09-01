@@ -274,21 +274,14 @@ def spawn_hr_backfill(pipeline, hr) -> None:
     и вставит её без ``vacancy_id`` (UNIQUE на (hr_id, tg_message_id,
     is_incoming) потом отстрелит Bot.send'овский insert).
     """
-    async def _run() -> None:
-        try:
-            await backfill_hr_dm_history(
-                hr,
-                pipeline.dm_helpers(),
-                pipeline.dm_hooks(),
-                backfill_limit=pipeline.rs.dm_backfill_limit,
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception(
-                "spawn_hr_backfill failed for hr %d",
-                hr.id, extra={"hr_id": hr.id},
-            )
-    task = asyncio.create_task(_run())
-    pipeline.backfill_tasks.add(task)
-    task.add_done_callback(pipeline.backfill_tasks.discard)
+    async def work() -> None:
+        await backfill_hr_dm_history(
+            hr,
+            pipeline.dm_helpers(),
+            pipeline.dm_hooks(),
+            backfill_limit=pipeline.rs.dm_backfill_limit,
+        )
+
+    pipeline.spawn_backfill(
+        work, f"spawn_hr_backfill for hr {hr.id}", extra={"hr_id": hr.id}
+    )

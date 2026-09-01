@@ -251,7 +251,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def ui_ingest_pasted_text(self, text, posted_at) -> pasted.PastedOutcome` (4)
   - `async def ui_forget_vacancy(self, vacancy_id) -> bool` (2)
 
-### `backend/bot/loop.py` — 270 строк
+### `backend/bot/loop.py` — 284 строк
 
 Жизненный цикл соединения: режим работы, главный цикл, выход из сеанса.
 
@@ -261,7 +261,9 @@ First-run bootstrap: ensure DB schema exists.
 - `async def current_mode(bot) -> BotMode` (7)
 - `async def _warm_peer_cache(bot) -> None` (11)
 - `async def _connect(bot) -> None` (30)
-- `async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None` (21)
+- `async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None` (14)
+- `def _spawn_catch_up(bot) -> None` (19)
+  - `async def work() -> None` (6)
 - `async def _tick(bot, mode: BotMode) -> None` (19)
 - `async def _ingest_round(bot) -> None` (16)
 - `async def _sleep_until_wake(bot) -> None` (17)
@@ -625,7 +627,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _hand_to_classification(dm, msg, hr_id: int, subject) -> None` (12)
 - `async def process_dm(msg, dm: DmHelpers) -> int | None` (33)
 
-### `backend/flows/dm_backfill.py` — 294 строк
+### `backend/flows/dm_backfill.py` — 287 строк
 
 Догон пропущенной переписки с HR.
 
@@ -640,8 +642,8 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _reconcile_deletes(session_factory, hr_id: int, messages: list, newest_before: int) -> bool` (37)
 - `async def backfill_hr_dm_history(hr, dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, newest_before: int=0) -> None` (26)
 - `async def catch_up_missed_dms(dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int) -> None` (35)
-- `def spawn_hr_backfill(pipeline, hr) -> None` (31)
-  - `async def _run() -> None` (15)
+- `def spawn_hr_backfill(pipeline, hr) -> None` (24)
+  - `async def work() -> None` (7)
 
 ### `backend/flows/dm_classify.py` — 324 строк ⚠ подошёл к 300
 
@@ -811,7 +813,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _still_there(pipeline, vacancy_id: int) -> bool` (8)
 - `async def _save_pasted_vacancy(pipeline, text: str, embedding: list[float], posted_at: datetime | None) -> int` (15)
 
-### `backend/flows/pipeline.py` — 325 строк ⚠ подошёл к 300
+### `backend/flows/pipeline.py` — 352 строк ⚠ подошёл к 300
 
 Сборка конвейера: его состояние, общие ресурсы и поверхность для зовущих.
 
@@ -821,8 +823,10 @@ First-run bootstrap: ensure DB schema exists.
 - `def _declare_window_hooks(pipeline) -> None` (32)
 - `def _declare_dm_debounce(pipeline) -> None` (19)
 - `class LmProviders` (14)
-- `class IngestionPipeline` (192)
+- `class IngestionPipeline` (219)
   - `def mark_shutting_down(self) -> None` (5)
+  - `def spawn_backfill(self, work, what: str, *, extra: dict | None=None) -> None` (26)
+    - `async def _run() -> None` (7)
   - `def emit_progress(self, stage: str, label: str, current: int, total: int) -> None` (2)
   - `def fire_contacts_changed(self) -> None` (2)
   - `def fire_vacancies_changed(self) -> None` (2)
@@ -2660,13 +2664,13 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/backend/conftest.py` — 57 строк
+### `tests/backend/conftest.py` — 59 строк
 
 Фикстуры слоя `backend`, собранные из модулей по предметам.
 
 Зависит от: `tests.backend.fixtures.backfill`, `tests.backend.fixtures.bot`, `tests.backend.fixtures.entry`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.listing`, `tests.backend.fixtures.logs`, `tests.backend.fixtures.rerun`, `tests.backend.fixtures.stats`
 
-Отдаёт наружу: `applied`, `busy_slot`, `channel_titles`, `chatting`, `chatting_on_fakes`, `clean_log_file`, `clean_root_logger`, `deliver`, `dm_pipeline`, `empty_media_dir`, `entry`, `hr_names`, `known_hr`, `lock_of_its_own`, `make_bot`, `make_pipeline`, `outbox`, `parsing`, `ready_to_send`, `rerunning`, `sending_unlocked`, `titles`, `unparsed_vacancy`
+Отдаёт наружу: `applied`, `busy_slot`, `channel_titles`, `chatting`, `chatting_on_fakes`, `clean_log_file`, `clean_root_logger`, `deliver`, `dm_pipeline`, `empty_media_dir`, `entry`, `hr_names`, `known_hr`, `lock_of_its_own`, `make_bot`, `make_pipeline`, `outbox`, `parsing`, `ready_to_send`, `rerunning`, `sending_unlocked`, `titles`, `turn_and_settle`, `unparsed_vacancy`
 
 
 ### `tests/backend/fixtures/__init__.py` — 1 строк
@@ -2689,11 +2693,11 @@ Runtime settings layer.
 - `async def catch_up_everyone(client, session_factory, *, hooks=None, **kwargs)` (12)
 - `async def known_hr(session_factory)` (4)
 
-### `tests/backend/fixtures/bot.py` — 259 строк
+### `tests/backend/fixtures/bot.py` — 290 строк
 
 Обстановка для проверок бота: всё собрано на подделках, до сети не доходит.
 
-Зависит от: `adapters.telegram`, `backend.bot.client`, `backend.bot.media`, `backend.crypto`, `backend.models`, `backend.repository.bot_mode`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`, `tests.fakes.ingestion`, `tests.fakes.lm_studio`, `tests.fakes.telegram`
+Зависит от: `adapters.telegram`, `backend.bot`, `backend.bot.client`, `backend.bot.media`, `backend.crypto`, `backend.models`, `backend.repository.bot_mode`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`, `tests.fakes.ingestion`, `tests.fakes.lm_studio`, `tests.fakes.telegram`
 
 - `class Outbox` (18)
   - `async def send_dm(self, _client, target, text, attachment=None)` (5)
@@ -2713,6 +2717,9 @@ Runtime settings layer.
 - `def outbox(monkeypatch, sending_unlocked)` (11)
 - `def ready_to_send(session_factory, make_bot)` (24)
   - `async def build(*, status=VacancyStatus.NEW, mode=BotMode.FULL, hr=None)` (13)
+- `def turn_and_settle(monkeypatch)` (26)
+  - `async def run(bot, mode)` (12)
+    - `async def next_mode(session)` (5)
 
 ### `tests/backend/fixtures/entry.py` — 71 строк
 
@@ -2976,13 +2983,13 @@ Runtime settings layer.
 
 - `def _outbox_read(user_id: int, max_id: int)` (5)
 
-### `tests/backend/test_bot_run_loop.py` — 421 строк ⚠ подошёл к 300
+### `tests/backend/test_bot_run_loop.py` — 450 строк ⚠ подошёл к 300
 
 Следствия одного оборота главного цикла бота.
 
 Зависит от: `backend.bot`, `backend.models`, `tests.fakes.ingestion`, `tests.fakes.telegram`
 
-Тестов: 25
+Тестов: 26
 
 - `def caught_up(monkeypatch)` (9)
   - `async def catch_up_missed_dms(client, *args, **kwargs)` (2)
@@ -5120,17 +5127,18 @@ Runtime settings layer.
 - `def status_history_row(vacancy_id: int, **overrides) -> VacancyStatusHistory` (10)
 - `def tg_creds(**overrides) -> TgAccountConfig` (16)
 
-### `tests/fakes/ingestion.py` — 154 строк
+### `tests/fakes/ingestion.py` — 169 строк
 
 Подделка конвейера сбора и оповещений окна о ходе цикла.
 
 Зависит от: `backend.flows.dm`, `backend.flows.dm_backfill`
 
-- `class FakeIngestion` (105)
+- `class FakeIngestion` (120)
   - `async def recover_orphan_vacancies(self)` (4)
   - `async def check_ghosting_timeouts(self)` (4)
   - `async def cancel_pending_dm_classifications(self, drain: bool=False)` (4)
-  - `def mark_shutting_down(self)` (2)
+  - `def mark_shutting_down(self)` (4)
+  - `def spawn_backfill(self, work, what: str, **_options) -> None` (11)
   - `def schedule_dm_classification(self, hr_id, *rest)` (3)
   - `def dm_helpers(self) -> DmHelpers` (7)
   - `def dm_hooks(self) -> DmHooks` (3)

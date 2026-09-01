@@ -33,7 +33,7 @@ def caught_up(monkeypatch):
 
 
 async def test_a_cold_session_reads_the_history_of_a_nameless_hr(
-    chatting, session_factory
+    chatting, session_factory, turn_and_settle
 ):
     """Переписка догоняется, когда у собеседника есть номер и нет ника.
 
@@ -52,7 +52,7 @@ async def test_a_cold_session_reads_the_history_of_a_nameless_hr(
         telegram_username=None,
     )
 
-    await bot.run(once=True)
+    await turn_and_settle(bot, BotMode.DM_ONLY)
 
     stored = await all_rows(session_factory, Message)
     assert [m.tg_message_id for m in stored] == [9]
