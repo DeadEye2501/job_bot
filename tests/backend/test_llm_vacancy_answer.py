@@ -340,11 +340,11 @@ def test_a_non_telegram_hr_contact_moves_to_the_way_to_apply():
     не показывает. А способ отклика она настоящий.
     """
     parsed = parsed_vacancy_from_json(
-        _answer(hr_contact="connect@hireway.agency", other_contact=None)
+        _answer(hr_contact="hr@acme.com", other_contact=None)
     )
 
     assert parsed.hr_contact is None
-    assert parsed.other_contact == "connect@hireway.agency"
+    assert parsed.other_contact == "hr@acme.com"
 
 
 def test_a_non_telegram_hr_contact_yields_to_an_occupied_way_to_apply():
@@ -354,7 +354,7 @@ def test_a_non_telegram_hr_contact_yields_to_an_occupied_way_to_apply():
     надёжнее, а перебей она — человек ушёл бы не туда, куда сказано в посте.
     """
     parsed = parsed_vacancy_from_json(
-        _answer(hr_contact="connect@hireway.agency", other_contact="jobs@acme.com")
+        _answer(hr_contact="hr@acme.com", other_contact="jobs@acme.com")
     )
 
     assert parsed.hr_contact is None
