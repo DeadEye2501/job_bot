@@ -62,3 +62,20 @@ async def test_the_page_is_cut_after_the_search_not_before(hr_names, session_fac
         "Виктор",
         "Галина",
     ]
+
+
+async def test_search_finds_a_person_by_the_handle_as_it_is_shown(
+    hr_names, session_factory
+):
+    """Ник, набранный с собачкой, находит человека.
+
+    Строка контактов рисует ник как `@ник`, и образец человек списывает
+    оттуда же.
+    """
+    await put(
+        session_factory,
+        hr_row(name="Анна", telegram_username="anna_hr"),
+        hr_row(name="Борис", telegram_username="recruiter_b"),
+    )
+
+    assert await hr_names(search="@anna_hr") == ["Анна"]

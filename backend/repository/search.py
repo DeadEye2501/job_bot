@@ -19,8 +19,13 @@ def matches_search(search: str | None, *values: object) -> bool:
     Не-строки среди значений пропускаются молча: зовущие разворачивают сюда
     списки звёздочкой, и одно негодное значение иначе роняло бы весь перечень
     — даже когда искать не просили.
+
+    Ведущая собачка с образца снимается: ники и у канала, и у человека лежат
+    голыми (`normalize_username`), а списки рисуют их как `@ник` — списанный с
+    экрана образец не совпадал бы ни с чем. Одна собачка после этого равна
+    пустому образцу, и это верно: её набирают первой, ещё не набрав ника.
     """
-    needle = (search or "").strip().casefold()
+    needle = (search or "").strip().lstrip("@").strip().casefold()
     if not needle:
         return True
     return any(isinstance(v, str) and needle in v.casefold() for v in values)
