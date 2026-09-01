@@ -87,14 +87,13 @@ def opened(monkeypatch, runtime_settings, session_factory):
     return fake, order
 
 
-async def test_the_bot_starts_switched_off_however_it_was_left(
-    runtime_settings, session_factory
-):
-    """Запуск застаёт бота выключенным, каким бы его ни оставили вчера.
+async def test_the_mode_outlives_a_restart(runtime_settings, session_factory):
+    """Запуск застаёт режим таким, каким его вчера оставили.
 
-    Режим лежит в настройках и переживает выход. Не сбрось его запуск, бот
-    принялся бы за работу сам, ещё до того как человек увидел окно, — а
-    выключал он его вчера именно затем, чтобы этого не было.
+    Режим — выбор человека, и стирать его при каждом открытии окна значит
+    решать за него. На нём вдобавок держится переписка: в OFF бот молчит на
+    все входящие письма, и сброшенный запуском режим гасил бы её до первого
+    щелчка тумблером — каждое утро.
     """
     async with session_factory() as session:
         async with session.begin():
@@ -103,7 +102,7 @@ async def test_the_bot_starts_switched_off_however_it_was_left(
     await window_module.prepare(session_factory)
 
     async with session_factory() as session:
-        assert await read_mode(session) is BotMode.OFF
+        assert await read_mode(session) is BotMode.FULL
 
 
 def test_everything_is_put_out_from_the_top_down(opened):

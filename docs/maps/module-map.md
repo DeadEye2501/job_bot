@@ -2589,16 +2589,16 @@ Runtime settings layer.
 
 - `def show_trouble(text: str) -> None` (11)
 
-### `client/window.py` — 234 строк
+### `client/window.py` — 228 строк
 
 Окно приложения: как оно открывается и чем гасится.
 
-Зависит от: `adapters`, `adapters.telegram`, `backend.bot.media`, `backend.models`, `backend.repository.bot_mode`, `backend.runtime_settings`, `client`, `client.bridge`, `client.serving`, `config`
+Зависит от: `adapters`, `adapters.telegram`, `backend.bot.media`, `backend.runtime_settings`, `client`, `client.bridge`, `client.serving`, `config`
 
-- `def run_ui() -> int` (32)
+- `def run_ui() -> int` (30)
 - `def _open_window(hub, *, settled: bool)` (19)
 - `def _put_out(hub, runner, listening) -> None` (32)
-- `async def prepare(session_factory) -> RuntimeSettings` (12)
+- `async def prepare(session_factory) -> RuntimeSettings` (10)
 - `def _open_runner() -> AsyncRunner` (4)
 - `def _open_database() -> tuple[Any, async_sessionmaker]` (9)
 - `def _await(future: Future) -> Any` (3)
@@ -5022,7 +5022,7 @@ Runtime settings layer.
 - `def _get(app, path: str) -> tuple[str, dict, bytes]` (10)
   - `def start_response(status: str, headers: list[tuple[str, str]]) -> None` (3)
 
-### `tests/client/test_window.py` — 281 строк
+### `tests/client/test_window.py` — 280 строк
 
 Следствия открытия и закрытия окна: что приложение делает вокруг него.
 
