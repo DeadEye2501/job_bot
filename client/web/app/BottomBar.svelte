@@ -16,7 +16,7 @@
   import RunButton from '$components/RunButton.svelte';
   import UnreadBadge from '$components/UnreadBadge.svelte';
   import { attempts } from '$state/attempts.js';
-  import { LAMPS, allAlive, blockedTip, shouldTurnOff } from '$state/health.js';
+  import { LAMPS, allAlive, blockedTip } from '$state/health.js';
   import { OFF } from '$state/modes.js';
   import { COUNTLESS_STAGES, STARTING, bar, caption, countlessNote } from '$state/progress.js';
 
@@ -57,14 +57,8 @@
   const lockedTip = $derived(blockedTip(health));
   const captionText = $derived(single || caption(channels, messages));
 
-  /** Принять свежее здоровье и погасить бота, если что-то отвалилось.
-   *
-   * Гашение здесь, а не на мосту: решение принимает окно, потому что мост о
-   * том, смотрит ли на него кто-нибудь, не знает.
-   */
-  async function applyHealth(fresh) {
+  function applyHealth(fresh) {
     health = fresh;
-    if (shouldTurnOff(fresh, mode)) await pickMode(OFF);
   }
 
   async function refresh() {
