@@ -103,18 +103,19 @@ Job Bot — single CLI entry point.
 
 - `def make_client(config: LlmProviderConfig) -> httpx.AsyncClient` (9)
 
-### `adapters/telegram.py` — 205 строк
+### `adapters/telegram.py` — 220 строк
 
 Сборка клиента Telegram и отправка письма его руками.
 
-Зависит от: `backend.runtime_settings`, `config`
+Зависит от: `backend.domain.telegram_identity`, `backend.runtime_settings`, `config`
 
 - `def make_client(tg: TgAccountConfig) -> Client` (30)
 - `async def send_dm(client: Client, user: str | int, text: str, attachment: str | Path | None=None) -> int | None` (24)
 - `def _message_date(messages, bookmark: tuple[int, int]) -> int` (19)
 - `async def _dialog_page(client, offset_date: int, offset_id: int, offset_peer)` (16)
 - `def _next_bookmark(dialogs, messages) -> tuple[int, int, int] | None` (17)
-- `async def warm_peer_cache(client) -> None` (39)
+- `def _peers_of(dialogs, users) -> list` (8)
+- `async def list_dialog_peers(client) -> list` (43)
 
 ### `adapters/telegraph.py` — 120 строк
 
@@ -253,7 +254,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def ui_ingest_pasted_text(self, text, posted_at) -> pasted.PastedOutcome` (4)
   - `async def ui_forget_vacancy(self, vacancy_id) -> bool` (2)
 
-### `backend/bot/loop.py` — 284 строк
+### `backend/bot/loop.py` — 286 строк
 
 Жизненный цикл соединения: режим работы, главный цикл, выход из сеанса.
 
@@ -261,11 +262,11 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def log_out_session(bot) -> None` (17)
 - `async def current_mode(bot) -> BotMode` (7)
-- `async def _warm_peer_cache(bot) -> None` (11)
+- `async def _read_dialogs(bot) -> None` (12)
 - `async def _connect(bot) -> None` (30)
 - `async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None` (14)
-- `def _spawn_catch_up(bot) -> None` (19)
-  - `async def work() -> None` (6)
+- `def _spawn_catch_up(bot) -> None` (20)
+  - `async def work() -> None` (7)
 - `async def _tick(bot, mode: BotMode) -> None` (19)
 - `async def _ingest_round(bot) -> None` (16)
 - `async def _sleep_until_wake(bot) -> None` (17)
@@ -505,7 +506,7 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: —
 
 
-### `backend/domain/telegram_identity.py` — 113 строк
+### `backend/domain/telegram_identity.py` — 165 строк
 
 Правила опознания собеседника в Telegram по написанному о нём.
 
@@ -515,6 +516,8 @@ First-run bootstrap: ensure DB schema exists.
 - `def normalize_username(hr_contact: str | None, *, typed_by_a_person: bool=False) -> str | None` (22)
 - `def typed_username(value) -> str | None` (24)
 - `def telegram_peer(hr) -> int | str | None` (9)
+- `class DialogPeer` (10)
+- `def hrs_in_dialog_order(hrs, dialogs) -> list` (35)
 
 ### `backend/domain/transitions.py` — 142 строк
 
@@ -629,7 +632,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _hand_to_classification(dm, msg, hr_id: int, subject) -> None` (12)
 - `async def process_dm(msg, dm: DmHelpers) -> int | None` (33)
 
-### `backend/flows/dm_backfill.py` — 287 строк
+### `backend/flows/dm_backfill.py` — 293 строк
 
 Догон пропущенной переписки с HR.
 
@@ -643,7 +646,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _walk_messages(messages: list, hr_id: int, dm: DmHelpers, hooks: DmHooks) -> bool` (18)
 - `async def _reconcile_deletes(session_factory, hr_id: int, messages: list, newest_before: int) -> bool` (37)
 - `async def backfill_hr_dm_history(hr, dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, newest_before: int=0) -> None` (28)
-- `async def catch_up_missed_dms(dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int) -> None` (34)
+- `async def catch_up_missed_dms(dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, dialogs=()) -> None` (40)
 - `def spawn_hr_backfill(pipeline, hr) -> None` (24)
   - `async def work() -> None` (7)
 
@@ -2682,7 +2685,7 @@ Runtime settings layer.
 Зависит от: —
 
 
-### `tests/backend/fixtures/backfill.py` — 72 строк
+### `tests/backend/fixtures/backfill.py` — 75 строк
 
 Обстановка для проверок догона переписки: собеседник и прогон догона.
 
@@ -2692,7 +2695,7 @@ Runtime settings layer.
 - `def ours(msg_id, text, *, photo=None)` (3)
 - `def _helpers(client, session_factory, **extra) -> DmHelpers` (14)
 - `async def catch_up(client, hr, session_factory, *, hooks=None, **kwargs)` (9)
-- `async def catch_up_everyone(client, session_factory, *, hooks=None, **kwargs)` (12)
+- `async def catch_up_everyone(client, session_factory, *, hooks=None, dialogs=(), **kwargs)` (15)
 - `async def known_hr(session_factory)` (4)
 
 ### `tests/backend/fixtures/bot.py` — 300 строк
@@ -3223,13 +3226,13 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `tests/backend/test_flows_catch_up.py` — 232 строк
+### `tests/backend/test_flows_catch_up.py` — 283 строк
 
 Следствия догона переписок по всем HR разом.
 
-Зависит от: `backend.flows.dm_backfill`, `backend.models`, `tests.backend.fixtures.backfill`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
+Зависит от: `backend.domain.telegram_identity`, `backend.flows.dm_backfill`, `backend.models`, `tests.backend.fixtures.backfill`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`
 
-Тестов: 8
+Тестов: 10
 
 - `async def _catch_up(session_factory, **kwargs)` (3)
 - `async def _hrs(session_factory, count)` (10)
@@ -4565,14 +4568,15 @@ Runtime settings layer.
 - `def _raw_dialog(peer_id: int)` (11)
 - `def _raw_message(peer_id: int, message_id: int, *, date: int)` (4)
 
-### `tests/backend/test_telegram_identity.py` — 77 строк
+### `tests/backend/test_telegram_identity.py` — 152 строк
 
 Следствия, которые наблюдают тесты `backend/domain/telegram_identity.py`.
 
 Зависит от: `backend.domain.telegram_identity`
 
-Тестов: 4
+Тестов: 8
 
+- `class Contact` (7)
 
 ### `tests/backend/test_telegram_login.py` — 363 строк ⚠ подошёл к 300
 

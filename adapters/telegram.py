@@ -16,6 +16,7 @@ from pathlib import Path
 
 from pyrogram import Client, raw, utils
 
+from backend.domain.telegram_identity import DialogPeer
 from backend.runtime_settings import TgAccountConfig
 from config import get_data_dir
 
@@ -163,14 +164,29 @@ def _next_bookmark(dialogs, messages) -> tuple[int, int, int] | None:
     return None
 
 
-async def warm_peer_cache(client) -> None:
-    """Сложить собеседников в кэш пиров проходом по списку переписок.
+def _peers_of(dialogs, users) -> list:
+    """Собеседники страницы: номер из переписки, ник — из участников ответа."""
+    nicks = {u.id: getattr(u, "username", None) for u in users}
+    peers = []
+    for dialog in dialogs:
+        peer_id = utils.get_peer_id(dialog.peer)
+        peers.append(DialogPeer(peer_id, nicks.get(peer_id)))
+    return peers
 
-    Кэш живёт в памяти вместе со строкой сеанса и пуст при каждом запуске, а
-    адресуем мы собеседника номером учётной записи: по пустому кэшу номер не
-    разрешается, и Telegram отвечает `PeerIdInvalid` — чтению переписки,
-    отправке письма и отметке о прочтении разом. Pyrogram кэширует участников
-    ответа после каждого обращения, и список переписок приносит их всех.
+
+async def list_dialog_peers(client) -> list:
+    """Собеседники, с которыми переписка есть, — свежими вперёд.
+
+    Ими правится догон: читать переписку у того, с кем её нет, нечего, а стоит
+    попытка дорого. Порядок берётся отсюда же — Telegram отдаёт список свежими
+    вперёд, и человек, открывший приложение, ждёт именно свежее.
+
+    Попутно проход кладёт участников в кэш пиров, и это не мелочь. Кэш живёт в
+    памяти вместе со строкой сеанса и пуст при каждом запуске, а адресуем мы
+    собеседника номером учётной записи: по пустому кэшу номер не разрешается, и
+    Telegram отвечает `PeerIdInvalid` — чтению переписки, отправке письма и
+    отметке о прочтении разом. Pyrogram кэширует участников ответа после
+    каждого обращения.
 
     Обращение сырое, а не `get_dialogs`: тот на каждую переписку разбирает
     верхнее письмо, а если оно ответ — идёт в сеть за оригиналом. Нам нужны
@@ -183,22 +199,21 @@ async def warm_peer_cache(client) -> None:
     offset_date, offset_id = 0, 0
     offset_peer = raw.types.InputPeerEmpty()
     seen: set[tuple[int, int]] = set()
-    warmed = 0
+    found: list = []
     while True:
         answer = await _dialog_page(client, offset_date, offset_id, offset_peer)
         dialogs = [d for d in answer.dialogs if isinstance(d, raw.types.Dialog)]
         if not dialogs:
-            return
-        warmed += len(dialogs)
+            return found
+        found.extend(_peers_of(dialogs, answer.users))
         step = _next_bookmark(dialogs, answer.messages)
         if step is None or step[:2] in seen:
             _log.warning(
-                "прогрев кэша пиров кончился, не сдвинув закладку: "
-                "прогрето %d переписок, остальные останутся неразрешимыми "
-                "по номеру учётной записи",
-                warmed,
+                "список переписок кончился, не сдвинув закладку: прочитано %d, "
+                "остальные останутся непрогретыми и недогнанными",
+                len(found),
             )
-            return
+            return found
         seen.add(step[:2])
         peer_id, offset_id, offset_date = step
         offset_peer = await client.resolve_peer(peer_id)

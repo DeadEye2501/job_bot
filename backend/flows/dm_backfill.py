@@ -8,7 +8,7 @@ from typing import Any
 
 from backend.flows.batches import report_failures
 from backend.flows.dm import DmHelpers, persist_outgoing_dm, process_dm
-from backend.domain.telegram_identity import telegram_peer
+from backend.domain.telegram_identity import hrs_in_dialog_order, telegram_peer
 from backend.models import Message
 from backend.repository.hr_list import list_hrs_for_backfill
 from backend.repository.messages import newest_tg_message_id, tombstone_messages
@@ -226,16 +226,22 @@ async def backfill_hr_dm_history(
 
 
 async def catch_up_missed_dms(
-    dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int
+    dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, dialogs=()
 ) -> None:
-    """Pull recent DM history per known HR, both directions.
+    """Догнать переписку с собеседниками, у которых она есть, свежими вперёд.
 
     Обе стороны — :func:`_store_outgoing`, удаления — :func:`_reconcile_deletes`.
+
+    `dialogs` — список переписок, прочитанный при подъёме соединения. Им
+    правится очередь: впереди идут те, с кем разговор есть, свежими вперёд —
+    человек, открывший приложение, ждёт свежее письмо, а не полного обхода
+    всех. Остальные досматриваются следом; пустой список просто оставляет
+    прежний порядок.
     """
     # Отметки снимаются здесь и разом: до прохода и одной сессией. Ими сверка
     # удалённого отличает стёртое от пришедшего, пока шёл проход.
     async with dm.session_factory() as session:
-        chats = await list_hrs_for_backfill(session)
+        chats = hrs_in_dialog_order(await list_hrs_for_backfill(session), dialogs)
         newest = {hr.id: await newest_tg_message_id(session, hr.id) for hr in chats}
     logger.info(
         "DM catch-up: %d HR(s), batch=%d delay=%ss",

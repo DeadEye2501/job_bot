@@ -2,7 +2,12 @@
 
 import pytest
 
-from backend.domain.telegram_identity import normalize_username, typed_username
+from backend.domain.telegram_identity import (
+    DialogPeer,
+    hrs_in_dialog_order,
+    normalize_username,
+    typed_username,
+)
 
 
 @pytest.mark.parametrize(
@@ -75,3 +80,73 @@ def test_a_four_letter_word_from_an_ad_is_not_taken_for_a_handle():
 def test_an_unusable_contact_yields_no_username(raw):
     """Негодная запись даёт отсутствие имени, а не мусор."""
     assert normalize_username(raw) is None
+
+
+class Contact:
+    """Наш собеседник в том виде, в каком его знает база."""
+
+    def __init__(self, hr_id, *, user_id=None, username=None):
+        self.id = hr_id
+        self.telegram_user_id = user_id
+        self.telegram_username = username
+
+
+def test_the_order_of_the_dialog_list_wins_over_the_order_of_the_contacts():
+    """Собеседники выстраиваются по свежести переписки, а не по номеру строки.
+
+    Догон читает их подряд и на каждого тратит обращение к Telegram; человек
+    закрывает окно раньше, чем очередь дойдёт до конца. Свежая переписка — та,
+    ради которой он приложение и открыл, — обязана идти первой.
+    """
+    contacts = [Contact(1, user_id=11), Contact(2, user_id=22)]
+    chats = [DialogPeer(22), DialogPeer(11)]
+
+    assert [hr.id for hr in hrs_in_dialog_order(contacts, chats)] == [2, 1]
+
+
+def test_a_contact_without_a_dialog_goes_last_but_is_not_dropped():
+    """Собеседник, с которым разговора нет, уходит в хвост, а не выбрасывается.
+
+    В хвост — потому что читать у него нечего и стоит попытка дорого: его
+    номера нет в кэше пиров, и чтение уходит в розыск по нику, который Telegram
+    душит ожиданиями в десятки секунд.
+
+    Но не выбрасывается: список переписок мог прийти неполным — чтение его
+    обрывается, когда закладку поставить не по чему, — и отбор по нему молча
+    потерял бы живую переписку.
+    """
+    contacts = [Contact(1, user_id=11), Contact(2, user_id=22)]
+
+    ordered = hrs_in_dialog_order(contacts, [DialogPeer(22)])
+
+    assert [hr.id for hr in ordered] == [2, 1]
+
+
+def test_a_contact_known_only_by_a_handle_is_matched_by_it():
+    """Известного одним ником опознают по нику, без оглядки на регистр.
+
+    Так заводит собеседников разбор объявления: в посте стоит `@ник`, а номера
+    учётной записи там нет вовсе. Не сведи мы его по нику — именно у такого
+    переписка и не догонялась бы, а он-то как раз и пишет первым.
+    """
+    contacts = [Contact(78, username="Mastakova_TeamLead")]
+
+    matched = hrs_in_dialog_order(contacts, [DialogPeer(8435291761, "mastakova_teamlead")])
+
+    assert [hr.id for hr in matched] == [78]
+
+
+def test_one_dialog_takes_one_contact():
+    """Одну переписку забирает тот, кто опознан по номеру, а не по нику.
+
+    Ник свободно достаётся другому человеку, и запись со своим номером под
+    чужим ником принадлежит не тому, с кем идёт разговор. Второй при этом не
+    пропадает — уходит в хвост, как всякий без переписки.
+    """
+    by_number = Contact(1, user_id=500, username="кто-то")
+    by_handle = Contact(2, username="кто-то")
+
+    matched = hrs_in_dialog_order([by_number, by_handle], [DialogPeer(500, "кто-то")])
+
+    assert [hr.id for hr in matched] == [1, 2]
+

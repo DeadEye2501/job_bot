@@ -51,8 +51,10 @@ async def catch_up(client, hr, session_factory, *, hooks=None, **kwargs):
     )
 
 
-async def catch_up_everyone(client, session_factory, *, hooks=None, **kwargs):
-    """Догоняет переписку по всем известным собеседникам.
+async def catch_up_everyone(
+    client, session_factory, *, hooks=None, dialogs=(), **kwargs
+):
+    """Догоняет переписку по списку переписок; пустой значит «по всем».
 
     Отличается от `catch_up` тем, что идёт настоящей дорогой обхода: отметку
     «что у нас было до прохода» снимает именно она, и сверка удалённого без
@@ -62,6 +64,7 @@ async def catch_up_everyone(client, session_factory, *, hooks=None, **kwargs):
         _helpers(client, session_factory, **kwargs),
         hooks or DmHooks(),
         backfill_limit=50,
+        dialogs=dialogs,
     )
 
 

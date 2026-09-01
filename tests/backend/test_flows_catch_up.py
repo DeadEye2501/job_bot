@@ -15,6 +15,7 @@ import logging
 
 from backend.flows.dm_backfill import _DM_CATCHUP_BATCH_SIZE, DmHooks
 from tests.backend.fixtures.backfill import catch_up_everyone
+from backend.domain.telegram_identity import DialogPeer
 from backend.models import HR
 from tests.dbio import all_rows, put
 from tests.factories import hr_row
@@ -230,3 +231,53 @@ async def test_the_window_hooks_reach_every_chat(session_factory, monkeypatch):
     assert heard.count("переписка") == 2
     assert heard.count("вакансии") == 2
     assert heard.count("разбор") == 2
+
+
+async def test_the_freshest_dialogs_are_caught_up_first(session_factory, monkeypatch):
+    """Впереди идут те, с кем переписка есть, и в порядке её свежести.
+
+    Раньше догон шёл по всем известным собеседникам подряд. Почти всё время
+    уходило на розыск ников тех, кому никогда не писали — у них и читать
+    нечего, — а свежая переписка стояла в конце очереди. Человек закрывал окно
+    раньше, чем очередь до неё доходила, и письмо, ради которого он приложение
+    и открыл, не подгружалось.
+
+    Остальные при этом не выбрасываются, а досматриваются следом: список
+    переписок мог прийти неполным.
+    """
+    hrs = await _hrs(session_factory, 3)
+    visited: list[int] = []
+
+    async def backfill(hr, *args, **kwargs):
+        visited.append(hr.id)
+
+    monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)
+
+    await _catch_up(
+        session_factory,
+        dialogs=[DialogPeer(hrs[2].telegram_user_id), DialogPeer(hrs[0].telegram_user_id)],
+    )
+
+    assert visited[:2] == [hrs[2].id, hrs[0].id]
+    assert sorted(visited) == sorted(hr.id for hr in hrs)
+
+
+async def test_without_a_dialog_list_everyone_is_caught_up(session_factory, monkeypatch):
+    """Списка переписок нет — обходятся все, как раньше.
+
+    Пустой он бывает не только у того, с кем не переписывались ни разу: чтение
+    списка могло и сорваться. Считать в этом случае, что переписок нет вовсе,
+    значило бы не догнать ничего.
+    """
+    hrs = await _hrs(session_factory, 3)
+    visited: list[int] = []
+
+    async def backfill(hr, *args, **kwargs):
+        visited.append(hr.id)
+
+    monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)
+
+    await _catch_up(session_factory, dialogs=[])
+
+    assert sorted(visited) == sorted(hr.id for hr in hrs)
+
