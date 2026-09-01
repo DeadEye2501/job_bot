@@ -6,12 +6,10 @@
 """
 
 import asyncio
-import logging
 
 from backend.flows.dm import DmHelpers
 from backend.flows.dm_backfill import DmHooks
-
-logger = logging.getLogger(__name__)
+from backend.flows.pipeline import IngestionPipeline
 
 
 class FakeIngestion:
@@ -62,31 +60,21 @@ class FakeIngestion:
         for task in self.backfill_tasks:
             task.cancel()
 
-    def spawn_backfill(self, work, what: str, **_options) -> None:
+    def spawn_backfill(self, work, what: str, *, extra: dict | None = None) -> None:
         """Пускает работу задачей и держит на неё ссылку — как настоящий.
 
         Не зовёт её на месте: тем, что догон **не** дожидается оборота, и
         отличается нынешний цикл от прежнего. Подделка, зовущая работу сразу,
         красила бы эту разницу зелёным при любом исходе.
 
-        Беду задачи перехватывает так же, как настоящий. Без перехвата она
-        всплывала бы в «Task exception was never retrieved» посреди чужой
-        проверки — то есть подделка ломала бы соседей там, где боевой код
-        отрабатывает штатно.
+        Само заведение берётся у настоящего конвейера, а не переписывается:
+        из всего конвейера оно трогает один набор задач, который есть и здесь,
+        — а переписанное семью строками рядом разъехалось бы с ним первой же
+        правкой, и подделка перестала бы вести себя как боевой код ровно там,
+        где обещает.
         """
         self.log.append(f"пущено задачей: {what}")
-
-        async def _run() -> None:
-            try:
-                await work()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("%s failed", what)
-
-        task = asyncio.create_task(_run())
-        self.backfill_tasks.add(task)
-        task.add_done_callback(self.backfill_tasks.discard)
+        IngestionPipeline.spawn_backfill(self, work, what, extra=extra)
 
     def schedule_dm_classification(self, hr_id, *rest):
         self.log.append(f"разбор запланирован: {hr_id}")

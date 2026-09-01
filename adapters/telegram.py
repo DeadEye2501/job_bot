@@ -144,6 +144,25 @@ async def _dialog_page(client, offset_date: int, offset_id: int, offset_peer):
     )
 
 
+def _next_bookmark(dialogs, messages) -> tuple[int, int, int] | None:
+    """Закладка следующей страницы: переписка, номер верхнего письма и время.
+
+    Берётся последняя переписка страницы, чьё верхнее письмо в ответе нашлось,
+    а не последняя вообще: письма может не быть — у стёртого Telegram кладёт
+    `messageEmpty`, у пустой переписки номер нулевой. Взяв закладку вслепую,
+    проход попросил бы с нулевым временем, а это значит «с самого верха», и
+    вся страница пришла бы заново.
+
+    Пусто значит, что двигаться не по чему на всей странице.
+    """
+    for dialog in reversed(dialogs):
+        peer_id = utils.get_peer_id(dialog.peer)
+        date = _message_date(messages, (peer_id, dialog.top_message))
+        if date:
+            return peer_id, dialog.top_message, date
+    return None
+
+
 async def warm_peer_cache(client) -> None:
     """Сложить собеседников в кэш пиров проходом по списку переписок.
 
@@ -156,26 +175,31 @@ async def warm_peer_cache(client) -> None:
     Обращение сырое, а не `get_dialogs`: тот на каждую переписку разбирает
     верхнее письмо, а если оно ответ — идёт в сеть за оригиналом. Нам нужны
     одни участники, и они лежат в ответе до всякого разбора.
+
+    Проход кончается по закладке, на которой страница уже кончалась. Без этого
+    сторожа он ходил бы по кругу — в подъёме, до объявления готовности, то
+    есть окно ждало бы готового бота вечно.
     """
     offset_date, offset_id = 0, 0
     offset_peer = raw.types.InputPeerEmpty()
-    # Закладки, на которых страница уже кончалась. По ним и кончается проход:
-    # верхнего письма в ответе может не оказаться вовсе — у стёртого письма
-    # Telegram кладёт `messageEmpty`, у пустой переписки номер нулевой, — а
-    # нулевая закладка значит «с самого верха», и без этого набора проход
-    # ходил бы по кругу. Ходил бы он в подъёме, до объявления готовности.
     seen: set[tuple[int, int]] = set()
+    warmed = 0
     while True:
         answer = await _dialog_page(client, offset_date, offset_id, offset_peer)
         dialogs = [d for d in answer.dialogs if isinstance(d, raw.types.Dialog)]
         if not dialogs:
             return
-        last = dialogs[-1]
-        bookmark = (utils.get_peer_id(last.peer), last.top_message)
-        if bookmark in seen:
+        warmed += len(dialogs)
+        step = _next_bookmark(dialogs, answer.messages)
+        if step is None or step[:2] in seen:
+            _log.warning(
+                "прогрев кэша пиров кончился, не сдвинув закладку: "
+                "прогрето %d переписок, остальные останутся неразрешимыми "
+                "по номеру учётной записи",
+                warmed,
+            )
             return
-        seen.add(bookmark)
-        offset_id = last.top_message
-        offset_date = _message_date(answer.messages, bookmark)
-        offset_peer = await client.resolve_peer(bookmark[0])
+        seen.add(step[:2])
+        peer_id, offset_id, offset_date = step
+        offset_peer = await client.resolve_peer(peer_id)
 

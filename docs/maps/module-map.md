@@ -103,7 +103,7 @@ Job Bot — single CLI entry point.
 
 - `def make_client(config: LlmProviderConfig) -> httpx.AsyncClient` (9)
 
-### `adapters/telegram.py` — 181 строк
+### `adapters/telegram.py` — 205 строк
 
 Сборка клиента Telegram и отправка письма его руками.
 
@@ -113,7 +113,8 @@ Job Bot — single CLI entry point.
 - `async def send_dm(client: Client, user: str | int, text: str, attachment: str | Path | None=None) -> int | None` (24)
 - `def _message_date(messages, bookmark: tuple[int, int]) -> int` (19)
 - `async def _dialog_page(client, offset_date: int, offset_id: int, offset_peer)` (16)
-- `async def warm_peer_cache(client) -> None` (34)
+- `def _next_bookmark(dialogs, messages) -> tuple[int, int, int] | None` (17)
+- `async def warm_peer_cache(client) -> None` (39)
 
 ### `adapters/telegraph.py` — 120 строк
 
@@ -628,7 +629,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _hand_to_classification(dm, msg, hr_id: int, subject) -> None` (12)
 - `async def process_dm(msg, dm: DmHelpers) -> int | None` (33)
 
-### `backend/flows/dm_backfill.py` — 286 строк
+### `backend/flows/dm_backfill.py` — 287 строк
 
 Догон пропущенной переписки с HR.
 
@@ -641,7 +642,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _store_incoming(hr_id: int, dm: DmHelpers, hooks: DmHooks, msg) -> bool` (27)
 - `async def _walk_messages(messages: list, hr_id: int, dm: DmHelpers, hooks: DmHooks) -> bool` (18)
 - `async def _reconcile_deletes(session_factory, hr_id: int, messages: list, newest_before: int) -> bool` (37)
-- `async def backfill_hr_dm_history(hr, dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, newest_before: int=0) -> None` (27)
+- `async def backfill_hr_dm_history(hr, dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, newest_before: int=0) -> None` (28)
 - `async def catch_up_missed_dms(dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int) -> None` (34)
 - `def spawn_hr_backfill(pipeline, hr) -> None` (24)
   - `async def work() -> None` (7)
@@ -2694,7 +2695,7 @@ Runtime settings layer.
 - `async def catch_up_everyone(client, session_factory, *, hooks=None, **kwargs)` (12)
 - `async def known_hr(session_factory)` (4)
 
-### `tests/backend/fixtures/bot.py` — 290 строк
+### `tests/backend/fixtures/bot.py` — 300 строк
 
 Обстановка для проверок бота: всё собрано на подделках, до сети не доходит.
 
@@ -2718,9 +2719,9 @@ Runtime settings layer.
 - `def outbox(monkeypatch, sending_unlocked)` (11)
 - `def ready_to_send(session_factory, make_bot)` (24)
   - `async def build(*, status=VacancyStatus.NEW, mode=BotMode.FULL, hr=None)` (13)
-- `def turn_and_settle(monkeypatch)` (26)
-  - `async def run(bot, mode)` (12)
-    - `async def next_mode(session)` (5)
+- `def turn_and_settle(monkeypatch)` (36)
+  - `async def run(bot, mode)` (18)
+    - `async def next_mode(session)` (11)
 
 ### `tests/backend/fixtures/entry.py` — 71 строк
 
@@ -4549,14 +4550,20 @@ Runtime settings layer.
 
 - `def _lock_once_it_is_free(lock_path: Path, seconds: float=5.0)` (14)
 
-### `tests/backend/test_telegram_adapter.py` — 140 строк
+### `tests/backend/test_telegram_adapter.py` — 256 строк
 
 Следствия сборки клиента Telegram и отправки личного сообщения.
 
 Зависит от: `adapters.telegram`, `config`, `tests.factories`, `tests.fakes.telegram`
 
-Тестов: 9
+Тестов: 11
 
+- `class DialogServer` (52)
+  - `async def invoke(self, query, **_options)` (13)
+  - `def _messages(self, page)` (15)
+  - `async def resolve_peer(self, peer_id)` (2)
+- `def _raw_dialog(peer_id: int)` (11)
+- `def _raw_message(peer_id: int, message_id: int, *, date: int)` (4)
 
 ### `tests/backend/test_telegram_identity.py` — 77 строк
 
@@ -5128,19 +5135,18 @@ Runtime settings layer.
 - `def status_history_row(vacancy_id: int, **overrides) -> VacancyStatusHistory` (10)
 - `def tg_creds(**overrides) -> TgAccountConfig` (16)
 
-### `tests/fakes/ingestion.py` — 186 строк
+### `tests/fakes/ingestion.py` — 174 строк
 
 Подделка конвейера сбора и оповещений окна о ходе цикла.
 
-Зависит от: `backend.flows.dm`, `backend.flows.dm_backfill`
+Зависит от: `backend.flows.dm`, `backend.flows.dm_backfill`, `backend.flows.pipeline`
 
-- `class FakeIngestion` (134)
+- `class FakeIngestion` (124)
   - `async def recover_orphan_vacancies(self)` (4)
   - `async def check_ghosting_timeouts(self)` (4)
   - `async def cancel_pending_dm_classifications(self, drain: bool=False)` (4)
   - `def mark_shutting_down(self)` (4)
-  - `def spawn_backfill(self, work, what: str, **_options) -> None` (25)
-    - `async def _run() -> None` (7)
+  - `def spawn_backfill(self, work, what: str, *, extra: dict | None=None) -> None` (15)
   - `def schedule_dm_classification(self, hr_id, *rest)` (3)
   - `def dm_helpers(self) -> DmHelpers` (7)
   - `def dm_hooks(self) -> DmHooks` (3)
@@ -5201,7 +5207,7 @@ Runtime settings layer.
 - `class LmClient` (9)
   - `async def aclose(self) -> None` (2)
 
-### `tests/fakes/telegram.py` — 465 строк ⚠ подошёл к 300
+### `tests/fakes/telegram.py` — 471 строк ⚠ подошёл к 300
 
 Подделка клиента Pyrogram и построители его объектов.
 
@@ -5218,14 +5224,14 @@ Runtime settings layer.
 - `def chat(*, title=None, photo=None, **extra) -> SimpleNamespace` (3)
 - `def user(*, username=None, photo=None, **extra) -> SimpleNamespace` (15)
 - `def _dialog(peer_id: int)` (17)
-- `class FakeTelegramClient` (262)
+- `class FakeTelegramClient` (268)
   - `def loop(self)` (4)
   - `def add_handler(self, handler) -> None` (2)
   - `def _refuse_cold(self, target) -> None` (10)
   - `def _fail_if_asked(self, method: str) -> None` (6)
   - `async def get_chat(self, chat_id)` (14)
   - `async def get_chat_history(self, target, limit=100)` (12)
-  - `async def invoke(self, query, **_options)` (34)
+  - `async def invoke(self, query, retries=3, timeout=10.0, sleep_threshold=None)` (40)
   - `async def resolve_peer(self, peer_id)` (5)
   - `async def get_users(self, username)` (18)
   - `async def download_media(self, target, file_name=None, in_memory=False)` (21)
