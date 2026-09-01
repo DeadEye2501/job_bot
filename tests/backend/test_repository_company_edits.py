@@ -99,3 +99,31 @@ async def test_aliases_can_be_emptied(session, session_factory):
 
     card = await get_company_detail(session, company.id)
     assert card.company.aliases == []
+
+
+async def test_a_renamed_company_gets_its_name_with_a_capital_letter(
+    session, session_factory
+):
+    """Переименование поднимает первую букву так же, как заведение.
+
+    Правило одно на оба входа: разойдись они, компания получала бы заглавную
+    букву при заведении и теряла её при первой же правке карточки.
+    """
+    company = company_row(name="Контур")
+    await put(session_factory, company)
+
+    await update_company_fields(session, company.id, name="  ромашка  ")
+
+    card = await get_company_detail(session, company.id)
+    assert card.company.name == "Ромашка"
+
+
+async def test_a_brand_spelling_survives_a_rename(session, session_factory):
+    """Написание бренда переживает и переименование."""
+    company = company_row(name="Контур")
+    await put(session_factory, company)
+
+    await update_company_fields(session, company.id, name="eBay")
+
+    card = await get_company_detail(session, company.id)
+    assert card.company.name == "eBay"

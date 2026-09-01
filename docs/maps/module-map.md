@@ -167,7 +167,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 130 модулей
+## backend — 131 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -377,6 +377,14 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def _is_brand_domain(host: str) -> bool` (15)
 - `def is_aggregator_host(host: str) -> bool` (12)
+
+### `backend/domain/company_names.py` — 39 строк
+
+Заглавная буква в названии компании.
+
+Зависит от: —
+
+- `def capitalized_company_name(name: str | None) -> str | None` (32)
 
 ### `backend/domain/currency.py` — 24 строк
 
@@ -1098,11 +1106,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (36)
 
-### `backend/llm/vacancy.py` — 471 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 472 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.taxonomy`, `backend.domain.telegram_identity`, `backend.incoming`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.rules`, `backend.llm.skills`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.company_names`, `backend.domain.taxonomy`, `backend.domain.telegram_identity`, `backend.incoming`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.rules`, `backend.llm.skills`, `backend.payloads`
 
 - `def _split_stack(data: dict) -> tuple[list, list]` (19)
 - `def _company_name_and_site(company_name: str | None, company_website: str | None) -> tuple[str | None, str | None]` (28)
@@ -1384,11 +1392,11 @@ First-run bootstrap: ensure DB schema exists.
 - `async def reset_channel_cursor(session: AsyncSession, channel_id: int) -> bool` (9)
 - `async def delete_channel(session: AsyncSession, channel_id: int) -> int | None` (39)
 
-### `backend/repository/companies_card.py` — 280 строк
+### `backend/repository/companies_card.py` — 281 строк
 
 Ведение записей о компаниях.
 
-Зависит от: `backend.domain.spellings`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository.blacklist`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.vacancies_life`
+Зависит от: `backend.domain.company_names`, `backend.domain.spellings`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository.blacklist`, `backend.repository.blacklist_marks`, `backend.repository.merging`, `backend.repository.vacancies_life`
 
 - `async def create_company(session: AsyncSession, *, name: str, website: str | None=None, aliases: list[str] | None=None, notes: str | None=None) -> Company` (37)
 - `def company_blacklist_candidates(co: Company) -> list[str]` (11)
@@ -1424,11 +1432,11 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def list_companies_with_counts(session: AsyncSession, search: str | None=None, *, limit: int | None=None, offset: int=0) -> tuple[list[CompanyWithCount], bool]` (36)
 
-### `backend/repository/companies_matching.py` — 479 строк ⚠ подошёл к 300
+### `backend/repository/companies_matching.py` — 484 строк ⚠ подошёл к 300
 
 Сведение разобранной из вакансии компании с уже заведённой.
 
-Зависит от: `backend.incoming`, `backend.llm.company`, `backend.models`, `backend.repository.companies_card`, `backend.repository.companies_keys`
+Зависит от: `backend.domain.company_names`, `backend.incoming`, `backend.llm.company`, `backend.models`, `backend.repository.companies_card`, `backend.repository.companies_keys`
 
 - `def _known_spellings(company: Company) -> tuple[str, list[str]]` (13)
 - `def _enrich_company_with_parsed(company: Company, parsed_name: str, parsed_website: str | None) -> None` (23)
@@ -1436,7 +1444,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _keep_pre_create_stage(decision: dict) -> None` (10)
 - `async def _insert_company(session: AsyncSession, name: str, website: str | None, decision: dict) -> Company | None` (25)
 - `async def _company_by_exact_name(session: AsyncSession, name: str) -> Company | None` (12)
-- `async def _create_company_row(session: AsyncSession, name: str, website: str | None, decision: dict, seen_ids: set[int]) -> tuple[Company | None, dict]` (40)
+- `async def _create_company_row(session: AsyncSession, name: str, website: str | None, decision: dict, seen_ids: set[int]) -> tuple[Company | None, dict]` (44)
 - `class _Parsed` (26)
   - `def of(cls, raw_name: str, website: str | None) -> '_Parsed'` (8)
 - `def _new_decision() -> dict` (36)
@@ -2601,7 +2609,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 252 модулей
+## tests — 253 модулей
 
 ### `tests/adapters/test_cv_text.py` — 299 строк
 
@@ -3057,6 +3065,15 @@ Runtime settings layer.
 Зависит от: `backend.domain.blacklist`
 
 Тестов: 6
+
+
+### `tests/backend/test_domain_company_names.py` — 98 строк
+
+Заглавная буква в названии компании.
+
+Зависит от: `backend.domain.company_names`
+
+Тестов: 7
 
 
 ### `tests/backend/test_domain_dedup.py` — 68 строк
@@ -3704,13 +3721,13 @@ Runtime settings layer.
 Тестов: 18
 
 
-### `tests/backend/test_llm_vacancy_answer.py` — 309 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_vacancy_answer.py` — 332 строк ⚠ подошёл к 300
 
 Следствия разбора ответа модели в разобранную вакансию.
 
 Зависит от: `backend.llm.vacancy`, `tests.fakes.llm`
 
-Тестов: 23
+Тестов: 26
 
 - `def _answer(**fields) -> str` (3)
 
@@ -3959,13 +3976,13 @@ Runtime settings layer.
   - `def install(**kwargs) -> Arbiter` (4)
 - `async def resolve(session, name, arbiter_fake=None, **kwargs)` (9)
 
-### `tests/backend/test_repository_company_autolink_rules.py` — 406 строк ⚠ подошёл к 300
+### `tests/backend/test_repository_company_autolink_rules.py` — 438 строк ⚠ подошёл к 300
 
 Следствия автоматического сведения разобранной компании к существующей.
 
 Зависит от: `backend.models`, `backend.repository.companies_matching`, `tests.dbio`, `tests.factories`
 
-Тестов: 20
+Тестов: 22
 
 
 ### `tests/backend/test_repository_company_blacklist_marks.py` — 132 строк
@@ -3986,22 +4003,22 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/backend/test_repository_company_creation.py` — 58 строк
+### `tests/backend/test_repository_company_creation.py` — 78 строк
 
 Следствия заведения компании вручную.
 
 Зависит от: `backend.repository.companies_card`
 
-Тестов: 4
+Тестов: 6
 
 
-### `tests/backend/test_repository_company_edits.py` — 101 строк
+### `tests/backend/test_repository_company_edits.py` — 129 строк
 
 Следствия правки полей компании.
 
 Зависит от: `backend.repository.companies_card`, `tests.dbio`, `tests.factories`
 
-Тестов: 6
+Тестов: 8
 
 
 ### `tests/backend/test_repository_company_keys.py` — 225 строк

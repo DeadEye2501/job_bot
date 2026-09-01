@@ -201,6 +201,10 @@
 - `AGGREGATOR_HOSTS` = `frozenset({'t.me', 'telegram.me', 'telegram.org'…`
 - `AGGREGATOR_BRANDS` = `frozenset({'indeed', 'stepstone'})`
 
+### `backend/domain/company_names.py`
+
+- `_ADDRESS_START_RE` = `re.compile('^[a-z][a-z0-9+.\\-]*://', re.IGNOREC…`
+
 ### `backend/domain/currency.py`
 
 - `CURRENCY_WRITINGS: tuple[tuple[str, str], ...]` = `набор из 6`

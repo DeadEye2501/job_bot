@@ -26,6 +26,8 @@
   }
 </script>
 
+<!-- Нажатие дальше не идёт: строка вокруг переключателя бывает нажимаемой сама,
+     и тогда переключение открывало бы её заодно с собой. -->
 <input
   type="checkbox"
   class="toggle compact"
@@ -34,4 +36,5 @@
   {disabled}
   {title}
   onchange={(event) => flip(event.currentTarget.checked)}
+  onclick={(event) => event.stopPropagation()}
 />

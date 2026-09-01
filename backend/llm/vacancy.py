@@ -8,6 +8,7 @@ from dataclasses import replace
 import httpx
 
 from adapters.lm_chat import ChatRequest, chat
+from backend.domain.company_names import capitalized_company_name
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.domain.telegram_identity import normalize_username
 from backend.payloads import ParsedVacancy
@@ -368,7 +369,7 @@ def _vacancy_of(data: dict, title: str) -> ParsedVacancy:
     return ParsedVacancy(
         title=title,
         description=description,
-        company_name=company_name,
+        company_name=capitalized_company_name(company_name),
         company_website=company_website,
         hr_contact=_hr_contact(_text_field("hr_contact")),
         other_contact=_way_to_apply(_text_field("other_contact")),

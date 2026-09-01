@@ -56,3 +56,23 @@ async def test_a_new_company_without_extras_gets_absence_not_emptiness(session):
     assert card.company.website is None
     assert card.company.notes is None
     assert card.company.aliases == []
+
+
+async def test_a_new_company_gets_its_name_with_a_capital_letter(session):
+    """Название компании ложится в базу с заглавной буквы."""
+    company = await create_company(session, name="  ромашка  ")
+
+    card = await get_company_detail(session, company.id)
+    assert card.company.name == "Ромашка"
+
+
+async def test_a_brand_spelling_of_a_new_company_survives(session):
+    """Написание бренда переживает заведение.
+
+    Вторая буква заглавная при маленькой первой — так бренд пишет себя сам, и
+    поднятая первая буква сделала бы из него другое имя.
+    """
+    company = await create_company(session, name="eBay")
+
+    card = await get_company_detail(session, company.id)
+    assert card.company.name == "eBay"
