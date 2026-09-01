@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.company_names import capitalized_company_name
 from backend.models import Company
 from backend.incoming import str_list
 from backend.repository.companies_card import add_company_spellings, create_company
@@ -166,7 +167,11 @@ async def _create_company_row(
     # ложный t.me/AcmeChannel, и не отравляет будущий host-match.
     persisted_website = real_corporate_website(website)
     _keep_pre_create_stage(decision)
-    name_clean = name.strip()
+    # Имя поднимается здесь, а не внутри вставки: вставка, розыск
+    # столкнувшейся строки и запись в журнал обязаны говорить об одном
+    # написании. Подними его только вставка — розыск шёл бы написанием,
+    # которое столкновения не вызывало, и не нашёл бы ничего.
+    name_clean = capitalized_company_name(name.strip())
     company = await _insert_company(
         session, name_clean, persisted_website, decision
     )

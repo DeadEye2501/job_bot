@@ -404,3 +404,35 @@ async def test_a_row_that_appeared_after_the_lookup_is_called_a_race(
 
     assert company.id == existing.id
     assert decision["stage"] == "create_race_fallback"
+
+
+async def test_a_company_created_by_the_pipeline_gets_a_capital_letter(session):
+    """Заведённая конвейером компания получает заглавную букву.
+
+    Тем же правилом, что и заведённая из окна: разойдись они, разбор поста
+    заводил бы вторую строку рядом с набранной руками.
+    """
+    company, decision = await find_or_create_company(session, "ромашка")
+
+    assert company.name == "Ромашка"
+    assert decision["stage"] == "create"
+
+
+async def test_a_name_colliding_after_the_capital_letter_finds_its_row(session):
+    """Столкновение по имени сводит с уже лежащей строкой, а не роняет привязку.
+
+    Вставка и розыск столкнувшейся строки обязаны говорить одним написанием:
+    подними имя только вставка, розыск шёл бы прежним написанием, не находил
+    бы ничего — и вакансия осталась бы вовсе без компании.
+    """
+    first, _ = await find_or_create_company(
+        session, "ромашка", website="https://romashka.ru"
+    )
+    await session.flush()
+
+    second, decision = await find_or_create_company(
+        session, "ромашка", website="https://romashka.dev"
+    )
+
+    assert second is not None
+    assert second.id == first.id

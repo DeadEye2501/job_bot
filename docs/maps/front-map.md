@@ -184,8 +184,8 @@
 - —
 - принимает: trouble, ready, children
 
-### components/ChannelRow.svelte (42)
-- Канал из отсева включить нельзя: обход всё равно его пропустит, и включённый переключатель обещал бы работу, которой не будет.
+### components/ChannelRow.svelte (60)
+- Нажимается вся строка, а не имя в ней: нажатие на одном имени оставляет мёртвыми отступы строки, кружок и хвост. Кнопкой строка быть не может — в ней стоит переключатель опроса, — поэтому клавиатуре она отвечает разметкой. Клавишу строка принимает только свою: у переключателя внутри неё нажатие клавиши всплывает сюда, и без этого Enter на переключателе открывал бы карточку вместо переключения.
 - принимает: channel, selected, onpick, ontoggle
 - берёт: ./Avatar.svelte, ./BlacklistMark.svelte, ./Handle.svelte, ./RowToggle.svelte
 
@@ -408,8 +408,8 @@
 - принимает: id, chips, text, oncopy, onclose
 - берёт: ./ModalHead.svelte, ./ModalShell.svelte
 
-### components/RowToggle.svelte (37)
-- —
+### components/RowToggle.svelte (40)
+- Нажатие дальше не идёт: строка вокруг переключателя бывает нажимаемой сама, и тогда переключение открывало бы её заодно с собой.
 - принимает: checked, disabled, title, ontoggle
 
 ### components/RunButton.svelte (13)
@@ -914,7 +914,7 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (6): .cnt-add-btn, .cnt-add-btn:hover, .cnt-add-btn .material-symbols-outlined, .cnt-list-empty, .cnt-detail-pane, .cnt-detail-empty
 - берёт: --accent, --border, --selected-bg
 
-### styles/contacts.css (105)
+### styles/contacts.css (103)
 - Строка списка контактов: кружок, имя с подписью и отметки в хвосте. Сами панели раздела — в contacts-layout.css, таблица отсева — в blacklist.css.
 - селекторы (14): .cnt-hr-row, .cnt-hr-row .hr-avatar, .cnt-hr-info, .cnt-hr-name, .cnt-hr-sub, .cnt-hr-sub .at, .cnt-hr-sub .company, .cnt-hr-sub .sep, .cnt-hr-trailing, .cnt-hr-bl, .cnt-hr-bl .material-symbols-outlined, .cnt-hr-row.blacklisted .cnt-hr-name, .cnt-hr-unread, .cnt-co-count
 - берёт: --accent, --bg-primary, --border, --danger, --text-primary, --text-secondary, --text-tertiary
@@ -1384,7 +1384,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 69 файлов
+## tests — 70 файлов
 
 ### tests/alive.test.js (79)
 - —
@@ -1446,6 +1446,9 @@ body, html, button, body, .material-symbols-outlined
 
 ### tests/channel_card_live.test.js (78)
 - * Сколько раз спросили названный слот.
+
+### tests/channel_row_live.test.js (99)
+- * Строка канала с записанными нажатиями.
 
 ### tests/channels.test.js (186)
 - —

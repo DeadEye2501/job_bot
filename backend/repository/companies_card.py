@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.company_names import capitalized_company_name
 from backend.domain.spellings import dedupe_first_wins
 from backend.models import Company, Vacancy
 from backend.payloads import CompanyDetail
@@ -37,7 +38,7 @@ async def create_company(
     человеку, конвейер — в два исхода сведения, поэтому здесь он не
     перехватывается.
     """
-    normalized = (name or "").strip()
+    normalized = capitalized_company_name((name or "").strip())
     if not normalized:
         raise ValueError("create_company: name is required")
     company = Company(
@@ -167,7 +168,7 @@ async def update_company_fields(
     if co is None:
         return False
     if "name" in fields:
-        cleaned = str(fields["name"] or "").strip()
+        cleaned = capitalized_company_name(str(fields["name"] or "").strip())
         if not cleaned:
             raise ValueError("company name is empty")
         previous = co.name

@@ -1,6 +1,7 @@
 <script>
   // Строка канала: значок, имя с ником, отсев, счёт вакансий и переключатель.
   import { channelTitle, channelToggle } from '$state/channels.js';
+  import { pressKey } from '$state/keys.js';
 
   import Avatar from './Avatar.svelte';
   import BlacklistMark from './BlacklistMark.svelte';
@@ -13,17 +14,34 @@
   const title = $derived(channelTitle(channel));
 </script>
 
-<div class="cnt-hr-row" class:selected class:blacklisted={shown.dim}>
+<!-- Нажимается вся строка, а не имя в ней: нажатие на одном имени оставляет
+     мёртвыми отступы строки, кружок и хвост. Кнопкой строка быть не может — в
+     ней стоит переключатель опроса, — поэтому клавиатуре она отвечает
+     разметкой.
+
+     Клавишу строка принимает только свою: у переключателя внутри неё нажатие
+     клавиши всплывает сюда, и без этого Enter на переключателе открывал бы
+     карточку вместо переключения. -->
+<div
+  class="cnt-hr-row"
+  class:selected
+  class:blacklisted={shown.dim}
+  role="button"
+  tabindex="0"
+  onclick={() => onpick()}
+  onkeydown={(event) =>
+    event.target === event.currentTarget && pressKey(event) && onpick()}
+>
   <Avatar avatar={channel.avatar} icon="tag" />
 
-  <button class="cnt-hr-info" type="button" onclick={() => onpick()}>
+  <span class="cnt-hr-info">
     <span class="cnt-hr-name" class:muted={!title.named}>
       {title.name}
     </span>
     <span class="cnt-hr-sub">
       <Handle username={channel.username} />
     </span>
-  </button>
+  </span>
 
   <span class="cnt-hr-trailing">
     <BlacklistMark blocked={channel.is_blacklisted} />

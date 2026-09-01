@@ -272,7 +272,8 @@ def test_a_name_that_is_only_a_link_is_left_alone():
     """Название, состоящее из одной ссылки, не опустошается.
 
     Иначе у вакансии не осталось бы названия компании вовсе, а так хотя бы
-    видно, откуда она.
+    видно, откуда она. Заглавной буквы такое имя не получает: адрес с
+    поднятой схемой — уже не адрес.
     """
     parsed = parsed_vacancy_from_json(_answer(company_name="https://kontur.ru"))
 
@@ -307,3 +308,25 @@ def test_an_hr_contact_written_after_its_label_loses_the_label():
     )
 
     assert parsed.hr_contact == "https://t.me/anna_hr"
+
+
+def test_a_company_name_gets_a_capital_letter():
+    """Название компании из ответа модели приходит с заглавной буквы."""
+    parsed = parsed_vacancy_from_json(_answer(company_name="ромашка"))
+
+    assert parsed.company_name == "Ромашка"
+
+
+def test_a_brand_spelling_of_a_company_name_survives_the_parsing():
+    """Написание бренда разбор не правит: вторая буква заглавная."""
+    parsed = parsed_vacancy_from_json(_answer(company_name="eBay"))
+
+    assert parsed.company_name == "eBay"
+
+
+def test_a_name_cleaned_of_its_link_gets_a_capital_letter():
+    """Имя, освобождённое от прилипшей ссылки, тоже поднимается."""
+    parsed = parsed_vacancy_from_json(_answer(company_name="ромашка https://acme.io"))
+
+    assert parsed.company_name == "Ромашка"
+    assert parsed.company_website == "https://acme.io"
