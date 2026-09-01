@@ -14,7 +14,7 @@
 import logging
 from pathlib import Path
 
-from pyrogram import Client
+from pyrogram import Client, raw, utils
 
 from backend.runtime_settings import TgAccountConfig
 from config import get_data_dir
@@ -99,3 +99,56 @@ async def send_dm(
     else:
         msg = await client.send_message(user, text)
     return getattr(msg, "id", None)
+
+
+_DIALOG_PAGE = 100
+"""Сколько переписок просить за раз. Предел Telegram для этого обращения."""
+
+
+def _message_date(messages, message_id: int) -> int:
+    """Время письма по его номеру; ноль, если такого в ответе нет.
+
+    Оно нужно закладке следующей страницы: Telegram отсчитывает её от пары
+    «номер и время верхнего письма», и без времени вторая страница пришла бы
+    той же первой.
+    """
+    for msg in messages:
+        if getattr(msg, "id", None) == message_id:
+            return getattr(msg, "date", 0) or 0
+    return 0
+
+
+async def warm_peer_cache(client) -> None:
+    """Сложить собеседников в кэш пиров проходом по списку переписок.
+
+    Кэш живёт в памяти вместе со строкой сеанса и пуст при каждом запуске, а
+    адресуем мы собеседника номером учётной записи: по пустому кэшу номер не
+    разрешается, и Telegram отвечает `PeerIdInvalid` — чтению переписки,
+    отправке письма и отметке о прочтении разом. Pyrogram кэширует участников
+    ответа после каждого обращения, и список переписок приносит их всех.
+
+    Обращение сырое, а не `get_dialogs`: тот на каждую переписку разбирает
+    верхнее письмо, а если оно ответ — идёт в сеть за оригиналом. Нам нужны
+    одни участники, и они лежат в ответе до всякого разбора.
+    """
+    offset_date, offset_id = 0, 0
+    offset_peer = raw.types.InputPeerEmpty()
+    while True:
+        answer = await client.invoke(
+            raw.functions.messages.GetDialogs(
+                offset_date=offset_date,
+                offset_id=offset_id,
+                offset_peer=offset_peer,
+                limit=_DIALOG_PAGE,
+                hash=0,
+            ),
+            sleep_threshold=60,
+        )
+        dialogs = [d for d in answer.dialogs if isinstance(d, raw.types.Dialog)]
+        if len(dialogs) < _DIALOG_PAGE:
+            return
+        last = dialogs[-1]
+        offset_id = last.top_message
+        offset_date = _message_date(answer.messages, offset_id)
+        offset_peer = await client.resolve_peer(utils.get_peer_id(last.peer))
+

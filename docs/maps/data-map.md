@@ -60,6 +60,7 @@
 - `SESSIONS_DIR` = `get_data_dir() / 'sessions'`
 - `SESSION_NAME` = `'job_bot'`
 - `SEND_LOCKED` = `False`
+- `_DIALOG_PAGE` = `100`
 
 ### `adapters/telegraph.py`
 
