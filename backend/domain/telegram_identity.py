@@ -9,6 +9,7 @@ Telegram, а здесь только решают, годится ли напи�
 """
 
 import re
+from dataclasses import dataclass
 
 _TG_USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
 # Ник, набранный человеком, принимается и от четырёх символов: новым такие
@@ -111,3 +112,54 @@ def telegram_peer(hr) -> int | str | None:
     зовущий.
     """
     return hr.telegram_user_id or hr.telegram_username
+
+
+@dataclass(frozen=True, slots=True)
+class DialogPeer:
+    """Собеседник из списка переписок Telegram: номер учётной записи и ник.
+
+    Ник приходит вместе с номером и нужен целиком ради одного случая: наш
+    собеседник, заведённый разбором объявления, известен одним ником — номера
+    в посте нет вовсе.
+    """
+
+    peer_id: int
+    username: str | None = None
+
+
+def hrs_in_dialog_order(hrs, dialogs) -> list:
+    """Наши собеседники, у кого переписка свежее, — впереди.
+
+    Догон читает их подряд, тратя на каждого обращение к Telegram, а человек
+    закрывает окно раньше, чем очередь дойдёт до конца. Порядок поэтому берётся
+    из списка переписок — Telegram отдаёт его свежими вперёд, — а не из порядка
+    строк в базе.
+
+    Кого в списке нет, тот уходит в хвост, но не пропадает. В хвост — потому
+    что читать у него нечего, переписки не существует, а попытка стоит дорого:
+    его номера нет в кэше пиров, и чтение уходит в розыск по нику, который
+    Telegram душит ожиданиями в десятки секунд. Не пропадает — потому что
+    список мог прийти неполным: чтение его обрывается там, где закладку
+    следующей страницы поставить не по чему, и отбор по такому списку молча
+    потерял бы живую переписку.
+
+    Опознание повторяет `find_known_hr`: сперва номер, потом ник и только у
+    того, у кого номера нет. Ник свободно достаётся другому человеку, и запись
+    со своим номером под чужим ником принадлежит не тому, с кем идёт разговор.
+    """
+    by_id = {hr.telegram_user_id: hr for hr in hrs if hr.telegram_user_id}
+    by_name = {
+        hr.telegram_username.lower(): hr
+        for hr in hrs
+        if hr.telegram_username and not hr.telegram_user_id
+    }
+    talking, taken = [], set()
+    for dialog in dialogs:
+        hr = by_id.get(dialog.peer_id)
+        if hr is None and dialog.username:
+            hr = by_name.get(dialog.username.lower())
+        if hr is not None and hr.id not in taken:
+            taken.add(hr.id)
+            talking.append(hr)
+    return talking + [hr for hr in hrs if hr.id not in taken]
+

@@ -41,17 +41,18 @@ async def current_mode(bot) -> BotMode:
         return BotMode.OFF
 
 
-async def _warm_peer_cache(bot) -> None:
-    """Прогреть кэш пиров; сорвавшийся прогрев подъёма не отменяет.
+async def _read_dialogs(bot) -> None:
+    """Прочитать список переписок; сорвавшееся чтение подъёма не отменяет.
 
-    Чем греют, знает адаптер Pyrogram. Здесь решается только судьба неудачи:
-    без прогрева приложение работает так же, как работало до него, и ронять
-    из-за этого подъём нечем — а без соединения не работает вовсе ничего.
+    Список ложится на бота: по нему правится догон, и он же попутно прогревает
+    кэш пиров. Чем читают, знает адаптер Pyrogram; здесь решается только судьба
+    неудачи. Пустой список значит «не знаем» — догон тогда идёт по всем
+    известным собеседникам, как ходил раньше: медленно, но не мимо.
     """
     try:
-        await telegram.warm_peer_cache(bot.client)
+        bot.dialogs = await telegram.list_dialog_peers(bot.client)
     except Exception:
-        logger.exception("peer cache warm-up failed")
+        logger.exception("dialog list read failed")
 
 
 async def _connect(bot) -> None:
@@ -69,9 +70,9 @@ async def _connect(bot) -> None:
     # свежая строка после первого входа дорога — оборвись приложение в эти
     # секунды, человек входил бы по коду заново.
     await persist_session_if_changed(bot)
-    # Прогрев — до объявления готовности: окно, узнавшее о готовом боте, шлёт
-    # письма сразу, а по холодному кэшу они падают.
-    await _warm_peer_cache(bot)
+    # До объявления готовности: окно, узнавшее о готовом боте, шлёт письма
+    # сразу, а по холодному кэшу они падают.
+    await _read_dialogs(bot)
     # ``bot.loop`` ставим ПОСЛЕ client.start() — это и метка
     # «бот готов принимать kick/cancel из потока окна», и сам loop
     # для thread-safe методов. До этого момента kick/cancel/
@@ -118,6 +119,7 @@ def _spawn_catch_up(bot) -> None:
             bot.ingestion.dm_helpers(),
             bot.ingestion.dm_hooks(),
             backfill_limit=bot.rs.dm_backfill_limit,
+            dialogs=bot.dialogs,
         )
 
     bot.ingestion.spawn_backfill(work, "dm catch-up")

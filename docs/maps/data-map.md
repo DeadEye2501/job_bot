@@ -279,6 +279,9 @@
 - `_TG_USERNAME_RE` = `re.compile('^[A-Za-z][A-Za-z0-9_]{4,31}$')`
 - `_TG_TYPED_USERNAME_RE` = `re.compile('^[A-Za-z][A-Za-z0-9_]{3,31}$')`
 - `_TG_RESERVED_PATHS` = `набор из 6`
+- `class DialogPeer`
+  - `peer_id: int`
+  - `username: str | None` = `None`
 
 ### `backend/domain/transitions.py`
 

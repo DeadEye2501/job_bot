@@ -23,7 +23,7 @@ import pytest
 from pyrogram import raw
 
 import adapters.telegram
-from adapters.telegram import make_client, send_dm, warm_peer_cache
+from adapters.telegram import list_dialog_peers, make_client, send_dm
 from tests.factories import tg_creds
 from tests.fakes.telegram import FakeTelegramClient
 from config import get_data_dir
@@ -219,8 +219,8 @@ def _raw_message(peer_id: int, message_id: int, *, date: int):
     )
 
 
-async def test_the_warm_up_walks_every_page_of_the_dialog_list():
-    """Прогрев доходит до последней переписки, а не до конца первой страницы.
+async def test_the_reading_walks_every_page_of_the_dialog_list():
+    """Чтение доходит до последней переписки, а не до конца первой страницы.
 
     Закладку он ставит по верхнему письму последней переписки страницы, а
     искать то письмо надо парой «переписка и номер»: в ответе лежат верхние
@@ -230,27 +230,27 @@ async def test_the_warm_up_walks_every_page_of_the_dialog_list():
     """
     server = DialogServer([11, 22, 33, 44, 55], page=2)
 
-    await warm_peer_cache(server)
+    found = await list_dialog_peers(server)
 
-    assert server.warmed == [11, 22, 33, 44, 55]
+    assert [peer.peer_id for peer in found] == [11, 22, 33, 44, 55]
 
 
-async def test_the_warm_up_ends_when_the_bookmark_cannot_move(caplog):
-    """Прогрев кончается, когда закладку поставить не по чему, и говорит об этом.
+async def test_the_reading_ends_when_the_bookmark_cannot_move(caplog):
+    """Чтение кончается, когда закладку поставить не по чему, и говорит об этом.
 
     Верхнего письма в ответе может не оказаться вовсе — у стёртого письма
     Telegram кладёт `messageEmpty`, у пустой переписки номер нулевой. Нулевая
-    закладка значит «с самого верха», и без сторожа прогрев ходил бы по кругу
+    закладка значит «с самого верха», и без сторожа проход ходил бы по кругу
     в подъёме, до объявления готовности.
 
-    Молчать при этом нельзя: прогретой окажется одна страница из многих, а
-    остальные собеседники так и останутся неразрешимыми по номеру.
+    Молчать при этом нельзя: прочитанной окажется одна страница из многих, и
+    остальные переписки не будут ни прогреты, ни догнаны.
     """
     server = DialogServer([11, 22, 33, 44], page=2, topless={11, 22})
 
     with caplog.at_level(logging.WARNING):
-        await warm_peer_cache(server)
+        await list_dialog_peers(server)
 
     assert server.warmed == [11, 22]
-    assert "прогрев" in caplog.text.lower()
+    assert "список переписок кончился" in caplog.text
 
