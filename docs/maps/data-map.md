@@ -1431,6 +1431,10 @@
 
 - `_HOTTEST_FIRST` = `набор из 11`
 
+### `tests/backend/test_telegram_adapter.py`
+
+- `_ALIEN_PEER` = `9999`
+
 ### `tests/backend/test_telegram_time.py`
 
 - `_TS` = `1755500000.0`
@@ -1483,7 +1487,6 @@
 
 ### `tests/fakes/ingestion.py`
 
-- `logger` = `logging.getLogger(__name__)`
 - `class FakeIngestion`
   - `_OWN` = `object()`
 

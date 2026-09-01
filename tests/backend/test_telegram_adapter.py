@@ -15,12 +15,15 @@
 о прочтении, и без него у исходящей строки нечему совпасть.
 """
 
+import logging
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from pyrogram import raw
 
 import adapters.telegram
-from adapters.telegram import make_client, send_dm
+from adapters.telegram import make_client, send_dm, warm_peer_cache
 from tests.factories import tg_creds
 from tests.fakes.telegram import FakeTelegramClient
 from config import get_data_dir
@@ -138,3 +141,116 @@ async def test_the_guard_stops_an_attachment_too(monkeypatch):
 
     assert await send_dm(client, "maria", "письмо", Path("Резюме.pdf")) is None
     assert client.outgoing == []
+
+
+class DialogServer:
+    """Telegram, отдающий список переписок постранично — как настоящий.
+
+    Закладку следующей страницы он читает из `offset_date`, и нулевая для него
+    значит «с самого верха». На этом и держится случай, ради которого у
+    прогрева стоит сторож продвижения: не найди тот времени верхнего письма —
+    попросил бы ту же первую страницу заново.
+
+    `topless` — переписки, чьё верхнее письмо в ответ не кладётся. Так Telegram
+    отвечает про стёртое письмо и про пустую переписку.
+    """
+
+    def __init__(self, peers, *, page=2, topless=()):
+        self.peers = list(peers)
+        self.page = page
+        self.topless = set(topless)
+        self.warmed: list[int] = []
+        # Время у переписок убывает: свежие впереди, как их и отдаёт Telegram.
+        self.dates = {peer: 1000 - at for at, peer in enumerate(self.peers)}
+
+    async def invoke(self, query, **_options):
+        start = 0
+        if query.offset_date:
+            after = [p for p, d in self.dates.items() if d == query.offset_date]
+            start = self.peers.index(after[0]) + 1 if after else 0
+        page = self.peers[start : start + self.page]
+        self.warmed.extend(page)
+        return SimpleNamespace(
+            dialogs=[_raw_dialog(peer) for peer in page],
+            messages=self._messages(page),
+            users=[],
+            chats=[],
+        )
+
+    def _messages(self, page):
+        """Верхние письма страницы, а перед ними — чужое с тем же номером.
+
+        Чужое стоит первым нарочно: номера у переписок не сквозные, и поиск
+        письма по одному номеру нашёл бы именно его.
+        """
+        if not page:
+            return []
+        alien = _raw_message(_ALIEN_PEER, page[-1], date=1)
+        own = [
+            _raw_message(peer, peer, date=self.dates[peer])
+            for peer in page
+            if peer not in self.topless
+        ]
+        return [alien, *own]
+
+    async def resolve_peer(self, peer_id):
+        return raw.types.InputPeerUser(user_id=peer_id, access_hash=0)
+
+
+_ALIEN_PEER = 9999
+
+
+def _raw_dialog(peer_id: int):
+    return raw.types.Dialog(
+        peer=raw.types.PeerUser(user_id=peer_id),
+        top_message=peer_id,
+        read_inbox_max_id=0,
+        read_outbox_max_id=0,
+        unread_count=0,
+        unread_mentions_count=0,
+        unread_reactions_count=0,
+        notify_settings=raw.types.PeerNotifySettings(),
+    )
+
+
+def _raw_message(peer_id: int, message_id: int, *, date: int):
+    return SimpleNamespace(
+        id=message_id, peer_id=raw.types.PeerUser(user_id=peer_id), date=date
+    )
+
+
+async def test_the_warm_up_walks_every_page_of_the_dialog_list():
+    """Прогрев доходит до последней переписки, а не до конца первой страницы.
+
+    Закладку он ставит по верхнему письму последней переписки страницы, а
+    искать то письмо надо парой «переписка и номер»: в ответе лежат верхние
+    письма всей страницы, счётчик номеров у каждой переписки свой, и по
+    одному номеру находится первое попавшееся чужое. С чужой закладкой вторая
+    страница приходит не той.
+    """
+    server = DialogServer([11, 22, 33, 44, 55], page=2)
+
+    await warm_peer_cache(server)
+
+    assert server.warmed == [11, 22, 33, 44, 55]
+
+
+async def test_the_warm_up_ends_when_the_bookmark_cannot_move(caplog):
+    """Прогрев кончается, когда закладку поставить не по чему, и говорит об этом.
+
+    Верхнего письма в ответе может не оказаться вовсе — у стёртого письма
+    Telegram кладёт `messageEmpty`, у пустой переписки номер нулевой. Нулевая
+    закладка значит «с самого верха», и без сторожа прогрев ходил бы по кругу
+    в подъёме, до объявления готовности.
+
+    Молчать при этом нельзя: прогретой окажется одна страница из многих, а
+    остальные собеседники так и останутся неразрешимыми по номеру.
+    """
+    server = DialogServer([11, 22, 33, 44], page=2, topless={11, 22})
+
+    with caplog.at_level(logging.WARNING):
+        await warm_peer_cache(server)
+
+    assert server.warmed == [11, 22]
+    assert "прогрев" in caplog.text.lower()
+
