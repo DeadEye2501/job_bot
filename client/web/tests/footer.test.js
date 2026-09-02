@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { allAlive, blockedTip, downNames } from '../state/health.js';
+import { allAlive, blockedTip, downNames, shouldTurnOff } from '../state/health.js';
 import { modeChosen } from '../state/modes.js';
 import { bar, caption, countlessNote } from '../state/progress.js';
 
@@ -44,6 +44,23 @@ describe('здоровье систем', () => {
       .toContain('DB');
   });
 
+  it('система отвалилась — работающего бота гасят', () => {
+    // Бот против мёртвой системы крутит обороты впустую и копит отказы, а
+    // тумблер в этот миг уже заперт и человек его не выключит.
+    expect(shouldTurnOff({ db: true, tg: false, chat: true, embed: true }, 'Full')).toBe(true);
+  });
+
+  it('уже выключенного гасить нечем', () => {
+    // Часы здоровья бьют каждые пять секунд. Гаси мы выключенного, каждый удар
+    // слал бы мосту set_mode заново — а на сломанном мосту это ещё и плашка
+    // отказа раз в пять секунд поверх той, по которой человек ищет причину.
+    expect(shouldTurnOff({ db: false, tg: false, chat: false, embed: false }, 'Off')).toBe(false);
+  });
+
+  it('живо всё — режим не трогают', () => {
+    // Иначе окно выключало бы бота само себе на ровном месте.
+    expect(shouldTurnOff({ db: true, tg: true, chat: true, embed: true }, 'Full')).toBe(false);
+  });
 });
 
 /** Нажатие мышью: место на дорожке шириной 300 точек. */
