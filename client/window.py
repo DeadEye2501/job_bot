@@ -18,6 +18,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from adapters import db
 from backend.bot.media import MEDIA_DIR
+from backend.models import BotMode
+from backend.repository.bot_mode import write_mode
 from backend.runtime_settings import RuntimeSettings
 from client import raise_window, window_size
 from client.bridge import Api, AsyncRunner, lifespan
@@ -56,8 +58,10 @@ def run_ui() -> int:
     """Открыть окно и держать его, пока человек не закроет.
 
     Порядок сборки значим. Мотор заводится первым — на нём делается всё
-    остальное, включая чтение настроек. Хозяйство поднимается до окна, потому
-    что окну оно нужно поверхностью.
+    остальное, включая чтение настроек. Режим сбрасывается в выключенный до
+    подъёма хозяйства: иначе бот принялся бы за работу раньше, чем человек
+    увидел окно. Хозяйство поднимается до окна, потому что окну оно нужно
+    поверхностью.
     """
     _own_the_taskbar_icon()
     logger.info("окно открывается")
@@ -142,13 +146,16 @@ def _put_out(hub, runner, listening) -> None:
 async def prepare(session_factory) -> RuntimeSettings:
     """Настройки в том виде, в каком окно застаёт их при открытии.
 
-    Режим не трогается: он выбор человека и переживает выход. Сбрасывали его
-    затем, чтобы бот не принялся за работу раньше, чем человек увидит окно, —
-    но работа эта одна, обход каналов, и она идёт только в полном режиме. Ценой
-    же сброса шла переписка: в выключенном боте молчат все обработчики, и
-    оставленный на ночь «только личные» каждое утро оказывался выключенным.
+    Режим сбрасывается в выключенный, каким бы он ни остался со вчера: он
+    переживает выход, и человек, оставивший бота работающим, застал бы обход
+    каналов и ответы HR ещё до того, как окно открылось, — а решает он это
+    каждый раз заново.
     """
-    return await RuntimeSettings.load(session_factory)
+    rs = await RuntimeSettings.load(session_factory)
+    async with session_factory() as session:
+        async with session.begin():
+            await write_mode(session, BotMode.OFF)
+    return rs
 
 
 def _open_runner() -> AsyncRunner:
