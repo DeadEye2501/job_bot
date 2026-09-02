@@ -22,6 +22,9 @@ afterEach(cleanup);
 function bar(health) {
   const asked = [];
   const tips = [];
+  // Плашки полоса показывает не через мост, а через `say`: отказ запертого
+  // тумблера виден только здесь.
+  const said = [];
   // Вести полосе приходят подпиской: сюда складываются обработчики, чтобы
   // проверка могла позвать их так же, как их зовёт мост.
   const handlers = {};
@@ -36,7 +39,7 @@ function bar(health) {
   render(BottomBar, {
     props: {
       ask,
-      say: () => {},
+      say: (text) => said.push(text),
       events: {
         on: (name, handler) => {
           handlers[name] = handler;
@@ -49,7 +52,7 @@ function bar(health) {
       oncontact: () => {},
     },
   });
-  return { asked, tips, handlers };
+  return { asked, tips, said, handlers };
 }
 
 describe('живая нижняя полоса', () => {
@@ -74,29 +77,29 @@ describe('живая нижняя полоса', () => {
     expect(document.body.textContent).toContain('Разбор вставленного объявления…');
   });
 
-  it('погасшая лампочка режим не трогает, а причину называет наверх', async () => {
-    // Режим — выбор человека, и гасить его за него полоса не вправе. Лампочек
-    // четыре, две из них — модели, а переписке модели не нужны вовсе: связь с
-    // LM Studio отваливалась и уносила с собой чаты, которых не касалась.
+  it('гасит бота, когда что-то отвалилось, и называет наверх причину', async () => {
+    // Бот, работающий против мёртвой системы, крутит обороты впустую, а
+    // тумблер в этот миг уже заперт, и человек выключить его не может.
     const { asked, tips } = bar({ db: true, tg: false, chat: true, embed: true });
     await settled();
 
-    expect(asked.some((one) => one.method === 'system.set_mode')).toBe(false);
+    expect(asked.some((one) => one.method === 'system.set_mode' && one.args[0] === 'Off')).toBe(true);
     expect(tips.at(-1)).toContain('TG');
   });
 
-  it('погасшая лампочка тумблер режима не запирает', async () => {
-    // Запертый тумблер при мёртвой лампе — ловушка: пока полоса гасила бота
-    // сама, она её закрывала, а без гашения человек остаётся с работающим
-    // ботом, которого нечем выключить. Режим — его выбор, и запирать выбор
-    // нельзя ни в какую сторону.
-    const { asked } = bar({ db: true, tg: false, chat: true, embed: true });
+  it('запертый тумблер режима не переключает, а объясняет отказ', async () => {
+    // Пока не жива хоть одна система, работать боту нечем, и смена режима
+    // отдала бы человеку тумблер, за которым ничего не происходит. Молчать
+    // при этом нельзя: запертую кнопку жмут именно затем, чтобы узнать почему.
+    const { asked, said } = bar({ db: true, tg: false, chat: true, embed: true });
     await settled();
+    const before = asked.filter((one) => one.method === 'system.set_mode').length;
 
     document.querySelector('.mode-control').click();
     await settled();
 
-    expect(asked.some((one) => one.method === 'system.set_mode')).toBe(true);
+    expect(asked.filter((one) => one.method === 'system.set_mode')).toHaveLength(before);
+    expect(said.at(-1)).toContain('TG');
   });
 
   it('при живых системах бота не трогает и подсказку отдаёт пустой', async () => {
