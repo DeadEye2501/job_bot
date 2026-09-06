@@ -15,7 +15,7 @@ from backend.telegram_time import tg_moment
 from backend.flows.dm_classify import classify_and_apply
 from backend.payloads import IncomingMessage, OutgoingMessage, PendingReply
 from backend.repository.hr_identify import find_known_hr
-from backend.repository.hr_identify import find_latest_vacancy_id_for_hr
+from backend.repository.hr_identify import find_last_outgoing_vacancy_id_for_hr
 from backend.repository.hr_identify import refresh_hr_from_telegram
 from backend.repository.hr_identify import resolve_reply_target_vacancy
 from backend.repository.messages import find_outgoing_message
@@ -179,17 +179,18 @@ async def _attributed_vacancy(session, hr_id: int, msg) -> int | None:
     """К какой вакансии относится письмо HR.
 
     Ответ на наше конкретное сообщение говорит это точно: у нашей строки
-    записан номер вакансии. Без ответа берётся самая свежая вакансия
-    этого HR — приближение верное, пока вакансия у него одна, а на пяти
-    оно промахивается: HR пишет про вторую, а мы относим к пятой. Цепочка
-    ответов эту беду и решает.
+    записан номер вакансии. Без цитаты берётся вакансия, о которой мы этому
+    человеку писали последней: разговор с ним начался с нашего отклика, и
+    отвечает он по нему, а не по тому, что успел с тех пор опубликовать.
+
+    Не писали вовсе — привязывать не к чему, и письмо ложится без вакансии.
     """
     reply_to_id = getattr(msg, "reply_to_message_id", None)
     if reply_to_id:
         by_reply = await resolve_reply_target_vacancy(session, hr_id, reply_to_id)
         if by_reply is not None:
             return by_reply
-    return await find_latest_vacancy_id_for_hr(
+    return await find_last_outgoing_vacancy_id_for_hr(
         session, hr_id, as_of=tg_moment(msg.date)
     )
 
@@ -352,6 +353,10 @@ async def process_dm(msg, dm: DmHelpers) -> int | None:
     if new_msg_id is None:
         return None
     if vacancy_id is None:
+        logger.info(
+            "hr %d: письма ему не отправляли, ответ лёг без вакансии",
+            hr_lookup.id,
+        )
         return hr_lookup.id
     v_status = await _status_open_for_reply(dm.session_factory, vacancy_id)
     if v_status is None:

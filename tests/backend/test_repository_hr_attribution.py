@@ -1,95 +1,209 @@
 """Следствия привязки ответа HR к вакансии, о которой он пишет.
 
 Путей два. Если HR ответил цитатой нашего письма, вакансия берётся из этого
-письма. Если написал просто так — из самой свежей его вакансии на момент
-сообщения.
+письма. Если написал просто так — из последнего нашего письма ему.
 """
 
-from backend.repository.hr_identify import find_latest_vacancy_id_for_hr, resolve_reply_target_vacancy
+from backend.repository.hr_identify import find_last_outgoing_vacancy_id_for_hr
+from backend.repository.hr_identify import resolve_reply_target_vacancy
 from tests.dbio import put
 from tests.factories import at, hr_row, message_row, vacancy_row
 
 
-async def test_an_hr_without_vacancies_has_nothing_to_attribute_to(
+REPLIED_AT = at(90)
+"""Когда пришёл ответ HR, к которому ищут вакансию.
+
+Позже всех наших писем в наборах ниже: отсечка по времени — предмет
+отдельной проверки, и в остальных мешать не должна.
+"""
+
+
+async def test_an_hr_we_never_wrote_to_has_nothing_to_attribute_to(
     session, session_factory
 ):
-    """У HR без вакансий привязывать ответ не к чему."""
-    hr = hr_row()
-    await put(session_factory, hr)
+    """Пока мы этому HR не писали, привязывать ответ не к чему.
 
-    assert await find_latest_vacancy_id_for_hr(session, hr.id) is None
-
-
-async def test_attribution_picks_the_freshest_vacancy_by_posting_date(
-    session, session_factory
-):
-    """Ответ привязывается к самой свежей вакансии — по дате публикации.
-
-    Дата публикации у второй строки отсутствует, и вместо неё идёт дата
-    создания, которая позже. Совпадение с порядком по одному лишь созданию
-    этим исключено.
+    Вакансия у него при этом есть: ленту его канала бот разбирает и без
+    нашего отклика. Считай такую строку целью — ответ садился бы на
+    вакансию, о которой мы не написали ни слова.
     """
     hr = hr_row()
     await put(session_factory, hr)
-    fresh = vacancy_row(hr_id=hr.id, created_at=at(10), posted_at=at(50))
-    stale = vacancy_row(hr_id=hr.id, created_at=at(30), posted_at=None)
-    await put(session_factory, fresh, stale)
+    await put(session_factory, vacancy_row(hr_id=hr.id))
 
-    assert await find_latest_vacancy_id_for_hr(session, hr.id) == fresh.id
+    assert await find_last_outgoing_vacancy_id_for_hr(
+        session, hr.id, as_of=REPLIED_AT
+    ) is None
 
 
-async def test_a_vacancy_without_a_posting_date_can_still_be_the_freshest(
+async def test_attribution_follows_our_letter_not_the_freshest_vacancy(
     session, session_factory
 ):
-    """Вакансия без даты публикации выигрывает по дате создания.
+    """Ответ садится на вакансию нашего письма, а не на свежайшую у HR.
 
-    Это вторая половина подстановки, и без неё первая ничего не доказывает:
-    при сортировке по одной лишь дате публикации пустое значение и так
-    уходит в хвост, поэтому прежний набор дал бы тот же ответ без всякой
-    подстановки. Здесь пустое значение обязано выиграть — а уйдя в хвост,
-    проиграет.
+    Вакансия, разобранная после отклика, — обычное дело: тот же человек
+    публикует следующую. Выбирай привязка свежайшую, ответ по вакансии, на
+    которую мы откликались, уходил бы на соседнюю.
     """
     hr = hr_row()
     await put(session_factory, hr)
-    published_long_ago = vacancy_row(hr_id=hr.id, created_at=at(10), posted_at=at(10))
-    created_recently = vacancy_row(hr_id=hr.id, created_at=at(50), posted_at=None)
-    await put(session_factory, published_long_ago, created_recently)
+    written_about = vacancy_row(hr_id=hr.id, created_at=at(10))
+    parsed_later = vacancy_row(hr_id=hr.id, created_at=at(50))
+    await put(session_factory, written_about, parsed_later)
+    await put(
+        session_factory,
+        message_row(
+            hr_id=hr.id, vacancy_id=written_about.id,
+            is_incoming=False, sent_at=at(20),
+        ),
+    )
 
-    assert await find_latest_vacancy_id_for_hr(session, hr.id) == created_recently.id
+    assert await find_last_outgoing_vacancy_id_for_hr(
+        session, hr.id, as_of=REPLIED_AT
+    ) == written_about.id
 
 
-async def test_an_unparsed_vacancy_is_never_the_attribution_target(
-    session, session_factory
-):
-    """Недоразобранная вакансия целью привязки не становится.
+async def test_the_latest_of_our_letters_is_the_target(session, session_factory):
+    """Из наших писем целью становится последнее по времени отправки.
 
-    Сообщение, пришедшее в окно разбора, иначе перевело бы статус ещё не
-    готовой строки.
+    Позднее письмо кладётся первым нарочно: догон заливает переписку
+    задним числом, и у давнего письма номер строки выходит больше, чем у
+    отправленного позже него. Совпади здесь порядок вставки с ожидаемым,
+    отбор по номеру строки вместо времени прошёл бы молча.
     """
     hr = hr_row()
     await put(session_factory, hr)
-    ready = vacancy_row(hr_id=hr.id, created_at=at(10), is_parsed=True)
-    half = vacancy_row(hr_id=hr.id, created_at=at(50), is_parsed=False)
-    await put(session_factory, ready, half)
+    older = vacancy_row(hr_id=hr.id)
+    newer = vacancy_row(hr_id=hr.id)
+    await put(session_factory, older, newer)
+    await put(
+        session_factory,
+        message_row(
+            hr_id=hr.id, vacancy_id=newer.id, is_incoming=False, sent_at=at(50)
+        ),
+        message_row(
+            hr_id=hr.id, vacancy_id=older.id, is_incoming=False, sent_at=at(10)
+        ),
+    )
 
-    assert await find_latest_vacancy_id_for_hr(session, hr.id) == ready.id
+    assert await find_last_outgoing_vacancy_id_for_hr(
+        session, hr.id, as_of=REPLIED_AT
+    ) == newer.id
 
 
-async def test_a_vacancy_appearing_after_the_message_is_not_its_target(
+async def test_our_letter_to_another_hr_is_not_a_target(session, session_factory):
+    """Письмо, написанное другому человеку, целью не становится.
+
+    Собеседников у нас десятки, и пишем мы им вперемешку. Отвяжись отбор
+    от своего человека — ответ садился бы на вакансию, о которой мы
+    говорили с кем-то другим; беда вышла бы громче исходной, а заметить
+    её было бы нечем.
+    """
+    ours = hr_row()
+    stranger = hr_row()
+    await put(session_factory, ours, stranger)
+    mine = vacancy_row(hr_id=ours.id)
+    theirs = vacancy_row(hr_id=stranger.id)
+    await put(session_factory, mine, theirs)
+    await put(
+        session_factory,
+        message_row(
+            hr_id=ours.id, vacancy_id=mine.id, is_incoming=False, sent_at=at(10)
+        ),
+        message_row(
+            hr_id=stranger.id, vacancy_id=theirs.id,
+            is_incoming=False, sent_at=at(50),
+        ),
+    )
+
+    assert await find_last_outgoing_vacancy_id_for_hr(
+        session, ours.id, as_of=REPLIED_AT
+    ) == mine.id
+
+
+async def test_our_letter_without_a_vacancy_is_not_a_target(
     session, session_factory
 ):
-    """Вакансия, появившаяся позже сообщения, целью привязки не становится.
+    """Письмо, набранное руками в «Контактах», целью не становится.
 
-    Иначе старое сообщение из догоняющего разбора откатило бы статус
-    только что добавленной вакансии.
+    Номера вакансии у него нет, и привязка обязана дотянуться до письма
+    постарше — иначе разговор о вакансии обрывался бы на первой же строке,
+    написанной из окна переписки.
     """
     hr = hr_row()
     await put(session_factory, hr)
-    before = vacancy_row(hr_id=hr.id, created_at=at(10))
-    after = vacancy_row(hr_id=hr.id, created_at=at(50))
+    vacancy = vacancy_row(hr_id=hr.id)
+    await put(session_factory, vacancy)
+    await put(
+        session_factory,
+        message_row(
+            hr_id=hr.id, vacancy_id=vacancy.id, is_incoming=False, sent_at=at(10)
+        ),
+        message_row(
+            hr_id=hr.id, vacancy_id=None, is_incoming=False, sent_at=at(50)
+        ),
+    )
+
+    assert await find_last_outgoing_vacancy_id_for_hr(
+        session, hr.id, as_of=REPLIED_AT
+    ) == vacancy.id
+
+
+async def test_a_letter_of_the_hr_is_not_a_target(session, session_factory):
+    """Письмо самого HR целью не становится: считаются только наши.
+
+    Номер вакансии у входящего письма стоит — его проставила эта самая
+    привязка, когда письмо записывали. Считай мы такие строки, привязка
+    читала бы собственный прошлый ответ вместо нашего письма и держалась
+    бы за него, даже когда мы написали о другой вакансии.
+    """
+    hr = hr_row()
+    await put(session_factory, hr)
+    ours = vacancy_row(hr_id=hr.id)
+    theirs = vacancy_row(hr_id=hr.id)
+    await put(session_factory, ours, theirs)
+    await put(
+        session_factory,
+        message_row(
+            hr_id=hr.id, vacancy_id=ours.id, is_incoming=False, sent_at=at(10)
+        ),
+        message_row(
+            hr_id=hr.id, vacancy_id=theirs.id, is_incoming=True, sent_at=at(50)
+        ),
+    )
+
+    assert await find_last_outgoing_vacancy_id_for_hr(
+        session, hr.id, as_of=REPLIED_AT
+    ) == ours.id
+
+
+async def test_a_letter_sent_after_the_message_is_not_its_target(
+    session, session_factory
+):
+    """Наше письмо, ушедшее позже ответа HR, целью для него не становится.
+
+    Догон читает переписку задним числом, и старый ответ иначе садился бы
+    на вакансию, о которой мы написали уже после него.
+    """
+    hr = hr_row()
+    await put(session_factory, hr)
+    before = vacancy_row(hr_id=hr.id)
+    after = vacancy_row(hr_id=hr.id)
     await put(session_factory, before, after)
+    await put(
+        session_factory,
+        message_row(
+            hr_id=hr.id, vacancy_id=before.id, is_incoming=False, sent_at=at(10)
+        ),
+        message_row(
+            hr_id=hr.id, vacancy_id=after.id, is_incoming=False, sent_at=at(50)
+        ),
+    )
 
-    assert await find_latest_vacancy_id_for_hr(session, hr.id, as_of=at(30)) == before.id
+    assert await find_last_outgoing_vacancy_id_for_hr(
+        session, hr.id, as_of=at(30)
+    ) == before.id
+
 
 async def test_a_reply_points_at_the_vacancy_of_the_letter_it_quotes(
     session, session_factory

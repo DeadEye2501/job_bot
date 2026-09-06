@@ -2,9 +2,9 @@
 
 У одного HR бывает несколько вакансий, и по тексту «да, давайте» не понять, о
 какой он. Если HR ответил через ответ на конкретное наше сообщение — вакансия
-известна точно: она записана у того сообщения. Без ответа берётся самая свежая
-вакансия этого HR на момент письма — приближение, но для одного HR с одной
-вакансией оно верное всегда.
+известна точно: она записана у того сообщения. Без ответа берётся вакансия, о
+которой мы этому человеку писали последней: разговор с ним начался с нашего
+отклика.
 
 Дальше письмо либо уходит в накопитель на отложенный разбор, либо разбирается
 на месте. Вакансия, из состояния которой автоматика уже не двигает, до разбора
@@ -24,31 +24,70 @@ from tests.fakes.telegram_objects import TG_EPOCH, incoming, message, user
 
 
 async def _two_vacancies(session_factory):
-    """HR с двумя вакансиями: старой и свежей.
+    """HR с двумя вакансиями, и о каждой мы ему писали — о «последней» позже.
 
-    Свежая заводится первой, чтобы порядок вставки не совпал с
-    ожидаемым: иначе «самую свежую» нельзя было бы отличить от
-    «последней записанной».
+    Письмо без цитаты относят к «последней». «Прежняя» лежит рядом затем,
+    чтобы цитате было куда указать иначе, чем умолчанию: укажи обе на одну
+    вакансию, и отбор по номеру письма прошёл бы молча.
+
+    «Прежняя» при этом свежее по времени появления, хотя писали о ней
+    раньше: так у человека и выходит — он публикует следующую вакансию,
+    пока мы ждём ответа по предыдущей. Совпади «та, о которой писали
+    последней» со «свежайшей у человека», набор одинаково устраивал бы и
+    прежний, снятый отбор.
     """
     await put(session_factory, hr_row(telegram_user_id=777))
     hr = await only_row(session_factory, HR)
     await put(
         session_factory,
         vacancy_row(
-            title="свежая",
-            hr_id=hr.id,
-            status=VacancyStatus.APPLIED,
-            created_at=at(-60),
+            title="прежняя", hr_id=hr.id,
+            status=VacancyStatus.APPLIED, created_at=at(-30),
         ),
         vacancy_row(
-            title="старая",
-            hr_id=hr.id,
-            status=VacancyStatus.APPLIED,
-            created_at=at(-120),
+            title="последняя", hr_id=hr.id,
+            status=VacancyStatus.APPLIED, created_at=at(-150),
         ),
     )
     by_title = {v.title: v for v in await all_rows(session_factory, Vacancy)}
+    await put(
+        session_factory,
+        message_row(
+            hr_id=hr.id, vacancy_id=by_title["последняя"].id,
+            is_incoming=False, tg_message_id=101, sent_at=at(-60),
+        ),
+        message_row(
+            hr_id=hr.id, vacancy_id=by_title["прежняя"].id,
+            is_incoming=False, tg_message_id=100, sent_at=at(-120),
+        ),
+    )
     return hr, by_title
+
+
+async def _one_vacancy(session_factory, *, title, status):
+    """HR с одной вакансией, о которой мы ему уже писали.
+
+    Наше письмо здесь не украшение: ответ без цитаты привязывают по нему.
+    Без него письмо HR легло бы вовсе без вакансии — и до заслонов с
+    разбором дело не дошло бы, а проверяют здесь именно их.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777))
+    hr = await only_row(session_factory, HR)
+    await put(session_factory, vacancy_row(title=title, hr_id=hr.id, status=status))
+    vacancy = await only_row(session_factory, Vacancy)
+    await put(
+        session_factory,
+        message_row(
+            hr_id=hr.id, vacancy_id=vacancy.id,
+            is_incoming=False, tg_message_id=100, sent_at=at(-60),
+        ),
+    )
+    return hr, vacancy
+
+
+async def _their_letters(session_factory) -> list:
+    """Письма HR из переписки: наши лежат там же, и читать надо не их."""
+    return [m for m in await all_rows(session_factory, Message) if m.is_incoming]
 
 
 def _ignore(*args):
@@ -65,88 +104,95 @@ async def test_a_reply_lands_on_the_vacancy_it_answers(session_factory, deliver)
     Это единственный точный способ: у HR может быть пять вакансий, и по
     тексту «да, давайте» не понять, о которой он.
     """
-    hr, by_title = await _two_vacancies(session_factory)
-    await put(
-        session_factory,
-        message_row(
-            hr_id=hr.id,
-            vacancy_id=by_title["старая"].id,
-            is_incoming=False,
-            tg_message_id=100,
-        ),
-    )
+    _, by_title = await _two_vacancies(session_factory)
 
     await deliver(
         incoming(text="да, давайте", reply_to_message_id=100), schedule=_ignore
     )
 
-    saved = [m for m in await all_rows(session_factory, Message) if m.is_incoming]
-    assert [m.vacancy_id for m in saved] == [by_title["старая"].id]
+    saved = await _their_letters(session_factory)
+    assert [m.vacancy_id for m in saved] == [by_title["прежняя"].id]
 
 
-async def test_a_letter_without_a_reply_lands_on_the_freshest(session_factory, deliver):
-    """Письмо без ответа относится к самой свежей вакансии этого HR.
+async def test_a_letter_without_a_reply_lands_on_what_we_wrote_about(
+    session_factory, deliver
+):
+    """Письмо без цитаты относится к вакансии последнего нашего письма.
 
-    Приближение, но для одного HR с одной вакансией верное всегда, а
-    цепочку ответов HR соблюдает не каждый.
+    Цепочку ответов HR соблюдает не каждый, а разговор с ним всё равно
+    начался с нашего отклика — по нему он и отвечает.
     """
-    hr, by_title = await _two_vacancies(session_factory)
+    _, by_title = await _two_vacancies(session_factory)
 
     await deliver(incoming(text="да, давайте"), schedule=_ignore)
 
-    assert (await only_row(session_factory, Message)).vacancy_id == by_title["свежая"].id
+    saved = await _their_letters(session_factory)
+    assert [m.vacancy_id for m in saved] == [by_title["последняя"].id]
 
 
 async def test_the_letter_time_is_read_in_our_scale(session_factory, deliver):
-    """Свежесть вакансии считается по времени письма, приведённому к нашей шкале.
+    """Время письма сверяют с нашими письмами, приведя к нашей же шкале.
 
     Отбор сравнивает его с колонками базы, а те наивные и по UTC. Метка от
     Telegram живёт по другим часам, и без приведения граница «на момент
-    письма» уезжает на смещение пояса: письмо относят к вакансии, которой в
-    ту минуту ещё не было.
+    письма» уезжает на смещение пояса: ответ относят к вакансии, о которой
+    в ту минуту ещё не написали.
 
     Метка взята с поясом нарочно: на машине, живущей по UTC, приведённая и
     сырая совпали бы, и проверка молчала бы вместе с бедой. Письмо помечено
-    между двумя вакансиями, так что промах виден по тому, к какой из них его
+    между двумя нашими, так что промах виден по тому, к какой вакансии его
     отнесли.
     """
-    await put(session_factory, hr_row(telegram_user_id=777))
-    hr = await only_row(session_factory, HR)
-    await put(
-        session_factory,
-        vacancy_row(
-            title="свежая", hr_id=hr.id,
-            status=VacancyStatus.APPLIED, created_at=at(-60),
-        ),
-        vacancy_row(
-            title="старая", hr_id=hr.id,
-            status=VacancyStatus.APPLIED, created_at=at(-120),
-        ),
-    )
-    by_title = {v.title: v for v in await all_rows(session_factory, Vacancy)}
+    _, by_title = await _two_vacancies(session_factory)
     stamped = at(-90).replace(tzinfo=timezone.utc).astimezone(
         timezone(timedelta(hours=5))
     )
 
     await deliver(incoming(text="да, давайте", date=stamped), schedule=_ignore)
 
-    saved = [m for m in await all_rows(session_factory, Message) if m.is_incoming]
-    assert [m.vacancy_id for m in saved] == [by_title["старая"].id]
+    saved = await _their_letters(session_factory)
+    assert [m.vacancy_id for m in saved] == [by_title["прежняя"].id]
 
 
-async def test_a_reply_to_something_unknown_falls_back_to_the_freshest(session_factory, deliver):
-    """Ответ на неизвестное сообщение относят к самой свежей вакансии.
+async def test_a_reply_to_something_unknown_falls_back_to_what_we_wrote_about(
+    session_factory, deliver
+):
+    """Ответ на неизвестное сообщение относят к вакансии нашего письма.
 
     Переписка могла начаться до появления приложения — тогда нашей
     строки об исходном сообщении просто нет.
     """
-    hr, by_title = await _two_vacancies(session_factory)
+    _, by_title = await _two_vacancies(session_factory)
 
     await deliver(
         incoming(text="да, давайте", reply_to_message_id=999), schedule=_ignore
     )
 
-    assert (await only_row(session_factory, Message)).vacancy_id == by_title["свежая"].id
+    saved = await _their_letters(session_factory)
+    assert [m.vacancy_id for m in saved] == [by_title["последняя"].id]
+
+
+async def test_a_letter_from_an_hr_we_never_wrote_to_lands_without_a_vacancy(
+    session_factory, deliver
+):
+    """Письмо HR, которому мы не писали, ложится без вакансии.
+
+    Вакансия у него при этом есть: ленту его канала бот разбирает и без
+    нашего отклика. Сядь ответ на неё, разговор оказался бы привязан к
+    строке, о которой мы не написали ни слова, — а ей чаще всего оказывается
+    отклонённая, и до разбора письмо не дошло бы вовсе.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777))
+    hr = await only_row(session_factory, HR)
+    await put(
+        session_factory,
+        vacancy_row(title="разобрана сама", hr_id=hr.id, status=VacancyStatus.NOT_FIT),
+    )
+
+    await deliver(incoming(text="да, давайте"), schedule=_ignore)
+
+    saved = await _their_letters(session_factory)
+    assert [m.vacancy_id for m in saved] == [None]
 
 
 async def test_a_letter_from_an_hr_without_vacancies_is_still_saved(session_factory, deliver):
@@ -187,12 +233,12 @@ async def test_a_letter_is_handed_to_the_buffer_when_there_is_one(session_factor
     )
 
     saved = (await all_rows(session_factory, Message))[-1]
-    assert saved.id != by_title["свежая"].id
+    assert saved.id != by_title["последняя"].id
     assert scheduled == [
         (
             hr.id,
             PendingReply(
-                vacancy_id=by_title["свежая"].id,
+                vacancy_id=by_title["последняя"].id,
                 message_id=saved.id,
                 tg_message_id=saved.tg_message_id,
                 text="да, давайте",
@@ -211,16 +257,8 @@ async def test_a_letter_about_a_new_vacancy_reaches_no_reader(
     объявляло бы отклик ушедшим, и кнопка отправки запиралась бы на вакансии,
     по которой мы не написали ни строки.
     """
-    await put(session_factory, hr_row(telegram_user_id=777))
-    hr = await only_row(session_factory, HR)
-    await put(
-        session_factory,
-        vacancy_row(
-            title="ещё не откликались",
-            hr_id=hr.id,
-            status=VacancyStatus.NEW,
-            created_at=at(-60),
-        ),
+    await _one_vacancy(
+        session_factory, title="ещё не откликались", status=VacancyStatus.NEW
     )
     scheduled: list[tuple] = []
 
@@ -230,7 +268,8 @@ async def test_a_letter_about_a_new_vacancy_reaches_no_reader(
     )
 
     assert scheduled == []
-    assert (await only_row(session_factory, Message)).text == "здравствуйте, вы откликались?"
+    saved = await _their_letters(session_factory)
+    assert [m.text for m in saved] == ["здравствуйте, вы откликались?"]
 
 
 async def test_a_vacancy_beyond_automation_reaches_no_reader(session_factory, deliver):
@@ -239,19 +278,8 @@ async def test_a_vacancy_beyond_automation_reaches_no_reader(session_factory, de
     Сообщение при этом сохраняется: оно след разговора, и терять его
     из-за статуса вакансии незачем.
     """
-    await put(
-        session_factory,
-        hr_row(telegram_user_id=777),
-    )
-    hr = await only_row(session_factory, HR)
-    await put(
-        session_factory,
-        vacancy_row(
-            title="отказали",
-            hr_id=hr.id,
-            status=VacancyStatus.DECLINE,
-            created_at=at(-60),
-        ),
+    await _one_vacancy(
+        session_factory, title="отказали", status=VacancyStatus.DECLINE
     )
     scheduled: list[tuple] = []
 
@@ -261,7 +289,8 @@ async def test_a_vacancy_beyond_automation_reaches_no_reader(session_factory, de
     )
 
     assert scheduled == []
-    assert (await only_row(session_factory, Message)).text == "да, давайте"
+    saved = await _their_letters(session_factory)
+    assert [m.text for m in saved] == ["да, давайте"]
 
 
 async def test_a_letter_about_a_vanished_vacancy_does_not_break_the_intake(
@@ -278,13 +307,9 @@ async def test_a_letter_about_a_vanished_vacancy_does_not_break_the_intake(
     Запись в журнале сверяется потому, что без неё «разбора не было»
     держалось бы на пустом клиенте модели в стенде, а не на заслоне.
     """
-    await put(session_factory, hr_row(telegram_user_id=777))
-    hr = await only_row(session_factory, HR)
-    await put(
-        session_factory,
-        vacancy_row(title="к отклику", hr_id=hr.id, status=VacancyStatus.APPLIED),
+    _, vacancy = await _one_vacancy(
+        session_factory, title="к отклику", status=VacancyStatus.APPLIED
     )
-    vacancy = await only_row(session_factory, Vacancy)
 
     async def save_and_lose_the_vacancy(session, incoming):
         saved = await save_incoming_message(session, incoming)
@@ -298,7 +323,8 @@ async def test_a_letter_about_a_vanished_vacancy_does_not_break_the_intake(
     with caplog.at_level(logging.INFO, logger="backend.flows.dm"):
         await deliver(incoming(text="да, давайте"), schedule=None)
 
-    assert (await only_row(session_factory, Message)).text == "да, давайте"
+    saved = await _their_letters(session_factory)
+    assert [m.text for m in saved] == ["да, давайте"]
     assert await all_rows(session_factory, Vacancy) == []
     assert [
         rec.getMessage() for rec in caplog.records if rec.name == "backend.flows.dm"
@@ -311,19 +337,8 @@ async def test_without_a_buffer_the_letter_is_read_on_the_spot(session_factory, 
     Этим путём идут догон пропущенного и запасной случай, когда
     планировщика не передали.
     """
-    await put(
-        session_factory,
-        hr_row(telegram_user_id=777),
-    )
-    hr = await only_row(session_factory, HR)
-    await put(
-        session_factory,
-        vacancy_row(
-            title="к отклику",
-            hr_id=hr.id,
-            status=VacancyStatus.APPLIED,
-            created_at=at(-60),
-        ),
+    await _one_vacancy(
+        session_factory, title="к отклику", status=VacancyStatus.APPLIED
     )
     asked: list[str] = []
 
@@ -347,29 +362,26 @@ async def test_without_a_buffer_the_letter_is_read_on_the_spot(session_factory, 
 
 
 async def test_a_reader_without_a_verdict_leaves_the_vacancy_alone(session_factory, monkeypatch, deliver):
-    """Разбор без вердикта вакансию не двигает."""
-    await put(
-        session_factory,
-        hr_row(telegram_user_id=777),
+    """Разбор без вердикта вакансию не двигает.
+
+    Обращения к разборщику считаются здесь наравне со статусом: не спроси
+    его вовсе — вакансия осталась бы на месте точно так же, и проверка
+    молчала бы о письме, не дошедшем до разбора.
+    """
+    await _one_vacancy(
+        session_factory, title="к отклику", status=VacancyStatus.APPLIED
     )
-    hr = await only_row(session_factory, HR)
-    await put(
-        session_factory,
-        vacancy_row(
-            title="к отклику",
-            hr_id=hr.id,
-            status=VacancyStatus.APPLIED,
-            created_at=at(-60),
-        ),
-    )
+    asked: list[str] = []
 
     async def classify_hr_reply(text, status, client, model):
+        asked.append(text)
         return None, None
 
     monkeypatch.setattr("backend.flows.dm_classify.classify_hr_reply", classify_hr_reply)
 
     await deliver(incoming(text="да, давайте"), schedule=None)
 
+    assert asked == ["да, давайте"]
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
 
 
@@ -380,7 +392,7 @@ async def test_the_quote_of_our_own_letter_does_not_go_to_the_reader(session_fac
     отвечает, — так читается разговор. Но разбирать эту цитату нельзя:
     в ней наш собственный текст, и модель приняла бы его за слова HR.
     """
-    hr, by_title = await _two_vacancies(session_factory)
+    await _two_vacancies(session_factory)
     scheduled: list[tuple] = []
     quoted = message(
         id=10,
@@ -395,6 +407,6 @@ async def test_the_quote_of_our_own_letter_does_not_go_to_the_reader(session_fac
 
     await deliver(quoted, schedule=lambda *a: scheduled.append(a))
 
-    saved = await only_row(session_factory, Message)
-    assert saved.text.startswith("↪ Откликаюсь на вакансию")
+    saved = await _their_letters(session_factory)
+    assert saved[0].text.startswith("↪ Откликаюсь на вакансию")
     assert scheduled[0][1].text == "да, давайте"
