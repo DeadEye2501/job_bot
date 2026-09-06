@@ -3,12 +3,11 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import HR, Message, Vacancy
+from backend.models import HR, Message
 from backend.repository.hr_card import carry_hr_marks, hr_blacklist_candidates
-from backend.repository.vacancies_common import PARSED_ONLY, VACANCY_APPEARED_AT
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +21,18 @@ HAS_TELEGRAM_IDENTITY = or_(
 что согласны они сегодня лишь тем, что никто не забыл вторую половину «или».
 Забудь её один из двоих — и человек, известный только ником, попал бы в
 подсказки отсева, но выпал из догона переписки, либо наоборот.
+"""
+
+
+OUR_LETTER_ABOUT_A_VACANCY = and_(
+    ~Message.is_incoming, Message.vacancy_id.is_not(None)
+)
+"""Отбор «письмо написали мы, и написали о вакансии».
+
+Одно объявление на двоих — привязку ответа и счёт прежних откликов, — и
+согласны они ровно тем, что оба вычёркивают письма, набранные руками в окне
+переписки: номера вакансии у тех нет. Разойдись эти двое, и привязка считала
+бы разговором то, чего отправка откликом не признаёт.
 """
 
 
@@ -67,44 +78,46 @@ async def find_known_hr(
     return hr
 
 
-async def find_latest_vacancy_id_for_hr(
+async def find_last_outgoing_vacancy_id_for_hr(
     session: AsyncSession,
     hr_id: int,
     *,
-    as_of: datetime | None = None,
+    as_of: datetime,
 ) -> int | None:
-    """Самая свежая вакансия, привязанная к HR — по posted_at (с fallback на
-    created_at, когда posted_at null'нут). Используется для атрибуции HR-
-    ответов: если HR пишет нам, считаем что он реагирует на самую свежую
-    из его вакансий, независимо от того, отправляли ли мы ему отклик через
-    бот (юзер мог написать с телефона/из десктопа).
+    """Вакансия, о которой мы этому HR писали последней.
 
-    ``as_of`` — таймстемп сообщения HR'а. Вакансии, появившиеся ПОЗЖЕ него,
-    отбрасываются: иначе старое сообщение из catch-up может «откатить
-    статус» только-что добавленной вакансии (time-travel). Также берутся
-    только полностью распаршенные вакансии (``is_parsed=True``), чтобы
-    DM в parse-window не флипнул статус ещё не готовой строки.
+    Ею и привязывается ответ, пришедший без цитаты. Не свежайшей вакансией
+    человека: ленту его канала бот разбирает и без нашего отклика, и почти
+    всякий раз к мигу ответа у него уже лежит вакансия свежее той, на
+    которую мы откликались. Севший на неё ответ пропадает — разобранная
+    вакансия чаще всего оказывается отклонённой, а отклонённую заслон
+    автоматики не двигает, и письмо со словами «вакансию мы закрыли» не
+    доходит даже до модели.
 
-    Clock-skew nuance: ``as_of`` приходит от Telegram (msg.date), а
-    ``Vacancy.created_at`` пишется локальным ``func.now()``. Если часы
-    клиента опаздывают относительно Telegram-серверного времени, существует
-    тонкий race с auto-send'ом, который committs и сразу шлёт DM — но в
-    single-user setup (Pyrogram-сессия привязана к ОС-времени) клиентское
-    время и Telegram-серверное обычно синкаются NTP-сервисом, окно
-    рассогласования = единицы секунд. Документировано вместо переключения
-    ``created_at`` на ``msg.date`` исходного поста (которое потребовало
-    бы тащить msg-time через 5 слоёв ingestion'а).
+    Письмо самого HR целью не становится: номер у входящего проставила эта
+    же привязка, и читай она его, то держалась бы за собственный прошлый
+    ответ. Ручное письмо из окна отсеяно отбором (см. его объявление).
+
+    ``as_of`` — время письма HR по Telegram; наши письма, ушедшие позже
+    него, отбрасываются, иначе догон сажал бы старый ответ на вакансию, о
+    которой мы написали уже после него. Шкала у обеих меток одна, наивный
+    UTC, но часы разные: уйди наши вперёд больше, чем собеседник тянул с
+    ответом, и только что отправленное письмо выпадет за границу. На
+    сверенных часах это единицы секунд.
+
+    Порядок — по времени письма, не по номеру строки: догон заливает
+    переписку задним числом, и у давнего письма номер выходит больше.
     """
-    stmt = (
-        select(Vacancy)
-        .where(Vacancy.hr_id == hr_id, PARSED_ONLY)
-        .order_by(VACANCY_APPEARED_AT.desc(), Vacancy.id.desc())
+    return await session.scalar(
+        select(Message.vacancy_id)
+        .where(
+            Message.hr_id == hr_id,
+            OUR_LETTER_ABOUT_A_VACANCY,
+            Message.sent_at <= as_of,
+        )
+        .order_by(Message.sent_at.desc(), Message.id.desc())
         .limit(1)
     )
-    if as_of is not None:
-        stmt = stmt.where(VACANCY_APPEARED_AT <= as_of)
-    latest = (await session.scalars(stmt)).first()
-    return latest.id if latest else None
 
 
 async def count_recent_outgoing_with_vacancy_for_hr(
@@ -128,8 +141,7 @@ async def count_recent_outgoing_with_vacancy_for_hr(
     cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
     stmt = select(func.count(Message.id)).where(
         Message.hr_id == hr_id,
-        ~Message.is_incoming,
-        Message.vacancy_id.is_not(None),
+        OUR_LETTER_ABOUT_A_VACANCY,
         Message.sent_at >= cutoff,
     )
     return (await session.scalar(stmt)) or 0

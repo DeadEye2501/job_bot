@@ -1039,6 +1039,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `HAS_TELEGRAM_IDENTITY` = `or_(HR.telegram_user_id.is_not(None), HR.telegra…`
+- `OUR_LETTER_ABOUT_A_VACANCY` = `and_(~Message.is_incoming, Message.vacancy_id.is…`
 
 ### `backend/repository/messages.py`
 
@@ -1426,6 +1427,10 @@
 ### `tests/backend/test_repository_channel_detail.py`
 
 - `_FUNNEL_SET` = `[VacancyStatus.NOT_FIT] * 2 + [VacancyStatus.SCA…`
+
+### `tests/backend/test_repository_hr_attribution.py`
+
+- `REPLIED_AT` = `at(90)`
 
 ### `tests/backend/test_repository_vacancy_ghosting.py`
 
