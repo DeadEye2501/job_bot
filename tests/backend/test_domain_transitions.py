@@ -127,21 +127,31 @@ def test_the_send_button_revives_a_rejected_vacancy():
 
 @pytest.mark.parametrize(
     "current",
+    [VacancyStatus.NEW, VacancyStatus.SCAM, VacancyStatus.GHOSTING],
+)
+def test_the_send_button_applies_where_no_application_counts(current):
+    """Там, где отклика нет или он ничего не дал, ушедшее письмо и есть отклик."""
+    assert should_apply_status(current, VacancyStatus.APPLIED, force=True)
+
+
+@pytest.mark.parametrize(
+    "current",
     [
-        VacancyStatus.DECLINE,
-        VacancyStatus.OFFER,
-        VacancyStatus.GHOSTING,
+        VacancyStatus.ANSWERED,
+        VacancyStatus.INVITATION,
+        VacancyStatus.TEST,
         VacancyStatus.IN_PROGRESS,
+        VacancyStatus.OFFER,
+        VacancyStatus.DECLINE,
     ],
 )
-def test_the_send_button_moves_an_outcome_already_reached(current):
-    """Ушедшее письмо переводит вакансию в «отклик отправлен» из любого статуса.
+def test_the_send_button_never_rolls_a_vacancy_back_to_applied(current):
+    """С вакансии, ушедшей по воронке дальше, кнопка в «отклик» не откатывает.
 
-    Прежде граф берёг здесь прежний исход, а письмо всё равно уходило: заслон
-    стоял на записи, а не на отправке, — и вакансия оставалась в «оффере» без
-    единой строки о том, что мы написали ещё раз.
+    Человек жмёт отправку, а не меняет статус: письмо там — очередная реплика
+    переписки, а не отклик.
     """
-    assert should_apply_status(current, VacancyStatus.APPLIED, force=True)
+    assert not should_apply_status(current, VacancyStatus.APPLIED, force=True)
 
 
 def test_a_second_send_adds_no_second_applied():

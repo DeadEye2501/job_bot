@@ -176,26 +176,22 @@ async def test_a_manual_send_lifts_a_vacancy_out_of_not_fit(
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
 
 
-async def test_a_manual_send_moves_even_a_later_status(
+async def test_a_manual_send_keeps_a_later_status(
     ready_to_send, session_factory, outbox
 ):
-    """Отправка из окна переводит в «отклик отправлен» и с позднего статуса.
+    """Отправка из окна не откатывает в «отклик отправлен» с позднего статуса.
 
-    Письмо HR ушло, и статус обязан это показать. Прежде вакансия оставалась
-    в приглашении, а в истории не появлялось ни строки — нажимать можно было
-    сколько угодно раз, и каждое нажатие писало HR заново.
+    Человек жмёт отправку, а не меняет статус: после ответа HR письмо —
+    продолжение переписки, и вакансия остаётся там, где стояла.
     """
     bot, hr, vacancy = await ready_to_send(
-        status=VacancyStatus.INVITATION
+        status=VacancyStatus.ANSWERED
     )
 
     await bot.send(hr, "письмо", vacancy_id=vacancy.id, force=True)
 
-    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
-    written = await only_row(session_factory, VacancyStatusHistory)
-    assert written.previous_status is VacancyStatus.INVITATION
-    assert written.status is VacancyStatus.APPLIED
-    assert written.applied is True
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.ANSWERED
+    assert await all_rows(session_factory, VacancyStatusHistory) == []
 
 
 async def test_the_timeline_records_that_an_application_went_out(

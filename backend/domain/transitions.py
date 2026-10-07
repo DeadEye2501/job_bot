@@ -112,6 +112,19 @@ GHOSTING_ELIGIBLE_FROM: frozenset[VacancyStatus] = frozenset(
 )
 
 
+# Откуда нажатие «Отправить отклик» проводит вакансию в Applied поверх графа:
+# статусы, где отклика нет или он ничего не дал. Остальные стоят дальше по
+# воронке, и письмо там — продолжение переписки, а не отклик.
+FORCED_APPLY_FROM: frozenset[VacancyStatus] = frozenset(
+    {
+        VacancyStatus.NEW,
+        VacancyStatus.NOT_FIT,
+        VacancyStatus.SCAM,
+        VacancyStatus.GHOSTING,
+    }
+)
+
+
 def should_apply_status(
     current: VacancyStatus,
     new: VacancyStatus,
@@ -125,18 +138,13 @@ def should_apply_status(
     Ручную UI-смену статуса (`change_vacancy_status`) граф НЕ покрывает —
     она работает напрямую, юзер вправе выставить любой статус.
 
-    `force=True` — нажатие «Отправить отклик» в окне: перевод в APPLIED
-    разрешён из любого статуса. Прежде граф пускал сюда только NEW и NOT_FIT,
-    оберегая Decline и Offer от случайного нажатия, — но письмо-то уходило
-    всё равно: заслон стоял на записи, а не на отправке. Вакансия оставалась
-    в прежнем статусе, в истории не появлялось ни строки, и нажать можно было
-    сколько угодно раз. Раз письмо ушло, статус обязан это показать; беречь
-    прежний статус — работа заслона отправки, а не графа.
-
-    Переход в тот же самый статус не разрешается и под `force`: петель в графе
-    нет, а APPLIED → APPLIED и сказать нечего — статус уже говорит то же самое,
-    что сказала бы новая строка истории.
+    `force=True` — нажатие «Отправить отклик» в окне. Человек жмёт кнопку
+    отправки, а не меняет статус, поэтому поверх графа оно проводит в APPLIED
+    только из `FORCED_APPLY_FROM`: там ушедшее письмо и есть отклик. С
+    вакансии, ушедшей по воронке дальше (Answered, Test, Offer…), письмо —
+    очередная реплика переписки, и откат в APPLIED записал бы то, чего не
+    было; переход там решает обычный граф.
     """
-    if force and new == VacancyStatus.APPLIED and current != VacancyStatus.APPLIED:
+    if force and new == VacancyStatus.APPLIED and current in FORCED_APPLY_FROM:
         return True
     return new in ALLOWED_AUTO_TRANSITIONS[current]
