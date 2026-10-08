@@ -3,9 +3,10 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { PRESETS, blankCreds, fileCreds, presetFor } from '../state/settings.js';
 import {
-  PRESETS, backScreen, cvModes, cvReady, llmTrouble, nextScreen, presetFor, resumeScreen,
-  stepAt, stepMarks,
+  backScreen, cvModes, cvReady, fileTrouble, llmTrouble, nextScreen, resumeScreen, stepAt,
+  stepMarks,
 } from '../state/wizard.js';
 
 describe('номер шага у экрана', () => {
@@ -138,6 +139,23 @@ describe('заслон перед моделью', () => {
   it('заполненное пропускают', () => {
     expect(llmTrouble({ base_url: 'https://api.openai.com/v1', model: 'gpt-4o' })).toBe('');
   });
+
+  it('Claude Code проходит без адреса сервера, но не без модели', () => {
+    // У Claude Code нет сервера: служебное слово вместо адреса заслон не
+    // судит по схеме, а модель нужна, как у всех.
+    expect(llmTrouble({ base_url: 'claude-code', model: 'sonnet' })).toBe('');
+    expect(llmTrouble({ base_url: 'claude-code', model: '' })).toBe('Выберите модель');
+  });
+});
+
+describe('эмбеддинги из файла модели', () => {
+  it('без выбранного файла дальше не пускают', () => {
+    expect(fileTrouble(blankCreds())).toBe('Выберите файл модели');
+  });
+
+  it('выбранный файл пропускают', () => {
+    expect(fileTrouble(fileCreds('d:/models/model.gguf'))).toBe('');
+  });
 });
 
 describe('готовые поставщики', () => {
@@ -155,6 +173,11 @@ describe('готовые поставщики', () => {
     // По отметке человек узнаёт, куда он ходит: подставленный адрес и выбранное
     // имя обязаны совпадать, иначе выбор читается как несделанный.
     expect(presetFor('http://localhost:1234')).toBe('LM Studio');
+  });
+
+  it('Claude по API и через Claude Code узнаются по адресу', () => {
+    expect(presetFor('https://api.anthropic.com')).toBe('Anthropic');
+    expect(presetFor('claude-code')).toBe('Claude Code');
   });
 
   it('незнакомый адрес отмечен как свой, а не как ничей', () => {

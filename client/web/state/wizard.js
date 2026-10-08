@@ -4,6 +4,8 @@
 // Чистые функции: пройденное приходит доводом с моста, наружу уходят отметки и
 // фразы. Ни моста, ни разметки этот файл не знает.
 
+import { addressless, isModelFile } from './settings.js';
+
 /** Экраны по порядку. Приветствие и финал — обложки: шага у них нет, и в
  *  строке шагов они ничего не подсвечивают. */
 const SCREENS = ['welcome', 'telegram', 'chat', 'embed', 'cv', 'done'];
@@ -16,32 +18,6 @@ const STEPS = [
   { screen: 'embed', at: 3, label: 'Сравнение' },
   { screen: 'cv', at: 4, label: 'Резюме' },
 ];
-
-/** Поставщики моделей, чей адрес известен заранее.
- *
- * Адрес подставляется в поле по выбору имени: набирать его руками — первый
- * способ ошибиться в мастере. Первым стоит местный — до него не нужно ничего
- * заводить, и мастер проходится сразу. Адреса, не совпавшего ни с одним из
- * этих, мастер не боится: он и есть «своё».
- */
-export const PRESETS = [
-  { label: 'OpenAI', base_url: 'https://api.openai.com/v1' },
-  { label: 'LM Studio', base_url: 'http://localhost:1234' },
-  { label: 'Ollama', base_url: 'http://localhost:11434' },
-  { label: 'OpenRouter', base_url: 'https://openrouter.ai/api/v1' },
-  { label: 'Custom', base_url: '' },
-];
-
-/** Каким поставщиком отмечен этот адрес.
- *
- * Незнакомый — «своё»: без такого пункта набранный руками адрес оставлял бы
- * выбор пустым, и человек читал бы это как «поставщик не выбран», хотя адрес
- * у него уже вписан.
- */
-export function presetFor(url) {
-  const typed = url.trim();
-  return PRESETS.find((one) => one.base_url && one.base_url === typed)?.label ?? 'Custom';
-}
 
 const SCHEME = /^https?:\/\//;
 
@@ -154,12 +130,20 @@ export function cvReady({ mode, path }) {
 /** Что мешает уйти с шага поставщика дальше. Пустая фраза значит «ничего».
  *
  * Мост шлёт запрос по этому адресу как есть: без схемы он не уйдёт никуда, а
- * человек будет думать, что сломалась проверка.
+ * человек будет думать, что сломалась проверка. У Claude Code сервера нет —
+ * вместо адреса служебное слово, и по схеме его не судят.
  */
 export function llmTrouble(creds) {
   const url = creds.base_url.trim();
   if (!url) return 'Укажите адрес поставщика';
-  if (!SCHEME.test(url)) return 'Адрес должен начинаться с http:// или https://';
+  if (!addressless(url) && !SCHEME.test(url)) {
+    return 'Адрес должен начинаться с http:// или https://';
+  }
   if (!creds.model.trim()) return 'Выберите модель';
   return '';
+}
+
+/** Что мешает уйти с шага эмбеддингов из файла. Пустая фраза значит «ничего». */
+export function fileTrouble(creds) {
+  return isModelFile(creds) ? '' : 'Выберите файл модели';
 }

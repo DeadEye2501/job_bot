@@ -7,7 +7,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BOUNDS,
+  addressless,
   blankCreds,
+  canShareChat,
+  fileCreds,
+  isModelFile,
   blankTelegram,
   clampField,
   credsChanged,
@@ -273,5 +277,54 @@ describe('пустые черновики настроек', () => {
     expect(
       telegramCreds({ api_id: '12', api_hash: 'ff', phone: '+7', has_session: true, username: 'x' }),
     ).toEqual({ api_id: '12', api_hash: 'ff', phone: '+7' });
+  });
+});
+
+describe('Claude Code без адреса и ключа', () => {
+  it('поля адреса и ключа не нужны только Claude Code', () => {
+    // Он ходит под входом человека по подписке: показанные поля просили бы
+    // вписать то, чего у него нет.
+    expect(addressless('claude-code')).toBe(true);
+    expect(addressless('https://api.anthropic.com')).toBe(false);
+    expect(addressless('http://localhost:1234')).toBe(false);
+  });
+});
+
+describe('эмбеддинги «как у чата»', () => {
+  it('с чатом на Claude делить адрес нельзя', () => {
+    // Claude векторов не считает: эмбеддинги на его адресе бот не примет.
+    expect(canShareChat({ base_url: 'https://api.anthropic.com', api_key: 'k', model: 'm' })).toBe(false);
+    expect(canShareChat({ base_url: 'claude-code', api_key: '', model: 'sonnet' })).toBe(false);
+  });
+
+  it('с OpenAI-совместимым чатом делить можно', () => {
+    expect(canShareChat({ base_url: 'https://api.openai.com/v1', api_key: 'k', model: 'm' })).toBe(true);
+  });
+
+  it('недописанный адрес проверку не роняет', () => {
+    expect(canShareChat({ base_url: 'http://loc', api_key: '', model: '' })).toBe(true);
+    expect(canShareChat({ base_url: '', api_key: '', model: '' })).toBe(true);
+  });
+});
+
+describe('файл модели', () => {
+  it('пустой адрес и путь к gguf в любом регистре — файл модели', () => {
+    expect(isModelFile({ base_url: '', model: 'd:/models/model.GGUF' })).toBe(true);
+  });
+
+  it('адрес сервера — не файл, даже с gguf в имени модели', () => {
+    expect(isModelFile({ base_url: 'http://localhost:1234', model: 'model.gguf' })).toBe(false);
+  });
+
+  it('пустой черновик — не файл', () => {
+    expect(isModelFile(blankCreds())).toBe(false);
+  });
+
+  it('выбранный файл ложится в поле модели без адреса и ключа', () => {
+    expect(fileCreds('d:/models/model.gguf')).toEqual({
+      base_url: '',
+      api_key: '',
+      model: 'd:/models/model.gguf',
+    });
   });
 });

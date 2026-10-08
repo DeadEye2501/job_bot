@@ -17,10 +17,14 @@
   import {
     blankCreds,
     blankTelegram,
+    canShareChat,
     credsChanged,
+    fileCreds,
     idleProbe,
+    isModelFile,
     loginTrouble,
     mirrored,
+    presetCreds,
     probePill,
     sameCreds,
     telegramCreds,
@@ -45,6 +49,9 @@
   let models = $state({ chat: [], embed: [] });
   let probes = $state({ chat: idleProbe(), embed: idleProbe() });
   let same = $state(false);
+  // Эмбеддинги из файла модели, а не с сервера. Своего поля в базе у признака
+  // нет: он выводится из записанного при первом чтении, дальше им правит человек.
+  let fromFile = $state(false);
   let logging = $state(false);
   let wiping = $state(false);
   let leaving = $state(false);
@@ -54,6 +61,9 @@
   let wipingBusy = $state(false);
 
   const pills = $derived({ chat: probePill(probes.chat), embed: probePill(probes.embed) });
+  // Эмбеддинги ходят туда же, куда чат, только пока чат не на Claude: векторов
+  // он не считает, и такую пару мост не примет.
+  const sharing = $derived(same && !fromFile && canShareChat(chat));
 
   const alive = living();
 
@@ -80,7 +90,8 @@
       // поля в базе у него нет. Дальше им распоряжается человек — пересчитывай
       // мы его при каждой записи, снятая галочка возвращалась бы сама, и
       // отдельный адрес для эмбеддингов задать было бы нечем.
-      same = sameCreds(now.chat, now.embed);
+      fromFile = isModelFile(now.embed);
+      same = !fromFile && sameCreds(now.chat, now.embed);
     }
     loaded = true;
   }
@@ -119,7 +130,7 @@
     if (part.model === undefined) listModels('chat');
     // Когда эмбеддинги ходят туда же, их адрес и ключ едут следом: иначе в
     // базе осталась бы пара, которой человек на экране не видел.
-    if (!same) return save({ chat });
+    if (!sharing) return save({ chat });
     embed = mirrored(chat, embed);
     if (part.model === undefined) listModels('embed');
     return save({ chat, embed });
@@ -128,6 +139,39 @@
   function saveEmbed(part) {
     embed = { ...embed, ...part };
     if (part.model === undefined) listModels('embed');
+    return save({ embed });
+  }
+
+  /** Человек выбрал поставщика чата по имени.
+   *
+   * Записи нет, пока не выбрана модель: имя прежнего поставщика у нового не
+   * заведётся, а без имени мост строку не примет.
+   */
+  function pickPreset(label) {
+    const next = presetCreds(label, chat);
+    if (next === null) return;
+    chat = next;
+    forgetProbe('chat');
+    return listModels('chat');
+  }
+
+  /** Человек переключил источник эмбеддингов: сервер или файл модели.
+   *
+   * Записи нет, пока не выбран файл или не набран сервер: пустой источник мост
+   * не примет, а прежний остаётся в базе до тех пор.
+   */
+  function switchSource(toFile) {
+    fromFile = toFile;
+    if (toFile) same = false;
+    forgetProbe('embed');
+  }
+
+  /** Спросить файл модели диалогом окна и записать его. */
+  async function pickFile() {
+    const got = await ask('settings.pick_model_file');
+    if (!got || got.cancelled || !alive.now) return;
+    embed = fileCreds(got.path);
+    forgetProbe('embed');
     return save({ embed });
   }
 
@@ -156,7 +200,11 @@
     const creds = kind === 'chat' ? chat : embed;
     // Пустую форму не отправляем: поставщик ответит отказом про разбор адреса,
     // и человек будет искать беду в сети вместо незаполненного поля.
-    if (!creds.base_url || !creds.model) return say('Заполните base_url и модель', true);
+    if (kind === 'embed' && fromFile) {
+      if (!isModelFile(embed)) return say('Выберите файл модели', true);
+    } else if (!creds.base_url || !creds.model) {
+      return say('Заполните base_url и модель', true);
+    }
     probes = { ...probes, [kind]: { ...idleProbe(), status: 'busy' } };
     const done = await probeModel(call, { kind, ...creds });
     if (!alive.now) return;
@@ -271,6 +319,7 @@
         onsave={saveChat}
         onedit={() => forgetProbe('chat')}
         onprobe={() => probe('chat')}
+        onpreset={pickPreset}
       />
 
       <LlmSection
@@ -281,10 +330,14 @@
         pill={pills.embed}
         busy={probes.embed.status === 'busy'}
         sameAsChat={same}
+        shareable={canShareChat(chat)}
+        {fromFile}
         onsave={saveEmbed}
         onedit={() => forgetProbe('embed')}
         onprobe={() => probe('embed')}
         onsame={switchSame}
+        onsource={switchSource}
+        onpickfile={pickFile}
       />
 
       <PipelineSection values={pipeline} onsave={savePipeline} />
