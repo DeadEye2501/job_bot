@@ -18,8 +18,8 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (242)
-- Тумблер режима не запирается ничем: режим — выбор человека, и погасшая лампочка не повод не дать его сменить. Двум лампочкам из четырёх переписка вовсе не нужна, а запертый тумблер при мёртвом Telegram оставлял бы человека с ботом, которого нечем выключить.
+### app/BottomBar.svelte (251)
+- Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
 - принимает: ask, say, events, onlocked, oncontact
 
 ### app/ChannelCard.svelte (278)
@@ -80,7 +80,7 @@
 - —
 - принимает: ask
 
-### app/SettingsScreen.svelte (346)
+### app/SettingsScreen.svelte (399)
 - Окно входа стоит внутри поля настроек, а не рядом с ним: кнопки в нём той же плотности, что и остальные кнопки экрана, и берут они её отсюда. На раскладку это не влияет — окно висит поверх страницы.
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
@@ -115,7 +115,7 @@
 - —
 - принимает: ask, busy, events, onback, onnext
 
-### app/WizardLlm.svelte (305)
+### app/WizardLlm.svelte (367)
 - —
 - принимает: ask, kind, onback, onnext
 
@@ -281,10 +281,10 @@
 - принимает: rows, onedit, onadd, onremove
 - берёт: ./Dropdown.svelte
 
-### components/LlmSection.svelte (116)
+### components/LlmSection.svelte (179)
 - Ввод в любое из полей гасит плашку проверки: она говорит «модель отвечает» про тот адрес, который проверяли, и на изменённых полях лгала бы. Ловится здесь, а не на каждом поле: событие всплывает, и второй обработчик у поля секрета пришлось бы заводить внутри чужого компонента.
-- принимает: title, icon, creds, models, pill, busy, sameAsChat, onsave, onprobe, onsame, onedit
-- берёт: ./SecretInput.svelte, ./SettingsSection.svelte, ./SuggestInput.svelte
+- принимает: title, icon, creds, models, pill, busy, sameAsChat, shareable, fromFile, onsave, onprobe, onsame, onedit, onpreset, onsource, onpickfile
+- берёт: ./Dropdown.svelte, ./SecretInput.svelte, ./SettingsSection.svelte, ./SuggestInput.svelte
 
 ### components/LogLevelPill.svelte (17)
 - —
@@ -329,9 +329,9 @@
 - принимает: extra, over, confirm, awayCloses, onclose, children
 - берёт: ./ModalKeys.svelte
 
-### components/ModeToggle.svelte (24)
+### components/ModeToggle.svelte (34)
 - —
-- принимает: mode, onpick
+- принимает: mode, disabled, title, onpick
 
 ### components/NavGroup.svelte (9)
 - —
@@ -624,9 +624,9 @@
 - * Заводит зов, отбивающий устаревший ответ. * * Заводится на каждое место, где вопросы обгоняют друг друга: свой у поиска, * свой у прокрутки, свой у каждой панели. Общий на экран объявлял бы * устаревшим ответ соседнего вопроса — их спрашивают вперемешку. * * `alive` спрашивают, а не передают значением: экран закрывают, пока ответ в * пути, и класть его тогда уже некуда. * * Сам зов принимается обёрткой, а не именем метода с нагрузкой: мост зовут с * разным числом доводов, и «ничего» отличается у него от «ничего не передали». * * `null` значит «не класть ничего»: отказ моста, ушедший экран и обогнанный * ответ на месте различать некому — все трое означают одно. Отказ поэтому и не * отбивается своей веткой: мост отвечает на него пустотой, и она уходит * зовущему сама, тем же словом, что и два остальных исхода.
 - отдаёт: freshAnswer, stillNeeded
 
-### state/health.js (51)
-- * Живо ли всё, на чём держится работа бота. * * По этому ответу отпирается кнопка прогона, поэтому незнание считается «не * живо»: до первого ответа моста мы не знаем ничего, а отпертая на миг раньше * правды кнопка пускает обход каналов без модели. Тумблер режима им не * запирается: режим — выбор человека, и лампочка ему не указ.
-- отдаёт: LAMPS, allAlive, blockedTip, downNames
+### state/health.js (64)
+- * Живо ли всё, на чём держится работа бота. * * По этому ответу отпираются тумблер режима и кнопка прогона, поэтому незнание * считается «не живо»: до первого ответа моста мы не знаем ничего, а отпертая * на миг раньше правды кнопка пускает обход каналов без модели.
+- отдаёт: LAMPS, allAlive, blockedTip, downNames, shouldTurnOff
 
 ### state/keys.js (70)
 - * Чем нажатая клавиша отзовётся в окне: закрытием, подтверждением или ничем. * * Многострочное поле — исключение: в нём Enter переносит строку. Иначе заметку * в два абзаца не набрать, первый же перевод строки отправил бы окно.
@@ -696,9 +696,9 @@
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
-### state/settings.js (222)
+### state/settings.js (309)
 - * Чем подписано пустое поле имени модели. * * Пока имён нет, подсказка не обещает списка: перечень читается с адреса и * ключа, и у непóднятого поставщика его не будет вовсе — имя тогда вписывают * руками. Слова общие на настройки и на шаг мастера: одно и то же поле, * подписанное по-разному, читается как два разных.
-- отдаёт: BOUNDS, CREDS_LIMITS, KEY_PLACEHOLDER, SAME_CREDS_LABEL, SCORE_MAX, blankCreds, blankTelegram, clampField, credsChanged, idleProbe, loginTrouble, mirrored, modelPlaceholder, nextStep, probePill, sameCreds, scorePercent, sessionPill, sessionText, telegramCreds, thresholdState
+- отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, fileCreds, idleProbe, isModelFile, loginTrouble, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probePill, sameCreds, scorePercent, sessionPill, sessionText, telegramCreds, thresholdState
 
 ### state/skills.js (84)
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
@@ -740,9 +740,9 @@
 - * Отбор и порядок, какими их оставили в прошлый заход.
 - отдаёт: vacancyView
 
-### state/wizard.js (165)
+### state/wizard.js (149)
 - * Экраны по порядку. Приветствие и финал — обложки: шага у них нет, и в * строке шагов они ничего не подсвечивают.
-- отдаёт: PRESETS, backScreen, cvModes, cvReady, llmTrouble, nextScreen, presetFor, resumeScreen, stepAt, stepMarks
+- отдаёт: backScreen, cvModes, cvReady, fileTrouble, llmTrouble, nextScreen, resumeScreen, stepAt, stepMarks
 
 ### state/words.js (15)
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
@@ -1088,9 +1088,9 @@ body, html, button, body, .material-symbols-outlined
 .modal-footer, .modal-footer, .modal-footer .btn, .modal-footer .btn .material-symbols-outlined, .modal-subtitle, .modal-error
 - берёт: --bg-secondary, --bg-tertiary, --border, --danger, --scrim, --shadow-modal, --text-primary, --text-secondary, --text-tertiary
 
-### styles/mode.css (50)
+### styles/mode.css (55)
 - Переключатель режима бота: слово, дорожка и бегунок на ней.
-- селекторы (13): .mode-control, .mode-text, .mode-track, .mode-knob, .mode-control[data-mode='Off'] .mode-knob, .mode-control[data-mode='Off'] .mode-text, .mode-control[data-mode='Off'] .mode-track, .mode-control[data-mode='DM Only'] .mode-knob, .mode-control[data-mode='DM Only'] .mode-text, .mode-control[data-mode='DM Only'] .mode-track, .mode-control[data-mode='Full'] .mode-knob, .mode-control[data-mode='Full'] .mode-text, .mode-control[data-mode='Full'] .mode-track
+- селекторы (14): .mode-control, .mode-text, .mode-track, .mode-knob, .mode-control[data-mode='Off'] .mode-knob, .mode-control[data-mode='Off'] .mode-text, .mode-control[data-mode='Off'] .mode-track, .mode-control[data-mode='DM Only'] .mode-knob, .mode-control[data-mode='DM Only'] .mode-text, .mode-control[data-mode='DM Only'] .mode-track, .mode-control[data-mode='Full'] .mode-knob, .mode-control[data-mode='Full'] .mode-text, .mode-control[data-mode='Full'] .mode-track, .mode-control.is-disabled
 - берёт: --accent, --accent-muted, --bg-tertiary, --border, --err, --err-muted, --text-secondary, --text-tertiary, --warn, --warn-muted
 
 ### styles/nav.css (92)
@@ -1413,7 +1413,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (109)
+### tests/bottom_bar_live.test.js (112)
 - —
 
 ### tests/bridge.test.js (161)
@@ -1480,7 +1480,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/flash.test.js (34)
 - —
 
-### tests/footer.test.js (152)
+### tests/footer.test.js (169)
 - * Нажатие мышью: место на дорожке шириной 300 точек.
 
 ### tests/fresh.test.js (71)
@@ -1554,7 +1554,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/search.test.js (49)
 - —
 
-### tests/settings.test.js (277)
+### tests/settings.test.js (330)
 - —
 
 ### tests/settled.js (21)
@@ -1595,7 +1595,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/vacancy_timeline_live.test.js (43)
 - —
 
-### tests/wizard.test.js (194)
+### tests/wizard.test.js (217)
 - —
 
 ### tests/wizard_cv_live.test.js (108)

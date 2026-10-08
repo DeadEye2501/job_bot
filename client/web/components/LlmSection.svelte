@@ -1,26 +1,51 @@
 <script>
   // Поставщик модели: адрес, ключ, имя модели и проверка связи.
   //
-  // Секция одна на двоих — чат и эмбеддинги, — но раскладка у них разная: у
-  // чата всё идёт одной сеткой, у эмбеддингов сверху стоит выбор «ходить туда
-  // же, куда чат», и при нём адрес с ключом не показываются вовсе.
+  // Секция одна на двоих — чат и эмбеддинги, — но раскладка у них разная. У
+  // чата сверху выбор поставщика, и у Claude Code адреса с ключом нет вовсе. У
+  // эмбеддингов сверху выбор «сервер или файл модели»; у сервера — галочка
+  // «ходить туда же, куда чат», и при ней адрес с ключом не показываются.
   import {
     CREDS_LIMITS,
+    EMBED_SOURCES,
     KEY_PLACEHOLDER,
+    PRESET_NAMES,
     SAME_CREDS_LABEL,
+    addressless,
     modelPlaceholder,
+    presetFor,
   } from '$state/settings.js';
 
+  import Dropdown from './Dropdown.svelte';
   import SecretInput from './SecretInput.svelte';
   import SettingsSection from './SettingsSection.svelte';
   import SuggestInput from './SuggestInput.svelte';
 
-  let { title, icon, creds, models, pill, busy, sameAsChat, onsave, onprobe, onsame, onedit } =
-    $props();
+  let {
+    title,
+    icon,
+    creds,
+    models,
+    pill,
+    busy,
+    sameAsChat,
+    shareable = true,
+    fromFile = false,
+    onsave,
+    onprobe,
+    onsame,
+    onedit,
+    onpreset,
+    onsource,
+    onpickfile,
+  } = $props();
 
   const embeds = $derived(sameAsChat !== undefined);
-  const ownCreds = $derived(sameAsChat !== true);
+  const ownCreds = $derived(!shareable || sameAsChat !== true);
   const placeholder = $derived(modelPlaceholder(models));
+  // Незнакомый адрес отмечен как «своё»: пустая отметка читалась бы как
+  // «поставщик не выбран», хотя адрес уже вписан.
+  const chosenPreset = $derived(presetFor(creds.base_url));
 
   /** Имя модели пришло из подсказки под полем.
    *
@@ -70,6 +95,12 @@
 
 {#snippet probeButton()}
   <div class="span-2 settings-actions">
+    {#if fromFile}
+      <button class="btn" type="button" disabled={busy} onclick={() => onpickfile()}>
+        <span class="material-symbols-outlined">folder_open</span>
+        Выбрать файл
+      </button>
+    {/if}
     <button class="btn" type="button" disabled={busy} onclick={() => onprobe()}>
       <span class="material-symbols-outlined">network_check</span>
       {busy ? 'Проверка…' : 'Проверить'}
@@ -84,31 +115,63 @@
        обработчик у поля секрета пришлось бы заводить внутри чужого компонента. -->
   <div oninput={() => onedit()}>
     {#if embeds}
-      <label class="checkbox-row">
-        <input
-          type="checkbox"
-          checked={sameAsChat}
-          onchange={(event) => onsame(event.currentTarget.checked)}
-        />
-        {SAME_CREDS_LABEL}
-      </label>
+      <div class="settings-row spaced">
+        <div class="span-2">
+          <Dropdown
+            options={EMBED_SOURCES}
+            value={fromFile ? EMBED_SOURCES[1] : EMBED_SOURCES[0]}
+            onpick={(source) => onsource(source === EMBED_SOURCES[1])}
+          />
+        </div>
+      </div>
 
-      {#if ownCreds}
+      {#if fromFile}
         <div class="settings-row spaced">
-          {@render urlField('base_url')}
-          {@render secretField()}
+          <input
+            class="input mono span-2"
+            readonly
+            value={creds.model}
+            title={creds.model}
+            placeholder="Файл модели не выбран"
+          />
+          {@render probeButton()}
+        </div>
+      {:else}
+        {#if shareable}
+          <label class="checkbox-row">
+            <input
+              type="checkbox"
+              checked={sameAsChat}
+              onchange={(event) => onsame(event.currentTarget.checked)}
+            />
+            {SAME_CREDS_LABEL}
+          </label>
+        {/if}
+
+        {#if ownCreds}
+          <div class="settings-row spaced">
+            {@render urlField('base_url')}
+            {@render secretField()}
+          </div>
+        {/if}
+
+        <div class="settings-row spaced">
+          {@render modelField()}
+          {@render probeButton()}
         </div>
       {/if}
-
-      <div class="settings-row spaced">
-        {@render modelField()}
-        {@render probeButton()}
-      </div>
     {:else}
       <div class="settings-row">
-        {@render urlField('base_url (например http://localhost:1234)')}
+        <div class="span-2">
+          <Dropdown options={PRESET_NAMES} value={chosenPreset} onpick={onpreset} />
+        </div>
+        {#if !addressless(creds.base_url)}
+          {@render urlField('base_url (например http://localhost:1234)')}
+        {/if}
         {@render modelField()}
-        {@render secretField()}
+        {#if !addressless(creds.base_url)}
+          {@render secretField()}
+        {/if}
         {@render probeButton()}
       </div>
     {/if}

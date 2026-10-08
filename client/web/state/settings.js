@@ -150,6 +150,93 @@ export function mirrored(chat, embed) {
   return { base_url: chat.base_url, api_key: chat.api_key, model: embed.model };
 }
 
+/** Служебный адрес Claude Code — тот же, что ждёт мост: сервера у него нет. */
+const CLAUDE_CODE_ADDRESS = 'claude-code';
+const CLAUDE_HOST = 'api.anthropic.com';
+
+/** Поставщики моделей, чей адрес известен заранее.
+ *
+ * Адрес подставляется в поле по выбору имени: набирать его руками — первый
+ * способ ошибиться. Список один на мастер и настройки: выбранное в одном месте
+ * узнаётся в другом. Адреса, не совпавшего ни с одним из этих, бояться нечего:
+ * он и есть «своё».
+ */
+export const PRESETS = [
+  { label: 'OpenAI', base_url: 'https://api.openai.com/v1' },
+  { label: 'Anthropic', base_url: `https://${CLAUDE_HOST}` },
+  { label: 'Claude Code', base_url: CLAUDE_CODE_ADDRESS },
+  { label: 'LM Studio', base_url: 'http://localhost:1234' },
+  { label: 'Ollama', base_url: 'http://localhost:11434' },
+  { label: 'OpenRouter', base_url: 'https://openrouter.ai/api/v1' },
+  { label: 'Custom', base_url: '' },
+];
+
+/** Имена поставщиков — то, из чего выбирают в списке. */
+export const PRESET_NAMES = PRESETS.map((one) => one.label);
+
+/** Каким поставщиком отмечен этот адрес.
+ *
+ * Незнакомый — «своё»: без такого пункта набранный руками адрес оставлял бы
+ * выбор пустым, и человек читал бы это как «поставщик не выбран», хотя адрес
+ * у него уже вписан.
+ */
+export function presetFor(url) {
+  const typed = url.trim();
+  return PRESETS.find((one) => one.base_url && one.base_url === typed)?.label ?? 'Custom';
+}
+
+/** Учётные данные поставщика, выбранного по имени; имя модели сбрасывается.
+ *
+ * Набранное для прежнего поставщика у нового почти наверняка не заведётся, и
+ * оставленное имя ушло бы в проверку молчаливой ошибкой. Незнакомое имя — ничего.
+ */
+export function presetCreds(label, creds) {
+  const preset = PRESETS.find((one) => one.label === label);
+  return preset === undefined ? null : { ...creds, base_url: preset.base_url, model: '' };
+}
+
+/** Нужны ли поставщику адрес и ключ: Claude Code ходит под входом человека. */
+export function addressless(url) {
+  return url.trim() === CLAUDE_CODE_ADDRESS;
+}
+
+/** Ведёт ли адрес к Claude — по API или через Claude Code.
+ *
+ * Недописанный адрес — не беда: его набирают по знаку, и проверка на каждом
+ * знаке не должна падать.
+ */
+function servesClaude(url) {
+  if (addressless(url)) return true;
+  try {
+    return new URL(url).hostname === CLAUDE_HOST;
+  } catch {
+    return false;
+  }
+}
+
+/** Можно ли эмбеддингам ходить туда же, куда чат.
+ *
+ * Claude векторов не считает: эмбеддинги на его адресе мост не примет, и
+ * галочка «как у чата» предлагала бы то, что не заработает.
+ */
+export function canShareChat(chat) {
+  return !servesClaude(chat.base_url);
+}
+
+/** Откуда берутся эмбеддинги: с сервера или из файла модели на диске. */
+export const EMBED_SOURCES = ['Сервер', 'Файл'];
+
+/** Указывают ли учётные данные на файл модели — тем же признаком, что у моста:
+ *  адреса нет, в поле модели путь к `.gguf` в любом регистре. */
+export function isModelFile(creds) {
+  return !creds.base_url && /\.gguf$/i.test(creds.model || '');
+}
+
+/** Учётные данные эмбеддингов из выбранного файла модели. */
+export function fileCreds(path) {
+  return { base_url: '', api_key: '', model: path };
+}
+
 
 /** Плашка сеанса Telegram в шапке секции.
  *

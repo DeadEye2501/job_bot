@@ -14,11 +14,19 @@
   import { askModels, probeModel } from '$state/provider.js';
   import {
     CREDS_LIMITS,
+    EMBED_SOURCES,
+    PRESET_NAMES,
     blankCreds,
     KEY_PLACEHOLDER,
     SAME_CREDS_LABEL,
+    addressless,
+    canShareChat,
+    fileCreds,
+    isModelFile,
     mirrored,
     modelPlaceholder,
+    presetCreds,
+    presetFor,
     sameCreds,
   } from '$state/settings.js';
   import Dropdown from '$components/Dropdown.svelte';
@@ -26,16 +34,15 @@
   import SuggestInput from '$components/SuggestInput.svelte';
   import WizardFoot from '$components/WizardFoot.svelte';
   import WizardStatus from '$components/WizardStatus.svelte';
-  import { PRESETS, llmTrouble, presetFor } from '$state/wizard.js';
-
-  // Список выбирают по имени поставщика, адрес за именем ищет `presetFor`.
-  const PRESET_NAMES = PRESETS.map((one) => one.label);
+  import { fileTrouble, llmTrouble } from '$state/wizard.js';
 
   let { ask, kind, onback, onnext } = $props();
 
   let creds = $state(blankCreds());
   let chat = $state(blankCreds());
   let sameAsChat = $state(true);
+  // Эмбеддинги из файла модели, а не с сервера.
+  let fromFile = $state(false);
   let models = $state([]);
   let status = $state(null);
   let busy = $state(false);
@@ -47,6 +54,8 @@
   // те же, что у чата, и показывать их значило бы предлагать править то, что
   // тут же перепишется чатовым.
   const ownCreds = $derived(chatStep || !sameAsChat);
+  // У Claude Code нет ни адреса, ни ключа: поля просили бы вписать то, чего нет.
+  const showAddress = $derived(ownCreds && !addressless(creds.base_url));
   const namePlaceholder = $derived(modelPlaceholder(models));
   // Незнакомый адрес отмечен как «своё»: пустая отметка читалась бы как
   // «поставщик не выбран», хотя адрес уже вписан.
@@ -62,7 +71,14 @@
       // Эмбеддинги начинают с того же адреса и ключа, что и чат: шаг о том и
       // говорит, а пустые поля заставляли бы перенабирать ключ вслепую. Своими
       // они считаются, только если своими и записаны.
-      sameAsChat = now.embed.base_url ? sameCreds(now.chat, now.embed) : true;
+      fromFile = isModelFile(now.embed);
+      if (fromFile) {
+        creds = now.embed;
+        return;
+      }
+      // С чатом на Claude делить адрес нельзя: векторов он не считает.
+      sameAsChat =
+        canShareChat(now.chat) && (now.embed.base_url ? sameCreds(now.chat, now.embed) : true);
       creds = sameAsChat ? mirrored(now.chat, now.embed) : now.embed;
     }
     return listModels();
@@ -105,9 +121,29 @@
    * оставленное имя ушло бы в проверку молчаливой ошибкой.
    */
   function pickPreset(label) {
-    const preset = PRESETS.find((one) => one.label === label);
-    if (preset === undefined) return;
-    return edit({ base_url: preset.base_url, model: '' });
+    const next = presetCreds(label, creds);
+    if (next === null) return;
+    return edit({ base_url: next.base_url, model: next.model });
+  }
+
+  /** Переключить источник эмбеддингов: сервер или файл модели. */
+  function switchSource(toFile) {
+    fromFile = toFile;
+    status = null;
+    creds = toFile ? fileCreds('') : blankCreds();
+    if (!toFile) sameAsChat = false;
+  }
+
+  /** Спросить файл модели диалогом окна; записывается он по «Дальше». */
+  async function pickFile() {
+    try {
+      const got = await call('settings.pick_model_file');
+      if (!alive.now || got.cancelled) return;
+      creds = fileCreds(got.path);
+      status = null;
+    } catch (refusal) {
+      if (alive.now) status = { tone: 'err', text: refusal.message };
+    }
   }
 
   /** Переключить эмбеддинги на чатовые адрес и ключ — или на свои. */
@@ -129,12 +165,16 @@
    */
   async function check() {
     if (busy) return;
-    if (!creds.base_url.trim()) {
+    if (fromFile && !isModelFile(creds)) {
+      status = { tone: 'err', text: 'Выберите файл модели.' };
+      return;
+    }
+    if (!fromFile && !creds.base_url.trim()) {
       status = { tone: 'err', text: 'Укажите base_url провайдера.' };
       return;
     }
     busy = true;
-    if (creds.model.trim()) await probe();
+    if (fromFile || creds.model.trim()) await probe();
     else await askNames();
     if (alive.now) busy = false;
   }
@@ -181,7 +221,7 @@
 
   async function save() {
     if (busy) return;
-    const trouble = llmTrouble(creds);
+    const trouble = fromFile ? fileTrouble(creds) : llmTrouble(creds);
     if (trouble) {
       status = { tone: 'err', text: trouble };
       return;
@@ -190,7 +230,9 @@
     status = { tone: 'busy', text: 'Сохраняем...' };
     // Адрес уезжает обрезанным: заслон судит по обрезанному, и пробел на конце
     // прошёл бы проверку, а на мост уехал бы вместе с ним.
-    creds = ownCreds ? { ...creds, base_url: creds.base_url.trim() } : mirrored(chat, creds);
+    if (!fromFile) {
+      creds = ownCreds ? { ...creds, base_url: creds.base_url.trim() } : mirrored(chat, creds);
+    }
     try {
       // Зовём мост напрямую: отказ записи — исход шага, и читают его там же,
       // где исход проверки, — строкой под полями.
@@ -217,7 +259,7 @@
   {#if chatStep}
     <div class="wiz-subtitle">
       На этой модели бот <strong>разбирает вакансии</strong> и классифицирует ответы HR. Подойдёт
-      любой сервис с OpenAI-совместимым API.
+      любой сервис с OpenAI-совместимым API, Anthropic или Claude Code.
     </div>
   {:else}
     <div class="wiz-subtitle">
@@ -241,17 +283,35 @@
     {#if chatStep}
       <Dropdown options={PRESET_NAMES} value={chosenPreset} onpick={pickPreset} />
     {:else}
-      <label class="checkbox-row">
-        <input
-          type="checkbox"
-          checked={sameAsChat}
-          onchange={(event) => useChatCreds(event.currentTarget.checked)}
-        />
-        {SAME_CREDS_LABEL}
-      </label>
+      <Dropdown
+        options={EMBED_SOURCES}
+        value={fromFile ? EMBED_SOURCES[1] : EMBED_SOURCES[0]}
+        onpick={(source) => switchSource(source === EMBED_SOURCES[1])}
+      />
+      {#if !fromFile && canShareChat(chat)}
+        <label class="checkbox-row">
+          <input
+            type="checkbox"
+            checked={sameAsChat}
+            onchange={(event) => useChatCreds(event.currentTarget.checked)}
+          />
+          {SAME_CREDS_LABEL}
+        </label>
+      {/if}
     {/if}
 
-    {#if ownCreds}
+    {#if fromFile}
+      <input
+        class="input mono"
+        readonly
+        value={creds.model}
+        title={creds.model}
+        placeholder="Файл модели не выбран"
+      />
+      <button class="btn" type="button" disabled={busy} onclick={pickFile}>
+        <span class="material-symbols-outlined">folder_open</span>Выбрать файл
+      </button>
+    {:else if showAddress}
       <input
         class="input mono"
         maxlength={CREDS_LIMITS.base_url}
@@ -268,18 +328,20 @@
       />
     {/if}
 
-    <SuggestInput
-      value={creds.model}
-      options={models}
-      placeholder={namePlaceholder}
-      mono
-      maxlength={CREDS_LIMITS.model}
-      onsave={(model) => edit({ model })}
-    />
+    {#if !fromFile}
+      <SuggestInput
+        value={creds.model}
+        options={models}
+        placeholder={namePlaceholder}
+        mono
+        maxlength={CREDS_LIMITS.model}
+        onsave={(model) => edit({ model })}
+      />
 
-    <div class="help">
-      После «Проверить» список заменится теми моделями, которые реально доступны у провайдера.
-    </div>
+      <div class="help">
+        После «Проверить» список заменится теми моделями, которые реально доступны у провайдера.
+      </div>
+    {/if}
 
     <WizardStatus {status} />
   </div>
