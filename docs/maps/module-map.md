@@ -34,7 +34,21 @@ Job Bot — single CLI entry point.
 - `def _started_or_told_why() -> int` (36)
 - `def main() -> int` (22)
 
-## adapters — 11 модулей
+## adapters — 13 модулей
+
+### `adapters/app_tied_process.py` — 118 строк
+
+Дочерние процессы, которые Windows снимает вместе с приложением.
+
+Зависит от: —
+
+- `class _IoCounters(ctypes.Structure)` (5)
+- `class _BasicLimit(ctypes.Structure)` (12)
+- `class _ExtendedLimit(ctypes.Structure)` (9)
+- `def _kernel32()` (11)
+- `def _kill_on_close_job()` (15)
+- `def _assign(job, pid: int) -> None` (11)
+- `def tie_to_app(pid: int) -> None` (15)
 
 ### `adapters/claude.py` — 142 строк
 
@@ -53,24 +67,43 @@ Claude через официальный SDK Anthropic: соединение, з
 - `async def list_models(client: ClaudeClient) -> list[str]` (4)
 - `async def ping(client: ClaudeClient, model: str, text: str) -> None` (11)
 
-### `adapters/claude_code.py` — 178 строк
+### `adapters/claude_code.py` — 109 строк
 
-Claude через установленный Claude Code по подписке: запрос — процесс `claude -p`.
+Claude через установленный Claude Code по подписке: запросы и перечень моделей.
 
-Зависит от: `adapters.claude`
+Зависит от: `adapters`, `adapters.claude`
 
 - `class CliTrouble(Exception)` (10)
 - `class ClaudeCodeClient` (8)
   - `async def aclose(self) -> None` (2)
 - `def make_client(*, timeout: float) -> ClaudeCodeClient` (3)
-- `def _find_cli() -> str | None` (11)
-- `def _argv(cli: str, model: str, prompt_file: str) -> list[str]` (18)
-- `async def _run_cli(argv: list[str], stdin: str, env: dict, timeout: float) -> tuple[int, str, str]` (20)
-- `def _reply(code: int, stdout: str, stderr: str) -> tuple[str | None, str | None]` (13)
-- `async def _converse(client: ClaudeCodeClient, model: str, messages: list[dict], timeout: float | None) -> tuple[str | None, str | None]` (20)
+- `def _find_cli() -> str | None` (12)
+- `def _reply(data: dict) -> tuple[str | None, str | None]` (9)
+- `async def _converse(client: ClaudeCodeClient, model: str, messages: list[dict], timeout: float | None) -> tuple[str | None, str | None]` (14)
 - `async def ask(client: ClaudeCodeClient, model: str, request)` (8)
 - `async def list_models(_client: ClaudeCodeClient) -> list[str]` (5)
 - `async def ping(client: ClaudeCodeClient, model: str, text: str) -> None` (3)
+
+### `adapters/claude_code_process.py` — 230 строк
+
+Живой процесс Claude Code: один на приложение, запросы по одному, сброс после каждого.
+
+Зависит от: `adapters`, `adapters.claude`
+
+- `class ProcessGone(Exception)` (2)
+- `class _Session` (3)
+- `def framed(instructions: str, data: str) -> str` (5)
+- `def _argv(cli: str, model: str) -> list[str]` (21)
+- `def _subscription_env() -> dict` (3)
+- `async def _spawn(argv: list[str], env: dict)` (19)
+- `def _lock() -> asyncio.Lock` (11)
+- `async def _send(process, text: str) -> None` (5)
+- `async def _result(process) -> dict` (16)
+- `async def _round(process, message: str) -> dict` (7)
+- `async def _drop() -> None` (7)
+- `async def _ready(cli: str, model: str)` (14)
+- `async def exchange(cli: str, model: str, message: str, timeout: float) -> dict` (19)
+- `async def shutdown() -> None` (10)
 
 ### `adapters/cv_text.py` — 137 строк
 
@@ -2679,7 +2712,7 @@ Runtime settings layer.
 
 - `def show_trouble(text: str) -> None` (11)
 
-### `client/window.py` — 235 строк
+### `client/window.py` — 248 строк
 
 Окно приложения: как оно открывается и чем гасится.
 
@@ -2687,7 +2720,8 @@ Runtime settings layer.
 
 - `def run_ui() -> int` (32)
 - `def _open_window(hub, *, settled: bool)` (19)
-- `def _put_out(hub, runner, listening) -> None` (32)
+- `def _put_out_claude_code(runner) -> None` (6)
+- `def _put_out(hub, runner, listening) -> None` (36)
 - `async def prepare(session_factory) -> RuntimeSettings` (13)
 - `def _open_runner() -> AsyncRunner` (4)
 - `def _open_database() -> tuple[Any, async_sessionmaker]` (9)
@@ -2706,7 +2740,18 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 262 модулей
+## tests — 263 модулей
+
+### `tests/adapters/test_app_tied_process.py` — 65 строк
+
+Дочерний процесс, привязанный к приложению, не переживает его аварийный выход.
+
+Зависит от: —
+
+Тестов: 2
+
+- `def _alive(pid: int) -> bool` (5)
+- `def _orphan(mode: str) -> int` (7)
 
 ### `tests/adapters/test_claude.py` — 263 строк
 
@@ -2721,15 +2766,16 @@ Runtime settings layer.
   - `def install(routes: dict) -> list` (9)
     - `async def relay(_transport, request)` (2)
 
-### `tests/adapters/test_claude_code.py` — 214 строк
+### `tests/adapters/test_claude_code.py` — 332 строк ⚠ подошёл к 300
 
-Следствия разговора с Claude через Claude Code по подписке.
+Следствия разговора с Claude через живой процесс Claude Code по подписке.
 
-Зависит от: `adapters`, `adapters.claude_code`, `adapters.lm_chat`, `adapters.lm_studio`, `backend.provider_config`, `tests.fakes.claude_code`, `tests.fakes.llm`
+Зависит от: `adapters`, `adapters.claude_code`, `adapters.claude_code_process`, `adapters.lm_chat`, `adapters.lm_studio`, `backend.provider_config`, `tests.fakes.claude_code`, `tests.fakes.llm`
 
-Тестов: 13
+Тестов: 20
 
 - `def _client() -> ClaudeCodeClient` (2)
+- `def _model_of(process) -> str` (3)
 
 ### `tests/adapters/test_cv_text.py` — 299 строк
 
@@ -5161,7 +5207,7 @@ Runtime settings layer.
 - `def _get(app, path: str) -> tuple[str, dict, bytes]` (10)
   - `def start_response(status: str, headers: list[tuple[str, str]]) -> None` (3)
 
-### `tests/client/test_window.py` — 281 строк
+### `tests/client/test_window.py` — 291 строк
 
 Следствия открытия и закрытия окна: что приложение делает вокруг него.
 
@@ -5176,9 +5222,10 @@ Runtime settings layer.
   - `def submit(self, coro) -> Future` (5)
   - `def stop(self) -> None` (2)
 - `class StubHub` (4)
-- `def opened(monkeypatch, runtime_settings, session_factory)` (24)
+- `def opened(monkeypatch, runtime_settings, session_factory)` (30)
   - `class StubListener` (3)
     - `def close(self) -> None` (2)
+  - `def claude_code_off()` (3)
 - `class _Settings` (5)
 - `def _sessions(tmp_path, monkeypatch)` (8)
 
@@ -5191,7 +5238,7 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/conftest.py` — 396 строк ⚠ подошёл к 300
+### `tests/conftest.py` — 402 строк ⚠ подошёл к 300
 
 Стенд: подмена каталога данных, хранилища ключей и базы.
 
@@ -5210,7 +5257,7 @@ Runtime settings layer.
 - `class ProviderReached(BaseException)` (6)
 - `def _anthropic_is_unreachable(monkeypatch)` (16)
   - `async def _refuse(*_args, **_kwargs)` (5)
-- `def _claude_code_is_unreachable(monkeypatch)` (15)
+- `def _claude_code_is_unreachable(monkeypatch)` (21)
   - `async def _refuse(*_args, **_kwargs)` (5)
 - `def _sending_locked(monkeypatch)` (10)
 - `async def _clear_all_tables(engine: AsyncEngine) -> None` (37)
@@ -5283,19 +5330,29 @@ Runtime settings layer.
 - `def refusal(category: str='cyber') -> httpx2.Response` (7)
 - `def model_list(*ids: str) -> httpx2.Response` (16)
 
-### `tests/fakes/claude_code.py` — 80 строк
+### `tests/fakes/claude_code.py` — 147 строк
 
-Подделка Claude Code: запуск процесса подменён, разбор и сборка вызова настоящие.
+Подделка Claude Code: живой процесс подменён, обмен с ним и разбор настоящие.
 
 Зависит от: `adapters`
 
 - `def _answer(text: str | None, **fields) -> dict` (3)
 - `def result(text: str | None, *, stop_reason: str='end_turn') -> dict` (5)
 - `def failure(text: str, *, status: int | None=None) -> dict` (9)
-- `class Calls` (9)
-- `def _system_prompt(argv: list[str]) -> str` (3)
-- `def install(monkeypatch, replies: list, *, cli: str | None=CLI) -> Calls` (26)
-  - `async def run(argv, stdin, env, timeout)` (12)
+- `class _Stdin` (9)
+  - `def write(self, data: bytes) -> None` (2)
+  - `async def drain(self) -> None` (2)
+- `class _Stdout` (6)
+  - `async def readline(self) -> bytes` (2)
+- `class Process` (48)
+  - `def heard(self, line: dict) -> None` (19)
+  - `def _push(self, message: dict) -> None` (2)
+  - `async def next_line(self) -> bytes` (6)
+  - `def kill(self) -> None` (3)
+  - `async def wait(self) -> int` (2)
+- `class Calls` (12)
+- `def install(monkeypatch, replies: list, *, cli: str | None=CLI) -> Calls` (18)
+  - `async def spawn(argv, env)` (6)
 
 ### `tests/fakes/gguf.py` — 54 строк
 

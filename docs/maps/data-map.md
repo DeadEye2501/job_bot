@@ -19,6 +19,21 @@
 
 ## adapters
 
+### `adapters/app_tied_process.py`
+
+- `_log` = `logging.getLogger(__name__)`
+- `_KILL_ON_JOB_CLOSE` = `8192`
+- `_EXTENDED_LIMIT_INFORMATION` = `9`
+- `_PROCESS_SET_QUOTA` = `256`
+- `_PROCESS_TERMINATE` = `1`
+- `class _IoCounters(ctypes.Structure)`
+  - `_fields_` = `[(name, ctypes.c_uint64) for name in ('ReadOpera…`
+- `class _BasicLimit(ctypes.Structure)`
+  - `_fields_` = `набор из 9`
+- `class _ExtendedLimit(ctypes.Structure)`
+  - `_fields_` = `набор из 6`
+- `_job` = `None`
+
 ### `adapters/claude.py`
 
 - `_log` = `logging.getLogger(__name__)`
@@ -32,8 +47,22 @@
 
 - `MODELS` = `набор из 3`
 - `NO_CLI` = `'Claude Code не установлен'`
+
+### `adapters/claude_code_process.py`
+
+- `FRAME_OPEN` = `'***ИНСТРУКЦИИ***'`
+- `FRAME_CLOSE` = `'***КОНЕЦ ИНСТРУКЦИЙ***'`
+- `FRAME_PROMPT` = `f'Каждое сообщение начинается с блока между стро…`
+- `_CLEAR` = `'/clear'`
 - `_NOT_SUBSCRIPTION` = `набор из 6`
 - `_NO_WINDOW` = `getattr(subprocess, 'CREATE_NO_WINDOW', 0)`
+- `_LINE_LIMIT` = `16 * 1024 * 1024`
+- `class _Session`
+  - `process: object`
+  - `model: str`
+- `_session: _Session | None` = `None`
+- `_guard: tuple[asyncio.AbstractEventLoop, asyncio.Lock] | None` = `None`
+- `_closing` = `False`
 
 ### `adapters/cv_text.py`
 
@@ -1409,6 +1438,7 @@
 - `WEB_DIST` = `CLIENT_DIR / 'web' / 'dist'`
 - `ICON_FILE` = `CLIENT_DIR / 'icon.ico'`
 - `_ENGINE_CLOSING_WAIT_S` = `5.0`
+- `_CLAUDE_CODE_CLOSING_WAIT_S` = `5.0`
 - `WINDOW_BACKGROUND` = `'#2d2d2f'`
 
 ### `client/window_size.py`
@@ -1417,6 +1447,12 @@
 - `MAIN` = `набор из 2`
 
 ## tests
+
+### `tests/adapters/test_app_tied_process.py`
+
+- `pytestmark` = `pytest.mark.skipif(sys.platform != 'win32', reas…`
+- `ROOT` = `Path(__file__).resolve().parents[2]`
+- `_APP` = `'\nimport os, subprocess, sys\nfrom adapters imp…`
 
 ### `tests/adapters/test_claude.py`
 
@@ -1553,6 +1589,8 @@
 ### `tests/fakes/claude_code.py`
 
 - `CLI` = `'C:\\fake\\claude.exe'`
+- `DIES` = `'процесс закрыл вывод'`
+- `HANGS` = `'процесс молчит'`
 
 ### `tests/fakes/ingestion.py`
 

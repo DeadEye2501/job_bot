@@ -255,10 +255,13 @@ def _anthropic_is_unreachable(monkeypatch):
 def _claude_code_is_unreachable(monkeypatch):
     """Настоящий Claude Code из тестов не запускается: запуск процесса заперт.
 
-    Каждый запуск тратит лимит подписки человека. Подделка
+    Каждый запрос тратит лимит подписки человека. Подделка
     `tests/fakes/claude_code.py` подменяет этот же вход поверх запора.
+
+    Живой процесс модуль держит между запросами, и тест, оставивший его,
+    передал бы следующему чужой процесс — поэтому после теста он забывается.
     """
-    from adapters import claude_code
+    from adapters import claude_code_process
 
     async def _refuse(*_args, **_kwargs):
         raise ProviderReached(
@@ -266,7 +269,10 @@ def _claude_code_is_unreachable(monkeypatch):
             "tests/fakes/claude_code.py."
         )
 
-    monkeypatch.setattr(claude_code, "_run_cli", _refuse)
+    monkeypatch.setattr(claude_code_process, "_spawn", _refuse)
+    yield
+    claude_code_process._session = None
+    claude_code_process._closing = False
 
 
 @pytest.fixture(autouse=True)
