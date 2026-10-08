@@ -28,7 +28,15 @@
 - `EFFORT` = `'medium'`
 - `REFUSED` = `'refusal'`
 - `NO_EMBEDDINGS` = `'У Anthropic нет моделей эмбеддингов'`
-- `_FINISH` = `словарь из 3`
+- `FINISH` = `словарь из 3`
+
+### `adapters/claude_code.py`
+
+- `CLAUDE_CODE_ADDRESS` = `'claude-code'`
+- `MODELS` = `набор из 3`
+- `NO_CLI` = `'Claude Code не установлен'`
+- `_NOT_SUBSCRIPTION` = `набор из 6`
+- `_NO_WINDOW` = `getattr(subprocess, 'CREATE_NO_WINDOW', 0)`
 
 ### `adapters/cv_text.py`
 
@@ -1405,6 +1413,11 @@
 - `LOG` = `logging.getLogger('tests.claude')`
 - `SONNET` = `'claude-sonnet-5-5'`
 
+### `tests/adapters/test_claude_code.py`
+
+- `LOG` = `logging.getLogger('tests.claude_code')`
+- `SONNET` = `'sonnet'`
+
 ### `tests/adapters/test_lm_models.py`
 
 - `NATIVE_MODELS` = `набор из 2`
@@ -1526,6 +1539,10 @@
 
 - `MESSAGES` = `набор из 2`
 - `MODELS` = `набор из 2`
+
+### `tests/fakes/claude_code.py`
+
+- `CLI` = `'C:\\fake\\claude.exe'`
 
 ### `tests/fakes/ingestion.py`
 

@@ -3,14 +3,15 @@
 Спрашивают отсюда двое: мастер настройки, который показывает человеку выбор,
 и проверка связи. Род модели — чат или встраивания — провайдеры отдают не
 всегда, и тогда его угадывают по имени. Клиента Anthropic оба вопроса
-отдают в `adapters/claude`, файл модели — в `adapters/gguf_embed`.
+отдают в `adapters/claude`, Claude Code — в `adapters/claude_code`, файл модели —
+в `adapters/gguf_embed`.
 """
 
 import logging
 
 import httpx
 
-from adapters import claude, gguf_embed
+from adapters import claude, claude_code, gguf_embed
 
 _log = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ def _ping_request(model: str, kind: str) -> tuple[str, dict]:
 
 
 async def model_listed(
-    client: httpx.AsyncClient | claude.ClaudeClient | gguf_embed.ModelFile, model: str
+    client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, model: str
 ) -> tuple[bool, list[str]]:
     """Числится ли модель у провайдера, и что у него есть вообще.
 
@@ -52,7 +53,7 @@ async def model_listed(
 
 
 async def check_model(
-    client: httpx.AsyncClient | claude.ClaudeClient | gguf_embed.ModelFile, model: str, kind: str
+    client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, model: str, kind: str
 ) -> tuple[bool, str]:
     """Есть ли модель у провайдера и отвечает ли она.
 
@@ -66,7 +67,7 @@ async def check_model(
     причиной, годной для подсказки. Наружу уходит короткое «род и текст» —
     трассировка нужна там, где её потом читают, то есть в журнале.
     """
-    if isinstance(client, claude.ClaudeClient) and kind == "embed":
+    if isinstance(client, (claude.ClaudeClient, claude_code.ClaudeCodeClient)) and kind == "embed":
         return False, claude.NO_EMBEDDINGS
     if isinstance(client, gguf_embed.ModelFile):
         return await client.check(kind)
@@ -83,6 +84,8 @@ async def check_model(
 
     if isinstance(client, claude.ClaudeClient):
         return await claude.ping(client, model)
+    if isinstance(client, claude_code.ClaudeCodeClient):
+        return await claude_code.ping(client, model)
     path, body = _ping_request(model, kind)
     try:
         r = await client.post(path, json=body)
@@ -154,7 +157,7 @@ async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | No
 
 
 async def list_models(
-    client: httpx.AsyncClient | claude.ClaudeClient | gguf_embed.ModelFile, *, kind: str | None = None
+    client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, *, kind: str | None = None
 ) -> list[str]:
     """Return ids of models exposed by the provider.
 
@@ -165,6 +168,8 @@ async def list_models(
     """
     if isinstance(client, claude.ClaudeClient):
         return await claude.list_models(client, kind)
+    if isinstance(client, claude_code.ClaudeCodeClient):
+        return await claude_code.list_models(client, kind)
     if isinstance(client, gguf_embed.ModelFile):
         return client.listed(kind)
     if kind is not None:

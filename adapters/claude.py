@@ -36,8 +36,9 @@ REFUSED = "refusal"
 NO_EMBEDDINGS = "У Anthropic нет моделей эмбеддингов"
 
 # Причины конца в словаре OpenAI: по `length` зовущие решают про обрыв. Окно
-# контекста, исчерпанное посреди ответа, — тот же обрыв.
-_FINISH = {
+# контекста, исчерпанное посреди ответа, — тот же обрыв. Общие с `claude_code`:
+# Claude Code отдаёт причины конца словами API.
+FINISH = {
     "max_tokens": "length",
     "model_context_window_exceeded": "length",
     "end_turn": "stop",
@@ -80,13 +81,23 @@ def _require_key(client: ClaudeClient) -> None:
         raise MissingKey("Не указан ключ Anthropic")
 
 
+def split_system(messages: list[dict[str, str]]) -> tuple[str, list[dict[str, str]]]:
+    """Системный промпт отдельно от реплик — так его ждёт Claude на обоих путях.
+
+    Одним правилом на API и на Claude Code: разъедься они, один и тот же
+    промпт уходил бы к одной модели по-разному.
+    """
+    system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+    return system, [m for m in messages if m["role"] != "system"]
+
+
 def _params(model: str, messages: list[dict[str, str]], max_tokens: int) -> dict:
     """Тело запроса: системные сообщения — в `system`, остальные — в `messages`."""
-    system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+    system, turns = split_system(messages)
     params = {
         "model": model,
         "max_tokens": max(max_tokens, MIN_MAX_TOKENS),
-        "messages": [m for m in messages if m["role"] != "system"],
+        "messages": turns,
         "thinking": {"type": "adaptive"},
         "output_config": {"effort": EFFORT},
     }
@@ -114,7 +125,7 @@ async def ask(client: ClaudeClient, model: str, request, log: logging.Logger):
         log.warning("%s: модель отказалась отвечать (%s)", request.purpose, category)
         return None, REFUSED
     text = "".join(block.text for block in reply.content if block.type == "text")
-    return text, _FINISH.get(reply.stop_reason, reply.stop_reason)
+    return text, FINISH.get(reply.stop_reason, reply.stop_reason)
 
 
 async def list_models(client: ClaudeClient, kind: str | None = None) -> list[str]:

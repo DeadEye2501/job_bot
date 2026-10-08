@@ -34,9 +34,9 @@ Job Bot — single CLI entry point.
 - `def _started_or_told_why() -> int` (36)
 - `def main() -> int` (22)
 
-## adapters — 10 модулей
+## adapters — 11 модулей
 
-### `adapters/claude.py` — 143 строк
+### `adapters/claude.py` — 154 строк
 
 Claude через официальный SDK Anthropic: соединение, запрос и перечень моделей.
 
@@ -48,10 +48,31 @@ Claude через официальный SDK Anthropic: соединение, з
 - `def serves(base_url: str) -> bool` (3)
 - `def make_client(config: LlmProviderConfig, *, timeout: float) -> ClaudeClient` (7)
 - `def _require_key(client: ClaudeClient) -> None` (9)
+- `def split_system(messages: list[dict[str, str]]) -> tuple[str, list[dict[str, str]]]` (8)
 - `def _params(model: str, messages: list[dict[str, str]], max_tokens: int) -> dict` (13)
 - `async def ask(client: ClaudeClient, model: str, request, log: logging.Logger)` (20)
 - `async def list_models(client: ClaudeClient, kind: str | None=None) -> list[str]` (6)
 - `async def ping(client: ClaudeClient, model: str) -> tuple[bool, str]` (15)
+
+### `adapters/claude_code.py` — 195 строк
+
+Claude через установленный Claude Code по подписке: запрос — процесс `claude -p`.
+
+Зависит от: `adapters.claude`
+
+- `class CliTrouble(Exception)` (10)
+- `class ClaudeCodeClient` (8)
+  - `async def aclose(self) -> None` (2)
+- `def serves(base_url: str) -> bool` (3)
+- `def make_client(*, timeout: float) -> ClaudeCodeClient` (3)
+- `def _find_cli() -> str | None` (11)
+- `def _argv(cli: str, model: str, prompt_file: str) -> list[str]` (18)
+- `async def _run_cli(argv: list[str], stdin: str, env: dict, timeout: float) -> tuple[int, str, str]` (20)
+- `def _reply(code: int, stdout: str, stderr: str) -> tuple[str | None, str | None]` (13)
+- `async def _converse(client: ClaudeCodeClient, model: str, messages: list[dict], timeout: float | None) -> tuple[str | None, str | None]` (20)
+- `async def ask(client: ClaudeCodeClient, model: str, request, log: logging.Logger)` (11)
+- `async def list_models(_client: ClaudeCodeClient, kind: str | None=None) -> list[str]` (7)
+- `async def ping(client: ClaudeCodeClient, model: str) -> tuple[bool, str]` (7)
 
 ### `adapters/cv_text.py` — 137 строк
 
@@ -95,7 +116,7 @@ Claude через официальный SDK Anthropic: соединение, з
   - `async def aclose(self) -> None` (3)
   - `def _release(self) -> None` (5)
 
-### `adapters/lm_chat.py` — 197 строк
+### `adapters/lm_chat.py` — 227 строк
 
 Обращение к чат-модели провайдера и разбор её ответа.
 
@@ -108,8 +129,10 @@ Claude через официальный SDK Anthropic: соединение, з
 - `def _delivery_refusal(purpose: str, trouble: Exception, log: logging.Logger) -> ChatAnswer` (6)
 - `def _warn_if_truncated(finish_reason, purpose: str, log: logging.Logger) -> None` (17)
 - `def _answer_or_empty(content, finish_reason, purpose: str, log: logging.Logger) -> ChatAnswer` (21)
-- `async def chat(client: httpx.AsyncClient | claude.ClaudeClient, model: str, request: ChatRequest, log: logging.Logger) -> ChatAnswer` (32)
-- `async def _chat_with_claude(client: claude.ClaudeClient, model: str, request: ChatRequest, log: logging.Logger) -> ChatAnswer` (24)
+- `async def chat(client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient, model: str, request: ChatRequest, log: logging.Logger) -> ChatAnswer` (34)
+- `async def _chat_with_claude(client: claude.ClaudeClient, model: str, request: ChatRequest, log: logging.Logger) -> ChatAnswer` (21)
+- `async def _chat_with_claude_code(client: claude_code.ClaudeCodeClient, model: str, request: ChatRequest, log: logging.Logger) -> ChatAnswer` (14)
+- `def _settled(content: str | None, finish_reason: str | None, purpose: str, log: logging.Logger) -> ChatAnswer` (13)
 
 ### `adapters/lm_embed.py` — 32 строк
 
@@ -119,26 +142,26 @@ Claude через официальный SDK Anthropic: соединение, з
 
 - `async def embed(client: httpx.AsyncClient | gguf_embed.ModelFile, model: str, text: str) -> list[float]` (20)
 
-### `adapters/lm_models.py` — 183 строк
+### `adapters/lm_models.py` — 188 строк
 
 Перечень моделей у провайдера и проверка, что нужная отвечает.
 
 Зависит от: `adapters`
 
 - `def _ping_request(model: str, kind: str) -> tuple[str, dict]` (14)
-- `async def model_listed(client: httpx.AsyncClient | claude.ClaudeClient | gguf_embed.ModelFile, model: str) -> tuple[bool, list[str]]` (18)
-- `async def check_model(client: httpx.AsyncClient | claude.ClaudeClient | gguf_embed.ModelFile, model: str, kind: str) -> tuple[bool, str]` (41)
+- `async def model_listed(client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, model: str) -> tuple[bool, list[str]]` (18)
+- `async def check_model(client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, model: str, kind: str) -> tuple[bool, str]` (43)
 - `def _looks_like_embed(name: str) -> bool` (9)
 - `async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | None` (37)
-- `async def list_models(client: httpx.AsyncClient | claude.ClaudeClient | gguf_embed.ModelFile, *, kind: str | None=None) -> list[str]` (28)
+- `async def list_models(client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, *, kind: str | None=None) -> list[str]` (30)
 
-### `adapters/lm_studio.py` — 41 строк
+### `adapters/lm_studio.py` — 49 строк
 
 Соединение с OpenAI-совместимым провайдером моделей.
 
 Зависит от: `adapters`, `backend.runtime_settings`
 
-- `def make_client(config: LlmProviderConfig) -> httpx.AsyncClient | claude.ClaudeClient | gguf_embed.ModelFile` (15)
+- `def make_client(config: LlmProviderConfig) -> httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile` (22)
 
 ### `adapters/telegram.py` — 220 строк
 
@@ -2671,7 +2694,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 259 модулей
+## tests — 261 модулей
 
 ### `tests/adapters/test_claude.py` — 288 строк
 
@@ -2686,6 +2709,17 @@ Runtime settings layer.
 - `def wire(monkeypatch)` (19)
   - `def install(routes: dict) -> list` (9)
     - `async def relay(_transport, request)` (2)
+
+### `tests/adapters/test_claude_code.py` — 223 строк
+
+Следствия разговора с Claude через Claude Code по подписке.
+
+Зависит от: `adapters`, `adapters.claude_code`, `adapters.lm_chat`, `adapters.lm_studio`, `backend.runtime_settings`, `tests.fakes.claude_code`
+
+Тестов: 14
+
+- `def _client() -> ClaudeCodeClient` (2)
+- `def _request(**over) -> ChatRequest` (12)
 
 ### `tests/adapters/test_cv_text.py` — 299 строк
 
@@ -5138,11 +5172,11 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/conftest.py` — 378 строк ⚠ подошёл к 300
+### `tests/conftest.py` — 396 строк ⚠ подошёл к 300
 
 Стенд: подмена каталога данных, хранилища ключей и базы.
 
-Зависит от: `adapters.db`, `adapters.telegram`, `alembic`, `backend.bootstrap`, `config`, `tests.fakes.keyring`
+Зависит от: `adapters`, `adapters.db`, `adapters.telegram`, `alembic`, `backend.bootstrap`, `config`, `tests.fakes.keyring`
 
 - `def _data_dir_without_appdata() -> Path` (15)
 - `def _temporary_data_dir()` (3)
@@ -5156,6 +5190,8 @@ Runtime settings layer.
   - `async def _refuse(*_args, **_kwargs)` (7)
 - `class ProviderReached(BaseException)` (6)
 - `def _anthropic_is_unreachable(monkeypatch)` (16)
+  - `async def _refuse(*_args, **_kwargs)` (5)
+- `def _claude_code_is_unreachable(monkeypatch)` (15)
   - `async def _refuse(*_args, **_kwargs)` (5)
 - `def _sending_locked(monkeypatch)` (10)
 - `async def _clear_all_tables(engine: AsyncEngine) -> None` (37)
@@ -5227,6 +5263,20 @@ Runtime settings layer.
 - `def message(text: str, *, stop_reason: str='end_turn') -> httpx2.Response` (9)
 - `def refusal(category: str='cyber') -> httpx2.Response` (7)
 - `def model_list(*ids: str) -> httpx2.Response` (16)
+
+### `tests/fakes/claude_code.py` — 82 строк
+
+Подделка Claude Code: запуск процесса подменён, разбор и сборка вызова настоящие.
+
+Зависит от: `adapters`
+
+- `def _answer(text: str | None, **fields) -> dict` (3)
+- `def result(text: str | None, *, stop_reason: str='end_turn') -> dict` (5)
+- `def failure(text: str, *, status: int | None=None) -> dict` (9)
+- `class Calls` (9)
+- `def _system_prompt(argv: list[str]) -> str | None` (5)
+- `def install(monkeypatch, replies: list, *, cli: str | None=CLI) -> Calls` (26)
+  - `async def run(argv, stdin, env, timeout)` (12)
 
 ### `tests/fakes/gguf.py` — 30 строк
 
@@ -5418,13 +5468,13 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/test_harness_safety.py` — 161 строк
+### `tests/test_harness_safety.py` — 172 строк
 
 Сторож стенда: падает, если подмена не сработала.
 
-Зависит от: `adapters.claude`, `adapters.telegram`, `backend.models`, `config`, `tests.conftest`
+Зависит от: `adapters`, `adapters.claude`, `adapters.telegram`, `backend.models`, `config`, `tests.conftest`
 
-Тестов: 12
+Тестов: 13
 
 
 ### `tests/test_package_shadowing.py` — 32 строк

@@ -8,6 +8,7 @@ import keyring
 import pytest
 from sqlalchemy import func, select
 
+from adapters import claude_code
 from adapters.claude import ClaudeClient
 from backend.models import Company
 from config import get_data_dir, get_database_url
@@ -47,6 +48,16 @@ async def test_a_call_into_real_anthropic_blows_up():
             max_tokens=1,
             messages=[{"role": "user", "content": "ping"}],
         )
+
+
+async def test_running_real_claude_code_blows_up():
+    """Запуск настоящего Claude Code из теста взрывается.
+
+    Каждый такой запуск тратит лимит подписки человека, а тест с забытой
+    подделкой запускал бы его молча и проходил бы зелёным.
+    """
+    with pytest.raises(ProviderReached, match="Claude Code"):
+        await claude_code._run_cli(["claude", "-p"], "ping", {}, 1.0)
 
 
 async def test_a_call_into_real_telegram_blows_up():
