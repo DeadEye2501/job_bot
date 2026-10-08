@@ -8,7 +8,7 @@ from backend.bot.chat import EMPTY_MESSAGE
 from backend.incoming import moment_or_none
 from backend.repository import messages as messages_repo
 from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
-from client.bridge.desktop import chosen_path
+from client.bridge.desktop import chosen_path, closed_dialog
 from client.bridge.page import read_page
 from client.bridge.refusals import NO_BOT, SEND_BROKE
 from client.bridge.wire import _message_row_to_dict
@@ -165,7 +165,7 @@ class HrChat:
         """
         path = chosen_path(self._hub.window)
         if path is None:
-            return {"ok": {"cancelled": True}}
+            return closed_dialog()
         return self._send_media({"hr_id": hr_id, "path": path})
 
     def _send_media(self, payload: dict) -> dict:

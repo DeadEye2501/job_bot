@@ -22,17 +22,14 @@
 ### `adapters/claude.py`
 
 - `_log` = `logging.getLogger(__name__)`
-- `CLAUDE_HOST` = `'api.anthropic.com'`
 - `_CLAUDE_URL` = `f'https://{CLAUDE_HOST}'`
-- `MIN_MAX_TOKENS` = `16000`
-- `EFFORT` = `'medium'`
+- `THINKING_ROOM` = `16000`
+- `EFFORT` = `'high'`
 - `REFUSED` = `'refusal'`
-- `NO_EMBEDDINGS` = `'У Anthropic нет моделей эмбеддингов'`
 - `FINISH` = `словарь из 3`
 
 ### `adapters/claude_code.py`
 
-- `CLAUDE_CODE_ADDRESS` = `'claude-code'`
 - `MODELS` = `набор из 3`
 - `NO_CLI` = `'Claude Code не установлен'`
 - `_NOT_SUBSCRIPTION` = `набор из 6`
@@ -59,6 +56,8 @@
 
 ### `adapters/lm_chat.py`
 
+- `CHAT_PATH` = `'/v1/chat/completions'`
+- `MODEL_REFUSED` = `claude.REFUSED`
 - `class ChatRequest`
   - `purpose: str`
   - `messages: list[dict[str, str]]`
@@ -70,14 +69,20 @@
   - `finish_reason: str | None` = `None`
   - `error: str | None` = `None`
 
+### `adapters/lm_embed.py`
+
+- `EMBED_PATH` = `'/v1/embeddings'`
+
 ### `adapters/lm_models.py`
 
 - `_log` = `logging.getLogger(__name__)`
+- `PING` = `'ping'`
 - `_EMBED_MARKERS` = `набор из 4`
 
 ### `adapters/lm_studio.py`
 
 - `LLM_REQUEST_TIMEOUT_SEC` = `180.0`
+- `LmClient` = `httpx.AsyncClient | claude.ClaudeClient | claude…`
 
 ### `adapters/telegram.py`
 
@@ -223,6 +228,12 @@
 - `_KEYRING_KEY` = `'master_key'`
 - `_REJECTED_KEYRING_BACKENDS` = `набор из 5`
 
+### `backend/domain/alphabet.py`
+
+- `CYRILLIC_LETTER` = `re.compile('[а-яё]', re.IGNORECASE)`
+- `LATIN_LETTER` = `re.compile('[a-z]', re.IGNORECASE)`
+- `CYRILLIC_WORD` = `re.compile('[а-яё]+', re.IGNORECASE)`
+
 ### `backend/domain/company_hosts.py`
 
 - `AGGREGATOR_HOSTS` = `frozenset({'t.me', 'telegram.me', 'telegram.org'…`
@@ -324,6 +335,7 @@
 - `JUNK_SKIP_PREFIXES` = `набор из 2`
 - `LLM_SKIP_PREFIX` = `'llm: '`
 - `TRUNCATED_SKIP_REASON` = `f'{LLM_SKIP_PREFIX}ответ модели не поместился'`
+- `REFUSED_SKIP_REASON` = `f'{LLM_SKIP_PREFIX}модель отказалась отвечать'`
 
 ### `backend/flows/apply.py`
 
@@ -518,8 +530,6 @@
 ### `backend/llm/cv_native.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_CYRILLIC` = `re.compile('[а-яё]', re.IGNORECASE)`
-- `_LATIN` = `re.compile('[a-z]', re.IGNORECASE)`
 
 ### `backend/llm/external.py`
 
@@ -610,9 +620,6 @@
 - `_WRAPPED_BY_PREPOSITION_RE` = `re.compile(_WRAPPER_HEAD + '.*?\\s(?:с|со|в|во|н…`
 - `_WRAPPED_BARE_RE` = `re.compile(_WRAPPER_HEAD + '\\s+(?P<tail>\\S.*)$…`
 - `_MAX_WRAPPED_WORDS` = `4`
-- `_CYRILLIC_RE` = `re.compile('[а-яёА-ЯЁ]')`
-- `_LATIN_RE` = `re.compile('[A-Za-z]')`
-- `_CYRILLIC_WORD_RE` = `re.compile('[а-яёА-ЯЁ]+')`
 - `_LISTED_RE` = `re.compile('\\s*,\\s*|\\s+(?:и|and)\\s+', re.IGN…`
 
 ### `backend/llm/vacancy.py`
@@ -1005,6 +1012,8 @@
 ### `backend/provider_config.py`
 
 - `MODEL_FILE_SUFFIX` = `'.gguf'`
+- `CLAUDE_HOST` = `'api.anthropic.com'`
+- `CLAUDE_CODE_ADDRESS` = `'claude-code'`
 - `class LlmProviderConfig`
   - `base_url: str`
   - `api_key: str` = `field(repr=False)`
@@ -1262,6 +1271,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `_MODEL_FILTER` = `f'Модель GGUF (*{MODEL_FILE_SUFFIX})'`
+- `PROVIDER_KINDS` = `tuple((kind.value for kind in LlmConfigKind))`
 
 ### `client/bridge/mark.py`
 

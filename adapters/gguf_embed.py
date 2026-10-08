@@ -82,18 +82,14 @@ class ModelFile:
         except _LOAD_TROUBLES as e:
             raise ModelUnavailable(f"модель не загрузилась: {self.path}") from e
 
-    def listed(self, kind: str | None) -> list[str]:
+    def listed(self) -> list[str]:
         """Файл как «перечень моделей»: он сам, пока лежит на диске."""
-        if kind == "chat" or not os.path.isfile(self.path):
-            return []
-        return [self.path]
+        return [self.path] if os.path.isfile(self.path) else []
 
-    async def check(self, kind: str) -> tuple[bool, str]:
-        """Проверка связи: загрузить модель и посчитать пробный вектор."""
-        if kind != "embed":
-            return False, "Файл модели годится только для эмбеддингов"
+    async def check(self, text: str) -> tuple[bool, str]:
+        """Проверка связи: загрузить модель и посчитать вектор пробного текста."""
         try:
-            await self.embed("ping")
+            await self.embed(text)
         except ModelUnavailable as e:
             _log.exception("файл модели не прошёл проверку")
             return False, str(e)

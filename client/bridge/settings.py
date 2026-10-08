@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from adapters.lm_studio import LlmProviderConfig
+from backend.provider_config import LlmProviderConfig
 from backend.telegram_login import username_of
 from client.bridge.answer import BAD_PAYLOAD, Denied, denied, reply
 from client.bridge.bot_stop import detach_bot, stop_bot
 from client.bridge.hub import Hub
-from client.bridge.llm import Llm, read_llm_creds
+from client.bridge.llm import PROVIDER_KINDS, Llm, read_llm_creds
 from client.bridge.login import Login
 from client.bridge.wire import _llm_provider_to_dict, _tg_creds_to_dict
 
@@ -279,7 +279,7 @@ def _read_providers(payload: dict) -> dict[str, LlmProviderConfig]:
     знает, в каком из двух полей стёрлось.
     """
     creds: dict[str, LlmProviderConfig] = {}
-    for kind in ("chat", "embed"):
+    for kind in PROVIDER_KINDS:
         draft = payload.get(kind)
         if not isinstance(draft, dict):
             continue

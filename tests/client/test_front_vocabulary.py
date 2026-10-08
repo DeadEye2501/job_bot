@@ -23,6 +23,7 @@ from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
 from backend.domain.verdict import (
     EMPTY_SKIP_REASON,
     LLM_SKIP_PREFIX,
+    REFUSED_SKIP_REASON,
     TRASH_SKIP_PREFIX,
     TRUNCATED_SKIP_REASON,
     blacklist_refusal,
@@ -83,6 +84,7 @@ def _skip_reasons_the_backend_writes() -> set[str]:
         low,
         EMPTY_SKIP_REASON,
         TRUNCATED_SKIP_REASON,
+        REFUSED_SKIP_REASON,
         # Мусор и отказ модели собирает разбор (`flows/parse.py`) из приставки
         # и слов модели; сами приставки объявлены рядом с приговором.
         f"{TRASH_SKIP_PREFIX}реклама",

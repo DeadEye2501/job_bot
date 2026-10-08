@@ -11,19 +11,17 @@ import time
 
 import pytest
 
-from adapters import gguf_embed, lm_embed, lm_models
+from adapters import lm_embed, lm_models
 from adapters.gguf_embed import ModelFile, ModelUnavailable
 from adapters.lm_studio import make_client
-from backend.runtime_settings import LlmProviderConfig
-from tests.fakes.gguf import Model, model_file
+from backend.provider_config import LlmProviderConfig
+from tests.fakes.gguf import Model, engine, engine_journal, failing_engine, model_file
 
 
 @pytest.fixture
 def journal(monkeypatch):
     """Журнал загрузок и закрытий подставной модели."""
-    happened: list[str] = []
-    monkeypatch.setattr(gguf_embed, "_open_model", lambda _path: Model(happened))
-    return happened
+    return engine_journal(monkeypatch)
 
 
 def test_an_empty_address_with_a_model_file_gets_the_file_client(tmp_path):
@@ -59,7 +57,7 @@ async def test_texts_asked_at_once_share_one_load(monkeypatch, tmp_path):
         time.sleep(0.05)
         return Model(happened)
 
-    monkeypatch.setattr(gguf_embed, "_open_model", slow)
+    engine(monkeypatch, slow)
     client = ModelFile(model_file(tmp_path))
 
     await asyncio.gather(*(client.embed(str(n)) for n in range(5)))
@@ -82,6 +80,7 @@ async def test_a_missing_file_is_the_whole_model_unavailable(journal, tmp_path):
     [
         pytest.param(ValueError("Failed to load model from file"), id="битый файл"),
         pytest.param(OSError("llama.dll not found"), id="нет библиотеки движка"),
+        pytest.param(ImportError("No module named 'llama_cpp'"), id="нет движка"),
         pytest.param(RuntimeError("failed to create context"), id="сбой движка"),
     ],
 )
@@ -91,11 +90,7 @@ async def test_a_file_the_engine_cannot_load_is_unavailable_too(monkeypatch, tmp
     Уйди она наружу как есть, приём поста счёл бы её бедой одного текста и
     шёл бы дальше, теряя посты, пока файл не починят.
     """
-
-    def broken(_path):
-        raise trouble
-
-    monkeypatch.setattr(gguf_embed, "_open_model", broken)
+    failing_engine(monkeypatch, trouble)
 
     with pytest.raises(ModelUnavailable):
         await ModelFile(model_file(tmp_path)).embed("текст")
@@ -106,7 +101,7 @@ async def test_a_model_without_embeddings_is_unavailable(monkeypatch, tmp_path):
 
     Она отдаёт вектор на каждый токен, и так она ответит на каждый пост.
     """
-    monkeypatch.setattr(gguf_embed, "_open_model", lambda _path: Model([], per_token=True))
+    engine(monkeypatch, lambda _path: Model([], per_token=True))
     path = model_file(tmp_path)
 
     with pytest.raises(ModelUnavailable):
@@ -166,7 +161,7 @@ async def test_an_engine_failure_on_the_probe_text_is_answered_not_raised(monkey
         def embed(self, text: str) -> list:
             raise RuntimeError(f"llama_decode returned -1 on {len(text)} chars")
 
-    monkeypatch.setattr(gguf_embed, "_open_model", lambda _path: Failing([]))
+    engine(monkeypatch, lambda _path: Failing([]))
     path = model_file(tmp_path)
 
     ok, detail = await lm_models.check_model(ModelFile(path), path, "embed")

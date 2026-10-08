@@ -11,7 +11,7 @@ import httpx
 
 from adapters import lm_studio
 from backend.health import database_alive, model_alive, telegram_alive
-from backend.runtime_settings import LlmProviderConfig
+from backend.provider_config import LlmProviderConfig
 from tests.fakes.gguf import model_file
 
 

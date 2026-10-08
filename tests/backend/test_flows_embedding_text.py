@@ -13,7 +13,8 @@ import pytest
 
 from adapters import gguf_embed
 from backend.flows import embeddings
-from tests.fakes.gguf import model_file
+from tests.fakes.gguf import failing_engine, model_file
+from tests.fakes.llm import embeddings_refused, embeddings_request
 
 
 class _Provider:
@@ -53,19 +54,11 @@ async def test_a_text_the_provider_choked_on_gives_no_fingerprint(caplog):
     [
         pytest.param(httpx.ConnectError("адрес молчит"), id="адрес молчит"),
         pytest.param(
-            httpx.HTTPStatusError(
-                "model not found",
-                request=httpx.Request("POST", "http://provider.test/v1/embeddings"),
-                response=httpx.Response(404),
-            ),
+            embeddings_refused(404, "model not found"),
             id="модели у поставщика нет",
         ),
         pytest.param(
-            httpx.HTTPStatusError(
-                "server error",
-                request=httpx.Request("POST", "http://provider.test/v1/embeddings"),
-                response=httpx.Response(503),
-            ),
+            embeddings_refused(503, "server error"),
             id="поставщик сломан",
         ),
     ],
@@ -91,7 +84,7 @@ async def test_the_fingerprint_comes_back_when_the_provider_answers():
             return httpx.Response(
                 200,
                 json={"data": [{"embedding": [0.5, 0.25]}]},
-                request=httpx.Request("POST", "http://provider.test/v1/embeddings"),
+                request=embeddings_request(),
             )
 
     pipeline = _Pipeline(_Answering())
@@ -115,7 +108,7 @@ async def test_a_very_long_text_is_cut_before_it_goes_to_the_provider():
             return httpx.Response(
                 200,
                 json={"data": [{"embedding": [0.5]}]},
-                request=httpx.Request("POST", "http://provider.test/v1/embeddings"),
+                request=embeddings_request(),
             )
 
     pipeline = _Pipeline(_Watching())
@@ -132,11 +125,7 @@ async def test_a_model_file_that_will_not_load_silences_the_provider(monkeypatch
     Сочти приём её бедой текста — курсор канала уехал бы мимо постов, которые
     не посчитаются, пока файл не вернут на место.
     """
-
-    def broken(_path):
-        raise ValueError("Failed to load model from file")
-
-    monkeypatch.setattr(gguf_embed, "_open_model", broken)
+    failing_engine(monkeypatch, ValueError("Failed to load model from file"))
     pipeline = _Pipeline(gguf_embed.ModelFile(model_file(tmp_path)))
 
     with pytest.raises(embeddings.ProviderIsSilent):

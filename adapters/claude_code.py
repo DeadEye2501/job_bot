@@ -8,7 +8,6 @@ API оплачивается отдельно от подписки, а Claude C
 
 import asyncio
 import json
-import logging
 import os
 import shutil
 import subprocess
@@ -16,8 +15,6 @@ import tempfile
 from pathlib import Path
 
 from adapters.claude import EFFORT, FINISH, REFUSED, split_system
-
-CLAUDE_CODE_ADDRESS = "claude-code"
 
 # Имена, которые Claude Code сам ведёт к последней версии модели.
 MODELS = ["sonnet", "opus", "haiku"]
@@ -60,11 +57,6 @@ class ClaudeCodeClient:
 
     async def aclose(self) -> None:
         """Закрывать нечего: соседи закрывают клиента, и этот обязан уметь."""
-
-
-def serves(base_url: str) -> bool:
-    """Ведёт ли адрес к Claude Code."""
-    return base_url.strip() == CLAUDE_CODE_ADDRESS
 
 
 def make_client(*, timeout: float) -> ClaudeCodeClient:
@@ -164,32 +156,23 @@ async def _converse(
     return _reply(code, out, err)
 
 
-async def ask(client: ClaudeCodeClient, model: str, request, log: logging.Logger):
+async def ask(client: ClaudeCodeClient, model: str, request):
     """Спросить модель: текст и причина конца в словаре OpenAI.
 
     `request` — `lm_chat.ChatRequest`; тип не назван, потому что `lm_chat` сам
     зовёт этот модуль. Беды уходят наверх `CliTrouble`: метку им ставит
-    `lm_chat`, одну на все пути. Отказ модели — ответ без текста с `REFUSED`.
+    `lm_chat`, одну на все пути. Отказ модели — ответ с причиной конца `REFUSED`.
     """
-    text, finish = await _converse(client, model, request.messages, request.timeout)
-    if finish == REFUSED:
-        log.warning("%s: модель отказалась отвечать", request.purpose)
-    return text, finish
+    return await _converse(client, model, request.messages, request.timeout)
 
 
-async def list_models(_client: ClaudeCodeClient, kind: str | None = None) -> list[str]:
-    """Модели Claude Code; эмбеддингов он не даёт. Нет Claude Code — `CliTrouble`."""
-    if kind == "embed":
-        return []
+async def list_models(_client: ClaudeCodeClient) -> list[str]:
+    """Модели Claude Code. Нет Claude Code — `CliTrouble`."""
     if _find_cli() is None:
         raise CliTrouble(NO_CLI)
     return list(MODELS)
 
 
-async def ping(client: ClaudeCodeClient, model: str) -> tuple[bool, str]:
-    """Пробный запрос через Claude Code — для кнопки проверки связи."""
-    try:
-        await _converse(client, model, [{"role": "user", "content": "ping"}], None)
-    except CliTrouble as e:
-        return False, f"{model} (ping failed: {e})"
-    return True, model
+async def ping(client: ClaudeCodeClient, model: str, text: str) -> None:
+    """Пробный запрос через Claude Code; беда — `CliTrouble`."""
+    await _converse(client, model, [{"role": "user", "content": text}], None)

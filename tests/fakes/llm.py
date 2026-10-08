@@ -31,6 +31,8 @@ import json
 import httpx
 import pytest
 
+from adapters.lm_chat import ChatRequest
+
 
 # Пары «метод, путь», по которым подделка раскладывает заготовленные ответы.
 # Держатся здесь, а не в каждом файле проверок: путь один на весь проект, и
@@ -237,3 +239,34 @@ def chat_response(content: str | None, *, finish_reason: str = "stop") -> httpx.
             ]
         },
     )
+
+
+def chat_request(**over) -> ChatRequest:
+    """Обращение, каким его собирают модули `backend/llm`: правила и текст.
+
+    Общее у тестов всех путей к модели: проверяют они одно — что из такого
+    обращения уходит поставщику и что возвращается зовущему.
+    """
+    fields = {
+        "purpose": "разбор вакансии",
+        "messages": [
+            {"role": "system", "content": "правила"},
+            {"role": "user", "content": "текст"},
+        ],
+        "max_tokens": 1200,
+    }
+    fields.update(over)
+    return ChatRequest(**fields)
+
+
+def embeddings_request() -> httpx.Request:
+    """Запрос к поддельному поставщику эмбеддингов — ответу и ошибке он обязателен."""
+    return httpx.Request(EMBEDDINGS[0], f"http://provider.test{EMBEDDINGS[1]}")
+
+
+def embeddings_refused(status: int, text: str = "") -> httpx.HTTPStatusError:
+    """Отказ поставщика эмбеддингов кодом состояния — так его бросает `raise_for_status`."""
+    return httpx.HTTPStatusError(
+        text, request=embeddings_request(), response=httpx.Response(status)
+    )
+

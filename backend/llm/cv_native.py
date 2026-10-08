@@ -9,16 +9,14 @@
 """
 
 import logging
-import re
 from dataclasses import replace
 
 from backend.domain.taxonomy import LEVEL_WHEN_UNTOLD, NATIVE_LEVEL
+from backend.domain.alphabet import CYRILLIC_LETTER, LATIN_LETTER
 from backend.payloads import ParsedCv, ParsedCvLanguage
 
 logger = logging.getLogger(__name__)
 
-_CYRILLIC = re.compile(r"[а-яё]", re.IGNORECASE)
-_LATIN = re.compile(r"[a-z]", re.IGNORECASE)
 
 
 def _resume_language(text: str) -> str:
@@ -28,7 +26,7 @@ def _resume_language(text: str) -> str:
     и на резюме разработчика их четверть. Большинства это не переворачивает,
     а порог тут был бы числом, взятым с потолка.
     """
-    if len(_CYRILLIC.findall(text)) >= len(_LATIN.findall(text)):
+    if len(CYRILLIC_LETTER.findall(text)) >= len(LATIN_LETTER.findall(text)):
         return "Русский"
     return "English"
 

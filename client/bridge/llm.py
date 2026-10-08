@@ -1,4 +1,4 @@
-"""Разговор с поставщиком модели: проба связи и опрос имён."""
+"""Поставщик модели для окна: проверить связь, спросить имена, выбрать файл модели."""
 
 from __future__ import annotations
 
@@ -10,16 +10,24 @@ from typing import Any, Callable
 import httpx
 
 from adapters import lm_models, lm_studio
-from adapters.lm_studio import LlmProviderConfig
-from backend.provider_config import MODEL_FILE_SUFFIX, provider_complete
+from backend.models import LlmConfigKind
+from backend.provider_config import (
+    MODEL_FILE_SUFFIX,
+    LlmProviderConfig,
+    provider_complete,
+    serves_kind,
+)
 from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, reply
-from client.bridge.desktop import chosen_path
+from client.bridge.desktop import chosen_path, closed_dialog
 from client.bridge.refusals import LLM_FIELDS_REQUIRED
 
 
 logger = logging.getLogger(__name__)
 
 _MODEL_FILTER = f"Модель GGUF (*{MODEL_FILE_SUFFIX})"
+
+# Рода поставщиков, какими их называет окно, — значения перечисления базы.
+PROVIDER_KINDS = tuple(kind.value for kind in LlmConfigKind)
 
 
 def _client_or_reason(cfg: LlmProviderConfig) -> tuple[httpx.AsyncClient | None, str]:
@@ -166,7 +174,7 @@ class Llm:
         try:
             payload = payload if isinstance(payload, dict) else {}
             kind = str(payload.get("kind", "")).strip()
-            if kind not in ("chat", "embed"):
+            if kind not in PROVIDER_KINDS:
                 raise ValueError(f"неизвестный род: {kind!r}")
             cfg = read_llm_creds(payload, kind)
         except BAD_PAYLOAD as e:
@@ -191,7 +199,7 @@ class Llm:
         """
         path = chosen_path(self._hub.window, _MODEL_FILTER)
         if path is None:
-            return {"ok": {"cancelled": True}}
+            return closed_dialog()
         return {"ok": {"path": path}}
 
     def list_models(self, payload: dict) -> dict:
@@ -209,7 +217,11 @@ class Llm:
         kind, base_url, api_key = read_models_ask(payload)
 
         async def run() -> dict:
-            if not base_url or kind not in ("chat", "embed"):
+            if not base_url or kind not in PROVIDER_KINDS:
+                return {"kind": kind, "models": []}
+            # Векторов Claude не считает: перечень его моделей в поле эмбеддингов
+            # подсказывал бы то, что не заработает.
+            if not serves_kind(kind, base_url):
                 return {"kind": kind, "models": []}
             answer = await _do_list_models_for_creds(base_url, api_key, kind=kind)
             if not answer["ok"]:

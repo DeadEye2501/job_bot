@@ -4,6 +4,7 @@
 `_from_tg_row` и `_from_llm_row` видны только тем, что оказалось в кэше.
 """
 
+import pytest
 from cryptography.fernet import Fernet
 
 from backend.crypto import encrypt_bytes, encrypt_str
@@ -171,6 +172,18 @@ async def test_a_model_file_without_an_address_is_a_provider(session_factory):
     embed = (await RuntimeSettings.load(session_factory)).embed
 
     assert (embed.base_url, embed.model) == ("", path)
+
+
+@pytest.mark.parametrize("address", ["https://api.anthropic.com", "claude-code"])
+async def test_claude_is_not_an_embeddings_provider(session_factory, address):
+    """Claude векторов не считает: строка эмбеддингов с его адресом — не поставщик.
+
+    Поднимись она, каждый пост падал бы как беда одного текста, и обход канала
+    уезжал бы мимо постов, не посчитав ни одного.
+    """
+    await put(session_factory, llm_config_row(LlmConfigKind.EMBED, base_url=address, model="sonnet"))
+
+    assert (await RuntimeSettings.load(session_factory)).embed is None
 
 
 async def test_a_model_file_is_not_a_chat_provider(session_factory):

@@ -189,7 +189,8 @@ async def list_hrs_for_company(
 async def list_hrs_with_unread(session: AsyncSession) -> list[dict]:
     """HRs that have at least one unread incoming message — for the footer
     pop-up. Ordered by most recent unread first so the latest noise is on
-    top. Returns plain dicts; the bridge serialises them as-is.
+    top. Returns plain dicts with `last_at` as a datetime: the bridge turns
+    it into a zoned string for the window (`client/bridge/wire._iso`).
     """
     rows = (
         await session.execute(
@@ -212,7 +213,7 @@ async def list_hrs_with_unread(session: AsyncSession) -> list[dict]:
             "name": name,
             "telegram_username": tg_username,
             "unread_count": int(unread or 0),
-            "last_at": last_at.isoformat() if last_at else None,
+            "last_at": last_at,
         }
         for hr_id, name, tg_username, unread, last_at in rows
     ]

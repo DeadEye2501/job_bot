@@ -12,14 +12,14 @@
 Служебные записи и опросы до сравнения не доходят вовсе: вакансий в них нет.
 """
 
-import pytest
-
 import httpx
+import pytest
 
 from adapters import telegraph
 from backend.flows import embeddings, ingest
 from backend.flows import parse as parse_mod
 from tests.backend.fixtures.parse_stub import parse_into
+from tests.fakes.llm import embeddings_refused
 from tests.fakes.telegram_objects import link_entity, post
 
 
@@ -89,11 +89,7 @@ async def test_a_model_the_provider_does_not_have_stops_the_post_too(
     """
 
     async def not_found(client, model, text):
-        raise httpx.HTTPStatusError(
-            "model not found",
-            request=httpx.Request("POST", "http://provider.test/v1/embeddings"),
-            response=httpx.Response(404),
-        )
+        raise embeddings_refused(404, "model not found")
 
     monkeypatch.setattr("adapters.lm_embed.embed", not_found)
 
@@ -112,11 +108,7 @@ async def test_a_text_the_provider_refuses_is_skipped(intake, monkeypatch):
     """
 
     async def refuse(client, model, text):
-        raise httpx.HTTPStatusError(
-            "context length exceeded",
-            request=httpx.Request("POST", "http://provider.test/v1/embeddings"),
-            response=httpx.Response(400),
-        )
+        raise embeddings_refused(400, "context length exceeded")
 
     monkeypatch.setattr("adapters.lm_embed.embed", refuse)
 
