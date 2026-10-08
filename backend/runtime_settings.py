@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backend.crypto import decrypt_bytes, decrypt_str, encrypt_bytes, encrypt_str
+from backend.provider_config import LlmProviderConfig, provider_complete
 from backend.repository.app_settings import CV_PATH_KEY, put_app_setting
 from backend.models import (
     AppSetting,
@@ -53,14 +54,6 @@ class TgAccountConfig:
     phone: str
     password: str = field(repr=False)  # 2FA password; "" if none
     session_string: str | None = field(repr=False)  # pyrogram session; None pre-login
-
-
-@dataclass(frozen=True)
-class LlmProviderConfig:
-    base_url: str
-    # "" for endpoints that don't need auth (LM Studio / Ollama local).
-    api_key: str = field(repr=False)
-    model: str
 
 
 # Defaults applied when an app_settings key is missing in the DB.
@@ -474,11 +467,11 @@ def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None:
 
     Нечитаемый ключ — тоже «нет», по причине из `_from_tg_row`.
     """
-    if not row.base_url or not row.model:
+    if not provider_complete(row.kind.value, row.base_url, row.model):
         return None
     try:
         return LlmProviderConfig(
-            base_url=row.base_url,
+            base_url=row.base_url or "",
             api_key=(
                 decrypt_str(row.api_key_encrypted) if row.api_key_encrypted else ""
             ),

@@ -159,6 +159,32 @@ async def test_a_provider_without_an_address_is_not_a_provider(session_factory):
     assert (await RuntimeSettings.load(session_factory)).chat is None
 
 
+async def test_a_model_file_without_an_address_is_a_provider(session_factory):
+    """Эмбеддинги из файла: адреса нет, в модели путь к `.gguf`.
+
+    Не поднимись такая строка, `rs.embed` вышел бы пустым, и бот не стартовал
+    бы вовсе, хотя окно показывает выбранный файл.
+    """
+    path = r"d:\models\model.gguf"
+    await put(session_factory, llm_config_row(LlmConfigKind.EMBED, base_url=None, model=path))
+
+    embed = (await RuntimeSettings.load(session_factory)).embed
+
+    assert (embed.base_url, embed.model) == ("", path)
+
+
+async def test_a_model_file_is_not_a_chat_provider(session_factory):
+    """Чат из файла не говорит: такая строка чата — не поставщик.
+
+    Поднимись она, бот собрал бы клиента файла на месте чата и падал бы на
+    каждом разговоре.
+    """
+    path = r"d:\models\model.gguf"
+    await put(session_factory, llm_config_row(LlmConfigKind.CHAT, base_url=None, model=path))
+
+    assert (await RuntimeSettings.load(session_factory)).chat is None
+
+
 async def test_a_provider_without_a_model_is_not_a_provider(session_factory):
     """Настройка без модели провайдером не считается."""
     await put(session_factory, llm_config_row(LlmConfigKind.CHAT, model=None))

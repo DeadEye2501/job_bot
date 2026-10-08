@@ -1,4 +1,4 @@
-"""Просьбы окна к рабочему столу: открыть названное тем, чем открывает система.
+"""Просьбы окна к рабочему столу: открыть названное системой, выбрать файл диалогом.
 
 Дорог наружу две, и заслоны у них разные. Ссылку разбирают по схеме — она и
 решает, чем система откроет адрес. Вложение переписки — по расширению и по
@@ -15,6 +15,8 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+
+import webview
 
 from client.bridge.answer import denied
 from client.bridge.media import media_file
@@ -182,3 +184,15 @@ class Desktop:
         if not open_in_system(str(target)):
             return denied(ATTACHMENT_NOT_OPENED)
         return {"ok": {}}
+
+
+def chosen_path(window, *file_types: str) -> str | None:
+    """Путь, выбранный человеком в диалоге самого окна; пусто — диалог закрыли.
+
+    Диалог у окна, а не у страницы: браузер отдаёт выбранный файл содержимым,
+    а не путём, — нарочно, — а мосту нужен именно путь на диске. Закрытый
+    диалог не беда, человек передумал: зовущие отвечают на это `cancelled`, а
+    не отказом, иначе окно показало бы плашку беды на обычное «нет, не сейчас».
+    """
+    chosen = window.create_file_dialog(webview.OPEN_DIALOG, file_types=file_types)
+    return chosen[0] if chosen else None

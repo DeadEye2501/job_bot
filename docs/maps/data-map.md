@@ -43,6 +43,12 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `adapters/gguf_embed.py`
+
+- `_log` = `logging.getLogger(__name__)`
+- `CONTEXT_TOKENS` = `8192`
+- `_LOAD_TROUBLES` = `набор из 4`
+
 ### `adapters/lm_chat.py`
 
 - `class ChatRequest`
@@ -988,6 +994,14 @@
   - `limit: int | None` = `None`
   - `offset: int` = `0`
 
+### `backend/provider_config.py`
+
+- `MODEL_FILE_SUFFIX` = `'.gguf'`
+- `class LlmProviderConfig`
+  - `base_url: str`
+  - `api_key: str` = `field(repr=False)`
+  - `model: str`
+
 ### `backend/repository/app_settings.py`
 
 - `CV_PATH_KEY` = `'cv_path'`
@@ -1138,10 +1152,6 @@
   - `phone: str`
   - `password: str` = `field(repr=False)`
   - `session_string: str | None` = `field(repr=False)`
-- `class LlmProviderConfig`
-  - `base_url: str`
-  - `api_key: str` = `field(repr=False)`
-  - `model: str`
 - `_APP_DEFAULTS: dict[str, str]` = `словарь из 10`
 
 ### `backend/single_instance.py`
@@ -1243,6 +1253,7 @@
 ### `client/bridge/llm.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `_MODEL_FILTER` = `f'Модель GGUF (*{MODEL_FILE_SUFFIX})'`
 
 ### `client/bridge/mark.py`
 

@@ -5,11 +5,14 @@
 оставляет его в уверенности, что всё в порядке, пока бот молчит.
 """
 
+import os
+
 import httpx
 
 from adapters import lm_studio
 from backend.health import database_alive, model_alive, telegram_alive
 from backend.runtime_settings import LlmProviderConfig
+from tests.fakes.gguf import model_file
 
 
 class Stopped:
@@ -102,3 +105,16 @@ async def test_the_lamp_answers_by_the_list_alone(monkeypatch):
 
     _provider(monkeypatch, listed=["llama"])
     assert await model_alive(cfg, "chat") is False
+
+
+async def test_a_model_file_lamp_follows_the_file_on_disk(tmp_path):
+    """Лампочка эмбеддингов из файла горит, пока файл лежит на диске.
+
+    Убранный или перенесённый файл гасит её, а с ней запирается тумблер: бот
+    не уходит в обход, который не сможет посчитать ни одного поста.
+    """
+    path = model_file(tmp_path)
+
+    assert await model_alive(LlmProviderConfig("", "", path), "embed") is True
+    os.remove(path)
+    assert await model_alive(LlmProviderConfig("", "", path), "embed") is False

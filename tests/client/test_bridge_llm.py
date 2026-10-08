@@ -11,6 +11,9 @@ import time
 
 import httpx
 
+from adapters import gguf_embed
+from tests.client.conftest import WindowThatPicks
+from tests.fakes.gguf import Model, model_file
 from tests.fakes.llm import CHAT, MODELS, models_response
 
 
@@ -348,3 +351,56 @@ async def test_a_bad_address_is_refused_with_its_kind(api, ask):
 
     assert answer["fail"] == "denied"
     assert answer["kind"] == "chat"
+
+
+async def test_a_model_file_check_needs_no_address(api, ask, monkeypatch, tmp_path):
+    """Проверка эмбеддингов из файла проходит без адреса и грузит модель."""
+    path = model_file(tmp_path)
+    happened: list[str] = []
+    monkeypatch.setattr(gguf_embed, "_open_model", lambda _path: Model(happened))
+
+    answer = await ask(
+        api.settings.probe_model, {"kind": "embed", "base_url": "", "model": path}
+    )
+
+    assert answer["ok"]["model"] == path
+    assert happened[0] == "загружена"
+
+
+async def test_a_model_file_is_refused_for_the_chat(api, ask, tmp_path):
+    """Чат из файла не говорит: путь к `.gguf` без адреса чату не годится."""
+    answer = await ask(
+        api.settings.probe_model,
+        {"kind": "chat", "base_url": "", "model": model_file(tmp_path)},
+    )
+
+    assert "fail" in answer
+
+
+async def test_a_model_file_is_saved_and_read_back(api, ask, tmp_path):
+    """Путь к файлу модели записывается без адреса и читается обратно."""
+    path = model_file(tmp_path)
+
+    await ask(api.settings.save, {"embed": {"base_url": "", "api_key": "", "model": path}})
+
+    assert (await ask(api.settings.get))["ok"]["embed"]["model"] == path
+
+
+async def test_picking_a_model_file_names_the_path_without_saving(api, ask, hub, tmp_path):
+    """Диалог только называет путь; записывает его страница своим сохранением."""
+    chosen = str(tmp_path / "m.gguf")
+    hub.window = WindowThatPicks([chosen])
+
+    before = (await ask(api.settings.get))["ok"]["embed"]
+
+    answer = await ask(api.settings.pick_model_file)
+
+    assert answer["ok"]["path"] == chosen
+    assert (await ask(api.settings.get))["ok"]["embed"] == before
+
+
+async def test_a_closed_model_dialog_is_not_a_refusal(api, ask, hub):
+    """Закрытый диалог — не отказ: человек передумал."""
+    hub.window = WindowThatPicks(None)
+
+    assert (await ask(api.settings.pick_model_file))["ok"]["cancelled"] is True

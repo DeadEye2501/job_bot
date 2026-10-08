@@ -11,11 +11,15 @@ import httpx
 
 from adapters import lm_models, lm_studio
 from adapters.lm_studio import LlmProviderConfig
+from backend.provider_config import MODEL_FILE_SUFFIX, provider_complete
 from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, reply
+from client.bridge.desktop import chosen_path
 from client.bridge.refusals import LLM_FIELDS_REQUIRED
 
 
 logger = logging.getLogger(__name__)
+
+_MODEL_FILTER = f"Модель GGUF (*{MODEL_FILE_SUFFIX})"
 
 
 def _client_or_reason(cfg: LlmProviderConfig) -> tuple[httpx.AsyncClient | None, str]:
@@ -95,7 +99,7 @@ async def _do_llm_probe(
         await client.aclose()
 
 
-def read_llm_creds(payload: dict) -> LlmProviderConfig:
+def read_llm_creds(payload: dict, kind: str) -> LlmProviderConfig:
     """Черновые учётные данные поставщика из нагрузки окна.
 
     Читаются одним правилом на всех, кто спрашивает поставщика: проба связи и
@@ -106,13 +110,14 @@ def read_llm_creds(payload: dict) -> LlmProviderConfig:
 
     Пустой адрес или пустое имя модели роняет `ValueError`: сохранённая
     пустота выглядит как настроенный поставщик, и беду ищут потом где угодно,
-    только не здесь.
+    только не здесь. Адрес не нужен одному — файлу модели эмбеддингов на диске,
+    поэтому правило спрашивает род поставщика.
     """
     if not isinstance(payload, dict):
         raise ValueError(LLM_FIELDS_REQUIRED)
     base_url, api_key = _provider_address(payload)
     model = str(payload.get("model") or "").strip()
-    if not base_url or not model:
+    if not provider_complete(kind, base_url, model):
         raise ValueError(LLM_FIELDS_REQUIRED)
     return LlmProviderConfig(base_url=base_url, api_key=api_key, model=model)
 
@@ -163,7 +168,7 @@ class Llm:
             kind = str(payload.get("kind", "")).strip()
             if kind not in ("chat", "embed"):
                 raise ValueError(f"неизвестный род: {kind!r}")
-            cfg = read_llm_creds(payload)
+            cfg = read_llm_creds(payload, kind)
         except BAD_PAYLOAD as e:
             return bad_fields("probe_model", e, kind=kind)
 
@@ -176,6 +181,18 @@ class Llm:
             return {"kind": kind, "model": cfg.model, "latency_ms": latency_ms}
 
         return reply(self._hub.runner, run())
+
+    def pick_model_file(self) -> dict:
+        """Спросить у человека файл модели эмбеддингов диалогом самого окна.
+
+        Только называет путь, не записывает: записывает страница тем же
+        `settings.save`, что и адрес сервера, — в настройках сразу, в мастере
+        по «Дальше». Закрытый диалог — не отказ, а «передумал».
+        """
+        path = chosen_path(self._hub.window, _MODEL_FILTER)
+        if path is None:
+            return {"ok": {"cancelled": True}}
+        return {"ok": {"path": path}}
 
     def list_models(self, payload: dict) -> dict:
         """Имена моделей у поставщика — окно подсказывает ими поле «Модель».

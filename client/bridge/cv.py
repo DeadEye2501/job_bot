@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import webview
-
 from adapters import lm_studio
 from adapters.cv_text import READABLE_SUFFIXES, read_cv_text
 from adapters.lm_studio import LlmProviderConfig
@@ -15,7 +13,7 @@ from backend.repository.profile_cv import save_parsed_cv
 
 from client.bridge.answer import denied, launched, reply
 from client.bridge.cv_file import _stat_cv
-from client.bridge.desktop import open_in_system
+from client.bridge.desktop import chosen_path, open_in_system
 from client.bridge.refusals import PARSE_CV_REFUSALS
 
 
@@ -53,12 +51,10 @@ class Cv:
         обычном «нет, не сейчас», а пустой путь стёр бы прежнее резюме, и
         следующий отклик ушёл бы без вложения.
         """
-        chosen = self._hub.window.create_file_dialog(
-            webview.OPEN_DIALOG, file_types=(_RESUME_FILTER,)
-        )
-        if not chosen:
+        path = chosen_path(self._hub.window, _RESUME_FILTER)
+        if path is None:
             return {"ok": {"cancelled": True}}
-        return self._replace({"path": chosen[0]})
+        return self._replace({"path": path})
 
     def _replace(self, payload: dict) -> dict:
         """Запомнить новый путь к резюме и рассказать, что по нему лежит.

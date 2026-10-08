@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "95144f66a472030b70b9b7b0196727250e16a313e7c276327dd113c763b9c37a"
+            "sha256": "3e2118f3c11185da7bebc827886f2c2dcec17c22e6991b089a0d428bac560cdf"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -53,11 +53,11 @@
         },
         "anyio": {
             "hashes": [
-                "sha256:6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101",
-                "sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94"
+                "sha256:9f505dda5ac9f0c8309b5e8bd445a8c2bf7246f3ce950121e45ea15bc41d1494",
+                "sha256:cfa139f3ed1a23ee8f88a145ddb5ac7605b8bbfd8592baacd7ce3d8bb4313c7f"
             ],
             "markers": "python_version >= '3.10'",
-            "version": "==4.15.1"
+            "version": "==4.14.2"
         },
         "beautifulsoup4": {
             "hashes": [
@@ -253,6 +253,14 @@
             "markers": "python_version >= '3.8' and python_full_version not in '3.9.0, 3.9.1'",
             "version": "==47.0.0"
         },
+        "diskcache": {
+            "hashes": [
+                "sha256:2c3a3fa2743d8535d832ec61c2054a1641f41775aa7c556758a109941e33e4fc",
+                "sha256:5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19"
+            ],
+            "markers": "python_version >= '3'",
+            "version": "==5.6.3"
+        },
         "docstring-parser": {
             "hashes": [
                 "sha256:292510982205c12b1248696f44959db3cdd1740237a968ea1e2e7a900eeb2015",
@@ -370,11 +378,11 @@
         },
         "idna": {
             "hashes": [
-                "sha256:a7db850025b95ded1eae8a46181a1a6c56c92c96f0e2b005d9ff8dc0210cab44",
-                "sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+                "sha256:7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2",
+                "sha256:ffb385a7e039654cef1ab9ef32c6fafe283c0c0467bba1d9029738ce4a14a848"
             ],
             "markers": "python_version >= '3.9'",
-            "version": "==3.20"
+            "version": "==3.18"
         },
         "jaraco.classes": {
             "hashes": [
@@ -399,6 +407,14 @@
             ],
             "markers": "python_version >= '3.10'",
             "version": "==4.6.0"
+        },
+        "jinja2": {
+            "hashes": [
+                "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d",
+                "sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67"
+            ],
+            "markers": "python_version >= '3.7'",
+            "version": "==3.1.6"
         },
         "jiter": {
             "hashes": [
@@ -533,6 +549,13 @@
             "index": "pypi",
             "markers": "python_version >= '3.9'",
             "version": "==25.7.0"
+        },
+        "llama-cpp-python": {
+            "file": "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.19/llama_cpp_python-0.3.19-cp313-cp313-win_amd64.whl",
+            "hashes": [
+                "sha256:6816e4a0a74ae9a356e7a0546e13147543f01f695c86a28d940e4b86519acf13"
+            ],
+            "markers": "python_version >= '3.8'"
         },
         "lxml": {
             "hashes": [

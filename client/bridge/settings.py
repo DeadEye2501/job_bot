@@ -284,7 +284,7 @@ def _read_providers(payload: dict) -> dict[str, LlmProviderConfig]:
         if not isinstance(draft, dict):
             continue
         try:
-            creds[kind] = read_llm_creds(draft)
+            creds[kind] = read_llm_creds(draft, kind)
         except BAD_PAYLOAD as e:
             raise ValueError(f"{kind}: {e}") from e
     return creds

@@ -6,6 +6,7 @@ import httpx
 from sqlalchemy import select
 
 from adapters import lm_embed
+from adapters.gguf_embed import ModelUnavailable
 from backend.models import Vacancy
 
 logger = logging.getLogger(__name__)
@@ -34,11 +35,15 @@ class ProviderIsSilent(Exception):
 def _is_about_the_provider(trouble: Exception) -> bool:
     """Беда про поставщика целиком, а не про этот текст.
 
-    Таких две: адрес не отвечает — соединения нет вовсе, — и ответ 404 или
+    У сервера таких две: адрес не отвечает — соединения нет вовсе, — и ответ 404 или
     500-й, то есть модели у поставщика нет либо он сам сломан. Обе приходят на
     каждый текст подряд. Отказ на самом тексте (переполненное окно — 400)
     говорит только об этом тексте, и следующий посчитается.
+
+    Третья — у модели из файла: файла нет на месте или движок его не грузит.
     """
+    if isinstance(trouble, ModelUnavailable):
+        return True
     if isinstance(trouble, httpx.TransportError):
         return True
     if isinstance(trouble, httpx.HTTPStatusError):
