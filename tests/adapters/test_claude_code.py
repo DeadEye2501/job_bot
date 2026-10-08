@@ -235,6 +235,17 @@ async def test_an_answer_survives_a_reset_that_failed(monkeypatch):
     assert len(calls.spawned) == 2
 
 
+async def test_an_answer_survives_a_pipe_broken_before_the_reset(monkeypatch):
+    """Процесс умер сразу после ответа — запись сброса падает, а ответ остаётся."""
+    calls = install(monkeypatch, [result("готово")])
+    calls.clear_breaks_pipe = True
+
+    answer = await chat(_client(), SONNET, chat_request(), LOG)
+
+    assert answer.text == "готово"
+    assert calls.killed == 1
+
+
 async def test_a_silent_process_is_dropped_after_the_deadline(monkeypatch):
     """Процесс молчит дольше срока — он снимается, следующее обращение поднимает новый.
 

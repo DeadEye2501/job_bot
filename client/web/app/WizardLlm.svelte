@@ -20,6 +20,7 @@
     blankCreds,
     KEY_PLACEHOLDER,
     SAME_CREDS_LABEL,
+    addressTrouble,
     addressless,
     canShareChat,
     fileCreds,
@@ -133,6 +134,8 @@
 
   /** Переключить источник эмбеддингов: сервер или файл модели. */
   function switchSource(toFile) {
+    // Выбранный заново тот же источник — не смена: стирать набранное не за что.
+    if (toFile === fromFile) return;
     fromFile = toFile;
     status = null;
     creds = sourceCreds(toFile);
@@ -172,12 +175,9 @@
    */
   async function check() {
     if (busy) return;
-    if (fromFile && fileTrouble(creds)) {
-      status = { tone: 'err', text: fileTrouble(creds) };
-      return;
-    }
-    if (!fromFile && !creds.base_url.trim()) {
-      status = { tone: 'err', text: 'Укажите base_url провайдера.' };
+    const trouble = fromFile ? fileTrouble(creds) : addressTrouble(creds.base_url);
+    if (trouble) {
+      status = { tone: 'err', text: trouble };
       return;
     }
     busy = true;

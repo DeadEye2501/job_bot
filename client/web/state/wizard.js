@@ -17,7 +17,6 @@ const STEPS = [
   { screen: 'cv', at: 4, label: 'Резюме' },
 ];
 
-
 /** Следующий экран мастера или ничего, если это последний. */
 export function nextScreen(screen) {
   const at = SCREENS.indexOf(screen);

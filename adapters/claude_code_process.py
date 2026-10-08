@@ -185,7 +185,8 @@ async def _cleared(process) -> bool:
     """
     try:
         await asyncio.wait_for(_ask(process, _CLEAR), _CLEAR_WAIT_S)
-    except (TimeoutError, ProcessGone):
+    except (TimeoutError, ProcessGone, OSError):
+        # OSError — запись в трубу процесса, умершего сразу после ответа.
         return False
     return True
 

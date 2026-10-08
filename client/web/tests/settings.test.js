@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BOUNDS,
   SOURCE_FILE,
+  addressTrouble,
   SOURCE_SERVER,
   addressless,
   isFileSource,
@@ -369,3 +370,15 @@ describe('источник эмбеддингов', () => {
     expect(sourceCreds(true).base_url).toBe('');
   });
 });
+
+describe('заслон адреса поставщика', () => {
+  it('пустой адрес и адрес без схемы не годятся, служебный адрес Claude Code годится', () => {
+    // По адресу спрашивают перечень имён ещё до выбора модели: заслон у этого
+    // вопроса тот же, что у записи, только без модели.
+    expect(addressTrouble('')).toBe('Укажите адрес поставщика');
+    expect(addressTrouble('localhost:1234')).toBe('Адрес должен начинаться с http:// или https://');
+    expect(addressTrouble('claude-code')).toBe('');
+    expect(addressTrouble('http://localhost:1234')).toBe('');
+  });
+});
+
