@@ -26,6 +26,8 @@ beautifulsoup4 = "==4.15.0"
 pypdf = "==6.16.2"
 python-docx = "==1.2.0"
 anthropic = "==1.12.1"
+# Готовое колесо под процессор: на PyPI только исходники, их сборка требует компилятора C++.
+llama-cpp-python = {file = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.19/llama_cpp_python-0.3.19-cp313-cp313-win_amd64.whl"}
 
 # mutmut убран: 3.7.0 на Windows отказывается запускаться вообще
 # («please use the WSL» ещё до разбора аргументов), 2.4.5 не работает на

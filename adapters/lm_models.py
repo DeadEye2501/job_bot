@@ -3,14 +3,14 @@
 Спрашивают отсюда двое: мастер настройки, который показывает человеку выбор,
 и проверка связи. Род модели — чат или встраивания — провайдеры отдают не
 всегда, и тогда его угадывают по имени. Клиента Anthropic оба вопроса
-отдают в `adapters/claude`.
+отдают в `adapters/claude`, файл модели — в `adapters/gguf_embed`.
 """
 
 import logging
 
 import httpx
 
-from adapters import claude
+from adapters import claude, gguf_embed
 
 _log = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def _ping_request(model: str, kind: str) -> tuple[str, dict]:
 
 
 async def model_listed(
-    client: httpx.AsyncClient | claude.ClaudeClient, model: str
+    client: httpx.AsyncClient | claude.ClaudeClient | gguf_embed.ModelFile, model: str
 ) -> tuple[bool, list[str]]:
     """Числится ли модель у провайдера, и что у него есть вообще.
 
@@ -52,7 +52,7 @@ async def model_listed(
 
 
 async def check_model(
-    client: httpx.AsyncClient | claude.ClaudeClient, model: str, kind: str
+    client: httpx.AsyncClient | claude.ClaudeClient | gguf_embed.ModelFile, model: str, kind: str
 ) -> tuple[bool, str]:
     """Есть ли модель у провайдера и отвечает ли она.
 
@@ -68,6 +68,8 @@ async def check_model(
     """
     if isinstance(client, claude.ClaudeClient) and kind == "embed":
         return False, claude.NO_EMBEDDINGS
+    if isinstance(client, gguf_embed.ModelFile):
+        return await client.check(kind)
     named = "чата" if kind == "chat" else "векторов"
     try:
         listed, models = await model_listed(client, model)
@@ -152,7 +154,7 @@ async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | No
 
 
 async def list_models(
-    client: httpx.AsyncClient | claude.ClaudeClient, *, kind: str | None = None
+    client: httpx.AsyncClient | claude.ClaudeClient | gguf_embed.ModelFile, *, kind: str | None = None
 ) -> list[str]:
     """Return ids of models exposed by the provider.
 
@@ -163,6 +165,8 @@ async def list_models(
     """
     if isinstance(client, claude.ClaudeClient):
         return await claude.list_models(client, kind)
+    if isinstance(client, gguf_embed.ModelFile):
+        return client.listed(kind)
     if kind is not None:
         loaded = await _loaded_models(client, kind)
         if loaded is not None:

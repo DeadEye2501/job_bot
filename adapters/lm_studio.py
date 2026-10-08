@@ -4,12 +4,13 @@
 Ollama, OpenAI, OpenRouter, vLLM. Здесь только соединение; разговор с
 чат-моделью, перечень моделей и отпечатки живут у соседей (`lm_chat`,
 `lm_models`, `lm_embed`). Адрес Anthropic получает клиента SDK из
-`adapters/claude`.
+`adapters/claude`, путь к файлу модели без адреса — клиента из
+`adapters/gguf_embed`.
 """
 
 import httpx
 
-from adapters import claude
+from adapters import claude, gguf_embed
 from backend.runtime_settings import LlmProviderConfig
 
 
@@ -23,9 +24,13 @@ from backend.runtime_settings import LlmProviderConfig
 LLM_REQUEST_TIMEOUT_SEC = 180.0
 
 
-def make_client(config: LlmProviderConfig) -> httpx.AsyncClient | claude.ClaudeClient:
+def make_client(
+    config: LlmProviderConfig,
+) -> httpx.AsyncClient | claude.ClaudeClient | gguf_embed.ModelFile:
     if claude.serves(config.base_url):
         return claude.make_client(config, timeout=LLM_REQUEST_TIMEOUT_SEC)
+    if config.names_model_file:
+        return gguf_embed.ModelFile(config.model)
     headers: dict[str, str] = {}
     if config.api_key:
         headers["Authorization"] = f"Bearer {config.api_key}"

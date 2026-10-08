@@ -11,7 +11,9 @@
 import httpx
 import pytest
 
+from adapters import gguf_embed
 from backend.flows import embeddings
+from tests.fakes.gguf import model_file
 
 
 class _Provider:
@@ -122,3 +124,20 @@ async def test_a_very_long_text_is_cut_before_it_goes_to_the_provider():
 
     assert len(sent[0]) == 6000
     assert sent[0] == "я" * 6000
+
+
+async def test_a_model_file_that_will_not_load_silences_the_provider(monkeypatch, tmp_path):
+    """Незагружаемый файл модели — молчание поставщика, а не беда одного текста.
+
+    Сочти приём её бедой текста — курсор канала уехал бы мимо постов, которые
+    не посчитаются, пока файл не вернут на место.
+    """
+
+    def broken(_path):
+        raise ValueError("Failed to load model from file")
+
+    monkeypatch.setattr(gguf_embed, "_open_model", broken)
+    pipeline = _Pipeline(gguf_embed.ModelFile(model_file(tmp_path)))
+
+    with pytest.raises(embeddings.ProviderIsSilent):
+        await embeddings.embed_text(pipeline, "текст", "vacancy 7")
