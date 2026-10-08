@@ -86,4 +86,4 @@ async def test_the_counted_records_reach_the_window(api, ask, session_factory):
 
     answer = await ask(api.stats.channels_pipeline, "all")
 
-    assert [row["label"] for row in answer["ok"]["channels"]] == ["Питон-вакансии"]
+    assert [row["title"] for row in answer["ok"]["channels"]] == ["Питон-вакансии"]

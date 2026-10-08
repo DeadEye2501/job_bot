@@ -4,6 +4,7 @@
 // Ни моста, ни разметки этот файл не знает.
 
 import { WEEKDAYS } from './calendar.js';
+import { channelName } from './channels.js';
 import { fillPercent } from './chosen.js';
 import { isoDay } from './dates.js';
 import { blankFilter } from './vacancy_filter.js';
@@ -128,6 +129,25 @@ export function skillRows(skills) {
 /** Сколько строк встаёт в одну колонку карточки навыков. */
 export function skillRowsPerColumn(skills) {
   return Math.ceil(skills.length / SKILL_COLUMNS);
+}
+
+/** Чем подписана строка, собравшая всё, что пришло не из канала. */
+const NO_CHANNEL = 'Без канала';
+
+/** Строки воронки по каналам: подпись и порядок.
+ *
+ * Канал подписан тем же правилом, что в Контактах: таблица ведёт туда по
+ * нажатию, и под другим именем канал там было бы не узнать. Строка без номера
+ * собрала пришедшее не из канала — вставленное, заведённое руками, найденное
+ * на сайтах.
+ *
+ * Вперёд идёт приславший больше, равных решает подпись без учёта регистра:
+ * по кодам символов заглавные встали бы впереди строчных.
+ */
+export function channelRows(channels) {
+  return channels
+    .map((one) => ({ ...one, label: one.id === null ? NO_CHANNEL : channelName(one).name }))
+    .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'ru', { sensitivity: 'base' }));
 }
 
 /** Конверсия канала: подпись и доля для полоски-метра.

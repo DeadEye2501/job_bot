@@ -20,7 +20,7 @@ from backend.repository.stats_common import (
 from backend.repository.vacancies_common import PARSED_ONLY
 
 def _channel_item(
-    ch_id: int,
+    ch_id: int | None,
     title: str | None,
     username: str | None,
     counts: tuple[int, int, int] = (0, 0, 0),
@@ -35,11 +35,15 @@ def _channel_item(
     Счётчики приходят тройкой, потому что тройкой их и отдаёт запрос; у
     канала, попавшего в таблицу воронкой, их нет вовсе, и нули у него значат
     «ничего не было», а не «пока неизвестно».
+
+    Подписи здесь нет: её собирает окно тем же правилом, что в Контактах. Пустой
+    номер — строка всего, что пришло не из канала.
     """
     total_vac, rerun_trash, not_fit = counts
     return {
         "id": ch_id,
-        "label": title or (f"@{username}" if username else f"#{ch_id}"),
+        "title": title,
+        "username": username,
         "_total_vac": int(total_vac or 0),
         "_rerun_trash": int(rerun_trash or 0),
         "not_fit": int(not_fit or 0),
@@ -75,26 +79,32 @@ def _trash_predicates():
 
 
 async def _ingest_by_channel(session: AsyncSession, since) -> list:
-    """Сколько каждый канал прислал за окно: всего, мусора, «не подошло»."""
+    """Сколько каждый канал прислал за окно: всего, мусора, «не подошло».
+
+    Соединение внешнее: вакансии без канала собираются под пустым номером.
+    """
     is_rerun_trash, is_not_fit_clean = _trash_predicates()
     return (
         await session.execute(
             select(
-                TelegramChannel.id,
+                Vacancy.source_channel_id,
                 TelegramChannel.title,
                 TelegramChannel.username,
                 func.count(Vacancy.id).label("total"),
                 func.sum(case((is_rerun_trash, 1), else_=0)).label("rerun_trash"),
                 func.sum(case((is_not_fit_clean, 1), else_=0)).label("not_fit"),
             )
-            .join(Vacancy, Vacancy.source_channel_id == TelegramChannel.id)
+            .select_from(Vacancy)
+            .outerjoin(TelegramChannel, Vacancy.source_channel_id == TelegramChannel.id)
             .where(*parsed_in_window(since))
-            .group_by(TelegramChannel.id)
+            .group_by(Vacancy.source_channel_id)
         )
     ).all()
 
 
-async def _trash_events_by_channel(session: AsyncSession, since) -> dict[int, int]:
+async def _trash_events_by_channel(
+    session: AsyncSession, since
+) -> dict[int | None, int]:
     """Сколько мусора удалено у каждого канала за то же окно.
 
     Отдельным запросом потому, что удалённых строк в `vacancy` уже нет:
@@ -108,12 +118,12 @@ async def _trash_events_by_channel(session: AsyncSession, since) -> dict[int, in
             .group_by(TrashEvent.source_channel_id)
         )
     ).all()
-    return {ch_id: int(cnt or 0) for ch_id, cnt in rows if ch_id is not None}
+    return {ch_id: int(cnt or 0) for ch_id, cnt in rows}
 
 
 async def _first_in_period_by_channel(
     session: AsyncSession, statuses, since
-) -> dict[int, set[int]]:
+) -> dict[int | None, set[int]]:
     """Чьи вакансии впервые дошли до этих статусов внутри окна.
 
     Считается по самому переходу, а не по заведению вакансии: воронка
@@ -128,16 +138,15 @@ async def _first_in_period_by_channel(
     )
     if since is not None:
         q = q.where(sub.c.first_at >= since)
-    by_ch: dict[int, set[int]] = {}
+    by_ch: dict[int | None, set[int]] = {}
     for ch_id, vid in (await session.execute(q)).all():
-        if ch_id is not None:
-            by_ch.setdefault(ch_id, set()).add(vid)
+        by_ch.setdefault(ch_id, set()).add(vid)
     return by_ch
 
 
 async def _funnel_by_channel(
     session: AsyncSession, since
-) -> dict[str, dict[int, set[int]]]:
+) -> dict[str, dict[int | None, set[int]]]:
     """Четыре ступени воронки, разложенные по каналам.
 
     Ключи здесь — это имена колонок в ответе окну: `_pipeline_row` кладёт
@@ -157,29 +166,38 @@ async def _funnel_by_channel(
 
 
 async def _channels_without_ingest(
-    session: AsyncSession, missing_ids: set[int]
-) -> dict[int, dict]:
+    session: AsyncSession, missing_ids: set[int | None]
+) -> dict[int | None, dict]:
     """Пустые строки для каналов, у которых в окне не было ингеста.
 
     Старая вакансия могла впервые дойти до нужного статуса внутри окна, а
     мусор — удалиться, не оставив строки. Без этих строк такой канал из
     таблицы выпал бы, хотя за период у него кое-что было.
+
+    Строке без канала спрашивать базу не о чем: подпись у неё своя, а пустой
+    номер в `IN` ничего бы и не нашёл.
     """
-    if not missing_ids:
-        return {}
+    found = (
+        {None: _channel_item(None, None, None)} if None in missing_ids else {}
+    )
+    channel_ids = missing_ids - {None}
+    if not channel_ids:
+        return found
     rows = (
         await session.execute(
             select(
                 TelegramChannel.id, TelegramChannel.title, TelegramChannel.username
-            ).where(TelegramChannel.id.in_(missing_ids))
+            ).where(TelegramChannel.id.in_(channel_ids))
         )
     ).all()
-    return {
-        ch_id: _channel_item(ch_id, title, username) for ch_id, title, username in rows
-    }
+    found.update(
+        (ch_id, _channel_item(ch_id, title, username))
+        for ch_id, title, username in rows
+    )
+    return found
 
 
-def _pipeline_row(ch_id: int, item: dict, trash_events: int, funnel) -> dict:
+def _pipeline_row(ch_id: int | None, item: dict, trash_events: int, funnel) -> dict:
     """Строка таблицы по одному каналу: ингест, воронка и две доли.
 
     Всего — это и строки вакансий, и удалённый мусор: последнего в
@@ -209,7 +227,8 @@ def _pipeline_row(ch_id: int, item: dict, trash_events: int, funnel) -> dict:
 
     return {
         "id": ch_id,
-        "label": item["label"],
+        "title": item["title"],
+        "username": item["username"],
         "total": total,
         "trash": trash,
         "not_fit": not_fit,
@@ -230,14 +249,14 @@ async def get_stats_channels_pipeline(
     воронки — у `_funnel_by_channel`. Окно `all` времени не спрашивает.
 
     Канал попадает в таблицу, если в окне у него было хоть что-то: ингест,
-    удалённый мусор или продвижение по воронке. Порядок — по «всего»
-    убыванием, споры решает подпись.
+    удалённый мусор или продвижение по воронке. Порядок строк задаёт окно:
+    равных в нём решает подпись, а её собирает окно.
     """
     since = stats_period_since(period)
     trash_events_by_ch = await _trash_events_by_channel(session, since)
     funnel = await _funnel_by_channel(session, since)
 
-    items_by_ch: dict[int, dict] = {}
+    items_by_ch: dict[int | None, dict] = {}
     for ch_id, title, username, total_vac, rerun_trash, not_fit in (
         await _ingest_by_channel(session, since)
     ):
@@ -255,5 +274,4 @@ async def get_stats_channels_pipeline(
         _pipeline_row(ch_id, item, trash_events_by_ch.get(ch_id, 0), funnel)
         for ch_id, item in items_by_ch.items()
     ]
-    items.sort(key=lambda it: (-it["total"], it["label"].casefold()))
     return {"period": period, "channels": items}

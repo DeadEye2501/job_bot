@@ -63,7 +63,7 @@ def applied(session_factory):
     return build
 
 
-async def rows_by_label(session, **kwargs) -> dict[str, dict]:
-    """Строки таблицы, разложенные по подписи канала."""
+async def rows_by_channel(session, **kwargs) -> dict[int | None, dict]:
+    """Строки таблицы, разложенные по номеру канала; без канала — под `None`."""
     got = await get_stats_channels_pipeline(session, **kwargs)
-    return {row["label"]: row for row in got["channels"]}
+    return {row["id"]: row for row in got["channels"]}

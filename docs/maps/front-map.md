@@ -443,8 +443,8 @@
 - —
 - принимает: title, ready, span, children
 
-### components/StatsChannelsCard.svelte (121)
-- —
+### components/StatsChannelsCard.svelte (136)
+- Фокус и роль кнопки включаются одним условием, а компилятор видит только условный tabindex и считает строку неинтерактивной.
 - принимает: channels, onpick
 
 ### components/StatsKpiRow.svelte (30)
@@ -704,9 +704,9 @@
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
 - отдаёт: aliasesAfter, countNote, grouped, groupsMatching, levelPercent
 
-### state/stats.js (261)
+### state/stats.js (281)
 - * Сроки, за которые считают, — от короткого к длинному. * * `delta` — как называется прирост за этот срок. У «всего времени» его нет: * сравнивать не с чем, это и есть всё время.
-- отдаёт: KPI, PERIODS, STATUS_ORDER, convNote, deltaNote, donut, duration, kpiRow, skillRows, skillRowsPerColumn, sliceTarget, statusColumns, statusTotal, weekBars
+- отдаёт: KPI, PERIODS, STATUS_ORDER, channelRows, convNote, deltaNote, donut, duration, kpiRow, skillRows, skillRowsPerColumn, sliceTarget, statusColumns, statusTotal, weekBars
 
 ### state/statuses.js (13)
 - * Статусы в том порядке, в каком их читают в кольце статистики. * * Значение совпадает с тем, каким статус приходит в строке списка и каким его * принимает смена статуса на мосту; им же покрашена точка рядом.
@@ -1253,9 +1253,9 @@ body, html, button, body, .material-symbols-outlined
 - Вращение значка: им показано, что дело идёт и ответа ещё нет. Своим файлом, а не в оформлении каждого экрана: крутится значок в двух местах — кнопка пересчёта статистики и строка состояния шага мастера, — и объявлено вращение было дважды, под двумя именами. Скорость у них при этом разная, и это своё: у кнопки оборот быстрее, потому что и ждать её недолго.
 - селекторы (1): @keyframes spin
 
-### styles/stats-channels.css (140)
+### styles/stats-channels.css (143)
 - Карточка «Каналы»: воронка канала одиннадцатью колонками. Сеткой, а не таблицей: имя канала и колонки конверсии резиновые, числовые — узкие по содержимому, и только так все одиннадцать влезают в карточку без поперечной прокрутки. Группы «Ингест», «Воронка отклика» и «Конверсия» отделены тонкой чертой — без неё одиннадцать чисел читаются как один ряд.
-- селекторы (24): .stats-ch-grid, .stats-ch-grid > *, .stats-ch-grid .stats-ch-group, .stats-ch-grid .stats-ch-group, .stats-ch-grid .stats-ch-group.ingest, .stats-ch-grid .stats-ch-group.funnel, .stats-ch-grid .stats-ch-group.outcome, .stats-ch-grid .stats-ch-th, .stats-ch-grid .stats-ch-name-cell, .stats-ch-grid .stats-ch-th-name, .stats-ch-grid .stats-ch-sep-l, .stats-ch-grid .stats-ch-conv, .stats-ch-grid .stats-ch-conv-label, .stats-ch-grid .stats-ch-conv-meter, .stats-ch-grid .stats-ch-conv-meter-fill, .stats-ch-grid .stats-ch-row, .stats-ch-grid .stats-ch-row.is-hover, .stats-ch-grid .v-dim, .stats-ch-grid .v-fit, .stats-ch-grid .v-sent, .stats-ch-grid .v-answ, .stats-ch-grid .v-invite, .stats-ch-grid .v-decline, .stats-ch-grid .stats-ch-last
+- селекторы (25): .stats-ch-grid, .stats-ch-grid > *, .stats-ch-grid .stats-ch-group, .stats-ch-grid .stats-ch-group, .stats-ch-grid .stats-ch-group.ingest, .stats-ch-grid .stats-ch-group.funnel, .stats-ch-grid .stats-ch-group.outcome, .stats-ch-grid .stats-ch-th, .stats-ch-grid .stats-ch-name-cell, .stats-ch-grid .stats-ch-th-name, .stats-ch-grid .stats-ch-sep-l, .stats-ch-grid .stats-ch-conv, .stats-ch-grid .stats-ch-conv-label, .stats-ch-grid .stats-ch-conv-meter, .stats-ch-grid .stats-ch-conv-meter-fill, .stats-ch-grid .stats-ch-row, .stats-ch-grid .stats-ch-row.stats-ch-opens, .stats-ch-grid .stats-ch-row.is-hover, .stats-ch-grid .v-dim, .stats-ch-grid .v-fit, .stats-ch-grid .v-sent, .stats-ch-grid .v-answ, .stats-ch-grid .v-invite, .stats-ch-grid .v-decline, .stats-ch-grid .stats-ch-last
 - берёт: --accent, --bg-tertiary, --border, --cols, --err, --info, --stats-group-funnel, --stats-group-ingest, --stats-group-outcome, --status-applied, --surface-raised, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/stats-responses.css (84)
@@ -1384,7 +1384,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 70 файлов
+## tests — 71 файлов
 
 ### tests/alive.test.js (79)
 - —
@@ -1564,8 +1564,11 @@ body, html, button, body, .material-symbols-outlined
 ### tests/skills.test.js (130)
 - —
 
-### tests/stats.test.js (273)
+### tests/stats.test.js (304)
 - —
+
+### tests/stats_channels_card_live.test.js (66)
+- * Строка таблицы с нулями во всех колонках.
 
 ### tests/suggest_input_live.test.js (92)
 - —
