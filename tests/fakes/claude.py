@@ -16,12 +16,12 @@ MESSAGES = ("POST", "/v1/messages")
 MODELS = ("GET", "/v1/models")
 
 
-def claude(routes: dict, *, api_key: str = "sk-test") -> ClaudeClient:
+def claude(routes: dict) -> ClaudeClient:
     """Клиент к поддельному Anthropic; ушедшие запросы копятся в `client.sent`."""
     sent: list[httpx2.Request] = []
     transport = httpx2.MockTransport(handler(routes, sent, httpx2))
     client = ClaudeClient(
-        api_key=api_key,
+        api_key="sk-test",
         base_url="https://api.anthropic.com",
         max_retries=0,
         http_client=DefaultAsyncHttpxClient(transport=transport),

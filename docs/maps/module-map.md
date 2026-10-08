@@ -50,7 +50,7 @@ Job Bot — single CLI entry point.
 - `def _assign(job, pid: int) -> None` (11)
 - `def tie_to_app(pid: int) -> None` (15)
 
-### `adapters/claude.py` — 142 строк
+### `adapters/claude.py` — 145 строк
 
 Claude через официальный SDK Anthropic: соединение, запрос и перечень моделей.
 
@@ -63,11 +63,11 @@ Claude через официальный SDK Anthropic: соединение, з
 - `def _require_key(client: ClaudeClient) -> None` (9)
 - `def split_system(messages: list[dict[str, str]]) -> tuple[str, list[dict[str, str]]]` (8)
 - `def _params(model: str, messages: list[dict[str, str]], max_tokens: int) -> dict` (13)
-- `async def ask(client: ClaudeClient, model: str, request)` (16)
+- `async def ask(client: ClaudeClient, model: str, request)` (19)
 - `async def list_models(client: ClaudeClient) -> list[str]` (4)
 - `async def ping(client: ClaudeClient, model: str, text: str) -> None` (11)
 
-### `adapters/claude_code.py` — 109 строк
+### `adapters/claude_code.py` — 112 строк
 
 Claude через установленный Claude Code по подписке: запросы и перечень моделей.
 
@@ -78,13 +78,14 @@ Claude через установленный Claude Code по подписке: 
   - `async def aclose(self) -> None` (2)
 - `def make_client(*, timeout: float) -> ClaudeCodeClient` (3)
 - `def _find_cli() -> str | None` (12)
-- `def _reply(data: dict) -> tuple[str | None, str | None]` (9)
-- `async def _converse(client: ClaudeCodeClient, model: str, messages: list[dict], timeout: float | None) -> tuple[str | None, str | None]` (14)
+- `def _cli() -> str` (6)
+- `def _reply(data: dict) -> tuple[str | None, str | None]` (7)
+- `async def _converse(client: ClaudeCodeClient, model: str, messages: list[dict], timeout: float | None) -> tuple[str | None, str | None]` (12)
 - `async def ask(client: ClaudeCodeClient, model: str, request)` (8)
-- `async def list_models(_client: ClaudeCodeClient) -> list[str]` (5)
+- `async def list_models(_client: ClaudeCodeClient) -> list[str]` (4)
 - `async def ping(client: ClaudeCodeClient, model: str, text: str) -> None` (3)
 
-### `adapters/claude_code_process.py` — 230 строк
+### `adapters/claude_code_process.py` — 248 строк
 
 Живой процесс Claude Code: один на приложение, запросы по одному, сброс после каждого.
 
@@ -98,8 +99,9 @@ Claude через установленный Claude Code по подписке: 
 - `async def _spawn(argv: list[str], env: dict)` (19)
 - `def _lock() -> asyncio.Lock` (11)
 - `async def _send(process, text: str) -> None` (5)
-- `async def _result(process) -> dict` (16)
-- `async def _round(process, message: str) -> dict` (7)
+- `async def _result(process) -> dict` (20)
+- `async def _ask(process, text: str) -> dict` (4)
+- `async def _cleared(process) -> bool` (11)
 - `async def _drop() -> None` (7)
 - `async def _ready(cli: str, model: str)` (14)
 - `async def exchange(cli: str, model: str, message: str, timeout: float) -> dict` (19)
@@ -147,7 +149,7 @@ Claude через установленный Claude Code по подписке: 
   - `async def aclose(self) -> None` (3)
   - `def _release(self) -> None` (5)
 
-### `adapters/lm_chat.py` — 235 строк
+### `adapters/lm_chat.py` — 239 строк
 
 Обращение к чат-модели провайдера и разбор её ответа.
 
@@ -459,7 +461,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def encrypt_bytes(plaintext: bytes) -> bytes` (2)
 - `def decrypt_bytes(ciphertext: bytes) -> bytes` (2)
 
-### `backend/domain/alphabet.py` — 12 строк
+### `backend/domain/alphabet.py` — 14 строк
 
 Буквы двух алфавитов, на которых пишут резюме и вакансии.
 
@@ -1001,11 +1003,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def normalize_enum(value, allowed: tuple[str, ...]) -> str | None` (22)
 - `def normalize_enum_list(values, allowed: tuple[str, ...]) -> list[str]` (15)
 
-### `backend/llm/answers.py` — 232 строк
+### `backend/llm/answers.py` — 234 строк
 
 Разбор того, что ответила модель, порядок двух заходов и жалоба на неудачу.
 
-Зависит от: —
+Зависит от: `adapters.lm_chat`
 
 - `def _last_object_in(text: str) -> tuple[int, int, str] | None` (27)
 - `def extract_last_json(answer: str) -> str | None` (37)
@@ -1538,11 +1540,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _carry_company_to_survivor(survivor: Company, taken: _AbsorbedCompany) -> None` (19)
 - `async def merge_company(session: AsyncSession, *, absorbed_id: int, survivor_id: int) -> None` (37)
 
-### `backend/repository/companies_keys.py` — 150 строк
+### `backend/repository/companies_keys.py` — 151 строк
 
 Приведение компании к ключам, по которым её сравнивают.
 
-Зависит от: `backend.domain.company_hosts`, `backend.incoming`
+Зависит от: `backend.domain.company_hosts`, `backend.domain.company_names`, `backend.incoming`
 
 - `def _translit_cyr_to_latin(s: str) -> str` (2)
 - `def _without_edge_legal_forms(words: list[str]) -> list[str]` (17)
@@ -2208,7 +2210,7 @@ Runtime settings layer.
   - `def block(self, company_id: int) -> dict` (12)
   - `def unblock(self, company_id: int) -> dict` (9)
 
-### `client/bridge/cv.py` — 151 строк
+### `client/bridge/cv.py` — 149 строк
 
 Файл резюме, на который смотрит окно: запомнить путь, открыть, разобрать.
 
@@ -2230,7 +2232,7 @@ Runtime settings layer.
 
 - `def _stat_cv(cv_path: str) -> dict | None` (9)
 
-### `client/bridge/desktop.py` — 206 строк
+### `client/bridge/desktop.py` — 211 строк
 
 Просьбы окна к рабочему столу: открыть названное системой, выбрать файл диалогом.
 
@@ -2243,6 +2245,7 @@ Runtime settings layer.
   - `def open_url(self, url: str) -> dict` (28)
   - `def open_attachment(self, url: str) -> dict` (25)
 - `def closed_dialog() -> dict` (3)
+- `def file_filter(label: str, suffixes) -> str` (3)
 - `def chosen_path(window, *file_types: str) -> str | None` (10)
 
 ### `client/bridge/events.py` — 149 строк
@@ -2359,20 +2362,20 @@ Runtime settings layer.
 
 Поставщик модели для окна: проверить связь, спросить имена, выбрать файл модели.
 
-Зависит от: `adapters`, `backend.log_secrets`, `backend.models`, `backend.provider_config`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.refusals`
+Зависит от: `adapters`, `adapters.lm_studio`, `backend.log_secrets`, `backend.models`, `backend.provider_config`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.refusals`
 
-- `def _client_or_reason(cfg: LlmProviderConfig) -> tuple[httpx.AsyncClient | None, str]` (16)
+- `def _client_or_reason(cfg: LlmProviderConfig) -> tuple[LmClient | None, str]` (16)
 - `async def _do_list_models_for_creds(base_url: str, api_key: str, *, kind: str | None=None) -> dict` (28)
-- `async def _do_llm_probe(cfg: LlmProviderConfig, check_fn: Callable[[httpx.AsyncClient, str], Any]) -> tuple[bool, str, list[str], int]` (27)
-- `def read_llm_creds(payload: dict, kind: str) -> LlmProviderConfig` (21)
+- `async def _do_llm_probe(cfg: LlmProviderConfig, check_fn: Callable[[LmClient, str], Any]) -> tuple[bool, str, list[str], int]` (27)
+- `def read_llm_creds(payload: dict, kind: str) -> LlmProviderConfig` (23)
 - `def read_models_ask(payload) -> tuple[str, str, str]` (4)
 - `def _provider_address(payload: dict) -> tuple[str, str]` (14)
-- `class Llm` (77)
+- `class Llm` (75)
   - `def probe_model(self, payload: dict) -> dict` (29)
     - `async def run() -> dict` (5)
   - `def pick_model_file(self) -> dict` (11)
-  - `def list_models(self, payload: dict) -> dict` (27)
-    - `async def run() -> dict` (11)
+  - `def list_models(self, payload: dict) -> dict` (25)
+    - `async def run() -> dict` (9)
 
 ### `client/bridge/login.py` — 129 строк
 
@@ -2464,7 +2467,7 @@ Runtime settings layer.
     - `async def run() -> dict` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (16)
 
-### `client/bridge/refusals.py` — 226 строк
+### `client/bridge/refusals.py` — 231 строк
 
 Слова, которыми мост отказывает окну.
 
@@ -2712,7 +2715,7 @@ Runtime settings layer.
 
 - `def show_trouble(text: str) -> None` (11)
 
-### `client/window.py` — 248 строк
+### `client/window.py` — 254 строк
 
 Окно приложения: как оно открывается и чем гасится.
 
@@ -2740,7 +2743,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 263 модулей
+## tests — 264 модулей
 
 ### `tests/adapters/test_app_tied_process.py` — 65 строк
 
@@ -2766,13 +2769,13 @@ Runtime settings layer.
   - `def install(routes: dict) -> list` (9)
     - `async def relay(_transport, request)` (2)
 
-### `tests/adapters/test_claude_code.py` — 332 строк ⚠ подошёл к 300
+### `tests/adapters/test_claude_code.py` — 350 строк ⚠ подошёл к 300
 
 Следствия разговора с Claude через живой процесс Claude Code по подписке.
 
 Зависит от: `adapters`, `adapters.claude_code`, `adapters.claude_code_process`, `adapters.lm_chat`, `adapters.lm_studio`, `backend.provider_config`, `tests.fakes.claude_code`, `tests.fakes.llm`
 
-Тестов: 20
+Тестов: 21
 
 - `def _client() -> ClaudeCodeClient` (2)
 - `def _model_of(process) -> str` (3)
@@ -2903,6 +2906,15 @@ Runtime settings layer.
   - `def check_keyring()` (2)
   - `def ensure_schema()` (2)
   - `def run_ui()` (3)
+
+### `tests/backend/fixtures/fit.py` — 32 строк
+
+Как тесты спрашивают зовы о пригодности — о роли, о языках.
+
+Зависит от: `backend.llm.candidate`, `tests.factories`
+
+- `async def asked(check, client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (9)
+- `async def verdict(check, client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (11)
 
 ### `tests/backend/fixtures/flows.py` — 269 строк
 
@@ -3860,27 +3872,23 @@ Runtime settings layer.
 
 - `def _verdict(verdict, issues=None) -> httpx.Response` (3)
 
-### `tests/backend/test_llm_fit_languages.py` — 176 строк
+### `tests/backend/test_llm_fit_languages.py` — 163 строк
 
 Следствия зова о языках вакансии.
 
-Зависит от: `backend.llm.candidate`, `backend.llm.fit_languages`, `tests.factories`, `tests.fakes.llm`
+Зависит от: `backend.llm.candidate`, `backend.llm.fit_languages`, `tests.backend.fixtures.fit`, `tests.factories`, `tests.fakes.llm`
 
 Тестов: 7
 
-- `async def _asked(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (9)
-- `async def _check(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (6)
 
-### `tests/backend/test_llm_fit_validation.py` — 288 строк
+### `tests/backend/test_llm_fit_validation.py` — 268 строк
 
 Следствия общего у трёх зовов о пригодности.
 
-Зависит от: `backend.llm.candidate`, `backend.llm.fit`, `backend.llm.fit_role`, `tests.factories`, `tests.fakes.llm`
+Зависит от: `backend.llm.fit`, `backend.llm.fit_role`, `tests.backend.fixtures.fit`, `tests.factories`, `tests.fakes.llm`
 
 Тестов: 16
 
-- `async def _check(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (11)
-- `async def _asked(client, *, raw_text='обычный текст вакансии', profile=None, parsed=None)` (9)
 
 ### `tests/backend/test_llm_genre_answer.py` — 76 строк
 
@@ -4984,7 +4992,7 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/client/test_bridge_llm.py` — 428 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_llm.py` — 429 строк ⚠ подошёл к 300
 
 Следствия проверки языковой модели: что окно узнаёт, нажав «проверить».
 
@@ -5238,7 +5246,7 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/conftest.py` — 402 строк ⚠ подошёл к 300
+### `tests/conftest.py` — 429 строк ⚠ подошёл к 300
 
 Стенд: подмена каталога данных, хранилища ключей и базы.
 
@@ -5259,6 +5267,9 @@ Runtime settings layer.
   - `async def _refuse(*_args, **_kwargs)` (5)
 - `def _claude_code_is_unreachable(monkeypatch)` (21)
   - `async def _refuse(*_args, **_kwargs)` (5)
+- `class EngineReached(BaseException)` (7)
+- `def _model_engine_is_locked(monkeypatch)` (15)
+  - `def _refuse(*_args, **_kwargs)` (5)
 - `def _sending_locked(monkeypatch)` (10)
 - `async def _clear_all_tables(engine: AsyncEngine) -> None` (37)
 - `async def _clean_database(_schema, database_url)` (25)
@@ -5324,13 +5335,13 @@ Runtime settings layer.
 
 Зависит от: `adapters.claude`, `tests.fakes.llm`
 
-- `def claude(routes: dict, *, api_key: str='sk-test') -> ClaudeClient` (12)
+- `def claude(routes: dict) -> ClaudeClient` (12)
 - `def _reply(content: list, stop_reason: str, **extra) -> httpx2.Response` (13)
 - `def message(text: str, *, stop_reason: str='end_turn') -> httpx2.Response` (9)
 - `def refusal(category: str='cyber') -> httpx2.Response` (7)
 - `def model_list(*ids: str) -> httpx2.Response` (16)
 
-### `tests/fakes/claude_code.py` — 147 строк
+### `tests/fakes/claude_code.py` — 152 строк
 
 Подделка Claude Code: живой процесс подменён, обмен с ним и разбор настоящие.
 
@@ -5344,13 +5355,13 @@ Runtime settings layer.
   - `async def drain(self) -> None` (2)
 - `class _Stdout` (6)
   - `async def readline(self) -> bytes` (2)
-- `class Process` (48)
-  - `def heard(self, line: dict) -> None` (19)
+- `class Process` (51)
+  - `def heard(self, line: dict) -> None` (22)
   - `def _push(self, message: dict) -> None` (2)
   - `async def next_line(self) -> bytes` (6)
   - `def kill(self) -> None` (3)
   - `async def wait(self) -> int` (2)
-- `class Calls` (12)
+- `class Calls` (14)
 - `def install(monkeypatch, replies: list, *, cli: str | None=CLI) -> Calls` (18)
   - `async def spawn(argv, env)` (6)
 
@@ -5551,13 +5562,13 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/test_harness_safety.py` — 183 строк
+### `tests/test_harness_safety.py` — 198 строк
 
 Сторож стенда: падает, если подмена не сработала.
 
-Зависит от: `adapters`, `adapters.claude`, `adapters.lm_chat`, `adapters.lm_studio`, `adapters.telegram`, `backend.models`, `backend.provider_config`, `config`, `tests.conftest`
+Зависит от: `adapters`, `adapters.claude`, `adapters.gguf_embed`, `adapters.lm_chat`, `adapters.lm_studio`, `adapters.telegram`, `backend.models`, `backend.provider_config`, `config`, `tests.conftest`
 
-Тестов: 13
+Тестов: 14
 
 
 ### `tests/test_package_shadowing.py` — 32 строк

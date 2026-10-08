@@ -4,8 +4,6 @@
 // Чистые функции: пройденное приходит доводом с моста, наружу уходят отметки и
 // фразы. Ни моста, ни разметки этот файл не знает.
 
-import { addressless, isModelFile } from './settings.js';
-
 /** Экраны по порядку. Приветствие и финал — обложки: шага у них нет, и в
  *  строке шагов они ничего не подсвечивают. */
 const SCREENS = ['welcome', 'telegram', 'chat', 'embed', 'cv', 'done'];
@@ -19,7 +17,6 @@ const STEPS = [
   { screen: 'cv', at: 4, label: 'Резюме' },
 ];
 
-const SCHEME = /^https?:\/\//;
 
 /** Следующий экран мастера или ничего, если это последний. */
 export function nextScreen(screen) {
@@ -125,25 +122,4 @@ export function cvModes() {
  */
 export function cvReady({ mode, path }) {
   return mode === 'skip' || !!path;
-}
-
-/** Что мешает уйти с шага поставщика дальше. Пустая фраза значит «ничего».
- *
- * Мост шлёт запрос по этому адресу как есть: без схемы он не уйдёт никуда, а
- * человек будет думать, что сломалась проверка. У Claude Code сервера нет —
- * вместо адреса служебное слово, и по схеме его не судят.
- */
-export function llmTrouble(creds) {
-  const url = creds.base_url.trim();
-  if (!url) return 'Укажите адрес поставщика';
-  if (!addressless(url) && !SCHEME.test(url)) {
-    return 'Адрес должен начинаться с http:// или https://';
-  }
-  if (!creds.model.trim()) return 'Выберите модель';
-  return '';
-}
-
-/** Что мешает уйти с шага эмбеддингов из файла. Пустая фраза значит «ничего». */
-export function fileTrouble(creds) {
-  return isModelFile(creds) ? '' : 'Выберите файл модели';
 }

@@ -224,7 +224,44 @@ export function canShareChat(chat) {
 }
 
 /** Откуда берутся эмбеддинги: с сервера или из файла модели на диске. */
-export const EMBED_SOURCES = ['Сервер', 'Файл'];
+export const SOURCE_SERVER = 'Сервер';
+export const SOURCE_FILE = 'Файл';
+export const EMBED_SOURCES = [SOURCE_SERVER, SOURCE_FILE];
+
+/** Подпись источника эмбеддингов по признаку «из файла». */
+export function sourceLabel(fromFile) {
+  return fromFile ? SOURCE_FILE : SOURCE_SERVER;
+}
+
+/** Из файла ли источник, выбранный по подписи. */
+export function isFileSource(label) {
+  return label === SOURCE_FILE;
+}
+
+/** Черновик эмбеддингов на смене источника — пустой.
+ *
+ * Прежнее с другого источника не годится: путь к файлу, дописанный адресом,
+ * мост принял бы как сервер с моделью по имени пути.
+ */
+export function sourceCreds(toFile) {
+  return toFile ? fileCreds('') : blankCreds();
+}
+
+/** Ходят ли эмбеддинги туда же, куда чат, прямо сейчас.
+ *
+ * Галочка — лишь желание человека: эмбеддинги из файла и чат на Claude ей не
+ * подчиняются. Векторов Claude не считает, и адрес чата, уехавший в
+ * эмбеддинги, мост бы не принял.
+ */
+export function sharesChat({ same, fromFile, chat }) {
+  return same && !fromFile && canShareChat(chat);
+}
+
+/** Чем подписано пустое поле пути к файлу модели. */
+export const NO_FILE_PLACEHOLDER = 'Файл модели не выбран';
+
+const SCHEME = /^https?:\/\//;
+
 
 /** Указывают ли учётные данные на файл модели — тем же признаком, что у моста:
  *  адреса нет, в поле модели путь к `.gguf` в любом регистре. */
@@ -306,4 +343,25 @@ export function sessionText(tg) {
 export function nextStep(answer) {
   if (answer.done) return 'done';
   return answer.need_password ? 'password' : 'code';
+}
+
+/** Что мешает уйти с шага поставщика дальше. Пустая фраза значит «ничего».
+ *
+ * Мост шлёт запрос по этому адресу как есть: без схемы он не уйдёт никуда, а
+ * человек будет думать, что сломалась проверка. У Claude Code сервера нет —
+ * вместо адреса служебное слово, и по схеме его не судят.
+ */
+export function llmTrouble(creds) {
+  const url = creds.base_url.trim();
+  if (!url) return 'Укажите адрес поставщика';
+  if (!addressless(url) && !SCHEME.test(url)) {
+    return 'Адрес должен начинаться с http:// или https://';
+  }
+  if (!creds.model.trim()) return 'Выберите модель';
+  return '';
+}
+
+/** Что мешает уйти с шага эмбеддингов из файла. Пустая фраза значит «ничего». */
+export function fileTrouble(creds) {
+  return isModelFile(creds) ? '' : 'Выберите файл модели';
 }

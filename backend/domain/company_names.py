@@ -2,7 +2,7 @@
 
 import re
 
-_ADDRESS_START_RE = re.compile(r"^[a-z][a-z0-9+.\-]*://", re.IGNORECASE)
+ADDRESS_START_RE = re.compile(r"^[a-z][a-z0-9+.\-]*://", re.IGNORECASE)
 
 
 def capitalized_company_name(name: str | None) -> str | None:
@@ -28,7 +28,7 @@ def capitalized_company_name(name: str | None) -> str | None:
     разбор, когда в поле не нашлось ничего другого, и «Https://kontur.ru» —
     не название с заглавной буквы, а испорченный адрес.
     """
-    if not name or _ADDRESS_START_RE.match(name):
+    if not name or ADDRESS_START_RE.match(name):
         return name
     first = next((at for at, letter in enumerate(name) if letter.isalpha()), None)
     if first is None:

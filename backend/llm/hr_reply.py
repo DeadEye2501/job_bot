@@ -5,7 +5,7 @@ import logging
 
 import httpx
 
-from adapters.lm_chat import ChatRequest, chat
+from adapters.lm_chat import CUT_BY_LIMIT, ChatRequest, chat
 
 from backend.domain.transitions import ALLOWED_AUTO_TRANSITIONS
 from backend.models import VacancyStatus
@@ -253,7 +253,7 @@ async def classify_hr_reply(
     reply = await chat(client, model, request, logger)
     if reply.text is None:
         return None, reply.error
-    if reply.finish_reason == "length":
+    if reply.finish_reason == CUT_BY_LIMIT:
         logger.warning("classify_hr_reply: ответ оборван, вердикта нет")
         return None, None
     parsed = _parse_classification(reply.text)

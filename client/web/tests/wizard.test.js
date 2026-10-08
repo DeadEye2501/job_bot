@@ -3,10 +3,11 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { PRESETS, blankCreds, fileCreds, presetFor } from '../state/settings.js';
 import {
-  backScreen, cvModes, cvReady, fileTrouble, llmTrouble, nextScreen, resumeScreen, stepAt,
-  stepMarks,
+  PRESETS, blankCreds, fileCreds, fileTrouble, llmTrouble, presetFor,
+} from '../state/settings.js';
+import {
+  backScreen, cvModes, cvReady, nextScreen, resumeScreen, stepAt, stepMarks,
 } from '../state/wizard.js';
 
 describe('номер шага у экрана', () => {

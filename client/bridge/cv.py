@@ -13,15 +13,13 @@ from backend.repository.profile_cv import save_parsed_cv
 
 from client.bridge.answer import denied, launched, reply
 from client.bridge.cv_file import _stat_cv
-from client.bridge.desktop import chosen_path, closed_dialog, open_in_system
+from client.bridge.desktop import chosen_path, closed_dialog, file_filter, open_in_system
 from client.bridge.refusals import PARSE_CV_REFUSALS
 
 
 # Старый двоичный `.doc` дописан к читаемым: разбор его не читает, а приложить
 # к отклику можно и его — там нужен только путь.
-_RESUME_FILTER = "Резюме ({})".format(
-    ";".join(f"*{one}" for one in (*READABLE_SUFFIXES, ".doc"))
-)
+_RESUME_FILTER = file_filter("Резюме", (*READABLE_SUFFIXES, ".doc"))
 
 
 class Cv:

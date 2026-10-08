@@ -7,7 +7,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BOUNDS,
+  SOURCE_FILE,
+  SOURCE_SERVER,
   addressless,
+  isFileSource,
+  sharesChat,
+  sourceCreds,
+  sourceLabel,
   blankCreds,
   canShareChat,
   fileCreds,
@@ -326,5 +332,40 @@ describe('файл модели', () => {
       api_key: '',
       model: 'd:/models/model.gguf',
     });
+  });
+});
+
+describe('эмбеддинги ходят туда же, куда чат', () => {
+  const openai = { base_url: 'https://api.openai.com/v1', api_key: 'k', model: 'gpt' };
+  const claudeCode = { base_url: 'claude-code', api_key: '', model: 'sonnet' };
+
+  it('только с отмеченной галочкой, сервером и чатом не на Claude', () => {
+    expect(sharesChat({ same: true, fromFile: false, chat: openai })).toBe(true);
+  });
+
+  it('чат ушёл на Claude — эмбеддинги за ним не едут, хоть галочка и стояла', () => {
+    // Иначе адрес Claude ушёл бы в эмбеддинги, а мост такую строку не примет.
+    expect(sharesChat({ same: true, fromFile: false, chat: claudeCode })).toBe(false);
+  });
+
+  it('эмбеддинги из файла за чатом не едут', () => {
+    expect(sharesChat({ same: true, fromFile: true, chat: openai })).toBe(false);
+  });
+});
+
+describe('источник эмбеддингов', () => {
+  it('подпись источника и обратно', () => {
+    expect(sourceLabel(true)).toBe(SOURCE_FILE);
+    expect(sourceLabel(false)).toBe(SOURCE_SERVER);
+    expect(isFileSource(SOURCE_FILE)).toBe(true);
+    expect(isFileSource(SOURCE_SERVER)).toBe(false);
+  });
+
+  it('смена источника начинает с пустого: путь к файлу не уезжает в сервер', () => {
+    // Оставленный путь человек дописал бы адресом, и мост принял бы строку
+    // «сервер + путь к .gguf» — бот спрашивал бы у сервера модель по имени пути.
+    expect(sourceCreds(false)).toEqual(blankCreds());
+    expect(isModelFile(sourceCreds(true))).toBe(false);
+    expect(sourceCreds(true).base_url).toBe('');
   });
 });

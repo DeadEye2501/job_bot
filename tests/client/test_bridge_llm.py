@@ -417,6 +417,7 @@ async def test_claude_is_refused_for_embeddings_before_any_call(api, ask, addres
     )
 
     assert answer["fail"] == "fields"
+    assert "эмбеддинг" in answer["detail"]
 
 
 @pytest.mark.parametrize("address", ["https://api.anthropic.com", "claude-code"])

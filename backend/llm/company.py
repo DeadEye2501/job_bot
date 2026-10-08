@@ -5,8 +5,8 @@ import logging
 
 import httpx
 
-from adapters.lm_chat import ChatRequest, chat
-from backend.llm.answers import ONLY_JSON, json_object, log_unparseable
+from adapters.lm_chat import CUT_BY_LIMIT, ChatRequest, chat
+from backend.llm.answers import ONLY_JSON, TRUNCATED_TROUBLE, json_object, log_unparseable
 from backend.llm.external import external_block
 from backend.llm.rules import AGGREGATOR_HOSTS_LINE
 from backend.incoming import str_list
@@ -166,9 +166,9 @@ async def dedupe_company_with_llm(
         # разборе сведения компаний, поэтому она остаётся строкой провайдера,
         # а не сводится к общему «не получилось».
         return None, reply.error
-    if reply.finish_reason == "length":
+    if reply.finish_reason == CUT_BY_LIMIT:
         # Обрыв решением о склейке быть не может: сведённые компании обратно
         # не разводятся, а лишняя заведённая запись поправима.
         logger.warning("dedupe_company: ответ оборван, свожу как «не та»")
-        return None, "truncated"
+        return None, TRUNCATED_TROUBLE
     return _matched_id(reply.text)

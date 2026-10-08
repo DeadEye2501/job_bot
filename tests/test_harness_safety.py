@@ -17,7 +17,7 @@ from backend.provider_config import LlmProviderConfig
 from adapters.claude import ClaudeClient
 from backend.models import Company
 from config import get_data_dir, get_database_url
-from tests.conftest import TMP_ROOT, ProviderReached, TelegramReached
+from tests.conftest import TMP_ROOT, EngineReached, ProviderReached, TelegramReached
 
 
 def test_data_dir_is_inside_the_temporary_folder():
@@ -69,6 +69,21 @@ async def test_running_real_claude_code_blows_up(monkeypatch, tmp_path):
 
     with pytest.raises(ProviderReached, match="Claude Code"):
         await chat(client, "sonnet", request, logging.getLogger(__name__))
+
+
+async def test_loading_a_real_embedding_model_blows_up(tmp_path):
+    """Загрузка настоящей модели эмбеддингов из теста взрывается.
+
+    Адаптер превращает беды движка в «модель недоступна»; без запора тест с
+    забытой подделкой молча грузил бы сотни мегабайт.
+    """
+    from adapters.gguf_embed import ModelFile
+
+    path = tmp_path / "модель.gguf"
+    path.write_bytes(b"GGUF")
+
+    with pytest.raises(EngineReached, match="настоящую модель"):
+        await ModelFile(str(path)).embed("текст")
 
 
 async def test_a_call_into_real_telegram_blows_up():

@@ -46,3 +46,19 @@ export async function probeModel(call, creds) {
     return { ok: false, model: '', latencyMs: 0, trouble: refusal.message };
   }
 }
+
+/** Спросить у человека файл модели диалогом окна.
+ *
+ * Закрытый диалог — пустой путь, а не беда: человек передумал. Отказ моста
+ * приходит фразой, как у соседей. Нужен мастеру и настройкам, и написанный
+ * дважды разошёлся бы в том, что считать «передумал».
+ */
+export async function pickModelFile(call) {
+  try {
+    const answer = await call('settings.pick_model_file');
+    return { path: answer?.path || '', trouble: '' };
+  } catch (refusal) {
+    return { path: '', trouble: refusal.message };
+  }
+}
+

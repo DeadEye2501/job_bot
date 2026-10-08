@@ -16,6 +16,10 @@ from adapters import claude, claude_code
 
 CHAT_PATH = "/v1/chat/completions"
 
+# Признак ответа, оборванного пределом токенов, — слово OpenAI, которым его
+# называют все пути: по нему зовущие решают, разбирать ли обрезанное.
+CUT_BY_LIMIT = "length"
+
 # Метка отказа модели отвечать. Отличать её от бед поставщика нужно зовущим:
 # беда поставщика временная, а отказ повторится на том же тексте.
 MODEL_REFUSED = claude.REFUSED
@@ -114,7 +118,7 @@ def _warn_if_truncated(finish_reason, purpose: str, log: logging.Logger) -> None
     только у письма, не кончившегося точкой. Пусть так: здесь записан факт
     (модель не договорила), а решение о нём остаётся наверху и у него.
     """
-    if finish_reason == "length":
+    if finish_reason == CUT_BY_LIMIT:
         log.warning(
             "%s: модель упёрлась в предел токенов, ответ может быть обрезан",
             purpose,
