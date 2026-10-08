@@ -3,7 +3,7 @@
 Провайдер любой OpenAI-совместимый: LM Studio, Ollama, OpenAI, OpenRouter,
 vLLM. Соединение с ним заводит сосед (`lm_studio.make_client`), здесь только
 разговор: что спросили, что ответили и чем беда, если ответа нет. Клиента
-Anthropic разговор отдаёт в `adapters/claude`.
+Anthropic разговор отдаёт в `adapters/claude`, Claude Code — в `adapters/claude_code`.
 """
 
 import logging
@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import anthropic
 import httpx
 
-from adapters import claude
+from adapters import claude, claude_code
 
 @dataclass(frozen=True)
 class ChatRequest:
@@ -138,7 +138,7 @@ def _answer_or_empty(
 
 
 async def chat(
-    client: httpx.AsyncClient | claude.ClaudeClient,
+    client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient,
     model: str,
     request: ChatRequest,
     log: logging.Logger,
@@ -153,6 +153,8 @@ async def chat(
     """
     if isinstance(client, claude.ClaudeClient):
         return await _chat_with_claude(client, model, request, log)
+    if isinstance(client, claude_code.ClaudeCodeClient):
+        return await _chat_with_claude_code(client, model, request, log)
     r, refusal = await _post_chat(client, model, request, log)
     if refusal is not None:
         return refusal
@@ -191,7 +193,35 @@ async def _chat_with_claude(
         return _status_refusal(request.purpose, e.status_code, log)
     except anthropic.APIConnectionError as e:
         return _delivery_refusal(request.purpose, e, log)
+    return _settled(content, finish_reason, request.purpose, log)
+
+
+async def _chat_with_claude_code(
+    client: claude_code.ClaudeCodeClient,
+    model: str,
+    request: ChatRequest,
+    log: logging.Logger,
+) -> ChatAnswer:
+    """Разговор через Claude Code, сведённый к тому же ответу, что у остальных путей."""
+    try:
+        content, finish_reason = await claude_code.ask(client, model, request, log)
+    except claude_code.CliTrouble as e:
+        if e.status is not None:
+            return _status_refusal(request.purpose, e.status, log)
+        return _delivery_refusal(request.purpose, e, log)
+    return _settled(content, finish_reason, request.purpose, log)
+
+
+def _settled(
+    content: str | None, finish_reason: str | None, purpose: str, log: logging.Logger
+) -> ChatAnswer:
+    """Ответ Claude — по API или через Claude Code — после того, как он пришёл.
+
+    Отказ модели — ошибка, а не пустой текст: пустоту зовущий прочёл бы как
+    «в объявлении ничего нет». Жалоба на обрыв и проверка на пустоту — общие
+    с OpenAI-путём.
+    """
     if finish_reason == claude.REFUSED:
         return ChatAnswer(error="refusal")
-    _warn_if_truncated(finish_reason, request.purpose, log)
-    return _answer_or_empty(content, finish_reason, request.purpose, log)
+    _warn_if_truncated(finish_reason, purpose, log)
+    return _answer_or_empty(content, finish_reason, purpose, log)

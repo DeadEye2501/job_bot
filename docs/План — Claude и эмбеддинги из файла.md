@@ -525,10 +525,33 @@
 
 ---
 
+### Задача 1б. Claude Code по подписке
+
+Добавлена после того, как выяснилось, что API оплачивается отдельно от подписки. Спека — часть 1б.
+
+**Файлы:**
+- Создать: `adapters/claude_code.py`, `tests/fakes/claude_code.py`, `tests/adapters/test_claude_code.py`.
+- Изменить:
+  - `adapters/lm_studio.py`, `adapters/lm_chat.py`, `adapters/lm_models.py` — развилки;
+  - `adapters/claude.py` — признак конца становится общим;
+  - `tests/conftest.py` — запор запуска процесса;
+  - `tests/test_harness_safety.py`.
+
+**Интерфейсы:**
+- `adapters.claude_code.serves(base_url) -> bool` — адрес `claude-code`.
+- `adapters.claude_code.ClaudeCodeClient(timeout: float)` с `aclose()`.
+- `adapters.claude_code.make_client(config, *, timeout) -> ClaudeCodeClient`.
+- `adapters.claude_code.ask(client, model, request, log) -> (text, finish_reason)`; беды — `CliTrouble(label)`.
+- `adapters.claude_code.list_models(client, kind) -> list[str]`, `ping(client, model) -> (bool, str)`.
+- `adapters.claude_code._run_cli(argv, stdin, env, timeout) -> (code, stdout, stderr)` — единственный
+  запуск процесса; стенд его запирает.
+
+Шаги по слайсу: тесты красным → код → зелёное → карты → ревью → коммит.
+
 ### Задача 2. Замер уровня размышления
 
-Делается с вашим ключом Anthropic и стоит денег: порядка десятка вакансий × восемь
-запросов × три уровня. Перед запуском — ваше согласие и ключ. Скрипт живёт в каталоге
+Делается через Claude Code по подписке: стоит не денег, а части лимита Max — порядка
+десятка вакансий × восемь запросов × три уровня. Скрипт живёт в каталоге
 scratchpad, в репозиторий не попадает.
 
 - [ ] **Шаг 1.** Взять из базы (только чтение) 10 вакансий разных исходов (`New`, `Not Fit`,

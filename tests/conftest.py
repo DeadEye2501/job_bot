@@ -252,6 +252,24 @@ def _anthropic_is_unreachable(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _claude_code_is_unreachable(monkeypatch):
+    """Настоящий Claude Code из тестов не запускается: запуск процесса заперт.
+
+    Каждый запуск тратит лимит подписки человека. Подделка
+    `tests/fakes/claude_code.py` подменяет этот же вход поверх запора.
+    """
+    from adapters import claude_code
+
+    async def _refuse(*_args, **_kwargs):
+        raise ProviderReached(
+            "тест запустил настоящий Claude Code. Подставьте подделку из "
+            "tests/fakes/claude_code.py."
+        )
+
+    monkeypatch.setattr(claude_code, "_run_cli", _refuse)
+
+
+@pytest.fixture(autouse=True)
 def _sending_locked(monkeypatch):
     """Второй слой запора: в боевом коде `SEND_LOCKED = False`.
 
