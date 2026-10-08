@@ -83,6 +83,9 @@ class Process:
         self.calls.reading = True
         if text == "/clear":
             self.calls.clears += 1
+            if self.calls.clear_dies:
+                self._lines.put_nowait(b"")
+                return
             self._push({"type": "conversation_reset"})
             self._push({"type": "system", "subtype": "init"})
             self._push(result("", stop_reason=None))
@@ -125,6 +128,8 @@ class Calls:
         # Сообщение ушло, пока предыдущее ещё ждало итога: очередь не держит.
         self.reading = False
         self.overlapped = False
+        # Сброс разговора не удаётся: процесс закрывает вывод на `/clear`.
+        self.clear_dies = False
 
 
 def install(monkeypatch, replies: list, *, cli: str | None = CLI) -> Calls:

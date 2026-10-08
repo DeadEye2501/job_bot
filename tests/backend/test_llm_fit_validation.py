@@ -10,47 +10,27 @@
 """
 
 import json
+from functools import partial
 
 import pytest
 
-from backend.llm.candidate import CandidateProfile
 from backend.llm.fit import _parse_fit_validation
 from backend.llm.fit_role import validate_role_fit
+from tests.backend.fixtures.fit import asked, verdict
 from tests.factories import parsed_vacancy
 from tests.fakes.llm import (
     CHAT,
     chat_response,
-    fit_answer,
     data_block,
+    fit_answer,
     messages_of,
     provider,
     provider_trouble,
     warning_before_the_block,
 )
 
-
-async def _check(client, *, raw_text="обычный текст вакансии", profile=None, parsed=None):
-    """Спросить зов о роли; отдать один вердикт.
-
-    Причину, по которой спросить не вышло, смотрит отдельная проверка: у
-    остальных провайдер отвечает, и разбирать пару в каждой значило бы писать
-    `[0]` тридцать раз.
-    """
-    validation, _trouble = await _asked(
-        client, raw_text=raw_text, profile=profile, parsed=parsed
-    )
-    return validation
-
-
-async def _asked(client, *, raw_text="обычный текст вакансии", profile=None, parsed=None):
-    """Спросить зов о роли и отдать ответ целиком: вердикт и причину."""
-    return await validate_role_fit(
-        parsed or parsed_vacancy(),
-        raw_text,
-        client,
-        "qwen",
-        profile=profile or CandidateProfile(),
-    )
+_asked = partial(asked, validate_role_fit)
+_check = partial(verdict, validate_role_fit)
 
 
 @pytest.mark.parametrize(

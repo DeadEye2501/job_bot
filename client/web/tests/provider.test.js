@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { askModels, probeModel } from '../state/provider.js';
+import { askModels, pickModelFile, probeModel } from '../state/provider.js';
 
 import { replying } from './bridge_stub.js';
 
@@ -97,5 +97,27 @@ describe('проверка связи с поставщиком', () => {
     await probeModel(call, CREDS);
 
     expect(asked).toEqual([{ method: 'settings.probe_model', payload: CREDS }]);
+  });
+});
+
+describe('выбор файла модели', () => {
+  it('выбранный путь приходит путём', async () => {
+    const call = async () => ({ path: 'd:/models/model.gguf' });
+
+    expect(await pickModelFile(call)).toEqual({ path: 'd:/models/model.gguf', trouble: '' });
+  });
+
+  it('закрытый диалог — пустой путь, а не беда', async () => {
+    const call = async () => ({ cancelled: true });
+
+    expect(await pickModelFile(call)).toEqual({ path: '', trouble: '' });
+  });
+
+  it('отказ моста приходит фразой', async () => {
+    const call = async () => {
+      throw refusal('Окно не ответило');
+    };
+
+    expect(await pickModelFile(call)).toEqual({ path: '', trouble: 'Окно не ответило' });
   });
 });

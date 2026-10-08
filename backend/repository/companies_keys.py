@@ -9,6 +9,7 @@
 import re
 
 from backend.domain.company_hosts import is_aggregator_host
+from backend.domain.company_names import ADDRESS_START_RE
 from backend.incoming import text_or_none
 
 
@@ -95,7 +96,7 @@ def normalize_host(url: str | None) -> str:
     if not url:
         return ""
     s = url.strip().lower()
-    s = re.sub(r"^[a-z][a-z0-9+.\-]*://", "", s)
+    s = ADDRESS_START_RE.sub("", s)
     s = s.lstrip("/")
     # Срезаем path / query / fragment ДО того, как лезть в port:
     # "sber.ru?utm=foo" без strip-а query превратился бы в host

@@ -275,6 +275,33 @@ def _claude_code_is_unreachable(monkeypatch):
     claude_code_process._closing = False
 
 
+class EngineReached(BaseException):
+    """Тест загрузил настоящую модель эмбеддингов.
+
+    Наследник `BaseException` по той же причине, что у соседей: адаптер
+    превращает беды движка в «модель недоступна», и наследника `Exception`
+    проглотил бы.
+    """
+
+
+@pytest.fixture(autouse=True)
+def _model_engine_is_locked(monkeypatch):
+    """Настоящий движок эмбеддингов из тестов не грузится.
+
+    Тест с забытой подделкой поднял бы модель на сотни мегабайт и прошёл бы
+    зелёным; подделка `tests/fakes/gguf.py` подменяет этот же вход поверх запора.
+    """
+    from adapters import gguf_embed
+
+    def _refuse(*_args, **_kwargs):
+        raise EngineReached(
+            "тест грузит настоящую модель эмбеддингов. Подставьте подделку из "
+            "tests/fakes/gguf.py."
+        )
+
+    monkeypatch.setattr(gguf_embed, "_open_model", _refuse)
+
+
 @pytest.fixture(autouse=True)
 def _sending_locked(monkeypatch):
     """Второй слой запора: в боевом коде `SEND_LOCKED = False`.

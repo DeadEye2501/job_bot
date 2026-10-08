@@ -6,7 +6,7 @@ import re
 
 import httpx
 
-from adapters.lm_chat import ChatRequest, chat
+from adapters.lm_chat import CUT_BY_LIMIT, ChatRequest, chat
 
 from backend.payloads import ParsedVacancy
 
@@ -238,7 +238,7 @@ def _letter_refusal(text: str, finish_reason) -> str | None:
     # символу цепляла бы стрелки и смайлы (`=>`, `->`, `<3`).
     if any(ch in text for ch in "[]{}") or _TEMPLATE_PLACEHOLDER_RE.search(text):
         return "чужая заглушка"
-    if finish_reason == "length" and text[-1] not in ".!?…":
+    if finish_reason == CUT_BY_LIMIT and text[-1] not in ".!?…":
         return "оборвано на полуслове"
     # Наставление упоминания вложений запрещает, но мягко — «прикладываю
     # CV» всё равно проскальзывает.

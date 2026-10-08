@@ -4,6 +4,8 @@
 import json
 import logging
 
+from adapters.lm_chat import CUT_BY_LIMIT
+
 ONLY_JSON = (
     "Никакого текста вне JSON. Никакого markdown. "
     "Никаких code-fence заборчиков. Никаких комментариев."
@@ -158,7 +160,7 @@ def truncation_trouble(finish_reason: str | None) -> str | None:
     вышло», и вакансия ждёт следующего захода. Различают их одинаково двое
     спрашивающих, и слово у них тоже одно.
     """
-    return TRUNCATED_TROUBLE if finish_reason == "length" else None
+    return TRUNCATED_TROUBLE if finish_reason == CUT_BY_LIMIT else None
 
 
 def wants_more_room(parsed, finish_reason: str | None) -> bool:
@@ -178,7 +180,7 @@ def wants_more_room(parsed, finish_reason: str | None) -> bool:
     вердикт пригодности, — и порознь это правило разъехалось бы: переспрашивай
     один из них на всяком обрыве, и собравшийся объект стоил бы лишнего зова.
     """
-    return parsed is None and finish_reason == "length"
+    return parsed is None and finish_reason == CUT_BY_LIMIT
 
 
 async def read_with_a_second_try(

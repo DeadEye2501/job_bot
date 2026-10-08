@@ -57,6 +57,7 @@
 - `_NOT_SUBSCRIPTION` = `набор из 6`
 - `_NO_WINDOW` = `getattr(subprocess, 'CREATE_NO_WINDOW', 0)`
 - `_LINE_LIMIT` = `16 * 1024 * 1024`
+- `_CLEAR_WAIT_S` = `30.0`
 - `class _Session`
   - `process: object`
   - `model: str`
@@ -86,6 +87,7 @@
 ### `adapters/lm_chat.py`
 
 - `CHAT_PATH` = `'/v1/chat/completions'`
+- `CUT_BY_LIMIT` = `'length'`
 - `MODEL_REFUSED` = `claude.REFUSED`
 - `class ChatRequest`
   - `purpose: str`
@@ -259,9 +261,9 @@
 
 ### `backend/domain/alphabet.py`
 
-- `CYRILLIC_LETTER` = `re.compile('[а-яё]', re.IGNORECASE)`
-- `LATIN_LETTER` = `re.compile('[a-z]', re.IGNORECASE)`
-- `CYRILLIC_WORD` = `re.compile('[а-яё]+', re.IGNORECASE)`
+- `CYRILLIC_LETTER` = `re.compile('[а-яёА-ЯЁ]')`
+- `LATIN_LETTER` = `re.compile('[a-zA-Z]')`
+- `CYRILLIC_WORD` = `re.compile('[а-яёА-ЯЁ]+')`
 
 ### `backend/domain/company_hosts.py`
 
@@ -270,7 +272,7 @@
 
 ### `backend/domain/company_names.py`
 
-- `_ADDRESS_START_RE` = `re.compile('^[a-z][a-z0-9+.\\-]*://', re.IGNOREC…`
+- `ADDRESS_START_RE` = `re.compile('^[a-z][a-z0-9+.\\-]*://', re.IGNOREC…`
 
 ### `backend/domain/currency.py`
 
@@ -1264,7 +1266,7 @@
 
 ### `client/bridge/cv.py`
 
-- `_RESUME_FILTER` = `'Резюме ({})'.format(';'.join((f'*{one}' for one…`
+- `_RESUME_FILTER` = `file_filter('Резюме', (*READABLE_SUFFIXES, '.doc…`
 
 ### `client/bridge/desktop.py`
 
@@ -1299,7 +1301,7 @@
 ### `client/bridge/llm.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_MODEL_FILTER` = `f'Модель GGUF (*{MODEL_FILE_SUFFIX})'`
+- `_MODEL_FILTER` = `file_filter('Модель GGUF', (MODEL_FILE_SUFFIX,))`
 - `PROVIDER_KINDS` = `tuple((kind.value for kind in LlmConfigKind))`
 
 ### `client/bridge/mark.py`
@@ -1359,6 +1361,7 @@
 - `CODE_FIRST` = `'Сначала запросите код подтверждения.'`
 - `CODE_STEP_FIRST` = `'Сначала пройдите шаг с кодом подтверждения.'`
 - `LLM_FIELDS_REQUIRED` = `'Заполните base_url и модель.'`
+- `EMBED_ON_CLAUDE` = `'Claude не считает эмбеддинги: выберите для них …`
 - `PROFILE_FIRST` = `'Сначала сохраните профайл (CV-таб).'`
 - `BUSY_CYCLE` = `'Уже идёт другой цикл, попробуйте позже.'`
 - `WIPE_FILES_BUSY` = `'Файлы открыты в другом процессе и не могут быть…`
@@ -1503,6 +1506,16 @@
 ### `tests/backend/test_llm_cv_response.py`
 
 - `MINIMAL_CV` = `json.dumps({'profile': CV_REQUIRED_PROFILE}, ens…`
+
+### `tests/backend/test_llm_fit_languages.py`
+
+- `_asked` = `partial(asked, validate_language_fit)`
+- `_check` = `partial(verdict, validate_language_fit)`
+
+### `tests/backend/test_llm_fit_validation.py`
+
+- `_asked` = `partial(asked, validate_role_fit)`
+- `_check` = `partial(verdict, validate_role_fit)`
 
 ### `tests/backend/test_migration_engine.py`
 

@@ -6,7 +6,7 @@ import time
 
 import httpx
 
-from adapters.lm_chat import ChatRequest, chat
+from adapters.lm_chat import CUT_BY_LIMIT, ChatRequest, chat
 from backend.incoming import normalize_enum
 from backend.llm.answers import ONLY_JSON, json_object, log_unparseable
 from backend.llm.external import external_block
@@ -157,7 +157,7 @@ async def factcheck_cover_letter(
     reply = await chat(client, model, request, logger)
     if reply.text is None:
         return True, []
-    if reply.finish_reason == "length":
+    if reply.finish_reason == CUT_BY_LIMIT:
         # Обрыв — та же беда, что и молчание провайдера: модель не
         # договорила, и её незаконченный отказ остановил бы отклик, который
         # первый слой наставления счёл годным.

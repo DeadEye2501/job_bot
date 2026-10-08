@@ -80,7 +80,7 @@
 - —
 - принимает: ask
 
-### app/SettingsScreen.svelte (399)
+### app/SettingsScreen.svelte (419)
 - Окно входа стоит внутри поля настроек, а не рядом с ним: кнопки в нём той же плотности, что и остальные кнопки экрана, и берут они её отсюда. На раскладку это не влияет — окно висит поверх страницы.
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
@@ -115,7 +115,7 @@
 - —
 - принимает: ask, busy, events, onback, onnext
 
-### app/WizardLlm.svelte (367)
+### app/WizardLlm.svelte (374)
 - —
 - принимает: ask, kind, onback, onnext
 
@@ -281,7 +281,7 @@
 - принимает: rows, onedit, onadd, onremove
 - берёт: ./Dropdown.svelte
 
-### components/LlmSection.svelte (179)
+### components/LlmSection.svelte (182)
 - Ввод в любое из полей гасит плашку проверки: она говорит «модель отвечает» про тот адрес, который проверяли, и на изменённых полях лгала бы. Ловится здесь, а не на каждом поле: событие всплывает, и второй обработчик у поля секрета пришлось бы заводить внутри чужого компонента.
 - принимает: title, icon, creds, models, pill, busy, sameAsChat, shareable, fromFile, onsave, onprobe, onsame, onedit, onpreset, onsource, onpickfile
 - берёт: ./Dropdown.svelte, ./SecretInput.svelte, ./SettingsSection.svelte, ./SuggestInput.svelte
@@ -684,9 +684,9 @@
 - * Подпись начатого обхода, о котором ещё ничего не известно. * * Первая весть о ходе приходит не сразу: до неё полосы уже бегут, и подпись под * ними обязана сказать, чем именно бот занят.
 - отдаёт: COUNTLESS_STAGES, STARTING, bar, caption, countlessNote
 
-### state/provider.js (48)
+### state/provider.js (64)
 - * Спросить у поставщика имена его моделей. * * Отказ и пустой перечень — разные ответы, и путать их нельзя: первое значит * «сервер не отозвался», второе — «сервер поднят, но модели в нём нет», и * чинятся они по-разному. Отказ приходит фразой, а не пустотой. * * Имя модели в вопрос не идёт: перечень читается с адреса и ключа, а имя — как * раз то, что в нём ищут.
-- отдаёт: askModels, probeModel
+- отдаёт: askModels, pickModelFile, probeModel
 
 ### state/search.js (25)
 - * Что из списка остаётся видно под набранное. * * Пустое набранное оставляет список целым: поле поиска стоит над уже открытым * списком, и до первого знака резать нечего. Одни пробелы — то же самое: их * набирают между словами и стирают последними, и схлопнутый на них список * мигал бы под руками. * * Регистр не различается — человек набирает как придётся, а значения приходят * как записаны. Вхождением, а не началом строки: имена приходят с приставками * («qwen/qwen3-4b», «@ник · компания»), и отбор по началу прятал бы строку от * того, кто набирает её собственное имя. * * `text` называет, где искать: у строки списка полей несколько, и по какому из * них её вспоминают, знает не этот файл, а тот, кто её показывает.
@@ -696,9 +696,9 @@
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
-### state/settings.js (309)
+### state/settings.js (367)
 - * Чем подписано пустое поле имени модели. * * Пока имён нет, подсказка не обещает списка: перечень читается с адреса и * ключа, и у непóднятого поставщика его не будет вовсе — имя тогда вписывают * руками. Слова общие на настройки и на шаг мастера: одно и то же поле, * подписанное по-разному, читается как два разных.
-- отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, fileCreds, idleProbe, isModelFile, loginTrouble, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probePill, sameCreds, scorePercent, sessionPill, sessionText, telegramCreds, thresholdState
+- отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, NO_FILE_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, SOURCE_FILE, SOURCE_SERVER, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, fileCreds, fileTrouble, idleProbe, isFileSource, isModelFile, llmTrouble, loginTrouble, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probePill, sameCreds, scorePercent, sessionPill, sessionText, sharesChat, sourceCreds, sourceLabel, telegramCreds, thresholdState
 
 ### state/skills.js (84)
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
@@ -740,9 +740,9 @@
 - * Отбор и порядок, какими их оставили в прошлый заход.
 - отдаёт: vacancyView
 
-### state/wizard.js (149)
+### state/wizard.js (125)
 - * Экраны по порядку. Приветствие и финал — обложки: шага у них нет, и в * строке шагов они ничего не подсвечивают.
-- отдаёт: backScreen, cvModes, cvReady, fileTrouble, llmTrouble, nextScreen, resumeScreen, stepAt, stepMarks
+- отдаёт: backScreen, cvModes, cvReady, nextScreen, resumeScreen, stepAt, stepMarks
 
 ### state/words.js (15)
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
@@ -1548,13 +1548,13 @@ body, html, button, body, .material-symbols-outlined
 ### tests/profile_experience_live.test.js (72)
 - * Вкладка с записанными за ней посылками на мост.
 
-### tests/provider.test.js (101)
+### tests/provider.test.js (123)
 - * Отказ моста в том виде, в каком его поднимает обёртка зова.
 
 ### tests/search.test.js (49)
 - —
 
-### tests/settings.test.js (330)
+### tests/settings.test.js (371)
 - —
 
 ### tests/settled.js (21)
@@ -1595,7 +1595,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/vacancy_timeline_live.test.js (43)
 - —
 
-### tests/wizard.test.js (217)
+### tests/wizard.test.js (218)
 - —
 
 ### tests/wizard_cv_live.test.js (108)

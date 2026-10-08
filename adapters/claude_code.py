@@ -11,7 +11,7 @@ import shutil
 from pathlib import Path
 
 from adapters import claude_code_process
-from adapters.claude import FINISH, REFUSED, split_system
+from adapters.claude import FINISH, split_system
 
 # Имена, которые Claude Code сам ведёт к последней версии модели.
 MODELS = ["sonnet", "opus", "haiku"]
@@ -60,14 +60,20 @@ def _find_cli() -> str | None:
     return str(beside) if beside.is_file() else found
 
 
+def _cli() -> str:
+    """Путь к Claude Code, а нет его — отказ одной фразой на всех зовущих."""
+    cli = _find_cli()
+    if cli is None:
+        raise CliTrouble(NO_CLI)
+    return cli
+
+
 def _reply(data: dict) -> tuple[str | None, str | None]:
     """Текст и причина конца из итога обращения; беда — `CliTrouble`."""
     if data.get("is_error"):
         detail = data.get("result") or data.get("subtype") or "ошибка без описания"
         raise CliTrouble(str(detail)[:200], status=data.get("api_error_status"))
     stop = data.get("stop_reason")
-    if stop == REFUSED:
-        return None, REFUSED
     return data.get("result"), FINISH.get(stop, stop)
 
 
@@ -75,9 +81,7 @@ async def _converse(
     client: ClaudeCodeClient, model: str, messages: list[dict], timeout: float | None
 ) -> tuple[str | None, str | None]:
     """Одно обращение: правила — в рамке инструкций, реплики — данными после неё."""
-    cli = _find_cli()
-    if cli is None:
-        raise CliTrouble(NO_CLI)
+    cli = _cli()
     system, turns = split_system(messages)
     message = claude_code_process.framed(system, "\n\n".join(m["content"] for m in turns))
     try:
@@ -92,15 +96,14 @@ async def ask(client: ClaudeCodeClient, model: str, request):
 
     `request` — `lm_chat.ChatRequest`; тип не назван, потому что `lm_chat` сам
     зовёт этот модуль. Беды уходят наверх `CliTrouble`: метку им ставит
-    `lm_chat`, одну на все пути. Отказ модели — ответ с причиной конца `REFUSED`.
+    `lm_chat`, одну на все пути. Отказ модели приходит причиной конца, как у API.
     """
     return await _converse(client, model, request.messages, request.timeout)
 
 
 async def list_models(_client: ClaudeCodeClient) -> list[str]:
     """Модели Claude Code. Нет Claude Code — `CliTrouble`."""
-    if _find_cli() is None:
-        raise CliTrouble(NO_CLI)
+    _cli()
     return list(MODELS)
 
 

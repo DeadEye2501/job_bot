@@ -9,11 +9,14 @@
     CREDS_LIMITS,
     EMBED_SOURCES,
     KEY_PLACEHOLDER,
+    NO_FILE_PLACEHOLDER,
     PRESET_NAMES,
     SAME_CREDS_LABEL,
     addressless,
+    isFileSource,
     modelPlaceholder,
     presetFor,
+    sourceLabel,
   } from '$state/settings.js';
 
   import Dropdown from './Dropdown.svelte';
@@ -119,8 +122,8 @@
         <div class="span-2">
           <Dropdown
             options={EMBED_SOURCES}
-            value={fromFile ? EMBED_SOURCES[1] : EMBED_SOURCES[0]}
-            onpick={(source) => onsource(source === EMBED_SOURCES[1])}
+            value={sourceLabel(fromFile)}
+            onpick={(source) => onsource(isFileSource(source))}
           />
         </div>
       </div>
@@ -132,7 +135,7 @@
             readonly
             value={creds.model}
             title={creds.model}
-            placeholder="Файл модели не выбран"
+            placeholder={NO_FILE_PLACEHOLDER}
           />
           {@render probeButton()}
         </div>

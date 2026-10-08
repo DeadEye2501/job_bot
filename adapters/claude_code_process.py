@@ -52,6 +52,10 @@ _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 # умолчанию (64 КБ) длинный разбор вакансии переполнил бы.
 _LINE_LIMIT = 16 * 1024 * 1024
 
+# Сброс разговора — короткая команда без модели; свой срок у него нарочно:
+# под общим сроком запроса он съедал бы время готового ответа.
+_CLEAR_WAIT_S = 30.0
+
 
 class ProcessGone(Exception):
     """Процесс закрыл вывод посреди обмена, упал или приложение уже закрывается."""
@@ -152,24 +156,38 @@ async def _result(process) -> dict:
     Code пишет в вывод и служебный текст, а ответ всегда приходит итогом.
     """
     while True:
-        raw = await process.stdout.readline()
+        try:
+            raw = await process.stdout.readline()
+        except ValueError as e:
+            # Строка длиннее предела чтения: разговор дальше не разобрать.
+            raise ProcessGone(f"строка потока не прочиталась: {e}") from e
         if not raw:
             raise ProcessGone("Claude Code закрыл вывод")
         try:
             message = json.loads(raw)
         except ValueError:
             continue
-        if message.get("type") == "result":
+        if isinstance(message, dict) and message.get("type") == "result":
             return message
 
 
-async def _round(process, message: str) -> dict:
-    """Обращение и сброс разговора за ним: следующий не увидит прошлого."""
-    await _send(process, message)
-    reply = await _result(process)
-    await _send(process, _CLEAR)
-    await _result(process)
-    return reply
+async def _ask(process, text: str) -> dict:
+    """Одна реплика и её итог."""
+    await _send(process, text)
+    return await _result(process)
+
+
+async def _cleared(process) -> bool:
+    """Сбросить разговор; не вышло — `False`, процесс тогда пора снять.
+
+    Готовый ответ от неудачного сброса не пропадает: он уже получен, а
+    снятый процесс просто не понесёт этот разговор в следующий запрос.
+    """
+    try:
+        await asyncio.wait_for(_ask(process, _CLEAR), _CLEAR_WAIT_S)
+    except (TimeoutError, ProcessGone):
+        return False
+    return True
 
 
 async def _drop() -> None:
@@ -210,8 +228,8 @@ async def exchange(cli: str, model: str, message: str, timeout: float) -> dict:
         process = await _ready(cli, model)
         settled = False
         try:
-            reply = await asyncio.wait_for(_round(process, message), timeout)
-            settled = True
+            reply = await asyncio.wait_for(_ask(process, message), timeout)
+            settled = await _cleared(process)
         finally:
             if not settled:
                 await _drop()

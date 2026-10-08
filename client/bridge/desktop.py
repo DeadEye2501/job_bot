@@ -194,6 +194,11 @@ def closed_dialog() -> dict:
     return {"ok": {"cancelled": True}}
 
 
+def file_filter(label: str, suffixes) -> str:
+    """Строка фильтра для диалога выбора файла: «Подпись (*.a;*.b)»."""
+    return "{} ({})".format(label, ";".join(f"*{one}" for one in suffixes))
+
+
 def chosen_path(window, *file_types: str) -> str | None:
     """Путь, выбранный человеком в диалоге самого окна; пусто — диалог закрыли.
 

@@ -7,6 +7,8 @@
 
 import re
 
-CYRILLIC_LETTER = re.compile(r"[а-яё]", re.IGNORECASE)
-LATIN_LETTER = re.compile(r"[a-z]", re.IGNORECASE)
-CYRILLIC_WORD = re.compile(r"[а-яё]+", re.IGNORECASE)
+# Без флага регистра: с ним латинский класс ловил бы ещё «İ», «ı», «ſ» и знак
+# Кельвина — и имя технологии с таким знаком сошло бы за латинское.
+CYRILLIC_LETTER = re.compile(r"[а-яёА-ЯЁ]")
+LATIN_LETTER = re.compile(r"[a-zA-Z]")
+CYRILLIC_WORD = re.compile(r"[а-яёА-ЯЁ]+")

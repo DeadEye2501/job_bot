@@ -217,6 +217,24 @@ async def test_a_process_that_died_is_replaced_by_the_next_request(monkeypatch):
     assert len(calls.spawned) == 2
 
 
+async def test_an_answer_survives_a_reset_that_failed(monkeypatch):
+    """Ответ получен, а сброс не удался — ответ не теряется, процесс снимается.
+
+    Готовый разбор вакансии пропал бы из-за сбоя служебной команды после него;
+    а процесс с несброшенным разговором следующему запросу не годится.
+    """
+    calls = install(monkeypatch, [result("готово"), result("дальше")])
+    calls.clear_dies = True
+
+    first = await chat(_client(), SONNET, chat_request(), LOG)
+    calls.clear_dies = False
+    second = await chat(_client(), SONNET, chat_request(), LOG)
+
+    assert first.text == "готово"
+    assert second.text == "дальше"
+    assert len(calls.spawned) == 2
+
+
 async def test_a_silent_process_is_dropped_after_the_deadline(monkeypatch):
     """Процесс молчит дольше срока — он снимается, следующее обращение поднимает новый.
 

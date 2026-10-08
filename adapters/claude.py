@@ -1,7 +1,7 @@
 """Claude через официальный SDK Anthropic: соединение, запрос и перечень моделей.
 
-Надстройка рядом с OpenAI-совместимым путём: точки входа (`lm_studio`,
-`lm_chat`, `lm_models`) узнают этот клиент по типу и отдают его сюда. Здесь
+Надстройка рядом с OpenAI-совместимым путём: `lm_studio` собирает этот клиент
+по адресу Anthropic, а `lm_chat` и `lm_models` узнают его по типу и отдают сюда. Здесь
 то, чем Claude отличается: системный промпт отдельным параметром, отсутствие
 temperature, блоки в ответе, отказ модели. Метки бед и проверка ответа
 остаются общими у точек входа.
@@ -112,13 +112,16 @@ async def ask(client: ClaudeClient, model: str, request):
     зовёт этот модуль, и импорт навстречу замкнул бы круг.
 
     Ошибки SDK и `MissingKey` уходят наверх: метку им ставит `lm_chat`, одну на
-    оба пути. Отказ модели — не ошибка, а ответ с причиной конца `REFUSED`.
+    все пути. Отказ модели — не ошибка, а ответ с причиной конца `REFUSED`; его
+    категорию знает только API, и записывается она здесь.
     """
     _require_key(client)
     target = client if request.timeout is None else client.with_options(timeout=request.timeout)
     reply = await target.messages.create(
         **_params(model, request.messages, request.max_tokens)
     )
+    if reply.stop_reason == REFUSED and reply.stop_details is not None:
+        _log.warning("отказ модели, категория: %s", reply.stop_details.category)
     text = "".join(block.text for block in reply.content if block.type == "text")
     return text, FINISH.get(reply.stop_reason, reply.stop_reason)
 

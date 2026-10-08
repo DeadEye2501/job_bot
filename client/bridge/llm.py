@@ -7,9 +7,9 @@ import time
 from functools import partial
 from typing import Any, Callable
 
-import httpx
 
 from adapters import lm_models, lm_studio
+from adapters.lm_studio import LmClient
 from backend.models import LlmConfigKind
 from backend.provider_config import (
     MODEL_FILE_SUFFIX,
@@ -18,19 +18,19 @@ from backend.provider_config import (
     serves_kind,
 )
 from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, reply
-from client.bridge.desktop import chosen_path, closed_dialog
-from client.bridge.refusals import LLM_FIELDS_REQUIRED
+from client.bridge.desktop import chosen_path, closed_dialog, file_filter
+from client.bridge.refusals import EMBED_ON_CLAUDE, LLM_FIELDS_REQUIRED
 
 
 logger = logging.getLogger(__name__)
 
-_MODEL_FILTER = f"Модель GGUF (*{MODEL_FILE_SUFFIX})"
+_MODEL_FILTER = file_filter("Модель GGUF", (MODEL_FILE_SUFFIX,))
 
 # Рода поставщиков, какими их называет окно, — значения перечисления базы.
 PROVIDER_KINDS = tuple(kind.value for kind in LlmConfigKind)
 
 
-def _client_or_reason(cfg: LlmProviderConfig) -> tuple[httpx.AsyncClient | None, str]:
+def _client_or_reason(cfg: LlmProviderConfig) -> tuple[LmClient | None, str]:
     """Клиент поставщика либо причина, по которой он не собрался.
 
     Сборка спотыкается о негодный адрес — `http://localhost:12ab` человек
@@ -80,7 +80,7 @@ async def _do_list_models_for_creds(
 
 async def _do_llm_probe(
     cfg: LlmProviderConfig,
-    check_fn: Callable[[httpx.AsyncClient, str], Any],
+    check_fn: Callable[[LmClient, str], Any],
 ) -> tuple[bool, str, list[str], int]:
     """Запускает chat/embed-проверку и возвращает кортеж (ok, detail, models, latency_ms).
 
@@ -125,6 +125,8 @@ def read_llm_creds(payload: dict, kind: str) -> LlmProviderConfig:
         raise ValueError(LLM_FIELDS_REQUIRED)
     base_url, api_key = _provider_address(payload)
     model = str(payload.get("model") or "").strip()
+    if not serves_kind(kind, base_url):
+        raise ValueError(EMBED_ON_CLAUDE)
     if not provider_complete(kind, base_url, model):
         raise ValueError(LLM_FIELDS_REQUIRED)
     return LlmProviderConfig(base_url=base_url, api_key=api_key, model=model)
@@ -217,11 +219,9 @@ class Llm:
         kind, base_url, api_key = read_models_ask(payload)
 
         async def run() -> dict:
-            if not base_url or kind not in PROVIDER_KINDS:
-                return {"kind": kind, "models": []}
             # Векторов Claude не считает: перечень его моделей в поле эмбеддингов
             # подсказывал бы то, что не заработает.
-            if not serves_kind(kind, base_url):
+            if not base_url or kind not in PROVIDER_KINDS or not serves_kind(kind, base_url):
                 return {"kind": kind, "models": []}
             answer = await _do_list_models_for_creds(base_url, api_key, kind=kind)
             if not answer["ok"]:

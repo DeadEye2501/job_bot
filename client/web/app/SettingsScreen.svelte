@@ -13,20 +13,24 @@
   import SettingsSection from '$components/SettingsSection.svelte';
   import TelegramSection from '$components/TelegramSection.svelte';
   import { living } from '$state/alive.js';
-  import { askModels, probeModel } from '$state/provider.js';
+  import { askModels, pickModelFile, probeModel } from '$state/provider.js';
   import {
     blankCreds,
     blankTelegram,
     canShareChat,
     credsChanged,
     fileCreds,
+    fileTrouble,
     idleProbe,
     isModelFile,
+    llmTrouble,
     loginTrouble,
     mirrored,
     presetCreds,
     probePill,
     sameCreds,
+    sharesChat,
+    sourceCreds,
     telegramCreds,
   } from '$state/settings.js';
 
@@ -63,7 +67,7 @@
   const pills = $derived({ chat: probePill(probes.chat), embed: probePill(probes.embed) });
   // Эмбеддинги ходят туда же, куда чат, только пока чат не на Claude: векторов
   // он не считает, и такую пару мост не примет.
-  const sharing = $derived(same && !fromFile && canShareChat(chat));
+  const sharing = $derived(sharesChat({ same, fromFile, chat }));
 
   const alive = living();
 
@@ -125,9 +129,13 @@
 
   function saveChat(part) {
     chat = { ...chat, ...part };
+    forgetShareOnClaude();
     // Перечень имён спрашивается заново на смене адреса или ключа: он с них и
     // читается, и оставленный прежним подсказывал бы модели чужого сервера.
     if (part.model === undefined) listModels('chat');
+    // Без модели мост строку не примет: после выбора поставщика её ещё нет, и
+    // уход из поля ключа дал бы плашку отказа вместо записи.
+    if (!chat.model) return;
     // Когда эмбеддинги ходят туда же, их адрес и ключ едут следом: иначе в
     // базе осталась бы пара, которой человек на экране не видел.
     if (!sharing) return save({ chat });
@@ -139,6 +147,7 @@
   function saveEmbed(part) {
     embed = { ...embed, ...part };
     if (part.model === undefined) listModels('embed');
+    if (!embed.model) return;
     return save({ embed });
   }
 
@@ -151,8 +160,18 @@
     const next = presetCreds(label, chat);
     if (next === null) return;
     chat = next;
+    forgetShareOnClaude();
     forgetProbe('chat');
     return listModels('chat');
+  }
+
+  /** Чат ушёл на Claude — галочка «как у чата» снимается насовсем.
+   *
+   * Скрытая, но взведённая, она вернулась бы отмеченной вместе с другим
+   * поставщиком чата и молча затёрла бы отдельный сервер эмбеддингов.
+   */
+  function forgetShareOnClaude() {
+    if (!canShareChat(chat)) same = false;
   }
 
   /** Человек переключил источник эмбеддингов: сервер или файл модели.
@@ -162,14 +181,18 @@
    */
   function switchSource(toFile) {
     fromFile = toFile;
-    if (toFile) same = false;
+    embed = sourceCreds(toFile);
+    same = false;
+    models = { ...models, embed: [] };
     forgetProbe('embed');
   }
 
   /** Спросить файл модели диалогом окна и записать его. */
   async function pickFile() {
-    const got = await ask('settings.pick_model_file');
-    if (!got || got.cancelled || !alive.now) return;
+    const got = await pickModelFile(call);
+    if (!alive.now) return;
+    if (got.trouble) return say(got.trouble, true);
+    if (!got.path) return;
     embed = fileCreds(got.path);
     forgetProbe('embed');
     return save({ embed });
@@ -200,11 +223,8 @@
     const creds = kind === 'chat' ? chat : embed;
     // Пустую форму не отправляем: поставщик ответит отказом про разбор адреса,
     // и человек будет искать беду в сети вместо незаполненного поля.
-    if (kind === 'embed' && fromFile) {
-      if (!isModelFile(embed)) return say('Выберите файл модели', true);
-    } else if (!creds.base_url || !creds.model) {
-      return say('Заполните base_url и модель', true);
-    }
+    const trouble = kind === 'embed' && fromFile ? fileTrouble(creds) : llmTrouble(creds);
+    if (trouble) return say(trouble, true);
     probes = { ...probes, [kind]: { ...idleProbe(), status: 'busy' } };
     const done = await probeModel(call, { kind, ...creds });
     if (!alive.now) return;

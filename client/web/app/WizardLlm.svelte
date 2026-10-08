@@ -11,10 +11,11 @@
   // недописанный адрес значил бы работающего бота без модели.
   import { call } from '$api/bridge.js';
   import { living } from '$state/alive.js';
-  import { askModels, probeModel } from '$state/provider.js';
+  import { askModels, pickModelFile, probeModel } from '$state/provider.js';
   import {
     CREDS_LIMITS,
     EMBED_SOURCES,
+    NO_FILE_PLACEHOLDER,
     PRESET_NAMES,
     blankCreds,
     KEY_PLACEHOLDER,
@@ -22,19 +23,23 @@
     addressless,
     canShareChat,
     fileCreds,
+    fileTrouble,
+    isFileSource,
     isModelFile,
+    llmTrouble,
     mirrored,
     modelPlaceholder,
     presetCreds,
     presetFor,
     sameCreds,
+    sourceCreds,
+    sourceLabel,
   } from '$state/settings.js';
   import Dropdown from '$components/Dropdown.svelte';
   import SecretInput from '$components/SecretInput.svelte';
   import SuggestInput from '$components/SuggestInput.svelte';
   import WizardFoot from '$components/WizardFoot.svelte';
   import WizardStatus from '$components/WizardStatus.svelte';
-  import { fileTrouble, llmTrouble } from '$state/wizard.js';
 
   let { ask, kind, onback, onnext } = $props();
 
@@ -130,20 +135,22 @@
   function switchSource(toFile) {
     fromFile = toFile;
     status = null;
-    creds = toFile ? fileCreds('') : blankCreds();
-    if (!toFile) sameAsChat = false;
+    creds = sourceCreds(toFile);
+    sameAsChat = false;
+    models = [];
   }
 
   /** Спросить файл модели диалогом окна; записывается он по «Дальше». */
   async function pickFile() {
-    try {
-      const got = await call('settings.pick_model_file');
-      if (!alive.now || got.cancelled) return;
-      creds = fileCreds(got.path);
-      status = null;
-    } catch (refusal) {
-      if (alive.now) status = { tone: 'err', text: refusal.message };
+    const got = await pickModelFile(call);
+    if (!alive.now) return;
+    if (got.trouble) {
+      status = { tone: 'err', text: got.trouble };
+      return;
     }
+    if (!got.path) return;
+    creds = fileCreds(got.path);
+    status = null;
   }
 
   /** Переключить эмбеддинги на чатовые адрес и ключ — или на свои. */
@@ -165,8 +172,8 @@
    */
   async function check() {
     if (busy) return;
-    if (fromFile && !isModelFile(creds)) {
-      status = { tone: 'err', text: 'Выберите файл модели.' };
+    if (fromFile && fileTrouble(creds)) {
+      status = { tone: 'err', text: fileTrouble(creds) };
       return;
     }
     if (!fromFile && !creds.base_url.trim()) {
@@ -285,8 +292,8 @@
     {:else}
       <Dropdown
         options={EMBED_SOURCES}
-        value={fromFile ? EMBED_SOURCES[1] : EMBED_SOURCES[0]}
-        onpick={(source) => switchSource(source === EMBED_SOURCES[1])}
+        value={sourceLabel(fromFile)}
+        onpick={(source) => switchSource(isFileSource(source))}
       />
       {#if !fromFile && canShareChat(chat)}
         <label class="checkbox-row">
@@ -306,7 +313,7 @@
         readonly
         value={creds.model}
         title={creds.model}
-        placeholder="Файл модели не выбран"
+        placeholder={NO_FILE_PLACEHOLDER}
       />
       <button class="btn" type="button" disabled={busy} onclick={pickFile}>
         <span class="material-symbols-outlined">folder_open</span>Выбрать файл

@@ -11,29 +11,16 @@
 выдумки: снаружи она видна только перевёрнутым вердиктом.
 """
 
+from functools import partial
+
 from backend.llm.candidate import CandidateLanguage, CandidateProfile
 from backend.llm.fit_languages import validate_language_fit
+from tests.backend.fixtures.fit import asked, verdict
 from tests.factories import parsed_vacancy
 from tests.fakes.llm import CHAT, fit_answer, messages_of, provider
 
-
-async def _asked(client, *, raw_text="обычный текст вакансии", profile=None, parsed=None):
-    """Спросить зов о языках и отдать ответ целиком: вердикт и причину."""
-    return await validate_language_fit(
-        parsed or parsed_vacancy(),
-        raw_text,
-        client,
-        "qwen",
-        profile=profile or CandidateProfile(),
-    )
-
-
-async def _check(client, *, raw_text="обычный текст вакансии", profile=None, parsed=None):
-    """Спросить зов о языках; отдать один вердикт."""
-    validation, _trouble = await _asked(
-        client, raw_text=raw_text, profile=profile, parsed=parsed
-    )
-    return validation
+_asked = partial(asked, validate_language_fit)
+_check = partial(verdict, validate_language_fit)
 
 
 async def test_the_question_about_languages_gets_no_parsed_fields():
