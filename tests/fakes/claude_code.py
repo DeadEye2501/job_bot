@@ -1,32 +1,40 @@
-"""Подделка Claude Code: запуск процесса подменён, разбор и сборка вызова настоящие.
+"""Подделка Claude Code: живой процесс подменён, обмен с ним и разбор настоящие.
 
-Подменены два входа: где лежит `claude` (`_find_cli`) и сам запуск процесса
-(`_run_cli`). Всё между ними — флаги, файл системного промпта, окружение,
-разбор ответа — остаётся боевым, и тесты видят, что ушло бы в процесс.
+Подменены два входа: где лежит `claude` (`claude_code._find_cli`) и запуск
+процесса (`claude_code_process._spawn`). Подставной процесс говорит потоком
+JSON-строк, как настоящий: на сообщение — строка начала и итог, на `/clear` —
+весть о сбросе, строка начала и пустой итог. Каждую строку он отдаёт, уступив
+петлю, как и настоящая труба: иначе обращения разом шли бы по очереди и без
+замка. Всё между входами — флаги, рамка, окружение, очередь, сброс,
+перезапуск — остаётся боевым.
 """
 
+import asyncio
 import json
-from pathlib import Path
 
-from adapters import claude_code
+from adapters import claude_code, claude_code_process
 
 CLI = r"C:\fake\claude.exe"
 
+# Заготовки поведения процесса вместо ответа.
+DIES = "процесс закрыл вывод"
+HANGS = "процесс молчит"
+
 
 def _answer(text: str | None, **fields) -> dict:
-    """Ответ `claude -p --output-format json`: текст и поля исхода."""
+    """Итог потокового Claude Code: текст и поля исхода."""
     return {"type": "result", "result": text, **fields}
 
 
 def result(text: str | None, *, stop_reason: str = "end_turn") -> dict:
-    """Ответ Claude Code на удачный запрос."""
+    """Итог удачного запроса."""
     return _answer(
         text, subtype="success", is_error=False, stop_reason=stop_reason, api_error_status=None
     )
 
 
 def failure(text: str, *, status: int | None = None) -> dict:
-    """Ответ Claude Code, в котором запрос не удался."""
+    """Итог запроса, который не удался."""
     return _answer(
         text,
         subtype="error_during_execution",
@@ -36,45 +44,104 @@ def failure(text: str, *, status: int | None = None) -> dict:
     )
 
 
+class _Stdin:
+    def __init__(self, process) -> None:
+        self.process = process
+
+    def write(self, data: bytes) -> None:
+        self.process.heard(json.loads(data.decode("utf-8")))
+
+    async def drain(self) -> None:
+        return None
+
+
+class _Stdout:
+    def __init__(self, process) -> None:
+        self.process = process
+
+    async def readline(self) -> bytes:
+        return await self.process.next_line()
+
+
+class Process:
+    """Подставной живой Claude Code: отвечает заготовленным по очереди."""
+
+    def __init__(self, calls, argv: list[str], env: dict) -> None:
+        self.calls = calls
+        self.argv = argv
+        self.env = env
+        self.returncode = None
+        self.stdin = _Stdin(self)
+        self.stdout = _Stdout(self)
+        self._lines: asyncio.Queue = asyncio.Queue()
+
+    def heard(self, line: dict) -> None:
+        """Строка, ушедшая процессу: запомнить и подложить ответ."""
+        text = line["message"]["content"]
+        if self.calls.reading:
+            self.calls.overlapped = True
+        self.calls.reading = True
+        if text == "/clear":
+            self.calls.clears += 1
+            self._push({"type": "conversation_reset"})
+            self._push({"type": "system", "subtype": "init"})
+            self._push(result("", stop_reason=None))
+            return
+        self.calls.messages.append(text)
+        reply = self.calls.replies.pop(0)
+        if reply == DIES:
+            self._lines.put_nowait(b"")
+        elif reply != HANGS:
+            self._push({"type": "system", "subtype": "init"})
+            self._push(reply)
+
+    def _push(self, message: dict) -> None:
+        self._lines.put_nowait((json.dumps(message, ensure_ascii=False) + "\n").encode("utf-8"))
+
+    async def next_line(self) -> bytes:
+        await asyncio.sleep(0)
+        line = await self._lines.get()
+        if not line or json.loads(line).get("type") == "result":
+            self.calls.reading = False
+        return line
+
+    def kill(self) -> None:
+        self.returncode = -9
+        self.calls.killed += 1
+
+    async def wait(self) -> int:
+        return self.returncode
+
+
 class Calls:
-    """Что ушло бы в процесс: доводы, stdin, окружение, срок и системный промпт."""
+    """Что видел подставной Claude Code: запуски, сообщения, сбросы, снятия."""
 
-    def __init__(self) -> None:
-        self.argv: list[list[str]] = []
-        self.stdin: list[str] = []
-        self.env: list[dict] = []
-        self.timeout: list[float] = []
-        self.system: list[str] = []
-
-
-def _system_prompt(argv: list[str]) -> str:
-    """Текст файла системного промпта, пока адаптер его не удалил."""
-    return Path(argv[argv.index("--system-prompt-file") + 1]).read_text(encoding="utf-8")
+    def __init__(self, replies: list) -> None:
+        self.replies = list(replies)
+        self.spawned: list[Process] = []
+        self.messages: list[str] = []
+        self.clears = 0
+        self.killed = 0
+        # Сообщение ушло, пока предыдущее ещё ждало итога: очередь не держит.
+        self.reading = False
+        self.overlapped = False
 
 
 def install(monkeypatch, replies: list, *, cli: str | None = CLI) -> Calls:
     """Подставить Claude Code, отвечающий по очереди заготовленным.
 
-    Ответ — словарь (уйдёт в stdout как JSON), тройка «код, stdout, stderr»
-    или исключение. Системный промпт читается в миг вызова: после ответа
-    адаптер свой временный файл удаляет.
+    Ответ — итог (`result`, `failure`), `DIES` или `HANGS`; `OSError` первым в
+    очереди — процесс не запускается вовсе.
     """
-    calls = Calls()
-    queue = list(replies)
+    calls = Calls(replies)
 
-    async def run(argv, stdin, env, timeout):
-        calls.argv.append(argv)
-        calls.stdin.append(stdin)
-        calls.env.append(env)
-        calls.timeout.append(timeout)
-        calls.system.append(_system_prompt(argv))
-        reply = queue.pop(0)
-        if isinstance(reply, BaseException):
-            raise reply
-        if isinstance(reply, tuple):
-            return reply
-        return 0, json.dumps(reply, ensure_ascii=False), ""
+    async def spawn(argv, env):
+        if calls.replies and isinstance(calls.replies[0], OSError):
+            raise calls.replies.pop(0)
+        process = Process(calls, argv, env)
+        calls.spawned.append(process)
+        return process
 
     monkeypatch.setattr(claude_code, "_find_cli", lambda: cli)
-    monkeypatch.setattr(claude_code, "_run_cli", run)
+    monkeypatch.setattr(claude_code_process, "_spawn", spawn)
     return calls

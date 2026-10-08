@@ -1,40 +1,22 @@
-"""Claude через установленный Claude Code по подписке: запрос — процесс `claude -p`.
+"""Claude через установленный Claude Code по подписке: запросы и перечень моделей.
 
 Надстройка рядом с OpenAI-совместимым путём и с API Anthropic (`adapters/claude`):
 API оплачивается отдельно от подписки, а Claude Code ходит под входом
 человека в Max. Точки входа (`lm_studio`, `lm_chat`, `lm_models`) узнают этот
-клиент по типу. Метки бед и проверка ответа остаются общими у них.
+клиент по типу. Здесь — из чего складывается сообщение и что берётся из
+ответа; живой процесс, через который идут запросы, — в `adapters/claude_code_process`.
 """
 
-import asyncio
-import json
-import os
 import shutil
-import subprocess
-import tempfile
 from pathlib import Path
 
-from adapters.claude import EFFORT, FINISH, REFUSED, split_system
+from adapters import claude_code_process
+from adapters.claude import FINISH, REFUSED, split_system
 
 # Имена, которые Claude Code сам ведёт к последней версии модели.
 MODELS = ["sonnet", "opus", "haiku"]
 
 NO_CLI = "Claude Code не установлен"
-
-# С ключом API, чужим адресом или облачным поставщиком в окружении Claude Code
-# ушёл бы мимо подписки — человек платил бы за то, что считал входящим в Max.
-_NOT_SUBSCRIPTION = (
-    "ANTHROPIC_API_KEY",
-    "ANTHROPIC_AUTH_TOKEN",
-    "ANTHROPIC_BASE_URL",
-    "CLAUDE_CODE_USE_BEDROCK",
-    "CLAUDE_CODE_USE_VERTEX",
-    "CLAUDE_CODE_USE_FOUNDRY",
-)
-
-# Окно процесса не показывается: приложение оконное, и каждый запрос мигал бы
-# консолью поверх него.
-_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 class CliTrouble(Exception):
@@ -50,13 +32,13 @@ class CliTrouble(Exception):
 
 
 class ClaudeCodeClient:
-    """Клиент Claude Code: помнит срок ожидания, процесс живёт ровно один запрос."""
+    """Клиент Claude Code: помнит срок ожидания, процесс у всех клиентов общий."""
 
     def __init__(self, timeout: float) -> None:
         self.timeout = timeout
 
     async def aclose(self) -> None:
-        """Закрывать нечего: соседи закрывают клиента, и этот обязан уметь."""
+        """Закрывать нечего: процесс живёт до закрытия окна, а не клиента."""
 
 
 def make_client(*, timeout: float) -> ClaudeCodeClient:
@@ -68,7 +50,8 @@ def _find_cli() -> str | None:
     """Путь к `claude.exe`; пусто — Claude Code не установлен.
 
     npm кладёт в PATH `.cmd`-обёртку. Через неё доводы шли бы сквозь разбор
-    `cmd.exe`, поэтому берётся настоящий `claude.exe` рядом с ней.
+    `cmd.exe`, а при снятии снимался бы `cmd.exe`, оставляя под ним сироту,
+    поэтому берётся настоящий `claude.exe` рядом с ней.
     """
     found = shutil.which("claude")
     if found is None:
@@ -77,56 +60,10 @@ def _find_cli() -> str | None:
     return str(beside) if beside.is_file() else found
 
 
-def _argv(cli: str, model: str, prompt_file: str) -> list[str]:
-    """Доводы запуска: чистый разговор без рабочего места разработчика.
-
-    Инструменты, сохранение сессии, свои настройки с хуками, MCP и навыки
-    выключены: модели нужны только наш промпт и текст.
-    """
-    return [
-        cli, "-p",
-        "--output-format", "json",
-        "--model", model,
-        "--effort", EFFORT,
-        "--system-prompt-file", prompt_file,
-        "--tools", "",
-        "--setting-sources", "",
-        "--no-session-persistence",
-        "--strict-mcp-config",
-        "--disable-slash-commands",
-    ]
-
-
-async def _run_cli(argv: list[str], stdin: str, env: dict, timeout: float) -> tuple[int, str, str]:
-    """Запустить Claude Code и дождаться ответа; по сроку процесс снимается."""
-    process = await asyncio.create_subprocess_exec(
-        *argv,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=env,
-        cwd=tempfile.gettempdir(),
-        creationflags=_NO_WINDOW,
-    )
-    try:
-        out, err = await asyncio.wait_for(process.communicate(stdin.encode("utf-8")), timeout)
-    finally:
-        # И по сроку, и при отмене задачи — остановка бота отменяет её: иначе
-        # `claude.exe` доживал бы запрос сиротой, тратя лимит подписки.
-        if process.returncode is None:
-            process.kill()
-            await process.wait()
-    return process.returncode, out.decode("utf-8", "replace"), err.decode("utf-8", "replace")
-
-
-def _reply(code: int, stdout: str, stderr: str) -> tuple[str | None, str | None]:
-    """Текст и причина конца из JSON-ответа; беда — `CliTrouble`."""
-    try:
-        data = json.loads(stdout)
-    except ValueError as e:
-        raise CliTrouble(f"ответ не разобрать (код {code}): {stderr[:200]}") from e
-    if data.get("is_error") or code != 0:
-        detail = data.get("result") or data.get("subtype") or f"код {code}: {stderr[:200]}"
+def _reply(data: dict) -> tuple[str | None, str | None]:
+    """Текст и причина конца из итога обращения; беда — `CliTrouble`."""
+    if data.get("is_error"):
+        detail = data.get("result") or data.get("subtype") or "ошибка без описания"
         raise CliTrouble(str(detail)[:200], status=data.get("api_error_status"))
     stop = data.get("stop_reason")
     if stop == REFUSED:
@@ -137,23 +74,17 @@ def _reply(code: int, stdout: str, stderr: str) -> tuple[str | None, str | None]
 async def _converse(
     client: ClaudeCodeClient, model: str, messages: list[dict], timeout: float | None
 ) -> tuple[str | None, str | None]:
-    """Один запрос: системный промпт — во временный файл, реплики — в stdin."""
+    """Одно обращение: правила — в рамке инструкций, реплики — данными после неё."""
     cli = _find_cli()
     if cli is None:
         raise CliTrouble(NO_CLI)
     system, turns = split_system(messages)
-    text = "\n\n".join(m["content"] for m in turns)
-    env = {k: v for k, v in os.environ.items() if k not in _NOT_SUBSCRIPTION}
-    with tempfile.TemporaryDirectory() as folder:
-        prompt_file = os.path.join(folder, "system.txt")
-        Path(prompt_file).write_text(system, encoding="utf-8")
-        try:
-            code, out, err = await _run_cli(
-                _argv(cli, model, prompt_file), text, env, timeout or client.timeout
-            )
-        except (TimeoutError, OSError) as e:
-            raise CliTrouble(f"{type(e).__name__}: {e}") from e
-    return _reply(code, out, err)
+    message = claude_code_process.framed(system, "\n\n".join(m["content"] for m in turns))
+    try:
+        data = await claude_code_process.exchange(cli, model, message, timeout or client.timeout)
+    except (TimeoutError, OSError, claude_code_process.ProcessGone) as e:
+        raise CliTrouble(f"{type(e).__name__}: {e}") from e
+    return _reply(data)
 
 
 async def ask(client: ClaudeCodeClient, model: str, request):

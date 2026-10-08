@@ -16,7 +16,7 @@ from typing import Any
 import webview
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adapters import db
+from adapters import claude_code_process, db
 from backend.bot.media import MEDIA_DIR
 from backend.models import BotMode
 from backend.repository.bot_mode import write_mode
@@ -35,6 +35,7 @@ WEB_DIST = CLIENT_DIR / "web" / "dist"
 ICON_FILE = CLIENT_DIR / "icon.ico"
 
 _ENGINE_CLOSING_WAIT_S = 5.0
+_CLAUDE_CODE_CLOSING_WAIT_S = 5.0
 """Сколько ждём, пока движок базы отпустит соединения.
 
 Столько же, сколько ждут бота: закрывается движок обычно мгновенно, а
@@ -109,6 +110,14 @@ def _open_window(hub, *, settled: bool):
     )
 
 
+def _put_out_claude_code(runner) -> None:
+    """Снять живой Claude Code; его беда не мешает гасить базу и мотор."""
+    try:
+        runner.submit(claude_code_process.shutdown()).result(timeout=_CLAUDE_CODE_CLOSING_WAIT_S)
+    except Exception:
+        logger.exception("живой Claude Code не снялся при закрытии")
+
+
 def _put_out(hub, runner, listening) -> None:
     """Погасить всё, что держало открытое окно, в порядке от верхнего к нижнему.
 
@@ -118,6 +127,9 @@ def _put_out(hub, runner, listening) -> None:
 
     Мост раньше мотора: гашение моста отправляет остановку бота на мотор и ждёт
     её. Погасни мотор первым, этой работе некуда было бы уехать.
+
+    Живой Claude Code — после моста, когда бот им уже не пользуется, и тоже
+    через мотор: не снятый, он пережил бы приложение.
 
     Движок последним и через мотор: закрывать его — работа асинхронная, а
     делать её после остановки мотора уже негде.
@@ -136,6 +148,7 @@ def _put_out(hub, runner, listening) -> None:
         if listening is not None:
             listening.close()
         lifespan.stop(hub)
+        _put_out_claude_code(runner)
         if hub.engine is not None:
             runner.submit(hub.engine.dispose()).result(timeout=_ENGINE_CLOSING_WAIT_S)
         runner.stop()

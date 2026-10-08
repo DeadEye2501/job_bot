@@ -9,6 +9,7 @@
 плане, слайс А3.
 """
 
+import asyncio
 import logging
 from concurrent.futures import Future
 
@@ -84,6 +85,12 @@ def opened(monkeypatch, runtime_settings, session_factory):
         window_module.lifespan, "stop", lambda hub: order.append("мост")
     )
     monkeypatch.setattr(runner, "stop", lambda: order.append("мотор"))
+
+    def claude_code_off():
+        order.append("Claude Code")
+        return asyncio.sleep(0)
+
+    monkeypatch.setattr(window_module.claude_code_process, "shutdown", claude_code_off)
     return fake, order
 
 
@@ -116,12 +123,15 @@ def test_everything_is_put_out_from_the_top_down(opened):
     Мост раньше мотора: гашение моста отправляет остановку бота на мотор и
     ждёт её. Погасни мотор первым, этой работе некуда было бы уехать, и бот
     остался бы жив до конца процесса, держа базу и соединение с Telegram.
+
+    Живой Claude Code — после моста, когда бот уже им не пользуется, и до
+    мотора, на котором его снимают. Не снятый, он пережил бы приложение.
     """
     _fake, order = opened
 
     window_module.run_ui()
 
-    assert order == ["слушатель", "мост", "мотор"]
+    assert order == ["слушатель", "мост", "Claude Code", "мотор"]
 
 
 def test_a_shutdown_that_broke_does_not_look_like_a_failed_launch(
@@ -167,7 +177,7 @@ def test_a_window_that_would_not_open_still_puts_the_bridge_out(opened, monkeypa
     with pytest.raises(RuntimeError):
         window_module.run_ui()
 
-    assert order == ["слушатель", "мост", "мотор"]
+    assert order == ["слушатель", "мост", "Claude Code", "мотор"]
 
 
 async def test_a_finished_setup_opens_the_window_the_layout_needs(
