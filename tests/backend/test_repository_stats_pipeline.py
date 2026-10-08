@@ -11,7 +11,7 @@
 from backend.domain.verdict import EMPTY_SKIP_REASON
 from backend.models import TrashEvent, VacancyStatus
 from backend.repository.stats_pipeline import get_stats_channels_pipeline
-from tests.backend.fixtures.stats import rows_by_label
+from tests.backend.fixtures.stats import rows_by_channel
 from tests.dbio import put
 from tests.factories import channel_row, days_ago, status_history_row, vacancy_row
 
@@ -32,7 +32,7 @@ async def test_a_channel_that_never_sent_anything_is_absent(
     await put(session_factory, silent, active)
     await put(session_factory, vacancy_row(source_channel_id=active.id))
 
-    assert list(await rows_by_label(session, period="all")) == ["Работает"]
+    assert list(await rows_by_channel(session, period="all")) == [active.id]
 
 
 async def test_a_channel_silent_within_the_window_drops_out_of_it(
@@ -53,29 +53,26 @@ async def test_a_channel_silent_within_the_window_drops_out_of_it(
         vacancy_row(source_channel_id=fresh.id, created_at=days_ago(1)),
     )
 
-    assert list(await rows_by_label(session, period="week")) == ["Пишет"]
-    assert sorted(await rows_by_label(session, period="all")) == sorted(
-        ["Замолчал", "Пишет"]
-    )
+    assert list(await rows_by_channel(session, period="week")) == [fresh.id]
+    assert set(await rows_by_channel(session, period="all")) == {stale.id, fresh.id}
 
 
-async def test_a_channel_is_labelled_by_what_it_has(session, session_factory):
-    """Подпись канала — заголовок, а без него ник, а без ника номер строки."""
-    titled = channel_row(username="a", title="С заголовком")
-    named = channel_row(username="onlyname", title=None)
-    bare = channel_row(username=None, title=None)
-    await put(session_factory, titled, named, bare)
-    await put(
-        session_factory,
-        vacancy_row(source_channel_id=titled.id),
-        vacancy_row(source_channel_id=named.id),
-        vacancy_row(source_channel_id=bare.id),
-    )
 
-    labels = set(await rows_by_label(session, period="all"))
 
-    assert labels == {"С заголовком", "@onlyname", f"#{bare.id}"}
 
+async def test_a_row_carries_what_the_window_names_the_channel_by(
+    session, session_factory
+):
+    """Строка несёт название и ник канала как есть: подпись собирает окно
+    тем же правилом, что в Контактах, куда таблица ведёт по нажатию."""
+    channel = channel_row(username="ch", title="Канал")
+    await put(session_factory, channel)
+    await put(session_factory, vacancy_row(source_channel_id=channel.id), vacancy_row())
+
+    rows = await rows_by_channel(session, period="all")
+
+    assert (rows[channel.id]["title"], rows[channel.id]["username"]) == ("Канал", "ch")
+    assert (rows[None]["title"], rows[None]["username"]) == (None, None)
 
 async def test_the_deleted_junk_counts_towards_what_the_channel_sent(
     session, session_factory
@@ -94,7 +91,7 @@ async def test_the_deleted_junk_counts_towards_what_the_channel_sent(
         TrashEvent(source_channel_id=channel.id, source_msg_id=2, reason="реклама"),
     )
 
-    row = (await rows_by_label(session, period="all"))["Шумный"]
+    row = (await rows_by_channel(session, period="all"))[channel.id]
 
     assert row["total"] == 3
     assert row["trash"] == 2
@@ -129,7 +126,7 @@ async def test_junk_marked_at_a_second_pass_counts_too(session, session_factory)
         vacancy_row(source_channel_id=channel.id, status=VacancyStatus.NEW),
     )
 
-    row = (await rows_by_label(session, period="all"))["Шумный"]
+    row = (await rows_by_channel(session, period="all"))[channel.id]
 
     assert row["total"] == 4
     assert row["trash"] == 1
@@ -162,7 +159,7 @@ async def test_an_empty_post_marked_at_a_second_pass_is_junk_too(
         ),
     )
 
-    row = (await rows_by_label(session, period="all"))["Шумный"]
+    row = (await rows_by_channel(session, period="all"))[channel.id]
 
     assert row["trash"] == 1
     assert row["not_fit"] == 1
@@ -190,7 +187,7 @@ async def test_the_leftover_is_zero_when_everything_was_junk(
         TrashEvent(source_channel_id=channel.id, source_msg_id=1, reason="реклама"),
     )
 
-    row = (await rows_by_label(session, period="all"))["Шумный"]
+    row = (await rows_by_channel(session, period="all"))[channel.id]
 
     assert row["total"] == 2
     assert row["trash"] == 2
@@ -221,11 +218,11 @@ async def test_a_channel_pulled_in_by_the_funnel_alone_looks_like_the_others(
         ),
     )
 
-    rows = await rows_by_label(session, period="week")
+    rows = await rows_by_channel(session, period="week")
 
-    assert set(rows) == {"@quiet", "@loud"}
-    assert (rows["@quiet"]["total"], rows["@quiet"]["trash"]) == (0, 0)
-    assert rows["@quiet"]["sent"] == 1
+    assert set(rows) == {quiet.id, loud.id}
+    assert (rows[quiet.id]["total"], rows[quiet.id]["trash"]) == (0, 0)
+    assert rows[quiet.id]["sent"] == 1
 
 
 async def test_a_channel_known_only_by_its_junk_still_appears(
@@ -247,7 +244,7 @@ async def test_a_channel_known_only_by_its_junk_still_appears(
         TrashEvent(source_channel_id=channel.id, source_msg_id=1, reason="реклама"),
     )
 
-    row = (await rows_by_label(session, period="all"))["@allspam"]
+    row = (await rows_by_channel(session, period="all"))[channel.id]
 
     assert row["total"] == 1
     assert row["trash"] == 1
@@ -255,33 +252,50 @@ async def test_a_channel_known_only_by_its_junk_still_appears(
     assert row["fit"] == 0
 
 
-async def test_the_table_leads_with_the_most_prolific_channel(
+
+
+async def test_vacancies_without_a_channel_gather_in_their_own_row(
     session, session_factory
 ):
-    """Вперёд идёт канал, приславший больше, при равенстве — по подписи.
+    """Вакансии не из канала — вставленные, заведённые руками, найденные на
+    сайте — собираются своей строкой, а не пропадают из таблицы.
 
-    Порядок заведения обратен ожидаемому, а у равных подписи в разном
-    регистре: сравнение по кодам символов поставило бы заглавные впереди.
+    Канал рядом нужен, чтобы строка без канала не слилась с его строкой.
     """
-    few_late = channel_row(username="a", title="яблоко")
-    few_early = channel_row(username="b", title="Апельсин")
-    many = channel_row(username="c", title="Много")
-    await put(session_factory, few_late, few_early, many)
+    channel = channel_row(username="ch", title="Канал")
+    await put(session_factory, channel)
     await put(
         session_factory,
-        vacancy_row(source_channel_id=many.id),
-        vacancy_row(source_channel_id=many.id),
-        vacancy_row(source_channel_id=few_late.id),
-        vacancy_row(source_channel_id=few_early.id),
+        vacancy_row(source_channel_id=channel.id),
+        vacancy_row(),
+        vacancy_row(status=VacancyStatus.NOT_FIT, skip_reason="язык не тот"),
+        TrashEvent(source_channel_id=None, source_msg_id=None, reason="реклама"),
     )
 
-    got = await get_stats_channels_pipeline(session, period="all")
+    rows = await rows_by_channel(session, period="all")
 
-    assert [row["label"] for row in got["channels"]] == [
-        "Много",
-        "Апельсин",
-        "яблоко",
-    ]
+    assert rows[channel.id]["total"] == 1
+    no_channel = rows[None]
+    assert (no_channel["total"], no_channel["trash"], no_channel["not_fit"]) == (3, 1, 1)
+    assert no_channel["fit"] == 1
+
+
+async def test_vacancies_without_a_channel_reach_the_funnel(session, session_factory):
+    """Отклик по вакансии не из канала, ушедший в окне, виден в воронке.
+
+    Сама вакансия старая и в окно ингеста не попадает: строку ей даёт только
+    воронка.
+    """
+    old = vacancy_row(created_at=days_ago(40))
+    await put(session_factory, old)
+    await put(
+        session_factory,
+        status_history_row(old.id, status=VacancyStatus.APPLIED, changed_at=days_ago(1)),
+    )
+
+    row = (await rows_by_channel(session, period="week"))[None]
+
+    assert (row["total"], row["sent"]) == (0, 1)
 
 
 async def test_an_unparsed_vacancy_is_not_counted(session, session_factory):
@@ -295,7 +309,7 @@ async def test_an_unparsed_vacancy_is_not_counted(session, session_factory):
         vacancy_row(source_channel_id=channel.id, is_parsed=False),
     )
 
-    row = (await rows_by_label(session, period="all"))["Канал"]
+    row = (await rows_by_channel(session, period="all"))[channel.id]
 
     # Разобранных две против одной неразобранной нарочно: на равном наборе
     # перевёрнутый отбор дал бы то же число, и подмена осталась бы незаметной.

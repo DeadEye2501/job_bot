@@ -9,7 +9,7 @@
 """
 
 from backend.models import VacancyStatus
-from tests.backend.fixtures.stats import rows_by_label
+from tests.backend.fixtures.stats import rows_by_channel
 from tests.dbio import put
 from tests.factories import channel_row, days_ago, status_history_row, vacancy_row
 
@@ -48,7 +48,7 @@ async def test_the_funnel_counts_the_first_move_of_each_vacancy(
             status_history_row(vacancy.id, status=status),
         )
 
-    row = (await rows_by_label(session, period="all"))["Канал"]
+    row = (await rows_by_channel(session, period="all"))[channel.id]
 
     assert row["sent"] == 7
     assert row["answered"] == 6
@@ -79,10 +79,10 @@ async def test_the_funnel_of_one_channel_does_not_leak_into_another(
         status_history_row(orphan.id, status=VacancyStatus.APPLIED),
     )
 
-    rows = await rows_by_label(session, period="all")
+    rows = await rows_by_channel(session, period="all")
 
-    assert (rows["Мой"]["sent"], rows["Мой"]["invite_plus"]) == (1, 0)
-    assert (rows["Чужой"]["sent"], rows["Чужой"]["invite_plus"]) == (1, 1)
+    assert (rows[mine.id]["sent"], rows[mine.id]["invite_plus"]) == (1, 0)
+    assert (rows[other.id]["sent"], rows[other.id]["invite_plus"]) == (1, 1)
 
 
 async def test_the_conversions_are_shares_of_what_was_sent(
@@ -102,7 +102,7 @@ async def test_the_conversions_are_shares_of_what_was_sent(
         status_history_row(silent.id, status=VacancyStatus.APPLIED),
     )
 
-    row = (await rows_by_label(session, period="all"))["Канал"]
+    row = (await rows_by_channel(session, period="all"))[channel.id]
 
     assert row["total"] == 3
     assert row["sent"] == 2
@@ -137,7 +137,7 @@ async def test_a_share_counts_only_those_who_were_sent_in_the_window(
         ),
     )
 
-    row = (await rows_by_label(session, period="month"))["Канал"]
+    row = (await rows_by_channel(session, period="month"))[channel.id]
 
     assert row["sent"] == 1
     assert row["answered"] == 1
@@ -152,7 +152,7 @@ async def test_without_a_single_application_there_are_no_shares(
     await put(session_factory, channel)
     await put(session_factory, vacancy_row(source_channel_id=channel.id))
 
-    row = (await rows_by_label(session, period="all"))["Канал"]
+    row = (await rows_by_channel(session, period="all"))[channel.id]
 
     assert row["sent"] == 0
     assert row["conv_answ_sent"] is None
@@ -179,8 +179,8 @@ async def test_the_window_cuts_ingest_and_funnel_by_their_own_dates(
         ),
     )
 
-    within = (await rows_by_label(session, period="week"))["Канал"]
-    lifetime = (await rows_by_label(session, period="all"))["Канал"]
+    within = (await rows_by_channel(session, period="week"))[channel.id]
+    lifetime = (await rows_by_channel(session, period="all"))[channel.id]
 
     assert within["total"] == 1
     assert within["sent"] == 1
@@ -210,7 +210,7 @@ async def test_an_unparsed_vacancy_walks_no_funnel_step(
         status_history_row(unparsed.id, status=VacancyStatus.DECLINE),
     )
 
-    row = (await rows_by_label(session, period="all"))["Канал"]
+    row = (await rows_by_channel(session, period="all"))[channel.id]
 
     assert (
         row["sent"], row["answered"], row["invite_plus"], row["decline"]

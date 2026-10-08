@@ -1777,22 +1777,22 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _kpi_deltas(session: AsyncSession, since: datetime | None) -> dict` (31)
 - `async def get_stats_kpi(session: AsyncSession, *, period: str) -> dict` (23)
 
-### `backend/repository/stats_pipeline.py` — 259 строк
+### `backend/repository/stats_pipeline.py` — 277 строк
 
 Воронка по каналам для экрана статистики.
 
 Зависит от: `backend.domain.funnel`, `backend.domain.verdict`, `backend.models`, `backend.repository.stats_common`, `backend.repository.vacancies_common`
 
-- `def _channel_item(ch_id: int, title: str | None, username: str | None, counts: tuple[int, int, int]=(0, 0, 0)) -> dict` (25)
+- `def _channel_item(ch_id: int | None, title: str | None, username: str | None, counts: tuple[int, int, int]=(0, 0, 0)) -> dict` (29)
 - `def _trash_predicates()` (26)
-- `async def _ingest_by_channel(session: AsyncSession, since) -> list` (18)
-- `async def _trash_events_by_channel(session: AsyncSession, since) -> dict[int, int]` (15)
-- `async def _first_in_period_by_channel(session: AsyncSession, statuses, since) -> dict[int, set[int]]` (22)
-- `async def _funnel_by_channel(session: AsyncSession, since) -> dict[str, dict[int, set[int]]]` (19)
-- `async def _channels_without_ingest(session: AsyncSession, missing_ids: set[int]) -> dict[int, dict]` (21)
-- `def _pipeline_row(ch_id: int, item: dict, trash_events: int, funnel) -> dict` (39)
+- `async def _ingest_by_channel(session: AsyncSession, since) -> list` (22)
+- `async def _trash_events_by_channel(session: AsyncSession, since) -> dict[int | None, int]` (17)
+- `async def _first_in_period_by_channel(session: AsyncSession, statuses, since) -> dict[int | None, set[int]]` (21)
+- `async def _funnel_by_channel(session: AsyncSession, since) -> dict[str, dict[int | None, set[int]]]` (19)
+- `async def _channels_without_ingest(session: AsyncSession, missing_ids: set[int | None]) -> dict[int | None, dict]` (30)
+- `def _pipeline_row(ch_id: int | None, item: dict, trash_events: int, funnel) -> dict` (40)
   - `def share(stage: str) -> float | None` (4)
-- `async def get_stats_channels_pipeline(session: AsyncSession, *, period: str) -> dict` (37)
+- `async def get_stats_channels_pipeline(session: AsyncSession, *, period: str) -> dict` (36)
 
 ### `backend/repository/stats_responses.py` — 147 строк
 
@@ -2995,7 +2995,7 @@ Runtime settings layer.
 
 - `def applied(session_factory)` (52)
   - `async def build(applied_at, *, hr=None, answered_after=None, **overrides)` (24)
-- `async def rows_by_label(session, **kwargs) -> dict[str, dict]` (4)
+- `async def rows_by_channel(session, **kwargs) -> dict[int | None, dict]` (4)
 
 ### `tests/backend/test_adapters_telegraph.py` — 205 строк
 
@@ -4521,13 +4521,13 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/backend/test_repository_stats_pipeline.py` — 302 строк ⚠ подошёл к 300
+### `tests/backend/test_repository_stats_pipeline.py` — 316 строк ⚠ подошёл к 300
 
 Следствия таблицы «каналы»: что канал прислал и сколько из этого мусор.
 
 Зависит от: `backend.domain.verdict`, `backend.models`, `backend.repository.stats_pipeline`, `tests.backend.fixtures.stats`, `tests.dbio`, `tests.factories`
 
-Тестов: 12
+Тестов: 13
 
 
 ### `tests/backend/test_repository_stats_response_time.py` — 260 строк

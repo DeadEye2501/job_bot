@@ -12,6 +12,9 @@
   //
   // Само правило ширины живёт в оформлении, сюда уезжает одно число: встроенный
   // стиль сильнее любого селектора, и раскладку им не пишут.
+  //
+  // Строка без номера — то, что пришло не из канала: открывать в Контактах у
+  // неё нечего, и нажатий она не принимает.
   import { pressKey } from '$state/keys.js';
   import { convNote } from '$state/stats.js';
 
@@ -65,18 +68,26 @@
   );
 
   const rows = $derived(
-    channels.map((one, at) => ({
-      id: one.id,
-      last: at === channels.length - 1,
-      cells: [
-        { look: 'stats-ch-name-cell', text: one.label, title: 'Открыть канал в Контактах' },
-        ...COLUMNS.map((column) => ({
-          look: column.look,
-          text: column.conv ? '' : one[column.field],
-          conv: column.conv ? convNote(one[column.field]) : null,
-        })),
-      ],
-    })),
+    channels.map((one, at) => {
+      const opens = one.id !== null;
+      return {
+        id: one.id,
+        opens,
+        last: at === channels.length - 1,
+        cells: [
+          {
+            look: 'stats-ch-name-cell',
+            text: one.label,
+            title: opens ? 'Открыть канал в Контактах' : undefined,
+          },
+          ...COLUMNS.map((column) => ({
+            look: column.look,
+            text: column.conv ? '' : one[column.field],
+            conv: column.conv ? convNote(one[column.field]) : null,
+          })),
+        ],
+      };
+    }),
   );
 </script>
 
@@ -95,17 +106,21 @@
 
   {#each rows as row (row.id)}
     {#each row.cells as cell, at (at)}
+      <!-- Фокус и роль кнопки включаются одним условием, а компилятор видит
+           только условный tabindex и считает строку неинтерактивной. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div
         class="stats-ch-row {cell.look}"
         class:stats-ch-last={row.last}
-        class:is-hover={hovered === row.id}
-        role="button"
-        tabindex="0"
+        class:stats-ch-opens={row.opens}
+        class:is-hover={row.opens && hovered === row.id}
+        role={row.opens ? 'button' : undefined}
+        tabindex={row.opens ? 0 : undefined}
         title={cell.title}
         onmouseenter={() => (hovered = row.id)}
         onmouseleave={() => (hovered = null)}
-        onclick={() => onpick(row.id)}
-        onkeydown={(event) => pressKey(event) && onpick(row.id)}
+        onclick={() => row.opens && onpick(row.id)}
+        onkeydown={(event) => row.opens && pressKey(event) && onpick(row.id)}
       >
         {#if cell.conv}
           <span class="stats-ch-conv-label">{cell.conv.text}</span>

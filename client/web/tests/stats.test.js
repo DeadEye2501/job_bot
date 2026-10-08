@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  channelRows,
   convNote,
   deltaNote,
   donut,
@@ -269,5 +270,35 @@ describe('итог кольца статусов', () => {
 
   it('пустая выборка даёт ноль, а не поломку', () => {
     expect(statusTotal({})).toBe(0);
+  });
+});
+
+describe('строки воронки по каналам', () => {
+  it('канал подписан так же, как в Контактах, а пришедшее не из канала — своей строкой', () => {
+    const rows = channelRows([
+      { id: 1, title: 'С заголовком', username: 'a', total: 1 },
+      { id: 2, title: null, username: 'onlyname', total: 1 },
+      { id: 3, title: null, username: null, total: 1 },
+      { id: null, title: null, username: null, total: 1 },
+    ]);
+
+    expect(rows.map((one) => one.label)).toEqual([
+      '@onlyname',
+      'Без канала',
+      'Канал #3',
+      'С заголовком',
+    ]);
+  });
+
+  it('вперёд идёт приславший больше, при равенстве — по подписи без учёта регистра', () => {
+    // Порядок прихода обратен ожидаемому, а у равных подписи в разном регистре:
+    // сравнение по кодам символов поставило бы заглавные впереди.
+    const rows = channelRows([
+      { id: 1, title: 'яблоко', username: null, total: 1 },
+      { id: 2, title: 'Апельсин', username: null, total: 1 },
+      { id: 3, title: 'Много', username: null, total: 2 },
+    ]);
+
+    expect(rows.map((one) => one.label)).toEqual(['Много', 'Апельсин', 'яблоко']);
   });
 });
