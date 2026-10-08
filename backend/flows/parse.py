@@ -8,6 +8,7 @@
 
 import logging
 
+from adapters.lm_chat import MODEL_REFUSED
 from backend.flows import dm_backfill
 from backend.domain.blacklist import check_blacklist
 from backend.domain.fit_fields import grade_refusal, work_format_refusal
@@ -18,6 +19,7 @@ from backend.domain.verdict import is_empty_vacancy
 from backend.domain.verdict import (
     EMPTY_SKIP_REASON,
     LLM_SKIP_PREFIX,
+    REFUSED_SKIP_REASON,
     TRASH_SKIP_PREFIX,
     TRUNCATED_SKIP_REASON,
 )
@@ -73,8 +75,9 @@ def _unanswered(
 
     Обрыв по пределу токенов и молчание провайдера решают разное, и все зовы к
     модели — о разборе, о жанре и три о пригодности — разводят их одинаково.
-    Обрыв повторится и на втором заходе с запасом, значит дальше это дело
-    человека: строка ложится в окно с названной причиной. Молчание провайдера
+    Обрыв повторится и на втором заходе с запасом, отказ модели — на том же
+    тексте, значит дальше это дело человека: строка ложится в окно с
+    названной причиной. Молчание провайдера
     приговором не является вовсе — строка остаётся неразобранной и ждёт
     следующего захода.
     """
@@ -86,6 +89,9 @@ def _unanswered(
             vacancy_id, what,
         )
         return TRUNCATED_SKIP_REASON, False
+    if trouble == MODEL_REFUSED:
+        logger.warning("vacancy %s: модель отказалась отвечать на %s, отдаю человеку", vacancy_id, what)
+        return REFUSED_SKIP_REASON, False
     logger.warning(
         "vacancy %s: %s не спросился (%s), оставляю неразобранной",
         vacancy_id, what, trouble,

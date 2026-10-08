@@ -137,6 +137,6 @@ async def test_each_row_carries_the_count_the_username_and_the_time(
             "name": "Анна",
             "telegram_username": "anna_hr",
             "unread_count": 2,
-            "last_at": at(50).isoformat(),
+            "last_at": at(50),
         }
     ]

@@ -10,10 +10,10 @@ import logging
 import time
 
 import httpx
+import pytest
 
-from adapters import gguf_embed
 from tests.client.conftest import WindowThatPicks
-from tests.fakes.gguf import Model, model_file
+from tests.fakes.gguf import engine_journal, model_file
 from tests.fakes.llm import CHAT, MODELS, models_response
 
 
@@ -356,8 +356,7 @@ async def test_a_bad_address_is_refused_with_its_kind(api, ask):
 async def test_a_model_file_check_needs_no_address(api, ask, monkeypatch, tmp_path):
     """Проверка эмбеддингов из файла проходит без адреса и грузит модель."""
     path = model_file(tmp_path)
-    happened: list[str] = []
-    monkeypatch.setattr(gguf_embed, "_open_model", lambda _path: Model(happened))
+    happened = engine_journal(monkeypatch)
 
     answer = await ask(
         api.settings.probe_model, {"kind": "embed", "base_url": "", "model": path}
@@ -374,7 +373,7 @@ async def test_a_model_file_is_refused_for_the_chat(api, ask, tmp_path):
         {"kind": "chat", "base_url": "", "model": model_file(tmp_path)},
     )
 
-    assert "fail" in answer
+    assert answer["fail"] == "fields"
 
 
 async def test_a_model_file_is_saved_and_read_back(api, ask, tmp_path):
@@ -404,3 +403,26 @@ async def test_a_closed_model_dialog_is_not_a_refusal(api, ask, hub):
     hub.window = WindowThatPicks(None)
 
     assert (await ask(api.settings.pick_model_file))["ok"]["cancelled"] is True
+
+
+@pytest.mark.parametrize("address", ["https://api.anthropic.com", "claude-code"])
+async def test_claude_is_refused_for_embeddings_before_any_call(api, ask, address):
+    """Claude векторов не считает: проба эмбеддингов на его адресе — отказ формы.
+
+    Пропусти мост такую строку, она легла бы в базу, и бот терял бы посты, не
+    посчитав ни одного вектора.
+    """
+    answer = await ask(
+        api.settings.probe_model, {"kind": "embed", "base_url": address, "model": "sonnet"}
+    )
+
+    assert answer["fail"] == "fields"
+
+
+@pytest.mark.parametrize("address", ["https://api.anthropic.com", "claude-code"])
+async def test_claude_lists_no_embedding_models(api, ask, address):
+    """Перечень моделей эмбеддингов у Claude пуст, и спрашивать его не идут."""
+    answer = await ask(api.settings.list_models, {"kind": "embed", "base_url": address})
+
+    assert answer["ok"]["models"] == []
+

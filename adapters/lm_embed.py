@@ -10,13 +10,16 @@ import httpx
 from adapters import gguf_embed
 
 
+EMBED_PATH = "/v1/embeddings"
+
+
 async def embed(
     client: httpx.AsyncClient | gguf_embed.ModelFile, model: str, text: str
 ) -> list[float]:
     if isinstance(client, gguf_embed.ModelFile):
         return await client.embed(text)
     r = await client.post(
-        "/v1/embeddings",
+        EMBED_PATH,
         json={"model": model, "input": text},
     )
     r.raise_for_status()

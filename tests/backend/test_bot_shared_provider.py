@@ -9,7 +9,7 @@
 import pytest
 
 from backend.bot.send import _shares_provider
-from backend.runtime_settings import LlmProviderConfig
+from backend.provider_config import LlmProviderConfig
 
 
 def _provider(base_url="http://a", api_key="ключ", model="qwen"):

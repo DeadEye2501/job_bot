@@ -44,13 +44,11 @@ class Calls:
         self.stdin: list[str] = []
         self.env: list[dict] = []
         self.timeout: list[float] = []
-        self.system: list[str | None] = []
+        self.system: list[str] = []
 
 
-def _system_prompt(argv: list[str]) -> str | None:
+def _system_prompt(argv: list[str]) -> str:
     """Текст файла системного промпта, пока адаптер его не удалил."""
-    if "--system-prompt-file" not in argv:
-        return None
     return Path(argv[argv.index("--system-prompt-file") + 1]).read_text(encoding="utf-8")
 
 

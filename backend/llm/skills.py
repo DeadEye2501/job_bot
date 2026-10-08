@@ -6,6 +6,7 @@ import re
 
 from backend.domain.skill_names import skill_key
 from backend.domain.spellings import dedupe_first_wins
+from backend.domain.alphabet import CYRILLIC_LETTER, CYRILLIC_WORD, LATIN_LETTER
 from backend.llm.rules import REQUIREMENT_WRAPPERS
 
 logger = logging.getLogger(__name__)
@@ -116,11 +117,6 @@ _WRAPPED_BARE_RE = re.compile(
 # вовсе: у строителя и маркетолога они бывают и в шесть слов, «Монтаж систем
 # вентиляции и кондиционирования».
 _MAX_WRAPPED_WORDS = 4
-_CYRILLIC_RE = re.compile(r"[а-яёА-ЯЁ]")
-_LATIN_RE = re.compile(r"[A-Za-z]")
-# Русское слово внутри хвоста: по ним хвост и разбивается на имена. «Docker в
-# продакшене» называет Docker, а «продакшене» — уточнение, а не второе имя.
-_CYRILLIC_WORD_RE = re.compile(r"[а-яёА-ЯЁ]+")
 # Чем разделено перечисление внутри одного требования: запятая, союз «и»,
 # английское «and». Косая не разделитель: «CI/CD» — одно имя.
 _LISTED_RE = re.compile(r"\s*,\s*|\s+(?:и|and)\s+", re.IGNORECASE)
@@ -139,7 +135,7 @@ def _is_name(one: str) -> bool:
     («ведения соцсетей»), и срезкой слова его не починить — там нужна
     начальная форма, которой у кода нет.
     """
-    return bool(_LATIN_RE.search(one)) and not _CYRILLIC_RE.search(one)
+    return bool(LATIN_LETTER.search(one)) and not CYRILLIC_LETTER.search(one)
 
 
 def _named_tools(s: str) -> list[str]:
@@ -155,7 +151,7 @@ def _named_tools(s: str) -> list[str]:
         return []
     found: list[str] = []
     for listed in _LISTED_RE.split(tail):
-        for part in _CYRILLIC_WORD_RE.split(listed):
+        for part in CYRILLIC_WORD.split(listed):
             # Точка и амперсанд не срезаются: они часть имени — «.NET», «H&M».
             one = part.strip(" \t,;:()«»\"'-–—")
             if one and _is_name(one):

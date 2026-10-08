@@ -4,11 +4,16 @@
 когда тесты уйдут в боевую базу или разошлют сообщения живым HR.
 """
 
+import logging
+
 import keyring
 import pytest
 from sqlalchemy import func, select
 
 from adapters import claude_code
+from adapters.lm_chat import ChatRequest, chat
+from adapters.lm_studio import make_client
+from backend.provider_config import LlmProviderConfig
 from adapters.claude import ClaudeClient
 from backend.models import Company
 from config import get_data_dir, get_database_url
@@ -50,14 +55,20 @@ async def test_a_call_into_real_anthropic_blows_up():
         )
 
 
-async def test_running_real_claude_code_blows_up():
+async def test_running_real_claude_code_blows_up(monkeypatch, tmp_path):
     """Запуск настоящего Claude Code из теста взрывается.
 
     Каждый такой запуск тратит лимит подписки человека, а тест с забытой
     подделкой запускал бы его молча и проходил бы зелёным.
     """
+    # Пути нарочно нет на диске: сними кто-нибудь запор, процесс не запустится
+    # вовсе, а не уйдёт к настоящему Claude Code по PATH.
+    monkeypatch.setattr(claude_code, "_find_cli", lambda: str(tmp_path / "нет" / "claude.exe"))
+    client = make_client(LlmProviderConfig("claude-code", "", "sonnet"))
+    request = ChatRequest(purpose="стенд", messages=[{"role": "user", "content": "ping"}], max_tokens=1)
+
     with pytest.raises(ProviderReached, match="Claude Code"):
-        await claude_code._run_cli(["claude", "-p"], "ping", {}, 1.0)
+        await chat(client, "sonnet", request, logging.getLogger(__name__))
 
 
 async def test_a_call_into_real_telegram_blows_up():

@@ -13,10 +13,11 @@ import pytest
 
 from adapters import claude_code, lm_models
 from adapters.claude_code import ClaudeCodeClient
-from adapters.lm_chat import ChatRequest, chat
+from adapters.lm_chat import chat
 from adapters.lm_studio import LLM_REQUEST_TIMEOUT_SEC, make_client
-from backend.runtime_settings import LlmProviderConfig
+from backend.provider_config import LlmProviderConfig
 from tests.fakes.claude_code import CLI, failure, install, result
+from tests.fakes.llm import chat_request
 
 LOG = logging.getLogger("tests.claude_code")
 SONNET = "sonnet"
@@ -24,20 +25,6 @@ SONNET = "sonnet"
 
 def _client() -> ClaudeCodeClient:
     return make_client(LlmProviderConfig("claude-code", "", SONNET))
-
-
-def _request(**over) -> ChatRequest:
-    """Обращение, каким его собирают модули `backend/llm`: правила и текст."""
-    fields = {
-        "purpose": "разбор вакансии",
-        "messages": [
-            {"role": "system", "content": "правила"},
-            {"role": "user", "content": "текст"},
-        ],
-        "max_tokens": 1200,
-    }
-    fields.update(over)
-    return ChatRequest(**fields)
 
 
 async def test_the_request_runs_claude_quietly_with_the_prompt_apart(monkeypatch):
@@ -49,7 +36,7 @@ async def test_the_request_runs_claude_quietly_with_the_prompt_apart(monkeypatch
     """
     calls = install(monkeypatch, [result("ок")])
 
-    await chat(_client(), SONNET, _request(), LOG)
+    await chat(_client(), SONNET, chat_request(), LOG)
 
     argv = calls.argv[0]
     assert argv[0] == CLI and "-p" in argv
@@ -70,13 +57,20 @@ async def test_only_what_leads_past_the_subscription_is_cut_from_the_environment
     считал входящим в Max. Остальное окружение доходит как есть: без пути и
     профиля пользователя Claude Code не нашёл бы своего входа.
     """
-    cut = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK")
+    cut = (
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_BASE_URL",
+        "CLAUDE_CODE_USE_BEDROCK",
+        "CLAUDE_CODE_USE_VERTEX",
+        "CLAUDE_CODE_USE_FOUNDRY",
+    )
     for name in cut:
         monkeypatch.setenv(name, "1")
     monkeypatch.setenv("JOB_BOT_TEST_MARK", "остаётся")
     calls = install(monkeypatch, [result("ок")])
 
-    await chat(_client(), SONNET, _request(), LOG)
+    await chat(_client(), SONNET, chat_request(), LOG)
 
     assert not set(cut) & set(calls.env[0])
     assert calls.env[0]["JOB_BOT_TEST_MARK"] == "остаётся"
@@ -86,7 +80,7 @@ async def test_the_answer_is_the_result_text(monkeypatch):
     """В ответ идёт текст из `result`."""
     install(monkeypatch, [result("готово")])
 
-    answer = await chat(_client(), SONNET, _request(), LOG)
+    answer = await chat(_client(), SONNET, chat_request(), LOG)
 
     assert (answer.text, answer.error) == ("готово", None)
 
@@ -96,7 +90,7 @@ async def test_an_answer_cut_by_the_limit_reads_as_length(monkeypatch, caplog):
     install(monkeypatch, [result('{"a":', stop_reason="max_tokens")])
 
     with caplog.at_level(logging.WARNING, logger="tests.claude_code"):
-        answer = await chat(_client(), SONNET, _request(), LOG)
+        answer = await chat(_client(), SONNET, chat_request(), LOG)
 
     assert answer.finish_reason == "length"
     assert "разбор вакансии: модель упёрлась в предел токенов" in caplog.text
@@ -106,7 +100,7 @@ async def test_a_refusal_is_an_error_not_an_empty_answer(monkeypatch):
     """Отказ модели — ошибка: пустой текст зовущий прочёл бы приговором объявлению."""
     install(monkeypatch, [result(None, stop_reason="refusal")])
 
-    answer = await chat(_client(), SONNET, _request(), LOG)
+    answer = await chat(_client(), SONNET, chat_request(), LOG)
 
     assert (answer.text, answer.error) == (None, "refusal")
 
@@ -135,7 +129,7 @@ async def test_troubles_carry_the_same_marks_as_the_other_paths(monkeypatch, rep
     """Беды Claude Code названы метками остальных путей, по ним зовущие выбирают откат."""
     install(monkeypatch, [reply])
 
-    answer = await chat(_client(), SONNET, _request(), LOG)
+    answer = await chat(_client(), SONNET, chat_request(), LOG)
 
     assert (answer.text, answer.error) == (None, error)
 
@@ -144,7 +138,7 @@ async def test_without_claude_code_installed_nothing_is_run(monkeypatch):
     """Claude Code не установлен — отказ без попытки что-то запустить."""
     calls = install(monkeypatch, [], cli=None)
 
-    answer = await chat(_client(), SONNET, _request(), LOG)
+    answer = await chat(_client(), SONNET, chat_request(), LOG)
     ok, detail = await lm_models.check_model(_client(), SONNET, "chat")
 
     assert answer.error == "llm_request_error: CliTrouble"
@@ -156,18 +150,25 @@ async def test_the_deadline_of_the_app_or_of_the_request_reaches_the_process(mon
     """Срок ожидания — общий у приложения либо свой у обращения."""
     calls = install(monkeypatch, [result("ок"), result("ок")])
 
-    await chat(_client(), SONNET, _request(), LOG)
-    await chat(_client(), SONNET, _request(timeout=300.0), LOG)
+    await chat(_client(), SONNET, chat_request(), LOG)
+    await chat(_client(), SONNET, chat_request(timeout=300.0), LOG)
 
     assert calls.timeout == [LLM_REQUEST_TIMEOUT_SEC, 300.0]
 
 
-async def test_models_are_the_names_claude_code_understands(monkeypatch):
-    """Чатовые модели — имена, которые Claude Code ведёт к последней версии сам."""
-    install(monkeypatch, [])
+async def test_every_listed_model_is_one_the_check_accepts_by_name(monkeypatch):
+    """Каждое имя из перечня проходит проверку и уходит в Claude Code как есть.
 
-    assert await lm_models.list_models(_client(), kind="chat") == ["sonnet", "opus", "haiku"]
-    assert await lm_models.list_models(_client(), kind="embed") == []
+    Перечень — подсказка в окне; имя из него, не принятое проверкой или
+    искажённое по дороге, человек выбрал бы и получил погасшую лампочку.
+    """
+    calls = install(monkeypatch, [result("pong") for _ in range(3)])
+    listed = await lm_models.list_models(_client(), kind="chat")
+
+    for name in listed:
+        assert await lm_models.check_model(_client(), name, "chat") == (True, name)
+
+    assert listed and [argv[argv.index("--model") + 1] for argv in calls.argv] == listed
 
 
 async def test_a_listed_model_that_answers_passes_the_check(monkeypatch):
@@ -185,16 +186,6 @@ async def test_a_probe_that_fails_fails_the_check(monkeypatch):
     ok, detail = await lm_models.check_model(_client(), SONNET, "chat")
 
     assert not ok and "usage limit" in detail
-
-
-async def test_an_embedding_check_against_claude_code_says_why(monkeypatch):
-    """Эмбеддингов Claude Code не даёт — проверка говорит это, ничего не запуская."""
-    calls = install(monkeypatch, [])
-
-    ok, detail = await lm_models.check_model(_client(), "что-угодно", "embed")
-
-    assert not ok and "эмбеддинг" in detail
-    assert calls.argv == []
 
 
 def test_the_real_exe_beside_the_npm_shim_is_preferred(monkeypatch, tmp_path):

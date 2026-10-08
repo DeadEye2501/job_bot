@@ -4,6 +4,8 @@
 которая отвечает сразу и помнит, сколько раз её грузили.
 """
 
+from adapters import gguf_embed
+
 
 class Model:
     """Модель-подделка: пишет в журнал загрузки и закрытия, вектор — длина текста."""
@@ -28,3 +30,25 @@ def model_file(folder) -> str:
     path = folder / "модель.gguf"
     path.write_bytes(b"GGUF")
     return str(path)
+
+
+def engine(monkeypatch, load) -> None:
+    """Подставить движку свою загрузку: `load(path)` отдаёт модель или бросает."""
+    monkeypatch.setattr(gguf_embed, "_open_model", load)
+
+
+def failing_engine(monkeypatch, trouble: BaseException) -> None:
+    """Движок, который файл не грузит, а бросает `trouble`."""
+
+    def load(_path):
+        raise trouble
+
+    engine(monkeypatch, load)
+
+
+def engine_journal(monkeypatch) -> list[str]:
+    """Подставить движок, который грузит подделку; вернуть журнал её загрузок."""
+    happened: list[str] = []
+    engine(monkeypatch, lambda _path: Model(happened))
+    return happened
+

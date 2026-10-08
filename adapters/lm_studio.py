@@ -12,7 +12,7 @@ Ollama, OpenAI, OpenRouter, vLLM. Здесь только соединение; 
 import httpx
 
 from adapters import claude, claude_code, gguf_embed
-from backend.runtime_settings import LlmProviderConfig
+from backend.provider_config import LlmProviderConfig, serves_claude, serves_claude_code
 
 
 # Большие локальные модели (Qwen3 30B, Llama 70B и т.п.) на длинном
@@ -27,15 +27,10 @@ LLM_REQUEST_TIMEOUT_SEC = 180.0
 
 def make_client(
     config: LlmProviderConfig,
-) -> (
-    httpx.AsyncClient
-    | claude.ClaudeClient
-    | claude_code.ClaudeCodeClient
-    | gguf_embed.ModelFile
-):
-    if claude.serves(config.base_url):
+) -> "LmClient":
+    if serves_claude(config.base_url):
         return claude.make_client(config, timeout=LLM_REQUEST_TIMEOUT_SEC)
-    if claude_code.serves(config.base_url):
+    if serves_claude_code(config.base_url):
         return claude_code.make_client(timeout=LLM_REQUEST_TIMEOUT_SEC)
     if config.names_model_file:
         return gguf_embed.ModelFile(config.model)
@@ -47,3 +42,14 @@ def make_client(
         timeout=LLM_REQUEST_TIMEOUT_SEC,
         headers=headers,
     )
+
+
+# Клиент любого поставщика, какого собирает `make_client`: точки входа
+# (`lm_chat`, `lm_models`, `lm_embed`) различают их по типу.
+LmClient = (
+    httpx.AsyncClient
+    | claude.ClaudeClient
+    | claude_code.ClaudeCodeClient
+    | gguf_embed.ModelFile
+)
+

@@ -8,6 +8,9 @@
 Заслон стоит здесь потому, что после передачи спрашивать уже не у кого:
 `startfile` исполняет отданное молча и об исходе рассказывает только тем, что
 не бросил.
+
+Обратная дорога — выбрать файл диалогом самого окна — у всех зовущих одна:
+путь называет человек, а закрытый диалог значит «передумал», не беду.
 """
 
 from __future__ import annotations
@@ -184,6 +187,11 @@ class Desktop:
         if not open_in_system(str(target)):
             return denied(ATTACHMENT_NOT_OPENED)
         return {"ok": {}}
+
+
+def closed_dialog() -> dict:
+    """Ответ окну на закрытый диалог: «передумал», а не отказ."""
+    return {"ok": {"cancelled": True}}
 
 
 def chosen_path(window, *file_types: str) -> str | None:

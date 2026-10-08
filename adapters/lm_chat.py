@@ -14,6 +14,13 @@ import httpx
 
 from adapters import claude, claude_code
 
+CHAT_PATH = "/v1/chat/completions"
+
+# Метка отказа модели отвечать. Отличать её от бед поставщика нужно зовущим:
+# беда поставщика временная, а отказ повторится на том же тексте.
+MODEL_REFUSED = claude.REFUSED
+
+
 @dataclass(frozen=True)
 class ChatRequest:
     """Одно обращение к чат-модели: что спрашиваем и в каких рамках.
@@ -68,7 +75,7 @@ async def _post_chat(
     # явный `timeout=None` означает «ждать без предела», а не «как у клиента».
     extra = {} if request.timeout is None else {"timeout": request.timeout}
     try:
-        r = await client.post("/v1/chat/completions", json=body, **extra)
+        r = await client.post(CHAT_PATH, json=body, **extra)
         r.raise_for_status()
     except httpx.HTTPStatusError as e:
         return None, _status_refusal(request.purpose, e.response.status_code, log)
@@ -80,7 +87,7 @@ async def _post_chat(
 def _status_refusal(purpose: str, status: int, log: logging.Logger) -> ChatAnswer:
     """Провайдер ответил кодом отказа.
 
-    Метка одна на оба пути — OpenAI-совместимый и Claude: по ней зовущие
+    Метка одна на все пути — OpenAI-совместимый, API Claude и Claude Code: по ней зовущие
     выбирают откат, и разъехавшиеся метки увели бы один путь мимо него.
     """
     log.warning("%s: провайдер ответил HTTP %s", purpose, status)
@@ -185,7 +192,7 @@ async def _chat_with_claude(
     те же, и вторые их копии разошлись бы с первыми.
     """
     try:
-        content, finish_reason = await claude.ask(client, model, request, log)
+        content, finish_reason = await claude.ask(client, model, request)
     except claude.MissingKey:
         log.warning("%s: не указан ключ Anthropic", request.purpose)
         return ChatAnswer(error="no_api_key")
@@ -204,7 +211,7 @@ async def _chat_with_claude_code(
 ) -> ChatAnswer:
     """Разговор через Claude Code, сведённый к тому же ответу, что у остальных путей."""
     try:
-        content, finish_reason = await claude_code.ask(client, model, request, log)
+        content, finish_reason = await claude_code.ask(client, model, request)
     except claude_code.CliTrouble as e:
         if e.status is not None:
             return _status_refusal(request.purpose, e.status, log)
@@ -222,6 +229,7 @@ def _settled(
     с OpenAI-путём.
     """
     if finish_reason == claude.REFUSED:
-        return ChatAnswer(error="refusal")
+        log.warning("%s: модель отказалась отвечать", purpose)
+        return ChatAnswer(error=MODEL_REFUSED)
     _warn_if_truncated(finish_reason, purpose, log)
     return _answer_or_empty(content, finish_reason, purpose, log)

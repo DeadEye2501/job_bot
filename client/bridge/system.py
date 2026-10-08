@@ -27,6 +27,7 @@ from client.bridge.hub import Hub
 from client.bridge.journal import Journal
 from client.bridge.refusals import NO_BOT, RUN_REFUSALS
 from client.bridge.wipe import Wipe
+from client.bridge.wire import _iso
 
 
 logger = logging.getLogger(__name__)
@@ -169,7 +170,7 @@ class System(Journal, Wipe, Desktop):
         async def run() -> dict:
             async with self._hub.session_factory() as session:
                 rows = await hr_list.list_hrs_with_unread(session)
-            return {"chats": rows}
+            return {"chats": [{**row, "last_at": _iso(row["last_at"])} for row in rows]}
 
         return reply(self._hub.runner, run())
 

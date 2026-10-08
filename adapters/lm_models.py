@@ -9,11 +9,17 @@
 
 import logging
 
+import anthropic
 import httpx
 
 from adapters import claude, claude_code, gguf_embed
+from adapters.lm_chat import CHAT_PATH
+from adapters.lm_embed import EMBED_PATH
+from adapters.lm_studio import LmClient
 
 _log = logging.getLogger(__name__)
+
+PING = "ping"
 
 
 def _ping_request(model: str, kind: str) -> tuple[str, dict]:
@@ -24,17 +30,35 @@ def _ping_request(model: str, kind: str) -> tuple[str, dict]:
     несовместимости с родом обращения.
     """
     if kind == "chat":
-        return "/v1/chat/completions", {
+        return CHAT_PATH, {
             "model": model,
-            "messages": [{"role": "user", "content": "ping"}],
+            "messages": [{"role": "user", "content": PING}],
             "max_tokens": 1,
         }
-    return "/v1/embeddings", {"model": model, "input": "ping"}
+    return EMBED_PATH, {"model": model, "input": PING}
 
 
-async def model_listed(
-    client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, model: str
-) -> tuple[bool, list[str]]:
+def _ping_failed(model: str, detail: str) -> tuple[bool, str]:
+    """Отказ проверки на пробном запросе — одной формой у всех поставщиков."""
+    return False, f"{model} (ping failed: {detail})"
+
+
+async def _ping_claude(
+    client: claude.ClaudeClient | claude_code.ClaudeCodeClient, model: str
+) -> tuple[bool, str]:
+    """Пробный запрос к Claude — по API или через Claude Code."""
+    try:
+        if isinstance(client, claude.ClaudeClient):
+            await claude.ping(client, model, PING)
+        else:
+            await claude_code.ping(client, model, PING)
+    except (anthropic.APIError, claude_code.CliTrouble) as e:
+        _log.exception("пробный запрос к модели %s не прошёл", model)
+        return _ping_failed(model, f"{type(e).__name__}: {e}")
+    return True, model
+
+
+async def model_listed(client: LmClient, model: str) -> tuple[bool, list[str]]:
     """Числится ли модель у провайдера, и что у него есть вообще.
 
     **Перечень спрашивается без рода, и это здесь главное.** Отбор по роду у
@@ -52,9 +76,7 @@ async def model_listed(
     return model in models, models
 
 
-async def check_model(
-    client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, model: str, kind: str
-) -> tuple[bool, str]:
+async def check_model(client: LmClient, model: str, kind: str) -> tuple[bool, str]:
     """Есть ли модель у провайдера и отвечает ли она.
 
     Спрашивает больше, чем лампочка здоровья: та берёт один `model_listed`, а
@@ -67,10 +89,8 @@ async def check_model(
     причиной, годной для подсказки. Наружу уходит короткое «род и текст» —
     трассировка нужна там, где её потом читают, то есть в журнале.
     """
-    if isinstance(client, (claude.ClaudeClient, claude_code.ClaudeCodeClient)) and kind == "embed":
-        return False, claude.NO_EMBEDDINGS
     if isinstance(client, gguf_embed.ModelFile):
-        return await client.check(kind)
+        return await client.check(PING)
     named = "чата" if kind == "chat" else "векторов"
     try:
         listed, models = await model_listed(client, model)
@@ -82,10 +102,8 @@ async def check_model(
         preview = ", ".join(models[:3]) or "no models loaded"
         return False, f"{model!r} not available (have: {preview})"
 
-    if isinstance(client, claude.ClaudeClient):
-        return await claude.ping(client, model)
-    if isinstance(client, claude_code.ClaudeCodeClient):
-        return await claude_code.ping(client, model)
+    if isinstance(client, (claude.ClaudeClient, claude_code.ClaudeCodeClient)):
+        return await _ping_claude(client, model)
     path, body = _ping_request(model, kind)
     try:
         r = await client.post(path, json=body)
@@ -93,7 +111,7 @@ async def check_model(
         _log.exception("пробный запрос к модели %s для %s не прошёл", model, named)
         return False, f"{type(e).__name__}: {e}"
     if not r.is_success:
-        return False, f"{model} (ping failed: HTTP {r.status_code})"
+        return _ping_failed(model, f"HTTP {r.status_code}")
     return True, model
 
 
@@ -157,7 +175,7 @@ async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | No
 
 
 async def list_models(
-    client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, *, kind: str | None = None
+    client: LmClient, *, kind: str | None = None
 ) -> list[str]:
     """Return ids of models exposed by the provider.
 
@@ -167,11 +185,11 @@ async def list_models(
     ``/v1/models``.
     """
     if isinstance(client, claude.ClaudeClient):
-        return await claude.list_models(client, kind)
+        return await claude.list_models(client)
     if isinstance(client, claude_code.ClaudeCodeClient):
-        return await claude_code.list_models(client, kind)
+        return await claude_code.list_models(client)
     if isinstance(client, gguf_embed.ModelFile):
-        return client.listed(kind)
+        return client.listed()
     if kind is not None:
         loaded = await _loaded_models(client, kind)
         if loaded is not None:

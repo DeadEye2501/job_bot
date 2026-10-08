@@ -1,22 +1,23 @@
 """Claude через официальный SDK Anthropic: соединение, запрос и перечень моделей.
 
-Надстройка рядом с OpenAI-совместимым путём: нынешние точки входа
-(`lm_studio`, `lm_chat`, `lm_models`) узнают этот клиент по типу и отдают
-его сюда. Здесь то, чем Claude отличается: системный промпт отдельным
-параметром, отсутствие temperature, блоки в ответе, отказ модели. Метки бед
-и проверка ответа остаются общими у точек входа.
+Надстройка рядом с OpenAI-совместимым путём: точки входа (`lm_studio`,
+`lm_chat`, `lm_models`) узнают этот клиент по типу и отдают его сюда. Здесь
+то, чем Claude отличается: системный промпт отдельным параметром, отсутствие
+temperature, блоки в ответе, отказ модели. Метки бед и проверка ответа
+остаются общими у точек входа.
+
+Правила разговора с Claude — уровень размышления, причины конца, отделение
+системного промпта — общие с `adapters/claude_code`: модель та же, путь к ней
+другой.
 """
 
 import logging
-from urllib.parse import urlsplit
 
 import anthropic
 
-from backend.runtime_settings import LlmProviderConfig
+from backend.provider_config import CLAUDE_HOST, LlmProviderConfig
 
 _log = logging.getLogger(__name__)
-
-CLAUDE_HOST = "api.anthropic.com"
 
 # Адрес клиента — всегда корень, а не то, что набрано: SDK сам дописывает
 # `/v1/...`, и набранный с `/v1` адрес давал бы `/v1/v1/messages` и 404,
@@ -25,15 +26,18 @@ _CLAUDE_URL = f"https://{CLAUDE_HOST}"
 
 # Размышление расходует тот же предел, что и ответ. Пределы в `backend/llm`
 # подобраны под локальную модель без размышления, и Claude обрывался бы на
-# них, не дойдя до ответа.
-MIN_MAX_TOKENS = 16000
-EFFORT = "medium"
+# них, не дойдя до ответа. Запас прибавляется, а не подставляется: второй
+# заход с поднятым пределом (`llm/answers.read_with_a_second_try`) иначе
+# повторял бы первый слово в слово.
+THINKING_ROOM = 16000
+
+# Время и расход от уровня почти не зависят — их съедает запуск запроса и
+# промпт на входе, — а вердикт от глубины размышления только выигрывает.
+EFFORT = "high"
 
 # Причина конца «модель отказалась отвечать». В словаре OpenAI её нет, и
 # зовущий отличает её от обрыва и от ответа именно по этому слову.
 REFUSED = "refusal"
-
-NO_EMBEDDINGS = "У Anthropic нет моделей эмбеддингов"
 
 # Причины конца в словаре OpenAI: по `length` зовущие решают про обрыв. Окно
 # контекста, исчерпанное посреди ответа, — тот же обрыв. Общие с `claude_code`:
@@ -54,11 +58,6 @@ class ClaudeClient(anthropic.AsyncAnthropic):
 
     async def aclose(self) -> None:
         await self.close()
-
-
-def serves(base_url: str) -> bool:
-    """Ведёт ли адрес к Anthropic."""
-    return urlsplit(base_url).hostname == CLAUDE_HOST
 
 
 def make_client(config: LlmProviderConfig, *, timeout: float) -> ClaudeClient:
@@ -96,7 +95,7 @@ def _params(model: str, messages: list[dict[str, str]], max_tokens: int) -> dict
     system, turns = split_system(messages)
     params = {
         "model": model,
-        "max_tokens": max(max_tokens, MIN_MAX_TOKENS),
+        "max_tokens": max_tokens + THINKING_ROOM,
         "messages": turns,
         "thinking": {"type": "adaptive"},
         "output_config": {"effort": EFFORT},
@@ -106,49 +105,38 @@ def _params(model: str, messages: list[dict[str, str]], max_tokens: int) -> dict
     return params
 
 
-async def ask(client: ClaudeClient, model: str, request, log: logging.Logger):
+async def ask(client: ClaudeClient, model: str, request):
     """Спросить модель: текст и причина конца в словаре OpenAI.
 
     `request` — `lm_chat.ChatRequest`; тип не назван, потому что `lm_chat` сам
     зовёт этот модуль, и импорт навстречу замкнул бы круг.
 
     Ошибки SDK и `MissingKey` уходят наверх: метку им ставит `lm_chat`, одну на
-    оба пути. Отказ модели — не ошибка, а ответ без текста с причиной `REFUSED`.
+    оба пути. Отказ модели — не ошибка, а ответ с причиной конца `REFUSED`.
     """
     _require_key(client)
     target = client if request.timeout is None else client.with_options(timeout=request.timeout)
     reply = await target.messages.create(
         **_params(model, request.messages, request.max_tokens)
     )
-    if reply.stop_reason == REFUSED:
-        category = reply.stop_details.category if reply.stop_details else None
-        log.warning("%s: модель отказалась отвечать (%s)", request.purpose, category)
-        return None, REFUSED
     text = "".join(block.text for block in reply.content if block.type == "text")
     return text, FINISH.get(reply.stop_reason, reply.stop_reason)
 
 
-async def list_models(client: ClaudeClient, kind: str | None = None) -> list[str]:
-    """Модели, доступные ключу. Эмбеддингов у Anthropic нет — для них пусто."""
-    if kind == "embed":
-        return []
+async def list_models(client: ClaudeClient) -> list[str]:
+    """Модели, доступные ключу."""
     _require_key(client)
     return [one.id async for one in client.models.list()]
 
 
-async def ping(client: ClaudeClient, model: str) -> tuple[bool, str]:
-    """Пробный запрос с теми же параметрами, что у настоящих.
+async def ping(client: ClaudeClient, model: str, text: str) -> None:
+    """Пробный запрос с теми же параметрами, что у настоящих; беда — ошибкой SDK.
 
     Голый запрос прошёл бы и у модели, которая не принимает размышления или
     уровня, — кнопка проверки зеленела бы, а каждый настоящий запрос получал
     бы 400.
     """
-    try:
-        await client.messages.create(
-            **_params(model, [{"role": "user", "content": "ping"}], max_tokens=16)
-        )
-    except anthropic.APIError as e:
-        _log.exception("пробный запрос к модели %s не прошёл", model)
-        return False, f"{model} (ping failed: {type(e).__name__})"
-    return True, model
-
+    _require_key(client)
+    await client.messages.create(
+        **_params(model, [{"role": "user", "content": text}], max_tokens=16)
+    )

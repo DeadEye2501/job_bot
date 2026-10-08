@@ -36,25 +36,24 @@ Job Bot — single CLI entry point.
 
 ## adapters — 11 модулей
 
-### `adapters/claude.py` — 154 строк
+### `adapters/claude.py` — 142 строк
 
 Claude через официальный SDK Anthropic: соединение, запрос и перечень моделей.
 
-Зависит от: `backend.runtime_settings`
+Зависит от: `backend.provider_config`
 
 - `class MissingKey(Exception)` (2)
 - `class ClaudeClient(anthropic.AsyncAnthropic)` (5)
   - `async def aclose(self) -> None` (2)
-- `def serves(base_url: str) -> bool` (3)
 - `def make_client(config: LlmProviderConfig, *, timeout: float) -> ClaudeClient` (7)
 - `def _require_key(client: ClaudeClient) -> None` (9)
 - `def split_system(messages: list[dict[str, str]]) -> tuple[str, list[dict[str, str]]]` (8)
 - `def _params(model: str, messages: list[dict[str, str]], max_tokens: int) -> dict` (13)
-- `async def ask(client: ClaudeClient, model: str, request, log: logging.Logger)` (20)
-- `async def list_models(client: ClaudeClient, kind: str | None=None) -> list[str]` (6)
-- `async def ping(client: ClaudeClient, model: str) -> tuple[bool, str]` (15)
+- `async def ask(client: ClaudeClient, model: str, request)` (16)
+- `async def list_models(client: ClaudeClient) -> list[str]` (4)
+- `async def ping(client: ClaudeClient, model: str, text: str) -> None` (11)
 
-### `adapters/claude_code.py` — 195 строк
+### `adapters/claude_code.py` — 178 строк
 
 Claude через установленный Claude Code по подписке: запрос — процесс `claude -p`.
 
@@ -63,16 +62,15 @@ Claude через установленный Claude Code по подписке: 
 - `class CliTrouble(Exception)` (10)
 - `class ClaudeCodeClient` (8)
   - `async def aclose(self) -> None` (2)
-- `def serves(base_url: str) -> bool` (3)
 - `def make_client(*, timeout: float) -> ClaudeCodeClient` (3)
 - `def _find_cli() -> str | None` (11)
 - `def _argv(cli: str, model: str, prompt_file: str) -> list[str]` (18)
 - `async def _run_cli(argv: list[str], stdin: str, env: dict, timeout: float) -> tuple[int, str, str]` (20)
 - `def _reply(code: int, stdout: str, stderr: str) -> tuple[str | None, str | None]` (13)
 - `async def _converse(client: ClaudeCodeClient, model: str, messages: list[dict], timeout: float | None) -> tuple[str | None, str | None]` (20)
-- `async def ask(client: ClaudeCodeClient, model: str, request, log: logging.Logger)` (11)
-- `async def list_models(_client: ClaudeCodeClient, kind: str | None=None) -> list[str]` (7)
-- `async def ping(client: ClaudeCodeClient, model: str) -> tuple[bool, str]` (7)
+- `async def ask(client: ClaudeCodeClient, model: str, request)` (8)
+- `async def list_models(_client: ClaudeCodeClient) -> list[str]` (5)
+- `async def ping(client: ClaudeCodeClient, model: str, text: str) -> None` (3)
 
 ### `adapters/cv_text.py` — 137 строк
 
@@ -99,7 +97,7 @@ Claude через установленный Claude Code по подписке: 
 - `def _trim(value: object) -> object` (14)
 - `async def ping(session) -> bool` (16)
 
-### `adapters/gguf_embed.py` — 115 строк
+### `adapters/gguf_embed.py` — 111 строк
 
 Эмбеддинги из GGUF-файла модели, посчитанные в своём процессе без сервера.
 
@@ -107,16 +105,16 @@ Claude через установленный Claude Code по подписке: 
 
 - `class ModelUnavailable(Exception)` (2)
 - `def _open_model(path: str)` (18)
-- `class ModelFile` (68)
+- `class ModelFile` (64)
   - `async def embed(self, text: str) -> list[float]` (3)
   - `def _embed_now(self, text: str) -> list[float]` (10)
   - `def _load(self)` (7)
-  - `def listed(self, kind: str | None) -> list[str]` (5)
-  - `async def check(self, kind: str) -> tuple[bool, str]` (15)
+  - `def listed(self) -> list[str]` (3)
+  - `async def check(self, text: str) -> tuple[bool, str]` (13)
   - `async def aclose(self) -> None` (3)
   - `def _release(self) -> None` (5)
 
-### `adapters/lm_chat.py` — 227 строк
+### `adapters/lm_chat.py` — 235 строк
 
 Обращение к чат-модели провайдера и разбор её ответа.
 
@@ -132,9 +130,9 @@ Claude через установленный Claude Code по подписке: 
 - `async def chat(client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient, model: str, request: ChatRequest, log: logging.Logger) -> ChatAnswer` (34)
 - `async def _chat_with_claude(client: claude.ClaudeClient, model: str, request: ChatRequest, log: logging.Logger) -> ChatAnswer` (21)
 - `async def _chat_with_claude_code(client: claude_code.ClaudeCodeClient, model: str, request: ChatRequest, log: logging.Logger) -> ChatAnswer` (14)
-- `def _settled(content: str | None, finish_reason: str | None, purpose: str, log: logging.Logger) -> ChatAnswer` (13)
+- `def _settled(content: str | None, finish_reason: str | None, purpose: str, log: logging.Logger) -> ChatAnswer` (14)
 
-### `adapters/lm_embed.py` — 32 строк
+### `adapters/lm_embed.py` — 35 строк
 
 Числовой отпечаток текста у модели встраиваний.
 
@@ -142,26 +140,28 @@ Claude через установленный Claude Code по подписке: 
 
 - `async def embed(client: httpx.AsyncClient | gguf_embed.ModelFile, model: str, text: str) -> list[float]` (20)
 
-### `adapters/lm_models.py` — 188 строк
+### `adapters/lm_models.py` — 206 строк
 
 Перечень моделей у провайдера и проверка, что нужная отвечает.
 
-Зависит от: `adapters`
+Зависит от: `adapters`, `adapters.lm_chat`, `adapters.lm_embed`, `adapters.lm_studio`
 
 - `def _ping_request(model: str, kind: str) -> tuple[str, dict]` (14)
-- `async def model_listed(client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, model: str) -> tuple[bool, list[str]]` (18)
-- `async def check_model(client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, model: str, kind: str) -> tuple[bool, str]` (43)
+- `def _ping_failed(model: str, detail: str) -> tuple[bool, str]` (3)
+- `async def _ping_claude(client: claude.ClaudeClient | claude_code.ClaudeCodeClient, model: str) -> tuple[bool, str]` (13)
+- `async def model_listed(client: LmClient, model: str) -> tuple[bool, list[str]]` (16)
+- `async def check_model(client: LmClient, model: str, kind: str) -> tuple[bool, str]` (37)
 - `def _looks_like_embed(name: str) -> bool` (9)
 - `async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | None` (37)
-- `async def list_models(client: httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile, *, kind: str | None=None) -> list[str]` (30)
+- `async def list_models(client: LmClient, *, kind: str | None=None) -> list[str]` (30)
 
-### `adapters/lm_studio.py` — 49 строк
+### `adapters/lm_studio.py` — 55 строк
 
 Соединение с OpenAI-совместимым провайдером моделей.
 
-Зависит от: `adapters`, `backend.runtime_settings`
+Зависит от: `adapters`, `backend.provider_config`
 
-- `def make_client(config: LlmProviderConfig) -> httpx.AsyncClient | claude.ClaudeClient | claude_code.ClaudeCodeClient | gguf_embed.ModelFile` (22)
+- `def make_client(config: LlmProviderConfig) -> 'LmClient'` (17)
 
 ### `adapters/telegram.py` — 220 строк
 
@@ -232,7 +232,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 132 модулей
+## backend — 133 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -426,6 +426,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def encrypt_bytes(plaintext: bytes) -> bytes` (2)
 - `def decrypt_bytes(ciphertext: bytes) -> bytes` (2)
 
+### `backend/domain/alphabet.py` — 12 строк
+
+Буквы двух алфавитов, на которых пишут резюме и вакансии.
+
+Зависит от: —
+
+
 ### `backend/domain/blacklist.py` — 56 строк
 
 Поиск запрещённого слова в тексте по границам слова.
@@ -588,7 +595,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def is_terminal_for_auto(status: VacancyStatus) -> bool` (9)
 - `def should_apply_status(current: VacancyStatus, new: VacancyStatus, *, force: bool=False) -> bool` (23)
 
-### `backend/domain/verdict.py` — 91 строк
+### `backend/domain/verdict.py` — 100 строк
 
 Приговор разобранному объявлению до того, как оно войдёт в граф статусов.
 
@@ -826,14 +833,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None` (16)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 
-### `backend/flows/parse.py` — 483 строк ⚠ подошёл к 300
+### `backend/flows/parse.py` — 489 строк ⚠ подошёл к 300
 
 Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
-Зависит от: `backend.domain.blacklist`, `backend.domain.fit_fields`, `backend.domain.resume_marks`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit_languages`, `backend.llm.fit_preferences`, `backend.llm.fit_role`, `backend.llm.genre`, `backend.llm.rules`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`
+Зависит от: `adapters.lm_chat`, `backend.domain.blacklist`, `backend.domain.fit_fields`, `backend.domain.resume_marks`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit_languages`, `backend.llm.fit_preferences`, `backend.llm.fit_role`, `backend.llm.genre`, `backend.llm.rules`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`
 
 - `async def _dropped_as_trash(pipeline, vacancy_id: int, reason: str, *, allow_delete: bool) -> bool` (23)
-- `def _unanswered(what: str, trouble: str | None, vacancy_id: int) -> tuple[str | None, bool] | None` (25)
+- `def _unanswered(what: str, trouble: str | None, vacancy_id: int) -> tuple[str | None, bool] | None` (29)
 - `def _fit_verdict_refusal(validation) -> str | None` (17)
 - `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (38)
 - `async def _thrown_out_as_a_resume(pipeline, vacancy_id: int, mark: str, allow_delete: bool) -> bool` (16)
@@ -1051,11 +1058,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _say_dropped(what: str, was, left) -> None` (3)
 - `def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv` (26)
 
-### `backend/llm/cv_native.py` — 75 строк
+### `backend/llm/cv_native.py` — 73 строк
 
 Родной язык кандидата — тот, на котором написано его резюме.
 
-Зависит от: `backend.domain.taxonomy`, `backend.payloads`
+Зависит от: `backend.domain.alphabet`, `backend.domain.taxonomy`, `backend.payloads`
 
 - `def _resume_language(text: str) -> str` (10)
 - `def with_native_language(parsed: ParsedCv, text: str) -> ParsedCv` (40)
@@ -1163,11 +1170,11 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: `backend.domain.company_hosts`, `backend.domain.resume_marks`, `backend.domain.taxonomy`
 
 
-### `backend/llm/skills.py` — 230 строк
+### `backend/llm/skills.py` — 226 строк
 
 Приведение названий технологий к виду, пригодному для стека вакансии.
 
-Зависит от: `backend.domain.skill_names`, `backend.domain.spellings`, `backend.llm.rules`
+Зависит от: `backend.domain.alphabet`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.llm.rules`
 
 - `def _strip_version(s: str) -> str` (12)
 - `def _capitalize_skill(s: str) -> str` (20)
@@ -1374,14 +1381,18 @@ First-run bootstrap: ensure DB schema exists.
 - `class ChannelDetail` (4)
 - `class VacancyFilter` (53)
 
-### `backend/provider_config.py` — 43 строк
+### `backend/provider_config.py` — 74 строк
 
 Поставщик модели в настройках: из каких полей он состоит и когда настроен.
 
 Зависит от: —
 
 - `def names_model_file(base_url: str | None, model: str | None) -> bool` (6)
-- `def provider_complete(kind: str, base_url: str | None, model: str | None) -> bool` (11)
+- `def serves_claude(base_url: str | None) -> bool` (3)
+- `def serves_claude_code(base_url: str | None) -> bool` (3)
+- `def chat_only(base_url: str | None) -> bool` (3)
+- `def serves_kind(kind: str, base_url: str | None) -> bool` (3)
+- `def provider_complete(kind: str, base_url: str | None, model: str | None) -> bool` (15)
 - `class LlmProviderConfig` (9)
   - `def names_model_file(self) -> bool` (2)
 
@@ -1579,7 +1590,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def create_hr(session: AsyncSession, *, name: str | None, telegram_username: str | None, telegram_user_id: int | None=None, notes: str | None=None) -> HR` (42)
 - `async def find_or_create_hr(session: AsyncSession, user, *, avatar: bytes | None=None) -> tuple[HR, bool]` (23)
 
-### `backend/repository/hr_list.py` — 218 строк
+### `backend/repository/hr_list.py` — 219 строк
 
 Перечни HR со счётчиками.
 
@@ -1591,7 +1602,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _unread_by_hr(session: AsyncSession) -> dict[int, int]` (17)
 - `async def list_hr_with_counts(session: AsyncSession, search: str | None=None, *, limit: int | None=None, offset: int=0, sort_by: str='vacancy_count') -> tuple[list[HrWithCount], bool]` (45)
 - `async def list_hrs_for_company(session: AsyncSession, company_id: int) -> list[tuple[HR, int]]` (16)
-- `async def list_hrs_with_unread(session: AsyncSession) -> list[dict]` (30)
+- `async def list_hrs_with_unread(session: AsyncSession) -> list[dict]` (31)
 
 ### `backend/repository/merging.py` — 54 строк
 
@@ -2168,7 +2179,7 @@ Runtime settings layer.
 
 Файл резюме, на который смотрит окно: запомнить путь, открыть, разобрать.
 
-Зависит от: `adapters`, `adapters.cv_text`, `adapters.lm_studio`, `backend.llm`, `backend.repository.app_settings`, `backend.repository.profile_cv`, `client.bridge.answer`, `client.bridge.cv_file`, `client.bridge.desktop`, `client.bridge.refusals`
+Зависит от: `adapters`, `adapters.cv_text`, `backend.llm`, `backend.provider_config`, `backend.repository.app_settings`, `backend.repository.profile_cv`, `client.bridge.answer`, `client.bridge.cv_file`, `client.bridge.desktop`, `client.bridge.refusals`
 
 - `class Cv` (95)
   - `def pick(self) -> dict` (16)
@@ -2186,7 +2197,7 @@ Runtime settings layer.
 
 - `def _stat_cv(cv_path: str) -> dict | None` (9)
 
-### `client/bridge/desktop.py` — 198 строк
+### `client/bridge/desktop.py` — 206 строк
 
 Просьбы окна к рабочему столу: открыть названное системой, выбрать файл диалогом.
 
@@ -2198,6 +2209,7 @@ Runtime settings layer.
 - `class Desktop` (67)
   - `def open_url(self, url: str) -> dict` (28)
   - `def open_attachment(self, url: str) -> dict` (25)
+- `def closed_dialog() -> dict` (3)
 - `def chosen_path(window, *file_types: str) -> str | None` (10)
 
 ### `client/bridge/events.py` — 149 строк
@@ -2310,11 +2322,11 @@ Runtime settings layer.
 - `def _remember_login(hub: Hub, username: str | None) -> None` (17)
 - `def _log_if_crashed(hub: Hub, future: Future) -> None` (20)
 
-### `client/bridge/llm.py` — 219 строк
+### `client/bridge/llm.py` — 231 строк
 
-Разговор с поставщиком модели: проба связи и опрос имён.
+Поставщик модели для окна: проверить связь, спросить имена, выбрать файл модели.
 
-Зависит от: `adapters`, `adapters.lm_studio`, `backend.log_secrets`, `backend.provider_config`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.refusals`
+Зависит от: `adapters`, `backend.log_secrets`, `backend.models`, `backend.provider_config`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.refusals`
 
 - `def _client_or_reason(cfg: LlmProviderConfig) -> tuple[httpx.AsyncClient | None, str]` (16)
 - `async def _do_list_models_for_creds(base_url: str, api_key: str, *, kind: str | None=None) -> dict` (28)
@@ -2322,12 +2334,12 @@ Runtime settings layer.
 - `def read_llm_creds(payload: dict, kind: str) -> LlmProviderConfig` (21)
 - `def read_models_ask(payload) -> tuple[str, str, str]` (4)
 - `def _provider_address(payload: dict) -> tuple[str, str]` (14)
-- `class Llm` (73)
+- `class Llm` (77)
   - `def probe_model(self, payload: dict) -> dict` (29)
     - `async def run() -> dict` (5)
   - `def pick_model_file(self) -> dict` (11)
-  - `def list_models(self, payload: dict) -> dict` (23)
-    - `async def run() -> dict` (7)
+  - `def list_models(self, payload: dict) -> dict` (27)
+    - `async def run() -> dict` (11)
 
 ### `client/bridge/login.py` — 129 строк
 
@@ -2443,7 +2455,7 @@ Runtime settings layer.
 
 Экран «Настройки»: всё, что окно спрашивает и правит на нём.
 
-Зависит от: `adapters.lm_studio`, `backend.telegram_login`, `client.bridge.answer`, `client.bridge.bot_stop`, `client.bridge.hub`, `client.bridge.llm`, `client.bridge.login`, `client.bridge.wire`
+Зависит от: `backend.provider_config`, `backend.telegram_login`, `client.bridge.answer`, `client.bridge.bot_stop`, `client.bridge.hub`, `client.bridge.llm`, `client.bridge.login`, `client.bridge.wire`
 
 - `class Settings(Login, Llm)` (192)
   - `def get(self) -> dict` (29)
@@ -2476,11 +2488,11 @@ Runtime settings layer.
   - `def skills(self, period: str) -> dict` (3)
   - `def channels_pipeline(self, period: str) -> dict` (3)
 
-### `client/bridge/system.py` — 308 строк ⚠ подошёл к 300
+### `client/bridge/system.py` — 309 строк ⚠ подошёл к 300
 
 Домен «система»: то, чем страница живёт на любом экране.
 
-Зависит от: `backend`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.refusals`, `client.bridge.wipe`
+Зависит от: `backend`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.refusals`, `client.bridge.wipe`, `client.bridge.wire`
 
 - `class System(Journal, Wipe, Desktop)` (216)
   - `def initial(self) -> dict` (16)
@@ -2694,32 +2706,30 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 261 модулей
+## tests — 262 модулей
 
-### `tests/adapters/test_claude.py` — 288 строк
+### `tests/adapters/test_claude.py` — 263 строк
 
 Следствия разговора с Claude через нынешние точки входа адаптеров.
 
-Зависит от: `adapters`, `adapters.lm_chat`, `adapters.lm_studio`, `backend.runtime_settings`, `tests.fakes.claude`, `tests.fakes.llm`
+Зависит от: `adapters`, `adapters.lm_chat`, `adapters.lm_studio`, `backend.provider_config`, `tests.fakes.claude`, `tests.fakes.llm`
 
-Тестов: 17
+Тестов: 16
 
-- `def _request(**over) -> ChatRequest` (12)
 - `def _body(client) -> dict` (3)
 - `def wire(monkeypatch)` (19)
   - `def install(routes: dict) -> list` (9)
     - `async def relay(_transport, request)` (2)
 
-### `tests/adapters/test_claude_code.py` — 223 строк
+### `tests/adapters/test_claude_code.py` — 214 строк
 
 Следствия разговора с Claude через Claude Code по подписке.
 
-Зависит от: `adapters`, `adapters.claude_code`, `adapters.lm_chat`, `adapters.lm_studio`, `backend.runtime_settings`, `tests.fakes.claude_code`
+Зависит от: `adapters`, `adapters.claude_code`, `adapters.lm_chat`, `adapters.lm_studio`, `backend.provider_config`, `tests.fakes.claude_code`, `tests.fakes.llm`
 
-Тестов: 14
+Тестов: 13
 
 - `def _client() -> ClaudeCodeClient` (2)
-- `def _request(**over) -> ChatRequest` (12)
 
 ### `tests/adapters/test_cv_text.py` — 299 строк
 
@@ -2731,15 +2741,15 @@ Runtime settings layer.
 
 - `def _tiny_pdf(pages: list[list[tuple[int, str]]]) -> bytes` (59)
 
-### `tests/adapters/test_gguf_embed.py` — 174 строк
+### `tests/adapters/test_gguf_embed.py` — 169 строк
 
 Следствия счёта векторов из файла модели; настоящая модель не грузится.
 
-Зависит от: `adapters`, `adapters.gguf_embed`, `adapters.lm_studio`, `backend.runtime_settings`, `tests.fakes.gguf`
+Зависит от: `adapters`, `adapters.gguf_embed`, `adapters.lm_studio`, `backend.provider_config`, `tests.fakes.gguf`
 
 Тестов: 11
 
-- `def journal(monkeypatch)` (5)
+- `def journal(monkeypatch)` (3)
 
 ### `tests/adapters/test_lm_chat.py` — 164 строк
 
@@ -2772,7 +2782,7 @@ Runtime settings layer.
 
 Следствия соединения с провайдером моделей.
 
-Зависит от: `adapters.lm_studio`, `backend.runtime_settings`
+Зависит от: `adapters.lm_studio`, `backend.provider_config`
 
 Тестов: 3
 
@@ -3154,7 +3164,7 @@ Runtime settings layer.
 
 Когда чат и векторы делят одно соединение с языковой моделью.
 
-Зависит от: `backend.bot.send`, `backend.runtime_settings`
+Зависит от: `backend.bot.send`, `backend.provider_config`
 
 Тестов: 1
 
@@ -3425,11 +3435,11 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `tests/backend/test_flows_embedding_text.py` — 143 строк
+### `tests/backend/test_flows_embedding_text.py` — 132 строк
 
 Отпечаток текста: что бывает, когда поставщик отпечатков не отвечает.
 
-Зависит от: `adapters`, `backend.flows`, `tests.fakes.gguf`
+Зависит от: `adapters`, `backend.flows`, `tests.fakes.gguf`, `tests.fakes.llm`
 
 Тестов: 5
 
@@ -3564,13 +3574,22 @@ Runtime settings layer.
 Тестов: 19
 
 
-### `tests/backend/test_flows_parse_verdict.py` — 486 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_parse_unanswered.py` — 152 строк
+
+Что становится с объявлением, когда модель не дала ответа.
+
+Зависит от: `adapters.lm_chat`, `backend.domain.verdict`, `backend.flows`, `backend.llm.answers`, `backend.models`, `tests.dbio`
+
+Тестов: 6
+
+
+### `tests/backend/test_flows_parse_verdict.py` — 369 строк ⚠ подошёл к 300
 
 Какой приговор получает объявление после разбора.
 
-Зависит от: `backend.domain.verdict`, `backend.flows`, `backend.llm.answers`, `backend.llm.rules`, `backend.models`, `backend.payloads`, `tests.dbio`
+Зависит от: `backend.flows`, `backend.llm.rules`, `backend.models`, `backend.payloads`, `tests.dbio`
 
-Тестов: 24
+Тестов: 19
 
 
 ### `tests/backend/test_flows_pasted_intake.py` — 288 строк
@@ -3588,11 +3607,11 @@ Runtime settings layer.
   - `async def parse(pipeline_arg, vacancy_id, text, username, *, allow_delete=True)` (9)
 - `def parse_calls(intake) -> list[tuple]` (7)
 
-### `tests/backend/test_flows_post_intake.py` — 341 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_post_intake.py` — 333 строк ⚠ подошёл к 300
 
 Что бот делает с очередным объявлением из канала.
 
-Зависит от: `adapters`, `backend.flows`, `tests.backend.fixtures.parse_stub`, `tests.fakes.telegram_objects`
+Зависит от: `adapters`, `backend.flows`, `tests.backend.fixtures.parse_stub`, `tests.fakes.llm`, `tests.fakes.telegram_objects`
 
 Тестов: 14
 
@@ -3663,7 +3682,7 @@ Runtime settings layer.
 
 Следствия вопроса «живо ли то, на чём держится работа».
 
-Зависит от: `adapters`, `backend.health`, `backend.runtime_settings`, `tests.fakes.gguf`
+Зависит от: `adapters`, `backend.health`, `backend.provider_config`, `tests.fakes.gguf`
 
 Тестов: 5
 
@@ -4605,13 +4624,13 @@ Runtime settings layer.
 Тестов: 14
 
 
-### `tests/backend/test_runtime_settings_load.py` — 230 строк
+### `tests/backend/test_runtime_settings_load.py` — 243 строк
 
 Следствия чтения настроек из базы в память.
 
 Зависит от: `backend.crypto`, `backend.models`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`
 
-Тестов: 20
+Тестов: 21
 
 
 ### `tests/backend/test_runtime_settings_masking.py` — 78 строк
@@ -4919,13 +4938,13 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/client/test_bridge_llm.py` — 406 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_llm.py` — 428 строк ⚠ подошёл к 300
 
 Следствия проверки языковой модели: что окно узнаёт, нажав «проверить».
 
-Зависит от: `adapters`, `tests.client.conftest`, `tests.fakes.gguf`, `tests.fakes.llm`
+Зависит от: `tests.client.conftest`, `tests.fakes.gguf`, `tests.fakes.llm`
 
-Тестов: 20
+Тестов: 22
 
 - `def _busy_provider(free: asyncio.Event)` (23)
   - `def make(_cfg)` (13)
@@ -5000,13 +5019,13 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/client/test_bridge_system.py` — 140 строк
+### `tests/client/test_bridge_system.py` — 159 строк
 
 Следствия домена «система»: чем занят бот и что показывает нижняя полоса.
 
-Зависит от: —
+Зависит от: `tests.dbio`, `tests.factories`
 
-Тестов: 8
+Тестов: 9
 
 
 ### `tests/client/test_bridge_vacancies.py` — 332 строк ⚠ подошёл к 300
@@ -5088,7 +5107,7 @@ Runtime settings layer.
 Тестов: 17
 
 
-### `tests/client/test_front_vocabulary.py` — 212 строк
+### `tests/client/test_front_vocabulary.py` — 214 строк
 
 Согласие перечней окна с перечнями бэкенда.
 
@@ -5100,7 +5119,7 @@ Runtime settings layer.
 - `def _object(module: str, name: str) -> str` (10)
 - `def _strings(module: str, name: str) -> list[str]` (3)
 - `def _values(module: str, name: str) -> list[str]` (3)
-- `def _skip_reasons_the_backend_writes() -> set[str]` (17)
+- `def _skip_reasons_the_backend_writes() -> set[str]` (18)
 - `def _reason_in(value: ast.expr) -> set[str]` (15)
 - `def _send_outcomes_the_backend_writes() -> set[str]` (12)
 
@@ -5264,7 +5283,7 @@ Runtime settings layer.
 - `def refusal(category: str='cyber') -> httpx2.Response` (7)
 - `def model_list(*ids: str) -> httpx2.Response` (16)
 
-### `tests/fakes/claude_code.py` — 82 строк
+### `tests/fakes/claude_code.py` — 80 строк
 
 Подделка Claude Code: запуск процесса подменён, разбор и сборка вызова настоящие.
 
@@ -5274,20 +5293,24 @@ Runtime settings layer.
 - `def result(text: str | None, *, stop_reason: str='end_turn') -> dict` (5)
 - `def failure(text: str, *, status: int | None=None) -> dict` (9)
 - `class Calls` (9)
-- `def _system_prompt(argv: list[str]) -> str | None` (5)
+- `def _system_prompt(argv: list[str]) -> str` (3)
 - `def install(monkeypatch, replies: list, *, cli: str | None=CLI) -> Calls` (26)
   - `async def run(argv, stdin, env, timeout)` (12)
 
-### `tests/fakes/gguf.py` — 30 строк
+### `tests/fakes/gguf.py` — 54 строк
 
 Подделка движка эмбеддингов: настоящая модель в тестах не грузится.
 
-Зависит от: —
+Зависит от: `adapters`
 
 - `class Model` (16)
   - `def embed(self, text: str) -> list` (5)
   - `def close(self) -> None` (2)
 - `def model_file(folder) -> str` (5)
+- `def engine(monkeypatch, load) -> None` (3)
+- `def failing_engine(monkeypatch, trouble: BaseException) -> None` (7)
+  - `def load(_path)` (2)
+- `def engine_journal(monkeypatch) -> list[str]` (5)
 
 ### `tests/fakes/ingestion.py` — 174 строк
 
@@ -5330,11 +5353,11 @@ Runtime settings layer.
   - `def set_password(self, service: str, username: str, password: str) -> None` (2)
   - `def delete_password(self, service: str, username: str) -> None` (7)
 
-### `tests/fakes/llm.py` — 239 строк
+### `tests/fakes/llm.py` — 272 строк
 
 Подделка провайдера LLM: настоящий клиент поверх подставного транспорта.
 
-Зависит от: —
+Зависит от: `adapters.lm_chat`
 
 - `def _troubles() -> list[tuple[str, object, str]]` (22)
 - `def provider_trouble(*extra)` (9)
@@ -5352,6 +5375,9 @@ Runtime settings layer.
 - `def data_block(request: httpx.Request) -> str` (9)
 - `def warning_before_the_block(request: httpx.Request) -> str` (9)
 - `def chat_response(content: str | None, *, finish_reason: str='stop') -> httpx.Response` (14)
+- `def chat_request(**over) -> ChatRequest` (16)
+- `def embeddings_request() -> httpx.Request` (3)
+- `def embeddings_refused(status: int, text: str='') -> httpx.HTTPStatusError` (5)
 
 ### `tests/fakes/lm_studio.py` — 18 строк
 
@@ -5468,11 +5494,11 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/test_harness_safety.py` — 172 строк
+### `tests/test_harness_safety.py` — 183 строк
 
 Сторож стенда: падает, если подмена не сработала.
 
-Зависит от: `adapters`, `adapters.claude`, `adapters.telegram`, `backend.models`, `config`, `tests.conftest`
+Зависит от: `adapters`, `adapters.claude`, `adapters.lm_chat`, `adapters.lm_studio`, `adapters.telegram`, `backend.models`, `backend.provider_config`, `config`, `tests.conftest`
 
 Тестов: 13
 

@@ -7,6 +7,9 @@
 
 import logging
 
+from tests.dbio import put
+from tests.factories import at, hr_row, message_row
+
 
 async def test_an_unknown_mode_is_refused_by_name(api, ask):
     """Незнакомый режим отбивают, назвав присланное.
@@ -138,3 +141,19 @@ async def test_a_deferred_model_probe_that_broke_leaves_its_trace(
     # И к самой беде: без этого сторож был бы зелен от любой трассировки, а
     # разбирать её человеку придётся именно по тексту броска.
     assert "поставщик отвалился" in caplog.text
+
+
+async def test_the_last_unread_moment_reaches_the_window_with_its_zone(api, ask, session_factory):
+    """Время последнего непрочитанного приходит окну с часовым поясом.
+
+    Без пояса окно читает время как местное, и свежее сообщение в списке над
+    полосой выглядит пришедшим несколько часов назад.
+    """
+    hr = hr_row(name="Анна")
+    await put(session_factory, hr)
+    await put(session_factory, message_row(hr_id=hr.id, is_incoming=True, read_at=None, sent_at=at(50)))
+
+    answer = await ask(api.system.unread_chats)
+
+    assert answer["ok"]["chats"][0]["last_at"] == at(50).isoformat() + "+00:00"
+

@@ -5,7 +5,7 @@
 """
 
 from adapters.lm_studio import make_client
-from backend.runtime_settings import LlmProviderConfig
+from backend.provider_config import LlmProviderConfig
 
 
 def test_a_provider_without_a_key_gets_no_authorization_header():

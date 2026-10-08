@@ -6,14 +6,14 @@ from pathlib import Path
 
 from adapters import lm_studio
 from adapters.cv_text import READABLE_SUFFIXES, read_cv_text
-from adapters.lm_studio import LlmProviderConfig
+from backend.provider_config import LlmProviderConfig
 from backend.llm import cv as llm_cv
 from backend.repository.app_settings import CV_PATH_KEY
 from backend.repository.profile_cv import save_parsed_cv
 
 from client.bridge.answer import denied, launched, reply
 from client.bridge.cv_file import _stat_cv
-from client.bridge.desktop import chosen_path, open_in_system
+from client.bridge.desktop import chosen_path, closed_dialog, open_in_system
 from client.bridge.refusals import PARSE_CV_REFUSALS
 
 
@@ -53,7 +53,7 @@ class Cv:
         """
         path = chosen_path(self._hub.window, _RESUME_FILTER)
         if path is None:
-            return {"ok": {"cancelled": True}}
+            return closed_dialog()
         return self._replace({"path": path})
 
     def _replace(self, payload: dict) -> dict:

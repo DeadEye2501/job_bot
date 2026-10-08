@@ -14,12 +14,21 @@
 #     PyInstaller'а сами не попадают.
 #   - Qt в сборке больше нет: окно рисует pywebview поверх системного
 #     WebView2, и от прежних 250-350 МБ с QtWebEngine осталась малая доля.
+#   - binaries: библиотеки движка эмбеддингов (llama-cpp) — он грузит их сам
+#     из своей папки `lib`, и граф импортов их не видит. Файл модели в exe
+#     не вшивается: onefile распаковывал бы сотни мегабайт на каждом старте,
+#     путь к модели задаётся в настройках.
+#   - SDK Anthropic подтягивается целиком: часть его модулей грузится лениво.
 #
 # Перед сборкой фронт собирается своим сборщиком:
 #     cd client/web && npm run build
 # Без этого в exe уедет старый `dist`, а при его отсутствии — ничего.
 
 import os
+
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules
+
+binaries = collect_dynamic_libs('llama_cpp')
 
 datas = [
     ('client/web/dist', 'client/web/dist'),
@@ -63,13 +72,17 @@ hiddenimports = [
     # versions/-каталога по имени файла, не по импорту.
     'logging.config',
     'logging.handlers',
+    # Движок эмбеддингов импортируется внутри функции, только когда выбран
+    # файл модели, — называем его явно, чтобы он наверняка попал в граф.
+    'llama_cpp',
+    *collect_submodules('anthropic'),
 ]
 
 
 a = Analysis(
     ['main.py'],
     pathex=[os.path.abspath(SPECPATH)],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
