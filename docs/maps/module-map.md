@@ -1794,14 +1794,14 @@ First-run bootstrap: ensure DB schema exists.
   - `def share(stage: str) -> float | None` (4)
 - `async def get_stats_channels_pipeline(session: AsyncSession, *, period: str) -> dict` (36)
 
-### `backend/repository/stats_responses.py` — 147 строк
+### `backend/repository/stats_responses.py` — 149 строк
 
-Скорость ответа HR: сколько ждали, кто не ответил и в какие дни пишут.
+Скорость ответа HR: сколько ждали, кто не ответил и в какие дни отвечают.
 
 Зависит от: `backend.domain.funnel`, `backend.models`, `backend.repository.stats_common`, `backend.repository.vacancies_common`
 
 - `async def _applied_in_period(session: AsyncSession, since: datetime | None) -> dict[int, datetime]` (23)
-- `async def _first_response_at(session: AsyncSession, applied_map: dict[int, datetime]) -> dict[int, datetime]` (31)
+- `async def _first_response_at(session: AsyncSession, applied_map: dict[int, datetime]) -> dict[int, datetime]` (32)
 - `def _local_weekday(stamp: datetime) -> int` (8)
 - `def _weekdays_and_waits(applied_map: dict[int, datetime], first_resp_by_vid: dict[int, datetime]) -> tuple[list[int], list[float]]` (17)
 - `def _median(values: list[float]) -> float | None` (9)
@@ -2987,14 +2987,14 @@ Runtime settings layer.
   - `async def reload()` (2)
   - `async def embed(pipeline, text, what)` (3)
 
-### `tests/backend/fixtures/stats.py` — 69 строк
+### `tests/backend/fixtures/stats.py` — 62 строк
 
 Обстановка для проверок сводки: отклик и ответ на него.
 
 Зависит от: `backend.models`, `backend.repository.stats_pipeline`, `tests.dbio`, `tests.factories`
 
-- `def applied(session_factory)` (52)
-  - `async def build(applied_at, *, hr=None, answered_after=None, **overrides)` (24)
+- `def applied(session_factory)` (45)
+  - `async def build(applied_at, *, answered_after=None, answer=VacancyStatus.ANSWERED, **overrides)` (20)
 - `async def rows_by_channel(session, **kwargs) -> dict[int | None, dict]` (4)
 
 ### `tests/backend/test_adapters_telegraph.py` — 205 строк
@@ -4530,20 +4530,20 @@ Runtime settings layer.
 Тестов: 13
 
 
-### `tests/backend/test_repository_stats_response_time.py` — 260 строк
+### `tests/backend/test_repository_stats_response_time.py` — 265 строк
 
 Следствия подсчёта срока ответа на отклик.
 
 Зависит от: `backend.models`, `backend.repository.stats_responses`, `tests.dbio`, `tests.factories`
 
-Тестов: 12
+Тестов: 14
 
 
-### `tests/backend/test_repository_stats_response_weekday.py` — 69 строк
+### `tests/backend/test_repository_stats_response_weekday.py` — 57 строк
 
 Следствия распределения ответов HR по дням недели.
 
-Зависит от: `backend.repository.stats_responses`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.repository.stats_responses`
 
 Тестов: 2
 

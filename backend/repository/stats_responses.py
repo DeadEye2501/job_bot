@@ -1,15 +1,16 @@
-"""Скорость ответа HR: сколько ждали, кто не ответил и в какие дни пишут."""
+"""Скорость ответа HR: сколько ждали, кто не ответил и в какие дни отвечают."""
 
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.funnel import percent_or_none
-from backend.models import Message, Vacancy, VacancyStatus
+from backend.domain.funnel import RESPONDED, percent_or_none
+from backend.models import Vacancy, VacancyStatus, VacancyStatusHistory
 from backend.repository.stats_common import (
     first_transition_subq,
     stats_period_since,
+    status_cond,
 )
 from backend.repository.vacancies_common import PARSED_ONLY
 
@@ -42,33 +43,34 @@ async def _applied_in_period(
 async def _first_response_at(
     session: AsyncSession, applied_map: dict[int, datetime]
 ) -> dict[int, datetime]:
-    """Когда HR ответил впервые — первое входящее позже нашего отклика.
+    """Когда ответили впервые — первый переход в ответный статус не раньше отклика.
 
-    Берём `Message.sent_at` (когда HR нажал «отправить»), а не `created_at`
-    (когда наш бот сохранил): день недели должен отражать, когда живой HR.
+    Ответ меряется сменой статуса, а не перепиской: откликнуться можно и на
+    сайте, и по почте, и ответ оттуда приложение не видит, а смену статуса
+    видит всегда. Ответный — любой статус `RESPONDED`: вакансия, сразу
+    ушедшая из отклика в тест или к офферу, тоже получила ответ.
+
     Одним запросом, а не по вакансии: выборки маленькие — десятки-сотни, —
     и группировка в Python дешевле N обращений к базе.
     """
     rows = (
         await session.execute(
-            select(Message.vacancy_id, Message.sent_at)
+            select(VacancyStatusHistory.vacancy_id, VacancyStatusHistory.changed_at)
             .where(
-                Message.vacancy_id.in_(applied_map.keys()),
-                Message.is_incoming.is_(True),
-                Message.is_deleted.is_(False),
+                VacancyStatusHistory.vacancy_id.in_(applied_map.keys()),
+                status_cond(RESPONDED),
             )
         )
     ).all()
     first_by_vid: dict[int, datetime] = {}
-    for vid, sent_at in rows:
-        if sent_at is None:
-            continue
-        applied_at = applied_map.get(vid)
-        if applied_at is None or sent_at <= applied_at:
+    for vid, changed_at in rows:
+        # Одна секунда с откликом — ещё ответ: метки секундные, а ответа
+        # раньше отклика не бывает.
+        if changed_at < applied_map[vid]:
             continue
         cur = first_by_vid.get(vid)
-        if cur is None or sent_at < cur:
-            first_by_vid[vid] = sent_at
+        if cur is None or changed_at < cur:
+            first_by_vid[vid] = changed_at
     return first_by_vid
 
 
@@ -88,7 +90,7 @@ def _weekdays_and_waits(
     """Ответы по дням недели (Пн=0 … Вс=6) и сроки ожидания в секундах.
 
     Отрицательного срока здесь не бывает: в `first_resp_by_vid` попадают
-    только письма позже нашего отклика, и это условие отбора, а не удача.
+    только переходы не раньше нашего отклика, и это условие отбора, а не удача.
     """
     by_weekday = [0, 0, 0, 0, 0, 0, 0]
     waits: list[float] = []
@@ -118,15 +120,15 @@ async def get_stats_hr_responses(
     """HR-response-time + weekday-распределение ответов.
 
     Метрики:
-      - by_weekday: распределение first-response.sent_at по дням недели
+      - by_weekday: распределение первого ответного перехода по дням недели
         (0=Пн … 6=Вс)
-      - median_seconds: median(first_response_sent_at − applied_at) среди
+      - median_seconds: median(первый ответный переход − applied_at) среди
         тех, кто ответил
       - no_response_pct: процент applied вакансий БЕЗ first-response
       - applied_count / responded_count: голые числа
     """
     applied_map = await _applied_in_period(session, stats_period_since(period))
-    # Пустая связка до базы не идёт: спрашивать письма по пустому перечню
+    # Пустая связка до базы не идёт: спрашивать переходы по пустому перечню
     # вакансий не о чем. Отдельного ответа у неё нет — все шесть чисел
     # выходят теми же правилами, и пустой перечень даёт нули и пустоты сам.
     first_resp_by_vid = (
