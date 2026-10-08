@@ -80,7 +80,7 @@
 - —
 - принимает: ask
 
-### app/SettingsScreen.svelte (419)
+### app/SettingsScreen.svelte (421)
 - Окно входа стоит внутри поля настроек, а не рядом с ним: кнопки в нём той же плотности, что и остальные кнопки экрана, и берут они её отсюда. На раскладку это не влияет — окно висит поверх страницы.
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
@@ -696,9 +696,9 @@
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
-### state/settings.js (367)
+### state/settings.js (373)
 - * Чем подписано пустое поле имени модели. * * Пока имён нет, подсказка не обещает списка: перечень читается с адреса и * ключа, и у непóднятого поставщика его не будет вовсе — имя тогда вписывают * руками. Слова общие на настройки и на шаг мастера: одно и то же поле, * подписанное по-разному, читается как два разных.
-- отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, NO_FILE_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, SOURCE_FILE, SOURCE_SERVER, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, fileCreds, fileTrouble, idleProbe, isFileSource, isModelFile, llmTrouble, loginTrouble, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probePill, sameCreds, scorePercent, sessionPill, sessionText, sharesChat, sourceCreds, sourceLabel, telegramCreds, thresholdState
+- отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, NO_FILE_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, SOURCE_FILE, SOURCE_SERVER, addressTrouble, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, fileCreds, fileTrouble, idleProbe, isFileSource, isModelFile, llmTrouble, loginTrouble, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probePill, sameCreds, scorePercent, sessionPill, sessionText, sharesChat, sourceCreds, sourceLabel, telegramCreds, thresholdState
 
 ### state/skills.js (84)
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
@@ -740,7 +740,7 @@
 - * Отбор и порядок, какими их оставили в прошлый заход.
 - отдаёт: vacancyView
 
-### state/wizard.js (125)
+### state/wizard.js (124)
 - * Экраны по порядку. Приветствие и финал — обложки: шага у них нет, и в * строке шагов они ничего не подсвечивают.
 - отдаёт: backScreen, cvModes, cvReady, nextScreen, resumeScreen, stepAt, stepMarks
 
@@ -1554,7 +1554,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/search.test.js (49)
 - —
 
-### tests/settings.test.js (371)
+### tests/settings.test.js (384)
 - —
 
 ### tests/settled.js (21)

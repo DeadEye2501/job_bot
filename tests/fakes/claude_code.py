@@ -49,7 +49,10 @@ class _Stdin:
         self.process = process
 
     def write(self, data: bytes) -> None:
-        self.process.heard(json.loads(data.decode("utf-8")))
+        line = json.loads(data.decode("utf-8"))
+        if line["message"]["content"] == "/clear" and self.process.calls.clear_breaks_pipe:
+            raise OSError("труба закрыта: процесс умер после ответа")
+        self.process.heard(line)
 
     async def drain(self) -> None:
         return None
@@ -130,6 +133,8 @@ class Calls:
         self.overlapped = False
         # Сброс разговора не удаётся: процесс закрывает вывод на `/clear`.
         self.clear_dies = False
+        # Процесс умер сразу после ответа: запись `/clear` в трубу падает.
+        self.clear_breaks_pipe = False
 
 
 def install(monkeypatch, replies: list, *, cli: str | None = CLI) -> Calls:

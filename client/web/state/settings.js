@@ -262,7 +262,6 @@ export const NO_FILE_PLACEHOLDER = 'Файл модели не выбран';
 
 const SCHEME = /^https?:\/\//;
 
-
 /** Указывают ли учётные данные на файл модели — тем же признаком, что у моста:
  *  адреса нет, в поле модели путь к `.gguf` в любом регистре. */
 export function isModelFile(creds) {
@@ -273,7 +272,6 @@ export function isModelFile(creds) {
 export function fileCreds(path) {
   return { base_url: '', api_key: '', model: path };
 }
-
 
 /** Плашка сеанса Telegram в шапке секции.
  *
@@ -352,12 +350,20 @@ export function nextStep(answer) {
  * вместо адреса служебное слово, и по схеме его не судят.
  */
 export function llmTrouble(creds) {
-  const url = creds.base_url.trim();
+  return addressTrouble(creds.base_url) || (creds.model.trim() ? '' : 'Выберите модель');
+}
+
+/** Что не так с адресом поставщика; пустая фраза значит «ничего».
+ *
+ * Отдельно от модели: по адресу спрашивают перечень имён ещё до того, как
+ * модель выбрана, и заслон у этого вопроса тот же.
+ */
+export function addressTrouble(baseUrl) {
+  const url = baseUrl.trim();
   if (!url) return 'Укажите адрес поставщика';
   if (!addressless(url) && !SCHEME.test(url)) {
     return 'Адрес должен начинаться с http:// или https://';
   }
-  if (!creds.model.trim()) return 'Выберите модель';
   return '';
 }
 

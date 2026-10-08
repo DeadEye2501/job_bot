@@ -180,6 +180,8 @@
    * не примет, а прежний остаётся в базе до тех пор.
    */
   function switchSource(toFile) {
+    // Выбранный заново тот же источник — не смена: стирать набранное не за что.
+    if (toFile === fromFile) return;
     fromFile = toFile;
     embed = sourceCreds(toFile);
     same = false;

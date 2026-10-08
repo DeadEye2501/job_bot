@@ -7,7 +7,6 @@ import time
 from functools import partial
 from typing import Any, Callable
 
-
 from adapters import lm_models, lm_studio
 from adapters.lm_studio import LmClient
 from backend.models import LlmConfigKind

@@ -85,7 +85,7 @@ Claude через установленный Claude Code по подписке: 
 - `async def list_models(_client: ClaudeCodeClient) -> list[str]` (4)
 - `async def ping(client: ClaudeCodeClient, model: str, text: str) -> None` (3)
 
-### `adapters/claude_code_process.py` — 248 строк
+### `adapters/claude_code_process.py` — 249 строк
 
 Живой процесс Claude Code: один на приложение, запросы по одному, сброс после каждого.
 
@@ -101,7 +101,7 @@ Claude через установленный Claude Code по подписке: 
 - `async def _send(process, text: str) -> None` (5)
 - `async def _result(process) -> dict` (20)
 - `async def _ask(process, text: str) -> dict` (4)
-- `async def _cleared(process) -> bool` (11)
+- `async def _cleared(process) -> bool` (12)
 - `async def _drop() -> None` (7)
 - `async def _ready(cli: str, model: str)` (14)
 - `async def exchange(cli: str, model: str, message: str, timeout: float) -> dict` (19)
@@ -2358,7 +2358,7 @@ Runtime settings layer.
 - `def _remember_login(hub: Hub, username: str | None) -> None` (17)
 - `def _log_if_crashed(hub: Hub, future: Future) -> None` (20)
 
-### `client/bridge/llm.py` — 231 строк
+### `client/bridge/llm.py` — 230 строк
 
 Поставщик модели для окна: проверить связь, спросить имена, выбрать файл модели.
 
@@ -2769,13 +2769,13 @@ Runtime settings layer.
   - `def install(routes: dict) -> list` (9)
     - `async def relay(_transport, request)` (2)
 
-### `tests/adapters/test_claude_code.py` — 350 строк ⚠ подошёл к 300
+### `tests/adapters/test_claude_code.py` — 361 строк ⚠ подошёл к 300
 
 Следствия разговора с Claude через живой процесс Claude Code по подписке.
 
 Зависит от: `adapters`, `adapters.claude_code`, `adapters.claude_code_process`, `adapters.lm_chat`, `adapters.lm_studio`, `backend.provider_config`, `tests.fakes.claude_code`, `tests.fakes.llm`
 
-Тестов: 21
+Тестов: 22
 
 - `def _client() -> ClaudeCodeClient` (2)
 - `def _model_of(process) -> str` (3)
@@ -5341,7 +5341,7 @@ Runtime settings layer.
 - `def refusal(category: str='cyber') -> httpx2.Response` (7)
 - `def model_list(*ids: str) -> httpx2.Response` (16)
 
-### `tests/fakes/claude_code.py` — 152 строк
+### `tests/fakes/claude_code.py` — 157 строк
 
 Подделка Claude Code: живой процесс подменён, обмен с ним и разбор настоящие.
 
@@ -5350,8 +5350,8 @@ Runtime settings layer.
 - `def _answer(text: str | None, **fields) -> dict` (3)
 - `def result(text: str | None, *, stop_reason: str='end_turn') -> dict` (5)
 - `def failure(text: str, *, status: int | None=None) -> dict` (9)
-- `class _Stdin` (9)
-  - `def write(self, data: bytes) -> None` (2)
+- `class _Stdin` (12)
+  - `def write(self, data: bytes) -> None` (5)
   - `async def drain(self) -> None` (2)
 - `class _Stdout` (6)
   - `async def readline(self) -> bytes` (2)
@@ -5361,7 +5361,7 @@ Runtime settings layer.
   - `async def next_line(self) -> bytes` (6)
   - `def kill(self) -> None` (3)
   - `async def wait(self) -> int` (2)
-- `class Calls` (14)
+- `class Calls` (16)
 - `def install(monkeypatch, replies: list, *, cli: str | None=CLI) -> Calls` (18)
   - `async def spawn(argv, env)` (6)
 
