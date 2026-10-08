@@ -2,12 +2,15 @@
 
 Спрашивают отсюда двое: мастер настройки, который показывает человеку выбор,
 и проверка связи. Род модели — чат или встраивания — провайдеры отдают не
-всегда, и тогда его угадывают по имени.
+всегда, и тогда его угадывают по имени. Клиента Anthropic оба вопроса
+отдают в `adapters/claude`.
 """
 
 import logging
 
 import httpx
+
+from adapters import claude
 
 _log = logging.getLogger(__name__)
 
@@ -29,7 +32,7 @@ def _ping_request(model: str, kind: str) -> tuple[str, dict]:
 
 
 async def model_listed(
-    client: httpx.AsyncClient, model: str
+    client: httpx.AsyncClient | claude.ClaudeClient, model: str
 ) -> tuple[bool, list[str]]:
     """Числится ли модель у провайдера, и что у него есть вообще.
 
@@ -49,7 +52,7 @@ async def model_listed(
 
 
 async def check_model(
-    client: httpx.AsyncClient, model: str, kind: str
+    client: httpx.AsyncClient | claude.ClaudeClient, model: str, kind: str
 ) -> tuple[bool, str]:
     """Есть ли модель у провайдера и отвечает ли она.
 
@@ -63,6 +66,8 @@ async def check_model(
     причиной, годной для подсказки. Наружу уходит короткое «род и текст» —
     трассировка нужна там, где её потом читают, то есть в журнале.
     """
+    if isinstance(client, claude.ClaudeClient) and kind == "embed":
+        return False, claude.NO_EMBEDDINGS
     named = "чата" if kind == "chat" else "векторов"
     try:
         listed, models = await model_listed(client, model)
@@ -74,6 +79,8 @@ async def check_model(
         preview = ", ".join(models[:3]) or "no models loaded"
         return False, f"{model!r} not available (have: {preview})"
 
+    if isinstance(client, claude.ClaudeClient):
+        return await claude.ping(client, model)
     path, body = _ping_request(model, kind)
     try:
         r = await client.post(path, json=body)
@@ -144,7 +151,9 @@ async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | No
     ]
 
 
-async def list_models(client: httpx.AsyncClient, *, kind: str | None = None) -> list[str]:
+async def list_models(
+    client: httpx.AsyncClient | claude.ClaudeClient, *, kind: str | None = None
+) -> list[str]:
     """Return ids of models exposed by the provider.
 
     С родом ('chat' | 'embed') сперва спрашивается родной путь LM Studio —
@@ -152,6 +161,8 @@ async def list_models(client: httpx.AsyncClient, *, kind: str | None = None) -> 
     (например, для проверки связи) — полный список через совместимый с OpenAI
     ``/v1/models``.
     """
+    if isinstance(client, claude.ClaudeClient):
+        return await claude.list_models(client, kind)
     if kind is not None:
         loaded = await _loaded_models(client, kind)
         if loaded is not None:

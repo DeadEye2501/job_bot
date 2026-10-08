@@ -43,6 +43,7 @@ keyring.set_keyring(MEMORY_KEYRING)
 # кладёт модуль в кэш `sys.modules` — повторный `import` в фикстуре ниже
 # просто берёт его оттуда.
 import adapters.telegram  # noqa: E402, F401 — импорт только ради побочного эффекта
+import httpx2  # noqa: E402
 import pyrogram  # noqa: E402
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402
@@ -221,6 +222,33 @@ def _telegram_is_unreachable(monkeypatch):
     monkeypatch.setattr(pyrogram.session.Session, "send", _refuse)
     monkeypatch.setattr(pyrogram.session.Session, "start", _refuse)
     monkeypatch.setattr(pyrogram.session.Auth, "create", _refuse)
+
+
+class ProviderReached(BaseException):
+    """Тест дотянулся до настоящего API Anthropic.
+
+    Наследник `BaseException` по той же причине, что у `TelegramReached`:
+    адаптер ловит ошибки SDK, и наследника `Exception` проглотил бы.
+    """
+
+
+@pytest.fixture(autouse=True)
+def _anthropic_is_unreachable(monkeypatch):
+    """Настоящий транспорт `httpx2` заперт; подделки ходят через `MockTransport`.
+
+    SDK Anthropic ходит своим клиентом, мимо подделок `tests/fakes/llm.py`, и
+    тест с забытой подделкой ушёл бы к настоящей модели за деньги. Запор стоит
+    на транспорте, а не на клиенте: клиента SDK собирает сам, и подменить его
+    в каждом месте сборки нельзя.
+    """
+
+    async def _refuse(*_args, **_kwargs):
+        raise ProviderReached(
+            "тест дотянулся до настоящего API Anthropic. Передайте в проверяемый "
+            "код подделку из tests/fakes/claude.py."
+        )
+
+    monkeypatch.setattr(httpx2.AsyncHTTPTransport, "handle_async_request", _refuse)
 
 
 @pytest.fixture(autouse=True)

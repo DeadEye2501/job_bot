@@ -85,21 +85,49 @@ def provider_trouble_named(*extra):
 
 
 def _picker(routes: dict):
-    """Выдаёт заготовленное для пары «метод, путь», списки — по очереди."""
+    """Выдаёт заготовленное для пары «метод, путь», списки — по очереди.
+
+    Беда самого теста — незаданный путь или исчерпанная очередь — приходит
+    строкой: ответ из неё собирает обработчик, у которого свой модуль
+    транспорта.
+    """
     queues = {
         key: list(value) for key, value in routes.items() if isinstance(value, list)
     }
 
     def pick(key: tuple[str, str]):
         if key not in queues:
-            return routes.get(key)
+            return routes.get(key, f"тест не задал ответ для {key[0]} {key[1]}")
         if not queues[key]:
-            return httpx.Response(
-                599, text=f"ответов для {key[0]} {key[1]} меньше, чем обращений"
-            )
+            return f"ответов для {key[0]} {key[1]} меньше, чем обращений"
         return queues[key].pop(0)
 
     return pick
+
+
+def handler(routes: dict, sent: list, http):
+    """Обработчик подставного транспорта: отдаёт заготовленное по пути запроса.
+
+    `http` — модуль транспорта: `httpx` у этой подделки, `httpx2` у подделки
+    Anthropic (`tests/fakes/claude.py`). Правила у обеих одни, и вторая копия
+    разошлась бы с первой.
+    """
+    pick = _picker(routes)
+
+    def handle(request):
+        sent.append(request)
+        prepared = pick((request.method, request.url.path))
+        if isinstance(prepared, str):
+            return http.Response(599, text=prepared)
+        if isinstance(prepared, BaseException):
+            # У ошибок транспорта запрос — обязательное поле, и без него
+            # обращение к нему поднимает RuntimeError вместо самой ошибки.
+            if isinstance(prepared, http.RequestError):
+                prepared.request = request
+            raise prepared
+        return prepared
+
+    return handle
 
 
 def provider(
@@ -114,23 +142,7 @@ def provider(
     урезан перед отправкой.
     """
     sent: list[httpx.Request] = []
-    pick = _picker(routes)
-
-    def handle(request: httpx.Request) -> httpx.Response:
-        sent.append(request)
-        key = (request.method, request.url.path)
-        prepared = pick(key)
-        if prepared is None:
-            return httpx.Response(
-                599, text=f"тест не задал ответ для {key[0]} {key[1]}"
-            )
-        if isinstance(prepared, BaseException):
-            # У ошибок httpx запрос — обязательное поле, и без него обращение
-            # к нему поднимает RuntimeError вместо самой ошибки.
-            if isinstance(prepared, httpx.RequestError):
-                prepared.request = request
-            raise prepared
-        return prepared
+    handle = handler(routes, sent, httpx)
 
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     client = httpx.AsyncClient(

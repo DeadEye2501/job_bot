@@ -19,6 +19,17 @@
 
 ## adapters
 
+### `adapters/claude.py`
+
+- `_log` = `logging.getLogger(__name__)`
+- `CLAUDE_HOST` = `'api.anthropic.com'`
+- `_CLAUDE_URL` = `f'https://{CLAUDE_HOST}'`
+- `MIN_MAX_TOKENS` = `16000`
+- `EFFORT` = `'medium'`
+- `REFUSED` = `'refusal'`
+- `NO_EMBEDDINGS` = `'У Anthropic нет моделей эмбеддингов'`
+- `_FINISH` = `словарь из 3`
+
 ### `adapters/cv_text.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -289,6 +300,7 @@
 - `ALLOWED_AUTO_TRANSITIONS: dict[VacancyStatus, frozenset[VacancyStatus]]` = `словарь из 11`
 - `GHOSTING_TIMEOUT_DAYS` = `14`
 - `GHOSTING_ELIGIBLE_FROM: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.APPLIED, VacancyStatus.…`
+- `FORCED_APPLY_FROM: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.NEW, VacancyStatus.NOT_…`
 
 ### `backend/domain/verdict.py`
 
@@ -1377,6 +1389,11 @@
 
 ## tests
 
+### `tests/adapters/test_claude.py`
+
+- `LOG` = `logging.getLogger('tests.claude')`
+- `SONNET` = `'claude-sonnet-5-5'`
+
 ### `tests/adapters/test_lm_models.py`
 
 - `NATIVE_MODELS` = `набор из 2`
@@ -1493,6 +1510,11 @@
 - `_PHOTO_HEADS` = `словарь из 4`
 - `CV_REQUIRED_PROFILE` = `person_fields()`
 - `_MARKED_COMPANIES` = `набор из 3`
+
+### `tests/fakes/claude.py`
+
+- `MESSAGES` = `набор из 2`
+- `MODELS` = `набор из 2`
 
 ### `tests/fakes/ingestion.py`
 

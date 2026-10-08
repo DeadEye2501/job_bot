@@ -8,9 +8,10 @@ import keyring
 import pytest
 from sqlalchemy import func, select
 
+from adapters.claude import ClaudeClient
 from backend.models import Company
 from config import get_data_dir, get_database_url
-from tests.conftest import TMP_ROOT, TelegramReached
+from tests.conftest import TMP_ROOT, ProviderReached, TelegramReached
 
 
 def test_data_dir_is_inside_the_temporary_folder():
@@ -29,6 +30,23 @@ def test_a_written_key_lands_in_the_in_memory_store(memory_keyring):
 
     assert keyring.get_password("jobbot-harness-check", "мастер-ключ") == "значение"
     assert memory_keyring.store[("jobbot-harness-check", "мастер-ключ")] == "значение"
+
+
+async def test_a_call_into_real_anthropic_blows_up():
+    """Обращение к настоящему API Anthropic из теста взрывается.
+
+    SDK ходит своим клиентом `httpx2`, мимо подделок `tests/fakes/llm.py`, и
+    без запора тест с забытой подделкой ушёл бы к настоящей модели — за
+    деньги, по ключу из окружения.
+    """
+    client = ClaudeClient(api_key="sk-test", max_retries=0)
+
+    with pytest.raises(ProviderReached, match="настоящего API Anthropic"):
+        await client.messages.create(
+            model="claude-sonnet-5-5",
+            max_tokens=1,
+            messages=[{"role": "user", "content": "ping"}],
+        )
 
 
 async def test_a_call_into_real_telegram_blows_up():

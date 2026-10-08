@@ -2,13 +2,17 @@
 
 Провайдер любой OpenAI-совместимый: LM Studio, Ollama, OpenAI, OpenRouter,
 vLLM. Соединение с ним заводит сосед (`lm_studio.make_client`), здесь только
-разговор: что спросили, что ответили и чем беда, если ответа нет.
+разговор: что спросили, что ответили и чем беда, если ответа нет. Клиента
+Anthropic разговор отдаёт в `adapters/claude`.
 """
 
 import logging
 from dataclasses import dataclass
 
+import anthropic
 import httpx
+
+from adapters import claude
 
 @dataclass(frozen=True)
 class ChatRequest:
@@ -67,16 +71,28 @@ async def _post_chat(
         r = await client.post("/v1/chat/completions", json=body, **extra)
         r.raise_for_status()
     except httpx.HTTPStatusError as e:
-        log.warning(
-            "%s: провайдер ответил HTTP %s", request.purpose, e.response.status_code
-        )
-        return None, ChatAnswer(error=f"llm_http_error: {e.response.status_code}")
+        return None, _status_refusal(request.purpose, e.response.status_code, log)
     except httpx.RequestError as e:
-        log.warning(
-            "%s: запрос не дошёл: %s: %s", request.purpose, type(e).__name__, e
-        )
-        return None, ChatAnswer(error=f"llm_request_error: {type(e).__name__}")
+        return None, _delivery_refusal(request.purpose, e, log)
     return r, None
+
+
+def _status_refusal(purpose: str, status: int, log: logging.Logger) -> ChatAnswer:
+    """Провайдер ответил кодом отказа.
+
+    Метка одна на оба пути — OpenAI-совместимый и Claude: по ней зовущие
+    выбирают откат, и разъехавшиеся метки увели бы один путь мимо него.
+    """
+    log.warning("%s: провайдер ответил HTTP %s", purpose, status)
+    return ChatAnswer(error=f"llm_http_error: {status}")
+
+
+def _delivery_refusal(
+    purpose: str, trouble: Exception, log: logging.Logger
+) -> ChatAnswer:
+    """Запрос до провайдера не дошёл; метка общая по той же причине."""
+    log.warning("%s: запрос не дошёл: %s: %s", purpose, type(trouble).__name__, trouble)
+    return ChatAnswer(error=f"llm_request_error: {type(trouble).__name__}")
 
 
 def _warn_if_truncated(finish_reason, purpose: str, log: logging.Logger) -> None:
@@ -122,7 +138,7 @@ def _answer_or_empty(
 
 
 async def chat(
-    client: httpx.AsyncClient,
+    client: httpx.AsyncClient | claude.ClaudeClient,
     model: str,
     request: ChatRequest,
     log: logging.Logger,
@@ -135,6 +151,8 @@ async def chat(
     Пишет в журнал логгером зовущего, а не своим: в окне журнала у строки
     виден источник, и обращения семерых иначе схлопнулись бы в одно имя.
     """
+    if isinstance(client, claude.ClaudeClient):
+        return await _chat_with_claude(client, model, request, log)
     r, refusal = await _post_chat(client, model, request, log)
     if refusal is not None:
         return refusal
@@ -149,5 +167,31 @@ async def chat(
     # модель, потратившая весь предел на размышление, и выйди отказ раньше —
     # журнал называл бы симптом, умалчивая о единственной причине, с которой
     # можно что-то сделать.
+    _warn_if_truncated(finish_reason, request.purpose, log)
+    return _answer_or_empty(content, finish_reason, request.purpose, log)
+
+
+async def _chat_with_claude(
+    client: claude.ClaudeClient,
+    model: str,
+    request: ChatRequest,
+    log: logging.Logger,
+) -> ChatAnswer:
+    """Разговор с Claude, сведённый к тому же ответу, что у OpenAI-пути.
+
+    Метки бед, жалоба на обрыв и проверка на пустоту — общие: беды у ответа
+    те же, и вторые их копии разошлись бы с первыми.
+    """
+    try:
+        content, finish_reason = await claude.ask(client, model, request, log)
+    except claude.MissingKey:
+        log.warning("%s: не указан ключ Anthropic", request.purpose)
+        return ChatAnswer(error="no_api_key")
+    except anthropic.APIStatusError as e:
+        return _status_refusal(request.purpose, e.status_code, log)
+    except anthropic.APIConnectionError as e:
+        return _delivery_refusal(request.purpose, e, log)
+    if finish_reason == claude.REFUSED:
+        return ChatAnswer(error="refusal")
     _warn_if_truncated(finish_reason, request.purpose, log)
     return _answer_or_empty(content, finish_reason, request.purpose, log)
