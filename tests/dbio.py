@@ -1,13 +1,16 @@
 """Короткие обращения к базе из теста.
 
 Положить готовые строки и прочитать результат обратно — работа, которую
-повторяет каждый тест, идущий в базу. Построение самих строк остаётся за
-`tests.factories`: здесь только доступ.
+повторяет каждый тест, идущий в базу; тесты миграций читают ещё и сам файл
+базы мимо ORM. Построение самих строк остаётся за фабриками: здесь только
+доступ.
 
 От `tests.conftest` отличается тем, что здесь не фикстуры. Стенд заводит
-подключение и убирает за тестом сам, без спроса; эти же три обращения тест
+подключение и убирает за тестом сам, без спроса; эти же обращения тест
 делает по своей воле и там, где ему нужно, — фикстурой такое не выражается.
 """
+
+import sqlite3
 
 from sqlalchemy import select
 
@@ -34,3 +37,21 @@ async def all_rows(session_factory, model) -> list:
     """
     async with session_factory() as session:
         return list((await session.scalars(select(model))).all())
+
+
+def sqlite_rows(db_file, sql: str) -> list[tuple]:
+    """Строки запроса к файлу базы мимо ORM.
+
+    Тестам миграций модели не годятся: они описывают `head`, а смотреть надо
+    на базу, стоящую на другой ревизии.
+    """
+    connection = sqlite3.connect(db_file)
+    try:
+        return connection.execute(sql).fetchall()
+    finally:
+        connection.close()
+
+
+def sqlite_tables(db_file) -> set[str]:
+    """Имена таблиц в файле базы — то, что ревизия завела или сняла."""
+    return {name for (name,) in sqlite_rows(db_file, "SELECT name FROM sqlite_master WHERE type = 'table'")}

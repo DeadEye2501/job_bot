@@ -222,16 +222,7 @@ Claude через установленный Claude Code по подписке: 
 - `def _article_text(html: str) -> str | None` (28)
 - `async def fetch_article(client: httpx.AsyncClient, url: str) -> str | None` (24)
 
-## alembic — 4 модулей
-
-### `alembic/bundled/aa4e0de05368_seed_initial_data.py` — 46 строк
-
-seed initial data (заглушка для сборки)
-
-Зависит от: —
-
-- `def upgrade() -> None` (2)
-- `def downgrade() -> None` (2)
+## alembic — 3 модулей
 
 ### `alembic/env.py` — 77 строк
 
@@ -244,19 +235,15 @@ seed initial data (заглушка для сборки)
 - `async def run_async_migrations() -> None` (14)
 - `def run_migrations_online() -> None` (2)
 
-### `alembic/versions/aa4e0de05368_seed_initial_data.py` — 460 строк ⚠ подошёл к 300
+### `alembic/versions/a9c3e1f07b42_aggregators.py` — 143 строк
 
-seed initial data
+aggregators
 
-Зависит от: `alembic`, `backend.crypto`
+Зависит от: `alembic`
 
-- `def _insert(name: str, rows: list[dict], **typed) -> None` (10)
-- `def _seed_profile() -> None` (14)
-- `def _seed_channels() -> None` (3)
-- `def _seed_secrets() -> None` (61)
-- `def _seed_settings() -> None` (27)
-- `def upgrade() -> None` (11)
-- `def downgrade() -> None` (11)
+- `def _source_columns(table: str) -> None` (8)
+- `def upgrade() -> None` (82)
+- `def downgrade() -> None` (24)
 
 ### `alembic/versions/e560edf8b958_init.py` — 272 строк
 
@@ -267,7 +254,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 133 модулей
+## backend — 134 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -1293,14 +1280,23 @@ First-run bootstrap: ensure DB schema exists.
 - `def _media_placeholder(msg) -> str` (18)
 - `def extract_dm_text(msg) -> str` (23)
 
-### `backend/models/__init__.py` — 66 строк
+### `backend/models/__init__.py` — 82 строк
 
 Объявления таблиц базы, собранные из всех предметов.
 
-Зависит от: `backend.models.base`, `backend.models.contacts`, `backend.models.enums`, `backend.models.message`, `backend.models.profile`, `backend.models.settings`, `backend.models.vacancy`
+Зависит от: `backend.models.application`, `backend.models.base`, `backend.models.contacts`, `backend.models.enums`, `backend.models.message`, `backend.models.profile`, `backend.models.settings`, `backend.models.vacancy`
 
-Отдаёт наружу: `HR`, `AppSetting`, `Base`, `BLACKLIST_KINDS`, `Blacklist`, `BotMode`, `BotState`, `Company`, `LlmConfig`, `LlmConfigKind`, `Message`, `Profile`, `ProfileExperience`, `ProfileLanguage`, `ProfileSkill`, `StatusHistorySource`, `status_code`, `TelegramChannel`, `TgAccount`, `TrashEvent`, `Vacancy`, `VacancyEvent`, `VacancyStatus`, `VacancyStatusHistory`, `profile_experience_skills`
+Отдаёт наружу: `HR`, `Aggregator`, `AppSetting`, `Application`, `ApplicationVia`, `Base`, `BLACKLIST_KINDS`, `Blacklist`, `BotMode`, `BotState`, `Company`, `ContactAddedBy`, `Gender`, `LlmConfig`, `LlmConfigKind`, `MailAccount`, `Message`, `Profile`, `ProfileExperience`, `ProfileLanguage`, `ProfileSkill`, `SalaryPeriod`, `Screening`, `StatusHistorySource`, `status_code`, `TelegramChannel`, `TgAccount`, `TrashEvent`, `Vacancy`, `VacancyContact`, `VacancyEvent`, `VacancyStatus`, `VacancyStatusHistory`, `profile_experience_skills`
 
+
+### `backend/models/application.py` — 46 строк
+
+Отклик вне Telegram и скрининг по нему.
+
+Зависит от: `backend.models.base`, `backend.models.enums`
+
+- `class Application(IdMixin, Base)` (21)
+- `class Screening(IdMixin, CreatedAtMixin, Base)` (12)
 
 ### `backend/models/base.py` — 65 строк
 
@@ -1314,17 +1310,18 @@ First-run bootstrap: ensure DB schema exists.
 - `class CreatedAtMixin` (8)
 - `class UpdatedAtMixin` (14)
 
-### `backend/models/contacts.py` — 51 строк
+### `backend/models/contacts.py` — 71 строк
 
 Таблицы сторон, с которыми связана вакансия.
 
 Зависит от: `backend.models.base`
 
 - `class TelegramChannel(IdMixin, Base)` (11)
+- `class Aggregator(IdMixin, Base)` (16)
 - `class HR(IdMixin, Base)` (17)
 - `class Company(IdMixin, Base)` (10)
 
-### `backend/models/enums.py` — 58 строк
+### `backend/models/enums.py` — 81 строк
 
 Перечисления, которыми колонки ограничивают набор значений.
 
@@ -1335,6 +1332,10 @@ First-run bootstrap: ensure DB schema exists.
 - `def status_code(status: VacancyStatus) -> str` (15)
 - `class StatusHistorySource(enum.Enum)` (11)
 - `class LlmConfigKind(enum.Enum)` (3)
+- `class ContactAddedBy(enum.Enum)` (4)
+- `class ApplicationVia(enum.Enum)` (4)
+- `class SalaryPeriod(enum.Enum)` (4)
+- `class Gender(enum.Enum)` (3)
 
 ### `backend/models/message.py` — 64 строк
 
@@ -1344,18 +1345,18 @@ First-run bootstrap: ensure DB schema exists.
 
 - `class Message(IdMixin, Base)` (46)
 
-### `backend/models/profile.py` — 98 строк
+### `backend/models/profile.py` — 107 строк
 
 Таблицы анкеты кандидата.
 
-Зависит от: `backend.models.base`
+Зависит от: `backend.models.base`, `backend.models.enums`
 
-- `class Profile(IdMixin, UpdatedAtMixin, Base)` (21)
+- `class Profile(IdMixin, UpdatedAtMixin, Base)` (29)
 - `class ProfileLanguage(IdMixin, Base)` (19)
 - `class ProfileSkill(IdMixin, Base)` (10)
 - `class ProfileExperience(IdMixin, Base)` (18)
 
-### `backend/models/settings.py` — 99 строк
+### `backend/models/settings.py` — 116 строк
 
 Таблицы, которыми настраивают работу бота.
 
@@ -1364,18 +1365,20 @@ First-run bootstrap: ensure DB schema exists.
 - `class BotState(IdMixin, Base)` (16)
 - `class Blacklist(IdMixin, CreatedAtMixin, Base)` (7)
 - `class TgAccount(IdMixin, UpdatedAtMixin, Base)` (18)
+- `class MailAccount(IdMixin, UpdatedAtMixin, Base)` (15)
 - `class LlmConfig(IdMixin, UpdatedAtMixin, Base)` (14)
 - `class AppSetting(UpdatedAtMixin, Base)` (7)
 
-### `backend/models/vacancy.py` — 179 строк
+### `backend/models/vacancy.py` — 211 строк
 
 Таблицы, в которых конвейер записывает судьбу разобранного поста.
 
 Зависит от: `backend.models.base`, `backend.models.contacts`, `backend.models.enums`
 
-- `class Vacancy(IdMixin, CreatedAtMixin, Base)` (62)
+- `class Vacancy(IdMixin, CreatedAtMixin, Base)` (69)
 - `class VacancyEvent(IdMixin, CreatedAtMixin, Base)` (16)
-- `class TrashEvent(IdMixin, CreatedAtMixin, Base)` (34)
+- `class TrashEvent(IdMixin, CreatedAtMixin, Base)` (39)
+- `class VacancyContact(IdMixin, Base)` (18)
 - `class VacancyStatusHistory(IdMixin, Base)` (38)
 
 ### `backend/notify.py` — 20 строк
@@ -2743,7 +2746,23 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 264 модулей
+## docs — 1 модулей
+
+### `docs/seed/aa4e0de05368_seed_initial_data.py` — 460 строк ⚠ подошёл к 300
+
+seed initial data
+
+Зависит от: `alembic`, `backend.crypto`
+
+- `def _insert(name: str, rows: list[dict], **typed) -> None` (10)
+- `def _seed_profile() -> None` (14)
+- `def _seed_channels() -> None` (3)
+- `def _seed_secrets() -> None` (61)
+- `def _seed_settings() -> None` (27)
+- `def upgrade() -> None` (11)
+- `def downgrade() -> None` (11)
+
+## tests — 266 модулей
 
 ### `tests/adapters/test_app_tied_process.py` — 65 строк
 
@@ -3008,16 +3027,15 @@ Runtime settings layer.
 - `def _page(*, headline: str='Senior Manual QA', body: str='<p>Ищем QA</p>') -> str` (9)
 - `def _client(handler) -> httpx.AsyncClient` (3)
 
-### `tests/backend/test_bootstrap_schema.py` — 176 строк
+### `tests/backend/test_bootstrap_schema.py` — 160 строк
 
 Следствия подготовки схемы базы при запуске.
 
-Зависит от: `alembic`, `backend.bootstrap`, `tests.conftest`
+Зависит от: `alembic`, `backend.bootstrap`, `tests.conftest`, `tests.dbio`
 
 Тестов: 3
 
-- `def _tables(db_file) -> set[str]` (9)
-- `def _revision_reached(db_file) -> str` (6)
+- `def _revision_reached(db_file) -> str` (2)
 - `def _project_of_two_revisions(root, db_file) -> None` (20)
 - `def _revisions_in(paths) -> set[str]` (9)
 
@@ -3986,16 +4004,25 @@ Runtime settings layer.
 Тестов: 19
 
 
-### `tests/backend/test_migration_engine.py` — 178 строк
+### `tests/backend/test_migration_aggregators.py` — 133 строк
+
+Следствия схемной ревизии агрегаторов: что она заводит и что держит база.
+
+Зависит от: `alembic`, `backend.bootstrap`, `backend.models`, `tests.conftest`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
+
+Тестов: 8
+
+
+### `tests/backend/test_migration_engine.py` — 171 строк
 
 Следствия того, каким движком alembic открывает базу и как его закрывает.
 
-Зависит от: `alembic`, `backend.bootstrap`, `tests.conftest`
+Зависит от: `alembic`, `backend.bootstrap`, `tests.conftest`, `tests.dbio`
 
 Тестов: 4
 
 - `def _learning_project(tmp_path, rebuild: str)` (14)
-- `def _tenants(db_file) -> list[tuple]` (6)
+- `def _tenants(db_file) -> list[tuple]` (2)
 
 ### `tests/backend/test_notify.py` — 61 строк
 
@@ -5246,7 +5273,7 @@ Runtime settings layer.
 Тестов: 2
 
 
-### `tests/conftest.py` — 429 строк ⚠ подошёл к 300
+### `tests/conftest.py` — 440 строк ⚠ подошёл к 300
 
 Стенд: подмена каталога данных, хранилища ключей и базы.
 
@@ -5258,7 +5285,7 @@ Runtime settings layer.
 - `def _appdata_guard()` (27)
 - `def database_url() -> str` (9)
 - `def migrations_target(tmp_path, monkeypatch) -> Path` (13)
-- `def _schema(database_url)` (8)
+- `def _schema(database_url)` (13)
 - `class TelegramReached(BaseException)` (10)
 - `def _telegram_is_unreachable(monkeypatch)` (39)
   - `async def _refuse(*_args, **_kwargs)` (7)
@@ -5272,12 +5299,13 @@ Runtime settings layer.
   - `def _refuse(*_args, **_kwargs)` (5)
 - `def _sending_locked(monkeypatch)` (10)
 - `async def _clear_all_tables(engine: AsyncEngine) -> None` (37)
-- `async def _clean_database(_schema, database_url)` (25)
+- `async def _empty_database(database_url) -> None` (9)
+- `async def _clean_database(_schema, database_url)` (19)
 - `async def engine(_schema, database_url)` (14)
 - `def session_factory(engine) -> async_sessionmaker[AsyncSession]` (8)
 - `async def session(session_factory)` (16)
 
-### `tests/dbio.py` — 36 строк
+### `tests/dbio.py` — 57 строк
 
 Короткие обращения к базе из теста.
 
@@ -5286,6 +5314,8 @@ Runtime settings layer.
 - `async def put(session_factory, *rows) -> None` (6)
 - `async def only_row(session_factory, model)` (4)
 - `async def all_rows(session_factory, model) -> list` (8)
+- `def sqlite_rows(db_file, sql: str) -> list[tuple]` (11)
+- `def sqlite_tables(db_file) -> set[str]` (3)
 
 ### `tests/factories.py` — 478 строк ⚠ подошёл к 300
 
@@ -5328,6 +5358,17 @@ Runtime settings layer.
 - `def vacancy_event_row(vacancy_id: int, **overrides) -> VacancyEvent` (5)
 - `def status_history_row(vacancy_id: int, **overrides) -> VacancyStatusHistory` (10)
 - `def tg_creds(**overrides) -> TgAccountConfig` (16)
+
+### `tests/factories_aggregators.py` — 44 строк
+
+Строки агрегаторов, контактов вакансии и откликов вне Telegram.
+
+Зависит от: `backend.models`, `tests.factories`
+
+- `def aggregator_row(**overrides) -> Aggregator` (5)
+- `def vacancy_contact_row(vacancy_id: int, value: str, **overrides) -> VacancyContact` (6)
+- `def application_row(vacancy_id: int, **overrides) -> Application` (9)
+- `def screening_row(application_id: int, position: int, **overrides) -> Screening` (5)
 
 ### `tests/fakes/claude.py` — 83 строк
 

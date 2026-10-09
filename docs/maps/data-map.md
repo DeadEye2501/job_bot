@@ -133,35 +133,19 @@
 
 ## alembic
 
-### `alembic/bundled/aa4e0de05368_seed_initial_data.py`
-
-- `revision: str` = `'aa4e0de05368'`
-- `down_revision: Union[str, Sequence[str], None]` = `'e560edf8b958'`
-- `branch_labels: Union[str, Sequence[str], None]` = `None`
-- `depends_on: Union[str, Sequence[str], None]` = `None`
-
 ### `alembic/env.py`
 
 - `config` = `context.config`
 - `target_metadata` = `Base.metadata`
 
-### `alembic/versions/aa4e0de05368_seed_initial_data.py`
+### `alembic/versions/a9c3e1f07b42_aggregators.py`
 
-- `revision: str` = `'aa4e0de05368'`
+- `revision: str` = `'a9c3e1f07b42'`
 - `down_revision: Union[str, Sequence[str], None]` = `'e560edf8b958'`
 - `branch_labels: Union[str, Sequence[str], None]` = `None`
 - `depends_on: Union[str, Sequence[str], None]` = `None`
-- `PROFILE_ROWS` = `набор из 1`
-- `PROFILE_LANGUAGE_ROWS` = `набор из 2`
-- `PROFILE_SKILLS_ROWS` = `набор из 25`
-- `PROFILE_EXPERIENCE_SKILLS_ROWS` = `набор из 45`
-- `PROFILE_EXPERIENCE_ROWS` = `набор из 6`
-- `APP_SETTINGS_ROWS` = `набор из 1`
-- `TG_SECRET` = `словарь из 5`
-- `CHAT_LLM_SECRET` = `словарь из 3`
-- `EMBED_LLM_SECRET` = `словарь из 3`
-- `BOT_STATE_ROWS` = `набор из 1`
-- `TELEGRAM_CHANNEL_ROWS` = `набор из 16`
+- `_SOURCE_COLUMNS` = `набор из 2`
+- `_PROFILE_COLUMNS` = `набор из 6`
 
 ### `alembic/versions/e560edf8b958_init.py`
 
@@ -681,6 +665,26 @@
 - `_SECRET_PATTERNS: tuple[re.Pattern[str], ...]` = `набор из 6`
 - `_REDACTED` = `'***'`
 
+### `backend/models/application.py`
+
+- `class Application(IdMixin, Base)`
+  - `__tablename__` = `'application'`
+  - `__table_args__` = `набор из 1`
+  - `vacancy_id: Mapped[int]` = `mapped_column(ForeignKey('vacancy.id'))`
+  - `aggregator_id: Mapped[int | None]` = `mapped_column(ForeignKey('aggregator.id'))`
+  - `via: Mapped[ApplicationVia]` = `mapped_column(enum_column(ApplicationVia, 'appli…`
+  - `target: Mapped[str]`
+  - `letter: Mapped[str | None]`
+  - `sent_at: Mapped[datetime]` = `mapped_column(DateTime(timezone=True))`
+  - `chat_anchor: Mapped[str | None]`
+- `class Screening(IdMixin, CreatedAtMixin, Base)`
+  - `__tablename__` = `'screening'`
+  - `__table_args__` = `набор из 1`
+  - `application_id: Mapped[int]` = `mapped_column(ForeignKey('application.id'))`
+  - `from_us: Mapped[bool]`
+  - `text: Mapped[str]`
+  - `position: Mapped[int]`
+
 ### `backend/models/base.py`
 
 - `class IdMixin`
@@ -699,6 +703,14 @@
   - `is_active: Mapped[bool]` = `mapped_column(server_default=expression.true())`
   - `last_processed_msg_id: Mapped[int | None]` = `mapped_column(BigInteger)`
   - `avatar: Mapped[bytes | None]` = `mapped_column(LargeBinary)`
+- `class Aggregator(IdMixin, Base)`
+  - `__tablename__` = `'aggregator'`
+  - `__table_args__` = `набор из 1`
+  - `name: Mapped[str]`
+  - `host: Mapped[str | None]`
+  - `is_active: Mapped[bool]` = `mapped_column(server_default=expression.false())`
+  - `is_logged_in: Mapped[bool]` = `mapped_column(server_default=expression.false())`
+  - `last_run_at: Mapped[datetime | None]` = `mapped_column(DateTime(timezone=True))`
 - `class HR(IdMixin, Base)`
   - `__tablename__` = `'hr'`
   - `__table_args__` = `набор из 1`
@@ -739,6 +751,21 @@
 - `class LlmConfigKind(enum.Enum)`
   - `CHAT` = `'chat'`
   - `EMBED` = `'embed'`
+- `class ContactAddedBy(enum.Enum)`
+  - `PARSE` = `'parse'`
+  - `AGENT` = `'agent'`
+  - `USER` = `'user'`
+- `class ApplicationVia(enum.Enum)`
+  - `AGGREGATOR` = `'aggregator'`
+  - `FORM` = `'form'`
+  - `EMAIL` = `'email'`
+- `class SalaryPeriod(enum.Enum)`
+  - `HOUR` = `'hour'`
+  - `MONTH` = `'month'`
+  - `YEAR` = `'year'`
+- `class Gender(enum.Enum)`
+  - `MALE` = `'male'`
+  - `FEMALE` = `'female'`
 
 ### `backend/models/message.py`
 
@@ -775,6 +802,12 @@
   - `work_format: Mapped[list[str]]` = `mapped_column(JSON, server_default=text("'[]'"))`
   - `grades: Mapped[list[str]]` = `mapped_column(JSON, server_default=text("'[]'"))`
   - `free_preferences: Mapped[str | None]`
+  - `expected_salary: Mapped[int | None]`
+  - `expected_salary_currency: Mapped[str | None]`
+  - `expected_salary_period: Mapped[SalaryPeriod | None]` = `mapped_column(enum_column(SalaryPeriod, 'salary_…`
+  - `first_name_latin: Mapped[str | None]`
+  - `last_name_latin: Mapped[str | None]`
+  - `gender: Mapped[Gender | None]` = `mapped_column(enum_column(Gender, 'gender'))`
 - `class ProfileLanguage(IdMixin, Base)`
   - `__tablename__` = `'profile_language'`
   - `__table_args__` = `набор из 1`
@@ -821,6 +854,13 @@
   - `phone: Mapped[str | None]`
   - `password_encrypted: Mapped[str | None]`
   - `session_blob_encrypted: Mapped[bytes | None]` = `mapped_column(LargeBinary)`
+- `class MailAccount(IdMixin, UpdatedAtMixin, Base)`
+  - `__tablename__` = `'mail_account'`
+  - `__table_args__` = `набор из 1`
+  - `address: Mapped[str | None]`
+  - `smtp_host: Mapped[str | None]`
+  - `smtp_port: Mapped[int | None]`
+  - `password_encrypted: Mapped[str | None]`
 - `class LlmConfig(IdMixin, UpdatedAtMixin, Base)`
   - `__tablename__` = `'llm_config'`
   - `__table_args__` = `набор из 1`
@@ -837,11 +877,13 @@
 
 - `class Vacancy(IdMixin, CreatedAtMixin, Base)`
   - `__tablename__` = `'vacancy'`
-  - `__table_args__` = `набор из 3`
+  - `__table_args__` = `набор из 4`
   - `hr_id: Mapped[int | None]` = `mapped_column(ForeignKey('hr.id'))`
   - `company_id: Mapped[int | None]` = `mapped_column(ForeignKey('company.id'))`
   - `source_channel_id: Mapped[int | None]` = `mapped_column(ForeignKey('telegram_channel.id'))`
   - `source_msg_id: Mapped[int | None]` = `mapped_column(BigInteger)`
+  - `source_aggregator_id: Mapped[int | None]` = `mapped_column(ForeignKey('aggregator.id'))`
+  - `source_key: Mapped[str | None]`
   - `raw_text: Mapped[str | None]`
   - `embedding: Mapped[list[float] | None]` = `mapped_column(JSON)`
   - `title: Mapped[str | None]`
@@ -874,10 +916,19 @@
   - `payload: Mapped[dict | None]` = `mapped_column(JSON)`
 - `class TrashEvent(IdMixin, CreatedAtMixin, Base)`
   - `__tablename__` = `'trash_event'`
-  - `__table_args__` = `набор из 1`
+  - `__table_args__` = `набор из 2`
   - `source_channel_id: Mapped[int | None]` = `mapped_column(ForeignKey('telegram_channel.id', …`
   - `source_msg_id: Mapped[int | None]` = `mapped_column(BigInteger)`
+  - `source_aggregator_id: Mapped[int | None]` = `mapped_column(ForeignKey('aggregator.id'))`
+  - `source_key: Mapped[str | None]`
   - `reason: Mapped[str | None]`
+- `class VacancyContact(IdMixin, Base)`
+  - `__tablename__` = `'vacancy_contact'`
+  - `__table_args__` = `набор из 2`
+  - `vacancy_id: Mapped[int]` = `mapped_column(ForeignKey('vacancy.id'))`
+  - `value: Mapped[str]`
+  - `match_key: Mapped[str]`
+  - `added_by: Mapped[ContactAddedBy]` = `mapped_column(enum_column(ContactAddedBy, 'conta…`
 - `class VacancyStatusHistory(IdMixin, Base)`
   - `__tablename__` = `'vacancy_status_history'`
   - `__table_args__` = `набор из 2`
@@ -1448,6 +1499,26 @@
 
 - `WIZARD` = `набор из 2`
 - `MAIN` = `набор из 2`
+
+## docs
+
+### `docs/seed/aa4e0de05368_seed_initial_data.py`
+
+- `revision: str` = `'aa4e0de05368'`
+- `down_revision: Union[str, Sequence[str], None]` = `'e560edf8b958'`
+- `branch_labels: Union[str, Sequence[str], None]` = `None`
+- `depends_on: Union[str, Sequence[str], None]` = `None`
+- `PROFILE_ROWS` = `набор из 1`
+- `PROFILE_LANGUAGE_ROWS` = `набор из 2`
+- `PROFILE_SKILLS_ROWS` = `набор из 25`
+- `PROFILE_EXPERIENCE_SKILLS_ROWS` = `набор из 45`
+- `PROFILE_EXPERIENCE_ROWS` = `набор из 6`
+- `APP_SETTINGS_ROWS` = `набор из 1`
+- `TG_SECRET` = `словарь из 5`
+- `CHAT_LLM_SECRET` = `словарь из 3`
+- `EMBED_LLM_SECRET` = `словарь из 3`
+- `BOT_STATE_ROWS` = `набор из 1`
+- `TELEGRAM_CHANNEL_ROWS` = `набор из 16`
 
 ## tests
 

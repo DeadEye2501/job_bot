@@ -23,6 +23,7 @@ from alembic import command
 
 from backend.bootstrap import alembic_config
 from tests.conftest import INIT_REVISION
+from tests.dbio import sqlite_rows
 
 # Учебная пара таблиц: у «дома» есть «жильцы», и связь между ними настоящая.
 # Проектных таблиц для этого не берут: они переезжают вместе со схемой, и
@@ -87,11 +88,7 @@ def _learning_project(tmp_path, rebuild: str):
 
 
 def _tenants(db_file) -> list[tuple]:
-    connection = sqlite3.connect(db_file)
-    try:
-        return connection.execute("SELECT id, дом_id FROM жилец").fetchall()
-    finally:
-        connection.close()
+    return sqlite_rows(db_file, "SELECT id, дом_id FROM жилец")
 
 
 def test_a_rebuild_that_did_not_quench_the_keys_is_refused(
@@ -119,10 +116,10 @@ def test_a_rebuild_that_quenched_the_keys_keeps_the_rows_pointing_at_the_table(
 ):
     """Погасив ключи, пересоздание не теряет строк, ссылающихся на таблицу.
 
-    Сторож учебный: своей `batch_alter_table` в проекте пока нет, и держит он
-    не её, а рецепт, который первая же обязана повторить. Забытое гашение в
-    будущей настоящей миграции он не поймает — оно упрётся в соседнюю
-    проверку выше и в собственный прогон.
+    Сторож учебный: держит он не настоящую миграцию, а рецепт, который
+    повторяет каждая пересборка таблицы в миграциях проекта. Забытое гашение в
+    настоящей миграции он не поймает — оно упрётся в соседнюю проверку выше и
+    в собственный прогон.
 
     Гашение действует потому, что pysqlite откладывает `BEGIN` до первой
     записи: миграцию alembic оборачивает транзакцией, но к моменту `PRAGMA`
@@ -147,11 +144,7 @@ def test_the_database_alembic_touched_stays_in_wal(migrations_target):
 
     command.upgrade(alembic_config(), INIT_REVISION)
 
-    connection = sqlite3.connect(db_file)
-    try:
-        mode = connection.execute("PRAGMA journal_mode").fetchone()[0]
-    finally:
-        connection.close()
+    mode = sqlite_rows(db_file, "PRAGMA journal_mode")[0][0]
 
     assert mode == "wal"
 

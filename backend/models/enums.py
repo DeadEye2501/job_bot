@@ -56,3 +56,26 @@ class StatusHistorySource(enum.Enum):
 class LlmConfigKind(enum.Enum):
     CHAT = "chat"
     EMBED = "embed"
+
+
+class ContactAddedBy(enum.Enum):
+    PARSE = "parse"
+    AGENT = "agent"
+    USER = "user"
+
+
+class ApplicationVia(enum.Enum):
+    AGGREGATOR = "aggregator"
+    FORM = "form"
+    EMAIL = "email"
+
+
+class SalaryPeriod(enum.Enum):
+    HOUR = "hour"
+    MONTH = "month"
+    YEAR = "year"
+
+
+class Gender(enum.Enum):
+    MALE = "male"
+    FEMALE = "female"

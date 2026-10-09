@@ -18,7 +18,7 @@ from sqlalchemy.sql import expression
 
 from backend.models.base import Base, CreatedAtMixin, IdMixin, enum_column
 from backend.models.contacts import HR, Company, TelegramChannel
-from backend.models.enums import StatusHistorySource, VacancyStatus
+from backend.models.enums import ContactAddedBy, StatusHistorySource, VacancyStatus
 
 
 class Vacancy(IdMixin, CreatedAtMixin, Base):
@@ -36,6 +36,7 @@ class Vacancy(IdMixin, CreatedAtMixin, Base):
         ),
         Index("ix_vacancy_hr_id_is_parsed", "hr_id", "is_parsed"),
         Index("ix_vacancy_company_id_is_parsed", "company_id", "is_parsed"),
+        Index("uq_vacancy_aggregator_key", "source_aggregator_id", "source_key", unique=True),
     )
 
     hr_id: Mapped[int | None] = mapped_column(ForeignKey("hr.id"))
@@ -45,6 +46,12 @@ class Vacancy(IdMixin, CreatedAtMixin, Base):
     )
     # BigInteger — см. TelegramChannel.last_processed_msg_id.
     source_msg_id: Mapped[int | None] = mapped_column(BigInteger)
+    # Не больше одного источника: канал или агрегатор. Держит код записи —
+    # CHECK в SQLite потребовал бы пересборки таблицы.
+    source_aggregator_id: Mapped[int | None] = mapped_column(
+        ForeignKey("aggregator.id"),
+    )
+    source_key: Mapped[str | None]
     raw_text: Mapped[str | None]
     embedding: Mapped[list[float] | None] = mapped_column(JSON)
     title: Mapped[str | None]
@@ -130,13 +137,38 @@ class TrashEvent(IdMixin, CreatedAtMixin, Base):
     __tablename__ = "trash_event"
     __table_args__ = (
         Index("ix_trash_event_channel_created", "source_channel_id", "created_at"),
+        Index("ix_trash_event_aggregator_key", "source_aggregator_id", "source_key"),
     )
 
     source_channel_id: Mapped[int | None] = mapped_column(
         ForeignKey("telegram_channel.id", ondelete="SET NULL"),
     )
     source_msg_id: Mapped[int | None] = mapped_column(BigInteger)
+    source_aggregator_id: Mapped[int | None] = mapped_column(
+        ForeignKey("aggregator.id"),
+    )
+    source_key: Mapped[str | None]
     reason: Mapped[str | None]
+
+
+class VacancyContact(IdMixin, Base):
+    """Контакт вакансии, кроме Telegram-HR: почта, ссылка, телефон.
+
+    Вида контакта нет: он виден по значению. Сравнивают по `match_key`.
+    """
+
+    __tablename__ = "vacancy_contact"
+    __table_args__ = (
+        Index("uq_vacancy_contact_key", "vacancy_id", "match_key", unique=True),
+        Index("ix_vacancy_contact_match_key", "match_key"),
+    )
+
+    vacancy_id: Mapped[int] = mapped_column(ForeignKey("vacancy.id"))
+    value: Mapped[str]
+    match_key: Mapped[str]
+    added_by: Mapped[ContactAddedBy] = mapped_column(
+        enum_column(ContactAddedBy, "contact_added_by")
+    )
 
 
 class VacancyStatusHistory(IdMixin, Base):

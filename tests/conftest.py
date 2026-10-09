@@ -7,6 +7,7 @@
 после обоих.
 """
 
+import asyncio
 import os
 import shutil
 import tempfile
@@ -58,8 +59,8 @@ from backend.bootstrap import alembic_config  # noqa: E402
 from config import APP_NAME  # noqa: E402
 
 
-# Ревизия init. До `head` не поднимаемся: следующая ревизия засевает личные
-# данные и лежит вне репозитория — набор тестов стал бы невоспроизводимым.
+# Ревизия init — первая и из дерева не уходит. Тестам движка миграций нужна
+# просто существующая ревизия; сам стенд поднимается до `head`.
 INIT_REVISION = "e560edf8b958"
 
 # Боевые каталоги данных — то, во что превращается `config._user_data_dir()`
@@ -165,9 +166,14 @@ def _schema(database_url):
 
     Синхронная фикстура намеренно: alembic заводит свой цикл событий внутри,
     и из уже работающего цикла его звать нельзя. Параметр `database_url`
-    фикстура держит явным порядок вычисления, а не для использования.
+    задаёт порядок вычисления и адрес уборки.
+
+    Строки, которые засевает ревизия, убираются сразу: иначе их видел бы
+    только первый тест прогона, а следующие — нет, и исход зависел бы от
+    порядка тестов.
     """
-    command.upgrade(alembic_config(), INIT_REVISION)
+    command.upgrade(alembic_config(), "head")
+    asyncio.run(_empty_database(database_url))
 
 
 class TelegramReached(BaseException):
@@ -319,7 +325,7 @@ async def _clear_all_tables(engine: AsyncEngine) -> None:
     """Удаляет все строки из всех таблиц, кроме `alembic_version`.
 
     Список таблиц берётся из `sqlite_master`, а не из `Base.metadata`: схема
-    поднята alembic'ом один раз до ревизии init, и если модели когда-нибудь
+    поднята alembic'ом один раз до `head`, и если модели когда-нибудь
     разойдутся со схемой, удаление по метаданным упадёт на несуществующей
     таблице, а по `sqlite_master` — нет. `PRAGMA foreign_keys=OFF` на время
     уборки снимает зависимость от порядка удаления. `sqlite_sequence`
@@ -354,6 +360,17 @@ async def _clear_all_tables(engine: AsyncEngine) -> None:
         await connection.commit()
 
 
+async def _empty_database(database_url) -> None:
+    """Очистить базу своим движком: чужой к этому моменту может быть закрыт."""
+    from adapters.db import make_engine
+
+    cleaner = make_engine(database_url)
+    try:
+        await _clear_all_tables(cleaner)
+    finally:
+        await cleaner.dispose()
+
+
 @pytest.fixture(autouse=True)
 async def _clean_database(_schema, database_url):
     """База пуста после каждого теста, как бы тест до неё ни добрался.
@@ -373,13 +390,7 @@ async def _clean_database(_schema, database_url):
     """
     yield
 
-    from adapters.db import make_engine
-
-    cleaner = make_engine(database_url)
-    try:
-        await _clear_all_tables(cleaner)
-    finally:
-        await cleaner.dispose()
+    await _empty_database(database_url)
 
 
 @pytest.fixture
