@@ -14,6 +14,11 @@ BROWSER_DIR = get_data_dir() / "browser"
 
 _PROGRAMS = ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA")
 
+# Перечень один на поиск и на подсказку человеку: разойдись они — подсказка врала бы.
+BROWSER_NAMES = CHROME, OPERA, BRAVE, VIVALDI, YANDEX, EDGE = (
+    "Chrome", "Opera", "Brave", "Vivaldi", "Яндекс.Браузер", "Edge",
+)
+
 
 @dataclass(frozen=True)
 class InstalledBrowser:
@@ -29,12 +34,12 @@ def find_browser() -> InstalledBrowser | None:
     исполняемому файлу.
     """
     for found in (
-        _channel("Chrome", "chrome", "Google/Chrome/Application/chrome.exe"),
+        _channel(CHROME, "chrome", "Google/Chrome/Application/chrome.exe"),
         _opera(),
-        _by_path("Brave", "BraveSoftware/Brave-Browser/Application/brave.exe"),
-        _by_path("Vivaldi", "Vivaldi/Application/vivaldi.exe"),
-        _by_path("Яндекс.Браузер", "Yandex/YandexBrowser/Application/browser.exe"),
-        _channel("Edge", "msedge", "Microsoft/Edge/Application/msedge.exe"),
+        _by_path(BRAVE, "BraveSoftware/Brave-Browser/Application/brave.exe"),
+        _by_path(VIVALDI, "Vivaldi/Application/vivaldi.exe"),
+        _by_path(YANDEX, "Yandex/YandexBrowser/Application/browser.exe"),
+        _channel(EDGE, "msedge", "Microsoft/Edge/Application/msedge.exe"),
     ):
         if found is not None:
             return found
@@ -66,7 +71,7 @@ def _opera() -> InstalledBrowser | None:
             key=lambda d: [int(p) for p in d.name.split(".") if p.isdigit()],
         )
         if versions:
-            return InstalledBrowser("Opera", None, versions[-1] / "opera.exe")
+            return InstalledBrowser(OPERA, None, versions[-1] / "opera.exe")
     return None
 
 

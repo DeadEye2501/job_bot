@@ -1,7 +1,7 @@
 """Подделка Claude Code: живой процесс подменён, обмен с ним и разбор настоящие.
 
 Подменены два входа: где лежит `claude` (`claude_code._find_cli`) и запуск
-процесса (`claude_code_process._spawn`). Подставной процесс говорит потоком
+процесса (`claude_code_process.spawn_cli`). Подставной процесс говорит потоком
 JSON-строк, как настоящий: на сообщение — строка начала и итог, на `/clear` —
 весть о сбросе, строка начала и пустой итог. Каждую строку он отдаёт, уступив
 петлю, как и настоящая труба: иначе обращения разом шли бы по очереди и без
@@ -153,5 +153,5 @@ def install(monkeypatch, replies: list, *, cli: str | None = CLI) -> Calls:
         return process
 
     monkeypatch.setattr(claude_code, "_find_cli", lambda: cli)
-    monkeypatch.setattr(claude_code_process, "_spawn", spawn)
+    monkeypatch.setattr(claude_code_process, "spawn_cli", spawn)
     return calls

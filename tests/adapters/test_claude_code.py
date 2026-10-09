@@ -15,7 +15,7 @@ import pytest
 
 from adapters import claude_code, claude_code_process, lm_models
 from adapters.claude_code import ClaudeCodeClient
-from adapters.claude_code_process import _spawn as real_spawn
+from adapters.claude_code_process import spawn_cli as real_spawn
 from adapters.lm_chat import chat
 from adapters.lm_studio import make_client
 from backend.provider_config import LlmProviderConfig

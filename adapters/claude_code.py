@@ -60,15 +60,15 @@ def _find_cli() -> str | None:
     return str(beside) if beside.is_file() else found
 
 
-def _cli() -> str:
+def cli() -> str:
     """Путь к Claude Code, а нет его — отказ одной фразой на всех зовущих."""
-    cli = _find_cli()
-    if cli is None:
+    found = _find_cli()
+    if found is None:
         raise CliTrouble(NO_CLI)
-    return cli
+    return found
 
 
-def _reply(data: dict) -> tuple[str | None, str | None]:
+def reply_of(data: dict) -> tuple[str | None, str | None]:
     """Текст и причина конца из итога обращения; беда — `CliTrouble`."""
     if data.get("is_error"):
         detail = data.get("result") or data.get("subtype") or "ошибка без описания"
@@ -81,14 +81,14 @@ async def _converse(
     client: ClaudeCodeClient, model: str, messages: list[dict], timeout: float | None
 ) -> tuple[str | None, str | None]:
     """Одно обращение: правила — в рамке инструкций, реплики — данными после неё."""
-    cli = _cli()
+    cli_path = cli()
     system, turns = split_system(messages)
     message = claude_code_process.framed(system, "\n\n".join(m["content"] for m in turns))
     try:
-        data = await claude_code_process.exchange(cli, model, message, timeout or client.timeout)
+        data = await claude_code_process.exchange(cli_path, model, message, timeout or client.timeout)
     except (TimeoutError, OSError, claude_code_process.ProcessGone) as e:
         raise CliTrouble(f"{type(e).__name__}: {e}") from e
-    return _reply(data)
+    return reply_of(data)
 
 
 async def ask(client: ClaudeCodeClient, model: str, request):
@@ -103,7 +103,7 @@ async def ask(client: ClaudeCodeClient, model: str, request):
 
 async def list_models(_client: ClaudeCodeClient) -> list[str]:
     """Модели Claude Code. Нет Claude Code — `CliTrouble`."""
-    _cli()
+    cli()
     return list(MODELS)
 
 
