@@ -258,6 +258,16 @@
 
 - `ADDRESS_START_RE` = `re.compile('^[a-z][a-z0-9+.\\-]*://', re.IGNOREC…`
 
+### `backend/domain/contact_keys.py`
+
+- `EMAIL_PATTERN` = `'[^\\s@]+@[^\\s@]+\\.[a-zA-Z]{2,}'`
+- `PHONE_PATTERN` = `'\\+?\\d[\\d\\s()-]{7,}\\d'`
+- `_SCHEMES` = `набор из 2`
+- `_ADDRESS_RE` = `re.compile(EMAIL_PATTERN)`
+- `_PHONE_RE` = `re.compile(PHONE_PATTERN)`
+- `_ARRIVAL_MARKS` = `набор из 1`
+- `_ARRIVAL_PARAMS` = `frozenset({'from'})`
+
 ### `backend/domain/currency.py`
 
 - `CURRENCY_WRITINGS: tuple[tuple[str, str], ...]` = `набор из 6`
@@ -273,6 +283,14 @@
 - `RESPONDED: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.ANSWERED, VacancyStatus…`
 - `INVITED: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.INVITATION, VacancyStat…`
 - `IN_PROGRESS_STEP: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.INVITATION, VacancyStat…`
+
+### `backend/domain/hosts.py`
+
+- `class AddressParts(NamedTuple)`
+  - `host: str`
+  - `path: str`
+  - `query: str`
+  - `fragment: str`
 
 ### `backend/domain/resume_marks.py`
 
@@ -645,8 +663,9 @@
 - `_GRADE_VALUES` = `'"' + ' | '.join(GRADES) + ' | null"'`
 - `_FORMAT_VALUES` = `'"' + ' | '.join(WORK_FORMATS) + ' | null"'`
 - `PARSE_VACANCY_PROMPT` = `'Ты парсишь пост с вакансией из Telegram-канала …`
-- `_TRAILING_URL_RE` = `re.compile('\\s*(https?://[^\\s)]+|(?:www\\.)?[a…`
-- `_CONTACT_ADDRESS_RE` = `re.compile('\n      [^\\s@]+@[^\\s@]+\\.[a-zA-Z]…`
+- `_DOMAIN` = `'(?:www\\.)?[a-zA-Z0-9-]+\\.[a-zA-Z]{2,}'`
+- `_TRAILING_URL_RE` = `re.compile(f'\\s*(https?://[^\\s)]+|{_DOMAIN}(?:…`
+- `_CONTACT_ADDRESS_RE` = `re.compile(f'\n      {EMAIL_PATTERN}            …`
 - `_LABELLED_ADDRESS_RE` = `re.compile('\\(([^()\\s]+)\\)\\s*$')`
 - `_DESCRIPTION_MAX_CHARS` = `1500`
 
@@ -1039,6 +1058,7 @@
   - `vacancy: Vacancy`
   - `history: list[VacancyStatusHistory]`
   - `events: list[VacancyEvent]`
+  - `contacts: list[VacancyContact]`
 - `class HrWithCount`
   - `hr: HR`
   - `vacancy_count: int`

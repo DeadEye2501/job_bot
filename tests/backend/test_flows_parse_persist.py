@@ -67,28 +67,6 @@ async def test_the_currency_of_the_salary_lands_in_the_row(parsing, session_fact
     assert saved.salary_currency == "$"
 
 
-async def test_an_extra_way_to_apply_is_kept_in_the_notes(parsing, session_factory):
-    """Не-телеграмный способ отклика сохраняется в заметках.
-
-    Иногда в объявлении вместо контакта дана почта или форма; без этого
-    пользователь остался бы с вакансией, на которую нечем ответить.
-    """
-    pipeline, vacancy = parsing
-    pipeline.parsed = parsed_vacancy(
-        title="Python-разработчик",
-        stack_required=["Python"],
-        other_contact="jobs@example.com",
-    )
-
-    await parse.parse_and_update_vacancy(pipeline, 
-        vacancy.id, "текст", "jobs", allow_delete=False
-    )
-
-    assert (await only_row(session_factory, Vacancy)).notes == (
-        "Контакты: jobs@example.com"
-    )
-
-
 async def test_a_reparse_without_skills_keeps_the_old_stack(
     parsing, session_factory
 ):

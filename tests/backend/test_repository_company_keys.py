@@ -10,11 +10,11 @@
 import pytest
 
 from backend.domain.company_hosts import is_aggregator_host
+from backend.domain.hosts import normalize_host
 from backend.repository.companies_keys import (
     _translit_cyr_to_latin,
     hosts_compatible,
     normalize_company_name,
-    normalize_host,
     real_corporate_website,
     signal_host,
 )

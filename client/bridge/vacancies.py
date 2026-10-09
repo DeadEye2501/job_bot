@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from backend.domain.scoring import build_skill_lookup
-from backend.models import Vacancy, VacancyStatus
+from backend.models import VacancyStatus
 from backend.repository import (
     profile_skills as skills_repo,
     vacancies_card,
@@ -33,8 +33,9 @@ from client.bridge.refusals import (
 )
 from client.bridge.page import read_page
 from client.bridge.vacancy_actions import VacancyActions
+from client.bridge.vacancy_contacts import VacancyContacts
 from client.bridge.vacancy_filter import read_vacancy_filter
-from client.bridge.vacancy_links import VacancyLinks
+from client.bridge.vacancy_links import VacancyLinks, require_vacancy
 from client.bridge.wire import _vacancy_detail_to_dict, _vacancy_list_row_to_dict
 
 
@@ -51,14 +52,14 @@ def _typed_text(raw) -> str | None:
     return None if raw is None else str(raw)
 
 
-class Vacancies(VacancyActions, VacancyLinks):
+class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
     """Вакансия на своём экране: как её показывают, как правят и что с ней делают.
 
-    Разрезано на три файла по объёму: экран один, и в одном файле он не
+    Разрезано на четыре файла по объёму: экран один, и в одном файле он не
     помещается. Разрез при этом не по ответственности — `change_status` отсюда
     и `delete` из примеси зовут один и тот же модуль репозитория, — а по тому,
     что человек делает на экране: смотрит и правит поля здесь, жмёт кнопки
-    действий и связывает карточки в примесях рядом.
+    действий, связывает карточки и правит контакты в примесях рядом.
 
     Поверхность у страницы одна, `api.vacancies`: примесь здесь раскладывает
     один экран по файлам, а не готовит вторую реализацию.
@@ -246,8 +247,7 @@ class Vacancies(VacancyActions, VacancyLinks):
             # изменилось» — то же положение с пустым пояснением. Различаем сами.
             if row is None:
                 async with self._hub.session_factory() as session:
-                    if await session.get(Vacancy, vacancy_id) is None:
-                        raise Denied(NO_VACANCY, vacancy_id=vacancy_id)
+                    await require_vacancy(session, vacancy_id)
             return {"vacancy_id": vacancy_id}
 
         return reply(self._hub.runner, run())

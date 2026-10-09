@@ -12,6 +12,7 @@ from backend.models import (
     HR,
     TelegramChannel,
     Vacancy,
+    VacancyContact,
     VacancyStatus,
     status_code,
 )
@@ -149,8 +150,9 @@ def _like_anywhere(text: str) -> str:
 def _search_clauses(search: str | None) -> tuple[list, set[str]]:
     """Условие поиска подстрокой и соседи, которых оно требует.
 
-    Ищется по девяти колонкам и по сырому JSON стека — по всему, что человек
-    видит в строке списка. Имя HR и имя компании лежат в своих таблицах,
+    Ищется по колонкам строки, по сырому JSON стека — по всему, что человек
+    видит в строке списка, — и по контактам вакансии: их видно в карточке, а
+    вспоминают вакансию часто по адресу, на который откликались. Имя HR и имя компании лежат в своих таблицах,
     поэтому соседи называются здесь же: знание «какое условие без какого
     соседа не читается» живёт при самом условии, а не у зовущего.
     """
@@ -168,6 +170,11 @@ def _search_clauses(search: str | None) -> tuple[list, set[str]]:
         func.lower(HR.telegram_username).like(q, escape=_LIKE_ESCAPE),
         func.lower(Company.name).like(q, escape=_LIKE_ESCAPE),
         func.lower(cast(Vacancy.stack, String)).like(q, escape=_LIKE_ESCAPE),
+        Vacancy.id.in_(
+            select(VacancyContact.vacancy_id).where(
+                func.lower(VacancyContact.value).like(q, escape=_LIKE_ESCAPE)
+            )
+        ),
     )
     return [matched], {"hr", "company"}
 

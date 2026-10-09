@@ -25,6 +25,7 @@ from backend.models import (
     Company,
     TelegramChannel,
     Vacancy,
+    VacancyContact,
     VacancyEvent,
     VacancyStatus,
     VacancyStatusHistory,
@@ -223,13 +224,10 @@ class ParsedVacancy:
     company_name: str | None
     company_website: str | None
     hr_contact: str | None
-    # Любой нон-Telegram способ откликнуться, который LLM нашёл в посте
-    # (email, ссылка на форму отклика, careers-страница, ссылка на job-
-    # площадку, явная инструкция «писать в комментариях»). Берётся
-    # дословно из текста поста. Сохраняется в ``Vacancy.notes`` строкой
-    # «Контакты: <other_contact>» — у юзера должен быть способ
-    # откликнуться даже когда TG-контакта в посте нет. None если в
-    # посте никакого контакта кроме (или включая) TG-аккаунта.
+    # Любой не-Telegram способ откликнуться, который модель нашла в посте:
+    # почта, форма, страница вакансий, ссылка на площадку. Берётся дословно.
+    # Ложится контактом вакансии (`vacancy_contact`, добавлен разбором). None —
+    # кроме Telegram-аккаунта в посте контакта нет.
     other_contact: str | None
     # Stack split into "обязательные" (required) and "будет плюсом" (preferred)
     # at parse time by the LLM. Both lists are already version-stripped,
@@ -287,6 +285,7 @@ class VacancyDetail:
     vacancy: Vacancy
     history: list[VacancyStatusHistory]
     events: list[VacancyEvent]
+    contacts: list[VacancyContact]
 
 
 @dataclass(frozen=True)

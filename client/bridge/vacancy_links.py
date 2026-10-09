@@ -23,6 +23,16 @@ from client.bridge.form_payloads import read_new_company_fields, read_new_hr_fie
 logger = logging.getLogger(__name__)
 
 
+async def require_vacancy(session, vacancy_id: int) -> None:
+    """Отказать «вакансия не найдена», если строки нет.
+
+    Так отвечают все зовы, которым без вакансии делать нечего, и фраза у них
+    одна.
+    """
+    if await session.get(Vacancy, vacancy_id) is None:
+        raise Denied(NO_VACANCY, vacancy_id=vacancy_id)
+
+
 _CREATING = {
     "create_hr": (HR_PICKER, read_new_hr_fields, create_hr_row),
     "create_company": (COMPANY_PICKER, read_new_company_fields, create_company_row),
@@ -177,8 +187,7 @@ class VacancyLinks:
     async def _picker(self, kind, vacancy_id: int, search: str | None) -> dict:
         """Открыть подборщик: без вакансии открывать нечего."""
         async with self._hub.session_factory() as session:
-            if await session.get(Vacancy, vacancy_id) is None:
-                raise Denied(NO_VACANCY, vacancy_id=vacancy_id)
+            await require_vacancy(session, vacancy_id)
             return await self._listing(session, kind, vacancy_id, search)
 
     async def _listing(self, session, kind, vacancy_id: int, search: str | None) -> dict:
