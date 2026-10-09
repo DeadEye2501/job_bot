@@ -157,3 +157,74 @@ async def test_a_contact_already_known_is_not_doubled(parsing, session_factory):
     assert await _contacts(session_factory) == [
         ("jobs@example.com", "jobs@example.com", "user")
     ]
+
+
+async def test_contacts_listed_with_commas_become_separate_rows(
+    parsing, session_factory
+):
+    """Строка с несколькими контактами через запятую ложится строкой на каждый:
+    одной записью её не узнать ни по почте, ни по ссылке. Запятая внутри
+    ссылки перечнем не считается."""
+    pipeline, vacancy = parsing
+    pipeline.parsed = parsed_vacancy(
+        title="Python-разработчик",
+        other_contact="jobs@example.com, https://example.com/a,b-c,  +7 999 123-45-67",
+    )
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=False
+    )
+
+    assert await _contacts(session_factory) == [
+        ("+7 999 123-45-67", "79991234567", "parse"),
+        ("https://example.com/a,b-c", "example.com/a,b-c", "parse"),
+        ("jobs@example.com", "jobs@example.com", "parse"),
+    ]
+
+
+async def test_a_comma_inside_a_phrase_does_not_make_a_contact_without_address(
+    parsing, session_factory
+):
+    """Часть перечня без адреса — продолжение соседнего контакта, а не контакт:
+    по ней откликнуться некуда."""
+    pipeline, vacancy = parsing
+    pipeline.parsed = parsed_vacancy(
+        title="Python-разработчик",
+        other_contact="Для резюме, почта jobs@example.com, в теме укажите вакансию, "
+        "+7 999 123-45-67, доб. 12",
+    )
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=False
+    )
+
+    assert sorted(v for v, _, _ in await _contacts(session_factory)) == [
+        "+7 999 123-45-67, доб. 12",
+        "Для резюме, почта jobs@example.com, в теме укажите вакансию",
+    ]
+
+
+async def test_a_reparse_keeps_every_contact_it_found_again(parsing, session_factory):
+    """Повторный разбор оставляет все свои находки из перечня в прежнем
+    написании, а не только одну, и убирает ту, которой в перечне больше нет."""
+    pipeline, vacancy = parsing
+    await put(
+        session_factory,
+        *(
+            vacancy_contact_row(
+                vacancy.id, value, match_key=value.lower(), added_by=ContactAddedBy.PARSE
+            )
+            for value in ("JOBS@example.com", "HR@example.com", "old@example.com")
+        ),
+    )
+    pipeline.parsed = parsed_vacancy(
+        title="Python-разработчик", other_contact="jobs@example.com, hr@example.com"
+    )
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=False
+    )
+
+    assert [v for v, _, _ in await _contacts(session_factory)] == [
+        "HR@example.com", "JOBS@example.com"
+    ]

@@ -262,11 +262,14 @@
 
 - `EMAIL_PATTERN` = `'[^\\s@]+@[^\\s@]+\\.[a-zA-Z]{2,}'`
 - `PHONE_PATTERN` = `'\\+?\\d[\\d\\s()-]{7,}\\d'`
+- `DOMAIN_PATTERN` = `'(?:www\\.)?[a-zA-Z0-9-]+\\.[a-zA-Z]{2,}'`
+- `CONTACT_ADDRESS_RE` = `re.compile(f'\n      {EMAIL_PATTERN}            …`
 - `_SCHEMES` = `набор из 2`
 - `_ADDRESS_RE` = `re.compile(EMAIL_PATTERN)`
 - `_PHONE_RE` = `re.compile(PHONE_PATTERN)`
 - `_ARRIVAL_MARKS` = `набор из 1`
 - `_ARRIVAL_PARAMS` = `frozenset({'from'})`
+- `_LIST_SEPARATOR` = `re.compile(',\\s+')`
 
 ### `backend/domain/currency.py`
 
@@ -663,9 +666,7 @@
 - `_GRADE_VALUES` = `'"' + ' | '.join(GRADES) + ' | null"'`
 - `_FORMAT_VALUES` = `'"' + ' | '.join(WORK_FORMATS) + ' | null"'`
 - `PARSE_VACANCY_PROMPT` = `'Ты парсишь пост с вакансией из Telegram-канала …`
-- `_DOMAIN` = `'(?:www\\.)?[a-zA-Z0-9-]+\\.[a-zA-Z]{2,}'`
-- `_TRAILING_URL_RE` = `re.compile(f'\\s*(https?://[^\\s)]+|{_DOMAIN}(?:…`
-- `_CONTACT_ADDRESS_RE` = `re.compile(f'\n      {EMAIL_PATTERN}            …`
+- `_TRAILING_URL_RE` = `re.compile(f'\\s*(https?://[^\\s)]+|{DOMAIN_PATT…`
 - `_LABELLED_ADDRESS_RE` = `re.compile('\\(([^()\\s]+)\\)\\s*$')`
 - `_DESCRIPTION_MAX_CHARS` = `1500`
 

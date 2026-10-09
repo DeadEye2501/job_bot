@@ -3,7 +3,7 @@
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.contact_keys import contact_key
+from backend.domain.contact_keys import contact_key, split_contacts
 from backend.models import ContactAddedBy, VacancyContact
 
 
@@ -13,18 +13,20 @@ async def replace_parsed_contact(
     """Заменить найденное разбором тем, что разбор нашёл сейчас.
 
     Строки агента и человека не трогаются. Найденное, которое уже есть под
-    тем же ключом, второй строкой не заводится.
+    тем же ключом, второй строкой не заводится. Перечень через запятую
+    ложится строкой на каждый контакт.
     """
-    value = value or ""
-    key = contact_key(value)
+    values = split_contacts(value or "")
+    keys = [key for key in map(contact_key, values) if key]
     stale = delete(VacancyContact).where(
         VacancyContact.vacancy_id == vacancy_id,
         VacancyContact.added_by == ContactAddedBy.PARSE,
     )
-    if key:
-        stale = stale.where(VacancyContact.match_key != key)
+    if keys:
+        stale = stale.where(VacancyContact.match_key.not_in(keys))
     await session.execute(stale)
-    await add_contact(session, vacancy_id, value, ContactAddedBy.PARSE)
+    for one in values:
+        await add_contact(session, vacancy_id, one, ContactAddedBy.PARSE)
 
 
 async def add_contact(
