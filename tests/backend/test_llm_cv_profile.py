@@ -9,6 +9,7 @@ import json
 import pytest
 
 from backend.llm.cv import parse_cv
+from backend.models import Gender, SalaryPeriod
 from tests.factories import CV_REQUIRED_PROFILE
 from tests.fakes.llm import CHAT, chat_response, provider
 
@@ -327,3 +328,35 @@ async def test_a_level_typed_in_cyrillic_letters_is_understood_by_the_parse():
     }), text="Иностранные языки: английский — В2")
 
     assert ("Английский", "B2") in [(x.language, x.level) for x in parsed.languages]
+
+
+async def test_the_answers_for_forms_come_through_the_parse():
+    """Зарплата, имя латиницей и пол, названные моделью, доезжают до анкеты."""
+    parsed = await parse_profile(
+        expected_salary=250000, expected_salary_currency="RUB",
+        expected_salary_period="Month", first_name_latin="Ivan",
+        last_name_latin="Petrov", gender="male",
+    )
+
+    p = parsed.profile
+    assert (p.expected_salary, p.expected_salary_currency, p.expected_salary_period) == (
+        250000, "₽", SalaryPeriod.MONTH
+    )
+    assert (p.first_name_latin, p.last_name_latin, p.gender) == ("Ivan", "Petrov", Gender.MALE)
+
+
+async def test_an_unknown_currency_period_or_gender_becomes_absent():
+    parsed = await parse_profile(
+        expected_salary_currency="тугрики", expected_salary_period="week", gender="другое"
+    )
+
+    assert parsed.profile.expected_salary_currency is None
+    assert parsed.profile.expected_salary_period is None
+    assert parsed.profile.gender is None
+
+
+async def test_a_zero_salary_is_no_salary():
+    """Ноль — не ожидание, а «не названо»: прежняя зарплата им не затирается."""
+    parsed = await parse_profile(expected_salary=0)
+
+    assert parsed.profile.expected_salary is None

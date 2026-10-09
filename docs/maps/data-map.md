@@ -1010,6 +1010,12 @@
   - `work_format: list[str]`
   - `grades: list[str]`
   - `free_preferences: str | None`
+  - `expected_salary: int | None`
+  - `expected_salary_currency: str | None`
+  - `expected_salary_period: SalaryPeriod | None`
+  - `first_name_latin: str | None`
+  - `last_name_latin: str | None`
+  - `gender: Gender | None`
 - `class ParsedCvLanguage`
   - `language: str`
   - `level: str`
@@ -1197,6 +1203,9 @@
 ### `backend/repository/profile_cv.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `_SALARY` = `набор из 3`
+- `_PERSON` = `набор из 3`
+- `_KEPT_ACROSS_RESUMES` = `_SALARY + _PERSON`
 
 ### `backend/repository/profile_experience.py`
 

@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+from backend.domain.salary import currency_sign
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
-from backend.incoming import normalize_enum_list, text_or_none
+from backend.incoming import (
+    enum_member_or_none,
+    int_or_none,
+    normalize_enum_list,
+    text_or_none,
+)
+from backend.models import Gender, SalaryPeriod
 from backend.payloads import REQUIRED_PROFILE_FIELDS
 from backend.repository import profile as profile_repo
 from backend.repository import profile_experience as experience_repo
@@ -156,6 +163,16 @@ def _read_profile_fields(payload: dict) -> dict:
         "github_url": text_or_none(payload.get("github_url")),
         "education": text_or_none(payload.get("education")),
         "free_preferences": text_or_none(payload.get("free_preferences")),
+        "expected_salary": int_or_none(payload.get("expected_salary")),
+        "expected_salary_currency": currency_sign(
+            text_or_none(payload.get("expected_salary_currency"))
+        ),
+        "expected_salary_period": enum_member_or_none(
+            payload.get("expected_salary_period"), SalaryPeriod
+        ),
+        "first_name_latin": text_or_none(payload.get("first_name_latin")),
+        "last_name_latin": text_or_none(payload.get("last_name_latin")),
+        "gender": enum_member_or_none(payload.get("gender"), Gender),
         "grades": normalize_enum_list(payload.get("grades"), GRADES),
         "work_format": normalize_enum_list(payload.get("work_format"), WORK_FORMATS),
     }

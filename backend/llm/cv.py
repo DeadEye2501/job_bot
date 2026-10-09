@@ -25,7 +25,14 @@ from backend.domain.taxonomy import (
     WORK_FORMATS,
 )
 from backend.domain.wording import spelled_alone
-from backend.incoming import fold_homoglyphs, normalize_enum_list, str_list
+from backend.domain.salary import currency_sign
+from backend.incoming import (
+    enum_member_or_none,
+    fold_homoglyphs,
+    int_or_none,
+    normalize_enum_list,
+    str_list,
+)
 from backend.llm.answers import (
     ONLY_JSON,
     json_object,
@@ -36,6 +43,7 @@ from backend.llm.cv_grounding import grounded_in_cv
 from backend.llm.cv_native import with_native_language
 from backend.llm.external import external_block
 from backend.llm.rules import NOT_A_SKILL_LINE, NOT_A_SKILL_SECTIONS
+from backend.models import Gender, SalaryPeriod
 from backend.payloads import (
     REQUIRED_PROFILE_FIELDS,
     ParsedCv,
@@ -93,7 +101,13 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
     "education": "string | null",
     "work_format": [""" + " | ".join(f'"{one}"' for one in WORK_FORMATS) + """, ...],
     "grades": [""" + " | ".join(f'"{one}"' for one in GRADES) + """, ...],
-    "free_preferences": "string | null"
+    "free_preferences": "string | null",
+    "expected_salary": "integer | null",
+    "expected_salary_currency": "string | null",
+    "expected_salary_period": "hour | month | year | null",
+    "first_name_latin": "string | null",
+    "last_name_latin": "string | null",
+    "gender": "male | female | null"
   },
   "languages": [
     {"language": "string", "level": "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "native" | "слово из резюме" | null}
@@ -127,6 +141,9 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 - work_format: подмножество из """ + " / ".join(WORK_FORMATS) + """ — формат работы, который кандидат рассматривает или предпочитает, ЕСЛИ это явно сказано в CV («удалёнка», «гибрид», «офис», «remote», «хочу работать из дома»). Не угадывай из контекста. [] если не указано.
 - grades: подмножество из """ + " / ".join(GRADES) + """ — только если кандидат САМ называет свой уровень: «Senior Python Developer» в заголовке резюме, «middle+», «рассматриваю senior роли», «ищу позицию тимлида». Ничего не выводи ни из стажа, ни из числа мест работы, ни из объёма ответственности, ни из названия прошлой должности: «Team-lead» в шапке места работы — это кем человек РАБОТАЛ, а не то, кем он себя объявляет. Многие нетехнические CV вообще не используют эти маркеры (используют «опытный», «ведущий», «главный», «помощник» и т.п.) — в таком случае верни []. Сомневаешься — верни []: пустой список честнее выдуманного грейда, по грейду отбирают вакансии.
 - free_preferences: краткое свободное текстовое поле с пожеланиями к вакансиям из блоков «О себе», «Цели», «Что ищу», «Обо мне», если там есть именно предпочтения по работе; иначе null. Не дублируй дословно весь раздел — сожми до сути.
+- expected_salary / expected_salary_currency / expected_salary_period: ожидаемая зарплата на руки, если резюме её называет. Сумма — целым числом без пробелов; назван диапазон — нижняя граница. Валюта — трёхбуквенным кодом ISO (RUB, USD, EUR). Период — hour, month или year. Не названа — все три null.
+- first_name_latin / last_name_latin: имя и фамилия латиницей, только если резюме само их так пишет. Транслитерацию не придумывать.
+- gender: male или female, только если пол назван прямо или однозначно виден по родовым формам, которыми человек пишет о себе. Иначе null.
 
 Семантика languages:
 - Название языка — в форме как в CV («Русский», «English», «Deutsch», «Français», «中文», «Português»).
@@ -289,6 +306,16 @@ def _parse_profile(data: dict) -> ParsedCvProfile | None:
         work_format=normalize_enum_list(data.get("work_format"), WORK_FORMATS),
         grades=normalize_enum_list(data.get("grades"), GRADES),
         free_preferences=str_or_none(data.get("free_preferences")),
+        expected_salary=int_or_none(data.get("expected_salary")) or None,
+        expected_salary_currency=currency_sign(
+            str_or_none(data.get("expected_salary_currency"))
+        ),
+        expected_salary_period=enum_member_or_none(
+            data.get("expected_salary_period"), SalaryPeriod
+        ),
+        first_name_latin=str_or_none(data.get("first_name_latin")),
+        last_name_latin=str_or_none(data.get("last_name_latin")),
+        gender=enum_member_or_none(data.get("gender"), Gender),
     )
 
 

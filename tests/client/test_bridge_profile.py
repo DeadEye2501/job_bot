@@ -59,10 +59,45 @@ async def test_a_saved_person_comes_back_on_the_next_request(api, ask):
         "github_url": None,
         "education": "МГУ",
         "free_preferences": None,
+        "expected_salary": None,
+        "expected_salary_currency": None,
+        "expected_salary_period": None,
+        "first_name_latin": None,
+        "last_name_latin": None,
+        "gender": None,
         "grades": [],
         "work_format": [],
         "languages": [],
     }
+
+
+async def test_the_answers_for_forms_come_back_as_saved(api, ask):
+    await ask(api.profile.save, {
+        **PERSON, "expected_salary": "250000", "expected_salary_currency": "RUB",
+        "expected_salary_period": "month", "first_name_latin": " Ivan ",
+        "last_name_latin": "Petrov", "gender": "male",
+    })
+
+    profile = (await ask(api.profile.get))["ok"]["profile"]
+
+    assert {k: profile[k] for k in (
+        "expected_salary", "expected_salary_currency", "expected_salary_period",
+        "first_name_latin", "last_name_latin", "gender",
+    )} == {
+        "expected_salary": 250000, "expected_salary_currency": "₽",
+        "expected_salary_period": "month", "first_name_latin": "Ivan",
+        "last_name_latin": "Petrov", "gender": "male",
+    }
+
+
+async def test_an_unknown_gender_or_currency_never_reaches_the_column(api, ask):
+    await ask(api.profile.save, {
+        **PERSON, "gender": "другое", "expected_salary_currency": "тугрики",
+    })
+
+    profile = (await ask(api.profile.get))["ok"]["profile"]
+
+    assert (profile["gender"], profile["expected_salary_currency"]) == (None, None)
 
 
 async def test_grades_keep_the_declared_order_not_the_clicked_one(api, ask):
