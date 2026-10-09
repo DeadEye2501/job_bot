@@ -710,13 +710,13 @@ First-run bootstrap: ensure DB schema exists.
 - `async def poll_channel(pipeline, channel_id: int, channel_username: str, last_id: int | None) -> bool` (42)
 - `async def advance_cursor(pipeline, channel_id: int, msg_id: int) -> None` (10)
 
-### `backend/flows/cleanup.py` — 93 строк
+### `backend/flows/cleanup.py` — 88 строк
 
 Удаление вакансии конвейером — вместе с её вектором в кэше.
 
 Зависит от: `backend.models`, `backend.repository.vacancies_life`
 
-- `async def _delete_and_forget(pipeline, vacancy_id: int, *, trash_reason=_NO_TRASH_EVENT) -> tuple[bool, int | None]` (41)
+- `async def _delete_and_forget(pipeline, vacancy_id: int, *, trash_reason=_NO_TRASH_EVENT) -> tuple[bool, int | None]` (36)
 - `async def forget_vacancy(pipeline, vacancy_id: int) -> bool` (15)
 - `async def delete_vacancy_as_trash(pipeline, vacancy_id: int, reason: str | None) -> None` (11)
 
@@ -1389,7 +1389,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class LlmConfig(IdMixin, UpdatedAtMixin, Base)` (14)
 - `class AppSetting(UpdatedAtMixin, Base)` (7)
 
-### `backend/models/vacancy.py` — 211 строк
+### `backend/models/vacancy.py` — 213 строк
 
 Таблицы, в которых конвейер записывает судьбу разобранного поста.
 
@@ -1397,7 +1397,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `class Vacancy(IdMixin, CreatedAtMixin, Base)` (69)
 - `class VacancyEvent(IdMixin, CreatedAtMixin, Base)` (16)
-- `class TrashEvent(IdMixin, CreatedAtMixin, Base)` (39)
+- `class TrashEvent(IdMixin, CreatedAtMixin, Base)` (41)
 - `class VacancyContact(IdMixin, Base)` (18)
 - `class VacancyStatusHistory(IdMixin, Base)` (38)
 
@@ -1897,16 +1897,18 @@ First-run bootstrap: ensure DB schema exists.
 - `def _last_activity(vacancy: Vacancy, last_msg_at, entered_at, touched_at)` (10)
 - `async def mark_ghosted_vacancies(session: AsyncSession, *, timeout_days: int) -> list[int]` (27)
 
-### `backend/repository/vacancies_life.py` — 150 строк
+### `backend/repository/vacancies_life.py` — 169 строк
 
 Что случается с вакансией после того, как её завели, кроме смены статуса.
 
 Зависит от: `backend.models`
 
 - `async def repoint_vacancies(session: AsyncSession, column, *, absorbed_id: int, survivor_id: int | None) -> int` (23)
-- `async def record_trash_event(session: AsyncSession, *, source_channel_id: int | None, source_msg_id: int | None, reason: str | None) -> None` (25)
-- `async def _trash_noted(session: AsyncSession, source_channel_id: int | None, source_msg_id: int) -> bool` (12)
-- `async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool` (32)
+- `async def record_trash_event(session: AsyncSession, vacancy: Vacancy | None, reason: str | None) -> None` (20)
+- `async def source_trashed(session: AsyncSession, aggregator_id: int, key: str) -> bool` (7)
+- `async def _trash_noted(session: AsyncSession, mark: TrashEvent) -> bool` (11)
+- `async def _marked(session: AsyncSession, *same) -> bool` (2)
+- `async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool` (41)
 - `async def add_vacancy_event(session: AsyncSession, vacancy_id: int, kind: str, payload: dict | None=None) -> VacancyEvent` (19)
 
 ### `backend/repository/vacancies_list.py` — 458 строк ⚠ подошёл к 300
@@ -4662,15 +4664,15 @@ seed initial data
 
 - `async def labels(session, **kwargs) -> list[str]` (4)
 
-### `tests/backend/test_repository_trash_marks.py` — 70 строк
+### `tests/backend/test_repository_trash_marks.py` — 103 строк
 
-Отметки о мусоре: по одной на пост, сколько бы раз его ни разбирали.
+Отметки о мусоре: по одной на объявление, сколько бы раз его ни разбирали.
 
-Зависит от: `backend.models`, `backend.repository.vacancies_life`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.vacancies_life`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 3
+Тестов: 5
 
-- `async def _noted(session, channel_id: int, msg_id: int, reason: str) -> None` (8)
+- `async def _noted(session, channel_id: int, msg_id: int, reason: str) -> None` (5)
 
 ### `tests/backend/test_repository_vacancy_detail.py` — 139 строк
 
@@ -4717,13 +4719,13 @@ seed initial data
 Тестов: 19
 
 
-### `tests/backend/test_repository_vacancy_links.py` — 237 строк
+### `tests/backend/test_repository_vacancy_links.py` — 266 строк
 
 Следствия привязки вакансии к HR и компании и её удаления.
 
-Зависит от: `backend.models`, `backend.repository.vacancies_card`, `backend.repository.vacancies_life`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.vacancies_card`, `backend.repository.vacancies_life`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 13
+Тестов: 14
 
 
 ### `tests/backend/test_repository_vacancy_mini_lists.py` — 260 строк

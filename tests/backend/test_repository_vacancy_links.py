@@ -9,7 +9,15 @@
 import pytest
 from sqlalchemy import select
 
-from backend.models import Message, Vacancy, VacancyEvent, VacancyStatusHistory
+from backend.models import (
+    Application,
+    Message,
+    Screening,
+    Vacancy,
+    VacancyContact,
+    VacancyEvent,
+    VacancyStatusHistory,
+)
 from backend.repository.vacancies_card import get_vacancy_detail, set_vacancy_company, set_vacancy_hr
 from backend.repository.vacancies_life import delete_vacancy
 from tests.dbio import put
@@ -21,6 +29,7 @@ from tests.factories import (
     vacancy_event_row,
     vacancy_row,
 )
+from tests.factories_aggregators import application_row, screening_row, vacancy_contact_row
 
 
 async def test_linking_an_hr_to_a_missing_vacancy_reports_failure(
@@ -235,3 +244,23 @@ async def test_deleting_a_vacancy_keeps_the_conversation(session, session_factor
     rows = (await session.scalars(select(Message))).all()
     assert sorted(m.text for m in rows) == sorted(["про эту вакансию", "просто так"])
     assert all(m.vacancy_id is None for m in rows)
+
+
+async def test_deleting_a_vacancy_takes_its_contacts_and_applications(
+    session, session_factory
+):
+    """Удалённая вакансия уносит контакты, отклики и их скрининг. Чужие остаются."""
+    gone, kept = vacancy_row(title="уйдёт"), vacancy_row(title="останется")
+    await put(session_factory, gone, kept)
+    applied, other = application_row(gone.id), application_row(kept.id)
+    await put(
+        session_factory, applied, other,
+        vacancy_contact_row(gone.id, "a@x.ru"), vacancy_contact_row(kept.id, "b@x.ru"),
+    )
+    await put(session_factory, screening_row(applied.id, 0), screening_row(other.id, 0))
+
+    assert await delete_vacancy(session, gone.id) is True
+
+    assert (await session.scalars(select(VacancyContact.vacancy_id))).all() == [kept.id]
+    assert (await session.scalars(select(Application.vacancy_id))).all() == [kept.id]
+    assert (await session.scalars(select(Screening.application_id))).all() == [other.id]

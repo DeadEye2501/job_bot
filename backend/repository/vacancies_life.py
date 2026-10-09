@@ -19,9 +19,12 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import (
+    Application,
     Message,
+    Screening,
     TrashEvent,
     Vacancy,
+    VacancyContact,
     VacancyEvent,
     VacancyStatusHistory,
 )
@@ -55,48 +58,56 @@ async def repoint_vacancies(
 
 
 async def record_trash_event(
-    session: AsyncSession,
-    *,
-    source_channel_id: int | None,
-    source_msg_id: int | None,
-    reason: str | None,
+    session: AsyncSession, vacancy: Vacancy | None, reason: str | None
 ) -> None:
-    """Записать факт «пост из канала классифицирован как trash».
-    Используется ДО удаления Vacancy-ряда (в auto-ingest режиме), чтобы
-    трекать «сколько мусора прислал канал» — иначе после delete этой
-    информации в БД не остаётся. Caller оборачивает в session.begin().
+    """Отметить объявление мусором. Одно объявление — одна отметка.
 
-    Один пост — одна отметка. Тот же пост приходит на разбор второй раз после
-    сброса курсора канала, и без этой проверки числа «сколько мусора прислал
-    канал» росли бы от каждого сброса, ничего нового не узнав.
+    Пишется до удаления строки вакансии: после него знать, сколько мусора
+    прислал источник, было бы не из чего. Объявление узнают по номеру на
+    источнике — сообщения в канале или на агрегаторе: тот же пост приходит на
+    разбор второй раз после сброса курсора канала, то же объявление агрегатора —
+    на следующем обходе, и без сверки числа росли бы от каждого повтора. Без
+    номера сверить не с чем, и отметка пишется всегда.
     """
-    if source_msg_id is not None and await _trash_noted(
-        session, source_channel_id, source_msg_id
-    ):
-        return
-    session.add(TrashEvent(
-        source_channel_id=source_channel_id,
-        source_msg_id=source_msg_id,
-        reason=reason,
-    ))
+    mark = TrashEvent(reason=reason)
+    if vacancy is not None:
+        mark.source_channel_id = vacancy.source_channel_id
+        mark.source_msg_id = vacancy.source_msg_id
+        mark.source_aggregator_id = vacancy.source_aggregator_id
+        mark.source_key = vacancy.source_key
+    if not await _trash_noted(session, mark):
+        session.add(mark)
 
 
-async def _trash_noted(
-    session: AsyncSession, source_channel_id: int | None, source_msg_id: int
-) -> bool:
-    """Отмечен ли этот пост мусором раньше."""
-    return (
-        await session.scalar(
-            select(TrashEvent.id).where(
-                TrashEvent.source_channel_id == source_channel_id,
-                TrashEvent.source_msg_id == source_msg_id,
-            ).limit(1)
-        )
-    ) is not None
+async def source_trashed(session: AsyncSession, aggregator_id: int, key: str) -> bool:
+    """Отмечено ли мусором объявление с этим номером на этом агрегаторе."""
+    return await _marked(
+        session,
+        TrashEvent.source_aggregator_id == aggregator_id,
+        TrashEvent.source_key == key,
+    )
+
+
+async def _trash_noted(session: AsyncSession, mark: TrashEvent) -> bool:
+    """Отмечено ли это объявление мусором раньше."""
+    if mark.source_key is not None:
+        return await source_trashed(session, mark.source_aggregator_id, mark.source_key)
+    if mark.source_msg_id is None:
+        return False
+    return await _marked(
+        session,
+        TrashEvent.source_channel_id == mark.source_channel_id,
+        TrashEvent.source_msg_id == mark.source_msg_id,
+    )
+
+
+async def _marked(session: AsyncSession, *same) -> bool:
+    return (await session.scalar(select(TrashEvent.id).where(*same).limit(1))) is not None
 
 
 async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool:
-    """Hard-delete a vacancy + its history + its events.
+    """Hard-delete a vacancy + its history + its events + its contacts + its
+    applications with their screening.
 
     ``message.vacancy_id`` is nullified rather than deleted so the chat
     history stays intact (the user might still want to see the conversation
@@ -113,6 +124,14 @@ async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool:
         .where(Message.vacancy_id == vacancy_id)
         .values(vacancy_id=None)
     )
+    applications = select(Application.id).where(Application.vacancy_id == vacancy_id)
+    await session.execute(
+        delete(Screening).where(Screening.application_id.in_(applications))
+    )
+    await session.execute(delete(Application).where(Application.vacancy_id == vacancy_id))
+    await session.execute(
+        delete(VacancyContact).where(VacancyContact.vacancy_id == vacancy_id)
+    )
     await session.execute(
         delete(VacancyStatusHistory).where(
             VacancyStatusHistory.vacancy_id == vacancy_id
@@ -124,7 +143,7 @@ async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool:
     await session.delete(vacancy)
     await session.flush()
     logger.info(
-        "Deleted vacancy %d (msgs detached, history+events purged)", vacancy_id
+        "Deleted vacancy %d (msgs detached, dependent rows purged)", vacancy_id
     )
     return True
 
