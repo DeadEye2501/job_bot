@@ -6,11 +6,11 @@
 
 ## . — 2 модулей
 
-### `config.py` — 121 строк
+### `config.py` — 122 строк
 
 Bootstrap config.
 
-Зависит от: `adapters.telegram`, `backend.bot.media`
+Зависит от: `adapters.browser`, `adapters.telegram`, `backend.bot.media`
 
 - `def _user_data_dir() -> Path` (12)
 - `def get_data_dir() -> Path` (5)
@@ -18,7 +18,7 @@ Bootstrap config.
 - `def get_lock_path() -> Path` (8)
 - `def data_files() -> list[Path]` (19)
 - `def _log_files() -> list[Path]` (4)
-- `def data_dirs() -> list[Path]` (17)
+- `def data_dirs() -> list[Path]` (18)
 - `def get_log_path() -> Path` (7)
 
 ### `main.py` — 185 строк
@@ -34,9 +34,9 @@ Job Bot — single CLI entry point.
 - `def _started_or_told_why() -> int` (36)
 - `def main() -> int` (22)
 
-## adapters — 13 модулей
+## adapters — 14 модулей
 
-### `adapters/app_tied_process.py` — 118 строк
+### `adapters/app_tied_process.py` — 188 строк
 
 Дочерние процессы, которые Windows снимает вместе с приложением.
 
@@ -45,10 +45,42 @@ Job Bot — single CLI entry point.
 - `class _IoCounters(ctypes.Structure)` (5)
 - `class _BasicLimit(ctypes.Structure)` (12)
 - `class _ExtendedLimit(ctypes.Structure)` (9)
-- `def _kernel32()` (11)
+- `class _ProcessEntry(ctypes.Structure)` (13)
+- `def _kernel32()` (15)
 - `def _kill_on_close_job()` (15)
 - `def _assign(job, pid: int) -> None` (11)
 - `def tie_to_app(pid: int) -> None` (15)
+- `def tie_children_named(name: str) -> int` (13)
+- `def _children() -> list[tuple[int, str]]` (13)
+- `def _snapshot() -> list[tuple[int, int, str]]` (16)
+
+### `adapters/browser.py` — 198 строк
+
+Браузер человека на движке Chromium под управлением Playwright.
+
+Зависит от: `adapters.app_tied_process`, `config`
+
+- `class InstalledBrowser` (4)
+- `def find_browser() -> InstalledBrowser | None` (17)
+- `def _candidates(relative: str) -> list[Path]` (2)
+- `def _first(relative: str) -> Path | None` (2)
+- `def _channel(name: str, channel: str, relative: str) -> InstalledBrowser | None` (2)
+- `def _by_path(name: str, relative: str) -> InstalledBrowser | None` (3)
+- `def _opera() -> InstalledBrowser | None` (10)
+- `def remove_profile(profile_id: int) -> None` (8)
+- `class BrowserHost` (110)
+  - `async def open_profile(self, profile_id: int) -> None` (8)
+  - `async def page(self)` (8)
+  - `async def show(self) -> None` (2)
+  - `async def hide_back(self) -> None` (3)
+  - `async def clear_cache(self) -> None` (4)
+  - `async def wait_closed(self, limit_sec: float) -> bool` (11)
+  - `async def close(self) -> None` (7)
+  - `async def _launch(self) -> None` (28)
+  - `async def _place(self, on_screen: bool) -> None` (10)
+  - `def _forget_context(self, closed) -> None` (4)
+  - `async def _close_context(self) -> None` (4)
+- `def _accept_dialogs(page) -> None` (4)
 
 ### `adapters/claude.py` — 145 строк
 
@@ -2922,18 +2954,29 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 275 модулей
+## tests — 276 модулей
 
-### `tests/adapters/test_app_tied_process.py` — 65 строк
+### `tests/adapters/test_app_tied_process.py` — 100 строк
 
-Дочерний процесс, привязанный к приложению, не переживает его аварийный выход.
+Привязка к приложению: кого Windows снимет вместе с ним и кого не тронет.
 
-Зависит от: —
+Зависит от: `adapters`
 
-Тестов: 2
+Тестов: 4
 
 - `def _alive(pid: int) -> bool` (5)
 - `def _orphan(mode: str) -> int` (7)
+
+### `tests/adapters/test_browser_choice.py` — 45 строк
+
+Какой браузер водит агент: первый найденный из перечня.
+
+Зависит от: `adapters.browser`
+
+Тестов: 4
+
+- `def _install(root: Path, relative: str) -> Path` (5)
+- `def _roots(monkeypatch, tmp_path)` (4)
 
 ### `tests/adapters/test_claude.py` — 263 строк
 
@@ -5054,13 +5097,13 @@ seed initial data
 Тестов: 3
 
 
-### `tests/backend/test_wipe.py` — 258 строк
+### `tests/backend/test_wipe.py` — 272 строк
 
 Следствия сноса данных: что остаётся в каталоге после «удалить всё».
 
 Зависит от: `backend.single_instance`, `backend.wipe`, `config`
 
-Тестов: 9
+Тестов: 10
 
 - `def lock_let_go()` (9)
 - `def data_dir(tmp_path, monkeypatch)` (7)
