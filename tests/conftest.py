@@ -275,7 +275,7 @@ def _claude_code_is_unreachable(monkeypatch):
             "tests/fakes/claude_code.py."
         )
 
-    monkeypatch.setattr(claude_code_process, "_spawn", _refuse)
+    monkeypatch.setattr(claude_code_process, "spawn_cli", _refuse)
     yield
     claude_code_process._session = None
     claude_code_process._closing = False

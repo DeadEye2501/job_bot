@@ -34,7 +34,18 @@ Job Bot — single CLI entry point.
 - `def _started_or_told_why() -> int` (36)
 - `def main() -> int` (22)
 
-## adapters — 16 модулей
+## adapters — 17 модулей
+
+### `adapters/agent_mcp.py` — 78 строк
+
+MCP-сервер инструментов одной сессии агента: HTTP на 127.0.0.1, токен в адресе.
+
+Зависит от: —
+
+- `class ToolServer` (17)
+  - `async def close(self) -> None` (12)
+- `async def serve_tools(tools: list[Callable]) -> ToolServer` (28)
+- `async def _started(server: uvicorn.Server, task: asyncio.Task) -> None` (10)
 
 ### `adapters/app_tied_process.py` — 188 строк
 
@@ -54,7 +65,7 @@ Job Bot — single CLI entry point.
 - `def _children() -> list[tuple[int, str]]` (13)
 - `def _snapshot() -> list[tuple[int, int, str]]` (16)
 
-### `adapters/browser.py` — 198 строк
+### `adapters/browser.py` — 203 строк
 
 Браузер человека на движке Chromium под управлением Playwright.
 
@@ -110,22 +121,27 @@ Claude через установленный Claude Code по подписке: 
   - `async def aclose(self) -> None` (2)
 - `def make_client(*, timeout: float) -> ClaudeCodeClient` (3)
 - `def _find_cli() -> str | None` (12)
-- `def _cli() -> str` (6)
-- `def _reply(data: dict) -> tuple[str | None, str | None]` (7)
+- `def cli() -> str` (6)
+- `def reply_of(data: dict) -> tuple[str | None, str | None]` (7)
 - `async def _converse(client: ClaudeCodeClient, model: str, messages: list[dict], timeout: float | None) -> tuple[str | None, str | None]` (12)
 - `async def ask(client: ClaudeCodeClient, model: str, request)` (8)
 - `async def list_models(_client: ClaudeCodeClient) -> list[str]` (4)
 - `async def ping(client: ClaudeCodeClient, model: str, text: str) -> None` (3)
 
-### `adapters/claude_code_agent.py` — 12 строк
+### `adapters/claude_code_agent.py` — 89 строк
 
-Claude Code как водитель агента: процесс, его инструменты, его итог.
+Сессия агента в своём процессе Claude Code: инструменты приложения, без чужих настроек.
 
-Зависит от: —
+Зависит от: `adapters`, `adapters.agent_mcp`
 
 - `class AgentEnd` (6)
+- `class AgentRun` (8)
+- `async def run_agent(run: AgentRun) -> AgentEnd` (19)
+- `def _end(data: dict) -> AgentEnd` (9)
+- `def _argv(cli: str, run: AgentRun) -> list[str]` (13)
+- `def _env() -> dict` (3)
 
-### `adapters/claude_code_process.py` — 249 строк
+### `adapters/claude_code_process.py` — 263 строк
 
 Живой процесс Claude Code: один на приложение, запросы по одному, сброс после каждого.
 
@@ -134,16 +150,17 @@ Claude Code как водитель агента: процесс, его инс�
 - `class ProcessGone(Exception)` (2)
 - `class _Session` (3)
 - `def framed(instructions: str, data: str) -> str` (5)
-- `def _argv(cli: str, model: str) -> list[str]` (21)
-- `def _subscription_env() -> dict` (3)
-- `async def _spawn(argv: list[str], env: dict)` (19)
+- `def stream_argv(cli: str, model: str, system_prompt: str, tools: str) -> list[str]` (23)
+- `def subscription_env() -> dict` (3)
+- `async def spawn_cli(argv: list[str], env: dict)` (19)
 - `def _lock() -> asyncio.Lock` (11)
-- `async def _send(process, text: str) -> None` (5)
-- `async def _result(process) -> dict` (20)
-- `async def _ask(process, text: str) -> dict` (4)
+- `async def send_line(process, text: str) -> None` (5)
+- `async def read_result(process) -> dict` (20)
+- `async def one_turn(process, text: str) -> dict` (4)
 - `async def _cleared(process) -> bool` (12)
-- `async def _drop() -> None` (7)
-- `async def _ready(cli: str, model: str)` (14)
+- `async def _drop() -> None` (6)
+- `async def put_down(process) -> None` (5)
+- `async def _ready(cli: str, model: str)` (16)
 - `async def exchange(cli: str, model: str, message: str, timeout: float) -> dict` (19)
 - `async def shutdown() -> None` (10)
 
@@ -305,7 +322,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 163 модулей
+## backend — 164 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -313,6 +330,14 @@ init
 
 Зависит от: —
 
+
+### `backend/agent/availability.py` — 19 строк
+
+Чем агенту работать: водитель — Claude Code, браузер — установленный Chromium.
+
+Зависит от: `adapters.browser`, `backend.provider_config`
+
+- `def agent_refusal(chat: LlmProviderConfig | None, browser: InstalledBrowser | None) -> str | None` (7)
 
 ### `backend/agent/human_gate.py` — 74 строк
 
@@ -3174,7 +3199,17 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 293 модулей
+## tests — 296 модулей
+
+### `tests/adapters/test_agent_mcp.py` — 71 строк
+
+Инструменты сессии доступны по своему адресу и только по нему.
+
+Зависит от: `adapters.agent_mcp`
+
+Тестов: 3
+
+- `async def _echo(text: str) -> str` (3)
 
 ### `tests/adapters/test_app_tied_process.py` — 100 строк
 
@@ -3221,6 +3256,15 @@ seed initial data
 
 - `def _client() -> ClaudeCodeClient` (2)
 - `def _model_of(process) -> str` (3)
+
+### `tests/adapters/test_claude_code_agent.py` — 105 строк
+
+Сессия агента: отдельный процесс Claude Code с инструментами приложения.
+
+Зависит от: `adapters.claude_code_agent`, `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `tests.fakes`
+
+Тестов: 10
+
 
 ### `tests/adapters/test_cv_text.py` — 299 строк
 
@@ -3479,6 +3523,15 @@ seed initial data
 
 - `def _page(*, headline: str='Senior Manual QA', body: str='<p>Ищем QA</p>') -> str` (9)
 - `def _client(handler) -> httpx.AsyncClient` (3)
+
+### `tests/backend/test_agent_availability.py` — 23 строк
+
+Агенту нужны водитель и браузер; без них агрегаторы заперты с подсказкой.
+
+Зависит от: `adapters.browser`, `backend.agent.availability`, `backend.provider_config`
+
+Тестов: 4
+
 
 ### `tests/backend/test_agent_human_gate.py` — 65 строк
 

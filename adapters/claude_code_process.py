@@ -8,6 +8,10 @@
 обращений разные: они едут в самом сообщении, в рамке инструкций (`framed`), и
 постоянный промпт объясняет модели, как эту рамку читать. Что из ответа
 берётся, решает `adapters/claude_code`; здесь — процесс, рамка и обмен.
+
+Запуск, доводы потокового разговора и обмен строками общие с сессией агента
+(`adapters/claude_code_agent`): «один на приложение» — это про процесс чата,
+у агента процесс свой на каждую сессию.
 """
 
 import asyncio
@@ -80,13 +84,15 @@ def framed(instructions: str, data: str) -> str:
     return f"{FRAME_OPEN}\n{instructions}\n{FRAME_CLOSE}\n\n{data}"
 
 
-def _argv(cli: str, model: str) -> list[str]:
-    """Доводы запуска: потоковый разговор без рабочего места разработчика.
+def stream_argv(cli: str, model: str, system_prompt: str, tools: str) -> list[str]:
+    """Доводы потокового разговора без рабочего места разработчика.
 
-    Инструменты, сохранение сессии, свои настройки с хуками и MCP выключены:
-    модели нужны только наши правила и текст. Команды оставлены включёнными —
-    сброс разговора идёт командой `/clear`. Потоковый вывод Claude Code без
-    `--verbose` не запускает.
+    Сохранение сессии, свои настройки с хуками и чужие MCP выключены: модели
+    нужны только наши правила, текст и названные встроенные инструменты
+    (`tools` — через запятую, пусто — никаких). Команды оставлены
+    включёнными — чат сбрасывает разговор командой `/clear`. Потоковый вывод
+    Claude Code без `--verbose` не запускает. Агент дописывает к этим
+    доводам свои инструменты и сервер MCP.
     """
     return [
         cli, "-p",
@@ -95,20 +101,20 @@ def _argv(cli: str, model: str) -> list[str]:
         "--verbose",
         "--model", model,
         "--effort", EFFORT,
-        "--system-prompt", FRAME_PROMPT,
-        "--tools", "",
+        "--system-prompt", system_prompt,
+        "--tools", tools,
         "--setting-sources", "",
         "--no-session-persistence",
         "--strict-mcp-config",
     ]
 
 
-def _subscription_env() -> dict:
+def subscription_env() -> dict:
     """Окружение процесса без того, что увело бы его мимо подписки."""
     return {k: v for k, v in os.environ.items() if k not in _NOT_SUBSCRIPTION}
 
 
-async def _spawn(argv: list[str], env: dict):
+async def spawn_cli(argv: list[str], env: dict):
     """Запустить Claude Code, привязанным к приложению.
 
     Вывод ошибок не читается: незачитанная труба переполнилась бы и встала.
@@ -142,14 +148,14 @@ def _lock() -> asyncio.Lock:
     return _guard[1]
 
 
-async def _send(process, text: str) -> None:
+async def send_line(process, text: str) -> None:
     """Отправить процессу одну реплику строкой потока."""
     line = json.dumps({"type": "user", "message": {"role": "user", "content": text}}, ensure_ascii=False)
     process.stdin.write((line + "\n").encode("utf-8"))
     await process.stdin.drain()
 
 
-async def _result(process) -> dict:
+async def read_result(process) -> dict:
     """Итог обращения: строки потока до первой с `type: result`.
 
     Строки, которые не разбираются, пропускаются: кроме JSON-сообщений Claude
@@ -171,10 +177,10 @@ async def _result(process) -> dict:
             return message
 
 
-async def _ask(process, text: str) -> dict:
+async def one_turn(process, text: str) -> dict:
     """Одна реплика и её итог."""
-    await _send(process, text)
-    return await _result(process)
+    await send_line(process, text)
+    return await read_result(process)
 
 
 async def _cleared(process) -> bool:
@@ -184,7 +190,7 @@ async def _cleared(process) -> bool:
     снятый процесс просто не понесёт этот разговор в следующий запрос.
     """
     try:
-        await asyncio.wait_for(_ask(process, _CLEAR), _CLEAR_WAIT_S)
+        await asyncio.wait_for(one_turn(process, _CLEAR), _CLEAR_WAIT_S)
     except (TimeoutError, ProcessGone, OSError):
         # OSError — запись в трубу процесса, умершего сразу после ответа.
         return False
@@ -195,9 +201,15 @@ async def _drop() -> None:
     """Снять процесс; следующий запрос поднимет новый."""
     global _session
     session, _session = _session, None
-    if session is not None and session.process.returncode is None:
-        session.process.kill()
-        await session.process.wait()
+    if session is not None:
+        await put_down(session.process)
+
+
+async def put_down(process) -> None:
+    """Снять процесс, если он ещё жив, и дождаться его конца."""
+    if process.returncode is None:
+        process.kill()
+        await process.wait()
 
 
 async def _ready(cli: str, model: str):
@@ -212,7 +224,9 @@ async def _ready(cli: str, model: str):
     if _session is not None and (_session.model != model or _session.process.returncode is not None):
         await _drop()
     if _session is None:
-        _session = _Session(await _spawn(_argv(cli, model), _subscription_env()), model)
+        _session = _Session(
+            await spawn_cli(stream_argv(cli, model, FRAME_PROMPT, ""), subscription_env()), model
+        )
     return _session.process
 
 
@@ -229,7 +243,7 @@ async def exchange(cli: str, model: str, message: str, timeout: float) -> dict:
         process = await _ready(cli, model)
         settled = False
         try:
-            reply = await asyncio.wait_for(_ask(process, message), timeout)
+            reply = await asyncio.wait_for(one_turn(process, message), timeout)
             settled = await _cleared(process)
         finally:
             if not settled:

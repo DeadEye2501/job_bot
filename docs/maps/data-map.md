@@ -19,6 +19,17 @@
 
 ## adapters
 
+### `adapters/agent_mcp.py`
+
+- `SERVER_NAME` = `'jobbot'`
+- `_START_SEC` = `10`
+- `_CLOSE_SEC` = `5`
+- `logger` = `logging.getLogger(__name__)`
+- `class ToolServer`
+  - `url: str`
+  - `_server: uvicorn.Server`
+  - `_task: asyncio.Task`
+
 ### `adapters/app_tied_process.py`
 
 - `_log` = `logging.getLogger(__name__)`
@@ -43,6 +54,13 @@
 - `logger` = `logging.getLogger(__name__)`
 - `BROWSER_DIR` = `get_data_dir() / 'browser'`
 - `_PROGRAMS` = `набор из 3`
+- `BROWSER_NAMES` = `набор из 6`
+- `CHROME` = `набор из 6`
+- `OPERA` = `набор из 6`
+- `BRAVE` = `набор из 6`
+- `VIVALDI` = `набор из 6`
+- `YANDEX` = `набор из 6`
+- `EDGE` = `набор из 6`
 - `class InstalledBrowser`
   - `name: str`
   - `channel: str | None`
@@ -64,10 +82,20 @@
 
 ### `adapters/claude_code_agent.py`
 
+- `logger` = `logging.getLogger(__name__)`
+- `_TOOL_TIMEOUT_MS` = `65 * 60 * 1000`
+- `_LIMIT_STATUS` = `429`
+- `_LIMIT_RE` = `re.compile('usage limit|limit reached|rate limit…`
 - `class AgentEnd`
   - `ok: bool`
   - `detail: str`
   - `limit_exhausted: bool`
+- `class AgentRun`
+  - `system_prompt: str`
+  - `task: str`
+  - `mcp_url: str`
+  - `model: str`
+  - `web_search: bool`
 
 ### `adapters/claude_code_process.py`
 
@@ -191,6 +219,11 @@
 - `depends_on: Union[str, Sequence[str], None]` = `None`
 
 ## backend
+
+### `backend/agent/availability.py`
+
+- `NO_DRIVER` = `'Для агрегаторов нужен Claude Code: выберите его…`
+- `NO_BROWSER` = `f"Не найден браузер на движке Chromium: {', '.jo…`
 
 ### `backend/agent/human_gate.py`
 
@@ -1797,6 +1830,10 @@
 - `LOG` = `logging.getLogger('tests.claude_code')`
 - `SONNET` = `'sonnet'`
 
+### `tests/adapters/test_claude_code_agent.py`
+
+- `RUN` = `AgentRun(system_prompt='РАМКА', task='ЗАДАНИЕ', …`
+
 ### `tests/adapters/test_lm_models.py`
 
 - `NATIVE_MODELS` = `набор из 2`
@@ -1807,6 +1844,10 @@
   - `sent: list` = `набор из 0`
   - `logins: list` = `набор из 0`
   - `events: list` = `набор из 0`
+
+### `tests/backend/test_agent_availability.py`
+
+- `CHROME` = `InstalledBrowser('Chrome', 'chrome', None)`
 
 ### `tests/backend/test_agent_prompts.py`
 

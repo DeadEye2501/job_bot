@@ -1,0 +1,71 @@
+"""Инструменты сессии доступны по своему адресу и только по нему."""
+
+import asyncio
+import time
+
+import httpx
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+
+from adapters.agent_mcp import serve_tools
+
+
+async def _echo(text: str) -> str:
+    """Повторить текст."""
+    return f"эхо: {text}"
+
+
+async def test_a_tool_is_called_through_the_session_address():
+    server = await serve_tools([_echo])
+    try:
+        async with streamable_http_client(server.url) as (read, write, _):
+            async with ClientSession(read, write) as client:
+                await client.initialize()
+                names = [t.name for t in (await client.list_tools()).tools]
+                result = await client.call_tool("_echo", {"text": "привет"})
+    finally:
+        await server.close()
+
+    assert names == ["_echo"]
+    assert result.content[0].text == "эхо: привет"
+
+
+async def test_an_address_without_the_token_leads_nowhere():
+    server = await serve_tools([_echo])
+    try:
+        bare = server.url.rsplit("/", 2)[0] + "/mcp"
+        async with httpx.AsyncClient() as client:
+            answer = await client.post(bare, json={})
+    finally:
+        await server.close()
+
+    assert answer.status_code == 404
+
+
+async def test_a_hanging_call_does_not_hold_the_close():
+    """Вызов, ждущий человека, держал бы остановку до часа."""
+    started = asyncio.Event()
+
+    async def _wait() -> str:
+        """Ждать вечно."""
+        started.set()
+        await asyncio.Event().wait()
+        return ""
+
+    server = await serve_tools([_wait])
+
+    async def call():
+        async with streamable_http_client(server.url) as (read, write, _):
+            async with ClientSession(read, write) as client:
+                await client.initialize()
+                await client.call_tool("_wait", {})
+
+    caller = asyncio.create_task(call())
+    await asyncio.wait_for(started.wait(), 10)
+    began = time.monotonic()
+
+    await asyncio.wait_for(server.close(), 10)
+
+    assert time.monotonic() - began < 8
+    caller.cancel()
+    await asyncio.gather(caller, return_exceptions=True)
