@@ -1,5 +1,7 @@
 """Письмо уходит по SMTP с вложенным резюме и входом под паролем приложения."""
 
+import smtplib
+
 from adapters.smtp_mail import MailAccountConfig, OutgoingMail, send_mail
 
 
@@ -15,7 +17,15 @@ class _FakeSmtp:
         return self
 
     def __exit__(self, *exc):
+        # Как у `smtplib.SMTP`: выход из `with` прощается с сервером.
+        self.quit()
         return False
+
+    def quit(self):
+        _FakeSmtp.events.append(("quit", self.where))
+
+    def close(self):
+        _FakeSmtp.events.append(("close", self.where))
 
     def starttls(self, **_options):
         _FakeSmtp.events.append(("starttls", self.where))
@@ -67,5 +77,27 @@ def test_port_587_secures_the_line_before_the_login(monkeypatch, tmp_path):
     )
 
     where = ("smtp.mail.test", 587)
-    assert _FakeSmtp.events == [("starttls", where), ("login", where)]
+    assert _FakeSmtp.events == [("starttls", where), ("login", where), ("quit", where)]
+    assert len(_FakeSmtp.sent) == 1
+
+
+class _RudeSmtp(_FakeSmtp):
+    """Сервер принял письмо, а на прощание ответил не 221."""
+
+    def quit(self):
+        raise smtplib.SMTPResponseException(250, b"bye")
+
+
+def test_a_rude_goodbye_after_an_accepted_letter_is_not_a_failure(monkeypatch, tmp_path):
+    """Письмо уже принято: сочти прощание отказом — следующий способ отправил бы второй отклик."""
+    monkeypatch.setattr(_FakeSmtp, "sent", [])
+    monkeypatch.setattr(_FakeSmtp, "logins", [])
+    monkeypatch.setattr(_FakeSmtp, "events", [])
+    monkeypatch.setattr("smtplib.SMTP_SSL", _RudeSmtp)
+
+    send_mail(
+        MailAccountConfig("me@mail.test", "smtp.mail.test", 465, "secret"),
+        OutgoingMail("hr@site.test", "Отклик", "Текст", _resume(tmp_path)),
+    )
+
     assert len(_FakeSmtp.sent) == 1

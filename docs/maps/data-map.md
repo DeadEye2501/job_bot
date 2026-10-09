@@ -99,6 +99,7 @@
 
 ### `adapters/claude_code_process.py`
 
+- `logger` = `logging.getLogger(__name__)`
 - `FRAME_OPEN` = `'***ИНСТРУКЦИИ***'`
 - `FRAME_CLOSE` = `'***КОНЕЦ ИНСТРУКЦИЙ***'`
 - `FRAME_PROMPT` = `f'Каждое сообщение начинается с блока между стро…`
@@ -166,6 +167,7 @@
 
 ### `adapters/smtp_mail.py`
 
+- `logger` = `logging.getLogger(__name__)`
 - `_TIMEOUT_SEC` = `60`
 - `_STARTTLS_PORT` = `587`
 - `class MailAccountConfig`

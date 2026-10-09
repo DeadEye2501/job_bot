@@ -86,3 +86,23 @@ async def test_a_window_that_failed_to_show_is_shown_on_the_next_call():
     assert await waiting == "готово"
     assert told == [("captcha", "site.test"), "resolved"]
     assert browser.calls == ["show", "hide"]
+
+
+async def test_a_stop_while_the_window_comes_up_is_not_a_wait():
+    """Обход остановили, пока браузер поднимался: ждать нечего и звать человека незачем."""
+    gate, told = _gate()
+    browser = FakeBrowser()
+    rising = asyncio.Event()
+
+    async def slow_show():
+        rising.set()
+        await asyncio.sleep(0.01)
+
+    browser.show = slow_show
+    waiting = asyncio.create_task(gate.wait("captcha", "site.test", browser))
+    await rising.wait()
+
+    gate.abort()
+
+    assert (await asyncio.wait_for(waiting, 1)).startswith("обход остановлен")
+    assert told == []

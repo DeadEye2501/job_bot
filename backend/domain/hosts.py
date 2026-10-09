@@ -86,7 +86,7 @@ def is_arrival_mark(name: str) -> bool:
     Метки рекламы, кликов и сессии. Имя ждётся в нижнем регистре.
     """
     return (name.startswith("utm") or name.endswith(("clid", "clkid"))
-            or "sess" in name or name in {"sid", "from"})
+            or "session" in name or name.endswith("sessid") or name in {"sid", "from"})
 
 
 def _numbering(query: str) -> str:

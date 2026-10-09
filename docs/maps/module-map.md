@@ -141,7 +141,7 @@ Claude через установленный Claude Code по подписке: 
 - `def _argv(cli: str, run: AgentRun) -> list[str]` (13)
 - `def _env() -> dict` (3)
 
-### `adapters/claude_code_process.py` — 263 строк
+### `adapters/claude_code_process.py` — 270 строк
 
 Живой процесс Claude Code: один на приложение, запросы по одному, сброс после каждого.
 
@@ -159,7 +159,7 @@ Claude через установленный Claude Code по подписке: 
 - `async def one_turn(process, text: str) -> dict` (4)
 - `async def _cleared(process) -> bool` (12)
 - `async def _drop() -> None` (6)
-- `async def put_down(process) -> None` (5)
+- `async def put_down(process) -> None` (9)
 - `async def _ready(cli: str, model: str)` (16)
 - `async def exchange(cli: str, model: str, message: str, timeout: float) -> dict` (19)
 - `async def shutdown() -> None` (10)
@@ -255,7 +255,7 @@ Claude через установленный Claude Code по подписке: 
 
 - `def make_client(config: LlmProviderConfig) -> 'LmClient'` (17)
 
-### `adapters/smtp_mail.py` — 58 строк
+### `adapters/smtp_mail.py` — 74 строк
 
 Отправка письма по SMTP с вложением, под паролем приложения.
 
@@ -263,7 +263,8 @@ Claude через установленный Claude Code по подписке: 
 
 - `class MailAccountConfig` (5)
 - `class OutgoingMail` (5)
-- `def send_mail(account: MailAccountConfig, mail: OutgoingMail) -> None` (17)
+- `def send_mail(account: MailAccountConfig, mail: OutgoingMail) -> None` (19)
+- `def _part(smtp) -> None` (9)
 - `def _message(sender: str, mail: OutgoingMail) -> EmailMessage` (10)
 
 ### `adapters/telegram.py` — 220 строк
@@ -340,14 +341,14 @@ init
 - `def agent_refusal(chat: LlmProviderConfig | None, browser: InstalledBrowser | None) -> str | None` (7)
 - `def current_refusal(chat: LlmProviderConfig | None) -> str | None` (4)
 
-### `backend/agent/human_gate.py` — 76 строк
+### `backend/agent/human_gate.py` — 80 строк
 
 Ожидание человека: капча или слетевший вход. Срок — час на каждое ожидание.
 
 Зависит от: —
 
-- `class HumanGate` (66)
-  - `async def wait(self, kind: str, host: str, browser) -> str` (17)
+- `class HumanGate` (70)
+  - `async def wait(self, kind: str, host: str, browser) -> str` (21)
   - `def resolve(self) -> None` (6)
   - `def abort(self) -> None` (10)
   - `def reset(self) -> None` (6)
@@ -707,7 +708,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _record_send(bot, hr: HR, text: str, outcome: _Outcome, permission) -> None` (22)
 - `async def send(bot, hr: HR, text: str, attachment=None, errand: Errand=Errand()) -> bool` (36)
 
-### `backend/bot/slot.py` — 172 строк
+### `backend/bot/slot.py` — 175 строк
 
 Единственное место прогона: пока оно занято, второй цикл получает отказ.
 
@@ -719,7 +720,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _run_task(bot, work: Callable[[], Any], label: str)` (31)
 - `async def run_in_slot(bot, work: Callable[[], Any], label: str, progress: tuple[str, str, int, int] | None=None) -> tuple[CycleOutcome, Any]` (29)
 - `def launch_in_slot(bot, work: Callable[[], Any], label: str) -> bool` (18)
-- `async def settle_slot(bot, timeout: float) -> None` (16)
+- `async def settle_slot(bot, timeout: float) -> None` (19)
 - `def _occupy(bot, label: str) -> bool` (7)
 - `def _release(bot) -> None` (4)
 
@@ -3412,13 +3413,13 @@ seed initial data
 - `def _client() -> ClaudeCodeClient` (2)
 - `def _model_of(process) -> str` (3)
 
-### `tests/adapters/test_claude_code_agent.py` — 105 строк
+### `tests/adapters/test_claude_code_agent.py` — 121 строк
 
 Сессия агента: отдельный процесс Claude Code с инструментами приложения.
 
-Зависит от: `adapters.claude_code_agent`, `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `tests.fakes`
+Зависит от: `adapters.claude_code_agent`, `adapters.claude_code_process`, `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `tests.fakes`
 
-Тестов: 10
+Тестов: 11
 
 
 ### `tests/adapters/test_cv_text.py` — 299 строк
@@ -3477,21 +3478,25 @@ seed initial data
 Тестов: 3
 
 
-### `tests/adapters/test_smtp_mail.py` — 71 строк
+### `tests/adapters/test_smtp_mail.py` — 103 строк
 
 Письмо уходит по SMTP с вложенным резюме и входом под паролем приложения.
 
 Зависит от: `adapters.smtp_mail`
 
-Тестов: 2
+Тестов: 3
 
-- `class _FakeSmtp` (23)
+- `class _FakeSmtp` (31)
   - `def __enter__(self)` (2)
-  - `def __exit__(self, *exc)` (2)
+  - `def __exit__(self, *exc)` (4)
+  - `def quit(self)` (2)
+  - `def close(self)` (2)
   - `def starttls(self, **_options)` (2)
   - `def login(self, user, password)` (3)
   - `def send_message(self, message)` (2)
 - `def _resume(tmp_path)` (4)
+- `class _RudeSmtp(_FakeSmtp)` (5)
+  - `def quit(self)` (2)
 
 ### `tests/backend/conftest.py` — 67 строк
 
@@ -3689,13 +3694,13 @@ seed initial data
 Тестов: 4
 
 
-### `tests/backend/test_agent_human_gate.py` — 88 строк
+### `tests/backend/test_agent_human_gate.py` — 108 строк
 
 Пауза на человека: браузер виден, окно знает, срок — час.
 
 Зависит от: `backend.agent.human_gate`, `tests.fakes.browser`
 
-Тестов: 6
+Тестов: 7
 
 - `def _gate(limit=60.0)` (5)
 
@@ -4032,13 +4037,13 @@ seed initial data
 
 - `def closed_loop()` (5)
 
-### `tests/backend/test_bot_slot.py` — 94 строк
+### `tests/backend/test_bot_slot.py` — 116 строк
 
 Место прогона, занятое отдельной задачей: цикл бота не ждёт её, место держится до конца.
 
 Зависит от: `backend.bot`, `tests.backend.fixtures.bot`
 
-Тестов: 5
+Тестов: 6
 
 
 ### `tests/backend/test_crypto.py` — 133 строк
@@ -4125,13 +4130,13 @@ seed initial data
 Тестов: 9
 
 
-### `tests/backend/test_domain_hosts.py` — 86 строк
+### `tests/backend/test_domain_hosts.py` — 90 строк
 
 Адрес, разобранный на хост и остаток: по хосту сравнивают сайты, по остатку —
 
 Зависит от: `backend.domain.hosts`
 
-Тестов: 15
+Тестов: 16
 
 
 ### `tests/backend/test_domain_salary.py` — 435 строк ⚠ подошёл к 300
@@ -6682,3 +6687,4 @@ seed initial data
 - `VacancyContacts` — наследник один: `Vacancies`
 - `VacancyLinks` — наследник один: `Vacancies`
 - `Wipe` — наследник один: `System`
+- `_FakeSmtp` — наследник один: `_RudeSmtp`
