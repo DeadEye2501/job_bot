@@ -27,9 +27,9 @@ from backend.domain.taxonomy import (
 from backend.domain.wording import spelled_alone
 from backend.domain.salary import currency_sign
 from backend.incoming import (
+    amount_or_none,
     enum_member_or_none,
     fold_homoglyphs,
-    int_or_none,
     normalize_enum_list,
     str_list,
 )
@@ -306,7 +306,7 @@ def _parse_profile(data: dict) -> ParsedCvProfile | None:
         work_format=normalize_enum_list(data.get("work_format"), WORK_FORMATS),
         grades=normalize_enum_list(data.get("grades"), GRADES),
         free_preferences=str_or_none(data.get("free_preferences")),
-        expected_salary=int_or_none(data.get("expected_salary")) or None,
+        expected_salary=amount_or_none(data.get("expected_salary")),
         expected_salary_currency=currency_sign(
             str_or_none(data.get("expected_salary_currency"))
         ),

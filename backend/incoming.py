@@ -54,6 +54,16 @@ def int_or_none(value) -> int | None:
     return _number_or_none(value, int)
 
 
+def amount_or_none(value) -> int | None:
+    """Сумма — целое больше нуля; ноль и меньше значат «не названо».
+
+    Ноль в поле зарплаты пишут вместо пустоты и модель, и человек, а
+    записанный суммой он затёр бы настоящую.
+    """
+    amount = int_or_none(value)
+    return amount if amount is not None and amount > 0 else None
+
+
 def float_or_none(value) -> float | None:
     """Дробное поле нагрузки: пропуск, пустота и негодное значат отсутствие."""
     return _number_or_none(value, float)

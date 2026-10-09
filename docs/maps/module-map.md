@@ -993,7 +993,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def telegram_alive(bot) -> bool` (7)
 - `async def model_alive(cfg, kind: str) -> bool` (44)
 
-### `backend/incoming.py` — 162 строк
+### `backend/incoming.py` — 172 строк
 
 Приведение внешнего ввода к значениям, годным для записи.
 
@@ -1002,6 +1002,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def fold_homoglyphs(text: str) -> str` (12)
 - `def text_or_none(value) -> str | None` (16)
 - `def int_or_none(value) -> int | None` (3)
+- `def amount_or_none(value) -> int | None` (8)
 - `def float_or_none(value) -> float | None` (3)
 - `def _number_or_none(value, kind)` (19)
 - `def moment_or_none(value) -> datetime | None` (16)
@@ -1227,7 +1228,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (36)
 
-### `backend/llm/vacancy.py` — 496 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 497 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
@@ -1389,7 +1390,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class LlmConfig(IdMixin, UpdatedAtMixin, Base)` (14)
 - `class AppSetting(UpdatedAtMixin, Base)` (7)
 
-### `backend/models/vacancy.py` — 213 строк
+### `backend/models/vacancy.py` — 214 строк
 
 Таблицы, в которых конвейер записывает судьбу разобранного поста.
 
@@ -1397,7 +1398,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `class Vacancy(IdMixin, CreatedAtMixin, Base)` (69)
 - `class VacancyEvent(IdMixin, CreatedAtMixin, Base)` (16)
-- `class TrashEvent(IdMixin, CreatedAtMixin, Base)` (41)
+- `class TrashEvent(IdMixin, CreatedAtMixin, Base)` (42)
 - `class VacancyContact(IdMixin, Base)` (18)
 - `class VacancyStatusHistory(IdMixin, Base)` (38)
 
@@ -1409,7 +1410,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 444 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 445 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -1913,7 +1914,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool` (41)
 - `async def add_vacancy_event(session: AsyncSession, vacancy_id: int, kind: str, payload: dict | None=None) -> VacancyEvent` (19)
 
-### `backend/repository/vacancies_list.py` — 458 строк ⚠ подошёл к 300
+### `backend/repository/vacancies_list.py` — 459 строк ⚠ подошёл к 300
 
 Отбор вакансий для списка на экране.
 
@@ -1921,7 +1922,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def _order_for(sort: str, freshness)` (34)
 - `def _like_anywhere(text: str) -> str` (18)
-- `def _search_clauses(search: str | None) -> tuple[list, set[str]]` (30)
+- `def _search_clauses(search: str | None) -> tuple[list, set[str]]` (31)
 - `def _choice_clauses(f: VacancyFilter) -> tuple[list, set[str]]` (41)
 - `def _salary_clauses(f: VacancyFilter) -> list` (34)
 - `def _range_clauses(f: VacancyFilter, freshness) -> list` (13)
@@ -2825,7 +2826,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 270 модулей
+## tests — 271 модулей
 
 ### `tests/adapters/test_app_tied_process.py` — 65 строк
 
@@ -4688,6 +4689,15 @@ seed initial data
 
 - `async def _noted(session, channel_id: int, msg_id: int, reason: str) -> None` (5)
 
+### `tests/backend/test_repository_vacancy_contacts.py` — 15 строк
+
+Узнаёт ли вакансия свой контакт в чужом написании.
+
+Зависит от: `backend.repository.vacancy_contacts`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
+
+Тестов: 1
+
+
 ### `tests/backend/test_repository_vacancy_detail.py` — 139 строк
 
 Следствия чтения карточки вакансии.
@@ -5140,13 +5150,13 @@ seed initial data
 Тестов: 4
 
 
-### `tests/client/test_bridge_profile.py` — 265 строк
+### `tests/client/test_bridge_profile.py` — 272 строк
 
 Следствия слотов анкеты — того, что человек рассказывает о себе.
 
 Зависит от: —
 
-Тестов: 13
+Тестов: 14
 
 - `async def _saved_person(api, ask, **extra) -> None` (4)
 

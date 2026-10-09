@@ -1,9 +1,9 @@
 """Runtime settings layer.
 
 Loads all mutable settings (TG account, LLM endpoints, pipeline tunables)
-from SQLite into memory at startup. Sensitive values — TG api_hash and 2FA
-password, the pyrogram session string, LLM api keys — go to and from the DB
-through ``backend.crypto``; in this layer they are always plaintext.
+from SQLite into memory at startup. Sensitive values — LLM api keys here, the
+Telegram secrets in ``backend.tg_credentials`` — go to and from the DB through
+``backend.crypto``; in this layer they are always plaintext.
 
 Construct via ``await RuntimeSettings.load(session_factory)`` once at
 startup. After the first-run wizard or any setting change, call
