@@ -6,6 +6,7 @@
 назван именем модуля, из которого она приехала.
 """
 
+from tests.backend.fixtures.aggregators import web_search
 from tests.backend.fixtures.backfill import known_hr
 from tests.backend.fixtures.entry import entry, lock_of_its_own
 from tests.backend.fixtures.bot import (
@@ -58,4 +59,5 @@ __all__ = [
     "titles",
     "turn_and_settle",
     "unparsed_vacancy",
+    "web_search",
 ]

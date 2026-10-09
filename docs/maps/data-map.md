@@ -1194,6 +1194,10 @@
 - `_GENDER` = `словарь из 2`
 - `_PERIOD` = `словарь из 3`
 
+### `backend/repository/aggregators.py`
+
+- `WEB_SEARCH_NAME` = `'Поиск по сети'`
+
 ### `backend/repository/app_settings.py`
 
 - `CV_PATH_KEY` = `'cv_path'`
