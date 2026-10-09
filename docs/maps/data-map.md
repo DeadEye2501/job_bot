@@ -662,7 +662,7 @@
 - `ROOMIER_PARSE_TOKENS` = `2400`
 - `_GRADE_VALUES` = `'"' + ' | '.join(GRADES) + ' | null"'`
 - `_FORMAT_VALUES` = `'"' + ' | '.join(WORK_FORMATS) + ' | null"'`
-- `PARSE_VACANCY_PROMPT` = `'Ты парсишь пост с вакансией из Telegram-канала …`
+- `PARSE_VACANCY_PROMPT` = `'Ты разбираешь текст объявления о вакансии и изв…`
 - `_DOMAIN` = `'(?:www\\.)?[a-zA-Z0-9-]+\\.[a-zA-Z]{2,}'`
 - `_TRAILING_URL_RE` = `re.compile(f'\\s*(https?://[^\\s)]+|{_DOMAIN}(?:…`
 - `_CONTACT_ADDRESS_RE` = `re.compile(f'\n      {EMAIL_PATTERN}            …`
