@@ -5,11 +5,16 @@
 alembic autogenerate неполный набор, и тот выписал бы удаление недостающих.
 """
 
+from backend.models.application import Application, Screening
 from backend.models.base import Base
-from backend.models.contacts import HR, Company, TelegramChannel
+from backend.models.contacts import HR, Aggregator, Company, TelegramChannel
 from backend.models.enums import (
+    ApplicationVia,
     BotMode,
+    ContactAddedBy,
+    Gender,
     LlmConfigKind,
+    SalaryPeriod,
     StatusHistorySource,
     VacancyStatus,
     status_code,
@@ -28,37 +33,48 @@ from backend.models.settings import (
     Blacklist,
     BotState,
     LlmConfig,
+    MailAccount,
     TgAccount,
 )
 from backend.models.vacancy import (
     TrashEvent,
     Vacancy,
+    VacancyContact,
     VacancyEvent,
     VacancyStatusHistory,
 )
 
 __all__ = [
     "HR",
+    "Aggregator",
     "AppSetting",
+    "Application",
+    "ApplicationVia",
     "Base",
     "BLACKLIST_KINDS",
     "Blacklist",
     "BotMode",
     "BotState",
     "Company",
+    "ContactAddedBy",
+    "Gender",
     "LlmConfig",
     "LlmConfigKind",
+    "MailAccount",
     "Message",
     "Profile",
     "ProfileExperience",
     "ProfileLanguage",
     "ProfileSkill",
+    "SalaryPeriod",
+    "Screening",
     "StatusHistorySource",
     "status_code",
     "TelegramChannel",
     "TgAccount",
     "TrashEvent",
     "Vacancy",
+    "VacancyContact",
     "VacancyEvent",
     "VacancyStatus",
     "VacancyStatusHistory",

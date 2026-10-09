@@ -37,6 +37,7 @@ datas = [
     ('alembic/env.py', 'alembic'),
     ('alembic/script.py.mako', 'alembic'),
     ('alembic/versions/e560edf8b958_init.py', 'alembic/versions'),
+    ('alembic/versions/a9c3e1f07b42_aggregators.py', 'alembic/versions'),
 ]
 
 hiddenimports = [

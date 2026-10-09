@@ -13,23 +13,22 @@
 выставляют только наши PRAGMA, и столкновение с заранее заведённой
 таблицей.
 
-Миграции проекта здесь до конца не доводятся: в последней ревизии лежат
-настоящие учётные данные пользователя, и в тестовую базу им попадать нельзя.
-Поэтому следствия разведены по двум сторожам, и каждый берёт то, что на его
-наборе наблюдаемо. «Миграции нашлись» проверяется на настоящих миграциях
-проекта — только у них есть свой путь, который и может указать в пустоту, —
-а «дошли до последней» на подложенном наборе из двух ревизий, потому что у
-проектного дойти до конца нельзя. Прогон в обоих случаях настоящий.
+Следствия разведены по двум сторожам, и каждый берёт то, что на его наборе
+наблюдаемо. «Миграции нашлись» проверяется на настоящих миграциях проекта —
+только у них есть свой путь, который и может указать в пустоту, — а «дошли до
+последней» на подложенном наборе из двух ревизий: его последнюю ревизию тест
+знает сам и не следит за ростом проектной истории. Прогон в обоих случаях
+настоящий.
 """
 
 import re
-import sqlite3
 from pathlib import Path
 
 from alembic import command
 
 from backend.bootstrap import alembic_config, ensure_schema
 from tests.conftest import INIT_REVISION
+from tests.dbio import sqlite_rows, sqlite_tables
 
 _ENV_PY = '''
 from alembic import context
@@ -61,23 +60,8 @@ def downgrade():
 '''
 
 
-def _tables(db_file) -> set[str]:
-    connection = sqlite3.connect(db_file)
-    try:
-        rows = connection.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table'"
-        ).fetchall()
-    finally:
-        connection.close()
-    return {name for (name,) in rows}
-
-
 def _revision_reached(db_file) -> str:
-    connection = sqlite3.connect(db_file)
-    try:
-        return connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-    finally:
-        connection.close()
+    return sqlite_rows(db_file, "SELECT version_num FROM alembic_version")[0][0]
 
 
 def _project_of_two_revisions(root, db_file) -> None:
@@ -114,7 +98,7 @@ def test_the_migrations_are_found_from_a_foreign_working_directory(
 
     command.upgrade(alembic_config(), INIT_REVISION)
 
-    assert "vacancy" in _tables(migrations_target)
+    assert "vacancy" in sqlite_tables(migrations_target)
 
 
 def test_the_schema_is_brought_to_the_latest_revision(
@@ -131,7 +115,7 @@ def test_the_schema_is_brought_to_the_latest_revision(
 
     ensure_schema()
 
-    assert {"первая", "вторая"} <= _tables(migrations_target)
+    assert {"первая", "вторая"} <= sqlite_tables(migrations_target)
     assert _revision_reached(migrations_target) == "second"
 
 

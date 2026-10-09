@@ -12,7 +12,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.models.base import Base, IdMixin, UpdatedAtMixin
+from backend.models.base import Base, IdMixin, UpdatedAtMixin, enum_column
+from backend.models.enums import Gender, SalaryPeriod
 
 profile_experience_skills = Table(
     "profile_experience_skills",
@@ -43,6 +44,14 @@ class Profile(IdMixin, UpdatedAtMixin, Base):
         JSON, server_default=text("'[]'")
     )
     free_preferences: Mapped[str | None]
+    expected_salary: Mapped[int | None]
+    expected_salary_currency: Mapped[str | None]
+    expected_salary_period: Mapped[SalaryPeriod | None] = mapped_column(
+        enum_column(SalaryPeriod, "salary_period")
+    )
+    first_name_latin: Mapped[str | None]
+    last_name_latin: Mapped[str | None]
+    gender: Mapped[Gender | None] = mapped_column(enum_column(Gender, "gender"))
 
 
 class ProfileLanguage(IdMixin, Base):

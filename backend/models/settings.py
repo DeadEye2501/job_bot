@@ -74,6 +74,23 @@ class TgAccount(IdMixin, UpdatedAtMixin, Base):
     session_blob_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
 
 
+class MailAccount(IdMixin, UpdatedAtMixin, Base):
+    """Почта, с которой уходят отклики письмом. Только отправка по SMTP.
+
+    Пароль приложения шифруется тем же Fernet, что секреты Telegram.
+    """
+
+    __tablename__ = "mail_account"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_mail_account_singleton"),
+    )
+
+    address: Mapped[str | None]
+    smtp_host: Mapped[str | None]
+    smtp_port: Mapped[int | None]
+    password_encrypted: Mapped[str | None]
+
+
 class LlmConfig(IdMixin, UpdatedAtMixin, Base):
     """OpenAI-compatible LLM endpoint config. Two rows: kind=chat, kind=embed."""
 
