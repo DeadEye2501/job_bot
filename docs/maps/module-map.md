@@ -482,12 +482,13 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def capitalized_company_name(name: str | None) -> str | None` (32)
 
-### `backend/domain/contact_keys.py` — 50 строк
+### `backend/domain/contact_keys.py` — 91 строк
 
-Нормальная форма контакта вакансии, по которой два написания признаются одним.
+Что считать одним контактом вакансии: перечень делится на контакты, а два
 
 Зависит от: `backend.domain.hosts`
 
+- `def split_contacts(value: str) -> list[str]` (22)
 - `def contact_key(value: str) -> str` (18)
 - `def _link_key(text: str) -> str` (11)
 
@@ -1228,7 +1229,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (36)
 
-### `backend/llm/vacancy.py` — 497 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 480 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
@@ -1955,13 +1956,13 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def create_vacancy(session: AsyncSession, fields: dict) -> int` (39)
 
-### `backend/repository/vacancy_contacts.py` — 85 строк
+### `backend/repository/vacancy_contacts.py` — 87 строк
 
 Контакты вакансии, кроме Telegram-HR.
 
 Зависит от: `backend.domain.contact_keys`, `backend.models`
 
-- `async def replace_parsed_contact(session: AsyncSession, vacancy_id: int, value: str | None) -> None` (18)
+- `async def replace_parsed_contact(session: AsyncSession, vacancy_id: int, value: str | None) -> None` (20)
 - `async def add_contact(session: AsyncSession, vacancy_id: int, value: str, added_by: ContactAddedBy) -> None` (21)
 - `async def has_contact(session: AsyncSession, vacancy_id: int, value: str) -> bool` (3)
 - `async def _contact_row(session: AsyncSession, vacancy_id: int, key: str) -> VacancyContact | None` (9)
@@ -3723,13 +3724,13 @@ seed initial data
 Тестов: 7
 
 
-### `tests/backend/test_flows_parse_contacts.py` — 159 строк
+### `tests/backend/test_flows_parse_contacts.py` — 230 строк
 
 Контакт, найденный разбором, ложится контактом вакансии, а заметки остаются
 
 Зависит от: `backend.flows`, `backend.models`, `backend.repository.vacancies_card`, `backend.repository.vacancy_contacts`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 7
+Тестов: 10
 
 - `async def _contacts(session_factory) -> list[tuple[str, str, str]]` (3)
 

@@ -9,7 +9,7 @@ import httpx
 
 from adapters.lm_chat import ChatRequest, chat
 from backend.domain.company_names import capitalized_company_name
-from backend.domain.contact_keys import EMAIL_PATTERN, PHONE_PATTERN
+from backend.domain.contact_keys import CONTACT_ADDRESS_RE, DOMAIN_PATTERN
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.domain.telegram_identity import normalize_username
 from backend.payloads import ParsedVacancy
@@ -196,27 +196,10 @@ PARSE_VACANCY_PROMPT = """Ты парсишь пост с вакансией и�
 # («КА https://example.com/», «Brand foo.com»). Регексп ловит trailing
 # URL/домен и вырезает; в `parsed_vacancy_from_json` вырезанный URL уезжает в
 # company_website если оно пусто.
-_DOMAIN = r"(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}"
-_TRAILING_URL_RE = re.compile(rf"\s*(https?://[^\s)]+|{_DOMAIN}(?:/[^\s)]*)?)\)?\s*$")
-
-
-# Sanitiser для other_contact: пост часто кончается ссылкой-словом
-# («Откликнуться», «Подробнее»), и способ отклика приезжает подписью. Адрес к
-# ней теперь подставляет чтение поста (`extract_post_text`), но подставить
-# нечего, когда ссылки нет вовсе, — а «пишите в комментарии» модель приносит
-# как контакт и без неё. Такая подпись легла бы контактом вакансии
-# «Откликнуться»: контакт вроде бы есть, а откликаться по нему некуда.
-# Настоящий способ отклика узнаётся по адресу внутри строки — почте, ссылке,
-# домену, телефону.
-_CONTACT_ADDRESS_RE = re.compile(
-    rf"""
-      {EMAIL_PATTERN}                                   # почта
-    | https?://\S+                                      # ссылка целиком
-    | {_DOMAIN}(?:/\S*)?                                # домен
-    | {PHONE_PATTERN}                                   # телефон
-    """,
-    re.VERBOSE,
+_TRAILING_URL_RE = re.compile(
+    rf"\s*(https?://[^\s)]+|{DOMAIN_PATTERN}(?:/[^\s)]*)?)\)?\s*$"
 )
+
 
 # Адрес, дописанный за подписью ссылки при чтении поста (`extract_post_text`).
 # Модель приносит их вместе — «контакты в описании (https://acme.com/jobs)», — а
@@ -293,7 +276,7 @@ def _address_after_label(value: str) -> str:
     остаётся дословной.
     """
     labelled = _LABELLED_ADDRESS_RE.search(value)
-    if labelled and _CONTACT_ADDRESS_RE.fullmatch(labelled.group(1)):
+    if labelled and CONTACT_ADDRESS_RE.fullmatch(labelled.group(1)):
         return labelled.group(1)
     return value
 
@@ -336,7 +319,7 @@ def _way_to_apply(other_contact: str | None) -> str | None:
     if not other_contact:
         return other_contact
     other_contact = _address_after_label(other_contact)
-    if _CONTACT_ADDRESS_RE.search(other_contact):
+    if CONTACT_ADDRESS_RE.search(other_contact):
         return other_contact
     logger.debug("parse_vacancy: способ отклика без адреса отброшен: %r", other_contact)
     return None
