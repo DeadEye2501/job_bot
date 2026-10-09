@@ -101,15 +101,65 @@ async def run_in_slot(
     месте её никто не станет ждать, и она осталась бы висеть
     неисполненной.
     """
-    if bot.current_poll_task is not None:
-        logger.info("%s: another cycle is already running, skipping", label)
+    if not _occupy(bot, label):
         return "busy", None
-    fire(bot.on_cycle_start, "on_cycle_start")
     if progress is not None:
         fire(bot.on_progress, "on_progress", *progress)
     try:
         outcome, result = await _run_task(bot, work, label)
     finally:
-        bot.current_poll_task = None
-        fire(bot.on_cycle_end, "on_cycle_end")
+        _release(bot)
     return outcome, result
+
+
+def launch_in_slot(bot, work: Callable[[], Any], label: str) -> bool:
+    """Занять место прогона отдельной задачей и вернуться сразу.
+
+    Обход агрегаторов ждёт человека до часа. Цикл бота при этом должен
+    тикать: таймер Ghosting, смена режима, проверка остановки.
+
+    Обёртка записывается в `current_poll_task` сразу — место занято с первого
+    мгновения; первым шагом `_run_task` подменяет её задачей работы, и «Стоп»
+    гасит уже её. Освобождает место конец обёртки, а не `finally` в ней:
+    погашенная до первого шага задача не исполнит ни строки.
+    """
+    if not _occupy(bot, label):
+        return False
+    task = asyncio.create_task(_run_task(bot, work, label))
+    bot.current_poll_task = task
+    bot.launched_task = task
+    task.add_done_callback(lambda _done: _release(bot))
+    return True
+
+
+async def settle_slot(bot, timeout: float) -> None:
+    """Погасить работу, запущенную отдельной задачей, и дождаться её конца.
+
+    Остановка бота зовёт это до закрытия клиентов: иначе они закрылись бы
+    под живым обходом, а снос данных удалял бы профиль открытого браузера.
+    """
+    launched = bot.launched_task
+    if launched is None or launched.done():
+        return
+    if bot.current_poll_task is not None:
+        bot.current_poll_task.cancel()
+    # `wait`, а не `wait_for`: погашенная до первого шага обёртка бросила бы
+    # отмену сюда, и остановка не дошла бы до закрытия клиентов.
+    _done, pending = await asyncio.wait({launched}, timeout=timeout)
+    if pending:
+        logger.warning("работа в месте прогона не кончилась за %s с", timeout)
+
+
+def _occupy(bot, label: str) -> bool:
+    """Занять место прогона; занято — отказ с записью в журнал."""
+    if bot.current_poll_task is not None:
+        logger.info("%s: another cycle is already running, skipping", label)
+        return False
+    fire(bot.on_cycle_start, "on_cycle_start")
+    return True
+
+
+def _release(bot) -> None:
+    """Освободить место и сказать окну, что прогон кончился."""
+    bot.current_poll_task = None
+    fire(bot.on_cycle_end, "on_cycle_end")

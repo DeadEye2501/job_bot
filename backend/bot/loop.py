@@ -5,12 +5,16 @@ from dataclasses import replace
 import asyncio
 
 from adapters import telegram
-from backend.bot import slot
+from backend.bot import aggregators, slot
 from backend.flows.dm_backfill import catch_up_missed_dms
 from backend.repository.bot_mode import read_mode
 from backend.models import BotMode
 
 logger = logging.getLogger(__name__)
+
+# Обход, погашенный при остановке, закрывает браузер и сервер инструментов —
+# сервер гаснет по своему сроку в пять секунд.
+_SETTLE_SEC = 15
 
 
 async def log_out_session(bot) -> None:
@@ -93,6 +97,8 @@ async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None:
     # выбрасывает: `drain=True` разбирает его напоследок — иначе пачка писем,
     # застигнутая выключением, осталась бы без вердикта до ручного прогона.
     if mode is BotMode.OFF and prev_mode is not BotMode.OFF:
+        # Обход агрегаторов — отдельная задача и тиков не ждёт: Off гасит его сразу.
+        slot.cancel_current_poll(bot)
         logger.info("Transition into OFF; draining DM debouncers")
         await bot.ingestion.cancel_pending_dm_classifications(drain=True)
     if mode is not BotMode.OFF and prev_mode is BotMode.OFF:
@@ -144,6 +150,7 @@ async def _tick(bot, mode: BotMode) -> None:
         # Оборот может тихо не сделать ничего: место прогона мог
         # занять ручной прогон из окна.
         await slot.run_in_slot(bot, lambda: _ingest_round(bot), "poll cycle")
+        await aggregators.launch_round(bot)
 
 
 async def _ingest_round(bot) -> None:
@@ -256,6 +263,7 @@ async def run(bot, *, once: bool = False) -> None:
                 logger.debug("Run-loop exiting after stop request")
                 return
     finally:
+        await slot.settle_slot(bot, timeout=_SETTLE_SEC)
         await _disconnect(bot)
 
 

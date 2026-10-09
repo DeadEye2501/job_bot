@@ -81,21 +81,25 @@ async def _new_title(kit: AgentKit, vacancy_id: int) -> str | None:
     return vacancy.title or "вакансия"
 
 
-async def _ways_for(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> list[Way]:
-    if order.only is not None:
-        return [order.only]
-    async with kit.pipeline.session_factory() as session:
-        vacancy = await session.get(Vacancy, order.vacancy_id)
+async def vacancy_ways(session_factory, vacancy_id: int, closed: set[int]) -> list[Way]:
+    """Способы отклика на вакансию по порядку — одни для фазы откликов и для окна выбора."""
+    async with session_factory() as session:
+        vacancy = await session.get(Vacancy, vacancy_id)
         if vacancy is None:
             return []
-        contacts = [c.value for c in await list_contacts(session, order.vacancy_id)]
+        contacts = [c.value for c in await list_contacts(session, vacancy_id)]
         aggregators = await list_aggregators(session)
         mail_ready = await get_mail_account(session) is not None
     sites = [KnownSite(a.id, a.host, a.is_logged_in) for a in aggregators if a.host]
     source = next((KnownSite(a.id, a.host) for a in aggregators
                    if a.id == vacancy.source_aggregator_id), None)
-    return apply_ways(ApplyFacts(vacancy.source_url, source, contacts, sites,
-                                 mail_ready, round_.closed_aggregators))
+    return apply_ways(ApplyFacts(vacancy.source_url, source, contacts, sites, mail_ready, closed))
+
+
+async def _ways_for(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> list[Way]:
+    if order.only is not None:
+        return [order.only]
+    return await vacancy_ways(kit.pipeline.session_factory, order.vacancy_id, round_.closed_aggregators)
 
 
 async def _one_way(kit: AgentKit, round_: RoundState, order: ApplyOrder, way: Way) -> str:

@@ -5,13 +5,16 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from adapters.browser import find_browser
 from backend.provider_config import LlmProviderConfig
 from backend.telegram_login import username_of
+from backend.agent.availability import current_refusal
 from client.bridge.answer import BAD_PAYLOAD, Denied, denied, reply
 from client.bridge.bot_stop import detach_bot, stop_bot
 from client.bridge.hub import Hub
 from client.bridge.llm import PROVIDER_KINDS, Llm, read_llm_creds
 from client.bridge.login import Login
+from client.bridge.mail import Mail
 from client.bridge.wire import _llm_provider_to_dict, _tg_creds_to_dict
 
 
@@ -43,12 +46,12 @@ APP_KEYS = (
 """
 
 
-class Settings(Login, Llm):
+class Settings(Login, Llm, Mail):
     """Настройки времени выполнения, какими их правит окно.
 
-    Разрезано на три файла по ответственности: сами настройки здесь, вход в
-    Telegram и разговор с поставщиком модели — у примесей рядом. Поверхность у
-    них при этом одна: окно видит один экран настроек, а не три, и примесь
+    Разрезано на четыре файла по ответственности: сами настройки здесь, вход в
+    Telegram, разговор с поставщиком модели и почта для откликов — у примесей
+    рядом. Поверхность у них при этом одна: окно видит один экран настроек, и примесь
     здесь — способ разложить этот экран по файлам, а не задел под вторую
     реализацию.
 
@@ -70,6 +73,7 @@ class Settings(Login, Llm):
         async def run() -> dict:
             rs = self._hub.rs
             tg = rs.tg
+            browser = find_browser()
             return {
                 "tg": {
                     **_tg_creds_to_dict(tg),
@@ -90,6 +94,8 @@ class Settings(Login, Llm):
                     "aggregator_backfill_limit": rs.aggregator_backfill_limit,
                     "show_browser": rs.show_browser,
                     "letter_writer": rs.letter_writer,
+                    "lock": current_refusal(self._hub.rs.chat),
+                    "browser": browser.name if browser else None,
                 },
             }
 

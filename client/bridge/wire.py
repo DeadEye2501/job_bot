@@ -420,3 +420,16 @@ def _vacancy_list_row_to_dict(
         "created_at": _iso(v.created_at),
         "last_activity_at": _iso(last_activity),
     }
+
+
+def _aggregator_row_to_dict(row) -> dict:
+    """Строка агрегатора на экране «Агрегаторы»; «Поиск по сети» — строка без хоста."""
+    return {
+        "id": row.id,
+        "name": row.name,
+        "host": row.host,
+        "is_active": bool(row.is_active),
+        "is_logged_in": bool(row.is_logged_in),
+        "last_run_at": _iso(row.last_run_at),
+        "is_web_search": row.host is None,
+    }

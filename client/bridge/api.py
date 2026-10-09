@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+from client.bridge.aggregators import Aggregators
 from client.bridge.blacklist import Blacklist
 from client.bridge.channels import Channels
 from client.bridge.companies import Companies
@@ -27,6 +28,7 @@ class Api:
     """Корень поверхности: держит домены, собранные из одного хозяйства."""
 
     def __init__(self, hub: Hub) -> None:
+        self.aggregators = Aggregators(hub)
         self.blacklist = Blacklist(hub)
         self.channels = Channels(hub)
         self.companies = Companies(hub)
