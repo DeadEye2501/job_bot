@@ -286,7 +286,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 148 модулей
+## backend — 149 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -553,14 +553,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def _word_match(text_lower: str, variant: str) -> bool` (4)
 - `def check_blacklist(raw_text: str, patterns: list[str]) -> str | None` (18)
 
-### `backend/domain/company_hosts.py` — 103 строк
+### `backend/domain/company_hosts.py` — 104 строк
 
 Хосты, которые не бывают домашним сайтом компании.
 
-Зависит от: —
+Зависит от: `backend.domain.hosts`
 
 - `def _is_brand_domain(host: str) -> bool` (15)
-- `def is_aggregator_host(host: str) -> bool` (12)
+- `def is_aggregator_host(host: str) -> bool` (11)
 
 ### `backend/domain/company_names.py` — 39 строк
 
@@ -617,15 +617,17 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def percent_or_none(numerator: int, denominator: int) -> int | None` (14)
 
-### `backend/domain/hosts.py` — 60 строк
+### `backend/domain/hosts.py` — 82 строк
 
-Хост адреса в нормальной форме и остальные части адреса.
+Разбор адреса: нормальный хост, остаток, принадлежность сайту, номер страницы.
 
 Зависит от: `backend.domain.company_names`
 
 - `class AddressParts(NamedTuple)` (5)
 - `def normalize_host(url: str | None) -> str` (21)
 - `def address_parts(url: str) -> AddressParts` (17)
+- `def host_owns(host: str, link_host: str) -> bool` (6)
+- `def source_key(url: str, aggregator_host: str | None) -> str | None` (12)
 - `def _without_scheme(url: str) -> str` (3)
 
 ### `backend/domain/resume_marks.py` — 62 строк
@@ -1583,6 +1585,21 @@ First-run bootstrap: ensure DB schema exists.
 - `def _skill_lines(skills, places, today: date) -> list[str]` (9)
 - `def _place_lines(places) -> list[str]` (7)
 - `def _years(years: int) -> str` (2)
+
+### `backend/repository/aggregators.py` — 108 строк
+
+Ведение записей об агрегаторах.
+
+Зависит от: `backend.domain.hosts`, `backend.models`, `backend.repository.vacancies_life`
+
+- `async def create_aggregator(session: AsyncSession, address: str) -> tuple[Aggregator | None, str]` (12)
+- `async def list_aggregators(session: AsyncSession) -> list[Aggregator]` (5)
+- `async def set_aggregator_active(session: AsyncSession, aggregator_id: int, active: bool) -> str` (8)
+- `async def set_logged_in(session: AsyncSession, aggregator_id: int, logged_in: bool) -> None` (5)
+- `async def mark_run(session: AsyncSession, aggregator_id: int, started_at: datetime) -> None` (4)
+- `async def applications_of(session: AsyncSession, aggregator_id: int) -> int` (12)
+- `async def delete_aggregator(session: AsyncSession, aggregator_id: int) -> str` (26)
+- `async def round_sources(session: AsyncSession) -> list[Aggregator]` (8)
 
 ### `backend/repository/app_settings.py` — 33 строк
 
@@ -2954,7 +2971,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 276 модулей
+## tests — 278 модулей
 
 ### `tests/adapters/test_app_tied_process.py` — 100 строк
 
@@ -3058,13 +3075,13 @@ seed initial data
 Тестов: 3
 
 
-### `tests/backend/conftest.py` — 61 строк
+### `tests/backend/conftest.py` — 63 строк
 
 Фикстуры слоя `backend`, собранные из модулей по предметам.
 
-Зависит от: `tests.backend.fixtures.backfill`, `tests.backend.fixtures.bot`, `tests.backend.fixtures.entry`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.listing`, `tests.backend.fixtures.logs`, `tests.backend.fixtures.rerun`, `tests.backend.fixtures.stats`
+Зависит от: `tests.backend.fixtures.aggregators`, `tests.backend.fixtures.backfill`, `tests.backend.fixtures.bot`, `tests.backend.fixtures.entry`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.listing`, `tests.backend.fixtures.logs`, `tests.backend.fixtures.rerun`, `tests.backend.fixtures.stats`
 
-Отдаёт наружу: `applied`, `busy_slot`, `caught_up`, `channel_titles`, `chatting`, `chatting_on_fakes`, `clean_log_file`, `clean_root_logger`, `deliver`, `dm_pipeline`, `empty_media_dir`, `entry`, `hr_names`, `known_hr`, `lock_of_its_own`, `make_bot`, `make_pipeline`, `outbox`, `parsing`, `ready_to_send`, `rerunning`, `sending_unlocked`, `titles`, `turn_and_settle`, `unparsed_vacancy`
+Отдаёт наружу: `applied`, `busy_slot`, `caught_up`, `channel_titles`, `chatting`, `chatting_on_fakes`, `clean_log_file`, `clean_root_logger`, `deliver`, `dm_pipeline`, `empty_media_dir`, `entry`, `hr_names`, `known_hr`, `lock_of_its_own`, `make_bot`, `make_pipeline`, `outbox`, `parsing`, `ready_to_send`, `rerunning`, `sending_unlocked`, `titles`, `turn_and_settle`, `unparsed_vacancy`, `web_search`
 
 
 ### `tests/backend/fixtures/__init__.py` — 1 строк
@@ -3073,6 +3090,14 @@ seed initial data
 
 Зависит от: —
 
+
+### `tests/backend/fixtures/aggregators.py` — 15 строк
+
+Строка «Поиск по сети»: миграция заводит её раз, а стенд чистит таблицы после каждого теста.
+
+Зависит от: `backend.models`, `backend.repository.aggregators`, `tests.dbio`, `tests.factories_aggregators`
+
+- `async def web_search(session_factory) -> Aggregator` (4)
 
 ### `tests/backend/fixtures/backfill.py` — 75 строк
 
@@ -3543,13 +3568,13 @@ seed initial data
 Тестов: 9
 
 
-### `tests/backend/test_domain_hosts.py` — 23 строк
+### `tests/backend/test_domain_hosts.py` — 58 строк
 
 Адрес, разобранный на хост и остаток: по хосту сравнивают сайты, по остатку —
 
 Зависит от: `backend.domain.hosts`
 
-Тестов: 3
+Тестов: 10
 
 
 ### `tests/backend/test_domain_salary.py` — 435 строк ⚠ подошёл к 300
@@ -4312,6 +4337,15 @@ seed initial data
 Тестов: 6
 
 - `async def _person(session_factory, **fields)` (4)
+
+### `tests/backend/test_repository_aggregators.py` — 109 строк
+
+Ведение агрегаторов: заведение, включение, вход, удаление, порядок обхода.
+
+Зависит от: `backend.models`, `backend.repository.aggregators`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
+
+Тестов: 10
+
 
 ### `tests/backend/test_repository_blacklist_adding.py` — 150 строк
 

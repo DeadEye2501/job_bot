@@ -1,4 +1,4 @@
-"""Хост адреса в нормальной форме и остальные части адреса."""
+"""Разбор адреса: нормальный хост, остаток, принадлежность сайту, номер страницы."""
 
 from typing import NamedTuple
 from urllib.parse import urlsplit
@@ -53,6 +53,28 @@ def address_parts(url: str) -> AddressParts:
     return AddressParts(
         normalize_host(url), parts.path.strip("/"), parts.query, parts.fragment
     )
+
+
+def host_owns(host: str, link_host: str) -> bool:
+    """Ссылка принадлежит сайту, если её хост равен его хосту или кончается на точку и его хост.
+
+    Хвост берётся с точкой: `spb.hh.ru` — та же площадка, а `nothh.ru` — нет.
+    """
+    return link_host == host or link_host.endswith("." + host)
+
+
+def source_key(url: str, aggregator_host: str | None) -> str | None:
+    """Номер вакансии: у агрегатора — путь страницы, у поиска по сети — хост и путь.
+
+    Сайты в сети разные, и одну страницу от другой отличает только адрес
+    целиком. Номер в адресе у агрегатора, устроенного иначе, дописывается здесь.
+    """
+    parts = address_parts(url)
+    if not parts.host or not parts.path:
+        return None
+    if aggregator_host is None:
+        return f"{parts.host}/{parts.path}".lower()
+    return parts.path if host_owns(aggregator_host, parts.host) else None
 
 
 def _without_scheme(url: str) -> str:

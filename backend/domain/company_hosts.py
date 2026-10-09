@@ -11,6 +11,8 @@
 `xing.com`, которого не было в коде.
 """
 
+from backend.domain.hosts import host_owns
+
 AGGREGATOR_HOSTS = frozenset({
     # Агрегаторы вакансий, соцсети, мессенджеры, блог-платформы: ссылка на
     # канал, профиль или пост говорит о компании не больше, чем её отсутствие.
@@ -97,7 +99,6 @@ def is_aggregator_host(host: str) -> bool:
     """
     if not host:
         return False
-    for known in AGGREGATOR_HOSTS:
-        if host == known or host.endswith("." + known):
-            return True
+    if any(host_owns(known, host) for known in AGGREGATOR_HOSTS):
+        return True
     return _is_brand_domain(host)
