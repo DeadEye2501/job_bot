@@ -333,7 +333,7 @@ def _parsed_from_row(v: Vacancy) -> ParsedVacancy:
     return ParsedVacancy(
         **{**direct, "title": v.title or ""},
         company_website=None,
-        other_contact=None,
+        other_contacts=[],
         stack_required=list(v.stack or []),
         stack_preferred=[],
     )

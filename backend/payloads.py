@@ -233,11 +233,12 @@ class ParsedVacancy:
     company_name: str | None
     company_website: str | None
     hr_contact: str | None
-    # Любой не-Telegram способ откликнуться, который модель нашла в посте:
-    # почта, форма, страница вакансий, ссылка на площадку. Берётся дословно.
-    # Ложится контактом вакансии (`vacancy_contact`, добавлен разбором). None —
-    # кроме Telegram-аккаунта в посте контакта нет.
-    other_contact: str | None
+    # Все не-Telegram способы откликнуться, которые модель нашла в посте:
+    # почта, форма, страница вакансий, ссылка на площадку — каждый своим
+    # элементом и дословно. Каждый ложится своим контактом вакансии
+    # (`vacancy_contact`, добавлен разбором). Пусто — кроме Telegram-аккаунта
+    # в посте контакта нет.
+    other_contacts: list[str]
     # Stack split into "обязательные" (required) and "будет плюсом" (preferred)
     # at parse time by the LLM. Both lists are already version-stripped,
     # capitalized and unique across BOTH lists (the LLM is explicitly

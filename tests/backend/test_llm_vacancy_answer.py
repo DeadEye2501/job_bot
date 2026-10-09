@@ -62,7 +62,6 @@ def test_a_title_is_trimmed():
         "company_name",
         "company_website",
         "hr_contact",
-        "other_contact",
         "salary",
         "location",
     ],
@@ -106,12 +105,14 @@ def test_a_way_to_apply_without_an_address_is_dropped(raw_contact):
 
     Пост часто кончается ссылкой-словом, а до модели доезжает только её
     подпись — сам адрес остаётся в разметке сообщения. Записанная как есть,
-    она даёт в заметке вакансии «Контакты: Откликнуться»: строка есть, а
-    откликаться по ней некуда.
+    она даёт контакт вакансии «Откликнуться»: контакт есть, а откликаться по
+    нему некуда. Соседний способ с адресом остаётся.
     """
-    parsed = parsed_vacancy_from_json(_answer(other_contact=raw_contact))
+    parsed = parsed_vacancy_from_json(
+        _answer(other_contacts=[raw_contact, "jobs@acme.com"])
+    )
 
-    assert parsed.other_contact is None
+    assert parsed.other_contacts == ["jobs@acme.com"]
 
 
 @pytest.mark.parametrize(
@@ -126,9 +127,19 @@ def test_a_way_to_apply_without_an_address_is_dropped(raw_contact):
 )
 def test_a_way_to_apply_with_an_address_is_kept(raw_contact):
     """Способ отклика с адресом сохраняется дословно."""
-    parsed = parsed_vacancy_from_json(_answer(other_contact=raw_contact))
+    parsed = parsed_vacancy_from_json(_answer(other_contacts=[raw_contact]))
 
-    assert parsed.other_contact == raw_contact
+    assert parsed.other_contacts == [raw_contact]
+
+
+def test_every_way_to_apply_is_kept_in_its_own_item():
+    """Каждый способ отклика из списка модели остаётся своим элементом, в
+    порядке ответа; не-строка и пустота списка не портят."""
+    parsed = parsed_vacancy_from_json(
+        _answer(other_contacts=["jobs@acme.com", 42, "  ", "https://acme.com/apply"])
+    )
+
+    assert parsed.other_contacts == ["jobs@acme.com", "https://acme.com/apply"]
 
 
 @pytest.mark.parametrize(
@@ -152,13 +163,13 @@ def test_an_address_written_after_its_label_is_left_alone_of_the_label(
     """От подписи с адресом в скобках остаётся один адрес.
 
     Адрес спрятанной ссылки дописывается за её подписью при чтении поста
-    (`extract_post_text`), и модель приносит их вместе. В заметке вакансии
-    нужен способ отклика, а не пересказ поста: «Контакты: контакты в описании
+    (`extract_post_text`), и модель приносит их вместе. В контактах вакансии
+    нужен способ отклика, а не пересказ поста: «контакты в описании
     (https://…)» читается как сбой, а не как адрес.
     """
-    parsed = parsed_vacancy_from_json(_answer(other_contact=raw_contact))
+    parsed = parsed_vacancy_from_json(_answer(other_contacts=[raw_contact]))
 
-    assert parsed.other_contact == expected
+    assert parsed.other_contacts == [expected]
 
 
 def test_an_overlong_description_is_cut_with_an_ellipsis():
@@ -339,33 +350,26 @@ def test_a_non_telegram_hr_contact_moves_to_the_way_to_apply():
     записанная туда, она пропадает с глаз совсем — карточка поля собеседника
     не показывает. А способ отклика она настоящий.
     """
+    parsed = parsed_vacancy_from_json(_answer(hr_contact="hr@acme.com"))
+
+    assert parsed.hr_contact is None
+    assert parsed.other_contacts == ["hr@acme.com"]
+
+
+def test_a_non_telegram_hr_contact_joins_the_named_ways_to_apply():
+    """Способы, которые назвала модель, остаются, а почта из поля собеседника
+    встаёт за ними: она тоже адрес из поста."""
     parsed = parsed_vacancy_from_json(
-        _answer(hr_contact="hr@acme.com", other_contact=None)
+        _answer(hr_contact="hr@acme.com", other_contacts=["jobs@acme.com"])
     )
 
     assert parsed.hr_contact is None
-    assert parsed.other_contact == "hr@acme.com"
-
-
-def test_a_non_telegram_hr_contact_yields_to_an_occupied_way_to_apply():
-    """Занятый способ отклика чужой записью не перебивается.
-
-    Модель уже назвала, куда откликаться; запись из чужого поля тут не
-    надёжнее, а перебей она — человек ушёл бы не туда, куда сказано в посте.
-    """
-    parsed = parsed_vacancy_from_json(
-        _answer(hr_contact="hr@acme.com", other_contact="jobs@acme.com")
-    )
-
-    assert parsed.hr_contact is None
-    assert parsed.other_contact == "jobs@acme.com"
+    assert parsed.other_contacts == ["jobs@acme.com", "hr@acme.com"]
 
 
 def test_a_telegram_hr_contact_stays_where_it_is():
     """Ник в своём поле остаётся и способа отклика не занимает."""
-    parsed = parsed_vacancy_from_json(
-        _answer(hr_contact="@anna_hr", other_contact=None)
-    )
+    parsed = parsed_vacancy_from_json(_answer(hr_contact="@anna_hr"))
 
     assert parsed.hr_contact == "@anna_hr"
-    assert parsed.other_contact is None
+    assert parsed.other_contacts == []
