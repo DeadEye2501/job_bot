@@ -13,6 +13,7 @@ from backend.models import Company, HR, Vacancy, VacancyEvent, VacancyStatusHist
 from backend.payloads import VacancyDetail
 
 from backend.repository.vacancies_life import add_vacancy_event
+from backend.repository.vacancy_contacts import list_contacts
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,7 @@ async def get_vacancy_detail(
         events=await _newest_first(
             session, VacancyEvent, VacancyEvent.created_at, vacancy_id
         ),
+        contacts=await list_contacts(session, vacancy_id),
     )
 
 

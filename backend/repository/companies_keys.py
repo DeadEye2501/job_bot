@@ -9,7 +9,7 @@
 import re
 
 from backend.domain.company_hosts import is_aggregator_host
-from backend.domain.company_names import ADDRESS_START_RE
+from backend.domain.hosts import normalize_host
 from backend.incoming import text_or_none
 
 
@@ -86,31 +86,6 @@ def normalize_company_name(s: str | None) -> str:
     s = _translit_cyr_to_latin(s)
     s = re.sub(r"[^a-z0-9]+", " ", s)
     return " ".join(_without_edge_legal_forms(s.split()))
-
-
-def normalize_host(url: str | None) -> str:
-    """Хост сайта без схемы / www. / порта / пути / query / fragment /
-    завершающей точки. Пустая строка для None или невалидного URL.
-    Полный host (а не registrable domain) — чтобы `pay.yandex.ru` ≠
-    `yandex.ru` (subsidiary trap)."""
-    if not url:
-        return ""
-    s = url.strip().lower()
-    s = ADDRESS_START_RE.sub("", s)
-    s = s.lstrip("/")
-    # Срезаем path / query / fragment ДО того, как лезть в port:
-    # "sber.ru?utm=foo" без strip-а query превратился бы в host
-    # "sber.ru?utm=foo" и сломал бы host-match.
-    s = s.split("/", 1)[0]
-    s = s.split("?", 1)[0]
-    s = s.split("#", 1)[0]
-    s = s.split(":", 1)[0]
-    if s.startswith("www."):
-        s = s[4:]
-    # FQDN с завершающей точкой ("example.com.") — нормализуем к
-    # "example.com", иначе host-match отказывает на пустяковом расхождении.
-    s = s.rstrip(".")
-    return s
 
 
 def signal_host(host: str) -> str:

@@ -254,7 +254,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 134 модулей
+## backend — 137 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -483,6 +483,15 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def capitalized_company_name(name: str | None) -> str | None` (32)
 
+### `backend/domain/contact_keys.py` — 50 строк
+
+Нормальная форма контакта вакансии, по которой два написания признаются одним.
+
+Зависит от: `backend.domain.hosts`
+
+- `def contact_key(value: str) -> str` (18)
+- `def _link_key(text: str) -> str` (11)
+
 ### `backend/domain/currency.py` — 24 строк
 
 Карта валют: чем их называют в объявлении и каким знаком печатают.
@@ -520,6 +529,17 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: `backend.models`
 
 - `def percent_or_none(numerator: int, denominator: int) -> int | None` (14)
+
+### `backend/domain/hosts.py` — 60 строк
+
+Хост адреса в нормальной форме и остальные части адреса.
+
+Зависит от: `backend.domain.company_names`
+
+- `class AddressParts(NamedTuple)` (5)
+- `def normalize_host(url: str | None) -> str` (21)
+- `def address_parts(url: str) -> AddressParts` (17)
+- `def _without_scheme(url: str) -> str` (3)
 
 ### `backend/domain/resume_marks.py` — 62 строк
 
@@ -878,18 +898,18 @@ First-run bootstrap: ensure DB schema exists.
 - `async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool` (11)
 - `async def save_empty_vacancy(pipeline, vacancy_id: int, parsed: ParsedVacancy | None, *, reason: str=EMPTY_SKIP_REASON) -> bool` (33)
 
-### `backend/flows/parse_write.py` — 245 строк
+### `backend/flows/parse_write.py` — 250 строк
 
-Запись исхода разбора: строка вакансии, её компания и её собеседник.
+Запись исхода разбора: строка вакансии, её контакт, компания и собеседник.
 
-Зависит от: `backend.domain.salary`, `backend.models`, `backend.payloads`, `backend.repository.companies_matching`, `backend.repository.hr_identify`, `backend.repository.vacancies_life`, `backend.repository.vacancy_status`, `backend.telegram_lookup`
+Зависит от: `backend.domain.salary`, `backend.models`, `backend.payloads`, `backend.repository.companies_matching`, `backend.repository.hr_identify`, `backend.repository.vacancies_life`, `backend.repository.vacancy_contacts`, `backend.repository.vacancy_status`, `backend.telegram_lookup`
 
 - `class Outcome` (13)
 - `async def _resolve_hr(pipeline, parsed: ParsedVacancy | None)` (12)
-- `def _clear_parsed_fields(v: Vacancy, score: int) -> None` (14)
-- `def _apply_parsed_fields(v: Vacancy, parsed: ParsedVacancy | None, outcome: Outcome) -> None` (28)
+- `def _clear_parsed_fields(v: Vacancy, score: int) -> None` (13)
+- `def _apply_parsed_fields(v: Vacancy, parsed: ParsedVacancy | None, outcome: Outcome) -> None` (25)
 - `def _fields_filled(v: Vacancy) -> list[str]` (11)
-- `async def _write_parsed_row(session, vacancy_id: int, parsed: ParsedVacancy | None, outcome: Outcome) -> Vacancy | None` (21)
+- `async def _write_parsed_row(session, vacancy_id: int, parsed: ParsedVacancy | None, outcome: Outcome) -> Vacancy | None` (29)
 - `async def _resolve_company(pipeline, parsed) -> tuple[int | None, dict | None]` (32)
 - `async def _link_resolved_hr(session, v: Vacancy, resolved) -> tuple[HR | None, bool]` (12)
 - `def _parsed_event_payload(v: Vacancy, outcome: Outcome, decision) -> dict` (15)
@@ -1207,11 +1227,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (36)
 
-### `backend/llm/vacancy.py` — 497 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 496 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.company_names`, `backend.domain.taxonomy`, `backend.domain.telegram_identity`, `backend.incoming`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.rules`, `backend.llm.skills`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.company_names`, `backend.domain.contact_keys`, `backend.domain.taxonomy`, `backend.domain.telegram_identity`, `backend.incoming`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.rules`, `backend.llm.skills`, `backend.payloads`
 
 - `def _split_stack(data: dict) -> tuple[list, list]` (19)
 - `def _company_name_and_site(company_name: str | None, company_website: str | None) -> tuple[str | None, str | None]` (28)
@@ -1389,7 +1409,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 437 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 436 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -1405,11 +1425,11 @@ First-run bootstrap: ensure DB schema exists.
 - `class ParsedCvExperience` (9)
 - `class ParsedCv` (5)
 - `class Classification` (3)
-- `class ParsedVacancy` (40)
+- `class ParsedVacancy` (37)
   - `def stack(self) -> list[str]` (11)
 - `class PostGenre` (14)
 - `class FitValidation` (3)
-- `class VacancyDetail` (4)
+- `class VacancyDetail` (5)
 - `class HrWithCount` (6)
 - `class HrDetail` (18)
 - `class CompanyDetail` (13)
@@ -1543,16 +1563,15 @@ First-run bootstrap: ensure DB schema exists.
 - `def _carry_company_to_survivor(survivor: Company, taken: _AbsorbedCompany) -> None` (19)
 - `async def merge_company(session: AsyncSession, *, absorbed_id: int, survivor_id: int) -> None` (37)
 
-### `backend/repository/companies_keys.py` — 151 строк
+### `backend/repository/companies_keys.py` — 126 строк
 
 Приведение компании к ключам, по которым её сравнивают.
 
-Зависит от: `backend.domain.company_hosts`, `backend.domain.company_names`, `backend.incoming`
+Зависит от: `backend.domain.company_hosts`, `backend.domain.hosts`, `backend.incoming`
 
 - `def _translit_cyr_to_latin(s: str) -> str` (2)
 - `def _without_edge_legal_forms(words: list[str]) -> list[str]` (17)
 - `def normalize_company_name(s: str | None) -> str` (17)
-- `def normalize_host(url: str | None) -> str` (23)
 - `def signal_host(host: str) -> str` (11)
 - `def real_corporate_website(url: str | None) -> str | None` (15)
 - `def hosts_compatible(a: str, b: str) -> bool` (6)
@@ -1569,7 +1588,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Сведение разобранной из вакансии компании с уже заведённой.
 
-Зависит от: `backend.domain.company_names`, `backend.incoming`, `backend.llm.company`, `backend.models`, `backend.repository.companies_card`, `backend.repository.companies_keys`
+Зависит от: `backend.domain.company_names`, `backend.domain.hosts`, `backend.incoming`, `backend.llm.company`, `backend.models`, `backend.repository.companies_card`, `backend.repository.companies_keys`
 
 - `def _known_spellings(company: Company) -> tuple[str, list[str]]` (13)
 - `def _enrich_company_with_parsed(company: Company, parsed_name: str, parsed_website: str | None) -> None` (23)
@@ -1843,14 +1862,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def activity_ts(aggs: tuple)` (7)
 - `def join_activity(stmt, aggs: tuple)` (9)
 
-### `backend/repository/vacancies_card.py` — 223 строк
+### `backend/repository/vacancies_card.py` — 225 строк
 
 Поля одной вакансии.
 
-Зависит от: `backend.models`, `backend.payloads`, `backend.repository.vacancies_life`
+Зависит от: `backend.models`, `backend.payloads`, `backend.repository.vacancies_life`, `backend.repository.vacancy_contacts`
 
 - `async def _newest_first(session: AsyncSession, model, stamp, vacancy_id: int) -> list` (20)
-- `async def get_vacancy_detail(session: AsyncSession, vacancy_id: int) -> VacancyDetail | None` (29)
+- `async def get_vacancy_detail(session: AsyncSession, vacancy_id: int) -> VacancyDetail | None` (30)
 - `async def update_vacancy_notes(session: AsyncSession, vacancy_id: int, notes: str | None) -> Vacancy | None` (30)
 - `class _Link` (16)
 - `async def _link_name(session: AsyncSession, link: _Link, row_id: int | None) -> str | None` (13)
@@ -1890,7 +1909,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool` (32)
 - `async def add_vacancy_event(session: AsyncSession, vacancy_id: int, kind: str, payload: dict | None=None) -> VacancyEvent` (19)
 
-### `backend/repository/vacancies_list.py` — 451 строк ⚠ подошёл к 300
+### `backend/repository/vacancies_list.py` — 458 строк ⚠ подошёл к 300
 
 Отбор вакансий для списка на экране.
 
@@ -1898,7 +1917,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def _order_for(sort: str, freshness)` (34)
 - `def _like_anywhere(text: str) -> str` (18)
-- `def _search_clauses(search: str | None) -> tuple[list, set[str]]` (24)
+- `def _search_clauses(search: str | None) -> tuple[list, set[str]]` (30)
 - `def _choice_clauses(f: VacancyFilter) -> tuple[list, set[str]]` (41)
 - `def _salary_clauses(f: VacancyFilter) -> list` (34)
 - `def _range_clauses(f: VacancyFilter, freshness) -> list` (13)
@@ -1930,6 +1949,19 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: `backend.domain.salary`, `backend.domain.scoring`, `backend.domain.stack`, `backend.models`, `backend.repository.profile_skills`, `backend.repository.vacancies_life`
 
 - `async def create_vacancy(session: AsyncSession, fields: dict) -> int` (39)
+
+### `backend/repository/vacancy_contacts.py` — 85 строк
+
+Контакты вакансии, кроме Telegram-HR.
+
+Зависит от: `backend.domain.contact_keys`, `backend.models`
+
+- `async def replace_parsed_contact(session: AsyncSession, vacancy_id: int, value: str | None) -> None` (18)
+- `async def add_contact(session: AsyncSession, vacancy_id: int, value: str, added_by: ContactAddedBy) -> None` (21)
+- `async def has_contact(session: AsyncSession, vacancy_id: int, value: str) -> bool` (3)
+- `async def _contact_row(session: AsyncSession, vacancy_id: int, key: str) -> VacancyContact | None` (9)
+- `async def list_contacts(session: AsyncSession, vacancy_id: int) -> list[VacancyContact]` (7)
+- `async def delete_contact(session: AsyncSession, contact_id: int) -> int | None` (8)
 
 ### `backend/repository/vacancy_status.py` — 398 строк ⚠ подошёл к 300
 
@@ -2062,7 +2094,7 @@ Runtime settings layer.
 - `def _remove_the_data() -> list[str]` (27)
 - `async def wipe_all(engine) -> list[str]` (28)
 
-## client — 45 модулей
+## client — 46 модулей
 
 ### `client/bridge/__init__.py` — 23 строк
 
@@ -2559,10 +2591,10 @@ Runtime settings layer.
 
 Экран «Вакансии»: список, карточка и правки в них.
 
-Зависит от: `backend.domain.scoring`, `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.hub`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.vacancy_actions`, `client.bridge.vacancy_filter`, `client.bridge.vacancy_links`, `client.bridge.wire`
+Зависит от: `backend.domain.scoring`, `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.hub`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.vacancy_actions`, `client.bridge.vacancy_contacts`, `client.bridge.vacancy_filter`, `client.bridge.vacancy_links`, `client.bridge.wire`
 
 - `def _typed_text(raw) -> str | None` (8)
-- `class Vacancies(VacancyActions, VacancyLinks)` (257)
+- `class Vacancies(VacancyActions, VacancyLinks, VacancyContacts)` (256)
   - `def list(self, payload: dict | None=None) -> dict` (15)
   - `def filter_options(self) -> dict` (19)
     - `async def run() -> dict` (4)
@@ -2573,8 +2605,8 @@ Runtime settings layer.
     - `async def run() -> dict` (10)
   - `def save_history_explanation(self, payload: dict) -> dict` (38)
     - `async def run() -> dict` (21)
-  - `def change_status(self, payload: dict) -> dict` (35)
-    - `async def run() -> dict` (16)
+  - `def change_status(self, payload: dict) -> dict` (34)
+    - `async def run() -> dict` (15)
   - `def create(self, payload: dict) -> dict` (27)
     - `async def run() -> dict` (5)
   - `def create_from_text(self, payload: dict) -> dict` (28)
@@ -2592,6 +2624,19 @@ Runtime settings layer.
   - `def delete(self, payload: dict) -> dict` (22)
     - `async def run() -> dict` (14)
 
+### `client/bridge/vacancy_contacts.py` — 57 строк
+
+Контакты вакансии, которые человек правит в карточке.
+
+Зависит от: `backend.domain.contact_keys`, `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.refusals`, `client.bridge.vacancy_links`, `client.bridge.wire`
+
+- `class VacancyContacts` (38)
+  - `def add_contact(self, payload: dict) -> dict` (19)
+    - `async def run() -> dict` (8)
+  - `def delete_contact(self, payload: dict) -> dict` (15)
+    - `async def run() -> dict` (7)
+- `async def _contacts_of(session, vacancy_id: int) -> dict` (3)
+
 ### `client/bridge/vacancy_filter.py` — 55 строк
 
 Отбор списка вакансий, прочитанный из нагрузки окна.
@@ -2600,13 +2645,14 @@ Runtime settings layer.
 
 - `def read_vacancy_filter(payload: dict, page: Page) -> VacancyFilter` (34)
 
-### `client/bridge/vacancy_links.py` — 218 строк
+### `client/bridge/vacancy_links.py` — 227 строк
 
 Привязка вакансии к человеку и к компании: подборщики и их правки.
 
 Зависит от: `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.companies`, `client.bridge.form_payloads`, `client.bridge.hr`, `client.bridge.pickers`, `client.bridge.refusals`
 
-- `class VacancyLinks` (159)
+- `async def require_vacancy(session, vacancy_id: int) -> None` (8)
+- `class VacancyLinks` (158)
   - `def hr_picker(self, payload: dict) -> dict` (8)
   - `def company_picker(self, payload: dict) -> dict` (3)
   - `def create_options(self) -> dict` (18)
@@ -2620,7 +2666,7 @@ Runtime settings layer.
   - `def create_company(self, payload: dict) -> dict` (3)
   - `def _created(self, slot: str, payload: dict) -> dict` (26)
     - `async def run() -> dict` (5)
-  - `async def _picker(self, kind, vacancy_id: int, search: str | None) -> dict` (6)
+  - `async def _picker(self, kind, vacancy_id: int, search: str | None) -> dict` (5)
   - `async def _listing(self, session, kind, vacancy_id: int, search: str | None) -> dict` (12)
   - `async def _linked(self, setting, vacancy_id: int, other_id: int | None, action: str, missing: str)` (22)
 
@@ -2636,7 +2682,7 @@ Runtime settings layer.
 - `def _leave_later() -> None` (9)
 - `def _leave() -> None` (9)
 
-### `client/bridge/wire.py` — 407 строк ⚠ подошёл к 300
+### `client/bridge/wire.py` — 412 строк ⚠ подошёл к 300
 
 Перевод внутренних значений в словари, которые читает окно.
 
@@ -2654,8 +2700,9 @@ Runtime settings layer.
 - `def _hr_face(hr) -> dict` (13)
 - `def _status_change(row) -> dict` (15)
 - `def _vacancy_event(row) -> dict` (8)
+- `def _contact(c) -> dict` (2)
 - `def _salary(v) -> dict` (17)
-- `def _vacancy_detail_to_dict(detail, matched_set: set[str], score_threshold: int) -> dict` (39)
+- `def _vacancy_detail_to_dict(detail, matched_set: set[str], score_threshold: int) -> dict` (40)
 - `def _hr_picker_row_to_dict(item) -> dict` (18)
 - `def _hr_mini_row_to_dict(hr, vacancy_count: int) -> dict` (11)
 - `def _message_row_to_dict(m) -> dict` (19)
@@ -2762,7 +2809,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 266 модулей
+## tests — 270 модулей
 
 ### `tests/adapters/test_app_tied_process.py` — 65 строк
 
@@ -3294,6 +3341,15 @@ seed initial data
 Тестов: 7
 
 
+### `tests/backend/test_domain_contact_keys.py` — 52 строк
+
+Нормальная форма контакта вакансии: по ней два написания одного контакта
+
+Зависит от: `backend.domain.contact_keys`
+
+Тестов: 6
+
+
 ### `tests/backend/test_domain_dedup.py` — 68 строк
 
 Следствия, которые наблюдают тесты поиска похожего вектора.
@@ -3319,6 +3375,15 @@ seed initial data
 Зависит от: `backend.domain.fit_fields`
 
 Тестов: 9
+
+
+### `tests/backend/test_domain_hosts.py` — 23 строк
+
+Адрес, разобранный на хост и остаток: по хосту сравнивают сайты, по остатку —
+
+Зависит от: `backend.domain.hosts`
+
+Тестов: 3
 
 
 ### `tests/backend/test_domain_salary.py` — 435 строк ⚠ подошёл к 300
@@ -3641,13 +3706,23 @@ seed initial data
 Тестов: 7
 
 
-### `tests/backend/test_flows_parse_persist.py` — 452 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_parse_contacts.py` — 159 строк
+
+Контакт, найденный разбором, ложится контактом вакансии, а заметки остаются
+
+Зависит от: `backend.flows`, `backend.models`, `backend.repository.vacancies_card`, `backend.repository.vacancy_contacts`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
+
+Тестов: 7
+
+- `async def _contacts(session_factory) -> list[tuple[str, str, str]]` (3)
+
+### `tests/backend/test_flows_parse_persist.py` — 430 строк ⚠ подошёл к 300
 
 Что остаётся в базе после разбора объявления.
 
 Зависит от: `backend.flows`, `backend.models`, `backend.payloads`, `backend.repository.vacancy_status`, `tests.dbio`, `tests.factories`
 
-Тестов: 19
+Тестов: 18
 
 
 ### `tests/backend/test_flows_parse_unanswered.py` — 152 строк
@@ -4259,7 +4334,7 @@ seed initial data
 
 Следствия приведения имени и сайта компании к сравнимому виду.
 
-Зависит от: `backend.domain.company_hosts`, `backend.repository.companies_keys`
+Зависит от: `backend.domain.company_hosts`, `backend.domain.hosts`, `backend.repository.companies_keys`
 
 Тестов: 11
 
@@ -4633,13 +4708,13 @@ seed initial data
 Тестов: 12
 
 
-### `tests/backend/test_repository_vacancy_joins.py` — 364 строк ⚠ подошёл к 300
+### `tests/backend/test_repository_vacancy_joins.py` — 374 строк ⚠ подошёл к 300
 
 Следствия отбора в `list_vacancies` по тому, что лежит в соседних таблицах.
 
-Зависит от: `backend.repository.vacancies_list`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.repository.vacancies_list`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 18
+Тестов: 19
 
 
 ### `tests/backend/test_repository_vacancy_links.py` — 237 строк
@@ -5129,6 +5204,15 @@ seed initial data
 - `def broken_vacancy(session_factory, with_bot)` (13)
   - `async def _put()` (8)
     - `async def broken(vacancy_id)` (2)
+
+### `tests/client/test_bridge_vacancy_contacts.py` — 77 строк
+
+Контакты вакансии в карточке: человек добавляет и удаляет их руками.
+
+Зависит от: `backend.models`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
+
+Тестов: 6
+
 
 ### `tests/client/test_bridge_vacancy_create.py` — 427 строк ⚠ подошёл к 300
 
@@ -5633,5 +5717,6 @@ seed initial data
 - `Model` — наследник один: `Failing`
 - `Silent` — наследник один: `Stoppable`
 - `VacancyActions` — наследник один: `Vacancies`
+- `VacancyContacts` — наследник один: `Vacancies`
 - `VacancyLinks` — наследник один: `Vacancies`
 - `Wipe` — наследник один: `System`

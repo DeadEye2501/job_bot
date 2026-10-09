@@ -208,6 +208,10 @@ def _vacancy_event(row) -> dict:
     }
 
 
+def _contact(c) -> dict:
+    return {"id": c.id, "value": c.value, "added_by": c.added_by.value}
+
+
 def _salary(v) -> dict:
     """Зарплата на проводе: строка объявления и разобранные из неё числа.
 
@@ -261,6 +265,7 @@ def _vacancy_detail_to_dict(
         "source_url": v.source_url,
         "stack": _stack_items(v.stack, matched_set),
         "notes": v.notes,
+        "contacts": [_contact(c) for c in detail.contacts],
         "posted_at": _iso(v.posted_at),
         "created_at": _iso(v.created_at),
         "history": [_status_change(h) for h in detail.history],

@@ -17,6 +17,7 @@ from tests.factories import (
     hr_row,
     vacancy_row,
 )
+from tests.factories_aggregators import vacancy_contact_row
 
 
 async def test_search_looks_into_every_column_it_promises(titles, session_factory):
@@ -362,3 +363,12 @@ async def test_a_later_posted_at_moves_the_row_into_the_window(
     )
 
     assert await titles(date_from=at(30)) == ["дотянулась"]
+
+
+async def test_search_reaches_the_contacts_of_a_vacancy(titles, session_factory):
+    """Вакансию находят по её почте или ссылке, хотя в колонках вакансии их нет."""
+    found, other = vacancy_row(title="с контактом"), vacancy_row(title="мимо")
+    await put(session_factory, found, other)
+    await put(session_factory, vacancy_contact_row(found.id, "Needle@Corp.ru"))
+
+    assert await titles(search="needle@corp") == ["с контактом"]

@@ -1,4 +1,4 @@
-"""Запись исхода разбора: строка вакансии, её компания и её собеседник.
+"""Запись исхода разбора: строка вакансии, её контакт, компания и собеседник.
 
 Отделено от самого разбора: там решают, чем объявление кончилось, здесь это
 кладут в базу. Приговоров тут не выносят — исход приходит доводом (`Outcome`),
@@ -17,6 +17,7 @@ from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
 from backend.repository.companies_matching import find_or_create_company
 from backend.repository.hr_identify import find_or_create_hr
 from backend.repository.vacancies_life import add_vacancy_event
+from backend.repository.vacancy_contacts import replace_parsed_contact
 from backend.repository.vacancy_status import apply_parse_outcome
 from backend.telegram_lookup import fetch_telegram_avatar
 from backend.telegram_lookup import resolve_hr_telegram
@@ -68,7 +69,6 @@ def _clear_parsed_fields(v: Vacancy, score: int) -> None:
     v.salary_min = None
     v.salary_max = None
     v.salary_currency = None
-    v.notes = None
 
 
 def _apply_parsed_fields(
@@ -96,9 +96,6 @@ def _apply_parsed_fields(
         if v.score is None:
             v.score = outcome.score
     v.salary_min, v.salary_max, v.salary_currency = parse_salary(parsed.salary)
-    v.notes = (
-        f"Контакты: {parsed.other_contact}" if parsed.other_contact else None
-    )
 
 
 def _fields_filled(v: Vacancy) -> list[str]:
@@ -117,7 +114,12 @@ def _fields_filled(v: Vacancy) -> list[str]:
 async def _write_parsed_row(
     session, vacancy_id: int, parsed: ParsedVacancy | None, outcome: Outcome
 ) -> Vacancy | None:
-    """Записать исход разбора в саму строку вакансии; отдать её или пустоту.
+    """Записать исход разбора в саму строку вакансии и её найденный контакт;
+    отдать строку или пустоту.
+
+    Контакт пишется той же транзакцией, что и поля: найденное разбором не
+    расходится с разобранной строкой. Заметки принадлежат человеку — разбор
+    их не пишет и не стирает.
 
     Пустота означает «строки больше нет»: пользователь мог удалить её из
     окна, пока шёл разбор. Отвечать на это исключением нечем — исход уже
@@ -134,6 +136,9 @@ async def _write_parsed_row(
     v.skip_reason = outcome.skip_reason
     v.is_parsed = True
     _apply_parsed_fields(v, parsed, outcome)
+    await replace_parsed_contact(
+        session, vacancy_id, parsed.other_contact if parsed is not None else None
+    )
     return v
 
 

@@ -10,13 +10,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.company_names import capitalized_company_name
+from backend.domain.hosts import normalize_host
 from backend.models import Company
 from backend.incoming import str_list
 from backend.repository.companies_card import add_company_spellings, create_company
 from backend.repository.companies_keys import (
     hosts_compatible,
     normalize_company_name,
-    normalize_host,
     real_corporate_website,
     signal_host,
 )
