@@ -305,7 +305,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 159 модулей
+## backend — 163 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -400,6 +400,24 @@ init
 - `def _bounds(last_run: datetime | None, limit: int, today: date) -> list[str]` (7)
 - `def _since(last_run: datetime | None) -> str` (4)
 
+### `backend/agent/tools_applier.py` — 136 строк
+
+Инструменты откликателя: своя вакансия, запись отклика на сайте и отклик письмом.
+
+Зависит от: `adapters`, `adapters.smtp_mail`, `backend.agent.jobs`, `backend.agent.kit`, `backend.models`, `backend.repository.applications`, `backend.repository.mail_account`, `backend.repository.vacancy_brief`, `backend.repository.vacancy_contacts`
+
+- `def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]` (30)
+  - `async def vacancy() -> str` (4)
+  - `async def record_application(via: str, target: str, letter: str='', screening: list[dict] | None=None, already_applied: bool=False) -> str` (12)
+  - `async def send_email(address: str, subject: str, body: str) -> str` (5)
+- `class _Report` (7)
+- `def _entry(job: ApplyJob, report: _Report) -> ApplicationEntry` (7)
+- `def _lines(screening: list[dict]) -> list[tuple[bool, str]]` (2)
+- `async def _record(kit: AgentKit, job: ApplyJob, entry: ApplicationEntry) -> str` (7)
+- `async def _append(kit: AgentKit, application_id: int, lines: list[tuple[bool, str]]) -> str` (7)
+- `async def _send_email(kit: AgentKit, job: ApplyJob, report: _Report, subject: str) -> str` (24)
+- `async def _deliver(account: MailAccountConfig, mail: OutgoingMail) -> str | None` (11)
+
 ### `backend/agent/tools_browser.py` — 96 строк
 
 Инструменты браузера для агента: открыть, снять, нажать, ввести, выбрать, приложить резюме.
@@ -436,6 +454,18 @@ init
   - `async def report_login(logged_in: bool) -> str` (6)
 - `def _report_failure(job: ApplyJob) -> Callable` (9)
   - `async def report_failure(reason: str) -> str` (6)
+
+### `backend/agent/tools_letter.py` — 58 строк
+
+Инструмент письма для отклика: пишет приложение или сверяется письмо агента.
+
+Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.llm.agent_letter`, `backend.models`, `backend.repository.agent_profile`
+
+- `def letter_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]` (17)
+  - `async def letter(language: str, limit: int=0, subject: str='', body: str='') -> str` (12)
+- `async def _ask(kit: AgentKit, job: ApplyJob, language: str, limit: int) -> LetterAsk | None` (8)
+- `async def _written(kit: AgentKit, job: ApplyJob, ask: LetterAsk) -> str` (7)
+- `async def _checked(kit: AgentKit, job: ApplyJob, ask: LetterAsk, own: Letter) -> str` (6)
 
 ### `backend/agent/tools_seeker.py` — 109 строк
 
@@ -1148,7 +1178,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _still_there(pipeline, vacancy_id: int) -> bool` (8)
 - `async def _save_pasted_vacancy(pipeline, text: str, embedding: list[float], posted_at: datetime | None) -> int` (15)
 
-### `backend/flows/pipeline.py` — 352 строк ⚠ подошёл к 300
+### `backend/flows/pipeline.py` — 360 строк ⚠ подошёл к 300
 
 Сборка конвейера: его состояние, общие ресурсы и поверхность для зовущих.
 
@@ -1158,7 +1188,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _declare_window_hooks(pipeline) -> None` (32)
 - `def _declare_dm_debounce(pipeline) -> None` (19)
 - `class LmProviders` (14)
-- `class IngestionPipeline` (219)
+- `class IngestionPipeline` (227)
   - `def mark_shutting_down(self) -> None` (5)
   - `def spawn_backfill(self, work, what: str, *, extra: dict | None=None) -> None` (26)
     - `async def _run() -> None` (7)
@@ -1166,7 +1196,8 @@ First-run bootstrap: ensure DB schema exists.
   - `def fire_contacts_changed(self) -> None` (2)
   - `def fire_vacancies_changed(self) -> None` (2)
   - `async def reload_resources(self) -> None` (28)
-  - `def cv_path(self)` (11)
+  - `def cv_path(self)` (10)
+  - `def cv_file(self) -> Path | None` (8)
   - `async def check_ghosting_timeouts(self) -> int` (2)
   - `async def rerun_pipeline_for_vacancy(self, vacancy_id) -> rerun.RerunPipelineOutcome` (4)
   - `async def recover_orphan_vacancies(self) -> int` (2)
@@ -1740,6 +1771,18 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def put_app_setting(session: AsyncSession, key: str, value: str) -> None` (7)
 
+### `backend/repository/applications.py` — 79 строк
+
+Отклики вне Telegram и скрининг по ним.
+
+Зависит от: `backend.domain.contact_keys`, `backend.models`, `backend.repository.vacancies_life`, `backend.repository.vacancy_status`, `backend.telegram_time`
+
+- `class ApplicationEntry` (12)
+- `async def application_exists(session: AsyncSession, vacancy_id: int, target: str) -> bool` (2)
+- `async def record_application(session: AsyncSession, entry: ApplicationEntry, *, forced: bool) -> int` (22)
+- `async def append_screening(session: AsyncSession, application_id: int, lines) -> None` (8)
+- `async def _existing(session: AsyncSession, vacancy_id: int, target: str) -> Application | None` (6)
+
 ### `backend/repository/blacklist.py` — 322 строк ⚠ подошёл к 300
 
 Ведение чёрного списка.
@@ -2242,6 +2285,15 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: `backend.domain.salary`, `backend.domain.scoring`, `backend.domain.stack`, `backend.models`, `backend.repository.profile_skills`, `backend.repository.vacancies_life`
 
 - `async def create_vacancy(session: AsyncSession, fields: dict) -> int` (39)
+
+### `backend/repository/vacancy_brief.py` — 39 строк
+
+Вакансия текстом для агента.
+
+Зависит от: `backend.llm.external`, `backend.models`, `backend.repository.vacancy_contacts`
+
+- `async def describe_vacancy(session: AsyncSession, vacancy_id: int) -> str | None` (20)
+- `async def _source(session: AsyncSession, vacancy: Vacancy) -> str` (8)
 
 ### `backend/repository/vacancy_contacts.py` — 85 строк
 
@@ -3122,7 +3174,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 288 модулей
+## tests — 293 модулей
 
 ### `tests/adapters/test_app_tied_process.py` — 100 строк
 
@@ -3448,6 +3500,16 @@ seed initial data
 
 - `def _task(vacancy_text='Текст вакансии', profile_text='Анкета', **job) -> str` (7)
 
+### `tests/backend/test_agent_tools_applier.py` — 119 строк
+
+Откликатель пишет отклик только на свою вакансию и только своим способом.
+
+Зависит от: `backend.agent.jobs`, `backend.agent.tools_applier`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`
+
+Тестов: 8
+
+- `def _job(vacancy_id, **over) -> ApplyJob` (3)
+
 ### `tests/backend/test_agent_tools_browser.py` — 86 строк
 
 Инструменты браузера: что агент видит и что доходит до страницы.
@@ -3458,7 +3520,7 @@ seed initial data
 
 - `def _tools(page, resume=None)` (2)
 
-### `tests/backend/test_agent_tools_common.py` — 98 строк
+### `tests/backend/test_agent_tools_common.py` — 92 строк
 
 Общие инструменты агента: анкета, вход, итог, неудача.
 
@@ -3468,6 +3530,29 @@ seed initial data
 
 - `class _Gate` (7)
   - `async def wait(self, kind, host, _browser)` (3)
+
+### `tests/backend/test_agent_tools_email.py` — 134 строк
+
+Отклик письмом: только на адрес из контактов, только с резюме, второй раз не уходит.
+
+Зависит от: `backend.agent.jobs`, `backend.agent.tools_applier`, `backend.models`, `backend.repository.app_settings`, `backend.repository.mail_account`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
+
+Тестов: 8
+
+- `def sent(monkeypatch)` (4)
+- `def ready(session_factory, session, tmp_path, make_pipeline)` (23)
+  - `async def build(*, simulated=False, mail=True, resume=True)` (18)
+
+### `tests/backend/test_agent_tools_letter.py` — 81 строк
+
+Письмо для отклика: пишет приложение или сверяется письмо агента; две отбивки — предел.
+
+Зависит от: `backend.agent.tools_letter`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`, `tests.fakes.llm`
+
+Тестов: 6
+
+- `def _written(body: str, subject: str='Отклик')` (2)
+- `async def _letter(make_pipeline, session_factory, answers, *, writer='app')` (7)
 
 ### `tests/backend/test_agent_tools_seeker.py` — 151 строк
 
@@ -4566,6 +4651,17 @@ seed initial data
 Тестов: 10
 
 
+### `tests/backend/test_repository_applications.py` — 93 строк
+
+Отклик вне Telegram: строка, скрининг и Applied — одной транзакцией.
+
+Зависит от: `backend.models`, `backend.repository.applications`, `tests.dbio`, `tests.factories`
+
+Тестов: 6
+
+- `def _entry(vacancy_id, **over) -> ApplicationEntry` (6)
+- `async def _record(session, entry, forced=False)` (3)
+
 ### `tests/backend/test_repository_blacklist_adding.py` — 150 строк
 
 Следствия заведения строки чёрного списка.
@@ -5129,6 +5225,15 @@ seed initial data
 Тестов: 5
 
 - `async def _noted(session, channel_id: int, msg_id: int, reason: str) -> None` (5)
+
+### `tests/backend/test_repository_vacancy_brief.py` — 34 строк
+
+Вакансия текстом для агента: чья она, где она и её текст — данными.
+
+Зависит от: `backend.repository.vacancy_brief`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
+
+Тестов: 3
+
 
 ### `tests/backend/test_repository_vacancy_contacts.py` — 15 строк
 
@@ -5931,13 +6036,14 @@ seed initial data
 - `def application_row(vacancy_id: int, **overrides) -> Application` (9)
 - `def screening_row(application_id: int, position: int, **overrides) -> Screening` (5)
 
-### `tests/fakes/agent.py` — 17 строк
+### `tests/fakes/agent.py` — 27 строк
 
 Набор сессии агента без браузера, водителя и человека.
 
-Зависит от: `backend.agent.kit`
+Зависит от: `backend.agent.jobs`, `backend.agent.kit`
 
 - `def tool(tools, name)` (3)
+- `def apply_job(vacancy_id: int, **overrides) -> ApplyJob` (7)
 - `def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit` (3)
 
 ### `tests/fakes/browser.py` — 111 строк

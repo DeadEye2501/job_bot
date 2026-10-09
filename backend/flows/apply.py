@@ -196,13 +196,13 @@ async def _full_letter(
             "vacancy %d: cover letter generation failed, skipping send", vacancy_id
         )
         return None, "cover_letter_failed"
-    cv_path = pipeline.cv_path()
-    if cv_path is None or not cv_path.is_file():
+    cv_file = pipeline.cv_file()
+    if cv_file is None:
         logger.warning(
-            "vacancy %d: CV file missing (%s), skipping send", vacancy_id, cv_path
+            "vacancy %d: CV file missing (%s), skipping send", vacancy_id, pipeline.cv_path()
         )
         return None, "cv_missing"
-    return _Letter(body, cv_path), None
+    return _Letter(body, cv_file), None
 
 
 async def _hand_letter_over(
