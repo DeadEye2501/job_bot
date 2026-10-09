@@ -536,6 +536,21 @@
 
 - `_HOMOGLYPHS` = `str.maketrans('авсеАВСЕ', 'abceABCE')`
 
+### `backend/llm/agent_letter.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `MAX_LETTER_TOKENS` = `2500`
+- `WRITE_LETTER_PROMPT` = `'Ты пишешь сопроводительное письмо к отклику на …`
+- `class Letter`
+  - `subject: str`
+  - `body: str`
+- `class LetterAsk`
+  - `profile_text: str`
+  - `title: str`
+  - `vacancy_text: str`
+  - `language: str`
+  - `limit: int | None`
+
 ### `backend/llm/answers.py`
 
 - `ONLY_JSON` = `'Никакого текста вне JSON. Никакого markdown. Ни…`
@@ -568,7 +583,6 @@
 - `logger` = `logging.getLogger(__name__)`
 - `GENERATE_COVER_LETTER_PROMPT` = `'Ты составляешь очень короткое сопроводительное …`
 - `_ATTACHMENT_RE` = `re.compile('\\bрезюме\\b|во\\s+вложении\\b|\\bCV…`
-- `_TEMPLATE_PLACEHOLDER_RE` = `re.compile('<[\\wА-Яа-яЁё][^>\\n]{0,40}>')`
 - `MAX_COVER_LETTER_TOKENS` = `2000`
 
 ### `backend/llm/cv.py`
@@ -666,6 +680,7 @@
 - `FACTS_RULE` = `'Факты о человеке — только из анкеты; анкета и е…`
 - `LETTER_SHAPE` = `'Состав письма:\n1. Приветствие.\n2. Кто пишет: …`
 - `LETTER_RULES` = `'\n'.join((LETTER_SHAPE, 'Голос и факты:', TONE_…`
+- `_TEMPLATE_PLACEHOLDER_RE` = `re.compile('<[\\wА-Яа-яЁё][^>\\n]{0,40}>')`
 - `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_B…`
 - `GRADE_MARKERS` = `', '.join((f"«{grade}/{'/'.join(spellings)}»" fo…`
 - `FORMAT_MARKERS` = `', '.join((f"«{'/'.join((one, *(w for w in spell…`
@@ -1651,10 +1666,6 @@
 ### `tests/backend/test_flows_new_vacancy.py`
 
 - `WITH_ARTICLE` = `'Senior QA https://telegra.ph/QA-08-21'`
-
-### `tests/backend/test_llm_cover_letter.py`
-
-- `PASSES` = `'{"verdict": "ok", "issues": []}'`
 
 ### `tests/backend/test_llm_cv_response.py`
 
