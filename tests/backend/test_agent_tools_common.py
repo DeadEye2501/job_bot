@@ -1,12 +1,12 @@
 """Общие инструменты агента: анкета, вход, итог, неудача."""
 
-from backend.agent.jobs import Applied, ApplyJob, Failed, Finished, LoginJob, Source
+from backend.agent.jobs import Applied, Failed, Finished, LoginJob, Source
 from backend.agent.tools_common import common_tools
 from backend.models import Aggregator
 from tests.dbio import all_rows, put
 from tests.factories import profile_row
 from tests.factories_aggregators import aggregator_row
-from tests.fakes.agent import kit_for, tool
+from tests.fakes.agent import apply_job, kit_for, tool
 
 
 async def test_the_profile_tool_gives_the_whole_profile(make_pipeline, session_factory):
@@ -53,9 +53,7 @@ async def test_a_finish_the_role_does_not_know_is_refused(make_pipeline, session
 
 
 async def test_a_failure_is_recorded_for_the_applier(make_pipeline):
-    job = ApplyJob(vacancy_id=1, method="form", target="https://site.test/f",
-                   aggregator_id=None, profile_id=1, forced=False, simulated=False,
-                   letter_writer="app")
+    job = apply_job(1)
 
     await tool(common_tools(kit_for(await make_pipeline()), job), "report_failure")(
         reason="форма требует отчество"
@@ -66,9 +64,7 @@ async def test_a_failure_is_recorded_for_the_applier(make_pipeline):
 
 async def test_a_recorded_application_cannot_be_turned_into_a_failure(make_pipeline):
     """Иначе код пошёл бы к следующему способу и откликнулся второй раз."""
-    job = ApplyJob(vacancy_id=1, method="form", target="https://site.test/f",
-                   aggregator_id=None, profile_id=1, forced=False, simulated=False,
-                   letter_writer="app", outcome=Applied(7))
+    job = apply_job(1, outcome=Applied(7))
     tools = common_tools(kit_for(await make_pipeline()), job)
 
     await tool(tools, "report_failure")(reason="передумал")
@@ -88,9 +84,7 @@ class _Gate:
 
 async def test_the_applier_asks_for_a_human_on_the_site_of_its_method(make_pipeline):
     gate = _Gate()
-    job = ApplyJob(vacancy_id=1, method="form", target="https://www.Company.test/apply",
-                   aggregator_id=None, profile_id=1, forced=False, simulated=False,
-                   letter_writer="app")
+    job = apply_job(1, target="https://www.Company.test/apply")
     need_human = tool(common_tools(kit_for(await make_pipeline(), gate=gate), job), "need_human")
 
     assert await need_human(kind="captcha") == "готово"

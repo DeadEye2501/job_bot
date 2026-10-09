@@ -275,6 +275,18 @@
 - `SEEKER_PROMPT` = `'Твоя задача — найти на сайте агрегатора свежие …`
 - `WEB_SEEKER_PROMPT` = `'Твоя задача — найти по всей сети свежие ваканси…`
 
+### `backend/agent/tools_applier.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `_AGGREGATOR` = `набор из 2`
+- `_FORM` = `набор из 2`
+- `_ALLOWED` = `словарь из 2`
+- `class _Report`
+  - `via: str`
+  - `target: str`
+  - `letter: str | None`
+  - `screening: list[tuple[bool, str]]`
+
 ### `backend/agent/tools_browser.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -286,6 +298,11 @@
 
 - `_ALREADY_APPLIED` = `'Отклик уже записан, итог не меняется: второй от…`
 - `_RESULTS` = `словарь из 3`
+
+### `backend/agent/tools_letter.py`
+
+- `_CHECKS_ALLOWED` = `2`
+- `_ENOUGH` = `'отбито дважды: отправляй без письма, если поле …`
 
 ### `backend/agent/tools_seeker.py`
 
@@ -1313,6 +1330,19 @@
 ### `backend/repository/app_settings.py`
 
 - `CV_PATH_KEY` = `'cv_path'`
+
+### `backend/repository/applications.py`
+
+- `_EXPLANATION` = `словарь из 3`
+- `class ApplicationEntry`
+  - `vacancy_id: int`
+  - `aggregator_id: int | None`
+  - `via: ApplicationVia`
+  - `target: str`
+  - `letter: str | None`
+  - `letter_by: str | None`
+  - `screening: list[tuple[bool, str]]`
+  - `simulated: bool`
 
 ### `backend/repository/blacklist.py`
 
