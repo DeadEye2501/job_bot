@@ -26,7 +26,7 @@
 
 import os
 
-from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
 binaries = collect_dynamic_libs('llama_cpp')
 
@@ -38,6 +38,8 @@ datas = [
     ('alembic/script.py.mako', 'alembic'),
     ('alembic/versions/e560edf8b958_init.py', 'alembic/versions'),
     ('alembic/versions/a9c3e1f07b42_aggregators.py', 'alembic/versions'),
+    # Драйвер Playwright — node и его пакет: без них браузер агента не стартует.
+    *collect_data_files('playwright'),
 ]
 
 hiddenimports = [
@@ -65,6 +67,12 @@ hiddenimports = [
     # файл модели, — называем его явно, чтобы он наверняка попал в граф.
     'llama_cpp',
     *collect_submodules('anthropic'),
+    # Агент: MCP-сервер, HTTP-сервер под ним и браузер. Playwright ввозится в
+    # теле функции, а uvicorn выбирает цикл и протоколы по строке имени —
+    # граф импортов не видит ни того, ни другого.
+    *collect_submodules('mcp'),
+    *collect_submodules('uvicorn'),
+    'playwright.async_api',
 ]
 
 

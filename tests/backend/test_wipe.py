@@ -84,6 +84,20 @@ async def test_the_lock_and_the_database_go_too(data_dir):
     assert list(data_dir.iterdir()) == []
 
 
+async def test_the_browser_profiles_go_too(data_dir):
+    """Профили браузера агента уходят тем же движением.
+
+    В профиле лежат куки и вход на агрегаторы: переживи он снос, следующий
+    человек за этим ноутбуком откликался бы от чужого имени.
+    """
+    profile = data_dir / "browser" / "3"
+    profile.mkdir(parents=True)
+    (profile / "Cookies").write_bytes(b"\x00")
+
+    assert await wipe_all(None) == []
+    assert list(data_dir.iterdir()) == []
+
+
 async def test_a_file_held_by_someone_else_is_reported(
     data_dir, monkeypatch, caplog
 ):

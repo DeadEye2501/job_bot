@@ -97,19 +97,20 @@ def data_dirs() -> list[Path]:
     """Папки, которые приложение держит в каталоге данных.
 
     Имена объявлены не здесь, а там, где эти папки заводятся, — у сеансов
-    Telegram и у вложений; здесь только перечень для тех, кому нужен весь
-    каталог целиком.
+    Telegram, у вложений и у профилей браузера агента; здесь только перечень
+    для тех, кому нужен весь каталог целиком.
 
     Берётся из объявлений имя, а путь собирается заново: те объявления
     считаются один раз, при ввозе модуля, и за сменившимся каталогом данных не
     идут. Ввоз отложен в тело по той же причине, по какой эти модули ввозят
     `config`: наверху вышел бы круг.
     """
+    from adapters.browser import BROWSER_DIR
     from adapters.telegram import SESSIONS_DIR
     from backend.bot.media import MEDIA_DIR
 
     data_dir = get_data_dir()
-    return [data_dir / SESSIONS_DIR.name, data_dir / MEDIA_DIR.name]
+    return [data_dir / SESSIONS_DIR.name, data_dir / MEDIA_DIR.name, data_dir / BROWSER_DIR.name]
 
 
 def get_log_path() -> Path:

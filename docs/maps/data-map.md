@@ -26,13 +26,27 @@
 - `_EXTENDED_LIMIT_INFORMATION` = `9`
 - `_PROCESS_SET_QUOTA` = `256`
 - `_PROCESS_TERMINATE` = `1`
+- `_SNAPPROCESS` = `2`
+- `_INVALID_HANDLE` = `wintypes.HANDLE(-1).value`
 - `class _IoCounters(ctypes.Structure)`
   - `_fields_` = `[(name, ctypes.c_uint64) for name in ('ReadOpera…`
 - `class _BasicLimit(ctypes.Structure)`
   - `_fields_` = `набор из 9`
 - `class _ExtendedLimit(ctypes.Structure)`
   - `_fields_` = `набор из 6`
+- `class _ProcessEntry(ctypes.Structure)`
+  - `_fields_` = `набор из 10`
 - `_job` = `None`
+
+### `adapters/browser.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `BROWSER_DIR` = `get_data_dir() / 'browser'`
+- `_PROGRAMS` = `набор из 3`
+- `class InstalledBrowser`
+  - `name: str`
+  - `channel: str | None`
+  - `executable: Path | None`
 
 ### `adapters/claude.py`
 
@@ -1614,6 +1628,7 @@
 - `pytestmark` = `pytest.mark.skipif(sys.platform != 'win32', reas…`
 - `ROOT` = `Path(__file__).resolve().parents[2]`
 - `_APP` = `'\nimport os, subprocess, sys\nfrom adapters imp…`
+- `_PARENT` = `'\nimport subprocess, sys, time\ngrandchild = su…`
 
 ### `tests/adapters/test_claude.py`
 

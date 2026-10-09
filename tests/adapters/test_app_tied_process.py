@@ -1,9 +1,11 @@
-"""Дочерний процесс, привязанный к приложению, не переживает его аварийный выход.
+"""Привязка к приложению: кого Windows снимет вместе с ним и кого не тронет.
 
-Проверка на настоящих процессах Windows: «приложение» здесь — промежуточный
-Python, который поднимает «внука», привязывает его (или нет) через
-`tie_to_app` и обрывается без единой уборки. Подставной процесс ничего бы не
-доказал: снимает внука система, а не наш код.
+Аварийный выход проверяется на настоящих процессах: «приложение» здесь —
+промежуточный Python, который поднимает «внука», привязывает его (или нет)
+через `tie_to_app` и обрывается без единой уборки. Подставной процесс ничего
+бы не доказал: снимает внука система, а не наш код. Отбор дочерних по имени
+и по родству — тоже на настоящих: чужой процесс, попавший в привязку, погас
+бы вместе с приложением.
 """
 
 import os
@@ -12,6 +14,8 @@ import sys
 from pathlib import Path
 
 import pytest
+
+from adapters import app_tied_process
 
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="задания есть только в Windows")
 
@@ -63,3 +67,34 @@ def test_an_untied_child_outlives_the_app():
         assert _alive(pid)
     finally:
         subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+
+
+def test_only_children_with_the_name_are_tied(monkeypatch):
+    """Драйвер браузера привязывается к приложению, а прочие дочерние — нет."""
+    tied = []
+    monkeypatch.setattr(app_tied_process, "tie_to_app", tied.append)
+    monkeypatch.setattr(app_tied_process, "_children", lambda: [(11, "NODE.EXE"), (12, "chrome.exe")])
+
+    assert app_tied_process.tie_children_named("node.exe") == 1
+    assert tied == [11]
+
+
+_PARENT = """
+import subprocess, sys, time
+grandchild = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+print(grandchild.pid, flush=True)
+time.sleep(30)
+"""
+
+
+def test_only_the_apps_own_children_are_listed():
+    """Внук приложения — уже не его дочерний: в отбор попадает только прямой потомок."""
+    with subprocess.Popen([sys.executable, "-c", _PARENT], stdout=subprocess.PIPE, text=True) as child:
+        try:
+            grandchild = int(child.stdout.readline())
+            listed = [pid for pid, _ in app_tied_process._children()]
+
+            assert child.pid in listed
+            assert grandchild not in listed
+        finally:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(child.pid)], capture_output=True)
