@@ -6,7 +6,7 @@ from backend.domain.contact_keys import contact_key
 from backend.models import ContactAddedBy
 from backend.repository import vacancy_contacts
 from backend.incoming import text_or_none
-from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, asked_id, bad_fields, denied, reply
 from client.bridge.refusals import NO_ENTRY
 from client.bridge.vacancy_links import require_vacancy
 from client.bridge.wire import _contact
@@ -36,10 +36,9 @@ class VacancyContacts:
         return reply(self._hub.runner, run())
 
     def delete_contact(self, payload: dict) -> dict:
-        try:
-            contact_id = int(payload["contact_id"])
-        except BAD_PAYLOAD as e:
-            return bad_fields("delete_contact", e)
+        contact_id, refused = asked_id(payload, "contact_id", "delete_contact")
+        if refused is not None:
+            return refused
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:

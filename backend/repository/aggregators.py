@@ -73,10 +73,10 @@ async def applications_of(session: AsyncSession, aggregator_id: int) -> int:
 async def delete_aggregator(session: AsyncSession, aggregator_id: int) -> str:
     """Удалить агрегатор. Вакансии, отклики и отметки о мусоре остаются, ссылка на него — нет.
 
-    Как удаление канала (`delete_channel`): ссылки обнуляет код, правила
-    «обнулить при удалении» у внешних ключей нет. Вакансии отвязывает общее
-    `repoint_vacancies`; отклики и мусор — другие таблицы, и у каждой свой
-    запрос: обобщать `repoint_vacancies` на любую модель его докстрока запрещает.
+    Ссылки обнуляет код: правила «обнулить при удалении» у внешних ключей нет.
+    Вакансии отвязывает общее `repoint_vacancies`; отклики и мусор — другие
+    таблицы, и у каждой свой запрос: обобщать `repoint_vacancies` на любую
+    модель его докстрока запрещает.
     """
     block = await deletion_block(session, aggregator_id)
     if block is not None:

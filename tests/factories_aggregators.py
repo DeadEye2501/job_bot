@@ -8,6 +8,7 @@ from backend.models import (
     Screening,
     VacancyContact,
 )
+from backend.repository.aggregators import WEB_SEARCH_NAME
 from tests.factories import EPOCH
 
 
@@ -16,6 +17,11 @@ def aggregator_row(**overrides) -> Aggregator:
     fields = {"name": "HeadHunter", "host": "hh.ru"}
     fields.update(overrides)
     return Aggregator(**fields)
+
+
+def web_search_row(**overrides) -> Aggregator:
+    """Строка «Поиск по сети»: без хоста, под своим именем."""
+    return aggregator_row(**{"name": WEB_SEARCH_NAME, "host": None, **overrides})
 
 
 def vacancy_contact_row(vacancy_id: int, value: str, **overrides) -> VacancyContact:

@@ -13,8 +13,9 @@ from backend.models import BotMode
 logger = logging.getLogger(__name__)
 
 # Обход, погашенный при остановке, закрывает браузер и сервер инструментов —
-# сервер гаснет по своему сроку в пять секунд.
-_SETTLE_SEC = 15
+# сервер гаснет по своему сроку в пять секунд. Срок короче того, которым окно
+# ждёт бота (`client/bridge/bot_stop.STOP_TIMEOUT_S`): иначе снос данных пошёл бы под открытым браузером.
+_SETTLE_SEC = 8
 
 
 async def log_out_session(bot) -> None:
@@ -98,7 +99,7 @@ async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None:
     # застигнутая выключением, осталась бы без вердикта до ручного прогона.
     if mode is BotMode.OFF and prev_mode is not BotMode.OFF:
         # Обход агрегаторов — отдельная задача и тиков не ждёт: Off гасит его сразу.
-        slot.cancel_current_poll(bot)
+        slot.cancel_launched(bot)
         logger.info("Transition into OFF; draining DM debouncers")
         await bot.ingestion.cancel_pending_dm_classifications(drain=True)
     if mode is not BotMode.OFF and prev_mode is BotMode.OFF:
@@ -150,7 +151,10 @@ async def _tick(bot, mode: BotMode) -> None:
         # Оборот может тихо не сделать ничего: место прогона мог
         # занять ручной прогон из окна.
         await slot.run_in_slot(bot, lambda: _ingest_round(bot), "poll cycle")
-        await aggregators.launch_round(bot)
+        # Опрос каналов идёт минутами: Off или остановка, пришедшие за это
+        # время, обход поднять уже не должны — он открыл бы браузер.
+        if not bot.stop_event.is_set() and await current_mode(bot) is BotMode.FULL:
+            await aggregators.launch_round(bot)
 
 
 async def _ingest_round(bot) -> None:

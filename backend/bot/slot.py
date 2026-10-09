@@ -48,6 +48,13 @@ def cancel_current_poll(bot) -> None:
     on_runner_loop(bot, task.cancel)
 
 
+def cancel_launched(bot) -> None:
+    """Погасить работу, запущенную отдельной задачей; опрос каналов не трогать."""
+    launched = bot.launched_task
+    if launched is not None and not launched.done():
+        cancel_current_poll(bot)
+
+
 async def _run_task(bot, work: Callable[[], Any], label: str):
     """Прогнать работу задачей; отдать исход и её ответ.
 

@@ -113,6 +113,11 @@ async def _one_way(kit: AgentKit, round_: RoundState, order: ApplyOrder, way: Wa
     if way.method != _EMAIL:
         await kit.browser.open_profile(job.profile_id)
     end = await run_guarded(kit, plan)
+    if job.delivery is not None:
+        # Сессия снята по сроку, пока сервер почты принимал письмо: исход
+        # способа — то, чем кончится отправка, а не пустота. `wait`, а не
+        # `gather`: остановка обхода в это время не должна оборвать отправку.
+        await asyncio.wait({job.delivery})
     if end.limit_exhausted:
         raise LimitExhausted
     return await _settle_way(kit, round_, job)

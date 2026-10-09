@@ -15,7 +15,7 @@ from backend.repository.stats_pipeline import get_stats_channels_pipeline
 from tests.backend.fixtures.stats import rows_by_channel
 from tests.dbio import put
 from tests.factories import channel_row, days_ago, status_history_row, vacancy_row
-from tests.factories_aggregators import aggregator_row
+from tests.factories_aggregators import aggregator_row, web_search_row
 
 
 async def test_an_empty_database_gives_no_rows(session):
@@ -342,7 +342,7 @@ async def test_an_aggregator_gets_its_own_row_with_its_junk(session, session_fac
 
 
 async def test_web_search_gets_its_own_row(session, session_factory):
-    web = aggregator_row(name=WEB_SEARCH_NAME, host=None)
+    web = web_search_row()
     await put(session_factory, web)
     await put(session_factory, vacancy_row(source_aggregator_id=web.id, source_key="a.test/jobs/1"))
 

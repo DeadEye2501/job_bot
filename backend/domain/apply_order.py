@@ -65,17 +65,21 @@ def _button(facts: ApplyFacts) -> Way | None:
 
 
 def _form(facts: ApplyFacts) -> Way | None:
-    """Своя страница у находки поиска по сети, иначе любая ссылка не на агрегатор человека."""
+    """Своя страница у находки поиска по сети, иначе любая ссылка не на агрегатор человека.
+
+    Страница агрегатора человека формой не бывает и у находки сети: веб-поиск
+    обходит их по наставлению, а не по запрету, и принести может.
+    """
     source = facts.source_site
-    if source is not None and source.host is None and facts.source_url:
-        return Way(_FORM, facts.source_url, None)
-    contact_links = [c.strip() for c in facts.contacts if is_link(c)]
-    return next((Way(_FORM, link, None) for link in contact_links
+    web_find = source is not None and source.host is None and facts.source_url
+    candidates = [facts.source_url] if web_find else []
+    candidates += [c.strip() for c in facts.contacts if is_link(c)]
+    return next((Way(_FORM, link, None) for link in candidates
                  if _owner(link, facts.sites) is None), None)
 
 
 def _links(facts: ApplyFacts) -> list[str]:
-    from_source = [facts.source_url] if facts.source_site and facts.source_site.host and facts.source_url else []
+    from_source = [facts.source_url] if facts.source_site and facts.source_url else []
     return from_source + [c.strip() for c in facts.contacts if is_link(c)]
 
 

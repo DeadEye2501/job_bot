@@ -102,6 +102,8 @@ async def _send_email(kit: AgentKit, job: ApplyJob, report: _Report, subject: st
     отклик записывается после того, как сервер его принял."""
     if isinstance(job.outcome, Applied):
         return "Отклик уже записан: второе письмо ушло бы тому же работодателю. Заверши работу."
+    if not subject or not report.letter.strip():
+        return "Нужны тема и текст письма — письмо не отправлено."
     async with kit.pipeline.session_factory() as session:
         if not await has_contact(session, job.vacancy_id, report.target):
             return "Адрес не из контактов вакансии — письмо не отправлено."
@@ -117,8 +119,18 @@ async def _send_email(kit: AgentKit, job: ApplyJob, report: _Report, subject: st
         return "Нет файла резюме."
     # Отправка и запись — одним неразрывным шагом: погашенная между ними сессия
     # оставила бы ушедшее письмо без отклика, и следующий обход послал бы второе.
-    return await asyncio.shield(_send_and_record(kit, job, report, OutgoingMail(
+    # Задача лежит на задании: следующий способ ждёт её конца (`_one_way`).
+    job.delivery = asyncio.ensure_future(_send_and_record(kit, job, report, OutgoingMail(
         report.target, subject, report.letter, resume), account))
+    job.delivery.add_done_callback(_log_lost)
+    return await asyncio.shield(job.delivery)
+
+
+def _log_lost(delivery: asyncio.Task) -> None:
+    """Сбой отправки или записи — в журнал: ждавшая сессия могла уже кончиться,
+    и больше его никто не прочтёт."""
+    if not delivery.cancelled() and delivery.exception() is not None:
+        logger.error("письмо-отклик: сбой отправки или записи", exc_info=delivery.exception())
 
 
 async def _send_and_record(kit: AgentKit, job: ApplyJob, report: _Report, mail: OutgoingMail,

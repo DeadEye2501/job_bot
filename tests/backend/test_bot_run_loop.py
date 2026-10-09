@@ -350,7 +350,8 @@ async def test_switching_off_drains_the_text_waiting_to_be_read(
     # Останов повешен на чтение режима, а не на сам слив: слив здесь —
     # предмет проверки, и если бы цикл кончался им, снятая строка вешала бы
     # прогон вместо того, чтобы покрасить тест.
-    modes = [BotMode.FULL]
+    # Полный оборот читает режим дважды: в начале и перед обходом агрегаторов.
+    modes = [BotMode.FULL, BotMode.FULL]
 
     async def next_mode(session):
         if modes:

@@ -121,7 +121,7 @@ class System(Journal, Wipe, Desktop):
             if self._hub.bot is not None:
                 # Обход агента — отдельная задача и тика не ждёт: Off гасит его сразу.
                 if chosen is BotMode.OFF:
-                    self._hub.bot.cancel_current_poll()
+                    self._hub.bot.cancel_round()
                 self._hub.bot.kick()
             return {"mode": chosen.value}
 

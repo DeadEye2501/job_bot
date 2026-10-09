@@ -18,7 +18,6 @@ from backend.flows.aggregator_round import RoundState, seek_source
 from backend.models import Aggregator, BotMode, Vacancy
 from backend.notify import fire
 from backend.repository import aggregators as repo
-from backend.telegram_time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +167,7 @@ async def _one_source(bot, kit: AgentKit, round_: RoundState, source: Source) ->
 async def _new_round(bot) -> RoundState:
     async with bot.session_factory() as session:
         web = next((a.id for a in await repo.list_aggregators(session) if a.host is None), 0)
-    return RoundState(utc_now(), set(), web)
+    return RoundState(set(), web)
 
 
 async def _row(bot, aggregator_id: int) -> Aggregator | None:

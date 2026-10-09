@@ -36,11 +36,6 @@ def is_address(value: str) -> bool:
     return bool(_ADDRESS_RE.fullmatch(_plain(value)))
 
 
-def is_phone(value: str) -> bool:
-    """Телефон — по тому же правилу, что у ключа контакта."""
-    return bool(_PHONE_RE.fullmatch(_plain(value)))
-
-
 def is_link(value: str) -> bool:
     """Ссылка — по тому же правилу, что у ключа контакта: не почта, не телефон,
     слитное написание с точкой в хосте."""

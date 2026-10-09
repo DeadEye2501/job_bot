@@ -3,10 +3,11 @@
 from backend.agent.jobs import Applied, Failed, Finished, LoginJob, Source
 from backend.agent.tools_common import common_tools
 from backend.models import Aggregator
+from backend.repository.agent_profile import build_agent_profile
 from tests.dbio import all_rows, put
 from tests.factories import profile_row
 from tests.factories_aggregators import aggregator_row
-from tests.fakes.agent import apply_job, kit_for, tool
+from tests.fakes.agent import TODAY, apply_job, kit_for, tool
 
 
 async def test_the_profile_tool_gives_the_whole_profile(make_pipeline, session_factory):
@@ -15,7 +16,10 @@ async def test_the_profile_tool_gives_the_whole_profile(make_pipeline, session_f
     await put(session_factory, site)
     tools = common_tools(kit_for(await make_pipeline()), LoginJob(Source.of(site)))
 
-    assert "Имя: Иван" in await tool(tools, "profile")()
+    async with session_factory() as session:
+        whole = await build_agent_profile(session, TODAY)
+
+    assert "Имя: Иван" in whole and await tool(tools, "profile")() == whole
 
 
 async def test_a_reported_login_lands_on_its_own_aggregator(make_pipeline, session_factory):
