@@ -1,11 +1,11 @@
 """Обстановка для проверок конвейера: он собран на подделках, модель молчит."""
 
-import asyncio
-from contextlib import suppress
 
+import httpx
 import pytest
 
 from backend.flows import apply, dm_classify
+from backend.flows import parse as parse_mod
 from backend.flows.dm import DmHelpers, process_dm
 from backend.flows.pipeline import IngestionPipeline, LmProviders
 from backend.models import (
@@ -15,6 +15,7 @@ from backend.models import (
 )
 from backend.payloads import FitValidation, PostGenre
 from backend.runtime_settings import RuntimeSettings
+from backend.task_stop import put_out
 from tests.dbio import only_row, put
 from tests.factories import (
     parsed_vacancy,
@@ -75,9 +76,7 @@ async def _put_out_backfills(pipelines) -> None:
     """
     for pipeline in pipelines:
         for task in list(pipeline.backfill_tasks):
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
+            await put_out(task)
 
 
 def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
@@ -147,6 +146,57 @@ async def make_pipeline(session_factory):
     yield build
 
     await _put_out_backfills(built)
+
+
+@pytest.fixture
+def one_vector(monkeypatch) -> list[str]:
+    """Модель эмбеддингов отвечает одним вектором на любой текст.
+
+    Похожесть решает подмена поиска похожих или пустая база, а не текст: тесту
+    нужен ответ модели, а не её смысл. Ответ фикстуры — тексты, которые модели
+    дали, по порядку: приёму поста важно, по какому тексту считан вектор.
+    """
+    seen: list[str] = []
+
+    async def embed(_client, _model, text):
+        seen.append(text)
+        return [0.1, 0.2]
+
+    monkeypatch.setattr("adapters.lm_embed.embed", embed)
+    return seen
+
+
+def similar_by_hand(pipeline, monkeypatch) -> None:
+    """Похожую заведённую вакансию и её разобранность задаёт тест.
+
+    `pipeline.similar_id` — что найдёт поиск похожих, `pipeline.unparsed` —
+    брошена ли она недоразобранной. Вместе они и есть ответ отсева повторов,
+    общего у вставки и приёма поста.
+    """
+    pipeline.similar_id = None
+    pipeline.unparsed = False
+
+    async def unparsed(_pipeline, _vacancy_id):
+        return pipeline.unparsed
+
+    monkeypatch.setattr(
+        pipeline.embeddings, "match", lambda vector, threshold: pipeline.similar_id
+    )
+    monkeypatch.setattr(parse_mod, "is_unparsed_vacancy", unparsed)
+
+
+@pytest.fixture
+def silent_embedder(monkeypatch, one_vector):
+    """Поставщик эмбеддингов не поднят — та же беда, что у живого `httpx`.
+
+    Зависит от `one_vector`, чтобы ложиться поверх него, сколько бы фикстур
+    тест ни позвал.
+    """
+
+    async def silent(_client, _model, _text):
+        raise httpx.ConnectError("поставщик не поднят")
+
+    monkeypatch.setattr("adapters.lm_embed.embed", silent)
 
 
 @pytest.fixture

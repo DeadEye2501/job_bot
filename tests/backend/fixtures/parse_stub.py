@@ -13,7 +13,7 @@
 from backend.flows import parse as parse_mod
 
 
-def parse_into(monkeypatch, calls: list, *, done=True) -> None:
+def parse_into(monkeypatch, calls: list, *, done=True, fails=()) -> None:
     """Подменить разбор: зов ложится четвёркой, ответ берётся у `done`.
 
     Четвёркой, а не тем, что нужно каждому: номер, текст, ник канала и
@@ -21,9 +21,15 @@ def parse_into(monkeypatch, calls: list, *, done=True) -> None:
 
     `done` бывает и обёрткой: прогону заново нужно менять ответ разбора уже
     после того, как подделка поставлена.
+
+    `fails` — номера, на которых разбор бросает: очереди разбора надо видеть,
+    что одна сломанная вакансия не держит остальных. Упавший зов в список не
+    ложится — разбор до записи не дошёл.
     """
 
     async def parse(pipeline, vacancy_id, text, username, *, allow_delete=True):
+        if vacancy_id in fails:
+            raise RuntimeError("разбор упал")
         calls.append((vacancy_id, text, username, allow_delete))
         return done() if callable(done) else done
 

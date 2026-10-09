@@ -88,6 +88,14 @@ async def source_trashed(session: AsyncSession, aggregator_id: int, key: str) ->
     )
 
 
+async def source_seen(session: AsyncSession, aggregator_id: int, key: str) -> bool:
+    """Видели ли номер на этом агрегаторе: вакансия с ним заведена или удалена как мусор."""
+    stored = await session.scalar(select(Vacancy.id).where(
+        Vacancy.source_aggregator_id == aggregator_id, Vacancy.source_key == key
+    ).limit(1))
+    return stored is not None or await source_trashed(session, aggregator_id, key)
+
+
 async def _trash_noted(session: AsyncSession, mark: TrashEvent) -> bool:
     """Отмечено ли это объявление мусором раньше."""
     if mark.source_key is not None:

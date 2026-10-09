@@ -28,6 +28,12 @@ from tests.dbio import all_rows, only_row, put
 from tests.factories import EPOCH, channel_row, vacancy_row
 from tests.fakes.telegram_objects import post
 
+# Подделка отпечатка на весь файл, а не по месту: подбор недоразобранного
+# считает отпечаток на каждой разобранной строке, и настоящий зов ушёл бы к
+# поставщику — беда утонула бы в журнале, проверки зеленели бы на
+# несработавшем шаге.
+pytestmark = pytest.mark.usefixtures("one_vector")
+
 WITH_ARTICLE = "Senior QA https://telegra.ph/QA-08-21"
 """Пост, всё содержание которого вынесено в статью по ссылке."""
 
@@ -44,25 +50,6 @@ def parses(monkeypatch):
     calls: list[tuple] = []
     parse_into(monkeypatch, calls)
     return calls
-
-
-@pytest.fixture(autouse=True)
-def embeds(monkeypatch):
-    """Подставной отпечаток: список текстов, по которым его считали.
-
-    Подделкой на весь файл, а не по месту: подбор недоразобранного считает
-    отпечаток на каждой разобранной строке, и настоящий зов ушёл бы к
-    поставщику. У подставного соединения запроса нет вовсе, а беда эта тонет в
-    записи журнала — проверки зеленели бы на несработавшем шаге.
-    """
-    texts: list[str] = []
-
-    async def embed(pipeline, text, what):
-        texts.append(text)
-        return [0.5, 0.25]
-
-    monkeypatch.setattr(embeddings, "embed_text", embed)
-    return texts
 
 
 async def _orphan_waiting_for_an_article(session_factory, created_at=None):
@@ -251,7 +238,7 @@ async def test_an_orphan_whose_article_arrived_is_judged_in_full(monkeypatch,
 
 
 async def test_a_dug_out_article_moves_the_fingerprint_too(monkeypatch,
-    parses, embeds, make_pipeline, session_factory
+    parses, one_vector, make_pipeline, session_factory
 ):
     """Дочитанная статья двигает и отпечаток строки.
 
@@ -271,11 +258,12 @@ async def test_a_dug_out_article_moves_the_fingerprint_too(monkeypatch,
     assert await pipeline.recover_orphan_vacancies() == 1
 
     whole = f"{WITH_ARTICLE}\n\nТребования: Python"
-    assert embeds == [whole]
-    assert (await only_row(session_factory, Vacancy)).embedding == [0.5, 0.25]
+    assert one_vector == [whole]
+    assert (await only_row(session_factory, Vacancy)).embedding == [0.1, 0.2]
     # Кэш отсева живёт в памяти и из базы не перечитывается: не поправь его — и
     # приём поста сравнивал бы свежий пост с шапкой, которой в строке уже нет.
-    assert pipeline.embeddings.matrix.tolist() == [[0.5, 0.25]]
+    (row,) = pipeline.embeddings.matrix.tolist()
+    assert row == pytest.approx([0.1, 0.2])
 
 
 async def test_an_orphan_still_without_its_article_waits_on(monkeypatch,
@@ -422,7 +410,7 @@ async def test_a_row_the_parse_gave_up_on_is_not_counted(monkeypatch,
 
 
 async def test_a_row_the_parse_gave_up_on_keeps_its_fingerprint(monkeypatch,
-    embeds, make_pipeline, session_factory
+    one_vector, make_pipeline, session_factory
 ):
     """Строка, на которой сдался разбор, отпечатка не меняет.
 
@@ -437,7 +425,7 @@ async def test_a_row_the_parse_gave_up_on_keeps_its_fingerprint(monkeypatch,
 
     await pipeline.recover_orphan_vacancies()
 
-    assert embeds == []
+    assert one_vector == []
 
 
 async def test_nothing_to_recover_is_no_work(make_pipeline):

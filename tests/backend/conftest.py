@@ -25,7 +25,9 @@ from tests.backend.fixtures.flows import (
     deliver,
     dm_pipeline,
     make_pipeline,
+    one_vector,
     parsing,
+    silent_embedder,
     unparsed_vacancy,
 )
 from tests.backend.fixtures.listing import channel_titles, hr_names, titles
@@ -51,11 +53,13 @@ __all__ = [
     "lock_of_its_own",
     "make_bot",
     "make_pipeline",
+    "one_vector",
     "outbox",
     "parsing",
     "ready_to_send",
     "rerunning",
     "sending_unlocked",
+    "silent_embedder",
     "titles",
     "turn_and_settle",
     "unparsed_vacancy",
