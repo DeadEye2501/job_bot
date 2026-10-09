@@ -1,10 +1,10 @@
 # Secrets
 .env
 
-# Personal data seed migration (CV, skills, experience, subscribed channels,
-# hardcoded tunables). Ships only on dev's machine; other users get an empty
-# DB + значения по умолчанию из backend/runtime_settings.py + мастер настройки.
-alembic/versions/aa4e0de05368_seed_initial_data.py
+# Бывшая засевная миграция с личными данными разработчика (резюме, опыт,
+# навыки, подписанные каналы). Своё отработала, лежит здесь на память и под
+# версию не идёт.
+docs/seed/
 
 # Восстановление единственной живой переписки после пересборки первой
 # миграции: имя и аватар настоящего HR, его telegram-id, тексты писем.
