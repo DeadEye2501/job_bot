@@ -308,6 +308,10 @@
 - `SEEKER_PROMPT` = `'Твоя задача — найти на сайте агрегатора свежие …`
 - `WEB_SEEKER_PROMPT` = `'Твоя задача — найти по всей сети свежие ваканси…`
 
+### `backend/agent/sessions.py`
+
+- `SESSION_LIMIT_SEC` = `3 * 3600`
+
 ### `backend/agent/tools_applier.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -439,6 +443,27 @@
 - `LATIN_LETTER` = `re.compile('[a-zA-Z]')`
 - `CYRILLIC_WORD` = `re.compile('[а-яёА-ЯЁ]+')`
 
+### `backend/domain/apply_order.py`
+
+- `_AGGREGATOR` = `ApplicationVia.AGGREGATOR.value`
+- `_FORM` = `ApplicationVia.FORM.value`
+- `_EMAIL` = `ApplicationVia.EMAIL.value`
+- `class Way`
+  - `method: str`
+  - `target: str`
+  - `aggregator_id: int | None`
+- `class KnownSite`
+  - `id: int`
+  - `host: str | None`
+  - `logged_in: bool` = `True`
+- `class ApplyFacts`
+  - `source_url: str | None`
+  - `source_site: KnownSite | None`
+  - `contacts: list[str]`
+  - `sites: list[KnownSite]`
+  - `mail_ready: bool`
+  - `closed: set[int]`
+
 ### `backend/domain/company_hosts.py`
 
 - `AGGREGATOR_HOSTS` = `frozenset({'t.me', 'telegram.me', 'telegram.org'…`
@@ -559,6 +584,24 @@
 - `LLM_SKIP_PREFIX` = `'llm: '`
 - `TRUNCATED_SKIP_REASON` = `f'{LLM_SKIP_PREFIX}ответ модели не поместился'`
 - `REFUSED_SKIP_REASON` = `f'{LLM_SKIP_PREFIX}модель отказалась отвечать'`
+
+### `backend/flows/aggregator_apply.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `_EMAIL` = `ApplicationVia.EMAIL.value`
+- `_NO_OUTCOME` = `'агент закончил без итога'`
+- `class ApplyOrder`
+  - `vacancy_id: int`
+  - `forced: bool`
+  - `only: Way | None`
+
+### `backend/flows/aggregator_round.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `class RoundState`
+  - `started_at: datetime`
+  - `closed_aggregators: set[int]`
+  - `web_search_id: int`
 
 ### `backend/flows/apply.py`
 
@@ -1855,6 +1898,10 @@
 - `ROLES` = `набор из 3`
 - `SHARED_RULES` = `набор из 4`
 
+### `tests/backend/test_agent_sessions.py`
+
+- `PLAN` = `SessionPlan(system_prompt='', task='', tools=[],…`
+
 ### `tests/backend/test_agent_tools_browser.py`
 
 - `VACANCY` = `'https://site.test/vacancy/1'`
@@ -1868,6 +1915,11 @@
 
 - `_ENV_PY` = `'\nfrom alembic import context\nfrom sqlalchemy …`
 - `_REVISION_PY` = `'\nrevision = "{revision}"\ndown_revision = {par…`
+
+### `tests/backend/test_domain_apply_order.py`
+
+- `SITE` = `KnownSite(1, 'site.test')`
+- `WEB` = `KnownSite(9, None)`
 
 ### `tests/backend/test_domain_dedup.py`
 
@@ -1886,6 +1938,18 @@
 ### `tests/backend/test_entry_point_log.py`
 
 - `ROOT` = `Path(__file__).resolve().parents[2]`
+
+### `tests/backend/test_flows_aggregator_apply.py`
+
+- `PAGE` = `'https://site.test/vacancy/1'`
+- `FORM` = `'https://company.test/apply'`
+- `STARTED` = `datetime(2026, 10, 9, 9, 0, tzinfo=timezone.utc)`
+
+### `tests/backend/test_flows_aggregator_seek.py`
+
+- `pytestmark` = `pytest.mark.usefixtures('one_vector')`
+- `PAGE` = `'https://site.test/vacancy/1'`
+- `STARTED` = `datetime(2026, 10, 9, 9, 0, tzinfo=timezone.utc)`
 
 ### `tests/backend/test_flows_ghosting_timer.py`
 

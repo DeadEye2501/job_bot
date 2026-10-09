@@ -322,7 +322,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 164 модулей
+## backend — 168 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -425,6 +425,18 @@ init
 - `def _bounds(last_run: datetime | None, limit: int, today: date) -> list[str]` (7)
 - `def _since(last_run: datetime | None) -> str` (4)
 
+### `backend/agent/sessions.py` — 59 строк
+
+Сессия агента под надзором: сервер, водитель, срок человека и общий срок.
+
+Зависит от: `adapters.agent_mcp`, `adapters.claude_code_agent`, `backend.agent.kit`, `backend.task_stop`
+
+- `class HumanTimeout(Exception)` (2)
+- `class LimitExhausted(Exception)` (2)
+- `async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd` (23)
+- `def live_session(model: str) -> RunSession` (12)
+  - `async def run(plan: SessionPlan) -> AgentEnd` (7)
+
 ### `backend/agent/tools_applier.py` — 136 строк
 
 Инструменты откликателя: своя вакансия, запись отклика на сайте и отклик письмом.
@@ -492,7 +504,7 @@ init
 - `async def _written(kit: AgentKit, job: ApplyJob, ask: LetterAsk) -> str` (7)
 - `async def _checked(kit: AgentKit, job: ApplyJob, ask: LetterAsk, own: Letter) -> str` (6)
 
-### `backend/agent/tools_seeker.py` — 109 строк
+### `backend/agent/tools_seeker.py` — 110 строк
 
 Инструменты искателя: известна ли вакансия и передача найденного в конвейер.
 
@@ -502,7 +514,7 @@ init
   - `async def is_known(url: str) -> str` (6)
   - `async def submit_vacancy(text: str, url: str, published: str, contacts: list[str]) -> str` (3)
 - `class _Page` (5)
-- `async def _submit(kit: AgentKit, job: SeekJob, queue, page: _Page) -> str` (26)
+- `async def _submit(kit: AgentKit, job: SeekJob, queue, page: _Page) -> str` (27)
 - `def _left(answer: str, job: SeekJob) -> str` (2)
 - `async def _known(kit: AgentKit, aggregator_id: int, key: str) -> bool` (4)
 - `async def _store(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: list[float]) -> int` (20)
@@ -706,6 +718,21 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: —
 
 
+### `backend/domain/apply_order.py` — 84 строк
+
+Какими способами откликнуться и в каком порядке: кнопка агрегатора, форма, почта.
+
+Зависит от: `backend.domain.contact_keys`, `backend.domain.hosts`, `backend.models`
+
+- `class Way` (4)
+- `class KnownSite` (7)
+- `class ApplyFacts` (13)
+- `def apply_ways(facts: ApplyFacts) -> list[Way]` (6)
+- `def _button(facts: ApplyFacts) -> Way | None` (7)
+- `def _form(facts: ApplyFacts) -> Way | None` (8)
+- `def _links(facts: ApplyFacts) -> list[str]` (3)
+- `def _owner(link: str, sites: list[KnownSite]) -> KnownSite | None` (3)
+
 ### `backend/domain/blacklist.py` — 56 строк
 
 Поиск запрещённого слова в тексте по границам слова.
@@ -734,13 +761,18 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def capitalized_company_name(name: str | None) -> str | None` (32)
 
-### `backend/domain/contact_keys.py` — 50 строк
+### `backend/domain/contact_keys.py` — 77 строк
 
-Нормальная форма контакта вакансии, по которой два написания признаются одним.
+Контакт вакансии: его вид — почта, телефон, ссылка — и нормальная форма, по которой два написания признаются одним.
 
 Зависит от: `backend.domain.hosts`
 
-- `def contact_key(value: str) -> str` (18)
+- `def contact_key(value: str) -> str` (14)
+- `def is_address(value: str) -> bool` (3)
+- `def is_phone(value: str) -> bool` (3)
+- `def is_link(value: str) -> bool` (7)
+- `def _linkish(text: str) -> bool` (2)
+- `def _plain(value: str) -> str` (6)
 - `def _link_key(text: str) -> str` (11)
 
 ### `backend/domain/currency.py` — 24 строк
@@ -918,6 +950,33 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: —
 
 - `def spelled_alone(text: str, word: str) -> bool` (9)
+
+### `backend/flows/aggregator_apply.py` — 149 строк
+
+Отклики агентом: способ за способом, пока один не удался или способы не кончились.
+
+Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `backend.agent.sessions`, `backend.agent.tools_applier`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_letter`, `backend.domain.apply_order`, `backend.flows.aggregator_round`, `backend.flows.events`, `backend.models`, `backend.repository.agent_profile`, `backend.repository.aggregators`, `backend.repository.mail_account`, `backend.repository.vacancy_brief`, `backend.repository.vacancy_contacts`
+
+- `class ApplyOrder` (7)
+- `async def apply_phase(kit: AgentKit, round_: RoundState, vacancy_ids: list[int]) -> None` (9)
+- `async def apply_vacancy(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> str` (19)
+- `async def _new_title(kit: AgentKit, vacancy_id: int) -> str | None` (8)
+- `async def _ways_for(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> list[Way]` (15)
+- `async def _one_way(kit: AgentKit, round_: RoundState, order: ApplyOrder, way: Way) -> str` (14)
+- `async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None` (15)
+- `async def _settle_way(kit: AgentKit, round_: RoundState, job: ApplyJob) -> str` (16)
+
+### `backend/flows/aggregator_round.py` — 87 строк
+
+Обход источников-агрегаторов: фаза поиска одного источника.
+
+Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.seeker`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_seeker`, `backend.flows.parse_queue`, `backend.repository.aggregators`, `backend.telegram_time`
+
+- `class RoundState` (6)
+- `async def seek_source(kit: AgentKit, round_: RoundState, source: Source) -> list[int]` (24)
+- `async def _search(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> AgentEnd` (7)
+- `async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionPlan` (10)
+- `async def _settle(kit: AgentKit, job: SeekJob, end: AgentEnd, started: datetime) -> None` (9)
 
 ### `backend/flows/apply.py` — 380 строк ⚠ подошёл к 300
 
@@ -3199,7 +3258,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 296 модулей
+## tests — 300 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
 
@@ -3553,6 +3612,16 @@ seed initial data
 
 - `def _task(vacancy_text='Текст вакансии', profile_text='Анкета', **job) -> str` (7)
 
+### `tests/backend/test_agent_sessions.py` — 73 строк
+
+Сессия агента под надзором: срок человека, общий срок, остановка.
+
+Зависит от: `backend.agent.human_gate`, `backend.agent.kit`, `backend.agent.sessions`, `tests.fakes.agent`
+
+Тестов: 4
+
+- `def _gate()` (2)
+
 ### `tests/backend/test_agent_tools_applier.py` — 119 строк
 
 Откликатель пишет отклик только на свою вакансию и только своим способом.
@@ -3607,13 +3676,13 @@ seed initial data
 - `def _written(body: str, subject: str='Отклик')` (2)
 - `async def _letter(make_pipeline, session_factory, answers, *, writer='app')` (7)
 
-### `tests/backend/test_agent_tools_seeker.py` — 151 строк
+### `tests/backend/test_agent_tools_seeker.py` — 165 строк
 
 Инструменты искателя: известна ли вакансия и передача найденного в конвейер.
 
 Зависит от: `backend.agent.jobs`, `backend.agent.tools_seeker`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
 
-Тестов: 11
+Тестов: 12
 
 - `class _Queue` (6)
   - `def put(self, vacancy_id, text)` (2)
@@ -3868,6 +3937,16 @@ seed initial data
 - `async def engine_on_disk(tmp_path)` (5)
 - `async def _pragma(engine, name)` (4)
 
+### `tests/backend/test_domain_apply_order.py` — 61 строк
+
+Порядок способов отклика: кнопка агрегатора, форма, почта.
+
+Зависит от: `backend.domain.apply_order`
+
+Тестов: 9
+
+- `def _facts(**over) -> ApplyFacts` (5)
+
 ### `tests/backend/test_domain_blacklist.py` — 39 строк
 
 Следствия, которые наблюдают тесты `backend/domain/blacklist.py`.
@@ -4006,6 +4085,39 @@ seed initial data
 Тестов: 11
 
 - `def _write_through(module, text: str) -> str` (22)
+
+### `tests/backend/test_flows_aggregator_apply.py` — 197 строк
+
+Фаза 2: отклик способ за способом, пока один не удался или способы не кончились.
+
+Зависит от: `backend.agent.sessions`, `backend.flows.aggregator_apply`, `backend.flows.aggregator_round`, `backend.models`, `backend.repository.mail_account`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
+
+Тестов: 10
+
+- `def board(session_factory)` (13)
+  - `async def make(**vacancy)` (8)
+- `def applying(make_pipeline)` (10)
+  - `async def run(vacancy_id, steps, round_=None)` (5)
+- `def _record(target)` (4)
+  - `async def step(tools)` (2)
+- `def _fail(reason)` (4)
+  - `async def step(tools)` (2)
+- `def _finish(result)` (4)
+  - `async def step(tools)` (2)
+- `async def _events(session_factory, kind)` (2)
+
+### `tests/backend/test_flows_aggregator_seek.py` — 145 строк
+
+Фаза 1: искатель находит, конвейер разбирает, last_run_at двигается только по done.
+
+Зависит от: `backend.agent.jobs`, `backend.agent.sessions`, `backend.flows.aggregator_round`, `backend.models`, `tests.backend.fixtures.parse_stub`, `tests.dbio`, `tests.factories_aggregators`, `tests.fakes.agent`
+
+Тестов: 8
+
+- `def parsed(monkeypatch)` (5)
+- `def seek(make_pipeline, session_factory)` (12)
+  - `async def run(steps, human_limit=3600.0, **source)` (7)
+- `async def _submit(tools, url=PAGE)` (2)
 
 ### `tests/backend/test_flows_application_choice.py` — 414 строк ⚠ подошёл к 300
 
@@ -6089,17 +6201,21 @@ seed initial data
 - `def application_row(vacancy_id: int, **overrides) -> Application` (9)
 - `def screening_row(application_id: int, position: int, **overrides) -> Screening` (5)
 
-### `tests/fakes/agent.py` — 27 строк
+### `tests/fakes/agent.py` — 61 строк
 
 Набор сессии агента без браузера, водителя и человека.
 
-Зависит от: `backend.agent.jobs`, `backend.agent.kit`
+Зависит от: `backend.agent.human_gate`, `backend.agent.jobs`, `backend.agent.kit`, `tests.fakes.browser`
 
+- `class LimitHit(Exception)` (2)
 - `def tool(tools, name)` (3)
 - `def apply_job(vacancy_id: int, **overrides) -> ApplyJob` (7)
+- `def scripted(steps: list[Callable[[dict[str, Callable]], Awaitable]])` (19)
+  - `async def run(plan: SessionPlan) -> AgentEnd` (8)
+- `def scripted_kit(pipeline, steps, *, human_limit: float=3600.0) -> AgentKit` (4)
 - `def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit` (3)
 
-### `tests/fakes/browser.py` — 111 строк
+### `tests/fakes/browser.py` — 120 строк
 
 Браузер агента с заданными страницами: что открыто, что нажато, что отказало.
 
@@ -6125,10 +6241,13 @@ seed initial data
   - `async def set_input_files(self, selector, files, **_options)` (3)
   - `def expect_file_chooser(self, **_options)` (2)
   - `async def go_back(self, **_options)` (2)
-- `class FakeBrowser` (15)
+- `class FakeBrowser` (24)
   - `async def page(self)` (2)
   - `async def show(self)` (2)
   - `async def hide_back(self)` (2)
+  - `async def open_profile(self, profile_id: int)` (2)
+  - `async def clear_cache(self)` (2)
+  - `async def close(self)` (2)
 
 ### `tests/fakes/claude.py` — 83 строк
 
