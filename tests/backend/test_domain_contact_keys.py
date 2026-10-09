@@ -19,6 +19,7 @@ def test_an_address_is_compared_without_case_and_mailto(written, key):
     "https://hh.ru/vacancy/123?from=main",
     "http://www.hh.ru/vacancy/123/",
     "hh.ru/vacancy/123?utm_source=tg&utm_medium=post",
+    "https://hh.ru/vacancy/123?gclid=a1&yclid=9",
     "HTTPS://HH.RU/vacancy/123",
     "https://hh.ru:443/vacancy/123",
 ])

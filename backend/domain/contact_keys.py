@@ -3,7 +3,7 @@
 import re
 from urllib.parse import parse_qsl, urlencode
 
-from backend.domain.hosts import address_parts
+from backend.domain.hosts import address_parts, is_arrival_mark
 
 # Почта и телефон, без якорей. По ним же разбор поста ищет адрес внутри строки
 # (`backend/llm/vacancy.py`): что считать почтой и телефоном, решает одно правило.
@@ -13,8 +13,6 @@ PHONE_PATTERN = r"\+?\d[\d\s()-]{7,}\d"
 _SCHEMES = ("mailto:", "tel:")
 _ADDRESS_RE = re.compile(EMAIL_PATTERN)
 _PHONE_RE = re.compile(PHONE_PATTERN)
-_ARRIVAL_MARKS = ("utm_",)
-_ARRIVAL_PARAMS = frozenset({"from"})
 
 
 def contact_key(value: str) -> str:
@@ -69,7 +67,7 @@ def _link_key(text: str) -> str:
     kept = [
         (name, value)
         for name, value in parse_qsl(parts.query, keep_blank_values=True)
-        if name not in _ARRIVAL_PARAMS and not name.startswith(_ARRIVAL_MARKS)
+        if not is_arrival_mark(name)
     ]
     path = f"/{parts.path}" if parts.path else ""
     query = f"?{urlencode(kept)}" if kept else ""

@@ -489,8 +489,6 @@
 - `_SCHEMES` = `набор из 2`
 - `_ADDRESS_RE` = `re.compile(EMAIL_PATTERN)`
 - `_PHONE_RE` = `re.compile(PHONE_PATTERN)`
-- `_ARRIVAL_MARKS` = `набор из 1`
-- `_ARRIVAL_PARAMS` = `frozenset({'from'})`
 
 ### `backend/domain/currency.py`
 
