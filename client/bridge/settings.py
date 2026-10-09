@@ -32,6 +32,9 @@ APP_KEYS = (
     "backfill_limit",
     "dm_backfill_limit",
     "send_locked",
+    "aggregator_backfill_limit",
+    "show_browser",
+    "letter_writer",
 )
 """Что окну позволено писать в настройки приложения.
 
@@ -82,6 +85,11 @@ class Settings(Login, Llm):
                     "backfill_limit": rs.backfill_limit,
                     "dm_backfill_limit": rs.dm_backfill_limit,
                     "send_locked": rs.send_locked,
+                },
+                "aggregators": {
+                    "aggregator_backfill_limit": rs.aggregator_backfill_limit,
+                    "show_browser": rs.show_browser,
+                    "letter_writer": rs.letter_writer,
                 },
             }
 

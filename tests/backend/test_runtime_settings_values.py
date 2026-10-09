@@ -62,7 +62,10 @@ def test_anything_but_true_leaves_a_switch_off(raw):
 
 @pytest.mark.parametrize(
     "key, expected",
-    [("poll_interval_sec", 1800), ("backfill_limit", 15), ("dm_backfill_limit", 50)],
+    [
+        ("poll_interval_sec", 1800), ("backfill_limit", 15), ("dm_backfill_limit", 50),
+        ("aggregator_backfill_limit", 20),
+    ],
 )
 def test_a_missing_whole_number_setting_falls_back_to_its_default(key, expected):
     """У целочисленных настроек опроса и бэкафилла есть умолчание."""
@@ -70,7 +73,8 @@ def test_a_missing_whole_number_setting_falls_back_to_its_default(key, expected)
 
 
 @pytest.mark.parametrize(
-    "key", ["poll_interval_sec", "backfill_limit", "dm_backfill_limit"]
+    "key",
+    ["poll_interval_sec", "backfill_limit", "dm_backfill_limit", "aggregator_backfill_limit"],
 )
 def test_a_written_whole_number_setting_is_read_back(key):
     """Записанное число читается обратно — в этом смысл настройки.
@@ -83,7 +87,8 @@ def test_a_written_whole_number_setting_is_read_back(key):
 
 
 @pytest.mark.parametrize(
-    "key", ["poll_interval_sec", "backfill_limit", "dm_backfill_limit"]
+    "key",
+    ["poll_interval_sec", "backfill_limit", "dm_backfill_limit", "aggregator_backfill_limit"],
 )
 def test_a_written_whole_number_survives_stray_spaces(key):
     """Пробелы вокруг числа не мешают его прочесть.
@@ -164,6 +169,7 @@ def test_an_unusable_flood_window_means_no_wait(raw):
         ("poll_interval_sec", 1800),
         ("backfill_limit", 15),
         ("dm_backfill_limit", 50),
+        ("aggregator_backfill_limit", 20),
     ],
 )
 @pytest.mark.parametrize("raw", ["не число", "1 800"])
@@ -178,7 +184,8 @@ def test_a_garbled_whole_number_setting_falls_back_to_its_default(key, default, 
 
 
 @pytest.mark.parametrize(
-    "key", ["poll_interval_sec", "backfill_limit", "dm_backfill_limit"]
+    "key",
+    ["poll_interval_sec", "backfill_limit", "dm_backfill_limit", "aggregator_backfill_limit"],
 )
 def test_a_whole_number_setting_right_on_its_bound_is_accepted(key):
     """Значение, равное нижней границе, принимается, а не откатывается.
@@ -198,6 +205,7 @@ def test_a_whole_number_setting_right_on_its_bound_is_accepted(key):
         ("poll_interval_sec", "-30", 1800),
         ("backfill_limit", "0", 15),
         ("dm_backfill_limit", "0", 50),
+        ("aggregator_backfill_limit", "0", 20),
     ],
 )
 def test_a_whole_number_setting_outside_its_range_falls_back(key, raw, default):
@@ -231,3 +239,27 @@ def test_the_path_to_the_resume_is_empty_until_set():
 def test_a_stored_resume_path_is_used():
     """Заданный путь к резюме берётся из настроек."""
     assert settings(cv_path="/tmp/cv.pdf").cv_path == "/tmp/cv.pdf"
+
+
+def test_the_aggregator_settings_have_their_defaults():
+    made = settings()
+    assert (made.aggregator_backfill_limit, made.show_browser, made.letter_writer) == (
+        20, False, "app"
+    )
+
+
+def test_the_aggregator_settings_read_what_was_stored():
+    made = settings(aggregator_backfill_limit="35", show_browser="true", letter_writer="agent")
+    assert (made.aggregator_backfill_limit, made.show_browser, made.letter_writer) == (
+        35, True, "agent"
+    )
+
+
+def test_an_unknown_letter_writer_falls_back_to_the_app():
+    """Чужое слово в настройке не выключает письма: пишет чат-модель приложения."""
+    assert settings(letter_writer="кто-то").letter_writer == "app"
+
+
+def test_a_letter_writer_typed_by_hand_is_still_recognised():
+    """Регистр и пробелы по краям слово чужим не делают: правят руками."""
+    assert settings(letter_writer="  Agent ").letter_writer == "agent"

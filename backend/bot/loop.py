@@ -80,7 +80,7 @@ async def _connect(bot) -> None:
     # ещё не имеет ожидателей; а poll-task ещё не создан, так что
     # и cancel'ить нечего).
     bot.loop = asyncio.get_running_loop()
-    from backend.runtime_settings import mask_phone
+    from backend.tg_credentials import mask_phone
     logger.info(
         "Telegram client connected (phone=%s)",
         mask_phone(bot.rs.tg.phone if bot.rs.tg else None),

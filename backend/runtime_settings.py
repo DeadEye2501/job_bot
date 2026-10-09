@@ -14,13 +14,12 @@ and the cache).
 import logging
 import math
 from collections.abc import Callable
-from dataclasses import dataclass, field
 
-from cryptography.fernet import InvalidToken
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from backend.crypto import decrypt_bytes, decrypt_str, encrypt_bytes, encrypt_str
+from backend.crypto import decrypt_or_none, encrypt_str
+from backend.incoming import normalize_enum
 from backend.provider_config import LlmProviderConfig, provider_complete
 from backend.repository.app_settings import CV_PATH_KEY, put_app_setting
 from backend.models import (
@@ -29,31 +28,16 @@ from backend.models import (
     LlmConfigKind,
     TgAccount,
 )
+from backend.tg_credentials import (
+    TgAccountConfig,
+    fill_tg_row,
+    from_tg_row,
+    log_tg_updated,
+    tg_row,
+)
 
 
 logger = logging.getLogger(__name__)
-
-
-def mask_phone(phone: str | None) -> str:
-    """Безопасное представление phone для логов: показывает только last4
-    для нормальных номеров (>=7 цифр), иначе полностью маскирует.
-    Возвращает строку всегда, чтобы можно было передавать в %s без if'ов.
-    """
-    if not phone:
-        return "***"
-    if len(phone) < 7:
-        return "***"
-    return f"***{phone[-4:]}"
-
-
-@dataclass(frozen=True)
-class TgAccountConfig:
-    api_id: int
-    # Sensitive fields hidden from repr() so accidental logging never leaks them.
-    api_hash: str = field(repr=False)
-    phone: str
-    password: str = field(repr=False)  # 2FA password; "" if none
-    session_string: str | None = field(repr=False)  # pyrogram session; None pre-login
 
 
 # Defaults applied when an app_settings key is missing in the DB.
@@ -89,30 +73,14 @@ _APP_DEFAULTS: dict[str, str] = {
     # разрешит снова слать (после полученного FloodWait-а). Дёргать
     # send_dm раньше — гарантированный повторный FloodWait и штраф.
     "flood_wait_until_ts": "0",            # epoch float — Bot.send не пытается до этого момента
+    "aggregator_backfill_limit": "20",
+    "show_browser": "false",
+    "letter_writer": "app",
 }
 
-
-def _log_tg_updated(
-    api_id: int, phone: str, password: str, session_string: str | None
-) -> None:
-    """След смены учётной записи Telegram — без самих секретов.
-
-    Номер пишется хвостом, чтобы мобильный не утекал в журнал открытым.
-    Отпечаток приложения в журнал не идёт вовсе, а про пароль и строку
-    сеанса говорится только «есть или нет».
-    """
-    logger.info(
-        "Telegram credentials updated (api_id=%d, phone=%s, has_password=%s, has_session=%s)",
-        api_id,
-        mask_phone(phone),
-        bool(password),
-        session_string is not None,
-    )
-
-
-async def _tg_row(session: AsyncSession) -> TgAccount | None:
-    """Единственная строка учётной записи Telegram, если она заведена."""
-    return (await session.scalars(select(TgAccount))).first()
+LETTER_WRITERS = ("app", "agent")
+"""Кто пишет письмо для откликов вне Telegram: чат-модель приложения или агент.
+Набор объявлен один раз: всё, что различает автора письма, берёт значения отсюда."""
 
 
 async def _llm_row(session: AsyncSession, kind: LlmConfigKind) -> LlmConfig | None:
@@ -144,8 +112,8 @@ class RuntimeSettings:
 
     async def reload(self) -> None:
         async with self._session_factory() as session:
-            tg_row = await _tg_row(session)
-            self._tg = _from_tg_row(tg_row) if tg_row else None
+            tg = await tg_row(session)
+            self._tg = from_tg_row(tg) if tg else None
 
             chat_row = await _llm_row(session, LlmConfigKind.CHAT)
             self._chat = _from_llm_row(chat_row) if chat_row else None
@@ -201,6 +169,28 @@ class RuntimeSettings:
     def backfill_limit(self) -> int:
         """How many recent messages to scrape per Telegram channel poll."""
         return self._app_int("backfill_limit", minimum=1)
+
+    @property
+    def aggregator_backfill_limit(self) -> int:
+        """Сколько новых для базы вакансий искатель передаёт в конвейер за обход
+        одного источника."""
+        return self._app_int("aggregator_backfill_limit", minimum=1)
+
+    @property
+    def show_browser(self) -> bool:
+        """Браузер виден всё время; выключено — только на капче и входе."""
+        return self._app_bool("show_browser")
+
+    @property
+    def letter_writer(self) -> str:
+        """Кто пишет письмо для откликов вне Telegram: `app` или `agent`.
+
+        Чужое слово читается как умолчание: письмо без автора не ушло бы вовсе.
+        """
+        return (
+            normalize_enum(self._app_value("letter_writer"), LETTER_WRITERS)
+            or _APP_DEFAULTS["letter_writer"]
+        )
 
     @property
     def dedup_cosine_threshold(self) -> float:
@@ -330,23 +320,13 @@ class RuntimeSettings:
         """
         async with self._session_factory() as session:
             async with session.begin():
-                row = await _tg_row(session)
+                row = await tg_row(session)
                 if row is None:
                     row = TgAccount(id=1)
                     session.add(row)
-                row.api_id = creds.api_id
-                row.api_hash_encrypted = encrypt_str(creds.api_hash)
-                row.phone = creds.phone
-                row.password_encrypted = (
-                    encrypt_str(creds.password) if creds.password else None
-                )
-                row.session_blob_encrypted = (
-                    encrypt_bytes(creds.session_string.encode("utf-8"))
-                    if creds.session_string is not None
-                    else None
-                )
+                fill_tg_row(row, creds)
         self._tg = creds
-        _log_tg_updated(
+        log_tg_updated(
             creds.api_id, creds.phone, creds.password, creds.session_string
         )
 
@@ -357,7 +337,7 @@ class RuntimeSettings:
         """
         async with self._session_factory() as session:
             async with session.begin():
-                row = await _tg_row(session)
+                row = await tg_row(session)
                 if row is not None:
                     await session.delete(row)
         self._tg = None
@@ -430,53 +410,16 @@ class RuntimeSettings:
         logger.info("First-run wizard completed")
 
 
-def _from_tg_row(row: TgAccount) -> TgAccountConfig | None:
-    """Учётные данные Telegram из строки базы; `None`, если их нет.
-
-    Нечитаемый шифротекст — тоже «нет»: связка ключей ОС и база разъезжаются
-    при чистке связки, переносе профиля и восстановлении из копии, а брошенный
-    отсюда отказ не ловит никто — приложение падает раньше окна.
-
-    Бед у этого две, и обе ловятся здесь: чужой ключ даёт отказ расшифровки, а
-    испорченная или обрезанная запись в связке — `ValueError` от самого
-    шифровальщика. Следствие у них одно, и различать их окну незачем.
-    """
-    if row.api_id is None or not row.api_hash_encrypted or not row.phone:
-        return None
-    try:
-        return TgAccountConfig(
-            api_id=row.api_id,
-            api_hash=decrypt_str(row.api_hash_encrypted),
-            phone=row.phone,
-            password=(
-                decrypt_str(row.password_encrypted) if row.password_encrypted else ""
-            ),
-            session_string=(
-                decrypt_bytes(row.session_blob_encrypted).decode("utf-8")
-                if row.session_blob_encrypted
-                else None
-            ),
-        )
-    except (InvalidToken, ValueError):
-        logger.exception("Telegram credentials are unreadable, treating as unset")
-        return None
-
-
 def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None:
     """Настройки провайдера из строки базы; `None`, если их нет.
 
-    Нечитаемый ключ — тоже «нет», по причине из `_from_tg_row`.
+    Нечитаемый ключ — тоже «нет», по причине из `decrypt_or_none`.
     """
     if not provider_complete(row.kind.value, row.base_url, row.model):
         return None
-    try:
-        return LlmProviderConfig(
-            base_url=row.base_url or "",
-            api_key=(
-                decrypt_str(row.api_key_encrypted) if row.api_key_encrypted else ""
-            ),
-            model=row.model,
-        )
-    except (InvalidToken, ValueError):
-        logger.exception("LLM provider key is unreadable, treating as unset")
+    api_key = decrypt_or_none(row.api_key_encrypted, "LLM provider key")
+    if api_key is None:
         return None
+    return LlmProviderConfig(
+        base_url=row.base_url or "", api_key=api_key, model=row.model,
+    )

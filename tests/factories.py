@@ -7,7 +7,7 @@
 
 from datetime import date, datetime, timedelta, timezone
 
-from backend.runtime_settings import TgAccountConfig
+from backend.tg_credentials import TgAccountConfig
 
 from backend.models import (
     AppSetting,

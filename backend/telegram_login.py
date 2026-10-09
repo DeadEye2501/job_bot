@@ -25,7 +25,7 @@ from pyrogram.errors import (
     SessionPasswordNeeded,
 )
 
-from backend.runtime_settings import TgAccountConfig, mask_phone
+from backend.tg_credentials import TgAccountConfig, mask_phone
 
 logger = logging.getLogger(__name__)
 

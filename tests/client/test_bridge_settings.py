@@ -85,3 +85,15 @@ async def test_saving_a_provider_without_an_address_is_refused(api, ask):
 
     assert answer["fail"] == "denied"
     assert "Заполните base_url и модель." in answer["detail"]
+
+
+async def test_the_aggregator_settings_come_back_after_saving(api, ask):
+    await ask(api.settings.save, {"app": {
+        "aggregator_backfill_limit": 30, "show_browser": True, "letter_writer": "agent",
+    }})
+
+    snapshot = (await ask(api.settings.get))["ok"]["aggregators"]
+
+    assert snapshot == {
+        "aggregator_backfill_limit": 30, "show_browser": True, "letter_writer": "agent",
+    }

@@ -9,7 +9,7 @@ SecretService и заводится сам при первом обращени�
 import logging
 
 import keyring
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 
 logger = logging.getLogger(__name__)
 
@@ -95,13 +95,24 @@ def encrypt_str(plaintext: str) -> str:
     return _cipher().encrypt(plaintext.encode("utf-8")).decode("ascii")
 
 
-def decrypt_str(ciphertext: str) -> str:
-    return _cipher().decrypt(ciphertext.encode("ascii")).decode("utf-8")
+def decrypt_or_none(ciphertext: str | bytes | None, what: str) -> str | None:
+    """Открытый текст секрета, а нечитаемый шифротекст — `None`, «не настроено».
+
+    Связка ключей ОС и база разъезжаются при чистке связки, переносе профиля и
+    восстановлении из копии, а брошенный отсюда отказ не ловит никто:
+    приложение падало бы раньше окна, где секрет вписывают заново. Чужой ключ
+    даёт `InvalidToken`, испорченная запись — `ValueError`; следствие у них одно.
+
+    Секрета нет вовсе — пустая строка: читать нечего, и беды в этом нет.
+    """
+    if not ciphertext:
+        return ""
+    try:
+        return _cipher().decrypt(ciphertext).decode("utf-8")
+    except (InvalidToken, ValueError):
+        logger.exception("%s is unreadable, treating as unset", what)
+        return None
 
 
 def encrypt_bytes(plaintext: bytes) -> bytes:
     return _cipher().encrypt(plaintext)
-
-
-def decrypt_bytes(ciphertext: bytes) -> bytes:
-    return _cipher().decrypt(ciphertext)

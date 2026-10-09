@@ -202,7 +202,7 @@ Claude через установленный Claude Code по подписке: 
 
 Сборка клиента Telegram и отправка письма его руками.
 
-Зависит от: `backend.domain.telegram_identity`, `backend.runtime_settings`, `config`
+Зависит от: `backend.domain.telegram_identity`, `backend.tg_credentials`, `config`
 
 - `def make_client(tg: TgAccountConfig) -> Client` (30)
 - `async def send_dm(client: Client, user: str | int, text: str, attachment: str | Path | None=None) -> int | None` (24)
@@ -254,7 +254,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 137 модулей
+## backend — 138 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -340,7 +340,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Жизненный цикл соединения: режим работы, главный цикл, выход из сеанса.
 
-Зависит от: `adapters`, `backend.bot`, `backend.flows.dm_backfill`, `backend.models`, `backend.repository.bot_mode`, `backend.runtime_settings`
+Зависит от: `adapters`, `backend.bot`, `backend.flows.dm_backfill`, `backend.models`, `backend.repository.bot_mode`, `backend.tg_credentials`
 
 - `async def log_out_session(bot) -> None` (17)
 - `async def current_mode(bot) -> BotMode` (7)
@@ -433,7 +433,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def on_dm_outgoing(bot, _client, msg) -> None` (13)
 - `async def on_dm(bot, _client, msg) -> None` (12)
 
-### `backend/crypto.py` — 107 строк
+### `backend/crypto.py` — 118 строк
 
 Шифрование секретов мастер-ключом из связки ключей ОС.
 
@@ -444,9 +444,8 @@ First-run bootstrap: ensure DB schema exists.
 - `def forget_master_key() -> None` (17)
 - `def _cipher() -> Fernet` (2)
 - `def encrypt_str(plaintext: str) -> str` (3)
-- `def decrypt_str(ciphertext: str) -> str` (2)
+- `def decrypt_or_none(ciphertext: str | bytes | None, what: str) -> str | None` (17)
 - `def encrypt_bytes(plaintext: bytes) -> bytes` (2)
-- `def decrypt_bytes(ciphertext: bytes) -> bytes` (2)
 
 ### `backend/domain/alphabet.py` — 14 строк
 
@@ -1990,18 +1989,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def apply_silence(session: AsyncSession, vacancy: Vacancy, timeout_days: int) -> None` (23)
 - `def apply_parse_outcome(vacancy: Vacancy, new_status: VacancyStatus) -> None` (18)
 
-### `backend/runtime_settings.py` — 482 строк ⚠ подошёл к 300
+### `backend/runtime_settings.py` — 425 строк ⚠ подошёл к 300
 
 Runtime settings layer.
 
-Зависит от: `adapters`, `backend.crypto`, `backend.models`, `backend.provider_config`, `backend.repository.app_settings`
+Зависит от: `adapters`, `backend.crypto`, `backend.incoming`, `backend.models`, `backend.provider_config`, `backend.repository.app_settings`, `backend.tg_credentials`
 
-- `def mask_phone(phone: str | None) -> str` (10)
-- `class TgAccountConfig` (7)
-- `def _log_tg_updated(api_id: int, phone: str, password: str, session_string: str | None) -> None` (16)
-- `async def _tg_row(session: AsyncSession) -> TgAccount | None` (3)
 - `async def _llm_row(session: AsyncSession, kind: LlmConfigKind) -> LlmConfig | None` (5)
-- `class RuntimeSettings` (306)
+- `class RuntimeSettings` (318)
   - `async def load(cls, session_factory: async_sessionmaker[AsyncSession]) -> 'RuntimeSettings'` (6)
   - `async def reload(self) -> None` (22)
   - `def tg(self) -> TgAccountConfig | None` (2)
@@ -2011,6 +2006,9 @@ Runtime settings layer.
   - `def scoring_threshold(self) -> int` (2)
   - `def poll_interval_sec(self) -> int` (2)
   - `def backfill_limit(self) -> int` (3)
+  - `def aggregator_backfill_limit(self) -> int` (4)
+  - `def show_browser(self) -> bool` (3)
+  - `def letter_writer(self) -> str` (9)
   - `def dedup_cosine_threshold(self) -> float` (8)
   - `def dm_backfill_limit(self) -> int` (6)
   - `def cv_path(self) -> str` (2)
@@ -2025,15 +2023,14 @@ Runtime settings layer.
     - `def read(raw: str) -> int | None` (6)
   - `def _app_number(self, key: str, read: Callable, kind: type)` (17)
   - `def _app_value(self, key: str) -> str` (8)
-  - `async def set_tg(self, creds: TgAccountConfig) -> None` (30)
+  - `async def set_tg(self, creds: TgAccountConfig) -> None` (20)
   - `async def clear_tg(self) -> None` (12)
   - `async def set_chat(self, *, base_url: str, api_key: str, model: str) -> None` (4)
   - `async def set_embed(self, *, base_url: str, api_key: str, model: str) -> None` (4)
   - `async def _set_llm(self, kind: LlmConfigKind, base_url: str, api_key: str, model: str) -> None` (32)
   - `async def set_app(self, key: str, value: str) -> None` (18)
   - `async def mark_wizard_completed(self) -> None` (3)
-- `def _from_tg_row(row: TgAccount) -> TgAccountConfig | None` (30)
-- `def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None` (18)
+- `def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None` (13)
 
 ### `backend/single_instance.py` — 127 строк
 
@@ -2049,7 +2046,7 @@ Runtime settings layer.
 
 Вход в Telegram по коду: четыре шага и состояние между ними.
 
-Зависит от: `backend.runtime_settings`
+Зависит от: `backend.tg_credentials`
 
 - `class LoginStep` (5)
 - `async def _safe_disconnect(client) -> None` (14)
@@ -2088,6 +2085,19 @@ Runtime settings layer.
 
 - `def tg_moment(dt: datetime | None) -> datetime | None` (15)
 - `def utc_now() -> datetime` (10)
+
+### `backend/tg_credentials.py` — 101 строк
+
+Учётная запись Telegram: от строки в базе до следа в журнале.
+
+Зависит от: `backend.crypto`, `backend.models`
+
+- `def mask_phone(phone: str | None) -> str` (10)
+- `class TgAccountConfig` (7)
+- `def log_tg_updated(api_id: int, phone: str, password: str, session_string: str | None) -> None` (16)
+- `async def tg_row(session: AsyncSession) -> TgAccount | None` (3)
+- `def from_tg_row(row: TgAccount) -> TgAccountConfig | None` (24)
+- `def fill_tg_row(row: TgAccount, creds: TgAccountConfig) -> None` (15)
 
 ### `backend/wipe.py` — 103 строк
 
@@ -2527,15 +2537,15 @@ Runtime settings layer.
   - `def stop(self) -> None` (24)
     - `async def _cancel_pending() -> None` (5)
 
-### `client/bridge/settings.py` — 290 строк
+### `client/bridge/settings.py` — 298 строк
 
 Экран «Настройки»: всё, что окно спрашивает и правит на нём.
 
 Зависит от: `backend.provider_config`, `backend.telegram_login`, `client.bridge.answer`, `client.bridge.bot_stop`, `client.bridge.hub`, `client.bridge.llm`, `client.bridge.login`, `client.bridge.wire`
 
-- `class Settings(Login, Llm)` (192)
-  - `def get(self) -> dict` (29)
-    - `async def run() -> dict` (20)
+- `class Settings(Login, Llm)` (197)
+  - `def get(self) -> dict` (34)
+    - `async def run() -> dict` (25)
   - `def save(self, payload: dict | None=None) -> dict` (34)
     - `async def run() -> dict` (12)
   - `def logout(self) -> dict` (36)
@@ -3309,13 +3319,13 @@ seed initial data
 
 - `def closed_loop()` (5)
 
-### `tests/backend/test_crypto.py` — 118 строк
+### `tests/backend/test_crypto.py` — 133 строк
 
 Следствия шифрования секретов в `backend/crypto.py`.
 
 Зависит от: `backend.crypto`
 
-Тестов: 11
+Тестов: 13
 
 
 ### `tests/backend/test_db_engine.py` — 93 строк
@@ -4786,31 +4796,31 @@ seed initial data
 Тестов: 14
 
 
-### `tests/backend/test_runtime_settings_load.py` — 243 строк
+### `tests/backend/test_runtime_settings_load.py` — 259 строк
 
 Следствия чтения настроек из базы в память.
 
 Зависит от: `backend.crypto`, `backend.models`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`
 
-Тестов: 21
+Тестов: 22
 
 
-### `tests/backend/test_runtime_settings_masking.py` — 78 строк
+### `tests/backend/test_runtime_settings_masking.py` — 74 строк
 
-Следствия сокрытия секретов от журнала в `backend/runtime_settings.py`.
+Следствия сокрытия секретов от журнала при записи настроек.
 
-Зависит от: `backend.runtime_settings`, `tests.factories`
+Зависит от: `backend.runtime_settings`, `backend.tg_credentials`, `tests.factories`
 
 Тестов: 4
 
 
-### `tests/backend/test_runtime_settings_values.py` — 233 строк
+### `tests/backend/test_runtime_settings_values.py` — 265 строк
 
 Следствия типизированных свойств `RuntimeSettings`.
 
 Зависит от: `backend.runtime_settings`
 
-Тестов: 25
+Тестов: 29
 
 - `def settings(**app) -> RuntimeSettings` (16)
 
@@ -5151,13 +5161,13 @@ seed initial data
 - `def real_runner()` (16)
 - `def _troubled(real_runner, exc: BaseException) -> None` (11)
 
-### `tests/client/test_bridge_settings.py` — 87 строк
+### `tests/client/test_bridge_settings.py` — 99 строк
 
 Следствия экрана настроек: что записано и что показано на экране.
 
 Зависит от: `backend.models`
 
-Тестов: 4
+Тестов: 5
 
 
 ### `tests/client/test_bridge_shell.py` — 251 строк
@@ -5411,7 +5421,7 @@ seed initial data
 
 Построение объектов, которые тесты подают на вход коду.
 
-Зависит от: `backend.models`, `backend.payloads`, `backend.runtime_settings`
+Зависит от: `backend.models`, `backend.payloads`, `backend.tg_credentials`
 
 - `def at(minutes: int) -> datetime` (3)
 - `def days_ago(days: float) -> datetime` (8)
