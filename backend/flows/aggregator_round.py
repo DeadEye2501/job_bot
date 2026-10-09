@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from backend.agent.jobs import Finished, SeekJob, Source
-from backend.agent.kit import AgentEnd, AgentKit, SessionPlan
+from adapters.claude_code_agent import AgentEnd
+from backend.agent.kit import AgentKit, SessionPlan
 from backend.agent.prompts.frame import system_prompt
 from backend.agent.prompts.seeker import SEEKER_PROMPT, WEB_SEEKER_PROMPT, seeker_task, web_seeker_task
 from backend.agent.sessions import HumanTimeout, LimitExhausted, run_guarded

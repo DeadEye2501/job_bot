@@ -7,16 +7,13 @@ from typing import Literal
 
 from adapters.browser import BrowserHost, find_browser, remove_profile
 from backend.agent.availability import current_refusal
-from backend.agent.jobs import LoginJob, Source
-from backend.agent.kit import AgentKit, SessionPlan
-from backend.agent.prompts.frame import system_prompt
-from backend.agent.prompts.login import LOGIN_PROMPT, login_task
-from backend.agent.sessions import HumanTimeout, LimitExhausted, live_session, run_guarded
-from backend.agent.tools_browser import browser_tools
-from backend.agent.tools_common import common_tools
+from backend.agent.jobs import Source
+from backend.agent.kit import AgentKit
+from backend.agent.sessions import HumanTimeout, LimitExhausted, live_session
 from backend.bot import slot
 from backend.domain.apply_order import Way
 from backend.flows.aggregator_apply import ApplyOrder, apply_phase, apply_vacancy
+from backend.flows.aggregator_login import log_in
 from backend.flows.aggregator_round import RoundState, seek_source
 from backend.models import Aggregator, BotMode, Vacancy
 from backend.notify import fire
@@ -25,12 +22,15 @@ from backend.telegram_time import utc_now
 
 logger = logging.getLogger(__name__)
 
-AgentOutcome = Literal[slot.CycleOutcome, "missing", "locked", "human_timeout", "limit"]
-"""Чем кончилось действие агента: исходы места прогона и свои."""
+AgentOutcome = Literal[
+    slot.CycleOutcome, "missing", "locked", "human_timeout", "limit",
+    "closed", "exhausted", "not_logged_in", "login_timeout",
+]
+"""Чем кончилось действие агента: исходы места прогона и свои — у отклика
+(вакансия закрыта, способы кончились) и у входа (не вошёл, окно не закрыто)."""
 
 HUMAN_TIMEOUT_NOTE = "Капча не пройдена — обход снят."
 LIMIT_NOTE = "Исчерпан лимит подписки Claude Code — обход снят."
-_LOGIN_WAIT_SEC = 3600
 
 
 def aggregators_available(bot) -> str | None:
@@ -51,9 +51,11 @@ async def agent_work(bot, work: Callable[[AgentKit], Awaitable[str]]) -> str:
     try:
         return await work(kit)
     except HumanTimeout:
+        logger.warning(HUMAN_TIMEOUT_NOTE)
         fire(bot.on_round_note, "on_round_note", HUMAN_TIMEOUT_NOTE)
         return "human_timeout"
     except LimitExhausted:
+        logger.warning(LIMIT_NOTE)
         fire(bot.on_round_note, "on_round_note", LIMIT_NOTE)
         return "limit"
     finally:
@@ -111,17 +113,7 @@ async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome:
         return "locked"
 
     async def work(kit: AgentKit) -> str:
-        await kit.browser.open_profile(row.id)
-        await kit.browser.show()
-        await (await kit.browser.page()).goto(f"https://{row.host}/")
-        if not await kit.browser.wait_closed(_LOGIN_WAIT_SEC):
-            raise HumanTimeout
-        job = LoginJob(Source.of(row))
-        plan = SessionPlan(system_prompt(LOGIN_PROMPT), login_task(row.host),
-                           [*common_tools(kit, job), *browser_tools(kit, None)], web_search=False)
-        if (await run_guarded(kit, plan)).limit_exhausted:
-            raise LimitExhausted
-        return "ok"
+        return await log_in(kit, Source.of(row))
 
     return await _in_slot(bot, work, f"aggregator login {aggregator_id}")
 
@@ -138,8 +130,8 @@ async def apply_via_agent(bot, vacancy_id: int, way: Way) -> AgentOutcome | Lite
         return "locked"
 
     async def work(kit: AgentKit) -> str:
-        await apply_vacancy(kit, await _new_round(bot), ApplyOrder(vacancy_id, True, way))
-        return "ok"
+        outcome = await apply_vacancy(kit, await _new_round(bot), ApplyOrder(vacancy_id, True, way))
+        return "ok" if outcome == "applied" else outcome
 
     return await _in_slot(bot, work, f"apply via agent {vacancy_id}")
 

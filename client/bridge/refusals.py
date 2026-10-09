@@ -246,8 +246,15 @@ AGGREGATOR_REFUSALS = {
     "limit": LIMIT_NOTE,
     "error": "Не удалось — см. логи.",
 }
+LOGIN_REFUSALS = {
+    **AGGREGATOR_REFUSALS,
+    "not_logged_in": "Агент не нашёл входа — войдите на сайт ещё раз.",
+    "login_timeout": "Окно входа не закрыто за час — вход не проверен.",
+}
 APPLY_VIA_REFUSALS = {
     **AGGREGATOR_REFUSALS,
+    "closed": "Вакансия закрыта — отклик не нужен.",
+    "exhausted": "Отклик не состоялся — причины в ленте вакансии.",
     "missing": NO_VACANCY,
     "off": "Бот выключен — включите его, чтобы откликнуться агентом.",
 }

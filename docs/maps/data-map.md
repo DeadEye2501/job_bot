@@ -361,7 +361,6 @@
 - `AgentOutcome` = `Literal[slot.CycleOutcome, 'missing', 'locked', …`
 - `HUMAN_TIMEOUT_NOTE` = `'Капча не пройдена — обход снят.'`
 - `LIMIT_NOTE` = `'Исчерпан лимит подписки Claude Code — обход сня…`
-- `_LOGIN_WAIT_SEC` = `3600`
 
 ### `backend/bot/can_send.py`
 
@@ -604,6 +603,10 @@
   - `vacancy_id: int`
   - `forced: bool`
   - `only: Way | None`
+
+### `backend/flows/aggregator_login.py`
+
+- `_LOGIN_WAIT_SEC` = `3600`
 
 ### `backend/flows/aggregator_round.py`
 
@@ -1788,7 +1791,8 @@
 - `LOGIN_FIRST` = `'Сначала войдите на сайт'`
 - `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться.'`
 - `AGGREGATOR_REFUSALS` = `словарь из 6`
-- `APPLY_VIA_REFUSALS` = `словарь из 2 и раскрытых`
+- `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
+- `APPLY_VIA_REFUSALS` = `словарь из 4 и раскрытых`
 
 ### `client/bridge/runner.py`
 

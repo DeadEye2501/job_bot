@@ -8,7 +8,7 @@ import logging
 from adapters.browser import find_browser
 from backend.provider_config import LlmProviderConfig
 from backend.telegram_login import username_of
-from backend.agent.availability import current_refusal
+from backend.agent.availability import agent_refusal
 from client.bridge.answer import BAD_PAYLOAD, Denied, denied, reply
 from client.bridge.bot_stop import detach_bot, stop_bot
 from client.bridge.hub import Hub
@@ -94,7 +94,7 @@ class Settings(Login, Llm, Mail):
                     "aggregator_backfill_limit": rs.aggregator_backfill_limit,
                     "show_browser": rs.show_browser,
                     "letter_writer": rs.letter_writer,
-                    "lock": current_refusal(self._hub.rs.chat),
+                    "lock": agent_refusal(rs.chat, browser),
                     "browser": browser.name if browser else None,
                 },
             }

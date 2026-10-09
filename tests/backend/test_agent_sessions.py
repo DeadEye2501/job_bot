@@ -4,16 +4,11 @@ import asyncio
 
 import pytest
 
-from backend.agent.human_gate import HumanGate
 from backend.agent.kit import AgentEnd, SessionPlan
 from backend.agent.sessions import HumanTimeout, run_guarded
-from tests.fakes.agent import kit_for
+from tests.fakes.agent import kit_for, silent_gate
 
 PLAN = SessionPlan(system_prompt="", task="", tools=[], web_search=False)
-
-
-def _gate():
-    return HumanGate(lambda kind, host: None, lambda: None)
 
 
 async def test_an_outside_stop_puts_the_session_out_before_returning(make_pipeline):
@@ -26,7 +21,7 @@ async def test_an_outside_stop_puts_the_session_out_before_returning(make_pipeli
             stopped.set()
 
     guarded = asyncio.create_task(run_guarded(
-        kit_for(await make_pipeline(), gate=_gate(), run_session=session), PLAN))
+        kit_for(await make_pipeline(), gate=silent_gate(), run_session=session), PLAN))
     await asyncio.sleep(0)
     guarded.cancel()
 
@@ -36,7 +31,7 @@ async def test_an_outside_stop_puts_the_session_out_before_returning(make_pipeli
 
 
 async def test_an_expired_wait_for_a_person_ends_the_session(make_pipeline):
-    gate = _gate()
+    gate = silent_gate()
 
     async def session(plan):
         gate.expired.set()
@@ -52,7 +47,7 @@ async def test_a_session_past_its_limit_is_a_failure(make_pipeline, monkeypatch)
     async def session(plan):
         await asyncio.sleep(3600)
 
-    end = await run_guarded(kit_for(await make_pipeline(), gate=_gate(), run_session=session), PLAN)
+    end = await run_guarded(kit_for(await make_pipeline(), gate=silent_gate(), run_session=session), PLAN)
 
     assert end == AgentEnd(False, "сессия агента превысила срок", False)
 
@@ -68,6 +63,6 @@ async def test_a_session_past_its_limit_is_put_out(make_pipeline, monkeypatch):
         finally:
             stopped.set()
 
-    await run_guarded(kit_for(await make_pipeline(), gate=_gate(), run_session=session), PLAN)
+    await run_guarded(kit_for(await make_pipeline(), gate=silent_gate(), run_session=session), PLAN)
 
     assert stopped.is_set()

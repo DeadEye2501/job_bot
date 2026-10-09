@@ -10,6 +10,7 @@ from client.bridge.hub import Hub
 from client.bridge.refusals import (
     AGGREGATOR_REFUSALS,
     LOGIN_FIRST,
+    LOGIN_REFUSALS,
     NO_AGGREGATOR,
     NO_BOT,
     NOT_A_SITE,
@@ -97,13 +98,13 @@ class Aggregators:
 
     def login(self, aggregator_id: int) -> dict:
         """Вход на сайт: видимый браузер, человек входит и закрывает окно, агент проверяет."""
-        return self._launch(aggregator_id, "login", "Вход проверен.")
+        return self._launch(aggregator_id, "login", "Вход проверен.", LOGIN_REFUSALS)
 
     def run_now(self, aggregator_id: int) -> dict:
         """Обойти один источник вне очереди."""
-        return self._launch(aggregator_id, "run_now", "Обход источника закончен.")
+        return self._launch(aggregator_id, "run_now", "Обход источника закончен.", AGGREGATOR_REFUSALS)
 
-    def _launch(self, aggregator_id: int, action: str, done: str) -> dict:
+    def _launch(self, aggregator_id: int, action: str, done: str, refusals: dict) -> dict:
         bot = self._hub.bot
         if bot is None:
             return denied(NO_BOT, aggregator_id=aggregator_id, action=action)
@@ -111,7 +112,7 @@ class Aggregators:
         return launched(
             self._hub,
             lambda: work(aggregator_id),
-            {**AGGREGATOR_REFUSALS, "locked": current_refusal(self._hub.rs.chat) or ""},
+            {**refusals, "locked": current_refusal(self._hub.rs.chat) or ""},
             done,
             aggregator_id=aggregator_id,
             action=action,

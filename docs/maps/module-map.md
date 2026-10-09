@@ -65,7 +65,7 @@ MCP-сервер инструментов одной сессии агента: 
 - `def _children() -> list[tuple[int, str]]` (13)
 - `def _snapshot() -> list[tuple[int, int, str]]` (16)
 
-### `adapters/browser.py` — 203 строк
+### `adapters/browser.py` — 206 строк
 
 Браузер человека на движке Chromium под управлением Playwright.
 
@@ -79,7 +79,7 @@ MCP-сервер инструментов одной сессии агента: 
 - `def _by_path(name: str, relative: str) -> InstalledBrowser | None` (3)
 - `def _opera() -> InstalledBrowser | None` (10)
 - `def remove_profile(profile_id: int) -> None` (8)
-- `class BrowserHost` (110)
+- `class BrowserHost` (113)
   - `async def open_profile(self, profile_id: int) -> None` (8)
   - `async def page(self)` (8)
   - `async def show(self) -> None` (2)
@@ -87,7 +87,7 @@ MCP-сервер инструментов одной сессии агента: 
   - `async def clear_cache(self) -> None` (4)
   - `async def wait_closed(self, limit_sec: float) -> bool` (11)
   - `async def close(self) -> None` (7)
-  - `async def _launch(self) -> None` (28)
+  - `async def _launch(self) -> None` (31)
   - `async def _place(self, on_screen: bool) -> None` (10)
   - `def _forget_context(self, closed) -> None` (4)
   - `async def _close_context(self) -> None` (4)
@@ -322,7 +322,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 170 модулей
+## backend — 171 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -342,7 +342,7 @@ init
 
 ### `backend/agent/human_gate.py` — 74 строк
 
-Ожидание человека: капча или слетевший вход. Срок — час на весь обход.
+Ожидание человека: капча или слетевший вход. Срок — час на каждое ожидание.
 
 Зависит от: —
 
@@ -438,7 +438,7 @@ init
 - `def live_session(model: str) -> RunSession` (12)
   - `async def run(plan: SessionPlan) -> AgentEnd` (7)
 
-### `backend/agent/tools_applier.py` — 136 строк
+### `backend/agent/tools_applier.py` — 144 строк
 
 Инструменты откликателя: своя вакансия, запись отклика на сайте и отклик письмом.
 
@@ -453,7 +453,8 @@ init
 - `def _lines(screening: list[dict]) -> list[tuple[bool, str]]` (2)
 - `async def _record(kit: AgentKit, job: ApplyJob, entry: ApplicationEntry) -> str` (7)
 - `async def _append(kit: AgentKit, application_id: int, lines: list[tuple[bool, str]]) -> str` (7)
-- `async def _send_email(kit: AgentKit, job: ApplyJob, report: _Report, subject: str) -> str` (24)
+- `async def _send_email(kit: AgentKit, job: ApplyJob, report: _Report, subject: str) -> str` (22)
+- `async def _send_and_record(kit: AgentKit, job: ApplyJob, report: _Report, mail: OutgoingMail, account: MailAccountConfig) -> str` (8)
 - `async def _deliver(account: MailAccountConfig, mail: OutgoingMail) -> str | None` (11)
 
 ### `backend/agent/tools_browser.py` — 96 строк
@@ -530,22 +531,22 @@ First-run bootstrap: ensure DB schema exists.
 - `def alembic_config() -> Config` (10)
 - `def ensure_schema() -> None` (9)
 
-### `backend/bot/aggregators.py` — 189 строк
+### `backend/bot/aggregators.py` — 181 строк
 
 Работа агента у бота: обход агрегаторов, вход на сайт, ручной отклик через место прогона и удаление источника.
 
-Зависит от: `adapters.browser`, `backend.agent.availability`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.login`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.bot`, `backend.domain.apply_order`, `backend.flows.aggregator_apply`, `backend.flows.aggregator_round`, `backend.models`, `backend.notify`, `backend.repository`, `backend.telegram_time`
+Зависит от: `adapters.browser`, `backend.agent.availability`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.sessions`, `backend.bot`, `backend.domain.apply_order`, `backend.flows.aggregator_apply`, `backend.flows.aggregator_login`, `backend.flows.aggregator_round`, `backend.models`, `backend.notify`, `backend.repository`, `backend.telegram_time`
 
 - `def aggregators_available(bot) -> str | None` (3)
 - `def human_done(bot) -> None` (3)
-- `async def agent_work(bot, work: Callable[[AgentKit], Awaitable[str]]) -> str` (16)
+- `async def agent_work(bot, work: Callable[[AgentKit], Awaitable[str]]) -> str` (18)
 - `async def launch_round(bot) -> None` (8)
 - `async def aggregator_round(bot) -> None` (14)
   - `async def work(kit: AgentKit) -> str` (9)
 - `async def run_aggregator_now(bot, aggregator_id: int) -> AgentOutcome` (13)
   - `async def work(kit: AgentKit) -> str` (3)
-- `async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome` (22)
-  - `async def work(kit: AgentKit) -> str` (12)
+- `async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome` (12)
+  - `async def work(kit: AgentKit) -> str` (2)
 - `async def apply_via_agent(bot, vacancy_id: int, way: Way) -> AgentOutcome | Literal['off']` (16)
   - `async def work(kit: AgentKit) -> str` (3)
 - `async def delete_aggregator(bot, aggregator_id: int) -> str` (10)
@@ -1002,11 +1003,19 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None` (15)
 - `async def _settle_way(kit: AgentKit, round_: RoundState, job: ApplyJob) -> str` (16)
 
-### `backend/flows/aggregator_round.py` — 87 строк
+### `backend/flows/aggregator_login.py` — 34 строк
+
+Вход на сайт агрегатора: человек входит в видимом браузере, агент проверяет вход.
+
+Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.login`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.models`
+
+- `async def log_in(kit: AgentKit, source: Source) -> str` (20)
+
+### `backend/flows/aggregator_round.py` — 88 строк
 
 Обход источников-агрегаторов: фаза поиска одного источника.
 
-Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.seeker`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_seeker`, `backend.flows.parse_queue`, `backend.repository.aggregators`, `backend.telegram_time`
+Зависит от: `adapters.claude_code_agent`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.seeker`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_seeker`, `backend.flows.parse_queue`, `backend.repository.aggregators`, `backend.telegram_time`
 
 - `class RoundState` (6)
 - `async def seek_source(kit: AgentKit, round_: RoundState, source: Source) -> list[int]` (24)
@@ -2103,7 +2112,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def list_hrs_for_company(session: AsyncSession, company_id: int) -> list[tuple[HR, int]]` (16)
 - `async def list_hrs_with_unread(session: AsyncSession) -> list[dict]` (31)
 
-### `backend/repository/mail_account.py` — 57 строк
+### `backend/repository/mail_account.py` — 62 строк
 
 Почта для откликов письмом: одна строка, пароль шифром.
 
@@ -2111,6 +2120,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `class MailSettings` (5)
 - `async def get_mail_account(session: AsyncSession) -> MailAccountConfig | None` (16)
+- `async def read_mail_account(session: AsyncSession) -> MailAccount | None` (3)
 - `async def save_mail_account(session: AsyncSession, settings: MailSettings) -> None` (9)
 - `def _server(address: str | None, host: str | None, port: int | None) -> tuple[str | None, int | None]` (4)
 
@@ -2597,7 +2607,7 @@ Runtime settings layer.
 Отдаёт наружу: `Api`, `AsyncRunner`
 
 
-### `client/bridge/aggregators.py` — 131 строк
+### `client/bridge/aggregators.py` — 132 строк
 
 Экран «Агрегаторы»: перечень, заведение, удаление, включение, вход и обход.
 
@@ -2614,7 +2624,7 @@ Runtime settings layer.
     - `async def run() -> dict` (9)
   - `def login(self, aggregator_id: int) -> dict` (3)
   - `def run_now(self, aggregator_id: int) -> dict` (3)
-  - `def _launch(self, aggregator_id: int, action: str, done: str) -> dict` (13)
+  - `def _launch(self, aggregator_id: int, action: str, done: str, refusals: dict) -> dict` (13)
 - `def _refuse_deletion(block: str | None) -> None` (4)
 
 ### `client/bridge/answer.py` — 204 строк
@@ -2941,11 +2951,11 @@ Runtime settings layer.
   - `def confirm_code(self, payload: dict) -> dict` (10)
   - `def confirm_password(self, payload: dict) -> dict` (10)
 
-### `client/bridge/mail.py` — 48 строк
+### `client/bridge/mail.py` — 47 строк
 
 Почта для откликов в настройках: что записано и запись новой.
 
-Зависит от: `backend.incoming`, `backend.models`, `backend.repository.mail_account`, `client.bridge.answer`
+Зависит от: `backend.incoming`, `backend.repository.mail_account`, `client.bridge.answer`
 
 - `class Mail` (38)
   - `def mail(self) -> dict` (14)
@@ -3026,7 +3036,7 @@ Runtime settings layer.
     - `async def run() -> dict` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (26)
 
-### `client/bridge/refusals.py` — 257 строк
+### `client/bridge/refusals.py` — 264 строк
 
 Слова, которыми мост отказывает окну.
 
@@ -3694,15 +3704,14 @@ seed initial data
 
 - `def _task(vacancy_text='Текст вакансии', profile_text='Анкета', **job) -> str` (7)
 
-### `tests/backend/test_agent_sessions.py` — 73 строк
+### `tests/backend/test_agent_sessions.py` — 68 строк
 
 Сессия агента под надзором: срок человека, общий срок, остановка.
 
-Зависит от: `backend.agent.human_gate`, `backend.agent.kit`, `backend.agent.sessions`, `tests.fakes.agent`
+Зависит от: `backend.agent.kit`, `backend.agent.sessions`, `tests.fakes.agent`
 
 Тестов: 4
 
-- `def _gate()` (2)
 
 ### `tests/backend/test_agent_tools_applier.py` — 119 строк
 
@@ -3747,7 +3756,7 @@ seed initial data
 - `def ready(session_factory, session, tmp_path, make_pipeline)` (23)
   - `async def build(*, simulated=False, mail=True, resume=True)` (18)
 
-### `tests/backend/test_agent_tools_letter.py` — 81 строк
+### `tests/backend/test_agent_tools_letter.py` — 77 строк
 
 Письмо для отклика: пишет приложение или сверяется письмо агента; две отбивки — предел.
 
@@ -3755,7 +3764,6 @@ seed initial data
 
 Тестов: 6
 
-- `def _written(body: str, subject: str='Отклик')` (2)
 - `async def _letter(make_pipeline, session_factory, answers, *, writer='app')` (7)
 
 ### `tests/backend/test_agent_tools_seeker.py` — 165 строк
@@ -3782,13 +3790,13 @@ seed initial data
 - `def _project_of_two_revisions(root, db_file) -> None` (20)
 - `def _revisions_in(paths) -> set[str]` (9)
 
-### `tests/backend/test_bot_aggregators.py` — 220 строк
+### `tests/backend/test_bot_aggregators.py` — 312 строк ⚠ подошёл к 300
 
 Обход агрегаторов в боте: место прогона, режимы, человек, сроки, ручные действия.
 
-Зависит от: `backend.agent.human_gate`, `backend.bot`, `backend.domain.apply_order`, `backend.models`, `backend.repository.aggregators`, `backend.repository.bot_mode`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.fakes.browser`
+Зависит от: `backend.bot`, `backend.domain.apply_order`, `backend.models`, `backend.repository.aggregators`, `backend.repository.bot_mode`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.fakes.browser`
 
-Тестов: 10
+Тестов: 16
 
 - `def agent(monkeypatch)` (13)
   - `def install(bot, steps, *, human_limit=None)` (8)
@@ -3798,6 +3806,10 @@ seed initial data
 - `def _hold(release)` (5)
   - `async def step(tools)` (3)
 - `async def _done(tools)` (2)
+- `def phases(monkeypatch)` (13)
+  - `async def seek(kit, round_, source)` (2)
+  - `async def apply(kit, round_, vacancy_ids)` (2)
+- `async def _set_mode(session_factory, mode)` (4)
 
 ### `tests/backend/test_bot_channels.py` — 168 строк
 
@@ -4196,13 +4208,13 @@ seed initial data
 
 - `def _write_through(module, text: str) -> str` (22)
 
-### `tests/backend/test_flows_aggregator_apply.py` — 197 строк
+### `tests/backend/test_flows_aggregator_apply.py` — 220 строк
 
 Фаза 2: отклик способ за способом, пока один не удался или способы не кончились.
 
 Зависит от: `backend.agent.sessions`, `backend.flows.aggregator_apply`, `backend.flows.aggregator_round`, `backend.models`, `backend.repository.mail_account`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
 
-Тестов: 10
+Тестов: 11
 
 - `def board(session_factory)` (13)
   - `async def make(**vacancy)` (8)
@@ -4623,7 +4635,7 @@ seed initial data
 - `def _provider(monkeypatch, *, listed: list[str]) -> list[str]` (23)
   - `def answer(request: httpx.Request) -> httpx.Response` (5)
 
-### `tests/backend/test_llm_agent_letter.py` — 104 строк
+### `tests/backend/test_llm_agent_letter.py` — 100 строк
 
 Письмо вне Telegram: пишет чат-модель, проверяет сверка фактов.
 
@@ -4631,7 +4643,6 @@ seed initial data
 
 Тестов: 10
 
-- `def _written(body: str, subject: str='Тема')` (2)
 - `def _ask(**over) -> LetterAsk` (5)
 
 ### `tests/backend/test_llm_classify_reply.py` — 274 строк
@@ -5948,7 +5959,7 @@ seed initial data
 
 - `def journal()` (20)
 
-### `tests/client/test_bridge_lifespan.py` — 256 строк
+### `tests/client/test_bridge_lifespan.py` — 257 строк
 
 Следствия подъёма и гашения моста: что окно заводит, открываясь и закрываясь.
 
@@ -6331,7 +6342,7 @@ seed initial data
 - `def application_row(vacancy_id: int, **overrides) -> Application` (9)
 - `def screening_row(application_id: int, position: int, **overrides) -> Screening` (5)
 
-### `tests/fakes/agent.py` — 61 строк
+### `tests/fakes/agent.py` — 66 строк
 
 Набор сессии агента без браузера, водителя и человека.
 
@@ -6342,10 +6353,11 @@ seed initial data
 - `def apply_job(vacancy_id: int, **overrides) -> ApplyJob` (7)
 - `def scripted(steps: list[Callable[[dict[str, Callable]], Awaitable]])` (19)
   - `async def run(plan: SessionPlan) -> AgentEnd` (8)
+- `def silent_gate(limit_sec: float=3600.0) -> HumanGate` (3)
 - `def scripted_kit(pipeline, steps, *, human_limit: float=3600.0) -> AgentKit` (4)
 - `def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit` (3)
 
-### `tests/fakes/browser.py` — 120 строк
+### `tests/fakes/browser.py` — 126 строк
 
 Браузер агента с заданными страницами: что открыто, что нажато, что отказало.
 
@@ -6371,13 +6383,14 @@ seed initial data
   - `async def set_input_files(self, selector, files, **_options)` (3)
   - `def expect_file_chooser(self, **_options)` (2)
   - `async def go_back(self, **_options)` (2)
-- `class FakeBrowser` (24)
+- `class FakeBrowser` (30)
   - `async def page(self)` (2)
   - `async def show(self)` (2)
   - `async def hide_back(self)` (2)
   - `async def open_profile(self, profile_id: int)` (2)
   - `async def clear_cache(self)` (2)
   - `async def close(self)` (2)
+  - `async def wait_closed(self, limit_sec: float) -> bool` (4)
 
 ### `tests/fakes/claude.py` — 83 строк
 
@@ -6471,7 +6484,7 @@ seed initial data
   - `def set_password(self, service: str, username: str, password: str) -> None` (2)
   - `def delete_password(self, service: str, username: str) -> None` (7)
 
-### `tests/fakes/llm.py` — 282 строк
+### `tests/fakes/llm.py` — 287 строк
 
 Подделка провайдера LLM: настоящий клиент поверх подставного транспорта.
 
@@ -6489,6 +6502,7 @@ seed initial data
 - `def parsed_vacancy_answer(**fields) -> dict` (8)
 - `def chat_json(payload: dict, *, finish_reason: str='stop') -> httpx.Response` (9)
 - `def fit_answer(verdict: str, reason: str | None=None) -> httpx.Response` (8)
+- `def letter_answer(body: str, subject: str='Отклик') -> httpx.Response` (3)
 - `def factcheck_answer(verdict: str, issues=()) -> httpx.Response` (8)
 - `def messages_of(request: httpx.Request) -> dict[str, str]` (9)
 - `def data_block(request: httpx.Request) -> str` (9)

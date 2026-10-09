@@ -166,12 +166,15 @@ class BrowserHost:
         for opened in self._context.pages:
             _accept_dialogs(opened)
         page = self._context.pages[-1] if self._context.pages else await self._context.new_page()
+        # Адрес запоминается до сворачивания: `_place` спрашивает `page()`, а та
+        # перезаписала бы его адресом пустой вкладки, и форма потерялась бы.
+        back_to = self._last_url
         if not self._always_visible:
             await self._place(on_screen=False)
-        if self._last_url == "about:blank":
+        if back_to == "about:blank":
             return
         try:
-            await page.goto(self._last_url)
+            await page.goto(back_to)
         except PlaywrightError:
             logger.exception("прежняя страница профиля %d не открылась", self._profile_id)
 

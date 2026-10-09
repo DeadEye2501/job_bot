@@ -4,11 +4,7 @@ from backend.agent.tools_letter import letter_tools
 from tests.dbio import put
 from tests.factories import vacancy_row
 from tests.fakes.agent import apply_job, kit_for, tool
-from tests.fakes.llm import CHAT, chat_json, factcheck_answer, provider
-
-
-def _written(body: str, subject: str = "Отклик"):
-    return chat_json({"subject": subject, "body": body})
+from tests.fakes.llm import CHAT, letter_answer, factcheck_answer, provider
 
 
 async def _letter(make_pipeline, session_factory, answers, *, writer="app"):
@@ -22,7 +18,7 @@ async def _letter(make_pipeline, session_factory, answers, *, writer="app"):
 
 async def test_the_app_writes_the_letter_with_its_subject(make_pipeline, session_factory):
     job, client, letter = await _letter(
-        make_pipeline, session_factory, [_written("Готов работать."), factcheck_answer("ok")]
+        make_pipeline, session_factory, [letter_answer("Готов работать."), factcheck_answer("ok")]
     )
 
     answer = await letter(language="русский")
@@ -32,7 +28,7 @@ async def test_the_app_writes_the_letter_with_its_subject(make_pipeline, session
 
 async def test_a_rejected_app_letter_comes_back_as_remarks(make_pipeline, session_factory):
     job, client, letter = await _letter(
-        make_pipeline, session_factory, [_written("Первое."), factcheck_answer("reject", ["выдумано"])]
+        make_pipeline, session_factory, [letter_answer("Первое."), factcheck_answer("reject", ["выдумано"])]
     )
 
     answer = await letter(language="русский")

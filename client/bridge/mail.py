@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from backend.incoming import int_or_none, text_or_none
-from backend.models import MailAccount
-from backend.repository.mail_account import MailSettings, save_mail_account
+from backend.repository.mail_account import MailSettings, read_mail_account, save_mail_account
 from client.bridge.answer import reply
 
 
@@ -19,7 +18,7 @@ class Mail:
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
-                row = await session.get(MailAccount, 1)
+                row = await read_mail_account(session)
             return {
                 "address": row.address if row else None,
                 "smtp_host": row.smtp_host if row else None,

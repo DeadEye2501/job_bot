@@ -40,6 +40,11 @@ async def get_mail_account(session: AsyncSession) -> MailAccountConfig | None:
     return MailAccountConfig(row.address, row.smtp_host, row.smtp_port, password)
 
 
+async def read_mail_account(session: AsyncSession) -> MailAccount | None:
+    """Строка почты как есть — для экрана настроек: пароль окну не отдаётся, только признак."""
+    return await session.get(MailAccount, 1)
+
+
 async def save_mail_account(session: AsyncSession, settings: MailSettings) -> None:
     """Записать почту. Пустой пароль — оставить прежний; у Gmail сервер подставляется сам."""
     row = await session.get(MailAccount, 1) or MailAccount(id=1)

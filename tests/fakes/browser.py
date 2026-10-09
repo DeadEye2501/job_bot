@@ -100,6 +100,7 @@ class FakeBrowser:
     def __init__(self, page: FakePage | None = None):
         self._page = page or FakePage()
         self.calls: list[str] = []
+        self.closes = True
 
     async def page(self):
         return self._page
@@ -118,3 +119,8 @@ class FakeBrowser:
 
     async def close(self):
         self.calls.append("close")
+
+    async def wait_closed(self, limit_sec: float) -> bool:
+        """Закрыл ли человек окно за срок; ответ задаёт тест полем `closes`."""
+        self.calls.append(("wait_closed", limit_sec))
+        return self.closes
