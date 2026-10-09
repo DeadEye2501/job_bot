@@ -355,6 +355,14 @@
 - `logger` = `logging.getLogger(__name__)`
 - `_PROJECT_ROOT` = `Path(__file__).resolve().parent.parent`
 
+### `backend/bot/aggregators.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `AgentOutcome` = `Literal[slot.CycleOutcome, 'missing', 'locked', …`
+- `HUMAN_TIMEOUT_NOTE` = `'Капча не пройдена — обход снят.'`
+- `LIMIT_NOTE` = `'Исчерпан лимит подписки Claude Code — обход сня…`
+- `_LOGIN_WAIT_SEC` = `3600`
+
 ### `backend/bot/can_send.py`
 
 - `NO_TARGET` = `'нет адресата'`
@@ -384,11 +392,13 @@
 - `class Bot`
   - `loop: asyncio.AbstractEventLoop | None`
   - `current_poll_task: asyncio.Task | None`
+  - `launched_task: asyncio.Task | None`
   - `dialogs: list[DialogPeer]`
 
 ### `backend/bot/loop.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `_SETTLE_SEC` = `15`
 
 ### `backend/bot/media.py`
 
@@ -1519,6 +1529,14 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `backend/repository/stats_pipeline.py`
+
+- `_VACANCY_SOURCE` = `набор из 2`
+
+### `backend/repository/stats_rows.py`
+
+- `SourceKey` = `tuple[int | None, int | None]`
+
 ### `backend/repository/vacancies_card.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -1609,6 +1627,10 @@
 - `logger` = `logging.getLogger(__name__)`
 
 ## client
+
+### `client/bridge/aggregators.py`
+
+- `_DELETION_REFUSALS` = `словарь из 3`
 
 ### `client/bridge/answer.py`
 
@@ -1760,6 +1782,13 @@
 - `PASTED_REFUSALS` = `словарь из 7`
 - `PARSE_CV_REFUSALS` = `словарь из 5`
 - `SEND_REFUSALS` = `словарь из 12`
+- `NO_AGGREGATOR` = `'Агрегатор не найден.'`
+- `NOT_A_SITE` = `'Адрес не похож на сайт'`
+- `WEB_SEARCH_KEPT` = `'Поиск по сети удалить нельзя'`
+- `LOGIN_FIRST` = `'Сначала войдите на сайт'`
+- `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться.'`
+- `AGGREGATOR_REFUSALS` = `словарь из 6`
+- `APPLY_VIA_REFUSALS` = `словарь из 2 и раскрытых`
 
 ### `client/bridge/runner.py`
 
@@ -2014,6 +2043,10 @@
 
 - `BRIDGE` = `Path(__file__).resolve().parents[2] / 'client' /…`
 
+### `tests/client/test_bridge_apply_via.py`
+
+- `FORM` = `'https://company.test/apply'`
+
 ### `tests/client/test_bridge_login.py`
 
 - `CREDENTIALS` = `словарь из 3`
@@ -2102,4 +2135,4 @@
 
 - `class Sent`
   - `id: int`
-- `ANSWERS` = `словарь из 11`
+- `ANSWERS` = `словарь из 15`

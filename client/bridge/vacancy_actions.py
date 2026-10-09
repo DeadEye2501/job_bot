@@ -7,14 +7,21 @@
 
 from __future__ import annotations
 
+from backend.domain.apply_order import Way
+from backend.flows.aggregator_apply import vacancy_ways
+from backend.models import Vacancy
 from backend.repository import vacancies_life
+from backend.agent.availability import current_refusal
 from client.bridge.answer import Denied, asked_id, denied, launched, reply
 from client.bridge.refusals import (
+    APPLY_VIA_REFUSALS,
     NO_BOT,
     NO_VACANCY,
     RERUN_REFUSALS,
     SEND_REFUSALS,
+    WAY_UNKNOWN,
 )
+from client.bridge.vacancy_links import require_vacancy
 
 
 class VacancyActions:
@@ -46,6 +53,54 @@ class VacancyActions:
             "Вакансия разобрана заново.",
             vacancy_id=vacancy_id,
             action="rerun",
+        )
+
+    def apply_ways(self, vacancy_id: int) -> dict:
+        """Способы отклика на вакансию для окна выбора, есть ли Telegram и что запирает агента.
+
+        Названий способов мост не отдаёт: таблица названий одна, во фронте.
+        """
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                await require_vacancy(session, vacancy_id)
+                vacancy = await session.get(Vacancy, vacancy_id)
+                telegram = vacancy.hr_id is not None
+            ways = await vacancy_ways(self._hub.session_factory, vacancy_id, set())
+            return {"ways": [{"method": w.method, "target": w.target} for w in ways],
+                    "telegram": telegram, "lock": current_refusal(self._hub.rs.chat)}
+
+        return reply(self._hub.runner, run())
+
+    def apply_via(self, payload: dict) -> dict:
+        """Откликнуться агентом выбранным способом — он должен быть среди способов вакансии."""
+        vacancy_id, refused = asked_id(payload, "vacancy_id", "apply_via")
+        if refused is not None:
+            return refused
+        bot = self._hub.bot
+        if bot is None:
+            return denied(NO_BOT, vacancy_id=vacancy_id, action="apply_via")
+        chosen = (payload.get("method"), payload.get("target"))
+
+        async def run() -> Way:
+            async with self._hub.session_factory() as session:
+                await require_vacancy(session, vacancy_id)
+            ways = await vacancy_ways(self._hub.session_factory, vacancy_id, set())
+            way = next((w for w in ways if (w.method, w.target) == chosen), None)
+            if way is None:
+                raise Denied(WAY_UNKNOWN, vacancy_id=vacancy_id)
+            return way
+
+        found = reply(self._hub.runner, run())
+        if "ok" not in found:
+            return found
+        return launched(
+            self._hub,
+            lambda: bot.apply_via_agent(vacancy_id, found["ok"]),
+            {**APPLY_VIA_REFUSALS, "locked": current_refusal(self._hub.rs.chat) or ""},
+            "Отклик агентом закончен.",
+            vacancy_id=vacancy_id,
+            action="apply_via",
         )
 
     def send_application(self, payload: dict) -> dict:

@@ -119,10 +119,19 @@ class System(Journal, Wipe, Desktop):
                 async with session.begin():
                     await write_mode(session, chosen)
             if self._hub.bot is not None:
+                # Обход агента — отдельная задача и тика не ждёт: Off гасит его сразу.
+                if chosen is BotMode.OFF:
+                    self._hub.bot.cancel_current_poll()
                 self._hub.bot.kick()
             return {"mode": chosen.value}
 
         return reply(self._hub.runner, run())
+
+    def human_done(self) -> dict:
+        """«Готово» — человек прошёл капчу или вошёл на сайт, агент продолжает."""
+        if self._hub.bot is not None:
+            self._hub.bot.human_done()
+        return {"ok": {}}
 
     def run_now(self) -> dict:
         """Кнопка обновления: один обход каналов помимо режима.

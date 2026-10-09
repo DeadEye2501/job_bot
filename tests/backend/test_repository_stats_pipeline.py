@@ -10,10 +10,12 @@
 
 from backend.domain.verdict import EMPTY_SKIP_REASON
 from backend.models import TrashEvent, VacancyStatus
+from backend.repository.aggregators import WEB_SEARCH_NAME
 from backend.repository.stats_pipeline import get_stats_channels_pipeline
 from tests.backend.fixtures.stats import rows_by_channel
 from tests.dbio import put
 from tests.factories import channel_row, days_ago, status_history_row, vacancy_row
+from tests.factories_aggregators import aggregator_row
 
 
 async def test_an_empty_database_gives_no_rows(session):
@@ -314,3 +316,49 @@ async def test_an_unparsed_vacancy_is_not_counted(session, session_factory):
     # Разобранных две против одной неразобранной нарочно: на равном наборе
     # перевёрнутый отбор дал бы то же число, и подмена осталась бы незаметной.
     assert row["total"] == 2
+
+
+async def _rows_by_source(session) -> dict[tuple, dict]:
+    got = await get_stats_channels_pipeline(session, period="all")
+    return {(row["id"], row["aggregator_id"]): row for row in got["channels"]}
+
+
+async def test_an_aggregator_gets_its_own_row_with_its_junk(session, session_factory):
+    """Найденное на агрегаторе — его строка, а не «Без канала»."""
+    site = aggregator_row(name="Сайт", host="site.test")
+    await put(session_factory, site)
+    await put(
+        session_factory,
+        vacancy_row(source_aggregator_id=site.id, source_key="v/1"),
+        vacancy_row(),
+        TrashEvent(source_aggregator_id=site.id, source_key="v/2", reason="реклама"),
+    )
+
+    rows = await _rows_by_source(session)
+
+    own = rows[(None, site.id)]
+    assert (own["kind"], own["title"], own["total"], own["trash"]) == ("aggregator", "Сайт", 2, 1)
+    assert rows[(None, None)]["total"] == 1 and rows[(None, None)]["kind"] == "none"
+
+
+async def test_web_search_gets_its_own_row(session, session_factory):
+    web = aggregator_row(name=WEB_SEARCH_NAME, host=None)
+    await put(session_factory, web)
+    await put(session_factory, vacancy_row(source_aggregator_id=web.id, source_key="a.test/jobs/1"))
+
+    rows = await _rows_by_source(session)
+
+    assert list(rows) == [(None, web.id)] and rows[(None, web.id)]["title"] == WEB_SEARCH_NAME
+
+
+async def test_a_channel_is_not_mixed_with_an_aggregator(session, session_factory):
+    channel = channel_row(username="ch", title="Канал")
+    site = aggregator_row(host="site.test")
+    await put(session_factory, channel, site)
+    await put(session_factory, vacancy_row(source_channel_id=channel.id),
+              vacancy_row(source_aggregator_id=site.id, source_key="v/1"))
+
+    rows = await _rows_by_source(session)
+
+    assert rows[(channel.id, None)]["kind"] == "channel"
+    assert rows[(channel.id, None)]["total"] == 1 and rows[(None, site.id)]["total"] == 1

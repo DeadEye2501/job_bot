@@ -94,6 +94,29 @@ async def test_the_aggregator_settings_come_back_after_saving(api, ask):
 
     snapshot = (await ask(api.settings.get))["ok"]["aggregators"]
 
-    assert snapshot == {
+    saved = ("aggregator_backfill_limit", "show_browser", "letter_writer")
+    assert {key: snapshot[key] for key in saved} == {
         "aggregator_backfill_limit": 30, "show_browser": True, "letter_writer": "agent",
     }
+
+
+async def test_mail_settings_come_back_without_the_password(api, ask):
+    saved = await ask(api.settings.save_mail, {"address": "me@gmail.com", "password": "Kx9-mail"})
+
+    answer = (await ask(api.settings.mail))["ok"]
+
+    assert "ok" in saved
+    assert answer == {"address": "me@gmail.com", "smtp_host": "smtp.gmail.com",
+                      "smtp_port": 465, "has_password": True}
+
+
+async def test_the_aggregator_snapshot_names_the_browser_and_what_locks_the_agent(
+    api, ask, monkeypatch
+):
+    from adapters.browser import InstalledBrowser
+
+    monkeypatch.setattr("client.bridge.settings.find_browser",
+                        lambda: InstalledBrowser("Opera", None, None))
+    aggregators = (await ask(api.settings.get))["ok"]["aggregators"]
+
+    assert aggregators["browser"] == "Opera" and aggregators["lock"]

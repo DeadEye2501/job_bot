@@ -1,6 +1,6 @@
 """Чем агенту работать: водитель — Claude Code, браузер — установленный Chromium."""
 
-from adapters.browser import BROWSER_NAMES, InstalledBrowser
+from adapters.browser import BROWSER_NAMES, InstalledBrowser, find_browser
 from backend.provider_config import LlmProviderConfig, serves_claude_code
 
 NO_DRIVER = "Для агрегаторов нужен Claude Code: выберите его поставщиком чата."
@@ -17,3 +17,9 @@ def agent_refusal(chat: LlmProviderConfig | None, browser: InstalledBrowser | No
     if browser is None:
         return NO_BROWSER
     return None
+
+
+def current_refusal(chat: LlmProviderConfig | None) -> str | None:
+    """Почему агент не может работать прямо сейчас — с браузером, найденным заново:
+    поставщика чата и браузер человек меняет без перезапуска."""
+    return agent_refusal(chat, find_browser())

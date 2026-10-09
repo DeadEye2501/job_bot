@@ -78,11 +78,10 @@ async def delete_aggregator(session: AsyncSession, aggregator_id: int) -> str:
     `repoint_vacancies`; отклики и мусор — другие таблицы, и у каждой свой
     запрос: обобщать `repoint_vacancies` на любую модель его докстрока запрещает.
     """
+    block = await deletion_block(session, aggregator_id)
+    if block is not None:
+        return block
     row = await session.get(Aggregator, aggregator_id)
-    if row is None:
-        return "missing"
-    if row.host is None:
-        return "protected"
     await repoint_vacancies(
         session, Vacancy.source_aggregator_id, absorbed_id=aggregator_id, survivor_id=None
     )
@@ -96,6 +95,14 @@ async def delete_aggregator(session: AsyncSession, aggregator_id: int) -> str:
     )
     await session.delete(row)
     return "ok"
+
+
+async def deletion_block(session: AsyncSession, aggregator_id: int) -> str | None:
+    """Почему агрегатор не удалить: `missing` — его нет, `protected` — это «Поиск по сети»."""
+    row = await session.get(Aggregator, aggregator_id)
+    if row is None:
+        return "missing"
+    return "protected" if row.host is None else None
 
 
 async def round_sources(session: AsyncSession) -> list[Aggregator]:

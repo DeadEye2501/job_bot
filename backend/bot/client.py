@@ -26,9 +26,13 @@ from backend.bot import send
 from backend.bot import chat
 from backend.bot import channels
 from backend.domain.telegram_identity import DialogPeer
+from backend.agent.human_gate import HumanGate
+from backend.bot import aggregators
 from backend.bot import slot
 from backend.flows.pipeline import IngestionPipeline, LmProviders
+from backend.domain.apply_order import Way
 from backend.models import BotMode
+from backend.notify import fire
 from backend.models import Message
 from backend.runtime_settings import RuntimeSettings
 
@@ -106,6 +110,8 @@ def _declare_loop_controls(bot) -> None:
     # Reference to the currently-running poll task so the UI's stop
     # button can cancel it without killing the whole bot loop.
     bot.current_poll_task = None
+    # Работа, запущенная в месте прогона отдельной задачей: остановка ждёт её.
+    bot.launched_task = None
     # Переписки, прочитанные при подъёме соединения: ими догон правит очередь.
     # Пустой список значит «не знаем» — тогда очередь остаётся прежней, и
     # догон идёт по всем известным собеседникам.
@@ -149,6 +155,10 @@ def _declare_ui_hooks(bot) -> None:
     # каждый раз когда в БД меняется Vacancy — фронт сразу делает
     # refetch.
     bot.on_vacancies_changed = None
+    # Агент ждёт человека (капча, вход) и человек справился; итог обхода словами.
+    bot.on_human_needed = None
+    bot.on_human_resolved = None
+    bot.on_round_note = None
 
 
 def _forward_pipeline_hooks(bot) -> None:
@@ -185,6 +195,7 @@ class Bot:
     # и без этих строк класс не объявляет ни одного своего поля.
     loop: asyncio.AbstractEventLoop | None
     current_poll_task: asyncio.Task | None
+    launched_task: asyncio.Task | None
     dialogs: list[DialogPeer]
 
     def __init__(
@@ -218,6 +229,10 @@ class Bot:
         _declare_loop_controls(self)
         _declare_ui_hooks(self)
         _forward_pipeline_hooks(self)
+        self.human_gate = HumanGate(
+            lambda kind, host: fire(self.on_human_needed, "on_human_needed", kind, host),
+            lambda: fire(self.on_human_resolved, "on_human_resolved"),
+        )
 
     @property
     def is_ready(self) -> bool:
@@ -334,3 +349,18 @@ class Bot:
 
     async def ui_forget_vacancy(self, vacancy_id) -> bool:
         return await self.ingestion.forget_vacancy(vacancy_id)
+
+    async def run_aggregator_now(self, aggregator_id) -> aggregators.AgentOutcome:
+        return await aggregators.run_aggregator_now(self, aggregator_id)
+
+    async def login_aggregator(self, aggregator_id) -> aggregators.AgentOutcome:
+        return await aggregators.login_aggregator(self, aggregator_id)
+
+    async def apply_via_agent(self, vacancy_id, way: Way) -> str:
+        return await aggregators.apply_via_agent(self, vacancy_id, way)
+
+    def human_done(self) -> None:
+        aggregators.human_done(self)
+
+    async def delete_aggregator(self, aggregator_id) -> str:
+        return await aggregators.delete_aggregator(self, aggregator_id)

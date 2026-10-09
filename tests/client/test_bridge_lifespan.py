@@ -176,6 +176,9 @@ async def test_what_the_bot_does_by_itself_reaches_the_queue(hub):
     bot.on_channels_changed()
     bot.on_contacts_changed()
     bot.on_vacancies_changed()
+    bot.on_human_needed("captcha", "site.test")
+    bot.on_human_resolved()
+    bot.on_round_note("обход снят")
     bot.on_cycle_end()
 
     news = await hub.events.take(after=0, timeout=0.01)
@@ -190,8 +193,12 @@ async def test_what_the_bot_does_by_itself_reaches_the_queue(hub):
         "contacts_lists_changed",
         "contacts_lists_changed",
         "vacancies_list_changed",
+        "human_needed",
+        "human_resolved",
+        "round_note",
         "ingestion_finished",
     ]
+    assert news["events"][-4]["payload"] == {"kind": "captcha", "host": "site.test"}
 
 
 async def test_an_arrived_letter_also_moves_the_unread_count(hub):

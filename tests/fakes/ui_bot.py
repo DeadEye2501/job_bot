@@ -31,6 +31,10 @@ ANSWERS = {
     "log_out_refusal": None,
     "channel_poll": "ok",
     "added": (1, "created"),
+    "aggregator_run": "ok",
+    "aggregator_login": "ok",
+    "apply_via": "ok",
+    "aggregator_deleted": "ok",
 }
 
 
@@ -116,3 +120,22 @@ class UiBot:
     async def add_channel(self, username: str) -> tuple[int | None, str]:
         self.calls.append(("add_channel", username))
         return self.answers["added"]
+
+    async def run_aggregator_now(self, aggregator_id: int) -> str:
+        self.calls.append(("run_aggregator_now", aggregator_id))
+        return self.answers["aggregator_run"]
+
+    async def login_aggregator(self, aggregator_id: int) -> str:
+        self.calls.append(("login_aggregator", aggregator_id))
+        return self.answers["aggregator_login"]
+
+    async def apply_via_agent(self, vacancy_id: int, way) -> str:
+        self.calls.append(("apply_via_agent", vacancy_id, way))
+        return self.answers["apply_via"]
+
+    def human_done(self) -> None:
+        self.calls.append(("human_done",))
+
+    async def delete_aggregator(self, aggregator_id: int) -> str:
+        self.calls.append(("delete_aggregator", aggregator_id))
+        return self.answers["aggregator_deleted"]

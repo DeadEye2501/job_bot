@@ -157,3 +157,20 @@ async def test_the_last_unread_moment_reaches_the_window_with_its_zone(api, ask,
 
     assert answer["ok"]["chats"][0]["last_at"] == at(50).isoformat() + "+00:00"
 
+
+
+async def test_ready_from_the_window_reaches_the_bot(api, ask, with_bot):
+    bot = with_bot()
+
+    answer = await ask(api.system.human_done)
+
+    assert answer == {"ok": {}} and bot.calls == [("human_done",)]
+
+
+async def test_switching_off_stops_the_running_agent_at_once(api, ask, with_bot):
+    """Обход агента — отдельная задача и тика не ждёт: Off гасит его сразу."""
+    bot = with_bot()
+
+    await ask(api.system.set_mode, "Off")
+
+    assert ("cancel_current_poll",) in bot.calls
