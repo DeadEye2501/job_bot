@@ -22,7 +22,8 @@ class LimitExhausted(Exception):
 
 async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     """Сессия наперегонки со сроками. Отмена снаружи гасит сессию и ждёт её конца:
-    агент не успеет записать отклик после остановки."""
+    агент не успеет записать отклик после остановки. Исключение — письмо,
+    которое сервер почты уже принимает: оно дойдёт и запишется (`ApplyJob.delivery`)."""
     session = asyncio.create_task(kit.run_session(plan))
     expiry = asyncio.create_task(kit.gate.expired.wait())
     try:

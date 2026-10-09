@@ -168,9 +168,11 @@ async def test_ready_from_the_window_reaches_the_bot(api, ask, with_bot):
 
 
 async def test_switching_off_stops_the_running_agent_at_once(api, ask, with_bot):
-    """Обход агента — отдельная задача и тика не ждёт: Off гасит его сразу."""
+    """Обход агента — отдельная задача и тика не ждёт: Off гасит его сразу, а опрос каналов
+    дорабатывает своё."""
     bot = with_bot()
 
     await ask(api.system.set_mode, "Off")
 
-    assert ("cancel_current_poll",) in bot.calls
+    assert ("cancel_round",) in bot.calls
+    assert ("cancel_current_poll",) not in bot.calls

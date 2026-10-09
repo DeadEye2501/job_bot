@@ -36,6 +36,12 @@ def test_a_web_find_goes_to_its_own_page_as_a_form():
     assert ways[0] == Way("form", "https://company.test/jobs/1", None)
 
 
+def test_a_web_find_on_a_known_aggregator_goes_through_its_button():
+    """Веб-поиск принёс страницу агрегатора человека: это его кнопка, а не форма работодателя."""
+    ways = apply_ways(_facts(source_url="https://site.test/vacancy/5", source_site=WEB))
+    assert ways == [Way("aggregator", "https://site.test/vacancy/5", 1)]
+
+
 def test_the_page_of_a_channel_post_is_not_a_form():
     """Адрес у вакансии из канала — пост в Telegram, а не форма работодателя."""
     assert apply_ways(_facts(source_url="https://t.me/jobs/10")) == []

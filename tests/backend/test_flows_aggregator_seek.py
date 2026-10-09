@@ -1,7 +1,5 @@
 """Фаза 1: искатель находит, конвейер разбирает, last_run_at двигается только по done."""
 
-from datetime import datetime, timezone
-
 import pytest
 
 from backend.agent.jobs import Source
@@ -16,7 +14,6 @@ from tests.fakes.agent import LimitHit, scripted_kit
 pytestmark = pytest.mark.usefixtures("one_vector")
 
 PAGE = "https://site.test/vacancy/1"
-STARTED = datetime(2026, 10, 9, 9, 0, tzinfo=timezone.utc)
 
 
 @pytest.fixture
@@ -35,7 +32,7 @@ def seek(make_pipeline, session_factory):
         row = aggregator_row(**{"host": "site.test", **source})
         await put(session_factory, row)
         kit = scripted_kit(await make_pipeline(), steps, human_limit=human_limit)
-        found = await seek_source(kit, RoundState(STARTED, set(), web_search_id=0), Source.of(row))
+        found = await seek_source(kit, RoundState(set(), web_search_id=0), Source.of(row))
         stored = [a for a in await all_rows(session_factory, Aggregator) if a.id == row.id][0]
         return found, stored, kit
 
@@ -130,16 +127,17 @@ async def test_the_web_seeker_searches_the_web_and_avoids_the_persons_aggregator
 async def test_the_pipeline_refreshes_its_snapshots_before_the_search(
     seek, monkeypatch, make_pipeline, parsed
 ):
+    order = []
+
     async def step(tools):
+        order.append("search")
         await tools["finish"](result="done")
 
-    reloaded = []
-
     async def reload_resources(self):
-        reloaded.append(True)
+        order.append("reload")
 
     monkeypatch.setattr("backend.flows.pipeline.IngestionPipeline.reload_resources", reload_resources)
 
     await seek([step])
 
-    assert reloaded == [True]
+    assert order == ["reload", "search"]

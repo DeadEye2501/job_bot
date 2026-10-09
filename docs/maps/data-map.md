@@ -266,6 +266,7 @@
   - `letter_writer: str`
   - `letter_checks: int` = `0`
   - `outcome: Outcome | None` = `None`
+  - `delivery: asyncio.Task | None` = `None`
 
 ### `backend/agent/kit.py`
 
@@ -397,7 +398,7 @@
 ### `backend/bot/loop.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_SETTLE_SEC` = `15`
+- `_SETTLE_SEC` = `8`
 
 ### `backend/bot/media.py`
 
@@ -610,7 +611,6 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `class RoundState`
-  - `started_at: datetime`
   - `closed_aggregators: set[int]`
   - `web_search_id: int`
 
@@ -1925,9 +1925,9 @@
 
 ### `tests/backend/test_agent_prompts.py`
 
-- `TODAY` = `date(2026, 10, 9)`
 - `ROLES` = `набор из 3`
 - `SHARED_RULES` = `набор из 4`
+- `_METHOD_NAMES` = `словарь из 3`
 
 ### `tests/backend/test_agent_sessions.py`
 
@@ -1957,10 +1957,6 @@
 - `IDS` = `np.array([10, 20, 30])`
 - `MATRIX` = `np.array([[1.0, 0.0], [0.0, 1.0], [0.9, 0.1]], d…`
 
-### `tests/backend/test_domain_tenure.py`
-
-- `TODAY` = `date(2026, 10, 9)`
-
 ### `tests/backend/test_domain_transitions.py`
 
 - `TERMINAL` = `набор из 4`
@@ -1974,13 +1970,11 @@
 
 - `PAGE` = `'https://site.test/vacancy/1'`
 - `FORM` = `'https://company.test/apply'`
-- `STARTED` = `datetime(2026, 10, 9, 9, 0, tzinfo=timezone.utc)`
 
 ### `tests/backend/test_flows_aggregator_seek.py`
 
 - `pytestmark` = `pytest.mark.usefixtures('one_vector')`
 - `PAGE` = `'https://site.test/vacancy/1'`
-- `STARTED` = `datetime(2026, 10, 9, 9, 0, tzinfo=timezone.utc)`
 
 ### `tests/backend/test_flows_ghosting_timer.py`
 
@@ -2012,10 +2006,6 @@
 - `_REBUILD_HEAD` = `'\nrevision = "дом_перестроен"\ndown_revision = …`
 - `_QUENCHED` = `_REBUILD_HEAD.format(quench='    op.execute("PRA…`
 - `_AS_IS` = `_REBUILD_HEAD.format(quench='')`
-
-### `tests/backend/test_repository_agent_profile.py`
-
-- `TODAY` = `date(2026, 10, 9)`
 
 ### `tests/backend/test_repository_channel_detail.py`
 

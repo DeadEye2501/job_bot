@@ -1,6 +1,8 @@
 """Фаза 2: отклик способ за способом, пока один не удался или способы не кончились."""
 
-from datetime import datetime, timezone
+import asyncio
+import threading
+import time
 
 import pytest
 
@@ -8,16 +10,17 @@ from backend.agent.sessions import LimitExhausted
 
 from backend.flows.aggregator_apply import ApplyOrder, apply_phase, apply_vacancy
 from backend.flows.aggregator_round import RoundState
-from backend.models import ContactAddedBy, Vacancy, VacancyEvent, VacancyStatus
+from backend.models import Application, ContactAddedBy, Vacancy, VacancyEvent, VacancyStatus
+from backend.repository.app_settings import CV_PATH_KEY
 from backend.repository.mail_account import MailSettings, save_mail_account
 from tests.dbio import all_rows, put
 from tests.factories import vacancy_row
 from tests.factories_aggregators import aggregator_row, vacancy_contact_row
 from tests.fakes.agent import LimitHit, scripted_kit
+from tests.waiting import wait_until
 
 PAGE = "https://site.test/vacancy/1"
 FORM = "https://company.test/apply"
-STARTED = datetime(2026, 10, 9, 9, 0, tzinfo=timezone.utc)
 
 
 @pytest.fixture
@@ -43,7 +46,7 @@ def applying(make_pipeline):
     async def run(vacancy_id, steps, round_=None):
         kit = scripted_kit(await make_pipeline(), steps)
         driver = kit.run_session
-        round_ = round_ or RoundState(STARTED, set(), web_search_id=0)
+        round_ = round_ or RoundState(set(), web_search_id=0)
         return await apply_vacancy(kit, round_, ApplyOrder(vacancy_id, False, None)), driver, round_
 
     return run
@@ -137,7 +140,7 @@ async def test_the_phase_skips_vacancies_that_left_new(board, make_pipeline, ses
     kit = scripted_kit(await make_pipeline(), [])
     driver = kit.run_session
 
-    await apply_phase(kit, RoundState(STARTED, set(), web_search_id=0), [vacancy.id])
+    await apply_phase(kit, RoundState(set(), web_search_id=0), [vacancy.id])
 
     assert driver.plans == []
 
@@ -148,7 +151,7 @@ async def test_the_phase_skips_vacancies_left_unparsed(board, make_pipeline, ses
     kit = scripted_kit(await make_pipeline(), [])
     driver = kit.run_session
 
-    await apply_phase(kit, RoundState(STARTED, set(), web_search_id=0), [vacancy.id])
+    await apply_phase(kit, RoundState(set(), web_search_id=0), [vacancy.id])
 
     assert driver.plans == []
 
@@ -190,7 +193,7 @@ async def test_the_email_way_needs_no_browser(make_pipeline, session, session_fa
         await tools["report_failure"](reason="нет")
 
     kit = scripted_kit(await make_pipeline(), [fail])
-    await apply_vacancy(kit, RoundState(STARTED, set(), web_search_id=0),
+    await apply_vacancy(kit, RoundState(set(), web_search_id=0),
                         ApplyOrder(vacancy.id, False, None))
 
     (plan,) = kit.run_session.plans
@@ -198,10 +201,11 @@ async def test_the_email_way_needs_no_browser(make_pipeline, session, session_fa
     assert kit.browser.calls == []
 
 
-async def test_a_simulated_form_application_is_filled_but_not_sent(
+async def test_a_simulated_application_is_told_not_to_send_and_is_marked(
     board, make_pipeline, session_factory
 ):
-    """В симуляции агент заполняет форму, но не отправляет; отклик записан с пометкой."""
+    """Последнюю кнопку формы код не знает: «не отправлять» агенту говорит задание,
+    а отклик записывается с пометкой симуляции."""
     _, vacancy = await board()
 
     async def record(tools):
@@ -211,10 +215,70 @@ async def test_a_simulated_form_application_is_filled_but_not_sent(
     await pipeline.rs.set_app("send_locked", "true")
     kit = scripted_kit(pipeline, [record])
 
-    await apply_vacancy(kit, RoundState(STARTED, set(), web_search_id=0),
+    await apply_vacancy(kit, RoundState(set(), web_search_id=0),
                         ApplyOrder(vacancy.id, False, None))
 
     (plan,) = kit.run_session.plans
     assert "Режим симуляции" in plan.task
     (event,) = await _events(session_factory, "applied_elsewhere")
     assert event["simulated"] is True
+
+
+@pytest.fixture
+async def slow_letter(make_pipeline, session, session_factory, tmp_path, monkeypatch):
+    """Вакансия с двумя адресами; сессия уходит, пока сервер почты принимает первое письмо.
+    Ответ — набор и вакансия."""
+    vacancy = vacancy_row(status=VacancyStatus.NEW)
+    await put(session_factory, vacancy)
+    await put(session_factory,
+              vacancy_contact_row(vacancy.id, "hr@company.test", added_by=ContactAddedBy.PARSE),
+              vacancy_contact_row(vacancy.id, "boss@company.test", added_by=ContactAddedBy.PARSE))
+    async with session.begin():
+        await save_mail_account(session, MailSettings("me@mail.test", "secret", "smtp.mail.test", 465))
+    cv = tmp_path / "cv.pdf"
+    cv.write_bytes(b"%PDF")
+    sending = threading.Event()
+
+    def slow_server(account, mail):
+        sending.set()
+        time.sleep(0.2)
+
+    monkeypatch.setattr("adapters.smtp_mail.send_mail", slow_server)
+
+    async def leave_while_sending(tools):
+        asyncio.get_running_loop().create_task(
+            tools["send_email"](address="hr@company.test", subject="Отклик", body="Текст"))
+        await wait_until(sending.is_set)
+
+    pipeline = await make_pipeline()
+    await pipeline.rs.set_app(CV_PATH_KEY, str(cv))
+    return scripted_kit(pipeline, [leave_while_sending, _fail("второй способ")]), vacancy
+
+
+async def test_a_letter_still_on_its_way_holds_the_next_way(slow_letter):
+    """Сессия кончилась, пока сервер почты принимал письмо: письмо дойдёт и запишется,
+    а второй способ не пробуется — иначе второе письмо ушло бы тому же работодателю."""
+    kit, vacancy = slow_letter
+
+    outcome = await apply_vacancy(kit, RoundState(set(), web_search_id=0),
+                                  ApplyOrder(vacancy.id, False, None))
+
+    assert outcome == "applied" and len(kit.run_session.plans) == 1
+
+
+async def test_a_stop_while_the_letter_is_on_its_way_does_not_cut_it_off(
+    slow_letter, session_factory
+):
+    """Обход остановили, пока он ждал письмо: письмо всё равно доходит и записывается."""
+    kit, vacancy = slow_letter
+    applying = asyncio.create_task(apply_vacancy(kit, RoundState(set(), web_search_id=0),
+                                                 ApplyOrder(vacancy.id, False, None)))
+    await wait_until(lambda: kit.run_session.plans)
+    await asyncio.sleep(0.05)
+
+    applying.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await applying
+    await asyncio.sleep(0.4)
+
+    assert len(await all_rows(session_factory, Application)) == 1

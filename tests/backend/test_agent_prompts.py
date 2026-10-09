@@ -1,6 +1,6 @@
 """Сборка промптов агента: что код подставляет и чего в них быть не может."""
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -15,8 +15,8 @@ from backend.llm.rules import FACT_KINDS, GENDER_RULE, LATIN_NAME_RULE, TONE_RUL
 from backend.models import ApplicationVia
 from backend.runtime_settings import LETTER_WRITERS
 from tests.factories import person_fields
+from tests.fakes.agent import TODAY
 
-TODAY = date(2026, 10, 9)
 ROLES = [LOGIN_PROMPT, SEEKER_PROMPT, WEB_SEEKER_PROMPT]
 SHARED_RULES = [TONE_RULE, GENDER_RULE, LATIN_NAME_RULE, FACT_KINDS]
 
@@ -87,10 +87,19 @@ def test_every_letter_writer_is_spelled_out(writer):
     assert "Письмо пиш" in _task(letter_writer=writer)
 
 
+_METHOD_NAMES = {
+    ApplicationVia.AGGREGATOR: "кнопка отклика на сайте агрегатора",
+    ApplicationVia.FORM: "форма работодателя",
+    ApplicationVia.EMAIL: "письмо",
+}
+
+
 @pytest.mark.parametrize("via", list(ApplicationVia))
 def test_every_method_has_its_name_and_its_simulation(via):
+    """Новый способ без своей подписи в этой таблице падает здесь KeyError-ом."""
+    name = _METHOD_NAMES[via]
     task = _task(method=via.value, simulated=True)
-    assert "Способ отклика: " in task and "Режим симуляции" in task
+    assert f"Способ отклика: {name}\n" in task and "Режим симуляции" in task
 
 
 def test_the_applier_prompt_is_clean_too():

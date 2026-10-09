@@ -1,5 +1,6 @@
 """Задачи сессий агента и их итоги."""
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -71,7 +72,8 @@ class ApplyJob:
 
     `method` — значение `ApplicationVia`; `profile_id` — профиль браузера:
     агрегатора или «Поиска по сети»; `forced` — ручной отклик, Applied и из
-    Not Fit, Scam, Ghosting; `letter_writer` — значение из `LETTER_WRITERS`.
+    Not Fit, Scam, Ghosting; `letter_writer` — значение из `LETTER_WRITERS`;
+    `delivery` — отправка письма с записью отклика, которая переживает сессию.
     """
 
     vacancy_id: int
@@ -84,3 +86,4 @@ class ApplyJob:
     letter_writer: str
     letter_checks: int = 0
     outcome: Outcome | None = None
+    delivery: asyncio.Task | None = None

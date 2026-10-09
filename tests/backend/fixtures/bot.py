@@ -21,6 +21,7 @@ from backend.models import (
 from backend.runtime_settings import RuntimeSettings
 from backend.task_stop import put_out
 from tests.dbio import only_row, put
+from tests.waiting import wait_until
 from tests.factories import (
     app_setting_row,
     hr_row,
@@ -32,6 +33,11 @@ from tests.factories import (
 from tests.fakes.ingestion import FakeIngestion, wire
 from tests.fakes.lm_studio import LmClient
 from tests.fakes.telegram import FakeTelegramClient
+
+
+async def slot_freed(bot) -> None:
+    """Дождаться, пока место прогона освободится."""
+    await wait_until(lambda: bot.current_poll_task is None)
 
 
 class Outbox:

@@ -6,14 +6,14 @@ from backend.models import Aggregator
 from backend.repository.aggregators import WEB_SEARCH_NAME
 from tests.dbio import all_rows, put
 from tests.factories import vacancy_row
-from tests.factories_aggregators import aggregator_row, application_row
+from tests.factories_aggregators import aggregator_row, application_row, web_search_row
 
 
 async def test_the_list_marks_web_search_and_says_why_the_agent_is_locked(
     api, ask, session_factory
 ):
     await put(session_factory, aggregator_row(host="site.test"),
-              aggregator_row(name=WEB_SEARCH_NAME, host=None))
+              web_search_row())
 
     answer = (await ask(api.aggregators.list))["ok"]
 
@@ -55,7 +55,7 @@ async def test_deleting_an_aggregator_with_applications_asks_first(
 
 async def test_web_search_cannot_be_deleted(api, ask, with_bot, session_factory):
     with_bot()
-    web = aggregator_row(name=WEB_SEARCH_NAME, host=None)
+    web = web_search_row()
     await put(session_factory, web)
 
     answer = await ask(api.aggregators.delete, {"aggregator_id": web.id, "confirmed": True})

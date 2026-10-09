@@ -23,9 +23,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RoundState:
-    """Один обход: когда начат, какие агрегаторы закрыты до его конца, чей профиль у «Поиска по сети»."""
+    """Один обход: какие агрегаторы закрыты до его конца, чей профиль у «Поиска по сети»."""
 
-    started_at: datetime
     closed_aggregators: set[int]
     web_search_id: int
 

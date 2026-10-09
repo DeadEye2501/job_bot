@@ -7,7 +7,7 @@ from backend.repository.aggregators import (
 )
 from tests.dbio import all_rows, only_row, put
 from tests.factories import vacancy_row
-from tests.factories_aggregators import aggregator_row, application_row
+from tests.factories_aggregators import aggregator_row, application_row, web_search_row
 
 
 async def test_an_address_is_stored_as_its_host(session):
@@ -47,6 +47,7 @@ async def test_a_lost_login_keeps_the_switch_and_leaves_the_round(session, sessi
     async with session.begin():
         await set_logged_in(session, row.id, False)
         assert await round_sources(session) == []
+    assert (await only_row(session_factory, Aggregator)).is_active is True
     async with session.begin():
         await set_logged_in(session, row.id, True)
         assert [a.id for a in await round_sources(session)] == [row.id]
@@ -91,7 +92,7 @@ async def test_a_deleted_aggregator_leaves_its_vacancies_and_applications(
 async def test_web_search_is_listed_first(session, session_factory):
     """Первым, хотя заведён позже сайта: порядок задаёт не номер строки."""
     await put(session_factory, aggregator_row(host="a.test"))
-    await put(session_factory, aggregator_row(name=WEB_SEARCH_NAME, host=None))
+    await put(session_factory, web_search_row())
     names = [a.name for a in await list_aggregators(session)]
     assert names == [WEB_SEARCH_NAME, "HeadHunter"]
 

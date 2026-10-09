@@ -4,16 +4,17 @@ import asyncio
 
 import pytest
 
-from backend.bot import aggregators, loop
+from backend.bot import aggregators, loop, slot
 from backend.domain.apply_order import Way
 from backend.models import Aggregator, BotMode
-from backend.repository.aggregators import WEB_SEARCH_NAME
 from backend.repository.bot_mode import write_mode
+from tests.backend.fixtures.bot import slot_freed
 from tests.dbio import all_rows, put
 from tests.factories import vacancy_row
-from tests.factories_aggregators import aggregator_row
+from tests.factories_aggregators import aggregator_row, web_search_row
 from tests.fakes.agent import kit_for, scripted, silent_gate
 from tests.fakes.browser import FakeBrowser
+from tests.waiting import wait_until
 
 
 @pytest.fixture
@@ -36,18 +37,8 @@ def agent(monkeypatch):
 async def sites(session_factory):
     """Один включённый агрегатор со входом и выключенный «Поиск по сети»."""
     site = aggregator_row(host="site.test", is_active=True, is_logged_in=True)
-    await put(session_factory, site, aggregator_row(name=WEB_SEARCH_NAME, host=None))
+    await put(session_factory, site, web_search_row())
     return site
-
-
-async def _settled(bot):
-    """С потолком: не освободись место, тест упадёт, а не повиснет."""
-
-    async def freed():
-        while bot.current_poll_task is not None:
-            await asyncio.sleep(0)
-
-    await asyncio.wait_for(freed(), 5)
 
 
 def _hold(release):
@@ -57,14 +48,21 @@ def _hold(release):
     return step
 
 
+async def _full(session_factory):
+    async with session_factory() as session:
+        async with session.begin():
+            await write_mode(session, BotMode.FULL)
+
+
 async def _done(tools):
     await tools["finish"](result="done")
 
 
 async def test_a_full_tick_launches_the_round_and_the_next_tick_finds_it_busy(
-    make_bot, sites, agent
+    make_bot, sites, agent, session_factory
 ):
     bot = await make_bot()
+    await _full(session_factory)
     release = asyncio.Event()
     kit = agent(bot, [_hold(release)])
 
@@ -76,8 +74,56 @@ async def test_a_full_tick_launches_the_round_and_the_next_tick_finds_it_busy(
 
     assert running is not None and bot.current_poll_task is not None
     release.set()
-    await _settled(bot)
+    await slot_freed(bot)
     assert len(kit.run_session.plans) == 1
+
+
+async def test_off_during_the_channel_poll_keeps_the_round_from_starting(
+    make_bot, sites, agent, session_factory, monkeypatch
+):
+    """Off пришёл, пока шёл опрос каналов: оборот уже начат полным, но обход не поднимается."""
+    bot = await make_bot()
+    await _full(session_factory)
+    kit = agent(bot, [_done])
+
+    async def poll_then_off(_bot):
+        async with session_factory() as session:
+            async with session.begin():
+                await write_mode(session, BotMode.OFF)
+
+    monkeypatch.setattr(loop, "_ingest_round", poll_then_off)
+    await loop._tick(bot, BotMode.FULL)
+
+    assert bot.launched_task is None and kit.run_session.plans == []
+
+
+async def test_a_stop_during_the_channel_poll_keeps_the_round_from_starting(
+    make_bot, sites, agent, session_factory, monkeypatch
+):
+    bot = await make_bot()
+    await _full(session_factory)
+    kit = agent(bot, [_done])
+
+    async def poll_then_stop(_bot):
+        bot.stop_event.set()
+
+    monkeypatch.setattr(loop, "_ingest_round", poll_then_stop)
+    await loop._tick(bot, BotMode.FULL)
+
+    assert bot.launched_task is None and kit.run_session.plans == []
+
+
+async def test_entering_off_lets_the_channel_poll_finish(make_bot):
+    """Off гасит обход агента, а не опрос каналов: тот дорабатывает свой оборот."""
+    bot = await make_bot()
+    release = asyncio.Event()
+    polling = asyncio.create_task(slot.run_in_slot(bot, release.wait, "poll cycle"))
+    await asyncio.sleep(0)
+
+    await loop._on_mode_switch(bot, BotMode.FULL, BotMode.OFF)
+    release.set()
+
+    assert (await polling)[0] == "ok"
 
 
 async def test_dm_only_runs_no_round(make_bot, sites, agent):
@@ -107,7 +153,7 @@ async def test_entering_off_puts_the_round_out_and_closes_the_browser(make_bot, 
     await asyncio.sleep(0)
 
     await loop._on_mode_switch(bot, BotMode.FULL, BotMode.OFF)
-    await _settled(bot)
+    await slot_freed(bot)
 
     assert "close" in kit.browser.calls
 
@@ -126,14 +172,10 @@ async def test_the_window_hears_when_a_person_is_needed_and_when_they_are_done(
 
     agent(bot, [step])
     await aggregators.launch_round(bot)
-    async def asked():
-        while not heard:
-            await asyncio.sleep(0)
-
-    await asyncio.wait_for(asked(), 5)
+    await wait_until(lambda: heard)
 
     aggregators.human_done(bot)
-    await _settled(bot)
+    await slot_freed(bot)
 
     assert heard == [("captcha", "site.test"), "resolved"]
 
@@ -150,7 +192,7 @@ async def test_an_expired_wait_drops_the_round_and_tells_the_window(
 
     agent(bot, [step], human_limit=0.01)
     await aggregators.launch_round(bot)
-    await _settled(bot)
+    await slot_freed(bot)
 
     assert notes == [aggregators.HUMAN_TIMEOUT_NOTE]
     assert all(a.last_run_at is None for a in await all_rows(session_factory, Aggregator))
@@ -177,11 +219,7 @@ async def test_a_stop_during_a_single_run_is_a_cancellation(make_bot, sites, age
     bot = await make_bot()
     agent(bot, [_hold(asyncio.Event())])
     running = asyncio.create_task(aggregators.run_aggregator_now(bot, sites.id))
-    async def started():
-        while not bot.current_poll_task:
-            await asyncio.sleep(0)
-
-    await asyncio.wait_for(started(), 5)
+    await wait_until(lambda: bot.current_poll_task)
     await asyncio.sleep(0)
 
     bot.cancel_current_poll()

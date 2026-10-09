@@ -291,6 +291,9 @@ class Bot:
     def cancel_current_poll(self) -> None:
         return slot.cancel_current_poll(self)
 
+    def cancel_round(self) -> None:
+        return slot.cancel_launched(self)
+
     async def force_poll_once(self) -> slot.CycleOutcome:
         return await channels.force_poll_once(self)
 

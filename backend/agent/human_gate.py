@@ -26,9 +26,11 @@ class HumanGate:
         if self._stopped:
             return _STOPPED
         if self._deadline is None:
-            self._deadline = time.monotonic() + self._limit
+            # Срок взводится после показа: не поднявшийся браузер — не начатое
+            # ожидание, и повтор должен показать его и позвать человека заново.
             self._done.clear()
             await browser.show()
+            self._deadline = time.monotonic() + self._limit
             self._on_needed(kind, host)
         try:
             await asyncio.wait_for(self._done.wait(), max(self._deadline - time.monotonic(), 0))

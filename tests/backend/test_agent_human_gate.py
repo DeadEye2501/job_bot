@@ -2,6 +2,8 @@
 
 import asyncio
 
+import pytest
+
 from backend.agent.human_gate import HumanGate
 from tests.fakes.browser import FakeBrowser
 
@@ -63,3 +65,24 @@ async def test_a_stop_before_the_call_is_not_lost():
 
     assert answer.startswith("обход остановлен")
     assert told == []
+
+
+async def test_a_window_that_failed_to_show_is_shown_on_the_next_call():
+    """Не показанный браузер — не начатое ожидание: следующий зов показывает его и зовёт человека."""
+    gate, told = _gate()
+    broken = FakeBrowser()
+
+    async def refuse():
+        raise RuntimeError("браузер не поднялся")
+
+    broken.show = refuse
+    with pytest.raises(RuntimeError):
+        await gate.wait("captcha", "site.test", broken)
+    browser = FakeBrowser()
+    waiting = asyncio.create_task(gate.wait("captcha", "site.test", browser))
+    await asyncio.sleep(0)
+    gate.resolve()
+
+    assert await waiting == "готово"
+    assert told == [("captcha", "site.test"), "resolved"]
+    assert browser.calls == ["show", "hide"]

@@ -4,8 +4,7 @@ from datetime import date
 from types import SimpleNamespace
 
 from backend.domain.tenure import full_years, place_period, skill_years
-
-TODAY = date(2026, 10, 9)
+from tests.fakes.agent import TODAY
 
 
 def _place(start, end=None):

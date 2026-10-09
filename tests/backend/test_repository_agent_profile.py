@@ -6,8 +6,7 @@ from backend.models import Gender, ProfileLanguage, SalaryPeriod, profile_experi
 from backend.repository.agent_profile import build_agent_profile
 from tests.dbio import put
 from tests.factories import experience_row, profile_row, profile_skill_row
-
-TODAY = date(2026, 10, 9)
+from tests.fakes.agent import TODAY
 
 
 async def _person(session_factory, **fields):

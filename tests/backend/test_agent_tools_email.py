@@ -132,3 +132,16 @@ async def test_after_a_recorded_application_no_second_letter_goes(ready, sent):
     answer = await send(address="boss@site.test", subject="S", body="B")
 
     assert len(sent) == 1 and "уже записан" in answer
+
+
+@pytest.mark.parametrize(("subject", "body"), [(" ", "Текст"), ("Отклик", " ")])
+async def test_a_letter_without_a_subject_or_a_text_does_not_go_out(
+    ready, sent, session_factory, subject, body
+):
+    job, send = await ready()
+
+    answer = await send(address="hr@site.test", subject=subject, body=body)
+
+    assert sent == [] and job.outcome is None
+    assert await all_rows(session_factory, Application) == []
+    assert "тем" in answer.lower()
