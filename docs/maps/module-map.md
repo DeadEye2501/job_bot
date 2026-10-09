@@ -254,7 +254,63 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 140 модулей
+## backend — 147 модулей
+
+### `backend/agent/__init__.py` — 1 строк
+
+Агент: всё, что работает за человека на сайтах.
+
+Зависит от: —
+
+
+### `backend/agent/prompts/__init__.py` — 1 строк
+
+Тексты промптов агента и сборка его стартовых заданий.
+
+Зависит от: —
+
+
+### `backend/agent/prompts/applier.py` — 80 строк
+
+Откликатель: отклик на одну вакансию одним способом.
+
+Зависит от: `backend.agent.prompts.screening`, `backend.llm.rules`, `backend.models`, `backend.runtime_settings`
+
+- `def applier_task(job, vacancy_text: str, profile_text: str, today: date) -> str` (18)
+
+### `backend/agent/prompts/frame.py` — 25 строк
+
+Общая рамка агента: правила, по которым работает любая его роль.
+
+Зависит от: `backend.llm.rules`
+
+- `def system_prompt(role_prompt: str) -> str` (3)
+
+### `backend/agent/prompts/login.py` — 13 строк
+
+Проверка входа: вошёл ли человек на сайт агрегатора.
+
+Зависит от: —
+
+- `def login_task(host: str) -> str` (3)
+
+### `backend/agent/prompts/screening.py` — 31 строк
+
+Скрининг: ответы работодателю от имени человека.
+
+Зависит от: —
+
+
+### `backend/agent/prompts/seeker.py` — 63 строк
+
+Искатели вакансий: на сайте агрегатора и по всей сети.
+
+Зависит от: —
+
+- `def seeker_task(host: str, last_run: datetime | None, limit: int, today: date) -> str` (3)
+- `def web_seeker_task(aggregator_hosts: list[str], last_run: datetime | None, limit: int, today: date) -> str` (8)
+- `def _bounds(last_run: datetime | None, limit: int, today: date) -> list[str]` (7)
+- `def _since(last_run: datetime | None) -> str` (4)
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -1062,7 +1118,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _matched_id(answer: str) -> tuple[int | None, str | None]` (22)
 - `async def dedupe_company_with_llm(client: httpx.AsyncClient, model: str, *, parsed_name: str, parsed_website: str | None, candidates: list) -> tuple[int | None, str | None]` (41)
 
-### `backend/llm/cover_letter.py` — 299 строк
+### `backend/llm/cover_letter.py` — 298 строк
 
 Сочинение письма-отклика.
 
@@ -1218,7 +1274,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
 - `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (55)
 
-### `backend/llm/rules.py` — 189 строк
+### `backend/llm/rules.py` — 247 строк
 
 Приметы предметной области, общие для наставлений модели.
 
@@ -2850,7 +2906,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 273 модулей
+## tests — 274 модулей
 
 ### `tests/adapters/test_app_tied_process.py` — 65 строк
 
@@ -3114,6 +3170,16 @@ seed initial data
 
 - `def _page(*, headline: str='Senior Manual QA', body: str='<p>Ищем QA</p>') -> str` (9)
 - `def _client(handler) -> httpx.AsyncClient` (3)
+
+### `tests/backend/test_agent_prompts.py` — 123 строк
+
+Сборка промптов агента: что код подставляет и чего в них быть не может.
+
+Зависит от: `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `backend.agent.prompts.login`, `backend.agent.prompts.seeker`, `backend.llm.rules`, `backend.models`, `backend.runtime_settings`, `tests.factories`
+
+Тестов: 16
+
+- `def _task(vacancy_text='Текст вакансии', profile_text='Анкета', **job) -> str` (7)
 
 ### `tests/backend/test_bootstrap_schema.py` — 160 строк
 

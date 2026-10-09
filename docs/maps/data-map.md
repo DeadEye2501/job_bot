@@ -156,6 +156,32 @@
 
 ## backend
 
+### `backend/agent/prompts/applier.py`
+
+- `APPLIER_PROMPT` = `'Твоя задача — откликнуться на одну вакансию одн…`
+- `_FILL_THE_FORM` = `'Режим симуляции: пройди всё до последней кнопки…`
+- `_SIMULATION` = `словарь из 3`
+- `_METHODS` = `словарь из 3`
+- `_WRITERS` = `dict(zip(LETTER_WRITERS, ('Письмо пишет: приложе…`
+
+### `backend/agent/prompts/frame.py`
+
+- `FRAME_PROMPT` = `'Ты работаешь агентом приложения, которое ищет р…`
+
+### `backend/agent/prompts/login.py`
+
+- `LOGIN_PROMPT` = `'Твоя задача — понять, вошёл ли человек на этот …`
+
+### `backend/agent/prompts/screening.py`
+
+- `SCREENING_RULES` = `'Скрининг — вопросы работодателя в форме отклика…`
+
+### `backend/agent/prompts/seeker.py`
+
+- `_SELECTION` = `'Отбор — средний. После тебя каждую вакансию про…`
+- `SEEKER_PROMPT` = `'Твоя задача — найти на сайте агрегатора свежие …`
+- `WEB_SEEKER_PROMPT` = `'Твоя задача — найти по всей сети свежие ваканси…`
+
 ### `backend/bootstrap.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -633,6 +659,13 @@
 - `SELF_OFFER_MARKERS` = `'\n'.join(('РУССКИЙ: «ищу работу», «ищу вакансию…`
 - `FACT_KINDS` = `'\n'.join(('- Технологии, инструменты, языки, фр…`
 - `NOT_IN_THE_PROFILE` = `'нет в блоке кандидата ни дословно, ни по смыслу…`
+- `TONE_RULE` = `'Всё, что пишешь работодателю от имени человека,…`
+- `GENDER_RULE` = `'Родовые формы — по полю «Пол» анкеты; пол не ук…`
+- `LATIN_NAME_RULE` = `'Имя и фамилию латиницей бери из полей «Имя лати…`
+- `ATTRIBUTION_RULES` = `'\n'.join(('- Атрибуция достижений: каждое дости…`
+- `FACTS_RULE` = `'Факты о человеке — только из анкеты; анкета и е…`
+- `LETTER_SHAPE` = `'Состав письма:\n1. Приветствие.\n2. Кто пишет: …`
+- `LETTER_RULES` = `'\n'.join((LETTER_SHAPE, 'Голос и факты:', TONE_…`
 - `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_B…`
 - `GRADE_MARKERS` = `', '.join((f"«{grade}/{'/'.join(spellings)}»" fo…`
 - `FORMAT_MARKERS` = `', '.join((f"«{'/'.join((one, *(w for w in spell…`
@@ -1580,6 +1613,12 @@
 ### `tests/adapters/test_lm_models.py`
 
 - `NATIVE_MODELS` = `набор из 2`
+
+### `tests/backend/test_agent_prompts.py`
+
+- `TODAY` = `date(2026, 10, 9)`
+- `ROLES` = `набор из 3`
+- `SHARED_RULES` = `набор из 4`
 
 ### `tests/backend/test_bootstrap_schema.py`
 
