@@ -18,22 +18,20 @@ from tests.fakes.llm import (
     CHAT,
     chat_response,
     data_block,
+    factcheck_answer,
     messages_of,
     provider,
     provider_trouble,
     warning_before_the_block,
 )
 
-PASSES = '{"verdict": "ok", "issues": []}'
-
-
-def _client(letter: str, *, finish_reason: str = "stop", factcheck: str = PASSES):
+def _client(letter: str, *, finish_reason: str = "stop", factcheck=None):
     """Провайдер, отвечающий сперва письмом, потом вердиктом проверки."""
     return provider(
         {
             CHAT: [
                 chat_response(letter, finish_reason=finish_reason),
-                chat_response(factcheck),
+                factcheck or factcheck_answer("ok"),
             ]
         }
     )
@@ -355,7 +353,7 @@ async def test_a_letter_rejected_by_the_factcheck_is_not_sent():
     """Письмо, отклонённое сверкой фактов, не отправляется."""
     client = _client(
         "Здравствуйте! Восемь лет пишу на Коболе.",
-        factcheck='{"verdict": "reject", "issues": ["выдумал Кобол"]}',
+        factcheck=factcheck_answer("reject", ["выдумал Кобол"]),
     )
 
     assert (

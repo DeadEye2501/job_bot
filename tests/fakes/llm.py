@@ -192,6 +192,16 @@ def fit_answer(verdict: str, reason: str | None = None) -> httpx.Response:
     return chat_json({"verdict": verdict, "reason": reason})
 
 
+def factcheck_answer(verdict: str, issues=()) -> httpx.Response:
+    """Ответ модели с вердиктом сверки письма.
+
+    Общий на всех, чьё письмо сверяется, — письмо в Telegram и письмо вне
+    него: вторая такая же заготовка разошлась бы с первой на первом же новом
+    поле ответа.
+    """
+    return chat_json({"verdict": verdict, "issues": list(issues)})
+
+
 def messages_of(request: httpx.Request) -> dict[str, str]:
     """Отправленные роли и их содержимое, разложенные по ролям.
 

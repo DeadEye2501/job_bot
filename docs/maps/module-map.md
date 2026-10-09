@@ -254,7 +254,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 147 модулей
+## backend — 148 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -1078,6 +1078,21 @@ First-run bootstrap: ensure DB schema exists.
 - `def enum_member_or_none(value, kind: type[enum.Enum])` (8)
 - `def normalize_enum_list(values, allowed: tuple[str, ...]) -> list[str]` (15)
 
+### `backend/llm/agent_letter.py` — 102 строк
+
+Письмо и тема для отклика вне Telegram: пишет чат-модель, проверяет сверка фактов.
+
+Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.factcheck`, `backend.llm.rules`
+
+- `class Letter` (3)
+- `class LetterAsk` (6)
+- `async def write_letter(ask: LetterAsk, client, model: str) -> tuple[Letter | None, list[str]]` (8)
+- `async def check_letter(ask: LetterAsk, letter: Letter, client, model: str) -> tuple[bool, list[str]]` (8)
+- `def _request(ask: LetterAsk) -> ChatRequest` (14)
+- `def _letter_of(text: str | None) -> Letter | None` (10)
+- `def _short_dash(text: str) -> str` (2)
+- `def _trouble(letter: Letter, limit: int | None) -> str | None` (7)
+
 ### `backend/llm/answers.py` — 234 строк
 
 Разбор того, что ответила модель, порядок двух заходов и жалоба на неудачу.
@@ -1118,7 +1133,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _matched_id(answer: str) -> tuple[int | None, str | None]` (22)
 - `async def dedupe_company_with_llm(client: httpx.AsyncClient, model: str, *, parsed_name: str, parsed_website: str | None, candidates: list) -> tuple[int | None, str | None]` (41)
 
-### `backend/llm/cover_letter.py` — 298 строк
+### `backend/llm/cover_letter.py` — 289 строк
 
 Сочинение письма-отклика.
 
@@ -1127,7 +1142,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_request(profile_block: str, parsed: ParsedVacancy, channel_ref: str | None) -> ChatRequest` (39)
 - `def _vacancy_ref(parsed: ParsedVacancy, channel_ref) -> str` (9)
 - `def _with_vacancy_filled(raw_text: str, parsed: ParsedVacancy, channel_ref) -> str` (27)
-- `def _letter_refusal(text: str, finish_reason) -> str | None` (24)
+- `def _letter_refusal(text: str, finish_reason) -> str | None` (23)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
 ### `backend/llm/cv.py` — 466 строк ⚠ подошёл к 300
@@ -1187,7 +1202,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def external_block(text: str, what: str, then: str='') -> str` (14)
 - `def wrap_external(text: str) -> str` (15)
 
-### `backend/llm/factcheck.py` — 170 строк
+### `backend/llm/factcheck.py` — 171 строк
 
 Сверка письма-отклика с тем, что о кандидате известно.
 
@@ -1274,12 +1289,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
 - `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (55)
 
-### `backend/llm/rules.py` — 247 строк
+### `backend/llm/rules.py` — 267 строк
 
 Приметы предметной области, общие для наставлений модели.
 
 Зависит от: `backend.domain.company_hosts`, `backend.domain.resume_marks`, `backend.domain.taxonomy`
 
+- `def has_placeholder(text: str) -> bool` (9)
 
 ### `backend/llm/skills.py` — 226 строк
 
@@ -2906,7 +2922,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 274 модулей
+## tests — 275 модулей
 
 ### `tests/adapters/test_app_tied_process.py` — 65 строк
 
@@ -3960,6 +3976,17 @@ seed initial data
 - `def _provider(monkeypatch, *, listed: list[str]) -> list[str]` (23)
   - `def answer(request: httpx.Request) -> httpx.Response` (5)
 
+### `tests/backend/test_llm_agent_letter.py` — 104 строк
+
+Письмо вне Telegram: пишет чат-модель, проверяет сверка фактов.
+
+Зависит от: `backend.llm.agent_letter`, `backend.llm.rules`, `tests.fakes.llm`
+
+Тестов: 10
+
+- `def _written(body: str, subject: str='Тема')` (2)
+- `def _ask(**over) -> LetterAsk` (5)
+
 ### `tests/backend/test_llm_classify_reply.py` — 274 строк
 
 Следствия разбора ответа HR в новый статус вакансии.
@@ -3984,7 +4011,7 @@ seed initial data
 - `def _answer(matched_id=None, reasoning=None) -> httpx.Response` (3)
 - `async def _ask(client, candidates, name='Сбербанк Тех', website=None)` (9)
 
-### `tests/backend/test_llm_cover_letter.py` — 404 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_cover_letter.py` — 402 строк ⚠ подошёл к 300
 
 Следствия составления письма-отклика.
 
@@ -3992,7 +4019,7 @@ seed initial data
 
 Тестов: 24
 
-- `def _client(letter: str, *, finish_reason: str='stop', factcheck: str=PASSES)` (10)
+- `def _client(letter: str, *, finish_reason: str='stop', factcheck=None)` (10)
 - `async def _written(*args, **kwargs)` (10)
 
 ### `tests/backend/test_llm_cv_grounding.py` — 383 строк ⚠ подошёл к 300
@@ -4072,7 +4099,7 @@ seed initial data
 Тестов: 2
 
 
-### `tests/backend/test_llm_factcheck.py` — 189 строк
+### `tests/backend/test_llm_factcheck.py` — 184 строк
 
 Следствия второй проверки письма — сверки фактов с профилем.
 
@@ -4080,7 +4107,6 @@ seed initial data
 
 Тестов: 11
 
-- `def _verdict(verdict, issues=None) -> httpx.Response` (3)
 
 ### `tests/backend/test_llm_fit_languages.py` — 163 строк
 
@@ -5682,7 +5708,7 @@ seed initial data
   - `def set_password(self, service: str, username: str, password: str) -> None` (2)
   - `def delete_password(self, service: str, username: str) -> None` (7)
 
-### `tests/fakes/llm.py` — 272 строк
+### `tests/fakes/llm.py` — 282 строк
 
 Подделка провайдера LLM: настоящий клиент поверх подставного транспорта.
 
@@ -5700,6 +5726,7 @@ seed initial data
 - `def parsed_vacancy_answer(**fields) -> dict` (8)
 - `def chat_json(payload: dict, *, finish_reason: str='stop') -> httpx.Response` (9)
 - `def fit_answer(verdict: str, reason: str | None=None) -> httpx.Response` (8)
+- `def factcheck_answer(verdict: str, issues=()) -> httpx.Response` (8)
 - `def messages_of(request: httpx.Request) -> dict[str, str]` (9)
 - `def data_block(request: httpx.Request) -> str` (9)
 - `def warning_before_the_block(request: httpx.Request) -> str` (9)

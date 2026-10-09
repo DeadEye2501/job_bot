@@ -11,7 +11,7 @@ from adapters.lm_chat import CUT_BY_LIMIT, ChatRequest, chat
 from backend.payloads import ParsedVacancy
 
 from backend.llm.external import external_block
-from backend.llm.rules import ATTRIBUTION_RULES, FACT_KINDS, NOT_IN_THE_PROFILE
+from backend.llm.rules import ATTRIBUTION_RULES, FACT_KINDS, NOT_IN_THE_PROFILE, has_placeholder
 from backend.llm.factcheck import factcheck_cover_letter
 
 logger = logging.getLogger(__name__)
@@ -124,14 +124,6 @@ _ATTACHMENT_RE = re.compile(
 )
 
 
-# `<токен>` или `<короткая фраза>` — шаблонные обозначения few-shot'ов
-# (`<технология>`, `<имя>`, `<достижение Y>`). Требуем словесный символ
-# сразу после `<`, чтобы `<3`, `<<`, `<=` не ловились. Длина внутри
-# скобок до 40 символов, без перевода строки — отсечь длинные XML/HTML
-# куски, если такое вдруг прилетит.
-_TEMPLATE_PLACEHOLDER_RE = re.compile(r"<[\wА-Яа-яЁё][^>\n]{0,40}>")
-
-
 # Бюджет токенов на cover-letter generation. Сам lim'ите длину письма
 # (15-80 слов) живёт в prompt'е, char-cap 1024 — в коде. Этот бюджет
 # нужен reasoning-моделям на <think>-блок ДО ответа: 300-400 не хватает,
@@ -233,9 +225,8 @@ def _letter_refusal(text: str, finish_reason) -> str | None:
     if len(text) > 1024:
         return "длиннее подписи Telegram"
     # Уцелевшая скобка после подстановки значит, что модель сочинила свою
-    # заглушку. Угловые ловятся отдельным образцом: проверка по одному
-    # символу цепляла бы стрелки и смайлы (`=>`, `->`, `<3`).
-    if any(ch in text for ch in "[]{}") or _TEMPLATE_PLACEHOLDER_RE.search(text):
+    # заглушку.
+    if has_placeholder(text):
         return "чужая заглушка"
     if finish_reason == CUT_BY_LIMIT and text[-1] not in ".!?…":
         return "оборвано на полуслове"

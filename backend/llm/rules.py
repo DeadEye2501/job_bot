@@ -12,6 +12,8 @@
 судит по обрезанному тексту, а другой по полному.
 """
 
+import re
+
 from backend.domain.company_hosts import AGGREGATOR_BRANDS, AGGREGATOR_HOSTS
 from backend.domain.resume_marks import AMBIGUOUS_MARKS, RESUME_MARKS
 from backend.domain.taxonomy import GRADE_SPELLINGS, WORK_FORMAT_SPELLINGS
@@ -121,6 +123,24 @@ LETTER_RULES = "\n".join((
     LETTER_SHAPE, "Голос и факты:", TONE_RULE, GENDER_RULE, LATIN_NAME_RULE, FACTS_RULE,
 ))
 """Письмо целиком для чат-модели: жанр и голос человека."""
+
+# `<токен>` или `<короткая фраза>` — шаблонные обозначения few-shot'ов
+# (`<технология>`, `<имя>`, `<достижение Y>`). Требуем словесный символ
+# сразу после `<`, чтобы `<3`, `<<`, `<=` не ловились. Длина внутри
+# скобок до 40 символов, без перевода строки — отсечь длинные XML/HTML
+# куски, если такое вдруг прилетит.
+_TEMPLATE_PLACEHOLDER_RE = re.compile(r"<[\wА-Яа-яЁё][^>\n]{0,40}>")
+
+
+def has_placeholder(text: str) -> bool:
+    """Осталась ли в тексте заглушка, которую модель сочинила сама.
+
+    Одна проверка на оба письма: разойдись наборы скобок, письмо, отбитое в
+    Telegram, вне его прошло бы. Квадратные и фигурные ловятся по знаку,
+    угловые — образцом: проверка по одному знаку цепляла бы стрелки и смайлы
+    (`=>`, `->`, `<3`).
+    """
+    return any(ch in text for ch in "[]{}") or bool(_TEMPLATE_PLACEHOLDER_RE.search(text))
 
 AGGREGATOR_HOSTS_LINE = ", ".join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_BRANDS))
 """Хосты, за которыми не стоит одна компания, — строкой для наставления.
