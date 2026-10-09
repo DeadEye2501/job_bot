@@ -74,8 +74,12 @@ def test_a_number_in_a_parameter_keeps_its_case():
 
 def test_click_session_and_arrival_marks_are_not_part_of_the_number():
     url = ("https://site.test/vacancy?job_id=7&gclid=a1&yclid=9&msclkid=b"
-           "&sid=c&session_id=5&utm_id=4&from=12")
+           "&sid=c&session_id=5&phpsessid=6&utm_id=4&from=12")
     assert source_key(url, "site.test") == "vacancy?job_id=7"
+
+
+def test_a_parameter_that_merely_contains_sess_is_kept():
+    assert source_key("https://site.test/test?assessment_id=7", "site.test") == "test?assessment_id=7"
 
 
 def test_parameter_order_does_not_change_the_number():

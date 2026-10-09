@@ -5,6 +5,7 @@ import json
 import subprocess
 
 from adapters.claude_code_agent import AgentRun, _argv, run_agent
+from adapters.claude_code_process import put_down
 from backend.agent.prompts.applier import APPLIER_PROMPT
 from backend.agent.prompts.frame import system_prompt
 from tests.fakes import claude_code
@@ -103,3 +104,18 @@ def test_the_longest_prompt_fits_a_windows_command_line():
     run = dataclasses.replace(RUN, system_prompt=system_prompt(APPLIER_PROMPT), web_search=True)
 
     assert len(subprocess.list2cmdline(_argv("claude", run))) < 30_000
+
+
+async def test_a_process_that_ended_on_its_own_is_put_down_quietly():
+    """Процесс умер между проверкой и снятием: итог сессии не подменяется ошибкой снятия."""
+
+    class Ended:
+        returncode = None
+
+        def kill(self):
+            raise ProcessLookupError
+
+        async def wait(self):
+            return 0
+
+    await put_down(Ended())

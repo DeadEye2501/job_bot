@@ -30,6 +30,10 @@ class HumanGate:
             # ожидание, и повтор должен показать его и позвать человека заново.
             self._done.clear()
             await browser.show()
+            # Остановили, пока браузер поднимался: `abort` не застал срока и не
+            # разбудил бы это ожидание — оно ждало бы час уже без обхода.
+            if self._stopped:
+                return _STOPPED
             self._deadline = time.monotonic() + self._limit
             self._on_needed(kind, host)
         try:

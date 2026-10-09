@@ -92,3 +92,25 @@ async def test_settling_a_work_put_out_before_its_first_step_does_not_raise(make
 
     await slot_freed(bot)
     assert bot.current_poll_task is None
+
+
+async def test_settling_waits_for_a_window_action_in_the_slot(make_bot):
+    """Вход или ручной отклик из окна тоже держат браузер: остановка ждёт и их."""
+    bot = await make_bot()
+    tidied = []
+
+    async def work():
+        try:
+            await asyncio.sleep(3600)
+        finally:
+            await asyncio.sleep(0)
+            tidied.append(True)
+
+    acting = asyncio.create_task(slot.run_in_slot(bot, work, "aggregator login 1"))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    await slot.settle_slot(bot, timeout=5)
+
+    assert tidied == [True]
+    assert (await acting)[0] == "cancelled"

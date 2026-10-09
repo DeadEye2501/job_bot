@@ -1,11 +1,14 @@
 """Отправка письма по SMTP с вложением, под паролем приложения."""
 
+import logging
 import mimetypes
 import smtplib
 import ssl
 from dataclasses import dataclass, field
 from email.message import EmailMessage
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 _TIMEOUT_SEC = 60
 _STARTTLS_PORT = 587
@@ -36,14 +39,27 @@ def send_mail(account: MailAccountConfig, mail: OutgoingMail) -> None:
     message = _message(account.address, mail)
     context = ssl.create_default_context()
     if account.port == _STARTTLS_PORT:
-        with smtplib.SMTP(account.host, account.port, timeout=_TIMEOUT_SEC) as smtp:
+        smtp = smtplib.SMTP(account.host, account.port, timeout=_TIMEOUT_SEC)
+    else:
+        smtp = smtplib.SMTP_SSL(account.host, account.port, context=context, timeout=_TIMEOUT_SEC)
+    try:
+        if account.port == _STARTTLS_PORT:
             smtp.starttls(context=context)
-            smtp.login(account.address, account.password)
-            smtp.send_message(message)
-        return
-    with smtplib.SMTP_SSL(account.host, account.port, context=context, timeout=_TIMEOUT_SEC) as smtp:
         smtp.login(account.address, account.password)
         smtp.send_message(message)
+    finally:
+        _part(smtp)
+
+
+def _part(smtp) -> None:
+    """Попрощаться с сервером. Не `with`: его выход бросает на ответе, отличном
+    от 221, — и письмо, которое сервер уже принял, сочлось бы неотправленным,
+    а следующий способ отправил бы второй отклик."""
+    try:
+        smtp.quit()
+    except (smtplib.SMTPException, OSError):
+        logger.warning("сервер почты попрощался с ошибкой", exc_info=True)
+        smtp.close()
 
 
 def _message(sender: str, mail: OutgoingMail) -> EmailMessage:

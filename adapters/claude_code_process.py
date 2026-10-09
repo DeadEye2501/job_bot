@@ -16,6 +16,7 @@
 
 import asyncio
 import json
+import logging
 import os
 import subprocess
 import tempfile
@@ -23,6 +24,8 @@ from dataclasses import dataclass
 
 from adapters import app_tied_process
 from adapters.claude import EFFORT
+
+logger = logging.getLogger(__name__)
 
 FRAME_OPEN = "***ИНСТРУКЦИИ***"
 FRAME_CLOSE = "***КОНЕЦ ИНСТРУКЦИЙ***"
@@ -208,7 +211,11 @@ async def _drop() -> None:
 async def put_down(process) -> None:
     """Снять процесс, если он ещё жив, и дождаться его конца."""
     if process.returncode is None:
-        process.kill()
+        try:
+            process.kill()
+        except ProcessLookupError:
+            # Умер сам между проверкой и снятием — снимать уже нечего.
+            logger.debug("процесс Claude Code кончился раньше снятия")
         await process.wait()
 
 

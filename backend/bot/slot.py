@@ -140,19 +140,22 @@ def launch_in_slot(bot, work: Callable[[], Any], label: str) -> bool:
 
 
 async def settle_slot(bot, timeout: float) -> None:
-    """Погасить работу, запущенную отдельной задачей, и дождаться её конца.
+    """Погасить работу в месте прогона и дождаться её конца.
 
     Остановка бота зовёт это до закрытия клиентов: иначе они закрылись бы
     под живым обходом, а снос данных удалял бы профиль открытого браузера.
+    Ждётся и обход, запущенный отдельной задачей, и действие окна — вход,
+    обход по кнопке, ручной отклик: браузер держат они все.
     """
-    launched = bot.launched_task
-    if launched is None or launched.done():
+    running = {t for t in (bot.launched_task, bot.current_poll_task)
+               if t is not None and not t.done()}
+    if not running:
         return
     if bot.current_poll_task is not None:
         bot.current_poll_task.cancel()
     # `wait`, а не `wait_for`: погашенная до первого шага обёртка бросила бы
     # отмену сюда, и остановка не дошла бы до закрытия клиентов.
-    _done, pending = await asyncio.wait({launched}, timeout=timeout)
+    _done, pending = await asyncio.wait(running, timeout=timeout)
     if pending:
         logger.warning("работа в месте прогона не кончилась за %s с", timeout)
 
