@@ -62,6 +62,13 @@
 - `MODELS` = `набор из 3`
 - `NO_CLI` = `'Claude Code не установлен'`
 
+### `adapters/claude_code_agent.py`
+
+- `class AgentEnd`
+  - `ok: bool`
+  - `detail: str`
+  - `limit_exhausted: bool`
+
 ### `adapters/claude_code_process.py`
 
 - `FRAME_OPEN` = `'***ИНСТРУКЦИИ***'`
@@ -185,6 +192,63 @@
 
 ## backend
 
+### `backend/agent/human_gate.py`
+
+- `LIMIT_SEC` = `3600.0`
+- `_STOPPED` = `'обход остановлен; заверши работу'`
+
+### `backend/agent/jobs.py`
+
+- `class Source`
+  - `id: int`
+  - `name: str`
+  - `host: str | None`
+  - `last_run_at: datetime | None`
+- `class Finished`
+  - `result: str`
+  - `reason: str`
+- `class Failed`
+  - `reason: str`
+- `class Applied`
+  - `application_id: int`
+- `Outcome` = `Finished | Failed | Applied`
+- `class LoginJob`
+  - `source: Source`
+  - `outcome: Outcome | None` = `None`
+- `class SeekJob`
+  - `source: Source`
+  - `limit: int`
+  - `submitted: int` = `0`
+  - `found: list[int]` = `field(default_factory=list)`
+  - `refused: bool` = `False`
+  - `outcome: Outcome | None` = `None`
+- `class ApplyJob`
+  - `vacancy_id: int`
+  - `method: str`
+  - `target: str`
+  - `aggregator_id: int | None`
+  - `profile_id: int`
+  - `forced: bool`
+  - `simulated: bool`
+  - `letter_writer: str`
+  - `letter_checks: int` = `0`
+  - `outcome: Outcome | None` = `None`
+
+### `backend/agent/kit.py`
+
+- `class SessionPlan`
+  - `system_prompt: str`
+  - `task: str`
+  - `tools: list[Callable]`
+  - `web_search: bool`
+- `RunSession` = `Callable[[SessionPlan], Awaitable[AgentEnd]]`
+- `class AgentKit`
+  - `pipeline: IngestionPipeline`
+  - `browser: BrowserHost`
+  - `gate: HumanGate`
+  - `run_session: RunSession`
+  - `today: date`
+
 ### `backend/agent/prompts/applier.py`
 
 - `APPLIER_PROMPT` = `'Твоя задача — откликнуться на одну вакансию одн…`
@@ -210,6 +274,18 @@
 - `_SELECTION` = `'Отбор — средний. После тебя каждую вакансию про…`
 - `SEEKER_PROMPT` = `'Твоя задача — найти на сайте агрегатора свежие …`
 - `WEB_SEEKER_PROMPT` = `'Твоя задача — найти по всей сети свежие ваканси…`
+
+### `backend/agent/tools_browser.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `_WAIT_MS` = `15000`
+- `_SNAPSHOT_LIMIT` = `60000`
+- `_CUT_MARK` = `'\n… снимок обрезан: страница длиннее, чем помещ…`
+
+### `backend/agent/tools_common.py`
+
+- `_ALREADY_APPLIED` = `'Отклик уже записан, итог не меняется: второй от…`
+- `_RESULTS` = `словарь из 3`
 
 ### `backend/bootstrap.py`
 
@@ -1688,6 +1764,10 @@
 - `ROLES` = `набор из 3`
 - `SHARED_RULES` = `набор из 4`
 
+### `tests/backend/test_agent_tools_browser.py`
+
+- `VACANCY` = `'https://site.test/vacancy/1'`
+
 ### `tests/backend/test_bootstrap_schema.py`
 
 - `_ENV_PY` = `'\nfrom alembic import context\nfrom sqlalchemy …`
@@ -1814,6 +1894,10 @@
 - `_PHOTO_HEADS` = `словарь из 4`
 - `CV_REQUIRED_PROFILE` = `person_fields()`
 - `_MARKED_COMPANIES` = `набор из 3`
+
+### `tests/fakes/agent.py`
+
+- `TODAY` = `date(2026, 10, 9)`
 
 ### `tests/fakes/claude.py`
 

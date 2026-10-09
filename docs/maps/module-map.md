@@ -34,7 +34,7 @@ Job Bot — single CLI entry point.
 - `def _started_or_told_why() -> int` (36)
 - `def main() -> int` (22)
 
-## adapters — 15 модулей
+## adapters — 16 модулей
 
 ### `adapters/app_tied_process.py` — 188 строк
 
@@ -116,6 +116,14 @@ Claude через установленный Claude Code по подписке: 
 - `async def ask(client: ClaudeCodeClient, model: str, request)` (8)
 - `async def list_models(_client: ClaudeCodeClient) -> list[str]` (4)
 - `async def ping(client: ClaudeCodeClient, model: str, text: str) -> None` (3)
+
+### `adapters/claude_code_agent.py` — 12 строк
+
+Claude Code как водитель агента: процесс, его инструменты, его итог.
+
+Зависит от: —
+
+- `class AgentEnd` (6)
 
 ### `adapters/claude_code_process.py` — 249 строк
 
@@ -297,7 +305,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 150 модулей
+## backend — 155 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -305,6 +313,43 @@ init
 
 Зависит от: —
 
+
+### `backend/agent/human_gate.py` — 74 строк
+
+Ожидание человека: капча или слетевший вход. Срок — час на весь обход.
+
+Зависит от: —
+
+- `class HumanGate` (64)
+  - `async def wait(self, kind: str, host: str, browser) -> str` (15)
+  - `def resolve(self) -> None` (6)
+  - `def abort(self) -> None` (10)
+  - `def reset(self) -> None` (6)
+  - `async def _take(self, browser) -> str` (10)
+
+### `backend/agent/jobs.py` — 86 строк
+
+Задачи сессий агента и их итоги.
+
+Зависит от: `backend.models`
+
+- `class Source` (12)
+  - `def of(cls, row: Aggregator) -> 'Source'` (3)
+- `class Finished` (5)
+- `class Failed` (4)
+- `class Applied` (4)
+- `class LoginJob` (3)
+- `class SeekJob` (10)
+- `class ApplyJob` (18)
+
+### `backend/agent/kit.py` — 35 строк
+
+Набор, с которым работает сессия агента.
+
+Зависит от: `adapters.browser`, `adapters.claude_code_agent`, `backend.agent.human_gate`, `backend.flows.pipeline`
+
+- `class SessionPlan` (7)
+- `class AgentKit` (9)
 
 ### `backend/agent/prompts/__init__.py` — 1 строк
 
@@ -354,6 +399,43 @@ init
 - `def web_seeker_task(aggregator_hosts: list[str], last_run: datetime | None, limit: int, today: date) -> str` (8)
 - `def _bounds(last_run: datetime | None, limit: int, today: date) -> list[str]` (7)
 - `def _since(last_run: datetime | None) -> str` (4)
+
+### `backend/agent/tools_browser.py` — 96 строк
+
+Инструменты браузера для агента: открыть, снять, нажать, ввести, выбрать, приложить резюме.
+
+Зависит от: `backend.agent.kit`
+
+- `def browser_tools(kit: AgentKit, resume: Path | None) -> list[Callable]` (35)
+  - `async def browser_open(url: str) -> str` (3)
+  - `async def browser_snapshot() -> str` (3)
+  - `async def browser_click(selector: str) -> str` (3)
+  - `async def browser_type(selector: str, text: str) -> str` (3)
+  - `async def browser_select(selector: str, value: str) -> str` (3)
+  - `async def browser_attach_resume(selector: str) -> str` (5)
+  - `async def browser_back() -> str` (3)
+- `async def _act(kit: AgentKit, action: Callable[..., Awaitable]) -> str` (12)
+- `async def _snapshot(kit: AgentKit) -> str` (12)
+- `async def _attach(page, selector: str, resume: Path) -> None` (12)
+- `def _first_line(error: Exception) -> str` (2)
+
+### `backend/agent/tools_common.py` — 95 строк
+
+Общие инструменты агента: анкета, итог сессии, зов человека, отметка входа, неудача способа.
+
+Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.domain.hosts`, `backend.models`, `backend.repository.agent_profile`, `backend.repository.aggregators`
+
+- `def common_tools(kit: AgentKit, job) -> list[Callable]` (27)
+  - `async def profile() -> str` (4)
+  - `async def finish(result: str, reason: str='') -> str` (8)
+- `def _login_target(job) -> int | None` (4)
+- `def _need_human(kit: AgentKit, job) -> Callable` (8)
+  - `async def need_human(kind: str) -> str` (5)
+- `def _host_of(job) -> str | None` (5)
+- `def _report_login(kit: AgentKit, aggregator_id: int) -> Callable` (9)
+  - `async def report_login(logged_in: bool) -> str` (6)
+- `def _report_failure(job: ApplyJob) -> Callable` (9)
+  - `async def report_failure(reason: str) -> str` (6)
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -2994,7 +3076,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 280 модулей
+## tests — 285 модулей
 
 ### `tests/adapters/test_app_tied_process.py` — 100 строк
 
@@ -3294,6 +3376,16 @@ seed initial data
 - `def _page(*, headline: str='Senior Manual QA', body: str='<p>Ищем QA</p>') -> str` (9)
 - `def _client(handler) -> httpx.AsyncClient` (3)
 
+### `tests/backend/test_agent_human_gate.py` — 65 строк
+
+Пауза на человека: браузер виден, окно знает, срок — час.
+
+Зависит от: `backend.agent.human_gate`, `tests.fakes.browser`
+
+Тестов: 5
+
+- `def _gate(limit=60.0)` (5)
+
 ### `tests/backend/test_agent_prompts.py` — 123 строк
 
 Сборка промптов агента: что код подставляет и чего в них быть не может.
@@ -3303,6 +3395,27 @@ seed initial data
 Тестов: 16
 
 - `def _task(vacancy_text='Текст вакансии', profile_text='Анкета', **job) -> str` (7)
+
+### `tests/backend/test_agent_tools_browser.py` — 86 строк
+
+Инструменты браузера: что агент видит и что доходит до страницы.
+
+Зависит от: `backend.agent.tools_browser`, `tests.fakes.agent`, `tests.fakes.browser`
+
+Тестов: 7
+
+- `def _tools(page, resume=None)` (2)
+
+### `tests/backend/test_agent_tools_common.py` — 98 строк
+
+Общие инструменты агента: анкета, вход, итог, неудача.
+
+Зависит от: `backend.agent.jobs`, `backend.agent.tools_common`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
+
+Тестов: 7
+
+- `class _Gate` (7)
+  - `async def wait(self, kind, host, _browser)` (3)
 
 ### `tests/backend/test_bootstrap_schema.py` — 160 строк
 
@@ -5741,6 +5854,46 @@ seed initial data
 - `def vacancy_contact_row(vacancy_id: int, value: str, **overrides) -> VacancyContact` (6)
 - `def application_row(vacancy_id: int, **overrides) -> Application` (9)
 - `def screening_row(application_id: int, position: int, **overrides) -> Screening` (5)
+
+### `tests/fakes/agent.py` — 17 строк
+
+Набор сессии агента без браузера, водителя и человека.
+
+Зависит от: `backend.agent.kit`
+
+- `def tool(tools, name)` (3)
+- `def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit` (3)
+
+### `tests/fakes/browser.py` — 111 строк
+
+Браузер агента с заданными страницами: что открыто, что нажато, что отказало.
+
+Зависит от: —
+
+- `class _Chooser` (6)
+  - `async def set_files(self, files, **_options)` (2)
+- `class _ChooserInfo` (20)
+  - `async def __aenter__(self)` (3)
+  - `async def __aexit__(self, kind, *_rest)` (4)
+  - `def value(self)` (4)
+    - `async def _chooser()` (2)
+- `class _Locator` (7)
+  - `async def aria_snapshot(self, **_options)` (3)
+- `class FakePage` (49)
+  - `def fail_if_asked(self, selector)` (3)
+  - `async def goto(self, url, **_options)` (4)
+  - `async def title(self)` (2)
+  - `def locator(self, selector)` (2)
+  - `async def click(self, selector, **_options)` (4)
+  - `async def fill(self, selector, text, **_options)` (3)
+  - `async def select_option(self, selector, value, **_options)` (3)
+  - `async def set_input_files(self, selector, files, **_options)` (3)
+  - `def expect_file_chooser(self, **_options)` (2)
+  - `async def go_back(self, **_options)` (2)
+- `class FakeBrowser` (15)
+  - `async def page(self)` (2)
+  - `async def show(self)` (2)
+  - `async def hide_back(self)` (2)
 
 ### `tests/fakes/claude.py` — 83 строк
 
