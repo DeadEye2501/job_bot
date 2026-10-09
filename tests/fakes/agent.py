@@ -1,11 +1,18 @@
 """Набор сессии агента без браузера, водителя и человека."""
 
+from collections.abc import Awaitable, Callable
 from datetime import date
 
+from backend.agent.human_gate import HumanGate
 from backend.agent.jobs import ApplyJob
-from backend.agent.kit import AgentKit
+from backend.agent.kit import AgentEnd, AgentKit, SessionPlan
+from tests.fakes.browser import FakeBrowser
 
 TODAY = date(2026, 10, 9)
+
+
+class LimitHit(Exception):
+    """Шаг сценария: водитель упёрся в лимит подписки."""
 
 
 def tool(tools, name):
@@ -20,6 +27,33 @@ def apply_job(vacancy_id: int, **overrides) -> ApplyJob:
                   letter_writer="app")
     fields.update(overrides)
     return ApplyJob(**fields)
+
+
+def scripted(steps: list[Callable[[dict[str, Callable]], Awaitable]]):
+    """Водитель по сценарию: на каждую сессию — следующий шаг с инструментами плана по имени.
+
+    Планы сессий копятся в `run.plans`: по ним видно, с каким наставлением,
+    заданием и поиском в сети сессия была поднята.
+    """
+    queue = list(steps)
+
+    async def run(plan: SessionPlan) -> AgentEnd:
+        run.plans.append(plan)
+        step = queue.pop(0)
+        try:
+            await step({t.__name__: t for t in plan.tools})
+        except LimitHit:
+            return AgentEnd(False, "лимит", True)
+        return AgentEnd(True, "", False)
+
+    run.plans = []
+    return run
+
+
+def scripted_kit(pipeline, steps, *, human_limit: float = 3600.0) -> AgentKit:
+    """Набор обхода: браузер-подделка, человек, который не придёт, водитель по сценарию."""
+    gate = HumanGate(lambda kind, host: None, lambda: None, limit_sec=human_limit)
+    return kit_for(pipeline, browser=FakeBrowser(), gate=gate, run_session=scripted(steps))
 
 
 def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit:

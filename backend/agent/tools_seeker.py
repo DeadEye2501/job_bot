@@ -66,6 +66,7 @@ async def _submit(kit: AgentKit, job: SeekJob, queue, page: _Page) -> str:
     job.submitted += 1
     job.found.append(vacancy_id)
     queue.put(vacancy_id, page.text)
+    kit.pipeline.emit_progress("aggregator", f"{job.source.name} — найдено", job.submitted, job.limit)
     return _left("принята", job)
 
 

@@ -149,3 +149,17 @@ async def test_a_repost_of_a_page_found_this_session_is_not_parsed_twice(make_pi
 
     assert answer.startswith("повтор")
     assert len(queue.items) == 1
+
+
+async def test_each_accepted_page_moves_the_progress_in_the_window(make_pipeline, session_factory):
+    site = aggregator_row(host="site.test")
+    await put(session_factory, site)
+    pipeline = await make_pipeline()
+    steps = []
+    pipeline.on_progress = lambda *step: steps.append(step)
+    job = SeekJob(Source.of(site), limit=5)
+    submit = tool(seeker_tools(kit_for(pipeline), job, _Queue()), "submit_vacancy")
+
+    await submit(text="Текст", url=PAGE, published="", contacts=[])
+
+    assert steps == [("aggregator", "HeadHunter — найдено", 1, 5)]

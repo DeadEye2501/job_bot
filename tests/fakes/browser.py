@@ -109,3 +109,12 @@ class FakeBrowser:
 
     async def hide_back(self):
         self.calls.append("hide")
+
+    async def open_profile(self, profile_id: int):
+        self.calls.append(("profile", profile_id))
+
+    async def clear_cache(self):
+        self.calls.append("clear_cache")
+
+    async def close(self):
+        self.calls.append("close")
