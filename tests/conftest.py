@@ -321,6 +321,18 @@ def _sending_locked(monkeypatch):
     monkeypatch.setattr(adapters.telegram, "SEND_LOCKED", True)
 
 
+@pytest.fixture(autouse=True)
+def _secrets_forgotten(monkeypatch):
+    """Запомненные секреты журнала не переходят в следующий тест.
+
+    Набор общий на процесс: пароль, сохранённый одним тестом, вымарывался бы
+    в журнале всех последующих, и тест образца зеленел бы без образца.
+    """
+    from backend import log_secrets
+
+    monkeypatch.setattr(log_secrets, "_KNOWN_SECRETS", frozenset())
+
+
 async def _clear_all_tables(engine: AsyncEngine) -> None:
     """Удаляет все строки из всех таблиц, кроме `alembic_version`.
 

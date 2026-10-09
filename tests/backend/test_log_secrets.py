@@ -16,7 +16,7 @@ import pytest
 
 from backend.log_buffer import LogBufferHandler
 from backend.log_file import LogFileHandler
-from backend.log_secrets import SecretRedactionFilter, install_secret_filter
+from backend.log_secrets import SecretRedactionFilter, install_secret_filter, remember_secret
 from tests.backend.fixtures.logs import record
 
 
@@ -298,3 +298,28 @@ def test_an_unavailable_file_is_reported_to_the_stream(monkeypatch, capsys, tmp_
     said = capsys.readouterr().err
     assert "не собирается" in said
     assert "Traceback" in said
+
+
+def test_a_remembered_secret_never_reaches_the_record():
+    remember_secret("abcd efgh ijkl mnop")
+    entry = record("вход с паролем abcd efgh ijkl mnop не удался")
+
+    SecretRedactionFilter().filter(entry)
+
+    assert "abcd efgh ijkl mnop" not in entry.msg
+
+
+def test_an_app_password_is_masked_even_when_unknown():
+    entry = record("password=wxyz qrst uvwa bcde")
+
+    SecretRedactionFilter().filter(entry)
+
+    assert "wxyz qrst uvwa bcde" not in entry.msg
+
+
+def test_an_ordinary_phrase_is_not_taken_for_a_password():
+    entry = record("this will make sure")
+
+    SecretRedactionFilter().filter(entry)
+
+    assert entry.msg == "this will make sure"
