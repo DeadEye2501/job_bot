@@ -94,7 +94,7 @@ def _empty_vacancy() -> dict:
         "company_name": None,
         "company_website": None,
         "hr_contact": None,
-        "other_contact": None,
+        "other_contacts": [],
         "stack_required": [],
         "stack_preferred": [],
         "grade": None,

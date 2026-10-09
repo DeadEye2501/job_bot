@@ -482,13 +482,12 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def capitalized_company_name(name: str | None) -> str | None` (32)
 
-### `backend/domain/contact_keys.py` — 91 строк
+### `backend/domain/contact_keys.py` — 50 строк
 
-Что считать одним контактом вакансии: перечень делится на контакты, а два
+Нормальная форма контакта вакансии, по которой два написания признаются одним.
 
 Зависит от: `backend.domain.hosts`
 
-- `def split_contacts(value: str) -> list[str]` (22)
 - `def contact_key(value: str) -> str` (18)
 - `def _link_key(text: str) -> str` (11)
 
@@ -1229,7 +1228,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (36)
 
-### `backend/llm/vacancy.py` — 480 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 494 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
@@ -1238,8 +1237,8 @@ First-run bootstrap: ensure DB schema exists.
 - `def _split_stack(data: dict) -> tuple[list, list]` (19)
 - `def _company_name_and_site(company_name: str | None, company_website: str | None) -> tuple[str | None, str | None]` (28)
 - `def _address_after_label(value: str) -> str` (15)
-- `def _contacts(hr_contact: str | None, other_contact: str | None) -> tuple[str | None, str | None]` (18)
-- `def _way_to_apply(other_contact: str | None) -> str | None` (22)
+- `def _contacts(hr_contact: str | None, other_contacts: list[str]) -> tuple[str | None, list[str]]` (17)
+- `def _way_to_apply(other_contact: str) -> str | None` (20)
 - `def parsed_vacancy_from_json(answer: str) -> ParsedVacancy | None` (16)
 - `def _vacancy_of(data: dict, title: str) -> ParsedVacancy` (34)
   - `def _text_field(field: str) -> str | None` (2)
@@ -1411,7 +1410,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 445 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 446 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -1427,7 +1426,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class ParsedCvExperience` (9)
 - `class ParsedCv` (5)
 - `class Classification` (3)
-- `class ParsedVacancy` (37)
+- `class ParsedVacancy` (38)
   - `def stack(self) -> list[str]` (11)
 - `class PostGenre` (14)
 - `class FitValidation` (3)
@@ -1956,13 +1955,13 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def create_vacancy(session: AsyncSession, fields: dict) -> int` (39)
 
-### `backend/repository/vacancy_contacts.py` — 87 строк
+### `backend/repository/vacancy_contacts.py` — 85 строк
 
 Контакты вакансии, кроме Telegram-HR.
 
 Зависит от: `backend.domain.contact_keys`, `backend.models`
 
-- `async def replace_parsed_contact(session: AsyncSession, vacancy_id: int, value: str | None) -> None` (20)
+- `async def replace_parsed_contacts(session: AsyncSession, vacancy_id: int, values: list[str]) -> None` (18)
 - `async def add_contact(session: AsyncSession, vacancy_id: int, value: str, added_by: ContactAddedBy) -> None` (21)
 - `async def has_contact(session: AsyncSession, vacancy_id: int, value: str) -> bool` (3)
 - `async def _contact_row(session: AsyncSession, vacancy_id: int, key: str) -> VacancyContact | None` (9)
@@ -3724,13 +3723,13 @@ seed initial data
 Тестов: 7
 
 
-### `tests/backend/test_flows_parse_contacts.py` — 230 строк
+### `tests/backend/test_flows_parse_contacts.py` — 204 строк
 
 Контакт, найденный разбором, ложится контактом вакансии, а заметки остаются
 
 Зависит от: `backend.flows`, `backend.models`, `backend.repository.vacancies_card`, `backend.repository.vacancy_contacts`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 10
+Тестов: 9
 
 - `async def _contacts(session_factory) -> list[tuple[str, str, str]]` (3)
 
@@ -4039,23 +4038,23 @@ seed initial data
 Тестов: 18
 
 
-### `tests/backend/test_llm_vacancy_answer.py` — 371 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_vacancy_answer.py` — 375 строк ⚠ подошёл к 300
 
 Следствия разбора ответа модели в разобранную вакансию.
 
 Зависит от: `backend.llm.vacancy`, `tests.fakes.llm`
 
-Тестов: 29
+Тестов: 30
 
 - `def _answer(**fields) -> str` (3)
 
-### `tests/backend/test_llm_vacancy_request.py` — 313 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_vacancy_request.py` — 306 строк ⚠ подошёл к 300
 
 Следствия обращения к модели за разбором поста с вакансией.
 
 Зависит от: `backend.llm.rules`, `backend.llm.vacancy`, `tests.fakes.llm`
 
-Тестов: 18
+Тестов: 17
 
 - `def _parsed(**fields) -> httpx.Response` (3)
 

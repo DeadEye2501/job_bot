@@ -294,20 +294,13 @@ async def test_the_source_channel_is_not_taken_for_a_way_to_apply():
     """Ссылка на сам канал способом отклика не считается.
 
     Чтение поста дописывает за подписью ссылки её адрес, и подвал канала
-    приезжает моделью как «первый встретившийся» способ отклика. В заметке
-    вакансии он читается контактом, а ведёт в тот же канал, откуда пост.
+    приезжает моделью способом отклика. В контактах вакансии он читается
+    контактом, а ведёт в тот же канал, откуда пост. Чужой адрес рядом остаётся.
     """
-    client = provider({CHAT: _parsed(other_contact="https://t.me/pyjobs")})
+    client = provider({
+        CHAT: _parsed(other_contacts=["https://t.me/pyjobs", "jobs@acme.com"])
+    })
 
     got, _ = await parse_vacancy("текст", client, "qwen", channel_username="PyJobs")
 
-    assert got.other_contact is None
-
-
-async def test_a_real_way_to_apply_survives():
-    """Чужой адрес способом отклика остаётся."""
-    client = provider({CHAT: _parsed(other_contact="jobs@acme.com")})
-
-    got, _ = await parse_vacancy("текст", client, "qwen", channel_username="PyJobs")
-
-    assert got.other_contact == "jobs@acme.com"
+    assert got.other_contacts == ["jobs@acme.com"]
