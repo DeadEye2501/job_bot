@@ -111,7 +111,7 @@ async def _one_way(kit: AgentKit, round_: RoundState, order: ApplyOrder, way: Wa
     if plan is None:
         return "exhausted"
     if way.method != _EMAIL:
-        await kit.browser.open_profile(job.profile_id)
+        await kit.browser.open_profile(job.profile_id, sending=not job.simulated)
     end = await run_guarded(kit, plan)
     if job.delivery is not None:
         # Сессия снята по сроку, пока сервер почты принимал письмо: исход

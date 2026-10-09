@@ -220,6 +220,7 @@ async def test_a_simulated_application_is_told_not_to_send_and_is_marked(
 
     (plan,) = kit.run_session.plans
     assert "Режим симуляции" in plan.task
+    assert kit.browser.sending is False
     (event,) = await _events(session_factory, "applied_elsewhere")
     assert event["simulated"] is True
 
@@ -282,3 +283,12 @@ async def test_a_stop_while_the_letter_is_on_its_way_does_not_cut_it_off(
     await asyncio.sleep(0.4)
 
     assert len(await all_rows(session_factory, Application)) == 1
+
+
+async def test_a_real_application_opens_the_browser_able_to_send(board, make_pipeline):
+    _, vacancy = await board()
+    kit = scripted_kit(await make_pipeline(), [_record(PAGE)])
+
+    await apply_vacancy(kit, RoundState(set(), web_search_id=0), ApplyOrder(vacancy.id, False, None))
+
+    assert kit.browser.sending is True
