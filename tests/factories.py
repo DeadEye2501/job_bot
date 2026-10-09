@@ -137,6 +137,12 @@ def parsed_cv_profile(**overrides) -> ParsedCvProfile:
         work_format=[],
         grades=[],
         free_preferences=None,
+        expected_salary=None,
+        expected_salary_currency=None,
+        expected_salary_period=None,
+        first_name_latin=None,
+        last_name_latin=None,
+        gender=None,
     )
     fields.update(overrides)
     return ParsedCvProfile(**fields)

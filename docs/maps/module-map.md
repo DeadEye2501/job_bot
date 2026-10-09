@@ -994,7 +994,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def telegram_alive(bot) -> bool` (7)
 - `async def model_alive(cfg, kind: str) -> bool` (44)
 
-### `backend/incoming.py` — 151 строк
+### `backend/incoming.py` — 162 строк
 
 Приведение внешнего ввода к значениям, годным для записи.
 
@@ -1008,6 +1008,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def moment_or_none(value) -> datetime | None` (16)
 - `def str_list(value) -> list[str]` (11)
 - `def normalize_enum(value, allowed: tuple[str, ...]) -> str | None` (22)
+- `def enum_member_or_none(value, kind: type[enum.Enum])` (8)
 - `def normalize_enum_list(values, allowed: tuple[str, ...]) -> list[str]` (15)
 
 ### `backend/llm/answers.py` — 234 строк
@@ -1061,17 +1062,17 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (24)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
-### `backend/llm/cv.py` — 439 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 466 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.domain.wording`, `backend.incoming`, `backend.llm.answers`, `backend.llm.cv_grounding`, `backend.llm.cv_native`, `backend.llm.external`, `backend.llm.rules`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.salary`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.domain.wording`, `backend.incoming`, `backend.llm.answers`, `backend.llm.cv_grounding`, `backend.llm.cv_native`, `backend.llm.external`, `backend.llm.rules`, `backend.models`, `backend.payloads`
 
 - `def _normalize_lang_level(value: object) -> str | None` (25)
 - `def _parse_language_item(item) -> tuple[str, str | None] | None` (13)
 - `def _parse_languages(raw: object) -> list[ParsedCvLanguage]` (28)
 - `def _parse_date(value) -> date | None` (21)
-- `def _parse_profile(data: dict) -> ParsedCvProfile | None` (17)
+- `def _parse_profile(data: dict) -> ParsedCvProfile | None` (27)
 - `def _parse_skill(item) -> ParsedCvSkill | None` (35)
 - `def _parse_experience(item) -> ParsedCvExperience | None` (18)
 - `def _parse_cv_json(answer: str) -> ParsedCv | None` (30)
@@ -1409,7 +1410,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 436 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 444 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -1419,7 +1420,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class OutgoingMessage` (21)
 - `class IncomingMessage` (19)
 - `class PendingReply` (15)
-- `class ParsedCvProfile` (13)
+- `class ParsedCvProfile` (19)
 - `class ParsedCvLanguage` (3)
 - `class ParsedCvSkill` (5)
 - `class ParsedCvExperience` (9)
@@ -1720,17 +1721,19 @@ First-run bootstrap: ensure DB schema exists.
 - `def _experience_lines(experiences: list) -> list[str]` (13)
 - `async def build_profile_block(session: AsyncSession) -> str` (28)
 
-### `backend/repository/profile_cv.py` — 156 строк
+### `backend/repository/profile_cv.py` — 186 строк
 
 Запись анкеты, разобранной моделью из резюме.
 
-Зависит от: `backend.domain.skill_names`, `backend.models`, `backend.payloads`, `backend.repository.app_settings`, `backend.repository.profile_experience`, `backend.repository.profile_languages`, `backend.repository.profile_skills`
+Зависит от: `backend.domain.skill_names`, `backend.models`, `backend.payloads`, `backend.repository.app_settings`, `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_languages`, `backend.repository.profile_skills`
 
 - `async def _wipe_profile(session: AsyncSession) -> None` (11)
 - `async def _add_parsed_skills(session: AsyncSession, profile_id: int, skills) -> dict[str, ProfileSkill]` (21)
 - `async def _add_parsed_experience(session: AsyncSession, profile_id: int, experience, skill_lookup: dict[str, ProfileSkill]) -> None` (32)
-- `def _new_profile(p) -> Profile` (20)
-- `async def save_parsed_cv(session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None=None) -> None` (41)
+- `async def _answers_to_keep(session: AsyncSession) -> dict` (5)
+- `def _answers(p, kept: dict) -> dict` (11)
+- `def _new_profile(p, kept: dict) -> Profile` (21)
+- `async def save_parsed_cv(session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None=None) -> None` (40)
 
 ### `backend/repository/profile_experience.py` — 162 строк
 
@@ -2483,11 +2486,11 @@ Runtime settings layer.
 - `async def merge_picker(session, subject: PickerSubject, absorbed_id: int, search: str | None) -> dict` (21)
 - `async def link_picker(session, subject: PickerSubject, vacancy, search: str | None) -> dict` (18)
 
-### `client/bridge/profile.py` — 161 строк
+### `client/bridge/profile.py` — 178 строк
 
 Анкета соискателя: сведения о себе, навыки и места работы.
 
-Зависит от: `backend.domain.taxonomy`, `backend.incoming`, `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.domain.salary`, `backend.domain.taxonomy`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.refusals`, `client.bridge.wire`
 
 - `class Profile(Cv)` (123)
   - `def get(self) -> dict` (19)
@@ -2502,7 +2505,7 @@ Runtime settings layer.
   - `def save_experience(self, payload: dict) -> dict` (3)
   - `def _save_rows(self, payload: dict, key: str, saving) -> dict` (29)
     - `async def run() -> dict` (11)
-- `def _read_profile_fields(payload: dict) -> dict` (16)
+- `def _read_profile_fields(payload: dict) -> dict` (26)
 
 ### `client/bridge/refusals.py` — 231 строк
 
@@ -2684,7 +2687,7 @@ Runtime settings layer.
 - `def _leave_later() -> None` (9)
 - `def _leave() -> None` (9)
 
-### `client/bridge/wire.py` — 412 строк ⚠ подошёл к 300
+### `client/bridge/wire.py` — 422 строк ⚠ подошёл к 300
 
 Перевод внутренних значений в словари, которые читает окно.
 
@@ -2694,7 +2697,8 @@ Runtime settings layer.
 - `def _vacancy_mini_row_to_dict(v) -> dict` (20)
 - `def _tg_creds_to_dict(tg) -> dict` (20)
 - `def _llm_provider_to_dict(cfg) -> dict` (19)
-- `def _profile_to_dict(p, languages=None) -> dict | None` (22)
+- `def _enum_value(member) -> str | None` (2)
+- `def _profile_to_dict(p, languages=None) -> dict | None` (28)
 - `def _skill_to_dict(s) -> dict` (8)
 - `def _exp_to_dict(e) -> dict` (12)
 - `def _stack_items(stack, matched_set: set[str]) -> list[dict]` (8)
@@ -3919,13 +3923,13 @@ seed initial data
 Тестов: 9
 
 
-### `tests/backend/test_llm_cv_profile.py` — 329 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_cv_profile.py` — 362 строк ⚠ подошёл к 300
 
 Следствия разбора профиля и языков в `backend/llm/cv.py`.
 
-Зависит от: `backend.llm.cv`, `tests.factories`, `tests.fakes.llm`
+Зависит от: `backend.llm.cv`, `backend.models`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 26
+Тестов: 29
 
 - `async def parse_answer(answer: str, text: str='резюме')` (8)
 - `async def parse_profile(text: str='резюме', **fields)` (9)
@@ -4541,13 +4545,13 @@ seed initial data
 Тестов: 11
 
 
-### `tests/backend/test_repository_profile_cv_saving.py` — 240 строк
+### `tests/backend/test_repository_profile_cv_saving.py` — 285 строк
 
 Следствия записи разобранного резюме в профиль.
 
 Зависит от: `backend.models`, `backend.payloads`, `backend.repository.profile`, `backend.repository.profile_cv`, `backend.repository.profile_experience`, `backend.repository.profile_skills`, `tests.dbio`, `tests.factories`
 
-Тестов: 10
+Тестов: 13
 
 
 ### `tests/backend/test_repository_profile_experience.py` — 286 строк
@@ -5126,13 +5130,13 @@ seed initial data
 Тестов: 4
 
 
-### `tests/client/test_bridge_profile.py` — 230 строк
+### `tests/client/test_bridge_profile.py` — 265 строк
 
 Следствия слотов анкеты — того, что человек рассказывает о себе.
 
 Зависит от: —
 
-Тестов: 11
+Тестов: 13
 
 - `async def _saved_person(api, ask, **extra) -> None` (4)
 
@@ -5403,7 +5407,7 @@ seed initial data
 - `def sqlite_rows(db_file, sql: str) -> list[tuple]` (11)
 - `def sqlite_tables(db_file) -> set[str]` (3)
 
-### `tests/factories.py` — 478 строк ⚠ подошёл к 300
+### `tests/factories.py` — 484 строк ⚠ подошёл к 300
 
 Построение объектов, которые тесты подают на вход коду.
 
@@ -5415,7 +5419,7 @@ seed initial data
 - `def _empty_vacancy() -> dict` (23)
 - `def parsed_vacancy(**overrides) -> ParsedVacancy` (7)
 - `def skill_fields(**overrides) -> dict` (7)
-- `def parsed_cv_profile(**overrides) -> ParsedCvProfile` (18)
+- `def parsed_cv_profile(**overrides) -> ParsedCvProfile` (24)
 - `def parsed_cv_skill(name: str, **overrides) -> ParsedCvSkill` (3)
 - `def parsed_cv_place(**overrides) -> ParsedCvExperience` (9)
 - `def parsed_cv(**overrides) -> ParsedCv` (10)

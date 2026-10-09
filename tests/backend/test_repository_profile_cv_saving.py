@@ -14,10 +14,12 @@ from sqlalchemy import select
 from backend.payloads import ParsedCvLanguage
 from backend.models import (
     AppSetting,
+    Gender,
     Profile,
     ProfileExperience,
     ProfileLanguage,
     ProfileSkill,
+    SalaryPeriod,
     profile_experience_skills,
 )
 from backend.repository.profile import get_profile
@@ -238,3 +240,46 @@ async def test_without_a_path_nothing_is_recorded(session):
     await save_parsed_cv(session, parsed_cv())
 
     assert (await session.scalars(select(AppSetting))).all() == []
+
+
+async def test_a_new_resume_keeps_the_answers_it_did_not_give(session, session_factory):
+    """Повторный разбор без зарплаты и пола не стирает введённое человеком."""
+    await put(session_factory, profile_row(
+        expected_salary=300000, expected_salary_period=SalaryPeriod.MONTH,
+        gender=Gender.FEMALE, first_name_latin="Anna",
+    ))
+
+    await save_parsed_cv(session, parsed_cv())
+
+    p = (await session.scalars(select(Profile))).one()
+    assert (p.expected_salary, p.expected_salary_period, p.gender, p.first_name_latin) == (
+        300000, SalaryPeriod.MONTH, Gender.FEMALE, "Anna"
+    )
+
+
+async def test_a_new_resume_overrides_the_answers_it_gave(session, session_factory):
+    await put(session_factory, profile_row(
+        expected_salary=300000, gender=Gender.FEMALE, first_name_latin="Anna",
+    ))
+
+    await save_parsed_cv(session, parsed_cv(profile=parsed_cv_profile(
+        expected_salary=350000, gender=Gender.MALE, first_name_latin="Ivan",
+    )))
+
+    p = (await session.scalars(select(Profile))).one()
+    assert (p.expected_salary, p.gender, p.first_name_latin) == (350000, Gender.MALE, "Ivan")
+
+
+async def test_a_new_salary_does_not_borrow_the_old_currency(session, session_factory):
+    """Зарплата переносится связкой: новая сумма со старой валютой — чужая зарплата."""
+    await put(session_factory, profile_row(
+        expected_salary=300000, expected_salary_currency="₽",
+        expected_salary_period=SalaryPeriod.MONTH,
+    ))
+
+    await save_parsed_cv(session, parsed_cv(profile=parsed_cv_profile(expected_salary=5000)))
+
+    p = (await session.scalars(select(Profile))).one()
+    assert (p.expected_salary, p.expected_salary_currency, p.expected_salary_period) == (
+        5000, None, None
+    )

@@ -94,6 +94,10 @@ def _llm_provider_to_dict(cfg) -> dict:
     }
 
 
+def _enum_value(member) -> str | None:
+    return member.value if member is not None else None
+
+
 def _profile_to_dict(p, languages=None) -> dict | None:
     if p is None:
         return None
@@ -108,6 +112,12 @@ def _profile_to_dict(p, languages=None) -> dict | None:
         "github_url": p.github_url,
         "education": p.education,
         "free_preferences": p.free_preferences,
+        "expected_salary": p.expected_salary,
+        "expected_salary_currency": p.expected_salary_currency,
+        "expected_salary_period": _enum_value(p.expected_salary_period),
+        "first_name_latin": p.first_name_latin,
+        "last_name_latin": p.last_name_latin,
+        "gender": _enum_value(p.gender),
         "grades": list(p.grades or []),
         "work_format": list(p.work_format or []),
         "languages": [
@@ -189,7 +199,7 @@ def _status_change(row) -> dict:
     """
     return {
         "id": row.id,
-        "previous_status": row.previous_status.value if row.previous_status else None,
+        "previous_status": _enum_value(row.previous_status),
         "status": row.status.value,
         "explanation": row.explanation,
         "applied": row.applied,

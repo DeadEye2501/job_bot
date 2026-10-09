@@ -23,6 +23,8 @@ from backend.domain.stack import joined_stack
 from backend.models import (
     HR,
     Company,
+    Gender,
+    SalaryPeriod,
     TelegramChannel,
     Vacancy,
     VacancyContact,
@@ -175,6 +177,12 @@ class ParsedCvProfile:
     work_format: list[str]
     grades: list[str]
     free_preferences: str | None
+    expected_salary: int | None
+    expected_salary_currency: str | None
+    expected_salary_period: SalaryPeriod | None
+    first_name_latin: str | None
+    last_name_latin: str | None
+    gender: Gender | None
 
 
 @dataclass(frozen=True)

@@ -11,6 +11,7 @@
 весь проект, а приведение — только те, кто принимает чужое.
 """
 
+import enum
 from datetime import datetime
 
 _HOMOGLYPHS = str.maketrans("авсеАВСЕ", "abceABCE")
@@ -132,6 +133,16 @@ def normalize_enum(value, allowed: tuple[str, ...]) -> str | None:
     if v in allowed:
         return v
     return None
+
+
+def enum_member_or_none(value, kind: type[enum.Enum]):
+    """Член перечисления по значению из ответа модели или формы; чужое — отсутствие.
+
+    Приводится тем же правилом, что `normalize_enum`: колонку с перечислением
+    наполняют оба пути, и правило у них одно.
+    """
+    known = normalize_enum(value, tuple(member.value for member in kind))
+    return kind(known) if known is not None else None
 
 
 def normalize_enum_list(values, allowed: tuple[str, ...]) -> list[str]:

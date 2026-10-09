@@ -14,6 +14,7 @@ from backend.models import (
     ProfileSkill,
 )
 from backend.payloads import ParsedCv
+from backend.repository.profile import get_profile
 from backend.repository.profile_experience import wipe_experience
 from backend.repository.profile_languages import replace_profile_languages
 from backend.repository.profile_skills import index_skill_keys
@@ -91,7 +92,36 @@ async def _add_parsed_experience(
     await session.flush()
 
 
-def _new_profile(p) -> Profile:
+_SALARY = ("expected_salary", "expected_salary_currency", "expected_salary_period")
+
+_PERSON = ("first_name_latin", "last_name_latin", "gender")
+
+_KEPT_ACROSS_RESUMES = _SALARY + _PERSON
+"""Ответы для форм, которых в резюме может не быть. Повторный разбор их не
+стирает: человек вводит их руками, а файл приносит редко."""
+
+
+async def _answers_to_keep(session: AsyncSession) -> dict:
+    old = await get_profile(session)
+    if old is None:
+        return {}
+    return {name: getattr(old, name) for name in _KEPT_ACROSS_RESUMES}
+
+
+def _answers(p, kept: dict) -> dict:
+    """Ответы для форм: из файла, а чего файл не дал — прежние.
+
+    Зарплата переносится связкой: новая сумма со старой валютой или периодом
+    была бы чужой зарплатой.
+    """
+    fresh = p.expected_salary is not None
+    answers = {name: getattr(p, name) if fresh else kept.get(name) for name in _SALARY}
+    for name in _PERSON:
+        answers[name] = getattr(p, name) if getattr(p, name) is not None else kept.get(name)
+    return answers
+
+
+def _new_profile(p, kept: dict) -> Profile:
     """Строка анкеты из разобранного резюме.
 
     Списки копируются, а не берутся ссылкой: разобранное резюме живёт своей
@@ -110,6 +140,7 @@ def _new_profile(p) -> Profile:
         work_format=list(p.work_format),
         grades=list(p.grades),
         free_preferences=p.free_preferences,
+        **_answers(p, kept),
     )
 
 
@@ -118,16 +149,15 @@ async def save_parsed_cv(
 ) -> None:
     """Replace the single Profile (and its skills/experience) with parsed data.
 
-    If ``cv_path`` is provided, also upserts ``app_settings.cv_path`` in the
-    same transaction so the wizard's "parse-and-save" step is atomic
-    (otherwise a crash between the two writes leaves a parsed profile with
-    no recorded source file).
-
+    A given ``cv_path`` is upserted in the same transaction: a crash between
+    two writes would leave a parsed profile with no recorded source file.
+    Ответы для форм переносятся в новую строку, если файл их не дал.
     Caller must wrap in ``session.begin()``.
     """
+    kept = await _answers_to_keep(session)
     await _wipe_profile(session)
 
-    profile = _new_profile(parsed.profile)
+    profile = _new_profile(parsed.profile, kept)
     session.add(profile)
     await session.flush()
 
