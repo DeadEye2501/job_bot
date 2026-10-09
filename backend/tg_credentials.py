@@ -87,8 +87,8 @@ def from_tg_row(row: TgAccount) -> TgAccountConfig | None:
 def fill_tg_row(row: TgAccount, creds: TgAccountConfig) -> None:
     """Переписать строку учётной записи присланным, секреты — шифротекстом.
 
-    Пустой пароль и пустая строка сеанса стирают записанный секрет: так
-    человека и разлогинивают.
+    Пустой пароль и отсутствующая строка сеанса стирают записанный секрет:
+    строка повторяет присланное целиком, а не дополняет его.
     """
     row.api_id = creds.api_id
     row.api_hash_encrypted = encrypt_str(creds.api_hash)

@@ -5,8 +5,8 @@ from __future__ import annotations
 from backend.domain.salary import currency_sign
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.incoming import (
+    amount_or_none,
     enum_member_or_none,
-    int_or_none,
     normalize_enum_list,
     text_or_none,
 )
@@ -163,7 +163,7 @@ def _read_profile_fields(payload: dict) -> dict:
         "github_url": text_or_none(payload.get("github_url")),
         "education": text_or_none(payload.get("education")),
         "free_preferences": text_or_none(payload.get("free_preferences")),
-        "expected_salary": int_or_none(payload.get("expected_salary")),
+        "expected_salary": amount_or_none(payload.get("expected_salary")),
         "expected_salary_currency": currency_sign(
             text_or_none(payload.get("expected_salary_currency"))
         ),

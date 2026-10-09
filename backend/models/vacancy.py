@@ -118,7 +118,8 @@ class TrashEvent(IdMixin, CreatedAtMixin, Base):
     из ``vacancy``, и впоследствии посчитать «сколько канал прислал мусора
     за период» по ``Vacancy``-ряду нельзя. Эта таблица — независимый
     счётчик: одна строка на объявление, привязанная к каналу или агрегатору.
-    Per-period stats читают её через COUNT(*) по источнику и created_at.
+    Per-period stats по каналам читают её через COUNT(*) WHERE channel_id=X
+    AND created_at >= since.
 
     Поля:
       - source_channel_id: nullable FK на ``telegram_channel`` (если канал

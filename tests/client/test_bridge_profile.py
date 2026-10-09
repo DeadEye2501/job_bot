@@ -90,6 +90,13 @@ async def test_the_answers_for_forms_come_back_as_saved(api, ask):
     }
 
 
+async def test_a_zero_salary_is_saved_as_no_salary(api, ask):
+    """Ноль — «не названо» и в окне, и в разборе резюме: правило у путей одно."""
+    await ask(api.profile.save, {**PERSON, "expected_salary": "0"})
+
+    assert (await ask(api.profile.get))["ok"]["profile"]["expected_salary"] is None
+
+
 async def test_an_unknown_gender_or_currency_never_reaches_the_column(api, ask):
     await ask(api.profile.save, {
         **PERSON, "gender": "другое", "expected_salary_currency": "тугрики",
