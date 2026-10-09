@@ -186,12 +186,35 @@ async def test_the_email_way_needs_no_browser(make_pipeline, session, session_fa
     async with session.begin():
         await save_mail_account(session, MailSettings("me@mail.test", "secret", "smtp.mail.test", 465))
 
-    async def look(tools):
-        assert not [name for name in tools if name.startswith("browser_")]
+    async def fail(tools):
         await tools["report_failure"](reason="нет")
 
-    kit = scripted_kit(await make_pipeline(), [look])
+    kit = scripted_kit(await make_pipeline(), [fail])
     await apply_vacancy(kit, RoundState(STARTED, set(), web_search_id=0),
                         ApplyOrder(vacancy.id, False, None))
 
-    assert len(kit.run_session.plans) == 1 and kit.browser.calls == []
+    (plan,) = kit.run_session.plans
+    assert not [t.__name__ for t in plan.tools if t.__name__.startswith("browser_")]
+    assert kit.browser.calls == []
+
+
+async def test_a_simulated_form_application_is_filled_but_not_sent(
+    board, make_pipeline, session_factory
+):
+    """В симуляции агент заполняет форму, но не отправляет; отклик записан с пометкой."""
+    _, vacancy = await board()
+
+    async def record(tools):
+        await tools["record_application"](via="aggregator", target=PAGE)
+
+    pipeline = await make_pipeline()
+    await pipeline.rs.set_app("send_locked", "true")
+    kit = scripted_kit(pipeline, [record])
+
+    await apply_vacancy(kit, RoundState(STARTED, set(), web_search_id=0),
+                        ApplyOrder(vacancy.id, False, None))
+
+    (plan,) = kit.run_session.plans
+    assert "Режим симуляции" in plan.task
+    (event,) = await _events(session_factory, "applied_elsewhere")
+    assert event["simulated"] is True

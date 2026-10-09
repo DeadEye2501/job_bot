@@ -2,11 +2,7 @@
 
 from backend.llm.agent_letter import Letter, LetterAsk, check_letter, write_letter
 from backend.llm.rules import ATTRIBUTION_RULES, FACT_KINDS, GENDER_RULE
-from tests.fakes.llm import CHAT, chat_json, data_block, factcheck_answer, messages_of, provider
-
-
-def _written(body: str, subject: str = "Тема"):
-    return chat_json({"subject": subject, "body": body})
+from tests.fakes.llm import CHAT, letter_answer, data_block, factcheck_answer, messages_of, provider
 
 
 def _ask(**over) -> LetterAsk:
@@ -17,7 +13,7 @@ def _ask(**over) -> LetterAsk:
 
 
 async def test_a_checked_letter_comes_back_with_its_subject():
-    client = provider({CHAT: [_written("Текст письма."), factcheck_answer("ok")]})
+    client = provider({CHAT: [letter_answer("Текст письма.", "Тема"), factcheck_answer("ok")]})
 
     letter, issues = await write_letter(_ask(), client, "m")
 
@@ -25,7 +21,7 @@ async def test_a_checked_letter_comes_back_with_its_subject():
 
 
 async def test_the_language_and_the_vacancy_reach_the_model():
-    client = provider({CHAT: [_written("B."), factcheck_answer("ok")]})
+    client = provider({CHAT: [letter_answer("B.", "Тема"), factcheck_answer("ok")]})
 
     await write_letter(_ask(language="испанский", vacancy_text="Особый текст"), client, "m")
 
@@ -35,7 +31,7 @@ async def test_the_language_and_the_vacancy_reach_the_model():
 
 async def test_the_writer_hears_what_the_check_holds_against_it():
     """Сочинитель знает тот же перечень фактов, что и сверка, и правило голоса — один раз."""
-    client = provider({CHAT: [_written("B."), factcheck_answer("ok")]})
+    client = provider({CHAT: [letter_answer("B.", "Тема"), factcheck_answer("ok")]})
 
     await write_letter(_ask(), client, "m")
 
@@ -46,7 +42,7 @@ async def test_the_writer_hears_what_the_check_holds_against_it():
 
 async def test_a_rejected_letter_comes_back_empty_with_the_reasons():
     """Повтор не здесь: его делает откликатель, позвав letter ещё раз."""
-    client = provider({CHAT: [_written("Первое."), factcheck_answer("reject", ["выдумано"])]})
+    client = provider({CHAT: [letter_answer("Первое.", "Тема"), factcheck_answer("reject", ["выдумано"])]})
 
     letter, issues = await write_letter(_ask(), client, "m")
 
@@ -55,7 +51,7 @@ async def test_a_rejected_letter_comes_back_empty_with_the_reasons():
 
 
 async def test_a_letter_longer_than_the_field_is_not_checked_at_all():
-    client = provider({CHAT: [_written("слово " * 50)]})
+    client = provider({CHAT: [letter_answer("слово " * 50, "Тема")]})
 
     letter, issues = await write_letter(_ask(limit=100), client, "m")
 
@@ -64,7 +60,7 @@ async def test_a_letter_longer_than_the_field_is_not_checked_at_all():
 
 
 async def test_a_zero_limit_means_no_limit():
-    client = provider({CHAT: [_written("слово " * 50), factcheck_answer("ok")]})
+    client = provider({CHAT: [letter_answer("слово " * 50, "Тема"), factcheck_answer("ok")]})
 
     letter, _ = await write_letter(_ask(limit=0), client, "m")
 
@@ -72,7 +68,7 @@ async def test_a_zero_limit_means_no_limit():
 
 
 async def test_a_placeholder_in_the_subject_is_not_taken():
-    client = provider({CHAT: [_written("Текст.", subject="Отклик на <название>")]})
+    client = provider({CHAT: [letter_answer("Текст.", "Отклик на <название>")]})
 
     letter, issues = await write_letter(_ask(), client, "m")
 
@@ -80,7 +76,7 @@ async def test_a_placeholder_in_the_subject_is_not_taken():
 
 
 async def test_a_long_dash_is_turned_into_a_short_one():
-    client = provider({CHAT: [_written("Опыт — пять лет."), factcheck_answer("ok")]})
+    client = provider({CHAT: [letter_answer("Опыт — пять лет.", "Тема"), factcheck_answer("ok")]})
 
     letter, _ = await write_letter(_ask(), client, "m")
 

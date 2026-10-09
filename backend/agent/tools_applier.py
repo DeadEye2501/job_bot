@@ -115,8 +115,16 @@ async def _send_email(kit: AgentKit, job: ApplyJob, report: _Report, subject: st
     if resume is None:
         job.outcome = Failed("нет файла резюме")
         return "Нет файла резюме."
+    # Отправка и запись — одним неразрывным шагом: погашенная между ними сессия
+    # оставила бы ушедшее письмо без отклика, и следующий обход послал бы второе.
+    return await asyncio.shield(_send_and_record(kit, job, report, OutgoingMail(
+        report.target, subject, report.letter, resume), account))
+
+
+async def _send_and_record(kit: AgentKit, job: ApplyJob, report: _Report, mail: OutgoingMail,
+                           account: MailAccountConfig) -> str:
     if not job.simulated:
-        trouble = await _deliver(account, OutgoingMail(report.target, subject, report.letter, resume))
+        trouble = await _deliver(account, mail)
         if trouble is not None:
             job.outcome = Failed(trouble)
             return trouble

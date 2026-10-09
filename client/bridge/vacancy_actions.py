@@ -98,7 +98,7 @@ class VacancyActions:
             self._hub,
             lambda: bot.apply_via_agent(vacancy_id, found["ok"]),
             {**APPLY_VIA_REFUSALS, "locked": current_refusal(self._hub.rs.chat) or ""},
-            "Отклик агентом закончен.",
+            "Отклик записан.",
             vacancy_id=vacancy_id,
             action="apply_via",
         )

@@ -57,7 +57,7 @@ async def test_the_task_is_the_first_message_and_the_process_is_closed(monkeypat
 
 
 async def test_an_exhausted_subscription_is_told_apart(monkeypatch):
-    claude_code.install(monkeypatch, [claude_code.failure("usage limit reached", status=429)])
+    claude_code.install(monkeypatch, [claude_code.failure("сервер занят", status=429)])
 
     end = await run_agent(RUN)
 

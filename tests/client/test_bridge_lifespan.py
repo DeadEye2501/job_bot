@@ -199,6 +199,7 @@ async def test_what_the_bot_does_by_itself_reaches_the_queue(hub):
         "ingestion_finished",
     ]
     assert news["events"][-4]["payload"] == {"kind": "captcha", "host": "site.test"}
+    assert news["events"][-2]["payload"] == {"text": "обход снят"}
 
 
 async def test_an_arrived_letter_also_moves_the_unread_count(hub):

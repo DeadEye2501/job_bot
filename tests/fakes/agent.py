@@ -50,10 +50,15 @@ def scripted(steps: list[Callable[[dict[str, Callable]], Awaitable]]):
     return run
 
 
+def silent_gate(limit_sec: float = 3600.0) -> HumanGate:
+    """Пауза на человека, который не придёт: окну ничего не говорится."""
+    return HumanGate(lambda kind, host: None, lambda: None, limit_sec=limit_sec)
+
+
 def scripted_kit(pipeline, steps, *, human_limit: float = 3600.0) -> AgentKit:
     """Набор обхода: браузер-подделка, человек, который не придёт, водитель по сценарию."""
-    gate = HumanGate(lambda kind, host: None, lambda: None, limit_sec=human_limit)
-    return kit_for(pipeline, browser=FakeBrowser(), gate=gate, run_session=scripted(steps))
+    return kit_for(pipeline, browser=FakeBrowser(), gate=silent_gate(human_limit),
+                   run_session=scripted(steps))
 
 
 def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit:

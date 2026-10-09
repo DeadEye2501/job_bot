@@ -4,7 +4,6 @@ import asyncio
 
 import pytest
 
-from backend.agent.human_gate import HumanGate
 from backend.bot import aggregators, loop
 from backend.domain.apply_order import Way
 from backend.models import Aggregator, BotMode
@@ -13,7 +12,7 @@ from backend.repository.bot_mode import write_mode
 from tests.dbio import all_rows, put
 from tests.factories import vacancy_row
 from tests.factories_aggregators import aggregator_row
-from tests.fakes.agent import kit_for, scripted
+from tests.fakes.agent import kit_for, scripted, silent_gate
 from tests.fakes.browser import FakeBrowser
 
 
@@ -23,7 +22,7 @@ def agent(monkeypatch):
 
     def install(bot, steps, *, human_limit=None):
         if human_limit is not None:
-            bot.human_gate = HumanGate(lambda kind, host: None, lambda: None, limit_sec=human_limit)
+            bot.human_gate = silent_gate(human_limit)
         kit = kit_for(bot.ingestion, browser=FakeBrowser(), gate=bot.human_gate,
                       run_session=scripted(steps))
         monkeypatch.setattr(aggregators, "_kit", lambda _bot: kit)
@@ -218,3 +217,96 @@ async def test_deleting_an_aggregator_waits_for_a_free_slot_and_takes_its_profil
 
     assert await aggregators.delete_aggregator(bot, site.id) == "ok"
     assert removed == [site.id] and await all_rows(session_factory, Aggregator) == []
+
+
+async def test_a_manual_application_tells_when_no_way_worked(make_bot, agent, session_factory):
+    """Окно не должно говорить «отклик закончен», если ни один способ не сработал."""
+    bot = await make_bot()
+    vacancy = vacancy_row()
+    await put(session_factory, vacancy)
+    async with session_factory() as session:
+        async with session.begin():
+            await write_mode(session, BotMode.DM_ONLY)
+
+    async def fail(tools):
+        await tools["report_failure"](reason="форма сломана")
+
+    agent(bot, [fail])
+    way = Way("form", "https://company.test/apply", None)
+
+    assert await aggregators.apply_via_agent(bot, vacancy.id, way) == "exhausted"
+
+
+async def test_a_login_the_agent_did_not_confirm_is_not_reported_as_done(make_bot, sites, agent):
+    async def not_in(tools):
+        await tools["report_login"](logged_in=False)
+        await tools["finish"](result="done")
+
+    bot = await make_bot()
+    agent(bot, [not_in])
+
+    assert await aggregators.login_aggregator(bot, sites.id) == "not_logged_in"
+
+
+async def test_a_login_window_left_open_is_not_called_a_captcha(make_bot, sites, agent):
+    bot = await make_bot()
+    kit = agent(bot, [])
+    kit.browser.closes = False
+
+    assert await aggregators.login_aggregator(bot, sites.id) == "login_timeout"
+
+
+@pytest.fixture
+def phases(monkeypatch):
+    """Поиск отдаёт найденную вакансию; фаза откликов только записывает, по чему её звали."""
+    applied = []
+
+    async def seek(kit, round_, source):
+        return [41]
+
+    async def apply(kit, round_, vacancy_ids):
+        applied.append(vacancy_ids)
+
+    monkeypatch.setattr(aggregators, "seek_source", seek)
+    monkeypatch.setattr(aggregators, "apply_phase", apply)
+    return applied
+
+
+async def _set_mode(session_factory, mode):
+    async with session_factory() as session:
+        async with session.begin():
+            await write_mode(session, mode)
+
+
+async def test_the_found_vacancies_are_applied_to_when_auto_apply_is_on(
+    make_bot, sites, agent, phases, session_factory
+):
+    bot = await make_bot()
+    agent(bot, [])
+    await _set_mode(session_factory, BotMode.FULL)
+
+    assert await aggregators.run_aggregator_now(bot, sites.id) == "ok"
+    assert phases == [[41]]
+
+
+async def test_auto_apply_off_leaves_the_found_vacancies_to_the_person(
+    make_bot, sites, agent, phases, session_factory
+):
+    bot = await make_bot()
+    agent(bot, [])
+    await _set_mode(session_factory, BotMode.FULL)
+    await bot.rs.set_app("auto_apply", "false")
+
+    await aggregators.run_aggregator_now(bot, sites.id)
+
+    assert phases == []
+
+
+async def test_off_mode_applies_to_nothing(make_bot, sites, agent, phases, session_factory):
+    bot = await make_bot()
+    agent(bot, [])
+    await _set_mode(session_factory, BotMode.OFF)
+
+    await aggregators.run_aggregator_now(bot, sites.id)
+
+    assert phases == []

@@ -192,6 +192,11 @@ def fit_answer(verdict: str, reason: str | None = None) -> httpx.Response:
     return chat_json({"verdict": verdict, "reason": reason})
 
 
+def letter_answer(body: str, subject: str = "Отклик") -> httpx.Response:
+    """Ответ модели с письмом и его темой — у письма вне Telegram."""
+    return chat_json({"subject": subject, "body": body})
+
+
 def factcheck_answer(verdict: str, issues=()) -> httpx.Response:
     """Ответ модели с вердиктом сверки письма.
 
