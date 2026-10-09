@@ -129,6 +129,21 @@
 - `LLM_REQUEST_TIMEOUT_SEC` = `180.0`
 - `LmClient` = `httpx.AsyncClient | claude.ClaudeClient | claude…`
 
+### `adapters/smtp_mail.py`
+
+- `_TIMEOUT_SEC` = `60`
+- `_STARTTLS_PORT` = `587`
+- `class MailAccountConfig`
+  - `address: str`
+  - `host: str`
+  - `port: int`
+  - `password: str` = `field(repr=False)`
+- `class OutgoingMail`
+  - `to: str`
+  - `subject: str`
+  - `body: str`
+  - `attachment: Path`
+
 ### `adapters/telegram.py`
 
 - `_log` = `logging.getLogger(__name__)`
@@ -743,8 +758,9 @@
 
 ### `backend/log_secrets.py`
 
-- `_SECRET_PATTERNS: tuple[re.Pattern[str], ...]` = `набор из 6`
+- `_SECRET_PATTERNS: tuple[re.Pattern[str], ...]` = `набор из 7`
 - `_REDACTED` = `'***'`
+- `_KNOWN_SECRETS: frozenset[str]` = `frozenset()`
 
 ### `backend/models/application.py`
 
@@ -1263,6 +1279,17 @@
 - `HAS_TELEGRAM_IDENTITY` = `or_(HR.telegram_user_id.is_not(None), HR.telegra…`
 - `OUR_LETTER_ABOUT_A_VACANCY` = `and_(~Message.is_incoming, Message.vacancy_id.is…`
 
+### `backend/repository/mail_account.py`
+
+- `_SSL_PORT` = `465`
+- `_GMAIL` = `набор из 2`
+- `_GMAIL_DOMAINS` = `набор из 2`
+- `class MailSettings`
+  - `address: str`
+  - `password: str | None` = `field(repr=False)`
+  - `host: str | None`
+  - `port: int | None`
+
 ### `backend/repository/messages.py`
 
 - `UNREAD_INCOMING` = `набор из 3`
@@ -1647,6 +1674,13 @@
 ### `tests/adapters/test_lm_models.py`
 
 - `NATIVE_MODELS` = `набор из 2`
+
+### `tests/adapters/test_smtp_mail.py`
+
+- `class _FakeSmtp`
+  - `sent: list` = `набор из 0`
+  - `logins: list` = `набор из 0`
+  - `events: list` = `набор из 0`
 
 ### `tests/backend/test_agent_prompts.py`
 

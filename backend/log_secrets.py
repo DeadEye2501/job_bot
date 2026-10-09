@@ -57,8 +57,28 @@ _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
         r"phone_code(?:_hash)?[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9_-]+",
         re.IGNORECASE,
     ),
+    # Пароль приложения почты: четыре группы по четыре строчные буквы. Только
+    # рядом со словом «пароль» — без этой привязки образец вымарывал бы обычные
+    # английские фразы из четырёх коротких слов.
+    re.compile(r"(?:password|пароль)\W{0,3}[a-z]{4} [a-z]{4} [a-z]{4} [a-z]{4}\b", re.IGNORECASE),
 )
 _REDACTED = "***"
+_KNOWN_SECRETS: frozenset[str] = frozenset()
+
+
+def remember_secret(value: str) -> None:
+    """Значение, которое вымарывается из журнала где угодно в строке.
+
+    Пароль, набранный человеком, может не походить ни на один образец, а в
+    журнал он попадает как есть — в тексте ошибки входа, например. Короче шести
+    знаков не запоминается: такое значение вымарывало бы обычные слова.
+
+    Набор подменяется целиком, а не дописывается: фильтр перебирает его из
+    любого потока, и дописанный посреди перебора набор уронил бы запись.
+    """
+    global _KNOWN_SECRETS
+    if value and len(value) >= 6:
+        _KNOWN_SECRETS = _KNOWN_SECRETS | {value}
 
 
 def report_own_failure(what: str, record: logging.LogRecord | None) -> None:
@@ -115,6 +135,8 @@ def _redact(text: str) -> str:
     out = text
     for pat in _SECRET_PATTERNS:
         out = pat.sub(_REDACTED, out)
+    for secret in _KNOWN_SECRETS:
+        out = out.replace(secret, _REDACTED)
     return out
 
 

@@ -34,7 +34,7 @@ Job Bot — single CLI entry point.
 - `def _started_or_told_why() -> int` (36)
 - `def main() -> int` (22)
 
-## adapters — 14 модулей
+## adapters — 15 модулей
 
 ### `adapters/app_tied_process.py` — 188 строк
 
@@ -230,6 +230,17 @@ Claude через установленный Claude Code по подписке: 
 
 - `def make_client(config: LlmProviderConfig) -> 'LmClient'` (17)
 
+### `adapters/smtp_mail.py` — 58 строк
+
+Отправка письма по SMTP с вложением, под паролем приложения.
+
+Зависит от: —
+
+- `class MailAccountConfig` (5)
+- `class OutgoingMail` (5)
+- `def send_mail(account: MailAccountConfig, mail: OutgoingMail) -> None` (17)
+- `def _message(sender: str, mail: OutgoingMail) -> EmailMessage` (10)
+
 ### `adapters/telegram.py` — 220 строк
 
 Сборка клиента Telegram и отправка письма его руками.
@@ -286,7 +297,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 149 модулей
+## backend — 150 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -1394,15 +1405,16 @@ First-run bootstrap: ensure DB schema exists.
   - `def doRollover(self) -> None` (16)
   - `def handleError(self, record: logging.LogRecord) -> None` (2)
 
-### `backend/log_secrets.py` — 169 строк
+### `backend/log_secrets.py` — 191 строк
 
 Вымарывание секретов из журнала — включая тот случай, когда запись сломалась.
 
 Зависит от: `config`
 
+- `def remember_secret(value: str) -> None` (13)
 - `def report_own_failure(what: str, record: logging.LogRecord | None) -> None` (33)
 - `def report_own_failure_once(what: str, record: logging.LogRecord) -> None` (13)
-- `def _redact(text: str) -> str` (5)
+- `def _redact(text: str) -> str` (7)
 - `class SecretRedactionFilter(logging.Filter)` (36)
   - `def filter(self, record: logging.LogRecord) -> bool` (32)
 - `def install_secret_filter() -> None` (11)
@@ -1807,6 +1819,17 @@ First-run bootstrap: ensure DB schema exists.
 - `async def list_hr_with_counts(session: AsyncSession, search: str | None=None, *, limit: int | None=None, offset: int=0, sort_by: str='vacancy_count') -> tuple[list[HrWithCount], bool]` (45)
 - `async def list_hrs_for_company(session: AsyncSession, company_id: int) -> list[tuple[HR, int]]` (16)
 - `async def list_hrs_with_unread(session: AsyncSession) -> list[dict]` (31)
+
+### `backend/repository/mail_account.py` — 57 строк
+
+Почта для откликов письмом: одна строка, пароль шифром.
+
+Зависит от: `adapters.smtp_mail`, `backend.crypto`, `backend.log_secrets`, `backend.models`
+
+- `class MailSettings` (5)
+- `async def get_mail_account(session: AsyncSession) -> MailAccountConfig | None` (16)
+- `async def save_mail_account(session: AsyncSession, settings: MailSettings) -> None` (9)
+- `def _server(address: str | None, host: str | None, port: int | None) -> tuple[str | None, int | None]` (4)
 
 ### `backend/repository/merging.py` — 54 строк
 
@@ -2971,7 +2994,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 278 модулей
+## tests — 280 модулей
 
 ### `tests/adapters/test_app_tied_process.py` — 100 строк
 
@@ -3074,6 +3097,22 @@ seed initial data
 
 Тестов: 3
 
+
+### `tests/adapters/test_smtp_mail.py` — 71 строк
+
+Письмо уходит по SMTP с вложенным резюме и входом под паролем приложения.
+
+Зависит от: `adapters.smtp_mail`
+
+Тестов: 2
+
+- `class _FakeSmtp` (23)
+  - `def __enter__(self)` (2)
+  - `def __exit__(self, *exc)` (2)
+  - `def starttls(self, **_options)` (2)
+  - `def login(self, user, password)` (3)
+  - `def send_message(self, message)` (2)
+- `def _resume(tmp_path)` (4)
 
 ### `tests/backend/conftest.py` — 63 строк
 
@@ -4271,13 +4310,13 @@ seed initial data
 
 - `def _busy(source, dest)` (3)
 
-### `tests/backend/test_log_secrets.py` — 300 строк
+### `tests/backend/test_log_secrets.py` — 325 строк ⚠ подошёл к 300
 
 Следствия вымарывания секретов и жалобы журнала на собственную беду.
 
 Зависит от: `backend.log_buffer`, `backend.log_file`, `backend.log_secrets`, `tests.backend.fixtures.logs`
 
-Тестов: 16
+Тестов: 19
 
 - `def _unbuildable()` (6)
 
@@ -4721,6 +4760,15 @@ seed initial data
 Зависит от: `backend.repository.hr_identify`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram_objects`
 
 Тестов: 9
+
+
+### `tests/backend/test_repository_mail_account.py` — 60 строк
+
+Почта для откликов: пароль лежит шифром, Gmail настраивается сам.
+
+Зависит от: `backend.log_secrets`, `backend.models`, `backend.repository.mail_account`, `tests.backend.fixtures.logs`, `tests.dbio`
+
+Тестов: 7
 
 
 ### `tests/backend/test_repository_message_changes.py` — 116 строк
@@ -5596,11 +5644,11 @@ seed initial data
 Тестов: 2
 
 
-### `tests/conftest.py` — 440 строк ⚠ подошёл к 300
+### `tests/conftest.py` — 452 строк ⚠ подошёл к 300
 
 Стенд: подмена каталога данных, хранилища ключей и базы.
 
-Зависит от: `adapters`, `adapters.db`, `adapters.telegram`, `alembic`, `backend.bootstrap`, `config`, `tests.fakes.keyring`
+Зависит от: `adapters`, `adapters.db`, `adapters.telegram`, `alembic`, `backend`, `backend.bootstrap`, `config`, `tests.fakes.keyring`
 
 - `def _data_dir_without_appdata() -> Path` (15)
 - `def _temporary_data_dir()` (3)
@@ -5621,6 +5669,7 @@ seed initial data
 - `def _model_engine_is_locked(monkeypatch)` (15)
   - `def _refuse(*_args, **_kwargs)` (5)
 - `def _sending_locked(monkeypatch)` (10)
+- `def _secrets_forgotten(monkeypatch)` (9)
 - `async def _clear_all_tables(engine: AsyncEngine) -> None` (37)
 - `async def _empty_database(database_url) -> None` (9)
 - `async def _clean_database(_schema, database_url)` (19)
