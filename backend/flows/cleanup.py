@@ -32,7 +32,7 @@ async def _delete_and_forget(
 
     Дорог к удалению две — забыть вакансию насовсем и удалить её приговором
     «мусор», — и различие ровно одно: вторая до удаления оставляет отметку о
-    мусоре, иначе «канал прислал N мусора» посчитать нечем. Часовой отличает
+    мусоре, иначе «источник прислал N мусора» посчитать нечем. Часовой отличает
     «отметки не надо» от «отметка без причины»: причина бывает и пустой.
 
     Вычёркивание вектора не украшение: оставь кэш вектор удалённой строки, и
@@ -40,19 +40,14 @@ async def _delete_and_forget(
     Разойдись дороги, одна из двух эту память бы и оставляла. Ни его, ни
     побудку окна не делают, когда удалять было нечего.
 
-    Удаление идёт через репозиторий, а не своим `session.delete`: проверка
-    внешних ключей у движка выключена, и дети строки остались бы сиротами.
+    Удаление идёт через репозиторий, а не своим `session.delete`: детей строки
+    убирает он, а без них включённая проверка внешних ключей удаление уронила бы.
     """
     async with pipeline.session_factory() as session:
         v = await session.get(Vacancy, vacancy_id)
         channel_id = v.source_channel_id if v is not None else None
         if trash_reason is not _NO_TRASH_EVENT:
-            await record_trash_event(
-                session,
-                source_channel_id=channel_id,
-                source_msg_id=v.source_msg_id if v is not None else None,
-                reason=trash_reason,
-            )
+            await record_trash_event(session, v, trash_reason)
         deleted = await repo_delete_vacancy(session, vacancy_id)
         await session.commit()
     if deleted:
