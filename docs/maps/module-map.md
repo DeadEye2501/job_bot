@@ -254,7 +254,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 138 модулей
+## backend — 140 модулей
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -626,6 +626,17 @@ First-run bootstrap: ensure DB schema exists.
 - `def telegram_peer(hr) -> int | str | None` (9)
 - `class DialogPeer` (10)
 - `def hrs_in_dialog_order(hrs, dialogs) -> list` (35)
+
+### `backend/domain/tenure.py` — 39 строк
+
+Сроки мест работы: период и стаж, общий и по навыку.
+
+Зависит от: —
+
+- `def place_period(place) -> str` (7)
+- `def full_years(start: date, end: date) -> int` (5)
+- `def years_in_it(experiences, today: date) -> int` (8)
+- `def skill_years(experiences, today: date) -> int` (8)
 
 ### `backend/domain/transitions.py` — 150 строк
 
@@ -1026,7 +1037,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def read_with_a_second_try(ask, read, tokens: tuple[int, int], told: tuple[logging.Logger, str])` (37)
 - `def str_or_none(value) -> str | None` (10)
 
-### `backend/llm/candidate.py` — 111 строк
+### `backend/llm/candidate.py` — 114 строк
 
 Сведения о кандидате в том виде, в каком они уходят в промпт.
 
@@ -1037,7 +1048,8 @@ First-run bootstrap: ensure DB schema exists.
 - `def format_languages(languages: list[CandidateLanguage] | None) -> str` (16)
 - `def format_text(text: str | None) -> str` (8)
 - `def format_known_skills(skills) -> str` (17)
-- `def build_candidate_profile(profile: Profile | None, languages: list[ProfileLanguage]) -> CandidateProfile` (22)
+- `def candidate_languages(rows: list[ProfileLanguage]) -> list[CandidateLanguage]` (3)
+- `def build_candidate_profile(profile: Profile | None, languages: list[ProfileLanguage]) -> CandidateProfile` (20)
 
 ### `backend/llm/company.py` — 174 строк
 
@@ -1455,6 +1467,19 @@ First-run bootstrap: ensure DB schema exists.
 - `class LlmProviderConfig` (9)
   - `def names_model_file(self) -> bool` (2)
 
+### `backend/repository/agent_profile.py` — 89 строк
+
+Анкета человека целиком, как её видит агент: со стажем общим и по навыкам.
+
+Зависит от: `backend.domain.salary`, `backend.domain.tenure`, `backend.llm.candidate`, `backend.models`, `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_languages`, `backend.repository.profile_skills`
+
+- `async def build_agent_profile(session: AsyncSession, today: date) -> str` (15)
+- `def _person_lines(p, languages) -> list[str]` (20)
+- `def _salary(p) -> str` (7)
+- `def _skill_lines(skills, places, today: date) -> list[str]` (9)
+- `def _place_lines(places) -> list[str]` (7)
+- `def _years(years: int) -> str` (2)
+
 ### `backend/repository/app_settings.py` — 33 строк
 
 Строка общего словаря настроек: записать значение по ключу.
@@ -1709,16 +1734,15 @@ First-run bootstrap: ensure DB schema exists.
 - `async def get_profile(session: AsyncSession) -> Profile | None` (3)
 - `async def upsert_profile(session: AsyncSession, **fields) -> Profile` (16)
 
-### `backend/repository/profile_block.py` — 110 строк
+### `backend/repository/profile_block.py` — 93 строк
 
 Сборка текстового блока анкеты для наставления модели.
 
-Зависит от: `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_skills`
+Зависит от: `backend.domain.tenure`, `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_skills`
 
 - `def _skills_lines(skills: list) -> list[str]` (12)
-- `def _years_in_it(experiences: list) -> int` (14)
 - `def _header_lines(profile, experiences: list) -> list[str]` (19)
-- `def _experience_lines(experiences: list) -> list[str]` (13)
+- `def _experience_lines(experiences: list) -> list[str]` (11)
 - `async def build_profile_block(session: AsyncSession) -> str` (28)
 
 ### `backend/repository/profile_cv.py` — 186 строк
@@ -2826,7 +2850,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 271 модулей
+## tests — 273 модулей
 
 ### `tests/adapters/test_app_tied_process.py` — 65 строк
 
@@ -3429,6 +3453,16 @@ seed initial data
 
 Тестов: 20
 
+
+### `tests/backend/test_domain_tenure.py` — 30 строк
+
+Сроки мест работы: период, полные годы, стаж по навыку.
+
+Зависит от: `backend.domain.tenure`
+
+Тестов: 4
+
+- `def _place(start, end=None)` (2)
 
 ### `tests/backend/test_domain_transitions.py` — 185 строк
 
@@ -4133,6 +4167,16 @@ seed initial data
 
 Тестов: 4
 
+
+### `tests/backend/test_repository_agent_profile.py` — 89 строк
+
+Анкета для агента: всё, на что опираются промпты, со стажем от кода.
+
+Зависит от: `backend.models`, `backend.repository.agent_profile`, `tests.dbio`, `tests.factories`
+
+Тестов: 6
+
+- `async def _person(session_factory, **fields)` (4)
 
 ### `tests/backend/test_repository_blacklist_adding.py` — 150 строк
 

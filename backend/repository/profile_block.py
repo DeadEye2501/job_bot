@@ -9,6 +9,7 @@ from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.tenure import place_period, years_in_it
 from backend.repository.profile import get_profile
 from backend.repository.profile_experience import list_experience
 from backend.repository.profile_skills import list_skills
@@ -28,22 +29,6 @@ def _skills_lines(skills: list) -> list[str]:
     ]
 
 
-def _years_in_it(experiences: list) -> int:
-    """Сколько лет опыта — от самого раннего места работы до сегодня.
-
-    Считается по началу, а не по сумме сроков: перерывы между местами опытом
-    быть не перестают, а вычесть их значило бы спорить с тем, как этот срок
-    называют в резюме. Отрицательным не бывает: место, начатое «завтра», —
-    опечатка, а не отрицательный стаж.
-    """
-    min_start = min(e.start_date for e in experiences)
-    today = date.today()
-    years = today.year - min_start.year - (
-        (today.month, today.day) < (min_start.month, min_start.day)
-    )
-    return max(years, 0)
-
-
 def _header_lines(profile, experiences: list) -> list[str]:
     """Шапка блока: имя, роль, место, стаж.
 
@@ -61,7 +46,7 @@ def _header_lines(profile, experiences: list) -> list[str]:
     if profile.location:
         lines.append(f"Локация: {profile.location}")
     if experiences:
-        lines.append(f"Опыт: {_years_in_it(experiences)}+ лет в IT")
+        lines.append(f"Опыт: {years_in_it(experiences, date.today())}+ лет в IT")
     return lines
 
 
@@ -73,10 +58,8 @@ def _experience_lines(experiences: list) -> list[str]:
     """
     lines = []
     for e in experiences:
-        end = e.end_date.strftime("%m.%Y") if e.end_date else "настоящее время"
-        start = e.start_date.strftime("%m.%Y")
         suffix = f": {e.achievements[0]}" if e.achievements else ""
-        lines.append(f"- {e.company} ({e.role}, {start} — {end}){suffix}")
+        lines.append(f"- {e.company} ({e.role}, {place_period(e)}){suffix}")
     return lines
 
 

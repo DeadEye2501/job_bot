@@ -1127,6 +1127,11 @@
   - `api_key: str` = `field(repr=False)`
   - `model: str`
 
+### `backend/repository/agent_profile.py`
+
+- `_GENDER` = `словарь из 2`
+- `_PERIOD` = `словарь из 3`
+
 ### `backend/repository/app_settings.py`
 
 - `CV_PATH_KEY` = `'cv_path'`
@@ -1586,6 +1591,10 @@
 - `IDS` = `np.array([10, 20, 30])`
 - `MATRIX` = `np.array([[1.0, 0.0], [0.0, 1.0], [0.9, 0.1]], d…`
 
+### `tests/backend/test_domain_tenure.py`
+
+- `TODAY` = `date(2026, 10, 9)`
+
 ### `tests/backend/test_domain_transitions.py`
 
 - `TERMINAL` = `набор из 4`
@@ -1628,6 +1637,10 @@
 - `_REBUILD_HEAD` = `'\nrevision = "дом_перестроен"\ndown_revision = …`
 - `_QUENCHED` = `_REBUILD_HEAD.format(quench='    op.execute("PRA…`
 - `_AS_IS` = `_REBUILD_HEAD.format(quench='')`
+
+### `tests/backend/test_repository_agent_profile.py`
+
+- `TODAY` = `date(2026, 10, 9)`
 
 ### `tests/backend/test_repository_channel_detail.py`
 
