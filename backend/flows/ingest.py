@@ -10,13 +10,13 @@ from backend.models import Vacancy
 from backend.payloads import ChannelPost
 from backend.telegram_time import tg_moment
 
-from backend.flows import embeddings
+from backend.flows import sameness
 
 logger = logging.getLogger(__name__)
 
 
-async def _post_embedding(pipeline, post: ChannelPost):
-    """Числовой отпечаток поста; пусто — модель отпечатков не дала.
+async def _post_match(pipeline, post: ChannelPost) -> sameness.Match | None:
+    """Отпечаток поста и похожая заведённая вакансия; пусто — модель отпечатков не дала.
 
     Пост без отпечатка пропускается, курсор идёт дальше, и следующий проход по
     каналу его не увидит — но это дешевле, чем встать на одном посте.
@@ -34,7 +34,7 @@ async def _post_embedding(pipeline, post: ChannelPost):
     дочитав статью, он пересчитывает отпечаток, — но пока строка ждёт, оно
     открыто.
     """
-    return await embeddings.embed_text(
+    return await sameness.known_or_new(
         pipeline, post.text, f"[@{post.channel_username}] {post.msg.id}"
     )
 
@@ -48,7 +48,7 @@ def _waits_to_be_read_out(vacancy_id: int, post: ChannelPost) -> None:
 
 
 async def _resume_or_skip(
-    pipeline, similar_id: int, post: ChannelPost, whole: bool
+    pipeline, match: sameness.Match, post: ChannelPost, whole: bool
 ) -> None:
     """Что делать с постом, похожим на уже заведённую вакансию.
 
@@ -56,7 +56,8 @@ async def _resume_or_skip(
     пропускается, — и вакансия, брошенная недоразобранной на прошлом
     прогоне. Вторую здесь и дорзабирают: иначе она пропускалась бы вечно.
     """
-    if not await parse.is_unparsed_vacancy(pipeline, similar_id):
+    similar_id = match.vacancy_id
+    if match.kind == "parsed":
         logger.info(
             "[@%s] %d duplicate of vacancy %d, skipping",
             post.channel_username, post.msg.id, similar_id,
@@ -86,16 +87,14 @@ async def ingest_post(
         return
     text, whole = await linked_article.with_linked_articles(text)
     post = ChannelPost(channel_id, channel_username, msg, text)
-    embedding = await _post_embedding(pipeline, post)
-    if embedding is None:
+    match = await _post_match(pipeline, post)
+    if match is None:
+        return
+    if match.kind != "new":
+        await _resume_or_skip(pipeline, match, post, whole)
         return
 
-    similar_id = await embeddings.similar_vacancy_id(pipeline, embedding)
-    if similar_id is not None:
-        await _resume_or_skip(pipeline, similar_id, post, whole)
-        return
-
-    new_vacancy_id = await save_new_vacancy(pipeline, post, embedding)
+    new_vacancy_id = await save_new_vacancy(pipeline, post, match.embedding)
     if new_vacancy_id is None:
         return
     # Сперва полный текст, потом приговор. Пока статья не пришла по причине,

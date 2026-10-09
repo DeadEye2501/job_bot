@@ -287,6 +287,15 @@
 - `_ALREADY_APPLIED` = `'Отклик уже записан, итог не меняется: второй от…`
 - `_RESULTS` = `словарь из 3`
 
+### `backend/agent/tools_seeker.py`
+
+- `WHAT` = `'найденная агентом вакансия'`
+- `class _Page`
+  - `text: str`
+  - `url: str`
+  - `published: str`
+  - `contacts: list[str]`
+
 ### `backend/bootstrap.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -588,6 +597,10 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `backend/flows/parse_queue.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
 ### `backend/flows/parse_write.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -632,6 +645,13 @@
 - `RerunPipelineOutcome` = `Literal['ok', 'missing', 'no_text', 'llm']`
 - `RECOVERED_PER_TURN` = `10`
 - `LONGEST_WAIT` = `timedelta(days=1)`
+
+### `backend/flows/sameness.py`
+
+- `class Match`
+  - `kind: str`
+  - `vacancy_id: int | None`
+  - `embedding: list[float] | None`
 
 ### `backend/health.py`
 
@@ -1768,6 +1788,11 @@
 
 - `VACANCY` = `'https://site.test/vacancy/1'`
 
+### `tests/backend/test_agent_tools_seeker.py`
+
+- `pytestmark` = `pytest.mark.usefixtures('one_vector')`
+- `PAGE` = `'https://site.test/vacancy/1?from=list'`
+
 ### `tests/backend/test_bootstrap_schema.py`
 
 - `_ENV_PY` = `'\nfrom alembic import context\nfrom sqlalchemy …`
@@ -1798,6 +1823,7 @@
 
 ### `tests/backend/test_flows_new_vacancy.py`
 
+- `pytestmark` = `pytest.mark.usefixtures('one_vector')`
 - `WITH_ARTICLE` = `'Senior QA https://telegra.ph/QA-08-21'`
 
 ### `tests/backend/test_llm_cv_response.py`

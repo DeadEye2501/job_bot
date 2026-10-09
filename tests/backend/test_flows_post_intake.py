@@ -17,47 +17,33 @@ import pytest
 
 from adapters import telegraph
 from backend.flows import embeddings, ingest
-from backend.flows import parse as parse_mod
+from tests.backend.fixtures.flows import similar_by_hand
 from tests.backend.fixtures.parse_stub import parse_into
 from tests.fakes.llm import embeddings_refused
 from tests.fakes.telegram_objects import link_entity, post
 
 
 @pytest.fixture
-async def intake(make_pipeline, monkeypatch):
+async def intake(make_pipeline, monkeypatch, one_vector):
     """Конвейер с подставным переводом в вектор, сохранением и разбором."""
     pipeline = await make_pipeline()
     pipeline.saved = []
     pipeline.parsed = []
     pipeline.new_id = 7
-    pipeline.similar_id = None
-    pipeline.unparsed = False
-
-    async def embed(client, model, text):
-        pipeline.embedded = text
-        return [0.1, 0.2]
+    pipeline.embedded = one_vector
+    similar_by_hand(pipeline, monkeypatch)
 
     async def save(pipeline, post, embedding):
         pipeline.saved.append((post.channel_id, post.msg.id, post.text))
         return pipeline.new_id
 
-    async def unparsed(pipeline, vacancy_id):
-        return pipeline.unparsed
-
-    monkeypatch.setattr("adapters.lm_embed.embed", embed)
-    monkeypatch.setattr(
-        pipeline.embeddings,
-        "match",
-        lambda vector, threshold: pipeline.similar_id,
-    )
     monkeypatch.setattr(ingest, "save_new_vacancy", save)
     parse_into(monkeypatch, pipeline.parsed)
-    monkeypatch.setattr(parse_mod, "is_unparsed_vacancy", unparsed)
     return pipeline
 
 
 async def test_a_provider_that_does_not_answer_at_all_stops_the_post(
-    intake, monkeypatch
+    intake, silent_embedder
 ):
     """Молчащий поставщик отпечатков поста не пропускает, а обрывает приём.
 
@@ -66,11 +52,6 @@ async def test_a_provider_that_does_not_answer_at_all_stops_the_post(
     нет вовсе» можно только здесь, у самого обращения: выше видно один и тот
     же пустой отпечаток.
     """
-
-    async def no_answer(client, model, text):
-        raise httpx.ConnectError("connection refused")
-
-    monkeypatch.setattr("adapters.lm_embed.embed", no_answer)
 
     with pytest.raises(embeddings.ProviderIsSilent):
         await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python"))
@@ -195,10 +176,10 @@ async def test_the_fingerprint_is_taken_from_the_whole_text(intake, monkeypatch)
         ),
     )
 
-    assert intake.embedded == (
+    assert intake.embedded == [
         "Senior QA, контакты (https://acme.test/jobs) в описании"
         " https://telegra.ph/QA-08-21\n\nТребования: Python"
-    )
+    ]
 
 
 @pytest.mark.parametrize(

@@ -13,35 +13,26 @@
 
 from datetime import datetime, timezone
 
-import httpx
 import pytest
 
 from backend.flows import cleanup
 from backend.flows import parse as parse_mod
 from backend.flows import pasted
 from backend.models import Vacancy, VacancyEvent
+from tests.backend.fixtures.flows import similar_by_hand
 from tests.dbio import all_rows, only_row, put
 from tests.factories import vacancy_row
 
 
 @pytest.fixture
-async def intake(make_pipeline, monkeypatch):
+async def intake(make_pipeline, monkeypatch, one_vector):
     """Конвейер с подставным переводом в вектор и подставным разбором."""
     pipeline = await make_pipeline()
     pipeline.parsed = []
-    pipeline.similar_id = None
-
-    async def embed(client, model, text):
-        pipeline.embedded = text
-        return [0.1, 0.2]
-
     pipeline.reloaded = 0
     pipeline.parse_done = True
-    pipeline.unparsed = False
     pipeline.parse_drops = False
-
-    async def unparsed(pipeline_arg, vacancy_id):
-        return pipeline.unparsed
+    similar_by_hand(pipeline, monkeypatch)
 
     async def reload_resources():
         pipeline.reloaded += 1
@@ -50,12 +41,6 @@ async def intake(make_pipeline, monkeypatch):
         pipeline.parsed.append("слепки")
 
     monkeypatch.setattr(pipeline, "reload_resources", reload_resources)
-    monkeypatch.setattr("adapters.lm_embed.embed", embed)
-    monkeypatch.setattr(
-        pipeline.embeddings,
-        "match",
-        lambda vector, threshold: pipeline.similar_id,
-    )
     async def parse(pipeline_arg, vacancy_id, text, username, *, allow_delete=True):
         pipeline.parsed.append((vacancy_id, text, username, allow_delete))
         if pipeline.parse_drops:
@@ -67,7 +52,6 @@ async def intake(make_pipeline, monkeypatch):
         return pipeline.parse_done
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
-    monkeypatch.setattr(parse_mod, "is_unparsed_vacancy", unparsed)
     return pipeline
 
 
@@ -211,7 +195,7 @@ async def test_a_text_matching_an_unfinished_row_finishes_it_instead_of_refusing
 
 
 async def test_a_silent_provider_is_told_apart_from_a_text_that_did_not_count(
-    intake, session_factory, monkeypatch
+    intake, session_factory, silent_embedder
 ):
     """Молчащий поставщик отпечатков не роняет заведение, а отвечает бедой.
 
@@ -219,11 +203,6 @@ async def test_a_silent_provider_is_told_apart_from_a_text_that_did_not_count(
     видно один и тот же пустой отпечаток. Пропусти бросок — и человек вместо
     «Модель отпечатков не ответила» прочтёт общее «не удалось завести».
     """
-
-    async def silent(client, model, text):
-        raise httpx.ConnectError("поставщик не поднят")
-
-    monkeypatch.setattr("adapters.lm_embed.embed", silent)
 
     assert await pasted.ingest_pasted_text(intake, "Ищем сварщика", None) == "embed"
 

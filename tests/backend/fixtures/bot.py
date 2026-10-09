@@ -2,7 +2,6 @@
 
 import asyncio
 import shutil
-from contextlib import suppress
 
 import pytest
 
@@ -20,6 +19,7 @@ from backend.models import (
     VacancyStatus,
 )
 from backend.runtime_settings import RuntimeSettings
+from backend.task_stop import put_out
 from tests.dbio import only_row, put
 from tests.factories import (
     app_setting_row,
@@ -201,9 +201,7 @@ async def busy_slot():
     yield occupy
 
     for task in occupied:
-        task.cancel()
-        with suppress(asyncio.CancelledError):
-            await task
+        await put_out(task)
 
 
 @pytest.fixture

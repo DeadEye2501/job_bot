@@ -15,7 +15,7 @@ import logging
 from datetime import datetime
 from typing import Literal
 
-from backend.flows import embeddings, intake, parse
+from backend.flows import embeddings, intake, parse, sameness
 from backend.models import Vacancy
 from backend.repository.vacancies_new import HAND_MADE
 
@@ -57,22 +57,22 @@ async def ingest_pasted_text(
     от рекламы засорял бы список.
     """
     try:
-        embedding = await embeddings.embed_text(pipeline, text, WHAT)
+        match = await sameness.known_or_new(pipeline, text, WHAT)
     except embeddings.ProviderIsSilent:
         logger.warning("%s: поставщик отпечатков молчит", WHAT)
         return "embed"
-    if embedding is None:
+    if match is None:
         return "embed"
+    if match.kind != "new":
+        return await _finish_or_refuse(pipeline, match, text)
 
-    similar_id = await embeddings.similar_vacancy_id(pipeline, embedding)
-    if similar_id is not None:
-        return await _finish_or_refuse(pipeline, similar_id, text)
-
-    vacancy_id = await _save_pasted_vacancy(pipeline, text, embedding, posted_at)
+    vacancy_id = await _save_pasted_vacancy(pipeline, text, match.embedding, posted_at)
     return await _parsed(pipeline, vacancy_id, text)
 
 
-async def _finish_or_refuse(pipeline, similar_id: int, text: str) -> PastedIntakeOutcome:
+async def _finish_or_refuse(
+    pipeline, match: sameness.Match, text: str
+) -> PastedIntakeOutcome:
     """Что делать со вставленным текстом уже знакомого объявления.
 
     Знакомая строка бывает двух родов, и приём поста канала разводит их так
@@ -81,11 +81,11 @@ async def _finish_or_refuse(pipeline, similar_id: int, text: str) -> PastedIntak
     «уже заведено», человека послали бы искать в списке строку, которой там
     нет — показывают только разобранные.
     """
-    if not await parse.is_unparsed_vacancy(pipeline, similar_id):
-        logger.info("%s: уже заведено вакансией %d", WHAT, similar_id)
+    if match.kind == "parsed":
+        logger.info("%s: уже заведено вакансией %d", WHAT, match.vacancy_id)
         return "duplicate"
-    logger.info("%s: дочитывает брошенную вакансию %d", WHAT, similar_id)
-    return await _parsed(pipeline, similar_id, text)
+    logger.info("%s: дочитывает брошенную вакансию %d", WHAT, match.vacancy_id)
+    return await _parsed(pipeline, match.vacancy_id, text)
 
 
 async def _parsed(pipeline, vacancy_id: int, text: str) -> PastedIntakeOutcome:
