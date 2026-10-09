@@ -17,7 +17,7 @@ from pathlib import Path
 from pyrogram import Client, raw, utils
 
 from backend.domain.telegram_identity import DialogPeer
-from backend.runtime_settings import TgAccountConfig
+from backend.tg_credentials import TgAccountConfig
 from config import get_data_dir
 
 _log = logging.getLogger(__name__)

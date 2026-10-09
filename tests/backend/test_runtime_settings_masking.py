@@ -1,15 +1,11 @@
-"""Следствия сокрытия секретов от журнала в `backend/runtime_settings.py`."""
+"""Следствия сокрытия секретов от журнала при записи настроек."""
 
 import logging
 
 import pytest
 
-from backend.runtime_settings import (
-    LlmProviderConfig,
-    RuntimeSettings,
-    TgAccountConfig,
-    mask_phone,
-)
+from backend.runtime_settings import LlmProviderConfig, RuntimeSettings
+from backend.tg_credentials import TgAccountConfig, mask_phone
 from tests.factories import tg_creds
 
 
@@ -38,13 +34,13 @@ async def test_the_saved_phone_reaches_the_log_masked(session_factory, caplog):
     """
     settings = await RuntimeSettings.load(session_factory)
 
-    with caplog.at_level(logging.INFO, logger="backend.runtime_settings"):
+    with caplog.at_level(logging.INFO, logger="backend.tg_credentials"):
         await settings.set_tg(tg_creds())
 
     written = [
         record.getMessage()
         for record in caplog.records
-        if record.name == "backend.runtime_settings"
+        if record.name == "backend.tg_credentials"
     ]
     assert written, "запись об обновлении учётных данных не появилась вовсе"
     assert not any("+79991234567" in line for line in written)

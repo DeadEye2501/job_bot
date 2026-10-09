@@ -1274,13 +1274,8 @@
 ### `backend/runtime_settings.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `class TgAccountConfig`
-  - `api_id: int`
-  - `api_hash: str` = `field(repr=False)`
-  - `phone: str`
-  - `password: str` = `field(repr=False)`
-  - `session_string: str | None` = `field(repr=False)`
-- `_APP_DEFAULTS: dict[str, str]` = `словарь из 10`
+- `_APP_DEFAULTS: dict[str, str]` = `словарь из 13`
+- `LETTER_WRITERS` = `набор из 2`
 
 ### `backend/single_instance.py`
 
@@ -1298,6 +1293,16 @@
 ### `backend/telegram_lookup.py`
 
 - `logger` = `logging.getLogger(__name__)`
+
+### `backend/tg_credentials.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `class TgAccountConfig`
+  - `api_id: int`
+  - `api_hash: str` = `field(repr=False)`
+  - `phone: str`
+  - `password: str` = `field(repr=False)`
+  - `session_string: str | None` = `field(repr=False)`
 
 ### `backend/wipe.py`
 
@@ -1465,7 +1470,7 @@
 - `logger` = `logging.getLogger(__name__)`
 - `_CONNECT_TRIES` = `15`
 - `_CONNECT_STEP_S` = `0.2`
-- `APP_KEYS` = `набор из 5`
+- `APP_KEYS` = `набор из 8`
 
 ### `client/bridge/system.py`
 

@@ -11,7 +11,7 @@
 """
 
 from adapters import telegram
-from backend.crypto import decrypt_bytes, decrypt_str
+from backend.crypto import decrypt_or_none
 from backend.models import AppSetting, LlmConfig, LlmConfigKind, TgAccount
 from backend.runtime_settings import RuntimeSettings
 from tests.dbio import all_rows, only_row, put
@@ -28,9 +28,9 @@ async def test_new_telegram_credentials_reach_both_the_database_and_memory(sessi
 
     assert settings.tg.api_hash == "шифр"
     row = await only_row(session_factory, TgAccount)
-    assert decrypt_str(row.api_hash_encrypted) == "шифр"
-    assert decrypt_str(row.password_encrypted) == "пароль"
-    assert decrypt_bytes(row.session_blob_encrypted) == "сессия".encode("utf-8")
+    assert decrypt_or_none(row.api_hash_encrypted, "секрет") == "шифр"
+    assert decrypt_or_none(row.password_encrypted, "секрет") == "пароль"
+    assert decrypt_or_none(row.session_blob_encrypted, "сеанс") == "сессия"
 
 
 async def test_the_secret_is_not_stored_in_the_clear(session_factory):
@@ -78,7 +78,7 @@ async def test_writing_credentials_twice_updates_the_same_row(session_factory):
 
     rows = await all_rows(session_factory, TgAccount)
     assert len(rows) == 1
-    assert decrypt_str(rows[0].api_hash_encrypted) == "второй"
+    assert decrypt_or_none(rows[0].api_hash_encrypted, "секрет") == "второй"
 
 
 async def test_clearing_credentials_empties_both_the_table_and_memory(session_factory):
@@ -110,7 +110,7 @@ async def test_the_chat_provider_is_written_and_cached(session_factory):
     assert settings.chat.model == "qwen"
     row = await only_row(session_factory, LlmConfig)
     assert row.kind is LlmConfigKind.CHAT
-    assert decrypt_str(row.api_key_encrypted) == "sk-1"
+    assert decrypt_or_none(row.api_key_encrypted, "секрет") == "sk-1"
 
 
 async def test_writing_the_chat_provider_twice_updates_the_same_row(session_factory):
@@ -123,7 +123,7 @@ async def test_writing_the_chat_provider_twice_updates_the_same_row(session_fact
     rows = await all_rows(session_factory, LlmConfig)
     assert len(rows) == 1
     assert rows[0].base_url == "http://b.test"
-    assert decrypt_str(rows[0].api_key_encrypted) == "sk-2"
+    assert decrypt_or_none(rows[0].api_key_encrypted, "секрет") == "sk-2"
     assert rows[0].model == "llama"
 
 

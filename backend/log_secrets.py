@@ -41,7 +41,7 @@ _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     # слова и пути.
     re.compile(r"\b[A-Za-z0-9+/=:_-]{50,}\b"),
     # Номер телефона и одноразовый код входа. Пишет их не наш код — свой номер
-    # он прячет сам (`runtime_settings.mask_phone`), — а Pyrogram: он
+    # он прячет сам (`tg_credentials.mask_phone`), — а Pyrogram: он
     # выкладывает в отладку каждое исходящее обращение целиком, и на входе в
     # Telegram это `auth.SendCode` и `auth.SignIn` с номером и кодом открытым
     # текстом. Уровень отладки поднимает кольцо записей (`log_buffer.install`),

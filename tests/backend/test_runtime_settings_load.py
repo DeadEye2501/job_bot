@@ -1,7 +1,7 @@
 """Следствия чтения настроек из базы в память.
 
-Строки кладёт сам тест, затем `RuntimeSettings.load` их читает. Закрытые
-`_from_tg_row` и `_from_llm_row` видны только тем, что оказалось в кэше.
+Строки кладёт сам тест, затем `RuntimeSettings.load` их читает. Разбор строк
+`from_tg_row` и `_from_llm_row` виден только тем, что оказалось в кэше.
 """
 
 import pytest
@@ -99,6 +99,22 @@ async def test_a_secret_no_key_can_open_is_not_credentials(session_factory):
     from_another_keyring = Fernet(Fernet.generate_key()).encrypt(b"hash").decode("ascii")
     await put(session_factory, tg_account_row(
         api_hash_encrypted=from_another_keyring
+    ))
+
+    assert (await RuntimeSettings.load(session_factory)).tg is None
+
+
+@pytest.mark.parametrize("column", ["password_encrypted", "session_blob_encrypted"])
+async def test_one_unreadable_secret_unsets_the_whole_account(session_factory, column):
+    """Читаемый отпечаток при нечитаемом пароле или сеансе — тоже «не настроено».
+
+    Учётная запись без пароля или сеанса подключилась бы не тем человеком или
+    не подключилась вовсе, и снаружи это выглядело бы как готовый вход.
+    """
+    foreign = Fernet(Fernet.generate_key()).encrypt(b"secret")
+    value = foreign if column == "session_blob_encrypted" else foreign.decode("ascii")
+    await put(session_factory, tg_account_row(
+        api_hash_encrypted=encrypt_str("hash"), **{column: value}
     ))
 
     assert (await RuntimeSettings.load(session_factory)).tg is None
