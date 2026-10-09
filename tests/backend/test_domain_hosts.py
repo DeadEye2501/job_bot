@@ -54,5 +54,33 @@ def test_a_web_page_is_known_by_host_and_path():
     )
 
 
+def test_a_parameter_named_as_an_id_keeps_pages_apart():
+    assert source_key("https://company.test/careers?gh_jid=abc&lang=en", None) == (
+        "company.test/careers?gh_jid=abc"
+    )
+
+
+def test_a_numeric_parameter_keeps_pages_apart():
+    assert source_key("https://site.test/job?vacancy=123&lang=en", "site.test") == (
+        "job?vacancy=123"
+    )
+
+
+def test_a_number_in_a_parameter_keeps_its_case():
+    assert source_key("https://Company.test/Careers?job_id=AbC", None) == (
+        "company.test/careers?job_id=AbC"
+    )
+
+
+def test_click_session_and_arrival_marks_are_not_part_of_the_number():
+    url = ("https://site.test/vacancy?job_id=7&gclid=a1&yclid=9&msclkid=b"
+           "&sid=c&session_id=5&utm_id=4&from=12")
+    assert source_key(url, "site.test") == "vacancy?job_id=7"
+
+
+def test_parameter_order_does_not_change_the_number():
+    assert source_key("https://site.test/job?b_id=2&a_id=1", "site.test") == "job?a_id=1&b_id=2"
+
+
 def test_an_address_without_a_path_has_no_number():
     assert source_key("https://site.test/", "site.test") is None

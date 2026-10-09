@@ -797,7 +797,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def capitalized_company_name(name: str | None) -> str | None` (32)
 
-### `backend/domain/contact_keys.py` — 77 строк
+### `backend/domain/contact_keys.py` — 75 строк
 
 Контакт вакансии: его вид — почта, телефон, ссылка — и нормальная форма, по которой два написания признаются одним.
 
@@ -849,7 +849,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def percent_or_none(numerator: int, denominator: int) -> int | None` (14)
 
-### `backend/domain/hosts.py` — 82 строк
+### `backend/domain/hosts.py` — 111 строк
 
 Разбор адреса: нормальный хост, остаток, принадлежность сайту, номер страницы.
 
@@ -859,7 +859,9 @@ First-run bootstrap: ensure DB schema exists.
 - `def normalize_host(url: str | None) -> str` (21)
 - `def address_parts(url: str) -> AddressParts` (17)
 - `def host_owns(host: str, link_host: str) -> bool` (6)
-- `def source_key(url: str, aggregator_host: str | None) -> str | None` (12)
+- `def source_key(url: str, aggregator_host: str | None) -> str | None` (15)
+- `def is_arrival_mark(name: str) -> bool` (7)
+- `def _numbering(query: str) -> str` (15)
 - `def _without_scheme(url: str) -> str` (3)
 
 ### `backend/domain/resume_marks.py` — 62 строк
@@ -4087,7 +4089,7 @@ seed initial data
 Тестов: 7
 
 
-### `tests/backend/test_domain_contact_keys.py` — 52 строк
+### `tests/backend/test_domain_contact_keys.py` — 53 строк
 
 Нормальная форма контакта вакансии: по ней два написания одного контакта
 
@@ -4123,13 +4125,13 @@ seed initial data
 Тестов: 9
 
 
-### `tests/backend/test_domain_hosts.py` — 58 строк
+### `tests/backend/test_domain_hosts.py` — 86 строк
 
 Адрес, разобранный на хост и остаток: по хосту сравнивают сайты, по остатку —
 
 Зависит от: `backend.domain.hosts`
 
-Тестов: 10
+Тестов: 15
 
 
 ### `tests/backend/test_domain_salary.py` — 435 строк ⚠ подошёл к 300
