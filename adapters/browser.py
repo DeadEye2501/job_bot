@@ -5,6 +5,7 @@ import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from config import get_data_dir
 
@@ -94,15 +95,20 @@ class BrowserHost:
         self._playwright = None
         self._context = None
         self._profile_id: int | None = None
+        self._sending = True
         self._last_url = "about:blank"
 
-    async def open_profile(self, profile_id: int) -> None:
-        if self._profile_id == profile_id and self._context is not None:
+    async def open_profile(self, profile_id: int, sending: bool = True) -> None:
+        """Открыть профиль. `sending=False` — отклик под симуляцией: всё, что сайт
+        отправил бы, обрывается в самом браузере (`hold_sending`), что бы ни нажали."""
+        if (self._profile_id == profile_id and self._sending == sending
+                and self._context is not None):
             return
         await self._close_context()
         if self._profile_id != profile_id:
             self._last_url = "about:blank"
         self._profile_id = profile_id
+        self._sending = sending
         await self._launch()
 
     async def page(self):
@@ -160,7 +166,11 @@ class BrowserHost:
             headless=False,
             channel=self._browser.channel,
             executable_path=str(self._browser.executable) if self._browser.executable else None,
+            # Запросы сервис-воркера идут мимо перехвата: при удержании их нет вовсе.
+            service_workers="allow" if self._sending else "block",
         )
+        if not self._sending:
+            await self._context.route("**/*", hold_sending)
         self._context.on("close", self._forget_context)
         self._context.on("page", _accept_dialogs)
         for opened in self._context.pages:
@@ -198,6 +208,40 @@ class BrowserHost:
         if self._context is not None:
             context, self._context = self._context, None
             await context.close()
+
+
+_SENDING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+_CAPTCHA_HOSTS = ("recaptcha.net", "hcaptcha.com", "challenges.cloudflare.com",
+                  "smartcaptcha.yandexcloud.net")
+# У Google капча — только путь: на его же хостах живут Google Forms, а это форма отклика.
+_GOOGLE_CAPTCHA_PATH = "/recaptcha/"
+# Cloudflare проверяет человека и на хосте самого сайта, своим служебным путём.
+_CLOUDFLARE_CHECK_PATH = "/cdn-cgi/challenge-platform/"
+
+
+async def hold_sending(route) -> None:
+    """Оборвать запрос, несущий данные на сервер, — кроме ответа капче.
+
+    Последнюю кнопку формы код не знает, а подпись у неё бывает любой; отправка
+    же данных — всегда такой запрос. Капча — проверка человека, а не отклик:
+    без неё форму не пройти и под симуляцией.
+    """
+    request = route.request
+    if request.method in _SENDING_METHODS and not _is_captcha(request.url):
+        logger.info("симуляция: %s %s не отправлен", request.method, request.url)
+        await route.abort("blockedbyclient")
+        return
+    await route.continue_()
+
+
+def _is_captcha(url: str) -> bool:
+    parts = urlsplit(url)
+    host = parts.hostname or ""
+    if parts.path.startswith(_CLOUDFLARE_CHECK_PATH):
+        return True
+    if host in ("google.com", "www.google.com"):
+        return parts.path.startswith(_GOOGLE_CAPTCHA_PATH)
+    return any(host == h or host.endswith("." + h) for h in _CAPTCHA_HOSTS)
 
 
 def _accept_dialogs(page) -> None:

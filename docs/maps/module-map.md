@@ -65,7 +65,7 @@ MCP-сервер инструментов одной сессии агента: 
 - `def _children() -> list[tuple[int, str]]` (13)
 - `def _snapshot() -> list[tuple[int, int, str]]` (16)
 
-### `adapters/browser.py` — 206 строк
+### `adapters/browser.py` — 250 строк
 
 Браузер человека на движке Chromium под управлением Playwright.
 
@@ -79,18 +79,20 @@ MCP-сервер инструментов одной сессии агента: 
 - `def _by_path(name: str, relative: str) -> InstalledBrowser | None` (3)
 - `def _opera() -> InstalledBrowser | None` (10)
 - `def remove_profile(profile_id: int) -> None` (8)
-- `class BrowserHost` (113)
-  - `async def open_profile(self, profile_id: int) -> None` (8)
+- `class BrowserHost` (122)
+  - `async def open_profile(self, profile_id: int, sending: bool=True) -> None` (12)
   - `async def page(self)` (8)
   - `async def show(self) -> None` (2)
   - `async def hide_back(self) -> None` (3)
   - `async def clear_cache(self) -> None` (4)
   - `async def wait_closed(self, limit_sec: float) -> bool` (11)
   - `async def close(self) -> None` (7)
-  - `async def _launch(self) -> None` (31)
+  - `async def _launch(self) -> None` (35)
   - `async def _place(self, on_screen: bool) -> None` (10)
   - `def _forget_context(self, closed) -> None` (4)
   - `async def _close_context(self) -> None` (4)
+- `async def hold_sending(route) -> None` (13)
+- `def _is_captcha(url: str) -> bool` (8)
 - `def _accept_dialogs(page) -> None` (4)
 
 ### `adapters/claude.py` — 145 строк
@@ -3355,7 +3357,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 305 модулей
+## tests — 306 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
 
@@ -3388,6 +3390,29 @@ seed initial data
 
 - `def _install(root: Path, relative: str) -> Path` (5)
 - `def _roots(monkeypatch, tmp_path)` (4)
+
+### `tests/adapters/test_browser_sending.py` — 113 строк
+
+Профиль под симуляцией отклика: данные с сайта не уходят, капча проходится.
+
+Зависит от: `adapters.browser`
+
+Тестов: 8
+
+- `class _Request` (3)
+- `class _Route` (10)
+  - `async def abort(self, *_reason)` (2)
+  - `async def continue_(self, **_options)` (2)
+- `async def _fate(method, url)` (4)
+- `class _Context` (14)
+  - `async def route(self, pattern, handler)` (2)
+  - `def on(self, *_event)` (2)
+  - `async def close(self)` (2)
+- `class _Page` (5)
+  - `def on(self, *_event)` (2)
+- `class _Playwright` (11)
+  - `async def start(self)` (2)
+  - `async def launch_persistent_context(self, _path, **options)` (3)
 
 ### `tests/adapters/test_claude.py` — 263 строк
 
@@ -4215,13 +4240,13 @@ seed initial data
 
 - `def _write_through(module, text: str) -> str` (22)
 
-### `tests/backend/test_flows_aggregator_apply.py` — 284 строк
+### `tests/backend/test_flows_aggregator_apply.py` — 294 строк
 
 Фаза 2: отклик способ за способом, пока один не удался или способы не кончились.
 
 Зависит от: `backend.agent.sessions`, `backend.flows.aggregator_apply`, `backend.flows.aggregator_round`, `backend.models`, `backend.repository.app_settings`, `backend.repository.mail_account`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.waiting`
 
-Тестов: 13
+Тестов: 14
 
 - `def board(session_factory)` (13)
   - `async def make(**vacancy)` (8)
@@ -6368,7 +6393,7 @@ seed initial data
 - `def scripted_kit(pipeline, steps, *, human_limit: float=3600.0) -> AgentKit` (4)
 - `def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit` (3)
 
-### `tests/fakes/browser.py` — 126 строк
+### `tests/fakes/browser.py` — 128 строк
 
 Браузер агента с заданными страницами: что открыто, что нажато, что отказало.
 
@@ -6394,11 +6419,11 @@ seed initial data
   - `async def set_input_files(self, selector, files, **_options)` (3)
   - `def expect_file_chooser(self, **_options)` (2)
   - `async def go_back(self, **_options)` (2)
-- `class FakeBrowser` (30)
+- `class FakeBrowser` (32)
   - `async def page(self)` (2)
   - `async def show(self)` (2)
   - `async def hide_back(self)` (2)
-  - `async def open_profile(self, profile_id: int)` (2)
+  - `async def open_profile(self, profile_id: int, sending: bool=True)` (3)
   - `async def clear_cache(self)` (2)
   - `async def close(self)` (2)
   - `async def wait_closed(self, limit_sec: float) -> bool` (4)

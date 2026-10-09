@@ -65,6 +65,10 @@
   - `name: str`
   - `channel: str | None`
   - `executable: Path | None`
+- `_SENDING_METHODS` = `frozenset({'POST', 'PUT', 'PATCH', 'DELETE'})`
+- `_CAPTCHA_HOSTS` = `набор из 4`
+- `_GOOGLE_CAPTCHA_PATH` = `'/recaptcha/'`
+- `_CLOUDFLARE_CHECK_PATH` = `'/cdn-cgi/challenge-platform/'`
 
 ### `adapters/claude.py`
 
@@ -1895,6 +1899,11 @@
 - `ROOT` = `Path(__file__).resolve().parents[2]`
 - `_APP` = `'\nimport os, subprocess, sys\nfrom adapters imp…`
 - `_PARENT` = `'\nimport subprocess, sys, time\ngrandchild = su…`
+
+### `tests/adapters/test_browser_sending.py`
+
+- `class _Page`
+  - `url` = `'about:blank'`
 
 ### `tests/adapters/test_claude.py`
 

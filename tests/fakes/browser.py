@@ -101,6 +101,7 @@ class FakeBrowser:
         self._page = page or FakePage()
         self.calls: list[str] = []
         self.closes = True
+        self.sending: bool | None = None
 
     async def page(self):
         return self._page
@@ -111,8 +112,9 @@ class FakeBrowser:
     async def hide_back(self):
         self.calls.append("hide")
 
-    async def open_profile(self, profile_id: int):
+    async def open_profile(self, profile_id: int, sending: bool = True):
         self.calls.append(("profile", profile_id))
+        self.sending = sending
 
     async def clear_cache(self):
         self.calls.append("clear_cache")
