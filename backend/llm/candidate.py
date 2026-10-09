@@ -87,6 +87,11 @@ def format_known_skills(skills) -> str:
     return "\n".join(lines) if lines else "—"
 
 
+def candidate_languages(rows: list[ProfileLanguage]) -> list[CandidateLanguage]:
+    """Языки анкеты в том виде, в каком их пишет `format_languages`."""
+    return [CandidateLanguage(name=row.language, level=row.level) for row in rows]
+
+
 def build_candidate_profile(
     profile: Profile | None,
     languages: list[ProfileLanguage],
@@ -104,8 +109,6 @@ def build_candidate_profile(
         location=profile.location,
         grades=list(profile.grades or []),
         work_formats=list(profile.work_format or []),
-        languages=[
-            CandidateLanguage(name=l.language, level=l.level) for l in languages
-        ],
+        languages=candidate_languages(languages),
         free_preferences=profile.free_preferences,
     )
