@@ -9,31 +9,23 @@ import { describe, expect, it } from 'vitest';
 
 import { providerForm } from '$state/provider_form.svelte.js';
 
-const SERVER = { base_url: 'http://localhost:1234', api_key: 'k', model: 'qwen' };
+import { answering, held } from './bridge_stub.js';
+import { serverCreds } from './creds.js';
 
-/** Мост, отвечающий по имени метода; зовы копятся в `asked`. */
+const SERVER = serverCreds('qwen');
+
+/** Мост, отвечающий заготовкой по имени метода — значением или функцией нагрузки. */
 function bridge(replies) {
-  const asked = [];
-  const call = async (method, payload) => {
-    asked.push({ method, payload });
+  const { asked, ask } = answering((method, payload) => {
     const reply = replies[method];
     return typeof reply === 'function' ? reply(payload) : reply;
-  };
-  return { asked, call };
+  });
+  return { asked, call: ask };
 }
 
 function form(replies, alive = { now: true }) {
   const { asked, call } = bridge(replies);
   return { asked, alive, form: providerForm({ kind: 'embed', call, alive }) };
-}
-
-/** Ответ, который доедет, когда его отпустят. */
-function held() {
-  let release;
-  const answer = new Promise((resolve) => {
-    release = resolve;
-  });
-  return { answer, release };
 }
 
 describe('перечень имён моделей', () => {
@@ -235,12 +227,12 @@ describe('проверка связи', () => {
 
   it('ответ, пришедший после правки полей, отбрасывается', async () => {
     const late = held();
-    const { form: f } = form({ 'settings.probe_model': () => late.answer });
+    const { form: f } = form({ 'settings.probe_model': () => late.promise });
     f.creds = SERVER;
     const probing = f.verify();
 
     f.forget();
-    late.release({ model: 'qwen', latency_ms: 1 });
+    late.give({ model: 'qwen', latency_ms: 1 });
     await probing;
 
     expect(f.probe.status).toBe('idle');
@@ -249,12 +241,12 @@ describe('проверка связи', () => {
   it('ответ, пришедший после ухода с экрана, не кладётся', async () => {
     const late = held();
     const alive = { now: true };
-    const { form: f } = form({ 'settings.probe_model': () => late.answer }, alive);
+    const { form: f } = form({ 'settings.probe_model': () => late.promise }, alive);
     f.creds = SERVER;
     const probing = f.verify();
 
     alive.now = false;
-    late.release({ model: 'qwen', latency_ms: 1 });
+    late.give({ model: 'qwen', latency_ms: 1 });
     await probing;
 
     expect(f.probe.status).toBe('busy');

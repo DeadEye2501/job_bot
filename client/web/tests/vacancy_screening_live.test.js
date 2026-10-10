@@ -5,6 +5,8 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { held } from './bridge_stub.js';
+import { buttonBy } from './press.js';
 import { settled } from './settled.js';
 import { mountVacancyCard, openActions } from './vacancy_card_mount.js';
 import { vacancyDetail } from './vacancy_detail.js';
@@ -41,9 +43,7 @@ function screen(hasScreening, screening = SCREENING) {
 async function screeningItem() {
   await settled();
   openActions(card.host);
-  return [...document.querySelectorAll('.menu-item')].find((one) =>
-    one.textContent.includes('Скрининг'),
-  );
+  return buttonBy('Скрининг', { among: '.menu-item' });
 }
 
 describe('скрининг из карточки', () => {
@@ -65,7 +65,7 @@ describe('скрининг из карточки', () => {
     expect(item.classList.contains('blocked')).toBe(true);
     item.click();
     await settled();
-    expect(asked.map(([method]) => method)).not.toContain('vacancies.screening');
+    expect(asked.map((one) => one.method)).not.toContain('vacancies.screening');
   });
 
   it('открывает окно, где реплики стоят диалогом: наши справа, работодателя слева', async () => {
@@ -73,7 +73,7 @@ describe('скрининг из карточки', () => {
     (await screeningItem()).click();
     await settled();
 
-    expect(asked).toContainEqual(['vacancies.screening', 7]);
+    expect(asked).toContainEqual({ method: 'vacancies.screening', payload: 7 });
     const bubbles = [...document.querySelectorAll('.modal-dialog .cnt-bubble')];
     expect(bubbles.map((one) => [one.textContent.trim(), one.classList.contains('me')])).toEqual([
       ['Сколько лет опыта?', false],
@@ -82,14 +82,13 @@ describe('скрининг из карточки', () => {
   });
 
   it('выбрали другую вакансию, пока скрининг ехал, — окно прежней не открывается', async () => {
-    let found;
-    const late = new Promise((done) => (found = done));
-    const { change } = screen(true, late);
+    const late = held();
+    const { change } = screen(true, late.promise);
     (await screeningItem()).click();
 
     change('vacancyId', 8);
     await settled();
-    found(SCREENING);
+    late.give(SCREENING);
     await settled();
 
     expect(document.querySelector('.modal-dialog .cnt-bubble')).toBeNull();

@@ -15,25 +15,21 @@ import { cleanup, render, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import PeopleList from '../app/PeopleList.svelte';
+import { answering, held } from './bridge_stub.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
 
 /** Вкладка «HR» с мостом, отвечающим не раньше, чем ему позволят. */
 function tab() {
-  const asked = [];
-  let letGo;
-  const flying = new Promise((done) => {
-    letGo = done;
-  });
-  const ask = async (method, payload) => {
-    asked.push({ method, payload });
+  const flying = held();
+  const { asked, ask } = answering(async (method) => {
     if (method === 'hr.create') {
-      await flying;
+      await flying.promise;
       return { id: 1 };
     }
     return { hrs: [], has_more: false };
-  };
+  });
 
   const shown = render(PeopleList, {
     props: {
@@ -46,7 +42,7 @@ function tab() {
       onvacancy: () => {},
     },
   });
-  return { asked, letGo, q: within(shown.container) };
+  return { asked, letGo: flying.give, q: within(shown.container) };
 }
 
 describe('живая вкладка «HR»', () => {

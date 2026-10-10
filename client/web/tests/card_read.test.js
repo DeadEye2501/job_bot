@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { cardRead } from '../state/card_read.js';
-import { replying } from './bridge_stub.js';
+import { held, replying } from './bridge_stub.js';
 
 function reader(answers, { alive = () => true } = {}) {
   const { asked, ask } = replying(answers);
@@ -58,15 +58,12 @@ describe('чтение карточки правой панели', () => {
   it('устаревший ответ никуда не ложится', async () => {
     // Панель одна на всю вкладку, и записи в ней переключают нажатием по
     // соседней строке: ответ про прежнюю показал бы её числа под новым именем.
-    let answerFirst;
-    const { shown, read } = reader([
-      () => new Promise((resolve) => (answerFirst = resolve)),
-      { hr_id: 8 },
-    ]);
+    const first = held();
+    const { shown, read } = reader([() => first.promise, { hr_id: 8 }]);
 
     const slow = read(7);
     await read(8);
-    answerFirst({ hr_id: 7 });
+    first.give({ hr_id: 7 });
     await slow;
 
     expect(shown).toEqual([{ card: { hr_id: 8 }, trouble: '' }]);

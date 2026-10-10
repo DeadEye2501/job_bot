@@ -7,8 +7,10 @@ import { flushSync } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { hearRound } from '../state/round.svelte.js';
+import { held, roundGoes } from './bridge_stub.js';
+import { press } from './press.js';
 import { settled } from './settled.js';
-import { mountVacancyCard, openActions, press } from './vacancy_card_mount.js';
+import { mountVacancyCard, openActions } from './vacancy_card_mount.js';
 import { vacancyDetail } from './vacancy_detail.js';
 
 const HR = { id: 1, name: 'Иван', telegram_username: 'ivan' };
@@ -37,12 +39,6 @@ function screen(ways, telegram) {
   return card;
 }
 
-/** Начать обход: его вести слушает общий учёт, как в окне. */
-function roundGoes() {
-  const handlers = {};
-  hearRound({ on: (name, hear) => ((handlers[name] = hear), () => {}) });
-  handlers.ingestion_started();
-}
 
 async function respond() {
   await settled();
@@ -51,10 +47,11 @@ async function respond() {
   await settled();
 }
 
+/** Ушедшие отклики — зовом и нагрузкой. */
 const sent = (asked) =>
-  asked.filter(
-    ([method]) => method === 'vacancies.apply_via' || method === 'vacancies.send_application',
-  );
+  asked
+    .filter(({ method }) => method === 'vacancies.apply_via' || method === 'vacancies.send_application')
+    .map(({ method, payload }) => [method, payload]);
 
 describe('отклик из карточки', () => {
   it('единственный способ уходит сразу, без окна выбора', async () => {
@@ -106,14 +103,13 @@ describe('отклик из карточки', () => {
   it('выбрали другую вакансию, пока мост искал способы, — отклик не уходит никуда', async () => {
     // Панель одна на весь список: ответ о способах прежней вакансии пришёл бы
     // уже к новой, и Telegram ушёл бы по ней сразу и без вопроса.
-    let found;
-    const late = new Promise((done) => (found = done));
-    const { asked, change } = screen(late, true);
+    const late = held();
+    const { asked, change } = screen(late.promise, true);
     await respond();
 
     change('vacancyId', 8);
     await settled();
-    found([]);
+    late.give([]);
     await settled();
 
     expect(sent(asked)).toEqual([]);
@@ -138,7 +134,7 @@ describe('отклик из карточки', () => {
     const { asked, said } = screen([FORM, MAIL], true);
     await respond();
 
-    expect(asked.map(([method]) => method)).not.toContain('vacancies.apply_ways');
+    expect(asked.map((one) => one.method)).not.toContain('vacancies.apply_ways');
     expect(sent(asked)).toEqual([]);
     expect(said).toContain('Идёт обход');
   });

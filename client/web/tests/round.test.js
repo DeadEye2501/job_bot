@@ -4,20 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import { hearRound, round } from '$state/round.svelte.js';
 
-function bridge() {
-  const handlers = {};
-  return {
-    on: (name, handler) => {
-      handlers[name] = handler;
-      return () => delete handlers[name];
-    },
-    fire: (name, payload) => handlers[name]?.(payload),
-  };
-}
+import { listening } from './bridge_stub.js';
 
 describe('конец прогона', () => {
   it('зовёт подписанного, когда шедший прогон кончился', () => {
-    const events = bridge();
+    const events = listening();
     const deaf = hearRound(events);
     let heard = 0;
     const off = round.onFinish(() => heard++);
@@ -29,7 +20,7 @@ describe('конец прогона', () => {
   });
 
   it('конец без начала не зовёт: окно открылось, а прогон шёл в прошлом', () => {
-    const events = bridge();
+    const events = listening();
     const deaf = hearRound(events);
     let heard = 0;
     const off = round.onFinish(() => heard++);
@@ -40,7 +31,7 @@ describe('конец прогона', () => {
   });
 
   it('отписанного не зовёт', () => {
-    const events = bridge();
+    const events = listening();
     const deaf = hearRound(events);
     let heard = 0;
     round.onFinish(() => heard++)();
@@ -53,7 +44,7 @@ describe('конец прогона', () => {
 
 describe('ожидание человека', () => {
   it('приходит с родом и сайтом и уходит, когда человек справился', () => {
-    const events = bridge();
+    const events = listening();
     const deaf = hearRound(events);
     events.fire('ingestion_started');
     events.fire('human_needed', { kind: 'captcha', host: 'site.test' });
@@ -64,7 +55,7 @@ describe('ожидание человека', () => {
   });
 
   it('уходит и с концом прогона: остановленный обход о человеке больше не скажет', () => {
-    const events = bridge();
+    const events = listening();
     const deaf = hearRound(events);
     events.fire('ingestion_started');
     events.fire('human_needed', { kind: 'login', host: 'site.test' });

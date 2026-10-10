@@ -16,12 +16,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import BottomBar from '../app/BottomBar.svelte';
 import { hearRound } from '../state/round.svelte.js';
+import { answering } from './bridge_stub.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
 
 function bar(health) {
-  const asked = [];
   const tips = [];
   // Плашки полоса показывает не через мост, а через `say`: отказ запертого
   // тумблера виден только здесь.
@@ -29,13 +29,12 @@ function bar(health) {
   // Вести полосе приходят подпиской: сюда складываются обработчики, чтобы
   // проверка могла позвать их так же, как их зовёт мост.
   const handlers = {};
-  const ask = async (method, ...args) => {
-    asked.push({ method, args });
+  const { asked, ask } = answering((method, payload) => {
     if (method === 'system.initial') return { unread: { count: 0 }, mode: 'Full', health };
-    if (method === 'system.set_mode') return { mode: args[0] };
+    if (method === 'system.set_mode') return { mode: payload };
     if (method === 'system.health') return health;
     return {};
-  };
+  });
 
   const events = {
     on: (name, handler) => {
@@ -89,7 +88,7 @@ describe('живая нижняя полоса', () => {
     const { asked, tips } = bar({ db: true, tg: false, chat: true, embed: true });
     await settled();
 
-    expect(asked.some((one) => one.method === 'system.set_mode' && one.args[0] === 'Off')).toBe(true);
+    expect(asked.some((one) => one.method === 'system.set_mode' && one.payload === 'Off')).toBe(true);
     expect(tips.at(-1)).toContain('TG');
   });
 
