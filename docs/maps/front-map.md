@@ -63,7 +63,7 @@
 - принимает: ask, say, events, open, onopened, oncompany, onvacancy
 - берёт: ./PersonCard.svelte
 
-### app/PersonCard.svelte (256)
+### app/PersonCard.svelte (257)
 - Своя запись на каждого человека: поле запечатывает номер при заведении, и заводиться заново на каждого его заставляет именно `{#key}` — без него запечатанный номер протухнет.
 - принимает: ask, say, events, personId, oncompany, onvacancy, onclose, onchanged
 - берёт: ./PersonChat.svelte
@@ -72,7 +72,7 @@
 - Строка отправки остаётся на месте и при заслоне, только запертой: пропав, она не сказала бы, почему писать нельзя.
 - принимает: ask, say, hrId, blocked, events, onread
 
-### app/ProfileCv.svelte (288)
+### app/ProfileCv.svelte (296)
 - —
 - принимает: ask
 
@@ -115,7 +115,7 @@
 - принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte
 
-### app/VacancyCard.svelte (458)
+### app/VacancyCard.svelte (462)
 - Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою оценку.
 - принимает: ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged
 - берёт: ./VacancyContactsSection.svelte, ./VacancyLinks.svelte
@@ -128,7 +128,7 @@
 - —
 - принимает: ask, say, vacancyId, kind, prefill, current, onclose, onlinked
 
-### app/WizardCv.svelte (191)
+### app/WizardCv.svelte (185)
 - —
 - принимает: ask, busy, events, onback, onnext
 
@@ -256,9 +256,9 @@
 - —
 - принимает: loaded, empty, chosen, detailEmpty, onlistscroll, ondetailscroll, toolbar, emptyNote, items, detail
 
-### components/CvFileRow.svelte (24)
-- Открывать нечего, когда файла нет на диске: система показала бы свою ошибку вместо нашей строки «файл не найден».
-- принимает: meta, onreplace, onopen
+### components/CvFileRow.svelte (22)
+- —
+- принимает: meta, actions
 
 ### components/DatePicker.svelte (149)
 - —
@@ -352,7 +352,7 @@
 - принимает: title, placeholder, empty, load, asRow, onapply, onclose
 - берёт: ./PickerDialog.svelte, ./PickerRow.svelte
 
-### components/MiniPeople.svelte (40)
+### components/MiniPeople.svelte (41)
 - —
 - принимает: people, empty, onpick
 - берёт: ./Avatar.svelte
@@ -660,7 +660,7 @@
 - * Заводит запись правки поля. * * Перечитываем и после отказа: поля правятся на месте, и отклонённое мостом * значение — а негодный ник мост отклоняет — осталось бы на экране. Человек * читал бы своё, а в базе лежало бы прежнее. * * Списку говорят только по удаче: не изменилось ничего, и перечитывать его * значило бы гонять мост ради того же вида.
 - отдаёт: cardSave
 
-### state/channels.js (68)
+### state/channels.js (69)
 - * Слова вкладки «Каналы».
 - отдаёт: CHANNELS_TAB, channelName, channelTitle, channelToggle, pollBlock
 
@@ -720,7 +720,7 @@
 - * Три положения слева направо. Порядок несущий: по нему считается, в какую * треть дорожки попало нажатие.
 - отдаёт: OFF, modeChosen
 
-### state/new_card.js (94)
+### state/new_card.js (97)
 - * Обвязка формы заведения по роду карточки. * * `named` держится рядом с `blank` нарочно: пустой черновик и заслон, который * решает, что он уже не пустой, — две половины одного правила, и разъехавшись, * они дали бы кнопку, открытую над формой, которую мост отобьёт.
 - отдаёт: NEW_CARD
 
@@ -744,17 +744,17 @@
 - * Сколько строк в странице. Столько же по умолчанию отдаёт мост.
 - отдаёт: PAGE, VACANCY_PAGE, appended, detailScrolled, nearBottom, nearTop, refreshLimit
 
-### state/people.js (140)
+### state/people.js (127)
 - * Как назвать человека в чужой карточке. * * Безымянный назван номером: строка должна читаться, а не пустовать.
 - отдаёт: blankPerson, named, personCandidate, personHead, personLine, personName, personSub, personTitle, unreadLine
 
-### state/picker.js (76)
+### state/picker.js (78)
 - * Отперта ли кнопка «Связать». * * Промах мышью по строке списка не должен менять привязку: выбор строки только * помечает её, а связывает отдельная кнопка. Выбор уже привязанного кнопку не * отпирает — нажатие переписало бы связь тем же значением и записало в ленту * перемену, которой не было.
 - отдаёт: candidate, labelOf, labels, linkReady, sameName
 
-### state/profile.js (148)
+### state/profile.js (153)
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
-- отдаёт: CURRENCIES, GENDERS, GRADES, LANG_LEVELS, SALARY_PERIODS, WORK_FORMATS, blankProfile, cvNote, fileSize, langRow, named, profileSheet, updatedNote
+- отдаёт: CURRENCIES, GENDERS, GRADES, LANG_LEVELS, SALARY_PERIODS, WORK_FORMATS, blankProfile, cvNote, cvOpenable, fileSize, langRow, named, profileSheet, updatedNote
 
 ### state/progress.js (82)
 - * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
@@ -780,7 +780,7 @@
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
-### state/settings.js (431)
+### state/settings.js (432)
 - * Чем подписано пустое поле имени модели. * * Пока имён нет, подсказка не обещает списка: перечень читается с адреса и * ключа, и у непóднятого поставщика его не будет вовсе — имя тогда вписывают * руками. Слова общие на настройки и на шаг мастера: одно и то же поле, * подписанное по-разному, читается как два разных.
 - отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, NO_FILE_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, SOURCE_FILE, SOURCE_SERVER, addressTrouble, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, embedReading, fileCreds, fileTrouble, idleProbe, isFileSource, isModelFile, llmTrouble, loginTrouble, mailNeedsServer, mailPill, mailToSave, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probeLine, probePill, sameCreds, scorePercent, sessionPill, sharesChat, sourceCreds, sourceLabel, telegramCreds, thresholdState
 
@@ -816,9 +816,9 @@
 - * Статусы в том порядке, в каком их читают в кольце статистики. * * Значение совпадает с тем, каким статус приходит в строке списка и каким его * принимает смена статуса на мосту; им же покрашена точка рядом.
 - отдаёт: STATUS_CHOICES
 
-### state/telegram.js (24)
-- * Чем подписан ник — или прямое слово о том, что его нет. * * Отсутствие тут говорящее: такую запись не найти в Telegram по имени. Пустое * место читалось бы как недогрузившаяся строка.
-- отдаёт: handleName, telegramHref
+### state/telegram.js (40)
+- * Ник с собакой — или пусто, когда ника нет. Чем подписать отсутствие, решает * место показа: у каждого своё слово.
+- отдаёт: atHandle, handleName, nameOrHandle, telegramHref
 
 ### state/unnamed.js (17)
 - * Чем подписана запись без названия. Показывают её приглушённой * (`styles/unnamed.css`) — так видно, что это не название, а его отсутствие.
@@ -832,7 +832,7 @@
 - * Почему отклик и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы * модели не допускаем — даже отклика в Telegram, которому браузер не нужен. * * Есть ли куда откликаться, здесь не решается: это знает только мост, и * ответ его разбирает `applyChoices`.
 - отдаёт: actionBlocks, applyChoices, noChoiceReason, rawChips, sourcePill
 
-### state/vacancy_card.js (190)
+### state/vacancy_card.js (192)
 - * Способ отклика словами; незнакомый код называется сам собой — коды заводит * бэкенд, и новый приедет раньше, чем окно про него узнает.
 - отдаёт: timelineRows
 
@@ -856,7 +856,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: plural, vacancyCount
 
-## styles — 114 файлов
+## styles — 113 файлов
 
 ### styles/accent-fill.css (16)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре. Одним правилом на три места, а не тремя одинаковыми: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -984,7 +984,7 @@ body, html, button, body, .material-symbols-outlined
 .choice-row[data-look='tile'] .choice.active:hover, .choice-row[data-look='chip'], .choice-row[data-look='chip'] .choice, .choice-row[data-look='chip'] .choice.active
 - берёт: --accent, --accent-chip-selected, --bg-secondary, --border, --surface-hover-firm, --surface-raised, --text-primary, --text-secondary
 
-### styles/clipped-line.css (47)
+### styles/clipped-line.css (46)
 - Строка в одну линию, обрезанная многоточием. Одним правилом на все места, где длинное значение не должно распирать свой столбец: имена в списках и карточках, подписи файлов, строки журнала, пилюли. Написанная в каждом файле оформления заново, эта тройка расходится молча — пропавший `white-space` даёт вторую строку и разъехавшуюся сетку, а пропавший `overflow` — обрезку без многоточия, по которой не видно, что значение длиннее показанного. Место, где строке отведена ширина, остаётся при самом блоке: `max-width`, `min-width: 0` и доля во флексе у каждого свои, и общими они не бывают. Хвост пилюли режется у самой подписи, а не у пилюли: обрезанная пилюля уносила бы вместе с хвостом и крестик, и длинную подпись стало бы нечем снять. Подписи бокового меню и имени категории третье объявление ничего не меняет: первая и так не переносится вслед за своей кнопкой, второе — поле ввода, где переноса не бывает вовсе. Держать их порознь ради этого значило бы писать ту же обрезку в третий и четвёртый раз.
 - селекторы (1): .chip-text,
 .hr-name,
@@ -993,7 +993,6 @@ body, html, button, body, .material-symbols-outlined
 .pdf-name,
 .exp-summary > strong,
 .exp-summary > .role,
-.file-pick .text,
 .logs-source,
 .logs-msg,
 .vac-mini-title,
@@ -1050,9 +1049,9 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (1): .num-pill
 - берёт: --bg-tertiary, --text-secondary
 
-### styles/cv-file.css (40)
-- Файл резюме: пунктирная рамка — то же, чем обычно показывают «сюда кладут».
-- селекторы (6): .pdf-row, .pdf-row > .material-symbols-outlined, .pdf-info, .pdf-name, .pdf-meta, .pdf-actions
+### styles/cv-file.css (48)
+- Файл резюме — в анкете и в мастере. Пунктир до выбора говорит «сюда кладут», сплошная рамка после — что файл уже взят: пустая строка со сплошной рамкой читалась бы как поле, в которое забыли что-то вписать.
+- селекторы (7): .pdf-row, .pdf-row.has-file, .pdf-row > .material-symbols-outlined, .pdf-info, .pdf-name, .pdf-meta, .pdf-actions
 - берёт: --bg-secondary, --border, --danger, --text-primary, --text-tertiary
 
 ### styles/date-picker.css (97)
@@ -1098,11 +1097,6 @@ body, html, button, body, .material-symbols-outlined
 ### styles/field-line.css (29)
 - Несколько полей одной строкой: вилка «от — до — валюта», страна и город. Не сетка формы (`form-grid.css`): та делит ряд на две равные колонки, а здесь полей бывает три и ширина у них разная — знак валюты уже числа. Высота у всех по самому высокому: рядом с полями ввода стоит и ряд переключателей, и ниже полей он выглядел бы недоделанным.
 - селекторы (4): .field-line, .field-line > *, .field-line > .field-narrow, .field-line > .field-choice
-
-### styles/file-pick.css (35)
-- Выбор файла резюме: одна строка со значком, подписью и кнопкой. Пунктир до выбора говорит «сюда кладут», сплошная рамка после — что файл уже взят: пустая строка со сплошной рамкой читалась бы как поле, в которое забыли что-то вписать.
-- селекторы (5): .file-pick, .file-pick.has-file, .file-pick .material-symbols-outlined, .file-pick .text, .file-pick .text .name
-- берёт: --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/filter-group.css (16)
 - Группа отбора: подпись над своими полями и черта под ними.
@@ -1564,7 +1558,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 92 файлов
+## tests — 94 файлов
 
 ### tests/aggregators.test.js (131)
 - —
@@ -1734,8 +1728,11 @@ body, html, button, body, .material-symbols-outlined
 ### tests/picker.test.js (134)
 - —
 
-### tests/profile.test.js (150)
+### tests/profile.test.js (157)
 - —
+
+### tests/profile_cv_live.test.js (38)
+- * Анкета, у которой мост отдаёт этот файл резюме.
 
 ### tests/profile_experience_live.test.js (72)
 - * Вкладка с записанными за ней посылками на мост.
@@ -1795,6 +1792,9 @@ body, html, button, body, .material-symbols-outlined
 ### tests/suggest_input_live.test.js (92)
 - —
 
+### tests/telegram.test.js (18)
+- —
+
 ### tests/tg_login_dialog_live.test.js (51)
 - —
 
@@ -1842,7 +1842,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/wizard.test.js (218)
 - —
 
-### tests/wizard_cv_live.test.js (108)
+### tests/wizard_cv_live.test.js (119)
 - * Шаг с подставным мостом: след зовов и способ доставить весть об исходе. * * `during` доставляет весть посреди самого зова разбора — так приходят * мгновенные отказы: файл пропал, формат не читается, текста в файле нет.
 
 ### tests/words.test.js (13)

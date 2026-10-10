@@ -6,6 +6,7 @@
   import { pressKey } from '$state/keys.js';
   import Avatar from './Avatar.svelte';
   import { personName } from '$state/people.js';
+  import { atHandle } from '$state/telegram.js';
   import { vacancyCount } from '$state/words.js';
 
   let { people, empty, onpick } = $props();
@@ -28,7 +29,7 @@
           <div>
             <div class="hr-mini-name">{personName(one)}</div>
             <span class="hr-mini-meta">
-              {#if one.telegram_username}@{one.telegram_username} · {/if}
+              {#if one.telegram_username}{atHandle(one.telegram_username)} · {/if}
               {vacancyCount(one.vacancy_count)}
             </span>
           </div>

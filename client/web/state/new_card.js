@@ -16,6 +16,7 @@
 
 import { blankCompany, companyNamed } from './companies.js';
 import { blankPerson, named } from './people.js';
+import { atHandle } from './telegram.js';
 import { blankVacancy, typed, vacancyNamed } from './vacancies.js';
 
 // Окна об одном поле — ник канала, адрес сайта, контакт вакансии: черновик
@@ -71,7 +72,9 @@ export const NEW_CARD = {
     placeholder: '@username канала или t.me/...',
     hint: 'Название и аватар подгрузятся из Telegram автоматически.',
     done: (_draft, answer) =>
-      answer.created ? `Канал добавлен: @${answer.username}` : `Канал @${answer.username} уже был заведён`,
+      answer.created
+        ? `Канал добавлен: ${atHandle(answer.username)}`
+        : `Канал ${atHandle(answer.username)} уже был заведён`,
   },
   aggregator: {
     ...ONE_FIELD,

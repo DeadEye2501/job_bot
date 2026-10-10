@@ -24,6 +24,7 @@
     SALARY_PERIODS,
     WORK_FORMATS,
     blankProfile,
+    cvOpenable,
     langRow,
     profileSheet,
     updatedNote,
@@ -280,7 +281,14 @@
     />
   </div>
 
-  <CvFileRow {meta} onreplace={replaceCv} onopen={openCv} />
+  <CvFileRow {meta}>
+    {#snippet actions()}
+      <button class="btn" type="button" onclick={replaceCv}>Заменить</button>
+      <button class="btn" type="button" disabled={!cvOpenable(meta)} onclick={openCv}>
+        Открыть
+      </button>
+    {/snippet}
+  </CvFileRow>
 
   {#if trouble}
     <div class="autosave-error">{trouble}</div>

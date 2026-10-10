@@ -1,24 +1,22 @@
 <script>
-  // Файл резюме: что за файл лежит и что с ним можно сделать.
+  // Файл резюме: что за файл лежит, и кнопки к нему. Кнопки у каждого места
+  // свои (`actions`): анкета файл заменяет и открывает, мастер только выбирает.
   import { cvNote } from '$state/profile.js';
 
-  let { meta, onreplace, onopen } = $props();
+  let { meta, actions } = $props();
 
   const note = $derived(cvNote(meta));
 </script>
 
-<div class="pdf-row">
-  <span class="material-symbols-outlined">description</span>
+<div class="pdf-row" class:has-file={!!meta}>
+  <span class="material-symbols-outlined">{meta ? 'description' : 'upload_file'}</span>
   <div class="pdf-info">
     <div class="pdf-name">{note.name}</div>
-    <div class="pdf-meta">{note.note}</div>
+    {#if note.note}
+      <div class="pdf-meta">{note.note}</div>
+    {/if}
   </div>
   <div class="pdf-actions">
-    <button class="btn" type="button" onclick={() => onreplace()}>Заменить</button>
-    <!-- Открывать нечего, когда файла нет на диске: система показала бы свою
-         ошибку вместо нашей строки «файл не найден». -->
-    <button class="btn" type="button" disabled={note.missing || !meta} onclick={() => onopen()}>
-      Открыть
-    </button>
+    {@render actions()}
   </div>
 </div>

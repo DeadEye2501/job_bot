@@ -16,7 +16,6 @@ import './styles/shell.css';
 import './styles/wizard.css';
 import './styles/status-row.css';
 import './styles/radio-card.css';
-import './styles/file-pick.css';
 import './styles/note-card.css';
 import './styles/help-block.css';
 import './styles/nav.css';

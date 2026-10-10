@@ -144,15 +144,22 @@
     say('Разбор запущен');
   }
 
-  /** Откликнуться: единственный способ уходит сразу, из нескольких выбирают в окне.
+  /** Ответ моста о вакансии — или пусто, если открыта уже другая.
    *
-   * Номер запечатан до вопроса: панель одна на весь список, и ответ о способах
-   * прежней вакансии, пришедший уже к новой, ушёл бы откликом по ней.
+   * Номер запечатан до вопроса: панель одна на весь список, и ответ о прежней
+   * вакансии, пришедший уже к новой, лёг бы на неё — способы ушли бы откликом
+   * по ней. Зов приходит готовым, с именем моста в нём: так его видит шов имён.
    */
-  async function respond() {
+  async function own(asked) {
     const id = vacancyId;
-    const found = await ask('vacancies.apply_ways', id);
-    if (!alive.now || found === null || id !== vacancyId) return;
+    const found = await asked(id);
+    return alive.now && found !== null && id === vacancyId ? found : null;
+  }
+
+  /** Откликнуться: единственный способ уходит сразу, из нескольких выбирают в окне. */
+  async function respond() {
+    const found = await own((id) => ask('vacancies.apply_ways', id));
+    if (found === null) return;
     const rows = applyChoices(found, card.hr);
     if (rows.length === 0) return say(noChoiceReason(found));
     if (rows.length === 1) return send(rows[0]);
@@ -174,12 +181,9 @@
     say('Отклик отправляется');
   }
 
-  /** Открыть скрининг; номер запечатан до вопроса — по той же причине, что у отклика. */
   async function showScreening() {
-    const id = vacancyId;
-    const found = await ask('vacancies.screening', id);
-    if (!alive.now || found === null || id !== vacancyId) return;
-    screening = found.applications;
+    const found = await own((id) => ask('vacancies.screening', id));
+    if (found !== null) screening = found.applications;
   }
 
   async function drop() {

@@ -4,6 +4,7 @@
 // признаки. Ни моста, ни разметки этот файл не знает.
 
 import { BLOCKED_TITLE, sourceBlock, sourceToggle } from './sources.js';
+import { atHandle, nameOrHandle } from './telegram.js';
 import { UNNAMED } from './unnamed.js';
 
 /** Слова вкладки «Каналы». */
@@ -23,10 +24,10 @@ export const CHANNELS_TAB = {
  * нажимаемой.
  */
 export function channelName(channel) {
-  const handle = channel.username ? `@${channel.username}` : '';
-  if (channel.title) return { name: channel.title, handle };
-  if (channel.username) return { name: `@${channel.username}`, handle: '' };
-  return { name: `Канал #${channel.id}`, handle: '' };
+  return {
+    name: nameOrHandle(channel.title, channel.username, `Канал #${channel.id}`),
+    handle: channel.title ? atHandle(channel.username) : '',
+  };
 }
 
 /** Чем подписан канал в строке списка: подпись и настоящее ли это название.

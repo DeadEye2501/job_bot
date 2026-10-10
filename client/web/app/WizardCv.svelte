@@ -7,7 +7,7 @@
   // молчаливо пройденный шаг человек считал бы приложенным резюме.
   import { call } from '$api/bridge.js';
   import { living } from '$state/alive.js';
-  import { fileSize } from '$state/profile.js';
+  import CvFileRow from '$components/CvFileRow.svelte';
   import WizardFoot from '$components/WizardFoot.svelte';
   import WizardStatus from '$components/WizardStatus.svelte';
   import { cvModes, cvReady } from '$state/wizard.js';
@@ -142,19 +142,13 @@
   </div>
 
   {#if loaded}
-    <div class="file-pick" class:has-file={!!cv}>
-      <span class="material-symbols-outlined">{cv ? 'description' : 'upload_file'}</span>
-      <span class="text">
-        {#if cv}
-          <span class="name">{cv.name}</span> · {fileSize(cv.size)}
-        {:else}
-          Файл ещё не выбран
-        {/if}
-      </span>
-      <button class="btn" type="button" disabled={saving} onclick={pick}>
-        {cv ? 'Заменить' : 'Выбрать'}
-      </button>
-    </div>
+    <CvFileRow meta={cv}>
+      {#snippet actions()}
+        <button class="btn" type="button" disabled={saving} onclick={pick}>
+          {cv ? 'Заменить' : 'Выбрать'}
+        </button>
+      {/snippet}
+    </CvFileRow>
   {/if}
 
   <div class="wiz-modes">
