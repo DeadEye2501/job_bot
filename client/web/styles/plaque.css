@@ -5,11 +5,9 @@
   bottom: 48px;
   left: 50%;
   transform: translateX(-50%) translateY(10px);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  /* Рамка — общая, в panel-frame.css. */
   color: var(--text-primary);
   padding: 8px 14px;
-  border-radius: 8px;
   font-size: 0.78rem;
   /* Выше всего, включая модальные окна: беда, случившаяся в модалке, обязана
      быть видна поверх неё, иначе человек ждёт ответа, которого не увидит. */

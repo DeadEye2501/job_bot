@@ -160,7 +160,7 @@
     />
   </div>
 
-  <button class="bl-add-btn" type="button" title="Добавить в blacklist" onclick={() => (adding = true)}>
+  <button class="btn bl-add-btn" type="button" title="Добавить в blacklist" onclick={() => (adding = true)}>
     <span class="material-symbols-outlined">add</span>
     Добавить
   </button>

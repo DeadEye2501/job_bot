@@ -17,7 +17,6 @@
   import {
     LOGIN_FIRST,
     actionBlock,
-    aggregatorLastRun,
     aggregatorWhere,
     loginMark,
   } from '$state/aggregators.js';
@@ -135,7 +134,6 @@
       </div>
 
       <div class="cnt-det-meta-row">
-        <span class="info-chip cnt-det-meta-chip">{aggregatorLastRun(card)}</span>
         <BlacklistChip value={card.blacklist_value} />
       </div>
     </div>

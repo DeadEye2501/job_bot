@@ -3,8 +3,8 @@
   //
   // Строка нажимается и уводит к самому человеку: из карточки компании смотрят,
   // кто из неё писал, и тут же открывают того, кому отвечать.
-  import { pressKey } from '$state/keys.js';
   import Avatar from './Avatar.svelte';
+  import MiniList from './MiniList.svelte';
   import { personName } from '$state/people.js';
   import { atHandle } from '$state/telegram.js';
   import { vacancyCount } from '$state/words.js';
@@ -12,30 +12,16 @@
   let { people, empty, onpick } = $props();
 </script>
 
-<div class="card-section">
-  {#if !people.length}
-    <div class="mini-list-empty">{empty}</div>
-  {:else}
-    <div class="hrs-mini">
-      {#each people as one (one.id)}
-        <div
-          class="hr-mini-row"
-          role="button"
-          tabindex="0"
-          onclick={() => onpick(one.id)}
-          onkeydown={(event) => pressKey(event) && onpick(one.id)}
-        >
-          <Avatar avatar={one.avatar} name={one.name} icon="person" />
-          <div>
-            <div class="hr-mini-name">{personName(one)}</div>
-            <span class="hr-mini-meta">
-              {#if one.telegram_username}{atHandle(one.telegram_username)} · {/if}
-              {vacancyCount(one.vacancy_count)}
-            </span>
-          </div>
-          <span class="material-symbols-outlined hr-mini-go">arrow_forward</span>
-        </div>
-      {/each}
+<MiniList items={people} {empty} listClass="hrs-mini" rowClass="hr-mini-row" {onpick}>
+  {#snippet row(one)}
+    <Avatar avatar={one.avatar} name={one.name} icon="person" />
+    <div>
+      <div class="hr-mini-name">{personName(one)}</div>
+      <span class="hr-mini-meta">
+        {#if one.telegram_username}{atHandle(one.telegram_username)} · {/if}
+        {vacancyCount(one.vacancy_count)}
+      </span>
     </div>
-  {/if}
-</div>
+    <span class="material-symbols-outlined hr-mini-go">arrow_forward</span>
+  {/snippet}
+</MiniList>

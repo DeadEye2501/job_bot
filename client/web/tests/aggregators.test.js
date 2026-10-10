@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   actionBlock,
-  aggregatorLastRun,
   aggregatorToggle,
   aggregatorWhere,
   loginMark,
@@ -23,18 +22,6 @@ describe('где ищет агрегатор', () => {
   it('у поиска по сети адреса нет — сказано, где он ищет', () => {
     // Пустое место под именем читалось бы как недозаведённый агрегатор.
     expect(aggregatorWhere(WEB)).toBe('по всей сети');
-  });
-});
-
-describe('последний обход', () => {
-  it('не было — так и сказано', () => {
-    expect(aggregatorLastRun({ ...SITE, last_run_at: null })).toBe('Ещё не обходили');
-  });
-
-  it('был — назван временем', () => {
-    const note = aggregatorLastRun({ ...SITE, last_run_at: '2026-10-09T12:30:00' });
-    expect(note.startsWith('Обход ')).toBe(true);
-    expect(note).not.toContain('Ещё не');
   });
 });
 

@@ -245,7 +245,7 @@
 {:else}
   <div class="det-head">
     <div class="status-wrap" class:popover-open={picking} bind:this={statusWrap}>
-      <button class="status-badge" type="button" onclick={() => (picking = !picking)}>
+      <button class="pill status-badge" type="button" onclick={() => (picking = !picking)}>
         <span class="status-dot" data-status={card.status}></span>
         <span class="status-label">{card.status}</span>
         <span class="material-symbols-outlined">expand_more</span>

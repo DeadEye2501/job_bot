@@ -8,35 +8,25 @@
   //
   // Строка нажимается и уводит к самой вакансии: из карточки канала смотрят,
   // что он приносит, и тут же открывают принесённое.
-  import { pressKey } from '$state/keys.js';
+  import MiniList from './MiniList.svelte';
   import { UNNAMED } from '$state/unnamed.js';
   import { shortAgo } from '$state/vacancies.js';
 
   let { vacancies, empty, loading = false, onpick } = $props();
 </script>
 
-<div class="card-section">
-  {#if !vacancies.length}
-    <div class="mini-list-empty">{empty}</div>
-  {:else}
-    <div class="vacs-mini">
-      {#each vacancies as one (one.id)}
-        <div
-          class="vac-mini-row"
-          role="button"
-          tabindex="0"
-          onclick={() => onpick(one.id)}
-          onkeydown={(event) => pressKey(event) && onpick(one.id)}
-        >
-          <span class="status-dot" data-status={one.status}></span>
-          {#if one.score !== null}<span class="num-pill vac-mini-score">{one.score}</span>{:else}<span></span>{/if}
-          <span class="vac-mini-title">{one.title || UNNAMED}</span>
-          <span class="vac-mini-when">{shortAgo(one.created_at, new Date())}</span>
-        </div>
-      {/each}
-    </div>
-    {#if loading}
-      <div class="mini-list-more">Загрузка…</div>
-    {/if}
-  {/if}
-</div>
+<MiniList
+  items={vacancies}
+  {empty}
+  {loading}
+  listClass="vacs-mini"
+  rowClass="vac-mini-row"
+  {onpick}
+>
+  {#snippet row(one)}
+    <span class="status-dot" data-status={one.status}></span>
+    {#if one.score !== null}<span class="num-pill vac-mini-score">{one.score}</span>{:else}<span></span>{/if}
+    <span class="vac-mini-title">{one.title || UNNAMED}</span>
+    <span class="vac-mini-when">{shortAgo(one.created_at, new Date())}</span>
+  {/snippet}
+</MiniList>

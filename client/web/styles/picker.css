@@ -30,10 +30,16 @@
   padding: 4px;
 }
 
-.picker-empty {
-  padding: 16px 12px;
+/* «Ничего не нашлось» у подборщиков — записи и навыка — одним видом: курсив
+   говорит, что это не строка перечня, а её отсутствие. */
+.picker-empty,
+.skill-picker-empty {
   font-size: 0.78rem;
   font-style: italic;
+}
+
+.picker-empty {
+  padding: 16px 12px;
 }
 
 .picker-row {

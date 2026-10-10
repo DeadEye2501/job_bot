@@ -5,11 +5,9 @@
    молча — первая же поправка досталась бы одной из двух. Своя у места работы
    только шапка, и живёт она в experience.css. */
 
+/* Рамка — общая, в panel-frame.css. */
 .collapsible,
 .exp-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
   margin-bottom: 8px;
 }
 

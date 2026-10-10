@@ -2,8 +2,7 @@
   // Строка компании в списке: значок, имя с подписью, отсев и счёт вакансий.
   import { companyLine, companyTitle } from '$state/companies.js';
 
-  import Avatar from './Avatar.svelte';
-  import RowMarks from './RowMarks.svelte';
+  import ContactRow from './ContactRow.svelte';
 
   let { company, selected = false, onpick } = $props();
 
@@ -14,25 +13,17 @@
   const bare = $derived(!company.website && !company.aliases.length);
 </script>
 
-<button
-  class="cnt-hr-row"
-  class:selected
-  class:blacklisted={company.is_blacklisted}
-  type="button"
-  onclick={() => onpick()}
+<ContactRow
+  icon="domain"
+  name={title.name}
+  named={title.named}
+  blocked={company.is_blacklisted}
+  dim={company.is_blacklisted}
+  count={company.vacancy_count}
+  {selected}
+  {onpick}
 >
-  <Avatar icon="domain" />
-
-  <span class="cnt-hr-info">
-    <span class="cnt-hr-name" class:muted={!title.named}>
-      {title.name}
-    </span>
-    <span class="cnt-hr-sub">
-      {#if bare}<span class="muted">{shown.sub}</span>{:else}{shown.sub}{/if}
-    </span>
-  </span>
-
-  <span class="cnt-hr-trailing">
-    <RowMarks blocked={company.is_blacklisted} count={company.vacancy_count} />
-  </span>
-</button>
+  {#snippet sub()}
+    {#if bare}<span class="muted">{shown.sub}</span>{:else}{shown.sub}{/if}
+  {/snippet}
+</ContactRow>

@@ -139,12 +139,8 @@
   overflow: hidden;
 }
 
+/* Вид навыка — общий с тихой пилюлей, в count-pill.css. */
 .mini-chip {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border-radius: 8px;
-  padding: 0 5px;
-  font-size: 0.65rem;
   white-space: nowrap;
 }
 

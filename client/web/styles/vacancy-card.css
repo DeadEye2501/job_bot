@@ -31,25 +31,18 @@
   text-align: left;
 }
 
+/* Рамка, подложка и отклик на курсор — общие с пилюлей выбора, в pill.css;
+   здесь раскладка точки, подписи и шеврона. */
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   /* Ширина заперта, чтобы шапка не прыгала между «New» и «In Progress», и
      заперта по самой длинной подписи. */
-  width: 108px;
+  width: 113px;
   box-sizing: border-box;
-  padding: 3px 8px 3px 7px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
   font-size: 0.68rem;
   letter-spacing: 0.02em;
-}
-
-.status-badge:hover {
-  border-color: var(--accent);
 }
 
 .status-label {
@@ -89,13 +82,8 @@
 }
 
 /* Оценка говорит не сама о себе, а о своём отношении к порогу отбора: залитая
-   акцентом — взятая уверенно, под порогом — отвергнутая. */
-.info-chip.score {
-  background: var(--accent);
-  color: var(--bg-primary);
-  font-weight: 500;
-}
-
+   акцентом — взятая уверенно, под порогом — отвергнутая. Заливка — общая, в
+   accent-fill.css; здесь только оттенки ниже порога. */
 .info-chip.score[data-tone='warn'] {
   background: var(--score-warn);
 }
