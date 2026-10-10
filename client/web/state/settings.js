@@ -257,6 +257,18 @@ export function sharesChat({ same, fromFile, chat }) {
   return same && !fromFile && canShareChat(chat);
 }
 
+/** Как читать записанные эмбеддинги, впервые открыв их поля.
+ *
+ * Своего поля в базе у обоих признаков нет: они выводятся из записанного один
+ * раз, дальше ими распоряжается человек. С чатом на Claude не делятся и при
+ * совпавших полях: взведённая скрытая галочка вернулась бы отмеченной вместе с
+ * другим поставщиком чата и молча затёрла бы свой сервер эмбеддингов.
+ */
+export function embedReading(chat, embed) {
+  const fromFile = isModelFile(embed);
+  return { fromFile, same: !fromFile && canShareChat(chat) && sameCreds(chat, embed) };
+}
+
 /** Чем подписано пустое поле пути к файлу модели. */
 export const NO_FILE_PLACEHOLDER = 'Файл модели не выбран';
 
@@ -319,6 +331,20 @@ export function probePill(probe) {
   if (probe.status === 'busy') {
     return { text: 'Проверка…', tone: '', title: '' };
   }
+  return null;
+}
+
+/** Что сказать строкой под полями шага мастера про проверку — или ничего.
+ *
+ * Та же проверка, что в плашке настроек, но отказ здесь показан целиком: у
+ * строки под полями места хватает, и искать причину человек будет там же.
+ */
+export function probeLine(probe) {
+  if (probe.status === 'ok') {
+    return { tone: 'ok', text: `Подключение работает (${probe.model} · ${probe.latencyMs}ms)` };
+  }
+  if (probe.status === 'err') return { tone: 'err', text: probe.error };
+  if (probe.status === 'busy') return { tone: 'busy', text: 'Проверяем подключение...' };
   return null;
 }
 

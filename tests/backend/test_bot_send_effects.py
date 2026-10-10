@@ -14,7 +14,6 @@
 import pytest
 
 from backend.models import (
-    BotMode,
     Message,
     Vacancy,
     VacancyEvent,
@@ -295,7 +294,7 @@ async def test_a_refused_send_tells_the_window_nothing(
     ready_to_send, outbox
 ):
     """Отказ заслона вестью не сопровождается: менять окну нечего."""
-    bot, hr, vacancy = await ready_to_send(mode=BotMode.OFF)
+    bot, hr, vacancy = await ready_to_send(hr=hr_row(telegram_username=None, telegram_user_id=None))
     heard = []
     bot.on_vacancies_changed = lambda: heard.append("вакансии")
 

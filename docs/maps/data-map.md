@@ -69,6 +69,8 @@
 - `_CAPTCHA_HOSTS` = `набор из 4`
 - `_GOOGLE_CAPTCHA_PATH` = `'/recaptcha/'`
 - `_CLOUDFLARE_CHECK_PATH` = `'/cdn-cgi/challenge-platform/'`
+- `_PERSON_LAUNCH` = `словарь из 2`
+- `_HIDE_WEBDRIVER` = `"Object.defineProperty(Navigator.prototype, 'web…`
 
 ### `adapters/claude.py`
 
@@ -169,6 +171,22 @@
 - `LLM_REQUEST_TIMEOUT_SEC` = `180.0`
 - `LmClient` = `httpx.AsyncClient | claude.ClaudeClient | claude…`
 
+### `adapters/site_home.py`
+
+- `FETCH_TIMEOUT_SEC` = `8.0`
+- `_USER_AGENT` = `'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Apple…`
+- `_TITLE_SEPARATORS_RE` = `re.compile(' [-—|] ')`
+- `_DECLARING_META` = `набор из 2`
+- `_ICON_RELS` = `набор из 3`
+- `_FALLBACK_ICON` = `'/favicon.ico'`
+- `_ICON_LIMIT_BYTES` = `256 * 1024`
+- `class SiteHints`
+  - `declared: tuple[str, ...]` = `набор из 0`
+  - `title_parts: tuple[str, ...]` = `набор из 0`
+- `class SiteHome`
+  - `hints: SiteHints`
+  - `icons: tuple[str, ...]`
+
 ### `adapters/smtp_mail.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -216,6 +234,13 @@
 - `depends_on: Union[str, Sequence[str], None]` = `None`
 - `_SOURCE_COLUMNS` = `набор из 2`
 - `_PROFILE_COLUMNS` = `набор из 6`
+
+### `alembic/versions/c4e8a2d19f3b_aggregator_avatar.py`
+
+- `revision: str` = `'c4e8a2d19f3b'`
+- `down_revision: Union[str, Sequence[str], None]` = `'a9c3e1f07b42'`
+- `branch_labels: Union[str, Sequence[str], None]` = `None`
+- `depends_on: Union[str, Sequence[str], None]` = `None`
 
 ### `alembic/versions/e560edf8b958_init.py`
 
@@ -282,6 +307,7 @@
   - `tools: list[Callable]`
   - `web_search: bool`
 - `RunSession` = `Callable[[SessionPlan], Awaitable[AgentEnd]]`
+- `T` = `TypeVar('T')`
 - `class AgentKit`
   - `pipeline: IngestionPipeline`
   - `browser: BrowserHost`
@@ -299,7 +325,11 @@
 
 ### `backend/agent/prompts/frame.py`
 
-- `FRAME_PROMPT` = `'Ты работаешь агентом приложения, которое ищет р…`
+- `_INTRO` = `'Ты работаешь агентом приложения, которое ищет р…`
+- `_RULES_BEFORE_HUMAN` = `набор из 6`
+- `_HUMAN_RULE` = `'Капча — need_human с kind="captcha"; слетевший …`
+- `_RULES_AFTER_HUMAN` = `набор из 2`
+- `_BROWSER` = `'Браузер. browser_snapshot отдаёт страницу текст…`
 
 ### `backend/agent/prompts/login.py`
 
@@ -322,8 +352,6 @@
 ### `backend/agent/tools_applier.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_AGGREGATOR` = `набор из 2`
-- `_FORM` = `набор из 2`
 - `_ALLOWED` = `словарь из 2`
 - `class _Report`
   - `via: str`
@@ -351,6 +379,7 @@
 ### `backend/agent/tools_seeker.py`
 
 - `WHAT` = `'найденная агентом вакансия'`
+- `BARRED` = `'сайт в чёрном списке человека'`
 - `class _Page`
   - `text: str`
   - `url: str`
@@ -372,7 +401,6 @@
 ### `backend/bot/can_send.py`
 
 - `NO_TARGET` = `'нет адресата'`
-- `BOT_OFF` = `'бот выключен'`
 - `BLACKLISTED` = `'чёрный список'`
 - `SENDING_LOCKED` = `'отправка заглушена'`
 - `class SendPermission`
@@ -390,7 +418,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `EMPTY_MESSAGE` = `'Пустое сообщение.'`
-- `_REFUSAL_TEXTS` = `словарь из 4`
+- `_REFUSAL_TEXTS` = `словарь из 3`
 
 ### `backend/bot/client.py`
 
@@ -411,7 +439,8 @@
 - `logger` = `logging.getLogger(__name__)`
 - `MEDIA_DIR` = `get_data_dir() / 'media'`
 - `PHOTO_EXTS` = `набор из 4`
-- `_PHOTO_SIGNATURES` = `набор из 2`
+- `_IMAGE_SIGNATURES` = `набор из 4`
+- `_PHOTO_TYPES` = `набор из 3`
 - `PHOTO_SIZE_LIMIT` = `10 * 1024 * 1024`
 - `DOCUMENT_SIZE_LIMIT` = `50 * 1024 * 1024`
 
@@ -461,9 +490,9 @@
 
 ### `backend/domain/apply_order.py`
 
-- `_AGGREGATOR` = `ApplicationVia.AGGREGATOR.value`
-- `_FORM` = `ApplicationVia.FORM.value`
-- `_EMAIL` = `ApplicationVia.EMAIL.value`
+- `VIA_AGGREGATOR` = `ApplicationVia.AGGREGATOR.value`
+- `VIA_FORM` = `ApplicationVia.FORM.value`
+- `VIA_EMAIL` = `ApplicationVia.EMAIL.value`
 - `class Way`
   - `method: str`
   - `target: str`
@@ -520,6 +549,7 @@
   - `path: str`
   - `query: str`
   - `fragment: str`
+- `_ZONE_SECOND_LEVELS` = `frozenset({'co', 'com', 'net', 'org', 'ac', 'gov…`
 
 ### `backend/domain/resume_marks.py`
 
@@ -602,7 +632,6 @@
 ### `backend/flows/aggregator_apply.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_EMAIL` = `ApplicationVia.EMAIL.value`
 - `_NO_OUTCOME` = `'агент закончил без итога'`
 - `class ApplyOrder`
   - `vacancy_id: int`
@@ -612,6 +641,10 @@
 ### `backend/flows/aggregator_login.py`
 
 - `_LOGIN_WAIT_SEC` = `3600`
+
+### `backend/flows/aggregator_name.py`
+
+- `logger` = `logging.getLogger(__name__)`
 
 ### `backend/flows/aggregator_round.py`
 
@@ -927,6 +960,13 @@
 - `GEO_LIMIT_MARKERS` = `'«Удалённо в РФ», «удалёнка только из России», «…`
 - `VACANCY_TEXT_CHARS` = `6000`
 
+### `backend/llm/site_name.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `MAX_SITE_NAME_TOKENS` = `1200`
+- `MAX_NAME_CHARS` = `40`
+- `SITE_NAME_PROMPT` = `'Задача — назвать сервис по адресу его сайта так…`
+
 ### `backend/llm/skills.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -1014,6 +1054,7 @@
   - `is_active: Mapped[bool]` = `mapped_column(server_default=expression.false())`
   - `is_logged_in: Mapped[bool]` = `mapped_column(server_default=expression.false())`
   - `last_run_at: Mapped[datetime | None]` = `mapped_column(DateTime(timezone=True))`
+  - `avatar: Mapped[bytes | None]` = `mapped_column(LargeBinary)`
 - `class HR(IdMixin, Base)`
   - `__tablename__` = `'hr'`
   - `__table_args__` = `набор из 1`
@@ -1142,7 +1183,12 @@
   - `__tablename__` = `'bot_state'`
   - `__table_args__` = `набор из 1`
   - `mode: Mapped[BotMode]` = `mapped_column(enum_column(BotMode, 'bot_mode'), …`
-- `BLACKLIST_KINDS: tuple[str, ...]` = `набор из 4`
+- `KEYWORD_KIND` = `'keyword'`
+- `HR_KIND` = `'hr'`
+- `COMPANY_KIND` = `'company'`
+- `CHANNEL_KIND` = `'channel'`
+- `AGGREGATOR_KIND` = `'aggregator'`
+- `BLACKLIST_KINDS: tuple[str, ...]` = `набор из 5`
 - `class Blacklist(IdMixin, CreatedAtMixin, Base)`
   - `__tablename__` = `'blacklist'`
   - `kind: Mapped[str]`
@@ -1211,6 +1257,7 @@
   - `hr: Mapped[HR | None]` = `relationship()`
   - `company: Mapped[Company | None]` = `relationship()`
   - `channel: Mapped[TelegramChannel | None]` = `relationship()`
+  - `aggregator: Mapped[Aggregator | None]` = `relationship()`
 - `class VacancyEvent(IdMixin, CreatedAtMixin, Base)`
   - `__tablename__` = `'vacancy_event'`
   - `__table_args__` = `набор из 1`
@@ -1419,6 +1466,10 @@
 ### `backend/repository/aggregators.py`
 
 - `WEB_SEARCH_NAME` = `'Поиск по сети'`
+- `NOT_A_SITE` = `'Адрес не похож на сайт'`
+- `_LISTED_ORDER` = `набор из 2`
+- `AGGREGATOR_BLACKLIST` = `BlacklistMark(AGGREGATOR_KIND, aggregator_blackl…`
+- `aggregator_blacklist_value` = `AGGREGATOR_BLACKLIST.value`
 
 ### `backend/repository/app_settings.py`
 
@@ -1441,11 +1492,15 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `BlacklistOutcome` = `Literal['created', 'reactivated', 'already_activ…`
+- `_SWITCH_OFF_MARKED` = `словарь из 2`
 - `_BLACKLIST_FIELD_UNSET` = `object()`
 
 ### `backend/repository/blacklist_marks.py`
 
 - `_ACCOUNT_MARK_PREFIX` = `'user_id:'`
+- `class BlacklistMark`
+  - `kind: str`
+  - `candidates: Callable[[Any], list[str]]`
 
 ### `backend/repository/bot_mode.py`
 
@@ -1454,11 +1509,12 @@
 ### `backend/repository/channels.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_CHANNEL_RATE_WINDOW_DAYS` = `30`
+- `CHANNEL_BLACKLIST` = `BlacklistMark(CHANNEL_KIND, channel_blacklist_ca…`
 
 ### `backend/repository/companies_card.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `COMPANY_BLACKLIST` = `BlacklistMark(COMPANY_KIND, company_blacklist_ca…`
 - `class _AbsorbedCompany`
   - `name: str`
   - `aliases: list`
@@ -1486,6 +1542,8 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `LAST_VACANCY_ORDER` = `набор из 2`
+- `HR_BLACKLIST` = `BlacklistMark(HR_KIND, hr_blacklist_candidates)`
+- `hr_blacklist_value` = `HR_BLACKLIST.value`
 - `class _AbsorbedHr`
   - `telegram_user_id: int | None`
   - `telegram_username: str | None`
@@ -1536,6 +1594,10 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `backend/repository/source_stats.py`
+
+- `_RATE_WINDOW_DAYS` = `30`
+
 ### `backend/repository/stats_pipeline.py`
 
 - `_VACANCY_SOURCE` = `набор из 2`
@@ -1547,7 +1609,7 @@
 ### `backend/repository/vacancies_card.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `VACANCY_NEIGHBOURS` = `набор из 3`
+- `VACANCY_NEIGHBOURS` = `набор из 4`
 - `class _Link`
   - `column: str`
   - `model: type`
@@ -1599,7 +1661,7 @@
 ### `backend/runtime_settings.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_APP_DEFAULTS: dict[str, str]` = `словарь из 13`
+- `_APP_DEFAULTS: dict[str, str]` = `словарь из 15`
 - `LETTER_WRITERS` = `набор из 2`
 
 ### `backend/single_instance.py`
@@ -1670,10 +1732,6 @@
   - `create_action: str`
   - `news: tuple[str, ...]`
 
-### `client/bridge/channels.py`
-
-- `logger` = `logging.getLogger(__name__)`
-
 ### `client/bridge/companies.py`
 
 - `COMPANY_CARD` = `CardSubject(picker=COMPANY_PICKER, id_key='compa…`
@@ -1685,7 +1743,7 @@
 ### `client/bridge/desktop.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_LINK_SCHEMES` = `frozenset({'http', 'https', 'tg'})`
+- `_LINK_SCHEMES` = `frozenset({'http', 'https', 'tg', 'mailto', 'tel…`
 - `_OPENABLE_SUFFIXES` = `frozenset({'.bmp', '.gif', '.jpeg', '.jpg', '.pn…`
 
 ### `client/bridge/events.py`
@@ -1721,15 +1779,15 @@
 ### `client/bridge/mark.py`
 
 - `class MarkSubject`
-  - `kind: str`
+  - `blacklist: BlacklistMark`
   - `model: type`
   - `key: str`
   - `missing: str`
   - `unnamed: str`
-  - `candidates: Callable[[object], list[str]]`
-- `HR_MARK` = `MarkSubject(kind='hr', model=HR, key='hr_id', mi…`
-- `COMPANY_MARK` = `MarkSubject(kind='company', model=Company, key='…`
-- `CHANNEL_MARK` = `MarkSubject(kind='channel', model=TelegramChanne…`
+- `HR_MARK` = `MarkSubject(blacklist=hr_card.HR_BLACKLIST, mode…`
+- `COMPANY_MARK` = `MarkSubject(blacklist=companies_card.COMPANY_BLA…`
+- `CHANNEL_MARK` = `MarkSubject(blacklist=channels_repo.CHANNEL_BLAC…`
+- `AGGREGATOR_MARK` = `MarkSubject(blacklist=aggregators_repo.AGGREGATO…`
 
 ### `client/bridge/page.py`
 
@@ -1763,6 +1821,7 @@
 - `NO_COMPANY` = `'Компания не найдена.'`
 - `NO_CHANNEL` = `'Канал не найден.'`
 - `NO_ENTRY` = `'Запись не найдена.'`
+- `BLACKLISTED_STAYS_OFF` = `'В чёрном списке — снимите запись, чтобы включит…`
 - `HR_TELEGRAM_TAKEN` = `'Человек с такой учётной записью Telegram уже за…`
 - `SEND_BROKE` = `'Telegram не принял письмо. Проверьте связь и за…`
 - `SPELLINGS_SHAPE` = `'Написания шлют списком или строкой через запяту…`
@@ -1790,13 +1849,13 @@
 - `PARSE_CV_REFUSALS` = `словарь из 5`
 - `SEND_REFUSALS` = `словарь из 12`
 - `NO_AGGREGATOR` = `'Агрегатор не найден.'`
-- `NOT_A_SITE` = `'Адрес не похож на сайт'`
 - `WEB_SEARCH_KEPT` = `'Поиск по сети удалить нельзя'`
 - `LOGIN_FIRST` = `'Сначала войдите на сайт'`
+- `WEB_SEARCH_UNMARKED` = `'Поиск по сети в чёрный список не заносится'`
 - `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться.'`
-- `AGGREGATOR_REFUSALS` = `словарь из 6`
+- `AGGREGATOR_REFUSALS` = `словарь из 7`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
-- `APPLY_VIA_REFUSALS` = `словарь из 4 и раскрытых`
+- `APPLY_VIA_REFUSALS` = `словарь из 3 и раскрытых`
 
 ### `client/bridge/runner.py`
 
@@ -1807,7 +1866,17 @@
 - `logger` = `logging.getLogger(__name__)`
 - `_CONNECT_TRIES` = `15`
 - `_CONNECT_STEP_S` = `0.2`
-- `APP_KEYS` = `набор из 8`
+- `APP_KEYS` = `набор из 10`
+
+### `client/bridge/source_page.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `class Source`
+  - `key: str`
+  - `link: Any`
+  - `method: str`
+- `CHANNEL` = `Source('channel_id', Vacancy.source_channel_id, …`
+- `AGGREGATOR` = `Source('aggregator_id', Vacancy.source_aggregato…`
 
 ### `client/bridge/system.py`
 
@@ -1952,6 +2021,7 @@
 
 - `pytestmark` = `pytest.mark.usefixtures('one_vector')`
 - `PAGE` = `'https://site.test/vacancy/1?from=list'`
+- `BARRED_PAGE` = `'https://jobs.barred.test/vacancy/1'`
 
 ### `tests/backend/test_bootstrap_schema.py`
 
@@ -1981,6 +2051,12 @@
 
 - `PAGE` = `'https://site.test/vacancy/1'`
 - `FORM` = `'https://company.test/apply'`
+
+### `tests/backend/test_flows_aggregator_name.py`
+
+- `CHAT_MODEL` = `LlmProviderConfig(base_url='http://provider.test…`
+- `_DECLARED` = `'<meta property="og:site_name" content="Пример Р…`
+- `_ICON` = `b'\x89PNG\r\n\x1a\n-icon-'`
 
 ### `tests/backend/test_flows_aggregator_seek.py`
 
@@ -2122,6 +2198,10 @@
 - `CHAT` = `набор из 2`
 - `EMBEDDINGS` = `набор из 2`
 - `MODELS` = `набор из 2`
+
+### `tests/fakes/site_home.py`
+
+- `HOME` = `набор из 2`
 
 ### `tests/fakes/telegram.py`
 

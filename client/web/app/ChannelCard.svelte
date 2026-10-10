@@ -13,37 +13,24 @@
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MenuItem from '$components/MenuItem.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
-  import { living } from '$state/alive.js';
+  import SourceStats from '$components/SourceStats.svelte';
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
-  import { cardRead } from '$state/card_read.js';
-  import { channelName, channelStats, pollBlock } from '$state/channels.js';
-  import { freshAnswer } from '$state/fresh.js';
-  import { PAGE, appended, refreshLimit } from '$state/paging.js';
-  import { donut } from '$state/stats.js';
+  import { channelName, pollBlock } from '$state/channels.js';
+  import { sourceCard } from '$state/source_card.svelte.js';
 
   let { ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged } = $props();
 
-  let card = $state(null);
-  let vacancies = $state([]);
-  let hasMore = $state(false);
-  let digging = $state(false);
   let asking = $state(false);
-  let trouble = $state('');
 
-  // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
-  // канал в ней переключают нажатием по соседней строке — ответ про прежний,
-  // лёгший поверх свежего, показал бы его числа под новым именем.
-  const alive = living();
-  const freshVacancies = freshAnswer(() => alive.now);
-
-  const readCard = cardRead({
+  // Каналов с тысячей вакансий хватает, и разом такой список не рисуется.
+  const source = sourceCard({
     ask: (...args) => ask(...args),
     method: 'channels.detail',
     trouble: 'Не удалось прочитать канал',
-    alive: () => alive.now,
-    show: (now) => ({ card, trouble } = now),
+    vacanciesOf: (id) => (page) => ask('channels.vacancies', { channel_id: id, ...page }),
   });
+  const card = $derived(source.card);
 
   const dropCard = cardFinish({
     ask: (...args) => ask(...args),
@@ -59,37 +46,12 @@
     block: 'channels.block',
     unblock: 'channels.unblock',
     say: (text) => say(text),
-    reread: () => readCard(channelId),
+    reread: () => source.read(channelId),
     onchanged: () => onchanged(),
   });
 
   const shown = $derived(card ? channelName({ ...card, id: card.channel_id }) : null);
   const pollTip = $derived(pollBlock(card, lockedTip));
-  const numbers = $derived(card ? channelStats(card.stats) : null);
-  const funnel = $derived(card ? donut(card.stats.status_counts) : []);
-
-  /** Дочитать вакансии канала.
-   *
-   * Страницами: каналов с тысячей вакансий хватает, и разом такой список не
-   * рисуется. `append` — добор к показанному, `replace` — первая страница.
-   *
-   * Перечитывание берёт столько строк, сколько показано, а не страницу: весть
-   * приходит на каждое разобранное объявление, и страницей она схлопывала бы
-   * пролистанное снова и снова — ровно во время того прогона, который человек
-   * и запустил.
-   */
-  async function loadVacancies(id, mode = 'replace') {
-    const page = await freshVacancies(() =>
-      ask('channels.vacancies', {
-        channel_id: id,
-        limit: mode === 'append' ? PAGE : refreshLimit(vacancies.length),
-        offset: mode === 'append' ? vacancies.length : 0,
-      }),
-    );
-    if (page === null) return;
-    vacancies = mode === 'append' ? appended(vacancies, page.vacancies) : page.vacancies;
-    hasMore = page.has_more;
-  }
 
   /** Дочитать следующую страницу вакансий: панель подошла к концу.
    *
@@ -97,11 +59,7 @@
    * знает об этой прокрутке она.
    */
   export function more() {
-    if (!hasMore || digging) return;
-    digging = true;
-    loadVacancies(channelId, 'append').finally(() => {
-      digging = false;
-    });
+    source.more(channelId);
   }
 
   /** Опросить канал сейчас.
@@ -133,35 +91,10 @@
     await dropCard(channelId);
   }
 
-  /** Перечитать карточку канала и показанные его вакансии. */
-  function reread(id) {
-    readCard(id);
-    loadVacancies(id);
-  }
-
-  $effect(() => {
-    const id = channelId;
-    const settled = alive.entered(() => {
-      // Показанное прежним каналом уходит сразу: панель одна, и его числа под
-      // новым именем читались бы как числа нового.
-      card = null;
-      trouble = '';
-      vacancies = [];
-      hasMore = false;
-      reread(id);
-    });
-    // Канал приносит вакансии и во время прогона, и сам по себе обходом: его
-    // числа и перечень стареют, пока карточка открыта, а прогнавший канал
-    // человек смотрит именно на них.
-    const deaf = events.on('vacancies_list_changed', () => reread(id));
-    return () => {
-      settled();
-      deaf();
-    };
-  });
+  $effect(() => source.watch(events, channelId));
 </script>
 
-<CardPane {trouble} ready={!!card}>
+<CardPane trouble={source.trouble} ready={!!card}>
   <div class="cnt-det-head">
     <Avatar avatar={card.avatar} icon="tag" />
 
@@ -214,56 +147,12 @@
     </ActionsMenu>
   </div>
 
-  <div class="card-section">
-    <div class="ch-stats-grid">
-      <div class="ch-stat">
-        <span class="big-num ch-stat-num">{card.stats.vacancies_per_day}</span>
-        <span class="ch-stat-label">Вакансий в день</span>
-      </div>
-      <div class="ch-stat">
-        <span class="big-num ch-stat-num fit">{numbers.fit}</span>
-        <span class="ch-stat-label">Подходящих вакансий</span>
-      </div>
-      <div class="ch-stat">
-        <span class="big-num ch-stat-num apply">{numbers.apply}</span>
-        <span class="ch-stat-label">Откликов из подходящих</span>
-      </div>
-      <div class="ch-stat">
-        <span class="big-num ch-stat-num response">{numbers.response}</span>
-        <span class="ch-stat-label">Ответов на отклики</span>
-      </div>
-    </div>
-
-    {#if numbers.empty}
-      <div class="ch-stats-empty">Из этого канала ещё не пришло вакансий</div>
-    {:else}
-      <div class="ch-bar">
-        {#each funnel as part (part.name)}
-          <div
-            class="ch-bar-seg"
-            data-status={part.name}
-            style="width: {part.percent}%"
-            title="{part.name} {part.count}"
-          ></div>
-        {/each}
-      </div>
-      <!-- Легенда под полосой: одиннадцать цветов без подписей не читаются, а
-           подписать отрезки внутри полосы негде. -->
-      <div class="ch-bar-legend">
-        {#each funnel as part (part.name)}
-          <span class="legend-item">
-            <span class="status-dot" data-status={part.name}></span>
-            {part.name} {part.count}
-          </span>
-        {/each}
-      </div>
-    {/if}
-  </div>
+  <SourceStats stats={card.stats} empty="Из этого канала ещё не пришло вакансий" />
 
   <MiniVacancies
-    {vacancies}
+    vacancies={source.vacancies.rows}
     empty="Из этого канала ещё нет вакансий."
-    loading={digging}
+    loading={source.vacancies.digging}
     onpick={onvacancy}
   />
 </CardPane>

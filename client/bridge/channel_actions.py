@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from backend.domain.telegram_identity import normalize_username
 from backend.repository import channels as channels_repo
-from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, launched, reply
+from client.bridge.answer import Denied, denied, launched, reply
 from client.bridge.mark import CHANNEL_MARK, marked, unmarked
-from client.bridge.refusals import NO_BOT, NO_CHANNEL, POLL_REFUSALS
+from client.bridge.refusals import (
+    BLACKLISTED_STAYS_OFF,
+    NO_BOT,
+    NO_CHANNEL,
+    POLL_REFUSALS,
+)
 from client.bridge.form_payloads import read_toggle
+from client.bridge.source_switch import switch_all
 
 
 class ChannelActions:
@@ -166,17 +172,11 @@ class ChannelActions:
         смогли» — прочитанная половина уезжает и в отказ, иначе окно не знало
         бы, какой именно тумблер возвращать на место.
         """
-        channel_id = None
-        is_active = None
-        try:
-            channel_id, is_active = read_toggle(payload, "channel_id", "is_active")
-            if channel_id is None or is_active is None:
-                raise KeyError("channel_id / is_active")
-        except BAD_PAYLOAD as e:
-            return bad_fields(
-                "channels.set_active", e,
-                action="set_active", channel_id=channel_id, is_active=is_active,
-            )
+        channel_id, is_active, refusal = read_toggle(
+            payload, "channel_id", "is_active", "channels.set_active"
+        )
+        if refusal is not None:
+            return refusal
 
         return reply(self._hub.runner, self._switched(channel_id, is_active))
 
@@ -193,7 +193,7 @@ class ChannelActions:
                     session, channel_id
                 ):
                     raise Denied(
-                        "Канал в blacklist — нельзя включить.",
+                        BLACKLISTED_STAYS_OFF,
                         channel_id=channel_id,
                         is_active=is_active,
                         action="set_active",
@@ -213,28 +213,5 @@ class ChannelActions:
         }
 
     def set_all_active(self, payload: dict) -> dict:
-        """Включить или выключить все каналы разом.
-
-        Признак возвращается эхом — по нему окно откатывает отметку,
-        поставленную до ответа. Заслонённые сплошное включение обходит
-        стороной, и держит это репозиторий: включить отмеченный канал нельзя
-        никаким путём.
-        """
-        try:
-            is_active = bool(payload["is_active"])
-        except BAD_PAYLOAD as e:
-            return bad_fields("set_all_active", e, action="set_all_active")
-
-        async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                async with session.begin():
-                    affected = await channels_repo.set_all_channels_active(
-                        session, is_active
-                    )
-            return {
-                "is_active": is_active,
-                "affected": affected,
-                "action": "set_all_active",
-            }
-
-        return reply(self._hub.runner, run())
+        """Общий выключатель каналов; строки не трогает — см. `source_switch`."""
+        return switch_all(self._hub, "channels_enabled", "channels.set_all_active", payload)

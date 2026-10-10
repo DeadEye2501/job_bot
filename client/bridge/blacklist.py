@@ -141,16 +141,11 @@ class Blacklist:
 
         По ним окно откатывает отметку, поставленную до ответа.
         """
-        blacklist_id = None
-        active = None
-        try:
-            blacklist_id, active = read_toggle(payload, "id", "active")
-            if blacklist_id is None or active is None:
-                raise KeyError("id / active")
-        except BAD_PAYLOAD as e:
-            return bad_fields(
-                "blacklist.set_active", e, action="set_active", id=blacklist_id, active=active
-            )
+        blacklist_id, active, refusal = read_toggle(
+            payload, "id", "active", "blacklist.set_active"
+        )
+        if refusal is not None:
+            return refusal
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:

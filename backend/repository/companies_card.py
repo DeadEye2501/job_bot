@@ -8,11 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.domain.company_names import capitalized_company_name
 from backend.domain.spellings import dedupe_first_wins
 from backend.models import Company, Vacancy
+from backend.models.settings import COMPANY_KIND
 from backend.payloads import CompanyDetail
 from backend.incoming import str_list, text_or_none
 
 from backend.repository.blacklist import rename_blacklist_marks
-from backend.repository.blacklist_marks import active_blacklist_value
+from backend.repository.blacklist_marks import BlacklistMark
 from backend.repository.merging import concat_notes, load_merge_pair
 from backend.repository.vacancies_life import repoint_vacancies
 
@@ -71,12 +72,7 @@ def company_blacklist_candidates(co: Company) -> list[str]:
     return [co.name] if co.name else []
 
 
-async def _company_blacklist_value(
-    session: AsyncSession, co: Company
-) -> str | None:
-    return await active_blacklist_value(
-        session, "company", company_blacklist_candidates(co)
-    )
+COMPANY_BLACKLIST = BlacklistMark(COMPANY_KIND, company_blacklist_candidates)
 
 
 async def get_company_detail(
@@ -94,7 +90,7 @@ async def get_company_detail(
         return None
     return CompanyDetail(
         company=co,
-        blacklist_value=await _company_blacklist_value(session, co),
+        blacklist_value=await COMPANY_BLACKLIST.value(session, co),
     )
 
 
@@ -174,7 +170,7 @@ async def update_company_fields(
         previous = co.name
         co.name = cleaned
         await rename_blacklist_marks(
-            session, "company", old_value=previous, new_value=cleaned
+            session, COMPANY_KIND, old_value=previous, new_value=cleaned
         )
     if "website" in fields:
         co.website = text_or_none(fields["website"])
@@ -272,7 +268,7 @@ async def merge_company(
     await session.flush()
     _carry_company_to_survivor(survivor, taken)
     await rename_blacklist_marks(
-        session, "company", old_value=taken.name, new_value=survivor.name
+        session, COMPANY_KIND, old_value=taken.name, new_value=survivor.name
     )
 
     logger.info(

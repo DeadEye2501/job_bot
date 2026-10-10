@@ -214,3 +214,17 @@ async def test_a_new_entry_tells_the_lists_to_reread_themselves(api, ask, hub):
     news = await hub.events.take(after=0, timeout=0.01)
 
     assert [one["kind"] for one in news["events"]] == ["contacts_lists_changed"]
+
+
+async def test_an_aggregator_entry_is_stored_as_its_host(api, ask):
+    await ask(api.blacklist.create, {"kind": "aggregator", "value": "https://www.Site.test/jobs"})
+
+    listed = (await ask(api.blacklist.list))["ok"]["items"]
+
+    assert [(row["kind"], row["value"]) for row in listed] == [("aggregator", "site.test")]
+
+
+async def test_an_aggregator_entry_without_a_host_is_refused(api, ask):
+    answer = await ask(api.blacklist.create, {"kind": "aggregator", "value": "https://"})
+
+    assert (answer["fail"], answer["detail"]) == ("denied", "Адрес не похож на сайт")

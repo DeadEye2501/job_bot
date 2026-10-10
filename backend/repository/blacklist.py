@@ -7,10 +7,12 @@ from typing import Literal
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.hosts import normalize_host
 from backend.models import Blacklist
+from backend.models.settings import AGGREGATOR_KIND, CHANNEL_KIND
 from backend.incoming import text_or_none
 
-from backend.repository import channels
+from backend.repository import aggregators, channels
 from backend.repository.blacklist_marks import active_mark_of
 
 logger = logging.getLogger(__name__)
@@ -25,19 +27,25 @@ BlacklistOutcome = Literal["created", "reactivated", "already_active"]
 """
 
 
-async def _hold_the_channel_rule(session: AsyncSession, kind: str) -> None:
-    """Держать правило «канал в отсеве не работает» при каждой записи отметки.
+_SWITCH_OFF_MARKED = {
+    CHANNEL_KIND: channels.deactivate_blacklisted_channels,
+    AGGREGATOR_KIND: aggregators.deactivate_blacklisted_aggregators,
+}
+"""Чем гасить источники своего рода, попавшие под отметку."""
 
-    Состояния несовместимы: канал, попавший в отсев, не должен опрашиваться.
-    Прежде это правило звали три дороги из пяти — карточка канала, заведение
-    записи с экрана списка и самопочинка на показе, — а тумблер строки и
-    правка её значения не звали, и отсеянный канал продолжал носить вакансии
-    до ближайшего открытия списка.
 
-    Зов стоит здесь, у самой записи, чтобы забыть о нём не мог никто.
+async def _hold_the_source_rule(session: AsyncSession, kind: str) -> None:
+    """Держать правило «источник в отсеве не работает» при каждой записи отметки.
+
+    Состояния несовместимы: канал или агрегатор, попавший в отсев, не должен
+    обходиться. Отметку пишут многие дороги — карточка, экран списка, тумблер
+    строки, правка значения, — и зов стоит здесь, у самой записи, чтобы
+    забыть о нём не могла ни одна: забытый, он оставил бы отсеянный источник
+    носить вакансии.
     """
-    if kind == "channel":
-        await channels.deactivate_blacklisted_channels(session)
+    switch_off = _SWITCH_OFF_MARKED.get(kind)
+    if switch_off is not None:
+        await switch_off(session)
 
 
 async def set_blacklist_active(
@@ -52,7 +60,7 @@ async def set_blacklist_active(
     prev = row.active
     row.active = bool(active)
     if row.active:
-        await _hold_the_channel_rule(session, row.kind)
+        await _hold_the_source_rule(session, row.kind)
     if prev != row.active:
         logger.info(
             "Blacklist %d active %s -> %s (kind=%s value=%r)",
@@ -123,7 +131,7 @@ async def rename_blacklist_marks(
         else:
             row.active = False
     standing.active = True
-    await _hold_the_channel_rule(session, kind)
+    await _hold_the_source_rule(session, kind)
     logger.info(
         "Blacklist marks of kind=%s moved %r -> %r (rows=%d)",
         kind,
@@ -138,6 +146,20 @@ _BLACKLIST_FIELD_UNSET = object()
 
 class BlacklistUpdateError(ValueError):
     """Soft-validation ошибка inline-edit'а blacklist'а."""
+
+
+def _value_of_kind(kind: str, value: str) -> str:
+    """Значение в том написании, в каком его ищет отметка своего рода.
+
+    Агрегатор отмечен хостом: набранный адрес целиком не совпал бы ни с
+    карточкой агрегатора, ни с хостом ссылки в объявлении.
+    """
+    if kind != AGGREGATOR_KIND:
+        return value
+    host = normalize_host(value)
+    if not host:
+        raise BlacklistUpdateError(aggregators.NOT_A_SITE)
+    return host
 
 
 def _required_value(value) -> str:
@@ -192,8 +214,8 @@ async def update_blacklist(
     if row is None:
         return False
     if value is not _BLACKLIST_FIELD_UNSET:
-        row.value = await _free_value(session, row, _required_value(value))
-        await _hold_the_channel_rule(session, row.kind)
+        row.value = await _free_value(session, row, _value_of_kind(row.kind, _required_value(value)))
+        await _hold_the_source_rule(session, row.kind)
     if reason is not _BLACKLIST_FIELD_UNSET:
         row.reason = text_or_none(reason)
     return True
@@ -264,14 +286,14 @@ async def create_blacklist(
     исходом от :func:`_reuse_existing`; иначе вставляется новая, активная.
 
     Канальную строку сопровождает гашение самих каналов — см.
-    `_hold_the_channel_rule`.
+    `_hold_the_source_rule`.
 
     Returns (row, outcome). Caller wraps in ``session.begin()``.
     """
-    normalized_value = _required_value(value)
     normalized_kind = (kind or "").strip()
     if not normalized_kind:
         raise BlacklistUpdateError("Тип обязателен.")
+    normalized_value = _value_of_kind(normalized_kind, _required_value(value))
     normalized_reason = text_or_none(reason)
 
     existing = await _same_entry(session, normalized_kind, normalized_value)
@@ -281,7 +303,7 @@ async def create_blacklist(
         row, outcome = await _insert_blacklist(
             session, normalized_kind, normalized_value, normalized_reason
         ), "created"
-    await _hold_the_channel_rule(session, normalized_kind)
+    await _hold_the_source_rule(session, normalized_kind)
     return row, outcome
 
 

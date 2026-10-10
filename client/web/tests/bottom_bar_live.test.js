@@ -15,6 +15,7 @@ import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import BottomBar from '../app/BottomBar.svelte';
+import { hearRound } from '../state/round.svelte.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
@@ -36,18 +37,23 @@ function bar(health) {
     return {};
   };
 
+  const events = {
+    on: (name, handler) => {
+      handlers[name] = handler;
+      return () => {};
+    },
+    run: () => {},
+    stop: () => {},
+  };
+  // Вести о начале и конце прогона слушает общий учёт, а не полоса: в окне его
+  // подписывает оболочка, здесь — проверка, на те же поддельные вести.
+  hearRound(events);
+
   render(BottomBar, {
     props: {
       ask,
       say: (text) => said.push(text),
-      events: {
-        on: (name, handler) => {
-          handlers[name] = handler;
-          return () => {};
-        },
-        run: () => {},
-        stop: () => {},
-      },
+      events,
       onlocked: (tip) => tips.push(tip),
       oncontact: () => {},
     },

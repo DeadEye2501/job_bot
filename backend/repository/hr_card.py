@@ -9,13 +9,14 @@ from sqlalchemy.orm import aliased
 
 from backend.domain.telegram_identity import typed_username
 from backend.models import Company, HR, Message, Vacancy
+from backend.models.settings import HR_KIND
 from backend.payloads import HrDetail
 from backend.incoming import text_or_none
 
 from backend.repository.blacklist import rename_blacklist_marks
 from backend.repository.blacklist_marks import (
+    BlacklistMark,
     account_mark,
-    active_blacklist_value,
     nickname_mark,
     preferred_blacklist_value,
 )
@@ -183,8 +184,11 @@ def hr_blacklist_candidates(hr: HR) -> list[str]:
     return _marks_of(hr.telegram_user_id, hr.telegram_username)
 
 
-async def hr_blacklist_value(session: AsyncSession, hr: HR) -> str | None:
-    return await active_blacklist_value(session, "hr", hr_blacklist_candidates(hr))
+HR_BLACKLIST = BlacklistMark(HR_KIND, hr_blacklist_candidates)
+
+# Имя для зовущих вне репозитория: отправке и разбору писем нужно только
+# «чем отмечен», а не вся отметка.
+hr_blacklist_value = HR_BLACKLIST.value
 
 
 async def delete_hr(session: AsyncSession, hr_id: int) -> bool:
@@ -349,7 +353,7 @@ async def carry_hr_marks(
     for old_value in written_before:
         if old_value not in now:
             await rename_blacklist_marks(
-                session, "hr", old_value=old_value, new_value=value
+                session, HR_KIND, old_value=old_value, new_value=value
             )
 
 

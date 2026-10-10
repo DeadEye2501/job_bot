@@ -76,6 +76,10 @@ _APP_DEFAULTS: dict[str, str] = {
     "aggregator_backfill_limit": "20",
     "show_browser": "false",
     "letter_writer": "app",
+    # Общие выключатели источников одного рода — над тумблерами строк, а не
+    # вместо них: выключенный гасит общий обход, строки помнят своё.
+    "channels_enabled": "true",
+    "aggregators_enabled": "true",
 }
 
 LETTER_WRITERS = ("app", "agent")
@@ -175,6 +179,16 @@ class RuntimeSettings:
         """Сколько новых для базы вакансий искатель передаёт в конвейер за обход
         одного источника."""
         return self._app_int("aggregator_backfill_limit", minimum=1)
+
+    @property
+    def channels_enabled(self) -> bool:
+        """Общий обход каналов разрешён. Ручной прогон одного канала его не спрашивает."""
+        return self._app_bool("channels_enabled")
+
+    @property
+    def aggregators_enabled(self) -> bool:
+        """Общий обход агрегаторов разрешён. Ручной обход и вход его не спрашивают."""
+        return self._app_bool("aggregators_enabled")
 
     @property
     def show_browser(self) -> bool:

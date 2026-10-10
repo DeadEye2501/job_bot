@@ -22,8 +22,9 @@
   import { cardNotes } from '$state/card_notes.js';
   import { cardRead } from '$state/card_read.js';
   import { cardSave } from '$state/card_save.js';
-  import { companyCandidate, companyLine, companyTitle, siteHref } from '$state/companies.js';
+  import { companyCandidate, companyLine, companyTitle } from '$state/companies.js';
   import { miniRead } from '$state/mini_read.js';
+  import { siteHref } from '$state/site.js';
 
   let { ask, say, companyId, onperson, onvacancy, onclose, onchanged } = $props();
 

@@ -10,6 +10,7 @@ from adapters import smtp_mail
 from adapters.smtp_mail import MailAccountConfig, OutgoingMail
 from backend.agent.jobs import Applied, ApplyJob, Failed
 from backend.agent.kit import AgentKit
+from backend.domain.apply_order import VIA_AGGREGATOR, VIA_EMAIL, VIA_FORM
 from backend.models import ApplicationVia
 from backend.repository.applications import ApplicationEntry, append_screening, application_exists
 from backend.repository.applications import record_application as store
@@ -19,9 +20,8 @@ from backend.repository.vacancy_contacts import has_contact
 
 logger = logging.getLogger(__name__)
 
-_AGGREGATOR, _FORM = ApplicationVia.AGGREGATOR.value, ApplicationVia.FORM.value
 # Кнопка агрегатора бывает переходом на форму работодателя: такой отклик пишется формой.
-_ALLOWED = {_AGGREGATOR: {_AGGREGATOR, _FORM}, _FORM: {_FORM}}
+_ALLOWED = {VIA_AGGREGATOR: {VIA_AGGREGATOR, VIA_FORM}, VIA_FORM: {VIA_FORM}}
 
 
 def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
@@ -48,10 +48,10 @@ def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
     async def send_email(address: str, subject: str, body: str) -> str:
         """Отправить письмо-отклик с резюме на адрес из контактов вакансии. Отклик записывается, когда сервер почты принял письмо."""
         # Тема — одной строкой: перевод строки в заголовке письмо не соберёт.
-        return await _send_email(kit, job, _Report(ApplicationVia.EMAIL.value, address.strip(), body, []),
+        return await _send_email(kit, job, _Report(VIA_EMAIL, address.strip(), body, []),
                                  " ".join(subject.split()))
 
-    if job.method == ApplicationVia.EMAIL.value:
+    if job.method == VIA_EMAIL:
         return [vacancy, send_email]
     return [vacancy, record_application]
 
@@ -80,9 +80,7 @@ def _lines(screening: list[dict]) -> list[tuple[bool, str]]:
 
 
 async def _record(kit: AgentKit, job: ApplyJob, entry: ApplicationEntry) -> str:
-    async with kit.pipeline.session_factory() as session:
-        async with session.begin():
-            application_id = await store(session, entry, forced=job.forced)
+    application_id = await kit.written(lambda session: store(session, entry, forced=job.forced))
     job.outcome = Applied(application_id)
     kit.pipeline.fire_vacancies_changed()
     return "Отклик записан."
@@ -91,9 +89,7 @@ async def _record(kit: AgentKit, job: ApplyJob, entry: ApplicationEntry) -> str:
 async def _append(kit: AgentKit, application_id: int, lines: list[tuple[bool, str]]) -> str:
     """Скрининг к отклику, уже записанному в этой сессии: вопросы со страницы
     подтверждения ложатся туда же, даже если её адрес другой."""
-    async with kit.pipeline.session_factory() as session:
-        async with session.begin():
-            await append_screening(session, application_id, lines)
+    await kit.written(lambda session: append_screening(session, application_id, lines))
     return "Скрининг дописан к записанному отклику."
 
 

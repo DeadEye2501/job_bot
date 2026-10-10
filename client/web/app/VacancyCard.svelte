@@ -16,10 +16,11 @@
   import { cardFinish } from '$state/card_finish.js';
   import { cardLinks } from '$state/card_links.js';
   import { miniRead } from '$state/mini_read.js';
-  import { actionBlocks, rawChips } from '$state/vacancy_actions.js';
+  import { actionBlocks, rawChips, sourcePill } from '$state/vacancy_actions.js';
   import { ago, gradeLabel, remoteLabel, salaryLabel, scoreTone } from '$state/vacancies.js';
   import { timelineRows } from '$state/vacancy_card.js';
 
+  import VacancyContactsSection from './VacancyContactsSection.svelte';
   import VacancyLinks from './VacancyLinks.svelte';
 
   let { ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged } = $props();
@@ -48,6 +49,7 @@
   const rows = $derived(card ? timelineRows(card.history, card.events) : []);
   const tone = $derived(card ? scoreTone(card.score, card.score_threshold) : '');
   const salary = $derived(card ? salaryLabel(card) : '');
+  const source = $derived(card ? sourcePill(card) : null);
   const blocks = $derived(
     card ? actionBlocks(card, lockedTip) : { send: '', rerun: '', source: '', raw: '' },
   );
@@ -241,16 +243,16 @@
     {#if salary}<span class="info-chip">{salary}</span>{/if}
     {#if card.remote}<span class="info-chip">{remoteLabel(card.remote)}</span>{/if}
     {#if card.location}<span class="info-chip">{card.location}</span>{/if}
-    {#if card.channel_username}
+    {#if source}
       <button
         class="info-chip"
         class:linkable={card.source_url}
         type="button"
-        title="Перейти к посту в канале"
+        title={source.title}
         disabled={!card.source_url}
         onclick={() => outside(card.source_url)}
       >
-        <span class="material-symbols-outlined">tag</span>{card.channel_username}
+        <span class="material-symbols-outlined">{source.icon}</span>{source.text}
       </button>
     {/if}
     {#if posted}
@@ -327,6 +329,16 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <div class="card-section det-section">
+    <VacancyContactsSection
+      {vacancyId}
+      contacts={card.contacts}
+      {ask}
+      onopen={outside}
+      onchanged={(contacts) => (card = { ...card, contacts })}
+    />
   </div>
 
   <div class="card-section det-section">

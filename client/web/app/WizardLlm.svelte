@@ -11,7 +11,7 @@
   // недописанный адрес значил бы работающего бота без модели.
   import { call } from '$api/bridge.js';
   import { living } from '$state/alive.js';
-  import { askModels, pickModelFile, probeModel } from '$state/provider.js';
+  import { providerForm } from '$state/provider_form.svelte.js';
   import {
     CREDS_LIMITS,
     EMBED_SOURCES,
@@ -23,17 +23,14 @@
     addressTrouble,
     addressless,
     canShareChat,
-    fileCreds,
+    embedReading,
     fileTrouble,
     isFileSource,
-    isModelFile,
-    llmTrouble,
     mirrored,
     modelPlaceholder,
-    presetCreds,
     presetFor,
-    sameCreds,
-    sourceCreds,
+    probeLine,
+    sharesChat,
     sourceLabel,
   } from '$state/settings.js';
   import Dropdown from '$components/Dropdown.svelte';
@@ -44,68 +41,50 @@
 
   let { ask, kind, onback, onnext } = $props();
 
-  let creds = $state(blankCreds());
   let chat = $state(blankCreds());
-  let sameAsChat = $state(true);
-  // Эмбеддинги из файла модели, а не с сервера.
-  let fromFile = $state(false);
-  let models = $state([]);
-  let status = $state(null);
+  // Что шаг говорит сам — заслон, перечень имён, запись. Исход проверки связи
+  // помнит форма, и строка показывает его, когда шагу сказать нечего.
+  let note = $state(null);
   let busy = $state(false);
 
   const alive = living();
+  const form = providerForm({ kind, call, alive });
 
   const chatStep = $derived(kind === 'chat');
+  const status = $derived(note ?? probeLine(form.probe));
   // Адрес и ключ стоят только там, где их набирают: при отмеченной галочке они
   // те же, что у чата, и показывать их значило бы предлагать править то, что
   // тут же перепишется чатовым.
-  const ownCreds = $derived(chatStep || !sameAsChat);
+  const sharing = $derived(
+    !chatStep && sharesChat({ same: form.same, fromFile: form.fromFile, chat }),
+  );
   // У Claude Code нет ни адреса, ни ключа: поля просили бы вписать то, чего нет.
-  const showAddress = $derived(ownCreds && !addressless(creds.base_url));
-  const namePlaceholder = $derived(modelPlaceholder(models));
+  const showAddress = $derived(!sharing && !addressless(form.creds.base_url));
+  const namePlaceholder = $derived(modelPlaceholder(form.models));
   // Незнакомый адрес отмечен как «своё»: пустая отметка читалась бы как
   // «поставщик не выбран», хотя адрес уже вписан.
-  const chosenPreset = $derived(presetFor(creds.base_url));
+  const chosenPreset = $derived(presetFor(form.creds.base_url));
 
   async function refresh() {
     const now = await ask('settings.get');
     if (now === null || !alive.now) return;
     chat = now.chat;
     if (chatStep) {
-      creds = now.chat;
+      form.creds = now.chat;
     } else {
+      const reading = embedReading(now.chat, now.embed);
+      form.fromFile = reading.fromFile;
+      if (reading.fromFile) {
+        form.creds = now.embed;
+        return;
+      }
       // Эмбеддинги начинают с того же адреса и ключа, что и чат: шаг о том и
       // говорит, а пустые поля заставляли бы перенабирать ключ вслепую. Своими
       // они считаются, только если своими и записаны.
-      fromFile = isModelFile(now.embed);
-      if (fromFile) {
-        creds = now.embed;
-        return;
-      }
-      // С чатом на Claude делить адрес нельзя: векторов он не считает.
-      sameAsChat =
-        canShareChat(now.chat) && (now.embed.base_url ? sameCreds(now.chat, now.embed) : true);
-      creds = sameAsChat ? mirrored(now.chat, now.embed) : now.embed;
+      form.same = reading.same || (!now.embed.base_url && canShareChat(now.chat));
+      form.creds = form.same ? mirrored(now.chat, now.embed) : now.embed;
     }
-    return listModels();
-  }
-
-  /** Спросить у поставщика имена его моделей.
-   *
-   * Молча: перечень — подсказка к полю, а не действие человека. Спрашивается он
-   * на каждую правку адреса и ключа, и непóднятый поставщик отвечает отказом на
-   * каждый знак — плашка беды выскакивала бы поверх набора. Не ответил — список
-   * пуст, имя модели вписывают руками.
-   *
-   * Отказ при этом не теряется, а возвращается фразой: по нажатию «Проверить»
-   * его и показывают, и путать его с пустым перечнем нельзя — «сервер молчит» и
-   * «в сервере нет моделей» чинятся по-разному.
-   */
-  async function listModels() {
-    const found = await askModels(call, { kind, ...creds });
-    if (!alive.now) return found;
-    models = found.models;
-    return found;
+    return form.listModels();
   }
 
   /** Поправить поле.
@@ -114,54 +93,35 @@
    * читается, и оставленный прежним подсказывал бы модели чужого сервера.
    */
   function edit(part) {
-    creds = { ...creds, ...part };
+    form.creds = { ...form.creds, ...part };
     // Строка состояния говорит про те данные, которые проверяли: правь их — ей
     // верить больше нельзя.
-    status = null;
-    if (part.base_url !== undefined || part.api_key !== undefined) return listModels();
+    note = null;
+    form.forget();
+    if (part.base_url !== undefined || part.api_key !== undefined) return form.listModels();
   }
 
-  /** Выбрать готового поставщика: адрес подставляется, имя модели сбрасывается.
-   *
-   * Набранное для прежнего поставщика у нового почти наверняка не заведётся, и
-   * оставленное имя ушло бы в проверку молчаливой ошибкой.
-   */
   function pickPreset(label) {
-    const next = presetCreds(label, creds);
-    if (next === null) return;
-    return edit({ base_url: next.base_url, model: next.model });
+    note = null;
+    return form.pickPreset(label);
   }
 
-  /** Переключить источник эмбеддингов: сервер или файл модели. */
   function switchSource(toFile) {
-    // Выбранный заново тот же источник — не смена: стирать набранное не за что.
-    if (toFile === fromFile) return;
-    fromFile = toFile;
-    status = null;
-    creds = sourceCreds(toFile);
-    sameAsChat = false;
-    models = [];
+    note = null;
+    form.switchSource(toFile);
   }
 
   /** Спросить файл модели диалогом окна; записывается он по «Дальше». */
   async function pickFile() {
-    const got = await pickModelFile(call);
-    if (!alive.now) return;
-    if (got.trouble) {
-      status = { tone: 'err', text: got.trouble };
-      return;
-    }
-    if (!got.path) return;
-    creds = fileCreds(got.path);
-    status = null;
+    const got = await form.pickFile();
+    if (got.trouble) note = { tone: 'err', text: got.trouble };
+    else if (got.path) note = null;
   }
 
   /** Переключить эмбеддинги на чатовые адрес и ключ — или на свои. */
   function useChatCreds(on) {
-    sameAsChat = on;
-    status = null;
-    if (on) creds = mirrored(chat, creds);
-    return listModels();
+    note = null;
+    return form.useChat(on, chat);
   }
 
   /** Проверить связь с поставщиком.
@@ -175,14 +135,19 @@
    */
   async function check() {
     if (busy) return;
+    const { creds, fromFile } = form;
     const trouble = fromFile ? fileTrouble(creds) : addressTrouble(creds.base_url);
     if (trouble) {
-      status = { tone: 'err', text: trouble };
+      note = { tone: 'err', text: trouble };
       return;
     }
     busy = true;
-    if (fromFile || creds.model.trim()) await probe();
-    else await askNames();
+    if (fromFile || creds.model.trim()) {
+      note = null;
+      await form.verify();
+    } else {
+      await askNames();
+    }
     if (alive.now) busy = false;
   }
 
@@ -193,53 +158,42 @@
    * сервера, другое загрузкой модели в него.
    */
   async function askNames() {
-    status = { tone: 'busy', text: 'Загружаем список моделей у провайдера...' };
-    const found = await listModels();
+    note = { tone: 'busy', text: 'Загружаем список моделей у провайдера...' };
+    const found = await form.listModels();
     if (!alive.now) return;
     if (found.trouble) {
-      status = { tone: 'err', text: found.trouble };
+      note = { tone: 'err', text: found.trouble };
       return;
     }
     if (!found.models.length) {
-      status = {
+      note = {
         tone: 'err',
         text: 'Провайдер не вернул ни одной модели — проверьте, что в LM Studio загружена модель.',
       };
       return;
     }
-    status = {
+    note = {
       tone: 'ok',
       text: `Найдено моделей: ${found.models.length}. Выберите модель из списка и нажмите «Проверить».`,
     };
   }
 
-  /** Проверить связь с поставщиком: имя модели набрано, и спрашивать есть что. */
-  async function probe() {
-    status = { tone: 'busy', text: 'Проверяем подключение...' };
-    const done = await probeModel(call, { kind, ...creds });
-    if (!alive.now) return;
-    // Поля могли поправить, пока ответ шёл: исход говорил бы про данные,
-    // которых в них уже нет.
-    if (status?.tone !== 'busy') return;
-    status = done.ok
-      ? { tone: 'ok', text: `Подключение работает (${done.model} · ${done.latencyMs}ms)` }
-      : { tone: 'err', text: done.trouble };
-  }
-
   async function save() {
     if (busy) return;
-    const trouble = fromFile ? fileTrouble(creds) : llmTrouble(creds);
-    if (trouble) {
-      status = { tone: 'err', text: trouble };
+    if (form.trouble) {
+      note = { tone: 'err', text: form.trouble };
       return;
     }
     busy = true;
-    status = { tone: 'busy', text: 'Сохраняем...' };
+    note = { tone: 'busy', text: 'Сохраняем...' };
     // Адрес уезжает обрезанным: заслон судит по обрезанному, и пробел на конце
     // прошёл бы проверку, а на мост уехал бы вместе с ним.
-    if (!fromFile) {
-      creds = ownCreds ? { ...creds, base_url: creds.base_url.trim() } : mirrored(chat, creds);
+    if (!form.fromFile) {
+      form.creds = sharing
+        ? mirrored(chat, form.creds)
+        : { ...form.creds, base_url: form.creds.base_url.trim() };
     }
+    const creds = form.creds;
     try {
       // Зовём мост напрямую: отказ записи — исход шага, и читают его там же,
       // где исход проверки, — строкой под полями.
@@ -247,7 +201,7 @@
     } catch (refusal) {
       if (!alive.now) return;
       busy = false;
-      status = { tone: 'err', text: refusal.message };
+      note = { tone: 'err', text: refusal.message };
       return;
     }
     if (!alive.now) return;
@@ -292,14 +246,14 @@
     {:else}
       <Dropdown
         options={EMBED_SOURCES}
-        value={sourceLabel(fromFile)}
+        value={sourceLabel(form.fromFile)}
         onpick={(source) => switchSource(isFileSource(source))}
       />
-      {#if !fromFile && canShareChat(chat)}
+      {#if !form.fromFile && canShareChat(chat)}
         <label class="checkbox-row">
           <input
             type="checkbox"
-            checked={sameAsChat}
+            checked={form.same}
             onchange={(event) => useChatCreds(event.currentTarget.checked)}
           />
           {SAME_CREDS_LABEL}
@@ -307,12 +261,12 @@
       {/if}
     {/if}
 
-    {#if fromFile}
+    {#if form.fromFile}
       <input
         class="input mono"
         readonly
-        value={creds.model}
-        title={creds.model}
+        value={form.creds.model}
+        title={form.creds.model}
         placeholder={NO_FILE_PLACEHOLDER}
       />
       <button class="btn" type="button" disabled={busy} onclick={pickFile}>
@@ -323,11 +277,11 @@
         class="input mono"
         maxlength={CREDS_LIMITS.base_url}
         placeholder="base_url"
-        value={creds.base_url}
+        value={form.creds.base_url}
         onblur={(event) => edit({ base_url: event.currentTarget.value.trim() })}
       />
       <SecretInput
-        value={creds.api_key}
+        value={form.creds.api_key}
         placeholder={KEY_PLACEHOLDER}
         mono
         maxlength={CREDS_LIMITS.api_key}
@@ -335,10 +289,10 @@
       />
     {/if}
 
-    {#if !fromFile}
+    {#if !form.fromFile}
       <SuggestInput
-        value={creds.model}
-        options={models}
+        value={form.creds.model}
+        options={form.models}
         placeholder={namePlaceholder}
         mono
         maxlength={CREDS_LIMITS.model}

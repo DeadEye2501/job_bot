@@ -10,10 +10,13 @@ from backend.domain.hosts import source_key
 from backend.flows import embeddings, intake, sameness
 from backend.incoming import moment_or_none, str_list
 from backend.models import ContactAddedBy, Vacancy
+from backend.repository.aggregators import barred_host_of
 from backend.repository.vacancies_life import source_seen
 from backend.repository.vacancy_contacts import add_contact
 
 WHAT = "найденная агентом вакансия"
+
+BARRED = "сайт в чёрном списке человека"
 
 
 def seeker_tools(kit: AgentKit, job: SeekJob, queue) -> list[Callable]:
@@ -21,9 +24,9 @@ def seeker_tools(kit: AgentKit, job: SeekJob, queue) -> list[Callable]:
 
     async def is_known(url: str) -> str:
         """Есть ли вакансия по этому адресу на этом источнике — заведённая или удалённая как мусор."""
-        key = source_key(url, job.source.host)
+        key, why = await _numbered(kit, job, url)
         if key is None:
-            return "адрес не с этого источника"
+            return why
         return "известна" if await _known(kit, job.source.id, key) else "новая"
 
     async def submit_vacancy(text: str, url: str, published: str, contacts: list[str]) -> str:
@@ -42,10 +45,14 @@ class _Page:
 
 
 async def _submit(kit: AgentKit, job: SeekJob, queue, page: _Page) -> str:
-    """Повтор по номеру — до предела и до эмбеддинга: он не стоит ни места в пределе, ни вызова модели."""
-    key = source_key(page.url, job.source.host)
+    """Повтор по номеру — до предела и до эмбеддинга: он не стоит ни места в пределе, ни вызова модели.
+
+    Сайт из отсева — пропуск, а не отказ: отказ обрывает обход, а вакансий с
+    других сайтов человек ждёт по-прежнему.
+    """
+    key, why = await _numbered(kit, job, page.url)
     if key is None:
-        return "пропущена: адрес не с этого источника; иди дальше"
+        return f"пропущена: {why}; иди дальше"
     if await _known(kit, job.source.id, key):
         return _left("повтор", job)
     if job.submitted >= job.limit:
@@ -74,6 +81,25 @@ def _left(answer: str, job: SeekJob) -> str:
     return f"{answer}; можно передать ещё {max(job.limit - job.submitted, 0)}"
 
 
+async def _numbered(kit: AgentKit, job: SeekJob, url: str) -> tuple[str | None, str]:
+    """Номер страницы на этом источнике — или пусто и причина, почему его нет.
+
+    Причины две, и обе значат «не открывать и не передавать»: сайт из отсева и
+    адрес не с этого источника. Отсев проверяется первым: его страница могла бы
+    оказаться и на этом источнике, а человеку она не нужна всё равно.
+    """
+    if await _barred(kit, url):
+        return None, f"{BARRED} — не открывай"
+    key = source_key(url, job.source.host)
+    return key, "" if key is not None else "адрес не с этого источника"
+
+
+async def _barred(kit: AgentKit, url: str) -> bool:
+    """Адрес ведёт на сайт из отсева — его вакансии человеку не нужны."""
+    async with kit.pipeline.session_factory() as session:
+        return await barred_host_of(session, [url]) is not None
+
+
 async def _known(kit: AgentKit, aggregator_id: int, key: str) -> bool:
     """Номер уже видели: вакансия с ним заведена или удалена как мусор."""
     async with kit.pipeline.session_factory() as session:
@@ -92,13 +118,15 @@ async def _store(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: 
         raw_text=page.text, embedding=embedding, source_aggregator_id=job.source.id,
         source_key=key, source_url=page.url, posted_at=_posted(page.published),
     )
-    vacancy_id = await intake.save_new_vacancy(
-        kit.pipeline, row, "found", {"source": job.source.name, "url": page.url}
-    )
-    async with kit.pipeline.session_factory() as session:
-        async with session.begin():
-            for value in page.contacts:
-                await add_contact(session, vacancy_id, value, ContactAddedBy.AGENT)
+    # «Поиск по сети» — способ поиска, а не место: окно подписывает такую
+    # находку своими словами, и знать об этом ему неоткуда, кроме события.
+    found = {"source": job.source.name, "url": page.url, "web_search": job.source.host is None}
+    vacancy_id = await intake.save_new_vacancy(kit.pipeline, row, "found", found)
+    async def contacts(session) -> None:
+        for value in page.contacts:
+            await add_contact(session, vacancy_id, value, ContactAddedBy.AGENT)
+
+    await kit.written(contacts)
     return vacancy_id
 
 

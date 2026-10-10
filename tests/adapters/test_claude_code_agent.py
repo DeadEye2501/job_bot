@@ -100,8 +100,15 @@ async def test_without_claude_code_the_session_fails_without_a_process(monkeypat
 
 
 def test_the_longest_prompt_fits_a_windows_command_line():
-    """Командная строка Windows — 32 767 знаков, а наставление откликателя самое длинное."""
-    run = dataclasses.replace(RUN, system_prompt=system_prompt(APPLIER_PROMPT), web_search=True)
+    """Командная строка Windows — 32 767 знаков, а наставление откликателя самое длинное:
+    правило о зове человека в нём есть, потому что откликателю дан `need_human`."""
+
+    def need_human():
+        """Подпись инструмента — по ней рамка решает, звать ли человека."""
+
+    run = dataclasses.replace(
+        RUN, system_prompt=system_prompt(APPLIER_PROMPT, [need_human]), web_search=True
+    )
 
     assert len(subprocess.list2cmdline(_argv("claude", run))) < 30_000
 

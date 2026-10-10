@@ -34,7 +34,13 @@ async def poll_active_channels(pipeline) -> None:
     Сорвавшаяся сводка обход не отменяет: она второстепенна — названия и
     картинки, — а следующий цикл идёт через полтора часа, и объявления этого
     человек не увидел бы вовсе.
+
+    Выключенный общий выключатель каналов гасит обход целиком, вместе со
+    сводкой: тумблеры строк он не трогает, и включённые каналы просто ждут.
     """
+    if not pipeline.rs.channels_enabled:
+        logger.info("Poll cycle skipped: channels are switched off as a whole")
+        return
     await pipeline.reload_resources()
     async with pipeline.session_factory() as session:
         all_named = await list_named_channels(session)

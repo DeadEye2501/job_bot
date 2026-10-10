@@ -285,3 +285,46 @@ describe('причина пропуска словами', () => {
     expect(parsedNote('too_many_links')).toBe('too_many_links.');
   });
 });
+
+// Строка ленты одного события — так, как её видит человек.
+function eventNote(kind, payload) {
+  return timelineRows([], [{ id: 1, kind, payload, created_at: '2026-10-10T11:00:00Z' }])[0].text;
+}
+
+describe('события агрегаторов в ленте', () => {
+  it('найденная агентом названа своим источником', () => {
+    expect(eventNote('found', { source: 'Пример', url: 'https://example.test/v/1', web_search: false }))
+      .toBe('Найдена на Пример.');
+  });
+
+  it('найденная поиском по сети названа своей подписью', () => {
+    // «Поиск по сети» — способ поиска, а не место: «Найдена на Поиск по сети»
+    // читалось бы как ошибка.
+    expect(eventNote('found', { source: 'Поиск по сети', url: 'https://example.test/v/1', web_search: true }))
+      .toBe('Найдена в сети.');
+  });
+
+  it('отклик вне Telegram назван способом и тем, кто писал письмо', () => {
+    // По «письмо: приложение / агент» человек сравнивает два способа писать
+    // письмо на живых откликах — для этого их и пишут в ленту.
+    expect(eventNote('applied_elsewhere', { via: 'aggregator', simulated: false, letter_by: 'app' }))
+      .toBe('Отклик на сайте агрегатора; письмо: приложение.');
+    expect(eventNote('applied_elsewhere', { via: 'email', simulated: true, letter_by: 'agent' }))
+      .toBe('Отклик письмом (симуляция); письмо: агент.');
+  });
+
+  it('отклик без письма так и назван', () => {
+    expect(eventNote('applied_elsewhere', { via: 'form', simulated: false, letter_by: null }))
+      .toBe('Отклик формой работодателя; письмо: без письма.');
+  });
+
+  it('несостоявшийся отклик назван способом и причиной', () => {
+    expect(eventNote('apply_failed', { method: 'form', reason: 'нужна регистрация на сайте' }))
+      .toBe('Отклик не удался (формой работодателя): нужна регистрация на сайте.');
+  });
+
+  it('закрытая на сайте вакансия так и названа', () => {
+    expect(eventNote('vacancy_closed', { method: 'aggregator', reason: '' }))
+      .toBe('Вакансия закрыта на сайте.');
+  });
+});

@@ -10,25 +10,25 @@ from tests.factories import vacancy_row
 from tests.factories_aggregators import aggregator_row, application_row, web_search_row
 
 
-async def test_an_address_is_stored_as_its_host(session):
+async def test_an_address_is_stored_as_its_host_under_the_given_name(session):
     async with session.begin():
-        row, outcome = await create_aggregator(session, "https://www.Site.test/jobs")
+        row, outcome = await create_aggregator(session, "https://www.Site.test/jobs", "Пример", None)
     assert (outcome, row.host, row.name, row.is_active, row.is_logged_in) == (
-        "created", "site.test", "site.test", False, False
+        "created", "site.test", "Пример", False, False
     )
 
 
 async def test_the_same_site_typed_differently_is_not_doubled(session, session_factory):
     await put(session_factory, aggregator_row(host="site.test"))
     async with session.begin():
-        _, outcome = await create_aggregator(session, "site.test/")
+        _, outcome = await create_aggregator(session, "site.test/", "Пример", None)
     assert outcome == "exists"
     assert len(await all_rows(session_factory, Aggregator)) == 1
 
 
 async def test_an_address_without_a_host_is_refused(session):
     async with session.begin():
-        _, outcome = await create_aggregator(session, "   ")
+        _, outcome = await create_aggregator(session, "   ", "Пример", None)
     assert outcome == "invalid"
 
 

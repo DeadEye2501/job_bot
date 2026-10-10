@@ -86,6 +86,18 @@ class _Gate:
         return "готово"
 
 
+async def test_the_login_check_cannot_call_for_a_human(make_pipeline, session_factory):
+    """Проверка входа идёт после того, как человек закрыл окно: позови она его
+    снова, окно открывалось бы по кругу, пока он не войдёт. Её дело — сказать
+    «не вошёл» и закончить."""
+    site = aggregator_row()
+    await put(session_factory, site)
+    tools = common_tools(kit_for(await make_pipeline()), LoginJob(Source.of(site)))
+
+    assert "need_human" not in {one.__name__ for one in tools}
+    assert "report_login" in {one.__name__ for one in tools}
+
+
 async def test_the_applier_asks_for_a_human_on_the_site_of_its_method(make_pipeline):
     gate = _Gate()
     job = apply_job(1, target="https://www.Company.test/apply")

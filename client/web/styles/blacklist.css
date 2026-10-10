@@ -9,36 +9,24 @@
   margin-bottom: 10px;
 }
 
-/* Поиск здесь шире, чем над списками контактов: ищут в нём не имя, а кусок
-   причины, набранный словами.
+/* Поиск забирает всю ширину полосы, а выбор рода и «Добавить» стоят к нему
+   вплотную у правого края: ищут здесь не имя, а кусок причины, набранный
+   словами, и узкому полю его не уместить.
 
    И в рамке, в отличие от прозрачного поиска над контактами: рядом с ним стоят
-   пилюли отбора и кнопка добавления, и без рамки поле теряется между ними. */
+   выбор рода и кнопка добавления, и без рамки поле теряется между ними. */
 .bl-toolbar .search-box {
   flex: 1;
-  max-width: 380px;
   padding: 4px 8px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
 }
 
-.bl-filter-pills {
-  display: flex;
-  gap: 3px;
-}
-
-/* Своё у этой пилюли — значок с числом внутри; общая скобка в pill.css. */
-.bl-filter-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.72rem;
-}
-
-.bl-filter-pill .count {
-  font-size: 0.68rem;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.7;
+/* Выбор рода — постоянной ширины и в высоту поиска: подписи у родов разной
+   длины, и подстраивайся поле под выбранную, оно сдвигало бы соседей. */
+.bl-kind-pick {
+  flex: 0 0 180px;
+  align-self: stretch;
 }
 
 .bl-add-btn {
@@ -46,7 +34,6 @@
   align-items: center;
   flex-shrink: 0;
   gap: 5px;
-  margin-left: auto;
   padding: 4px 11px;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -146,6 +133,11 @@
 .bl-kind-chip.channel {
   background: var(--kind-channel-bg);
   color: var(--kind-channel-fg);
+}
+
+.bl-kind-chip.aggregator {
+  background: var(--kind-aggregator-bg);
+  color: var(--kind-aggregator-fg);
 }
 
 /* Правится на месте — общим правилом из inline-edit.css; здесь только размер

@@ -5,7 +5,36 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { blankProfile, cvNote, fileSize, langRow, named, updatedNote } from '../state/profile.js';
+import {
+  blankProfile,
+  cvNote,
+  fileSize,
+  langRow,
+  named,
+  profileSheet,
+  updatedNote,
+} from '../state/profile.js';
+
+describe('анкета, уезжающая на мост', () => {
+  it('сумма с пробелами между разрядами уезжает числом', () => {
+    // «150 000» человек пишет так, как привык читать, а мост считает суммой
+    // только цифры: с пробелом она легла бы пустотой.
+    const form = { ...blankProfile(), expected_salary: '150 000' };
+    expect(profileSheet(form, new Set(), new Set()).expected_salary).toBe('150000');
+  });
+
+  it('неразрывный пробел между разрядами — тоже не часть суммы', () => {
+    // Скопированная из чужого текста сумма приходит с неразрывными пробелами.
+    const form = { ...blankProfile(), expected_salary: '150 000' };
+    expect(profileSheet(form, new Set(), new Set()).expected_salary).toBe('150000');
+  });
+
+  it('грейды и форматы уезжают списками', () => {
+    const sheet = profileSheet(blankProfile(), new Set(['Senior']), new Set(['remote']));
+    expect(sheet.grades).toEqual(['Senior']);
+    expect(sheet.work_format).toEqual(['remote']);
+  });
+});
 
 describe('размер файла резюме', () => {
   it('малое показано в байтах', () => {
@@ -89,6 +118,9 @@ describe('что уезжает на мост', () => {
     expect(blankProfile()).toEqual({
       first_name: '',
       last_name: '',
+      first_name_latin: '',
+      last_name_latin: '',
+      gender: '',
       title: '',
       email: '',
       phone: '',
@@ -97,6 +129,9 @@ describe('что уезжает на мост', () => {
       location: '',
       education: '',
       free_preferences: '',
+      expected_salary: '',
+      expected_salary_currency: '',
+      expected_salary_period: '',
       grades: [],
       work_format: [],
       languages: [],

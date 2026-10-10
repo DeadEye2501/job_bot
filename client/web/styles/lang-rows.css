@@ -26,24 +26,8 @@
   text-transform: capitalize;
 }
 
-.lang-remove {
-  color: var(--text-tertiary);
-  text-align: center;
-  font-size: 1.05rem;
-  line-height: 1;
-}
-
-.lang-remove:hover {
-  color: var(--danger);
-}
-
+/* Вид кнопки — общий, в add-link.css; своё здесь — место под списком. */
 .lang-add {
   margin-top: 3px;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
   align-self: flex-start;
-}
-
-.lang-add:hover {
-  color: var(--accent);
 }

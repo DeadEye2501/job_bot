@@ -102,7 +102,7 @@ async def test_a_blacklisted_channel_cannot_be_turned_back_on(
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Канал в blacklist — нельзя включить."
+    assert answer["detail"] == "В чёрном списке — снимите запись, чтобы включить"
 
 
 async def test_blacklisting_sweeps_the_namesake_channel_too(
@@ -159,36 +159,23 @@ async def test_removing_the_blacklist_clears_the_card(api, ask, session_factory)
     assert shown["ok"]["blacklist_value"] is None
 
 
-async def test_turning_all_on_leaves_the_blacklisted_ones_off(
-    api, ask, session_factory
-):
-    """Сплошное включение обходит огороженные каналы стороной.
+async def test_the_switch_over_all_leaves_each_row_as_it_was(api, ask, session_factory):
+    """Общий выключатель — отдельный признак: тумблеры строк он не переписывает.
 
-    Кнопкой «включить все» пользуются после долгого перерыва, не помня, кого
-    и за что выключали. Включи она заслонённых — те вернулись бы в опрос без
-    единого слова об этом.
+    Включённый снова, он возвращает в обход ровно те каналы, что были включены.
     """
-    plain = channel_row(username="pyjobs")
-    barred = channel_row(username="spam")
-    await put(session_factory, plain, barred)
+    await put(session_factory,
+              channel_row(username="on", is_active=True),
+              channel_row(username="off", is_active=False))
 
-    await ask(api.channels.block, barred.id)
+    turned = (await ask(api.channels.set_all_active, {"is_active": False}))["ok"]
+    listed = (await ask(api.channels.list, {}))["ok"]
 
-    # Оба гасим до сплошного включения: канал заводится уже включённым, и на
-    # готовых умолчаниях тест зеленел бы, даже не включив ничего.
-    switched = await ask(
-        api.channels.set_active, {"channel_id": plain.id, "is_active": False}
-    )
-    assert "ok" in switched
-
-    turned = await ask(api.channels.set_all_active, {"is_active": True})
-    assert turned["ok"]["affected"] == 1
-
-    listed = await ask(api.channels.list, {})
-    state = {
-        row["username"]: row["is_active"] for row in listed["ok"]["channels"]
+    assert turned == {"is_active": False}
+    assert listed["enabled"] is False
+    assert {row["username"]: row["is_active"] for row in listed["channels"]} == {
+        "on": True, "off": False
     }
-    assert state == {"pyjobs": True, "spam": False}
 
 
 async def test_an_unparsed_vacancy_does_not_raise_a_false_alarm(

@@ -17,13 +17,17 @@
  * Отказ не закрывает панель и молчит: плашку об отказе человек уже увидел, а
  * закрытая панель поверх неё читается как «сделано».
  *
+ * `held(done)` — не кончилось ли дело вопросом вместо действия: агрегатор с
+ * откликами мост сперва не сносит, а называет их число. Такой ответ, как и
+ * отказ, панель не закрывает.
+ *
  * Отвечает, случилось ли: слияние по этому ответу гасит своё окно выбора, а по
  * отказу оставляет его открытым — выбранное в нём ещё нужно.
  */
-export function cardFinish({ ask, method, note, say, onchanged, onclose }) {
+export function cardFinish({ ask, method, note, say, onchanged, onclose, held = () => false }) {
   return async function finish(payload) {
     const done = await ask(method, payload);
-    if (done === null) return false;
+    if (done === null || held(done)) return false;
     say(note);
     onchanged();
     onclose();

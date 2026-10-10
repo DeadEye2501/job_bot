@@ -84,6 +84,18 @@ async def test_the_first_way_that_works_ends_the_vacancy(board, applying, sessio
     assert stored.status is VacancyStatus.APPLIED
 
 
+async def test_the_applier_is_told_how_to_call_a_person(board, applying):
+    """Откликатель зовёт человека на капчу и слетевший вход — правило о том в его наставлении."""
+    _, vacancy = await board()
+
+    _, driver, _ = await applying(vacancy.id, [_record(PAGE)])
+
+    (plan,) = driver.plans
+    # Подстрока самого правила о зове человека: слово `need_human` называет и
+    # промпт роли, и по нему пропажу правила не заметить.
+    assert 'need_human с kind="captcha"' in plan.system_prompt
+
+
 async def test_a_failed_way_hands_over_to_the_next_and_all_failures_are_told(
     board, applying, session_factory
 ):

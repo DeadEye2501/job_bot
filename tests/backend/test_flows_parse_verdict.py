@@ -16,11 +16,16 @@
 вакансию, а не выбросить её.
 """
 
+from dataclasses import replace
+
 from backend.flows import parse
 from backend.llm.rules import VACANCY_TEXT_CHARS
 from backend.models import TrashEvent, Vacancy, VacancyStatus
 from backend.payloads import FitValidation, PostGenre
-from tests.dbio import all_rows, only_row
+from backend.repository.blacklist_marks import load_active_blacklist_patterns
+from tests.dbio import all_rows, only_row, put
+from tests.factories import blacklist_row
+from tests.factories_aggregators import vacancy_contact_row
 
 
 async def test_a_fitting_vacancy_stays_new(parsing, session_factory):
@@ -367,3 +372,66 @@ async def test_the_score_judges_only_what_the_validator_called_a_vacancy(
     assert pipeline.validated is True
     assert saved.status is VacancyStatus.NOT_FIT
     assert saved.skip_reason.endswith("< 100")
+
+
+async def _barred(session_factory, vacancy_id: int, source_url: str | None) -> None:
+    """Сайт `barred.test` в отсеве; у вакансии — данный адрес страницы."""
+    await put(session_factory, blacklist_row("aggregator", "barred.test"))
+    async with session_factory() as session:
+        (await session.get(Vacancy, vacancy_id)).source_url = source_url
+        await session.commit()
+
+
+async def test_a_vacancy_from_a_blacklisted_site_is_marked_unfit(parsing, session_factory):
+    """Текст страницы хоста обычно не несёт — отсев смотрит на адрес самой вакансии."""
+    pipeline, vacancy = parsing
+    await _barred(session_factory, vacancy.id, "https://jobs.barred.test/vacancy/1")
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", None, allow_delete=False)
+
+    saved = await only_row(session_factory, Vacancy)
+    assert (saved.status, saved.skip_reason) == (VacancyStatus.NOT_FIT, "blacklist: barred.test")
+
+
+async def test_a_contact_leading_to_a_blacklisted_site_marks_the_vacancy_unfit(
+    parsing, session_factory
+):
+    pipeline, vacancy = parsing
+    await _barred(session_factory, vacancy.id, "https://clean.test/vacancy/1")
+    await put(session_factory, vacancy_contact_row(vacancy.id, "https://barred.test/apply/7"))
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", None, allow_delete=False)
+
+    assert (await only_row(session_factory, Vacancy)).skip_reason == "blacklist: barred.test"
+
+
+async def test_a_contact_found_by_this_very_parse_marks_the_vacancy_unfit(
+    parsing, session_factory
+):
+    """Контакты разбора ложатся в базу после приговора: на первом разборе поста
+    сверять приходится и то, что нашёл сам разбор, — иначе вакансия со ссылкой
+    на отсеянный сайт проходила бы, пока её не разберут повторно."""
+    pipeline, vacancy = parsing
+    await _barred(session_factory, vacancy.id, "https://t.me/jobs/1")
+    pipeline.parsed = replace(pipeline.parsed, other_contacts=["https://barred.test/apply/7"])
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
+
+    assert (await only_row(session_factory, Vacancy)).skip_reason == "blacklist: barred.test"
+
+
+async def test_a_post_merely_naming_a_blacklisted_site_is_not_sifted_out(
+    parsing, session_factory
+):
+    """Отмеченный сайт отсеивает вакансии, что на нём живут, а не тексты, где он
+    назван: пост из канала, упомянувший сайт мимоходом, — чужая вакансия."""
+    pipeline, vacancy = parsing
+    await _barred(session_factory, vacancy.id, "https://t.me/jobs/1")
+    async with session_factory() as session:
+        pipeline.blacklist_patterns = await load_active_blacklist_patterns(session)
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "Пишите нам, не на barred.test", "jobs", allow_delete=False
+    )
+
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NEW

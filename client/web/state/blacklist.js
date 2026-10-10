@@ -17,6 +17,7 @@ export const BLACKLIST_KINDS = [
   { key: 'hr', label: 'HR' },
   { key: 'company', label: 'Компании' },
   { key: 'channel', label: 'Каналы' },
+  { key: 'aggregator', label: 'Агрегаторы' },
 ];
 
 // Чего ждут в поле значения у каждого рода. Слово набирают руками, остальное
@@ -31,6 +32,7 @@ const VALUE_FIELDS = {
   hr: { placeholder: '@username HR или имя', hints: true, none: 'HR' },
   company: { placeholder: 'Название компании', hints: true, none: 'компаний' },
   channel: { placeholder: '@username канала или название', hints: true, none: 'каналов' },
+  aggregator: { placeholder: 'Адрес сайта: example.com', hints: true, none: 'агрегаторов' },
 };
 
 /** Пустой черновик строки отсева.
@@ -68,6 +70,25 @@ export function blacklistCounts(rows) {
     if (counts[row.kind] !== undefined) counts[row.kind] += 1;
   }
   return counts;
+}
+
+/** Подписи родов в выпадающем списке отбора — каждый со своим числом строк.
+ *
+ * Порядок тот же, что у `BLACKLIST_KINDS`: по месту подписи в перечне и
+ * узнаётся выбранный род (`kindPicked`, `kindIndex`).
+ */
+export function kindOptions(counts) {
+  return BLACKLIST_KINDS.map((one) => `${one.label} (${one.key ? counts[one.key] : counts.all})`);
+}
+
+/** Род по выбранной подписи; незнакомая подпись — общий род. */
+export function kindPicked(options, picked) {
+  return BLACKLIST_KINDS[options.indexOf(picked)]?.key ?? '';
+}
+
+/** Место рода в перечне подписей — чтобы показать выбранный с его числом. */
+export function kindIndex(kind) {
+  return BLACKLIST_KINDS.findIndex((one) => one.key === kind);
 }
 
 /** Что показать подсказчиком существующих записей — и почему там пусто.

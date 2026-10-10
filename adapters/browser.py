@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from backend.domain.hosts import host_owns
 from config import get_data_dir
 
 logger = logging.getLogger(__name__)
@@ -96,19 +97,28 @@ class BrowserHost:
         self._context = None
         self._profile_id: int | None = None
         self._sending = True
+        self._as_person = False
         self._last_url = "about:blank"
 
-    async def open_profile(self, profile_id: int, sending: bool = True) -> None:
+    async def open_profile(
+        self, profile_id: int, sending: bool = True, as_person: bool = False
+    ) -> None:
         """Открыть профиль. `sending=False` — отклик под симуляцией: всё, что сайт
-        отправил бы, обрывается в самом браузере (`hold_sending`), что бы ни нажали."""
+        отправил бы, обрывается в самом браузере (`hold_sending`), что бы ни нажали.
+
+        `as_person` — в окне работает человек, а не агент (вход на сайт): браузер
+        открыт без пометки «управляется программой». С ней вход Google отказывает
+        («браузер небезопасен»), а человеку, входящему руками, она не нужна.
+        """
         if (self._profile_id == profile_id and self._sending == sending
-                and self._context is not None):
+                and self._as_person == as_person and self._context is not None):
             return
         await self._close_context()
         if self._profile_id != profile_id:
             self._last_url = "about:blank"
         self._profile_id = profile_id
         self._sending = sending
+        self._as_person = as_person
         await self._launch()
 
     async def page(self):
@@ -168,9 +178,12 @@ class BrowserHost:
             executable_path=str(self._browser.executable) if self._browser.executable else None,
             # Запросы сервис-воркера идут мимо перехвата: при удержании их нет вовсе.
             service_workers="allow" if self._sending else "block",
+            **(_PERSON_LAUNCH if self._as_person else {}),
         )
         if not self._sending:
             await self._context.route("**/*", hold_sending)
+        if self._as_person:
+            await self._context.add_init_script(_HIDE_WEBDRIVER)
         self._context.on("close", self._forget_context)
         self._context.on("page", _accept_dialogs)
         for opened in self._context.pages:
@@ -219,6 +232,21 @@ _GOOGLE_CAPTCHA_PATH = "/recaptcha/"
 _CLOUDFLARE_CHECK_PATH = "/cdn-cgi/challenge-platform/"
 
 
+# Запуск без пометки «управляется программой»: без флага `--enable-automation`,
+# который Playwright ставит сам. Песочница включена: без неё Playwright ставит
+# `--no-sandbox`, а на флаги, которых Chrome не поддерживает, он вешает над
+# страницей плашку.
+_PERSON_LAUNCH = {
+    "ignore_default_args": ["--enable-automation"],
+    "chromium_sandbox": True,
+}
+
+# `navigator.webdriver` выставляет само подключение Playwright, и по нему вход
+# Google отказывает («браузер небезопасен»). Прячется скриптом страницы, а не
+# флагом `--disable-blink-features`: на тот Chrome тоже вешает плашку.
+_HIDE_WEBDRIVER = "Object.defineProperty(Navigator.prototype, 'webdriver', {get: () => false})"
+
+
 async def hold_sending(route) -> None:
     """Оборвать запрос, несущий данные на сервер, — кроме ответа капче.
 
@@ -241,7 +269,7 @@ def _is_captcha(url: str) -> bool:
         return True
     if host in ("google.com", "www.google.com"):
         return parts.path.startswith(_GOOGLE_CAPTCHA_PATH)
-    return any(host == h or host.endswith("." + h) for h in _CAPTCHA_HOSTS)
+    return any(host_owns(h, host) for h in _CAPTCHA_HOSTS)
 
 
 def _accept_dialogs(page) -> None:

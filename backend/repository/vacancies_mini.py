@@ -83,37 +83,38 @@ async def list_vacancies_for_company(
     return await _list_linked(session, Vacancy.company_id == company_id)
 
 
-async def count_vacancies_for_channel(session: AsyncSession, channel_id: int) -> int:
-    """Сколько разобранных вакансий числится за каналом.
+async def count_vacancies_from(session: AsyncSession, from_source) -> int:
+    """Сколько разобранных вакансий числится за источником — каналом или агрегатором.
 
     Отбор тот же, что у списка рядом и у счётчика в карточке: мост сверяет с
     этим числом пустую страницу и жалуется на расхождение. Считай оно иначе —
-    жалоба приходила бы на всякий канал, у которого есть хоть одна
+    жалоба приходила бы на всякий источник, у которого есть хоть одна
     недоразобранная строка, то есть на любой работающий.
     """
     counted = await session.execute(
-        select(func.count(Vacancy.id)).where(
-            Vacancy.source_channel_id == channel_id, PARSED_ONLY
-        )
+        select(func.count(Vacancy.id)).where(from_source, PARSED_ONLY)
     )
     return int(counted.scalar_one())
 
 
-async def list_vacancies_for_channel(
+async def list_vacancies_from(
     session: AsyncSession,
-    channel_id: int,
+    from_source,
     *,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Vacancy], bool]:
-    """Страница разобранных вакансий канала и есть ли за ней ещё.
+    """Страница разобранных вакансий источника и есть ли за ней ещё.
+
+    `from_source` — условие «вакансия пришла из этого источника»: канал и
+    агрегатор листаются одинаково и различаются только колонкой ссылки.
 
     Порядок — по горячести статуса, потом по свежести. Страница нужна потому,
-    что каналы накапливают тысячи вакансий, и мини-список карточки грузит их
-    пачками; признак продолжения отдаёт запрос — см. `paging.trim_page`.
+    что источники накапливают тысячи вакансий, и мини-список карточки грузит
+    их пачками; признак продолжения отдаёт запрос — см. `paging.trim_page`.
 
     Недоразобранные не показываются — тем же отбором, что берут счётчик
-    канала и его числа: все трое обещают выдачу, и разойдись они, число в
+    источника и его числа: все трое обещают выдачу, и разойдись они, число в
     пилюле перестало бы отвечать за список под ней.
     """
     status_rank = case(
@@ -124,7 +125,7 @@ async def list_vacancies_for_channel(
     rows = (
         await session.scalars(
             select(Vacancy)
-            .where(Vacancy.source_channel_id == channel_id, PARSED_ONLY)
+            .where(from_source, PARSED_ONLY)
             .order_by(
                 status_rank.asc(),
                 VACANCY_APPEARED_AT.desc(),

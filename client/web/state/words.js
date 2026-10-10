@@ -13,3 +13,8 @@ export function plural(count, one, few, many) {
   if (last >= 2 && last <= 4) return few;
   return many;
 }
+
+/** Счёт вакансий при человеке, компании, кандидате в окне выбора. */
+export function vacancyCount(count) {
+  return `${count} ${plural(count, 'вакансия', 'вакансии', 'вакансий')}`;
+}

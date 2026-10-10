@@ -29,8 +29,16 @@
   font-size: 0.7rem;
 }
 
-.form-grid {
+.form-grid,
+.name-grid {
   gap: 8px 14px;
+}
+
+/* Имя анкеты одной строкой: имя с фамилией, они же латиницей и пол. Пары
+   делят ширину поровну, плитки пола берут сколько им нужно. */
+.name-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
 }
 
 .cnt-form-grid {

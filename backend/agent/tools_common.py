@@ -4,9 +4,9 @@ from collections.abc import Callable
 
 from backend.agent.jobs import Applied, ApplyJob, Failed, Finished, LoginJob, SeekJob
 from backend.agent.kit import AgentKit
+from backend.domain.apply_order import VIA_AGGREGATOR
 from backend.domain.hosts import normalize_host
 from backend.repository.agent_profile import build_agent_profile
-from backend.models import ApplicationVia
 from backend.repository.aggregators import set_logged_in
 
 _ALREADY_APPLIED = (
@@ -41,7 +41,11 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
         job.outcome = Finished(result, reason)
         return "Итог записан, работа окончена."
 
-    tools = [profile, finish, _need_human(kit, job)]
+    tools = [profile, finish]
+    # Проверка входа идёт, когда человек уже закрыл окно: позови она его снова,
+    # окно открывалось бы по кругу, пока он не войдёт. Её дело — «не вошёл».
+    if not isinstance(job, LoginJob):
+        tools.append(_need_human(kit, job))
     aggregator_id = _login_target(job)
     if aggregator_id is not None:
         tools.append(_report_login(kit, aggregator_id))
@@ -53,7 +57,7 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
 def _login_target(job) -> int | None:
     if isinstance(job, (LoginJob, SeekJob)):
         return job.source.id if job.source.host is not None else None
-    return job.aggregator_id if job.method == ApplicationVia.AGGREGATOR.value else None
+    return job.aggregator_id if job.method == VIA_AGGREGATOR else None
 
 
 def _need_human(kit: AgentKit, job) -> Callable:
@@ -76,9 +80,7 @@ def _host_of(job) -> str | None:
 def _report_login(kit: AgentKit, aggregator_id: int) -> Callable:
     async def report_login(logged_in: bool) -> str:
         """Вошёл ли человек на сайт: true — вошёл, false — нет."""
-        async with kit.pipeline.session_factory() as session:
-            async with session.begin():
-                await set_logged_in(session, aggregator_id, logged_in)
+        await kit.written(lambda session: set_logged_in(session, aggregator_id, logged_in))
         return "Отметка входа записана."
 
     return report_login

@@ -1,0 +1,38 @@
+/* Два поля одной таблеткой: общая рамка и скругление, между полями черта.
+
+   Так стоят поля, которые читаются одним значением, — имя с фамилией. Рамку
+   держит обёртка, поэтому наведение и фокус подсвечивают её, а не половину. */
+
+.input-pair {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.input-pair:hover:not(:focus-within) {
+  border-color: var(--text-secondary);
+}
+
+.input-pair:focus-within {
+  border-color: var(--accent);
+}
+
+.input-pair .input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+}
+
+/* Отметка незаполненного обязательного (`input.css`) у поля в таблетке ложится
+   и на общую рамку: своей рамки у половины нет, и без этого красным стал бы
+   один фон. Пока в таблетке стоит курсор, рамка не красная, а обычная рамка
+   фокуса — как и у одиночного поля. */
+.input-pair:has(.input.missing):not(:focus-within) {
+  border-color: var(--danger-border);
+}
+
+.input-pair .input + .input {
+  border-left: 1px solid var(--border);
+}

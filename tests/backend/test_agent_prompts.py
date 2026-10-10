@@ -23,27 +23,27 @@ SHARED_RULES = [TONE_RULE, GENDER_RULE, LATIN_NAME_RULE, FACT_KINDS]
 
 @pytest.mark.parametrize("role", ROLES)
 def test_every_role_works_inside_the_common_frame(role):
-    built = system_prompt(role)
+    built = system_prompt(role, [])
     assert built.endswith(role)
-    assert "need_human" in built and "finish" in built
+    assert "finish" in built
 
 
 @pytest.mark.parametrize("rule", SHARED_RULES)
 @pytest.mark.parametrize("role", ROLES)
 def test_every_role_hears_each_voice_rule_once(role, rule):
     """Правило голоса приходит из общего объявления и ровно один раз."""
-    assert system_prompt(role).count(rule) == 1
+    assert system_prompt(role, []).count(rule) == 1
 
 
 @pytest.mark.parametrize("role", ROLES)
 def test_no_slot_is_left_unfilled(role):
-    assert "{" not in system_prompt(role)
+    assert "{" not in system_prompt(role, [])
 
 
 @pytest.mark.parametrize("role", ROLES)
 def test_a_prompt_carries_nothing_about_the_person(role):
     """Всё о человеке приходит из анкеты инструментом, а не из текста промпта."""
-    built = system_prompt(role)
+    built = system_prompt(role, [])
     for value in person_fields().values():
         assert value not in built
 
@@ -103,7 +103,7 @@ def test_every_method_has_its_name_and_its_simulation(via):
 
 
 def test_the_applier_prompt_is_clean_too():
-    built = system_prompt(APPLIER_PROMPT)
+    built = system_prompt(APPLIER_PROMPT, [])
     assert "{" not in built
     for value in person_fields().values():
         assert value not in built
@@ -112,7 +112,7 @@ def test_the_applier_prompt_is_clean_too():
 @pytest.mark.parametrize("rule", SHARED_RULES)
 def test_the_applier_hears_each_voice_rule_once(rule):
     """Рамка, правила письма и скрининг вместе не повторяют правило голоса."""
-    assert system_prompt(APPLIER_PROMPT).count(rule) == 1
+    assert system_prompt(APPLIER_PROMPT, []).count(rule) == 1
 
 
 def test_the_applier_task_carries_its_vacancy_method_and_profile():

@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import aclosing
 
 from adapters import db, lm_models, lm_studio
 
@@ -80,11 +81,10 @@ async def model_alive(cfg, kind: str) -> bool:
             kind, cfg.base_url, exc_info=True,
         )
         return False
-    try:
-        listed, _have = await lm_models.model_listed(client, cfg.model)
-        return listed
-    except Exception:
-        logger.debug("healthcheck: %s probe failed", kind, exc_info=True)
-        return False
-    finally:
-        await client.aclose()
+    async with aclosing(client):
+        try:
+            listed, _have = await lm_models.model_listed(client, cfg.model)
+            return listed
+        except Exception:
+            logger.debug("healthcheck: %s probe failed", kind, exc_info=True)
+            return False

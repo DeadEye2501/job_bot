@@ -84,6 +84,18 @@ async def test_only_the_switched_on_channels_are_read(
     assert [step for step in walking.walked if step != "настройки"] == ["on"]
 
 
+async def test_the_switch_over_all_channels_stops_the_walk(walking, session_factory):
+    """Общий выключатель каналов гасит обход целиком, не трогая тумблеров строк."""
+    channel = channel_row(username="on", is_active=True)
+    await put(session_factory, channel)
+    await walking.rs.set_app("channels_enabled", "false")
+
+    await walking.poll_active_channels()
+
+    assert [step for step in walking.walked if step != "настройки"] == []
+    assert [row.is_active for row in await all_rows(session_factory, TelegramChannel)] == [True]
+
+
 async def test_a_channel_without_a_name_is_not_walked(walking, session_factory):
     """Канал без имени не обходят: спросить у Telegram его нечем."""
     await put(

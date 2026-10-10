@@ -27,6 +27,16 @@ export function nearBottom({ scrollTop, clientHeight, scrollHeight }) {
   return scrollTop + clientHeight >= scrollHeight - AHEAD;
 }
 
+/** Дочитать открытую карточку, когда её панель подошла к концу.
+ *
+ * Прокручивается панель целиком, вместе с шапкой и числами карточки, — и знает
+ * об этой прокрутке список, а не сама карточка. `card` — открытая карточка с
+ * `more()` или пусто, пока ничего не открыто.
+ */
+export function detailScrolled(event, card) {
+  if (card !== null && nearBottom(event.currentTarget)) card.more();
+}
+
 /** Пора ли просить письма постарее.
  *
  * Переписку листают в другую сторону — вверх, к началу разговора, — и потому

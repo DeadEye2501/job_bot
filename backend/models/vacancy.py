@@ -17,7 +17,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import expression
 
 from backend.models.base import Base, CreatedAtMixin, IdMixin, enum_column
-from backend.models.contacts import HR, Company, TelegramChannel
+from backend.models.contacts import HR, Aggregator, Company, TelegramChannel
 from backend.models.enums import ContactAddedBy, StatusHistorySource, VacancyStatus
 
 
@@ -90,6 +90,7 @@ class Vacancy(IdMixin, CreatedAtMixin, Base):
     hr: Mapped[HR | None] = relationship()
     company: Mapped[Company | None] = relationship()
     channel: Mapped[TelegramChannel | None] = relationship()
+    aggregator: Mapped[Aggregator | None] = relationship()
 
 
 class VacancyEvent(IdMixin, CreatedAtMixin, Base):

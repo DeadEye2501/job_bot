@@ -24,9 +24,10 @@ export const PROFILE_TABS = [
   { key: 'experience', label: 'Experience' },
 ];
 
-/** Вкладки раздела «Контакты». Каналы первыми — с них начинается сбор. */
+/** Вкладки раздела «Контакты». Источники первыми — с них начинается сбор. */
 export const CONTACTS_TABS = [
   { key: 'channels', label: 'Каналы' },
+  { key: 'aggregators', label: 'Агрегаторы' },
   { key: 'companies', label: 'Компании' },
   { key: 'people', label: 'HR' },
   { key: 'blacklist', label: 'Чёрный список' },

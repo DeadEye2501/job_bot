@@ -38,6 +38,9 @@ class Aggregator(IdMixin, Base):
     is_active: Mapped[bool] = mapped_column(server_default=expression.false())
     is_logged_in: Mapped[bool] = mapped_column(server_default=expression.false())
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Значок сайта — то же место, что аватар у канала: по нему агрегатор
+    # узнают в списке, не читая имени.
+    avatar: Mapped[bytes | None] = mapped_column(LargeBinary)
 
 
 class HR(IdMixin, Base):

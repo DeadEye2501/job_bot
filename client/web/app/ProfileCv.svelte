@@ -9,14 +9,25 @@
   import { call } from '$api/bridge.js';
   import CvFileRow from '$components/CvFileRow.svelte';
   import DelayedTextarea from '$components/DelayedTextarea.svelte';
+  import Dropdown from '$components/Dropdown.svelte';
   import LangRows from '$components/LangRows.svelte';
   import ChoiceRow from '$components/ChoiceRow.svelte';
   import { living } from '$state/alive.js';
   import { autosave } from '$state/autosave.js';
-  import { toggled } from '$state/chosen.js';
   import { saveKey } from '$state/keys.js';
   import { oneWrite } from '$state/one_write.js';
-  import { GRADES, WORK_FORMATS, blankProfile, langRow, updatedNote } from '$state/profile.js';
+  import { alone, toggled } from '$state/chosen.js';
+  import {
+    CURRENCIES,
+    GENDERS,
+    GRADES,
+    SALARY_PERIODS,
+    WORK_FORMATS,
+    blankProfile,
+    langRow,
+    profileSheet,
+    updatedNote,
+  } from '$state/profile.js';
 
   // Пауза перед записью набранного. Короче — и мост получает вопрос на каждое
   // слово, длиннее — и человек успевает уйти с вкладки, не дождавшись записи.
@@ -24,13 +35,18 @@
 
   let { ask } = $props();
 
-  // Длины те же, что у полей базы: обрезать текст мост не станет, он ответит
-  // отказом — а человек к тому мигу уже набрал лишнее и потерял бы набранное.
-  // `must` — поле, без которого мост анкету не примет вовсе. Звёздочка в
+  // Пределы длины держит только окно: ни мост, ни база длину полей анкеты не
+  // меряют. `must` — поле, без которого мост анкету не примет вовсе. Звёздочка в
   // подсказке говорит о том же, но только пока поле пустое и подсказка видна.
-  const FIELDS = [
+  const NAME_FIELDS = [
     { key: 'first_name', placeholder: 'Имя *', max: 64, must: true },
     { key: 'last_name', placeholder: 'Фамилия *', max: 64, must: true },
+  ];
+  const LATIN_FIELDS = [
+    { key: 'first_name_latin', placeholder: 'Имя латиницей', max: 64 },
+    { key: 'last_name_latin', placeholder: 'Фамилия латиницей', max: 64 },
+  ];
+  const FIELDS = [
     { key: 'title', placeholder: 'Должность *', max: 120, wide: true, must: true },
     { key: 'email', placeholder: 'Email *', max: 254, must: true },
     { key: 'phone', placeholder: 'Телефон', max: 32 },
@@ -71,9 +87,8 @@
     loaded = true;
   }
 
-  /** Анкета целиком — тем видом, каким её принимает мост. */
   function sheet() {
-    return { ...form, grades: [...grades], work_format: [...formats] };
+    return profileSheet(form, grades, formats);
   }
 
   /** Отдать анкету мосту и сказать, легла ли она.
@@ -147,6 +162,18 @@
     return save();
   }
 
+  /** Валюту из списка выбирают, а не переключают: выбранная повторно остаётся. */
+  function pickCurrency(sign) {
+    form = { ...form, expected_salary_currency: sign };
+    return save();
+  }
+
+  /** Пол и срок зарплаты — по одному значению; нажатое повторно снимается. */
+  function pickOne(key, value) {
+    form = { ...form, [key]: alone(form[key], value) };
+    return save();
+  }
+
   /** Выбрать другой файл резюме.
    *
    * Путь спрашивает мост диалогом самого окна: браузер отдаёт выбранный файл
@@ -175,20 +202,61 @@
     <div class="updated-ts">{updatedNote(form.updated_at)}</div>
   </div>
 
+  {#snippet field(one)}
+    <input
+      class="input"
+      class:span-2={one.wide}
+      class:missing={trouble && one.must && !form[one.key].trim()}
+      maxlength={one.max}
+      inputmode={one.mode}
+      placeholder={one.placeholder}
+      value={form[one.key] ?? ''}
+      oninput={(event) => typed(one.key, event.currentTarget.value)}
+      onblur={() => saver.flush()}
+      onkeydown={(event) => saveKey(event) && saver.flush()}
+    />
+  {/snippet}
+
   <div class="form-grid" bind:this={fields}>
-    {#each FIELDS as one (one.key)}
-      <input
-        class="input"
-        class:span-2={one.wide}
-        class:missing={trouble && one.must && !form[one.key].trim()}
-        maxlength={one.max}
-        placeholder={one.placeholder}
-        value={form[one.key]}
-        oninput={(event) => typed(one.key, event.currentTarget.value)}
-        onblur={() => saver.flush()}
-        onkeydown={(event) => saveKey(event) && saver.flush()}
+    <div class="name-grid span-2">
+      <div class="input-pair">
+        {#each NAME_FIELDS as one (one.key)}{@render field(one)}{/each}
+      </div>
+      <div class="input-pair">
+        {#each LATIN_FIELDS as one (one.key)}{@render field(one)}{/each}
+      </div>
+      <ChoiceRow
+        options={GENDERS}
+        chosen={new Set([form.gender])}
+        look="tile"
+        onpick={(value) => pickOne('gender', value)}
       />
-    {/each}
+    </div>
+
+    {#each FIELDS as one (one.key)}{@render field(one)}{/each}
+
+    <div class="field-line span-2">
+      {@render field({
+        key: 'expected_salary',
+        placeholder: 'Ожидаемая зарплата на руки',
+        max: 12,
+        mode: 'numeric',
+      })}
+      <div class="field-narrow">
+        <Dropdown
+          options={CURRENCIES}
+          value={form.expected_salary_currency}
+          placeholder="—"
+          onpick={pickCurrency}
+        />
+      </div>
+      <ChoiceRow
+        options={SALARY_PERIODS}
+        chosen={new Set([form.expected_salary_period])}
+        look="seg"
+        onpick={(value) => pickOne('expected_salary_period', value)}
+      />
+    </div>
 
     <DelayedTextarea
       maxlength="1000"

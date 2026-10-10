@@ -13,19 +13,20 @@ from backend.agent.tools_applier import applier_tools
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
 from backend.agent.tools_letter import letter_tools
-from backend.domain.apply_order import ApplyFacts, KnownSite, Way, apply_ways
+from backend.domain.apply_order import VIA_EMAIL, ApplyFacts, KnownSite, Way, apply_ways
+from backend.domain.contact_keys import is_link
+from backend.domain.hosts import owning_host
 from backend.flows.aggregator_round import RoundState
 from backend.flows.events import record_vacancy_event
-from backend.models import ApplicationVia, Vacancy, VacancyStatus
+from backend.models import Vacancy, VacancyStatus
 from backend.repository.agent_profile import build_agent_profile
-from backend.repository.aggregators import list_aggregators
+from backend.repository.aggregators import barred_hosts, list_aggregators
 from backend.repository.mail_account import get_mail_account
 from backend.repository.vacancy_brief import describe_vacancy
 from backend.repository.vacancy_contacts import list_contacts
 
 logger = logging.getLogger(__name__)
 
-_EMAIL = ApplicationVia.EMAIL.value
 _NO_OUTCOME = "агент закончил без итога"
 
 
@@ -82,7 +83,12 @@ async def _new_title(kit: AgentKit, vacancy_id: int) -> str | None:
 
 
 async def vacancy_ways(session_factory, vacancy_id: int, closed: set[int]) -> list[Way]:
-    """Способы отклика на вакансию по порядку — одни для фазы откликов и для окна выбора."""
+    """Способы отклика на вакансию по порядку — одни для фазы откликов и для окна выбора.
+
+    Сайт из отсева не работает и для откликов: его агрегатор и ссылки на него
+    в способы не попадают. Вакансию могли разобрать до того, как сайт занесли
+    в отсев, — и откликнуться через него теперь значило бы обойти отметку.
+    """
     async with session_factory() as session:
         vacancy = await session.get(Vacancy, vacancy_id)
         if vacancy is None:
@@ -90,10 +96,17 @@ async def vacancy_ways(session_factory, vacancy_id: int, closed: set[int]) -> li
         contacts = [c.value for c in await list_contacts(session, vacancy_id)]
         aggregators = await list_aggregators(session)
         mail_ready = await get_mail_account(session) is not None
-    sites = [KnownSite(a.id, a.host, a.is_logged_in) for a in aggregators if a.host]
+        barred = await barred_hosts(session)
+
+    def clear(link: str | None) -> bool:
+        return bool(link) and owning_host(link, barred) is None
+
+    sites = [KnownSite(a.id, a.host, a.is_logged_in) for a in aggregators if a.host and clear(a.host)]
     source = next((KnownSite(a.id, a.host) for a in aggregators
                    if a.id == vacancy.source_aggregator_id), None)
-    return apply_ways(ApplyFacts(vacancy.source_url, source, contacts, sites, mail_ready, closed))
+    source_url = vacancy.source_url if clear(vacancy.source_url) else None
+    contacts = [c for c in contacts if not is_link(c) or clear(c)]
+    return apply_ways(ApplyFacts(source_url, source, contacts, sites, mail_ready, closed))
 
 
 async def _ways_for(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> list[Way]:
@@ -110,7 +123,7 @@ async def _one_way(kit: AgentKit, round_: RoundState, order: ApplyOrder, way: Wa
     plan = await _apply_plan(kit, job)
     if plan is None:
         return "exhausted"
-    if way.method != _EMAIL:
+    if way.method != VIA_EMAIL:
         await kit.browser.open_profile(job.profile_id, sending=not job.simulated)
     end = await run_guarded(kit, plan)
     if job.delivery is not None:
@@ -134,10 +147,10 @@ async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None:
             return None
         profile_text = await build_agent_profile(session, kit.today)
     tools = [*common_tools(kit, job), *applier_tools(kit, job), *letter_tools(kit, job)]
-    if job.method != _EMAIL:
+    if job.method != VIA_EMAIL:
         tools += browser_tools(kit, kit.pipeline.cv_file())
     task = applier_task(job, vacancy_text, profile_text, kit.today)
-    return SessionPlan(system_prompt(APPLIER_PROMPT), task, tools, web_search=True)
+    return SessionPlan(system_prompt(APPLIER_PROMPT, tools), task, tools, web_search=True)
 
 
 async def _settle_way(kit: AgentKit, round_: RoundState, job: ApplyJob) -> str:

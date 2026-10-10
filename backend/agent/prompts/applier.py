@@ -4,7 +4,7 @@ from datetime import date
 
 from backend.agent.prompts.screening import SCREENING_RULES
 from backend.llm.rules import LETTER_SHAPE
-from backend.models import ApplicationVia
+from backend.domain.apply_order import VIA_AGGREGATOR, VIA_EMAIL, VIA_FORM
 from backend.runtime_settings import LETTER_WRITERS
 
 APPLIER_PROMPT = """Твоя задача — откликнуться на одну вакансию одним способом, названным в задании. Пригодность вакансии не пересуживай: её уже отобрал конвейер приложения. Следующий способ, если этот не удался, выберет приложение.
@@ -44,17 +44,17 @@ _FILL_THE_FORM = (
     "Сразу после этого вызови record_application, как если бы сайт подтвердил отправку."
 )
 _SIMULATION = {
-    ApplicationVia.AGGREGATOR.value: _FILL_THE_FORM,
-    ApplicationVia.FORM.value: _FILL_THE_FORM,
-    ApplicationVia.EMAIL.value: (
+    VIA_AGGREGATOR: _FILL_THE_FORM,
+    VIA_FORM: _FILL_THE_FORM,
+    VIA_EMAIL: (
         "Режим симуляции: зови send_email как обычно — приложение соберёт письмо, "
         "но НЕ отправит его."
     ),
 }
 _METHODS = {
-    ApplicationVia.AGGREGATOR.value: "кнопка отклика на сайте агрегатора",
-    ApplicationVia.FORM.value: "форма работодателя",
-    ApplicationVia.EMAIL.value: "письмо",
+    VIA_AGGREGATOR: "кнопка отклика на сайте агрегатора",
+    VIA_FORM: "форма работодателя",
+    VIA_EMAIL: "письмо",
 }
 # Подписи идут в порядке набора; strict ловит при импорте набор, выросший без подписи.
 _WRITERS = dict(zip(LETTER_WRITERS, ("Письмо пишет: приложение", "Письмо пишешь ты"), strict=True))

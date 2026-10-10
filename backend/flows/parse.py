@@ -38,6 +38,7 @@ from backend.flows.events import record_vacancy_event
 from backend.flows import apply
 from backend.flows import cleanup
 from backend.flows.parse_write import Outcome, persist_parse_outcome
+from backend.repository.aggregators import vacancy_barred_host
 from backend.repository.vacancy_status import was_ever_applied
 
 logger = logging.getLogger(__name__)
@@ -333,12 +334,16 @@ async def _verdict_for(
 
     Чёрный список, наоборот, впереди: он не догадка о посте, а решение
     человека, и жанр поста его не меняет. Читает он весь исходный текст, а
-    модели достаётся урезанный по её бюджету.
+    модели достаётся урезанный по её бюджету. Сайты из отсева сверяются не с
+    текстом, а с адресом вакансии и её контактами: отметка сайта отсеивает то,
+    что на нём живёт, а не всякий пост, где он назван.
     """
     score = score_stack(
         parsed.stack_required, parsed.stack_preferred, pipeline.skills_cache
     )
-    blocked = blacklist_refusal(check_blacklist(text, pipeline.blacklist_patterns))
+    async with pipeline.session_factory() as session:
+        barred = await vacancy_barred_host(session, vacancy_id, parsed.other_contacts)
+    blocked = blacklist_refusal(check_blacklist(text, pipeline.blacklist_patterns) or barred)
     logger.debug(
         "vacancy %s: score=%d threshold=%d blacklist=%s",
         vacancy_id, score, pipeline.rs.scoring_threshold, blocked,

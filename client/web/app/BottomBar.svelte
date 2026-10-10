@@ -19,6 +19,7 @@
   import { LAMPS, allAlive, blockedTip, shouldTurnOff } from '$state/health.js';
   import { OFF } from '$state/modes.js';
   import { COUNTLESS_STAGES, STARTING, bar, caption, countlessNote } from '$state/progress.js';
+  import { round } from '$state/round.svelte.js';
 
   let { ask, say, events, onlocked, oncontact } = $props();
 
@@ -45,8 +46,6 @@
   let chatsLoading = $state(false);
   let chats = $state([]);
   let mode = $state(OFF);
-  let running = $state(false);
-  let crawling = $state(false);
   let channels = $state(NOTHING_YET.channels);
   let messages = $state(NOTHING_YET.messages);
   // Работа без счёта — прогон одной вакансии: полосам показать нечего, а
@@ -138,23 +137,16 @@
     // Два зова, а не имя за тернарием: спрятанное в условие имя выпадает из шва
     // с мостом — сторож ищет его литералом на месте зова, — и разъезд с питоном
     // остался бы незамеченным до первого нажатия.
-    if (running) await ask('system.stop_run');
+    if (round.running) await ask('system.stop_run');
     else await ask('system.run_now');
   }
 
   function started() {
-    crawling = true;
-    running = true;
     // Первая весть о ходе приходит не сразу: до неё полосы уже бегут, и подпись
     // под ними обязана сказать, чем бот занят.
     single = STARTING;
     channels = NOTHING_YET.channels;
     messages = NOTHING_YET.messages;
-  }
-
-  function finished() {
-    crawling = false;
-    running = false;
   }
 
   /** Подвинуть полосу, которой касается весть.
@@ -185,8 +177,9 @@
 
   $effect(() => {
     const deaf = [
-      events.on('ingestion_started', started),
-      events.on('ingestion_finished', finished),
+      // Весть о начале слушает общий учёт (`state/round.svelte.js`), а полосе
+      // он говорит о ней в тот же миг: ход прошлого прогона стирается.
+      round.onStart(started),
       events.on('progress_update', moved),
       events.on('unread_changed', askUnread),
       // Потеря значит, что часть случившегося выпала из кольца: чем гадать,
@@ -214,7 +207,7 @@
   </div>
 
   <div class="bb-center">
-    {#if crawling}
+    {#if round.running}
       <ProgressBars
         channels={bar(channels.current, channels.total)}
         messages={bar(messages.current, messages.total)}
@@ -228,9 +221,9 @@
          сам режим словом, и объяснять, что по нему нажимают, нечего. -->
     <ModeToggle {mode} disabled={locked} title={locked ? lockedTip : null} onpick={pickMode} />
     <RunButton
-      {running}
+      running={round.running}
       disabled={locked}
-      title={locked ? lockedTip : (running ? STOP_TITLE : RUN_TITLE)}
+      title={locked ? lockedTip : (round.running ? STOP_TITLE : RUN_TITLE)}
       onpress={toggleRun}
     />
     <UnreadBadge

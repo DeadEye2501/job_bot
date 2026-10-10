@@ -241,6 +241,21 @@ def _salary(v) -> dict:
     }
 
 
+def _source(v) -> dict:
+    """Откуда вакансия: канал или агрегатор, номер поста и адрес её страницы.
+
+    «Поиск по сети» назван отдельным признаком: его имя — способ поиска, а не
+    место, откуда вакансия пришла, и окно подписывает её иначе.
+    """
+    return {
+        "channel_username": v.channel.username if v.channel is not None else None,
+        "aggregator_name": v.aggregator.name if v.aggregator is not None else None,
+        "from_web_search": v.aggregator is not None and v.aggregator.host is None,
+        "source_msg_id": v.source_msg_id,
+        "source_url": v.source_url,
+    }
+
+
 def _vacancy_detail_to_dict(
     detail, matched_set: set[str], score_threshold: int,
 ) -> dict:
@@ -270,9 +285,7 @@ def _vacancy_detail_to_dict(
         **_salary(v),
         "remote": v.remote,
         "location": v.location,
-        "channel_username": v.channel.username if v.channel is not None else None,
-        "source_msg_id": v.source_msg_id,
-        "source_url": v.source_url,
+        **_source(v),
         "stack": _stack_items(v.stack, matched_set),
         "notes": v.notes,
         "contacts": [_contact(c) for c in detail.contacts],
@@ -432,4 +445,17 @@ def _aggregator_row_to_dict(row) -> dict:
         "is_logged_in": bool(row.is_logged_in),
         "last_run_at": _iso(row.last_run_at),
         "is_web_search": row.host is None,
+        "avatar": _avatar_data_url(row.avatar),
+    }
+
+
+def _source_stats_to_dict(stats) -> dict:
+    """Числа карточки источника — канала или агрегатора; см. `ChannelStats`."""
+    return {
+        "status_counts": stats.status_counts,
+        "total": stats.total,
+        "vacancies_per_day": stats.vacancies_per_day,
+        "fit_percent": stats.fit_percent,
+        "apply_percent": stats.apply_percent,
+        "response_percent": stats.response_percent,
     }

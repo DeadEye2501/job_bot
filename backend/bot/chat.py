@@ -5,7 +5,6 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from backend.models import BotMode
 from backend.models import HR
 from backend.models import Message
 from backend.payloads import OutgoingMessage
@@ -29,16 +28,13 @@ EMPTY_MESSAGE = "Пустое сообщение."
 async def mark_hr_chat_read(bot, hr_id: int) -> int:
     """Погасить непрочитанное этого HR в базе и в Telegram; сказать, сколько.
 
-    Выключенный бот не делает ни того ни другого: «выключен» значит, что он не
-    трогает ни базу, ни Telegram.
+    Режим не спрашивается: переписку открыл человек, а режим — про автоматику.
 
     Отметку в Telegram видит живой человек на том конце, поэтому она проходит
-    через общий заслон отправки, а не через один режим: при «симуляции
-    отправки» и у отсеянного собеседника наружу не уходит ничего. Счётчик в
-    окне при этом гасится — прочитанное всё равно прочитано.
+    через общий заслон отправки: при «симуляции отправки» и у отсеянного
+    собеседника наружу не уходит ничего. Счётчик в окне при этом гасится —
+    прочитанное всё равно прочитано.
     """
-    if (await bot.current_mode()) is BotMode.OFF:
-        return 0
     now = datetime.now(timezone.utc)
     async with bot.session_factory() as session:
         hr = await session.get(HR, hr_id)
@@ -79,7 +75,6 @@ _REFUSAL_TEXTS = {
     can_send.NO_TARGET: (
         "У HR нет ни telegram_user_id, ни @username — нечем отправить."
     ),
-    can_send.BOT_OFF: "Бот выключен. Включите DM Only или Full.",
     can_send.BLACKLISTED: "HR в blacklist ({value}). Сначала уберите из blacklist.",
     can_send.SENDING_LOCKED: "Отправка отключена: защита от случайной отправки.",
 }

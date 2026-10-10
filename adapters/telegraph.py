@@ -15,6 +15,8 @@ import re
 import httpx
 from bs4 import BeautifulSoup
 
+from adapters.web_page import page_client
+
 logger = logging.getLogger(__name__)
 
 # Адрес статьи: «https://telegra.ph/ключ». Ключ обязателен: без него это
@@ -44,11 +46,7 @@ _USER_AGENT = "Mozilla/5.0 (compatible; JobBot/1.0)"
 
 def make_client() -> httpx.AsyncClient:
     """Клиент к Telegraph. Переходы разрешены: короткие адреса ведут через них."""
-    return httpx.AsyncClient(
-        timeout=FETCH_TIMEOUT_SEC,
-        follow_redirects=True,
-        headers={"User-Agent": _USER_AGENT},
-    )
+    return page_client(FETCH_TIMEOUT_SEC, _USER_AGENT)
 
 
 def _article_text(html: str) -> str | None:

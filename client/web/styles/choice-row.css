@@ -1,7 +1,9 @@
-/* Ряд вариантов выбора: два вида одного ряда.
+/* Ряд вариантов выбора: три вида одного ряда.
 
    Сегментами — когда вариантов три-четыре и они делят ширину поровну; чипами —
-   когда их одиннадцать и в один ряд равной ширины они не помещаются. */
+   когда их одиннадцать и в один ряд равной ширины они не помещаются; плитками —
+   сегменты без растяжки, когда варианты в букву и тянуть их на всю ширину
+   значило бы превратить две буквы в полосу. */
 
 .choice-row {
   display: flex;
@@ -17,8 +19,8 @@
   color: var(--text-primary);
 }
 
-.choice-row[data-look='seg'] {
-  width: 100%;
+.choice-row[data-look='seg'],
+.choice-row[data-look='tile'] {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -27,32 +29,51 @@
   background: var(--bg-secondary);
 }
 
-.choice-row[data-look='seg'] .choice {
-  flex: 1;
-  padding: 2px 12px;
+.choice-row[data-look='seg'] {
+  width: 100%;
+}
+
+.choice-row[data-look='seg'] .choice,
+.choice-row[data-look='tile'] .choice {
   border-right: 1px solid var(--border);
   font-weight: 500;
-  letter-spacing: 0.3px;
   text-align: center;
 }
 
-.choice-row[data-look='seg'] .choice:first-child {
+.choice-row[data-look='seg'] .choice {
+  flex: 1;
+  padding: 2px 12px;
+  letter-spacing: 0.3px;
+}
+
+/* Ширина плитки — около высоты поля ввода, рядом с которым она стоит: так
+   буква сидит в квадрате, а не в полоске. */
+.choice-row[data-look='tile'] .choice {
+  width: 32px;
+  font-size: 0.85rem;
+}
+
+.choice-row[data-look='seg'] .choice:first-child,
+.choice-row[data-look='tile'] .choice:first-child {
   border-radius: 4px 0 0 4px;
 }
 
-.choice-row[data-look='seg'] .choice:last-child {
+.choice-row[data-look='seg'] .choice:last-child,
+.choice-row[data-look='tile'] .choice:last-child {
   border-right: none;
   border-radius: 0 4px 4px 0;
 }
 
 /* Выбранное обведено, а не залито: залитых бывает три из четырёх разом, и
    экран превращался бы в сплошное пятно. */
-.choice-row[data-look='seg'] .choice.active {
+.choice-row[data-look='seg'] .choice.active,
+.choice-row[data-look='tile'] .choice.active {
   box-shadow: inset 0 0 0 1px var(--text-primary);
   color: var(--text-primary);
 }
 
-.choice-row[data-look='seg'] .choice.active:hover {
+.choice-row[data-look='seg'] .choice.active:hover,
+.choice-row[data-look='tile'] .choice.active:hover {
   background: var(--surface-hover-firm);
   color: var(--text-primary);
 }

@@ -221,15 +221,14 @@ async def test_a_failed_telegram_mark_keeps_the_local_one(chatting, session_fact
     assert (await only_row(session_factory, Message)).read_at is not None
 
 
-async def test_a_switched_off_bot_marks_nothing_read(chatting, session_factory):
-    """Выключенный бот не гасит непрочитанное и не пишет в Telegram."""
+async def test_a_chat_opened_by_the_person_is_read_in_off_too(chatting, session_factory):
+    """Режим — про автоматику: переписку открыл человек, и прочитанное гасится и в Off."""
     bot, client, hr = await chatting(mode=BotMode.OFF, telegram_user_id=777)
     await put(session_factory, message_row(hr_id=hr.id, is_incoming=True, read_at=None))
 
-    assert await bot.mark_hr_chat_read(hr.id) == 0
+    assert await bot.mark_hr_chat_read(hr.id) == 1
 
-    assert (await only_row(session_factory, Message)).read_at is None
-    assert client.read_calls == []
+    assert (await only_row(session_factory, Message)).read_at is not None
 
 
 async def test_a_missing_hr_marks_nothing(chatting):

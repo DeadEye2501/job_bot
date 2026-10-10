@@ -119,9 +119,6 @@ class System(Journal, Wipe, Desktop):
                 async with session.begin():
                     await write_mode(session, chosen)
             if self._hub.bot is not None:
-                # Обход агента — отдельная задача и тика не ждёт: Off гасит его сразу.
-                if chosen is BotMode.OFF:
-                    self._hub.bot.cancel_round()
                 self._hub.bot.kick()
             return {"mode": chosen.value}
 
@@ -134,12 +131,16 @@ class System(Journal, Wipe, Desktop):
         return {"ok": {}}
 
     def run_now(self) -> dict:
-        """Кнопка обновления: один обход каналов помимо режима.
+        """Кнопка обновления: один полный оборот — каналы, затем агрегаторы —
+        в любом режиме.
 
         Ответ говорит только «пущено»: обход идёт по всем каналам и по всем их
         новым постам — это самая долгая работа в приложении, и ждать её значит
         держать зов вместе с окном. Чем кончилось, человек узнаёт вестью, а о
         ходе рассказывает нижняя полоса.
+
+        Весть звучит, когда пройдены каналы: агрегаторы уходят дальше отдельной
+        задачей, и о них говорит та же полоса.
         """
         bot = self._hub.bot
         if bot is None:
@@ -149,7 +150,7 @@ class System(Journal, Wipe, Desktop):
             self._hub,
             bot.force_poll_once,
             RUN_REFUSALS,
-            "Каналы прогнаны.",
+            "Каналы пройдены.",
             action="run_now",
         )
 
