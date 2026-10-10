@@ -61,43 +61,9 @@ describe('лента карточки', () => {
     expect(rows.map((one) => one.key)).toEqual(['h7', 'e5', 'h3', 'e1']);
   });
 
-  it('удавшаяся авто-отправка и отправленный отклик в ленту не попадают', () => {
-    // О них уже сказано статусом «Applied» строкой выше; повтор растил бы
-    // ленту вдвое, ничего не добавляя.
-    const events = [
-      { id: 9, kind: 'auto_send', payload: { ok: true }, created_at: '2026-08-14T12:30:00Z' },
-      { id: 8, kind: 'applied_sent', payload: { hr_id: 1 }, created_at: '2026-08-14T12:20:00Z' },
-      ...EVENTS,
-    ];
-    const kinds = timelineRows(HISTORY, events).map((one) => one.kind);
-    // Остальное на месте: отсев, съевший ленту целиком, прошёл бы одной
-    // проверкой «нет лишнего».
-    expect(kinds).toEqual(['history', 'parsed', 'history', 'ingested']);
-  });
-
-  it('неудавшаяся авто-отправка остаётся и названа причиной', () => {
-    // Это единственное место, где человек узнаёт, почему отклик не ушёл сам.
-    const events = [
-      {
-        id: 9,
-        kind: 'auto_send',
-        payload: { ok: false, reason: 'cv_missing' },
-        created_at: '2026-08-14T12:30:00Z',
-      },
-    ];
-    expect(timelineRows([], events)[0].text).toBe('Авто-отправка: CV-файл не найден.');
-  });
-
-  it('текущей помечена первая видимая строка, а не первая пришедшая', () => {
-    // Свечение говорит «вот на чём вакансия стоит сейчас». Достанься оно
-    // отброшенной строке, светилась бы пустота, а живая строка стояла бы
-    // тусклой.
-    const events = [
-      { id: 9, kind: 'applied_sent', payload: {}, created_at: '2026-08-14T23:00:00Z' },
-      ...EVENTS,
-    ];
-    const rows = timelineRows(HISTORY, events);
-    expect(rows[0].key).toBe('h7');
+  it('текущей помечена самая свежая строка', () => {
+    // Свечение говорит «вот на чём вакансия стоит сейчас».
+    const rows = timelineRows(HISTORY, EVENTS);
     expect(rows.filter((one) => one.current).map((one) => one.key)).toEqual(['h7']);
   });
 
@@ -304,27 +270,22 @@ describe('события агрегаторов в ленте', () => {
       .toBe('Найдена в сети.');
   });
 
-  it('отклик вне Telegram назван способом и тем, кто писал письмо', () => {
+  it('отклик назван способом и тем, кто писал письмо', () => {
     // По «письмо: приложение / агент» человек сравнивает два способа писать
     // письмо на живых откликах — для этого их и пишут в ленту.
-    expect(eventNote('applied_elsewhere', { via: 'aggregator', simulated: false, letter_by: 'app' }))
+    expect(eventNote('applied', { via: 'aggregator', simulated: false, letter_by: 'app' }))
       .toBe('Отклик на сайте агрегатора; письмо: приложение.');
-    expect(eventNote('applied_elsewhere', { via: 'email', simulated: true, letter_by: 'agent' }))
+    expect(eventNote('applied', { via: 'email', simulated: true, letter_by: 'agent' }))
       .toBe('Отклик письмом (симуляция); письмо: агент.');
   });
 
+  it('отклик в Telegram назван своим способом', () => {
+    expect(eventNote('applied', { via: 'telegram', simulated: false, letter_by: 'app' }))
+      .toBe('Отклик в Telegram; письмо: приложение.');
+  });
+
   it('отклик без письма так и назван', () => {
-    expect(eventNote('applied_elsewhere', { via: 'form', simulated: false, letter_by: null }))
+    expect(eventNote('applied', { via: 'form', simulated: false, letter_by: null }))
       .toBe('Отклик формой работодателя; письмо: без письма.');
-  });
-
-  it('несостоявшийся отклик назван способом и причиной', () => {
-    expect(eventNote('apply_failed', { method: 'form', reason: 'нужна регистрация на сайте' }))
-      .toBe('Отклик не удался (формой работодателя): нужна регистрация на сайте.');
-  });
-
-  it('закрытая на сайте вакансия так и названа', () => {
-    expect(eventNote('vacancy_closed', { method: 'aggregator', reason: '' }))
-      .toBe('Вакансия закрыта на сайте.');
   });
 });

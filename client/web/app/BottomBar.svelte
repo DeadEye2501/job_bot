@@ -23,6 +23,7 @@
   import {
     COUNTLESS_STAGES,
     STARTING,
+    applyNote,
     bar,
     caption,
     countlessNote,
@@ -167,6 +168,8 @@
    */
   function moved(step) {
     if (COUNTLESS_STAGES.has(step.stage)) single = countlessNote(step.label);
+    // Отклики идут вакансия за вакансией после поиска: подпись — какая и где в очереди.
+    if (step.stage === 'apply') single = applyNote(step);
     // Агрегатор обходится той же полосой, что канал: источник за источником, и
     // подпись его — имя сайта со счётом найденного.
     if (step.stage === 'channel' || step.stage === 'aggregator') {

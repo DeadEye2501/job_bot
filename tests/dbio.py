@@ -52,6 +52,18 @@ def sqlite_rows(db_file, sql: str) -> list[tuple]:
         connection.close()
 
 
+def sqlite_write(db_file, *statements: str) -> None:
+    """Записать в файл базы мимо ORM одной сделкой — по той же причине, что
+    `sqlite_rows`: модели описывают `head`, а база стоит на другой ревизии."""
+    connection = sqlite3.connect(db_file)
+    try:
+        for sql in statements:
+            connection.execute(sql)
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def sqlite_tables(db_file) -> set[str]:
     """Имена таблиц в файле базы — то, что ревизия завела или сняла."""
     return {name for (name,) in sqlite_rows(db_file, "SELECT name FROM sqlite_master WHERE type = 'table'")}

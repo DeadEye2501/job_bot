@@ -6,25 +6,6 @@
 
 import { atHandle } from './telegram.js';
 
-// Роды событий, которых в ленте не бывает: об удавшейся отправке уже сказано
-// статусом «Applied» строкой выше, и повтор растил бы ленту вдвое, ничего не
-// добавляя.
-const HIDDEN = new Set(['applied_sent']);
-
-// Отказы авто-отправки словами. Коды приходят с бэкенда
-// (`backend/flows/apply.py`), и это единственное место, где человек узнаёт,
-// почему отклик не ушёл сам.
-const SEND_FAILS = {
-  profile_empty: 'профиль пуст',
-  cover_letter_failed: 'письмо не прошло проверку',
-  cover_letter_unasked: 'модель не ответила',
-  cv_missing: 'CV-файл не найден',
-  race: 'статус успел измениться',
-  blocked: 'отправка заблокирована',
-  telegram_error: 'Telegram отказался',
-  flood_wait: 'Telegram держит FloodWait',
-};
-
 // Приставки причин пропуска: чем начинается ответ бэкенда и каким словом это
 // называется в ленте.
 const SKIP_PREFIXES = [
@@ -74,9 +55,14 @@ function linkNote(what, payload, blank) {
   return `${what}: ${was} → ${now}.`;
 }
 
-// Способы отклика вне Telegram словами — в той форме, в какой они встают после
-// «Отклик …». Коды приходят с бэкенда (`ApplicationVia`).
-const VIA = { aggregator: 'на сайте агрегатора', form: 'формой работодателя', email: 'письмом' };
+// Способы отклика словами — в той форме, в какой они встают после «Отклик …».
+// Коды приходят с бэкенда (`ApplicationVia`).
+const VIA = {
+  telegram: 'в Telegram',
+  aggregator: 'на сайте агрегатора',
+  form: 'формой работодателя',
+  email: 'письмом',
+};
 
 /** Способ отклика словами; незнакомый код называется сам собой — коды заводит
  *  бэкенд, и новый приедет раньше, чем окно про него узнает. */
@@ -100,16 +86,12 @@ const EVENT_TEXT = {
     `Поступила из канала ${atHandle(payload.channel) || 'неизвестного канала'}.`,
   created_by_hand: () => 'Вакансия добавлена вручную.',
   parsed: (payload) => skipNote(payload.skip_reason) || 'Без замечаний.',
-  auto_send: (payload) => `Авто-отправка: ${SEND_FAILS[payload.reason] || payload.reason}.`,
   linked_hr: (payload) => linkNote('HR', payload, 'не привязан'),
   linked_company: (payload) => linkNote('Компания', payload, 'не привязана'),
   // «Поиск по сети» — способ поиска, а не место: «Найдена на Поиск по сети»
   // читалось бы как ошибка.
   found: (payload) => (payload.web_search ? 'Найдена в сети.' : `Найдена на ${payload.source}.`),
-  applied_elsewhere: appliedNote,
-  apply_failed: (payload) =>
-    `Отклик не удался (${viaWords(payload.method)}): ${payload.reason}.`,
-  vacancy_closed: () => 'Вакансия закрыта на сайте.',
+  applied: appliedNote,
 };
 
 // Чем подписано событие. Незнакомый род называется сам собой: роды заводит
@@ -162,13 +144,6 @@ function eventRow(one) {
   };
 }
 
-// Удавшаяся авто-отправка молчит по тому же доводу, что и `applied_sent`;
-// неудавшаяся остаётся — ради неё род и показывают.
-function worthShowing(one) {
-  if (HIDDEN.has(one.kind)) return false;
-  return !(one.kind === 'auto_send' && (one.payload || {}).ok === true);
-}
-
 // Свежее сверху. При равной метке запись истории стоит выше события: база
 // ставит им одно время — разбор и записанный им же статус приходят одной
 // секундой, — а статус и есть то, ради чего строку читают.
@@ -180,13 +155,11 @@ function newerFirst(one, other) {
 /** Лента карточки: история и события в одном порядке.
  *
  * Это одна жизнь вакансии, а не два списка: разбор, отклик и правки человека
- * читаются подряд, иначе причину нынешнего статуса не найти.
- *
- * Отметка «текущая» достаётся первой видимой строке, а не первой пришедшей:
- * достанься она отброшенной, светилась бы пустота.
+ * читаются подряд, иначе причину нынешнего статуса не найти. Отметка
+ * «текущая» — у самой свежей строки.
  */
 export function timelineRows(history, events) {
-  const rows = [...history.map(historyRow), ...events.filter(worthShowing).map(eventRow)];
+  const rows = [...history.map(historyRow), ...events.map(eventRow)];
   rows.sort(newerFirst);
   return rows.map((one, at) => ({ ...one, current: at === 0 }));
 }

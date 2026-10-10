@@ -15,6 +15,7 @@ import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import BottomBar from '../app/BottomBar.svelte';
+import { applyNote } from '../state/progress.js';
 import { hearRound } from '../state/round.svelte.js';
 import { answering } from './bridge_stub.js';
 import { settled } from './settled.js';
@@ -152,6 +153,23 @@ describe('живая нижняя полоса', () => {
     await settled();
 
     expect(document.querySelector('.progress-caption').textContent).toContain('hh.ru — найдено (3/10)');
+  });
+
+  it('ступень отклика видна подписью', async () => {
+    expect(applyNote({ label: 'Python-разработчик', current: 0, total: 3 }))
+      .toBe('Python-разработчик — отклик (1/3)');
+  });
+
+  it('ход откликов виден под полосами', async () => {
+    const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+
+    handlers.ingestion_started();
+    handlers.progress_update({ stage: 'apply', label: 'Python-разработчик', current: 1, total: 3 });
+    await settled();
+
+    expect(document.querySelector('.progress-caption').textContent)
+      .toContain('Python-разработчик — отклик (2/3)');
   });
 
   it('слово обхода показывается плашкой', async () => {

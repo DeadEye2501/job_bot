@@ -31,7 +31,8 @@ async def apply_vacancies(kit: AgentKit, vacancy_ids: list[int]) -> None:
     """Откликнуться на каждую по очереди. Мир читается раз и доучивается по ходу."""
     world = await read_world(kit.pipeline.rs, kit.pipeline.session_factory)
     total = len(vacancy_ids)
-    for number, vacancy_id in enumerate(vacancy_ids, 1):
+    # Счёт с нуля, как у каналов: окно само называет место в очереди с единицы.
+    for number, vacancy_id in enumerate(vacancy_ids):
         kit.pipeline.emit_progress("apply", await _title(kit, vacancy_id), number, total)
         await _apply_one(kit, world, vacancy_id)
 

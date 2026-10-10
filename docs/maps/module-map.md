@@ -316,7 +316,7 @@ Claude через установленный Claude Code по подписке: 
 
 - `def page_client(timeout_sec: float, user_agent: str) -> httpx.AsyncClient` (7)
 
-## alembic — 3 модулей
+## alembic — 4 модулей
 
 ### `alembic/env.py` — 77 строк
 
@@ -338,6 +338,15 @@ aggregators
 - `def _source_columns(table: str) -> None` (8)
 - `def upgrade() -> None` (83)
 - `def downgrade() -> None` (24)
+
+### `alembic/versions/c4d7e2a915b3_one_apply_trail.py` — 30 строк
+
+one apply trail
+
+Зависит от: `alembic`
+
+- `def upgrade() -> None` (4)
+- `def downgrade() -> None` (2)
 
 ### `alembic/versions/e560edf8b958_init.py` — 272 строк
 
@@ -596,13 +605,13 @@ init
 - `class Missed` (5)
 - `async def delivered(record: Awaitable, vacancy_id: int) -> Outcome` (11)
 
-### `backend/applying/run.py` — 77 строк
+### `backend/applying/run.py` — 78 строк
 
 Цикл откликателя: по каждой вакансии первый доступный способ, пока один не удастся.
 
 Зависит от: `backend.agent.kit`, `backend.agent.stops`, `backend.applying.browser`, `backend.applying.email`, `backend.applying.result`, `backend.applying.telegram`, `backend.applying.world`, `backend.domain.apply_order`, `backend.models`
 
-- `async def apply_vacancies(kit: AgentKit, vacancy_ids: list[int]) -> None` (7)
+- `async def apply_vacancies(kit: AgentKit, vacancy_ids: list[int]) -> None` (8)
 - `async def _apply_one(kit: AgentKit, world: World, vacancy_id: int) -> None` (13)
 - `async def apply_chosen(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (18)
 - `async def _title(kit: AgentKit, vacancy_id: int) -> str` (4)
@@ -3552,7 +3561,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 312 модулей
+## tests — 313 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
 
@@ -4041,13 +4050,13 @@ Runtime settings layer.
 Тестов: 8
 
 
-### `tests/backend/test_applying_run.py` — 70 строк
+### `tests/backend/test_applying_run.py` — 80 строк
 
 Цикл откликателя: по каждой вакансии первый доступный способ, пока один не удастся.
 
 Зависит от: `backend.applying`, `backend.applying.result`, `backend.domain.apply_order`
 
-Тестов: 5
+Тестов: 6
 
 - `def executors(monkeypatch)` (13)
   - `def fake(method)` (5)
@@ -5141,7 +5150,7 @@ Runtime settings layer.
 Тестов: 19
 
 
-### `tests/backend/test_migration_aggregators.py` — 133 строк
+### `tests/backend/test_migration_aggregators.py` — 127 строк
 
 Следствия схемной ревизии агрегаторов: что она заводит и что держит база.
 
@@ -5150,7 +5159,17 @@ Runtime settings layer.
 Тестов: 8
 
 
-### `tests/backend/test_migration_engine.py` — 171 строк
+### `tests/backend/test_migration_apply_trail.py` — 36 строк
+
+Ревизия следа откликов: одно событие отклика вместо пяти родов.
+
+Зависит от: `alembic`, `backend.bootstrap`, `tests.dbio`
+
+Тестов: 2
+
+- `def _with_old_events(target) -> None` (5)
+
+### `tests/backend/test_migration_engine.py` — 164 строк
 
 Следствия того, каким движком alembic открывает базу и как его закрывает.
 
@@ -6562,7 +6581,7 @@ Runtime settings layer.
 - `def session_factory(engine) -> async_sessionmaker[AsyncSession]` (8)
 - `async def session(session_factory)` (16)
 
-### `tests/dbio.py` — 57 строк
+### `tests/dbio.py` — 69 строк
 
 Короткие обращения к базе из теста.
 
@@ -6572,6 +6591,7 @@ Runtime settings layer.
 - `async def only_row(session_factory, model)` (4)
 - `async def all_rows(session_factory, model) -> list` (8)
 - `def sqlite_rows(db_file, sql: str) -> list[tuple]` (11)
+- `def sqlite_write(db_file, *statements: str) -> None` (10)
 - `def sqlite_tables(db_file) -> set[str]` (3)
 
 ### `tests/factories.py` — 484 строк ⚠ подошёл к 300
