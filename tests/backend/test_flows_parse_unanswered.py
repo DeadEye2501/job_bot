@@ -38,7 +38,7 @@ async def test_a_vacancy_survives_a_provider_that_did_not_answer(
     # Чужой приговор из обстановки — на месте: своего разбор не выносил.
     assert saved.skip_reason == "прошлый отказ"
     assert await all_rows(session_factory, TrashEvent) == []
-    assert done is False
+    assert done.stored is False
 
 
 async def test_a_verdict_that_never_fits_lands_the_vacancy_for_the_human(
@@ -61,7 +61,7 @@ async def test_a_verdict_that_never_fits_lands_the_vacancy_for_the_human(
     )
 
     saved = await only_row(session_factory, Vacancy)
-    assert done is True
+    assert done.stored is True
     assert saved.is_parsed is True
     assert saved.status is VacancyStatus.NOT_FIT
     assert saved.skip_reason == TRUNCATED_SKIP_REASON
@@ -84,7 +84,7 @@ async def test_a_verdict_the_model_refused_lands_the_vacancy_for_the_human(
     )
 
     saved = await only_row(session_factory, Vacancy)
-    assert done is True
+    assert done.stored is True
     assert saved.is_parsed is True
     assert saved.status is VacancyStatus.NOT_FIT
     assert saved.skip_reason == REFUSED_SKIP_REASON
@@ -111,7 +111,7 @@ async def test_a_verdict_nobody_answered_leaves_the_vacancy_unparsed(
     assert saved.is_parsed is False
     # Чужой приговор из обстановки — на месте: своего разбор не выносил.
     assert saved.skip_reason == "прошлый отказ"
-    assert done is False
+    assert done.stored is False
 
 
 async def test_a_post_the_genre_call_could_not_judge_stays_unparsed(parsing, session_factory):
@@ -127,7 +127,7 @@ async def test_a_post_the_genre_call_could_not_judge_stays_unparsed(parsing, ses
         pipeline, vacancy.id, "текст", "jobs", allow_delete=True
     )
 
-    assert done is False
+    assert done.stored is False
     assert pipeline.validated is False
     saved = await only_row(session_factory, Vacancy)
     assert saved.is_parsed is False

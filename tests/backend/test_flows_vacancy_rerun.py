@@ -137,7 +137,7 @@ async def test_a_vacancy_gone_by_the_time_of_the_write_is_called_missing(
         async with session_factory() as session:
             await session.delete(await session.get(Vacancy, vacancy_id))
             await session.commit()
-        return False
+        return parse_mod.Judged(False)
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse_and_vanish)
 
@@ -247,7 +247,7 @@ async def test_a_rerun_writes_the_status_it_changed_into_the_history(
             row = await session.get(Vacancy, vacancy_id)
             apply_parse_outcome(row, VacancyStatus.NOT_FIT)
             await session.commit()
-        return True
+        return parse_mod.Judged(True)
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 
@@ -289,7 +289,7 @@ async def test_a_status_already_explained_gets_no_second_row(
         async with session_factory() as session:
             await mark_vacancy_applied(session, vacancy_id, "Авто-отправка отклика.")
             await session.commit()
-        return True
+        return parse_mod.Judged(True)
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
 

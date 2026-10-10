@@ -49,7 +49,7 @@ async def intake(make_pipeline, monkeypatch, one_vector):
             await cleanup.delete_vacancy_as_trash(
                 pipeline, vacancy_id, reason="реклама"
             )
-        return pipeline.parse_done
+        return parse_mod.Judged(pipeline.parse_done)
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
     return pipeline

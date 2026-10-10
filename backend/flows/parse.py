@@ -1,14 +1,14 @@
 """Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
 Всё здесь про одно — чем объявление кончилось: спросить модель, свериться с
-чёрным списком, вынести приговор, выбросить мусор, отправить отклик пригодному,
-пометить пустышку. Куда исход ложится, знает сосед (`flows/parse_write`);
-зовут его отсюда, а не наоборот.
+чёрным списком, вынести приговор, выбросить мусор, пометить пустышку. Куда
+исход ложится, знает сосед (`flows/parse_write`); зовут его отсюда, а не
+наоборот. Откликаться ли, решает не разбор, а передача (`flows/handover`).
 """
 
 import logging
+from dataclasses import dataclass
 
-from backend.flows import dm_backfill
 from backend.flows.fit_refusal import unanswered, unfit_refusal
 from backend.domain.blacklist import check_blacklist
 from backend.domain.contact_keys import is_link
@@ -19,19 +19,32 @@ from backend.domain.verdict import is_empty_vacancy
 from backend.domain.verdict import EMPTY_SKIP_REASON, TRASH_SKIP_PREFIX
 from backend.llm.rules import VACANCY_TEXT_CHARS
 from backend.llm.vacancy import parse_vacancy
-from backend.models import Vacancy
+from backend.models import HR, Vacancy
 from backend.payloads import ParsedVacancy
 from backend.models import VacancyStatus
-from backend.flows.events import record_vacancy_event
 
-from backend.flows import apply
 from backend.flows import cleanup
 from backend.flows.parse_write import Outcome, persist_parse_outcome
 from backend.repository.aggregators import barred_host_of
 from backend.repository.vacancy_contacts import vacancy_addresses
-from backend.repository.vacancy_status import was_ever_applied
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class Judged:
+    """Итог разбора: записан ли исход и HR, заведённый этим разбором."""
+
+    stored: bool
+    fresh_hr: HR | None = None
+
+
+def _judged(written) -> "Judged":
+    """Итог по ответу записи: не дошла — не записан; новый HR — отдаётся."""
+    if written is None:
+        return Judged(False)
+    hr, created = written
+    return Judged(True, hr if created else None)
 
 
 async def _dropped_as_trash(
@@ -61,7 +74,7 @@ async def _dropped_as_trash(
 
 async def _thrown_out_as_a_resume(
     pipeline, vacancy_id: int, mark: str, allow_delete: bool
-) -> bool:
+) -> Judged:
     """Убрать пост соискателя, не спрашивая модель вовсе; сказать, вышло ли.
 
     Поля у такой строки не заполняются: разбора не было, а показывать в
@@ -73,46 +86,8 @@ async def _thrown_out_as_a_resume(
     if await _dropped_as_trash(
         pipeline, vacancy_id, reason, allow_delete=allow_delete
     ):
-        return True
+        return Judged(True)
     return await save_empty_vacancy(pipeline, vacancy_id, None, reason=reason)
-
-
-async def _auto_send_if_allowed(
-    pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus
-) -> None:
-    """Отправить отклик, если можно; попытку записать при любом исходе.
-
-    Запись нужна затем, что через месяцы человек смотрит на новую вакансию
-    с опознанным HR и пройденным порогом и не понимает, почему отклик так
-    и не ушёл. Без строки в ленте ответа на это нет нигде — речь про исход
-    самой отправки; те, до кого она не дошла вовсе, молчат, и ответ на них
-    виден по другим следам: статусу, привязке HR, настройке автоотправки.
-
-    У отбитого повтора след свой: три первых признака говорят «должно было
-    уйти» — статус «Новая», HR привязан, автоотправка включена, — и объясняет
-    молчание только история статусов, где отклик остался, вместе с записью
-    «Прогон заново».
-
-    «Уже откликались» спрашивается у истории, а не у статуса: разбор ставит
-    начальный статус поверх любого, и прогон заново приводит сюда вакансию,
-    у которой отклик давно ушёл, — со статусом «Новая», потому что его только
-    что и поставили. Заслоны в `apply` читают статус и такую не отбивают вовсе.
-    """
-    if status != VacancyStatus.NEW or hr is None or not pipeline.rs.auto_apply:
-        return
-    async with pipeline.session_factory() as session:
-        if await was_ever_applied(session, vacancy_id):
-            logger.info(
-                "vacancy %d: отклик уже уходил, второго письма не шлю", vacancy_id
-            )
-            return
-    ok, reason = await apply.try_auto_send(pipeline, hr, parsed, vacancy_id)
-    await record_vacancy_event(
-        pipeline.session_factory,
-        vacancy_id,
-        "auto_send",
-        {"ok": ok, "reason": reason},
-    )
 
 
 async def _parsed_or_dropped(
@@ -120,9 +95,9 @@ async def _parsed_or_dropped(
 ):
     """Разобрать объявление; пустота в ответ — с ним уже покончено.
 
-    Три значения: разбор, отказ модели и «дошла ли запись». Третье нужно
-    только пустой дороге: там строку записывают, и сорвавшаяся запись не
-    должна доехать до окна словом «разобрана».
+    Три значения: разбор, отказ модели и итог записи. Третий нужен только
+    пустой дороге: там строку записывают, и сорвавшаяся запись не должна
+    доехать до окна словом «разобрана».
 
     Пустышку отсеиваем до модели-оценщика: разбор не вытащил ни одного поля
     сверх названия, и второе обращение к модели ей не положено. Дорога эта не
@@ -148,16 +123,16 @@ async def _parsed_or_dropped(
     if trouble is not None:
         reason, unasked = trouble
         if unasked:
-            return None, refusal, False
+            return None, refusal, Judged(False)
         return None, None, await save_empty_vacancy(
             pipeline, vacancy_id, None, reason=reason
         )
     if not is_empty_vacancy(parsed):
-        return parsed, None, True
+        return parsed, None, Judged(True)
     if await _dropped_as_trash(
         pipeline, vacancy_id, EMPTY_SKIP_REASON, allow_delete=allow_delete
     ):
-        return None, None, True
+        return None, None, Judged(True)
     return None, None, await save_empty_vacancy(pipeline, vacancy_id, parsed)
 
 
@@ -213,24 +188,10 @@ async def _verdict_for(
     return status, skip_reason, score
 
 
-async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> bool:
-    """Записать исход, отправить отклик, если можно, и догнать переписку.
-
-    Догон идёт последним нарочно: пойди он раньше, вытащил бы наше же
-    письмо прежде, чем отправка закоммитит свою строку, — и в переписке
-    появился бы дубль без вакансии.
-
-    Отвечает, дошла ли запись: не дошла — отклик не отправляют и человеку
-    говорят «не удалось», а не «готово» над карточкой, которая не менялась.
-    """
-    written = await persist_parse_outcome(pipeline, vacancy_id, parsed, outcome)
-    if written is None:
-        return False
-    hr, created = written
-    await _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id, outcome.status)
-    if created:
-        dm_backfill.spawn_hr_backfill(pipeline, hr)
-    return True
+async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> Judged:
+    """Записать исход. Не дошла запись — человеку говорят «не удалось», а не
+    «готово» над карточкой, которая не менялась."""
+    return _judged(await persist_parse_outcome(pipeline, vacancy_id, parsed, outcome))
 
 
 async def _thrown_out_by_the_verdict(
@@ -256,7 +217,7 @@ async def _thrown_out_by_the_verdict(
 async def parse_and_update_vacancy(
     pipeline, vacancy_id: int, text: str, channel_username: str | None,
     *, allow_delete: bool = True,
-) -> bool:
+) -> Judged:
     """Разобрать объявление, вынести приговор и записать исход; сказать, вышло ли.
 
     ``allow_delete`` разводит две дороги: непригодную строку удаляют там, где
@@ -274,17 +235,17 @@ async def parse_and_update_vacancy(
         pipeline, vacancy_id, text, channel_username, allow_delete
     )
     if refusal is not None:
-        return False
+        return Judged(False)
     if parsed is None:
         return stored
     verdict = await _verdict_for(pipeline, parsed, text, vacancy_id)
     if verdict is None:
-        return False
+        return Judged(False)
     status, skip_reason, score = verdict
     if await _thrown_out_by_the_verdict(
         pipeline, vacancy_id, skip_reason, allow_delete
     ):
-        return True
+        return Judged(True)
     return await _finish_parse(
         pipeline,
         vacancy_id,
@@ -314,7 +275,7 @@ async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
 async def save_empty_vacancy(
     pipeline, vacancy_id: int, parsed: ParsedVacancy | None,
     *, reason: str = EMPTY_SKIP_REASON,
-) -> bool:
+) -> Judged:
     """Записать непригодную строку пометкой, когда удалять её нельзя.
 
     Пишется то, что разбор всё же вытащил, — обычно заголовок и ещё один
@@ -327,7 +288,7 @@ async def save_empty_vacancy(
     прежние поля, окно показало бы разобранное прошлым заходом рядом с
     приговором «мусор», то есть выдало бы старое за новое.
     """
-    written = await persist_parse_outcome(
+    return _judged(await persist_parse_outcome(
         pipeline,
         vacancy_id,
         parsed,
@@ -337,10 +298,4 @@ async def save_empty_vacancy(
             score=0,
             keep_previous_stack=False,
         ),
-    )
-    if written is None:
-        return False
-    hr, hr_created = written
-    if hr_created:
-        dm_backfill.spawn_hr_backfill(pipeline, hr)
-    return True
+    ))

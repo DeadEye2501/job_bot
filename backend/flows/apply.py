@@ -1,7 +1,6 @@
 """Решение отправить отклик: письмо, охраны от повтора и запись исхода."""
 
 import logging
-import time
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -23,11 +22,9 @@ from backend.repository.hr_identify import count_recent_outgoing_with_vacancy_fo
 
 logger = logging.getLogger(__name__)
 
-# Вакансии, отправка по которым идёт прямо сейчас. Живёт в модуле, а не в
-# конвейере: отправку заводят обе дороги — кнопка окна и авто-отправка
-# разбора, — а конвейер у них общий один, и держать список на нём значило бы
-# только дальше идти за тем же самым. Замка не нужно: обе дороги идут на одном
-# цикле asyncio, и между проверкой и записью сюда никто не вклинится.
+# Вакансии, отправка по которым идёт прямо сейчас. Замка не нужно: нажатия
+# идут на одном цикле asyncio, и между проверкой и записью сюда никто не
+# вклинится.
 _SENDING: set[int] = set()
 
 
@@ -49,30 +46,6 @@ def _send_refusal(v, *, force: bool, when: str) -> str | None:
         )
         return "race"
     return None
-
-
-async def try_auto_send(
-    pipeline, hr, parsed: ParsedVacancy, vacancy_id: int
-) -> tuple[bool, str]:
-    """Wrapper над send_application с уважением FloodWait-окна.
-    Возвращает тот же (ok, reason) контракт; дополнительный reason-код
-    ``flood_wait``.
-    """
-    # FloodWait persist: Bot.send (через send_application → _send)
-    # на FloodWait выписывает в app_settings момент когда можно
-    # пробовать снова. Дёргать send_dm раньше — гарантированный
-    # повторный FloodWait и накопление штрафа.
-    wait_until = pipeline.rs.flood_wait_until_ts
-    if wait_until > 0:
-        remaining = wait_until - time.time()
-        if remaining > 0:
-            logger.warning(
-                "vacancy %d: skipping auto-send, FloodWait еще %d сек",
-                vacancy_id, int(remaining),
-            )
-            return False, "flood_wait"
-
-    return await send_application(pipeline, hr, parsed, vacancy_id)
 
 
 @dataclass(frozen=True, slots=True)

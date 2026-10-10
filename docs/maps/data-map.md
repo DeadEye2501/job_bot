@@ -691,12 +691,6 @@
 - `TRUNCATED_SKIP_REASON` = `f'{LLM_SKIP_PREFIX}ответ модели не поместился'`
 - `REFUSED_SKIP_REASON` = `f'{LLM_SKIP_PREFIX}модель отказалась отвечать'`
 
-### `backend/flows/aggregator_apply.py`
-
-- `class ApplyOrder`
-  - `vacancy_id: int`
-  - `only: Way | None`
-
 ### `backend/flows/aggregator_name.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -704,9 +698,6 @@
 ### `backend/flows/aggregator_round.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `class RoundState`
-  - `closed_aggregators: set[int]`
-  - `web_search_id: int`
 
 ### `backend/flows/apply.py`
 
@@ -794,6 +785,9 @@
 ### `backend/flows/parse.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `class Judged`
+  - `stored: bool`
+  - `fresh_hr: HR | None` = `None`
 
 ### `backend/flows/parse_queue.py`
 
@@ -1719,7 +1713,7 @@
 ### `backend/runtime_settings.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_APP_DEFAULTS: dict[str, str]` = `словарь из 15`
+- `_APP_DEFAULTS: dict[str, str]` = `словарь из 14`
 - `LETTER_WRITERS` = `набор из 2`
 
 ### `backend/single_instance.py`

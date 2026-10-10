@@ -15,7 +15,7 @@ from typing import Literal
 from sqlalchemy import select
 
 from adapters import telegraph
-from backend.flows import embeddings, linked_article, parse
+from backend.flows import embeddings, handover, linked_article
 from backend.message_text import extract_post_text
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
@@ -266,7 +266,7 @@ async def rerun_pipeline_for_vacancy(
         logger.warning("rerun: vacancy %d has empty raw_text", vacancy_id)
         return "no_text"
     await pipeline.reload_resources()
-    if not await parse.parse_and_update_vacancy(
+    if not await handover.judge_and_hand_over(
         pipeline, vacancy_id, text, origin.channel_username, allow_delete=False
     ):
         # Разбор не дошёл до конца по одной из двух причин, и человеку они
@@ -397,7 +397,7 @@ async def _recover_one(pipeline, row) -> bool:
         logger.info("recover: vacancy %d ждёт дочитывания статьи", row.id)
         return False
     text, allow_delete = judged
-    if not await parse.parse_and_update_vacancy(
+    if not await handover.judge_and_hand_over(
         pipeline, row.id, text, row.username or "", allow_delete=allow_delete
     ):
         return False

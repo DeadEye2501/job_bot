@@ -15,7 +15,7 @@ import logging
 from datetime import datetime
 from typing import Literal
 
-from backend.flows import embeddings, intake, parse, sameness
+from backend.flows import embeddings, handover, intake, sameness
 from backend.models import Vacancy
 from backend.repository.vacancies_new import HAND_MADE
 
@@ -104,7 +104,7 @@ async def _parsed(pipeline, vacancy_id: int, text: str) -> PastedIntakeOutcome:
     человека искать то, чего он не найдёт.
     """
     await pipeline.reload_resources()
-    if not await parse.parse_and_update_vacancy(pipeline, vacancy_id, text, None):
+    if not await handover.judge_and_hand_over(pipeline, vacancy_id, text, None):
         return "llm"
     return "ok" if await _still_there(pipeline, vacancy_id) else "trash"
 

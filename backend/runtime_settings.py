@@ -59,11 +59,6 @@ _APP_DEFAULTS: dict[str, str] = {
     # настройках. Авторитет здесь, а telegram.SEND_LOCKED зеркалится из этой
     # настройки на старте Bot.run и на каждой её записи (`set_app`).
     "send_locked": "false",
-    # auto_apply: kill-switch для автоматической отправки cover-letter'ов
-    # из poll-цикла (auto-send branch в flows/parse.py, parse_and_update_vacancy).
-    # При False parse-pipeline всё равно отрабатывает — статус NEW,
-    # ручная отправка из UI через «Отправить отклик» работает.
-    "auto_apply": "true",
     # Cosine-similarity порог дедупа вакансий по embedding'ам. >= → считаем
     # дубликатом существующей вакансии и не парсим повторно. Слишком высокий
     # → дубли проскальзывают; слишком низкий → разные вакансии в одной
@@ -240,13 +235,6 @@ class RuntimeSettings:
         этой настройки на старте Bot.run и на каждой её записи, кто бы её ни
         писал."""
         return self._app_bool("send_locked")
-
-    @property
-    def auto_apply(self) -> bool:
-        """Если False, авто-отправка cover-letter'ов из poll-цикла
-        отключена (parse-pipeline отрабатывает, ручная отправка через
-        UI работает)."""
-        return self._app_bool("auto_apply")
 
     @property
     def flood_wait_until_ts(self) -> float:

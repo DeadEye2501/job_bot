@@ -13,11 +13,13 @@ class ParseQueue:
     """Разбирает по одной в порядке поступления; одна сломанная не держит остальных.
 
     Разбор — без канала, как у вставленного текста: у найденной страницы его нет.
+    Итоги копятся в `judged`: передают их откликателю целиком, после поиска.
     """
 
     def __init__(self, pipeline) -> None:
         self._pipeline = pipeline
         self._items: asyncio.Queue[tuple[int, str]] = asyncio.Queue()
+        self.judged: list[tuple[int, parse.Judged]] = []
         self._worker = asyncio.create_task(self._work())
 
     def put(self, vacancy_id: int, text: str) -> None:
@@ -36,7 +38,8 @@ class ParseQueue:
         while True:
             vacancy_id, text = await self._items.get()
             try:
-                await parse.parse_and_update_vacancy(self._pipeline, vacancy_id, text, None)
+                self.judged.append((vacancy_id, await parse.parse_and_update_vacancy(
+                    self._pipeline, vacancy_id, text, None)))
             except Exception:
                 logger.exception("разбор найденной вакансии %d не удался", vacancy_id)
             finally:

@@ -114,16 +114,6 @@ def test_sending_locks_once_explicitly_asked():
     assert settings(send_locked="true").send_locked is True
 
 
-def test_automatic_apply_is_on_by_default():
-    """Автоматическая отправка откликов по умолчанию включена."""
-    assert settings().auto_apply is True
-
-
-def test_automatic_apply_turns_off_when_set():
-    """Записанное «false» отключает авто-отправку откликов."""
-    assert settings(auto_apply="false").auto_apply is False
-
-
 @pytest.mark.parametrize(
     "raw, expected",
     [("0.92", 0.92), ("0.999", 0.999), ("0.5", 0.5)],

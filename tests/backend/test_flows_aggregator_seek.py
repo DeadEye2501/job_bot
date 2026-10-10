@@ -1,11 +1,13 @@
-"""Фаза 1: искатель находит, конвейер разбирает, last_run_at двигается только по done."""
+"""Обход источника: искатель находит, конвейер разбирает, отобранное уходит
+откликателю пулом после поиска; last_run_at двигается только по done."""
 
 import pytest
 
 from backend.agent.jobs import Source
 from backend.agent.sessions import HumanTimeout, LimitExhausted
-from backend.flows.aggregator_round import RoundState, seek_source
+from backend.flows.aggregator_round import seek_source
 from backend.models import Aggregator, Vacancy
+from tests.backend.fixtures.flows import similar_by_hand
 from tests.backend.fixtures.parse_stub import parse_into
 from tests.dbio import all_rows, put
 from tests.factories import blacklist_row
@@ -27,15 +29,19 @@ def parsed(monkeypatch):
 
 @pytest.fixture
 def seek(make_pipeline, session_factory):
-    """Обход одного источника по сценарию; ответ — найденное, строка источника и набор."""
+    """Обход одного источника по сценарию; ответ — переданное откликателю одним
+    перечнем (пусто — ничего), строка источника и набор."""
 
-    async def run(steps, human_limit=3600.0, **source):
+    async def run(steps, human_limit=3600.0, on_kit=None, **source):
         row = aggregator_row(**{"host": "site.test", **source})
         await put(session_factory, row)
         kit = scripted_kit(await make_pipeline(), steps, human_limit=human_limit)
-        found = await seek_source(kit, RoundState(set(), web_search_id=0), Source.of(row))
+        if on_kit is not None:
+            await on_kit(kit)
+        await seek_source(kit, Source.of(row))
         stored = [a for a in await all_rows(session_factory, Aggregator) if a.id == row.id][0]
-        return found, stored, kit
+        handed = [vacancy_id for ids in kit.pipeline.applied for vacancy_id in ids]
+        return handed, stored, kit
 
     return run
 
@@ -79,8 +85,45 @@ async def test_a_silent_embedding_model_is_a_failure_whatever_the_agent_says(
     assert found == [] and stored.last_run_at is None
 
 
+async def test_the_pool_is_handed_over_after_the_search(seek, parsed, monkeypatch):
+    """Три находки уходят откликателю одним перечнем — после того, как разобраны все."""
+    parsed_when_applied = []
+
+    async def step(tools):
+        for number in (1, 2, 3):
+            await _submit(tools, url=f"https://site.test/vacancy/{number}")
+        await tools["finish"](result="done")
+
+    async def watch(kit):
+        similar_by_hand(kit.pipeline, monkeypatch)
+
+        async def apply(ids):
+            parsed_when_applied.append(len(parsed))
+            kit.pipeline.applied.append(list(ids))
+        kit.pipeline.apply = apply
+
+    handed, _, kit = await seek([step], on_kit=watch)
+
+    assert len(kit.pipeline.applied) == 1 and len(handed) == 3
+    assert parsed_when_applied == [3]
+
+
+async def test_the_search_browser_is_closed_before_the_handover(seek, parsed):
+    """Поиск и отклик делят один профиль браузера: двух окон на него Chromium не откроет."""
+    calls_when_applied = []
+
+    async def watch(kit):
+        async def apply(ids):
+            calls_when_applied.append(list(kit.browser.calls))
+        kit.pipeline.apply = apply
+
+    await seek([_submit_and_finish], on_kit=watch)
+
+    assert calls_when_applied[0][-1] == "close"
+
+
 async def test_a_crash_mid_session_fails_the_source_not_the_round(seek, session_factory, parsed):
-    """Найденное до сбоя разбирается: фаза откликов берёт только разобранное."""
+    """Найденное до сбоя разбирается и уходит откликателю."""
     async def step(tools):
         await _submit(tools)
         raise RuntimeError("сломалось")

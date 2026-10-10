@@ -329,55 +329,25 @@ async def test_a_login_window_left_open_is_not_called_a_captcha(make_bot, sites,
 
 
 @pytest.fixture
-def phases(monkeypatch):
-    """Поиск отдаёт найденную вакансию; фаза откликов только записывает, по чему её звали."""
-    applied = []
+def sought(monkeypatch):
+    """Источники, на которых прошёл поиск."""
+    names = []
 
-    async def seek(kit, round_, source):
-        return [41]
-
-    async def apply(kit, round_, vacancy_ids):
-        applied.append(vacancy_ids)
+    async def seek(kit, source):
+        names.append(source.name)
 
     monkeypatch.setattr(aggregators, "seek_source", seek)
-    monkeypatch.setattr(aggregators, "apply_phase", apply)
-    return applied
+    return names
 
 
-async def test_the_found_vacancies_are_applied_to_when_auto_apply_is_on(
-    make_bot, sites, agent, phases, session_factory
-):
-    bot = await make_bot()
-    agent(bot, [])
-    await switch_to(session_factory, BotMode.FULL)
-
-    assert await aggregators.run_aggregator_now(bot, sites.id) == "ok"
-    assert phases == [[41]]
-
-
-async def test_auto_apply_off_leaves_the_found_vacancies_to_the_person(
-    make_bot, sites, agent, phases, session_factory
-):
-    bot = await make_bot()
-    agent(bot, [])
-    await switch_to(session_factory, BotMode.FULL)
-    await bot.rs.set_app("auto_apply", "false")
-
-    await aggregators.run_aggregator_now(bot, sites.id)
-
-    assert phases == []
-
-
-async def test_a_run_started_by_hand_applies_in_off_too(make_bot, sites, agent, phases, session_factory):
-    """Режим — про автоматику: обход, запущенный человеком, отрабатывает полностью
-    и в Off — вместе с откликами."""
+async def test_a_run_started_by_hand_runs_in_off_too(make_bot, sites, agent, sought, session_factory):
+    """Режим — про автоматику: обход, запущенный человеком, отрабатывает и в Off."""
     bot = await make_bot()
     agent(bot, [])
     await switch_to(session_factory, BotMode.OFF)
 
-    await aggregators.run_aggregator_now(bot, sites.id)
-
-    assert phases == [[41]]
+    assert await aggregators.run_aggregator_now(bot, sites.id) == "ok"
+    assert sought == [sites.name]
 
 
 async def test_a_blacklisted_site_is_neither_run_nor_logged_into(
