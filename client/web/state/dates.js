@@ -75,6 +75,16 @@ export function isoDay(year, month, day) {
   return `${year}-${padded(month)}-${padded(day)}`;
 }
 
+/** День мгновения тем же видом, местными часами. */
+export function dayIso(at) {
+  return isoDay(at.getFullYear(), at.getMonth() + 1, at.getDate());
+}
+
+/** Часы и минуты мгновения, местными часами. */
+export function clock(at) {
+  return `${padded(at.getHours())}:${padded(at.getMinutes())}`;
+}
+
 /** День и часы одной строкой, местными часами.
  *
  * Ею подписано объявление в окне исходного текста: по дню и времени пост
@@ -86,8 +96,7 @@ export function showStamp(iso) {
   if (!iso) return '';
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return '';
-  const day = isoDay(at.getFullYear(), at.getMonth() + 1, at.getDate());
-  return `${day} ${padded(at.getHours())}:${padded(at.getMinutes())}`;
+  return `${dayIso(at)} ${clock(at)}`;
 }
 
 /** Годна ли набранная дата: да, нет или «ещё набирают».

@@ -4,6 +4,7 @@
   // Пустых состояний своих нет: столбцы на нуле, дни недели и прочерки в
   // метриках сами говорят «откликов не было», а подменённая карточка
   // выглядела бы недогрузившейся.
+  import { share } from '$state/sources.js';
   import { duration, weekBars } from '$state/stats.js';
 
   let { answer } = $props();
@@ -11,11 +12,7 @@
   const bars = $derived(weekBars(answer.by_weekday || [0, 0, 0, 0, 0, 0, 0], answer.applied_count));
   const answered = $derived(!!answer.applied_count);
   const median = $derived(answered ? duration(answer.median_seconds) : '—');
-  const silent = $derived(
-    answered && answer.no_response_pct !== null && answer.no_response_pct !== undefined
-      ? `${answer.no_response_pct}%`
-      : '—',
-  );
+  const silent = $derived(answered ? share(answer.no_response_pct) : '—');
 </script>
 
 <div class="stats-resp-card">

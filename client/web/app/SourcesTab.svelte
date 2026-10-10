@@ -12,11 +12,9 @@
   // `source.save` зовёт мост напрямую, а не общей обёрткой: та показывает
   // отказ плашкой и отдаёт пустоту, и слова моста гасли бы в углу, пока
   // человек смотрит в поле.
-  import AddButton from '$components/AddButton.svelte';
   import AddressDialog from '$components/AddressDialog.svelte';
   import ContactsPanes from '$components/ContactsPanes.svelte';
   import RowToggle from '$components/RowToggle.svelte';
-  import SearchBox from '$components/SearchBox.svelte';
   import { living } from '$state/alive.js';
   import { contactAdding } from '$state/contact_adding.svelte.js';
   import { watchContacts } from '$state/contacts_watch.js';
@@ -94,23 +92,19 @@
   loaded={list.loaded}
   empty={list.rows.length === 0}
   chosen={opened !== null}
+  search={list.search}
+  searchHint={words.search}
+  addTitle={words.add}
+  none={words.none}
   detailEmpty={words.pick}
+  onsearch={list.find}
+  onadd={() => (adding.adding = true)}
   ondetailscroll={(event) => detailScrolled(event, card)}
 >
-  {#snippet toolbar()}
-    <SearchBox value={list.search} placeholder={words.search} onsearch={list.find} />
-    <AddButton title={words.add} onclick={() => (adding.adding = true)} />
+  {#snippet tools()}
     <!-- Общий выключатель поверх строк: выключенный, гасит обход всех
          источников рода, но положения строк хранит. -->
     <RowToggle checked={master.checked} title={master.title} ontoggle={list.toggleAll} />
-  {/snippet}
-
-  {#snippet emptyNote()}
-    {#if list.search}
-      Ничего не найдено по запросу «{list.search}»
-    {:else}
-      {words.none}
-    {/if}
   {/snippet}
 
   {#snippet items()}

@@ -12,9 +12,9 @@
 - * Слушатель вестей поверх зова, который спрашивает мост «что нового после N». * * Зов приходит доводом, а не берётся отсюда: так цикл проверяется без окна и * без моста вовсе, а другого способа его проверить нет — он бесконечен по * устройству.
 - отдаёт: listener
 
-## app — 30 файлов
+## app — 31 файлов
 
-### app/AggregatorCard.svelte (196)
+### app/AggregatorCard.svelte (183)
 - —
 - принимает: ask, say, lockedTip, lock, events, aggregatorId, onvacancy, onclose, onchanged
 
@@ -31,7 +31,7 @@
 - Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
 - принимает: ask, say, events, onlocked, oncontact
 
-### app/ChannelCard.svelte (167)
+### app/ChannelCard.svelte (153)
 - —
 - принимает: ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged
 
@@ -40,12 +40,12 @@
 - принимает: ask, say, lockedTip, events, open, onopened, onvacancy
 - берёт: ./ChannelCard.svelte, ./SourcesTab.svelte
 
-### app/CompaniesList.svelte (101)
-- —
+### app/CompaniesList.svelte (52)
+- Название подрезается здесь, а не в общем заведении: у человека подрезать нечего — его находят ещё и ником, и номером учётной записи.
 - принимает: ask, say, events, open, onopened, onperson, onvacancy
-- берёт: ./CompanyCard.svelte
+- берёт: ./CompanyCard.svelte, ./ContactsTab.svelte
 
-### app/CompanyCard.svelte (254)
+### app/CompanyCard.svelte (223)
 - Написания: под ними компания приходит в объявлениях. Потеряй карточка одно из них — следующая вакансия завела бы компанию заново.
 - принимает: ask, say, companyId, onperson, onvacancy, onclose, onchanged
 
@@ -54,16 +54,20 @@
 - принимает: ask, say, lockedTip, events, openCard, onopened, onvacancy
 - берёт: ./AggregatorsList.svelte, ./BlacklistList.svelte, ./ChannelsList.svelte, ./CompaniesList.svelte, ./PeopleList.svelte
 
+### app/ContactsTab.svelte (68)
+- —
+- принимает: kind, words, list, save, say, events, open, onopened, row, pane
+
 ### app/LogsScreen.svelte (197)
 - —
 - принимает: ask, events, say
 
-### app/PeopleList.svelte (97)
-- —
+### app/PeopleList.svelte (49)
+- Негодный ник отбивает мост, и его отказ приезжает плашкой — потому здесь и не проверяется ничего сверх общего заслона.
 - принимает: ask, say, events, open, onopened, oncompany, onvacancy
-- берёт: ./PersonCard.svelte
+- берёт: ./ContactsTab.svelte, ./PersonCard.svelte
 
-### app/PersonCard.svelte (257)
+### app/PersonCard.svelte (231)
 - Своя запись на каждого человека: поле запечатывает номер при заведении, и заводиться заново на каждого его заставляет именно `{#key}` — без него запечатанный номер протухнет.
 - принимает: ask, say, events, personId, oncompany, onvacancy, onclose, onchanged
 - берёт: ./PersonChat.svelte
@@ -76,7 +80,7 @@
 - —
 - принимает: ask
 
-### app/ProfileExperience.svelte (146)
+### app/ProfileExperience.svelte (145)
 - —
 - принимает: ask
 
@@ -98,7 +102,7 @@
 - —
 - берёт: ./BottomBar.svelte, ./ContactsScreen.svelte, ./LogsScreen.svelte, ./ProfileScreen.svelte, ./SettingsScreen.svelte, ./StatsScreen.svelte, ./VacanciesScreen.svelte, ./WizardScreen.svelte
 
-### app/SourcesTab.svelte (143)
+### app/SourcesTab.svelte (137)
 - Общий выключатель поверх строк: выключенный, гасит обход всех источников рода, но положения строк хранит.
 - принимает: kind, words, source, openCreated, rereadOnRound, say, events, open, onopened, row, pane
 
@@ -207,6 +211,11 @@
 - —
 - принимает: label, addLabel, items, onedit, onadd, onremove
 
+### components/CardActions.svelte (44)
+- —
+- принимает: lead, blocked, deleteLabel, deleteTip, removable, onblock, onunblock, ondelete
+- берёт: ./ActionsMenu.svelte, ./BlacklistMenuItem.svelte, ./MenuItem.svelte
+
 ### components/CardHandle.svelte (23)
 - —
 - принимает: username, onopen
@@ -247,14 +256,10 @@
 - принимает: message, confirmLabel, locked, onconfirm, oncancel
 - берёт: ./ModalShell.svelte
 
-### components/ContactActions.svelte (23)
+### components/ContactsPanes.svelte (72)
 - —
-- принимает: mergeLabel, blocked, onmerge, onblock, onunblock, ondelete
-- берёт: ./ActionsMenu.svelte, ./BlacklistMenuItem.svelte, ./MenuItem.svelte
-
-### components/ContactsPanes.svelte (58)
-- —
-- принимает: loaded, empty, chosen, detailEmpty, onlistscroll, ondetailscroll, toolbar, emptyNote, items, detail
+- принимает: loaded, empty, chosen, search, searchHint, addTitle, addIcon, none, detailEmpty, onsearch, onadd, onlistscroll, ondetailscroll, tools, items, detail
+- берёт: ./AddButton.svelte, ./SearchBox.svelte
 
 ### components/CvFileRow.svelte (22)
 - —
@@ -519,7 +524,7 @@
 - —
 - принимает: answer, period
 
-### components/StatsResponsesCard.svelte (42)
+### components/StatsResponsesCard.svelte (39)
 - —
 - принимает: answer
 
@@ -598,7 +603,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 64 файлов
+## state — 65 файлов
 
 ### state/aggregators.js (76)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
@@ -664,7 +669,7 @@
 - * Слова вкладки «Каналы».
 - отдаёт: CHANNELS_TAB, channelName, channelTitle, channelToggle, pollBlock
 
-### state/chat.js (115)
+### state/chat.js (106)
 - * Разложить письма по дням, сохранив их порядок. * * Подпись дня стоит над первым письмом этого дня, а не над каждым: иначе лента * превращается в чересполосицу дат. * * Письмо без времени выпадает вовсе — поставить его некуда, а под чужой * подписью дня оно соврало бы.
 - отдаёт: attachmentKind, byDays, chatTime, isUnread, sendBlock, tick, unread
 
@@ -684,9 +689,9 @@
 - * Заходит на вкладку и отдаёт снятие — его и возвращают из эффекта. * * Перечитывает по вести не страницей, а показанным: иначе занесение в отсев из * карточки схлопывало бы пролистанное до первой страницы.
 - отдаёт: watchContacts
 
-### state/dates.js (111)
+### state/dates.js (120)
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
-- отдаёт: asIso, dayOf, isoDay, padded, shortDate, showDate, showStamp, validDate
+- отдаёт: asIso, clock, dayIso, dayOf, isoDay, padded, shortDate, showDate, showStamp, validDate
 
 ### state/experience.js (83)
 - * Период работы для шапки карточки. * * Месяц и год без дня: места работы различают по месяцам, а день удлиняет * строку вдвое. Открытый конец назван словами — по нему и читают, работает * человек здесь сейчас или нет.
@@ -744,6 +749,10 @@
 - * Сколько строк в странице. Столько же по умолчанию отдаёт мост.
 - отдаёт: PAGE, VACANCY_PAGE, appended, detailScrolled, nearBottom, nearTop, refreshLimit
 
+### state/pane_card.svelte.js (86)
+- * Заводит карточку правой панели. * * `method` — чтение карточки по номеру, `trouble` — слова его отказа. * `lists` — короткие списки карточки по имени: у каждого `method`, `payload` * и `key`, как у `miniRead`; пришедшее ложится в `rows` под тем же именем.
+- отдаёт: paneCard
+
 ### state/people.js (127)
 - * Как назвать человека в чужой карточке. * * Безымянный назван номером: строка должна читаться, а не пустовать.
 - отдаёт: blankPerson, named, personCandidate, personHead, personLine, personName, personSub, personTitle, unreadLine
@@ -792,7 +801,7 @@
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
 - отдаёт: aliasesAfter, countNote, grouped, groupsMatching, levelPercent
 
-### state/source_card.svelte.js (85)
+### state/source_card.svelte.js (69)
 - * Заходит на карточку источника и отдаёт снятие. * * `alive` — признак жизни карточки (`alive.js`), `id` — открытый источник. * `forget` убирает показанное прежним: панель одна, и его числа под новым * именем читались бы как числа нового. `read(id)` читает карточку с её * вакансиями — и на заходе, и по вести: обход приносит вакансии, пока карточка * открыта, и смотрит прогнавший человек именно на них.
 - отдаёт: sourceCard, watchSourceCard
 
@@ -804,9 +813,9 @@
 - * Заводит вакансии карточки; `alive` — признак жизни её экрана (`alive.js`). * * `read(page)` — обёртка над мостом: получает `{limit, offset}`, отдаёт * страницу `{vacancies, has_more}` или пустоту.
 - отдаёт: sourceVacancies
 
-### state/sources.js (98)
+### state/sources.js (99)
 - * Чем заперто ручное действие источника; пусто — не заперто. * * Отсев старше всего: обход кончится и лампа зажжётся сами, а запись в отсеве * сама не снимется. Дальше идущий обход — место прогона одно, и мост второй * прогон не пустит, — потом слова моста о том, чего не хватает, и погасшая * лампа. `barred` — слова отсева у этого рода, пусто — источник не в отсеве.
-- отдаёт: BLOCKED_TITLE, MASTER_OFF_TITLE, masterToggle, sourceBlock, sourceStats, sourceToggle
+- отдаёт: BLOCKED_TITLE, MASTER_OFF_TITLE, masterToggle, share, sourceBlock, sourceStats, sourceToggle
 
 ### state/stats.js (295)
 - * Сроки, за которые считают, — от короткого к длинному. * * `delta` — как называется прирост за этот срок. У «всего времени» его нет: * сравнивать не с чем, это и есть всё время.
@@ -852,9 +861,9 @@
 - * Экраны по порядку. Приветствие и финал — обложки: шага у них нет, и в * строке шагов они ничего не подсвечивают.
 - отдаёт: backScreen, cvModes, cvReady, nextScreen, resumeScreen, stepAt, stepMarks
 
-### state/words.js (20)
+### state/words.js (25)
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
-- отдаёт: plural, vacancyCount
+- отдаёт: counted, plural, vacancyCount
 
 ## styles — 113 файлов
 
@@ -1587,7 +1596,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist.test.js (227)
 - —
 
-### tests/blacklist_menu_item.test.js (114)
+### tests/blacklist_menu_item.test.js (113)
 - * Кому эти слова положены: сам пункт, окошко ручного занесения и кнопка на * вкладке отсева. Всем прочим — нет: там это была бы четвёртая копия.
 
 ### tests/blacklist_menu_item_live.test.js (67)

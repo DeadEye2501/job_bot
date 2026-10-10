@@ -5,10 +5,9 @@
   // Своё у агрегатора — вход на сайт и запоры агента: без входа и без
   // водителя с браузером обходить его нечем.
 
-  import ActionsMenu from '$components/ActionsMenu.svelte';
   import Avatar from '$components/Avatar.svelte';
   import BlacklistChip from '$components/BlacklistChip.svelte';
-  import BlacklistMenuItem from '$components/BlacklistMenuItem.svelte';
+  import CardActions from '$components/CardActions.svelte';
   import CardPane from '$components/CardPane.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import LoginMark from '$components/LoginMark.svelte';
@@ -141,38 +140,26 @@
       </div>
     </div>
 
-    <ActionsMenu>
-      {#snippet children(close)}
-        <MenuItem
-          icon="refresh"
-          label="Прогнать сейчас"
-          title={runTip || 'Обойти этот источник сейчас'}
-          disabled={!!runTip}
-          {close}
-          onpick={runNow}
-        />
-        {#if !card.is_web_search}
-          <BlacklistMenuItem
-            blocked={!!card.blacklist_value}
-            {close}
-            onblock={() => blocking.block(aggregatorId)}
-            onunblock={() => blocking.unblock(aggregatorId)}
-          />
-
-          <div class="menu-line"></div>
-
-          <MenuItem
-            icon="delete"
-            label="Удалить агрегатор"
-            danger
-            title={dropTip || null}
-            disabled={!!dropTip}
-            {close}
-            onpick={drop}
-          />
-        {/if}
-      {/snippet}
-    </ActionsMenu>
+    {#snippet lead(close)}
+      <MenuItem
+        icon="refresh"
+        label="Прогнать сейчас"
+        title={runTip || 'Обойти этот источник сейчас'}
+        disabled={!!runTip}
+        {close}
+        onpick={runNow}
+      />
+    {/snippet}
+    <CardActions
+      {lead}
+      blocked={!!card.blacklist_value}
+      deleteLabel="Удалить агрегатор"
+      deleteTip={dropTip}
+      removable={!card.is_web_search}
+      onblock={() => blocking.block(aggregatorId)}
+      onunblock={() => blocking.unblock(aggregatorId)}
+      ondelete={drop}
+    />
   </div>
 
   <SourceStats stats={card.stats} empty="С этого агрегатора ещё не пришло вакансий" />

@@ -14,7 +14,12 @@ export function plural(count, one, few, many) {
   return many;
 }
 
+/** Число вместе с согласованным словом. */
+export function counted(count, one, few, many) {
+  return `${count} ${plural(count, one, few, many)}`;
+}
+
 /** Счёт вакансий при человеке, компании, кандидате в окне выбора. */
 export function vacancyCount(count) {
-  return `${count} ${plural(count, 'вакансия', 'вакансии', 'вакансий')}`;
+  return counted(count, 'вакансия', 'вакансии', 'вакансий');
 }

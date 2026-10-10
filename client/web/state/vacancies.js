@@ -7,7 +7,7 @@
 import { GRADES as PROFILE_GRADES } from './profile.js';
 import { REMOTE_CHOICES } from './vacancy_filter.js';
 import { RUNNING } from './progress.js';
-import { plural } from './words.js';
+import { counted } from './words.js';
 
 /** Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и
  *  разбираются там `backend/repository/vacancies_list._order_for`; незнакомый
@@ -167,7 +167,7 @@ export function shortAgo(iso, now) {
   if (days < 60) return `${Math.floor(days / 7)} нед`;
   if (days < 365) return `${Math.floor(days / 30)} мес`;
   const years = Math.floor(days / 365);
-  return `${years} ${plural(years, 'год', 'года', 'лет')}`;
+  return counted(years, 'год', 'года', 'лет');
 }
 
 /** Каким цветом читается оценка рядом с порогом отбора.

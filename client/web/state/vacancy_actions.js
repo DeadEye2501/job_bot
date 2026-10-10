@@ -6,7 +6,7 @@
 import { showStamp } from './dates.js';
 import { RUNNING } from './progress.js';
 import { atHandle, handleName } from './telegram.js';
-import { plural } from './words.js';
+import { counted } from './words.js';
 
 /** Почему отклик и переразбор сейчас недоступны.
  *
@@ -110,7 +110,7 @@ export function rawChips(card) {
       ? null
       : { icon: 'numbers', text: `msg #${card.source_msg_id}` },
     stamp ? { icon: 'schedule', text: stamp } : null,
-    { icon: 'straighten', text: `${length} ${plural(length, 'символ', 'символа', 'символов')}` },
+    { icon: 'straighten', text: counted(length, 'символ', 'символа', 'символов') },
   ];
   return chips.filter(Boolean);
 }
