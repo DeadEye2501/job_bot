@@ -11,6 +11,7 @@ from backend.agent.prompts.login import LOGIN_PROMPT, login_task
 from backend.agent.prompts.seeker import (
     SEEKER_PROMPT, WEB_SEEKER_PROMPT, seeker_task, web_seeker_task,
 )
+from backend.domain.apply_order import Way
 from backend.llm.rules import FACT_KINDS, GENDER_RULE, LATIN_NAME_RULE, TONE_RULE
 from backend.models import ApplicationVia
 from backend.runtime_settings import LETTER_WRITERS
@@ -67,11 +68,9 @@ def test_the_login_check_knows_the_site():
     assert "site.test" in login_task("site.test")
 
 
-def _task(vacancy_text="Текст вакансии", profile_text="Анкета", **job) -> str:
-    fields = dict(
-        method=ApplicationVia.FORM.value, target="https://site.test/form",
-        simulated=False, letter_writer="app",
-    )
+def _task(vacancy_text="Текст вакансии", profile_text="Анкета", method=ApplicationVia.FORM.value,
+          **job) -> str:
+    fields = dict(way=Way(method, "https://site.test/form", None), simulated=False, letter_writer="app")
     fields.update(job)
     return applier_task(SimpleNamespace(**fields), vacancy_text, profile_text, TODAY)
 
@@ -90,16 +89,13 @@ def test_every_letter_writer_is_spelled_out(writer):
 _METHOD_NAMES = {
     ApplicationVia.AGGREGATOR: "кнопка отклика на сайте агрегатора",
     ApplicationVia.FORM: "форма работодателя",
-    ApplicationVia.EMAIL: "письмо",
 }
 
 
-@pytest.mark.parametrize("via", [v for v in ApplicationVia if v is not ApplicationVia.TELEGRAM])
+@pytest.mark.parametrize("via", list(_METHOD_NAMES))
 def test_every_method_has_its_name_and_its_simulation(via):
-    """Новый способ агента без своей подписи в этой таблице падает здесь KeyError-ом.
-
-    Telegram агенту не достаётся: туда пишет исполнитель сам, без браузера.
-    """
+    """Агенту достаются только браузерные способы: Telegram и почту приложение
+    отправляет само."""
     name = _METHOD_NAMES[via]
     task = _task(method=via.value, simulated=True)
     assert f"Способ отклика: {name}\n" in task and "Режим симуляции" in task
@@ -128,8 +124,3 @@ def test_simulation_is_spelled_out_in_the_task():
     """Под симуляцией агент проходит форму, но последнюю кнопку не нажимает."""
     assert "НЕ нажимай" in _task(simulated=True)
     assert "НЕ нажимай" not in _task(simulated=False)
-
-
-def test_a_simulated_letter_is_not_told_to_record_by_hand():
-    """У почты инструмента record_application нет: запись делает send_email."""
-    assert "record_application" not in _task(method=ApplicationVia.EMAIL.value, simulated=True)

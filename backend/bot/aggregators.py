@@ -23,11 +23,11 @@ logger = logging.getLogger(__name__)
 
 AgentOutcome = Literal[
     slot.CycleOutcome, "missing", "locked", "blacklisted", "human_timeout", "limit",
-    "closed", "exhausted", "not_logged_in", "login_timeout",
+    "exhausted", "not_logged_in", "login_timeout",
 ]
 """Чем кончилось действие агента: исходы места прогона и свои — у источника
-(в отсеве), у отклика (вакансия закрыта, способы кончились) и у входа (не
-вошёл, окно не закрыто)."""
+(в отсеве), у отклика (способы кончились) и у входа (не вошёл, окно не
+закрыто)."""
 
 HUMAN_TIMEOUT_NOTE = "Капча не пройдена — обход снят."
 LIMIT_NOTE = "Исчерпан лимит подписки Claude Code — обход снят."
@@ -177,8 +177,7 @@ async def _one_source(bot, kit: AgentKit, round_: RoundState, source: Source) ->
 
 async def _new_round(bot) -> RoundState:
     async with bot.session_factory() as session:
-        web = next((a.id for a in await repo.list_aggregators(session) if a.host is None), 0)
-    return RoundState(set(), web)
+        return RoundState(set(), await repo.web_search_id(session))
 
 
 async def _row(bot, aggregator_id: int) -> Aggregator | None:

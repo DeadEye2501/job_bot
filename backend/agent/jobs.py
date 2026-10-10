@@ -1,9 +1,9 @@
 """Задачи сессий агента и их итоги."""
 
-import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from backend.domain.apply_order import Way
 from backend.models import Aggregator
 
 
@@ -70,18 +70,14 @@ class SeekJob:
 class ApplyJob:
     """Отклик одним способом.
 
-    `method` — значение `ApplicationVia`; `profile_id` — профиль браузера:
-    агрегатора или «Поиска по сети»; `letter_writer` — значение из `LETTER_WRITERS`;
-    `delivery` — отправка письма с записью отклика, которая переживает сессию.
+    `profile_id` — профиль браузера: агрегатора или «Поиска по сети»;
+    `letter_writer` — значение из `LETTER_WRITERS`.
     """
 
     vacancy_id: int
-    method: str
-    target: str
-    aggregator_id: int | None
+    way: Way
     profile_id: int
     simulated: bool
     letter_writer: str
     letter_checks: int = 0
     outcome: Outcome | None = None
-    delivery: asyncio.Task | None = None

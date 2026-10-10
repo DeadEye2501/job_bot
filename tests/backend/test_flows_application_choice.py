@@ -59,7 +59,7 @@ async def applying(make_pipeline, session_factory, tmp_path, monkeypatch):
         pipeline.asked_for_letter = (block, parsed, channel_ref)
         return pipeline.letter, pipeline.letter_trouble
 
-    monkeypatch.setattr("backend.flows.apply.generate_cover_letter", generate_cover_letter)
+    monkeypatch.setattr("backend.applying.telegram_letter.generate_cover_letter", generate_cover_letter)
     return pipeline, hr, vacancy, resume
 
 
@@ -365,7 +365,7 @@ async def test_a_second_send_while_the_first_is_in_flight_is_refused(
         return pipeline.letter, pipeline.letter_trouble
 
     monkeypatch.setattr(
-        "backend.flows.apply.generate_cover_letter", generate_cover_letter
+        "backend.applying.telegram_letter.generate_cover_letter", generate_cover_letter
     )
 
     ok, reason = await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id)
@@ -403,7 +403,7 @@ async def test_a_send_that_broke_lets_the_next_one_through_too(applying, monkeyp
             raise RuntimeError("модель отвалилась")
         return pipeline.letter, pipeline.letter_trouble
 
-    monkeypatch.setattr("backend.flows.apply.generate_cover_letter", breaks_once)
+    monkeypatch.setattr("backend.applying.telegram_letter.generate_cover_letter", breaks_once)
     with pytest.raises(RuntimeError):
         await apply.send_application(pipeline, hr, parsed_vacancy(), vacancy.id)
 

@@ -4,7 +4,7 @@ from datetime import date
 
 from backend.agent.prompts.screening import SCREENING_RULES
 from backend.llm.rules import LETTER_SHAPE
-from backend.domain.apply_order import VIA_AGGREGATOR, VIA_EMAIL, VIA_FORM
+from backend.domain.apply_order import VIA_AGGREGATOR, VIA_FORM
 from backend.runtime_settings import LETTER_WRITERS
 
 APPLIER_PROMPT = """Твоя задача — откликнуться на одну вакансию одним способом, названным в задании. Пригодность вакансии не пересуживай: её уже отобрал конвейер приложения. Следующий способ, если этот не удался, выберет приложение.
@@ -24,8 +24,6 @@ APPLIER_PROMPT = """Твоя задача — откликнуться на од
 8. Площадка отказала в отклике совсем — лимит откликов исчерпан, отклик платный — finish с result="platform_closed".
 9. После need_human начинай форму заново.
 
-Почта: адрес — из контактов вакансии. Тему и текст получи по правилам письма ниже, затем send_email с адресом, темой и текстом; резюме приложение приложит само. Открывать ничего не нужно.
-
 Письмо. В задании сказано, кто его пишет.
 - Пишет приложение — зови letter с языком формы и пределом длины поля, если он виден, и вставь готовый текст как есть.
 - Пишешь ты — напиши его по правилам ниже, подгони длину под поле, учти, что форма просит написать, и проверь инструментом letter, передав тему и текст.
@@ -39,22 +37,13 @@ APPLIER_PROMPT = """Твоя задача — откликнуться на од
 
 """ + SCREENING_RULES
 
-_FILL_THE_FORM = (
+_SIMULATION = (
     "Режим симуляции: пройди всё до последней кнопки отправки, но НЕ нажимай её. "
     "Сразу после этого вызови record_application, как если бы сайт подтвердил отправку."
 )
-_SIMULATION = {
-    VIA_AGGREGATOR: _FILL_THE_FORM,
-    VIA_FORM: _FILL_THE_FORM,
-    VIA_EMAIL: (
-        "Режим симуляции: зови send_email как обычно — приложение соберёт письмо, "
-        "но НЕ отправит его."
-    ),
-}
 _METHODS = {
     VIA_AGGREGATOR: "кнопка отклика на сайте агрегатора",
     VIA_FORM: "форма работодателя",
-    VIA_EMAIL: "письмо",
 }
 # Подписи идут в порядке набора; strict ловит при импорте набор, выросший без подписи.
 _WRITERS = dict(zip(LETTER_WRITERS, ("Письмо пишет: приложение", "Письмо пишешь ты"), strict=True))
@@ -63,18 +52,18 @@ _WRITERS = dict(zip(LETTER_WRITERS, ("Письмо пишет: приложен�
 def applier_task(job, vacancy_text: str, profile_text: str, today: date) -> str:
     """Стартовое задание откликателя: способ, вакансия, анкета, симуляция.
 
-    `job` — что угодно с `method`, `target`, `simulated`, `letter_writer`:
+    `job` — что угодно с `way`, `simulated`, `letter_writer`:
     в потоке это его задание отклика. Вакансия приходит готовым текстом
     `describe_vacancy`, уже в рамке «данные, а не инструкции».
     """
     lines = [
-        f"Способ отклика: {_METHODS[job.method]}",
-        f"Адрес способа: {job.target}",
+        f"Способ отклика: {_METHODS[job.way.method]}",
+        f"Адрес способа: {job.way.target}",
         _WRITERS[job.letter_writer],
         f"Сегодня: {today.isoformat()}",
         vacancy_text,
         "Анкета человека:", profile_text,
     ]
     if job.simulated:
-        lines.append(_SIMULATION[job.method])
+        lines.append(_SIMULATION)
     return "\n".join(lines)

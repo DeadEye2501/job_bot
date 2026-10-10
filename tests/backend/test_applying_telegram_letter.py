@@ -12,7 +12,7 @@
 
 import pytest
 
-from backend.flows.apply import _build_short_text, _format_channel_ref
+from backend.applying.telegram_letter import format_channel_ref, short_note
 
 
 @pytest.mark.parametrize(
@@ -32,12 +32,12 @@ def test_a_channel_reference_is_normalised_or_dropped(raw, expected):
     Пропадает именно отсутствием: строку «Канал: …» составитель письма
     тогда не пишет вовсе, а не показывает HR «Канал: None».
     """
-    assert _format_channel_ref(raw) == expected
+    assert format_channel_ref(raw) == expected
 
 
 def test_the_second_vacancy_is_introduced_as_one_more():
     """Вторая вакансия подаётся как «ещё одна»."""
-    assert _build_short_text("Python-разработчик", None, 1) == (
+    assert short_note("Python-разработчик", None, 1) == (
         "А вот я увидел ещё одну интересную вакансию: Python-разработчик"
     )
 
@@ -48,7 +48,7 @@ def test_the_third_and_later_are_introduced_more_briefly(prior):
 
     Восторг «интересную» на седьмом письме подряд читается издевательски.
     """
-    assert _build_short_text("Python-разработчик", None, prior) == (
+    assert short_note("Python-разработчик", None, prior) == (
         "И ещё одну: Python-разработчик"
     )
 
@@ -66,12 +66,12 @@ def test_a_vacancy_without_a_title_is_still_written_about(prior, expected):
     Название берётся из разбора и иногда не выходит; отменять из-за него
     отклик значило бы менять сделанное дело на подпись к нему.
     """
-    assert _build_short_text("", None, prior) == expected
+    assert short_note("", None, prior) == expected
 
 
 def test_the_channel_is_named_on_its_own_line():
     """Канал называется отдельной строкой под вводной."""
-    got = _build_short_text("Python-разработчик", "@pyjobs", 1)
+    got = short_note("Python-разработчик", "@pyjobs", 1)
 
     assert got == (
         "А вот я увидел ещё одну интересную вакансию: Python-разработчик"
@@ -81,4 +81,4 @@ def test_the_channel_is_named_on_its_own_line():
 
 def test_a_vacancy_without_a_channel_gets_no_channel_line():
     """Без канала строки о канале в письме нет."""
-    assert "\n" not in _build_short_text("Python-разработчик", None, 1)
+    assert "\n" not in short_note("Python-разработчик", None, 1)

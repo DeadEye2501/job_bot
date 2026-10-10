@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from adapters import telegram
+from backend.applying.telegram_ban import clear_flood_wait, note_flood_wait
 from backend.bot import can_send, slot
 from backend.models import HR
 from backend.payloads import OutgoingMessage
@@ -79,37 +80,6 @@ class _Outcome:
     force: bool
 
 
-async def _note_flood_wait(bot, error) -> None:
-    """Запомнить, до какого времени Telegram просил не писать.
-
-    Запись переживает перезапуск нарочно: автоотправка спрашивает её перед
-    каждым откликом и молчит, пока окно не закроется. Ручной отправке из
-    окна это просто отказ — человек увидит подсказку и попробует позже.
-    """
-    import time as _time
-
-    secs = int(getattr(error, "value", 0) or 0)
-    logger.warning("Bot.send: FloodWait %d сек, persist'у flood_wait_until_ts", secs)
-    try:
-        await bot.rs.set_app("flood_wait_until_ts", str(_time.time() + secs))
-    except Exception:
-        logger.exception("Bot.send: failed to persist flood_wait_until_ts")
-
-
-async def _clear_flood_wait(bot) -> None:
-    """Снять запрет: Telegram отпустил, и ждать больше нечего.
-
-    Не сняв его, автоотправка после восстановления сверялась бы с
-    просроченным окном и молчала бы дольше, чем просили.
-    """
-    if bot.rs.flood_wait_until_ts <= 0:
-        return
-    try:
-        await bot.rs.set_app("flood_wait_until_ts", "0")
-    except Exception:
-        logger.exception("Bot.send: failed to clear flood_wait_until_ts")
-
-
 async def _deliver_dm(
     bot, target, text: str, attachment, vacancy_id
 ) -> tuple[int | None, bool]:
@@ -128,9 +98,9 @@ async def _deliver_dm(
     try:
         tg_msg_id = await telegram.send_dm(bot.client, target, text, attachment)
     except FloodWait as e:
-        await _note_flood_wait(bot, e)
+        await note_flood_wait(bot.rs, e)
         return None, False
-    await _clear_flood_wait(bot)
+    await clear_flood_wait(bot.rs)
     return tg_msg_id, True
 
 

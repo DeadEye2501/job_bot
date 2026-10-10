@@ -7,16 +7,24 @@ from sqlalchemy import select
 
 from backend.agent.kit import AgentKit
 from backend.agent.sessions import HumanTimeout, LimitExhausted
+from backend.applying.browser import via_browser
+from backend.applying.email import via_email
 from backend.applying.result import Missed, Outcome
+from backend.applying.telegram import via_telegram
 from backend.applying.world import learn, read_world, ways_in
-from backend.domain.apply_order import Way, World
+from backend.domain.apply_order import VIA_AGGREGATOR, VIA_EMAIL, VIA_FORM, VIA_TELEGRAM, Way, World
 from backend.models import Vacancy
 
 logger = logging.getLogger(__name__)
 
 Executor = Callable[[AgentKit, int, Way], Awaitable[Outcome]]
 
-EXECUTORS: dict[str, Executor] = {}
+EXECUTORS: dict[str, Executor] = {
+    VIA_TELEGRAM: via_telegram,
+    VIA_AGGREGATOR: via_browser,
+    VIA_FORM: via_browser,
+    VIA_EMAIL: via_email,
+}
 
 
 async def apply_vacancies(kit: AgentKit, vacancy_ids: list[int]) -> None:
@@ -29,7 +37,7 @@ async def apply_vacancies(kit: AgentKit, vacancy_ids: list[int]) -> None:
 
 
 async def apply_chosen(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
-    """Ручной отклик: перечень — один выбранный способ."""
+    """Один названный способ, без перебора следующих."""
     return await _try(kit, vacancy_id, way)
 
 

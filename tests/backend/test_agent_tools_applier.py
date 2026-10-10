@@ -27,17 +27,6 @@ async def test_a_recorded_application_ends_the_session(make_pipeline, session_fa
     assert job.outcome == Applied(row.id)
 
 
-async def test_the_email_way_cannot_be_recorded_by_hand(make_pipeline, session_factory):
-    """Письмо записывает send_email после того, как сервер его принял."""
-    vacancy = vacancy_row()
-    await put(session_factory, vacancy)
-    job = _job(vacancy.id, method="email", target="hr@site.test")
-    tools = applier_tools(kit_for(await make_pipeline()), job)
-
-    assert "record_application" not in [t.__name__ for t in tools]
-    assert "send_email" in [t.__name__ for t in tools]
-
-
 async def test_a_form_way_cannot_be_recorded_as_the_aggregator(make_pipeline, session_factory):
     vacancy = vacancy_row()
     await put(session_factory, vacancy)

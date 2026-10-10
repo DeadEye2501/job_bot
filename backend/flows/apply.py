@@ -8,19 +8,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from adapters import telegram
-from backend.llm.cover_letter import generate_cover_letter
+from backend.applying.telegram_letter import (
+    RECENT_SEND_WINDOW_DAYS,
+    Letter,
+    format_channel_ref,
+    full_letter,
+    parsed_from_row,
+    short_note,
+)
 from backend.models import Vacancy
 from backend.models import VacancyStatus
-from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
+from backend.payloads import ParsedVacancy
 from backend.repository.hr_identify import count_recent_outgoing_with_vacancy_for_hr
 
 logger = logging.getLogger(__name__)
-
-
-# Окно «недавно отправляли cover letter этому HR'у» (см.
-# count_recent_outgoing_with_vacancy_for_hr). Старше — шлём полный
-# cover letter + CV, как первый раз.
-_RECENT_SEND_WINDOW_DAYS = 14
 
 # Вакансии, отправка по которым идёт прямо сейчас. Живёт в модуле, а не в
 # конвейере: отправку заводят обе дороги — кнопка окна и авто-отправка
@@ -28,42 +29,6 @@ _RECENT_SEND_WINDOW_DAYS = 14
 # только дальше идти за тем же самым. Замка не нужно: обе дороги идут на одном
 # цикле asyncio, и между проверкой и записью сюда никто не вклинится.
 _SENDING: set[int] = set()
-
-
-def _format_channel_ref(channel_username: str | None) -> str | None:
-    """Нормализуем @-handle для подстановки в шаблоны. None → None
-    (caller дропает строку «Канал: …» целиком, чтобы не рендерилось
-    «Канал: None»)."""
-    if not channel_username:
-        return None
-    s = channel_username.strip()
-    if not s:
-        return None
-    return s if s.startswith("@") else f"@{s}"
-
-
-def _build_short_text(
-    title: str, channel_ref: str | None, prior_count: int,
-) -> str:
-    """Hardcoded follow-up. ``prior_count`` — сколько раз мы уже писали
-    этому HR'у cover letter в окне (1 → «А вот ещё одну», 2+ → «И ещё
-    одну»). Пустой title не блокирует — деградируемся в обобщённое
-    «вашу вакансию» (отправить отклик важнее, чем точно подписать)."""
-    if title:
-        intro = (
-            f"А вот я увидел ещё одну интересную вакансию: {title}"
-            if prior_count == 1
-            else f"И ещё одну: {title}"
-        )
-    else:
-        intro = (
-            "А вот я увидел ещё одну вашу вакансию"
-            if prior_count == 1
-            else "И ещё одну вашу вакансию"
-        )
-    if channel_ref:
-        intro += f"\nКанал: {channel_ref}"
-    return intro
 
 
 def _send_refusal(v, *, force: bool, when: str) -> str | None:
@@ -111,18 +76,6 @@ async def try_auto_send(
 
 
 @dataclass(frozen=True, slots=True)
-class _Letter:
-    """Письмо к отправке: текст и вложение к нему.
-
-    Пара настоящая: у полного письма вложение есть всегда, у короткого его
-    нет никогда, и решается это одним и тем же выбором ветки.
-    """
-
-    text: str
-    attachment: object | None
-
-
-@dataclass(frozen=True, slots=True)
 class _Plan:
     """Из чего собирать письмо: сколько уже писали, о чём и откуда.
 
@@ -159,54 +112,17 @@ async def _send_plan(pipeline, hr, vacancy_id: int, force: bool) -> tuple:
             return refusal, None
         return None, _Plan(
             await count_recent_outgoing_with_vacancy_for_hr(
-                session, hr.id, window_days=_RECENT_SEND_WINDOW_DAYS,
+                session, hr.id, window_days=RECENT_SEND_WINDOW_DAYS,
             ),
             (v.title or "").strip(),
-            _format_channel_ref(
+            format_channel_ref(
                 v.channel.username if v.channel is not None else None
             ),
         )
 
 
-async def _full_letter(
-    pipeline, parsed: ParsedVacancy, channel_ref: str | None, vacancy_id: int
-):
-    """Полное письмо с резюме; при беде — пара «пусто и код отказа».
-
-    Название и канал вплетает в текст сама модель: детерминированная
-    приставка «Откликаюсь на вакансию: …» выглядела штампом поверх живого
-    письма и потому снята.
-    """
-    if not pipeline.profile_block:
-        logger.warning("vacancy %d: profile_block empty, skipping send", vacancy_id)
-        return None, "profile_empty"
-    body, trouble = await generate_cover_letter(
-        pipeline.profile_block, parsed,
-        pipeline.lm_client, pipeline.lm_chat_model,
-        channel_ref=channel_ref,
-    )
-    if trouble is not None:
-        logger.warning(
-            "vacancy %d: письмо не сочинилось — модель не ответила (%s)",
-            vacancy_id, trouble,
-        )
-        return None, "cover_letter_unasked"
-    if body is None:
-        logger.warning(
-            "vacancy %d: cover letter generation failed, skipping send", vacancy_id
-        )
-        return None, "cover_letter_failed"
-    cv_file = pipeline.cv_file()
-    if cv_file is None:
-        logger.warning(
-            "vacancy %d: CV file missing (%s), skipping send", vacancy_id, pipeline.cv_path()
-        )
-        return None, "cv_missing"
-    return _Letter(body, cv_file), None
-
-
 async def _hand_letter_over(
-    pipeline, hr, letter: _Letter, vacancy_id: int, force: bool
+    pipeline, hr, letter: Letter, vacancy_id: int, force: bool
 ) -> tuple:
     """Отдать письмо отправке; отдать признак удачи и код исхода.
 
@@ -291,14 +207,14 @@ async def _send_the_letter(
     if refusal is not None:
         return False, refusal
     if plan.prior_count == 0:
-        letter, letter_refusal = await _full_letter(
+        letter, letter_refusal = await full_letter(
             pipeline, parsed, plan.channel_ref, vacancy_id
         )
         if letter is None:
             return False, letter_refusal
     else:
-        letter = _Letter(
-            _build_short_text(plan.title, plan.channel_ref, plan.prior_count), None
+        letter = Letter(
+            short_note(plan.title, plan.channel_ref, plan.prior_count), None
         )
     refusal = await _still_sendable(pipeline, vacancy_id, force)
     if refusal is not None:
@@ -314,29 +230,6 @@ async def _send_the_letter(
         hr.id, plan.prior_count,
     )
     return True, "sent"
-
-
-def _parsed_from_row(v: Vacancy) -> ParsedVacancy:
-    """Собрать разобранную вакансию обратно из строки базы.
-
-    Наставлению модели нужен тот же вид, что и на самотёке, иначе письмо
-    вручную сочинялось бы по другим данным. Прямые поля берутся перечнем
-    `DIRECT_PARSED_FIELDS` — тем же, каким разбор их и записывал: со своим
-    списком новое поле до ручного отклика не доехало бы молча.
-
-    Остальное собирается здесь: пустое название вакансии становится пустой
-    строкой (у разобранной оно не пустует), сайт компании и второй контакт в
-    строке не хранятся вовсе, а стек хранится одним списком — в обязательный
-    он и уходит: занизить требование хуже, чем завысить.
-    """
-    direct = {name: getattr(v, name) for name in DIRECT_PARSED_FIELDS}
-    return ParsedVacancy(
-        **{**direct, "title": v.title or ""},
-        company_website=None,
-        other_contacts=[],
-        stack_required=list(v.stack or []),
-        stack_preferred=[],
-    )
 
 
 async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool, str]:
@@ -374,7 +267,7 @@ async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool,
             )
             return False, "already_applied"
         hr = v.hr
-        parsed = _parsed_from_row(v)
+        parsed = parsed_from_row(v)
     if not pipeline.profile_block:
         await pipeline.reload_resources()
     return await send_application(pipeline, hr, parsed, vacancy_id, force=True)
