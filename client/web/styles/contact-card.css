@@ -28,9 +28,6 @@
 }
 
 .cnt-det-name {
-  color: var(--text-primary);
-  font-size: 1.05rem;
-  font-weight: 500;
   overflow-wrap: anywhere;
 }
 

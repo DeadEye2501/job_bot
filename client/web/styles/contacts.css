@@ -30,9 +30,6 @@
    внутри неё стоят span'ы: кнопка не принимает блочную разметку. */
 .cnt-hr-name {
   display: block;
-  color: var(--text-primary);
-  font-size: 0.83rem;
-  font-weight: 500;
 }
 
 .cnt-hr-sub {

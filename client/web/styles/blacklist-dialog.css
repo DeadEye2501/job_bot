@@ -99,8 +99,6 @@
   padding: 5px 9px;
   border-bottom: 1px solid var(--border);
   font-size: 0.82rem;
-  text-align: left;
-  width: 100%;
 }
 
 .bl-combobox-option:last-child {
