@@ -18,7 +18,7 @@
 """
 
 from backend.agent.availability import current_refusal
-from backend.bot.aggregators import HUMAN_TIMEOUT_NOTE, LIMIT_NOTE
+from backend.bot.work import HUMAN_TIMEOUT_NOTE, LIMIT_NOTE
 
 NO_BOT = "Бот ещё не готов."
 """Бот не поднят: без него нет ни отправки, ни отметки о прочтении, ни опроса
@@ -147,13 +147,22 @@ LOGS_TOO_OFTEN = "Журнал спрашивают не чаще раза в с
 раз в секунду не приходится — новые записи и так приезжают подпиской.
 """
 
+AGENT_STOPS = {
+    "human_timeout": HUMAN_TIMEOUT_NOTE,
+    "limit": LIMIT_NOTE,
+}
+"""Чем обрывается работа с набором агента — у всех, кто может дойти до
+браузерного отклика, одними словами: капчу и лимит человек узнаёт по фразе."""
+
 RUN_REFUSALS = {
     "busy": BUSY_CYCLE,
+    **AGENT_STOPS,
     "cancelled": "Поллинг отменён.",
-    "error": "Не удалось прогнать каналы — см. логи.",
+    "error": "Не удалось пройти обход — см. логи.",
 }
 POLL_REFUSALS = {
     "busy": BUSY_CYCLE,
+    **AGENT_STOPS,
     "missing": "Канал не найден или без @username.",
     "blacklisted": "Канал в чёрном списке — прогнать его нельзя.",
     "cancelled": "Поллинг канала отменён.",
@@ -176,6 +185,7 @@ POLL_REFUSALS = {
 
 RERUN_REFUSALS = {
     "busy": BUSY_CYCLE,
+    **AGENT_STOPS,
     "missing": NO_VACANCY,
     "no_text": "У вакансии нет исходного текста — разбирать нечего.",
     "llm": "Модель не ответила — разбор не состоялся, см. логи.",
@@ -191,6 +201,7 @@ RERUN_REFUSALS = {
 
 PASTED_REFUSALS = {
     "busy": BUSY_CYCLE,
+    **AGENT_STOPS,
     "duplicate": "Такое объявление уже заведено.",
     "embed": "Модель отпечатков не ответила — объявление не заведено, см. логи.",
     "llm": "Модель не ответила — объявление не разобрано, см. логи.",
@@ -219,29 +230,6 @@ PARSE_CV_REFUSALS = {
 все три — человек не узнал бы, что делать.
 """
 
-SEND_REFUSALS = {
-    "busy": BUSY_CYCLE,
-    "no_vacancy": NO_VACANCY,
-    "no_hr": "К вакансии не привязан HR.",
-    "already_applied": "Отклик по этой вакансии уже отправлен.",
-    "in_flight": "Отправка по этой вакансии уже идёт.",
-    "profile_empty": "Профиль пуст — нечем заполнить cover letter.",
-    "cover_letter_failed": "Cover letter не прошёл проверку (длина / формат — см. логи).",
-    "cover_letter_unasked": "Модель не дала ответа — письмо не сочинилось "
-                            "(см. журнал).",
-    "cv_missing": "Файл резюме не найден — проверьте путь в настройках.",
-    "blocked": "Отправка заблокирована (blacklist / у HR нет ни id, "
-               "ни @username / Telegram просит подождать).",
-    "telegram_error": "Telegram отказался принять сообщение (см. логи).",
-    "race": "Статус вакансии успел измениться — отправка отменена.",
-    "error": "Не удалось отправить отклик — см. логи.",
-}
-"""Почему отклик не ушёл. Коды приходят с бэкенда — ими отвечают
-`IngestionPipeline.send_application_for_vacancy` и `Bot.send`, — и это
-единственное место, где человек читает их словами: иначе он не отличит
-настоящую отправку от запрета, отсутствия резюме и поломки модели.
-"""
-
 NO_AGGREGATOR = "Агрегатор не найден."
 WEB_SEARCH_KEPT = "Поиск по сети удалить нельзя"
 LOGIN_FIRST = "Сначала войдите на сайт"
@@ -254,8 +242,7 @@ AGGREGATOR_REFUSALS = {
     "missing": NO_AGGREGATOR,
     "blacklisted": "В чёрном списке — снимите запись, чтобы работать с сайтом",
     "cancelled": "Остановлено.",
-    "human_timeout": HUMAN_TIMEOUT_NOTE,
-    "limit": LIMIT_NOTE,
+    **AGENT_STOPS,
     "error": "Не удалось — см. логи.",
 }
 LOGIN_REFUSALS = {
@@ -263,15 +250,21 @@ LOGIN_REFUSALS = {
     "not_logged_in": "Вход на сайт не выполнен — попробуйте ещё раз.",
     "login_timeout": "Окно входа не закрыто за час — вход не проверен.",
 }
-APPLY_VIA_REFUSALS = {
-    **AGGREGATOR_REFUSALS,
-    "exhausted": "Отклик не состоялся — причина в журнале.",
-    "missing": NO_VACANCY,
-}
-"""Чем кончилась работа агента. У занятого места прогона фраза одна на все
-наборы; капча и лимит говорят теми же словами, что весть `round_note`.
+"""Чем кончилась работа агента у источника. У занятого места прогона фраза одна
+на все наборы; капча и лимит говорят теми же словами, что весть `round_note`.
 `locked` здесь нет: подсказку доступности подставляет `agent_refusals` — она
 меняется вместе с настройками."""
+
+APPLY_VIA_REFUSALS = {
+    "busy": BUSY_CYCLE,
+    **AGENT_STOPS,
+    "missing": NO_VACANCY,
+    "failed": "Отклик не состоялся — причина в журнале.",
+    "cancelled": "Отклик отменён.",
+    "error": "Не удалось откликнуться — см. логи.",
+}
+"""Чем кончился ручной отклик выбранным способом. Запора агента здесь нет:
+недоступный способ окно выбрать не может — его нет в перечне."""
 
 
 def agent_refusals(table: dict, chat) -> dict:

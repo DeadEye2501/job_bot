@@ -98,6 +98,11 @@ def scripted_kit(pipeline, steps, *, human_limit: float = 3600.0) -> AgentKit:
                    run_session=scripted(steps))
 
 
+def work_kit(bot) -> AgentKit:
+    """Набор работы бота на браузере-подделке — подмена `bot/work._kit`."""
+    return kit_for(bot.ingestion, browser=FakeBrowser(), gate=bot.human_gate)
+
+
 def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit:
     return AgentKit(pipeline=pipeline, browser=browser, gate=gate,
                     run_session=run_session, today=TODAY)

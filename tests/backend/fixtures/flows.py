@@ -44,14 +44,9 @@ def known_hr_client() -> FakeTelegramClient:
 
 
 def _pipeline_on_fakes(session_factory, client, settings) -> IngestionPipeline:
-    """Конвейер на подделках; отправку письма подменяет список `sent`, передачу
-    откликателю — список `applied`, куда ложится каждый переданный перечень id."""
-    outgoing: list[tuple] = []
+    """Конвейер на подделках; передачу откликателю подменяет список `applied`,
+    куда ложится каждый переданный перечень id."""
     applied: list[list[int]] = []
-
-    async def send(hr, text, attachment=None, vacancy_id=None, *, force=False):
-        outgoing.append((hr.id, text, attachment, vacancy_id, force))
-        return True
 
     async def apply(vacancy_ids):
         applied.append(list(vacancy_ids))
@@ -68,8 +63,6 @@ def _pipeline_on_fakes(session_factory, client, settings) -> IngestionPipeline:
         apply=apply,
         runtime_settings=settings,
     )
-    pipeline.send = send
-    pipeline.sent = outgoing
     pipeline.applied = applied
     return pipeline
 

@@ -5,6 +5,7 @@ import asyncio
 from adapters.agent_mcp import serve_tools
 from adapters.claude_code_agent import AgentEnd, AgentRun, run_agent
 from backend.agent.kit import AgentKit, RunSession, SessionPlan
+from backend.agent.stops import HumanTimeout
 from backend.task_stop import put_out
 
 # Зависший процесс Claude Code иначе держал бы место прогона, а с ним и обход
@@ -12,12 +13,6 @@ from backend.task_stop import put_out
 SESSION_LIMIT_SEC = 3 * 3600
 
 
-class HumanTimeout(Exception):
-    """Человек не справился с капчей или входом за час — обход снимается."""
-
-
-class LimitExhausted(Exception):
-    """Исчерпан лимит подписки водителя — следующий источник упёрся бы в то же."""
 
 
 async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:

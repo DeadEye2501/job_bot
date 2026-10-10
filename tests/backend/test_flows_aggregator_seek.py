@@ -4,7 +4,7 @@
 import pytest
 
 from backend.agent.jobs import Source
-from backend.agent.sessions import HumanTimeout, LimitExhausted
+from backend.agent.stops import HumanTimeout, LimitExhausted
 from backend.flows.aggregator_round import seek_source
 from backend.models import Aggregator, Vacancy
 from tests.backend.fixtures.flows import similar_by_hand

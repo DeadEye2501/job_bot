@@ -29,7 +29,6 @@ class FakeIngestion:
         self.rerun_calls: list[int] = []
         self.pasted_calls: list[tuple] = []
         self.forget_calls: list[int] = []
-        self.application_calls: list[int] = []
         self.full_calls = 0
         self.buffer_edits: list[tuple] = []
         self.buffer_removals: list[tuple] = []
@@ -117,10 +116,6 @@ class FakeIngestion:
 
     async def forget_vacancy(self, vacancy_id: int):
         self.forget_calls.append(vacancy_id)
-        return await self._answer()
-
-    async def send_application_for_vacancy(self, vacancy_id: int):
-        self.application_calls.append(vacancy_id)
         return await self._answer()
 
     _OWN = object()

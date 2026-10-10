@@ -7,20 +7,16 @@
 
 from __future__ import annotations
 
+from backend.applying.world import available_ways
 from backend.domain.apply_order import Way
-from backend.flows.aggregator_apply import vacancy_ways
-from backend.models import Vacancy
 from backend.repository import vacancies_life
-from backend.agent.availability import current_refusal
 from client.bridge.answer import Denied, asked_id, denied, launched, reply
 from client.bridge.refusals import (
     APPLY_VIA_REFUSALS,
     NO_BOT,
     NO_VACANCY,
     RERUN_REFUSALS,
-    SEND_REFUSALS,
     WAY_UNKNOWN,
-    agent_refusals,
 )
 from client.bridge.vacancy_links import require_vacancy
 
@@ -57,24 +53,25 @@ class VacancyActions:
         )
 
     def apply_ways(self, vacancy_id: int) -> dict:
-        """Способы отклика на вакансию для окна выбора, есть ли Telegram и что запирает агента.
+        """Доступные сейчас способы отклика на вакансию для окна выбора.
 
         Названий способов мост не отдаёт: таблица названий одна, во фронте.
+        Недоступного способа в перечне нет вовсе — объяснять запор нечего.
         """
 
         async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                await require_vacancy(session, vacancy_id)
-                vacancy = await session.get(Vacancy, vacancy_id)
-                telegram = vacancy.hr_id is not None
-            ways = await vacancy_ways(self._hub.session_factory, vacancy_id)
-            return {"ways": [{"method": w.method, "target": w.target} for w in ways],
-                    "telegram": telegram, "lock": current_refusal(self._hub.rs.chat)}
+            ways = await self._available_ways(vacancy_id)
+            return {"ways": [{"method": w.method, "target": w.target} for w in ways]}
 
         return reply(self._hub.runner, run())
 
+    async def _available_ways(self, vacancy_id: int) -> list[Way]:
+        async with self._hub.session_factory() as session:
+            await require_vacancy(session, vacancy_id)
+        return await available_ways(self._hub.rs, self._hub.session_factory, vacancy_id)
+
     def apply_via(self, payload: dict) -> dict:
-        """Откликнуться агентом выбранным способом — он должен быть среди способов вакансии."""
+        """Откликнуться выбранным способом — он должен быть среди доступных способов вакансии."""
         vacancy_id, refused = asked_id(payload, "vacancy_id", "apply_via")
         if refused is not None:
             return refused
@@ -84,9 +81,7 @@ class VacancyActions:
         chosen = (payload.get("method"), payload.get("target"))
 
         async def run() -> Way:
-            async with self._hub.session_factory() as session:
-                await require_vacancy(session, vacancy_id)
-            ways = await vacancy_ways(self._hub.session_factory, vacancy_id)
+            ways = await self._available_ways(vacancy_id)
             way = next((w for w in ways if (w.method, w.target) == chosen), None)
             if way is None:
                 raise Denied(WAY_UNKNOWN, vacancy_id=vacancy_id)
@@ -97,38 +92,11 @@ class VacancyActions:
             return found
         return launched(
             self._hub,
-            lambda: bot.apply_via_agent(vacancy_id, found["ok"]),
-            agent_refusals(APPLY_VIA_REFUSALS, self._hub.rs.chat),
+            lambda: bot.apply_chosen_way(vacancy_id, found["ok"]),
+            APPLY_VIA_REFUSALS,
             "Отклик записан.",
             vacancy_id=vacancy_id,
             action="apply_via",
-        )
-
-    def send_application(self, payload: dict) -> dict:
-        """Отправить отклик по вакансии: письмо, резюме и всё остальное — на боте.
-
-        Ответ говорит только «пущено»: письмо сочиняет модель, и до её ответа
-        зов держал бы окно, а начатую отправку это всё равно не отменило бы.
-        """
-        vacancy_id, refused = asked_id(payload, "vacancy_id", "send_application")
-        if refused is not None:
-            return refused
-
-        bot = self._hub.bot
-        if bot is None:
-            return denied(NO_BOT, vacancy_id=vacancy_id, action="send")
-
-        async def sending() -> str:
-            sent, reason = await bot.ui_send_vacancy_application(vacancy_id)
-            return "ok" if sent else reason
-
-        return launched(
-            self._hub,
-            sending,
-            SEND_REFUSALS,
-            "Отклик отправлен.",
-            vacancy_id=vacancy_id,
-            action="send",
         )
 
     def delete(self, payload: dict) -> dict:

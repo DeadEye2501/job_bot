@@ -5,7 +5,6 @@ import time
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.agent.availability import current_refusal
-from backend.agent.kit import AgentKit
 from backend.applying.result import Lesson, TelegramClosed
 from backend.domain.apply_order import KnownSite, VacancyFacts, Way, World, apply_ways
 from backend.models import HR, Aggregator, Vacancy
@@ -14,10 +13,9 @@ from backend.repository.mail_account import get_mail_account
 from backend.repository.vacancy_contacts import contact_values
 
 
-async def read_world(kit: AgentKit) -> World:
+async def read_world(rs, session_factory) -> World:
     """Что доступно прямо сейчас; закрытых до конца прогона сайтов ещё нет."""
-    rs = kit.pipeline.rs
-    async with kit.pipeline.session_factory() as session:
+    async with session_factory() as session:
         mail_ready = await get_mail_account(session) is not None
         aggregators = await list_aggregators(session)
     return World(
@@ -54,11 +52,16 @@ def _handle(hr: HR | None) -> str | None:
     return str(hr.telegram_user_id) if hr.telegram_user_id else None
 
 
-async def ways_in(kit: AgentKit, world: World, vacancy_id: int) -> list[Way]:
+async def ways_in(session_factory, world: World, vacancy_id: int) -> list[Way]:
     """Способы вакансии в этом мире; удалённая — пустой перечень."""
-    async with kit.pipeline.session_factory() as session:
+    async with session_factory() as session:
         facts = await vacancy_facts(session, vacancy_id)
     return [] if facts is None else apply_ways(facts, world)
+
+
+async def available_ways(rs, session_factory, vacancy_id: int) -> list[Way]:
+    """Способы вакансии в мире, прочитанном только что, — для окна выбора."""
+    return await ways_in(session_factory, await read_world(rs, session_factory), vacancy_id)
 
 
 def learn(world: World, lesson: Lesson) -> None:

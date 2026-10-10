@@ -17,6 +17,7 @@ import pytest
 from backend.models import BotMode
 from tests.backend.fixtures.bot import switch_to
 from tests.fakes.ingestion import FakeIngestion, WindowHooks, wire
+from tests.waiting import wait_until
 
 
 async def test_a_manual_channel_poll_reports_success(make_bot):
@@ -150,13 +151,13 @@ async def test_a_forced_full_poll_reports_success(make_bot):
 
 @pytest.fixture
 def launched(monkeypatch) -> list:
-    """Обход агрегаторов подменён: в списке — боты, которым его запустили."""
+    """Обход агрегаторов подменён: в списке — боты, у которых он прошёл."""
     bots = []
 
-    async def launch(bot):
+    async def seek_all(bot, kit):
         bots.append(bot)
 
-    monkeypatch.setattr("backend.bot.aggregators.launch_round", launch)
+    monkeypatch.setattr("backend.bot.aggregators.seek_all", seek_all)
     return bots
 
 
@@ -203,7 +204,7 @@ async def test_a_cancelled_full_poll_frees_the_slot(make_bot):
     """Отменённый полный прогон освобождает место и сообщает об отмене."""
     bot = wire(await make_bot(), FakeIngestion(hangs=True))
     running = asyncio.create_task(bot.force_poll_once())
-    await asyncio.sleep(0)
+    await wait_until(lambda: bot.current_poll_task not in (None, bot.launched_task))
     bot.cancel_current_poll()
 
     assert await running == "cancelled"

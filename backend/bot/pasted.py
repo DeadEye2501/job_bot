@@ -4,12 +4,12 @@ import logging
 from datetime import datetime
 from typing import Literal
 
-from backend.bot import slot
+from backend.bot import slot, work
 from backend.flows import pasted as flow_pasted
 
 logger = logging.getLogger(__name__)
 
-PastedOutcome = Literal[slot.CycleOutcome, flow_pasted.PastedIntakeOutcome]
+PastedOutcome = Literal[slot.CycleOutcome, work.AgentStop, flow_pasted.PastedIntakeOutcome]
 """Чем кончилось заведение по вставленному тексту, как это видит окно.
 
 Складывается по тому же уговору, что и исход повторного прогона: место
@@ -30,9 +30,9 @@ async def ui_ingest_pasted_text(
     разбор одного объявления, заранее не знает никто.
     """
     logger.info("UI ingest of pasted text, %d chars", len(text))
-    return await slot.answer_in_slot(
+    return await work.in_slot(
         bot,
-        lambda: bot.ingestion.ingest_pasted_text(text, posted_at),
+        lambda _kit: bot.ingestion.ingest_pasted_text(text, posted_at),
         "ingest pasted text",
         progress=("pasted", "Разбор вставленного объявления…", 0, 0),
     )

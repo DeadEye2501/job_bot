@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import {
   actionBlocks,
   applyChoices,
-  noChoiceReason,
   rawChips,
   sourcePill,
 } from '../state/vacancy_actions.js';
@@ -162,58 +161,25 @@ describe('пилюля источника в шапке карточки', () =>
 });
 
 describe('способы отклика в окне выбора', () => {
-  const HR = { id: 1, name: 'Иван', telegram_username: 'ivan' };
-  const FORM = { method: 'form', target: 'https://example.com/job' };
   const MAIL = { method: 'email', target: 'hr@example.com' };
 
-  it('Telegram первым — ником с собакой, за ним адреса способов агента', () => {
-    const rows = applyChoices({ ways: [FORM, MAIL], telegram: true, lock: null }, HR);
-    expect(rows.map((row) => row.contact)).toEqual([
-      '@ivan',
-      'https://example.com/job',
-      'hr@example.com',
-    ]);
+  it('способы приходят строками окна как есть, Telegram среди них', () => {
+    const rows = applyChoices({ ways: [
+      { method: 'telegram', target: '@hr_name' },
+      { method: 'email', target: 'hr@company.test' },
+    ] });
+    expect(rows.map((r) => r.contact)).toEqual(['@hr_name', 'hr@company.test']);
+    expect(rows.every((r) => r.way)).toBe(true);
   });
 
-  it('HR без ника назван именем', () => {
-    const [row] = applyChoices(
-      { ways: [], telegram: true, lock: null },
-      { ...HR, telegram_username: null },
-    );
-    expect(row.contact).toBe('Иван');
-  });
-
-  it('способ агента несёт то, что мост ждёт обратно', () => {
-    const [row] = applyChoices({ ways: [MAIL], telegram: false, lock: null }, null);
+  it('способ несёт то, что мост ждёт обратно', () => {
+    const [row] = applyChoices({ ways: [MAIL] });
     expect(row.way).toEqual(MAIL);
-  });
-
-  it('у Telegram способа агента нет: он уходит прежней отправкой', () => {
-    const [row] = applyChoices({ ways: [], telegram: true, lock: null }, HR);
-    expect(row.way).toBeNull();
   });
 
   it('ключи строк разные и у двух адресов одного способа', () => {
     const other = { method: 'email', target: 'boss@example.com' };
-    const rows = applyChoices({ ways: [MAIL, other], telegram: true, lock: null }, HR);
-    expect(new Set(rows.map((row) => row.key)).size).toBe(3);
-  });
-
-  it('запертый агент оставляет только Telegram', () => {
-    // Агенту нечем работать — нет водителя или браузера; Telegram же шлёт бот.
-    const rows = applyChoices({ ways: [FORM], telegram: true, lock: 'Нет браузера' }, HR);
-    expect(rows.map((row) => row.contact)).toEqual(['@ivan']);
-  });
-
-  it('без способов из-за запертого агента причиной названо то, что его заперло', () => {
-    expect(noChoiceReason({ ways: [FORM], telegram: false, lock: 'Нет браузера' })).toBe(
-      'Нет браузера',
-    );
-  });
-
-  it('без способов вовсе сказано, что откликнуться некуда', () => {
-    expect(noChoiceReason({ ways: [], telegram: false, lock: null })).toBe(
-      'Откликнуться некуда: нет ни HR, ни контактов для отклика',
-    );
+    const rows = applyChoices({ ways: [MAIL, other] });
+    expect(new Set(rows.map((row) => row.key)).size).toBe(2);
   });
 });

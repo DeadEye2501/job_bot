@@ -13,7 +13,7 @@ import { settled } from './settled.js';
 import { mountVacancyCard, openActions } from './vacancy_card_mount.js';
 import { vacancyDetail } from './vacancy_detail.js';
 
-const HR = { id: 1, name: 'Иван', telegram_username: 'ivan' };
+const TG = { method: 'telegram', target: '@hr_name' };
 const MAIL = { method: 'email', target: 'hr@example.com' };
 const FORM = { method: 'form', target: 'https://example.com/job' };
 
@@ -26,13 +26,13 @@ afterEach(() => {
 });
 
 /** Карточка, у которой мост отдаёт эти способы; `ways` может быть обещанием. */
-function screen(ways, telegram) {
+function screen(ways) {
   card = mountVacancyCard((method, payload) => {
     if (method === 'vacancies.detail') {
-      return { vacancy: vacancyDetail(payload, { hr: telegram ? HR : null }) };
+      return { vacancy: vacancyDetail(payload) };
     }
     if (method === 'vacancies.apply_ways') {
-      return Promise.resolve(ways).then((found) => ({ ways: found, telegram, lock: null }));
+      return Promise.resolve(ways).then((found) => ({ ways: found }));
     }
     return { ok: true };
   });
@@ -55,7 +55,7 @@ const sent = (asked) =>
 
 describe('отклик из карточки', () => {
   it('единственный способ уходит сразу, без окна выбора', async () => {
-    const { asked } = screen([MAIL], false);
+    const { asked } = screen([MAIL]);
     await respond();
 
     expect(document.querySelector('.way-row')).toBeNull();
@@ -64,15 +64,25 @@ describe('отклик из карточки', () => {
     ]);
   });
 
-  it('единственный Telegram уходит прежней отправкой', async () => {
-    const { asked } = screen([], true);
+  it('без доступных способов сказано, что откликнуться некуда, и ничего не уходит', async () => {
+    const { asked, said } = screen([]);
     await respond();
 
-    expect(sent(asked)).toEqual([['vacancies.send_application', { vacancy_id: 7 }]]);
+    expect(said).toContain('Откликнуться некуда: нет доступных способов');
+    expect(sent(asked)).toEqual([]);
+  });
+
+  it('единственный Telegram уходит тем же ходом, что остальные способы', async () => {
+    const { asked } = screen([TG]);
+    await respond();
+
+    expect(sent(asked)).toEqual([
+      ['vacancies.apply_via', { vacancy_id: 7, method: 'telegram', target: '@hr_name' }],
+    ]);
   });
 
   it('из нескольких способов выбирают в окне, и уходит выбранный', async () => {
-    const { asked } = screen([FORM, MAIL], true);
+    const { asked } = screen([TG, FORM, MAIL]);
     await respond();
 
     const rows = document.querySelectorAll('.way-row');
@@ -91,7 +101,7 @@ describe('отклик из карточки', () => {
   });
 
   it('пока ничего не выбрано, подтверждать нечего', async () => {
-    const { asked } = screen([FORM, MAIL], true);
+    const { asked } = screen([TG, FORM, MAIL]);
     await respond();
 
     press('Подтвердить');
@@ -102,21 +112,21 @@ describe('отклик из карточки', () => {
 
   it('выбрали другую вакансию, пока мост искал способы, — отклик не уходит никуда', async () => {
     // Панель одна на весь список: ответ о способах прежней вакансии пришёл бы
-    // уже к новой, и Telegram ушёл бы по ней сразу и без вопроса.
+    // уже к новой, и единственный способ ушёл бы по ней сразу и без вопроса.
     const late = held();
-    const { asked, change } = screen(late.promise, true);
+    const { asked, change } = screen(late.promise);
     await respond();
 
     change('vacancyId', 8);
     await settled();
-    late.give([]);
+    late.give([TG]);
     await settled();
 
     expect(sent(asked)).toEqual([]);
   });
 
   it('окно, открытое до обхода, запирает подтверждение, когда обход начался', async () => {
-    const { asked } = screen([FORM, MAIL], true);
+    const { asked } = screen([TG, FORM, MAIL]);
     await respond();
     document.querySelectorAll('.way-row')[2].click();
     flushSync();
@@ -131,7 +141,7 @@ describe('отклик из карточки', () => {
 
   it('во время обхода отклик заперт целиком, и об этом сказано', async () => {
     roundGoes();
-    const { asked, said } = screen([FORM, MAIL], true);
+    const { asked, said } = screen([TG, FORM, MAIL]);
     await respond();
 
     expect(asked.map((one) => one.method)).not.toContain('vacancies.apply_ways');

@@ -12,6 +12,7 @@ from tests.backend.fixtures.applying import (
     kit,
     kit_with,
     mail_case,
+    manual_case,
     telegram_case,
     two_vacancies,
 )
@@ -65,6 +66,7 @@ __all__ = [
     "make_bot",
     "mail_case",
     "make_pipeline",
+    "manual_case",
     "one_vector",
     "outbox",
     "parsing",

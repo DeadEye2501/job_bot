@@ -6,7 +6,7 @@ from typing import Literal
 
 from pyrogram.errors import FloodWait, UsernameInvalid, UsernameNotOccupied
 
-from backend.bot import slot
+from backend.bot import slot, work
 from backend.flows import channels as flow_channels
 from backend.telegram_lookup import read_channel_metadata
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
@@ -17,7 +17,7 @@ from backend.repository.channels import (
 
 logger = logging.getLogger(__name__)
 
-ChannelPollOutcome = Literal[slot.CycleOutcome, flow_channels.PollOutcome]
+ChannelPollOutcome = Literal[slot.CycleOutcome, work.AgentStop, flow_channels.PollOutcome]
 """Чем кончился прогон одного канала, как это видит окно.
 
 Складывается, а не выписывается: исходы места прогона и исходы самого обхода
@@ -47,9 +47,9 @@ async def poll_channel_now(bot, channel_id: int) -> ChannelPollOutcome:
       модели. Своё слово ему нужно: «не найден» послал бы человека искать
       запись, которая на месте, а причина осталась бы только в журнале.
     """
-    return await slot.answer_in_slot(
+    return await work.in_slot(
         bot,
-        lambda: bot.ingestion.poll_one_channel(channel_id),
+        lambda _kit: bot.ingestion.poll_one_channel(channel_id),
         f"manual poll for channel {channel_id}",
     )
 

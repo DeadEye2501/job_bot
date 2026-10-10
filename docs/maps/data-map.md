@@ -338,6 +338,10 @@
 
 - `SESSION_LIMIT_SEC` = `3 * 3600`
 
+### `backend/agent/stops.py`
+
+- `RUN_STOPPERS` = `набор из 2`
+
 ### `backend/agent/tools_applier.py`
 
 - `_ALLOWED` = `словарь из 2`
@@ -434,9 +438,11 @@
 ### `backend/bot/aggregators.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `AgentOutcome` = `Literal[slot.CycleOutcome, 'missing', 'locked', …`
-- `HUMAN_TIMEOUT_NOTE` = `'Капча не пройдена — обход снят.'`
-- `LIMIT_NOTE` = `'Исчерпан лимит подписки Claude Code — обход сня…`
+- `AgentOutcome` = `Literal[slot.CycleOutcome, work.AgentStop, 'miss…`
+
+### `backend/bot/apply.py`
+
+- `ApplyOutcome` = `Literal[slot.CycleOutcome, work.AgentStop, 'fail…`
 
 ### `backend/bot/can_send.py`
 
@@ -451,7 +457,7 @@
 ### `backend/bot/channels.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `ChannelPollOutcome` = `Literal[slot.CycleOutcome, flow_channels.PollOut…`
+- `ChannelPollOutcome` = `Literal[slot.CycleOutcome, work.AgentStop, flow_…`
 - `ChannelAddOutcome` = `Literal['created', 'exists', 'invalid', 'error']`
 
 ### `backend/bot/chat.py`
@@ -486,24 +492,12 @@
 ### `backend/bot/pasted.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `PastedOutcome` = `Literal[slot.CycleOutcome, flow_pasted.PastedInt…`
+- `PastedOutcome` = `Literal[slot.CycleOutcome, work.AgentStop, flow_…`
 
 ### `backend/bot/rerun.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `RerunOutcome` = `Literal[slot.CycleOutcome, flow_rerun.RerunPipel…`
-
-### `backend/bot/send.py`
-
-- `logger` = `logging.getLogger(__name__)`
-- `class Errand`
-  - `vacancy_id: int | None` = `None`
-  - `force: bool` = `False`
-- `class _Outcome`
-  - `vacancy_id: int | None`
-  - `tg_message_id: int | None`
-  - `suppressed: bool`
-  - `force: bool`
+- `RerunOutcome` = `Literal[slot.CycleOutcome, work.AgentStop, flow_…`
 
 ### `backend/bot/slot.py`
 
@@ -513,10 +507,18 @@
 ### `backend/bot/turn.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `TurnOutcome` = `Literal[slot.CycleOutcome, work.AgentStop]`
 
 ### `backend/bot/updates.py`
 
 - `logger` = `logging.getLogger(__name__)`
+
+### `backend/bot/work.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `HUMAN_TIMEOUT_NOTE` = `'Капча не пройдена — работа остановлена.'`
+- `LIMIT_NOTE` = `'Исчерпан лимит подписки Claude Code — работа ос…`
+- `AgentStop` = `Literal['human_timeout', 'limit']`
 
 ### `backend/crypto.py`
 
@@ -698,15 +700,6 @@
 ### `backend/flows/aggregator_round.py`
 
 - `logger` = `logging.getLogger(__name__)`
-
-### `backend/flows/apply.py`
-
-- `logger` = `logging.getLogger(__name__)`
-- `_SENDING: set[int]` = `set()`
-- `class _Plan`
-  - `prior_count: int`
-  - `title: str`
-  - `channel_ref: str | None`
 
 ### `backend/flows/channels.py`
 
@@ -1894,20 +1887,20 @@
 - `ATTACHMENT_MISSING` = `'Вложение не найдено.'`
 - `ATTACHMENT_NOT_OPENED` = `'Не удалось открыть вложение.'`
 - `LOGS_TOO_OFTEN` = `'Журнал спрашивают не чаще раза в секунду.'`
-- `RUN_REFUSALS` = `словарь из 3`
-- `POLL_REFUSALS` = `словарь из 5`
-- `RERUN_REFUSALS` = `словарь из 6`
-- `PASTED_REFUSALS` = `словарь из 7`
+- `AGENT_STOPS` = `словарь из 2`
+- `RUN_REFUSALS` = `словарь из 3 и раскрытых`
+- `POLL_REFUSALS` = `словарь из 5 и раскрытых`
+- `RERUN_REFUSALS` = `словарь из 6 и раскрытых`
+- `PASTED_REFUSALS` = `словарь из 7 и раскрытых`
 - `PARSE_CV_REFUSALS` = `словарь из 5`
-- `SEND_REFUSALS` = `словарь из 13`
 - `NO_AGGREGATOR` = `'Агрегатор не найден.'`
 - `WEB_SEARCH_KEPT` = `'Поиск по сети удалить нельзя'`
 - `LOGIN_FIRST` = `'Сначала войдите на сайт'`
 - `WEB_SEARCH_UNMARKED` = `'Поиск по сети в чёрный список не заносится'`
 - `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться.'`
-- `AGGREGATOR_REFUSALS` = `словарь из 7`
+- `AGGREGATOR_REFUSALS` = `словарь из 5 и раскрытых`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
-- `APPLY_VIA_REFUSALS` = `словарь из 2 и раскрытых`
+- `APPLY_VIA_REFUSALS` = `словарь из 5 и раскрытых`
 
 ### `client/bridge/runner.py`
 
@@ -2074,6 +2067,10 @@
 - `_ENV_PY` = `'\nfrom alembic import context\nfrom sqlalchemy …`
 - `_REVISION_PY` = `'\nrevision = "{revision}"\ndown_revision = {par…`
 
+### `tests/backend/test_bot_apply.py`
+
+- `TG` = `Way('telegram', '@hr_name', None)`
+
 ### `tests/backend/test_domain_apply_order.py`
 
 - `SITE` = `KnownSite(1, 'site.test')`
@@ -2182,7 +2179,6 @@
 ### `tests/client/test_front_vocabulary.py`
 
 - `STATE` = `Path(__file__).resolve().parents[2] / 'client' /…`
-- `APPLY` = `Path(__file__).resolve().parents[2] / 'backend' …`
 
 ### `tests/client/test_page_contract.py`
 
@@ -2263,6 +2259,6 @@
 
 - `class Sent`
   - `id: int`
-- `ANSWERS` = `словарь из 15`
+- `ANSWERS` = `словарь из 14`
 - `class UiBot`
   - `is_running_round` = `False`

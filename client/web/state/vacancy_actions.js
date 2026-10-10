@@ -5,7 +5,7 @@
 
 import { showStamp } from './dates.js';
 import { RUNNING } from './progress.js';
-import { atHandle, handleName } from './telegram.js';
+import { atHandle } from './telegram.js';
 import { counted } from './words.js';
 
 /** Почему отклик и переразбор сейчас недоступны.
@@ -37,36 +37,17 @@ export function actionBlocks(card, lockedTip, running) {
   };
 }
 
-/** Способы отклика строками окна выбора: Telegram первым, за ним способы агента.
+/** Способы отклика строками окна выбора — в порядке, в каком их отдал мост.
  *
- * Строка — один контакт: ник Telegram с собакой, по которой его и узнают, или
- * адрес — ссылка на сайт, почта.
- *
- * Довод — ответ `vacancies.apply_ways`. Telegram шлёт бот прежней отправкой,
- * поэтому `way` у него пустой; у способа агента это то, что мост ждёт обратно в
- * `vacancies.apply_via`. Запертому агенту работать нечем, и его способы в окно
- * не попадают.
+ * Строка — один контакт: ник Telegram с собакой, номер, ссылка на сайт, почта.
+ * Довод — ответ `vacancies.apply_ways`: в нём только доступные сейчас способы,
+ * и `way` у каждой строки — то, что мост ждёт обратно в `vacancies.apply_via`.
  */
-export function applyChoices(found, hr) {
-  const viaTelegram = found.telegram
-    ? [{ key: 'telegram', contact: telegramName(hr), way: null }]
-    : [];
-  const viaAgent = found.lock
-    ? []
-    : found.ways.map((way) => ({ key: `${way.method} ${way.target}`, contact: way.target, way }));
-  return [...viaTelegram, ...viaAgent];
+export function applyChoices(found) {
+  return found.ways.map((way) => ({ key: `${way.method} ${way.target}`, contact: way.target, way }));
 }
 
-/** Почему откликнуться некуда: способы есть, но агент заперт, — или их нет вовсе. */
-export function noChoiceReason(found) {
-  return found.ways.length && found.lock
-    ? found.lock
-    : 'Откликнуться некуда: нет ни HR, ни контактов для отклика';
-}
-
-function telegramName(hr) {
-  return hr?.telegram_username ? handleName(hr.telegram_username) : hr?.name || '—';
-}
+export const NO_WAYS = 'Откликнуться некуда: нет доступных способов';
 
 /** Пилюля источника в шапке карточки: откуда вакансия и куда ведёт нажатие.
  *

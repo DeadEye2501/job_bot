@@ -8,7 +8,7 @@
 
 import pytest
 
-from backend.bot.send import _shares_provider
+from backend.bot.client import _shares_provider
 from backend.provider_config import LlmProviderConfig
 
 

@@ -23,7 +23,6 @@ ANSWERS = {
     "poll": "ok",
     "rerun": "ok",
     "pasted": "ok",
-    "application": (True, "sent"),
     "forgotten": True,
     "read": 1,
     "sent": 1,
@@ -89,10 +88,6 @@ class UiBot:
         self.calls.append(("ui_ingest_pasted_text", text, posted_at))
         return self.answers["pasted"]
 
-    async def ui_send_vacancy_application(self, vacancy_id: int) -> tuple[bool, str]:
-        self.calls.append(("ui_send_vacancy_application", vacancy_id))
-        return self.answers["application"]
-
     async def ui_forget_vacancy(self, vacancy_id: int) -> bool:
         self.calls.append(("ui_forget_vacancy", vacancy_id))
         return self.answers["forgotten"]
@@ -132,8 +127,8 @@ class UiBot:
         self.calls.append(("login_aggregator", aggregator_id))
         return self.answers["aggregator_login"]
 
-    async def apply_via_agent(self, vacancy_id: int, way) -> str:
-        self.calls.append(("apply_via_agent", vacancy_id, way))
+    async def apply_chosen_way(self, vacancy_id: int, way) -> str:
+        self.calls.append(("apply_chosen_way", vacancy_id, way))
         return self.answers["apply_via"]
 
     def human_done(self) -> None:

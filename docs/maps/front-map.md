@@ -119,7 +119,7 @@
 - принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte
 
-### app/VacancyCard.svelte (462)
+### app/VacancyCard.svelte (460)
 - Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою оценку.
 - принимает: ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged
 - берёт: ./VacancyContactsSection.svelte, ./VacancyLinks.svelte
@@ -846,9 +846,9 @@
 - * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
 - отдаёт: SORTS, VACANCY_MODES, ago, blankVacancy, emptyNote, gradeLabel, pasteLock, remoteLabel, salaryLabel, scoreTone, shortAgo, shownStack, sortKey, typed, vacancyFields, vacancyLine, vacancyNamed
 
-### state/vacancy_actions.js (116)
+### state/vacancy_actions.js (97)
 - * Почему отклик и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы * модели не допускаем — даже отклика в Telegram, которому браузер не нужен. * * Есть ли куда откликаться, здесь не решается: это знает только мост, и * ответ его разбирает `applyChoices`.
-- отдаёт: actionBlocks, applyChoices, noChoiceReason, rawChips, sourcePill
+- отдаёт: NO_WAYS, actionBlocks, applyChoices, rawChips, sourcePill
 
 ### state/vacancy_card.js (192)
 - * Способ отклика словами; незнакомый код называется сам собой — коды заводит * бэкенд, и новый приедет раньше, чем окно про него узнает.
@@ -1879,10 +1879,10 @@ body, html, button, body, .material-symbols-outlined
 ### tests/vacancies_screen_new_live.test.js (318)
 - * Мост, отвечающий тем же, чем отвечает настоящий. * * Заведение чужой карточки отказывает: так ведёт себя настоящий, когда имя * занято или связь оборвалась, — и это единственный способ увидеть, что * остаётся в черновике после неудачи.
 
-### tests/vacancy_actions.test.js (219)
+### tests/vacancy_actions.test.js (185)
 - —
 
-### tests/vacancy_apply_live.test.js (141)
+### tests/vacancy_apply_live.test.js (151)
 - * Карточка, у которой мост отдаёт эти способы; `ways` может быть обещанием.
 
 ### tests/vacancy_card.test.js (330)
