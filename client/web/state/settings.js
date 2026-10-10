@@ -319,6 +319,25 @@ export function mailNeedsServer(mail) {
   return Boolean(mail?.address) && !mail.server_by_address;
 }
 
+/** Почта, какой её примет мост: набранное поверх записанного — или пусто, если
+ *  записывать нечего.
+ *
+ * Поле пароля отдаёт его на каждом уходе, и прежний записывать незачем. Сервер
+ * уходит, только пока его поля видны: подставленный прежнему адресу иначе
+ * вернулся бы вписанным руками и пережил бы смену адреса.
+ */
+export function mailToSave(mail, part) {
+  if (part.password === (mail.password ?? '')) return null;
+  const next = { ...mail, ...part };
+  const server = mailNeedsServer(next);
+  return {
+    address: (next.address ?? '').trim(),
+    password: next.password ?? '',
+    smtp_host: server ? (next.smtp_host ?? '').trim() || null : null,
+    smtp_port: server ? Number.parseInt(next.smtp_port, 10) || null : null,
+  };
+}
+
 /** Проверка, которой ещё не было.
  *
  * Одним объявлением на оба экрана и на оба места — начальное состояние и сброс

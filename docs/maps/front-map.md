@@ -89,7 +89,7 @@
 - —
 - принимает: ask
 
-### app/SettingsScreen.svelte (376)
+### app/SettingsScreen.svelte (373)
 - Записи на смене источника нет, пока не выбран файл или не набран сервер: пустой источник мост не примет, а прежний остаётся в базе до тех пор.
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
@@ -772,9 +772,9 @@
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
-### state/settings.js (412)
+### state/settings.js (431)
 - * Чем подписано пустое поле имени модели. * * Пока имён нет, подсказка не обещает списка: перечень читается с адреса и * ключа, и у непóднятого поставщика его не будет вовсе — имя тогда вписывают * руками. Слова общие на настройки и на шаг мастера: одно и то же поле, * подписанное по-разному, читается как два разных.
-- отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, NO_FILE_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, SOURCE_FILE, SOURCE_SERVER, addressTrouble, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, embedReading, fileCreds, fileTrouble, idleProbe, isFileSource, isModelFile, llmTrouble, loginTrouble, mailNeedsServer, mailPill, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probeLine, probePill, sameCreds, scorePercent, sessionPill, sharesChat, sourceCreds, sourceLabel, telegramCreds, thresholdState
+- отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, NO_FILE_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, SOURCE_FILE, SOURCE_SERVER, addressTrouble, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, embedReading, fileCreds, fileTrouble, idleProbe, isFileSource, isModelFile, llmTrouble, loginTrouble, mailNeedsServer, mailPill, mailToSave, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probeLine, probePill, sameCreds, scorePercent, sessionPill, sharesChat, sourceCreds, sourceLabel, telegramCreds, thresholdState
 
 ### state/site.js (31)
 - /i; /** Адрес, по которому открывают сайт. * * Домен приходит из чужого объявления, вынутый оттуда моделью, — доверия ему * нет. Наружу уходит только http(s): всё прочее, включая `javascript:` и * `file:`, переписывается на обычный адрес вместе со своей схемой. Голый домен * без схемы система открыла бы как файл рядом со страницей, поэтому схему * дописываем и ему.
@@ -1716,10 +1716,10 @@ body, html, button, body, .material-symbols-outlined
 ### tests/search.test.js (49)
 - —
 
-### tests/settings.test.js (424)
+### tests/settings.test.js (469)
 - —
 
-### tests/settings_screen_live.test.js (211)
+### tests/settings_screen_live.test.js (227)
 - * Экран над мостом; `mail` — что мост отдаёт о почте.
 
 ### tests/settled.js (21)

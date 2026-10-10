@@ -21,6 +21,7 @@
     credsChanged,
     embedReading,
     loginTrouble,
+    mailToSave,
     mirrored,
     probePill,
     sharesChat,
@@ -122,14 +123,10 @@
 
   /** Записать почту целиком: мост принимает её одной записью. */
   async function saveMail(part) {
-    const next = { ...mail, ...part };
-    mail = next;
-    await ask('settings.save_mail', {
-      address: next.address ?? '',
-      password: next.password ?? '',
-      smtp_host: next.smtp_host ?? null,
-      smtp_port: next.smtp_port ?? null,
-    });
+    const payload = mailToSave(mail, part);
+    if (payload === null) return;
+    mail = { ...mail, ...payload };
+    await ask('settings.save_mail', payload);
     await readMail();
   }
 

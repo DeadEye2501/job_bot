@@ -132,6 +132,22 @@ describe('почта для откликов', () => {
     expect(asked.filter(([method]) => method === 'settings.mail')).toHaveLength(2);
   });
 
+  it('уход из поля с прежним паролем ничего не записывает', async () => {
+    const { asked, byHolder } = screen({
+      address: 'me@yandex.ru',
+      password: 'secret',
+      smtp_host: 'smtp.yandex.ru',
+      smtp_port: 465,
+      server_by_address: true,
+    });
+    await settled();
+
+    leave(byHolder('Пароль приложения'), 'secret');
+    await settled();
+
+    expect(asked.filter(([method]) => method === 'settings.save_mail')).toEqual([]);
+  });
+
   it('поля сервера показываются, пока сервер не подставлен по адресу', async () => {
     // Вписанный руками сервер незнакомой почты держит поля на месте: иначе
     // опечатку в нём было бы негде поправить.

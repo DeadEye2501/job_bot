@@ -8,10 +8,11 @@ from dataclasses import dataclass, field
 from email.message import EmailMessage
 from pathlib import Path
 
+from backend.domain.mail_servers import STARTTLS_PORT
+
 logger = logging.getLogger(__name__)
 
 _TIMEOUT_SEC = 60
-_STARTTLS_PORT = 587
 
 
 @dataclass(frozen=True)
@@ -38,12 +39,12 @@ def send_mail(account: MailAccountConfig, mail: OutgoingMail) -> None:
     """
     message = _message(account.address, mail)
     context = ssl.create_default_context()
-    if account.port == _STARTTLS_PORT:
+    if account.port == STARTTLS_PORT:
         smtp = smtplib.SMTP(account.host, account.port, timeout=_TIMEOUT_SEC)
     else:
         smtp = smtplib.SMTP_SSL(account.host, account.port, context=context, timeout=_TIMEOUT_SEC)
     try:
-        if account.port == _STARTTLS_PORT:
+        if account.port == STARTTLS_PORT:
             smtp.starttls(context=context)
         smtp.login(account.address, account.password)
         smtp.send_message(message)

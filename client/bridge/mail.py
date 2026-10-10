@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
+from backend.domain.mail_servers import known_server
 from backend.incoming import int_or_none, text_or_none
-from backend.repository.mail_account import (
-    MailSettings,
-    known_server,
-    read_mail_account,
-    save_mail_account,
-)
+from backend.repository.mail_account import MailSettings, read_mail_account, save_mail_account
 from client.bridge.answer import reply
 
 

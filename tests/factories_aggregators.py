@@ -1,10 +1,12 @@
-"""Строки агрегаторов, контактов вакансии и откликов вне Telegram."""
+"""Строки откликов вне Telegram: агрегаторы, контакты вакансии, отклики, почта."""
 
+from backend.crypto import encrypt_str
 from backend.models import (
     Aggregator,
     Application,
     ApplicationVia,
     ContactAddedBy,
+    MailAccount,
     Screening,
     VacancyContact,
 )
@@ -48,3 +50,8 @@ def screening_row(application_id: int, position: int, **overrides) -> Screening:
     fields = {"from_us": False, "text": "Сколько лет опыта?"}
     fields.update(overrides)
     return Screening(application_id=application_id, position=position, **fields)
+
+def mail_account_row() -> MailAccount:
+    """Строка почты, готовой к отправке: адрес, пароль шифром и сервер."""
+    return MailAccount(id=1, address="me@mail.test", password_encrypted=encrypt_str("secret"),
+                       smtp_host="smtp.mail.test", smtp_port=465)

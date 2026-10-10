@@ -12,10 +12,9 @@ from backend.flows.aggregator_apply import ApplyOrder, apply_phase, apply_vacanc
 from backend.flows.aggregator_round import RoundState
 from backend.models import Application, ContactAddedBy, Vacancy, VacancyEvent, VacancyStatus
 from backend.repository.app_settings import CV_PATH_KEY
-from backend.repository.mail_account import MailSettings, save_mail_account
 from tests.dbio import all_rows, put
 from tests.factories import vacancy_row
-from tests.factories_aggregators import aggregator_row, vacancy_contact_row
+from tests.factories_aggregators import aggregator_row, mail_account_row, vacancy_contact_row
 from tests.fakes.agent import LimitHit, scripted_kit
 from tests.waiting import wait_until
 
@@ -198,8 +197,7 @@ async def test_the_email_way_needs_no_browser(make_pipeline, session, session_fa
     await put(session_factory, vacancy)
     await put(session_factory, vacancy_contact_row(vacancy.id, "hr@company.test",
                                                    added_by=ContactAddedBy.PARSE))
-    async with session.begin():
-        await save_mail_account(session, MailSettings("me@mail.test", "secret", "smtp.mail.test", 465))
+    await put(session_factory, mail_account_row())
 
     async def fail(tools):
         await tools["report_failure"](reason="нет")
@@ -246,8 +244,7 @@ async def slow_letter(make_pipeline, session, session_factory, tmp_path, monkeyp
     await put(session_factory,
               vacancy_contact_row(vacancy.id, "hr@company.test", added_by=ContactAddedBy.PARSE),
               vacancy_contact_row(vacancy.id, "boss@company.test", added_by=ContactAddedBy.PARSE))
-    async with session.begin():
-        await save_mail_account(session, MailSettings("me@mail.test", "secret", "smtp.mail.test", 465))
+    await put(session_factory, mail_account_row())
     cv = tmp_path / "cv.pdf"
     cv.write_bytes(b"%PDF")
     sending = threading.Event()

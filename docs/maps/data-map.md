@@ -191,7 +191,6 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `_TIMEOUT_SEC` = `60`
-- `_STARTTLS_PORT` = `587`
 - `class MailAccountConfig`
   - `address: str`
   - `host: str`
@@ -551,6 +550,16 @@
   - `query: str`
   - `fragment: str`
 - `_ZONE_SECOND_LEVELS` = `frozenset({'co', 'com', 'net', 'org', 'ac', 'gov…`
+
+### `backend/domain/mail_servers.py`
+
+- `SSL_PORT` = `465`
+- `STARTTLS_PORT` = `587`
+- `_GMAIL` = `набор из 2`
+- `_YANDEX` = `набор из 2`
+- `_MAIL_RU` = `набор из 2`
+- `_OUTLOOK` = `набор из 2`
+- `_KNOWN_SERVERS` = `словарь из 12`
 
 ### `backend/domain/resume_marks.py`
 
@@ -1563,13 +1572,6 @@
 
 ### `backend/repository/mail_account.py`
 
-- `_SSL_PORT` = `465`
-- `_STARTTLS_PORT` = `587`
-- `_GMAIL` = `набор из 2`
-- `_YANDEX` = `набор из 2`
-- `_MAIL_RU` = `набор из 2`
-- `_OUTLOOK` = `набор из 2`
-- `_KNOWN_SERVERS` = `словарь из 12`
 - `class MailSettings`
   - `address: str`
   - `password: str | None` = `field(repr=False)`

@@ -2,10 +2,9 @@
 
 from backend.domain.apply_order import Way
 from backend.models import ContactAddedBy
-from backend.repository.mail_account import MailSettings, save_mail_account
 from tests.dbio import put
 from tests.factories import blacklist_row, hr_row, vacancy_row
-from tests.factories_aggregators import aggregator_row, vacancy_contact_row
+from tests.factories_aggregators import aggregator_row, mail_account_row, vacancy_contact_row
 
 FORM = "https://company.test/apply"
 
@@ -24,8 +23,7 @@ async def test_the_ways_of_a_vacancy_come_with_telegram_and_the_lock(
     hr = hr_row()
     await put(session_factory, hr)
     vacancy = await _vacancy(session_factory, hr_id=hr.id)
-    async with session.begin():
-        await save_mail_account(session, MailSettings("me@mail.test", "secret", "smtp.mail.test", 465))
+    await put(session_factory, mail_account_row())
 
     answer = (await ask(api.vacancies.apply_ways, vacancy.id))["ok"]
 
