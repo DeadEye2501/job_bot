@@ -77,6 +77,16 @@ async def test_popular_mail_needs_no_server(session, address, server):
     assert (account.host, account.port) == server
 
 
+async def test_a_new_popular_address_takes_its_own_server_not_the_old_one(session):
+    """Окно шлёт почту целиком, и сервер, подставленный прежнему адресу, едет с ней."""
+    async with session.begin():
+        await save_mail_account(session, MailSettings("me@gmail.com", "secret", None, None))
+    async with session.begin():
+        await save_mail_account(session, MailSettings("me@yandex.ru", None, "smtp.gmail.com", 465))
+    account = await get_mail_account(session)
+    assert (account.host, account.port) == ("smtp.yandex.ru", 465)
+
+
 async def test_unknown_mail_without_a_server_cannot_send(session):
     async with session.begin():
         await save_mail_account(session, MailSettings("me@company.test", "secret", None, None))

@@ -6,22 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.smtp_mail import MailAccountConfig
 from backend.crypto import decrypt_or_none, encrypt_str
+from backend.domain.mail_servers import SSL_PORT, known_server
 from backend.log_secrets import remember_secret
 from backend.models import MailAccount
-
-_SSL_PORT = 465
-_STARTTLS_PORT = 587
-_GMAIL = ("smtp.gmail.com", _SSL_PORT)
-_YANDEX = ("smtp.yandex.ru", _SSL_PORT)
-_MAIL_RU = ("smtp.mail.ru", _SSL_PORT)
-_OUTLOOK = ("smtp.office365.com", _STARTTLS_PORT)
-_KNOWN_SERVERS = {
-    "gmail.com": _GMAIL, "googlemail.com": _GMAIL,
-    "yandex.ru": _YANDEX, "ya.ru": _YANDEX, "yandex.com": _YANDEX,
-    "mail.ru": _MAIL_RU, "inbox.ru": _MAIL_RU, "list.ru": _MAIL_RU, "bk.ru": _MAIL_RU,
-    "outlook.com": _OUTLOOK, "hotmail.com": _OUTLOOK, "live.com": _OUTLOOK,
-}
-"""Сервер популярной почты по домену адреса: человеку незачем искать его в справке."""
 
 
 @dataclass(frozen=True)
@@ -33,21 +20,11 @@ class MailSettings:
 
 
 async def get_mail_account(session: AsyncSession) -> MailAccountConfig | None:
-    """Почта, готовая к отправке, или пусто: без адреса, пароля или сервера писать нечем.
-
-    `decrypt_or_none` отдаёт `""` за пустой секрет и `None` за нечитаемый; для
-    почты оба значат одно — пароля нет.
-    """
-    row = await session.get(MailAccount, 1)
-    if row is None or not row.address or not row.password_encrypted:
+    """Почта, готовая к отправке, или пусто: без адреса, пароля или сервера писать нечем."""
+    saved = await read_mail_account(session)
+    if saved is None or not (saved.address and saved.password and saved.host and saved.port):
         return None
-    if not row.smtp_host or not row.smtp_port:
-        return None
-    password = decrypt_or_none(row.password_encrypted, "mail password")
-    if not password:
-        return None
-    remember_secret(password)
-    return MailAccountConfig(row.address, row.smtp_host, row.smtp_port, password)
+    return MailAccountConfig(saved.address, saved.host, saved.port, saved.password)
 
 
 async def read_mail_account(session: AsyncSession) -> MailSettings | None:
@@ -77,12 +54,13 @@ async def save_mail_account(session: AsyncSession, settings: MailSettings) -> No
     row.smtp_host, row.smtp_port = _server(row.address, settings.host, settings.port)
 
 
-def known_server(address: str | None) -> tuple[str, int] | None:
-    """Сервер и порт популярной почты по домену адреса; незнакомой — пусто."""
-    return _KNOWN_SERVERS.get((address or "").rpartition("@")[2].lower())
-
-
 def _server(address: str | None, host: str | None, port: int | None) -> tuple[str | None, int | None]:
-    if not (host or "").strip():
-        return known_server(address) or (None, None)
-    return host.strip(), port or _SSL_PORT
+    """Сервер популярной почты берётся по адресу, даже если прислан другой: окно шлёт
+    почту целиком, и сервер, подставленный прежнему адресу, иначе пережил бы смену адреса."""
+    known = known_server(address)
+    if known:
+        return known
+    host = (host or "").strip()
+    if not host:
+        return None, None
+    return host, port or SSL_PORT

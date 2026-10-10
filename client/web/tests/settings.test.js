@@ -19,6 +19,7 @@ import {
   canShareChat,
   fileCreds,
   isModelFile,
+  mailToSave,
   blankTelegram,
   clampField,
   credsChanged,
@@ -422,3 +423,47 @@ describe('заслон адреса поставщика', () => {
   });
 });
 
+
+describe('запись почты', () => {
+  const GMAIL = {
+    address: 'me@gmail.com',
+    password: 'secret',
+    smtp_host: 'smtp.gmail.com',
+    smtp_port: 465,
+    server_by_address: true,
+  };
+  const COMPANY = {
+    address: 'me@company.test',
+    password: 'secret',
+    smtp_host: 'smtp.company.test',
+    smtp_port: 465,
+    server_by_address: false,
+  };
+
+  it('сервер, подставленный прежнему адресу, со сменой адреса не уходит', () => {
+    expect(mailToSave(GMAIL, { address: ' me@company.test ' })).toEqual({
+      address: 'me@company.test',
+      password: 'secret',
+      smtp_host: null,
+      smtp_port: null,
+    });
+  });
+
+  it('вписанный руками сервер уходит, порт — числом', () => {
+    expect(mailToSave(COMPANY, { smtp_port: '587' })).toEqual({
+      address: 'me@company.test',
+      password: 'secret',
+      smtp_host: 'smtp.company.test',
+      smtp_port: 587,
+    });
+    expect(mailToSave(COMPANY, { smtp_host: '  ', smtp_port: 'x' })).toMatchObject({
+      smtp_host: null,
+      smtp_port: null,
+    });
+  });
+
+  it('прежний пароль записывать нечего', () => {
+    expect(mailToSave(GMAIL, { password: 'secret' })).toBeNull();
+    expect(mailToSave(GMAIL, { password: 'other' })).toMatchObject({ password: 'other' });
+  });
+});

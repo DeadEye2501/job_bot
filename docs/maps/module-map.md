@@ -272,11 +272,11 @@ Claude через установленный Claude Code по подписке: 
 - `def _vector(tag) -> bool` (2)
 - `def _hints(soup: BeautifulSoup) -> SiteHints` (10)
 
-### `adapters/smtp_mail.py` — 74 строк
+### `adapters/smtp_mail.py` — 75 строк
 
 Отправка письма по SMTP с вложением, под паролем приложения.
 
-Зависит от: —
+Зависит от: `backend.domain.mail_servers`
 
 - `class MailAccountConfig` (5)
 - `class OutgoingMail` (5)
@@ -357,7 +357,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 174 модулей
+## backend — 175 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -913,6 +913,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def is_arrival_mark(name: str) -> bool` (7)
 - `def _numbering(query: str) -> str` (15)
 - `def _without_scheme(url: str) -> str` (3)
+
+### `backend/domain/mail_servers.py` — 23 строк
+
+Справочник почтовых серверов: человеку незачем искать сервер своей почты в справке.
+
+Зависит от: —
+
+- `def known_server(address: str | None) -> tuple[str, int] | None` (3)
 
 ### `backend/domain/resume_marks.py` — 62 строк
 
@@ -2197,18 +2205,17 @@ First-run bootstrap: ensure DB schema exists.
 - `async def list_hrs_for_company(session: AsyncSession, company_id: int) -> list[tuple[HR, int]]` (16)
 - `async def list_hrs_with_unread(session: AsyncSession) -> list[dict]` (31)
 
-### `backend/repository/mail_account.py` — 88 строк
+### `backend/repository/mail_account.py` — 66 строк
 
 Почта для откликов письмом: одна строка, пароль шифром.
 
-Зависит от: `adapters.smtp_mail`, `backend.crypto`, `backend.log_secrets`, `backend.models`
+Зависит от: `adapters.smtp_mail`, `backend.crypto`, `backend.domain.mail_servers`, `backend.log_secrets`, `backend.models`
 
 - `class MailSettings` (5)
-- `async def get_mail_account(session: AsyncSession) -> MailAccountConfig | None` (16)
+- `async def get_mail_account(session: AsyncSession) -> MailAccountConfig | None` (6)
 - `async def read_mail_account(session: AsyncSession) -> MailSettings | None` (14)
 - `async def save_mail_account(session: AsyncSession, settings: MailSettings) -> None` (9)
-- `def known_server(address: str | None) -> tuple[str, int] | None` (3)
-- `def _server(address: str | None, host: str | None, port: int | None) -> tuple[str | None, int | None]` (4)
+- `def _server(address: str | None, host: str | None, port: int | None) -> tuple[str | None, int | None]` (10)
 
 ### `backend/repository/merging.py` — 54 строк
 
@@ -3053,11 +3060,11 @@ Runtime settings layer.
   - `def confirm_code(self, payload: dict) -> dict` (10)
   - `def confirm_password(self, payload: dict) -> dict` (10)
 
-### `client/bridge/mail.py` — 54 строк
+### `client/bridge/mail.py` — 50 строк
 
 Почта для откликов в настройках: что записано и запись новой.
 
-Зависит от: `backend.incoming`, `backend.repository.mail_account`, `client.bridge.answer`
+Зависит от: `backend.domain.mail_servers`, `backend.incoming`, `backend.repository.mail_account`, `client.bridge.answer`
 
 - `class Mail` (40)
   - `def mail(self) -> dict` (16)
@@ -3900,17 +3907,17 @@ seed initial data
 - `class _Gate` (7)
   - `async def wait(self, kind, host, _browser)` (3)
 
-### `tests/backend/test_agent_tools_email.py` — 147 строк
+### `tests/backend/test_agent_tools_email.py` — 143 строк
 
 Отклик письмом: только на адрес из контактов, только с резюме, второй раз не уходит.
 
-Зависит от: `backend.agent.jobs`, `backend.agent.tools_applier`, `backend.models`, `backend.repository.app_settings`, `backend.repository.mail_account`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
+Зависит от: `backend.agent.jobs`, `backend.agent.tools_applier`, `backend.models`, `backend.repository.app_settings`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
 
 Тестов: 9
 
 - `def sent(monkeypatch)` (4)
-- `def ready(session_factory, session, tmp_path, make_pipeline)` (23)
-  - `async def build(*, simulated=False, mail=True, resume=True)` (18)
+- `def ready(session_factory, session, tmp_path, make_pipeline)` (20)
+  - `async def build(*, simulated=False, mail=True, resume=True)` (15)
 
 ### `tests/backend/test_agent_tools_letter.py` — 77 строк
 
@@ -4362,11 +4369,11 @@ seed initial data
 
 - `def _write_through(module, text: str) -> str` (22)
 
-### `tests/backend/test_flows_aggregator_apply.py` — 306 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_aggregator_apply.py` — 303 строк ⚠ подошёл к 300
 
 Фаза 2: отклик способ за способом, пока один не удался или способы не кончились.
 
-Зависит от: `backend.agent.sessions`, `backend.flows.aggregator_apply`, `backend.flows.aggregator_round`, `backend.models`, `backend.repository.app_settings`, `backend.repository.mail_account`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.waiting`
+Зависит от: `backend.agent.sessions`, `backend.flows.aggregator_apply`, `backend.flows.aggregator_round`, `backend.models`, `backend.repository.app_settings`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.waiting`
 
 Тестов: 15
 
@@ -4381,7 +4388,7 @@ seed initial data
 - `def _finish(result)` (4)
   - `async def step(tools)` (2)
 - `async def _events(session_factory, kind)` (2)
-- `async def slow_letter(make_pipeline, session, session_factory, tmp_path, monkeypatch)` (28)
+- `async def slow_letter(make_pipeline, session, session_factory, tmp_path, monkeypatch)` (27)
   - `def slow_server(account, mail)` (3)
   - `async def leave_while_sending(tools)` (4)
 
@@ -5503,13 +5510,13 @@ seed initial data
 Тестов: 9
 
 
-### `tests/backend/test_repository_mail_account.py` — 83 строк
+### `tests/backend/test_repository_mail_account.py` — 93 строк
 
 Почта для откликов: пароль лежит шифром, популярные почты настраиваются сами.
 
 Зависит от: `backend.log_secrets`, `backend.models`, `backend.repository.mail_account`, `tests.backend.fixtures.logs`, `tests.dbio`
 
-Тестов: 9
+Тестов: 10
 
 
 ### `tests/backend/test_repository_message_changes.py` — 116 строк
@@ -6014,11 +6021,11 @@ seed initial data
 Тестов: 6
 
 
-### `tests/client/test_bridge_apply_via.py` — 81 строк
+### `tests/client/test_bridge_apply_via.py` — 79 строк
 
 Отклик выбранным способом: какие способы есть у вакансии и запуск агента одним из них.
 
-Зависит от: `backend.domain.apply_order`, `backend.models`, `backend.repository.mail_account`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
+Зависит от: `backend.domain.apply_order`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
 Тестов: 5
 
@@ -6519,17 +6526,18 @@ seed initial data
 - `def status_history_row(vacancy_id: int, **overrides) -> VacancyStatusHistory` (10)
 - `def tg_creds(**overrides) -> TgAccountConfig` (16)
 
-### `tests/factories_aggregators.py` — 50 строк
+### `tests/factories_aggregators.py` — 57 строк
 
-Строки агрегаторов, контактов вакансии и откликов вне Telegram.
+Строки откликов вне Telegram: агрегаторы, контакты вакансии, отклики, почта.
 
-Зависит от: `backend.models`, `backend.repository.aggregators`, `tests.factories`
+Зависит от: `backend.crypto`, `backend.models`, `backend.repository.aggregators`, `tests.factories`
 
 - `def aggregator_row(**overrides) -> Aggregator` (5)
 - `def web_search_row(**overrides) -> Aggregator` (3)
 - `def vacancy_contact_row(vacancy_id: int, value: str, **overrides) -> VacancyContact` (6)
 - `def application_row(vacancy_id: int, **overrides) -> Application` (9)
 - `def screening_row(application_id: int, position: int, **overrides) -> Screening` (5)
+- `def mail_account_row() -> MailAccount` (4)
 
 ### `tests/fakes/agent.py` — 66 строк
 

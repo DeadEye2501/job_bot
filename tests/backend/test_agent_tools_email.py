@@ -8,10 +8,9 @@ from backend.agent.jobs import Applied, Failed
 from backend.agent.tools_applier import applier_tools
 from backend.models import Application, ContactAddedBy, VacancyEvent
 from backend.repository.app_settings import CV_PATH_KEY
-from backend.repository.mail_account import MailSettings, save_mail_account
 from tests.dbio import all_rows, put
 from tests.factories import vacancy_row
-from tests.factories_aggregators import vacancy_contact_row
+from tests.factories_aggregators import mail_account_row, vacancy_contact_row
 from tests.fakes.agent import apply_job, kit_for, tool
 
 
@@ -33,10 +32,7 @@ def ready(session_factory, session, tmp_path, make_pipeline):
                   vacancy_contact_row(vacancy.id, "hr@site.test", added_by=ContactAddedBy.PARSE),
                   vacancy_contact_row(vacancy.id, "boss@site.test", added_by=ContactAddedBy.PARSE))
         if mail:
-            async with session.begin():
-                await save_mail_account(
-                    session, MailSettings("me@mail.test", "secret", "smtp.mail.test", 465)
-                )
+            await put(session_factory, mail_account_row())
         cv = tmp_path / "cv.pdf"
         if resume:
             cv.write_bytes(b"%PDF")
