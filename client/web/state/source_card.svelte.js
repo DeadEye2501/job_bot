@@ -2,13 +2,14 @@
 // смена открытого источника.
 //
 // Своим объявлением, потому что карточки канала и агрегатора читали себя
-// дословно одинаково. Своё у каждой — запоры, меню и шапка — остаётся в ней.
+// дословно одинаково. Сама карточка с её сменой — общая с людьми и компаниями
+// (`pane_card`); здесь сверх неё листаемые вакансии и перечитывание по вести.
+// Своё у каждой — запоры, меню и шапка — остаётся в ней.
 //
 // Имён методов моста здесь нет: имя чтения карточки приходит доводом, чтение
 // вакансий — обёрткой, чтобы оба стояли на шве, в самой карточке.
 
-import { living } from '$state/alive.js';
-import { cardRead } from '$state/card_read.js';
+import { paneCard } from '$state/pane_card.svelte.js';
 import { sourceVacancies } from '$state/source_vacancies.svelte.js';
 
 /** Заходит на карточку источника и отдаёт снятие.
@@ -36,50 +37,33 @@ export function watchSourceCard(events, alive, id, { forget, read }) {
  * `method` — чтение карточки по номеру, `trouble` — слова его отказа;
  * `vacanciesOf(id)` — обёртка чтения страницы вакансий этого источника.
  */
-export function sourceCard({ ask, method, trouble: refused, vacanciesOf }) {
-  let card = $state(null);
-  let trouble = $state('');
-
-  // Свой счёт попыток на каждый вопрос: панель одна на всю вкладку, и
-  // источник в ней переключают нажатием по соседней строке — ответ про
-  // прежний, лёгший поверх свежего, показал бы его числа под новым именем.
-  const alive = living();
-  const vacancies = sourceVacancies(alive);
-
-  const read = cardRead({
-    ask,
-    method,
-    trouble: refused,
-    alive: () => alive.now,
-    show: (now) => ({ card, trouble } = now),
-  });
-
-  function reread(id) {
-    read(id);
-    vacancies.reload(vacanciesOf(id));
-  }
+export function sourceCard({ ask, method, trouble, vacanciesOf }) {
+  const pane = paneCard({ ask, method, trouble });
+  const vacancies = sourceVacancies(pane.alive);
 
   return {
     get card() {
-      return card;
+      return pane.card;
     },
     get trouble() {
-      return trouble;
+      return pane.trouble;
     },
     vacancies,
     /** Перечитать одни числа: отметка отсева, вход и время обхода. */
-    read,
+    read: pane.read,
     /** Дочитать следующую страницу вакансий открытого источника. */
     more: (id) => vacancies.more(vacanciesOf(id)),
     /** Зайти на источник и отдать снятие — его возвращают из эффекта. */
     watch: (events, id) =>
-      watchSourceCard(events, alive, id, {
+      watchSourceCard(events, pane.alive, id, {
         forget: () => {
-          card = null;
-          trouble = '';
+          pane.forget();
           vacancies.clear();
         },
-        read: reread,
+        read: (one) => {
+          pane.readAll(one);
+          vacancies.reload(vacanciesOf(one));
+        },
       }),
   };
 }

@@ -10,7 +10,7 @@
 
   import { whileOpen } from '$state/outside.js';
   import { WEEKDAYS, monthGrid, monthTitle, shiftMonth } from '$state/calendar.js';
-  import { asIso, dayOf, isoDay, showDate, validDate } from '$state/dates.js';
+  import { asIso, dayIso, dayOf, isoDay, showDate, validDate } from '$state/dates.js';
 
   // `disabled` — для даты окончания у места работы, где отмечено «по настоящее
   // время»: набирать там нечего, и календарь не открывается вместе с полем.
@@ -20,7 +20,7 @@
   let { value, onpick, disabled, up } = $props();
 
   const now = new Date();
-  const today = isoDay(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  const today = dayIso(now);
   // Календарь открывается на выбранном месяце, а без выбора — на нынешнем.
   const start = untrack(() =>
     value ? dayOf(value) : { year: now.getFullYear(), month: now.getMonth() + 1 },

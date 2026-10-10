@@ -93,6 +93,7 @@ export function sourceStats(stats) {
   };
 }
 
-function share(percent) {
+/** Доля в процентах; неизвестная — прочерком, ноль читался бы как значение. */
+export function share(percent) {
   return percent === null || percent === undefined ? '—' : `${percent}%`;
 }

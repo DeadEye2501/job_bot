@@ -1,97 +1,49 @@
 <script>
-  // Вкладка «HR»: список людей с поиском, страницами и заведением.
+  // Вкладка «HR»: общая вкладка контактов со строкой и карточкой человека.
 
-  import AddButton from '$components/AddButton.svelte';
-  import ContactsPanes from '$components/ContactsPanes.svelte';
-  import NewCardDialog from '$components/NewCardDialog.svelte';
   import PersonRow from '$components/PersonRow.svelte';
-  import SearchBox from '$components/SearchBox.svelte';
-  import { contactAdding } from '$state/contact_adding.svelte.js';
-  import { watchContacts } from '$state/contacts_watch.js';
-  import { NEW_CARD } from '$state/new_card.js';
-  import { takeOpened } from '$state/open_mark.js';
   import { pagedList } from '$state/paged_list.svelte.js';
 
+  import ContactsTab from './ContactsTab.svelte';
   import PersonCard from './PersonCard.svelte';
 
   let { ask, say, events, open, onopened, oncompany, onvacancy } = $props();
 
   const list = pagedList({ ask: (...args) => ask(...args), method: 'hr.list', key: 'hrs' });
 
-  const FORM = NEW_CARD.hr;
-
-  // Негодный ник отбивает мост, и его отказ приезжает плашкой — потому здесь
-  // и не проверяется ничего сверх общего заслона.
-  const newCard = contactAdding({
-    list,
-    form: FORM,
-    save: (draft) => ask('hr.create', { ...draft }),
-    say: (text) => say(text),
-  });
-
-  // Чья карточка показана справа.
-  let opened = $state(null);
-
-  // Кого открыть, придя со стороны — из списка непрочитанного над полосой или
-  // из карточки вакансии.
-  $effect(() => takeOpened(open, (id) => (opened = id), onopened));
-
-  // Только про списки: весть о непрочитанном кладётся на каждое сохранённое
-  // письмо, и обход в сотню сообщений перечитал бы список сотню раз подряд.
-  $effect(() => watchContacts(events, list));
+  const words = {
+    add: 'Добавить HR',
+    pick: 'Выберите HR в списке слева',
+    none: "HR'ов пока нет",
+  };
 </script>
 
-<ContactsPanes
-  loaded={list.loaded}
-  empty={list.rows.length === 0}
-  chosen={opened !== null}
-  detailEmpty="Выберите HR в списке слева"
-  onlistscroll={list.scrolled}
+<!-- Негодный ник отбивает мост, и его отказ приезжает плашкой — потому здесь
+     и не проверяется ничего сверх общего заслона. -->
+<ContactsTab
+  kind="hr"
+  {words}
+  {list}
+  save={(draft) => ask('hr.create', { ...draft })}
+  {say}
+  {events}
+  {open}
+  {onopened}
 >
-  {#snippet toolbar()}
-    <SearchBox value={list.search} placeholder={FORM.searchHint} onsearch={list.find} />
-    <AddButton title="Добавить HR" icon={FORM.icon} onclick={() => (newCard.adding = true)} />
+  {#snippet row(person, at)}
+    <PersonRow {person} selected={at.selected} onpick={at.pick} />
   {/snippet}
 
-  {#snippet emptyNote()}
-    {#if list.search}
-      Никого не найдено по запросу «{list.search}».
-    {:else}
-      HR'ов пока нет.<br />Нажмите кнопку добавления вверху, чтобы создать первого.
-    {/if}
-  {/snippet}
-
-  {#snippet items()}
-    {#each list.rows as person (person.id)}
-      <PersonRow
-        {person}
-        selected={opened === person.id}
-        onpick={() => (opened = person.id)}
-      />
-    {/each}
-  {/snippet}
-
-  {#snippet detail()}
+  {#snippet pane(personId, close)}
     <PersonCard
       {ask}
       {say}
       {events}
       {oncompany}
       {onvacancy}
-      personId={opened}
-      onclose={() => (opened = null)}
+      {personId}
+      onclose={close}
       onchanged={() => list.again()}
     />
   {/snippet}
-</ContactsPanes>
-
-{#if newCard.adding}
-  <NewCardDialog
-    kind="hr"
-    draft={newCard.draft}
-    busy={newCard.saving}
-    ready={newCard.ready}
-    onconfirm={() => newCard.create()}
-    oncancel={() => (newCard.adding = false)}
-  />
-{/if}
+</ContactsTab>

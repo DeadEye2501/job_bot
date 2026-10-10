@@ -9,7 +9,7 @@
   import { toggled, without } from '$state/chosen.js';
   import { experienceGoing } from '$state/experience.js';
   import { oneWrite } from '$state/one_write.js';
-  import { plural } from '$state/words.js';
+  import { counted } from '$state/words.js';
 
   let { ask } = $props();
 
@@ -112,8 +112,7 @@
     <div class="page-title">
       Профиль / Experience
       <span class="page-title-meta">
-        {rows.length}
-        {plural(rows.length, 'место', 'места', 'мест')} работы
+        {counted(rows.length, 'место', 'места', 'мест')} работы
       </span>
     </div>
   </div>

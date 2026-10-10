@@ -3,7 +3,7 @@
 // Чистые функции: записи приходят доводами, наружу уходят строки и списки.
 // Ни моста, ни разметки этот файл не знает.
 
-import { padded } from './dates.js';
+import { clock, padded } from './dates.js';
 
 /** Уровни на пилюлях — от беды к мелочи. Порядок постоянный: по нему человек
  *  метит в нужную пилюлю, не читая подписей.
@@ -49,7 +49,7 @@ export function logTime(epochSec) {
   if (epochSec === null || epochSec === undefined) return '';
   const at = new Date(epochSec * 1000);
   const three = String(at.getMilliseconds()).padStart(3, '0');
-  return `${padded(at.getHours())}:${padded(at.getMinutes())}:${padded(at.getSeconds())}.${three}`;
+  return `${clock(at)}:${padded(at.getSeconds())}.${three}`;
 }
 
 /** Каким цветом показать уровень записи.

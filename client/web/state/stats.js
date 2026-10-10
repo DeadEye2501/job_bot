@@ -6,7 +6,7 @@
 import { WEEKDAYS } from './calendar.js';
 import { channelName } from './channels.js';
 import { fillPercent } from './chosen.js';
-import { isoDay } from './dates.js';
+import { dayIso } from './dates.js';
 import { blankFilter } from './vacancy_filter.js';
 
 /** Сроки, за которые считают, — от короткого к длинному.
@@ -264,7 +264,7 @@ export function sliceTarget(status, period, now) {
   return {
     ...target,
     datePreset: 'range',
-    dateFrom: isoDay(from.getFullYear(), from.getMonth() + 1, from.getDate()),
+    dateFrom: dayIso(from),
   };
 }
 

@@ -5,7 +5,7 @@
 
 import { fillPercent } from './chosen.js';
 import { matching } from './search.js';
-import { plural } from './words.js';
+import { counted } from './words.js';
 
 const NO_CATEGORY = 'Общее';
 
@@ -65,7 +65,7 @@ export function levelPercent(level) {
 export function countNote(skills, categories) {
   return (
     `${skills} навыков, ` +
-    `${categories} ${plural(categories, 'категория', 'категории', 'категорий')}`
+    counted(categories, 'категория', 'категории', 'категорий')
   );
 }
 

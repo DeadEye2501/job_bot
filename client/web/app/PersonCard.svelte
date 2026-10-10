@@ -6,54 +6,38 @@
 
   import Avatar from '$components/Avatar.svelte';
   import BlacklistChip from '$components/BlacklistChip.svelte';
+  import CardActions from '$components/CardActions.svelte';
   import CardHandle from '$components/CardHandle.svelte';
   import CardPane from '$components/CardPane.svelte';
-  import ContactActions from '$components/ContactActions.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
+  import MenuItem from '$components/MenuItem.svelte';
   import MergeDialog from '$components/MergeDialog.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import NotesField from '$components/NotesField.svelte';
-  import { living } from '$state/alive.js';
   import { cardActions } from '$state/card_actions.svelte.js';
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
   import { cardNotes } from '$state/card_notes.js';
-  import { cardRead } from '$state/card_read.js';
   import { cardSave } from '$state/card_save.js';
   import { sendBlock } from '$state/chat.js';
-  import { miniRead } from '$state/mini_read.js';
+  import { paneCard } from '$state/pane_card.svelte.js';
   import { personCandidate, personHead, personName } from '$state/people.js';
   import { atHandle } from '$state/telegram.js';
-  import { plural } from '$state/words.js';
+  import { counted } from '$state/words.js';
 
   import PersonChat from './PersonChat.svelte';
 
   let { ask, say, events, personId, oncompany, onvacancy, onclose, onchanged } = $props();
 
-  let card = $state(null);
-  let vacancies = $state([]);
-  let trouble = $state('');
-
-  // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
-  // человека в ней переключают нажатием по соседней строке — ответ про
-  // прежнего, лёгший поверх свежего, показал бы его числа под новым именем.
-  const alive = living();
-  const loadVacancies = miniRead({
-    ask: (...args) => ask(...args),
-    alive: () => alive.now,
-    method: 'hr.vacancies',
-    payload: (id) => ({ hr_id: id }),
-    key: 'vacancies',
-    show: (rows) => (vacancies = rows),
-  });
-
-  const readCard = cardRead({
+  const pane = paneCard({
     ask: (...args) => ask(...args),
     method: 'hr.detail',
     trouble: 'Не удалось прочитать карточку',
-    alive: () => alive.now,
-    show: (now) => ({ card, trouble } = now),
+    lists: {
+      vacancies: { method: 'hr.vacancies', payload: (id) => ({ hr_id: id }), key: 'vacancies' },
+    },
   });
+  const card = $derived(pane.card);
 
   const dropCard = cardFinish({
     ask: (...args) => ask(...args),
@@ -76,7 +60,7 @@
   const saveField = cardSave({
     ask: (...args) => ask(...args),
     method: 'hr.update',
-    reread: () => readCard(personId),
+    reread: () => pane.read(personId),
     onchanged: () => onchanged(),
   });
 
@@ -84,7 +68,7 @@
     ask: (...args) => ask(...args),
     method: 'hr.update',
     payload: (id, text) => ({ hr_id: id, notes: text }),
-    alive: () => alive.now,
+    alive: () => pane.alive.now,
     onchanged: () => onchanged(),
   });
 
@@ -92,7 +76,7 @@
     block: (id) => ask('hr.block', id),
     unblock: (id) => ask('hr.unblock', id),
     say: (text) => say(text),
-    reread: () => readCard(personId),
+    reread: () => pane.read(personId),
     onchanged: () => onchanged(),
   });
 
@@ -111,21 +95,10 @@
     return now === null ? null : now.hrs;
   }
 
-  $effect(() => {
-    const id = personId;
-    return alive.entered(() => {
-      // Показанное прежним человеком уходит сразу: панель одна, и его числа под
-      // новым именем читались бы как числа нового.
-      card = null;
-      trouble = '';
-      vacancies = [];
-      readCard(id);
-      loadVacancies(id);
-    });
-  });
+  $effect(() => pane.enter(personId));
 </script>
 
-<CardPane {trouble} ready={!!card}>
+<CardPane trouble={pane.trouble} ready={!!card}>
   <div class="cnt-det-head">
     <Avatar avatar={card.avatar} name={card.name} icon="person" />
 
@@ -157,18 +130,19 @@
         {#if card.unread_count}
           <span class="info-chip cnt-det-meta-chip unread">
             <span class="material-symbols-outlined">mail</span>
-            {card.unread_count}
-            {plural(card.unread_count, 'непрочитанное', 'непрочитанных', 'непрочитанных')}
+            {counted(card.unread_count, 'непрочитанное', 'непрочитанных', 'непрочитанных')}
           </span>
         {/if}
         <BlacklistChip value={card.blacklist_value} />
       </div>
     </div>
 
-    <ContactActions
-      mergeLabel="Слить с другим HR"
+    {#snippet lead(close)}
+      <MenuItem icon="merge" label="Слить с другим HR" {close} onpick={() => (acts.asking = 'merge')} />
+    {/snippet}
+    <CardActions
+      {lead}
       blocked={!!card.blacklist_value}
-      onmerge={() => (acts.asking = 'merge')}
       onblock={() => blocking.block(personId)}
       onunblock={() => blocking.unblock(personId)}
       ondelete={() => (acts.asking = 'delete')}
@@ -199,7 +173,7 @@
     hrId={card.hr_id}
     blocked={sendBlock(card)}
     onread={async () => {
-      await readCard(personId);
+      await pane.read(personId);
       onchanged();
     }}
   />
@@ -218,7 +192,7 @@
     {/key}
   </div>
 
-  <MiniVacancies {vacancies} empty="Связанных вакансий нет." onpick={onvacancy} />
+  <MiniVacancies vacancies={pane.rows.vacancies} empty="Связанных вакансий нет." onpick={onvacancy} />
 </CardPane>
 
 {#if acts.asking === 'delete'}

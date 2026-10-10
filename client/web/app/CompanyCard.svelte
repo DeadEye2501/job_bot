@@ -7,60 +7,40 @@
 
   import Avatar from '$components/Avatar.svelte';
   import BlacklistChip from '$components/BlacklistChip.svelte';
+  import CardActions from '$components/CardActions.svelte';
   import CardPane from '$components/CardPane.svelte';
-  import ContactActions from '$components/ContactActions.svelte';
   import ChipList from '$components/ChipList.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
+  import MenuItem from '$components/MenuItem.svelte';
   import MergeDialog from '$components/MergeDialog.svelte';
   import MiniPeople from '$components/MiniPeople.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import NotesField from '$components/NotesField.svelte';
-  import { living } from '$state/alive.js';
   import { cardActions } from '$state/card_actions.svelte.js';
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
   import { cardNotes } from '$state/card_notes.js';
-  import { cardRead } from '$state/card_read.js';
   import { cardSave } from '$state/card_save.js';
   import { companyCandidate, companyLine, companyTitle } from '$state/companies.js';
-  import { miniRead } from '$state/mini_read.js';
+  import { paneCard } from '$state/pane_card.svelte.js';
   import { siteHref } from '$state/site.js';
 
   let { ask, say, companyId, onperson, onvacancy, onclose, onchanged } = $props();
 
-  let card = $state(null);
-  let people = $state([]);
-  let vacancies = $state([]);
-  let trouble = $state('');
-
-  // Свой счёт попыток на каждый вопрос: панель живёт одна на всю вкладку, и
-  // компанию в ней переключают нажатием по соседней строке — ответ про
-  // прежнюю, лёгший поверх свежего, показал бы её числа под новым именем.
-  const alive = living();
-  const loadPeople = miniRead({
-    ask: (...args) => ask(...args),
-    alive: () => alive.now,
-    method: 'companies.people',
-    payload: (id) => id,
-    key: 'hrs',
-    show: (rows) => (people = rows),
-  });
-  const loadVacancies = miniRead({
-    ask: (...args) => ask(...args),
-    alive: () => alive.now,
-    method: 'companies.vacancies',
-    payload: (id) => ({ company_id: id }),
-    key: 'vacancies',
-    show: (rows) => (vacancies = rows),
-  });
-
-  const readCard = cardRead({
+  const pane = paneCard({
     ask: (...args) => ask(...args),
     method: 'companies.detail',
     trouble: 'Не удалось прочитать компанию',
-    alive: () => alive.now,
-    show: (now) => ({ card, trouble } = now),
+    lists: {
+      people: { method: 'companies.people', payload: (id) => id, key: 'hrs' },
+      vacancies: {
+        method: 'companies.vacancies',
+        payload: (id) => ({ company_id: id }),
+        key: 'vacancies',
+      },
+    },
   });
+  const card = $derived(pane.card);
 
   const dropCard = cardFinish({
     ask: (...args) => ask(...args),
@@ -83,7 +63,7 @@
   const saveField = cardSave({
     ask: (...args) => ask(...args),
     method: 'companies.update',
-    reread: () => readCard(companyId),
+    reread: () => pane.read(companyId),
     onchanged: () => onchanged(),
   });
 
@@ -91,7 +71,7 @@
     ask: (...args) => ask(...args),
     method: 'companies.update',
     payload: (id, text) => ({ company_id: id, notes: text }),
-    alive: () => alive.now,
+    alive: () => pane.alive.now,
     onchanged: () => onchanged(),
   });
 
@@ -100,7 +80,7 @@
     unblock: (id) => ask('companies.unblock', id),
     female: true,
     say: (text) => say(text),
-    reread: () => readCard(companyId),
+    reread: () => pane.read(companyId),
     onchanged: () => onchanged(),
   });
 
@@ -131,23 +111,10 @@
     return now === null ? null : now.companies;
   }
 
-  $effect(() => {
-    const id = companyId;
-    return alive.entered(() => {
-      // Показанное прежней компанией уходит сразу: панель одна, и её числа под
-      // новым именем читались бы как числа новой.
-      card = null;
-      trouble = '';
-      people = [];
-      vacancies = [];
-      readCard(id);
-      loadPeople(id);
-      loadVacancies(id);
-    });
-  });
+  $effect(() => pane.enter(companyId));
 </script>
 
-<CardPane {trouble} ready={!!card}>
+<CardPane trouble={pane.trouble} ready={!!card}>
   <div class="cnt-det-head">
     <Avatar icon="domain" />
 
@@ -174,10 +141,12 @@
       </div>
     </div>
 
-    <ContactActions
-      mergeLabel="Слить с другой компанией"
+    {#snippet lead(close)}
+      <MenuItem icon="merge" label="Слить с другой компанией" {close} onpick={() => (acts.asking = 'merge')} />
+    {/snippet}
+    <CardActions
+      {lead}
       blocked={!!card.blacklist_value}
-      onmerge={() => (acts.asking = 'merge')}
       onblock={() => blocking.block(companyId)}
       onunblock={() => blocking.unblock(companyId)}
       ondelete={() => (acts.asking = 'delete')}
@@ -216,9 +185,9 @@
     {/key}
   </div>
 
-  <MiniPeople {people} empty="HR-контактов нет." onpick={onperson} />
+  <MiniPeople people={pane.rows.people} empty="HR-контактов нет." onpick={onperson} />
 
-  <MiniVacancies {vacancies} empty="Связанных вакансий нет." onpick={onvacancy} />
+  <MiniVacancies vacancies={pane.rows.vacancies} empty="Связанных вакансий нет." onpick={onvacancy} />
 </CardPane>
 
 {#if acts.asking === 'delete'}

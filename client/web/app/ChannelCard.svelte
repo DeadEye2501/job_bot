@@ -4,16 +4,16 @@
   // Стоит правой панелью рядом со списком: канал правят, глядя на его же числа,
   // и уводить ради этого с экрана значило бы терять из виду соседей по списку.
 
-  import ActionsMenu from '$components/ActionsMenu.svelte';
   import Avatar from '$components/Avatar.svelte';
   import BlacklistChip from '$components/BlacklistChip.svelte';
-  import BlacklistMenuItem from '$components/BlacklistMenuItem.svelte';
+  import CardActions from '$components/CardActions.svelte';
   import CardHandle from '$components/CardHandle.svelte';
   import CardPane from '$components/CardPane.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import MenuItem from '$components/MenuItem.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import SourceStats from '$components/SourceStats.svelte';
+  import { cardActions } from '$state/card_actions.svelte.js';
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
   import { channelName, pollBlock } from '$state/channels.js';
@@ -21,8 +21,6 @@
   import { sourceCard } from '$state/source_card.svelte.js';
 
   let { ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged } = $props();
-
-  let asking = $state(false);
 
   // Каналов с тысячей вакансий хватает, и разом такой список не рисуется.
   const source = sourceCard({
@@ -41,6 +39,9 @@
     onchanged: () => onchanged(),
     onclose: () => onclose(),
   });
+
+  // Слияния у канала нет: из общих действий карточки ему нужно одно удаление.
+  const acts = cardActions({ id: () => channelId, dropCard, mergeCard: null });
 
   const blocking = cardBlocking({
     block: (id) => ask('channels.block', id),
@@ -86,11 +87,6 @@
     );
   }
 
-  async function drop() {
-    asking = false;
-    await dropCard(channelId);
-  }
-
   $effect(() => source.watch(events, channelId));
 </script>
 
@@ -110,41 +106,31 @@
       </div>
     </div>
 
-    <ActionsMenu>
-      {#snippet children(close)}
-        <MenuItem
-          icon="refresh"
-          label="Прогнать сейчас"
-          title={pollTip || 'Запустить поллинг этого канала'}
-          disabled={!!pollTip}
-          {close}
-          onpick={pollNow}
-        />
-        <MenuItem
-          icon="restart_alt"
-          label="Сбросить курсор"
-          title="Сбросить last_processed_msg_id"
-          {close}
-          onpick={resetCursor}
-        />
-        <BlacklistMenuItem
-          blocked={!!card.blacklist_value}
-          {close}
-          onblock={() => blocking.block(channelId)}
-          onunblock={() => blocking.unblock(channelId)}
-        />
-
-        <div class="menu-line"></div>
-
-        <MenuItem
-          icon="delete"
-          label="Удалить канал"
-          danger
-          {close}
-          onpick={() => (asking = true)}
-        />
-      {/snippet}
-    </ActionsMenu>
+    {#snippet lead(close)}
+      <MenuItem
+        icon="refresh"
+        label="Прогнать сейчас"
+        title={pollTip || 'Запустить поллинг этого канала'}
+        disabled={!!pollTip}
+        {close}
+        onpick={pollNow}
+      />
+      <MenuItem
+        icon="restart_alt"
+        label="Сбросить курсор"
+        title="Сбросить last_processed_msg_id"
+        {close}
+        onpick={resetCursor}
+      />
+    {/snippet}
+    <CardActions
+      {lead}
+      blocked={!!card.blacklist_value}
+      deleteLabel="Удалить канал"
+      onblock={() => blocking.block(channelId)}
+      onunblock={() => blocking.unblock(channelId)}
+      ondelete={() => (acts.asking = 'delete')}
+    />
   </div>
 
   <SourceStats stats={card.stats} empty="Из этого канала ещё не пришло вакансий" />
@@ -157,11 +143,11 @@
   />
 </CardPane>
 
-{#if asking}
+{#if acts.asking === 'delete'}
   <ConfirmDialog
     message={`Удалить «${shown.name}»?\n\nСвязанные вакансии останутся, но без привязки к каналу. Действие необратимо.`}
     confirmLabel="Удалить"
-    onconfirm={drop}
-    oncancel={() => (asking = false)}
+    onconfirm={() => acts.drop()}
+    oncancel={() => (acts.asking = null)}
   />
 {/if}

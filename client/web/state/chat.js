@@ -4,7 +4,7 @@
 // списки. «Сегодня» тоже довод — без него эти функции нельзя было бы проверить,
 // не подменяя часы всей странице.
 
-import { padded, shortDate } from './dates.js';
+import { clock, dayIso, shortDate } from './dates.js';
 
 /** Разложить письма по дням, сохранив их порядок.
  *
@@ -19,7 +19,7 @@ export function byDays(messages, now) {
   for (const one of messages) {
     if (!one.sent_at) continue;
     const at = new Date(one.sent_at);
-    const key = `${at.getFullYear()}-${at.getMonth()}-${at.getDate()}`;
+    const key = dayIso(at);
     const last = days[days.length - 1];
     if (last && last.key === key) last.messages.push(one);
     else days.push({ key, day: dayLabel(at, now), messages: [one] });
@@ -41,8 +41,7 @@ export function attachmentKind(message) {
 
 /** Часы и минуты письма. Ведущий ноль обязателен: «9:5» читается как сломанное. */
 export function chatTime(sentAt) {
-  const at = new Date(sentAt);
-  return `${padded(at.getHours())}:${padded(at.getMinutes())}`;
+  return clock(new Date(sentAt));
 }
 
 /** Дошло ли своё письмо до собеседника.
@@ -99,17 +98,9 @@ export function sendBlock(card) {
  * подписаны даты в других тесных местах окна.
  */
 function dayLabel(at, now) {
-  if (sameDay(at, now)) return 'Сегодня';
+  if (dayIso(at) === dayIso(now)) return 'Сегодня';
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (sameDay(at, yesterday)) return 'Вчера';
+  if (dayIso(at) === dayIso(yesterday)) return 'Вчера';
   return shortDate(at, now);
-}
-
-function sameDay(one, other) {
-  return (
-    one.getFullYear() === other.getFullYear()
-    && one.getMonth() === other.getMonth()
-    && one.getDate() === other.getDate()
-  );
 }
