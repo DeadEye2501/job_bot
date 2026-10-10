@@ -6,7 +6,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.hosts import normalize_host, owning_host, owning_hosts
-from backend.models import Aggregator, Application, TrashEvent, Vacancy, VacancyContact
+from backend.models import Aggregator, Application, TrashEvent, Vacancy
 from backend.payloads import ChannelStats
 from backend.models.settings import AGGREGATOR_KIND
 from backend.repository.blacklist_marks import BlacklistMark
@@ -99,22 +99,6 @@ async def barred_host_of(session: AsyncSession, urls: list[str]) -> str | None:
     if not marked:
         return None
     return next((host for host in (owning_host(url, marked) for url in urls) if host), None)
-
-
-async def vacancy_barred_host(
-    session: AsyncSession, vacancy_id: int, found: list[str]
-) -> str | None:
-    """Отмеченный отсевом хост, на который ведёт адрес вакансии или любой её контакт.
-
-    `found` — контакты, найденные идущим разбором: в базу они ложатся после
-    приговора, и без них первый разбор поста пропустил бы ссылку на сайт из
-    отсева.
-    """
-    source_url = await session.scalar(select(Vacancy.source_url).where(Vacancy.id == vacancy_id))
-    contacts = (await session.scalars(
-        select(VacancyContact.value).where(VacancyContact.vacancy_id == vacancy_id)
-    )).all()
-    return await barred_host_of(session, [url for url in (source_url, *contacts, *found) if url])
 
 
 async def list_aggregators_with_counts(

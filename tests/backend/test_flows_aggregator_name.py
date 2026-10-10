@@ -68,6 +68,17 @@ async def test_an_unreachable_site_does_not_block_creation(monkeypatch, session_
     assert (await only_row(session_factory, Aggregator)).name == "Example"
 
 
+async def test_an_address_the_client_cannot_even_build_does_not_block_creation(
+    monkeypatch, session_factory
+):
+    """Негодный адрес клиент отвергает ещё до сети, и не ошибкой HTTP."""
+    serve_home(monkeypatch, home_page())
+
+    row, status = await create_named_aggregator(session_factory, "exa\tmple.com", None)
+
+    assert (status, row.avatar) == ("created", None)
+
+
 _ICON = b"\x89PNG\r\n\x1a\n-icon-"
 
 
@@ -87,6 +98,16 @@ async def test_the_icon_the_page_declares_becomes_the_avatar(monkeypatch, sessio
 
 async def test_without_a_declared_icon_the_site_favicon_is_taken(monkeypatch, session_factory):
     serve_home(monkeypatch, home_page(), {"/favicon.ico": _image(b"ico")})
+
+    row, _ = await create_named_aggregator(session_factory, "example.com", None)
+
+    assert row.avatar == b"ico"
+
+
+async def test_a_broken_icon_address_gives_way_to_the_next_one(monkeypatch, session_factory):
+    """Адрес значка пишет сайт, и негодный клиент отвергает ещё до сети."""
+    head = '<link rel="icon" href="https://example.com:abc/i.png">'
+    serve_home(monkeypatch, home_page(head=head), {"/favicon.ico": _image(b"ico")})
 
     row, _ = await create_named_aggregator(session_factory, "example.com", None)
 

@@ -57,7 +57,7 @@ async def _site(host: str) -> tuple[site_home.SiteHints, bytes | None]:
     async with site_home.make_client() as client:
         try:
             home = await site_home.fetch_home(client, host)
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, httpx.InvalidURL) as e:
             logger.info("site_name: главная %s не отдалась: %s: %s", host, type(e).__name__, e)
             return site_home.SiteHints(), None
         return home.hints, await site_home.fetch_icon(client, home.icons)

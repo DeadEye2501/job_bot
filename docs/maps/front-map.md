@@ -116,7 +116,7 @@
 - принимает: ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged
 - берёт: ./VacancyContactsSection.svelte, ./VacancyLinks.svelte
 
-### app/VacancyContactsSection.svelte (48)
+### app/VacancyContactsSection.svelte (54)
 - —
 - принимает: vacancyId, contacts, ask, onopen, onchanged
 
@@ -1531,7 +1531,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 89 файлов
+## tests — 90 файлов
 
 ### tests/aggregators.test.js (115)
 - —
@@ -1569,9 +1569,9 @@ body, html, button, body, .material-symbols-outlined
 ### tests/bridge.test.js (161)
 - —
 
-### tests/bridge_stub.js (41)
+### tests/bridge_stub.js (48)
 - * Мост, отвечающий заготовленным по очереди; зовы копятся в `asked`.
-- отдаёт: replying, rereading, tracing
+- отдаёт: held, replying, rereading, tracing
 
 ### tests/calendar.test.js (60)
 - —
@@ -1636,8 +1636,8 @@ body, html, button, body, .material-symbols-outlined
 ### tests/footer.test.js (176)
 - * Нажатие мышью: место на дорожке шириной 300 точек.
 
-### tests/fresh.test.js (71)
-- * Ответ, который держат в руке: отдают его, когда скажут.
+### tests/fresh.test.js (65)
+- —
 
 ### tests/keys.test.js (97)
 - —
@@ -1783,6 +1783,9 @@ body, html, button, body, .material-symbols-outlined
 
 ### tests/vacancy_contacts.test.js (41)
 - —
+
+### tests/vacancy_contacts_live.test.js (92)
+- * Карточка вакансии №7 с контактом; удаление отвечает обещанием `removed`.
 
 ### tests/vacancy_detail.js (38)
 - * Карточка вакансии от моста; названное в `extra` перебивает заготовку.

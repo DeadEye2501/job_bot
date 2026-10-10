@@ -4,13 +4,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { freshAnswer } from '../state/fresh.js';
-
-/** Ответ, который держат в руке: отдают его, когда скажут. */
-function held(value) {
-  let release;
-  const promise = new Promise((done) => (release = done));
-  return { promise, give: () => release(value) };
-}
+import { held } from './bridge_stub.js';
 
 describe('свежий ответ моста', () => {
   it('единственный ответ доезжает до экрана', async () => {

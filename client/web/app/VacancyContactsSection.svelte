@@ -14,8 +14,14 @@
 
   let { vacancyId, contacts, ask, onopen, onchanged } = $props();
 
+  /** Отдать карточке список из ответа — только своей вакансии: ответ о
+   *  прежней, приехавший после выбора другой, встал бы под неё. */
+  function take(done) {
+    if (done.vacancy_id === vacancyId) onchanged(done.contacts);
+  }
+
   const newContact = contactAdding({
-    list: { again: (done) => onchanged(done.contacts) },
+    list: { again: take },
     form: NEW_CARD.contact,
     save: (draft) => call('vacancies.add_contact', { vacancy_id: vacancyId, value: draft.trim() }),
     say: () => {},
@@ -23,7 +29,7 @@
 
   async function remove(contactId) {
     const done = await ask('vacancies.delete_contact', { contact_id: contactId });
-    if (done !== null) onchanged(done.contacts);
+    if (done !== null) take(done);
   }
 </script>
 

@@ -111,13 +111,13 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
 
     monkeypatch.setattr(apply, "try_auto_send", try_auto_send)
     monkeypatch.setattr("backend.flows.parse.parse_vacancy", parse_vacancy)
-    monkeypatch.setattr("backend.flows.parse.classify_post_genre", classify_post_genre)
-    monkeypatch.setattr("backend.flows.parse.validate_role_fit", asking_fit("роль"))
+    monkeypatch.setattr("backend.flows.fit_refusal.classify_post_genre", classify_post_genre)
+    monkeypatch.setattr("backend.flows.fit_refusal.validate_role_fit", asking_fit("роль"))
     monkeypatch.setattr(
-        "backend.flows.parse.validate_language_fit", asking_fit("языки")
+        "backend.flows.fit_refusal.validate_language_fit", asking_fit("языки")
     )
     monkeypatch.setattr(
-        "backend.flows.parse.validate_preferences_fit", asking_fit("предпочтения")
+        "backend.flows.fit_refusal.validate_preferences_fit", asking_fit("предпочтения")
     )
 
 

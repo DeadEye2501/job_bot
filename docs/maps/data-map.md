@@ -729,6 +729,10 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `backend/flows/fit_refusal.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
 ### `backend/flows/ghosting.py`
 
 - `logger` = `logging.getLogger(__name__)`
