@@ -1,0 +1,70 @@
+"""Цикл откликателя: по каждой вакансии первый доступный способ, пока один не удастся."""
+
+import time
+
+import pytest
+
+from backend.applying import run
+from backend.applying.result import Missed, TelegramClosed
+from backend.domain.apply_order import Way
+
+
+@pytest.fixture
+def executors(monkeypatch):
+    """Исполнители-подделки: ответ по способу, журнал вызовов."""
+    calls, answers = [], {}
+
+    def fake(method):
+        async def execute(kit, vacancy_id, way):
+            calls.append((vacancy_id, way.method))
+            return answers.get((vacancy_id, method), "applied")
+        return execute
+
+    monkeypatch.setattr(run, "EXECUTORS", {m: fake(m) for m in
+                        ("telegram", "aggregator", "form", "email")})
+    return calls, answers
+
+
+async def test_each_vacancy_gets_its_first_way(executors, two_vacancies, kit):
+    calls, _ = executors
+    await run.apply_vacancies(kit, [v.id for v in two_vacancies])
+    assert [m for _, m in calls] == ["telegram", "telegram"]
+
+
+async def test_a_missed_way_hands_over_to_the_next(executors, two_vacancies, kit):
+    calls, answers = executors
+    first = two_vacancies[0].id
+    answers[(first, "telegram")] = Missed("нет адресата")
+    await run.apply_vacancies(kit, [first])
+    assert calls == [(first, "telegram"), (first, "email")]
+
+
+async def test_a_telegram_ban_closes_telegram_for_the_rest_of_the_run(
+        executors, two_vacancies, kit):
+    calls, answers = executors
+    first, second = (v.id for v in two_vacancies)
+    answers[(first, "telegram")] = Missed("FloodWait", TelegramClosed(until=time.time() + 600))
+    await run.apply_vacancies(kit, [first, second])
+    assert calls == [(first, "telegram"), (first, "email"), (second, "email")]
+
+
+async def test_a_crashed_way_hands_over_to_the_next(executors, two_vacancies, kit, monkeypatch):
+    """Сбой приложения в одном способе — промах этого способа, а не конец прогона."""
+    calls, _ = executors
+    first, second = (v.id for v in two_vacancies)
+
+    async def crash(kit, vacancy_id, way):
+        calls.append((vacancy_id, way.method))
+        raise RuntimeError("сбой")
+
+    monkeypatch.setitem(run.EXECUTORS, "telegram", crash)
+    await run.apply_vacancies(kit, [first, second])
+    assert calls == [(first, "telegram"), (first, "email"), (second, "telegram"), (second, "email")]
+
+
+async def test_a_chosen_way_is_tried_alone(executors, two_vacancies, kit):
+    calls, answers = executors
+    first = two_vacancies[0].id
+    answers[(first, "email")] = Missed("сервер не принял")
+    outcome = await run.apply_chosen(kit, first, Way("email", "hr@company.test", None))
+    assert isinstance(outcome, Missed) and calls == [(first, "email")]
