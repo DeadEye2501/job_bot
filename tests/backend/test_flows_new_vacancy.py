@@ -16,12 +16,12 @@ import httpx
 import pytest
 
 from adapters import telegraph
-from backend.flows import parse as parse_mod
 from backend.flows import ingest, rerun
 from backend.flows import intake as intake_flow
 from backend.flows import embeddings
 from backend.models import TelegramChannel, Vacancy, VacancyEvent
 from backend.payloads import ChannelPost
+from tests.backend.fixtures.flows import similar_by_hand
 from tests.backend.fixtures.parse_stub import parse_into
 from tests.backend.fixtures.rerun import WithMessages
 from tests.dbio import all_rows, only_row, put
@@ -44,8 +44,7 @@ def parses(monkeypatch):
 
     Общим домом (`fixtures/parse_stub`), а не своим телом: разъедься у копий
     умолчание `allow_delete`, проверка про запрет зеленела бы на подделке, а
-    не на коде. Своё тело осталось у одной проверки — той, где разбор обязан
-    сорваться на первой строке и уцелеть на второй.
+    не на коде.
     """
     calls: list[tuple] = []
     parse_into(monkeypatch, calls)
@@ -211,7 +210,21 @@ async def test_an_unfinished_vacancy_is_picked_up_later(parses,
 
     assert await pipeline.recover_orphan_vacancies() == 1
     assert parses == [(1, "текст", "", True)]
-    assert client.asked == []
+    assert client.asked == [] and pipeline.applied == [[1]]
+
+
+async def test_a_new_post_goes_from_the_parse_to_the_applier(
+    parses, one_vector, make_pipeline, session_factory, monkeypatch
+):
+    await put(session_factory, channel_row(username="jobs"))
+    channel = await only_row(session_factory, TelegramChannel)
+    pipeline = await make_pipeline()
+    similar_by_hand(pipeline, monkeypatch)
+
+    await ingest.ingest_post(pipeline, channel.id, "jobs", post(42, text="Ищем Python-разработчика"))
+
+    (row,) = await all_rows(session_factory, Vacancy)
+    assert pipeline.applied == [[row.id]]
 
 
 async def test_an_orphan_whose_article_arrived_is_judged_in_full(monkeypatch,
@@ -336,24 +349,15 @@ async def test_one_broken_orphan_does_not_stop_the_rest(monkeypatch,
     Оборот идёт по всем недоразобранным сразу; потерять из-за одной строки
     все остальные значило бы оставить их полуготовыми до следующего оборота.
     """
-    await put(
-        session_factory,
-        vacancy_row(title=None, is_parsed=False, raw_text="первая"),
-        vacancy_row(title=None, is_parsed=False, raw_text="вторая"),
-    )
+    first = vacancy_row(title=None, is_parsed=False, raw_text="первая")
+    await put(session_factory, first,
+              vacancy_row(title=None, is_parsed=False, raw_text="вторая"))
     pipeline = await make_pipeline()
-    done: list[str] = []
-
-    async def parse(pipeline, vacancy_id, text, username, allow_delete=True):
-        if text == "первая":
-            raise RuntimeError("не разобралось")
-        done.append(text)
-        return True
-
-    monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
+    calls: list[tuple] = []
+    parse_into(monkeypatch, calls, fails={first.id})
 
     assert await pipeline.recover_orphan_vacancies() == 1
-    assert done == ["вторая"]
+    assert [text for _, text, *_ in calls] == ["вторая"]
 
 
 async def test_the_window_hears_about_the_recovery(parses, make_pipeline, session_factory):

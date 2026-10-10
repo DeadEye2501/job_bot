@@ -9,22 +9,17 @@
 карточка показала бы ноль баллов рядом с прежними тегами. Поэтому пустой
 разбор стек не затирает.
 
-Отклик уходит сам только у прошедшей всё вакансии и только если пользователь
-включил автоотправку. Попытка записывается в ленту в любом случае: иначе,
-глядя через месяц на новую вакансию с резолвленным HR, не понять, почему
-отклик не ушёл.
+Разбор сам не откликается: отклик — дело откликателя, которому отбор передаёт
+вакансию после вердикта (`flows/handover`).
 """
 
 import logging
 from dataclasses import replace
 
 from backend.flows import parse
-from backend.flows import apply
-import pytest
 
 from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
 from backend.payloads import FitValidation
-from backend.repository.vacancy_status import mark_vacancy_applied
 from tests.dbio import all_rows, only_row, put
 from tests.factories import app_setting_row, company_row, parsed_vacancy
 
@@ -209,136 +204,6 @@ async def test_the_timeline_records_what_was_filled(parsing, session_factory):
     }
 
 
-async def test_a_fitting_vacancy_gets_an_application_sent(parsing):
-    """Прошедшей всё вакансии отклик уходит сам."""
-    pipeline, vacancy = parsing
-    pipeline.parsed = parsed_vacancy(
-        title="Python-разработчик", stack_required=["Python"], hr_contact="@maria"
-    )
-    await pipeline.rs.set_app("auto_apply", "true")
-
-    await parse.parse_and_update_vacancy(pipeline, 
-        vacancy.id, "текст", "jobs", allow_delete=False
-    )
-
-    assert pipeline.asked_to_send == [vacancy.id]
-
-
-async def test_auto_apply_switched_off_sends_nothing(parsing):
-    """С выключенной автоотправкой отклик сам не уходит."""
-    pipeline, vacancy = parsing
-    pipeline.parsed = parsed_vacancy(
-        title="Python-разработчик", stack_required=["Python"], hr_contact="@maria"
-    )
-    await pipeline.rs.set_app("auto_apply", "false")
-
-    await parse.parse_and_update_vacancy(pipeline, 
-        vacancy.id, "текст", "jobs", allow_delete=False
-    )
-
-    assert pipeline.asked_to_send == []
-
-
-async def test_an_unfit_vacancy_gets_no_application(parsing):
-    """Непригодной вакансии отклик не уходит даже при включённой автоотправке."""
-    pipeline, vacancy = parsing
-    pipeline.verdict = FitValidation(verdict="reject", reason="нужен C++")
-    pipeline.parsed = parsed_vacancy(
-        title="Python-разработчик", stack_required=["Python"], hr_contact="@maria"
-    )
-    await pipeline.rs.set_app("auto_apply", "true")
-
-    await parse.parse_and_update_vacancy(pipeline, 
-        vacancy.id, "текст", "jobs", allow_delete=False
-    )
-
-    assert pipeline.asked_to_send == []
-
-
-async def test_a_vacancy_without_an_hr_gets_no_application(parsing):
-    """Вакансии без разысканного HR отклик не уходит: писать некому."""
-    pipeline, vacancy = parsing
-    await pipeline.rs.set_app("auto_apply", "true")
-
-    await parse.parse_and_update_vacancy(pipeline, 
-        vacancy.id, "текст", "jobs", allow_delete=False
-    )
-
-    assert pipeline.asked_to_send == []
-
-
-@pytest.mark.parametrize(
-    ("outcome", "reason"),
-    [
-        pytest.param(True, "sent", id="ушло"),
-        pytest.param(False, "cv_missing", id="не ушло"),
-    ],
-)
-async def test_every_attempt_is_recorded_in_the_timeline(monkeypatch, 
-    parsing, session_factory, outcome, reason
-):
-    """Каждая попытка отправки записывается в ленту, чем бы ни кончилась.
-
-    Иначе, глядя через месяц на новую вакансию с разысканным HR,
-    пользователь не поймёт, почему отклик так и не ушёл.
-    """
-    pipeline, vacancy = parsing
-    pipeline.parsed = parsed_vacancy(
-        title="Python-разработчик", stack_required=["Python"], hr_contact="@maria"
-    )
-    await pipeline.rs.set_app("auto_apply", "true")
-
-    async def try_auto_send(pipeline, hr, parsed, vacancy_id):
-        return outcome, reason
-
-    monkeypatch.setattr(apply, "try_auto_send", try_auto_send)
-
-    await parse.parse_and_update_vacancy(pipeline, 
-        vacancy.id, "текст", "jobs", allow_delete=False
-    )
-
-    event = next(
-        e
-        for e in await all_rows(session_factory, VacancyEvent)
-        if e.kind == "auto_send"
-    )
-    assert event.payload == {"ok": outcome, "reason": reason}
-
-
-async def test_a_vacancy_already_written_to_gets_no_second_letter(
-    monkeypatch, parsing, session_factory
-):
-    """Повторный разбор откликнутой вакансии второго письма не шлёт.
-
-    Прогон заново сбрасывает статус в «Новая» — так и задумано, — а заслон
-    отправки читает именно статус и к этому мигу видит уже сброшенный. Спросить
-    надо историю: в ней отклик остаётся навсегда. По статусу же второй прогон
-    подряд отправил бы письмо и на вакансии, которую первый уже отбил.
-    """
-    pipeline, vacancy = parsing
-    pipeline.parsed = parsed_vacancy(
-        title="Python-разработчик", stack_required=["Python"], hr_contact="@maria"
-    )
-    await pipeline.rs.set_app("auto_apply", "true")
-    async with session_factory() as session:
-        assert await mark_vacancy_applied(session, vacancy.id, "отклик ушёл")
-        await session.commit()
-
-    tried = []
-
-    async def try_auto_send(pipeline, hr, parsed, vacancy_id):
-        tried.append(vacancy_id)
-        return True, "sent"
-
-    monkeypatch.setattr(apply, "try_auto_send", try_auto_send)
-
-    await parse.parse_and_update_vacancy(
-        pipeline, vacancy.id, "текст", "jobs", allow_delete=False
-    )
-
-    assert tried == []
-
-
 async def test_a_vanished_vacancy_is_left_alone(parsing, session_factory, caplog):
     """По исчезнувшей вакансии ничего не записывается — и не через поломку.
 
@@ -409,7 +274,7 @@ async def test_a_write_that_failed_is_not_reported_as_a_finished_parse(
             pipeline, vacancy.id, "текст", "jobs", allow_delete=False
         )
 
-    assert done is False
+    assert done.stored is False
 
 
 async def test_the_window_hears_about_both_lists(parsing):

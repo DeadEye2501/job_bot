@@ -1,0 +1,43 @@
+"""Передача отобранного откликателю: решение «откликаться» и догон новых HR после отклика."""
+
+from sqlalchemy import select
+
+from backend.flows import parse
+from backend.flows.dm_backfill import spawn_hr_backfill
+from backend.flows.parse import Judged
+from backend.models import Vacancy, VacancyStatus
+
+
+async def to_apply(session_factory, vacancy_ids: list[int]) -> list[int]:
+    """Откликаться — значит после вердикта вакансия стоит в New."""
+    if not vacancy_ids:
+        return []
+    async with session_factory() as session:
+        rows = await session.scalars(select(Vacancy.id).where(
+            Vacancy.id.in_(vacancy_ids), Vacancy.status == VacancyStatus.NEW))
+        chosen = set(rows)
+    return [vacancy_id for vacancy_id in vacancy_ids if vacancy_id in chosen]
+
+
+async def hand_over(pipeline, judged: list[tuple[int, Judged]]) -> None:
+    """Отклик раньше догона: догон, пошедший первым, положил бы наше письмо
+    в переписку без вакансии. Сорвавшийся отклик догона не отменяет: новый HR
+    уже в базе, и пустая переписка у него — та же беда."""
+    chosen = await to_apply(pipeline.session_factory,
+                            [vacancy_id for vacancy_id, one in judged if one.stored])
+    try:
+        if chosen:
+            await pipeline.apply(chosen)
+    finally:
+        for _, one in judged:
+            if one.fresh_hr is not None:
+                spawn_hr_backfill(pipeline, one.fresh_hr)
+
+
+async def judge_and_hand_over(pipeline, vacancy_id: int, text: str, channel_username: str | None,
+                              *, allow_delete: bool = True) -> bool:
+    """Разбор одной вакансии и передача её итога; ответ — записан ли исход."""
+    judged = await parse.parse_and_update_vacancy(
+        pipeline, vacancy_id, text, channel_username, allow_delete=allow_delete)
+    await hand_over(pipeline, [(vacancy_id, judged)])
+    return judged.stored

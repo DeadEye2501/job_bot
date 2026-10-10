@@ -31,6 +31,6 @@ def parse_into(monkeypatch, calls: list, *, done=True, fails=()) -> None:
         if vacancy_id in fails:
             raise RuntimeError("разбор упал")
         calls.append((vacancy_id, text, username, allow_delete))
-        return done() if callable(done) else done
+        return parse_mod.Judged(done() if callable(done) else done)
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)

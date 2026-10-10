@@ -7,6 +7,7 @@
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -158,7 +159,7 @@ class IngestionPipeline:
         client,
         session_factory,
         models: LmProviders,
-        send,
+        apply: Callable[[list[int]], Awaitable[None]],
         runtime_settings,
     ) -> None:
         self.client = client
@@ -167,14 +168,17 @@ class IngestionPipeline:
         self.lm_embed_client = models.embed_client
         self.lm_chat_model = models.chat_model
         self.lm_embed_model = models.embed_model
-        self.send = send
+        # Отклик на отобранное: откликатель с набором агента бота.
+        self.apply = apply
+        # Письмо HR из окна; ставит его бот — отправка живёт у него.
+        self.send = None
         self.rs = runtime_settings
         _declare_caches(self)
         _declare_window_hooks(self)
         _declare_dm_debounce(self)
 
         # Ссылки на идущие чтения переписки — и догон по одному собеседнику
-        # (`spawn_hr_backfill` из разбора объявления), и общий догон при
+        # (`spawn_hr_backfill` из передачи отобранного), и общий догон при
         # подъёме соединения. Цикл событий держит на задачах только слабые
         # ссылки: без своего набора Python вправе прибрать задачу посреди
         # работы. Снимается с учёта она сама, по завершении.

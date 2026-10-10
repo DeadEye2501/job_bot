@@ -317,35 +317,6 @@ async def test_a_vacancy_without_a_title_is_still_written_about(
     assert "вашу вакансию" in pipeline.sent[0][1]
 
 
-async def test_a_rate_limit_window_holds_the_auto_send(applying):
-    """Пока окно запрета не вышло, автоматика не отправляет.
-
-    Стучаться раньше срока — верный способ получить запрет подольше.
-    """
-    import time
-
-    pipeline, hr, vacancy, _ = applying
-    await pipeline.rs.set_app("flood_wait_until_ts", str(time.time() + 999))
-
-    assert await apply.try_auto_send(pipeline, hr, parsed_vacancy(), vacancy.id) == (
-        False,
-        "flood_wait",
-    )
-    assert pipeline.sent == []
-
-
-async def test_an_expired_rate_limit_window_lets_the_send_through(applying):
-    """Истёкшее окно запрета отправку больше не держит."""
-    import time
-
-    pipeline, hr, vacancy, _ = applying
-    await pipeline.rs.set_app("flood_wait_until_ts", str(time.time() - 10))
-
-    ok, reason = await apply.try_auto_send(pipeline, hr, parsed_vacancy(), vacancy.id)
-
-    assert (ok, reason) == (True, "sent")
-
-
 async def test_a_second_send_while_the_first_is_in_flight_is_refused(
     applying, monkeypatch
 ):

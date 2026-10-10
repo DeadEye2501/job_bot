@@ -4,7 +4,7 @@
 import httpx
 import pytest
 
-from backend.flows import apply, dm_classify
+from backend.flows import dm_classify
 from backend.flows import parse as parse_mod
 from backend.flows.dm import DmHelpers, process_dm
 from backend.flows.pipeline import IngestionPipeline, LmProviders
@@ -44,12 +44,17 @@ def known_hr_client() -> FakeTelegramClient:
 
 
 def _pipeline_on_fakes(session_factory, client, settings) -> IngestionPipeline:
-    """Конвейер на подделках; отправку письма подменяет список `sent`."""
+    """Конвейер на подделках; отправку письма подменяет список `sent`, передачу
+    откликателю — список `applied`, куда ложится каждый переданный перечень id."""
     outgoing: list[tuple] = []
+    applied: list[list[int]] = []
 
     async def send(hr, text, attachment=None, vacancy_id=None, *, force=False):
         outgoing.append((hr.id, text, attachment, vacancy_id, force))
         return True
+
+    async def apply(vacancy_ids):
+        applied.append(list(vacancy_ids))
 
     pipeline = IngestionPipeline(
         client=client,
@@ -60,10 +65,12 @@ def _pipeline_on_fakes(session_factory, client, settings) -> IngestionPipeline:
             embed_client=LmClient("http://provider.test"),
             embed_model="bge",
         ),
-        send=send,
+        apply=apply,
         runtime_settings=settings,
     )
+    pipeline.send = send
     pipeline.sent = outgoing
+    pipeline.applied = applied
     return pipeline
 
 
@@ -80,7 +87,7 @@ async def _put_out_backfills(pipelines) -> None:
 
 
 def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
-    """Подменяет разбор, проверку пригодности и отправку заготовленным."""
+    """Подменяет разбор и проверку пригодности заготовленным."""
 
     async def parse_vacancy(text, client_, model, **kwargs):
         pipeline.parse_asked = True
@@ -105,11 +112,6 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
 
         return ask
 
-    async def try_auto_send(pipeline, hr, parsed, vacancy_id):
-        pipeline.asked_to_send.append(vacancy_id)
-        return True, "sent"
-
-    monkeypatch.setattr(apply, "try_auto_send", try_auto_send)
     monkeypatch.setattr("backend.flows.parse.parse_vacancy", parse_vacancy)
     monkeypatch.setattr("backend.flows.fit_refusal.classify_post_genre", classify_post_genre)
     monkeypatch.setattr("backend.flows.fit_refusal.validate_role_fit", asking_fit("роль"))
@@ -287,7 +289,6 @@ async def parsing(make_pipeline, monkeypatch, unparsed_vacancy, session_factory)
     pipeline.genre_trouble = None
     pipeline.genre_asked = False
     _fit_answers_by_default(pipeline)
-    pipeline.asked_to_send = []
     _answer_instead_of_the_model(pipeline, monkeypatch)
 
     await put(session_factory, profile_row())

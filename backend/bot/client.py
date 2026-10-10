@@ -223,9 +223,10 @@ class Bot:
                 embed_client=self.lm_embed_client,
                 embed_model=self.lm_embed_model,
             ),
-            send=self.send,
+            apply=self.apply_vacancies,
             runtime_settings=self.rs,
         )
+        self.ingestion.send = self.send
         _subscribe_to_updates(self)
         _declare_loop_controls(self)
         _declare_ui_hooks(self)
@@ -316,6 +317,9 @@ class Bot:
 
     async def send_to_hr_media(self, hr_id, file_path) -> Message:
         return await chat.send_to_hr_media(self, hr_id, file_path)
+
+    async def apply_vacancies(self, vacancy_ids: list[int]) -> None:
+        return await aggregators.apply_found(self, vacancy_ids)
 
     async def ui_send_vacancy_application(self, vacancy_id) -> tuple[bool, str]:
         return await send.ui_send_vacancy_application(self, vacancy_id)

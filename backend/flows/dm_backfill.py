@@ -274,11 +274,10 @@ def spawn_hr_backfill(pipeline, hr) -> None:
     ``on_new_message`` per HR once the rows land — open chat in UI
     fills in without restart.
 
-    Wajne: вызывать ПОСЛЕ ``try_auto_send`` для свежесозданного HR'а,
-    иначе backfill может догнать через ``get_chat_history`` cover-
-    letter сообщение раньше, чем ``Bot.send`` закоммитит свою row,
-    и вставит её без ``vacancy_id`` (UNIQUE на (hr_id, tg_message_id,
-    is_incoming) потом отстрелит Bot.send'овский insert).
+    Зовёт его передача отобранного (`flows/handover`) — после отклика:
+    пойди догон первым, он вытащил бы наше письмо через ``get_chat_history``
+    раньше, чем откликатель запишет свою строку, и положил бы её без
+    ``vacancy_id``.
     """
     async def work() -> None:
         await backfill_hr_dm_history(

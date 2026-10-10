@@ -1,8 +1,7 @@
-"""Обход источников-агрегаторов: фаза поиска одного источника."""
+"""Обход источника-агрегатора: поиск, разбор найденного и передача отобранного."""
 
 import asyncio
 import logging
-from dataclasses import dataclass
 from datetime import datetime
 
 from backend.agent.jobs import Finished, SeekJob, Source
@@ -16,6 +15,7 @@ from backend.agent.sessions import HumanTimeout, LimitExhausted, run_guarded
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
 from backend.agent.tools_seeker import seeker_tools
+from backend.flows.handover import hand_over
 from backend.flows.parse_queue import ParseQueue
 from backend.repository.aggregators import barred_hosts, list_aggregators, mark_run
 from backend.telegram_time import utc_now
@@ -23,19 +23,14 @@ from backend.telegram_time import utc_now
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class RoundState:
-    """Один обход: какие агрегаторы закрыты до его конца, чей профиль у «Поиска по сети»."""
+async def seek_source(kit: AgentKit, source: Source) -> None:
+    """Обход одного источника: искатель и конвейер рядом, отобранное — откликателю
+    пулом после поиска.
 
-    closed_aggregators: set[int]
-    web_search_id: int
-
-
-async def seek_source(kit: AgentKit, round_: RoundState, source: Source) -> list[int]:
-    """Фаза 1 одного источника: искатель и конвейер рядом. Ответ — заведённое искателем.
-
-    При сбое источника заведённое до сбоя доразбирается и тоже отдаётся:
-    вакансия уже в базе, а к оставшимся в New обход не возвращается.
+    При сбое источника заведённое до сбоя доразбирается и тоже передаётся:
+    вакансия уже в базе, а к оставшимся в New обход не возвращается. Браузер
+    поиска закрывается до передачи: отклик открывает тот же профиль, а двух
+    окон на один профиль Chromium не откроет.
     """
     job = SeekJob(source, kit.pipeline.rs.aggregator_backfill_limit)
     queue = ParseQueue(kit.pipeline)
@@ -50,11 +45,17 @@ async def seek_source(kit: AgentKit, round_: RoundState, source: Source) -> list
     except Exception:
         logger.exception("обход источника %s: сбой", source.name)
         await queue.drain()
-        return job.found
+        await _hand_over(kit, queue)
+        return
     if end.limit_exhausted:
         raise LimitExhausted
     await _settle(kit, job, end, started)
-    return job.found
+    await _hand_over(kit, queue)
+
+
+async def _hand_over(kit: AgentKit, queue: ParseQueue) -> None:
+    await kit.browser.close()
+    await hand_over(kit.pipeline, queue.judged)
 
 
 async def _search(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> AgentEnd:

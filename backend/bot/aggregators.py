@@ -10,11 +10,11 @@ from backend.agent.availability import current_refusal
 from backend.agent.jobs import Source
 from backend.agent.kit import AgentKit
 from backend.agent.sessions import HumanTimeout, LimitExhausted, live_session
+from backend.applying import run
 from backend.bot import slot
 from backend.domain.apply_order import Way
-from backend.flows.aggregator_apply import ApplyOrder, apply_phase, apply_vacancy
 from backend.flows.aggregator_login import log_in
-from backend.flows.aggregator_round import RoundState, seek_source
+from backend.flows.aggregator_round import seek_source
 from backend.models import Aggregator, Vacancy
 from backend.notify import fire
 from backend.repository import aggregators as repo
@@ -87,11 +87,11 @@ async def aggregator_round(bot) -> None:
     async def work(kit: AgentKit) -> str:
         async with bot.session_factory() as session:
             sources = [Source.of(row) for row in await repo.round_sources(session)]
-        round_ = await _new_round(bot)
-        await kit.browser.open_profile(round_.web_search_id)
+        async with bot.session_factory() as session:
+            await kit.browser.open_profile(await repo.web_search_id(session))
         await kit.browser.clear_cache()
         for source in sources:
-            await _one_source(bot, kit, round_, source)
+            await seek_source(kit, source)
         return "ok"
 
     await agent_work(bot, work)
@@ -106,7 +106,7 @@ async def run_aggregator_now(bot, aggregator_id: int) -> AgentOutcome:
         return refusal
 
     async def work(kit: AgentKit) -> str:
-        await _one_source(bot, kit, await _new_round(bot), Source.of(row))
+        await seek_source(kit, Source.of(row))
         return "ok"
 
     return await _in_slot(bot, work, f"aggregator {aggregator_id}")
@@ -127,8 +127,7 @@ async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome:
 
 
 async def apply_via_agent(bot, vacancy_id: int, way: Way) -> AgentOutcome:
-    """Ручной отклик выбранным способом.
-    Ни выключенный автоотклик, ни режим ему не помеха: нажал человек."""
+    """Ручной отклик выбранным способом. Режим ему не помеха: нажал человек."""
     async with bot.session_factory() as session:
         if await session.get(Vacancy, vacancy_id) is None:
             return "missing"
@@ -136,10 +135,19 @@ async def apply_via_agent(bot, vacancy_id: int, way: Way) -> AgentOutcome:
         return "locked"
 
     async def work(kit: AgentKit) -> str:
-        outcome = await apply_vacancy(kit, await _new_round(bot), ApplyOrder(vacancy_id, way))
-        return "ok" if outcome == "applied" else outcome
+        outcome = await run.apply_chosen(kit, vacancy_id, way)
+        return "ok" if outcome == "applied" else "exhausted"
 
     return await _in_slot(bot, work, f"apply via agent {vacancy_id}")
+
+
+async def apply_found(bot, vacancy_ids: list[int]) -> None:
+    """Откликнуться на отобранное сбором; браузер, если понадобился, закрывается после."""
+    kit = _kit(bot)
+    try:
+        await run.apply_vacancies(kit, vacancy_ids)
+    finally:
+        await kit.browser.close()
 
 
 async def delete_aggregator(bot, aggregator_id: int) -> str:
@@ -162,22 +170,6 @@ def _kit(bot) -> AgentKit:
         run_session=live_session(bot.rs.chat.model),
         today=date.today(),
     )
-
-
-async def _one_source(bot, kit: AgentKit, round_: RoundState, source: Source) -> None:
-    """Поиск на источнике, затем отклики по найденному — если автоотклик включён.
-
-    Режим не спрашивается: он решает, запускать ли обход автоматически, а
-    запущенный — им или человеком — отрабатывает целиком.
-    """
-    found = await seek_source(kit, round_, source)
-    if found and bot.rs.auto_apply:
-        await apply_phase(kit, round_, found)
-
-
-async def _new_round(bot) -> RoundState:
-    async with bot.session_factory() as session:
-        return RoundState(set(), await repo.web_search_id(session))
 
 
 async def _row(bot, aggregator_id: int) -> Aggregator | None:

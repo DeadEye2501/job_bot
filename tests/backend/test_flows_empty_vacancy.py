@@ -15,6 +15,7 @@
 """
 
 from backend.flows import parse
+from backend.flows.handover import hand_over
 import asyncio
 
 import pytest
@@ -193,9 +194,10 @@ async def test_a_first_time_hr_gets_his_history_caught_up(
     await put(session_factory, vacancy_row(title="прошлое"))
     vacancy = await only_row(session_factory, Vacancy)
 
-    await parse.save_empty_vacancy(
+    judged = await parse.save_empty_vacancy(
         pipeline, vacancy.id, parsed_vacancy(title="Что-то", hr_contact="@maria")
     )
+    await hand_over(pipeline, [(vacancy.id, judged)])
     await asyncio.sleep(0)
 
     assert caught_backfills == [(await only_row(session_factory, HR)).id]
@@ -215,9 +217,10 @@ async def test_a_known_hr_is_not_caught_up_again(
     await put(session_factory, vacancy_row(title="прошлое"))
     vacancy = await only_row(session_factory, Vacancy)
 
-    await parse.save_empty_vacancy(
+    judged = await parse.save_empty_vacancy(
         pipeline, vacancy.id, parsed_vacancy(title="Что-то", hr_contact="@maria")
     )
+    await hand_over(pipeline, [(vacancy.id, judged)])
     await asyncio.sleep(0)
 
     assert caught_backfills == []
@@ -300,7 +303,7 @@ async def test_a_failed_write_of_an_empty_vacancy_is_not_called_a_parse(
         pipeline, vacancy.id, "текст", "jobs", allow_delete=False
     )
 
-    assert done is False
+    assert done.stored is False
 
 
 async def test_a_vacancy_the_model_never_fits_into_an_answer_stops_being_an_orphan(
@@ -326,7 +329,7 @@ async def test_a_vacancy_the_model_never_fits_into_an_answer_stops_being_an_orph
     )
 
     saved = await only_row(session_factory, Vacancy)
-    assert done is True
+    assert done.stored is True
     assert saved.is_parsed is True
     assert saved.status is VacancyStatus.NOT_FIT
     assert saved.skip_reason == TRUNCATED_SKIP_REASON
@@ -353,7 +356,7 @@ async def test_a_provider_that_fell_still_leaves_the_vacancy_for_the_next_run(
     )
 
     saved = await only_row(session_factory, Vacancy)
-    assert done is False
+    assert done.stored is False
     assert saved.is_parsed is False
 
 

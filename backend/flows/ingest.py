@@ -4,7 +4,7 @@ import logging
 
 from sqlalchemy.exc import IntegrityError
 
-from backend.flows import intake, linked_article, parse
+from backend.flows import handover, intake, linked_article
 from backend.message_text import extract_post_text
 from backend.models import Vacancy
 from backend.payloads import ChannelPost
@@ -73,7 +73,7 @@ async def _resume_or_skip(
     # Брошенная строка могла прийти из другого канала (перепост): разбираем
     # по тексту нынешнего поста и его каналу, а кладём в ту строку.
     # Совпадение отпечатков ручается, что тексты почти дословны.
-    await parse.parse_and_update_vacancy(
+    await handover.judge_and_hand_over(
         pipeline, similar_id, post.text, post.channel_username
     )
 
@@ -105,7 +105,7 @@ async def ingest_post(
     if not whole:
         _waits_to_be_read_out(new_vacancy_id, post)
         return
-    await parse.parse_and_update_vacancy(
+    await handover.judge_and_hand_over(
         pipeline, new_vacancy_id, text, channel_username
     )
 

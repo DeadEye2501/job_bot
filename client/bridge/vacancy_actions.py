@@ -67,7 +67,7 @@ class VacancyActions:
                 await require_vacancy(session, vacancy_id)
                 vacancy = await session.get(Vacancy, vacancy_id)
                 telegram = vacancy.hr_id is not None
-            ways = await vacancy_ways(self._hub.session_factory, vacancy_id, set())
+            ways = await vacancy_ways(self._hub.session_factory, vacancy_id)
             return {"ways": [{"method": w.method, "target": w.target} for w in ways],
                     "telegram": telegram, "lock": current_refusal(self._hub.rs.chat)}
 
@@ -86,7 +86,7 @@ class VacancyActions:
         async def run() -> Way:
             async with self._hub.session_factory() as session:
                 await require_vacancy(session, vacancy_id)
-            ways = await vacancy_ways(self._hub.session_factory, vacancy_id, set())
+            ways = await vacancy_ways(self._hub.session_factory, vacancy_id)
             way = next((w for w in ways if (w.method, w.target) == chosen), None)
             if way is None:
                 raise Denied(WAY_UNKNOWN, vacancy_id=vacancy_id)

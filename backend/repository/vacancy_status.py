@@ -19,7 +19,7 @@
 import logging
 from dataclasses import dataclass
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.transitions import APPLY_MOVES_FROM, should_apply_status
@@ -119,32 +119,6 @@ async def mark_vacancy_applied(
         _move_status(vacancy, VacancyStatus.APPLIED, _Signature(explanation))
     )
     return True
-
-
-async def was_ever_applied(session: AsyncSession, vacancy_id: int) -> bool:
-    """Уходил ли по этой вакансии отклик хоть раз.
-
-    Спрашивают историю, а не статус: прогон заново ставит начальный статус
-    поверх любого (`apply_parse_outcome`), и заслон отправки, читающий статус,
-    к этому мигу видит уже сброшенный. По статусу и второй прогон подряд был бы
-    «первым» — отбитая первым разом вакансия отправила бы письмо на втором.
-
-    В истории отклик остаётся навсегда: строку туда пишет сам перевод в
-    «откликнулись» (`mark_vacancy_applied`), и пишет её всегда, когда перевод
-    состоялся.
-
-    Транзакцию открывает зовущий.
-    """
-    return bool(
-        await session.scalar(
-            select(
-                exists().where(
-                    VacancyStatusHistory.vacancy_id == vacancy_id,
-                    VacancyStatusHistory.status == VacancyStatus.APPLIED,
-                )
-            )
-        )
-    )
 
 
 async def last_status_history_id(

@@ -111,7 +111,7 @@ async def test_a_vacancy_deleted_while_the_model_answered_stays_out_of_the_cache
         async with session_factory() as session:
             await session.delete(await session.get(Vacancy, vacancy_id))
             await session.commit()
-        return True
+        return parse_mod.Judged(True)
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse_and_delete)
 
