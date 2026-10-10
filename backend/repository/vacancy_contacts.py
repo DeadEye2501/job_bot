@@ -1,10 +1,14 @@
-"""Контакты вакансии, кроме Telegram-HR."""
+"""Контакты вакансии — всё, чем она указывает вовне, кроме Telegram-HR.
+
+Адрес страницы вакансии стоит в той же выборке, что и контакты (`vacancy_addresses`):
+сверке с отсевом сайтов он такой же адрес, как ссылка в контактах.
+"""
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.contact_keys import contact_key
-from backend.models import ContactAddedBy, VacancyContact
+from backend.models import ContactAddedBy, Vacancy, VacancyContact
 
 
 async def replace_parsed_contacts(
@@ -73,6 +77,17 @@ async def list_contacts(session: AsyncSession, vacancy_id: int) -> list[VacancyC
         .where(VacancyContact.vacancy_id == vacancy_id)
         .order_by(VacancyContact.id)
     )).all())
+
+
+async def contact_values(session: AsyncSession, vacancy_id: int) -> list[str]:
+    """Значения контактов вакансии в порядке заведения."""
+    return [contact.value for contact in await list_contacts(session, vacancy_id)]
+
+
+async def vacancy_addresses(session: AsyncSession, vacancy_id: int) -> list[str]:
+    """Адрес страницы вакансии и все её контакты — то, чем она указывает вовне."""
+    source_url = await session.scalar(select(Vacancy.source_url).where(Vacancy.id == vacancy_id))
+    return [address for address in (source_url, *await contact_values(session, vacancy_id)) if address]
 
 
 async def delete_contact(session: AsyncSession, contact_id: int) -> int | None:

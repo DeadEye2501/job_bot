@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.llm.external import external_block
 from backend.models import Aggregator, TelegramChannel, Vacancy
-from backend.repository.vacancy_contacts import list_contacts
+from backend.repository.vacancy_contacts import contact_values
 
 
 async def describe_vacancy(session: AsyncSession, vacancy_id: int) -> str | None:
@@ -17,7 +17,7 @@ async def describe_vacancy(session: AsyncSession, vacancy_id: int) -> str | None
     vacancy = await session.get(Vacancy, vacancy_id)
     if vacancy is None:
         return None
-    contacts = [c.value for c in await list_contacts(session, vacancy_id)]
+    contacts = await contact_values(session, vacancy_id)
     return "\n".join([
         f"Вакансия: {vacancy.title or '—'}",
         f"Компания: {vacancy.company_name or '—'}",

@@ -39,3 +39,10 @@ export function rereading(trail) {
     trail.push('карточка перечитана');
   };
 }
+
+/** Ответ моста, который держат в руке: отдают его, когда скажут. */
+export function held(value) {
+  let release;
+  const promise = new Promise((done) => (release = done));
+  return { promise, give: () => release(value) };
+}

@@ -23,7 +23,7 @@ from backend.repository.agent_profile import build_agent_profile
 from backend.repository.aggregators import barred_hosts, list_aggregators
 from backend.repository.mail_account import get_mail_account
 from backend.repository.vacancy_brief import describe_vacancy
-from backend.repository.vacancy_contacts import list_contacts
+from backend.repository.vacancy_contacts import contact_values
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ async def vacancy_ways(session_factory, vacancy_id: int, closed: set[int]) -> li
         vacancy = await session.get(Vacancy, vacancy_id)
         if vacancy is None:
             return []
-        contacts = [c.value for c in await list_contacts(session, vacancy_id)]
+        contacts = await contact_values(session, vacancy_id)
         aggregators = await list_aggregators(session)
         mail_ready = await get_mail_account(session) is not None
         barred = await barred_hosts(session)

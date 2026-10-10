@@ -357,7 +357,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 175 модулей
+## backend — 176 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -1277,6 +1277,19 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def record_vacancy_event(session_factory, vacancy_id: int, kind: str, payload: dict) -> None` (24)
 
+### `backend/flows/fit_refusal.py` — 173 строк
+
+Отказ в пригодности: пост не вакансия, мимо анкеты по полям или по суждению модели.
+
+Зависит от: `adapters.lm_chat`, `backend.domain.fit_fields`, `backend.domain.verdict`, `backend.llm.answers`, `backend.llm.fit_languages`, `backend.llm.fit_preferences`, `backend.llm.fit_role`, `backend.llm.genre`
+
+- `def unanswered(what: str, trouble: str | None, vacancy_id: int) -> tuple[str | None, bool] | None` (29)
+- `def _fit_verdict_refusal(validation) -> str | None` (17)
+- `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (38)
+- `async def _genre_refusal(pipeline, text: str, vacancy_id: int) -> tuple[str | None, bool]` (20)
+- `def _fields_refusal(parsed, profile) -> str | None` (12)
+- `async def unfit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (21)
+
 ### `backend/flows/ghosting.py` — 37 строк
 
 Гашение вакансий, по которым HR замолчал дольше срока.
@@ -1316,23 +1329,18 @@ First-run bootstrap: ensure DB schema exists.
 - `def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None` (16)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 
-### `backend/flows/parse.py` — 494 строк ⚠ подошёл к 300
+### `backend/flows/parse.py` — 346 строк ⚠ подошёл к 300
 
 Приговор объявлению: разбор моделью, вердикт по разобранному и что дальше.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.blacklist`, `backend.domain.fit_fields`, `backend.domain.resume_marks`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.parse_write`, `backend.llm.answers`, `backend.llm.fit_languages`, `backend.llm.fit_preferences`, `backend.llm.fit_role`, `backend.llm.genre`, `backend.llm.rules`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.aggregators`, `backend.repository.vacancy_status`
+Зависит от: `backend.domain.blacklist`, `backend.domain.contact_keys`, `backend.domain.resume_marks`, `backend.domain.scoring`, `backend.domain.verdict`, `backend.flows`, `backend.flows.events`, `backend.flows.fit_refusal`, `backend.flows.parse_write`, `backend.llm.rules`, `backend.llm.vacancy`, `backend.models`, `backend.payloads`, `backend.repository.aggregators`, `backend.repository.vacancy_contacts`, `backend.repository.vacancy_status`
 
 - `async def _dropped_as_trash(pipeline, vacancy_id: int, reason: str, *, allow_delete: bool) -> bool` (23)
-- `def _unanswered(what: str, trouble: str | None, vacancy_id: int) -> tuple[str | None, bool] | None` (29)
-- `def _fit_verdict_refusal(validation) -> str | None` (17)
-- `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (38)
 - `async def _thrown_out_as_a_resume(pipeline, vacancy_id: int, mark: str, allow_delete: bool) -> bool` (16)
-- `async def _genre_refusal(pipeline, text: str, vacancy_id: int) -> tuple[str | None, bool]` (20)
-- `def _fields_refusal(parsed, profile) -> str | None` (12)
-- `async def _unfit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (21)
 - `async def _auto_send_if_allowed(pipeline, hr, parsed, vacancy_id: int, status: VacancyStatus) -> None` (36)
 - `async def _parsed_or_dropped(pipeline, vacancy_id: int, text: str, channel_username: str, allow_delete: bool)` (44)
-- `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (39)
+- `async def _barred_site(pipeline, vacancy_id: int, found: list[str]) -> str | None` (10)
+- `async def _verdict_for(pipeline, parsed, text: str, vacancy_id: int) -> tuple | None` (38)
 - `async def _finish_parse(pipeline, vacancy_id: int, parsed, outcome: Outcome) -> bool` (18)
 - `async def _thrown_out_by_the_verdict(pipeline, vacancy_id: int, skip_reason: str | None, allow_delete: bool) -> bool` (18)
 - `async def parse_and_update_vacancy(pipeline, vacancy_id: int, text: str, channel_username: str | None, *, allow_delete: bool=True) -> bool` (43)
@@ -1959,7 +1967,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _place_lines(places) -> list[str]` (7)
 - `def _years(years: int) -> str` (2)
 
-### `backend/repository/aggregators.py` — 238 строк
+### `backend/repository/aggregators.py` — 222 строк
 
 Ведение записей об агрегаторах.
 
@@ -1972,7 +1980,6 @@ First-run bootstrap: ensure DB schema exists.
 - `async def deactivate_blacklisted_aggregators(session: AsyncSession) -> int` (6)
 - `async def barred_hosts(session: AsyncSession) -> set[str]` (7)
 - `async def barred_host_of(session: AsyncSession, urls: list[str]) -> str | None` (11)
-- `async def vacancy_barred_host(session: AsyncSession, vacancy_id: int, found: list[str]) -> str | None` (14)
 - `async def list_aggregators_with_counts(session: AsyncSession, search: str | None=None) -> list[tuple[Aggregator, int, bool]]` (14)
 - `async def get_aggregator_detail(session: AsyncSession, aggregator_id: int) -> tuple[Aggregator, ChannelStats, str | None] | None` (9)
 - `async def set_aggregator_active(session: AsyncSession, aggregator_id: int, active: bool) -> str` (15)
@@ -2536,9 +2543,9 @@ First-run bootstrap: ensure DB schema exists.
 - `async def describe_vacancy(session: AsyncSession, vacancy_id: int) -> str | None` (20)
 - `async def _source(session: AsyncSession, vacancy: Vacancy) -> str` (8)
 
-### `backend/repository/vacancy_contacts.py` — 85 строк
+### `backend/repository/vacancy_contacts.py` — 100 строк
 
-Контакты вакансии, кроме Telegram-HR.
+Контакты вакансии — всё, чем она указывает вовне, кроме Telegram-HR.
 
 Зависит от: `backend.domain.contact_keys`, `backend.models`
 
@@ -2547,6 +2554,8 @@ First-run bootstrap: ensure DB schema exists.
 - `async def has_contact(session: AsyncSession, vacancy_id: int, value: str) -> bool` (3)
 - `async def _contact_row(session: AsyncSession, vacancy_id: int, key: str) -> VacancyContact | None` (9)
 - `async def list_contacts(session: AsyncSession, vacancy_id: int) -> list[VacancyContact]` (7)
+- `async def contact_values(session: AsyncSession, vacancy_id: int) -> list[str]` (3)
+- `async def vacancy_addresses(session: AsyncSession, vacancy_id: int) -> list[str]` (4)
 - `async def delete_contact(session: AsyncSession, contact_id: int) -> int | None` (8)
 
 ### `backend/repository/vacancy_status.py` — 398 строк ⚠ подошёл к 300
@@ -4392,13 +4401,13 @@ seed initial data
   - `def slow_server(account, mail)` (3)
   - `async def leave_while_sending(tools)` (4)
 
-### `tests/backend/test_flows_aggregator_name.py` — 129 строк
+### `tests/backend/test_flows_aggregator_name.py` — 150 строк
 
 Имя агрегатора: как сервис зовут люди, а не его адрес.
 
 Зависит от: `backend.flows.aggregator_name`, `backend.models`, `backend.provider_config`, `tests.dbio`, `tests.factories_aggregators`, `tests.fakes.llm`, `tests.fakes.site_home`
 
-Тестов: 11
+Тестов: 13
 
 - `def _model_says(monkeypatch, answer: httpx.Response | BaseException) -> list` (5)
 - `async def _name_of_created(session_factory, chat: LlmProviderConfig | None) -> str` (4)
@@ -4706,13 +4715,13 @@ seed initial data
 Тестов: 6
 
 
-### `tests/backend/test_flows_parse_verdict.py` — 437 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_parse_verdict.py` — 452 строк ⚠ подошёл к 300
 
 Какой приговор получает объявление после разбора.
 
 Зависит от: `backend.flows`, `backend.llm.rules`, `backend.models`, `backend.payloads`, `backend.repository.blacklist_marks`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 23
+Тестов: 24
 
 - `async def _barred(session_factory, vacancy_id: int, source_url: str | None) -> None` (6)
 

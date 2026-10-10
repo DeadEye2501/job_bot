@@ -78,7 +78,7 @@ async def fetch_icon(client: httpx.AsyncClient, urls: tuple[str, ...]) -> bytes 
     for url in urls:
         try:
             response = await client.get(url)
-        except httpx.HTTPError:
+        except (httpx.HTTPError, httpx.InvalidURL):
             continue
         kind = response.headers.get("content-type", "")
         if (response.status_code == 200 and kind.startswith("image/") and "svg" not in kind

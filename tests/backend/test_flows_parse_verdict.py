@@ -420,6 +420,21 @@ async def test_a_contact_found_by_this_very_parse_marks_the_vacancy_unfit(
     assert (await only_row(session_factory, Vacancy)).skip_reason == "blacklist: barred.test"
 
 
+async def test_a_mail_contact_on_a_blacklisted_site_does_not_sift_the_vacancy(
+    parsing, session_factory
+):
+    """С отсевом сверяются ссылки, а не почта: у почты решало бы написание —
+    ящик на поддомене сайта отсеивался бы, а на самом сайте нет."""
+    pipeline, vacancy = parsing
+    await _barred(session_factory, vacancy.id, "https://clean.test/vacancy/1")
+    await put(session_factory, vacancy_contact_row(vacancy.id, "jobs@career.barred.test"))
+    pipeline.parsed = replace(pipeline.parsed, other_contacts=["hr@career.barred.test"])
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", None, allow_delete=False)
+
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NEW
+
+
 async def test_a_post_merely_naming_a_blacklisted_site_is_not_sifted_out(
     parsing, session_factory
 ):
