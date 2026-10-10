@@ -287,9 +287,7 @@ async def test_a_status_already_explained_gets_no_second_row(
 
     async def parse(_pipeline, vacancy_id, text, username, allow_delete=False):
         async with session_factory() as session:
-            await mark_vacancy_applied(
-                session, vacancy_id, "Авто-отправка отклика.", force=False
-            )
+            await mark_vacancy_applied(session, vacancy_id, "Авто-отправка отклика.")
             await session.commit()
         return True
 

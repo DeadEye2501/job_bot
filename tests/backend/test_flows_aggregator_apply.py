@@ -46,7 +46,7 @@ def applying(make_pipeline):
         kit = scripted_kit(await make_pipeline(), steps)
         driver = kit.run_session
         round_ = round_ or RoundState(set(), web_search_id=0)
-        return await apply_vacancy(kit, round_, ApplyOrder(vacancy_id, False, None)), driver, round_
+        return await apply_vacancy(kit, round_, ApplyOrder(vacancy_id, None)), driver, round_
 
     return run
 
@@ -183,7 +183,7 @@ async def test_the_email_way_needs_no_browser(make_pipeline, session, session_fa
 
     kit = scripted_kit(await make_pipeline(), [fail_step("нет")])
     await apply_vacancy(kit, RoundState(set(), web_search_id=0),
-                        ApplyOrder(vacancy.id, False, None))
+                        ApplyOrder(vacancy.id, None))
 
     (plan,) = kit.run_session.plans
     assert not [t.__name__ for t in plan.tools if t.__name__.startswith("browser_")]
@@ -201,12 +201,12 @@ async def test_a_simulated_application_is_told_not_to_send_and_is_marked(
     kit = scripted_kit(pipeline, [record_step(PAGE, via="aggregator")])
 
     await apply_vacancy(kit, RoundState(set(), web_search_id=0),
-                        ApplyOrder(vacancy.id, False, None))
+                        ApplyOrder(vacancy.id, None))
 
     (plan,) = kit.run_session.plans
     assert "Режим симуляции" in plan.task
     assert kit.browser.sending is False
-    (event,) = await _events(session_factory, "applied_elsewhere")
+    (event,) = await _events(session_factory, "applied")
     assert event["simulated"] is True
 
 
@@ -246,7 +246,7 @@ async def test_a_letter_still_on_its_way_holds_the_next_way(slow_letter):
     kit, vacancy = slow_letter
 
     outcome = await apply_vacancy(kit, RoundState(set(), web_search_id=0),
-                                  ApplyOrder(vacancy.id, False, None))
+                                  ApplyOrder(vacancy.id, None))
 
     assert outcome == "applied" and len(kit.run_session.plans) == 1
 
@@ -257,7 +257,7 @@ async def test_a_stop_while_the_letter_is_on_its_way_does_not_cut_it_off(
     """Обход остановили, пока он ждал письмо: письмо всё равно доходит и записывается."""
     kit, vacancy = slow_letter
     applying = asyncio.create_task(apply_vacancy(kit, RoundState(set(), web_search_id=0),
-                                                 ApplyOrder(vacancy.id, False, None)))
+                                                 ApplyOrder(vacancy.id, None)))
     await wait_until(lambda: kit.run_session.plans)
     await asyncio.sleep(0.05)
 
@@ -273,6 +273,6 @@ async def test_a_real_application_opens_the_browser_able_to_send(board, make_pip
     _, vacancy = await board()
     kit = scripted_kit(await make_pipeline(), [record_step(PAGE, via="aggregator")])
 
-    await apply_vacancy(kit, RoundState(set(), web_search_id=0), ApplyOrder(vacancy.id, False, None))
+    await apply_vacancy(kit, RoundState(set(), web_search_id=0), ApplyOrder(vacancy.id, None))
 
     assert kit.browser.sending is True

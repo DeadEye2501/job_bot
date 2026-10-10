@@ -321,11 +321,7 @@ async def test_a_vacancy_already_written_to_gets_no_second_letter(
     )
     await pipeline.rs.set_app("auto_apply", "true")
     async with session_factory() as session:
-        # `force=True` — так отклик и уходит из окна: перевод в «откликнулись»
-        # поверх графа, раз письмо уже у человека.
-        assert await mark_vacancy_applied(
-            session, vacancy.id, "отклик ушёл", force=True
-        )
+        assert await mark_vacancy_applied(session, vacancy.id, "отклик ушёл")
         await session.commit()
 
     tried = []

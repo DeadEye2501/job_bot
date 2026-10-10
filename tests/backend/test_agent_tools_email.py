@@ -97,7 +97,7 @@ async def test_a_simulated_letter_is_recorded_but_not_sent(ready, sent, session_
     await send(address="hr@site.test", subject="S", body="B")
 
     assert sent == [] and len(await all_rows(session_factory, Application)) == 1
-    (event,) = [e for e in await all_rows(session_factory, VacancyEvent) if e.kind == "applied_elsewhere"]
+    (event,) = [e for e in await all_rows(session_factory, VacancyEvent) if e.kind == "applied"]
     assert event.payload["simulated"] is True
 
 

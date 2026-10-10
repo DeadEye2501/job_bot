@@ -381,7 +381,7 @@ init
   - `def reset(self) -> None` (6)
   - `async def _take(self, browser) -> str` (14)
 
-### `backend/agent/jobs.py` — 89 строк
+### `backend/agent/jobs.py` — 87 строк
 
 Задачи сессий агента и их итоги.
 
@@ -394,7 +394,7 @@ init
 - `class Applied` (4)
 - `class LoginJob` (3)
 - `class SeekJob` (10)
-- `class ApplyJob` (20)
+- `class ApplyJob` (18)
 
 ### `backend/agent/kit.py` — 50 строк
 
@@ -719,7 +719,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def ui_rerun_vacancy_pipeline(bot, vacancy_id: int) -> RerunOutcome` (20)
 
-### `backend/bot/send.py` — 324 строк ⚠ подошёл к 300
+### `backend/bot/send.py` — 321 строк ⚠ подошёл к 300
 
 Доставка отклика в Telegram: вложение, ограничения сервиса, след в базе.
 
@@ -729,13 +729,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def _shares_provider(a, b) -> bool` (12)
 - `async def ui_send_vacancy_application(bot, vacancy_id: int) -> tuple[bool, str]` (10)
 - `class Errand` (12)
-- `class _Outcome` (15)
+- `class _Outcome` (14)
 - `async def _note_flood_wait(bot, error) -> None` (15)
 - `async def _clear_flood_wait(bot) -> None` (12)
 - `async def _deliver_dm(bot, target, text: str, attachment, vacancy_id) -> tuple[int | None, bool]` (22)
-- `async def _commit_send(bot, hr: HR, text: str, outcome: _Outcome) -> bool` (41)
+- `async def _commit_send(bot, hr: HR, text: str, outcome: _Outcome) -> bool` (40)
 - `def _log_refusal(permission, hr: HR, vacancy_id: int | None) -> None` (7)
-- `async def _flip_applied_alone(bot, outcome: _Outcome) -> None` (29)
+- `async def _flip_applied_alone(bot, outcome: _Outcome) -> None` (28)
 - `async def _hand_over(bot, permission, text: str, attachment, vacancy_id) -> tuple[int | None, bool]` (19)
 - `async def _audit_sent(bot, hr_id: int, chars: int, outcome: _Outcome) -> None` (21)
 - `async def _record_send(bot, hr: HR, text: str, outcome: _Outcome, permission) -> None` (22)
@@ -1027,14 +1027,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def years_in_it(experiences, today: date) -> int` (8)
 - `def skill_years(experiences, today: date) -> int` (8)
 
-### `backend/domain/transitions.py` — 150 строк
+### `backend/domain/transitions.py` — 136 строк
 
 Граф разрешённых авто-переходов статуса вакансии, вместе с условиями
 
 Зависит от: `backend.models`
 
 - `def is_terminal_for_auto(status: VacancyStatus) -> bool` (9)
-- `def should_apply_status(current: VacancyStatus, new: VacancyStatus, *, force: bool=False) -> bool` (23)
+- `def should_apply_status(current: VacancyStatus, new: VacancyStatus) -> bool` (7)
 
 ### `backend/domain/verdict.py` — 100 строк
 
@@ -1054,20 +1054,20 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def spelled_alone(text: str, word: str) -> bool` (9)
 
-### `backend/flows/aggregator_apply.py` — 171 строк
+### `backend/flows/aggregator_apply.py` — 168 строк
 
 Отклики агентом: способ за способом, пока один не удался или способы не кончились.
 
 Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `backend.agent.sessions`, `backend.agent.tools_applier`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_letter`, `backend.domain.apply_order`, `backend.domain.contact_keys`, `backend.domain.hosts`, `backend.flows.aggregator_round`, `backend.flows.events`, `backend.models`, `backend.repository.agent_profile`, `backend.repository.aggregators`, `backend.repository.mail_account`, `backend.repository.vacancy_brief`, `backend.repository.vacancy_contacts`
 
-- `class ApplyOrder` (7)
+- `class ApplyOrder` (5)
 - `async def apply_phase(kit: AgentKit, round_: RoundState, vacancy_ids: list[int]) -> None` (9)
 - `async def apply_vacancy(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> str` (19)
 - `async def _new_title(kit: AgentKit, vacancy_id: int) -> str | None` (8)
 - `async def vacancy_ways(session_factory, vacancy_id: int, closed: set[int]) -> list[Way]` (25)
   - `def clear(link: str | None) -> bool` (2)
 - `async def _ways_for(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> list[Way]` (4)
-- `async def _one_way(kit: AgentKit, round_: RoundState, order: ApplyOrder, way: Way) -> str` (19)
+- `async def _one_way(kit: AgentKit, round_: RoundState, order: ApplyOrder, way: Way) -> str` (18)
 - `async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None` (15)
 - `async def _settle_way(kit: AgentKit, round_: RoundState, job: ApplyJob) -> str` (16)
 
@@ -1124,13 +1124,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parsed_from_row(v: Vacancy) -> ParsedVacancy` (21)
 - `async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool, str]` (39)
 
-### `backend/flows/auto_gate.py` — 48 строк
+### `backend/flows/auto_gate.py` — 49 строк
 
 Заслон автоматики: двигает ли она эту вакансию вообще.
 
 Зависит от: `backend.domain.transitions`, `backend.models`
 
-- `async def status_open_for_auto(session_factory, vacancy_id: int) -> tuple[bool, VacancyStatus | None]` (34)
+- `async def status_open_for_auto(session_factory, vacancy_id: int) -> tuple[bool, VacancyStatus | None]` (35)
 
 ### `backend/flows/batches.py` — 30 строк
 
@@ -2013,7 +2013,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `class ApplicationEntry` (12)
 - `async def application_exists(session: AsyncSession, vacancy_id: int, target: str) -> bool` (2)
-- `async def record_application(session: AsyncSession, entry: ApplicationEntry, *, forced: bool) -> int` (22)
+- `async def record_application(session: AsyncSession, entry: ApplicationEntry) -> int` (22)
 - `async def append_screening(session: AsyncSession, application_id: int, lines) -> None` (8)
 - `class ScreenedApplication` (5)
 - `async def vacancy_screening(session: AsyncSession, vacancy_id: int) -> list[ScreenedApplication]` (12)
@@ -2565,7 +2565,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def vacancy_addresses(session: AsyncSession, vacancy_id: int) -> list[str]` (4)
 - `async def delete_contact(session: AsyncSession, contact_id: int) -> int | None` (8)
 
-### `backend/repository/vacancy_status.py` — 398 строк ⚠ подошёл к 300
+### `backend/repository/vacancy_status.py` — 389 строк ⚠ подошёл к 300
 
 Смена статуса вакансии: решение, запись, история.
 
@@ -2574,7 +2574,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _ensure_trailing_period(s: str | None) -> str | None` (9)
 - `class _Signature` (13)
 - `def _move_status(vacancy: Vacancy, new_status: VacancyStatus, sign: _Signature) -> VacancyStatusHistory` (34)
-- `async def mark_vacancy_applied(session: AsyncSession, vacancy_id: int, explanation: str | None, *, force: bool) -> bool` (25)
+- `async def mark_vacancy_applied(session: AsyncSession, vacancy_id: int, explanation: str | None) -> bool` (18)
 - `async def was_ever_applied(session: AsyncSession, vacancy_id: int) -> bool` (24)
 - `async def last_status_history_id(session: AsyncSession, vacancy_id: int) -> int | None` (13)
 - `async def record_rerun(session: AsyncSession, vacancy_id: int, previous: VacancyStatus, last_history: int | None) -> None` (38)
@@ -3493,22 +3493,6 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## docs — 1 модулей
-
-### `docs/seed/aa4e0de05368_seed_initial_data.py` — 460 строк ⚠ подошёл к 300
-
-seed initial data
-
-Зависит от: `alembic`, `backend.crypto`
-
-- `def _insert(name: str, rows: list[dict], **typed) -> None` (10)
-- `def _seed_profile() -> None` (14)
-- `def _seed_channels() -> None` (3)
-- `def _seed_secrets() -> None` (61)
-- `def _seed_settings() -> None` (27)
-- `def upgrade() -> None` (11)
-- `def downgrade() -> None` (11)
-
 ## tests — 311 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
@@ -4354,13 +4338,13 @@ seed initial data
 
 - `def _place(start, end=None)` (2)
 
-### `tests/backend/test_domain_transitions.py` — 185 строк
+### `tests/backend/test_domain_transitions.py` — 130 строк
 
 Следствия, которые наблюдают тесты `backend/domain/transitions.py`.
 
 Зависит от: `backend.domain.transitions`, `backend.models`
 
-Тестов: 15
+Тестов: 10
 
 - `def ways_out(status: VacancyStatus) -> list[VacancyStatus]` (3)
 
@@ -4698,7 +4682,7 @@ seed initial data
 
 - `async def _contacts(session_factory) -> list[tuple[str, str, str]]` (3)
 
-### `tests/backend/test_flows_parse_persist.py` — 430 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_parse_persist.py` — 426 строк ⚠ подошёл к 300
 
 Что остаётся в базе после разбора объявления.
 
@@ -4799,7 +4783,7 @@ seed initial data
 
 - `async def with_a_vacancy(make_pipeline, session_factory)` (22)
 
-### `tests/backend/test_flows_vacancy_rerun.py` — 301 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_vacancy_rerun.py` — 299 строк
 
 Следствия повторного прогона вакансии кнопкой из карточки.
 
@@ -5142,16 +5126,16 @@ seed initial data
 Тестов: 10
 
 
-### `tests/backend/test_repository_applications.py` — 122 строк
+### `tests/backend/test_repository_applications.py` — 116 строк
 
 Отклик вне Telegram: строка, скрининг и Applied — одной транзакцией.
 
 Зависит от: `backend.models`, `backend.repository.applications`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 7
+Тестов: 6
 
 - `def _entry(vacancy_id, **over) -> ApplicationEntry` (6)
-- `async def _record(session, entry, forced=False)` (3)
+- `async def _record(session, entry)` (3)
 
 ### `tests/backend/test_repository_blacklist_adding.py` — 150 строк
 
@@ -5835,13 +5819,13 @@ seed initial data
 Тестов: 15
 
 
-### `tests/backend/test_repository_vacancy_status.py` — 267 строк
+### `tests/backend/test_repository_vacancy_status.py` — 301 строк ⚠ подошёл к 300
 
-Следствия смены статуса вакансии — руками и автоматически.
+Следствия смены статуса вакансии — руками, откликом и автоматически.
 
 Зависит от: `backend.models`, `backend.payloads`, `backend.repository.vacancies_card`, `backend.repository.vacancy_status`, `tests.dbio`, `tests.factories`
 
-Тестов: 14
+Тестов: 16
 
 
 ### `tests/backend/test_runtime_settings_load.py` — 259 строк

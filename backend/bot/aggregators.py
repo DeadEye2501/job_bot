@@ -127,7 +127,7 @@ async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome:
 
 
 async def apply_via_agent(bot, vacancy_id: int, way: Way) -> AgentOutcome:
-    """Ручной отклик выбранным способом: Applied и из Not Fit, Scam, Ghosting.
+    """Ручной отклик выбранным способом.
     Ни выключенный автоотклик, ни режим ему не помеха: нажал человек."""
     async with bot.session_factory() as session:
         if await session.get(Vacancy, vacancy_id) is None:
@@ -136,7 +136,7 @@ async def apply_via_agent(bot, vacancy_id: int, way: Way) -> AgentOutcome:
         return "locked"
 
     async def work(kit: AgentKit) -> str:
-        outcome = await apply_vacancy(kit, await _new_round(bot), ApplyOrder(vacancy_id, True, way))
+        outcome = await apply_vacancy(kit, await _new_round(bot), ApplyOrder(vacancy_id, way))
         return "ok" if outcome == "applied" else outcome
 
     return await _in_slot(bot, work, f"apply via agent {vacancy_id}")

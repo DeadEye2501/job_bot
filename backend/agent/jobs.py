@@ -71,8 +71,7 @@ class ApplyJob:
     """Отклик одним способом.
 
     `method` — значение `ApplicationVia`; `profile_id` — профиль браузера:
-    агрегатора или «Поиска по сети»; `forced` — ручной отклик, Applied и из
-    Not Fit, Scam, Ghosting; `letter_writer` — значение из `LETTER_WRITERS`;
+    агрегатора или «Поиска по сети»; `letter_writer` — значение из `LETTER_WRITERS`;
     `delivery` — отправка письма с записью отклика, которая переживает сессию.
     """
 
@@ -81,7 +80,6 @@ class ApplyJob:
     target: str
     aggregator_id: int | None
     profile_id: int
-    forced: bool
     simulated: bool
     letter_writer: str
     letter_checks: int = 0

@@ -32,11 +32,9 @@ _NO_OUTCOME = "агент закончил без итога"
 
 @dataclass(frozen=True)
 class ApplyOrder:
-    """Что откликать и как: `forced` — ручной отклик (Applied и из Not Fit, Scam,
-    Ghosting), `only` — один выбранный человеком способ."""
+    """Что откликать и как: `only` — один выбранный человеком способ."""
 
     vacancy_id: int
-    forced: bool
     only: Way | None
 
 
@@ -48,7 +46,7 @@ async def apply_phase(kit: AgentKit, round_: RoundState, vacancy_ids: list[int])
         if title is None:
             continue
         kit.pipeline.emit_progress("apply", f"{title} — отклик", number, total)
-        await apply_vacancy(kit, round_, ApplyOrder(vacancy_id, False, None))
+        await apply_vacancy(kit, round_, ApplyOrder(vacancy_id, None))
 
 
 async def apply_vacancy(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> str:
@@ -118,8 +116,7 @@ async def _ways_for(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> lis
 async def _one_way(kit: AgentKit, round_: RoundState, order: ApplyOrder, way: Way) -> str:
     rs = kit.pipeline.rs
     job = ApplyJob(order.vacancy_id, way.method, way.target, way.aggregator_id,
-                   way.aggregator_id or round_.web_search_id, order.forced,
-                   simulated=rs.send_locked, letter_writer=rs.letter_writer)
+                   way.aggregator_id or round_.web_search_id, simulated=rs.send_locked, letter_writer=rs.letter_writer)
     plan = await _apply_plan(kit, job)
     if plan is None:
         return "exhausted"

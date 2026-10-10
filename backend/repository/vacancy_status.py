@@ -1,9 +1,7 @@
 """Смена статуса вакансии: решение, запись, история.
 
-Поле `vacancy.status` пишется только отсюда. Раньше это было не так — разбор
-объявления ставил статус своей строкой, и заметить это по коду было нечем:
-заслон переходов проверялся тестами графа, а путь записи мимо графа ими не
-покрывался вовсе.
+Поле `vacancy.status` пишется только отсюда: путь записи мимо этого модуля
+не покрывался бы ни тестами графа, ни тестами переходов.
 
 Наружу торчат поводы, а не статусы: отклик ушёл, HR ответил, HR молчит,
 объявление разобрано, человек выбрал руками. Что из повода следует и позволен
@@ -24,7 +22,7 @@ from dataclasses import dataclass
 from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.transitions import should_apply_status
+from backend.domain.transitions import APPLY_MOVES_FROM, should_apply_status
 from backend.models import (
     StatusHistorySource,
     Vacancy,
@@ -75,13 +73,13 @@ def _move_status(
     """Оформить переход вакансии в ``new_status``.
 
     Решать, переводить ли, остаётся зовущему — у каждого пути своё условие
-    (`force` у отклика, граф переходов у классификатора, срок молчания у
-    гашения, воля пользователя у экрана).
+    (`APPLY_MOVES_FROM` у отклика, граф переходов у классификатора, срок
+    молчания у гашения, воля пользователя у экрана).
 
     Отметка «применено» снята только там, где статус остался прежним, а это
     бывает у одного пути из четырёх — у экрана, где комментарий пишется и к
     нынешнему статусу. Трём остальным равный переход не достаётся вовсе:
-    `should_apply_status` отвергает его первой же строкой, а в «пропала»
+    Applied в `APPLY_MOVES_FROM` нет, граф петель не держит, а в «пропала»
     уходят только из «отклик отправлен» и «в работе».
 
     Строку зовущий кладёт в сессию сам: он же решает, нужен ли ему сразу
@@ -104,25 +102,18 @@ def _move_status(
 
 
 async def mark_vacancy_applied(
-    session: AsyncSession, vacancy_id: int, explanation: str | None, *, force: bool
+    session: AsyncSession, vacancy_id: int, explanation: str | None
 ) -> bool:
-    """Перевести вакансию в «отклик отправлен» и записать это в историю.
+    """Отклик состоялся: Applied из `APPLY_MOVES_FROM`, остальное не трогается.
 
-    Липкость статуса уважается: у отказа и у оффера отклик уже ничего не
-    решает, и автоматика их не двигает. `force` приходит от нажатия в окне и
-    пускает в отклик поверх графа только оттуда, где отклика нет или он
-    ничего не дал (`FORCED_APPLY_FROM`).
-
-    Отвечает, состоялся ли перевод. Историю пишет всегда, когда перевод
-    состоялся: без неё карточка показывает сменившийся статус без следа
+    Отвечает, сменился ли статус. Историю пишет всегда, когда смена
+    состоялась: без неё карточка показывает сменившийся статус без следа
     о том, кто и когда его тронул.
 
     Транзакцию закрывает зовущий.
     """
     vacancy = await session.get(Vacancy, vacancy_id)
-    if vacancy is None or not should_apply_status(
-        vacancy.status, VacancyStatus.APPLIED, force=force
-    ):
+    if vacancy is None or vacancy.status not in APPLY_MOVES_FROM:
         return False
     session.add(
         _move_status(vacancy, VacancyStatus.APPLIED, _Signature(explanation))

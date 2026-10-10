@@ -1,17 +1,51 @@
-"""Следствия смены статуса вакансии — руками и автоматически.
+"""Следствия смены статуса вакансии — руками, откликом и автоматически.
 
-Пути два, и ведут они себя по-разному нарочно. Ручная смена с экрана графом
+Пути три, и ведут они себя по-разному нарочно. Ручная смена с экрана графом
 переходов не ограничена: пользователь вправе поставить любой статус, и
-липкие вроде «отказ» его не держат. Автоматическая, от разбора ответа HR,
-графу подчиняется и запрещённый переход не записывает вовсе.
+липкие вроде «отказ» его не держат. Отклик ведёт в Applied только оттуда, где
+отклика ещё не было или с вакансией попрощались. Автоматическая, от разбора
+ответа HR, графу подчиняется и запрещённый переход не записывает вовсе.
 """
 
-from backend.models import StatusHistorySource, VacancyStatus
+import pytest
+
+from backend.models import StatusHistorySource, Vacancy, VacancyStatus
 from backend.payloads import Classification
 from backend.repository.vacancies_card import get_vacancy_detail
-from backend.repository.vacancy_status import apply_classification, change_vacancy_status, update_status_history_explanation
-from tests.dbio import put
+from backend.repository.vacancy_status import (
+    apply_classification,
+    change_vacancy_status,
+    mark_vacancy_applied,
+    update_status_history_explanation,
+)
+from tests.dbio import only_row, put
 from tests.factories import message_row, vacancy_row
+
+
+@pytest.mark.parametrize("status", [
+    VacancyStatus.NEW, VacancyStatus.NOT_FIT, VacancyStatus.SCAM,
+    VacancyStatus.GHOSTING, VacancyStatus.DECLINE,
+])
+async def test_an_application_moves_a_vacancy_to_applied(session_factory, status):
+    row = vacancy_row(status=status)
+    await put(session_factory, row)
+    async with session_factory() as session:
+        assert await mark_vacancy_applied(session, row.id, "Отклик письмом.")
+        await session.commit()
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
+
+
+@pytest.mark.parametrize("status", [
+    VacancyStatus.APPLIED, VacancyStatus.ANSWERED, VacancyStatus.TEST,
+    VacancyStatus.INVITATION, VacancyStatus.IN_PROGRESS, VacancyStatus.OFFER,
+])
+async def test_an_application_leaves_a_vacancy_in_progress_where_it_is(session_factory, status):
+    row = vacancy_row(status=status)
+    await put(session_factory, row)
+    async with session_factory() as session:
+        assert not await mark_vacancy_applied(session, row.id, "Отклик письмом.")
+        await session.commit()
+    assert (await only_row(session_factory, Vacancy)).status is status
 
 
 async def test_a_missing_vacancy_has_no_status_to_change(session, session_factory):

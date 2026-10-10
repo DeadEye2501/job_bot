@@ -4,8 +4,9 @@
 from backend.models import VacancyStatus
 
 # Единый state-machine для авто-переходов статуса вакансии. Источник
-# правды — docs/Статусы.md. Применяется ко ВСЕМ авто-источникам
-# (LLM-классификация HR-реплая, авто-отправка отклика). Ручная смена
+# правды — docs/Статусы.md. Применяется к переходам по чужому ходу
+# (LLM-классификация HR-реплая); отклик двигает статус своим правилом,
+# `APPLY_MOVES_FROM`. Ручная смена
 # статуса юзером через UI (`change_vacancy_status`) граф игнорирует —
 # юзер вправе выставить любой статус из любого.
 #
@@ -112,39 +113,24 @@ GHOSTING_ELIGIBLE_FROM: frozenset[VacancyStatus] = frozenset(
 )
 
 
-# Откуда нажатие «Отправить отклик» проводит вакансию в Applied поверх графа:
-# статусы, где отклика нет или он ничего не дал. Остальные стоят дальше по
-# воронке, и письмо там — продолжение переписки, а не отклик.
-FORCED_APPLY_FROM: frozenset[VacancyStatus] = frozenset(
+# Откуда отклик проводит вакансию в Applied: отклика ещё не было или с
+# вакансией попрощались. Дальше по воронке отклик — реплика переписки, и
+# статус он не трогает. Кто откликнулся, правило не знает.
+APPLY_MOVES_FROM: frozenset[VacancyStatus] = frozenset(
     {
         VacancyStatus.NEW,
         VacancyStatus.NOT_FIT,
         VacancyStatus.SCAM,
         VacancyStatus.GHOSTING,
+        VacancyStatus.DECLINE,
     }
 )
 
 
-def should_apply_status(
-    current: VacancyStatus,
-    new: VacancyStatus,
-    *,
-    force: bool = False,
-) -> bool:
-    """Гейт авто-перехода статуса. Используется во ВСЕХ
-    auto-источниках смены статуса (LLM-классификатор HR-реплая,
-    `Bot.send`).
+def should_apply_status(current: VacancyStatus, new: VacancyStatus) -> bool:
+    """Гейт авто-перехода по графу: ответ HR и таймер молчания.
 
-    Ручную UI-смену статуса (`change_vacancy_status`) граф НЕ покрывает —
-    она работает напрямую, юзер вправе выставить любой статус.
-
-    `force=True` — нажатие «Отправить отклик» в окне. Человек жмёт кнопку
-    отправки, а не меняет статус, поэтому поверх графа оно проводит в APPLIED
-    только из `FORCED_APPLY_FROM`: там ушедшее письмо и есть отклик. С
-    вакансии, ушедшей по воронке дальше (Answered, Test, Offer…), письмо —
-    очередная реплика переписки, и откат в APPLIED записал бы то, чего не
-    было; переход там решает обычный граф.
+    Ручную смену статуса с экрана (`change_vacancy_status`) граф не
+    покрывает: человек вправе выставить любой статус из любого.
     """
-    if force and new == VacancyStatus.APPLIED and current in FORCED_APPLY_FROM:
-        return True
     return new in ALLOWED_AUTO_TRANSITIONS[current]

@@ -117,61 +117,6 @@ def test_ghosting_releases_a_vacancy_when_the_hr_finally_answers(revived):
     assert should_apply_status(VacancyStatus.GHOSTING, revived)
 
 
-def test_the_send_button_revives_a_rejected_vacancy():
-    """Кнопка «Отправить отклик» проводит Not Fit в Applied поверх графа."""
-    assert not should_apply_status(VacancyStatus.NOT_FIT, VacancyStatus.APPLIED)
-    assert should_apply_status(
-        VacancyStatus.NOT_FIT, VacancyStatus.APPLIED, force=True
-    )
-
-
-@pytest.mark.parametrize(
-    "current",
-    [VacancyStatus.NEW, VacancyStatus.SCAM, VacancyStatus.GHOSTING],
-)
-def test_the_send_button_applies_where_no_application_counts(current):
-    """Там, где отклика нет или он ничего не дал, ушедшее письмо и есть отклик."""
-    assert should_apply_status(current, VacancyStatus.APPLIED, force=True)
-
-
-@pytest.mark.parametrize(
-    "current",
-    [
-        VacancyStatus.ANSWERED,
-        VacancyStatus.INVITATION,
-        VacancyStatus.TEST,
-        VacancyStatus.IN_PROGRESS,
-        VacancyStatus.OFFER,
-        VacancyStatus.DECLINE,
-    ],
-)
-def test_the_send_button_never_rolls_a_vacancy_back_to_applied(current):
-    """С вакансии, ушедшей по воронке дальше, кнопка в «отклик» не откатывает.
-
-    Человек жмёт отправку, а не меняет статус: письмо там — очередная реплика
-    переписки, а не отклик.
-    """
-    assert not should_apply_status(current, VacancyStatus.APPLIED, force=True)
-
-
-def test_a_second_send_adds_no_second_applied():
-    """Второе письмо по уже откликнутой вакансии записи не заводит.
-
-    Статус уже говорит то же самое, что сказала бы новая строка, а петель в
-    графе нет.
-    """
-    assert not should_apply_status(
-        VacancyStatus.APPLIED, VacancyStatus.APPLIED, force=True
-    )
-
-
-def test_the_send_button_opens_nothing_but_applied():
-    """Признак force открывает дорогу только в Applied и никуда больше."""
-    assert not should_apply_status(
-        VacancyStatus.NEW, VacancyStatus.OFFER, force=True
-    )
-
-
 @pytest.mark.parametrize("status", list(VacancyStatus))
 def test_ghosting_eligibility_agrees_with_the_gate(status):
     """Список кандидатов на Ghosting по таймеру совпадает с тем, что пропускают ворота.
