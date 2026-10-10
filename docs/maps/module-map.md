@@ -1773,7 +1773,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
 - `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (55)
 
-### `backend/llm/rules.py` — 267 строк
+### `backend/llm/rules.py` — 272 строк
 
 Приметы предметной области, общие для наставлений модели.
 
@@ -5194,13 +5194,13 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_repository_agent_profile.py` — 88 строк
+### `tests/backend/test_repository_agent_profile.py` — 101 строк
 
 Анкета для агента: всё, на что опираются промпты, со стажем от кода.
 
-Зависит от: `backend.models`, `backend.repository.agent_profile`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`
+Зависит от: `backend.llm.rules`, `backend.models`, `backend.repository.agent_profile`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`
 
-Тестов: 6
+Тестов: 7
 
 - `async def _person(session_factory, **fields)` (4)
 
