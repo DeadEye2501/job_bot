@@ -6,6 +6,15 @@
 import { BLOCKED_TITLE, sourceBlock, sourceToggle } from './sources.js';
 import { UNNAMED } from './unnamed.js';
 
+/** Слова вкладки «Каналы». */
+export const CHANNELS_TAB = {
+  search: 'Поиск канала...',
+  add: 'Добавить канал',
+  pick: 'Выберите канал в списке',
+  none: 'Каналов пока нет',
+  master: 'каналов',
+};
+
 /** Чем подписать канал в списке.
  *
  * Название — сверху, ник — под ним: по названию канал узнают, по нику ищут.

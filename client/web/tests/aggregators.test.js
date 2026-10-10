@@ -8,6 +8,7 @@ import {
   aggregatorLastRun,
   aggregatorToggle,
   aggregatorWhere,
+  loginMark,
 } from '../state/aggregators.js';
 import { MASTER_OFF_TITLE } from '../state/sources.js';
 
@@ -111,5 +112,20 @@ describe('запор действий агента', () => {
 
   it('всё живо — не заперто', () => {
     expect(actionBlock({ running: false, lock: null, lockedTip: '' })).toBe('');
+  });
+});
+
+describe('значок входа рядом с именем', () => {
+  it('говорит, выполнен ли вход, и зовёт войти заново', () => {
+    expect(loginMark(false, '')).toEqual({ done: false, icon: 'login', title: 'Войти на сайт' });
+    expect(loginMark(true, '')).toEqual({
+      done: true,
+      icon: 'how_to_reg',
+      title: 'Вход выполнен — нажмите, чтобы войти заново',
+    });
+  });
+
+  it('запертый называет запор, а не вход', () => {
+    expect(loginMark(true, 'Идёт обход').title).toBe('Идёт обход');
   });
 });

@@ -11,10 +11,17 @@
   import BlacklistMenuItem from '$components/BlacklistMenuItem.svelte';
   import CardPane from '$components/CardPane.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
+  import LoginMark from '$components/LoginMark.svelte';
   import MenuItem from '$components/MenuItem.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import SourceStats from '$components/SourceStats.svelte';
-  import { LOGIN_FIRST, actionBlock, aggregatorLastRun, aggregatorWhere } from '$state/aggregators.js';
+  import {
+    LOGIN_FIRST,
+    actionBlock,
+    aggregatorLastRun,
+    aggregatorWhere,
+    loginMark,
+  } from '$state/aggregators.js';
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
   import { RUNNING } from '$state/progress.js';
@@ -52,9 +59,8 @@
   });
 
   const blocking = cardBlocking({
-    ask: (...args) => ask(...args),
-    block: 'aggregators.block',
-    unblock: 'aggregators.unblock',
+    block: (id) => ask('aggregators.block', id),
+    unblock: (id) => ask('aggregators.unblock', id),
     say: (text) => say(text),
     reread: () => source.read(aggregatorId),
     onchanged: () => onchanged(),
@@ -106,18 +112,11 @@
       <div class="login-line">
         <div class="cnt-det-name">{card.name}</div>
         {#if !card.is_web_search}
-          <!-- Вход — значком рядом с именем: он же и показывает, выполнен ли
-               вход, и по нажатию открывает сайт войти (заново). -->
-          <button
-            class="icon-btn login-mark"
-            class:done={card.is_logged_in}
-            type="button"
-            title={block || (card.is_logged_in ? 'Вход выполнен — нажмите, чтобы войти заново' : 'Войти на сайт')}
+          <LoginMark
+            mark={loginMark(card.is_logged_in, block)}
             disabled={!!block}
-            onclick={login}
-          >
-            <span class="material-symbols-outlined">{card.is_logged_in ? 'how_to_reg' : 'login'}</span>
-          </button>
+            onlogin={login}
+          />
         {/if}
       </div>
 

@@ -10,10 +10,10 @@ import { rereading, tracing } from './bridge_stub.js';
 /** Карточка, записывающая всё, что с ней сделали. */
 function card(answer, female = false) {
   const trail = [];
+  const ask = tracing(trail, answer);
   const blocking = cardBlocking({
-    ask: tracing(trail, answer),
-    block: 'companies.block',
-    unblock: 'companies.unblock',
+    block: (id) => ask('companies.block', id),
+    unblock: (id) => ask('companies.unblock', id),
     female,
     say: (text) => trail.push(`сказано: ${text}`),
     reread: rereading(trail),

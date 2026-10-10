@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { watchSourceCard } from '$state/contacts_watch.js';
+import { watchSourceCard } from '$state/source_card.svelte.js';
 
 function bridge() {
   const handlers = {};
