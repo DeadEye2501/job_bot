@@ -5,6 +5,7 @@
 
 import { candidate } from './picker.js';
 import { atHandle, handleName, nameOrHandle } from './telegram.js';
+import { titled } from './unnamed.js';
 
 // Чем назван человек, которого назвать нечем. Прочерк, а не номер: строка
 // стоит среди имён, и «Человек #7» человек принимает за имя. Номер остаётся
@@ -96,8 +97,7 @@ export function personLine(person) {
  * как имя.
  */
 export function personTitle(person) {
-  const named = Boolean(person.name || person.telegram_username);
-  return { name: named ? personName(person) : UNNAMED, named };
+  return titled(person.name || person.telegram_username ? personName(person) : '', UNNAMED);
 }
 
 /** Чем подписан человек в шапке своей карточки.
@@ -106,7 +106,7 @@ export function personTitle(person) {
  * и сверху читался бы дважды.
  */
 export function personHead(person) {
-  return { name: person.name || UNNAMED, named: Boolean(person.name) };
+  return titled(person.name, UNNAMED);
 }
 
 /** Человек в том виде, в каком его показывает окно выбора.

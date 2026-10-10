@@ -665,7 +665,7 @@
 - * Заводит запись правки поля. * * Перечитываем и после отказа: поля правятся на месте, и отклонённое мостом * значение — а негодный ник мост отклоняет — осталось бы на экране. Человек * читал бы своё, а в базе лежало бы прежнее. * * Списку говорят только по удаче: не изменилось ничего, и перечитывать его * значило бы гонять мост ради того же вида.
 - отдаёт: cardSave
 
-### state/channels.js (69)
+### state/channels.js (68)
 - * Слова вкладки «Каналы».
 - отдаёт: CHANNELS_TAB, channelName, channelTitle, channelToggle, pollBlock
 
@@ -829,9 +829,9 @@
 - * Ник с собакой — или пусто, когда ника нет. Чем подписать отсутствие, решает * место показа: у каждого своё слово.
 - отдаёт: atHandle, handleName, nameOrHandle, telegramHref
 
-### state/unnamed.js (17)
+### state/unnamed.js (26)
 - * Чем подписана запись без названия. Показывают её приглушённой * (`styles/unnamed.css`) — так видно, что это не название, а его отсутствие.
-- отдаёт: UNNAMED
+- отдаёт: UNNAMED, titled
 
 ### state/vacancies.js (301)
 - * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
@@ -1633,9 +1633,9 @@ body, html, button, body, .material-symbols-outlined
 ### tests/bridge.test.js (161)
 - —
 
-### tests/bridge_stub.js (85)
+### tests/bridge_stub.js (95)
 - * Подписка на вести моста: обработчики копятся по имени, `fire` зовёт их так * же, как мост, `heard` говорит, слушают ли весть.
-- отдаёт: answering, held, listening, replying, rereading, roundGoes, tracing
+- отдаёт: answering, held, listening, relisting, replying, rereading, roundGoes, saying, tracing
 
 ### tests/calendar.test.js (60)
 - —
@@ -1644,7 +1644,7 @@ body, html, button, body, .material-symbols-outlined
 - * Карточка, записывающая всё, что с ней сделали.
 
 ### tests/card_finish.test.js (89)
-- * Панель, записывающая всё, что с ней сделали, — в том порядке, в каком делали.
+- * Панель, записывающая всё, что с ней сделали, — в том порядке, в каком делали. * `own` подменяет зов, подпись и прочее своё у карточки.
 
 ### tests/card_links.test.js (37)
 - —

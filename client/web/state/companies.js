@@ -9,7 +9,7 @@
 // моста, ни разметки этот файл не знает.
 
 import { candidate } from './picker.js';
-import { UNNAMED } from './unnamed.js';
+import { titled } from './unnamed.js';
 
 /** Чем подписать компанию в списке.
  *
@@ -39,7 +39,7 @@ export function companyLine(company) {
  * в ряду названий он читался бы как название.
  */
 export function companyTitle(company) {
-  return { name: company.name || UNNAMED, named: Boolean(company.name) };
+  return titled(company.name);
 }
 
 /** Пустой черновик заведения компании.

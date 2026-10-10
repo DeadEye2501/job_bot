@@ -5,7 +5,7 @@
 
 import { BLOCKED_TITLE, sourceBlock, sourceToggle } from './sources.js';
 import { atHandle, nameOrHandle } from './telegram.js';
-import { UNNAMED } from './unnamed.js';
+import { titled } from './unnamed.js';
 
 /** Слова вкладки «Каналы». */
 export const CHANNELS_TAB = {
@@ -37,8 +37,7 @@ export function channelName(channel) {
  * названий и читался бы как название. По второму ответу подпись глушат серым.
  */
 export function channelTitle(channel) {
-  const named = Boolean(channel.title || channel.username);
-  return { name: named ? channelName(channel).name : UNNAMED, named };
+  return titled(channel.title || channel.username ? channelName(channel).name : '');
 }
 
 /** Чем заперт ручной прогон канала; пусто — прогонять можно.

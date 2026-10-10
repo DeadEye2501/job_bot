@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { cardBlocking } from '../state/card_block.js';
 
-import { rereading, tracing } from './bridge_stub.js';
+import { relisting, rereading, saying, tracing } from './bridge_stub.js';
 
 /** Карточка, записывающая всё, что с ней сделали. */
 function card(answer, female = false) {
@@ -15,9 +15,9 @@ function card(answer, female = false) {
     block: (id) => ask('companies.block', id),
     unblock: (id) => ask('companies.unblock', id),
     female,
-    say: (text) => trail.push(`сказано: ${text}`),
+    say: saying(trail),
     reread: rereading(trail),
-    onchanged: () => trail.push('список перечитан'),
+    onchanged: relisting(trail),
   });
   return { blocking, trail };
 }

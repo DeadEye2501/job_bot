@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { cardSave } from '../state/card_save.js';
 
-import { rereading, tracing } from './bridge_stub.js';
+import { relisting, rereading, tracing } from './bridge_stub.js';
 
 /** Карточка, записывающая всё, что с ней сделали. */
 function card(answer) {
@@ -14,7 +14,7 @@ function card(answer) {
     ask: tracing(trail, answer),
     reread: rereading(trail),
     method: 'hr.update',
-    onchanged: () => trail.push('список перечитан'),
+    onchanged: relisting(trail),
   });
   return { save, trail };
 }

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { cardNotes } from '../state/card_notes.js';
 
-import { tracing } from './bridge_stub.js';
+import { relisting, tracing } from './bridge_stub.js';
 
 /** Карточка с заметкой, записывающая всё, что с ней сделали. */
 function card(answer, live = true) {
@@ -15,7 +15,7 @@ function card(answer, live = true) {
     method: 'hr.update',
     payload: (id, text) => ({ hr_id: id, notes: text }),
     alive: () => live,
-    onchanged: () => trail.push('список перечитан'),
+    onchanged: relisting(trail),
   });
   return { saveNotes, trail };
 }

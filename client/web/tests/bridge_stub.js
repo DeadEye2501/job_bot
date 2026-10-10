@@ -64,6 +64,16 @@ export function tracing(trail, answer) {
   };
 }
 
+/** Слово человеку, пишущее в тот же след. */
+export function saying(trail) {
+  return (text) => trail.push(`сказано: ${text}`);
+}
+
+/** Перечитывание списка, пишущее в тот же след. */
+export function relisting(trail) {
+  return () => trail.push('список перечитан');
+}
+
 /** Отложенное перечитывание карточки, пишущее в тот же след.
  *
  *  Отложено нарочно: сними кто-нибудь `await` перед ним, и список узнал бы о
