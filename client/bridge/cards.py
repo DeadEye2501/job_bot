@@ -32,6 +32,8 @@ from dataclasses import dataclass
 
 import logging
 
+from sqlalchemy.exc import IntegrityError
+
 from backend.incoming import text_or_none
 from client.bridge.answer import BAD_PAYLOAD, Denied, asked_id, bad_fields, reply
 from client.bridge.page import read_page, read_search
@@ -211,6 +213,20 @@ def create_card(hub, subject: CardSubject, payload: dict) -> dict:
         return {"action": subject.create_action, "created_id": created_id}
 
     return reply(hub.runner, run())
+
+
+async def created_or_taken(session, create: Callable, taken: str, **echo) -> int:
+    """Номер заведённой строки — или отказ словами, если такая уже есть.
+
+    Отказ базы говорит про нарушенное ограничение таблицы, а человеку надо
+    знать, что карточка уже заведена и её ищут, а не заводят снова. `create`
+    зовётся без доводов: поля у предметов свои, и подставляет их зовущий.
+    """
+    try:
+        async with session.begin():
+            return (await create()).id
+    except IntegrityError:
+        raise Denied(taken, **echo)
 
 
 async def _deleting(hub, subject: CardSubject, entity_id: int) -> dict:

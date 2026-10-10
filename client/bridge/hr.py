@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from sqlalchemy.exc import IntegrityError
-
 from backend.repository import hr_card, hr_identify, vacancies_mini
 from client.bridge.answer import Denied, denied, reply
 from client.bridge.cards import (
     CardSubject,
     asked_update,
     create_card,
+    created_or_taken,
     delete_card,
     listed,
     merge_candidates,
@@ -38,21 +37,17 @@ async def create_hr_row(session, fields: dict, **echo) -> int:
     без номера учётной записи не отличима от любой другой — в следующий раз
     человек завёл бы вторую такую же вместо того, чтобы найти эту.
 
-    Занятый номер учётной записи объясняется словами, а не отказом базы: тот
-    говорит про нарушенное ограничение таблицы, а человеку надо знать, что
-    карточка этого собеседника уже есть — её завёл бот, а ищут её по имени.
-    Соседний файл-близнец такой же случай объясняет так же.
+    Занятый номер учётной записи значит, что карточку этого собеседника уже
+    завёл бот, и искать её надо по имени.
 
     Поля отказа отдаёт зовущий: подборщику нужен номер вакансии, из которой
     заводят, окну контактов — ничего.
     """
     if not hr_is_identified(fields):
         raise Denied(IDENTITY_REQUIRED, **echo)
-    try:
-        async with session.begin():
-            return (await hr_identify.create_hr(session, **fields)).id
-    except IntegrityError:
-        raise Denied(HR_TELEGRAM_TAKEN, **echo)
+    return await created_or_taken(
+        session, lambda: hr_identify.create_hr(session, **fields), HR_TELEGRAM_TAKEN, **echo
+    )
 
 
 HR_CARD = CardSubject(

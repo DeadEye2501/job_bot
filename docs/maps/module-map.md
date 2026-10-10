@@ -1083,9 +1083,9 @@ First-run bootstrap: ensure DB schema exists.
 
 Вход на сайт агрегатора: человек входит в видимом браузере, агент проверяет вход.
 
-Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.login`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.models`
+Зависит от: `backend.agent.human_gate`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.login`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.models`
 
-- `async def log_in(kit: AgentKit, source: Source) -> str` (21)
+- `async def log_in(kit: AgentKit, source: Source) -> str` (22)
 
 ### `backend/flows/aggregator_name.py` — 89 строк
 
@@ -2815,7 +2815,7 @@ Runtime settings layer.
 - `def detach_bot(hub) -> tuple[object | None, Future | None]` (10)
 - `async def stop_bot(bot, bot_task: Future | None, asking: Callable[[], Awaitable[None]] | None=None, timeout: float=STOP_TIMEOUT_S) -> bool` (41)
 
-### `client/bridge/cards.py` — 257 строк
+### `client/bridge/cards.py` — 273 строк
 
 Карточка контакта: то, что человек и компания делают одним и тем же телом.
 
@@ -2833,6 +2833,7 @@ Runtime settings layer.
 - `def delete_card(hub, subject: CardSubject, entity_id: int) -> dict` (6)
 - `def create_card(hub, subject: CardSubject, payload: dict) -> dict` (21)
   - `async def run() -> dict` (6)
+- `async def created_or_taken(session, create: Callable, taken: str, **echo) -> int` (12)
 - `async def _deleting(hub, subject: CardSubject, entity_id: int) -> dict` (12)
 - `def asked_update(payload: dict, subject: CardSubject) -> tuple` (17)
 - `def _tell(hub, subject: CardSubject) -> None` (9)
@@ -2878,7 +2879,7 @@ Runtime settings layer.
 
 - `def _filter_languages(items) -> list[tuple[str, str]]` (35)
 
-### `client/bridge/companies.py` — 258 строк
+### `client/bridge/companies.py` — 259 строк
 
 Компания как запись в контактах: найти, показать, поправить, убрать.
 
@@ -2967,13 +2968,13 @@ Runtime settings layer.
 - `def _slashed(country: str | None, city: str | None) -> str | None` (10)
 - `def read_new_vacancy_fields(payload: dict) -> dict` (39)
 
-### `client/bridge/hr.py` — 234 строк
+### `client/bridge/hr.py` — 229 строк
 
 Экран «Контакты / HR»: список людей, их карточка и правки в ней.
 
 Зависит от: `backend.repository`, `client.bridge.answer`, `client.bridge.cards`, `client.bridge.form_payloads`, `client.bridge.hr_chat`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.media`, `client.bridge.pickers`, `client.bridge.refusals`
 
-- `async def create_hr_row(session, fields: dict, **echo) -> int` (23)
+- `async def create_hr_row(session, fields: dict, **echo) -> int` (19)
 - `class Hr(HrChat)` (152)
   - `def list(self, payload: dict | None=None) -> dict` (7)
   - `def detail(self, hr_id: int) -> dict` (26)

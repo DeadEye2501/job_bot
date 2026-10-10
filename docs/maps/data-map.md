@@ -656,10 +656,6 @@
   - `forced: bool`
   - `only: Way | None`
 
-### `backend/flows/aggregator_login.py`
-
-- `_LOGIN_WAIT_SEC` = `3600`
-
 ### `backend/flows/aggregator_name.py`
 
 - `logger` = `logging.getLogger(__name__)`

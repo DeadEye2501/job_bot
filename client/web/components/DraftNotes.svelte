@@ -5,17 +5,16 @@
   // длины у заметок общие, и разъехавшись, они назвали бы одно и то же поле в
   // двух окнах по-разному.
   //
-  // Потолок тот же, что держит база: обрезанное на записи значение человек
-  // прочёл бы как потерянное.
-  //
   // Черновик правится на месте: он приходит своим объектом от того, кто его
   // потом и отправит.
+  import { NOTES_LIMIT } from '$state/card_notes.js';
+
   let { draft } = $props();
 </script>
 
 <textarea
   class="textarea"
-  maxlength="2000"
+  maxlength={NOTES_LIMIT}
   placeholder="Заметки"
   bind:value={draft.notes}
 ></textarea>
