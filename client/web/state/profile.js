@@ -59,18 +59,23 @@ export function fileSize(bytes) {
   return `${(size / MB).toFixed(1)} МБ`;
 }
 
-/** Что показать про файл резюме: имя, подпись под ним и признак пропажи.
+/** Что показать про файл резюме: имя и подпись под ним.
  *
- * Пропажа названа отдельно и словами: путь в настройках есть, бот прикладывает
- * резюме к каждому отклику, а файла на диске нет — молчи об этом экран, человек
- * узнал бы об этом от HR.
+ * Пропажа названа словами: путь в настройках есть, бот прикладывает резюме к
+ * каждому отклику, а файла на диске нет — молчи об этом экран, человек узнал
+ * бы об этом от HR.
  */
 export function cvNote(meta) {
-  if (!meta) return { name: 'Файл не выбран', note: '', missing: false };
-  const missing = !meta.exists;
+  if (!meta) return { name: 'Файл не выбран', note: '' };
   const parts = [fileSize(meta.size)];
-  if (missing) parts.push('файл не найден');
-  return { name: meta.name, note: parts.join(' · '), missing };
+  if (!meta.exists) parts.push('файл не найден');
+  return { name: meta.name, note: parts.join(' · ') };
+}
+
+/** Можно ли открыть файл резюме: открывать нечего, когда файла нет на диске —
+ *  система показала бы свою ошибку вместо нашей строки «файл не найден». */
+export function cvOpenable(meta) {
+  return Boolean(meta?.exists);
 }
 
 /** Когда анкету правили в последний раз.

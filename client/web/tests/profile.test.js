@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   blankProfile,
   cvNote,
+  cvOpenable,
   fileSize,
   langRow,
   named,
@@ -55,21 +56,27 @@ describe('размер файла резюме', () => {
 });
 
 describe('строка про файл резюме', () => {
+  it('открыть можно только файл, который есть на диске', () => {
+    expect(cvOpenable(null)).toBe(false);
+    expect(cvOpenable({ name: 'cv.pdf', size: 1, exists: false })).toBe(false);
+    expect(cvOpenable({ name: 'cv.pdf', size: 1, exists: true })).toBe(true);
+  });
+
   it('без файла так и сказано', () => {
     // Пустое место читалось бы как «файл есть, но имя не показали».
-    expect(cvNote(null)).toEqual({ name: 'Файл не выбран', note: '', missing: false });
+    expect(cvNote(null)).toEqual({ name: 'Файл не выбран', note: '' });
   });
 
   it('файл на месте — имя и размер', () => {
     expect(cvNote({ name: 'cv.pdf', size: 2048, exists: true }))
-      .toEqual({ name: 'cv.pdf', note: '2 КБ', missing: false });
+      .toEqual({ name: 'cv.pdf', note: '2 КБ' });
   });
 
   it('файл прописан, но исчез с диска — сказано прямо', () => {
     // Это главный случай: путь в настройках есть, бот прикладывает резюме к
     // отклику, а файла нет. Молчи об этом экран — человек узнал бы от HR.
     expect(cvNote({ name: 'cv.pdf', size: 2048, exists: false }))
-      .toEqual({ name: 'cv.pdf', note: '2 КБ · файл не найден', missing: true });
+      .toEqual({ name: 'cv.pdf', note: '2 КБ · файл не найден' });
   });
 });
 

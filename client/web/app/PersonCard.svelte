@@ -23,6 +23,7 @@
   import { sendBlock } from '$state/chat.js';
   import { miniRead } from '$state/mini_read.js';
   import { personCandidate, personHead, personName } from '$state/people.js';
+  import { atHandle } from '$state/telegram.js';
   import { plural } from '$state/words.js';
 
   import PersonChat from './PersonChat.svelte';
@@ -185,7 +186,7 @@
     <input
       class="input cnt-input"
       maxlength="64"
-      value={card.telegram_username ? `@${card.telegram_username}` : ''}
+      value={atHandle(card.telegram_username)}
       placeholder="Telegram @username"
       onchange={(event) => save({ telegram_username: event.currentTarget.value.trim() })}
     />

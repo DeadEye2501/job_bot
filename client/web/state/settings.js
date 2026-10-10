@@ -4,6 +4,7 @@
 // строки и признаки. Ни моста, ни разметки этот файл не знает.
 
 import { fillPercent } from './chosen.js';
+import { atHandle } from './telegram.js';
 
 /** Чем подписано пустое поле имени модели.
  *
@@ -293,7 +294,7 @@ export function fileCreds(path) {
  */
 export function sessionPill(tg) {
   if (!tg?.has_session) return { text: 'Нет сессии', tone: 'err', title: '' };
-  return { text: tg.username ? `@${tg.username}` : 'Сессия активна', tone: 'ok', title: '' };
+  return { text: atHandle(tg.username) || 'Сессия активна', tone: 'ok', title: '' };
 }
 
 /** Плашка почты для откликов в шапке секции: подключённая называет адрес.

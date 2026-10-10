@@ -5,7 +5,7 @@
 
 import { showStamp } from './dates.js';
 import { RUNNING } from './progress.js';
-import { handleName } from './telegram.js';
+import { atHandle, handleName } from './telegram.js';
 import { plural } from './words.js';
 
 /** Почему отклик и переразбор сейчас недоступны.
@@ -104,7 +104,7 @@ export function rawChips(card) {
   // заведения, и второе на день-другой позже первого.
   const stamp = showStamp(card.posted_at || card.created_at);
   const chips = [
-    card.channel_username ? { icon: 'tag', text: `@${card.channel_username}` } : null,
+    card.channel_username ? { icon: 'tag', text: atHandle(card.channel_username) } : null,
     card.aggregator_name ? { icon: 'language', text: siteName(card) } : null,
     card.source_msg_id === null || card.source_msg_id === undefined
       ? null

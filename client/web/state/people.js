@@ -4,7 +4,7 @@
 // списки. Ни моста, ни разметки этот файл не знает.
 
 import { candidate } from './picker.js';
-import { handleName } from './telegram.js';
+import { atHandle, handleName, nameOrHandle } from './telegram.js';
 
 // Чем назван человек, которого назвать нечем. Прочерк, а не номер: строка
 // стоит среди имён, и «Человек #7» человек принимает за имя. Номер остаётся
@@ -29,7 +29,7 @@ export function personName(person) {
  * его отличить.
  */
 export function unreadLine(row) {
-  const handle = row.telegram_username ? `@${row.telegram_username}` : '';
+  const handle = atHandle(row.telegram_username);
   const name = (row.name || '').trim();
   return {
     name: nameOrHandle(name, row.telegram_username, `HR #${row.hr_id}`),
@@ -124,17 +124,4 @@ export function personCandidate(person) {
     count: person.vacancy_count,
     blocked: person.is_blacklisted,
   });
-}
-
-/** Цепочка запасных имён: имя, за ним ник, за ним переданное последнее слово.
- *
- * Имя приходит из переписки и бывает пустым, ник есть почти всегда — по нему
- * человека и узнают в самом Telegram. Нет ни того ни другого (учётная запись
- * скрыла ник) — остаётся то, чем зовёт безымянного место показа: карточка и
- * список непрочитанных зовут его по-разному.
- */
-function nameOrHandle(name, username, unnamed) {
-  if (name) return name;
-  if (username) return `@${username}`;
-  return unnamed;
 }

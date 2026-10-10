@@ -15,7 +15,10 @@ import WizardCv from '../app/WizardCv.svelte';
 afterEach(cleanup);
 
 const ANSWERS = {
-  'profile.get': { cv_meta: { name: 'резюме.pdf', size: 1024 }, cv_path: 'C:/резюме.pdf' },
+  'profile.get': {
+    cv_meta: { name: 'резюме.pdf', size: 1024, exists: true },
+    cv_path: 'C:/резюме.pdf',
+  },
   'profile.parse_cv': { started: true },
 };
 
@@ -60,6 +63,14 @@ async function parsing(trail) {
 }
 
 describe('живой шаг резюме', () => {
+  it('взятый файл назван строкой резюме с размером, и его можно заменить', async () => {
+    step();
+
+    await vi.waitFor(() => expect(screen.getByText('резюме.pdf')).toBeTruthy());
+    expect(screen.getByText('1 КБ')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Заменить' })).toBeTruthy();
+  });
+
   it('удавшийся разбор уводит шаг дальше', async () => {
     const { trail, finished } = step();
     await parsing(trail);

@@ -3,6 +3,8 @@
 // Своим модулем, а не у людей или компаний: окном выбирают и тех и других, а
 // правила у него одни — предметного в них нет ничего.
 
+import { atHandle } from './telegram.js';
+
 /** Отперта ли кнопка «Связать».
  *
  * Промах мышью по строке списка не должен менять привязку: выбор строки только
@@ -45,7 +47,7 @@ export function candidate({ id, icon, avatar = null, line, count, blocked }) {
 export function labelOf(row, named) {
   const shown = named(row);
   return row.name && row.telegram_username
-    ? `${shown} · @${row.telegram_username}`
+    ? `${shown} · ${atHandle(row.telegram_username)}`
     : shown;
 }
 
