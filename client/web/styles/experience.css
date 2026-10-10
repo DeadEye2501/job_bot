@@ -59,14 +59,7 @@
 .exp-delete {
   display: inline-flex;
   align-items: center;
-  color: var(--text-tertiary);
   cursor: pointer;
-  padding: 2px;
-  border-radius: 4px;
-}
-
-.exp-delete .material-symbols-outlined {
-  font-size: 16px;
 }
 
 .exp-body {

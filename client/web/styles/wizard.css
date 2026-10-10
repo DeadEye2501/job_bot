@@ -130,12 +130,6 @@
   font-weight: 500;
 }
 
-.wiz-title {
-  color: var(--text-primary);
-  font-size: 1.05rem;
-  font-weight: 500;
-}
-
 .wiz-text {
   margin: 0;
   color: var(--text-secondary);
@@ -213,8 +207,11 @@
 }
 
 /* Поля мастера светлее тела: их здесь три-четыре на экран, и рамкой одной они
-   не отделяются от коробки, на которой стоят. */
-.wiz-window .input {
+   не отделяются от коробки, на которой стоят. Выбор поставщика стоит в ряду
+   полей и берёт их плотность: список общий со всем окном, а поля мастера
+   крупнее прочих — как и его кнопки. */
+.wiz-window .input,
+.wiz-window .cdd-btn {
   background: var(--bg-tertiary);
   padding: 7px 10px;
   font-size: 0.86rem;
@@ -253,14 +250,6 @@
   flex-direction: column;
   gap: 6px;
   margin-top: 12px;
-}
-
-/* Выбор поставщика стоит в ряду полей и берёт их плотность: список общий со
-   всем окном, а поля мастера крупнее прочих — как и его кнопки. */
-.wiz-window .cdd-btn {
-  background: var(--bg-tertiary);
-  padding: 7px 10px;
-  font-size: 0.86rem;
 }
 
 /* Подсказка под самим полем идёт вплотную: снизу её отделяет уже зазор полей. */
