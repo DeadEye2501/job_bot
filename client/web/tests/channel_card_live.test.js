@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import ChannelCard from '../app/ChannelCard.svelte';
 import { hearRound } from '../state/round.svelte.js';
+import { answering, roundGoes } from './bridge_stub.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
@@ -36,14 +37,12 @@ const CARD = {
 };
 
 function screen() {
-  const asked = [];
+  const { asked, ask } = answering((method) =>
+    method === 'channels.detail' ? CARD : { vacancies: [], has_more: false },
+  );
   const shown = render(ChannelCard, {
     props: {
-      ask: async (method) => {
-        asked.push(method);
-        if (method === 'channels.detail') return CARD;
-        return { vacancies: [], has_more: false };
-      },
+      ask,
       say: () => {},
       lockedTip: '',
       events: { on: () => () => {} },
@@ -58,7 +57,7 @@ function screen() {
 
 /** Сколько раз спросили названный слот. */
 function times(asked, method) {
-  return asked.filter((one) => one === method).length;
+  return asked.filter((one) => one.method === method).length;
 }
 
 describe('живая карточка канала', () => {
@@ -78,9 +77,7 @@ describe('живая карточка канала', () => {
   });
 
   it('во время обхода «Прогнать сейчас» заперт и называет обход', async () => {
-    const handlers = {};
-    hearRound({ on: (name, hear) => ((handlers[name] = hear), () => {}) });
-    handlers.ingestion_started();
+    roundGoes();
     const { shown } = screen();
     await settled();
 

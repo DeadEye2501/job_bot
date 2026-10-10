@@ -7,6 +7,7 @@
 import { flushSync, mount, unmount } from 'svelte';
 
 import VacancyCard from '../app/VacancyCard.svelte';
+import { answering } from './bridge_stub.js';
 import { livingProps } from './live_props.svelte.js';
 
 /** Смонтировать карточку вакансии №7 над мостом `answer(method, payload)`.
@@ -15,13 +16,10 @@ import { livingProps } from './live_props.svelte.js';
  * одного свойства — как её делает живой родитель — и разборку.
  */
 export function mountVacancyCard(answer) {
-  const asked = [];
+  const { asked, ask } = answering(answer);
   const said = [];
   const [props, change] = livingProps({
-    ask: async (method, payload) => {
-      asked.push([method, payload]);
-      return answer(method, payload);
-    },
+    ask,
     say: (text) => said.push(text),
     events: { on: () => () => {} },
     lockedTip: '',
@@ -49,13 +47,4 @@ export function mountVacancyCard(answer) {
 export function openActions(host) {
   host.querySelector('button[title="Действия"]').click();
   flushSync();
-}
-
-/** Нажать кнопку с такой подписью. Ищется по всей странице: окна карточки
- *  встают поверх неё, а не внутри. */
-export function press(label) {
-  const found = [...document.querySelectorAll('button')].find((one) =>
-    one.textContent.includes(label),
-  );
-  found.click();
 }

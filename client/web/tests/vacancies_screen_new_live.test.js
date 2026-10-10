@@ -11,7 +11,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import VacanciesScreen from '../app/VacanciesScreen.svelte';
 import { hearRound } from '../state/round.svelte.js';
+import { roundGoes } from './bridge_stub.js';
 import { livingProps } from './live_props.svelte.js';
+import { buttonBy, press } from './press.js';
 import { settled } from './settled.js';
 
 let mounted = null;
@@ -164,7 +166,7 @@ describe('живой экран вакансий', () => {
     company.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await settled();
 
-    [...page.querySelectorAll('button')].find((one) => one.textContent.trim() === 'Создать').click();
+    press('Создать', { exact: true });
     await settled();
 
     expect(SENT).toHaveLength(1);
@@ -188,7 +190,7 @@ describe('живой экран вакансий', () => {
     await typeChip(chipRow(page, 'Must:'), 'Python');
     await typeChip(chipRow(page, 'Nice:'), 'Docker');
 
-    [...page.querySelectorAll('button')].find((one) => one.textContent.trim() === 'Создать').click();
+    press('Создать', { exact: true });
     await settled();
 
     expect(SENT[0].stack_required).toEqual(['Python']);
@@ -204,9 +206,7 @@ describe('живой экран вакансий', () => {
     page.querySelector('button[title="Добавить вакансию"]').click();
     await settled();
 
-    [...page.querySelectorAll('button')]
-      .find((one) => one.textContent.trim() === 'Текст')
-      .click();
+    press('Текст', { exact: true });
     await settled();
 
     const text = page.querySelector('textarea[placeholder="Текст объявления"]');
@@ -220,7 +220,7 @@ describe('живой экран вакансий', () => {
     when.dispatchEvent(new Event('input', { bubbles: true }));
     await settled();
 
-    [...page.querySelectorAll('button')].find((one) => one.textContent.trim() === 'Создать').click();
+    press('Создать', { exact: true });
     await settled();
 
     expect(PASTED).toHaveLength(1);
@@ -246,7 +246,7 @@ describe('живой экран вакансий', () => {
     title.dispatchEvent(new Event('input', { bubbles: true }));
     await settled();
 
-    [...page.querySelectorAll('button')].find((one) => one.textContent.trim() === 'Создать').click();
+    press('Создать', { exact: true });
     await settled();
 
     expect(SAID).toEqual(['Вакансия заведена']);
@@ -260,14 +260,10 @@ describe('живой экран вакансий', () => {
     page.querySelector('button[title="Добавить вакансию"]').click();
     await settled();
 
-    [...page.querySelectorAll('button')]
-      .find((one) => one.textContent.trim() === 'Текст')
-      .click();
+    press('Текст', { exact: true });
     await settled();
 
-    const create = [...page.querySelectorAll('button')].find(
-      (one) => one.textContent.trim() === 'Создать',
-    );
+    const create = buttonBy('Создать', { exact: true });
     expect(create.disabled).toBe(true);
 
     const text = page.querySelector('textarea[placeholder="Текст объявления"]');
@@ -303,16 +299,12 @@ describe('живой экран вакансий', () => {
 
   it('во время обхода вставленный текст не заводится, и кнопка говорит почему', async () => {
     // Разбор вставленного занимает место прогона, и мост его не пустит.
-    const handlers = {};
-    hearRound({ on: (name, hear) => ((handlers[name] = hear), () => {}) });
-    handlers.ingestion_started();
+    roundGoes();
     const page = screen();
     await settled();
     page.querySelector('button[title="Добавить вакансию"]').click();
     await settled();
-    [...page.querySelectorAll('button')]
-      .find((one) => one.textContent.trim() === 'Текст')
-      .click();
+    press('Текст', { exact: true });
     await settled();
     const text = page.querySelector('textarea[placeholder="Текст объявления"]');
     text.value = 'Ищем повара';

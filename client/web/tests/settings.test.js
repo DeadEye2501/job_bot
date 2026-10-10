@@ -36,6 +36,8 @@ import {
 } from '../state/settings.js';
 import { matching } from '../state/search.js';
 
+import { serverCreds } from './creds.js';
+
 describe('числовое поле настроек', () => {
   const bounds = { ...BOUNDS.poll_interval_sec, fallback: 60 };
 
@@ -82,7 +84,7 @@ describe('порог отбора на дорожке', () => {
 });
 
 describe('учётные данные поставщика модели', () => {
-  const creds = { base_url: 'http://localhost:1234', api_key: 'k', model: 'm' };
+  const creds = serverCreds('m');
 
   it('смена любого поля считается сменой', () => {
     // По этому ответу гасится плашка проверки. Не заметь он смены — плашка
@@ -105,8 +107,8 @@ describe('учётные данные поставщика модели', () => 
 
   it('«те же, что у чата» — про адрес и ключ, но не про модель', () => {
     // Модель у эмбеддингов своя всегда: она и не может совпадать с чатовой.
-    const chat = { base_url: 'http://localhost:1234', api_key: 'k', model: 'chat-model' };
-    const embed = { base_url: 'http://localhost:1234', api_key: 'k', model: 'embed-model' };
+    const chat = serverCreds('chat-model');
+    const embed = serverCreds('embed-model');
 
     expect(sameCreds(chat, embed)).toBe(true);
     expect(sameCreds(chat, { ...embed, base_url: 'http://other' })).toBe(false);
@@ -173,7 +175,7 @@ describe('строка проверки на шаге мастера', () => {
 });
 
 describe('записанные эмбеддинги при первом чтении', () => {
-  const chat = { base_url: 'http://localhost:1234', api_key: 'k', model: 'chat-model' };
+  const chat = serverCreds('chat-model');
 
   it('путь к файлу модели — источник «файл», с чатом он не делится', () => {
     expect(embedReading(chat, fileCreds('D:/m.gguf'))).toEqual({ fromFile: true, same: false });
@@ -202,17 +204,13 @@ describe('записанные эмбеддинги при первом чтен
 });
 
 describe('эмбеддинги ходят туда же, куда чат', () => {
-  const chat = { base_url: 'http://localhost:1234', api_key: 'k', model: 'chat-model' };
+  const chat = serverCreds('chat-model');
   const embed = { base_url: 'http://other', api_key: 'иной', model: 'embed-model' };
 
   it('включили — адрес и ключ переезжают от чата', () => {
     // Без этого в базе осталась бы пара, которой человек на экране уже не
     // видит: поля спрятаны, а разбор вакансий ходит по старому адресу.
-    expect(mirrored(chat, embed)).toEqual({
-      base_url: 'http://localhost:1234',
-      api_key: 'k',
-      model: 'embed-model',
-    });
+    expect(mirrored(chat, embed)).toEqual(serverCreds('embed-model'));
   });
 
   it('модель остаётся своей', () => {

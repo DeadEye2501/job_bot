@@ -5,24 +5,14 @@ import { describe, expect, it } from 'vitest';
 
 import { watchSourceCard } from '$state/source_card.svelte.js';
 
-function bridge() {
-  const handlers = {};
-  return {
-    on: (name, handler) => {
-      handlers[name] = handler;
-      return () => delete handlers[name];
-    },
-    fire: (name) => handlers[name]?.(),
-    heard: (name) => name in handlers,
-  };
-}
+import { listening } from './bridge_stub.js';
 
 const ALIVE = { entered: (read) => (read(), () => {}) };
 
 describe('заход на карточку источника', () => {
   it('сперва убирает показанное прежним, потом читает новый', () => {
     const trail = [];
-    watchSourceCard(bridge(), ALIVE, 7, {
+    watchSourceCard(listening(), ALIVE, 7, {
       forget: () => trail.push('сброс'),
       read: (id) => trail.push(`чтение ${id}`),
     });
@@ -30,7 +20,7 @@ describe('заход на карточку источника', () => {
   });
 
   it('весть о смене вакансий перечитывает открытый источник', () => {
-    const events = bridge();
+    const events = listening();
     const read = [];
     watchSourceCard(events, ALIVE, 7, { forget: () => {}, read: (id) => read.push(id) });
 
@@ -40,7 +30,7 @@ describe('заход на карточку источника', () => {
   });
 
   it('снятие отписывает от вестей', () => {
-    const events = bridge();
+    const events = listening();
     const off = watchSourceCard(events, ALIVE, 7, { forget: () => {}, read: () => {} });
 
     off();

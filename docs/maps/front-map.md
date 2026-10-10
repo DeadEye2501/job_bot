@@ -1558,7 +1558,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 94 файлов
+## tests — 95 файлов
 
 ### tests/aggregators.test.js (131)
 - —
@@ -1575,7 +1575,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/attempts.test.js (32)
 - —
 
-### tests/autosave.test.js (139)
+### tests/autosave.test.js (140)
 - —
 
 ### tests/autosize.test.js (85)
@@ -1593,15 +1593,15 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (167)
+### tests/bottom_bar_live.test.js (166)
 - —
 
 ### tests/bridge.test.js (161)
 - —
 
-### tests/bridge_stub.js (48)
-- * Мост, отвечающий заготовленным по очереди; зовы копятся в `asked`.
-- отдаёт: held, replying, rereading, tracing
+### tests/bridge_stub.js (85)
+- * Подписка на вести моста: обработчики копятся по имени, `fire` зовёт их так * же, как мост, `heard` говорит, слушают ли весть.
+- отдаёт: answering, held, listening, replying, rereading, roundGoes, tracing
 
 ### tests/calendar.test.js (60)
 - —
@@ -1618,13 +1618,13 @@ body, html, button, body, .material-symbols-outlined
 ### tests/card_notes.test.js (53)
 - * Карточка с заметкой, записывающая всё, что с ней сделали.
 
-### tests/card_read.test.js (87)
+### tests/card_read.test.js (84)
 - —
 
 ### tests/card_save.test.js (50)
 - * Карточка, записывающая всё, что с ней сделали.
 
-### tests/channel_card_live.test.js (96)
+### tests/channel_card_live.test.js (93)
 - * Сколько раз спросили названный слот.
 
 ### tests/channels.test.js (140)
@@ -1645,11 +1645,12 @@ body, html, button, body, .material-symbols-outlined
 ### tests/confirm_dialog_live.test.js (62)
 - * Окно с запором `locked`; отдаёт счёт подтверждений и красную кнопку.
 
-### tests/confirm_tone_live.test.js (34)
+### tests/contact_adding.test.js (130)
 - —
 
-### tests/contact_adding.test.js (128)
-- —
+### tests/creds.js (7)
+- * Связка адрес–ключ–модель на локальном сервере; модель — своя у каждой проверки.
+- отдаёт: serverCreds
 
 ### tests/dates.test.js (111)
 - —
@@ -1710,7 +1711,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/outside.test.js (122)
 - * Узел, считающий своими только перечисленные цели.
 
-### tests/paged_list.test.js (179)
+### tests/paged_list.test.js (178)
 - * Прокрутка, доехавшая до низа списка.
 
 ### tests/paging.test.js (82)
@@ -1719,14 +1720,18 @@ body, html, button, body, .material-symbols-outlined
 ### tests/people.test.js (208)
 - —
 
-### tests/people_list_live.test.js (74)
+### tests/people_list_live.test.js (70)
 - * Вкладка «HR» с мостом, отвечающим не раньше, чем ему позволят.
 
-### tests/person_chat_live.test.js (70)
+### tests/person_chat_live.test.js (69)
 - * Переписка с записанными за ней просьбами к мосту.
 
 ### tests/picker.test.js (134)
 - —
+
+### tests/press.js (19)
+- * Кнопка с этой подписью.
+- отдаёт: buttonBy, press
 
 ### tests/profile.test.js (157)
 - —
@@ -1740,19 +1745,19 @@ body, html, button, body, .material-symbols-outlined
 ### tests/provider.test.js (123)
 - * Отказ моста в том виде, в каком его поднимает обёртка зова.
 
-### tests/provider_form.test.js (284)
-- * Мост, отвечающий по имени метода; зовы копятся в `asked`.
+### tests/provider_form.test.js (276)
+- * Мост, отвечающий заготовкой по имени метода — значением или функцией нагрузки.
 
-### tests/round.test.js (75)
+### tests/round.test.js (66)
 - —
 
 ### tests/search.test.js (49)
 - —
 
-### tests/settings.test.js (469)
+### tests/settings.test.js (467)
 - —
 
-### tests/settings_screen_live.test.js (227)
+### tests/settings_screen_live.test.js (221)
 - * Экран над мостом; `mail` — что мост отдаёт о почте.
 
 ### tests/settled.js (21)
@@ -1765,19 +1770,19 @@ body, html, button, body, .material-symbols-outlined
 ### tests/skills.test.js (130)
 - —
 
-### tests/source_card.test.js (91)
+### tests/source_card.test.js (82)
 - * Карточка, чей мост отвечает по номеру источника и записывает вопросы.
 
-### tests/source_card_watch.test.js (50)
+### tests/source_card_watch.test.js (40)
 - —
 
-### tests/source_list.test.js (100)
+### tests/source_list.test.js (99)
 - * Список, читающий заготовленные ответы и записывающий, что у моста просили.
 
 ### tests/source_row_live.test.js (120)
 - * Строка с записанными нажатиями.
 
-### tests/source_vacancies.test.js (121)
+### tests/source_vacancies.test.js (122)
 - * Чтение, отвечающее страницами по очереди и записывающее, что просили.
 
 ### tests/sources.test.js (53)
@@ -1795,30 +1800,30 @@ body, html, button, body, .material-symbols-outlined
 ### tests/telegram.test.js (18)
 - —
 
-### tests/tg_login_dialog_live.test.js (51)
+### tests/tg_login_dialog_live.test.js (52)
 - —
 
 ### tests/vacancies.test.js (297)
 - —
 
-### tests/vacancies_screen_new_live.test.js (326)
+### tests/vacancies_screen_new_live.test.js (318)
 - * Мост, отвечающий тем же, чем отвечает настоящий. * * Заведение чужой карточки отказывает: так ведёт себя настоящий, когда имя * занято или связь оборвалась, — и это единственный способ увидеть, что * остаётся в черновике после неудачи.
 
 ### tests/vacancy_actions.test.js (219)
 - —
 
-### tests/vacancy_apply_live.test.js (145)
+### tests/vacancy_apply_live.test.js (141)
 - * Карточка, у которой мост отдаёт эти способы; `ways` может быть обещанием.
 
 ### tests/vacancy_card.test.js (330)
 - —
 
-### tests/vacancy_card_live.test.js (76)
+### tests/vacancy_card_live.test.js (102)
 - —
 
-### tests/vacancy_card_mount.js (61)
+### tests/vacancy_card_mount.js (50)
 - * Смонтировать карточку вакансии №7 над мостом `answer(method, payload)`. * * Отдаёт, что спрашивали у моста и что сказано плашкой, узел карточки, смену * одного свойства — как её делает живой родитель — и разборку.
-- отдаёт: mountVacancyCard, openActions, press
+- отдаёт: mountVacancyCard, openActions
 
 ### tests/vacancy_contacts.test.js (41)
 - —
@@ -1833,7 +1838,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/vacancy_filter.test.js (241)
 - —
 
-### tests/vacancy_screening_live.test.js (97)
+### tests/vacancy_screening_live.test.js (96)
 - * Карточка со скринингом или без; `screening` может быть обещанием.
 
 ### tests/vacancy_timeline_live.test.js (43)

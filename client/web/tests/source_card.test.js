@@ -5,16 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { sourceCard } from '$state/source_card.svelte.js';
 
-function bridge() {
-  const handlers = {};
-  return {
-    on: (name, handler) => {
-      handlers[name] = handler;
-      return () => delete handlers[name];
-    },
-    fire: (name) => handlers[name]?.(),
-  };
-}
+import { listening } from './bridge_stub.js';
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -40,7 +31,7 @@ describe('карточка источника', () => {
   it('заход читает числа и вакансии открытого источника', async () => {
     const { card } = opened({ 7: { name: 'Семь' } });
 
-    card.watch(bridge(), 7);
+    card.watch(listening(), 7);
     await settle();
 
     expect(card.card).toEqual({ name: 'Семь' });
@@ -49,10 +40,10 @@ describe('карточка источника', () => {
 
   it('смена источника сразу убирает показанное прежним', async () => {
     const { card } = opened({ 7: { name: 'Семь' } });
-    card.watch(bridge(), 7)();
+    card.watch(listening(), 7)();
     await settle();
 
-    card.watch(bridge(), 8);
+    card.watch(listening(), 8);
 
     expect(card.card).toBe(null);
     expect(card.vacancies.rows).toEqual([]);
@@ -61,14 +52,14 @@ describe('карточка источника', () => {
   it('отказ моста показан строкой беды', async () => {
     const { card } = opened({});
 
-    card.watch(bridge(), 7);
+    card.watch(listening(), 7);
     await settle();
 
     expect(card.trouble).toBe('Не удалось прочитать источник');
   });
 
   it('весть о смене вакансий перечитывает открытый источник', async () => {
-    const events = bridge();
+    const events = listening();
     const { card, asked } = opened({ 7: { name: 'Семь' } });
     card.watch(events, 7);
     await settle();
@@ -81,7 +72,7 @@ describe('карточка источника', () => {
 
   it('добор берёт следующую страницу открытого источника', async () => {
     const { card, asked } = opened({ 7: { name: 'Семь' } });
-    card.watch(bridge(), 7);
+    card.watch(listening(), 7);
     await settle();
 
     await card.more(7);

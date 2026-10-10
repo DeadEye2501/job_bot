@@ -25,11 +25,11 @@ describe('свежий ответ моста', () => {
     // Человек набирает поиск посимвольно, ответы возвращаются вразнобой: лёгший
     // поверх свежего старый показал бы строки, которых он уже не ищет.
     const fresh = freshAnswer(() => true);
-    const first = held('старое');
+    const first = held();
 
     const early = fresh(() => first.promise);
     const late = await fresh(() => Promise.resolve('свежее'));
-    first.give();
+    first.give('старое');
 
     expect(await early).toBe(null);
     expect(late).toBe('свежее');
@@ -40,11 +40,11 @@ describe('свежий ответ моста', () => {
     // состояние всплывает при следующем заходе поверх свежего.
     let live = true;
     const fresh = freshAnswer(() => live);
-    const answer = held('ответ');
+    const answer = held();
 
     const going = fresh(() => answer.promise);
     live = false;
-    answer.give();
+    answer.give('ответ');
 
     expect(await going).toBe(null);
   });
@@ -54,11 +54,11 @@ describe('свежий ответ моста', () => {
     // здоровье, непрочитанное и режим спрашивают вперемешку.
     const one = freshAnswer(() => true);
     const other = freshAnswer(() => true);
-    const slow = held('первый');
+    const slow = held();
 
     const early = one(() => slow.promise);
     await other(() => Promise.resolve('второй'));
-    slow.give();
+    slow.give('первый');
 
     expect(await early).toBe('первый');
   });

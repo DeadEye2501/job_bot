@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import { contactAdding } from '$state/contact_adding.svelte.js';
 
+import { held } from './bridge_stub.js';
+
 // Окно об одном поле — адрес канала, сайта или контакт: черновик строкой.
 const ADDRESS = {
   blank: () => '',
@@ -95,10 +97,10 @@ describe('окно заведения над списком', () => {
 
   it('пустое не уходит на мост, и второе нажатие, пока летит первое, тоже', async () => {
     let sent = 0;
-    let release;
+    const answer = held();
     const { entry } = adding(() => {
       sent += 1;
-      return new Promise((resolve) => (release = resolve));
+      return answer.promise;
     });
     entry.adding = true;
     entry.draft = '   ';
@@ -108,7 +110,7 @@ describe('окно заведения над списком', () => {
     entry.draft = 'example.test';
     const first = entry.create();
     await entry.create();
-    release({ name: 'Пример' });
+    answer.give({ name: 'Пример' });
     await first;
 
     expect(sent).toBe(1);

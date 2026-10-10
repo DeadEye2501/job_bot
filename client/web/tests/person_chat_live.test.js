@@ -12,6 +12,7 @@ import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import PersonChat from '../app/PersonChat.svelte';
+import { answering } from './bridge_stub.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
@@ -31,16 +32,14 @@ function letter(id) {
 
 /** Переписка с записанными за ней просьбами к мосту. */
 function chat(shownCount) {
-  const asked = [];
   const listeners = {};
   const messages = Array.from({ length: shownCount }, (_, i) => letter(i + 1));
 
-  const ask = async (method, payload) => {
-    asked.push({ method, payload });
+  const { asked, ask } = answering((method, payload) => {
     if (method === 'hr.messages') return { messages, has_more: true, ...payload };
     if (method === 'hr.mark_read') return { updated: 0 };
     return {};
-  };
+  });
   const events = {
     on: (name, fn) => {
       listeners[name] = fn;

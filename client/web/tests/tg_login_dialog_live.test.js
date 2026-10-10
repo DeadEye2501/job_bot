@@ -7,6 +7,7 @@ import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import TgLoginDialog from '../components/TgLoginDialog.svelte';
+import { press } from './press.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
@@ -44,7 +45,7 @@ describe('облачный пароль в окне входа', () => {
     field().value = 'secret';
     field().dispatchEvent(new Event('blur'));
     await settled();
-    [...document.querySelectorAll('button')].find((one) => one.textContent.includes('Войти')).click();
+    press('Войти');
 
     expect(sent).toEqual(['secret']);
   });

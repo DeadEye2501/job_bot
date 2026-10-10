@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import { sourceList } from '$state/source_list.svelte.js';
 
+import { held } from './bridge_stub.js';
+
 const ALIVE = { now: true, entered: (read) => (read(), () => {}) };
 
 function answer(rows, extra = {}) {
@@ -50,22 +52,19 @@ describe('список источников', () => {
 
   it('ответ, обогнанный свежим, не ложится поверх', async () => {
     // Поиск набирают посимвольно, и ответы доезжают вразнобой.
-    let late;
-    const answers = [null, answer([{ id: 2 }])];
+    const late = held();
+    const answers = [late.promise, answer([{ id: 2 }])];
     const list = sourceList({
       alive: ALIVE,
       key: 'sources',
-      read: () => {
-        const next = answers.shift();
-        return next === null ? new Promise((resolve) => (late = resolve)) : Promise.resolve(next);
-      },
+      read: async () => answers.shift(),
       setActive: async () => ({}),
       setAll: async () => ({}),
     });
 
     const first = list.find('j');
     await list.find('jo');
-    late(answer([{ id: 1 }]));
+    late.give(answer([{ id: 1 }]));
     await first;
 
     expect(list.rows).toEqual([{ id: 2 }]);

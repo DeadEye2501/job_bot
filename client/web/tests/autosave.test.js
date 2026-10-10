@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { autosave } from '../state/autosave.js';
+import { held } from './bridge_stub.js';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -105,12 +106,12 @@ describe('отложенная запись', () => {
     // вторую. Верни отказ первой пломбу к тому, что было до неё, — и уже
     // записанное второй уехало бы на мост третьим разом.
     const sent = [];
-    let answerFirst;
+    const first = held();
     const notes = autosave({
       delay: 800,
       save: (value) => {
         sent.push(value);
-        return sent.length === 1 ? new Promise((resolve) => (answerFirst = resolve)) : true;
+        return sent.length === 1 ? first.promise : true;
       },
     });
 
@@ -118,7 +119,7 @@ describe('отложенная запись', () => {
     await vi.advanceTimersByTimeAsync(800);
     notes.typed('Позвонить в среду');
     await vi.advanceTimersByTimeAsync(800);
-    answerFirst(false);
+    first.give(false);
     await vi.advanceTimersByTimeAsync(0);
     notes.flush();
 

@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import { sourceVacancies } from '$state/source_vacancies.svelte.js';
 
+import { held } from './bridge_stub.js';
+
 const ALIVE = { now: true };
 
 function rows(from, count) {
@@ -77,13 +79,12 @@ describe('вакансии источника', () => {
     // Источник сменяют нажатием по соседней строке, а ответы моста доезжают
     // вразнобой.
     const list = sourceVacancies(ALIVE);
-    let late;
-    const stale = () => new Promise((resolve) => (late = resolve));
+    const late = held();
     const fresh = async () => ({ vacancies: rows(100, 1), has_more: false });
 
-    const first = list.reload(stale);
+    const first = list.reload(() => late.promise);
     await list.reload(fresh);
-    late({ vacancies: rows(0, 3), has_more: true });
+    late.give({ vacancies: rows(0, 3), has_more: true });
     await first;
 
     expect(list.rows.map((one) => one.id)).toEqual([100]);
@@ -94,15 +95,15 @@ describe('вакансии источника', () => {
     const { read } = reading([{ vacancies: rows(0, 50), has_more: true }]);
     await list.reload(read);
     let asked = 0;
-    let release;
+    const answer = held();
     const slow = () => {
       asked += 1;
-      return new Promise((resolve) => (release = resolve));
+      return answer.promise;
     };
 
     const first = list.more(slow);
     await list.more(slow);
-    release({ vacancies: rows(50, 1), has_more: false });
+    answer.give({ vacancies: rows(50, 1), has_more: false });
     await first;
 
     expect(asked).toBe(1);

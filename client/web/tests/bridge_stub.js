@@ -1,16 +1,52 @@
-// Подставной мост для проверок состояния: отвечает заготовленным и помнит зовы.
-//
-// Заготовки разбираются по очереди, по одной на зов. Заготовка-функция зовётся
-// в миг ответа, а не заранее: так проверяются ответы, доезжающие не в том
-// порядке, в каком их спросили, — а их проверяют оба потребителя.
+// Подставной мост для проверок: отвечает заготовленным, помнит зовы и шлёт
+// вести так же, как настоящий.
 
-/** Мост, отвечающий заготовленным по очереди; зовы копятся в `asked`. */
+import { hearRound } from '../state/round.svelte.js';
+
+/** Подписка на вести моста: обработчики копятся по имени, `fire` зовёт их так
+ *  же, как мост, `heard` говорит, слушают ли весть. */
+export function listening() {
+  const handlers = {};
+  return {
+    on: (name, handler) => {
+      handlers[name] = handler;
+      return () => delete handlers[name];
+    },
+    fire: (name, payload) => handlers[name]?.(payload),
+    heard: (name) => name in handlers,
+  };
+}
+
+/** Начать обход: его вести слушает общий учёт прогона, как в окне. Снимают
+ *  учёт с подделки, подписав его на пустые вести (`hearRound({ on: … })`). */
+export function roundGoes() {
+  const events = listening();
+  hearRound(events);
+  events.fire('ingestion_started');
+}
+
+/** Мост, отвечающий заготовленным по очереди; зовы копятся в `asked`.
+ *
+ *  Заготовка-функция зовётся в миг ответа, а не заранее: так проверяются
+ *  ответы, доезжающие не в том порядке, в каком их спросили.
+ */
 export function replying(answers) {
+  return answering(() => {
+    const next = answers.shift();
+    return typeof next === 'function' ? next() : next;
+  });
+}
+
+/** Мост, отвечающий функцией `answer(method, payload)`; зовы копятся в `asked`.
+ *
+ *  Отдельно от `replying`: там ответы идут очередью по одному на зов, а здесь —
+ *  по имени метода, сколько бы раз и в каком порядке экран ни спрашивал.
+ */
+export function answering(answer) {
   const asked = [];
   const ask = async (method, payload) => {
     asked.push({ method, payload });
-    const next = answers.shift();
-    return typeof next === 'function' ? next() : next;
+    return answer(method, payload);
   };
   return { asked, ask };
 }
@@ -40,9 +76,10 @@ export function rereading(trail) {
   };
 }
 
-/** Ответ моста, который держат в руке: отдают его, когда скажут. */
-export function held(value) {
+/** Ответ моста, который держат в руке: отдают его, когда скажут, и тем, что
+ *  скажут. */
+export function held() {
   let release;
   const promise = new Promise((done) => (release = done));
-  return { promise, give: () => release(value) };
+  return { promise, give: (value) => release(value) };
 }

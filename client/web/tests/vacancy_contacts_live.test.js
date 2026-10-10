@@ -44,33 +44,33 @@ function screen(removed = null) {
 
 describe('контакты из запоздалого ответа', () => {
   it('ответ о своей вакансии встаёт в карточку', async () => {
-    const own = held(LATE);
+    const own = held();
     const { host } = screen(own.promise);
     await settled();
 
     host.querySelector('button[title="Удалить контакт"]').click();
-    own.give();
+    own.give(LATE);
     await settled();
 
     expect(host.textContent).toContain('late@first.test');
   });
 
   it('удалили контакт и выбрали другую вакансию — ответ прежней не встаёт под новую', async () => {
-    const late = held(LATE);
+    const late = held();
     const { change, host } = screen(late.promise);
     await settled();
 
     host.querySelector('button[title="Удалить контакт"]').click();
     change('vacancyId', 8);
     await settled();
-    late.give();
+    late.give(LATE);
     await settled();
 
     expect(host.textContent).not.toContain('late@first.test');
   });
 
   it('добавили контакт и выбрали другую вакансию — ответ прежней не встаёт под новую', async () => {
-    const late = held(LATE);
+    const late = held();
     added = late.promise;
     const { change, host } = screen();
     await settled();
@@ -84,7 +84,7 @@ describe('контакты из запоздалого ответа', () => {
     field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     change('vacancyId', 8);
     await settled();
-    late.give();
+    late.give(LATE);
     await settled();
 
     expect(host.textContent).not.toContain('late@first.test');

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { pagedList } from '$state/paged_list.svelte.js';
 
-import { replying } from './bridge_stub.js';
+import { held, replying } from './bridge_stub.js';
 
 function page(rows, has_more = false) {
   return { hrs: rows, has_more };
@@ -108,10 +108,10 @@ describe('список страницами', () => {
     // строкой «ivan» лежали бы полсотни посторонних людей, а найденное по
     // самому поиску отбросилось бы как устаревшее.
     const strangers = Array.from({ length: 50 }, (_, at) => ({ id: at }));
-    let answerSearch;
+    const search = held();
     const { ask: answer } = replying([
       page(strangers, true),
-      () => new Promise((resolve) => (answerSearch = resolve)),
+      () => search.promise,
       page([{ id: 900 }], true),
     ]);
     const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
@@ -119,7 +119,7 @@ describe('список страницами', () => {
     await list.refresh();
     const searching = list.find('ivan');
     await list.scrolled(atBottom());
-    answerSearch(page([{ id: 100 }], true));
+    search.give(page([{ id: 100 }], true));
     await searching;
 
     expect(list.rows).toEqual([{ id: 100 }]);
@@ -130,10 +130,10 @@ describe('список страницами', () => {
     // и дописывать к его хвосту страницу, отсчитанную от прежнего, значит
     // показать половину списка дважды.
     const strangers = Array.from({ length: 50 }, (_, at) => ({ id: at }));
-    let answerMore;
+    const more = held();
     const { ask: answer } = replying([
       page(strangers, true),
-      () => new Promise((resolve) => (answerMore = resolve)),
+      () => more.promise,
       page(strangers.slice(), true),
     ]);
     const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
@@ -141,7 +141,7 @@ describe('список страницами', () => {
     await list.refresh();
     const loading = list.scrolled(atBottom());
     await list.refresh();
-    answerMore(page([{ id: 900 }], true));
+    more.give(page([{ id: 900 }], true));
     await loading;
 
     expect(list.rows.map((one) => one.id)).not.toContain(900);
@@ -150,14 +150,13 @@ describe('список страницами', () => {
   it('устаревший ответ уступает свежему', async () => {
     // Пока летел ответ по первому запросу, человек набрал ещё знак; доехав
     // вторым, старый ответ показал бы найденное по прежнему запросу.
-    let releaseFirst;
-    const first = new Promise((resolve) => (releaseFirst = resolve));
-    const { ask: answer } = replying([() => first, page([{ id: 2 }])]);
+    const first = held();
+    const { ask: answer } = replying([() => first.promise, page([{ id: 2 }])]);
     const list = pagedList({ ask: answer, method: 'hr.list', key: 'hrs' });
 
     const slow = list.find('М');
     await list.find('Ма');
-    releaseFirst(page([{ id: 1 }]));
+    first.give(page([{ id: 1 }]));
     await slow;
 
     expect(list.rows).toEqual([{ id: 2 }]);

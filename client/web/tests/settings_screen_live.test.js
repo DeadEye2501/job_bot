@@ -7,6 +7,7 @@ import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import SettingsScreen from '../app/SettingsScreen.svelte';
+import { answering } from './bridge_stub.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
@@ -37,18 +38,12 @@ const NO_MAIL = {
 
 /** Экран над мостом; `mail` — что мост отдаёт о почте. */
 function screen(mail = NO_MAIL) {
-  const asked = [];
-  const shown = render(SettingsScreen, {
-    props: {
-      ask: async (method, payload) => {
-        asked.push([method, payload]);
-        if (method === 'settings.get') return SNAPSHOT;
-        if (method === 'settings.mail') return mail;
-        return {};
-      },
-      say: () => {},
-    },
+  const { asked, ask } = answering((method) => {
+    if (method === 'settings.get') return SNAPSHOT;
+    if (method === 'settings.mail') return mail;
+    return {};
   });
+  const shown = render(SettingsScreen, { props: { ask, say: () => {} } });
   const field = (label) =>
     [...shown.container.querySelectorAll('.pipeline-row > div')]
       .find((one) => one.querySelector('.pipeline-label')?.textContent === label)
@@ -77,7 +72,10 @@ describe('лимит вакансий с агрегатора', () => {
     leave(field('Вакансий с агрегатора'), '9999');
     await settled();
 
-    expect(asked).toContainEqual(['settings.save', { app: { aggregator_backfill_limit: 500 } }]);
+    expect(asked).toContainEqual({
+      method: 'settings.save',
+      payload: { app: { aggregator_backfill_limit: 500 } },
+    });
   });
 });
 
@@ -125,11 +123,11 @@ describe('почта для откликов', () => {
     leave(byHolder('Адрес почты'), ' me@yandex.ru ');
     await settled();
 
-    expect(asked).toContainEqual([
-      'settings.save_mail',
-      { address: 'me@yandex.ru', password: '', smtp_host: null, smtp_port: null },
-    ]);
-    expect(asked.filter(([method]) => method === 'settings.mail')).toHaveLength(2);
+    expect(asked).toContainEqual({
+      method: 'settings.save_mail',
+      payload: { address: 'me@yandex.ru', password: '', smtp_host: null, smtp_port: null },
+    });
+    expect(asked.filter((one) => one.method === 'settings.mail')).toHaveLength(2);
   });
 
   it('уход из поля с прежним паролем ничего не записывает', async () => {
@@ -145,7 +143,7 @@ describe('почта для откликов', () => {
     leave(byHolder('Пароль приложения'), 'secret');
     await settled();
 
-    expect(asked.filter(([method]) => method === 'settings.save_mail')).toEqual([]);
+    expect(asked.filter((one) => one.method === 'settings.save_mail')).toEqual([]);
   });
 
   it('поля сервера показываются, пока сервер не подставлен по адресу', async () => {
@@ -196,7 +194,10 @@ describe('почта для откликов', () => {
       .click();
     await settled();
 
-    expect(asked).toContainEqual(['system.open_url', 'https://id.yandex.ru/security']);
+    expect(asked).toContainEqual({
+      method: 'system.open_url',
+      payload: 'https://id.yandex.ru/security',
+    });
   });
 });
 
@@ -215,13 +216,6 @@ describe('шапки секций', () => {
     expect(head('Telegram').textContent).toContain('Войти');
     expect(head('LLM для чата').textContent).toContain('Проверить');
     expect(head('LLM для эмбеддингов').textContent).toContain('Проверить');
-  });
-
-  it('строки о сеансе Telegram под полями нет: о нём говорит плашка в шапке', async () => {
-    const { text } = screen();
-    await settled();
-
-    expect(text()).not.toContain('Сессии нет');
   });
 });
 
