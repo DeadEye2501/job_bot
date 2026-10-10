@@ -51,6 +51,7 @@ def screening_row(application_id: int, position: int, **overrides) -> Screening:
     fields.update(overrides)
     return Screening(application_id=application_id, position=position, **fields)
 
+
 def mail_account_row() -> MailAccount:
     """Строка почты, готовой к отправке: адрес, пароль шифром и сервер."""
     return MailAccount(id=1, address="me@mail.test", password_encrypted=encrypt_str("secret"),

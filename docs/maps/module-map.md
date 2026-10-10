@@ -1292,15 +1292,15 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def record_vacancy_event(session_factory, vacancy_id: int, kind: str, payload: dict) -> None` (24)
 
-### `backend/flows/fit_refusal.py` — 173 строк
+### `backend/flows/fit_refusal.py` — 171 строк
 
 Отказ в пригодности: пост не вакансия, мимо анкеты по полям или по суждению модели.
 
 Зависит от: `adapters.lm_chat`, `backend.domain.fit_fields`, `backend.domain.verdict`, `backend.llm.answers`, `backend.llm.fit_languages`, `backend.llm.fit_preferences`, `backend.llm.fit_role`, `backend.llm.genre`
 
-- `def unanswered(what: str, trouble: str | None, vacancy_id: int) -> tuple[str | None, bool] | None` (29)
+- `def unanswered(what: str, trouble: str | None, vacancy_id: int) -> tuple[str | None, bool] | None` (28)
 - `def _fit_verdict_refusal(validation) -> str | None` (17)
-- `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (38)
+- `async def _fit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (37)
 - `async def _genre_refusal(pipeline, text: str, vacancy_id: int) -> tuple[str | None, bool]` (20)
 - `def _fields_refusal(parsed, profile) -> str | None` (12)
 - `async def unfit_refusal(pipeline, parsed, text: str, vacancy_id: int) -> tuple[str | None, bool]` (21)
@@ -2387,7 +2387,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _kpi_deltas(session: AsyncSession, since: datetime | None) -> dict` (31)
 - `async def get_stats_kpi(session: AsyncSession, *, period: str) -> dict` (23)
 
-### `backend/repository/stats_pipeline.py` — 201 строк
+### `backend/repository/stats_pipeline.py` — 202 строк
 
 Воронка по источникам — каналам и агрегаторам — для экрана статистики.
 
@@ -6549,7 +6549,7 @@ seed initial data
 - `def status_history_row(vacancy_id: int, **overrides) -> VacancyStatusHistory` (10)
 - `def tg_creds(**overrides) -> TgAccountConfig` (16)
 
-### `tests/factories_aggregators.py` — 57 строк
+### `tests/factories_aggregators.py` — 58 строк
 
 Строки откликов вне Telegram: агрегаторы, контакты вакансии, отклики, почта.
 

@@ -24,6 +24,7 @@ from backend.repository.vacancies_common import PARSED_ONLY, SOURCE_LINKS
 _VACANCY_SOURCE = (SOURCE_LINKS[CHANNEL_KIND], SOURCE_LINKS[AGGREGATOR_KIND])
 """Ссылка вакансии на источник: ключ строки статистики — канал, затем агрегатор."""
 
+
 def _trash_predicates():
     """Два условия «мусор» и «просто не подошло», набранные одним образцом.
 

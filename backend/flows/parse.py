@@ -195,7 +195,7 @@ async def _verdict_for(
         parsed.stack_required, parsed.stack_preferred, pipeline.skills_cache
     )
     barred = await _barred_site(pipeline, vacancy_id, parsed.other_contacts)
-    blocked =blacklist_refusal(check_blacklist(text, pipeline.blacklist_patterns) or barred)
+    blocked = blacklist_refusal(check_blacklist(text, pipeline.blacklist_patterns) or barred)
     logger.debug(
         "vacancy %s: score=%d threshold=%d blacklist=%s",
         vacancy_id, score, pipeline.rs.scoring_threshold, blocked,
