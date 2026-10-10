@@ -3,7 +3,7 @@
   //
   // Поля здесь черновые: мост принимает их только входом, а до удавшегося
   // входа они нигде не хранятся.
-  import { sessionPill, sessionText } from '$state/settings.js';
+  import { sessionPill } from '$state/settings.js';
 
   import SecretInput from './SecretInput.svelte';
   import SettingsSection from './SettingsSection.svelte';
@@ -11,7 +11,20 @@
   let { tg, draft, busy, onedit, onlogin, onlogout } = $props();
 </script>
 
-<SettingsSection icon="send" title="Telegram" pill={sessionPill(tg)}>
+{#snippet sessionButtons()}
+  <button class="btn" type="button" onclick={() => onlogin()}>
+    <span class="material-symbols-outlined">{tg.has_session ? 'sync' : 'login'}</span>
+    {tg.has_session ? 'Перелогиниться' : 'Войти'}
+  </button>
+  {#if tg.has_session}
+    <button class="btn danger" type="button" disabled={busy} onclick={() => onlogout()}>
+      <span class="material-symbols-outlined">logout</span>
+      Выйти из сессии
+    </button>
+  {/if}
+{/snippet}
+
+<SettingsSection icon="send" title="Telegram" pill={sessionPill(tg)} actions={sessionButtons}>
   <div class="settings-row">
     <input
       class="input"
@@ -31,21 +44,6 @@
         placeholder="api_hash"
         onsave={(api_hash) => onedit({ api_hash: api_hash.trim() })}
       />
-    </div>
-    <div class="session-row">
-      <span class="session-info">{sessionText(tg)}</span>
-      <div class="session-actions">
-        <button class="btn" type="button" onclick={() => onlogin()}>
-          <span class="material-symbols-outlined">{tg.has_session ? 'sync' : 'login'}</span>
-          {tg.has_session ? 'Перелогиниться' : 'Войти'}
-        </button>
-        {#if tg.has_session}
-          <button class="btn danger" type="button" disabled={busy} onclick={() => onlogout()}>
-            <span class="material-symbols-outlined">logout</span>
-            Выйти из сессии
-          </button>
-        {/if}
-      </div>
     </div>
   </div>
 </SettingsSection>

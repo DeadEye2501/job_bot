@@ -17,7 +17,7 @@
   import { living } from '$state/alive.js';
   import { channelRows, PERIODS, sliceTarget } from '$state/stats.js';
 
-  let { ask, onslice, onchannel } = $props();
+  let { ask, onslice, onsource } = $props();
 
   let period = $state('month');
   let kpi = $state(null);
@@ -113,11 +113,11 @@
       {/if}
     </StatsCard>
 
-    <StatsCard title="Каналы" ready={!!channels} span="12">
+    <StatsCard title="Источники" ready={!!channels} span="12">
       {#if channels.channels.length}
-        <StatsChannelsCard channels={channelRows(channels.channels)} onpick={onchannel} />
+        <StatsChannelsCard channels={channelRows(channels.channels)} onpick={onsource} />
       {:else}
-        <div class="stats-loading">Нет вакансий из каналов за период</div>
+        <div class="stats-loading">Нет вакансий из источников за период</div>
       {/if}
     </StatsCard>
   </div>

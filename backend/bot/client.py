@@ -362,5 +362,8 @@ class Bot:
     def human_done(self) -> None:
         aggregators.human_done(self)
 
+    def reveal_browser(self) -> None:
+        aggregators.reveal_browser(self)
+
     async def delete_aggregator(self, aggregator_id) -> str:
         return await aggregators.delete_aggregator(self, aggregator_id)

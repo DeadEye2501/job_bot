@@ -27,7 +27,7 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (244)
+### app/BottomBar.svelte (262)
 - Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
 - принимает: ask, say, events, onlocked, oncontact
 
@@ -89,7 +89,7 @@
 - —
 - принимает: ask
 
-### app/SettingsScreen.svelte (349)
+### app/SettingsScreen.svelte (376)
 - Записи на смене источника нет, пока не выбран файл или не набран сервер: пустой источник мост не примет, а прежний остаётся в базе до тех пор.
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
@@ -100,18 +100,18 @@
 
 ### app/StatsScreen.svelte (124)
 - Числа считает бот, а не окно: пересчитать за тот же срок иначе нечем — пришлось бы уходить в другой раздел и возвращаться.
-- принимает: ask, onslice, onchannel
+- принимает: ask, onslice, onsource
 
 ### app/TelegramLogin.svelte (96)
 - Окно пересоздаётся на смене шага: код и облачный пароль — разные секреты, и набранный код не должен доехать до поля пароля.
 - принимает: say, creds, relogin, ondone, onclose
 
-### app/VacanciesScreen.svelte (431)
+### app/VacanciesScreen.svelte (440)
 - —
 - принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte
 
-### app/VacancyCard.svelte (411)
+### app/VacancyCard.svelte (453)
 - Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою оценку.
 - принимает: ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged
 - берёт: ./VacancyContactsSection.svelte, ./VacancyLinks.svelte
@@ -142,7 +142,7 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 95 файлов
+## components — 100 файлов
 
 ### components/ActionsMenu.svelte (30)
 - —
@@ -166,6 +166,11 @@
 - —
 - принимает: row, enabled, selected, onpick, ontoggle
 - берёт: ./SourceRow.svelte
+
+### components/ApplyWaysDialog.svelte (40)
+- —
+- принимает: rows, onapply, onclose
+- берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte
 
 ### components/AskDialog.svelte (67)
 - Окно берёт на себя Escape, но не Enter: в нём набирают заметки в несколько строк, и подтверждение по Enter обрывало бы заведение на первом же переводе строки.
@@ -233,9 +238,9 @@
 - принимает: company, selected, onpick
 - берёт: ./Avatar.svelte, ./RowMarks.svelte
 
-### components/ConfirmDialog.svelte (21)
+### components/ConfirmDialog.svelte (18)
 - —
-- принимает: message, confirmLabel, tone, onconfirm, oncancel
+- принимает: message, confirmLabel, onconfirm, oncancel
 - берёт: ./ModalShell.svelte
 
 ### components/ContactActions.svelte (23)
@@ -298,12 +303,16 @@
 - —
 - принимает: name, state, title
 
+### components/HumanPlate.svelte (14)
+- —
+- принимает: text, onreveal, ondone
+
 ### components/LangRows.svelte (49)
 - —
 - принимает: rows, onedit, onadd, onremove
 - берёт: ./Dropdown.svelte
 
-### components/LlmSection.svelte (182)
+### components/LlmSection.svelte (184)
 - Ввод в любое из полей гасит плашку проверки: она говорит «модель отвечает» про тот адрес, который проверяли, и на изменённых полях лгала бы. Ловится здесь, а не на каждом поле: событие всплывает, и второй обработчик у поля секрета пришлось бы заводить внутри чужого компонента.
 - принимает: title, icon, creds, models, pill, busy, sameAsChat, shareable, fromFile, onsave, onprobe, onsame, onedit, onpreset, onsource, onpickfile
 - берёт: ./Dropdown.svelte, ./SecretInput.svelte, ./SettingsSection.svelte, ./SuggestInput.svelte
@@ -315,6 +324,16 @@
 ### components/LogRow.svelte (27)
 - Нажимается вся строка, а не значок в ней: строк сотни, и целиться в значок ради трассировки человеку не за что. Клавиатуре она отвечает тем же — иначе журнал не развернуть, не берясь за мышь.
 - принимает: time, level, tone, source, message, details, expanded, ontoggle
+
+### components/MailPasswordHelp.svelte (54)
+- —
+- принимает: onopen, onclose
+- берёт: ./ModalHead.svelte, ./ModalShell.svelte
+
+### components/MailSection.svelte (52)
+- —
+- принимает: mail, onsave, onopen
+- берёт: ./MailPasswordHelp.svelte, ./SecretInput.svelte, ./SettingsSection.svelte
 
 ### components/MenuItem.svelte (38)
 - —
@@ -359,9 +378,9 @@
 - —
 - принимает: icon, label, active, onpick
 
-### components/NewCardDialog.svelte (75)
+### components/NewCardDialog.svelte (79)
 - Ряд способов только у вакансии: её заводят двумя — набирают поля сами или отдают боту текст объявления. У человека и компании второго нет вовсе. Ряд тот же, что у грейда и формата: свой разошёлся бы с ними видом.
-- принимает: kind, draft, busy, ready, options, oncompany, onhr, onconfirm, oncancel
+- принимает: kind, draft, busy, ready, locked, options, oncompany, onhr, onconfirm, oncancel
 - берёт: ./AskDialog.svelte, ./ChoiceRow.svelte, ./NewCompanyFields.svelte, ./NewPersonFields.svelte, ./NewVacancyFields.svelte, ./PastedVacancyFields.svelte
 
 ### components/NewCompanyFields.svelte (35)
@@ -407,7 +426,7 @@
 - принимает: row, current, chosen, mark, onpick
 - берёт: ./Avatar.svelte
 
-### components/PipelineSection.svelte (113)
+### components/PipelineSection.svelte (131)
 - Поля нет — значит выключена, как и в настройках бота: включённая молча, она показывала бы «отклик отправлен» над письмом, которого HR не получал. Стенд включают нарочно.
 - принимает: values, onsave
 - берёт: ./SettingsSection.svelte
@@ -443,17 +462,22 @@
 - —
 - принимает: running, disabled, title, onpress
 
+### components/ScreeningDialog.svelte (31)
+- —
+- принимает: applications, onclose
+- берёт: ./ModalHead.svelte, ./ModalShell.svelte
+
 ### components/SearchBox.svelte (36)
 - —
 - принимает: value, placeholder, maxlength, onsearch
 
-### components/SecretInput.svelte (32)
-- —
-- принимает: value, placeholder, mono, maxlength, onsave
+### components/SecretInput.svelte (51)
+- Проверка a11y гасится нарочно: фокус просит только окно об одном поле.
+- принимает: value, placeholder, mono, maxlength, autofocus, onsave, onhelp
 
-### components/SettingsSection.svelte (17)
+### components/SettingsSection.svelte (26)
 - —
-- принимает: icon, title, pill, danger, children
+- принимает: icon, title, pill, actions, danger, children
 - берёт: ./StatusPill.svelte
 
 ### components/SkillPicker.svelte (82)
@@ -479,7 +503,7 @@
 - —
 - принимает: title, ready, span, children
 
-### components/StatsChannelsCard.svelte (136)
+### components/StatsChannelsCard.svelte (137)
 - Фокус и роль кнопки включаются одним условием, а компилятор видит только условный tabindex и считает строку неинтерактивной.
 - принимает: channels, onpick
 
@@ -514,15 +538,15 @@
 - принимает: value, options, placeholder, asked, mono, maxlength, onsave
 - берёт: ./DropPanel.svelte
 
-### components/TelegramSection.svelte (51)
+### components/TelegramSection.svelte (49)
 - —
 - принимает: tg, draft, busy, onedit, onlogin, onlogout
 - берёт: ./SecretInput.svelte, ./SettingsSection.svelte
 
-### components/TgLoginDialog.svelte (61)
+### components/TgLoginDialog.svelte (62)
 - Escape закрывает, Enter — нет: шаг уходит только кнопкой.
 - принимает: step, phone, relogin, busy, error, onsubmit, oncancel
-- берёт: ./ModalShell.svelte
+- берёт: ./ModalShell.svelte, ./SecretInput.svelte
 
 ### components/TopTabs.svelte (12)
 - —
@@ -532,9 +556,9 @@
 - Затемнения нет вовсе, но нажатие мимо список закрывает: он висит поверх окна, и оставленный открытым перекрывал бы правый край полосы.
 - принимает: count, open, loading, rows, ontoggle, onpick
 
-### components/VacancyActions.svelte (67)
-- —
-- принимает: blocks, say, onsend, onrerun, onlinkhr, onlinkcompany, onraw, onsource, ondelete
+### components/VacancyActions.svelte (88)
+- Без скрининга пункт не нажимается вовсе, а не объясняет плашкой: смотреть нечего, и серого пункта для этого довольно.
+- принимает: blocks, screened, say, onsend, onrerun, onlinkhr, onlinkcompany, onraw, onscreening, onsource, ondelete
 - берёт: ./ActionsMenu.svelte, ./MenuItem.svelte
 
 ### components/VacancyContacts.svelte (23)
@@ -568,9 +592,9 @@
 
 ## state — 64 файлов
 
-### state/aggregators.js (59)
+### state/aggregators.js (57)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
-- отдаёт: LOGIN_FIRST, RUNNING, actionBlock, aggregatorLastRun, aggregatorToggle, aggregatorWhere
+- отдаёт: LOGIN_FIRST, actionBlock, aggregatorLastRun, aggregatorToggle, aggregatorWhere
 
 ### state/alive.js (59)
 - * Заводит признак жизни экрана.
@@ -724,9 +748,9 @@
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
 - отдаёт: CURRENCIES, GENDERS, GRADES, LANG_LEVELS, SALARY_PERIODS, WORK_FORMATS, blankProfile, cvNote, fileSize, langRow, named, profileSheet, updatedNote
 
-### state/progress.js (72)
+### state/progress.js (77)
 - * Подпись начатого обхода, о котором ещё ничего не известно. * * Первая весть о ходе приходит не сразу: до неё полосы уже бегут, и подпись под * ними обязана сказать, чем именно бот занят.
-- отдаёт: COUNTLESS_STAGES, STARTING, bar, caption, countlessNote
+- отдаёт: COUNTLESS_STAGES, STARTING, bar, caption, countlessNote, humanText
 
 ### state/provider.js (64)
 - * Спросить у поставщика имена его моделей. * * Отказ и пустой перечень — разные ответы, и путать их нельзя: первое значит * «сервер не отозвался», второе — «сервер поднят, но модели в нём нет», и * чинятся они по-разному. Отказ приходит фразой, а не пустотой. * * Имя модели в вопрос не идёт: перечень читается с адреса и ключа, а имя — как * раз то, что в нём ищут.
@@ -736,9 +760,9 @@
 - * Заводит поля поставщика. * * `kind` — чат или эмбеддинги: с ним спрашивают поставщика. `alive` — признак * жизни экрана (`alive.js`): ответ, пришедший после ухода, класть некуда.
 - отдаёт: providerForm
 
-### state/round.svelte.js (63)
-- * Что известно о прогоне сейчас.
-- отдаёт: hearRound, round
+### state/round.svelte.js (83)
+- * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
+- отдаёт: RUNNING, hearRound, round
 
 ### state/search.js (25)
 - * Что из списка остаётся видно под набранное. * * Пустое набранное оставляет список целым: поле поиска стоит над уже открытым * списком, и до первого знака резать нечего. Одни пробелы — то же самое: их * набирают между словами и стирают последними, и схлопнутый на них список * мигал бы под руками. * * Регистр не различается — человек набирает как придётся, а значения приходят * как записаны. Вхождением, а не началом строки: имена приходят с приставками * («qwen/qwen3-4b», «@ник · компания»), и отбор по началу прятал бы строку от * того, кто набирает её собственное имя. * * `text` называет, где искать: у строки списка полей несколько, и по какому из * них её вспоминают, знает не этот файл, а тот, кто её показывает.
@@ -748,9 +772,9 @@
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
-### state/settings.js (399)
+### state/settings.js (412)
 - * Чем подписано пустое поле имени модели. * * Пока имён нет, подсказка не обещает списка: перечень читается с адреса и * ключа, и у непóднятого поставщика его не будет вовсе — имя тогда вписывают * руками. Слова общие на настройки и на шаг мастера: одно и то же поле, * подписанное по-разному, читается как два разных.
-- отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, NO_FILE_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, SOURCE_FILE, SOURCE_SERVER, addressTrouble, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, embedReading, fileCreds, fileTrouble, idleProbe, isFileSource, isModelFile, llmTrouble, loginTrouble, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probeLine, probePill, sameCreds, scorePercent, sessionPill, sessionText, sharesChat, sourceCreds, sourceLabel, telegramCreds, thresholdState
+- отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, NO_FILE_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, SOURCE_FILE, SOURCE_SERVER, addressTrouble, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, embedReading, fileCreds, fileTrouble, idleProbe, isFileSource, isModelFile, llmTrouble, loginTrouble, mailNeedsServer, mailPill, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probeLine, probePill, sameCreds, scorePercent, sessionPill, sharesChat, sourceCreds, sourceLabel, telegramCreds, thresholdState
 
 ### state/site.js (31)
 - /i; /** Адрес, по которому открывают сайт. * * Домен приходит из чужого объявления, вынутый оттуда моделью, — доверия ему * нет. Наружу уходит только http(s): всё прочее, включая `javascript:` и * `file:`, переписывается на обычный адрес вместе со своей схемой. Голый домен * без схемы система открыла бы как файл рядом со страницей, поэтому схему * дописываем и ему.
@@ -776,7 +800,7 @@
 - * Подпись переключателя, запертого отсевом, — одна у канала и агрегатора. * * Слово в слово с отказом моста на то же включение (`refusals.py`): человек * читает одно и то же, нажал он запертый переключатель или прочёл подсказку.
 - отдаёт: BLOCKED_TITLE, MASTER_OFF_TITLE, masterToggle, sourceStats, sourceToggle
 
-### state/stats.js (281)
+### state/stats.js (295)
 - * Сроки, за которые считают, — от короткого к длинному. * * `delta` — как называется прирост за этот срок. У «всего времени» его нет: * сравнивать не с чем, это и есть всё время.
 - отдаёт: KPI, PERIODS, STATUS_ORDER, channelRows, convNote, deltaNote, donut, duration, kpiRow, skillRows, skillRowsPerColumn, sliceTarget, statusColumns, statusTotal, weekBars
 
@@ -792,16 +816,16 @@
 - * Чем подписана запись без названия. Показывают её приглушённой * (`styles/unnamed.css`) — так видно, что это не название, а его отсутствие.
 - отдаёт: UNNAMED
 
-### state/vacancies.js (291)
+### state/vacancies.js (301)
 - * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
-- отдаёт: SORTS, VACANCY_MODES, ago, blankVacancy, emptyNote, gradeLabel, remoteLabel, salaryLabel, scoreTone, shortAgo, shownStack, sortKey, typed, vacancyFields, vacancyLine, vacancyNamed
+- отдаёт: SORTS, VACANCY_MODES, ago, blankVacancy, emptyNote, gradeLabel, pasteLock, remoteLabel, salaryLabel, scoreTone, shortAgo, shownStack, sortKey, typed, vacancyFields, vacancyLine, vacancyNamed
 
-### state/vacancy_actions.js (79)
-- * Почему отправка и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Отклик уходит человеку, и без привязанного HR слать его некому; разбору же * HR не нужен — он его как раз и находит.
-- отдаёт: actionBlocks, rawChips, sourcePill
+### state/vacancy_actions.js (116)
+- * Почему отклик и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы * модели не допускаем — даже отклика в Telegram, которому браузер не нужен. * * Есть ли куда откликаться, здесь не решается: это знает только мост, и * ответ его разбирает `applyChoices`.
+- отдаёт: actionBlocks, applyChoices, noChoiceReason, rawChips, sourcePill
 
-### state/vacancy_card.js (184)
-- * Своя запись правится, чужая читается: пояснение бота — след его работы, а не * заметка, и правка стирала бы то, по чему потом разбираются.
+### state/vacancy_card.js (190)
+- * Способ отклика словами; незнакомый код называется сам собой — коды заводит * бэкенд, и новый приедет раньше, чем окно про него узнает.
 - отдаёт: timelineRows
 
 ### state/vacancy_contacts.js (27)
@@ -824,7 +848,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: plural, vacancyCount
 
-## styles — 108 файлов
+## styles — 110 файлов
 
 ### styles/accent-fill.css (16)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре. Одним правилом на три места, а не тремя одинаковыми: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -850,6 +874,11 @@
 - Окно заведения по адресу — канала или агрегатора: узкая коробка с шапкой, полем и подвалом. Сами шапка, тело и подвал — общие, в modal.css.
 - селекторы (2): .address-dialog, .address-hint
 - берёт: --text-tertiary
+
+### styles/apply-ways.css (15)
+- Окно выбора, куда откликнуться: строки контактов в узкой коробке. Шапка, тело и подвал — общие, в modal.css; сама строка, её рамка и отметка выбора — строка подборщика (`picker.css`).
+- селекторы (2): .apply-ways-dialog, .picker-row.way-row:hover:not(.selected):not(.current)
+- берёт: --surface-raised-hover, --text-primary
 
 ### styles/autosave-error.css (16)
 - Отказ отложенной записи: коробка под формой вкладки анкеты. Стоит под формой, а не плашкой поверх экрана: анкету заполняют сверху вниз, и до последнего обязательного поля каждая запись законно отказана — плашка била бы на каждом поле. Рамкой и подложкой, а не голой строкой: строка под длинной формой теряется среди подписей полей.
@@ -1057,9 +1086,9 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (3): .field-caption, .captioned-field, .captioned-field .chips
 - берёт: --text-tertiary
 
-### styles/field-line.css (23)
+### styles/field-line.css (29)
 - Несколько полей одной строкой: вилка «от — до — валюта», страна и город. Не сетка формы (`form-grid.css`): та делит ряд на две равные колонки, а здесь полей бывает три и ширина у них разная — знак валюты уже числа. Высота у всех по самому высокому: рядом с полями ввода стоит и ряд переключателей, и ниже полей он выглядел бы недоделанным.
-- селекторы (3): .field-line, .field-line > *, .field-line > .field-narrow
+- селекторы (4): .field-line, .field-line > *, .field-line > .field-narrow, .field-line > .field-choice
 
 ### styles/file-pick.css (35)
 - Выбор файла резюме: одна строка со значком, подписью и кнопкой. Пунктир до выбора говорит «сюда кладут», сплошная рамка после — что файл уже взят: пустая строка со сплошной рамкой читалась бы как поле, в которое забыли что-то вписать.
@@ -1091,10 +1120,16 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (5): .health, .health .dot, .health[data-state='ok'] .dot, .health[data-state='err'] .dot, .health-label
 - берёт: --accent, --accent-glow-inner, --accent-glow-outer, --err, --err-glow-inner, --err-glow-outer, --text-secondary, --text-tertiary
 
-### styles/help-block.css (34)
+### styles/help-block.css (42)
 - Пошаговая инструкция «где это взять»: нумерованный список с адресами. Стоит под полем, которое сама и объясняет: api_id в мастере Telegram, адрес поставщика моделей.
-- селекторы (5): .help, .help strong, .help code, .help ol, .help ol li
-- берёт: --bg-tertiary, --text-primary, --text-secondary
+- селекторы (6): .help, .help strong, .help code,
+.help .help-link, .help ol, .help ol li, .help .help-link:hover
+- берёт: --bg-secondary, --bg-tertiary, --text-primary, --text-secondary
+
+### styles/human-plate.css (44)
+- Плашка ожидания человека в центре нижней полосы, на месте полос хода. Красная, а не в цвет хода: агент стоит, пока человек не вмешается, и плашку должно быть видно краем глаза. Во всю высоту полосы и без скруглений: кусок самой полосы, ставший плашкой, а не всплывшая поверх неё кнопка. Центр полосы — узел нулевой ширины (`footer.css`), поэтому плашка встаёт по нему сама, сдвигом на свою половину. Снизу точка просвета: вровень с краем окна нижняя рамка уходит под него и не видна.
+- селекторы (5): .human-plate, .human-plate-text, .human-plate-done, .human-plate-done:hover, .human-plate-done .material-symbols-outlined
+- берёт: --err, --err-fill, --ok, --ok-fill
 
 ### styles/icon-button.css (29)
 - Кнопка-значок: квадрат со значком внутри, без подписи. Вынесена на втором потребителе — кнопка обхода в полосе и очистка журнала.
@@ -1180,9 +1215,9 @@ body, html, button, body, .material-symbols-outlined
 .hr-mini-name, .hr-mini-row .hr-avatar, .hr-mini-meta, .hr-mini-go, .mini-list-empty, .mini-list-more
 - берёт: --accent, --border, --selected-bg, --text-primary, --text-tertiary
 
-### styles/modal.css (194)
+### styles/modal.css (204)
 - Окно поверх окна: затемнение на весь экран и коробка по центру.
-- селекторы (23): .modal-backdrop, .modal-dialog, .modal-dialog.narrow, .modal-dialog.narrow.tall, .modal-dialog.narrow .modal-body, .modal-dialog.narrow .modal-body > *, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-actions,
+- селекторы (24): .modal-backdrop, .modal-dialog, .modal-dialog.narrow, .modal-dialog.narrow.tall, .modal-dialog.narrow.roomy, .modal-dialog.narrow .modal-body, .modal-dialog.narrow .modal-body > *, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-actions,
 .modal-footer, .modal-footer, .modal-footer .btn, .modal-footer .btn .material-symbols-outlined, .modal-subtitle, .modal-error
 - берёт: --bg-secondary, --bg-tertiary, --border, --danger, --scrim, --shadow-modal, --text-primary, --text-secondary, --text-tertiary
 
@@ -1234,9 +1269,13 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (2): .pill, .pill:hover
 - берёт: --accent, --bg-secondary, --border, --text-secondary
 
-### styles/pipeline.css (70)
-- Пороги отбора: пять величин в ряд, ползунок, числовые поля и тумблер.
-- селекторы (9): .pipeline-row, .pipeline-row > div, .pipeline-label, .with-unit, .with-unit .input, .with-unit .unit, .slider-row, .slider-num, .with-toggle
+### styles/pipeline.css (63)
+- Пороги отбора: шесть величин в две строки по три, подпись слева от поля. Сетка из шести дорожек — пара «подпись, элемент» на колонку, — а ячейки прозрачны для неё: так подписи одной колонки берут общую ширину по длинной, и поле, полоска порога и тумблер под ними встают на одну вертикаль.
+- селекторы (8): .pipeline-row, .pipeline-row > div, .pipeline-label, .with-unit,
+.slider-row,
+.with-toggle, .with-unit .input,
+.slider-row input[type='range'].slider,
+.with-toggle, .with-toggle, .with-unit .unit, .slider-num
 - берёт: --text-secondary, --text-tertiary
 
 ### styles/plaque.css (36)
@@ -1315,17 +1354,17 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (8): .search-box, .search-box .material-symbols-outlined, .search-input, .search-input:focus, .search-clear, .search-clear:hover, .search-clear .material-symbols-outlined, .search-bar .search-box
 - берёт: --surface-hover-firm, --text-primary, --text-secondary, --text-tertiary
 
-### styles/settings-section.css (69)
+### styles/settings-section.css (81)
 - Коробка с заголовком-шапкой: секция настроек и карточка чисел. Имя осталось от первого потребителя — переименование задело бы три файла ради одного слова.
-- селекторы (10): .settings-section,
-.stats-card, .settings-section, .settings-section-title, .settings-section-title .material-symbols-outlined, .settings-section.danger, .settings-section.danger .settings-section-title,
+- селекторы (11): .settings-section,
+.stats-card, .settings-section, .settings-section-title, .settings-section-title .material-symbols-outlined, .settings-section-side, .settings-section.danger, .settings-section.danger .settings-section-title,
 .settings-section.danger .settings-section-title .material-symbols-outlined, .danger-row, .danger-text, .danger-sub, .danger-row .btn
 - берёт: --bg-secondary, --border, --danger, --err-zone-bg, --err-zone-border, --text-primary, --text-secondary, --text-tertiary
 
-### styles/settings.css (89)
+### styles/settings.css (61)
 - Экран настроек: колонка секций посреди поля. Что внутри секций — сетка полей, пороги, опасная зона — своими файлами.
-- селекторы (12): .settings-page, .settings-inner, .settings-page .input, .settings-page .btn, .settings-page .btn .material-symbols-outlined, .settings-page .btn.danger, .settings-page .btn.danger:hover:not(:disabled), .settings-row.spaced, .settings-actions, .session-actions, .session-row, .session-info
-- берёт: --bg-tertiary, --border, --danger, --text-tertiary
+- селекторы (8): .settings-page, .settings-inner, .settings-page .input, .settings-page .btn, .settings-page .btn .material-symbols-outlined, .settings-page .btn.danger, .settings-page .btn.danger:hover:not(:disabled), .settings-row.spaced
+- берёт: --bg-tertiary, --border, --danger
 
 ### styles/shell.css (42)
 - Рама окна: боковое меню, поле раздела, нижняя полоса. Раскладка сеткой, и разворот меню — это правка одной её переменной.
@@ -1356,7 +1395,7 @@ body, html, button, body, .material-symbols-outlined
 - Вращение значка: им показано, что дело идёт и ответа ещё нет. Своим файлом, а не в оформлении каждого экрана: крутится значок в двух местах — кнопка пересчёта статистики и строка состояния шага мастера, — и объявлено вращение было дважды, под двумя именами. Скорость у них при этом разная, и это своё: у кнопки оборот быстрее, потому что и ждать её недолго.
 - селекторы (1): @keyframes spin
 
-### styles/stats-channels.css (143)
+### styles/stats-channels.css (146)
 - Карточка «Каналы»: воронка канала одиннадцатью колонками. Сеткой, а не таблицей: имя канала и колонки конверсии резиновые, числовые — узкие по содержимому, и только так все одиннадцать влезают в карточку без поперечной прокрутки. Группы «Ингест», «Воронка отклика» и «Конверсия» отделены тонкой чертой — без неё одиннадцать чисел читаются как один ряд.
 - селекторы (25): .stats-ch-grid, .stats-ch-grid > *, .stats-ch-grid .stats-ch-group, .stats-ch-grid .stats-ch-group, .stats-ch-grid .stats-ch-group.ingest, .stats-ch-grid .stats-ch-group.funnel, .stats-ch-grid .stats-ch-group.outcome, .stats-ch-grid .stats-ch-th, .stats-ch-grid .stats-ch-name-cell, .stats-ch-grid .stats-ch-th-name, .stats-ch-grid .stats-ch-sep-l, .stats-ch-grid .stats-ch-conv, .stats-ch-grid .stats-ch-conv-label, .stats-ch-grid .stats-ch-conv-meter, .stats-ch-grid .stats-ch-conv-meter-fill, .stats-ch-grid .stats-ch-row, .stats-ch-grid .stats-ch-row.stats-ch-opens, .stats-ch-grid .stats-ch-row.is-hover, .stats-ch-grid .v-dim, .stats-ch-grid .v-fit, .stats-ch-grid .v-sent, .stats-ch-grid .v-answ, .stats-ch-grid .v-invite, .stats-ch-grid .v-decline, .stats-ch-grid .stats-ch-last
 - берёт: --accent, --bg-tertiary, --border, --cols, --err, --info, --stats-group-funnel, --stats-group-ingest, --stats-group-outcome, --status-applied, --surface-raised, --text-primary, --text-secondary, --text-tertiary
@@ -1470,7 +1509,7 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (25): .vac-list-toolbar, .vac-list-toolbar .icon-btn, .vac-list-toolbar .icon-btn .material-symbols-outlined, .vac-list-toolbar .icon-btn:hover, .vac-sort-menu, .vac-sort-option, .vac-sort-option:hover, .vac-sort-option.active, .vac-list-empty, .vac-list-empty .material-symbols-outlined, .vac-detail-pane, .vac-detail-empty, .vac-row, .vac-row-head, .vac-title, .vac-meta, .vac-meta .v-co, .vac-meta .sep, .vac-meta .when, .vac-score, .vac-score[data-tone='warn'], .vac-score[data-tone='bad'], .vac-stack, .mini-chip, .mini-chip.more
 - берёт: --accent, --accent-hover-soft, --accent-option-active, --bg-secondary, --bg-tertiary, --border, --err, --score-warn, --scrim, --text-primary, --text-secondary, --text-tertiary
 
-### styles/vacancy-card.css (154)
+### styles/vacancy-card.css (157)
 - Карточка вакансии: шапка со статусом, чипы разбора, стек, текст и связи. Лента переходов — в timeline.css, выбор статуса — в status-picker.css, исходный текст — в raw-text.css, кружок с именами — в contact-block.css.
 - селекторы (20): .det-head, .status-wrap, .det-title, .status-badge, .status-badge:hover, .status-label, .status-badge .material-symbols-outlined, .status-wrap.popover-open .status-badge .material-symbols-outlined, .det-info, .info-chip, .info-chip .material-symbols-outlined, .info-chip.linkable, .info-chip.linkable:hover, .info-chip.score, .info-chip.score[data-tone='warn'], .info-chip.score[data-tone='bad'], .det-stack, .stack-chip, .det-section p, .vac-contacts
 - берёт: --accent, --bg-primary, --bg-secondary, --bg-tertiary, --border, --err, --score-warn, --text-primary, --text-secondary
@@ -1492,7 +1531,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 84 файлов
+## tests — 89 файлов
 
 ### tests/aggregators.test.js (115)
 - —
@@ -1524,7 +1563,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (118)
+### tests/bottom_bar_live.test.js (167)
 - —
 
 ### tests/bridge.test.js (161)
@@ -1573,8 +1612,8 @@ body, html, button, body, .material-symbols-outlined
 ### tests/companies.test.js (111)
 - —
 
-### tests/confirm_tone_live.test.js (75)
-- * Карточка с привязанным HR: без него пункт отправки заперт.
+### tests/confirm_tone_live.test.js (34)
+- —
 
 ### tests/contact_adding.test.js (128)
 - —
@@ -1594,7 +1633,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/flash.test.js (34)
 - —
 
-### tests/footer.test.js (169)
+### tests/footer.test.js (176)
 - * Нажатие мышью: место на дорожке шириной 300 точек.
 
 ### tests/fresh.test.js (71)
@@ -1671,14 +1710,17 @@ body, html, button, body, .material-symbols-outlined
 ### tests/provider_form.test.js (284)
 - * Мост, отвечающий по имени метода; зовы копятся в `asked`.
 
-### tests/round.test.js (52)
+### tests/round.test.js (75)
 - —
 
 ### tests/search.test.js (49)
 - —
 
-### tests/settings.test.js (444)
+### tests/settings.test.js (424)
 - —
+
+### tests/settings_screen_live.test.js (211)
+- * Экран над мостом; `mail` — что мост отдаёт о почте.
 
 ### tests/settled.js (21)
 - * Дождаться, пока осядут ответы моста и отрисовка.
@@ -1705,39 +1747,52 @@ body, html, button, body, .material-symbols-outlined
 ### tests/sources.test.js (53)
 - —
 
-### tests/stats.test.js (304)
+### tests/stats.test.js (335)
 - —
 
-### tests/stats_channels_card_live.test.js (66)
+### tests/stats_channels_card_live.test.js (91)
 - * Строка таблицы с нулями во всех колонках.
 
 ### tests/suggest_input_live.test.js (92)
 - —
 
-### tests/vacancies.test.js (285)
+### tests/tg_login_dialog_live.test.js (51)
 - —
 
-### tests/vacancies_screen_new_live.test.js (301)
+### tests/vacancies.test.js (297)
+- —
+
+### tests/vacancies_screen_new_live.test.js (326)
 - * Мост, отвечающий тем же, чем отвечает настоящий. * * Заведение чужой карточки отказывает: так ведёт себя настоящий, когда имя * занято или связь оборвалась, — и это единственный способ увидеть, что * остаётся в черновике после неудачи.
 
-### tests/vacancy_actions.test.js (159)
+### tests/vacancy_actions.test.js (219)
 - —
+
+### tests/vacancy_apply_live.test.js (131)
+- * Карточка, у которой мост отдаёт эти способы; `ways` может быть обещанием.
 
 ### tests/vacancy_card.test.js (330)
 - —
 
-### tests/vacancy_card_live.test.js (80)
+### tests/vacancy_card_live.test.js (76)
 - —
+
+### tests/vacancy_card_mount.js (61)
+- * Смонтировать карточку вакансии №7 над мостом `answer(method, payload)`. * * Отдаёт, что спрашивали у моста и что сказано плашкой, узел карточки, смену * одного свойства — как её делает живой родитель — и разборку.
+- отдаёт: mountVacancyCard, openActions, press
 
 ### tests/vacancy_contacts.test.js (41)
 - —
 
-### tests/vacancy_detail.js (37)
+### tests/vacancy_detail.js (38)
 - * Карточка вакансии от моста; названное в `extra` перебивает заготовку.
 - отдаёт: vacancyDetail
 
 ### tests/vacancy_filter.test.js (241)
 - —
+
+### tests/vacancy_screening_live.test.js (97)
+- * Карточка со скринингом или без; `screening` может быть обещанием.
 
 ### tests/vacancy_timeline_live.test.js (43)
 - —

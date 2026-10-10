@@ -136,6 +136,9 @@ class UiBot:
     def human_done(self) -> None:
         self.calls.append(("human_done",))
 
+    def reveal_browser(self) -> None:
+        self.calls.append(("reveal_browser",))
+
     async def delete_aggregator(self, aggregator_id: int) -> str:
         self.calls.append(("delete_aggregator", aggregator_id))
         return self.answers["aggregator_deleted"]

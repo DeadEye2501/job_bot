@@ -1,0 +1,44 @@
+/* Плашка ожидания человека в центре нижней полосы, на месте полос хода.
+
+   Красная, а не в цвет хода: агент стоит, пока человек не вмешается, и плашку
+   должно быть видно краем глаза. Во всю высоту полосы и без скруглений: кусок
+   самой полосы, ставший плашкой, а не всплывшая поверх неё кнопка. Центр полосы
+   — узел нулевой ширины (`footer.css`), поэтому плашка встаёт по нему сама,
+   сдвигом на свою половину. Снизу точка просвета: вровень с краем окна нижняя
+   рамка уходит под него и не видна. */
+.human-plate {
+  position: absolute;
+  top: 0;
+  bottom: 1px;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px 0 28px;
+  border: 1px solid var(--err);
+  background: var(--err-fill);
+  pointer-events: auto;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.human-plate-text {
+  color: var(--err);
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.human-plate-done {
+  display: inline-flex;
+  padding: 0 2px;
+  border-radius: 3px;
+  color: var(--ok);
+}
+
+.human-plate-done:hover {
+  background: var(--ok-fill);
+}
+
+.human-plate-done .material-symbols-outlined {
+  font-size: 16px;
+}

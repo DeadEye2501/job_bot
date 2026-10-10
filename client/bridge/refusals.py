@@ -216,6 +216,7 @@ PARSE_CV_REFUSALS = {
 """
 
 SEND_REFUSALS = {
+    "busy": BUSY_CYCLE,
     "no_vacancy": NO_VACANCY,
     "no_hr": "К вакансии не привязан HR.",
     "already_applied": "Отклик по этой вакансии уже отправлен.",

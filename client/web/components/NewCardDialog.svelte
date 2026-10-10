@@ -25,11 +25,15 @@
   // Подсказки и приём набранного нужны одной форме из трёх — вакансии: она
   // называет компанию и человека словами, а узнаёт их и заводит тот, кто
   // держит мост. У человека и компании подсказывать нечему.
+  //
+  // `locked` — почему заводить сейчас нельзя; пусто — можно. Кнопка заперта и
+  // говорит причину своей подписью, как говорит, что работа идёт.
   let {
     kind,
     draft,
     busy,
     ready,
+    locked = '',
     options = null,
     oncompany = null,
     onhr = null,
@@ -45,8 +49,8 @@
   extra={kind === 'vacancy' ? 'tall' : ''}
   title={form.title}
   confirmLabel="Создать"
-  busyLabel={form.busyLabel}
-  {busy}
+  busyLabel={locked || form.busyLabel}
+  busy={busy || Boolean(locked)}
   {ready}
   {onconfirm}
   {oncancel}

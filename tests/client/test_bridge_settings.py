@@ -101,14 +101,27 @@ async def test_the_aggregator_settings_come_back_after_saving(api, ask):
     }
 
 
-async def test_mail_settings_come_back_without_the_password(api, ask):
+async def test_mail_settings_come_back_with_the_password(api, ask):
+    """Пароль окну отдаётся, как ключи моделей и `api_hash`: подключённая почта
+    открывается с паролем точками, и глазом его можно показать."""
     saved = await ask(api.settings.save_mail, {"address": "me@gmail.com", "password": "Kx9-mail"})
 
     answer = (await ask(api.settings.mail))["ok"]
 
     assert "ok" in saved
-    assert answer == {"address": "me@gmail.com", "smtp_host": "smtp.gmail.com",
-                      "smtp_port": 465, "has_password": True}
+    assert answer == {"address": "me@gmail.com", "password": "Kx9-mail", "smtp_host": "smtp.gmail.com",
+                      "smtp_port": 465, "server_by_address": True}
+
+
+async def test_a_server_typed_by_hand_is_not_by_address(api, ask):
+    """Окно держит поля сервера, пока сервер не подставлен по адресу: вписанный руками
+    сервер незнакомой почты иначе было бы негде поправить."""
+    await ask(api.settings.save_mail, {"address": "me@company.test", "password": "x",
+                                       "smtp_host": "smtp.company.test", "smtp_port": 587})
+
+    answer = (await ask(api.settings.mail))["ok"]
+
+    assert (answer["smtp_host"], answer["server_by_address"]) == ("smtp.company.test", False)
 
 
 async def test_the_aggregator_snapshot_names_the_browser_and_what_locks_the_agent(

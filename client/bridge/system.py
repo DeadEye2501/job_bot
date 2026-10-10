@@ -130,6 +130,12 @@ class System(Journal, Wipe, Desktop):
             self._hub.bot.human_done()
         return {"ok": {}}
 
+    def reveal_browser(self) -> dict:
+        """Нажатие на плашку ожидания: вывести вперёд браузер, где ждут человека."""
+        if self._hub.bot is not None:
+            self._hub.bot.reveal_browser()
+        return {"ok": {}}
+
     def run_now(self) -> dict:
         """Кнопка обновления: один полный оборот — каналы, затем агрегаторы —
         в любом режиме.

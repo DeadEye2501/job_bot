@@ -218,7 +218,7 @@
         events={heard}
       />
     {:else if section === 'stats'}
-      <StatsScreen {ask} onslice={goSlice} onchannel={(id) => goContacts({ tab: 'channels', id })} />
+      <StatsScreen {ask} onslice={goSlice} onsource={goContacts} />
     {:else if section === 'vacancies'}
       <VacanciesScreen
         {ask}

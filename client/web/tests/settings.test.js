@@ -30,7 +30,6 @@ import {
   sameCreds,
   scorePercent,
   sessionPill,
-  sessionText,
   telegramCreds,
   thresholdState,
 } from '../state/settings.js';
@@ -239,25 +238,6 @@ describe('плашка сеанса Telegram', () => {
     // По ней человек понимает, что бот не поедет, не читая строку ниже.
     expect(sessionPill({ has_session: false, username: '' }))
       .toEqual({ text: 'Нет сессии', tone: 'err', title: '' });
-  });
-});
-
-describe('слова про сеанс Telegram', () => {
-  it('вошедший назван по нику', () => {
-    expect(sessionText({ has_session: true, username: 'deadeye' }))
-      .toBe('Сессия активна, авторизован как @deadeye');
-  });
-
-  it('без ника говорят только про сеанс', () => {
-    // Ник спрашивают у самого Telegram, и на холодном старте он не успевает
-    // ответить. Пустое «@» выглядело бы поломкой учётной записи.
-    expect(sessionText({ has_session: true, username: '' })).toBe('Сессия активна');
-  });
-
-  it('без сеанса зовут войти заново', () => {
-    // Это единственное, что человек может сделать: без сеанса бот не поедет.
-    expect(sessionText({ has_session: false, username: '' }))
-      .toBe('Сессии нет — авторизуйтесь заново');
   });
 });
 

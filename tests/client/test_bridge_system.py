@@ -175,3 +175,11 @@ async def test_switching_off_cancels_nothing(api, ask, with_bot):
     await ask(api.system.set_mode, "Off")
 
     assert [call for call in bot.calls if call[0].startswith("cancel")] == []
+
+
+async def test_a_click_on_the_plate_reaches_the_bot(api, ask, with_bot):
+    bot = with_bot()
+
+    answer = await ask(api.system.reveal_browser)
+
+    assert answer == {"ok": {}} and bot.calls == [("reveal_browser",)]

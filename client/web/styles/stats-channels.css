@@ -51,6 +51,8 @@
 .stats-ch-grid .stats-ch-group.funnel { color: var(--stats-group-funnel); }
 .stats-ch-grid .stats-ch-group.outcome { color: var(--stats-group-outcome); }
 
+/* Шапка в одну строку: подпись в два слова, перенесённая в узком окне, делает
+   шапку двухэтажной, и колонки под ней встают неровно. */
 .stats-ch-grid .stats-ch-th {
   color: var(--text-tertiary);
   font-size: 0.62rem;
@@ -58,6 +60,7 @@
   letter-spacing: 0.4px;
   padding: 4px 6px 8px;
   font-weight: 400;
+  white-space: nowrap;
 }
 
 .stats-ch-grid .stats-ch-name-cell {

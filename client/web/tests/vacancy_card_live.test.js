@@ -6,48 +6,27 @@
 // а меняет ему одно свойство. Не назови эффект этот номер своей зависимостью —
 // на экране осталась бы прежняя вакансия, и человек правил бы статус не той.
 
-import { flushSync, mount, unmount } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import VacancyCard from '../app/VacancyCard.svelte';
-import { livingProps } from './live_props.svelte.js';
 import { settled } from './settled.js';
+import { mountVacancyCard } from './vacancy_card_mount.js';
 import { vacancyDetail } from './vacancy_detail.js';
 
-let mounted = null;
-let host = null;
+let card = null;
 
 afterEach(() => {
-  if (mounted) flushSync(() => unmount(mounted));
-  host?.remove();
-  mounted = null;
-  host = null;
+  card?.remove();
+  card = null;
 });
 
-function screen(vacancyId, extra = {}) {
-  const asked = [];
-  const [props, change] = livingProps({
-    ask: async (method, payload) => {
-      asked.push([method, payload]);
-      return { vacancy: vacancyDetail(payload, extra) };
-    },
-    say: () => {},
-    events: { on: () => () => {} },
-    lockedTip: '',
-    vacancyId,
-    oncontacts: () => {},
-    onclose: () => {},
-    onchanged: () => {},
-  });
-  host = document.createElement('div');
-  document.body.append(host);
-  mounted = mount(VacancyCard, { target: host, props });
-  return { asked, change, text: () => host.textContent };
+function screen(extra = {}) {
+  card = mountVacancyCard((method, payload) => ({ vacancy: vacancyDetail(payload, extra) }));
+  return { asked: card.asked, change: card.change, text: () => card.host.textContent };
 }
 
 describe('живая карточка вакансии', () => {
   it('перечитывается, когда открыли другую вакансию', async () => {
-    const { asked, change, text } = screen(7);
+    const { asked, change, text } = screen();
     await settled();
     expect(asked).toEqual([['vacancies.detail', 7]]);
 
@@ -65,7 +44,7 @@ describe('живая карточка вакансии', () => {
     // Наставление разбора велит модели брать зарплату дословно, и в поле
     // ложится написанное автором: «🎯 ЗП: действительно готовы обсудить ваши
     // пожелания». В пилюле такому не место — она показывает только числа.
-    const { text } = screen(7, {
+    const { text } = screen({
       salary: '🎯 ЗП: действительно готовы обсудить ваши пожелания',
       salary_min: 500000,
       salary_max: 700000,
@@ -77,4 +56,21 @@ describe('живая карточка вакансии', () => {
     expect(text()).toContain('от 500000 до 700000 ֏');
     expect(text()).not.toContain('готовы обсудить');
   });
+
+  it('нажатие на название кладёт его в буфер обмена и говорит об этом', async () => {
+    const copied = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: async (text) => copied.push(text) },
+      configurable: true,
+    });
+    screen({ title: 'Повар в бистро' });
+    await settled();
+
+    card.host.querySelector('.det-title').click();
+    await settled();
+
+    expect(copied).toEqual(['Повар в бистро']);
+    expect(card.said).toContain('Название скопировано');
+  });
 });
+

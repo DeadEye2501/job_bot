@@ -115,4 +115,53 @@ describe('живая нижняя полоса', () => {
     expect(asked.some((one) => one.method === 'system.set_mode')).toBe(false);
     expect(tips.at(-1)).toBe('');
   });
+
+  it('ожидание человека встаёт плашкой на место полос', async () => {
+    const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+
+    handlers.ingestion_started();
+    handlers.human_needed({ kind: 'captcha', host: 'site.test' });
+    await settled();
+
+    expect(document.querySelector('.human-plate').textContent).toContain('Требуется пройти капчу');
+    expect(document.querySelector('.progress-wrap')).toBeNull();
+  });
+
+  it('нажатие на плашку выводит браузер, галочка отпускает агента', async () => {
+    const { asked, handlers } = bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+    handlers.ingestion_started();
+    handlers.human_needed({ kind: 'captcha', host: 'site.test' });
+    await settled();
+
+    document.querySelector('.human-plate-text').click();
+    document.querySelector('.human-plate-done').click();
+    await settled();
+
+    const methods = asked.map((one) => one.method);
+    expect(methods).toContain('system.reveal_browser');
+    expect(methods).toContain('system.human_done');
+  });
+
+  it('ход обхода агрегатора идёт полосой каналов, со счётом в скобках', async () => {
+    const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+
+    handlers.ingestion_started();
+    handlers.progress_update({ stage: 'aggregator', label: 'hh.ru — найдено', current: 3, total: 10 });
+    await settled();
+
+    expect(document.querySelector('.progress-caption').textContent).toContain('hh.ru — найдено (3/10)');
+  });
+
+  it('слово обхода показывается плашкой', async () => {
+    const { handlers, said } = bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+
+    handlers.round_note({ text: 'Капча не пройдена — обход снят.' });
+
+    expect(said).toContain('Капча не пройдена — обход снят.');
+  });
 });
+

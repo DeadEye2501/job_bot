@@ -33,6 +33,18 @@
   color: var(--text-secondary);
 }
 
+/* Плашка и кнопки справа в шапке. Шрифт сброшен: шапка набрана прописными с
+   разрядкой, и кнопки переняли бы это. */
+.settings-section-side {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
 /* Опасная зона отличается от прочих секций только цветом рамки и заголовка:
    всё внутри устроено так же, и разводить её отдельной коробкой незачем. */
 .settings-section.danger {

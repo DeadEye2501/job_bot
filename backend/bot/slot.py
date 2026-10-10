@@ -153,9 +153,14 @@ async def settle_slot(bot, timeout: float) -> None:
         logger.warning("работа в месте прогона не кончилась за %s с", timeout)
 
 
+def slot_taken(bot) -> bool:
+    """Занято ли место прогона: идёт обход, прогон источника или действие окна."""
+    return bot.current_poll_task is not None
+
+
 def _occupy(bot, label: str) -> bool:
     """Занять место прогона; занято — отказ с записью в журнал."""
-    if bot.current_poll_task is not None:
+    if slot_taken(bot):
         logger.info("%s: another cycle is already running, skipping", label)
         return False
     fire(bot.on_cycle_start, "on_cycle_start")

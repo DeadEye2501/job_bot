@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
-// Строка воронки открывает свой канал в Контактах — кроме строки «Без канала»:
-// открывать у неё нечего, и нажатие на ней не должно уводить с экрана.
+// Строка воронки открывает свой источник в Контактах — кроме строки «Без
+// канала»: открывать у неё нечего, и нажатие на ней не должно уводить с экрана.
 
 import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -12,10 +12,11 @@ import { settled } from './settled.js';
 afterEach(cleanup);
 
 /** Строка таблицы с нулями во всех колонках. */
-function line(id, label) {
+function line(key, label, target) {
   return {
-    id,
+    key,
     label,
+    target,
     total: 0,
     trash: 0,
     not_fit: 0,
@@ -29,13 +30,21 @@ function line(id, label) {
   };
 }
 
-/** Таблица из канала и строки без канала, с записанными нажатиями. */
+const CHANNEL = { tab: 'channels', id: 7 };
+const SITE = { tab: 'aggregators', id: 2 };
+
+/** Таблица из канала, двух агрегаторов и строки без канала, с записанными нажатиями. */
 function card() {
   const picked = [];
   const shown = render(StatsChannelsCard, {
     props: {
-      channels: [line(7, 'Канал'), line(null, 'Без канала')],
-      onpick: (id) => picked.push(id),
+      channels: [
+        line('channel:7', 'Канал', CHANNEL),
+        line('aggregator:2', 'HeadHunter', SITE),
+        line('aggregator:1', 'Поиск по сети', { tab: 'aggregators', id: 1 }),
+        line('none:', 'Без канала', null),
+      ],
+      onpick: (target) => picked.push(target),
     },
   });
   const nameCell = (text) =>
@@ -46,13 +55,29 @@ function card() {
 }
 
 describe('живая таблица воронки по каналам', () => {
+  it('строки агрегаторов показываются все', () => {
+    const { nameCell } = card();
+
+    expect(nameCell('HeadHunter')).toBeTruthy();
+    expect(nameCell('Поиск по сети')).toBeTruthy();
+  });
+
   it('строка канала открывает канал', async () => {
     const { picked, nameCell } = card();
 
     nameCell('Канал').click();
     await settled();
 
-    expect(picked).toEqual([7]);
+    expect(picked).toEqual([CHANNEL]);
+  });
+
+  it('строка агрегатора открывает агрегатор', async () => {
+    const { picked, nameCell } = card();
+
+    nameCell('HeadHunter').click();
+    await settled();
+
+    expect(picked).toEqual([SITE]);
   });
 
   it('строка без канала никуда не ведёт', async () => {

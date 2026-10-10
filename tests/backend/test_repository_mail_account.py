@@ -1,4 +1,6 @@
-"""Почта для откликов: пароль лежит шифром, Gmail настраивается сам."""
+"""Почта для откликов: пароль лежит шифром, популярные почты настраиваются сами."""
+
+import pytest
 
 from backend.log_secrets import SecretRedactionFilter
 from backend.models import MailAccount
@@ -58,3 +60,24 @@ async def test_a_saved_password_never_reaches_the_log(session):
     SecretRedactionFilter().filter(entry)
 
     assert "Kx9-mail" not in entry.msg
+
+
+@pytest.mark.parametrize(("address", "server"), [
+    ("me@yandex.ru", ("smtp.yandex.ru", 465)),
+    ("me@ya.ru", ("smtp.yandex.ru", 465)),
+    ("me@mail.ru", ("smtp.mail.ru", 465)),
+    ("me@bk.ru", ("smtp.mail.ru", 465)),
+    ("me@outlook.com", ("smtp.office365.com", 587)),
+    ("Me@Hotmail.com", ("smtp.office365.com", 587)),
+])
+async def test_popular_mail_needs_no_server(session, address, server):
+    async with session.begin():
+        await save_mail_account(session, MailSettings(address, "secret", None, None))
+    account = await get_mail_account(session)
+    assert (account.host, account.port) == server
+
+
+async def test_unknown_mail_without_a_server_cannot_send(session):
+    async with session.begin():
+        await save_mail_account(session, MailSettings("me@company.test", "secret", None, None))
+    assert await get_mail_account(session) is None

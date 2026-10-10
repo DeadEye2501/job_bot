@@ -15,7 +15,11 @@
   font-weight: 500;
 }
 
-.help code {
+/* Адрес в инструкции — простой и нажимаемый — набран одинаково: моноширинным
+   на подложке. Нажимаемый отличается только откликом на наведение — темнеет,
+   как пилюля источника в карточке вакансии. */
+.help code,
+.help .help-link {
   font-family: ui-monospace, Consolas, monospace;
   font-size: 0.78rem;
   background: var(--bg-tertiary);
@@ -31,4 +35,8 @@
 
 .help ol li {
   margin-bottom: 3px;
+}
+
+.help .help-link:hover {
+  background: var(--bg-secondary);
 }

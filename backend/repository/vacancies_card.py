@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from backend.models import Company, HR, Vacancy, VacancyEvent, VacancyStatusHistory
 from backend.payloads import VacancyDetail
 
+from backend.repository.applications import has_screening
 from backend.repository.vacancies_life import add_vacancy_event
 from backend.repository.vacancy_contacts import list_contacts
 
@@ -84,6 +85,7 @@ async def get_vacancy_detail(
             session, VacancyEvent, VacancyEvent.created_at, vacancy_id
         ),
         contacts=await list_contacts(session, vacancy_id),
+        has_screening=await has_screening(session, vacancy_id),
     )
 
 

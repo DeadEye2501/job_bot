@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { allAlive, blockedTip, downNames, shouldTurnOff } from '../state/health.js';
 import { modeChosen } from '../state/modes.js';
-import { bar, caption, countlessNote } from '../state/progress.js';
+import { bar, caption, countlessNote, humanText } from '../state/progress.js';
 
 describe('здоровье систем', () => {
   it('живо всё — значит живо каждое из четырёх', () => {
@@ -165,5 +165,12 @@ describe('полоса прогресса', () => {
     // «сделано ноль», и человек решил бы, что обход стоит.
     expect(bar(0, 0).unknown).toBe(true);
     expect(bar(3, 10).unknown).toBe(false);
+  });
+});
+
+describe('плашка ожидания человека', () => {
+  it('называет, что требуется: пройти капчу или войти на сайт', () => {
+    expect(humanText({ kind: 'captcha', host: 'site.test' })).toBe('Требуется пройти капчу');
+    expect(humanText({ kind: 'login', host: 'site.test' })).toBe('Требуется войти на site.test');
   });
 });

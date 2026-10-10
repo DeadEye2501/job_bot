@@ -71,6 +71,39 @@ async def append_screening(session: AsyncSession, application_id: int, lines) ->
                               text=text, position=start + offset))
 
 
+@dataclass(frozen=True)
+class ScreenedApplication:
+    """Отклик со скринингом: куда ушёл и реплики «наша ли, текст» по порядку."""
+
+    target: str
+    lines: list[tuple[bool, str]]
+
+
+async def vacancy_screening(session: AsyncSession, vacancy_id: int) -> list[ScreenedApplication]:
+    """Скрининг вакансии отклик за откликом, в порядке отправки; отклики без реплик пропущены."""
+    rows = await session.execute(
+        select(Application.id, Application.target, Screening.from_us, Screening.text)
+        .join(Screening, Screening.application_id == Application.id)
+        .where(Application.vacancy_id == vacancy_id)
+        .order_by(Application.sent_at, Application.id, Screening.position)
+    )
+    shown: dict[int, ScreenedApplication] = {}
+    for application_id, target, from_us, text in rows:
+        shown.setdefault(application_id, ScreenedApplication(target, [])).lines.append((from_us, text))
+    return list(shown.values())
+
+
+async def has_screening(session: AsyncSession, vacancy_id: int) -> bool:
+    """Был ли скрининг хоть по одному отклику вакансии."""
+    found = await session.scalar(
+        select(Screening.id)
+        .join(Application, Screening.application_id == Application.id)
+        .where(Application.vacancy_id == vacancy_id)
+        .limit(1)
+    )
+    return found is not None
+
+
 async def _existing(session: AsyncSession, vacancy_id: int, target: str) -> Application | None:
     """Отклик на тот же адрес — по ключу контакта, а не по написанию: `HR@Site.ru`
     и `hr@site.ru`, адрес с косой в конце и без — один адрес."""

@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { actionBlocks, rawChips, sourcePill } from '../state/vacancy_actions.js';
+import {
+  actionBlocks,
+  applyChoices,
+  noChoiceReason,
+  rawChips,
+  sourcePill,
+} from '../state/vacancy_actions.js';
 
 const CARD = {
   hr: { id: 1, name: 'Иван', telegram_username: 'ivan' },
@@ -28,22 +34,10 @@ describe('запреты действий', () => {
     );
   });
 
-  it('без HR отправка заперта, а переразбор нет', () => {
-    // Отклик уходит человеку, и слать его некому; разбору же HR не нужен —
-    // он его как раз и находит.
-    expect(actionBlocks({ ...CARD, hr: null }, '')).toEqual({
-      send: 'Сначала привяжите HR',
-      rerun: '',
-      source: '',
-      raw: '',
-    });
-  });
-
-  it('о неживом окружении говорят раньше, чем об отсутствующем HR', () => {
-    // Привязать HR при мёртвой модели человек может, а отправить всё равно
-    // нет: назови мы первую причину, он сделал бы работу и упёрся во вторую.
-    const blocks = actionBlocks({ ...CARD, hr: null }, 'Модель не отвечает');
-    expect(blocks.send).toBe('Модель не отвечает');
+  it('без HR отклик не заперт: откликнуться можно и не в Telegram', () => {
+    // Куда откликаться, решает окно выбора по ответу моста: у вакансии с сайта
+    // HR нет, а форма и почта есть.
+    expect(actionBlocks({ ...CARD, hr: null }, '').send).toBe('');
   });
 
   it('неживое окружение запирает оба, и сказано об этом теми же словами', () => {
@@ -52,6 +46,15 @@ describe('запреты действий', () => {
     // обхода внизу окна.
     const blocks = actionBlocks(CARD, 'Модель не отвечает');
     expect(blocks).toMatchObject({ send: 'Модель не отвечает', rerun: 'Модель не отвечает' });
+  });
+
+  it('идущий обход запирает и отклик, и переразбор', () => {
+    // Оба зовут модель, а прогон зовёт её сам: параллельной работы модели не
+    // допускаем — даже отклик в Telegram, которому браузер не нужен.
+    expect(actionBlocks(CARD, '', true)).toMatchObject({
+      send: 'Идёт обход',
+      rerun: 'Идёт обход',
+    });
   });
 
   it('без ссылки на источник переход к посту заперт', () => {
@@ -155,5 +158,62 @@ describe('пилюля источника в шапке карточки', () =>
     // Вставленная текстом или заведённая руками: пустая пилюля читалась бы как
     // потерянный источник.
     expect(sourcePill({ ...CARD, channel_username: null, aggregator_name: null })).toBeNull();
+  });
+});
+
+describe('способы отклика в окне выбора', () => {
+  const HR = { id: 1, name: 'Иван', telegram_username: 'ivan' };
+  const FORM = { method: 'form', target: 'https://example.com/job' };
+  const MAIL = { method: 'email', target: 'hr@example.com' };
+
+  it('Telegram первым — ником с собакой, за ним адреса способов агента', () => {
+    const rows = applyChoices({ ways: [FORM, MAIL], telegram: true, lock: null }, HR);
+    expect(rows.map((row) => row.contact)).toEqual([
+      '@ivan',
+      'https://example.com/job',
+      'hr@example.com',
+    ]);
+  });
+
+  it('HR без ника назван именем', () => {
+    const [row] = applyChoices(
+      { ways: [], telegram: true, lock: null },
+      { ...HR, telegram_username: null },
+    );
+    expect(row.contact).toBe('Иван');
+  });
+
+  it('способ агента несёт то, что мост ждёт обратно', () => {
+    const [row] = applyChoices({ ways: [MAIL], telegram: false, lock: null }, null);
+    expect(row.way).toEqual(MAIL);
+  });
+
+  it('у Telegram способа агента нет: он уходит прежней отправкой', () => {
+    const [row] = applyChoices({ ways: [], telegram: true, lock: null }, HR);
+    expect(row.way).toBeNull();
+  });
+
+  it('ключи строк разные и у двух адресов одного способа', () => {
+    const other = { method: 'email', target: 'boss@example.com' };
+    const rows = applyChoices({ ways: [MAIL, other], telegram: true, lock: null }, HR);
+    expect(new Set(rows.map((row) => row.key)).size).toBe(3);
+  });
+
+  it('запертый агент оставляет только Telegram', () => {
+    // Агенту нечем работать — нет водителя или браузера; Telegram же шлёт бот.
+    const rows = applyChoices({ ways: [FORM], telegram: true, lock: 'Нет браузера' }, HR);
+    expect(rows.map((row) => row.contact)).toEqual(['@ivan']);
+  });
+
+  it('без способов из-за запертого агента причиной названо то, что его заперло', () => {
+    expect(noChoiceReason({ ways: [FORM], telegram: false, lock: 'Нет браузера' })).toBe(
+      'Нет браузера',
+    );
+  });
+
+  it('без способов вовсе сказано, что откликнуться некуда', () => {
+    expect(noChoiceReason({ ways: [], telegram: false, lock: null })).toBe(
+      'Откликнуться некуда: нет ни HR, ни контактов для отклика',
+    );
   });
 });

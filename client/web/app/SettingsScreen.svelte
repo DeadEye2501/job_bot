@@ -1,6 +1,6 @@
 <script>
   // Экран настроек: учётная запись Telegram, оба поставщика моделей, пороги
-  // отбора и удаление всех данных.
+  // отбора, почта для откликов и удаление всех данных.
   //
   // Записывается всё по ходу, без кнопки «сохранить»: поле уезжает на мост,
   // когда его покидают. Так было и в прежнем окне, и это верно для настроек —
@@ -9,6 +9,7 @@
   import { call } from '$api/bridge.js';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import LlmSection from '$components/LlmSection.svelte';
+  import MailSection from '$components/MailSection.svelte';
   import PipelineSection from '$components/PipelineSection.svelte';
   import SettingsSection from '$components/SettingsSection.svelte';
   import TelegramSection from '$components/TelegramSection.svelte';
@@ -40,6 +41,7 @@
   let tg = $state(null);
   let draft = $state(blankTelegram());
   let pipeline = $state({});
+  let mail = $state({});
   let logging = $state(false);
   let wiping = $state(false);
   let leaving = $state(false);
@@ -66,6 +68,7 @@
    * соседнее поле, которое человек правит прямо сейчас.
    */
   async function refresh() {
+    readMail();
     const now = await ask('settings.get');
     if (now === null || !alive.now) return;
     // Плашка проверки говорит про те данные, которые проверяли: приехали
@@ -75,7 +78,9 @@
     tg = now.tg;
     chat.creds = now.chat;
     embed.creds = now.embed;
-    pipeline = now.pipeline;
+    // Лимит агрегатора приходит в снимке агрегаторов, а стоит в строке
+    // «Пайплайн» рядом с лимитом каналов и пишется тем же сохранением.
+    pipeline = { ...now.pipeline, aggregator_backfill_limit: now.aggregators.aggregator_backfill_limit };
     if (!loaded) {
       draft = telegramCreds(now.tg);
       // Признаки выводятся из настроек только здесь, при первом чтении. Дальше
@@ -106,6 +111,26 @@
   function savePipeline(part) {
     pipeline = { ...pipeline, ...part };
     return save({ app: part });
+  }
+
+  /** Перечитать почту: мост подставляет сервер по адресу, и записанное
+   *  отличается от набранного. */
+  async function readMail() {
+    const now = await ask('settings.mail');
+    if (now !== null && alive.now) mail = now;
+  }
+
+  /** Записать почту целиком: мост принимает её одной записью. */
+  async function saveMail(part) {
+    const next = { ...mail, ...part };
+    mail = next;
+    await ask('settings.save_mail', {
+      address: next.address ?? '',
+      password: next.password ?? '',
+      smtp_host: next.smtp_host ?? null,
+      smtp_port: next.smtp_port ?? null,
+    });
+    await readMail();
   }
 
   function saveChat(part) {
@@ -255,6 +280,8 @@
         onlogin={startLogin}
         onlogout={() => (leaving = true)}
       />
+
+      <MailSection {mail} onsave={saveMail} onopen={(url) => ask('system.open_url', url)} />
 
       <LlmSection
         icon="smart_toy"

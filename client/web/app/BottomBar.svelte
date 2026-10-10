@@ -11,6 +11,7 @@
   // подсказку о запертых кнопках — её оболочка раздаёт экранам — и уход в
   // контакты из списка непрочитанного.
   import HealthLamp from '$components/HealthLamp.svelte';
+  import HumanPlate from '$components/HumanPlate.svelte';
   import ModeToggle from '$components/ModeToggle.svelte';
   import ProgressBars from '$components/ProgressBars.svelte';
   import RunButton from '$components/RunButton.svelte';
@@ -18,7 +19,14 @@
   import { attempts } from '$state/attempts.js';
   import { LAMPS, allAlive, blockedTip, shouldTurnOff } from '$state/health.js';
   import { OFF } from '$state/modes.js';
-  import { COUNTLESS_STAGES, STARTING, bar, caption, countlessNote } from '$state/progress.js';
+  import {
+    COUNTLESS_STAGES,
+    STARTING,
+    bar,
+    caption,
+    countlessNote,
+    humanText,
+  } from '$state/progress.js';
   import { round } from '$state/round.svelte.js';
 
   let { ask, say, events, onlocked, oncontact } = $props();
@@ -158,7 +166,9 @@
    */
   function moved(step) {
     if (COUNTLESS_STAGES.has(step.stage)) single = countlessNote(step.label);
-    if (step.stage === 'channel') {
+    // Агрегатор обходится той же полосой, что канал: источник за источником, и
+    // подпись его — имя сайта со счётом найденного.
+    if (step.stage === 'channel' || step.stage === 'aggregator') {
       single = '';
       channels = { ...step };
     }
@@ -181,6 +191,8 @@
       // он говорит о ней в тот же миг: ход прошлого прогона стирается.
       round.onStart(started),
       events.on('progress_update', moved),
+      // Слово обхода — почему он снят: капча не пройдена, лимит исчерпан.
+      events.on('round_note', (note) => say(note.text)),
       events.on('unread_changed', askUnread),
       // Потеря значит, что часть случившегося выпала из кольца: чем гадать,
       // чего именно не хватает, дешевле перечитать всё разом.
@@ -207,7 +219,13 @@
   </div>
 
   <div class="bb-center">
-    {#if round.running}
+    {#if round.human}
+      <HumanPlate
+        text={humanText(round.human)}
+        onreveal={() => ask('system.reveal_browser')}
+        ondone={() => ask('system.human_done')}
+      />
+    {:else if round.running}
       <ProgressBars
         channels={bar(channels.current, channels.total)}
         messages={bar(messages.current, messages.total)}

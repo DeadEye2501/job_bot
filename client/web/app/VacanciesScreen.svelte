@@ -18,10 +18,18 @@
   import { personName } from '$state/people.js';
   import { labels, sameName } from '$state/picker.js';
   import { whileOpen } from '$state/outside.js';
+  import { round } from '$state/round.svelte.js';
   import { VACANCY_PAGE, appended, nearBottom, refreshLimit } from '$state/paging.js';
   import { filterPayload } from '$state/vacancy_filter.js';
   import { vacancyView } from '$state/vacancy_view.svelte.js';
-  import { SORTS, emptyNote, sortKey, typed, vacancyFields } from '$state/vacancies.js';
+  import {
+    SORTS,
+    emptyNote,
+    pasteLock,
+    sortKey,
+    typed,
+    vacancyFields,
+  } from '$state/vacancies.js';
 
   // `lockedTip` приходит сверху, а не спрашивается здесь: лампы состояния
   // опрашивает оболочка для нижней полосы, и второй опрос из карточки дал бы
@@ -422,6 +430,7 @@
     draft={newCard.draft}
     busy={newCard.saving}
     ready={newCard.ready}
+    locked={pasteLock(newCard.draft, round.running)}
     options={suggestions}
     oncompany={(typed) => settle('companies', typed)}
     onhr={(typed) => settle('hrs', typed)}

@@ -1,5 +1,6 @@
 <script>
-  // Пороги отбора и ритм обхода: пять величин в одну строку.
+  // Пороги отбора и ритм обхода: шесть величин в две строки по три — сверху
+  // порог, интервал и симуляция, снизу три лимита.
   import { untrack } from 'svelte';
 
   import { BOUNDS, SCORE_MAX, clampField, scorePercent, thresholdState } from '$state/settings.js';
@@ -10,9 +11,20 @@
 
   // Подписи — здесь, границы — в `state/settings.js` рядом с тем, кто по ним
   // зажимает: разъедься они, поле принимало бы одно, а показывало другое.
-  const NUMBERS = [
-    { key: 'poll_interval_sec', label: 'Интервал опроса', unit: 'сек', ...BOUNDS.poll_interval_sec },
+  const INTERVAL = {
+    key: 'poll_interval_sec',
+    label: 'Интервал опроса',
+    unit: 'сек',
+    ...BOUNDS.poll_interval_sec,
+  };
+  const LIMITS = [
     { key: 'backfill_limit', label: 'Сообщений за цикл', unit: 'шт', ...BOUNDS.backfill_limit },
+    {
+      key: 'aggregator_backfill_limit',
+      label: 'Вакансий с агрегатора',
+      unit: 'шт',
+      ...BOUNDS.aggregator_backfill_limit,
+    },
     {
       key: 'dm_backfill_limit',
       label: 'DM-сообщений на HR',
@@ -78,22 +90,7 @@
       </div>
     </div>
 
-    {#each NUMBERS as one (one.key)}
-      <div>
-        <div class="pipeline-label">{one.label}</div>
-        <div class="with-unit">
-          <input
-            class="input"
-            type="number"
-            min={one.min}
-            max={one.max}
-            value={values[one.key]}
-            onblur={(event) => keep(event.currentTarget, one)}
-          />
-          <span class="unit">{one.unit}</span>
-        </div>
-      </div>
-    {/each}
+    {@render number(INTERVAL)}
 
     <div>
       <div class="pipeline-label" title={LOCK_TITLE}>Симуляция отправки</div>
@@ -109,5 +106,26 @@
         />
       </div>
     </div>
+
+    {#each LIMITS as one (one.key)}
+      {@render number(one)}
+    {/each}
   </div>
 </SettingsSection>
+
+{#snippet number(one)}
+  <div>
+    <div class="pipeline-label">{one.label}</div>
+    <div class="with-unit">
+      <input
+        class="input"
+        type="number"
+        min={one.min}
+        max={one.max}
+        value={values[one.key]}
+        onblur={(event) => keep(event.currentTarget, one)}
+      />
+      <span class="unit">{one.unit}</span>
+    </div>
+  </div>
+{/snippet}

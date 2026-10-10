@@ -8,9 +8,14 @@ from backend.models import (
     VacancyEvent,
     VacancyStatus,
 )
-from backend.repository.applications import ApplicationEntry, record_application
+from backend.repository.applications import (
+    ApplicationEntry,
+    record_application,
+    vacancy_screening,
+)
 from tests.dbio import all_rows, only_row, put
-from tests.factories import vacancy_row
+from tests.factories import at, vacancy_row
+from tests.factories_aggregators import application_row, screening_row
 
 
 def _entry(vacancy_id, **over) -> ApplicationEntry:
@@ -91,3 +96,27 @@ async def test_the_same_address_typed_differently_is_the_same_application(sessio
 
     assert again == first
     assert len(await all_rows(session_factory, Application)) == 1
+
+
+async def test_the_screening_of_a_vacancy_goes_application_by_application(session, session_factory):
+    """Отклик за откликом в порядке отправки, реплики по порядку; отклик без
+    скрининга и чужая вакансия в выборку не попадают."""
+    vacancy, other = vacancy_row(), vacancy_row()
+    await put(session_factory, vacancy, other)
+    late = application_row(vacancy.id, target="https://late.test/", sent_at=at(10))
+    early = application_row(vacancy.id, target="hr@early.test", sent_at=at(0))
+    silent = application_row(vacancy.id, target="https://silent.test/", sent_at=at(5))
+    foreign = application_row(other.id, sent_at=at(0))
+    await put(session_factory, late, early, silent, foreign)
+    await put(session_factory,
+              screening_row(late.id, 1, from_us=True, text="Пять"),
+              screening_row(late.id, 0, text="Сколько лет опыта?"),
+              screening_row(early.id, 0, text="Когда можете выйти?"),
+              screening_row(foreign.id, 0, text="Чужой вопрос"))
+
+    shown = await vacancy_screening(session, vacancy.id)
+
+    assert [(one.target, one.lines) for one in shown] == [
+        ("hr@early.test", [(False, "Когда можете выйти?")]),
+        ("https://late.test/", [(False, "Сколько лет опыта?"), (True, "Пять")]),
+    ]

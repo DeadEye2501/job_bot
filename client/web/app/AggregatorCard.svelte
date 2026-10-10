@@ -14,10 +14,10 @@
   import MenuItem from '$components/MenuItem.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
   import SourceStats from '$components/SourceStats.svelte';
-  import { LOGIN_FIRST, RUNNING, actionBlock, aggregatorLastRun, aggregatorWhere } from '$state/aggregators.js';
+  import { LOGIN_FIRST, actionBlock, aggregatorLastRun, aggregatorWhere } from '$state/aggregators.js';
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
-  import { round } from '$state/round.svelte.js';
+  import { RUNNING, round } from '$state/round.svelte.js';
   import { siteHref } from '$state/site.js';
   import { sourceCard } from '$state/source_card.svelte.js';
 

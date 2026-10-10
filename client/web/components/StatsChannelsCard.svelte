@@ -13,8 +13,8 @@
   // Само правило ширины живёт в оформлении, сюда уезжает одно число: встроенный
   // стиль сильнее любого селектора, и раскладку им не пишут.
   //
-  // Строка без номера — то, что пришло не из канала: открывать в Контактах у
-  // неё нечего, и нажатий она не принимает.
+  // Строка без цели — то, что пришло ни из канала, ни с агрегатора: открывать в
+  // Контактах у неё нечего, и нажатий она не принимает.
   import { pressKey } from '$state/keys.js';
   import { convNote } from '$state/stats.js';
 
@@ -69,16 +69,17 @@
 
   const rows = $derived(
     channels.map((one, at) => {
-      const opens = one.id !== null;
+      const opens = one.target !== null;
       return {
-        id: one.id,
+        key: one.key,
+        target: one.target,
         opens,
         last: at === channels.length - 1,
         cells: [
           {
             look: 'stats-ch-name-cell',
             text: one.label,
-            title: opens ? 'Открыть канал в Контактах' : undefined,
+            title: opens ? 'Открыть в Контактах' : undefined,
           },
           ...COLUMNS.map((column) => ({
             look: column.look,
@@ -99,12 +100,12 @@
     </div>
   {/each}
 
-  <div class="stats-ch-th stats-ch-th-name">Канал</div>
+  <div class="stats-ch-th stats-ch-th-name">Источник</div>
   {#each COLUMNS as column (column.field)}
     <div class="stats-ch-th {column.headLook}">{column.head}</div>
   {/each}
 
-  {#each rows as row (row.id)}
+  {#each rows as row (row.key)}
     {#each row.cells as cell, at (at)}
       <!-- Фокус и роль кнопки включаются одним условием, а компилятор видит
            только условный tabindex и считает строку неинтерактивной. -->
@@ -113,14 +114,14 @@
         class="stats-ch-row {cell.look}"
         class:stats-ch-last={row.last}
         class:stats-ch-opens={row.opens}
-        class:is-hover={row.opens && hovered === row.id}
+        class:is-hover={row.opens && hovered === row.key}
         role={row.opens ? 'button' : undefined}
         tabindex={row.opens ? 0 : undefined}
         title={cell.title}
-        onmouseenter={() => (hovered = row.id)}
+        onmouseenter={() => (hovered = row.key)}
         onmouseleave={() => (hovered = null)}
-        onclick={() => row.opens && onpick(row.id)}
-        onkeydown={(event) => row.opens && pressKey(event) && onpick(row.id)}
+        onclick={() => row.opens && onpick(row.target)}
+        onkeydown={(event) => row.opens && pressKey(event) && onpick(row.target)}
       >
         {#if cell.conv}
           <span class="stats-ch-conv-label">{cell.conv.text}</span>

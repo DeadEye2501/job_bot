@@ -106,3 +106,65 @@ async def test_a_stop_while_the_window_comes_up_is_not_a_wait():
 
     assert (await asyncio.wait_for(waiting, 1)).startswith("обход остановлен")
     assert told == []
+
+
+async def test_a_click_on_the_plate_brings_the_waiting_browser_forward_again():
+    """Человек свернул браузер или ушёл в приложение — нажатие на плашку выводит его снова."""
+    gate, _ = _gate()
+    browser = FakeBrowser()
+    waiting = asyncio.create_task(gate.wait("captcha", "site.test", browser))
+    await asyncio.sleep(0)
+
+    gate.reveal()
+    await asyncio.sleep(0)
+    gate.resolve()
+    await waiting
+
+    assert browser.calls == ["show", "show", "hide"]
+
+
+async def test_a_click_when_nobody_waits_shows_nothing():
+    """Ожидание кончилось — браузер принадлежит уже следующему шагу агента, и трогать его незачем."""
+    gate, _ = _gate()
+    browser = FakeBrowser()
+    waiting = asyncio.create_task(gate.wait("captcha", "site.test", browser))
+    await asyncio.sleep(0)
+    gate.resolve()
+    await waiting
+
+    gate.reveal()
+    await asyncio.sleep(0)
+
+    assert browser.calls == ["show", "hide"]
+
+
+async def test_a_click_right_before_the_check_still_sends_the_browser_back():
+    """Нажали на плашку и сразу на галочку — браузер уходит назад, а не остаётся поверх приложения."""
+    gate, _ = _gate()
+    browser = FakeBrowser()
+    waiting = asyncio.create_task(gate.wait("captcha", "site.test", browser))
+    await asyncio.sleep(0)
+
+    async def slow_show():
+        await asyncio.sleep(0.01)
+        browser.calls.append("show")
+
+    browser.show = slow_show
+    gate.reveal()
+    gate.resolve()
+    await waiting
+
+    assert browser.calls == ["show", "show", "hide"]
+
+
+async def test_a_click_after_the_wait_expired_does_not_raise_a_browser():
+    """Срок вышел, работа агента кончается и закрывает браузер: поднятый нажатием заново, он
+    занял бы профиль сайта, и никто бы его не закрыл."""
+    gate, _ = _gate(limit=0.01)
+    browser = FakeBrowser()
+    await gate.wait("captcha", "site.test", browser)
+
+    gate.reveal()
+    await asyncio.sleep(0)
+
+    assert browser.calls == ["show"]

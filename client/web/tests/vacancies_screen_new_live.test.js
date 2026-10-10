@@ -10,6 +10,7 @@ import { flushSync, mount, unmount } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import VacanciesScreen from '../app/VacanciesScreen.svelte';
+import { hearRound } from '../state/round.svelte.js';
 import { livingProps } from './live_props.svelte.js';
 import { settled } from './settled.js';
 
@@ -17,6 +18,7 @@ let mounted = null;
 let host = null;
 
 afterEach(() => {
+  hearRound({ on: () => () => {} });
   if (mounted) flushSync(() => unmount(mounted));
   host?.remove();
   mounted = null;
@@ -297,5 +299,28 @@ describe('живой экран вакансий', () => {
     await settled();
 
     expect(page.querySelector('input[placeholder="Название (обязательно)"]')).toBeTruthy();
+  });
+
+  it('во время обхода вставленный текст не заводится, и кнопка говорит почему', async () => {
+    // Разбор вставленного занимает место прогона, и мост его не пустит.
+    const handlers = {};
+    hearRound({ on: (name, hear) => ((handlers[name] = hear), () => {}) });
+    handlers.ingestion_started();
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    [...page.querySelectorAll('button')]
+      .find((one) => one.textContent.trim() === 'Текст')
+      .click();
+    await settled();
+    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
+    text.value = 'Ищем повара';
+    text.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+
+    const create = page.querySelector('.modal-footer .btn.primary');
+    expect(create.textContent.trim()).toBe('Идёт обход');
+    expect(create.disabled).toBe(true);
   });
 });

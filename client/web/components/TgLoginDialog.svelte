@@ -6,6 +6,7 @@
   // оно не закрывается: код набирают в чужом приложении, и промах мимо коробки
   // стоил бы нового кода.
   import ModalShell from './ModalShell.svelte';
+  import SecretInput from './SecretInput.svelte';
 
   let { step, phone, relogin, busy, error, onsubmit, oncancel } = $props();
 
@@ -37,15 +38,15 @@
       </div>
     {/if}
 
-    <!-- Фокус сразу в поле: окно открылось затем, чтобы в него набрали. -->
-    <!-- svelte-ignore a11y_autofocus -->
-    <input
-      class="input"
-      type={asking.secret ? 'password' : 'text'}
-      placeholder={asking.placeholder}
-      autofocus
-      bind:value
-    />
+    <!-- Фокус сразу в поле: окно открылось затем, чтобы в него набрали. Пароль
+         — полем секрета с глазом; набранное уходит при уходе из поля, а уходят
+         из него раньше, чем засчитывается нажатие «Войти». -->
+    {#if asking.secret}
+      <SecretInput {value} placeholder={asking.placeholder} autofocus onsave={(typed) => (value = typed)} />
+    {:else}
+      <!-- svelte-ignore a11y_autofocus -->
+      <input class="input" placeholder={asking.placeholder} autofocus bind:value />
+    {/if}
 
     {#if error}
       <div class="modal-error">{error}</div>
