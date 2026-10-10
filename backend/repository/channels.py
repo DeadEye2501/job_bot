@@ -117,12 +117,7 @@ async def list_telegram_channels(
 async def get_channel_detail(
     session: AsyncSession, channel_id: int
 ) -> ChannelDetail | None:
-    """Detail-pane payload: the channel itself + computed stats.
-
-    Запросов четыре: сама строка канала, разбивка по статусам одной
-    группировкой, окно темпа (:func:`source_stats.source_stats`) и отметка
-    чёрного списка.
-    """
+    """Карточка канала: сам канал, его числа и значение отметки отсева."""
     ch = await session.get(TelegramChannel, channel_id)
     if ch is None:
         return None
@@ -177,15 +172,18 @@ async def create_channel(
 
 async def set_channel_active(
     session: AsyncSession, channel_id: int, is_active: bool
-) -> bool:
-    """Toggle TelegramChannel.is_active. Returns False if the row is missing.
+) -> str:
+    """Включить или выключить канал: «ok», «missing» или «blacklisted».
 
-    Caller wraps in ``session.begin()``; only a single row mutation here so
-    no extra invariants to enforce.
+    Запрет отсева стоит здесь, как у агрегатора, а не в окне и не в мосте:
+    пройди включение — отметка была бы отменена нажатием, которое про неё
+    ничего не знает. Транзакцию держит зовущий.
     """
     ch = await session.get(TelegramChannel, channel_id)
     if ch is None:
-        return False
+        return "missing"
+    if is_active and await CHANNEL_BLACKLIST.value(session, ch) is not None:
+        return "blacklisted"
     prev = ch.is_active
     ch.is_active = bool(is_active)
     if prev != ch.is_active:
@@ -196,7 +194,7 @@ async def set_channel_active(
             prev,
             ch.is_active,
         )
-    return True
+    return "ok"
 
 
 async def deactivate_blacklisted_channels(session: AsyncSession) -> int:
@@ -217,9 +215,8 @@ async def is_channel_blacklisted(
     """True если в blacklist'е активна строка kind=channel, value которой
     совпадает с одним из blacklist-кандидатов канала.
 
-    Зовут двое: мост — чтобы отказать во включении отсеянного канала, и ручной
-    прогон одного канала (`flows/channels.poll_one_channel`) — чтобы не тащить
-    из него вакансии в обход отметки.
+    Зовёт ручной прогон одного канала (`flows/channels.poll_one_channel`) —
+    чтобы не тащить из него вакансии в обход отметки.
     """
     ch = await session.get(TelegramChannel, channel_id)
     if ch is None:

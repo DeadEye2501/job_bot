@@ -38,8 +38,6 @@ APP_KEYS = (
     "aggregator_backfill_limit",
     "show_browser",
     "letter_writer",
-    "channels_enabled",
-    "aggregators_enabled",
 )
 """Что окну позволено писать в настройки приложения.
 

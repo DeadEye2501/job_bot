@@ -7,10 +7,9 @@ from backend.repository import channels as channels_repo
 from client.bridge.answer import Denied, reply
 from client.bridge.channel_actions import ChannelActions
 from client.bridge.hub import Hub
-from client.bridge.media import _avatar_data_url
 from client.bridge.refusals import NO_CHANNEL
 from client.bridge.source_page import CHANNEL, source_vacancies
-from client.bridge.wire import _channel_row_to_dict, _source_stats_to_dict
+from client.bridge.wire import _channel_card_to_dict, _channel_row_to_dict
 
 
 class Channels(ChannelActions):
@@ -61,7 +60,7 @@ class Channels(ChannelActions):
 
         Номер едет обратно в отказе: по нему окно гасит строку, за которой
         канала уже нет, — перечень, из которого её открыли, мог устареть.
-        Числа — разбивка по положениям дел и доли отклика, см. `ChannelStats`.
+        Числа — разбивка по положениям дел и доли отклика, см. `SourceStats`.
         """
 
         async def run() -> dict:
@@ -69,16 +68,7 @@ class Channels(ChannelActions):
                 detail = await channels_repo.get_channel_detail(session, channel_id)
             if detail is None:
                 raise Denied(NO_CHANNEL, channel_id=channel_id)
-            channel = detail.channel
-            return {
-                "channel_id": channel.id,
-                "username": channel.username,
-                "title": channel.title,
-                "is_active": bool(channel.is_active),
-                "avatar": _avatar_data_url(channel.avatar),
-                "stats": _source_stats_to_dict(detail.stats),
-                "blacklist_value": detail.blacklist_value,
-            }
+            return _channel_card_to_dict(detail)
 
         return reply(self._hub.runner, run())
 

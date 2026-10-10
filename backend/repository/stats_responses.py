@@ -1,6 +1,7 @@
 """Скорость ответа HR: сколько ждали, кто не ответил и в какие дни отвечают."""
 
 from datetime import datetime, timezone
+from statistics import median
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -103,17 +104,6 @@ def _weekdays_and_waits(
     return by_weekday, waits
 
 
-def _median(values: list[float]) -> float | None:
-    """Середина ряда; на пустом ряду середины нет."""
-    if not values:
-        return None
-    ordered = sorted(values)
-    n = len(ordered)
-    if n % 2 == 1:
-        return float(ordered[n // 2])
-    return (ordered[n // 2 - 1] + ordered[n // 2]) / 2
-
-
 async def get_stats_hr_responses(
     session: AsyncSession, *, period: str
 ) -> dict:
@@ -140,7 +130,7 @@ async def get_stats_hr_responses(
     return {
         "period": period,
         "by_weekday": by_weekday,
-        "median_seconds": _median(waits),
+        "median_seconds": float(median(waits)) if waits else None,
         "no_response_pct": percent_or_none(
             applied_count - responded_count, applied_count
         ),

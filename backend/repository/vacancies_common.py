@@ -4,6 +4,10 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Vacancy, VacancyStatus
+from backend.models.settings import AGGREGATOR_KIND, CHANNEL_KIND
+
+SOURCE_LINKS = {CHANNEL_KIND: Vacancy.source_channel_id, AGGREGATOR_KIND: Vacancy.source_aggregator_id}
+"""Колонка ссылки на источник по его роду: мост знает род, а колонку — только репозиторий."""
 
 PARSED_ONLY = Vacancy.is_parsed.is_(True)
 """Отбор «вакансия разобрана до конца».

@@ -20,6 +20,7 @@ import logging
 from concurrent.futures import CancelledError
 from typing import Any, Callable, Coroutine
 
+from backend.incoming import int_or_none
 from client.bridge.events import Events
 from client.bridge.payload import _log_invalid_payload
 from client.bridge.runner import AsyncRunner
@@ -105,6 +106,35 @@ def asked_id(payload: dict, key: str, slot: str) -> tuple:
         return int(payload[key]), None
     except BAD_PAYLOAD as e:
         return None, bad_fields(slot, e)
+
+
+def read_toggle(payload: dict, id_key: str, flag_key: str, slot: str) -> tuple:
+    """Номер строки и её новое положение из нагрузки тумблера, а при негодной — готовый отказ.
+
+    Тремя значениями, как `asked_id`: номер, признак и отказ окну либо пустота.
+    Оба поля обязательны, но читаются «сколько смогли»: негодное или
+    пропущенное становится пустотой, а прочитанная половина уезжает в отказ
+    под теми же ключами — окно по ней возвращает на место тот тумблер,
+    который человек нажал, и не трогает соседние. Отказ собирается здесь, а не
+    у зовущего: эхо — часть отказа, и слот, собирающий его сам, может его
+    потерять.
+
+    Признак читается как есть: окно шлёт его булевым, а всё, что доедет иным,
+    значит «включить» ровно тогда, когда это значит истину.
+    """
+    row_id = None
+    flag = None
+    try:
+        raw_flag = payload.get(flag_key)
+        row_id = int_or_none(payload.get(id_key))
+        flag = None if raw_flag is None else bool(raw_flag)
+        if row_id is None or flag is None:
+            raise KeyError(f"{id_key} / {flag_key}")
+    except BAD_PAYLOAD as e:
+        return row_id, flag, bad_fields(
+            slot, e, action="set_active", **{id_key: row_id, flag_key: flag}
+        )
+    return row_id, flag, None
 
 
 def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict:

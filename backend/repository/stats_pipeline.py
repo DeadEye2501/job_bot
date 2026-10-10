@@ -12,16 +12,17 @@ from backend.models import (
     Vacancy,
     VacancyStatus,
 )
-
+from backend.models.settings import AGGREGATOR_KIND, CHANNEL_KIND
 from backend.repository.stats_common import (
     first_transition_subq,
     parsed_in_window,
     stats_period_since,
 )
 from backend.repository.stats_rows import SourceKey, pipeline_row, source_item
-from backend.repository.vacancies_common import PARSED_ONLY
+from backend.repository.vacancies_common import PARSED_ONLY, SOURCE_LINKS
 
-_VACANCY_SOURCE = (Vacancy.source_channel_id, Vacancy.source_aggregator_id)
+_VACANCY_SOURCE = (SOURCE_LINKS[CHANNEL_KIND], SOURCE_LINKS[AGGREGATOR_KIND])
+"""Ссылка вакансии на источник: ключ строки статистики — канал, затем агрегатор."""
 
 def _trash_predicates():
     """Два условия «мусор» и «просто не подошло», набранные одним образцом.

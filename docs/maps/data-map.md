@@ -440,7 +440,6 @@
 - `logger` = `logging.getLogger(__name__)`
 - `MEDIA_DIR` = `get_data_dir() / 'media'`
 - `PHOTO_EXTS` = `набор из 4`
-- `_IMAGE_SIGNATURES` = `набор из 4`
 - `_PHOTO_TYPES` = `набор из 3`
 - `PHOTO_SIZE_LIMIT` = `10 * 1024 * 1024`
 - `DOCUMENT_SIZE_LIMIT` = `50 * 1024 * 1024`
@@ -555,6 +554,10 @@
   - `query: str`
   - `fragment: str`
 - `_ZONE_SECOND_LEVELS` = `frozenset({'co', 'com', 'net', 'org', 'ac', 'gov…`
+
+### `backend/domain/image_types.py`
+
+- `_IMAGE_SIGNATURES` = `набор из 4`
 
 ### `backend/domain/mail_servers.py`
 
@@ -1439,7 +1442,7 @@
   - `channel: TelegramChannel`
   - `vacancy_count: int`
   - `is_blacklisted: bool` = `False`
-- `class ChannelStats`
+- `class SourceStats`
   - `status_counts: dict[str, int]`
   - `total: int`
   - `vacancies_per_day: float`
@@ -1448,7 +1451,7 @@
   - `response_percent: int | None`
 - `class ChannelDetail`
   - `channel: TelegramChannel`
-  - `stats: ChannelStats`
+  - `stats: SourceStats`
   - `blacklist_value: str | None` = `None`
 - `class VacancyFilter`
   - `sort: str` = `'newest'`
@@ -1641,6 +1644,7 @@
 
 ### `backend/repository/vacancies_common.py`
 
+- `SOURCE_LINKS` = `словарь из 2`
 - `PARSED_ONLY` = `Vacancy.is_parsed.is_(True)`
 - `VACANCY_APPEARED_AT` = `func.coalesce(Vacancy.posted_at, Vacancy.created…`
 
@@ -1886,17 +1890,17 @@
 - `logger` = `logging.getLogger(__name__)`
 - `_CONNECT_TRIES` = `15`
 - `_CONNECT_STEP_S` = `0.2`
-- `APP_KEYS` = `набор из 10`
+- `APP_KEYS` = `набор из 8`
 
 ### `client/bridge/source_page.py`
 
 - `logger` = `logging.getLogger(__name__)`
 - `class Source`
   - `key: str`
-  - `link: Any`
+  - `kind: str`
   - `method: str`
-- `CHANNEL` = `Source('channel_id', Vacancy.source_channel_id, …`
-- `AGGREGATOR` = `Source('aggregator_id', Vacancy.source_aggregato…`
+- `CHANNEL` = `Source('channel_id', CHANNEL_KIND, 'channels.vac…`
+- `AGGREGATOR` = `Source('aggregator_id', AGGREGATOR_KIND, 'aggreg…`
 
 ### `client/bridge/system.py`
 

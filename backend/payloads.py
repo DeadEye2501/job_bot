@@ -360,12 +360,12 @@ class ChannelWithCount:
 
 
 @dataclass(frozen=True)
-class ChannelStats:
-    """Computed stats for the Contacts/Channels detail pane.
+class SourceStats:
+    """Числа карточки источника вакансий — канала или агрегатора.
 
-    All counts are over the full lifetime of the channel; only
-    ``vacancies_per_day`` is windowed (last 30 days) — это про «пропускная
-    способность сейчас», а не средняя за всю историю канала.
+    Все счёты — за всю жизнь источника; только ``vacancies_per_day`` берётся
+    окном в 30 дней — это про «пропускная способность сейчас», а не средняя
+    за всю историю.
 
     ``status_counts`` keys are ``VacancyStatus.value`` strings (e.g.
     ``"New"``, ``"Applied"``) so the frontend can drive the breakdown bar
@@ -385,7 +385,7 @@ class ChannelStats:
 @dataclass(frozen=True)
 class ChannelDetail:
     channel: TelegramChannel
-    stats: ChannelStats
+    stats: SourceStats
     blacklist_value: str | None = None
 
 

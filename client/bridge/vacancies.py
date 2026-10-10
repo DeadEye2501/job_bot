@@ -37,7 +37,11 @@ from client.bridge.vacancy_actions import VacancyActions
 from client.bridge.vacancy_contacts import VacancyContacts
 from client.bridge.vacancy_filter import read_vacancy_filter
 from client.bridge.vacancy_links import VacancyLinks, require_vacancy
-from client.bridge.wire import _vacancy_detail_to_dict, _vacancy_list_row_to_dict
+from client.bridge.wire import (
+    _screening_to_dict,
+    _vacancy_detail_to_dict,
+    _vacancy_list_row_to_dict,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -160,11 +164,7 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
             async with self._hub.session_factory() as session:
                 await require_vacancy(session, vacancy_id)
                 shown = await applications.vacancy_screening(session, vacancy_id)
-            return {"applications": [
-                {"target": one.target,
-                 "lines": [{"from_us": from_us, "text": text} for from_us, text in one.lines]}
-                for one in shown
-            ]}
+            return {"applications": [_screening_to_dict(one) for one in shown]}
 
         return reply(self._hub.runner, run())
 

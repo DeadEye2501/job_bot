@@ -30,7 +30,7 @@ async def _listed_and_clean(session_factory, *, is_active: bool):
 
 async def test_switching_a_missing_channel_reports_failure(session):
     """Переключить несуществующий канал нельзя, и вызов об этом сообщает."""
-    assert await set_channel_active(session, 10_000, True) is False
+    assert await set_channel_active(session, 10_000, True) == "missing"
 
 
 async def test_a_channel_switches_both_ways(session, session_factory):
@@ -38,11 +38,23 @@ async def test_a_channel_switches_both_ways(session, session_factory):
     channel = channel_row(username="pyjobs", is_active=True)
     await put(session_factory, channel)
 
-    assert await set_channel_active(session, channel.id, False) is True
+    assert await set_channel_active(session, channel.id, False) == "ok"
     assert (await session.get(TelegramChannel, channel.id)).is_active is False
 
-    assert await set_channel_active(session, channel.id, True) is True
+    assert await set_channel_active(session, channel.id, True) == "ok"
     assert (await session.get(TelegramChannel, channel.id)).is_active is True
+
+
+async def test_a_blacklisted_channel_is_not_switched_on_but_is_switched_off(
+    session, session_factory
+):
+    """Запрет стоит в самой записи, как у агрегатора: включение, которое про
+    отметку ничего не знает, её не отменит."""
+    listed, _ = await _listed_and_clean(session_factory, is_active=True)
+
+    assert await set_channel_active(session, listed.id, False) == "ok"
+    assert await set_channel_active(session, listed.id, True) == "blacklisted"
+    assert (await session.get(TelegramChannel, listed.id)).is_active is False
 
 
 async def test_a_blacklisted_channel_is_recognised_as_such(session, session_factory):

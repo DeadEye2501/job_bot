@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any
 
@@ -373,14 +374,25 @@ def _channel_row_to_dict(item) -> dict:
     Avatar carried as base64 data URL; same convention as HR rows.
     """
     ch = item.channel
+    return {"id": ch.id, **_channel_fields(ch),
+            "vacancy_count": item.vacancy_count, "is_blacklisted": item.is_blacklisted}
+
+
+def _channel_card_to_dict(detail) -> dict:
+    """Карточка канала: сам канал, его числа и значение отметки отсева."""
+    ch = detail.channel
+    return {"channel_id": ch.id, **_channel_fields(ch),
+            "stats": _source_stats_to_dict(detail.stats),
+            "blacklist_value": detail.blacklist_value}
+
+
+def _channel_fields(ch) -> dict:
+    """Что о канале показывают и строка списка, и карточка."""
     return {
-        "id": ch.id,
         "username": ch.username,
         "title": ch.title,
         "is_active": bool(ch.is_active),
-        "vacancy_count": item.vacancy_count,
         "avatar": _avatar_data_url(ch.avatar),
-        "is_blacklisted": item.is_blacklisted,
     }
 
 
@@ -450,13 +462,20 @@ def _aggregator_row_to_dict(row) -> dict:
     }
 
 
+def _aggregator_list_row_to_dict(row, vacancy_count: int, barred: bool) -> dict:
+    """Строка списка агрегаторов: сам агрегатор, счёт его вакансий и отметка отсева."""
+    return {**_aggregator_row_to_dict(row), "vacancy_count": vacancy_count, "is_blacklisted": barred}
+
+
+def _screening_to_dict(shown) -> dict:
+    """Скрининг одного отклика для окна: куда ушёл отклик и реплики по порядку."""
+    return {"target": shown.target,
+            "lines": [{"from_us": from_us, "text": text} for from_us, text in shown.lines]}
+
+
 def _source_stats_to_dict(stats) -> dict:
-    """Числа карточки источника — канала или агрегатора; см. `ChannelStats`."""
-    return {
-        "status_counts": stats.status_counts,
-        "total": stats.total,
-        "vacancies_per_day": stats.vacancies_per_day,
-        "fit_percent": stats.fit_percent,
-        "apply_percent": stats.apply_percent,
-        "response_percent": stats.response_percent,
-    }
+    """Числа карточки источника — канала или агрегатора; см. `SourceStats`.
+
+    Полем к полю: новое поле чисел доезжает до окна само, а не выпадает молча.
+    """
+    return asdict(stats)
