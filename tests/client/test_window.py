@@ -15,9 +15,10 @@ from concurrent.futures import Future
 
 import pytest
 
-from backend.repository.bot_mode import read_mode, write_mode
+from backend.repository.bot_mode import read_mode
 from backend.models import BotMode
 from client import window as window_module
+from tests.backend.fixtures.bot import switch_to
 
 
 class FakeWebview:
@@ -103,9 +104,7 @@ async def test_the_bot_starts_switched_off_however_it_was_left(
     принялся бы за работу сам — обходом каналов и ответами на письма — раньше,
     чем человек увидел окно и решил, работать ли сегодня вообще.
     """
-    async with session_factory() as session:
-        async with session.begin():
-            await write_mode(session, BotMode.FULL)
+    await switch_to(session_factory, BotMode.FULL)
 
     await window_module.prepare(session_factory)
 

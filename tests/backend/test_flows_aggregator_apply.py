@@ -15,7 +15,7 @@ from backend.repository.app_settings import CV_PATH_KEY
 from tests.dbio import all_rows, put
 from tests.factories import vacancy_row
 from tests.factories_aggregators import aggregator_row, mail_account_row, vacancy_contact_row
-from tests.fakes.agent import LimitHit, scripted_kit
+from tests.fakes.agent import LimitHit, fail_step, finish_step, record_step, scripted_kit
 from tests.waiting import wait_until
 
 PAGE = "https://site.test/vacancy/1"
@@ -51,24 +51,6 @@ def applying(make_pipeline):
     return run
 
 
-def _record(target):
-    async def step(tools):
-        await tools["record_application"](via="aggregator" if target == PAGE else "form", target=target)
-    return step
-
-
-def _fail(reason):
-    async def step(tools):
-        await tools["report_failure"](reason=reason)
-    return step
-
-
-def _finish(result):
-    async def step(tools):
-        await tools["finish"](result=result)
-    return step
-
-
 async def _events(session_factory, kind):
     return [e.payload for e in await all_rows(session_factory, VacancyEvent) if e.kind == kind]
 
@@ -76,7 +58,7 @@ async def _events(session_factory, kind):
 async def test_the_first_way_that_works_ends_the_vacancy(board, applying, session_factory):
     _, vacancy = await board()
 
-    outcome, driver, _ = await applying(vacancy.id, [_record(PAGE)])
+    outcome, driver, _ = await applying(vacancy.id, [record_step(PAGE, via="aggregator")])
 
     assert outcome == "applied" and len(driver.plans) == 1
     (stored,) = await all_rows(session_factory, Vacancy)
@@ -87,7 +69,7 @@ async def test_the_applier_is_told_how_to_call_a_person(board, applying):
     """Откликатель зовёт человека на капчу и слетевший вход — правило о том в его наставлении."""
     _, vacancy = await board()
 
-    _, driver, _ = await applying(vacancy.id, [_record(PAGE)])
+    _, driver, _ = await applying(vacancy.id, [record_step(PAGE, via="aggregator")])
 
     (plan,) = driver.plans
     # Подстрока самого правила о зове человека: слово `need_human` называет и
@@ -100,7 +82,7 @@ async def test_a_failed_way_hands_over_to_the_next_and_all_failures_are_told(
 ):
     _, vacancy = await board()
 
-    outcome, driver, _ = await applying(vacancy.id, [_fail("капча"), _fail("форма сломана")])
+    outcome, driver, _ = await applying(vacancy.id, [fail_step("капча"), fail_step("форма сломана")])
 
     assert outcome == "exhausted" and len(driver.plans) == 2
     (stored,) = await all_rows(session_factory, Vacancy)
@@ -113,7 +95,7 @@ async def test_a_failed_way_hands_over_to_the_next_and_all_failures_are_told(
 async def test_a_closed_vacancy_is_not_tried_another_way(board, applying, session_factory):
     _, vacancy = await board()
 
-    outcome, driver, _ = await applying(vacancy.id, [_finish("vacancy_closed")])
+    outcome, driver, _ = await applying(vacancy.id, [finish_step("vacancy_closed")])
 
     assert outcome == "closed" and len(driver.plans) == 1
     assert len(await _events(session_factory, "vacancy_closed")) == 1
@@ -127,7 +109,7 @@ async def test_a_closed_platform_drops_its_button_for_the_rest_of_the_round(
                          source_key="vacancy/2", source_url="https://site.test/vacancy/2")
     await put(session_factory, second)
 
-    _, _, round_ = await applying(vacancy.id, [_finish("platform_closed"), _fail("нет")])
+    _, _, round_ = await applying(vacancy.id, [finish_step("platform_closed"), fail_step("нет")])
     _, driver, _ = await applying(second.id, [], round_=round_)
 
     assert round_.closed_aggregators == {site.id}
@@ -184,7 +166,7 @@ async def test_a_crashed_way_is_a_failure_and_the_next_way_is_tried(board, apply
     async def crash(tools):
         raise RuntimeError("сломалось")
 
-    outcome, driver, _ = await applying(vacancy.id, [crash, _record(FORM)])
+    outcome, driver, _ = await applying(vacancy.id, [crash, record_step(FORM)])
 
     assert outcome == "applied" and len(driver.plans) == 2
     assert await _events(session_factory, "apply_failed") == [
@@ -199,10 +181,7 @@ async def test_the_email_way_needs_no_browser(make_pipeline, session, session_fa
                                                    added_by=ContactAddedBy.PARSE))
     await put(session_factory, mail_account_row())
 
-    async def fail(tools):
-        await tools["report_failure"](reason="нет")
-
-    kit = scripted_kit(await make_pipeline(), [fail])
+    kit = scripted_kit(await make_pipeline(), [fail_step("нет")])
     await apply_vacancy(kit, RoundState(set(), web_search_id=0),
                         ApplyOrder(vacancy.id, False, None))
 
@@ -217,13 +196,9 @@ async def test_a_simulated_application_is_told_not_to_send_and_is_marked(
     """Последнюю кнопку формы код не знает: «не отправлять» агенту говорит задание,
     а отклик записывается с пометкой симуляции."""
     _, vacancy = await board()
-
-    async def record(tools):
-        await tools["record_application"](via="aggregator", target=PAGE)
-
     pipeline = await make_pipeline()
     await pipeline.rs.set_app("send_locked", "true")
-    kit = scripted_kit(pipeline, [record])
+    kit = scripted_kit(pipeline, [record_step(PAGE, via="aggregator")])
 
     await apply_vacancy(kit, RoundState(set(), web_search_id=0),
                         ApplyOrder(vacancy.id, False, None))
@@ -262,7 +237,7 @@ async def slow_letter(make_pipeline, session, session_factory, tmp_path, monkeyp
 
     pipeline = await make_pipeline()
     await pipeline.rs.set_app(CV_PATH_KEY, str(cv))
-    return scripted_kit(pipeline, [leave_while_sending, _fail("второй способ")]), vacancy
+    return scripted_kit(pipeline, [leave_while_sending, fail_step("второй способ")]), vacancy
 
 
 async def test_a_letter_still_on_its_way_holds_the_next_way(slow_letter):
@@ -296,7 +271,7 @@ async def test_a_stop_while_the_letter_is_on_its_way_does_not_cut_it_off(
 
 async def test_a_real_application_opens_the_browser_able_to_send(board, make_pipeline):
     _, vacancy = await board()
-    kit = scripted_kit(await make_pipeline(), [_record(PAGE)])
+    kit = scripted_kit(await make_pipeline(), [record_step(PAGE, via="aggregator")])
 
     await apply_vacancy(kit, RoundState(set(), web_search_id=0), ApplyOrder(vacancy.id, False, None))
 

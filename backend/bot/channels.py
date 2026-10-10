@@ -1,4 +1,4 @@
-"""Правка каналов из окна: заведение, удаление, чтение по требованию."""
+"""Каналы по просьбе окна: заведение нового и чтение по требованию."""
 
 import logging
 
@@ -6,7 +6,7 @@ from typing import Literal
 
 from pyrogram.errors import FloodWait, UsernameInvalid, UsernameNotOccupied
 
-from backend.bot import aggregators, slot
+from backend.bot import slot
 from backend.flows import channels as flow_channels
 from backend.telegram_lookup import read_channel_metadata
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
@@ -46,17 +46,12 @@ async def poll_channel_now(bot, channel_id: int) -> ChannelPollOutcome:
     - "error": обход сломался — закрытый канал, просьба подождать, молчание
       модели. Своё слово ему нужно: «не найден» послал бы человека искать
       запись, которая на месте, а причина осталась бы только в журнале.
-
-    Место прогона отвечает о своём — занято, отменено, сорвалось наружу, — а
-    об исходе самого обхода говорит он сам, и его ответ сильнее: место видит
-    удачей всё, что не бросило исключение.
     """
-    outcome, walk = await slot.run_in_slot(
+    return await slot.answer_in_slot(
         bot,
         lambda: bot.ingestion.poll_one_channel(channel_id),
         f"manual poll for channel {channel_id}",
     )
-    return walk if outcome == "ok" else outcome
 
 
 async def _ask_telegram_about(bot, username: str):
@@ -123,37 +118,3 @@ async def add_channel(
                 return existing.id, "exists"
             channel_id = await create_channel(session, username, title, avatar)
     return channel_id, "created"
-
-
-async def ingest_round(bot) -> None:
-    """Оборот приёма: сперва дочитать отложенное, потом идти за новым.
-
-    Недоразобранная строка ждёт статьи, которой не хватило на приёме, и в
-    окне её не видно вовсе — ни в списке, ни в отказах. Подбирай такие только
-    при подъёме, и объявление ждало бы до следующего запуска приложения, а
-    работает оно сутками.
-
-    Сорвавшийся подбор обход не отменяет: свежие объявления человек ждёт
-    больше, чем дочитанные.
-    """
-    try:
-        await bot.ingestion.recover_orphan_vacancies()
-    except Exception:
-        logger.exception("orphan recovery failed")
-    await bot.ingestion.poll_active_channels()
-
-
-async def force_poll_once(bot) -> slot.CycleOutcome:
-    """Кнопка ▶: тот же оборот, что у цикла, — недоразобранное, каналы, затем
-    агрегаторы, — но в любом режиме: человек нажал сам и ждёт, что что-то
-    произойдёт.
-
-    Выключатели каналов и агрегаторов действуют как в цикле: выключенному
-    просто нечего опрашивать. «busy» — место прогона занято; погашенный или
-    сорвавшийся опрос каналов обход агрегаторов не пускает.
-    """
-    outcome, _ = await slot.run_in_slot(bot, lambda: ingest_round(bot), "forced poll cycle")
-    if outcome != "ok" or bot.stop_event.is_set():
-        return outcome
-    await aggregators.launch_round(bot)
-    return "ok"

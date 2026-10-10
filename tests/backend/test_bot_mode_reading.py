@@ -11,15 +11,13 @@
 
 from backend.bot import loop
 from backend.models import BotMode
-from backend.repository.bot_mode import write_mode
+from tests.backend.fixtures.bot import switch_to
 
 
 async def test_the_mode_comes_from_the_base(make_bot, session_factory):
     """Режим берётся из базы, а не из памяти бота."""
     bot = await make_bot()
-    async with session_factory() as session:
-        async with session.begin():
-            await write_mode(session, BotMode.FULL)
+    await switch_to(session_factory, BotMode.FULL)
 
     assert await bot.current_mode() is BotMode.FULL
 

@@ -199,5 +199,4 @@ async def _refused(bot, row: Aggregator) -> AgentOutcome | None:
 
 
 async def _in_slot(bot, work: Callable[[AgentKit], Awaitable[str]], label: str) -> AgentOutcome:
-    outcome, result = await slot.run_in_slot(bot, lambda: agent_work(bot, work), label)
-    return result if outcome == "ok" else outcome
+    return await slot.answer_in_slot(bot, lambda: agent_work(bot, work), label)

@@ -82,7 +82,7 @@ def row_saved_mid_send(session_factory, hr_id):
     return save
 
 
-async def _switch_to(session_factory, mode: BotMode) -> None:
+async def switch_to(session_factory, mode: BotMode) -> None:
     """Поставить режим боту стенда так же, как это делает окно."""
     async with session_factory() as session:
         async with session.begin():
@@ -162,7 +162,7 @@ def chatting(session_factory, make_bot):
         telegram_client = client if client is not None else FakeTelegramClient()
         await put(session_factory, hr_row(**hr_fields))
         bot = await make_bot(telegram_client)
-        await _switch_to(session_factory, mode)
+        await switch_to(session_factory, mode)
         return bot, telegram_client, await only_row(session_factory, HR)
 
     return build
@@ -256,7 +256,7 @@ def ready_to_send(session_factory, make_bot):
             vacancy_row(title="к отклику", status=status),
         )
         bot = await make_bot()
-        await _switch_to(session_factory, mode)
+        await switch_to(session_factory, mode)
         saved_hr = await only_row(session_factory, HR)
         vacancy = await only_row(session_factory, Vacancy)
         return bot, saved_hr, vacancy

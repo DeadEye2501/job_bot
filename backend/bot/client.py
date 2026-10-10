@@ -29,6 +29,7 @@ from backend.domain.telegram_identity import DialogPeer
 from backend.agent.human_gate import HumanGate
 from backend.bot import aggregators
 from backend.bot import slot
+from backend.bot import turn
 from backend.flows.pipeline import IngestionPipeline, LmProviders
 from backend.domain.apply_order import Way
 from backend.models import BotMode
@@ -292,7 +293,10 @@ class Bot:
         return slot.cancel_current_poll(self)
 
     async def force_poll_once(self) -> slot.CycleOutcome:
-        return await channels.force_poll_once(self)
+        """Кнопка ▶: тот же оборот, что у цикла, но в любом режиме — человек
+        нажал сам и ждёт, что что-то произойдёт. Выключатели каналов и
+        агрегаторов действуют как в цикле: выключенному нечего опрашивать."""
+        return await turn.run_turn(self, "forced poll cycle")
 
     async def mark_hr_chat_read(self, hr_id) -> int:
         return await chat.mark_hr_chat_read(self, hr_id)
