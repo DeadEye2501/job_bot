@@ -5,18 +5,20 @@ import { describe, expect, it } from 'vitest';
 
 import { cardFinish } from '../state/card_finish.js';
 
-import { replying } from './bridge_stub.js';
+import { relisting, replying, saying } from './bridge_stub.js';
 
-/** Панель, записывающая всё, что с ней сделали, — в том порядке, в каком делали. */
-function panel(answer) {
+/** Панель, записывающая всё, что с ней сделали, — в том порядке, в каком делали.
+ *  `own` подменяет зов, подпись и прочее своё у карточки. */
+function panel(answer, own = {}) {
   const trail = [];
   const finish = cardFinish({
     ask: () => Promise.resolve(answer),
     method: 'channels.delete',
     note: 'Канал удалён',
-    say: (text) => trail.push(`сказано: ${text}`),
-    onchanged: () => trail.push('список перечитан'),
+    say: saying(trail),
+    onchanged: relisting(trail),
     onclose: () => trail.push('панель закрыта'),
+    ...own,
   });
   return { finish, trail };
 }
@@ -54,16 +56,14 @@ describe('действие, кончающее карточку', () => {
   it('ответ, просящий подтверждения, оставляет карточку на месте и молчит', async () => {
     // Мост сносит агрегатор без откликов сразу, а с откликами сперва спрашивает
     // их число: панель, закрытая на вопросе, читалась бы как «удалено».
-    const trail = [];
-    const finish = cardFinish({
-      ask: () => Promise.resolve({ confirm: 4 }),
-      method: 'aggregators.delete',
-      note: 'Агрегатор удалён',
-      say: (text) => trail.push(`сказано: ${text}`),
-      onchanged: () => trail.push('список перечитан'),
-      onclose: () => trail.push('панель закрыта'),
-      held: (done) => Boolean(done.confirm),
-    });
+    const { finish, trail } = panel(
+      { confirm: 4 },
+      {
+        method: 'aggregators.delete',
+        note: 'Агрегатор удалён',
+        held: (done) => Boolean(done.confirm),
+      },
+    );
 
     expect(await finish({ aggregator_id: 7, confirmed: false })).toBe(false);
     expect(trail).toEqual([]);
