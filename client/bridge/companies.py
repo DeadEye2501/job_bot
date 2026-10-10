@@ -10,6 +10,7 @@ from client.bridge.cards import (
     CardSubject,
     asked_update,
     create_card,
+    created_or_taken,
     delete_card,
     listed,
     merge_candidates,
@@ -49,12 +50,12 @@ async def create_company_row(session, fields: dict, **echo) -> int:
     name = fields["name"]
     if not name:
         raise Denied(NAME_REQUIRED, **echo)
-    try:
-        async with session.begin():
-            created_id = (await companies_card.create_company(session, **fields)).id
-    except IntegrityError:
-        raise Denied(COMPANY_EXISTS.format(name=name), **echo)
-    return created_id
+    return await created_or_taken(
+        session,
+        lambda: companies_card.create_company(session, **fields),
+        COMPANY_EXISTS.format(name=name),
+        **echo,
+    )
 
 
 COMPANY_CARD = CardSubject(

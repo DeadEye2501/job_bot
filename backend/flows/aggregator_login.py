@@ -1,5 +1,6 @@
 """Вход на сайт агрегатора: человек входит в видимом браузере, агент проверяет вход."""
 
+from backend.agent.human_gate import LIMIT_SEC
 from backend.agent.jobs import LoginJob, Source
 from backend.agent.kit import AgentKit, SessionPlan
 from backend.agent.prompts.frame import system_prompt
@@ -8,8 +9,6 @@ from backend.agent.sessions import LimitExhausted, run_guarded
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
 from backend.models import Aggregator
-
-_LOGIN_WAIT_SEC = 3600
 
 
 async def log_in(kit: AgentKit, source: Source) -> str:
@@ -22,7 +21,8 @@ async def log_in(kit: AgentKit, source: Source) -> str:
     await kit.browser.open_profile(source.id, as_person=True)
     await kit.browser.show()
     await (await kit.browser.page()).goto(f"https://{source.host}/")
-    if not await kit.browser.wait_closed(_LOGIN_WAIT_SEC):
+    # Вход — то же ожидание человека, что капча: срок у них один.
+    if not await kit.browser.wait_closed(LIMIT_SEC):
         return "login_timeout"
     job = LoginJob(source)
     tools = [*common_tools(kit, job), *browser_tools(kit, None)]

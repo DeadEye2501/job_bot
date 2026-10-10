@@ -282,7 +282,7 @@
 - принимает: draft, field, caption
 - берёт: ./ChipList.svelte
 
-### components/DraftNotes.svelte (21)
+### components/DraftNotes.svelte (20)
 - —
 - принимает: draft
 
@@ -411,7 +411,7 @@
 - принимает: draft, options, oncompany, onhr
 - берёт: ./ChoiceRow.svelte, ./DraftChips.svelte, ./DraftNotes.svelte, ./PostedAtField.svelte, ./SuggestInput.svelte
 
-### components/NotesField.svelte (74)
+### components/NotesField.svelte (68)
 - —
 - принимает: value, placeholder, owner, save
 
@@ -653,9 +653,9 @@
 - * Три связи карточки: две внутрь и одна в подборщик. * * Пустая связь названа пустотой, а не пропущена: карточка ставит на её место * неподвижную подпись, и разбирать, чего в ответе нет, ей было бы нечем. * * Имя компании без привязки ведёт не в контакты, а в подборщик с этим самым * именем: связи нет, но разбор её узнал — человек нажимает и сразу видит * совпадения, вместо того чтобы набирать то же слово руками.
 - отдаёт: cardLinks
 
-### state/card_notes.js (27)
-- * Заводит запись заметки. * * Карточку не перечитываем: человек мог набрать ещё, пока летел вопрос, и * пришедшее из базы стёрло бы это. Записанным считаем набранное — этот зов * называет только поправленные поля, самой заметки в ответе нет, — а пустая от * пробельной здесь не отличается, обе сводятся к пустоте по дороге. * * Ответ в закрытую карточку не кладётся: панель закрывают, не дожидаясь записи, * и сказанное ей всплыло бы над следующей, открытой на её месте. * * `null` значит «не легло»: поле по нему считает набранное несохранённым, и * следующая попытка уедет тем же текстом.
-- отдаёт: cardNotes
+### state/card_notes.js (33)
+- * Предел длины заметки — один на все её места: поле карточки и окно * заведения. В базе длина не ограничена вовсе, и разъедься числа, человек * набирал бы у компании столько, сколько у вакансии уже не помещается. Поля * форм — не заметки: у них свои предметы и свои числа.
+- отдаёт: NOTES_LIMIT, cardNotes
 
 ### state/card_read.js (49)
 - * Заводит чтение карточки. * * `trouble` — чем назвать неудачу: «карточку», «компанию» и «канал» человек * читает по-разному, и общее слово посылало бы его не туда. * * `alive` спрашивают, а не передают значением: панель закрывают, пока ответ в * пути, и класть его тогда уже некуда. * * `ask` принимается обёрткой, а не самим доводом: довод читается один раз, при * заведении, и подмена его сверху сюда бы не доехала. * * Показанное отдаётся парой — карточка и слово о беде разом: положи их * карточка порознь, третье состояние («ответ негоден, не трогать ничего») * пришлось бы разбирать в каждой из трёх, и одна опять разобрала бы иначе. * * `show` кладёт эту пару в состояние карточки. Через довод, а не ответом: * ответ разбирали три карточки, и разбор был у них дословно один — проверка * на негодность и распаковка пары. Своими у них остаются только имена полей, * а имя подставить за карточку нельзя.
@@ -967,7 +967,7 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (12): .ch-stats-grid, .ch-stat, .ch-stat-num.fit, .ch-stat-num.apply, .ch-stat-num.response, .ch-stat-label, .ch-bar, .ch-bar-seg, .ch-bar-legend, .ch-bar-legend .legend-item, .ch-bar-legend .status-dot, .ch-stats-empty
 - берёт: --accent, --bg-tertiary, --info, --status-applied, --text-secondary
 
-### styles/chat.css (293)
+### styles/chat.css (289)
 - Переписка в карточке человека: лента писем, пузыри и строка отправки. Своим файлом, а не в оформлении карточки: карточку одевают три предмета, а переписка есть только у человека.
 - селекторы (38): .cnt-detail-pane:has(> .cnt-chat-section), .cnt-chat-section, .cnt-chat-body, .cnt-chat-empty, .cnt-chat-day, .cnt-chat-older, .cnt-chat-older:hover, .cnt-bubble, .cnt-bubble.them, .cnt-bubble.me, .cnt-bubble.deleted, .cnt-bubble-content, .cnt-bubble-text, .cnt-bubble-text.deleted, .cnt-bubble-text.gone, .cnt-bubble-edited, .cnt-bubble-photo, .cnt-bubble-photo img, .cnt-bubble-doc, .cnt-bubble-doc:hover, .cnt-bubble-doc .material-symbols-outlined, .cnt-bubble-time, .cnt-bubble.me .cnt-bubble-time, .cnt-bubble-tick, .cnt-bubble-tick.read, .cnt-bubble.me .cnt-bubble-tick, .cnt-bubble.me .cnt-bubble-tick.read, .cnt-chat-input-area, .cnt-chat-input, .cnt-chat-input:focus, .cnt-chat-input::placeholder, .cnt-chat-attach, .cnt-chat-attach:hover:not(:disabled), .cnt-chat-attach .material-symbols-outlined, .cnt-chat-send, .cnt-chat-send:hover:not(:disabled), .cnt-chat-send .material-symbols-outlined, .cnt-chat-disabled-hint
 - берёт: --accent, --accent-chip-bg, --accent-muted, --bg-tertiary, --border, --surface-raised, --surface-raised-hover, --text-primary, --text-secondary, --text-tertiary
@@ -1207,13 +1207,12 @@ body, html, button, body, .material-symbols-outlined
 - Экран журнала: панель сверху и список записей под ней. Что стоит внутри — пилюли и строки — своими файлами.
 - селекторы (5): .logs-toolbar, .logs-level-pills, .logs-toolbar-gap, .logs-auto-refresh, .logs-list
 
-### styles/master-detail.css (71)
+### styles/master-detail.css (60)
 - Каркас «список слева, подробности справа» — общий у контактов и вакансий. Своим файлом, потому что раскладка одна на два раздела, а написана была дважды: под приставкой `cnt-` и под `vac-`. Ширина панели стояла двумя числами в двух файлах, и разъехались бы они молча — а разделы эти стоят соседними вкладками одного окна, и разницу видно глазом. Селекторы сгруппированы, а не сведены к общему имени: имена классов несущие — по ним разметка и оформление раздела ищутся поиском, — и переименование стоило бы дороже, чем даёт. Что осталось у каждого раздела своим: отступы подробностей (у вакансий они плотнее — строка там гуще), пустые состояния (у вакансий это центрованный столбик со значком, у контактов простой абзац) и всё содержимое строки.
-- селекторы (6): .cnt-layout,
+- селекторы (5): .cnt-layout,
 .vacancies-layout, .cnt-list-pane,
 .vac-list-pane, .cnt-list-toolbar,
-.vac-list-toolbar, .cnt-list,
-.vac-list, .cnt-detail-pane,
+.vac-list-toolbar, .cnt-detail-pane,
 .vac-detail-pane, .cnt-hr-row.selected,
 .vac-row.selected
 - берёт: --accent, --bg-primary, --bg-secondary, --border, --selected-bg
@@ -1391,13 +1390,19 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (6): .screen-body, .screen-body.flush, .page-head, .page-title, .page-title-meta, .updated-ts
 - берёт: --text-primary, --text-tertiary
 
-### styles/scroll-body.css (23)
-- Тело, которое занимает остаток рамы и прокручивается внутри себя. Одним правилом на все места, где прокручивается середина, а не окно целиком: у экрана раздела, у страницы настроек, у тела окна, у панели отбора и у перечня подборщика шапка и подвал обязаны остаться на виду. `min-height: 0` тут не украшение: без него флексовый ребёнок не сжимается ниже своего содержимого, тело распирает раму, и прокрутки не выходит вовсе. Написанная в каждом файле заново, эта четвёрка и расходится обычно на нём — молча и с виду беспричинно. Отступы и подложка остаются при самих блоках: они у каждого свои.
+### styles/scroll-body.css (31)
+- Тело, которое занимает остаток рамы и прокручивается внутри себя. Одним правилом на все места, где прокручивается середина, а не окно целиком: у экрана раздела, у страницы настроек, у тела окна, у панели отбора, у перечня подборщика, у списка и подробностей раздела, у тела мастера и у ленты переписки шапка и подвал обязаны остаться на виду. У ребёнка сетки `flex: 1` ничего не делает, и правило годится ему так же. `min-height: 0` тут не украшение: без него флексовый ребёнок не сжимается ниже своего содержимого, тело распирает раму, и прокрутки не выходит вовсе. Написанная в каждом файле заново, эта четвёрка и расходится обычно на нём — молча и с виду беспричинно. Отступы и подложка остаются при самих блоках: они у каждого свои.
 - селекторы (1): .screen-body,
 .settings-page,
 .modal-body,
 .filter-body,
-.picker-list
+.picker-list,
+.cnt-list,
+.vac-list,
+.cnt-detail-pane,
+.vac-detail-pane,
+.wiz-body,
+.cnt-chat-body
 
 ### styles/search-box.css (65)
 - Строка поиска над списком: лупа, поле и крестик очистки. Своим файлом, а не в оформлении списка: коробка одна на всё окно — вакансии, четыре вкладки контактов, окно выбора записи и подборщик навыков, — и различает их только место, в котором она стоит.
@@ -1584,7 +1589,7 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (20): .filter-wrap, .filter-btn.active, .filter-panel, .filter-head, .filter-head .material-symbols-outlined, .filter-title, .filter-meta, .filter-close, .filter-close:hover, .filter-close .material-symbols-outlined, .filter-panel .input, .filter-body .status-dot, .filter-body .choice:hover, .filter-pair, .filter-dates, .filter-dates .date-picker:last-child .date-panel, .filter-foot, .filter-foot .btn, .filter-foot .btn .material-symbols-outlined, .filter-foot-right
 - берёт: --accent, --bg-tertiary, --selected-bg, --surface-hover-firm, --text-primary, --text-secondary, --text-tertiary
 
-### styles/wizard.css (258)
+### styles/wizard.css (255)
 - Мастер первого запуска: полосы окна, обложка, финал и поджатия общих блоков под него. Полосы те же, что у самого приложения, и это нарочно: мастер — не отдельная программа, а первый разговор с этой. Что стоит внутри шага — карточки подсказок, инструкция, выбор файла, строка состояния — вынесено своими файлами: те же блоки встречаются и вне мастера.
 - селекторы (36): .wiz-window, .wiz-steps, .wiz-steps.dimmed, .wiz-step, .wiz-step::before, .wiz-step:first-child::before, .wiz-step[data-mark='active']::before,
 .wiz-step[data-mark='done']::before, .wiz-step-mark, .wiz-step[data-mark='active'] .wiz-step-mark, .wiz-step[data-mark='done'] .wiz-step-mark, .wiz-step-label, .wiz-step[data-mark='active'] .wiz-step-label, .wiz-step[data-mark='done'] .wiz-step-label, .wiz-body, .wiz-body > *:last-child, .wiz-head, .wiz-head .material-symbols-outlined, .wiz-head h1, .wiz-text, .wiz-text strong, .wiz-foot, .wiz-foot-right, .wiz-done, .wiz-done .material-symbols-outlined, .wiz-done h2, .wiz-done .wiz-text, .wiz-subtitle, .wiz-subtitle strong, .wiz-welcome, .wiz-window .input,
