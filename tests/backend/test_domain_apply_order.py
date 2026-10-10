@@ -1,6 +1,7 @@
 """Порядок способов отклика: Telegram, кнопка агрегатора, форма, почта."""
 
 from backend.domain.apply_order import KnownSite, VacancyFacts, Way, World, apply_ways
+from tests.factories_aggregators import world_of
 
 SITE = KnownSite(1, "site.test")
 WEB = KnownSite(9, None)
@@ -12,8 +13,8 @@ def _vacancy(**over) -> VacancyFacts:
 
 
 def _world(**over) -> World:
-    return World(**{"telegram_open": True, "mail_ready": True, "agent_ready": True,
-                    "sites": [SITE], "closed_sites": set(), **over})
+    """Мир с одним агрегатором человека — `SITE`."""
+    return world_of(**{"sites": [SITE], **over})
 
 
 def test_telegram_goes_first():

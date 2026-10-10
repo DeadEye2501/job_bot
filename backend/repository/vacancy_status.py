@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # Зеркало JS-`ended` (client/web/state/vacancy_card.js). Применяется
 # ко всем записям `vacancy_status_history.explanation`, чтобы заметки в
 # таймлайне рендерились единообразно как "Status: reason." — независимо
-# от того, ЛЛМ ли это, ручной ввод или подпись авто-отправки.
+# от того, ЛЛМ ли это, ручной ввод или подпись отклика.
 def _ensure_trailing_period(s: str | None) -> str | None:
     if s is None:
         return None

@@ -2,11 +2,10 @@
 
 from backend.domain.apply_order import Way
 from backend.models import ContactAddedBy
+from tests.backend.fixtures.applying import FORM
 from tests.dbio import put
 from tests.factories import hr_row, vacancy_row
 from tests.factories_aggregators import mail_account_row, vacancy_contact_row
-
-FORM = "https://company.test/apply"
 
 
 async def _vacancy(session_factory, **over):

@@ -4,11 +4,11 @@ import time
 
 from backend.applying.result import TelegramClosed
 from backend.applying.telegram import via_telegram
-from backend.domain.apply_order import Way
 from backend.models import Application, ApplicationVia, Message, VacancyEvent
-from tests.dbio import all_rows
+from tests.backend.fixtures.applying import TG
+from tests.dbio import all_rows, put
+from tests.factories import days_ago, message_row
 
-TG = Way("telegram", "@hr_name", None)
 
 
 async def test_the_first_letter_goes_with_the_resume(telegram_case):
@@ -25,6 +25,17 @@ async def test_a_second_vacancy_of_the_same_hr_gets_a_short_note(telegram_case):
     await via_telegram(kit, vacancy.id, TG)
     _, text, attachment = sent[-1]
     assert attachment is None and text.startswith("А вот я увидел")
+
+
+async def test_a_rerun_writes_the_full_letter_again(telegram_case):
+    """Прогон заново — отклик как новый: наше прежнее письмо по этой же вакансии
+    не делает его припиской «ещё одна вакансия»."""
+    kit, vacancy, sent = await telegram_case()
+    await put(kit.pipeline.session_factory, message_row(
+        hr_id=vacancy.hr_id, vacancy_id=vacancy.id, is_incoming=False, sent_at=days_ago(1)))
+    await via_telegram(kit, vacancy.id, TG)
+    ((_, _, attachment),) = sent
+    assert attachment is not None
 
 
 async def test_a_flood_wait_is_a_lesson_and_is_stored(telegram_case):

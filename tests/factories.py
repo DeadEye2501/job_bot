@@ -70,6 +70,13 @@ _PHOTO_HEADS = {
 }
 
 
+def resume_file(folder, name: str = "Резюме.pdf"):
+    """Файл резюме на диске — заголовка PDF ему хватает: читать его никто не будет."""
+    resume = folder / name
+    resume.write_bytes(b"%PDF")
+    return resume
+
+
 def photo_head(suffix: str) -> bytes:
     """Начало настоящей картинки такого вида; для прочего — пусто.
 

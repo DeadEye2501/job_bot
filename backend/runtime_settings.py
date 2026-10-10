@@ -64,10 +64,11 @@ _APP_DEFAULTS: dict[str, str] = {
     # → дубли проскальзывают; слишком низкий → разные вакансии в одной
     # компании склеиваются. 0.92 — эмпирический baseline.
     "dedup_cosine_threshold": "0.92",
-    # FloodWait-окно: Bot.send выписывает сюда момент, когда Telegram
-    # разрешит снова слать (после полученного FloodWait-а). Дёргать
-    # send_dm раньше — гарантированный повторный FloodWait и штраф.
-    "flood_wait_until_ts": "0",            # epoch float — Bot.send не пытается до этого момента
+    # FloodWait-окно: откликатель (`applying/telegram_ban`) выписывает сюда
+    # момент, когда Telegram разрешит снова слать, и до него Telegram в
+    # способах не предлагает (`applying/world`). Дёргать send_dm раньше —
+    # гарантированный повторный FloodWait и штраф.
+    "flood_wait_until_ts": "0",            # epoch float
     "aggregator_backfill_limit": "20",
     "show_browser": "false",
     "letter_writer": "app",

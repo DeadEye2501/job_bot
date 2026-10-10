@@ -2037,6 +2037,7 @@
 
 - `PAGE` = `'https://site.test/vacancy/1'`
 - `FORM` = `'https://company.test/apply'`
+- `TG` = `Way('telegram', '@hr_name', None)`
 
 ### `tests/backend/test_agent_availability.py`
 
@@ -2066,18 +2067,10 @@
 
 - `MAIL` = `Way('email', 'hr@company.test', None)`
 
-### `tests/backend/test_applying_telegram.py`
-
-- `TG` = `Way('telegram', '@hr_name', None)`
-
 ### `tests/backend/test_bootstrap_schema.py`
 
 - `_ENV_PY` = `'\nfrom alembic import context\nfrom sqlalchemy …`
 - `_REVISION_PY` = `'\nrevision = "{revision}"\ndown_revision = {par…`
-
-### `tests/backend/test_bot_apply.py`
-
-- `TG` = `Way('telegram', '@hr_name', None)`
 
 ### `tests/backend/test_domain_apply_order.py`
 
@@ -2172,10 +2165,6 @@
 ### `tests/client/test_bot_contract.py`
 
 - `BRIDGE` = `Path(__file__).resolve().parents[2] / 'client' /…`
-
-### `tests/client/test_bridge_apply_via.py`
-
-- `FORM` = `'https://company.test/apply'`
 
 ### `tests/client/test_bridge_login.py`
 

@@ -57,16 +57,20 @@ async def test_an_application_leaves_one_applied_event(session_factory):
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
 
 
-async def test_the_same_address_twice_adds_screening_not_a_row(session, session_factory):
+async def test_a_new_application_to_the_same_address_is_its_own(session, session_factory):
+    """Ручной отклик на отказ и прогон заново уходят тому же HR: каждый — свой
+    отклик, и каждый снова ведёт вакансию в Applied."""
     vacancy = vacancy_row()
     await put(session_factory, vacancy)
     first = await _record(session, _entry(vacancy.id))
+    async with session.begin():
+        (await session.get(Vacancy, vacancy.id)).status = VacancyStatus.DECLINE
 
-    again = await _record(session, _entry(vacancy.id, screening=[(False, "Ещё вопрос")]))
+    again = await _record(session, _entry(vacancy.id))
 
-    assert again == first
-    assert len(await all_rows(session_factory, Application)) == 1
-    assert [s.position for s in await all_rows(session_factory, Screening)] == [0, 1, 2]
+    assert again != first and len(await all_rows(session_factory, Application)) == 2
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
+    assert [e.kind for e in await all_rows(session_factory, VacancyEvent)] == ["applied", "applied"]
 
 
 async def test_the_feed_says_how_and_who_wrote_the_letter(session, session_factory):
@@ -79,17 +83,6 @@ async def test_the_feed_says_how_and_who_wrote_the_letter(session, session_facto
                 if e.kind == "applied"]
     assert event.payload == {"via": "form", "target": "https://site.test/form",
                              "simulated": True, "letter_by": "agent"}
-
-
-async def test_the_same_address_typed_differently_is_the_same_application(session, session_factory):
-    vacancy = vacancy_row()
-    await put(session_factory, vacancy)
-    first = await _record(session, _entry(vacancy.id, via=ApplicationVia.EMAIL, target="HR@Site.test"))
-
-    again = await _record(session, _entry(vacancy.id, via=ApplicationVia.EMAIL, target="hr@site.test"))
-
-    assert again == first
-    assert len(await all_rows(session_factory, Application)) == 1
 
 
 async def test_the_screening_of_a_vacancy_goes_application_by_application(session, session_factory):

@@ -64,7 +64,7 @@ async def _connect(bot) -> None:
     """Поднять соединение и объявить бота готовым к обращениям из окна."""
     # Синкаем галку «Симуляция отправки» из БД-настройки в module-level guard
     # adapters/telegram.send_dm. Авторитет — rs.send_locked; константа
-    # — defence-in-depth на случай если Bot.send забудет проверить.
+    # держит запор на самом вызове Telegram, кто бы его ни звал.
     telegram.SEND_LOCKED = bot.rs.send_locked
     if telegram.SEND_LOCKED:
         logger.warning(

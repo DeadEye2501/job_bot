@@ -5,10 +5,10 @@ import asyncio
 from backend.bot.apply import apply_chosen_way
 from backend.domain.apply_order import Way
 from backend.models import BotMode, Vacancy, VacancyStatus
+from tests.backend.fixtures.applying import TG
 from tests.backend.fixtures.bot import switch_to
 from tests.dbio import only_row
 
-TG = Way("telegram", "@hr_name", None)
 
 
 async def test_a_manual_telegram_application_goes_through_the_same_applier(manual_case):

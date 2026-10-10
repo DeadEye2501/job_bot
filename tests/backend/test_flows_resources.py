@@ -11,7 +11,7 @@
 
 from backend.models import Profile, ProfileLanguage
 from tests.dbio import only_row, put
-from tests.factories import blacklist_row, profile_row, profile_skill_row
+from tests.factories import blacklist_row, profile_row, profile_skill_row, resume_file
 
 
 async def test_the_skills_are_lifted_into_memory(make_pipeline, session_factory):
@@ -146,8 +146,7 @@ async def test_an_unset_cv_path_yields_nothing(make_pipeline):
 
 async def test_a_set_cv_path_is_handed_over_as_a_path(make_pipeline, tmp_path):
     """Заданный путь к резюме отдаётся как путь, а не строкой."""
-    resume = tmp_path / "Резюме.pdf"
-    resume.write_bytes(b"%PDF")
+    resume = resume_file(tmp_path)
     pipeline = await make_pipeline()
     await pipeline.rs.set_app("cv_path", str(resume))
 

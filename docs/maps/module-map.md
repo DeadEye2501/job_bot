@@ -284,7 +284,7 @@ Claude через установленный Claude Code по подписке: 
 - `def _part(smtp) -> None` (9)
 - `def _message(sender: str, mail: OutgoingMail) -> EmailMessage` (10)
 
-### `adapters/telegram.py` — 220 строк
+### `adapters/telegram.py` — 221 строк
 
 Сборка клиента Telegram и отправка письма его руками.
 
@@ -699,9 +699,9 @@ First-run bootstrap: ensure DB schema exists.
 - `async def apply_chosen_way(bot, vacancy_id: int, way: Way) -> ApplyOutcome` (13)
   - `async def apply(kit: AgentKit) -> str` (5)
 
-### `backend/bot/can_send.py` — 57 строк
+### `backend/bot/can_send.py` — 55 строк
 
-Один ответ на вопрос «можно ли писать этому HR» — окну и конвейеру.
+Ответ на вопрос «можно ли писать этому HR» для переписки из окна.
 
 Зависит от: `adapters`, `backend.domain.telegram_identity`, `backend.repository.hr_card`
 
@@ -1186,13 +1186,13 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionPlan` (12)
 - `async def _settle(kit: AgentKit, job: SeekJob, end: AgentEnd, started: datetime) -> None` (9)
 
-### `backend/flows/auto_gate.py` — 49 строк
+### `backend/flows/auto_gate.py` — 48 строк
 
 Заслон автоматики: двигает ли она эту вакансию вообще.
 
 Зависит от: `backend.domain.transitions`, `backend.models`
 
-- `async def status_open_for_auto(session_factory, vacancy_id: int) -> tuple[bool, VacancyStatus | None]` (35)
+- `async def status_open_for_auto(session_factory, vacancy_id: int) -> tuple[bool, VacancyStatus | None]` (34)
 
 ### `backend/flows/batches.py` — 30 строк
 
@@ -1890,7 +1890,7 @@ First-run bootstrap: ensure DB schema exists.
 
 ### `backend/models/application.py` — 46 строк
 
-Отклик вне Telegram и скрининг по нему.
+Отклик и скрининг по нему.
 
 Зависит от: `backend.models.base`, `backend.models.enums`
 
@@ -2078,11 +2078,11 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def put_app_setting(session: AsyncSession, key: str, value: str) -> None` (7)
 
-### `backend/repository/applications.py` — 109 строк
+### `backend/repository/applications.py` — 100 строк
 
 Отклики и скрининг по ним.
 
-Зависит от: `backend.domain.contact_keys`, `backend.models`, `backend.repository.vacancies_life`, `backend.repository.vacancy_status`, `backend.telegram_time`
+Зависит от: `backend.models`, `backend.repository.vacancies_life`, `backend.repository.vacancy_status`, `backend.telegram_time`
 
 - `class ApplicationEntry` (12)
 - `async def record_application(session: AsyncSession, entry: ApplicationEntry) -> int` (22)
@@ -2090,7 +2090,6 @@ First-run bootstrap: ensure DB schema exists.
 - `class ScreenedApplication` (5)
 - `async def vacancy_screening(session: AsyncSession, vacancy_id: int) -> list[ScreenedApplication]` (12)
 - `async def has_screening(session: AsyncSession, vacancy_id: int) -> bool` (9)
-- `async def _existing(session: AsyncSession, vacancy_id: int, target: str) -> Application | None` (6)
 
 ### `backend/repository/blacklist.py` — 344 строк ⚠ подошёл к 300
 
@@ -2262,7 +2261,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def carry_hr_marks(session: AsyncSession, written_before: list[str], hr: HR) -> None` (34)
 - `async def merge_hr(session: AsyncSession, *, absorbed_id: int, survivor_id: int) -> None` (45)
 
-### `backend/repository/hr_identify.py` — 288 строк
+### `backend/repository/hr_identify.py` — 292 строк
 
 Соответствие записи HR данным Telegram.
 
@@ -2270,7 +2269,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def find_known_hr(session: AsyncSession, telegram_user_id: int, telegram_username: str | None=None) -> HR | None` (40)
 - `async def find_last_outgoing_vacancy_id_for_hr(session: AsyncSession, hr_id: int, *, as_of: datetime) -> int | None` (40)
-- `async def count_recent_outgoing_with_vacancy_for_hr(session: AsyncSession, hr_id: int, *, window_days: int) -> int` (25)
+- `async def count_recent_outgoing_with_vacancy_for_hr(session: AsyncSession, hr_id: int, *, window_days: int, other_than: int) -> int` (29)
 - `async def resolve_reply_target_vacancy(session: AsyncSession, hr_id: int, reply_to_tg_msg_id: int) -> int | None` (24)
 - `def telegram_full_name(user) -> str | None` (3)
 - `async def refresh_hr_from_telegram(session: AsyncSession, hr: HR, user, *, avatar: bytes | None) -> None` (39)
@@ -2657,7 +2656,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def apply_silence(session: AsyncSession, vacancy: Vacancy, timeout_days: int) -> None` (23)
 - `def apply_parse_outcome(vacancy: Vacancy, new_status: VacancyStatus) -> None` (18)
 
-### `backend/runtime_settings.py` — 427 строк ⚠ подошёл к 300
+### `backend/runtime_settings.py` — 428 строк ⚠ подошёл к 300
 
 Runtime settings layer.
 
@@ -3708,11 +3707,11 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `tests/adapters/test_smtp_mail.py` — 103 строк
+### `tests/adapters/test_smtp_mail.py` — 98 строк
 
 Письмо уходит по SMTP с вложенным резюме и входом под паролем приложения.
 
-Зависит от: `adapters.smtp_mail`
+Зависит от: `adapters.smtp_mail`, `tests.factories`
 
 Тестов: 3
 
@@ -3724,7 +3723,6 @@ Runtime settings layer.
   - `def starttls(self, **_options)` (2)
   - `def login(self, user, password)` (3)
   - `def send_message(self, message)` (2)
-- `def _resume(tmp_path)` (4)
 - `class _RudeSmtp(_FakeSmtp)` (5)
   - `def quit(self)` (2)
 
@@ -3752,11 +3750,11 @@ Runtime settings layer.
 
 - `async def web_search(session_factory) -> Aggregator` (4)
 
-### `tests/backend/fixtures/applying.py` — 188 строк
+### `tests/backend/fixtures/applying.py` — 189 строк
 
 Стенд откликателя: набор агента и вакансии, на которые есть чем откликнуться.
 
-Зависит от: `backend.applying`, `backend.bot`, `backend.llm.agent_letter`, `backend.models`, `backend.repository.app_settings`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.fakes.browser`
+Зависит от: `backend.applying`, `backend.bot`, `backend.domain.apply_order`, `backend.llm.agent_letter`, `backend.models`, `backend.repository.app_settings`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.fakes.browser`
 
 - `async def kit(make_pipeline)` (3)
 - `def board(session_factory)` (13)
@@ -3769,12 +3767,11 @@ Runtime settings layer.
   - `async def make(*, prior_letter=False, flood_wait=None, simulated=False, hr_user_id=None)` (14)
 - `def manual_case(make_bot, session_factory, tmp_path, monkeypatch)` (21)
   - `async def make(*, status=VacancyStatus.NEW, hang=False)` (14)
-- `def _resume(tmp_path)` (4)
 - `async def _telegram_vacancy(session_factory, *, hr_user_id=None, status=VacancyStatus.NEW)` (6)
 - `def _model_writes_the_letter(monkeypatch) -> None` (7)
   - `async def generate_cover_letter(block, parsed, client, model, *, channel_ref=None)` (2)
-- `def mail_case(make_pipeline, session_factory, tmp_path, monkeypatch)` (33)
-  - `async def make(*, server_refuses=False, simulated=False, mail=True, resume=True)` (24)
+- `def mail_case(make_pipeline, session_factory, tmp_path, monkeypatch)` (31)
+  - `async def make(*, server_refuses=False, simulated=False, mail=True, resume=True)` (22)
     - `def send_mail(account, mail)` (4)
     - `async def write_letter(ask, client, model)` (2)
 
@@ -4062,13 +4059,13 @@ Runtime settings layer.
   - `def fake(method)` (5)
     - `async def execute(kit, vacancy_id, way)` (3)
 
-### `tests/backend/test_applying_telegram.py` — 64 строк
+### `tests/backend/test_applying_telegram.py` — 75 строк
 
 Отклик в Telegram: письмо, доставка и след в базе.
 
-Зависит от: `backend.applying.result`, `backend.applying.telegram`, `backend.domain.apply_order`, `backend.models`, `tests.dbio`
+Зависит от: `backend.applying.result`, `backend.applying.telegram`, `backend.models`, `tests.backend.fixtures.applying`, `tests.dbio`, `tests.factories`
 
-Тестов: 6
+Тестов: 7
 
 
 ### `tests/backend/test_applying_telegram_letter.py` — 84 строк
@@ -4080,7 +4077,7 @@ Runtime settings layer.
 Тестов: 6
 
 
-### `tests/backend/test_applying_world.py` — 62 строк
+### `tests/backend/test_applying_world.py` — 57 строк
 
 Мир откликателя: что доступно прямо сейчас.
 
@@ -4088,7 +4085,6 @@ Runtime settings layer.
 
 Тестов: 7
 
-- `def _world(**over) -> World` (3)
 - `async def _facts(session_factory, **vacancy)` (5)
 
 ### `tests/backend/test_bootstrap_schema.py` — 160 строк
@@ -4123,7 +4119,7 @@ Runtime settings layer.
 
 Ручной отклик одним зовом: выбранный способ через того же откликателя, в месте прогона.
 
-Зависит от: `backend.bot.apply`, `backend.domain.apply_order`, `backend.models`, `tests.backend.fixtures.bot`, `tests.dbio`
+Зависит от: `backend.bot.apply`, `backend.domain.apply_order`, `backend.models`, `tests.backend.fixtures.applying`, `tests.backend.fixtures.bot`, `tests.dbio`
 
 Тестов: 6
 
@@ -4355,11 +4351,11 @@ Runtime settings layer.
 - `async def engine_on_disk(tmp_path)` (5)
 - `async def _pragma(engine, name)` (4)
 
-### `tests/backend/test_domain_apply_order.py` — 90 строк
+### `tests/backend/test_domain_apply_order.py` — 91 строк
 
 Порядок способов отклика: Telegram, кнопка агрегатора, форма, почта.
 
-Зависит от: `backend.domain.apply_order`
+Зависит от: `backend.domain.apply_order`, `tests.factories_aggregators`
 
 Тестов: 13
 
@@ -4854,7 +4850,7 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/backend/test_flows_resources.py` — 154 строк
+### `tests/backend/test_flows_resources.py` — 153 строк
 
 Следствия перезагрузки настроек перед обходом каналов.
 
@@ -5226,13 +5222,13 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_repository_applications.py` — 116 строк
+### `tests/backend/test_repository_applications.py` — 109 строк
 
 Отклик вне Telegram: строка, скрининг и Applied — одной транзакцией.
 
 Зависит от: `backend.models`, `backend.repository.applications`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 6
+Тестов: 5
 
 - `def _entry(vacancy_id, **over) -> ApplicationEntry` (6)
 - `async def _record(session, entry)` (3)
@@ -6115,11 +6111,11 @@ Runtime settings layer.
 Тестов: 6
 
 
-### `tests/client/test_bridge_apply_via.py` — 69 строк
+### `tests/client/test_bridge_apply_via.py` — 68 строк
 
 Отклик выбранным способом: какие способы доступны у вакансии и запуск одного из них.
 
-Зависит от: `backend.domain.apply_order`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
+Зависит от: `backend.domain.apply_order`, `backend.models`, `tests.backend.fixtures.applying`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
 Тестов: 5
 
@@ -6594,7 +6590,7 @@ Runtime settings layer.
 - `def sqlite_write(db_file, *statements: str) -> None` (10)
 - `def sqlite_tables(db_file) -> set[str]` (3)
 
-### `tests/factories.py` — 484 строк ⚠ подошёл к 300
+### `tests/factories.py` — 491 строк ⚠ подошёл к 300
 
 Построение объектов, которые тесты подают на вход коду.
 
@@ -6602,6 +6598,7 @@ Runtime settings layer.
 
 - `def at(minutes: int) -> datetime` (3)
 - `def days_ago(days: float) -> datetime` (8)
+- `def resume_file(folder, name: str='Резюме.pdf')` (5)
 - `def photo_head(suffix: str) -> bytes` (7)
 - `def _empty_vacancy() -> dict` (23)
 - `def parsed_vacancy(**overrides) -> ParsedVacancy` (7)
@@ -6636,11 +6633,11 @@ Runtime settings layer.
 - `def status_history_row(vacancy_id: int, **overrides) -> VacancyStatusHistory` (10)
 - `def tg_creds(**overrides) -> TgAccountConfig` (16)
 
-### `tests/factories_aggregators.py` — 58 строк
+### `tests/factories_aggregators.py` — 67 строк
 
-Строки откликов вне Telegram: агрегаторы, контакты вакансии, отклики, почта.
+Строки и факты откликов: агрегаторы, контакты вакансии, отклики, почта, мир откликателя.
 
-Зависит от: `backend.crypto`, `backend.models`, `backend.repository.aggregators`, `tests.factories`
+Зависит от: `backend.crypto`, `backend.domain.apply_order`, `backend.models`, `backend.repository.aggregators`, `tests.factories`
 
 - `def aggregator_row(**overrides) -> Aggregator` (5)
 - `def web_search_row(**overrides) -> Aggregator` (3)
@@ -6648,6 +6645,7 @@ Runtime settings layer.
 - `def application_row(vacancy_id: int, **overrides) -> Application` (9)
 - `def screening_row(application_id: int, position: int, **overrides) -> Screening` (5)
 - `def mail_account_row() -> MailAccount` (4)
+- `def world_of(**overrides) -> World` (6)
 
 ### `tests/fakes/agent.py` — 108 строк
 

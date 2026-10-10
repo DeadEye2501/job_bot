@@ -8,11 +8,19 @@ from pyrogram.errors import FloodWait
 
 from backend.applying import run
 from backend.bot import work
+from backend.domain.apply_order import Way
 from backend.llm.agent_letter import Letter
 from backend.models import VacancyStatus
 from backend.repository.app_settings import CV_PATH_KEY
 from tests.dbio import put
-from tests.factories import days_ago, hr_row, message_row, profile_row, vacancy_row
+from tests.factories import (
+    days_ago,
+    hr_row,
+    message_row,
+    profile_row,
+    resume_file,
+    vacancy_row,
+)
 from tests.factories_aggregators import aggregator_row, mail_account_row, vacancy_contact_row
 from tests.fakes.agent import kit_for, scripted, scripted_kit, work_kit
 from tests.fakes.browser import FakeBrowser
@@ -26,6 +34,7 @@ async def kit(make_pipeline):
 
 PAGE = "https://site.test/vacancy/1"
 FORM = "https://company.test/apply"
+TG = Way("telegram", "@hr_name", None)
 
 
 @pytest.fixture
@@ -88,7 +97,7 @@ def telegram_case(make_pipeline, session_factory, tmp_path, monkeypatch, outbox)
     """
 
     async def make(*, prior_letter=False, flood_wait=None, simulated=False, hr_user_id=None):
-        resume = _resume(tmp_path)
+        resume = resume_file(tmp_path)
         vacancy = await _telegram_vacancy(session_factory, hr_user_id=hr_user_id)
         if prior_letter:
             other = vacancy_row(hr_id=vacancy.hr_id, title="Прежняя")
@@ -115,7 +124,7 @@ def manual_case(make_bot, session_factory, tmp_path, monkeypatch):
         vacancy = await _telegram_vacancy(session_factory, status=status)
         await put(session_factory, profile_row())
         bot = await make_bot()
-        await bot.rs.set_app(CV_PATH_KEY, str(_resume(tmp_path)))
+        await bot.rs.set_app(CV_PATH_KEY, str(resume_file(tmp_path)))
         _model_writes_the_letter(monkeypatch)
         monkeypatch.setattr(work, "_kit", work_kit)
         bot.hanging = asyncio.Event()
@@ -127,12 +136,6 @@ def manual_case(make_bot, session_factory, tmp_path, monkeypatch):
         return bot, vacancy
 
     return make
-
-
-def _resume(tmp_path):
-    resume = tmp_path / "Резюме.pdf"
-    resume.write_bytes(b"%PDF")
-    return resume
 
 
 async def _telegram_vacancy(session_factory, *, hr_user_id=None, status=VacancyStatus.NEW):
@@ -161,9 +164,7 @@ def mail_case(make_pipeline, session_factory, tmp_path, monkeypatch):
     """
 
     async def make(*, server_refuses=False, simulated=False, mail=True, resume=True):
-        cv = tmp_path / "cv.pdf"
-        if resume:
-            cv.write_bytes(b"%PDF")
+        cv = resume_file(tmp_path, "cv.pdf") if resume else tmp_path / "cv.pdf"
         if mail:
             await put(session_factory, mail_account_row())
         vacancy = vacancy_row()
