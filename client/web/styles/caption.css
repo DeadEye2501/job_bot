@@ -15,7 +15,10 @@
 .bl-row.head,
 .ch-stat-label,
 .skill-picker-cat,
-.donut-label {
+.donut-label,
+.filter-label,
+.stats-ch-th,
+.stats-ch-group {
   color: var(--text-tertiary);
   letter-spacing: 0.4px;
   text-transform: uppercase;

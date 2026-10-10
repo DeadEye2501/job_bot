@@ -35,7 +35,7 @@
   </div>
 
   {#if numbers.empty}
-    <div class="ch-stats-empty">{empty}</div>
+    <div class="empty-note ch-stats-empty">{empty}</div>
   {:else}
     <div class="ch-bar">
       {#each funnel as part (part.name)}

@@ -314,7 +314,7 @@
         <!-- Ключ по месту, а не по названию: разбор кладёт в стек то, что
              нашёл, и одно и то же название приходит дважды. -->
         {#each card.stack as one, at (at)}
-          <span class="stack-chip" class:matched={one.matched}>{one.name}</span>
+          <span class="info-chip stack-chip" class:matched={one.matched}>{one.name}</span>
         {/each}
       </div>
     </div>
@@ -333,7 +333,7 @@
             <div class="hr-name muted">HR не определён</div>
           {:else}
             <button
-              class="hr-name is-link"
+              class="hr-name link-hover"
               type="button"
               title="Открыть в Контактах"
               onclick={() => oncontacts(links.hrCard)}
@@ -351,7 +351,7 @@
             <div class="hr-name muted">Компания не определена</div>
           {:else if links.companyCard}
             <button
-              class="hr-name is-link"
+              class="hr-name link-hover"
               type="button"
               title="Открыть в Контактах"
               onclick={() => oncontacts(links.companyCard)}
@@ -362,7 +362,7 @@
             <!-- Имя разбор узнал, а связи нет: нажатие открывает подборщик с
                  этим самым именем, вместо того чтобы набирать его руками. -->
             <button
-              class="hr-name is-link"
+              class="hr-name link-hover"
               type="button"
               title="Связать с компанией"
               onclick={() => (linking = { kind: 'company', prefill: links.companyPick })}

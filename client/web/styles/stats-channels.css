@@ -29,11 +29,9 @@
   min-width: 0;
 }
 
+/* Капитель — общая (`caption.css`). */
 .stats-ch-grid .stats-ch-group {
-  text-transform: uppercase;
-  color: var(--text-tertiary);
   font-size: 0.6rem;
-  letter-spacing: 0.6px;
   padding: 6px 6px 0;
   border-bottom: 0;
 }
@@ -54,10 +52,7 @@
 /* Шапка в одну строку: подпись в два слова, перенесённая в узком окне, делает
    шапку двухэтажной, и колонки под ней встают неровно. */
 .stats-ch-grid .stats-ch-th {
-  color: var(--text-tertiary);
   font-size: 0.62rem;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
   padding: 4px 6px 8px;
   font-weight: 400;
   white-space: nowrap;

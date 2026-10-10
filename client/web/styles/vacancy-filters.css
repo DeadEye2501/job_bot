@@ -26,7 +26,6 @@
   width: 340px;
   max-height: 520px;
   overflow: hidden;
-  box-shadow: 0 8px 22px var(--scrim);
 }
 
 /* Полоса — общая, в bar.css; здесь только её просвет, отступы и кегль: в шапке

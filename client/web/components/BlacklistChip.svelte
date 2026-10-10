@@ -8,7 +8,7 @@
 </script>
 
 {#if value}
-  <span class="cnt-det-meta-chip blacklist" title="В blacklist: {value}">
+  <span class="info-chip cnt-det-meta-chip blacklist" title="В blacklist: {value}">
     <span class="material-symbols-outlined">block</span>
     В blacklist
   </span>

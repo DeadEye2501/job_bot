@@ -22,10 +22,6 @@
   text-align: left;
 }
 
-.menu-item:hover {
-  background: var(--selected-bg);
-}
-
 .menu-item .material-symbols-outlined {
   flex-shrink: 0;
   font-size: 14px;

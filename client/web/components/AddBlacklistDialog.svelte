@@ -78,7 +78,7 @@
         {#if hints !== null && open}
           <div class="pop-frame drop-panel bl-combobox-dropdown">
             {#if hints.empty}
-              <div class="bl-combobox-empty">{hints.empty}</div>
+              <div class="empty-note bl-combobox-empty">{hints.empty}</div>
             {:else}
               {#each hints.options as one (one.value)}
                 <button class="bl-combobox-option" type="button" onclick={() => pick(one.value)}>

@@ -81,21 +81,6 @@
   margin-bottom: 10px;
 }
 
-.info-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  font-size: 0.72rem;
-}
-
-.info-chip .material-symbols-outlined {
-  font-size: 12px;
-}
-
 /* Чип канала ведёт к посту, из которого вакансию взяли: перечитать
    объявление целиком иначе негде. */
 .info-chip.linkable {
@@ -129,14 +114,11 @@
   gap: 3px;
 }
 
-/* Чип стека карточки крупнее чипа строки списка: в списке их читают краем
-   глаза, а здесь по ним разбираются, чем вакансия набрала оценку. */
+/* Форма — общий чип (`info-chip.css`), но текст ярче: в списке стек читают
+   краем глаза, а здесь по нему разбираются, чем вакансия набрала оценку. */
 .stack-chip {
   padding: 1px 8px;
-  border-radius: 10px;
-  background: var(--bg-tertiary);
   color: var(--text-primary);
-  font-size: 0.72rem;
 }
 
 /* Переносится и посреди слова: в описании из объявления попадаются ссылки и

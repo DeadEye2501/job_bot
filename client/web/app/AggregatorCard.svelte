@@ -125,7 +125,7 @@
           <span>{aggregatorWhere(card)}</span>
         {:else}
           <button
-            class="cnt-det-link"
+            class="cnt-det-link link-hover"
             type="button"
             title="Открыть сайт"
             onclick={() => ask('system.open_url', siteHref(card.host))}
@@ -136,7 +136,7 @@
       </div>
 
       <div class="cnt-det-meta-row">
-        <span class="cnt-det-meta-chip">{aggregatorLastRun(card)}</span>
+        <span class="info-chip cnt-det-meta-chip">{aggregatorLastRun(card)}</span>
         <BlacklistChip value={card.blacklist_value} />
       </div>
     </div>

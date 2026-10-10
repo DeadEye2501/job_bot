@@ -58,25 +58,21 @@
   background: var(--bg-secondary);
 }
 
-/* Крестик проступает по наведению на строку: постоянный столбик крестиков
-   спорит с текстом, а убирают строку редко. */
-.list-item .icon-btn {
+/* Крестик — общий (`remove-cross.css`); здесь он проступает по наведению на
+   строку: постоянный столбик крестиков спорит с текстом, а убирают строку
+   редко. Коробка своя: строка выровнена по верху, и без неё крестик сжался бы
+   до ширины знака и встал выше первой строки текста. */
+.list-item .remove-cross {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
   opacity: 0;
   transition: opacity 0.1s;
   flex-shrink: 0;
 }
 
-.list-item .icon-btn .material-symbols-outlined {
-  font-size: 14px;
-}
-
-.list-item:hover .icon-btn {
+.list-item:hover .remove-cross {
   opacity: 1;
-}
-
-/* Только цветом, без подложки: крестик и так проступает по наведению на строку,
-   и подложка под ним добавляет второе движение там, где хватает одного. */
-.list-item button.icon-btn:hover {
-  color: var(--danger);
-  background: transparent;
 }

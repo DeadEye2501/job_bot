@@ -61,13 +61,6 @@
   cursor: pointer;
 }
 
-/* Ссылкой под курсором подсвечиваются и контакты вакансии (vacancy-contacts.css). */
-.cnt-det-link:hover,
-.vac-contact-link:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-
 .cnt-det-meta-row {
   display: flex;
   align-items: center;
@@ -81,14 +74,9 @@
   min-width: 0;
 }
 
+/* Форма чипа — общая (`info-chip.css`); цифры здесь моноширинные: время и
+   счёт в соседних карточках встают ровно. */
 .cnt-det-meta-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 7px;
-  border-radius: 9px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -102,10 +90,6 @@
 .cnt-det-meta-chip.blacklist {
   background: var(--danger-tint-strong);
   color: var(--danger);
-}
-
-.cnt-det-meta-chip .material-symbols-outlined {
-  font-size: 12px;
 }
 
 /* Поле карточки — общее поле, поджатое под тесную сетку: полей в ней по два в

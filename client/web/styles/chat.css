@@ -43,11 +43,11 @@
   overflow-y: auto;
 }
 
+/* Надпись пустой ленты — общая (`empty-note.css`); своё у неё — тесный отступ
+   и кегль. */
 .cnt-chat-empty {
   padding: 16px 10px;
-  color: var(--text-tertiary);
   font-size: 0.78rem;
-  text-align: center;
 }
 
 /* Подпись дня — пилюлей посреди ленты: она делит переписку поперёк, и без

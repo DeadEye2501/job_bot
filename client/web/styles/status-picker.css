@@ -28,10 +28,6 @@
   cursor: pointer;
 }
 
-.status-option:hover {
-  background: var(--selected-bg);
-}
-
 .status-option input {
   accent-color: var(--accent);
 }

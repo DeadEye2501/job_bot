@@ -95,7 +95,7 @@
   </button>
 
   {#if shown}
-    <div class="pop filter-panel">
+    <div class="pop raised filter-panel">
       <div class="bar filter-head">
         <span class="material-symbols-outlined">filter_list</span>
         <span class="filter-title">Фильтры</span>

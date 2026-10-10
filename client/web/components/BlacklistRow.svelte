@@ -83,7 +83,7 @@
 </script>
 
 <div class="bl-row" class:disabled={!row.active}>
-  <span class="bl-kind-chip {row.kind}">{row.kind}</span>
+  <span class="info-chip bl-kind-chip {row.kind}">{row.kind}</span>
 
   <input
     class="inline-edit bl-input value"

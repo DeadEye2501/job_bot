@@ -4,13 +4,12 @@
    (`log-row.css`): разойдись они, красная строка стояла бы под жёлтой
    пилюлей. */
 
+/* Скобка — общая пилюля выбора (`pill.css`); своё — отступ под значок, шрифт
+   и приглушённый цвет незажатой. */
 .logs-level-pill {
   padding: 3px 9px 3px 7px;
-  border-radius: 12px;
   font-size: 0.72rem;
   font-family: ui-monospace, monospace;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
   color: var(--text-tertiary);
   display: inline-flex;
   align-items: center;
@@ -23,7 +22,6 @@
 }
 
 .logs-level-pill:hover {
-  border-color: var(--accent);
   color: var(--text-secondary);
 }
 
@@ -64,4 +62,5 @@
   background: var(--bg-tertiary);
   border-color: var(--text-secondary);
   color: var(--text-primary);
+  font-weight: 400;
 }
