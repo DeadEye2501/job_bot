@@ -37,10 +37,10 @@ async def application_exists(session: AsyncSession, vacancy_id: int, target: str
     return await _existing(session, vacancy_id, target) is not None
 
 
-async def record_application(session: AsyncSession, entry: ApplicationEntry, *, forced: bool) -> int:
+async def record_application(session: AsyncSession, entry: ApplicationEntry) -> int:
     """Записать состоявшийся отклик. Тот же адрес второй строки не даёт — скрининг дописывается.
 
-    Вызывающий держит транзакцию. Статус двигает граф: без `forced` — только из New.
+    Вызывающий держит транзакцию. Статус двигает `mark_vacancy_applied`.
     """
     known = await _existing(session, entry.vacancy_id, entry.target)
     if known is not None:
@@ -53,8 +53,8 @@ async def record_application(session: AsyncSession, entry: ApplicationEntry, *, 
     session.add(row)
     await session.flush()
     await append_screening(session, row.id, entry.screening)
-    await mark_vacancy_applied(session, entry.vacancy_id, _EXPLANATION[entry.via], force=forced)
-    await add_vacancy_event(session, entry.vacancy_id, "applied_elsewhere", {
+    await mark_vacancy_applied(session, entry.vacancy_id, _EXPLANATION[entry.via])
+    await add_vacancy_event(session, entry.vacancy_id, "applied", {
         "via": entry.via.value, "target": entry.target,
         "simulated": entry.simulated, "letter_by": entry.letter_by,
     })

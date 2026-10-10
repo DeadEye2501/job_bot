@@ -80,7 +80,7 @@ def _lines(screening: list[dict]) -> list[tuple[bool, str]]:
 
 
 async def _record(kit: AgentKit, job: ApplyJob, entry: ApplicationEntry) -> str:
-    application_id = await kit.written(lambda session: store(session, entry, forced=job.forced))
+    application_id = await kit.written(lambda session: store(session, entry))
     job.outcome = Applied(application_id)
     kit.pipeline.fire_vacancies_changed()
     return "Отклик записан."

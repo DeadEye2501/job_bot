@@ -26,9 +26,9 @@ def _entry(vacancy_id, **over) -> ApplicationEntry:
     return ApplicationEntry(**fields)
 
 
-async def _record(session, entry, forced=False):
+async def _record(session, entry):
     async with session.begin():
-        return await record_application(session, entry, forced=forced)
+        return await record_application(session, entry)
 
 
 async def test_a_new_vacancy_gets_applied_with_its_screening(session, session_factory):
@@ -43,23 +43,17 @@ async def test_a_new_vacancy_gets_applied_with_its_screening(session, session_fa
     ]
 
 
-async def test_a_vacancy_moved_by_a_person_keeps_its_status(session, session_factory):
-    """Автоматика ставит Applied только из New; отклик записывается, статус остаётся."""
-    vacancy = vacancy_row(status=VacancyStatus.NOT_FIT)
-    await put(session_factory, vacancy)
-
-    await _record(session, _entry(vacancy.id))
-
-    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NOT_FIT
-    assert len(await all_rows(session_factory, Application)) == 1
-
-
-async def test_a_manual_application_moves_a_not_fit_vacancy(session, session_factory):
-    vacancy = vacancy_row(status=VacancyStatus.NOT_FIT)
-    await put(session_factory, vacancy)
-
-    await _record(session, _entry(vacancy.id), forced=True)
-
+async def test_an_application_leaves_one_applied_event(session_factory):
+    row = vacancy_row(status=VacancyStatus.DECLINE)
+    await put(session_factory, row)
+    async with session_factory() as session:
+        async with session.begin():
+            await record_application(session, ApplicationEntry(
+                vacancy_id=row.id, aggregator_id=None, via=ApplicationVia.EMAIL,
+                target="hr@company.test", letter="Письмо", letter_by="app",
+                screening=[], simulated=False))
+    (event,) = [e for e in await all_rows(session_factory, VacancyEvent)]
+    assert event.kind == "applied" and event.payload["via"] == "email"
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
 
 
@@ -82,7 +76,7 @@ async def test_the_feed_says_how_and_who_wrote_the_letter(session, session_facto
     await _record(session, _entry(vacancy.id, simulated=True, letter_by="agent"))
 
     (event,) = [e for e in await all_rows(session_factory, VacancyEvent)
-                if e.kind == "applied_elsewhere"]
+                if e.kind == "applied"]
     assert event.payload == {"via": "form", "target": "https://site.test/form",
                              "simulated": True, "letter_by": "agent"}
 

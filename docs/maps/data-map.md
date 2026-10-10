@@ -286,7 +286,6 @@
   - `target: str`
   - `aggregator_id: int | None`
   - `profile_id: int`
-  - `forced: bool`
   - `simulated: bool`
   - `letter_writer: str`
   - `letter_checks: int` = `0`
@@ -628,7 +627,7 @@
 - `ALLOWED_AUTO_TRANSITIONS: dict[VacancyStatus, frozenset[VacancyStatus]]` = `словарь из 11`
 - `GHOSTING_TIMEOUT_DAYS` = `14`
 - `GHOSTING_ELIGIBLE_FROM: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.APPLIED, VacancyStatus.…`
-- `FORCED_APPLY_FROM: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.NEW, VacancyStatus.NOT_…`
+- `APPLY_MOVES_FROM: frozenset[VacancyStatus]` = `frozenset({VacancyStatus.NEW, VacancyStatus.NOT_…`
 
 ### `backend/domain/verdict.py`
 
@@ -646,7 +645,6 @@
 - `_NO_OUTCOME` = `'агент закончил без итога'`
 - `class ApplyOrder`
   - `vacancy_id: int`
-  - `forced: bool`
   - `only: Way | None`
 
 ### `backend/flows/aggregator_name.py`
@@ -1953,26 +1951,6 @@
 
 - `WIZARD` = `набор из 2`
 - `MAIN` = `набор из 2`
-
-## docs
-
-### `docs/seed/aa4e0de05368_seed_initial_data.py`
-
-- `revision: str` = `'aa4e0de05368'`
-- `down_revision: Union[str, Sequence[str], None]` = `'e560edf8b958'`
-- `branch_labels: Union[str, Sequence[str], None]` = `None`
-- `depends_on: Union[str, Sequence[str], None]` = `None`
-- `PROFILE_ROWS` = `набор из 1`
-- `PROFILE_LANGUAGE_ROWS` = `набор из 2`
-- `PROFILE_SKILLS_ROWS` = `набор из 25`
-- `PROFILE_EXPERIENCE_SKILLS_ROWS` = `набор из 45`
-- `PROFILE_EXPERIENCE_ROWS` = `набор из 6`
-- `APP_SETTINGS_ROWS` = `набор из 1`
-- `TG_SECRET` = `словарь из 5`
-- `CHAT_LLM_SECRET` = `словарь из 3`
-- `EMBED_LLM_SECRET` = `словарь из 3`
-- `BOT_STATE_ROWS` = `набор из 1`
-- `TELEGRAM_CHANNEL_ROWS` = `набор из 16`
 
 ## tests
 

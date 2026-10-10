@@ -23,7 +23,7 @@ def tool(tools, name):
 def apply_job(vacancy_id: int, **overrides) -> ApplyJob:
     """Задание откликателя: по умолчанию форма работодателя, без агрегатора, всерьёз."""
     fields = dict(vacancy_id=vacancy_id, method="form", target="https://company.test/apply",
-                  aggregator_id=None, profile_id=1, forced=False, simulated=False,
+                  aggregator_id=None, profile_id=1, simulated=False,
                   letter_writer="app")
     fields.update(overrides)
     return ApplyJob(**fields)

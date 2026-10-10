@@ -363,7 +363,7 @@ async def send_application_for_vacancy(pipeline, vacancy_id: int) -> tuple[bool,
             return False, "no_hr"
         # Отказ здесь, а не ниже: `force=True` минует заслон `_send_refusal`,
         # а письмо уходит до перевода статуса — HR получил бы второе, и то,
-        # что граф переходов потом не пустит `APPLIED → APPLIED`, уже неважно.
+        # что `APPLY_MOVES_FROM` потом не пустит `APPLIED → APPLIED`, уже неважно.
         # Читается то же, что в `_send_refusal`, а слово окну другое, и это
         # не повтор: там гонка с моделью, здесь человек нажал сам и должен
         # услышать, что отклик уже был.
