@@ -16,11 +16,11 @@ from client.bridge.answer import Denied, asked_id, denied, launched, reply
 from client.bridge.refusals import (
     APPLY_VIA_REFUSALS,
     NO_BOT,
-    agent_refusals,
     NO_VACANCY,
     RERUN_REFUSALS,
     SEND_REFUSALS,
     WAY_UNKNOWN,
+    agent_refusals,
 )
 from client.bridge.vacancy_links import require_vacancy
 
