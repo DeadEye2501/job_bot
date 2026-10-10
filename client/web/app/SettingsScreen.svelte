@@ -14,6 +14,7 @@
   import SettingsSection from '$components/SettingsSection.svelte';
   import TelegramSection from '$components/TelegramSection.svelte';
   import { living } from '$state/alive.js';
+  import { healthNow } from '$state/health_now.svelte.js';
   import { providerForm } from '$state/provider_form.svelte.js';
   import {
     blankTelegram,
@@ -55,7 +56,12 @@
   const chat = providerForm({ kind: 'chat', call, alive });
   const embed = providerForm({ kind: 'embed', call, alive });
 
-  const pills = $derived({ chat: probePill(chat.probe), embed: probePill(embed.probe) });
+  // Пока кнопку не нажимали, плашка говорит последним замером моста: его
+  // снимают на подключении и держат, пока связь жива.
+  const pills = $derived({
+    chat: probePill(chat.probe, healthNow.answer?.chat_ms ?? null),
+    embed: probePill(embed.probe, healthNow.answer?.embed_ms ?? null),
+  });
   // Эмбеддинги ходят туда же, куда чат, только пока чат не на Claude: векторов
   // он не считает, и такую пару мост не примет.
   const sharing = $derived(

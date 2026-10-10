@@ -18,6 +18,7 @@
   import UnreadBadge from '$components/UnreadBadge.svelte';
   import { attempts } from '$state/attempts.js';
   import { LAMPS, allAlive, blockedTip, shouldTurnOff } from '$state/health.js';
+  import { healthNow, keepHealth } from '$state/health_now.svelte.js';
   import { OFF } from '$state/modes.js';
   import {
     COUNTLESS_STAGES,
@@ -47,7 +48,7 @@
 
   const chatTries = attempts();
 
-  let health = $state(null);
+  const health = $derived(healthNow.answer);
   let unread = $state(0);
   // Список непрочитанных переписок: открыт ли, ждём ли ответа и что в нём.
   let chatsOpen = $state(false);
@@ -70,7 +71,7 @@
    * том, смотрит ли на него кто-нибудь, не знает.
    */
   async function applyHealth(fresh) {
-    health = fresh;
+    keepHealth(fresh);
     if (shouldTurnOff(fresh, mode)) await pickMode(OFF);
   }
 

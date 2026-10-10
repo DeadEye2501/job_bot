@@ -38,7 +38,6 @@ datas = [
     ('alembic/script.py.mako', 'alembic'),
     ('alembic/versions/e560edf8b958_init.py', 'alembic/versions'),
     ('alembic/versions/a9c3e1f07b42_aggregators.py', 'alembic/versions'),
-    ('alembic/versions/c4e8a2d19f3b_aggregator_avatar.py', 'alembic/versions'),
     # Драйвер Playwright — node и его пакет: без них браузер агента не стартует.
     *collect_data_files('playwright'),
 ]
@@ -70,8 +69,10 @@ hiddenimports = [
     *collect_submodules('anthropic'),
     # Агент: MCP-сервер, HTTP-сервер под ним и браузер. Playwright ввозится в
     # теле функции, а uvicorn выбирает цикл и протоколы по строке имени —
-    # граф импортов не видит ни того, ни другого.
-    *collect_submodules('mcp'),
+    # граф импортов не видит ни того, ни другого. Консольная утилита MCP
+    # (`mcp.cli`) не берётся: приложению она не нужна, а без пакета `typer`
+    # её импорт завершает процесс и обрывает саму сборку.
+    *collect_submodules('mcp', filter=lambda name: not name.startswith('mcp.cli')),
     *collect_submodules('uvicorn'),
     'playwright.async_api',
 ]
