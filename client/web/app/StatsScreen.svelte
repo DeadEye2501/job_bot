@@ -15,7 +15,7 @@
   import StatsSkillsCard from '$components/StatsSkillsCard.svelte';
   import StatsStatusCard from '$components/StatsStatusCard.svelte';
   import { living } from '$state/alive.js';
-  import { channelRows, PERIODS, sliceTarget } from '$state/stats.js';
+  import { PERIODS, sliceTarget, sourceRows } from '$state/stats.js';
 
   let { ask, onslice, onsource } = $props();
 
@@ -115,7 +115,7 @@
 
     <StatsCard title="Источники" ready={!!channels} span="12">
       {#if channels.channels.length}
-        <StatsChannelsCard channels={channelRows(channels.channels)} onpick={onsource} />
+        <StatsChannelsCard channels={sourceRows(channels.channels)} onpick={onsource} />
       {:else}
         <div class="stats-loading">Нет вакансий из источников за период</div>
       {/if}

@@ -12,16 +12,16 @@
 - * Слушатель вестей поверх зова, который спрашивает мост «что нового после N». * * Зов приходит доводом, а не берётся отсюда: так цикл проверяется без окна и * без моста вовсе, а другого способа его проверить нет — он бесконечен по * устройству.
 - отдаёт: listener
 
-## app — 29 файлов
+## app — 30 файлов
 
-### app/AggregatorCard.svelte (197)
-- Вход — значком рядом с именем: он же и показывает, выполнен ли вход, и по нажатию открывает сайт войти (заново).
+### app/AggregatorCard.svelte (196)
+- —
 - принимает: ask, say, lockedTip, lock, events, aggregatorId, onvacancy, onclose, onchanged
 
-### app/AggregatorsList.svelte (123)
-- —
+### app/AggregatorsList.svelte (60)
+- `lock` — чем заперты действия агента: слова моста о водителе и браузере.
 - принимает: ask, say, lockedTip, events, open, onopened, onvacancy
-- берёт: ./AggregatorCard.svelte
+- берёт: ./AggregatorCard.svelte, ./SourcesTab.svelte
 
 ### app/BlacklistList.svelte (216)
 - —
@@ -31,21 +31,21 @@
 - Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
 - принимает: ask, say, events, onlocked, oncontact
 
-### app/ChannelCard.svelte (168)
+### app/ChannelCard.svelte (167)
 - —
 - принимает: ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged
 
-### app/ChannelsList.svelte (117)
-- Общий выключатель поверх строк: выключенный, гасит обход всех каналов, но положения строк хранит.
+### app/ChannelsList.svelte (46)
+- —
 - принимает: ask, say, lockedTip, events, open, onopened, onvacancy
-- берёт: ./ChannelCard.svelte
+- берёт: ./ChannelCard.svelte, ./SourcesTab.svelte
 
 ### app/CompaniesList.svelte (101)
 - —
 - принимает: ask, say, events, open, onopened, onperson, onvacancy
 - берёт: ./CompanyCard.svelte
 
-### app/CompanyCard.svelte (255)
+### app/CompanyCard.svelte (254)
 - Написания: под ними компания приходит в объявлениях. Потеряй карточка одно из них — следующая вакансия завела бы компанию заново.
 - принимает: ask, say, companyId, onperson, onvacancy, onclose, onchanged
 
@@ -63,7 +63,7 @@
 - принимает: ask, say, events, open, onopened, oncompany, onvacancy
 - берёт: ./PersonCard.svelte
 
-### app/PersonCard.svelte (257)
+### app/PersonCard.svelte (256)
 - Своя запись на каждого человека: поле запечатывает номер при заведении, и заводиться заново на каждого его заставляет именно `{#key}` — без него запечатанный номер протухнет.
 - принимает: ask, say, events, personId, oncompany, onvacancy, onclose, onchanged
 - берёт: ./PersonChat.svelte
@@ -97,6 +97,10 @@
 ### app/Shell.svelte (254)
 - —
 - берёт: ./BottomBar.svelte, ./ContactsScreen.svelte, ./LogsScreen.svelte, ./ProfileScreen.svelte, ./SettingsScreen.svelte, ./StatsScreen.svelte, ./VacanciesScreen.svelte, ./WizardScreen.svelte
+
+### app/SourcesTab.svelte (143)
+- Общий выключатель поверх строк: выключенный, гасит обход всех источников рода, но положения строк хранит.
+- принимает: kind, words, source, openCreated, rereadOnRound, say, events, open, onopened, row, pane
 
 ### app/StatsScreen.svelte (124)
 - Числа считает бот, а не окно: пересчитать за тот же срок иначе нечем — пришлось бы уходить в другой раздел и возвращаться.
@@ -142,7 +146,7 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 100 файлов
+## components — 101 файлов
 
 ### components/ActionsMenu.svelte (30)
 - —
@@ -324,6 +328,10 @@
 ### components/LogRow.svelte (27)
 - Нажимается вся строка, а не значок в ней: строк сотни, и целиться в значок ради трассировки человеку не за что. Клавиатуре она отвечает тем же — иначе журнал не развернуть, не берясь за мышь.
 - принимает: time, level, tone, source, message, details, expanded, ontoggle
+
+### components/LoginMark.svelte (17)
+- —
+- принимает: mark, disabled, onlogin
 
 ### components/MailPasswordHelp.svelte (54)
 - —
@@ -592,9 +600,9 @@
 
 ## state — 64 файлов
 
-### state/aggregators.js (54)
+### state/aggregators.js (76)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
-- отдаёт: LOGIN_FIRST, actionBlock, aggregatorLastRun, aggregatorToggle, aggregatorWhere
+- отдаёт: AGGREGATORS_TAB, LOGIN_FIRST, actionBlock, aggregatorLastRun, aggregatorToggle, aggregatorWhere, loginMark
 
 ### state/alive.js (59)
 - * Заводит признак жизни экрана.
@@ -628,8 +636,8 @@
 - * Заводит действия карточки над собой. * * `id` спрашивают, а не передают значением: панель одна на всю вкладку, и * карточку в ней переключают нажатием по соседней строке.
 - отдаёт: cardActions
 
-### state/card_block.js (36)
-- * Заводит перемену отсева. * * Имена методов приходят литералами: собранное из частей имя не найдётся * поиском по шву, и переименование на мосту нашлось бы только с экрана. * * `female` — про кого речь: «занесён» про компанию человек читает как опечатку. * Слова при этом общие на все три карточки (`state/blacklist.js`) — написанные * порознь, они разошлись бы и остальным. * * Карточку и список перечитывают оба: отметка отсева стоит и в самой карточке, * и в её строке списка, и необновлённая заставила бы нажать второй раз. * * Отказ молчит и не перечитывает ничего: плашку человек уже увидел, а * перечитанная карточка показала бы ровно то же.
+### state/card_block.js (38)
+- * Заводит перемену отсева. * * `block` и `unblock` — готовые зовы моста `(id) => ask('домен.метод', id)`, * а не имена: шов имён ищет имя моста в самом зове, и переданное полем * объекта или собранное из частей он не видит — переименование на мосту * нашлось бы только с экрана. * * `female` — про кого речь: «занесён» про компанию человек читает как опечатку. * Слова при этом общие на все три карточки (`state/blacklist.js`) — написанные * порознь, они разошлись бы и остальным. * * Карточку и список перечитывают оба: отметка отсева стоит и в самой карточке, * и в её строке списка, и необновлённая заставила бы нажать второй раз. * * Отказ молчит и не перечитывает ничего: плашку человек уже увидел, а * перечитанная карточка показала бы ровно то же.
 - отдаёт: cardBlocking
 
 ### state/card_finish.js (36)
@@ -652,9 +660,9 @@
 - * Заводит запись правки поля. * * Перечитываем и после отказа: поля правятся на месте, и отклонённое мостом * значение — а негодный ник мост отклоняет — осталось бы на экране. Человек * читал бы своё, а в базе лежало бы прежнее. * * Списку говорят только по удаче: не изменилось ничего, и перечитывать его * значило бы гонять мост ради того же вида.
 - отдаёт: cardSave
 
-### state/channels.js (59)
-- * Чем подписать канал в списке. * * Название — сверху, ник — под ним: по названию канал узнают, по нику ищут. * Названия у канала может не быть — тогда его место занимает ник, а совсем * безымянный назван номером: показать нечего, но строка должна остаться * нажимаемой.
-- отдаёт: channelName, channelTitle, channelToggle, pollBlock
+### state/channels.js (68)
+- * Слова вкладки «Каналы».
+- отдаёт: CHANNELS_TAB, channelName, channelTitle, channelToggle, pollBlock
 
 ### state/chat.js (115)
 - * Разложить письма по дням, сохранив их порядок. * * Подпись дня стоит над первым письмом этого дня, а не над каждым: иначе лента * превращается в чересполосицу дат. * * Письмо без времени выпадает вовсе — поставить его некуда, а под чужой * подписью дня оно соврало бы.
@@ -672,9 +680,9 @@
 - * Заводит окно заведения. * * `list.again(answer)` — что сделать по удаче: перечитать список вкладки или * положить список, пришедший в ответе моста. * * `save` отправляет черновик; отказ — пустота (уже показан плашкой) или * брошенная ошибка (остаётся в окне, см. `trouble`). * * `form.done(draft, answer)` — слово по удаче; пустое значит, что об исходе * скажет весть.
 - отдаёт: contactAdding
 
-### state/contacts_watch.js (45)
+### state/contacts_watch.js (23)
 - * Заходит на вкладку и отдаёт снятие — его и возвращают из эффекта. * * Перечитывает по вести не страницей, а показанным: иначе занесение в отсев из * карточки схлопывало бы пролистанное до первой страницы.
-- отдаёт: watchContacts, watchSourceCard
+- отдаёт: watchContacts
 
 ### state/dates.js (111)
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
@@ -784,9 +792,9 @@
 - * Наибольший уровень навыка. Дорожка ползунка размечена по нему.
 - отдаёт: aliasesAfter, countNote, grouped, groupsMatching, levelPercent
 
-### state/source_card.svelte.js (66)
-- * Заводит карточку источника. * * `method` — чтение карточки по номеру, `trouble` — слова его отказа; * `vacanciesOf(id)` — обёртка чтения страницы вакансий этого источника.
-- отдаёт: sourceCard
+### state/source_card.svelte.js (85)
+- * Заходит на карточку источника и отдаёт снятие. * * `alive` — признак жизни карточки (`alive.js`), `id` — открытый источник. * `forget` убирает показанное прежним: панель одна, и его числа под новым * именем читались бы как числа нового. `read(id)` читает карточку с её * вакансиями — и на заходе, и по вести: обход приносит вакансии, пока карточка * открыта, и смотрит прогнавший человек именно на них.
+- отдаёт: sourceCard, watchSourceCard
 
 ### state/source_list.svelte.js (76)
 - * Заводит список источников. * * `alive` — признак жизни вкладки (`alive.js`); `read(search)` — чтение списка; * `key` — под каким именем строки лежат в ответе; `setActive(row, on)` и * `setAll(on)` — переключатели. Отказ моста — пустота: плашку он уже показал.
@@ -802,7 +810,7 @@
 
 ### state/stats.js (295)
 - * Сроки, за которые считают, — от короткого к длинному. * * `delta` — как называется прирост за этот срок. У «всего времени» его нет: * сравнивать не с чем, это и есть всё время.
-- отдаёт: KPI, PERIODS, STATUS_ORDER, channelRows, convNote, deltaNote, donut, duration, kpiRow, skillRows, skillRowsPerColumn, sliceTarget, statusColumns, statusTotal, weekBars
+- отдаёт: KPI, PERIODS, STATUS_ORDER, convNote, deltaNote, donut, duration, kpiRow, skillRows, skillRowsPerColumn, sliceTarget, sourceRows, statusColumns, statusTotal, weekBars
 
 ### state/statuses.js (13)
 - * Статусы в том порядке, в каком их читают в кольце статистики. * * Значение совпадает с тем, каким статус приходит в строке списка и каким его * принимает смена статуса на мосту; им же покрашена точка рядом.
@@ -1531,10 +1539,13 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 91 файлов
+## tests — 92 файлов
 
-### tests/aggregators.test.js (115)
+### tests/aggregators.test.js (131)
 - —
+
+### tests/aggregators_list_live.test.js (59)
+- * Вкладка над мостом, у которого агрегаторов нет: ни всех, ни по запросу.
 
 ### tests/alive.test.js (79)
 - —
@@ -1619,9 +1630,6 @@ body, html, button, body, .material-symbols-outlined
 - —
 
 ### tests/contact_adding.test.js (128)
-- —
-
-### tests/contacts_watch.test.js (50)
 - —
 
 ### tests/dates.test.js (111)
@@ -1738,7 +1746,10 @@ body, html, button, body, .material-symbols-outlined
 ### tests/source_card.test.js (91)
 - * Карточка, чей мост отвечает по номеру источника и записывает вопросы.
 
-### tests/source_list.test.js (97)
+### tests/source_card_watch.test.js (50)
+- —
+
+### tests/source_list.test.js (100)
 - * Список, читающий заготовленные ответы и записывающий, что у моста просили.
 
 ### tests/source_row_live.test.js (120)

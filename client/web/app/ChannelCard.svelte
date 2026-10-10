@@ -43,9 +43,8 @@
   });
 
   const blocking = cardBlocking({
-    ask: (...args) => ask(...args),
-    block: 'channels.block',
-    unblock: 'channels.unblock',
+    block: (id) => ask('channels.block', id),
+    unblock: (id) => ask('channels.unblock', id),
     say: (text) => say(text),
     reread: () => source.read(channelId),
     onchanged: () => onchanged(),

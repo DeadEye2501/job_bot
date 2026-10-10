@@ -9,8 +9,27 @@
 
 import { living } from '$state/alive.js';
 import { cardRead } from '$state/card_read.js';
-import { watchSourceCard } from '$state/contacts_watch.js';
 import { sourceVacancies } from '$state/source_vacancies.svelte.js';
+
+/** Заходит на карточку источника и отдаёт снятие.
+ *
+ * `alive` — признак жизни карточки (`alive.js`), `id` — открытый источник.
+ * `forget` убирает показанное прежним: панель одна, и его числа под новым
+ * именем читались бы как числа нового. `read(id)` читает карточку с её
+ * вакансиями — и на заходе, и по вести: обход приносит вакансии, пока карточка
+ * открыта, и смотрит прогнавший человек именно на них.
+ */
+export function watchSourceCard(events, alive, id, { forget, read }) {
+  const settled = alive.entered(() => {
+    forget();
+    read(id);
+  });
+  const deaf = events.on('vacancies_list_changed', () => read(id));
+  return () => {
+    settled();
+    deaf();
+  };
+}
 
 /** Заводит карточку источника.
  *

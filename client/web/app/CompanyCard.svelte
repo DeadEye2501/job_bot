@@ -96,9 +96,8 @@
   });
 
   const blocking = cardBlocking({
-    ask: (...args) => ask(...args),
-    block: 'companies.block',
-    unblock: 'companies.unblock',
+    block: (id) => ask('companies.block', id),
+    unblock: (id) => ask('companies.unblock', id),
     female: true,
     say: (text) => say(text),
     reread: () => readCard(companyId),

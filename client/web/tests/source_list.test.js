@@ -72,10 +72,13 @@ describe('список источников', () => {
   });
 
   it('переключатель строки говорит, легло ли, и список перечитан', async () => {
-    const { list, asked } = listing([answer([]), answer([])], { setActive: async () => null });
+    const refused = listing([answer([{ id: 1, is_active: true }])], { setActive: async () => null });
+    expect(await refused.list.toggle({ id: 1 }, false)).toBe(false);
+    expect(refused.asked).toHaveLength(1);
 
-    expect(await list.toggle({ id: 1 }, true)).toBe(false);
-    expect(asked).toHaveLength(1);
+    const taken = listing([answer([{ id: 1, is_active: false }])]);
+    expect(await taken.list.toggle({ id: 1 }, false)).toBe(true);
+    expect(taken.list.rows).toEqual([{ id: 1, is_active: false }]);
   });
 
   it('общий выключатель уходит своим зовом и говорит, легло ли', async () => {

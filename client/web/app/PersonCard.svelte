@@ -88,9 +88,8 @@
   });
 
   const blocking = cardBlocking({
-    ask: (...args) => ask(...args),
-    block: 'hr.block',
-    unblock: 'hr.unblock',
+    block: (id) => ask('hr.block', id),
+    unblock: (id) => ask('hr.unblock', id),
     say: (text) => say(text),
     reread: () => readCard(personId),
     onchanged: () => onchanged(),

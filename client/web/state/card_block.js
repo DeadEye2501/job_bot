@@ -8,8 +8,10 @@ import { blockNote, unblockNote } from './blacklist.js';
 
 /** Заводит перемену отсева.
  *
- * Имена методов приходят литералами: собранное из частей имя не найдётся
- * поиском по шву, и переименование на мосту нашлось бы только с экрана.
+ * `block` и `unblock` — готовые зовы моста `(id) => ask('домен.метод', id)`,
+ * а не имена: шов имён ищет имя моста в самом зове, и переданное полем
+ * объекта или собранное из частей он не видит — переименование на мосту
+ * нашлось бы только с экрана.
  *
  * `female` — про кого речь: «занесён» про компанию человек читает как опечатку.
  * Слова при этом общие на все три карточки (`state/blacklist.js`) — написанные
@@ -21,10 +23,10 @@ import { blockNote, unblockNote } from './blacklist.js';
  * Отказ молчит и не перечитывает ничего: плашку человек уже увидел, а
  * перечитанная карточка показала бы ровно то же.
  */
-export function cardBlocking({ ask, block, unblock, female = false, say, reread, onchanged }) {
-  function flip(method, note) {
+export function cardBlocking({ block, unblock, female = false, say, reread, onchanged }) {
+  function flip(asked, note) {
     return async function turn(id) {
-      const done = await ask(method, id);
+      const done = await asked(id);
       if (done === null) return;
       say(note(done, female));
       await reread();

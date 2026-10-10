@@ -131,14 +131,14 @@ export function skillRowsPerColumn(skills) {
   return Math.ceil(skills.length / SKILL_COLUMNS);
 }
 
-/** Чем подписана строка, собравшая всё, что пришло не из канала. */
-const NO_CHANNEL = 'Без канала';
+/** Чем подписана строка, собравшая всё, что пришло ни из канала, ни с агрегатора. */
+const NO_SOURCE = 'Без канала';
 
 // Подпись строки источника и куда ведёт её нажатие — по роду источника.
 const SOURCE_ROW = {
   channel: (one) => ({ label: channelName(one).name, target: { tab: 'channels', id: one.id } }),
   aggregator: (one) => ({ label: one.title, target: { tab: 'aggregators', id: one.aggregator_id } }),
-  none: () => ({ label: NO_CHANNEL, target: null }),
+  none: () => ({ label: NO_SOURCE, target: null }),
 };
 
 /** Строки воронки по источникам: ключ, подпись, куда ведёт нажатие и порядок.
@@ -154,7 +154,7 @@ const SOURCE_ROW = {
  * Вперёд идёт приславший больше, равных решает подпись без учёта регистра:
  * по кодам символов заглавные встали бы впереди строчных.
  */
-export function channelRows(channels) {
+export function sourceRows(channels) {
   return channels
     .map((one) => ({
       ...one,
