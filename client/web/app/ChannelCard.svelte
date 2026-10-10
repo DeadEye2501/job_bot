@@ -17,6 +17,7 @@
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
   import { channelName, pollBlock } from '$state/channels.js';
+  import { round } from '$state/round.svelte.js';
   import { sourceCard } from '$state/source_card.svelte.js';
 
   let { ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged } = $props();
@@ -51,7 +52,7 @@
   });
 
   const shown = $derived(card ? channelName({ ...card, id: card.channel_id }) : null);
-  const pollTip = $derived(pollBlock(card, lockedTip));
+  const pollTip = $derived(pollBlock(card, lockedTip, round.running));
 
   /** Дочитать следующую страницу вакансий: панель подошла к концу.
    *

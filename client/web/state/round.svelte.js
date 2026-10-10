@@ -8,10 +8,6 @@
 // файл; остальные читают `round.running` и `round.human` или просят позвать их
 // в миг начала или конца (`round.onStart`, `round.onFinish`).
 
-/** Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон
- *  не пустит. */
-export const RUNNING = 'Идёт обход';
-
 let running = $state(false);
 let human = $state(null);
 const starters = new Set();

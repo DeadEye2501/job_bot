@@ -14,7 +14,7 @@
 
 ## app — 29 файлов
 
-### app/AggregatorCard.svelte (194)
+### app/AggregatorCard.svelte (197)
 - Вход — значком рядом с именем: он же и показывает, выполнен ли вход, и по нажатию открывает сайт войти (заново).
 - принимает: ask, say, lockedTip, lock, events, aggregatorId, onvacancy, onclose, onchanged
 
@@ -31,7 +31,7 @@
 - Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
 - принимает: ask, say, events, onlocked, oncontact
 
-### app/ChannelCard.svelte (167)
+### app/ChannelCard.svelte (168)
 - —
 - принимает: ask, say, lockedTip, events, channelId, onvacancy, onclose, onchanged
 
@@ -111,7 +111,7 @@
 - принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte
 
-### app/VacancyCard.svelte (453)
+### app/VacancyCard.svelte (458)
 - Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою оценку.
 - принимает: ask, say, events, lockedTip, vacancyId, oncontacts, onclose, onchanged
 - берёт: ./VacancyContactsSection.svelte, ./VacancyLinks.svelte
@@ -167,9 +167,9 @@
 - принимает: row, enabled, selected, onpick, ontoggle
 - берёт: ./SourceRow.svelte
 
-### components/ApplyWaysDialog.svelte (40)
+### components/ApplyWaysDialog.svelte (49)
 - —
-- принимает: rows, onapply, onclose
+- принимает: rows, locked, onapply, onclose
 - берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte
 
 ### components/AskDialog.svelte (67)
@@ -238,9 +238,9 @@
 - принимает: company, selected, onpick
 - берёт: ./Avatar.svelte, ./RowMarks.svelte
 
-### components/ConfirmDialog.svelte (18)
+### components/ConfirmDialog.svelte (30)
 - —
-- принимает: message, confirmLabel, onconfirm, oncancel
+- принимает: message, confirmLabel, locked, onconfirm, oncancel
 - берёт: ./ModalShell.svelte
 
 ### components/ContactActions.svelte (23)
@@ -353,9 +353,9 @@
 - —
 - принимает: vacancies, empty, loading, onpick
 
-### components/ModalFoot.svelte (15)
+### components/ModalFoot.svelte (22)
 - —
-- принимает: label, busyLabel, busy, ready, oncancel, onconfirm
+- принимает: label, busyLabel, busy, ready, tip, oncancel, onconfirm
 
 ### components/ModalHead.svelte (23)
 - —
@@ -592,7 +592,7 @@
 
 ## state — 64 файлов
 
-### state/aggregators.js (57)
+### state/aggregators.js (54)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
 - отдаёт: LOGIN_FIRST, actionBlock, aggregatorLastRun, aggregatorToggle, aggregatorWhere
 
@@ -652,7 +652,7 @@
 - * Заводит запись правки поля. * * Перечитываем и после отказа: поля правятся на месте, и отклонённое мостом * значение — а негодный ник мост отклоняет — осталось бы на экране. Человек * читал бы своё, а в базе лежало бы прежнее. * * Списку говорят только по удаче: не изменилось ничего, и перечитывать его * значило бы гонять мост ради того же вида.
 - отдаёт: cardSave
 
-### state/channels.js (58)
+### state/channels.js (59)
 - * Чем подписать канал в списке. * * Название — сверху, ник — под ним: по названию канал узнают, по нику ищут. * Названия у канала может не быть — тогда его место занимает ник, а совсем * безымянный назван номером: показать нечего, но строка должна остаться * нажимаемой.
 - отдаёт: channelName, channelTitle, channelToggle, pollBlock
 
@@ -748,9 +748,9 @@
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
 - отдаёт: CURRENCIES, GENDERS, GRADES, LANG_LEVELS, SALARY_PERIODS, WORK_FORMATS, blankProfile, cvNote, fileSize, langRow, named, profileSheet, updatedNote
 
-### state/progress.js (77)
-- * Подпись начатого обхода, о котором ещё ничего не известно. * * Первая весть о ходе приходит не сразу: до неё полосы уже бегут, и подпись под * ними обязана сказать, чем именно бот занят.
-- отдаёт: COUNTLESS_STAGES, STARTING, bar, caption, countlessNote, humanText
+### state/progress.js (82)
+- * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
+- отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, bar, caption, countlessNote, humanText
 
 ### state/provider.js (64)
 - * Спросить у поставщика имена его моделей. * * Отказ и пустой перечень — разные ответы, и путать их нельзя: первое значит * «сервер не отозвался», второе — «сервер поднят, но модели в нём нет», и * чинятся они по-разному. Отказ приходит фразой, а не пустотой. * * Имя модели в вопрос не идёт: перечень читается с адреса и ключа, а имя — как * раз то, что в нём ищут.
@@ -760,9 +760,9 @@
 - * Заводит поля поставщика. * * `kind` — чат или эмбеддинги: с ним спрашивают поставщика. `alive` — признак * жизни экрана (`alive.js`): ответ, пришедший после ухода, класть некуда.
 - отдаёт: providerForm
 
-### state/round.svelte.js (83)
-- * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
-- отдаёт: RUNNING, hearRound, round
+### state/round.svelte.js (79)
+- * Что известно о прогоне сейчас.
+- отдаёт: hearRound, round
 
 ### state/search.js (25)
 - * Что из списка остаётся видно под набранное. * * Пустое набранное оставляет список целым: поле поиска стоит над уже открытым * списком, и до первого знака резать нечего. Одни пробелы — то же самое: их * набирают между словами и стирают последними, и схлопнутый на них список * мигал бы под руками. * * Регистр не различается — человек набирает как придётся, а значения приходят * как записаны. Вхождением, а не началом строки: имена приходят с приставками * («qwen/qwen3-4b», «@ник · компания»), и отбор по началу прятал бы строку от * того, кто набирает её собственное имя. * * `text` называет, где искать: у строки списка полей несколько, и по какому из * них её вспоминают, знает не этот файл, а тот, кто её показывает.
@@ -796,9 +796,9 @@
 - * Заводит вакансии карточки; `alive` — признак жизни её экрана (`alive.js`). * * `read(page)` — обёртка над мостом: получает `{limit, offset}`, отдаёт * страницу `{vacancies, has_more}` или пустоту.
 - отдаёт: sourceVacancies
 
-### state/sources.js (83)
-- * Подпись переключателя, запертого отсевом, — одна у канала и агрегатора. * * Слово в слово с отказом моста на то же включение (`refusals.py`): человек * читает одно и то же, нажал он запертый переключатель или прочёл подсказку.
-- отдаёт: BLOCKED_TITLE, MASTER_OFF_TITLE, masterToggle, sourceStats, sourceToggle
+### state/sources.js (98)
+- * Чем заперто ручное действие источника; пусто — не заперто. * * Отсев старше всего: обход кончится и лампа зажжётся сами, а запись в отсеве * сама не снимется. Дальше идущий обход — место прогона одно, и мост второй * прогон не пустит, — потом слова моста о том, чего не хватает, и погасшая * лампа. `barred` — слова отсева у этого рода, пусто — источник не в отсеве.
+- отдаёт: BLOCKED_TITLE, MASTER_OFF_TITLE, masterToggle, sourceBlock, sourceStats, sourceToggle
 
 ### state/stats.js (295)
 - * Сроки, за которые считают, — от короткого к длинному. * * `delta` — как называется прирост за этот срок. У «всего времени» его нет: * сравнивать не с чем, это и есть всё время.
@@ -1531,7 +1531,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-window .cdd-btn, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-primary, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 90 файлов
+## tests — 91 файлов
 
 ### tests/aggregators.test.js (115)
 - —
@@ -1594,10 +1594,10 @@ body, html, button, body, .material-symbols-outlined
 ### tests/card_save.test.js (50)
 - * Карточка, записывающая всё, что с ней сделали.
 
-### tests/channel_card_live.test.js (78)
+### tests/channel_card_live.test.js (96)
 - * Сколько раз спросили названный слот.
 
-### tests/channels.test.js (133)
+### tests/channels.test.js (140)
 - —
 
 ### tests/channels_list_live.test.js (67)
@@ -1611,6 +1611,9 @@ body, html, button, body, .material-symbols-outlined
 
 ### tests/companies.test.js (111)
 - —
+
+### tests/confirm_dialog_live.test.js (62)
+- * Окно с запором `locked`; отдаёт счёт подтверждений и красную кнопку.
 
 ### tests/confirm_tone_live.test.js (34)
 - —
@@ -1768,7 +1771,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/vacancy_actions.test.js (219)
 - —
 
-### tests/vacancy_apply_live.test.js (131)
+### tests/vacancy_apply_live.test.js (145)
 - * Карточка, у которой мост отдаёт эти способы; `ways` может быть обещанием.
 
 ### tests/vacancy_card.test.js (330)

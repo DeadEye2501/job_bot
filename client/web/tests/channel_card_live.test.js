@@ -14,6 +14,7 @@ import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import ChannelCard from '../app/ChannelCard.svelte';
+import { hearRound } from '../state/round.svelte.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
@@ -74,5 +75,22 @@ describe('живая карточка канала', () => {
     await settled();
 
     expect(shown.container.textContent).toContain('Python Cool');
+  });
+
+  it('во время обхода «Прогнать сейчас» заперт и называет обход', async () => {
+    const handlers = {};
+    hearRound({ on: (name, hear) => ((handlers[name] = hear), () => {}) });
+    handlers.ingestion_started();
+    const { shown } = screen();
+    await settled();
+
+    shown.container.querySelector('button[title="Действия"]').click();
+    await settled();
+    const poll = [...document.querySelectorAll('.menu-item')].find((one) =>
+      one.textContent.includes('Прогнать сейчас'),
+    );
+
+    expect([poll.disabled, poll.title]).toEqual([true, 'Идёт обход']);
+    hearRound({ on: () => () => {} });
   });
 });

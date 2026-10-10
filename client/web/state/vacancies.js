@@ -6,7 +6,7 @@
 
 import { GRADES as PROFILE_GRADES } from './profile.js';
 import { REMOTE_CHOICES } from './vacancy_filter.js';
-import { RUNNING } from './round.svelte.js';
+import { RUNNING } from './progress.js';
 import { plural } from './words.js';
 
 /** Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и

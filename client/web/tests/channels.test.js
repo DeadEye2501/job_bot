@@ -100,6 +100,13 @@ describe('запор ручного прогона канала', () => {
     expect(pollBlock({ blacklist_value: null }, '')).toBe('');
   });
 
+  it('во время обхода прогон заперт: место прогона одно', () => {
+    expect(pollBlock({ blacklist_value: null }, '', true)).toBe('Идёт обход');
+    expect(pollBlock({ blacklist_value: '@spam' }, '', true)).toBe(
+      'Канал в чёрном списке — прогнать его нельзя',
+    );
+  });
+
   it('непрочитанная карточка запирается только лампой', () => {
     expect(pollBlock(null, 'Бот заблокирован')).toBe('Бот заблокирован');
   });
