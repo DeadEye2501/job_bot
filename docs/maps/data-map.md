@@ -379,6 +379,24 @@
   - `published: str`
   - `contacts: list[str]`
 
+### `backend/applying/result.py`
+
+- `class TelegramClosed`
+  - `until: float`
+- `class SiteClosed`
+  - `site_id: int`
+- `Lesson` = `TelegramClosed | SiteClosed`
+- `class Missed`
+  - `reason: str`
+  - `lesson: Lesson | None` = `None`
+- `Outcome` = `Literal['applied'] | Missed`
+
+### `backend/applying/run.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `Executor` = `Callable[[AgentKit, int, Way], Awaitable[Outcome…`
+- `EXECUTORS: dict[str, Executor]` = `словарь из 0`
+
 ### `backend/bootstrap.py`
 
 - `logger` = `logging.getLogger(__name__)`

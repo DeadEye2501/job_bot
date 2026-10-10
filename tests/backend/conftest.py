@@ -7,6 +7,7 @@
 """
 
 from tests.backend.fixtures.aggregators import web_search
+from tests.backend.fixtures.applying import kit, two_vacancies
 from tests.backend.fixtures.backfill import known_hr
 from tests.backend.fixtures.entry import entry, lock_of_its_own
 from tests.backend.fixtures.bot import (
@@ -49,6 +50,7 @@ __all__ = [
     "empty_media_dir",
     "entry",
     "hr_names",
+    "kit",
     "known_hr",
     "lock_of_its_own",
     "make_bot",
@@ -62,6 +64,7 @@ __all__ = [
     "silent_embedder",
     "titles",
     "turn_and_settle",
+    "two_vacancies",
     "unparsed_vacancy",
     "web_search",
 ]

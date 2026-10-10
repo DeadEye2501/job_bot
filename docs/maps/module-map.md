@@ -348,7 +348,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 178 модулей
+## backend — 182 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -555,6 +555,47 @@ init
 - `async def _store(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: list[float]) -> int` (22)
   - `async def contacts(session) -> None` (3)
 - `def _posted(published: str) -> datetime | None` (6)
+
+### `backend/applying/__init__.py` — 5 строк
+
+Откликатель: на каждую вакансию — первый доступный способ, пока один не удастся.
+
+Зависит от: —
+
+
+### `backend/applying/result.py` — 30 строк
+
+Исходы исполнителя способа и то новое о мире, что он узнал по дороге.
+
+Зависит от: —
+
+- `class TelegramClosed` (4)
+- `class SiteClosed` (2)
+- `class Missed` (5)
+
+### `backend/applying/run.py` — 74 строк
+
+Цикл откликателя: по каждой вакансии первый доступный способ, пока один не удастся.
+
+Зависит от: `backend.agent.kit`, `backend.agent.sessions`, `backend.applying.result`, `backend.applying.world`, `backend.domain.apply_order`, `backend.models`
+
+- `async def apply_vacancies(kit: AgentKit, vacancy_ids: list[int]) -> None` (7)
+- `async def apply_chosen(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (3)
+- `async def _apply_one(kit: AgentKit, world: World, vacancy_id: int) -> None` (13)
+- `async def _try(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (18)
+- `async def _title(kit: AgentKit, vacancy_id: int) -> str` (4)
+
+### `backend/applying/world.py` — 69 строк
+
+Факты для выбора способа: что известно о вакансии и что сейчас доступно.
+
+Зависит от: `backend.agent.availability`, `backend.agent.kit`, `backend.applying.result`, `backend.domain.apply_order`, `backend.models`, `backend.repository.aggregators`, `backend.repository.mail_account`, `backend.repository.vacancy_contacts`
+
+- `async def read_world(kit: AgentKit) -> World` (13)
+- `async def vacancy_facts(session: AsyncSession, vacancy_id: int) -> VacancyFacts | None` (14)
+- `def _handle(hr: HR | None) -> str | None` (7)
+- `async def ways_in(kit: AgentKit, world: World, vacancy_id: int) -> list[Way]` (5)
+- `def learn(world: World, lesson: Lesson) -> None` (6)
 
 ### `backend/bootstrap.py` — 41 строк
 
@@ -3496,7 +3537,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 311 модулей
+## tests — 314 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
 
@@ -3663,13 +3704,13 @@ Runtime settings layer.
 - `class _RudeSmtp(_FakeSmtp)` (5)
   - `def quit(self)` (2)
 
-### `tests/backend/conftest.py` — 67 строк
+### `tests/backend/conftest.py` — 70 строк
 
 Фикстуры слоя `backend`, собранные из модулей по предметам.
 
-Зависит от: `tests.backend.fixtures.aggregators`, `tests.backend.fixtures.backfill`, `tests.backend.fixtures.bot`, `tests.backend.fixtures.entry`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.listing`, `tests.backend.fixtures.logs`, `tests.backend.fixtures.rerun`, `tests.backend.fixtures.stats`
+Зависит от: `tests.backend.fixtures.aggregators`, `tests.backend.fixtures.applying`, `tests.backend.fixtures.backfill`, `tests.backend.fixtures.bot`, `tests.backend.fixtures.entry`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.listing`, `tests.backend.fixtures.logs`, `tests.backend.fixtures.rerun`, `tests.backend.fixtures.stats`
 
-Отдаёт наружу: `applied`, `busy_slot`, `caught_up`, `channel_titles`, `chatting`, `chatting_on_fakes`, `clean_log_file`, `clean_root_logger`, `deliver`, `dm_pipeline`, `empty_media_dir`, `entry`, `hr_names`, `known_hr`, `lock_of_its_own`, `make_bot`, `make_pipeline`, `one_vector`, `outbox`, `parsing`, `ready_to_send`, `rerunning`, `sending_unlocked`, `silent_embedder`, `titles`, `turn_and_settle`, `unparsed_vacancy`, `web_search`
+Отдаёт наружу: `applied`, `busy_slot`, `caught_up`, `channel_titles`, `chatting`, `chatting_on_fakes`, `clean_log_file`, `clean_root_logger`, `deliver`, `dm_pipeline`, `empty_media_dir`, `entry`, `hr_names`, `kit`, `known_hr`, `lock_of_its_own`, `make_bot`, `make_pipeline`, `one_vector`, `outbox`, `parsing`, `ready_to_send`, `rerunning`, `sending_unlocked`, `silent_embedder`, `titles`, `turn_and_settle`, `two_vacancies`, `unparsed_vacancy`, `web_search`
 
 
 ### `tests/backend/fixtures/__init__.py` — 1 строк
@@ -3686,6 +3727,15 @@ Runtime settings layer.
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories_aggregators`
 
 - `async def web_search(session_factory) -> Aggregator` (4)
+
+### `tests/backend/fixtures/applying.py` — 30 строк
+
+Стенд откликателя: набор агента и вакансии, на которые есть чем откликнуться.
+
+Зависит от: `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.fakes.browser`
+
+- `async def kit(make_pipeline)` (3)
+- `async def two_vacancies(session_factory)` (12)
 
 ### `tests/backend/fixtures/backfill.py` — 75 строк
 
@@ -3953,6 +4003,29 @@ Runtime settings layer.
   - `def put(self, vacancy_id, text)` (2)
 - `async def _seeker(make_pipeline, session_factory, *, limit=5)` (6)
 - `async def _web_seeker(make_pipeline, session_factory)` (6)
+
+### `tests/backend/test_applying_run.py` — 70 строк
+
+Цикл откликателя: по каждой вакансии первый доступный способ, пока один не удастся.
+
+Зависит от: `backend.applying`, `backend.applying.result`, `backend.domain.apply_order`
+
+Тестов: 5
+
+- `def executors(monkeypatch)` (13)
+  - `def fake(method)` (5)
+    - `async def execute(kit, vacancy_id, way)` (3)
+
+### `tests/backend/test_applying_world.py` — 62 строк
+
+Мир откликателя: что доступно прямо сейчас.
+
+Зависит от: `backend.applying.result`, `backend.applying.world`, `backend.domain.apply_order`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
+
+Тестов: 7
+
+- `def _world(**over) -> World` (3)
+- `async def _facts(session_factory, **vacancy)` (5)
 
 ### `tests/backend/test_bootstrap_schema.py` — 160 строк
 
