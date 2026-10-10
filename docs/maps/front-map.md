@@ -27,7 +27,7 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (263)
+### app/BottomBar.svelte (266)
 - Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
 - принимает: ask, say, events, onlocked, oncontact
 
@@ -774,9 +774,9 @@
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
 - отдаёт: CURRENCIES, GENDERS, GRADES, LANG_LEVELS, SALARY_PERIODS, WORK_FORMATS, blankProfile, cvNote, cvOpenable, fileSize, langRow, named, profileSheet, updatedNote
 
-### state/progress.js (82)
+### state/progress.js (87)
 - * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
-- отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, bar, caption, countlessNote, humanText
+- отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, applyNote, bar, caption, countlessNote, humanText
 
 ### state/provider.js (64)
 - * Спросить у поставщика имена его моделей. * * Отказ и пустой перечень — разные ответы, и путать их нельзя: первое значит * «сервер не отозвался», второе — «сервер поднят, но модели в нём нет», и * чинятся они по-разному. Отказ приходит фразой, а не пустотой. * * Имя модели в вопрос не идёт: перечень читается с адреса и ключа, а имя — как * раз то, что в нём ищут.
@@ -850,7 +850,7 @@
 - * Почему отклик и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы * модели не допускаем — даже отклика в Telegram, которому браузер не нужен. * * Есть ли куда откликаться, здесь не решается: это знает только мост, и * ответ его разбирает `applyChoices`.
 - отдаёт: NO_WAYS, actionBlocks, applyChoices, rawChips, sourcePill
 
-### state/vacancy_card.js (192)
+### state/vacancy_card.js (165)
 - * Способ отклика словами; незнакомый код называется сам собой — коды заводит * бэкенд, и новый приедет раньше, чем окно про него узнает.
 - отдаёт: timelineRows
 
@@ -1663,7 +1663,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (166)
+### tests/bottom_bar_live.test.js (184)
 - —
 
 ### tests/bridge.test.js (161)
@@ -1885,7 +1885,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/vacancy_apply_live.test.js (151)
 - * Карточка, у которой мост отдаёт эти способы; `ways` может быть обещанием.
 
-### tests/vacancy_card.test.js (330)
+### tests/vacancy_card.test.js (291)
 - —
 
 ### tests/vacancy_card_live.test.js (102)

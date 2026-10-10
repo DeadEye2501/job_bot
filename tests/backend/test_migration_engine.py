@@ -16,14 +16,12 @@
 ревизий ниже.
 """
 
-import sqlite3
-
 import pytest
 from alembic import command
 
 from backend.bootstrap import alembic_config
 from tests.conftest import INIT_REVISION
-from tests.dbio import sqlite_rows
+from tests.dbio import sqlite_rows, sqlite_write
 
 # Учебная пара таблиц: у «дома» есть «жильцы», и связь между ними настоящая.
 # Проектных таблиц для этого не берут: они переезжают вместе со схемой, и
@@ -158,12 +156,7 @@ def test_a_migration_that_blew_up_lets_go_of_the_database(migrations_target):
     показать беду и предложить откат, упирается в занятый файл.
     """
     db_file = migrations_target
-    prepared = sqlite3.connect(db_file)
-    try:
-        prepared.execute("CREATE TABLE company (id INTEGER PRIMARY KEY)")
-        prepared.commit()
-    finally:
-        prepared.close()
+    sqlite_write(db_file, "CREATE TABLE company (id INTEGER PRIMARY KEY)")
 
     with pytest.raises(Exception, match="company"):
         command.upgrade(alembic_config(), INIT_REVISION)

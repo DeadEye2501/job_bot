@@ -62,6 +62,16 @@ async def test_a_crashed_way_hands_over_to_the_next(executors, two_vacancies, ki
     assert calls == [(first, "telegram"), (first, "email"), (second, "telegram"), (second, "email")]
 
 
+async def test_the_window_hears_each_vacancy_and_its_place_counted_from_zero(
+        executors, two_vacancies, kit, monkeypatch):
+    """Окно само называет место в очереди с единицы — ход уходит с нуля, как у каналов."""
+    steps = []
+    monkeypatch.setattr(kit.pipeline, "emit_progress",
+                        lambda stage, label, current, total: steps.append((stage, label, current, total)))
+    await run.apply_vacancies(kit, [v.id for v in two_vacancies])
+    assert steps == [("apply", "Вакансия 1", 0, 2), ("apply", "Вакансия 2", 1, 2)]
+
+
 async def test_a_chosen_way_is_tried_alone(executors, two_vacancies, kit):
     calls, answers = executors
     first = two_vacancies[0].id

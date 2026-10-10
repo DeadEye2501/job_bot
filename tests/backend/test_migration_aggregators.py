@@ -1,7 +1,5 @@
 """Следствия схемной ревизии агрегаторов: что она заводит и что держит база."""
 
-import sqlite3
-
 import pytest
 from alembic import command
 from sqlalchemy.exc import IntegrityError
@@ -9,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.bootstrap import alembic_config
 from backend.models import Vacancy, VacancyContact
 from tests.conftest import INIT_REVISION
-from tests.dbio import all_rows, put, sqlite_rows, sqlite_tables
+from tests.dbio import all_rows, put, sqlite_rows, sqlite_tables, sqlite_write
 from tests.factories import vacancy_row
 from tests.factories_aggregators import aggregator_row, vacancy_contact_row
 
@@ -60,13 +58,9 @@ def test_the_rollback_keeps_the_rows_of_rebuilt_tables(migrations_target):
     только на непустой базе: на пустой ссылаться нечему.
     """
     command.upgrade(alembic_config(), "head")
-    connection = sqlite3.connect(migrations_target)
-    try:
-        connection.execute("INSERT INTO vacancy (id) VALUES (1)")
-        connection.execute("INSERT INTO vacancy_event (vacancy_id, kind) VALUES (1, 'found')")
-        connection.commit()
-    finally:
-        connection.close()
+    sqlite_write(migrations_target,
+                 "INSERT INTO vacancy (id) VALUES (1)",
+                 "INSERT INTO vacancy_event (vacancy_id, kind) VALUES (1, 'found')")
 
     command.downgrade(alembic_config(), INIT_REVISION)
 

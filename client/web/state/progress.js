@@ -70,6 +70,11 @@ export function countlessNote(label, spare = RERUN) {
   return label || spare;
 }
 
+/** Подпись ступени откликов: вакансия и её место в очереди, считая с единицы. */
+export function applyNote({ label, current, total }) {
+  return `${label} — отклик (${current + 1}/${total})`;
+}
+
 function channelPart({ label, current, total }) {
   if (label) return `${label} (${Math.max(0, current)}/${Math.max(0, total)})`;
   if (!total || total <= 0) return NO_TOTAL;

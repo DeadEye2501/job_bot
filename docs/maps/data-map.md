@@ -234,6 +234,14 @@
 - `_SOURCE_COLUMNS` = `набор из 2`
 - `_PROFILE_COLUMNS` = `набор из 6`
 
+### `alembic/versions/c4d7e2a915b3_one_apply_trail.py`
+
+- `revision: str` = `'c4d7e2a915b3'`
+- `down_revision: Union[str, Sequence[str], None]` = `'a9c3e1f07b42'`
+- `branch_labels: Union[str, Sequence[str], None]` = `None`
+- `depends_on: Union[str, Sequence[str], None]` = `None`
+- `_GONE_KINDS` = `набор из 4`
+
 ### `alembic/versions/e560edf8b958_init.py`
 
 - `revision: str` = `'e560edf8b958'`
@@ -2124,6 +2132,11 @@
 
 - `_asked` = `partial(asked, validate_role_fit)`
 - `_check` = `partial(verdict, validate_role_fit)`
+
+### `tests/backend/test_migration_apply_trail.py`
+
+- `_BEFORE` = `'a9c3e1f07b42'`
+- `_OLD_KINDS` = `набор из 6`
 
 ### `tests/backend/test_migration_engine.py`
 
