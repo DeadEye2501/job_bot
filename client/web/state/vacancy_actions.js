@@ -4,7 +4,7 @@
 // разметки этот файл не знает.
 
 import { showStamp } from './dates.js';
-import { RUNNING } from './round.svelte.js';
+import { RUNNING } from './progress.js';
 import { handleName } from './telegram.js';
 import { plural } from './words.js';
 

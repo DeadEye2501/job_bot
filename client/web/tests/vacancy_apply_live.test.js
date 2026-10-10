@@ -119,6 +119,20 @@ describe('отклик из карточки', () => {
     expect(sent(asked)).toEqual([]);
   });
 
+  it('окно, открытое до обхода, запирает подтверждение, когда обход начался', async () => {
+    const { asked } = screen([FORM, MAIL], true);
+    await respond();
+    document.querySelectorAll('.way-row')[2].click();
+    flushSync();
+
+    roundGoes();
+    flushSync();
+    press('Подтвердить');
+    await settled();
+
+    expect(sent(asked)).toEqual([]);
+  });
+
   it('во время обхода отклик заперт целиком, и об этом сказано', async () => {
     roundGoes();
     const { asked, said } = screen([FORM, MAIL], true);

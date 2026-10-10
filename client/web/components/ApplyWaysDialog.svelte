@@ -4,11 +4,14 @@
   // Выбор двухшаговый, как у подборщика: нажатие по строке только помечает её,
   // а отклик уходит кнопкой внизу. Ушедший отклик назад не вернуть, и промах
   // мышью не должен его отправлять.
+  //
+  // `locked` — чем отклик заперт сейчас; пусто — не заперт. Окно открыто до
+  // обхода, а обход мог начаться, пока выбирали: подтверждение тогда заперто.
   import ModalFoot from './ModalFoot.svelte';
   import ModalHead from './ModalHead.svelte';
   import ModalShell from './ModalShell.svelte';
 
-  let { rows, onapply, onclose } = $props();
+  let { rows, locked, onapply, onclose } = $props();
 
   let chosen = $state(null);
 
@@ -35,6 +38,12 @@
       {/each}
     </div>
 
-    <ModalFoot label="Подтвердить" ready={chosen !== null} oncancel={onclose} onconfirm={apply} />
+    <ModalFoot
+      label="Подтвердить"
+      ready={chosen !== null && !locked}
+      tip={locked}
+      oncancel={onclose}
+      onconfirm={apply}
+    />
   {/snippet}
 </ModalShell>

@@ -410,7 +410,12 @@
 {/if}
 
 {#if choosing !== null}
-  <ApplyWaysDialog rows={choosing} onapply={send} onclose={() => (choosing = null)} />
+  <ApplyWaysDialog
+    rows={choosing}
+    locked={blocks.send}
+    onapply={send}
+    onclose={() => (choosing = null)}
+  />
 {/if}
 
 {#if asking === 'delete'}

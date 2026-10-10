@@ -17,7 +17,8 @@
   import { LOGIN_FIRST, actionBlock, aggregatorLastRun, aggregatorWhere } from '$state/aggregators.js';
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
-  import { RUNNING, round } from '$state/round.svelte.js';
+  import { RUNNING } from '$state/progress.js';
+  import { round } from '$state/round.svelte.js';
   import { siteHref } from '$state/site.js';
   import { sourceCard } from '$state/source_card.svelte.js';
 
@@ -63,6 +64,7 @@
     actionBlock({ blocked: !!card?.blacklist_value, running: round.running, lock, lockedTip }),
   );
   const runTip = $derived(block || (card && !card.is_logged_in ? LOGIN_FIRST : ''));
+  const dropTip = $derived(round.running ? RUNNING : '');
 
   /** Дочитать следующую страницу: зовёт список — прокручивается панель целиком. */
   export function more() {
@@ -164,8 +166,8 @@
             icon="delete"
             label="Удалить агрегатор"
             danger
-            title={round.running ? RUNNING : null}
-            disabled={round.running}
+            title={dropTip || null}
+            disabled={!!dropTip}
             {close}
             onpick={drop}
           />
@@ -188,6 +190,7 @@
   <ConfirmDialog
     message={`Удалить «${card.name}»?\n\nОткликов на его вакансии: ${asking}. Вакансии и отклики останутся, но без привязки к агрегатору; вход на сайт придётся пройти заново. Действие необратимо.`}
     confirmLabel="Удалить"
+    locked={dropTip}
     onconfirm={dropConfirmed}
     oncancel={() => (asking = null)}
   />

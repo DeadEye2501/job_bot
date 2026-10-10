@@ -5,8 +5,7 @@
 // признаки. Ни моста, ни разметки этот файл не знает.
 
 import { showStamp } from './dates.js';
-import { RUNNING } from './round.svelte.js';
-import { BLOCKED_TITLE, sourceToggle } from './sources.js';
+import { BLOCKED_TITLE, sourceBlock, sourceToggle } from './sources.js';
 
 /** Где агрегатор ищет — подпись под именем.
  *
@@ -44,14 +43,12 @@ export function aggregatorToggle(row, enabled) {
 
 /** Чем заперты действия агента — вход и прогон; пусто — не заперты.
  *
- * Отсев старше всего: обход кончится и лампа зажжётся сами, а запись в отсеве
- * сама не снимется. Дальше идущий обход: мост второй прогон не пустит, а «нет
- * браузера» в этот миг сбивало бы — браузер есть, он просто занят. Потом слова
- * моста о водителе и браузере и погасшая лампа.
+ * Старшинство — общее у источников (`sources.sourceBlock`). Обход здесь стоит
+ * раньше слов моста ещё и затем, что «нет браузера» в этот миг сбивало бы —
+ * браузер есть, он просто занят.
  */
 export function actionBlock({ blocked = false, running, lock, lockedTip }) {
   // Слово в слово с отказом моста на те же вход и прогон (`refusals.py`).
-  if (blocked) return 'В чёрном списке — снимите запись, чтобы работать с сайтом';
-  if (running) return RUNNING;
-  return lock || lockedTip || '';
+  const barred = blocked ? 'В чёрном списке — снимите запись, чтобы работать с сайтом' : '';
+  return sourceBlock({ barred, running, lock, lockedTip });
 }
