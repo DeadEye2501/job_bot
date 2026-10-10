@@ -22,17 +22,13 @@
 }
 
 /* Меню порядка падает из полосы и прижато к её правому краю — под кнопку, из
-   которой открылось. */
+   которой открылось. Оправа — общая (`popover.css`). */
 .vac-sort-menu {
   position: absolute;
   top: calc(100% + 4px);
   right: 8px;
   width: 200px;
   padding: 4px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  box-shadow: 0 8px 22px var(--scrim);
   z-index: 20;
 }
 
@@ -43,10 +39,6 @@
   text-align: left;
   color: var(--text-primary);
   font-size: 0.78rem;
-}
-
-.vac-sort-option:hover {
-  background: var(--accent-hover-soft);
 }
 
 .vac-sort-option.active {

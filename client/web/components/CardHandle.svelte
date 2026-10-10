@@ -11,7 +11,7 @@
 
 {#if username}
   <button
-    class="cnt-det-link"
+    class="cnt-det-link link-hover"
     type="button"
     title="Открыть в Telegram"
     onclick={() => onopen(telegramHref(username))}

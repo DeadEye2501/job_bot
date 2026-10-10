@@ -43,9 +43,3 @@ img.hr-avatar {
   text-align: left;
 }
 
-/* Нажимаемое имя отличается от подписи только на наведении: подчёркивание в
-   покое разлиновало бы блок, где нажимается почти всё. */
-.hr-name.is-link:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}

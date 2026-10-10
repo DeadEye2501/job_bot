@@ -107,10 +107,6 @@
   border-bottom: 0;
 }
 
-.bl-combobox-option:hover {
-  background: var(--selected-bg);
-}
-
 .bl-combobox-option .opt-label {
   color: var(--text-primary);
 }
@@ -123,9 +119,8 @@
   font-size: 0.7rem;
 }
 
+/* Надпись пустой подсказки — общая (`empty-note.css`); своё — отступ и кегль. */
 .bl-combobox-empty {
   padding: 8px 12px;
-  color: var(--text-tertiary);
   font-size: 0.78rem;
-  text-align: center;
 }

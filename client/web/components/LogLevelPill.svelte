@@ -4,7 +4,7 @@
 </script>
 
 <button
-  class="logs-level-pill"
+  class="pill logs-level-pill"
   class:active
   data-tone={tone}
   type="button"

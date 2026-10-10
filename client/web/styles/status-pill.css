@@ -1,13 +1,10 @@
-/* Плашка состояния в шапке секции: прижата к правому краю. */
+/* Плашка состояния в шапке секции. Место и сброс шрифта шапки даёт обёртка
+   (`settings-section-side`). */
 
 .status-pill {
-  margin-left: auto;
   font-size: 0.7rem;
   padding: 1px 8px;
   border-radius: 8px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
 }
 
 .status-pill[data-tone='ok'] {

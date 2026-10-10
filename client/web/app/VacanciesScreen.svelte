@@ -369,7 +369,7 @@
       />
 
       {#if sortOpen}
-        <div class="vac-sort-menu">
+        <div class="pop-frame raised vac-sort-menu">
           {#each SORTS as one (one.key)}
             <button
               class="vac-sort-option"

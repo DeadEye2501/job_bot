@@ -9,10 +9,8 @@
   border-bottom: none;
 }
 
+/* Капитель и цвет — общие (`caption.css`). */
 .filter-label {
   margin-bottom: 5px;
-  color: var(--text-tertiary);
   font-size: 0.66rem;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
 }

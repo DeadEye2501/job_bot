@@ -214,9 +214,9 @@
 <div class="card-section cnt-chat-section">
   <div class="cnt-chat-body" bind:this={feed} onscroll={scrolled}>
     {#if !loaded}
-      <div class="cnt-chat-empty">Загрузка переписки…</div>
+      <div class="empty-note cnt-chat-empty">Загрузка переписки…</div>
     {:else if !messages.length}
-      <div class="cnt-chat-empty">Переписки пока нет.</div>
+      <div class="empty-note cnt-chat-empty">Переписки пока нет.</div>
     {:else}
       {#if digging}
         <div class="cnt-chat-older">Загрузка…</div>

@@ -13,7 +13,7 @@
 
 {#each contacts as one (one.id)}
   <div class="vac-contact">
-    <button class="vac-contact-link" type="button" title="Открыть" onclick={() => onopen(one.value)}>
+    <button class="vac-contact-link link-hover" type="button" title="Открыть" onclick={() => onopen(one.value)}>
       {one.value}
     </button>
     <button class="remove-cross" type="button" title="Удалить контакт" onclick={() => onremove(one.id)}>

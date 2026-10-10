@@ -142,7 +142,7 @@
             <span>{card.last_company_name}</span>
           {:else}
             <button
-              class="cnt-det-link"
+              class="cnt-det-link link-hover"
               type="button"
               onclick={() => oncompany(card.last_company_id)}
             >
@@ -154,7 +154,7 @@
 
       <div class="cnt-det-meta-row">
         {#if card.unread_count}
-          <span class="cnt-det-meta-chip unread">
+          <span class="info-chip cnt-det-meta-chip unread">
             <span class="material-symbols-outlined">mail</span>
             {card.unread_count}
             {plural(card.unread_count, 'непрочитанное', 'непрочитанных', 'непрочитанных')}

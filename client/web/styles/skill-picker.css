@@ -70,10 +70,6 @@
   gap: 6px;
 }
 
-.skill-picker-item:hover {
-  background: var(--selected-bg);
-}
-
 /* Уже взятый навык не пропадает из списка, а гаснет: пропади он — человек
    искал бы его вслепую и брал второй раз. */
 .skill-picker-item.disabled {

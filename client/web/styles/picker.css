@@ -51,6 +51,15 @@
   background: var(--selected-bg);
 }
 
+/* Под курсором строка серая и в белой рамке, а не в лаймовом отклике общих
+   перечней (`row-hover.css`): лайм в подборщике значит выбранную, и отклик
+   того же цвета читался бы как выбор. Выбранную и нынешнюю отклик не трогает:
+   их подложка — ответ, ради которого её красили. */
+.picker-row:hover:not(.selected):not(.current) {
+  border-color: var(--text-primary);
+  background: var(--surface-raised-hover);
+}
+
 .picker-row.current {
   background: var(--accent-row-current);
 }

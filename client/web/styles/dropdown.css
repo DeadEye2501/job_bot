@@ -76,7 +76,6 @@
 }
 
 .cdd-option:hover {
-  background: var(--selected-bg);
   color: var(--text-primary);
 }
 

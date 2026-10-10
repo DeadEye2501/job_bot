@@ -1,0 +1,19 @@
+/* Чип: короткая подпись в скруглённой подложке — сведения в шапке карточки,
+   стек вакансии, род записи отсева, синоним навыка. Тона, отступы и кегль,
+   где они свои, — при своих блоках; здесь общая форма, чтобы чипы соседних
+   экранов не расходились на пиксель. */
+
+.info-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.info-chip .material-symbols-outlined {
+  font-size: 12px;
+}

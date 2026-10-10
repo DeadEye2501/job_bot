@@ -100,16 +100,11 @@
   margin-top: 8px;
 }
 
-/* Пилюля растянута на всю колонку рода, и имя в ней стоит по центру: у четырёх
+/* Форма — общий чип (`info-chip.css`). Имя рода стоит по центру колонки: у
    родов длина слова разная, и прижатые влево они читались бы лесенкой. */
 .bl-kind-chip {
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
-  gap: 4px;
   padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 0.72rem;
   font-weight: 500;
 }
 

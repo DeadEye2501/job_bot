@@ -8,7 +8,7 @@
   let { text, onremove } = $props();
 </script>
 
-<span class="chip">
+<span class="info-chip chip">
   <span class="chip-text">{text}</span>
   <button class="chip-x" type="button" title="убрать" onclick={() => onremove()}>×</button>
 </span>

@@ -36,20 +36,23 @@ import './styles/empty-note.css';
 import './styles/count-pill.css';
 import './styles/status-pill.css';
 import './styles/logs.css';
-import './styles/log-level-pill.css';
 import './styles/log-row.css';
 import './styles/screen.css';
 import './styles/form-grid.css';
+import './styles/name-grid.css';
 import './styles/field-caption.css';
 import './styles/field-line.css';
 import './styles/input-pair.css';
 import './styles/remove-cross.css';
 import './styles/add-link.css';
+import './styles/link-hover.css';
 import './styles/vacancy-contacts.css';
 import './styles/confirm-field.css';
 import './styles/autosave-error.css';
 import './styles/slider.css';
 import './styles/dropdown.css';
+// Раньше всех, кто носит общий чип: у них своё при той же весомости селектора.
+import './styles/info-chip.css';
 import './styles/chips.css';
 import './styles/settings.css';
 import './styles/settings-section.css';
@@ -91,6 +94,8 @@ import './styles/filter-group.css';
 import './styles/pick-list.css';
 import './styles/date-picker.css';
 import './styles/pill.css';
+// После общей пилюли: у пилюли уровня свои отступ и цвет при той же весомости селектора.
+import './styles/log-level-pill.css';
 import './styles/big-number.css';
 import './styles/ruled-row.css';
 import './styles/accent-fill.css';
@@ -124,6 +129,7 @@ import './styles/scroll-body.css';
 import './styles/caption.css';
 import './styles/quiet-number.css';
 import './styles/row-hover.css';
+import './styles/option-hover.css';
 
 import { mount } from 'svelte';
 

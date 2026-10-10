@@ -28,8 +28,8 @@
         use:growing={text}
         onblur={(event) => onedit(index, event.currentTarget.value.trim())}
       ></textarea>
-      <button class="icon-btn" type="button" title="Удалить" onclick={() => onremove(index)}>
-        <span class="material-symbols-outlined">close</span>
+      <button class="remove-cross" type="button" title="Удалить" onclick={() => onremove(index)}>
+        ×
       </button>
     </div>
   {/each}
