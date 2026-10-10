@@ -78,7 +78,7 @@ async def _errand(kit: AgentKit, vacancy_id: int) -> _Errand | None:
         if v is None:
             return None
         prior = await count_recent_outgoing_with_vacancy_for_hr(
-            session, v.hr.id, window_days=RECENT_SEND_WINDOW_DAYS)
+            session, v.hr.id, window_days=RECENT_SEND_WINDOW_DAYS, other_than=vacancy_id)
         return _Errand(
             vacancy_id, v.hr.id, telegram_peer(v.hr), parsed_from_row(v), prior,
             (v.title or "").strip(),

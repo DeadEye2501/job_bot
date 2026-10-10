@@ -3,6 +3,7 @@
 import smtplib
 
 from adapters.smtp_mail import MailAccountConfig, OutgoingMail, send_mail
+from tests.factories import resume_file
 
 
 class _FakeSmtp:
@@ -38,12 +39,6 @@ class _FakeSmtp:
         _FakeSmtp.sent.append(message)
 
 
-def _resume(tmp_path):
-    resume = tmp_path / "cv.pdf"
-    resume.write_bytes(b"%PDF")
-    return resume
-
-
 def test_a_letter_goes_out_with_the_resume_attached(monkeypatch, tmp_path):
     monkeypatch.setattr(_FakeSmtp, "sent", [])
     monkeypatch.setattr(_FakeSmtp, "logins", [])
@@ -52,7 +47,7 @@ def test_a_letter_goes_out_with_the_resume_attached(monkeypatch, tmp_path):
 
     send_mail(
         MailAccountConfig("me@mail.test", "smtp.mail.test", 465, "secret"),
-        OutgoingMail("hr@site.test", "Отклик", "Текст", _resume(tmp_path)),
+        OutgoingMail("hr@site.test", "Отклик", "Текст", resume_file(tmp_path, "cv.pdf")),
     )
 
     (message,) = _FakeSmtp.sent
@@ -73,7 +68,7 @@ def test_port_587_secures_the_line_before_the_login(monkeypatch, tmp_path):
 
     send_mail(
         MailAccountConfig("me@mail.test", "smtp.mail.test", 587, "secret"),
-        OutgoingMail("hr@site.test", "Отклик", "Текст", _resume(tmp_path)),
+        OutgoingMail("hr@site.test", "Отклик", "Текст", resume_file(tmp_path, "cv.pdf")),
     )
 
     where = ("smtp.mail.test", 587)
@@ -97,7 +92,7 @@ def test_a_rude_goodbye_after_an_accepted_letter_is_not_a_failure(monkeypatch, t
 
     send_mail(
         MailAccountConfig("me@mail.test", "smtp.mail.test", 465, "secret"),
-        OutgoingMail("hr@site.test", "Отклик", "Текст", _resume(tmp_path)),
+        OutgoingMail("hr@site.test", "Отклик", "Текст", resume_file(tmp_path, "cv.pdf")),
     )
 
     assert len(_FakeSmtp.sent) == 1

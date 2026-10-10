@@ -125,11 +125,14 @@ async def count_recent_outgoing_with_vacancy_for_hr(
     hr_id: int,
     *,
     window_days: int,
+    other_than: int,
 ) -> int:
     """Сколько cover-letter'ов мы отправили этому HR'у за последние
-    ``window_days`` дней. Считаются только outgoing rows с привязанным
-    ``vacancy_id`` — ручные сообщения из чата Contacts (без vacancy_id)
-    игнорируются. Подписан на 0 при отсутствии истории.
+    ``window_days`` дней о других вакансиях, кроме ``other_than``. Считаются
+    только outgoing rows с привязанным ``vacancy_id`` — ручные сообщения из
+    чата Contacts (без vacancy_id) игнорируются. Подписан на 0 при отсутствии
+    истории. Письмо о той же вакансии не в счёт: прогон заново откликается
+    как впервые.
 
     Используется в auto / manual send-ветке для решения «полный cover
     letter + CV (count==0) vs short follow-up без вложений (count>=1)».
@@ -142,6 +145,7 @@ async def count_recent_outgoing_with_vacancy_for_hr(
     stmt = select(func.count(Message.id)).where(
         Message.hr_id == hr_id,
         OUR_LETTER_ABOUT_A_VACANCY,
+        Message.vacancy_id != other_than,
         Message.sent_at >= cutoff,
     )
     return (await session.scalar(stmt)) or 0
@@ -267,8 +271,8 @@ async def find_or_create_hr(
     session: AsyncSession, user, *, avatar: bytes | None = None
 ) -> tuple[HR, bool]:
     """Return (hr, created). ``created=True`` ⇒ row только что вставлен —
-    caller (vacancy parse path: основная ветка с автоотправкой и NotFit-
-    save) использует это, чтобы запустить per-HR backfill DM-истории.
+    разбор вакансии отдаёт такого HR в итоге, и передача отобранного
+    (`flows/handover`) запускает по нему per-HR backfill DM-истории.
     Catch-up для всех HR'ов крутится только на OFF→active transition;
     новый HR, созданный в активном режиме, без этого хука остался бы с
     пустым чатом до рестарта."""

@@ -4,15 +4,10 @@ import time
 
 from backend.applying.result import SiteClosed
 from backend.applying.world import learn, read_world, vacancy_facts, ways_in
-from backend.domain.apply_order import KnownSite, World
+from backend.domain.apply_order import KnownSite
 from tests.dbio import put
 from tests.factories import hr_row, vacancy_row
-from tests.factories_aggregators import aggregator_row
-
-
-def _world(**over) -> World:
-    return World(**{"telegram_open": True, "mail_ready": True, "agent_ready": True,
-                    "sites": [], "closed_sites": set(), **over})
+from tests.factories_aggregators import aggregator_row, world_of
 
 
 async def _facts(session_factory, **vacancy):
@@ -43,11 +38,11 @@ async def test_a_vacancy_from_an_aggregator_knows_its_site(session_factory):
 
 
 async def test_a_deleted_vacancy_has_no_ways(kit):
-    assert await ways_in(kit.pipeline.session_factory, _world(), 999) == []
+    assert await ways_in(kit.pipeline.session_factory, world_of(), 999) == []
 
 
 def test_a_closed_site_is_learned_for_the_rest_of_the_run():
-    world = _world()
+    world = world_of()
     learn(world, SiteClosed(3))
     assert world.closed_sites == {3}
 

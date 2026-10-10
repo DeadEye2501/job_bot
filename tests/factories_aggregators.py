@@ -1,6 +1,7 @@
-"""Строки откликов вне Telegram: агрегаторы, контакты вакансии, отклики, почта."""
+"""Строки и факты откликов: агрегаторы, контакты вакансии, отклики, почта, мир откликателя."""
 
 from backend.crypto import encrypt_str
+from backend.domain.apply_order import World
 from backend.models import (
     Aggregator,
     Application,
@@ -56,3 +57,11 @@ def mail_account_row() -> MailAccount:
     """Строка почты, готовой к отправке: адрес, пароль шифром и сервер."""
     return MailAccount(id=1, address="me@mail.test", password_encrypted=encrypt_str("secret"),
                        smtp_host="smtp.mail.test", smtp_port=465)
+
+
+def world_of(**overrides) -> World:
+    """Мир откликателя, где открыто всё, а сайтов человека нет; иное задаёт тест."""
+    fields = {"telegram_open": True, "mail_ready": True, "agent_ready": True,
+              "sites": [], "closed_sites": set()}
+    fields.update(overrides)
+    return World(**fields)

@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.contact_keys import contact_key
 from backend.models import Application, ApplicationVia, Screening
 from backend.repository.vacancies_life import add_vacancy_event
 from backend.repository.vacancy_status import mark_vacancy_applied
@@ -35,14 +34,14 @@ class ApplicationEntry:
 
 
 async def record_application(session: AsyncSession, entry: ApplicationEntry) -> int:
-    """Записать состоявшийся отклик. Тот же адрес второй строки не даёт — скрининг дописывается.
+    """Записать состоявшийся отклик: каждый — своя строка, статус и событие.
+
+    Отклик на тот же адрес — прогон заново или ручной отклик на отказ — такой же
+    отклик, как первый. Вопросы со страницы подтверждения в той же сессии агента
+    дописываются к уже записанному (`append_screening`), а не сюда.
 
     Вызывающий держит транзакцию. Статус двигает `mark_vacancy_applied`.
     """
-    known = await _existing(session, entry.vacancy_id, entry.target)
-    if known is not None:
-        await append_screening(session, known.id, entry.screening)
-        return known.id
     row = Application(
         vacancy_id=entry.vacancy_id, aggregator_id=entry.aggregator_id, via=entry.via,
         target=entry.target, letter=entry.letter, sent_at=utc_now(),
@@ -99,11 +98,3 @@ async def has_screening(session: AsyncSession, vacancy_id: int) -> bool:
         .limit(1)
     )
     return found is not None
-
-
-async def _existing(session: AsyncSession, vacancy_id: int, target: str) -> Application | None:
-    """Отклик на тот же адрес — по ключу контакта, а не по написанию: `HR@Site.ru`
-    и `hr@site.ru`, адрес с косой в конце и без — один адрес."""
-    key = contact_key(target)
-    rows = await session.scalars(select(Application).where(Application.vacancy_id == vacancy_id))
-    return next((row for row in rows if contact_key(row.target) == key), None)
