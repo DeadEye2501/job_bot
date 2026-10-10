@@ -1,40 +1,51 @@
-/* Пороги отбора: пять величин в ряд, ползунок, числовые поля и тумблер. */
+/* Пороги отбора: шесть величин в две строки по три, подпись слева от поля.
 
+   Сетка из шести дорожек — пара «подпись, элемент» на колонку, — а ячейки
+   прозрачны для неё: так подписи одной колонки берут общую ширину по длинной,
+   и поле, полоска порога и тумблер под ними встают на одну вертикаль. */
 .pipeline-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px 12px;
-  /* По верху: у ползунка и числового поля разная высота содержимого, и без
-     этого подписи пяти величин встали бы на разных уровнях. */
-  align-items: start;
+  grid-template-columns: repeat(3, auto 1fr);
+  gap: 6px 10px;
+  align-items: center;
 }
 
 .pipeline-row > div {
-  display: flex;
-  flex-direction: column;
-  /* Иначе длинная подпись распирает свою колонку и ломает равные пять. */
-  min-width: 0;
+  display: contents;
 }
 
+/* Подпись прижата к своему полю, а не к краю колонки: у короткой подписи иначе
+   до поля оставался просвет, и непонятно, чья она. */
 .pipeline-label {
   font-size: 0.7rem;
   color: var(--text-tertiary);
-  margin-bottom: 2px;
-  text-align: center;
+  white-space: nowrap;
+  text-align: right;
 }
 
-.with-unit {
+/* Элемент и подпись за ним — «шт», «сек», число порога — вплотную, от начала
+   своей дорожки. Высота одна — элементы соседних колонок на одной линии. */
+.with-unit,
+.slider-row,
+.with-toggle {
   display: flex;
-  align-items: center;
   gap: 6px;
-  justify-content: center;
+  align-items: center;
+  height: 28px;
 }
 
-/* Ширина поля закреплена: при равных колонках «50» и «1800» расползались бы
-   на всю ячейку с разной плотностью, а по центру встают только по содержимому. */
-.with-unit .input {
+/* Ширина поля закреплена: «50» и «1800» иначе встали бы разной ширины. Полоска
+   порога и место тумблера той же ширины — колонки читаются одним рядом, а
+   тумблер стоит по центру поля под ним. Селектор полоски полный: общее правило
+   ползунка (`slider.css`) тянет её на всю ширину и весит больше короткого. */
+.with-unit .input,
+.slider-row input[type='range'].slider,
+.with-toggle {
   width: 72px;
-  flex: 0 0 auto;
+}
+
+.with-toggle {
+  justify-content: center;
 }
 
 .with-unit .unit {
@@ -42,28 +53,10 @@
   font-size: 0.75rem;
 }
 
-.slider-row {
-  display: grid;
-  grid-template-columns: 1fr 32px;
-  gap: 8px;
-  align-items: center;
-  /* Вровень с числовыми полями рядом, чтобы числа стояли на одной линии. */
-  height: 28px;
-}
-
 .slider-num {
   color: var(--text-secondary);
   font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.with-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* Вровень с полями и ползунком в соседних колонках. */
-  height: 28px;
 }
 
 /* Сам переключатель — в toggle.css: такой же стоит в строке списка каналов, и

@@ -59,31 +59,3 @@
 .settings-row.spaced {
   margin-top: 6px;
 }
-
-.settings-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  padding-top: 4px;
-}
-
-/* Кнопки сеанса стоят вровень со строкой слева: отступ сверху, нужный кнопке
-   под полями, здесь сдвинул бы их относительно подписи рядом. */
-.session-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.session-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 6px;
-  padding-top: 4px;
-  grid-column: span 2;
-}
-
-.session-info {
-  color: var(--text-tertiary);
-  font-size: 0.72rem;
-}

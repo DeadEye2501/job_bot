@@ -7,6 +7,7 @@ import logging
 from backend.domain.scoring import build_skill_lookup
 from backend.models import VacancyStatus
 from backend.repository import (
+    applications,
     profile_skills as skills_repo,
     vacancies_card,
     vacancies_list,
@@ -149,6 +150,21 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
                     detail, matched_set, self._hub.rs.scoring_threshold,
                 ),
             }
+
+        return reply(self._hub.runner, run())
+
+    def screening(self, vacancy_id: int) -> dict:
+        """Скрининг вакансии для окна диалога: отклик за откликом, реплики по порядку."""
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                await require_vacancy(session, vacancy_id)
+                shown = await applications.vacancy_screening(session, vacancy_id)
+            return {"applications": [
+                {"target": one.target,
+                 "lines": [{"from_us": from_us, "text": text} for from_us, text in one.lines]}
+                for one in shown
+            ]}
 
         return reply(self._hub.runner, run())
 

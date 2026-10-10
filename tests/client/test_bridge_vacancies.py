@@ -10,7 +10,12 @@ import json
 from backend.models import VacancyStatus
 from tests.dbio import put
 from tests.factories import company_row, status_history_row, vacancy_row
-from tests.factories_aggregators import aggregator_row, web_search_row
+from tests.factories_aggregators import (
+    aggregator_row,
+    application_row,
+    screening_row,
+    web_search_row,
+)
 
 
 async def test_the_filter_menus_come_by_their_own_ask(api, ask, session_factory):
@@ -363,3 +368,41 @@ async def test_the_saved_explanation_comes_back_with_its_period(
     )
 
     assert answer["ok"]["explanation"] == "передумал."
+
+
+async def test_a_card_says_whether_there_was_a_screening(api, ask, session_factory):
+    """По признаку окно серит пункт «Скрининг»: отклик без реплик скрининга не даёт."""
+    screened, silent = vacancy_row(), vacancy_row()
+    await put(session_factory, screened, silent)
+    talked = application_row(screened.id)
+    quiet = application_row(silent.id)
+    await put(session_factory, talked, quiet)
+    await put(session_factory, screening_row(talked.id, 0))
+
+    yes = (await ask(api.vacancies.detail, screened.id))["ok"]["vacancy"]
+    no = (await ask(api.vacancies.detail, silent.id))["ok"]["vacancy"]
+
+    assert (yes["has_screening"], no["has_screening"]) == (True, False)
+
+
+async def test_the_screening_comes_application_by_application(api, ask, session_factory):
+    vacancy = vacancy_row()
+    await put(session_factory, vacancy)
+    sent = application_row(vacancy.id, target="hr@company.test")
+    await put(session_factory, sent)
+    await put(session_factory, screening_row(sent.id, 0, text="Сколько лет опыта?"),
+              screening_row(sent.id, 1, from_us=True, text="Пять"))
+
+    answer = (await ask(api.vacancies.screening, vacancy.id))["ok"]
+
+    assert answer == {"applications": [{
+        "target": "hr@company.test",
+        "lines": [{"from_us": False, "text": "Сколько лет опыта?"},
+                  {"from_us": True, "text": "Пять"}],
+    }]}
+
+
+async def test_the_screening_of_a_missing_vacancy_is_refused(api, ask):
+    answer = await ask(api.vacancies.screening, 999)
+
+    assert (answer["fail"], answer["detail"]) == ("denied", "Вакансия не найдена.")

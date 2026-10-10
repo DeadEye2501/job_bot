@@ -7,6 +7,7 @@ import {
   ago,
   blankVacancy,
   emptyNote,
+  pasteLock,
   salaryLabel,
   scoreTone,
   shortAgo,
@@ -281,5 +282,16 @@ describe('заслон формы заведения вакансии', () => {
     // Пробельное название дошло бы до базы строкой, которую в списке не видно
     // и не найти поиском.
     expect(vacancyNamed({ ...blankVacancy(), title: '   ' })).toBe(false);
+  });
+});
+
+describe('запор вставленного объявления', () => {
+  it('во время обхода текст не заводится: его разбирает конвейер на месте прогона', () => {
+    expect(pasteLock({ mode: 'text' }, true)).toBe('Идёт обход');
+  });
+
+  it('набранные поля обходу не мешают', () => {
+    expect(pasteLock({ mode: 'fields' }, true)).toBe('');
+    expect(pasteLock({ mode: 'text' }, false)).toBe('');
   });
 });

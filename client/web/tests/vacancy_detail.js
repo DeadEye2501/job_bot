@@ -32,6 +32,7 @@ export function vacancyDetail(id, extra = {}) {
     salary_currency: null,
     remote: null,
     location: null,
+    has_screening: false,
     ...extra,
   };
 }

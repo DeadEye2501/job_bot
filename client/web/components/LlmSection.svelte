@@ -96,50 +96,50 @@
   </div>
 {/snippet}
 
-{#snippet probeButton()}
-  <div class="span-2 settings-actions">
-    {#if fromFile}
-      <button class="btn" type="button" disabled={busy} onclick={() => onpickfile()}>
-        <span class="material-symbols-outlined">folder_open</span>
-        Выбрать файл
-      </button>
-    {/if}
-    <button class="btn" type="button" disabled={busy} onclick={() => onprobe()}>
-      <span class="material-symbols-outlined">network_check</span>
-      {busy ? 'Проверка…' : 'Проверить'}
+{#snippet probeButtons()}
+  {#if fromFile}
+    <button class="btn" type="button" disabled={busy} onclick={() => onpickfile()}>
+      <span class="material-symbols-outlined">folder_open</span>
+      Выбрать файл
     </button>
-  </div>
+  {/if}
+  <button class="btn" type="button" disabled={busy} onclick={() => onprobe()}>
+    <span class="material-symbols-outlined">network_check</span>
+    {busy ? 'Проверка…' : 'Проверить'}
+  </button>
 {/snippet}
 
-<SettingsSection {icon} {title} {pill}>
+<SettingsSection {icon} {title} {pill} actions={probeButtons}>
   <!-- Ввод в любое из полей гасит плашку проверки: она говорит «модель
        отвечает» про тот адрес, который проверяли, и на изменённых полях лгала
        бы. Ловится здесь, а не на каждом поле: событие всплывает, и второй
        обработчик у поля секрета пришлось бы заводить внутри чужого компонента. -->
   <div oninput={() => onedit()}>
+    <!-- Выбор и первое поле за ним — одной строкой: самое длинное имя в выборе
+         короткое, и своя строка под него стояла бы пустой полосой. -->
     {#if embeds}
       <div class="settings-row spaced">
-        <div class="span-2">
-          <Dropdown
-            options={EMBED_SOURCES}
-            value={sourceLabel(fromFile)}
-            onpick={(source) => onsource(isFileSource(source))}
-          />
+        <div class="field-line span-2">
+          <div class="field-choice">
+            <Dropdown
+              options={EMBED_SOURCES}
+              value={sourceLabel(fromFile)}
+              onpick={(source) => onsource(isFileSource(source))}
+            />
+          </div>
+          {#if fromFile}
+            <input
+              class="input mono"
+              readonly
+              value={creds.model}
+              title={creds.model}
+              placeholder={NO_FILE_PLACEHOLDER}
+            />
+          {/if}
         </div>
       </div>
 
-      {#if fromFile}
-        <div class="settings-row spaced">
-          <input
-            class="input mono span-2"
-            readonly
-            value={creds.model}
-            title={creds.model}
-            placeholder={NO_FILE_PLACEHOLDER}
-          />
-          {@render probeButton()}
-        </div>
-      {:else}
+      {#if !fromFile}
         {#if shareable}
           <label class="checkbox-row">
             <input
@@ -160,22 +160,24 @@
 
         <div class="settings-row spaced">
           {@render modelField()}
-          {@render probeButton()}
         </div>
       {/if}
     {:else}
       <div class="settings-row">
-        <div class="span-2">
-          <Dropdown options={PRESET_NAMES} value={chosenPreset} onpick={onpreset} />
+        <div class="field-line span-2">
+          <div class="field-choice">
+            <Dropdown options={PRESET_NAMES} value={chosenPreset} onpick={onpreset} />
+          </div>
+          {#if addressless(creds.base_url)}
+            {@render modelField()}
+          {:else}
+            {@render urlField('base_url (например http://localhost:1234)')}
+          {/if}
         </div>
         {#if !addressless(creds.base_url)}
-          {@render urlField('base_url (например http://localhost:1234)')}
-        {/if}
-        {@render modelField()}
-        {#if !addressless(creds.base_url)}
+          {@render modelField()}
           {@render secretField()}
         {/if}
-        {@render probeButton()}
       </div>
     {/if}
   </div>

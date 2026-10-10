@@ -1,4 +1,4 @@
-// Общий учёт прогона: кого зовут в миг его конца.
+// Общий учёт прогона: кого зовут в миг его конца и ждёт ли прогон человека.
 
 import { describe, expect, it } from 'vitest';
 
@@ -11,7 +11,7 @@ function bridge() {
       handlers[name] = handler;
       return () => delete handlers[name];
     },
-    fire: (name) => handlers[name]?.(),
+    fire: (name, payload) => handlers[name]?.(payload),
   };
 }
 
@@ -47,6 +47,29 @@ describe('конец прогона', () => {
     events.fire('ingestion_started');
     events.fire('ingestion_finished');
     expect(heard).toBe(0);
+    deaf();
+  });
+});
+
+describe('ожидание человека', () => {
+  it('приходит с родом и сайтом и уходит, когда человек справился', () => {
+    const events = bridge();
+    const deaf = hearRound(events);
+    events.fire('ingestion_started');
+    events.fire('human_needed', { kind: 'captcha', host: 'site.test' });
+    expect(round.human).toEqual({ kind: 'captcha', host: 'site.test' });
+    events.fire('human_resolved');
+    expect(round.human).toBeNull();
+    deaf();
+  });
+
+  it('уходит и с концом прогона: остановленный обход о человеке больше не скажет', () => {
+    const events = bridge();
+    const deaf = hearRound(events);
+    events.fire('ingestion_started');
+    events.fire('human_needed', { kind: 'login', host: 'site.test' });
+    events.fire('ingestion_finished');
+    expect(round.human).toBeNull();
     deaf();
   });
 });

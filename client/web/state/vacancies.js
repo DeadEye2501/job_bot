@@ -6,6 +6,7 @@
 
 import { GRADES as PROFILE_GRADES } from './profile.js';
 import { REMOTE_CHOICES } from './vacancy_filter.js';
+import { RUNNING } from './round.svelte.js';
 import { plural } from './words.js';
 
 /** Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и
@@ -283,6 +284,15 @@ export function vacancyFields({ mode, raw_text, ...fields }) {
  */
 export function typed(draft) {
   return draft.mode === 'text';
+}
+
+/** Почему вставленное объявление сейчас не завести; пусто — можно.
+ *
+ * Вставленный текст разбирает конвейер на месте прогона, и во время обхода мост
+ * его не пустит. Набранные поля ложатся в базу мимо конвейера и обходу не мешают.
+ */
+export function pasteLock(draft, running) {
+  return typed(draft) && running ? RUNNING : '';
 }
 
 export function vacancyNamed(draft) {

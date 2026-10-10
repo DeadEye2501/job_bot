@@ -5,6 +5,7 @@
 // признаки. Ни моста, ни разметки этот файл не знает.
 
 import { showStamp } from './dates.js';
+import { RUNNING } from './round.svelte.js';
 import { BLOCKED_TITLE, sourceToggle } from './sources.js';
 
 /** Где агрегатор ищет — подпись под именем.
@@ -20,9 +21,6 @@ export function aggregatorWhere(row) {
 export function aggregatorLastRun(row) {
   return row.last_run_at ? `Обход ${showStamp(row.last_run_at)}` : 'Ещё не обходили';
 }
-
-/** Чем заперты действия с агрегатором, пока идёт прогон: запуск, вход, удаление. */
-export const RUNNING = 'Идёт обход';
 
 /** Чем заперт агрегатор без входа — и переключатель строки, и прогон из карточки. */
 export const LOGIN_FIRST = 'Сначала войдите на сайт';

@@ -4,11 +4,16 @@
 // экранов, которые запускают конвейер или агента. Учёт один, иначе полоса и
 // экран разошлись бы — одна показывала бы ход, а другой пускал бы второй прогон.
 //
-// Вести о начале и конце прогона слушает только этот файл; остальные читают
-// `round.running` или просят позвать их в миг начала или конца
-// (`round.onStart`, `round.onFinish`).
+// Вести о начале и конце прогона и об ожидании человека слушает только этот
+// файл; остальные читают `round.running` и `round.human` или просят позвать их
+// в миг начала или конца (`round.onStart`, `round.onFinish`).
+
+/** Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон
+ *  не пустит. */
+export const RUNNING = 'Идёт обход';
 
 let running = $state(false);
+let human = $state(null);
 const starters = new Set();
 const finishers = new Set();
 
@@ -17,6 +22,11 @@ export const round = {
   /** Идёт ли прогон: обход, прогон одного источника, вход или разбор. */
   get running() {
     return running;
+  },
+
+  /** Кого ждёт прогон: `{ kind, host }` — капча или вход на сайт, — или пусто. */
+  get human() {
+    return human;
   },
 
   /** Позвать в миг начала прогона; отдаёт отписку.
@@ -48,15 +58,25 @@ export const round = {
  */
 export function hearRound(events) {
   running = false;
+  human = null;
   const offs = [
     events.on('ingestion_started', () => {
       running = true;
       starters.forEach((hear) => hear());
     }),
+    // Ожидание кончается и с концом прогона: остановленный обход отпускает
+    // агента молча, вести «человек справился» за ним не будет.
     events.on('ingestion_finished', () => {
       const was = running;
       running = false;
+      human = null;
       if (was) finishers.forEach((hear) => hear());
+    }),
+    events.on('human_needed', (need) => {
+      human = need;
+    }),
+    events.on('human_resolved', () => {
+      human = null;
     }),
   ];
   return () => offs.forEach((off) => off());

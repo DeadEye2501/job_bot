@@ -4,23 +4,29 @@
 // разметки этот файл не знает.
 
 import { showStamp } from './dates.js';
+import { RUNNING } from './round.svelte.js';
+import { handleName } from './telegram.js';
 import { plural } from './words.js';
 
-/** Почему отправка и переразбор сейчас недоступны.
+/** Почему отклик и переразбор сейчас недоступны.
  *
  * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое
  * окружение запирает оба и объясняется теми же словами, что и кнопка обхода
  * внизу окна: две разные фразы об одной беде человек читает как две беды.
  *
- * Отклик уходит человеку, и без привязанного HR слать его некому; разбору же
- * HR не нужен — он его как раз и находит.
+ * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы
+ * модели не допускаем — даже отклика в Telegram, которому браузер не нужен.
+ *
+ * Есть ли куда откликаться, здесь не решается: это знает только мост, и
+ * ответ его разбирает `applyChoices`.
  */
-export function actionBlocks(card, lockedTip) {
+export function actionBlocks(card, lockedTip, running) {
+  const busy = lockedTip || (running ? RUNNING : '');
   return {
-    send: lockedTip || (card.hr ? '' : 'Сначала привяжите HR'),
+    send: busy,
     // Пустой текст разбор не запирает: его зовут как раз тогда, когда карточка
     // вышла кривой, и заслон отнял бы единственный способ это поправить.
-    rerun: lockedTip,
+    rerun: busy,
     // Переход к посту наружу ходит мимо бота, поэтому неживое окружение его не
     // касается: заперт он только тем, что ссылки может не быть вовсе.
     source: card.source_url ? '' : 'Нет ссылки на источник',
@@ -29,6 +35,37 @@ export function actionBlocks(card, lockedTip) {
     // одни подписи и ни строки текста.
     raw: card.raw_text ? '' : 'У вакансии нет исходного текста',
   };
+}
+
+/** Способы отклика строками окна выбора: Telegram первым, за ним способы агента.
+ *
+ * Строка — один контакт: ник Telegram с собакой, по которой его и узнают, или
+ * адрес — ссылка на сайт, почта.
+ *
+ * Довод — ответ `vacancies.apply_ways`. Telegram шлёт бот прежней отправкой,
+ * поэтому `way` у него пустой; у способа агента это то, что мост ждёт обратно в
+ * `vacancies.apply_via`. Запертому агенту работать нечем, и его способы в окно
+ * не попадают.
+ */
+export function applyChoices(found, hr) {
+  const viaTelegram = found.telegram
+    ? [{ key: 'telegram', contact: telegramName(hr), way: null }]
+    : [];
+  const viaAgent = found.lock
+    ? []
+    : found.ways.map((way) => ({ key: `${way.method} ${way.target}`, contact: way.target, way }));
+  return [...viaTelegram, ...viaAgent];
+}
+
+/** Почему откликнуться некуда: способы есть, но агент заперт, — или их нет вовсе. */
+export function noChoiceReason(found) {
+  return found.ways.length && found.lock
+    ? found.lock
+    : 'Откликнуться некуда: нет ни HR, ни контактов для отклика';
+}
+
+function telegramName(hr) {
+  return hr?.telegram_username ? handleName(hr.telegram_username) : hr?.name || '—';
 }
 
 /** Пилюля источника в шапке карточки: откуда вакансия и куда ведёт нажатие.

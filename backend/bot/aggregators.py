@@ -43,6 +43,11 @@ def human_done(bot) -> None:
     slot.on_runner_loop(bot, bot.human_gate.resolve)
 
 
+def reveal_browser(bot) -> None:
+    """Нажатие на плашку ожидания: вывести браузер вперёд. Задача заводится на цикле бота."""
+    slot.on_runner_loop(bot, bot.human_gate.reveal)
+
+
 async def agent_work(bot, work: Callable[[AgentKit], Awaitable[str]]) -> str:
     """Общая обёртка работы агента: чистая пауза на человека в начале,
     отпущенный ждущий вызов и закрытый браузер в конце, чем бы ни кончилось."""
@@ -139,7 +144,7 @@ async def apply_via_agent(bot, vacancy_id: int, way: Way) -> AgentOutcome:
 
 async def delete_aggregator(bot, aggregator_id: int) -> str:
     """Удалить агрегатор и его профиль браузера; пока место прогона занято — отказ."""
-    if bot.current_poll_task is not None:
+    if slot.slot_taken(bot):
         return "busy"
     async with bot.session_factory() as session:
         async with session.begin():

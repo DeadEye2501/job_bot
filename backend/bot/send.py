@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from adapters import telegram
-from backend.bot import can_send
+from backend.bot import can_send, slot
 from backend.models import HR
 from backend.payloads import OutgoingMessage
 from backend.flows.events import record_vacancy_event
@@ -36,10 +36,14 @@ def _shares_provider(a, b) -> bool:
 
 
 async def ui_send_vacancy_application(bot, vacancy_id: int) -> tuple[bool, str]:
-    """Manual cover-letter send — vacancy detail «more» menu, кнопка
-    «Отправить отклик». Возвращает (ok, reason) — UI использует reason
+    """Manual cover-letter send — vacancy detail «more» menu, пункт
+    «Откликнуться». Возвращает (ok, reason) — UI использует reason
     для понятного toast'а (что именно не сработало)."""
     logger.info("UI send application for vacancy %d", vacancy_id)
+    # Пока идёт прогон, модель зовёт только он: письмо сочиняла бы она же,
+    # параллельно с ним.
+    if slot.slot_taken(bot):
+        return False, "busy"
     return await bot.ingestion.send_application_for_vacancy(vacancy_id)
 
 

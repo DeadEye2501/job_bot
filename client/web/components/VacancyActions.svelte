@@ -8,8 +8,19 @@
   import ActionsMenu from './ActionsMenu.svelte';
   import MenuItem from './MenuItem.svelte';
 
-  let { blocks, say, onsend, onrerun, onlinkhr, onlinkcompany, onraw, onsource, ondelete } =
-    $props();
+  let {
+    blocks,
+    screened,
+    say,
+    onsend,
+    onrerun,
+    onlinkhr,
+    onlinkcompany,
+    onraw,
+    onscreening,
+    onsource,
+    ondelete,
+  } = $props();
 
   function pick(action, blocked) {
     if (blocked) return say(blocked);
@@ -21,7 +32,7 @@
   {#snippet children(close)}
     <MenuItem
       icon="send"
-      label="Отправить отклик"
+      label="Откликнуться"
       title={blocks.send || null}
       blocked={Boolean(blocks.send)}
       {close}
@@ -50,6 +61,16 @@
       blocked={Boolean(blocks.raw)}
       {close}
       onpick={() => pick(onraw, blocks.raw)}
+    />
+    <!-- Без скрининга пункт не нажимается вовсе, а не объясняет плашкой:
+         смотреть нечего, и серого пункта для этого довольно. -->
+    <MenuItem
+      icon="forum"
+      label="Скрининг"
+      blocked={!screened}
+      disabled={!screened}
+      {close}
+      onpick={onscreening}
     />
     <MenuItem
       icon="open_in_new"

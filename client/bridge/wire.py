@@ -293,6 +293,7 @@ def _vacancy_detail_to_dict(
         "created_at": _iso(v.created_at),
         "history": [_status_change(h) for h in detail.history],
         "events": [_vacancy_event(e) for e in detail.events],
+        "has_screening": detail.has_screening,
     }
 
 

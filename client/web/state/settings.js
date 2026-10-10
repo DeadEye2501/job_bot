@@ -79,6 +79,7 @@ export const BOUNDS = {
   poll_interval_sec: { min: 10, max: 86400 },
   backfill_limit: { min: 1, max: 500 },
   dm_backfill_limit: { min: 1, max: 500 },
+  aggregator_backfill_limit: { min: 1, max: 500 },
 };
 
 /** Во что превратился ввод числового поля.
@@ -295,6 +296,29 @@ export function sessionPill(tg) {
   return { text: tg.username ? `@${tg.username}` : 'Сессия активна', tone: 'ok', title: '' };
 }
 
+/** Плашка почты для откликов в шапке секции: подключённая называет адрес.
+ *
+ * Подключена — значит записаны адрес, пароль и сервер: без любого из трёх
+ * отклик письмом не уйдёт. Само соединение не проверяется — неверный пароль
+ * скажется на первой отправке.
+ */
+export function mailPill(mail) {
+  const ready = mail?.address && mail.password && mail.smtp_host;
+  return ready
+    ? { text: mail.address, tone: 'ok', title: '' }
+    : { text: 'Не подключена', tone: 'err', title: '' };
+}
+
+/** Нужны ли поля сервера: адрес записан, а сервер по нему не подставляется.
+ *
+ * Спрашивается «подставлен ли по адресу», а не «записан ли»: вписанный руками
+ * сервер незнакомой почты иначе убрал бы поля, и опечатку в нём было бы негде
+ * поправить.
+ */
+export function mailNeedsServer(mail) {
+  return Boolean(mail?.address) && !mail.server_by_address;
+}
+
 /** Проверка, которой ещё не было.
  *
  * Одним объявлением на оба экрана и на оба места — начальное состояние и сброс
@@ -346,17 +370,6 @@ export function probeLine(probe) {
   if (probe.status === 'err') return { tone: 'err', text: probe.error };
   if (probe.status === 'busy') return { tone: 'busy', text: 'Проверяем подключение...' };
   return null;
-}
-
-/** Что сказать человеку про сеанс Telegram.
- *
- * Ник спрашивают у самого Telegram, и на холодном старте он не успевает
- * ответить: пустое «@» выглядело бы поломкой учётной записи, поэтому без ника
- * говорят только про сеанс.
- */
-export function sessionText(tg) {
-  if (!tg?.has_session) return 'Сессии нет — авторизуйтесь заново';
-  return tg.username ? `Сессия активна, авторизован как @${tg.username}` : 'Сессия активна';
 }
 
 /** На каком шаге вход после ответа моста.

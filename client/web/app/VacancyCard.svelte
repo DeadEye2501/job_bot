@@ -5,10 +5,12 @@
   // Стоит правой панелью рядом со списком: вакансию читают, не теряя из виду
   // соседние, — рядом с ними и решают, стоит ли она отклика.
 
+  import ApplyWaysDialog from '$components/ApplyWaysDialog.svelte';
   import Avatar from '$components/Avatar.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import NotesField from '$components/NotesField.svelte';
   import RawTextDialog from '$components/RawTextDialog.svelte';
+  import ScreeningDialog from '$components/ScreeningDialog.svelte';
   import StatusPicker from '$components/StatusPicker.svelte';
   import VacancyActions from '$components/VacancyActions.svelte';
   import VacancyTimeline from '$components/VacancyTimeline.svelte';
@@ -16,7 +18,14 @@
   import { cardFinish } from '$state/card_finish.js';
   import { cardLinks } from '$state/card_links.js';
   import { miniRead } from '$state/mini_read.js';
-  import { actionBlocks, rawChips, sourcePill } from '$state/vacancy_actions.js';
+  import { round } from '$state/round.svelte.js';
+  import {
+    actionBlocks,
+    applyChoices,
+    noChoiceReason,
+    rawChips,
+    sourcePill,
+  } from '$state/vacancy_actions.js';
   import { ago, gradeLabel, remoteLabel, salaryLabel, scoreTone } from '$state/vacancies.js';
   import { timelineRows } from '$state/vacancy_card.js';
 
@@ -34,6 +43,8 @@
   let asking = $state(null);
   let linking = $state(null);
   let raw = $state(false);
+  let choosing = $state(null);
+  let screening = $state(null);
 
   const alive = living();
 
@@ -51,7 +62,7 @@
   const salary = $derived(card ? salaryLabel(card) : '');
   const source = $derived(card ? sourcePill(card) : null);
   const blocks = $derived(
-    card ? actionBlocks(card, lockedTip) : { send: '', rerun: '', source: '', raw: '' },
+    card ? actionBlocks(card, lockedTip, round.running) : { send: '', rerun: '', source: '', raw: '' },
   );
   const links = $derived(card ? cardLinks(card) : null);
   // Когда объявление вышло: у поста есть своя метка, а у записи — только время
@@ -133,17 +144,42 @@
     say('Разбор запущен');
   }
 
-  /** Отправить отклик.
+  /** Откликнуться: единственный способ уходит сразу, из нескольких выбирают в окне.
+   *
+   * Номер запечатан до вопроса: панель одна на весь список, и ответ о способах
+   * прежней вакансии, пришедший уже к новой, ушёл бы откликом по ней.
+   */
+  async function respond() {
+    const id = vacancyId;
+    const found = await ask('vacancies.apply_ways', id);
+    if (!alive.now || found === null || id !== vacancyId) return;
+    const rows = applyChoices(found, card.hr);
+    if (rows.length === 0) return say(noChoiceReason(found));
+    if (rows.length === 1) return send(rows[0]);
+    choosing = rows;
+  }
+
+  /** Отправить отклик выбранным способом.
    *
    * Ответа об отправке здесь не ждут: письмо сочиняет модель, и ждать её
    * значило бы держать окно. Ушло письмо или нет, скажет оболочка — вестью об
    * исходе, — а карточка перечитается по вести о смене списка.
    */
-  async function send() {
-    asking = null;
-    const done = await ask('vacancies.send_application', { vacancy_id: vacancyId });
+  async function send(row) {
+    choosing = null;
+    const done = row.way
+      ? await ask('vacancies.apply_via', { vacancy_id: vacancyId, ...row.way })
+      : await ask('vacancies.send_application', { vacancy_id: vacancyId });
     if (done === null) return;
     say('Отклик отправляется');
+  }
+
+  /** Открыть скрининг; номер запечатан до вопроса — по той же причине, что у отклика. */
+  async function showScreening() {
+    const id = vacancyId;
+    const found = await ask('vacancies.screening', id);
+    if (!alive.now || found === null || id !== vacancyId) return;
+    screening = found.applications;
   }
 
   async function drop() {
@@ -160,20 +196,20 @@
     return ask('system.open_url', url);
   }
 
-  /** Положить исходный текст в буфер обмена.
+  /** Положить текст в буфер обмена и сказать об этом.
    *
    * Кладёт страница сама: мосту для этого делать нечего, а в окне буфер обмена
    * есть. Отказать он может — окно без разрешения на буфер такое бывает, — и
    * молчать об этом нельзя: человек уйдёт вставлять пустоту.
    */
-  async function copyRaw() {
-    if (!card.raw_text) return say('Копировать нечего');
+  async function copy(text, done) {
+    if (!text) return say('Копировать нечего');
     try {
-      await navigator.clipboard.writeText(card.raw_text);
+      await navigator.clipboard.writeText(text);
     } catch (trouble) {
       return say(`Не удалось скопировать: ${trouble}`);
     }
-    say('Текст скопирован');
+    say(done);
   }
 
   $effect(() => {
@@ -220,16 +256,24 @@
         />
       {/if}
     </div>
-    <div class="det-title">{card.title || '—'}</div>
+    <button
+      class="det-title"
+      type="button"
+      onclick={() => copy(card.title, 'Название скопировано')}
+    >
+      {card.title || '—'}
+    </button>
 
     <VacancyActions
       {blocks}
       {say}
-      onsend={() => (asking = 'send')}
+      onsend={respond}
       onrerun={rerun}
       onlinkhr={() => (linking = { kind: 'hr', prefill: '' })}
       onlinkcompany={() => (linking = { kind: 'company', prefill: '' })}
       onraw={() => (raw = true)}
+      screened={card.has_screening}
+      onscreening={showScreening}
       onsource={() => outside(card.source_url)}
       ondelete={() => (asking = 'delete')}
     />
@@ -365,14 +409,8 @@
   {/if}
 {/if}
 
-{#if asking === 'send'}
-  <ConfirmDialog
-    message="Сгенерировать сопроводительное письмо и отправить связанному HR с прикреплённым резюме?"
-    confirmLabel="Отправить"
-    tone="primary"
-    onconfirm={send}
-    oncancel={() => (asking = null)}
-  />
+{#if choosing !== null}
+  <ApplyWaysDialog rows={choosing} onapply={send} onclose={() => (choosing = null)} />
 {/if}
 
 {#if asking === 'delete'}
@@ -389,9 +427,13 @@
     id={card.id}
     chips={rawChips(card)}
     text={card.raw_text ?? ''}
-    oncopy={copyRaw}
+    oncopy={() => copy(card.raw_text, 'Текст скопирован')}
     onclose={() => (raw = false)}
   />
+{/if}
+
+{#if screening !== null}
+  <ScreeningDialog applications={screening} onclose={() => (screening = null)} />
 {/if}
 
 {#if linking !== null}

@@ -76,13 +76,19 @@ function linkNote(what, payload, blank) {
 // «Отклик …». Коды приходят с бэкенда (`ApplicationVia`).
 const VIA = { aggregator: 'на сайте агрегатора', form: 'формой работодателя', email: 'письмом' };
 
+/** Способ отклика словами; незнакомый код называется сам собой — коды заводит
+ *  бэкенд, и новый приедет раньше, чем окно про него узнает. */
+function viaWords(method) {
+  return VIA[method] || method;
+}
+
 // Кто писал письмо отклика: по этой строке сравнивают два способа на живых
 // откликах (настройка `letter_writer`).
 const WRITER = { app: 'приложение', agent: 'агент' };
 
 function appliedNote(payload) {
   const simulated = payload.simulated ? ' (симуляция)' : '';
-  return `Отклик ${VIA[payload.via] || payload.via}${simulated}; письмо: ${WRITER[payload.letter_by] || 'без письма'}.`;
+  return `Отклик ${viaWords(payload.via)}${simulated}; письмо: ${WRITER[payload.letter_by] || 'без письма'}.`;
 }
 
 // Подписи событий по роду. Таблицей, а не цепочкой сравнений: родов больше
@@ -100,7 +106,7 @@ const EVENT_TEXT = {
   found: (payload) => (payload.web_search ? 'Найдена в сети.' : `Найдена на ${payload.source}.`),
   applied_elsewhere: appliedNote,
   apply_failed: (payload) =>
-    `Отклик не удался (${VIA[payload.method] || payload.method}): ${payload.reason}.`,
+    `Отклик не удался (${viaWords(payload.method)}): ${payload.reason}.`,
   vacancy_closed: () => 'Вакансия закрыта на сайте.',
 };
 

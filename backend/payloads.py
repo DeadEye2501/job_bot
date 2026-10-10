@@ -296,6 +296,7 @@ class VacancyDetail:
     history: list[VacancyStatusHistory]
     events: list[VacancyEvent]
     contacts: list[VacancyContact]
+    has_screening: bool
 
 
 @dataclass(frozen=True)

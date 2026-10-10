@@ -258,6 +258,7 @@
 
 ### `backend/agent/human_gate.py`
 
+- `logger` = `logging.getLogger(__name__)`
 - `LIMIT_SEC` = `3600.0`
 - `_STOPPED` = `'обход остановлен; заверши работу'`
 
@@ -1396,6 +1397,7 @@
   - `history: list[VacancyStatusHistory]`
   - `events: list[VacancyEvent]`
   - `contacts: list[VacancyContact]`
+  - `has_screening: bool`
 - `class HrWithCount`
   - `hr: HR`
   - `vacancy_count: int`
@@ -1487,6 +1489,9 @@
   - `letter_by: str | None`
   - `screening: list[tuple[bool, str]]`
   - `simulated: bool`
+- `class ScreenedApplication`
+  - `target: str`
+  - `lines: list[tuple[bool, str]]`
 
 ### `backend/repository/blacklist.py`
 
@@ -1559,8 +1564,12 @@
 ### `backend/repository/mail_account.py`
 
 - `_SSL_PORT` = `465`
+- `_STARTTLS_PORT` = `587`
 - `_GMAIL` = `набор из 2`
-- `_GMAIL_DOMAINS` = `набор из 2`
+- `_YANDEX` = `набор из 2`
+- `_MAIL_RU` = `набор из 2`
+- `_OUTLOOK` = `набор из 2`
+- `_KNOWN_SERVERS` = `словарь из 12`
 - `class MailSettings`
   - `address: str`
   - `password: str | None` = `field(repr=False)`
@@ -1847,7 +1856,7 @@
 - `RERUN_REFUSALS` = `словарь из 6`
 - `PASTED_REFUSALS` = `словарь из 7`
 - `PARSE_CV_REFUSALS` = `словарь из 5`
-- `SEND_REFUSALS` = `словарь из 12`
+- `SEND_REFUSALS` = `словарь из 13`
 - `NO_AGGREGATOR` = `'Агрегатор не найден.'`
 - `WEB_SEARCH_KEPT` = `'Поиск по сети удалить нельзя'`
 - `LOGIN_FIRST` = `'Сначала войдите на сайт'`
