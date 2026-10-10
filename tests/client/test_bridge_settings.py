@@ -72,6 +72,20 @@ async def test_an_unknown_setting_is_ignored_not_written(api, ask, session_facto
         assert await session.get(AppSetting, "придуманное") is None
 
 
+async def test_source_switches_are_not_written_through_the_settings_form(api, ask, session_factory):
+    """Общие выключатели каналов и агрегаторов пишет своя кнопка над списком
+    (`source_switch`): форма настроек их не шлёт, и мимо той кнопки — с её
+    вестями окну — их не записать."""
+    answer = await ask(api.settings.save, {"app": {"channels_enabled": False,
+                                                   "aggregators_enabled": False,
+                                                   "scoring_threshold": 6}})
+
+    assert answer["ok"]["applied"] == ["app.scoring_threshold"]
+    async with session_factory() as session:
+        assert await session.get(AppSetting, "channels_enabled") is None
+        assert await session.get(AppSetting, "aggregators_enabled") is None
+
+
 async def test_saving_a_provider_without_an_address_is_refused(api, ask):
     """Пустой адрес поставщика не сохраняют молча.
 

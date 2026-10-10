@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
-from backend.bot.media import image_type
+from backend.domain.image_types import image_type
 from client.serving import MEDIA_PREFIX, inside
 
 

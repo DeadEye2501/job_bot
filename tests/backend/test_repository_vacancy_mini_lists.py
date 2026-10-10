@@ -6,9 +6,10 @@ HR и компании идут по времени, а список канал�
 горяч статус.
 """
 
-from backend.models import Vacancy, VacancyStatus
+from backend.models import VacancyStatus
 from backend.repository.vacancies_mini import list_vacancies_for_company, list_vacancies_for_hr, list_vacancies_from
 from tests.dbio import put
+from tests.factories_aggregators import aggregator_row
 from tests.factories import (
     at,
     channel_row,
@@ -134,7 +135,7 @@ async def test_the_channel_list_holds_only_the_parsed_ones(
         ),
     )
 
-    got, _ = await list_vacancies_from(session, Vacancy.source_channel_id == channel.id)
+    got, _ = await list_vacancies_from(session, "channel", channel.id)
 
     assert [v.title for v in got] == ["разобранная"]
 
@@ -181,7 +182,7 @@ async def test_the_channel_list_leads_with_the_hottest_status(
         ],
     )
 
-    got, _ = await list_vacancies_from(session, Vacancy.source_channel_id == channel.id)
+    got, _ = await list_vacancies_from(session, "channel", channel.id)
 
     assert [v.title for v in got] == [s.value for s in _HOTTEST_FIRST]
 
@@ -213,7 +214,7 @@ async def test_inside_one_status_the_channel_list_prefers_the_posting_date(
         ),
     )
 
-    got, _ = await list_vacancies_from(session, Vacancy.source_channel_id == channel.id)
+    got, _ = await list_vacancies_from(session, "channel", channel.id)
 
     assert [v.title for v in got] == ["опубликована позже", "создана позже"]
 
@@ -236,8 +237,8 @@ async def test_the_channel_list_pages(session, session_factory):
         vacancy_row(title="третья", source_channel_id=channel.id, created_at=at(30)),
     )
 
-    first, _ = await list_vacancies_from(session, Vacancy.source_channel_id == channel.id, limit=2)
-    second, _ = await list_vacancies_from(session, Vacancy.source_channel_id == channel.id, limit=2, offset=2)
+    first, _ = await list_vacancies_from(session, "channel", channel.id, limit=2)
+    second, _ = await list_vacancies_from(session, "channel", channel.id, limit=2, offset=2)
 
     assert [v.title for v in first] == ["первая", "вторая"]
     assert [v.title for v in second] == ["третья", "четвёртая"]
@@ -255,6 +256,24 @@ async def test_a_neighbouring_channels_vacancies_stay_out(session, session_facto
         vacancy_row(title="ничья", source_channel_id=None),
     )
 
-    got, _ = await list_vacancies_from(session, Vacancy.source_channel_id == mine.id)
+    got, _ = await list_vacancies_from(session, "channel", mine.id)
 
     assert [v.title for v in got] == ["моя"]
+
+
+async def test_an_aggregators_list_holds_its_own_vacancies_not_a_channels(
+    session, session_factory
+):
+    """Источник называют родом и номером: номер агрегатора не путается с номером канала."""
+    channel = channel_row(username="pyjobs")
+    site = aggregator_row(host="board.test")
+    await put(session_factory, channel, site)
+    await put(
+        session_factory,
+        vacancy_row(title="с агрегатора", source_aggregator_id=site.id),
+        vacancy_row(title="из канала", source_channel_id=channel.id),
+    )
+
+    got, _ = await list_vacancies_from(session, "aggregator", site.id)
+
+    assert [v.title for v in got] == ["с агрегатора"]

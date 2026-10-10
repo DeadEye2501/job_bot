@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.funnel import APPLIED, FIT_EXCLUDE, RESPONDED, percent_or_none
 from backend.models import Vacancy
-from backend.payloads import ChannelStats
+from backend.payloads import SourceStats
 from backend.repository.vacancies_common import PARSED_ONLY, count_by_status
 
 _RATE_WINDOW_DAYS = 30
@@ -31,7 +31,7 @@ async def _vacancies_per_day(session: AsyncSession, from_source) -> float:
     return round(recent_count / _RATE_WINDOW_DAYS, 1)
 
 
-async def source_stats(session: AsyncSession, from_source) -> ChannelStats:
+async def source_stats(session: AsyncSession, from_source) -> SourceStats:
     """Числа карточки источника: разбивка по статусам, темп и три доли.
 
     `from_source` — условие «вакансия пришла из этого источника»: каналы и
@@ -55,7 +55,7 @@ async def source_stats(session: AsyncSession, from_source) -> ChannelStats:
     responded_total = sum(
         n for s, n in counts_by_enum.items() if s in RESPONDED
     )
-    return ChannelStats(
+    return SourceStats(
         status_counts={
             status.value: count for status, count in counts_by_enum.items()
         },

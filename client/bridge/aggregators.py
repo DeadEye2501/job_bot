@@ -5,8 +5,7 @@ from __future__ import annotations
 from backend.agent.availability import current_refusal
 from backend.flows.aggregator_name import create_named_aggregator
 from backend.repository import aggregators as repo
-from client.bridge.answer import Denied, asked_id, denied, launched, reply
-from client.bridge.form_payloads import read_toggle
+from client.bridge.answer import Denied, asked_id, denied, launched, read_toggle, reply
 from client.bridge.hub import Hub
 from client.bridge.mark import AGGREGATOR_MARK, marked, unmarked
 from client.bridge.page import read_search
@@ -18,10 +17,15 @@ from client.bridge.refusals import (
     NO_AGGREGATOR,
     NO_BOT,
     WEB_SEARCH_KEPT,
+    agent_refusals,
 )
 from client.bridge.source_page import AGGREGATOR, source_vacancies
 from client.bridge.source_switch import switch_all
-from client.bridge.wire import _aggregator_row_to_dict, _source_stats_to_dict
+from client.bridge.wire import (
+    _aggregator_list_row_to_dict,
+    _aggregator_row_to_dict,
+    _source_stats_to_dict,
+)
 
 
 class Aggregators:
@@ -43,9 +47,7 @@ class Aggregators:
                 rows = await repo.list_aggregators_with_counts(session, search)
             return {"search": search or "",
                     "enabled": self._hub.rs.aggregators_enabled,
-                    "aggregators": [{**_aggregator_row_to_dict(row), "vacancy_count": count,
-                                     "is_blacklisted": barred}
-                                    for row, count, barred in rows],
+                    "aggregators": [_aggregator_list_row_to_dict(*one) for one in rows],
                     "lock": current_refusal(self._hub.rs.chat)}
 
         return reply(self._hub.runner, run())
@@ -167,7 +169,7 @@ class Aggregators:
         return launched(
             self._hub,
             lambda: work(aggregator_id),
-            {**refusals, "locked": current_refusal(self._hub.rs.chat) or ""},
+            agent_refusals(refusals, self._hub.rs.chat),
             done,
             aggregator_id=aggregator_id,
             action=action,

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import Vacancy, VacancyStatus
 from backend.repository.hr_card import LAST_VACANCY_ORDER
 from backend.repository.paging import trim_page
-from backend.repository.vacancies_common import PARSED_ONLY, VACANCY_APPEARED_AT
+from backend.repository.vacancies_common import PARSED_ONLY, SOURCE_LINKS, VACANCY_APPEARED_AT
 
 # Обещание этого порядка — «по ходу воронки»: наверху офер, под ним «в
 # процессе», и только потом приглашение с тестом. Так потому, что по графу
@@ -83,7 +83,11 @@ async def list_vacancies_for_company(
     return await _list_linked(session, Vacancy.company_id == company_id)
 
 
-async def count_vacancies_from(session: AsyncSession, from_source) -> int:
+def _from_source(kind: str, source_id: int):
+    return SOURCE_LINKS[kind] == source_id
+
+
+async def count_vacancies_from(session: AsyncSession, kind: str, source_id: int) -> int:
     """Сколько разобранных вакансий числится за источником — каналом или агрегатором.
 
     Отбор тот же, что у списка рядом и у счётчика в карточке: мост сверяет с
@@ -92,22 +96,23 @@ async def count_vacancies_from(session: AsyncSession, from_source) -> int:
     недоразобранная строка, то есть на любой работающий.
     """
     counted = await session.execute(
-        select(func.count(Vacancy.id)).where(from_source, PARSED_ONLY)
+        select(func.count(Vacancy.id)).where(_from_source(kind, source_id), PARSED_ONLY)
     )
     return int(counted.scalar_one())
 
 
 async def list_vacancies_from(
     session: AsyncSession,
-    from_source,
+    kind: str,
+    source_id: int,
     *,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Vacancy], bool]:
     """Страница разобранных вакансий источника и есть ли за ней ещё.
 
-    `from_source` — условие «вакансия пришла из этого источника»: канал и
-    агрегатор листаются одинаково и различаются только колонкой ссылки.
+    Источник — род (`CHANNEL_KIND`, `AGGREGATOR_KIND`) и номер: канал и агрегатор
+    листаются одинаково и различаются только колонкой ссылки.
 
     Порядок — по горячести статуса, потом по свежести. Страница нужна потому,
     что источники накапливают тысячи вакансий, и мини-список карточки грузит
@@ -125,7 +130,7 @@ async def list_vacancies_from(
     rows = (
         await session.scalars(
             select(Vacancy)
-            .where(from_source, PARSED_ONLY)
+            .where(_from_source(kind, source_id), PARSED_ONLY)
             .order_by(
                 status_rank.asc(),
                 VACANCY_APPEARED_AT.desc(),

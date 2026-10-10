@@ -12,8 +12,7 @@ from backend.models import ApplicationVia
 VIA_AGGREGATOR = ApplicationVia.AGGREGATOR.value
 VIA_FORM = ApplicationVia.FORM.value
 VIA_EMAIL = ApplicationVia.EMAIL.value
-"""Способы отклика строкой — так их несут `Way` и задание агента. Объявлены
-здесь, у перечня способов, и отсюда их берут агент и поток отклика."""
+"""Способы отклика строкой — так их несут `Way` и задание агента."""
 
 
 @dataclass(frozen=True)

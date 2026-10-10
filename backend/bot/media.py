@@ -6,6 +6,8 @@ import shutil
 from config import get_data_dir
 from pathlib import Path
 
+from backend.domain.image_types import image_type
+
 
 logger = logging.getLogger(__name__)
 
@@ -19,33 +21,8 @@ MEDIA_DIR = get_data_dir() / "media"
 PHOTO_EXTS = {".png", ".jpg", ".jpeg", ".webp"}  # GIFs go via send_document → preserved as animation
 
 
-# WEBP сюда не попадает: у него подпись разорвана — `RIFF`, четыре байта
-# длины, и только потом `WEBP`, поэтому она проверяется отдельно.
-_IMAGE_SIGNATURES = (
-    (b"\xff\xd8\xff", "image/jpeg"),
-    (b"\x89PNG\r\n\x1a\n", "image/png"),
-    (b"\x00\x00\x01\x00", "image/x-icon"),
-    (b"GIF8", "image/gif"),
-)
-
 _PHOTO_TYPES = {"image/jpeg", "image/png", "image/webp"}
 """Что Telegram принимает в send_photo."""
-
-
-def image_type(head: bytes) -> str | None:
-    """Тип картинки по её первым байтам; None — не узнана.
-
-    Одно объявление на отправку вложений и на показ снимков в окне: обе
-    стороны не верят имени и расширению, а читают сами байты, и разойдись
-    подписи — одна и та же картинка была бы фото для одной и чужим файлом
-    для другой. Хватает первых двенадцати байт.
-    """
-    for signature, kind in _IMAGE_SIGNATURES:
-        if head.startswith(signature):
-            return kind
-    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
-        return "image/webp"
-    return None
 
 
 # User-facing caps на upload. Telegram regular doc-limit ≈ 2 GB, но без

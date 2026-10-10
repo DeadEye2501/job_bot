@@ -16,6 +16,7 @@ from client.bridge.answer import Denied, asked_id, denied, launched, reply
 from client.bridge.refusals import (
     APPLY_VIA_REFUSALS,
     NO_BOT,
+    agent_refusals,
     NO_VACANCY,
     RERUN_REFUSALS,
     SEND_REFUSALS,
@@ -97,7 +98,7 @@ class VacancyActions:
         return launched(
             self._hub,
             lambda: bot.apply_via_agent(vacancy_id, found["ok"]),
-            {**APPLY_VIA_REFUSALS, "locked": current_refusal(self._hub.rs.chat) or ""},
+            agent_refusals(APPLY_VIA_REFUSALS, self._hub.rs.chat),
             "Отклик записан.",
             vacancy_id=vacancy_id,
             action="apply_via",

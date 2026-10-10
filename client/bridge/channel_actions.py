@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from backend.domain.telegram_identity import normalize_username
 from backend.repository import channels as channels_repo
-from client.bridge.answer import Denied, denied, launched, reply
+from client.bridge.answer import Denied, denied, launched, read_toggle, reply
 from client.bridge.mark import CHANNEL_MARK, marked, unmarked
 from client.bridge.refusals import (
     BLACKLISTED_STAYS_OFF,
@@ -12,7 +12,6 @@ from client.bridge.refusals import (
     NO_CHANNEL,
     POLL_REFUSALS,
 )
-from client.bridge.form_payloads import read_toggle
 from client.bridge.source_switch import switch_all
 
 
@@ -181,29 +180,13 @@ class ChannelActions:
         return reply(self._hub.runner, self._switched(channel_id, is_active))
 
     async def _switched(self, channel_id: int, is_active: bool) -> dict:
-        """Переключить один канал, не оживив запрещённого.
-
-        Заслон стоит здесь, а не в окне: канал в отсеве не читают, и пройди
-        включение — заслон оказался бы отменён нажатием, которое про него
-        ничего не знает.
-        """
+        """Переключить один канал; запрет отсева держит репозиторий."""
         async with self._hub.session_factory() as session:
             async with session.begin():
-                if is_active and await channels_repo.is_channel_blacklisted(
-                    session, channel_id
-                ):
-                    raise Denied(
-                        BLACKLISTED_STAYS_OFF,
-                        channel_id=channel_id,
-                        is_active=is_active,
-                        action="set_active",
-                    )
-                switched = await channels_repo.set_channel_active(
-                    session, channel_id, is_active
-                )
-        if not switched:
+                status = await channels_repo.set_channel_active(session, channel_id, is_active)
+        if status != "ok":
             raise Denied(
-                NO_CHANNEL,
+                BLACKLISTED_STAYS_OFF if status == "blacklisted" else NO_CHANNEL,
                 channel_id=channel_id, is_active=is_active, action="set_active",
             )
         return {

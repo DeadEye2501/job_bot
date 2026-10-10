@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from backend.models import BLACKLIST_KINDS
 from backend.repository import blacklist as blacklist_repo, blacklist_candidates
-from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
+from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, read_toggle, reply
 from client.bridge.hub import Hub
 from client.bridge.refusals import NO_ENTRY
 from client.bridge.wire import _blacklist_row_to_dict
-from client.bridge.form_payloads import read_toggle
 
 
 class Blacklist:

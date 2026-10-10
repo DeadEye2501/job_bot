@@ -1,5 +1,7 @@
 """Строка таблицы источников на экране статистики: кто прислал, сколько, куда дошло."""
 
+from backend.models.settings import AGGREGATOR_KIND, CHANNEL_KIND
+
 SourceKey = tuple[int | None, int | None]
 """Источник строки — пара «канал, агрегатор»; обе пусты у заведённого руками."""
 
@@ -29,7 +31,7 @@ def source_item(
     return {
         "id": channel_id,
         "aggregator_id": aggregator_id,
-        "kind": "channel" if channel_id else "aggregator" if aggregator_id else "none",
+        "kind": CHANNEL_KIND if channel_id else AGGREGATOR_KIND if aggregator_id else "none",
         "title": title,
         "username": username,
         "_total_vac": int(total_vac or 0),

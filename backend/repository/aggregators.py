@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.hosts import normalize_host, owning_host, owning_hosts
 from backend.models import Aggregator, Application, TrashEvent, Vacancy
-from backend.payloads import ChannelStats
+from backend.payloads import SourceStats
 from backend.models.settings import AGGREGATOR_KIND
 from backend.repository.blacklist_marks import BlacklistMark
 from backend.repository.search import matches_search
@@ -119,7 +119,7 @@ async def list_aggregators_with_counts(
 
 async def get_aggregator_detail(
     session: AsyncSession, aggregator_id: int
-) -> tuple[Aggregator, ChannelStats, str | None] | None:
+) -> tuple[Aggregator, SourceStats, str | None] | None:
     """Агрегатор, числа его карточки — те же, что у канала, — и значение его отметки отсева."""
     row = await session.get(Aggregator, aggregator_id)
     if row is None:
