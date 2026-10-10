@@ -94,9 +94,12 @@ _METHOD_NAMES = {
 }
 
 
-@pytest.mark.parametrize("via", list(ApplicationVia))
+@pytest.mark.parametrize("via", [v for v in ApplicationVia if v is not ApplicationVia.TELEGRAM])
 def test_every_method_has_its_name_and_its_simulation(via):
-    """Новый способ без своей подписи в этой таблице падает здесь KeyError-ом."""
+    """Новый способ агента без своей подписи в этой таблице падает здесь KeyError-ом.
+
+    Telegram агенту не достаётся: туда пишет исполнитель сам, без браузера.
+    """
     name = _METHOD_NAMES[via]
     task = _task(method=via.value, simulated=True)
     assert f"Способ отклика: {name}\n" in task and "Режим симуляции" in task

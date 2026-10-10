@@ -486,6 +486,7 @@
 
 ### `backend/domain/apply_order.py`
 
+- `VIA_TELEGRAM` = `ApplicationVia.TELEGRAM.value`
 - `VIA_AGGREGATOR` = `ApplicationVia.AGGREGATOR.value`
 - `VIA_FORM` = `ApplicationVia.FORM.value`
 - `VIA_EMAIL` = `ApplicationVia.EMAIL.value`
@@ -497,13 +498,17 @@
   - `id: int`
   - `host: str | None`
   - `logged_in: bool` = `True`
-- `class ApplyFacts`
+- `class VacancyFacts`
+  - `hr_handle: str | None`
   - `source_url: str | None`
   - `source_site: KnownSite | None`
   - `contacts: list[str]`
-  - `sites: list[KnownSite]`
+- `class World`
+  - `telegram_open: bool`
   - `mail_ready: bool`
-  - `closed: set[int]`
+  - `agent_ready: bool`
+  - `sites: list[KnownSite]`
+  - `closed_sites: set[int]`
 
 ### `backend/domain/company_hosts.py`
 
@@ -1109,6 +1114,7 @@
   - `AGENT` = `'agent'`
   - `USER` = `'user'`
 - `class ApplicationVia(enum.Enum)`
+  - `TELEGRAM` = `'telegram'`
   - `AGGREGATOR` = `'aggregator'`
   - `FORM` = `'form'`
   - `EMAIL` = `'email'`
@@ -1487,7 +1493,7 @@
 
 ### `backend/repository/applications.py`
 
-- `_EXPLANATION` = `словарь из 3`
+- `_EXPLANATION` = `словарь из 4`
 - `class ApplicationEntry`
   - `vacancy_id: int`
   - `aggregator_id: int | None`

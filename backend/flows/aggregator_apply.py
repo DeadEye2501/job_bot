@@ -13,7 +13,7 @@ from backend.agent.tools_applier import applier_tools
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
 from backend.agent.tools_letter import letter_tools
-from backend.domain.apply_order import VIA_EMAIL, ApplyFacts, KnownSite, Way, apply_ways
+from backend.domain.apply_order import VIA_EMAIL, KnownSite, VacancyFacts, Way, World, apply_ways
 from backend.domain.contact_keys import is_link
 from backend.domain.hosts import owning_host
 from backend.flows.aggregator_round import RoundState
@@ -104,7 +104,9 @@ async def vacancy_ways(session_factory, vacancy_id: int, closed: set[int]) -> li
                    if a.id == vacancy.source_aggregator_id), None)
     source_url = vacancy.source_url if clear(vacancy.source_url) else None
     contacts = [c for c in contacts if not is_link(c) or clear(c)]
-    return apply_ways(ApplyFacts(source_url, source, contacts, sites, mail_ready, closed))
+    return apply_ways(VacancyFacts(None, source_url, source, contacts),
+                      World(telegram_open=False, mail_ready=mail_ready, agent_ready=True,
+                            sites=sites, closed_sites=closed))
 
 
 async def _ways_for(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> list[Way]:

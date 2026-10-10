@@ -1,4 +1,4 @@
-"""Отклики вне Telegram и скрининг по ним."""
+"""Отклики и скрининг по ним."""
 
 from dataclasses import dataclass
 
@@ -12,6 +12,7 @@ from backend.repository.vacancy_status import mark_vacancy_applied
 from backend.telegram_time import utc_now
 
 _EXPLANATION = {
+    ApplicationVia.TELEGRAM: "Отклик в Telegram.",
     ApplicationVia.AGGREGATOR: "Отклик на сайте агрегатора.",
     ApplicationVia.FORM: "Отклик формой работодателя.",
     ApplicationVia.EMAIL: "Отклик письмом.",
