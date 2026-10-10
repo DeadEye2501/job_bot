@@ -1,0 +1,32 @@
+/* Контакты вакансии в карточке: подпись с «+ Контакт» и строка на контакт.
+   Подпись — общая (`caption.css`), «+ Контакт» — `add-link.css`, крестик —
+   `remove-cross.css`. */
+
+.vac-contacts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.vac-contacts-head .field-label {
+  font-size: 0.7rem;
+}
+
+.vac-contact {
+  display: grid;
+  grid-template-columns: 1fr 20px;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Светлее ссылок шапки контакта: здесь контакт — само содержимое строки, а не
+   подпись под именем. Подсветка под курсором — общая с ними, в contact-card.css. */
+.vac-contact-link {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}

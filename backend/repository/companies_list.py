@@ -6,8 +6,7 @@ from backend.models import Company, Vacancy
 from backend.payloads import CompanyWithCount
 from backend.incoming import str_list
 
-from backend.repository.blacklist_marks import active_blacklist_values, marked_by
-from backend.repository.companies_card import company_blacklist_candidates
+from backend.repository.companies_card import COMPANY_BLACKLIST
 from backend.repository.paging import searched_page
 from backend.repository.search import matches_search
 from backend.repository.vacancies_common import with_vacancy_counts
@@ -39,13 +38,13 @@ async def list_companies_with_counts(
         offset,
     )
 
-    bl_values = await active_blacklist_values(session, "company")
+    bl_values = await COMPANY_BLACKLIST.marked(session)
 
     return [
         CompanyWithCount(
             company=c,
             vacancy_count=int(cnt or 0),
-            is_blacklisted=marked_by(company_blacklist_candidates(c), bl_values),
+            is_blacklisted=COMPANY_BLACKLIST.among(c, bl_values),
         )
         for c, cnt in rows
     ], has_more

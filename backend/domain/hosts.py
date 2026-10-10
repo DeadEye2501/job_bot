@@ -1,4 +1,4 @@
-"""Разбор адреса: нормальный хост, остаток, принадлежность сайту, номер страницы."""
+"""Разбор адреса: нормальный хост, имя сайта, остаток, принадлежность сайту, номер страницы."""
 
 from typing import NamedTuple
 from urllib.parse import parse_qsl, urlsplit
@@ -55,12 +55,49 @@ def address_parts(url: str) -> AddressParts:
     )
 
 
+# Вторые уровни, под которыми зоны стран раздают имена сайтам: `example.co.uk`
+# назван «example», а не «co». Перечнем общих слов, а не длиной метки: короткое
+# имя сайта в зоне страны (`hr.ex.ru`) иначе приняли бы за такой уровень.
+_ZONE_SECOND_LEVELS = frozenset({"co", "com", "net", "org", "ac", "gov", "edu"})
+
+
+def site_label(host: str) -> str:
+    """Имя сайта в хосте — без доменной зоны и поддоменов: `jobs.example.com` → `example`."""
+    labels = host.split(".")
+    if len(labels) >= 3 and len(labels[-1]) == 2 and labels[-2] in _ZONE_SECOND_LEVELS:
+        return labels[-3]
+    return labels[-2] if len(labels) >= 2 else labels[0]
+
+
 def host_owns(host: str, link_host: str) -> bool:
     """Ссылка принадлежит сайту, если её хост равен его хосту или кончается на точку и его хост.
 
     Хвост берётся с точкой: `spb.hh.ru` — та же площадка, а `nothh.ru` — нет.
     """
     return link_host == host or link_host.endswith("." + host)
+
+
+def owning_hosts(host: str) -> list[str]:
+    """Хосты, которым принадлежит этот (`host_owns`): он сам и каждый, у кого он
+    поддомен, — без голой доменной зоны: `spb.hh.ru` → `spb.hh.ru`, `hh.ru`.
+
+    Отметка отсева на сайте ловится точным совпадением с любым из них — и
+    поддомен сайта отсеивается так же, как ссылка на него.
+    """
+    labels = host.split(".")
+    return [".".join(labels[at:]) for at in range(max(len(labels) - 1, 1))]
+
+
+def owning_host(url: str, hosts: set[str]) -> str | None:
+    """Хост из набора, которому принадлежит ссылка (`host_owns`); пусто — ничей.
+
+    Набор перебирается по порядку, чтобы при двух подходящих — сайте и его
+    поддомене в одном наборе — ответ не менялся от запуска к запуску.
+    """
+    link_host = normalize_host(url)
+    if not link_host:
+        return None
+    return next((host for host in sorted(hosts) if host_owns(host, link_host)), None)
 
 
 def source_key(url: str, aggregator_host: str | None) -> str | None:

@@ -18,6 +18,11 @@ import { blankCompany, companyNamed } from './companies.js';
 import { blankPerson, named } from './people.js';
 import { blankVacancy, typed, vacancyNamed } from './vacancies.js';
 
+// Окна об одном поле — ник канала, адрес сайта, контакт вакансии: черновик
+// строкой, и пустая строка ничего не называет. Отказ моста у них остаётся в
+// окне (`contact_adding`): это почти всегда опечатка в набранном.
+const ONE_FIELD = { blank: () => '', named: (draft) => Boolean(draft.trim()) };
+
 /** Обвязка формы заведения по роду карточки.
  *
  * `named` держится рядом с `blank` нарочно: пустой черновик и заслон, который
@@ -57,5 +62,33 @@ export const NEW_CARD = {
     done: (draft) => (typed(draft) ? '' : 'Вакансия заведена'),
     blank: blankVacancy,
     named: vacancyNamed,
+  },
+  // Слово по удаче называет то, что ответил мост, а не набранное: ник и адрес
+  // он приводит к своему написанию, и человек должен увидеть, что легло.
+  channel: {
+    ...ONE_FIELD,
+    title: 'Добавить канал',
+    placeholder: '@username канала или t.me/...',
+    hint: 'Название и аватар подгрузятся из Telegram автоматически.',
+    done: (_draft, answer) =>
+      answer.created ? `Канал добавлен: @${answer.username}` : `Канал @${answer.username} уже был заведён`,
+  },
+  aggregator: {
+    ...ONE_FIELD,
+    title: 'Добавить агрегатор',
+    placeholder: 'example.com или https://...',
+    hint: 'После добавления войдите на сайт — без входа агрегатор не включить.',
+    done: (_draft, answer) =>
+      answer.status === 'created'
+        ? `Агрегатор добавлен: ${answer.aggregator.host}`
+        : `${answer.aggregator.host} уже был заведён`,
+  },
+  // О контакте слова нет: он сразу появляется в списке карточки.
+  contact: {
+    ...ONE_FIELD,
+    title: 'Добавить контакт',
+    placeholder: 'Почта, ссылка или телефон',
+    hint: 'Контакт для отклика вне Telegram: почта, страница вакансии, форма или телефон.',
+    done: () => '',
   },
 };

@@ -6,7 +6,7 @@ from typing import Literal
 
 from pyrogram.errors import FloodWait, UsernameInvalid, UsernameNotOccupied
 
-from backend.bot import slot
+from backend.bot import aggregators, slot
 from backend.flows import channels as flow_channels
 from backend.telegram_lookup import read_channel_metadata
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
@@ -125,14 +125,35 @@ async def add_channel(
     return channel_id, "created"
 
 
-async def force_poll_once(bot) -> slot.CycleOutcome:
-    """Manual one-shot poll, fired regardless of bot_state.mode. Used by
-    the refresh button so the user always sees something happen.
+async def ingest_round(bot) -> None:
+    """Оборот приёма: сперва дочитать отложенное, потом идти за новым.
 
-    Отдаёт "busy", если место прогона занято, — окно показывает это
-    подсказкой.
+    Недоразобранная строка ждёт статьи, которой не хватило на приёме, и в
+    окне её не видно вовсе — ни в списке, ни в отказах. Подбирай такие только
+    при подъёме, и объявление ждало бы до следующего запуска приложения, а
+    работает оно сутками.
+
+    Сорвавшийся подбор обход не отменяет: свежие объявления человек ждёт
+    больше, чем дочитанные.
     """
-    outcome, _ = await slot.run_in_slot(
-        bot, lambda: bot.ingestion.poll_active_channels(), "forced poll cycle"
-    )
-    return outcome
+    try:
+        await bot.ingestion.recover_orphan_vacancies()
+    except Exception:
+        logger.exception("orphan recovery failed")
+    await bot.ingestion.poll_active_channels()
+
+
+async def force_poll_once(bot) -> slot.CycleOutcome:
+    """Кнопка ▶: тот же оборот, что у цикла, — недоразобранное, каналы, затем
+    агрегаторы, — но в любом режиме: человек нажал сам и ждёт, что что-то
+    произойдёт.
+
+    Выключатели каналов и агрегаторов действуют как в цикле: выключенному
+    просто нечего опрашивать. «busy» — место прогона занято; погашенный или
+    сорвавшийся опрос каналов обход агрегаторов не пускает.
+    """
+    outcome, _ = await slot.run_in_slot(bot, lambda: ingest_round(bot), "forced poll cycle")
+    if outcome != "ok" or bot.stop_event.is_set():
+        return outcome
+    await aggregators.launch_round(bot)
+    return "ok"

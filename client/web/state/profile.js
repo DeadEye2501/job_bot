@@ -21,6 +21,25 @@ export const WORK_FORMATS = [
   { value: 'hybrid', label: 'Гибрид' },
 ];
 
+/** Пол — для родовых форм в письмах и ответах, которые агент пишет за человека.
+ *  Значения совпадают с перечнем `Gender` модели анкеты. */
+export const GENDERS = [
+  { value: 'male', label: 'М' },
+  { value: 'female', label: 'Ж' },
+];
+
+/** Валюты ожидаемой зарплаты — знаками, какими их хранит мост. Перечень тот
+ *  же, что у разбора валют (`backend/domain/currency.py`): другое мост не
+ *  узнает и запишет пустоту. */
+export const CURRENCIES = ['₽', '$', '€', '₸', '֏', '₾'];
+
+/** За какой срок названа ожидаемая зарплата. Значения — перечень `SalaryPeriod`. */
+export const SALARY_PERIODS = [
+  { value: 'hour', label: 'В час' },
+  { value: 'month', label: 'В месяц' },
+  { value: 'year', label: 'В год' },
+];
+
 /** Уровни языка от высшего к младшему: родной и высокий выбирают чаще всего,
  *  и они должны попадаться первыми. */
 export const LANG_LEVELS = ['native', 'C2', 'C1', 'B2', 'B1', 'A2', 'A1'];
@@ -83,6 +102,9 @@ export function blankProfile() {
   return {
     first_name: '',
     last_name: '',
+    first_name_latin: '',
+    last_name_latin: '',
+    gender: '',
     title: '',
     email: '',
     phone: '',
@@ -91,10 +113,28 @@ export function blankProfile() {
     location: '',
     education: '',
     free_preferences: '',
+    expected_salary: '',
+    expected_salary_currency: '',
+    expected_salary_period: '',
     grades: [],
     work_format: [],
     languages: [],
     updated_at: null,
+  };
+}
+
+/** Анкета целиком — тем видом, каким её принимает мост.
+ *
+ * Сумма уезжает одними цифрами: «150 000» человек пишет так, как привык
+ * читать, а мост считает суммой только число, и с пробелом между разрядами
+ * она легла бы пустотой. В поле при этом остаётся набранное как есть.
+ */
+export function profileSheet(form, grades, formats) {
+  return {
+    ...form,
+    expected_salary: String(form.expected_salary ?? '').replace(/\s/g, ''),
+    grades: [...grades],
+    work_format: [...formats],
   };
 }
 

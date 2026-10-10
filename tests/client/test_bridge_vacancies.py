@@ -10,6 +10,7 @@ import json
 from backend.models import VacancyStatus
 from tests.dbio import put
 from tests.factories import company_row, status_history_row, vacancy_row
+from tests.factories_aggregators import aggregator_row, web_search_row
 
 
 async def test_the_filter_menus_come_by_their_own_ask(api, ask, session_factory):
@@ -218,6 +219,38 @@ async def test_a_changed_status_reaches_the_card(api, ask, session_factory):
 
     shown = await ask(api.vacancies.detail, vacancy.id)
     assert shown["ok"]["vacancy"]["status"] == "Applied"
+
+
+async def test_a_card_from_an_aggregator_names_its_source(api, ask, session_factory):
+    """Пилюля источника у вакансии с агрегатора — как у вакансии из канала: имя
+    источника приходит в карточке само, по привязке, без записи руками."""
+    site = aggregator_row(name="Пример Работа", host="example.test")
+    await put(session_factory, site)
+    vacancy = vacancy_row(source_aggregator_id=site.id, source_key="vacancy/1",
+                          source_url="https://example.test/vacancy/1")
+    plain = vacancy_row()
+    await put(session_factory, vacancy, plain)
+
+    card = (await ask(api.vacancies.detail, vacancy.id))["ok"]["vacancy"]
+    bare = (await ask(api.vacancies.detail, plain.id))["ok"]["vacancy"]
+
+    assert (card["aggregator_name"], card["channel_username"]) == ("Пример Работа", None)
+    assert card["from_web_search"] is False
+    assert bare["aggregator_name"] is None
+
+
+async def test_a_card_found_on_the_open_web_says_so(api, ask, session_factory):
+    """У «Поиска по сети» имя — не источник, а способ поиска: окну нужно знать,
+    что вакансия пришла с чужого сайта, а не с агрегатора."""
+    web = web_search_row()
+    await put(session_factory, web)
+    vacancy = vacancy_row(source_aggregator_id=web.id, source_key="company.test/jobs/1",
+                          source_url="https://company.test/jobs/1")
+    await put(session_factory, vacancy)
+
+    card = (await ask(api.vacancies.detail, vacancy.id))["ok"]["vacancy"]
+
+    assert card["from_web_search"] is True
 
 
 async def test_an_explanation_for_a_missing_record_is_refused(

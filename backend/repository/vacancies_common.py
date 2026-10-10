@@ -49,11 +49,20 @@ def with_vacancy_counts(subject, link, label):
     выбросил бы из списка предмет без единой разобранной вакансии, а тот
     обязан остаться в нём с нулём.
     """
+    return counted_vacancies(subject, link).order_by(*by_vacancy_count(label))
+
+
+def counted_vacancies(subject, link):
+    """Предметы со счётом разобранных вакансий, без порядка.
+
+    Порознь от запроса выше, потому что не всякий перечень ставит плодовитых
+    сверху: агрегаторы держат «Поиск по сети» первым и дальше порядок
+    заведения, а считать им надо тем же отбором, что и соседям.
+    """
     return (
         select(subject, func.count(Vacancy.id).label("cnt"))
         .outerjoin(Vacancy, and_(link == subject.id, PARSED_ONLY))
         .group_by(subject.id)
-        .order_by(*by_vacancy_count(label))
     )
 
 

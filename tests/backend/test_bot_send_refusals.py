@@ -36,20 +36,16 @@ async def test_an_hr_without_an_address_is_not_written_to(
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NEW
 
 
-async def test_a_switched_off_bot_writes_to_nobody(
-    ready_to_send, session_factory, outbox
+async def test_a_switched_off_bot_still_writes_what_the_person_asked(
+    ready_to_send, outbox
 ):
-    """Выключенный бот писем не шлёт даже по кнопке из окна.
-
-    Кнопка «отправить отклик» доступна всегда, а «выключен» пользователь
-    понимает как «ничего не делает» — включая то, что он попросил сам.
-    """
+    """Режим — про автоматику, а не про то, что человек нажал сам: в Off отклик
+    по кнопке из окна уходит. Человек знает, что нажимает."""
     bot, saved_hr, vacancy = await ready_to_send(mode=BotMode.OFF)
 
-    assert await bot.send(saved_hr, "письмо", vacancy_id=vacancy.id) is False
+    assert await bot.send(saved_hr, "письмо", vacancy_id=vacancy.id) is True
 
-    assert outbox.sent == []
-    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NEW
+    assert len(outbox.sent) == 1
 
 
 @pytest.mark.parametrize(
@@ -116,7 +112,9 @@ async def test_a_refusal_leaves_no_trace_in_the_history(
     Строка «отклик отправлен» в ленте означала бы для пользователя, что
     ход сделан, и он не стал бы отправлять письмо руками.
     """
-    bot, saved_hr, vacancy = await ready_to_send(mode=BotMode.OFF)
+    bot, saved_hr, vacancy = await ready_to_send(
+        hr=hr_row(telegram_username=None, telegram_user_id=None)
+    )
 
     await bot.send(saved_hr, "письмо", vacancy_id=vacancy.id)
 

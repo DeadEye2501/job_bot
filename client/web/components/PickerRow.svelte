@@ -4,15 +4,13 @@
   // Отмеченная и нынешняя различаются нарочно: первая — то, что человек выбрал
   // сейчас, вторая — то, что привязано уже, и без второй он выбрал бы того же
   // самого, не заметив.
-  import { plural } from '$state/words.js';
+  import { vacancyCount } from '$state/words.js';
 
   import Avatar from './Avatar.svelte';
 
   let { row, current = false, chosen = false, mark = '', onpick } = $props();
 
-  const about = $derived(
-    `${row.count} ${plural(row.count, 'вакансия', 'вакансии', 'вакансий')}`,
-  );
+  const about = $derived(vacancyCount(row.count));
 </script>
 
 <button

@@ -37,3 +37,9 @@ def test_a_pattern_starting_with_punctuation_keeps_its_boundaries():
 def test_an_empty_pattern_is_skipped():
     """Пустой образец не считается совпадением с чем угодно."""
     assert check_blacklist("любой текст", ["", "казино"]) is None
+
+
+def test_a_host_matches_inside_a_link_and_on_a_subdomain():
+    """Образец-адрес ловится в ссылке и на поддомене, но не внутри чужого хоста."""
+    assert check_blacklist("Откликайтесь: https://spb.superjob.ru/vacancy/1", ["superjob.ru"]) == "superjob.ru"
+    assert check_blacklist("Подробности на nothh.ru", ["hh.ru"]) is None

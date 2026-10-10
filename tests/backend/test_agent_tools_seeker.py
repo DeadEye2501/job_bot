@@ -6,10 +6,10 @@ import pytest
 
 from backend.agent.jobs import SeekJob, Source
 from backend.agent.tools_seeker import seeker_tools
-from backend.models import ContactAddedBy, TrashEvent, Vacancy, VacancyContact
+from backend.models import ContactAddedBy, TrashEvent, Vacancy, VacancyContact, VacancyEvent
 from tests.dbio import all_rows, put
-from tests.factories import vacancy_row
-from tests.factories_aggregators import aggregator_row
+from tests.factories import blacklist_row, vacancy_row
+from tests.factories_aggregators import aggregator_row, web_search_row
 from tests.fakes.agent import kit_for, tool
 
 pytestmark = pytest.mark.usefixtures("one_vector")
@@ -31,6 +31,31 @@ async def _seeker(make_pipeline, session_factory, *, limit=5):
     job, queue = SeekJob(Source.of(site), limit=limit), _Queue()
     pipeline = await make_pipeline()
     return job, queue, seeker_tools(kit_for(pipeline), job, queue), site
+
+
+async def test_a_find_on_the_open_web_is_marked_so_in_its_event(make_pipeline, session_factory):
+    """«Поиск по сети» — способ поиска, а не место: событие говорит окну, что
+    вакансия найдена в сети, и окно подписывает её своими словами."""
+    web = web_search_row()
+    await put(session_factory, web)
+    job = SeekJob(Source.of(web), limit=5)
+    tools = seeker_tools(kit_for(await make_pipeline()), job, _Queue())
+
+    await tool(tools, "submit_vacancy")(
+        text="Текст вакансии", url="https://company.test/jobs/1", published="", contacts=[]
+    )
+
+    (event,) = [one for one in await all_rows(session_factory, VacancyEvent) if one.kind == "found"]
+    assert event.payload["web_search"] is True
+
+
+async def test_a_find_on_an_aggregator_is_not_marked_as_the_open_web(make_pipeline, session_factory):
+    job, queue, tools, site = await _seeker(make_pipeline, session_factory)
+
+    await tool(tools, "submit_vacancy")(text="Текст вакансии", url=PAGE, published="", contacts=[])
+
+    (event,) = [one for one in await all_rows(session_factory, VacancyEvent) if one.kind == "found"]
+    assert event.payload["web_search"] is False
 
 
 async def test_a_known_number_is_known_before_opening(make_pipeline, session_factory):
@@ -163,3 +188,36 @@ async def test_each_accepted_page_moves_the_progress_in_the_window(make_pipeline
     await submit(text="Текст", url=PAGE, published="", contacts=[])
 
     assert steps == [("aggregator", "HeadHunter — найдено", 1, 5)]
+
+
+BARRED_PAGE = "https://jobs.barred.test/vacancy/1"
+
+
+async def _web_seeker(make_pipeline, session_factory):
+    """Искатель «Поиска по сети», а у человека в отсеве сайт `barred.test`."""
+    web = web_search_row()
+    await put(session_factory, web, blacklist_row("aggregator", "barred.test"))
+    job, queue = SeekJob(Source.of(web), limit=5), _Queue()
+    return job, queue, seeker_tools(kit_for(await make_pipeline()), job, queue)
+
+
+async def test_a_page_of_a_blacklisted_site_is_not_to_be_opened(make_pipeline, session_factory):
+    _, _, tools = await _web_seeker(make_pipeline, session_factory)
+
+    answer = await tool(tools, "is_known")(url=BARRED_PAGE)
+
+    assert "чёрном списке" in answer and "не открывай" in answer
+
+
+async def test_a_page_of_a_blacklisted_site_is_skipped_without_costing_the_limit(
+    make_pipeline, session_factory
+):
+    """Не отказ — отказ обрывает обход; сайт в отсеве лишь пропускается."""
+    job, queue, tools = await _web_seeker(make_pipeline, session_factory)
+
+    answer = await tool(tools, "submit_vacancy")(
+        text="Текст вакансии", url=BARRED_PAGE, published="", contacts=[]
+    )
+
+    assert answer.startswith("пропущена") and "чёрном списке" in answer
+    assert (await all_rows(session_factory, Vacancy), job.submitted, job.refused) == ([], 0, False)

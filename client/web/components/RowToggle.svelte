@@ -10,7 +10,9 @@
   // времени уже приехал таким же.
   import { untrack } from 'svelte';
 
-  let { checked, disabled = false, title = null, ontoggle } = $props();
+  // `muted` — серый вид без запора: положение своё и нажимается, но работать по
+  // нему сейчас ничего не будет (выключен общий выключатель над списком).
+  let { checked, disabled = false, muted = false, title = null, ontoggle } = $props();
 
   let on = $state(untrack(() => checked));
 
@@ -32,6 +34,7 @@
   type="checkbox"
   class="toggle compact"
   class:locked={disabled}
+  class:muted
   checked={on}
   {disabled}
   {title}

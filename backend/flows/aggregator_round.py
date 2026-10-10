@@ -9,13 +9,15 @@ from backend.agent.jobs import Finished, SeekJob, Source
 from adapters.claude_code_agent import AgentEnd
 from backend.agent.kit import AgentKit, SessionPlan
 from backend.agent.prompts.frame import system_prompt
-from backend.agent.prompts.seeker import SEEKER_PROMPT, WEB_SEEKER_PROMPT, seeker_task, web_seeker_task
+from backend.agent.prompts.seeker import (
+    SEEKER_PROMPT, WEB_SEEKER_PROMPT, blacklisted_sites, seeker_task, web_seeker_task,
+)
 from backend.agent.sessions import HumanTimeout, LimitExhausted, run_guarded
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
 from backend.agent.tools_seeker import seeker_tools
 from backend.flows.parse_queue import ParseQueue
-from backend.repository.aggregators import list_aggregators, mark_run
+from backend.repository.aggregators import barred_hosts, list_aggregators, mark_run
 from backend.telegram_time import utc_now
 
 logger = logging.getLogger(__name__)
@@ -69,11 +71,13 @@ async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionP
     tools = [*common_tools(kit, job), *seeker_tools(kit, job, queue), *browser_tools(kit, None)]
     if source.host is not None:
         task = seeker_task(source.host, source.last_run_at, job.limit, kit.today)
-        return SessionPlan(system_prompt(SEEKER_PROMPT), task, tools, web_search=False)
+        return SessionPlan(system_prompt(SEEKER_PROMPT, tools), task, tools, web_search=False)
     async with kit.pipeline.session_factory() as session:
         hosts = [a.host for a in await list_aggregators(session) if a.host]
-    task = web_seeker_task(hosts, source.last_run_at, job.limit, kit.today)
-    return SessionPlan(system_prompt(WEB_SEEKER_PROMPT), task, tools, web_search=True)
+        barred = sorted(await barred_hosts(session))
+    task = "\n".join([web_seeker_task(hosts, source.last_run_at, job.limit, kit.today),
+                      blacklisted_sites(barred)])
+    return SessionPlan(system_prompt(WEB_SEEKER_PROMPT, tools), task, tools, web_search=True)
 
 
 async def _settle(kit: AgentKit, job: SeekJob, end: AgentEnd, started: datetime) -> None:

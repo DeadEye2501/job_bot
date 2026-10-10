@@ -65,14 +65,13 @@ async def test_an_empty_message_is_refused(
     assert client.outgoing == []
 
 
-async def test_a_switched_off_bot_refuses_to_chat(chatting):
-    """Выключенный бот сообщений не шлёт и говорит, что включить."""
+async def test_a_switched_off_bot_still_sends_what_the_person_wrote(chatting, sending_unlocked):
+    """Режим — про автоматику: сообщение, набранное человеком в окне, уходит и в Off."""
     bot, client, hr = await chatting(mode=BotMode.OFF)
 
-    with pytest.raises(RuntimeError, match="Бот выключен"):
-        await bot.send_to_hr_chat(hr.id, "здравствуйте")
+    await bot.send_to_hr_chat(hr.id, "здравствуйте")
 
-    assert client.outgoing == []
+    assert len(client.outgoing) == 1
 
 
 async def test_the_send_guard_refuses_and_says_why(chatting):

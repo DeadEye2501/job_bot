@@ -146,6 +146,41 @@ async def test_a_forced_full_poll_reports_success(make_bot):
     assert bot.current_poll_task is None
 
 
+async def test_a_forced_poll_is_the_same_turn_as_the_cycle(make_bot, monkeypatch):
+    """Кнопка ▶ — тот же оборот, что у цикла: подбор недоразобранного, каналы,
+    затем обход агрегаторов. Режим её не держит: бот выключен — она всё равно идёт."""
+    launched = []
+
+    async def launch(bot):
+        launched.append(bot)
+
+    monkeypatch.setattr("backend.bot.aggregators.launch_round", launch)
+    ingestion = FakeIngestion()
+    bot = wire(await make_bot(), ingestion)
+
+    assert await bot.force_poll_once() == "ok"
+    assert ingestion.log[:2] == ["недоразобранные", "прогон каналов"]
+    assert launched == [bot]
+
+
+async def test_a_forced_poll_with_channels_switched_off_still_runs_the_turn(
+    make_bot, monkeypatch
+):
+    """Выключенные каналы ▶ не останавливают: опрашивать там нечего, а оборот
+    идёт дальше к агрегаторам и кончается удачей."""
+    launched = []
+
+    async def launch(bot):
+        launched.append(bot)
+
+    monkeypatch.setattr("backend.bot.aggregators.launch_round", launch)
+    bot = wire(await make_bot(), FakeIngestion())
+    await bot.rs.set_app("channels_enabled", "false")
+
+    assert await bot.force_poll_once() == "ok"
+    assert launched == [bot]
+
+
 async def test_a_forced_full_poll_while_busy_is_refused(make_bot, busy_slot):
     """Полный прогон при занятом месте отказывается."""
     ingestion = FakeIngestion()

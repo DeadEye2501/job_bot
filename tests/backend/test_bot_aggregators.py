@@ -10,7 +10,7 @@ from backend.models import Aggregator, BotMode
 from backend.repository.bot_mode import write_mode
 from tests.backend.fixtures.bot import slot_freed
 from tests.dbio import all_rows, put
-from tests.factories import vacancy_row
+from tests.factories import blacklist_row, vacancy_row
 from tests.factories_aggregators import aggregator_row, web_search_row
 from tests.fakes.agent import kit_for, scripted, silent_gate
 from tests.fakes.browser import FakeBrowser
@@ -78,10 +78,11 @@ async def test_a_full_tick_launches_the_round_and_the_next_tick_finds_it_busy(
     assert len(kit.run_session.plans) == 1
 
 
-async def test_off_during_the_channel_poll_keeps_the_round_from_starting(
+async def test_off_during_the_channel_poll_lets_the_started_turn_finish(
     make_bot, sites, agent, session_factory, monkeypatch
 ):
-    """Off пришёл, пока шёл опрос каналов: оборот уже начат полным, но обход не поднимается."""
+    """Off запрещает автоматике следующий запуск, но не отменяет начатого: оборот
+    уже пошёл — каналы, затем агрегаторы, — и дорабатывает целиком."""
     bot = await make_bot()
     await _full(session_factory)
     kit = agent(bot, [_done])
@@ -91,10 +92,11 @@ async def test_off_during_the_channel_poll_keeps_the_round_from_starting(
             async with session.begin():
                 await write_mode(session, BotMode.OFF)
 
-    monkeypatch.setattr(loop, "_ingest_round", poll_then_off)
+    monkeypatch.setattr("backend.bot.channels.ingest_round", poll_then_off)
     await loop._tick(bot, BotMode.FULL)
+    await slot_freed(bot)
 
-    assert bot.launched_task is None and kit.run_session.plans == []
+    assert len(kit.run_session.plans) == 1
 
 
 async def test_a_stop_during_the_channel_poll_keeps_the_round_from_starting(
@@ -107,14 +109,37 @@ async def test_a_stop_during_the_channel_poll_keeps_the_round_from_starting(
     async def poll_then_stop(_bot):
         bot.stop_event.set()
 
-    monkeypatch.setattr(loop, "_ingest_round", poll_then_stop)
+    monkeypatch.setattr("backend.bot.channels.ingest_round", poll_then_stop)
     await loop._tick(bot, BotMode.FULL)
 
     assert bot.launched_task is None and kit.run_session.plans == []
 
 
+async def test_stop_pressed_during_the_channel_poll_stops_the_whole_turn(
+    make_bot, sites, agent, session_factory, monkeypatch
+):
+    """«Стоп» гасит оборот целиком: погашенный опрос каналов не отдаёт место
+    обходу агрегаторов, хотя бот при этом жив и работает дальше."""
+    bot = await make_bot()
+    await _full(session_factory)
+    kit = agent(bot, [_done])
+    polling = asyncio.Event()
+
+    async def poll_forever(_bot):
+        polling.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr("backend.bot.channels.ingest_round", poll_forever)
+    tick = asyncio.create_task(loop._tick(bot, BotMode.FULL))
+    await polling.wait()
+    slot.cancel_current_poll(bot)
+    await tick
+
+    assert bot.launched_task is None and kit.run_session.plans == []
+
+
 async def test_entering_off_lets_the_channel_poll_finish(make_bot):
-    """Off гасит обход агента, а не опрос каналов: тот дорабатывает свой оборот."""
+    """Off ничего не отменяет: опрос каналов дорабатывает свой оборот."""
     bot = await make_bot()
     release = asyncio.Event()
     polling = asyncio.create_task(slot.run_in_slot(bot, release.wait, "poll cycle"))
@@ -145,17 +170,23 @@ async def test_an_unavailable_agent_skips_the_round_quietly(make_bot, sites, age
     assert bot.current_poll_task is None and kit.run_session.plans == []
 
 
-async def test_entering_off_puts_the_round_out_and_closes_the_browser(make_bot, sites, agent):
+async def test_entering_off_lets_the_running_round_finish(make_bot, sites, agent):
+    """Off ничего не отменяет: идущий обход агрегаторов дорабатывает. Остановить
+    его — дело кнопки «Стоп»."""
     bot = await make_bot()
-    kit = agent(bot, [_hold(asyncio.Event())])
+    release = asyncio.Event()
+    kit = agent(bot, [_hold(release)])
     await aggregators.launch_round(bot)
     await asyncio.sleep(0)
     await asyncio.sleep(0)
 
     await loop._on_mode_switch(bot, BotMode.FULL, BotMode.OFF)
-    await slot_freed(bot)
+    await asyncio.sleep(0)
 
-    assert "close" in kit.browser.calls
+    assert bot.launched_task is not None and not bot.launched_task.done()
+    release.set()
+    await slot_freed(bot)
+    assert kit.run_session.plans and bot.launched_task.result()[0] == "ok"
 
 
 async def test_the_window_hears_when_a_person_is_needed_and_when_they_are_done(
@@ -198,20 +229,18 @@ async def test_an_expired_wait_drops_the_round_and_tells_the_window(
     assert all(a.last_run_at is None for a in await all_rows(session_factory, Aggregator))
 
 
-async def test_a_manual_application_is_refused_in_off_and_while_busy(
+async def test_a_manual_application_ignores_off_and_waits_only_for_the_slot(
     make_bot, agent, session_factory, busy_slot
 ):
+    """Режим — про автоматику: в Off ручной отклик не отказывает режимом, его
+    держит только занятое место прогона."""
     bot = await make_bot()
     vacancy = vacancy_row()
     await put(session_factory, vacancy)
     agent(bot, [])
     way = Way("form", "https://company.test/apply", None)
-
-    assert await aggregators.apply_via_agent(bot, vacancy.id, way) == "off"
-    async with session_factory() as session:
-        async with session.begin():
-            await write_mode(session, BotMode.DM_ONLY)
     busy_slot(bot)
+
     assert await aggregators.apply_via_agent(bot, vacancy.id, way) == "busy"
 
 
@@ -286,6 +315,39 @@ async def test_a_login_the_agent_did_not_confirm_is_not_reported_as_done(make_bo
     assert await aggregators.login_aggregator(bot, sites.id) == "not_logged_in"
 
 
+async def test_a_login_opens_the_profile_for_a_human(make_bot, sites, agent):
+    """Входит человек руками, и браузер для входа открыт без пометки «управляется
+    программой»: с ней вход Google отказывает."""
+    async def logged_in(tools):
+        await tools["report_login"](logged_in=True)
+        await tools["finish"](result="done")
+
+    bot = await make_bot()
+    kit = agent(bot, [logged_in])
+
+    await aggregators.login_aggregator(bot, sites.id)
+
+    assert kit.browser.as_person is True
+
+
+async def test_the_login_check_settles_a_captcha_itself(make_bot, sites, agent):
+    """Проверка входа идёт, когда человек уже закрыл окно, и звать его ей нечем:
+    правила про зов человека в её наставлении нет, а капча вместо сайта для неё —
+    тот же итог «не вошёл»."""
+    async def checked(tools):
+        await tools["report_login"](logged_in=True)
+        await tools["finish"](result="done")
+
+    bot = await make_bot()
+    kit = agent(bot, [checked])
+
+    await aggregators.login_aggregator(bot, sites.id)
+
+    (plan,) = kit.run_session.plans
+    assert "need_human" not in plan.system_prompt
+    assert "Капча" in plan.system_prompt and "logged_in=false" in plan.system_prompt
+
+
 async def test_a_login_window_left_open_is_not_called_a_captcha(make_bot, sites, agent):
     bot = await make_bot()
     kit = agent(bot, [])
@@ -340,11 +402,49 @@ async def test_auto_apply_off_leaves_the_found_vacancies_to_the_person(
     assert phases == []
 
 
-async def test_off_mode_applies_to_nothing(make_bot, sites, agent, phases, session_factory):
+async def test_a_run_started_by_hand_applies_in_off_too(make_bot, sites, agent, phases, session_factory):
+    """Режим — про автоматику: обход, запущенный человеком, отрабатывает полностью
+    и в Off — вместе с откликами."""
     bot = await make_bot()
     agent(bot, [])
     await _set_mode(session_factory, BotMode.OFF)
 
     await aggregators.run_aggregator_now(bot, sites.id)
 
-    assert phases == []
+    assert phases == [[41]]
+
+
+async def test_a_blacklisted_site_is_neither_run_nor_logged_into(
+    make_bot, sites, agent, session_factory
+):
+    """Ручной обход и вход тоже не трогают сайт из отсева: отметку снимают, а не обходят."""
+    bot = await make_bot()
+    kit = agent(bot, [_done, _done])
+    await put(session_factory, blacklist_row("aggregator", "site.test"))
+
+    assert await aggregators.run_aggregator_now(bot, sites.id) == "blacklisted"
+    assert await aggregators.login_aggregator(bot, sites.id) == "blacklisted"
+    assert kit.run_session.plans == []
+
+
+async def test_the_switch_over_all_aggregators_keeps_the_round_from_starting(
+    make_bot, sites, agent
+):
+    """Общий выключатель гасит обход целиком; строки при этом остаются включёнными."""
+    bot = await make_bot()
+    kit = agent(bot, [_done])
+    await bot.rs.set_app("aggregators_enabled", "false")
+
+    await aggregators.launch_round(bot)
+
+    assert bot.current_poll_task is None and kit.run_session.plans == []
+
+
+async def test_the_switch_over_all_aggregators_leaves_a_manual_run_alone(
+    make_bot, sites, agent
+):
+    bot = await make_bot()
+    agent(bot, [_done])
+    await bot.rs.set_app("aggregators_enabled", "false")
+
+    assert await aggregators.run_aggregator_now(bot, sites.id) == "ok"

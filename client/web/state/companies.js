@@ -11,9 +11,6 @@
 import { candidate } from './picker.js';
 import { UNNAMED } from './unnamed.js';
 
-// Начало адреса до двоеточия — то, что притворяется схемой.
-const SCHEME = /^([a-z][a-z0-9+.-]*):\/*/i;
-
 /** Чем подписать компанию в списке.
  *
  * Имя — сверху, сайт и алиасы — под ним: по имени компанию узнают, по
@@ -80,24 +77,4 @@ export function companyCandidate(company) {
     count: company.vacancy_count,
     blocked: company.is_blacklisted,
   });
-}
-
-/** Адрес, по которому открывают сайт компании.
- *
- * Домен приходит из чужого объявления, вынутый оттуда моделью, — доверия ему
- * нет. Наружу уходит только http(s): всё прочее, включая `javascript:` и
- * `file:`, переписывается на обычный адрес вместе со своей схемой. Голый домен
- * без схемы система открыла бы как файл рядом со страницей, поэтому схему
- * дописываем и ему.
- */
-export function siteHref(website) {
-  const text = (website || '').trim();
-  if (!text) return null;
-  if (/^https?:\/\//i.test(text)) return text;
-  const bare = text.replace(/^\/*/, '');
-  const scheme = SCHEME.exec(bare);
-  // Точка в «схеме» выдаёт порт: у настоящей схемы точек не бывает, а
-  // `example.com:8080`, принятый за схему, оставил бы от адреса один порт.
-  const rest = scheme !== null && !scheme[1].includes('.') ? bare.slice(scheme[0].length) : bare;
-  return `https://${rest}`;
 }

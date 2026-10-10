@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { actionBlocks, rawChips } from '../state/vacancy_actions.js';
+import { actionBlocks, rawChips, sourcePill } from '../state/vacancy_actions.js';
 
 const CARD = {
   hr: { id: 1, name: 'Иван', telegram_username: 'ivan' },
@@ -123,5 +123,37 @@ describe('чипы исходного текста', () => {
       created_at: null,
     });
     expect(chips).toEqual([{ icon: 'straighten', text: '14 символов' }]);
+  });
+
+  it('у вакансии с агрегатора первым назван агрегатор', () => {
+    const chips = rawChips({ ...CARD, channel_username: null, aggregator_name: 'Пример' });
+    expect(chips[0]).toEqual({ icon: 'language', text: 'Пример' });
+  });
+});
+
+describe('пилюля источника в шапке карточки', () => {
+  it('у вакансии из канала — канал и переход к посту', () => {
+    expect(sourcePill(CARD)).toEqual({ icon: 'tag', text: 'jobs', title: 'Перейти к посту в канале' });
+  });
+
+  it('у вакансии с агрегатора — агрегатор и переход к вакансии на сайте', () => {
+    // Источник любой вакансии виден одинаково: пилюля заполняется сама, по
+    // привязке, и по нажатию ведёт туда, откуда вакансия пришла.
+    const card = { ...CARD, channel_username: null, aggregator_name: 'Пример' };
+    expect(sourcePill(card)).toEqual({ icon: 'language', text: 'Пример', title: 'Перейти к вакансии на сайте' });
+  });
+
+  it('у вакансии из поиска по сети — «Сайт», а не имя поиска', () => {
+    // «Поиск по сети» — способ, которым её нашли, а не место, откуда она:
+    // пришла она с сайта компании или чужой доски.
+    const card = { ...CARD, channel_username: null, aggregator_name: 'Поиск по сети', from_web_search: true };
+    expect(sourcePill(card).text).toBe('Сайт');
+    expect(rawChips(card)[0]).toEqual({ icon: 'language', text: 'Сайт' });
+  });
+
+  it('у вакансии без источника пилюли нет', () => {
+    // Вставленная текстом или заведённая руками: пустая пилюля читалась бы как
+    // потерянный источник.
+    expect(sourcePill({ ...CARD, channel_username: null, aggregator_name: null })).toBeNull();
   });
 });

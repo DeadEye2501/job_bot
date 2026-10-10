@@ -1,26 +1,18 @@
 """Ведение записей о телеграм-каналах."""
 
 import logging
-from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.funnel import APPLIED, FIT_EXCLUDE, RESPONDED, percent_or_none
 from backend.models import TelegramChannel, TrashEvent, Vacancy
-from backend.payloads import ChannelDetail, ChannelStats, ChannelWithCount
+from backend.payloads import ChannelDetail, ChannelWithCount
 
-from backend.repository.blacklist_marks import (
-    marked_by,
-    active_blacklist_value,
-    active_blacklist_values,
-)
+from backend.models.settings import CHANNEL_KIND
+from backend.repository.blacklist_marks import BlacklistMark
 from backend.repository.search import matches_search
-from backend.repository.vacancies_common import (
-    PARSED_ONLY,
-    count_by_status,
-    with_vacancy_counts,
-)
+from backend.repository.source_stats import source_stats
+from backend.repository.vacancies_common import with_vacancy_counts
 from backend.repository.vacancies_life import repoint_vacancies
 
 logger = logging.getLogger(__name__)
@@ -67,25 +59,7 @@ def channel_blacklist_candidates(ch: TelegramChannel) -> list[str]:
     return [f"@{ch.username}"]
 
 
-def _is_blacklisted(ch: TelegramChannel, bl_values: set[str]) -> bool:
-    """Отмечен ли канал одной из активных строк, прочитанных заранее.
-
-    Отдельное объявление, потому что зовущих трое — перечень, разовый проход
-    и сплошное включение, — и вписанный трижды перечень написаний канала
-    разошёлся бы с ними молча. Само сравнение общее у трёх предметов.
-    """
-    return marked_by(channel_blacklist_candidates(ch), bl_values)
-
-
-async def _channel_blacklist_value(
-    session: AsyncSession, ch: TelegramChannel
-) -> str | None:
-    """Если канал сейчас активно в blacklist'е, возвращаем точный
-    `value` строки (для UI-чипа в detail-pane). None — если не в нём.
-    """
-    return await active_blacklist_value(
-        session, "channel", channel_blacklist_candidates(ch)
-    )
+CHANNEL_BLACKLIST = BlacklistMark(CHANNEL_KIND, channel_blacklist_candidates)
 
 
 def _channels_with_counts_query():
@@ -128,75 +102,16 @@ async def list_telegram_channels(
         (ch, cnt) for ch, cnt in rows if matches_search(search, ch.title, ch.username)
     ]
 
-    bl_values = await active_blacklist_values(session, "channel")
+    bl_values = await CHANNEL_BLACKLIST.marked(session)
 
     return [
         ChannelWithCount(
             channel=ch,
             vacancy_count=int(cnt or 0),
-            is_blacklisted=_is_blacklisted(ch, bl_values),
+            is_blacklisted=CHANNEL_BLACKLIST.among(ch, bl_values),
         )
         for ch, cnt in rows
     ]
-
-
-_CHANNEL_RATE_WINDOW_DAYS = 30
-
-
-async def _vacancies_per_day(session: AsyncSession, channel_id: int) -> float:
-    """Сколько разобранных вакансий в день канал приносит в последнем окне.
-
-    Окно своё, а не «за всё время»: канал, замолчавший полгода назад,
-    иначе выглядел бы таким же живым, как вчерашний.
-    """
-    since = datetime.now(timezone.utc) - timedelta(days=_CHANNEL_RATE_WINDOW_DAYS)
-    recent_count = int(
-        (
-            await session.execute(
-                select(func.count(Vacancy.id))
-                .where(
-                    Vacancy.source_channel_id == channel_id,
-                    Vacancy.created_at >= since,
-                    PARSED_ONLY,
-                )
-            )
-        ).scalar_one()
-    )
-    return round(recent_count / _CHANNEL_RATE_WINDOW_DAYS, 1)
-
-
-async def _channel_stats(
-    session: AsyncSession, channel_id: int, counts_by_enum: dict
-) -> ChannelStats:
-    """Числа карточки канала: разбивка по статусам, темп и три доли.
-
-    Доли считаются одна от другой, ступенями воронки: годные от всех,
-    отклики от годных, ответы от откликов — каждая отвечает на свой вопрос
-    о канале, и общий знаменатель смазал бы все три. Считаются они за всё
-    время, а темп — за окно: доли говорят, каков канал вообще, темп — жив
-    ли он сейчас.
-    """
-    per_day = await _vacancies_per_day(session, channel_id)
-    total = sum(counts_by_enum.values())
-    fit_total = sum(
-        n for s, n in counts_by_enum.items() if s not in FIT_EXCLUDE
-    )
-    applied_total = sum(
-        n for s, n in counts_by_enum.items() if s in APPLIED
-    )
-    responded_total = sum(
-        n for s, n in counts_by_enum.items() if s in RESPONDED
-    )
-    return ChannelStats(
-        status_counts={
-            status.value: count for status, count in counts_by_enum.items()
-        },
-        total=total,
-        vacancies_per_day=per_day,
-        fit_percent=percent_or_none(fit_total, total),
-        apply_percent=percent_or_none(applied_total, fit_total),
-        response_percent=percent_or_none(responded_total, applied_total),
-    )
 
 
 async def get_channel_detail(
@@ -205,20 +120,17 @@ async def get_channel_detail(
     """Detail-pane payload: the channel itself + computed stats.
 
     Запросов четыре: сама строка канала, разбивка по статусам одной
-    группировкой, окно темпа (:func:`_channel_stats`) и отметка чёрного
-    списка.
+    группировкой, окно темпа (:func:`source_stats.source_stats`) и отметка
+    чёрного списка.
     """
     ch = await session.get(TelegramChannel, channel_id)
     if ch is None:
         return None
-    counts_by_enum = await count_by_status(
-        session, Vacancy.source_channel_id == channel_id, PARSED_ONLY
-    )
-    stats = await _channel_stats(session, channel_id, counts_by_enum)
+    stats = await source_stats(session, Vacancy.source_channel_id == channel_id)
     return ChannelDetail(
         channel=ch,
         stats=stats,
-        blacklist_value=await _channel_blacklist_value(session, ch),
+        blacklist_value=await CHANNEL_BLACKLIST.value(session, ch),
     )
 
 
@@ -288,26 +200,12 @@ async def set_channel_active(
 
 
 async def deactivate_blacklisted_channels(session: AsyncSession) -> int:
-    """Set is_active=False для всех каналов, чьи blacklist-кандидаты
-    совпадают с активной строкой kind=channel. Idempotent: уже-выключенные
-    не трогаем. Returns count flipped — для логов/тостов.
+    """Выключить каналы под действующей отметкой; сколько выключено — для журнала.
 
-    Отметку читает ``_is_blacklisted`` — то же правило, что у перечня и у
-    сплошного включения. Caller wraps в ``session.begin()``.
+    Правило общее с агрегаторами (`BlacklistMark.switch_off`); своё здесь —
+    только запись в журнал. Caller wraps в ``session.begin()``.
     """
-    bl_values = await active_blacklist_values(session, "channel")
-    if not bl_values:
-        return 0
-    channels = (
-        await session.scalars(
-            select(TelegramChannel).where(TelegramChannel.is_active.is_(True))
-        )
-    ).all()
-    flipped = 0
-    for ch in channels:
-        if _is_blacklisted(ch, bl_values):
-            ch.is_active = False
-            flipped += 1
+    flipped = await CHANNEL_BLACKLIST.switch_off(session, TelegramChannel)
     if flipped:
         logger.info("Deactivated %d channel(s) by blacklist", flipped)
     return flipped
@@ -326,37 +224,7 @@ async def is_channel_blacklisted(
     ch = await session.get(TelegramChannel, channel_id)
     if ch is None:
         return False
-    return await _channel_blacklist_value(session, ch) is not None
-
-
-async def set_all_channels_active(
-    session: AsyncSession, is_active: bool
-) -> int:
-    """Bulk-flip every TelegramChannel.is_active to the same value.
-    Returns row count for the toast. Caller wraps in ``session.begin()``.
-
-    При is_active=True пропускаем каналы, попавшие в blacklist — их
-    нельзя включить никаким образом, в т.ч. через «Включить все».
-    """
-    stmt = update(TelegramChannel).values(is_active=bool(is_active))
-    if is_active:
-        bl_values = await active_blacklist_values(session, "channel")
-        if bl_values:
-            # Отмеченные отбираются тем же правилом, что и везде, а не
-            # обратным предикатом по SQL: перечень каналов невелик (десятки),
-            # и лишний проход по нему дешевле второго написания правила.
-            channels = (await session.scalars(select(TelegramChannel))).all()
-            marked = [ch.id for ch in channels if _is_blacklisted(ch, bl_values)]
-            if marked:
-                stmt = stmt.where(TelegramChannel.id.notin_(marked))
-    result = await session.execute(stmt)
-    affected = int(result.rowcount or 0)
-    logger.info(
-        "Bulk channel toggle is_active=%s, affected=%d",
-        bool(is_active),
-        affected,
-    )
-    return affected
+    return await CHANNEL_BLACKLIST.value(session, ch) is not None
 
 
 async def reset_channel_cursor(session: AsyncSession, channel_id: int) -> bool:

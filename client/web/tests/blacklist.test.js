@@ -9,6 +9,9 @@ import {
   blacklistHints,
   blacklistShown,
   blockNote,
+  kindIndex,
+  kindOptions,
+  kindPicked,
   unblockNote,
   valueField,
 } from '../state/blacklist.js';
@@ -20,7 +23,7 @@ describe('отбор чёрного списка', () => {
     { id: 3, kind: 'keyword', value: 'крипта', reason: '' },
   ];
 
-  it('род отбирают пилюлями', () => {
+  it('отбирают по выбранному роду', () => {
     // Роды правят по одному: перемешанные, они не читаются — у каждого свой
     // смысл значения.
     expect(blacklistShown(rows, { kind: 'hr', search: '' }).map((one) => one.id)).toEqual([1]);
@@ -75,15 +78,38 @@ describe('счёт строк отсева по родам', () => {
     { kind: 'keyword', value: 'казино' },
   ];
 
-  it('у каждой пилюли своё число', () => {
+  it('у каждого рода своё число', () => {
     // По ним видно, где строки вообще есть: пустой род нажимают и получают
     // пустой список, не понимая, отбор это или их нет вовсе.
     expect(blacklistCounts(ROWS).hr).toBe(2);
     expect(blacklistCounts(ROWS).company).toBe(0);
   });
 
-  it('общая пилюля считает все строки', () => {
+  it('общий род считает все строки', () => {
     expect(blacklistCounts(ROWS).all).toBe(3);
+  });
+});
+
+describe('выбор рода выпадающим списком', () => {
+  const COUNTS = blacklistCounts([{ kind: 'hr', value: '@a' }, { kind: 'hr', value: '@b' }]);
+
+  it('каждый род назван со своим числом строк', () => {
+    // По числу видно, где строки вообще есть: пустой род выбирают и получают
+    // пустой список, не понимая, отбор это или их нет вовсе.
+    const options = kindOptions(COUNTS);
+    expect(options[0]).toBe('Все (2)');
+    expect(options).toContain('HR (2)');
+    expect(options).toContain('Компании (0)');
+  });
+
+  it('выбранная подпись даёт свой род', () => {
+    const options = kindOptions(COUNTS);
+    expect(kindPicked(options, 'HR (2)')).toBe('hr');
+    expect(kindPicked(options, 'Все (2)')).toBe('');
+  });
+
+  it('показан выбранный род с его числом', () => {
+    expect(kindOptions(COUNTS)[kindIndex('hr')]).toBe('HR (2)');
   });
 });
 

@@ -8,6 +8,7 @@
   import AddBlacklistDialog from '$components/AddBlacklistDialog.svelte';
   import BlacklistRow from '$components/BlacklistRow.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
+  import Dropdown from '$components/Dropdown.svelte';
   import SearchBox from '$components/SearchBox.svelte';
   import { living } from '$state/alive.js';
   import {
@@ -16,6 +17,9 @@
     blacklistHints,
     blacklistShown,
     blankRow,
+    kindIndex,
+    kindOptions,
+    kindPicked,
     valueField,
   } from '$state/blacklist.js';
   import { freshAnswer } from '$state/fresh.js';
@@ -39,7 +43,7 @@
   const freshKnown = freshAnswer(() => alive.now);
 
   const shown = $derived(blacklistShown(rows, { kind, search }));
-  const counts = $derived(blacklistCounts(rows));
+  const kindChoices = $derived(kindOptions(blacklistCounts(rows)));
   const field = $derived(valueField(draft.kind));
   const hints = $derived(
     field.hints
@@ -148,18 +152,12 @@
     onsearch={(text) => (search = text)}
   />
 
-  <div class="bl-filter-pills">
-    {#each BLACKLIST_KINDS as one (one.key)}
-      <button
-        class="pill bl-filter-pill"
-        class:active={kind === one.key}
-        type="button"
-        onclick={() => (kind = one.key)}
-      >
-        {one.label}
-        <span class="count">{one.key ? counts[one.key] : counts.all}</span>
-      </button>
-    {/each}
+  <div class="bl-kind-pick">
+    <Dropdown
+      options={kindChoices}
+      value={kindChoices[kindIndex(kind)]}
+      onpick={(picked) => (kind = kindPicked(kindChoices, picked))}
+    />
   </div>
 
   <button class="bl-add-btn" type="button" title="Добавить в blacklist" onclick={() => (adding = true)}>

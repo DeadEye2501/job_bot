@@ -1,20 +1,27 @@
 <script>
-  // Окно заведения канала: одно поле, пояснение под ним и две кнопки.
+  // Окно заведения по адресу: одно поле, пояснение под ним и две кнопки.
+  //
+  // Так заводят канал (по нику или ссылке), агрегатор (по адресу сайта) и
+  // контакт вакансии: слова у них свои и лежат обвязкой формы по роду
+  // (`state/new_card.js`), а устройство одно.
   //
   // Своим окном, а не общим спрашивающим: у этого есть шапка с крестиком, свой
-  // подвал и строка отказа внутри — канал заводят по нику, и ошибку в нике
-  // объясняют там же, где его набирали, а не общей плашкой поверх окна.
+  // подвал и строка отказа внутри — ошибку в набранном объясняют там же, где
+  // его набирали, а не общей плашкой поверх окна.
   import { pressKey } from '$state/keys.js';
+  import { NEW_CARD } from '$state/new_card.js';
   import ModalFoot from './ModalFoot.svelte';
   import ModalHead from './ModalHead.svelte';
   import ModalShell from './ModalShell.svelte';
 
-  let { value, trouble, saving, oninput, onadd, onclose } = $props();
+  let { kind, value, trouble, saving, ready, oninput, onadd, onclose } = $props();
+
+  const form = $derived(NEW_CARD[kind]);
 </script>
 
-<ModalShell extra="narrow add-channel" {onclose}>
+<ModalShell extra="narrow address-dialog" {onclose}>
   {#snippet children()}
-    <ModalHead icon="add_circle" title="Добавить канал" {onclose} />
+    <ModalHead icon="add_circle" title={form.title} {onclose} />
 
     <div class="modal-body">
       <!-- Курсор ставится в поле сразу: окно об одном поле и открывают затем,
@@ -25,12 +32,12 @@
         class="input cnt-input"
         autofocus
         maxlength="200"
-        placeholder="@username канала или t.me/..."
+        placeholder={form.placeholder}
         {value}
         oninput={(event) => oninput(event.currentTarget.value)}
         onkeydown={(event) => pressKey(event) && onadd()}
       />
-      <div class="cnt-add-hint">Название и аватар подгрузятся из Telegram автоматически.</div>
+      <div class="address-hint">{form.hint}</div>
       {#if trouble}
         <div class="modal-error">{trouble}</div>
       {/if}
@@ -40,7 +47,7 @@
       label="Добавить"
       busyLabel="Добавляю…"
       busy={saving}
-      ready={Boolean(value.trim())}
+      {ready}
       oncancel={onclose}
       onconfirm={onadd}
     />

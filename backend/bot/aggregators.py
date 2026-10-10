@@ -15,18 +15,19 @@ from backend.domain.apply_order import Way
 from backend.flows.aggregator_apply import ApplyOrder, apply_phase, apply_vacancy
 from backend.flows.aggregator_login import log_in
 from backend.flows.aggregator_round import RoundState, seek_source
-from backend.models import Aggregator, BotMode, Vacancy
+from backend.models import Aggregator, Vacancy
 from backend.notify import fire
 from backend.repository import aggregators as repo
 
 logger = logging.getLogger(__name__)
 
 AgentOutcome = Literal[
-    slot.CycleOutcome, "missing", "locked", "human_timeout", "limit",
+    slot.CycleOutcome, "missing", "locked", "blacklisted", "human_timeout", "limit",
     "closed", "exhausted", "not_logged_in", "login_timeout",
 ]
-"""Чем кончилось действие агента: исходы места прогона и свои — у отклика
-(вакансия закрыта, способы кончились) и у входа (не вошёл, окно не закрыто)."""
+"""Чем кончилось действие агента: исходы места прогона и свои — у источника
+(в отсеве), у отклика (вакансия закрыта, способы кончились) и у входа (не
+вошёл, окно не закрыто)."""
 
 HUMAN_TIMEOUT_NOTE = "Капча не пройдена — обход снят."
 LIMIT_NOTE = "Исчерпан лимит подписки Claude Code — обход снят."
@@ -63,8 +64,11 @@ async def agent_work(bot, work: Callable[[AgentKit], Awaitable[str]]) -> str:
 
 
 async def launch_round(bot) -> None:
-    """Пустить обход отдельной задачей, если агент может работать и источники есть."""
-    if aggregators_available(bot) is not None:
+    """Пустить обход отдельной задачей, если агент может работать и источники есть.
+
+    Общий выключатель агрегаторов гасит обход целиком, «Поиск по сети» тоже.
+    """
+    if not bot.rs.aggregators_enabled or aggregators_available(bot) is not None:
         return
     async with bot.session_factory() as session:
         if not await repo.round_sources(session):
@@ -93,8 +97,8 @@ async def run_aggregator_now(bot, aggregator_id: int) -> AgentOutcome:
     row = await _row(bot, aggregator_id)
     if row is None:
         return "missing"
-    if aggregators_available(bot) is not None:
-        return "locked"
+    if (refusal := await _refused(bot, row)) is not None:
+        return refusal
 
     async def work(kit: AgentKit) -> str:
         await _one_source(bot, kit, await _new_round(bot), Source.of(row))
@@ -108,8 +112,8 @@ async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome:
     row = await _row(bot, aggregator_id)
     if row is None or row.host is None:
         return "missing"
-    if aggregators_available(bot) is not None:
-        return "locked"
+    if (refusal := await _refused(bot, row)) is not None:
+        return refusal
 
     async def work(kit: AgentKit) -> str:
         return await log_in(kit, Source.of(row))
@@ -117,11 +121,9 @@ async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome:
     return await _in_slot(bot, work, f"aggregator login {aggregator_id}")
 
 
-async def apply_via_agent(bot, vacancy_id: int, way: Way) -> AgentOutcome | Literal["off"]:
+async def apply_via_agent(bot, vacancy_id: int, way: Way) -> AgentOutcome:
     """Ручной отклик выбранным способом: Applied и из Not Fit, Scam, Ghosting.
-    Выключенный автоотклик ему не помеха, режим Off — помеха."""
-    if await bot.current_mode() is BotMode.OFF:
-        return "off"
+    Ни выключенный автоотклик, ни режим ему не помеха: нажал человек."""
     async with bot.session_factory() as session:
         if await session.get(Vacancy, vacancy_id) is None:
             return "missing"
@@ -158,9 +160,13 @@ def _kit(bot) -> AgentKit:
 
 
 async def _one_source(bot, kit: AgentKit, round_: RoundState, source: Source) -> None:
-    """Поиск на источнике, затем отклики по найденному — если автоотклик включён и режим не Off."""
+    """Поиск на источнике, затем отклики по найденному — если автоотклик включён.
+
+    Режим не спрашивается: он решает, запускать ли обход автоматически, а
+    запущенный — им или человеком — отрабатывает целиком.
+    """
     found = await seek_source(kit, round_, source)
-    if found and bot.rs.auto_apply and await bot.current_mode() is not BotMode.OFF:
+    if found and bot.rs.auto_apply:
         await apply_phase(kit, round_, found)
 
 
@@ -173,6 +179,18 @@ async def _new_round(bot) -> RoundState:
 async def _row(bot, aggregator_id: int) -> Aggregator | None:
     async with bot.session_factory() as session:
         return await session.get(Aggregator, aggregator_id)
+
+
+async def _refused(bot, row: Aggregator) -> AgentOutcome | None:
+    """Чем отказать в ручной работе с сайтом; пусто — можно.
+
+    Сайт в отсеве руками не обходят и на него не входят — отметку снимают;
+    отсев старше запора агента: запор погаснет сам, а отметка — нет.
+    """
+    async with bot.session_factory() as session:
+        if await repo.aggregator_blacklist_value(session, row) is not None:
+            return "blacklisted"
+    return "locked" if aggregators_available(bot) is not None else None
 
 
 async def _in_slot(bot, work: Callable[[AgentKit], Awaitable[str]], label: str) -> AgentOutcome:

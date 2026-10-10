@@ -1,6 +1,7 @@
 <script>
   // Вкладка «HR»: список людей с поиском, страницами и заведением.
 
+  import AddButton from '$components/AddButton.svelte';
   import ContactsPanes from '$components/ContactsPanes.svelte';
   import NewCardDialog from '$components/NewCardDialog.svelte';
   import PersonRow from '$components/PersonRow.svelte';
@@ -49,14 +50,7 @@
 >
   {#snippet toolbar()}
     <SearchBox value={list.search} placeholder={FORM.searchHint} onsearch={list.find} />
-    <button
-      class="icon-btn cnt-add-btn"
-      type="button"
-      title="Добавить HR"
-      onclick={() => (newCard.adding = true)}
-    >
-      <span class="material-symbols-outlined">{FORM.icon}</span>
-    </button>
+    <AddButton title="Добавить HR" icon={FORM.icon} onclick={() => (newCard.adding = true)} />
   {/snippet}
 
   {#snippet emptyNote()}

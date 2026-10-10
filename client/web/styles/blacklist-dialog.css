@@ -13,7 +13,7 @@
    подсказчик берёт существующие. */
 .bl-kind-segmented {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 3px;
   padding: 3px;
   border-radius: 5px;
@@ -55,6 +55,12 @@
 
 .bl-kind-seg.active.channel {
   background: var(--kind-channel-active-bg);
+  color: var(--fg-max);
+  font-weight: 500;
+}
+
+.bl-kind-seg.active.aggregator {
+  background: var(--kind-aggregator-active-bg);
   color: var(--fg-max);
   font-weight: 500;
 }

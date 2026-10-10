@@ -9,9 +9,11 @@ from backend.domain.contact_keys import is_address, is_link
 from backend.domain.hosts import host_owns, normalize_host
 from backend.models import ApplicationVia
 
-_AGGREGATOR = ApplicationVia.AGGREGATOR.value
-_FORM = ApplicationVia.FORM.value
-_EMAIL = ApplicationVia.EMAIL.value
+VIA_AGGREGATOR = ApplicationVia.AGGREGATOR.value
+VIA_FORM = ApplicationVia.FORM.value
+VIA_EMAIL = ApplicationVia.EMAIL.value
+"""Способы отклика строкой — так их несут `Way` и задание агента. Объявлены
+здесь, у перечня способов, и отсюда их берут агент и поток отклика."""
 
 
 @dataclass(frozen=True)
@@ -51,7 +53,7 @@ def apply_ways(facts: ApplyFacts) -> list[Way]:
     """Способы по порядку: кнопка агрегатора, форма, затем каждый адрес почты."""
     ways = [way for way in (_button(facts), _form(facts)) if way is not None]
     if facts.mail_ready:
-        ways += [Way(_EMAIL, c.strip(), None) for c in facts.contacts if is_address(c)]
+        ways += [Way(VIA_EMAIL, c.strip(), None) for c in facts.contacts if is_address(c)]
     return ways
 
 
@@ -60,7 +62,7 @@ def _button(facts: ApplyFacts) -> Way | None:
     for link in _links(facts):
         site = _owner(link, facts.sites)
         if site is not None and site.logged_in and site.id not in facts.closed:
-            return Way(_AGGREGATOR, link, site.id)
+            return Way(VIA_AGGREGATOR, link, site.id)
     return None
 
 
@@ -74,7 +76,7 @@ def _form(facts: ApplyFacts) -> Way | None:
     web_find = source is not None and source.host is None and facts.source_url
     candidates = [facts.source_url] if web_find else []
     candidates += [c.strip() for c in facts.contacts if is_link(c)]
-    return next((Way(_FORM, link, None) for link in candidates
+    return next((Way(VIA_FORM, link, None) for link in candidates
                  if _owner(link, facts.sites) is None), None)
 
 

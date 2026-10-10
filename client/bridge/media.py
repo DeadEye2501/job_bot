@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
+from backend.bot.media import image_type
 from client.serving import MEDIA_PREFIX, inside
 
 
@@ -65,12 +66,22 @@ def _under_media(stored_path: str) -> str | None:
     return None if target is None else target.relative_to(root).as_posix()
 
 
+def _image_type(blob: bytes) -> str:
+    """Тип снимка по его первым байтам.
+
+    Снимки Telegram приходят jpeg, а значки сайтов — png, ico, gif, webp, и
+    заголовка с типом у колонки нет: правду говорят только сами байты. Не
+    узнанное считается jpeg — так приходит всё, что дал Telegram.
+    """
+    return image_type(blob) or "image/jpeg"
+
+
 def _avatar_data_url(blob: bytes | None) -> str | None:
-    """Снимок учётной записи, вшитый в сам ответ.
+    """Снимок учётной записи или значок сайта, вшитый в сам ответ.
 
     Аватарки Telegram весят по нескольку килобайт, и вшитые в список они
     обходятся дешевле, чем отдельный запрос на каждую строку.
     """
     if not blob:
         return None
-    return "data:image/jpeg;base64," + base64.b64encode(blob).decode("ascii")
+    return f"data:{_image_type(blob)};base64," + base64.b64encode(blob).decode("ascii")

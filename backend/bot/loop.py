@@ -5,7 +5,7 @@ from dataclasses import replace
 import asyncio
 
 from adapters import telegram
-from backend.bot import aggregators, slot
+from backend.bot import aggregators, channels, slot
 from backend.flows.dm_backfill import catch_up_missed_dms
 from backend.repository.bot_mode import read_mode
 from backend.models import BotMode
@@ -97,9 +97,9 @@ async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None:
     # Уход в OFF гасит таймеры отложенного разбора, но накопленное не
     # выбрасывает: `drain=True` разбирает его напоследок — иначе пачка писем,
     # застигнутая выключением, осталась бы без вердикта до ручного прогона.
+    # Начатую работу — опрос каналов, обход агрегаторов — Off не трогает: режим
+    # решает лишь, что автоматика запустит дальше, а начатое гасит «Стоп».
     if mode is BotMode.OFF and prev_mode is not BotMode.OFF:
-        # Обход агрегаторов — отдельная задача и тиков не ждёт: Off гасит его сразу.
-        slot.cancel_launched(bot)
         logger.info("Transition into OFF; draining DM debouncers")
         await bot.ingestion.cancel_pending_dm_classifications(drain=True)
     if mode is not BotMode.OFF and prev_mode is BotMode.OFF:
@@ -150,29 +150,14 @@ async def _tick(bot, mode: BotMode) -> None:
     if mode is BotMode.FULL:
         # Оборот может тихо не сделать ничего: место прогона мог
         # занять ручной прогон из окна.
-        await slot.run_in_slot(bot, lambda: _ingest_round(bot), "poll cycle")
-        # Опрос каналов идёт минутами: Off или остановка, пришедшие за это
-        # время, обход поднять уже не должны — он открыл бы браузер.
-        if not bot.stop_event.is_set() and await current_mode(bot) is BotMode.FULL:
+        outcome, _ = await slot.run_in_slot(
+            bot, lambda: channels.ingest_round(bot), "poll cycle"
+        )
+        # Оборот — каналы, затем агрегаторы — уже начат, и смена режима посреди
+        # него его не отменяет. Отменяет «Стоп»: погашенный опрос каналов гасит
+        # и обход агрегаторов, а остановка бота к тому же закрывает окно.
+        if outcome == "ok" and not bot.stop_event.is_set():
             await aggregators.launch_round(bot)
-
-
-async def _ingest_round(bot) -> None:
-    """Оборот приёма: сперва дочитать отложенное, потом идти за новым.
-
-    Недоразобранная строка ждёт статьи, которой не хватило на приёме, и в
-    окне её не видно вовсе — ни в списке, ни в отказах. Подбирай такие только
-    при подъёме, и объявление ждало бы до следующего запуска приложения, а
-    работает оно сутками.
-
-    Сорвавшийся подбор обход не отменяет: свежие объявления человек ждёт
-    больше, чем дочитанные.
-    """
-    try:
-        await bot.ingestion.recover_orphan_vacancies()
-    except Exception:
-        logger.exception("orphan recovery failed")
-    await bot.ingestion.poll_active_channels()
 
 
 async def _sleep_until_wake(bot) -> None:
@@ -237,11 +222,12 @@ async def run(bot, *, once: bool = False) -> None:
     гнёзда до конца работы приложения.
 
     Недоразобранные вакансии подбираются на каждом полном обороте, вместе с
-    обходом каналов (`_ingest_round`), а не единожды при подъёме: строка ждёт
+    обходом каналов (`channels.ingest_round`), а не единожды при подъёме: строка ждёт
     там не только обрыва работы, но и статьи по ссылке, а та возвращается
     посреди рабочего дня.
 
-    Режим OFF — полная остановка: ни догона переписки, ни разбора, ни обхода.
+    В режиме OFF автоматика не запускается: ни догона переписки, ни разбора,
+    ни обхода. Начатое при этом дорабатывает — гасит его только «Стоп».
     Догон идёт на каждом переходе в рабочий режим, включая самый первый.
     """
     try:

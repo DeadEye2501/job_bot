@@ -72,22 +72,44 @@ function linkNote(what, payload, blank) {
   return `${what}: ${was} → ${now}.`;
 }
 
+// Способы отклика вне Telegram словами — в той форме, в какой они встают после
+// «Отклик …». Коды приходят с бэкенда (`ApplicationVia`).
+const VIA = { aggregator: 'на сайте агрегатора', form: 'формой работодателя', email: 'письмом' };
+
+// Кто писал письмо отклика: по этой строке сравнивают два способа на живых
+// откликах (настройка `letter_writer`).
+const WRITER = { app: 'приложение', agent: 'агент' };
+
+function appliedNote(payload) {
+  const simulated = payload.simulated ? ' (симуляция)' : '';
+  return `Отклик ${VIA[payload.via] || payload.via}${simulated}; письмо: ${WRITER[payload.letter_by] || 'без письма'}.`;
+}
+
+// Подписи событий по роду. Таблицей, а не цепочкой сравнений: родов больше
+// десятка, и каждый новый удлинял бы одну функцию.
+const EVENT_TEXT = {
+  ingested: (payload) =>
+    `Поступила из канала ${payload.channel ? `@${payload.channel}` : 'неизвестного канала'}.`,
+  created_by_hand: () => 'Вакансия добавлена вручную.',
+  parsed: (payload) => skipNote(payload.skip_reason) || 'Без замечаний.',
+  auto_send: (payload) => `Авто-отправка: ${SEND_FAILS[payload.reason] || payload.reason}.`,
+  linked_hr: (payload) => linkNote('HR', payload, 'не привязан'),
+  linked_company: (payload) => linkNote('Компания', payload, 'не привязана'),
+  // «Поиск по сети» — способ поиска, а не место: «Найдена на Поиск по сети»
+  // читалось бы как ошибка.
+  found: (payload) => (payload.web_search ? 'Найдена в сети.' : `Найдена на ${payload.source}.`),
+  applied_elsewhere: appliedNote,
+  apply_failed: (payload) =>
+    `Отклик не удался (${VIA[payload.method] || payload.method}): ${payload.reason}.`,
+  vacancy_closed: () => 'Вакансия закрыта на сайте.',
+};
+
 // Чем подписано событие. Незнакомый род называется сам собой: роды заводит
 // бэкенд, и новый приедет раньше, чем окно про него узнает, — пустая строка в
 // ленте выглядела бы поломкой.
 function eventText(kind, payload) {
-  if (kind === 'ingested') {
-    const channel = payload.channel ? `@${payload.channel}` : 'неизвестного канала';
-    return `Поступила из канала ${channel}.`;
-  }
-  if (kind === 'created_by_hand') return 'Вакансия добавлена вручную.';
-  if (kind === 'parsed') return skipNote(payload.skip_reason) || 'Без замечаний.';
-  if (kind === 'auto_send') {
-    return `Авто-отправка: ${SEND_FAILS[payload.reason] || payload.reason}.`;
-  }
-  if (kind === 'linked_hr') return linkNote('HR', payload, 'не привязан');
-  if (kind === 'linked_company') return linkNote('Компания', payload, 'не привязана');
-  return kind;
+  const text = EVENT_TEXT[kind];
+  return text ? text(payload) : kind;
 }
 
 function moment(iso) {

@@ -6,8 +6,8 @@ HR и компании идут по времени, а список канал�
 горяч статус.
 """
 
-from backend.models import VacancyStatus
-from backend.repository.vacancies_mini import list_vacancies_for_channel, list_vacancies_for_company, list_vacancies_for_hr
+from backend.models import Vacancy, VacancyStatus
+from backend.repository.vacancies_mini import list_vacancies_for_company, list_vacancies_for_hr, list_vacancies_from
 from tests.dbio import put
 from tests.factories import (
     at,
@@ -134,7 +134,7 @@ async def test_the_channel_list_holds_only_the_parsed_ones(
         ),
     )
 
-    got, _ = await list_vacancies_for_channel(session, channel.id)
+    got, _ = await list_vacancies_from(session, Vacancy.source_channel_id == channel.id)
 
     assert [v.title for v in got] == ["разобранная"]
 
@@ -181,7 +181,7 @@ async def test_the_channel_list_leads_with_the_hottest_status(
         ],
     )
 
-    got, _ = await list_vacancies_for_channel(session, channel.id)
+    got, _ = await list_vacancies_from(session, Vacancy.source_channel_id == channel.id)
 
     assert [v.title for v in got] == [s.value for s in _HOTTEST_FIRST]
 
@@ -213,7 +213,7 @@ async def test_inside_one_status_the_channel_list_prefers_the_posting_date(
         ),
     )
 
-    got, _ = await list_vacancies_for_channel(session, channel.id)
+    got, _ = await list_vacancies_from(session, Vacancy.source_channel_id == channel.id)
 
     assert [v.title for v in got] == ["опубликована позже", "создана позже"]
 
@@ -236,8 +236,8 @@ async def test_the_channel_list_pages(session, session_factory):
         vacancy_row(title="третья", source_channel_id=channel.id, created_at=at(30)),
     )
 
-    first, _ = await list_vacancies_for_channel(session, channel.id, limit=2)
-    second, _ = await list_vacancies_for_channel(session, channel.id, limit=2, offset=2)
+    first, _ = await list_vacancies_from(session, Vacancy.source_channel_id == channel.id, limit=2)
+    second, _ = await list_vacancies_from(session, Vacancy.source_channel_id == channel.id, limit=2, offset=2)
 
     assert [v.title for v in first] == ["первая", "вторая"]
     assert [v.title for v in second] == ["третья", "четвёртая"]
@@ -255,6 +255,6 @@ async def test_a_neighbouring_channels_vacancies_stay_out(session, session_facto
         vacancy_row(title="ничья", source_channel_id=None),
     )
 
-    got, _ = await list_vacancies_for_channel(session, mine.id)
+    got, _ = await list_vacancies_from(session, Vacancy.source_channel_id == mine.id)
 
     assert [v.title for v in got] == ["моя"]

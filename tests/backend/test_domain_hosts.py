@@ -3,7 +3,7 @@
 
 import pytest
 
-from backend.domain.hosts import AddressParts, address_parts, host_owns, source_key
+from backend.domain.hosts import AddressParts, address_parts, host_owns, site_label, source_key
 
 
 def test_an_address_splits_into_its_host_and_the_rest():
@@ -88,3 +88,11 @@ def test_parameter_order_does_not_change_the_number():
 
 def test_an_address_without_a_path_has_no_number():
     assert source_key("https://site.test/", "site.test") is None
+
+
+@pytest.mark.parametrize(("host", "label"), [
+    ("example.com", "example"), ("jobs.example.com", "example"), ("example.am", "example"),
+    ("jobs.example.co.uk", "example"), ("hr.ex.ru", "ex"), ("localhost", "localhost"),
+])
+def test_the_site_label_drops_the_zone_and_subdomains(host, label):
+    assert site_label(host) == label

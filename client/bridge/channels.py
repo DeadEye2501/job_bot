@@ -2,20 +2,15 @@
 
 from __future__ import annotations
 
-import logging
-
 from backend.incoming import text_or_none
-from backend.repository import channels as channels_repo, vacancies_mini
-from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, reply
+from backend.repository import channels as channels_repo
+from client.bridge.answer import Denied, reply
 from client.bridge.channel_actions import ChannelActions
 from client.bridge.hub import Hub
 from client.bridge.media import _avatar_data_url
-from client.bridge.page import Page, read_page
 from client.bridge.refusals import NO_CHANNEL
-from client.bridge.wire import _channel_row_to_dict, _vacancy_mini_row_to_dict
-
-
-logger = logging.getLogger(__name__)
+from client.bridge.source_page import CHANNEL, source_vacancies
+from client.bridge.wire import _channel_row_to_dict, _source_stats_to_dict
 
 
 class Channels(ChannelActions):
@@ -55,6 +50,7 @@ class Channels(ChannelActions):
                 )
             return {
                 "search": search or "",
+                "enabled": self._hub.rs.channels_enabled,
                 "channels": [_channel_row_to_dict(r) for r in rows],
             }
 
@@ -74,62 +70,18 @@ class Channels(ChannelActions):
             if detail is None:
                 raise Denied(NO_CHANNEL, channel_id=channel_id)
             channel = detail.channel
-            stats = detail.stats
             return {
                 "channel_id": channel.id,
                 "username": channel.username,
                 "title": channel.title,
                 "is_active": bool(channel.is_active),
                 "avatar": _avatar_data_url(channel.avatar),
-                "stats": {
-                    "status_counts": stats.status_counts,
-                    "total": stats.total,
-                    "vacancies_per_day": stats.vacancies_per_day,
-                    "fit_percent": stats.fit_percent,
-                    "apply_percent": stats.apply_percent,
-                    "response_percent": stats.response_percent,
-                },
+                "stats": _source_stats_to_dict(detail.stats),
                 "blacklist_value": detail.blacklist_value,
             }
 
         return reply(self._hub.runner, run())
 
     def vacancies(self, payload: dict) -> dict:
-        """Страница вакансий этого канала — для его карточки.
-
-        Нагрузка: `{channel_id, limit, offset}`. Дописать пришедшее или
-        заменить показанное, окно решает само.
-        """
-        try:
-            channel_id = int(payload["channel_id"])
-            page = read_page(payload, default_limit=50)
-        except BAD_PAYLOAD as e:
-            return bad_fields("channels.vacancies", e)
-
-        return reply(self._hub.runner, self._paged(channel_id, page))
-
-    async def _paged(self, channel_id: int, page: Page) -> dict:
-        """Страница вакансий канала и эхо того, о чём спрашивали."""
-        async with self._hub.session_factory() as session:
-            rows, has_more = await vacancies_mini.list_vacancies_for_channel(
-                session, channel_id, limit=page.limit, offset=page.offset,
-            )
-            # Жалоба на живую беду: пусто здесь при непустом счёте в карточке.
-            # По одному пустому списку не видно, где она — в запросе перечня
-            # или в эхе моста; ноль против N различает эти два места.
-            if not rows:
-                total = await vacancies_mini.count_vacancies_for_channel(
-                    session, channel_id
-                )
-                if total > 0:
-                    logger.warning(
-                        "канал %d: перечень вакансий пуст, а строк с этим "
-                        "источником %d (потолок=%d сдвиг=%d) — разойтись со "
-                        "счётчиком карточки он не должен",
-                        channel_id, total, page.limit, page.offset,
-                    )
-        return {
-            "channel_id": channel_id,
-            "has_more": has_more,
-            "vacancies": [_vacancy_mini_row_to_dict(v) for v in rows],
-        }
+        """Страница вакансий этого канала — для его карточки; см. `source_page`."""
+        return source_vacancies(self._hub, CHANNEL, payload)

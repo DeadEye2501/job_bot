@@ -53,7 +53,7 @@
     />
     <MenuItem
       icon="open_in_new"
-      label="Перейти к каналу-источнику"
+      label="Перейти к источнику"
       title={blocks.source || null}
       blocked={Boolean(blocks.source)}
       {close}

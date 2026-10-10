@@ -11,7 +11,7 @@
 <div class="list-block">
   <div class="field-label">
     <span>{label}</span>
-    <button class="list-add" type="button" onclick={() => onadd()}>
+    <button class="add-link list-add" type="button" onclick={() => onadd()}>
       <span class="material-symbols-outlined">add</span>
       {addLabel}
     </button>

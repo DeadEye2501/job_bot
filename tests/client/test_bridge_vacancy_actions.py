@@ -59,7 +59,7 @@ async def test_a_busy_run_is_explained_not_swallowed(api, ask, with_bot, told):
 
 
 async def test_a_finished_run_says_so_when_it_is_finished(api, ask, with_bot, told):
-    """Обход каналов отвечает сразу, а исход говорит вестью.
+    """Обход отвечает сразу, а исход говорит вестью.
 
     Обход идёт по всем каналам и по всем их новым постам — самая долгая работа
     в приложении. Дождись мост её конца, окно висело бы десятками минут.
@@ -69,7 +69,9 @@ async def test_a_finished_run_says_so_when_it_is_finished(api, ask, with_bot, to
     answer = await ask(api.system.run_now)
 
     assert answer["ok"] == {"started": True, "action": "run_now"}
-    assert await told() == {"message": "Каналы прогнаны.", "danger": False}
+    # Весть звучит, когда пройдены каналы: обход агрегаторов уходит дальше
+    # отдельной задачей, и «обход закончен» в этот миг было бы неправдой.
+    assert await told() == {"message": "Каналы пройдены.", "danger": False}
 
 
 async def test_a_stop_reaches_the_bot(api, ask, with_bot):

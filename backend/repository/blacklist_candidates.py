@@ -4,7 +4,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company, HR
+from backend.models.settings import AGGREGATOR_KIND, CHANNEL_KIND, COMPANY_KIND, HR_KIND
 
+from backend.repository.aggregators import aggregator_blacklist_candidates, list_aggregators
 from backend.repository.blacklist_marks import preferred_blacklist_value
 from backend.repository.channels import (
     channel_blacklist_candidates,
@@ -31,7 +33,7 @@ def _named_candidates(named: list[tuple[str | None, str | None]]) -> list[dict]:
 
     Принимает пары «отсеиваемое значение, название». Годится тем, у кого
     название отдельно от значения: у собеседника это имя против ника, у
-    канала — заголовок против ника. Компания такой формы не имеет —
+    канала — заголовок против ника, у агрегатора — имя против хоста. Компания такой формы не имеет —
     уточнением там служит сайт, а порядок задаёт сам запрос.
     """
     out: list[dict] = []
@@ -57,6 +59,23 @@ async def _company_candidates(session: AsyncSession) -> list[dict]:
     return _by_label(out)
 
 
+async def _aggregator_candidates(session: AsyncSession) -> list[dict]:
+    """Строки подсказки по агрегаторам: значение — хост, подпись — имя.
+
+    Имя заведённого агрегатора и есть его хост, пока его не переименовали;
+    такое имя названием не считается — иначе хост встал бы и подписью, и под ней.
+    """
+    return _named_candidates(
+        [
+            (
+                preferred_blacklist_value(aggregator_blacklist_candidates(row)),
+                row.name if row.name != row.host else None,
+            )
+            for row in await list_aggregators(session)
+        ]
+    )
+
+
 async def list_blacklist_candidates(
     session: AsyncSession, kind: str
 ) -> list[dict]:
@@ -73,13 +92,13 @@ async def list_blacklist_candidates(
     набранный без собачки `ник` там не совпадёт никогда, и HR продолжит писать.
     Ослабить это сравнение нельзя — им же три экрана показывают отметку, и
     разойдись оно, разойдутся и они. А вот в тексте объявления значение ищется
-    независимо от рода (`load_active_blacklist_patterns` берёт все подряд), и
+    независимо от рода (`load_active_blacklist_patterns` берёт все, кроме сайтов), и
     там тот же `ник` сработает по границам слова — не там, где имелось в виду.
 
     Каждая строка — `{value, label, sub?}`, порядок по подписи. Незнакомый
     род и ключевое слово подсказок не имеют: последнее набирают свободно.
     """
-    if kind == "hr":
+    if kind == HR_KIND:
         rows = (
             await session.scalars(select(HR).where(HAS_TELEGRAM_IDENTITY))
         ).all()
@@ -89,9 +108,9 @@ async def list_blacklist_candidates(
                 for hr in rows
             ]
         )
-    if kind == "company":
+    if kind == COMPANY_KIND:
         return await _company_candidates(session)
-    if kind == "channel":
+    if kind == CHANNEL_KIND:
         return _named_candidates(
             [
                 (
@@ -101,4 +120,6 @@ async def list_blacklist_candidates(
                 for ch in await list_named_channels(session)
             ]
         )
+    if kind == AGGREGATOR_KIND:
+        return await _aggregator_candidates(session)
     return []

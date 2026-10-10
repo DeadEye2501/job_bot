@@ -13,11 +13,9 @@ from dataclasses import dataclass
 
 from adapters import telegram
 from backend.domain.telegram_identity import telegram_peer
-from backend.models import BotMode
 from backend.repository.hr_card import hr_blacklist_value
 
 NO_TARGET = "нет адресата"
-BOT_OFF = "бот выключен"
 BLACKLISTED = "чёрный список"
 SENDING_LOCKED = "отправка заглушена"
 
@@ -36,17 +34,18 @@ class SendPermission:
 async def can_send_to_hr(bot, hr) -> SendPermission:
     """Проверяет заслоны по порядку и отдаёт первый сработавший.
 
-    Порядок стоит по цене: адресат и режим читаются из того, что уже под
-    рукой, чёрный список — единственный, кто идёт в базу, и потому стоит за
-    ними. Замок отправки последний: он снимается одним переключателем, а всё,
-    что выше, пользователь чинит по-настоящему — и узнать об этом ему
-    полезнее.
+    Режима среди заслонов нет: он про автоматику и решает, запускать ли её, а
+    сюда приходят и автоматика, и человек. Автоматика при выключенном режиме
+    сюда не доходит — её не запускают, — а нажатое человеком уходит в любом.
+
+    Порядок стоит по цене: адресат читается из того, что уже под рукой, чёрный
+    список — единственный, кто идёт в базу, и потому стоит за ним. Замок
+    отправки последний: он снимается одним переключателем, а всё, что выше,
+    пользователь чинит по-настоящему — и узнать об этом ему полезнее.
     """
     target = telegram_peer(hr)
     if target is None:
         return SendPermission(refusal=NO_TARGET)
-    if (await bot.current_mode()) is BotMode.OFF:
-        return SendPermission(target=target, refusal=BOT_OFF)
     async with bot.session_factory() as session:
         blacklisted = await hr_blacklist_value(session, hr)
     if blacklisted:

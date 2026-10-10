@@ -61,7 +61,9 @@
   cursor: pointer;
 }
 
-.cnt-det-link:hover {
+/* Ссылкой под курсором подсвечиваются и контакты вакансии (vacancy-contacts.css). */
+.cnt-det-link:hover,
+.vac-contact-link:hover {
   color: var(--accent);
   text-decoration: underline;
 }

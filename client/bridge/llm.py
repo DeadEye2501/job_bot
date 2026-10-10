@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from contextlib import aclosing
 from functools import partial
 from typing import Any, Callable
 
@@ -59,22 +60,21 @@ async def _do_list_models_for_creds(
     client, reason = _client_or_reason(cfg)
     if client is None:
         return {"ok": False, "error": reason}
-    try:
-        models = await lm_models.list_models(client, kind=kind)
-        return {"ok": True, "models": models}
-    except Exception as e:
-        # Человеку в плашку едет короткая фраза, и по ней не отличить
-        # неподнятого поставщика от оборванной сети или чужого ответа. След
-        # остаётся только здесь: дальше беда уходит исходом, а не броском.
-        logger.exception("не вышло спросить имена моделей у %s", base_url)
-        # httpx иногда сериализует request включая Authorization-header
-        # в repr exception'а. Прогоняем через root-logger SecretRedaction-
-        # Filter руками — он висит на root, но мы тут просто текст
-        # формируем без logger.* вызова.
-        from backend.log_secrets import _redact
-        return {"ok": False, "error": _redact(f"{type(e).__name__}: {e}")}
-    finally:
-        await client.aclose()
+    async with aclosing(client):
+        try:
+            models = await lm_models.list_models(client, kind=kind)
+            return {"ok": True, "models": models}
+        except Exception as e:
+            # Человеку в плашку едет короткая фраза, и по ней не отличить
+            # неподнятого поставщика от оборванной сети или чужого ответа. След
+            # остаётся только здесь: дальше беда уходит исходом, а не броском.
+            logger.exception("не вышло спросить имена моделей у %s", base_url)
+            # httpx иногда сериализует request включая Authorization-header
+            # в repr exception'а. Прогоняем через root-logger SecretRedaction-
+            # Filter руками — он висит на root, но мы тут просто текст
+            # формируем без logger.* вызова.
+            from backend.log_secrets import _redact
+            return {"ok": False, "error": _redact(f"{type(e).__name__}: {e}")}
 
 
 async def _do_llm_probe(
@@ -83,14 +83,13 @@ async def _do_llm_probe(
 ) -> tuple[bool, str, list[str], int]:
     """Запускает chat/embed-проверку и возвращает кортеж (ok, detail, models, latency_ms).
 
-    `client.aclose()` гарантирован через finally — иначе при cancellation
-    httpx-сокет утекает.
+    Клиент закрывается и на отмене — иначе httpx-сокет утекает.
     """
     client, reason = _client_or_reason(cfg)
     if client is None:
         return False, reason, [], 0
     t0 = time.monotonic()
-    try:
+    async with aclosing(client):
         ok, detail = await check_fn(client, cfg.model)
         latency_ms = int((time.monotonic() - t0) * 1000)
         models: list[str] = []
@@ -102,8 +101,6 @@ async def _do_llm_probe(
                     "post-check list_models failed: %s", e, exc_info=True
                 )
         return ok, detail, models, latency_ms
-    finally:
-        await client.aclose()
 
 
 def read_llm_creds(payload: dict, kind: str) -> LlmProviderConfig:

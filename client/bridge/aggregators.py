@@ -3,20 +3,25 @@
 from __future__ import annotations
 
 from backend.agent.availability import current_refusal
+from backend.flows.aggregator_name import create_named_aggregator
 from backend.repository import aggregators as repo
-from client.bridge.answer import BAD_PAYLOAD, Denied, asked_id, bad_fields, denied, launched, reply
+from client.bridge.answer import Denied, asked_id, denied, launched, reply
 from client.bridge.form_payloads import read_toggle
 from client.bridge.hub import Hub
+from client.bridge.mark import AGGREGATOR_MARK, marked, unmarked
+from client.bridge.page import read_search
 from client.bridge.refusals import (
     AGGREGATOR_REFUSALS,
+    BLACKLISTED_STAYS_OFF,
     LOGIN_FIRST,
     LOGIN_REFUSALS,
     NO_AGGREGATOR,
     NO_BOT,
-    NOT_A_SITE,
     WEB_SEARCH_KEPT,
 )
-from client.bridge.wire import _aggregator_row_to_dict
+from client.bridge.source_page import AGGREGATOR, source_vacancies
+from client.bridge.source_switch import switch_all
+from client.bridge.wire import _aggregator_row_to_dict, _source_stats_to_dict
 
 
 class Aggregators:
@@ -25,29 +30,78 @@ class Aggregators:
     def __init__(self, hub: Hub) -> None:
         self._hub = hub
 
-    def list(self) -> dict:
-        """Все источники разом, «Поиск по сети» первым, и подсказка, если агент заперт."""
+    def list(self, payload: dict | None = None) -> dict:
+        """Источники со счётом вакансий и отметкой отсева, «Поиск по сети» первым,
+        общий выключатель и подсказка, если агент заперт.
+
+        Строка поиска едет обратно, как у каналов: по ней окно рисует поле.
+        """
+        search = read_search(payload)
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
-                rows = await repo.list_aggregators(session)
-            return {"aggregators": [_aggregator_row_to_dict(r) for r in rows],
+                rows = await repo.list_aggregators_with_counts(session, search)
+            return {"search": search or "",
+                    "enabled": self._hub.rs.aggregators_enabled,
+                    "aggregators": [{**_aggregator_row_to_dict(row), "vacancy_count": count,
+                                     "is_blacklisted": barred}
+                                    for row, count, barred in rows],
                     "lock": current_refusal(self._hub.rs.chat)}
 
         return reply(self._hub.runner, run())
 
+    def detail(self, aggregator_id: int) -> dict:
+        """Карточка агрегатора с числами его вакансий; номер едет и в отказе, как у канала."""
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                found = await repo.get_aggregator_detail(session, aggregator_id)
+            if found is None:
+                raise Denied(NO_AGGREGATOR, aggregator_id=aggregator_id)
+            row, stats, blacklist_value = found
+            card = _aggregator_row_to_dict(row)
+            return {"aggregator_id": card.pop("id"), **card,
+                    "stats": _source_stats_to_dict(stats),
+                    "blacklist_value": blacklist_value}
+
+        return reply(self._hub.runner, run())
+
+    def vacancies(self, payload: dict) -> dict:
+        """Страница вакансий этого агрегатора — для его карточки; см. `source_page`."""
+        return source_vacancies(self._hub, AGGREGATOR, payload)
+
+    def set_all_active(self, payload: dict) -> dict:
+        """Общий выключатель агрегаторов; строки не трогает — см. `source_switch`."""
+        return switch_all(self._hub, "aggregators_enabled", "aggregators.set_all_active", payload)
+
+    def block(self, aggregator_id: int) -> dict:
+        """Занести агрегатор в чёрный список по его хосту; агрегатор гаснет сразу.
+
+        Повторное нажатие второй записи не заводит: погашенная оживает. У
+        «Поиска по сети» хоста нет — отказ.
+        """
+        return reply(self._hub.runner, marked(self._hub, AGGREGATOR_MARK, aggregator_id))
+
+    def unblock(self, aggregator_id: int) -> dict:
+        """Убрать агрегатор из чёрного списка: запись гасится, а не сносится."""
+        return reply(self._hub.runner, unmarked(self._hub, AGGREGATOR_MARK, aggregator_id))
+
     def create(self, payload: dict | None = None) -> dict:
-        """Завести агрегатор по адресу, набранному как угодно; уже заведённый — не отказ."""
+        """Завести агрегатор по адресу, набранному как угодно; уже заведённый — не отказ.
+
+        Имя сервиса ищется тем же зовом — окно держит «Добавляю…», пока оно
+        ищется, — см. `aggregator_name`.
+        """
         payload = payload if isinstance(payload, dict) else {}
         address = str(payload.get("address") or "")
 
         async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                async with session.begin():
-                    row, status = await repo.create_aggregator(session, address)
-                    if status == "invalid":
-                        raise Denied(NOT_A_SITE)
-                    return {"aggregator": _aggregator_row_to_dict(row), "status": status}
+            row, status = await create_named_aggregator(
+                self._hub.session_factory, address, self._hub.rs.chat
+            )
+            if status == "invalid":
+                raise Denied(repo.NOT_A_SITE)
+            return {"aggregator": _aggregator_row_to_dict(row), "status": status}
 
         return reply(self._hub.runner, run())
 
@@ -75,14 +129,13 @@ class Aggregators:
         return reply(self._hub.runner, run())
 
     def set_active(self, payload: dict | None = None) -> dict:
-        """Включить или выключить агрегатор; без входа включить нельзя."""
+        """Включить или выключить агрегатор; без входа и в отсеве включить нельзя."""
         payload = payload if isinstance(payload, dict) else {}
-        try:
-            aggregator_id, active = read_toggle(payload, "aggregator_id", "is_active")
-            if aggregator_id is None or active is None:
-                raise ValueError("нужны aggregator_id и is_active")
-        except BAD_PAYLOAD as e:
-            return bad_fields("aggregators.set_active", e)
+        aggregator_id, active, refusal = read_toggle(
+            payload, "aggregator_id", "is_active", "aggregators.set_active"
+        )
+        if refusal is not None:
+            return refusal
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
@@ -92,6 +145,8 @@ class Aggregators:
                 raise Denied(NO_AGGREGATOR)
             if outcome == "not_logged_in":
                 raise Denied(LOGIN_FIRST)
+            if outcome == "blacklisted":
+                raise Denied(BLACKLISTED_STAYS_OFF)
             return {"aggregator_id": aggregator_id, "is_active": active}
 
         return reply(self._hub.runner, run())

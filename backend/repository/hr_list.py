@@ -6,8 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import Company, HR, Message, Vacancy
 from backend.payloads import HrWithCount
 
-from backend.repository.blacklist_marks import active_blacklist_values, marked_by
-from backend.repository.hr_card import LAST_VACANCY_ORDER, hr_blacklist_candidates
+from backend.repository.hr_card import HR_BLACKLIST, LAST_VACANCY_ORDER
 from backend.repository.hr_identify import HAS_TELEGRAM_IDENTITY
 from backend.repository.messages import UNREAD_INCOMING
 from backend.repository.paging import searched_page
@@ -155,14 +154,14 @@ async def list_hr_with_counts(
     )
     last_co = await _last_company_by_hr(session)
     unread_by_hr = await _unread_by_hr(session)
-    bl_values = await active_blacklist_values(session, "hr")
+    bl_values = await HR_BLACKLIST.marked(session)
     return [
         HrWithCount(
             hr=hr,
             vacancy_count=int(cnt or 0),
             last_company_name=last_co.get(hr.id),
             unread_count=unread_by_hr.get(hr.id, 0),
-            is_blacklisted=marked_by(hr_blacklist_candidates(hr), bl_values),
+            is_blacklisted=HR_BLACKLIST.among(hr, bl_values),
         )
         for hr, cnt in counts
     ], has_more

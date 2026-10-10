@@ -13,6 +13,7 @@
   import { listener } from '$api/events.js';
   import { living } from '$state/alive.js';
   import { blockedTip } from '$state/health.js';
+  import { hearRound } from '$state/round.svelte.js';
   import BottomBar from './BottomBar.svelte';
   import ContactsScreen from './ContactsScreen.svelte';
   import LogsScreen from './LogsScreen.svelte';
@@ -152,6 +153,7 @@
     // Показывает её оболочка, а не карточка: работа переживает и закрытую
     // карточку, и уход на соседний экран, а сказать о ней надо всё равно.
     heard.on('action_finished', (done) => say(done.message, done.danger));
+    const roundDeaf = hearRound(heard);
     // Цикл вестей пускается здесь: подписки экранов и полосы встают в их
     // эффектах, а пропущенное между подъёмом и подпиской доберёт первый же
     // вопрос — очередь отдаёт всё, что накопилось после названного номера.
@@ -160,6 +162,7 @@
     setupClock = setInterval(askSetup, SETUP_RETRY_MS);
     return () => {
       settled();
+      roundDeaf();
       heard.stop();
       clearInterval(setupClock);
       clearTimeout(plaqueTimer);

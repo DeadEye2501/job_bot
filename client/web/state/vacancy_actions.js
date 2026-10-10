@@ -31,6 +31,29 @@ export function actionBlocks(card, lockedTip) {
   };
 }
 
+/** Пилюля источника в шапке карточки: откуда вакансия и куда ведёт нажатие.
+ *
+ * Канал и агрегатор показаны одинаково — источник у вакансии один, и пилюля
+ * его заполняется сама, по привязке. Ведёт она по `source_url`: у вакансии из
+ * канала это пост, у вакансии с агрегатора или из сети — её страница на сайте.
+ * Без источника пилюли нет: пустая читалась бы как потерянный источник.
+ */
+export function sourcePill(card) {
+  if (card.channel_username) {
+    return { icon: 'tag', text: card.channel_username, title: 'Перейти к посту в канале' };
+  }
+  if (card.aggregator_name) {
+    return { icon: 'language', text: siteName(card), title: 'Перейти к вакансии на сайте' };
+  }
+  return null;
+}
+
+/** Имя сайта-источника. У найденной поиском по сети — «Сайт»: «Поиск по сети»
+ *  — способ, которым её нашли, а не место, откуда она пришла. */
+function siteName(card) {
+  return card.from_web_search ? 'Сайт' : card.aggregator_name;
+}
+
 /** Чем подписан исходный текст объявления — чипами над самим текстом.
  *
  * По каналу, номеру сообщения и времени поста объявление находят в самом
@@ -45,6 +68,7 @@ export function rawChips(card) {
   const stamp = showStamp(card.posted_at || card.created_at);
   const chips = [
     card.channel_username ? { icon: 'tag', text: `@${card.channel_username}` } : null,
+    card.aggregator_name ? { icon: 'language', text: siteName(card) } : null,
     card.source_msg_id === null || card.source_msg_id === undefined
       ? null
       : { icon: 'numbers', text: `msg #${card.source_msg_id}` },

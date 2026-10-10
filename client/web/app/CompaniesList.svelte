@@ -1,6 +1,7 @@
 <script>
   // Вкладка «Компании»: список слева, карточка выбранной справа.
 
+  import AddButton from '$components/AddButton.svelte';
   import ContactsPanes from '$components/ContactsPanes.svelte';
   import NewCardDialog from '$components/NewCardDialog.svelte';
   import CompanyRow from '$components/CompanyRow.svelte';
@@ -54,14 +55,7 @@
       placeholder={FORM.searchHint}
       onsearch={list.find}
     />
-    <button
-      class="icon-btn cnt-add-btn"
-      type="button"
-      title="Добавить компанию"
-      onclick={() => (newCard.adding = true)}
-    >
-      <span class="material-symbols-outlined">{FORM.icon}</span>
-    </button>
+    <AddButton title="Добавить компанию" icon={FORM.icon} onclick={() => (newCard.adding = true)} />
   {/snippet}
 
   {#snippet emptyNote()}

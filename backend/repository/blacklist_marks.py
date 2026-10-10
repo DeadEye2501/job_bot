@@ -1,9 +1,14 @@
 """Активные строки чёрного списка, по которым предметы получают отметку."""
 
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
+
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Blacklist, HR
+from backend.models.settings import AGGREGATOR_KIND, HR_KIND
 
 _ACCOUNT_MARK_PREFIX = "user_id:"
 
@@ -104,7 +109,7 @@ async def _nicknames_of_marked_people(session: AsyncSession) -> list[str]:
     marked = (
         await session.scalars(
             select(Blacklist.value).where(
-                Blacklist.kind == "hr", Blacklist.active.is_(True)
+                Blacklist.kind == HR_KIND, Blacklist.active.is_(True)
             )
         )
     ).all()
@@ -123,21 +128,26 @@ async def _nicknames_of_marked_people(session: AsyncSession) -> list[str]:
 
 
 async def load_active_blacklist_patterns(session: AsyncSession) -> list[str]:
-    """Все активные значения списка, любого рода, — образцы для сверки с
-    текстом объявления.
+    """Активные значения списка — образцы для сверки с текстом объявления.
 
-    Род здесь не спрашивается нарочно: по тексту поста отсеивают и по
-    названию компании, и по ключевому слову, и знать заранее, чем именно
-    совпадёт, конвейеру незачем.
+    Род здесь почти не спрашивается: по тексту поста отсеивают и по названию
+    компании, и по ключевому слову, и знать заранее, чем именно совпадёт,
+    конвейеру незачем.
 
-    Одно исключение — люди: их написание в списке несменяемое и потому в
-    тексте не встречается. К значениям добавляются ники отмеченных, иначе
-    отметка на человеке гасила бы только письма (`_nicknames_of_marked_people`).
+    Сайты в образцы не идут: отметка сайта отсеивает вакансии, которые на нём
+    живут, — по адресу страницы и контактам (`aggregators.vacancy_barred_host`), —
+    а пост, назвавший сайт мимоходом, остаётся чужой вакансией.
+
+    Люди идут иначе: их написание в списке несменяемое и потому в тексте не
+    встречается. К значениям добавляются ники отмеченных, иначе отметка на
+    человеке гасила бы только письма (`_nicknames_of_marked_people`).
     """
     values = list(
         (
             await session.scalars(
-                select(Blacklist.value).where(Blacklist.active)
+                select(Blacklist.value).where(
+                    Blacklist.active, Blacklist.kind != AGGREGATOR_KIND
+                )
             )
         ).all()
     )
@@ -149,7 +159,7 @@ def marked_by(candidates: list[str], values: set[str]) -> bool:
 
     Перечням нужен ответ на каждую строку, и значения они читают разом
     (`active_blacklist_values`), а не запросом на предмет. Объявление одно на
-    все три перечня — людей, компаний и каналов: разойдись они, один и тот же
+    все перечни — людей, компаний, каналов и агрегаторов: разойдись они, один и тот же
     предмет считался бы отмеченным на одном экране и чистым на другом.
     """
     return any(c in values for c in candidates)
@@ -165,3 +175,46 @@ def preferred_blacklist_value(candidates: list[str]) -> str | None:
     пишет кнопка.
     """
     return candidates[0] if candidates else None
+
+
+@dataclass(frozen=True)
+class BlacklistMark:
+    """Отметка предмета одного рода: род и перечень написаний предмета.
+
+    Пара объявляется у предмета один раз, а правила «чем отмечен», «отмечен
+    ли» и «погасить отмеченные» живут здесь одним телом на всех: написанные у
+    каждого предмета своей копией, они расходились бы родом или перечнем, и
+    один и тот же предмет считался бы отмеченным на одном экране и чистым на
+    другом.
+    """
+
+    kind: str
+    candidates: Callable[[Any], list[str]]
+
+    async def value(self, session: AsyncSession, row) -> str | None:
+        """Написание действующей отметки предмета — для чипа и запретов; None — чист."""
+        return await active_blacklist_value(session, self.kind, self.candidates(row))
+
+    async def marked(self, session: AsyncSession) -> set[str]:
+        """Написания всех действующих отметок рода — читаются разом для списка."""
+        return await active_blacklist_values(session, self.kind)
+
+    def among(self, row, values: set[str]) -> bool:
+        """Отмечен ли предмет одной из заранее прочитанных строк своего рода."""
+        return marked_by(self.candidates(row), values)
+
+    async def switch_off(self, session: AsyncSession, model) -> int:
+        """Выключить включённые источники под действующей отметкой; сколько выключено.
+
+        Перебором строк, а не запросом: отметка ловит написания, которые
+        собирает питон (у сайта — и поддомены), а источников единицы.
+        Выключенные не трогаются. Сессию открывает и закрывает зовущий.
+        """
+        marked = await self.marked(session)
+        if not marked:
+            return 0
+        rows = (await session.scalars(select(model).where(model.is_active.is_(True)))).all()
+        barred = [row for row in rows if self.among(row, marked)]
+        for row in barred:
+            row.is_active = False
+        return len(barred)

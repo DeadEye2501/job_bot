@@ -64,9 +64,6 @@ class UiBot:
     def cancel_current_poll(self) -> None:
         self.calls.append(("cancel_current_poll",))
 
-    def cancel_round(self) -> None:
-        self.calls.append(("cancel_round",))
-
     def request_stop(self) -> None:
         self.calls.append(("request_stop",))
 

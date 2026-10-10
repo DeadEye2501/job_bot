@@ -8,6 +8,7 @@ from backend.flows.aggregator_round import RoundState, seek_source
 from backend.models import Aggregator, Vacancy
 from tests.backend.fixtures.parse_stub import parse_into
 from tests.dbio import all_rows, put
+from tests.factories import blacklist_row
 from tests.factories_aggregators import aggregator_row
 from tests.fakes.agent import LimitHit, scripted_kit
 
@@ -122,6 +123,41 @@ async def test_the_web_seeker_searches_the_web_and_avoids_the_persons_aggregator
 
     (plan,) = kit.run_session.plans
     assert plan.web_search is True and "board.test" in plan.task
+
+
+@pytest.mark.parametrize("host", ["site.test", None], ids=["агрегатор", "поиск по сети"])
+async def test_the_seeker_is_told_how_to_call_a_person(seek, parsed, host):
+    async def step(tools):
+        await tools["finish"](result="done")
+
+    _, _, kit = await seek([step], host=host)
+
+    (plan,) = kit.run_session.plans
+    # Подстрока самого правила о зове человека: слово `need_human` называет и
+    # промпт роли, и по нему пропажу правила не заметить.
+    assert 'need_human с kind="captcha"' in plan.system_prompt
+
+
+async def test_the_web_seeker_hears_of_the_blacklisted_sites(seek, session_factory, parsed):
+    await put(session_factory, blacklist_row("aggregator", "barred.test"))
+
+    async def step(tools):
+        await tools["finish"](result="done")
+
+    _, _, kit = await seek([step], name="Поиск по сети", host=None)
+
+    (plan,) = kit.run_session.plans
+    assert "barred.test" in plan.task
+
+
+async def test_the_web_seeker_hears_that_no_site_is_blacklisted(seek, parsed):
+    async def step(tools):
+        await tools["finish"](result="done")
+
+    _, _, kit = await seek([step], name="Поиск по сети", host=None)
+
+    (plan,) = kit.run_session.plans
+    assert "Сайты в чёрном списке: нет" in plan.task
 
 
 async def test_the_pipeline_refreshes_its_snapshots_before_the_search(

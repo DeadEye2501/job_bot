@@ -2,7 +2,28 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { appended, nearBottom, nearTop, refreshLimit } from '../state/paging.js';
+import { appended, detailScrolled, nearBottom, nearTop, refreshLimit } from '../state/paging.js';
+
+describe('дочитывание открытой карточки по прокрутке панели', () => {
+  const AT_BOTTOM = { currentTarget: { scrollTop: 1000, clientHeight: 100, scrollHeight: 1100 } };
+  const AT_TOP = { currentTarget: { scrollTop: 0, clientHeight: 100, scrollHeight: 5000 } };
+
+  it('у низа панели карточка дочитывает следующую страницу', () => {
+    let asked = 0;
+    detailScrolled(AT_BOTTOM, { more: () => asked++ });
+    expect(asked).toBe(1);
+  });
+
+  it('вдали от низа не дочитывает', () => {
+    let asked = 0;
+    detailScrolled(AT_TOP, { more: () => asked++ });
+    expect(asked).toBe(0);
+  });
+
+  it('без открытой карточки дочитывать нечего', () => {
+    expect(() => detailScrolled(AT_BOTTOM, null)).not.toThrow();
+  });
+});
 
 describe('догрузка по прокрутке', () => {
   it('следующая страница просится, не доехав до самого низа', () => {

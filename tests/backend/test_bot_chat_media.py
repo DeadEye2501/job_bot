@@ -191,17 +191,16 @@ async def test_a_path_that_is_not_a_file_is_refused(
     assert client.outgoing == []
 
 
-async def test_a_switched_off_bot_sends_no_files(
-    chatting, tmp_path
+async def test_a_switched_off_bot_still_sends_the_files_the_person_chose(
+    chatting, tmp_path, sending_unlocked
 ):
-    """Выключенный бот файлов не шлёт — так же, как и сообщений."""
+    """Режим — про автоматику: файл, выбранный человеком, уходит и в Off."""
     bot, client, hr = await chatting(mode=BotMode.OFF)
     src = _file(tmp_path, "снимок.png")
 
-    with pytest.raises(RuntimeError, match="Бот выключен"):
-        await bot.send_to_hr_media(hr.id, str(src))
+    await bot.send_to_hr_media(hr.id, str(src))
 
-    assert client.outgoing == []
+    assert len(client.outgoing) == 1
 
 
 async def test_the_send_guard_stops_files_too(chatting, tmp_path):

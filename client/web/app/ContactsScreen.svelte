@@ -11,6 +11,7 @@
   import TopTabs from '$components/TopTabs.svelte';
   import { CONTACTS_TABS } from '$state/sections.js';
 
+  import AggregatorsList from './AggregatorsList.svelte';
   import BlacklistList from './BlacklistList.svelte';
   import ChannelsList from './ChannelsList.svelte';
   import CompaniesList from './CompaniesList.svelte';
@@ -43,7 +44,17 @@
 <TopTabs tabs={CONTACTS_TABS} active={tab} onpick={(key) => (tab = key)} />
 
 <div class="screen-body" class:flush={tab !== 'blacklist'}>
-  {#if tab === 'channels'}
+  {#if tab === 'aggregators'}
+    <AggregatorsList
+      {ask}
+      {say}
+      {lockedTip}
+      {events}
+      {onvacancy}
+      open={mine('aggregators')}
+      onopened={() => (mark = null)}
+    />
+  {:else if tab === 'channels'}
     <ChannelsList
       {ask}
       {say}

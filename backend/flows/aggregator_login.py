@@ -19,14 +19,15 @@ async def log_in(kit: AgentKit, source: Source) -> str:
     (окно не закрыто за час). Судит отметка в базе, а не конец сессии: сессия
     кончается и тогда, когда входа нет.
     """
-    await kit.browser.open_profile(source.id)
+    await kit.browser.open_profile(source.id, as_person=True)
     await kit.browser.show()
     await (await kit.browser.page()).goto(f"https://{source.host}/")
     if not await kit.browser.wait_closed(_LOGIN_WAIT_SEC):
         return "login_timeout"
     job = LoginJob(source)
-    plan = SessionPlan(system_prompt(LOGIN_PROMPT), login_task(source.host),
-                       [*common_tools(kit, job), *browser_tools(kit, None)], web_search=False)
+    tools = [*common_tools(kit, job), *browser_tools(kit, None)]
+    plan = SessionPlan(system_prompt(LOGIN_PROMPT, tools), login_task(source.host), tools,
+                       web_search=False)
     if (await run_guarded(kit, plan)).limit_exhausted:
         raise LimitExhausted
     async with kit.pipeline.session_factory() as session:

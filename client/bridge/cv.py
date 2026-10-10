@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import aclosing
 from pathlib import Path
 
 from adapters import lm_studio
@@ -135,11 +136,8 @@ async def _parse_into_profile(hub, path: Path, chat: LlmProviderConfig) -> str:
     if trouble is not None:
         return trouble
 
-    client = lm_studio.make_client(chat)
-    try:
+    async with aclosing(lm_studio.make_client(chat)) as client:
         parsed = await llm_cv.parse_cv(text, client, chat.model)
-    finally:
-        await client.aclose()
     if parsed is None:
         return "unparsed"
 

@@ -39,10 +39,19 @@ class BotState(IdMixin, Base):
 
 # `Blacklist.kind` — свободная строка: отсеять чужое значение может только
 # код. Здесь набор объявлен для бэкенда; второе его написание живёт во фронте
-# (`BLACKLIST_KINDS` в `client/web/state/contacts.js`) и несёт ещё и слова для
+# (`BLACKLIST_KINDS` в `client/web/state/blacklist.js`) и несёт ещё и слова для
 # человека. Сойтись они обязаны ключами: род, известный одному и неизвестный
-# другому, даёт строку, которую заводят, но не показывают.
-BLACKLIST_KINDS: tuple[str, ...] = ("keyword", "hr", "company", "channel")
+# другому, даёт строку, которую заводят, но не показывают. Каждый род назван
+# своим именем, и бэкенд пишет его только так: опечатка в литерале не нашлась
+# бы ничем, кроме отметки, которая молча перестала отмечать.
+KEYWORD_KIND = "keyword"
+HR_KIND = "hr"
+COMPANY_KIND = "company"
+CHANNEL_KIND = "channel"
+AGGREGATOR_KIND = "aggregator"
+BLACKLIST_KINDS: tuple[str, ...] = (
+    KEYWORD_KIND, HR_KIND, COMPANY_KIND, CHANNEL_KIND, AGGREGATOR_KIND
+)
 
 
 class Blacklist(IdMixin, CreatedAtMixin, Base):

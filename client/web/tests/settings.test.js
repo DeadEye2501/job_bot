@@ -22,8 +22,10 @@ import {
   blankTelegram,
   clampField,
   credsChanged,
+  embedReading,
   mirrored,
   nextStep,
+  probeLine,
   probePill,
   sameCreds,
   scorePercent,
@@ -138,6 +140,64 @@ describe('плашка проверки модели', () => {
     // Пустая плашка на непроверенном поставщике читалась бы как «что-то не
     // так», хотя не так ровно ничего.
     expect(probePill({ status: 'idle' })).toBe(null);
+  });
+});
+
+describe('строка проверки на шаге мастера', () => {
+  it('пока проверяют — так и написано', () => {
+    expect(probeLine({ status: 'busy' })).toEqual({
+      tone: 'busy',
+      text: 'Проверяем подключение...',
+    });
+  });
+
+  it('удача называет модель и время ответа', () => {
+    expect(probeLine({ status: 'ok', model: 'qwen', latencyMs: 120 })).toEqual({
+      tone: 'ok',
+      text: 'Подключение работает (qwen · 120ms)',
+    });
+  });
+
+  it('отказ поставщика показан его же словами', () => {
+    // Строка стоит под полями, места ей хватает: краткое «Ошибка» заставило бы
+    // искать причину там, где её нет.
+    expect(probeLine({ status: 'err', error: 'Connection refused' })).toEqual({
+      tone: 'err',
+      text: 'Connection refused',
+    });
+  });
+
+  it('непроверенное молчит', () => {
+    expect(probeLine({ status: 'idle' })).toBe(null);
+  });
+});
+
+describe('записанные эмбеддинги при первом чтении', () => {
+  const chat = { base_url: 'http://localhost:1234', api_key: 'k', model: 'chat-model' };
+
+  it('путь к файлу модели — источник «файл», с чатом он не делится', () => {
+    expect(embedReading(chat, fileCreds('D:/m.gguf'))).toEqual({ fromFile: true, same: false });
+  });
+
+  it('тот же адрес и ключ — эмбеддинги ходят туда же, куда чат', () => {
+    expect(embedReading(chat, { ...chat, model: 'embed-model' })).toEqual({
+      fromFile: false,
+      same: true,
+    });
+  });
+
+  it('свой адрес — свой', () => {
+    const embed = { base_url: 'http://other', api_key: 'k', model: 'embed-model' };
+
+    expect(embedReading(chat, embed)).toEqual({ fromFile: false, same: false });
+  });
+
+  it('с чатом на Claude не делятся и при совпавших полях', () => {
+    // Векторов Claude не считает: взведённая галочка вернулась бы отмеченной
+    // вместе с другим поставщиком чата и молча затёрла бы свой сервер.
+    const claude = { base_url: 'claude-code', api_key: '', model: 'sonnet' };
+
+    expect(embedReading(claude, { ...claude, model: 'e' }).same).toBe(false);
   });
 });
 

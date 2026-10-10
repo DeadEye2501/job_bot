@@ -106,6 +106,16 @@ async def test_a_telegram_link_opens(api, ask, opened):
     assert opened == ["tg://resolve?domain=ivanov"]
 
 
+async def test_a_mail_and_a_phone_contact_open_too(api, ask, opened):
+    """Контакт вакансии бывает почтой и телефоном: письмо и звонок система
+    открывает своими программами, как ссылку — браузером."""
+    mail = await ask(api.system.open_url, "mailto:hr@example.test")
+    phone = await ask(api.system.open_url, "tel:+79001234567")
+
+    assert "ok" in mail and "ok" in phone
+    assert opened == ["mailto:hr@example.test", "tel:+79001234567"]
+
+
 async def test_a_link_the_system_would_not_open_is_named_a_refusal(
     api, ask, refused_by_the_system
 ):

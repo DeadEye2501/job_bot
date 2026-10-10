@@ -39,11 +39,11 @@
           value={row.level}
           onpick={(level) => onedit(index, { level })}
         />
-        <button class="lang-remove" type="button" title="удалить" onclick={() => onremove(index)}>
+        <button class="remove-cross" type="button" title="удалить" onclick={() => onremove(index)}>
           ×
         </button>
       </div>
     {/each}
   </div>
-  <button class="lang-add" type="button" onclick={add}>+ Добавить язык</button>
+  <button class="add-link lang-add" type="button" onclick={add}>+ Добавить язык</button>
 </div>

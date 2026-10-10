@@ -6,7 +6,7 @@
   import { pressKey } from '$state/keys.js';
   import Avatar from './Avatar.svelte';
   import { personName } from '$state/people.js';
-  import { plural } from '$state/words.js';
+  import { vacancyCount } from '$state/words.js';
 
   let { people, empty, onpick } = $props();
 </script>
@@ -29,7 +29,7 @@
             <div class="hr-mini-name">{personName(one)}</div>
             <span class="hr-mini-meta">
               {#if one.telegram_username}@{one.telegram_username} · {/if}
-              {one.vacancy_count} {plural(one.vacancy_count, 'вакансия', 'вакансии', 'вакансий')}
+              {vacancyCount(one.vacancy_count)}
             </span>
           </div>
           <span class="material-symbols-outlined hr-mini-go">arrow_forward</span>

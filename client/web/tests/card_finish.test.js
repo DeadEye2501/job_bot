@@ -51,6 +51,24 @@ describe('действие, кончающее карточку', () => {
     expect(await panel(null).finish(7)).toBe(false);
   });
 
+  it('ответ, просящий подтверждения, оставляет карточку на месте и молчит', async () => {
+    // Мост сносит агрегатор без откликов сразу, а с откликами сперва спрашивает
+    // их число: панель, закрытая на вопросе, читалась бы как «удалено».
+    const trail = [];
+    const finish = cardFinish({
+      ask: () => Promise.resolve({ confirm: 4 }),
+      method: 'aggregators.delete',
+      note: 'Агрегатор удалён',
+      say: (text) => trail.push(`сказано: ${text}`),
+      onchanged: () => trail.push('список перечитан'),
+      onclose: () => trail.push('панель закрыта'),
+      held: (done) => Boolean(done.confirm),
+    });
+
+    expect(await finish({ aggregator_id: 7, confirmed: false })).toBe(false);
+    expect(trail).toEqual([]);
+  });
+
   it('мосту уходит названная нагрузка', async () => {
     const { asked, ask } = replying([{ merged: true }]);
     const finish = cardFinish({

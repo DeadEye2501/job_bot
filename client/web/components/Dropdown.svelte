@@ -7,7 +7,7 @@
 
   import DropPanel from './DropPanel.svelte';
 
-  let { options, value, onpick } = $props();
+  let { options, value, placeholder = '', onpick } = $props();
 
   let open = $state(false);
   let root = $state(null);
@@ -23,7 +23,7 @@
 
 <div class="cdd" class:open bind:this={root}>
   <button class="cdd-btn" type="button" onclick={() => (open = !open)}>
-    <span class="cdd-label">{value}</span>
+    <span class="cdd-label" class:empty={!value}>{value || placeholder}</span>
     <span class="material-symbols-outlined">expand_more</span>
   </button>
   {#if open}

@@ -10,8 +10,9 @@
   align-items: center;
 }
 
+/* Вид кнопки — общий, в add-link.css; своё здесь — мельче кегль и значок в
+   строке подписи, где заголовок набран прописными. */
 .list-add {
-  color: var(--text-secondary);
   font-size: 0.7rem;
   cursor: pointer;
   display: inline-flex;
@@ -19,10 +20,6 @@
   gap: 2px;
   text-transform: none;
   letter-spacing: 0;
-}
-
-.list-add:hover {
-  color: var(--accent);
 }
 
 .list-add .material-symbols-outlined {
