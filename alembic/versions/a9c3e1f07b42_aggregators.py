@@ -69,7 +69,7 @@ def upgrade() -> None:
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('vacancy_id', sa.Integer(), nullable=False),
         sa.Column('aggregator_id', sa.Integer(), nullable=True),
-        sa.Column('via', sa.Enum('aggregator', 'form', 'email', name='application_via'), nullable=False),
+        sa.Column('via', sa.Enum('telegram', 'aggregator', 'form', 'email', name='application_via'), nullable=False),
         sa.Column('target', sa.String(), nullable=False),
         sa.Column('letter', sa.String(), nullable=True),
         sa.Column('sent_at', sa.DateTime(timezone=True), nullable=False),

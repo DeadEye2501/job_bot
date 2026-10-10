@@ -1,14 +1,12 @@
-"""Какими способами откликнуться и в каком порядке: кнопка агрегатора, форма, почта.
-
-Telegram в перечне нет: отклик в Telegram делает своя фаза раньше.
-"""
+"""Какими способами откликнуться и в каком порядке."""
 
 from dataclasses import dataclass
 
 from backend.domain.contact_keys import is_address, is_link
-from backend.domain.hosts import host_owns, normalize_host
+from backend.domain.hosts import owning_host
 from backend.models import ApplicationVia
 
+VIA_TELEGRAM = ApplicationVia.TELEGRAM.value
 VIA_AGGREGATOR = ApplicationVia.AGGREGATOR.value
 VIA_FORM = ApplicationVia.FORM.value
 VIA_EMAIL = ApplicationVia.EMAIL.value
@@ -33,57 +31,74 @@ class KnownSite:
 
 
 @dataclass(frozen=True)
-class ApplyFacts:
-    """Что известно о вакансии для выбора способов.
+class VacancyFacts:
+    """Что о вакансии нужно выбору способа. `hr_handle` — адрес HR в Telegram
+    словом окна (`@ник` или номер); `source_site` — площадка, с которой она пришла."""
 
-    `source_site` — агрегатор, с которого она пришла (у вакансии из канала —
-    пусто); `sites` — все агрегаторы человека; `closed` — закрытые до конца обхода.
-    """
-
+    hr_handle: str | None
     source_url: str | None
     source_site: KnownSite | None
     contacts: list[str]
-    sites: list[KnownSite]
+
+
+@dataclass
+class World:
+    """Что сейчас доступно. Живёт прогон откликателя: исполнитель доучивает его."""
+
+    telegram_open: bool
     mail_ready: bool
-    closed: set[int]
+    agent_ready: bool
+    sites: list[KnownSite]
+    closed_sites: set[int]
 
 
-def apply_ways(facts: ApplyFacts) -> list[Way]:
-    """Способы по порядку: кнопка агрегатора, форма, затем каждый адрес почты."""
-    ways = [way for way in (_button(facts), _form(facts)) if way is not None]
-    if facts.mail_ready:
-        ways += [Way(VIA_EMAIL, c.strip(), None) for c in facts.contacts if is_address(c)]
-    return ways
+def apply_ways(vacancy: VacancyFacts, world: World) -> list[Way]:
+    """Способы по порядку: Telegram, кнопка агрегатора, форма, каждый адрес почты."""
+    ways = [_telegram(vacancy, world)]
+    if world.agent_ready:
+        ways += [_button(vacancy, world), _form(vacancy, world)]
+    if world.mail_ready:
+        ways += [Way(VIA_EMAIL, c.strip(), None) for c in vacancy.contacts if is_address(c)]
+    return [way for way in ways if way is not None]
 
 
-def _button(facts: ApplyFacts) -> Way | None:
+def _telegram(vacancy: VacancyFacts, world: World) -> Way | None:
+    if vacancy.hr_handle is None or not world.telegram_open:
+        return None
+    return Way(VIA_TELEGRAM, vacancy.hr_handle, None)
+
+
+def _button(vacancy: VacancyFacts, world: World) -> Way | None:
     """Ссылка на вакансию на сайте залогиненного и не закрытого агрегатора."""
-    for link in _links(facts):
-        site = _owner(link, facts.sites)
-        if site is not None and site.logged_in and site.id not in facts.closed:
+    for link in _links(vacancy):
+        site = _owner(link, world.sites)
+        if site is not None and site.logged_in and site.id not in world.closed_sites:
             return Way(VIA_AGGREGATOR, link, site.id)
     return None
 
 
-def _form(facts: ApplyFacts) -> Way | None:
+def _form(vacancy: VacancyFacts, world: World) -> Way | None:
     """Своя страница у находки поиска по сети, иначе любая ссылка не на агрегатор человека.
 
     Страница агрегатора человека формой не бывает и у находки сети: веб-поиск
     обходит их по наставлению, а не по запрету, и принести может.
     """
-    source = facts.source_site
-    web_find = source is not None and source.host is None and facts.source_url
-    candidates = [facts.source_url] if web_find else []
-    candidates += [c.strip() for c in facts.contacts if is_link(c)]
-    return next((Way(VIA_FORM, link, None) for link in candidates
-                 if _owner(link, facts.sites) is None), None)
+    source = vacancy.source_site
+    web_find = source is not None and source.host is None and vacancy.source_url
+    candidates = [vacancy.source_url] if web_find else []
+    return next((Way(VIA_FORM, link, None) for link in candidates + _contact_links(vacancy)
+                 if _owner(link, world.sites) is None), None)
 
 
-def _links(facts: ApplyFacts) -> list[str]:
-    from_source = [facts.source_url] if facts.source_site and facts.source_url else []
-    return from_source + [c.strip() for c in facts.contacts if is_link(c)]
+def _links(vacancy: VacancyFacts) -> list[str]:
+    from_source = [vacancy.source_url] if vacancy.source_site and vacancy.source_url else []
+    return from_source + _contact_links(vacancy)
+
+
+def _contact_links(vacancy: VacancyFacts) -> list[str]:
+    return [c.strip() for c in vacancy.contacts if is_link(c)]
 
 
 def _owner(link: str, sites: list[KnownSite]) -> KnownSite | None:
-    host = normalize_host(link)
-    return next((s for s in sites if s.host and host_owns(s.host, host)), None)
+    host = owning_host(link, {s.host for s in sites if s.host})
+    return next((s for s in sites if host and s.host == host), None)

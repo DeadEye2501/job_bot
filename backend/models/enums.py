@@ -65,6 +65,7 @@ class ContactAddedBy(enum.Enum):
 
 
 class ApplicationVia(enum.Enum):
+    TELEGRAM = "telegram"
     AGGREGATOR = "aggregator"
     FORM = "form"
     EMAIL = "email"

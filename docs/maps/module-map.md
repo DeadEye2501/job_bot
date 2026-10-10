@@ -801,19 +801,22 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: —
 
 
-### `backend/domain/apply_order.py` — 89 строк
+### `backend/domain/apply_order.py` — 104 строк
 
-Какими способами откликнуться и в каком порядке: кнопка агрегатора, форма, почта.
+Какими способами откликнуться и в каком порядке.
 
 Зависит от: `backend.domain.contact_keys`, `backend.domain.hosts`, `backend.models`
 
 - `class Way` (4)
 - `class KnownSite` (7)
-- `class ApplyFacts` (13)
-- `def apply_ways(facts: ApplyFacts) -> list[Way]` (6)
-- `def _button(facts: ApplyFacts) -> Way | None` (7)
-- `def _form(facts: ApplyFacts) -> Way | None` (12)
-- `def _links(facts: ApplyFacts) -> list[str]` (3)
+- `class VacancyFacts` (8)
+- `class World` (8)
+- `def apply_ways(vacancy: VacancyFacts, world: World) -> list[Way]` (8)
+- `def _telegram(vacancy: VacancyFacts, world: World) -> Way | None` (4)
+- `def _button(vacancy: VacancyFacts, world: World) -> Way | None` (7)
+- `def _form(vacancy: VacancyFacts, world: World) -> Way | None` (11)
+- `def _links(vacancy: VacancyFacts) -> list[str]` (3)
+- `def _contact_links(vacancy: VacancyFacts) -> list[str]` (2)
 - `def _owner(link: str, sites: list[KnownSite]) -> KnownSite | None` (3)
 
 ### `backend/domain/blacklist.py` — 56 строк
@@ -1054,7 +1057,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def spelled_alone(text: str, word: str) -> bool` (9)
 
-### `backend/flows/aggregator_apply.py` — 168 строк
+### `backend/flows/aggregator_apply.py` — 170 строк
 
 Отклики агентом: способ за способом, пока один не удался или способы не кончились.
 
@@ -1064,7 +1067,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def apply_phase(kit: AgentKit, round_: RoundState, vacancy_ids: list[int]) -> None` (9)
 - `async def apply_vacancy(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> str` (19)
 - `async def _new_title(kit: AgentKit, vacancy_id: int) -> str | None` (8)
-- `async def vacancy_ways(session_factory, vacancy_id: int, closed: set[int]) -> list[Way]` (25)
+- `async def vacancy_ways(session_factory, vacancy_id: int, closed: set[int]) -> list[Way]` (27)
   - `def clear(link: str | None) -> bool` (2)
 - `async def _ways_for(kit: AgentKit, round_: RoundState, order: ApplyOrder) -> list[Way]` (4)
 - `async def _one_way(kit: AgentKit, round_: RoundState, order: ApplyOrder, way: Way) -> str` (18)
@@ -1848,7 +1851,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class HR(IdMixin, Base)` (17)
 - `class Company(IdMixin, Base)` (10)
 
-### `backend/models/enums.py` — 81 строк
+### `backend/models/enums.py` — 82 строк
 
 Перечисления, которыми колонки ограничивают набор значений.
 
@@ -1860,7 +1863,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class StatusHistorySource(enum.Enum)` (11)
 - `class LlmConfigKind(enum.Enum)` (3)
 - `class ContactAddedBy(enum.Enum)` (4)
-- `class ApplicationVia(enum.Enum)` (4)
+- `class ApplicationVia(enum.Enum)` (5)
 - `class SalaryPeriod(enum.Enum)` (4)
 - `class Gender(enum.Enum)` (3)
 
@@ -2005,9 +2008,9 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def put_app_setting(session: AsyncSession, key: str, value: str) -> None` (7)
 
-### `backend/repository/applications.py` — 112 строк
+### `backend/repository/applications.py` — 113 строк
 
-Отклики вне Telegram и скрининг по ним.
+Отклики и скрининг по ним.
 
 Зависит от: `backend.domain.contact_keys`, `backend.models`, `backend.repository.vacancies_life`, `backend.repository.vacancy_status`, `backend.telegram_time`
 
@@ -3866,7 +3869,7 @@ Runtime settings layer.
 
 - `def _gate(limit=60.0)` (5)
 
-### `tests/backend/test_agent_prompts.py` — 132 строк
+### `tests/backend/test_agent_prompts.py` — 135 строк
 
 Сборка промптов агента: что код подставляет и чего в них быть не может.
 
@@ -4228,15 +4231,16 @@ Runtime settings layer.
 - `async def engine_on_disk(tmp_path)` (5)
 - `async def _pragma(engine, name)` (4)
 
-### `tests/backend/test_domain_apply_order.py` — 67 строк
+### `tests/backend/test_domain_apply_order.py` — 90 строк
 
-Порядок способов отклика: кнопка агрегатора, форма, почта.
+Порядок способов отклика: Telegram, кнопка агрегатора, форма, почта.
 
 Зависит от: `backend.domain.apply_order`
 
-Тестов: 10
+Тестов: 13
 
-- `def _facts(**over) -> ApplyFacts` (5)
+- `def _vacancy(**over) -> VacancyFacts` (3)
+- `def _world(**over) -> World` (3)
 
 ### `tests/backend/test_domain_blacklist.py` — 45 строк
 
