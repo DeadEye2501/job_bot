@@ -5,7 +5,7 @@ from dataclasses import replace
 import asyncio
 
 from adapters import telegram
-from backend.bot import aggregators, channels, slot
+from backend.bot import slot, turn
 from backend.flows.dm_backfill import catch_up_missed_dms
 from backend.repository.bot_mode import read_mode
 from backend.models import BotMode
@@ -150,14 +150,7 @@ async def _tick(bot, mode: BotMode) -> None:
     if mode is BotMode.FULL:
         # Оборот может тихо не сделать ничего: место прогона мог
         # занять ручной прогон из окна.
-        outcome, _ = await slot.run_in_slot(
-            bot, lambda: channels.ingest_round(bot), "poll cycle"
-        )
-        # Оборот — каналы, затем агрегаторы — уже начат, и смена режима посреди
-        # него его не отменяет. Отменяет «Стоп»: погашенный опрос каналов гасит
-        # и обход агрегаторов, а остановка бота к тому же закрывает окно.
-        if outcome == "ok" and not bot.stop_event.is_set():
-            await aggregators.launch_round(bot)
+        await turn.run_turn(bot, "poll cycle")
 
 
 async def _sleep_until_wake(bot) -> None:
@@ -222,7 +215,7 @@ async def run(bot, *, once: bool = False) -> None:
     гнёзда до конца работы приложения.
 
     Недоразобранные вакансии подбираются на каждом полном обороте, вместе с
-    обходом каналов (`channels.ingest_round`), а не единожды при подъёме: строка ждёт
+    обходом каналов (`turn.ingest_round`), а не единожды при подъёме: строка ждёт
     там не только обрыва работы, но и статьи по ссылке, а та возвращается
     посреди рабочего дня.
 

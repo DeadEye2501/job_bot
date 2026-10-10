@@ -112,6 +112,22 @@ async def run_in_slot(
     return outcome, result
 
 
+async def answer_in_slot(
+    bot,
+    work: Callable[[], Any],
+    label: str,
+    progress: tuple[str, str, int, int] | None = None,
+) -> Any:
+    """Ответ работы, прогнанной в месте прогона, — или отказ самого места.
+
+    Место отвечает о своём — занято, отменено, сорвалось наружу, — а об исходе
+    самой работы говорит она, и её ответ сильнее: место видит удачей всё, что
+    не бросило исключение.
+    """
+    outcome, result = await run_in_slot(bot, work, label, progress)
+    return result if outcome == "ok" else outcome
+
+
 def launch_in_slot(bot, work: Callable[[], Any], label: str) -> bool:
     """Занять место прогона отдельной задачей и вернуться сразу.
 

@@ -50,6 +50,42 @@ def scripted(steps: list[Callable[[dict[str, Callable]], Awaitable]]):
     return run
 
 
+def finish_step(result: str = "done"):
+    """Шаг сценария: сессия кончается этим итогом и больше ничего не делает."""
+    async def step(tools):
+        await tools["finish"](result=result)
+    return step
+
+
+def fail_step(reason: str):
+    """Шаг сценария: способ отклика не сработал по этой причине."""
+    async def step(tools):
+        await tools["report_failure"](reason=reason)
+    return step
+
+
+def record_step(target: str, via: str = "form"):
+    """Шаг сценария: отклик записан этим способом на этот адрес."""
+    async def step(tools):
+        await tools["record_application"](via=via, target=target)
+    return step
+
+
+def captcha_step():
+    """Шаг сценария: агент упёрся в капчу и зовёт человека."""
+    async def step(tools):
+        await tools["need_human"](kind="captcha")
+    return step
+
+
+def login_step(logged_in: bool):
+    """Шаг сценария: агент говорит, вошёл ли человек, и кончает сессию."""
+    async def step(tools):
+        await tools["report_login"](logged_in=logged_in)
+        await tools["finish"](result="done")
+    return step
+
+
 def silent_gate(limit_sec: float = 3600.0) -> HumanGate:
     """Пауза на человека, который не придёт: окну ничего не говорится."""
     return HumanGate(lambda kind, host: None, lambda: None, limit_sec=limit_sec)

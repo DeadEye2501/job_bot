@@ -357,7 +357,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 176 модулей
+## backend — 177 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -375,7 +375,7 @@ init
 - `def agent_refusal(chat: LlmProviderConfig | None, browser: InstalledBrowser | None) -> str | None` (7)
 - `def current_refusal(chat: LlmProviderConfig | None) -> str | None` (4)
 
-### `backend/agent/human_gate.py` — 119 строк
+### `backend/agent/human_gate.py` — 120 строк
 
 Ожидание человека: капча или слетевший вход. Срок — час на каждое ожидание.
 
@@ -574,7 +574,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def alembic_config() -> Config` (10)
 - `def ensure_schema() -> None` (9)
 
-### `backend/bot/aggregators.py` — 203 строк
+### `backend/bot/aggregators.py` — 202 строк
 
 Работа агента у бота: обход агрегаторов, вход на сайт, ручной отклик через место прогона и удаление источника.
 
@@ -599,7 +599,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _new_round(bot) -> RoundState` (4)
 - `async def _row(bot, aggregator_id: int) -> Aggregator | None` (3)
 - `async def _refused(bot, row: Aggregator) -> AgentOutcome | None` (10)
-- `async def _in_slot(bot, work: Callable[[AgentKit], Awaitable[str]], label: str) -> AgentOutcome` (3)
+- `async def _in_slot(bot, work: Callable[[AgentKit], Awaitable[str]], label: str) -> AgentOutcome` (2)
 
 ### `backend/bot/can_send.py` — 57 строк
 
@@ -610,17 +610,15 @@ First-run bootstrap: ensure DB schema exists.
 - `class SendPermission` (8)
 - `async def can_send_to_hr(bot, hr) -> SendPermission` (24)
 
-### `backend/bot/channels.py` — 159 строк
+### `backend/bot/channels.py` — 120 строк
 
-Правка каналов из окна: заведение, удаление, чтение по требованию.
+Каналы по просьбе окна: заведение нового и чтение по требованию.
 
 Зависит от: `backend.bot`, `backend.flows`, `backend.repository.channels`, `backend.telegram_lookup`
 
-- `async def poll_channel_now(bot, channel_id: int) -> ChannelPollOutcome` (29)
+- `async def poll_channel_now(bot, channel_id: int) -> ChannelPollOutcome` (24)
 - `async def _ask_telegram_about(bot, username: str)` (24)
 - `async def add_channel(bot, username: str) -> tuple[int | None, ChannelAddOutcome]` (38)
-- `async def ingest_round(bot) -> None` (16)
-- `async def force_poll_once(bot) -> slot.CycleOutcome` (14)
 
 ### `backend/bot/chat.py` — 216 строк
 
@@ -636,7 +634,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _checked_kind(src: Path, file_path: str) -> bool` (28)
 - `async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message` (38)
 
-### `backend/bot/client.py` — 369 строк ⚠ подошёл к 300
+### `backend/bot/client.py` — 373 строк ⚠ подошёл к 300
 
 Сборка бота: его состояние, соединения и поверхность, которой пользуется окно.
 
@@ -647,7 +645,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _declare_loop_controls(bot) -> None` (21)
 - `def _declare_ui_hooks(bot) -> None` (41)
 - `def _forward_pipeline_hooks(bot) -> None` (17)
-- `class Bot` (187)
+- `class Bot` (190)
   - `def is_ready(self) -> bool` (7)
   - `def is_connected(self) -> bool` (13)
   - `def kick(self) -> None` (8)
@@ -655,7 +653,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def poll_channel_now(self, channel_id) -> channels.ChannelPollOutcome` (4)
   - `async def add_channel(self, username) -> tuple[int | None, channels.ChannelAddOutcome]` (4)
   - `def cancel_current_poll(self) -> None` (2)
-  - `async def force_poll_once(self) -> slot.CycleOutcome` (2)
+  - `async def force_poll_once(self) -> slot.CycleOutcome` (5)
   - `async def mark_hr_chat_read(self, hr_id) -> int` (2)
   - `async def send_to_hr_chat(self, hr_id, text) -> Message` (2)
   - `async def send_to_hr_media(self, hr_id, file_path) -> Message` (2)
@@ -679,7 +677,7 @@ First-run bootstrap: ensure DB schema exists.
   - `def reveal_browser(self) -> None` (2)
   - `async def delete_aggregator(self, aggregator_id) -> str` (2)
 
-### `backend/bot/loop.py` — 284 строк
+### `backend/bot/loop.py` — 277 строк
 
 Жизненный цикл соединения: режим работы, главный цикл, выход из сеанса.
 
@@ -692,7 +690,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None` (16)
 - `def _spawn_catch_up(bot) -> None` (20)
   - `async def work() -> None` (7)
-- `async def _tick(bot, mode: BotMode) -> None` (26)
+- `async def _tick(bot, mode: BotMode) -> None` (19)
 - `async def _sleep_until_wake(bot) -> None` (17)
 - `async def _disconnect(bot) -> None` (33)
 - `async def run(bot, *, once: bool=False) -> None` (41)
@@ -714,21 +712,21 @@ First-run bootstrap: ensure DB schema exists.
 - `def media_path_for_db(path) -> str` (11)
 - `async def download_media(client, msg, hr_id: int) -> str | None` (25)
 
-### `backend/bot/pasted.py` — 39 строк
+### `backend/bot/pasted.py` — 38 строк
 
 Заведение вакансии по вставленному тексту — из окна.
 
 Зависит от: `backend.bot`, `backend.flows`
 
-- `async def ui_ingest_pasted_text(bot, text: str, posted_at: datetime | None) -> PastedOutcome` (20)
+- `async def ui_ingest_pasted_text(bot, text: str, posted_at: datetime | None) -> PastedOutcome` (19)
 
-### `backend/bot/rerun.py` — 41 строк
+### `backend/bot/rerun.py` — 38 строк
 
 Ручной перезапуск разбора вакансии из окна.
 
 Зависит от: `backend.bot`, `backend.flows`
 
-- `async def ui_rerun_vacancy_pipeline(bot, vacancy_id: int) -> RerunOutcome` (23)
+- `async def ui_rerun_vacancy_pipeline(bot, vacancy_id: int) -> RerunOutcome` (20)
 
 ### `backend/bot/send.py` — 324 строк ⚠ подошёл к 300
 
@@ -752,7 +750,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _record_send(bot, hr: HR, text: str, outcome: _Outcome, permission) -> None` (22)
 - `async def send(bot, hr: HR, text: str, attachment=None, errand: Errand=Errand()) -> bool` (36)
 
-### `backend/bot/slot.py` — 173 строк
+### `backend/bot/slot.py` — 189 строк
 
 Единственное место прогона: пока оно занято, второй цикл получает отказ.
 
@@ -762,11 +760,21 @@ First-run bootstrap: ensure DB schema exists.
 - `def cancel_current_poll(bot) -> None` (7)
 - `async def _run_task(bot, work: Callable[[], Any], label: str)` (31)
 - `async def run_in_slot(bot, work: Callable[[], Any], label: str, progress: tuple[str, str, int, int] | None=None) -> tuple[CycleOutcome, Any]` (29)
+- `async def answer_in_slot(bot, work: Callable[[], Any], label: str, progress: tuple[str, str, int, int] | None=None) -> Any` (14)
 - `def launch_in_slot(bot, work: Callable[[], Any], label: str) -> bool` (18)
 - `async def settle_slot(bot, timeout: float) -> None` (19)
 - `def slot_taken(bot) -> bool` (3)
 - `def _occupy(bot, label: str) -> bool` (7)
 - `def _release(bot) -> None` (4)
+
+### `backend/bot/turn.py` — 44 строк
+
+Полный оборот автоматики: недоразобранное и каналы, затем обход агрегаторов.
+
+Зависит от: `backend.bot`
+
+- `async def ingest_round(bot) -> None` (16)
+- `async def run_turn(bot, label: str) -> slot.CycleOutcome` (12)
 
 ### `backend/bot/updates.py` — 113 строк
 
@@ -3527,7 +3535,7 @@ seed initial data
 - `def _install(root: Path, relative: str) -> Path` (5)
 - `def _roots(monkeypatch, tmp_path)` (4)
 
-### `tests/adapters/test_browser_sending.py` — 138 строк
+### `tests/adapters/test_browser_sending.py` — 139 строк
 
 Профиль под симуляцией отклика: данные с сайта не уходят, капча проходится.
 
@@ -3708,7 +3716,7 @@ seed initial data
   - `async def send_dm(self, _client, target, text, attachment=None)` (5)
 - `def row_saved_mid_send(session_factory, hr_id)` (20)
   - `async def save(answer) -> None` (10)
-- `async def _switch_to(session_factory, mode: BotMode) -> None` (5)
+- `async def switch_to(session_factory, mode: BotMode) -> None` (5)
 - `def make_bot(session_factory, monkeypatch)` (40)
   - `async def build(client=None, *, embed_url='http://provider.test') -> Bot` (17)
 - `def empty_media_dir()` (13)
@@ -3963,11 +3971,11 @@ seed initial data
 - `def _project_of_two_revisions(root, db_file) -> None` (20)
 - `def _revisions_in(paths) -> set[str]` (9)
 
-### `tests/backend/test_bot_aggregators.py` — 450 строк ⚠ подошёл к 300
+### `tests/backend/test_bot_aggregators.py` — 416 строк ⚠ подошёл к 300
 
 Обход агрегаторов в боте: место прогона, режимы, человек, сроки, ручные действия.
 
-Зависит от: `backend.bot`, `backend.domain.apply_order`, `backend.models`, `backend.repository.bot_mode`, `tests.backend.fixtures.bot`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.fakes.browser`, `tests.waiting`
+Зависит от: `backend.bot`, `backend.domain.apply_order`, `backend.models`, `tests.backend.fixtures.bot`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.fakes.browser`, `tests.waiting`
 
 Тестов: 25
 
@@ -3976,12 +3984,9 @@ seed initial data
 - `async def sites(session_factory)` (5)
 - `def _hold(release)` (5)
   - `async def step(tools)` (3)
-- `async def _full(session_factory)` (4)
-- `async def _done(tools)` (2)
 - `def phases(monkeypatch)` (13)
   - `async def seek(kit, round_, source)` (2)
   - `async def apply(kit, round_, vacancy_ids)` (2)
-- `async def _set_mode(session_factory, mode)` (4)
 
 ### `tests/backend/test_bot_channels.py` — 168 строк
 
@@ -4098,23 +4103,25 @@ seed initial data
 Тестов: 14
 
 
-### `tests/backend/test_bot_mode_reading.py` — 40 строк
+### `tests/backend/test_bot_mode_reading.py` — 38 строк
 
 Откуда бот берёт свой режим.
 
-Зависит от: `backend.bot`, `backend.models`, `backend.repository.bot_mode`
+Зависит от: `backend.bot`, `backend.models`, `tests.backend.fixtures.bot`
 
 Тестов: 2
 
 
-### `tests/backend/test_bot_poll_slot.py` — 221 строк
+### `tests/backend/test_bot_poll_slot.py` — 228 строк
 
 Следствия ручного прогона, запущенного кнопкой окна.
 
-Зависит от: `tests.fakes.ingestion`
+Зависит от: `backend.models`, `tests.backend.fixtures.bot`, `tests.fakes.ingestion`
 
 Тестов: 16
 
+- `def launched(monkeypatch) -> list` (9)
+  - `async def launch(bot)` (2)
 
 ### `tests/backend/test_bot_read_receipts.py` — 390 строк ⚠ подошёл к 300
 
@@ -4378,7 +4385,7 @@ seed initial data
 
 - `def _write_through(module, text: str) -> str` (22)
 
-### `tests/backend/test_flows_aggregator_apply.py` — 303 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_aggregator_apply.py` — 278 строк
 
 Фаза 2: отклик способ за способом, пока один не удался или способы не кончились.
 
@@ -4390,12 +4397,6 @@ seed initial data
   - `async def make(**vacancy)` (8)
 - `def applying(make_pipeline)` (10)
   - `async def run(vacancy_id, steps, round_=None)` (5)
-- `def _record(target)` (4)
-  - `async def step(tools)` (2)
-- `def _fail(reason)` (4)
-  - `async def step(tools)` (2)
-- `def _finish(result)` (4)
-  - `async def step(tools)` (2)
 - `async def _events(session_factory, kind)` (2)
 - `async def slow_letter(make_pipeline, session, session_factory, tmp_path, monkeypatch)` (27)
   - `def slow_server(account, mail)` (3)
@@ -4413,7 +4414,7 @@ seed initial data
 - `async def _name_of_created(session_factory, chat: LlmProviderConfig | None) -> str` (4)
 - `def _image(body: bytes=_ICON) -> httpx.Response` (2)
 
-### `tests/backend/test_flows_aggregator_seek.py` — 179 строк
+### `tests/backend/test_flows_aggregator_seek.py` — 169 строк
 
 Фаза 1: искатель находит, конвейер разбирает, last_run_at двигается только по done.
 
@@ -4425,6 +4426,7 @@ seed initial data
 - `def seek(make_pipeline, session_factory)` (12)
   - `async def run(steps, human_limit=3600.0, **source)` (7)
 - `async def _submit(tools, url=PAGE)` (2)
+- `async def _submit_and_finish(tools)` (3)
 
 ### `tests/backend/test_flows_application_choice.py` — 414 строк ⚠ подошёл к 300
 
@@ -6266,7 +6268,7 @@ seed initial data
 Тестов: 7
 
 
-### `tests/client/test_bridge_system.py` — 185 строк
+### `tests/client/test_bridge_system.py` — 186 строк
 
 Следствия домена «система»: чем занят бот и что показывает нижняя полоса.
 
@@ -6417,11 +6419,11 @@ seed initial data
 - `def _get(app, path: str) -> tuple[str, dict, bytes]` (10)
   - `def start_response(status: str, headers: list[tuple[str, str]]) -> None` (3)
 
-### `tests/client/test_window.py` — 291 строк
+### `tests/client/test_window.py` — 290 строк
 
 Следствия открытия и закрытия окна: что приложение делает вокруг него.
 
-Зависит от: `backend.models`, `backend.repository.bot_mode`, `client`
+Зависит от: `backend.models`, `backend.repository.bot_mode`, `client`, `tests.backend.fixtures.bot`
 
 Тестов: 10
 
@@ -6548,7 +6550,7 @@ seed initial data
 - `def screening_row(application_id: int, position: int, **overrides) -> Screening` (5)
 - `def mail_account_row() -> MailAccount` (4)
 
-### `tests/fakes/agent.py` — 66 строк
+### `tests/fakes/agent.py` — 102 строк
 
 Набор сессии агента без браузера, водителя и человека.
 
@@ -6559,6 +6561,16 @@ seed initial data
 - `def apply_job(vacancy_id: int, **overrides) -> ApplyJob` (7)
 - `def scripted(steps: list[Callable[[dict[str, Callable]], Awaitable]])` (19)
   - `async def run(plan: SessionPlan) -> AgentEnd` (8)
+- `def finish_step(result: str='done')` (5)
+  - `async def step(tools)` (2)
+- `def fail_step(reason: str)` (5)
+  - `async def step(tools)` (2)
+- `def record_step(target: str, via: str='form')` (5)
+  - `async def step(tools)` (2)
+- `def captcha_step()` (5)
+  - `async def step(tools)` (2)
+- `def login_step(logged_in: bool)` (6)
+  - `async def step(tools)` (3)
 - `def silent_gate(limit_sec: float=3600.0) -> HumanGate` (3)
 - `def scripted_kit(pipeline, steps, *, human_limit: float=3600.0) -> AgentKit` (4)
 - `def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit` (3)

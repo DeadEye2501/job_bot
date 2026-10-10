@@ -132,7 +132,8 @@ async def test_a_profile_opened_for_a_human_login_carries_no_automation_mark(mon
     assert "--enable-automation" in person.options["ignore_default_args"]
     # `navigator.webdriver` прячет скрипт страницы, а не флаг: на флаги, которых
     # Chrome не поддерживает, — и на `--no-sandbox` — он вешает над страницей плашку.
-    assert any("webdriver" in script for script in person.init_scripts)
+    assert any("defineProperty(Navigator.prototype, 'webdriver'" in script
+               for script in person.init_scripts)
     assert not person.options.get("args")
     assert person.options["chromium_sandbox"] is True
     assert not agent.options.get("ignore_default_args") and not agent.init_scripts

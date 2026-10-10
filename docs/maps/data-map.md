@@ -259,6 +259,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `LIMIT_SEC` = `3600.0`
+- `_DONE` = `'готово'`
 - `_STOPPED` = `'обход остановлен; заверши работу'`
 
 ### `backend/agent/jobs.py`
@@ -470,6 +471,10 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `CycleOutcome` = `Literal['ok', 'busy', 'cancelled', 'error']`
+
+### `backend/bot/turn.py`
+
+- `logger` = `logging.getLogger(__name__)`
 
 ### `backend/bot/updates.py`
 

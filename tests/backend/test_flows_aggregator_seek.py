@@ -10,7 +10,7 @@ from tests.backend.fixtures.parse_stub import parse_into
 from tests.dbio import all_rows, put
 from tests.factories import blacklist_row
 from tests.factories_aggregators import aggregator_row
-from tests.fakes.agent import LimitHit, scripted_kit
+from tests.fakes.agent import LimitHit, captcha_step, finish_step, scripted_kit
 
 pytestmark = pytest.mark.usefixtures("one_vector")
 
@@ -44,14 +44,15 @@ async def _submit(tools, url=PAGE):
     await tools["submit_vacancy"](text=f"Текст {url}", url=url, published="", contacts=[])
 
 
+async def _submit_and_finish(tools):
+    await _submit(tools)
+    await tools["finish"](result="done")
+
+
 async def test_a_finished_search_moves_the_last_run_and_parses_what_it_found(
     seek, session_factory, parsed
 ):
-    async def step(tools):
-        await _submit(tools)
-        await tools["finish"](result="done")
-
-    found, stored, _ = await seek([step])
+    found, stored, _ = await seek([_submit_and_finish])
 
     (vacancy,) = await all_rows(session_factory, Vacancy)
     assert found == [vacancy.id] and [vacancy_id for vacancy_id, *_ in parsed] == [vacancy.id]
@@ -73,11 +74,7 @@ async def test_a_search_without_finish_keeps_the_last_run_but_gives_what_it_foun
 async def test_a_silent_embedding_model_is_a_failure_whatever_the_agent_says(
     seek, parsed, silent_embedder
 ):
-    async def step(tools):
-        await _submit(tools)
-        await tools["finish"](result="done")
-
-    found, stored, _ = await seek([step])
+    found, stored, _ = await seek([_submit_and_finish])
 
     assert found == [] and stored.last_run_at is None
 
@@ -104,11 +101,8 @@ async def test_an_exhausted_subscription_stops_the_round(seek, parsed):
 
 
 async def test_an_expired_wait_for_a_person_stops_the_round(seek, parsed):
-    async def step(tools):
-        await tools["need_human"](kind="captcha")
-
     with pytest.raises(HumanTimeout):
-        await seek([step], human_limit=0.01)
+        await seek([captcha_step()], human_limit=0.01)
 
 
 async def test_the_web_seeker_searches_the_web_and_avoids_the_persons_aggregators(
@@ -116,8 +110,7 @@ async def test_the_web_seeker_searches_the_web_and_avoids_the_persons_aggregator
 ):
     await put(session_factory, aggregator_row(host="board.test"))
 
-    async def step(tools):
-        await tools["finish"](result="done")
+    step = finish_step()
 
     _, _, kit = await seek([step], name="Поиск по сети", host=None)
 
@@ -127,8 +120,7 @@ async def test_the_web_seeker_searches_the_web_and_avoids_the_persons_aggregator
 
 @pytest.mark.parametrize("host", ["site.test", None], ids=["агрегатор", "поиск по сети"])
 async def test_the_seeker_is_told_how_to_call_a_person(seek, parsed, host):
-    async def step(tools):
-        await tools["finish"](result="done")
+    step = finish_step()
 
     _, _, kit = await seek([step], host=host)
 
@@ -141,8 +133,7 @@ async def test_the_seeker_is_told_how_to_call_a_person(seek, parsed, host):
 async def test_the_web_seeker_hears_of_the_blacklisted_sites(seek, session_factory, parsed):
     await put(session_factory, blacklist_row("aggregator", "barred.test"))
 
-    async def step(tools):
-        await tools["finish"](result="done")
+    step = finish_step()
 
     _, _, kit = await seek([step], name="Поиск по сети", host=None)
 
@@ -151,8 +142,7 @@ async def test_the_web_seeker_hears_of_the_blacklisted_sites(seek, session_facto
 
 
 async def test_the_web_seeker_hears_that_no_site_is_blacklisted(seek, parsed):
-    async def step(tools):
-        await tools["finish"](result="done")
+    step = finish_step()
 
     _, _, kit = await seek([step], name="Поиск по сети", host=None)
 

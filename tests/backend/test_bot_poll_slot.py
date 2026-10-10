@@ -14,6 +14,8 @@ import asyncio
 
 import pytest
 
+from backend.models import BotMode
+from tests.backend.fixtures.bot import switch_to
 from tests.fakes.ingestion import FakeIngestion, WindowHooks, wire
 
 
@@ -146,34 +148,39 @@ async def test_a_forced_full_poll_reports_success(make_bot):
     assert bot.current_poll_task is None
 
 
-async def test_a_forced_poll_is_the_same_turn_as_the_cycle(make_bot, monkeypatch):
-    """Кнопка ▶ — тот же оборот, что у цикла: подбор недоразобранного, каналы,
-    затем обход агрегаторов. Режим её не держит: бот выключен — она всё равно идёт."""
-    launched = []
+@pytest.fixture
+def launched(monkeypatch) -> list:
+    """Обход агрегаторов подменён: в списке — боты, которым его запустили."""
+    bots = []
 
     async def launch(bot):
-        launched.append(bot)
+        bots.append(bot)
 
     monkeypatch.setattr("backend.bot.aggregators.launch_round", launch)
+    return bots
+
+
+async def test_a_forced_poll_is_the_same_turn_as_the_cycle(make_bot, launched, session_factory):
+    """Кнопка ▶ — тот же оборот, что у цикла: подбор недоразобранного, каналы,
+    затем обход агрегаторов. Режим её не держит: бот выключен — она всё равно идёт."""
     ingestion = FakeIngestion()
     bot = wire(await make_bot(), ingestion)
+    await switch_to(session_factory, BotMode.OFF)
 
     assert await bot.force_poll_once() == "ok"
     assert ingestion.log[:2] == ["недоразобранные", "прогон каналов"]
     assert launched == [bot]
 
 
-async def test_a_forced_poll_with_channels_switched_off_still_runs_the_turn(
-    make_bot, monkeypatch
+async def test_the_forced_poll_itself_does_not_stop_at_switched_off_channels(
+    make_bot, launched
 ):
     """Выключенные каналы ▶ не останавливают: опрашивать там нечего, а оборот
-    идёт дальше к агрегаторам и кончается удачей."""
-    launched = []
+    идёт дальше к агрегаторам и кончается удачей.
 
-    async def launch(bot):
-        launched.append(bot)
-
-    monkeypatch.setattr("backend.bot.aggregators.launch_round", launch)
+    Опрос каналов здесь подделан, и выключатель, который действует внутри него,
+    не на пути. Сторожит тест другое: что сама кнопка выключатель каналов не
+    спрашивает и оборот из-за него не обрывает."""
     bot = wire(await make_bot(), FakeIngestion())
     await bot.rs.set_app("channels_enabled", "false")
 

@@ -8,6 +8,7 @@ from collections.abc import Callable
 logger = logging.getLogger(__name__)
 
 LIMIT_SEC = 3600.0
+_DONE = "готово"
 _STOPPED = "обход остановлен; заверши работу"
 
 
@@ -62,7 +63,7 @@ class HumanGate:
     def resolve(self) -> None:
         """Галочка на плашке окна. Зовётся на цикле бота, а не из потока окна."""
         if self._deadline is not None:
-            self._answer = "готово"
+            self._answer = _DONE
             self._done.set()
             self._on_resolved()
 
@@ -109,8 +110,8 @@ class HumanGate:
         answer, self._answer = self._answer, None
         self._deadline = None
         if answer is None:
-            return "готово"
-        if answer == "готово":
+            return _DONE
+        if answer == _DONE:
             # Вывод по нажатию, начатый перед галочкой, кончился бы уже после
             # ухода назад и оставил бы браузер поверх приложения.
             if self._showing:

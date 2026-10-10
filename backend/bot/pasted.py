@@ -30,10 +30,9 @@ async def ui_ingest_pasted_text(
     разбор одного объявления, заранее не знает никто.
     """
     logger.info("UI ingest of pasted text, %d chars", len(text))
-    outcome, walk = await slot.run_in_slot(
+    return await slot.answer_in_slot(
         bot,
         lambda: bot.ingestion.ingest_pasted_text(text, posted_at),
         "ingest pasted text",
         progress=("pasted", "Разбор вставленного объявления…", 0, 0),
     )
-    return walk if outcome == "ok" else outcome
