@@ -1,0 +1,64 @@
+"""Отклик в Telegram: письмо, доставка и след в базе."""
+
+import time
+
+from backend.applying.result import TelegramClosed
+from backend.applying.telegram import via_telegram
+from backend.domain.apply_order import Way
+from backend.models import Application, ApplicationVia, Message, VacancyEvent
+from tests.dbio import all_rows
+
+TG = Way("telegram", "@hr_name", None)
+
+
+async def test_the_first_letter_goes_with_the_resume(telegram_case):
+    kit, vacancy, sent = await telegram_case()
+    assert await via_telegram(kit, vacancy.id, TG) == "applied"
+    ((_, _, attachment),) = sent
+    assert attachment is not None
+    (row,) = await all_rows(kit.pipeline.session_factory, Application)
+    assert row.via is ApplicationVia.TELEGRAM and row.target == "@hr_name"
+
+
+async def test_a_second_vacancy_of_the_same_hr_gets_a_short_note(telegram_case):
+    kit, vacancy, sent = await telegram_case(prior_letter=True)
+    await via_telegram(kit, vacancy.id, TG)
+    _, text, attachment = sent[-1]
+    assert attachment is None and text.startswith("А вот я увидел")
+
+
+async def test_a_flood_wait_is_a_lesson_and_is_stored(telegram_case):
+    kit, vacancy, _ = await telegram_case(flood_wait=300)
+    outcome = await via_telegram(kit, vacancy.id, TG)
+    assert isinstance(outcome.lesson, TelegramClosed)
+    assert kit.pipeline.rs.flood_wait_until_ts > time.time()
+
+
+async def test_a_sent_letter_is_an_application_even_if_recording_breaks(telegram_case, monkeypatch):
+    """Письмо уже у HR: сорвавшаяся запись не повод пробовать следующий способ —
+    работодатель получил бы второй отклик."""
+    kit, vacancy, sent = await telegram_case()
+
+    async def broken(session, entry):
+        raise RuntimeError("база недоступна")
+
+    monkeypatch.setattr("backend.applying.telegram.record_application", broken)
+    assert await via_telegram(kit, vacancy.id, TG) == "applied" and len(sent) == 1
+
+
+async def test_simulation_records_without_sending(telegram_case):
+    kit, vacancy, sent = await telegram_case(simulated=True)
+    assert await via_telegram(kit, vacancy.id, TG) == "applied"
+    assert sent == [] and await all_rows(kit.pipeline.session_factory, Message) == []
+    (event,) = [e for e in await all_rows(kit.pipeline.session_factory, VacancyEvent)
+                if e.kind == "applied"]
+    assert event.payload["simulated"] is True
+
+
+async def test_the_letter_is_delivered_to_the_hr_account_and_kept_in_the_chat(telegram_case):
+    """Номер учётной записи не меняется, ник меняется: письмо идёт по номеру, если он есть."""
+    kit, vacancy, sent = await telegram_case(hr_user_id=777)
+    await via_telegram(kit, vacancy.id, TG)
+    ((target, _, _),) = sent
+    (message,) = await all_rows(kit.pipeline.session_factory, Message)
+    assert target == 777 and message.vacancy_id == vacancy.id and not message.is_incoming

@@ -34,10 +34,6 @@ class ApplicationEntry:
     simulated: bool
 
 
-async def application_exists(session: AsyncSession, vacancy_id: int, target: str) -> bool:
-    return await _existing(session, vacancy_id, target) is not None
-
-
 async def record_application(session: AsyncSession, entry: ApplicationEntry) -> int:
     """Записать состоявшийся отклик. Тот же адрес второй строки не даёт — скрининг дописывается.
 

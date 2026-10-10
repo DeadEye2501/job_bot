@@ -54,11 +54,6 @@ async def add_contact(
         known.added_by = added_by
 
 
-async def has_contact(session: AsyncSession, vacancy_id: int, value: str) -> bool:
-    """Есть ли у вакансии этот контакт в любом написании."""
-    return await _contact_row(session, vacancy_id, contact_key(value)) is not None
-
-
 async def _contact_row(
     session: AsyncSession, vacancy_id: int, key: str
 ) -> VacancyContact | None:

@@ -57,7 +57,7 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
 def _login_target(job) -> int | None:
     if isinstance(job, (LoginJob, SeekJob)):
         return job.source.id if job.source.host is not None else None
-    return job.aggregator_id if job.method == VIA_AGGREGATOR else None
+    return job.way.aggregator_id if job.way.method == VIA_AGGREGATOR else None
 
 
 def _need_human(kit: AgentKit, job) -> Callable:
@@ -73,7 +73,7 @@ def _need_human(kit: AgentKit, job) -> Callable:
 def _host_of(job) -> str | None:
     """Сайт, на котором нужен человек: источник поиска или адрес способа отклика."""
     if isinstance(job, ApplyJob):
-        return normalize_host(job.target) or None
+        return normalize_host(job.way.target) or None
     return job.source.host
 
 

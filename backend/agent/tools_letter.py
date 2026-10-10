@@ -21,7 +21,7 @@ def letter_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
             return _ENOUGH
         if job.letter_writer == "agent" and not body.strip():
             return "Письмо пишешь ты: передай subject и body, приложение сверит их с анкетой."
-        ask = await _ask(kit, job, language, limit)
+        ask = await letter_ask(kit, job.vacancy_id, language, limit or None)
         if ask is None:
             return "Вакансия удалена."
         if job.letter_writer == "agent":
@@ -31,14 +31,15 @@ def letter_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
     return [letter]
 
 
-async def _ask(kit: AgentKit, job: ApplyJob, language: str, limit: int) -> LetterAsk | None:
+async def letter_ask(kit: AgentKit, vacancy_id: int, language: str, limit: int | None) -> LetterAsk | None:
+    """Что нужно модели для письма: анкета и вакансия; удалённая — пусто."""
     async with kit.pipeline.session_factory() as session:
-        vacancy = await session.get(Vacancy, job.vacancy_id)
+        vacancy = await session.get(Vacancy, vacancy_id)
         if vacancy is None:
             return None
         profile = await build_agent_profile(session, kit.today)
     return LetterAsk(profile_text=profile, title=vacancy.title or "", vacancy_text=vacancy.raw_text or "",
-                     language=language, limit=limit or None)
+                     language=language, limit=limit)
 
 
 async def _written(kit: AgentKit, job: ApplyJob, ask: LetterAsk) -> str:

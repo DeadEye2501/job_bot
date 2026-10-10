@@ -7,7 +7,14 @@
 """
 
 from tests.backend.fixtures.aggregators import web_search
-from tests.backend.fixtures.applying import kit, two_vacancies
+from tests.backend.fixtures.applying import (
+    board,
+    kit,
+    kit_with,
+    mail_case,
+    telegram_case,
+    two_vacancies,
+)
 from tests.backend.fixtures.backfill import known_hr
 from tests.backend.fixtures.entry import entry, lock_of_its_own
 from tests.backend.fixtures.bot import (
@@ -38,6 +45,7 @@ from tests.backend.fixtures.stats import applied
 
 __all__ = [
     "applied",
+    "board",
     "busy_slot",
     "caught_up",
     "channel_titles",
@@ -51,9 +59,11 @@ __all__ = [
     "entry",
     "hr_names",
     "kit",
+    "kit_with",
     "known_hr",
     "lock_of_its_own",
     "make_bot",
+    "mail_case",
     "make_pipeline",
     "one_vector",
     "outbox",
@@ -62,6 +72,7 @@ __all__ = [
     "rerunning",
     "sending_unlocked",
     "silent_embedder",
+    "telegram_case",
     "titles",
     "turn_and_settle",
     "two_vacancies",

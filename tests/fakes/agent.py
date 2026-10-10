@@ -6,6 +6,7 @@ from datetime import date
 from backend.agent.human_gate import HumanGate
 from backend.agent.jobs import ApplyJob
 from backend.agent.kit import AgentEnd, AgentKit, SessionPlan
+from backend.domain.apply_order import Way
 from tests.fakes.browser import FakeBrowser
 
 TODAY = date(2026, 10, 9)
@@ -20,11 +21,11 @@ def tool(tools, name):
     return next(t for t in tools if t.__name__ == name)
 
 
-def apply_job(vacancy_id: int, **overrides) -> ApplyJob:
+def apply_job(vacancy_id: int, *, method="form", target="https://company.test/apply",
+              aggregator_id=None, **overrides) -> ApplyJob:
     """Задание откликателя: по умолчанию форма работодателя, без агрегатора, всерьёз."""
-    fields = dict(vacancy_id=vacancy_id, method="form", target="https://company.test/apply",
-                  aggregator_id=None, profile_id=1, simulated=False,
-                  letter_writer="app")
+    fields = dict(vacancy_id=vacancy_id, way=Way(method, target, aggregator_id), profile_id=1,
+                  simulated=False, letter_writer="app")
     fields.update(overrides)
     return ApplyJob(**fields)
 

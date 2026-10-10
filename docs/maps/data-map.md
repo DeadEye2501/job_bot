@@ -282,15 +282,12 @@
   - `outcome: Outcome | None` = `None`
 - `class ApplyJob`
   - `vacancy_id: int`
-  - `method: str`
-  - `target: str`
-  - `aggregator_id: int | None`
+  - `way: Way`
   - `profile_id: int`
   - `simulated: bool`
   - `letter_writer: str`
   - `letter_checks: int` = `0`
   - `outcome: Outcome | None` = `None`
-  - `delivery: asyncio.Task | None` = `None`
 
 ### `backend/agent/kit.py`
 
@@ -311,9 +308,8 @@
 ### `backend/agent/prompts/applier.py`
 
 - `APPLIER_PROMPT` = `'Твоя задача — откликнуться на одну вакансию одн…`
-- `_FILL_THE_FORM` = `'Режим симуляции: пройди всё до последней кнопки…`
-- `_SIMULATION` = `словарь из 3`
-- `_METHODS` = `словарь из 3`
+- `_SIMULATION` = `'Режим симуляции: пройди всё до последней кнопки…`
+- `_METHODS` = `словарь из 2`
 - `_WRITERS` = `dict(zip(LETTER_WRITERS, ('Письмо пишет: приложе…`
 
 ### `backend/agent/prompts/frame.py`
@@ -344,7 +340,6 @@
 
 ### `backend/agent/tools_applier.py`
 
-- `logger` = `logging.getLogger(__name__)`
 - `_ALLOWED` = `словарь из 2`
 - `class _Report`
   - `via: str`
@@ -379,8 +374,17 @@
   - `published: str`
   - `contacts: list[str]`
 
+### `backend/applying/browser.py`
+
+- `_NO_OUTCOME` = `'агент закончил без итога'`
+
+### `backend/applying/email.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
 ### `backend/applying/result.py`
 
+- `logger` = `logging.getLogger(__name__)`
 - `class TelegramClosed`
   - `until: float`
 - `class SiteClosed`
@@ -390,12 +394,37 @@
   - `reason: str`
   - `lesson: Lesson | None` = `None`
 - `Outcome` = `Literal['applied'] | Missed`
+- `GONE` = `Missed('вакансия удалена')`
 
 ### `backend/applying/run.py`
 
 - `logger` = `logging.getLogger(__name__)`
 - `Executor` = `Callable[[AgentKit, int, Way], Awaitable[Outcome…`
-- `EXECUTORS: dict[str, Executor]` = `словарь из 0`
+- `EXECUTORS: dict[str, Executor]` = `словарь из 4`
+
+### `backend/applying/telegram.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `class _Errand`
+  - `vacancy_id: int`
+  - `hr_id: int`
+  - `peer: int | str`
+  - `parsed: ParsedVacancy`
+  - `prior_count: int`
+  - `title: str`
+  - `channel_ref: str | None`
+
+### `backend/applying/telegram_ban.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
+### `backend/applying/telegram_letter.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `RECENT_SEND_WINDOW_DAYS` = `14`
+- `class Letter`
+  - `text: str`
+  - `attachment: object | None`
 
 ### `backend/bootstrap.py`
 
@@ -664,8 +693,6 @@
 
 ### `backend/flows/aggregator_apply.py`
 
-- `logger` = `logging.getLogger(__name__)`
-- `_NO_OUTCOME` = `'агент закончил без итога'`
 - `class ApplyOrder`
   - `vacancy_id: int`
   - `only: Way | None`
@@ -684,11 +711,7 @@
 ### `backend/flows/apply.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_RECENT_SEND_WINDOW_DAYS` = `14`
 - `_SENDING: set[int]` = `set()`
-- `class _Letter`
-  - `text: str`
-  - `attachment: object | None`
 - `class _Plan`
   - `prior_count: int`
   - `title: str`
@@ -1890,7 +1913,7 @@
 - `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться.'`
 - `AGGREGATOR_REFUSALS` = `словарь из 7`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
-- `APPLY_VIA_REFUSALS` = `словарь из 3 и раскрытых`
+- `APPLY_VIA_REFUSALS` = `словарь из 2 и раскрытых`
 
 ### `client/bridge/runner.py`
 
@@ -2015,6 +2038,11 @@
   - `logins: list` = `набор из 0`
   - `events: list` = `набор из 0`
 
+### `tests/backend/fixtures/applying.py`
+
+- `PAGE` = `'https://site.test/vacancy/1'`
+- `FORM` = `'https://company.test/apply'`
+
 ### `tests/backend/test_agent_availability.py`
 
 - `CHROME` = `InstalledBrowser('Chrome', 'chrome', None)`
@@ -2023,7 +2051,7 @@
 
 - `ROLES` = `набор из 3`
 - `SHARED_RULES` = `набор из 4`
-- `_METHOD_NAMES` = `словарь из 3`
+- `_METHOD_NAMES` = `словарь из 2`
 
 ### `tests/backend/test_agent_sessions.py`
 
@@ -2038,6 +2066,14 @@
 - `pytestmark` = `pytest.mark.usefixtures('one_vector')`
 - `PAGE` = `'https://site.test/vacancy/1?from=list'`
 - `BARRED_PAGE` = `'https://jobs.barred.test/vacancy/1'`
+
+### `tests/backend/test_applying_email.py`
+
+- `MAIL` = `Way('email', 'hr@company.test', None)`
+
+### `tests/backend/test_applying_telegram.py`
+
+- `TG` = `Way('telegram', '@hr_name', None)`
 
 ### `tests/backend/test_bootstrap_schema.py`
 
@@ -2062,11 +2098,6 @@
 ### `tests/backend/test_entry_point_log.py`
 
 - `ROOT` = `Path(__file__).resolve().parents[2]`
-
-### `tests/backend/test_flows_aggregator_apply.py`
-
-- `PAGE` = `'https://site.test/vacancy/1'`
-- `FORM` = `'https://company.test/apply'`
 
 ### `tests/backend/test_flows_aggregator_name.py`
 

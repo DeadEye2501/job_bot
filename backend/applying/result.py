@@ -1,7 +1,11 @@
 """Исходы исполнителя способа и то новое о мире, что он узнал по дороге."""
 
+import logging
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Literal
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -28,3 +32,19 @@ class Missed:
 
 
 Outcome = Literal["applied"] | Missed
+
+GONE = Missed("вакансия удалена")
+"""Вакансию удалили, пока до неё дошла очередь: способ пробовать не на чем."""
+
+
+async def delivered(record: Awaitable, vacancy_id: int) -> Outcome:
+    """Письмо уже у адресата — отклик состоялся, чем бы ни кончилась его запись.
+
+    Промах здесь отдал бы вакансию следующему способу, и работодатель получил
+    бы второй отклик; сорвавшаяся запись остаётся строкой в журнале.
+    """
+    try:
+        await record
+    except Exception:
+        logger.exception("вакансия %d: письмо ушло, а отклик не записан", vacancy_id)
+    return "applied"
