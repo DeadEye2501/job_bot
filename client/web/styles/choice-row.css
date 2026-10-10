@@ -19,14 +19,12 @@
   color: var(--text-primary);
 }
 
+/* Рамка — общая, в panel-frame.css; подложка у неё та же, что у полей ввода
+   (`input.css`): ряд стоит между ними в столбик, и своя, более тёмная,
+   читалась бы как другой род поля. */
 .choice-row[data-look='seg'],
 .choice-row[data-look='tile'] {
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  /* Та же подложка, что у полей ввода (`input.css`): ряд стоит между ними в
-     столбик, и своя, более тёмная, читалась бы как другой род поля. */
-  background: var(--bg-secondary);
 }
 
 .choice-row[data-look='seg'] {

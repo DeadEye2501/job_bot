@@ -9,10 +9,8 @@
    всеми пятью объявлениями. Своё каждый блок дописывает сам: у переписки нет
    внутреннего отступа, потому что лента прижимается к рамке. */
 
+/* Рамка — общая, в panel-frame.css. */
 .card-section {
   margin-bottom: 10px;
   padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--bg-secondary);
 }

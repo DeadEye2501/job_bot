@@ -9,9 +9,8 @@
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  background: var(--bg-secondary);
-  border: 1px dashed var(--border);
-  border-radius: 6px;
+  /* Рамка — общая, в panel-frame.css; здесь только её пунктир. */
+  border-style: dashed;
   margin-top: 14px;
 }
 

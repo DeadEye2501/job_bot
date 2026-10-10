@@ -12,6 +12,7 @@ import 'material-symbols/outlined.css';
 import './styles/palette.css';
 import './styles/base.css';
 import './styles/spin.css';
+import './styles/panel-frame.css';
 import './styles/shell.css';
 import './styles/wizard.css';
 import './styles/status-row.css';

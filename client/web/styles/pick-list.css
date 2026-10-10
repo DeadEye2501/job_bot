@@ -1,26 +1,10 @@
 /* Выбор многих из длинного перечня: кнопка со счётом и раскрывающаяся панель
-   с поиском под ней. Выпадающий список одного значения — в dropdown.css. */
+   с поиском под ней. Кнопка — та же, что у выпадающего списка одного
+   значения (dropdown.css): открывается она так же, и выглядеть иначе ей
+   незачем. */
 
 .pick {
   position: relative;
-}
-
-.pick-btn {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 4px 6px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-size: 0.76rem;
-}
-
-.pick-btn .material-symbols-outlined {
-  font-size: 14px;
-  color: var(--text-tertiary);
 }
 
 .pick-panel {

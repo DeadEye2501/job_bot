@@ -17,6 +17,19 @@
   transition: border-color 0.1s, background 0.1s;
 }
 
+/* Значок мельче подписи: в кегле строки глиф выглядит крупнее слова рядом. */
+.btn .material-symbols-outlined {
+  font-size: 14px;
+}
+
+/* Поджатая кнопка — в узких подвалах всплывающих панелей: панель уже окна,
+   а кнопок в подвале две-три. */
+.popover-actions .btn,
+.filter-foot .btn {
+  padding: 4px 10px;
+  font-size: 0.76rem;
+}
+
 .btn:hover:not(:disabled) { border-color: var(--accent); }
 
 .btn.primary:hover:not(:disabled) {

@@ -3379,7 +3379,7 @@ Runtime settings layer.
 - `def _leave_later() -> None` (9)
 - `def _leave() -> None` (9)
 
-### `client/bridge/wire.py` — 481 строк ⚠ подошёл к 300
+### `client/bridge/wire.py` — 480 строк ⚠ подошёл к 300
 
 Перевод внутренних значений в словари, которые читает окно.
 
@@ -3411,7 +3411,7 @@ Runtime settings layer.
 - `def _channel_fields(ch) -> dict` (8)
 - `def _company_picker_row_to_dict(item) -> dict` (14)
 - `def _vacancy_list_row_to_dict(v, matched_set: set[str], activity_by_id: dict[int, Any] | None=None) -> dict` (34)
-- `def _aggregator_row_to_dict(row) -> dict` (12)
+- `def _aggregator_row_to_dict(row) -> dict` (11)
 - `def _aggregator_list_row_to_dict(row, vacancy_count: int, barred: bool) -> dict` (3)
 - `def _screening_to_dict(shown) -> dict` (4)
 - `def _source_stats_to_dict(stats) -> dict` (6)

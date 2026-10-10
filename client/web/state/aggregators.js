@@ -4,7 +4,6 @@
 // Чистые функции: строки моста приходят доводами, наружу уходят строки и
 // признаки. Ни моста, ни разметки этот файл не знает.
 
-import { showStamp } from './dates.js';
 import { BLOCKED_TITLE, sourceBlock, sourceToggle } from './sources.js';
 
 /** Где агрегатор ищет — подпись под именем.
@@ -14,11 +13,6 @@ import { BLOCKED_TITLE, sourceBlock, sourceToggle } from './sources.js';
  */
 export function aggregatorWhere(row) {
   return row.is_web_search ? 'по всей сети' : row.host;
-}
-
-/** Когда агрегатор обходили в последний раз. */
-export function aggregatorLastRun(row) {
-  return row.last_run_at ? `Обход ${showStamp(row.last_run_at)}` : 'Ещё не обходили';
 }
 
 /** Чем заперт агрегатор без входа — и переключатель строки, и прогон из карточки. */

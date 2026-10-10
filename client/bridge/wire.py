@@ -456,7 +456,6 @@ def _aggregator_row_to_dict(row) -> dict:
         "host": row.host,
         "is_active": bool(row.is_active),
         "is_logged_in": bool(row.is_logged_in),
-        "last_run_at": _iso(row.last_run_at),
         "is_web_search": row.host is None,
         "avatar": _avatar_data_url(row.avatar),
     }

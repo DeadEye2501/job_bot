@@ -81,8 +81,7 @@
   background: transparent;
 }
 
+/* Вид надписи — общий, в picker.css. */
 .skill-picker-empty {
   padding: 10px;
-  font-size: 0.78rem;
-  font-style: italic;
 }

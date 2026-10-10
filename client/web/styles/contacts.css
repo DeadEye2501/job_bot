@@ -7,10 +7,8 @@
   grid-template-columns: 32px 1fr auto;
   align-items: center;
   gap: 8px;
-  width: 100%;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
-  text-align: left;
   cursor: pointer;
 }
 
@@ -26,8 +24,8 @@
 }
 
 /* Имя и подпись — двумя этажами: строка списка узка, и в один ряд подпись
-   съела бы имя. Блоками, потому что у человека и у компании строка — кнопка, а
-   внутри неё стоят span'ы: кнопка не принимает блочную разметку. */
+   съела бы имя. Блоками, потому что этажи — span'ы: строка отвечает клавиатуре
+   как кнопка, и внутри неё стоит только строчная разметка. */
 .cnt-hr-name {
   display: block;
 }
@@ -76,7 +74,8 @@
 }
 
 /* Счёт непрочитанного — сплошная акцентная пилюля: это единственное место
-   списка, куда человек смотрит первым делом. */
+   списка, куда человек смотрит первым делом. Заливка — общая, в
+   accent-fill.css. */
 .cnt-hr-unread {
   display: inline-flex;
   align-items: center;
@@ -86,10 +85,7 @@
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--accent);
-  color: var(--bg-primary);
   font-size: 0.65rem;
-  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 

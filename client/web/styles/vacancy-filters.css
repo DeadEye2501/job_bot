@@ -116,12 +116,7 @@
   padding: 8px 10px;
 }
 
-/* Кнопки поджаты: панель уже окна, а кнопок в подвале три. */
-.filter-foot .btn {
-  padding: 4px 10px;
-  font-size: 0.76rem;
-}
-
+/* Поджатая кнопка подвала — общая, в button.css. */
 .filter-foot .btn .material-symbols-outlined {
   line-height: 1;
 }

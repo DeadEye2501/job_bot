@@ -27,7 +27,7 @@
 </script>
 
 <div class="pick" bind:this={root}>
-  <button class="pick-btn" type="button" onclick={() => (open = !open)}>
+  <button class="cdd-btn" type="button" onclick={() => (open = !open)}>
     <span>{chosen.size ? `Выбрано: ${chosen.size}` : placeholder}</span>
     <span class="material-symbols-outlined">{open ? 'expand_less' : 'expand_more'}</span>
   </button>

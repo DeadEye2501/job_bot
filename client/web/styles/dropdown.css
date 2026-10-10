@@ -7,14 +7,11 @@
 
 /* Высоту кнопка берёт у обёртки: в строке полей (`field-line.css`) обёртку
    тянут по высоте соседних полей ввода, и кнопка ниже них торчала бы
-   недоделанной. Где обёртку не тянут, высота остаётся своей. */
+   недоделанной. Где обёртку не тянут, высота остаётся своей. Рамка — общая
+   с полем ввода, в input.css. */
 .cdd-btn {
   width: 100%;
   height: 100%;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  border-radius: 4px;
   padding: 4px 8px;
   font-size: 0.82rem;
   display: flex;

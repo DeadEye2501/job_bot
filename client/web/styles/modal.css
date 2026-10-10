@@ -12,10 +12,8 @@
   z-index: 1000;
 }
 
+/* Рамка — общая, в panel-frame.css. */
 .modal-dialog {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
   padding: 16px 18px;
   min-width: 320px;
   max-width: 440px;
@@ -180,15 +178,7 @@
 }
 
 .modal-footer .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   padding: 4px 12px;
-  font-size: 0.78rem;
-}
-
-.modal-footer .btn .material-symbols-outlined {
-  font-size: 14px;
 }
 
 .modal-subtitle {

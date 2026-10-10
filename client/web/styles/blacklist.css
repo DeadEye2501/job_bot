@@ -29,28 +29,14 @@
   align-self: stretch;
 }
 
+/* Вид кнопки — общий, в button.css; здесь только то, что поиск рядом её не
+   сжимает. */
 .bl-add-btn {
-  display: inline-flex;
-  align-items: center;
   flex-shrink: 0;
-  gap: 5px;
-  padding: 4px 11px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-secondary);
-  font-size: 0.78rem;
 }
 
-/* Обводка под курсором — общая, в accent-outline.css. */
-
-.bl-add-btn .material-symbols-outlined {
-  font-size: 14px;
-}
-
+/* Рамка — общая, в panel-frame.css. */
 .bl-table {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-secondary);
   overflow: hidden;
 }
 

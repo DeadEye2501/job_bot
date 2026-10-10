@@ -1,12 +1,19 @@
 /* Поле ввода, многострочное поле и поле для секрета рядом с глазом.
    Экран настроек уменьшает их своим правилом — там полей вдвое больше. */
 
+/* Рамка поля — общая с кнопкой выпадающего списка (dropdown.css): они стоят
+   в одних формах вперемешку, и разная рамка читалась бы как разный род поля. */
 .input,
-.textarea {
+.textarea,
+.cdd-btn {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   color: var(--text-primary);
   border-radius: 4px;
+}
+
+.input,
+.textarea {
   padding: 6px 10px;
   font-size: 0.85rem;
   font-family: inherit;
