@@ -1,7 +1,9 @@
 """Анкета для агента: всё, на что опираются промпты, со стажем от кода."""
 
+import re
 from datetime import date
 
+from backend.llm.rules import LATIN_NAME_RULE
 from backend.models import Gender, ProfileLanguage, SalaryPeriod, profile_experience_skills
 from backend.repository.agent_profile import build_agent_profile
 from tests.dbio import put
@@ -31,6 +33,17 @@ async def test_the_answers_for_forms_reach_the_agent(session, session_factory):
     assert "Имя латиницей: Ivan" in text and "Фамилия латиницей: Petrov" in text
     assert "мужской" in text
     assert "250000 RUB в месяц, на руки" in text
+
+
+async def test_the_name_rule_points_at_both_spellings_of_the_profile(session, session_factory):
+    """Имя пишется алфавитом текста: русскому письму — поля «Имя» и «Фамилия»,
+    тексту латиницей — латинские. Правило отсылает только к полям, что в анкете есть."""
+    await _person(session_factory)
+    text = await build_agent_profile(session, TODAY)
+    labels = {line.split(":")[0].strip() for line in text.splitlines()}
+    named = set(re.findall(r"«([^»]+)»", LATIN_NAME_RULE))
+
+    assert {"Имя", "Фамилия", "Имя латиницей", "Фамилия латиницей"} <= named <= labels
 
 
 async def test_empty_answers_are_named_empty(session, session_factory):
