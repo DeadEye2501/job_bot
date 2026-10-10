@@ -234,13 +234,6 @@
 - `_SOURCE_COLUMNS` = `набор из 2`
 - `_PROFILE_COLUMNS` = `набор из 6`
 
-### `alembic/versions/c4e8a2d19f3b_aggregator_avatar.py`
-
-- `revision: str` = `'c4e8a2d19f3b'`
-- `down_revision: Union[str, Sequence[str], None]` = `'a9c3e1f07b42'`
-- `branch_labels: Union[str, Sequence[str], None]` = `None`
-- `depends_on: Union[str, Sequence[str], None]` = `None`
-
 ### `alembic/versions/e560edf8b958_init.py`
 
 - `revision: str` = `'e560edf8b958'`
@@ -1902,6 +1895,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `_MODEL_PROBE_INTERVAL_S` = `60.0`
+- `MODEL_KINDS` = `набор из 2`
 
 ### `client/bridge/vacancies.py`
 
@@ -2150,6 +2144,10 @@
 
 - `CREDENTIALS` = `словарь из 3`
 
+### `tests/client/test_bridge_model_speed.py`
+
+- `SAVED_CHAT` = `словарь из 1`
+
 ### `tests/client/test_bridge_profile.py`
 
 - `PERSON` = `словарь из 4`
@@ -2239,3 +2237,5 @@
 - `class Sent`
   - `id: int`
 - `ANSWERS` = `словарь из 15`
+- `class UiBot`
+  - `is_running_round` = `False`

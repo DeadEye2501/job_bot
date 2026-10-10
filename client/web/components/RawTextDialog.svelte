@@ -11,7 +11,7 @@
   let { id, chips, text, oncopy, onclose } = $props();
 </script>
 
-<ModalShell extra="vac-raw-modal" {onclose}>
+<ModalShell extra="narrow roomy" {onclose}>
   {#snippet children()}
     <ModalHead icon="code" title="Исходный текст вакансии" meta="id #{id}" {onclose} />
 

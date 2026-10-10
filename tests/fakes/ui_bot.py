@@ -46,6 +46,9 @@ class UiBot:
     зеленел бы на умолчании вместо заказанного ответа.
     """
 
+    # Прогона у подделки нет, пока тест не скажет обратного.
+    is_running_round = False
+
     def __init__(self, **answers) -> None:
         unknown = set(answers) - set(ANSWERS)
         if unknown:

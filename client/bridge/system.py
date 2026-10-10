@@ -15,7 +15,9 @@ from __future__ import annotations
 import logging
 import time
 from concurrent.futures import Future
+from functools import partial
 
+from adapters import lm_models
 from backend import health
 from backend.models import BotMode
 from backend.repository.bot_mode import read_mode, write_mode
@@ -25,6 +27,7 @@ from client.bridge.answer import Denied, denied, launched, reply
 from client.bridge.desktop import Desktop
 from client.bridge.hub import Hub
 from client.bridge.journal import Journal
+from client.bridge.llm import _do_llm_probe
 from client.bridge.refusals import NO_BOT, RUN_REFUSALS
 from client.bridge.wipe import Wipe
 from client.bridge.wire import _iso
@@ -72,6 +75,7 @@ class System(Journal, Wipe, Desktop):
         self._models_probed_at: float = float("-inf")
         self._models_answer: tuple[bool, bool] = (False, False)
         self._models_in_flight = False
+        self._timing = False
         self._open_journal()
 
     def initial(self) -> dict:
@@ -231,7 +235,14 @@ class System(Journal, Wipe, Desktop):
             "tg": health.telegram_alive(self._hub.bot),
         }
         chat, embed = await self._models_alive()
-        return {**alive, "chat": chat, "embed": embed}
+        speed = self._hub.model_ms
+        return {
+            **alive,
+            "chat": chat,
+            "embed": embed,
+            "chat_ms": speed["chat"],
+            "embed_ms": speed["embed"],
+        }
 
     async def _unread(self) -> dict:
         """Сколько входящих писем не прочитаны."""
@@ -276,12 +287,68 @@ class System(Journal, Wipe, Desktop):
             self._models_answer = await self._ask_models()
         finally:
             self._models_in_flight = False
+        self._time_new_links()
 
     async def _ask_models(self) -> tuple[bool, bool]:
         return (
             await health.model_alive(self._hub.rs.chat, "chat"),
             await health.model_alive(self._hub.rs.embed, "embed"),
         )
+
+    def _time_new_links(self) -> None:
+        """Забыть замер оборвавшихся моделей и снять его у подключившихся.
+
+        Мерят один раз на подключение, а не на каждой пробе: замер — настоящий
+        вопрос модели, и раз в минуту он отнимал бы у бота очередь ради числа,
+        которое меняется редко. Дальше пробы идут перечнем имён, а замер
+        держится, пока они говорят «жива».
+
+        Пока идёт прогон, не мерят: модель занята разбором, а параллельной её
+        работы быть не должно. Неснятый замер снимется первой пробой после
+        прогона. Ответа не ждут — как и отложенной пробы, по той же причине.
+        """
+        speed = self._hub.model_ms
+        links = list(zip(MODEL_KINDS, self._models_answer))
+        for kind, alive in links:
+            if not alive:
+                speed[kind] = None
+        fresh = [kind for kind, alive in links if alive and speed[kind] is None]
+        bot = self._hub.bot
+        if not fresh or self._timing or (bot is not None and bot.is_running_round):
+            return
+        self._timing = True
+        self._hub.runner.submit(self._time_models(fresh)).add_done_callback(_probed)
+
+    async def _time_models(self, kinds: list[str]) -> None:
+        """Снять замер у каждой из моделей и оставить его хозяйству.
+
+        Замер о прежних настройках не кладётся: пока модель отвечала, её
+        могли сменить в настройках, и число говорило бы о чужой.
+        """
+        try:
+            for kind in kinds:
+                cfg = getattr(self._hub.rs, kind)
+                if cfg is None:
+                    continue
+                ms = await _speed_of(cfg, kind)
+                if getattr(self._hub.rs, kind) == cfg:
+                    self._hub.model_ms[kind] = ms
+        finally:
+            self._timing = False
+
+
+MODEL_KINDS = ("chat", "embed")
+"""Порядок моделей в ответе пробы (`_ask_models`)."""
+
+
+async def _speed_of(cfg, kind: str) -> int | None:
+    """Время настоящего вопроса модели — того же, что у кнопки «Проверить».
+
+    Не ответила — пусто: число о неответившей модели было бы ложью.
+    """
+    check = partial(lm_models.check_model, kind=kind)
+    ok, _detail, _models, latency_ms = await _do_llm_probe(cfg, check)
+    return latency_ms if ok else None
 
 
 def _probed(task: Future) -> None:

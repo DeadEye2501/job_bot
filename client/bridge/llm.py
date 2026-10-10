@@ -184,6 +184,11 @@ class Llm:
             ok, detail, _models, latency_ms = await _do_llm_probe(cfg, check_fn)
             if not ok:
                 raise Denied(detail, kind=kind)
+            # Проверенная сохранённая модель — это и есть последний замер: его
+            # плашка настроек показывает и после ухода с экрана. Черновую не
+            # кладём — число говорило бы о модели, которой бот не пользуется.
+            if cfg == getattr(self._hub.rs, kind):
+                self._hub.model_ms[kind] = latency_ms
             return {"kind": kind, "model": cfg.model, "latency_ms": latency_ms}
 
         return reply(self._hub.runner, run())

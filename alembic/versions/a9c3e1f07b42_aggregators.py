@@ -42,6 +42,7 @@ def upgrade() -> None:
         sa.Column('is_active', sa.Boolean(), server_default=sa.text('0'), nullable=False),
         sa.Column('is_logged_in', sa.Boolean(), server_default=sa.text('0'), nullable=False),
         sa.Column('last_run_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('avatar', sa.LargeBinary(), nullable=True),
         sa.PrimaryKeyConstraint('id'),
     )
     op.create_index('uq_aggregator_host', 'aggregator', ['host'], unique=True)

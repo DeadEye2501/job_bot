@@ -316,7 +316,7 @@ Claude через установленный Claude Code по подписке: 
 
 - `def page_client(timeout_sec: float, user_agent: str) -> httpx.AsyncClient` (7)
 
-## alembic — 4 модулей
+## alembic — 3 модулей
 
 ### `alembic/env.py` — 77 строк
 
@@ -329,24 +329,15 @@ Claude через установленный Claude Code по подписке: 
 - `async def run_async_migrations() -> None` (14)
 - `def run_migrations_online() -> None` (2)
 
-### `alembic/versions/a9c3e1f07b42_aggregators.py` — 143 строк
+### `alembic/versions/a9c3e1f07b42_aggregators.py` — 144 строк
 
 aggregators
 
 Зависит от: `alembic`
 
 - `def _source_columns(table: str) -> None` (8)
-- `def upgrade() -> None` (82)
+- `def upgrade() -> None` (83)
 - `def downgrade() -> None` (24)
-
-### `alembic/versions/c4e8a2d19f3b_aggregator_avatar.py` — 26 строк
-
-aggregator avatar
-
-Зависит от: `alembic`
-
-- `def upgrade() -> None` (2)
-- `def downgrade() -> None` (3)
 
 ### `alembic/versions/e560edf8b958_init.py` — 272 строк
 
@@ -634,7 +625,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _checked_kind(src: Path, file_path: str) -> bool` (28)
 - `async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message` (38)
 
-### `backend/bot/client.py` — 373 строк ⚠ подошёл к 300
+### `backend/bot/client.py` — 383 строк ⚠ подошёл к 300
 
 Сборка бота: его состояние, соединения и поверхность, которой пользуется окно.
 
@@ -645,9 +636,10 @@ First-run bootstrap: ensure DB schema exists.
 - `def _declare_loop_controls(bot) -> None` (21)
 - `def _declare_ui_hooks(bot) -> None` (41)
 - `def _forward_pipeline_hooks(bot) -> None` (17)
-- `class Bot` (190)
+- `class Bot` (200)
   - `def is_ready(self) -> bool` (7)
   - `def is_connected(self) -> bool` (13)
+  - `def is_running_round(self) -> bool` (8)
   - `def kick(self) -> None` (8)
   - `def request_stop(self) -> None` (8)
   - `async def poll_channel_now(self, channel_id) -> channels.ChannelPollOutcome` (4)
@@ -3005,13 +2997,13 @@ Runtime settings layer.
   - `def pick_media(self, hr_id: int) -> dict` (20)
   - `def _send_media(self, payload: dict) -> dict` (17)
 
-### `client/bridge/hub.py` — 55 строк
+### `client/bridge/hub.py` — 60 строк
 
 Живое хозяйство окна: то, из чего собран каждый домен поверхности.
 
 Зависит от: `client.bridge.events`
 
-- `class Hub` (38)
+- `class Hub` (43)
 
 ### `client/bridge/journal.py` — 106 строк
 
@@ -3049,7 +3041,7 @@ Runtime settings layer.
 - `def _remember_login(hub: Hub, username: str | None) -> None` (17)
 - `def _log_if_crashed(hub: Hub, future: Future) -> None` (20)
 
-### `client/bridge/llm.py` — 227 строк
+### `client/bridge/llm.py` — 232 строк
 
 Поставщик модели для окна: проверить связь, спросить имена, выбрать файл модели.
 
@@ -3061,9 +3053,9 @@ Runtime settings layer.
 - `def read_llm_creds(payload: dict, kind: str) -> LlmProviderConfig` (23)
 - `def read_models_ask(payload) -> tuple[str, str, str]` (4)
 - `def _provider_address(payload: dict) -> tuple[str, str]` (14)
-- `class Llm` (75)
-  - `def probe_model(self, payload: dict) -> dict` (29)
-    - `async def run() -> dict` (5)
+- `class Llm` (80)
+  - `def probe_model(self, payload: dict) -> dict` (34)
+    - `async def run() -> dict` (10)
   - `def pick_model_file(self) -> dict` (11)
   - `def list_models(self, payload: dict) -> dict` (25)
     - `async def run() -> dict` (9)
@@ -3248,13 +3240,13 @@ Runtime settings layer.
   - `def skills(self, period: str) -> dict` (3)
   - `def channels_pipeline(self, period: str) -> dict` (3)
 
-### `client/bridge/system.py` — 325 строк ⚠ подошёл к 300
+### `client/bridge/system.py` — 392 строк ⚠ подошёл к 300
 
 Домен «система»: то, чем страница живёт на любом экране.
 
-Зависит от: `backend`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.refusals`, `client.bridge.wipe`, `client.bridge.wire`
+Зависит от: `adapters`, `backend`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.llm`, `client.bridge.refusals`, `client.bridge.wipe`, `client.bridge.wire`
 
-- `class System(Journal, Wipe, Desktop)` (232)
+- `class System(Journal, Wipe, Desktop)` (282)
   - `def initial(self) -> dict` (16)
     - `async def run() -> dict` (6)
   - `async def _mode(self) -> BotMode` (5)
@@ -3270,11 +3262,14 @@ Runtime settings layer.
   - `def events(self, after) -> dict` (15)
   - `def health(self) -> dict` (3)
   - `def unread(self) -> dict` (3)
-  - `async def _health(self) -> dict` (18)
+  - `async def _health(self) -> dict` (25)
   - `async def _unread(self) -> dict` (4)
   - `async def _models_alive(self) -> tuple[bool, bool]` (31)
-  - `async def _probe_models(self) -> None` (6)
+  - `async def _probe_models(self) -> None` (7)
   - `async def _ask_models(self) -> tuple[bool, bool]` (5)
+  - `def _time_new_links(self) -> None` (23)
+  - `async def _time_models(self, kinds: list[str]) -> None` (16)
+- `async def _speed_of(cfg, kind: str) -> int | None` (8)
 - `def _probed(task: Future) -> None` (16)
 - `def _after(asked) -> int | None` (21)
 
@@ -3514,7 +3509,7 @@ seed initial data
 - `def upgrade() -> None` (11)
 - `def downgrade() -> None` (11)
 
-## tests — 310 модулей
+## tests — 311 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
 
@@ -6221,6 +6216,20 @@ seed initial data
 Тестов: 1
 
 
+### `tests/client/test_bridge_model_speed.py` — 134 строк
+
+Следствия запомненного замера скорости моделей.
+
+Зависит от: `tests.fakes.llm`
+
+Тестов: 4
+
+- `def models_say(monkeypatch, answers: list[bool])` (16)
+  - `async def alive(_cfg, kind)` (4)
+- `def timed(monkeypatch, ms: int | None) -> list[str]` (10)
+  - `async def speed(_cfg, kind)` (3)
+- `async def health_after_drain(api, ask, runner) -> dict` (5)
+
 ### `tests/client/test_bridge_paging.py` — 74 строк
 
 Следствия признака продолжения — того, по которому окно решает, просить ли ещё.
@@ -6813,14 +6822,14 @@ seed initial data
 - `def user(*, username=None, photo=None, **extra) -> SimpleNamespace` (15)
 - `def dialog(peer_id: int, top_message: int | None=None)` (17)
 
-### `tests/fakes/ui_bot.py` — 144 строк
+### `tests/fakes/ui_bot.py` — 147 строк
 
 Бот, каким его видит окно: обращения, которые делает мост.
 
 Зависит от: `backend.bot.pasted`, `backend.bot.rerun`
 
 - `class Sent` (4)
-- `class UiBot` (104)
+- `class UiBot` (107)
   - `def _refuse_if_asked(self) -> None` (3)
   - `async def force_poll_once(self) -> str` (3)
   - `def cancel_current_poll(self) -> None` (2)

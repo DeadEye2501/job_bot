@@ -259,6 +259,16 @@ class Bot:
             self.is_ready and getattr(self.client, "is_connected", False)
         )
 
+    @property
+    def is_running_round(self) -> bool:
+        """Занято ли место прогона — идёт ли обход, прогон источника или разбор.
+
+        Спрашивает окно: пока модель занята прогоном, оно не задаёт ей своих
+        вопросов — параллельной работы модели быть не должно.
+        """
+        task = self.current_poll_task
+        return task is not None and not task.done()
+
     def kick(self) -> None:
         """Wake the loop so the next poll runs immediately instead of waiting.
 

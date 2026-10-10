@@ -27,7 +27,7 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (262)
+### app/BottomBar.svelte (263)
 - Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
 - принимает: ask, say, events, onlocked, oncontact
 
@@ -93,7 +93,7 @@
 - —
 - принимает: ask
 
-### app/SettingsScreen.svelte (373)
+### app/SettingsScreen.svelte (379)
 - Записи на смене источника нет, пока не выбран файл или не набран сервер: пустой источник мост не примет, а прежний остаётся в базе до тех пор.
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
@@ -608,7 +608,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 65 файлов
+## state — 66 файлов
 
 ### state/aggregators.js (70)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
@@ -714,6 +714,10 @@
 - * Живо ли всё, на чём держится работа бота. * * По этому ответу отпираются тумблер режима и кнопка прогона, поэтому незнание * считается «не живо»: до первого ответа моста мы не знаем ничего, а отпертая * на миг раньше правды кнопка пускает обход каналов без модели.
 - отдаёт: LAMPS, allAlive, blockedTip, downNames, shouldTurnOff
 
+### state/health_now.svelte.js (20)
+- * Что известно о здоровье сейчас: ответ `system.health` или пусто до первого.
+- отдаёт: healthNow, keepHealth
+
 ### state/keys.js (70)
 - * Чем нажатая клавиша отзовётся в окне: закрытием, подтверждением или ничем. * * Многострочное поле — исключение: в нём Enter переносит строку. Иначе заметку * в два абзаца не набрать, первый же перевод строки отправил бы окно.
 - отдаёт: modalKey, modalPress, opened, pressKey, saveKey
@@ -794,7 +798,7 @@
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
-### state/settings.js (432)
+### state/settings.js (441)
 - * Чем подписано пустое поле имени модели. * * Пока имён нет, подсказка не обещает списка: перечень читается с адреса и * ключа, и у непóднятого поставщика его не будет вовсе — имя тогда вписывают * руками. Слова общие на настройки и на шаг мастера: одно и то же поле, * подписанное по-разному, читается как два разных.
 - отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, NO_FILE_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, SOURCE_FILE, SOURCE_SERVER, addressTrouble, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, embedReading, fileCreds, fileTrouble, idleProbe, isFileSource, isModelFile, llmTrouble, loginTrouble, mailNeedsServer, mailPill, mailToSave, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probeLine, probePill, sameCreds, scorePercent, sessionPill, sharesChat, sourceCreds, sourceLabel, telegramCreds, thresholdState
 
@@ -1251,7 +1255,7 @@ body, html, button, body, .material-symbols-outlined
 .hr-mini-name, .hr-mini-row .hr-avatar, .hr-mini-meta, .hr-mini-go, .mini-list-empty, .mini-list-more
 - берёт: --accent, --border, --selected-bg, --text-primary, --text-tertiary
 
-### styles/modal.css (194)
+### styles/modal.css (195)
 - Окно поверх окна: затемнение на весь экран и коробка по центру.
 - селекторы (23): .modal-backdrop, .modal-dialog, .modal-dialog.narrow, .modal-dialog.narrow.tall, .modal-dialog.narrow.roomy, .modal-dialog.narrow .modal-body, .modal-dialog.narrow .modal-body > *, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-actions,
 .modal-footer, .modal-footer, .modal-footer .btn, .modal-subtitle, .modal-error
@@ -1384,9 +1388,9 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (8): .radio-card, .radio-card:hover, .radio-card.selected, .radio-card.disabled:hover, .radio-card input, .radio-card.disabled input, .radio-card .rc-title, .radio-card .rc-sub
 - берёт: --accent, --accent-hover-soft, --bg-tertiary, --border, --text-primary, --text-tertiary
 
-### styles/raw-text.css (77)
-- Окно исходного текста: полоса сведений об объявлении и сам текст под ней. Шапка, тело и крестик — общие, в modal.css.
-- селекторы (9): .vac-raw-modal, .raw-meta, .raw-meta-chip, .raw-meta-chip .material-symbols-outlined, .raw-copy-btn, .raw-copy-btn:hover, .raw-copy-btn:active, .raw-copy-btn .material-symbols-outlined, .raw-text
+### styles/raw-text.css (68)
+- Окно исходного текста: полоса сведений об объявлении и сам текст под ней. Коробка, шапка, тело и крестик — общие окна для чтения, в modal.css.
+- селекторы (8): .raw-meta, .raw-meta-chip, .raw-meta-chip .material-symbols-outlined, .raw-copy-btn, .raw-copy-btn:hover, .raw-copy-btn:active, .raw-copy-btn .material-symbols-outlined, .raw-text
 - берёт: --accent, --bg-over-content, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary
 
 ### styles/remove-cross.css (16)
@@ -1494,7 +1498,7 @@ body, html, button, body, .material-symbols-outlined
 .stats-skills-legend .leg-other, .stats-skill-row.mine .stats-skill-bar-fill, .stats-skill-num, .stats-skills-legend, .stats-skills-legend span, .stats-skills-legend .leg-dot
 - берёт: --accent, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-### styles/stats-status.css (55)
+### styles/stats-status.css (59)
 - Карточка «Статусы»: счётчики двумя колонками и кольцо между ними. Само кольцо — в donut.css, цвет точки — в status-color.css.
 - селекторы (7): .stats-status-card, .stats-status-col, .stats-status-col.right, .stats-sc-item, .stats-sc-item:hover, .stats-sc-name, .stats-sc-num
 - берёт: --bg-tertiary, --text-primary, --text-secondary
@@ -1820,7 +1824,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/search.test.js (49)
 - —
 
-### tests/settings.test.js (467)
+### tests/settings.test.js (478)
 - —
 
 ### tests/settings_screen_live.test.js (221)

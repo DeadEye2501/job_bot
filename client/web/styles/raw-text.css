@@ -1,14 +1,5 @@
 /* Окно исходного текста: полоса сведений об объявлении и сам текст под ней.
-   Шапка, тело и крестик — общие, в modal.css. */
-
-.vac-raw-modal {
-  width: min(720px, 92vw);
-  max-width: min(720px, 92vw);
-  max-height: min(440px, 88vh);
-  padding: 0;
-  overflow: hidden;
-  gap: 0;
-}
+   Коробка, шапка, тело и крестик — общие окна для чтения, в modal.css. */
 
 .raw-meta {
   display: flex;
@@ -32,13 +23,14 @@
 }
 
 /* Прижата к верхнему краю видимой части: длинный текст прокручивают, и уехавшая
-   вверх кнопка нашлась бы только возвратом в начало. */
+   вверх кнопка нашлась бы только возвратом в начало. Тело окна — столбец, и
+   вправо её прижимает он, а отрицательный отступ снизу заводит текст под неё. */
 .raw-copy-btn {
   position: sticky;
   top: 8px;
-  float: right;
+  align-self: flex-end;
   z-index: 2;
-  margin: 8px 8px -28px 0;
+  margin-bottom: -28px;
   border: 1px solid var(--border);
   background: var(--bg-over-content);
   opacity: 0.55;
@@ -66,7 +58,6 @@
    объявления: по ним и видно, чего разбор не разобрал. */
 .raw-text {
   margin: 0;
-  padding: 12px;
   color: var(--text-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.78rem;
