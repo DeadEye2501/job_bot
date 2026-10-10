@@ -1,10 +1,10 @@
-"""Отклик выбранным способом: какие способы есть у вакансии и запуск агента одним из них."""
+"""Отклик выбранным способом: какие способы доступны у вакансии и запуск одного из них."""
 
 from backend.domain.apply_order import Way
 from backend.models import ContactAddedBy
 from tests.dbio import put
-from tests.factories import blacklist_row, hr_row, vacancy_row
-from tests.factories_aggregators import aggregator_row, mail_account_row, vacancy_contact_row
+from tests.factories import hr_row, vacancy_row
+from tests.factories_aggregators import mail_account_row, vacancy_contact_row
 
 FORM = "https://company.test/apply"
 
@@ -17,36 +17,16 @@ async def _vacancy(session_factory, **over):
     return vacancy
 
 
-async def test_the_ways_of_a_vacancy_come_with_telegram_and_the_lock(
-    api, ask, session, session_factory
-):
-    hr = hr_row()
-    await put(session_factory, hr)
+async def test_the_window_gets_only_available_ways(api, ask, session_factory):
+    """Агент не готов — формы в перечне нет; Telegram и почта на месте."""
+    hr = hr_row(telegram_username="hr_name")
+    await put(session_factory, hr, mail_account_row())
     vacancy = await _vacancy(session_factory, hr_id=hr.id)
-    await put(session_factory, mail_account_row())
 
-    answer = (await ask(api.vacancies.apply_ways, vacancy.id))["ok"]
+    answer = await ask(api.vacancies.apply_ways, vacancy.id)
 
-    assert answer["ways"] == [{"method": "form", "target": FORM},
-                              {"method": "email", "target": "hr@company.test"}]
-    assert answer["telegram"] is True and answer["lock"]
-
-
-async def test_no_way_leads_to_a_blacklisted_site(api, ask, session_factory):
-    """Сайт в отсеве не работает и для откликов: ни кнопкой его агрегатора, ни
-    формой на нём. Вакансию могли разобрать до того, как сайт занесли в отсев."""
-    site = aggregator_row(host="board.test", is_logged_in=True)
-    await put(session_factory, site, blacklist_row(kind="aggregator", value="board.test"))
-    vacancy = vacancy_row(source_aggregator_id=site.id, source_key="v/1",
-                          source_url="https://board.test/v/1")
-    await put(session_factory, vacancy)
-    await put(session_factory,
-              vacancy_contact_row(vacancy.id, "https://spb.board.test/apply", added_by=ContactAddedBy.PARSE),
-              vacancy_contact_row(vacancy.id, FORM, added_by=ContactAddedBy.PARSE))
-
-    answer = (await ask(api.vacancies.apply_ways, vacancy.id))["ok"]
-
-    assert answer["ways"] == [{"method": "form", "target": FORM}]
+    assert answer == {"ok": {"ways": [{"method": "telegram", "target": "@hr_name"},
+                                      {"method": "email", "target": "hr@company.test"}]}}
 
 
 async def test_a_missing_vacancy_has_no_ways(api, ask):
@@ -55,16 +35,28 @@ async def test_a_missing_vacancy_has_no_ways(api, ask):
     assert (answer["fail"], answer["detail"]) == ("denied", "Вакансия не найдена.")
 
 
-async def test_a_chosen_way_goes_to_the_agent(api, ask, with_bot, told, session_factory):
+async def test_a_chosen_way_goes_to_the_applier(api, ask, with_bot, told, session_factory):
+    bot = with_bot()
+    await put(session_factory, mail_account_row())
+    vacancy = await _vacancy(session_factory)
+
+    answer = await ask(api.vacancies.apply_via,
+                       {"vacancy_id": vacancy.id, "method": "email", "target": "hr@company.test"})
+
+    assert answer["ok"]["started"] is True
+    assert (await told())["danger"] is False
+    assert bot.calls == [("apply_chosen_way", vacancy.id, Way("email", "hr@company.test", None))]
+
+
+async def test_a_way_not_available_now_is_refused(api, ask, with_bot, session_factory):
+    """Форма у вакансии есть, но агент не готов: выбрать её нельзя."""
     bot = with_bot()
     vacancy = await _vacancy(session_factory)
 
     answer = await ask(api.vacancies.apply_via,
                        {"vacancy_id": vacancy.id, "method": "form", "target": FORM})
 
-    assert answer["ok"]["started"] is True
-    assert (await told())["danger"] is False
-    assert bot.calls == [("apply_via_agent", vacancy.id, Way("form", FORM, None))]
+    assert answer["fail"] == "denied" and bot.calls == []
 
 
 async def test_a_way_the_vacancy_does_not_have_is_refused(api, ask, with_bot, session_factory):
@@ -75,5 +67,3 @@ async def test_a_way_the_vacancy_does_not_have_is_refused(api, ask, with_bot, se
                        {"vacancy_id": vacancy.id, "method": "form", "target": "https://evil.test/"})
 
     assert answer["fail"] == "denied" and bot.calls == []
-
-

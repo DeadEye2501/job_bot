@@ -1,36 +1,26 @@
-"""Работа агента у бота: обход агрегаторов, вход на сайт, ручной отклик через место прогона и удаление источника."""
+"""Работа агента у бота с источниками: обход агрегаторов, вход на сайт и удаление источника."""
 
 import logging
-from collections.abc import Awaitable, Callable
-from datetime import date
 from typing import Literal
 
-from adapters.browser import BrowserHost, find_browser, remove_profile
+from adapters.browser import remove_profile
 from backend.agent.availability import current_refusal
 from backend.agent.jobs import Source
 from backend.agent.kit import AgentKit
-from backend.agent.sessions import HumanTimeout, LimitExhausted, live_session
-from backend.applying import run
-from backend.bot import slot
-from backend.domain.apply_order import Way
+from backend.bot import slot, work
 from backend.flows.aggregator_login import log_in
 from backend.flows.aggregator_round import seek_source
-from backend.models import Aggregator, Vacancy
-from backend.notify import fire
+from backend.models import Aggregator
 from backend.repository import aggregators as repo
 
 logger = logging.getLogger(__name__)
 
 AgentOutcome = Literal[
-    slot.CycleOutcome, "missing", "locked", "blacklisted", "human_timeout", "limit",
-    "exhausted", "not_logged_in", "login_timeout",
+    slot.CycleOutcome, work.AgentStop, "missing", "locked", "blacklisted",
+    "not_logged_in", "login_timeout",
 ]
 """Чем кончилось действие агента: исходы места прогона и свои — у источника
-(в отсеве), у отклика (способы кончились) и у входа (не вошёл, окно не
-закрыто)."""
-
-HUMAN_TIMEOUT_NOTE = "Капча не пройдена — обход снят."
-LIMIT_NOTE = "Исчерпан лимит подписки Claude Code — обход снят."
+(в отсеве) и у входа (не вошёл, окно не закрыто)."""
 
 
 def aggregators_available(bot) -> str | None:
@@ -48,53 +38,23 @@ def reveal_browser(bot) -> None:
     slot.on_runner_loop(bot, bot.human_gate.reveal)
 
 
-async def agent_work(bot, work: Callable[[AgentKit], Awaitable[str]]) -> str:
-    """Общая обёртка работы агента: чистая пауза на человека в начале,
-    отпущенный ждущий вызов и закрытый браузер в конце, чем бы ни кончилось."""
-    kit = _kit(bot)
-    kit.gate.reset()
-    try:
-        return await work(kit)
-    except HumanTimeout:
-        logger.warning(HUMAN_TIMEOUT_NOTE)
-        fire(bot.on_round_note, "on_round_note", HUMAN_TIMEOUT_NOTE)
-        return "human_timeout"
-    except LimitExhausted:
-        logger.warning(LIMIT_NOTE)
-        fire(bot.on_round_note, "on_round_note", LIMIT_NOTE)
-        return "limit"
-    finally:
-        kit.gate.abort()
-        await kit.browser.close()
+async def seek_all(bot, kit: AgentKit) -> None:
+    """Обход всех источников внутри оборота; кеш профиля «Поиска по сети» чистится в начале.
 
-
-async def launch_round(bot) -> None:
-    """Пустить обход отдельной задачей, если агент может работать и источники есть.
-
-    Общий выключатель агрегаторов гасит обход целиком, «Поиск по сети» тоже.
+    Общий выключатель агрегаторов гасит обход целиком, «Поиск по сети» тоже;
+    не готов агент или источников нет — обхода нет.
     """
     if not bot.rs.aggregators_enabled or aggregators_available(bot) is not None:
         return
     async with bot.session_factory() as session:
-        if not await repo.round_sources(session):
-            return
-    slot.launch_in_slot(bot, lambda: aggregator_round(bot), "aggregator round")
-
-
-async def aggregator_round(bot) -> None:
-    """Обход всех источников; кеш профиля «Поиска по сети» чистится в начале каждого."""
-
-    async def work(kit: AgentKit) -> str:
-        async with bot.session_factory() as session:
-            sources = [Source.of(row) for row in await repo.round_sources(session)]
-        async with bot.session_factory() as session:
-            await kit.browser.open_profile(await repo.web_search_id(session))
-        await kit.browser.clear_cache()
-        for source in sources:
-            await seek_source(kit, source)
-        return "ok"
-
-    await agent_work(bot, work)
+        sources = [Source.of(row) for row in await repo.round_sources(session)]
+        web_search = await repo.web_search_id(session)
+    if not sources:
+        return
+    await kit.browser.open_profile(web_search)
+    await kit.browser.clear_cache()
+    for source in sources:
+        await seek_source(kit, source)
 
 
 async def run_aggregator_now(bot, aggregator_id: int) -> AgentOutcome:
@@ -105,11 +65,11 @@ async def run_aggregator_now(bot, aggregator_id: int) -> AgentOutcome:
     if (refusal := await _refused(bot, row)) is not None:
         return refusal
 
-    async def work(kit: AgentKit) -> str:
+    async def one_source(kit: AgentKit) -> str:
         await seek_source(kit, Source.of(row))
         return "ok"
 
-    return await _in_slot(bot, work, f"aggregator {aggregator_id}")
+    return await work.in_slot(bot, one_source, f"aggregator {aggregator_id}")
 
 
 async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome:
@@ -120,34 +80,10 @@ async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome:
     if (refusal := await _refused(bot, row)) is not None:
         return refusal
 
-    async def work(kit: AgentKit) -> str:
+    async def login(kit: AgentKit) -> str:
         return await log_in(kit, Source.of(row))
 
-    return await _in_slot(bot, work, f"aggregator login {aggregator_id}")
-
-
-async def apply_via_agent(bot, vacancy_id: int, way: Way) -> AgentOutcome:
-    """Ручной отклик выбранным способом. Режим ему не помеха: нажал человек."""
-    async with bot.session_factory() as session:
-        if await session.get(Vacancy, vacancy_id) is None:
-            return "missing"
-    if aggregators_available(bot) is not None:
-        return "locked"
-
-    async def work(kit: AgentKit) -> str:
-        outcome = await run.apply_chosen(kit, vacancy_id, way)
-        return "ok" if outcome == "applied" else "exhausted"
-
-    return await _in_slot(bot, work, f"apply via agent {vacancy_id}")
-
-
-async def apply_found(bot, vacancy_ids: list[int]) -> None:
-    """Откликнуться на отобранное сбором; браузер, если понадобился, закрывается после."""
-    kit = _kit(bot)
-    try:
-        await run.apply_vacancies(kit, vacancy_ids)
-    finally:
-        await kit.browser.close()
+    return await work.in_slot(bot, login, f"aggregator login {aggregator_id}")
 
 
 async def delete_aggregator(bot, aggregator_id: int) -> str:
@@ -160,16 +96,6 @@ async def delete_aggregator(bot, aggregator_id: int) -> str:
     if outcome == "ok":
         remove_profile(aggregator_id)
     return outcome
-
-
-def _kit(bot) -> AgentKit:
-    return AgentKit(
-        pipeline=bot.ingestion,
-        browser=BrowserHost(find_browser(), bot.rs.show_browser),
-        gate=bot.human_gate,
-        run_session=live_session(bot.rs.chat.model),
-        today=date.today(),
-    )
 
 
 async def _row(bot, aggregator_id: int) -> Aggregator | None:
@@ -187,7 +113,3 @@ async def _refused(bot, row: Aggregator) -> AgentOutcome | None:
         if await repo.aggregator_blacklist_value(session, row) is not None:
             return "blacklisted"
     return "locked" if aggregators_available(bot) is not None else None
-
-
-async def _in_slot(bot, work: Callable[[AgentKit], Awaitable[str]], label: str) -> AgentOutcome:
-    return await slot.answer_in_slot(bot, lambda: agent_work(bot, work), label)

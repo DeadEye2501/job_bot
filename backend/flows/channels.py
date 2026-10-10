@@ -3,6 +3,7 @@
 import logging
 from typing import Literal
 
+from backend.agent.stops import RUN_STOPPERS
 from backend.telegram_lookup import read_channel_metadata
 from backend.models import TelegramChannel
 from backend.repository.channels import is_channel_blacklisted, list_named_channels
@@ -60,9 +61,11 @@ async def poll_active_channels(pipeline) -> None:
     for idx, ch in enumerate(active_named):
         pipeline.emit_progress("channel", f"@{ch.username}", idx, total)
         try:
-            await poll_channel(pipeline, 
+            await poll_channel(pipeline,
                 ch.id, ch.username, ch.last_processed_msg_id
             )
+        except RUN_STOPPERS:
+            raise
         except Exception:
             logger.exception("[@%s] poll failed", ch.username)
     pipeline.emit_progress("channel", "", total, total)
@@ -115,6 +118,8 @@ async def poll_one_channel(pipeline, channel_id: int) -> PollOutcome:
     await refresh_channel_metadata_for_ids(pipeline, [channel_id])
     try:
         walked_whole = await poll_channel(pipeline, channel_id, username, last_id)
+    except RUN_STOPPERS:
+        raise
     except Exception:
         logger.exception("[@%s] manual poll failed", username)
         return "error"
@@ -257,6 +262,8 @@ async def _take_post(pipeline, channel_id: int, channel_username: str, msg) -> b
         await ingest.ingest_post(pipeline, channel_id, channel_username, msg)
     except embeddings.ProviderIsSilent:
         return False
+    except RUN_STOPPERS:
+        raise
     except Exception:
         logger.exception(
             "[@%s] %d ingest failed, advancing cursor", channel_username, msg.id,

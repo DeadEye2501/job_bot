@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-import ast
 import re
 from pathlib import Path
 
@@ -31,11 +30,8 @@ from backend.domain.verdict import (
 )
 from backend.models.enums import BotMode, VacancyStatus
 from backend.models.settings import BLACKLIST_KINDS
-from client.bridge.refusals import SEND_REFUSALS
-
 
 STATE = Path(__file__).resolve().parents[2] / "client" / "web" / "state"
-APPLY = Path(__file__).resolve().parents[2] / "backend" / "flows" / "apply.py"
 
 
 def _array(module: str, name: str) -> str:
@@ -113,55 +109,6 @@ def test_the_window_understands_every_skip_reason_the_backend_writes() -> None:
             score.group(1), reason, re.IGNORECASE
         )
         assert recognised, f"окно не узнаёт причину пропуска {reason!r}"
-
-
-def _reason_in(value: ast.expr) -> set[str]:
-    """Код исхода в том, что возвращают: он всегда на месте «почему».
-
-    Обходить возврат целиком нельзя — вместе с исходами приезжают слова из
-    записей в журнал и куски адресов, — а перечислять формы поимённо мало:
-    исход приезжает и парой «удалось — почему», и одной строкой, и половиной
-    тернария, и последняя форма при переборе форм терялась.
-    """
-    if isinstance(value, ast.IfExp):
-        return _reason_in(value.body) | _reason_in(value.orelse)
-    if isinstance(value, ast.Tuple) and len(value.elts) == 2:
-        return _reason_in(value.elts[1])
-    if isinstance(value, ast.Constant) and isinstance(value.value, str):
-        return {value.value}
-    return set()
-
-
-def _send_outcomes_the_backend_writes() -> set[str]:
-    """Коды исходов отправки отклика — разбором самого отправляющего.
-
-    Переписанные сюда руками, они разошлись бы с ним молча, а именно этого
-    сторож и не должен допускать. Берутся возвраты пары «удалось — почему» и
-    одиночные строки: обе формы в этом модуле встречаются.
-    """
-    found: set[str] = set()
-    for node in ast.walk(ast.parse(APPLY.read_text(encoding="utf-8"))):
-        if isinstance(node, ast.Return) and node.value is not None:
-            found |= _reason_in(node.value)
-    return found
-
-
-def test_every_send_outcome_is_said_in_words_somewhere() -> None:
-    """У каждого исхода отправки есть слова человеку хоть у одного читателя.
-
-    Читателей два, и множества у них разные по устройству: мост переводит то,
-    чем кончилась нажатая кнопка, окно — то, чем кончилась автоматическая
-    отправка, и `flood_wait` до кнопки не доходит вовсе. Общее у них одно:
-    новый код, заведённый на бэкенде, обязан где-то стать словами. Не стань —
-    человек прочтёт технический код посреди русской фразы.
-    """
-    said = set(SEND_REFUSALS) | set(
-        re.findall(r"^\s*([a-z_]+):", _object("vacancy_card.js", "SEND_FAILS"), re.M)
-    )
-    # «Ушло» исходом отказа не является: его в слова не переводят нигде.
-    unsaid = _send_outcomes_the_backend_writes() - said - {"sent"}
-
-    assert not unsaid, f"эти исходы отправки не переведены никем: {sorted(unsaid)}"
 
 
 def test_work_formats_are_the_same_on_both_screens() -> None:

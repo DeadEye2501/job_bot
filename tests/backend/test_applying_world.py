@@ -43,7 +43,7 @@ async def test_a_vacancy_from_an_aggregator_knows_its_site(session_factory):
 
 
 async def test_a_deleted_vacancy_has_no_ways(kit):
-    assert await ways_in(kit, _world(), 999) == []
+    assert await ways_in(kit.pipeline.session_factory, _world(), 999) == []
 
 
 def test_a_closed_site_is_learned_for_the_rest_of_the_run():
@@ -54,9 +54,9 @@ def test_a_closed_site_is_learned_for_the_rest_of_the_run():
 
 async def test_a_ban_in_the_store_closes_telegram(kit):
     await kit.pipeline.rs.set_app("flood_wait_until_ts", str(time.time() + 600))
-    assert not (await read_world(kit)).telegram_open
+    assert not (await read_world(kit.pipeline.rs, kit.pipeline.session_factory)).telegram_open
 
 
 async def test_a_past_ban_leaves_telegram_open(kit):
     await kit.pipeline.rs.set_app("flood_wait_until_ts", str(time.time() - 1))
-    assert (await read_world(kit)).telegram_open
+    assert (await read_world(kit.pipeline.rs, kit.pipeline.session_factory)).telegram_open

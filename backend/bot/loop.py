@@ -149,8 +149,9 @@ async def _tick(bot, mode: BotMode) -> None:
     # to incoming HR messages via the registered MessageHandler).
     if mode is BotMode.FULL:
         # Оборот может тихо не сделать ничего: место прогона мог
-        # занять ручной прогон из окна.
-        await turn.run_turn(bot, "poll cycle")
+        # занять ручной прогон из окна. Задача оборота идёт сама: цикл
+        # тикает дальше — таймер молчания, смена режима, остановка.
+        turn.launch_turn(bot, "poll cycle")
 
 
 async def _sleep_until_wake(bot) -> None:
@@ -207,6 +208,12 @@ async def _disconnect(bot) -> None:
     await bot.lm_client.aclose()
 
 
+async def _turn_done(bot) -> None:
+    """Дождаться задачи оборота: один оборот цикла — это оборот целиком."""
+    if bot.launched_task is not None:
+        await asyncio.wait({bot.launched_task})
+
+
 async def run(bot, *, once: bool = False) -> None:
     """Главный цикл бота: подъём, обороты по режиму, разборка за собой.
 
@@ -215,13 +222,14 @@ async def run(bot, *, once: bool = False) -> None:
     гнёзда до конца работы приложения.
 
     Недоразобранные вакансии подбираются на каждом полном обороте, вместе с
-    обходом каналов (`turn.ingest_round`), а не единожды при подъёме: строка ждёт
+    обходом каналов (`turn.launch_turn`), а не единожды при подъёме: строка ждёт
     там не только обрыва работы, но и статьи по ссылке, а та возвращается
     посреди рабочего дня.
 
     В режиме OFF автоматика не запускается: ни догона переписки, ни разбора,
-    ни обхода. Начатое при этом дорабатывает — гасит его только «Стоп».
-    Догон идёт на каждом переходе в рабочий режим, включая самый первый.
+    ни обхода. Начатое при этом дорабатывает — гасит его только «Стоп» или
+    остановка бота. Догон идёт на каждом переходе в рабочий режим, включая
+    самый первый.
     """
     try:
         await _connect(bot)
@@ -231,15 +239,12 @@ async def run(bot, *, once: bool = False) -> None:
             await _on_mode_switch(bot, prev_mode, mode)
             await _tick(bot, mode)
             prev_mode = mode
+            if once:
+                await _turn_done(bot)
             if once or bot.stop_event.is_set():
-                # `_disconnect` логирует «Bot run-loop exiting» —
-                # детали (once / stop_event) пишем DEBUG, чтобы не
-                # дублировать INFO-строку.
-                logger.debug(
-                    "Run-loop terminating: once=%s stop_event=%s",
-                    once,
-                    bot.stop_event.is_set(),
-                )
+                # Подробность — DEBUG: INFO-строку о выходе пишет `_disconnect`.
+                logger.debug("Run-loop terminating: once=%s stop_event=%s",
+                             once, bot.stop_event.is_set())
                 return
             await _sleep_until_wake(bot)
             if bot.stop_event.is_set():

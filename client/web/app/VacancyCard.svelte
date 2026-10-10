@@ -22,7 +22,7 @@
   import {
     actionBlocks,
     applyChoices,
-    noChoiceReason,
+    NO_WAYS,
     rawChips,
     sourcePill,
   } from '$state/vacancy_actions.js';
@@ -160,23 +160,21 @@
   async function respond() {
     const found = await own((id) => ask('vacancies.apply_ways', id));
     if (found === null) return;
-    const rows = applyChoices(found, card.hr);
-    if (rows.length === 0) return say(noChoiceReason(found));
+    const rows = applyChoices(found);
+    if (rows.length === 0) return say(NO_WAYS);
     if (rows.length === 1) return send(rows[0]);
     choosing = rows;
   }
 
-  /** Отправить отклик выбранным способом.
+  /** Откликнуться выбранным способом.
    *
-   * Ответа об отправке здесь не ждут: письмо сочиняет модель, и ждать её
-   * значило бы держать окно. Ушло письмо или нет, скажет оболочка — вестью об
-   * исходе, — а карточка перечитается по вести о смене списка.
+   * Ответа об отклике здесь не ждут: письмо сочиняет модель, форму проходит
+   * агент, и ждать их значило бы держать окно. Чем кончилось, скажет оболочка
+   * — вестью об исходе, — а карточка перечитается по вести о смене списка.
    */
   async function send(row) {
     choosing = null;
-    const done = row.way
-      ? await ask('vacancies.apply_via', { vacancy_id: vacancyId, ...row.way })
-      : await ask('vacancies.send_application', { vacancy_id: vacancyId });
+    const done = await ask('vacancies.apply_via', { vacancy_id: vacancyId, ...row.way });
     if (done === null) return;
     say('Отклик отправляется');
   }

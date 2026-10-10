@@ -5,7 +5,8 @@ import asyncio
 import pytest
 
 from backend.agent.kit import AgentEnd, SessionPlan
-from backend.agent.sessions import HumanTimeout, run_guarded
+from backend.agent.sessions import run_guarded
+from backend.agent.stops import HumanTimeout
 from tests.fakes.agent import kit_for, silent_gate
 
 PLAN = SessionPlan(system_prompt="", task="", tools=[], web_search=False)

@@ -4,7 +4,8 @@ from backend.agent.jobs import Applied, ApplyJob, Failed, Finished
 from backend.agent.kit import AgentKit, SessionPlan
 from backend.agent.prompts.applier import APPLIER_PROMPT, applier_task
 from backend.agent.prompts.frame import system_prompt
-from backend.agent.sessions import LimitExhausted, run_guarded
+from backend.agent.sessions import run_guarded
+from backend.agent.stops import LimitExhausted
 from backend.agent.tools_applier import applier_tools
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools

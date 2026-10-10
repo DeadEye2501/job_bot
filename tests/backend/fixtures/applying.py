@@ -1,17 +1,20 @@
 """Стенд откликателя: набор агента и вакансии, на которые есть чем откликнуться."""
 
+import asyncio
 import smtplib
 
 import pytest
 from pyrogram.errors import FloodWait
 
+from backend.applying import run
+from backend.bot import work
 from backend.llm.agent_letter import Letter
 from backend.models import VacancyStatus
 from backend.repository.app_settings import CV_PATH_KEY
 from tests.dbio import put
-from tests.factories import days_ago, hr_row, message_row, vacancy_row
+from tests.factories import days_ago, hr_row, message_row, profile_row, vacancy_row
 from tests.factories_aggregators import aggregator_row, mail_account_row, vacancy_contact_row
-from tests.fakes.agent import kit_for, scripted, scripted_kit
+from tests.fakes.agent import kit_for, scripted, scripted_kit, work_kit
 from tests.fakes.browser import FakeBrowser
 
 
@@ -85,29 +88,68 @@ def telegram_case(make_pipeline, session_factory, tmp_path, monkeypatch, outbox)
     """
 
     async def make(*, prior_letter=False, flood_wait=None, simulated=False, hr_user_id=None):
-        resume = tmp_path / "Резюме.pdf"
-        resume.write_bytes(b"%PDF")
-        hr = hr_row(telegram_username="hr_name", telegram_user_id=hr_user_id)
-        await put(session_factory, hr)
-        vacancy = vacancy_row(hr_id=hr.id)
-        await put(session_factory, vacancy)
+        resume = _resume(tmp_path)
+        vacancy = await _telegram_vacancy(session_factory, hr_user_id=hr_user_id)
         if prior_letter:
-            other = vacancy_row(hr_id=hr.id, title="Прежняя")
+            other = vacancy_row(hr_id=vacancy.hr_id, title="Прежняя")
             await put(session_factory, other)
-            await put(session_factory, message_row(hr_id=hr.id, vacancy_id=other.id,
+            await put(session_factory, message_row(hr_id=vacancy.hr_id, vacancy_id=other.id,
                                                    is_incoming=False, sent_at=days_ago(1)))
         if flood_wait is not None:
             outbox.error = FloodWait(value=flood_wait)
         pipeline = await _pipeline(make_pipeline, simulated=simulated, resume=resume)
         pipeline.profile_block = "Иван Петров, Python-разработчик"
-
-        async def generate_cover_letter(block, parsed, client, model, *, channel_ref=None):
-            return "Здравствуйте! Откликаюсь на вакансию.", None
-
-        monkeypatch.setattr("backend.applying.telegram_letter.generate_cover_letter", generate_cover_letter)
+        _model_writes_the_letter(monkeypatch)
         return kit_for(pipeline, browser=FakeBrowser()), vacancy, outbox.sent
 
     return make
+
+
+@pytest.fixture
+def manual_case(make_bot, session_factory, tmp_path, monkeypatch):
+    """Бот и вакансия с HR `hr_name`: ручной отклик через место прогона, анкета в
+    базе, письмо готово, отправка под симуляцией стенда. `hang` — исполнитель
+    Telegram висит; `bot.hanging` взводится, когда работа до него дошла."""
+
+    async def make(*, status=VacancyStatus.NEW, hang=False):
+        vacancy = await _telegram_vacancy(session_factory, status=status)
+        await put(session_factory, profile_row())
+        bot = await make_bot()
+        await bot.rs.set_app(CV_PATH_KEY, str(_resume(tmp_path)))
+        _model_writes_the_letter(monkeypatch)
+        monkeypatch.setattr(work, "_kit", work_kit)
+        bot.hanging = asyncio.Event()
+        if hang:
+            async def hanging(kit, vacancy_id, way):
+                bot.hanging.set()
+                await asyncio.Event().wait()
+            monkeypatch.setitem(run.EXECUTORS, "telegram", hanging)
+        return bot, vacancy
+
+    return make
+
+
+def _resume(tmp_path):
+    resume = tmp_path / "Резюме.pdf"
+    resume.write_bytes(b"%PDF")
+    return resume
+
+
+async def _telegram_vacancy(session_factory, *, hr_user_id=None, status=VacancyStatus.NEW):
+    hr = hr_row(telegram_username="hr_name", telegram_user_id=hr_user_id)
+    await put(session_factory, hr)
+    vacancy = vacancy_row(hr_id=hr.id, status=status)
+    await put(session_factory, vacancy)
+    return vacancy
+
+
+def _model_writes_the_letter(monkeypatch) -> None:
+    """Модель письма отвечает готовым текстом."""
+
+    async def generate_cover_letter(block, parsed, client, model, *, channel_ref=None):
+        return "Здравствуйте! Откликаюсь на вакансию.", None
+
+    monkeypatch.setattr("backend.applying.telegram_letter.generate_cover_letter", generate_cover_letter)
 
 
 @pytest.fixture

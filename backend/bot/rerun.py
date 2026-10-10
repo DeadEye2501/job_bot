@@ -4,12 +4,12 @@ import logging
 
 from typing import Literal
 
-from backend.bot import slot
+from backend.bot import slot, work
 from backend.flows import rerun as flow_rerun
 
 logger = logging.getLogger(__name__)
 
-RerunOutcome = Literal[slot.CycleOutcome, flow_rerun.RerunPipelineOutcome]
+RerunOutcome = Literal[slot.CycleOutcome, work.AgentStop, flow_rerun.RerunPipelineOutcome]
 """Чем кончился повторный прогон вакансии, как это видит окно.
 
 Складывается по тому же уговору, что `channels.ChannelPollOutcome`.
@@ -30,9 +30,9 @@ async def ui_rerun_vacancy_pipeline(bot, vacancy_id: int) -> RerunOutcome:
     займёт разбор одной вакансии, заранее не знает никто.
     """
     logger.info("UI rerun pipeline for vacancy %d", vacancy_id)
-    return await slot.answer_in_slot(
+    return await work.in_slot(
         bot,
-        lambda: bot.ingestion.rerun_pipeline_for_vacancy(vacancy_id),
+        lambda _kit: bot.ingestion.rerun_pipeline_for_vacancy(vacancy_id),
         f"rerun pipeline for vacancy {vacancy_id}",
         progress=("rerun", f"Прогон вакансии #{vacancy_id}…", 0, 0),
     )

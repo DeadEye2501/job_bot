@@ -18,16 +18,17 @@ from pyrogram.handlers import (
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from adapters import lm_studio, telegram
+from backend.applying import run
 from backend.bot import pasted
 from backend.bot import rerun
 from backend.bot import loop
 from backend.bot import updates
-from backend.bot import send
 from backend.bot import chat
 from backend.bot import channels
 from backend.domain.telegram_identity import DialogPeer
 from backend.agent.human_gate import HumanGate
 from backend.bot import aggregators
+from backend.bot import apply
 from backend.bot import slot
 from backend.bot import turn
 from backend.flows.pipeline import IngestionPipeline, LmProviders
@@ -39,6 +40,20 @@ from backend.runtime_settings import RuntimeSettings
 
 
 logger = logging.getLogger(__name__)
+
+
+def _shares_provider(a, b) -> bool:
+    """Two LLM provider configs share the same httpx client if endpoint+auth match.
+
+    Model name is intentionally NOT compared — model is per-request, not on
+    the client.
+    """
+    return (
+        a is not None
+        and b is not None
+        and a.base_url == b.base_url
+        and a.api_key == b.api_key
+    )
 
 
 def _open_connections(bot, runtime_settings: RuntimeSettings) -> None:
@@ -55,7 +70,7 @@ def _open_connections(bot, runtime_settings: RuntimeSettings) -> None:
     # at the same endpoint with the same auth.
     bot.lm_embed_client = (
         bot.lm_client
-        if send._shares_provider(runtime_settings.chat, runtime_settings.embed)
+        if _shares_provider(runtime_settings.chat, runtime_settings.embed)
         else lm_studio.make_client(runtime_settings.embed)
     )
     bot.lm_embed_model = runtime_settings.embed.model
@@ -113,6 +128,8 @@ def _declare_loop_controls(bot) -> None:
     bot.current_poll_task = None
     # Работа, запущенная в месте прогона отдельной задачей: остановка ждёт её.
     bot.launched_task = None
+    # Набор агента идущей работы (`bot/work.agent_work`): им откликается конвейер.
+    bot.kit = None
     # Переписки, прочитанные при подъёме соединения: ими догон правит очередь.
     # Пустой список значит «не знаем» — тогда очередь остаётся прежней, и
     # догон идёт по всем известным собеседникам.
@@ -226,7 +243,6 @@ class Bot:
             apply=self.apply_vacancies,
             runtime_settings=self.rs,
         )
-        self.ingestion.send = self.send
         _subscribe_to_updates(self)
         _declare_loop_controls(self)
         _declare_ui_hooks(self)
@@ -303,11 +319,17 @@ class Bot:
     def cancel_current_poll(self) -> None:
         return slot.cancel_current_poll(self)
 
-    async def force_poll_once(self) -> slot.CycleOutcome:
+    async def force_poll_once(self) -> turn.TurnOutcome:
         """Кнопка ▶: тот же оборот, что у цикла, но в любом режиме — человек
         нажал сам и ждёт, что что-то произойдёт. Выключатели каналов и
-        агрегаторов действуют как в цикле: выключенному нечего опрашивать."""
-        return await turn.run_turn(self, "forced poll cycle")
+        агрегаторов действуют как в цикле: выключенному нечего опрашивать.
+        Ответ — исход места прогона, а если оборот прошёл, то его собственный:
+        капча и лимит обрывают его изнутри."""
+        task = turn.launch_turn(self, "forced poll cycle")
+        if task is None:
+            return "busy"
+        outcome, said = await task
+        return said if outcome == "ok" else outcome
 
     async def mark_hr_chat_read(self, hr_id) -> int:
         return await chat.mark_hr_chat_read(self, hr_id)
@@ -319,17 +341,8 @@ class Bot:
         return await chat.send_to_hr_media(self, hr_id, file_path)
 
     async def apply_vacancies(self, vacancy_ids: list[int]) -> None:
-        return await aggregators.apply_found(self, vacancy_ids)
-
-    async def ui_send_vacancy_application(self, vacancy_id) -> tuple[bool, str]:
-        return await send.ui_send_vacancy_application(self, vacancy_id)
-
-    async def send(
-        self, hr, text, attachment=None, vacancy_id=None, *, force=False
-    ) -> bool:
-        return await send.send(
-            self, hr, text, attachment, send.Errand(vacancy_id, force)
-        )
+        # Зов через модуль: тест подменяет откликателя на нём.
+        return await run.apply_vacancies(self.kit, vacancy_ids)
 
     async def _on_raw_update(self, _client, update, _users, _chats) -> None:
         return await updates.on_raw_update(self, _client, update, _users, _chats)
@@ -374,8 +387,8 @@ class Bot:
     async def login_aggregator(self, aggregator_id) -> aggregators.AgentOutcome:
         return await aggregators.login_aggregator(self, aggregator_id)
 
-    async def apply_via_agent(self, vacancy_id, way: Way) -> str:
-        return await aggregators.apply_via_agent(self, vacancy_id, way)
+    async def apply_chosen_way(self, vacancy_id: int, way: Way) -> apply.ApplyOutcome:
+        return await apply.apply_chosen_way(self, vacancy_id, way)
 
     def human_done(self) -> None:
         aggregators.human_done(self)

@@ -17,6 +17,7 @@ import asyncio
 import pytest
 
 from backend.bot import loop as loop_mod
+from backend.bot import slot
 from backend.models import BotMode
 from tests.fakes.ingestion import FakeIngestion, wire
 
@@ -368,21 +369,22 @@ async def test_switching_off_drains_the_text_waiting_to_be_read(
     assert pipeline.drains == 1
 
 
-async def test_a_stop_request_ends_the_loop_after_the_current_turn(
+async def test_a_stop_request_ends_the_loop_and_puts_out_the_turn(
     chatting, caught_up
 ):
-    """Просьба остановиться заканчивает цикл после текущего оборота.
+    """Просьба остановиться заканчивает цикл, не уходя в сон, и гасит идущий оборот.
 
-    Без неё цикл ушёл бы в получасовой сон и вышел бы только к его концу.
+    Без неё цикл ушёл бы в получасовой сон и вышел бы только к его концу. Оборот
+    не дожидаются: в нём бывает ожидание человека на час.
     """
     bot, client, _ = await chatting(mode=BotMode.FULL)
-    pipeline = FakeIngestion()
+    pipeline = FakeIngestion(hangs=True)
     wire(bot, pipeline)
     bot.request_stop()
 
     await bot.run()
 
-    assert pipeline.full_calls == 1
+    assert bot.launched_task.done() and not slot.slot_taken(bot)
     assert client.lifecycle == ["запуск", "остановка"]
 
 

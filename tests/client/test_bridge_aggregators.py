@@ -3,7 +3,7 @@
 import httpx
 
 from backend.agent.availability import NO_DRIVER
-from backend.bot.aggregators import HUMAN_TIMEOUT_NOTE
+from backend.bot.work import HUMAN_TIMEOUT_NOTE
 from backend.models import Aggregator, VacancyStatus
 from backend.repository.aggregators import WEB_SEARCH_NAME
 from tests.dbio import all_rows, put

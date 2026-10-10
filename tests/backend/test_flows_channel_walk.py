@@ -9,6 +9,7 @@
 гасятся, иначе нижняя так и застынет на счётчике последнего канала.
 """
 
+from backend.agent.stops import HumanTimeout
 from backend.flows import channels
 import pytest
 
@@ -165,6 +166,27 @@ async def test_a_broken_channel_does_not_stop_the_walk(monkeypatch, walking, ses
     await walking.poll_active_channels()
 
     assert walked == ["good"]
+
+
+async def test_a_captcha_nobody_solved_stops_the_whole_walk(monkeypatch, walking, session_factory):
+    """Капча, которую человек не прошёл, — беда всей работы, а не одного канала:
+    следующий канал упёрся бы в то же ожидание."""
+    await put(
+        session_factory,
+        channel_row(username="first", is_active=True),
+        channel_row(username="second", is_active=True),
+    )
+    walked: list[str] = []
+
+    async def poll(pipeline, channel_id, username, last_id):
+        walked.append(username)
+        raise HumanTimeout
+
+    monkeypatch.setattr(channels, "poll_channel", poll)
+
+    with pytest.raises(HumanTimeout):
+        await walking.poll_active_channels()
+    assert walked == ["first"]
 
 
 async def test_the_window_is_told_where_the_walk_is(walking, session_factory):

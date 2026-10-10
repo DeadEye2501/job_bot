@@ -1,31 +1,47 @@
 """Следствия действий над вакансией, которым нужен поднятый бот.
 
 Предмет — то, что мост делает чужими руками: ручной прогон каналов, повторный
-разбор, отправка отклика и удаление вместе с кэшем. Бот подделан: внутрь его
-Telegram и модели мост не заходит ни разу, он зовёт пять методов и смотрит на
-ответ.
+разбор, отклик выбранным способом и удаление вместе с кэшем. Бот подделан:
+внутрь его Telegram и модели мост не заходит ни разу, он зовёт его методы и
+смотрит на ответ.
 """
 
 import pytest
 
 from tests.dbio import put
 from tests.factories import vacancy_row
+from tests.factories_aggregators import mail_account_row, vacancy_contact_row
 
 
 @pytest.fixture
-def broken_vacancy(session_factory, with_bot):
-    """Вакансия, отправка по которой срывается броском изнутри бота."""
+def mailable_vacancy(session_factory):
+    """Вакансия с адресом HR и настроенной почтой: письмо — доступный способ."""
 
     async def _put():
-        async def broken(vacancy_id):
-            raise RuntimeError("сорвалось на полпути")
-
-        with_bot().ui_send_vacancy_application = broken
         vacancy = vacancy_row()
-        await put(session_factory, vacancy)
+        await put(session_factory, vacancy, mail_account_row())
+        await put(session_factory, vacancy_contact_row(vacancy.id, "hr@company.test"))
         return vacancy
 
     return _put
+
+
+@pytest.fixture
+def broken_vacancy(with_bot, mailable_vacancy):
+    """Вакансия, отклик по которой срывается броском изнутри бота."""
+
+    async def _put():
+        async def broken(vacancy_id, way):
+            raise RuntimeError("сорвалось на полпути")
+
+        with_bot().apply_chosen_way = broken
+        return await mailable_vacancy()
+
+    return _put
+
+
+def _by_mail(vacancy) -> dict:
+    return {"vacancy_id": vacancy.id, "method": "email", "target": "hr@company.test"}
 
 
 async def test_a_manual_run_before_the_bot_is_up_is_refused_by_name(api, ask):
@@ -69,9 +85,9 @@ async def test_a_finished_run_says_so_when_it_is_finished(api, ask, with_bot, to
     answer = await ask(api.system.run_now)
 
     assert answer["ok"] == {"started": True, "action": "run_now"}
-    # Весть звучит, когда пройдены каналы: обход агрегаторов уходит дальше
-    # отдельной задачей, и «обход закончен» в этот миг было бы неправдой.
-    assert await told() == {"message": "Каналы пройдены.", "danger": False}
+    # Весть звучит, когда пройден весь оборот: каналы, агрегаторы и отклики
+    # идут одной задачей.
+    assert await told() == {"message": "Обход завершён.", "danger": False}
 
 
 async def test_a_stop_reaches_the_bot(api, ask, with_bot):
@@ -164,66 +180,59 @@ async def test_a_rerun_answers_before_it_parses(
 
 
 async def test_a_refused_application_is_told_in_human_words(
-    api, ask, with_bot, told, session_factory
+    api, ask, with_bot, told, mailable_vacancy
 ):
-    """Отказ отправки переводят с кода на человеческий.
+    """Исход отклика переводят с кода на человеческий: покажи мост код — человек
+    не понял бы, что делать дальше."""
+    with_bot(apply_via="failed")
+    vacancy = await mailable_vacancy()
 
-    Причин девять, и они разные по смыслу: непривязанный HR чинится нажатием,
-    а пустая анкета — заполнением. Покажи мост код — человек не понял бы, что
-    делать дальше.
-    """
-    with_bot(application=(False, "no_hr"))
-    vacancy = vacancy_row()
-    await put(session_factory, vacancy)
-
-    await ask(api.vacancies.send_application, {"vacancy_id": vacancy.id})
+    await ask(api.vacancies.apply_via, _by_mail(vacancy))
 
     assert await told() == {
-        "message": "К вакансии не привязан HR.",
+        "message": "Отклик не состоялся — причина в журнале.",
         "danger": True,
     }
 
 
 async def test_an_unknown_refusal_code_still_reaches_the_window(
-    api, ask, with_bot, told, session_factory
+    api, ask, with_bot, told, mailable_vacancy
 ):
     """Незнакомый код отказа не теряется: человек слышит общий отказ.
 
     Коды заводит бэкенд, и новый появится там раньше, чем перевод здесь.
-    Промолчи мост о незнакомом — отправка выглядела бы удавшейся.
+    Промолчи мост о незнакомом — отклик выглядел бы удавшимся.
     """
-    with_bot(application=(False, "квота_кончилась"))
-    vacancy = vacancy_row()
-    await put(session_factory, vacancy)
+    with_bot(apply_via="квота_кончилась")
+    vacancy = await mailable_vacancy()
 
-    await ask(api.vacancies.send_application, {"vacancy_id": vacancy.id})
+    await ask(api.vacancies.apply_via, _by_mail(vacancy))
 
     assert await told() == {
-        "message": "Не удалось отправить отклик — см. логи.",
+        "message": "Не удалось откликнуться — см. логи.",
         "danger": True,
     }
 
 
-async def test_a_sent_application_answers_before_it_sends(
-    api, ask, with_bot, told, session_factory
+async def test_an_application_answers_before_it_is_done(
+    api, ask, with_bot, told, mailable_vacancy
 ):
-    """Ответ приходит сразу, а «отправлено» — вестью, когда письмо ушло.
+    """Ответ приходит сразу, а «записан» — вестью, когда отклик состоялся.
 
-    Письмо сочиняет модель, и ждать её значило бы держать окно; отменить
-    начатую отправку это всё равно не отменило бы.
+    Письмо сочиняет модель, а форму проходит агент, и ждать их значило бы
+    держать окно.
     """
     with_bot()
-    vacancy = vacancy_row()
-    await put(session_factory, vacancy)
+    vacancy = await mailable_vacancy()
 
-    answer = await ask(api.vacancies.send_application, {"vacancy_id": vacancy.id})
+    answer = await ask(api.vacancies.apply_via, _by_mail(vacancy))
 
     assert answer["ok"] == {
         "started": True,
         "vacancy_id": vacancy.id,
-        "action": "send",
+        "action": "apply_via",
     }
-    assert await told() == {"message": "Отклик отправлен.", "danger": False}
+    assert await told() == {"message": "Отклик записан.", "danger": False}
 
 
 async def test_deleting_with_the_bot_up_goes_through_the_bot(
@@ -250,15 +259,15 @@ async def test_a_launched_job_that_broke_still_answers_the_window(
     """Сорвавшаяся пущенная работа всё равно говорит окну, и след ложится в журнал.
 
     Ответ на зов сказал только «пущено»: промолчи мост об исходе — человек
-    остался бы с «отправляется» навсегда, ровно с той бедой, ради которой
+    остался бы с «откликается» навсегда, ровно с той бедой, ради которой
     вести и заведены.
     """
     vacancy = await broken_vacancy()
 
     with caplog.at_level("ERROR"):
-        answer = await ask(api.vacancies.send_application, {"vacancy_id": vacancy.id})
+        answer = await ask(api.vacancies.apply_via, _by_mail(vacancy))
         said = await told()
 
     assert answer["ok"]["started"] is True
-    assert said == {"message": "Не удалось отправить отклик — см. логи.", "danger": True}
+    assert said == {"message": "Не удалось откликнуться — см. логи.", "danger": True}
     assert "сорвалось на полпути" in caplog.text

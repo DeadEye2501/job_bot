@@ -17,7 +17,6 @@ from backend.flows.dm_backfill import DmHooks
 from backend.flows.dm_debounce import DmDebounce
 from backend.notify import fire
 
-from backend.flows import apply
 from backend.flows import pasted
 from backend.flows import dm_classify
 from backend.flows import channels
@@ -170,8 +169,6 @@ class IngestionPipeline:
         self.lm_embed_model = models.embed_model
         # Отклик на отобранное: откликатель с набором агента бота.
         self.apply = apply
-        # Письмо HR из окна; ставит его бот — отправка живёт у него.
-        self.send = None
         self.rs = runtime_settings
         _declare_caches(self)
         _declare_window_hooks(self)
@@ -360,5 +357,3 @@ class IngestionPipeline:
     async def cancel_pending_dm_classifications(self, *, drain=False) -> None:
         return await dm_classify.cancel_pending_dm_classifications(self, drain=drain)
 
-    async def send_application_for_vacancy(self, vacancy_id) -> tuple[bool, str]:
-        return await apply.send_application_for_vacancy(self, vacancy_id)

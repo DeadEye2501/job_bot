@@ -2,7 +2,7 @@
 
 import pytest
 
-from backend.agent.sessions import LimitExhausted
+from backend.agent.stops import LimitExhausted
 from backend.applying.browser import via_browser
 from backend.applying.result import Missed, SiteClosed
 from backend.domain.apply_order import Way

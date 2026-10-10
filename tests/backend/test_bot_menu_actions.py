@@ -180,24 +180,4 @@ async def test_a_broken_window_hook_does_not_stop_a_rerun(make_bot, broken):
     assert ingestion.rerun_calls == [5]
 
 
-async def test_sending_an_application_passes_the_pipeline_answer_through(make_bot):
-    """Итог отправки отклика передаётся окну как есть.
-
-    Причину неудачи составляет конвейер: окно показывает её словами, а
-    не переводит код обратно в текст.
-    """
-    ingestion = FakeIngestion(outcome=(False, "HR без адреса"))
-    bot = wire(await make_bot(), ingestion)
-
-    assert await bot.ui_send_vacancy_application(5) == (False, "HR без адреса")
-    assert ingestion.application_calls == [5]
-
-
-async def test_sending_an_application_while_a_run_goes_is_refused(make_bot, busy_slot):
-    """Пока идёт прогон, модель зовёт только он: письмо отклика сочиняла бы она же,
-    параллельно с ним."""
-    bot = wire(await make_bot(), FakeIngestion(outcome=(True, "ок")))
-    busy_slot(bot)
-
-    assert await bot.ui_send_vacancy_application(5) == (False, "busy")
 

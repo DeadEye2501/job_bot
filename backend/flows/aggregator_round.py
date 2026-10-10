@@ -11,7 +11,8 @@ from backend.agent.prompts.frame import system_prompt
 from backend.agent.prompts.seeker import (
     SEEKER_PROMPT, WEB_SEEKER_PROMPT, blacklisted_sites, seeker_task, web_seeker_task,
 )
-from backend.agent.sessions import HumanTimeout, LimitExhausted, run_guarded
+from backend.agent.sessions import run_guarded
+from backend.agent.stops import RUN_STOPPERS, LimitExhausted
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
 from backend.agent.tools_seeker import seeker_tools
@@ -39,7 +40,7 @@ async def seek_source(kit: AgentKit, source: Source) -> None:
     try:
         end = await _search(kit, job, queue)
         await queue.drain()
-    except (HumanTimeout, LimitExhausted, asyncio.CancelledError):
+    except (*RUN_STOPPERS, asyncio.CancelledError):
         await queue.stop()
         raise
     except Exception:

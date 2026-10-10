@@ -15,6 +15,7 @@ from typing import Literal
 from sqlalchemy import select
 
 from adapters import telegraph
+from backend.agent.stops import RUN_STOPPERS
 from backend.flows import embeddings, handover, linked_article
 from backend.message_text import extract_post_text
 from backend.models import TelegramChannel
@@ -438,6 +439,8 @@ async def recover_orphan_vacancies(pipeline) -> int:
         try:
             if await _recover_one(pipeline, r):
                 processed += 1
+        except RUN_STOPPERS:
+            raise
         except Exception:
             logger.exception(
                 "recover: vacancy %d parse failed", r.id

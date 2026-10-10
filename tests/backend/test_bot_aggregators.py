@@ -4,16 +4,15 @@ import asyncio
 
 import pytest
 
-from backend.bot import aggregators, loop, slot
-from backend.domain.apply_order import Way
+from backend.bot import aggregators, loop, slot, work
+from backend.bot.turn import launch_turn
 from backend.models import Aggregator, BotMode
 from tests.backend.fixtures.bot import slot_freed, switch_to
 from tests.dbio import all_rows, put
-from tests.factories import blacklist_row, vacancy_row
+from tests.factories import blacklist_row
 from tests.factories_aggregators import aggregator_row, web_search_row
 from tests.fakes.agent import (
     captcha_step,
-    fail_step,
     finish_step,
     kit_for,
     login_step,
@@ -33,7 +32,7 @@ def agent(monkeypatch):
             bot.human_gate = silent_gate(human_limit)
         kit = kit_for(bot.ingestion, browser=FakeBrowser(), gate=bot.human_gate,
                       run_session=scripted(steps))
-        monkeypatch.setattr(aggregators, "_kit", lambda _bot: kit)
+        monkeypatch.setattr(work, "_kit", lambda _bot: kit)
         monkeypatch.setattr(aggregators, "aggregators_available", lambda _bot: None)
         return kit
 
@@ -84,53 +83,37 @@ async def test_off_during_the_channel_poll_lets_the_started_turn_finish(
     await switch_to(session_factory, BotMode.FULL)
     kit = agent(bot, [finish_step()])
 
-    async def poll_then_off(_bot):
+    async def poll_then_off():
         await switch_to(session_factory, BotMode.OFF)
 
-    monkeypatch.setattr("backend.bot.turn.ingest_round", poll_then_off)
+    bot.ingestion.poll_active_channels = poll_then_off
     await loop._tick(bot, BotMode.FULL)
     await slot_freed(bot)
 
     assert len(kit.run_session.plans) == 1
 
 
-async def test_a_stop_during_the_channel_poll_keeps_the_round_from_starting(
-    make_bot, sites, agent, session_factory, monkeypatch
-):
-    bot = await make_bot()
-    await switch_to(session_factory, BotMode.FULL)
-    kit = agent(bot, [finish_step()])
-
-    async def poll_then_stop(_bot):
-        bot.stop_event.set()
-
-    monkeypatch.setattr("backend.bot.turn.ingest_round", poll_then_stop)
-    await loop._tick(bot, BotMode.FULL)
-
-    assert bot.launched_task is None and kit.run_session.plans == []
-
-
 async def test_stop_pressed_during_the_channel_poll_stops_the_whole_turn(
-    make_bot, sites, agent, session_factory, monkeypatch
+    make_bot, sites, agent, session_factory
 ):
-    """«Стоп» гасит оборот целиком: погашенный опрос каналов не отдаёт место
-    обходу агрегаторов, хотя бот при этом жив и работает дальше."""
+    """«Стоп» гасит оборот целиком: погашенный опрос каналов не доходит до
+    агрегаторов, хотя бот при этом жив и работает дальше."""
     bot = await make_bot()
     await switch_to(session_factory, BotMode.FULL)
     kit = agent(bot, [finish_step()])
     polling = asyncio.Event()
 
-    async def poll_forever(_bot):
+    async def poll_forever():
         polling.set()
         await asyncio.Event().wait()
 
-    monkeypatch.setattr("backend.bot.turn.ingest_round", poll_forever)
-    tick = asyncio.create_task(loop._tick(bot, BotMode.FULL))
+    bot.ingestion.poll_active_channels = poll_forever
+    await loop._tick(bot, BotMode.FULL)
     await polling.wait()
     slot.cancel_current_poll(bot)
-    await tick
+    await slot_freed(bot)
 
-    assert bot.launched_task is None and kit.run_session.plans == []
+    assert bot.launched_task.result()[0] == "cancelled" and kit.run_session.plans == []
 
 
 async def test_entering_off_lets_the_channel_poll_finish(make_bot):
@@ -160,9 +143,9 @@ async def test_an_unavailable_agent_skips_the_round_quietly(make_bot, sites, age
     kit = agent(bot, [finish_step()])
     monkeypatch.setattr(aggregators, "aggregators_available", lambda _bot: "нужен Claude Code")
 
-    await aggregators.launch_round(bot)
+    await aggregators.seek_all(bot, kit)
 
-    assert bot.current_poll_task is None and kit.run_session.plans == []
+    assert kit.run_session.plans == [] and kit.browser.calls == []
 
 
 async def test_entering_off_lets_the_running_round_finish(make_bot, sites, agent):
@@ -171,9 +154,8 @@ async def test_entering_off_lets_the_running_round_finish(make_bot, sites, agent
     bot = await make_bot()
     release = asyncio.Event()
     kit = agent(bot, [_hold(release)])
-    await aggregators.launch_round(bot)
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
+    launch_turn(bot, "turn")
+    await wait_until(lambda: kit.run_session.plans)
 
     await loop._on_mode_switch(bot, BotMode.FULL, BotMode.OFF)
     await asyncio.sleep(0)
@@ -197,7 +179,7 @@ async def test_the_window_hears_when_a_person_is_needed_and_when_they_are_done(
         await tools["finish"](result="done")
 
     agent(bot, [step])
-    await aggregators.launch_round(bot)
+    launch_turn(bot, "turn")
     await wait_until(lambda: heard)
 
     aggregators.human_done(bot)
@@ -214,29 +196,11 @@ async def test_an_expired_wait_drops_the_round_and_tells_the_window(
     bot.on_round_note = notes.append
 
     agent(bot, [captcha_step()], human_limit=0.01)
-    await aggregators.launch_round(bot)
+    launch_turn(bot, "turn")
     await slot_freed(bot)
 
-    assert notes == [aggregators.HUMAN_TIMEOUT_NOTE]
+    assert notes == [work.HUMAN_TIMEOUT_NOTE]
     assert all(a.last_run_at is None for a in await all_rows(session_factory, Aggregator))
-
-
-async def test_a_manual_application_ignores_off_and_waits_only_for_the_slot(
-    make_bot, agent, session_factory, busy_slot
-):
-    """Режим — про автоматику: в Off ручной отклик не отказывает режимом, его
-    держит только занятое место прогона."""
-    bot = await make_bot()
-    vacancy = vacancy_row()
-    await put(session_factory, vacancy)
-    await switch_to(session_factory, BotMode.OFF)
-    agent(bot, [fail_step("форма сломана")])
-    way = Way("form", "https://company.test/apply", None)
-    busy_slot(bot)
-
-    assert await aggregators.apply_via_agent(bot, vacancy.id, way) == "busy"
-    bot.current_poll_task = None
-    assert await aggregators.apply_via_agent(bot, vacancy.id, way) == "exhausted"
 
 
 async def test_a_stop_during_a_single_run_is_a_cancellation(make_bot, sites, agent):
@@ -276,18 +240,6 @@ async def test_deleting_an_aggregator_waits_for_a_free_slot_and_takes_its_profil
 
     assert await aggregators.delete_aggregator(bot, site.id) == "ok"
     assert removed == [site.id] and await all_rows(session_factory, Aggregator) == []
-
-
-async def test_a_manual_application_tells_when_no_way_worked(make_bot, agent, session_factory):
-    """Окно не должно говорить «отклик закончен», если ни один способ не сработал."""
-    bot = await make_bot()
-    vacancy = vacancy_row()
-    await put(session_factory, vacancy)
-    await switch_to(session_factory, BotMode.DM_ONLY)
-    agent(bot, [fail_step("форма сломана")])
-    way = Way("form", "https://company.test/apply", None)
-
-    assert await aggregators.apply_via_agent(bot, vacancy.id, way) == "exhausted"
 
 
 async def test_a_login_the_agent_did_not_confirm_is_not_reported_as_done(make_bot, sites, agent):
@@ -371,9 +323,9 @@ async def test_the_switch_over_all_aggregators_keeps_the_round_from_starting(
     kit = agent(bot, [finish_step()])
     await bot.rs.set_app("aggregators_enabled", "false")
 
-    await aggregators.launch_round(bot)
+    await aggregators.seek_all(bot, kit)
 
-    assert bot.current_poll_task is None and kit.run_session.plans == []
+    assert kit.run_session.plans == [] and kit.browser.calls == []
 
 
 async def test_the_switch_over_all_aggregators_leaves_a_manual_run_alone(
