@@ -371,18 +371,20 @@ async def test_the_saved_explanation_comes_back_with_its_period(
 
 
 async def test_a_card_says_whether_there_was_a_screening(api, ask, session_factory):
-    """По признаку окно серит пункт «Скрининг»: отклик без реплик скрининга не даёт."""
-    screened, silent = vacancy_row(), vacancy_row()
-    await put(session_factory, screened, silent)
+    """По признаку окно серит пункт «Скрининг». Письмо окно показывает первой
+    репликой отклика, поэтому пункт открыт и по одному письму; отклик без письма
+    и без реплик скрининга его не даёт."""
+    screened, lettered, silent = vacancy_row(), vacancy_row(), vacancy_row()
+    await put(session_factory, screened, lettered, silent)
     talked = application_row(screened.id)
-    quiet = application_row(silent.id)
-    await put(session_factory, talked, quiet)
+    await put(session_factory, talked, application_row(lettered.id, letter="Письмо"),
+              application_row(silent.id))
     await put(session_factory, screening_row(talked.id, 0))
 
-    yes = (await ask(api.vacancies.detail, screened.id))["ok"]["vacancy"]
-    no = (await ask(api.vacancies.detail, silent.id))["ok"]["vacancy"]
+    flags = [(await ask(api.vacancies.detail, one.id))["ok"]["vacancy"]["has_screening"]
+             for one in (screened, lettered, silent)]
 
-    assert (yes["has_screening"], no["has_screening"]) == (True, False)
+    assert flags == [True, True, False]
 
 
 async def test_the_screening_comes_application_by_application(api, ask, session_factory):
