@@ -9,6 +9,7 @@
   border-bottom: 1px solid var(--border);
   align-items: start;
   cursor: pointer;
+  user-select: text;
 }
 
 .logs-row.expanded { background: var(--bg-secondary); }
