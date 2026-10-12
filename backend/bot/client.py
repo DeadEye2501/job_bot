@@ -31,6 +31,7 @@ from backend.bot import aggregators
 from backend.bot import apply
 from backend.bot import slot
 from backend.bot import turn
+from backend.bot import work
 from backend.flows.pipeline import IngestionPipeline, LmProviders
 from backend.domain.apply_order import Way
 from backend.models import BotMode
@@ -319,7 +320,7 @@ class Bot:
     def cancel_current_poll(self) -> None:
         return slot.cancel_current_poll(self)
 
-    async def force_poll_once(self) -> turn.TurnOutcome:
+    async def force_poll_once(self) -> work.WorkOutcome:
         """Кнопка ▶: тот же оборот, что у цикла, но в любом режиме — человек
         нажал сам и ждёт, что что-то произойдёт. Выключатели каналов и
         агрегаторов действуют как в цикле: выключенному нечего опрашивать.
@@ -389,6 +390,9 @@ class Bot:
 
     async def apply_chosen_way(self, vacancy_id: int, way: Way) -> apply.ApplyOutcome:
         return await apply.apply_chosen_way(self, vacancy_id, way)
+
+    async def apply_all_new(self) -> work.WorkOutcome:
+        return await apply.apply_all_new(self)
 
     def human_done(self) -> None:
         aggregators.human_done(self)

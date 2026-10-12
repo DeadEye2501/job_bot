@@ -7,6 +7,7 @@ import pytest
 from backend.applying import run
 from backend.applying.result import Missed, TelegramClosed, Unfit
 from backend.domain.apply_order import Way
+from backend.models import Vacancy, VacancyStatus
 
 
 @pytest.fixture
@@ -37,6 +38,25 @@ async def test_a_missed_way_hands_over_to_the_next(executors, two_vacancies, kit
     answers[(first, "telegram")] = Missed("нет адресата")
     await run.apply_vacancies(kit, [first])
     assert calls == [(first, "telegram"), (first, "email")]
+
+
+async def test_a_vacancy_taken_out_of_new_during_the_run_gets_no_application(
+        executors, two_vacancies, kit, session_factory, monkeypatch):
+    """Прогон длинный, а человек тем временем правит статусы: убранная им из New
+    вакансия отклика не получает, хотя в списке прогона она была."""
+    calls, _ = executors
+    first, second = (v.id for v in two_vacancies)
+    applied = run.EXECUTORS["telegram"]
+
+    async def declining_the_next(kit, vacancy_id, way):
+        async with session_factory() as session:
+            (await session.get(Vacancy, second)).status = VacancyStatus.DECLINE
+            await session.commit()
+        return await applied(kit, vacancy_id, way)
+
+    monkeypatch.setitem(run.EXECUTORS, "telegram", declining_the_next)
+    await run.apply_vacancies(kit, [first, second])
+    assert calls == [(first, "telegram")]
 
 
 async def test_an_unfit_vacancy_tries_no_other_way(executors, two_vacancies, kit):

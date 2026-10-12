@@ -23,6 +23,7 @@ from typing import Any, Callable, Coroutine
 from backend.incoming import int_or_none
 from client.bridge.events import Events
 from client.bridge.payload import _log_invalid_payload
+from client.bridge.refusals import NO_BOT
 from client.bridge.runner import AsyncRunner
 
 
@@ -211,6 +212,22 @@ def launched(
         logger.exception("bridge: launched job could not start")
         return {"fail": "broken", "detail": f"{type(e).__name__}: {e}"}
     return {"ok": {"started": True, **started}}
+
+
+def launched_on_bot(
+    hub, start: Callable[[Any], Coroutine[Any, Any, str]],
+    refusals: dict[str, str], done: str, **started: Any,
+) -> dict:
+    """Долгая работа бота: без поднятого бота — отказ словами про бота, иначе `launched`.
+
+    Бота поднимают после входа в Telegram, а кнопки рисуют всегда: молчание на
+    такое нажатие оставило бы кнопку нажатой навсегда. Отказ несёт те же метки,
+    что и ответ «пущено», — окно узнаёт по ним, о чём речь.
+    """
+    bot = hub.bot
+    if bot is None:
+        return denied(NO_BOT, **started)
+    return launched(hub, lambda: start(bot), refusals, done, **started)
 
 
 def finished(events: Events, status: str, refusals: dict[str, str], done: str) -> None:

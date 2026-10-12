@@ -2,9 +2,10 @@
 нового HR — после отклика."""
 
 from backend.flows import handover, parse
-from backend.flows.handover import judge_and_hand_over
+from backend.flows.handover import judge_and_hand_over, new_to_apply
 from backend.models import Vacancy, VacancyStatus
-from tests.factories import parsed_vacancy
+from tests.dbio import put
+from tests.factories import at, parsed_vacancy, vacancy_row
 
 
 async def _set_status(session_factory, vacancy_id, status):
@@ -54,6 +55,17 @@ async def test_a_new_hr_is_caught_up_after_the_application(parsing, monkeypatch)
     monkeypatch.setattr(handover, "spawn_hr_backfill", lambda _p, hr: order.append("backfill"))
     await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan")
     assert order == ["apply", "backfill"]
+
+
+async def test_new_vacancies_to_apply_are_parsed_ones_newest_first(session_factory):
+    """Неразобранная ещё не прошла отбор, а ушедшая из New уже не ждёт отклика."""
+    old = vacancy_row(status=VacancyStatus.NEW, is_parsed=True, created_at=at(0))
+    fresh = vacancy_row(status=VacancyStatus.NEW, is_parsed=True, created_at=at(10))
+    raw = vacancy_row(status=VacancyStatus.NEW, is_parsed=False, created_at=at(20))
+    done = vacancy_row(status=VacancyStatus.APPLIED, is_parsed=True, created_at=at(30))
+    await put(session_factory, old, fresh, raw, done)
+
+    assert await new_to_apply(session_factory) == [fresh.id, old.id]
 
 
 async def test_a_rerun_of_an_applied_vacancy_applies_again(parsing, session_factory):

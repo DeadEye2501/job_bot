@@ -4,12 +4,12 @@ import asyncio
 
 from backend.applying import run
 from backend.applying.result import Unfit
-from backend.bot.apply import apply_chosen_way
+from backend.bot.apply import apply_all_new, apply_chosen_way
 from backend.domain.apply_order import Way
 from backend.models import BotMode, Vacancy, VacancyStatus
-from tests.backend.fixtures.applying import TG
+from tests.backend.fixtures.applying import TG, telegram_vacancy
 from tests.backend.fixtures.bot import switch_to
-from tests.dbio import only_row
+from tests.dbio import all_rows, only_row
 
 
 
@@ -63,6 +63,37 @@ async def test_a_way_that_found_the_vacancy_unfit_says_so(manual_case, monkeypat
     monkeypatch.setitem(run.EXECUTORS, "email", unfit)
     way = Way("email", "hr@company.test", None)
     assert await apply_chosen_way(bot, vacancy.id, way) == "unfit"
+
+
+async def test_apply_all_new_goes_through_every_new_vacancy(manual_case, session_factory):
+    """Отказ откликом перевёлся бы в Applied — он остаётся отказом, значит его не трогали."""
+    bot, first = await manual_case()
+    second = await telegram_vacancy(session_factory)
+    declined = await telegram_vacancy(session_factory, status=VacancyStatus.DECLINE)
+
+    assert await apply_all_new(bot) == "ok"
+
+    statuses = {v.id: v.status for v in await all_rows(session_factory, Vacancy)}
+    assert statuses == {first.id: VacancyStatus.APPLIED, second.id: VacancyStatus.APPLIED,
+                        declined.id: VacancyStatus.DECLINE}
+
+
+async def test_apply_all_new_is_not_held_by_off(manual_case, session_factory):
+    """Режим — про автоматику: нажатое человеком работает и в Off."""
+    bot, vacancy = await manual_case()
+    await switch_to(session_factory, BotMode.OFF)
+
+    assert await apply_all_new(bot) == "ok"
+    assert (await only_row(bot.session_factory, Vacancy)).status is VacancyStatus.APPLIED
+
+
+async def test_apply_all_new_waits_for_the_slot_and_stops_on_cancel(manual_case):
+    bot, _ = await manual_case(hang=True)
+    first = asyncio.create_task(apply_all_new(bot))
+    await bot.hanging.wait()
+    assert await apply_all_new(bot) == "busy"
+    bot.cancel_current_poll()
+    assert await first == "cancelled"
 
 
 async def test_a_missing_vacancy_is_missing(manual_case):

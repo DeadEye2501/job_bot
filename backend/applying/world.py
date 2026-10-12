@@ -2,12 +2,13 @@
 
 import time
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.agent.availability import current_refusal
 from backend.applying.result import Lesson, TelegramClosed
 from backend.domain.apply_order import KnownSite, VacancyFacts, Way, World, apply_ways
-from backend.models import HR, Aggregator, Vacancy
+from backend.models import HR, Aggregator, Vacancy, VacancyStatus
 from backend.repository.aggregators import list_aggregators
 from backend.repository.mail_account import get_mail_account
 from backend.repository.vacancy_contacts import contact_values
@@ -25,6 +26,20 @@ async def read_world(rs, session_factory) -> World:
         sites=[KnownSite(a.id, a.host, a.is_logged_in) for a in aggregators],
         closed_sites=set(),
     )
+
+
+AWAITS_APPLICATION = Vacancy.status == VacancyStatus.NEW
+"""Вакансия ждёт отклика автоматики. Одно условие на отбор и на сам отклик:
+разойдись они, отбор и откликатель откликались бы на разное."""
+
+
+async def awaits_application(session_factory, vacancy_id: int) -> bool:
+    """Ждёт ли вакансия отклика прямо сейчас. Спрашивается перед каждым способом,
+    а не однажды: прогон длинный, и статус за это время мог сменить человек."""
+    async with session_factory() as session:
+        found = await session.scalar(
+            select(Vacancy.id).where(Vacancy.id == vacancy_id, AWAITS_APPLICATION))
+    return found is not None
 
 
 async def vacancy_facts(session: AsyncSession, vacancy_id: int) -> VacancyFacts | None:

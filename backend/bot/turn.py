@@ -7,16 +7,11 @@
 
 import asyncio
 import logging
-from typing import Literal
-
 from backend.agent.kit import AgentKit
 from backend.agent.stops import RUN_STOPPERS
 from backend.bot import aggregators, slot, work
 
 logger = logging.getLogger(__name__)
-
-TurnOutcome = Literal[slot.CycleOutcome, work.AgentStop]
-"""Чем кончился оборот: исходы места прогона и обрыв работы с агентом."""
 
 
 def launch_turn(bot, label: str) -> asyncio.Task | None:

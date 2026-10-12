@@ -5,7 +5,7 @@ from __future__ import annotations
 from backend.agent.availability import current_refusal
 from backend.flows.aggregator_name import create_named_aggregator
 from backend.repository import aggregators as repo
-from client.bridge.answer import Denied, asked_id, denied, launched, read_toggle, reply
+from client.bridge.answer import Denied, asked_id, launched_on_bot, read_toggle, reply
 from client.bridge.hub import Hub
 from client.bridge.mark import AGGREGATOR_MARK, marked, unmarked
 from client.bridge.page import read_search
@@ -162,13 +162,13 @@ class Aggregators:
         return self._launch(aggregator_id, "run_now", "Обход источника закончен.", AGGREGATOR_REFUSALS)
 
     def _launch(self, aggregator_id: int, action: str, done: str, refusals: dict) -> dict:
-        bot = self._hub.bot
-        if bot is None:
-            return denied(NO_BOT, aggregator_id=aggregator_id, action=action)
-        work = bot.login_aggregator if action == "login" else bot.run_aggregator_now
-        return launched(
+        def start(bot):
+            work = bot.login_aggregator if action == "login" else bot.run_aggregator_now
+            return work(aggregator_id)
+
+        return launched_on_bot(
             self._hub,
-            lambda: work(aggregator_id),
+            start,
             agent_refusals(refusals, self._hub.rs.chat),
             done,
             aggregator_id=aggregator_id,

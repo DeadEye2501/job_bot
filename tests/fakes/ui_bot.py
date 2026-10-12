@@ -33,6 +33,7 @@ ANSWERS = {
     "aggregator_run": "ok",
     "aggregator_login": "ok",
     "apply_via": "ok",
+    "apply_all": "ok",
     "aggregator_deleted": "ok",
 }
 
@@ -130,6 +131,10 @@ class UiBot:
     async def apply_chosen_way(self, vacancy_id: int, way) -> str:
         self.calls.append(("apply_chosen_way", vacancy_id, way))
         return self.answers["apply_via"]
+
+    async def apply_all_new(self) -> str:
+        self.calls.append(("apply_all_new",))
+        return self.answers["apply_all"]
 
     def human_done(self) -> None:
         self.calls.append(("human_done",))

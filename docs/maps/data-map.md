@@ -445,6 +445,10 @@
   - `text: str`
   - `attachment: object | None`
 
+### `backend/applying/world.py`
+
+- `AWAITS_APPLICATION` = `Vacancy.status == VacancyStatus.NEW`
+
 ### `backend/bootstrap.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -453,11 +457,11 @@
 ### `backend/bot/aggregators.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `AgentOutcome` = `Literal[slot.CycleOutcome, work.AgentStop, 'miss…`
+- `AgentOutcome` = `Literal[work.WorkOutcome, 'missing', 'locked', '…`
 
 ### `backend/bot/apply.py`
 
-- `ApplyOutcome` = `Literal[slot.CycleOutcome, work.AgentStop, 'fail…`
+- `ApplyOutcome` = `Literal[work.WorkOutcome, 'failed', 'unfit', 'mi…`
 
 ### `backend/bot/can_send.py`
 
@@ -472,7 +476,7 @@
 ### `backend/bot/channels.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `ChannelPollOutcome` = `Literal[slot.CycleOutcome, work.AgentStop, flow_…`
+- `ChannelPollOutcome` = `Literal[work.WorkOutcome, flow_channels.PollOutc…`
 - `ChannelAddOutcome` = `Literal['created', 'exists', 'invalid', 'error']`
 
 ### `backend/bot/chat.py`
@@ -507,12 +511,12 @@
 ### `backend/bot/pasted.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `PastedOutcome` = `Literal[slot.CycleOutcome, work.AgentStop, flow_…`
+- `PastedOutcome` = `Literal[work.WorkOutcome, flow_pasted.PastedInta…`
 
 ### `backend/bot/rerun.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `RerunOutcome` = `Literal[slot.CycleOutcome, work.AgentStop, flow_…`
+- `RerunOutcome` = `Literal[work.WorkOutcome, flow_rerun.RerunPipeli…`
 
 ### `backend/bot/slot.py`
 
@@ -522,7 +526,6 @@
 ### `backend/bot/turn.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `TurnOutcome` = `Literal[slot.CycleOutcome, work.AgentStop]`
 
 ### `backend/bot/updates.py`
 
@@ -534,6 +537,7 @@
 - `HUMAN_TIMEOUT_NOTE` = `'Капча не пройдена — работа остановлена.'`
 - `LIMIT_NOTE` = `'Исчерпан лимит подписки Claude Code — работа ос…`
 - `AgentStop` = `Literal['human_timeout', 'limit']`
+- `WorkOutcome` = `Literal[slot.CycleOutcome, AgentStop]`
 
 ### `backend/crypto.py`
 
@@ -1921,6 +1925,7 @@
 - `AGGREGATOR_REFUSALS` = `словарь из 5 и раскрытых`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
 - `APPLY_VIA_REFUSALS` = `словарь из 6 и раскрытых`
+- `APPLY_ALL_REFUSALS` = `словарь из 3 и раскрытых`
 
 ### `client/bridge/runner.py`
 
@@ -2273,6 +2278,6 @@
 
 - `class Sent`
   - `id: int`
-- `ANSWERS` = `словарь из 14`
+- `ANSWERS` = `словарь из 15`
 - `class UiBot`
   - `is_running_round` = `False`

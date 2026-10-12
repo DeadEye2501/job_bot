@@ -11,7 +11,7 @@ from backend.applying.browser import via_browser
 from backend.applying.email import via_email
 from backend.applying.result import Missed, Outcome, Unfit
 from backend.applying.telegram import via_telegram
-from backend.applying.world import learn, read_world, ways_in
+from backend.applying.world import awaits_application, learn, read_world, ways_in
 from backend.domain.apply_order import VIA_AGGREGATOR, VIA_EMAIL, VIA_FORM, VIA_TELEGRAM, Way, World
 from backend.models import Vacancy
 
@@ -39,7 +39,7 @@ async def apply_vacancies(kit: AgentKit, vacancy_ids: list[int]) -> None:
 
 async def _apply_one(kit: AgentKit, world: World, vacancy_id: int) -> None:
     tried: set[Way] = set()
-    while True:
+    while await awaits_application(kit.pipeline.session_factory, vacancy_id):
         ways = [w for w in await ways_in(kit.pipeline.session_factory, world, vacancy_id) if w not in tried]
         if not ways:
             return

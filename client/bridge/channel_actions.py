@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from backend.domain.telegram_identity import normalize_username
 from backend.repository import channels as channels_repo
-from client.bridge.answer import Denied, denied, launched, read_toggle, reply
+from client.bridge.answer import Denied, denied, launched_on_bot, read_toggle, reply
 from client.bridge.mark import CHANNEL_MARK, marked, unmarked
 from client.bridge.refusals import (
     BLACKLISTED_STAYS_OFF,
@@ -54,13 +54,9 @@ class ChannelActions:
         пяти обращений к модели, и ждать их значит держать зов вместе с окном.
         Чем кончилось, человек узнаёт вестью.
         """
-        bot = self._hub.bot
-        if bot is None:
-            return denied(NO_BOT, channel_id=channel_id, action="poll_now")
-
-        return launched(
+        return launched_on_bot(
             self._hub,
-            lambda: bot.poll_channel_now(channel_id),
+            lambda bot: bot.poll_channel_now(channel_id),
             POLL_REFUSALS,
             "Канал прогнан.",
             channel_id=channel_id,

@@ -1,14 +1,15 @@
 """Следствия домена «система»: чем занят бот и что показывает нижняя полоса.
 
-Предмет — то, что видно всегда, на любом экране: режим работы, здоровье связи
-и счёт непрочитанного. Журнал, снос данных и обращение к рабочему столу лежат
+Предмет — то, что видно всегда, на любом экране: режим работы, здоровье связи,
+счёт непрочитанного и счёт новых вакансий. Журнал, снос данных и обращение к рабочему столу лежат
 своими файлами — их открывают нарочно, а это видно постоянно.
 """
 
 import logging
 
+from backend.models import VacancyStatus
 from tests.dbio import put
-from tests.factories import at, hr_row, message_row
+from tests.factories import at, hr_row, message_row, vacancy_row
 
 
 async def test_an_unknown_mode_is_refused_by_name(api, ask):
@@ -44,6 +45,16 @@ async def test_the_first_request_brings_the_whole_snapshot(api, ask):
     assert snapshot["health"]["db"] is True
     assert snapshot["unread"]["count"] == 0
     assert snapshot["mode"] == "Off"
+
+
+async def test_the_new_vacancies_count_is_what_apply_all_would_take(api, ask, session_factory):
+    """Число на значке — ровно то, что возьмёт нажатие: разобранные New."""
+    await put(session_factory, vacancy_row(), vacancy_row(),
+              vacancy_row(is_parsed=False), vacancy_row(status=VacancyStatus.APPLIED))
+
+    answer = await ask(api.system.new_vacancies)
+
+    assert answer["ok"] == {"count": 2}
 
 
 async def test_the_page_can_ask_the_queue_what_is_new(api, ask, hub):

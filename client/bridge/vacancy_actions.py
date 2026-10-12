@@ -10,10 +10,9 @@ from __future__ import annotations
 from backend.applying.world import available_ways
 from backend.domain.apply_order import Way
 from backend.repository import vacancies_life
-from client.bridge.answer import Denied, asked_id, denied, launched, reply
+from client.bridge.answer import Denied, asked_id, launched_on_bot, reply
 from client.bridge.refusals import (
     APPLY_VIA_REFUSALS,
-    NO_BOT,
     NO_VACANCY,
     RERUN_REFUSALS,
     WAY_UNKNOWN,
@@ -39,13 +38,9 @@ class VacancyActions:
         if refused is not None:
             return refused
 
-        bot = self._hub.bot
-        if bot is None:
-            return denied(NO_BOT, vacancy_id=vacancy_id, action="rerun")
-
-        return launched(
+        return launched_on_bot(
             self._hub,
-            lambda: bot.ui_rerun_vacancy_pipeline(vacancy_id),
+            lambda bot: bot.ui_rerun_vacancy_pipeline(vacancy_id),
             RERUN_REFUSALS,
             "Вакансия разобрана заново.",
             vacancy_id=vacancy_id,
@@ -75,9 +70,6 @@ class VacancyActions:
         vacancy_id, refused = asked_id(payload, "vacancy_id", "apply_via")
         if refused is not None:
             return refused
-        bot = self._hub.bot
-        if bot is None:
-            return denied(NO_BOT, vacancy_id=vacancy_id, action="apply_via")
         chosen = (payload.get("method"), payload.get("target"))
 
         async def run() -> Way:
@@ -90,9 +82,9 @@ class VacancyActions:
         found = reply(self._hub.runner, run())
         if "ok" not in found:
             return found
-        return launched(
+        return launched_on_bot(
             self._hub,
-            lambda: bot.apply_chosen_way(vacancy_id, found["ok"]),
+            lambda bot: bot.apply_chosen_way(vacancy_id, found["ok"]),
             APPLY_VIA_REFUSALS,
             "Отклик записан.",
             vacancy_id=vacancy_id,

@@ -4,12 +4,12 @@ import logging
 
 from typing import Literal
 
-from backend.bot import slot, work
+from backend.bot import work
 from backend.flows import rerun as flow_rerun
 
 logger = logging.getLogger(__name__)
 
-RerunOutcome = Literal[slot.CycleOutcome, work.AgentStop, flow_rerun.RerunPipelineOutcome]
+RerunOutcome = Literal[work.WorkOutcome, flow_rerun.RerunPipelineOutcome]
 """Чем кончился повторный прогон вакансии, как это видит окно.
 
 Складывается по тому же уговору, что `channels.ChannelPollOutcome`.
