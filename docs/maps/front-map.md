@@ -986,7 +986,7 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (12): .ch-stats-grid, .ch-stat, .ch-stat-num.fit, .ch-stat-num.apply, .ch-stat-num.response, .ch-stat-label, .ch-bar, .ch-bar-seg, .ch-bar-legend, .ch-bar-legend .legend-item, .ch-bar-legend .status-dot, .ch-stats-empty
 - берёт: --accent, --bg-tertiary, --info, --status-applied, --text-secondary
 
-### styles/chat.css (289)
+### styles/chat.css (291)
 - Переписка в карточке человека: лента писем, пузыри и строка отправки. Своим файлом, а не в оформлении карточки: карточку одевают три предмета, а переписка есть только у человека.
 - селекторы (38): .cnt-detail-pane:has(> .cnt-chat-section), .cnt-chat-section, .cnt-chat-body, .cnt-chat-empty, .cnt-chat-day, .cnt-chat-older, .cnt-chat-older:hover, .cnt-bubble, .cnt-bubble.them, .cnt-bubble.me, .cnt-bubble.deleted, .cnt-bubble-content, .cnt-bubble-text, .cnt-bubble-text.deleted, .cnt-bubble-text.gone, .cnt-bubble-edited, .cnt-bubble-photo, .cnt-bubble-photo img, .cnt-bubble-doc, .cnt-bubble-doc:hover, .cnt-bubble-doc .material-symbols-outlined, .cnt-bubble-time, .cnt-bubble.me .cnt-bubble-time, .cnt-bubble-tick, .cnt-bubble-tick.read, .cnt-bubble.me .cnt-bubble-tick, .cnt-bubble.me .cnt-bubble-tick.read, .cnt-chat-input-area, .cnt-chat-input, .cnt-chat-input:focus, .cnt-chat-input::placeholder, .cnt-chat-attach, .cnt-chat-attach:hover:not(:disabled), .cnt-chat-attach .material-symbols-outlined, .cnt-chat-send, .cnt-chat-send:hover:not(:disabled), .cnt-chat-send .material-symbols-outlined, .cnt-chat-disabled-hint
 - берёт: --accent, --accent-chip-bg, --accent-muted, --bg-tertiary, --border, --surface-raised, --surface-raised-hover, --text-primary, --text-secondary, --text-tertiary
@@ -1216,7 +1216,7 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (10): .logs-level-pill, .logs-level-pill .material-symbols-outlined, .logs-level-pill:hover, .logs-level-pill .count, .logs-level-pill.active .material-symbols-outlined, .logs-level-pill.active .count, .logs-level-pill.active[data-tone='error'], .logs-level-pill.active[data-tone='warn'], .logs-level-pill.active[data-tone='info'], .logs-level-pill.active[data-tone='debug']
 - берёт: --alert-fill, --alert-muted, --alert-text, --bg-tertiary, --danger, --err-fill, --err-muted, --info, --info-fill, --info-muted, --text-primary, --text-secondary, --text-tertiary
 
-### styles/log-row.css (61)
+### styles/log-row.css (62)
 - Строка журнала: время, уровень, источник, сообщение — и трассировка под ними, когда строку развернули.
 - селекторы (12): .logs-row, .logs-row.expanded, .logs-time, .logs-level, .logs-level[data-tone='error'], .logs-level[data-tone='warn'], .logs-level[data-tone='info'], .logs-level[data-tone='debug'], .logs-source, .logs-msg, .logs-row.expanded .logs-msg, .logs-details
 - берёт: --alert-text, --bg-secondary, --bg-tertiary, --border, --danger, --info, --text-primary, --text-secondary, --text-tertiary
@@ -1577,7 +1577,7 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (5): .tg-login, .modal-dialog.tg-login-box, .tg-login .modal-title, .tg-login .input, .tg-login .modal-actions
 - берёт: --bg-tertiary
 
-### styles/timeline.css (151)
+### styles/timeline.css (152)
 - Лента жизни вакансии: точка, текст и время в три колонки.
 - селекторы (26): .timeline, .tl-item, .tl-item .status-dot, .tl-item .status-dot[data-status=''], .tl-item .status-dot[data-status='Not Fit'], .tl-item.current .status-dot, .tl-item.current .status-dot[data-status='New'], .tl-item.current .status-dot[data-status='Applied'], .tl-item.current .status-dot[data-status='Answered'], .tl-item.current .status-dot[data-status='Test'], .tl-item.current .status-dot[data-status='Invitation'], .tl-item.current .status-dot[data-status='In Progress'], .tl-item.current .status-dot[data-status='Offer'], .tl-item.current .status-dot[data-status='Decline'], .tl-item.current .status-dot[data-status='Ghosting'], .tl-item.current .status-dot[data-status='Scam'], .tl-item.current .status-dot[data-status='Not Fit'], .tl-text, .tl-label, .tl-history-row, .tl-history-row .tl-label, .tl-event, .tl-note, .tl-note:focus, .tl-note::placeholder, .tl-when
 - берёт: --bg-tertiary, --dot-outline, --status-not-fit-timeline, --text-primary, --text-secondary, --text-tertiary, --tl-halo-answered, --tl-halo-applied, --tl-halo-decline, --tl-halo-default, --tl-halo-ghosting, --tl-halo-in-progress, --tl-halo-invitation, --tl-halo-new, --tl-halo-not-fit, --tl-halo-offer, --tl-halo-scam, --tl-halo-test
@@ -1622,7 +1622,7 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (24): .vac-list-toolbar, .vac-list-toolbar .icon-btn, .vac-list-toolbar .icon-btn .material-symbols-outlined, .vac-list-toolbar .icon-btn:hover, .vac-sort-menu, .vac-sort-option, .vac-sort-option.active, .vac-list-empty, .vac-list-empty .material-symbols-outlined, .vac-detail-pane, .vac-detail-empty, .vac-row, .vac-row-head, .vac-title, .vac-meta, .vac-meta .v-co, .vac-meta .sep, .vac-meta .when, .vac-score, .vac-score[data-tone='warn'], .vac-score[data-tone='bad'], .vac-stack, .mini-chip, .mini-chip.more
 - берёт: --accent, --accent-option-active, --border, --err, --score-warn, --text-primary, --text-secondary, --text-tertiary
 
-### styles/vacancy-card.css (123)
+### styles/vacancy-card.css (124)
 - Карточка вакансии: шапка со статусом, чипы разбора, стек, текст и связи. Лента переходов — в timeline.css, выбор статуса — в status-picker.css, исходный текст — в raw-text.css, кружок с именами — в contact-block.css.
 - селекторы (16): .det-head, .status-wrap, .det-title, .status-badge, .status-label, .status-badge .material-symbols-outlined, .status-wrap.popover-open .status-badge .material-symbols-outlined, .det-info, .info-chip.linkable, .info-chip.linkable:hover, .info-chip.score[data-tone='warn'], .info-chip.score[data-tone='bad'], .det-stack, .stack-chip, .det-section p, .vac-contacts
 - берёт: --accent, --bg-secondary, --err, --score-warn, --text-primary, --text-secondary
