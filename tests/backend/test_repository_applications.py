@@ -107,3 +107,21 @@ async def test_the_screening_of_a_vacancy_goes_application_by_application(sessio
         ("hr@early.test", [(False, "Когда можете выйти?")]),
         ("https://late.test/", [(False, "Сколько лет опыта?"), (True, "Пять")]),
     ]
+
+
+async def test_the_letter_opens_its_application_as_our_first_line(session, session_factory):
+    """Письмо — первое, что работодатель получил от нас: оно идёт первой репликой,
+    и отклик, где было одно письмо без вопросов, в окне тоже есть."""
+    vacancy = vacancy_row()
+    await put(session_factory, vacancy)
+    asked = application_row(vacancy.id, target="https://asked.test/", letter="Письмо А", sent_at=at(0))
+    plain = application_row(vacancy.id, target="hr@plain.test", letter="Письмо Б", sent_at=at(5))
+    await put(session_factory, asked, plain)
+    await put(session_factory, screening_row(asked.id, 0, text="Сколько лет опыта?"))
+
+    shown = await vacancy_screening(session, vacancy.id)
+
+    assert [(one.target, one.lines) for one in shown] == [
+        ("https://asked.test/", [(True, "Письмо А"), (False, "Сколько лет опыта?")]),
+        ("hr@plain.test", [(True, "Письмо Б")]),
+    ]

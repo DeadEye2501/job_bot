@@ -2082,7 +2082,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def put_app_setting(session: AsyncSession, key: str, value: str) -> None` (7)
 
-### `backend/repository/applications.py` — 100 строк
+### `backend/repository/applications.py` — 114 строк
 
 Отклики и скрининг по ним.
 
@@ -2092,8 +2092,9 @@ First-run bootstrap: ensure DB schema exists.
 - `async def record_application(session: AsyncSession, entry: ApplicationEntry) -> int` (22)
 - `async def append_screening(session: AsyncSession, application_id: int, lines) -> None` (8)
 - `class ScreenedApplication` (5)
-- `async def vacancy_screening(session: AsyncSession, vacancy_id: int) -> list[ScreenedApplication]` (12)
-- `async def has_screening(session: AsyncSession, vacancy_id: int) -> bool` (9)
+- `async def vacancy_screening(session: AsyncSession, vacancy_id: int) -> list[ScreenedApplication]` (16)
+- `async def _screening_lines(session: AsyncSession, application_ids: list[int]) -> dict[int, list[tuple[bool, str]]]` (13)
+- `async def has_screening(session: AsyncSession, vacancy_id: int) -> bool` (4)
 
 ### `backend/repository/blacklist.py` — 344 строк ⚠ подошёл к 300
 
@@ -5229,13 +5230,13 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_repository_applications.py` — 109 строк
+### `tests/backend/test_repository_applications.py` — 127 строк
 
 Отклик вне Telegram: строка, скрининг и Applied — одной транзакцией.
 
 Зависит от: `backend.models`, `backend.repository.applications`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 5
+Тестов: 6
 
 - `def _entry(vacancy_id, **over) -> ApplicationEntry` (6)
 - `async def _record(session, entry)` (3)
@@ -6377,7 +6378,7 @@ Runtime settings layer.
 Тестов: 12
 
 
-### `tests/client/test_bridge_vacancies.py` — 408 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_vacancies.py` — 410 строк ⚠ подошёл к 300
 
 Следствия слотов вакансий, которым хватает одной базы.
 

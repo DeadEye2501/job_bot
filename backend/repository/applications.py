@@ -69,32 +69,46 @@ async def append_screening(session: AsyncSession, application_id: int, lines) ->
 
 @dataclass(frozen=True)
 class ScreenedApplication:
-    """Отклик со скринингом: куда ушёл и реплики «наша ли, текст» по порядку."""
+    """Отклик в окне скрининга: куда ушёл и реплики «наша ли, текст» по порядку — письмо, затем вопросы и ответы."""
 
     target: str
     lines: list[tuple[bool, str]]
 
 
 async def vacancy_screening(session: AsyncSession, vacancy_id: int) -> list[ScreenedApplication]:
-    """Скрининг вакансии отклик за откликом, в порядке отправки; отклики без реплик пропущены."""
-    rows = await session.execute(
-        select(Application.id, Application.target, Screening.from_us, Screening.text)
-        .join(Screening, Screening.application_id == Application.id)
+    """Скрининг вакансии отклик за откликом, в порядке отправки; отклики без реплик пропущены.
+
+    Письмо отклика — первая наша реплика: это первое, что работодатель от нас получил.
+    """
+    applications = (await session.execute(
+        select(Application.id, Application.target, Application.letter)
         .where(Application.vacancy_id == vacancy_id)
-        .order_by(Application.sent_at, Application.id, Screening.position)
+        .order_by(Application.sent_at, Application.id)
+    )).all()
+    asked = await _screening_lines(session, [one.id for one in applications])
+    shown = [
+        ScreenedApplication(target, ([(True, letter)] if letter else []) + asked.get(application_id, []))
+        for application_id, target, letter in applications
+    ]
+    return [one for one in shown if one.lines]
+
+
+async def _screening_lines(
+    session: AsyncSession, application_ids: list[int]
+) -> dict[int, list[tuple[bool, str]]]:
+    """Реплики скрининга этих откликов по порядку, сгруппированные по отклику."""
+    rows = await session.execute(
+        select(Screening.application_id, Screening.from_us, Screening.text)
+        .where(Screening.application_id.in_(application_ids))
+        .order_by(Screening.position)
     )
-    shown: dict[int, ScreenedApplication] = {}
-    for application_id, target, from_us, text in rows:
-        shown.setdefault(application_id, ScreenedApplication(target, [])).lines.append((from_us, text))
-    return list(shown.values())
+    lines: dict[int, list[tuple[bool, str]]] = {}
+    for application_id, from_us, text in rows:
+        lines.setdefault(application_id, []).append((from_us, text))
+    return lines
 
 
 async def has_screening(session: AsyncSession, vacancy_id: int) -> bool:
-    """Был ли скрининг хоть по одному отклику вакансии."""
-    found = await session.scalar(
-        select(Screening.id)
-        .join(Application, Screening.application_id == Application.id)
-        .where(Application.vacancy_id == vacancy_id)
-        .limit(1)
-    )
-    return found is not None
+    """Есть ли что показать в окне скрининга. Из той же выборки, что и само окно:
+    отдельное правило «что считать скринингом» разошлось бы с ним молча."""
+    return bool(await vacancy_screening(session, vacancy_id))
