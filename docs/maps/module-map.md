@@ -1405,7 +1405,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def check_ghosting_timeouts(pipeline) -> int` (26)
 
-### `backend/flows/handover.py` — 56 строк
+### `backend/flows/handover.py` — 59 строк
 
 Передача отобранного откликателю: решение «откликаться» и догон новых HR после отклика.
 
@@ -1413,7 +1413,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def to_apply(session_factory, vacancy_ids: list[int]) -> list[int]` (9)
 - `async def new_to_apply(session_factory) -> list[int]` (8)
-- `async def hand_over(pipeline, judged: list[tuple[int, Judged]]) -> None` (13)
+- `async def hand_over(pipeline, judged: list[tuple[int, Judged]]) -> None` (16)
 - `async def judge_and_hand_over(pipeline, vacancy_id: int, text: str, channel_username: str | None, *, allow_delete: bool=True) -> bool` (7)
 
 ### `backend/flows/ingest.py` — 154 строк
@@ -2699,14 +2699,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def apply_silence(session: AsyncSession, vacancy: Vacancy, timeout_days: int) -> None` (23)
 - `def apply_parse_outcome(vacancy: Vacancy, new_status: VacancyStatus) -> None` (18)
 
-### `backend/runtime_settings.py` — 428 строк ⚠ подошёл к 300
+### `backend/runtime_settings.py` — 441 строк ⚠ подошёл к 300
 
 Runtime settings layer.
 
 Зависит от: `adapters`, `backend.crypto`, `backend.incoming`, `backend.models`, `backend.provider_config`, `backend.repository.app_settings`, `backend.tg_credentials`
 
 - `async def _llm_row(session: AsyncSession, kind: LlmConfigKind) -> LlmConfig | None` (5)
-- `class RuntimeSettings` (321)
+- `class RuntimeSettings` (330)
   - `async def load(cls, session_factory: async_sessionmaker[AsyncSession]) -> 'RuntimeSettings'` (6)
   - `async def reload(self) -> None` (22)
   - `def tg(self) -> TgAccountConfig | None` (2)
@@ -2726,6 +2726,7 @@ Runtime settings layer.
   - `def cv_path(self) -> str` (2)
   - `def wizard_completed(self) -> bool` (2)
   - `def send_locked(self) -> bool` (7)
+  - `def auto_apply(self) -> bool` (3)
   - `def flood_wait_until_ts(self) -> float` (2)
   - `def _app_bool(self, key: str) -> bool` (9)
   - `def _app_float(self, key: str) -> float` (17)
@@ -2739,7 +2740,7 @@ Runtime settings layer.
   - `async def set_chat(self, *, base_url: str, api_key: str, model: str) -> None` (4)
   - `async def set_embed(self, *, base_url: str, api_key: str, model: str) -> None` (4)
   - `async def _set_llm(self, kind: LlmConfigKind, base_url: str, api_key: str, model: str) -> None` (32)
-  - `async def set_app(self, key: str, value: str) -> None` (18)
+  - `async def set_app(self, key: str, value: str | bool) -> None` (22)
   - `async def mark_wizard_completed(self) -> None` (3)
 - `def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None` (13)
 
@@ -3337,13 +3338,13 @@ Runtime settings layer.
   - `def stop(self) -> None` (24)
     - `async def _cancel_pending() -> None` (5)
 
-### `client/bridge/settings.py` — 304 строк ⚠ подошёл к 300
+### `client/bridge/settings.py` — 301 строк ⚠ подошёл к 300
 
 Экран «Настройки»: всё, что окно спрашивает и правит на нём.
 
 Зависит от: `adapters.browser`, `backend.agent.availability`, `backend.provider_config`, `backend.telegram_login`, `client.bridge.answer`, `client.bridge.bot_stop`, `client.bridge.hub`, `client.bridge.llm`, `client.bridge.login`, `client.bridge.mail`, `client.bridge.wire`
 
-- `class Settings(Login, Llm, Mail)` (200)
+- `class Settings(Login, Llm, Mail)` (197)
   - `def get(self) -> dict` (37)
     - `async def run() -> dict` (28)
   - `def save(self, payload: dict | None=None) -> dict` (34)
@@ -3354,7 +3355,7 @@ Runtime settings layer.
     - `async def run() -> dict` (3)
   - `async def _username(self) -> str` (22)
   - `async def _apply_providers(self, creds: dict[str, LlmProviderConfig]) -> list[str]` (10)
-  - `async def _apply_app(self, app: dict, applied: list[str]) -> None` (20)
+  - `async def _apply_app(self, app: dict, applied: list[str]) -> None` (17)
 - `def _check_logout_without_bot(has_session: bool) -> None` (19)
 - `async def _wait_connected(client) -> None` (8)
 - `def _read_providers(payload: dict) -> dict[str, LlmProviderConfig]` (21)
@@ -4793,13 +4794,13 @@ Runtime settings layer.
 - `def _long_ago()` (3)
 - `def _recently()` (3)
 
-### `tests/backend/test_flows_handover.py` — 75 строк
+### `tests/backend/test_flows_handover.py` — 98 строк
 
 Сбор отдаёт откликателю: годная после вердикта вакансия уходит отклику, догон
 
 Зависит от: `backend.flows`, `backend.flows.handover`, `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 7
+Тестов: 9
 
 - `async def _set_status(session_factory, vacancy_id, status)` (4)
 
@@ -6051,23 +6052,23 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_runtime_settings_values.py` — 255 строк
+### `tests/backend/test_runtime_settings_values.py` — 264 строк
 
 Следствия типизированных свойств `RuntimeSettings`.
 
 Зависит от: `backend.runtime_settings`
 
-Тестов: 27
+Тестов: 29
 
 - `def settings(**app) -> RuntimeSettings` (16)
 
-### `tests/backend/test_runtime_settings_writes.py` — 210 строк
+### `tests/backend/test_runtime_settings_writes.py` — 223 строк
 
 Следствия записи настроек: у одних методов их два, у других — одно.
 
 Зависит от: `adapters`, `backend.crypto`, `backend.models`, `backend.runtime_settings`, `tests.dbio`, `tests.factories`
 
-Тестов: 16
+Тестов: 17
 
 
 ### `tests/backend/test_schema_and_models.py` — 42 строк
@@ -6472,13 +6473,13 @@ Runtime settings layer.
 - `def real_runner()` (16)
 - `def _troubled(real_runner, exc: BaseException) -> None` (11)
 
-### `tests/client/test_bridge_settings.py` — 150 строк
+### `tests/client/test_bridge_settings.py` — 165 строк
 
 Следствия экрана настроек: что записано и что показано на экране.
 
 Зависит от: `adapters.browser`, `backend.agent.availability`, `backend.models`
 
-Тестов: 9
+Тестов: 11
 
 
 ### `tests/client/test_bridge_shell.py` — 261 строк

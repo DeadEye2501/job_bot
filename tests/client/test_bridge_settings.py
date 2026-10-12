@@ -72,6 +72,21 @@ async def test_an_unknown_setting_is_ignored_not_written(api, ask, session_facto
         assert await session.get(AppSetting, "придуманное") is None
 
 
+async def test_auto_apply_comes_back_after_saving(api, ask):
+    assert (await ask(api.settings.get))["ok"]["pipeline"]["auto_apply"] is True
+    await ask(api.settings.save, {"app": {"auto_apply": False}})
+    assert (await ask(api.settings.get))["ok"]["pipeline"]["auto_apply"] is False
+
+
+async def test_the_simulation_is_not_written_through_the_settings_form(api, ask, session_factory):
+    """Симуляцию из окна не включить: ключ мостом не принимается."""
+    answer = await ask(api.settings.save, {"app": {"send_locked": True}})
+    assert answer["ok"]["applied"] == []
+    async with session_factory() as session:
+        assert await session.get(AppSetting, "send_locked") is None
+    assert "send_locked" not in (await ask(api.settings.get))["ok"]["pipeline"]
+
+
 async def test_source_switches_are_not_written_through_the_settings_form(api, ask, session_factory):
     """Общие выключатели каналов и агрегаторов пишет своя кнопка над списком
     (`source_switch`): форма настроек их не шлёт, и мимо той кнопки — с её

@@ -59,6 +59,10 @@ _APP_DEFAULTS: dict[str, str] = {
     # настройках. Авторитет здесь, а telegram.SEND_LOCKED зеркалится из этой
     # настройки на старте Bot.run и на каждой её записи (`set_app`).
     "send_locked": "false",
+    # auto_apply: передаётся ли разобранное откликателю (`flows/handover`).
+    # Ручной отклик зовёт откликатель мимо передачи, и эта настройка его не
+    # касается.
+    "auto_apply": "true",
     # Cosine-similarity порог дедупа вакансий по embedding'ам. >= → считаем
     # дубликатом существующей вакансии и не парсим повторно. Слишком высокий
     # → дубли проскальзывают; слишком низкий → разные вакансии в одной
@@ -238,6 +242,11 @@ class RuntimeSettings:
         return self._app_bool("send_locked")
 
     @property
+    def auto_apply(self) -> bool:
+        """Передаётся ли разобранное откликателю; выключено — только разбор."""
+        return self._app_bool("auto_apply")
+
+    @property
     def flood_wait_until_ts(self) -> float:
         return self._app_float("flood_wait_until_ts")
 
@@ -389,7 +398,11 @@ class RuntimeSettings:
             bool(api_key),
         )
 
-    async def set_app(self, key: str, value: str) -> None:
+    async def set_app(self, key: str, value: str | bool) -> None:
+        """Записать настройку; да/нет ложится словом, по которому его читает
+        `_app_bool`, — переводит его здесь, а не каждый пишущий у себя."""
+        if isinstance(value, bool):
+            value = "true" if value else "false"
         async with self._session_factory() as session:
             async with session.begin():
                 await put_app_setting(session, key, value)
@@ -409,7 +422,7 @@ class RuntimeSettings:
         logger.debug("app setting %s set (%d chars)", key, len(value or ""))
 
     async def mark_wizard_completed(self) -> None:
-        await self.set_app("wizard_completed", "true")
+        await self.set_app("wizard_completed", True)
         logger.info("First-run wizard completed")
 
 

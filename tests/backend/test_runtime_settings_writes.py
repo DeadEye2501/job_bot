@@ -170,6 +170,19 @@ async def test_an_existing_setting_is_updated_in_place(session_factory):
     assert [(r.key, r.value) for r in rows] == [("scoring_threshold", "42")]
 
 
+async def test_a_yes_no_setting_is_stored_as_the_word_it_is_read_by(session_factory):
+    """Да/нет ложится словом, по которому его читают: «True» из `str(True)`
+    сравнение с «true» не прошёл бы, и включённое читалось бы выключенным."""
+    settings = await RuntimeSettings.load(session_factory)
+
+    await settings.set_app("show_browser", True)
+    assert settings.show_browser is True
+    await settings.set_app("show_browser", False)
+
+    assert settings.show_browser is False
+    assert (await only_row(session_factory, AppSetting)).value == "false"
+
+
 async def test_locking_sends_reaches_the_transport_at_once(session_factory, monkeypatch):
     """Запрет отправки, записанный настройкой, тут же виден транспорту.
 

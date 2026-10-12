@@ -405,7 +405,7 @@
 
 ### `backend/app_version.py`
 
-- `VERSION` = `'1.0.0'`
+- `VERSION` = `'1.0.1'`
 
 ### `backend/applying/browser.py`
 
@@ -1752,7 +1752,7 @@
 ### `backend/runtime_settings.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_APP_DEFAULTS: dict[str, str]` = `словарь из 14`
+- `_APP_DEFAULTS: dict[str, str]` = `словарь из 15`
 - `LETTER_WRITERS` = `набор из 2`
 
 ### `backend/single_instance.py`
