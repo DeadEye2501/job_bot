@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { allAlive, blockedTip, downNames, shouldTurnOff } from '../state/health.js';
-import { modeChosen } from '../state/modes.js';
+import { modeChosen, modeHintAt } from '../state/modes.js';
 import { bar, caption, countlessNote, humanText } from '../state/progress.js';
 
 describe('здоровье систем', () => {
@@ -90,11 +90,18 @@ describe('переключатель режима', () => {
   });
 
   it('нажатие мимо дорожки не выбирает ничего', () => {
-    // Слева от дорожки лежит слово режима — шире самой дорожки, — и «ближний
-    // край» там врал: метясь в слово «Full», человек гасил бота. Слово не
-    // орган управления, а подпись, и нажатие по нему не значит ничего.
+    // «Ближний край» врал бы: промах поднимал бы выключенного бота, а
+    // отправленного письма не вернуть.
     expect(byMouse(-20)).toBe('');
     expect(byMouse(9999)).toBe('');
+  });
+
+  it('подсказка называет режим той трети, над которой курсор', () => {
+    // Слова у переключателя нет: что включит нажатие, человек узнаёт наведением.
+    expect(modeHintAt(10, 300)).toBe('Выключить автоматику');
+    expect(modeHintAt(150, 300)).toBe('Только приём сообщений от HR');
+    expect(modeHintAt(290, 300)).toBe('Вся автоматика: поиск, отклики, переписка');
+    expect(modeHintAt(-20, 300)).toBe('');
   });
 
   it('перебор по кругу возвращается к началу', () => {

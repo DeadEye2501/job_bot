@@ -1,7 +1,15 @@
 <script>
-  import { modeChosen } from '$state/modes.js';
+  import { modeChosen, modeHintAt } from '$state/modes.js';
 
   let { mode, disabled, title, onpick } = $props();
+  // Что включит нажатие там, где сейчас курсор. Запертый говорит своё — почему
+  // заперт, — и это сильнее.
+  let hint = $state('');
+
+  function hover(event) {
+    const box = event.currentTarget.querySelector('.mode-track').getBoundingClientRect();
+    hint = modeHintAt(event.clientX - box.left, box.width);
+  }
 
   function pick(event) {
     // Отказ объясняется словами, а не молчанием: запертую кнопку человек жмёт
@@ -14,9 +22,8 @@
       { detail: event.detail, offsetX: event.clientX - box.left, width: box.width },
       mode,
     );
-    // Пустое — нажатие мимо дорожки, по слову режима: оно подпись, а не орган
-    // управления. Тот же режим не отправляем тоже: мост ответил бы тем же
-    // значением, а лишний зов разбудил бы бота ни за чем.
+    // Пустое — нажатие мимо дорожки. Тот же режим не отправляем тоже: мост
+    // ответил бы тем же значением, а лишний зов разбудил бы бота ни за чем.
     if (chosen && chosen !== mode) onpick(chosen);
   }
 </script>
@@ -25,10 +32,10 @@
   class="mode-control"
   class:is-disabled={disabled}
   data-mode={mode}
-  {title}
+  title={title || hint}
   aria-disabled={disabled}
   onclick={pick}
+  onmousemove={hover}
 >
-  <span class="mode-text">{mode}</span>
   <span class="mode-track"><span class="mode-knob"></span></span>
 </button>

@@ -22,7 +22,8 @@ import { settled } from './settled.js';
 
 afterEach(cleanup);
 
-function bar(health) {
+// `counts` — что по очереди отвечает число новых вакансий; последнее держится.
+function bar(health, counts = [0]) {
   const tips = [];
   // Плашки полоса показывает не через мост, а через `say`: отказ запертого
   // тумблера виден только здесь.
@@ -30,10 +31,12 @@ function bar(health) {
   // Вести полосе приходят подпиской: сюда складываются обработчики, чтобы
   // проверка могла позвать их так же, как их зовёт мост.
   const handlers = {};
+  const left = [...counts];
   const { asked, ask } = answering((method, payload) => {
     if (method === 'system.initial') return { unread: { count: 0 }, mode: 'Full', health };
     if (method === 'system.set_mode') return { mode: payload };
     if (method === 'system.health') return health;
+    if (method === 'system.new_vacancies') return { count: left.length > 1 ? left.shift() : left[0] };
     return {};
   });
 
@@ -179,6 +182,106 @@ describe('живая нижняя полоса', () => {
     handlers.round_note({ text: 'Капча не пройдена — обход снят.' });
 
     expect(said).toContain('Капча не пройдена — обход снят.');
+  });
+});
+
+describe('счётчик непрочитанного', () => {
+  it('при нуле заперт, как прочие значки, и говорит, что сообщений нет', async () => {
+    bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+
+    const badge = document.querySelector('.badge-unread');
+    expect(badge.getAttribute('aria-disabled')).toBe('true');
+    expect(badge.title).toBe('Новых сообщений нет');
+  });
+});
+
+describe('переключатель режима без слова', () => {
+  it('наведение на треть дорожки называет режим, который она включит', async () => {
+    bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+    const toggle = document.querySelector('.mode-control');
+    // У jsdom раскладки нет: дорожку меряем сами, как её мерил бы браузер.
+    document.querySelector('.mode-track').getBoundingClientRect = () => ({ left: 0, width: 300 });
+
+    toggle.dispatchEvent(new MouseEvent('mousemove', { clientX: 150, bubbles: true }));
+    await settled();
+
+    expect(toggle.title).toBe('Только приём сообщений от HR');
+  });
+
+  it('запертый говорит, почему заперт, а не что включит', async () => {
+    const { tips } = bar({ db: true, tg: false, chat: true, embed: true });
+    await settled();
+    const toggle = document.querySelector('.mode-control');
+    document.querySelector('.mode-track').getBoundingClientRect = () => ({ left: 0, width: 300 });
+
+    toggle.dispatchEvent(new MouseEvent('mousemove', { clientX: 150, bubbles: true }));
+    await settled();
+
+    expect(toggle.title).toBe(tips.at(-1));
+  });
+});
+
+describe('значок «отклик на все новые»', () => {
+  const ALIVE = { db: true, tg: true, chat: true, embed: true };
+  const icon = () => document.querySelector('.apply-all-btn');
+
+  it('без новых вакансий серый и не нажимается', async () => {
+    const { asked } = bar(ALIVE, [0]);
+    await settled();
+
+    expect(icon().getAttribute('aria-disabled')).toBe('true');
+    expect(icon().classList.contains('has-new')).toBe(false);
+    expect(icon().title).toBe('Новых вакансий для отклика нет');
+    icon().click();
+    await settled();
+    expect(asked.map((one) => one.method)).not.toContain('system.apply_all_new');
+  });
+
+  it('с новыми — жёлтый, с числом в подсказке, нажатие пускает отклики', async () => {
+    const { asked } = bar(ALIVE, [3]);
+    await settled();
+
+    expect(icon().getAttribute('aria-disabled')).toBe('false');
+    expect(icon().classList.contains('has-new')).toBe(true);
+    expect(icon().title).toBe('Откликнуться на все новые вакансии: 3');
+    icon().click();
+    await settled();
+    expect(asked.map((one) => one.method)).toContain('system.apply_all_new');
+  });
+
+  it('пока идёт прогон, заперт', async () => {
+    const { asked, handlers } = bar(ALIVE, [3]);
+    await settled();
+
+    handlers.ingestion_started();
+    await settled();
+
+    expect(icon().getAttribute('aria-disabled')).toBe('true');
+    icon().click();
+    await settled();
+    expect(asked.map((one) => one.method)).not.toContain('system.apply_all_new');
+  });
+
+  it('перемена в списке вакансий перечитывает число', async () => {
+    const { handlers } = bar(ALIVE, [3, 0]);
+    await settled();
+
+    handlers.vacancies_list_changed();
+    await settled();
+
+    expect(icon().classList.contains('has-new')).toBe(false);
+    expect(icon().getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('стоит перед переключателем режима', async () => {
+    bar(ALIVE, [3]);
+    await settled();
+
+    const right = [...document.querySelector('.bb-right').children];
+    expect(right).toContain(icon());
+    expect(right.indexOf(icon())).toBe(right.indexOf(document.querySelector('.mode-control')) - 1);
   });
 });
 
