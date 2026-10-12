@@ -7,6 +7,7 @@ from backend.flows import parse
 from backend.flows.dm_backfill import spawn_hr_backfill
 from backend.flows.parse import Judged
 from backend.models import Vacancy
+from backend.repository.hr_card import LAST_VACANCY_ORDER
 from backend.repository.vacancies_common import PARSED_ONLY
 
 
@@ -27,7 +28,7 @@ async def new_to_apply(session_factory) -> list[int]:
         return list(await session.scalars(
             select(Vacancy.id)
             .where(AWAITS_APPLICATION, PARSED_ONLY)
-            .order_by(Vacancy.created_at.desc(), Vacancy.id.desc())
+            .order_by(*LAST_VACANCY_ORDER)
         ))
 
 

@@ -6,8 +6,14 @@
 """
 
 import logging
+import sys
 
+import httpx
+import pytest
+
+from backend.app_version import VERSION
 from backend.models import VacancyStatus
+from tests.fakes.github_release import release_answer, serve_latest
 from tests.dbio import put
 from tests.factories import at, hr_row, message_row, vacancy_row
 
@@ -45,6 +51,49 @@ async def test_the_first_request_brings_the_whole_snapshot(api, ask):
     assert snapshot["health"]["db"] is True
     assert snapshot["unread"]["count"] == 0
     assert snapshot["mode"] == "Off"
+
+
+async def test_the_version_comes_with_whether_this_copy_can_update(api, ask, monkeypatch):
+    """Из исходников подменять нечего — обновиться может только собранный exe."""
+    assert (await ask(api.system.version))["ok"] == {"version": VERSION, "updatable": False}
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+
+    assert (await ask(api.system.version))["ok"]["updatable"] is True
+
+
+async def test_a_newer_release_is_named(api, ask, monkeypatch):
+    serve_latest(monkeypatch, release_answer("v9.0.0"))
+
+    assert (await ask(api.system.check_update))["ok"] == {"newer": "9.0.0", "trouble": None}
+
+
+@pytest.mark.parametrize("answer", [
+    release_answer(f"v{VERSION}"),
+    release_answer("v9.0.0", asset="notes.txt"),
+])
+async def test_no_newer_release_names_nothing(api, ask, monkeypatch, answer):
+    serve_latest(monkeypatch, answer)
+
+    assert (await ask(api.system.check_update))["ok"] == {"newer": None, "trouble": None}
+
+
+@pytest.mark.parametrize("trouble", [
+    httpx.ConnectError("нет сети"),
+    httpx.Response(503),
+    # Портал сети Wi-Fi отвечает своей страницей и кодом 200.
+    httpx.Response(200, text="<html>Войдите в сеть</html>"),
+])
+async def test_an_unreachable_github_is_an_answer_not_a_refusal(api, ask, monkeypatch, caplog, trouble):
+    """Ответом, а не отказом: отказ окно рисует плашкой ошибки, а спека велит
+    цвет сообщения — беда сети не поломка приложения. В журнал она ложится."""
+    serve_latest(monkeypatch, trouble)
+
+    with caplog.at_level(logging.WARNING, logger="client.bridge.app_update"):
+        answer = await ask(api.system.check_update)
+
+    assert answer["ok"] == {"newer": None, "trouble": "GitHub не ответил — проверьте связь."}
+    assert any(r.name == "client.bridge.app_update" for r in caplog.records)
 
 
 async def test_the_new_vacancies_count_is_what_apply_all_would_take(api, ask, session_factory):

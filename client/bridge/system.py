@@ -2,7 +2,8 @@
 
 Режим бота, ручной сбор и отклик на все новые она отсюда пускает, здоровье
 связи, счёт непрочитанного и счёт новых вакансий — читает; журнал,
-снос данных и просьба к рабочему столу приходят примесями из соседних файлов.
+снос данных, просьба к рабочему столу и обновление приложения приходят
+примесями из соседних файлов.
 Разрез по файлам — это раскладка одного домена, а не задел под вторую
 реализацию: страница видит один предмет, `api.system`.
 
@@ -25,6 +26,7 @@ from backend.repository.bot_mode import read_mode, write_mode
 from backend.incoming import int_or_none
 from backend.repository import hr_list, messages as messages_repo
 from client.bridge.answer import Denied, denied, launched_on_bot, reply
+from client.bridge.app_update import AppUpdate
 from client.bridge.desktop import Desktop
 from client.bridge.hub import Hub
 from client.bridge.journal import Journal
@@ -54,12 +56,13 @@ _MODEL_PROBE_INTERVAL_S = 60.0
 надёжнее — он работает при любом ритме часов.
 """
 
-class System(Journal, Wipe, Desktop):
+class System(Journal, Wipe, Desktop, AppUpdate):
     """То, что страница показывает всегда, на каком бы экране ни стояла.
 
     Режим бота, ручной сбор, отклик на все новые, здоровье связи, счёт
     непрочитанного и счёт новых вакансий — здесь;
-    журнал, снос всех данных и открытие ссылки — примесями рядом.
+    журнал, снос всех данных, открытие ссылки и обновление приложения —
+    примесями рядом.
 
     Своих часов у домена нет вовсе: здоровье и непрочитанное он считает по
     вопросу, а спрашивает их страница своим чередом — она одна знает, открыт ли

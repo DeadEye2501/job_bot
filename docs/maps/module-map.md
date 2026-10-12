@@ -34,7 +34,7 @@ Job Bot — single CLI entry point.
 - `def _started_or_told_why() -> int` (36)
 - `def main() -> int` (22)
 
-## adapters — 19 модулей
+## adapters — 20 модулей
 
 ### `adapters/agent_mcp.py` — 85 строк
 
@@ -209,6 +209,16 @@ Claude через установленный Claude Code по подписке: 
   - `async def aclose(self) -> None` (3)
   - `def _release(self) -> None` (5)
 
+### `adapters/github_release.py` — 55 строк
+
+Последний релиз приложения на GitHub.
+
+Зависит от: `adapters.web_page`
+
+- `class Release` (5)
+- `def make_client() -> httpx.AsyncClient` (2)
+- `async def latest_release() -> Release | None` (25)
+
 ### `adapters/lm_chat.py` — 239 строк
 
 Обращение к чат-модели провайдера и разбор её ответа.
@@ -358,7 +368,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 188 модулей
+## backend — 189 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -569,6 +579,15 @@ init
 - `async def _store(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: list[float]) -> int` (25)
   - `async def contacts(session) -> None` (3)
 - `def _posted(published: str) -> datetime | None` (6)
+
+### `backend/app_version.py` — 25 строк
+
+Версия приложения: единственное место, где оно знает свой номер.
+
+Зависит от: —
+
+- `def _parse(text: str) -> tuple[int, int, int] | None` (6)
+- `def newer_version(tag: str) -> str | None` (9)
 
 ### `backend/applying/__init__.py` — 5 строк
 
@@ -1375,11 +1394,11 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def check_ghosting_timeouts(pipeline) -> int` (26)
 
-### `backend/flows/handover.py` — 55 строк
+### `backend/flows/handover.py` — 56 строк
 
 Передача отобранного откликателю: решение «откликаться» и догон новых HR после отклика.
 
-Зависит от: `backend.applying.world`, `backend.flows`, `backend.flows.dm_backfill`, `backend.flows.parse`, `backend.models`, `backend.repository.vacancies_common`
+Зависит от: `backend.applying.world`, `backend.flows`, `backend.flows.dm_backfill`, `backend.flows.parse`, `backend.models`, `backend.repository.hr_card`, `backend.repository.vacancies_common`
 
 - `async def to_apply(session_factory, vacancy_ids: list[int]) -> list[int]` (9)
 - `async def new_to_apply(session_factory) -> list[int]` (8)
@@ -2798,7 +2817,7 @@ Runtime settings layer.
 - `def _remove_the_data() -> list[str]` (27)
 - `async def wipe_all(engine) -> list[str]` (28)
 
-## client — 50 модулей
+## client — 51 модулей
 
 ### `client/bridge/__init__.py` — 23 строк
 
@@ -2860,6 +2879,17 @@ Runtime settings layer.
 Зависит от: `client.bridge.aggregators`, `client.bridge.blacklist`, `client.bridge.channels`, `client.bridge.companies`, `client.bridge.hr`, `client.bridge.hub`, `client.bridge.profile`, `client.bridge.settings`, `client.bridge.stats`, `client.bridge.system`, `client.bridge.vacancies`, `client.bridge.wizard`
 
 - `class Api` (15)
+
+### `client/bridge/app_update.py` — 52 строк
+
+Обновление приложения из релизов GitHub: какая версия запущена и есть ли новее.
+
+Зависит от: `adapters`, `backend.app_version`, `client.bridge.answer`
+
+- `class AppUpdate` (30)
+  - `def version(self) -> dict` (7)
+  - `def check_update(self) -> dict` (19)
+    - `async def run() -> dict` (9)
 
 ### `client/bridge/blacklist.py` — 162 строк
 
@@ -3015,7 +3045,7 @@ Runtime settings layer.
 - `def file_filter(label: str, suffixes) -> str` (3)
 - `def chosen_path(window, *file_types: str) -> str | None` (10)
 
-### `client/bridge/events.py` — 149 строк
+### `client/bridge/events.py` — 155 строк
 
 Живые события окна: копит случившееся с номерами и отдаёт всё новее названного.
 
@@ -3104,11 +3134,11 @@ Runtime settings layer.
     - `async def run() -> dict` (2)
   - `def _push_record(self, entry: dict) -> None` (16)
 
-### `client/bridge/lifespan.py` — 298 строк
+### `client/bridge/lifespan.py` — 299 строк
 
 Жизнь моста при окне: от подъёма хозяйства до его гашения.
 
-Зависит от: `backend.bot.client`, `backend.telegram_login`, `client.bridge.bot_stop`, `client.bridge.hub`, `client.bridge.journal`
+Зависит от: `backend.bot.client`, `backend.telegram_login`, `client.bridge.bot_stop`, `client.bridge.events`, `client.bridge.hub`, `client.bridge.journal`
 
 - `def start(runner, session_factory, rs, engine=None) -> Hub` (20)
 - `def stop(hub: Hub) -> None` (35)
@@ -3323,13 +3353,13 @@ Runtime settings layer.
   - `def skills(self, period: str) -> dict` (3)
   - `def channels_pipeline(self, period: str) -> dict` (3)
 
-### `client/bridge/system.py` — 409 строк ⚠ подошёл к 300
+### `client/bridge/system.py` — 412 строк ⚠ подошёл к 300
 
 Домен «система»: то, чем страница живёт на любом экране.
 
-Зависит от: `adapters`, `backend`, `backend.flows.handover`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.llm`, `client.bridge.refusals`, `client.bridge.wipe`, `client.bridge.wire`
+Зависит от: `adapters`, `backend`, `backend.flows.handover`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.app_update`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.llm`, `client.bridge.refusals`, `client.bridge.wipe`, `client.bridge.wire`
 
-- `class System(Journal, Wipe, Desktop)` (298)
+- `class System(Journal, Wipe, Desktop, AppUpdate)` (299)
   - `def initial(self) -> dict` (16)
     - `async def run() -> dict` (6)
   - `async def _mode(self) -> BotMode` (5)
@@ -3359,14 +3389,14 @@ Runtime settings layer.
 - `def _probed(task: Future) -> None` (16)
 - `def _after(asked) -> int | None` (21)
 
-### `client/bridge/vacancies.py` — 321 строк ⚠ подошёл к 300
+### `client/bridge/vacancies.py` — 324 строк ⚠ подошёл к 300
 
 Экран «Вакансии»: список, карточка и правки в них.
 
-Зависит от: `backend.domain.scoring`, `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.hub`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.vacancy_actions`, `client.bridge.vacancy_contacts`, `client.bridge.vacancy_filter`, `client.bridge.vacancy_links`, `client.bridge.wire`
+Зависит от: `backend.domain.scoring`, `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.events`, `client.bridge.form_payloads`, `client.bridge.hub`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.vacancy_actions`, `client.bridge.vacancy_contacts`, `client.bridge.vacancy_filter`, `client.bridge.vacancy_links`, `client.bridge.wire`
 
 - `def _typed_text(raw) -> str | None` (8)
-- `class Vacancies(VacancyActions, VacancyLinks, VacancyContacts)` (263)
+- `class Vacancies(VacancyActions, VacancyLinks, VacancyContacts)` (265)
   - `def list(self, payload: dict | None=None) -> dict` (15)
   - `def filter_options(self) -> dict` (19)
     - `async def run() -> dict` (4)
@@ -3379,27 +3409,27 @@ Runtime settings layer.
     - `async def run() -> dict` (10)
   - `def save_history_explanation(self, payload: dict) -> dict` (38)
     - `async def run() -> dict` (21)
-  - `def change_status(self, payload: dict) -> dict` (34)
-    - `async def run() -> dict` (15)
-  - `def create(self, payload: dict) -> dict` (27)
-    - `async def run() -> dict` (5)
+  - `def change_status(self, payload: dict) -> dict` (35)
+    - `async def run() -> dict` (16)
+  - `def create(self, payload: dict) -> dict` (28)
+    - `async def run() -> dict` (6)
   - `def create_from_text(self, payload: dict) -> dict` (24)
 
-### `client/bridge/vacancy_actions.py` — 115 строк
+### `client/bridge/vacancy_actions.py` — 117 строк
 
 Действия над вакансией: перезапуск разбора, отклик, удаление.
 
-Зависит от: `backend.applying.world`, `backend.domain.apply_order`, `backend.repository`, `client.bridge.answer`, `client.bridge.refusals`, `client.bridge.vacancy_links`
+Зависит от: `backend.applying.world`, `backend.domain.apply_order`, `backend.repository`, `client.bridge.answer`, `client.bridge.events`, `client.bridge.refusals`, `client.bridge.vacancy_links`
 
-- `class VacancyActions` (93)
+- `class VacancyActions` (94)
   - `def rerun(self, payload: dict) -> dict` (20)
   - `def apply_ways(self, vacancy_id: int) -> dict` (12)
     - `async def run() -> dict` (3)
   - `async def _available_ways(self, vacancy_id: int) -> list[Way]` (4)
   - `def apply_via(self, payload: dict) -> dict` (25)
     - `async def run() -> Way` (6)
-  - `def delete(self, payload: dict) -> dict` (22)
-    - `async def run() -> dict` (14)
+  - `def delete(self, payload: dict) -> dict` (23)
+    - `async def run() -> dict` (15)
 
 ### `client/bridge/vacancy_contacts.py` — 56 строк
 
@@ -3578,7 +3608,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 313 модулей
+## tests — 316 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
 
@@ -3944,6 +3974,15 @@ Runtime settings layer.
   - `async def build(applied_at, *, answered_after=None, answer=VacancyStatus.ANSWERED, **overrides)` (20)
 - `async def rows_by_channel(session, **kwargs) -> dict[int | None, dict]` (4)
 
+### `tests/backend/test_adapters_github_release.py` — 48 строк
+
+Последний релиз приложения на GitHub: что из ответа API берётся и когда релиза нет.
+
+Зависит от: `adapters.github_release`, `tests.fakes.github_release`
+
+Тестов: 5
+
+
 ### `tests/backend/test_adapters_telegraph.py` — 205 строк
 
 Следствия, которые наблюдают тесты `adapters/telegraph.py`.
@@ -4046,6 +4085,16 @@ Runtime settings layer.
   - `def put(self, vacancy_id, text)` (2)
 - `async def _seeker(make_pipeline, session_factory, *, limit=5)` (6)
 - `async def _web_seeker(make_pipeline, session_factory)` (6)
+
+### `tests/backend/test_app_version.py` — 30 строк
+
+Новее ли релиз, чем запущенное приложение: по тегу вида `v1.2.3`.
+
+Зависит от: `backend`, `backend.app_version`
+
+Тестов: 3
+
+- `def running_1_9_0(monkeypatch)` (3)
 
 ### `tests/backend/test_applying_browser.py` — 114 строк
 
@@ -6379,22 +6428,22 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/client/test_bridge_system.py` — 197 строк
+### `tests/client/test_bridge_system.py` — 246 строк
 
 Следствия домена «система»: чем занят бот и что показывает нижняя полоса.
 
-Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.app_version`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.github_release`
 
-Тестов: 13
+Тестов: 17
 
 
-### `tests/client/test_bridge_vacancies.py` — 410 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_vacancies.py` — 431 строк ⚠ подошёл к 300
 
 Следствия слотов вакансий, которым хватает одной базы.
 
 Зависит от: `backend.models`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 21
+Тестов: 22
 
 
 ### `tests/client/test_bridge_vacancy_actions.py` — 299 строк
@@ -6777,6 +6826,15 @@ Runtime settings layer.
   - `def load(_path)` (2)
 - `def engine_journal(monkeypatch) -> list[str]` (5)
 
+### `tests/fakes/github_release.py` — 34 строк
+
+Подделка API релизов GitHub: настоящий клиент поверх подставного транспорта.
+
+Зависит от: `adapters.github_release`, `tests.fakes.llm`
+
+- `def serve_latest(monkeypatch, prepared: httpx.Response | BaseException) -> None` (4)
+- `def release_answer(tag: str, *, asset: str=ASSET, digest: str | None=_DIGEST) -> httpx.Response` (11)
+
 ### `tests/fakes/ingestion.py` — 169 строк
 
 Подделка конвейера сбора и оповещений окна о ходе цикла.
@@ -6817,7 +6875,7 @@ Runtime settings layer.
   - `def set_password(self, service: str, username: str, password: str) -> None` (2)
   - `def delete_password(self, service: str, username: str) -> None` (7)
 
-### `tests/fakes/llm.py` — 287 строк
+### `tests/fakes/llm.py` — 300 строк
 
 Подделка провайдера LLM: настоящий клиент поверх подставного транспорта.
 
@@ -6830,6 +6888,8 @@ Runtime settings layer.
   - `def pick(key: tuple[str, str])` (6)
 - `def handler(routes: dict, sent: list, http)` (23)
   - `def handle(request)` (12)
+- `def serve(monkeypatch, make_client: str, routes: dict) -> None` (11)
+  - `def _client() -> httpx.AsyncClient` (2)
 - `def provider(routes: dict[tuple[str, str], httpx.Response | BaseException | list], *, api_key: str='') -> httpx.AsyncClient` (22)
 - `def models_response(*ids: str) -> httpx.Response` (3)
 - `def parsed_vacancy_answer(**fields) -> dict` (8)
@@ -6854,14 +6914,13 @@ Runtime settings layer.
 - `class LmClient` (9)
   - `async def aclose(self) -> None` (2)
 
-### `tests/fakes/site_home.py` — 33 строк
+### `tests/fakes/site_home.py` — 29 строк
 
 Подделка главной страницы сайта: настоящий клиент поверх подставного транспорта.
 
 Зависит от: `tests.fakes.llm`
 
-- `def serve_home(monkeypatch, prepared: httpx.Response | BaseException, pages: dict | None=None) -> None` (13)
-  - `def _client() -> httpx.AsyncClient` (2)
+- `def serve_home(monkeypatch, prepared: httpx.Response | BaseException, pages: dict | None=None) -> None` (9)
 - `def home_page(*, head: str='') -> httpx.Response` (3)
 
 ### `tests/fakes/telegram.py` — 297 строк
@@ -7005,6 +7064,7 @@ Runtime settings layer.
 
 ## Абстракции с одной реализацией
 
+- `AppUpdate` — наследник один: `System`
 - `ChannelActions` — наследник один: `Channels`
 - `Cv` — наследник один: `Profile`
 - `Desktop` — наследник один: `System`

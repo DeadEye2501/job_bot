@@ -140,6 +140,18 @@
 - `CONTEXT_TOKENS` = `8192`
 - `_LOAD_TROUBLES` = `набор из 4`
 
+### `adapters/github_release.py`
+
+- `LATEST` = `'https://api.github.com/repos/DeadEye2501/job_bo…`
+- `ASSET` = `'JobBot.exe'`
+- `_TIMEOUT_SEC` = `20.0`
+- `_USER_AGENT` = `'JobBot-updater'`
+- `class Release`
+  - `tag: str`
+  - `url: str`
+  - `size: int`
+  - `sha256: str`
+
 ### `adapters/lm_chat.py`
 
 - `CHAT_PATH` = `'/v1/chat/completions'`
@@ -390,6 +402,10 @@
   - `url: str`
   - `published: str`
   - `contacts: list[str]`
+
+### `backend/app_version.py`
+
+- `VERSION` = `'1.0.0'`
 
 ### `backend/applying/browser.py`
 
@@ -1775,6 +1791,11 @@
 - `logger` = `logging.getLogger(__name__)`
 - `BAD_PAYLOAD` = `набор из 4`
 
+### `client/bridge/app_update.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `GITHUB_SILENT` = `'GitHub не ответил — проверьте связь.'`
+
 ### `client/bridge/bot_stop.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -1818,6 +1839,7 @@
 ### `client/bridge/events.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `LIST_CHANGED` = `'vacancies_list_changed'`
 - `KEEP_EVENTS` = `500`
 - `WAIT_SECONDS` = `25.0`
 
@@ -2242,6 +2264,10 @@
 - `CLI` = `'C:\\fake\\claude.exe'`
 - `DIES` = `'процесс закрыл вывод'`
 - `HANGS` = `'процесс молчит'`
+
+### `tests/fakes/github_release.py`
+
+- `_DIGEST` = `'sha256:' + 'ab' * 32`
 
 ### `tests/fakes/ingestion.py`
 

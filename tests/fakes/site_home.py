@@ -8,7 +8,7 @@
 
 import httpx
 
-from tests.fakes.llm import handler
+from tests.fakes.llm import serve
 
 HOME = ("GET", "/")
 
@@ -21,11 +21,7 @@ def serve_home(
     `pages` — другие пути сайта (значок) и их ответы; незаданный путь отвечает бедой.
     """
     routes = {HOME: prepared, **{("GET", path): answer for path, answer in (pages or {}).items()}}
-
-    def _client() -> httpx.AsyncClient:
-        return httpx.AsyncClient(transport=httpx.MockTransport(handler(routes, [], httpx)))
-
-    monkeypatch.setattr("adapters.site_home.make_client", _client)
+    serve(monkeypatch, "adapters.site_home.make_client", routes)
 
 
 def home_page(*, head: str = "") -> httpx.Response:
