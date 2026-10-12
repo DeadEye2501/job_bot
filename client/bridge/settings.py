@@ -239,9 +239,7 @@ class Settings(Login, Llm, Mail):
             if key not in APP_KEYS:
                 logger.warning("настройки: незнакомый ключ %r пропущен", key)
                 continue
-            # Да/нет едет как есть — в слово его переводят настройки; прочее
-            # хранится строкой.
-            await self._hub.rs.set_app(str(key), value if isinstance(value, bool) else str(value))
+            await self._hub.rs.set_app(str(key), value)
             applied.append(f"app.{key}")
 
 

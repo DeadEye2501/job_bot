@@ -183,6 +183,16 @@ async def test_a_yes_no_setting_is_stored_as_the_word_it_is_read_by(session_fact
     assert (await only_row(session_factory, AppSetting)).value == "false"
 
 
+async def test_a_number_from_the_window_is_stored_as_text(session_factory):
+    """Окно присылает числа как есть — строкой их делают настройки."""
+    settings = await RuntimeSettings.load(session_factory)
+
+    await settings.set_app("scoring_threshold", 42)
+
+    assert settings.scoring_threshold == 42
+    assert (await only_row(session_factory, AppSetting)).value == "42"
+
+
 async def test_locking_sends_reaches_the_transport_at_once(session_factory, monkeypatch):
     """Запрет отправки, записанный настройкой, тут же виден транспорту.
 
