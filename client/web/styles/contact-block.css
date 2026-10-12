@@ -37,7 +37,12 @@ img.hr-avatar {
   min-width: 0;
 }
 
+/* Имя бывает кнопкой, а кнопка растёт по своему тексту, а не по столбцу: без
+   своей ширины многоточию из `clipped-line.css` нечего обрезать, и длинное
+   название вылезает за карточку. */
 .hr-name {
+  display: block;
+  max-width: 100%;
   color: var(--text-primary);
   font-size: 0.83rem;
   text-align: left;
