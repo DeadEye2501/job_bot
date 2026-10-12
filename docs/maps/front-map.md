@@ -27,9 +27,9 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (290)
+### app/BottomBar.svelte (334)
 - Полоса даёт переключателю подсказку только запертому — почему заперт; отпертый называет режим под курсором сам.
-- принимает: ask, say, events, onlocked, oncontact
+- принимает: ask, say, events, onlocked, oncontact, app
 
 ### app/ChannelCard.svelte (153)
 - —
@@ -98,7 +98,7 @@
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
 
-### app/Shell.svelte (254)
+### app/Shell.svelte (262)
 - —
 - берёт: ./BottomBar.svelte, ./ContactsScreen.svelte, ./LogsScreen.svelte, ./ProfileScreen.svelte, ./SettingsScreen.svelte, ./StatsScreen.svelte, ./VacanciesScreen.svelte, ./WizardScreen.svelte
 
@@ -150,7 +150,7 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 103 файлов
+## components — 104 файлов
 
 ### components/ActionsMenu.svelte (30)
 - —
@@ -578,6 +578,10 @@
 - Затемнения нет вовсе, но нажатие мимо список закрывает: он висит поверх окна, и оставленный открытым перекрывал бы правый край полосы.
 - принимает: count, open, loading, rows, ontoggle, onpick
 
+### components/UpdateButton.svelte (17)
+- —
+- принимает: ready, disabled, title, onpress
+
 ### components/VacancyActions.svelte (88)
 - Без скрининга пункт не нажимается вовсе, а не объясняет плашкой: смотреть нечего, и серого пункта для этого довольно.
 - принимает: blocks, screened, say, onsend, onrerun, onlinkhr, onlinkcompany, onraw, onscreening, onsource, ondelete
@@ -778,9 +782,9 @@
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
 - отдаёт: CURRENCIES, GENDERS, GRADES, LANG_LEVELS, SALARY_PERIODS, WORK_FORMATS, blankProfile, cvNote, cvOpenable, fileSize, langRow, named, profileSheet, updatedNote
 
-### state/progress.js (87)
+### state/progress.js (96)
 - * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
-- отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, applyNote, bar, caption, countlessNote, humanText
+- отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, applyNote, bar, caption, countlessNote, humanText, updateNote
 
 ### state/provider.js (64)
 - * Спросить у поставщика имена его моделей. * * Отказ и пустой перечень — разные ответы, и путать их нельзя: первое значит * «сервер не отозвался», второе — «сервер поднят, но модели в нём нет», и * чинятся они по-разному. Отказ приходит фразой, а не пустотой. * * Имя модели в вопрос не идёт: перечень читается с адреса и ключа, а имя — как * раз то, что в нём ищут.
@@ -878,7 +882,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: counted, plural, vacancyCount
 
-## styles — 118 файлов
+## styles — 119 файлов
 
 ### styles/accent-fill.css (20)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре, текущий шаг мастера, уверенная оценка вакансии и счёт непрочитанного. Одним правилом на все места, а не своим в каждом: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -1282,10 +1286,10 @@ body, html, button, body, .material-symbols-outlined
 - Имя анкеты одной строкой: имя с фамилией, они же латиницей и пол. Пары делят ширину поровну, плитки пола берут сколько им нужно. Просвет — тот же, что у сетки формы под ней (`form-grid.css`).
 - селекторы (1): .name-grid
 
-### styles/nav.css (92)
+### styles/nav.css (102)
 - Боковое меню: разделы и кнопка разворота.
-- селекторы (14): .sidebar, .nav-group,
-.sidebar-toggle, .nav-group, .nav-icon-rail, .nav-icon-rail .material-symbols-outlined, .nav-label, .app-frame:not(.sidebar-expanded) .nav-label, .nav-group:hover, .nav-group.active, .nav-group.active .nav-icon-rail .material-symbols-outlined, .sidebar-spacer, .sidebar-toggle, .sidebar-toggle:hover, .sidebar-toggle .material-symbols-outlined
+- селекторы (15): .sidebar, .nav-group,
+.sidebar-toggle, .nav-group, .nav-icon-rail, .nav-icon-rail .material-symbols-outlined, .nav-label, .app-frame:not(.sidebar-expanded) .nav-label, .nav-group:hover, .nav-group.active, .nav-group.active .nav-icon-rail .material-symbols-outlined, .sidebar-spacer, .sidebar-version, .sidebar-toggle, .sidebar-toggle:hover, .sidebar-toggle .material-symbols-outlined
 - берёт: --accent, --bg-tertiary, --border, --rail-w, --selected-bg, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/new-box.css (24)
@@ -1612,6 +1616,12 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (13): .badge-unread, .badge-unread .material-symbols-outlined, .badge-unread[data-has-unread='true'], .badge-unread[data-has-unread='true']:hover, .unread-popup-backdrop, .unread-popup, .unread-popup-empty, .unread-popup-list, .unread-popup-row, .unread-popup-row:last-child, .unread-popup-name, .unread-popup-sub, .unread-popup-count
 - берёт: --accent, --accent-badge-hover, --selected-bg, --shadow-popup, --surface-raised, --text-primary, --text-tertiary
 
+### styles/update.css (13)
+- Значок обновления приложения в нижней полосе. Общее с прочими кнопками-значками — в icon-button.css, вид запертого — в disabled-look.css.
+- селекторы (2): .update-btn, .update-btn.has-update,
+.update-btn.has-update:hover
+- берёт: --accent, --text-tertiary
+
 ### styles/vacancies.css (149)
 - Экран вакансий: список слева, подробности справа, строка в три этажа.
 - селекторы (24): .vac-list-toolbar, .vac-list-toolbar .icon-btn, .vac-list-toolbar .icon-btn .material-symbols-outlined, .vac-list-toolbar .icon-btn:hover, .vac-sort-menu, .vac-sort-option, .vac-sort-option.active, .vac-list-empty, .vac-list-empty .material-symbols-outlined, .vac-detail-pane, .vac-detail-empty, .vac-row, .vac-row-head, .vac-title, .vac-meta, .vac-meta .v-co, .vac-meta .sep, .vac-meta .when, .vac-score, .vac-score[data-tone='warn'], .vac-score[data-tone='bad'], .vac-stack, .mini-chip, .mini-chip.more
@@ -1675,7 +1685,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (287)
+### tests/bottom_bar_live.test.js (383)
 - —
 
 ### tests/bridge.test.js (161)

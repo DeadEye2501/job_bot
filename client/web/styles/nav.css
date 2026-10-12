@@ -76,6 +76,16 @@
   flex: 1;
 }
 
+/* Номер версии стоит в колонке значков, а не по ширине меню: при развороте он
+   не сдвигается, а в свёрнутом меню стоит по центру узкой полосы. */
+.sidebar-version {
+  width: var(--rail-w);
+  padding: 4px 0;
+  text-align: center;
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+}
+
 .sidebar-toggle {
   justify-content: center;
   color: var(--text-tertiary);

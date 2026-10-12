@@ -23,7 +23,9 @@ import { settled } from './settled.js';
 afterEach(cleanup);
 
 // `counts` — что по очереди отвечает число новых вакансий; последнее держится.
-function bar(health, counts = [0]) {
+// `app` — запущенная версия и может ли копия обновиться; `updates` — что по
+// очереди отвечает проверка обновления, последнее держится.
+function bar(health, counts = [0], { app = null, updates = [{ newer: null, trouble: null }] } = {}) {
   const tips = [];
   // Плашки полоса показывает не через мост, а через `say`: отказ запертого
   // тумблера виден только здесь.
@@ -32,11 +34,13 @@ function bar(health, counts = [0]) {
   // проверка могла позвать их так же, как их зовёт мост.
   const handlers = {};
   const left = [...counts];
+  const checks = [...updates];
   const { asked, ask } = answering((method, payload) => {
     if (method === 'system.initial') return { unread: { count: 0 }, mode: 'Full', health };
     if (method === 'system.set_mode') return { mode: payload };
     if (method === 'system.health') return health;
     if (method === 'system.new_vacancies') return { count: left.length > 1 ? left.shift() : left[0] };
+    if (method === 'system.check_update') return checks.length > 1 ? checks.shift() : checks[0];
     return {};
   });
 
@@ -59,6 +63,7 @@ function bar(health, counts = [0]) {
       events,
       onlocked: (tip) => tips.push(tip),
       oncontact: () => {},
+      app,
     },
   });
   return { asked, tips, said, handlers };
@@ -282,6 +287,97 @@ describe('значок «отклик на все новые»', () => {
     const right = [...document.querySelector('.bb-right').children];
     expect(right).toContain(icon());
     expect(right.indexOf(icon())).toBe(right.indexOf(document.querySelector('.mode-control')) - 1);
+  });
+});
+
+describe('значок обновления', () => {
+  const ALIVE = { db: true, tg: true, chat: true, embed: true };
+  const BUILT = { version: '1.0.0', updatable: true };
+  const NOTHING = { newer: null, trouble: null };
+  const SILENT = { newer: null, trouble: 'GitHub не ответил — проверьте связь.' };
+  const READY = { newer: '1.1.0', trouble: null };
+  const icon = () => document.querySelector('.update-btn');
+  const methods = (asked) => asked.map((one) => one.method);
+
+  it('у копии из исходников его нет — подменять нечего', async () => {
+    bar(ALIVE, [0], { app: { version: '1.0.0', updatable: false } });
+    await settled();
+
+    expect(icon()).toBeNull();
+  });
+
+  it('при запуске проверяет молча: серый, «Проверить обновления», без плашки', async () => {
+    const { asked, said } = bar(ALIVE, [0], { app: BUILT, updates: [SILENT] });
+    await settled();
+
+    expect(methods(asked)).toContain('system.check_update');
+    expect(icon().classList.contains('has-update')).toBe(false);
+    expect(icon().title).toBe('Проверить обновления');
+    expect(said).toEqual([]);
+  });
+
+  it('нажатие серого проверяет и говорит, что версия последняя', async () => {
+    const { said } = bar(ALIVE, [0], { app: BUILT, updates: [NOTHING] });
+    await settled();
+
+    icon().click();
+    await settled();
+
+    expect(said).toContain('Установлена последняя версия, v1.0.0');
+  });
+
+  it('по нажатию беда сети говорится словами', async () => {
+    const { said } = bar(ALIVE, [0], { app: BUILT, updates: [NOTHING, SILENT] });
+    await settled();
+
+    icon().click();
+    await settled();
+
+    expect(said).toContain('GitHub не ответил — проверьте связь.');
+  });
+
+  it('найденная версия — акцентный значок, нажатие качает её', async () => {
+    const { asked } = bar(ALIVE, [0], { app: BUILT, updates: [READY] });
+    await settled();
+
+    expect(icon().classList.contains('has-update')).toBe(true);
+    expect(icon().title).toBe('Обновить приложение');
+    icon().click();
+    await settled();
+    expect(methods(asked)).toContain('system.update');
+  });
+
+  it('пока идёт прогон, обновиться нельзя', async () => {
+    const { asked, handlers } = bar(ALIVE, [0], { app: BUILT, updates: [READY] });
+    await settled();
+
+    handlers.ingestion_started();
+    await settled();
+
+    expect(icon().getAttribute('aria-disabled')).toBe('true');
+    icon().click();
+    await settled();
+    expect(methods(asked)).not.toContain('system.update');
+  });
+
+  it('стоит перед значком «!»', async () => {
+    bar(ALIVE, [0], { app: BUILT });
+    await settled();
+
+    const right = [...document.querySelector('.bb-right').children];
+    expect(right).toContain(icon());
+    expect(right.indexOf(icon())).toBe(right.indexOf(document.querySelector('.apply-all-btn')) - 1);
+  });
+
+  it('ход скачивания — верхняя полоса и подпись в мегабайтах', async () => {
+    const { handlers } = bar(ALIVE, [0], { app: BUILT });
+    await settled();
+
+    handlers.ingestion_started();
+    handlers.progress_update({ stage: 'update', label: 'Обновление', current: 1048576, total: 2097152 });
+    await settled();
+
+    expect(document.querySelector('.progress-caption').textContent).toBe('Обновление — 1 из 2 МБ');
   });
 });
 

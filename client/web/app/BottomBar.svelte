@@ -17,6 +17,7 @@
   import ProgressBars from '$components/ProgressBars.svelte';
   import RunButton from '$components/RunButton.svelte';
   import UnreadBadge from '$components/UnreadBadge.svelte';
+  import UpdateButton from '$components/UpdateButton.svelte';
   import { attempts } from '$state/attempts.js';
   import { LAMPS, allAlive, blockedTip, shouldTurnOff } from '$state/health.js';
   import { healthNow, keepHealth } from '$state/health_now.svelte.js';
@@ -29,10 +30,14 @@
     caption,
     countlessNote,
     humanText,
+    updateNote,
   } from '$state/progress.js';
   import { round } from '$state/round.svelte.js';
+  import { untrack } from 'svelte';
 
-  let { ask, say, events, onlocked, oncontact } = $props();
+  // `app` — запущенная версия и может ли эта копия обновиться; спрашивает её
+  // оболочка один раз — ей же номер нужен для бокового меню.
+  let { ask, say, events, onlocked, oncontact, app = null } = $props();
 
   // Ход обхода, о котором ещё ничего не известно. Одним объявлением на оба
   // места: начальное состояние и сброс в начале обхода обязаны совпадать, а
@@ -66,6 +71,9 @@
   // Сколько вакансий возьмёт «отклик на все новые» — число считает мост той же
   // выборкой, что и сам прогон.
   let newCount = $state(0);
+  // Найденная на GitHub версия новее запущенной; пусто — не найдено или ещё не
+  // проверяли.
+  let newer = $state(null);
 
   const locked = $derived(!allAlive(health));
   const lockedTip = $derived(blockedTip(health));
@@ -99,6 +107,23 @@
   async function askNew() {
     const answer = await ask('system.new_vacancies');
     if (answer !== null) newCount = answer.count;
+  }
+
+  /** Проверить обновление. При запуске — молча: человек ни о чём не просил; по
+   *  нажатию — словами, цветом сообщения: беда сети не поломка приложения. */
+  async function askUpdate(aloud) {
+    const answer = await ask('system.check_update');
+    if (answer === null) return;
+    newer = answer.newer;
+    if (!aloud) return;
+    if (answer.trouble) say(answer.trouble);
+    else if (!answer.newer) say(`Установлена последняя версия, v${app.version}`);
+  }
+
+  // Два зова, а не имя за тернарием: сторож шва с мостом ищет имя литералом.
+  function pressUpdate() {
+    if (newer) ask('system.update');
+    else askUpdate(true);
   }
 
   async function askHealth() {
@@ -187,6 +212,11 @@
     if (COUNTLESS_STAGES.has(step.stage)) single = countlessNote(step.label);
     // Отклики идут вакансия за вакансией после поиска: подпись — какая и где в очереди.
     if (step.stage === 'apply') single = applyNote(step);
+    // Скачивание обновления — одна верхняя полоса байтами, подпись мегабайтами.
+    if (step.stage === 'update') {
+      single = updateNote(step);
+      channels = { label: '', current: step.current, total: step.total };
+    }
     // Агрегатор обходится той же полосой, что канал: источник за источником, и
     // подпись его — имя сайта со счётом найденного.
     if (step.stage === 'channel' || step.stage === 'aggregator') {
@@ -205,6 +235,12 @@
   // переразбор были бы открыты при неизвестном здоровье, а отпертая на миг
   // раньше правды кнопка запускает бота без модели.
   $effect(() => onlocked(lockedTip));
+
+  // Тихая проверка — один раз, как только оболочка сказала, что эта копия
+  // обновляться умеет: из исходников подменять нечего, и спрашивать незачем.
+  $effect(() => {
+    if (app?.updatable) untrack(() => askUpdate(false));
+  });
 
   $effect(() => {
     const deaf = [
@@ -257,6 +293,14 @@
   </div>
 
   <div class="bb-right">
+    {#if app?.updatable}
+      <UpdateButton
+        ready={newer !== null}
+        disabled={newer !== null && round.running}
+        title={newer !== null ? 'Обновить приложение' : 'Проверить обновления'}
+        onpress={pressUpdate}
+      />
+    {/if}
     <ApplyAllButton
       count={newCount}
       disabled={locked || round.running || newCount === 0}
