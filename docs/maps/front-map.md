@@ -27,7 +27,7 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (334)
+### app/BottomBar.svelte (344)
 - Полоса даёт переключателю подсказку только запертому — почему заперт; отпертый называет режим под курсором сам.
 - принимает: ask, say, events, onlocked, oncontact, app
 
@@ -150,7 +150,7 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 104 файлов
+## components — 103 файлов
 
 ### components/ActionsMenu.svelte (30)
 - —
@@ -174,10 +174,6 @@
 - —
 - принимает: row, enabled, selected, onpick, ontoggle
 - берёт: ./ContactRow.svelte
-
-### components/ApplyAllButton.svelte (17)
-- —
-- принимает: count, disabled, title, onpress
 
 ### components/ApplyWaysDialog.svelte (49)
 - —
@@ -507,6 +503,10 @@
 - принимает: icon, title, pill, actions, danger, children
 - берёт: ./StatusPill.svelte
 
+### components/SignalButton.svelte (19)
+- —
+- принимает: icon, kind, lit, disabled, title, onpress
+
 ### components/SkillPicker.svelte (82)
 - —
 - принимает: chosen, known, onadd, onremove
@@ -578,10 +578,6 @@
 - Затемнения нет вовсе, но нажатие мимо список закрывает: он висит поверх окна, и оставленный открытым перекрывал бы правый край полосы.
 - принимает: count, open, loading, rows, ontoggle, onpick
 
-### components/UpdateButton.svelte (17)
-- —
-- принимает: ready, disabled, title, onpress
-
 ### components/VacancyActions.svelte (88)
 - Без скрининга пункт не нажимается вовсе, а не объясняет плашкой: смотреть нечего, и серого пункта для этого довольно.
 - принимает: blocks, screened, say, onsend, onrerun, onlinkhr, onlinkcompany, onraw, onscreening, onsource, ondelete
@@ -616,7 +612,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 66 файлов
+## state — 67 файлов
 
 ### state/aggregators.js (70)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
@@ -778,7 +774,7 @@
 - * Отперта ли кнопка «Связать». * * Промах мышью по строке списка не должен менять привязку: выбор строки только * помечает её, а связывает отдельная кнопка. Выбор уже привязанного кнопку не * отпирает — нажатие переписало бы связь тем же значением и записало в ленту * перемену, которой не было.
 - отдаёт: candidate, labelOf, labels, linkReady, sameName
 
-### state/profile.js (153)
+### state/profile.js (151)
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
 - отдаёт: CURRENCIES, GENDERS, GRADES, LANG_LEVELS, SALARY_PERIODS, WORK_FORMATS, blankProfile, cvNote, cvOpenable, fileSize, langRow, named, profileSheet, updatedNote
 
@@ -846,6 +842,10 @@
 - * Ник с собакой — или пусто, когда ника нет. Чем подписать отсутствие, решает * место показа: у каждого своё слово.
 - отдаёт: atHandle, handleName, nameOrHandle, telegramHref
 
+### state/units.js (4)
+- —
+- отдаёт: KB, MB
+
 ### state/unnamed.js (26)
 - * Чем подписана запись без названия. Показывают её приглушённой * (`styles/unnamed.css`) — так видно, что это не название, а его отсутствие.
 - отдаёт: UNNAMED, titled
@@ -882,7 +882,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: counted, plural, vacancyCount
 
-## styles — 119 файлов
+## styles — 118 файлов
 
 ### styles/accent-fill.css (20)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре, текущий шаг мастера, уверенная оценка вакансии и счёт непрочитанного. Одним правилом на все места, а не своим в каждом: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -910,13 +910,6 @@
 - Окно заведения по адресу — канала или агрегатора: узкая коробка с шапкой, полем и подвалом. Сами шапка, тело и подвал — общие, в modal.css.
 - селекторы (2): .address-dialog, .address-hint
 - берёт: --text-tertiary
-
-### styles/apply-all.css (18)
-- Значок «отклик на все новые» в нижней полосе. Общее с прочими кнопками-значками — в icon-button.css.
-- селекторы (3): .apply-all-btn, .apply-all-btn.has-new,
-.apply-all-btn.has-new:hover, .apply-all-btn.is-disabled,
-.apply-all-btn.is-disabled:hover
-- берёт: --text-tertiary, --warn
 
 ### styles/apply-ways.css (7)
 - Окно выбора, куда откликнуться: строки контактов в узкой коробке. Шапка, тело и подвал — общие, в modal.css; сама строка, её рамка, отклик и отметка выбора — строка подборщика (`picker.css`).
@@ -1474,6 +1467,14 @@ body, html, button, body, .material-symbols-outlined
 - объявляет: --footer-h, --rail-w, --sidebar-w
 - берёт: --bg-primary, --bg-secondary, --footer-h, --rail-w, --sidebar-w, --text-tertiary
 
+### styles/signal-button.css (25)
+- Значки-сигналы нижней полосы: отклик на все новые и обновление приложения. Общее с прочими кнопками-значками — в icon-button.css, вид запертого — в disabled-look.css.
+- селекторы (4): .signal-btn, .apply-all-btn.lit,
+.apply-all-btn.lit:hover, .update-btn.lit,
+.update-btn.lit:hover, .signal-btn.is-disabled,
+.signal-btn.is-disabled:hover
+- берёт: --accent, --text-tertiary, --warn
+
 ### styles/skill-picker.css (87)
 - Стек места работы: чипы взятых навыков и подборщик под ними. Своим файлом, а не в оформлении карточки: подборщик — свой компонент, и выбирают им из навыков анкеты, а не из чего-то, что знает карточка.
 - селекторы (11): .skills-block, .skill-picker, .skill-picker-search, .skill-picker-search .search-input, .skill-picker-search > .search-box > .material-symbols-outlined, .skill-picker-list, .skill-picker-cat, .skill-picker-item, .skill-picker-item.disabled, .skill-picker-item.disabled:hover, .skill-picker-empty
@@ -1616,12 +1617,6 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (13): .badge-unread, .badge-unread .material-symbols-outlined, .badge-unread[data-has-unread='true'], .badge-unread[data-has-unread='true']:hover, .unread-popup-backdrop, .unread-popup, .unread-popup-empty, .unread-popup-list, .unread-popup-row, .unread-popup-row:last-child, .unread-popup-name, .unread-popup-sub, .unread-popup-count
 - берёт: --accent, --accent-badge-hover, --selected-bg, --shadow-popup, --surface-raised, --text-primary, --text-tertiary
 
-### styles/update.css (13)
-- Значок обновления приложения в нижней полосе. Общее с прочими кнопками-значками — в icon-button.css, вид запертого — в disabled-look.css.
-- селекторы (2): .update-btn, .update-btn.has-update,
-.update-btn.has-update:hover
-- берёт: --accent, --text-tertiary
-
 ### styles/vacancies.css (149)
 - Экран вакансий: список слева, подробности справа, строка в три этажа.
 - селекторы (24): .vac-list-toolbar, .vac-list-toolbar .icon-btn, .vac-list-toolbar .icon-btn .material-symbols-outlined, .vac-list-toolbar .icon-btn:hover, .vac-sort-menu, .vac-sort-option, .vac-sort-option.active, .vac-list-empty, .vac-list-empty .material-symbols-outlined, .vac-detail-pane, .vac-detail-empty, .vac-row, .vac-row-head, .vac-title, .vac-meta, .vac-meta .v-co, .vac-meta .sep, .vac-meta .when, .vac-score, .vac-score[data-tone='warn'], .vac-score[data-tone='bad'], .vac-stack, .mini-chip, .mini-chip.more
@@ -1685,7 +1680,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (383)
+### tests/bottom_bar_live.test.js (432)
 - —
 
 ### tests/bridge.test.js (161)

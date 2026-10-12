@@ -237,7 +237,7 @@ describe('значок «отклик на все новые»', () => {
     await settled();
 
     expect(icon().getAttribute('aria-disabled')).toBe('true');
-    expect(icon().classList.contains('has-new')).toBe(false);
+    expect(icon().classList.contains('lit')).toBe(false);
     expect(icon().title).toBe('Новых вакансий для отклика нет');
     icon().click();
     await settled();
@@ -249,7 +249,7 @@ describe('значок «отклик на все новые»', () => {
     await settled();
 
     expect(icon().getAttribute('aria-disabled')).toBe('false');
-    expect(icon().classList.contains('has-new')).toBe(true);
+    expect(icon().classList.contains('lit')).toBe(true);
     expect(icon().title).toBe('Откликнуться на все новые вакансии: 3');
     icon().click();
     await settled();
@@ -276,7 +276,7 @@ describe('значок «отклик на все новые»', () => {
     handlers.vacancies_list_changed();
     await settled();
 
-    expect(icon().classList.contains('has-new')).toBe(false);
+    expect(icon().classList.contains('lit')).toBe(false);
     expect(icon().getAttribute('aria-disabled')).toBe('true');
   });
 
@@ -311,7 +311,7 @@ describe('значок обновления', () => {
     await settled();
 
     expect(methods(asked)).toContain('system.check_update');
-    expect(icon().classList.contains('has-update')).toBe(false);
+    expect(icon().classList.contains('lit')).toBe(false);
     expect(icon().title).toBe('Проверить обновления');
     expect(said).toEqual([]);
   });
@@ -340,7 +340,7 @@ describe('значок обновления', () => {
     const { asked } = bar(ALIVE, [0], { app: BUILT, updates: [READY] });
     await settled();
 
-    expect(icon().classList.contains('has-update')).toBe(true);
+    expect(icon().classList.contains('lit')).toBe(true);
     expect(icon().title).toBe('Обновить приложение');
     icon().click();
     await settled();
@@ -378,6 +378,55 @@ describe('значок обновления', () => {
     await settled();
 
     expect(document.querySelector('.progress-caption').textContent).toBe('Обновление — 1 из 2 МБ');
+    expect(document.querySelector('.progress-fill').getAttribute('style')).toContain('width: 50%');
+  });
+
+  it('в конце скачивания числа подписи сходятся', async () => {
+    // Скачанное и итог округляются одним правилом: иначе полный файл читался
+    // бы как «94 из 95 МБ» — будто не докачан.
+    const { handlers } = bar(ALIVE, [0], { app: BUILT });
+    await settled();
+
+    handlers.ingestion_started();
+    handlers.progress_update({ stage: 'update', label: 'Обновление', current: 99000000, total: 99000000 });
+    await settled();
+
+    expect(document.querySelector('.progress-caption').textContent).toBe('Обновление — 94 из 94 МБ');
+  });
+
+  it('у запертого значка подсказки нет: обещать то, что не нажмётся, незачем', async () => {
+    const { handlers } = bar(ALIVE, [0], { app: BUILT, updates: [READY] });
+    await settled();
+
+    handlers.ingestion_started();
+    await settled();
+
+    expect(icon().title).toBe('');
+  });
+
+  it('после прогона найденная версия переспрашивается молча', async () => {
+    // Релиз могли отозвать, а скачивание ответить «новой версии нет»: значок не
+    // должен звать обновиться к тому, чего уже нет.
+    const { handlers } = bar(ALIVE, [0], { app: BUILT, updates: [READY, NOTHING] });
+    await settled();
+
+    handlers.ingestion_started();
+    handlers.ingestion_finished();
+    await settled();
+
+    expect(icon().classList.contains('lit')).toBe(false);
+  });
+});
+
+describe('кнопка запуска на прогоне', () => {
+  it('«Стоп» не заперт и при погасшей лампе: идущую работу всегда можно остановить', async () => {
+    const { handlers } = bar({ db: true, tg: true, chat: false, embed: true });
+    await settled();
+
+    handlers.ingestion_started();
+    await settled();
+
+    expect(document.querySelector('.run-btn').getAttribute('aria-disabled')).toBe('false');
   });
 });
 

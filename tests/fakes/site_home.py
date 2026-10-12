@@ -8,7 +8,7 @@
 
 import httpx
 
-from tests.fakes.llm import serve
+from tests.fakes.http import serve
 
 HOME = ("GET", "/")
 

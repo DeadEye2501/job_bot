@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from adapters.github_release import ASSET, LATEST
-from tests.fakes.llm import serve
+from tests.fakes.http import serve
 
 APP = b"MZ" + b"\0" * 2046
 """Содержимое файла релиза по умолчанию — маленький, но непустой exe."""
