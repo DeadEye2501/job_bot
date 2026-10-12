@@ -883,13 +883,13 @@ First-run bootstrap: ensure DB schema exists.
   - `async def turn(kit: AgentKit) -> str` (5)
 - `async def _recover(bot) -> None` (17)
 
-### `backend/bot/update.py` — 37 строк
+### `backend/bot/update.py` — 48 строк
 
 Скачивание обновления в месте прогона: пока оно идёт, прогон не начать.
 
 Зависит от: `backend`, `backend.bot`, `backend.notify`
 
-- `async def download_update(bot) -> DownloadOutcome` (19)
+- `async def download_update(bot) -> DownloadOutcome` (26)
   - `def report(got: int, total: int) -> None` (2)
 
 ### `backend/bot/updates.py` — 113 строк
@@ -2830,16 +2830,17 @@ Runtime settings layer.
 - `async def _fetch(release: Release, target: Path, report: Callable[[int, int], None]) -> str` (23)
 - `def remove_leftover(path: Path) -> None` (8)
 
-### `backend/updater.py` — 119 строк
+### `backend/updater.py` — 124 строк
 
 Подмена exe скачанным обновлением — копией приложения в режиме `--update`.
 
 Зависит от: `backend.update_download`
 
 - `def updater_copy() -> Path` (4)
-- `def launch_updater(new: Path) -> None` (13)
+- `def launch_updater(new: Path) -> None` (10)
 - `def run(args: list[str]) -> int` (20)
 - `def clear_leftovers() -> None` (5)
+- `def _start(args: list[str]) -> None` (6)
 - `def _log_to_own_file() -> None` (6)
 - `def _wait_for_exit(pid: int) -> None` (9)
 - `def _replace(new: Path, exe: Path) -> bool` (14)
@@ -3315,7 +3316,7 @@ Runtime settings layer.
     - `async def run() -> dict` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (26)
 
-### `client/bridge/refusals.py` — 294 строк
+### `client/bridge/refusals.py` — 295 строк
 
 Слова, которыми мост отказывает окну.
 
@@ -3647,7 +3648,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 319 модулей
+## tests — 320 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
 
@@ -4437,13 +4438,13 @@ Runtime settings layer.
     - `async def channels()` (4)
     - `async def seek_all(_bot, kit)` (2)
 
-### `tests/backend/test_bot_update.py` — 49 строк
+### `tests/backend/test_bot_update.py` — 64 строк
 
 Скачивание обновления в месте прогона: ход идёт в полосу, занятое место — отказ.
 
 Зависит от: `backend.bot.update`, `tests.fakes.github_release`
 
-Тестов: 2
+Тестов: 3
 
 - `def _app_in(monkeypatch, tmp_path)` (4)
 - `def handed(monkeypatch)` (5)
@@ -6164,13 +6165,13 @@ Runtime settings layer.
 - `def target(tmp_path)` (2)
 - `def _quiet(got, total)` (2)
 
-### `tests/backend/test_updater.py` — 151 строк
+### `tests/backend/test_updater.py` — 165 строк
 
 Подмена exe: копия ждёт выхода приложения, заменяет его файл и запускает новый.
 
 Зависит от: `backend`
 
-Тестов: 8
+Тестов: 9
 
 - `def app(tmp_path)` (7)
 - `def started(monkeypatch, tmp_path)` (12)
@@ -6501,13 +6502,13 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/client/test_bridge_system.py` — 285 строк
+### `tests/client/test_bridge_system.py` — 296 строк
 
 Следствия домена «система»: чем занят бот и что показывает нижняя полоса.
 
 Зависит от: `backend.app_version`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.github_release`
 
-Тестов: 20
+Тестов: 21
 
 - `def handed_over(hub)` (5)
 
@@ -6904,7 +6905,7 @@ Runtime settings layer.
 
 Подделка GitHub: API релизов и скачивание файла поверх подставного транспорта.
 
-Зависит от: `adapters.github_release`, `tests.fakes.llm`
+Зависит от: `adapters.github_release`, `tests.fakes.http`
 
 - `def download_url(tag: str, asset: str=ASSET) -> str` (2)
 - `def serve_latest(monkeypatch, prepared: httpx.Response | BaseException, files: dict[str, httpx.Response | BaseException] | None=None) -> None` (9)
@@ -6912,6 +6913,15 @@ Runtime settings layer.
   - `async def pieces()` (3)
 - `def serve_newer(monkeypatch, served: httpx.Response | BaseException | None=None, content: bytes=APP, digest=FROM_CONTENT) -> None` (7)
 - `def release_answer(tag: str, *, asset: str=ASSET, content: bytes=APP, digest=FROM_CONTENT) -> httpx.Response` (14)
+
+### `tests/fakes/http.py` — 24 строк
+
+Подделка HTTP для адаптеров со своим сборщиком клиента: настоящий `httpx`
+
+Зависит от: `tests.fakes.llm`
+
+- `def serve(monkeypatch, make_client: str, routes: dict) -> None` (11)
+  - `def _client() -> httpx.AsyncClient` (2)
 
 ### `tests/fakes/ingestion.py` — 169 строк
 
@@ -6953,7 +6963,7 @@ Runtime settings layer.
   - `def set_password(self, service: str, username: str, password: str) -> None` (2)
   - `def delete_password(self, service: str, username: str) -> None` (7)
 
-### `tests/fakes/llm.py` — 300 строк
+### `tests/fakes/llm.py` — 287 строк
 
 Подделка провайдера LLM: настоящий клиент поверх подставного транспорта.
 
@@ -6966,8 +6976,6 @@ Runtime settings layer.
   - `def pick(key: tuple[str, str])` (6)
 - `def handler(routes: dict, sent: list, http)` (23)
   - `def handle(request)` (12)
-- `def serve(monkeypatch, make_client: str, routes: dict) -> None` (11)
-  - `def _client() -> httpx.AsyncClient` (2)
 - `def provider(routes: dict[tuple[str, str], httpx.Response | BaseException | list], *, api_key: str='') -> httpx.AsyncClient` (22)
 - `def models_response(*ids: str) -> httpx.Response` (3)
 - `def parsed_vacancy_answer(**fields) -> dict` (8)
@@ -6996,7 +7004,7 @@ Runtime settings layer.
 
 Подделка главной страницы сайта: настоящий клиент поверх подставного транспорта.
 
-Зависит от: `tests.fakes.llm`
+Зависит от: `tests.fakes.http`
 
 - `def serve_home(monkeypatch, prepared: httpx.Response | BaseException, pages: dict | None=None) -> None` (9)
 - `def home_page(*, head: str='') -> httpx.Response` (3)

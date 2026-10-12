@@ -545,6 +545,7 @@
 
 ### `backend/bot/update.py`
 
+- `logger` = `logging.getLogger(__name__)`
 - `_LABEL` = `'Обновление'`
 - `DownloadOutcome` = `Literal[slot.CycleOutcome, update_download.Updat…`
 
@@ -1969,7 +1970,7 @@
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
 - `APPLY_VIA_REFUSALS` = `словарь из 6 и раскрытых`
 - `APPLY_ALL_REFUSALS` = `словарь из 3 и раскрытых`
-- `UPDATE_REFUSALS` = `словарь из 5`
+- `UPDATE_REFUSALS` = `словарь из 6`
 
 ### `client/bridge/runner.py`
 

@@ -124,6 +124,17 @@ async def test_a_downloaded_update_closes_the_window(api, ask, with_bot, told, h
     assert handed_over == ["окно закрыто"]
 
 
+async def test_a_copy_that_did_not_start_says_so_and_keeps_the_app(api, ask, with_bot, told, handed_over):
+    with_bot(update="handoff_failed")
+
+    await ask(api.system.update)
+
+    assert await told() == {
+        "message": "Обновление скачано, но запустить подмену не вышло — см. логи.", "danger": True,
+    }
+    assert handed_over == []
+
+
 async def test_a_download_that_did_not_match_says_so_and_keeps_the_app(api, ask, with_bot, told, handed_over):
     with_bot(update="broken")
 

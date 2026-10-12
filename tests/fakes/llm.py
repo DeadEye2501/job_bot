@@ -132,19 +132,6 @@ def handler(routes: dict, sent: list, http):
     return handle
 
 
-def serve(monkeypatch, make_client: str, routes: dict) -> None:
-    """Подменить сборку клиента адаптера: настоящий `httpx` поверх заготовленных ответов.
-
-    `make_client` — путь к сборщику клиента в адаптере; разбор ответов остаётся
-    боевым. Сеть тестов не заперта, и без подмены адаптер ушёл бы в живую сеть.
-    """
-
-    def _client() -> httpx.AsyncClient:
-        return httpx.AsyncClient(transport=httpx.MockTransport(handler(routes, [], httpx)))
-
-    monkeypatch.setattr(make_client, _client)
-
-
 def provider(
     routes: dict[tuple[str, str], httpx.Response | BaseException | list],
     *,

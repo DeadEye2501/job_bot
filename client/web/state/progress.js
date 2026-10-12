@@ -4,6 +4,7 @@
 // Чистые функции: вести приходят доводами, наружу уходят строка и число.
 
 import { fillPercent } from './chosen.js';
+import { MB } from './units.js';
 
 /** Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон
  *  не пустит. */
@@ -75,13 +76,12 @@ export function applyNote({ label, current, total }) {
   return `${label} — отклик (${current + 1}/${total})`;
 }
 
-const MB = 1024 * 1024;
-
 /** Подпись скачивания обновления: ход приходит байтами, человеку — мегабайты.
- *  Пока размер неизвестен — до ответа GitHub, — одно имя ступени. */
+ *  Пока размер неизвестен — до ответа GitHub, — одно имя ступени. Оба числа
+ *  округляются одним правилом: иначе докачанный файл читался бы недокачанным. */
 export function updateNote({ label, current, total }) {
   if (!total) return `${label}…`;
-  return `${label} — ${Math.floor(current / MB)} из ${Math.ceil(total / MB)} МБ`;
+  return `${label} — ${Math.round(current / MB)} из ${Math.round(total / MB)} МБ`;
 }
 
 function channelPart({ label, current, total }) {

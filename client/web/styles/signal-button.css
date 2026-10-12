@@ -1,0 +1,25 @@
+/* Значки-сигналы нижней полосы: отклик на все новые и обновление приложения.
+   Общее с прочими кнопками-значками — в icon-button.css, вид запертого — в
+   disabled-look.css. */
+
+/* Серый, но живой: на наведение отзывается, как прочие значки. */
+.signal-btn {
+  color: var(--text-tertiary);
+}
+
+.apply-all-btn.lit,
+.apply-all-btn.lit:hover {
+  color: var(--warn);
+}
+
+.update-btn.lit,
+.update-btn.lit:hover {
+  color: var(--accent);
+}
+
+/* Запертый гаснет до серого и подсвеченным: цвет звал бы нажать то, что сейчас
+   не нажмётся. Стоит последним — перебивает подсветку той же силы. */
+.signal-btn.is-disabled,
+.signal-btn.is-disabled:hover {
+  color: var(--text-tertiary);
+}

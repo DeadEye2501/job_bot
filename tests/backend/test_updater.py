@@ -139,6 +139,20 @@ def test_the_copy_is_told_which_file_replaces_which(tmp_path, monkeypatch):
     assert (exe, replacement) == (str(tmp_path / "JobBot.exe"), str(new))
 
 
+def test_both_launches_ask_for_a_fresh_unpacking(app, started, tmp_path, monkeypatch):
+    """Собранный exe, запущенный из собранного, без этой просьбы может взять
+    распаковку запустившего — а её сотрут, едва тот выйдет."""
+    exe, new = app
+    envs = []
+    monkeypatch.setattr(updater.subprocess, "Popen", lambda args, **kw: envs.append(kw.get("env") or {}))
+    monkeypatch.setattr(updater.shutil, "copy2", lambda source, target: None)
+
+    updater.launch_updater(new)
+    updater.run(["0", str(exe), str(new)])
+
+    assert [env.get("PYINSTALLER_RESET_ENVIRONMENT") for env in envs] == ["1", "1"]
+
+
 def test_the_copy_writes_its_own_log_not_the_apps(app, started, tmp_path, caplog):
     """Журнал приложения сторожит замок, а копия замка не берёт: её записи не идут
     наверх, к обработчикам приложения, а ложатся в свой файл."""

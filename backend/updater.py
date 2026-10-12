@@ -49,10 +49,7 @@ def launch_updater(new: Path) -> None:
     """
     exe = Path(sys.executable)
     shutil.copy2(exe, updater_copy())
-    subprocess.Popen(
-        [str(updater_copy()), UPDATE_FLAG, str(os.getppid()), str(exe), str(new)],
-        creationflags=_DETACHED, close_fds=True,
-    )
+    _start([str(updater_copy()), UPDATE_FLAG, str(os.getppid()), str(exe), str(new)])
 
 
 def run(args: list[str]) -> int:
@@ -73,7 +70,7 @@ def run(args: list[str]) -> int:
     except Exception:
         logger.exception("подмена сорвалась, запускается прежний exe: %s", exe)
     finally:
-        subprocess.Popen([str(exe)], creationflags=_DETACHED, close_fds=True)
+        _start([str(exe)])
     return 0 if replaced else 1
 
 
@@ -82,6 +79,14 @@ def clear_leftovers() -> None:
     копию-подменщик."""
     for leftover in (new_exe_path(), updater_copy()):
         remove_leftover(leftover)
+
+
+def _start(args: list[str]) -> None:
+    """Запустить собранный exe отвязанным и со свежей распаковкой: запущенный из
+    собранного, он иначе может взять распаковку запустившего, а её сотрут, едва
+    тот выйдет."""
+    subprocess.Popen(args, creationflags=_DETACHED, close_fds=True,
+                     env={**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"})
 
 
 def _log_to_own_file() -> None:

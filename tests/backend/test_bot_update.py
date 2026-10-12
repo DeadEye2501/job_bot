@@ -39,6 +39,21 @@ async def test_the_download_lies_next_to_the_app_and_goes_to_the_copy(make_bot, 
     assert handed == [tmp_path / "JobBot.exe.new"]
 
 
+async def test_a_copy_that_did_not_start_is_named_as_such(make_bot, monkeypatch, tmp_path, caplog):
+    """Файл скачан и сверен, а копию запустить не вышло: это не «не скачалось», и
+    человеку говорят то, что случилось; трассировка — в журнале."""
+    _app_in(monkeypatch, tmp_path)
+
+    def broken(new):
+        raise OSError("нет места")
+
+    monkeypatch.setattr("backend.updater.launch_updater", broken)
+    bot = await make_bot()
+
+    assert await download_update(bot) == "handoff_failed"
+    assert any("копию" in r.getMessage() for r in caplog.records)
+
+
 async def test_a_busy_slot_downloads_nothing(make_bot, monkeypatch, tmp_path, handed):
     """Пока идёт прогон, скачивание не начинается: место прогона одно."""
     _app_in(monkeypatch, tmp_path)

@@ -10,14 +10,13 @@
   // Мост и плашку берёт доводами, как их берут экраны. Наружу отдаёт две вещи:
   // подсказку о запертых кнопках — её оболочка раздаёт экранам — и уход в
   // контакты из списка непрочитанного.
-  import ApplyAllButton from '$components/ApplyAllButton.svelte';
   import HealthLamp from '$components/HealthLamp.svelte';
   import HumanPlate from '$components/HumanPlate.svelte';
   import ModeToggle from '$components/ModeToggle.svelte';
   import ProgressBars from '$components/ProgressBars.svelte';
   import RunButton from '$components/RunButton.svelte';
+  import SignalButton from '$components/SignalButton.svelte';
   import UnreadBadge from '$components/UnreadBadge.svelte';
-  import UpdateButton from '$components/UpdateButton.svelte';
   import { attempts } from '$state/attempts.js';
   import { LAMPS, allAlive, blockedTip, shouldTurnOff } from '$state/health.js';
   import { healthNow, keepHealth } from '$state/health_now.svelte.js';
@@ -78,6 +77,8 @@
   const locked = $derived(!allAlive(health));
   const lockedTip = $derived(blockedTip(health));
   const captionText = $derived(single || caption(channels, messages));
+  // Обновиться во время прогона нельзя — проверить можно всегда.
+  const updateLocked = $derived(newer !== null && round.running);
   const applyAllTitle = $derived.by(() => {
     if (locked) return lockedTip;
     if (round.running) return '';
@@ -185,7 +186,7 @@
   }
 
   async function toggleRun() {
-    if (locked) return say(lockedTip);
+    if (locked && !round.running) return say(lockedTip);
     // Два зова, а не имя за тернарием: спрятанное в условие имя выпадает из шва
     // с мостом — сторож ищет его литералом на месте зова, — и разъезд с питоном
     // остался бы незамеченным до первого нажатия.
@@ -215,7 +216,7 @@
     // Скачивание обновления — одна верхняя полоса байтами, подпись мегабайтами.
     if (step.stage === 'update') {
       single = updateNote(step);
-      channels = { label: '', current: step.current, total: step.total };
+      messages = { current: step.current, total: step.total };
     }
     // Агрегатор обходится той же полосой, что канал: источник за источником, и
     // подпись его — имя сайта со счётом найденного.
@@ -247,6 +248,9 @@
       // Весть о начале слушает общий учёт (`state/round.svelte.js`), а полосе
       // он говорит о ней в тот же миг: ход прошлого прогона стирается.
       round.onStart(started),
+      // Найденную версию после прогона — скачивание тоже прогон — переспросить
+      // молча: релиз могли отозвать, и звать к нему значок не должен.
+      round.onFinish(() => newer && askUpdate(false)),
       events.on('vacancies_list_changed', askNew),
       events.on('progress_update', moved),
       // Слово обхода — почему он снят: капча не пройдена, лимит исчерпан.
@@ -294,15 +298,19 @@
 
   <div class="bb-right">
     {#if app?.updatable}
-      <UpdateButton
-        ready={newer !== null}
-        disabled={newer !== null && round.running}
-        title={newer !== null ? 'Обновить приложение' : 'Проверить обновления'}
+      <SignalButton
+        icon="autorenew"
+        kind="update-btn"
+        lit={newer !== null}
+        disabled={updateLocked}
+        title={updateLocked ? '' : newer !== null ? 'Обновить приложение' : 'Проверить обновления'}
         onpress={pressUpdate}
       />
     {/if}
-    <ApplyAllButton
-      count={newCount}
+    <SignalButton
+      icon="error"
+      kind="apply-all-btn"
+      lit={newCount > 0}
       disabled={locked || round.running || newCount === 0}
       title={applyAllTitle}
       onpress={() => ask('system.apply_all_new')}
@@ -310,10 +318,12 @@
     <!-- Полоса даёт переключателю подсказку только запертому — почему заперт;
          отпертый называет режим под курсором сам. -->
     <ModeToggle {mode} disabled={locked} title={locked ? lockedTip : null} onpick={pickMode} />
+    <!-- Идущую работу остановить можно всегда: погасшая лампа запирает пуск, а
+         не «Стоп» — иначе скачивание при лежащей модели было бы не отменить. -->
     <RunButton
       running={round.running}
-      disabled={locked}
-      title={locked ? lockedTip : (round.running ? STOP_TITLE : RUN_TITLE)}
+      disabled={locked && !round.running}
+      title={round.running ? STOP_TITLE : locked ? lockedTip : RUN_TITLE}
       onpress={toggleRun}
     />
     <UnreadBadge
