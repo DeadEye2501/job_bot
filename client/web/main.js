@@ -116,6 +116,7 @@ import './styles/progress.css';
 import './styles/human-plate.css';
 import './styles/run.css';
 import './styles/apply-all.css';
+import './styles/update.css';
 import './styles/unread.css';
 import './styles/plaque.css';
 

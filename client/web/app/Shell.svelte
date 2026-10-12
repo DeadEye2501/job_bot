@@ -67,6 +67,9 @@
   // неизвестно, и кнопки бота на это время заперты — отпертая на миг раньше
   // правды запускает его без модели.
   let lockedTip = $state(blockedTip(null));
+  // Запущенная версия и может ли эта копия обновиться. Спрашивается здесь одним
+  // зовом на двоих: номер — боковому меню, оба — нижней полосе.
+  let app = $state(null);
 
   let plaqueTimer = null;
   let setupClock = null;
@@ -158,6 +161,7 @@
     // эффектах, а пропущенное между подъёмом и подпиской доберёт первый же
     // вопрос — очередь отдаёт всё, что накопилось после названного номера.
     heard.run();
+    ask('system.version').then((answer) => (app = answer));
     askSetup();
     setupClock = setInterval(askSetup, SETUP_RETRY_MS);
     return () => {
@@ -192,6 +196,9 @@
       />
     {/each}
     <div class="sidebar-spacer"></div>
+    {#if app}
+      <div class="sidebar-version">v{app.version}</div>
+    {/if}
     <button
       class="sidebar-toggle"
       type="button"
@@ -247,6 +254,7 @@
     events={heard}
     onlocked={(tip) => (lockedTip = tip)}
     oncontact={goContacts}
+    {app}
   />
 </div>
 {/if}

@@ -1,0 +1,13 @@
+/* Значок обновления приложения в нижней полосе.
+   Общее с прочими кнопками-значками — в icon-button.css, вид запертого — в
+   disabled-look.css. */
+
+/* Серый, но живой: на наведение отзывается, как прочие значки, — им проверяют. */
+.update-btn {
+  color: var(--text-tertiary);
+}
+
+.update-btn.has-update,
+.update-btn.has-update:hover {
+  color: var(--accent);
+}
