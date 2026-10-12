@@ -16,7 +16,7 @@ from backend.repository import aggregators as repo
 logger = logging.getLogger(__name__)
 
 AgentOutcome = Literal[
-    slot.CycleOutcome, work.AgentStop, "missing", "locked", "blacklisted",
+    work.WorkOutcome, "missing", "locked", "blacklisted",
     "not_logged_in", "login_timeout",
 ]
 """Чем кончилось действие агента: исходы места прогона и свои — у источника

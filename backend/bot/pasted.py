@@ -4,12 +4,12 @@ import logging
 from datetime import datetime
 from typing import Literal
 
-from backend.bot import slot, work
+from backend.bot import work
 from backend.flows import pasted as flow_pasted
 
 logger = logging.getLogger(__name__)
 
-PastedOutcome = Literal[slot.CycleOutcome, work.AgentStop, flow_pasted.PastedIntakeOutcome]
+PastedOutcome = Literal[work.WorkOutcome, flow_pasted.PastedIntakeOutcome]
 """Чем кончилось заведение по вставленному тексту, как это видит окно.
 
 Складывается по тому же уговору, что и исход повторного прогона: место

@@ -1,7 +1,7 @@
 """Домен «система»: то, чем страница живёт на любом экране.
 
-Режим бота и ручной сбор она отсюда правит, здоровье связи и счёт
-непрочитанного — читает; журнал,
+Режим бота, ручной сбор и отклик на все новые она отсюда пускает, здоровье
+связи, счёт непрочитанного и счёт новых вакансий — читает; журнал,
 снос данных и просьба к рабочему столу приходят примесями из соседних файлов.
 Разрез по файлам — это раскладка одного домена, а не задел под вторую
 реализацию: страница видит один предмет, `api.system`.
@@ -19,16 +19,17 @@ from functools import partial
 
 from adapters import lm_models
 from backend import health
+from backend.flows.handover import new_to_apply
 from backend.models import BotMode
 from backend.repository.bot_mode import read_mode, write_mode
 from backend.incoming import int_or_none
 from backend.repository import hr_list, messages as messages_repo
-from client.bridge.answer import Denied, denied, launched, reply
+from client.bridge.answer import Denied, denied, launched_on_bot, reply
 from client.bridge.desktop import Desktop
 from client.bridge.hub import Hub
 from client.bridge.journal import Journal
 from client.bridge.llm import _do_llm_probe
-from client.bridge.refusals import NO_BOT, RUN_REFUSALS
+from client.bridge.refusals import APPLY_ALL_REFUSALS, NO_BOT, RUN_REFUSALS
 from client.bridge.wipe import Wipe
 from client.bridge.wire import _iso
 
@@ -56,7 +57,8 @@ _MODEL_PROBE_INTERVAL_S = 60.0
 class System(Journal, Wipe, Desktop):
     """То, что страница показывает всегда, на каком бы экране ни стояла.
 
-    Режим бота, ручной сбор, здоровье связи и счёт непрочитанного — здесь;
+    Режим бота, ручной сбор, отклик на все новые, здоровье связи, счёт
+    непрочитанного и счёт новых вакансий — здесь;
     журнал, снос всех данных и открытие ссылки — примесями рядом.
 
     Своих часов у домена нет вовсе: здоровье и непрочитанное он считает по
@@ -152,16 +154,31 @@ class System(Journal, Wipe, Desktop):
         Весть звучит, когда оборот пройден целиком — каналы, агрегаторы и
         отклики.
         """
-        bot = self._hub.bot
-        if bot is None:
-            return denied(NO_BOT, action="run_now")
-
-        return launched(
+        return launched_on_bot(
             self._hub,
-            bot.force_poll_once,
+            lambda bot: bot.force_poll_once(),
             RUN_REFUSALS,
             "Обход завершён.",
             action="run_now",
+        )
+
+    def new_vacancies(self) -> dict:
+        """Сколько вакансий возьмёт отклик на все новые — той же выборкой, что и он."""
+
+        async def run() -> dict:
+            return {"count": len(await new_to_apply(self._hub.session_factory))}
+
+        return reply(self._hub.runner, run())
+
+    def apply_all_new(self) -> dict:
+        """Значок «!»: откликнуться подряд на все новые вакансии. Ответ — «пущено»,
+        исход — вестью, как у обхода."""
+        return launched_on_bot(
+            self._hub,
+            lambda bot: bot.apply_all_new(),
+            APPLY_ALL_REFUSALS,
+            "Отклики на новые вакансии закончены.",
+            action="apply_all_new",
         )
 
     def stop_run(self) -> dict:

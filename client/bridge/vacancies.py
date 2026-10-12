@@ -20,14 +20,13 @@ from client.bridge.answer import (
     Denied,
     bad_fields,
     denied,
-    launched,
+    launched_on_bot,
     reply,
 )
 from client.bridge.form_payloads import read_new_vacancy_fields
 from client.bridge.hub import Hub
 from client.bridge.refusals import (
     NAME_REQUIRED,
-    NO_BOT,
     NO_VACANCY,
     PASTED_REFUSALS,
     TEXT_REQUIRED,
@@ -312,14 +311,10 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
         if not text:
             return denied(TEXT_REQUIRED, action="create_from_text")
 
-        bot = self._hub.bot
-        if bot is None:
-            return denied(NO_BOT, action="create_from_text")
-
         posted_at = moment_or_none(payload.get("posted_at"))
-        return launched(
+        return launched_on_bot(
             self._hub,
-            lambda: bot.ui_ingest_pasted_text(text, posted_at),
+            lambda bot: bot.ui_ingest_pasted_text(text, posted_at),
             PASTED_REFUSALS,
             "Объявление заведено.",
             action="create_from_text",

@@ -98,7 +98,7 @@ def telegram_case(make_pipeline, session_factory, tmp_path, monkeypatch, outbox)
 
     async def make(*, prior_letter=False, flood_wait=None, simulated=False, hr_user_id=None):
         resume = resume_file(tmp_path)
-        vacancy = await _telegram_vacancy(session_factory, hr_user_id=hr_user_id)
+        vacancy = await telegram_vacancy(session_factory, hr_user_id=hr_user_id)
         if prior_letter:
             other = vacancy_row(hr_id=vacancy.hr_id, title="Прежняя")
             await put(session_factory, other)
@@ -121,7 +121,7 @@ def manual_case(make_bot, session_factory, tmp_path, monkeypatch):
     Telegram висит; `bot.hanging` взводится, когда работа до него дошла."""
 
     async def make(*, status=VacancyStatus.NEW, hang=False):
-        vacancy = await _telegram_vacancy(session_factory, status=status)
+        vacancy = await telegram_vacancy(session_factory, status=status)
         await put(session_factory, profile_row())
         bot = await make_bot()
         await bot.rs.set_app(CV_PATH_KEY, str(resume_file(tmp_path)))
@@ -138,7 +138,8 @@ def manual_case(make_bot, session_factory, tmp_path, monkeypatch):
     return make
 
 
-async def _telegram_vacancy(session_factory, *, hr_user_id=None, status=VacancyStatus.NEW):
+async def telegram_vacancy(session_factory, *, hr_user_id=None, status=VacancyStatus.NEW):
+    """Вакансия, на которую откликаются в Telegram: HR `hr_name` и сама вакансия."""
     hr = hr_row(telegram_username="hr_name", telegram_user_id=hr_user_id)
     await put(session_factory, hr)
     vacancy = vacancy_row(hr_id=hr.id, status=status)

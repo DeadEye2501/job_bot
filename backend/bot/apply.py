@@ -1,7 +1,8 @@
-"""Ручной отклик выбранным способом: тот же откликатель, в месте прогона с набором агента.
+"""Отклик по нажатию человека: тот же откликатель, в месте прогона с набором агента.
 
-Отличие от `bot/aggregators`: там — работа агента с источниками, здесь — отклик
-по нажатию человека на любой способ, от Telegram до формы.
+Нажатий два — выбранный способ одной вакансии и отклик на все новые разом.
+Отличие от `bot/aggregators`: там — работа агента с источниками, здесь — отклик,
+о котором попросил человек.
 """
 
 from typing import Literal
@@ -9,11 +10,12 @@ from typing import Literal
 from backend.agent.kit import AgentKit
 from backend.applying import run
 from backend.applying.result import Unfit
-from backend.bot import slot, work
+from backend.bot import work
 from backend.domain.apply_order import Way
+from backend.flows.handover import new_to_apply
 from backend.models import Vacancy
 
-ApplyOutcome = Literal[slot.CycleOutcome, work.AgentStop, "failed", "unfit", "missing"]
+ApplyOutcome = Literal[work.WorkOutcome, "failed", "unfit", "missing"]
 """Чем кончился ручной отклик: исходы места прогона и работы с агентом, свой
 провал способа, вакансия, оказавшаяся неподходящей, и пропавшая вакансия."""
 
@@ -34,3 +36,18 @@ async def apply_chosen_way(bot, vacancy_id: int, way: Way) -> ApplyOutcome:
         return "unfit" if isinstance(outcome, Unfit) else "failed"
 
     return await work.in_slot(bot, apply, f"apply {way.method} {vacancy_id}")
+
+
+async def apply_all_new(bot) -> work.WorkOutcome:
+    """Откликнуться подряд на все новые разобранные вакансии. Режим не помеха: нажал человек.
+
+    Список берётся уже в месте прогона: взятый до него разошёлся бы с тем, что
+    успел сделать прогон, ждавший места.
+    """
+
+    async def apply(kit: AgentKit) -> str:
+        await bot.ingestion.reload_resources()
+        await run.apply_vacancies(kit, await new_to_apply(bot.session_factory))
+        return "ok"
+
+    return await work.in_slot(bot, apply, "apply all new")

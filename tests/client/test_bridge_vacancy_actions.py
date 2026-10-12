@@ -104,6 +104,32 @@ async def test_a_stop_reaches_the_bot(api, ask, with_bot):
     assert ("cancel_current_poll",) in bot.calls
 
 
+async def test_apply_all_before_the_bot_is_up_is_refused_by_name(api, ask):
+    answer = await ask(api.system.apply_all_new)
+
+    assert (answer["fail"], answer["detail"]) == ("denied", "Бот ещё не готов.")
+
+
+async def test_apply_all_reaches_the_bot_and_says_when_finished(api, ask, with_bot, told):
+    bot = with_bot()
+
+    answer = await ask(api.system.apply_all_new)
+
+    assert answer["ok"] == {"started": True, "action": "apply_all_new"}
+    assert await told() == {"message": "Отклики на новые вакансии закончены.", "danger": False}
+    assert ("apply_all_new",) in bot.calls
+
+
+async def test_a_stopped_apply_all_says_its_own_words(api, ask, with_bot, told):
+    """Слова остановки свои, а не обхода: «Поллинг отменён» после «Стопа» на
+    откликах сбил бы с толку."""
+    with_bot(apply_all="cancelled")
+
+    await ask(api.system.apply_all_new)
+
+    assert await told() == {"message": "Отклики на новые вакансии остановлены.", "danger": True}
+
+
 async def test_a_rerun_before_the_bot_is_up_is_refused_by_name(
     api, ask, session_factory
 ):

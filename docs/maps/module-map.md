@@ -654,13 +654,14 @@ init
 - `async def full_letter(pipeline, parsed: ParsedVacancy, channel_ref: str | None, vacancy_id: int)` (27)
 - `def parsed_from_row(v: Vacancy) -> ParsedVacancy` (17)
 
-### `backend/applying/world.py` — 72 строк
+### `backend/applying/world.py` — 87 строк
 
 Факты для выбора способа: что известно о вакансии и что сейчас доступно.
 
 Зависит от: `backend.agent.availability`, `backend.applying.result`, `backend.domain.apply_order`, `backend.models`, `backend.repository.aggregators`, `backend.repository.mail_account`, `backend.repository.vacancy_contacts`
 
 - `async def read_world(rs, session_factory) -> World` (12)
+- `async def awaits_application(session_factory, vacancy_id: int) -> bool` (7)
 - `async def vacancy_facts(session: AsyncSession, vacancy_id: int) -> VacancyFacts | None` (14)
 - `def _handle(hr: HR | None) -> str | None` (7)
 - `async def ways_in(session_factory, world: World, vacancy_id: int) -> list[Way]` (5)
@@ -694,14 +695,16 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _row(bot, aggregator_id: int) -> Aggregator | None` (3)
 - `async def _refused(bot, row: Aggregator) -> AgentOutcome | None` (10)
 
-### `backend/bot/apply.py` — 36 строк
+### `backend/bot/apply.py` — 53 строк
 
-Ручной отклик выбранным способом: тот же откликатель, в месте прогона с набором агента.
+Отклик по нажатию человека: тот же откликатель, в месте прогона с набором агента.
 
-Зависит от: `backend.agent.kit`, `backend.applying`, `backend.applying.result`, `backend.bot`, `backend.domain.apply_order`, `backend.models`
+Зависит от: `backend.agent.kit`, `backend.applying`, `backend.applying.result`, `backend.bot`, `backend.domain.apply_order`, `backend.flows.handover`, `backend.models`
 
 - `async def apply_chosen_way(bot, vacancy_id: int, way: Way) -> ApplyOutcome` (16)
   - `async def apply(kit: AgentKit) -> str` (8)
+- `async def apply_all_new(bot) -> work.WorkOutcome` (13)
+  - `async def apply(kit: AgentKit) -> str` (4)
 
 ### `backend/bot/can_send.py` — 55 строк
 
@@ -736,7 +739,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _checked_kind(src: Path, file_path: str) -> bool` (28)
 - `async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message` (38)
 
-### `backend/bot/client.py` — 400 строк ⚠ подошёл к 300
+### `backend/bot/client.py` — 404 строк ⚠ подошёл к 300
 
 Сборка бота: его состояние, соединения и поверхность, которой пользуется окно.
 
@@ -748,7 +751,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _declare_loop_controls(bot) -> None` (23)
 - `def _declare_ui_hooks(bot) -> None` (41)
 - `def _forward_pipeline_hooks(bot) -> None` (17)
-- `class Bot` (200)
+- `class Bot` (203)
   - `def is_ready(self) -> bool` (7)
   - `def is_connected(self) -> bool` (13)
   - `def is_running_round(self) -> bool` (8)
@@ -757,7 +760,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def poll_channel_now(self, channel_id) -> channels.ChannelPollOutcome` (4)
   - `async def add_channel(self, username) -> tuple[int | None, channels.ChannelAddOutcome]` (4)
   - `def cancel_current_poll(self) -> None` (2)
-  - `async def force_poll_once(self) -> turn.TurnOutcome` (11)
+  - `async def force_poll_once(self) -> work.WorkOutcome` (11)
   - `async def mark_hr_chat_read(self, hr_id) -> int` (2)
   - `async def send_to_hr_chat(self, hr_id, text) -> Message` (2)
   - `async def send_to_hr_media(self, hr_id, file_path) -> Message` (2)
@@ -776,6 +779,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def run_aggregator_now(self, aggregator_id) -> aggregators.AgentOutcome` (2)
   - `async def login_aggregator(self, aggregator_id) -> aggregators.AgentOutcome` (2)
   - `async def apply_chosen_way(self, vacancy_id: int, way: Way) -> apply.ApplyOutcome` (2)
+  - `async def apply_all_new(self) -> work.WorkOutcome` (2)
   - `def human_done(self) -> None` (2)
   - `def reveal_browser(self) -> None` (2)
   - `async def delete_aggregator(self, aggregator_id) -> str` (2)
@@ -848,7 +852,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _occupy(bot, label: str) -> bool` (7)
 - `def _release(bot) -> None` (4)
 
-### `backend/bot/turn.py` — 57 строк
+### `backend/bot/turn.py` — 52 строк
 
 Полный оборот автоматики одной задачей: недоразобранное, каналы, агрегаторы.
 
@@ -871,7 +875,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def on_dm_outgoing(bot, _client, msg) -> None` (13)
 - `async def on_dm(bot, _client, msg) -> None` (12)
 
-### `backend/bot/work.py` — 65 строк
+### `backend/bot/work.py` — 69 строк
 
 Работа в месте прогона с набором агента: набор живёт, пока идёт работа.
 
@@ -1371,13 +1375,14 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def check_ghosting_timeouts(pipeline) -> int` (26)
 
-### `backend/flows/handover.py` — 43 строк
+### `backend/flows/handover.py` — 55 строк
 
 Передача отобранного откликателю: решение «откликаться» и догон новых HR после отклика.
 
-Зависит от: `backend.flows`, `backend.flows.dm_backfill`, `backend.flows.parse`, `backend.models`
+Зависит от: `backend.applying.world`, `backend.flows`, `backend.flows.dm_backfill`, `backend.flows.parse`, `backend.models`, `backend.repository.vacancies_common`
 
 - `async def to_apply(session_factory, vacancy_ids: list[int]) -> list[int]` (9)
+- `async def new_to_apply(session_factory) -> list[int]` (8)
 - `async def hand_over(pipeline, judged: list[tuple[int, Judged]]) -> None` (13)
 - `async def judge_and_hand_over(pipeline, vacancy_id: int, text: str, channel_username: str | None, *, allow_delete: bool=True) -> bool` (7)
 
@@ -2828,13 +2833,14 @@ Runtime settings layer.
   - `def login(self, aggregator_id: int) -> dict` (3)
   - `def run_now(self, aggregator_id: int) -> dict` (3)
   - `def _launch(self, aggregator_id: int, action: str, done: str, refusals: dict) -> dict` (13)
+    - `def start(bot)` (3)
 - `def _refuse_deletion(block: str | None) -> None` (4)
 
-### `client/bridge/answer.py` — 234 строк
+### `client/bridge/answer.py` — 251 строк
 
 Единый конверт ответа окну — от исхода работы до ответа зовущему.
 
-Зависит от: `backend.incoming`, `client.bridge.events`, `client.bridge.payload`, `client.bridge.runner`
+Зависит от: `backend.incoming`, `client.bridge.events`, `client.bridge.payload`, `client.bridge.refusals`, `client.bridge.runner`
 
 - `class Denied(Exception)` (12)
 - `def denied(reason: str, **extra: Any) -> dict` (8)
@@ -2844,6 +2850,7 @@ Runtime settings layer.
 - `def reply(runner: AsyncRunner, coro: Coroutine[Any, Any, Any]) -> dict` (33)
 - `def launched(hub, work: Callable[[], Coroutine[Any, Any, str]], refusals: dict[str, str], done: str, **started: Any) -> dict` (39)
   - `async def report() -> None` (10)
+- `def launched_on_bot(hub, start: Callable[[Any], Coroutine[Any, Any, str]], refusals: dict[str, str], done: str, **started: Any) -> dict` (14)
 - `def finished(events: Events, status: str, refusals: dict[str, str], done: str) -> None` (19)
 
 ### `client/bridge/api.py` — 41 строк
@@ -2906,16 +2913,16 @@ Runtime settings layer.
 - `def asked_update(payload: dict, subject: CardSubject) -> tuple` (17)
 - `def _tell(hub, subject: CardSubject) -> None` (9)
 
-### `client/bridge/channel_actions.py` — 200 строк
+### `client/bridge/channel_actions.py` — 196 строк
 
 Что окно делает с каналом: опрос, курсор, чёрный список, состав.
 
 Зависит от: `backend.domain.telegram_identity`, `backend.repository`, `client.bridge.answer`, `client.bridge.mark`, `client.bridge.refusals`, `client.bridge.source_switch`
 
-- `class ChannelActions` (183)
+- `class ChannelActions` (179)
   - `def block(self, channel_id: int) -> dict` (10)
   - `def unblock(self, channel_id: int) -> dict` (8)
-  - `def poll_now(self, channel_id: int) -> dict` (19)
+  - `def poll_now(self, channel_id: int) -> dict` (15)
   - `def reset_cursor(self, channel_id: int) -> dict` (22)
     - `async def run() -> dict` (9)
   - `def delete(self, channel_id: int) -> dict` (25)
@@ -3239,7 +3246,7 @@ Runtime settings layer.
     - `async def run() -> dict` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (26)
 
-### `client/bridge/refusals.py` — 277 строк
+### `client/bridge/refusals.py` — 285 строк
 
 Слова, которыми мост отказывает окну.
 
@@ -3316,13 +3323,13 @@ Runtime settings layer.
   - `def skills(self, period: str) -> dict` (3)
   - `def channels_pipeline(self, period: str) -> dict` (3)
 
-### `client/bridge/system.py` — 392 строк ⚠ подошёл к 300
+### `client/bridge/system.py` — 409 строк ⚠ подошёл к 300
 
 Домен «система»: то, чем страница живёт на любом экране.
 
-Зависит от: `adapters`, `backend`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.llm`, `client.bridge.refusals`, `client.bridge.wipe`, `client.bridge.wire`
+Зависит от: `adapters`, `backend`, `backend.flows.handover`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.llm`, `client.bridge.refusals`, `client.bridge.wipe`, `client.bridge.wire`
 
-- `class System(Journal, Wipe, Desktop)` (282)
+- `class System(Journal, Wipe, Desktop)` (298)
   - `def initial(self) -> dict` (16)
     - `async def run() -> dict` (6)
   - `async def _mode(self) -> BotMode` (5)
@@ -3330,7 +3337,10 @@ Runtime settings layer.
     - `async def run() -> dict` (7)
   - `def human_done(self) -> dict` (5)
   - `def reveal_browser(self) -> dict` (5)
-  - `def run_now(self) -> dict` (23)
+  - `def run_now(self) -> dict` (19)
+  - `def new_vacancies(self) -> dict` (7)
+    - `async def run() -> dict` (2)
+  - `def apply_all_new(self) -> dict` (10)
   - `def stop_run(self) -> dict` (15)
     - `async def run() -> dict` (6)
   - `def unread_chats(self) -> dict` (13)
@@ -3349,14 +3359,14 @@ Runtime settings layer.
 - `def _probed(task: Future) -> None` (16)
 - `def _after(asked) -> int | None` (21)
 
-### `client/bridge/vacancies.py` — 326 строк ⚠ подошёл к 300
+### `client/bridge/vacancies.py` — 321 строк ⚠ подошёл к 300
 
 Экран «Вакансии»: список, карточка и правки в них.
 
 Зависит от: `backend.domain.scoring`, `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.form_payloads`, `client.bridge.hub`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.vacancy_actions`, `client.bridge.vacancy_contacts`, `client.bridge.vacancy_filter`, `client.bridge.vacancy_links`, `client.bridge.wire`
 
 - `def _typed_text(raw) -> str | None` (8)
-- `class Vacancies(VacancyActions, VacancyLinks, VacancyContacts)` (267)
+- `class Vacancies(VacancyActions, VacancyLinks, VacancyContacts)` (263)
   - `def list(self, payload: dict | None=None) -> dict` (15)
   - `def filter_options(self) -> dict` (19)
     - `async def run() -> dict` (4)
@@ -3373,20 +3383,20 @@ Runtime settings layer.
     - `async def run() -> dict` (15)
   - `def create(self, payload: dict) -> dict` (27)
     - `async def run() -> dict` (5)
-  - `def create_from_text(self, payload: dict) -> dict` (28)
+  - `def create_from_text(self, payload: dict) -> dict` (24)
 
-### `client/bridge/vacancy_actions.py` — 123 строк
+### `client/bridge/vacancy_actions.py` — 115 строк
 
 Действия над вакансией: перезапуск разбора, отклик, удаление.
 
 Зависит от: `backend.applying.world`, `backend.domain.apply_order`, `backend.repository`, `client.bridge.answer`, `client.bridge.refusals`, `client.bridge.vacancy_links`
 
-- `class VacancyActions` (100)
-  - `def rerun(self, payload: dict) -> dict` (24)
+- `class VacancyActions` (93)
+  - `def rerun(self, payload: dict) -> dict` (20)
   - `def apply_ways(self, vacancy_id: int) -> dict` (12)
     - `async def run() -> dict` (3)
   - `async def _available_ways(self, vacancy_id: int) -> list[Way]` (4)
-  - `def apply_via(self, payload: dict) -> dict` (28)
+  - `def apply_via(self, payload: dict) -> dict` (25)
     - `async def run() -> Way` (6)
   - `def delete(self, payload: dict) -> dict` (22)
     - `async def run() -> dict` (14)
@@ -3758,7 +3768,7 @@ Runtime settings layer.
 
 - `async def web_search(session_factory) -> Aggregator` (4)
 
-### `tests/backend/fixtures/applying.py` — 189 строк
+### `tests/backend/fixtures/applying.py` — 190 строк
 
 Стенд откликателя: набор агента и вакансии, на которые есть чем откликнуться.
 
@@ -3775,7 +3785,7 @@ Runtime settings layer.
   - `async def make(*, prior_letter=False, flood_wait=None, simulated=False, hr_user_id=None)` (14)
 - `def manual_case(make_bot, session_factory, tmp_path, monkeypatch)` (21)
   - `async def make(*, status=VacancyStatus.NEW, hang=False)` (14)
-- `async def _telegram_vacancy(session_factory, *, hr_user_id=None, status=VacancyStatus.NEW)` (6)
+- `async def telegram_vacancy(session_factory, *, hr_user_id=None, status=VacancyStatus.NEW)` (7)
 - `def _model_writes_the_letter(monkeypatch) -> None` (7)
   - `async def generate_cover_letter(block, parsed, client, model, *, channel_ref=None)` (2)
 - `def mail_case(make_pipeline, session_factory, tmp_path, monkeypatch)` (31)
@@ -4055,13 +4065,13 @@ Runtime settings layer.
 Тестов: 8
 
 
-### `tests/backend/test_applying_run.py` — 89 строк
+### `tests/backend/test_applying_run.py` — 109 строк
 
 Цикл откликателя: по каждой вакансии первый доступный способ, пока один не удастся.
 
-Зависит от: `backend.applying`, `backend.applying.result`, `backend.domain.apply_order`
+Зависит от: `backend.applying`, `backend.applying.result`, `backend.domain.apply_order`, `backend.models`
 
-Тестов: 7
+Тестов: 8
 
 - `def executors(monkeypatch)` (13)
   - `def fake(method)` (5)
@@ -4123,13 +4133,13 @@ Runtime settings layer.
 - `def sought(monkeypatch)` (9)
   - `async def seek(kit, source)` (2)
 
-### `tests/backend/test_bot_apply.py` — 70 строк
+### `tests/backend/test_bot_apply.py` — 101 строк
 
 Ручной отклик одним зовом: выбранный способ через того же откликателя, в месте прогона.
 
 Зависит от: `backend.applying`, `backend.applying.result`, `backend.bot.apply`, `backend.domain.apply_order`, `backend.models`, `tests.backend.fixtures.applying`, `tests.backend.fixtures.bot`, `tests.dbio`
 
-Тестов: 7
+Тестов: 10
 
 
 ### `tests/backend/test_bot_channels.py` — 168 строк
@@ -4683,13 +4693,13 @@ Runtime settings layer.
 - `def _long_ago()` (3)
 - `def _recently()` (3)
 
-### `tests/backend/test_flows_handover.py` — 63 строк
+### `tests/backend/test_flows_handover.py` — 75 строк
 
 Сбор отдаёт откликателю: годная после вердикта вакансия уходит отклику, догон
 
-Зависит от: `backend.flows`, `backend.flows.handover`, `backend.models`, `tests.factories`
+Зависит от: `backend.flows`, `backend.flows.handover`, `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 6
+Тестов: 7
 
 - `async def _set_status(session_factory, vacancy_id, status)` (4)
 
@@ -6369,13 +6379,13 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/client/test_bridge_system.py` — 186 строк
+### `tests/client/test_bridge_system.py` — 197 строк
 
 Следствия домена «система»: чем занят бот и что показывает нижняя полоса.
 
-Зависит от: `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 12
+Тестов: 13
 
 
 ### `tests/client/test_bridge_vacancies.py` — 410 строк ⚠ подошёл к 300
@@ -6387,13 +6397,13 @@ Runtime settings layer.
 Тестов: 21
 
 
-### `tests/client/test_bridge_vacancy_actions.py` — 273 строк
+### `tests/client/test_bridge_vacancy_actions.py` — 299 строк
 
 Следствия действий над вакансией, которым нужен поднятый бот.
 
 Зависит от: `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 13
+Тестов: 16
 
 - `def mailable_vacancy(session_factory)` (10)
   - `async def _put()` (5)
@@ -6905,14 +6915,14 @@ Runtime settings layer.
 - `def user(*, username=None, photo=None, **extra) -> SimpleNamespace` (15)
 - `def dialog(peer_id: int, top_message: int | None=None)` (17)
 
-### `tests/fakes/ui_bot.py` — 142 строк
+### `tests/fakes/ui_bot.py` — 147 строк
 
 Бот, каким его видит окно: обращения, которые делает мост.
 
 Зависит от: `backend.bot.pasted`, `backend.bot.rerun`
 
 - `class Sent` (4)
-- `class UiBot` (103)
+- `class UiBot` (107)
   - `def _refuse_if_asked(self) -> None` (3)
   - `async def force_poll_once(self) -> str` (3)
   - `def cancel_current_poll(self) -> None` (2)
@@ -6931,6 +6941,7 @@ Runtime settings layer.
   - `async def run_aggregator_now(self, aggregator_id: int) -> str` (3)
   - `async def login_aggregator(self, aggregator_id: int) -> str` (3)
   - `async def apply_chosen_way(self, vacancy_id: int, way) -> str` (3)
+  - `async def apply_all_new(self) -> str` (3)
   - `def human_done(self) -> None` (2)
   - `def reveal_browser(self) -> None` (2)
   - `async def delete_aggregator(self, aggregator_id: int) -> str` (3)

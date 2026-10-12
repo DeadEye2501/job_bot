@@ -6,7 +6,7 @@ from typing import Literal
 
 from pyrogram.errors import FloodWait, UsernameInvalid, UsernameNotOccupied
 
-from backend.bot import slot, work
+from backend.bot import work
 from backend.flows import channels as flow_channels
 from backend.telegram_lookup import read_channel_metadata
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
@@ -17,7 +17,7 @@ from backend.repository.channels import (
 
 logger = logging.getLogger(__name__)
 
-ChannelPollOutcome = Literal[slot.CycleOutcome, work.AgentStop, flow_channels.PollOutcome]
+ChannelPollOutcome = Literal[work.WorkOutcome, flow_channels.PollOutcome]
 """Чем кончился прогон одного канала, как это видит окно.
 
 Складывается, а не выписывается: исходы места прогона и исходы самого обхода

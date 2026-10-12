@@ -2,21 +2,33 @@
 
 from sqlalchemy import select
 
+from backend.applying.world import AWAITS_APPLICATION
 from backend.flows import parse
 from backend.flows.dm_backfill import spawn_hr_backfill
 from backend.flows.parse import Judged
-from backend.models import Vacancy, VacancyStatus
+from backend.models import Vacancy
+from backend.repository.vacancies_common import PARSED_ONLY
 
 
 async def to_apply(session_factory, vacancy_ids: list[int]) -> list[int]:
-    """Откликаться — значит после вердикта вакансия стоит в New."""
+    """Что из разобранного поставить в очередь откликов: ждущее отклика после вердикта."""
     if not vacancy_ids:
         return []
     async with session_factory() as session:
         rows = await session.scalars(select(Vacancy.id).where(
-            Vacancy.id.in_(vacancy_ids), Vacancy.status == VacancyStatus.NEW))
+            Vacancy.id.in_(vacancy_ids), AWAITS_APPLICATION))
         chosen = set(rows)
     return [vacancy_id for vacancy_id in vacancy_ids if vacancy_id in chosen]
+
+
+async def new_to_apply(session_factory) -> list[int]:
+    """Всё, что ждёт отклика и разобрано, свежие первыми."""
+    async with session_factory() as session:
+        return list(await session.scalars(
+            select(Vacancy.id)
+            .where(AWAITS_APPLICATION, PARSED_ONLY)
+            .order_by(Vacancy.created_at.desc(), Vacancy.id.desc())
+        ))
 
 
 async def hand_over(pipeline, judged: list[tuple[int, Judged]]) -> None:
