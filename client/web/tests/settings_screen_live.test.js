@@ -23,7 +23,7 @@ const SNAPSHOT = {
     poll_interval_sec: 60,
     backfill_limit: 50,
     dm_backfill_limit: 20,
-    send_locked: false,
+    auto_apply: true,
   },
   aggregators: { aggregator_backfill_limit: 20, show_browser: false, letter_writer: 'app' },
 };
@@ -76,6 +76,32 @@ describe('лимит вакансий с агрегатора', () => {
       method: 'settings.save',
       payload: { app: { aggregator_backfill_limit: 500 } },
     });
+  });
+});
+
+describe('автоотклик', () => {
+  it('тумблер показывает записанное', async () => {
+    const { field } = screen();
+    await settled();
+
+    expect(field('Автоотклик').checked).toBe(true);
+  });
+
+  it('выключение уходит сохранением настроек приложения', async () => {
+    const { asked, field } = screen();
+    await settled();
+
+    field('Автоотклик').click();
+    await settled();
+
+    expect(asked).toContainEqual({ method: 'settings.save', payload: { app: { auto_apply: false } } });
+  });
+
+  it('симуляции отправки в окне нет', async () => {
+    const { text } = screen();
+    await settled();
+
+    expect(text()).not.toContain('Симуляция');
   });
 });
 

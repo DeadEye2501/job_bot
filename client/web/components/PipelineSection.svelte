@@ -1,6 +1,6 @@
 <script>
   // Пороги отбора и ритм обхода: шесть величин в две строки по три — сверху
-  // порог, интервал и симуляция, снизу три лимита.
+  // порог, интервал и автоотклик, снизу три лимита.
   import { untrack } from 'svelte';
 
   import { BOUNDS, SCORE_MAX, clampField, scorePercent, thresholdState } from '$state/settings.js';
@@ -32,9 +32,6 @@
       ...BOUNDS.dm_backfill_limit,
     },
   ];
-
-  const LOCK_TITLE =
-    'Когда включено, исходящие сообщения не уходят в Telegram — это режим проверки обхода без настоящей отправки';
 
   // Порог живёт своим состоянием: запись уходит по отпусканию, и до ответа
   // моста число рядом с ползунком отставало бы — порог тянули бы вслепую.
@@ -74,7 +71,7 @@
 <SettingsSection icon="tune" title="Пайплайн">
   <div class="pipeline-row">
     <div>
-      <div class="pipeline-label">Score threshold</div>
+      <div class="field-caption pipeline-label">Score threshold</div>
       <div class="slider-row">
         <input
           type="range"
@@ -93,16 +90,13 @@
     {@render number(INTERVAL)}
 
     <div>
-      <div class="pipeline-label" title={LOCK_TITLE}>Симуляция отправки</div>
-      <!-- Поля нет — значит выключена, как и в настройках бота: включённая
-           молча, она показывала бы «отклик отправлен» над письмом, которого HR
-           не получал. Стенд включают нарочно. -->
+      <div class="field-caption pipeline-label">Автоотклик</div>
       <div class="with-toggle">
         <input
           type="checkbox"
           class="toggle"
-          checked={values.send_locked === true}
-          onchange={(event) => onsave({ send_locked: event.currentTarget.checked })}
+          checked={values.auto_apply}
+          onchange={(event) => onsave({ auto_apply: event.currentTarget.checked })}
         />
       </div>
     </div>
@@ -115,7 +109,7 @@
 
 {#snippet number(one)}
   <div>
-    <div class="pipeline-label">{one.label}</div>
+    <div class="field-caption pipeline-label">{one.label}</div>
     <div class="with-unit">
       <input
         class="input"

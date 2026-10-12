@@ -449,8 +449,8 @@
 - принимает: row, current, chosen, mark, onpick
 - берёт: ./Avatar.svelte
 
-### components/PipelineSection.svelte (131)
-- Поля нет — значит выключена, как и в настройках бота: включённая молча, она показывала бы «отклик отправлен» над письмом, которого HR не получал. Стенд включают нарочно.
+### components/PipelineSection.svelte (125)
+- —
 - принимает: values, onsave
 - берёт: ./SettingsSection.svelte
 
@@ -1351,7 +1351,7 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (2): .pill, .pill:hover
 - берёт: --accent, --bg-secondary, --border, --text-secondary
 
-### styles/pipeline.css (63)
+### styles/pipeline.css (62)
 - Пороги отбора: шесть величин в две строки по три, подпись слева от поля. Сетка из шести дорожек — пара «подпись, элемент» на колонку, — а ячейки прозрачны для неё: так подписи одной колонки берут общую ширину по длинной, и поле, полоска порога и тумблер под ними встают на одну вертикаль.
 - селекторы (8): .pipeline-row, .pipeline-row > div, .pipeline-label, .with-unit,
 .slider-row,
@@ -1844,7 +1844,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/settings.test.js (478)
 - —
 
-### tests/settings_screen_live.test.js (221)
+### tests/settings_screen_live.test.js (247)
 - * Экран над мостом; `mail` — что мост отдаёт о почте.
 
 ### tests/settled.js (21)
