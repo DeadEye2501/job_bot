@@ -34,6 +34,7 @@ ANSWERS = {
     "aggregator_login": "ok",
     "apply_via": "ok",
     "apply_all": "ok",
+    "update": "ok",
     "aggregator_deleted": "ok",
 }
 
@@ -135,6 +136,10 @@ class UiBot:
     async def apply_all_new(self) -> str:
         self.calls.append(("apply_all_new",))
         return self.answers["apply_all"]
+
+    async def download_update(self) -> str:
+        self.calls.append(("download_update",))
+        return self.answers["update"]
 
     def human_done(self) -> None:
         self.calls.append(("human_done",))

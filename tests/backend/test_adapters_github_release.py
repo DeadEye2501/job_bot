@@ -3,19 +3,30 @@
 import httpx
 import pytest
 
-from adapters.github_release import Release, latest_release
-from tests.fakes.github_release import release_answer, serve_latest
+from adapters.github_release import Release, download, latest_release
+from tests.fakes.github_release import NEWER, download_url, release_answer, serve_latest, serve_newer
 
 
 async def test_the_release_brings_its_tag_and_the_app_file(monkeypatch):
-    serve_latest(monkeypatch, release_answer("v1.1.0"))
+    serve_latest(monkeypatch, release_answer("v1.1.0", content=b"app", digest="sha256:" + "ab" * 32))
 
     assert await latest_release() == Release(
         tag="v1.1.0",
-        url="https://github.com/DeadEye2501/job_bot/releases/download/v1.1.0/JobBot.exe",
-        size=1024,
+        url=download_url("v1.1.0"),
+        size=3,
         sha256="ab" * 32,
     )
+
+
+async def test_a_file_comes_down_in_pieces(monkeypatch):
+    """Потоком, а не целиком в память: exe весит под сотню мегабайт."""
+    content = b"\0" * (200 * 1024)
+    serve_newer(monkeypatch, content=content)
+    pieces = []
+
+    await download(download_url(NEWER), pieces.append)
+
+    assert len(pieces) > 1 and b"".join(pieces) == content
 
 
 async def test_a_release_without_the_app_file_is_no_release(monkeypatch):

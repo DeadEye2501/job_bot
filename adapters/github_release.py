@@ -4,6 +4,7 @@
 знают форму ответа API релизов. Клиент берётся у него же.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import httpx
@@ -53,3 +54,16 @@ async def latest_release() -> Release | None:
         size=asset["size"],
         sha256=asset["digest"].removeprefix("sha256:"),
     )
+
+
+async def download(url: str, write: Callable[[bytes], None]) -> None:
+    """Скачать файл потоком, отдавая куски по мере прихода.
+
+    Куда их класть и что с ними делать — сверять, удалять при беде — решает
+    зовущий; беда сети уходит к нему же.
+    """
+    async with make_client() as client:
+        async with client.stream("GET", url) as response:
+            response.raise_for_status()
+            async for chunk in response.aiter_bytes():
+                write(chunk)

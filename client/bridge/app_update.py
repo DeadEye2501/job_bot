@@ -11,9 +11,10 @@ import sys
 
 import httpx
 
-from adapters import github_release
 from backend.app_version import VERSION, newer_version
-from client.bridge.answer import reply
+from backend.update_download import newer_release
+from client.bridge.answer import launched_on_bot, reply
+from client.bridge.refusals import UPDATE_REFUSALS
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class AppUpdate:
 
         async def run() -> dict:
             try:
-                release = await github_release.latest_release()
+                release = await newer_release()
             # Ответ не той формы — чаще всего страница портала сети Wi-Fi с кодом
             # 200 — для человека та же беда связи, что и обрыв.
             except (httpx.HTTPError, ValueError, KeyError, TypeError):
@@ -50,3 +51,13 @@ class AppUpdate:
             return {"newer": release and newer_version(release.tag), "trouble": None}
 
         return reply(self._hub.runner, run())
+
+    def update(self) -> dict:
+        """Скачать новую версию. Ответ — «пущено», исход — вестью; ход — в полосе."""
+        return launched_on_bot(
+            self._hub,
+            lambda bot: bot.download_update(),
+            UPDATE_REFUSALS,
+            "Обновление скачано.",
+            action="update",
+        )
