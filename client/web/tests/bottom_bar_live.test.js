@@ -299,11 +299,17 @@ describe('значок обновления', () => {
   const icon = () => document.querySelector('.update-btn');
   const methods = (asked) => asked.map((one) => one.method);
 
-  it('у копии из исходников его нет — подменять нечего', async () => {
-    bar(ALIVE, [0], { app: { version: '1.0.0', updatable: false } });
+  it('у копии из исходников проверяет так же, а найденную версию не качает — подменять нечего', async () => {
+    const { asked } = bar(ALIVE, [0], { app: { version: '1.0.0', updatable: false }, updates: [READY] });
     await settled();
 
-    expect(icon()).toBeNull();
+    expect(methods(asked)).toContain('system.check_update');
+    expect(icon().classList.contains('lit')).toBe(true);
+    expect(icon().title).toBe('Обновить приложение');
+    expect(icon().getAttribute('aria-disabled')).toBe('true');
+    icon().click();
+    await settled();
+    expect(methods(asked)).not.toContain('system.update');
   });
 
   it('при запуске проверяет молча: серый, «Проверить обновления», без плашки', async () => {

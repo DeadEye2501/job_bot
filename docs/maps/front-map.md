@@ -27,7 +27,7 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (344)
+### app/BottomBar.svelte (347)
 - Полоса даёт переключателю подсказку только запертому — почему заперт; отпертый называет режим под курсором сам.
 - принимает: ask, say, events, onlocked, oncontact, app
 
@@ -1467,7 +1467,7 @@ body, html, button, body, .material-symbols-outlined
 - объявляет: --footer-h, --rail-w, --sidebar-w
 - берёт: --bg-primary, --bg-secondary, --footer-h, --rail-w, --sidebar-w, --text-tertiary
 
-### styles/signal-button.css (25)
+### styles/signal-button.css (31)
 - Значки-сигналы нижней полосы: отклик на все новые и обновление приложения. Общее с прочими кнопками-значками — в icon-button.css, вид запертого — в disabled-look.css.
 - селекторы (4): .signal-btn, .apply-all-btn.lit,
 .apply-all-btn.lit:hover, .update-btn.lit,
@@ -1680,7 +1680,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (432)
+### tests/bottom_bar_live.test.js (438)
 - —
 
 ### tests/bridge.test.js (161)

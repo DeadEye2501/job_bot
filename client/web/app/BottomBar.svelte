@@ -79,6 +79,9 @@
   const captionText = $derived(single || caption(channels, messages));
   // Обновиться во время прогона нельзя — проверить можно всегда.
   const updateLocked = $derived(newer !== null && round.running);
+  // Копия из исходников проверяет как exe, а качать ей нечего: подменить
+  // запущенный питон скачанным exe нельзя.
+  const updateBarred = $derived(newer !== null && !app.updatable);
   const applyAllTitle = $derived.by(() => {
     if (locked) return lockedTip;
     if (round.running) return '';
@@ -237,10 +240,10 @@
   // раньше правды кнопка запускает бота без модели.
   $effect(() => onlocked(lockedTip));
 
-  // Тихая проверка — один раз, как только оболочка сказала, что эта копия
-  // обновляться умеет: из исходников подменять нечего, и спрашивать незачем.
+  // Тихая проверка — один раз, как только оболочка назвала версию: сравнивать
+  // до этого не с чем.
   $effect(() => {
-    if (app?.updatable) untrack(() => askUpdate(false));
+    if (app) untrack(() => askUpdate(false));
   });
 
   $effect(() => {
@@ -297,12 +300,12 @@
   </div>
 
   <div class="bb-right">
-    {#if app?.updatable}
+    {#if app}
       <SignalButton
         icon="autorenew"
         kind="update-btn"
         lit={newer !== null}
-        disabled={updateLocked}
+        disabled={updateLocked || updateBarred}
         title={updateLocked ? '' : newer !== null ? 'Обновить приложение' : 'Проверить обновления'}
         onpress={pressUpdate}
       />
