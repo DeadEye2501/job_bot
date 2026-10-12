@@ -9,16 +9,17 @@
 
 import pytest
 
-from backend.models import StatusHistorySource, Vacancy, VacancyStatus
+from backend.models import StatusHistorySource, Vacancy, VacancyStatus, VacancyStatusHistory
 from backend.payloads import Classification
 from backend.repository.vacancies_card import get_vacancy_detail
 from backend.repository.vacancy_status import (
     apply_classification,
     change_vacancy_status,
     mark_vacancy_applied,
+    mark_vacancy_unfit,
     update_status_history_explanation,
 )
-from tests.dbio import only_row, put
+from tests.dbio import all_rows, only_row, put
 from tests.factories import message_row, vacancy_row
 
 
@@ -46,6 +47,32 @@ async def test_an_application_leaves_a_vacancy_in_progress_where_it_is(session_f
         assert not await mark_vacancy_applied(session, row.id, "Отклик письмом.")
         await session.commit()
     assert (await only_row(session_factory, Vacancy)).status is status
+
+
+async def test_a_new_vacancy_the_form_rules_out_leaves_as_not_fit_with_the_reason(session_factory):
+    """Причина — в ленте истории карточки."""
+    row = vacancy_row(status=VacancyStatus.NEW)
+    await put(session_factory, row)
+    async with session_factory() as session:
+        await mark_vacancy_unfit(session, row.id, "Условие формы")
+        await session.commit()
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NOT_FIT
+    history = await only_row(session_factory, VacancyStatusHistory)
+    assert (history.previous_status, history.explanation) == (VacancyStatus.NEW, "Условие формы.")
+
+
+@pytest.mark.parametrize("status", [
+    VacancyStatus.NOT_FIT, VacancyStatus.APPLIED, VacancyStatus.DECLINE, VacancyStatus.GHOSTING,
+])
+async def test_a_vacancy_past_new_keeps_its_status_and_history(session_factory, status):
+    """Итог прежних откликов и решений человека повторный отклик не затирает."""
+    row = vacancy_row(status=status)
+    await put(session_factory, row)
+    async with session_factory() as session:
+        await mark_vacancy_unfit(session, row.id, "Условие формы")
+        await session.commit()
+    assert (await only_row(session_factory, Vacancy)).status is status
+    assert await all_rows(session_factory, VacancyStatusHistory) == []
 
 
 async def test_a_missing_vacancy_has_no_status_to_change(session, session_factory):

@@ -2,6 +2,9 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Annotated, TypedDict
+
+from pydantic import StringConstraints
 
 from backend.agent.jobs import Applied, ApplyJob
 from backend.agent.kit import AgentKit
@@ -14,6 +17,17 @@ from backend.repository.vacancy_brief import describe_vacancy
 # Кнопка агрегатора бывает переходом на форму работодателя: такой отклик пишется формой.
 _ALLOWED = {VIA_AGGREGATOR: {VIA_AGGREGATOR, VIA_FORM}, VIA_FORM: {VIA_FORM}}
 
+_Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+# По этому типу MCP строит схему инструмента: пара без текста отклоняется
+# агенту при вызове, и ниже по потоку проверять её уже нечего.
+class ScreeningPair(TypedDict):
+    """Вопрос работодателя и ответ человека на него."""
+
+    question: _Text
+    answer: _Text
+
 
 def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
     """Инструменты откликателя, привязанные к своей вакансии и своему способу."""
@@ -24,10 +38,10 @@ def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
             return await describe_vacancy(session, job.vacancy_id) or "Вакансия удалена."
 
     async def record_application(
-        via: str, target: str, letter: str = "", screening: list[dict] | None = None,
+        via: str, target: str, letter: str = "", screening: list[ScreeningPair] | None = None,
         already_applied: bool = False,
     ) -> str:
-        """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы, письмо, вопросы и ответы скрининга по порядку. Повтор с тем же адресом дописывает скрининг."""
+        """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы, письмо, скрининг. В screening — каждый вопрос работодателя из формы и со страницы подтверждения вместе с данным ответом, по порядку; вопросов не было — пустой список. Повтор с тем же адресом дописывает скрининг."""
         if via not in _ALLOWED[job.way.method]:
             return "Этим способом отклик не пишется."
         lines = _lines(screening or [])
@@ -58,8 +72,9 @@ def _entry(job: ApplyJob, report: _Report) -> ApplicationEntry:
     )
 
 
-def _lines(screening: list[dict]) -> list[tuple[bool, str]]:
-    return [(bool(x.get("from_us")), str(x.get("text", ""))) for x in screening if isinstance(x, dict)]
+def _lines(screening: list[ScreeningPair]) -> list[tuple[bool, str]]:
+    """Пара ложится двумя репликами ленты: вопрос работодателя, затем ответ человека."""
+    return [line for pair in screening for line in ((False, pair["question"]), (True, pair["answer"]))]
 
 
 async def _record(kit: AgentKit, job: ApplyJob, entry: ApplicationEntry) -> str:

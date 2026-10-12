@@ -2,6 +2,8 @@
 
 import asyncio
 
+from backend.applying import run
+from backend.applying.result import Unfit
 from backend.bot.apply import apply_chosen_way
 from backend.domain.apply_order import Way
 from backend.models import BotMode, Vacancy, VacancyStatus
@@ -49,6 +51,18 @@ async def test_a_way_that_did_not_work_is_a_failure(manual_case):
     bot, vacancy = await manual_case()
     way = Way("email", "hr@company.test", None)
     assert await apply_chosen_way(bot, vacancy.id, way) == "failed"
+
+
+async def test_a_way_that_found_the_vacancy_unfit_says_so(manual_case, monkeypatch):
+    """Окну это не провал способа: вакансия ушла в Not Fit, и сказать надо об этом."""
+    bot, vacancy = await manual_case()
+
+    async def unfit(kit, vacancy_id, way):
+        return Unfit("Условие формы")
+
+    monkeypatch.setitem(run.EXECUTORS, "email", unfit)
+    way = Way("email", "hr@company.test", None)
+    assert await apply_chosen_way(bot, vacancy.id, way) == "unfit"
 
 
 async def test_a_missing_vacancy_is_missing(manual_case):

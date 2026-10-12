@@ -4,11 +4,11 @@ import pytest
 
 from backend.agent.stops import LimitExhausted
 from backend.applying.browser import via_browser
-from backend.applying.result import Missed, SiteClosed
+from backend.applying.result import Missed, SiteClosed, Unfit
 from backend.domain.apply_order import Way
-from backend.models import VacancyEvent
+from backend.models import Vacancy, VacancyEvent, VacancyStatus, VacancyStatusHistory
 from tests.backend.fixtures.applying import FORM, PAGE
-from tests.dbio import all_rows, put
+from tests.dbio import all_rows, only_row, put
 from tests.factories_aggregators import web_search_row
 from tests.fakes.agent import LimitHit, finish_step, record_step
 
@@ -31,6 +31,17 @@ async def test_a_closed_vacancy_is_missed_without_a_lesson(board, kit_with):
     kit = await kit_with([finish_step("vacancy_closed")])
     outcome = await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
     assert outcome == Missed("вакансия закрыта на сайте")
+
+
+async def test_a_form_the_profile_rules_out_leaves_the_vacancy_as_not_fit(board, kit_with, session_factory):
+    """Дело не в способе, а в вакансии: итог несёт причину, а не урок о площадке,
+    и вакансия уходит в Not Fit с этой причиной в истории."""
+    site, vacancy = await board()
+    kit = await kit_with([finish_step("not_fit", "Условие формы")])
+    outcome = await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
+    assert outcome == Unfit("Условие формы")
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NOT_FIT
+    assert (await only_row(session_factory, VacancyStatusHistory)).explanation == "Условие формы."
 
 
 async def test_a_session_without_an_outcome_is_missed(board, kit_with):

@@ -9,7 +9,7 @@ from backend.agent.kit import AgentKit
 from backend.agent.stops import RUN_STOPPERS
 from backend.applying.browser import via_browser
 from backend.applying.email import via_email
-from backend.applying.result import Missed, Outcome
+from backend.applying.result import Missed, Outcome, Unfit
 from backend.applying.telegram import via_telegram
 from backend.applying.world import learn, read_world, ways_in
 from backend.domain.apply_order import VIA_AGGREGATOR, VIA_EMAIL, VIA_FORM, VIA_TELEGRAM, Way, World
@@ -46,7 +46,7 @@ async def _apply_one(kit: AgentKit, world: World, vacancy_id: int) -> None:
         way = ways[0]
         tried.add(way)
         outcome = await apply_chosen(kit, vacancy_id, way)
-        if outcome == "applied":
+        if outcome == "applied" or isinstance(outcome, Unfit):
             return
         if outcome.lesson is not None:
             learn(world, outcome.lesson)

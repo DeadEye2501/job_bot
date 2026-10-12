@@ -10,11 +10,12 @@ from backend.agent.tools_applier import applier_tools
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
 from backend.agent.tools_letter import letter_tools
-from backend.applying.result import GONE, Missed, Outcome, SiteClosed
+from backend.applying.result import GONE, Missed, Outcome, SiteClosed, Unfit
 from backend.domain.apply_order import Way
 from backend.repository.agent_profile import build_agent_profile
 from backend.repository.aggregators import web_search_id
 from backend.repository.vacancy_brief import describe_vacancy
+from backend.repository.vacancy_status import mark_vacancy_unfit
 
 _NO_OUTCOME = "агент закончил без итога"
 
@@ -33,7 +34,17 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     end = await run_guarded(kit, plan)
     if end.limit_exhausted:
         raise LimitExhausted
-    return _settle(job, way)
+    outcome = _settle(job, way)
+    if isinstance(outcome, Unfit):
+        await _mark_unfit(kit, vacancy_id, outcome.reason)
+    return outcome
+
+
+async def _mark_unfit(kit: AgentKit, vacancy_id: int, reason: str) -> None:
+    """Not Fit пишет исполнитель, как Applied пишет запись отклика: решение о
+    статусе принимается там, где узнали исход, а окно слышит о нём той же вестью."""
+    await kit.written(lambda session: mark_vacancy_unfit(session, vacancy_id, reason))
+    kit.pipeline.fire_vacancies_changed()
 
 
 async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None:
@@ -59,6 +70,8 @@ def _settle(job: ApplyJob, way: Way) -> Outcome:
         return "applied"
     if isinstance(outcome, Finished) and outcome.result == "vacancy_closed":
         return Missed("вакансия закрыта на сайте")
+    if isinstance(outcome, Finished) and outcome.result == "not_fit":
+        return Unfit(outcome.reason)
     if isinstance(outcome, Finished):
         reason = f"площадка закрыла отклик: {outcome.reason}" if outcome.reason else "площадка закрыла отклик"
         lesson = SiteClosed(way.aggregator_id) if way.aggregator_id is not None else None

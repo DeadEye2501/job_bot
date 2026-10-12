@@ -36,6 +36,15 @@ class ToolServer:
             logger.warning("MCP-сервер не закрылся за %s с, погашен", _CLOSE_SEC)
 
 
+def tool_host(tools: list[Callable], **settings) -> FastMCP:
+    """FastMCP с инструментами сессии: по их подписям он строит схему, которую
+    видит агент, и проверяет по ней доводы каждого вызова."""
+    mcp = FastMCP(SERVER_NAME, **settings)
+    for tool in tools:
+        mcp.add_tool(tool, name=tool.__name__, description=tool.__doc__ or "")
+    return mcp
+
+
 async def serve_tools(tools: list[Callable]) -> ToolServer:
     """Поднять сервер с инструментами сессии на свободном порту.
 
@@ -44,10 +53,8 @@ async def serve_tools(tools: list[Callable]) -> ToolServer:
     угаданному порту.
     """
     token = secrets.token_urlsafe(24)
-    mcp = FastMCP(SERVER_NAME, streamable_http_path=f"/{token}/mcp",
-                  stateless_http=True, json_response=True)
-    for tool in tools:
-        mcp.add_tool(tool, name=tool.__name__, description=tool.__doc__ or "")
+    mcp = tool_host(tools, streamable_http_path=f"/{token}/mcp",
+                    stateless_http=True, json_response=True)
     sock = socket.socket()
     up = False
     try:

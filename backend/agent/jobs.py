@@ -24,7 +24,7 @@ class Source:
 
 @dataclass(frozen=True)
 class Finished:
-    """Агент сам завершил сессию: `done`, `failed`, `vacancy_closed` или `platform_closed`."""
+    """Агент сам завершил сессию: `done`, `failed`, `vacancy_closed`, `platform_closed` или `not_fit`."""
 
     result: str
     reason: str
@@ -81,3 +81,14 @@ class ApplyJob:
     letter_writer: str
     letter_checks: int = 0
     outcome: Outcome | None = None
+
+
+RESULTS = {
+    LoginJob: frozenset({"done"}),
+    SeekJob: frozenset({"done", "failed"}),
+    ApplyJob: frozenset({"vacancy_closed", "platform_closed", "not_fit"}),
+}
+"""Итоги, которыми агент завершает сессию каждой задачи."""
+
+HUMAN_KINDS = ("captcha", "login")
+"""Зачем агент зовёт человека."""

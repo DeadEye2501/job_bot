@@ -91,8 +91,9 @@ async def test_a_new_vacancy_is_stored_with_its_source_and_contacts(make_pipelin
     assert (vacancy.source_aggregator_id, vacancy.source_key, vacancy.source_url) == (
         site.id, "vacancy/1", PAGE
     )
-    (contact,) = await all_rows(session_factory, VacancyContact)
-    assert (contact.match_key, contact.added_by) == ("hr@site.test", ContactAddedBy.AGENT)
+    page, email = await all_rows(session_factory, VacancyContact)
+    assert (page.value, page.added_by) == (PAGE, ContactAddedBy.AGENT)
+    assert (email.match_key, email.added_by) == ("hr@site.test", ContactAddedBy.AGENT)
     assert queue.items == [(vacancy.id, "Текст вакансии")]
     assert answer.startswith("принята") and "ещё 4" in answer
     assert job.found == [vacancy.id]

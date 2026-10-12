@@ -109,6 +109,9 @@ async def _known(kit: AgentKit, aggregator_id: int, key: str) -> bool:
 async def _store(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: list[float]) -> int:
     """Завести вакансию, затем её контакты своей транзакцией.
 
+    Адрес самой страницы ложится и в контакты, первым: человек ищет ссылку на
+    вакансию в её контактах, рядом с остальными, а не только в шапке карточки.
+
     Контакты пишутся до очереди разбора: разбор трогает только свои строки.
     Одной транзакцией с вакансией их не сделать без пятого довода у
     `intake.save_new_vacancy`; оборвись запись между ними, вакансия останется
@@ -123,7 +126,7 @@ async def _store(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: 
     found = {"source": job.source.name, "url": page.url, "web_search": job.source.host is None}
     vacancy_id = await intake.save_new_vacancy(kit.pipeline, row, "found", found)
     async def contacts(session) -> None:
-        for value in page.contacts:
+        for value in (page.url, *page.contacts):
             await add_contact(session, vacancy_id, value, ContactAddedBy.AGENT)
 
     await kit.written(contacts)
