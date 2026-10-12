@@ -64,6 +64,9 @@ def entry(clean_root_logger, lock_of_its_own, monkeypatch):
         "backend.crypto._check_keyring_backend", check_keyring
     )
     monkeypatch.setattr("backend.bootstrap.ensure_schema", ensure_schema)
+    # Уборка после обновления смотрела бы рядом с интерпретатором и в настоящей
+    # временной папке; её место в запуске сторожит свой тест.
+    monkeypatch.setattr("backend.updater.clear_leftovers", lambda: None)
     monkeypatch.setitem(
         sys.modules, "client.window", type("Window", (), {"run_ui": staticmethod(run_ui)})
     )

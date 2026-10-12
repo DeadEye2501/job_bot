@@ -103,17 +103,28 @@ async def test_an_update_before_the_bot_is_up_is_refused_by_name(api, ask):
     assert (answer["fail"], answer["detail"]) == ("denied", "Бот ещё не готов.")
 
 
-async def test_an_update_reaches_the_bot_and_says_when_downloaded(api, ask, with_bot, told):
+@pytest.fixture
+def handed_over(hub):
+    """Закрыто ли окно после скачивания."""
+    done = []
+    hub.window = type("Window", (), {"destroy": lambda self: done.append("окно закрыто")})()
+    return done
+
+
+async def test_a_downloaded_update_closes_the_window(api, ask, with_bot, told, handed_over):
+    """Копия-подменщик ждёт выхода приложения, поэтому окно закрывается штатно,
+    как крестиком: закрытие гасит бота по-хорошему."""
     bot = with_bot()
 
     answer = await ask(api.system.update)
 
     assert answer["ok"] == {"started": True, "action": "update"}
-    assert await told() == {"message": "Обновление скачано.", "danger": False}
+    assert await told() == {"message": "Обновление скачано — приложение перезапускается.", "danger": False}
     assert ("download_update",) in bot.calls
+    assert handed_over == ["окно закрыто"]
 
 
-async def test_a_download_that_did_not_match_says_so(api, ask, with_bot, told):
+async def test_a_download_that_did_not_match_says_so_and_keeps_the_app(api, ask, with_bot, told, handed_over):
     with_bot(update="broken")
 
     await ask(api.system.update)
@@ -121,6 +132,7 @@ async def test_a_download_that_did_not_match_says_so(api, ask, with_bot, told):
     assert await told() == {
         "message": "Скачанный файл не сошёлся с релизом — обновление не поставлено.", "danger": True,
     }
+    assert handed_over == []
 
 
 async def test_the_new_vacancies_count_is_what_apply_all_would_take(api, ask, session_factory):

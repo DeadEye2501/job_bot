@@ -83,7 +83,31 @@ pipenv run pip install pyinstaller        # один раз — в venv
 pipenv run python -m PyInstaller JobBot.spec --clean --noconfirm
 ```
 
-После сборки готовый файл лежит в `dist/JobBot.exe`. Холодный старт — несколько секунд: онешот распаковывает себя во временный `_MEIPASS`-каталог. БД и логи живут в `%APPDATA%\JobBot`, рядом с .exe ничего не сохраняется — распространять можно как один файл.
+После сборки готовый файл лежит в `dist/JobBot.exe`. Холодный старт — несколько секунд: онешот распаковывает себя во временный `_MEIPASS`-каталог. БД и логи живут в `%APPDATA%\JobBot`, рядом с .exe постоянно ничего не хранится — распространять можно как один файл. Временно рядом появляется только `JobBot.exe.new` — скачанное обновление до подмены.
+
+### Обновление
+
+Собранный exe при запуске спрашивает последний релиз репозитория `DeadEye2501/job_bot` на GitHub (`backend/update_download.py`, `adapters/github_release.py`). Значок круглых стрелок в нижней полосе серый — проверить вручную, акцентный — найдена версия новее. По нажатию акцентного:
+
+1. новый `JobBot.exe` скачивается рядом с запущенным как `JobBot.exe.new`, ход — в полосе; скачивание занимает место прогона, «Стоп» его отменяет;
+2. файл сверяется с контрольной суммой релиза; не сошлось — удаляется;
+3. приложение копирует себя во временную папку и запускает копию с `--update` (`backend/updater.py`), а само закрывается штатно;
+4. копия ждёт выхода приложения, заменяет `JobBot.exe` скачанным и запускает его; свой журнал пишет в `%TEMP%\JobBot-update.log`, журнал приложения не трогает;
+5. новый exe при старте убирает `JobBot.exe.new` и копию.
+
+При запуске из исходников (`python main.py`) значка нет — подменять нечего; номер версии в боковом меню есть.
+
+### Выпуск версии
+
+1. Поднять номер в `backend/app_version.py` (`VERSION`).
+2. Собрать exe (раздел выше).
+3. Выложить релиз с тегом `v` + номер и файлом `JobBot.exe`:
+
+   ```powershell
+   gh release create v1.0.1 dist/JobBot.exe --title "1.0.1"
+   ```
+
+GitHub CLI ставится `winget install GitHub.cli`, вход — `gh auth login`.
 
 Что вшито в бандл (см. `JobBot.spec`): собранный фронт `client/web/dist`, `alembic.ini` + `alembic/env.py` + `alembic/script.py.mako` + init-миграция, `client/icon.ico`. Hidden imports: `aiosqlite`, `keyring.backends.Windows`, `keyring.backends.fail`, `logging.config`, `logging.handlers` и подмодули `anthropic`. Отдельно — библиотеки движка `llama_cpp` (`collect_dynamic_libs`).
 

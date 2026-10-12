@@ -1787,6 +1787,16 @@
 - `UpdateOutcome` = `Literal['ok', 'no_update', 'broken']`
 - `_MB` = `1024 * 1024`
 
+### `backend/updater.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `UPDATE_FLAG` = `'--update'`
+- `_ATTEMPTS` = `30`
+- `_PAUSE_SEC` = `1.0`
+- `_WAIT_MS` = `60000`
+- `_SYNCHRONIZE` = `1048576`
+- `_DETACHED` = `8 | 512`
+
 ### `backend/wipe.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -2216,6 +2226,10 @@
 ### `tests/backend/test_update_download.py`
 
 - `MB` = `1024 * 1024`
+
+### `tests/backend/test_updater.py`
+
+- `REAL_POPEN` = `subprocess.Popen`
 
 ### `tests/client/test_bot_contract.py`
 

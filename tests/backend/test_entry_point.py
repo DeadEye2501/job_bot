@@ -39,6 +39,32 @@ def test_the_launch_goes_through_all_three_steps(entry):
     assert order == ["хранилище ключей", "схема базы", "окно"]
 
 
+def test_the_update_copy_replaces_the_exe_without_lock_window_or_database(entry, monkeypatch):
+    """Копия-подменщик замка не берёт — приложение ещё держит его, закрываясь, —
+    и ни окна, ни схемы базы не трогает. Полезь она за замком, получила бы отказ
+    второй копии, и обновление не встало бы никогда."""
+    from backend.single_instance import hold_the_only_copy
+
+    module, order = entry
+    seen = []
+    monkeypatch.setattr("backend.updater.run", lambda args: seen.append(args) or 0)
+    monkeypatch.setattr(sys, "argv", ["JobBot.exe", "--update", "42", "JobBot.exe", "JobBot.exe.new"])
+
+    with hold_the_only_copy(module.get_lock_path()):
+        assert module.main() == 0
+    assert seen == [["42", "JobBot.exe", "JobBot.exe.new"]]
+    assert order == []
+
+
+def test_a_normal_start_clears_update_leftovers_first(entry, monkeypatch):
+    module, order = entry
+    monkeypatch.setattr("backend.updater.clear_leftovers", lambda: order.append("уборка"))
+
+    module.main()
+
+    assert order[0] == "уборка"
+
+
 def test_the_schema_is_updated_before_the_window(entry):
     """Схема базы обновляется до окна.
 

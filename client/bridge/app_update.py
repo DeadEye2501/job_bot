@@ -53,11 +53,20 @@ class AppUpdate:
         return reply(self._hub.runner, run())
 
     def update(self) -> dict:
-        """Скачать новую версию. Ответ — «пущено», исход — вестью; ход — в полосе."""
+        """Скачать новую версию и передать её подменщику. Ответ — «пущено», исход —
+        вестью; ход — в полосе."""
         return launched_on_bot(
             self._hub,
-            lambda bot: bot.download_update(),
+            self._download_then_hand_over,
             UPDATE_REFUSALS,
-            "Обновление скачано.",
+            "Обновление скачано — приложение перезапускается.",
             action="update",
         )
+
+    async def _download_then_hand_over(self, bot) -> str:
+        """Скачанное бот отдал копии-подменщику — окно закрывается штатно, как
+        крестиком: копия ждёт выхода приложения, а закрытие гасит бота по-хорошему."""
+        outcome = await bot.download_update()
+        if outcome == "ok":
+            self._hub.window.destroy()
+        return outcome

@@ -21,7 +21,7 @@ Bootstrap config.
 - `def data_dirs() -> list[Path]` (18)
 - `def get_log_path() -> Path` (7)
 
-### `main.py` — 185 строк
+### `main.py` — 193 строк
 
 Job Bot — single CLI entry point.
 
@@ -32,7 +32,7 @@ Job Bot — single CLI entry point.
 - `def _log_uncaught(exc_type, exc, tb) -> None` (13)
 - `def _log_uncaught_in_thread(args) -> None` (10)
 - `def _started_or_told_why() -> int` (36)
-- `def main() -> int` (22)
+- `def main() -> int` (30)
 
 ## adapters — 20 модулей
 
@@ -369,7 +369,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 191 модулей
+## backend — 192 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -883,13 +883,13 @@ First-run bootstrap: ensure DB schema exists.
   - `async def turn(kit: AgentKit) -> str` (5)
 - `async def _recover(bot) -> None` (17)
 
-### `backend/bot/update.py` — 32 строк
+### `backend/bot/update.py` — 37 строк
 
 Скачивание обновления в месте прогона: пока оно идёт, прогон не начать.
 
 Зависит от: `backend`, `backend.bot`, `backend.notify`
 
-- `async def download_update(bot) -> DownloadOutcome` (14)
+- `async def download_update(bot) -> DownloadOutcome` (19)
   - `def report(got: int, total: int) -> None` (2)
 
 ### `backend/bot/updates.py` — 113 строк
@@ -2828,7 +2828,21 @@ Runtime settings layer.
 - `async def newer_release() -> Release | None` (6)
 - `async def download_update(target: Path, report: Callable[[int, int], None]) -> UpdateOutcome` (21)
 - `async def _fetch(release: Release, target: Path, report: Callable[[int, int], None]) -> str` (23)
-- `def _remove(target: Path) -> None` (8)
+- `def remove_leftover(path: Path) -> None` (8)
+
+### `backend/updater.py` — 119 строк
+
+Подмена exe скачанным обновлением — копией приложения в режиме `--update`.
+
+Зависит от: `backend.update_download`
+
+- `def updater_copy() -> Path` (4)
+- `def launch_updater(new: Path) -> None` (13)
+- `def run(args: list[str]) -> int` (20)
+- `def clear_leftovers() -> None` (5)
+- `def _log_to_own_file() -> None` (6)
+- `def _wait_for_exit(pid: int) -> None` (9)
+- `def _replace(new: Path, exe: Path) -> bool` (14)
 
 ### `backend/wipe.py` — 103 строк
 
@@ -2903,17 +2917,18 @@ Runtime settings layer.
 
 - `class Api` (15)
 
-### `client/bridge/app_update.py` — 63 строк
+### `client/bridge/app_update.py` — 72 строк
 
 Обновление приложения из релизов GitHub: какая версия запущена и есть ли новее.
 
 Зависит от: `backend.app_version`, `backend.update_download`, `client.bridge.answer`, `client.bridge.refusals`
 
-- `class AppUpdate` (40)
+- `class AppUpdate` (49)
   - `def version(self) -> dict` (7)
   - `def check_update(self) -> dict` (19)
     - `async def run() -> dict` (9)
-  - `def update(self) -> dict` (9)
+  - `def update(self) -> dict` (10)
+  - `async def _download_then_hand_over(self, bot) -> str` (7)
 
 ### `client/bridge/blacklist.py` — 162 строк
 
@@ -3632,7 +3647,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 318 модулей
+## tests — 319 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
 
@@ -3891,14 +3906,14 @@ Runtime settings layer.
 - `def caught_up(monkeypatch)` (13)
   - `async def catch_up_missed_dms(client, *args, **kwargs)` (2)
 
-### `tests/backend/fixtures/entry.py` — 71 строк
+### `tests/backend/fixtures/entry.py` — 74 строк
 
 Точка входа с подменёнными шагами запуска — общая двум сторожам.
 
 Зависит от: `main`
 
 - `def lock_of_its_own(monkeypatch, tmp_path)` (12)
-- `def entry(clean_root_logger, lock_of_its_own, monkeypatch)` (41)
+- `def entry(clean_root_logger, lock_of_its_own, monkeypatch)` (44)
   - `def check_keyring()` (2)
   - `def ensure_schema()` (2)
   - `def run_ui()` (3)
@@ -4422,7 +4437,7 @@ Runtime settings layer.
     - `async def channels()` (4)
     - `async def seek_all(_bot, kit)` (2)
 
-### `tests/backend/test_bot_update.py` — 37 строк
+### `tests/backend/test_bot_update.py` — 49 строк
 
 Скачивание обновления в месте прогона: ход идёт в полосу, занятое место — отказ.
 
@@ -4431,6 +4446,7 @@ Runtime settings layer.
 Тестов: 2
 
 - `def _app_in(monkeypatch, tmp_path)` (4)
+- `def handed(monkeypatch)` (5)
 
 ### `tests/backend/test_crypto.py` — 133 строк
 
@@ -4582,13 +4598,13 @@ Runtime settings layer.
 Тестов: 9
 
 
-### `tests/backend/test_entry_point.py` — 173 строк
+### `tests/backend/test_entry_point.py` — 199 строк
 
 Следствия запуска приложения из единственной точки входа.
 
 Зависит от: `backend.single_instance`
 
-Тестов: 8
+Тестов: 10
 
 - `def shown(monkeypatch)` (7)
 
@@ -6148,6 +6164,18 @@ Runtime settings layer.
 - `def target(tmp_path)` (2)
 - `def _quiet(got, total)` (2)
 
+### `tests/backend/test_updater.py` — 151 строк
+
+Подмена exe: копия ждёт выхода приложения, заменяет его файл и запускает новый.
+
+Зависит от: `backend`
+
+Тестов: 8
+
+- `def app(tmp_path)` (7)
+- `def started(monkeypatch, tmp_path)` (12)
+- `def leftovers(tmp_path, monkeypatch)` (8)
+
 ### `tests/backend/test_wipe.py` — 272 строк
 
 Следствия сноса данных: что остаётся в каталоге после «удалить всё».
@@ -6473,7 +6501,7 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/client/test_bridge_system.py` — 273 строк
+### `tests/client/test_bridge_system.py` — 285 строк
 
 Следствия домена «система»: чем занят бот и что показывает нижняя полоса.
 
@@ -6481,6 +6509,7 @@ Runtime settings layer.
 
 Тестов: 20
 
+- `def handed_over(hub)` (5)
 
 ### `tests/client/test_bridge_vacancies.py` — 431 строк ⚠ подошёл к 300
 
