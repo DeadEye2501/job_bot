@@ -31,6 +31,7 @@ from backend.bot import aggregators
 from backend.bot import apply
 from backend.bot import slot
 from backend.bot import turn
+from backend.bot import update
 from backend.bot import work
 from backend.flows.pipeline import IngestionPipeline, LmProviders
 from backend.domain.apply_order import Way
@@ -393,6 +394,9 @@ class Bot:
 
     async def apply_all_new(self) -> work.WorkOutcome:
         return await apply.apply_all_new(self)
+
+    async def download_update(self) -> update.DownloadOutcome:
+        return await update.download_update(self)
 
     def human_done(self) -> None:
         aggregators.human_done(self)

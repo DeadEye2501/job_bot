@@ -209,7 +209,7 @@ Claude через установленный Claude Code по подписке: 
   - `async def aclose(self) -> None` (3)
   - `def _release(self) -> None` (5)
 
-### `adapters/github_release.py` — 55 строк
+### `adapters/github_release.py` — 69 строк
 
 Последний релиз приложения на GitHub.
 
@@ -218,6 +218,7 @@ Claude через установленный Claude Code по подписке: 
 - `class Release` (5)
 - `def make_client() -> httpx.AsyncClient` (2)
 - `async def latest_release() -> Release | None` (25)
+- `async def download(url: str, write: Callable[[bytes], None]) -> None` (11)
 
 ### `adapters/lm_chat.py` — 239 строк
 
@@ -368,7 +369,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 189 модулей
+## backend — 191 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -758,7 +759,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _checked_kind(src: Path, file_path: str) -> bool` (28)
 - `async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message` (38)
 
-### `backend/bot/client.py` — 404 строк ⚠ подошёл к 300
+### `backend/bot/client.py` — 408 строк ⚠ подошёл к 300
 
 Сборка бота: его состояние, соединения и поверхность, которой пользуется окно.
 
@@ -770,7 +771,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _declare_loop_controls(bot) -> None` (23)
 - `def _declare_ui_hooks(bot) -> None` (41)
 - `def _forward_pipeline_hooks(bot) -> None` (17)
-- `class Bot` (203)
+- `class Bot` (206)
   - `def is_ready(self) -> bool` (7)
   - `def is_connected(self) -> bool` (13)
   - `def is_running_round(self) -> bool` (8)
@@ -799,6 +800,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def login_aggregator(self, aggregator_id) -> aggregators.AgentOutcome` (2)
   - `async def apply_chosen_way(self, vacancy_id: int, way: Way) -> apply.ApplyOutcome` (2)
   - `async def apply_all_new(self) -> work.WorkOutcome` (2)
+  - `async def download_update(self) -> update.DownloadOutcome` (2)
   - `def human_done(self) -> None` (2)
   - `def reveal_browser(self) -> None` (2)
   - `async def delete_aggregator(self, aggregator_id) -> str` (2)
@@ -880,6 +882,15 @@ First-run bootstrap: ensure DB schema exists.
 - `def launch_turn(bot, label: str) -> asyncio.Task | None` (17)
   - `async def turn(kit: AgentKit) -> str` (5)
 - `async def _recover(bot) -> None` (17)
+
+### `backend/bot/update.py` — 32 строк
+
+Скачивание обновления в месте прогона: пока оно идёт, прогон не начать.
+
+Зависит от: `backend`, `backend.bot`, `backend.notify`
+
+- `async def download_update(bot) -> DownloadOutcome` (14)
+  - `def report(got: int, total: int) -> None` (2)
 
 ### `backend/bot/updates.py` — 113 строк
 
@@ -2807,6 +2818,18 @@ Runtime settings layer.
 - `def from_tg_row(row: TgAccount) -> TgAccountConfig | None` (24)
 - `def fill_tg_row(row: TgAccount, creds: TgAccountConfig) -> None` (15)
 
+### `backend/update_download.py` — 97 строк
+
+Скачивание обновления: файл остаётся на диске, только если сошёлся с релизом.
+
+Зависит от: `adapters`, `adapters.github_release`, `backend.app_version`
+
+- `def new_exe_path() -> Path` (5)
+- `async def newer_release() -> Release | None` (6)
+- `async def download_update(target: Path, report: Callable[[int, int], None]) -> UpdateOutcome` (21)
+- `async def _fetch(release: Release, target: Path, report: Callable[[int, int], None]) -> str` (23)
+- `def _remove(target: Path) -> None` (8)
+
 ### `backend/wipe.py` — 103 строк
 
 Снос всего, что приложение записало на диск.
@@ -2880,16 +2903,17 @@ Runtime settings layer.
 
 - `class Api` (15)
 
-### `client/bridge/app_update.py` — 52 строк
+### `client/bridge/app_update.py` — 63 строк
 
 Обновление приложения из релизов GitHub: какая версия запущена и есть ли новее.
 
-Зависит от: `adapters`, `backend.app_version`, `client.bridge.answer`
+Зависит от: `backend.app_version`, `backend.update_download`, `client.bridge.answer`, `client.bridge.refusals`
 
-- `class AppUpdate` (30)
+- `class AppUpdate` (40)
   - `def version(self) -> dict` (7)
   - `def check_update(self) -> dict` (19)
     - `async def run() -> dict` (9)
+  - `def update(self) -> dict` (9)
 
 ### `client/bridge/blacklist.py` — 162 строк
 
@@ -3276,7 +3300,7 @@ Runtime settings layer.
     - `async def run() -> dict` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (26)
 
-### `client/bridge/refusals.py` — 285 строк
+### `client/bridge/refusals.py` — 294 строк
 
 Слова, которыми мост отказывает окну.
 
@@ -3608,7 +3632,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 316 модулей
+## tests — 318 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
 
@@ -3974,13 +3998,13 @@ Runtime settings layer.
   - `async def build(applied_at, *, answered_after=None, answer=VacancyStatus.ANSWERED, **overrides)` (20)
 - `async def rows_by_channel(session, **kwargs) -> dict[int | None, dict]` (4)
 
-### `tests/backend/test_adapters_github_release.py` — 48 строк
+### `tests/backend/test_adapters_github_release.py` — 59 строк
 
 Последний релиз приложения на GitHub: что из ответа API берётся и когда релиза нет.
 
 Зависит от: `adapters.github_release`, `tests.fakes.github_release`
 
-Тестов: 5
+Тестов: 6
 
 
 ### `tests/backend/test_adapters_telegraph.py` — 205 строк
@@ -4397,6 +4421,16 @@ Runtime settings layer.
     - `async def recover()` (3)
     - `async def channels()` (4)
     - `async def seek_all(_bot, kit)` (2)
+
+### `tests/backend/test_bot_update.py` — 37 строк
+
+Скачивание обновления в месте прогона: ход идёт в полосу, занятое место — отказ.
+
+Зависит от: `backend.bot.update`, `tests.fakes.github_release`
+
+Тестов: 2
+
+- `def _app_in(monkeypatch, tmp_path)` (4)
 
 ### `tests/backend/test_crypto.py` — 133 строк
 
@@ -6103,6 +6137,17 @@ Runtime settings layer.
 Тестов: 3
 
 
+### `tests/backend/test_update_download.py` — 90 строк
+
+Скачивание обновления: файл ложится, только если сошёлся с релизом; иначе его нет.
+
+Зависит от: `backend.app_version`, `backend.update_download`, `tests.fakes.github_release`
+
+Тестов: 7
+
+- `def target(tmp_path)` (2)
+- `def _quiet(got, total)` (2)
+
 ### `tests/backend/test_wipe.py` — 272 строк
 
 Следствия сноса данных: что остаётся в каталоге после «удалить всё».
@@ -6428,13 +6473,13 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/client/test_bridge_system.py` — 246 строк
+### `tests/client/test_bridge_system.py` — 273 строк
 
 Следствия домена «система»: чем занят бот и что показывает нижняя полоса.
 
 Зависит от: `backend.app_version`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.github_release`
 
-Тестов: 17
+Тестов: 20
 
 
 ### `tests/client/test_bridge_vacancies.py` — 431 строк ⚠ подошёл к 300
@@ -6826,14 +6871,18 @@ Runtime settings layer.
   - `def load(_path)` (2)
 - `def engine_journal(monkeypatch) -> list[str]` (5)
 
-### `tests/fakes/github_release.py` — 34 строк
+### `tests/fakes/github_release.py` — 73 строк
 
-Подделка API релизов GitHub: настоящий клиент поверх подставного транспорта.
+Подделка GitHub: API релизов и скачивание файла поверх подставного транспорта.
 
 Зависит от: `adapters.github_release`, `tests.fakes.llm`
 
-- `def serve_latest(monkeypatch, prepared: httpx.Response | BaseException) -> None` (4)
-- `def release_answer(tag: str, *, asset: str=ASSET, digest: str | None=_DIGEST) -> httpx.Response` (11)
+- `def download_url(tag: str, asset: str=ASSET) -> str` (2)
+- `def serve_latest(monkeypatch, prepared: httpx.Response | BaseException, files: dict[str, httpx.Response | BaseException] | None=None) -> None` (9)
+- `def in_pieces(content: bytes, size: int=64 * 1024) -> httpx.Response` (8)
+  - `async def pieces()` (3)
+- `def serve_newer(monkeypatch, served: httpx.Response | BaseException | None=None, content: bytes=APP, digest=FROM_CONTENT) -> None` (7)
+- `def release_answer(tag: str, *, asset: str=ASSET, content: bytes=APP, digest=FROM_CONTENT) -> httpx.Response` (14)
 
 ### `tests/fakes/ingestion.py` — 169 строк
 
@@ -6974,14 +7023,14 @@ Runtime settings layer.
 - `def user(*, username=None, photo=None, **extra) -> SimpleNamespace` (15)
 - `def dialog(peer_id: int, top_message: int | None=None)` (17)
 
-### `tests/fakes/ui_bot.py` — 147 строк
+### `tests/fakes/ui_bot.py` — 152 строк
 
 Бот, каким его видит окно: обращения, которые делает мост.
 
 Зависит от: `backend.bot.pasted`, `backend.bot.rerun`
 
 - `class Sent` (4)
-- `class UiBot` (107)
+- `class UiBot` (111)
   - `def _refuse_if_asked(self) -> None` (3)
   - `async def force_poll_once(self) -> str` (3)
   - `def cancel_current_poll(self) -> None` (2)
@@ -7001,6 +7050,7 @@ Runtime settings layer.
   - `async def login_aggregator(self, aggregator_id: int) -> str` (3)
   - `async def apply_chosen_way(self, vacancy_id: int, way) -> str` (3)
   - `async def apply_all_new(self) -> str` (3)
+  - `async def download_update(self) -> str` (3)
   - `def human_done(self) -> None` (2)
   - `def reveal_browser(self) -> None` (2)
   - `async def delete_aggregator(self, aggregator_id: int) -> str` (3)

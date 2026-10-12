@@ -543,6 +543,11 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `backend/bot/update.py`
+
+- `_LABEL` = `'Обновление'`
+- `DownloadOutcome` = `Literal[slot.CycleOutcome, update_download.Updat…`
+
 ### `backend/bot/updates.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -1776,6 +1781,12 @@
   - `password: str` = `field(repr=False)`
   - `session_string: str | None` = `field(repr=False)`
 
+### `backend/update_download.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `UpdateOutcome` = `Literal['ok', 'no_update', 'broken']`
+- `_MB` = `1024 * 1024`
+
 ### `backend/wipe.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -1948,6 +1959,7 @@
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
 - `APPLY_VIA_REFUSALS` = `словарь из 6 и раскрытых`
 - `APPLY_ALL_REFUSALS` = `словарь из 3 и раскрытых`
+- `UPDATE_REFUSALS` = `словарь из 5`
 
 ### `client/bridge/runner.py`
 
@@ -2201,6 +2213,10 @@
 
 - `_TS` = `1755500000.0`
 
+### `tests/backend/test_update_download.py`
+
+- `MB` = `1024 * 1024`
+
 ### `tests/client/test_bot_contract.py`
 
 - `BRIDGE` = `Path(__file__).resolve().parents[2] / 'client' /…`
@@ -2267,7 +2283,9 @@
 
 ### `tests/fakes/github_release.py`
 
-- `_DIGEST` = `'sha256:' + 'ab' * 32`
+- `APP` = `b'MZ' + b'\x00' * 2046`
+- `NEWER` = `'v99.0.0'`
+- `FROM_CONTENT` = `object()`
 
 ### `tests/fakes/ingestion.py`
 
@@ -2304,6 +2322,6 @@
 
 - `class Sent`
   - `id: int`
-- `ANSWERS` = `словарь из 15`
+- `ANSWERS` = `словарь из 16`
 - `class UiBot`
   - `is_running_round` = `False`
