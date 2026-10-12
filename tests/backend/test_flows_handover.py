@@ -27,6 +27,29 @@ async def test_an_unfit_vacancy_stays_with_the_collection(parsing):
     assert pipeline.applied == []
 
 
+async def test_with_auto_apply_off_a_fit_vacancy_stays_in_new(parsing, session_factory):
+    """Выключенный автоотклик — после разбора откликатель не зовётся вовсе."""
+    pipeline, vacancy = parsing
+    await pipeline.rs.set_app("auto_apply", "false")
+    assert await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan")
+    assert pipeline.applied == []
+    async with session_factory() as session:
+        assert (await session.get(Vacancy, vacancy.id)).status == VacancyStatus.NEW
+
+
+async def test_with_auto_apply_off_a_new_hr_is_still_caught_up(parsing, monkeypatch):
+    """Догон переписки — не откликатель, автоотклик его не касается."""
+    pipeline, vacancy = parsing
+    pipeline.parsed = parsed_vacancy(
+        title="Python-разработчик", stack_required=["Python"], hr_contact="@maria")
+    await pipeline.rs.set_app("auto_apply", "false")
+    caught = []
+    monkeypatch.setattr(handover, "spawn_hr_backfill", lambda _p, hr: caught.append(hr))
+    await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan")
+    assert pipeline.applied == []
+    assert len(caught) == 1
+
+
 async def test_a_parse_the_model_never_answered_applies_nothing(parsing):
     """Без ответа модели вакансия остаётся в New неразобранной — откликаться рано."""
     pipeline, vacancy = parsing

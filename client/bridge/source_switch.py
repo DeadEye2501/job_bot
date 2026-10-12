@@ -23,7 +23,7 @@ def switch_all(hub: Hub, key: str, where: str, payload: dict) -> dict:
         return bad_fields(where, e, action="set_all_active")
 
     async def run() -> dict:
-        await hub.rs.set_app(key, "true" if is_active else "false")
+        await hub.rs.set_app(key, is_active)
         return {"is_active": is_active}
 
     return reply(hub.runner, run())

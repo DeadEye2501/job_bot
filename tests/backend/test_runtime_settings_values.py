@@ -114,6 +114,15 @@ def test_sending_locks_once_explicitly_asked():
     assert settings(send_locked="true").send_locked is True
 
 
+def test_auto_apply_is_on_in_an_empty_base():
+    """Пустая база откликается сама: тумблер выключают нарочно."""
+    assert settings().auto_apply is True
+
+
+def test_auto_apply_turns_off_once_written_off():
+    assert settings(auto_apply="false").auto_apply is False
+
+
 @pytest.mark.parametrize(
     "raw, expected",
     [("0.92", 0.92), ("0.999", 0.999), ("0.5", 0.5)],

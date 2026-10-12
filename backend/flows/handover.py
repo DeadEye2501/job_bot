@@ -35,9 +35,12 @@ async def new_to_apply(session_factory) -> list[int]:
 async def hand_over(pipeline, judged: list[tuple[int, Judged]]) -> None:
     """Отклик раньше догона: догон, пошедший первым, положил бы наше письмо
     в переписку без вакансии. Сорвавшийся отклик догона не отменяет: новый HR
-    уже в базе, и пустая переписка у него — та же беда."""
-    chosen = await to_apply(pipeline.session_factory,
-                            [vacancy_id for vacancy_id, one in judged if one.stored])
+    уже в базе, и пустая переписка у него — та же беда.
+
+    Выключенный автоотклик откликателя не зовёт, а догон оставляет: догон — не
+    отклик. Решается здесь, один раз на все разборы."""
+    stored = [vacancy_id for vacancy_id, one in judged if one.stored]
+    chosen = await to_apply(pipeline.session_factory, stored) if pipeline.rs.auto_apply else []
     try:
         if chosen:
             await pipeline.apply(chosen)

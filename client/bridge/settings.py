@@ -34,7 +34,7 @@ APP_KEYS = (
     "poll_interval_sec",
     "backfill_limit",
     "dm_backfill_limit",
-    "send_locked",
+    "auto_apply",
     "aggregator_backfill_limit",
     "show_browser",
     "letter_writer",
@@ -88,7 +88,7 @@ class Settings(Login, Llm, Mail):
                     "poll_interval_sec": rs.poll_interval_sec,
                     "backfill_limit": rs.backfill_limit,
                     "dm_backfill_limit": rs.dm_backfill_limit,
-                    "send_locked": rs.send_locked,
+                    "auto_apply": rs.auto_apply,
                 },
                 "aggregators": {
                     "aggregator_backfill_limit": rs.aggregator_backfill_limit,
@@ -239,12 +239,9 @@ class Settings(Login, Llm, Mail):
             if key not in APP_KEYS:
                 logger.warning("настройки: незнакомый ключ %r пропущен", key)
                 continue
-            # Да/нет хранится словом: настройки держат строки, и `send_locked`
-            # разбирается сравнением с «true» в нижнем регистре — `str(True)`
-            # дал бы «True» и это сравнение не прошёл.
-            if isinstance(value, bool):
-                value = "true" if value else "false"
-            await self._hub.rs.set_app(str(key), str(value))
+            # Да/нет едет как есть — в слово его переводят настройки; прочее
+            # хранится строкой.
+            await self._hub.rs.set_app(str(key), value if isinstance(value, bool) else str(value))
             applied.append(f"app.{key}")
 
 
