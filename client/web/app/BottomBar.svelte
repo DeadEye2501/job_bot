@@ -10,6 +10,7 @@
   // Мост и плашку берёт доводами, как их берут экраны. Наружу отдаёт две вещи:
   // подсказку о запертых кнопках — её оболочка раздаёт экранам — и уход в
   // контакты из списка непрочитанного.
+  import ApplyAllButton from '$components/ApplyAllButton.svelte';
   import HealthLamp from '$components/HealthLamp.svelte';
   import HumanPlate from '$components/HumanPlate.svelte';
   import ModeToggle from '$components/ModeToggle.svelte';
@@ -46,6 +47,7 @@
 
   const RUN_TITLE = 'Прогнать цикл прямо сейчас';
   const STOP_TITLE = 'Остановить цикл';
+  const NO_NEW_TITLE = 'Новых вакансий для отклика нет';
 
   const chatTries = attempts();
 
@@ -61,10 +63,19 @@
   // Работа без счёта — прогон одной вакансии: полосам показать нечего, а
   // сказать есть что, и говорит она за них обеих.
   let single = $state('');
+  // Сколько вакансий возьмёт «отклик на все новые» — число считает мост той же
+  // выборкой, что и сам прогон.
+  let newCount = $state(0);
 
   const locked = $derived(!allAlive(health));
   const lockedTip = $derived(blockedTip(health));
   const captionText = $derived(single || caption(channels, messages));
+  const applyAllTitle = $derived.by(() => {
+    if (locked) return lockedTip;
+    if (round.running) return '';
+    if (newCount === 0) return NO_NEW_TITLE;
+    return `Откликнуться на все новые вакансии: ${newCount}`;
+  });
 
   /** Принять свежее здоровье и погасить бота, если что-то отвалилось.
    *
@@ -82,6 +93,12 @@
     unread = now.unread.count;
     mode = now.mode;
     await applyHealth(now.health);
+    await askNew();
+  }
+
+  async function askNew() {
+    const answer = await ask('system.new_vacancies');
+    if (answer !== null) newCount = answer.count;
   }
 
   async function askHealth() {
@@ -194,6 +211,7 @@
       // Весть о начале слушает общий учёт (`state/round.svelte.js`), а полосе
       // он говорит о ней в тот же миг: ход прошлого прогона стирается.
       round.onStart(started),
+      events.on('vacancies_list_changed', askNew),
       events.on('progress_update', moved),
       // Слово обхода — почему он снят: капча не пройдена, лимит исчерпан.
       events.on('round_note', (note) => say(note.text)),
@@ -241,6 +259,12 @@
   <div class="bb-right">
     <!-- Подсказка только у запертого переключателя: у отпертого рядом стоит
          сам режим словом, и объяснять, что по нему нажимают, нечего. -->
+    <ApplyAllButton
+      count={newCount}
+      disabled={locked || round.running || newCount === 0}
+      title={applyAllTitle}
+      onpress={() => ask('system.apply_all_new')}
+    />
     <ModeToggle {mode} disabled={locked} title={locked ? lockedTip : null} onpick={pickMode} />
     <RunButton
       running={round.running}

@@ -12,7 +12,8 @@
   class="badge-unread"
   type="button"
   data-has-unread={count > 0}
-  title="Непрочитанные сообщения"
+  title={count > 0 ? 'Непрочитанные сообщения' : 'Новых сообщений нет'}
+  aria-disabled={count === 0}
   onclick={() => ontoggle()}
 >
   <span class="material-symbols-outlined">mail</span>

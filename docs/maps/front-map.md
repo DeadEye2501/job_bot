@@ -27,7 +27,7 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (266)
+### app/BottomBar.svelte (290)
 - Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
 - принимает: ask, say, events, onlocked, oncontact
 
@@ -150,7 +150,7 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 102 файлов
+## components — 103 файлов
 
 ### components/ActionsMenu.svelte (30)
 - —
@@ -174,6 +174,10 @@
 - —
 - принимает: row, enabled, selected, onpick, ontoggle
 - берёт: ./ContactRow.svelte
+
+### components/ApplyAllButton.svelte (17)
+- —
+- принимает: count, disabled, title, onpress
 
 ### components/ApplyWaysDialog.svelte (49)
 - —
@@ -393,7 +397,7 @@
 - принимает: extra, over, confirm, awayCloses, onclose, children
 - берёт: ./ModalKeys.svelte
 
-### components/ModeToggle.svelte (34)
+### components/ModeToggle.svelte (41)
 - —
 - принимает: mode, disabled, title, onpick
 
@@ -570,7 +574,7 @@
 - —
 - принимает: tabs, active, onpick
 
-### components/UnreadBadge.svelte (49)
+### components/UnreadBadge.svelte (50)
 - Затемнения нет вовсе, но нажатие мимо список закрывает: он висит поверх окна, и оставленный открытым перекрывал бы правый край полосы.
 - принимает: count, open, loading, rows, ontoggle, onpick
 
@@ -730,9 +734,9 @@
 - * Заводит чтение по номеру записи. * * `payload` собирает нагрузку из номера записи: у компании это одно имя поля, * у человека другое, и подставить его за карточку нельзя. * * `show` кладёт пришедшее. Через довод, а не ответом: разбор ответа — проверку * на негодность и взятие поля — карточки вели одинаково, и своими у них * остаются только имена.
 - отдаёт: miniRead
 
-### state/modes.js (61)
+### state/modes.js (70)
 - * Три положения слева направо. Порядок несущий: по нему считается, в какую * треть дорожки попало нажатие.
-- отдаёт: OFF, modeChosen
+- отдаёт: OFF, modeChosen, modeHintAt
 
 ### state/new_card.js (97)
 - * Обвязка формы заведения по роду карточки. * * `named` держится рядом с `blank` нарочно: пустой черновик и заслон, который * решает, что он уже не пустой, — две половины одного правила, и разъехавшись, * они дали бы кнопку, открытую над формой, которую мост отобьёт.
@@ -874,7 +878,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: counted, plural, vacancyCount
 
-## styles — 117 файлов
+## styles — 118 файлов
 
 ### styles/accent-fill.css (20)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре, текущий шаг мастера, уверенная оценка вакансии и счёт непрочитанного. Одним правилом на все места, а не своим в каждом: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -902,6 +906,13 @@
 - Окно заведения по адресу — канала или агрегатора: узкая коробка с шапкой, полем и подвалом. Сами шапка, тело и подвал — общие, в modal.css.
 - селекторы (2): .address-dialog, .address-hint
 - берёт: --text-tertiary
+
+### styles/apply-all.css (22)
+- Значок «отклик на все новые» в нижней полосе. Общее с прочими кнопками-значками — в icon-button.css.
+- селекторы (4): .apply-all-btn, .apply-all-btn.has-new,
+.apply-all-btn.has-new:hover, .apply-all-btn.is-disabled, .apply-all-btn.is-disabled,
+.apply-all-btn.is-disabled:hover
+- берёт: --text-tertiary, --warn
 
 ### styles/apply-ways.css (7)
 - Окно выбора, куда откликнуться: строки контактов в узкой коробке. Шапка, тело и подвал — общие, в modal.css; сама строка, её рамка, отклик и отметка выбора — строка подборщика (`picker.css`).
@@ -1044,7 +1055,7 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (3): .confirm-field, .confirm-field .input, .confirm-field .icon-btn:hover
 - берёт: --accent
 
-### styles/contact-block.css (45)
+### styles/contact-block.css (50)
 - Кружок и два имени рядом с ним: так подписаны HR и компания в карточке вакансии и кандидаты в подборщике привязки.
 - селекторы (6): .contact-block, .hr-avatar, .hr-avatar .material-symbols-outlined, img.hr-avatar, .hr-info, .hr-name
 - берёт: --bg-tertiary, --text-primary, --text-secondary
@@ -1261,10 +1272,10 @@ body, html, button, body, .material-symbols-outlined
 .modal-footer, .modal-footer, .modal-footer .btn, .modal-subtitle, .modal-error
 - берёт: --bg-tertiary, --border, --danger, --scrim, --shadow-modal, --text-primary, --text-secondary, --text-tertiary
 
-### styles/mode.css (55)
-- Переключатель режима бота: слово, дорожка и бегунок на ней.
-- селекторы (14): .mode-control, .mode-text, .mode-track, .mode-knob, .mode-control[data-mode='Off'] .mode-knob, .mode-control[data-mode='Off'] .mode-text, .mode-control[data-mode='Off'] .mode-track, .mode-control[data-mode='DM Only'] .mode-knob, .mode-control[data-mode='DM Only'] .mode-text, .mode-control[data-mode='DM Only'] .mode-track, .mode-control[data-mode='Full'] .mode-knob, .mode-control[data-mode='Full'] .mode-text, .mode-control[data-mode='Full'] .mode-track, .mode-control.is-disabled
-- берёт: --accent, --accent-muted, --bg-tertiary, --border, --err, --err-muted, --text-secondary, --text-tertiary, --warn, --warn-muted
+### styles/mode.css (42)
+- Переключатель режима бота: дорожка и бегунок на ней. Режим читается по месту бегунка и его цвету, слова у переключателя нет.
+- селекторы (10): .mode-control, .mode-track, .mode-knob, .mode-control[data-mode='Off'] .mode-knob, .mode-control[data-mode='Off'] .mode-track, .mode-control[data-mode='DM Only'] .mode-knob, .mode-control[data-mode='DM Only'] .mode-track, .mode-control[data-mode='Full'] .mode-knob, .mode-control[data-mode='Full'] .mode-track, .mode-control.is-disabled
+- берёт: --accent, --accent-muted, --bg-tertiary, --border, --err, --err-muted, --text-tertiary, --warn, --warn-muted
 
 ### styles/name-grid.css (9)
 - Имя анкеты одной строкой: имя с фамилией, они же латиницей и пол. Пары делят ширину поровну, плитки пола берут сколько им нужно. Просвет — тот же, что у сетки формы под ней (`form-grid.css`).
@@ -1595,9 +1606,9 @@ body, html, button, body, .material-symbols-outlined
 .hr-name.muted
 - берёт: --text-tertiary
 
-### styles/unread.css (97)
+### styles/unread.css (103)
 - Счёт непрочитанного: пилюля со значком письма и список под ней.
-- селекторы (14): .badge-unread, .badge-unread .material-symbols-outlined, .badge-unread[data-has-unread='true'], .badge-unread:hover, .badge-unread[data-has-unread='true']:hover, .unread-popup-backdrop, .unread-popup, .unread-popup-empty, .unread-popup-list, .unread-popup-row, .unread-popup-row:last-child, .unread-popup-name, .unread-popup-sub, .unread-popup-count
+- селекторы (15): .badge-unread, .badge-unread .material-symbols-outlined, .badge-unread[data-has-unread='true'], .badge-unread[data-has-unread='true']:hover, .badge-unread[data-has-unread='false'], .badge-unread[data-has-unread='true']:hover, .unread-popup-backdrop, .unread-popup, .unread-popup-empty, .unread-popup-list, .unread-popup-row, .unread-popup-row:last-child, .unread-popup-name, .unread-popup-sub, .unread-popup-count
 - берёт: --accent, --accent-badge-hover, --selected-bg, --shadow-popup, --surface-raised, --surface-raised-hover, --text-primary, --text-tertiary
 
 ### styles/vacancies.css (149)
@@ -1663,7 +1674,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (184)
+### tests/bottom_bar_live.test.js (287)
 - —
 
 ### tests/bridge.test.js (161)
@@ -1734,7 +1745,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/flash.test.js (34)
 - —
 
-### tests/footer.test.js (176)
+### tests/footer.test.js (183)
 - * Нажатие мышью: место на дорожке шириной 300 точек.
 
 ### tests/fresh.test.js (65)

@@ -1,19 +1,9 @@
-/* Переключатель режима бота: слово, дорожка и бегунок на ней. */
+/* Переключатель режима бота: дорожка и бегунок на ней. Режим читается по месту
+   бегунка и его цвету, слова у переключателя нет. */
 
 .mode-control {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-}
-
-/* Ширина слова закреплена: без неё переключатель ездил бы влево-вправо на
-   каждой смене Off ↔ DM Only ↔ Full. */
-.mode-text {
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-  min-width: 56px;
-  text-align: right;
-  transition: color 0.15s;
 }
 
 .mode-track {
@@ -37,15 +27,12 @@
 }
 
 .mode-control[data-mode='Off'] .mode-knob { left: 1px; background: var(--err); }
-.mode-control[data-mode='Off'] .mode-text { color: var(--err); }
 .mode-control[data-mode='Off'] .mode-track { border-color: var(--err-muted); }
 
 .mode-control[data-mode='DM Only'] .mode-knob { left: 15px; background: var(--warn); }
-.mode-control[data-mode='DM Only'] .mode-text { color: var(--warn); }
 .mode-control[data-mode='DM Only'] .mode-track { border-color: var(--warn-muted); }
 
 .mode-control[data-mode='Full'] .mode-knob { left: 29px; background: var(--accent); }
-.mode-control[data-mode='Full'] .mode-text { color: var(--accent); }
 .mode-control[data-mode='Full'] .mode-track { border-color: var(--accent-muted); }
 
 .mode-control.is-disabled {

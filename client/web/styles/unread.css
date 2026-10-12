@@ -21,8 +21,14 @@
   color: var(--accent);
 }
 
-.badge-unread:hover {
+/* При нуле открывать нечего — значок заперт, как прочие в полосе, и на
+   наведение не отзывается. */
+.badge-unread[data-has-unread='true']:hover {
   background: var(--surface-raised-hover);
+}
+
+.badge-unread[data-has-unread='false'] {
+  cursor: default;
 }
 
 .badge-unread[data-has-unread='true']:hover {
