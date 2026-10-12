@@ -158,7 +158,14 @@ def _started_or_told_why() -> int:
 
 
 def main() -> int:
+    from backend import updater
     from backend.single_instance import hold_the_only_copy
+
+    # Копия-подменщик — до замка: его ещё держит закрывающееся приложение, чей
+    # exe она ждёт, чтобы подменить. Журнал её не касается: файл открывается
+    # только записью, а она пишет в свой.
+    if sys.argv[1:2] == [updater.UPDATE_FLAG]:
+        return updater.run(sys.argv[2:])
 
     # Замок берётся первым и держится до самого конца: живёт он, пока жив
     # дескриптор. Две копии над одним каталогом данных делят файл журнала — а
@@ -178,6 +185,7 @@ def main() -> int:
         ask_to_raise()
         return 3
     with the_only_copy:
+        updater.clear_leftovers()
         return _started_or_told_why()
 
 

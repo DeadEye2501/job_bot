@@ -3,6 +3,8 @@
 import asyncio
 import sys
 
+import pytest
+
 from backend.bot.update import download_update
 from tests.fakes.github_release import APP, serve_newer
 
@@ -13,8 +15,17 @@ def _app_in(monkeypatch, tmp_path):
     serve_newer(monkeypatch)
 
 
-async def test_the_download_lies_next_to_the_app_and_its_way_reaches_the_bar(make_bot, monkeypatch, tmp_path):
-    """Полоса показывает ход с первого мгновения, ещё до ответа GitHub, и до конца."""
+@pytest.fixture
+def handed(monkeypatch):
+    """Кому отдано скачанное: путь, с которым запущена копия-подменщик."""
+    given = []
+    monkeypatch.setattr("backend.updater.launch_updater", given.append)
+    return given
+
+
+async def test_the_download_lies_next_to_the_app_and_goes_to_the_copy(make_bot, monkeypatch, tmp_path, handed):
+    """Полоса показывает ход с первого мгновения, ещё до ответа GitHub, и до конца;
+    скачанное и сверенное уходит копии-подменщику."""
     _app_in(monkeypatch, tmp_path)
     bot = await make_bot()
     steps = []
@@ -25,13 +36,14 @@ async def test_the_download_lies_next_to_the_app_and_its_way_reaches_the_bar(mak
     assert (tmp_path / "JobBot.exe.new").read_bytes() == APP
     assert steps[0] == ("update", "Обновление", 0, 0)
     assert steps[-1] == ("update", "Обновление", len(APP), len(APP))
+    assert handed == [tmp_path / "JobBot.exe.new"]
 
 
-async def test_a_busy_slot_downloads_nothing(make_bot, monkeypatch, tmp_path):
+async def test_a_busy_slot_downloads_nothing(make_bot, monkeypatch, tmp_path, handed):
     """Пока идёт прогон, скачивание не начинается: место прогона одно."""
     _app_in(monkeypatch, tmp_path)
     bot = await make_bot()
     bot.current_poll_task = asyncio.get_running_loop().create_future()
 
     assert await download_update(bot) == "busy"
-    assert not (tmp_path / "JobBot.exe.new").exists()
+    assert not (tmp_path / "JobBot.exe.new").exists() and handed == []

@@ -58,7 +58,7 @@ async def download_update(target: Path, report: Callable[[int, int], None]) -> U
             logger.warning("обновление %s не сошлось с релизом: сумма %s", release.tag, sha256)
     finally:
         if not kept:
-            _remove(target)
+            remove_leftover(target)
     return "ok" if kept else "broken"
 
 
@@ -87,11 +87,11 @@ async def _fetch(release: Release, target: Path, report: Callable[[int, int], No
     return digest.hexdigest()
 
 
-def _remove(target: Path) -> None:
-    """Убрать недокачанное. Свежий файл бывает ненадолго занят антивирусом — тогда
-    он остаётся до следующего запуска, который его уберёт, а исход скачивания
-    своим и остаётся."""
+def remove_leftover(path: Path) -> None:
+    """Убрать файл обновления — недокачанный или отслуживший. Занятый — свежий файл
+    держит антивирус, копия-подменщик ещё не вышла — остаётся до следующего
+    запуска, который его уберёт; зовущий от этого не падает."""
     try:
-        target.unlink(missing_ok=True)
+        path.unlink(missing_ok=True)
     except OSError:
-        logger.warning("не удалось убрать недокачанное обновление %s", target, exc_info=True)
+        logger.warning("не удалось убрать файл обновления %s", path, exc_info=True)
