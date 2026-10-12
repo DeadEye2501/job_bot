@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from backend.agent.jobs import Applied, ApplyJob, Failed, Finished, LoginJob, SeekJob
+from backend.agent.jobs import HUMAN_KINDS, RESULTS, Applied, ApplyJob, Failed, Finished, LoginJob, SeekJob
 from backend.agent.kit import AgentKit
 from backend.domain.apply_order import VIA_AGGREGATOR
 from backend.domain.hosts import normalize_host
@@ -13,12 +13,6 @@ _ALREADY_APPLIED = (
     "Отклик уже записан, итог не меняется: второй отклик ушёл бы тому же "
     "работодателю другим способом. Заверши работу."
 )
-
-_RESULTS = {
-    LoginJob: {"done"},
-    SeekJob: {"done", "failed"},
-    ApplyJob: {"vacancy_closed", "platform_closed"},
-}
 
 
 def common_tools(kit: AgentKit, job) -> list[Callable]:
@@ -33,9 +27,9 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
             return await build_agent_profile(session, kit.today) or "Анкета не заполнена."
 
     async def finish(result: str, reason: str = "") -> str:
-        """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed или platform_closed. Проверка входа: done."""
-        if result not in _RESULTS[type(job)]:
-            return f"Итога «{result}» у этой задачи не бывает: {', '.join(sorted(_RESULTS[type(job)]))}."
+        """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed или not_fit. Проверка входа: done."""
+        if result not in RESULTS[type(job)]:
+            return f"Итога «{result}» у этой задачи не бывает: {', '.join(sorted(RESULTS[type(job)]))}."
         if isinstance(job.outcome, Applied):
             return _ALREADY_APPLIED
         job.outcome = Finished(result, reason)
@@ -63,7 +57,7 @@ def _login_target(job) -> int | None:
 def _need_human(kit: AgentKit, job) -> Callable:
     async def need_human(kind: str) -> str:
         """Нужен человек: kind — captcha или login. Вызов держится, пока человек не нажмёт «Готово». Ответ «срок вышел» — заверши работу."""
-        if kind not in ("captcha", "login"):
+        if kind not in HUMAN_KINDS:
             return "kind — captcha или login."
         return await kit.gate.wait(kind, _host_of(job) or "сайт", kit.browser)
 

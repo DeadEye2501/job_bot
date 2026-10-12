@@ -8,13 +8,14 @@ from typing import Literal
 
 from backend.agent.kit import AgentKit
 from backend.applying import run
+from backend.applying.result import Unfit
 from backend.bot import slot, work
 from backend.domain.apply_order import Way
 from backend.models import Vacancy
 
-ApplyOutcome = Literal[slot.CycleOutcome, work.AgentStop, "failed", "missing"]
+ApplyOutcome = Literal[slot.CycleOutcome, work.AgentStop, "failed", "unfit", "missing"]
 """Чем кончился ручной отклик: исходы места прогона и работы с агентом, свой
-провал способа и пропавшая вакансия."""
+провал способа, вакансия, оказавшаяся неподходящей, и пропавшая вакансия."""
 
 
 async def apply_chosen_way(bot, vacancy_id: int, way: Way) -> ApplyOutcome:
@@ -27,6 +28,9 @@ async def apply_chosen_way(bot, vacancy_id: int, way: Way) -> ApplyOutcome:
         # Анкета в памяти конвейера свежа после оборота, а нажать можно и до
         # первого: письмо без неё не сочинить.
         await bot.ingestion.reload_resources()
-        return "ok" if await run.apply_chosen(kit, vacancy_id, way) == "applied" else "failed"
+        outcome = await run.apply_chosen(kit, vacancy_id, way)
+        if outcome == "applied":
+            return "ok"
+        return "unfit" if isinstance(outcome, Unfit) else "failed"
 
     return await work.in_slot(bot, apply, f"apply {way.method} {vacancy_id}")

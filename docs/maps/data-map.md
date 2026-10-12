@@ -296,6 +296,8 @@
   - `letter_writer: str`
   - `letter_checks: int` = `0`
   - `outcome: Outcome | None` = `None`
+- `RESULTS` = `словарь из 3`
+- `HUMAN_KINDS` = `набор из 2`
 
 ### `backend/agent/kit.py`
 
@@ -353,6 +355,10 @@
 ### `backend/agent/tools_applier.py`
 
 - `_ALLOWED` = `словарь из 2`
+- `_Text` = `Annotated[str, StringConstraints(strip_whitespac…`
+- `class ScreeningPair(TypedDict)`
+  - `question: _Text`
+  - `answer: _Text`
 - `class _Report`
   - `via: str`
   - `target: str`
@@ -369,7 +375,6 @@
 ### `backend/agent/tools_common.py`
 
 - `_ALREADY_APPLIED` = `'Отклик уже записан, итог не меняется: второй от…`
-- `_RESULTS` = `словарь из 3`
 
 ### `backend/agent/tools_letter.py`
 
@@ -405,7 +410,9 @@
 - `class Missed`
   - `reason: str`
   - `lesson: Lesson | None` = `None`
-- `Outcome` = `Literal['applied'] | Missed`
+- `class Unfit`
+  - `reason: str`
+- `Outcome` = `Literal['applied'] | Missed | Unfit`
 - `GONE` = `Missed('вакансия удалена')`
 
 ### `backend/applying/run.py`
@@ -1710,6 +1717,11 @@
   - `explanation: str | None` = `None`
   - `message_id: int | None` = `None`
   - `source: StatusHistorySource` = `StatusHistorySource.SYSTEM`
+- `class _Move`
+  - `allowed: frozenset[VacancyStatus]`
+  - `to: VacancyStatus`
+- `_APPLIED` = `_Move(APPLY_MOVES_FROM, VacancyStatus.APPLIED)`
+- `_UNFIT` = `_Move(frozenset({VacancyStatus.NEW}), VacancySta…`
 
 ### `backend/runtime_settings.py`
 
@@ -1908,7 +1920,7 @@
 - `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться.'`
 - `AGGREGATOR_REFUSALS` = `словарь из 5 и раскрытых`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
-- `APPLY_VIA_REFUSALS` = `словарь из 5 и раскрытых`
+- `APPLY_VIA_REFUSALS` = `словарь из 6 и раскрытых`
 
 ### `client/bridge/runner.py`
 

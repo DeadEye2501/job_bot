@@ -51,10 +51,10 @@ def scripted(steps: list[Callable[[dict[str, Callable]], Awaitable]]):
     return run
 
 
-def finish_step(result: str = "done"):
+def finish_step(result: str = "done", reason: str = ""):
     """Шаг сценария: сессия кончается этим итогом и больше ничего не делает."""
     async def step(tools):
-        await tools["finish"](result=result)
+        await tools["finish"](result=result, reason=reason)
     return step
 
 

@@ -31,7 +31,17 @@ class Missed:
     lesson: Lesson | None = None
 
 
-Outcome = Literal["applied"] | Missed
+@dataclass(frozen=True)
+class Unfit:
+    """Вакансия человеку не подходит: форма поставила условие, которое анкета исключает.
+
+    Не промах способа: другой способ упрётся в то же условие, и пробовать его незачем.
+    """
+
+    reason: str
+
+
+Outcome = Literal["applied"] | Missed | Unfit
 
 GONE = Missed("вакансия удалена")
 """Вакансию удалили, пока до неё дошла очередь: способ пробовать не на чем."""

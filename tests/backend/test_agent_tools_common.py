@@ -56,6 +56,16 @@ async def test_a_finish_the_role_does_not_know_is_refused(make_pipeline, session
     assert job.outcome is None and "не бывает" in answer
 
 
+async def test_the_applier_can_finish_with_an_unfit_vacancy(make_pipeline):
+    job = apply_job(1)
+
+    await tool(common_tools(kit_for(await make_pipeline()), job), "finish")(
+        result="not_fit", reason="Условие формы"
+    )
+
+    assert job.outcome == Finished("not_fit", "Условие формы")
+
+
 async def test_a_failure_is_recorded_for_the_applier(make_pipeline):
     job = apply_job(1)
 

@@ -3,9 +3,9 @@
 Поле `vacancy.status` пишется только отсюда: путь записи мимо этого модуля
 не покрывался бы ни тестами графа, ни тестами переходов.
 
-Наружу торчат поводы, а не статусы: отклик ушёл, HR ответил, HR молчит,
-объявление разобрано, человек выбрал руками. Что из повода следует и позволен
-ли переход, решает модуль; сам перевод пишет `_move_status`, и он закрытый.
+Наружу торчат поводы, а не статусы: отклик ушёл, отклик узнал, что вакансия
+не подходит, HR ответил, HR молчит, объявление разобрано, человек выбрал
+руками. Что из повода следует и позволен ли переход, решает модуль; сам перевод пишет `_move_status`, и он закрытый.
 Рядом живёт работа с самими строками истории — прочитать последнюю, переписать
 пояснение: предмет у них тот же, и порознь им жить негде.
 
@@ -112,12 +112,42 @@ async def mark_vacancy_applied(
 
     Транзакцию закрывает зовущий.
     """
+    return await _move_by_application(session, vacancy_id, _APPLIED, explanation)
+
+
+async def mark_vacancy_unfit(
+    session: AsyncSession, vacancy_id: int, reason: str
+) -> None:
+    """Отклик узнал, что вакансия не подходит: Not Fit с причиной в истории — только из New.
+
+    Дальше New стоит итог прежнего отклика или решение человека, и повторный
+    отклик руками их не затирает.
+
+    Транзакцию закрывает зовущий.
+    """
+    await _move_by_application(session, vacancy_id, _UNFIT, reason)
+
+
+@dataclass(frozen=True, slots=True)
+class _Move:
+    """Переход по поводу отклика: из каких статусов он разрешён и куда ведёт."""
+
+    allowed: frozenset[VacancyStatus]
+    to: VacancyStatus
+
+
+_APPLIED = _Move(APPLY_MOVES_FROM, VacancyStatus.APPLIED)
+_UNFIT = _Move(frozenset({VacancyStatus.NEW}), VacancyStatus.NOT_FIT)
+
+
+async def _move_by_application(
+    session: AsyncSession, vacancy_id: int, move: _Move, explanation: str | None
+) -> bool:
+    """Перевести вакансию, если она стоит в разрешённом статусе; ответ — сменился ли он."""
     vacancy = await session.get(Vacancy, vacancy_id)
-    if vacancy is None or vacancy.status not in APPLY_MOVES_FROM:
+    if vacancy is None or vacancy.status not in move.allowed:
         return False
-    session.add(
-        _move_status(vacancy, VacancyStatus.APPLIED, _Signature(explanation))
-    )
+    session.add(_move_status(vacancy, move.to, _Signature(explanation)))
     return True
 
 

@@ -1,5 +1,9 @@
 """Откликатель пишет отклик только на свою вакансию и только своим способом."""
 
+import pytest
+from mcp.server.fastmcp.exceptions import ToolError
+
+from adapters.agent_mcp import tool_host
 from backend.agent.jobs import Applied, ApplyJob
 from backend.agent.tools_applier import applier_tools
 from backend.models import Application, Screening
@@ -20,11 +24,54 @@ async def test_a_recorded_application_ends_the_session(make_pipeline, session_fa
 
     await tool(applier_tools(kit_for(await make_pipeline()), job), "record_application")(
         via="aggregator", target="https://site.test/vacancy/1",
-        screening=[{"from_us": False, "text": "В"}, {"from_us": True, "text": "О"}],
+        screening=[{"question": "В", "answer": "О"}],
     )
 
     (row,) = await all_rows(session_factory, Application)
     assert job.outcome == Applied(row.id)
+
+
+async def test_screening_pairs_land_as_the_question_then_the_answer(make_pipeline, session_factory):
+    vacancy = vacancy_row()
+    await put(session_factory, vacancy)
+    server = tool_host(applier_tools(kit_for(await make_pipeline()), _job(vacancy.id)))
+
+    await server.call_tool("record_application", {
+        "via": "aggregator", "target": "https://site.test/vacancy/1",
+        "screening": [{"question": "Опыт?", "answer": "Четыре года"}],
+    })
+
+    rows = await all_rows(session_factory, Screening)
+    assert [(s.from_us, s.text) for s in rows] == [(False, "Опыт?"), (True, "Четыре года")]
+
+
+@pytest.mark.parametrize("pair", [
+    {"q": "Опыт?", "a": "Четыре года"},
+    {"question": "", "answer": "Четыре года"},
+    {"question": "Опыт?", "answer": ""},
+    {"question": "Опыт?", "answer": "   "},
+])
+async def test_a_screening_pair_without_its_text_is_refused_not_stored_empty(
+    make_pipeline, session_factory, pair
+):
+    """Агент узнаёт об ошибке сразу и может повторить, а окно не показывает пустых реплик.
+
+    Отказ — от проверки доводов, а не от сбоя внутри инструмента: FastMCP
+    заворачивает в ту же ошибку любое исключение.
+    """
+    vacancy = vacancy_row()
+    await put(session_factory, vacancy)
+    job = _job(vacancy.id)
+    server = tool_host(applier_tools(kit_for(await make_pipeline()), job))
+
+    with pytest.raises(ToolError, match="validation error"):
+        await server.call_tool("record_application", {
+            "via": "aggregator", "target": "https://site.test/vacancy/1", "screening": [pair],
+        })
+
+    assert job.outcome is None
+    assert await all_rows(session_factory, Application) == []
+    assert await all_rows(session_factory, Screening) == []
 
 
 async def test_a_form_way_cannot_be_recorded_as_the_aggregator(make_pipeline, session_factory):
@@ -90,13 +137,14 @@ async def test_questions_after_the_record_join_the_same_application(make_pipelin
     job = _job(vacancy.id)
     record = tool(applier_tools(kit_for(await make_pipeline()), job), "record_application")
     await record(via="aggregator", target="https://site.test/vacancy/1",
-                 screening=[{"from_us": False, "text": "Опыт?"}])
+                 screening=[{"question": "Опыт?", "answer": "Четыре года"}])
 
     await record(via="aggregator", target="https://site.test/vacancy/1/done",
-                 screening=[{"from_us": False, "text": "Город?"}])
+                 screening=[{"question": "Город?", "answer": "Москва"}])
 
     assert len(await all_rows(session_factory, Application)) == 1
-    assert [s.text for s in await all_rows(session_factory, Screening)] == ["Опыт?", "Город?"]
+    texts = [s.text for s in await all_rows(session_factory, Screening)]
+    assert texts == ["Опыт?", "Четыре года", "Город?", "Москва"]
 
 
 async def test_the_vacancy_tool_describes_its_own_vacancy(make_pipeline, session_factory):

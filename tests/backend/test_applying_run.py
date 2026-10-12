@@ -5,7 +5,7 @@ import time
 import pytest
 
 from backend.applying import run
-from backend.applying.result import Missed, TelegramClosed
+from backend.applying.result import Missed, TelegramClosed, Unfit
 from backend.domain.apply_order import Way
 
 
@@ -37,6 +37,15 @@ async def test_a_missed_way_hands_over_to_the_next(executors, two_vacancies, kit
     answers[(first, "telegram")] = Missed("нет адресата")
     await run.apply_vacancies(kit, [first])
     assert calls == [(first, "telegram"), (first, "email")]
+
+
+async def test_an_unfit_vacancy_tries_no_other_way(executors, two_vacancies, kit):
+    """Не подходит сама вакансия, а не способ: следующему способу пробовать нечего."""
+    calls, answers = executors
+    first = two_vacancies[0].id
+    answers[(first, "telegram")] = Unfit("Условие формы")
+    await run.apply_vacancies(kit, [first])
+    assert calls == [(first, "telegram")]
 
 
 async def test_a_telegram_ban_closes_telegram_for_the_rest_of_the_run(
