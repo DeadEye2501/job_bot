@@ -10,10 +10,6 @@
   color: var(--warn);
 }
 
-.apply-all-btn.is-disabled {
-  cursor: default;
-}
-
 /* Запертый значок и при новых вакансиях гаснет до серого: жёлтый звал бы
    нажать то, что сейчас не нажмётся. */
 .apply-all-btn.is-disabled,

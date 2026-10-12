@@ -257,14 +257,14 @@
   </div>
 
   <div class="bb-right">
-    <!-- Подсказка только у запертого переключателя: у отпертого рядом стоит
-         сам режим словом, и объяснять, что по нему нажимают, нечего. -->
     <ApplyAllButton
       count={newCount}
       disabled={locked || round.running || newCount === 0}
       title={applyAllTitle}
       onpress={() => ask('system.apply_all_new')}
     />
+    <!-- Полоса даёт переключателю подсказку только запертому — почему заперт;
+         отпертый называет режим под курсором сам. -->
     <ModeToggle {mode} disabled={locked} title={locked ? lockedTip : null} onpick={pickMode} />
     <RunButton
       running={round.running}

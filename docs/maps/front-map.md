@@ -28,7 +28,7 @@
 - принимает: ask, say, events
 
 ### app/BottomBar.svelte (290)
-- Подсказка только у запертого переключателя: у отпертого рядом стоит сам режим словом, и объяснять, что по нему нажимают, нечего.
+- Полоса даёт переключателю подсказку только запертому — почему заперт; отпертый называет режим под курсором сам.
 - принимает: ask, say, events, onlocked, oncontact
 
 ### app/ChannelCard.svelte (153)
@@ -397,7 +397,7 @@
 - принимает: extra, over, confirm, awayCloses, onclose, children
 - берёт: ./ModalKeys.svelte
 
-### components/ModeToggle.svelte (41)
+### components/ModeToggle.svelte (43)
 - —
 - принимает: mode, disabled, title, onpick
 
@@ -907,10 +907,10 @@
 - селекторы (2): .address-dialog, .address-hint
 - берёт: --text-tertiary
 
-### styles/apply-all.css (22)
+### styles/apply-all.css (18)
 - Значок «отклик на все новые» в нижней полосе. Общее с прочими кнопками-значками — в icon-button.css.
-- селекторы (4): .apply-all-btn, .apply-all-btn.has-new,
-.apply-all-btn.has-new:hover, .apply-all-btn.is-disabled, .apply-all-btn.is-disabled,
+- селекторы (3): .apply-all-btn, .apply-all-btn.has-new,
+.apply-all-btn.has-new:hover, .apply-all-btn.is-disabled,
 .apply-all-btn.is-disabled:hover
 - берёт: --text-tertiary, --warn
 
@@ -1091,10 +1091,11 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (14): .date-picker, .input-date-text, .input-date-text.invalid, .date-panel, .date-panel.up, .date-head, .date-head .icon-btn:hover, .date-title, .date-week, .date-weekday, .date-cell, .date-day, .date-day:hover, .date-day.today
 - берёт: --accent, --bg-tertiary, --err, --scrim, --selected-bg, --text-primary, --text-secondary
 
-### styles/disabled-look.css (35)
+### styles/disabled-look.css (36)
 - Как выглядит запертое: не даёт себя нажать и говорит об этом видом. Одним файлом на все места, где запертость показывают, — иначе одинаково запертые соседи гаснут по-разному, и разница читается как разная запертость. Глубин здесь три, и делит их не прихоть, а то, что заперто: — кнопка гаснет заметнее всех: она сплошная, и лёгкое приглушение на ней не читается; — пункт меню и карточка выбора приглушены мягче: они стоят в ряду таких же, и глубокая тень выбила бы ряд; — поле и кнопка отправки в переписке не гаснут вовсе, а гасят свои буквы: они и так на приглушённом полотне, а прозрачное поле читалось бы как пропавшее. Переключатель режима (`mode.css`) сюда не сведён: у него глубина своя и ни с одной из этих трёх не совпадает.
 - селекторы (3): .btn:disabled,
 .icon-btn.is-disabled,
+.badge-unread[data-has-unread='false'],
 .cnt-chat-attach:disabled, .menu-item.blocked,
 .radio-card.disabled, .cnt-chat-input:disabled,
 .cnt-chat-send:disabled
@@ -1606,10 +1607,10 @@ body, html, button, body, .material-symbols-outlined
 .hr-name.muted
 - берёт: --text-tertiary
 
-### styles/unread.css (103)
+### styles/unread.css (93)
 - Счёт непрочитанного: пилюля со значком письма и список под ней.
-- селекторы (15): .badge-unread, .badge-unread .material-symbols-outlined, .badge-unread[data-has-unread='true'], .badge-unread[data-has-unread='true']:hover, .badge-unread[data-has-unread='false'], .badge-unread[data-has-unread='true']:hover, .unread-popup-backdrop, .unread-popup, .unread-popup-empty, .unread-popup-list, .unread-popup-row, .unread-popup-row:last-child, .unread-popup-name, .unread-popup-sub, .unread-popup-count
-- берёт: --accent, --accent-badge-hover, --selected-bg, --shadow-popup, --surface-raised, --surface-raised-hover, --text-primary, --text-tertiary
+- селекторы (13): .badge-unread, .badge-unread .material-symbols-outlined, .badge-unread[data-has-unread='true'], .badge-unread[data-has-unread='true']:hover, .unread-popup-backdrop, .unread-popup, .unread-popup-empty, .unread-popup-list, .unread-popup-row, .unread-popup-row:last-child, .unread-popup-name, .unread-popup-sub, .unread-popup-count
+- берёт: --accent, --accent-badge-hover, --selected-bg, --shadow-popup, --surface-raised, --text-primary, --text-tertiary
 
 ### styles/vacancies.css (149)
 - Экран вакансий: список слева, подробности справа, строка в три этажа.

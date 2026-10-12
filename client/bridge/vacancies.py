@@ -23,6 +23,7 @@ from client.bridge.answer import (
     launched_on_bot,
     reply,
 )
+from client.bridge.events import LIST_CHANGED
 from client.bridge.form_payloads import read_new_vacancy_fields
 from client.bridge.hub import Hub
 from client.bridge.refusals import (
@@ -263,6 +264,7 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
             if row is None:
                 async with self._hub.session_factory() as session:
                     await require_vacancy(session, vacancy_id)
+            self._hub.events.add(LIST_CHANGED)
             return {"vacancy_id": vacancy_id}
 
         return reply(self._hub.runner, run())
@@ -291,6 +293,7 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
             async with self._hub.session_factory() as session:
                 async with session.begin():
                     created_id = await vacancies_new.create_vacancy(session, fields)
+            self._hub.events.add(LIST_CHANGED)
             return {"action": "create_vacancy", "created_id": created_id}
 
         return reply(self._hub.runner, run())

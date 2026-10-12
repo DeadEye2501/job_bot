@@ -11,6 +11,7 @@ from backend.applying.world import available_ways
 from backend.domain.apply_order import Way
 from backend.repository import vacancies_life
 from client.bridge.answer import Denied, asked_id, launched_on_bot, reply
+from client.bridge.events import LIST_CHANGED
 from client.bridge.refusals import (
     APPLY_VIA_REFUSALS,
     NO_VACANCY,
@@ -110,6 +111,7 @@ class VacancyActions:
                         gone = await vacancies_life.delete_vacancy(session, vacancy_id)
             if not gone:
                 raise Denied(NO_VACANCY, vacancy_id=vacancy_id, action="delete")
+            self._hub.events.add(LIST_CHANGED)
             return {"vacancy_id": vacancy_id, "action": "delete"}
 
         return reply(self._hub.runner, run())

@@ -7,6 +7,8 @@
 
 import json
 
+import pytest
+
 from backend.models import VacancyStatus
 from tests.dbio import put
 from tests.factories import company_row, status_history_row, vacancy_row
@@ -224,6 +226,25 @@ async def test_a_changed_status_reaches_the_card(api, ask, session_factory):
 
     shown = await ask(api.vacancies.detail, vacancy.id)
     assert shown["ok"]["vacancy"]["status"] == "Applied"
+
+
+@pytest.mark.parametrize("act", ["change_status", "create", "delete"])
+async def test_a_hand_edit_tells_the_window_the_list_changed(api, ask, hub, session_factory, act):
+    """По этой вести значок «!» перечитывает число новых: без неё правка руками
+    оставила бы на нём прежнее число, и нажатие брало бы не то, что обещано."""
+    vacancy = vacancy_row(status=VacancyStatus.NEW)
+    await put(session_factory, vacancy)
+    payload = {
+        "change_status": {"vacancy_id": vacancy.id, "status": "Not Fit"},
+        "create": {"title": "Вакансия руками"},
+        "delete": {"vacancy_id": vacancy.id},
+    }[act]
+
+    answer = await ask(getattr(api.vacancies, act), payload)
+
+    assert "fail" not in answer
+    news = await hub.events.take(0, timeout=0.1)
+    assert "vacancies_list_changed" in [one["kind"] for one in news["events"]]
 
 
 async def test_a_card_from_an_aggregator_names_its_source(api, ask, session_factory):

@@ -7,6 +7,7 @@ from concurrent.futures import Future
 
 from backend.telegram_login import TelegramLogin
 from client.bridge.bot_stop import detach_bot, stop_bot
+from client.bridge.events import LIST_CHANGED
 from client.bridge.hub import Hub
 from client.bridge.journal import close_journal
 
@@ -213,7 +214,7 @@ def _tell_the_window(bot, hub: Hub) -> None:
     # канала не доезжало до окна до перехода на соседний экран.
     bot.on_channels_changed = lambda: events.add("contacts_lists_changed")
     bot.on_contacts_changed = lambda: events.add("contacts_lists_changed")
-    bot.on_vacancies_changed = lambda: events.add("vacancies_list_changed")
+    bot.on_vacancies_changed = lambda: events.add(LIST_CHANGED)
     bot.on_human_needed = lambda kind, host: events.add("human_needed", {"kind": kind, "host": host})
     bot.on_human_resolved = lambda: events.add("human_resolved")
     bot.on_round_note = lambda text: events.add("round_note", {"text": text})
