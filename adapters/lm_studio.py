@@ -37,8 +37,11 @@ def make_client(
     headers: dict[str, str] = {}
     if config.api_key:
         headers["Authorization"] = f"Bearer {config.api_key}"
+    # Пути запросов (`/v1/chat/completions` и соседи) дописывают `/v1` сами, а
+    # адрес провайдера пишут и с ним, и без: хвостовой `/v1` снимается, иначе
+    # запрос уходил бы на `/v1/v1/...` и получал 404.
     return httpx.AsyncClient(
-        base_url=config.base_url,
+        base_url=config.base_url.rstrip("/").removesuffix("/v1"),
         timeout=LLM_REQUEST_TIMEOUT_SEC,
         headers=headers,
     )

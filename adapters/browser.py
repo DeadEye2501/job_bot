@@ -196,8 +196,10 @@ class BrowserHost:
             await self._place(on_screen=False)
         if back_to == "about:blank":
             return
+        # Ждать разметки, а не полной загрузки: тяжёлые страницы агрегаторов
+        # дотягивают своё полминуты, а работать агенту можно уже с разметкой.
         try:
-            await page.goto(back_to)
+            await page.goto(back_to, wait_until="domcontentloaded")
         except PlaywrightError:
             logger.exception("прежняя страница профиля %d не открылась", self._profile_id)
 

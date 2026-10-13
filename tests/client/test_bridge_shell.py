@@ -16,7 +16,7 @@ import logging
 
 import pytest
 
-from client.bridge.desktop import open_in_system
+from client.bridge.desktop import chosen_path, open_in_system
 from client.serving import MEDIA_PREFIX
 
 
@@ -220,6 +220,26 @@ async def test_a_missing_attachment_is_named_missing(api, ask, opened, media):
 
     assert answer["fail"] == "denied"
     assert opened == []
+
+
+def test_a_file_is_chosen_without_a_deprecated_dialog_name(caplog):
+    """Диалог выбора файла открывается нынешним именем pywebview: устаревшее
+    оставляет пометку в журнале на каждый выбор и уйдёт в следующей версии."""
+    asked = []
+
+    class Window:
+        def create_file_dialog(self, kind, file_types=()):
+            # Род диалога читается, как читает его настоящее окно: устаревшее
+            # имя у pywebview ленивое и пишет пометку именно при чтении.
+            asked.append((int(kind), file_types))
+            return ["C:/резюме.pdf"]
+
+    with caplog.at_level(logging.WARNING):
+        chosen = chosen_path(Window(), "PDF (*.pdf)")
+
+    assert chosen == "C:/резюме.pdf"
+    assert asked == [(10, ("PDF (*.pdf)",))]
+    assert "deprecated" not in caplog.text
 
 
 def test_the_system_gets_the_target_and_says_it_went_through(monkeypatch):

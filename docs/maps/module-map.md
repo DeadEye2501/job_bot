@@ -66,7 +66,7 @@ MCP-сервер инструментов одной сессии агента: 
 - `def _children() -> list[tuple[int, str]]` (13)
 - `def _snapshot() -> list[tuple[int, int, str]]` (16)
 
-### `adapters/browser.py` — 278 строк
+### `adapters/browser.py` — 280 строк
 
 Браузер человека на движке Chromium под управлением Playwright.
 
@@ -80,7 +80,7 @@ MCP-сервер инструментов одной сессии агента: 
 - `def _by_path(name: str, relative: str) -> InstalledBrowser | None` (3)
 - `def _opera() -> InstalledBrowser | None` (10)
 - `def remove_profile(profile_id: int) -> None` (8)
-- `class BrowserHost` (134)
+- `class BrowserHost` (136)
   - `async def open_profile(self, profile_id: int, sending: bool=True, as_person: bool=False) -> None` (20)
   - `async def page(self)` (8)
   - `async def show(self) -> None` (2)
@@ -88,7 +88,7 @@ MCP-сервер инструментов одной сессии агента: 
   - `async def clear_cache(self) -> None` (4)
   - `async def wait_closed(self, limit_sec: float) -> bool` (11)
   - `async def close(self) -> None` (7)
-  - `async def _launch(self) -> None` (38)
+  - `async def _launch(self) -> None` (40)
   - `async def _place(self, on_screen: bool) -> None` (10)
   - `def _forget_context(self, closed) -> None` (4)
   - `async def _close_context(self) -> None` (4)
@@ -261,13 +261,13 @@ Claude через установленный Claude Code по подписке: 
 - `async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | None` (37)
 - `async def list_models(client: LmClient, *, kind: str | None=None) -> list[str]` (30)
 
-### `adapters/lm_studio.py` — 55 строк
+### `adapters/lm_studio.py` — 58 строк
 
 Соединение с OpenAI-совместимым провайдером моделей.
 
 Зависит от: `adapters`, `backend.provider_config`
 
-- `def make_client(config: LlmProviderConfig) -> 'LmClient'` (17)
+- `def make_client(config: LlmProviderConfig) -> 'LmClient'` (20)
 
 ### `adapters/site_home.py` — 115 строк
 
@@ -1636,7 +1636,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _short_dash(text: str) -> str` (2)
 - `def _trouble(letter: Letter, limit: int | None) -> str | None` (7)
 
-### `backend/llm/answers.py` — 234 строк
+### `backend/llm/answers.py` — 253 строк
 
 Разбор того, что ответила модель, порядок двух заходов и жалоба на неудачу.
 
@@ -1648,7 +1648,8 @@ First-run bootstrap: ensure DB schema exists.
 - `def log_unparseable(answer: str, log: logging.Logger, purpose: str) -> None` (18)
 - `def truncation_trouble(finish_reason: str | None) -> str | None` (9)
 - `def wants_more_room(parsed, finish_reason: str | None) -> bool` (18)
-- `async def read_with_a_second_try(ask, read, tokens: tuple[int, int], told: tuple[logging.Logger, str])` (37)
+- `async def read_with_a_second_try(ask, read, tokens: tuple[int, int], told: tuple[logging.Logger, str], *, empty_means: str | None=None)` (39)
+- `def _say_unread(answer: str, told: tuple[logging.Logger, str], empty_means: str | None) -> None` (15)
 - `def str_or_none(value) -> str | None` (10)
 
 ### `backend/llm/candidate.py` — 114 строк
@@ -1868,7 +1869,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (36)
 
-### `backend/llm/vacancy.py` — 494 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 495 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
@@ -1886,7 +1887,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _without_the_channel_itself(parsed: ParsedVacancy, channel_username: str | None) -> ParsedVacancy` (27)
   - `def is_the_channel(contact: str | None) -> bool` (3)
 - `def _log_parsed(parsed: ParsedVacancy) -> None` (10)
-- `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, known_skills=None) -> tuple[ParsedVacancy | None, str | None]` (38)
+- `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, known_skills=None) -> tuple[ParsedVacancy | None, str | None]` (39)
 
 ### `backend/log_buffer.py` — 214 строк
 
@@ -3845,13 +3846,13 @@ Runtime settings layer.
 Тестов: 15
 
 
-### `tests/adapters/test_lm_studio.py` — 26 строк
+### `tests/adapters/test_lm_studio.py` — 42 строк
 
 Следствия соединения с провайдером моделей.
 
 Зависит от: `adapters.lm_studio`, `backend.provider_config`
 
-Тестов: 3
+Тестов: 4
 
 
 ### `tests/adapters/test_smtp_mail.py` — 98 строк
@@ -5248,14 +5249,16 @@ Runtime settings layer.
 
 - `async def _asked(answer: httpx.Response, text: str='Ищем в команду')` (3)
 
-### `tests/backend/test_llm_json_extraction.py` — 210 строк
+### `tests/backend/test_llm_json_extraction.py` — 265 строк
 
 Следствия вырезания ответа-объекта из того, что вернула модель.
 
 Зависит от: `backend.llm.answers`
 
-Тестов: 13
+Тестов: 17
 
+- `async def _second_try(answer: str, **options)` (9)
+  - `async def ask(room)` (2)
 
 ### `tests/backend/test_llm_profile_formatting.py` — 121 строк
 
@@ -6560,13 +6563,13 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/client/test_bridge_shell.py` — 261 строк
+### `tests/client/test_bridge_shell.py` — 281 строк
 
 Следствия обращения к оболочке: что окно отдаёт системе, а что нет.
 
 Зависит от: `client.bridge.desktop`, `client.serving`
 
-Тестов: 13
+Тестов: 14
 
 - `def opened(monkeypatch) -> list` (8)
 - `def refused_by_the_system(monkeypatch) -> None` (9)

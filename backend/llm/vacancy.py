@@ -486,6 +486,7 @@ async def parse_vacancy(
         parsed_vacancy_from_json,
         (MAX_PARSE_TOKENS, ROOMIER_PARSE_TOKENS),
         (logger, "parse_vacancy"),
+        empty_means="модель сочла пост не вакансией",
     )
     if parsed is None:
         return None, trouble

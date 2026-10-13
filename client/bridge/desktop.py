@@ -206,5 +206,5 @@ def chosen_path(window, *file_types: str) -> str | None:
     диалог не беда, человек передумал: зовущие отвечают на это `cancelled`, а
     не отказом, иначе окно показало бы плашку беды на обычное «нет, не сейчас».
     """
-    chosen = window.create_file_dialog(webview.OPEN_DIALOG, file_types=file_types)
+    chosen = window.create_file_dialog(webview.FileDialog.OPEN, file_types=file_types)
     return chosen[0] if chosen else None
