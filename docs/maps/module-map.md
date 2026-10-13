@@ -526,13 +526,13 @@ init
 - `def live_session(model: str) -> RunSession` (12)
   - `async def run(plan: SessionPlan) -> AgentEnd` (7)
 
-### `backend/agent/stops.py` — 17 строк
+### `backend/agent/stops.py` — 18 строк
 
 Беды, которые снимают всю работу с агентом, а не один её шаг.
 
 Зависит от: —
 
-- `class HumanTimeout(Exception)` (2)
+- `class HumanTimeout(Exception)` (3)
 - `class LimitExhausted(Exception)` (2)
 
 ### `backend/agent/tools_applier.py` — 143 строк
@@ -973,7 +973,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def on_dm_outgoing(bot, _client, msg) -> None` (13)
 - `async def on_dm(bot, _client, msg) -> None` (12)
 
-### `backend/bot/work.py` — 69 строк
+### `backend/bot/work.py` — 71 строк
 
 Работа в месте прогона с набором агента: набор живёт, пока идёт работа.
 

@@ -590,7 +590,7 @@
 ### `backend/bot/work.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `HUMAN_TIMEOUT_NOTE` = `'Капча не пройдена — работа остановлена.'`
+- `HUMAN_TIMEOUT_NOTE` = `'Время ожидания истекло.'`
 - `LIMIT_NOTE` = `'Исчерпан лимит подписки Claude Code — работа ос…`
 - `AgentStop` = `Literal['human_timeout', 'limit']`
 - `WorkOutcome` = `Literal[slot.CycleOutcome, AgentStop]`
