@@ -233,17 +233,13 @@ async def test_the_window_hooks_reach_every_chat(session_factory, monkeypatch):
     assert heard.count("разбор") == 2
 
 
-async def test_the_freshest_dialogs_are_caught_up_first(session_factory, monkeypatch):
-    """Впереди идут те, с кем переписка есть, и в порядке её свежести.
+async def test_only_the_dialogs_are_caught_up_freshest_first(session_factory, monkeypatch):
+    """С прочитанным списком переписок догоняются только те, кто в нём есть, —
+    свежими вперёд.
 
-    Раньше догон шёл по всем известным собеседникам подряд. Почти всё время
-    уходило на розыск ников тех, кому никогда не писали — у них и читать
-    нечего, — а свежая переписка стояла в конце очереди. Человек закрывал окно
-    раньше, чем очередь до неё доходила, и письмо, ради которого он приложение
-    и открыл, не подгружалось.
-
-    Остальные при этом не выбрасываются, а досматриваются следом: список
-    переписок мог прийти неполным.
+    У остальных читать нечего, а попытка уходит в розыск по нику, и на частый
+    розыск Telegram отвечает запретом на часы — у новых вакансий перестают
+    находиться HR.
     """
     hrs = await _hrs(session_factory, 3)
     visited: list[int] = []
@@ -258,17 +254,12 @@ async def test_the_freshest_dialogs_are_caught_up_first(session_factory, monkeyp
         dialogs=[DialogPeer(hrs[2].telegram_user_id), DialogPeer(hrs[0].telegram_user_id)],
     )
 
-    assert visited[:2] == [hrs[2].id, hrs[0].id]
-    assert sorted(visited) == sorted(hr.id for hr in hrs)
+    assert visited == [hrs[2].id, hrs[0].id]
 
 
 async def test_without_a_dialog_list_everyone_is_caught_up(session_factory, monkeypatch):
-    """Списка переписок нет — обходятся все, как раньше.
-
-    Пустой он бывает не только у того, с кем не переписывались ни разу: чтение
-    списка могло и сорваться. Считать в этом случае, что переписок нет вовсе,
-    значило бы не догнать ничего.
-    """
+    """Список переписок неизвестен — чтение сорвалось или не дошло до конца, —
+    обходятся все: считать, что переписок нет, значило бы не догнать ничего."""
     hrs = await _hrs(session_factory, 3)
     visited: list[int] = []
 
@@ -277,7 +268,7 @@ async def test_without_a_dialog_list_everyone_is_caught_up(session_factory, monk
 
     monkeypatch.setattr("backend.flows.dm_backfill.backfill_hr_dm_history", backfill)
 
-    await _catch_up(session_factory, dialogs=[])
+    await _catch_up(session_factory, dialogs=None)
 
     assert sorted(visited) == sorted(hr.id for hr in hrs)
 

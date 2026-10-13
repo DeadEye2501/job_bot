@@ -4,7 +4,7 @@ import pytest
 
 from backend.domain.telegram_identity import (
     DialogPeer,
-    hrs_in_dialog_order,
+    hrs_to_catch_up,
     normalize_username,
     typed_username,
 )
@@ -101,25 +101,29 @@ def test_the_order_of_the_dialog_list_wins_over_the_order_of_the_contacts():
     contacts = [Contact(1, user_id=11), Contact(2, user_id=22)]
     chats = [DialogPeer(22), DialogPeer(11)]
 
-    assert [hr.id for hr in hrs_in_dialog_order(contacts, chats)] == [2, 1]
+    assert [hr.id for hr in hrs_to_catch_up(contacts, chats)] == [2, 1]
 
 
-def test_a_contact_without_a_dialog_goes_last_but_is_not_dropped():
-    """Собеседник, с которым разговора нет, уходит в хвост, а не выбрасывается.
+def test_a_contact_without_a_dialog_is_not_read_at_all():
+    """Собеседника, с которым разговора нет, догон не читает.
 
-    В хвост — потому что читать у него нечего и стоит попытка дорого: его
-    номера нет в кэше пиров, и чтение уходит в розыск по нику, который Telegram
-    душит ожиданиями в десятки секунд.
-
-    Но не выбрасывается: список переписок мог прийти неполным — чтение его
-    обрывается, когда закладку поставить не по чему, — и отбор по нему молча
-    потерял бы живую переписку.
+    Читать у него нечего, а попытка дорогая: его номера нет в кэше пиров, и
+    чтение уходит в розыск по нику, за который Telegram запрещает такой розыск
+    часами — на весь аккаунт, вместе с розыском HR новых вакансий.
     """
     contacts = [Contact(1, user_id=11), Contact(2, user_id=22)]
 
-    ordered = hrs_in_dialog_order(contacts, [DialogPeer(22)])
+    ordered = hrs_to_catch_up(contacts, [DialogPeer(22)])
 
-    assert [hr.id for hr in ordered] == [2, 1]
+    assert [hr.id for hr in ordered] == [2]
+
+
+def test_without_a_known_dialog_list_everyone_is_read():
+    """Список переписок неизвестен — читаются все: отбор по нему молча
+    потерял бы живую переписку."""
+    contacts = [Contact(1, user_id=11), Contact(2, user_id=22)]
+
+    assert [hr.id for hr in hrs_to_catch_up(contacts, None)] == [1, 2]
 
 
 def test_a_contact_known_only_by_a_handle_is_matched_by_it():
@@ -129,26 +133,24 @@ def test_a_contact_known_only_by_a_handle_is_matched_by_it():
     учётной записи там нет вовсе. Не сведи мы его по нику — именно у такого
     переписка и не догонялась бы, а он-то как раз и пишет первым.
     """
-    # Второй нужен, чтобы проверка вообще могла упасть: с одним собеседником
-    # он попал бы в ответ и головой, и хвостом, и ответ был бы тем же.
     contacts = [Contact(1, user_id=11), Contact(78, username="Mastakova_TeamLead")]
 
-    matched = hrs_in_dialog_order(contacts, [DialogPeer(8435291761, "mastakova_teamlead")])
+    matched = hrs_to_catch_up(contacts, [DialogPeer(8435291761, "mastakova_teamlead")])
 
-    assert [hr.id for hr in matched] == [78, 1]
+    assert [hr.id for hr in matched] == [78]
 
 
 def test_one_dialog_takes_one_contact():
     """Одну переписку забирает тот, кто опознан по номеру, а не по нику.
 
     Ник свободно достаётся другому человеку, и запись со своим номером под
-    чужим ником принадлежит не тому, с кем идёт разговор. Второй при этом не
-    пропадает — уходит в хвост, как всякий без переписки.
+    чужим ником принадлежит не тому, с кем идёт разговор. Второму переписки
+    не достаётся, и его не читают, как всякого без переписки.
     """
     by_number = Contact(1, user_id=500, username="кто-то")
     by_handle = Contact(2, username="кто-то")
 
-    matched = hrs_in_dialog_order([by_number, by_handle], [DialogPeer(500, "кто-то")])
+    matched = hrs_to_catch_up([by_number, by_handle], [DialogPeer(500, "кто-то")])
 
-    assert [hr.id for hr in matched] == [1, 2]
+    assert [hr.id for hr in matched] == [1]
 

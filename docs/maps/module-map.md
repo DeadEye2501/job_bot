@@ -296,7 +296,7 @@ Claude через установленный Claude Code по подписке: 
 - `def _part(smtp) -> None` (9)
 - `def _message(sender: str, mail: OutgoingMail) -> EmailMessage` (10)
 
-### `adapters/telegram.py` — 221 строк
+### `adapters/telegram.py` — 222 строк
 
 Сборка клиента Telegram и отправка письма его руками.
 
@@ -308,7 +308,7 @@ Claude через установленный Claude Code по подписке: 
 - `async def _dialog_page(client, offset_date: int, offset_id: int, offset_peer)` (16)
 - `def _next_bookmark(dialogs, messages) -> tuple[int, int, int] | None` (17)
 - `def _peers_of(dialogs, users) -> list` (8)
-- `async def list_dialog_peers(client) -> list` (43)
+- `async def list_dialog_peers(client) -> list | None` (44)
 
 ### `adapters/telegraph.py` — 118 строк
 
@@ -814,7 +814,7 @@ First-run bootstrap: ensure DB schema exists.
   - `def reveal_browser(self) -> None` (2)
   - `async def delete_aggregator(self, aggregator_id) -> str` (2)
 
-### `backend/bot/loop.py` — 282 строк
+### `backend/bot/loop.py` — 283 строк
 
 Жизненный цикл соединения: режим работы, главный цикл, выход из сеанса.
 
@@ -822,7 +822,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def log_out_session(bot) -> None` (17)
 - `async def current_mode(bot) -> BotMode` (7)
-- `async def _read_dialogs(bot) -> None` (12)
+- `async def _read_dialogs(bot) -> None` (13)
 - `async def _connect(bot) -> None` (30)
 - `async def _on_mode_switch(bot, prev_mode: BotMode, mode: BotMode) -> None` (16)
 - `def _spawn_catch_up(bot) -> None` (20)
@@ -1158,7 +1158,7 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: —
 
 
-### `backend/domain/telegram_identity.py` — 165 строк
+### `backend/domain/telegram_identity.py` — 166 строк
 
 Правила опознания собеседника в Telegram по написанному о нём.
 
@@ -1169,7 +1169,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def typed_username(value) -> str | None` (24)
 - `def telegram_peer(hr) -> int | str | None` (9)
 - `class DialogPeer` (10)
-- `def hrs_in_dialog_order(hrs, dialogs) -> list` (35)
+- `def hrs_to_catch_up(hrs, dialogs) -> list` (36)
 
 ### `backend/domain/tenure.py` — 39 строк
 
@@ -1306,21 +1306,22 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _hand_to_classification(dm, msg, hr_id: int, subject) -> None` (12)
 - `async def process_dm(msg, dm: DmHelpers) -> int | None` (37)
 
-### `backend/flows/dm_backfill.py` — 292 строк
+### `backend/flows/dm_backfill.py` — 303 строк ⚠ подошёл к 300
 
 Догон пропущенной переписки с HR.
 
 Зависит от: `backend.domain.telegram_identity`, `backend.flows.batches`, `backend.flows.dm`, `backend.models`, `backend.notify`, `backend.repository.hr_list`, `backend.repository.messages`
 
 - `class DmHooks` (9)
-- `async def _fetch_history(client, hr, limit: int) -> list | None` (40)
+- `async def _fetch_history(client, hr, limit: int) -> list | None` (29)
+- `async def _read_or_find(client, hr, target, limit: int) -> list | None` (22)
   - `async def read(peer) -> list` (2)
 - `async def _store_outgoing(hr_id: int, dm: DmHelpers, msg) -> bool` (23)
 - `async def _store_incoming(hr_id: int, dm: DmHelpers, hooks: DmHooks, msg) -> bool` (27)
 - `async def _walk_messages(messages: list, hr_id: int, dm: DmHelpers, hooks: DmHooks) -> bool` (18)
 - `async def _reconcile_deletes(session_factory, hr_id: int, messages: list, newest_before: int) -> bool` (37)
 - `async def backfill_hr_dm_history(hr, dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, newest_before: int=0) -> None` (28)
-- `async def catch_up_missed_dms(dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, dialogs=()) -> None` (40)
+- `async def catch_up_missed_dms(dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, dialogs) -> None` (38)
 - `def spawn_hr_backfill(pipeline, hr) -> None` (23)
   - `async def work() -> None` (7)
 
@@ -3929,7 +3930,7 @@ Runtime settings layer.
 - `def ours(msg_id, text, *, photo=None)` (3)
 - `def _helpers(client, session_factory, **extra) -> DmHelpers` (14)
 - `async def catch_up(client, hr, session_factory, *, hooks=None, **kwargs)` (9)
-- `async def catch_up_everyone(client, session_factory, *, hooks=None, dialogs=(), **kwargs)` (15)
+- `async def catch_up_everyone(client, session_factory, *, hooks=None, dialogs=None, **kwargs)` (15)
 - `async def known_hr(session_factory)` (4)
 
 ### `tests/backend/fixtures/bot.py` — 320 строк ⚠ подошёл к 300
@@ -4315,7 +4316,7 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/backend/test_bot_connect.py` — 161 строк
+### `tests/backend/test_bot_connect.py` — 159 строк
 
 Следствия подъёма соединения с Telegram.
 
@@ -4730,7 +4731,7 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `tests/backend/test_flows_catch_up.py` — 283 строк
+### `tests/backend/test_flows_catch_up.py` — 274 строк
 
 Следствия догона переписок по всем HR разом.
 
@@ -4868,13 +4869,13 @@ Runtime settings layer.
 
 - `async def _set_status(session_factory, vacancy_id, status)` (4)
 
-### `tests/backend/test_flows_history_backfill.py` — 376 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_history_backfill.py` — 396 строк ⚠ подошёл к 300
 
 Следствия догона переписки с одним HR.
 
 Зависит от: `backend.flows.dm`, `backend.flows.dm_backfill`, `backend.models`, `tests.backend.fixtures.backfill`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`, `tests.fakes.telegram_objects`
 
-Тестов: 16
+Тестов: 17
 
 
 ### `tests/backend/test_flows_hr_backfill_spawn.py` — 152 строк
@@ -6174,7 +6175,7 @@ Runtime settings layer.
 Тестов: 1
 
 
-### `tests/backend/test_telegram_adapter.py` — 256 строк
+### `tests/backend/test_telegram_adapter.py` — 259 строк
 
 Следствия сборки клиента Telegram и отправки личного сообщения.
 
@@ -6189,13 +6190,13 @@ Runtime settings layer.
 - `def _raw_dialog(peer_id: int)` (11)
 - `def _raw_message(peer_id: int, message_id: int, *, date: int)` (4)
 
-### `tests/backend/test_telegram_identity.py` — 154 строк
+### `tests/backend/test_telegram_identity.py` — 156 строк
 
 Следствия, которые наблюдают тесты `backend/domain/telegram_identity.py`.
 
 Зависит от: `backend.domain.telegram_identity`
 
-Тестов: 8
+Тестов: 9
 
 - `class Contact` (7)
 
@@ -7095,20 +7096,20 @@ Runtime settings layer.
 - `def serve_home(monkeypatch, prepared: httpx.Response | BaseException, pages: dict | None=None) -> None` (9)
 - `def home_page(*, head: str='') -> httpx.Response` (3)
 
-### `tests/fakes/telegram.py` — 297 строк
+### `tests/fakes/telegram.py` — 309 строк ⚠ подошёл к 300
 
 Подделка клиента Pyrogram: отвечает на обращения и записывает их.
 
 Зависит от: `tests.fakes.telegram_objects`
 
-- `class FakeTelegramClient` (272)
+- `class FakeTelegramClient` (284)
   - `def loop(self)` (4)
   - `def add_handler(self, handler) -> None` (2)
   - `def _refuse_cold(self, target) -> None` (10)
   - `def _fail_if_asked(self, method: str) -> None` (6)
   - `async def get_chat(self, chat_id)` (14)
   - `async def get_chat_history(self, target, limit=100)` (12)
-  - `async def invoke(self, query, retries=3, timeout=10.0, sleep_threshold=None)` (43)
+  - `async def invoke(self, query, retries=3, timeout=10.0, sleep_threshold=None)` (55)
   - `async def resolve_peer(self, peer_id)` (5)
   - `async def get_users(self, username)` (18)
   - `async def download_media(self, target, file_name=None, in_memory=False)` (21)

@@ -112,13 +112,12 @@ async def test_a_dialog_page_that_never_moves_ends_the_warm_up(chatting):
 async def test_a_broken_dialog_read_still_catches_everyone_up(
     chatting, monkeypatch, turn_and_settle
 ):
-    """Сорвавшееся чтение переписок догон не отменяет, а лишает порядка.
+    """Сорвавшееся чтение переписок догон не отменяет: список неизвестен, и
+    догон идёт по всем известным собеседникам — медленно, но не мимо.
 
-    Список правит очередь, а не решает, идти ли вообще: не прочитав его, догон
-    обязан пойти по всем известным собеседникам — медленно, как ходил раньше,
-    но не мимо. Сорваться же чтению есть от чего: долгое «слишком часто» от
-    Telegram вылетает наружу, и приходит оно как раз тогда, когда переписки
-    больше всего и ждут.
+    Сорваться чтению есть от чего: долгое «слишком часто» от Telegram
+    вылетает наружу, и приходит оно как раз тогда, когда переписки больше
+    всего и ждут.
     """
     caught: list[dict] = []
 
@@ -135,7 +134,7 @@ async def test_a_broken_dialog_read_still_catches_everyone_up(
 
     await turn_and_settle(bot, BotMode.DM_ONLY)
 
-    assert [one["dialogs"] for one in caught] == [[]]
+    assert [one["dialogs"] for one in caught] == [None]
 
 
 async def test_a_handle_from_the_dialog_list_reaches_the_queue(chatting, caught_up,
@@ -144,11 +143,10 @@ async def test_a_handle_from_the_dialog_list_reaches_the_queue(chatting, caught_
 
     По нему опознают собеседника, у которого номера учётной записи нет вовсе,
     — так заводит его разбор объявления, где в посте стоит один `@ник`. Не
-    разбери мы ники из ответа, такой собеседник уехал бы в хвост очереди, и
-    его письмо не подгружалось бы, пока очередь до него не дойдёт.
+    разбери мы ники из ответа, такой собеседник не попал бы в догон вовсе.
     """
     client = FakeTelegramClient()
-    client.dialog_page = [500]
+    client.cold_peers = {500}
     client.nicks = {500: "Mastakova_TeamLead"}
     bot, _, _ = await chatting(mode=BotMode.DM_ONLY, client=client)
     wire(bot, FakeIngestion())

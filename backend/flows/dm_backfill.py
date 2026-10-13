@@ -8,7 +8,7 @@ from typing import Any
 
 from backend.flows.batches import report_failures
 from backend.flows.dm import DmHelpers, persist_outgoing_dm, process_dm
-from backend.domain.telegram_identity import hrs_in_dialog_order, telegram_peer
+from backend.domain.telegram_identity import hrs_to_catch_up, telegram_peer
 from backend.models import Message
 from backend.repository.hr_list import list_hrs_for_backfill
 from backend.repository.messages import newest_tg_message_id, tombstone_messages
@@ -53,32 +53,45 @@ async def _fetch_history(client, hr, limit: int) -> list | None:
     часы. Столько держать переписку одного собеседника незачем: догон идёт по
     всем разом, и пережидающий занял бы своё место в пачке до конца ожидания.
     Пропущенное не теряется: догон повторится на следующем подъёме соединения.
+    Просьба одна и та же, где бы её ни прислали — на чтение или на розыск по
+    нику, — и пишется она одной строкой: это запрет, а не поломка.
     """
-    from pyrogram.errors import FloodWait, PeerIdInvalid
-
-    async def read(peer) -> list:
-        return [msg async for msg in client.get_chat_history(peer, limit=limit)]
+    from pyrogram.errors import FloodWait
 
     target = telegram_peer(hr)
     if target is None:
         return None
     try:
-        return await read(target)
-    except PeerIdInvalid:
-        logger.warning("backfill: PeerIdInvalid у hr %d — пробую по нику", hr.id)
-        if not hr.telegram_username:
-            return None
-        try:
-            await client.get_users(hr.telegram_username)
-            return await read(hr.telegram_username)
-        except Exception:
-            logger.exception("backfill: resolve fallback failed для hr %d", hr.id)
-            return None
+        return await _read_or_find(client, hr, target, limit)
     except FloodWait as e:
         logger.warning(
             "backfill: FloodWait %ss на hr %d — пропускаю до следующего раза",
             getattr(e, "value", "?"), hr.id,
         )
+        return None
+
+
+async def _read_or_find(client, hr, target, limit: int) -> list | None:
+    """Прочитать переписку; неизвестного собеседника — разыскать по нику и
+    прочитать снова. Просьба Telegram подождать уходит зовущему."""
+    from pyrogram.errors import FloodWait, PeerIdInvalid
+
+    async def read(peer) -> list:
+        return [msg async for msg in client.get_chat_history(peer, limit=limit)]
+
+    try:
+        return await read(target)
+    except PeerIdInvalid:
+        logger.warning("backfill: PeerIdInvalid у hr %d — пробую по нику", hr.id)
+    if not hr.telegram_username:
+        return None
+    try:
+        await client.get_users(hr.telegram_username)
+        return await read(hr.telegram_username)
+    except FloodWait:
+        raise
+    except Exception:
+        logger.exception("backfill: resolve fallback failed для hr %d", hr.id)
         return None
 
 
@@ -226,22 +239,20 @@ async def backfill_hr_dm_history(
 
 
 async def catch_up_missed_dms(
-    dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, dialogs=()
+    dm: DmHelpers, hooks: DmHooks, *, backfill_limit: int, dialogs
 ) -> None:
-    """Догнать переписку по всем известным собеседникам, свежими вперёд.
+    """Догнать переписку собеседников, с которыми она есть, свежими вперёд.
 
     Обе стороны — :func:`_store_outgoing`, удаления — :func:`_reconcile_deletes`.
 
-    `dialogs` — список переписок, прочитанный при подъёме соединения. Им
-    правится очередь: впереди идут те, с кем разговор есть, свежими вперёд —
-    человек, открывший приложение, ждёт свежее письмо, а не полного обхода
-    всех. Остальные досматриваются следом; пустой список просто оставляет
-    прежний порядок.
+    `dialogs` — список переписок, прочитанный при подъёме соединения. Читаются
+    только те, с кем разговор есть, свежими вперёд — человек, открывший
+    приложение, ждёт свежее письмо. `None` — список неизвестен, и читаются все.
     """
     # Отметки снимаются здесь и разом: до прохода и одной сессией. Ими сверка
     # удалённого отличает стёртое от пришедшего, пока шёл проход.
     async with dm.session_factory() as session:
-        chats = hrs_in_dialog_order(await list_hrs_for_backfill(session), dialogs)
+        chats = hrs_to_catch_up(await list_hrs_for_backfill(session), dialogs)
         newest = {hr.id: await newest_tg_message_id(session, hr.id) for hr in chats}
     logger.info(
         "DM catch-up: %d HR(s), batch=%d delay=%ss",

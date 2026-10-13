@@ -226,6 +226,26 @@ async def test_a_failed_second_try_leaves_its_trace_in_the_log(
     assert "OSError: сеть" in caplog.text
 
 
+async def test_a_rate_limit_on_the_name_search_is_one_line_not_a_traceback(
+    session_factory, caplog
+):
+    """Запрет Telegram на розыск по нику — не поломка: одна строка с его сроком.
+
+    Трассировка на каждого собеседника прятала бы за собой настоящие ошибки.
+    """
+    await put(session_factory, hr_row(telegram_user_id=777, telegram_username="maria"))
+    hr = await only_row(session_factory, HR)
+    client = FakeTelegramClient(
+        fails={"get_chat_history": PeerIdInvalid(), "get_users": FloodWait(value=20000)},
+    )
+
+    with caplog.at_level(logging.WARNING):
+        await _catch_up(client, hr, session_factory)
+
+    assert "Traceback" not in caplog.text
+    assert "20000" in caplog.text
+
+
 async def test_the_window_hears_about_the_caught_up_chat(
     known_hr, session_factory
 ):

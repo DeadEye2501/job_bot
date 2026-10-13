@@ -249,8 +249,11 @@ async def test_the_reading_ends_when_the_bookmark_cannot_move(caplog):
     server = DialogServer([11, 22, 33, 44], page=2, topless={11, 22})
 
     with caplog.at_level(logging.WARNING):
-        await list_dialog_peers(server)
+        found = await list_dialog_peers(server)
 
     assert server.warmed == [11, 22]
     assert "список переписок кончился" in caplog.text
+    # Недочитанный список — не список всех переписок: по нему догон отобрал бы
+    # собеседников и молча потерял бы остальных.
+    assert found is None
 
