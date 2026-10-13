@@ -4,19 +4,77 @@ import pytest
 
 from backend.agent.stops import LimitExhausted
 from backend.applying.browser import via_browser
-from backend.applying.result import Missed, SiteClosed, Unfit
+from backend.applying.result import Dropped, Missed, SiteClosed, Unfit
 from backend.domain.apply_order import Way
 from backend.models import Vacancy, VacancyEvent, VacancyStatus, VacancyStatusHistory
 from tests.backend.fixtures.applying import FORM, PAGE
 from tests.dbio import all_rows, only_row, put
 from tests.factories_aggregators import web_search_row
-from tests.fakes.agent import LimitHit, finish_step, record_step
+from tests.fakes.agent import (
+    LimitHit,
+    edited,
+    finish_step,
+    finished,
+    page_item,
+    record_step,
+    under_confirmation,
+)
 
 
 async def test_a_recorded_application_is_applied(board, kit_with):
     site, vacancy = await board()
     kit = await kit_with([record_step(PAGE, via="aggregator")])
     assert await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id)) == "applied"
+
+
+async def test_a_page_the_person_finished_drops_the_vacancy(board, kit_with, session_factory):
+    """«Закончить» в окне — исход способа как есть: вакансия остаётся в New, что
+    бы агент ни сказал после."""
+    site, vacancy = await board()
+
+    async def step(tools):
+        await tools["need_human"](kind="confirm", items=[page_item("#name", "Иван")])
+        await tools["finish"](result="not_fit", reason="передумал")
+
+    kit, _ = await under_confirmation(await kit_with([step]), finished)
+
+    assert await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id)) == Dropped()
+    assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NEW
+
+
+async def _typing(kit_with, board):
+    """Сессия агента: подтверждает имя «Иван», затем пробует вписать оба варианта."""
+    site, vacancy = await board()
+    answers = []
+
+    async def step(tools):
+        await tools["need_human"](kind="confirm", items=[page_item("#name", "Иван")])
+        answers.append(await tools["browser_type"](selector="#name", text="Иван"))
+        answers.append(await tools["browser_type"](selector="#name", text="Иван Петров"))
+        await tools["record_application"](via="aggregator", target=PAGE)
+
+    return site, vacancy, await kit_with([step]), answers
+
+
+async def test_under_confirmation_only_the_edited_text_reaches_the_page(board, kit_with):
+    site, vacancy, kit, answers = await _typing(kit_with, board)
+    kit, _ = await under_confirmation(kit, edited({"Имя": "Иван Петров"}))
+
+    await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
+
+    page = await kit.browser.page()
+    assert [call for call in page.calls if call[0] == "fill"] == [("fill", "#name", "Иван Петров")]
+    assert answers[0].startswith("не вышло")
+
+
+async def test_with_auto_apply_on_typing_is_as_before(board, kit_with):
+    site, vacancy, kit, _ = await _typing(kit_with, board)
+
+    await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
+
+    page = await kit.browser.page()
+    assert [call for call in page.calls if call[0] == "fill"] == [
+        ("fill", "#name", "Иван"), ("fill", "#name", "Иван Петров")]
 
 
 async def test_a_closed_platform_is_a_lesson(board, kit_with):

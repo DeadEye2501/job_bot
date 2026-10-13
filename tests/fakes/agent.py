@@ -1,5 +1,6 @@
 """Набор сессии агента без браузера, водителя и человека."""
 
+import dataclasses
 from collections.abc import Awaitable, Callable
 from datetime import date
 
@@ -106,6 +107,33 @@ def answering_gate(answer: Callable[[dict], dict | None],
 
     gate = HumanGate(needed, lambda: None, limit_sec=limit_sec)
     return gate, asked
+
+
+def page_item(selector: str, value: str, *, label="Имя", kind="text", error="") -> dict:
+    """Поле страницы с ответом — пункт, которым агент подтверждает страницу."""
+    return {"label": label, "kind": kind, "value": value, "error": error, "selector": selector}
+
+
+def edited(values: dict[str, str], by: str = "label"):
+    """Ответ окна: пункты, чей `by` назван в `values`, правлены, прочие — как пришли."""
+
+    def answer(payload):
+        return {"items": [{**item, "value": values.get(item[by], item["value"])}
+                          for item in payload["items"]]}
+
+    return answer
+
+
+def finished(payload) -> dict:
+    """Ответ окна «Закончить»."""
+    return {"drop": True}
+
+
+async def under_confirmation(kit: AgentKit, answer, limit_sec: float = 3600.0) -> tuple[AgentKit, list]:
+    """Набор в режиме «с подтверждением» с человеком у окна (`answering_gate`)."""
+    await kit.pipeline.rs.set_app("auto_apply", "confirm")
+    gate, asked = answering_gate(answer, limit_sec)
+    return dataclasses.replace(kit, gate=gate), asked
 
 
 def scripted_kit(pipeline, steps, *, human_limit: float = 3600.0) -> AgentKit:

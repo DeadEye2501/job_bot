@@ -1,5 +1,6 @@
 """Браузерный способ: сессия агента на кнопку агрегатора или форму работодателя."""
 
+from backend.agent.confirm import confirming
 from backend.agent.jobs import Applied, ApplyJob, Failed, Finished
 from backend.agent.kit import AgentKit, SessionPlan
 from backend.agent.prompts.applier import APPLIER_PROMPT, applier_task
@@ -10,7 +11,7 @@ from backend.agent.tools_applier import applier_tools
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
 from backend.agent.tools_letter import letter_tools
-from backend.applying.result import GONE, Missed, Outcome, SiteClosed, Unfit
+from backend.applying.result import GONE, Dropped, Missed, Outcome, SiteClosed, Unfit
 from backend.domain.apply_order import Way
 from backend.repository.agent_profile import build_agent_profile
 from backend.repository.aggregators import web_search_id
@@ -26,7 +27,8 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     rs = kit.pipeline.rs
     async with kit.pipeline.session_factory() as session:
         profile = way.aggregator_id or await web_search_id(session)
-    job = ApplyJob(vacancy_id, way, profile, simulated=rs.send_locked, letter_writer=rs.letter_writer)
+    job = ApplyJob(vacancy_id, way, profile, simulated=rs.send_locked, letter_writer=rs.letter_writer,
+                   confirming=confirming(kit))
     plan = await _apply_plan(kit, job)
     if plan is None:
         return GONE
@@ -58,7 +60,7 @@ async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None:
             return None
         profile_text = await build_agent_profile(session, kit.today)
     tools = [*common_tools(kit, job), *applier_tools(kit, job), *letter_tools(kit, job),
-             *browser_tools(kit, kit.pipeline.cv_file())]
+             *browser_tools(kit, kit.pipeline.cv_file(), job.confirmed if job.confirming else None)]
     task = applier_task(job, vacancy_text, profile_text, kit.today)
     return SessionPlan(system_prompt(APPLIER_PROMPT, tools), task, tools, web_search=True)
 
@@ -68,6 +70,8 @@ def _settle(job: ApplyJob, way: Way) -> Outcome:
     outcome = job.outcome
     if isinstance(outcome, Applied):
         return "applied"
+    if isinstance(outcome, Dropped):
+        return outcome
     if isinstance(outcome, Finished) and outcome.result == "vacancy_closed":
         return Missed("вакансия закрыта на сайте")
     if isinstance(outcome, Finished) and outcome.result == "not_fit":

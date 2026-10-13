@@ -6,7 +6,8 @@ from typing import Annotated, TypedDict
 
 from pydantic import StringConstraints
 
-from backend.agent.jobs import Applied, ApplyJob
+from backend.agent.confirm import is_checked
+from backend.agent.jobs import FINAL_ANSWER, Applied, ApplyJob, Dropped
 from backend.agent.kit import AgentKit
 from backend.domain.apply_order import VIA_AGGREGATOR, VIA_FORM
 from backend.models import ApplicationVia
@@ -44,11 +45,18 @@ def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
         """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы, письмо, скрининг. В screening — каждый вопрос работодателя из формы и со страницы подтверждения вместе с данным ответом, по порядку; вопросов не было — пустой список. Повтор с тем же адресом дописывает скрининг."""
         if via not in _ALLOWED[job.way.method]:
             return "Этим способом отклик не пишется."
-        lines = _lines(screening or [])
+        # Записанный отклик дописывается, а не отказывает: окончательность здесь
+        # нужна только «Закончить» — после него ничего не ушло и писать нечего.
+        if isinstance(job.outcome, Dropped):
+            return FINAL_ANSWER
+        lines = _lines(_confirmed_pairs(job) if job.confirming else screening or [])
         if isinstance(job.outcome, Applied):
-            return await _append(kit, job.outcome.application_id, lines)
-        letter_text = None if already_applied else (letter or None)
-        return await _record(kit, job, _entry(job, _Report(via, target, letter_text, lines)))
+            answer = await _append(kit, job.outcome.application_id, lines)
+        else:
+            letter_text = None if already_applied else (letter or None)
+            answer = await _record(kit, job, _entry(job, _Report(via, target, letter_text, lines)))
+        job.unscreened.clear()
+        return answer
 
     return [vacancy, record_application]
 
@@ -75,6 +83,21 @@ def _entry(job: ApplyJob, report: _Report) -> ApplicationEntry:
 def _lines(screening: list[ScreeningPair]) -> list[tuple[bool, str]]:
     """Пара ложится двумя репликами ленты: вопрос работодателя, затем ответ человека."""
     return [line for pair in screening for line in ((False, pair["question"]), (True, pair["answer"]))]
+
+
+def _confirmed_pairs(job: ApplyJob) -> list[ScreeningPair]:
+    """Скрининг под подтверждением — то, что ушло, а не пересказ агента: пункты
+    с подписью, ещё не легшие в запись. Письмо подписи не имеет и вопросом не
+    считается."""
+    return [{"question": item["label"], "answer": _answer(item)}
+            for item in job.unscreened.values() if item["label"]]
+
+
+def _answer(item: dict) -> str:
+    """Галочка в ленте — словом, как её прочтёт человек."""
+    if item["kind"] == "check":
+        return "да" if is_checked(item) else "нет"
+    return item["value"]
 
 
 async def _record(kit: AgentKit, job: ApplyJob, entry: ApplicationEntry) -> str:
