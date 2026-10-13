@@ -10,10 +10,16 @@
 
 import json
 import logging
+from types import SimpleNamespace
 
 import pytest
 
-from backend.llm.answers import extract_last_json, json_object, log_unparseable
+from backend.llm.answers import (
+    extract_last_json,
+    json_object,
+    log_unparseable,
+    read_with_a_second_try,
+)
 
 
 @pytest.mark.parametrize(
@@ -178,6 +184,55 @@ def test_a_complaint_about_an_unparsed_answer_names_the_purpose(caplog):
     assert "разбор вакансии" in written[0]
     assert "начало" in written[0] and "конец" in written[0]
     assert "ш" * 900 not in written[0]
+
+
+async def _second_try(answer: str, **options):
+    """Прогнать общее чтение ответа с чтением, которое ничего не принимает."""
+    async def ask(room):
+        return SimpleNamespace(text=answer, finish_reason="stop", error=None)
+
+    return await read_with_a_second_try(
+        ask, lambda text: None, (100, 200), (logging.getLogger("проверка"), "разбор"),
+        **options,
+    )
+
+
+async def test_an_empty_answer_where_it_is_lawful_is_named_by_its_meaning(caplog):
+    """Целый объект без значений там, где зовущий назвал его смысл, — ответ, а
+    не поломка: так модель отвечает на пост, который не вакансия. Жалоба «не
+    разобрался» на нём прятала бы настоящие поломки разбора."""
+    with caplog.at_level(logging.INFO):
+        parsed, _ = await _second_try(
+            '{"title": null, "stack": [], "salary": null}', empty_means="не вакансия"
+        )
+
+    assert parsed is None
+    assert "не разобрался" not in caplog.text
+    assert "не вакансия" in caplog.text
+
+
+async def test_an_empty_answer_elsewhere_is_still_a_broken_one(caplog):
+    """Где пустой ответ не назван законным, он поломка: у вердикта пригодности
+    пустой объект значит, что модель не ответила."""
+    with caplog.at_level(logging.INFO):
+        await _second_try('{"verdict": "", "reason": ""}')
+
+    assert "не разобрался" in caplog.text
+
+
+async def test_false_is_a_value_not_an_empty_field(caplog):
+    """`false` — ответ модели, а не пустота: отвергнутый чтением, он поломка."""
+    with caplog.at_level(logging.INFO):
+        await _second_try('{"is_vacancy": false}', empty_means="не вакансия")
+
+    assert "не разобрался" in caplog.text
+
+
+async def test_a_broken_answer_is_still_complained_about(caplog):
+    with caplog.at_level(logging.INFO):
+        await _second_try("совсем не то, что просили", empty_means="не вакансия")
+
+    assert "не разобрался" in caplog.text
 
 
 def test_an_object_that_will_not_parse_yields_nothing(caplog):

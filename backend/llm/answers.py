@@ -184,7 +184,8 @@ def wants_more_room(parsed, finish_reason: str | None) -> bool:
 
 
 async def read_with_a_second_try(
-    ask, read, tokens: tuple[int, int], told: tuple[logging.Logger, str]
+    ask, read, tokens: tuple[int, int], told: tuple[logging.Logger, str],
+    *, empty_means: str | None = None,
 ):
     """Спросить модель и, не разобрав оборванный ответ, переспросить с запасом.
 
@@ -202,7 +203,8 @@ async def read_with_a_second_try(
 
     `ask` — обращение по потолку токенов, `read` — разбор ответа, `tokens` —
     пара «обычный потолок и просторный», `told` — журнал и имя обращения для
-    записи в него.
+    записи в него. `empty_means` — что значит пустой по существу ответ, если
+    для этого обращения он законен; не задано — пустой ответ та же поломка.
     """
     log, purpose = told
     usual, roomier = tokens
@@ -217,9 +219,26 @@ async def read_with_a_second_try(
             return None, reply.error
         parsed = read(reply.text)
     if parsed is None:
-        log_unparseable(reply.text, log, purpose)
+        _say_unread(reply.text, told, empty_means)
         return None, truncation_trouble(reply.finish_reason)
     return parsed, None
+
+
+def _say_unread(answer: str, told: tuple[logging.Logger, str], empty_means: str | None) -> None:
+    """Сказать, почему ответ не дал разобранного: пуст по существу или сломан.
+
+    Пустой по существу ответ — целый объект, где у каждого поля нет значения;
+    `False` и ноль значением считаются. Законен он только там, где зовущий
+    сказал, что он значит (разбор поста: «не вакансия»): там жалоба «не
+    разобрался» прятала бы настоящие поломки разбора. У остальных пустой
+    ответ — поломка, и жалоба прежняя.
+    """
+    log, purpose = told
+    data = json_object(answer, log, purpose) if empty_means else None
+    if isinstance(data, dict) and all(value in (None, "", [], {}) for value in data.values()):
+        log.info("%s: %s", purpose, empty_means)
+        return
+    log_unparseable(answer, log, purpose)
 
 
 def str_or_none(value) -> str | None:
