@@ -1677,7 +1677,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (23)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
-### `backend/llm/cv.py` — 485 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 497 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
@@ -1689,6 +1689,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parse_date(value) -> date | None` (21)
 - `def _parse_profile(data: dict) -> ParsedCvProfile | None` (27)
 - `def _parse_skill(item) -> ParsedCvSkill | None` (35)
+- `def _points(value) -> list[str]` (10)
 - `def _parse_experience(item) -> ParsedCvExperience | None` (18)
 - `def _parse_project(item) -> ParsedCvProject | None` (13)
 - `def _parsed_items(raw: object, parse) -> list` (5)
@@ -5129,13 +5130,13 @@ Runtime settings layer.
 Тестов: 14
 
 
-### `tests/backend/test_llm_cv_items.py` — 243 строк
+### `tests/backend/test_llm_cv_items.py` — 270 строк
 
 Следствия разбора навыков, опыта работы и проектов в `backend/llm/cv.py`.
 
 Зависит от: `backend.llm.cv`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 25
+Тестов: 27
 
 - `async def parse_sections(**sections)` (4)
 - `async def only(section: str, item: dict)` (6)
