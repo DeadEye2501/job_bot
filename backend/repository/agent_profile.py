@@ -11,6 +11,7 @@ from backend.models import Gender, SalaryPeriod
 from backend.repository.profile import get_profile
 from backend.repository.profile_experience import list_experience
 from backend.repository.profile_languages import list_profile_languages
+from backend.repository.profile_projects import list_projects
 from backend.repository.profile_skills import list_skills
 
 _GENDER = {Gender.MALE: "мужской", Gender.FEMALE: "женский"}
@@ -23,13 +24,15 @@ async def build_agent_profile(session: AsyncSession, today: date) -> str:
     if profile is None:
         return ""
     places = await list_experience(session)
+    projects = await list_projects(session)
     skills = await list_skills(session)
     languages = await list_profile_languages(session)
     return "\n".join([
         *_person_lines(profile, languages),
         f"Общий стаж: {_years(years_in_it(places, today)) if places else 'нет мест работы'}",
-        "Навыки:", *_skill_lines(skills, places, today),
+        "Навыки:", *_skill_lines(skills, places, projects, today),
         "Опыт работы:", *_place_lines(places),
+        "Проекты:", *_project_lines(projects),
         f"Предпочтения: {profile.free_preferences or 'не указаны'}",
     ])
 
@@ -65,24 +68,46 @@ def _salary(p) -> str:
     return f"{money} {period}, на руки"
 
 
-def _skill_lines(skills, places, today: date) -> list[str]:
-    lines = []
-    for skill in skills:
-        named = [p for p in places if skill in p.skills]
-        term = f"стаж {_years(skill_years(named, today))}" if named else (
-            "стаж не привязан к местам работы"
-        )
-        lines.append(f"- {skill.name} — уровень {skill.level}, {term}")
-    return lines
+def _skill_lines(skills, places, projects, today: date) -> list[str]:
+    return [
+        f"- {skill.name} — уровень {skill.level}, {_skill_term(skill, places, projects, today)}"
+        for skill in skills
+    ]
+
+
+def _skill_term(skill, places, projects, today: date) -> str:
+    """Стаж по навыку — только по местам работы; навык из одних проектов — опыт
+    без стажа: проект показывает, что человек с инструментом работал, но срока
+    не даёт."""
+    named = [p for p in places if skill in p.skills]
+    if named:
+        return f"стаж {_years(skill_years(named, today))}"
+    if any(skill in p.skills for p in projects):
+        return "опыт есть в проектах, стаж не считается"
+    return "стаж не привязан к местам работы"
+
+
+def _record_lines(head: str, labelled: list[tuple[str, list[str]]]) -> list[str]:
+    """Запись анкеты целиком: шапка и под ней каждый пункт со своей подписью."""
+    return [f"- {head}", *(f"  {label}: {one}" for label, points in labelled for one in points)]
 
 
 def _place_lines(places) -> list[str]:
-    lines = []
-    for p in places:
-        lines.append(f"- {p.company}, {p.role}, {place_period(p)}")
-        lines += [f"  Обязанность: {one}" for one in p.responsibilities]
-        lines += [f"  Достижение: {one}" for one in p.achievements]
-    return lines
+    return [
+        line for p in places for line in _record_lines(
+            f"{p.company}, {p.role}, {place_period(p)}",
+            [("Обязанность", p.responsibilities), ("Достижение", p.achievements)],
+        )
+    ]
+
+
+def _project_lines(projects) -> list[str]:
+    """Проекты целиком, как места работы, — и со ссылкой: формы её спрашивают."""
+    return [
+        line for p in projects for line in _record_lines(
+            f"{p.name}, {p.url}" if p.url else p.name, [("О проекте", p.about)]
+        )
+    ]
 
 
 def _years(years: int) -> str:

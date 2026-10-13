@@ -11,7 +11,13 @@ from adapters.lm_chat import CUT_BY_LIMIT, ChatRequest, chat
 from backend.payloads import ParsedVacancy
 
 from backend.llm.external import external_block
-from backend.llm.rules import ATTRIBUTION_RULES, FACT_KINDS, NOT_IN_THE_PROFILE, has_placeholder
+from backend.llm.rules import (
+    ATTRIBUTION_RULES,
+    EXAMPLE_SOURCE,
+    FACT_KINDS,
+    NOT_IN_THE_PROFILE,
+    has_placeholder,
+)
 from backend.llm.factcheck import factcheck_cover_letter
 
 logger = logging.getLogger(__name__)
@@ -68,7 +74,7 @@ GENERATE_COVER_LETTER_PROMPT = """Ты составляешь очень кор�
    - «Меня зовут <имя>, увидел в {channel} вашу вакансию {title} и решил откликнуться»
    - «<имя>, <роль> с <N>+ годами опыта — заинтересовала ваша вакансия {title}, нашёл её в {channel}»
    - «Откликаюсь на вашу вакансию {title} из {channel}»
-3. Одно (опционально — два) предложение — самый цепкий мэтч: 1 факт из блока кандидата + опционально 1 деталь из вакансии, которая зацепила. НЕ пересказывай весь стек, не перечисляй много фактов. Этот блок можно опустить, если в блоке мало конкретики — лучше короткое честное письмо, чем растянутое.
+3. Одно (опционально — два) предложение — самый цепкий мэтч: 1 факт из блока кандидата + опционально 1 деталь из вакансии, которая зацепила. """ + EXAMPLE_SOURCE + """ НЕ пересказывай весь стек, не перечисляй много фактов. Этот блок можно опустить, если в блоке мало конкретики — лучше короткое честное письмо, чем растянутое.
 4. Закрытие: одно короткое предложение готовности обсудить (без упоминания вложений).
 
 Если в данных вакансии Title = "не указано" — НЕ используй `{title}`, переформулируй без него («вашу позицию», «вашу вакансию» — без скобок, без placeholder'а). Если Channel = "не указано" — НЕ используй `{channel}`, опусти упоминание канала.
