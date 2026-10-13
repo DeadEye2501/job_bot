@@ -1537,7 +1537,7 @@ body, html, button, body, .material-symbols-outlined
 .stats-skills-legend .leg-other, .stats-skill-row.mine .stats-skill-bar-fill, .stats-skill-num, .stats-skills-legend, .stats-skills-legend span, .stats-skills-legend .leg-dot
 - берёт: --accent, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-### styles/stats-status.css (59)
+### styles/stats-status.css (61)
 - Карточка «Статусы»: счётчики двумя колонками и кольцо между ними. Само кольцо — в donut.css, цвет точки — в status-color.css.
 - селекторы (7): .stats-status-card, .stats-status-col, .stats-status-col.right, .stats-sc-item, .stats-sc-item:hover, .stats-sc-name, .stats-sc-num
 - берёт: --bg-tertiary, --text-primary, --text-secondary
