@@ -1794,6 +1794,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `_APP_DEFAULTS: dict[str, str]` = `словарь из 15`
+- `AUTO_APPLY_MODES` = `набор из 3`
 - `LETTER_WRITERS` = `набор из 2`
 
 ### `backend/single_instance.py`

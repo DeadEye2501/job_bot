@@ -23,7 +23,7 @@ const SNAPSHOT = {
     poll_interval_sec: 60,
     backfill_limit: 50,
     dm_backfill_limit: 20,
-    auto_apply: true,
+    auto_apply: 'true',
   },
   aggregators: { aggregator_backfill_limit: 20, show_browser: false, letter_writer: 'app' },
 };
@@ -49,7 +49,11 @@ function screen(mail = NO_MAIL) {
       .find((one) => one.querySelector('.pipeline-label')?.textContent === label)
       ?.querySelector('input');
   const byHolder = (text) => shown.container.querySelector(`input[placeholder="${text}"]`);
-  return { asked, field, byHolder, text: () => shown.container.textContent };
+  const modes = () => [...shown.container.querySelectorAll('input[name="auto_apply"]')];
+  const modeCaption = () =>
+    modes()[0].closest('.pipeline-row > div').querySelector('.pipeline-label > :not([aria-hidden="true"])')
+      .textContent;
+  return { asked, field, byHolder, modes, modeCaption, text: () => shown.container.textContent };
 }
 
 function leave(input, value) {
@@ -80,21 +84,44 @@ describe('лимит вакансий с агрегатора', () => {
 });
 
 describe('автоотклик', () => {
-  it('тумблер показывает записанное', async () => {
-    const { field } = screen();
+  it('три положения слева направо, подсказка — имя положения', async () => {
+    const { modes } = screen();
     await settled();
 
-    expect(field('Автоотклик').checked).toBe(true);
+    expect(modes().map((one) => [one.value, one.title])).toEqual([
+      ['false', 'Только поиск'],
+      ['confirm', 'Отклик с подтверждением'],
+      ['true', 'Автоотклик'],
+    ]);
   });
 
-  it('выключение уходит сохранением настроек приложения', async () => {
-    const { asked, field } = screen();
+  it('отмечено записанное, подпись слева — его имя', async () => {
+    const { modes, modeCaption } = screen();
     await settled();
 
-    field('Автоотклик').click();
+    expect(modes().filter((one) => one.checked).map((one) => one.value)).toEqual(['true']);
+    expect(modeCaption()).toBe('Автоотклик');
+  });
+
+  it('выбор другого уходит его словом и меняет подпись', async () => {
+    const { asked, modes, modeCaption } = screen();
     await settled();
 
-    expect(asked).toContainEqual({ method: 'settings.save', payload: { app: { auto_apply: false } } });
+    modes()[1].click();
+    await settled();
+
+    expect(asked).toContainEqual({ method: 'settings.save', payload: { app: { auto_apply: 'confirm' } } });
+    expect(modeCaption()).toBe('Отклик с подтверждением');
+  });
+
+  it('«Только поиск» уходит словом false', async () => {
+    const { asked, modes } = screen();
+    await settled();
+
+    modes()[0].click();
+    await settled();
+
+    expect(asked).toContainEqual({ method: 'settings.save', payload: { app: { auto_apply: 'false' } } });
   });
 
   it('симуляции отправки в окне нет', async () => {

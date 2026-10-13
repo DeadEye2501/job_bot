@@ -104,7 +104,3 @@
   font-size: 0.75rem;
   cursor: pointer;
 }
-
-.date-current input {
-  accent-color: var(--accent);
-}

@@ -59,9 +59,9 @@ _APP_DEFAULTS: dict[str, str] = {
     # нарочно, записью в базу. Авторитет здесь, а telegram.SEND_LOCKED зеркалится из этой
     # настройки на старте Bot.run и на каждой её записи (`set_app`).
     "send_locked": "false",
-    # auto_apply: передаётся ли разобранное откликателю (`flows/handover`).
-    # Ручной отклик зовёт откликатель мимо передачи, и эта настройка его не
-    # касается.
+    # auto_apply: режим из `AUTO_APPLY_MODES` — передаётся ли разобранное
+    # откликателю (`flows/handover`). Ручной отклик зовёт откликатель мимо
+    # передачи.
     "auto_apply": "true",
     # Cosine-similarity порог дедупа вакансий по embedding'ам. >= → считаем
     # дубликатом существующей вакансии и не парсим повторно. Слишком высокий
@@ -81,6 +81,11 @@ _APP_DEFAULTS: dict[str, str] = {
     "channels_enabled": "true",
     "aggregators_enabled": "true",
 }
+
+AUTO_APPLY_MODES = ("false", "true", "confirm")
+"""Режимы автоотклика: только поиск, отклик сам, отклик с подтверждением.
+Первые два — слова булевой записи `set_app`: записанное булевым читается
+режимом без перевода."""
 
 LETTER_WRITERS = ("app", "agent")
 """Кто пишет письмо для откликов вне Telegram: чат-модель приложения или агент.
@@ -201,10 +206,7 @@ class RuntimeSettings:
 
         Чужое слово читается как умолчание: письмо без автора не ушло бы вовсе.
         """
-        return (
-            normalize_enum(self._app_value("letter_writer"), LETTER_WRITERS)
-            or _APP_DEFAULTS["letter_writer"]
-        )
+        return self._app_enum("letter_writer", LETTER_WRITERS, _APP_DEFAULTS["letter_writer"])
 
     @property
     def dedup_cosine_threshold(self) -> float:
@@ -242,13 +244,21 @@ class RuntimeSettings:
         return self._app_bool("send_locked")
 
     @property
-    def auto_apply(self) -> bool:
-        """Передаётся ли разобранное откликателю; выключено — только разбор."""
-        return self._app_bool("auto_apply")
+    def auto_apply(self) -> str:
+        """Режим автоотклика из `AUTO_APPLY_MODES`.
+
+        Чужое слово — «только поиск»: отклик, ушедший без спроса, уже не
+        вернуть, а пропущенный бот возьмёт следующим прогоном.
+        """
+        return self._app_enum("auto_apply", AUTO_APPLY_MODES, "false")
 
     @property
     def flood_wait_until_ts(self) -> float:
         return self._app_float("flood_wait_until_ts")
+
+    def _app_enum(self, key: str, allowed: tuple[str, ...], unknown: str) -> str:
+        """Слово из перечня; пусто — умолчание настройки, чужое слово — `unknown`."""
+        return normalize_enum(self._app_value(key), allowed) or unknown
 
     def _app_bool(self, key: str) -> bool:
         """Булева настройка; истина — только слово «true» в любом регистре.

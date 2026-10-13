@@ -1,6 +1,6 @@
 <script>
   // Пороги отбора и ритм обхода: шесть величин в две строки по три — сверху
-  // порог, интервал и автоотклик, снизу три лимита.
+  // порог, интервал и режим автоотклика, снизу три лимита.
   import { untrack } from 'svelte';
 
   import { BOUNDS, SCORE_MAX, clampField, scorePercent, thresholdState } from '$state/settings.js';
@@ -17,6 +17,12 @@
     unit: 'сек',
     ...BOUNDS.poll_interval_sec,
   };
+  // Слева направо — от «не откликаться вовсе» к «откликаться самому».
+  const AUTO_APPLY = [
+    { value: 'false', label: 'Только поиск' },
+    { value: 'confirm', label: 'Отклик с подтверждением' },
+    { value: 'true', label: 'Автоотклик' },
+  ];
   const LIMITS = [
     { key: 'backfill_limit', label: 'Сообщений за цикл', unit: 'шт', ...BOUNDS.backfill_limit },
     {
@@ -90,14 +96,22 @@
     {@render number(INTERVAL)}
 
     <div>
-      <div class="field-caption pipeline-label">Автоотклик</div>
-      <div class="with-toggle">
-        <input
-          type="checkbox"
-          class="toggle"
-          checked={values.auto_apply}
-          onchange={(event) => onsave({ auto_apply: event.currentTarget.checked })}
-        />
+      <div class="field-caption pipeline-label mode-caption">
+        {#each AUTO_APPLY as one (one.value)}
+          <span aria-hidden={one.value !== values.auto_apply}>{one.label}</span>
+        {/each}
+      </div>
+      <div class="mode-radios">
+        {#each AUTO_APPLY as one (one.value)}
+          <input
+            type="radio"
+            name="auto_apply"
+            value={one.value}
+            title={one.label}
+            checked={one.value === values.auto_apply}
+            onchange={() => onsave({ auto_apply: one.value })}
+          />
+        {/each}
       </div>
     </div>
 
