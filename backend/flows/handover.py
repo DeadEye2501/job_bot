@@ -38,9 +38,11 @@ async def hand_over(pipeline, judged: list[tuple[int, Judged]]) -> None:
     уже в базе, и пустая переписка у него — та же беда.
 
     Выключенный автоотклик откликателя не зовёт, а догон оставляет: догон — не
-    отклик. Решается здесь, один раз на все разборы."""
+    отклик. Решается здесь, один раз на все разборы. Подтверждение передачи не
+    касается: человека ждёт уже откликатель."""
     stored = [vacancy_id for vacancy_id, one in judged if one.stored]
-    chosen = await to_apply(pipeline.session_factory, stored) if pipeline.rs.auto_apply else []
+    handing = pipeline.rs.auto_apply != "false"
+    chosen = await to_apply(pipeline.session_factory, stored) if handing else []
     try:
         if chosen:
             await pipeline.apply(chosen)

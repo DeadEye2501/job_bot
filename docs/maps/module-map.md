@@ -1429,7 +1429,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def check_ghosting_timeouts(pipeline) -> int` (26)
 
-### `backend/flows/handover.py` — 59 строк
+### `backend/flows/handover.py` — 61 строк
 
 Передача отобранного откликателю: решение «откликаться» и догон новых HR после отклика.
 
@@ -1437,7 +1437,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def to_apply(session_factory, vacancy_ids: list[int]) -> list[int]` (9)
 - `async def new_to_apply(session_factory) -> list[int]` (8)
-- `async def hand_over(pipeline, judged: list[tuple[int, Judged]]) -> None` (16)
+- `async def hand_over(pipeline, judged: list[tuple[int, Judged]]) -> None` (18)
 - `async def judge_and_hand_over(pipeline, vacancy_id: int, text: str, channel_username: str | None, *, allow_delete: bool=True) -> bool` (7)
 
 ### `backend/flows/ingest.py` — 154 строк
@@ -2757,14 +2757,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def apply_silence(session: AsyncSession, vacancy: Vacancy, timeout_days: int) -> None` (23)
 - `def apply_parse_outcome(vacancy: Vacancy, new_status: VacancyStatus) -> None` (18)
 
-### `backend/runtime_settings.py` — 440 строк ⚠ подошёл к 300
+### `backend/runtime_settings.py` — 450 строк ⚠ подошёл к 300
 
 Runtime settings layer.
 
 Зависит от: `adapters`, `backend.crypto`, `backend.incoming`, `backend.models`, `backend.provider_config`, `backend.repository.app_settings`, `backend.tg_credentials`
 
 - `async def _llm_row(session: AsyncSession, kind: LlmConfigKind) -> LlmConfig | None` (5)
-- `class RuntimeSettings` (329)
+- `class RuntimeSettings` (334)
   - `async def load(cls, session_factory: async_sessionmaker[AsyncSession]) -> 'RuntimeSettings'` (6)
   - `async def reload(self) -> None` (22)
   - `def tg(self) -> TgAccountConfig | None` (2)
@@ -2778,14 +2778,15 @@ Runtime settings layer.
   - `def channels_enabled(self) -> bool` (3)
   - `def aggregators_enabled(self) -> bool` (3)
   - `def show_browser(self) -> bool` (3)
-  - `def letter_writer(self) -> str` (9)
+  - `def letter_writer(self) -> str` (6)
   - `def dedup_cosine_threshold(self) -> float` (8)
   - `def dm_backfill_limit(self) -> int` (6)
   - `def cv_path(self) -> str` (2)
   - `def wizard_completed(self) -> bool` (2)
   - `def send_locked(self) -> bool` (7)
-  - `def auto_apply(self) -> bool` (3)
+  - `def auto_apply(self) -> str` (7)
   - `def flood_wait_until_ts(self) -> float` (2)
+  - `def _app_enum(self, key: str, allowed: tuple[str, ...], unknown: str) -> str` (3)
   - `def _app_bool(self, key: str) -> bool` (9)
   - `def _app_float(self, key: str) -> float` (17)
     - `def read(raw: str) -> float | None` (6)
@@ -4875,13 +4876,13 @@ Runtime settings layer.
 - `def _long_ago()` (3)
 - `def _recently()` (3)
 
-### `tests/backend/test_flows_handover.py` — 98 строк
+### `tests/backend/test_flows_handover.py` — 106 строк
 
 Сбор отдаёт откликателю: годная после вердикта вакансия уходит отклику, догон
 
 Зависит от: `backend.flows`, `backend.flows.handover`, `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 9
+Тестов: 10
 
 - `async def _set_status(session_factory, vacancy_id, status)` (4)
 
@@ -6146,13 +6147,13 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_runtime_settings_values.py` — 264 строк
+### `tests/backend/test_runtime_settings_values.py` — 272 строк
 
 Следствия типизированных свойств `RuntimeSettings`.
 
 Зависит от: `backend.runtime_settings`
 
-Тестов: 29
+Тестов: 30
 
 - `def settings(**app) -> RuntimeSettings` (16)
 

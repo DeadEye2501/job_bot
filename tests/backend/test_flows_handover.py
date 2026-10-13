@@ -37,6 +37,14 @@ async def test_with_auto_apply_off_a_fit_vacancy_stays_in_new(parsing, session_f
         assert (await session.get(Vacancy, vacancy.id)).status == VacancyStatus.NEW
 
 
+async def test_with_confirmed_auto_apply_a_fit_vacancy_goes_to_the_applier(parsing):
+    """С подтверждением передача идёт как при включённом: ждёт человека уже откликатель."""
+    pipeline, vacancy = parsing
+    await pipeline.rs.set_app("auto_apply", "confirm")
+    assert await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan")
+    assert pipeline.applied == [[vacancy.id]]
+
+
 async def test_with_auto_apply_off_a_new_hr_is_still_caught_up(parsing, monkeypatch):
     """Догон переписки — не откликатель, автоотклик его не касается."""
     pipeline, vacancy = parsing

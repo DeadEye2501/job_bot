@@ -115,12 +115,20 @@ def test_sending_locks_once_explicitly_asked():
 
 
 def test_auto_apply_is_on_in_an_empty_base():
-    """Пустая база откликается сама: тумблер выключают нарочно."""
-    assert settings().auto_apply is True
+    """Пустая база откликается сама: выключают нарочно."""
+    assert settings().auto_apply == "true"
 
 
-def test_auto_apply_turns_off_once_written_off():
-    assert settings(auto_apply="false").auto_apply is False
+@pytest.mark.parametrize("written", ["true", "false", "confirm", "TRUE"])
+def test_auto_apply_reads_the_written_mode_in_any_case(written):
+    """Слово режима читается без оглядки на регистр: правят его и руками в базе."""
+    assert settings(auto_apply=written).auto_apply == written.lower()
+
+
+@pytest.mark.parametrize("written", ["0", "off", "может быть"])
+def test_an_unknown_auto_apply_word_means_search_only(written):
+    """Незнакомое слово откликов не шлёт: отправка без спроса дороже пропуска."""
+    assert settings(auto_apply=written).auto_apply == "false"
 
 
 @pytest.mark.parametrize(

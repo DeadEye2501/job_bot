@@ -32,7 +32,7 @@
      и тогда переключение открывало бы её заодно с собой. -->
 <input
   type="checkbox"
-  class="toggle compact"
+  class="toggle"
   class:locked={disabled}
   class:muted
   checked={on}

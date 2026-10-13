@@ -449,7 +449,7 @@
 - принимает: row, current, chosen, mark, onpick
 - берёт: ./Avatar.svelte
 
-### components/PipelineSection.svelte (125)
+### components/PipelineSection.svelte (139)
 - —
 - принимает: values, onsave
 - берёт: ./SettingsSection.svelte
@@ -947,13 +947,14 @@
 - селекторы (1): .bar
 - берёт: --bg-tertiary, --border
 
-### styles/base.css (75)
+### styles/base.css (82)
 - Основание страницы: то, что верно на ней везде и не принадлежит ни одному блоку. Всё остальное оформление лежит файлом на блок рядом. Сюда попадает только то, у чего своего блока нет: сама страница, сброс чужих умолчаний и договор о шрифте — и текста, и значков.
-- селекторы (6): *,
+- селекторы (7): *,
 *::before,
 *::after, html,
-body, html, button, body, .material-symbols-outlined
-- берёт: --bg-secondary, --text-primary
+body, html, input[type='radio'],
+input[type='checkbox'], button, body, .material-symbols-outlined
+- берёт: --accent, --bg-secondary, --text-primary
 
 ### styles/big-number.css (13)
 - Крупное число: то, ради чего в карточку смотрят. Так набраны число в середине кольца статусов и числа плиток канала. Цифры моноширинные: числа стоят одно под другим и меняются на месте — пропорциональные дёргали бы соседей при каждом обновлении.
@@ -1013,10 +1014,10 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (38): .cnt-detail-pane:has(> .cnt-chat-section), .cnt-chat-section, .cnt-chat-body, .cnt-chat-empty, .cnt-chat-day, .cnt-chat-older, .cnt-chat-older:hover, .cnt-bubble, .cnt-bubble.them, .cnt-bubble.me, .cnt-bubble.deleted, .cnt-bubble-content, .cnt-bubble-text, .cnt-bubble-text.deleted, .cnt-bubble-text.gone, .cnt-bubble-edited, .cnt-bubble-photo, .cnt-bubble-photo img, .cnt-bubble-doc, .cnt-bubble-doc:hover, .cnt-bubble-doc .material-symbols-outlined, .cnt-bubble-time, .cnt-bubble.me .cnt-bubble-time, .cnt-bubble-tick, .cnt-bubble-tick.read, .cnt-bubble.me .cnt-bubble-tick, .cnt-bubble.me .cnt-bubble-tick.read, .cnt-chat-input-area, .cnt-chat-input, .cnt-chat-input:focus, .cnt-chat-input::placeholder, .cnt-chat-attach, .cnt-chat-attach:hover:not(:disabled), .cnt-chat-attach .material-symbols-outlined, .cnt-chat-send, .cnt-chat-send:hover:not(:disabled), .cnt-chat-send .material-symbols-outlined, .cnt-chat-disabled-hint
 - берёт: --accent, --accent-chip-bg, --accent-muted, --bg-tertiary, --border, --surface-raised, --surface-raised-hover, --text-primary, --text-secondary, --text-tertiary
 
-### styles/checkbox.css (15)
+### styles/checkbox.css (14)
 - Галочка с подписью в одну строку: подпись нажимается вместе с квадратиком.
 - селекторы (2): .checkbox-row, .checkbox-row input
-- берёт: --accent, --text-secondary
+- берёт: --text-secondary
 
 ### styles/chips.css (56)
 - Короткие подписи россыпью: синонимы навыка, стек места работы.
@@ -1136,10 +1137,10 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (1): .empty-note
 - берёт: --text-tertiary
 
-### styles/experience.css (110)
+### styles/experience.css (106)
 - Место работы: шапка карточки и всё, что внутри. Сама коробка — общая с категорией навыков, в collapsible.css; своя здесь шапка: там её нажимает одна стрелка, а здесь — вся строка целиком, и разложена она сеткой под стрелку, подпись и корзину.
-- селекторы (14): .exp-header, .exp-card.collapsed .exp-header, .exp-summary, .exp-summary > strong, .exp-summary > .role, .exp-summary .period, .exp-delete, .exp-body, .field-row .input, .date-pair, .date-pair .date-picker, .date-dash, .date-current, .date-current input
-- берёт: --accent, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
+- селекторы (13): .exp-header, .exp-card.collapsed .exp-header, .exp-summary, .exp-summary > strong, .exp-summary > .role, .exp-summary .period, .exp-delete, .exp-body, .field-row .input, .date-pair, .date-pair .date-picker, .date-dash, .date-current
+- берёт: --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/field-caption.css (26)
 - Подпись поля в форме и строка, в которой она стоит перед полем. Не `.field-label` из caption.css: та набрана капителью, и так подписаны шапки таблиц, колонки чисел и заголовки разделов — там подпись одна на весь блок и стоит поодаль. В форме, где полей десяток, капитель читается громче самих полей, между которыми она и стоит. Перед полем, а не над ним: пилюли начинаются с той же строки, и подпись читается как её начало, а не как заголовок над пустотой.
@@ -1373,13 +1374,13 @@ body, html, button, body, .material-symbols-outlined
 - селекторы (2): .pill, .pill:hover
 - берёт: --accent, --bg-secondary, --border, --text-secondary
 
-### styles/pipeline.css (62)
-- Пороги отбора: шесть величин в две строки по три, подпись слева от поля. Сетка из шести дорожек — пара «подпись, элемент» на колонку, — а ячейки прозрачны для неё: так подписи одной колонки берут общую ширину по длинной, и поле, полоска порога и тумблер под ними встают на одну вертикаль.
-- селекторы (8): .pipeline-row, .pipeline-row > div, .pipeline-label, .with-unit,
+### styles/pipeline.css (81)
+- Пороги отбора: шесть величин в две строки по три, подпись слева от поля. Сетка из шести дорожек — пара «подпись, элемент» на колонку, — а ячейки прозрачны для неё: так подписи одной колонки берут общую ширину по длинной, и поле, полоска порога и ряд режимов под ними встают на одну вертикаль.
+- селекторы (12): .pipeline-row, .pipeline-row > div, .pipeline-label, .with-unit,
 .slider-row,
-.with-toggle, .with-unit .input,
+.mode-radios, .with-unit .input,
 .slider-row input[type='range'].slider,
-.with-toggle, .with-toggle, .with-unit .unit, .slider-num
+.mode-radios, .mode-radios, .mode-radios input, .mode-caption, .mode-caption > span, .mode-caption > span[aria-hidden='true'], .with-unit .unit, .slider-num
 - берёт: --text-secondary, --text-tertiary
 
 ### styles/plaque.css (34)
@@ -1414,7 +1415,7 @@ body, html, button, body, .material-symbols-outlined
 .skill-picker-item .lvl
 - берёт: --text-tertiary
 
-### styles/radio-card.css (51)
+### styles/radio-card.css (50)
 - Карточка выбора: способ, его название и пояснение под ним. Карточками, а не строкой переключателей: у каждого способа есть пояснение, и в строку оно не встаёт. Так выбирают, что делать с резюме.
 - селекторы (8): .radio-card, .radio-card:hover, .radio-card.selected, .radio-card.disabled:hover, .radio-card input, .radio-card.disabled input, .radio-card .rc-title, .radio-card .rc-sub
 - берёт: --accent, --accent-hover-soft, --bg-tertiary, --border, --text-primary, --text-tertiary
@@ -1574,10 +1575,10 @@ body, html, button, body, .material-symbols-outlined
 .ch-bar-seg[data-status='Not Fit']
 - берёт: --accent, --alert, --err, --fg-max, --info, --ok, --status-applied, --status-not-fit, --status-offer, --status-test, --text-tertiary, --warn
 
-### styles/status-picker.css (54)
+### styles/status-picker.css (50)
 - Выбор статуса: что стоит внутри окошка под значком статуса. Оправа окошка — общая, в popover.css.
-- селекторы (6): .status-picker, .status-options, .status-option, .status-option input, .popover-comment, .popover-actions
-- берёт: --accent, --bg-tertiary, --text-primary
+- селекторы (5): .status-picker, .status-options, .status-option, .popover-comment, .popover-actions
+- берёт: --bg-tertiary, --text-primary
 
 ### styles/status-pill.css (18)
 - Плашка состояния в шапке секции. Место и сброс шрифта шапки даёт обёртка (`settings-section-side`).
@@ -1612,9 +1613,9 @@ body, html, button, body, .material-symbols-outlined
 .vac-title
 - берёт: --text-primary
 
-### styles/toggle.css (71)
-- Переключатель-пилюля: дорожка и шарик на ней. Двух размеров, и размер несущий: в анкете порогов он стоит один в колонке и взят в полный рост, а в строке списка контактов делит место с именем, счётом и значком отсева — там он вдвое меньше. Числа лежат переменными, чтобы шарик не пришлось пересчитывать на каждый размер руками.
-- селекторы (8): .toggle, .toggle.compact, .toggle::after, .toggle:checked, .toggle:checked::after, .toggle:disabled, .toggle.locked:disabled, .toggle.muted:checked
+### styles/toggle.css (63)
+- Переключатель-пилюля: дорожка и шарик на ней. Стоит в строке списка, где делит место с именем, счётом и значком отсева, — отсюда малый рост. Числа лежат переменными, чтобы шарик не пришлось пересчитывать руками.
+- селекторы (7): .toggle, .toggle::after, .toggle:checked, .toggle:checked::after, .toggle:disabled, .toggle.locked:disabled, .toggle.muted:checked
 - объявляет: --toggle-gap, --toggle-h, --toggle-knob, --toggle-w
 - берёт: --accent, --bg-primary, --bg-tertiary, --text-tertiary, --toggle-gap, --toggle-h, --toggle-knob, --toggle-w
 
@@ -1876,7 +1877,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/settings.test.js (478)
 - —
 
-### tests/settings_screen_live.test.js (247)
+### tests/settings_screen_live.test.js (274)
 - * Экран над мостом; `mail` — что мост отдаёт о почте.
 
 ### tests/settled.js (21)

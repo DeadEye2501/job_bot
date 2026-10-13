@@ -73,9 +73,9 @@ async def test_an_unknown_setting_is_ignored_not_written(api, ask, session_facto
 
 
 async def test_auto_apply_comes_back_after_saving(api, ask):
-    assert (await ask(api.settings.get))["ok"]["pipeline"]["auto_apply"] is True
-    await ask(api.settings.save, {"app": {"auto_apply": False}})
-    assert (await ask(api.settings.get))["ok"]["pipeline"]["auto_apply"] is False
+    assert (await ask(api.settings.get))["ok"]["pipeline"]["auto_apply"] == "true"
+    await ask(api.settings.save, {"app": {"auto_apply": "confirm"}})
+    assert (await ask(api.settings.get))["ok"]["pipeline"]["auto_apply"] == "confirm"
 
 
 async def test_the_simulation_is_not_written_through_the_settings_form(api, ask, session_factory):
