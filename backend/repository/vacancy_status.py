@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.sentence import closed_sentence
 from backend.domain.transitions import APPLY_MOVES_FROM, should_apply_status
 from backend.models import (
     StatusHistorySource,
@@ -34,19 +35,12 @@ from backend.payloads import Classification
 logger = logging.getLogger(__name__)
 
 
-# Зеркало JS-`ended` (client/web/state/vacancy_card.js). Применяется
-# ко всем записям `vacancy_status_history.explanation`, чтобы заметки в
-# таймлайне рендерились единообразно как "Status: reason." — независимо
-# от того, ЛЛМ ли это, ручной ввод или подпись отклика.
+# Применяется ко всем записям `vacancy_status_history.explanation`, чтобы
+# заметки в таймлайне рендерились единообразно как "Status: reason." —
+# независимо от того, ЛЛМ ли это, ручной ввод или подпись отклика.
 def _ensure_trailing_period(s: str | None) -> str | None:
-    if s is None:
-        return None
-    trimmed = s.strip()
-    if not trimmed:
-        return None
-    if trimmed[-1] in ".!?…:":
-        return trimmed
-    return trimmed + "."
+    trimmed = (s or "").strip()
+    return closed_sentence(trimmed) if trimmed else None
 
 
 @dataclass(frozen=True, slots=True)

@@ -16,11 +16,12 @@ const SKIP_PREFIXES = [
 
 const SCORE_SKIP = /^score\s+(-?\d+)\s*<\s*(-?\d+)$/i;
 
-const ENDINGS = /[.!?…:]$/;
+const ENDINGS = /[.!?…:][»"')\]]*$/;
 
 // Точка в конце, если её нет. Строки ленты стоят вперемешку — фраза модели,
 // наша подпись, пояснение человека, — и без общего окончания соседние
-// выглядели бы по-разному.
+// выглядели бы по-разному. Зеркало `backend/domain/sentence.py`: знак конца
+// виден и за закрывающей кавычкой или скобкой.
 function ended(text) {
   const trimmed = text.trimEnd();
   if (!trimmed || ENDINGS.test(trimmed)) return trimmed;

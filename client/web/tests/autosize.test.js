@@ -19,6 +19,9 @@ function field(fits) {
   return {
     trail,
     heard,
+    dataset: {},
+    offsetHeight: 0,
+    clientHeight: 0,
     addEventListener: (kind, fn) => heard.set(kind, fn),
     removeEventListener: (kind, fn) => heard.get(kind) === fn && heard.delete(kind),
     style: {
@@ -76,7 +79,7 @@ describe('поле с пределом строк', () => {
 
   function limited(fits) {
     const one = field(fits);
-    one.dataset = { lines: '2' };
+    one.dataset.lines = '2';
     return one;
   }
 

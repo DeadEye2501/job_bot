@@ -15,6 +15,7 @@ from datetime import date
 import httpx
 
 from adapters.lm_chat import ChatRequest, chat
+from backend.domain.sentence import closed_sentence
 from backend.domain.skill_names import skill_key
 from backend.domain.spellings import dedupe_first_wins
 from backend.domain.taxonomy import (
@@ -391,7 +392,7 @@ def _points(value) -> list[str]:
     точке. Пункт из одних таких знаков пуст и выпадает.
     """
     points = [point.rstrip(";,: ") for point in str_list(value)]
-    return [p if re.search(r"[.!?…][»\"')\]]*$", p) else p + "." for p in points if p]
+    return [closed_sentence(point) for point in points if point]
 
 
 def _parse_experience(item) -> ParsedCvExperience | None:
