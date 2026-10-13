@@ -7,7 +7,7 @@
 """
 
 from backend.llm.cv_grounding import grounded_in_cv
-from tests.factories import parsed_cv, parsed_cv_place
+from tests.factories_cv import parsed_cv, parsed_cv_place
 
 
 def test_a_stack_is_dropped_when_the_job_has_no_stack_section():

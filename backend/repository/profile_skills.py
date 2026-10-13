@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.skill_names import index_by_key
 from backend.incoming import str_list
-from backend.models import ProfileSkill, profile_experience_skills
+from backend.models import STACK_LINKS, ProfileSkill
 
 logger = logging.getLogger(__name__)
 
@@ -97,17 +97,11 @@ def _upsert_skills(
 async def _drop_skills(
     session: AsyncSession, existing: dict, drop_ids: set[int]
 ) -> None:
-    """Снести навыки, которых человек в анкете не оставил.
-
-    Delete rows the user removed. Junction has no ON DELETE CASCADE on
-    SQLite by default, so wipe the links explicitly first.
-    """
+    """Снести навыки, которых человек в анкете не оставил, сняв их со стека
+    каждой записи анкеты (`STACK_LINKS`)."""
     for sid in drop_ids:
-        await session.execute(
-            delete(profile_experience_skills).where(
-                profile_experience_skills.c.skill_id == sid
-            )
-        )
+        for links in STACK_LINKS:
+            await session.execute(delete(links).where(links.c.skill_id == sid))
         await session.delete(existing[sid])
 
 
@@ -116,13 +110,12 @@ async def save_skills(
     rows: list[dict],
     profile_id: int,
 ) -> None:
-    """Update / insert / delete skills by id, preserving experience links.
+    """Сохранить навыки по номерам строк, не порвав стеки мест работы и проектов.
 
-    Each row may carry an integer ``id`` (existing row → UPDATE) or a None
-    / string id (new row → INSERT). Rows whose ids are not present in the
-    payload get DELETEd along with their junction entries. UPDATEing a row
-    leaves its row id stable, so profile_experience_skills naturally
-    survives even if the user renamed the skill.
+    Строка с целым ``id`` правится на месте, без него (или с номером-строкой)
+    заводится заново. Не названные в присланном перечне удаляются вместе со
+    связками стека. Правка не меняет номер строки, поэтому стеки переживают и
+    переименование навыка.
 
     Caller wraps in ``session.begin()``.
     """

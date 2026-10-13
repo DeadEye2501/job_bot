@@ -21,11 +21,14 @@ from backend.models.enums import (
 )
 from backend.models.message import Message
 from backend.models.profile import (
+    STACK_LINKS,
     Profile,
     ProfileExperience,
     ProfileLanguage,
+    ProfileProject,
     ProfileSkill,
     profile_experience_skills,
+    profile_project_skills,
 )
 from backend.models.settings import (
     BLACKLIST_KINDS,
@@ -65,7 +68,9 @@ __all__ = [
     "Profile",
     "ProfileExperience",
     "ProfileLanguage",
+    "ProfileProject",
     "ProfileSkill",
+    "STACK_LINKS",
     "SalaryPeriod",
     "Screening",
     "StatusHistorySource",
@@ -79,4 +84,5 @@ __all__ = [
     "VacancyStatus",
     "VacancyStatusHistory",
     "profile_experience_skills",
+    "profile_project_skills",
 ]

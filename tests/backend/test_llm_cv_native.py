@@ -2,7 +2,7 @@
 
 from backend.llm.cv_native import with_native_language
 from backend.payloads import ParsedCvLanguage
-from tests.factories import parsed_cv
+from tests.factories_cv import parsed_cv
 
 
 def test_a_resume_written_in_russian_gives_a_native_russian():

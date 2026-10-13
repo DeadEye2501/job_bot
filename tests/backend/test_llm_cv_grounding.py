@@ -6,7 +6,7 @@
 
 from backend.llm.cv_grounding import grounded_in_cv
 from backend.payloads import ParsedCvLanguage
-from tests.factories import parsed_cv, parsed_cv_place, parsed_cv_profile, parsed_cv_skill
+from tests.factories_cv import parsed_cv, parsed_cv_place, parsed_cv_profile, parsed_cv_skill
 
 
 def test_a_language_the_resume_never_names_is_dropped():

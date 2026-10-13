@@ -237,6 +237,13 @@
 - `config` = `context.config`
 - `target_metadata` = `Base.metadata`
 
+### `alembic/versions/6cc10045aeb6_projects.py`
+
+- `revision: str` = `'6cc10045aeb6'`
+- `down_revision: Union[str, Sequence[str], None]` = `'c4d7e2a915b3'`
+- `branch_labels: Union[str, Sequence[str], None]` = `None`
+- `depends_on: Union[str, Sequence[str], None]` = `None`
+
 ### `alembic/versions/a9c3e1f07b42_aggregators.py`
 
 - `revision: str` = `'a9c3e1f07b42'`
@@ -1216,6 +1223,8 @@
 ### `backend/models/profile.py`
 
 - `profile_experience_skills` = `Table('profile_experience_skills', Base.metadata…`
+- `profile_project_skills` = `Table('profile_project_skills', Base.metadata, C…`
+- `STACK_LINKS` = `набор из 2`
 - `class Profile(IdMixin, UpdatedAtMixin, Base)`
   - `__tablename__` = `'profile'`
   - `first_name: Mapped[str]`
@@ -1260,6 +1269,13 @@
   - `achievements: Mapped[list[str]]` = `mapped_column(JSON, server_default=text("'[]'"))`
   - `responsibilities: Mapped[list[str]]` = `mapped_column(JSON, server_default=text("'[]'"))`
   - `skills: Mapped[list['ProfileSkill']]` = `relationship(secondary=profile_experience_skills…`
+- `class ProfileProject(IdMixin, Base)`
+  - `__tablename__` = `'profile_project'`
+  - `profile_id: Mapped[int]` = `mapped_column(ForeignKey('profile.id'))`
+  - `name: Mapped[str]`
+  - `url: Mapped[str | None]`
+  - `about: Mapped[list[str]]` = `mapped_column(JSON, server_default=text("'[]'"))`
+  - `skills: Mapped[list['ProfileSkill']]` = `relationship(secondary=profile_project_skills)`
 
 ### `backend/models/settings.py`
 
@@ -1669,11 +1685,23 @@
 
 ### `backend/repository/profile_experience.py`
 
-- `logger` = `logging.getLogger(__name__)`
+- `EXPERIENCE` = `RecordKind(ProfileExperience, profile_experience…`
 
 ### `backend/repository/profile_languages.py`
 
 - `logger` = `logging.getLogger(__name__)`
+
+### `backend/repository/profile_projects.py`
+
+- `PROJECTS` = `RecordKind(ProfileProject, profile_project_skill…`
+
+### `backend/repository/profile_records.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `class RecordKind(NamedTuple)`
+  - `model: type`
+  - `links: Table`
+  - `fields_of: Callable[[dict], dict]`
 
 ### `backend/repository/profile_skills.py`
 

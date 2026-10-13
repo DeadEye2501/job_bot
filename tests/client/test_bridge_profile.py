@@ -270,3 +270,38 @@ async def test_a_saved_experience_keeps_its_skills(api, ask):
     row = listed["ok"]["experience"][0]
     assert row["company"] == "Контур"
     assert row["skill_names"] == ["Python"]
+
+
+async def test_a_saved_project_comes_back_with_its_stack(api, ask):
+    await _saved_person(api, ask)
+    await ask(api.profile.save_skills, {"skills": [{"name": "Python"}]})
+
+    saved = await ask(api.profile.save_projects, {"projects": [{
+        "name": "Бот", "url": "https://example.org/bot",
+        "about": ["Описание"], "skill_names": ["Python"],
+    }]})
+    assert saved["ok"] == {}
+
+    listed = (await ask(api.profile.projects))["ok"]
+    project = listed["projects"][0]
+    assert {k: v for k, v in project.items() if k != "id"} == {
+        "name": "Бот", "url": "https://example.org/bot",
+        "about": ["Описание"], "skill_names": ["Python"],
+    }
+    assert [s["name"] for s in listed["skills_index"]] == ["Python"]
+
+
+async def test_a_nameless_project_is_refused_by_its_number(api, ask):
+    await _saved_person(api, ask)
+
+    answer = await ask(api.profile.save_projects, {"projects": [{"name": "Бот"}, {"name": ""}]})
+
+    assert answer["fail"] == "denied"
+    assert "#2" in answer["detail"]
+
+
+async def test_projects_without_a_person_are_refused_by_name(api, ask):
+    answer = await ask(api.profile.save_projects, {"projects": [{"name": "Бот"}]})
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Сначала сохраните профайл (CV-таб)."
