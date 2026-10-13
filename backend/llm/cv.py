@@ -382,6 +382,18 @@ def _parse_skill(item) -> ParsedCvSkill | None:
     )
 
 
+def _points(value) -> list[str]:
+    """Пункты перечня записи, каждый — законченной фразой с точкой.
+
+    Резюме ставит точку то в одном пункте, то в другом, а пункт без неё
+    выбивается из списка. Свой знак конца фразы остаётся — и за закрывающей
+    кавычкой или скобкой тоже; точка с запятой, запятая и двоеточие уступают
+    точке. Пункт из одних таких знаков пуст и выпадает.
+    """
+    points = [point.rstrip(";,: ") for point in str_list(value)]
+    return [p if re.search(r"[.!?…][»\"')\]]*$", p) else p + "." for p in points if p]
+
+
 def _parse_experience(item) -> ParsedCvExperience | None:
     if not isinstance(item, dict):
         return None
@@ -396,8 +408,8 @@ def _parse_experience(item) -> ParsedCvExperience | None:
         role=role,
         start_date=start,
         end_date=_parse_date(item.get("end_date")),
-        achievements=str_list(item.get("achievements")),
-        responsibilities=str_list(item.get("responsibilities")),
+        achievements=_points(item.get("achievements")),
+        responsibilities=_points(item.get("responsibilities")),
         stack=str_list(item.get("stack")),
     )
 
@@ -412,7 +424,7 @@ def _parse_project(item) -> ParsedCvProject | None:
     return ParsedCvProject(
         name=name,
         url=str_or_none(item.get("url")),
-        about=str_list(item.get("about")),
+        about=_points(item.get("about")),
         stack=str_list(item.get("stack")),
     )
 

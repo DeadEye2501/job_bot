@@ -179,9 +179,36 @@ async def test_bullets_are_trimmed_and_cleaned_of_rubbish():
         stack=["Python", "  Docker  "],
     )
 
-    assert job.achievements == ["Сократил время сборки"]
-    assert job.responsibilities == ["Поддерживал сервис"]
+    assert job.achievements == ["Сократил время сборки."]
+    assert job.responsibilities == ["Поддерживал сервис."]
     assert job.stack == ["Python", "Docker"]
+
+
+async def test_every_point_ends_with_a_full_stop():
+    """Пункт перечня кончается точкой, как бы его ни дало резюме: в соседних
+    пунктах она есть, и строка без неё выбивалась бы из списка. Свой знак конца
+    фразы остаётся, точка с запятой и двоеточие уступают точке."""
+    job = await one_job(
+        achievements=["Запустил сервис", "Ускорил сборку.", "Справился?", "Внедрил CI;"],
+        responsibilities=["Писал код:"],
+    )
+    project = await one_project(about=["Описание проекта", "Работает быстро!"])
+
+    assert job.achievements == ["Запустил сервис.", "Ускорил сборку.", "Справился?", "Внедрил CI."]
+    assert job.responsibilities == ["Писал код."]
+    assert project.about == ["Описание проекта.", "Работает быстро!"]
+
+
+async def test_a_full_stop_is_seen_behind_a_closing_quote_and_not_doubled():
+    """Знак конца фразы за закрывающей кавычкой или скобкой — уже конец, а
+    точка с запятой после точки её не удваивает."""
+    job = await one_job(achievements=[
+        "Запустил «Директ».»", "(в т.ч. CI.)", "Внедрил.;", "Работал с «Директом»", ";",
+    ])
+
+    assert job.achievements == [
+        "Запустил «Директ».»", "(в т.ч. CI.)", "Внедрил.", "Работал с «Директом».",
+    ]
 
 
 async def test_the_order_of_jobs_is_preserved():
@@ -200,7 +227,7 @@ async def test_a_project_keeps_its_link_points_and_stack():
     )
 
     assert (project.url, project.about, project.stack) == (
-        "https://example.org/bot", ["Описание", "Пункт"], ["Python"]
+        "https://example.org/bot", ["Описание.", "Пункт."], ["Python"]
     )
 
 
