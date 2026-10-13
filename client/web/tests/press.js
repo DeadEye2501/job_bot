@@ -13,6 +13,12 @@ export function buttonBy(label, { exact = false, among = 'button' } = {}) {
   );
 }
 
+/** Набрать в поле, как это делает человек: значение и всплывающая весть ввода. */
+export function typed(field, text) {
+  field.value = text;
+  field.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 /** Нажать кнопку с этой подписью. */
 export function press(label, options) {
   buttonBy(label, options).click();

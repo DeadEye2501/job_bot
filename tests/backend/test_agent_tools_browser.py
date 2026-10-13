@@ -28,6 +28,17 @@ async def _strict(confirmed, outcome=None, fields=None):
     return page, tools
 
 
+async def test_after_finishing_the_resume_is_not_attached(tmp_path):
+    """Загрузка резюме тоже нажимает на странице — и после «Закончить» не проходит."""
+    page = FakePage(choosers={"text=Загрузить"})
+    job = apply_job(1, confirming=True, outcome=Dropped())
+    tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), tmp_path / "cv.pdf", job)
+
+    answer = await tool(tools, "browser_attach_resume")(selector="text=Загрузить")
+
+    assert answer.startswith("не вышло") and page.calls == []
+
+
 async def test_after_finishing_nothing_reaches_the_page():
     """Человек закончил — «Отправить» не нажимается, что бы агент ни решил."""
     page, tools = await _strict(_item("#name", "Иван"), outcome=Dropped())
@@ -124,7 +135,7 @@ async def test_a_confirmed_empty_check_stays_empty():
 
 async def test_a_click_on_an_unconfirmed_check_is_refused():
     """Галочку, которую человек не видел, агент не ставит — ни ею самой, ни подписью к ней."""
-    page, tools = await _strict({}, fields={"#ads": ("check", ""), "text=Хочу рассылку": ("check", "")})
+    page, tools = await _strict({}, fields={"#ads": ("check", "", False), "text=Хочу рассылку": ("check", "", False)})
 
     await tool(tools, "browser_click")(selector="#ads")
     await tool(tools, "browser_click")(selector="text=Хочу рассылку")
@@ -134,7 +145,7 @@ async def test_a_click_on_an_unconfirmed_check_is_refused():
 
 async def test_a_radio_in_a_confirmed_group_is_clicked():
     """Вариант переключателя выбирает агент, ближайший к подтверждённому, — в подтверждённой группе."""
-    fields = {"#relocate": ("", "relocate"), "#relocate-yes": ("radio", "relocate")}
+    fields = {"#relocate": ("", "relocate", False), "#relocate-yes": ("radio", "relocate", False)}
     page, tools = await _strict(_item("#relocate", "да", kind="choice"), fields=fields)
 
     await tool(tools, "browser_click")(selector="#relocate-yes")
@@ -143,7 +154,7 @@ async def test_a_radio_in_a_confirmed_group_is_clicked():
 
 
 async def test_a_radio_of_an_unconfirmed_group_is_refused():
-    fields = {"#relocate": ("", "relocate"), "#trips-yes": ("radio", "trips")}
+    fields = {"#relocate": ("", "relocate", False), "#trips-yes": ("radio", "trips", False)}
     page, tools = await _strict(_item("#relocate", "да", kind="choice"), fields=fields)
 
     answer = await tool(tools, "browser_click")(selector="#trips-yes")

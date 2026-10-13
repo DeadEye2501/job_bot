@@ -11,6 +11,7 @@ import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import NotesField from '../components/NotesField.svelte';
+import { typed } from './press.js';
 
 afterEach(cleanup);
 
@@ -34,11 +35,6 @@ function notes(owner) {
   return { sent, shown, box: shown.getByPlaceholderText('Заметки…') };
 }
 
-/** Набрать в поле, как это делает человек. */
-function typed(box, text) {
-  box.value = text;
-  box.dispatchEvent(new Event('input', { bubbles: true }));
-}
 
 describe('живое поле заметки', () => {
   it('на прощание досылает набранное к той записи, у которой набирали', async () => {

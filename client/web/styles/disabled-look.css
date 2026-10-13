@@ -18,7 +18,8 @@
 .btn:disabled,
 .icon-btn.is-disabled,
 .badge-unread[data-has-unread='false'],
-.cnt-chat-attach:disabled {
+.cnt-chat-attach:disabled,
+.human-plate-done:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

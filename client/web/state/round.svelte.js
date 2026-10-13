@@ -92,9 +92,14 @@ export const round = {
   },
 };
 
+/** Отметка галочки пункта: окно и откликатель пишут её словом, как прочие значения. */
+export function isChecked(item) {
+  return item.value === 'true';
+}
+
 /** Пункт заполнен: у галочки — отмечена, у прочих — непустое значение. */
 function filled(item) {
-  return item.kind === 'check' ? item.value === 'true' : item.value.trim() !== '';
+  return item.kind === 'check' ? isChecked(item) : item.value.trim() !== '';
 }
 
 /** Подписать учёт на вести моста; отдаёт отписку.

@@ -14,12 +14,12 @@ from tests.fakes.browser import FakeBrowser, FakePage
 PAGE = "https://site.test/vacancy/1/apply"
 
 
-async def _applier(make_pipeline, session_factory, answer, *, confirming=True, required=()):
-    """Откликатель на странице формы; человек отвечает окну `answer`; `required` —
-    поля, которые страница называет обязательными."""
+async def _applier(make_pipeline, session_factory, answer, *, confirming=True, fields=None):
+    """Откликатель на странице формы; человек отвечает окну `answer`; `fields` —
+    что страница говорит о своих полях (`FakePage`)."""
     vacancy = vacancy_row()
     await put(session_factory, vacancy)
-    page = FakePage(required=required)
+    page = FakePage(fields=fields)
     page.url = PAGE
     kit, asked = await under_confirmation(kit_for(await make_pipeline(), browser=FakeBrowser(page)), answer)
     job = apply_job(vacancy.id, method="aggregator", target=PAGE, confirming=confirming)
@@ -28,7 +28,7 @@ async def _applier(make_pipeline, session_factory, answer, *, confirming=True, r
 
 async def test_the_window_knows_which_fields_the_page_requires(make_pipeline, session_factory):
     """Обязательность берётся у самой страницы, а не со слов агента."""
-    _, tools, asked = await _applier(make_pipeline, session_factory, edited({}), required={"#name"})
+    _, tools, asked = await _applier(make_pipeline, session_factory, edited({}), fields={"#name": ("", "", True)})
 
     await tool(tools, "need_human")(kind="confirm", items=[page_item("#name", "Иван"), page_item("#nick", "")])
 
@@ -40,7 +40,7 @@ async def test_the_letter_written_is_the_one_confirmed(make_pipeline, session_fa
     job, tools, _ = await _applier(make_pipeline, session_factory, edited({"": "Правленое письмо"}))
     await tool(tools, "need_human")(kind="confirm", items=[page_item("#letter", "Исходное", label="")])
 
-    await tool(tools, "record_application")(via="aggregator", target=PAGE, letter="Исходное")
+    await tool(tools, "record_application")(via="aggregator", target=PAGE)
 
     (row,) = await all_rows(session_factory, Application)
     assert row.letter == "Правленое письмо"
@@ -119,8 +119,7 @@ async def test_the_screening_written_is_what_was_confirmed(make_pipeline, sessio
         page_item("#letter", "Здравствуйте", label=""),
     ])
 
-    await tool(tools, "record_application")(
-        via="aggregator", target=PAGE, screening=[{"question": "Опыт?", "answer": "Четыре года"}])
+    await tool(tools, "record_application")(via="aggregator", target=PAGE)
 
     rows = await all_rows(session_factory, Screening)
     assert [(s.from_us, s.text) for s in rows] == [

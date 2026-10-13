@@ -1,7 +1,6 @@
 """Общие инструменты агента: анкета, итог сессии, зов человека, отметка входа, неудача способа."""
 
 import json
-import logging
 from collections.abc import Callable
 
 from backend.agent.confirm import ConfirmItem, ask_person
@@ -18,13 +17,11 @@ from backend.agent.jobs import (
     SeekJob,
 )
 from backend.agent.kit import AgentKit
-from backend.agent.tools_browser import page_field
+from backend.agent.page_fields import field_or_none
 from backend.domain.apply_order import VIA_AGGREGATOR
 from backend.domain.hosts import normalize_host
 from backend.repository.agent_profile import build_agent_profile
 from backend.repository.aggregators import set_logged_in
-
-logger = logging.getLogger(__name__)
 
 
 def common_tools(kit: AgentKit, job) -> list[Callable]:
@@ -132,13 +129,8 @@ async def _required(page, selector: str) -> bool:
     Поле, которого на странице не нашлось, обязательным не считается: окно
     заперло бы подтверждение на пункте, которого человек не может заполнить.
     """
-    from playwright.async_api import Error as PlaywrightError
-
-    try:
-        return (await page_field(page, selector)).required
-    except PlaywrightError:
-        logger.info("поле %s на странице не найдено — обязательность неизвестна", selector)
-        return False
+    field = await field_or_none(page, selector)
+    return field is not None and field.required
 
 
 def _last_known(before: dict | None, item: ConfirmItem) -> ConfirmItem:
