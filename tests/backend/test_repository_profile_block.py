@@ -9,7 +9,7 @@ from datetime import date
 
 from backend.repository.profile_block import build_profile_block
 from tests.dbio import put
-from tests.factories import experience_row, profile_row, profile_skill_row
+from tests.factories import experience_row, profile_row, profile_skill_row, project_row
 
 
 async def test_without_a_profile_the_block_is_empty(session):
@@ -180,6 +180,35 @@ async def test_free_preferences_go_into_their_own_section(session, session_facto
     block = await build_profile_block(session)
 
     assert block.endswith("Дополнительно:\nготов к переезду в Европу")
+
+
+async def test_projects_follow_the_places_with_their_first_point(session, session_factory):
+    """Проект в письме — как место работы: название и одна зацепка."""
+    person = profile_row()
+    await put(session_factory, person)
+    await put(
+        session_factory,
+        experience_row(person.id, company="Контур"),
+        project_row(person.id, name="Бот", about=["Описание бота", "Второй пункт"]),
+    )
+
+    block = await build_profile_block(session)
+
+    assert "Проекты:\n- Бот: Описание бота" in block
+    assert block.index("Опыт работы:") < block.index("Проекты:")
+    assert "Второй пункт" not in block
+
+
+async def test_projects_alone_give_no_years(session, session_factory):
+    """Стаж — только места работы: одни проекты лет опыта не дают."""
+    person = profile_row()
+    await put(session_factory, person)
+    await put(session_factory, project_row(person.id, name="Бот"))
+
+    block = await build_profile_block(session)
+
+    assert "Проекты:\n- Бот" in block
+    assert "лет в IT" not in block
 
 
 async def test_an_empty_preferences_field_adds_no_section(session, session_factory):

@@ -4,10 +4,16 @@ import re
 from datetime import date
 
 from backend.llm.rules import LATIN_NAME_RULE
-from backend.models import Gender, ProfileLanguage, SalaryPeriod, profile_experience_skills
+from backend.models import (
+    Gender,
+    ProfileLanguage,
+    SalaryPeriod,
+    profile_experience_skills,
+    profile_project_skills,
+)
 from backend.repository.agent_profile import build_agent_profile
 from tests.dbio import put
-from tests.factories import experience_row, profile_row, profile_skill_row
+from tests.factories import experience_row, profile_row, profile_skill_row, project_row
 from tests.fakes.agent import TODAY
 
 
@@ -92,6 +98,65 @@ async def test_a_place_of_work_comes_whole(session, session_factory):
 
     assert "Место, Роль, 03.2020 — настоящее время" in text
     assert "вела учёт" in text and "первое" in text and "второе" in text
+
+
+async def test_a_project_comes_whole_with_its_link(session, session_factory):
+    """Проект целиком, как место работы, — и со ссылкой: формы её спрашивают."""
+    person = await _person(session_factory)
+    await put(session_factory, project_row(
+        person.id, name="Бот", url="https://example.org/bot", about=["Описание", "Пункт"]))
+
+    text = await build_agent_profile(session, TODAY)
+
+    assert "- Бот, https://example.org/bot" in text
+    assert "О проекте: Описание" in text and "О проекте: Пункт" in text
+
+
+async def test_a_project_without_a_link_names_no_link(session, session_factory):
+    """Нет ссылки — нет и слова о ней: агент вписал бы его в поле формы."""
+    person = await _person(session_factory)
+    await put(session_factory, project_row(person.id, name="Бот", url=None))
+
+    text = await build_agent_profile(session, TODAY)
+
+    assert "- Бот\n" in text
+    assert "None" not in text
+
+
+async def test_a_skill_in_a_place_and_a_project_keeps_the_places_tenure(
+    session, session_factory
+):
+    """Стаж — по местам работы, и проект его не отменяет."""
+    person = await _person(session_factory)
+    tool = profile_skill_row(person.id, "Инструмент-Г")
+    place = experience_row(person.id, start_date=date(2019, 1, 1), end_date=date(2021, 1, 1))
+    project = project_row(person.id)
+    await put(session_factory, tool, place, project)
+    await session.execute(profile_experience_skills.insert().values(
+        experience_id=place.id, skill_id=tool.id))
+    await session.execute(profile_project_skills.insert().values(
+        project_id=project.id, skill_id=tool.id))
+    await session.commit()
+
+    text = await build_agent_profile(session, TODAY)
+
+    assert "Инструмент-Г — уровень 3, стаж 2+ г." in text
+
+
+async def test_a_skill_named_only_in_projects_is_had_without_tenure(session, session_factory):
+    """Опыт с инструментом проект подтверждает, но стажа не даёт."""
+    person = await _person(session_factory)
+    tool = profile_skill_row(person.id, "Инструмент-В")
+    project = project_row(person.id)
+    await put(session_factory, tool, project)
+    await session.execute(profile_project_skills.insert().values(
+        project_id=project.id, skill_id=tool.id))
+    await session.commit()
+
+    text = await build_agent_profile(session, TODAY)
+
+    assert "Инструмент-В — уровень 3, опыт есть в проектах, стаж не считается" in text
+    assert "Общий стаж: нет мест работы" in text
 
 
 async def test_languages_come_with_their_levels(session, session_factory):

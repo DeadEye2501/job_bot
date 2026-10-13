@@ -467,11 +467,11 @@ init
 
 - `def login_task(host: str) -> str` (3)
 
-### `backend/agent/prompts/screening.py` — 31 строк
+### `backend/agent/prompts/screening.py` — 33 строк
 
 Скрининг: ответы работодателю от имени человека.
 
-Зависит от: —
+Зависит от: `backend.llm.rules`
 
 
 ### `backend/agent/prompts/seeker.py` — 68 строк
@@ -1665,7 +1665,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _matched_id(answer: str) -> tuple[int | None, str | None]` (22)
 - `async def dedupe_company_with_llm(client: httpx.AsyncClient, model: str, *, parsed_name: str, parsed_website: str | None, candidates: list) -> tuple[int | None, str | None]` (41)
 
-### `backend/llm/cover_letter.py` — 289 строк
+### `backend/llm/cover_letter.py` — 295 строк
 
 Сочинение письма-отклика.
 
@@ -1824,7 +1824,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str) -> ChatRequest` (21)
 - `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (55)
 
-### `backend/llm/rules.py` — 272 строк
+### `backend/llm/rules.py` — 278 строк
 
 Приметы предметной области, общие для наставлений модели.
 
@@ -2086,17 +2086,20 @@ First-run bootstrap: ensure DB schema exists.
 - `class LlmProviderConfig` (9)
   - `def names_model_file(self) -> bool` (2)
 
-### `backend/repository/agent_profile.py` — 89 строк
+### `backend/repository/agent_profile.py` — 114 строк
 
 Анкета человека целиком, как её видит агент: со стажем общим и по навыкам.
 
-Зависит от: `backend.domain.salary`, `backend.domain.tenure`, `backend.llm.candidate`, `backend.models`, `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_languages`, `backend.repository.profile_skills`
+Зависит от: `backend.domain.salary`, `backend.domain.tenure`, `backend.llm.candidate`, `backend.models`, `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_languages`, `backend.repository.profile_projects`, `backend.repository.profile_skills`
 
-- `async def build_agent_profile(session: AsyncSession, today: date) -> str` (15)
+- `async def build_agent_profile(session: AsyncSession, today: date) -> str` (17)
 - `def _person_lines(p, languages) -> list[str]` (20)
 - `def _salary(p) -> str` (7)
-- `def _skill_lines(skills, places, today: date) -> list[str]` (9)
+- `def _skill_lines(skills, places, projects, today: date) -> list[str]` (5)
+- `def _skill_term(skill, places, projects, today: date) -> str` (10)
+- `def _record_lines(head: str, labelled: list[tuple[str, list[str]]]) -> list[str]` (3)
 - `def _place_lines(places) -> list[str]` (7)
+- `def _project_lines(projects) -> list[str]` (7)
 - `def _years(years: int) -> str` (2)
 
 ### `backend/repository/aggregators.py` — 227 строк
@@ -2403,16 +2406,18 @@ First-run bootstrap: ensure DB schema exists.
 - `async def get_profile(session: AsyncSession) -> Profile | None` (3)
 - `async def upsert_profile(session: AsyncSession, **fields) -> Profile` (16)
 
-### `backend/repository/profile_block.py` — 93 строк
+### `backend/repository/profile_block.py` — 106 строк
 
 Сборка текстового блока анкеты для наставления модели.
 
-Зависит от: `backend.domain.tenure`, `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_skills`
+Зависит от: `backend.domain.tenure`, `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_projects`, `backend.repository.profile_skills`
 
 - `def _skills_lines(skills: list) -> list[str]` (12)
 - `def _header_lines(profile, experiences: list) -> list[str]` (19)
-- `def _experience_lines(experiences: list) -> list[str]` (11)
-- `async def build_profile_block(session: AsyncSession) -> str` (28)
+- `def _record_line(head: str, points: list[str]) -> str` (7)
+- `def _experience_lines(experiences: list) -> list[str]` (5)
+- `def _project_lines(projects: list) -> list[str]` (3)
+- `async def build_profile_block(session: AsyncSession) -> str` (32)
 
 ### `backend/repository/profile_cv.py` — 177 строк
 
@@ -5356,13 +5361,13 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_repository_agent_profile.py` — 101 строк
+### `tests/backend/test_repository_agent_profile.py` — 166 строк
 
 Анкета для агента: всё, на что опираются промпты, со стажем от кода.
 
 Зависит от: `backend.llm.rules`, `backend.models`, `backend.repository.agent_profile`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`
 
-Тестов: 7
+Тестов: 11
 
 - `async def _person(session_factory, **fields)` (4)
 
@@ -5817,13 +5822,13 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/backend/test_repository_profile_block.py` — 196 строк
+### `tests/backend/test_repository_profile_block.py` — 225 строк
 
 Следствия сборки блока «Информация о кандидате» для письма-отклика.
 
 Зависит от: `backend.repository.profile_block`, `tests.dbio`, `tests.factories`
 
-Тестов: 11
+Тестов: 13
 
 
 ### `tests/backend/test_repository_profile_cv_saving.py` — 337 строк ⚠ подошёл к 300
