@@ -22,27 +22,26 @@
   // запись он умеет только с заведённым навыком. Держим строки целиком:
   // подборщик раскладывает их по категориям и показывает уровень.
   let known = $state([]);
-  let open = $state(new Set());
+  // Помнятся свёрнутые, а не раскрытые: карточки раскрыты, пока человек сам
+  // их не свернёт, — записей немного, и по одним шапкам их не читают.
+  let closed = $state(new Set());
 
   const alive = living();
   // Свежим карточкам номера даёт мост, и до первой записи их нет. Свой ключ
-  // нужен до тех пор: по нему список узнаёт строку, а раскрытость помнится
+  // нужен до тех пор: по нему список узнаёт строку, а свёрнутость помнится
   // набором ключей — держи мы там сами записи, любая правка подменяла бы
-  // объект, и карточка складывалась бы на каждом введённом символе.
+  // объект, и карточка раскрывалась бы на каждом введённом символе.
   let born = 0;
 
   async function refresh() {
     const now = await load();
     if (now === null || !alive.now) return;
     rows = now[kind.key].map((one) => ({ ...one, key: `id-${one.id}` }));
-    // Раскрыты все: записей немного, и по свёрнутым шапкам человек их не
-    // читает — открывал бы каждую.
-    open = new Set(rows.map((one) => one.key));
     known = now.skills_index;
     loaded = true;
   }
 
-  const write = oneWrite(send);
+  const write = oneWrite((going) => send(going));
 
   /** Отправить перечень целиком.
    *
@@ -77,7 +76,7 @@
     // спрашивая про запись, которой в нём уже нет.
     leaving = null;
     rows = rows.filter((one) => one.key !== key);
-    open = without(open, key);
+    closed = without(closed, key);
     return save();
   }
 
@@ -88,9 +87,6 @@
     // человек их расставил, и добавляют почти всегда последнее — внизу человек
     // искал бы его глазами.
     rows = [fresh, ...rows];
-    // Свежая карточка раскрыта сразу: свёрнутая пустая выглядит как пустая
-    // строка списка, и человек жал бы «добавить» второй раз.
-    open = toggled(open, fresh.key);
   }
 
   $effect(() => {
@@ -112,8 +108,8 @@
     <Card
       record={one}
       {known}
-      open={open.has(one.key)}
-      ontoggle={() => (open = toggled(open, one.key))}
+      open={!closed.has(one.key)}
+      ontoggle={() => (closed = toggled(closed, one.key))}
       onedit={(part) => edit(one.key, part)}
       onremove={() => (leaving = one)}
     />

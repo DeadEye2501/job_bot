@@ -378,7 +378,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 194 модулей
+## backend — 195 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -1117,6 +1117,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def _preferred_points(level_lookup: dict[str, tuple[str, int]], item: object, paid: set[str]) -> int` (10)
 - `def score_stack(stack_required: list[str], stack_preferred: list[str], skills: list[ProfileSkill]) -> int` (40)
 
+### `backend/domain/sentence.py` — 18 строк
+
+Законченная фраза: свой знак конца или точка.
+
+Зависит от: —
+
+- `def closed_sentence(text: str) -> str` (3)
+
 ### `backend/domain/skill_names.py` — 57 строк
 
 Сведение написаний названия навыка по общему ключу.
@@ -1677,11 +1685,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (23)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
-### `backend/llm/cv.py` — 497 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 498 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.salary`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.domain.wording`, `backend.incoming`, `backend.llm.answers`, `backend.llm.cv_grounding`, `backend.llm.cv_native`, `backend.llm.external`, `backend.llm.rules`, `backend.models`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.salary`, `backend.domain.sentence`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.domain.wording`, `backend.incoming`, `backend.llm.answers`, `backend.llm.cv_grounding`, `backend.llm.cv_native`, `backend.llm.external`, `backend.llm.rules`, `backend.models`, `backend.payloads`
 
 - `def _normalize_lang_level(value: object) -> str | None` (25)
 - `def _parse_language_item(item) -> tuple[str, str | None] | None` (13)
@@ -2718,13 +2726,13 @@ First-run bootstrap: ensure DB schema exists.
 - `async def vacancy_addresses(session: AsyncSession, vacancy_id: int) -> list[str]` (4)
 - `async def delete_contact(session: AsyncSession, contact_id: int) -> int | None` (8)
 
-### `backend/repository/vacancy_status.py` — 393 строк ⚠ подошёл к 300
+### `backend/repository/vacancy_status.py` — 387 строк ⚠ подошёл к 300
 
 Смена статуса вакансии: решение, запись, история.
 
-Зависит от: `backend.domain.transitions`, `backend.models`, `backend.payloads`
+Зависит от: `backend.domain.sentence`, `backend.domain.transitions`, `backend.models`, `backend.payloads`
 
-- `def _ensure_trailing_period(s: str | None) -> str | None` (9)
+- `def _ensure_trailing_period(s: str | None) -> str | None` (3)
 - `class _Signature` (13)
 - `def _move_status(vacancy: Vacancy, new_status: VacancyStatus, sign: _Signature) -> VacancyStatusHistory` (34)
 - `async def mark_vacancy_applied(session: AsyncSession, vacancy_id: int, explanation: str | None) -> bool` (12)
@@ -3696,7 +3704,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 322 модулей
+## tests — 323 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
 
@@ -4616,6 +4624,15 @@ Runtime settings layer.
 Зависит от: `backend.domain.scoring`, `tests.factories`
 
 Тестов: 20
+
+
+### `tests/backend/test_domain_sentence.py` — 20 строк
+
+Законченная фраза: точка в конце, если своего знака конца нет.
+
+Зависит от: `backend.domain.sentence`
+
+Тестов: 1
 
 
 ### `tests/backend/test_domain_tenure.py` — 29 строк

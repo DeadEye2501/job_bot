@@ -692,6 +692,10 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `backend/domain/sentence.py`
+
+- `_ENDED_RE` = `re.compile('[.!?…:][»\\"\')\\]]*$')`
+
 ### `backend/domain/skill_names.py`
 
 - `T` = `TypeVar('T')`

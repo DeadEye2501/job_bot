@@ -19,6 +19,20 @@ function sheet(meta) {
   });
 }
 
+describe('поле личных предпочтений', () => {
+  it('растёт не выше десяти строк, а образование — без предела', async () => {
+    // Раскладки в jsdom нет, и высоту не измерить: проверяется, что поле
+    // объявило предел, по которому его подгоняет `fitHeight`.
+    sheet({ name: 'cv.pdf', size: 2048, exists: true });
+
+    const wishes = await vi.waitFor(() => screen.getByPlaceholderText(/Личные предпочтения/));
+    const education = screen.getAllByRole('textbox').find((one) => one !== wishes && one.tagName === 'TEXTAREA');
+
+    expect(wishes.dataset.lines).toBe('10');
+    expect(education.dataset.lines).toBeUndefined();
+  });
+});
+
 describe('файл резюме в анкете', () => {
   it('пропавший с диска не открывается', async () => {
     sheet({ name: 'cv.pdf', size: 2048, exists: false });
