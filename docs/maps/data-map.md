@@ -1464,11 +1464,17 @@
   - `achievements: list[str]`
   - `responsibilities: list[str]`
   - `stack: list[str]`
+- `class ParsedCvProject`
+  - `name: str`
+  - `url: str | None`
+  - `about: list[str]`
+  - `stack: list[str]`
 - `class ParsedCv`
   - `profile: ParsedCvProfile`
   - `languages: list[ParsedCvLanguage]`
   - `skills: list[ParsedCvSkill]`
   - `experience: list[ParsedCvExperience]`
+  - `projects: list[ParsedCvProject]`
 - `class Classification`
   - `status: VacancyStatus`
   - `explanation: str | None`

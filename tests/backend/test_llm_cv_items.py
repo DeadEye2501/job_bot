@@ -1,4 +1,4 @@
-"""Следствия разбора навыков и опыта работы в `backend/llm/cv.py`.
+"""Следствия разбора навыков, опыта работы и проектов в `backend/llm/cv.py`.
 
 Проверяется через `parse_cv`: «модель вернула такой JSON — вышло такое».
 Значения уровней и дат сняты прогоном настоящих функций.
@@ -19,21 +19,25 @@ async def parse_sections(**sections):
     return await parse_cv("резюме", client, "qwen")
 
 
+async def only(section: str, item: dict):
+    """Разобрать раздел с единственным элементом и вернуть то, что из него вышло."""
+    got = getattr(await parse_sections(**{section: [item]}), section)
+    if not got:
+        raise AssertionError(f"элемент не пережил разбор: parsed.{section} пуст")
+    return got[0]
+
+
 async def one_skill(**fields):
-    """Разобрать единственный навык и вернуть его."""
-    parsed = await parse_sections(skills=[{"name": "Python", **fields}])
-    if not parsed.skills:
-        raise AssertionError("навык не пережил разбор: parsed.skills пуст")
-    return parsed.skills[0]
+    return await only("skills", {"name": "Python", **fields})
 
 
 async def one_job(**fields):
-    """Разобрать единственное место работы и вернуть его."""
     base = {"company": "ООО Ромашка", "role": "Разработчик", "start_date": "2020-03-01"}
-    parsed = await parse_sections(experience=[{**base, **fields}])
-    if not parsed.experience:
-        raise AssertionError("место работы не пережило разбор: parsed.experience пуст")
-    return parsed.experience[0]
+    return await only("experience", {**base, **fields})
+
+
+async def one_project(**fields):
+    return await only("projects", {"name": "Бот", **fields})
 
 
 @pytest.mark.parametrize(
@@ -188,6 +192,24 @@ async def test_the_order_of_jobs_is_preserved():
     ])
 
     assert [j.company for j in parsed.experience] == ["Вторая", "Первая"]
+
+
+async def test_a_project_keeps_its_link_points_and_stack():
+    project = await one_project(
+        url="https://example.org/bot", about=["Описание", " Пункт "], stack=["Python"]
+    )
+
+    assert (project.url, project.about, project.stack) == (
+        "https://example.org/bot", ["Описание", "Пункт"], ["Python"]
+    )
+
+
+async def test_a_project_without_a_name_is_dropped():
+    assert (await parse_sections(projects=[{"name": " ", "about": ["Пункт"]}])).projects == []
+
+
+async def test_a_resume_without_projects_has_none():
+    assert (await parse_sections()).projects == []
 
 
 async def test_a_soft_skills_section_never_becomes_skills():

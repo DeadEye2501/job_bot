@@ -9,9 +9,10 @@ from backend.payloads import (
     ParsedCv,
     ParsedCvExperience,
     ParsedCvProfile,
+    ParsedCvProject,
     ParsedCvSkill,
 )
-from tests.factories import experience_fields, person_fields, skill_fields
+from tests.factories import experience_fields, person_fields, project_fields, skill_fields
 
 
 def parsed_cv_profile(**overrides) -> ParsedCvProfile:
@@ -56,6 +57,11 @@ def parsed_cv_place(**overrides) -> ParsedCvExperience:
     return ParsedCvExperience(**fields)
 
 
+def parsed_cv_project(**overrides) -> ParsedCvProject:
+    """Разобранный проект — с теми же умолчаниями, что и строка в базе, и стеком."""
+    return ParsedCvProject(**project_fields(**{"stack": [], **overrides}))
+
+
 def parsed_cv(**overrides) -> ParsedCv:
     """Разобранное резюме целиком."""
     fields = {
@@ -63,6 +69,7 @@ def parsed_cv(**overrides) -> ParsedCv:
         "languages": [],
         "skills": [],
         "experience": [],
+        "projects": [],
     }
     fields.update(overrides)
     return ParsedCv(**fields)

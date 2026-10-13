@@ -50,6 +50,7 @@ from backend.payloads import (
     ParsedCvExperience,
     ParsedCvLanguage,
     ParsedCvProfile,
+    ParsedCvProject,
     ParsedCvSkill,
 )
 
@@ -126,6 +127,9 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
       "responsibilities": ["string", ...],
       "stack": ["string", ...]
     }
+  ],
+  "projects": [
+    {"name": "string", "url": "string | null", "about": ["string", ...], "stack": ["string", ...]}
   ]
 }
 
@@ -152,7 +156,7 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 - Уровень тоже берётся только из текста, и переписывается как есть. Назван по шкале — верни по шкале. Назван словом («свободно», «разговорный», «базовый», «fluent», «в совершенстве») — верни ЭТО СЛОВО, а не свою догадку о том, какой шкале оно отвечает. Не назван вовсе — верни level: null.
 
 Семантика skills:
-- Извлекай навыки ИЗ ВСЕГО ТЕКСТА РЕЗЮМЕ, а не только из явного раздела «Профессиональные навыки» / «Skills» / «Технологии». Сканируй также: описания опыта работы, буллеты обязанностей/достижений, строки «Стек:» / «Tech stack:» внутри каждой работы, заголовок резюме (title), раздел «О себе». Если в CV нет отдельного блока скилов — собери список из упоминаний по всему тексту. Если технология встречается ТОЛЬКО в одном месте работы и нигде больше — она всё равно должна попасть в skills.
+- Извлекай навыки ИЗ ВСЕГО ТЕКСТА РЕЗЮМЕ, а не только из явного раздела «Профессиональные навыки» / «Skills» / «Технологии». Сканируй также: описания опыта работы и проектов, буллеты обязанностей/достижений, строки «Стек:» / «Tech stack:» внутри каждой работы и проекта, заголовок резюме (title), раздел «О себе». Если в CV нет отдельного блока скилов — собери список из упоминаний по всему тексту. Если технология встречается ТОЛЬКО в одном месте работы или проекте и нигде больше — она всё равно должна попасть в skills.
 - Дедуплицируй: один и тот же навык / инструмент — ровно одна запись skills. Разные написания одного навыка («Postgres» и «PostgreSQL», «JS» и «JavaScript», «Photoshop» и «Adobe Photoshop» и «PS», «Figma» и «figma.com») — это ОДНА запись: каноническое имя в name, остальные написания — в aliases. Не создавай две записи для одного и того же.
 - Каждый отдельный навык — отдельная запись JSON-массива. Если в исходной строке навыки перечислены через "|" / "," / "/" — раздели их на отдельные элементы.
 - category: бери из заголовка списка в резюме ("Python", "Базы данных", "DevOps", "Дизайн", "Маркетинг", "Финансы", "Кулинария" и т.п.). Если категории нет — "Общее". Заголовок пиши тот, что стоит в резюме, — по нему видно, откуда навык взят.
@@ -183,11 +187,18 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
   Каждый буллет — отдельная строка массива. Срезай ведущие "- ", "• ", "* ". Не дублируй и не объединяй буллеты.
 - stack: массив конкретных навыков, инструментов или программ из секции "Стек" / "Tech stack" / "Технологии" / "Инструменты" / "Tools" этого опыта. Раздели по "|" / "," / "/". Без описаний. Нет у этой работы такой секции — верни []: не собирай стек пересказом обязанностей («электрические сети», «монтажные работы» — это работа, а не инструмент) и не переноси сюда общий список навыков кандидата из раздела «Профессиональные навыки». Пустой stack — нормальный ответ, у нетехнических работ его не бывает вовсе. НЕ клади сюда категории/рубрики («Базы данных», «DevOps», «Языки программирования», «Frontend», «Дизайн-инструменты», «Маркетинговые инструменты», «Финансовые инструменты») — даже если в CV они там перечислены как заголовки.
 
+Семантика projects:
+- Проект — запись того же рода, что место работы, только без должности и дат: то, что человек сделал сам, помимо мест работы.
+- Проектом считается ТОЛЬКО то, что резюме само так называет: раздел или пометка вроде «Проекты», «Пет-проекты», «Портфолио», «Pet projects», «Side projects», «Open source». Раздел узнаётся по смыслу заголовка, на любом языке и в любом написании.
+- name и url — как company и company_url у места работы: название дословно из CV, ссылка рядом с ним или null.
+- about: короткое описание проекта, если резюме его даёт (строка под названием, подзаголовок), — ПЕРВЫМ пунктом; всё остальное о проекте — следующими, каждый буллет отдельной строкой.
+- stack и границы записи — по тем же правилам, что у experience: проекту принадлежит то, что напечатано от его названия до названия следующей записи.
+
 Общие правила:
 - Бери только то, что есть в тексте. Не выдумывай.
 - Имена собственные (company, role, first_name, last_name) — только дословно копируй из CV. Не заменяй их на синонимы, описания или «более понятные» варианты, даже если оригинал кажется заглушкой или слишком общим словом.
 - Если поля profile нет в CV — null (но first_name, last_name, title и email обязательны).
-- languages, skills и experience могут быть пустыми массивами, если в CV их нет.
+- languages, skills, experience и projects могут быть пустыми массивами, если в CV их нет.
 - """ + ONLY_JSON
 
 
@@ -246,13 +257,8 @@ def _parse_languages(raw: object) -> list[ParsedCvLanguage]:
     человеком. Высшим, а не низшим, потому что уровня не называет тот, кто в
     языке уверен, — неуверенный как раз уточняет.
     """
-    if not isinstance(raw, list):
-        return []
     best: dict[str, tuple[str, str | None]] = {}
-    for row in (_parse_language_item(it) for it in raw):
-        if row is None:
-            continue
-        language, level = row
+    for language, level in _parsed_items(raw, _parse_language_item):
         known = best.get(language.casefold())
         if known is not None and known[1] is not None:
             continue
@@ -396,6 +402,28 @@ def _parse_experience(item) -> ParsedCvExperience | None:
     )
 
 
+def _parse_project(item) -> ParsedCvProject | None:
+    """Проект из ответа модели; без названия — пусто."""
+    if not isinstance(item, dict):
+        return None
+    name = str_or_none(item.get("name"))
+    if not name:
+        return None
+    return ParsedCvProject(
+        name=name,
+        url=str_or_none(item.get("url")),
+        about=str_list(item.get("about")),
+        stack=str_list(item.get("stack")),
+    )
+
+
+def _parsed_items(raw: object, parse) -> list:
+    """Перечень из ответа модели: каждый элемент разобран, негодные отброшены;
+    не перечень вовсе — пусто."""
+    items = raw if isinstance(raw, list) else []
+    return [one for one in (parse(item) for item in items) if one is not None]
+
+
 def _parse_cv_json(answer: str) -> ParsedCv | None:
     """Разобранное резюме из ответа модели; пусто — разбирать нечего.
 
@@ -410,21 +438,12 @@ def _parse_cv_json(answer: str) -> ParsedCv | None:
     if profile is None:
         return None
 
-    languages = _parse_languages(data.get("languages"))
-
-    raw_skills = data.get("skills") if isinstance(data.get("skills"), list) else []
-    skills = [s for s in (_parse_skill(it) for it in raw_skills) if s is not None]
-
-    raw_exp = data.get("experience") if isinstance(data.get("experience"), list) else []
-    experience = [
-        e for e in (_parse_experience(it) for it in raw_exp) if e is not None
-    ]
-
     return ParsedCv(
         profile=profile,
-        languages=languages,
-        skills=skills,
-        experience=experience,
+        languages=_parse_languages(data.get("languages")),
+        skills=_parsed_items(data.get("skills"), _parse_skill),
+        experience=_parsed_items(data.get("experience"), _parse_experience),
+        projects=_parsed_items(data.get("projects"), _parse_project),
     )
 
 

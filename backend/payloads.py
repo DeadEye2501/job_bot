@@ -213,11 +213,20 @@ class ParsedCvExperience:
 
 
 @dataclass(frozen=True)
+class ParsedCvProject:
+    name: str
+    url: str | None
+    about: list[str]
+    stack: list[str]
+
+
+@dataclass(frozen=True)
 class ParsedCv:
     profile: ParsedCvProfile
     languages: list[ParsedCvLanguage]
     skills: list[ParsedCvSkill]
     experience: list[ParsedCvExperience]
+    projects: list[ParsedCvProject]
 
 
 @dataclass(frozen=True)

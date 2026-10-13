@@ -34,6 +34,7 @@ from tests.factories_cv import (
     parsed_cv,
     parsed_cv_place,
     parsed_cv_profile,
+    parsed_cv_project,
     parsed_cv_skill,
 )
 
@@ -164,6 +165,22 @@ async def test_a_place_is_linked_to_the_skills_it_names(session):
 
     places = await list_experience(session)
     assert sorted(s.name for s in places[0].skills) == ["PostgreSQL", "Python"]
+
+
+async def test_projects_are_written_in_order_with_their_stack(session):
+    await save_parsed_cv(session, parsed_cv(
+        skills=[parsed_cv_skill("Python")],
+        projects=[
+            parsed_cv_project(name="Бот", about=["Описание"], stack=["python"]),
+            parsed_cv_project(name="Сайт"),
+        ],
+    ))
+
+    first, second = await list_projects(session)
+    assert (first.name, first.about, [s.name for s in first.skills]) == (
+        "Бот", ["Описание"], ["Python"]
+    )
+    assert second.name == "Сайт"
 
 
 async def test_a_skill_named_twice_in_a_stack_is_linked_once(session):

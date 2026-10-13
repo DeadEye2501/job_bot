@@ -252,46 +252,64 @@ def _company_at(lowered: str, company: str, cursor: int) -> int:
     return lowered.find(company.lower(), cursor)
 
 
-def _job_blocks(text: str, companies: list[str]) -> list[str | None]:
-    """Кусок текста на каждую работу: от её названия до названия следующей.
-
-    Пусто — названия в тексте не нашлось: модель его переиначила, и проверять
-    такую работу нечем.
+def _starts(lowered: str, names: list[str], taken: set[int]) -> list[int]:
+    """Где начинается каждая запись перечня; -1 — названия в тексте нет.
 
     Названия ищутся подряд, каждое следующее — за предыдущим. Первое вхождение
     не годится: о работодателе поминают и в шапке «о себе», и кусок работы
     съёжился бы до этого упоминания, отняв у неё настоящий стек. Тем же
     порядком разводятся две работы в одной компании.
 
+    Шапка, уже отданная записи другого перечня, пропускается: одна шапка — одна
+    запись, и проект, названный как работодатель, не отнимает его кусок.
+    """
+    starts: list[int] = []
+    cursor = 0
+    for name in names:
+        start = _company_at(lowered, name, cursor)
+        while start in taken:
+            start = _company_at(lowered, name, start + len(name))
+        starts.append(start)
+        if start >= 0:
+            taken.add(start)
+            cursor = start + len(name)
+    return starts
+
+
+def _job_blocks(text: str, groups: list[list[str]]) -> list[str | None]:
+    """Кусок текста на каждую запись перечней по порядку: от её названия до
+    начала ближайшей следующей записи любого перечня.
+
+    Пусто — названия в тексте не нашлось: модель его переиначила, и проверять
+    такую запись нечем.
+
+    Перечни — места работы и проекты — ищутся каждый своим проходом: разделы в
+    резюме стоят в любом порядке, и общий проход, ушедший за последнюю работу,
+    не нашёл бы проектов, стоящих выше опыта.
+
     Кусок начинается сразу ЗА названием: оставь название внутри, и компания,
     назвавшаяся «Технологии Доверия», сама себе разрешила бы стек.
 
-    Последнему куску достаётся весь хвост резюме с разделами, к работе не
-    относящимися. Раздел, названный «Технологии:», такая работа зачтёт себе —
+    Последнему куску достаётся весь хвост резюме с разделами, к записи не
+    относящимися. Раздел, названный «Технологии:», такая запись зачтёт себе —
     щель известная и неприкрытая.
     """
     lowered = text.lower()
-    starts: list[int] = []
-    cursor = 0
-    for company in companies:
-        start = _company_at(lowered, company, cursor)
-        starts.append(start)
-        if start >= 0:
-            cursor = start + len(company)
-
+    taken: set[int] = set()
+    starts = [start for names in groups for start in _starts(lowered, names, taken)]
+    found = [start for start in starts if start >= 0]
     blocks: list[str | None] = []
-    for number, start in enumerate(starts):
-        if start < 0:
-            blocks.append(None)
-            continue
-        opens = start + len(companies[number])
-        later = [spot for spot in starts[number + 1:] if spot > start]
-        blocks.append(lowered[opens: min(later) if later else len(lowered)])
+    for name, start in zip([name for names in groups for name in names], starts):
+        later = [spot for spot in found if spot > start]
+        blocks.append(
+            None if start < 0
+            else lowered[start + len(name): min(later) if later else len(lowered)]
+        )
     return blocks
 
 
 def _grounded_stack(place, block: str | None) -> list[str]:
-    """Стек работы, если резюме объявляет его заголовком; иначе пусто.
+    """Стек записи — работы или проекта, — если резюме объявляет его заголовком; иначе пусто.
 
     Названия в стеке настоящие — выдумано их место: модель читает «Корректировки
     в 1С» в обязанностях и кладёт 1С в стек, а то и переносит туда весь общий
@@ -318,13 +336,22 @@ def _grounded_languages(text: str, languages: list) -> list:
     ]
 
 
-def _grounded_experience(text: str, experience: list) -> list:
-    """Места работы со стеком, объявленным заголовком в их же куске текста."""
-    blocks = _job_blocks(text, [place.company for place in experience])
-    return [
-        replace(place, stack=_grounded_stack(place, block))
-        for place, block in zip(experience, blocks)
+def _grounded_records(text: str, parsed: ParsedCv) -> tuple[list, list]:
+    """Места работы и проекты со стеком, объявленным заголовком в их же куске.
+
+    Куски режутся по всем записям сразу: проекты в резюме идут своим разделом,
+    и без их названий последняя работа забрала бы себе стек проекта.
+    """
+    groups = [
+        [place.company for place in parsed.experience],
+        [project.name for project in parsed.projects],
     ]
+    records = [*parsed.experience, *parsed.projects]
+    grounded = [
+        replace(record, stack=_grounded_stack(record, block))
+        for record, block in zip(records, _job_blocks(text, groups))
+    ]
+    return grounded[: len(parsed.experience)], grounded[len(parsed.experience):]
 
 
 def _say_dropped(what: str, was, left) -> None:
@@ -352,9 +379,11 @@ def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv:
         [lang.language for lang in languages],
     )
 
+    experience, projects = _grounded_records(text, parsed)
     return replace(
         parsed,
         profile=replace(parsed.profile, grades=grades, work_format=formats),
         languages=languages,
-        experience=_grounded_experience(text, parsed.experience),
+        experience=experience,
+        projects=projects,
     )

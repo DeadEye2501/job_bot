@@ -1677,7 +1677,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (23)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
-### `backend/llm/cv.py` — 466 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 485 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
@@ -1685,15 +1685,17 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def _normalize_lang_level(value: object) -> str | None` (25)
 - `def _parse_language_item(item) -> tuple[str, str | None] | None` (13)
-- `def _parse_languages(raw: object) -> list[ParsedCvLanguage]` (28)
+- `def _parse_languages(raw: object) -> list[ParsedCvLanguage]` (23)
 - `def _parse_date(value) -> date | None` (21)
 - `def _parse_profile(data: dict) -> ParsedCvProfile | None` (27)
 - `def _parse_skill(item) -> ParsedCvSkill | None` (35)
 - `def _parse_experience(item) -> ParsedCvExperience | None` (18)
-- `def _parse_cv_json(answer: str) -> ParsedCv | None` (30)
+- `def _parse_project(item) -> ParsedCvProject | None` (13)
+- `def _parsed_items(raw: object, parse) -> list` (5)
+- `def _parse_cv_json(answer: str) -> ParsedCv | None` (21)
 - `async def parse_cv(text: str, client: httpx.AsyncClient, model: str) -> ParsedCv | None` (36)
 
-### `backend/llm/cv_grounding.py` — 360 строк ⚠ подошёл к 300
+### `backend/llm/cv_grounding.py` — 389 строк ⚠ подошёл к 300
 
 Что в разобранном резюме не подтверждается его же текстом.
 
@@ -1709,12 +1711,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def _level_read_near(windows: list[str]) -> str | None` (16)
 - `def _grounded_level(windows: list[str], level: str) -> str` (24)
 - `def _company_at(lowered: str, company: str, cursor: int) -> int` (19)
-- `def _job_blocks(text: str, companies: list[str]) -> list[str | None]` (36)
+- `def _starts(lowered: str, names: list[str], taken: set[int]) -> list[int]` (22)
+- `def _job_blocks(text: str, groups: list[list[str]]) -> list[str | None]` (30)
 - `def _grounded_stack(place, block: str | None) -> list[str]` (11)
 - `def _grounded_languages(text: str, languages: list) -> list` (13)
-- `def _grounded_experience(text: str, experience: list) -> list` (7)
+- `def _grounded_records(text: str, parsed: ParsedCv) -> tuple[list, list]` (16)
 - `def _say_dropped(what: str, was, left) -> None` (3)
-- `def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv` (26)
+- `def grounded_in_cv(parsed: ParsedCv, text: str) -> ParsedCv` (28)
 
 ### `backend/llm/cv_native.py` — 73 строк
 
@@ -2037,7 +2040,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 447 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 456 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -2051,7 +2054,8 @@ First-run bootstrap: ensure DB schema exists.
 - `class ParsedCvLanguage` (3)
 - `class ParsedCvSkill` (5)
 - `class ParsedCvExperience` (9)
-- `class ParsedCv` (5)
+- `class ParsedCvProject` (5)
+- `class ParsedCv` (6)
 - `class Classification` (3)
 - `class ParsedVacancy` (38)
   - `def stack(self) -> list[str]` (11)
@@ -2410,7 +2414,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _experience_lines(experiences: list) -> list[str]` (11)
 - `async def build_profile_block(session: AsyncSession) -> str` (28)
 
-### `backend/repository/profile_cv.py` — 183 строк
+### `backend/repository/profile_cv.py` — 177 строк
 
 Запись анкеты, разобранной моделью из резюме.
 
@@ -2418,11 +2422,11 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def _wipe_profile(session: AsyncSession) -> None` (12)
 - `async def _add_parsed_skills(session: AsyncSession, profile_id: int, skills) -> dict[str, ProfileSkill]` (21)
-- `async def _add_parsed_experience(session: AsyncSession, profile_id: int, experience, skill_lookup: dict[str, ProfileSkill]) -> None` (27)
+- `def _parsed_records(model, records, profile_id: int, skill_lookup: dict[str, ProfileSkill]) -> list` (20)
 - `async def _answers_to_keep(session: AsyncSession) -> dict` (5)
 - `def _answers(p, kept: dict) -> dict` (11)
 - `def _new_profile(p, kept: dict) -> Profile` (21)
-- `async def save_parsed_cv(session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None=None) -> None` (40)
+- `async def save_parsed_cv(session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None=None) -> None` (39)
 
 ### `backend/repository/profile_experience.py` — 71 строк
 
@@ -5111,26 +5115,28 @@ Runtime settings layer.
 Тестов: 27
 
 
-### `tests/backend/test_llm_cv_grounding_stack.py` — 196 строк
+### `tests/backend/test_llm_cv_grounding_stack.py` — 247 строк
 
-Что в разобранном опыте работы не подтверждается текстом резюме.
+Что в разобранных местах работы и проектах не подтверждается текстом резюме.
 
 Зависит от: `backend.llm.cv_grounding`, `tests.factories_cv`
 
-Тестов: 9
+Тестов: 12
 
 
-### `tests/backend/test_llm_cv_items.py` — 221 строк
+### `tests/backend/test_llm_cv_items.py` — 243 строк
 
-Следствия разбора навыков и опыта работы в `backend/llm/cv.py`.
+Следствия разбора навыков, опыта работы и проектов в `backend/llm/cv.py`.
 
 Зависит от: `backend.llm.cv`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 22
+Тестов: 25
 
 - `async def parse_sections(**sections)` (4)
-- `async def one_skill(**fields)` (6)
-- `async def one_job(**fields)` (7)
+- `async def only(section: str, item: dict)` (6)
+- `async def one_skill(**fields)` (2)
+- `async def one_job(**fields)` (3)
+- `async def one_project(**fields)` (2)
 
 ### `tests/backend/test_llm_cv_native.py` — 119 строк
 
@@ -5820,13 +5826,13 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/backend/test_repository_profile_cv_saving.py` — 320 строк ⚠ подошёл к 300
+### `tests/backend/test_repository_profile_cv_saving.py` — 337 строк ⚠ подошёл к 300
 
 Следствия записи разобранного резюме в профиль.
 
 Зависит от: `backend.models`, `backend.payloads`, `backend.repository.profile`, `backend.repository.profile_cv`, `backend.repository.profile_experience`, `backend.repository.profile_projects`, `backend.repository.profile_skills`, `tests.dbio`, `tests.factories`, `tests.factories_cv`
 
-Тестов: 15
+Тестов: 16
 
 
 ### `tests/backend/test_repository_profile_experience.py` — 283 строк
@@ -6834,7 +6840,7 @@ Runtime settings layer.
 - `def mail_account_row() -> MailAccount` (4)
 - `def world_of(**overrides) -> World` (6)
 
-### `tests/factories_cv.py` — 68 строк
+### `tests/factories_cv.py` — 75 строк
 
 Разобранное резюме — то, что разбор отдаёт записи анкеты и сверке с текстом.
 
@@ -6843,7 +6849,8 @@ Runtime settings layer.
 - `def parsed_cv_profile(**overrides) -> ParsedCvProfile` (24)
 - `def parsed_cv_skill(name: str, **overrides) -> ParsedCvSkill` (3)
 - `def parsed_cv_place(**overrides) -> ParsedCvExperience` (9)
-- `def parsed_cv(**overrides) -> ParsedCv` (10)
+- `def parsed_cv_project(**overrides) -> ParsedCvProject` (3)
+- `def parsed_cv(**overrides) -> ParsedCv` (11)
 
 ### `tests/fakes/agent.py` — 108 строк
 

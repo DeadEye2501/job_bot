@@ -1,6 +1,7 @@
 """Запись анкеты, разобранной моделью из резюме."""
 
 import logging
+from dataclasses import asdict
 
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,7 @@ from backend.models import (
     Profile,
     ProfileExperience,
     ProfileLanguage,
+    ProfileProject,
     ProfileSkill,
 )
 from backend.payloads import ParsedCv
@@ -60,33 +62,26 @@ async def _add_parsed_skills(
     return lookup
 
 
-async def _add_parsed_experience(
-    session: AsyncSession, profile_id: int, experience,
-    skill_lookup: dict[str, ProfileSkill],
-) -> None:
-    """Записать места работы из резюме, связав их стек с навыками анкеты.
+def _parsed_records(model, records, profile_id: int, skill_lookup: dict[str, ProfileSkill]) -> list:
+    """Строки мест работы или проектов из резюме, со стеком, связанным с навыками анкеты.
 
-    Технология, которой в анкете не нашлось, пропадает из связок с жалобой в
-    журнал: молча потерянная связь выглядела бы как отсутствие опыта.
+    Поля разобранной записи без стека — ровно колонки её модели. Технология,
+    которой в анкете не нашлось, пропадает из связок с жалобой в журнал: молча
+    потерянная связь выглядела бы как отсутствие опыта.
     """
-    for e in experience:
-        exp = ProfileExperience(
-            profile_id=profile_id,
-            company=e.company,
-            company_url=e.company_url,
-            role=e.role,
-            start_date=e.start_date,
-            end_date=e.end_date,
-            achievements=list(e.achievements),
-            responsibilities=list(e.responsibilities),
-        )
-        for tech in link_stack(exp, e.stack, skill_lookup):
+    rows = []
+    for record in records:
+        fields = asdict(record)
+        stack = fields.pop("stack")
+        row = model(profile_id=profile_id, **fields)
+        for tech in link_stack(row, stack, skill_lookup):
+            # Первое поле разобранной записи — её название: компания или проект.
             logger.warning(
-                "save_parsed_cv: experience %r stack item %r not matched to any ProfileSkill",
-                e.company, tech,
+                "save_parsed_cv: %s %r stack item %r not matched to any ProfileSkill",
+                model.__tablename__, next(iter(fields.values())), tech,
             )
-        session.add(exp)
-    await session.flush()
+        rows.append(row)
+    return rows
 
 
 _SALARY = ("expected_salary", "expected_salary_currency", "expected_salary_period")
@@ -144,12 +139,11 @@ def _new_profile(p, kept: dict) -> Profile:
 async def save_parsed_cv(
     session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None = None
 ) -> None:
-    """Replace the single Profile (and its skills/experience) with parsed data.
+    """Заменить анкету — с навыками, местами работы и проектами — разобранной.
 
-    A given ``cv_path`` is upserted in the same transaction: a crash between
-    two writes would leave a parsed profile with no recorded source file.
-    Ответы для форм переносятся в новую строку, если файл их не дал.
-    Caller must wrap in ``session.begin()``.
+    Путь к резюме пишется той же сделкой: сбой между двумя записями оставил бы
+    разобранную анкету без записанного источника. Ответы для форм переносятся
+    в новую строку, если файл их не дал. Сделку держит зовущий.
     """
     kept = await _answers_to_keep(session)
     await _wipe_profile(session)
@@ -167,17 +161,17 @@ async def save_parsed_cv(
         [(lang.language, lang.level) for lang in parsed.languages],
     )
     skill_lookup = await _add_parsed_skills(session, profile.id, parsed.skills)
-    await _add_parsed_experience(
-        session, profile.id, parsed.experience, skill_lookup
-    )
+    session.add_all([
+        *_parsed_records(ProfileExperience, parsed.experience, profile.id, skill_lookup),
+        *_parsed_records(ProfileProject, parsed.projects, profile.id, skill_lookup),
+    ])
+    await session.flush()
     if cv_path is not None:
         await put_app_setting(session, CV_PATH_KEY, cv_path)
         await session.flush()
 
     logger.info(
-        "Profile replaced: languages=%d skills=%d experiences=%d cv_path=%s",
-        len(parsed.languages),
-        len(parsed.skills),
-        len(parsed.experience),
-        cv_path,
+        "Profile replaced: languages=%d skills=%d experiences=%d projects=%d cv_path=%s",
+        len(parsed.languages), len(parsed.skills), len(parsed.experience),
+        len(parsed.projects), cv_path,
     )
