@@ -8,7 +8,7 @@ from pyrogram.errors import FloodWait, UsernameInvalid, UsernameNotOccupied
 
 from backend.bot import work
 from backend.flows import channels as flow_channels
-from backend.telegram_lookup import read_channel_metadata
+from backend.telegram_lookup import read_channel_metadata, say_flood_wait
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
 from backend.repository.channels import (
     create_channel,
@@ -67,12 +67,7 @@ async def _ask_telegram_about(bot, username: str):
         logger.info("add_channel: Telegram не знает канала @%s", username)
         return None, "invalid"
     except FloodWait as e:
-        # Словом, а не трассировкой: это не поломка, а просьба подождать —
-        # так же, как у поиска собеседника (`telegram_lookup._quietly`).
-        # Срок Telegram называет не всегда, поэтому он идёт строкой.
-        logger.warning(
-            "add_channel: FloodWait %s на @%s", getattr(e, "value", "?"), username
-        )
+        say_flood_wait(logger, f"add_channel @{username}", e)
         return None, "error"
     except Exception:
         logger.exception("add_channel: get_chat(%s) failed", username)

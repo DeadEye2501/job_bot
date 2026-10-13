@@ -55,7 +55,9 @@ async def test_a_closed_server_leaves_no_task_behind():
 
 
 async def test_a_hanging_call_does_not_hold_the_close():
-    """Вызов, ждущий человека, держал бы остановку до часа."""
+    """Вызов, ждущий человека, не держит остановку: сессия к закрытию сервера
+    уже кончилась, и ждать её вызов незачем — окно ждёт остановки бота
+    считанные секунды."""
     started = asyncio.Event()
 
     async def _wait() -> str:
@@ -78,6 +80,6 @@ async def test_a_hanging_call_does_not_hold_the_close():
 
     await asyncio.wait_for(server.close(), 10)
 
-    assert time.monotonic() - began < 8
+    assert time.monotonic() - began < 2
     caller.cancel()
     await asyncio.gather(caller, return_exceptions=True)

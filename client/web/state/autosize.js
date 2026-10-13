@@ -45,7 +45,7 @@ function mostHeight(field) {
 }
 
 /** Держать высоту поля подогнанной, пока поле живёт: при заведении, на каждый
- *  набор и на смену текста снаружи.
+ *  набор и на смену текста снаружи — пока человек не растянул поле сам.
  *
  * Распорядителем, а не парой строк у каждого поля: так растянуты и пункты
  * записей анкеты, и пояснение в ленте вакансии. Второй такой же был бы копией —
@@ -62,14 +62,13 @@ function mostHeight(field) {
 export function growing(field) {
   // Высота, поставленная подгоном. Другая в поле — значит, его тянул человек,
   // и размер его главнее: до нового заведения поля подгон молчит.
-  let ours = '';
+  let ours = field.style.height;
   const fit = () => {
     if (field.style.height !== ours) return;
     fitHeight(field);
     ours = field.style.height;
   };
-  fitHeight(field);
-  ours = field.style.height;
+  fit();
   field.addEventListener('input', fit);
   return {
     update: () => painted().then(fit),

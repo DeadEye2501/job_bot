@@ -219,8 +219,10 @@ async def read_with_a_second_try(
             return None, reply.error
         parsed = read(reply.text)
     if parsed is None:
-        _say_unread(reply.text, told, empty_means)
-        return None, truncation_trouble(reply.finish_reason)
+        trouble = truncation_trouble(reply.finish_reason)
+        # Оборванный ответ — обрыв, а не решение модели: смысла пустому он не даёт.
+        _say_unread(reply.text, told, None if trouble else empty_means)
+        return None, trouble
     return parsed, None
 
 
@@ -231,7 +233,7 @@ def _say_unread(answer: str, told: tuple[logging.Logger, str], empty_means: str 
     `False` и ноль значением считаются. Законен он только там, где зовущий
     сказал, что он значит (разбор поста: «не вакансия»): там жалоба «не
     разобрался» прятала бы настоящие поломки разбора. У остальных пустой
-    ответ — поломка, и жалоба прежняя.
+    ответ — поломка, и о нём жалуются, как о любом неразобранном.
     """
     log, purpose = told
     data = json_object(answer, log, purpose) if empty_means else None

@@ -13,6 +13,7 @@ from backend.models import Message
 from backend.repository.hr_list import list_hrs_for_backfill
 from backend.repository.messages import newest_tg_message_id, tombstone_messages
 from backend.notify import fire
+from backend.telegram_lookup import say_flood_wait
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +45,7 @@ async def _fetch_history(client, hr, limit: int) -> list | None:
     """Хвост переписки, свежими вперёд; `None` — прочитать не удалось.
 
     Пустой список этим не считается: он значит «переписки нет», и зовущий идёт
-    дальше. Неизвестный собеседник чинится здесь же, одной попыткой: номера
-    нет в кэше, и `get_users` зовётся ради побочного действия — он кладёт
-    собеседника туда, оттого второе чтение и проходит.
+    дальше. Неизвестного собеседника разыскивает `_read_or_find`.
 
     Просьбу «слишком часто» не пережидают вовсе. Короткие Pyrogram переживает
     сам (`sleep_threshold`), значит сюда доходят только долгие — минуты и
@@ -64,16 +63,18 @@ async def _fetch_history(client, hr, limit: int) -> list | None:
     try:
         return await _read_or_find(client, hr, target, limit)
     except FloodWait as e:
-        logger.warning(
-            "backfill: FloodWait %ss на hr %d — пропускаю до следующего раза",
-            getattr(e, "value", "?"), hr.id,
-        )
+        say_flood_wait(logger, f"backfill: hr {hr.id}", e)
         return None
 
 
 async def _read_or_find(client, hr, target, limit: int) -> list | None:
     """Прочитать переписку; неизвестного собеседника — разыскать по нику и
-    прочитать снова. Просьба Telegram подождать уходит зовущему."""
+    прочитать снова. Просьба Telegram подождать уходит зовущему.
+
+    Неизвестен он, когда номера нет в кэше пиров: `get_users` зовётся ради
+    побочного действия — кладёт собеседника туда, оттого второе чтение и
+    проходит.
+    """
     from pyrogram.errors import FloodWait, PeerIdInvalid
 
     async def read(peer) -> list:
