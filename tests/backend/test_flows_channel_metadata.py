@@ -110,6 +110,24 @@ async def test_a_channel_telegram_does_not_know_does_not_stop_the_sweep(
     assert titles == {"broken": "Было", "jobs": "Стало"}
 
 
+async def test_a_channel_that_no_longer_exists_is_one_line_not_a_traceback(
+    make_pipeline, session_factory, caplog
+):
+    """Канал, которого нет, — не поломка: одна строка, без трассировки.
+
+    Сводка идёт и по выключенным каналам, а такой канал после обхода и стоит
+    выключенным: трассировка на него каждый круг прятала бы настоящие ошибки.
+    """
+    saved = await _channels(session_factory, channel_row(username="gone"))
+    pipeline = await make_pipeline(FakeTelegramClient())
+
+    with caplog.at_level(logging.INFO):
+        await channels.refresh_channel_metadata(pipeline, saved)
+
+    assert "Traceback" not in caplog.text
+    assert "@gone" in caplog.text
+
+
 async def test_a_failed_request_does_not_stop_the_sweep(
     make_pipeline, session_factory
 ):
