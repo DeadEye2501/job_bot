@@ -1257,7 +1257,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def report_failures(hr_ids: list[int], results: list, what: str, log: logging.Logger) -> None` (25)
 
-### `backend/flows/channels.py` — 384 строк ⚠ подошёл к 300
+### `backend/flows/channels.py` — 379 строк ⚠ подошёл к 300
 
 Обход телеграм-каналов за свежими постами.
 
@@ -1271,7 +1271,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _store_metadata(pipeline, title_updates: dict[int, str], avatar_updates: dict[int, bytes]) -> None` (19)
 - `async def _collect_metadata(pipeline, channels) -> tuple[dict, dict]` (34)
 - `async def refresh_channel_metadata(pipeline, channels) -> None` (27)
-- `async def _unseen_posts(pipeline, channel_username: str, last_id: int | None)` (28)
+- `async def _unseen_posts(pipeline, channel_username: str, last_id: int | None)` (23)
 - `async def _take_post(pipeline, channel_id: int, channel_username: str, msg) -> bool` (19)
 - `def _silence_broke_the_walk(channel_username: str, msg_id: int, silence: int) -> bool` (19)
 - `async def poll_channel(pipeline, channel_id: int, channel_username: str, last_id: int | None) -> bool` (42)
@@ -4763,7 +4763,7 @@ Runtime settings layer.
 
 - `async def _channels(session_factory, *rows)` (4)
 
-### `tests/backend/test_flows_channel_reading.py` — 330 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_channel_reading.py` — 332 строк ⚠ подошёл к 300
 
 Следствия чтения новых сообщений одного канала.
 
