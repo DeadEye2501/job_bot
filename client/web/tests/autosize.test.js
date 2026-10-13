@@ -28,6 +28,9 @@ function field(fits) {
       set height(value) {
         trail.push(value);
       },
+      get height() {
+        return trail.at(-1);
+      },
     },
     get scrollHeight() {
       return trail.at(-1) === 'auto' ? fits : 999;
@@ -125,11 +128,25 @@ describe('поле, растущее пока живёт', () => {
   it('подгоняет её на каждый набор', () => {
     const one = field(64);
     growing(one);
-    one.trail.length = 0;
+    const before = one.trail.length;
 
     one.heard.get('input')();
 
-    expect(one.trail).toEqual(['auto', '64px']);
+    expect(one.trail.slice(before)).toEqual(['auto', '64px']);
+  });
+
+  it('растянутое рукой больше не подгоняет — ни на набор, ни на смену текста', async () => {
+    // Человек растянул поле, чтобы видеть больше, и печатает дальше: прыжок
+    // обратно отнял бы то, ради чего он тянул. Заново поле подгонится, когда
+    // его заведут снова — при новом входе на вкладку.
+    const one = field(64);
+    const grown = growing(one);
+    one.style.height = '300px';
+
+    one.heard.get('input')();
+    await grown.update();
+
+    expect(one.trail.at(-1)).toBe('300px');
   });
 
   it('уходя, снимает за собой слушателя', () => {

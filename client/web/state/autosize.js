@@ -60,8 +60,16 @@ function mostHeight(field) {
  * прежнего жильца ячейки.
  */
 export function growing(field) {
-  const fit = () => fitHeight(field);
-  fit();
+  // Высота, поставленная подгоном. Другая в поле — значит, его тянул человек,
+  // и размер его главнее: до нового заведения поля подгон молчит.
+  let ours = '';
+  const fit = () => {
+    if (field.style.height !== ours) return;
+    fitHeight(field);
+    ours = field.style.height;
+  };
+  fitHeight(field);
+  ours = field.style.height;
   field.addEventListener('input', fit);
   return {
     update: () => painted().then(fit),
