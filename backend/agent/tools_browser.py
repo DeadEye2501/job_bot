@@ -3,8 +3,10 @@
 import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import NamedTuple
 
 from backend.agent.confirm import is_checked
+from backend.agent.jobs import ApplyJob, Dropped
 from backend.agent.kit import AgentKit
 
 logger = logging.getLogger(__name__)
@@ -18,14 +20,13 @@ class _Refused(Exception):
     """Ввод, которого человек не подтверждал: на страницу он не попадает."""
 
 
-def browser_tools(kit: AgentKit, resume: Path | None,
-                  confirmed: dict[tuple[str, str], dict] | None = None) -> list[Callable]:
+def browser_tools(kit: AgentKit, resume: Path | None, confirming: ApplyJob | None = None) -> list[Callable]:
     """Инструменты над вкладкой агента. Ответ действия — «готово; адрес: …» или «не вышло: …».
 
-    `confirmed` — подтверждённые человеком поля по ключу «адрес страницы,
-    селектор»; есть он — ввод, выбор и галочки делают только подтверждённое.
+    `confirming` — отклик под подтверждением: ввод, выбор и нажатия делают
+    только подтверждённое человеком, а после «Закончить» — ничего.
     """
-    fill, select, click = _plain() if confirmed is None else _strict(confirmed)
+    fill, select, click = _plain() if confirming is None else _strict(confirming)
 
     async def browser_open(url: str) -> str:
         """Открыть адрес во вкладке."""
@@ -93,42 +94,115 @@ def _plain() -> tuple[Callable, Callable, Callable]:
     return fill, select, click
 
 
-def _strict(confirmed: dict[tuple[str, str], dict]) -> tuple[Callable, Callable, Callable]:
+def _strict(job: ApplyJob) -> tuple[Callable, Callable, Callable]:
     """Ввод, выбор и нажатие под подтверждением человека.
 
     Текст — только подтверждённый и только в своё поле. Вариант списка выбирает
     агент, ближайший к подтверждённому тексту, но поле должно быть подтверждено.
     Нажатие на подтверждённую галочку ставит подтверждённую отметку, а не
     переключает её: повторное нажатие отметку не снимет. Нажатия не по полям —
-    резюме, «Отправить», переходы — как есть.
+    резюме, «Отправить», переходы — как есть, пока человек не закончил: после
+    «Закончить» не проходит ничего, и «Отправить» держит код, а не наставление.
     """
     plain_fill, plain_select, plain_click = _plain()
 
-    def field(page, selector) -> dict:
-        item = confirmed.get((page.url, selector))
-        if item is None:
-            raise _Refused("поле не подтверждено человеком на этой странице — "
-                           "сначала need_human с kind=confirm")
-        return item
-
     async def fill(page, selector, text):
-        item = field(page, selector)
+        item = _confirmed_field(job, page, selector)
         if text != item["value"]:
             raise _Refused(f"вписать можно только подтверждённое: «{item['value']}»")
         await plain_fill(page, selector, text)
 
     async def select(page, selector, value):
-        field(page, selector)
+        _confirmed_field(job, page, selector)
         await plain_select(page, selector, value)
 
     async def click(page, selector):
-        item = confirmed.get((page.url, selector))
+        _not_finished(job)
+        item = job.confirmed.get((page.url, selector))
         if item is not None and item["kind"] == "check":
             await page.set_checked(selector, is_checked(item), timeout=_WAIT_MS)
             return
+        if item is None:
+            await _refuse_unconfirmed_choice(job, page, selector)
         await plain_click(page, selector)
 
     return fill, select, click
+
+
+# Что за элемент под селектором — так, как его понимает сам браузер, а не
+# разметка одного сайта: обычные галочка и кружок, самодельные с ролью, и подпись,
+# нажатие на которую переключает привязанное к ней поле. Группа кружка — его имя
+# или общий `radiogroup`; у контейнера группы — группа первого кружка внутри.
+# Обязательность — признак самого поля или его группы: `required` или
+# `aria-required`, как размечают их и обычные формы, и конструкторы опросов.
+_FIELD_OF = """el => {
+  const target = el.closest('label')?.control || el;
+  const type = (target.type || '').toLowerCase();
+  const role = (target.getAttribute('role') || '').toLowerCase();
+  const isRadio = type === 'radio' || role === 'radio';
+  const radio = isRadio ? target : target.querySelector?.('input[type=radio], [role=radio]');
+  const group = radio ? radio.name || radio.closest('[role=radiogroup]')?.id || '' : '';
+  const required = Boolean(target.required) || target.closest('[aria-required=true]') !== null;
+  if (type === 'checkbox' || role === 'checkbox' || role === 'switch') return ['check', '', required];
+  return [isRadio ? 'radio' : '', group, required];
+}"""
+
+
+class PageField(NamedTuple):
+    """Элемент страницы, каким его видит браузер: вид (`check`, `radio` или
+    пусто — не поле), группа кружка и обязательность."""
+
+    kind: str
+    group: str
+    required: bool
+
+
+async def page_field(page, selector: str) -> PageField:
+    return PageField(*await page.locator(selector).first.evaluate(_FIELD_OF, timeout=_WAIT_MS))
+
+
+async def _refuse_unconfirmed_choice(job: ApplyJob, page, selector: str) -> None:
+    """Нажатие по галочке или кружку, которых человек не подтверждал, — тоже ввод.
+
+    Кружок проходит, если подтверждена его группа: вариант, ближайший к
+    подтверждённому тексту, выбирает агент — как в выпадающем списке.
+    """
+    kind, group, _ = await page_field(page, selector)
+    if kind == "check":
+        raise _Refused("галочка не подтверждена человеком — сначала need_human с kind=confirm")
+    if kind == "radio" and (not group or group not in await _confirmed_groups(job, page)):
+        raise _Refused("переключатель не подтверждён человеком — сначала need_human с kind=confirm")
+
+
+async def _confirmed_groups(job: ApplyJob, page) -> set[str]:
+    """Группы кружков, подтверждённых на этой странице пунктом-переключателем."""
+    from playwright.async_api import Error as PlaywrightError
+
+    groups = set()
+    for (url, selector), item in job.confirmed.items():
+        if url != page.url or item["kind"] != "choice":
+            continue
+        # Поле прошлого шага формы на том же адресе могло уйти со страницы:
+        # такой пункт группы не даёт, а нажатие решается по остальным.
+        try:
+            groups.add((await page_field(page, selector)).group)
+        except PlaywrightError:
+            logger.info("подтверждённое поле %s на странице не найдено", selector)
+    return groups
+
+
+def _not_finished(job: ApplyJob) -> None:
+    if isinstance(job.outcome, Dropped):
+        raise _Refused("человек закончил работу по этой вакансии — заверши работу")
+
+
+def _confirmed_field(job: ApplyJob, page, selector: str) -> dict:
+    """Пункт, подтверждённый человеком для этого поля на этой странице."""
+    _not_finished(job)
+    item = job.confirmed.get((page.url, selector))
+    if item is None:
+        raise _Refused("поле не подтверждено человеком на этой странице — сначала need_human с kind=confirm")
+    return item
 
 
 async def _snapshot(kit: AgentKit) -> str:

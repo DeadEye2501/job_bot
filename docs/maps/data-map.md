@@ -284,6 +284,7 @@
   - `value: str`
   - `error: str`
   - `selector: str`
+  - `required: NotRequired[bool]`
 
 ### `backend/agent/human_gate.py`
 
@@ -409,6 +410,15 @@
 - `_WAIT_MS` = `15000`
 - `_SNAPSHOT_LIMIT` = `60000`
 - `_CUT_MARK` = `'\n… снимок обрезан: страница длиннее, чем помещ…`
+- `_FIELD_OF` = `"el => {\n  const target = el.closest('label')?.…`
+- `class PageField(NamedTuple)`
+  - `kind: str`
+  - `group: str`
+  - `required: bool`
+
+### `backend/agent/tools_common.py`
+
+- `logger` = `logging.getLogger(__name__)`
 
 ### `backend/agent/tools_letter.py`
 

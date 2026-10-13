@@ -23,6 +23,7 @@ export const STARTING = 'Запуск…';
 
 /** Что требуется от человека — словами плашки, что встаёт на место полос. */
 export function humanText(need) {
+  if (need.kind === 'confirm') return 'Требуется подтверждение ввода';
   return need.kind === 'captcha' ? 'Требуется пройти капчу' : `Требуется войти на ${need.host}`;
 }
 

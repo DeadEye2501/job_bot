@@ -396,14 +396,14 @@ init
 - `def agent_refusal(chat: LlmProviderConfig | None, browser: InstalledBrowser | None) -> str | None` (7)
 - `def current_refusal(chat: LlmProviderConfig | None) -> str | None` (4)
 
-### `backend/agent/confirm.py` — 64 строк
+### `backend/agent/confirm.py` — 71 строк
 
 Подтвердить отправку у человека: одна точка для всех способов отклика.
 
 Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.repository.vacancy_contacts`
 
-- `class ConfirmItem(TypedDict)` (10)
-- `def text_item(label: str, value: str) -> ConfirmItem` (3)
+- `class ConfirmItem(TypedDict)` (16)
+- `def text_item(label: str, value: str) -> ConfirmItem` (4)
 - `def is_checked(item: ConfirmItem) -> bool` (3)
 - `def confirming(kit: AgentKit) -> bool` (3)
 - `async def confirmed(kit: AgentKit, vacancy_id: int, items: list[ConfirmItem]) -> list[ConfirmItem] | Dropped` (6)
@@ -462,7 +462,7 @@ init
 Зависит от: —
 
 
-### `backend/agent/prompts/applier.py` — 85 строк
+### `backend/agent/prompts/applier.py` — 86 строк
 
 Откликатель: отклик на одну вакансию одним способом.
 
@@ -524,33 +524,33 @@ init
 - `class HumanTimeout(Exception)` (2)
 - `class LimitExhausted(Exception)` (2)
 
-### `backend/agent/tools_applier.py` — 119 строк
+### `backend/agent/tools_applier.py` — 124 строк
 
 Инструменты откликателя: своя вакансия и запись отклика на сайте.
 
 Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.domain.apply_order`, `backend.models`, `backend.repository.applications`, `backend.repository.vacancy_brief`
 
 - `class ScreeningPair(TypedDict)` (5)
-- `def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]` (29)
+- `def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]` (30)
   - `async def vacancy() -> str` (4)
-  - `async def record_application(via: str, target: str, letter: str='', screening: list[ScreeningPair] | None=None, already_applied: bool=False) -> str` (19)
+  - `async def record_application(via: str, target: str, letter: str='', screening: list[ScreeningPair] | None=None, already_applied: bool=False) -> str` (20)
 - `class _Report` (7)
 - `def _entry(job: ApplyJob, report: _Report) -> ApplicationEntry` (7)
 - `def _lines(screening: list[ScreeningPair]) -> list[tuple[bool, str]]` (3)
-- `def _confirmed_pairs(job: ApplyJob) -> list[ScreeningPair]` (6)
+- `def _confirmed_sent(job: ApplyJob) -> tuple[str | None, list[ScreeningPair]]` (10)
 - `def _answer(item: dict) -> str` (5)
 - `async def _record(kit: AgentKit, job: ApplyJob, entry: ApplicationEntry) -> str` (3)
 - `async def record_and_announce(kit: AgentKit, entry: ApplicationEntry) -> int` (5)
 - `async def _append(kit: AgentKit, application_id: int, lines: list[tuple[bool, str]]) -> str` (5)
 
-### `backend/agent/tools_browser.py` — 163 строк
+### `backend/agent/tools_browser.py` — 237 строк
 
 Инструменты браузера для агента: открыть, снять, нажать, ввести, выбрать, приложить резюме.
 
-Зависит от: `backend.agent.confirm`, `backend.agent.kit`
+Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`
 
 - `class _Refused(Exception)` (2)
-- `def browser_tools(kit: AgentKit, resume: Path | None, confirmed: dict[tuple[str, str], dict] | None=None) -> list[Callable]` (41)
+- `def browser_tools(kit: AgentKit, resume: Path | None, confirming: ApplyJob | None=None) -> list[Callable]` (40)
   - `async def browser_open(url: str) -> str` (3)
   - `async def browser_snapshot() -> str` (3)
   - `async def browser_click(selector: str) -> str` (3)
@@ -563,28 +563,38 @@ init
   - `def fill(page, selector, text)` (2)
   - `def select(page, selector, value)` (2)
   - `def click(page, selector)` (2)
-- `def _strict(confirmed: dict[tuple[str, str], dict]) -> tuple[Callable, Callable, Callable]` (36)
-  - `def field(page, selector) -> dict` (6)
+- `def _strict(job: ApplyJob) -> tuple[Callable, Callable, Callable]` (33)
   - `async def fill(page, selector, text)` (5)
   - `async def select(page, selector, value)` (3)
-  - `async def click(page, selector)` (6)
+  - `async def click(page, selector)` (9)
+- `class PageField(NamedTuple)` (7)
+- `async def page_field(page, selector: str) -> PageField` (2)
+- `async def _refuse_unconfirmed_choice(job: ApplyJob, page, selector: str) -> None` (11)
+- `async def _confirmed_groups(job: ApplyJob, page) -> set[str]` (15)
+- `def _not_finished(job: ApplyJob) -> None` (3)
+- `def _confirmed_field(job: ApplyJob, page, selector: str) -> dict` (7)
 - `async def _snapshot(kit: AgentKit) -> str` (12)
 - `async def _attach(page, selector: str, resume: Path) -> None` (12)
 - `def _first_line(error: Exception) -> str` (2)
 
-### `backend/agent/tools_common.py` — 133 строк
+### `backend/agent/tools_common.py` — 178 строк
 
 Общие инструменты агента: анкета, итог сессии, зов человека, отметка входа, неудача способа.
 
-Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.domain.apply_order`, `backend.domain.hosts`, `backend.repository.agent_profile`, `backend.repository.aggregators`
+Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.tools_browser`, `backend.domain.apply_order`, `backend.domain.hosts`, `backend.repository.agent_profile`, `backend.repository.aggregators`
 
-- `def common_tools(kit: AgentKit, job) -> list[Callable]` (31)
+- `def common_tools(kit: AgentKit, job) -> list[Callable]` (27)
   - `async def profile() -> str` (4)
   - `async def finish(result: str, reason: str='') -> str` (8)
 - `def _login_target(job) -> int | None` (4)
-- `def _need_human(kit: AgentKit, job) -> Callable` (10)
-  - `async def need_human(kind: str, items: list[ConfirmItem] | None=None) -> str` (7)
-- `async def _confirm_page(kit: AgentKit, job: ApplyJob, items: list[ConfirmItem]) -> str` (20)
+- `def _human_call(kit: AgentKit, job) -> list[Callable]` (13)
+- `def _need_human(kit: AgentKit, job) -> Callable` (6)
+  - `async def need_human(kind: str) -> str` (3)
+- `def _need_human_confirming(kit: AgentKit, job: ApplyJob) -> Callable` (8)
+  - `async def need_human(kind: str, items: list[ConfirmItem] | None=None) -> str` (5)
+- `async def _wait_in_browser(kit: AgentKit, job, kind: str) -> str` (5)
+- `async def _confirm_page(kit: AgentKit, job: ApplyJob, items: list[ConfirmItem]) -> str` (22)
+- `async def _required(page, selector: str) -> bool` (13)
 - `def _last_known(before: dict | None, item: ConfirmItem) -> ConfirmItem` (8)
 - `def _host_of(job) -> str | None` (5)
 - `def _report_login(kit: AgentKit, aggregator_id: int) -> Callable` (7)
@@ -4138,15 +4148,15 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_agent_confirm_page.py` — 145 строк
+### `tests/backend/test_agent_confirm_page.py` — 164 строк
 
 Агент подтверждает страницу у человека: что вернулось, то и впишется; «Закончить»
 
-Зависит от: `backend.agent.jobs`, `backend.agent.tools_applier`, `backend.agent.tools_common`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`, `tests.fakes.browser`
+Зависит от: `adapters.agent_mcp`, `backend.agent.jobs`, `backend.agent.tools_applier`, `backend.agent.tools_common`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`, `tests.fakes.browser`
 
-Тестов: 10
+Тестов: 12
 
-- `async def _applier(make_pipeline, session_factory, answer, *, confirming=True)` (12)
+- `async def _applier(make_pipeline, session_factory, answer, *, confirming=True, required=())` (10)
 
 ### `tests/backend/test_agent_human_gate.py` — 271 строк
 
@@ -4187,17 +4197,17 @@ Runtime settings layer.
 
 - `def _job(vacancy_id, **over) -> ApplyJob` (3)
 
-### `tests/backend/test_agent_tools_browser.py` — 192 строк
+### `tests/backend/test_agent_tools_browser.py` — 234 строк
 
 Инструменты браузера: что агент видит и что доходит до страницы.
 
-Зависит от: `backend.agent.tools_browser`, `tests.fakes.agent`, `tests.fakes.browser`
+Зависит от: `backend.agent.jobs`, `backend.agent.tools_browser`, `tests.fakes.agent`, `tests.fakes.browser`
 
-Тестов: 18
+Тестов: 22
 
 - `def _tools(page, resume=None)` (2)
 - `def _item(selector, value, kind='text', url=VACANCY)` (3)
-- `async def _strict(confirmed)` (7)
+- `async def _strict(confirmed, outcome=None, fields=None)` (9)
 
 ### `tests/backend/test_agent_tools_common.py` — 118 строк
 
@@ -4243,7 +4253,7 @@ Runtime settings layer.
 
 - `def running_1_9_0(monkeypatch)` (3)
 
-### `tests/backend/test_applying_browser.py` — 172 строк
+### `tests/backend/test_applying_browser.py` — 174 строк
 
 Браузерный способ: одна сессия агента на кнопку агрегатора или форму работодателя.
 
@@ -4251,10 +4261,10 @@ Runtime settings layer.
 
 Тестов: 13
 
-- `async def _typing(kit_with, board)` (12)
-  - `async def step(tools)` (5)
+- `async def _typing(kit_with, board, *, confirming)` (14)
+  - `async def step(tools)` (6)
 
-### `tests/backend/test_applying_confirm.py` — 127 строк
+### `tests/backend/test_applying_confirm.py` — 129 строк
 
 Подтверждение отправки у человека: письмо Telegram и почты уходит тем, что
 
@@ -6983,7 +6993,7 @@ Runtime settings layer.
 - `def work_kit(bot) -> AgentKit` (3)
 - `def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit` (3)
 
-### `tests/fakes/browser.py` — 134 строк
+### `tests/fakes/browser.py` — 148 строк
 
 Браузер агента с заданными страницами: что открыто, что нажато, что отказало.
 
@@ -6996,9 +7006,11 @@ Runtime settings layer.
   - `async def __aexit__(self, kind, *_rest)` (4)
   - `def value(self)` (4)
     - `async def _chooser()` (2)
-- `class _Locator` (7)
+- `class _Locator` (17)
   - `async def aria_snapshot(self, **_options)` (3)
-- `class FakePage` (53)
+  - `def first(self)` (2)
+  - `async def evaluate(self, _script, **_options)` (5)
+- `class FakePage` (57)
   - `def fail_if_asked(self, selector)` (3)
   - `async def goto(self, url, **_options)` (4)
   - `async def title(self)` (2)

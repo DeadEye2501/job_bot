@@ -44,6 +44,8 @@ async def test_a_telegram_letter_goes_and_is_recorded_as_the_person_left_it(tele
     assert text == row.letter == "Правленое письмо"
     ((item,),) = [one["items"] for one in asked]
     assert item["label"] == "" and item["kind"] == "text" and item["value"] and item["error"] == ""
+    # Пустое письмо Telegram не примет: обязательно оно всегда.
+    assert item["required"] is True
 
 
 async def test_the_window_gets_the_link_to_the_vacancy(telegram_case):

@@ -42,15 +42,29 @@ class _Locator:
         self._page.fail_if_asked(self._selector)
         return self._page.pages.get(self._page.url, ("", ""))[1]
 
+    @property
+    def first(self):
+        return self
+
+    async def evaluate(self, _script, **_options):
+        """Что за поле под селектором — как его называет страница: вид, группа и
+        обязательно ли оно."""
+        self._page.fail_if_asked(self._selector)
+        return [*self._page.fields.get(self._selector, ("", "")), self._selector in self._page.required]
+
 
 class FakePage:
     """Страница: `pages` — адрес → (заголовок, снимок); `failures` — селектор → ошибка;
-    `choosers` — селекторы, нажатие на которые открывает окно выбора файла."""
+    `choosers` — селекторы, нажатие на которые открывает окно выбора файла;
+    `fields` — селектор → (вид, группа): `check`, `radio` или пусто — не поле;
+    `required` — селекторы полей, которые страница называет обязательными."""
 
-    def __init__(self, pages=None, failures=None, choosers=()):
+    def __init__(self, pages=None, failures=None, choosers=(), fields=None, required=()):
         self.pages = pages or {}
         self.failures = failures or {}
         self.choosers = set(choosers)
+        self.fields = fields or {}
+        self.required = set(required)
         self.url = "about:blank"
         self.calls: list[tuple] = []
         self.chooser_opened = False

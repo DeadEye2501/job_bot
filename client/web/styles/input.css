@@ -77,7 +77,8 @@
    Поле, в котором стоят, отметки не носит: акцентная рамка говорит, куда уйдёт
    набранное, и красная поверх неё прятала бы курсор ровно в тот миг, когда эту
    самую беду и чинят. */
-.input.missing:not(:focus) {
+.input.missing:not(:focus),
+.textarea.missing:not(:focus) {
   border-color: var(--danger-border);
   background: var(--danger-wash);
 }

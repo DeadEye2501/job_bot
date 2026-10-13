@@ -28,6 +28,17 @@
   font-weight: 500;
 }
 
+/* Подтверждение — в цвет акцента: агент не упёрся, а ждёт проверки, и тревога
+   капчи тут была бы неправдой. Видна плашка так же краем глаза. */
+.human-plate.confirm {
+  border-color: var(--accent);
+  background: var(--accent-hover-soft);
+}
+
+.human-plate.confirm .human-plate-text {
+  color: var(--accent);
+}
+
 .human-plate-done {
   display: inline-flex;
   padding: 0 2px;
@@ -35,8 +46,14 @@
   color: var(--ok);
 }
 
-.human-plate-done:hover {
+.human-plate-done:hover:not(:disabled) {
   background: var(--ok-fill);
+}
+
+/* Подтвердить нечем, пока обязательное в окне пусто: галочка гаснет. */
+.human-plate-done:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .human-plate-done .material-symbols-outlined {

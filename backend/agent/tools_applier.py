@@ -42,18 +42,19 @@ def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
         via: str, target: str, letter: str = "", screening: list[ScreeningPair] | None = None,
         already_applied: bool = False,
     ) -> str:
-        """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы, письмо, скрининг. В screening — каждый вопрос работодателя из формы и со страницы подтверждения вместе с данным ответом, по порядку; вопросов не было — пустой список. Повтор с тем же адресом дописывает скрининг."""
+        """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы, письмо, скрининг. В screening — каждый вопрос работодателя из формы и со страницы подтверждения вместе с данным ответом, по порядку; вопросов не было — пустой список. Повтор с тем же адресом дописывает скрининг. Под подтверждением письмо и скрининг берутся из подтверждённого человеком."""
         if via not in _ALLOWED[job.way.method]:
             return "Этим способом отклик не пишется."
         # Записанный отклик дописывается, а не отказывает: окончательность здесь
         # нужна только «Закончить» — после него ничего не ушло и писать нечего.
         if isinstance(job.outcome, Dropped):
             return FINAL_ANSWER
-        lines = _lines(_confirmed_pairs(job) if job.confirming else screening or [])
+        sent_letter, pairs = _confirmed_sent(job) if job.confirming else (letter or None, screening or [])
+        lines = _lines(pairs)
         if isinstance(job.outcome, Applied):
             answer = await _append(kit, job.outcome.application_id, lines)
         else:
-            letter_text = None if already_applied else (letter or None)
+            letter_text = None if already_applied else sent_letter
             answer = await _record(kit, job, _entry(job, _Report(via, target, letter_text, lines)))
         job.unscreened.clear()
         return answer
@@ -85,12 +86,16 @@ def _lines(screening: list[ScreeningPair]) -> list[tuple[bool, str]]:
     return [line for pair in screening for line in ((False, pair["question"]), (True, pair["answer"]))]
 
 
-def _confirmed_pairs(job: ApplyJob) -> list[ScreeningPair]:
-    """Скрининг под подтверждением — то, что ушло, а не пересказ агента: пункты
-    с подписью, ещё не легшие в запись. Письмо подписи не имеет и вопросом не
-    считается."""
-    return [{"question": item["label"], "answer": _answer(item)}
-            for item in job.unscreened.values() if item["label"]]
+def _confirmed_sent(job: ApplyJob) -> tuple[str | None, list[ScreeningPair]]:
+    """Письмо и скрининг под подтверждением — то, что ушло, а не пересказ агента.
+
+    Письмо — пункт без подписи; скрининг — пункты с подписью, ещё не легшие в
+    запись.
+    """
+    letter = next((item["value"] for item in job.confirmed.values() if not item["label"]), "")
+    pairs = [{"question": item["label"], "answer": _answer(item)}
+             for item in job.unscreened.values() if item["label"]]
+    return letter or None, pairs
 
 
 def _answer(item: dict) -> str:

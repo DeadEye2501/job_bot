@@ -27,7 +27,7 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (347)
+### app/BottomBar.svelte (385)
 - Полоса даёт переключателю подсказку только запертому — почему заперт; отпертый называет режим под курсором сам.
 - принимает: ask, say, events, onlocked, oncontact, app
 
@@ -150,7 +150,7 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 106 файлов
+## components — 107 файлов
 
 ### components/ActionsMenu.svelte (30)
 - —
@@ -256,6 +256,11 @@
 - принимает: message, confirmLabel, locked, onconfirm, oncancel
 - берёт: ./ModalShell.svelte
 
+### components/ConfirmSendDialog.svelte (76)
+- —
+- принимает: url, items, blocked, onedit, onopen, onconfirm, ondrop, onfold
+- берёт: ./ModalHead.svelte, ./ModalShell.svelte
+
 ### components/ContactRow.svelte (77)
 - Нажимается вся строка, а не имя в ней: нажатие на одном имени оставляет мёртвыми отступы строки, кружок и хвост. Кнопкой строка быть не может — в строке источника стоит переключатель обхода, — поэтому клавиатуре она отвечает разметкой. Клавишу строка принимает только свою: у переключателя внутри неё нажатие клавиши всплывает сюда, и без этого Enter на переключателе открывал бы карточку вместо переключения.
 - принимает: avatar, initialsOf, icon, name, named, blocked, dim, count, unread, toggle, selected, onpick, ontoggle, sub
@@ -317,9 +322,9 @@
 - —
 - принимает: name, state, title
 
-### components/HumanPlate.svelte (14)
+### components/HumanPlate.svelte (22)
 - —
-- принимает: text, onreveal, ondone
+- принимает: text, confirm, blocked, onreveal, ondone
 
 ### components/LangRows.svelte (49)
 - —
@@ -792,7 +797,7 @@
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
 - отдаёт: CURRENCIES, GENDERS, GRADES, LANG_LEVELS, SALARY_PERIODS, WORK_FORMATS, blankProfile, cvNote, cvOpenable, fileSize, langRow, named, profileSheet, updatedNote
 
-### state/progress.js (96)
+### state/progress.js (97)
 - * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
 - отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, applyNote, bar, caption, countlessNote, humanText, updateNote
 
@@ -812,7 +817,7 @@
 - * Лежит ли запись уже в базе. * * Номера мало: его даёт мост, а вкладка себя после записи не перечитывает — * заведённая в этот заход запись живёт с пустым номером до конца визита, уже * будучи записанной. Отметку об уехавшей записи ставит сама вкладка, и без неё * опустошённое обязательное поле вычёркивало такую строку из посылки, а мост * стирал её молча вместе со всем, что в ней было.
 - отдаёт: recordsGoing
 
-### state/round.svelte.js (79)
+### state/round.svelte.js (131)
 - * Что известно о прогоне сейчас.
 - отдаёт: hearRound, round
 
@@ -904,7 +909,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: counted, plural, vacancyCount
 
-## styles — 118 файлов
+## styles — 119 файлов
 
 ### styles/accent-fill.css (20)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре, текущий шаг мастера, уверенная оценка вакансии и счёт непрочитанного. Одним правилом на все места, а не своим в каждом: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -1075,6 +1080,11 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (3): .confirm-field, .confirm-field .input, .confirm-field .icon-btn:hover
 - берёт: --accent
 
+### styles/confirm-send.css (25)
+- Окно подтверждения отправки: ссылка на вакансию и пункты. Тело и рамка — общей узкой коробки для чтения (`modal.css`), отметка отвергнутого поля — общая `.missing` (`input.css`), текст ошибки — общий `.modal-error`; здесь только ссылка и столбец пункта.
+- селекторы (3): .confirm-send-link, .confirm-item-required, .confirm-item
+- берёт: --danger, --text-secondary
+
 ### styles/contact-block.css (50)
 - Кружок и два имени рядом с ним: так подписаны HR и компания в карточке вакансии и кандидаты в подборщике привязки.
 - селекторы (6): .contact-block, .hr-avatar, .hr-avatar .material-symbols-outlined, img.hr-avatar, .hr-info, .hr-name
@@ -1187,10 +1197,10 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .help .help-link, .help ol, .help ol li, .help .help-link:hover
 - берёт: --bg-secondary, --bg-tertiary, --text-primary, --text-secondary
 
-### styles/human-plate.css (44)
+### styles/human-plate.css (61)
 - Плашка ожидания человека в центре нижней полосы, на месте полос хода. Красная, а не в цвет хода: агент стоит, пока человек не вмешается, и плашку должно быть видно краем глаза. Во всю высоту полосы и без скруглений: кусок самой полосы, ставший плашкой, а не всплывшая поверх неё кнопка. Центр полосы — узел нулевой ширины (`footer.css`), поэтому плашка встаёт по нему сама, сдвигом на свою половину. Снизу точка просвета: вровень с краем окна нижняя рамка уходит под него и не видна.
-- селекторы (5): .human-plate, .human-plate-text, .human-plate-done, .human-plate-done:hover, .human-plate-done .material-symbols-outlined
-- берёт: --err, --err-fill, --ok, --ok-fill
+- селекторы (8): .human-plate, .human-plate-text, .human-plate.confirm, .human-plate.confirm .human-plate-text, .human-plate-done, .human-plate-done:hover:not(:disabled), .human-plate-done:disabled, .human-plate-done .material-symbols-outlined
+- берёт: --accent, --accent-hover-soft, --err, --err-fill, --ok, --ok-fill
 
 ### styles/icon-button.css (29)
 - Кнопка-значок: квадрат со значком внутри, без подписи. Вынесена на втором потребителе — кнопка обхода в полосе и очистка журнала.
@@ -1213,7 +1223,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (6): .input-pair, .input-pair:hover:not(:focus-within), .input-pair:focus-within, .input-pair .input, .input-pair:has(.input.missing):not(:focus-within), .input-pair .input + .input
 - берёт: --accent, --border, --danger-border, --text-secondary
 
-### styles/input.css (90)
+### styles/input.css (91)
 - Поле ввода, многострочное поле и поле для секрета рядом с глазом. Экран настроек уменьшает их своим правилом — там полей вдвое больше.
 - селекторы (11): .input,
 .textarea,
@@ -1221,7 +1231,8 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .textarea, .input:hover:not(:disabled, :focus),
 .textarea:hover:not(:disabled, :focus), .input:focus,
 .textarea:focus, .input::placeholder,
-.textarea::placeholder, .textarea, .textarea.grown, .secret-input, .secret-input .input, .input.missing:not(:focus), .input.mono
+.textarea::placeholder, .textarea, .textarea.grown, .secret-input, .secret-input .input, .input.missing:not(:focus),
+.textarea.missing:not(:focus), .input.mono
 - берёт: --accent, --bg-secondary, --border, --danger-border, --danger-wash, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/lang-rows.css (33)
@@ -1668,7 +1679,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 98 файлов
+## tests — 100 файлов
 
 ### tests/aggregators.test.js (118)
 - —
@@ -1703,8 +1714,12 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (438)
+### tests/bottom_bar_live.test.js (389)
 - —
+
+### tests/bottom_bar_stub.js (59)
+- * Полоса со здоровьем `health`; ответ — зовы моста, подсказки запора, плашки * и обработчики вестей. * * `counts` — что по очереди отвечает число новых вакансий; последнее держится. * `app` — запущенная версия и может ли копия обновиться; `updates` — что по * очереди отвечает проверка обновления, последнее держится.
+- отдаёт: bar
 
 ### tests/bridge.test.js (161)
 - —
@@ -1754,6 +1769,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 
 ### tests/confirm_dialog_live.test.js (62)
 - * Окно с запором `locked`; отдаёт счёт подтверждений и красную кнопку.
+
+### tests/confirm_send_live.test.js (181)
+- * Полоса, ждущая подтверждения: прогон идёт, пришла весть с пунктами.
 
 ### tests/contact_adding.test.js (130)
 - —

@@ -114,6 +114,7 @@ import './styles/health-lamp.css';
 import './styles/mode.css';
 import './styles/progress.css';
 import './styles/human-plate.css';
+import './styles/confirm-send.css';
 import './styles/run.css';
 import './styles/signal-button.css';
 import './styles/unread.css';

@@ -1,0 +1,25 @@
+/* Окно подтверждения отправки: ссылка на вакансию и пункты.
+
+   Тело и рамка — общей узкой коробки для чтения (`modal.css`), отметка
+   отвергнутого поля — общая `.missing` (`input.css`), текст ошибки — общий
+   `.modal-error`; здесь только ссылка и столбец пункта. */
+
+.confirm-send-link {
+  align-self: flex-start;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  text-align: left;
+  word-break: break-all;
+}
+
+/* Звёздочка обязательного — тем же цветом, что ошибка: пустым это поле не уйдёт. */
+.confirm-item-required {
+  margin-left: 2px;
+  color: var(--danger);
+}
+
+.confirm-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

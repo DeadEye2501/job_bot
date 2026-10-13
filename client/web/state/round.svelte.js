@@ -6,10 +6,17 @@
 //
 // Вести о начале и конце прогона и об ожидании человека слушает только этот
 // файл; остальные читают `round.running` и `round.human` или просят позвать их
-// в миг начала или конца (`round.onStart`, `round.onFinish`).
+// в миг начала или конца (`round.onStart`, `round.onFinish`). Ожидание
+// подтверждения несёт ещё пункты, какими их правит человек, и свёрнутость
+// окна: это то же ожидание, а не второй учёт.
 
 let running = $state(false);
 let human = $state(null);
+// Пункты подтверждения, какими их оставил человек, и свёрнуто ли окно. Живут
+// здесь, а не в окне: галочка плашки подтверждает то, что сейчас в окне, и
+// свёрнутое окно своих правок терять не должно.
+let draft = $state([]);
+let folded = $state(false);
 const starters = new Set();
 const finishers = new Set();
 
@@ -20,9 +27,47 @@ export const round = {
     return running;
   },
 
-  /** Кого ждёт прогон: `{ kind, host }` — капча или вход на сайт, — или пусто. */
+  /** Кого ждёт прогон: `{ kind, host, payload }` — капча, вход на сайт или
+   *  подтверждение отправки, — или пусто. */
   get human() {
     return human;
+  },
+
+  /** Пункты окна подтверждения, какими их оставил человек. */
+  get draft() {
+    return draft;
+  },
+
+  /** Заполнено ли всё обязательное: иначе отправка вернётся с ошибкой сайта,
+   *  и подтверждать её — только тратить время. */
+  get ready() {
+    return draft.every((item) => !item.required || filled(item));
+  },
+
+  /** Свёрнуто ли окно подтверждения в плашку. */
+  get folded() {
+    return folded;
+  },
+
+  /** Поправить значение пункта `at`. */
+  edit(at, value) {
+    draft[at] = { ...draft[at], value };
+  },
+
+  fold() {
+    folded = true;
+  },
+
+  /** Ответ ушёл: ожидание гаснет сразу, не дожидаясь вести моста. Второе
+   *  нажатие до неё ушло бы ответом уже следующему ожиданию — письму, которого
+   *  человек не видел. */
+  answered() {
+    human = null;
+    draft = [];
+  },
+
+  unfold() {
+    folded = false;
   },
 
   /** Позвать в миг начала прогона; отдаёт отписку.
@@ -47,6 +92,11 @@ export const round = {
   },
 };
 
+/** Пункт заполнен: у галочки — отмечена, у прочих — непустое значение. */
+function filled(item) {
+  return item.kind === 'check' ? item.value === 'true' : item.value.trim() !== '';
+}
+
 /** Подписать учёт на вести моста; отдаёт отписку.
  *
  * Подписка начинает с «не идёт»: окно открывается заново, а прогон, шедший до
@@ -70,6 +120,8 @@ export function hearRound(events) {
     }),
     events.on('human_needed', (need) => {
       human = need;
+      draft = need.kind === 'confirm' ? need.payload.items.map((item) => ({ ...item })) : [];
+      folded = false;
     }),
     events.on('human_resolved', () => {
       human = null;

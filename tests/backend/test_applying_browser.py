@@ -42,13 +42,15 @@ async def test_a_page_the_person_finished_drops_the_vacancy(board, kit_with, ses
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.NEW
 
 
-async def _typing(kit_with, board):
-    """Сессия агента: подтверждает имя «Иван», затем пробует вписать оба варианта."""
+async def _typing(kit_with, board, *, confirming):
+    """Сессия агента: под подтверждением подтверждает имя «Иван», затем пробует
+    вписать оба варианта."""
     site, vacancy = await board()
     answers = []
 
     async def step(tools):
-        await tools["need_human"](kind="confirm", items=[page_item("#name", "Иван")])
+        if confirming:
+            await tools["need_human"](kind="confirm", items=[page_item("#name", "Иван")])
         answers.append(await tools["browser_type"](selector="#name", text="Иван"))
         answers.append(await tools["browser_type"](selector="#name", text="Иван Петров"))
         await tools["record_application"](via="aggregator", target=PAGE)
@@ -57,7 +59,7 @@ async def _typing(kit_with, board):
 
 
 async def test_under_confirmation_only_the_edited_text_reaches_the_page(board, kit_with):
-    site, vacancy, kit, answers = await _typing(kit_with, board)
+    site, vacancy, kit, answers = await _typing(kit_with, board, confirming=True)
     kit, _ = await under_confirmation(kit, edited({"Имя": "Иван Петров"}))
 
     await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
@@ -68,7 +70,7 @@ async def test_under_confirmation_only_the_edited_text_reaches_the_page(board, k
 
 
 async def test_with_auto_apply_on_typing_is_as_before(board, kit_with):
-    site, vacancy, kit, _ = await _typing(kit_with, board)
+    site, vacancy, kit, _ = await _typing(kit_with, board, confirming=False)
 
     await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
 
