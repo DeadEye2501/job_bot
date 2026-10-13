@@ -42,6 +42,18 @@ async def test_an_address_without_the_token_leads_nowhere():
     assert answer.status_code == 404
 
 
+async def test_a_closed_server_leaves_no_task_behind():
+    """Закрытый сервер гасит своё приложение целиком: оставленная задача
+    висела бы до закрытия окна, а там гасилась бы с ошибкой в журнале."""
+    before = asyncio.all_tasks()
+    server = await serve_tools([_echo])
+
+    await server.close()
+    await asyncio.sleep(0)
+
+    assert asyncio.all_tasks() - before == set()
+
+
 async def test_a_hanging_call_does_not_hold_the_close():
     """Вызов, ждущий человека, держал бы остановку до часа."""
     started = asyncio.Event()

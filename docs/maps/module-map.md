@@ -36,16 +36,16 @@ Job Bot — single CLI entry point.
 
 ## adapters — 20 модулей
 
-### `adapters/agent_mcp.py` — 85 строк
+### `adapters/agent_mcp.py` — 94 строк
 
 MCP-сервер инструментов одной сессии агента: HTTP на 127.0.0.1, токен в адресе.
 
 Зависит от: —
 
-- `class ToolServer` (17)
-  - `async def close(self) -> None` (12)
+- `class ToolServer` (22)
+  - `async def close(self) -> None` (17)
 - `def tool_host(tools: list[Callable], **settings) -> FastMCP` (7)
-- `async def serve_tools(tools: list[Callable]) -> ToolServer` (26)
+- `async def serve_tools(tools: list[Callable]) -> ToolServer` (28)
 - `async def _started(server: uvicorn.Server, task: asyncio.Task) -> None` (10)
 
 ### `adapters/app_tied_process.py` — 188 строк
@@ -3709,13 +3709,13 @@ Runtime settings layer.
 
 ## tests — 323 модулей
 
-### `tests/adapters/test_agent_mcp.py` — 71 строк
+### `tests/adapters/test_agent_mcp.py` — 83 строк
 
 Инструменты сессии доступны по своему адресу и только по нему.
 
 Зависит от: `adapters.agent_mcp`
 
-Тестов: 3
+Тестов: 4
 
 - `async def _echo(text: str) -> str` (3)
 
