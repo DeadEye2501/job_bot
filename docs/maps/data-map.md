@@ -437,7 +437,9 @@
   - `lesson: Lesson | None` = `None`
 - `class Unfit`
   - `reason: str`
-- `Outcome` = `Literal['applied'] | Missed | Unfit`
+- `class Dropped`
+  - `reason: str` = `'отказался человек'`
+- `Outcome` = `Literal['applied'] | Missed | Unfit | Dropped`
 - `GONE` = `Missed('вакансия удалена')`
 
 ### `backend/applying/run.py`
@@ -486,7 +488,7 @@
 
 ### `backend/bot/apply.py`
 
-- `ApplyOutcome` = `Literal[work.WorkOutcome, 'failed', 'unfit', 'mi…`
+- `ApplyOutcome` = `Literal[work.WorkOutcome, 'failed', 'unfit', 'dr…`
 
 ### `backend/bot/can_send.py`
 
@@ -2010,7 +2012,7 @@
 - `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться.'`
 - `AGGREGATOR_REFUSALS` = `словарь из 5 и раскрытых`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
-- `APPLY_VIA_REFUSALS` = `словарь из 6 и раскрытых`
+- `APPLY_VIA_REFUSALS` = `словарь из 7 и раскрытых`
 - `APPLY_ALL_REFUSALS` = `словарь из 3 и раскрытых`
 - `UPDATE_REFUSALS` = `словарь из 6`
 
@@ -2142,6 +2144,7 @@
 - `PAGE` = `'https://site.test/vacancy/1'`
 - `FORM` = `'https://company.test/apply'`
 - `TG` = `Way('telegram', '@hr_name', None)`
+- `MAIL` = `Way('email', 'hr@company.test', None)`
 
 ### `tests/backend/test_agent_availability.py`
 
@@ -2167,9 +2170,9 @@
 - `PAGE` = `'https://site.test/vacancy/1?from=list'`
 - `BARRED_PAGE` = `'https://jobs.barred.test/vacancy/1'`
 
-### `tests/backend/test_applying_email.py`
+### `tests/backend/test_applying_confirm.py`
 
-- `MAIL` = `Way('email', 'hr@company.test', None)`
+- `LINK` = `'https://t.me/jobs/42'`
 
 ### `tests/backend/test_bootstrap_schema.py`
 

@@ -79,9 +79,14 @@ async def contact_values(session: AsyncSession, vacancy_id: int) -> list[str]:
     return [contact.value for contact in await list_contacts(session, vacancy_id)]
 
 
+async def vacancy_link(session: AsyncSession, vacancy_id: int) -> str | None:
+    """Адрес страницы вакансии — тот, что открывает её карточка."""
+    return await session.scalar(select(Vacancy.source_url).where(Vacancy.id == vacancy_id))
+
+
 async def vacancy_addresses(session: AsyncSession, vacancy_id: int) -> list[str]:
     """Адрес страницы вакансии и все её контакты — то, чем она указывает вовне."""
-    source_url = await session.scalar(select(Vacancy.source_url).where(Vacancy.id == vacancy_id))
+    source_url = await vacancy_link(session, vacancy_id)
     return [address for address in (source_url, *await contact_values(session, vacancy_id)) if address]
 
 
