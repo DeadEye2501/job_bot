@@ -28,9 +28,10 @@ def aggregators_available(bot) -> str | None:
     return current_refusal(bot.rs.chat)
 
 
-def human_done(bot) -> None:
-    """«Готово» из окна. Событие asyncio трогается только на цикле бота."""
-    slot.on_runner_loop(bot, bot.human_gate.resolve)
+def human_done(bot, answer=None) -> None:
+    """Ответ окна: «готово» или правленые пункты подтверждения. Событие asyncio
+    трогается только на цикле бота."""
+    slot.on_runner_loop(bot, lambda: bot.human_gate.resolve(answer))
 
 
 def reveal_browser(bot) -> None:

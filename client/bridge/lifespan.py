@@ -215,7 +215,9 @@ def _tell_the_window(bot, hub: Hub) -> None:
     bot.on_channels_changed = lambda: events.add("contacts_lists_changed")
     bot.on_contacts_changed = lambda: events.add("contacts_lists_changed")
     bot.on_vacancies_changed = lambda: events.add(LIST_CHANGED)
-    bot.on_human_needed = lambda kind, host: events.add("human_needed", {"kind": kind, "host": host})
+    bot.on_human_needed = lambda kind, host, payload: events.add(
+        "human_needed", {"kind": kind, "host": host, "payload": payload}
+    )
     bot.on_human_resolved = lambda: events.add("human_resolved")
     bot.on_round_note = lambda text: events.add("round_note", {"text": text})
 

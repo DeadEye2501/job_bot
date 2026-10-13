@@ -133,10 +133,11 @@ class System(Journal, Wipe, Desktop, AppUpdate):
 
         return reply(self._hub.runner, run())
 
-    def human_done(self) -> dict:
-        """«Готово» — человек прошёл капчу или вошёл на сайт, агент продолжает."""
+    def human_done(self, answer=None) -> dict:
+        """Ответ человека: «готово» после капчи или входа, ответ окна
+        подтверждения — откликатель продолжает."""
         if self._hub.bot is not None:
-            self._hub.bot.human_done()
+            self._hub.bot.human_done(answer)
         return {"ok": {}}
 
     def reveal_browser(self) -> dict:

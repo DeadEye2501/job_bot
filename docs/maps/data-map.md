@@ -282,6 +282,7 @@
 - `LIMIT_SEC` = `3600.0`
 - `_DONE` = `'готово'`
 - `_STOPPED` = `'обход остановлен; заверши работу'`
+- `_NO_BROWSER` = `_NoBrowser()`
 
 ### `backend/agent/jobs.py`
 

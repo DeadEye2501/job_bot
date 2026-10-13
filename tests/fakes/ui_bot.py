@@ -141,8 +141,8 @@ class UiBot:
         self.calls.append(("download_update",))
         return self.answers["update"]
 
-    def human_done(self) -> None:
-        self.calls.append(("human_done",))
+    def human_done(self, answer=None) -> None:
+        self.calls.append(("human_done", answer))
 
     def reveal_browser(self) -> None:
         self.calls.append(("reveal_browser",))
