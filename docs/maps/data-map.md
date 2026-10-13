@@ -515,7 +515,7 @@
   - `loop: asyncio.AbstractEventLoop | None`
   - `current_poll_task: asyncio.Task | None`
   - `launched_task: asyncio.Task | None`
-  - `dialogs: list[DialogPeer]`
+  - `dialogs: list[DialogPeer] | None`
 
 ### `backend/bot/loop.py`
 

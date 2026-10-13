@@ -175,8 +175,9 @@ def _peers_of(dialogs, users) -> list:
     return peers
 
 
-async def list_dialog_peers(client) -> list:
-    """Собеседники, с которыми переписка есть, — свежими вперёд.
+async def list_dialog_peers(client) -> list | None:
+    """Собеседники, с которыми переписка есть, — свежими вперёд; `None` —
+    список дочитать не вышло, и всех переписок он не называет.
 
     Ими правится догон: читать переписку у того, с кем её нет, нечего, а стоит
     попытка дорого. Порядок берётся отсюда же — Telegram отдаёт список свежими
@@ -211,10 +212,10 @@ async def list_dialog_peers(client) -> list:
         if step is None or step[:2] in seen:
             _log.warning(
                 "список переписок кончился, не сдвинув закладку: прочитано %d, "
-                "остальные останутся непрогретыми и недогнанными",
+                "остальные не прогреты, догон пойдёт по всем",
                 len(found),
             )
-            return found
+            return None
         seen.add(step[:2])
         peer_id, offset_id, offset_date = step
         offset_peer = await client.resolve_peer(peer_id)

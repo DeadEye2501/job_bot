@@ -132,10 +132,10 @@ def _declare_loop_controls(bot) -> None:
     bot.launched_task = None
     # Набор агента идущей работы (`bot/work.agent_work`): им откликается конвейер.
     bot.kit = None
-    # Переписки, прочитанные при подъёме соединения: ими догон правит очередь.
-    # Пустой список значит «не знаем» — тогда очередь остаётся прежней, и
-    # догон идёт по всем известным собеседникам.
-    bot.dialogs = []
+    # Переписки, прочитанные при подъёме соединения: ими догон отбирает, кого
+    # читать. `None` значит «не знаем» — догон идёт по всем известным
+    # собеседникам.
+    bot.dialogs = None
 
 
 def _declare_ui_hooks(bot) -> None:
@@ -216,7 +216,7 @@ class Bot:
     loop: asyncio.AbstractEventLoop | None
     current_poll_task: asyncio.Task | None
     launched_task: asyncio.Task | None
-    dialogs: list[DialogPeer]
+    dialogs: list[DialogPeer] | None
 
     def __init__(
         self,
