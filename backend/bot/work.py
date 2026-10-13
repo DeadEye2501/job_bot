@@ -19,7 +19,9 @@ from backend.notify import fire
 
 logger = logging.getLogger(__name__)
 
-HUMAN_TIMEOUT_NOTE = "Капча не пройдена — работа остановлена."
+# Одна фраза на все ожидания человека — капчу, вход и подтверждение отправки:
+# что именно не дождалось ответа, человек видит сам по плашке, которая была.
+HUMAN_TIMEOUT_NOTE = "Время ожидания истекло."
 LIMIT_NOTE = "Исчерпан лимит подписки Claude Code — работа остановлена."
 
 AgentStop = Literal["human_timeout", "limit"]
