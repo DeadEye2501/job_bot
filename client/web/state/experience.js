@@ -62,8 +62,6 @@ export function cardTitle(exp) {
 
 /** Места работы как вид записи вкладки профиля. */
 export const EXPERIENCE = {
-  load: 'profile.experience',
-  save: 'profile.save_experience',
   key: 'experience',
   heading: 'Профиль / Experience',
   count: (n) => `${counted(n, 'место', 'места', 'мест')} работы`,

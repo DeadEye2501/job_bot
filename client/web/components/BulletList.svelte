@@ -1,17 +1,18 @@
 <script>
-  // Список строк под заголовком: достижения, обязанности.
+  // Список строк под заголовком: достижения, обязанности, «О проекте».
+  // Наружу уходит перечень целиком — каким он стал после правки.
   //
   // Строка — многострочное поле, а не однострочное: достижение пишут фразой, и
   // в узкой строке видно только её начало.
   import { growing } from '$state/autosize.js';
 
-  let { label, addLabel, items, onedit, onadd, onremove } = $props();
+  let { label, addLabel, items, onchange } = $props();
 </script>
 
 <div class="list-block">
   <div class="field-label">
     <span>{label}</span>
-    <button class="add-link list-add" type="button" onclick={() => onadd()}>
+    <button class="add-link list-add" type="button" onclick={() => onchange([...items, ''])}>
       <span class="material-symbols-outlined">add</span>
       {addLabel}
     </button>
@@ -26,9 +27,17 @@
         maxlength="250"
         value={text}
         use:growing={text}
-        onblur={(event) => onedit(index, event.currentTarget.value.trim())}
+        onblur={(event) => {
+          const typed = event.currentTarget.value.trim();
+          onchange(items.map((one, at) => (at === index ? typed : one)));
+        }}
       ></textarea>
-      <button class="remove-cross" type="button" title="Удалить" onclick={() => onremove(index)}>
+      <button
+        class="remove-cross"
+        type="button"
+        title="Удалить"
+        onclick={() => onchange(items.filter((_, at) => at !== index))}
+      >
         ×
       </button>
     </div>

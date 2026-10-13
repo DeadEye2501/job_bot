@@ -28,8 +28,18 @@
   {:else if tab === 'skills'}
     <ProfileSkills {ask} />
   {:else if tab === 'experience'}
-    <ProfileRecords {ask} kind={EXPERIENCE} Card={ExperienceCard} />
+    <ProfileRecords
+      load={() => ask('profile.experience')}
+      save={(going) => ask('profile.save_experience', { experience: going })}
+      kind={EXPERIENCE}
+      Card={ExperienceCard}
+    />
   {:else}
-    <ProfileRecords {ask} kind={PROJECTS} Card={ProjectCard} />
+    <ProfileRecords
+      load={() => ask('profile.projects')}
+      save={(going) => ask('profile.save_projects', { projects: going })}
+      kind={PROJECTS}
+      Card={ProjectCard}
+    />
   {/if}
 </div>

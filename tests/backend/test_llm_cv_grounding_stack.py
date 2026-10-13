@@ -214,6 +214,41 @@ def test_projects_above_the_jobs_are_bounded_all_the_same():
     assert grounded.experience[0].stack == ["Go"]
 
 
+def test_a_listed_project_named_in_a_jobs_duties_takes_no_stack_from_it():
+    """Шапка проекта под маркером списка — шапка, а его название в обязанностях
+    работы — нет: иначе кусок работы обрывался бы до её «Стек:»."""
+    parsed = parsed_cv(
+        experience=[parsed_cv_place(company="Контур", stack=["Go"])],
+        projects=[parsed_cv_project(name="Пульс", stack=["Python"])],
+    )
+    text = (
+        "Контур\n"
+        "- поддерживал портал Пульс\n"
+        "Стек: Go\n"
+        "Проекты\n"
+        "• Пульс\n"
+        "Стек: Python\n"
+    )
+
+    grounded = grounded_in_cv(parsed, text)
+
+    assert grounded.experience[0].stack == ["Go"]
+    assert grounded.projects[0].stack == ["Python"]
+
+
+def test_a_name_inside_another_word_is_not_a_heading():
+    """Название проекта внутри чужого слова шапкой не считается."""
+    parsed = parsed_cv(
+        experience=[parsed_cv_place(company="Контур", stack=["Go"])],
+        projects=[parsed_cv_project(name="Бот", stack=[])],
+    )
+    text = "Контур\n- писала работоспособные сервисы\nСтек: Go\nПроекты: Бот\n"
+
+    grounded = grounded_in_cv(parsed, text)
+
+    assert grounded.experience[0].stack == ["Go"]
+
+
 def test_a_project_without_a_stack_section_keeps_no_stack():
     """Стек проекта проверяется тем же правилом, что стек работы."""
     parsed = parsed_cv(projects=[parsed_cv_project(name="Бот", stack=["Python"])])
