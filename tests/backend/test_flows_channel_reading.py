@@ -294,24 +294,26 @@ async def test_the_window_is_told_where_inside_the_channel_it_is(reading):
     ]
 
 
-async def test_a_channel_that_outran_the_limit_says_so(reading, caplog):
-    """Канал, выложивший больше предела за один срок, отмечается в журнале.
+async def test_a_channel_that_outran_the_limit_loses_nothing(reading, session_factory):
+    """Канал, выложивший больше предела за простой, не теряет середину.
 
-    Читается только предел свежих, и на первом виденном чтение обрывается. Не
-    доберись оно до виденного — значит между отметкой и самым старым из
-    прочитанных остались посты, которых не увидит уже никто: отметка уедет на
-    самый свежий. Молча это худший из исходов, потому что снаружи обход
-    выглядит удавшимся.
+    За обход берётся предел старейших непрочитанных, и отметка встаёт на
+    последнем из них: остальное заберут следующие обходы. Отметка, уехавшая на
+    самый свежий, оставила бы между ней и прежней посты, которых не увидит уже
+    никто.
     """
     pipeline, client, channel = reading
     await pipeline.rs.set_app("backfill_limit", "3")
     client.history = [post(msg_id) for msg_id in range(20, 0, -1)]
 
-    with caplog.at_level("WARNING"):
-        await channels.poll_channel(pipeline, channel.id, "jobs", 5)
+    await channels.poll_channel(pipeline, channel.id, "jobs", 5)
+    first = list(pipeline.taken)
+    await channels.poll_channel(pipeline, channel.id, "jobs", 8)
 
-    assert "jobs" in caplog.text
-    assert "5" in caplog.text and "18" in caplog.text
+    assert first == [6, 7, 8]
+    assert pipeline.taken == [6, 7, 8, 9, 10, 11]
+    saved = await only_row(session_factory, TelegramChannel)
+    assert saved.last_processed_msg_id == 11
 
 
 async def test_the_first_walk_of_a_channel_is_not_called_a_loss(reading, caplog):

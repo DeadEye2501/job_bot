@@ -257,33 +257,28 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
 
 
 async def _unseen_posts(pipeline, channel_username: str, last_id: int | None):
-    """Посты канала, которых мы ещё не видели, — старые первыми.
+    """Посты канала, которых мы ещё не видели, — старые первыми, не больше
+    предела за обход.
 
-    Читаем свежими вперёд и останавливаемся на первом уже виденном: канал
-    отдаёт хвост в обратном порядке, и идти дальше незачем. В ответ порядок
-    переворачивается — разбирать посты надо в том порядке, в каком их
-    писали.
+    С отметкой канал читается свежими вперёд до первого уже виденного, и
+    берутся старейшие непрочитанные: отметка сдвигается только по прочитанному,
+    а остальное возьмут следующие обходы. Возьми свежие — и после простоя,
+    когда новых больше предела, середина между отметкой и ними пропала бы.
+
+    Без отметки — первый обход — берётся предел самых свежих: это глубина
+    первого захода, читать «до виденного» нечего.
     """
     limit = pipeline.rs.backfill_limit
-    new_msgs = []
-    reached_seen = False
-    async for msg in pipeline.client.get_chat_history(
-        channel_username, limit=limit
-    ):
-        if last_id is not None and msg.id <= last_id:
-            reached_seen = True
+    client = pipeline.client
+    if last_id is None:
+        newest = [msg async for msg in client.get_chat_history(channel_username, limit=limit)]
+        return list(reversed(newest))
+    unseen = []
+    async for msg in client.get_chat_history(channel_username):
+        if msg.id <= last_id:
             break
-        new_msgs.append(msg)
-    if last_id is not None and not reached_seen and len(new_msgs) >= limit:
-        # Дочитать нечем: отметка сейчас уедет на самый свежий, и пропущенное
-        # не увидит уже никто. Молча это худший из исходов — снаружи обход
-        # выглядит удавшимся, а половины объявлений в списке нет.
-        logger.warning(
-            "[@%s] предел догона %d исчерпан, а отметка %d не встретилась: "
-            "посты между ней и %d потеряны, подними backfill_limit",
-            channel_username, limit, last_id, new_msgs[-1].id,
-        )
-    return list(reversed(new_msgs))
+        unseen.append(msg)
+    return list(reversed(unseen))[:limit]
 
 
 async def _take_post(pipeline, channel_id: int, channel_username: str, msg) -> bool:
