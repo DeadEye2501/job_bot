@@ -21,6 +21,7 @@ from backend.message_text import extract_post_text
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
 from backend.repository.channels import list_named_channels
+from backend.telegram_lookup import say_flood_wait
 from backend.telegram_time import utc_now
 from backend.repository.vacancy_status import (
     last_status_history_id,
@@ -117,10 +118,7 @@ async def _fetch_fresh_text(
             return None
         return await _post_text(msg, where, vacancy_id)
     except FloodWait as e:
-        logger.warning(
-            "rerun: vacancy %d FloodWait %ss while fetching %s, keeping cached raw_text",
-            vacancy_id, e.value, where,
-        )
+        say_flood_wait(logger, f"rerun: vacancy {vacancy_id} {where}, keeping cached raw_text", e)
     except Exception:
         logger.exception(
             "rerun: vacancy %d failed to refetch %s, keeping cached raw_text",

@@ -36,7 +36,7 @@ Job Bot — single CLI entry point.
 
 ## adapters — 20 модулей
 
-### `adapters/agent_mcp.py` — 94 строк
+### `adapters/agent_mcp.py` — 97 строк
 
 MCP-сервер инструментов одной сессии агента: HTTP на 127.0.0.1, токен в адресе.
 
@@ -744,14 +744,14 @@ First-run bootstrap: ensure DB schema exists.
 - `class SendPermission` (8)
 - `async def can_send_to_hr(bot, hr) -> SendPermission` (24)
 
-### `backend/bot/channels.py` — 120 строк
+### `backend/bot/channels.py` — 115 строк
 
 Каналы по просьбе окна: заведение нового и чтение по требованию.
 
 Зависит от: `backend.bot`, `backend.flows`, `backend.repository.channels`, `backend.telegram_lookup`
 
 - `async def poll_channel_now(bot, channel_id: int) -> ChannelPollOutcome` (24)
-- `async def _ask_telegram_about(bot, username: str)` (24)
+- `async def _ask_telegram_about(bot, username: str)` (19)
 - `async def add_channel(bot, username: str) -> tuple[int | None, ChannelAddOutcome]` (38)
 
 ### `backend/bot/chat.py` — 216 строк
@@ -1308,15 +1308,15 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _hand_to_classification(dm, msg, hr_id: int, subject) -> None` (12)
 - `async def process_dm(msg, dm: DmHelpers) -> int | None` (37)
 
-### `backend/flows/dm_backfill.py` — 303 строк ⚠ подошёл к 300
+### `backend/flows/dm_backfill.py` — 304 строк ⚠ подошёл к 300
 
 Догон пропущенной переписки с HR.
 
-Зависит от: `backend.domain.telegram_identity`, `backend.flows.batches`, `backend.flows.dm`, `backend.models`, `backend.notify`, `backend.repository.hr_list`, `backend.repository.messages`
+Зависит от: `backend.domain.telegram_identity`, `backend.flows.batches`, `backend.flows.dm`, `backend.models`, `backend.notify`, `backend.repository.hr_list`, `backend.repository.messages`, `backend.telegram_lookup`
 
 - `class DmHooks` (9)
-- `async def _fetch_history(client, hr, limit: int) -> list | None` (29)
-- `async def _read_or_find(client, hr, target, limit: int) -> list | None` (22)
+- `async def _fetch_history(client, hr, limit: int) -> list | None` (24)
+- `async def _read_or_find(client, hr, target, limit: int) -> list | None` (27)
   - `async def read(peer) -> list` (2)
 - `async def _store_outgoing(hr_id: int, dm: DmHelpers, msg) -> bool` (23)
 - `async def _store_incoming(hr_id: int, dm: DmHelpers, hooks: DmHooks, msg) -> bool` (27)
@@ -1562,16 +1562,16 @@ First-run bootstrap: ensure DB schema exists.
   - `def dm_hooks(self) -> DmHooks` (6)
   - `async def cancel_pending_dm_classifications(self, *, drain=False) -> None` (2)
 
-### `backend/flows/rerun.py` — 455 строк ⚠ подошёл к 300
+### `backend/flows/rerun.py` — 453 строк ⚠ подошёл к 300
 
 Повторный разбор уже заведённой вакансии.
 
-Зависит от: `adapters`, `backend.agent.stops`, `backend.flows`, `backend.message_text`, `backend.models`, `backend.repository.channels`, `backend.repository.vacancy_status`, `backend.telegram_time`
+Зависит от: `adapters`, `backend.agent.stops`, `backend.flows`, `backend.message_text`, `backend.models`, `backend.repository.channels`, `backend.repository.vacancy_status`, `backend.telegram_lookup`, `backend.telegram_time`
 
 - `class _Origin` (14)
 - `async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None` (23)
 - `async def _post_text(msg, where: str, vacancy_id: int) -> tuple[str, bool] | None` (17)
-- `async def _fetch_fresh_text(pipeline, channel_username: str, msg_id: int | None, vacancy_id: int)` (36)
+- `async def _fetch_fresh_text(pipeline, channel_username: str, msg_id: int | None, vacancy_id: int)` (33)
 - `async def _store(pipeline, vacancy_id: int, **fields) -> bool` (17)
 - `async def _refresh_embedding(pipeline, vacancy_id: int, text: str) -> None` (36)
 - `async def _note_rerun(pipeline, vacancy_id: int, origin: '_Origin') -> None` (5)
@@ -1636,7 +1636,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _short_dash(text: str) -> str` (2)
 - `def _trouble(letter: Letter, limit: int | None) -> str | None` (7)
 
-### `backend/llm/answers.py` — 253 строк
+### `backend/llm/answers.py` — 255 строк
 
 Разбор того, что ответила модель, порядок двух заходов и жалоба на неудачу.
 
@@ -1648,7 +1648,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def log_unparseable(answer: str, log: logging.Logger, purpose: str) -> None` (18)
 - `def truncation_trouble(finish_reason: str | None) -> str | None` (9)
 - `def wants_more_room(parsed, finish_reason: str | None) -> bool` (18)
-- `async def read_with_a_second_try(ask, read, tokens: tuple[int, int], told: tuple[logging.Logger, str], *, empty_means: str | None=None)` (39)
+- `async def read_with_a_second_try(ask, read, tokens: tuple[int, int], told: tuple[logging.Logger, str], *, empty_means: str | None=None)` (41)
 - `def _say_unread(answer: str, told: tuple[logging.Logger, str], empty_means: str | None) -> None` (15)
 - `def str_or_none(value) -> str | None` (10)
 
@@ -1803,13 +1803,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def _prompt_for(profile: CandidateProfile) -> str` (7)
 - `async def validate_role_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (12)
 
-### `backend/llm/genre.py` — 137 строк
+### `backend/llm/genre.py` — 139 строк
 
 Жанр поста: зовёт ли автор на работу или предлагает себя.
 
 Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.rules`, `backend.payloads`
 
-- `def _parse_genre(answer: str) -> PostGenre | None` (18)
+- `def _parse_genre(answer: str) -> PostGenre | None` (20)
 - `def _genre_request(text: str, max_tokens: int) -> ChatRequest` (17)
 - `async def classify_post_genre(text: str, client: httpx.AsyncClient, model: str) -> tuple[PostGenre | None, str | None]` (22)
 
@@ -2841,14 +2841,15 @@ Runtime settings layer.
   - `async def _failed(self, client, message: str) -> LoginStep` (5)
   - `async def _save(self) -> LoginStep` (48)
 
-### `backend/telegram_lookup.py` — 107 строк
+### `backend/telegram_lookup.py` — 115 строк
 
 Что берётся у Telegram по дороге, а не ради самого похода.
 
 Зависит от: `backend.domain.telegram_identity`
 
 - `async def read_channel_metadata(client, chat, *, current_avatar: bytes | None=None) -> tuple[str | None, bytes | None]` (20)
-- `async def _quietly(what: str, asking)` (26)
+- `async def _quietly(what: str, asking)` (24)
+- `def say_flood_wait(log: logging.Logger, what: str, error) -> None` (8)
 - `async def fetch_telegram_avatar(client, entity) -> bytes | None` (21)
 - `async def resolve_hr_telegram(client, hr_contact: str)` (12)
 
@@ -3710,7 +3711,7 @@ Runtime settings layer.
 
 ## tests — 323 модулей
 
-### `tests/adapters/test_agent_mcp.py` — 83 строк
+### `tests/adapters/test_agent_mcp.py` — 85 строк
 
 Инструменты сессии доступны по своему адресу и только по нему.
 
@@ -4764,7 +4765,7 @@ Runtime settings layer.
 
 - `async def _channels(session_factory, *rows)` (4)
 
-### `tests/backend/test_flows_channel_reading.py` — 332 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_channel_reading.py` — 331 строк ⚠ подошёл к 300
 
 Следствия чтения новых сообщений одного канала.
 
@@ -5249,15 +5250,15 @@ Runtime settings layer.
 
 - `async def _asked(answer: httpx.Response, text: str='Ищем в команду')` (3)
 
-### `tests/backend/test_llm_json_extraction.py` — 265 строк
+### `tests/backend/test_llm_json_extraction.py` — 275 строк
 
 Следствия вырезания ответа-объекта из того, что вернула модель.
 
 Зависит от: `backend.llm.answers`
 
-Тестов: 17
+Тестов: 18
 
-- `async def _second_try(answer: str, **options)` (9)
+- `async def _second_try(answer: str, finish: str='stop', **options)` (9)
   - `async def ask(room)` (2)
 
 ### `tests/backend/test_llm_profile_formatting.py` — 121 строк

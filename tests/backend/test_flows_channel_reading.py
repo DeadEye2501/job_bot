@@ -316,17 +316,16 @@ async def test_a_channel_that_outran_the_limit_loses_nothing(reading, session_fa
     assert saved.last_processed_msg_id == 11
 
 
-async def test_the_first_walk_of_a_channel_is_not_called_a_loss(reading, caplog):
-    """Первый обход канала потерей не считается, сколько бы он ни прочёл.
+async def test_the_first_walk_of_a_channel_takes_the_freshest(reading):
+    """Первый обход канала берёт предел самых свежих, а не самых старых.
 
-    Отметки ещё нет, читать «до виденного» нечего, и предел здесь работает по
-    назначению — это глубина первого захода, а не обрыв.
+    Отметки ещё нет, читать «до виденного» нечего: предел здесь — глубина
+    первого захода, и захватывать им начало канала незачем.
     """
     pipeline, client, channel = reading
     await pipeline.rs.set_app("backfill_limit", "3")
     client.history = [post(msg_id) for msg_id in range(20, 0, -1)]
 
-    with caplog.at_level("WARNING"):
-        await channels.poll_channel(pipeline, channel.id, "jobs", None)
+    await channels.poll_channel(pipeline, channel.id, "jobs", None)
 
-    assert "WARNING" not in caplog.text
+    assert pipeline.taken == [18, 19, 20]

@@ -61,13 +61,21 @@ async def _quietly(what: str, asking):
     try:
         return await asking()
     except FloodWait as e:
-        logger.warning(
-            "%s: FloodWait %s, пропускаю", what, getattr(e, "value", "?")
-        )
+        say_flood_wait(logger, what, e)
         return None
     except Exception:
         logger.exception("%s: не вышло", what)
         return None
+
+
+def say_flood_wait(log: logging.Logger, what: str, error) -> None:
+    """Записать просьбу Telegram подождать: словом, а не трассировкой.
+
+    Это не поломка, а запрет на срок. Срок Telegram называет не всегда, и в
+    запись он идёт строкой — собранная числом, она упала бы на «?» и унесла бы
+    с собой саму запись.
+    """
+    log.warning("%s: FloodWait %s, пропускаю", what, getattr(error, "value", "?"))
 
 
 async def fetch_telegram_avatar(client, entity) -> bytes | None:

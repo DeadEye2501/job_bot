@@ -12,9 +12,12 @@ from mcp.server.fastmcp import FastMCP
 
 SERVER_NAME = "jobbot"
 _START_SEC = 10
-_CLOSE_SEC = 5
-# Ждать закрытия дольше мягкой остановки: после неё сервер ещё гасит приложение.
-_CLOSE_WAIT_SEC = _CLOSE_SEC * 2
+# Мягкая остановка — доля секунды: сервер закрывают, когда сессия агента уже
+# кончилась, и ждать её висящий вызов незачем — он только задержал бы
+# остановку бота, а окно ждёт её считанные секунды.
+_GRACE_SEC = 0.5
+# Сколько ждать закрытия целиком: мягкая остановка и остановка приложения.
+_CLOSE_WAIT_SEC = 5
 logger = logging.getLogger(__name__)
 
 
@@ -70,7 +73,7 @@ async def serve_tools(tools: list[Callable]) -> ToolServer:
         # log_config=None: в оконной сборке sys.stdout пуст, а журнал uvicorn по
         # умолчанию спрашивает у него isatty. Записи идут в корневой журнал приложения.
         server = uvicorn.Server(uvicorn.Config(
-            mcp.streamable_http_app(), log_config=None, timeout_graceful_shutdown=_CLOSE_SEC,
+            mcp.streamable_http_app(), log_config=None, timeout_graceful_shutdown=_GRACE_SEC,
         ))
         task = asyncio.create_task(server.serve(sockets=[sock]))
         await _started(server, task)

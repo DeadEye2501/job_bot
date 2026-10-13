@@ -7,7 +7,7 @@
   import { untrack } from 'svelte';
 
   import { autosave } from '$state/autosave.js';
-  import { fitHeight } from '$state/autosize.js';
+  import { growing } from '$state/autosize.js';
   import { shortDate } from '$state/dates.js';
   import { flashing } from '$state/flash.js';
 
@@ -23,7 +23,6 @@
   let reason = $state(untrack(() => row.reason || ''));
   let valueSaved = $state(false);
   let reasonSaved = $state(false);
-  let field = $state(null);
 
   const markValue = flashing((on) => (valueSaved = on));
   const markReason = flashing((on) => (reasonSaved = on));
@@ -59,20 +58,12 @@
     return true;
   }
 
-  /** Растянуть причину по набранному: она бывает в три строки, а полосы
-   *  прокрутки в строке таблицы не разглядеть. */
-  function grow() {
-    if (field === null) return;
-    fitHeight(field);
-  }
-
   $effect(() => {
     savers.value.known(row.value);
     savers.reason.known(row.reason || '');
   });
 
   $effect(() => {
-    grow();
     return () => {
       // Набранное и не уехавшее отправляем на прощание: строку убрали или
       // отобрали родом, и ждать паузы больше нечему.
@@ -98,15 +89,12 @@
   <textarea
     class="inline-edit bl-input reason"
     class:saved-flash={reasonSaved}
-    bind:this={field}
     rows="1"
     maxlength="500"
     placeholder="Причина (опционально)"
     bind:value={reason}
-    oninput={() => {
-      grow();
-      savers.reason.typed(reason);
-    }}
+    use:growing={reason}
+    oninput={() => savers.reason.typed(reason)}
     onblur={() => savers.reason.flush()}
   ></textarea>
 

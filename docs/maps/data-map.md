@@ -23,8 +23,8 @@
 
 - `SERVER_NAME` = `'jobbot'`
 - `_START_SEC` = `10`
-- `_CLOSE_SEC` = `5`
-- `_CLOSE_WAIT_SEC` = `_CLOSE_SEC * 2`
+- `_GRACE_SEC` = `0.5`
+- `_CLOSE_WAIT_SEC` = `5`
 - `logger` = `logging.getLogger(__name__)`
 - `class ToolServer`
   - `url: str`

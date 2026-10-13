@@ -87,7 +87,9 @@ def _parse_genre(answer: str) -> PostGenre | None:
     is_vacancy = data.get("is_vacancy")
     reason = str_or_none(data.get("reason"))
     if not isinstance(is_vacancy, bool) or reason is None:
-        logger.warning(
+        # Вполголоса: о неразобранном ответе громко скажет общее чтение
+        # (`answers.read_with_a_second_try`), здесь — только чего не хватило.
+        logger.debug(
             "classify_post_genre: ответ без жанра или без обоснования: %r", data
         )
         return None

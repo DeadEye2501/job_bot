@@ -186,10 +186,10 @@ def test_a_complaint_about_an_unparsed_answer_names_the_purpose(caplog):
     assert "ш" * 900 not in written[0]
 
 
-async def _second_try(answer: str, **options):
+async def _second_try(answer: str, finish: str = "stop", **options):
     """Прогнать общее чтение ответа с чтением, которое ничего не принимает."""
     async def ask(room):
-        return SimpleNamespace(text=answer, finish_reason="stop", error=None)
+        return SimpleNamespace(text=answer, finish_reason=finish, error=None)
 
     return await read_with_a_second_try(
         ask, lambda text: None, (100, 200), (logging.getLogger("проверка"), "разбор"),
@@ -218,6 +218,16 @@ async def test_an_empty_answer_elsewhere_is_still_a_broken_one(caplog):
         await _second_try('{"verdict": "", "reason": ""}')
 
     assert "не разобрался" in caplog.text
+
+
+async def test_an_empty_answer_cut_by_the_limit_is_not_given_a_meaning(caplog):
+    """Пустой объект, оборванный на пределе токенов, — обрыв, а не ответ:
+    назвать его «не вакансия» значило бы соврать о решении модели."""
+    with caplog.at_level(logging.INFO):
+        _, trouble = await _second_try('{"title": null}', finish="length", empty_means="не вакансия")
+
+    assert trouble is not None
+    assert "не вакансия" not in caplog.text
 
 
 async def test_false_is_a_value_not_an_empty_field(caplog):
