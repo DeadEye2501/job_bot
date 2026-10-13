@@ -12,13 +12,19 @@
   //
   // Записью распоряжается сама анкета: у неё одна отложенная запись на всю
   // страницу, и поле про неё знает только то, чем её позвать.
+  //
+  // Высота — по набранному, не выше предела `lines`, если он задан.
+  import { growing } from '$state/autosize.js';
   import { saveKey } from '$state/keys.js';
 
-  let { value, maxlength, placeholder, ontyped, onflush } = $props();
+  let { value, maxlength, placeholder, lines, ontyped, onflush } = $props();
 </script>
 
 <textarea
   class="textarea span-2"
+  rows="1"
+  data-lines={lines}
+  use:growing={value}
   {maxlength}
   {placeholder}
   {value}

@@ -35,6 +35,9 @@
     const now = await load();
     if (now === null || !alive.now) return;
     rows = now[kind.key].map((one) => ({ ...one, key: `id-${one.id}` }));
+    // Раскрыты все: записей немного, и по свёрнутым шапкам человек их не
+    // читает — открывал бы каждую.
+    open = new Set(rows.map((one) => one.key));
     known = now.skills_index;
     loaded = true;
   }

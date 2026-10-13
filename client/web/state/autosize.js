@@ -19,10 +19,30 @@ import { tick as painted } from 'svelte';
  * Сжатие до `auto` перед замером несущее: растянутое поле показывает прежнюю
  * высоту и после того, как текст из него убрали, — стёртый абзац оставил бы
  * после себя дыру во весь свой рост.
+ *
+ * Поле может объявить предел в строках (`data-lines`): длинный текст тогда
+ * прокручивается внутри, а не растягивает форму на весь экран. Растянуть его
+ * выше человек может сам, за нижний край.
  */
 export function fitHeight(field) {
   field.style.height = 'auto';
-  field.style.height = `${field.scrollHeight}px`;
+  // Высота поля считается с рамкой, а текст меряется без неё: без прибавки
+  // поле выходит на ширину рамки ниже текста, и сбоку встаёт прокрутка.
+  const border = field.offsetHeight - field.clientHeight || 0;
+  field.style.height = `${Math.min(field.scrollHeight, mostHeight(field)) + border}px`;
+}
+
+/** Высота поля в объявленный предел строк; предела нет — без ограничения.
+ *
+ * Высота строки `normal` числом не читается: браузер берёт её около 1.2
+ * размера шрифта, и так же считается здесь.
+ */
+function mostHeight(field) {
+  const lines = Number(field.dataset?.lines);
+  if (!lines) return Infinity;
+  const look = getComputedStyle(field);
+  const line = parseFloat(look.lineHeight) || parseFloat(look.fontSize) * 1.2;
+  return lines * line + parseFloat(look.paddingTop) + parseFloat(look.paddingBottom);
 }
 
 /** Держать высоту поля подогнанной, пока поле живёт: при заведении, на каждый

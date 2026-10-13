@@ -3,7 +3,7 @@
 // Разметки в прогоне нет — проверки идут в node, — поэтому поле подставляется:
 // предмет здесь не браузер, а порядок, в котором высоту меряют и ставят.
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { fitHeight, growing } from '../state/autosize.js';
 
@@ -49,6 +49,62 @@ describe('высота поля по набранному', () => {
     fitHeight(one);
 
     expect(one.trail).toEqual(['auto', '64px']);
+  });
+});
+
+describe('поле с рамкой', () => {
+  it('рамка прибавляется к высоте текста — иначе текст не влезает, и сбоку встаёт прокрутка', () => {
+    const one = field(64);
+    one.offsetHeight = 42;
+    one.clientHeight = 40;
+
+    fitHeight(one);
+
+    expect(one.trail.at(-1)).toBe('66px');
+  });
+});
+
+describe('поле с пределом строк', () => {
+  // Строка — 20px, поля сверху и снизу по 6px: предел в две строки — 52px.
+  // Вида поля в node нет, и его отдаёт подставной замер браузера.
+  beforeEach(() => {
+    globalThis.getComputedStyle = () => ({ lineHeight: '20px', paddingTop: '6px', paddingBottom: '6px' });
+  });
+  afterEach(() => {
+    delete globalThis.getComputedStyle;
+  });
+
+  function limited(fits) {
+    const one = field(fits);
+    one.dataset = { lines: '2' };
+    return one;
+  }
+
+  it('длинный текст — не выше предела', () => {
+    const one = limited(500);
+
+    fitHeight(one);
+
+    expect(one.trail.at(-1)).toBe('52px');
+  });
+
+  it('высота строки «normal» считается от размера шрифта', () => {
+    globalThis.getComputedStyle = () => ({
+      lineHeight: 'normal', fontSize: '10px', paddingTop: '6px', paddingBottom: '6px',
+    });
+    const one = limited(500);
+
+    fitHeight(one);
+
+    expect(one.trail.at(-1)).toBe('36px');
+  });
+
+  it('короткий текст — по себе, предел его не растягивает', () => {
+    const one = limited(30);
+
+    fitHeight(one);
+
+    expect(one.trail.at(-1)).toBe('30px');
   });
 });
 

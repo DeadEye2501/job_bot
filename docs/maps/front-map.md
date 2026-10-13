@@ -76,11 +76,11 @@
 - Строка отправки остаётся на месте и при заслоне, только запертой: пропав, она не сказала бы, почему писать нельзя.
 - принимает: ask, say, hrId, blocked, events, onread
 
-### app/ProfileCv.svelte (296)
+### app/ProfileCv.svelte (297)
 - —
 - принимает: ask
 
-### app/ProfileRecords.svelte (133)
+### app/ProfileRecords.svelte (136)
 - —
 - принимает: load, save, kind, Card
 
@@ -274,9 +274,9 @@
 - —
 - принимает: value, onpick, disabled, up
 
-### components/DelayedTextarea.svelte (28)
+### components/DelayedTextarea.svelte (34)
 - —
-- принимает: value, maxlength, placeholder, ontyped, onflush
+- принимает: value, maxlength, placeholder, lines, ontyped, onflush
 
 ### components/DonutChart.svelte (42)
 - —
@@ -644,8 +644,8 @@
 - * Заводит отложенную запись поля. * * Пауза считается от последнего знака: запись на каждый знак послала бы мосту * по вопросу на букву, а отсчёт от первого отправлял бы недописанное. * * `save` отвечает, легло ли: ложь означает отказ, и тогда набранное считается * незаписанным — следующая попытка уедет тем же текстом.
 - отдаёт: autosave
 
-### state/autosize.js (51)
-- * Подогнать высоту поля под его текст. * * Сжатие до `auto` перед замером несущее: растянутое поле показывает прежнюю * высоту и после того, как текст из него убрали, — стёртый абзац оставил бы * после себя дыру во весь свой рост.
+### state/autosize.js (71)
+- * Подогнать высоту поля под его текст. * * Сжатие до `auto` перед замером несущее: растянутое поле показывает прежнюю * высоту и после того, как текст из него убрали, — стёртый абзац оставил бы * после себя дыру во весь свой рост. * * Поле может объявить предел в строках (`data-lines`): длинный текст тогда * прокручивается внутри, а не растягивает форму на весь экран. Растянуть его * выше человек может сам, за нижний край.
 - отдаёт: fitHeight, growing
 
 ### state/avatar.js (19)
@@ -1687,7 +1687,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/autosave.test.js (140)
 - —
 
-### tests/autosize.test.js (85)
+### tests/autosize.test.js (141)
 - * Поле, помнящее всё, что ему ставили в высоту. * * Измеренная высота отвечает по последнему поставленному: настоящее поле * меряет содержимое ровно так — сжатое до `auto` показывает свой текст, а * растянутое прежним значением показывает это самое прежнее.
 
 ### tests/avatar.test.js (27)
@@ -1851,7 +1851,7 @@ body, html, button, body, .material-symbols-outlined
 ### tests/profile_experience_live.test.js (54)
 - * Завести место работы и заполнить три обязательных поля.
 
-### tests/profile_projects_live.test.js (61)
+### tests/profile_projects_live.test.js (66)
 - —
 
 ### tests/projects.test.js (40)
