@@ -168,6 +168,43 @@ async def test_a_broken_channel_does_not_stop_the_walk(monkeypatch, walking, ses
     assert walked == ["good"]
 
 
+async def test_a_channel_that_no_longer_exists_is_switched_off(
+    monkeypatch, walking, session_factory
+):
+    """Канал, которого в Telegram больше нет, выключается, а обход идёт дальше.
+
+    Ник никем не занят — канал удалён или переименован, и вакансий оттуда не
+    будет. Читать его каждый круг значит тратить розыск по нику, на частый
+    розыск Telegram отвечает запретом на часы — на весь аккаунт.
+    """
+    from pyrogram.errors import UsernameNotOccupied
+
+    await put(
+        session_factory,
+        channel_row(username="gone", is_active=True),
+        channel_row(username="good", is_active=True),
+    )
+    walked: list[str] = []
+
+    async def poll(pipeline, channel_id, username, last_id):
+        if username == "gone":
+            raise UsernameNotOccupied
+        walked.append(username)
+
+    monkeypatch.setattr(channels, "poll_channel", poll)
+
+    heard: list[int] = []
+    walking.on_channels_changed = lambda: heard.append(1)
+
+    await walking.poll_active_channels()
+
+    assert walked == ["good"]
+    switched = {row.username: row.is_active for row in await all_rows(session_factory, TelegramChannel)}
+    assert switched == {"gone": False, "good": True}
+    # Окно слышит о выключении: иначе в списке канал стоял бы включённым.
+    assert heard
+
+
 async def test_a_captcha_nobody_solved_stops_the_whole_walk(monkeypatch, walking, session_factory):
     """Капча, которую человек не прошёл, — беда всей работы, а не одного канала:
     следующий канал упёрся бы в то же ожидание."""

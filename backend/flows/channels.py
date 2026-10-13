@@ -6,7 +6,11 @@ from typing import Literal
 from backend.agent.stops import RUN_STOPPERS
 from backend.telegram_lookup import read_channel_metadata
 from backend.models import TelegramChannel
-from backend.repository.channels import is_channel_blacklisted, list_named_channels
+from backend.repository.channels import (
+    is_channel_blacklisted,
+    list_named_channels,
+    set_channel_active,
+)
 
 from backend.flows import embeddings, ingest
 from backend.notify import fire
@@ -60,19 +64,45 @@ async def poll_active_channels(pipeline) -> None:
     )
     for idx, ch in enumerate(active_named):
         pipeline.emit_progress("channel", f"@{ch.username}", idx, total)
-        try:
-            await poll_channel(pipeline,
-                ch.id, ch.username, ch.last_processed_msg_id
-            )
-        except RUN_STOPPERS:
-            raise
-        except Exception:
-            logger.exception("[@%s] poll failed", ch.username)
+        await _walk_channel(pipeline, ch)
     pipeline.emit_progress("channel", "", total, total)
     # 0/0 on the message track signals the UI to clear that bar between
     # cycles; otherwise it would freeze on the last channel's count.
     pipeline.emit_progress("message", "", 0, 0)
     logger.info("Poll cycle done")
+
+
+async def _walk_channel(pipeline, ch) -> None:
+    """Прочитать один канал обхода; его беда обход не обрывает.
+
+    Канал, чей ник никем не занят, удалён или переименован: вакансий оттуда
+    не будет, а чтение каждый круг тратит розыск по нику, на частый розыск
+    Telegram отвечает запретом на часы — на весь аккаунт. Такой канал
+    выключается; вернуть его — тумблером, если ник снова заведут.
+    """
+    from pyrogram.errors import UsernameNotOccupied
+
+    try:
+        await poll_channel(pipeline, ch.id, ch.username, ch.last_processed_msg_id)
+    except RUN_STOPPERS:
+        raise
+    except UsernameNotOccupied:
+        logger.warning("[@%s] канала больше нет — ник никем не занят; выключаю", ch.username)
+        await _switch_off(pipeline, ch)
+    except Exception:
+        logger.exception("[@%s] poll failed", ch.username)
+
+
+async def _switch_off(pipeline, ch) -> None:
+    """Выключить канал и сказать окну; беда записи обход не обрывает."""
+    try:
+        async with pipeline.session_factory() as session:
+            await set_channel_active(session, ch.id, False)
+            await session.commit()
+    except Exception:
+        logger.exception("[@%s] выключить не вышло", ch.username)
+        return
+    fire(pipeline.on_channels_changed, "on_channels_changed")
 
 
 PollOutcome = Literal["ok", "missing", "blacklisted", "error"]
@@ -171,13 +201,19 @@ async def _collect_metadata(pipeline, channels) -> tuple[dict, dict]:
     попадает в сбор только изменившееся.
 
     Канал, до которого не достучались, пропускается с записью в журнал: из-за
-    одного закрытого остальные обновиться должны.
+    одного закрытого остальные обновиться должны. Канал, которого нет вовсе,
+    — одной строкой: обход его уже выключил, а сводка идёт и по выключенным.
     """
+    from pyrogram.errors import UsernameNotOccupied
+
     title_updates: dict[int, str] = {}
     avatar_updates: dict[int, bytes] = {}
     for ch in channels:
         try:
             chat = await pipeline.client.get_chat(ch.username)
+        except UsernameNotOccupied:
+            logger.info("[@%s] канала нет — название не обновить", ch.username)
+            continue
         except Exception:
             logger.exception("[@%s] get_chat failed", ch.username)
             continue
