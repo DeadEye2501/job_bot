@@ -1695,7 +1695,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parse_cv_json(answer: str) -> ParsedCv | None` (21)
 - `async def parse_cv(text: str, client: httpx.AsyncClient, model: str) -> ParsedCv | None` (36)
 
-### `backend/llm/cv_grounding.py` — 389 строк ⚠ подошёл к 300
+### `backend/llm/cv_grounding.py` — 391 строк ⚠ подошёл к 300
 
 Что в разобранном резюме не подтверждается его же текстом.
 
@@ -1710,7 +1710,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _level_named_in(near: str, word: str) -> bool` (12)
 - `def _level_read_near(windows: list[str]) -> str | None` (16)
 - `def _grounded_level(windows: list[str], level: str) -> str` (24)
-- `def _company_at(lowered: str, company: str, cursor: int) -> int` (19)
+- `def _company_at(lowered: str, company: str, cursor: int) -> int` (21)
 - `def _starts(lowered: str, names: list[str], taken: set[int]) -> list[int]` (22)
 - `def _job_blocks(text: str, groups: list[list[str]]) -> list[str | None]` (30)
 - `def _grounded_stack(place, block: str | None) -> list[str]` (11)
@@ -5120,13 +5120,13 @@ Runtime settings layer.
 Тестов: 27
 
 
-### `tests/backend/test_llm_cv_grounding_stack.py` — 247 строк
+### `tests/backend/test_llm_cv_grounding_stack.py` — 282 строк
 
 Что в разобранных местах работы и проектах не подтверждается текстом резюме.
 
 Зависит от: `backend.llm.cv_grounding`, `tests.factories_cv`
 
-Тестов: 12
+Тестов: 14
 
 
 ### `tests/backend/test_llm_cv_items.py` — 243 строк

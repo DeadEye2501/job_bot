@@ -117,7 +117,7 @@ async def save_skills(
     связками стека. Правка не меняет номер строки, поэтому стеки переживают и
     переименование навыка.
 
-    Caller wraps in ``session.begin()``.
+    Сделку держит зовущий.
     """
     existing = {s.id: s for s in await list_skills(session)}
     keep_ids = _upsert_skills(session, rows, existing, profile_id)

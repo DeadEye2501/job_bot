@@ -27,8 +27,6 @@ export function projectTitle(project) {
 
 /** Проекты как вид записи вкладки профиля. */
 export const PROJECTS = {
-  load: 'profile.projects',
-  save: 'profile.save_projects',
   key: 'projects',
   heading: 'Профиль / Projects',
   count: (n) => counted(n, 'проект', 'проекта', 'проектов'),

@@ -2,39 +2,19 @@
 //
 // Вкладка проектов: та же вкладка записей, что у мест работы, с полями проекта.
 
-import { cleanup, render, within } from '@testing-library/svelte';
+import { cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import ProfileRecords from '../app/ProfileRecords.svelte';
 import ProjectCard from '../components/ProjectCard.svelte';
 import { PROJECTS } from '../state/projects.js';
+import { fill, recordsTab } from './records_tab.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
 
 const OLD = { id: 1, name: 'Давний', url: null, about: [], skill_names: [] };
 
-/** Вкладка с записанными за ней посылками на мост. */
-function tab(projects = []) {
-  const sent = [];
-  const ask = async (method, payload) => {
-    if (method === 'profile.projects') return { projects, skills_index: [] };
-    if (method === 'profile.save_projects') {
-      sent.push(payload.projects);
-      return {};
-    }
-    return {};
-  };
-  const shown = render(ProfileRecords, { props: { ask, kind: PROJECTS, Card: ProjectCard } });
-  return { sent, q: within(shown.container) };
-}
-
-/** Набрать в поле и отпустить его: поля карточки отправляют по уходу фокуса. */
-function fill(field, value) {
-  field.value = value;
-  field.dispatchEvent(new Event('input', { bubbles: true }));
-  field.dispatchEvent(new Event('blur', { bubbles: true }));
-}
+const tab = (projects) => recordsTab(PROJECTS, ProjectCard, projects);
 
 describe('живая вкладка проектов', () => {
   it('новый проект встаёт первым и уезжает с одним названием', async () => {
@@ -47,6 +27,23 @@ describe('живая вкладка проектов', () => {
     await settled();
 
     expect(sent.at(-1).map((one) => one.name)).toEqual(['Свежий', 'Давний']);
+  });
+
+  it('пункты «О проекте» уезжают перечнем: добавленный, набранный, удалённый', async () => {
+    const { sent, q } = tab([{ ...OLD, about: ['Описание'] }]);
+    await settled();
+    q.getByText('Давний').click();
+    await settled();
+
+    q.getByText('Добавить пункт').click();
+    await settled();
+    fill(q.getAllByRole('textbox').at(-1), 'Второй');
+    await settled();
+    expect(sent.at(-1)[0].about).toEqual(['Описание', 'Второй']);
+
+    q.getAllByTitle('Удалить')[0].click();
+    await settled();
+    expect(sent.at(-1)[0].about).toEqual(['Второй']);
   });
 
   it('у карточки проекта нет должности и дат, есть «О проекте» и стек', async () => {

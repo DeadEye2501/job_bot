@@ -1,16 +1,17 @@
 <script>
   // Вкладка записей анкеты — мест работы или проектов: карточки одного вида.
   //
-  // Вид записи (`kind`) говорит, чем спрашивать и чем писать, как назвать и
-  // какой пустой завести; карточка (`Card`) — её поля. Перечень уезжает на мост
-  // целиком и заменяет прежний — как и навыки.
+  // Вид записи (`kind`) говорит, как назвать и какой пустой завести; карточка
+  // (`Card`) — её поля; `load` и `save` — зовы моста, которые сборка пишет
+  // литералом. Перечень уезжает на мост целиком и заменяет прежний — как и
+  // навыки.
 
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import { living } from '$state/alive.js';
   import { toggled, without } from '$state/chosen.js';
   import { oneWrite } from '$state/one_write.js';
 
-  let { ask, kind, Card } = $props();
+  let { load, save: send, kind, Card } = $props();
 
   let leaving = $state(null);
   let trouble = $state('');
@@ -31,14 +32,14 @@
   let born = 0;
 
   async function refresh() {
-    const now = await ask(kind.load);
+    const now = await load();
     if (now === null || !alive.now) return;
     rows = now[kind.key].map((one) => ({ ...one, key: `id-${one.id}` }));
     known = now.skills_index;
     loaded = true;
   }
 
-  const write = oneWrite((going) => ask(kind.save, { [kind.key]: going }));
+  const write = oneWrite(send);
 
   /** Отправить перечень целиком.
    *

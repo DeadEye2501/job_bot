@@ -80,11 +80,11 @@
 - —
 - принимает: ask
 
-### app/ProfileRecords.svelte (132)
+### app/ProfileRecords.svelte (133)
 - —
-- принимает: ask, kind, Card
+- принимает: load, save, kind, Card
 
-### app/ProfileScreen.svelte (35)
+### app/ProfileScreen.svelte (45)
 - —
 - принимает: ask
 - берёт: ./ProfileCv.svelte, ./ProfileRecords.svelte, ./ProfileSkills.svelte
@@ -207,9 +207,9 @@
 - принимает: row, onedit, ontoggle, onremove
 - берёт: ./RowToggle.svelte
 
-### components/BulletList.svelte (36)
+### components/BulletList.svelte (45)
 - —
-- принимает: label, addLabel, items, onedit, onadd, onremove
+- принимает: label, addLabel, items, onchange
 
 ### components/CardActions.svelte (44)
 - —
@@ -300,7 +300,7 @@
 - принимает: options, value, placeholder, onpick
 - берёт: ./DropPanel.svelte
 
-### components/ExperienceCard.svelte (107)
+### components/ExperienceCard.svelte (97)
 - —
 - принимает: record, known, open, ontoggle, onedit, onremove
 - берёт: ./BulletList.svelte, ./DatePicker.svelte, ./RecordCard.svelte, ./StackField.svelte
@@ -467,7 +467,7 @@
 - —
 - принимает: channels, messages, text
 
-### components/ProjectCard.svelte (43)
+### components/ProjectCard.svelte (40)
 - —
 - принимает: record, known, open, ontoggle, onedit, onremove
 - берёт: ./BulletList.svelte, ./RecordCard.svelte, ./StackField.svelte
@@ -716,7 +716,7 @@
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
 - отдаёт: asIso, clock, dayIso, dayOf, isoDay, padded, shortDate, showDate, showStamp, validDate
 
-### state/experience.js (84)
+### state/experience.js (82)
 - * Период работы для шапки карточки. * * Месяц и год без дня: места работы различают по месяцам, а день удлиняет * строку вдвое. Открытый конец назван словами — по нему и читают, работает * человек здесь сейчас или нет.
 - отдаёт: EXPERIENCE, cardTitle, experienceGoing, experienceReady, period
 
@@ -796,7 +796,7 @@
 - * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
 - отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, applyNote, bar, caption, countlessNote, humanText, updateNote
 
-### state/projects.js (39)
+### state/projects.js (37)
 - * Готов ли проект к записи: обязательно одно название, как требует мост.
 - отдаёт: PROJECTS, projectReady, projectTitle, projectsGoing
 
@@ -1667,7 +1667,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 97 файлов
+## tests — 98 файлов
 
 ### tests/aggregators.test.js (118)
 - —
@@ -1848,11 +1848,11 @@ body, html, button, body, .material-symbols-outlined
 ### tests/profile_cv_live.test.js (38)
 - * Анкета, у которой мост отдаёт этот файл резюме.
 
-### tests/profile_experience_live.test.js (76)
-- * Вкладка с записанными за ней посылками на мост.
+### tests/profile_experience_live.test.js (54)
+- * Завести место работы и заполнить три обязательных поля.
 
-### tests/profile_projects_live.test.js (64)
-- * Вкладка с записанными за ней посылками на мост.
+### tests/profile_projects_live.test.js (61)
+- —
 
 ### tests/projects.test.js (40)
 - —
@@ -1862,6 +1862,10 @@ body, html, button, body, .material-symbols-outlined
 
 ### tests/provider_form.test.js (276)
 - * Мост, отвечающий заготовкой по имени метода — значением или функцией нагрузки.
+
+### tests/records_tab.js (27)
+- * Вкладка вида `kind` с карточкой `Card` и перечнем `rows` от моста.
+- отдаёт: fill, recordsTab
 
 ### tests/round.test.js (66)
 - —

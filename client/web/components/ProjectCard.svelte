@@ -33,10 +33,7 @@
     label="О проекте"
     addLabel="Добавить пункт"
     items={record.about}
-    onedit={(index, text) =>
-      onedit({ about: record.about.map((one, at) => (at === index ? text : one)) })}
-    onadd={() => onedit({ about: [...record.about, ''] })}
-    onremove={(index) => onedit({ about: record.about.filter((_, at) => at !== index) })}
+    onchange={(about) => onedit({ about })}
   />
 
   <StackField chosen={record.skill_names} {known} {onedit} />

@@ -11,39 +11,17 @@
 // Само правило отбора сторожат проверки состояния (`experience.test.js`); здесь
 // предмет другой — что метку кто-то ставит, и ставит после удачи.
 
-import { cleanup, render, within } from '@testing-library/svelte';
+import { cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import ProfileRecords from '../app/ProfileRecords.svelte';
 import ExperienceCard from '../components/ExperienceCard.svelte';
 import { EXPERIENCE } from '../state/experience.js';
+import { fill, recordsTab } from './records_tab.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
 
-/** Вкладка с записанными за ней посылками на мост. */
-function tab() {
-  const sent = [];
-  const ask = async (method, payload) => {
-    if (method === 'profile.experience') return { experience: [], skills_index: [] };
-    if (method === 'profile.save_experience') {
-      sent.push(payload.experience);
-      return {};
-    }
-    return {};
-  };
-  const shown = render(ProfileRecords, {
-    props: { ask, kind: EXPERIENCE, Card: ExperienceCard },
-  });
-  return { sent, q: within(shown.container) };
-}
-
-/** Набрать в поле и отпустить его: поля карточки отправляют по уходу фокуса. */
-function fill(field, value) {
-  field.value = value;
-  field.dispatchEvent(new Event('input', { bubbles: true }));
-  field.dispatchEvent(new Event('blur', { bubbles: true }));
-}
+const tab = () => recordsTab(EXPERIENCE, ExperienceCard);
 
 /** Завести место работы и заполнить три обязательных поля. */
 async function fillFresh(q) {

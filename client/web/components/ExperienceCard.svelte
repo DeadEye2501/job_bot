@@ -34,10 +34,6 @@
   function pickDate(key, iso) {
     onedit({ [key]: iso || null });
   }
-
-  function editItem(field, index, text) {
-    onedit({ [field]: record[field].map((one, at) => (at === index ? text : one)) });
-  }
 </script>
 
 <RecordCard {title} {open} {ontoggle} {onremove} removeLabel="Удалить место работы">
@@ -87,20 +83,14 @@
     label="Достижения"
     addLabel="Добавить достижение"
     items={record.achievements}
-    onedit={(index, text) => editItem('achievements', index, text)}
-    onadd={() => onedit({ achievements: [...record.achievements, ''] })}
-    onremove={(index) =>
-      onedit({ achievements: record.achievements.filter((_, at) => at !== index) })}
+    onchange={(achievements) => onedit({ achievements })}
   />
 
   <BulletList
     label="Обязанности"
     addLabel="Добавить обязанность"
     items={record.responsibilities}
-    onedit={(index, text) => editItem('responsibilities', index, text)}
-    onadd={() => onedit({ responsibilities: [...record.responsibilities, ''] })}
-    onremove={(index) =>
-      onedit({ responsibilities: record.responsibilities.filter((_, at) => at !== index) })}
+    onchange={(responsibilities) => onedit({ responsibilities })}
   />
 
   <StackField chosen={record.skill_names} {known} {onedit} />
