@@ -13,6 +13,8 @@ from mcp.server.fastmcp import FastMCP
 SERVER_NAME = "jobbot"
 _START_SEC = 10
 _CLOSE_SEC = 5
+# Ждать закрытия дольше мягкой остановки: после неё сервер ещё гасит приложение.
+_CLOSE_WAIT_SEC = _CLOSE_SEC * 2
 logger = logging.getLogger(__name__)
 
 
@@ -24,16 +26,21 @@ class ToolServer:
 
     async def close(self) -> None:
         """Закрыть, не дожидаясь висящих вызовов: ждущий человека вызов иначе
-        держал бы остановку до часа."""
+        держал бы остановку до часа.
+
+        Висящие вызовы гасит сам сервер по сроку мягкой остановки (`serve_tools`), а
+        не принудительный выход: тот пропускает остановку приложения, и его
+        задача висела бы до закрытия окна.
+        """
         if self._task.done():
             return
         self._server.should_exit = True
-        self._server.force_exit = True
         try:
-            await asyncio.wait_for(self._task, _CLOSE_SEC)
+            await asyncio.wait_for(self._task, _CLOSE_WAIT_SEC)
         except TimeoutError:
+            logger.warning("MCP-сервер не закрылся за %s с, погашен", _CLOSE_WAIT_SEC)
             self._task.cancel()
-            logger.warning("MCP-сервер не закрылся за %s с, погашен", _CLOSE_SEC)
+            await asyncio.gather(self._task, return_exceptions=True)
 
 
 def tool_host(tools: list[Callable], **settings) -> FastMCP:
@@ -62,7 +69,9 @@ async def serve_tools(tools: list[Callable]) -> ToolServer:
         port = sock.getsockname()[1]
         # log_config=None: в оконной сборке sys.stdout пуст, а журнал uvicorn по
         # умолчанию спрашивает у него isatty. Записи идут в корневой журнал приложения.
-        server = uvicorn.Server(uvicorn.Config(mcp.streamable_http_app(), log_config=None))
+        server = uvicorn.Server(uvicorn.Config(
+            mcp.streamable_http_app(), log_config=None, timeout_graceful_shutdown=_CLOSE_SEC,
+        ))
         task = asyncio.create_task(server.serve(sockets=[sock]))
         await _started(server, task)
         up = True
