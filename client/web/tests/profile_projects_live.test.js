@@ -23,7 +23,7 @@ describe('живая вкладка проектов', () => {
 
     q.getByText('+ Добавить проект').click();
     await settled();
-    fill(q.getByPlaceholderText('Название проекта'), 'Свежий');
+    fill(q.getAllByPlaceholderText('Название проекта')[0], 'Свежий');
     await settled();
 
     expect(sent.at(-1).map((one) => one.name)).toEqual(['Свежий', 'Давний']);
@@ -31,8 +31,6 @@ describe('живая вкладка проектов', () => {
 
   it('пункты «О проекте» уезжают перечнем: добавленный, набранный, удалённый', async () => {
     const { sent, q } = tab([{ ...OLD, about: ['Описание'] }]);
-    await settled();
-    q.getByText('Давний').click();
     await settled();
 
     q.getByText('Добавить пункт').click();
@@ -44,6 +42,13 @@ describe('живая вкладка проектов', () => {
     q.getAllByTitle('Удалить')[0].click();
     await settled();
     expect(sent.at(-1)[0].about).toEqual(['Второй']);
+  });
+
+  it('записанные карточки раскрыты сразу', async () => {
+    const { q } = tab([OLD, { ...OLD, id: 2, name: 'Второй' }]);
+    await settled();
+
+    expect(q.getAllByPlaceholderText('Название проекта')).toHaveLength(2);
   });
 
   it('у карточки проекта нет должности и дат, есть «О проекте» и стек', async () => {

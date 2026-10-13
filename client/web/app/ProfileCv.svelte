@@ -275,6 +275,7 @@
     <DelayedTextarea
       maxlength="2000"
       placeholder="Личные предпочтения — что важно при выборе работы, что точно не подойдёт"
+      lines={10}
       value={form.free_preferences}
       ontyped={(text) => typed('free_preferences', text)}
       onflush={() => saver.flush()}
