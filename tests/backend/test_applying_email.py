@@ -8,12 +8,11 @@ import pytest
 
 from backend.applying.email import via_email
 from backend.applying.result import Missed
-from backend.domain.apply_order import Way
 from backend.models import Application, ApplicationVia, VacancyEvent
+from tests.backend.fixtures.applying import MAIL
 from tests.dbio import all_rows
 from tests.waiting import wait_until
 
-MAIL = Way("email", "hr@company.test", None)
 
 
 async def test_a_letter_goes_with_the_resume_and_is_recorded(mail_case):

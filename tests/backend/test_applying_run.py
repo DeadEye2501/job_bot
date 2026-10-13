@@ -5,9 +5,9 @@ import time
 import pytest
 
 from backend.applying import run
-from backend.applying.result import Missed, TelegramClosed, Unfit
-from backend.domain.apply_order import Way
+from backend.applying.result import Dropped, Missed, TelegramClosed, Unfit
 from backend.models import Vacancy, VacancyStatus
+from tests.backend.fixtures.applying import MAIL
 
 
 @pytest.fixture
@@ -68,6 +68,15 @@ async def test_an_unfit_vacancy_tries_no_other_way(executors, two_vacancies, kit
     assert calls == [(first, "telegram")]
 
 
+async def test_a_vacancy_the_person_finished_tries_no_other_way(executors, two_vacancies, kit):
+    """«Закончить» — про вакансию, а не про способ: следующий способ не пробуется."""
+    calls, answers = executors
+    first = two_vacancies[0].id
+    answers[(first, "telegram")] = Dropped()
+    await run.apply_vacancies(kit, [first])
+    assert calls == [(first, "telegram")]
+
+
 async def test_a_telegram_ban_closes_telegram_for_the_rest_of_the_run(
         executors, two_vacancies, kit):
     calls, answers = executors
@@ -105,5 +114,5 @@ async def test_a_chosen_way_is_tried_alone(executors, two_vacancies, kit):
     calls, answers = executors
     first = two_vacancies[0].id
     answers[(first, "email")] = Missed("сервер не принял")
-    outcome = await run.apply_chosen(kit, first, Way("email", "hr@company.test", None))
+    outcome = await run.apply_chosen(kit, first, MAIL)
     assert isinstance(outcome, Missed) and calls == [(first, "email")]

@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from backend.agent.human_gate import HumanGate
+from backend.agent.stops import HumanTimeout
 from tests.fakes.browser import FakeBrowser
 
 
@@ -99,6 +100,33 @@ async def test_a_stop_releases_a_wait_with_data_at_once():
     gate.abort()
 
     assert (await asyncio.wait_for(waiting, 1)).startswith("обход остановлен")
+
+
+async def test_asking_the_window_returns_its_answer():
+    gate, _ = _gate()
+    asking = asyncio.create_task(gate.ask("confirm", "site.test", {"items": []}))
+    await asyncio.sleep(0)
+
+    gate.resolve({"drop": True})
+
+    assert await asking == {"drop": True}
+
+
+async def test_asking_the_window_answers_nothing_once_stopped():
+    gate, _ = _gate()
+    asking = asyncio.create_task(gate.ask("confirm", "site.test", {"items": []}))
+    await asyncio.sleep(0)
+
+    gate.abort()
+
+    assert await asyncio.wait_for(asking, 1) is None
+
+
+async def test_asking_the_window_past_the_deadline_drops_the_run():
+    gate, _ = _gate(limit=0.01)
+
+    with pytest.raises(HumanTimeout):
+        await gate.ask("confirm", "site.test", {"items": []})
 
 
 async def test_the_deadline_raises_the_flag_for_the_round():

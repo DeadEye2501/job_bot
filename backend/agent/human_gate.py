@@ -6,6 +6,8 @@ import logging
 import time
 from collections.abc import Callable
 
+from backend.agent.stops import HumanTimeout
+
 logger = logging.getLogger(__name__)
 
 LIMIT_SEC = 3600.0
@@ -78,6 +80,18 @@ class HumanGate:
         finally:
             self._waiting -= 1
         return await self._take(browser)
+
+    async def ask(self, kind: str, host: str, payload: dict) -> dict | None:
+        """Спросить окно приложения: его ответ или пусто, если обход остановили.
+
+        Срок поднимает `HumanTimeout` здесь же: у того, кто ждёт окна без сессии
+        агента, некому поднять его выше.
+        """
+        answer = await self.wait(kind, host, payload=payload)
+        if self.expired.is_set():
+            raise HumanTimeout
+        # Окно отвечает словарём; строкой — только остановка.
+        return answer if isinstance(answer, dict) else None
 
     async def _arm(self, kind: str, host: str, browser, payload) -> bool:
         """Начать ожидание: вывести браузер, взвести срок, позвать человека.

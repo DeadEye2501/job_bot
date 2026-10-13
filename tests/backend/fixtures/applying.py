@@ -35,6 +35,7 @@ async def kit(make_pipeline):
 PAGE = "https://site.test/vacancy/1"
 FORM = "https://company.test/apply"
 TG = Way("telegram", "@hr_name", None)
+MAIL = Way("email", "hr@company.test", None)
 
 
 @pytest.fixture

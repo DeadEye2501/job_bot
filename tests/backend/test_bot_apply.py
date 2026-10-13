@@ -5,9 +5,8 @@ import asyncio
 from backend.applying import run
 from backend.applying.result import Unfit
 from backend.bot.apply import apply_all_new, apply_chosen_way
-from backend.domain.apply_order import Way
 from backend.models import BotMode, Vacancy, VacancyStatus
-from tests.backend.fixtures.applying import TG, telegram_vacancy
+from tests.backend.fixtures.applying import MAIL, TG, telegram_vacancy
 from tests.backend.fixtures.bot import switch_to
 from tests.dbio import all_rows, only_row
 
@@ -31,6 +30,32 @@ async def test_a_manual_application_reads_the_profile_before_the_letter(manual_c
     assert await apply_chosen_way(bot, vacancy.id, TG) == "ok"
 
 
+async def test_a_manual_application_finished_in_the_window_has_its_own_word(manual_case):
+    """Человек закончил, а не провалился: ручной отклик отвечает своим словом."""
+    bot, vacancy = await manual_case()
+    await bot.rs.set_app("auto_apply", "confirm")
+    bot.on_human_needed = lambda kind, host, payload: bot.human_done({"drop": True})
+
+    assert await apply_chosen_way(bot, vacancy.id, TG) == "dropped"
+    assert (await only_row(bot.session_factory, Vacancy)).status is VacancyStatus.NEW
+
+
+async def test_applying_to_all_new_waits_for_confirmation_too(manual_case):
+    bot, vacancy = await manual_case()
+    await bot.rs.set_app("auto_apply", "confirm")
+    asked = []
+
+    def answer(kind, host, payload):
+        asked.append(payload)
+        bot.human_done({"items": payload["items"]})
+
+    bot.on_human_needed = answer
+
+    assert await apply_all_new(bot) == "ok"
+    assert len(asked) == 1
+    assert (await only_row(bot.session_factory, Vacancy)).status is VacancyStatus.APPLIED
+
+
 async def test_a_manual_application_is_not_held_by_off(manual_case, session_factory):
     """Режим — про автоматику: нажатое человеком работает и в Off."""
     bot, vacancy = await manual_case()
@@ -49,8 +74,7 @@ async def test_a_second_click_waits_for_the_slot(manual_case):
 
 async def test_a_way_that_did_not_work_is_a_failure(manual_case):
     bot, vacancy = await manual_case()
-    way = Way("email", "hr@company.test", None)
-    assert await apply_chosen_way(bot, vacancy.id, way) == "failed"
+    assert await apply_chosen_way(bot, vacancy.id, MAIL) == "failed"
 
 
 async def test_a_way_that_found_the_vacancy_unfit_says_so(manual_case, monkeypatch):
@@ -61,8 +85,7 @@ async def test_a_way_that_found_the_vacancy_unfit_says_so(manual_case, monkeypat
         return Unfit("Условие формы")
 
     monkeypatch.setitem(run.EXECUTORS, "email", unfit)
-    way = Way("email", "hr@company.test", None)
-    assert await apply_chosen_way(bot, vacancy.id, way) == "unfit"
+    assert await apply_chosen_way(bot, vacancy.id, MAIL) == "unfit"
 
 
 async def test_apply_all_new_goes_through_every_new_vacancy(manual_case, session_factory):

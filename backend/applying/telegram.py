@@ -1,7 +1,7 @@
 """Отклик в Telegram: письмо HR, доставка и след в базе."""
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from pyrogram.errors import FloodWait
 from sqlalchemy import select
@@ -9,7 +9,8 @@ from sqlalchemy.orm import selectinload
 
 from adapters import telegram
 from backend.agent.kit import AgentKit
-from backend.applying.result import GONE, Missed, Outcome, TelegramClosed, delivered
+from backend.applying.confirm import confirmed, text_item
+from backend.applying.result import GONE, Dropped, Missed, Outcome, TelegramClosed, delivered
 from backend.applying.telegram_ban import clear_flood_wait, note_flood_wait
 from backend.applying.telegram_letter import (
     RECENT_SEND_WINDOW_DAYS,
@@ -56,6 +57,10 @@ async def via_telegram(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     letter = await _letter(kit, errand)
     if isinstance(letter, Missed):
         return letter
+    kept = await confirmed(kit, vacancy_id, [text_item("", letter.text)])
+    if isinstance(kept, Dropped):
+        return kept
+    letter = replace(letter, text=kept[0]["value"])
     tg_message_id = None
     if not kit.pipeline.rs.send_locked:
         sent = await _deliver(kit, errand.peer, letter)

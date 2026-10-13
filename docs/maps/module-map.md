@@ -378,7 +378,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 195 модулей
+## backend — 196 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -396,17 +396,18 @@ init
 - `def agent_refusal(chat: LlmProviderConfig | None, browser: InstalledBrowser | None) -> str | None` (7)
 - `def current_refusal(chat: LlmProviderConfig | None) -> str | None` (4)
 
-### `backend/agent/human_gate.py` — 156 строк
+### `backend/agent/human_gate.py` — 170 строк
 
 Ожидание человека: капча, слетевший вход или подтверждение отправки. Срок — час
 
-Зависит от: —
+Зависит от: `backend.agent.stops`
 
 - `class _NoBrowser` (8)
   - `async def show(self) -> None` (2)
   - `async def hide_back(self) -> None` (2)
-- `class HumanGate` (128)
+- `class HumanGate` (140)
   - `async def wait(self, kind: str, host: str, browser=None, payload=None) -> str | dict` (27)
+  - `async def ask(self, kind: str, host: str, payload: dict) -> dict | None` (11)
   - `async def _arm(self, kind: str, host: str, browser, payload) -> bool` (16)
   - `def resolve(self, answer=None) -> None` (7)
   - `def reveal(self) -> None` (10)
@@ -621,16 +622,25 @@ init
 - `async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None` (14)
 - `def _settle(job: ApplyJob, way: Way) -> Outcome` (14)
 
-### `backend/applying/email.py` — 57 строк
+### `backend/applying/confirm.py` — 33 строк
+
+Подтвердить отправку у человека: одна точка для всех способов отклика.
+
+Зависит от: `backend.agent.kit`, `backend.applying.result`, `backend.repository.vacancy_contacts`
+
+- `def text_item(label: str, value: str) -> dict` (3)
+- `async def confirmed(kit: AgentKit, vacancy_id: int, items: list[dict]) -> list[dict] | Dropped` (12)
+
+### `backend/applying/email.py` — 66 строк
 
 Отклик письмом без агента: модель приложения пишет, сервер почты принимает,
 
-Зависит от: `adapters`, `adapters.smtp_mail`, `backend.agent.kit`, `backend.agent.tools_applier`, `backend.agent.tools_letter`, `backend.applying.result`, `backend.domain.apply_order`, `backend.llm.agent_letter`, `backend.models`, `backend.repository.applications`, `backend.repository.mail_account`
+Зависит от: `adapters`, `adapters.smtp_mail`, `backend.agent.kit`, `backend.agent.tools_applier`, `backend.agent.tools_letter`, `backend.applying.confirm`, `backend.applying.result`, `backend.domain.apply_order`, `backend.llm.agent_letter`, `backend.models`, `backend.repository.applications`, `backend.repository.mail_account`
 
-- `async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (11)
-- `async def _send_and_record(kit: AgentKit, vacancy_id: int, way: Way, letter: Letter) -> Outcome` (22)
+- `async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (27)
+- `async def _send_and_record(kit: AgentKit, vacancy_id: int, account: MailAccountConfig, mail: OutgoingMail) -> Outcome` (14)
 
-### `backend/applying/result.py` — 60 строк
+### `backend/applying/result.py` — 72 строк
 
 Исходы исполнителя способа и то новое о мире, что он узнал по дороге.
 
@@ -640,27 +650,28 @@ init
 - `class SiteClosed` (2)
 - `class Missed` (5)
 - `class Unfit` (7)
+- `class Dropped` (9)
 - `async def delivered(record: Awaitable, vacancy_id: int) -> Outcome` (11)
 
-### `backend/applying/run.py` — 78 строк
+### `backend/applying/run.py` — 80 строк
 
 Цикл откликателя: по каждой вакансии первый доступный способ, пока один не удастся.
 
 Зависит от: `backend.agent.kit`, `backend.agent.stops`, `backend.applying.browser`, `backend.applying.email`, `backend.applying.result`, `backend.applying.telegram`, `backend.applying.world`, `backend.domain.apply_order`, `backend.models`
 
 - `async def apply_vacancies(kit: AgentKit, vacancy_ids: list[int]) -> None` (8)
-- `async def _apply_one(kit: AgentKit, world: World, vacancy_id: int) -> None` (13)
+- `async def _apply_one(kit: AgentKit, world: World, vacancy_id: int) -> None` (15)
 - `async def apply_chosen(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (18)
 - `async def _title(kit: AgentKit, vacancy_id: int) -> str` (4)
 
-### `backend/applying/telegram.py` — 134 строк
+### `backend/applying/telegram.py` — 139 строк
 
 Отклик в Telegram: письмо HR, доставка и след в базе.
 
-Зависит от: `adapters`, `backend.agent.kit`, `backend.applying.result`, `backend.applying.telegram_ban`, `backend.applying.telegram_letter`, `backend.domain.apply_order`, `backend.domain.telegram_identity`, `backend.models`, `backend.payloads`, `backend.repository.applications`, `backend.repository.hr_identify`, `backend.repository.messages`, `backend.telegram_time`
+Зависит от: `adapters`, `backend.agent.kit`, `backend.applying.confirm`, `backend.applying.result`, `backend.applying.telegram_ban`, `backend.applying.telegram_letter`, `backend.domain.apply_order`, `backend.domain.telegram_identity`, `backend.models`, `backend.payloads`, `backend.repository.applications`, `backend.repository.hr_identify`, `backend.repository.messages`, `backend.telegram_time`
 
 - `class _Errand` (14)
-- `async def via_telegram(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (15)
+- `async def via_telegram(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (19)
 - `async def _errand(kit: AgentKit, vacancy_id: int) -> _Errand | None` (19)
 - `async def _letter(kit: AgentKit, errand: _Errand) -> Letter | Missed` (6)
 - `async def _deliver(kit: AgentKit, peer: int | str, letter: Letter) -> int | None | Missed` (15)
@@ -728,14 +739,14 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _row(bot, aggregator_id: int) -> Aggregator | None` (3)
 - `async def _refused(bot, row: Aggregator) -> AgentOutcome | None` (10)
 
-### `backend/bot/apply.py` — 53 строк
+### `backend/bot/apply.py` — 56 строк
 
 Отклик по нажатию человека: тот же откликатель, в месте прогона с набором агента.
 
 Зависит от: `backend.agent.kit`, `backend.applying`, `backend.applying.result`, `backend.bot`, `backend.domain.apply_order`, `backend.flows.handover`, `backend.models`
 
-- `async def apply_chosen_way(bot, vacancy_id: int, way: Way) -> ApplyOutcome` (16)
-  - `async def apply(kit: AgentKit) -> str` (8)
+- `async def apply_chosen_way(bot, vacancy_id: int, way: Way) -> ApplyOutcome` (18)
+  - `async def apply(kit: AgentKit) -> str` (10)
 - `async def apply_all_new(bot) -> work.WorkOutcome` (13)
   - `async def apply(kit: AgentKit) -> str` (4)
 
@@ -2719,7 +2730,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def describe_vacancy(session: AsyncSession, vacancy_id: int) -> str | None` (20)
 - `async def _source(session: AsyncSession, vacancy: Vacancy) -> str` (8)
 
-### `backend/repository/vacancy_contacts.py` — 95 строк
+### `backend/repository/vacancy_contacts.py` — 100 строк
 
 Контакты вакансии — всё, чем она указывает вовне, кроме Telegram-HR.
 
@@ -2730,6 +2741,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _contact_row(session: AsyncSession, vacancy_id: int, key: str) -> VacancyContact | None` (9)
 - `async def list_contacts(session: AsyncSession, vacancy_id: int) -> list[VacancyContact]` (7)
 - `async def contact_values(session: AsyncSession, vacancy_id: int) -> list[str]` (3)
+- `async def vacancy_link(session: AsyncSession, vacancy_id: int) -> str | None` (3)
 - `async def vacancy_addresses(session: AsyncSession, vacancy_id: int) -> list[str]` (4)
 - `async def delete_contact(session: AsyncSession, contact_id: int) -> int | None` (8)
 
@@ -3380,7 +3392,7 @@ Runtime settings layer.
     - `async def run() -> dict` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (26)
 
-### `client/bridge/refusals.py` — 295 строк
+### `client/bridge/refusals.py` — 296 строк
 
 Слова, которыми мост отказывает окну.
 
@@ -3713,7 +3725,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 324 модулей
+## tests — 325 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -3903,7 +3915,7 @@ Runtime settings layer.
 
 - `async def web_search(session_factory) -> Aggregator` (4)
 
-### `tests/backend/fixtures/applying.py` — 190 строк
+### `tests/backend/fixtures/applying.py` — 191 строк
 
 Стенд откликателя: набор агента и вакансии, на которые есть чем откликнуться.
 
@@ -4108,13 +4120,13 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_agent_human_gate.py` — 243 строк
+### `tests/backend/test_agent_human_gate.py` — 271 строк
 
 Пауза на человека: браузер виден, окно знает, срок — час.
 
-Зависит от: `backend.agent.human_gate`, `tests.fakes.browser`
+Зависит от: `backend.agent.human_gate`, `backend.agent.stops`, `tests.fakes.browser`
 
-Тестов: 17
+Тестов: 20
 
 - `def _gate(limit=60.0)` (5)
 
@@ -4210,22 +4222,36 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_applying_email.py` — 92 строк
+### `tests/backend/test_applying_confirm.py` — 143 строк
+
+Подтверждение отправки у человека: письмо Telegram и почты уходит тем, что
+
+Зависит от: `backend.agent.stops`, `backend.applying`, `backend.applying.email`, `backend.applying.result`, `backend.applying.telegram`, `backend.models`, `tests.backend.fixtures.applying`, `tests.dbio`, `tests.fakes.agent`, `tests.waiting`
+
+Тестов: 9
+
+- `def _edited(values: dict[str, str])` (8)
+  - `def answer(payload)` (3)
+- `def _finished(payload)` (2)
+- `def _silent(payload)` (2)
+- `async def _confirming(kit, answer, *, limit=3600.0)` (9)
+
+### `tests/backend/test_applying_email.py` — 91 строк
 
 Отклик письмом: модель приложения пишет, сервер почты принимает, отклик записывается.
 
-Зависит от: `backend.applying.email`, `backend.applying.result`, `backend.domain.apply_order`, `backend.models`, `tests.dbio`, `tests.waiting`
+Зависит от: `backend.applying.email`, `backend.applying.result`, `backend.models`, `tests.backend.fixtures.applying`, `tests.dbio`, `tests.waiting`
 
 Тестов: 8
 
 
-### `tests/backend/test_applying_run.py` — 109 строк
+### `tests/backend/test_applying_run.py` — 118 строк
 
 Цикл откликателя: по каждой вакансии первый доступный способ, пока один не удастся.
 
-Зависит от: `backend.applying`, `backend.applying.result`, `backend.domain.apply_order`, `backend.models`
+Зависит от: `backend.applying`, `backend.applying.result`, `backend.models`, `tests.backend.fixtures.applying`
 
-Тестов: 8
+Тестов: 9
 
 - `def executors(monkeypatch)` (13)
   - `def fake(method)` (5)
@@ -4287,13 +4313,13 @@ Runtime settings layer.
 - `def sought(monkeypatch)` (9)
   - `async def seek(kit, source)` (2)
 
-### `tests/backend/test_bot_apply.py` — 101 строк
+### `tests/backend/test_bot_apply.py` — 124 строк
 
 Ручной отклик одним зовом: выбранный способ через того же откликателя, в месте прогона.
 
-Зависит от: `backend.applying`, `backend.applying.result`, `backend.bot.apply`, `backend.domain.apply_order`, `backend.models`, `tests.backend.fixtures.applying`, `tests.backend.fixtures.bot`, `tests.dbio`
+Зависит от: `backend.applying`, `backend.applying.result`, `backend.bot.apply`, `backend.models`, `tests.backend.fixtures.applying`, `tests.backend.fixtures.bot`, `tests.dbio`
 
-Тестов: 10
+Тестов: 12
 
 
 ### `tests/backend/test_bot_channels.py` — 168 строк
@@ -6895,7 +6921,7 @@ Runtime settings layer.
 - `def parsed_cv_project(**overrides) -> ParsedCvProject` (3)
 - `def parsed_cv(**overrides) -> ParsedCv` (11)
 
-### `tests/fakes/agent.py` — 108 строк
+### `tests/fakes/agent.py` — 124 строк
 
 Набор сессии агента без браузера, водителя и человека.
 
@@ -6917,6 +6943,8 @@ Runtime settings layer.
 - `def login_step(logged_in: bool)` (6)
   - `async def step(tools)` (3)
 - `def silent_gate(limit_sec: float=3600.0) -> HumanGate` (3)
+- `def answering_gate(answer: Callable[[dict], dict | None], limit_sec: float=3600.0) -> tuple[HumanGate, list]` (14)
+  - `def needed(kind, host, payload)` (5)
 - `def scripted_kit(pipeline, steps, *, human_limit: float=3600.0) -> AgentKit` (4)
 - `def work_kit(bot) -> AgentKit` (3)
 - `def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit` (3)

@@ -92,6 +92,22 @@ def silent_gate(limit_sec: float = 3600.0) -> HumanGate:
     return HumanGate(lambda kind, host, payload: None, lambda: None, limit_sec=limit_sec)
 
 
+def answering_gate(answer: Callable[[dict], dict | None],
+                   limit_sec: float = 3600.0) -> tuple[HumanGate, list]:
+    """Человек у окна подтверждения: на каждый зов сразу отвечает тем, что `answer`
+    вернул на его данные; `None` — не отвечает вовсе. Второе — данные всех зовов."""
+    asked = []
+
+    def needed(kind, host, payload):
+        asked.append(payload)
+        reply = answer(payload)
+        if reply is not None:
+            gate.resolve(reply)
+
+    gate = HumanGate(needed, lambda: None, limit_sec=limit_sec)
+    return gate, asked
+
+
 def scripted_kit(pipeline, steps, *, human_limit: float = 3600.0) -> AgentKit:
     """Набор обхода: браузер-подделка, человек, который не придёт, водитель по сценарию."""
     return kit_for(pipeline, browser=FakeBrowser(), gate=silent_gate(human_limit),

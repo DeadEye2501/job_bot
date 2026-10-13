@@ -9,15 +9,16 @@ from typing import Literal
 
 from backend.agent.kit import AgentKit
 from backend.applying import run
-from backend.applying.result import Unfit
+from backend.applying.result import Dropped, Unfit
 from backend.bot import work
 from backend.domain.apply_order import Way
 from backend.flows.handover import new_to_apply
 from backend.models import Vacancy
 
-ApplyOutcome = Literal[work.WorkOutcome, "failed", "unfit", "missing"]
+ApplyOutcome = Literal[work.WorkOutcome, "failed", "unfit", "dropped", "missing"]
 """Чем кончился ручной отклик: исходы места прогона и работы с агентом, свой
-провал способа, вакансия, оказавшаяся неподходящей, и пропавшая вакансия."""
+провал способа, вакансия, оказавшаяся неподходящей, работа, законченная
+человеком в окне подтверждения, и пропавшая вакансия."""
 
 
 async def apply_chosen_way(bot, vacancy_id: int, way: Way) -> ApplyOutcome:
@@ -33,6 +34,8 @@ async def apply_chosen_way(bot, vacancy_id: int, way: Way) -> ApplyOutcome:
         outcome = await run.apply_chosen(kit, vacancy_id, way)
         if outcome == "applied":
             return "ok"
+        if isinstance(outcome, Dropped):
+            return "dropped"
         return "unfit" if isinstance(outcome, Unfit) else "failed"
 
     return await work.in_slot(bot, apply, f"apply {way.method} {vacancy_id}")
