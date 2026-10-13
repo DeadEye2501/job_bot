@@ -8,7 +8,7 @@
 ссылка на вакансию и чтение ответа окна.
 """
 
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 from backend.agent.jobs import Dropped
 from backend.agent.kit import AgentKit
@@ -20,18 +20,25 @@ from backend.repository.vacancy_contacts import vacancy_link
 class ConfirmItem(TypedDict):
     """Пункт окна подтверждения: подпись поля (у письма пусто), вид, значение,
     ошибка поля с сайта при повторном показе и селектор поля на странице (у
-    письма Telegram и почты страницы нет — пусто)."""
+    письма Telegram и почты страницы нет — пусто).
+
+    `required` ставит код, а не агент: у поля страницы — по её разметке, у
+    письма — всегда. Окно не подтверждает, пока обязательное пусто: отправка
+    вернулась бы с ошибкой, и время ушло бы впустую.
+    """
 
     label: str
     kind: Literal["text", "choice", "check"]
     value: str
     error: str
     selector: str
+    required: NotRequired[bool]
 
 
 def text_item(label: str, value: str) -> ConfirmItem:
-    """Пункт письма или его темы: правится текстом, страницы у него нет."""
-    return {"label": label, "kind": "text", "value": value, "error": "", "selector": ""}
+    """Пункт письма или его темы: правится текстом, страницы у него нет; пустым
+    не уходит ни письмо, ни тема."""
+    return {"label": label, "kind": "text", "value": value, "error": "", "selector": "", "required": True}
 
 
 def is_checked(item: ConfirmItem) -> bool:

@@ -1,7 +1,8 @@
 """Инструменты браузера: что агент видит и что доходит до страницы."""
 
+from backend.agent.jobs import Dropped
 from backend.agent.tools_browser import browser_tools
-from tests.fakes.agent import kit_for, page_item, tool
+from tests.fakes.agent import apply_job, kit_for, page_item, tool
 from tests.fakes.browser import FakeBrowser, FakePage
 
 VACANCY = "https://site.test/vacancy/1"
@@ -16,13 +17,25 @@ def _item(selector, value, kind="text", url=VACANCY):
     return {(url, selector): page_item(selector, value, kind=kind)}
 
 
-async def _strict(confirmed):
-    """Страница вакансии под подтверждением: ввод — только подтверждённого."""
-    page = FakePage()
-    tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), None, confirmed)
+async def _strict(confirmed, outcome=None, fields=None):
+    """Страница вакансии под подтверждением: ввод — только подтверждённого.
+    `fields` — что страница называет полями: селектор → (вид, группа)."""
+    page = FakePage(fields=fields)
+    job = apply_job(1, confirming=True, confirmed=confirmed, outcome=outcome)
+    tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), None, job)
     await tool(tools, "browser_open")(url=VACANCY)
     page.calls.clear()
     return page, tools
+
+
+async def test_after_finishing_nothing_reaches_the_page():
+    """Человек закончил — «Отправить» не нажимается, что бы агент ни решил."""
+    page, tools = await _strict(_item("#name", "Иван"), outcome=Dropped())
+
+    await tool(tools, "browser_type")(selector="#name", text="Иван")
+    answer = await tool(tools, "browser_click")(selector="text=Отправить")
+
+    assert answer.startswith("не вышло") and page.calls == []
 
 
 async def test_under_confirmation_an_unconfirmed_field_is_not_typed_into():
@@ -107,6 +120,35 @@ async def test_a_confirmed_empty_check_stays_empty():
     await tool(tools, "browser_click")(selector="#ads")
 
     assert page.calls == [("check", "#ads", False)]
+
+
+async def test_a_click_on_an_unconfirmed_check_is_refused():
+    """Галочку, которую человек не видел, агент не ставит — ни ею самой, ни подписью к ней."""
+    page, tools = await _strict({}, fields={"#ads": ("check", ""), "text=Хочу рассылку": ("check", "")})
+
+    await tool(tools, "browser_click")(selector="#ads")
+    await tool(tools, "browser_click")(selector="text=Хочу рассылку")
+
+    assert page.calls == []
+
+
+async def test_a_radio_in_a_confirmed_group_is_clicked():
+    """Вариант переключателя выбирает агент, ближайший к подтверждённому, — в подтверждённой группе."""
+    fields = {"#relocate": ("", "relocate"), "#relocate-yes": ("radio", "relocate")}
+    page, tools = await _strict(_item("#relocate", "да", kind="choice"), fields=fields)
+
+    await tool(tools, "browser_click")(selector="#relocate-yes")
+
+    assert page.calls == [("click", "#relocate-yes")]
+
+
+async def test_a_radio_of_an_unconfirmed_group_is_refused():
+    fields = {"#relocate": ("", "relocate"), "#trips-yes": ("radio", "trips")}
+    page, tools = await _strict(_item("#relocate", "да", kind="choice"), fields=fields)
+
+    answer = await tool(tools, "browser_click")(selector="#trips-yes")
+
+    assert answer.startswith("не вышло") and page.calls == []
 
 
 async def test_clicks_off_the_fields_stay_as_they_were():

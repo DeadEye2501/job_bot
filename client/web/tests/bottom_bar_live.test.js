@@ -11,63 +11,14 @@
 // которым зажигаются лампочки, и подсказка о запертых кнопках, которую ждут
 // наверху — её раздают экранам.
 
-import { cleanup, render } from '@testing-library/svelte';
+import { cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import BottomBar from '../app/BottomBar.svelte';
 import { applyNote } from '../state/progress.js';
-import { hearRound } from '../state/round.svelte.js';
-import { answering } from './bridge_stub.js';
+import { bar } from './bottom_bar_stub.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
-
-// `counts` — что по очереди отвечает число новых вакансий; последнее держится.
-// `app` — запущенная версия и может ли копия обновиться; `updates` — что по
-// очереди отвечает проверка обновления, последнее держится.
-function bar(health, counts = [0], { app = null, updates = [{ newer: null, trouble: null }] } = {}) {
-  const tips = [];
-  // Плашки полоса показывает не через мост, а через `say`: отказ запертого
-  // тумблера виден только здесь.
-  const said = [];
-  // Вести полосе приходят подпиской: сюда складываются обработчики, чтобы
-  // проверка могла позвать их так же, как их зовёт мост.
-  const handlers = {};
-  const left = [...counts];
-  const checks = [...updates];
-  const { asked, ask } = answering((method, payload) => {
-    if (method === 'system.initial') return { unread: { count: 0 }, mode: 'Full', health };
-    if (method === 'system.set_mode') return { mode: payload };
-    if (method === 'system.health') return health;
-    if (method === 'system.new_vacancies') return { count: left.length > 1 ? left.shift() : left[0] };
-    if (method === 'system.check_update') return checks.length > 1 ? checks.shift() : checks[0];
-    return {};
-  });
-
-  const events = {
-    on: (name, handler) => {
-      handlers[name] = handler;
-      return () => {};
-    },
-    run: () => {},
-    stop: () => {},
-  };
-  // Вести о начале и конце прогона слушает общий учёт, а не полоса: в окне его
-  // подписывает оболочка, здесь — проверка, на те же поддельные вести.
-  hearRound(events);
-
-  render(BottomBar, {
-    props: {
-      ask,
-      say: (text) => said.push(text),
-      events,
-      onlocked: (tip) => tips.push(tip),
-      oncontact: () => {},
-      app,
-    },
-  });
-  return { asked, tips, said, handlers };
-}
 
 describe('живая нижняя полоса', () => {
   it('разбор вставленного объявления называет себя под полосами', async () => {

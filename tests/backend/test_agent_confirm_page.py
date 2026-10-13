@@ -1,30 +1,49 @@
 """Агент подтверждает страницу у человека: что вернулось, то и впишется; «Закончить»
 — окончательный исход, который ни отклик, ни неудача не перепишут."""
 
+from adapters.agent_mcp import tool_host
 from backend.agent.jobs import Applied, Dropped, Failed
 from backend.agent.tools_applier import applier_tools
 from backend.agent.tools_common import common_tools
 from backend.models import Application, Screening
 from tests.dbio import all_rows, put
 from tests.factories import vacancy_row
-from tests.fakes.agent import answering_gate, apply_job, edited, finished, kit_for, page_item, tool
+from tests.fakes.agent import apply_job, edited, finished, kit_for, page_item, tool, under_confirmation
 from tests.fakes.browser import FakeBrowser, FakePage
 
 PAGE = "https://site.test/vacancy/1/apply"
 
 
-async def _applier(make_pipeline, session_factory, answer, *, confirming=True):
-    """Откликатель на странице формы; человек отвечает окну `answer`."""
+async def _applier(make_pipeline, session_factory, answer, *, confirming=True, required=()):
+    """Откликатель на странице формы; человек отвечает окну `answer`; `required` —
+    поля, которые страница называет обязательными."""
     vacancy = vacancy_row()
     await put(session_factory, vacancy)
-    pipeline = await make_pipeline()
-    await pipeline.rs.set_app("auto_apply", "confirm")
-    gate, asked = answering_gate(answer)
-    page = FakePage()
+    page = FakePage(required=required)
     page.url = PAGE
+    kit, asked = await under_confirmation(kit_for(await make_pipeline(), browser=FakeBrowser(page)), answer)
     job = apply_job(vacancy.id, method="aggregator", target=PAGE, confirming=confirming)
-    kit = kit_for(pipeline, browser=FakeBrowser(page), gate=gate)
     return job, [*common_tools(kit, job), *applier_tools(kit, job)], asked
+
+
+async def test_the_window_knows_which_fields_the_page_requires(make_pipeline, session_factory):
+    """Обязательность берётся у самой страницы, а не со слов агента."""
+    _, tools, asked = await _applier(make_pipeline, session_factory, edited({}), required={"#name"})
+
+    await tool(tools, "need_human")(kind="confirm", items=[page_item("#name", "Иван"), page_item("#nick", "")])
+
+    assert [item["required"] for item in asked[0]["items"]] == [True, False]
+
+
+async def test_the_letter_written_is_the_one_confirmed(make_pipeline, session_factory):
+    """Человек поправил письмо — в запись ложится правленое, а не пересказ агента."""
+    job, tools, _ = await _applier(make_pipeline, session_factory, edited({"": "Правленое письмо"}))
+    await tool(tools, "need_human")(kind="confirm", items=[page_item("#letter", "Исходное", label="")])
+
+    await tool(tools, "record_application")(via="aggregator", target=PAGE, letter="Исходное")
+
+    (row,) = await all_rows(session_factory, Application)
+    assert row.letter == "Правленое письмо"
 
 
 async def test_the_page_is_confirmed_as_the_person_left_it(make_pipeline, session_factory):
@@ -36,11 +55,11 @@ async def test_the_page_is_confirmed_as_the_person_left_it(make_pipeline, sessio
     assert "Иван Петров" in answer
 
 
-async def test_without_confirmation_the_page_is_not_confirmed(make_pipeline, session_factory):
-    """Режим решён один раз при постановке задачи: вне него человека не зовут."""
+async def test_without_confirmation_the_agent_has_nothing_to_confirm_with(make_pipeline, session_factory):
+    """Режим решён один раз при постановке задачи: вне него пунктов зову человека не передать."""
     job, tools, asked = await _applier(make_pipeline, session_factory, finished, confirming=False)
 
-    await tool(tools, "need_human")(kind="confirm", items=[page_item("#name", "Иван")])
+    await tool_host(tools).call_tool("need_human", {"kind": "confirm", "items": [page_item("#name", "Иван")]})
 
     assert asked == [] and job.confirmed == {} and job.outcome is None
 

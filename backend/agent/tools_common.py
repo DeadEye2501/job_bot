@@ -1,6 +1,7 @@
 """Общие инструменты агента: анкета, итог сессии, зов человека, отметка входа, неудача способа."""
 
 import json
+import logging
 from collections.abc import Callable
 
 from backend.agent.confirm import ConfirmItem, ask_person
@@ -17,10 +18,13 @@ from backend.agent.jobs import (
     SeekJob,
 )
 from backend.agent.kit import AgentKit
+from backend.agent.tools_browser import page_field
 from backend.domain.apply_order import VIA_AGGREGATOR
 from backend.domain.hosts import normalize_host
 from backend.repository.agent_profile import build_agent_profile
 from backend.repository.aggregators import set_logged_in
+
+logger = logging.getLogger(__name__)
 
 
 def common_tools(kit: AgentKit, job) -> list[Callable]:
@@ -43,11 +47,7 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
         job.outcome = Finished(result, reason)
         return "Итог записан, работа окончена."
 
-    tools = [profile, finish]
-    # Проверка входа идёт, когда человек уже закрыл окно: позови она его снова,
-    # окно открывалось бы по кругу, пока он не войдёт. Её дело — «не вошёл».
-    if not isinstance(job, LoginJob):
-        tools.append(_need_human(kit, job))
+    tools = [profile, finish, *_human_call(kit, job)]
     aggregator_id = _login_target(job)
     if aggregator_id is not None:
         tools.append(_report_login(kit, aggregator_id))
@@ -62,16 +62,44 @@ def _login_target(job) -> int | None:
     return job.way.aggregator_id if job.way.method == VIA_AGGREGATOR else None
 
 
+def _human_call(kit: AgentKit, job) -> list[Callable]:
+    """Зов человека, какой задаче положен.
+
+    Проверка входа идёт, когда человек уже закрыл окно: позови она его снова,
+    окно открывалось бы по кругу, пока он не войдёт. Её дело — «не вошёл».
+    Отклик под подтверждением зовёт человека ещё и с пунктами страницы: решено
+    при постановке задачи, и прочим задачам этот зов не выдаётся вовсе.
+    """
+    if isinstance(job, LoginJob):
+        return []
+    if isinstance(job, ApplyJob) and job.confirming:
+        return [_need_human_confirming(kit, job)]
+    return [_need_human(kit, job)]
+
+
 def _need_human(kit: AgentKit, job) -> Callable:
-    async def need_human(kind: str, items: list[ConfirmItem] | None = None) -> str:
-        """Нужен человек: kind — captcha, login или confirm. Вызов держится, пока человек не ответит. Ответ «срок вышел» — заверши работу. confirm — подтвердить поля страницы перед отправкой: items — все поля с ответами."""
-        if kind == "confirm" and isinstance(job, ApplyJob) and job.confirming and items is not None:
-            return await _confirm_page(kit, job, items)
-        if kind not in HUMAN_KINDS:
-            return "kind — captcha или login; confirm — с items, в отклике под подтверждением."
-        return await kit.gate.wait(kind, _host_of(job) or "сайт", kit.browser)
+    async def need_human(kind: str) -> str:
+        """Нужен человек: kind — captcha или login. Вызов держится, пока человек не нажмёт «Готово». Ответ «срок вышел» — заверши работу."""
+        return await _wait_in_browser(kit, job, kind)
 
     return need_human
+
+
+def _need_human_confirming(kit: AgentKit, job: ApplyJob) -> Callable:
+    async def need_human(kind: str, items: list[ConfirmItem] | None = None) -> str:
+        """Нужен человек: kind — captcha, login или confirm. Вызов держится, пока человек не ответит. Ответ «срок вышел» — заверши работу. confirm — подтвердить поля страницы перед вводом: items — все поля с ответами."""
+        if kind == "confirm":
+            return await _confirm_page(kit, job, items) if items else "items — все поля страницы с ответами."
+        return await _wait_in_browser(kit, job, kind)
+
+    return need_human
+
+
+async def _wait_in_browser(kit: AgentKit, job, kind: str) -> str:
+    """Капча или вход: человек работает в браузере агента."""
+    if kind not in HUMAN_KINDS:
+        return "kind — captcha или login."
+    return await kit.gate.wait(kind, _host_of(job) or "сайт", kit.browser)
 
 
 async def _confirm_page(kit: AgentKit, job: ApplyJob, items: list[ConfirmItem]) -> str:
@@ -83,8 +111,10 @@ async def _confirm_page(kit: AgentKit, job: ApplyJob, items: list[ConfirmItem]) 
     """
     if isinstance(job.outcome, Dropped):
         return FINAL_ANSWER
-    url = (await kit.browser.page()).url
-    shown = [_last_known(job.confirmed.get((url, item["selector"])), item) for item in items]
+    page = await kit.browser.page()
+    url = page.url
+    shown = [{**_last_known(job.confirmed.get((url, item["selector"])), item),
+              "required": await _required(page, item["selector"])} for item in items]
     kept = await ask_person(kit, job.vacancy_id, shown)
     if isinstance(kept, Dropped):
         if not isinstance(job.outcome, FINAL):
@@ -94,6 +124,21 @@ async def _confirm_page(kit: AgentKit, job: ApplyJob, items: list[ConfirmItem]) 
         job.confirmed[(url, item["selector"])] = item
         job.unscreened[(url, item["selector"], item["label"])] = item
     return "Подтверждено. Впиши ровно это:\n" + json.dumps(kept, ensure_ascii=False)
+
+
+async def _required(page, selector: str) -> bool:
+    """Обязательно ли поле — по разметке самой страницы, а не со слов агента.
+
+    Поле, которого на странице не нашлось, обязательным не считается: окно
+    заперло бы подтверждение на пункте, которого человек не может заполнить.
+    """
+    from playwright.async_api import Error as PlaywrightError
+
+    try:
+        return (await page_field(page, selector)).required
+    except PlaywrightError:
+        logger.info("поле %s на странице не найдено — обязательность неизвестна", selector)
+        return False
 
 
 def _last_known(before: dict | None, item: ConfirmItem) -> ConfirmItem:

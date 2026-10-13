@@ -10,6 +10,7 @@
   // Мост и плашку берёт доводами, как их берут экраны. Наружу отдаёт две вещи:
   // подсказку о запертых кнопках — её оболочка раздаёт экранам — и уход в
   // контакты из списка непрочитанного.
+  import ConfirmSendDialog from '$components/ConfirmSendDialog.svelte';
   import HealthLamp from '$components/HealthLamp.svelte';
   import HumanPlate from '$components/HumanPlate.svelte';
   import ModeToggle from '$components/ModeToggle.svelte';
@@ -54,6 +55,28 @@
   const NO_NEW_TITLE = 'Новых вакансий для отклика нет';
 
   const chatTries = attempts();
+
+  // Ожидание подтверждения отправки: плашка разворачивает его окно, а не
+  // браузер, и галочка плашки подтверждает то, что в окне сейчас. Окно
+  // сворачивается в плашку и разворачивается из неё — вместе их не бывает.
+  const confirming = $derived(round.human?.kind === 'confirm');
+  // Обязательное пусто — подтвердить нельзя ни в окне, ни галочкой плашки.
+  const unfilled = $derived(round.ready ? '' : 'Заполните обязательные поля');
+  const unfolded = $derived(confirming && !round.folded);
+
+  function reveal() {
+    if (confirming) round.unfold();
+    else ask('system.reveal_browser');
+  }
+
+  function done() {
+    return answer(confirming ? { items: $state.snapshot(round.draft) } : undefined);
+  }
+
+  function answer(reply) {
+    round.answered();
+    return ask('system.human_done', reply);
+  }
 
   const health = $derived(healthNow.answer);
   let unread = $state(0);
@@ -284,11 +307,13 @@
   </div>
 
   <div class="bb-center">
-    {#if round.human}
+    {#if round.human && !unfolded}
       <HumanPlate
         text={humanText(round.human)}
-        onreveal={() => ask('system.reveal_browser')}
-        ondone={() => ask('system.human_done')}
+        confirm={confirming}
+        blocked={unfilled}
+        onreveal={reveal}
+        ondone={done}
       />
     {:else if round.running}
       <ProgressBars
@@ -345,3 +370,16 @@
     />
   </div>
 </div>
+
+{#if unfolded}
+  <ConfirmSendDialog
+    url={round.human.payload.url}
+    items={round.draft}
+    blocked={unfilled}
+    onedit={round.edit}
+    onopen={(url) => ask('system.open_url', url)}
+    onconfirm={done}
+    ondrop={() => answer({ drop: true })}
+    onfold={round.fold}
+  />
+{/if}
