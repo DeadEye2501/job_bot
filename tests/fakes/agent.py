@@ -89,7 +89,7 @@ def login_step(logged_in: bool):
 
 def silent_gate(limit_sec: float = 3600.0) -> HumanGate:
     """Пауза на человека, который не придёт: окну ничего не говорится."""
-    return HumanGate(lambda kind, host: None, lambda: None, limit_sec=limit_sec)
+    return HumanGate(lambda kind, host, payload: None, lambda: None, limit_sec=limit_sec)
 
 
 def scripted_kit(pipeline, steps, *, human_limit: float = 3600.0) -> AgentKit:

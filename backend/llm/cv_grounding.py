@@ -47,18 +47,6 @@ from backend.payloads import ParsedCv
 logger = logging.getLogger(__name__)
 
 
-def _spelled_in(text: str, word: str) -> bool:
-    """Слово стоит в тексте само, а не прячется внутри другого.
-
-    Начало стережёт граница слова: без неё «валидация» подтверждала бы «лид».
-    Конец — запретом на латинскую букву следом, а не второй границей: русское
-    звание в тексте склоняют («сеньора», «тимлида»), и хвост ему нужен, а
-    английское, наоборот, обязано кончиться — иначе «middleware» подтвердит
-    «middle».
-    """
-    return re.search(r"\b" + re.escape(word) + r"(?![a-z])", text) is not None
-
-
 def _any_named_in(text: str, words: tuple[str, ...]) -> bool:
     """Хоть одно из написаний стоит в тексте.
 
@@ -66,7 +54,7 @@ def _any_named_in(text: str, words: tuple[str, ...]) -> bool:
     своди их — и настоящее звание объявлялось бы выдуманным.
     """
     plain = text.replace("ё", "е")
-    return any(_spelled_in(plain, word.replace("ё", "е")) for word in words)
+    return any(spelled_alone(plain, word.replace("ё", "е")) for word in words)
 
 
 def _grounded_formats(text: str, formats: list[str]) -> list[str]:

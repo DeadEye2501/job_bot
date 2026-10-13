@@ -396,20 +396,24 @@ init
 - `def agent_refusal(chat: LlmProviderConfig | None, browser: InstalledBrowser | None) -> str | None` (7)
 - `def current_refusal(chat: LlmProviderConfig | None) -> str | None` (4)
 
-### `backend/agent/human_gate.py` — 120 строк
+### `backend/agent/human_gate.py` — 156 строк
 
-Ожидание человека: капча или слетевший вход. Срок — час на каждое ожидание.
+Ожидание человека: капча, слетевший вход или подтверждение отправки. Срок — час
 
 Зависит от: —
 
-- `class HumanGate` (106)
-  - `async def wait(self, kind: str, host: str, browser) -> str` (28)
-  - `def resolve(self) -> None` (6)
+- `class _NoBrowser` (8)
+  - `async def show(self) -> None` (2)
+  - `async def hide_back(self) -> None` (2)
+- `class HumanGate` (128)
+  - `async def wait(self, kind: str, host: str, browser=None, payload=None) -> str | dict` (27)
+  - `async def _arm(self, kind: str, host: str, browser, payload) -> bool` (16)
+  - `def resolve(self, answer=None) -> None` (7)
   - `def reveal(self) -> None` (10)
   - `async def _show(self, browser) -> None` (7)
   - `def abort(self) -> None` (10)
   - `def reset(self) -> None` (6)
-  - `async def _take(self, browser) -> str` (14)
+  - `async def _take(self, browser) -> str | dict` (13)
 
 ### `backend/agent/jobs.py` — 94 строк
 
@@ -706,14 +710,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def alembic_config() -> Config` (10)
 - `def ensure_schema() -> None` (9)
 
-### `backend/bot/aggregators.py` — 115 строк
+### `backend/bot/aggregators.py` — 116 строк
 
 Работа агента у бота с источниками: обход агрегаторов, вход на сайт и удаление источника.
 
 Зависит от: `adapters.browser`, `backend.agent.availability`, `backend.agent.jobs`, `backend.agent.kit`, `backend.bot`, `backend.flows.aggregator_login`, `backend.flows.aggregator_round`, `backend.models`, `backend.repository`
 
 - `def aggregators_available(bot) -> str | None` (3)
-- `def human_done(bot) -> None` (3)
+- `def human_done(bot, answer=None) -> None` (4)
 - `def reveal_browser(bot) -> None` (3)
 - `async def seek_all(bot, kit: AgentKit) -> None` (17)
 - `async def run_aggregator_now(bot, aggregator_id: int) -> AgentOutcome` (13)
@@ -810,7 +814,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def apply_chosen_way(self, vacancy_id: int, way: Way) -> apply.ApplyOutcome` (2)
   - `async def apply_all_new(self) -> work.WorkOutcome` (2)
   - `async def download_update(self) -> update.DownloadOutcome` (2)
-  - `def human_done(self) -> None` (2)
+  - `def human_done(self, answer=None) -> None` (2)
   - `def reveal_browser(self) -> None` (2)
   - `async def delete_aggregator(self, aggregator_id) -> str` (2)
 
@@ -1201,13 +1205,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def blacklist_refusal(blacklist_match: str | None) -> str | None` (9)
 - `def decide_vacancy_status(score: int, *, threshold: int) -> tuple[VacancyStatus, str | None]` (14)
 
-### `backend/domain/wording.py` — 21 строк
+### `backend/domain/wording.py` — 23 строк
 
 Как узнать написание в тексте: словом, а не куском чужого слова.
 
 Зависит от: —
 
-- `def spelled_alone(text: str, word: str) -> bool` (9)
+- `def spelled_alone(text: str, word: str) -> bool` (11)
 
 ### `backend/flows/aggregator_login.py` — 36 строк
 
@@ -1708,13 +1712,12 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parse_cv_json(answer: str) -> ParsedCv | None` (21)
 - `async def parse_cv(text: str, client: httpx.AsyncClient, model: str) -> ParsedCv | None` (36)
 
-### `backend/llm/cv_grounding.py` — 391 строк ⚠ подошёл к 300
+### `backend/llm/cv_grounding.py` — 379 строк ⚠ подошёл к 300
 
 Что в разобранном резюме не подтверждается его же текстом.
 
 Зависит от: `backend.domain.taxonomy`, `backend.domain.wording`, `backend.incoming`, `backend.llm.hallucination`, `backend.payloads`
 
-- `def _spelled_in(text: str, word: str) -> bool` (10)
 - `def _any_named_in(text: str, words: tuple[str, ...]) -> bool` (8)
 - `def _grounded_formats(text: str, formats: list[str]) -> list[str]` (18)
 - `def _language_named_in(text: str, name: str) -> bool` (18)
@@ -3231,7 +3234,7 @@ Runtime settings layer.
     - `async def run() -> dict` (2)
   - `def _push_record(self, entry: dict) -> None` (16)
 
-### `client/bridge/lifespan.py` — 299 строк
+### `client/bridge/lifespan.py` — 301 строк ⚠ подошёл к 300
 
 Жизнь моста при окне: от подъёма хозяйства до его гашения.
 
@@ -3244,7 +3247,7 @@ Runtime settings layer.
 - `def _forget_login(hub: Hub) -> None` (14)
 - `def _start_bot(hub: Hub) -> None` (25)
   - `async def _build_and_run() -> None` (8)
-- `def _tell_the_window(bot, hub: Hub) -> None` (39)
+- `def _tell_the_window(bot, hub: Hub) -> None` (41)
   - `def arrived(hr_id: int) -> None` (3)
 - `def _restart_bot(hub: Hub) -> None` (36)
   - `async def _swap() -> None` (15)
@@ -3453,19 +3456,19 @@ Runtime settings layer.
   - `def skills(self, period: str) -> dict` (3)
   - `def channels_pipeline(self, period: str) -> dict` (3)
 
-### `client/bridge/system.py` — 412 строк ⚠ подошёл к 300
+### `client/bridge/system.py` — 413 строк ⚠ подошёл к 300
 
 Домен «система»: то, чем страница живёт на любом экране.
 
 Зависит от: `adapters`, `backend`, `backend.flows.handover`, `backend.incoming`, `backend.models`, `backend.repository`, `backend.repository.bot_mode`, `client.bridge.answer`, `client.bridge.app_update`, `client.bridge.desktop`, `client.bridge.hub`, `client.bridge.journal`, `client.bridge.llm`, `client.bridge.refusals`, `client.bridge.wipe`, `client.bridge.wire`
 
-- `class System(Journal, Wipe, Desktop, AppUpdate)` (299)
+- `class System(Journal, Wipe, Desktop, AppUpdate)` (300)
   - `def initial(self) -> dict` (16)
     - `async def run() -> dict` (6)
   - `async def _mode(self) -> BotMode` (5)
   - `def set_mode(self, mode: str) -> dict` (26)
     - `async def run() -> dict` (7)
-  - `def human_done(self) -> dict` (5)
+  - `def human_done(self, answer=None) -> dict` (6)
   - `def reveal_browser(self) -> dict` (5)
   - `def run_now(self) -> dict` (19)
   - `def new_vacancies(self) -> dict` (7)
@@ -3709,7 +3712,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 323 модулей
+## tests — 324 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -4104,13 +4107,13 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_agent_human_gate.py` — 170 строк
+### `tests/backend/test_agent_human_gate.py` — 243 строк
 
 Пауза на человека: браузер виден, окно знает, срок — час.
 
 Зависит от: `backend.agent.human_gate`, `tests.fakes.browser`
 
-Тестов: 11
+Тестов: 17
 
 - `def _gate(limit=60.0)` (5)
 
@@ -4267,13 +4270,13 @@ Runtime settings layer.
 - `def _project_of_two_revisions(root, db_file) -> None` (20)
 - `def _revisions_in(paths) -> set[str]` (9)
 
-### `tests/backend/test_bot_aggregators.py` — 338 строк ⚠ подошёл к 300
+### `tests/backend/test_bot_aggregators.py` — 354 строк ⚠ подошёл к 300
 
 Обход агрегаторов в боте: место прогона, режимы, человек, сроки, ручные действия.
 
 Зависит от: `backend.bot`, `backend.bot.turn`, `backend.models`, `tests.backend.fixtures.bot`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.fakes.browser`, `tests.waiting`
 
-Тестов: 20
+Тестов: 21
 
 - `def agent(monkeypatch)` (13)
   - `def install(bot, steps, *, human_limit=None)` (8)
@@ -4667,6 +4670,15 @@ Runtime settings layer.
 Зависит от: `backend.domain.verdict`, `backend.models`, `tests.factories`
 
 Тестов: 9
+
+
+### `tests/backend/test_domain_wording.py` — 19 строк
+
+Написание стоит в тексте словом, а не куском чужого слова.
+
+Зависит от: `backend.domain.wording`
+
+Тестов: 4
 
 
 ### `tests/backend/test_entry_point.py` — 199 строк
@@ -6585,13 +6597,13 @@ Runtime settings layer.
 Тестов: 7
 
 
-### `tests/client/test_bridge_system.py` — 296 строк
+### `tests/client/test_bridge_system.py` — 305 строк ⚠ подошёл к 300
 
 Следствия домена «система»: чем занят бот и что показывает нижняя полоса.
 
 Зависит от: `backend.app_version`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.github_release`
 
-Тестов: 21
+Тестов: 22
 
 - `def handed_over(hub)` (5)
 
@@ -7181,7 +7193,7 @@ Runtime settings layer.
   - `async def apply_chosen_way(self, vacancy_id: int, way) -> str` (3)
   - `async def apply_all_new(self) -> str` (3)
   - `async def download_update(self) -> str` (3)
-  - `def human_done(self) -> None` (2)
+  - `def human_done(self, answer=None) -> None` (2)
   - `def reveal_browser(self) -> None` (2)
   - `async def delete_aggregator(self, aggregator_id: int) -> str` (3)
 

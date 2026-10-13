@@ -13,9 +13,11 @@ import re
 def spelled_alone(text: str, word: str) -> bool:
     """Написание стоит в тексте само, а не внутри другого слова.
 
-    Дефис по краям запрещён наравне с буквой и цифрой. Между словами, наоборот,
-    дефис и пробел равнозначны: «Upper-Intermediate» и «Upper Intermediate» —
-    одно написание.
+    Перед написанием запрещены буква, цифра и дефис. После — латинская буква,
+    цифра и дефис, но не русская буква: русское слово в тексте склоняют
+    («сеньора», «тимлида»), и хвост ему нужен, а английское обязано кончиться —
+    иначе «middleware» подтвердит «middle». Между словами дефис и пробел
+    равнозначны: «Upper-Intermediate» и «Upper Intermediate» — одно написание.
     """
     loose = r"[\s-]+".join(re.escape(part) for part in re.split(r"[\s-]+", word))
-    return re.search(rf"(?<![-\w]){loose}(?![-\w])", text) is not None
+    return re.search(rf"(?<![-\w]){loose}(?![-a-zA-Z0-9_])", text) is not None

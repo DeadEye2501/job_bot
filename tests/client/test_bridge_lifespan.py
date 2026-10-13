@@ -176,7 +176,7 @@ async def test_what_the_bot_does_by_itself_reaches_the_queue(hub):
     bot.on_channels_changed()
     bot.on_contacts_changed()
     bot.on_vacancies_changed()
-    bot.on_human_needed("captcha", "site.test")
+    bot.on_human_needed("confirm", "site.test", {"items": []})
     bot.on_human_resolved()
     bot.on_round_note("обход снят")
     bot.on_cycle_end()
@@ -198,7 +198,7 @@ async def test_what_the_bot_does_by_itself_reaches_the_queue(hub):
         "round_note",
         "ingestion_finished",
     ]
-    assert news["events"][-4]["payload"] == {"kind": "captcha", "host": "site.test"}
+    assert news["events"][-4]["payload"] == {"kind": "confirm", "host": "site.test", "payload": {"items": []}}
     assert news["events"][-2]["payload"] == {"text": "обход снят"}
 
 

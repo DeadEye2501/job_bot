@@ -171,7 +171,7 @@ async def test_the_window_hears_when_a_person_is_needed_and_when_they_are_done(
 ):
     bot = await make_bot()
     heard = []
-    bot.on_human_needed = lambda kind, host: heard.append((kind, host))
+    bot.on_human_needed = lambda kind, host, payload: heard.append((kind, host, payload))
     bot.on_human_resolved = lambda: heard.append("resolved")
 
     async def step(tools):
@@ -185,7 +185,23 @@ async def test_the_window_hears_when_a_person_is_needed_and_when_they_are_done(
     aggregators.human_done(bot)
     await slot_freed(bot)
 
-    assert heard == [("captcha", "site.test"), "resolved"]
+    assert heard == [("captcha", "site.test", None), "resolved"]
+
+
+async def test_the_answer_from_the_window_reaches_the_waiting_call(make_bot):
+    """Данные доезжают до окна, а ответ окна едет на цикл бота и достаётся тому,
+    кто ждал с данными."""
+    bot = await make_bot()
+    heard = []
+    bot.on_human_needed = lambda kind, host, payload: heard.append(payload)
+    bot.on_human_resolved = lambda: None
+    waiting = asyncio.create_task(bot.human_gate.wait("confirm", "site.test", payload={"items": []}))
+    await asyncio.sleep(0)
+
+    bot.human_done({"items": [{"value": "правка"}]})
+
+    assert await asyncio.wait_for(waiting, 1) == {"items": [{"value": "правка"}]}
+    assert heard == [{"items": []}]
 
 
 async def test_an_expired_wait_drops_the_round_and_tells_the_window(

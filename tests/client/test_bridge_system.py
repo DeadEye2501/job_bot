@@ -274,7 +274,16 @@ async def test_ready_from_the_window_reaches_the_bot(api, ask, with_bot):
 
     answer = await ask(api.system.human_done)
 
-    assert answer == {"ok": {}} and bot.calls == [("human_done",)]
+    assert answer == {"ok": {}} and bot.calls == [("human_done", None)]
+
+
+async def test_the_window_answer_reaches_the_bot(api, ask, with_bot):
+    """Подтверждение несёт правленые пункты — они уходят боту как есть."""
+    bot = with_bot()
+
+    answer = await ask(api.system.human_done, {"items": [{"value": "правка"}]})
+
+    assert answer == {"ok": {}} and bot.calls == [("human_done", {"items": [{"value": "правка"}]})]
 
 
 async def test_switching_off_cancels_nothing(api, ask, with_bot):

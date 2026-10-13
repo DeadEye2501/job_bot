@@ -250,7 +250,7 @@ class Bot:
         _declare_ui_hooks(self)
         _forward_pipeline_hooks(self)
         self.human_gate = HumanGate(
-            lambda kind, host: fire(self.on_human_needed, "on_human_needed", kind, host),
+            lambda kind, host, payload: fire(self.on_human_needed, "on_human_needed", kind, host, payload),
             lambda: fire(self.on_human_resolved, "on_human_resolved"),
         )
 
@@ -398,8 +398,8 @@ class Bot:
     async def download_update(self) -> update.DownloadOutcome:
         return await update.download_update(self)
 
-    def human_done(self) -> None:
-        aggregators.human_done(self)
+    def human_done(self, answer=None) -> None:
+        aggregators.human_done(self, answer)
 
     def reveal_browser(self) -> None:
         aggregators.reveal_browser(self)
