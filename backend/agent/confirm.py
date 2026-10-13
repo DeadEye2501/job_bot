@@ -8,7 +8,7 @@
 ссылка на вакансию и чтение ответа окна.
 """
 
-from typing import Literal, NotRequired, TypedDict
+from typing import Literal, TypedDict
 
 from backend.agent.jobs import Dropped
 from backend.agent.kit import AgentKit
@@ -20,22 +20,25 @@ from backend.repository.vacancy_contacts import vacancy_link
 class ConfirmItem(TypedDict):
     """Пункт окна подтверждения: подпись поля (у письма пусто), вид, значение,
     ошибка поля с сайта при повторном показе и селектор поля на странице (у
-    письма Telegram и почты страницы нет — пусто).
-
-    `required` ставит код, а не агент: у поля страницы — по её разметке, у
-    письма — всегда. Окно не подтверждает, пока обязательное пусто: отправка
-    вернулась бы с ошибкой, и время ушло бы впустую.
-    """
+    письма Telegram и почты страницы нет — пусто)."""
 
     label: str
     kind: Literal["text", "choice", "check"]
     value: str
     error: str
     selector: str
-    required: NotRequired[bool]
 
 
-def text_item(label: str, value: str) -> ConfirmItem:
+# Своим типом, а не полем пункта агента: обязательность ставит код — у поля
+# страницы по её разметке, у письма всегда, — и агенту её в схеме не предлагают.
+class ShownItem(ConfirmItem):
+    """Пункт, каким его видит окно: ещё и обязательность. Окно не подтверждает,
+    пока обязательное пусто: отправка вернулась бы с ошибкой впустую."""
+
+    required: bool
+
+
+def text_item(label: str, value: str) -> ShownItem:
     """Пункт письма или его темы: правится текстом, страницы у него нет; пустым
     не уходит ни письмо, ни тема."""
     return {"label": label, "kind": "text", "value": value, "error": "", "selector": "", "required": True}
@@ -51,7 +54,7 @@ def confirming(kit: AgentKit) -> bool:
     return kit.pipeline.rs.auto_apply == "confirm"
 
 
-async def confirmed(kit: AgentKit, vacancy_id: int, items: list[ConfirmItem]) -> list[ConfirmItem] | Dropped:
+async def confirmed(kit: AgentKit, vacancy_id: int, items: list[ShownItem]) -> list[ShownItem] | Dropped:
     """Пункты, какими их отправить: в режиме подтверждения — как их оставил
     человек, иначе — как есть."""
     if not confirming(kit):
@@ -59,7 +62,7 @@ async def confirmed(kit: AgentKit, vacancy_id: int, items: list[ConfirmItem]) ->
     return await ask_person(kit, vacancy_id, items)
 
 
-async def ask_person(kit: AgentKit, vacancy_id: int, items: list[ConfirmItem]) -> list[ConfirmItem] | Dropped:
+async def ask_person(kit: AgentKit, vacancy_id: int, items: list[ShownItem]) -> list[ShownItem] | Dropped:
     """Пункты, какими их оставил человек, или `Dropped`, если он закончил или
     обход остановили: в обоих случаях ничего не уходит. Срок обрывает прогон
     из самого ожидания."""

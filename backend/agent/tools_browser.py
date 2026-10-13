@@ -3,11 +3,11 @@
 import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import NamedTuple
 
 from backend.agent.confirm import is_checked
 from backend.agent.jobs import ApplyJob, Dropped
 from backend.agent.kit import AgentKit
+from backend.agent.page_fields import field_or_none, page_field
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +26,11 @@ def browser_tools(kit: AgentKit, resume: Path | None, confirming: ApplyJob | Non
     `confirming` — отклик под подтверждением: ввод, выбор и нажатия делают
     только подтверждённое человеком, а после «Закончить» — ничего.
     """
-    fill, select, click = _plain() if confirming is None else _strict(confirming)
+    act, fill, select, click = _actions(kit, confirming)
 
     async def browser_open(url: str) -> str:
         """Открыть адрес во вкладке."""
-        return await _act(kit, lambda page: page.goto(url))
+        return await act(lambda page: page.goto(url))
 
     async def browser_snapshot() -> str:
         """Что сейчас на странице: адрес, заголовок и дерево доступности с адресами ссылок."""
@@ -38,37 +38,53 @@ def browser_tools(kit: AgentKit, resume: Path | None, confirming: ApplyJob | Non
 
     async def browser_click(selector: str) -> str:
         """Нажать на элемент по селектору Playwright."""
-        return await _act(kit, lambda page: click(page, selector))
+        return await act(lambda page: click(page, selector))
 
     async def browser_type(selector: str, text: str) -> str:
         """Ввести текст в поле, заменив прежний."""
-        return await _act(kit, lambda page: fill(page, selector, text))
+        return await act(lambda page: fill(page, selector, text))
 
     async def browser_select(selector: str, value: str) -> str:
         """Выбрать значение в выпадающем списке."""
-        return await _act(kit, lambda page: select(page, selector, value))
+        return await act(lambda page: select(page, selector, value))
 
     async def browser_attach_resume(selector: str) -> str:
         """Приложить резюме: селектор — кнопка или поле загрузки, видимые в снимке."""
         if resume is None:
             return "нет файла резюме"
-        return await _act(kit, lambda page: _attach(page, selector, resume))
+        return await act(lambda page: _attach(page, selector, resume))
 
     async def browser_back() -> str:
         """Вернуться на предыдущую страницу."""
-        return await _act(kit, lambda page: page.go_back())
+        return await act(lambda page: page.go_back())
 
     return [browser_open, browser_snapshot, browser_click, browser_type,
             browser_select, browser_attach_resume, browser_back]
 
 
-async def _act(kit: AgentKit, action: Callable[..., Awaitable]) -> str:
+def _actions(kit: AgentKit, job: ApplyJob | None) -> tuple[Callable, Callable, Callable, Callable]:
+    """Действие над страницей и ввод, выбор, нажатие — обычные или под подтверждением.
+
+    После «Закончить» не проходит ни одно действие — решается здесь, один раз на
+    все инструменты: и «Отправить», и нажатие при загрузке резюме.
+    """
+    fill, select, click = _plain() if job is None else _strict(job)
+    held = _going if job is None else lambda: _not_finished(job)
+
+    async def act(action: Callable[..., Awaitable]) -> str:
+        return await _act(kit, action, held)
+
+    return act, fill, select, click
+
+
+async def _act(kit: AgentKit, action: Callable[..., Awaitable], held: Callable[[], None]) -> str:
     """Действие над страницей. Отказ Playwright — исход для агента, а не беда приложения:
     агент получает текст и решает сам."""
     from playwright.async_api import Error as PlaywrightError
 
     page = await kit.browser.page()
     try:
+        held()
         await action(page)
     except _Refused as refusal:
         logger.info("ввод агента без подтверждения отклонён: %s", refusal)
@@ -101,8 +117,7 @@ def _strict(job: ApplyJob) -> tuple[Callable, Callable, Callable]:
     агент, ближайший к подтверждённому тексту, но поле должно быть подтверждено.
     Нажатие на подтверждённую галочку ставит подтверждённую отметку, а не
     переключает её: повторное нажатие отметку не снимет. Нажатия не по полям —
-    резюме, «Отправить», переходы — как есть, пока человек не закончил: после
-    «Закончить» не проходит ничего, и «Отправить» держит код, а не наставление.
+    резюме, «Отправить», переходы — как есть.
     """
     plain_fill, plain_select, plain_click = _plain()
 
@@ -117,7 +132,6 @@ def _strict(job: ApplyJob) -> tuple[Callable, Callable, Callable]:
         await plain_select(page, selector, value)
 
     async def click(page, selector):
-        _not_finished(job)
         item = job.confirmed.get((page.url, selector))
         if item is not None and item["kind"] == "check":
             await page.set_checked(selector, is_checked(item), timeout=_WAIT_MS)
@@ -127,38 +141,6 @@ def _strict(job: ApplyJob) -> tuple[Callable, Callable, Callable]:
         await plain_click(page, selector)
 
     return fill, select, click
-
-
-# Что за элемент под селектором — так, как его понимает сам браузер, а не
-# разметка одного сайта: обычные галочка и кружок, самодельные с ролью, и подпись,
-# нажатие на которую переключает привязанное к ней поле. Группа кружка — его имя
-# или общий `radiogroup`; у контейнера группы — группа первого кружка внутри.
-# Обязательность — признак самого поля или его группы: `required` или
-# `aria-required`, как размечают их и обычные формы, и конструкторы опросов.
-_FIELD_OF = """el => {
-  const target = el.closest('label')?.control || el;
-  const type = (target.type || '').toLowerCase();
-  const role = (target.getAttribute('role') || '').toLowerCase();
-  const isRadio = type === 'radio' || role === 'radio';
-  const radio = isRadio ? target : target.querySelector?.('input[type=radio], [role=radio]');
-  const group = radio ? radio.name || radio.closest('[role=radiogroup]')?.id || '' : '';
-  const required = Boolean(target.required) || target.closest('[aria-required=true]') !== null;
-  if (type === 'checkbox' || role === 'checkbox' || role === 'switch') return ['check', '', required];
-  return [isRadio ? 'radio' : '', group, required];
-}"""
-
-
-class PageField(NamedTuple):
-    """Элемент страницы, каким его видит браузер: вид (`check`, `radio` или
-    пусто — не поле), группа кружка и обязательность."""
-
-    kind: str
-    group: str
-    required: bool
-
-
-async def page_field(page, selector: str) -> PageField:
-    return PageField(*await page.locator(selector).first.evaluate(_FIELD_OF, timeout=_WAIT_MS))
 
 
 async def _refuse_unconfirmed_choice(job: ApplyJob, page, selector: str) -> None:
@@ -175,20 +157,19 @@ async def _refuse_unconfirmed_choice(job: ApplyJob, page, selector: str) -> None
 
 
 async def _confirmed_groups(job: ApplyJob, page) -> set[str]:
-    """Группы кружков, подтверждённых на этой странице пунктом-переключателем."""
-    from playwright.async_api import Error as PlaywrightError
-
+    """Группы кружков, подтверждённых на этой странице пунктом-переключателем.
+    Поле прошлого шага формы, ушедшее со страницы, группы не даёт."""
     groups = set()
     for (url, selector), item in job.confirmed.items():
-        if url != page.url or item["kind"] != "choice":
-            continue
-        # Поле прошлого шага формы на том же адресе могло уйти со страницы:
-        # такой пункт группы не даёт, а нажатие решается по остальным.
-        try:
-            groups.add((await page_field(page, selector)).group)
-        except PlaywrightError:
-            logger.info("подтверждённое поле %s на странице не найдено", selector)
+        if url == page.url and item["kind"] == "choice":
+            field = await field_or_none(page, selector)
+            if field is not None:
+                groups.add(field.group)
     return groups
+
+
+def _going() -> None:
+    """Не под подтверждением действия ничто не держит."""
 
 
 def _not_finished(job: ApplyJob) -> None:
@@ -198,7 +179,6 @@ def _not_finished(job: ApplyJob) -> None:
 
 def _confirmed_field(job: ApplyJob, page, selector: str) -> dict:
     """Пункт, подтверждённый человеком для этого поля на этой странице."""
-    _not_finished(job)
     item = job.confirmed.get((page.url, selector))
     if item is None:
         raise _Refused("поле не подтверждено человеком на этой странице — сначала need_human с kind=confirm")

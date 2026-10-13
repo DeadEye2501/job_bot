@@ -3,11 +3,12 @@
 
 import { hearRound } from '../state/round.svelte.js';
 
-/** Подписка на вести моста: обработчики копятся по имени, `fire` зовёт их так
- *  же, как мост, `heard` говорит, слушают ли весть. */
+/** Подписка на вести моста: обработчики копятся по имени в `handlers`, `fire`
+ *  зовёт их так же, как мост, `heard` говорит, слушают ли весть. */
 export function listening() {
   const handlers = {};
   return {
+    handlers,
     on: (name, handler) => {
       handlers[name] = handler;
       return () => delete handlers[name];

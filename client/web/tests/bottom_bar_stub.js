@@ -5,7 +5,7 @@ import { render } from '@testing-library/svelte';
 
 import BottomBar from '../app/BottomBar.svelte';
 import { hearRound } from '../state/round.svelte.js';
-import { answering } from './bridge_stub.js';
+import { answering, listening } from './bridge_stub.js';
 
 /** Полоса со здоровьем `health`; ответ — зовы моста, подсказки запора, плашки
  *  и обработчики вестей.
@@ -19,9 +19,6 @@ export function bar(health, counts = [0], { app = null, updates = [{ newer: null
   // Плашки полоса показывает не через мост, а через `say`: отказ запертого
   // тумблера виден только здесь.
   const said = [];
-  // Вести полосе приходят подпиской: сюда складываются обработчики, чтобы
-  // проверка могла позвать их так же, как их зовёт мост.
-  const handlers = {};
   const left = [...counts];
   const checks = [...updates];
   const { asked, ask } = answering((method, payload) => {
@@ -33,14 +30,9 @@ export function bar(health, counts = [0], { app = null, updates = [{ newer: null
     return {};
   });
 
-  const events = {
-    on: (name, handler) => {
-      handlers[name] = handler;
-      return () => {};
-    },
-    run: () => {},
-    stop: () => {},
-  };
+  // Вести полосе приходят подпиской: проверка зовёт обработчики так же, как мост.
+  const events = { ...listening(), run: () => {}, stop: () => {} };
+  const { handlers } = events;
   // Вести о начале и конце прогона слушает общий учёт, а не полоса: в окне его
   // подписывает оболочка, здесь — проверка, на те же поддельные вести.
   hearRound(events);

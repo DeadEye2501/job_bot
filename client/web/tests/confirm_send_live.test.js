@@ -7,7 +7,7 @@ import { cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { bar } from './bottom_bar_stub.js';
-import { buttonBy } from './press.js';
+import { buttonBy, typed } from './press.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
@@ -39,11 +39,8 @@ const fields = () => [...dialog().querySelectorAll('.confirm-item')];
 const button = (text) => buttonBy(text, { exact: true });
 const answered = (asked) => asked.filter((one) => one.method === 'system.human_done').map((one) => one.payload);
 
-function type(field, text) {
-  const input = field.querySelector('textarea, input');
-  input.value = text;
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-}
+/** Набрать в поле пункта. */
+const type = (field, text) => typed(field.querySelector('textarea, input'), text);
 
 describe('окно подтверждения отправки', () => {
   it('весть с пунктами открывает окно: ссылка на вакансию сверху, пункты ниже', async () => {
@@ -106,6 +103,16 @@ describe('окно подтверждения отправки', () => {
     await waiting([{ label: 'Имя', kind: 'text', value: '', error: '', selector: '#n', required: true }]);
 
     expect(fields()[0].querySelector('.confirm-item-required')).not.toBeNull();
+  });
+
+  it('обязательная галочка тоже помечена, а одни пробелы заполнением не считаются', async () => {
+    await waiting([
+      { label: 'Согласие', kind: 'check', value: 'true', error: '', selector: '#a', required: true },
+      { label: 'Имя', kind: 'text', value: '   ', error: '', selector: '#n', required: true },
+    ]);
+
+    expect(fields()[0].querySelector('.confirm-item-required')).not.toBeNull();
+    expect(button('Подтвердить').disabled).toBe(true);
   });
 
   it('пока обязательное пусто, подтвердить нельзя ни в окне, ни с плашки', async () => {

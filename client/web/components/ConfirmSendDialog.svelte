@@ -1,12 +1,13 @@
 <script>
   // Окно подтверждения отправки: что уйдёт работодателю — правится здесь.
   //
-  // Пункт по виду: текст и письмо — многострочным полем (у письма подписи нет),
-  // список и переключатель — строкой с вариантом, галочка — галочкой. Ошибка
-  // сайта у поля, отвергнутого при прошлой отправке, стоит под ним.
+  // Список и переключатель — строкой, а не своим списком вариантов: варианты
+  // знает страница, а не окно, и вариант, ближайший к тексту, выбирает агент.
   //
   // Закрытие окна — «Свернуть»: ожидание не кончается, оно уходит в плашку
   // нижней полосы, а правки остаются.
+  import { isChecked } from '$state/round.svelte.js';
+
   import ModalHead from './ModalHead.svelte';
   import ModalShell from './ModalShell.svelte';
 
@@ -28,7 +29,7 @@
             <label class="checkbox-row">
               <input
                 type="checkbox"
-                checked={item.value === 'true'}
+                checked={isChecked(item)}
                 onchange={(event) => onedit(at, event.currentTarget.checked ? 'true' : 'false')}
               />
               {item.label}{#if item.required}<span class="confirm-item-required">*</span>{/if}

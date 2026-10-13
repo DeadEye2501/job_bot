@@ -284,7 +284,8 @@
   - `value: str`
   - `error: str`
   - `selector: str`
-  - `required: NotRequired[bool]`
+- `class ShownItem(ConfirmItem)`
+  - `required: bool`
 
 ### `backend/agent/human_gate.py`
 
@@ -353,6 +354,16 @@
   - `run_session: RunSession`
   - `today: date`
 
+### `backend/agent/page_fields.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `_WAIT_MS` = `15000`
+- `_FIELD_OF` = `"el => {\n  const FIELD = 'input, select, textar…`
+- `class PageField(NamedTuple)`
+  - `kind: str`
+  - `group: str`
+  - `required: bool`
+
 ### `backend/agent/prompts/applier.py`
 
 - `APPLIER_PROMPT` = `'Твоя задача — откликнуться на одну вакансию одн…`
@@ -410,15 +421,6 @@
 - `_WAIT_MS` = `15000`
 - `_SNAPSHOT_LIMIT` = `60000`
 - `_CUT_MARK` = `'\n… снимок обрезан: страница длиннее, чем помещ…`
-- `_FIELD_OF` = `"el => {\n  const target = el.closest('label')?.…`
-- `class PageField(NamedTuple)`
-  - `kind: str`
-  - `group: str`
-  - `required: bool`
-
-### `backend/agent/tools_common.py`
-
-- `logger` = `logging.getLogger(__name__)`
 
 ### `backend/agent/tools_letter.py`
 
@@ -2174,6 +2176,10 @@
 ### `tests/backend/test_agent_confirm_page.py`
 
 - `PAGE` = `'https://site.test/vacancy/1/apply'`
+
+### `tests/backend/test_agent_page_fields.py`
+
+- `FORM` = `'\n<input type=checkbox id=plain><label for=plai…`
 
 ### `tests/backend/test_agent_prompts.py`
 

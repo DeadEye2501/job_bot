@@ -49,13 +49,6 @@
 .human-plate-done:hover:not(:disabled) {
   background: var(--ok-fill);
 }
-
-/* Подтвердить нечем, пока обязательное в окне пусто: галочка гаснет. */
-.human-plate-done:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 .human-plate-done .material-symbols-outlined {
   font-size: 16px;
 }

@@ -256,7 +256,7 @@
 - принимает: message, confirmLabel, locked, onconfirm, oncancel
 - берёт: ./ModalShell.svelte
 
-### components/ConfirmSendDialog.svelte (76)
+### components/ConfirmSendDialog.svelte (77)
 - —
 - принимает: url, items, blocked, onedit, onopen, onconfirm, ondrop, onfold
 - берёт: ./ModalHead.svelte, ./ModalShell.svelte
@@ -817,9 +817,9 @@
 - * Лежит ли запись уже в базе. * * Номера мало: его даёт мост, а вкладка себя после записи не перечитывает — * заведённая в этот заход запись живёт с пустым номером до конца визита, уже * будучи записанной. Отметку об уехавшей записи ставит сама вкладка, и без неё * опустошённое обязательное поле вычёркивало такую строку из посылки, а мост * стирал её молча вместе со всем, что в ней было.
 - отдаёт: recordsGoing
 
-### state/round.svelte.js (131)
+### state/round.svelte.js (136)
 - * Что известно о прогоне сейчас.
-- отдаёт: hearRound, round
+- отдаёт: hearRound, isChecked, round
 
 ### state/search.js (25)
 - * Что из списка остаётся видно под набранное. * * Пустое набранное оставляет список целым: поле поиска стоит над уже открытым * списком, и до первого знака резать нечего. Одни пробелы — то же самое: их * набирают между словами и стирают последними, и схлопнутый на них список * мигал бы под руками. * * Регистр не различается — человек набирает как придётся, а значения приходят * как записаны. Вхождением, а не началом строки: имена приходят с приставками * («qwen/qwen3-4b», «@ник · компания»), и отбор по началу прятал бы строку от * того, кто набирает её собственное имя. * * `text` называет, где искать: у строки списка полей несколько, и по какому из * них её вспоминают, знает не этот файл, а тот, кто её показывает.
@@ -1080,8 +1080,8 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (3): .confirm-field, .confirm-field .input, .confirm-field .icon-btn:hover
 - берёт: --accent
 
-### styles/confirm-send.css (25)
-- Окно подтверждения отправки: ссылка на вакансию и пункты. Тело и рамка — общей узкой коробки для чтения (`modal.css`), отметка отвергнутого поля — общая `.missing` (`input.css`), текст ошибки — общий `.modal-error`; здесь только ссылка и столбец пункта.
+### styles/confirm-send.css (21)
+- Окно подтверждения отправки: ссылка на вакансию и пункты.
 - селекторы (3): .confirm-send-link, .confirm-item-required, .confirm-item
 - берёт: --danger, --text-secondary
 
@@ -1121,12 +1121,13 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (14): .date-picker, .input-date-text, .input-date-text.invalid, .date-panel, .date-panel.up, .date-head, .date-head .icon-btn:hover, .date-title, .date-week, .date-weekday, .date-cell, .date-day, .date-day:hover, .date-day.today
 - берёт: --accent, --bg-tertiary, --err, --scrim, --selected-bg, --text-primary, --text-secondary
 
-### styles/disabled-look.css (36)
+### styles/disabled-look.css (37)
 - Как выглядит запертое: не даёт себя нажать и говорит об этом видом. Одним файлом на все места, где запертость показывают, — иначе одинаково запертые соседи гаснут по-разному, и разница читается как разная запертость. Глубин здесь три, и делит их не прихоть, а то, что заперто: — кнопка гаснет заметнее всех: она сплошная, и лёгкое приглушение на ней не читается; — пункт меню и карточка выбора приглушены мягче: они стоят в ряду таких же, и глубокая тень выбила бы ряд; — поле и кнопка отправки в переписке не гаснут вовсе, а гасят свои буквы: они и так на приглушённом полотне, а прозрачное поле читалось бы как пропавшее. Переключатель режима (`mode.css`) сюда не сведён: у него глубина своя и ни с одной из этих трёх не совпадает.
 - селекторы (3): .btn:disabled,
 .icon-btn.is-disabled,
 .badge-unread[data-has-unread='false'],
-.cnt-chat-attach:disabled, .menu-item.blocked,
+.cnt-chat-attach:disabled,
+.human-plate-done:disabled, .menu-item.blocked,
 .radio-card.disabled, .cnt-chat-input:disabled,
 .cnt-chat-send:disabled
 - берёт: --text-tertiary
@@ -1197,9 +1198,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .help .help-link, .help ol, .help ol li, .help .help-link:hover
 - берёт: --bg-secondary, --bg-tertiary, --text-primary, --text-secondary
 
-### styles/human-plate.css (61)
+### styles/human-plate.css (54)
 - Плашка ожидания человека в центре нижней полосы, на месте полос хода. Красная, а не в цвет хода: агент стоит, пока человек не вмешается, и плашку должно быть видно краем глаза. Во всю высоту полосы и без скруглений: кусок самой полосы, ставший плашкой, а не всплывшая поверх неё кнопка. Центр полосы — узел нулевой ширины (`footer.css`), поэтому плашка встаёт по нему сама, сдвигом на свою половину. Снизу точка просвета: вровень с краем окна нижняя рамка уходит под него и не видна.
-- селекторы (8): .human-plate, .human-plate-text, .human-plate.confirm, .human-plate.confirm .human-plate-text, .human-plate-done, .human-plate-done:hover:not(:disabled), .human-plate-done:disabled, .human-plate-done .material-symbols-outlined
+- селекторы (7): .human-plate, .human-plate-text, .human-plate.confirm, .human-plate.confirm .human-plate-text, .human-plate-done, .human-plate-done:hover:not(:disabled), .human-plate-done .material-symbols-outlined
 - берёт: --accent, --accent-hover-soft, --err, --err-fill, --ok, --ok-fill
 
 ### styles/icon-button.css (29)
@@ -1717,15 +1718,15 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/bottom_bar_live.test.js (389)
 - —
 
-### tests/bottom_bar_stub.js (59)
+### tests/bottom_bar_stub.js (51)
 - * Полоса со здоровьем `health`; ответ — зовы моста, подсказки запора, плашки * и обработчики вестей. * * `counts` — что по очереди отвечает число новых вакансий; последнее держится. * `app` — запущенная версия и может ли копия обновиться; `updates` — что по * очереди отвечает проверка обновления, последнее держится.
 - отдаёт: bar
 
 ### tests/bridge.test.js (161)
 - —
 
-### tests/bridge_stub.js (95)
-- * Подписка на вести моста: обработчики копятся по имени, `fire` зовёт их так * же, как мост, `heard` говорит, слушают ли весть.
+### tests/bridge_stub.js (96)
+- * Подписка на вести моста: обработчики копятся по имени в `handlers`, `fire` * зовёт их так же, как мост, `heard` говорит, слушают ли весть.
 - отдаёт: answering, held, listening, relisting, replying, rereading, roundGoes, saying, tracing
 
 ### tests/calendar.test.js (60)
@@ -1770,7 +1771,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/confirm_dialog_live.test.js (62)
 - * Окно с запором `locked`; отдаёт счёт подтверждений и красную кнопку.
 
-### tests/confirm_send_live.test.js (181)
+### tests/confirm_send_live.test.js (188)
 - * Полоса, ждущая подтверждения: прогон идёт, пришла весть с пунктами.
 
 ### tests/contact_adding.test.js (130)
@@ -1827,7 +1828,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/notes_field_delay_live.test.js (51)
 - —
 
-### tests/notes_field_live.test.js (62)
+### tests/notes_field_live.test.js (58)
 - * Поле заметки с записанными за ним отправками.
 
 ### tests/one_write.test.js (139)
@@ -1857,9 +1858,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/picker.test.js (134)
 - —
 
-### tests/press.js (19)
+### tests/press.js (25)
 - * Кнопка с этой подписью.
-- отдаёт: buttonBy, press
+- отдаёт: buttonBy, press, typed
 
 ### tests/profile.test.js (157)
 - —

@@ -30,6 +30,16 @@ class ScreeningPair(TypedDict):
     answer: _Text
 
 
+@dataclass(frozen=True)
+class _Report:
+    """Что о состоявшемся отклике известно: от агента или из подтверждённого."""
+
+    via: str
+    target: str
+    letter: str | None
+    screening: list[tuple[bool, str]]
+
+
 def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
     """Инструменты откликателя, привязанные к своей вакансии и своему способу."""
 
@@ -38,38 +48,46 @@ def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
         async with kit.pipeline.session_factory() as session:
             return await describe_vacancy(session, job.vacancy_id) or "Вакансия удалена."
 
+    # Под подтверждением письмо и ответы уже известны — их подтвердил человек, —
+    # и агенту запись отдаётся без них: пересказ, который выбросили бы, не просят.
+    return [vacancy, _confirmed_record(kit, job) if job.confirming else _reported_record(kit, job)]
+
+
+def _reported_record(kit: AgentKit, job: ApplyJob) -> Callable:
     async def record_application(
         via: str, target: str, letter: str = "", screening: list[ScreeningPair] | None = None,
         already_applied: bool = False,
     ) -> str:
-        """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы, письмо, скрининг. В screening — каждый вопрос работодателя из формы и со страницы подтверждения вместе с данным ответом, по порядку; вопросов не было — пустой список. Повтор с тем же адресом дописывает скрининг. Под подтверждением письмо и скрининг берутся из подтверждённого человеком."""
-        if via not in _ALLOWED[job.way.method]:
-            return "Этим способом отклик не пишется."
-        # Записанный отклик дописывается, а не отказывает: окончательность здесь
-        # нужна только «Закончить» — после него ничего не ушло и писать нечего.
-        if isinstance(job.outcome, Dropped):
-            return FINAL_ANSWER
-        sent_letter, pairs = _confirmed_sent(job) if job.confirming else (letter or None, screening or [])
-        lines = _lines(pairs)
-        if isinstance(job.outcome, Applied):
-            answer = await _append(kit, job.outcome.application_id, lines)
-        else:
-            letter_text = None if already_applied else sent_letter
-            answer = await _record(kit, job, _entry(job, _Report(via, target, letter_text, lines)))
-        job.unscreened.clear()
-        return answer
+        """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы, письмо, скрининг. В screening — каждый вопрос работодателя из формы и со страницы подтверждения вместе с данным ответом, по порядку; вопросов не было — пустой список. Повтор с тем же адресом дописывает скрининг."""
+        letter_text = None if already_applied else (letter or None)
+        return await _write(kit, job, _Report(via, target, letter_text, _lines(screening or [])))
 
-    return [vacancy, record_application]
+    return record_application
 
 
-@dataclass(frozen=True)
-class _Report:
-    """Что о состоявшемся отклике сообщил агент."""
+def _confirmed_record(kit: AgentKit, job: ApplyJob) -> Callable:
+    async def record_application(via: str, target: str, already_applied: bool = False) -> str:
+        """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы. Письмо и ответы на вопросы приложение берёт из подтверждённого человеком. Повтор с тем же адресом дописывает вопросы со страницы подтверждения."""
+        letter, pairs = _confirmed_sent(job)
+        return await _write(kit, job, _Report(via, target, None if already_applied else letter, _lines(pairs)))
 
-    via: str
-    target: str
-    letter: str | None
-    screening: list[tuple[bool, str]]
+    return record_application
+
+
+async def _write(kit: AgentKit, job: ApplyJob, report: _Report) -> str:
+    """Записать отклик или дописать скрининг к записанному в этой сессии."""
+    if report.via not in _ALLOWED[job.way.method]:
+        return "Этим способом отклик не пишется."
+    # Записанный отклик дописывается, а не отказывает: окончательность здесь
+    # нужна только «Закончить» — после него ничего не ушло и писать нечего.
+    if isinstance(job.outcome, Dropped):
+        return FINAL_ANSWER
+    if isinstance(job.outcome, Applied):
+        answer = await _append(kit, job.outcome.application_id, report.screening)
+    else:
+        answer = await _record(kit, job, _entry(job, report))
+    job.unscreened.clear()
+    return answer
 
 
 def _entry(job: ApplyJob, report: _Report) -> ApplicationEntry:
@@ -89,10 +107,11 @@ def _lines(screening: list[ScreeningPair]) -> list[tuple[bool, str]]:
 def _confirmed_sent(job: ApplyJob) -> tuple[str | None, list[ScreeningPair]]:
     """Письмо и скрининг под подтверждением — то, что ушло, а не пересказ агента.
 
-    Письмо — пункт без подписи; скрининг — пункты с подписью, ещё не легшие в
-    запись.
+    Письмо — последний подтверждённый текстовый пункт без подписи; скрининг —
+    пункты с подписью, ещё не легшие в запись.
     """
-    letter = next((item["value"] for item in job.confirmed.values() if not item["label"]), "")
+    letter = next((item["value"] for item in reversed(job.confirmed.values())
+                   if not item["label"] and item["kind"] == "text"), "")
     pairs = [{"question": item["label"], "answer": _answer(item)}
              for item in job.unscreened.values() if item["label"]]
     return letter or None, pairs
