@@ -5,6 +5,10 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Literal
 
+# Исход сессии агента и исход способа сразу: «Закончить» нажимают и в окне
+# Telegram и почты, и посреди сессии агента — объявлен он там, где его ставит сессия.
+from backend.agent.jobs import Dropped
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,18 +43,6 @@ class Unfit:
     """
 
     reason: str
-
-
-@dataclass(frozen=True)
-class Dropped:
-    """Человек закончил работу по вакансии в окне подтверждения: ничего не ушло.
-
-    Не промах способа: человек бросил вакансию, а не способ, и другой способ
-    спросил бы его о том же. Статус вакансии не меняется — следующий прогон
-    возьмёт её снова.
-    """
-
-    reason: str = "отказался человек"
 
 
 Outcome = Literal["applied"] | Missed | Unfit | Dropped

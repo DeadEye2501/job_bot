@@ -1,18 +1,26 @@
 """Общие инструменты агента: анкета, итог сессии, зов человека, отметка входа, неудача способа."""
 
+import json
 from collections.abc import Callable
 
-from backend.agent.jobs import HUMAN_KINDS, RESULTS, Applied, ApplyJob, Failed, Finished, LoginJob, SeekJob
+from backend.agent.confirm import ConfirmItem, ask_person
+from backend.agent.jobs import (
+    FINAL,
+    FINAL_ANSWER,
+    HUMAN_KINDS,
+    RESULTS,
+    ApplyJob,
+    Dropped,
+    Failed,
+    Finished,
+    LoginJob,
+    SeekJob,
+)
 from backend.agent.kit import AgentKit
 from backend.domain.apply_order import VIA_AGGREGATOR
 from backend.domain.hosts import normalize_host
 from backend.repository.agent_profile import build_agent_profile
 from backend.repository.aggregators import set_logged_in
-
-_ALREADY_APPLIED = (
-    "Отклик уже записан, итог не меняется: второй отклик ушёл бы тому же "
-    "работодателю другим способом. Заверши работу."
-)
 
 
 def common_tools(kit: AgentKit, job) -> list[Callable]:
@@ -30,8 +38,8 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
         """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed или not_fit. Проверка входа: done."""
         if result not in RESULTS[type(job)]:
             return f"Итога «{result}» у этой задачи не бывает: {', '.join(sorted(RESULTS[type(job)]))}."
-        if isinstance(job.outcome, Applied):
-            return _ALREADY_APPLIED
+        if isinstance(job.outcome, FINAL):
+            return FINAL_ANSWER
         job.outcome = Finished(result, reason)
         return "Итог записан, работа окончена."
 
@@ -55,13 +63,47 @@ def _login_target(job) -> int | None:
 
 
 def _need_human(kit: AgentKit, job) -> Callable:
-    async def need_human(kind: str) -> str:
-        """Нужен человек: kind — captcha или login. Вызов держится, пока человек не нажмёт «Готово». Ответ «срок вышел» — заверши работу."""
+    async def need_human(kind: str, items: list[ConfirmItem] | None = None) -> str:
+        """Нужен человек: kind — captcha, login или confirm. Вызов держится, пока человек не ответит. Ответ «срок вышел» — заверши работу. confirm — подтвердить поля страницы перед отправкой: items — все поля с ответами."""
+        if kind == "confirm" and isinstance(job, ApplyJob) and job.confirming and items is not None:
+            return await _confirm_page(kit, job, items)
         if kind not in HUMAN_KINDS:
-            return "kind — captcha или login."
+            return "kind — captcha или login; confirm — с items, в отклике под подтверждением."
         return await kit.gate.wait(kind, _host_of(job) or "сайт", kit.browser)
 
     return need_human
+
+
+async def _confirm_page(kit: AgentKit, job: ApplyJob, items: list[ConfirmItem]) -> str:
+    """Подтвердить поля страницы у человека и запомнить подтверждённое за этой страницей.
+
+    После записанного отклика страница тоже подтверждается — вопросы после
+    отправки уходят работодателю, — но «Закончить» на ней отклик не отменяет:
+    он уже у работодателя.
+    """
+    if isinstance(job.outcome, Dropped):
+        return FINAL_ANSWER
+    url = (await kit.browser.page()).url
+    shown = [_last_known(job.confirmed.get((url, item["selector"])), item) for item in items]
+    kept = await ask_person(kit, job.vacancy_id, shown)
+    if isinstance(kept, Dropped):
+        if not isinstance(job.outcome, FINAL):
+            job.outcome = kept
+        return "Человек закончил работу по этой вакансии. Больше ничего не вводи и не отправляй, заверши работу."
+    for item in kept:
+        job.confirmed[(url, item["selector"])] = item
+        job.unscreened[(url, item["selector"], item["label"])] = item
+    return "Подтверждено. Впиши ровно это:\n" + json.dumps(kept, ensure_ascii=False)
+
+
+def _last_known(before: dict | None, item: ConfirmItem) -> ConfirmItem:
+    """Значение пункта — последнее известное для поля: подтверждённое человеком
+    важнее ответа модели, и сайт, отвергший отправленное, показывает человеку его
+    же правку рядом с ошибкой. Поле считается тем же по подписи: у шагов формы
+    бывает один адрес, и селектор следующего шага совпадает с прежним."""
+    if before is not None and before["label"] == item["label"]:
+        return {**item, "value": before["value"]}
+    return item
 
 
 def _host_of(job) -> str | None:
@@ -83,8 +125,8 @@ def _report_login(kit: AgentKit, aggregator_id: int) -> Callable:
 def _report_failure(job: ApplyJob) -> Callable:
     async def report_failure(reason: str) -> str:
         """Отклик этим способом не удался; причина — коротко, по-русски."""
-        if isinstance(job.outcome, Applied):
-            return _ALREADY_APPLIED
+        if isinstance(job.outcome, FINAL):
+            return FINAL_ANSWER
         job.outcome = Failed(reason)
         return "Неудача записана. Приложение попробует другой способ."
 

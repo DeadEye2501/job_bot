@@ -1,7 +1,7 @@
 """Инструменты браузера: что агент видит и что доходит до страницы."""
 
 from backend.agent.tools_browser import browser_tools
-from tests.fakes.agent import kit_for, tool
+from tests.fakes.agent import kit_for, page_item, tool
 from tests.fakes.browser import FakeBrowser, FakePage
 
 VACANCY = "https://site.test/vacancy/1"
@@ -9,6 +9,112 @@ VACANCY = "https://site.test/vacancy/1"
 
 def _tools(page, resume=None):
     return browser_tools(kit_for(None, browser=FakeBrowser(page)), resume)
+
+
+def _item(selector, value, kind="text", url=VACANCY):
+    """Пункт, подтверждённый человеком на странице `url`."""
+    return {(url, selector): page_item(selector, value, kind=kind)}
+
+
+async def _strict(confirmed):
+    """Страница вакансии под подтверждением: ввод — только подтверждённого."""
+    page = FakePage()
+    tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), None, confirmed)
+    await tool(tools, "browser_open")(url=VACANCY)
+    page.calls.clear()
+    return page, tools
+
+
+async def test_under_confirmation_an_unconfirmed_field_is_not_typed_into():
+    page, tools = await _strict({})
+
+    answer = await tool(tools, "browser_type")(selector="#name", text="Иван")
+
+    assert answer.startswith("не вышло") and page.calls == []
+
+
+async def test_the_confirmed_text_goes_into_the_confirmed_field():
+    page, tools = await _strict(_item("#name", "Иван Петров"))
+
+    await tool(tools, "browser_type")(selector="#name", text="Иван Петров")
+
+    assert page.calls == [("fill", "#name", "Иван Петров")]
+
+
+async def test_text_other_than_the_confirmed_is_refused():
+    """Человек поправил ответ модели — модельный исходный на страницу уже не попадает."""
+    page, tools = await _strict(_item("#name", "Иван Петров"))
+
+    answer = await tool(tools, "browser_type")(selector="#name", text="Иван")
+
+    assert "Иван Петров" in answer and page.calls == []
+
+
+async def test_confirmed_text_into_another_field_is_refused():
+    page, tools = await _strict(_item("#name", "Иван Петров"))
+
+    await tool(tools, "browser_type")(selector="#phone", text="Иван Петров")
+
+    assert page.calls == []
+
+
+async def test_a_field_confirmed_on_another_page_is_not_confirmed_here():
+    """Страница сменилась за время ожидания — её поля человек не видел."""
+    page, tools = await _strict(_item("#name", "Иван Петров", url="https://site.test/other"))
+
+    await tool(tools, "browser_type")(selector="#name", text="Иван Петров")
+
+    assert page.calls == []
+
+
+async def test_an_empty_confirmed_field_goes_empty():
+    page, tools = await _strict(_item("#patronymic", ""))
+
+    await tool(tools, "browser_type")(selector="#patronymic", text="")
+
+    assert page.calls == [("fill", "#patronymic", "")]
+
+
+async def test_an_unconfirmed_list_is_not_chosen_in():
+    page, tools = await _strict({})
+
+    await tool(tools, "browser_select")(selector="#city", value="Москва")
+
+    assert page.calls == []
+
+
+async def test_a_confirmed_list_takes_the_option_the_agent_chose():
+    page, tools = await _strict(_item("#city", "москва", kind="choice"))
+
+    await tool(tools, "browser_select")(selector="#city", value="Москва")
+
+    assert page.calls == [("select", "#city", "Москва")]
+
+
+async def test_a_click_on_a_confirmed_check_sets_the_confirmed_mark_every_time():
+    """Нажатие не переключает галочку, а ставит подтверждённое: повтор её не снимет."""
+    page, tools = await _strict(_item("#agree", "true", kind="check"))
+
+    await tool(tools, "browser_click")(selector="#agree")
+    await tool(tools, "browser_click")(selector="#agree")
+
+    assert page.calls == [("check", "#agree", True), ("check", "#agree", True)]
+
+
+async def test_a_confirmed_empty_check_stays_empty():
+    page, tools = await _strict(_item("#ads", "false", kind="check"))
+
+    await tool(tools, "browser_click")(selector="#ads")
+
+    assert page.calls == [("check", "#ads", False)]
+
+
+async def test_clicks_off_the_fields_stay_as_they_were():
+    page, tools = await _strict(_item("#agree", "true", kind="check"))
+
+    await tool(tools, "browser_click")(selector="text=Отправить")
+
+    assert page.calls == [("click", "text=Отправить")]
 
 
 async def test_an_opened_page_is_seen_with_its_address_and_title():

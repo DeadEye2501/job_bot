@@ -70,7 +70,8 @@ def test_the_login_check_knows_the_site():
 
 def _task(vacancy_text="Текст вакансии", profile_text="Анкета", method=ApplicationVia.FORM.value,
           **job) -> str:
-    fields = dict(way=Way(method, "https://site.test/form", None), simulated=False, letter_writer="app")
+    fields = dict(way=Way(method, "https://site.test/form", None), simulated=False, letter_writer="app",
+                  confirming=False)
     fields.update(job)
     return applier_task(SimpleNamespace(**fields), vacancy_text, profile_text, TODAY)
 
@@ -118,6 +119,12 @@ def test_the_applier_task_carries_its_vacancy_method_and_profile():
     task = _task()
     assert "Текст вакансии" in task and "https://site.test/form" in task
     assert "Анкета" in task and "2026-10-09" in task
+
+
+def test_confirmation_is_spelled_out_in_the_task():
+    """Под подтверждением агент зовёт человека перед отправкой каждой страницы."""
+    assert 'kind="confirm"' in _task(confirming=True)
+    assert 'kind="confirm"' not in _task(confirming=False)
 
 
 def test_simulation_is_spelled_out_in_the_task():

@@ -276,6 +276,15 @@
 - `NO_DRIVER` = `'Для агрегаторов нужен Claude Code: выберите его…`
 - `NO_BROWSER` = `f"Не найден браузер на движке Chromium: {', '.jo…`
 
+### `backend/agent/confirm.py`
+
+- `class ConfirmItem(TypedDict)`
+  - `label: str`
+  - `kind: Literal['text', 'choice', 'check']`
+  - `value: str`
+  - `error: str`
+  - `selector: str`
+
 ### `backend/agent/human_gate.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -298,7 +307,11 @@
   - `reason: str`
 - `class Applied`
   - `application_id: int`
-- `Outcome` = `Finished | Failed | Applied`
+- `class Dropped`
+  - `reason: str` = `'отказался человек'`
+- `Outcome` = `Finished | Failed | Applied | Dropped`
+- `FINAL` = `набор из 2`
+- `FINAL_ANSWER` = `'Итог окончательный и не меняется: отклик уже за…`
 - `class LoginJob`
   - `source: Source`
   - `outcome: Outcome | None` = `None`
@@ -315,8 +328,11 @@
   - `profile_id: int`
   - `simulated: bool`
   - `letter_writer: str`
+  - `confirming: bool` = `False`
   - `letter_checks: int` = `0`
   - `outcome: Outcome | None` = `None`
+  - `confirmed: dict[tuple[str, str], dict]` = `field(default_factory=dict)`
+  - `unscreened: dict[tuple[str, str, str], dict]` = `field(default_factory=dict)`
 - `RESULTS` = `словарь из 3`
 - `HUMAN_KINDS` = `набор из 2`
 
@@ -340,6 +356,7 @@
 
 - `APPLIER_PROMPT` = `'Твоя задача — откликнуться на одну вакансию одн…`
 - `_SIMULATION` = `'Режим симуляции: пройди всё до последней кнопки…`
+- `_CONFIRMING` = `'Режим подтверждения: всё, что вводится на стран…`
 - `_METHODS` = `словарь из 2`
 - `_WRITERS` = `dict(zip(LETTER_WRITERS, ('Письмо пишет: приложе…`
 
@@ -393,10 +410,6 @@
 - `_SNAPSHOT_LIMIT` = `60000`
 - `_CUT_MARK` = `'\n… снимок обрезан: страница длиннее, чем помещ…`
 
-### `backend/agent/tools_common.py`
-
-- `_ALREADY_APPLIED` = `'Отклик уже записан, итог не меняется: второй от…`
-
 ### `backend/agent/tools_letter.py`
 
 - `_CHECKS_ALLOWED` = `2`
@@ -437,8 +450,6 @@
   - `lesson: Lesson | None` = `None`
 - `class Unfit`
   - `reason: str`
-- `class Dropped`
-  - `reason: str` = `'отказался человек'`
 - `Outcome` = `Literal['applied'] | Missed | Unfit | Dropped`
 - `GONE` = `Missed('вакансия удалена')`
 
@@ -2149,6 +2160,10 @@
 ### `tests/backend/test_agent_availability.py`
 
 - `CHROME` = `InstalledBrowser('Chrome', 'chrome', None)`
+
+### `tests/backend/test_agent_confirm_page.py`
+
+- `PAGE` = `'https://site.test/vacancy/1/apply'`
 
 ### `tests/backend/test_agent_prompts.py`
 

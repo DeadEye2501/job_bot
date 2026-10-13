@@ -83,6 +83,10 @@ class FakePage:
         self.fail_if_asked(selector)
         self.calls.append(("select", selector, value))
 
+    async def set_checked(self, selector, checked, **_options):
+        self.fail_if_asked(selector)
+        self.calls.append(("check", selector, checked))
+
     async def set_input_files(self, selector, files, **_options):
         self.fail_if_asked(selector)
         self.calls.append(("input_files", selector, files))

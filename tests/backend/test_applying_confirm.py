@@ -14,24 +14,10 @@ from backend.applying.telegram import via_telegram
 from backend.models import Application, Vacancy, VacancyStatus
 from tests.backend.fixtures.applying import MAIL, TG
 from tests.dbio import all_rows, only_row
-from tests.fakes.agent import answering_gate
+from tests.fakes.agent import answering_gate, edited, finished, under_confirmation
 from tests.waiting import wait_until
 
 LINK = "https://t.me/jobs/42"
-
-
-def _edited(values: dict[str, str]):
-    """Ответ окна: пункты с этими подписями правлены, прочие оставлены как пришли."""
-
-    def answer(payload):
-        return {"items": [{**item, "value": values.get(item["label"], item["value"])}
-                          for item in payload["items"]]}
-
-    return answer
-
-
-def _finished(payload):
-    return {"drop": True}
 
 
 def _silent(payload):
@@ -40,18 +26,16 @@ def _silent(payload):
 
 async def _confirming(kit, answer, *, limit=3600.0):
     """Режим «с подтверждением» и человек у окна; ссылка вакансии — `LINK`."""
-    await kit.pipeline.rs.set_app("auto_apply", "confirm")
     async with kit.pipeline.session_factory() as session:
         for vacancy in await all_rows(kit.pipeline.session_factory, Vacancy):
             (await session.get(Vacancy, vacancy.id)).source_url = LINK
         await session.commit()
-    gate, asked = answering_gate(answer, limit)
-    return dataclasses.replace(kit, gate=gate), asked
+    return await under_confirmation(kit, answer, limit)
 
 
 async def test_a_telegram_letter_goes_and_is_recorded_as_the_person_left_it(telegram_case):
     kit, vacancy, sent = await telegram_case()
-    kit, asked = await _confirming(kit, _edited({"": "Правленое письмо"}))
+    kit, asked = await _confirming(kit, edited({"": "Правленое письмо"}))
 
     assert await via_telegram(kit, vacancy.id, TG) == "applied"
 
@@ -64,7 +48,7 @@ async def test_a_telegram_letter_goes_and_is_recorded_as_the_person_left_it(tele
 
 async def test_the_window_gets_the_link_to_the_vacancy(telegram_case):
     kit, vacancy, _ = await telegram_case()
-    kit, asked = await _confirming(kit, _edited({}))
+    kit, asked = await _confirming(kit, edited({}))
 
     await via_telegram(kit, vacancy.id, TG)
 
@@ -73,7 +57,7 @@ async def test_the_window_gets_the_link_to_the_vacancy(telegram_case):
 
 async def test_finishing_sends_nothing_and_leaves_the_vacancy_new(telegram_case):
     kit, vacancy, sent = await telegram_case()
-    kit, _ = await _confirming(kit, _finished)
+    kit, _ = await _confirming(kit, finished)
 
     assert isinstance(await via_telegram(kit, vacancy.id, TG), Dropped)
 
@@ -105,7 +89,7 @@ async def test_a_stop_while_the_letter_waits_sends_nothing(telegram_case):
 
 async def test_a_mail_goes_with_the_subject_and_body_the_person_left(mail_case):
     kit, vacancy, outbox = await mail_case()
-    kit, asked = await _confirming(kit, _edited({"Тема": "Новая тема", "": "Новое тело"}))
+    kit, asked = await _confirming(kit, edited({"Тема": "Новая тема", "": "Новое тело"}))
 
     assert await via_email(kit, vacancy.id, MAIL) == "applied"
 
@@ -117,7 +101,7 @@ async def test_a_mail_goes_with_the_subject_and_body_the_person_left(mail_case):
 
 async def test_a_finished_mail_is_not_sent(mail_case):
     kit, vacancy, outbox = await mail_case()
-    kit, _ = await _confirming(kit, _finished)
+    kit, _ = await _confirming(kit, finished)
 
     assert isinstance(await via_email(kit, vacancy.id, MAIL), Dropped)
     assert outbox == [] and await all_rows(kit.pipeline.session_factory, Application) == []
@@ -126,7 +110,7 @@ async def test_a_finished_mail_is_not_sent(mail_case):
 async def test_without_mail_settings_the_person_is_not_asked(mail_case):
     """Отправить не с чего — подтверждать нечего: окно не зовётся впустую."""
     kit, vacancy, _ = await mail_case(mail=False)
-    kit, asked = await _confirming(kit, _finished)
+    kit, asked = await _confirming(kit, finished)
 
     await via_email(kit, vacancy.id, MAIL)
 
@@ -136,7 +120,7 @@ async def test_without_mail_settings_the_person_is_not_asked(mail_case):
 async def test_with_auto_apply_on_nobody_is_asked(telegram_case):
     kit, vacancy, sent = await telegram_case()
     await kit.pipeline.rs.set_app("auto_apply", "true")
-    gate, asked = answering_gate(_finished)
+    gate, asked = answering_gate(finished)
 
     assert await via_telegram(dataclasses.replace(kit, gate=gate), vacancy.id, TG) == "applied"
 

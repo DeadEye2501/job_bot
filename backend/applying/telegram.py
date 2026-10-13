@@ -8,8 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from adapters import telegram
+from backend.agent.confirm import confirmed, text_item
 from backend.agent.kit import AgentKit
-from backend.applying.confirm import confirmed, text_item
 from backend.applying.result import GONE, Dropped, Missed, Outcome, TelegramClosed, delivered
 from backend.applying.telegram_ban import clear_flood_wait, note_flood_wait
 from backend.applying.telegram_letter import (

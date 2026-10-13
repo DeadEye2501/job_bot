@@ -44,7 +44,29 @@ class Applied:
     application_id: int
 
 
-Outcome = Finished | Failed | Applied
+@dataclass(frozen=True)
+class Dropped:
+    """Человек закончил работу по вакансии в окне подтверждения: ничего не ушло.
+
+    Не промах способа: человек бросил вакансию, а не способ, и другой способ
+    спросил бы его о том же. Статус вакансии не меняется — следующий прогон
+    возьмёт её снова.
+    """
+
+    reason: str = "отказался человек"
+
+
+Outcome = Finished | Failed | Applied | Dropped
+
+FINAL = (Applied, Dropped)
+"""Исходы, после которых сессия итог не меняет: отклик уже ушёл, или человек
+закончил работу по вакансии. Переписанные, они дали бы второй отклик тому же
+работодателю или отправку, от которой человек отказался."""
+
+FINAL_ANSWER = (
+    "Итог окончательный и не меняется: отклик уже записан или человек закончил "
+    "работу по вакансии. Заверши работу."
+)
 
 
 @dataclass
@@ -71,7 +93,14 @@ class ApplyJob:
     """Отклик одним способом.
 
     `profile_id` — профиль браузера: агрегатора или «Поиска по сети»;
-    `letter_writer` — значение из `LETTER_WRITERS`.
+    `letter_writer` — значение из `LETTER_WRITERS`; `confirming` — перед
+    отправкой каждой страницы ждать подтверждения человека.
+
+    `confirmed` — подтверждённые человеком пункты по ключу «адрес страницы,
+    селектор поля»: всё, что можно вписать. `unscreened` — подтверждённые и ещё
+    не легшие в запись скрининга; к ключу добавлена подпись: подтверждённое
+    снова после ошибки сайта заменяет прежнее, а следующий шаг формы на том же
+    адресе и под тем же селектором ложится своим вопросом.
     """
 
     vacancy_id: int
@@ -79,8 +108,11 @@ class ApplyJob:
     profile_id: int
     simulated: bool
     letter_writer: str
+    confirming: bool = False
     letter_checks: int = 0
     outcome: Outcome | None = None
+    confirmed: dict[tuple[str, str], dict] = field(default_factory=dict)
+    unscreened: dict[tuple[str, str, str], dict] = field(default_factory=dict)
 
 
 RESULTS = {

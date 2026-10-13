@@ -4,6 +4,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+from backend.agent.confirm import is_checked
 from backend.agent.kit import AgentKit
 
 logger = logging.getLogger(__name__)
@@ -13,8 +14,18 @@ _SNAPSHOT_LIMIT = 60_000
 _CUT_MARK = "\n… снимок обрезан: страница длиннее, чем помещается в ответ."
 
 
-def browser_tools(kit: AgentKit, resume: Path | None) -> list[Callable]:
-    """Инструменты над вкладкой агента. Ответ действия — «готово; адрес: …» или «не вышло: …»."""
+class _Refused(Exception):
+    """Ввод, которого человек не подтверждал: на страницу он не попадает."""
+
+
+def browser_tools(kit: AgentKit, resume: Path | None,
+                  confirmed: dict[tuple[str, str], dict] | None = None) -> list[Callable]:
+    """Инструменты над вкладкой агента. Ответ действия — «готово; адрес: …» или «не вышло: …».
+
+    `confirmed` — подтверждённые человеком поля по ключу «адрес страницы,
+    селектор»; есть он — ввод, выбор и галочки делают только подтверждённое.
+    """
+    fill, select, click = _plain() if confirmed is None else _strict(confirmed)
 
     async def browser_open(url: str) -> str:
         """Открыть адрес во вкладке."""
@@ -26,15 +37,15 @@ def browser_tools(kit: AgentKit, resume: Path | None) -> list[Callable]:
 
     async def browser_click(selector: str) -> str:
         """Нажать на элемент по селектору Playwright."""
-        return await _act(kit, lambda page: page.click(selector, timeout=_WAIT_MS))
+        return await _act(kit, lambda page: click(page, selector))
 
     async def browser_type(selector: str, text: str) -> str:
         """Ввести текст в поле, заменив прежний."""
-        return await _act(kit, lambda page: page.fill(selector, text, timeout=_WAIT_MS))
+        return await _act(kit, lambda page: fill(page, selector, text))
 
     async def browser_select(selector: str, value: str) -> str:
         """Выбрать значение в выпадающем списке."""
-        return await _act(kit, lambda page: page.select_option(selector, value, timeout=_WAIT_MS))
+        return await _act(kit, lambda page: select(page, selector, value))
 
     async def browser_attach_resume(selector: str) -> str:
         """Приложить резюме: селектор — кнопка или поле загрузки, видимые в снимке."""
@@ -58,10 +69,66 @@ async def _act(kit: AgentKit, action: Callable[..., Awaitable]) -> str:
     page = await kit.browser.page()
     try:
         await action(page)
+    except _Refused as refusal:
+        logger.info("ввод агента без подтверждения отклонён: %s", refusal)
+        return f"не вышло: {refusal}"
     except PlaywrightError as error:
         logger.info("действие агента в браузере не вышло: %s", _first_line(error))
         return f"не вышло: {_first_line(error)}"
     return f"готово; адрес: {page.url}"
+
+
+def _plain() -> tuple[Callable, Callable, Callable]:
+    """Ввод, выбор и нажатие как есть."""
+
+    def fill(page, selector, text):
+        return page.fill(selector, text, timeout=_WAIT_MS)
+
+    def select(page, selector, value):
+        return page.select_option(selector, value, timeout=_WAIT_MS)
+
+    def click(page, selector):
+        return page.click(selector, timeout=_WAIT_MS)
+
+    return fill, select, click
+
+
+def _strict(confirmed: dict[tuple[str, str], dict]) -> tuple[Callable, Callable, Callable]:
+    """Ввод, выбор и нажатие под подтверждением человека.
+
+    Текст — только подтверждённый и только в своё поле. Вариант списка выбирает
+    агент, ближайший к подтверждённому тексту, но поле должно быть подтверждено.
+    Нажатие на подтверждённую галочку ставит подтверждённую отметку, а не
+    переключает её: повторное нажатие отметку не снимет. Нажатия не по полям —
+    резюме, «Отправить», переходы — как есть.
+    """
+    plain_fill, plain_select, plain_click = _plain()
+
+    def field(page, selector) -> dict:
+        item = confirmed.get((page.url, selector))
+        if item is None:
+            raise _Refused("поле не подтверждено человеком на этой странице — "
+                           "сначала need_human с kind=confirm")
+        return item
+
+    async def fill(page, selector, text):
+        item = field(page, selector)
+        if text != item["value"]:
+            raise _Refused(f"вписать можно только подтверждённое: «{item['value']}»")
+        await plain_fill(page, selector, text)
+
+    async def select(page, selector, value):
+        field(page, selector)
+        await plain_select(page, selector, value)
+
+    async def click(page, selector):
+        item = confirmed.get((page.url, selector))
+        if item is not None and item["kind"] == "check":
+            await page.set_checked(selector, is_checked(item), timeout=_WAIT_MS)
+            return
+        await plain_click(page, selector)
+
+    return fill, select, click
 
 
 async def _snapshot(kit: AgentKit) -> str:

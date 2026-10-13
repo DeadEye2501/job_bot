@@ -7,10 +7,10 @@ import smtplib
 
 from adapters import smtp_mail
 from adapters.smtp_mail import MailAccountConfig, OutgoingMail
+from backend.agent.confirm import confirmed, text_item
 from backend.agent.kit import AgentKit
 from backend.agent.tools_applier import record_and_announce
 from backend.agent.tools_letter import letter_ask
-from backend.applying.confirm import confirmed, text_item
 from backend.applying.result import GONE, Dropped, Missed, Outcome, delivered
 from backend.domain.apply_order import Way
 from backend.llm.agent_letter import write_letter
